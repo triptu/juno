@@ -72,8 +72,8 @@ test('no fixture shows the pointer, and the text cursor only over selectable tex
     const name = `${route.component}/${route.fixture}`
     await page.goto(`/#/${encodeURIComponent(route.component)}/${encodeURIComponent(route.fixture)}`)
     await expect(page.locator(`[data-fixture-frame="${name}"]`)).toBeVisible()
-    const hits = await page.evaluate((name) => {
-      const frame = document.querySelector(`[data-fixture-frame="${name}"]`)
+    const hits = await page.evaluate((frameName) => {
+      const frame = document.querySelector(`[data-fixture-frame="${frameName}"]`)
       if (!frame) return ['no frame']
       const bad: string[] = []
       for (const element of Array.from(frame.querySelectorAll('*'))) {

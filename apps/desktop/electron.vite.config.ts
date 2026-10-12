@@ -40,8 +40,12 @@ function contentSecurityPolicy(): Plugin {
 const repoRoot = resolve(__dirname, '../..')
 
 // Workspace packages ship TypeScript source, so main, preload and the engine
-// entry must bundle them. Everything else from node_modules stays external.
-const externalize = externalizeDepsPlugin({ exclude: ['@juno/contract', '@juno/engine', '@juno/state'] })
+// entry must bundle them. `effect` is bundled too: externalised, main loaded
+// the whole barrel through require("effect") before creating the window.
+// Measured on the M1 shell (7 runs, median): launch to first window 416 ms
+// external vs 314 ms bundled; launch to "Engine live" 526 ms vs 379 ms.
+// Everything else from node_modules stays external.
+const externalize = externalizeDepsPlugin({ exclude: ['@juno/contract', '@juno/engine', '@juno/state', 'effect'] })
 
 // electron-vite defaults every target to `minify: false`. Minified output is
 // less than half the size and parses faster; scripts/check-bundle-size.mjs
