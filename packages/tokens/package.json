@@ -1,0 +1,21 @@
+{
+  "name": "@juno/tokens",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Design tokens for Juno as StyleX variables. The single source of colours, type, spacing, radii, shadows and motion.",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    "./tokens.stylex": "./src/tokens.stylex.ts",
+    "./themes.stylex": "./src/themes.stylex.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@stylexjs/stylex": "0.19.1"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3"
+  }
+}

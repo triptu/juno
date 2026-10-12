@@ -1,0 +1,26 @@
+{
+  "name": "@juno/ui",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Juno's presentational React components. Styled only with StyleX and @juno/tokens. No app state, no IPC.",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@juno/tokens": "workspace:*",
+    "@stylexjs/stylex": "0.19.1"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "19.3.0",
+    "react": "19.3.0",
+    "typescript": "5.9.3"
+  }
+}
