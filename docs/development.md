@@ -47,6 +47,10 @@ packages/ui             @juno/ui. Primitives, StyleX only, each with *.fixtures.
 packages/contract       @juno/contract. IPC channel names and Effect Schemas.
 packages/store          @juno/store. cache.db and user.db per workspace, migrations,
                         writer and reader clients, invalidation and live queries.
+packages/slack          @juno/slack. The Slack client as Effect services (SlackApi,
+                        RequestQueue, SlackEdge, SlackSocket) and the schemas under
+                        @juno/slack/schemas.
+packages/fake-slack     @juno/fake-slack. In-process fake Slack with a control API.
 scripts                 Small repo scripts used by package.json.
 docs                    Research, design handoff, this file.
 ```
@@ -127,6 +131,12 @@ that file so it stays a few hundred bytes. Schemas live in `index.ts`.
   `ELECTRON_RUN_AS_NODE=1 apps/desktop/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron node_modules/.pnpm/node_modules/vitest/vitest.mjs run`
   from the package directory. Node 24 prints an ExperimentalWarning for `node:sqlite`;
   it is harmless.
+- **`@juno/slack` tests depend on `@juno/fake-slack`, which depends on `@juno/slack`.**
+  The cycle is a devDependency only, but `pnpm -r test` refuses task cycles unless
+  `pnpm-workspace.yaml` sets `ignoreWorkspaceCycles: true`, so it does. Under the
+  `TestClock` (`it.effect`) the background lane's 1.5 s spacing never elapses; tests
+  that make several background calls in a row set `backgroundMinIntervalMillis: 0`
+  or use `it.live`.
 - **Store tests and the test clock.** `@effect/vitest`'s `it.effect` runs with a
   `TestClock`, so a live query's debounce window never ends on its own; tests call
   `TestClock.adjust(DEFAULT_LIVE_QUERY_DEBOUNCE)`. Use `it.live` for real time.
