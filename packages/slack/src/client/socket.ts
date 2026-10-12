@@ -172,6 +172,8 @@ export class SlackSocket extends Context.Service<SlackSocket, SlackSocketShape>(
                 yield* Ref.update(state, (s) => (s.current?.socket === ws ? { ...s, current: undefined } : s))
                 yield* Effect.sync(() => {
                   ws.removeAllListeners()
+                  // Terminating a socket that is still connecting emits `error`; with no listener it is an uncaught exception.
+                  ws.on('error', () => {})
                   if (ws.readyState === WebSocket.OPEN) ws.close(CLOSE_NORMAL)
                   else ws.terminate()
                 })
