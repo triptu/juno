@@ -1,0 +1,28 @@
+{
+  "name": "@juno/fake-slack",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A fake Slack: HTTP API, websocket, sign-in page, fixtures and a control API for tests. Speaks the protocol subset documented in docs/research/slack-data-access.md.",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "start": "node --experimental-strip-types src/bin.ts"
+  },
+  "dependencies": {
+    "@juno/slack": "workspace:*",
+    "effect": "4.0.3",
+    "ws": "8.22.0"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "@types/ws": "8.18.2",
+    "typescript": "5.9.3",
+    "vite": "7.3.7",
+    "vitest": "5.0.4"
+  }
+}
