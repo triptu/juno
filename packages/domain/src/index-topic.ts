@@ -1,0 +1,71 @@
+/**
+ * The pure part of `reindexTopics`: given a topic's messages and read state,
+ * the activity row the index stores. `sync` loads the inputs and writes the
+ * row; nothing here touches a database.
+ */
+import { messageBody, previewText, type Lookups, type MessageContent } from '@juno/richtext'
+import { compareTs, type Ts, type UserId } from './ids'
+import { messageMentionsMeDirectly, type Me } from './mentions'
+import type { ReadState } from './reads'
+import type { TopicActivity, TopicPreview } from './topic'
+
+export interface IndexMessage extends MessageContent {
+  readonly ts: Ts
+  readonly userId?: UserId
+  readonly deleted?: boolean
+}
+
+export interface IndexInput {
+  /** Any order; tombstones are skipped. */
+  readonly messages: ReadonlyArray<IndexMessage>
+  readonly reads: ReadState
+  readonly me: Me
+  /** Name lookups for the preview text. */
+  readonly lookups: Lookups
+  /** Display name of a sender, for "Sender: text". Own messages read "You". */
+  readonly senderName: (id: UserId | undefined) => string
+  /** Whether local history covers everything since the read pointer. Defaults to true. */
+  readonly historyComplete?: boolean
+}
+
+export interface IndexedTopic {
+  readonly activity: TopicActivity
+  readonly preview?: TopicPreview
+  readonly rootTs?: Ts
+}
+
+export const MAX_PARTICIPANTS = 4
+
+export function indexTopic(input: IndexInput): IndexedTopic | undefined {
+  const live = input.messages.filter((m) => !m.deleted).toSorted((a, b) => compareTs(a.ts, b.ts))
+  const latest = live[live.length - 1]
+  const first = live[0]
+  if (!latest || !first) return undefined
+
+  const { lastReadTs, markedUnread } = input.reads
+  const unread = live.filter((m) => m.userId !== input.me.userId && (lastReadTs === undefined || compareTs(m.ts, lastReadTs) > 0))
+  const unreadCount = Math.max(unread.length, markedUnread ? 1 : 0)
+  const mentionsMe = unread.some((m) => messageMentionsMeDirectly(messageBody(m, input.lookups), input.me))
+
+  const participants: UserId[] = []
+  for (let i = live.length - 1; i >= 0 && participants.length < MAX_PARTICIPANTS; i--) {
+    const id = live[i]?.userId
+    if (id !== undefined && !participants.includes(id)) participants.push(id)
+  }
+
+  const sender = latest.userId === input.me.userId ? 'You' : input.senderName(latest.userId)
+  const preview: TopicPreview = { sender, text: previewText(messageBody(latest, input.lookups)) }
+
+  return {
+    activity: {
+      lastActivityTs: latest.ts,
+      messageCount: live.length,
+      unreadCount,
+      unreadExact: input.historyComplete ?? true,
+      mentionsMe,
+      participants,
+    },
+    preview,
+    rootTs: first.ts,
+  }
+}

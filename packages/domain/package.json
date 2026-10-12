@@ -1,0 +1,23 @@
+{
+  "name": "@juno/domain",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Pure rules. Ids, topics, status and visibility, titles, sorting, relative time, notification decisions, clarity and audience checks, the command grammar and context menu item lists. No I/O.",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@juno/richtext": "workspace:*",
+    "effect": "4.0.3"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3",
+    "vitest": "5.0.4"
+  }
+}
