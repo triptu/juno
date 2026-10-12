@@ -1,6 +1,6 @@
 # 0002. A small Schema-typed message protocol instead of effect/rpc
 
-Status: superseded by ADR 0009 (2026-10-12). Kept as the fallback design.
+Status: superseded by ADR 0009 (2026-10-12), whose spike chose `effect/rpc`. Kept as the record of the fallback design; it was not implemented.
 
 ## Context
 

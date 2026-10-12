@@ -1,5 +1,7 @@
 import { app, BrowserWindow, shell, type BrowserWindowConstructorOptions } from 'electron'
 import { join } from 'node:path'
+import { BACKGROUND, type Launch } from './launch'
+import { APP_URL } from './scheme'
 
 /** Height of the drag strip drawn by the renderer. Keep in sync with --titlebar-height. */
 const TITLEBAR_HEIGHT = 44
@@ -13,7 +15,7 @@ const TRAFFIC_LIGHT_SIZE = 12
 export function createWindow(options: BrowserWindowConstructorOptions = {}): BrowserWindow {
   const window = new BrowserWindow({
     show: false,
-    backgroundColor: '#fdfcf8',
+    backgroundColor: BACKGROUND.light,
     ...options,
     ...(process.platform === 'darwin'
       ? {
@@ -30,6 +32,8 @@ export function createWindow(options: BrowserWindowConstructorOptions = {}): Bro
       nodeIntegrationInWorker: false,
       webviewTag: false,
       spellcheck: true,
+      // Cache the bundle's compiled code on the first run, not after a heat check.
+      v8CacheOptions: 'bypassHeatCheck',
     },
   })
 
@@ -41,23 +45,25 @@ export function createWindow(options: BrowserWindowConstructorOptions = {}): Bro
     return { action: 'deny' }
   })
 
+  // ready-to-show fires after the first paint; the shell paints with no data.
   window.once('ready-to-show', () => window.show())
   return window
 }
 
-export function createMainWindow(): BrowserWindow {
+export function createMainWindow(launch: Launch): BrowserWindow {
   const window = createWindow({
     title: 'Juno',
     width: 1200,
     height: 800,
+    ...launch.bounds,
     minWidth: 720,
     minHeight: 480,
+    backgroundColor: BACKGROUND[launch.theme],
   })
 
   // electron-vite sets ELECTRON_RENDERER_URL in dev for the Vite server.
   const devUrl = !app.isPackaged && process.env.ELECTRON_RENDERER_URL
-  if (devUrl) void window.loadURL(devUrl)
-  else void window.loadFile(join(__dirname, '../renderer/index.html'))
+  void window.loadURL(devUrl || APP_URL)
 
   return window
 }

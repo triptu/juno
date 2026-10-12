@@ -2,11 +2,18 @@ import * as stylex from '@stylexjs/stylex'
 import { useAtom, useAtomValue } from '@effect/atom-react'
 import { Moon, Sun } from 'lucide-react'
 import { useLayoutEffect } from 'react'
+import { appInfoAtom, persistTheme, themeAtom } from '@juno/state'
 import { Button, Text } from '@juno/ui'
 import { colors, layout, spacing } from '@juno/tokens/tokens.stylex'
-import { appInfoAtom } from './state/appInfo'
-import { applyTheme, themeAtom } from './state/theme'
+import { EngineStatus } from './containers/EngineStatus'
+import { applyTheme } from './theme'
 
+/**
+ * The app shell. It paints with no data: everything below the title bar that
+ * needs the engine renders its own waiting state. Tabs will live inside
+ * `<main>` as `<Activity>` children (performance 4.3); nothing above them may
+ * change on a tick.
+ */
 export function App() {
   const [theme, setTheme] = useAtom(themeAtom)
   const appInfo = useAtomValue(appInfoAtom)
@@ -29,8 +36,15 @@ export function App() {
               ? 'Could not read app info'
               : 'Loading app info'}
         </Text>
+        <EngineStatus />
         <div {...stylex.props(styles.actions)}>
-          <Button onClick={() => setTheme(nextTheme)} aria-pressed={theme === 'dark'}>
+          <Button
+            onClick={() => {
+              setTheme(nextTheme)
+              persistTheme(nextTheme)
+            }}
+            aria-pressed={theme === 'dark'}
+          >
             {theme === 'light' ? <Moon size={16} aria-hidden /> : <Sun size={16} aria-hidden />}
             {`Use ${nextTheme} theme`}
           </Button>

@@ -28,6 +28,7 @@ Run these from the repo root.
 | `pnpm test:e2e` | Builds, then runs the Playwright tests against the built app. |
 | `pnpm gallery` | Starts the fixture gallery at http://localhost:4174 (browser only, no Electron). |
 | `pnpm gallery:shots` | Builds the gallery and screenshots every fixture in light and dark into `apps/gallery/shots/`. |
+| `pnpm --filter @juno/engine test` | Runs the engine's vitest suite (the port protocol over an in-memory MessageChannel, delta diffing). |
 | `pnpm package` | Builds a DMG and zip with electron-builder into `apps/desktop/release/`. Not run in CI yet. |
 
 Copy `.env.example` to `.env` for local secrets. `.env` is ignored by git.
@@ -37,17 +38,25 @@ Copy `.env.example` to `.env` for local secrets. `.env` is ignored by git.
 ```
 apps/gallery            Vite + React gallery: a route and a screenshot per fixture.
 apps/desktop            The Electron app. Thin wiring only.
-  src/main              Window factory, IPC handlers, app lifecycle.
-  src/preload           contextBridge. Exposes window.juno and nothing else.
-  src/renderer          React root, global.css, state atoms.
+  src/main              Window factory, IPC handlers, engine supervisor, juno:// scheme, launch.json.
+  src/engine            Entry of the engine utility process: parentPort in, startEngine().
+  src/preload           contextBridge. Exposes window.juno and forwards the engine port.
+  src/renderer          React root, global.css, containers (wire atoms to views), views.
   e2e                   Playwright tests and the Electron launch fixture.
   electron.vite.config.ts
   electron-builder.yml
 packages/tokens         @juno/tokens. The only place design values live. See its README.
 packages/ui             @juno/ui. Primitives, StyleX only, each with *.fixtures.tsx. See its README.
-packages/contract       @juno/contract. IPC channel names and Effect Schemas.
+packages/contract       @juno/contract. Routes (effect/rpc groups), live-query schemas, errors,
+                        parentPort and port-handoff messages, main IPC channels.
 packages/store          @juno/store. cache.db and user.db per workspace, migrations,
                         writer and reader clients, invalidation and live queries.
+packages/engine         @juno/engine. The engine: protocol server, feature handlers, startEngine().
+packages/state          @juno/state. The renderer's engine client and every atom.
+packages/domain         @juno/domain. Pure product rules: ids, topic status, titles, sorting, notifications, checks.
+packages/richtext       @juno/richtext. Slack blocks and mrkdwn to a message view model, and back.
+packages/slack          @juno/slack. Slack payload schemas and (soon) the API and socket clients.
+packages/fake-slack     @juno/fake-slack. A fake Slack server for tests and development.
 scripts                 Small repo scripts used by package.json.
 docs                    Research, design handoff, this file.
 ```
@@ -96,17 +105,55 @@ Rules that come from the design spec and are enforced in `@juno/ui`:
   by Vite from `src/renderer/main.tsx`. Never load fonts from a URL. Instrument Serif
   has one weight (400).
 
-## IPC
+## Processes
+
+Three processes talk to each other (`docs/architecture.md` section 2):
+
+- **main** forks the **engine** as an Electron utility process (`src/main/engine.ts`,
+  built from `src/engine/index.ts` to `out/main/engine.js`) with the `persist:slack`
+  partition and `serviceName: 'juno-engine'`, restarts it with backoff when it exits,
+  and serves the renderer from `juno://app/` (`src/main/scheme.ts`).
+- The **renderer** talks to the engine over one `MessagePort`. It asks main for a port
+  (`window.juno.engine.requestPort()`), main creates a `MessageChannelMain`, posts one
+  end to the engine and the other to the renderer, and the preload forwards it to the
+  page with `window.postMessage`. When the engine dies the port fires `close`; the
+  renderer asks for a new one and every live query re-subscribes.
+- Everything on the port is `effect/rpc` (ADR 0009). Routes are declared once in
+  `packages/contract/src/routes/<feature>.ts`, served by `packages/engine`, and
+  called through `liveQuery(route)` and `command(route)` from `packages/state`.
+
+`startEngine(transport, config)` in `@juno/engine` runs under plain Node too: the
+vitest suite in `packages/engine/test` connects the real state client to it over a
+`worker_threads` `MessageChannel`. Under `JUNO_E2E=1` main exposes
+`globalThis.junoTest` (engine pid and supervisor state) for Playwright.
+
+## IPC with main
 
 `packages/contract` defines a route per channel: a name, an input schema and an
 output schema. Main registers handlers through `handle()` in `src/main/ipc.ts`,
-which checks the sender is the main frame of one of our windows, decodes the input
-and encodes the output. The preload turns each route into one function on
-`window.juno`. The renderer decodes the answer again (see `state/appInfo.ts`) and
-exposes it as an `@effect/atom-react` atom.
+which checks the sender is the main frame of one of our windows showing
+`juno://app/` (or the Vite dev URL), decodes the input and encodes the output. The
+preload turns each route into one function on `window.juno`. The renderer decodes
+the answer again (see `packages/state/src/shell.ts`) and exposes it as an atom.
 
 `packages/contract/src/channels.ts` has no runtime imports. The preload bundles only
-that file so it stays a few hundred bytes. Schemas live in `index.ts`.
+that file so it stays under a kilobyte. Schemas live in `index.ts`.
+
+## Adding a route
+
+1. `packages/contract/src/routes/<feature>.ts`: export each route and the group.
+   `liveQuery('feature.thing', { value, payload? })` streams a single value;
+   `liveList('feature.rows', { row, payload })` streams a windowed list as deltas
+   (rows need `id` and `rev`, the payload needs `window`); `Rpc.make('feature.do',
+   { payload, success, error })` is a command. Errors come from `errors.ts`.
+2. `packages/engine/src/<feature>/handlers.ts`: `<Feature>Routes.toLayer(...)`. Build
+   live queries with `liveValue` / `liveList` from `protocol/live.ts`; they stamp
+   `meta` and diff rows by `rev`. `engine/src/status/` is the example.
+3. `packages/state`: `liveQuery(route)(payload)` and `command(route)` give the atoms.
+   Containers read them with `useAtomValue` / `useAtomSet`. Nothing outside
+   `packages/state` imports `effect/reactivity/Atom`, `effect/rpc` or `effect/workers`.
+4. The integration task adds the group to `routes/index.ts` and the handler layer to
+   `engine/src/layer.ts`.
 
 ## Pitfalls met while setting this up
 
@@ -147,3 +194,27 @@ that file so it stays a few hundred bytes. Schemas live in `index.ts`.
   the page side (`require` and `process` are undefined, only `window.juno` exists).
 - **`.browserslistrc`** targets Chromium 152 so lightningcss does not rewrite
   `light-dark()` into a no-op polyfill.
+- **One request per port.** `RpcClient.layerProtocolWorker` is a worker pool, and a
+  pool item's default `concurrency` is 1, so the first live query blocked every
+  later command. `packages/state/src/transport.ts` sets it to a large number: one
+  port carries everything.
+- **Clients die with `Effect.provide`.** An `RpcClient` made inside
+  `Effect.provide(protocolLayer)` is interrupted when that call returns. The client
+  lives in `AtomRpc.Service` / `Atom.runtime`, whose scope outlives any atom.
+- **Defects are fatal by default.** `RpcServer.layer` without `disableFatalDefects: true`
+  ends the whole client when one handler dies. The engine sets it, so a defect is
+  the `Exit` of that one request.
+- **Result atoms need a mount.** Writing to a `command(route)` atom that nothing has
+  mounted does nothing visible; `useAtomSet` mounts it in React, and tests call
+  `registry.mount(atom)` first.
+- **The preload has no `window` type.** `tsconfig.node.json` has no DOM lib, so
+  `src/preload/index.ts` starts with `/// <reference lib="dom" />`.
+- **`@juno/state` must typecheck without the DOM lib** because the engine's tests
+  import it. Browser globals are reached through `globalThis` with local types
+  (`perf.ts`, `port.ts`), never through the DOM lib's names.
+- **Node and DOM `MessagePort`s** have the same `addEventListener` surface at runtime
+  but different typings; tests cast Node ports to `PortLike` / `MessagePortLike`.
+- **Renderer bundle size.** Adding `effect/rpc`, `effect/workers` and the JSON codecs
+  took the initial JS from 856 KB to 1,086 KB, above the 1.0 MB budget in
+  `docs/performance.md` before any feature code. The bundle check still needs to be
+  written; the budget or the lazy-chunk plan has to absorb this.

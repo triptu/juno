@@ -5,9 +5,10 @@ import react from '@vitejs/plugin-react'
 import stylex from '@stylexjs/unplugin'
 
 /**
- * Injects the renderer's Content Security Policy. Production allows only
- * bundled scripts. Dev additionally allows the inline React Refresh preamble
- * and the HMR websocket.
+ * Injects the renderer's Content Security Policy (architecture section 14).
+ * Production allows only bundled code and styles; images may come from the
+ * juno: scheme, Slack's CDN and Gravatar. Dev additionally allows the inline
+ * React Refresh preamble, Vite's injected styles and the HMR websocket.
  */
 function contentSecurityPolicy(): Plugin {
   return {
@@ -17,9 +18,9 @@ function contentSecurityPolicy(): Plugin {
       const policy = [
         "default-src 'self'",
         dev ? "script-src 'self' 'unsafe-inline'" : "script-src 'self'",
-        "style-src 'self' 'unsafe-inline'",
+        dev ? "style-src 'self' 'unsafe-inline'" : "style-src 'self'",
         "font-src 'self'",
-        "img-src 'self' data:",
+        "img-src 'self' juno: https://*.slack-edge.com https://secure.gravatar.com data:",
         dev ? "connect-src 'self' ws://localhost:*" : "connect-src 'self'",
       ].join('; ')
       return [
@@ -38,15 +39,21 @@ function contentSecurityPolicy(): Plugin {
 // the build is started from.
 const repoRoot = resolve(__dirname, '../..')
 
-// Workspace packages ship TypeScript source, so main and preload must bundle
-// them. Everything else from node_modules stays external.
-const externalize = externalizeDepsPlugin({ exclude: ['@juno/contract'] })
+// Workspace packages ship TypeScript source, so main, preload and the engine
+// entry must bundle them. Everything else from node_modules stays external.
+const externalize = externalizeDepsPlugin({ exclude: ['@juno/contract', '@juno/engine', '@juno/state'] })
 
 export default defineConfig({
   main: {
     plugins: [externalize],
     build: {
-      rollupOptions: { input: resolve(__dirname, 'src/main/index.ts') },
+      rollupOptions: {
+        // index.js is the main process; engine.js is forked as a utility process.
+        input: {
+          index: resolve(__dirname, 'src/main/index.ts'),
+          engine: resolve(__dirname, 'src/engine/index.ts'),
+        },
+      },
     },
   },
   preload: {

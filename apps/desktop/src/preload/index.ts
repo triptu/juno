@@ -1,5 +1,6 @@
+/// <reference lib="dom" />
 import { contextBridge, ipcRenderer } from 'electron'
-import { Channels, type JunoBridge } from '@juno/contract/channels'
+import { Channels, Events, PORT_HANDOFF_TAG, type JunoBridge } from '@juno/contract/channels'
 
 // The whole bridge. Add one function per contract route; never expose
 // ipcRenderer or Node APIs. The renderer validates every answer.
@@ -7,6 +8,18 @@ const bridge: JunoBridge = {
   app: {
     getInfo: () => ipcRenderer.invoke(Channels.appGetInfo),
   },
+  engine: {
+    requestPort: () => ipcRenderer.invoke(Channels.engineRequestPort),
+  },
+  launch: {
+    setTheme: (theme) => ipcRenderer.invoke(Channels.launchSetTheme, { theme }),
+  },
 }
 
 contextBridge.exposeInMainWorld('juno', bridge)
+
+// Main sends the engine port here; the page cannot receive it any other way.
+// Forward it as a window message; the page checks event.source and the tag.
+ipcRenderer.on(Events.enginePort, (event) => {
+  window.postMessage({ _tag: PORT_HANDOFF_TAG }, '*', event.ports)
+})
