@@ -131,7 +131,7 @@ describe('SlackEdge', () => {
       const program = Effect.gen(function* () {
         const edge = yield* SlackEdge
         const first = yield* edge.usersInfo([SELF, 'U0MAYA', 'U0NOPE'])
-        assert.deepStrictEqual(first.results.map((user) => user.id).toSorted(), [SELF, 'U0MAYA'])
+        assert.deepStrictEqual(first.results.map((user) => user.id).toSorted(), [SELF, 'U0MAYA'].toSorted())
         assert.deepStrictEqual(first.failed_ids, ['U0NOPE'])
         const second = yield* edge.usersInfo(['U0MAYA'])
         assert.strictEqual(second.results.length, 1)

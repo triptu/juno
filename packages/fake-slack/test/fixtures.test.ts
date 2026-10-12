@@ -84,7 +84,7 @@ describe('every fixture response decodes with @juno/slack schemas', () => {
     expect(section?.type === 'rich_text_section' && section.elements.some((e) => e.type === 'user' && e.user_id === 'U0DEV')).toBe(true)
     expect(section?.type === 'rich_text_section' && section.elements.some((e) => e.type === 'channel' && e.channel_id === 'C0PLATFORM')).toBe(true)
     const reacted = replies.messages.find((m) => m.reactions !== undefined)
-    expect(reacted?.reactions?.[0]).toEqual({ name: '+1', users: ['U0ALEX', 'U0DEV'], count: 2 })
+    expect(reacted?.reactions?.[0]).toEqual({ name: '+1', users: ['U0TUSHAR', 'U0DEV'], count: 2 })
   })
 
   it('thread view, marks, subscriptions', async () => {

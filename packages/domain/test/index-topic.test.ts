@@ -3,7 +3,7 @@ import { bodyFromMrkdwn } from '@juno/richtext'
 import { UsergroupId, indexTopic, messageMentionsMe, messageMentionsMeDirectly, type IndexInput, type IndexMessage } from '../src/index'
 import { HOUR, NOW, leoId, mayaId, me, ts } from './fixtures'
 
-const lookups = { me, user: (id: string) => ({ U0ME: 'Alex Moreau', U0MAYA: 'Maya Chen', U0LEO: 'Leo Park' })[id] }
+const lookups = { me, user: (id: string) => ({ U0ME: 'Tushar', U0MAYA: 'Maya Chen', U0LEO: 'Leo Park' })[id] }
 const senderName = (id: string | undefined) => (id === undefined ? 'Unknown' : (lookups.user(id) ?? id))
 
 function input(messages: IndexMessage[], overrides: Partial<IndexInput> = {}): IndexInput {
@@ -34,7 +34,7 @@ describe('topic index row', () => {
 
   it('strips quote lines from the preview and names the sender', () => {
     const row = indexTopic(input([root, reply1]))
-    expect(row?.preview).toEqual({ sender: 'Maya Chen', text: 'Yes, it doubled. @Alex Moreau can you check?' })
+    expect(row?.preview).toEqual({ sender: 'Maya Chen', text: 'Yes, it doubled. @Tushar can you check?' })
   })
 
   it('mark-as-unread keeps the count at one or more', () => {

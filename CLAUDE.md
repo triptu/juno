@@ -10,7 +10,7 @@ Juno is a calm, topic-first desktop client for Slack. It reads and writes real S
 - `docs/research/` holds what we learned by reverse engineering Slack. Treat it as evidence, with its stated unknowns.
 - `docs/development.md` covers setup, commands and known toolchain pitfalls.
 
-Read the parts relevant to your task before changing code. If the code and a doc disagree, fix whichever is wrong in the same change.
+Read the parts relevant to your task, and the package's README, before changing code. If the code and a doc disagree, fix whichever is wrong in the same change.
 
 ## How the code is shaped
 
@@ -25,7 +25,8 @@ Read the parts relevant to your task before changing code. If the code and a doc
 
 - Use the project skills in `.claude/skills/` when touching the tool they cover (Effect, StyleX, performance, and others as they are added).
 - Tests: prefer end-to-end tests that follow a user flow against the fake Slack server. Write unit tests only for pure domain rules, and test behaviour, not implementation details.
-- Run `pnpm typecheck`, `pnpm lint` and the relevant tests before calling work done.
+- Run `pnpm typecheck`, `pnpm lint` (which includes `check-deps`) and the relevant tests before calling work done.
+- A new import of an unstable Effect module needs an entry in the `unstable` list in `scripts/check-deps.mjs` and a note in the effect skill.
 - Commit in small logical commits with plain messages. Only stage the paths you changed. Never add co-author trailers or mention AI tools in commits.
 - Never put real Slack tokens, cookies or message content into code, docs, logs, fixtures or commits.
 - Live Slack checks are read-only. Writes are allowed only in a private test channel created for that purpose or in the user's self-DM.
@@ -33,3 +34,5 @@ Read the parts relevant to your task before changing code. If the code and a doc
 ## Writing
 
 Docs, comments, UI copy and commit messages use plain, simple, concise English. No metaphors, no hype. UI copy follows SPEC.md section 17 (sentence case, short verb-first buttons, no emoji in chrome).
+
+`AGENTS.md` is a symlink to this file. Edit `CLAUDE.md` only.

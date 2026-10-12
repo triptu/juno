@@ -7,9 +7,10 @@ How to build and run Juno, and how the repo is put together.
 - Node 24 or newer (Node 26 is what this was built with).
 - pnpm 12. Node 25+ has no Corepack, so install it directly: `npm i -g pnpm@12`.
 - macOS for the window chrome and e2e tests. Nothing else is platform-specific yet.
+- Google Chrome, for the gallery tests and screenshots.
 
-No Playwright browser download is needed for the e2e tests. Electron is the browser. The
-gallery screenshots use the installed Google Chrome (`channel: 'chrome'`); set
+No Playwright browser download is needed for the desktop e2e tests. Electron is the browser. The
+gallery projects use the installed Google Chrome (`channel: 'chrome'`); set
 `GALLERY_BROWSER=chromium` after `npx playwright install chromium` to use Playwright's own build.
 
 ## Commands
@@ -20,48 +21,54 @@ Run these from the repo root.
 | --- | --- |
 | `pnpm install` | Installs everything. Electron downloads its binary in a postinstall. |
 | `pnpm dev` | Starts electron-vite with HMR for the renderer and reload for main and preload. |
-| `pnpm build` | Builds main, preload and renderer into `apps/desktop/out/`. |
+| `pnpm build` | Builds main, preload and renderer into `apps/desktop/out/`, then checks the renderer bundle size. |
 | `pnpm typecheck` | Runs `tsc` in every package. |
-| `pnpm lint` | Runs oxlint, then a script that fails on any `cursor: pointer`. |
-| `pnpm check-deps` | Fails on any `@juno/*` edge not in `juno.allowedDeps` (each package.json), any cycle, undeclared imports and the hard rules in `docs/architecture.md` section 3. |
+| `pnpm lint` | Runs oxlint, the `cursor: pointer` check, then `check-deps`. |
+| `pnpm check-deps` | The package graph and the import rules in `docs/architecture.md` section 3. Part of `pnpm lint`; run it alone for a quicker loop. |
 | `pnpm test` | Runs every package's vitest suite (`packages/*/test`). |
-| `pnpm test:e2e` | Builds, then runs the Playwright tests against the built app. |
+| `pnpm test:e2e` | Builds, runs the Playwright tests against the built app, then the gallery behaviour tests. |
+| `pnpm test:gallery` | Builds the gallery and runs only its behaviour tests (mouse-down activation, cursor rule). |
 | `pnpm gallery` | Starts the fixture gallery at http://localhost:4174 (browser only, no Electron). |
 | `pnpm gallery:shots` | Builds the gallery and screenshots every fixture in light and dark into `apps/gallery/shots/`. |
-| `pnpm --filter @juno/engine test` | Runs the engine's vitest suite (the port protocol over an in-memory MessageChannel, delta diffing). |
+| `pnpm --filter @juno/engine test` | Runs one package's suite (here the engine's: the port protocol over an in-memory MessageChannel, live query serving). |
 | `pnpm package` | Builds a DMG and zip with electron-builder into `apps/desktop/release/`. Not run in CI yet. |
+
+Before calling work done: `pnpm typecheck`, `pnpm lint`, `pnpm test`, and `pnpm test:e2e` for anything the app or gallery shows.
 
 Copy `.env.example` to `.env` for local secrets. `.env` is ignored by git.
 
 ## Layout
 
 ```
-apps/gallery            Vite + React gallery: a route and a screenshot per fixture.
+apps/gallery            Vite + React gallery: a route and a screenshot per fixture, plus behaviour tests.
 apps/desktop            The Electron app. Thin wiring only.
   src/main              Window factory, IPC handlers, engine supervisor, juno:// scheme, launch.json.
   src/engine            Entry of the engine utility process: parentPort in, startEngine().
   src/preload           contextBridge. Exposes window.juno and forwards the engine port.
-  src/renderer          React root, global.css, containers (wire atoms to views), views.
+  src/renderer          React root, global.css, containers (wire atoms to views).
   e2e                   Playwright tests and the Electron launch fixture.
   electron.vite.config.ts
   electron-builder.yml
-packages/tokens         @juno/tokens. The only place design values live. See its README.
-packages/ui             @juno/ui. Primitives, StyleX only, each with *.fixtures.tsx. See its README.
+packages/tokens         @juno/tokens. The only place design values live.
+packages/ui             @juno/ui. Primitives, StyleX only, each with *.fixtures.tsx. Owns applyTheme.
+packages/views          @juno/views. Feature views (props in, callbacks out) with fixtures.
 packages/contract       @juno/contract. Routes (effect/rpc groups), live-query schemas, errors,
-                        parentPort and port-handoff messages, main IPC channels.
+                        parentPort and port-handoff messages, main IPC routes.
 packages/store          @juno/store. cache.db and user.db per workspace, migrations,
                         writer and reader clients, invalidation and live queries.
 packages/engine         @juno/engine. The engine: protocol server, feature handlers, startEngine().
 packages/state          @juno/state. The renderer's engine client and every atom.
 packages/domain         @juno/domain. Pure product rules: ids, topic status, titles, sorting, notifications, checks.
 packages/richtext       @juno/richtext. Slack blocks and mrkdwn to a message view model, and back.
+packages/slack-schema   @juno/slack-schema. Effect Schemas for Slack payloads and the branded Ts.
 packages/slack          @juno/slack. The Slack client as Effect services (SlackApi,
-                        RequestQueue, SlackEdge, SlackSocket) and the schemas under
-                        @juno/slack/schemas.
+                        RequestQueue, SlackEdge, SlackSocket).
 packages/fake-slack     @juno/fake-slack. In-process fake Slack with a control API.
-scripts                 Small repo scripts used by package.json.
-docs                    Research, design handoff, this file.
+scripts                 Repo scripts used by package.json (check-deps, bundle size, cursor rule).
+docs                    Research, design handoff, architecture, this file.
 ```
+
+Every package has a README with its public API and rules. Read the one for the package you are about to change.
 
 Workspace packages ship TypeScript source. Their `exports` point at `src/*.ts` and
 the app's Vite build compiles them. There is no per-package build step.
@@ -93,8 +100,9 @@ Each package has its own `tsconfig.json` that extends `tsconfig.base.json` (stri
    the gallery) sets the body font, background, scrollbars and selection with
    `var(--font-sans)`, `var(--background)` and friends, and the e2e test reads the
    same variables to check computed colours.
-6. The theme is switched by `applyTheme()` in `src/renderer/state/theme.ts`, which
-   puts the dark classes on `<html>` so portals attached to `<body>` are covered.
+6. The theme is switched by `applyTheme()` in `packages/ui/src/theme.ts`, which
+   puts the dark and accent classes on `<html>` so portals attached to `<body>` are
+   covered. The desktop app imports it from `@juno/views`, the gallery from `@juno/ui`.
 
 Rules that come from the design spec and are enforced in `@juno/ui`:
 
@@ -103,9 +111,11 @@ Rules that come from the design spec and are enforced in `@juno/ui`:
 - Hover styles only inside `@media (hover: hover)`.
 - 2px focus ring in `--focus-ring` on `:focus-visible` only.
 - Rows, tabs and option rows navigate on `pointerdown` (see `packages/ui/README.md`).
-- Fonts are `@fontsource-variable/inter` and `@fontsource/instrument-serif`, bundled
-  by Vite from `src/renderer/main.tsx`. Never load fonts from a URL. Instrument Serif
-  has one weight (400).
+- Fonts are bundled by Vite from `@juno/tokens/fonts.css` (Inter, Instrument Serif,
+  JetBrains Mono), which both apps import. Never load fonts from a URL. Instrument
+  Serif has one weight (400).
+
+The `stylex` skill (`.claude/skills/stylex/SKILL.md`) has the full rules and the StyleX pitfalls.
 
 ## Processes
 
@@ -131,31 +141,54 @@ vitest suite in `packages/engine/test` connects the real state client to it over
 
 ## IPC with main
 
-`packages/contract` defines a route per channel: a name, an input schema and an
-output schema. Main registers handlers through `handle()` in `src/main/ipc.ts`,
-which checks the sender is the main frame of one of our windows showing
-`juno://app/` (or the Vite dev URL), decodes the input and encodes the output. The
-preload turns each route into one function on `window.juno`. The renderer decodes
-the answer again (see `packages/state/src/shell.ts`) and exposes it as an atom.
+`packages/contract/src/shell.ts` defines `ShellRoutes`: a channel name (from
+`channels.ts`), an input schema and an output schema each. Main registers handlers
+through `handle()` in `src/main/ipc.ts`, which checks the sender is the main frame
+of one of our windows showing `juno://app/` (or the Vite dev URL), decodes the
+input and encodes the output. The preload turns each route into one function on
+`window.juno`. The renderer decodes the answer again (see `packages/state/src/shell.ts`)
+and exposes it as an atom.
 
 `packages/contract/src/channels.ts` has no runtime imports. The preload bundles only
-that file so it stays under a kilobyte. Schemas live in `index.ts`.
+that file so it stays under a kilobyte. Schemas live in `shell.ts`.
 
-## Adding a route
+## Adding a feature
 
-1. `packages/contract/src/routes/<feature>.ts`: export each route and the group.
-   `liveQuery('feature.thing', { value, payload? })` streams a single value;
-   `liveList('feature.rows', { row, payload })` streams a windowed list as deltas
-   (rows need `id` and `rev`, the payload needs `window`); `Rpc.make('feature.do',
-   { payload, success, error })` is a command. Errors come from `errors.ts`.
-2. `packages/engine/src/<feature>/handlers.ts`: `<Feature>Routes.toLayer(...)`. Build
-   live queries with `liveValue` / `liveList` from `protocol/live.ts`; they stamp
-   `meta` and diff rows by `rev`. `engine/src/status/` is the example.
-3. `packages/state`: `liveQuery(route)(payload)` and `command(route)` give the atoms.
-   Containers read them with `useAtomValue` / `useAtomSet`. Nothing outside
-   `packages/state` imports `effect/reactivity/Atom`, `effect/rpc` or `effect/workers`.
-4. The integration task adds the group to `routes/index.ts` and the handler layer to
-   `engine/src/layer.ts`.
+The path of one feature, from the wire to a test. `engine.status` is the worked example at every step.
+Names are explained in `docs/architecture.md` sections 2.6 and 7.
+
+1. **Route.** `packages/contract/src/routes/<feature>.ts`: `liveValueRoute('feature.thing', { value, payload? })`
+   streams one value; `liveListRoute('feature.rows', { row, payload? })` streams a windowed list as
+   deltas (rows need `id` and `rev`; the route adds `range: ListRange` to the payload itself);
+   `Rpc.make('feature.do', { payload, success, error })` is a command. Errors come from `errors.ts`.
+   Export the group as `<Feature>Routes`. The integration task adds it to `routes/index.ts`.
+2. **Handler.** `packages/engine/src/<feature>/handlers.ts`: `<Feature>Routes.toLayer(...)`. For a
+   store-backed query, pass `liveQuery(keys, timed(query))` from `@juno/store` to `serveLiveValue` or
+   `serveLiveList` from `protocol/live.ts`; they stamp `meta` and diff rows by `rev`. Map `@juno/slack`
+   errors to contract errors and turn `StoreError` into a defect (`Effect.orDie`); see architecture 2.6.
+   The integration task adds the layer to `engine/src/layer.ts`. A feature folder imports nothing from
+   another feature folder (`check-deps`).
+3. **Atoms.** `packages/state/src/<feature>.ts`: declare each atom once, at module level, with
+   `liveQuery(route)(payload)` or `command(route)`, and export it from `index.ts`. Both helpers are
+   memoized per route, but one declaration keeps the names in one place.
+4. **Container.** `apps/desktop/src/renderer/containers/<Feature>.tsx`: reads atoms with `useAtomValue`
+   and `useAtomSet` from `@juno/state/react`, maps results to view props, binds callbacks to commands.
+5. **View.** `packages/views/src/<Feature>View.tsx` with `<Feature>View.fixtures.tsx`, registered in
+   `src/fixtures.ts` and exported from `index.ts`. Check it in `pnpm gallery`. Props in, callbacks out;
+   no state, Effect or `window.juno`.
+6. **Test.** `apps/desktop/e2e/<feature>.spec.ts` follows the user flow against the built app (and the
+   fake Slack server once sign-in exists). Add engine or domain unit tests only for pure rules.
+
+## Tests
+
+| Kind | Where | Run |
+| --- | --- | --- |
+| Pure rules, store, Slack client, engine protocol | `packages/<name>/test/` (vitest) | `pnpm test` |
+| User flows in the built app | `apps/desktop/e2e/` (Playwright, one worker) | `pnpm test:e2e` |
+| Mouse-down activation, cursor rule, in a real browser | `apps/gallery/behaviour.spec.ts` | `pnpm test:gallery` |
+| Screenshots of every fixture | `apps/gallery/shots.spec.ts` | `pnpm gallery:shots` |
+
+Tests that need the Effect test clock use `@effect/vitest`; see the effect skill.
 
 ## Pitfalls met while setting this up
 
@@ -177,44 +210,18 @@ that file so it stays under a kilobyte. Schemas live in `index.ts`.
   `ELECTRON_RUN_AS_NODE=1 apps/desktop/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron node_modules/.pnpm/node_modules/vitest/vitest.mjs run`
   from the package directory. Node 24 prints an ExperimentalWarning for `node:sqlite`;
   it is harmless.
-- **`@juno/slack` tests depend on `@juno/fake-slack`, which depends on `@juno/slack`.**
-  The cycle is a devDependency only, but `pnpm -r test` refuses task cycles unless
-  `pnpm-workspace.yaml` sets `ignoreWorkspaceCycles: true`, so it does. Under the
-  `TestClock` (`it.effect`) the background lane's 1.5 s spacing never elapses; tests
-  that make several background calls in a row set `backgroundMinIntervalMillis: 0`
-  or use `it.live`.
-- **Store tests and the test clock.** `@effect/vitest`'s `it.effect` runs with a
-  `TestClock`, so a live query's debounce window never ends on its own; tests call
-  `TestClock.adjust(DEFAULT_LIVE_QUERY_DEBOUNCE)`. Use `it.live` for real time.
-- **StyleX token imports.** Tokens must be imported through a subpath ending in
-  `.stylex` (`@juno/tokens/tokens.stylex`). Re-exporting from an `index.ts` fails
-  the build with "Could not resolve the path to the imported file".
-- **Workspace packages in main and preload.** `externalizeDepsPlugin` externalises
-  every dependency, including `@juno/contract`, which would then be `require`d as
-  TypeScript at runtime. The config excludes it so it gets bundled.
+- **Workspace packages and `effect` in main and preload.** `externalizeDepsPlugin`
+  externalises every dependency, and workspace packages ship TypeScript, so
+  `electron.vite.config.ts` excludes `@juno/contract`, `@juno/engine`, `@juno/state`
+  and `effect` to bundle them. Bundling `effect` cut the launch to first window from
+  416 ms to 314 ms. Add a workspace package that main or the engine imports to that list.
 - **`app.getVersion()` in tests.** Launching Electron with the script path makes it
   report Electron's own version. The fixture launches the package directory, like
   `electron .`, and `package.json` has `productName: "Juno"`.
-- **`:disabled` before `:active`.** StyleX orders pseudo-classes so `:active` wins
-  over `:disabled` at equal specificity. Disabled buttons set `pointer-events: none`,
-  so `:active` can never match them.
 - **No `getLastWebPreferences` in Electron 44.** The e2e test checks isolation from
   the page side (`require` and `process` are undefined, only `window.juno` exists).
 - **`.browserslistrc`** targets Chromium 152 so lightningcss does not rewrite
   `light-dark()` into a no-op polyfill.
-- **One request per port.** `RpcClient.layerProtocolWorker` is a worker pool, and a
-  pool item's default `concurrency` is 1, so the first live query blocked every
-  later command. `packages/state/src/transport.ts` sets it to a large number: one
-  port carries everything.
-- **Clients die with `Effect.provide`.** An `RpcClient` made inside
-  `Effect.provide(protocolLayer)` is interrupted when that call returns. The client
-  lives in `AtomRpc.Service` / `Atom.runtime`, whose scope outlives any atom.
-- **Defects are fatal by default.** `RpcServer.layer` without `disableFatalDefects: true`
-  ends the whole client when one handler dies. The engine sets it, so a defect is
-  the `Exit` of that one request.
-- **Result atoms need a mount.** Writing to a `command(route)` atom that nothing has
-  mounted does nothing visible; `useAtomSet` mounts it in React, and tests call
-  `registry.mount(atom)` first.
 - **The preload has no `window` type.** `tsconfig.node.json` has no DOM lib, so
   `src/preload/index.ts` starts with `/// <reference lib="dom" />`.
 - **`@juno/state` must typecheck without the DOM lib** because the engine's tests
@@ -222,7 +229,11 @@ that file so it stays under a kilobyte. Schemas live in `index.ts`.
   (`perf.ts`, `port.ts`), never through the DOM lib's names.
 - **Node and DOM `MessagePort`s** have the same `addEventListener` surface at runtime
   but different typings; tests cast Node ports to `PortLike` / `MessagePortLike`.
-- **Renderer bundle size.** Adding `effect/rpc`, `effect/workers` and the JSON codecs
-  took the initial JS from 856 KB to 1,086 KB, above the 1.0 MB budget in
-  `docs/performance.md` before any feature code. The bundle check still needs to be
-  written; the budget or the lazy-chunk plan has to absorb this.
+- **Renderer bundle size.** The budget is 1.0 MB of initial JS and 150 KB of CSS
+  (`docs/performance.md`); `pnpm build` runs `scripts/check-bundle-size.mjs` and fails
+  over it. The M1 shell is 426.1 KB of JS (138.6 KB gzip) and 68.7 KB of CSS, minified.
+  electron-vite does not minify by default, so the config sets `minify: 'esbuild'` for
+  all three targets; without it the same code was 1,097 KB.
+
+Effect and StyleX pitfalls are in their skills: `.claude/skills/effect/SKILL.md` ("Pitfalls") and
+`.claude/skills/stylex/SKILL.md`.

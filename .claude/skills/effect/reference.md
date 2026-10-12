@@ -62,7 +62,8 @@ only a missing key. `Layer.effect` handles `Scope` itself (verified: a layer usi
 
 ## Not in this repo yet
 
-- `@effect/vitest` is not installed. When added, use `it.effect` and `it.live`; `TestClock` comes
-  from `effect/testing`.
-- Atoms: `effect/reactivity/Atom` and `@effect/atom-react` hooks (`useAtomValue`, `useAtom`,
-  `useAtomSet`). They are unstable, so only the planned state helpers should import them.
+- Nothing is missing now. `@effect/vitest` 4.0.3 is installed in `store` and `slack` (`it.effect`,
+  `it.live`; `TestClock` comes from `effect/testing`).
+- Atoms: `effect/reactivity/Atom` and the `@effect/atom-react` hooks (`useAtomValue`, `useAtom`,
+  `useAtomSet`) are unstable, so only `@juno/state` imports them. Containers get the hooks from
+  `@juno/state/react`.

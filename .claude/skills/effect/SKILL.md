@@ -45,9 +45,24 @@ Stable: `Effect`, `Layer`, `Context`, `Stream`, `Schedule`, `Scope`, `Queue`, `R
 - A few members of stable modules: `Effect.withExecutionPlan`, `Effect.withErrorReporting`,
   `Stream.withExecutionPlan`, `Stream.limitBytes`, the `ByteSize`/`MacAddress` schemas.
 
-Juno wrappers: atoms go through `liveQuery(route)` and `command(route)` in `@juno/state`
-(planned; M0 still imports `effect/reactivity/Atom` in `renderer/state/`), and `Reactivity` sits
-behind `Invalidation` in `@juno/store`. Check the tag in the `.d.ts` before using other modules.
+Juno wrappers (`scripts/check-deps.mjs` fails `pnpm lint` on an import from anywhere else):
+
+| Unstable module | Wrapper, and the only files that import it |
+| --- | --- |
+| `effect/reactivity` (`Atom`, `AtomRegistry`, `AtomRpc`, `AsyncResult`) | `liveQuery(route)` and `command(route)` in `@juno/state`; `packages/state/src` only |
+| `@effect/atom-react` | `@juno/state/react` (`useAtomValue`, `useAtom`, `useAtomSet`, `useAtomRefresh`, `RegistryContext`); containers import the hooks from there |
+| `effect/reactivity/Reactivity` | `Invalidation` in `packages/store/src/invalidation.ts` |
+| `effect/rpc` | route declarations in `packages/contract/src`, the server in `packages/engine/src/protocol`, the client in `packages/state/src` |
+| `effect/workers` | the port transports: `packages/state/src/transport.ts`, `packages/engine/src/protocol/runner.ts` |
+| `effect/sql`, `@effect/sql-sqlite-node` | `@juno/store` only. See below. |
+| everything else listed above | nowhere yet. Add a wrapper module and an entry in `check-deps.mjs` first. |
+
+**`effect/sql` is a decision, not an accident.** The store exports `SqlClient` (as a type) from
+`@juno/store` as the type of its writer and reader, so every engine feature writes its queries
+against it. That is accepted: the engine reaches it through `@juno/store`, never `effect/sql`, and a
+breaking change in `effect/sql` is fixed in the store and in those queries.
+
+Check the tag in the `.d.ts` before using any other unstable module.
 
 ## Effect 3 name to Effect 4 name
 
@@ -150,6 +165,28 @@ yield* TestClock.adjust(60_000)
 yield* Fiber.join(f)
 ```
 
-Tests: `@effect/vitest` (`it.effect`, `it.live`) is the documented runner but is not installed yet;
-outside it, provide `TestClock.layer()` yourself. Juno prefers end-to-end tests, so test a service
-through its public layer.
+Tests: `@effect/vitest` 4.0.3 is installed in `store` and `slack` (add it as a devDependency where
+needed). `it.effect` runs with a `TestClock`; `it.live` uses real time. Juno prefers end-to-end
+tests, so test a service through its public layer.
+
+## Pitfalls met in this repo
+
+- **Clients die with `Effect.provide`.** An `RpcClient` made inside `Effect.provide(protocolLayer)` is
+  interrupted when that call returns. Keep the client in a scope that outlives its users: the state
+  client lives in `AtomRpc.Service` / `Atom.runtime`.
+- **Defects are fatal by default.** `RpcServer.layer` without `disableFatalDefects: true` ends the
+  whole client when one handler dies. The engine sets it, so a defect is the `Exit` of that one
+  request and the port stays usable.
+- **Result atoms need a mount.** Writing to a `command(route)` atom that nothing has mounted does
+  nothing visible. `useAtomSet` mounts it in React; in tests call `registry.mount(atom)` first, or use
+  `runCommand(registry, route, payload)`. Tests make their own registry with `makeRegistry()`.
+- **One request per port.** `RpcClient.layerProtocolWorker` is a worker pool and a pool item's default
+  `concurrency` is 1, so the first live query blocked every later command.
+  `packages/state/src/transport.ts` sets it high: one port carries everything.
+- **The test clock stops time.** Under `it.effect`, sleeps and debounce windows never end on their own.
+  Store tests call `TestClock.adjust(DEFAULT_LIVE_QUERY_DEBOUNCE)`; Slack client tests that make
+  several background calls in a row set `backgroundMinIntervalMillis: 0` (the lane spaces calls 1.5 s)
+  or use `it.live`.
+- **Errors are mapped at the engine edge.** `@juno/slack` and `@juno/store` errors never reach a route
+  as they are: handlers map Slack errors to `@juno/contract` errors and turn `StoreError` into a defect
+  (`Effect.orDie`). See `docs/architecture.md` section 2.6.

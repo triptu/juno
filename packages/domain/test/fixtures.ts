@@ -7,7 +7,7 @@ export const DAY = 24 * HOUR
 export const eng: ChannelInfo = { id: ChannelId.make('C0ENG'), kind: 'public', name: 'eng' }
 export const hiring: ChannelInfo = { id: ChannelId.make('C0HIRING'), kind: 'private', name: 'hiring' }
 export const maya: ChannelInfo = { id: ChannelId.make('D0MAYA'), kind: 'im', name: 'Maya Chen' }
-export const group: ChannelInfo = { id: ChannelId.make('G0MPIM'), kind: 'mpim', name: 'mpdm-alex--maya--leo-1', memberNames: ['Maya Chen', 'Leo Park'] }
+export const group: ChannelInfo = { id: ChannelId.make('G0MPIM'), kind: 'mpim', name: 'mpdm-tushar--maya--leo-1', memberNames: ['Maya Chen', 'Leo Park'] }
 export const alerts: ChannelInfo = { id: ChannelId.make('C0ALERTS'), kind: 'public', name: 'alerts-prod', ignored: true }
 
 export const me = UserId.make('U0ME')

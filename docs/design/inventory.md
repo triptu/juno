@@ -50,7 +50,7 @@ Style: transparent, colour `--foreground-subtle`, hover `--surface-hover`, press
 
 **Avatar menu** (popover, 248px wide, anchored top 36px right 0, z 20, padding 6, radius 13, `--pop-shadow`):
 
-- Header: avatar 32 + "Alex Moreau" 13/600 + "acme.slack.com" 12 muted; padding `8 8 10`.
+- Header: avatar 32 + "Tushar" 13/600 + "acme.slack.com" 12 muted; padding `8 8 10`.
 - Separator 1px `--border-default`, margin `2 6 4`.
 - Items 32px, radius 6, padding 0 8, gap 10, icon 15 `--foreground-subtle`, label 13, right hint 11 muted:
   - Set status (`circle-dot`)

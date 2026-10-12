@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Juno logo concepts</title>
+<style>
+  :root { --paper: #FCFBF7; --ink: #23211A; --muted: #706E66; --dark: #131415; }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 32px 40px; background: var(--paper); color: var(--ink);
+         font: 13px/1.4 Inter, -apple-system, system-ui, sans-serif; width: 1480px; }
+  h1 { font: 400 28px/1.1 "Instrument Serif", Georgia, serif; margin: 0 0 4px; }
+  p.lead { margin: 0 0 24px; color: var(--muted); }
+  table { border-collapse: collapse; width: 100%; }
+  th { text-align: left; font-weight: 500; color: var(--muted); padding: 0 12px 8px 0; font-size: 12px; }
+  td { padding: 10px 12px 10px 0; vertical-align: middle; border-top: 1px solid #F1EEE4; }
+  td.name { width: 120px; font-weight: 500; }
+  .strip { display: flex; align-items: center; gap: 18px; padding: 10px 14px; border-radius: 10px; width: 100%; }
+  .strip.light { background: #FFFFFF; box-shadow: 0 0 0 1px #EFECE1; }
+  .strip.dark { background: var(--dark); }
+  .strip img { display: block; image-rendering: auto; }
+  .big { display: flex; gap: 24px; align-items: flex-end; }
+  .big img { display: block; }
+  .dock { display: flex; gap: 12px; align-items: center; padding: 10px 14px; border-radius: 22px;
+          background: rgba(200,200,200,0.55); backdrop-filter: blur(20px); width: max-content;
+          border: 1px solid rgba(255,255,255,0.5); }
+  .dockbg { padding: 20px; border-radius: 12px; background: linear-gradient(135deg, #c9d1dc, #e7e3d8 60%, #d6d9cf); }
+  .dockbg.dark { background: linear-gradient(135deg, #2a2d33, #3c3a36 60%, #1d1f22); }
+  .dockbg.dark .dock { background: rgba(40,40,40,0.6); border-color: rgba(255,255,255,0.12); }
+  .sq { width: 64px; height: 64px; border-radius: 14px; background: linear-gradient(#d9d9d9, #bdbdbd); box-shadow: 0 2px 4px rgba(0,0,0,.25); }
+  .dockbg.dark .sq { background: linear-gradient(#6a6a6a, #4a4a4a); }
+  .dock img { width: 64px; height: 64px; }
+  section { margin-top: 36px; }
+  h2 { font: 400 20px/1.1 "Instrument Serif", Georgia, serif; margin: 0 0 12px; }
+  .grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 16px; }
+  .cell { text-align: center; color: var(--muted); font-size: 12px; }
+  .cell img { display: block; margin: 0 auto 6px; }
+  .menubar { display: flex; align-items: center; gap: 14px; height: 24px; padding: 0 10px; background: #f6f6f6; border-radius: 6px; border: 1px solid #e5e5e5; font-size: 12px; width: max-content; }
+  .menubar.dark { background: #2b2b2b; border-color: #3a3a3a; color: #eee; }
+  .menubar img { width: 16px; height: 16px; }
+  .tab { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 6px; background: #FCFBF7; box-shadow: 0 0 0 1px #EFECE1; font-size: 12px; }
+  .tab img { width: 14px; height: 14px; }
+</style>
+</head>
+<body>
+<h1>Juno logo concepts</h1>
+<p class="lead">Each mark at 16, 32, 64, 128 and 512 px on light and dark, then in a mock Dock. Phase 1 exploration.</p>
+
+<table>
+  <thead><tr><th>Concept</th><th>Light: 16 / 32 / 64 / 128</th><th>Dark: 16 / 32 / 64 / 128</th></tr></thead>
+  <tbody id="rows"></tbody>
+</table>
+
+<section>
+  <h2>App icon at 512 px, light and dark variants</h2>
+  <div class="grid" id="big"></div>
+</section>
+
+<section>
+  <h2>Dock, light desktop</h2>
+  <div class="dockbg"><div class="dock" id="dockLight"></div></div>
+</section>
+<section>
+  <h2>Dock, dark desktop (dark variants)</h2>
+  <div class="dockbg dark"><div class="dock" id="dockDark"></div></div>
+</section>
+
+<section>
+  <h2>Menu bar and tab at 16 px and 14 px</h2>
+  <div style="display:flex; gap: 16px; flex-wrap: wrap" id="small"></div>
+</section>
+
+<script>
+  const names = ["rows", "thread", "monogram", "crescent", "bubble", "reply"];
+  const sizes = [16, 32, 64, 128];
+  const img = (src, s) => `<img src="${src}" width="${s}" height="${s}" alt="">`;
+  const mark = (n) => `concepts/${n}/mark.svg`;
+  const icon = (n, d) => `concepts/${n}/app-icon${d ? "-dark" : ""}.svg`;
+  // For the dark strip the flat mark is inverted with a CSS filter; the dark app icon is a real file.
+  document.getElementById("rows").innerHTML = names.map((n) => `
+    <tr>
+      <td class="name">${n}</td>
+      <td><div class="strip light">${sizes.map((s) => img(mark(n), s)).join("")}<span style="width:12px"></span>${[16,32,64,128].map((s) => img(icon(n), s)).join("")}</div></td>
+      <td><div class="strip dark">${sizes.map((s) => `<img src="${mark(n)}" width="${s}" height="${s}" style="filter: invert(1) hue-rotate(180deg) brightness(1.05)" alt="">`).join("")}<span style="width:12px"></span>${[16,32,64,128].map((s) => img(icon(n, true), s)).join("")}</div></td>
+    </tr>`).join("");
+  document.getElementById("big").innerHTML = names.map((n) => `
+    <div class="cell">${img(icon(n), 220)}${img(icon(n, true), 220)}${n}</div>`).join("");
+  const grey = `<div class="sq"></div>`;
+  document.getElementById("dockLight").innerHTML = grey + names.map((n) => img(icon(n), 64)).join(grey) + grey;
+  document.getElementById("dockDark").innerHTML = grey + names.map((n) => img(icon(n, true), 64)).join(grey) + grey;
+  document.getElementById("small").innerHTML = names.map((n) => `
+    <div style="display:flex; flex-direction:column; gap:8px; align-items:flex-start">
+      <div class="menubar"><img src="${mark(n)}" alt=""> <span>Juno</span> <span>File</span> <span>Edit</span></div>
+      <div class="menubar dark"><img src="${mark(n)}" style="filter: invert(1) hue-rotate(180deg) brightness(1.05)" alt=""> <span>Juno</span> <span>File</span></div>
+      <div class="tab"><img src="${mark(n)}" alt=""> Postgres 16 migration plan</div>
+    </div>`).join("");
+</script>
+</body>
+</html>

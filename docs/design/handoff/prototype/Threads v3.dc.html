@@ -56,7 +56,7 @@ a:hover{color:var(--foreground-subtle)}
             <div style="display:flex;align-items:center;gap:10px;padding:8px 8px 10px">
               <span style="width:32px;height:32px;border-radius:999px;flex:none;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;background:{{me.bg}};color:{{me.fg}}">{{me.ini}}</span>
               <div style="min-width:0;display:flex;flex-direction:column">
-                <span style="font-size:13px;font-weight:600">Alex Moreau</span>
+                <span style="font-size:13px;font-weight:600">Tushar</span>
                 <span style="font-size:12px;color:var(--foreground-muted)">acme.slack.com</span>
               </div>
             </div>
@@ -902,7 +902,7 @@ a:hover{color:var(--foreground-subtle)}
 <script type="text/x-dc" data-dc-script data-props="{&quot;rowStyle&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;chat&quot;,&quot;list&quot;,&quot;cards&quot;],&quot;default&quot;:&quot;chat&quot;,&quot;tsType&quot;:&quot;'chat'|'list'|'cards'&quot;,&quot;section&quot;:&quot;Topic list&quot;},&quot;density&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;compact&quot;,&quot;balanced&quot;,&quot;airy&quot;],&quot;default&quot;:&quot;balanced&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Topic list&quot;},&quot;previewLines&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;1&quot;,&quot;2&quot;],&quot;default&quot;:&quot;2&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Topic list&quot;},&quot;showAvatars&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Topic list&quot;},&quot;grouping&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;flat&quot;,&quot;channel&quot;],&quot;default&quot;:&quot;flat&quot;,&quot;tsType&quot;:&quot;'flat'|'channel'&quot;,&quot;section&quot;:&quot;Topic list&quot;},&quot;quietDays&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;min&quot;:1,&quot;max&quot;:30,&quot;step&quot;:1,&quot;unit&quot;:&quot;days&quot;,&quot;default&quot;:7,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Topic list&quot;},&quot;messageStyle&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;flat&quot;,&quot;bubbles&quot;],&quot;default&quot;:&quot;flat&quot;,&quot;tsType&quot;:&quot;'flat'|'bubbles'&quot;,&quot;section&quot;:&quot;Thread&quot;},&quot;aiAssist&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Thread&quot;},&quot;accent&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;options&quot;:[&quot;#1B1C15&quot;,&quot;#2E1F64&quot;,&quot;#00674F&quot;,&quot;#7F1734&quot;,&quot;#008AB3&quot;],&quot;default&quot;:&quot;#1B1C15&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Theme&quot;},&quot;dark&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Theme&quot;}}">
 const ICON = n => `url(//unpkg.com/lucide-static@0.454.0/icons/${n}.svg) center / contain no-repeat`;
 const P = {
-  me: { name: 'Alex Moreau', first: 'Alex', c: '#008AB3' },
+  me: { name: 'Tushar', first: 'Tushar', c: '#008AB3' },
   maya: { name: 'Maya Chen', first: 'Maya', c: '#7F1734' },
   leo: { name: 'Leo Park', first: 'Leo', c: '#2E1F64' },
   sam: { name: 'Sam Okafor', first: 'Sam', c: '#00674F' },
@@ -951,13 +951,13 @@ const INCOMING = [
   { t: '10:02', from: 'dev', ch: 'eng', text: 'I can own the dry run on staging Thursday.', jev: { now: 0.08, silent: 0.35 } },
   { t: '10:07', from: 'maya', ch: 'dm-maya', text: 'Perfect. Send me a one-line description when you have it.', jev: { now: 0.52, silent: 0.05 } },
   { t: '10:30', from: 'elena', ch: 'hiring', text: 'Rina finished the onsite. Panel notes are in the scorecard.', jev: { now: 0.31, silent: 0.1 } },
-  { t: '10:55', from: 'elena', ch: 'hiring', text: '@Alex she has a competing offer with a Friday deadline. Can you do a 30 min close call tomorrow?', jev: { now: 0.89, silent: 0.01 }, mention: true },
+  { t: '10:55', from: 'elena', ch: 'hiring', text: '@Tushar she has a competing offer with a Friday deadline. Can you do a 30 min close call tomorrow?', jev: { now: 0.89, silent: 0.01 }, mention: true },
   { t: '11:05', from: 'grafana', ch: 'alerts-prod', text: '[FIRING] disk 85% on db-replica-2', jev: { now: 0.42, silent: 0.45 } },
   { t: '11:12', from: 'deploybot', ch: 'deploys', text: 'api@91be07 deployed to prod', jev: { now: 0.02, silent: 0.9 } },
   { t: '11:20', from: 'priya', ch: 'design-review', text: 'Two options for the thread list: compact rows vs. two-line previews.', jev: { now: 0.06, silent: 0.4 } },
   { t: '12:05', from: 'leo', ch: 'dm-ml', text: 'lunch friday?', jev: { now: 0.04, silent: 0.74 } },
   { t: '12:30', from: 'sam', ch: 'eng', text: 'Reminder: on-call handoff moves to Mondays starting next week.', jev: { now: 0.14, silent: 0.3 } },
-  { t: '13:10', from: 'maya', ch: 'leadership', text: '@Alex can you own the narrative for the SRE role?', jev: { now: 0.71, silent: 0.02 }, mention: true },
+  { t: '13:10', from: 'maya', ch: 'leadership', text: '@Tushar can you own the narrative for the SRE role?', jev: { now: 0.71, silent: 0.02 }, mention: true },
   { t: '13:42', from: 'dev', ch: 'eng', text: '@Leo I think the preview environments never shut down. Will check.', jev: { now: 0.05, silent: 0.66 } },
 ];
 const IDEAS = [
@@ -987,7 +987,7 @@ function seed() {
     TH({ id: 't2', ch: 'hiring', manualTitle: 'Rina Sato · Staff backend', aiTitle: 'Rina Sato onsite debrief', ago: 12, unread: 2, mention: true, needsYou: true, summary: 'The panel was positive on systems design. Elena needs a 30 minute close call from you tomorrow. Rina has a competing offer that expires Friday.', msgs: [
       M('elena', '10:30', 'Rina finished the onsite. Panel notes are in the scorecard.'),
       M('sam', '10:41', 'Strong systems design. Went deep on idempotency without being prompted.'),
-      M('elena', '10:55', '@Alex she has a competing offer with a Friday deadline. Can you do a 30 min close call tomorrow?'),
+      M('elena', '10:55', '@Tushar she has a competing offer with a Friday deadline. Can you do a 30 min close call tomorrow?'),
     ] }),
     TH({ id: 't4', ch: 'product', aiTitle: 'Q4 roadmap cuts', ago: 25, unread: 3, pinned: true, summary: "Maya is writing up the cuts for Thursday's review. Priya will mock an early access flow for the API v3 partners. The draft is open for comments today.", msgs: [
       M('maya', '8:55', 'Proposal: cut offline mode and public API v3 from Q4. Keeps sync reliability as the one big bet.'),
@@ -995,7 +995,7 @@ function seed() {
       M('me', '9:30', "Eng view: cutting both frees about three engineers for sync. I'm for it."),
       M('maya', '9:41', "Great. I'll write it up for Thursday's review.", { reactions: [R('🙏', 'priya')] }),
       M('priya', '9:48', "I'll mock an early access flow for the partners so v3 doesn't feel dropped."),
-      M('maya', '10:20', 'Draft is up. Cross-posting to #leadership once @Alex has looked.'),
+      M('maya', '10:20', 'Draft is up. Cross-posting to #leadership once @Tushar has looked.'),
     ] }),
     TH({ id: 't5', ch: 'dm-maya', ago: 38, unread: 1, needsYou: true, msgs: [
       M('maya', '9:02', 'Can eng take the Wednesday afternoon slot at the offsite? 90 minutes.'),
@@ -1072,7 +1072,7 @@ function seed() {
     TH({ id: 't11', ch: 'leadership', aiTitle: 'Eng headcount 2027', ago: 3000, unread: 1, mention: true, needsYou: true, msgs: [
       M('maya', 'Sat', 'Finance wants the 2027 plan by the 20th.'),
       M('sam', 'Sat', 'Eng ask is six: four backend, one SRE, one EM.'),
-      M('maya', 'Sat', '@Alex can you own the narrative for the SRE role?'),
+      M('maya', 'Sat', '@Tushar can you own the narrative for the SRE role?'),
     ] }),
     { id: 'm-ml', ch: 'dm-ml', kind: 'main', ago: 3100, unread: 0, mention: false, needsYou: false, pinned: false, subscribed: true, resolved: false, reopened: false, msgs: [
       M('leo', 'Sat', 'lunch friday?'),
@@ -1365,17 +1365,17 @@ class Component extends DCLogic {
     const findT = id => this.state.topics.find(t => t.id === id);
     return [
       { name: 'list_topics', description: 'List topics (Slack threads and each channel or DM Main thread) sorted by most recent activity.', input_schema: { type: 'object', properties: { include_resolved: { type: 'boolean' } } },
-        run: async (inp) => JSON.stringify(this.state.topics.filter(t => (inp && inp.include_resolved) || !t.resolved).sort((a, b) => a.ago - b.ago).slice(0, 30).map(t => { const l = t.msgs[t.msgs.length - 1]; const c = chOf(t.ch); return { topic_id: t.id, title: tLabel(t), channel_id: t.ch, channel: chLabel(c), channel_type: kindLabel(c), unread: t.unread, mentions_alex: t.mention, resolved: t.resolved, subscribed: t.subscribed, last_activity: rel(t.ago) + ' ago', last_message: P[l.from].name + ': ' + l.text }; })) },
+        run: async (inp) => JSON.stringify(this.state.topics.filter(t => (inp && inp.include_resolved) || !t.resolved).sort((a, b) => a.ago - b.ago).slice(0, 30).map(t => { const l = t.msgs[t.msgs.length - 1]; const c = chOf(t.ch); return { topic_id: t.id, title: tLabel(t), channel_id: t.ch, channel: chLabel(c), channel_type: kindLabel(c), unread: t.unread, mentions_me: t.mention, resolved: t.resolved, subscribed: t.subscribed, last_activity: rel(t.ago) + ' ago', last_message: P[l.from].name + ': ' + l.text }; })) },
       { name: 'read_topic', description: 'Read every message in a topic.', input_schema: { type: 'object', properties: { topic_id: { type: 'string' } }, required: ['topic_id'] },
         run: async ({ topic_id }) => { const t = findT(topic_id); if (!t) throw new Error('No topic ' + topic_id); return JSON.stringify({ title: tLabel(t), channel: chLabel(chOf(t.ch)), messages: t.msgs.map(m => ({ from: P[m.from].name, time: m.t, text: m.text })) }); } },
-      { name: 'list_channels', description: 'List channels and DMs Alex can post to, with ids.', input_schema: { type: 'object', properties: {} },
+      { name: 'list_channels', description: 'List channels and DMs Tushar can post to, with ids.', input_schema: { type: 'object', properties: {} },
         run: async () => JSON.stringify(CH.map(c => ({ channel_id: c.id, name: chLabel(c), type: kindLabel(c), people: c.people ? c.people.map(p => P[p].name) : undefined }))) },
-      { name: 'propose_message', description: 'Propose a message for Alex to send. Nothing is sent until Alex presses Send. Use channel_id for a channel or DM. Add topic_id to reply inside that thread.', input_schema: { type: 'object', properties: { channel_id: { type: 'string' }, topic_id: { type: 'string' }, text: { type: 'string' } }, required: ['channel_id', 'text'] },
-        run: async ({ channel_id, topic_id, text }) => { if (!chOf(channel_id)) throw new Error('Unknown channel_id ' + channel_id + '. Call list_channels.'); if (topic_id && !findT(topic_id)) topic_id = undefined; this.pending.push({ type: 'send', ch: channel_id, topicId: topic_id, text, status: 'pending' }); return 'Shown to Alex for confirmation.'; } },
+      { name: 'propose_message', description: 'Propose a message for Tushar to send. Nothing is sent until Tushar presses Send. Use channel_id for a channel or DM. Add topic_id to reply inside that thread.', input_schema: { type: 'object', properties: { channel_id: { type: 'string' }, topic_id: { type: 'string' }, text: { type: 'string' } }, required: ['channel_id', 'text'] },
+        run: async ({ channel_id, topic_id, text }) => { if (!chOf(channel_id)) throw new Error('Unknown channel_id ' + channel_id + '. Call list_channels.'); if (topic_id && !findT(topic_id)) topic_id = undefined; this.pending.push({ type: 'send', ch: channel_id, topicId: topic_id, text, status: 'pending' }); return 'Shown to Tushar for confirmation.'; } },
       { name: 'show_topics', description: 'Attach clickable links to specific topics under your reply.', input_schema: { type: 'object', properties: { topic_ids: { type: 'array', items: { type: 'string' } } }, required: ['topic_ids'] },
         run: async ({ topic_ids }) => { const ids = (topic_ids || []).filter(findT); this.pending.push({ type: 'topics', ids }); return 'Linked ' + ids.length + ' topics.'; } },
-      { name: 'propose_resolve', description: 'Propose resolving topics that look settled. Alex confirms.', input_schema: { type: 'object', properties: { topic_ids: { type: 'array', items: { type: 'string' } } }, required: ['topic_ids'] },
-        run: async ({ topic_ids }) => { const ids = (topic_ids || []).filter(findT); this.pending.push({ type: 'resolve', ids, status: 'pending' }); return 'Shown to Alex for confirmation.'; } },
+      { name: 'propose_resolve', description: 'Propose resolving topics that look settled. Tushar confirms.', input_schema: { type: 'object', properties: { topic_ids: { type: 'array', items: { type: 'string' } } }, required: ['topic_ids'] },
+        run: async ({ topic_ids }) => { const ids = (topic_ids || []).filter(findT); this.pending.push({ type: 'resolve', ids, status: 'pending' }); return 'Shown to Tushar for confirmation.'; } },
     ];
   }
   async askAI(text) {
@@ -1384,10 +1384,10 @@ class Component extends DCLogic {
     this.setState({ ai: { msgs, busy: true, draft: '' } });
     this.pending = [];
     const lv = this.lastViewed && s.topics.find(t => t.id === this.lastViewed);
-    const system = "You are Juno, the assistant built into Juno, Alex Moreau's personal Slack client. Alex is head of engineering at a product company. Your job is to manage and orchestrate: find things, summarize, triage, and route. You do not write for Alex beyond what was asked. When Alex asks you to tell or message someone, call propose_message with Alex's own intent stated briefly and plainly in Alex's voice (lowercase-casual is fine). Never claim something was sent. Look things up with tools instead of guessing ids. Keep replies to 1–4 short sentences or a few short lines. Plain text only: no markdown, no bullet symbols, no emoji. When you refer to specific topics, call show_topics so Alex can open them." + (lv ? " Alex was just looking at the topic '" + (lv.kind === 'main' ? chLabel(chOf(lv.ch)) + ' Main' : titleOf(lv)) + "' (topic_id " + lv.id + ") in " + chLabel(chOf(lv.ch)) + ". 'This' usually means that topic." : '');
+    const system = "You are Juno, the assistant built into Juno, Tushar's personal Slack client. Tushar is head of engineering at a product company. Your job is to manage and orchestrate: find things, summarize, triage, and route. You do not write for Tushar beyond what was asked. When Tushar asks you to tell or message someone, call propose_message with Tushar's own intent stated briefly and plainly in Tushar's voice (lowercase-casual is fine). Never claim something was sent. Look things up with tools instead of guessing ids. Keep replies to 1–4 short sentences or a few short lines. Plain text only: no markdown, no bullet symbols, no emoji. When you refer to specific topics, call show_topics so Tushar can open them." + (lv ? " Tushar was just looking at the topic '" + (lv.kind === 'main' ? chLabel(chOf(lv.ch)) + ' Main' : titleOf(lv)) + "' (topic_id " + lv.id + ") in " + chLabel(chOf(lv.ch)) + ". 'This' usually means that topic." : '');
     let reply = '';
     try {
-      reply = await window.claude.complete({ model: 'claude-haiku-4-5', max_tokens: 1024, system, messages: msgs.map(m => ({ role: m.role, content: m.text || (m.cards && m.cards.length ? '(proposed actions shown to Alex)' : '…') })), tools: this.aiTools() });
+      reply = await window.claude.complete({ model: 'claude-haiku-4-5', max_tokens: 1024, system, messages: msgs.map(m => ({ role: m.role, content: m.text || (m.cards && m.cards.length ? '(proposed actions shown to Tushar)' : '…') })), tools: this.aiTools() });
     } catch (err) { reply = "Couldn't reach the assistant. Try again in a moment."; }
     const cards = this.pending.slice(); this.pending = [];
     this.setState(st => ({ ai: { msgs: [...st.ai.msgs, { role: 'assistant', text: (reply || '').trim(), cards }], busy: false, draft: st.ai.draft } }));
@@ -1866,7 +1866,7 @@ class Component extends DCLogic {
         const isMe = m.from === 'me';
         const lastOfGroup = !next || next.from !== m.from || !!next.quote || (i + 1 === since);
         const key = m.id;
-        const mentionsMe = /@Alex\b/.test(m.text);
+        const mentionsMe = /@Tushar\b/.test(m.text);
         return {
           name: P[m.from].name, t: m.t, isMe, head, av: av(m.from),
           blocks: this.blocks(m.text, bubbles && isMe),
