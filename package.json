@@ -12,6 +12,7 @@
     "build": "pnpm --filter @juno/desktop build",
     "typecheck": "pnpm -r --parallel typecheck",
     "lint": "oxlint . && node scripts/check-no-pointer-cursor.mjs",
+    "test": "pnpm -r --if-present test",
     "test:e2e": "pnpm --filter @juno/desktop test:e2e",
     "package": "pnpm --filter @juno/desktop package"
   },
