@@ -302,6 +302,31 @@ importers:
         specifier: 5.9.3
         version: 5.9.3
 
+  packages/domain:
+    dependencies:
+      '@juno/richtext':
+        specifier: workspace:*
+        version: link:../richtext
+      effect:
+        specifier: 4.0.3
+        version: 4.0.3
+    devDependencies:
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: 5.0.4
+        version: 5.0.4(@types/node@24.19.2)(vite@7.3.7(@types/node@24.19.2)(jiti@2.7.0)(lightningcss@1.33.0))
+
+  packages/richtext:
+    devDependencies:
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: 5.0.4
+        version: 5.0.4(@types/node@24.19.2)(vite@7.3.7(@types/node@24.19.2)(jiti@2.7.0)(lightningcss@1.33.0))
+
   packages/store:
     dependencies:
       '@effect/sql-sqlite-node':
