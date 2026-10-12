@@ -1,10 +1,14 @@
 import { expect, hooks, test } from './fixtures'
 
-test('shows the engine status that arrives over the port', async ({ win }) => {
+// The engine's diagnostic line is part of the signed-in shell, so every test
+// here signs in first.
+test('shows the engine status that arrives over the port', async ({ juno, win }) => {
+  await juno.signIn()
   await expect(win.getByRole('status', { name: 'Engine status' })).toHaveText('Engine live')
 })
 
-test('answers a command from the engine', async ({ win }) => {
+test('answers a command from the engine', async ({ juno, win }) => {
+  await juno.signIn()
   await expect(win.getByRole('status', { name: 'Engine status' })).toHaveText('Engine live')
   const ping = win.getByRole('button', { name: 'Ping engine' })
   await ping.click()
@@ -14,7 +18,7 @@ test('answers a command from the engine', async ({ win }) => {
 })
 
 test('is served from the juno: scheme', async ({ win }) => {
-  await expect(win.getByRole('heading', { name: 'Juno' })).toBeVisible()
+  await expect(win.getByRole('heading', { name: 'Welcome to Juno', exact: true })).toBeVisible()
   expect(await win.evaluate(() => location.protocol)).toBe('juno:')
   expect(await win.evaluate(() => location.href)).toBe('juno://app/index.html?theme=light')
   // Nothing outside the renderer folder is served: a traversal attempt ends
@@ -28,7 +32,8 @@ test('is served from the juno: scheme', async ({ win }) => {
   expect(escaped).toBe(404)
 })
 
-test('recovers after the engine process is killed', async ({ app, win }) => {
+test('recovers after the engine process is killed', async ({ juno, app, win }) => {
+  await juno.signIn()
   const line = win.getByRole('status', { name: 'Engine status' })
   await expect(line).toHaveText('Engine live')
   const pid = await hooks(app, 'enginePid')
@@ -38,6 +43,7 @@ test('recovers after the engine process is killed', async ({ app, win }) => {
 
   // The port closes, the renderer notices, main restarts the engine, the
   // renderer gets a new port and the live query delivers a fresh snapshot.
+  // The new engine picks the stored session up from main on its own.
   await expect(line).toHaveText('Engine restarting', { timeout: 10_000 })
   await expect(line).toHaveText('Engine live', { timeout: 15_000 })
   await expect.poll(() => hooks(app, 'enginePid'), { timeout: 15_000 }).not.toBe(pid)
@@ -48,7 +54,8 @@ test('recovers after the engine process is killed', async ({ app, win }) => {
   await expect(win.getByText(/Pong \d+/)).toBeVisible()
 })
 
-test('says so when the supervisor gives up on the engine', async ({ app, win }) => {
+test('says so when the supervisor gives up on the engine', async ({ juno, app, win }) => {
+  await juno.signIn()
   const line = win.getByRole('status', { name: 'Engine status' })
   await expect(line).toHaveText('Engine live')
 
