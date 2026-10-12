@@ -1,15 +1,20 @@
 /**
- * Typed IPC contract shared by main, preload and renderer.
+ * The wire. Three contracts live here:
  *
- * Each route pairs a channel name with an input and an output schema. Main
- * decodes the input and encodes the output through these schemas, so a bad
- * payload fails in main. The renderer decodes the response again, so a wrong
- * answer fails at the edge, not deep inside the UI.
+ * - renderer <-> engine: `effect/rpc` route groups under `routes/` (ADR 0009),
+ *   live-query helpers in `live.ts`, errors in `errors.ts`.
+ * - renderer <-> main: `Channels` with input and output schemas in `Routes`.
+ * - engine <-> main and the port handoff: `protocol.ts`.
  */
 import { Schema } from 'effect'
 import { Channels, type AppInfo as AppInfoType } from './channels'
 
-export { Channels, type Channel, type JunoBridge, type Platform } from './channels'
+export { Channels, Events, PORT_HANDOFF_TAG, type Channel, type JunoBridge, type Platform, type Theme } from './channels'
+export * from './errors'
+export * from './live'
+export * from './protocol'
+export * from './routes/engine'
+export { AllRoutes } from './routes/index'
 
 export const PlatformSchema = Schema.Literals(['darwin', 'win32', 'linux'])
 
@@ -29,8 +34,13 @@ type _AppInfoMatches = AppInfoType extends typeof AppInfo.Type
 const _check: _AppInfoMatches = true
 void _check
 
+/** renderer -> main request/response routes over `ipcRenderer.invoke`. */
+export const ThemeSchema = Schema.Literals(['light', 'dark'])
+
 export const Routes = {
   [Channels.appGetInfo]: { input: Schema.Void, output: AppInfo },
+  [Channels.engineRequestPort]: { input: Schema.Void, output: Schema.Void },
+  [Channels.launchSetTheme]: { input: Schema.Struct({ theme: ThemeSchema }), output: Schema.Void },
 } as const
 
 export type Routes = typeof Routes
