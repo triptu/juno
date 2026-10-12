@@ -162,7 +162,7 @@ Navigation (sidebar rows, tabs, nav items, filter chips, ⌘K rows, Browse rows,
 
 ### 4.5 Scroll restoration
 
-- Each tab records `{ anchorKey, offsetTop }` on `scrollend` (debounced by the browser). Restoring uses the anchor row's position after mount, before the first paint.
+- Each tab records `{ anchorKey, offset }` on `scrollend` (debounced by the browser). Restoring uses the anchor row's position after mount, before the first paint.
 - Window resize keeps the anchor row in place (Chromium's anchoring does this for in-flow lists).
 - Sidebar scroll position survives filter changes only when the filter result contains the anchor row; otherwise the list starts at the top.
 
