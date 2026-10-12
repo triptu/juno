@@ -89,9 +89,10 @@ shape, but if they use a raw value that now has a token, use the token. Rules co
   `@stylexjs/shared`). So `:hover` and `:active` beat `:disabled`. Set the disabled colour
   explicitly in every state, and use `pointer-events: none` so they cannot match.
 - **A `createTheme` re-emits every variable of its group.** Never use one for a partial override on a
-  child element (say, a different `--foreground-default` inside one card): it also resets the group's
-  other variables there and undoes the active dark or accent theme. Use a token that already has the
-  right value, or add a token.
+  child element (say, a different `--foreground-muted` inside one row): it also resets the group's
+  other variables there and undoes the active dark or accent theme. Set the one variable in a
+  `stylex.create` style instead (`'--foreground-muted': colors['--foreground-subtle']`, as
+  `ListRow selected` does), or use a token that already has the right value.
 - **Static values only.** `stylex.create` cannot call functions or read runtime values. For a value
   that varies at runtime use a function style: `stylex.create({ w: (px: number) => ({ width: px }) })`.
 - **Workspace setup.** Packages ship TypeScript source and list `@stylexjs/stylex` as their own
