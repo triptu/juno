@@ -105,18 +105,19 @@ pnpm workspaces, every package shipped as TypeScript source. The owner wants eac
 
 ```mermaid
 flowchart TD
-  richtext
-  domain --> richtext
+  slack_schema[slack-schema]
+  richtext --> slack_schema
+  domain --> richtext & slack_schema
   contract --> domain
-  slack --> domain
-  store --> domain
+  slack --> slack_schema
+  store --> domain & slack_schema
   sync --> slack & store & domain
   ai --> domain
   assistant --> ai & store & domain & contract
   notifications --> store & domain & ai
   files --> slack & store & sync
   engine --> contract & sync & store & assistant & notifications & files & slack
-  fake_slack[fake-slack] --> slack
+  fake_slack[fake-slack] --> slack_schema
   tokens
   ui --> tokens
   views --> ui & tokens & contract
@@ -127,11 +128,12 @@ flowchart TD
 
 | Package | Rule it protects | Owns | Must not |
 | --- | --- | --- | --- |
-| `@juno/richtext` | pure text handling | Slack `blocks`/`rich_text`/mrkdwn → `MessageBody` view model (sections, quotes, code, lists, mentions, links, emoji, files); composer text with `@`/`#` → `rich_text` blocks; emoji shortcode table; preview text (quotes stripped) | import anything but `effect` Schema |
-| `@juno/domain` | pure rules | ids, `Topic`, status and visibility, title resolution, sorting, topic index computation (`reindexTopics` inputs → row), read-state merge rule, notification decision order, clarity and audience checks, ⌘K grammar, relative time, mention detection, context-menu item lists | I/O, Effect services, React |
+| `@juno/slack-schema` | one Slack vocabulary | Effect Schemas for every payload read or sent (blocks, messages, methods, socket frames), the branded `Ts` with `compareTs`, `maxTs`, `minTs`, `tsToMillis`, `millisToTs` | import anything but `effect` |
+| `@juno/richtext` | pure text handling | Slack `blocks`/`rich_text`/mrkdwn → `MessageBody` view model (sections, quotes, code, lists, mentions, links, emoji, files); composer text with `@`/`#` → `rich_text` blocks; emoji shortcode table; preview text (quotes stripped) | import anything but `slack-schema` types |
+| `@juno/domain` | pure rules | ids, `Topic`, status and visibility, title resolution, sorting, topic index computation (`reindexTopics` inputs → row), read-state merge rule, notification decision order, clarity and audience checks, ⌘K grammar, relative time, mention detection, context-menu item lists; re-exports `Ts` and its helpers | I/O, Effect services, React |
 | `@juno/contract` | the wire | route groups per feature, view models (`TopicRow`, `TopicDetail`, `MessageView`, `ForYouCard`, `JunoMessage`, `NotificationRule`, `Prefs`, `EngineStatus`), events, errors, `channels.ts` for the preload | logic |
-| `@juno/slack` | the client, shared with the fake | `SlackSession`, `HttpTransport`, `SlackApi`, `RequestQueue`, `SlackEdge`, `SlackSocket`, `schemas/` for every payload read or sent, Grid routing | know about topics, the store, the UI |
-| `@juno/fake-slack` | tests cannot leak into the engine | HTTP + WS fake with fixtures, control API (inject, reply, mark from another client, drop socket, 429, expire session, Grid mode), sign-in page, file upload endpoints | import the engine |
+| `@juno/slack` | the client, shared with the fake | `SlackSession`, `HttpTransport`, `SlackApi`, `RequestQueue`, `SlackEdge`, `SlackSocket`, Grid routing | know about topics, the store, the UI |
+| `@juno/fake-slack` | tests cannot leak into the engine | HTTP + WS fake with fixtures, control API (inject, reply, mark from another client, drop socket, 429, expire session, Grid mode), sign-in page, file upload endpoints | import the engine or the client |
 | `@juno/store` | the schema | `cache.db` and `user.db` schemas, timestamped migrations, writer and reader clients, `Invalidation` (wraps `Reactivity`), FTS5 table | call Slack or AI, shape data for the UI |
 | `@juno/sync` | Slack ↔ store | boot, discovery, backfill, merge rules, event application, read-state mirroring, outbox and its worker, reconnect reconciliation, `reindexTopics` calls | render, call AI |
 | `@juno/files` | authenticated bytes | upload staging and the upload flow, file metadata rows, thumbnail URL resolution, download requests to main | touch the renderer |
@@ -166,7 +168,7 @@ The writer connection `ATTACH`es `cache.db` to `user.db` as `cache` so one trans
 
 Connections: `@effect/sql-sqlite-node` gives one serialised connection per client, so the store builds two with one shared `Invalidation`: `StoreWriter` (all writes and transactions; `BEGIN IMMEDIATE`) and `StoreReader` (opened read-only, the same attachment, used by live queries). Both are `SqlClient`s; the service type says which connection a query runs on. WAL mode lets the reader run while the writer commits, and a reader query during an open writer transaction sees the last committed state. Busy timeout is 250 ms (the default 5 s blocks the event loop); `transaction()` retries a lock timeout a few times with backoff in Effect. Backfill writes are split with `inBatches(rows, write)` into transactions of `BATCH_ROWS` (200) so a live query or a Resolve never waits more than a few milliseconds.
 
-Invalidation and live queries (`store/src/invalidation.ts`, the only module that imports `effect/reactivity/Reactivity`): keys are table names, optionally with row ids. A subscription on `['messages']` re-runs for any write to that table; one on `{ messages: ['C1'] }` re-runs for `{ messages: ['C1'] }` and for `['messages']`, not for another channel. `transaction(effect)` wraps the writer transaction in a batch: keys invalidated inside fire once after the commit and not at all on rollback; nested calls become savepoints in the outer batch. `liveQuery(keys, query)` is a `Stream`: it runs `query` now, then again whenever its keys are invalidated, with a leading-edge debounce (the first change after an idle period runs at once; further changes inside the 30 ms window collapse into one trailing run). The engine's route layer turns these streams into the snapshot-plus-deltas wire format of section 2.6; the store itself does not shape rows for the UI.
+Invalidation and live queries (`store/src/invalidation.ts`, the only module that imports `effect/reactivity/Reactivity`): keys are table names, optionally with row ids. A subscription on `['messages']` re-runs for any write to that table; one on `{ messages: ['C1'] }` re-runs for `{ messages: ['C1'] }` and for `['messages']`, not for another channel. `transaction(effect)` wraps the writer transaction in a batch: keys invalidated inside fire once after the commit and not at all on rollback; nested calls become savepoints in the outer batch. `liveQuery(keys, query)` is a `Stream` of `Result`s: it runs `query` now, then again whenever its keys are invalidated, with a leading-edge debounce (the first change after an idle period runs at once; further changes inside the 30 ms window collapse into one trailing run). A failed run is emitted as `Result.fail(e)` and the subscription stays alive; only a defect fails the stream. The engine's route layer turns these streams into the snapshot-plus-deltas wire format of section 2.6; the store itself does not shape rows for the UI.
 
 ### 4.2 Mirror tables (`cache.db`)
 
@@ -363,7 +365,7 @@ Shortcuts and the app menu: main builds the application menu (Juno, File, Edit, 
 
 ## 9. Message rendering, emoji and files
 
-`@juno/richtext` is the owner the review found missing. It converts incoming `blocks` (preferring `rich_text`), mrkdwn `text` as fallback, `attachments` and `files` into `MessageBody` (a tree of sections, quotes, preformatted, lists, inline text with styles, `user`, `channel`, `usergroup`, `broadcast`, `emoji`, `link`, `date`, `file`), resolves mention ids to names through a lookup the caller passes, strips quotes for previews, and converts composer text with `@Name` and `#channel` tokens plus `> ` lines into outgoing `rich_text` blocks. It ships a shortcode-to-unicode table for `:thumbsup:` in text and for reaction names; custom emoji come from the `emoji` table. The picker in v1 is the fixed set of 12. All of this has table-driven tests with real redacted payloads from the live smoke. Until `@juno/slack` exists, `richtext/src/slack-types.ts` holds the minimal input shapes it reads (`rich_text` elements, `section`, `header`, `context`, `divider`); `slack`'s schemas should decode to those shapes or `richtext` should import them from `slack` once the dependency direction allows. A preview with nothing left after stripping quotes shows the sender alone, never a dangling colon.
+`@juno/richtext` is the owner the review found missing. It converts incoming `blocks` (preferring `rich_text`), mrkdwn `text` as fallback, `attachments` and `files` into `MessageBody` (a tree of sections, quotes, preformatted, lists, inline text with styles, `user`, `channel`, `usergroup`, `broadcast`, `emoji`, `link`, `date`, `file`), resolves mention ids to names through a lookup the caller passes, strips quotes for previews, and converts composer text with `@Name` and `#channel` tokens plus `> ` lines into outgoing `rich_text` blocks. It ships a shortcode-to-unicode table for `:thumbsup:` in text and for reaction names; custom emoji come from the `emoji` table. The picker in v1 is the fixed set of 12. All of this has table-driven tests with real redacted payloads from the live smoke. Its input types come from `@juno/slack-schema`, so a decoded `Message` renders with no cast; element kinds the schema does not model (`file`, `canvas`, `message_mention`, future ones) decode to `{ type: 'unknown', raw }` and richtext keeps their `text` or `fallback`. A preview with nothing left after stripping quotes shows the sender alone, never a dangling colon.
 
 Files (owner decision 4, `@juno/files`):
 
