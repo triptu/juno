@@ -1,0 +1,32 @@
+{
+  "name": "@juno/gallery",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Browser-only gallery that renders every ui and views fixture for review and screenshots.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --port 4174 --strictPort",
+    "build": "vite build",
+    "preview": "vite preview --port 4174 --strictPort",
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.shots.json",
+    "shots": "vite build && playwright test"
+  },
+  "dependencies": {
+    "@juno/tokens": "workspace:*",
+    "@juno/ui": "workspace:*",
+    "@stylexjs/stylex": "0.19.1",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.0",
+    "@stylexjs/unplugin": "0.19.1",
+    "@types/node": "24.19.2",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "5.2.0",
+    "typescript": "5.9.3",
+    "unplugin": "2.3.11",
+    "vite": "7.3.7"
+  }
+}

@@ -8,7 +8,9 @@ How to build and run Juno, and how the repo is put together.
 - pnpm 12. Node 25+ has no Corepack, so install it directly: `npm i -g pnpm@12`.
 - macOS for the window chrome and e2e tests. Nothing else is platform-specific yet.
 
-No Playwright browser download is needed. Electron is the browser.
+No Playwright browser download is needed for the e2e tests. Electron is the browser. The
+gallery screenshots use the installed Google Chrome (`channel: 'chrome'`); set
+`GALLERY_BROWSER=chromium` after `npx playwright install chromium` to use Playwright's own build.
 
 ## Commands
 
@@ -22,6 +24,8 @@ Run these from the repo root.
 | `pnpm typecheck` | Runs `tsc` in every package. |
 | `pnpm lint` | Runs oxlint, then a script that fails on any `cursor: pointer`. |
 | `pnpm test:e2e` | Builds, then runs the Playwright tests against the built app. |
+| `pnpm gallery` | Starts the fixture gallery at http://localhost:4174 (browser only, no Electron). |
+| `pnpm gallery:shots` | Builds the gallery and screenshots every fixture in light and dark into `apps/gallery/shots/`. |
 | `pnpm package` | Builds a DMG and zip with electron-builder into `apps/desktop/release/`. Not run in CI yet. |
 
 Copy `.env.example` to `.env` for local secrets. `.env` is ignored by git.
@@ -29,6 +33,7 @@ Copy `.env.example` to `.env` for local secrets. `.env` is ignored by git.
 ## Layout
 
 ```
+apps/gallery            Vite + React gallery: a route and a screenshot per fixture.
 apps/desktop            The Electron app. Thin wiring only.
   src/main              Window factory, IPC handlers, app lifecycle.
   src/preload           contextBridge. Exposes window.juno and nothing else.
@@ -36,8 +41,8 @@ apps/desktop            The Electron app. Thin wiring only.
   e2e                   Playwright tests and the Electron launch fixture.
   electron.vite.config.ts
   electron-builder.yml
-packages/tokens         @juno/tokens. The only place design values live.
-packages/ui             @juno/ui. Presentational React components, StyleX only.
+packages/tokens         @juno/tokens. The only place design values live. See its README.
+packages/ui             @juno/ui. Primitives, StyleX only, each with *.fixtures.tsx. See its README.
 packages/contract       @juno/contract. IPC channel names and Effect Schemas.
 scripts                 Small repo scripts used by package.json.
 docs                    Research, design handoff, this file.
@@ -54,12 +59,14 @@ Each package has its own `tsconfig.json` that extends `tsconfig.base.json` (stri
 ## How tokens flow into StyleX
 
 1. `packages/tokens/src/tokens.stylex.ts` calls `stylex.defineVars` for colours,
-   shadows, radii, spacing, fonts, type scale, motion and layout. Every key starts
-   with `--`, so StyleX emits a CSS variable with that exact name, for example
-   `--background` or `--foreground-default`. Values are the light theme from
-   `docs/design/handoff/prototype/colors_and_type.css`.
+   accent, tints, hues, shadows, radii, spacing, fonts, type roles, motion, layout,
+   sizes, z layers and opacity. Every key starts with `--`, so StyleX emits a CSS
+   variable with that exact name, for example `--background` or `--text-ui-size`.
+   Values come from `docs/design/tokens.md`; `packages/tokens/README.md` explains
+   the naming.
 2. `packages/tokens/src/themes.stylex.ts` calls `stylex.createTheme` with the dark
-   values. `dark` is the pair of classes (colours and shadows) to apply.
+   values. `dark` is the pair of classes (colours and shadows) to apply. The four
+   accent themes override the `accent` group only, so they combine with `dark`.
 3. Components import tokens through the subpath, never a barrel:
    `import { colors } from '@juno/tokens/tokens.stylex'`, then use
    `colors['--background']` inside `stylex.create`.
@@ -67,9 +74,10 @@ Each package has its own `tsconfig.json` that extends `tsconfig.base.json` (stri
    and `defineVars` call into one CSS file during the renderer build. In dev it
    injects a virtual stylesheet into `index.html` itself.
 5. Because the variable names are stable, plain CSS can use them too.
-   `apps/desktop/src/renderer/global.css` sets the body font and background with
-   `var(--font-sans)` and `var(--background)`, and the e2e test reads the same
-   variables to check computed colours.
+   `packages/tokens/src/global.css` (imported by the renderer's `global.css` and by
+   the gallery) sets the body font, background, scrollbars and selection with
+   `var(--font-sans)`, `var(--background)` and friends, and the e2e test reads the
+   same variables to check computed colours.
 6. The theme is switched by `applyTheme()` in `src/renderer/state/theme.ts`, which
    puts the dark classes on `<html>` so portals attached to `<body>` are covered.
 
@@ -78,7 +86,8 @@ Rules that come from the design spec and are enforced in `@juno/ui`:
 - Default arrow cursor, never `cursor: pointer`. `pnpm lint` fails on it.
 - Buttons scale to 0.96 on press, never when disabled.
 - Hover styles only inside `@media (hover: hover)`.
-- 2px focus ring in `--selection-background` on `:focus-visible` only.
+- 2px focus ring in `--focus-ring` on `:focus-visible` only.
+- Rows, tabs and option rows navigate on `pointerdown` (see `packages/ui/README.md`).
 - Fonts are `@fontsource-variable/inter` and `@fontsource/instrument-serif`, bundled
   by Vite from `src/renderer/main.tsx`. Never load fonts from a URL. Instrument Serif
   has one weight (400).
