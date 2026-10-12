@@ -15,3 +15,7 @@ allowBuilds:
 # from that policy on purpose.
 minimumReleaseAgeExclude:
   - effect@4.0.3
+  # vitest 5.0.4 and its @vitest/* parts were published the day fake-slack was
+  # set up.
+  - vitest@5.0.4
+  - "@vitest/*"
