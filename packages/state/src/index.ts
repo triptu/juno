@@ -12,6 +12,7 @@ export {
 } from './atoms'
 export { configureConnection, connectionStateAtom, makeRegistry, registry, type ConnectionState, type Registry } from './client'
 export { engineStatusAtom, pingCommand } from './engine'
+export { importFromSlackAppCommand, sessionStatusAtom, signInCommand, signOutCommand } from './session'
 export { applyListDelta, emptyWindow, type ListWindow } from './list'
 export { acquireRendererPort, EngineFailed } from './port'
 export { appInfoAtom, persistTheme, themeAtom, type Theme } from './shell'
