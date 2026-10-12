@@ -14,7 +14,7 @@ import {
   type SlackConfigOverrides,
 } from '../src/index.ts'
 
-export const SELF = 'U0ALEX'
+export const SELF = 'U0TUSHAR'
 export const CHANNEL = 'C0ENG'
 
 /** A running fake, closed when the scope ends. */

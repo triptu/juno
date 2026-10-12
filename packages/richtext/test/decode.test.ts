@@ -11,7 +11,7 @@ import { messageBody, plainText, previewText, type Lookups, type MessageContent 
 
 const lookups: Lookups = {
   me: 'U0ME',
-  user: (id) => ({ U0ME: 'Alex Moreau', U0MAYA: 'Maya Chen' })[id],
+  user: (id) => ({ U0ME: 'Tushar', U0MAYA: 'Maya Chen' })[id],
   channel: (id) => ({ C0ENG: 'eng' })[id],
 }
 
@@ -67,7 +67,7 @@ describe('decode with slack-schema, render with richtext', () => {
       {
         kind: 'paragraph',
         children: [
-          { kind: 'user', id: 'U0ME', name: 'Alex Moreau', isMe: true },
+          { kind: 'user', id: 'U0ME', name: 'Tushar', isMe: true },
           { kind: 'text', text: ' the ' },
           { kind: 'text', text: 'staging bill', style: { bold: true } },
           { kind: 'text', text: ' doubled, see ' },
@@ -84,7 +84,7 @@ describe('decode with slack-schema, render with richtext', () => {
 
   it('keeps the text of unknown elements in previews and plain text', () => {
     const body = messageBody(message, lookups)
-    expect(previewText(body)).toBe('@Alex Moreau the staging bill doubled, see the invoice 📈 and the file invoice-october.pdf plus Q4 plan see the table')
+    expect(previewText(body)).toBe('@Tushar the staging bill doubled, see the invoice 📈 and the file invoice-october.pdf plus Q4 plan see the table')
     expect(plainText(body)).toContain('invoice-october.pdf')
     expect(plainText(body)).toContain('> from the finance thread')
   })

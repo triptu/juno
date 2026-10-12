@@ -49,7 +49,7 @@ describe('tolerant decoding', () => {
           type: 'rich_text_section',
           elements: [
             { type: 'text', text: 'Hey ', style: { bold: true } },
-            { type: 'user', user_id: 'U0ALEX' },
+            { type: 'user', user_id: 'U0TUSHAR' },
             { type: 'channel', channel_id: 'C0ENG' },
             { type: 'usergroup', usergroup_id: 'S1' },
             { type: 'broadcast', range: 'here' },

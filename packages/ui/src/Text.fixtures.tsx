@@ -14,7 +14,7 @@ const sample: ReadonlyArray<[TextVariant, string]> = [
   ['body', 'Draft plan is in the doc. Short version: logical replication to the new cluster, cut over behind the read-only flag.'],
   ['bodySmall', 'Dev will run the staging dry run Thursday 2–4pm and Leo is pairing. Results go in this thread.'],
   ['ui', 'All topics'],
-  ['preview', 'Maya: Draft is up. Cross-posting to #leadership once @Alex has looked.'],
+  ['preview', 'Maya: Draft is up. Cross-posting to #leadership once @Tushar has looked.'],
   ['pill', 'eng · Public channel'],
   ['buttonSmall', 'Group into topic'],
   ['meta', 'Yesterday'],
@@ -32,7 +32,7 @@ export default defineFixtures(Text, {
   'page-title': fixture({ variant: 'pageTitle', tone: 'default', children: 'For you' }),
   'row-title-unread': fixture({ variant: 'rowTitle', tone: 'default', weight: 'semibold', truncate: true, children: 'Rina Sato · Staff backend' }),
   'preview-clamped': fixture(
-    { variant: 'preview', tone: 'muted', clamp: 2, children: 'Elena: @Alex she has a competing offer with a Friday deadline. Can you do a 30 min close call tomorrow? She was positive on systems design.' },
+    { variant: 'preview', tone: 'muted', clamp: 2, children: 'Elena: @Tushar she has a competing offer with a Friday deadline. Can you do a 30 min close call tomorrow? She was positive on systems design.' },
     { width: 240 },
   ),
   'meta-numeric': fixture({ variant: 'meta', tone: 'muted', numeric: true, children: '10:05' }),

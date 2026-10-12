@@ -4,7 +4,7 @@ import { bodyFromMrkdwn, inlinesOf, messageBody, plainText, previewLine, preview
 
 const lookups: Lookups = {
   me: 'U0ME',
-  user: (id) => ({ U0ME: 'Alex Moreau', U0MAYA: 'Maya Chen', U0LEO: 'Leo Park' })[id],
+  user: (id) => ({ U0ME: 'Tushar', U0MAYA: 'Maya Chen', U0LEO: 'Leo Park' })[id],
   channel: (id) => ({ C0ENG: 'eng', C0INC: 'incidents' })[id],
   usergroup: (id) => ({ S0ONCALL: 'oncall' })[id],
   emoji: (name) => (name === 'partyparrot' ? 'https://emoji.slack-edge.com/T1/partyparrot/abc.gif' : undefined),
@@ -85,7 +85,7 @@ describe('rich_text blocks', () => {
     expect(body.blocks[0]).toEqual({
       kind: 'paragraph',
       children: [
-        { kind: 'user', id: 'U0ME', name: 'Alex Moreau', isMe: true },
+        { kind: 'user', id: 'U0ME', name: 'Tushar', isMe: true },
         { kind: 'text', text: ' and ' },
         { kind: 'user', id: 'U0MAYA', name: 'Maya Chen', isMe: false },
         { kind: 'text', text: ' see ' },
@@ -266,7 +266,7 @@ describe('mrkdwn text', () => {
   it.each<[string, MessageBody['blocks'][number]]>([
     ['plain &amp; escaped &lt;b&gt;', { kind: 'paragraph', children: [{ kind: 'text', text: 'plain & escaped <b>' }] }],
     ['hi <@U0MAYA>', { kind: 'paragraph', children: [{ kind: 'text', text: 'hi ' }, { kind: 'user', id: 'U0MAYA', name: 'Maya Chen', isMe: false }] }],
-    ['<@U0ME|alex> here', { kind: 'paragraph', children: [{ kind: 'user', id: 'U0ME', name: 'Alex Moreau', isMe: true }, { kind: 'text', text: ' here' }] }],
+    ['<@U0ME|tushar> here', { kind: 'paragraph', children: [{ kind: 'user', id: 'U0ME', name: 'Tushar', isMe: true }, { kind: 'text', text: ' here' }] }],
     ['in <#C0ENG|eng>', { kind: 'paragraph', children: [{ kind: 'text', text: 'in ' }, { kind: 'channel', id: 'C0ENG', name: 'eng' }] }],
     ['in <#C0OTHER|random>', { kind: 'paragraph', children: [{ kind: 'text', text: 'in ' }, { kind: 'channel', id: 'C0OTHER', name: 'random' }] }],
     ['<!subteam^S0ONCALL|@oncall> ping', { kind: 'paragraph', children: [{ kind: 'usergroup', id: 'S0ONCALL', handle: 'oncall' }, { kind: 'text', text: ' ping' }] }],

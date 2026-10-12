@@ -24,10 +24,10 @@ export interface SeedUser {
   readonly bot?: boolean
 }
 
-export const SELF_ID = 'U0ALEX'
+export const SELF_ID = 'U0TUSHAR'
 
 export const PEOPLE: ReadonlyArray<SeedUser> = [
-  { id: 'U0ALEX', name: 'alex', realName: 'Alex Moreau', title: 'Engineering manager', color: '008ab3', tz: 'Europe/Paris' },
+  { id: 'U0TUSHAR', name: 'tushar', realName: 'Tushar', title: 'Engineering manager', color: '008ab3', tz: 'Europe/Paris' },
   { id: 'U0MAYA', name: 'maya', realName: 'Maya Chen', title: 'Head of product', color: '7f1734', tz: 'America/Los_Angeles' },
   { id: 'U0LEO', name: 'leo', realName: 'Leo Park', title: 'Staff engineer', color: '2e1f64', tz: 'Europe/London' },
   { id: 'U0SAM', name: 'sam', realName: 'Sam Okafor', title: 'Engineering manager', color: '00674f', tz: 'Europe/Berlin' },
@@ -99,8 +99,8 @@ export const CONVERSATIONS: ReadonlyArray<SeedConversation> = [
         ago: 63,
         replies: [
           { from: 'U0DEV', text: '4 minutes is fine for us. Billing webhooks retry for 30 min, so nothing gets dropped.', ago: 55 },
-          { from: 'U0ALEX', text: "Good. What's the rollback if replication lags on cutover day?", ago: 44 },
-          { from: 'U0LEO', text: 'We keep the old primary warm for 48h. Flip DNS back and replay from the WAL position we logged.', ago: 31, reactions: [['+1', 'U0ALEX', 'U0DEV']] },
+          { from: 'U0TUSHAR', text: "Good. What's the rollback if replication lags on cutover day?", ago: 44 },
+          { from: 'U0LEO', text: 'We keep the old primary warm for 48h. Flip DNS back and replay from the WAL position we logged.', ago: 31, reactions: [['+1', 'U0TUSHAR', 'U0DEV']] },
           { from: 'U0DEV', text: "> What's the rollback if replication lags on cutover day?\nI can own the dry run on staging Thursday.", ago: 13 },
           { from: 'U0LEO', text: "Thursday works. I'll pair. <@U0DEV> can you grab the replica sizing from <#C0PLATFORM|platform>?", ago: 10 },
           { from: 'U0DEV', text: 'Booked 2–4pm. Will post results here.', ago: 4 },
@@ -143,10 +143,10 @@ export const CONVERSATIONS: ReadonlyArray<SeedConversation> = [
         thread: { unread: 3 },
         replies: [
           { from: 'U0PRIYA', text: 'Agree on offline. API v3 has two design partners waiting, though.', ago: 102 },
-          { from: 'U0ALEX', text: "Eng view: cutting both frees about three engineers for sync. I'm for it.", ago: 75 },
+          { from: 'U0TUSHAR', text: "Eng view: cutting both frees about three engineers for sync. I'm for it.", ago: 75 },
           { from: 'U0MAYA', text: "Great. I'll write it up for Thursday's review.", ago: 64, reactions: [['pray', 'U0PRIYA']] },
           { from: 'U0PRIYA', text: "I'll mock an early access flow for the partners so v3 doesn't feel dropped.", ago: 57 },
-          { from: 'U0MAYA', text: 'Draft is up. Cross-posting to <#C0LEADERSHIP|leadership> once <@U0ALEX> has looked.', ago: 25 },
+          { from: 'U0MAYA', text: 'Draft is up. Cross-posting to <#C0LEADERSHIP|leadership> once <@U0TUSHAR> has looked.', ago: 25 },
         ],
       },
       {
@@ -198,8 +198,8 @@ export const CONVERSATIONS: ReadonlyArray<SeedConversation> = [
         ago: 95,
         replies: [
           { from: 'U0JONAS', text: "Cause: a missing index after last night's deploy. Hotfix rolling out.", ago: 84 },
-          { from: 'U0DEV', text: 'Confirmed, p95 back to 210ms.', ago: 72, reactions: [['tada', 'U0JONAS', 'U0ALEX']] },
-          { from: 'U0ALEX', text: 'Thanks both. Postmortem in the usual doc, no rush.', ago: 70, reactions: [['white_check_mark', 'U0JONAS']] },
+          { from: 'U0DEV', text: 'Confirmed, p95 back to 210ms.', ago: 72, reactions: [['tada', 'U0JONAS', 'U0TUSHAR']] },
+          { from: 'U0TUSHAR', text: 'Thanks both. Postmortem in the usual doc, no rush.', ago: 70, reactions: [['white_check_mark', 'U0JONAS']] },
         ],
       },
     ],
@@ -216,8 +216,8 @@ export const CONVERSATIONS: ReadonlyArray<SeedConversation> = [
         ago: 160,
         replies: [
           { from: 'U0LEO', text: 'Two-line. Skimming beats fitting more rows on screen.', ago: 146 },
-          { from: 'U0ALEX', text: 'Agree. And keep the reply count, it tells me whether to open it now or later.', ago: 139 },
-          { from: 'U0PRIYA', text: "That's where I landed too. Shipping two-line as the default.", ago: 130, reactions: [['+1', 'U0LEO', 'U0ALEX']] },
+          { from: 'U0TUSHAR', text: 'Agree. And keep the reply count, it tells me whether to open it now or later.', ago: 139 },
+          { from: 'U0PRIYA', text: "That's where I landed too. Shipping two-line as the default.", ago: 130, reactions: [['+1', 'U0LEO', 'U0TUSHAR']] },
         ],
       },
       {
@@ -266,7 +266,7 @@ export const CONVERSATIONS: ReadonlyArray<SeedConversation> = [
     id: 'C0HIRING',
     name: 'hiring',
     kind: 'private',
-    members: ['U0ALEX', 'U0ELENA', 'U0SAM', 'U0MAYA'],
+    members: ['U0TUSHAR', 'U0ELENA', 'U0SAM', 'U0MAYA'],
     topic: 'Open roles and candidates',
     messages: [
       {
@@ -276,14 +276,14 @@ export const CONVERSATIONS: ReadonlyArray<SeedConversation> = [
         thread: { unread: 2 },
         replies: [
           { from: 'U0SAM', text: 'Strong systems design. Went deep on idempotency without being prompted.', ago: 26 },
-          { from: 'U0ELENA', text: '<@U0ALEX> she has a competing offer with a Friday deadline. Can you do a 30 min close call tomorrow?', ago: 12 },
+          { from: 'U0ELENA', text: '<@U0TUSHAR> she has a competing offer with a Friday deadline. Can you do a 30 min close call tomorrow?', ago: 12 },
         ],
       },
       {
         from: 'U0ELENA',
         text: "Marco's references came back. All positive, one note on delegation.",
         ago: 1520,
-        replies: [{ from: 'U0ALEX', text: "Let's talk through that note at sync. Otherwise moving forward.", ago: 1500 }],
+        replies: [{ from: 'U0TUSHAR', text: "Let's talk through that note at sync. Otherwise moving forward.", ago: 1500 }],
       },
     ],
   },
@@ -291,7 +291,7 @@ export const CONVERSATIONS: ReadonlyArray<SeedConversation> = [
     id: 'C0LEADERSHIP',
     name: 'leadership',
     kind: 'private',
-    members: ['U0ALEX', 'U0MAYA', 'U0SAM'],
+    members: ['U0TUSHAR', 'U0MAYA', 'U0SAM'],
     messages: [
       {
         from: 'U0MAYA',
@@ -300,7 +300,7 @@ export const CONVERSATIONS: ReadonlyArray<SeedConversation> = [
         thread: { unread: 1 },
         replies: [
           { from: 'U0SAM', text: 'Eng ask is six: four backend, one SRE, one EM.', ago: 3015 },
-          { from: 'U0MAYA', text: '<@U0ALEX> can you own the narrative for the SRE role?', ago: 3000 },
+          { from: 'U0MAYA', text: '<@U0TUSHAR> can you own the narrative for the SRE role?', ago: 3000 },
         ],
       },
       { from: 'U0MAYA', text: 'Retro notes are in the doc.', ago: 18 * DAY + 80 },
@@ -310,17 +310,17 @@ export const CONVERSATIONS: ReadonlyArray<SeedConversation> = [
     id: 'D0MAYA',
     name: '',
     kind: 'im',
-    members: ['U0ALEX', 'U0MAYA'],
+    members: ['U0TUSHAR', 'U0MAYA'],
     messages: [
       { from: 'U0MAYA', text: 'Running 5 late to the planning sync', ago: 2005 },
-      { from: 'U0ALEX', text: 'no worries', ago: 2000 },
+      { from: 'U0TUSHAR', text: 'no worries', ago: 2000 },
       {
         from: 'U0MAYA',
         text: 'Can eng take the Wednesday afternoon slot at the offsite? 90 minutes.',
         ago: 103,
         thread: { unread: 1 },
         replies: [
-          { from: 'U0ALEX', text: 'Yes. Thinking a roadmap teardown, not slides.', ago: 90 },
+          { from: 'U0TUSHAR', text: 'Yes. Thinking a roadmap teardown, not slides.', ago: 90 },
           { from: 'U0MAYA', text: 'Perfect. Send me a one-line description when you have it.', ago: 38 },
         ],
       },
@@ -330,25 +330,25 @@ export const CONVERSATIONS: ReadonlyArray<SeedConversation> = [
     id: 'D0SAM',
     name: '',
     kind: 'im',
-    members: ['U0ALEX', 'U0SAM'],
+    members: ['U0TUSHAR', 'U0SAM'],
     messages: [
       {
         from: 'U0SAM',
         text: 'Notes from today: promo packet for Dev, on-call load, Q1 planning.',
         ago: 1810,
-        replies: [{ from: 'U0ALEX', text: "Thanks. I'll review Dev's packet this week.", ago: 1800 }],
+        replies: [{ from: 'U0TUSHAR', text: "Thanks. I'll review Dev's packet this week.", ago: 1800 }],
       },
     ],
   },
   {
     id: 'G0MAYALEO',
-    name: 'mpdm-alex--maya--leo-1',
+    name: 'mpdm-tushar--maya--leo-1',
     kind: 'mpim',
-    members: ['U0ALEX', 'U0MAYA', 'U0LEO'],
+    members: ['U0TUSHAR', 'U0MAYA', 'U0LEO'],
     messages: [
       { from: 'U0LEO', text: 'lunch friday?', ago: 3110 },
       { from: 'U0MAYA', text: 'yes. the ramen place', ago: 3105 },
-      { from: 'U0ALEX', text: 'in', ago: 3100 },
+      { from: 'U0TUSHAR', text: 'in', ago: 3100 },
     ],
   },
 ]

@@ -54,7 +54,7 @@ describe('authentication', () => {
 
     const submit = await fetch(`${fake.url}/signin`, {
       method: 'POST',
-      body: new URLSearchParams({ email: 'alex@juno-fake.test', password: 'anything' }),
+      body: new URLSearchParams({ email: 'tushar@juno-fake.test', password: 'anything' }),
       redirect: 'manual',
     })
     expect(submit.status).toBe(303)

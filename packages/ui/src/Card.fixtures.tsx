@@ -58,7 +58,7 @@ export default defineFixtures(
       kind: 'Follow-up',
       sourceIcon: Hash,
       source: 'Q4 roadmap cuts',
-      title: 'Alex has not looked at the roadmap draft',
+      title: 'Tushar has not looked at the roadmap draft',
       body: 'Maya is waiting on your review before cross-posting to #leadership.',
       actions: (
         <>

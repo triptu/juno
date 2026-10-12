@@ -2,7 +2,7 @@
 
 A calm, topic-first desktop client for Slack. Product and design spec for the build.
 
-Version 1 · October 2026 · Owner: Alex Moreau · Prototype: Threads v3.dc.html
+Version 1 · October 2026 · Owner: Tushar · Prototype: Threads v3.dc.html
 
 **How to read this.** This is a product and design doc, not a technical plan. It describes what Juno is, how every surface behaves and how it should look and feel. The build is expected to reverse-engineer the Slack desktop client's data access and run as an Electron, React and TypeScript app, styled with StyleX, using pi-ai with the OpenRouter provider for AI. Implementation choices beyond that are open.
 
