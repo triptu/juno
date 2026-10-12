@@ -1,21 +1,22 @@
+import { Hash, Lock, User, Users } from 'lucide-react'
 import { ContextPill } from './ContextPill'
 import { defineFixtures, fixture, scene } from './fixtures/define'
 import { Row } from './fixtures/layout'
 
 export default defineFixtures(ContextPill, {
-  public: fixture({ kind: 'public', name: 'eng', showKind: true }),
-  private: fixture({ kind: 'private', name: 'hiring', showKind: true }),
-  dm: fixture({ kind: 'dm', name: 'Maya Chen', showKind: true }),
-  group: fixture({ kind: 'group', name: 'Maya, Leo', showKind: true }),
-  small: fixture({ kind: 'public', name: 'eng', showKind: true, size: 22 }),
-  'to-field': fixture({ kind: 'public', name: 'eng', showKind: true, size: 28 }),
-  'name-only': fixture({ kind: 'dm', name: 'Maya Chen' }),
+  public: fixture({ tint: 'public', icon: Hash, name: 'eng', kindLabel: 'Public channel', showKind: true }),
+  private: fixture({ tint: 'private', icon: Lock, name: 'hiring', kindLabel: 'Private channel', showKind: true }),
+  dm: fixture({ tint: 'dm', icon: User, name: 'Maya Chen', kindLabel: 'Direct message', showKind: true }),
+  group: fixture({ tint: 'dm', icon: Users, name: 'Maya, Leo', kindLabel: 'Group DM', showKind: true }),
+  small: fixture({ tint: 'public', icon: Hash, name: 'eng', kindLabel: 'Public channel', showKind: true, size: 22 }),
+  'to-field': fixture({ tint: 'public', icon: Hash, name: 'eng', kindLabel: 'Public channel', showKind: true, size: 28 }),
+  'name-only': fixture({ tint: 'dm', icon: User, name: 'Maya Chen', kindLabel: 'Direct message' }),
   'all-kinds': scene(() => (
     <Row gap="sm">
-      <ContextPill kind="public" name="eng" showKind />
-      <ContextPill kind="private" name="hiring" showKind />
-      <ContextPill kind="dm" name="Maya Chen" showKind />
-      <ContextPill kind="group" name="Maya, Leo" showKind />
+      <ContextPill tint="public" icon={Hash} name="eng" kindLabel="Public channel" showKind />
+      <ContextPill tint="private" icon={Lock} name="hiring" kindLabel="Private channel" showKind />
+      <ContextPill tint="dm" icon={User} name="Maya Chen" kindLabel="Direct message" showKind />
+      <ContextPill tint="dm" icon={Users} name="Maya, Leo" kindLabel="Group DM" showKind />
     </Row>
   )),
 })

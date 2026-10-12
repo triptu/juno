@@ -1,6 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
 import { accent, colors, spacing } from '@juno/tokens/tokens.stylex'
-import { roles } from './internal/type'
+import { variants as typeVariants } from './internal/type'
 
 export interface DividerProps {
   /** `default` for menus and hairlines, `subtle` between rows. */
@@ -34,7 +34,7 @@ export interface LabelledRuleProps {
 export function LabelledRule({ label, tone = 'accent' }: LabelledRuleProps) {
   return (
     <div role="separator" aria-label={label} {...stylex.props(styles.labelled)}>
-      <span {...stylex.props(roles.divider, tone === 'accent' ? styles.labelAccent : styles.labelMuted)}>{label}</span>
+      <span {...stylex.props(typeVariants.divider, tone === 'accent' ? styles.labelAccent : styles.labelMuted)}>{label}</span>
       <span {...stylex.props(styles.rule, tone === 'accent' ? styles.ruleAccent : styles.ruleMuted)} />
     </div>
   )
@@ -61,6 +61,8 @@ const styles = stylex.create({
     display: 'flex',
     alignItems: 'center',
     gap: spacing['--space-2-5'],
+    // Fills the row so the rule runs the whole message column.
+    width: '100%',
     userSelect: 'none',
   },
   labelAccent: { color: accent['--hl'] },

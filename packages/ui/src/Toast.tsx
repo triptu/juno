@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 import { colors, layout, radii, sizes, spacing, weights, z } from '@juno/tokens/tokens.stylex'
 import { Kbd } from './Kbd'
 import { interactive } from './internal/interactive'
-import { roles } from './internal/type'
+import { variants as typeVariants } from './internal/type'
 import { Surface } from './Surface'
 
 const HOVER = '@media (hover: hover)'
@@ -23,12 +23,12 @@ export interface ToastProps {
 export function Toast({ text, action }: ToastProps) {
   return (
     <Surface kind="toast" role="status" aria-live="polite" sx={styles.toast}>
-      <span {...stylex.props(roles.ui, styles.text)}>{text}</span>
+      <span {...stylex.props(typeVariants.ui, styles.text)}>{text}</span>
       {action ? (
         <button
           type="button"
           onClick={action.onAction}
-          {...stylex.props(interactive.reset, interactive.feedback, interactive.press, interactive.focusRing, roles.buttonSmall, styles.action)}
+          {...stylex.props(interactive.reset, interactive.feedback, interactive.press, interactive.focusRing, typeVariants.buttonSmall, styles.action)}
         >
           {action.label}
           {action.kbd ? <Kbd inherit>{action.kbd}</Kbd> : null}

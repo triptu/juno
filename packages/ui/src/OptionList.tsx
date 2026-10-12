@@ -1,10 +1,10 @@
 import * as stylex from '@stylexjs/stylex'
-import { useCallback, type HTMLAttributes, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
-import { colors, radii, sizes, spacing } from '@juno/tokens/tokens.stylex'
+import { createContext, useCallback, useContext, type HTMLAttributes, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
+import { colors, radii, sizes, spacing, weights } from '@juno/tokens/tokens.stylex'
 import { Divider } from './Divider'
 import { activateHandlers, type ActivateEvent } from './internal/activate'
 import { interactive } from './internal/interactive'
-import { roles } from './internal/type'
+import { variants as typeVariants } from './internal/type'
 import { Text } from './Text'
 
 const HOVER = '@media (hover: hover)'
@@ -24,23 +24,28 @@ export interface OptionListProps extends Omit<HTMLAttributes<HTMLDivElement>, 's
   readonly children?: ReactNode
 }
 
+// Rows read the list's role so a menu gets menuitems and a listbox options.
+const ListRole = createContext<'listbox' | 'menu'>('listbox')
+
 /**
  * The vertical list used by menus, pickers, suggestions and the palette.
  * Dumb: the owner tracks the active id and handles selection.
  */
 export function OptionList({ role = 'listbox', label, activeId, focusable = false, onKeyDown, children, ...rest }: OptionListProps) {
   return (
-    <div
-      role={role}
-      aria-label={label}
-      aria-activedescendant={activeId}
-      tabIndex={focusable ? 0 : undefined}
-      onKeyDown={onKeyDown}
-      {...rest}
-      {...stylex.props(styles.list, focusable && interactive.focusRing)}
-    >
-      {children}
-    </div>
+    <ListRole.Provider value={role}>
+      <div
+        role={role}
+        aria-label={label}
+        aria-activedescendant={activeId}
+        tabIndex={focusable ? 0 : undefined}
+        onKeyDown={onKeyDown}
+        {...rest}
+        {...stylex.props(styles.list, focusable && interactive.focusRing)}
+      >
+        {children}
+      </div>
+    </ListRole.Provider>
   )
 }
 
@@ -87,11 +92,14 @@ export function OptionRow({
   onContextMenu,
 }: OptionRowProps) {
   const twoLine = size === 55
+  const listRole = useContext(ListRole)
+  // The keyboard highlight is announced through aria-activedescendant on the
+  // list; aria-selected is only the real selection, and only in a listbox.
   return (
     <div
       id={id}
-      role="option"
-      aria-selected={selected || active}
+      role={listRole === 'menu' ? 'menuitem' : 'option'}
+      aria-selected={listRole === 'menu' ? undefined : selected}
       aria-disabled={disabled || undefined}
       {...activateHandlers<HTMLDivElement>(onSelect, { keepFocus: true, disabled })}
       onPointerMove={onActivate}
@@ -107,12 +115,12 @@ export function OptionRow({
     >
       {leading ? <span {...stylex.props(styles.leading)}>{leading}</span> : null}
       <span {...stylex.props(styles.body, twoLine && styles.bodyColumn)}>
-        <span {...stylex.props(styles.label, twoLine ? roles.body : roles.ui)}>{label}</span>
+        <span {...stylex.props(styles.label, twoLine ? typeVariants.body : typeVariants.ui)}>{label}</span>
         {sub !== undefined && subPlacement !== 'end' ? (
-          <span {...stylex.props(styles.sub, subPlacement === 'below' ? roles.meta : roles.tag)}>{sub}</span>
+          <span {...stylex.props(styles.sub, subPlacement === 'below' ? typeVariants.meta : typeVariants.tag)}>{sub}</span>
         ) : null}
       </span>
-      {sub !== undefined && subPlacement === 'end' ? <span {...stylex.props(styles.subEnd, roles.tag)}>{sub}</span> : null}
+      {sub !== undefined && subPlacement === 'end' ? <span {...stylex.props(styles.subEnd, typeVariants.tag)}>{sub}</span> : null}
       {trailing ? <span {...stylex.props(styles.trailing)}>{trailing}</span> : null}
     </div>
   )
@@ -125,7 +133,7 @@ export interface OptionGroupLabelProps {
 /** Section heading inside a list: PEOPLE, CHANNELS, RECENT. */
 export function OptionGroupLabel({ children }: OptionGroupLabelProps) {
   return (
-    <Text role="sectionLabel" tone="muted" as="div" sx={styles.groupLabel}>
+    <Text variant="sectionLabel" tone="muted" as="div" sx={styles.groupLabel}>
       {children}
     </Text>
   )
@@ -152,11 +160,11 @@ export function OptionHeader({ leading, title, sub }: OptionHeaderProps) {
     <div {...stylex.props(styles.header)}>
       {leading}
       <span {...stylex.props(styles.headerText)}>
-        <Text role="ui" weight="semibold" truncate>
+        <Text variant="ui" weight="semibold" truncate>
           {title}
         </Text>
         {sub !== undefined ? (
-          <Text role="meta" tone="muted" truncate>
+          <Text variant="meta" tone="muted" truncate>
             {sub}
           </Text>
         ) : null}
@@ -296,12 +304,12 @@ const styles = stylex.create({
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
     minWidth: 0,
-    fontWeight: 400,
+    fontWeight: weights['--weight-regular'],
   },
   subEnd: {
     color: colors['--foreground-muted'],
     flexShrink: 0,
-    fontWeight: 400,
+    fontWeight: weights['--weight-regular'],
   },
   trailing: {
     display: 'inline-flex',

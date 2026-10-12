@@ -1,7 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import type { ReactNode } from 'react'
 import { colors, opacity, radii, spacing } from '@juno/tokens/tokens.stylex'
-import { roles } from './internal/type'
+import { variants as typeVariants } from './internal/type'
 
 export interface KbdProps {
   /** `plain` is bare muted text ("⌘J"); `key` draws a keycap ("esc"). */
@@ -14,7 +14,7 @@ export interface KbdProps {
 /** Keyboard hint in the mono face. */
 export function Kbd({ look = 'plain', inherit = false, children }: KbdProps) {
   return (
-    <kbd {...stylex.props(styles.base, roles.kbd, look === 'key' && styles.key, inherit && styles.inherit)}>
+    <kbd {...stylex.props(styles.base, typeVariants.kbd, look === 'key' && styles.key, inherit && styles.inherit)}>
       {children}
     </kbd>
   )

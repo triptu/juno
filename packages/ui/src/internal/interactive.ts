@@ -65,10 +65,8 @@ export const interactive = stylex.create({
     outlineOffset: `calc(-1 * ${sizes['--focus-ring-width']})`,
     outlineColor: colors['--focus-ring'],
   },
-  disabled: {
-    opacity: opacity['--opacity-disabled'],
-  },
-  // Looks disabled but stays focusable (Send with an empty draft).
+  // The disabled look, also used by `dimmed` controls that look disabled but
+  // stay focusable (Send with an empty draft).
   dimmed: {
     opacity: opacity['--opacity-disabled'],
   },

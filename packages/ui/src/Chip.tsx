@@ -5,7 +5,7 @@ import { accent, colors, radii, sizes, spacing, tints, weights } from '@juno/tok
 import { Icon, type IconSize } from './Icon'
 import { IconButton } from './IconButton'
 import { interactive } from './internal/interactive'
-import { roles } from './internal/type'
+import { variants as typeVariants } from './internal/type'
 
 const HOVER = '@media (hover: hover)'
 
@@ -81,7 +81,7 @@ export function Chip(props: ChipProps) {
   )
   const shared = [
     styles.base,
-    roles[size <= 20 ? 'tag' : size === 22 || size === 24 ? 'meta' : size === 26 ? 'pill' : 'ui'],
+    typeVariants[size <= 20 ? 'tag' : size === 22 || size === 24 ? 'meta' : size === 26 ? 'pill' : 'ui'],
     styles.weightMedium,
     sizeStyles[size],
     variants[variant],

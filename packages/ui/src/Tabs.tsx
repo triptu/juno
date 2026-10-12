@@ -6,7 +6,7 @@ import { Icon } from './Icon'
 import { IconButton } from './IconButton'
 import { activateHandlers, type ActivateEvent } from './internal/activate'
 import { interactive } from './internal/interactive'
-import { roles } from './internal/type'
+import { variants as typeVariants } from './internal/type'
 
 const HOVER = '@media (hover: hover)'
 
@@ -49,7 +49,7 @@ export function Tab({ icon, label, active = false, onSelect, onClose, onContextM
       title={label}
       onContextMenu={onContextMenu}
       {...activateHandlers<HTMLDivElement>(onSelect)}
-      {...stylex.props(interactive.focusRingInset, styles.tab, roles.ui, active ? styles.tabActive : styles.tabInactive)}
+      {...stylex.props(interactive.focusRingInset, styles.tab, typeVariants.ui, active ? styles.tabActive : styles.tabInactive)}
     >
       <Icon icon={icon} size={14} dim />
       <span {...stylex.props(styles.label)}>{label}</span>
@@ -77,6 +77,9 @@ const styles = stylex.create({
   strip: {
     display: 'flex',
     alignItems: 'flex-end',
+    // Fills the window so the strip and its bottom border run edge to edge.
+    width: '100%',
+    boxSizing: 'border-box',
     height: layout['--titlebar-height'],
     paddingInline: spacing['--space-2-5'],
     gap: spacing['--space-0-5'],

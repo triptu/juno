@@ -36,11 +36,11 @@ export function PageHeader({ title, size = 'default', subtitle, trailing }: Page
   return (
     <header {...stylex.props(styles.header)}>
       <div {...stylex.props(styles.headerText)}>
-        <Text role={size === 'compact' ? 'pageTitleCompact' : 'pageTitle'} tone="default">
+        <Text variant={size === 'compact' ? 'pageTitleCompact' : 'pageTitle'} tone="default">
           {title}
         </Text>
         {subtitle !== undefined ? (
-          <Text role="body" tone="subtle" as="p" sx={styles.subtitle}>
+          <Text variant="body" tone="subtle" as="p" sx={styles.subtitle}>
             {subtitle}
           </Text>
         ) : null}
@@ -61,11 +61,11 @@ export function Section({ heading, sub, children }: SectionProps) {
   return (
     <section {...stylex.props(styles.section)}>
       <div {...stylex.props(styles.sectionHead)}>
-        <Text role="heading" tone="default">
+        <Text variant="heading" tone="default">
           {heading}
         </Text>
         {sub ? (
-          <Text role="ui" tone="muted" as="p">
+          <Text variant="ui" tone="muted" as="p">
             {sub}
           </Text>
         ) : null}

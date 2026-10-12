@@ -1,8 +1,8 @@
 import { defineFixtures, fixture, scene } from './fixtures/define'
 import { Stack } from './fixtures/layout'
-import { Text, type TextRole } from './Text'
+import { Text, type TextVariant } from './Text'
 
-const sample: ReadonlyArray<[TextRole, string]> = [
+const sample: ReadonlyArray<[TextVariant, string]> = [
   ['display', 'What do you need?'],
   ['pageTitle', 'Notifications'],
   ['pageTitleCompact', 'All topics'],
@@ -28,18 +28,18 @@ const sample: ReadonlyArray<[TextRole, string]> = [
 ]
 
 export default defineFixtures(Text, {
-  body: fixture({ role: 'body', tone: 'default', selectable: true, children: 'We keep the old primary warm for 48h. Flip DNS back and replay from the WAL position we logged.' }),
-  'page-title': fixture({ role: 'pageTitle', tone: 'default', children: 'For you' }),
-  'row-title-unread': fixture({ role: 'rowTitle', tone: 'default', weight: 'semibold', truncate: true, children: 'Rina Sato · Staff backend' }),
+  body: fixture({ variant: 'body', tone: 'default', selectable: true, children: 'We keep the old primary warm for 48h. Flip DNS back and replay from the WAL position we logged.' }),
+  'page-title': fixture({ variant: 'pageTitle', tone: 'default', children: 'For you' }),
+  'row-title-unread': fixture({ variant: 'rowTitle', tone: 'default', weight: 'semibold', truncate: true, children: 'Rina Sato · Staff backend' }),
   'preview-clamped': fixture(
-    { role: 'preview', tone: 'muted', clamp: 2, children: 'Elena: @Alex she has a competing offer with a Friday deadline. Can you do a 30 min close call tomorrow? She was positive on systems design.' },
+    { variant: 'preview', tone: 'muted', clamp: 2, children: 'Elena: @Alex she has a competing offer with a Friday deadline. Can you do a 30 min close call tomorrow? She was positive on systems design.' },
     { width: 240 },
   ),
-  'meta-numeric': fixture({ role: 'meta', tone: 'muted', numeric: true, children: '10:05' }),
+  'meta-numeric': fixture({ variant: 'meta', tone: 'muted', numeric: true, children: '10:05' }),
   'all-roles': scene(() => (
     <Stack gap="sm" width={560}>
-      {sample.map(([role, copy]) => (
-        <Text key={role} role={role} tone="default" title={role}>
+      {sample.map(([variant, copy]) => (
+        <Text key={variant} variant={variant} tone="default" title={variant}>
           {copy}
         </Text>
       ))}
@@ -47,16 +47,16 @@ export default defineFixtures(Text, {
   )),
   tones: scene(() => (
     <Stack gap="sm">
-      <Text role="ui" tone="default">
+      <Text variant="ui" tone="default">
         Default: body text and titles
       </Text>
-      <Text role="ui" tone="subtle">
+      <Text variant="ui" tone="subtle">
         Subtle: icons, secondary text, unread previews
       </Text>
-      <Text role="ui" tone="muted">
+      <Text variant="ui" tone="muted">
         Muted: meta, times, placeholders
       </Text>
-      <Text role="ui" tone="accent">
+      <Text variant="ui" tone="accent">
         Accent: the new divider
       </Text>
     </Stack>

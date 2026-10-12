@@ -35,14 +35,14 @@ export function Card({ kindIcon, kind, sourceIcon, source, title, body, children
         <div {...stylex.props(styles.header)}>
           {kindIcon ? <Icon icon={kindIcon} size={13} /> : null}
           {kind ? (
-            <Text role="meta" weight="medium" tone="subtle">
+            <Text variant="meta" weight="medium" tone="subtle">
               {kind}
             </Text>
           ) : null}
           {kind && source ? <span aria-hidden>·</span> : null}
           {sourceIcon ? <Icon icon={sourceIcon} size={11} /> : null}
           {source ? (
-            <Text role="meta" tone="muted" truncate>
+            <Text variant="meta" tone="muted" truncate>
               {source}
             </Text>
           ) : null}
@@ -54,12 +54,12 @@ export function Card({ kindIcon, kind, sourceIcon, source, title, body, children
         </div>
       ) : null}
       {title ? (
-        <Text role="heading" tone="default">
+        <Text variant="heading" tone="default">
           {title}
         </Text>
       ) : null}
       {body !== undefined ? (
-        <Text role="bodySmall" tone="subtle">
+        <Text variant="bodySmall" tone="subtle">
           {body}
         </Text>
       ) : null}

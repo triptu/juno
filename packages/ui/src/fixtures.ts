@@ -18,6 +18,7 @@ import Icon from './Icon.fixtures'
 import IconButton from './IconButton.fixtures'
 import Kbd from './Kbd.fixtures'
 import ListRow from './ListRow.fixtures'
+import NavItem from './NavItem.fixtures'
 import OptionList from './OptionList.fixtures'
 import Page from './Page.fixtures'
 import Popover from './Popover.fixtures'
@@ -47,6 +48,7 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   IconButton,
   Kbd,
   ListRow,
+  NavItem,
   OptionList,
   Page,
   Popover,

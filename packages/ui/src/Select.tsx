@@ -1,7 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import type { SelectHTMLAttributes } from 'react'
 import { colors, radii, sizes, spacing } from '@juno/tokens/tokens.stylex'
-import { roles } from './internal/type'
+import { variants as typeVariants } from './internal/type'
 
 export interface SelectOption {
   readonly value: string
@@ -18,7 +18,7 @@ export interface SelectProps extends Omit<SelectHTMLAttributes<HTMLSelectElement
 /** A native select styled like a 30 or 32px field. The menu is the OS's. */
 export function Select({ options, size = 32, label, ...rest }: SelectProps) {
   return (
-    <select aria-label={label} {...rest} {...stylex.props(styles.select, roles.ui, sizeStyles[size])}>
+    <select aria-label={label} {...rest} {...stylex.props(styles.select, typeVariants.ui, sizeStyles[size])}>
       {options.map((option) => (
         <option key={option.value} value={option.value} disabled={option.disabled}>
           {option.label}

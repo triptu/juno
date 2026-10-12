@@ -1,42 +1,42 @@
 import * as stylex from '@stylexjs/stylex'
-import { Hash, Lock, User, Users } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import { radii, sizes, spacing, tints, weights } from '@juno/tokens/tokens.stylex'
 import { Icon, type IconSize } from './Icon'
-import { roles } from './internal/type'
+import { variants as typeVariants } from './internal/type'
 
-export type ContextKind = 'public' | 'private' | 'dm' | 'group'
+/** The three context tints from the tokens: neutral, amber and blue. */
+export type ContextTint = 'public' | 'private' | 'dm'
 export type ContextPillSize = 22 | 26 | 28
 
 export interface ContextPillProps {
-  readonly kind: ContextKind
+  readonly tint: ContextTint
+  /** The icon for the kind of place: hash, lock, user, users. */
+  readonly icon: LucideIcon
   /** Channel or person name without the "#". */
   readonly name: string
-  /** Appends " · Public channel" and so on at regular weight. */
+  /** The kind, appended after a dot at regular weight ("Public channel"). Also the tooltip. */
+  readonly kindLabel?: string
+  /** Append `kindLabel` to the visible text. */
   readonly showKind?: boolean
   readonly size?: ContextPillSize
 }
 
-const icons = { public: Hash, private: Lock, dm: User, group: Users } as const
-
-export const contextKindLabel: Record<ContextKind, string> = {
-  public: 'Public channel',
-  private: 'Private channel',
-  dm: 'Direct message',
-  group: 'Group DM',
-}
-
 const iconBySize: Record<ContextPillSize, IconSize> = { 22: 11, 26: 13, 28: 13 }
 
-/** The tinted pill that says where a topic lives. */
-export function ContextPill({ kind, name, showKind = false, size = 26 }: ContextPillProps) {
+/**
+ * The tinted pill that says where a topic lives. The owner maps the
+ * conversation kind to a tint, an icon and a label (that rule lives in
+ * `@juno/domain`); the pill only draws them.
+ */
+export function ContextPill({ tint, icon, name, kindLabel, showKind = false, size = 26 }: ContextPillProps) {
   return (
-    <span title={contextKindLabel[kind]} {...stylex.props(styles.base, roles.pill, sizeStyles[size], tintStyles[kind])}>
-      <Icon icon={icons[kind]} size={iconBySize[size]} />
+    <span title={kindLabel} {...stylex.props(styles.base, typeVariants.pill, sizeStyles[size], tintStyles[tint])}>
+      <Icon icon={icon} size={iconBySize[size]} />
       <span {...stylex.props(styles.name)}>{name}</span>
-      {showKind ? (
+      {showKind && kindLabel ? (
         <span {...stylex.props(styles.kind)}>
           <span aria-hidden>{' · '}</span>
-          {contextKindLabel[kind]}
+          {kindLabel}
         </span>
       ) : null}
     </span>
@@ -78,5 +78,4 @@ const tintStyles = stylex.create({
   public: { color: tints['--tint-public-fg'], backgroundColor: tints['--tint-public-bg'] },
   private: { color: tints['--tint-private-fg'], backgroundColor: tints['--tint-private-bg'] },
   dm: { color: tints['--tint-dm-fg'], backgroundColor: tints['--tint-dm-bg'] },
-  group: { color: tints['--tint-dm-fg'], backgroundColor: tints['--tint-dm-bg'] },
 })

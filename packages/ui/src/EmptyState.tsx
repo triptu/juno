@@ -20,16 +20,16 @@ export function EmptyState({ title, body, action, variant = 'list', padding = 'l
   return (
     <div {...stylex.props(styles.root, padding === 'page' ? styles.page : styles.list)}>
       {variant === 'workspace' ? (
-        <Text role="emptyTitle" tone="subtle">
+        <Text variant="emptyTitle" tone="subtle">
           {title}
         </Text>
       ) : (
-        <Text role="body" weight="medium" tone="default" as="h2">
+        <Text variant="body" weight="medium" tone="default" as="h2">
           {title}
         </Text>
       )}
       {body ? (
-        <Text role="ui" tone="muted" as="p" sx={styles.body}>
+        <Text variant="ui" tone="muted" as="p" sx={styles.body}>
           {body}
         </Text>
       ) : null}

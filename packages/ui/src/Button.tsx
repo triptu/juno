@@ -5,38 +5,32 @@ import { accent, colors, radii, shadows, sizes, spacing, weights } from '@juno/t
 import { Icon, type IconSize } from './Icon'
 import { Kbd } from './Kbd'
 import { interactive } from './internal/interactive'
-import { roles } from './internal/type'
+import { variants as typeVariants } from './internal/type'
 
-export type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'raised'
+/**
+ * `filter` is the quick-filter chip (All, Channels, DMs, Unread): ghost on
+ * the sidebar, muted until hovered, and semibold on a secondary fill when
+ * `pressed`. It has one size, 28px, with the 7px radius.
+ */
+export type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'raised' | 'filter'
 /** Height: xs 22, sm 28, md 30, lg 32, xl 34, 2xl 36. */
 export type ButtonSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl'
-export type ButtonRadius = 'md' | 'md-plus' | 'lg' | 'full'
 export type ButtonTone = 'default' | 'subtle' | 'muted'
 
 export interface ButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'style' | 'className'> {
   readonly variant?: ButtonVariant
+  /** Ignored by `filter`, which is always 28px. */
   readonly size?: ButtonSize
-  /** Corner radius; derived from the size unless set. */
-  readonly radius?: ButtonRadius
   /** Text colour for ghost and outline buttons. */
   readonly tone?: ButtonTone
-  /** Text setting; derived from the size unless set. */
-  readonly text?: 'tagSmall' | 'buttonSmall' | 'ui'
   readonly iconStart?: LucideIcon
   readonly iconEnd?: LucideIcon
-  readonly iconSize?: IconSize
   /** Trailing keyboard hint, for example "↵". */
   readonly kbd?: string
-  /** Trailing content such as a count Chip. Pushed to the end when `align` is start. */
-  readonly trailing?: ReactNode
-  /** Selected state for toggles. Sets aria-pressed. */
+  /** Selected state for toggles (Pin, filters). Sets aria-pressed. */
   readonly pressed?: boolean
   /** Looks disabled but stays focusable. Sets aria-disabled. */
   readonly dimmed?: boolean
-  readonly fullWidth?: boolean
-  readonly align?: 'start' | 'center'
-  /** Semibold label, for a selected filter. */
-  readonly strong?: boolean
   readonly children?: ReactNode
 }
 
@@ -44,7 +38,9 @@ export interface ButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement
 // StyleX cannot read constants from other modules.
 const HOVER = '@media (hover: hover)'
 
-const radiusBySize: Record<ButtonSize, ButtonRadius> = {
+type Radius = 'md' | 'md-plus' | 'lg'
+
+const radiusBySize: Record<ButtonSize, Radius> = {
   xs: 'md',
   sm: 'md',
   md: 'md-plus',
@@ -74,29 +70,26 @@ const iconBySize: Record<ButtonSize, IconSize> = {
 /**
  * Every clickable control with a label. Arrow cursor, press scale unless
  * disabled, hover colours only with a pointer, focus ring on keyboard focus.
+ * Radius, text size and icon size follow from the size; sidebar nav items
+ * are `NavItem`.
  */
 export function Button({
   variant = 'secondary',
   size = 'lg',
-  radius,
   tone = 'default',
-  text,
   iconStart,
   iconEnd,
-  iconSize,
   kbd,
-  trailing,
   pressed,
   dimmed = false,
-  fullWidth = false,
-  align = 'center',
-  strong = false,
   type = 'button',
   disabled,
   children,
   ...rest
 }: ButtonProps) {
-  const iconPx = iconSize ?? iconBySize[size]
+  const filter = variant === 'filter'
+  const effectiveSize: ButtonSize = filter ? 'sm' : size
+  const iconPx = iconBySize[effectiveSize]
   return (
     <button
       type={type}
@@ -110,26 +103,20 @@ export function Button({
         interactive.press,
         interactive.focusRing,
         styles.base,
-        roles[text ?? textBySize[size]],
+        typeVariants[filter ? 'ui' : textBySize[effectiveSize]],
         styles.weightMedium,
-        sizeStyles[size],
-        radiusStyles[radius ?? radiusBySize[size]],
-        variants[variant],
+        sizeStyles[effectiveSize],
+        radiusStyles[filter ? 'md-plus' : radiusBySize[effectiveSize]],
+        variantStyles[variant],
         (variant === 'ghost' || variant === 'outline') && tones[tone],
         pressed && pressedStyles[variant],
-        strong && styles.strong,
         dimmed && interactive.dimmed,
-        disabled && interactive.disabled,
-        fullWidth && styles.fullWidth,
-        align === 'start' && styles.alignStart,
+        disabled && interactive.dimmed,
       )}
     >
       {iconStart ? <Icon icon={iconStart} size={iconPx} /> : null}
-      {children !== undefined && children !== null ? (
-        <span {...stylex.props(styles.label, align === 'start' && styles.labelGrow)}>{children}</span>
-      ) : null}
+      {children !== undefined && children !== null ? <span {...stylex.props(styles.label)}>{children}</span> : null}
       {iconEnd ? <Icon icon={iconEnd} size={iconPx} /> : null}
-      {trailing}
       {kbd ? <Kbd>{kbd}</Kbd> : null}
     </button>
   )
@@ -151,23 +138,10 @@ const styles = stylex.create({
   weightMedium: {
     fontWeight: weights['--weight-medium'],
   },
-  strong: {
-    fontWeight: weights['--weight-semibold'],
-  },
   label: {
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     minWidth: 0,
-  },
-  labelGrow: {
-    flexGrow: 1,
-  },
-  fullWidth: {
-    display: 'flex',
-    width: '100%',
-  },
-  alignStart: {
-    justifyContent: 'flex-start',
   },
 })
 
@@ -184,10 +158,9 @@ const radiusStyles = stylex.create({
   md: { borderRadius: radii['--radius-md'] },
   'md-plus': { borderRadius: radii['--radius-md-plus'] },
   lg: { borderRadius: radii['--radius-lg'] },
-  full: { borderRadius: radii['--radius-full'] },
 })
 
-const variants = stylex.create({
+const variantStyles = stylex.create({
   primary: {
     color: accent['--hl-fg'],
     backgroundColor: accent['--hl'],
@@ -217,13 +190,25 @@ const variants = stylex.create({
       ':hover': { default: null, [HOVER]: colors['--surface-hover'] },
     },
   },
+  // The ring gives the raised button an edge on light paper, where the soft
+  // shadow alone reads like a ghost button.
   raised: {
     color: colors['--foreground-default'],
     backgroundColor: {
       default: colors['--surface-default'],
       ':hover': { default: null, [HOVER]: colors['--background'] },
     },
-    boxShadow: shadows['--shadow-sm'],
+    boxShadow: `${shadows['--card-ring']}, ${shadows['--shadow-sm']}`,
+  },
+  filter: {
+    color: {
+      default: colors['--foreground-muted'],
+      ':hover': { default: null, [HOVER]: colors['--foreground-default'] },
+    },
+    backgroundColor: {
+      default: 'transparent',
+      ':hover': { default: null, [HOVER]: colors['--surface-hover'] },
+    },
   },
 })
 
@@ -259,4 +244,12 @@ const pressedStyles = stylex.create({
     },
   },
   raised: {},
+  filter: {
+    color: colors['--foreground-default'],
+    fontWeight: weights['--weight-semibold'],
+    backgroundColor: {
+      default: colors['--secondary-default'],
+      ':hover': { default: null, [HOVER]: colors['--secondary-hover'] },
+    },
+  },
 })

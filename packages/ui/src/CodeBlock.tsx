@@ -1,6 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
-import { colors, spacing } from '@juno/tokens/tokens.stylex'
-import { roles } from './internal/type'
+import { colors, layout, spacing } from '@juno/tokens/tokens.stylex'
+import { variants as typeVariants } from './internal/type'
 import { Surface } from './Surface'
 
 export interface CodeBlockProps {
@@ -12,7 +12,7 @@ export interface CodeBlockProps {
 export function CodeBlock({ children, label }: CodeBlockProps) {
   return (
     <Surface kind="inset" as="pre" aria-label={label} sx={styles.block}>
-      <code {...stylex.props(roles.code, styles.code)}>{children}</code>
+      <code {...stylex.props(typeVariants.code, styles.code)}>{children}</code>
     </Surface>
   )
 }
@@ -22,16 +22,16 @@ const styles = stylex.create({
     margin: 0,
     paddingBlock: spacing['--space-2-5'],
     paddingInline: spacing['--space-3'],
-    maxHeight: '150px',
+    maxHeight: layout['--code-block-max-height'],
     overflowY: 'auto',
     overscrollBehavior: 'contain',
     whiteSpace: 'pre-wrap',
     overflowWrap: 'anywhere',
     userSelect: 'text',
     cursor: 'text',
-    color: colors['--foreground-default'],
   },
   code: {
     display: 'block',
+    color: colors['--foreground-default'],
   },
 })

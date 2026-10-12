@@ -1,16 +1,18 @@
 import * as stylex from '@stylexjs/stylex'
 import type { ElementType, HTMLAttributes, ReactNode } from 'react'
 import { accent, colors } from '@juno/tokens/tokens.stylex'
-import { numeric as numericStyles, roles, weight as weightStyles, type TextRole, type Weight } from './internal/type'
+import type { LayoutStyles } from './internal/sx'
+import { numeric as numericStyles, variants as typeVariants, weight as weightStyles, type TextVariant, type Weight } from './internal/type'
 
-export type { TextRole, Weight }
+export type { TextVariant, Weight }
 
 export type TextTone = 'inherit' | 'default' | 'subtle' | 'muted' | 'accent' | 'danger'
 
 export interface TextProps extends Omit<HTMLAttributes<HTMLElement>, 'style' | 'className'> {
-  readonly role?: TextRole
+  /** The type role: family, size, weight, line height and tracking. Default `ui`. */
+  readonly variant?: TextVariant
   readonly tone?: TextTone
-  /** Overrides the role's weight, for example 600 on an unread title. */
+  /** Overrides the variant's weight, for example 600 on an unread title. */
   readonly weight?: Weight
   /** One line with an ellipsis. */
   readonly truncate?: boolean
@@ -20,14 +22,14 @@ export interface TextProps extends Omit<HTMLAttributes<HTMLElement>, 'style' | '
   readonly numeric?: boolean
   /** Chrome text is not selectable; message text and similar opt in. */
   readonly selectable?: boolean
-  /** Element to render. Default span; block roles default to a block tag. */
+  /** Element to render. Default span; block variants default to a block tag. */
   readonly as?: ElementType
   /** Extra StyleX styles from the owner (layout only). */
-  readonly sx?: stylex.StyleXStyles
+  readonly sx?: LayoutStyles
   readonly children?: ReactNode
 }
 
-const blockTags: Partial<Record<TextRole, ElementType>> = {
+const blockTags: Partial<Record<TextVariant, ElementType>> = {
   body: 'p',
   bodySmall: 'p',
   preview: 'p',
@@ -41,11 +43,12 @@ const blockTags: Partial<Record<TextRole, ElementType>> = {
 }
 
 /**
- * Typography. Maps a role name to the family, size, weight, line height and
- * letter spacing of that role, and a tone to a foreground colour.
+ * Typography. Maps a variant name to the family, size, weight, line height
+ * and letter spacing of that type role, and a tone to a foreground colour.
+ * ARIA `role` passes through untouched.
  */
 export function Text({
-  role = 'ui',
+  variant = 'ui',
   tone = 'inherit',
   weight,
   truncate = false,
@@ -57,20 +60,20 @@ export function Text({
   children,
   ...rest
 }: TextProps) {
-  const Tag = as ?? blockTags[role] ?? 'span'
+  const Tag = as ?? blockTags[variant] ?? 'span'
   return (
     <Tag
       {...rest}
       {...stylex.props(
         styles.base,
-        roles[role],
+        typeVariants[variant],
         tones[tone],
         weight && weightStyles[weight],
         truncate && styles.truncate,
         clamp !== undefined && styles.clamp(clamp),
         numeric && numericStyles.tabular,
         selectable ? styles.selectable : styles.unselectable,
-        (role === 'body' || role === 'bodySmall' || role === 'preview') && styles.prose,
+        (variant === 'body' || variant === 'bodySmall' || variant === 'preview') && styles.prose,
         sx,
       )}
     >

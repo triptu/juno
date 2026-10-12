@@ -1,12 +1,12 @@
 /**
  * One StyleX style per type role. Each sets the five properties of the role
- * from the `text` tokens. Text uses these directly; controls compose the role
- * they need (Button uses `ui`, Chip uses `tag`, ...).
+ * from the `text` tokens. Text exposes them as its `variant`; controls compose
+ * the one they need (Button uses `ui`, Chip uses `tag`, ...).
  */
 import * as stylex from '@stylexjs/stylex'
 import { text, weights } from '@juno/tokens/tokens.stylex'
 
-export type TextRole =
+export type TextVariant =
   | 'sectionLabel'
   | 'tableHeader'
   | 'divider'
@@ -30,7 +30,7 @@ export type TextRole =
   | 'kbd'
   | 'code'
 
-export const roles = stylex.create({
+export const variants = stylex.create({
   sectionLabel: {
     fontFamily: text['--text-section-label-family'],
     fontSize: text['--text-section-label-size'],

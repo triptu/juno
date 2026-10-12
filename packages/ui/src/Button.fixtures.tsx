@@ -1,6 +1,5 @@
-import { ArrowUp, Bell, Check, CircleCheck, LayoutList, Lightbulb, Sparkles } from 'lucide-react'
+import { ArrowUp, Bell, Check, CircleCheck } from 'lucide-react'
 import { Button } from './Button'
-import { Chip } from './Chip'
 import { defineFixtures, fixture, scene } from './fixtures/define'
 import { Row, Stack } from './fixtures/layout'
 
@@ -14,53 +13,51 @@ export default defineFixtures(Button, {
   'row-resolve': fixture({ variant: 'outline', size: 'xs', iconStart: Check, children: 'Resolve', title: 'Resolve and hide until there is new activity' }),
   disabled: fixture({ variant: 'primary', size: '2xl', disabled: true, children: 'Send' }),
   dimmed: fixture({ variant: 'primary', size: '2xl', dimmed: true, children: 'Send' }),
-  nav: scene(
+  hover: scene(
     () => (
-      <Stack gap="sm" width={260}>
-        <Button variant="ghost" size="lg" radius="md-plus" iconStart={LayoutList} iconSize={15} fullWidth align="start" pressed>
-          All topics
-        </Button>
-        <Button
-          variant="ghost"
-          size="lg"
-          radius="md-plus"
-          iconStart={Lightbulb}
-          iconSize={15}
-          fullWidth
-          align="start"
-          trailing={
-            <Chip variant="strong" numeric>
-              5
-            </Chip>
-          }
-        >
-          For you
-        </Button>
-        <Button variant="ghost" size="lg" radius="md-plus" iconStart={Sparkles} iconSize={15} fullWidth align="start" kbd="⌘J">
-          Juno
-        </Button>
-      </Stack>
+      <Row>
+        <Button variant="primary">Primary</Button>
+        <Button variant="secondary">Secondary</Button>
+        <Button variant="outline">Outline</Button>
+        <Button variant="ghost">Ghost</Button>
+        <Button variant="raised">Raised</Button>
+        <Button variant="filter">Filter</Button>
+      </Row>
     ),
-    { surface: 'subtle' },
+    { hover: 'button' },
   ),
+  'hover-secondary': fixture({ variant: 'secondary', size: '2xl', children: 'Discard' }, { hover: 'button' }),
+  'hover-outline': fixture({ variant: 'outline', size: 'lg', iconStart: CircleCheck, children: 'Resolve' }, { hover: 'button' }),
+  'hover-ghost': fixture({ variant: 'ghost', size: 'md', tone: 'subtle', children: 'Open topic' }, { hover: 'button' }),
+  'hover-raised': fixture({ variant: 'raised', size: 'sm', kbd: '↵', children: 'Fix and send' }, { hover: 'button' }),
+  'active-press': fixture({ variant: 'primary', size: '2xl', children: 'Send' }, { press: 'button' }),
+  'active-press-secondary': fixture({ variant: 'secondary', size: '2xl', children: 'Discard' }, { press: 'button' }),
+  'active-press-disabled': fixture({ variant: 'primary', size: '2xl', disabled: true, children: 'Send' }, { press: 'button' }),
   filters: scene(
     () => (
       <Row gap="sm">
-        <Button variant="ghost" size="sm" radius="md-plus" text="ui" tone="muted" pressed strong>
+        <Button variant="filter" pressed>
           All
         </Button>
-        <Button variant="ghost" size="sm" radius="md-plus" text="ui" tone="muted">
-          Channels
-        </Button>
-        <Button variant="ghost" size="sm" radius="md-plus" text="ui" tone="muted">
-          DMs
-        </Button>
-        <Button variant="ghost" size="sm" radius="md-plus" text="ui" tone="muted" aria-label="Show unread only">
+        <Button variant="filter">Channels</Button>
+        <Button variant="filter">DMs</Button>
+        <Button variant="filter" aria-label="Show unread only">
           Unread
         </Button>
       </Row>
     ),
     { surface: 'subtle' },
+  ),
+  'filters-hover': scene(
+    () => (
+      <Row gap="sm">
+        <Button variant="filter" pressed>
+          All
+        </Button>
+        <Button variant="filter">Channels</Button>
+      </Row>
+    ),
+    { surface: 'subtle', hover: 'button:nth-of-type(2)' },
   ),
   'all-sizes': scene(() => (
     <Row>
@@ -90,6 +87,7 @@ export default defineFixtures(Button, {
         <Button variant="outline">Outline</Button>
         <Button variant="ghost">Ghost</Button>
         <Button variant="raised">Raised</Button>
+        <Button variant="filter">Filter</Button>
       </Row>
       <Row>
         <Button variant="primary" disabled>
@@ -107,6 +105,9 @@ export default defineFixtures(Button, {
         <Button variant="raised" disabled>
           Raised
         </Button>
+        <Button variant="filter" disabled>
+          Filter
+        </Button>
       </Row>
       <Row>
         <Button variant="secondary" pressed>
@@ -114,6 +115,9 @@ export default defineFixtures(Button, {
         </Button>
         <Button variant="ghost" pressed>
           Pressed ghost
+        </Button>
+        <Button variant="filter" pressed>
+          Pressed filter
         </Button>
         <Button variant="ghost" tone="subtle">
           Subtle ghost

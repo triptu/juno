@@ -85,8 +85,7 @@ export function IconButton({
         variants[variant],
         variant === 'ghost' && tones[tone],
         pressed && pressedStyles[variant],
-        dimmed && interactive.dimmed,
-        disabled && interactive.disabled,
+        (dimmed || disabled) && interactive.dimmed,
       )}
     >
       <Icon icon={icon} size={iconSize ?? iconBySize[size]} />
