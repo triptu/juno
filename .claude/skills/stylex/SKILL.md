@@ -36,9 +36,8 @@ shape, but if they use a raw value that now has a token, use the token. Rules co
    ```
 5. **Focus ring on `:focus-visible` only**: a 2px solid outline with 2px offset,
    `outlineStyle: { default: 'none', ':focus-visible': 'solid' }`. Never style plain `:focus`.
-   Use the `--focus-ring` colour (and `--focus-ring-width`/`-offset`) when `tokens.stylex.ts` has
-   them. `--selection-background` is the pale text-selection colour and fails contrast for a ring
-   (`tokens.md` 1.8); the first `Button.tsx` still used it.
+   Use the `--focus-ring` colour (and `--focus-ring-width`/`-offset`). `--selection-background` is
+   the pale text-selection colour and fails contrast for a ring (`tokens.md` 1.8).
 6. **Press scale** 0.96 (`--press-scale` when present): `transform: { default: 'none', ':active': 'scale(0.96)', ':disabled': 'none' }`
    and `pointerEvents: { default: 'auto', ':disabled': 'none' }`. Disabled controls never scale.
 7. **Motion**: at most `motion['--duration-fast']` (150ms) for hover and press feedback. Set
@@ -54,8 +53,9 @@ shape, but if they use a raw value that now has a token, use the token. Rules co
   no import of `themes.stylex`.
 - Dark values live in `themes.stylex.ts` as `stylex.createTheme(colors, { ... })`. `dark` is an
   array of themes (colours, shadows), so spread it: `stylex.props(...dark)`. `applyTheme()` in
-  `renderer/state/theme.ts` puts those classes on `<html>` (so portals on `<body>` are covered) and
-  sets `colorScheme`.
+  `packages/ui/src/theme.ts` (re-exported by `@juno/views`, which is how the desktop app reaches it)
+  puts those classes on `<html>` (so portals on `<body>` are covered), sets `colorScheme` and pauses
+  transitions for two frames while the classes swap.
 - **One theme per token group can be active at a time.** `createTheme` returns
   `{ [groupHash]: 'themeClass groupHash' }`, so `stylex.props(darkColors, accentTheme)` built on the
   same `colors` group keeps only the last one (verified by compiling both). So an accent must not be
@@ -88,13 +88,18 @@ shape, but if they use a raw value that now has a token, use the token. Rules co
   `:disabled` 92, `:hover` 130, `:focus-visible` 160, `:active` 170 (read from
   `@stylexjs/shared`). So `:hover` and `:active` beat `:disabled`. Set the disabled colour
   explicitly in every state, and use `pointer-events: none` so they cannot match.
+- **A `createTheme` re-emits every variable of its group.** Never use one for a partial override on a
+  child element (say, a different `--foreground-default` inside one card): it also resets the group's
+  other variables there and undoes the active dark or accent theme. Use a token that already has the
+  right value, or add a token.
 - **Static values only.** `stylex.create` cannot call functions or read runtime values. For a value
   that varies at runtime use a function style: `stylex.create({ w: (px: number) => ({ width: px }) })`.
 - **Workspace setup.** Packages ship TypeScript source and list `@stylexjs/stylex` as their own
   dependency. The plugin sits before `react()` in `electron.vite.config.ts` and gets
   `unstable_moduleResolution: { type: 'commonJS', rootDir: repoRoot }` so builds work from any cwd.
-- **Fonts**: bundled `@fontsource` packages through the `fonts` tokens. Instrument Serif has one
-  weight (400); never set bold on it.
+- **Fonts**: bundled `@fontsource` packages, imported once per app from `@juno/tokens/fonts.css`
+  (Inter, Instrument Serif, JetBrains Mono). Pick them through the `fonts` tokens. Instrument Serif
+  has one weight (400); never set bold on it.
 - **Main process** cannot use StyleX. The one raw colour there (`BrowserWindow.backgroundColor` in
   `main/window.ts`) must match `--background`; update both together.
 - **Verify** with `pnpm typecheck`, `pnpm lint`, `pnpm build`, and `pnpm test:e2e` for anything

@@ -57,9 +57,10 @@ The bar: the app must feel native and insanely fast. Input paints on the next fr
 ## Measure before you call it done
 
 - Instrument with `@juno/state/perf.ts` marks (`juno.topic-open`, `juno.tab-switch`, ...) so the DevTools "Juno" track and the harness see the change.
-- Interaction or list change: run the matching scenario in `apps/desktop/perf/` (`pnpm perf`), compare to `baselines.json`. CI fails at p95 over budget or median 15 % over baseline. Changing a baseline needs a PR that says why.
+- Bundle: `pnpm build` runs `scripts/check-bundle-size.mjs` (initial JS 1.0 MB, CSS 150 KB; now 426 KB and 69 KB).
+- Interaction or list change: once the harness exists (not built yet, `docs/performance.md` 7.3), run the matching scenario in `apps/desktop/perf/` (`pnpm perf`), compare to `baselines.json`. CI fails at p95 over budget or median 15 % over baseline. Changing a baseline needs a PR that says why.
 - Query change: run the plan test and the engine benchmark.
-- By hand: `pnpm dev`, DevTools Performance panel, repeat the interaction 5 times, read the Juno and React tracks and the long-animation-frame entries (`window.__juno.perf` in dev).
+- By hand: `pnpm dev`, DevTools Performance panel, repeat the interaction 5 times, read the Juno and React tracks and the long-animation-frame entries (`window.__juno.perf`).
 
 ## Review questions
 
