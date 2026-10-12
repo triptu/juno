@@ -279,6 +279,7 @@ All [proto] measured at 1280×800 with Inter unless marked.
 
 | Token | Value | Use |
 | --- | --- | --- |
+| `--control-18` | 18px | Tags and count badges (implemented as `--control-<px>`; the names below map to `--control-20` … `--control-44`) |
 | `--control-xs` | 20px | Tab close, scope chip close, digest chip close |
 | `--control-sm` | 22px | Row Resolve button, status chips, dismiss (For you), decision chips |
 | `--control-md-` | 24px | Reaction chip, segmented-control segment, summary chips |
@@ -382,7 +383,8 @@ Apply these when porting; the prototype values are listed so no one copies them 
 | `:hover` rules unconditionally | Wrap hover styles in `@media (hover: hover)` |
 | Text selectable everywhere | `user-select: none` on chrome; messages, inputs and the prompt block stay selectable |
 | `--foreground-muted` 52% L in the CSS file | 42% L (the prototype's runtime override) |
-| Focus ring in `--selection-background` | Proposed `--focus-ring` (see 1.7); decision pending |
+| Focus ring in `--selection-background` | `--focus-ring` = `--info` light, `hsla(200, 80%, 65%)` dark (decided) |
+| Cyan accent with off-white text (3.8:1) | Cyan takes near-black `--hl-fg` (`hsla(48, 10%, 2%)`) |
 | Composer max 184px | 194px (8 full lines) |
 | Söhne / Meraki | Inter / Instrument Serif, bundled |
 | Global letter-spacing 0.02em in CSS file | 0.01em (prototype root) |

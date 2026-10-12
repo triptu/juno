@@ -1,0 +1,108 @@
+/*
+ * Global defaults for any document that renders Juno UI. Import once from the
+ * app entry together with fonts.css. Everything else is StyleX.
+ *
+ * Variables like --background and --text-ui-size are emitted by
+ * tokens.stylex.ts on :root; this file only reads them.
+ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+html {
+  /* Ask the browser for native form controls and scrollbars in the right
+     scheme. Themes set this to light or dark on the root element. */
+  color-scheme: light;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground-default);
+  font-family: var(--font-sans);
+  font-size: var(--text-body-size);
+  line-height: var(--text-ui-leading);
+  letter-spacing: var(--tracking-normal);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  overflow: hidden;
+  /* Chrome is not selectable. Message text, inputs and code opt back in. */
+  user-select: none;
+  /* The arrow cursor everywhere, like a macOS app. */
+  cursor: default;
+}
+
+input,
+textarea,
+select,
+[contenteditable] {
+  user-select: text;
+}
+
+input,
+textarea {
+  cursor: text;
+}
+
+/* Form controls are reset by the primitives themselves. StyleX rules live in
+   @layer blocks, so an unlayered reset here would override them. */
+
+::selection {
+  background: var(--selection-background);
+}
+
+/* Scrollbars: 10px, transparent track, a soft thumb inset by 3px. */
+::-webkit-scrollbar {
+  width: var(--scrollbar-size);
+  height: var(--scrollbar-size);
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: var(--border-strong);
+  border: 3px solid transparent;
+  background-clip: padding-box;
+  border-radius: var(--radius-xl);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--border-strongest);
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* While the theme flips, every transition is off so colours change in one
+   frame. Set data-theme-switching on <html>, swap the theme classes, then
+   remove the attribute after two animation frames. */
+[data-theme-switching],
+[data-theme-switching] *,
+[data-theme-switching] *::before,
+[data-theme-switching] *::after {
+  transition: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

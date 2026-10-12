@@ -1,0 +1,8 @@
+/*
+ * The bundled fonts. Inter (variable, 100-900) for UI and Instrument Serif
+ * (400 regular and italic) for page titles. Both come from @fontsource and are
+ * served by Vite from node_modules; nothing is ever loaded from a URL.
+ */
+@import '@fontsource-variable/inter/wght.css';
+@import '@fontsource/instrument-serif/400.css';
+@import '@fontsource/instrument-serif/400-italic.css';
