@@ -11,10 +11,11 @@
     "dev": "pnpm --filter @juno/desktop dev",
     "build": "pnpm --filter @juno/desktop build",
     "typecheck": "pnpm -r --parallel typecheck",
-    "lint": "oxlint . && node scripts/check-no-pointer-cursor.mjs",
+    "lint": "oxlint . && node scripts/check-no-pointer-cursor.mjs && node scripts/check-deps.mjs",
     "check-deps": "node scripts/check-deps.mjs",
     "test": "pnpm -r --if-present test",
-    "test:e2e": "pnpm --filter @juno/desktop test:e2e",
+    "test:e2e": "pnpm --filter @juno/desktop test:e2e && pnpm --filter @juno/gallery test:e2e",
+    "test:gallery": "pnpm --filter @juno/gallery test:e2e",
     "package": "pnpm --filter @juno/desktop package",
     "gallery": "pnpm --filter @juno/gallery dev",
     "gallery:shots": "pnpm --filter @juno/gallery shots"

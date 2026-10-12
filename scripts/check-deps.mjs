@@ -10,9 +10,12 @@
 //
 // Fails on: a missing allowedDeps field, a declared @juno dependency outside
 // the allowed list, an unknown @juno package, a dependency cycle, an import of
-// an undeclared @juno package in src, and the hard rules below.
+// an undeclared @juno package in src, test or e2e, and the hard rules below
+// (package rules, directory rules, the unstable Effect module allow-list, engine
+// feature folders and the sendSync ban).
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
-import { dirname, join, relative, resolve } from 'node:path'
+import { builtinModules } from 'node:module'
+import { dirname, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -23,11 +26,113 @@ const warnings = []
 // from the root 'effect' module, as used today by domain/ids.ts).
 const schemaOnlyEffect = new Set(['@juno/domain', '@juno/richtext'])
 // Packages whose src must not import effect at all.
-const noEffect = new Set(['@juno/ui', '@juno/tokens', '@juno/views', '@juno/domain', '@juno/richtext'])
+// (@juno/views is covered by the `views` directory rule below.)
+const noEffect = new Set(['@juno/ui', '@juno/tokens', '@juno/domain', '@juno/richtext'])
 // Packages whose src must not import @juno/state.
-const noState = new Set(['@juno/ui', '@juno/views'])
+const noState = new Set(['@juno/ui'])
 // The only package allowed to import electron.
 const electronOwner = '@juno/desktop'
+
+const NODE_BUILTIN = '<node built-in>'
+const EFFECT_ANY = '<effect>'
+const isNodeBuiltin = (spec) =>
+  spec.startsWith('node:') || builtinModules.includes(spec) || builtinModules.includes(spec.split('/')[0])
+
+// Directory rules. `dir` is a repo-relative path prefix, or `match` a regex tested on the
+// repo-relative path with forward slashes. `ban` lists package names (or NODE_BUILTIN,
+// EFFECT_ANY); `allowOnly` is a predicate for the only specifiers the directory may import.
+const dirRules = [
+  {
+    dir: 'apps/desktop/src/renderer',
+    ban: ['@juno/engine', '@juno/store', '@juno/slack', '@juno/fake-slack', 'electron', NODE_BUILTIN],
+    reason:
+      'The renderer talks to the engine over the port through @juno/state and to main through window.juno. It has no Electron or Node access.',
+  },
+  {
+    dir: 'apps/desktop/src/main',
+    ban: ['@juno/state', '@juno/views', '@juno/ui', '@juno/engine', '@juno/store', '@juno/slack', 'react', 'react-dom'],
+    reason: 'Main is the shell: no UI, state or engine code. It forks the engine entry as a separate process.',
+  },
+  {
+    dir: 'apps/desktop/src/engine',
+    ban: ['@juno/state', '@juno/views', '@juno/ui', 'react', 'react-dom'],
+    reason: 'The engine entry is a Node program with no UI code.',
+  },
+  {
+    dir: 'apps/desktop/src/preload',
+    allowOnly: (spec) => spec === 'electron' || spec === '@juno/contract/channels' || spec.startsWith('.'),
+    reason:
+      'The preload may import only electron and @juno/contract/channels (names and types, no runtime imports) so it stays small.',
+  },
+  {
+    match: /(^|\/)views\//,
+    ban: ['@juno/state', '@juno/engine', '@juno/store', 'electron', NODE_BUILTIN, EFFECT_ANY],
+    reason: 'Views are dumb: props in, callbacks out. No state, Effect, IPC or Electron (docs/architecture.md sections 1 and 8).',
+  },
+]
+
+// Text patterns banned in src.
+const textRules = [
+  { re: /\bsendSync\b/, reason: 'ipcRenderer.sendSync blocks the renderer. Use invoke (docs/performance.md 2.1).' },
+  {
+    re: /\b(?:window|globalThis)\.juno\b/,
+    reason: 'Views and ui do not reach the shell bridge. Containers pass callbacks.',
+    only: (rel) => /(^|\/)views\//.test(rel) || rel.startsWith('packages/ui/'),
+  },
+]
+
+// Unstable Effect modules (.claude/skills/effect/SKILL.md, "Unstable modules"). Each may be
+// imported only from the listed repo-relative paths (a path ending in "/" is a directory). To
+// allow a new place, add it here and record why in the effect skill. `spec` matches the import
+// specifier; `names` matches named imports from the root 'effect' module.
+const unstable = [
+  {
+    label: 'Atom, AtomRegistry, AtomRpc and AsyncResult from effect/reactivity',
+    spec: /^effect\/reactivity(?:\/(?!Reactivity$).+)?$/,
+    allow: ['packages/state/src/', 'packages/engine/test/protocol.test.ts'],
+  },
+  {
+    label: 'effect/reactivity/Reactivity',
+    spec: /^effect\/reactivity\/Reactivity$/,
+    allow: ['packages/store/src/invalidation.ts'],
+  },
+  { label: '@effect/atom-react', spec: /^@effect\/atom-react(?:\/|$)/, allow: ['packages/state/src/react.ts'] },
+  {
+    label: 'effect/rpc',
+    spec: /^effect\/rpc(?:\/|$)/,
+    allow: ['packages/contract/src/', 'packages/engine/src/protocol/', 'packages/state/src/'],
+  },
+  {
+    label: 'effect/workers',
+    spec: /^effect\/workers(?:\/|$)/,
+    allow: ['packages/state/src/transport.ts', 'packages/engine/src/protocol/runner.ts'],
+  },
+  {
+    label: 'effect/sql and @effect/sql-sqlite-node',
+    spec: /^(?:effect\/sql(?:\/|$)|@effect\/sql-)/,
+    allow: ['packages/store/'],
+  },
+  {
+    label: 'other unstable subpaths',
+    spec: /^(?:effect\/(?:http|http-api|socket|persistence|cli|ai|cluster|workflow|observability|process|devtools|eventlog)(?:\/|$)|@effect\/platform)/,
+    allow: [],
+  },
+  {
+    label: 'unstable root modules',
+    spec: /^effect\/(?:FileSystem|Path|Terminal|Stdio|Newtype|LayerMap|Graph|ExecutionPlan|ErrorReporter|Arbitrary|Crypto)$/,
+    names: new Set([
+      'FileSystem', 'Path', 'Terminal', 'Stdio', 'Newtype', 'LayerMap', 'Graph', 'ExecutionPlan',
+      'ErrorReporter', 'Arbitrary', 'Crypto',
+    ]),
+    allow: [],
+  },
+]
+
+// Engine feature folders (docs/architecture.md section 3): a folder under packages/engine/src
+// other than the shared ones is a feature. It may not import another feature or the composition files.
+const engineSrc = 'packages/engine/src'
+const engineSharedFolders = new Set(['protocol'])
+const engineCompositionFiles = new Set(['layer', 'startEngine', 'index'])
 
 function subdirs(dir) {
   const abs = join(root, dir)
@@ -47,6 +152,15 @@ function sourceFiles(dir) {
     }
   }
   if (existsSync(dir)) walk(dir)
+  return files
+}
+
+// The files a package's checks scan: src, test and e2e recursively, plus top-level ts files.
+function scannedFiles(pkgDir) {
+  const files = ['src', 'test', 'e2e'].flatMap((name) => sourceFiles(join(pkgDir, name)))
+  for (const entry of readdirSync(pkgDir, { withFileTypes: true })) {
+    if (entry.isFile() && /\.(ts|tsx|mts)$/.test(entry.name)) files.push(join(pkgDir, entry.name))
+  }
   return files
 }
 
@@ -189,21 +303,75 @@ for (const pkg of packages) {
   }
 }
 
-// 4 and 5. Scan src imports for undeclared @juno packages and for the hard rules.
+// 4 and 5. Scan imports for undeclared @juno packages and for the hard rules.
+// The package rules (effect, state, testDeps) apply to src only; the others to src, test and e2e.
+function underAllowed(rel, allow) {
+  return allow.some((entry) => (entry.endsWith('/') ? rel.startsWith(entry) : rel === entry))
+}
+
+// The feature folder a repo-relative engine path belongs to, or null (shared folder or top-level file).
+function engineFeatureOf(rel) {
+  if (!rel.startsWith(`${engineSrc}/`)) return null
+  const parts = rel.slice(engineSrc.length + 1).split('/')
+  if (parts.length < 2) return null
+  return engineSharedFolders.has(parts[0]) ? null : parts[0]
+}
+
 let fileCount = 0
 for (const pkg of packages) {
-  for (const file of sourceFiles(join(pkg.dir, 'src'))) {
+  const srcPrefix = join(pkg.dir, 'src') + sep
+  for (const file of scannedFiles(pkg.dir)) {
     fileCount++
+    const isSrc = file.startsWith(srcPrefix)
     const where = relative(root, file)
+    const rel = where.split(sep).join('/')
     const text = stripComments(readFileSync(file, 'utf8'))
+
+    for (const rule of textRules) {
+      if (isSrc && (rule.only?.(rel) ?? true) && rule.re.test(text)) {
+        errors.push(`${where}: matches ${rule.re}. ${rule.reason}`)
+      }
+    }
+
     for (const { spec, clause } of importsOf(text)) {
       const target = packageOf(spec)
+      const isEffect = spec === 'effect' || spec.startsWith('effect/') || spec.startsWith('@effect/')
 
       if (target === 'electron' && pkg.name !== electronOwner) {
         errors.push(`${where}: imports electron. Only ${electronOwner} may import electron.`)
       }
 
-      if (noEffect.has(pkg.name) && (spec === 'effect' || spec.startsWith('effect/') || spec.startsWith('@effect/'))) {
+      for (const rule of dirRules) {
+        if (rule.dir ? !rel.startsWith(`${rule.dir}/`) : !rule.match.test(rel)) continue
+        const banned = (rule.ban ?? []).some((item) =>
+          item === NODE_BUILTIN ? isNodeBuiltin(spec) : item === EFFECT_ANY ? isEffect : target === item,
+        )
+        if (banned || (rule.allowOnly && !rule.allowOnly(spec))) errors.push(`${where}: imports ${spec}. ${rule.reason}`)
+      }
+
+      for (const rule of unstable) {
+        const named = rule.names && spec === 'effect' ? (namedImports(clause) ?? []).filter((name) => rule.names.has(name)) : []
+        if ((rule.spec.test(spec) || named.length > 0) && !underAllowed(rel, rule.allow)) {
+          const who = rule.allow.length > 0 ? `only ${rule.allow.join(', ')} may import it` : 'no file may import it yet'
+          errors.push(
+            `${where}: imports ${named.length > 0 ? `${named.join(', ')} from 'effect'` : spec}, an unstable Effect module (${rule.label}); ${who}. ` +
+              'Use the wrapper, or add the path to `unstable` in scripts/check-deps.mjs and record why in .claude/skills/effect/SKILL.md.',
+          )
+        }
+      }
+
+      const feature = engineFeatureOf(rel)
+      if (feature && spec.startsWith('.')) {
+        const targetRel = relative(root, resolve(dirname(file), spec)).split(sep).join('/')
+        const isFile = ['.ts', '.tsx'].some((ext) => existsSync(resolve(root, targetRel + ext)))
+        const targetFeature = engineFeatureOf(isFile ? `${targetRel}.ts` : `${targetRel}/index.ts`)
+        const topLevel = targetRel.startsWith(`${engineSrc}/`) ? targetRel.slice(engineSrc.length + 1) : null
+        if ((targetFeature && targetFeature !== feature) || (topLevel && engineCompositionFiles.has(topLevel))) {
+          errors.push(`${where}: imports ${spec}. Engine feature folders do not import each other or the composition files (docs/architecture.md section 3).`)
+        }
+      }
+
+      if (isSrc && noEffect.has(pkg.name) && isEffect) {
         const names = namedImports(clause)
         const isSchemaOnly = schemaOnlyEffect.has(pkg.name) && spec === 'effect' && names !== null && names.length > 0 && names.every((name) => name === 'Schema')
         if (!isSchemaOnly) {
@@ -211,11 +379,11 @@ for (const pkg of packages) {
         }
       }
 
-      if (noState.has(pkg.name) && target === '@juno/state') {
+      if (isSrc && noState.has(pkg.name) && target === '@juno/state') {
         errors.push(`${where}: imports @juno/state. ${pkg.name} must not import @juno/state.`)
       }
 
-      if ((pkg.json.juno?.testDeps ?? []).includes(target) && !(pkg.json.juno?.allowedDeps ?? []).includes(target)) {
+      if (isSrc && (pkg.json.juno?.testDeps ?? []).includes(target) && !(pkg.json.juno?.allowedDeps ?? []).includes(target)) {
         errors.push(`${where}: imports ${target}, which ${pkg.name} may only use in tests (juno.testDeps).`)
       }
 
@@ -235,5 +403,5 @@ if (errors.length > 0) {
 }
 
 console.log(
-  `check-deps: ok (${packages.length} packages, ${edgeCount} @juno edges, ${fileCount} src files, ${warnings.length} known exception(s))`,
+  `check-deps: ok (${packages.length} packages, ${edgeCount} @juno edges, ${fileCount} files, ${warnings.length} known exception(s))`,
 )
