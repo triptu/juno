@@ -39,5 +39,17 @@
     "typescript": "5.9.3",
     "unplugin": "2.3.11",
     "vite": "7.3.7"
+  },
+  "juno": {
+    "allowedDeps": [
+      "@juno/contract",
+      "@juno/engine",
+      "@juno/state",
+      "@juno/views"
+    ],
+    "exceptions": [
+      "@juno/tokens",
+      "@juno/ui"
+    ]
   }
 }

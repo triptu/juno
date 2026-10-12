@@ -23,6 +23,7 @@ Run these from the repo root.
 | `pnpm build` | Builds main, preload and renderer into `apps/desktop/out/`. |
 | `pnpm typecheck` | Runs `tsc` in every package. |
 | `pnpm lint` | Runs oxlint, then a script that fails on any `cursor: pointer`. |
+| `pnpm check-deps` | Fails on any `@juno/*` edge not in `juno.allowedDeps` (each package.json), any cycle, undeclared imports and the hard rules in `docs/architecture.md` section 3. |
 | `pnpm test` | Runs every package's vitest suite (`packages/*/test`). |
 | `pnpm test:e2e` | Builds, then runs the Playwright tests against the built app. |
 | `pnpm gallery` | Starts the fixture gallery at http://localhost:4174 (browser only, no Electron). |
