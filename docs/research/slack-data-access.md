@@ -1,0 +1,344 @@
+# How the Slack web client accesses data
+
+Reverse-engineering notes for Juno. Scope: the web client (app.slack.com, "gantry-v2" build) that the Slack desktop app 4.52.178 runs, its HTTP API calls, its real-time websocket, and where the desktop app stores credentials.
+
+Everything below comes from static reading of the cached JS bundles. No network requests were made and nothing was executed. No token, cookie or message content is reproduced here; only names, formats and locations.
+
+## 0. Sources and method
+
+Observed
+
+- Bundles came from the newest Service Worker cache entry, `gantry-1791793654` (641 entries, brotli-encoded bodies in Chromium simple-cache files). Extracted to `/tmp/juno-re/webclient/gantry-latest` with `/tmp/juno-re/scripts/extract_simple_cache.py`, then beautified with prettier into `/tmp/juno-re/webclient/pretty/`.
+- `client-v2.html` declares the build: `data-version-ts="1791793654"`, `data-build-number="134135"`, `data-cdn="https://a.slack-edge.com/bv1-13-br/"`, `data-app="client-v2"`.
+- Key bundles (short names used in evidence refs below):
+  - `shared` = `gantry-v2-shared.c702ca6ba455738b.min.js` (API request classes, token storage, socket class, boot fetchers, thread subscription fetchers, history fetchers, notification rules).
+  - `boot-async` = `gantry-v2-async-gantry-v2-shared-boot-async.df256c9e690d80a1.min.js` (socket manager, RTM event handlers, chat.postMessage, counts, boot payload processing, notification display).
+  - `client-boot` = `client-boot.51f971944b5407a4.min.js` (boot of a team, conversations.view call, send-message thunk, counts application).
+  - `vendors` / `vendors-client` = `gantry-v2-vendors.dec445a4b4b1ff78.min.js`, `gantry-v2-vendors-client.f076b67a6cdc90e6.min.js` (generated per-method fetcher registry: one module per API method).
+- REA evidence IDs: `ev_c632a19387874e177010bd7d40f24c97d405bb4c90bd632b94ca7ce23bc68311` (analyze_javascript_application over the 7 core bundles; summary view `ev_b95cbd0ef1534f25919a580815f90b4c1cd80661f95f79a9350f976ab4ffbf90`, module page `ev_70191ead63b2835ce5d94ba24e0e782dbb308419dc2c01e1ab1f441e11e3a68d`), `ev_b5cd44e802dc43d71eff423dde6400e0aa154e4b9e42ef3e6e491a4e7f8eb341` (`shared` alone, 2283 modules), `ev_5ef7199fdef2677fdfafe521e6ac02a3a069c205be6fc61c133fa872606df35c` (threads-view chunk, complete graph). REA's semantic graphs for the big bundles were budget-truncated and feature traces (`ev_27cdcd8b…`, `ev_b9ffc976…`) returned no-match, so all behavioural claims below are backed by direct reading of the named modules, with REA as inventory evidence only.
+
+## 1. Authentication model
+
+Observed
+
+- HTTP API URL: `/api/<method>?_x_id=<id>&...` where host is `//<team-host>` when the team has a known host, else same-origin. Built in `SlackApiRequest` (`shared`, module `GGwr`): `` D = `/api/${method}?_x_id=${id}${queryString}` ``, `L = host ? `//${host}${D}` : D`. The host comes from `GantryTeamMetadata.getHostForTeamId` (`shared`, module `/e6U`), which reads `localConfig_v2.teams[teamId].url` and takes its host. So requests go to `https://<workspace>.slack.com/api/<method>`; on failure to resolve it throws `api_missing_host_error`.
+- `_x_id` format (`shared`, `EVbb` `generateId`): `` `${versionUid.substring(0,8) || "noversion"}-${(Date.now()/1000).toFixed(3)}` ``.
+- Query string params added (`shared`, `Q6X1` `generateQueryString`): `slack_route=<enterpriseId:teamId | teamId>`, `_x_version_ts=<build version ts>`, `_x_frontend_build_type=current`, `_x_desktop_ia=4` (desktop only), `_x_gantry=true`, optional `_x_csid=<session id>`, `db_proxy_enabled`, pass-through `feature_*`/`force_*`/`country` params. `BaseRequest._openAndSend` (`DW51`) adds `fp=<2-char fingerprint hash>` and `_x_num_retries=<n>`. `TracedRequest._setMetaQueryString` adds `_x_b3_traceid`, `_x_b3_spanid`, `_x_b3_sampled` when sampled.
+- Body: HTTP POST, `multipart/form-data` built by `getFormData` (`shared`, `qVKj`): every arg becomes a form field; objects are `JSON.stringify`'d; `token` is forced to be the first field (`UPtI` `ensureTokenIsFirstArg`). `apiCall` (`IlU1`) also injects `_x_reason=<reason>`, `_x_mode=online|degraded|offline`, and (gantry) `_x_app_name=client` plus `_x_sonic=true` on desktop.
+- Token selection (`shared`, `QFsU` `computeToken`): `token` = enterprise token when the method needs org scope, else the team token from an in-memory map `tokenMap[token] = teamId` (`kgOc`), filled at boot from `localConfig_v2.teams[teamId].token` and `.enterprise_api_token` (`bootTeamContext` in `shared`). Tokens start with `xoxc-`.
+- Cookie: XHR is opened with `withCredentials = true` whenever on gantry or when the token starts with `xoxc-` (`GGwr`, `SuHj`). The code never reads the `d` cookie itself; the browser attaches it. Both the `xoxc-` token (form field) and the `d` cookie (HttpOnly) are required for a successful call.
+- Headers: only `X-Slack-Version-Ts` is set, and only on the `sendBeacon`/XHR fallback path (`shared`, `lL9T` `beaconApiCall`). Responses are read for `X-Slack-Req-Id` and `Retry-After`. No `Authorization` header is used.
+- Edge/Flannel API (`shared`, `SuHj` `FlannelRequest` + the `query` function in the same area): JSON POST (`payload = JSON.stringify(args)`, token inside the JSON body) to `<flannelUrl>/<method>?_x_app_name=client`, where `flannelUrl` is fetched at runtime via `api.getFlannelHttpUrl` (`include_external_workspaces: true`) and cached with `ttl_seconds` in the `endpoints` store. CSP in `client-v2.html` allows `edgeapi.slack.com`.
+- Websocket URL (`boot-async`, `getSocketUrl`): base from `client.getWebSocketURL`, then `token=<xoxc>` is a query param (see section 4).
+- Local storage of credentials on this machine:
+  - `~/Library/Application Support/Slack/Local Storage/leveldb/*.ldb|*.log`, origin `https://app.slack.com`, key `localConfig_v2`. Value is a JSON string. Read/written by `shared` module `xLyU` (`getLocalConfig`, `createLocalConfigFacade`).
+  - `~/Library/Application Support/Slack/Cookies` (SQLite, table `cookies`). Slack cookies present on host `.slack.com`: `b`, `d` (Secure, HttpOnly, SameSite=Lax, ~1 year expiry, `encrypted_value` ~291 bytes), `lc`, `ssb_instance_id`, `tz`, `ui`, `utm`. `value` is empty; everything is in `encrypted_value`.
+  - IndexedDB `https_app.slack.com_0.indexeddb.leveldb` holds a `reduxPersistence` database (persisted redux stores: channels, members, messages, prefs, etc.). Local Storage also holds `persist-v1::<TEAM_ID>::<USER_ID>::<storeKey>` entries (drafts, expandables, accessibility).
+
+localConfig_v2 shape (observed keys; other keys inferred from `_z(teamId, key)` reads):
+
+```ts
+interface LocalConfigV2 {
+  teams: Record<TeamId, {
+    id: string; name?: string; domain?: string;
+    url: string;                     // "https://<workspace>.slack.com/"
+    token: string;                   // "xoxc-…"
+    user_id: string; user_locale?: string;
+    enterprise_id?: string; enterprise_api_token?: string; enterprise_name?: string;
+    variant?: string;                // commercial | gov
+    lastViewState?, lastActiveTab?, channelSidebarBackground?, customTheme? ... // UI
+  }>;
+  lastActiveTeamId: string; orderedTeamIds: string[]; recentlyUsedTeamIds?: string[];
+  prevTeams?: Record<string, unknown>; recents?: unknown;
+  lc?: unknown; lcCommercial?: unknown; lcGov?: unknown; lastFetched?: number; lastColdBootTs?: number;
+}
+```
+
+Inferred
+
+- The `d` cookie is decrypted the standard Chromium way on macOS: `encrypted_value` starts with `v10`, AES-128-CBC, key = PBKDF2-SHA1(password from Keychain item "Slack Safe Storage", salt `saltysalt`, 1003 iterations, 16 bytes), IV = 16 spaces. Recent Chromium versions prefix the plaintext with a 32-byte SHA-256 of `host_key`. (Standard Chromium `OSCrypt` behaviour; not visible in the web bundles.)
+- `_x_app_name` is `client` (from `document.documentElement.dataset.app` = `client-v2` with `data-app-name-override="client"`).
+- The `xoxc-` token alone is rejected without the matching `d` cookie session (server-side; consistent with `withCredentials` always being set for `xoxc-`).
+
+Unknown
+
+- Token lifetime and whether `xoxc-` rotates; the client has an `auth.test` fetcher and a "refetch credentials" path (`handleTeamAuthentication` in `shared`) but the refresh mechanism itself lives in the desktop shell/sign-in flow, outside these bundles.
+- Whether `fp` (fingerprint) is validated server-side. It is a 2-character hash from FingerprintJS components; the client always sends it.
+
+## 2. Boot sequence
+
+Observed (`shared`, module `sQEb`; `boot-async`, module `1lIp` `processClientBootData`; `client-boot`, `fetchMessagesData`)
+
+Requests enqueued at boot (all POST `/api/...`, token in body):
+
+| Method | Args (besides token) | Purpose |
+| --- | --- | --- |
+| `client.userBoot` | `_x_reason=fetch-client-data`, `version_all_channels`, `return_all_relevant_mpdms=true`, optional `min_channel_updated` | Primary state: self, team, channels, ims, prefs, subteams, starred |
+| `client.counts` | `thread_counts_by_channel=true`, `org_wide_aware=true`, `include_file_channels=true`, `include_all_unreads=true|pref`, optional `channel_ids[]`, `counts_last_fetched` | Unread/mention counts per channel/IM/MPIM and threads |
+| `users.prefs.get` | none | Full user prefs |
+| `conversations.view` | `channel?`, `count=28`, `canonical_avatars`, `no_user_profile`, `ignore_replies`, `no_self`, `include_full_users`, `include_use_case`, `include_stories`, `no_members`, `include_mutation_timestamps`, `include_free_team_extra_messages` | Messages for the channel being opened (falls back to a default channel) |
+| `client.channels` | same as userBoot | Channel list refresh (incremental via `min_channel_updated`) |
+| `client.init`, `client.extras`, `client.gantryBoot`, `client.shouldReload`, `experiments.getByUser`, `team.info`, `team.prefs.get`, `users.info` (self), plus user-group-membership and feature-flag fetchers whose method constants were not resolved | see `sQEb` | secondary |
+| `api.getFlannelHttpUrl` | `include_external_workspaces=true` | Edge API base URL |
+| `client.getWebSocketURL` | none | Websocket URL (section 4) |
+
+`client.userBoot` response fields consumed (`processClientBootData`):
+
+```ts
+interface ClientUserBoot {
+  ok: true;
+  self: User;                       // id, name, profile, prefs? …
+  team: Team & { prefs: TeamPrefs };
+  prefs: UserPrefs;                 // same keys as users.prefs.get
+  channels: Channel[];              // public, private, mpim (is_member, last_read, latest?, is_open?)
+  ims: Im[];                        // { id, user, is_im, last_read, is_open, … }
+  is_open: string[];                // ids of open IMs/MPIMs
+  starred: string[];
+  subteams: { self: string[]; all?: Subteam[] };
+  read_only_channels: string[]; thread_only_channels: string[];
+  channels_priority: unknown; unchanged_channel_ids?: string[]; has_more_mpdms: boolean;
+  links?: unknown; workspaces?: unknown; default_workspace?: string; account_types?: unknown;
+  emoji_cache_ts: number; app_commands_cache_ts: number; paid_features: string[];
+  can_access_client_v2?: boolean; auth_min_last_fetched?: number; hidden_messages_count?: number;
+  visitor_channels?: string[]; temporary_channel_expirations?: unknown;
+}
+```
+
+`client.counts` response (`boot-async` `OKlm` `transformClientCountsOutput`; `client-boot` `applyCountsToChannels`):
+
+```ts
+interface ClientCounts {
+  ok: true;
+  channels: CountEntry[]; ims: CountEntry[]; mpims: CountEntry[];
+  threads: { has_unreads: boolean; mention_count: number;
+             unread_count_by_channel?: Record<ChannelId, number>;
+             mention_count_by_channel?: Record<ChannelId, number> };
+  channel_badges?: Record<string, unknown>; alerts?: unknown; saved?: unknown;
+  file_channels?: { quip?: { mention_count_by_channel: Record<string, number> } };
+  counts_last_fetched?: number; activity_v2?: unknown;
+}
+interface CountEntry {
+  id: ChannelId; last_read: Ts; latest?: Ts;
+  has_unreads: boolean; mention_count: number; mention_count_display?: number;
+  vip_count?: number; updated?: Ts; history_invalid?: Ts;
+}
+```
+
+Inferred
+
+- `conversations.view` returns `{ messages, channel, pins?, … }` like `conversations.history` plus channel metadata; it is the client's "open this channel" call.
+- Channels are kept in sync afterwards by RTM events plus periodic `client.counts` (the client passes `counts_last_fetched` to get only changed entries).
+
+Unknown
+
+- Exact `User`/`Channel` object field lists beyond standard Slack Web API shapes (standard shapes apply: `id`, `name`, `is_channel`, `is_private`, `is_im`, `is_mpim`, `is_member`, `last_read`, `unread_count`, `topic`, `purpose`, `user` for IMs).
+
+## 3. API method inventory relevant to Juno
+
+Observed. Source: generated fetcher registry (`vendors`, `vendors-client`, one module per method, e.g. `(0,N.r)("conversationsHistoryFetcher","conversations.history")`), plus the call sites named below. 405 distinct method strings were found across the core bundles; this table lists the ones Juno needs.
+
+Listing conversations
+- `client.userBoot` / `client.channels` (section 2) are what the client uses. `conversations.list`, `users.conversations` are not used by the client (`conversations.list` only appears in the async vendors chunk); use userBoot + `client.counts`.
+- `client.dms` fetcher exists (DM list). `conversations.info`, `conversations.genericInfo`, `conversations.members`, `conversations.open`, `conversations.close` exist.
+
+History (`shared`, module with `fetchHistory`/`fetchReplies`, around `determineDefaultHistoryLimit`)
+- `conversations.history` args: `{ channel, limit (default 28), oldest?, latest?, inclusive: true, ignore_replies: true, include_pin_count: true, no_user_profile: true, include_stories: true, include_free_team_extra_messages: true, include_date_joined?, include_tombstones?, cursor?, cached_latest_updates: {[ts]: version} }`. Response: `{ messages, has_more, is_limited, pin_count, channel_actions_count, deleted: Ts[], response_metadata: { next_cursor? }, latest_updates?, unchanged_messages?: Ts[], date_joined? }`.
+- `conversations.replies` args: `{ channel, ts: thread_ts, inclusive: true, limit, oldest?, latest?, cursor?, include_tombstones?, cached_latest_updates }`. Response: `{ messages, has_more, response_metadata, deleted, latest_updates, unchanged_messages }`. First message is the root. Error `thread_not_found` is handled.
+- `conversations.view` (section 2).
+- `conversations.historyChanges` returns `{ ekm_change_ts }` (enterprise key management only).
+
+Thread subscriptions and unreads (`shared`, module `ZUxn`; `boot-async` `WhFy` `refreshThreads`, `zvzS` `processThreads`)
+- `subscriptions.thread.add` `{ channel, thread_ts, last_read }` and `subscriptions.thread.remove` `{ channel, thread_ts, last_read }` (sent through the persisted/offline queue `d.I`).
+- `subscriptions.thread.get` `{ channel, thread_ts }`.
+- `subscriptions.thread.mark` `{ channel, thread_ts, ts: last_read, read: 1|0 }` (read=0 marks unread).
+- `subscriptions.thread.clearAll` `{ max_ts, undo_ts? }`.
+- `subscriptions.thread.getView` `{ current_ts?, limit, fetch_threads_state: boolean, priority_mode?, channel_id? }` → 
+
+```ts
+interface ThreadsGetView {
+  ok: true;
+  threads: Array<{
+    root_msg: Message & { channel: ChannelId; thread_ts: Ts; subscribed: boolean; last_read?: Ts; reply_count: number; latest_reply?: Ts };
+    unread_replies: Message[]; latest_replies: Message[]; priority?: boolean;
+  }>;
+  has_more: boolean; total_unread_replies: number;
+  threads_state?: { has_unreads: boolean; mention_count: number; unread_count_by_channel; mention_count_by_channel; timestamp: Ts };
+}
+```
+- `subscriptions.thread.getTimestamps` `{ mode, limit, org_wide_aware: true }`.
+- `client.counts.threads` (section 2) gives the global threads unread/mention state.
+
+Marking read/unread
+- `conversations.mark` `{ channel, ts, previous_ts?, reason? }` (`shared`, `createFetcherMark`). Marking "unread" is done by marking at the ts before the first unread message. `conversations.markMany`-style call with `markers: JSON` also exists (`K.ke` in the same module). `conversations.dms.mark` `{ undo_key }` marks old DMs read.
+- These are in the "persisted/retry on reconnect" list (`shared`, `J6Mn`): `conversations.mark`, `subscriptions.thread.add/remove`, `reactions.add/remove`, `users.prefs.set`, `saved.*`, `activity.mark*`.
+
+Posting (`boot-async`, `gzYT` `chatPostMessage`; `client-boot` send thunk around `"Sent a message to ${b} via HTTP"`)
+- `chat.postMessage` args built from the pending message: `{ channel, ts (client-generated), type: "message", text?, blocks: JSON string (rich_text), markdown_text? (alternative to blocks), thread_ts?, reply_broadcast?: boolean, client_msg_id: uuid, include_channel_perm_error: true, skip_dlp_user_warning?, unfurl?: JSON, pending_slug_urls?: JSON, draft_id?, xArgs (send_as_user_id etc.) }`. Messages are sent over HTTP (not the socket) through a per-team `MessageQueue` (one in flight at a time). The server echoes the message on the socket with the same `client_msg_id`; the client resolves the placeholder by `client_msg_id`.
+- Errors handled: `message_limit_exceeded`, `ekm_access_denied`, `dlp_user_warning`, `restricted_action_*`, HTTP 429 (`message_send_ratelimit`).
+- `chat.update` `{ channel, ts, blocks | markdown_text, file_ids?, skip_dlp_user_warning }` (`boot-async`, `commitMessageEdit`; retries `message_not_found` up to 10× with 175 ms delay). `chat.delete`, `chat.unfurlLink`, `drafts.create/update` (`{ blocks, client_msg_id, destinations, file_ids, … }`) exist.
+
+Reactions
+- `reactions.add` / `reactions.remove` with standard `{ channel, timestamp, name }` (registered in the persisted-call list; standard Web API args; the call site args were not read in full).
+
+Users, channels, emoji, usergroups via the Edge ("Flannel") API (`shared`, method map `U` near `MEMBER_INFO: "users/info"`; `fetchObjectsById`, `fetchObjectsWithQuery`, `fetchChannelFirstNMembers`)
+- Methods: `users/info`, `users/search`, `users/list`, `users/counts`, `users/searchBulk`, `channels/info`, `channels/search`, `channels/list`, `channels/membership`, `mpims/search`, `usergroups/info`, `usergroups/search`, `usergroups/searchBulk`, `emojis/info`, `emojis/search`, `emojis/list`, `huddles/info|list`, `objects/search`, `permissions/info`, `externalTeams/*`, `apps/info`.
+- By-id query: `{ updated_ids: {[id]: updated_ts_or_0}, check_membership?, check_interaction?, include_profile_only_users? }` or `{ ids: [...] }` when not conditional. Max ids per query is a constant `L` (chunked, concurrency 2).
+- List/search query: `{ query?, count, marker?, filter?, present_first?, channels?: [id] }`; e.g. channel members: `{ channels: [id], present_first: true, filter: "everyone AND NOT bots AND NOT apps", count: n<=100 }`.
+- Response: `{ ok, results: Object[] | Record, failed_ids?, pending_ids?, invalid_ids?, member_channels?, mpims?, disconnected_ids?, can_interact?, next_marker? }`. Paging is by `marker = next_marker`.
+- Web API fallbacks: `users.info` (default args `canonical_avatars`, `name_tagging`), `users.list`, `usergroups.search`, `subteams.info` `{ usergroups: ids, include_users: false, include_count: true, include_disabled: true }`, `emoji.adminList`/`emoji.getInfo`.
+- `emoji.list` is not called by this client; custom emoji come from `emojis/list` on the edge API.
+
+Search (`shared`, `createThunkSearchModules` area: `` `search.modules.${module}` ``)
+- Method is `search.modules.<module>` with module in `messages | files | people | channels | dms | shortcuts | workflows | salesforce | agents | default`. Args: `{ module, query, page, cursor, client_req_id?, search_session_id?, browse_session_id?, extracts: 1, highlight: 1, max_extract_len: 200, extra_message_data: 1, no_user_profile: 1, count (20/21/50), file_title_only, query_rewrite_disabled, … }`. `search.messages` is not used.
+
+Permalinks
+- No API call. `constructMsgPermalink(channel, ts, threadTs)` → `/archives/<C>/p<ts without dot>` plus `?thread_ts=<root>&cid=<C>` for replies; absolute form `https://<team domain>.slack.com/archives/...` (`shared`, `constructAbsoluteMsgPermalink`). `chat.getPermalink` is never called.
+
+Presence
+- Subscribe over the socket: `{ type: "presence_sub", ids: [userIds] }` (`client-boot`, `sendPresenceSubEvent`). Updates arrive as `presence_change` events (section 4). `presence.set` exists for the self user. No `users.getPresence`.
+
+Files
+- `files.getUploadURL` / `files.completeUpload` (and `files.uploadExternal`, `files.info`, `files.list`, `files.share`) exist in the async vendors chunk. Not read in detail.
+
+Activity / mentions (`boot-async`, `fetchActivityFeed` thunk; fetcher `activityFeedFetcher`)
+- `activity.feed` args: `{ mode: "chrono_v1" | "chrono_unreads" | "priority_unreads_inbox_v1", types: string[], limit: 20, cursor?, archiveOnly, unreadOnly, priorityOnly, channelIds?, channelSectionIds?, excludeAutomations? }`. Also `activity.markRead`, `activity.markUnread`, `activity.markAllRead`, `activity.archive`.
+- Mentions for Juno are more simply derived from `client.counts` (`mention_count`) and message text.
+
+Prefs
+- `users.prefs.get` (all prefs), `users.prefs.set` `{ prefs: JSON }` (persisted), `users.prefs.setNotifications`. Notification-relevant prefs read in the notification code: `mute_sounds`, `show_typing`, per-channel `channel_notification_settings`/`muted_channels`, `desktop_notification_actions`, `enable_unread_view`, `enable_threads_view`.
+
+Internal/undocumented methods used: `client.userBoot`, `client.channels`, `client.counts`, `client.dms`, `client.init`, `client.extras`, `client.gantryBoot`, `client.shouldReload`, `client.getWebSocketURL`, `api.getFlannelHttpUrl`, `conversations.view`, `conversations.genericInfo`, `conversations.historyChanges`, `conversations.dms.mark`, `subscriptions.thread.*`, `search.modules.*`, `activity.*`, `drafts.*`, `experiments.getByUser`, the whole edge `users/list`-style API.
+
+Inferred
+
+- The standard public API shapes (`messages[]`, `ok/error`, `response_metadata.next_cursor`) apply; the extra args above only add fields.
+- `reactions.add` args are the public `{ channel, timestamp, name }` since the persisted-call layer treats them like any Web API call.
+
+Unknown
+
+- Full response schema of `conversations.view`, `client.dms`, the edge `results` object fields for emoji (`name`, `url`, `alias_for` are referenced elsewhere), and `activity.feed` item shapes.
+
+## 4. Real-time (websocket)
+
+Observed (`boot-async`: `EndpointManager`, `getSocketUrl`, `BaseSocketManager`; `shared`: `Kot3` `SlackSocket`, `LtEM` RTM handler registry, `iPXF` socket flannel)
+
+- URL acquisition: POST `client.getWebSocketURL` (token in body) → `{ primary_websocket_url, fallback_websocket_url, ttl_seconds, routing_context }`. Cached in localStorage under an `endpoints`-versioned key until expiry. `rtm.connect` / `rtm.start` are not used (an `rtm.start` default-args entry exists but no call site).
+- Connection URL = `primary_websocket_url` + query params: `token=<xoxc>`, `sync_desync=1`, `slack_client=desktop`, `start_args=<urlencoded JSON>`, `no_query_on_subscribe=1`, `flannel=3`, `lazy_channels=1`, `gateway_server=<routing_context>`, `enterprise_id?`, `exclude_events?`, `ws_region?`, `is_backup=1` + `last_primary_region` on fallback, `frt=<fast reconnect token>`, `batch_presence_aware=1`, `slack_route?`. Hosts are validated against an allow-list that includes `wss-primary.slack.com` (`isValidSlackWebSocketUrl`). A separate `wss://wss-primary.slack.com/switchboard?token&team` socket exists for speech-to-text only.
+- `start_args` default: `{ agent: "client", feature_*…, org_wide_aware: true, agent_version: <version ts>, eac_cache_ts: true, cache_ts: 0, name_tagging: true, only_self_subteams: true, connect_only: true, ms_latest: true, no_presence?: true, no_subteams?: true }`.
+- Protocol: JSON text frames. Every outgoing message gets an incrementing numeric `id` (starting at 16385); replies carry `reply_to` and `ok`. Max outgoing frame 32768 chars. Types sent: `ping` every 10 s (close with code 4998 if no pong for 90 s), `tickle` (fire-and-forget keepalive after user activity), `typing`/`user_typing` `{ type: "user_typing", channel, thread_ts? }`, `presence_sub { ids }`, `subscription_update { subtype: user_change_subscribe_request | user_change_unsubscribe_request | dnd_invalidated_*, ids }`, and `flannel { subtype: <method>, ...args }` (edge queries over the socket).
+- First frame is `{ type: "hello", flannel?, region, start?: {...} }`; `start` (when present) carries `self` and boot data. `{ type: "error", error: { code, msg, retry_after } }` is handled: `rate_limited`/`ratelimited`/`backend_overloaded`/`unknown` → backoff `retry_after` s or 30 s; `Socket URL has expired` → refetch; `invalid_auth` during fast-reconnect → slow reconnect. `{ type: "goodbye" }` → disconnect when window not focused. `{ type: "reconnect_url", url }` → stored for fast reconnect (valid 285 s). `{ type: "access_paused" }` routes to the access-paused handler. `pong` is the reply to `ping` (matched by `reply_to`).
+- Reconnect: state machine (`PROV_CONNECT → PROV_CONNECTING → PROV_CONNECTED → PROV_FINALIZE → CONNECTED`, `ERROR → WAIT_FOR_RATE_LIMIT → CONNECT`, `WAIT_FOR_CONNECTIVITY`, `SLEEP/ASLEEP`, `HALT`). Backoff is exponential with cap 60 s, base 1 s (`WAIT_FOR_RATE_LIMIT`). After a successful connect the client refreshes counts via `client.counts` (inferred from `applyCountsToChannelsAndThreads` logging "wasLastConnectFast").
+- Event dispatch: `addRtmHandler(type, fn)` / `addSharedRtmHandler` / `addBatchRtmHandler` registry; `message` events are routed by `subtype` in `messageReceived`.
+
+Event types with payloads relevant to Juno (handlers in `boot-async` unless noted):
+
+```ts
+// message (no subtype): a full Message object with { type:"message", channel, user, text, ts, thread_ts?, blocks?, client_msg_id?, files?, attachments?, reply_count?, subscribed?, team? }
+// message subtypes handled: message_changed, message_deleted, message_replied, thread_broadcast, message_locked,
+//   channel_join/leave (join-leave list), channel_topic/purpose, bot_message, me_message, reply_broadcast (legacy), document_mention, tabbed_canvas_updated, …
+{ type:"message", subtype:"message_changed", channel, ts, message: Message, previous_message?: Message, event_ts, hidden?: true }
+{ type:"message", subtype:"message_deleted", channel, deleted_ts, previous_message?, event_ts }
+{ type:"message", subtype:"message_replied", channel, message: { ts, reply_count, latest_reply, replies?: [{user, ts}] }, event_ts }
+{ type:"channel_marked" | "group_marked" | "im_marked" | "mpim_marked", channel, ts, unread_count?, mention_count? }
+{ type:"thread_subscribed" | "thread_unsubscribed" | "thread_marked", subscription: { channel, thread_ts, last_read, date_create?, active? } }
+{ type:"update_thread_state" | "update_global_thread_state", has_unreads, mention_count, unread_count_by_channel, mention_count_by_channel, timestamp, channel_badges?, org_wide? }
+{ type:"reaction_added" | "reaction_removed", reaction: string, user, item_user?, item: { type:"message", channel, ts } | { type:"file", file } , event_ts, url? }
+{ type:"user_typing", channel, user, thread_ts? }            // batched
+{ type:"presence_change", presence: "active"|"away", users: string[] }   // batched; manual_presence_change for self
+{ type:"channel_joined" | "channel_left" | "channel_created" | "channel_rename" | "channel_archive" | "channel_unarchive" | "channel_deleted" | "channel_converted_to_shared", channel: Channel | id }
+{ type:"im_open" | "im_close" | "im_created" | "mpim_open" | "mpim_close", channel, user? }
+{ type:"member_joined_channel" | "member_left_channel", user, channel }  // batched
+{ type:"desktop_notification", channel, ts | msg, thread_ts?, user?, title, subtitle, content, is_shared?, is_channel_invite?, launchUri?, imageUri?, avatarImage?, event_ts, trace_ctx? }
+{ type:"pref_change", name, value } ; { type:"user_change", user } ; { type:"dnd_updated"|"dnd_updated_user", user, dnd_status }
+{ type:"pin_added" | "pin_removed" } ; { type:"star_added" | "star_removed" } ; { type:"emoji_changed" } ; { type:"bot_changed" }
+{ type:"subteam_*" } ; { type:"channel_history_changed"|"im_history_changed", channel, latest, event_ts } ; { type:"force_reload" } ; { type:"user_session_expiration" }
+```
+
+Inferred
+
+- `channel_marked` family payloads follow the public RTM API (`unread_count`, `unread_count_display`, `mention_count` fields are consumed elsewhere via counts).
+- `reaction_*` `item.ts`/`item.channel` are required (handler logs an error otherwise).
+
+Unknown
+
+- The full `hello.start` payload and `flannel=3` semantics (the `flannel` socket subtype lets the client run edge queries without HTTP; Juno can use HTTP edge calls instead).
+
+## 5. Message format
+
+Observed (`shared`, `N8wa` rich text enum; mention regexes; `client-boot` send thunk; `boot-async` `gzYT`)
+
+- Outgoing messages are sent as `blocks` (JSON string) of one `rich_text` block (or `markdown_text` when the markdown composer is on). Minimal text: `[{ type:"rich_text", elements:[{ type:"rich_text_section", elements:[{ type:"text", text }] }] }]`.
+- Rich text element types: `rich_text_section`, `rich_text_header`, `rich_text_divider`, `rich_text_quote`, `rich_text_preformatted`, `rich_text_list` (`style: bullet|ordered|check|checked|unchecked`, `indent`), inline `text` (with `style: {bold, italic, strike, code}`), `user {user_id}`, `usergroup {usergroup_id}`, `channel {channel_id}`, `broadcast {range: here|channel|everyone}`, `emoji {name, unicode?}`, `link {url, text?}`, `date`, `color`, `workflowtoken`, `file`, `canvas`, `message_mention`, `workflow_mention`, `list_record`, `truncation`, `unknown`.
+- Quotes: a `rich_text_quote` element wraps a section; in the mrkdwn `text` field it is `&gt; ` at line start. There is no reply/quote object.
+- mrkdwn `text` encodings the client parses: `<@U…>` user, `<#C…|name>` channel, `<!subteam^S…|@handle>` usergroup, `<!here>`, `<!channel>`, `<!everyone>`, `<!date^…>`, `<url|label>`, `<!sf:…>` (Salesforce). Regexes: `/<!channel\b/`, `/<!here\b/`, `/<!everyone\b/`, `/<!group\b/`, `` `<!subteam^${id}|@${handle}>` ``.
+- Incoming messages carry both `text` (mrkdwn, HTML-escaped `&lt; &gt; &amp;`) and `blocks`; the client renders `blocks` when present (`shouldRenderBlocksInsteadOfText`) and falls back to parsing `text`.
+- Thread fields on messages: `thread_ts`, `reply_count`, `reply_users`, `latest_reply`, `subscribed`, `last_read`, `unread_count` (root), `parent_user_id` (reply), `subtype: "thread_broadcast"` for "also send to channel" replies.
+- Edits: `edited: { user, ts }`; deletions arrive as `message_deleted` with `deleted_ts`.
+
+Inferred
+
+- For Juno, sending `blocks` with a `rich_text` block is the safest; `text` can still be sent as a plain fallback (the API accepts both). Mentions in outgoing blocks are `{type:"user", user_id}` / `{type:"channel", channel_id}` / `{type:"usergroup", usergroup_id}` / `{type:"broadcast", range}`.
+
+Unknown
+
+- Exact rendering of `markdown_text`; whether the server rewrites `text` from `blocks` (standard behaviour is yes).
+
+## 6. Rate limits, pagination, errors
+
+Observed (`shared`, `DW51` `BaseRequest`, `GGwr` `SlackApiRequest`, `kPEx` API queue, `IlU1` `apiCall`)
+
+- Per-team request queue: max 10 concurrent requests for the focused team, 1 for background teams. Queue pauses while offline and resumes on reconnect (`reconnectService`/`reconnectClient`). `EXPEDITED` requests jump the queue.
+- Retries: default `maxAttempts = 3`, `timeout = 60 s`, `maxRetryAfter = 180 s`. Retry on HTTP 429, 500, 503, 504, client timeout/abort/unknown, and on `ok:false` with `error` in `["ratelimited","rate_limited","rate_limit_exceeded","rate_limit_reached","ratelimit","rate_limit"]` or `internal_error`. Delay = `Retry-After` header seconds if present, else backoff: 60 s base for 429/503/`ratelimited`, 15 s for 504, 30 s for other 5xx, plus jitter capped at `maxRetryAfter`. Each retry adds `_x_num_retries`.
+- Never retried (fatal auth/state errors): `invalid_args, invalid_auth, account_inactive, token_revoked, not_authed, missing_scope, org_login_required, active_migration, accesslimited, access_paused, two_factor_setup_required, user_in_no_workspaces, mobile_login_required, user_needs_to_accept_custom_tos, enterprise_active_migration`. A separate list of methods is never retried at all (e.g. `chat.command`, `conversations.view`, `search.*`, `oauth.*`).
+- Boot-time "start errors" that trigger sign-out/relogin UI: `user_removed_from_team, account_inactive, team_disabled, invalid_auth, two_factor_setup_required, force_reload, clear_cache, org_login_required, team_added_to_org, ratelimited, accesslimited, access_paused, user_in_no_workspaces`. `invalid_auth` with context `disallowed_ip_address` is special-cased.
+- Response envelope: `{ ok: boolean, error?: string, response_metadata?: { next_cursor?: string, messages?: string[] }, ... }`. Pagination: `cursor`/`next_cursor` for `conversations.history`/`replies` (plus `oldest`/`latest`/`has_more` windows), `marker`/`next_marker` for edge queries, `page`/`cursor` for search, `cursor` for `activity.feed`, `cursor_mark`/`next_cursor_mark` for usergroup search.
+- History fetch loop protection: the client logs an error every 100 history fetches for one channel (`react_messages_loop_fetch`), implying no hard client-side rate limit on history.
+- Socket rate limiting: `error.retry_after` on the socket, backoff capped at 60 s.
+
+Inferred
+
+- Slack applies Tier limits per method and per token; the client's 60 s default backoff on 429 is a good default for Juno.
+
+## 7. Notifications
+
+Observed (`boot-async` `ojMJ` `maybeShowNotification`; `shared` `shouldShowNotificationFor*`; `boot-async` `bMHo` reason table)
+
+- The server decides candidates: a `desktop_notification` RTM event is sent for every message the server thinks should notify (mentions, DMs, keywords, thread replies you follow), with pre-rendered `title`/`subtitle`/`content`. The client only raises an OS notification from this event (handler `addRtmHandler("desktop_notification", maybeShowNotification)`); plain `message` events do not raise notifications by themselves (they only play sounds via `maybePlayMessageSentOrArrivedNoise`).
+- Client-side gate (`shouldShowNotificationForDesktopNotification`, result 0 = show): skip when channel unknown (3), channel belongs to another org/team (24, 17), not a reply/root mismatch (7), the thread/huddle is active on screen (16), sender is hidden (29), message ts is newer than latest in store (19, duplicate guard), or the thread's `last_read >= ts` (20). `is_channel_invite` always shows. Dedup by a 100-entry processed-notification set (21). Also `fe_notification_clogging`, `pref-disabled` channel (`u0` pref check → `slack_settings`), in-progress streaming (33).
+- Channel/DM message gates (used for sounds and legacy paths) add: `no_display`(4), `no_notifications`(5), reply/not reply (6/7), join/leave (8), bot/app without mention (9/10), own message (11), muted channel (12), DND (13; `_ignore_dnd` overrides, and a `dnd_override` RTM event re-runs the check), pref `nothing` (14), OS permission denied (15), active view visible (16), oversized mention (18), email-shared (22), app DM suppressed (23).
+- Desktop display options passed through from the event: `skip_formatting: true`, `launch_uri`, `image_uri`, `avatar_image`. Sounds: pref `mute_sounds`; per-channel `desktop_notification_setting` of `everything | mentions | nothing`.
+
+Inferred
+
+- Juno should subscribe to `desktop_notification` as its "server says this matters" signal, then apply its own rules (section 14 of the spec) on top; it must not depend on `message` events alone for mention detection, but can compute mentions locally from `text` (`<@SELF>`, `<!here>`, `<!channel>`, usergroup ids from `subteams.self`) when the user has notifications muted.
+
+Unknown
+
+- Whether `desktop_notification` is sent when the client's notification prefs are "nothing" (the client-side gate suggests the server still sends and the client filters).
+
+## 8. Recommended minimal API surface for Juno v1
+
+Transport
+- `POST https://<workspace>.slack.com/api/<method>?_x_id=<8hex>-<unix.sss>&slack_route=<team>&_x_version_ts=<build ts from client-v2.html, or omit>&_x_app_name=client` with `multipart/form-data`, `token` first, `_x_reason=<short-reason>`, cookie `d` attached (Electron `session` with the decrypted cookie, or run inside the same Chromium profile). Honour `Retry-After`, retry 429/5xx up to 3 times with 60 s base backoff.
+- Edge: `POST <api.getFlannelHttpUrl().url>/users/info?_x_app_name=client` with JSON `{ token, updated_ids:{…} | ids:[…] }` (fallback to `users.info`/`users.list` Web API if simpler).
+- Websocket: `client.getWebSocketURL` → connect with `token`, `sync_desync=1`, `slack_client=desktop`, `start_args={"agent":"juno"...}`, `flannel=3`, `lazy_channels=1`, `batch_presence_aware=1`, `no_query_on_subscribe=1`; `ping` every 10 s; handle `hello`, `error`, `goodbye`, `reconnect_url`; exponential backoff on close.
+
+Calls
+1. Boot: `client.userBoot` (`return_all_relevant_mpdms=true`, `version_all_channels`), `client.counts` (`thread_counts_by_channel=true`), `users.prefs.get`, `api.getFlannelHttpUrl`, `client.getWebSocketURL`.
+2. Topics: `subscriptions.thread.getView` (paged by `current_ts`) for followed threads; `conversations.history` (`ignore_replies=true`, `limit`, `oldest/latest`) for Main; `conversations.replies` for a topic; `client.counts` for unread badges.
+3. Read state: `conversations.mark {channel, ts}`; `subscriptions.thread.mark {channel, thread_ts, ts, read}`; `subscriptions.thread.add/remove {channel, thread_ts, last_read}`.
+4. Write: `chat.postMessage {channel, blocks(JSON rich_text) | text, thread_ts?, reply_broadcast?, client_msg_id, ts}`; `reactions.add/remove {channel, timestamp, name}`; `chat.update` for edits.
+5. People and lookup: edge `users/info`, `users/search`, `channels/info`, `usergroups/info`, `emojis/list` (or `users.info`/`users.list`, `conversations.info` Web API equivalents); `users.prefs.get` for highlight words and muted channels.
+6. Search: `search.modules.messages {query, page, count, extracts:1, highlight:1}`.
+7. Live: RTM events `message` (+ `message_changed`, `message_deleted`, `message_replied`, `thread_broadcast`), `channel_marked`/`im_marked`/`mpim_marked`/`group_marked`, `thread_marked`/`thread_subscribed`/`thread_unsubscribed`, `update_thread_state`, `reaction_added/removed`, `user_typing`, `presence_change` (after `presence_sub`), `channel_joined/left`, `im_open/close`, `desktop_notification`, `pref_change`, `user_change`, `force_reload`, `user_session_expiration`.
+
+## 9. Risks
+
+- Terms of Service: using an `xoxc-` user session token outside the official client is against Slack's API ToS for third-party apps and can lead to the session or account being flagged. The app should be personal-use only, never ship tokens, and never automate posting at scale.
+- Token and cookie coupling: `xoxc-` tokens are only valid with the `d` cookie session. Decrypting `Cookies` needs the "Slack Safe Storage" Keychain item (user prompt). If Slack rotates the session (`user_session_expiration`, `invalid_auth`, `token_revoked`) Juno must re-read `localConfig_v2` and the cookie, or ask the user to re-sign-in in Slack. The desktop app may re-encrypt cookies with a different scheme on Chromium upgrades.
+- Undocumented methods (`client.userBoot`, `client.counts`, `subscriptions.thread.*`, `search.modules.*`, edge `users/list`) can change without notice; version-gate by `_x_version_ts` and keep fallbacks on public methods (`conversations.list`, `users.conversations`, `conversations.history`, `search.messages`).
+- Rate limits: the official client stays under limits with one message in flight and 10 concurrent reads per team. Thread fan-out (one `conversations.replies` per topic) must be batched and cached; prefer `subscriptions.thread.getView` and `client.counts` deltas.
+- Fingerprint/anti-bot params (`fp`, `_x_sonic`, `_x_gantry`, `slack_client=desktop`): unknown whether validated. Mimicking the desktop client's query params and User-Agent is the safest default.
+- Enterprise Grid differences: `enterprise_id`/`enterprise_api_token` per team, `slack_route=<enterprise>:<team>`, org-wide threads (`update_global_thread_state`), `org_login_required`, and edge API URL per enterprise. The test account here is a single workspace; Grid paths are untested.
+- Websocket allow-list: the client only accepts `wss-primary.slack.com`-style hosts; `fallback_websocket_url` is a backup region, not an alternate protocol.
+- Local state coupling: reading `localConfig_v2` while Slack is running is safe (read-only leveldb copy), but writing to Slack's storage must never happen.
