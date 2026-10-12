@@ -388,10 +388,22 @@ importers:
       effect:
         specifier: 4.0.3
         version: 4.0.3
+      ws:
+        specifier: 8.22.0
+        version: 8.22.0
     devDependencies:
+      '@effect/vitest':
+        specifier: 4.0.3
+        version: 4.0.3(effect@4.0.3)(vitest@5.0.4(@types/node@24.19.2)(vite@7.3.7(@types/node@24.19.2)(jiti@2.7.0)(lightningcss@1.33.0)))
+      '@juno/fake-slack':
+        specifier: workspace:*
+        version: link:../fake-slack
       '@types/node':
         specifier: 24.19.2
         version: 24.19.2
+      '@types/ws':
+        specifier: 8.18.2
+        version: 8.18.2
       typescript:
         specifier: 5.9.3
         version: 5.9.3

@@ -19,3 +19,8 @@ minimumReleaseAgeExclude:
   # set up.
   - vitest@5.0.4
   - "@vitest/*"
+
+# @juno/slack tests run against @juno/fake-slack, which depends on @juno/slack
+# for its schemas. The cycle is a devDependency only; pnpm needs to be told so
+# `pnpm -r test` runs.
+ignoreWorkspaceCycles: true
