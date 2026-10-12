@@ -1,0 +1,301 @@
+/* ============================================================
+   Littlebird Design System — Colors & Type
+   ------------------------------------------------------------
+   Two parallel systems live here:
+     1. BRAND colors (Eggshell / Off-White / Off-Black + accent)
+        — used in marketing, packaging, slides, splash screens.
+     2. PRODUCT colors (semantic tokens from the desktop app)
+        — used in UI surfaces, text, borders, accents.
+   Both are real. Pick by context; never mix accent hues across
+   the two systems without intent.
+   ============================================================ */
+
+/* ---------- Typefaces ---------- */
+/* NOTE: Söhne is the Littlebird sans. It is a licensed typeface
+   (Klim Type Foundry) and the .otf files must be provided by the
+   team. If Söhne is unavailable, the stack falls back to Inter,
+   which shares similar proportions. */
+
+@font-face {
+  font-family: 'Sohne';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('assets/Sohne-Buch.otf') format('opentype');
+}
+@font-face {
+  font-family: 'Sohne';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('assets/Sohne-Halbfett.otf') format('opentype');
+}
+@font-face {
+  font-family: 'Sohne';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('assets/Sohne-Kraftig.otf') format('opentype');
+}
+
+/* Meraki — the Littlebird serif. Used as a display / editorial
+   accent (quotes, hero headlines, editorial UI like "Journal"). */
+@font-face {
+  font-family: 'Meraki';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('assets/Meraki-Regular.otf') format('opentype');
+}
+
+/* Google Fonts fallback — Inter approximates Söhne. */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root {
+  /* =========================================================
+     BRAND PALETTE
+     Primary (neutrals + paper tones) and accents from the
+     &Walsh brand guidelines. Keep the HEX values stable.
+     ========================================================= */
+
+  /* Primary / paper */
+  --lb-eggshell:      #F4EDD9;   /* warm off-white, default surface in hero moments */
+  --lb-off-white:     #FFFAEB;   /* lightest tone, for editorial backgrounds */
+  --lb-white:         #FFFFFF;
+  --lb-off-black:     #1B1C15;   /* warm near-black, primary text on light */
+
+  /* Secondary / accent — full palette from brand guidelines */
+  --lb-midnight-blue:  #2E1F64;
+  --lb-rose-quartz:    #A49496;
+  --lb-cyan:           #008AB3;  /* "Cyan Cornflower Blue" */
+  --lb-emerald:        #50C878;
+  --lb-jordy-blue:     #92C2F9;
+  --lb-red:            #C41E3A;
+  --lb-dark-emerald:   #00674F;
+  --lb-plum:           #E89EB8;
+  --lb-claret:         #7F1734;
+  --lb-yellow:         #FFEE8C;
+
+  /* =========================================================
+     PRODUCT TOKENS (mirrors apps/desktop/src/styles/base.css)
+     Light theme. Warm-white paper with a near-black accent.
+     ========================================================= */
+
+  /* Radii */
+  --radius-sm: 0.25rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.625rem;
+
+  /* Backgrounds & surfaces */
+  --background:          hsla(48, 50%, 98%, 1);
+  --background-subtle:   hsla(48, 35%, 97%, 1);
+  --surface-default:     hsla(48, 30%, 98%, 1);
+  --surface-hover:       hsla(48, 30%, 94%, 1);
+  --surface-active:      hsla(48, 30%, 92%, 1);
+
+  --secondary-default:   hsla(48, 30%, 92%, 1);
+  --secondary-hover:     hsla(48, 30%, 90%, 1);
+  --secondary-active:    hsla(48, 30%, 88%, 1);
+
+  /* Borders */
+  --border-subtle:       hsla(48, 30%, 92%, 1);
+  --border-default:      hsla(48, 30%, 91%, 1);
+  --border-strong:       hsla(48, 30%, 88%, 1);
+  --border-strongest:    hsla(48, 30%, 82%, 1);
+
+  /* Foreground — warm neutrals, not pure black */
+  --foreground-default:  hsla(48, 15%, 12%, 1);
+  --foreground-subtle:   hsla(48,  8%, 35%, 1);
+  --foreground-muted:    hsla(48,  4%, 52%, 1);
+
+  /* Accent — near-black on light */
+  --accent-default:          hsla(48, 30%,  8%, 1);
+  --accent-hover:            hsla(48, 30%, 10%, 1);
+  --accent-active:           hsla(48, 30%, 13%, 1);
+  --accent-foreground:       hsla(48, 20%, 95%, 1);
+  --accent-foreground-subtle: hsla(48, 20%, 90%, 1);
+  --accent-foreground-muted: hsla(48, 20%, 70%, 1);
+
+  /* Focus / selection */
+  --selection-background: hsla(200, 50%, 80%, 1);
+
+  /* Shadows */
+  --shadow-sm:  0 1px 2px 0 rgba(27, 28, 21, 0.04);
+  --shadow-md:  0 2px 6px 0 rgba(27, 28, 21, 0.06);
+  --shadow-card: 0 0 12px 0 rgba(27, 28, 21, 0.12);
+  --shadow-lg:  0 8px 24px 0 rgba(27, 28, 21, 0.10);
+
+  /* Semantic (status) */
+  --danger:   #C41E3A;
+  --success:  #00674F;
+  --warning:  #E0A500;
+  --info:     #008AB3;
+
+  /* =========================================================
+     TYPE — families
+     ========================================================= */
+  --font-sans:   'Sohne', 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-serif:  'Meraki', 'Instrument Serif', ui-serif, 'Iowan Old Style', Georgia, serif;
+  --font-mono:   'PP Neue Montreal Mono', 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  /* Type scale (pixel-accurate to app defaults) */
+  --text-xs:   0.75rem;    /* 12 */
+  --text-sm:   0.875rem;   /* 14 */
+  --text-sm\.5:0.9375rem;  /* 15 */
+  --text-base: 1rem;       /* 16 */
+  --text-md:   1.0625rem;  /* 17 */
+  --text-lg:   1.125rem;   /* 18 */
+  --text-xl:   1.25rem;    /* 20 */
+  --text-2xl:  1.5rem;     /* 24 */
+  --text-3xl:  1.875rem;   /* 30 */
+  --text-4xl:  2.25rem;    /* 36 */
+  --text-5xl:  3rem;       /* 48 */
+  --text-6xl:  4rem;       /* 64 */
+
+  /* Letter-spacing — app runs a mild +0.02em globally */
+  --tracking-tight:  -0.01em;
+  --tracking-normal: 0.02em;
+  --tracking-wide:   0.06em;
+
+  --leading-tight:  1.2;
+  --leading-snug:   1.4;
+  --leading-normal: 1.6;
+  --leading-relaxed: 1.75;
+
+  /* Spacing scale */
+  --space-1:  0.25rem;
+  --space-2:  0.5rem;
+  --space-3:  0.75rem;
+  --space-4:  1rem;
+  --space-5:  1.25rem;
+  --space-6:  1.5rem;
+  --space-8:  2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+  --space-24: 6rem;
+}
+
+/* =========================================================
+   DARK THEME
+   ========================================================= */
+.dark, [data-theme='dark'] {
+  --background:          hsla(210, 5%,  8%, 1);
+  --background-subtle:   hsla(210, 5%,  9%, 1);
+  --surface-default:     hsla(210, 5%, 11%, 1);
+  --surface-hover:       hsla(210, 5%, 13%, 1);
+  --surface-active:      hsla(210, 5%, 15%, 1);
+
+  --secondary-default:   hsla(210, 5%, 16%, 1);
+  --secondary-hover:     hsla(210, 5%, 18%, 1);
+  --secondary-active:    hsla(210, 5%, 20%, 1);
+
+  --border-subtle:       hsla(210, 5%, 12%, 1);
+  --border-default:      hsla(210, 5%, 15%, 1);
+  --border-strong:       hsla(210, 5%, 16%, 1);
+  --border-strongest:    hsla(210, 5%, 21%, 1);
+
+  --foreground-default:  hsla(45, 30%, 90%, 1);
+  --foreground-subtle:   hsla(45, 10%, 80%, 1);
+  --foreground-muted:    hsla(45,  2%, 55%, 1);
+
+  --accent-default:          hsla(48, 30%, 90%, 1);
+  --accent-hover:            hsla(48, 30%, 95%, 1);
+  --accent-active:           hsla(48, 30%, 99%, 1);
+  --accent-foreground:       hsla(48, 10%,  2%, 1);
+  --accent-foreground-subtle: hsla(48, 10%,  5%, 1);
+  --accent-foreground-muted: hsla(48, 10%, 10%, 1);
+  --selection-background:    hsla(200, 97%, 20%, 1);
+
+  --shadow-sm:  0 1px 2px 0 rgba(0, 0, 0, 0.30);
+  --shadow-md:  0 2px 6px 0 rgba(0, 0, 0, 0.40);
+  --shadow-card: 0 0 12px 0 rgba(0, 0, 0, 0.45);
+  --shadow-lg:  0 8px 24px 0 rgba(0, 0, 0, 0.50);
+}
+
+/* =========================================================
+   SEMANTIC ELEMENT DEFAULTS
+   These rules apply to bare elements so you can drop content
+   into a page and get the Littlebird voice for free.
+   ========================================================= */
+html, body {
+  background: var(--background);
+  color: var(--foreground-default);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: var(--leading-relaxed);
+  letter-spacing: var(--tracking-normal);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-sans);
+  color: var(--foreground-default);
+  letter-spacing: var(--tracking-tight);
+  font-weight: 600;
+  margin: 0;
+}
+
+/* Display headings use Meraki serif for editorial moments. */
+.display, .serif {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+h1 { font-size: var(--text-4xl); line-height: 1.1; }
+h2 { font-size: var(--text-3xl); line-height: 1.2; }
+h3 { font-size: var(--text-2xl); line-height: 1.25; }
+h4 { font-size: var(--text-xl);  line-height: 1.35; }
+h5 { font-size: var(--text-lg);  line-height: 1.4; }
+h6 { font-size: var(--text-base); line-height: 1.5; font-weight: 700; }
+
+p { margin: 0; color: var(--foreground-default); }
+
+small, .text-xs { font-size: var(--text-xs); color: var(--foreground-muted); }
+
+a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-thickness: 1px;
+}
+a:hover { text-decoration-thickness: 2px; }
+
+code, kbd, pre, samp {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+}
+code {
+  background: var(--surface-hover);
+  padding: 0.1em 0.35em;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-default);
+}
+kbd {
+  background: var(--surface-default);
+  border: 1px solid var(--border-strong);
+  border-bottom-width: 2px;
+  border-radius: var(--radius-sm);
+  padding: 0.1em 0.4em;
+  font-size: 0.85em;
+}
+
+hr {
+  border: 0;
+  border-top: 1px solid var(--border-default);
+  margin: var(--space-8) 0;
+}
+
+::selection { background: var(--selection-background); }
+
+/* Utility classes — thin on purpose */
+.u-surface       { background: var(--surface-default); border: 1px solid var(--border-default); border-radius: var(--radius-lg); }
+.u-card          { background: var(--surface-default); border: 1px solid var(--border-default); border-radius: var(--radius-xl); box-shadow: var(--shadow-card); }
+.u-muted         { color: var(--foreground-muted); }
+.u-subtle        { color: var(--foreground-subtle); }
+.u-mono          { font-family: var(--font-mono); }
+.u-serif         { font-family: var(--font-serif); }
+.u-uppercase     { text-transform: uppercase; letter-spacing: var(--tracking-wide); }
