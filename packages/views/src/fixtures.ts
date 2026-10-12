@@ -5,6 +5,8 @@
 import type { FixtureSet } from '@juno/ui'
 import AppInfoView from './AppInfoView.fixtures'
 import EngineStatusView from './EngineStatusView.fixtures'
+import SessionView from './SessionView.fixtures'
+import SignInView from './SignInView.fixtures'
 import Shell from './Shell.fixtures'
 import ThemeToggleView from './ThemeToggleView.fixtures'
 
@@ -12,6 +14,8 @@ import ThemeToggleView from './ThemeToggleView.fixtures'
 export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   AppInfoView,
   EngineStatusView,
+  SessionView,
   Shell,
+  SignInView,
   ThemeToggleView,
 }
