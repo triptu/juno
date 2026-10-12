@@ -1,105 +1,109 @@
 # Juno architecture
 
-Status: proposed, October 2026. Decisions with lasting consequences have an ADR in `docs/decisions/`. The product spec (`docs/design/handoff/SPEC.md`) decides behaviour; this document decides structure.
+Version 2, October 2026. Revised after `docs/reviews/architecture-review-1.md` and the owner's decisions. Decisions with lasting consequences have an ADR in `docs/decisions/`; ADRs 0007 to 0011 are new in this version. The product spec (`docs/design/handoff/SPEC.md`) decides behaviour; this document decides structure.
 
-Inputs: the spec, `docs/research/slack-data-access.md` (API, boot, socket, limits), `docs/research/slack-desktop-shell.md` (what to copy from Slack's shell), `docs/research/tech-stack.md` (versions, pitfalls), `docs/design/inventory.md` and `primitives.md`.
+Inputs: the spec, `docs/research/slack-data-access.md`, `docs/research/slack-desktop-shell.md`, `docs/research/tech-stack.md`, `docs/design/inventory.md`, `docs/design/primitives.md`, the review, and the installed `effect@4.0.3`, `@effect/atom-react@4.0.3` and `electron@44.7.0` sources (API names below were checked there).
+
+Owner decisions folded in: the sidebar shows every thread with recent activity in member channels plus each channel's Main; Resolve is local plus mark-read, never unfollow; sends have no undo, but own messages can be edited and deleted (M6); full file upload, thumbnails and download in v1; a pinned resolved row stays in Pinned, dimmed with a check; new DMs open with `conversations.open`; v1 ships the default design with dark mode and accent as the only appearance settings; the keychain prompt during import is acceptable; the quiet window defaults to 7 days and is capped at 14; one workspace in the v1 UI on a multi-team-ready data layout; digests that fall due while the app is quit are delivered at the next launch.
 
 ## 1. Overview
-
-Juno is three processes and one data store.
 
 ```mermaid
 flowchart LR
   subgraph main["Electron main (shell)"]
-    W[windows, menus, tray badge]
+    W[windows, app menu, context menus, badge]
     N[OS notifications]
-    S[secrets: safeStorage, keychain, sign-in window]
+    S[secrets: safeStorage, keychain, sign-in window, persist:slack session]
+    F[juno:// scheme: app files, authenticated thumbnails]
   end
-  subgraph engine["Utility process (engine)"]
-    SL[slack: Web API + socket]
+  subgraph engine["Utility process (engine), session persist:slack"]
+    SL[slack: Web API over Electron net, socket over ws]
     SY[sync + outbox]
-    ST[(SQLite store)]
-    AI[assistant + ai]
-    NO[notifications pipeline]
+    ST[(cache.db + user.db)]
+    AS[assistant + ai]
+    NO[notifications]
     Q[live queries + commands]
   end
   subgraph renderer["Renderer (UI)"]
     A[atoms] --> C[containers] --> V[views] --> U[ui primitives] --> T[tokens]
   end
   SL <-->|HTTPS + WSS| Slack[(Slack)]
-  AI <-->|HTTPS| OR[(OpenRouter)]
-  Q <-->|MessagePort, Schema-typed messages| A
-  engine <-->|parentPort: secrets, notify, badge| main
-  renderer <-->|ipcRenderer.invoke: menus, window, clipboard| main
+  AS <-->|HTTPS| OR[(OpenRouter)]
+  Q <-->|MessagePort| A
+  engine <-->|parentPort: secrets, cookies, notify, badge, clock| main
+  renderer <-->|ipcRenderer.invoke: menus, window, clipboard, files| main
 ```
 
-- The **shell** (main) owns everything that needs Electron APIs: windows, native menus, notifications, dock badge, `safeStorage`, the embedded sign-in window and the import from the installed Slack app. It holds no business logic.
-- The **engine** (a `utilityProcess`) owns all business logic and I/O: the Slack session, the Web API client, the realtime socket, the sync engine, SQLite, AI calls and the notification pipeline. It is a plain Node program built from Effect services, so it also runs outside Electron for engine-level tests.
+- The **shell** (main) owns what needs Electron APIs: windows, the application menu and context menus, notifications, the dock badge, `safeStorage`, the `persist:slack` session that holds the Slack cookie, the sign-in window, the import from the installed Slack app, the `juno://` scheme, file dialogs and downloads. No business logic.
+- The **engine** (a `utilityProcess` forked with `partition: 'persist:slack'`) owns all business logic and I/O. It is a plain Node program built from Effect services, so it also runs outside Electron for tests.
 - The **renderer** is UI only. It subscribes to live queries and sends commands over one MessagePort. It never sees a token, a cookie or an API key.
 
-Three rules hold everything together:
+Three rules:
 
-1. **SQLite is the source of truth for the UI.** Every screen reads from the store through a live query. Slack is a remote the engine syncs with; the UI never waits for Slack.
-2. **Writes are local first.** A command updates the store in one transaction, which updates the UI through the live query, and queues the Slack call in a persisted outbox. Optimism lives in the engine, not in React.
-3. **Views are dumb.** They take props and call callbacks. No atoms, no Effect, no IPC. Containers wire atoms to views.
+1. **SQLite is the source of truth for the UI.** Every screen reads from the store through a live query. The UI never waits for Slack.
+2. **Writes are local first.** A command updates the store in one transaction and queues the Slack call in a persisted outbox. The engine owns optimism, revert and undo.
+3. **Views are dumb.** Props in, callbacks out. No atoms, no Effect, no IPC. Containers wire atoms to views.
 
-## 2. Process model and the contract
+## 2. Processes, network and the contract
 
-### 2.1 Why a utility process
+### 2.1 Why a utility process (ADR 0001)
 
-The draft put the engine in main. The engine should run in a `utilityProcess` instead (ADR 0001):
+`node:sqlite` is synchronous and `client.userBoot` is megabytes of JSON. In main, those stalls freeze native menus, window dragging and every IPC call. In a utility process they stall nothing the user sees, a crash does not take the window down, and the engine stays a Node program that tests can run against `fake-slack` without Electron. The engine only depends on a MessagePort-shaped `Transport`, so it could be hosted in main with no package changes if ever needed.
 
-- `node:sqlite` is synchronous. Writing a few thousand messages at boot, or re-running a big query, blocks the thread it runs on. In main that stalls native menus, window dragging and every IPC round trip. In a utility process it stalls nothing the user can see.
-- Parsing `client.userBoot` (megabytes of JSON for a large workspace) has the same problem.
-- A crash or runaway loop in the engine does not take the window down; main restarts the process and the renderer reconnects.
-- The engine becomes a Node program with a `start(transport, config)` entry. Engine tests run it under plain Node against `fake-slack` without launching Electron.
-- Electron APIs are not available in a utility process. That is a feature: the engine cannot grow shell concerns.
+### 2.2 Network: Electron `net` inside the engine (ADR 0007)
 
-Cost: secrets must be handed from main to the engine in memory, notifications and the badge go through a small engine→main channel, and HTTP/WebSocket use Node (`fetch`, `ws`) instead of Chromium's session. The engine attaches the `d` cookie itself; it never needs Chromium's cookie jar.
+The review was right that the engine should not hand-hold the cookie. Electron 44 exposes `net` in utility processes, and `utilityProcess.fork` takes `session` or `partition` (checked in `electron.d.ts`). The engine is forked with `partition: 'persist:slack'`, and `SlackApi` calls `net.fetch` on that session: the `d` cookie is attached and any `Set-Cookie` that Slack sends to rotate the session is stored back. System proxy, PAC and keychain CAs come for free, and the TLS fingerprint is Chromium's. Chromium encrypts the cookie store with the same OS keychain backend `safeStorage` uses.
 
-The engine only depends on a MessagePort-shaped `Transport`. If the utility process ever causes trouble, main can host the engine with no code change in any package.
+`HttpTransport` is an Effect service with two layers: `ElectronNet` (production) and `NodeFetch` (engine tests under Node, pointed at `fake-slack`). `SlackApi` depends only on `HttpTransport`.
 
-### 2.2 The three channels
+The socket is the one place the cookie is handled by hand, because `net` has no WebSocket. Before each connect the engine asks main for `session.cookieHeader` (main serialises `session.fromPartition('persist:slack').cookies.get({ domain: 'slack.com' })`, HttpOnly cookies included) and opens the socket with `ws` and headers `Cookie`, `Origin: https://app.slack.com` and the Slack desktop `User-Agent`. The header string is used for the upgrade only and dropped afterwards. `Set-Cookie` headers on the upgrade response (`ws` emits `upgrade` with the response) are forwarded to main, which writes them into the session. Proxies: `ws` does not read the system proxy, so main also answers `session.resolveProxy(wsUrl)` and the engine passes an agent when a proxy is configured. This is the socket cookie story; it is small and testable (the fake rejects an upgrade without the cookie).
 
-| Channel | Transport | Direction | Content |
-| --- | --- | --- | --- |
-| renderer ↔ engine | `MessageChannelMain`; main hands one port to the utility process and the other to the renderer (`webContents.postMessage`, preload forwards it with `window.postMessage`) | both | queries, live subscriptions, commands, engine events |
-| renderer ↔ main | `contextBridge` + `ipcRenderer.invoke` on named channels | both | native context menu popup, title-bar double click, clipboard, open external, request engine port; main→renderer: notification click, system theme change, deep link |
-| engine ↔ main | `process.parentPort` | both | main→engine: session secrets, config, `sign-in completed`; engine→main: `notify`, `setBadge`, `authRequired`, `openExternal` |
+Custom protocols are not supported in utility processes (checked), so `juno://files/...` thumbnails are served by main with `net.fetch` on the same session.
 
-All three are defined in `@juno/contract` with Effect `Schema` for every payload, decoded on receipt on both sides. The preload imports only `@juno/contract/channels` (names and TypeScript types, no runtime dependencies) so it stays tiny and ESM-free. This mirrors Slack's shell, which keeps channel names, payload types and joi validators in one `src/common` package and validates every IPC payload in main.
+### 2.3 Secrets and sessions
 
-### 2.3 Protocol over the port
+- The `d` cookie lives only in the `persist:slack` Chromium session. The sign-in window uses that partition, so the cookie lands in place. The import path writes the decrypted cookie into the session with `cookies.set`.
+- The `xoxc` token and the OpenRouter key are encrypted with `safeStorage` into `userData/secrets.bin`, read by main, sent to the engine over `parentPort` at start, and kept in memory there. Under `JUNO_E2E` main uses a plaintext secrets file so the keychain never prompts.
+- Sign-out deletes `secrets.bin`, clears the `persist:slack` session, and deletes the workspace's `cache.db`.
 
-`effect/rpc` is marked unstable in Effect 4 and has no Electron transport. The contract is the longest-lived interface in the app, so it does not sit on an unstable module (ADR 0002). Instead, `@juno/contract` defines a small message protocol and `@juno/engine` / `@juno/state` implement a server and client for it (about 150 lines each). The route definitions mirror the shape of `RpcGroup` so a later move is mechanical.
+### 2.4 The three channels
 
-Wire messages (all `Schema` structs, JSON over `postMessage`):
+| Channel | Transport | Content |
+| --- | --- | --- |
+| renderer ↔ engine | `MessageChannelMain`; main gives one port to the engine and the other to the renderer (`webContents.postMessage`; the preload forwards it with `window.postMessage`, the page checks `event.source === window`) | live queries, commands, engine events |
+| renderer ↔ main | `contextBridge` + `ipcRenderer.invoke` | context menu popup, app-menu commands, title-bar double click, clipboard, open external, file dialogs, `webUtils.getPathForFile` for dropped files, request engine port |
+| engine ↔ main | `process.parentPort` | main→engine: secrets, config, cookie header, proxy, `clock.advance` (e2e), sign-in completed; engine→main: `notify`, `setBadge`, `authRequired`, `setCookies`, `openExternal` |
 
-```
-req  { id, route, input }          -> ok { id, output } | err { id, error }
-sub  { id, route, input }          -> next { id, value }* then end { id } | err { id, error }
-unsub { id }                        (client cancels; server interrupts the fiber)
-evt  { name, value }               (engine → renderer, unsolicited)
-```
+Every payload is an Effect `Schema` in `@juno/contract`, decoded on receipt. The preload imports only `@juno/contract/channels` (names and types, no runtime imports). Main checks `event.senderFrame.url` against `juno://app`.
 
-Route kinds:
+### 2.5 Engine lifecycle
 
-- **Query** (`req`): one-shot reads such as `search.run`, `command.parse`. Rarely used; most reads are live.
-- **Live query** (`sub`): the normal way to read. The server emits the current snapshot at once, then a new snapshot whenever a store write invalidates one of the query's keys (debounced about 30 ms, structurally de-duplicated). Examples: `topics.list(filter)`, `topic.get(id)`, `messages.list(topicId, page)`, `allTopics.list(filters)`, `forYou.list`, `juno.chat`, `notifications.settings`, `notifications.today`, `prefs.get`, `engine.status`.
-- **Command** (`req`): a write. Returns quickly after the local transaction. Declares its error union and, where reversible, its inverse command name (`topic.resolve` ↔ `topic.reopen`), which the renderer uses for the undo stack.
-- **Event** (`evt`): things that are not a query result: `command.failed` (an outbox item gave up), `navigate` (a notification was clicked), `toast`.
+Main forks the engine at startup and restarts it on exit with exponential backoff (1 s base, 30 s cap, give up after 5 crashes in 2 minutes and show the "engine failed" state). The renderer's `MessagePort` fires `close` when the engine dies (verified by the review); the renderer then asks main for a new port, re-subscribes everything, and the live queries deliver fresh snapshots. The engine accepts several ports at once (renderer reload, a second window later) and drops a port's subscriptions when it closes. `engine.status` carries the phase: `first-run | booting | catching-up { done, total } | live | offline | rate-limited { until } | session-expired | restarting`.
 
-Errors are `Schema.TaggedError` classes in `contract/errors.ts`: `NotSignedIn`, `Offline`, `SlackRejected { code }`, `RateLimited { retryAfter }`, `NotFound`, `AiUnavailable`, `Invalid { issues }`. Each route lists the subset it can return; a decode failure on either side becomes `ProtocolError` and is logged with the route name. Cancellation: streams are cancelled with `unsub`; commands are short and are not cancellable except AI generation, which is a stream.
+### 2.6 Protocol: a time-boxed spike, then decide (ADR 0009)
 
-The renderer obtains the port once at startup (`window.juno.engine.requestPort()`), and reconnects with a fresh port if main restarts the engine (`engine.status` reports `restarting`).
+ADR 0002 chose a hand-written protocol because `effect/rpc` is unstable and had no Electron transport. The review showed that `effect/rpc` 4.0.3 does have postMessage-shaped transports: `RpcClient.layerProtocolWorker` / `RpcServer.layerProtocolWorkerRunner` over `Worker.makePlatform`, which accepts any object with `postMessage` (checked), and `AtomRpc.Service` binds an `RpcGroup` to atoms with reactivity keys. The design already depends on `sql`, `Reactivity` and `Atom`, which are equally unstable. So the first M1 task is a one-day spike. Both options define the same thing in `@juno/contract`: route groups per feature with `payload`, `success`, `error` schemas, stream routes for live queries, and commands that return `{ undo?: Command }`.
+
+Spike A (effect/rpc): `RpcGroup` in `contract`; `Worker.makePlatform` adapters for a DOM `MessagePort` and a `MessagePortMain`; `AtomRpc` in `state`. Spike B (custom): eight `Schema` messages (`req`, `ok`, `err`, `sub`, `next`, `end`, `unsub`, `evt`) and a client and server of about 150 lines each.
+
+Decision criteria, in order: (1) a live query round trip and a streaming subscription work end to end from a sandboxed renderer to the utility process; (2) interruption of a subscription on `unsub` and on port close is observable in the engine within 100 ms; (3) typed errors and defects reach the renderer as values, never as a closed port; (4) several ports at once; (5) payload size and encode/decode time for a 300-row snapshot (budget: under 5 ms each side); (6) lines of code we own and how readable a failure is in devtools. If A passes 1 to 4 and is not more than twice B on 5, use A and delete B. Otherwise keep B and write down what it lacks (back-pressure, defect encoding, multi-client) as known gaps.
+
+Either way, the shape of the API is fixed now:
+
+- **Live query** (stream): emits a first full snapshot, then deltas: `{ order: Id[], upsert: Row[], remove: Id[], meta }`. Every row carries a `rev`; the renderer keeps a cache by id so rows with an unchanged `rev` keep object identity and `React.memo` holds. Subscriptions cover a window (an anchor plus N rows), never a full history. Debounce is leading-edge (a user command is not delayed), 30 ms trailing. A failed query run is emitted as a value (`{ error }`) and the subscription continues.
+- **Command** (request): returns `{ undo?: Command, result }` after the local transaction.
+- **Event**: `command.failed`, `navigate`, `toast`, `clock.tick`, `typing`.
+
+Errors are `Schema.TaggedError` classes: `NotSignedIn`, `Offline`, `SlackRejected { code }`, `RateLimited { retryAfter }`, `NotFound`, `AiUnavailable`, `Invalid { issues }`, `ProtocolError`.
 
 ## 3. Packages
 
-Monorepo, pnpm workspaces, every package shipped as TypeScript source. Dependency direction is enforced by two mechanisms: pnpm's strict `node_modules` (a package can only import what it declares) and `scripts/check-deps.mjs`, which fails if a package declares an edge outside the table below.
+pnpm workspaces, every package shipped as TypeScript source. The owner wants each smaller thing to be a package; the split below keeps that and makes each package name the rule it protects. The dependency graph is enforced by pnpm's strict layout (a package can only import what it declares) plus `scripts/check-deps.mjs`, which fails on any edge not in this table. Inside `engine`, feature folders are enforced with oxlint `no-restricted-imports` overrides.
 
 ```mermaid
 flowchart TD
-  domain
+  richtext
+  domain --> richtext
   contract --> domain
   slack --> domain
   store --> domain
@@ -107,7 +111,8 @@ flowchart TD
   ai --> domain
   assistant --> ai & store & domain & contract
   notifications --> store & domain & ai
-  engine --> contract & sync & store & assistant & notifications & slack
+  files --> slack & store & sync
+  engine --> contract & sync & store & assistant & notifications & files & slack
   fake_slack[fake-slack] --> slack
   tokens
   ui --> tokens
@@ -117,306 +122,338 @@ flowchart TD
   gallery[apps/gallery] --> views & tokens
 ```
 
-Each package in one paragraph, with what it must not do.
+| Package | Rule it protects | Owns | Must not |
+| --- | --- | --- | --- |
+| `@juno/richtext` | pure text handling | Slack `blocks`/`rich_text`/mrkdwn → `MessageBody` view model (sections, quotes, code, lists, mentions, links, emoji, files); composer text with `@`/`#` → `rich_text` blocks; emoji shortcode table; preview text (quotes stripped) | import anything but `effect` Schema |
+| `@juno/domain` | pure rules | ids, `Topic`, status and visibility, title resolution, sorting, topic index computation (`reindexTopics` inputs → row), read-state merge rule, notification decision order, clarity and audience checks, ⌘K grammar, relative time, mention detection, context-menu item lists | I/O, Effect services, React |
+| `@juno/contract` | the wire | route groups per feature, view models (`TopicRow`, `TopicDetail`, `MessageView`, `ForYouCard`, `JunoMessage`, `NotificationRule`, `Prefs`, `EngineStatus`), events, errors, `channels.ts` for the preload | logic |
+| `@juno/slack` | the client, shared with the fake | `SlackSession`, `HttpTransport`, `SlackApi`, `RequestQueue`, `SlackEdge`, `SlackSocket`, `schemas/` for every payload read or sent, Grid routing | know about topics, the store, the UI |
+| `@juno/fake-slack` | tests cannot leak into the engine | HTTP + WS fake with fixtures, control API (inject, reply, mark from another client, drop socket, 429, expire session, Grid mode), sign-in page, file upload endpoints | import the engine |
+| `@juno/store` | the schema | `cache.db` and `user.db` schemas, timestamped migrations, writer and reader clients, `Invalidation` (wraps `Reactivity`), FTS5 table | call Slack or AI, shape data for the UI |
+| `@juno/sync` | Slack ↔ store | boot, discovery, backfill, merge rules, event application, read-state mirroring, outbox and its worker, reconnect reconciliation, `reindexTopics` calls | render, call AI |
+| `@juno/files` | authenticated bytes | upload staging and the upload flow, file metadata rows, thumbnail URL resolution, download requests to main | touch the renderer |
+| `@juno/ai` | provider isolation | `AiProvider` with `PiAiProvider` and `FakeAiProvider`, task table (prompts, output schemas, tier) | touch the store |
+| `@juno/assistant` | AI policy | when tasks run, `ai_cache`, budget, concurrency, the off switch, For you generation, the Juno chat with tools and cards | call OpenRouter directly |
+| `@juno/notifications` | one decision path | pipeline, Today log, digest scheduler, `Notifier` interface | show anything itself |
+| `@juno/engine` | composition | the app `Layer`, feature folders (`topics/`, `messages/`, `reads/`, `search/`, `notifications/`, `assistant/`, `files/`, `session/`) each with its route handlers and live queries, the port transport, config from env, `startEngine()` | hold domain rules |
+| `@juno/tokens` | design values | `defineVars` with `--` keys, `createTheme` for dark and accents | |
+| `@juno/ui` | primitives | the 18 primitives from `primitives.md` plus `Icon` | import contract, state, data |
+| `@juno/views` | dumb UI | feature components, each with `*.fixtures.ts` | import `@juno/state`, `effect`, `window.juno` |
+| `@juno/state` | the bridge | engine client, `liveQuery`/`command` helpers, atoms, undo stack, toasts, tabs, drafts, clock | JSX |
+| `apps/desktop` | wiring | `src/main`, `src/preload`, `src/engine` (utility entry), `src/renderer` with containers, `e2e/` | |
+| `apps/gallery` | review | browser-only fixture gallery and its screenshot project | Electron |
 
-- **`@juno/domain`** (pure). Types and rules with no I/O and no Effect services: ids (`TopicId`, `ChannelId`, `Ts`), `Topic`, `Visibility`, title resolution, sorting and filtering, quiet/resolved/reopened logic, notification rule matching and decision order, deterministic clarity fixes, audience keyword check, relative-time formatting, mention detection in Slack mrkdwn. Everything here has behaviour tests. Must not import Node, Electron, React, `effect/sql` or any other package.
-- **`@juno/contract`**. The wire: route tables with input/output/error schemas, view models (`TopicRow`, `TopicDetail`, `MessageView`, `ForYouCard`, `JunoMessage`, `NotificationRule`, `Prefs`), events, errors, the protocol message schemas, and the dependency-free `channels.ts` for the preload. View models are shaped for screens, not for storage, and they are also the prop types of views. Must not contain logic beyond schemas and a few pure constructors.
-- **`@juno/slack`**. The Slack client as Effect services: `SlackSession` (token, cookie, team), `SlackApi` (multipart POST with `token` first, `_x_*` params, retry on 429/5xx with `Retry-After`, the fatal-error list), `RequestQueue` (lanes, concurrency), `SlackEdge` (JSON POST to the flannel URL), `SlackSocket` (socket lifecycle as a scoped `Stream<RtmEvent>`), and `schemas/` for every payload we read or send (messages, blocks, channels, counts, threads view, RTM events). Exposes `@juno/slack/schemas` so `fake-slack` encodes the same shapes. Must not know about topics, the store or the UI.
-- **`@juno/store`**. SQLite via `@effect/sql-sqlite-node` on `node:sqlite`: migrations, typed queries, the `Store` service, transaction helper, and `Invalidation` (a thin wrapper over Effect's `Reactivity`, which is unstable, so the wrapper keeps the swap local). Owns the schema in section 4. Must not call Slack or the AI and must not shape data for the UI.
-- **`@juno/sync`**. Boot, discovery, backfill, realtime event application, read-state mirroring, reconnect reconciliation and the outbox. Translates Slack entities into store rows and topic activity. Must not render, must not call the AI.
-- **`@juno/ai`**. `AiProvider` interface with two implementations: `PiAiProvider` (pi-ai + OpenRouter, in-memory key) and `FakeAiProvider` (deterministic). Task definitions (`titleTopic`, `routeCheck`, `settledScore`, `groupRun`, `urgencyGate`, `parseCommand`, `catchUp`, `forYou`, `chat`) with their tool-shaped output schemas, prompts and model tier (`decision` or `generation`). Must not touch the store; tasks take plain data and return plain data.
-- **`@juno/assistant`**. Policy: when tasks run, caching in `ai_cache`, budget and concurrency, the global off switch, the For you generator, and the Juno chat session with its tools and confirm cards. Must not call OpenRouter directly (only through `AiProvider`).
-- **`@juno/notifications`**. The pipeline from incoming message to outcome: ignored → rules → quiet hours → AI gate → outcome; the Today log; the digest scheduler; the `Notifier` interface implemented by the engine→main channel. Rule matching itself is in `domain`. Must not show anything itself.
-- **`@juno/engine`**. Composition: the app `Layer`, the contract server (route → service), live query implementations (store → view models), the port `Transport` adapter, config from environment (`JUNO_SLACK_API_URL`, `JUNO_SLACK_WS_URL`, `JUNO_OPENROUTER_URL`, `JUNO_AI=fake`, `JUNO_DATA_DIR`), and `startEngine()`. Must not contain domain rules; if a route handler grows past wiring, the logic belongs in a service package.
-- **`@juno/fake-slack`**. A Node HTTP + WebSocket server that speaks the subset of Slack Juno uses, seeded from fixtures (the prototype's workspace), with a control API for tests: inject message, reply, mark from another client, drop the socket, return 429, expire the session. Encodes responses with `@juno/slack/schemas` so the fake and the client cannot drift. Also serves a minimal sign-in page that sets a `d` cookie and makes one API call with a fake `xoxc` token, so the capture flow is tested end to end. Must not import the engine.
-- **`@juno/tokens`**. StyleX `defineVars` with `--` keys and `createTheme` for dark and accents. The only place a colour, size, radius, shadow or duration is written down.
-- **`@juno/ui`**. The 18 primitives from `primitives.md` (Button, IconButton, Chip, ContextPill, Surface, Popover, OptionList, Tabs, fields, Toast, EmptyState, PageHeader, …) plus `Icon` over `lucide-react`. StyleX only, tokens only. Must not import contract, state or anything with data.
-- **`@juno/views`**. Dumb feature components: `Sidebar`, `TopicRow`, `TopicHeader`, `MessageList`, `Composer` (+ `SendCheckBar`, `AudienceWarning`, `MentionSuggest`), `CommandPalette`, `AllTopicsTable`, `ForYouPage`, `JunoThread`, `NotificationsPage`, `PreferencesPage`, `NewMessageForm`, `TabStrip`. Props in (contract view models), callbacks out. Every view ships `*.fixtures.ts`. Must not import `@juno/state`, `effect`, `window.juno`, or React context other than its own layout helpers.
-- **`@juno/state`**. The atom bridge: `EngineClient` (protocol client over a `MessagePort`), subscription atoms and families, command functions, undo stack, toasts, tabs, drafts, focus/viewing state. Must not contain JSX.
-- **`apps/desktop`**. `src/main` (window factory, menus, notifications, badge, secrets, sign-in window, Slack-app import, utility process supervisor), `src/preload` (bridge), `src/engine` (utility entry: `startEngine`), `src/renderer` (app shell and **containers** that map atoms to views), `e2e/` (Playwright). Wiring only.
-- **`apps/gallery`**. A browser-only Vite app that renders every view with every fixture for screenshots (section 8). No Electron.
+Compared with v1, `richtext` and `files` are new and `ai` stays separate from `assistant` because "the provider never touches the store" is a rule worth a package. No packages were merged; `engine` gets feature folders so one feature such as resolve lives in `engine/topics/` plus its `contract` route group, `domain` rule and `views` component, not spread across six packages.
 
-What Slack's shell taught us, and where it shows: one shared contract package with names, types and validators; validate every payload in the receiving process; one window factory that force-merges secure `webPreferences` plus a `browser-window-created` watchdog; notifications and the dock badge computed from app state and shown from main; a persisted retry list for `conversations.mark`, `subscriptions.thread.*` and `reactions.*` (our outbox); one message in flight for sends and `client_msg_id` echo matching; `desktop_notification` as the server's "this matters" signal. What we deliberately do not copy: the 30-namespace bridge, the delegate object pattern, cookie header surgery, hidden windows for downloads.
+What Slack's shell taught us: one shared contract package with names, types and validators, validated in the receiving process; one window factory that force-merges secure `webPreferences` plus a `browser-window-created` watchdog; notifications and the badge computed from app state and shown from main; a persisted retry list for marks, thread subscriptions and reactions (our outbox); one send in flight and `client_msg_id` echo matching; `desktop_notification` as the server's "this matters" signal; cookies kept in a Chromium session, never in app files.
 
 ## 4. Data model
 
-### 4.1 Slack entities (mirror tables)
+### 4.1 Two databases per workspace (ADR 0008)
 
-Keyed by `team_id` from day one so multi-workspace is a UI change later. Timestamps are Slack `ts` strings; they sort lexicographically within a channel.
+`<userData>/workspaces/<enterprise_id or team_id>/` holds:
+
+- `cache.db`: the Slack mirror, `topic_index`, `messages_fts`, `emoji`, `files`, `ai_cache`. Disposable. Its schema has a version number; on mismatch it is deleted and re-synced. "Reset local cache" in Preferences does the same.
+- `user.db`: overlay, reads, groups, ignored channels, notification rules and settings and log, For you cards, Juno chat, drafts, outbox, prefs. Durable, with timestamped migrations (`202610121430_add_x.ts`).
+- `uploads/`: staged files waiting in the outbox.
+
+The writer connection `ATTACH`es `cache.db` to `user.db` so one transaction can span both. There is one workspace directory per signed-in team; the v1 UI shows one at a time.
+
+Connections: `@effect/sql-sqlite-node` gives one serialised connection per layer, so the store builds two: `StoreWriter` (all writes and transactions, `Reactivity`) and `StoreReader` (`PRAGMA query_only`, used by live queries). WAL mode lets readers run while the writer commits. Busy timeout is set to 250 ms (the default 5 s blocks the event loop) with retry in Effect. Backfill transactions are capped at 200 rows so a live query or a Resolve never waits more than a few milliseconds.
+
+### 4.2 Mirror tables (`cache.db`)
 
 ```sql
-team            (id PK, name, domain, self_user_id, prefs_json, booted_at)
+team            (id PK, name, domain, self_user_id, enterprise_id, prefs_json, booted_at)
 users           (id PK, name, display_name, real_name, avatar_url, tz, is_bot, deleted, updated)
-conversations   (id PK, kind 'public'|'private'|'im'|'mpim', name, user_id /*im*/, member_ids_json /*mpim*/,
+conversations   (id PK, kind 'public'|'private'|'im'|'mpim', name, user_id, member_ids_json,
                  is_member, is_archived, topic, purpose, created, updated)
 messages        (channel, ts, PK(channel, ts), thread_ts, user_id, subtype, text, blocks_json,
                  files_json, attachments_json, edited_ts, deleted, client_msg_id,
-                 reply_count, latest_reply, reply_users_json, pending /*our unsent*/)
+                 reply_count, latest_reply, reply_users_json, last_event_ts, version)
+messages_fts    (fts5: text, content=messages)        -- fed in the same transaction as the message write
 reactions       (channel, ts, name, PK(channel, ts, name), count, user_ids_json, me)
-thread_subs     (channel, thread_ts, PK, subscribed, slack_last_read)        -- from Slack
+files           (id PK, name, mimetype, size, url_private, thumb_json, permalink, user_id, created)
+emoji           (name PK, url, alias_for)
+thread_subs     (channel, thread_ts, PK, subscribed, slack_last_read)
 channel_reads   (channel PK, slack_last_read, latest, has_unreads, mention_count, counts_updated)
-sync_cursors    (channel PK, newest_synced_ts, oldest_synced_ts, has_older, synced_at)
+synced_ranges   (channel, from_ts, to_ts, PK(channel, from_ts))   -- explicit, never moved by socket events
 thread_cursors  (channel, thread_ts, PK, replies_complete, synced_at)
-sync_state      (key PK, value_json)   -- counts_last_fetched, ws reconnect url, boot version
+topic_index     (topic_id PK, channel, kind, last_activity_ts, message_count, participants_json,
+                 root_ts, unread_count, unread_exact, mentions_me, preview_json, rev)
+sync_state      (key PK, value_json)
+ai_cache        (task, key, PK, input_hash, output_json, model, cost_usd, created_at)
 ```
 
-### 4.2 Topics are derived, not stored
-
-A topic is a view over the tables above plus the overlay. Ids are strings so the UI never cares which kind it is:
-
-| Kind | Id | Exists when |
-| --- | --- | --- |
-| Thread | `t:<channel>:<thread_ts>` | a root message with `reply_count ≥ 1`, or a Slack subscription, or a `tracked` overlay row (New message with "Track replies") |
-| Main | `m:<channel>` | the user is a member of the conversation |
-| Group | `g:<channel>:<group_id>` | a client-only grouping of Main messages exists |
-
-Per topic the derivation computes: `lastActivityTs` (latest reply, or latest top-level message for Main, excluding grouped messages), `messageCount`, participants (`reply_users` or distinct senders), `unreadCount` and `mentionsMe` (from `topic_reads.last_read_ts` against message timestamps), `kind` and tint of its conversation. This is one SQL query per list plus a small pure function in `domain` for status. It is materialised into a `topic_index` table that sync updates inside the same transaction as the message write, so sidebar queries are a single indexed read.
+### 4.3 Durable tables (`user.db`)
 
 ```sql
-topic_index     (topic_id PK, team_id, channel, kind, last_activity_ts, message_count,
-                 participants_json, root_ts, unread_count, mentions_me, preview_json)
-```
-
-### 4.3 Client-only overlay
-
-Never written to Slack. One row per topic, nullable columns, so "no overlay" is simply no row.
-
-```sql
-topic_overlay   (topic_id PK,
-                 manual_title, ai_title, ai_title_source_hash, ai_title_at,
-                 resolved_at, resolved_activity_ts,   -- Reopened = new activity after resolved_activity_ts
-                 reopened_at,                         -- set by sync on new activity; cleared on mark read or resolve
-                 pinned_at,
-                 unsubscribed_at,                     -- Juno's own flag; for threads also mirrored to Slack
-                 tracked,                             -- thread topic created by "Track replies"
-                 settled_dismissed_ts, grouping_dismissed_ts)
-topic_reads     (topic_id PK, last_read_ts, marked_unread)   -- Juno's read state, mirrored to Slack when possible
+topic_overlay   (topic_id PK, manual_title, ai_title, ai_title_source_hash, ai_title_at,
+                 resolved_at, resolved_activity_ts, reopened_at, pinned_at, unsubscribed_at,
+                 tracked, settled_dismissed_ts, grouping_dismissed_ts)
+topic_reads     (topic_id PK, last_read_ts, marked_unread, local_write_ack_ts)
 main_groups     (id PK, channel, title, created_at)
 main_group_msgs (group_id, ts, PK)
 ignored_channels(channel PK, ignored_at)
-notification_rules   (id PK, position, kind 'person'|'channel'|'mention_in'|'keyword', value, action 'now'|'digest'|'silent')
+pending_messages(client_msg_id PK, channel, thread_ts, text, blocks_json, file_ids_json, created_at, ts /*once known*/)
+notification_rules   (id PK, position, kind, value, action)
 notification_settings(id=1, ai_gate, threshold, digest_times_json, quiet_from, quiet_to)
-notification_log     (id PK, at, channel, ts, topic_id, preview, outcome, reason, rule_id, ai_score, digest_slot, delivered_at)
-ai_cache        (task, key, PK, input_hash, output_json, model, cost_usd, created_at)
+notification_log     (id PK, at, channel, ts, UNIQUE(channel, ts), topic_id, preview, outcome, reason,
+                      rule_id, ai_score, digest_slot, delivered_at)
 for_you_cards   (id PK, kind, topic_id, payload_json, input_hash, created_at, dismissed_at, done_at)
-juno_chat       (id PK, role, content_json, created_at)      -- one thread, cards included
+juno_chat       (id PK, role, content_json, created_at)
 drafts          (topic_id PK, text, updated_at)
-outbox          (id PK, kind, payload_json, created_at, attempts, next_at, last_error)
-prefs           (key PK, value_json)   -- tweaks, quiet days, theme, accent, aiAssist, tabs
+outbox          (id PK, kind, target_key, payload_json, depends_on, created_at, attempts, next_at, last_error)
+prefs           (key PK, value_json)
 ```
 
-Status rules (in `domain/visibility.ts`, tested): ignored channel → `ignored`; `unsubscribed_at` → `unsubscribed`; `resolved_at` and no later activity → `resolved`; no activity within `quietDays` and not pinned and no unread → `quiet`; else `open`. The sidebar shows `open` topics plus pinned ones; All topics shows everything but ignored. Sync clears `resolved_at` and sets `reopened_at` when a message arrives after `resolved_activity_ts`; the Reopened tag shows while `reopened_at` is set.
+### 4.4 Topics are derived (ADR 0004)
 
-Title resolution: `manual_title ?? ai_title ?? firstWords(root.text, 6)`. "Use AI title" clears `manual_title`. Saving an empty manual title, or one equal to the AI title, clears it.
+| Kind | Id | Exists when |
+| --- | --- | --- |
+| Thread | `t:<channel>:<thread_ts>` | a root with `reply_count ≥ 1`, or a Slack subscription, or a `tracked` overlay row, or a stub root created from a reply whose root is not stored yet |
+| Main | `m:<channel>` | the user is a member |
+| Group | `g:<channel>:<group_id>` | a `main_groups` row exists |
 
-Subscription mapping: for thread topics, Subscribe/Unsubscribe calls `subscriptions.thread.add/remove` through the outbox and sets `unsubscribed_at`; Juno's flag drives visibility, Slack's flag drives the bell icon and the server's notification candidates. Main topics have no Slack equivalent, so only the overlay flag changes. Stealth is a tab attribute in the renderer, not data: a stealth tab never sends `topic.markRead`.
+`topic_index` has exactly one writer: `reindexTopics(ids)` in `sync`, which recomputes rows from source tables and is called at the end of every transaction for the topics it touched. No arithmetic on counters anywhere. An engine test compares the incremental index with a full rebuild after random event sequences. Changes that depend only on time (a topic turning quiet, a digest slot) come from a ticker fiber that invalidates `topics` at the next boundary computed from the index.
+
+Status (`domain/visibility.ts`): ignored channel → `ignored`; `unsubscribed_at` → `unsubscribed`; `resolved_at` and no later activity → `resolved`; no activity within `quietDays` (default 7, max 14) and not pinned and no unread → `quiet`; else `open`. The sidebar shows `open` topics plus every pinned topic; a pinned resolved topic stays in Pinned, dimmed, with a check and no hover Resolve. All topics shows everything except ignored. A message after `resolved_activity_ts` clears `resolved_at` and sets `reopened_at`; the tag shows until mark-read or the next resolve.
+
+Title: `manual_title ?? ai_title ?? firstWords(root, 6)`.
+
+Subscriptions: Subscribe/Unsubscribe on a thread calls `subscriptions.thread.add/remove` through the outbox and sets the overlay flag; Juno's flag drives visibility, Slack's drives the bell and the server's notification candidates. Main has only the overlay flag. Resolve never unfollows. Stealth is a tab attribute.
 
 ## 5. Sync
 
-### 5.1 Request budget
+### 5.1 Request budget and rate limits
 
-Slack's own client allows 10 concurrent requests per team. The user will often run the official app at the same time against the same limits, so Juno stays well under that. `RequestQueue` has three lanes: `interactive` (the user opened something; concurrency 3, jumps the queue), `background` (discovery and backfill; concurrency 2, at most ~40 calls per minute), `send` (one in flight, like Slack's `MessageQueue`). Every call honours `Retry-After`, retries 429/5xx up to 3 times with a 60 s base and jitter, pauses the queue while offline, and never retries the fatal auth errors, which instead raise `authRequired`.
+The official client allows 10 concurrent requests per team and the user will often run it at the same time, against the same limits. `RequestQueue` keeps three lanes: `interactive` (concurrency 3, jumps the queue), `background` (concurrency 2, about 40 calls per minute) and `send` (one in flight). Limits are tracked per method: a 429 pauses that method's bucket until `Retry-After` (default 60 s, jittered), other methods continue. Retries: 3 attempts on 429 and 5xx; the fatal auth list raises `authRequired` instead. The interactive lane never blocks the UI: if the method is paused, the route returns at once (the live query already shows cached data), schedules the fetch, and `engine.status` shows `rate-limited`. Boot progress is reported as `catching-up { done, total }` so the sidebar can show a quiet "Catching up" line.
+
+Cost estimate for a manager in 150 active channels: cold boot is about 150 history calls plus 50 reply calls, 4 to 5 minutes on the background lane. The sidebar is usable after `getView` (a few seconds); the rest fills in. Warm boot is 5 to 10 calls.
 
 ### 5.2 Cold boot
 
-1. `client.userBoot` (`return_all_relevant_mpdms`, `version_all_channels`) → `team`, `users` (self), `conversations`. `users.prefs.get` → muted channels, highlight words.
-2. `client.counts` (`thread_counts_by_channel=true`) → `channel_reads` for every conversation (`last_read`, `latest`, `mention_count`) and the threads state.
-3. `client.getWebSocketURL` → connect the socket now, so events during backfill are not lost (they are applied in order; a message that arrives before its history page is upserted, not duplicated).
-4. `subscriptions.thread.getView` (limit 50, paged by `current_ts`) until the roots are older than the quiet window → thread topics for followed threads, with `latest_replies` as previews and `unread_replies` for counts. One call per page.
-5. Discovery of other threads and of Main activity: for each conversation with `counts.latest` inside the quiet window, ordered by `latest` descending, `conversations.history` (`ignore_replies=true`, `limit=100`). Top-level messages carry `reply_count`, `latest_reply` and `reply_users`, so thread roots are discovered without fetching replies. Conversations with no activity in the window are not fetched at all. Thirty to fifty calls for a busy workspace, on the background lane.
-6. Users referenced by any row and not in `users` → edge `users/info` in chunks of 100 (fallback `users.info`).
-7. Previews for discovered but unfollowed threads: the sidebar needs the latest reply, not the root. For the top ~50 topics by activity, `conversations.replies` (`oldest=latest_reply`, `inclusive=true`, `limit=2`) on the background lane; until then the row previews the root. Replies for everything else are fetched when the topic is opened.
+1. `client.userBoot` → team (with `enterprise_id`), self, conversations. `users.prefs.get`.
+2. `client.counts` (`thread_counts_by_channel=true`) → `channel_reads`.
+3. `client.getWebSocketURL` → connect the socket first, so nothing during backfill is lost.
+4. `subscriptions.thread.getView` (limit 50, paged by `current_ts`) until roots are older than the quiet window → followed threads with previews and unread counts.
+5. For every conversation with `counts.latest` inside the quiet window, newest first: `conversations.history` (`ignore_replies=true`, `limit=100`). Roots carry `reply_count`, `latest_reply`, `reply_users`, so threads are discovered without fetching replies. Each page records a `synced_ranges` row.
+6. Unknown users → edge `users/info` in chunks of 100. Edge `emojis/list` → `emoji`.
+7. Previews for unfollowed threads: for the top 50 by activity, `conversations.replies` (`oldest=latest_reply`, `inclusive=true`, `limit=2`), background lane.
 
-Gap accepted: a thread whose root is older than the quiet window but got a reply inside it, in a channel we do not follow it in, is not discovered at cold boot. From then on `message_replied` events keep roots current.
+### 5.3 Discovery of thread activity after boot
 
-### 5.3 Warm boot
+The gap: a reply inside the window to a root outside it, in a thread we do not follow, is invisible to windowed history, to "history since cursor" at warm boot, and to reconnect reconciliation. It probably does not move `counts.latest` either (unverified; the live smoke measures it).
 
-The sidebar renders from SQLite before any network call. Then: `client.userBoot` (membership changes), `client.counts` with `counts_last_fetched` (only changed entries come back), history since `newest_synced_ts` for conversations whose `latest` moved, `subscriptions.thread.getView` first page, and incremental replies only for topics that are visible or open. Typically five to ten calls.
+Plan, in order of preference:
 
-### 5.4 Opening a topic
+1. **Search as the discovery source.** `search.modules.messages` with `query: "is:thread after:<date>"`, `count: 50`, paged, for the gap since the last successful sync (warm boot, reconnect, and a periodic sweep every 10 minutes while live). One to three calls replace 30 to 150 history calls and cover old roots. Unknowns to verify in the live smoke before M3: whether `is:thread` is honoured for an `xoxc` session, whether matches carry `channel.id` and `thread_ts`, whether paging is by `page` or `cursor`, and the rate tier. Results from channels the user is not a member of must be dropped (search also covers public channels you are not in).
+2. **Fallback if search fails the spike.** History since cursor for conversations whose `latest` moved, plus incremental `conversations.replies` for every stored root whose `latest_reply` is newer than stored (`getView` gives this for followed threads; for others, `message_replied` events while live). The gap then remains for unfollowed old roots during downtime, and All topics shows a quiet "Tracking threads since <date>" note.
 
-- Thread: `conversations.replies` (`limit=100`, `oldest=` last synced reply when `replies_complete`), interactive lane, paging older only on scroll. Then, unless the tab is stealth, `topic.markRead`.
-- Main: `conversations.history` (`limit=50`, `ignore_replies=true`) incremental from the cursor; older pages on scroll up. Grouped messages are excluded by the query.
-- Unknown users in the page → edge lookup.
-- If two or more messages are unread and AI is on, `assistant` runs `catchUp` on the unread run; the result arrives through the `topic.get` subscription.
+A reply for a root not in the store creates the thread topic with a stub root and queues a fetch of the root (`conversations.replies` with `limit=1`).
 
-### 5.5 Read state
+### 5.4 Merge rules (ADR 0011)
 
-`topic_reads.last_read_ts` is Juno's truth and updates immediately. It is mirrored to Slack through the outbox when Slack has a matching concept:
+Writes merge field by field with guards, so pages, events and echoes can arrive in any order:
+
+- A tombstone (`deleted=1`) always wins.
+- `reply_count` and `latest_reply` take the maximum.
+- An edit applies only if its `edited_ts` is newer than the stored one.
+- Reactions from a page apply only if `messages.last_event_ts` is older than the page's request start; otherwise the page's reaction state is ignored for that message.
+- Socket events never move `synced_ranges`.
+- Warm boot and reconnect pass `cached_latest_updates` to `conversations.history` and `conversations.replies` for the visible window and apply `latest_updates`, `unchanged_messages` and `deleted` from the response. The value format of `latest_updates` is Unknown (research section 3); until the live smoke confirms it, the fallback is to re-fetch the visible window and merge with the rules above.
+- Frames of a known type with an unexpected shape are logged with a redacted copy in a 50-entry ring buffer and skipped; they never fail the stream.
+
+A seeded randomised engine test interleaves fake socket events, page responses, drops and outbox sends, then asserts that the store equals the fake's state. It runs in seconds and replaces most of the soak test.
+
+### 5.5 Opening a topic
+
+- Thread: `conversations.replies` (`limit=100`, incremental when `replies_complete`), interactive lane; older pages on scroll up. Unless the tab is stealth, `topic.markRead`.
+- Main: `conversations.history` (`limit=50`, `ignore_replies=true`) incremental from `synced_ranges`; older on scroll up. Grouped messages are excluded by the query.
+- The container snapshots the read pointer at open time as view state for the "N new" divider, so the divider does not vanish when `markRead` lands.
+- Two or more unread and AI on → `catchUp` runs; the summary arrives through `topic.get`.
+
+### 5.6 Read state
+
+`topic_reads.last_read_ts` is Juno's state and updates immediately. Conflict rule: a local write that is still pending in the outbox wins over server events; once acknowledged, `local_write_ack_ts` is set and server `*_marked` events apply in `event_ts` order, ignoring any older than `local_write_ack_ts`. Mirroring:
 
 | Topic | Mark read | Mark unread |
 | --- | --- | --- |
-| Main | `conversations.mark { channel, ts: latest }` | `conversations.mark { ts: the ts before the first unread }` |
-| Thread, subscribed in Slack | `subscriptions.thread.mark { read: 1, ts: latest reply }` | `subscriptions.thread.mark { read: 0, ts }` |
+| Main | `conversations.mark { ts }` where `ts` is the latest message such that everything at or before it is read across Main and all of that channel's groups | `conversations.mark { ts: the ts before the first unread }` |
+| Thread, subscribed in Slack | `subscriptions.thread.mark { read: 1, ts: latest reply }` | `read: 0` |
 | Thread, not subscribed | local only | local only |
+| Group | local only; it moves the channel watermark through the Main rule above | local only |
 
-Incoming `channel_marked`/`im_marked`/`group_marked`/`mpim_marked` and `thread_marked` events (reads done in the official client) update `topic_reads` too, so the two clients agree. Stealth never marks; a message arriving while a non-stealth topic is active and the window is focused is marked read by the renderer (`presence.viewing` tells the engine which topic is on screen, which the notification pipeline also uses). "Mark channel as read" marks Main and every thread topic in that channel. Resolve marks read.
+Counts: Main uses `client.counts` (`has_unreads`, `mention_count`) and shows an exact number only when local history covers everything since `last_read` (`unread_exact`); otherwise the row shows a dot. Threads count from stored replies, which `getView` and the open fetch make complete.
 
-### 5.6 Outbox
+### 5.7 Outbox and echo reconciliation (ADR 0011)
 
-Every Slack write goes through `outbox` rows: `mark`, `threadSubscribe`, `threadUnsubscribe`, `postMessage`, `updateMessage`, `deleteMessage`, `addReaction`, `removeReaction`. A worker drains it in order per channel, retries with backoff, and on a final failure reverts the local change where one exists (for example a reaction) and emits `command.failed`. `postMessage` inserts a `pending` message row with a `client_msg_id`; the socket echoes the real message with the same id and the row is replaced. The outbox survives restarts, which is why resolve, mark and send feel instant offline.
+Kinds: `mark`, `threadSubscribe`, `threadUnsubscribe`, `postMessage`, `updateMessage`, `deleteMessage`, `addReaction`, `removeReaction`, `openConversation`, `uploadFiles`. The worker drains per `target_key` in order (a `PartitionedSemaphore` keyed by channel), retries with backoff, and on final failure reverts the local change where one exists and emits `command.failed`.
 
-### 5.7 Reconnect
+Coalescing: several `mark` rows for one target collapse to the last; an add/remove reaction pair cancels; an edit of a pending message rewrites the pending row instead of queuing `updateMessage`.
 
-After the socket reconnects: `client.counts(counts_last_fetched)`; history since the cursor for every conversation whose `latest` moved; `subscriptions.thread.getView` first page; replies refresh for open and visible topics with a newer `latest_reply`; flush the outbox. A `force_reload` event or a boot-version change triggers a full cold boot over the existing store (upserts, nothing dropped).
+Sends: `postMessage` inserts a `pending_messages` row keyed by `client_msg_id` and a `pending` row in the message list. Reconciliation happens on whichever arrives first: the `chat.postMessage` response (`ts`, `message`), the socket echo, or a history or replies page containing the same `client_msg_id`. After an ambiguous failure (timeout, 5xx) the worker checks recent history for the `client_msg_id` before retrying, so a message is never posted twice. Outbox items that need a real `ts` (`updateMessage`, `deleteMessage`, `addReaction` on a just-sent message) carry `depends_on = client_msg_id` and resolve the `ts` when they run.
+
+### 5.8 Reconnect
+
+After `hello`: `client.counts(counts_last_fetched)`; history since `synced_ranges` for conversations whose `latest` moved; `getView` first page; the discovery sweep of 5.3 for the outage; replies refresh for open and visible topics; flush the outbox. `force_reload` or a schema version change triggers a full cold boot over the existing store.
 
 ## 6. Realtime
 
-`SlackSocket.events: Effect<Stream<RtmEvent>, SocketError, Scope>`. Inside the scope: fetch the socket URL (cached until `ttl_seconds`), open with `ws` (needed for the `Cookie` and `User-Agent` headers, which the browser `WebSocket` cannot set), wait for `hello`, `ping` every 10 s and close with 4998 if no `pong` for 90 s, keep `reconnect_url` for fast reconnect. Frames are decoded with `Schema`; unknown types become `{ type: 'unknown' }` and are counted, never failed on. `error.retry_after`, `goodbye` and close all end the stream with a typed error.
+`SlackSocket.events: Effect<Stream<RtmEvent>, SocketError, Scope>`. Inside the scope: socket URL (cached until `ttl_seconds`), cookie header and proxy from main, `ws` connect with headers, wait for `hello`, `ping` every 10 s and close with 4998 after 90 s without `pong`, keep `reconnect_url`. Frames are decoded with `Schema`; unknown types become `{ type: 'unknown' }`.
 
-Sync runs the stream with `Stream.retry` on an exponential schedule (1 s base, 60 s cap, jitter), except `invalid_auth` and `user_session_expiration`, which stop the stream and raise `authRequired`. Each event is applied in one store transaction:
+Fatal conditions (`invalid_auth`, `user_session_expiration`, `token_revoked`) end the stream as a value, before `Stream.retry` (stable; the schedule resets after the first new element) sees them, so the exponential schedule (1 s base, 60 s cap, jittered) retries only transport errors, `goodbye` and `error.retry_after`.
 
-| Event | Store effect |
+Each event is one writer transaction wrapped in `Reactivity.withBatch` so queries re-run once per transaction:
+
+| Event | Effect |
 | --- | --- |
-| `message` (no subtype, `thread_broadcast`, `bot_message`, `me_message`) | upsert message; update root `reply_count`/`latest_reply`; update `topic_index`; reopen if resolved; notification pipeline input when not from self |
-| `message_changed`, `message_deleted` | update or tombstone; recompute preview |
-| `message_replied` | root counters only (the reply arrives as its own `message` when we are in the channel) |
-| `channel_marked` family, `thread_marked`, `thread_subscribed`, `thread_unsubscribed` | `channel_reads`, `thread_subs`, `topic_reads` |
-| `reaction_added/removed` | `reactions` |
-| `channel_*`, `im_*`, `mpim_*`, `member_*` | `conversations`; new conversations get a Main topic |
-| `user_change`, `pref_change` | `users`, `team.prefs_json` |
-| `desktop_notification` | notification pipeline, marked as a server candidate |
-| `force_reload`, `user_session_expiration` | resync / authRequired |
+| `message` (no subtype, `thread_broadcast`, `bot_message`, `me_message`, `file_share`) | merge message and files; roots: counters; `reindexTopics`; reopen if resolved; notification input unless from self; stub root if needed |
+| `message_changed`, `message_deleted` | merge with guards; tombstone |
+| `message_replied` | root counters (max) |
+| `channel_marked` family, `thread_marked`, `thread_subscribed/unsubscribed` | read-state conflict rule |
+| `reaction_added/removed` | `reactions`, bump `last_event_ts` |
+| `channel_*`, `im_*`, `mpim_*`, `member_*` | `conversations`; new Main topics |
+| `user_change`, `pref_change`, `emoji_changed` | `users`, prefs, `emoji` |
+| `desktop_notification` | notification input (server candidate) |
+| `update_thread_state`, `update_global_thread_state` (Grid) | threads counts |
+| `force_reload`, `user_session_expiration` | resync / `authRequired` |
 
-The transaction ends by invalidating keys (`topic:<id>`, `topics`, `messages:<topicId>`, `conversation:<id>`, `notifications`). Live queries that depend on those keys re-run, debounced 30 ms, and the renderer gets a new snapshot. `presence_change` and `user_typing` are not stored; typing is forwarded as an event for the open topic only.
+`presence_change` is not stored; `user_typing` is forwarded as an event for the open topic only.
 
 ## 7. Renderer state
 
-`@juno/state` holds atoms; containers in `apps/desktop/src/renderer` read them. Atom APIs are unstable, so every atom is created through two local helpers, `liveQuery(route)` and `command(route)`, and nothing else in the app imports `effect/reactivity/Atom` directly.
+`@juno/state` creates every atom through two helpers, `liveQuery(route)` and `command(route)`, so the unstable `effect/reactivity/Atom` API is referenced in one file. Containers use `useAtomValue`, `useAtomSet` and `useAtomRefresh` from `@effect/atom-react`.
 
-Atoms:
+Atoms: `engineAtom`, `engineStatusAtom`, `sessionAtom`, `nowAtom` (engine `clock.tick` plus local elapsed time, so renderer and engine share one clock), `topicListAtom(filter)` (family by `{ kind, unreadOnly, scope }`), `topicAtom(id)`, `messagesAtom(id, window)`, `allTopicsAtom(filters)`, `forYouAtom`, `junoChatAtom`, `notificationSettingsAtom`, `notificationTodayAtom`, `prefsAtom`, `browseAtom`, `peopleAtom`, `ignoredAtom`, `searchAtom(query)` and `commandParseAtom(query)` (one-shot, debounced 150 ms), `undoStackAtom`, `toastAtom`, `tabsAtom`, `sendingAtom(topicId)`, `attachmentsAtom(topicId)`.
 
-- `engineAtom`: the protocol client bound to the port; `engineStatusAtom` from `engine.status`.
-- `sessionAtom` (`signedOut | signingIn | ready { team, self }`).
-- `topicListAtom(filter)`: family keyed by `{ kind, unreadOnly, scope }`, subscription to `topics.list`. Row data is final; the sidebar maps rows to `TopicRow` props without further computation.
-- `topicAtom(id)`, `messagesAtom(id)`, `allTopicsAtom(filters)`, `forYouAtom`, `junoChatAtom`, `notificationSettingsAtom`, `notificationTodayAtom`, `prefsAtom`, `browseAtom` (channels and people with activity and unread), `ignoredAtom`.
-- One-shot: `searchAtom(query)` and `commandParseAtom(query)` (debounced 150 ms; the result carries the confidence badge).
-- Commands: `topic.resolve/reopen/pin/unpin/rename/useAiTitle/markRead/markUnread/subscribe/unsubscribe/track`, `channel.ignore/unignore/markRead/markUnread`, `message.send/edit/delete/react/unreact`, `main.group/dismissGroup`, `notifications.*`, `forYou.dismiss/done`, `juno.ask/confirmCard/dismissCard`, `prefs.set`, `drafts.set`, `presence.viewing`, `session.signOut`.
+No optimistic copies in the renderer. The two exceptions the review called out:
 
-Optimistic updates and rollback: there are none in the renderer. A command's local transaction completes in a few milliseconds and the live query delivers the new snapshot; the round trip over a local MessagePort is cheaper and simpler than keeping a second copy of state in React. The only renderer-side transient is `sendingAtom(topicId)` for the send button. Rollback is the engine's job: if an outbox item finally fails, the engine reverts the local row in the same code path that applied it and emits `command.failed`, which the toast host shows with a Retry action.
+- **Composer text is local.** The textarea is uncontrolled or local React state; it reads the draft once on mount and saves with a 500 ms debounce, fire and forget, never reading back while focused. Attachments in progress are local too.
+- **Undo comes from the engine (ADR 0010).** A command returns `{ undo?: Command }` computed inside its transaction from the prior state, so `resolve` returns an undo that restores `resolved_at`, the read pointer and `reopened_at` together. The renderer only stores up to 20 of them and replays on ⌘Z or the toast. Sends, edits and deletes return no undo; delete asks for an inline confirmation instead.
 
-Undo: `undoStackAtom` keeps the last 20 reversible actions as `{ label, inverse: Command, at }`. Running a command whose route declares an inverse pushes an entry and shows the toast; ⌘Z (when focus is not in a non-empty input) or the toast's Undo pops it and runs the inverse. Inverses: resolve ↔ reopen, subscribe ↔ unsubscribe, ignore ↔ unignore, pin ↔ unpin, routed post and ⌘K send → `message.delete` of the echoed `ts` (or cancel the outbox item if not yet sent).
+Tabs: `{ tabs: Tab[], activeId }`, `Tab = { id, kind, topicId?, stealth? }`, pages are singletons, persisted through `prefs.set('tabs')` and restored at launch. Lists: topic rows and message rows are rendered with `content-visibility: auto` inside a capped window (sidebar 300 rows, messages 500 rows) and the `rev` identity cache; "stick to bottom" and prepending older pages are handled by the message container with scroll anchoring. The M4 budget is under 16 ms from invalidation to paint for 300 rows, measured by an engine benchmark plus a Playwright trace; `react-virtuoso` is adopted only if the measurement fails.
 
-Tabs: `tabsAtom` is `{ tabs: Tab[], activeId }` with `Tab = { id, kind: 'topic'|'all'|'forYou'|'juno'|'new'|'notifications'|'prefs', topicId?, stealth? }`. Pages are singletons. Tabs persist across restarts through `prefs.set('tabs')` (debounced), including stealth flags, because closing the app should not lose a working set; the active tab is restored too. Drafts persist per topic in `drafts`. UI tweaks (`rowStyle`, `density`, `previewLines`, `showAvatars`, `grouping`, `quietDays`, `messageStyle`, `aiAssist`, `accent`, `theme`) live in `prefs` and arrive through `prefsAtom`; the root applies the theme classes from `@juno/tokens/themes.stylex` and sets `data-theme-switching` for two frames on change.
+Appearance in v1 is the default design: `prefs` keeps `theme` (`system | light | dark`) and `accent`. The other tweak keys from the prototype (`rowStyle`, `density`, `previewLines`, `showAvatars`, `grouping`, `messageStyle`) stay out of the UI; views still take them as optional props with defaults, so adding a variant later is a prefs key and a fixture, not a refactor.
 
-## 8. UI layering and review
+Shortcuts and the app menu: main builds the application menu (Juno, File, Edit, View, Go, Window, Help) and menu items send `menu.command { id }` to the focused window. ⌘K, ⌘J, ⌘N, ⌘W, ⌘, and ⌘⇧[ / ⌘⇧] live there. ⌘Z is an Edit › Undo item without the `undo` role: the renderer receives `menu.undo` and, if focus is in an editable element with text, calls `shell.editUndo()` (`webContents.undo()`); otherwise it pops the Juno undo stack. Tests click menu items by id through `app.evaluate`.
 
-```
-tokens  →  ui primitives  →  views (dumb)  →  containers (apps/desktop)  →  app shell
-```
+## 8. UI layering and review (ADR 0005)
 
-- **tokens**: CSS variables only.
-- **ui**: primitives; no product words in them (`Chip`, not `UnreadBadge`).
-- **views**: feature components. Props are contract view models plus callbacks (`onResolve(topicId)`). No atoms, no Effect, no `window`. A view that needs the current time takes `now` as a prop; containers tick it.
-- **containers**: one per view or page; read atoms, map to props, bind callbacks to commands and to the undo stack. Native context menus are requested here (`window.juno.shell.contextMenu.popup(items)` returns the chosen id) with the item list computed by a pure function in `domain`.
+`tokens → ui → views → containers → app shell`. Views take contract view models and callbacks; a view that needs time takes `now`. Containers read atoms, map to props, bind callbacks to commands and the undo stack, and request native context menus through `shell.contextMenu.popup(items)` with item lists from `domain`.
 
-A designer changes the UI by editing `tokens`, `ui` or `views` and checking the gallery. Those packages do not declare `@juno/state`, `effect` or `@juno/engine` as dependencies, so the change cannot reach logic even by accident.
+`apps/gallery` renders every view with every fixture at `/#/<View>/<fixture>?theme=dark`; a Playwright project screenshots them into `apps/gallery/shots/`. Baselines are generated and compared on one CI image because font rendering differs across macOS versions; locally the shots are review aids. View fixtures and `fake-slack` seeds are separate files: view models on one side, Slack payloads on the other.
 
-**Gallery over Storybook.** `apps/gallery` is a plain Vite + React app (the same StyleX plugin config as the renderer) with a route per view and fixture: `/#/TopicRow/unread-mention`, `/#/Sidebar/default?theme=dark&density=compact`. Each view exports `fixtures.ts`: a record of named prop sets, which doubles as seed data for `fake-slack` where the shapes overlap. A Playwright project `gallery` opens every route in light and dark and writes `apps/gallery/shots/<view>/<fixture>-<theme>.png`; design-review agents run `pnpm gallery:shots` and read the PNGs, and a diff against the previous run is the visual regression check. The index page lists all views and fixtures with a search box. This is a few hundred lines, uses the real build pipeline, needs no Electron, and keeps fixtures as plain TypeScript. Storybook would add its own builder, its own StyleX integration problems and a second config to maintain for little gain.
+## 9. Message rendering, emoji and files
 
-## 9. AI
+`@juno/richtext` is the owner the review found missing. It converts incoming `blocks` (preferring `rich_text`), mrkdwn `text` as fallback, `attachments` and `files` into `MessageBody` (a tree of sections, quotes, preformatted, lists, inline text with styles, `user`, `channel`, `usergroup`, `broadcast`, `emoji`, `link`, `date`, `file`), resolves mention ids to names through a lookup the caller passes, strips quotes for previews, and converts composer text with `@Name` and `#channel` tokens plus `> ` lines into outgoing `rich_text` blocks. It ships a shortcode-to-unicode table for `:thumbsup:` in text and for reaction names; custom emoji come from the `emoji` table. The picker in v1 is the fixed set of 12. All of this has table-driven tests with real redacted payloads from the live smoke.
 
-Two kinds of work, two model tiers, one interface (ADR 0006).
+Files (owner decision 4, `@juno/files`):
 
-| Feature | Kind | Implementation |
+- **Upload.** Three sources: the `+` button (main `dialog.showOpenDialog` → paths), drag-in (preload `webUtils.getPathForFile(file)` → paths), paste (bytes transferred over the port as `ArrayBuffer`; the engine writes them under `uploads/`). The composer shows attachment chips with local previews. On send, one `uploadFiles` outbox item per message runs the public flow: `files.getUploadURLExternal { filename, length }` → `POST` bytes to `upload_url` (through `HttpTransport`) → `files.completeUploadExternal { files: [{ id, title }], channel_id, thread_ts?, initial_comment }`, which posts the message with the files attached; the echo carries `files`. Unknown: the web client's own fetchers are named `files.getUploadURL` / `files.completeUpload` (research section 3, "not read in detail"); whether their arguments differ and whether an `xoxc` session is accepted on the public `*External` pair is verified in the live smoke in the private test channel before M6. `fake-slack` implements the public flow.
+- **Thumbnails.** `MessageView` file entries point at `juno://files/<file_id>/<variant>`. Main serves them with `net.fetch(url_private_thumb, { session })` on `persist:slack`; Chromium's HTTP cache for that session caches them.
+- **Download.** `shell.downloadFile(fileId)` → main `session.downloadURL(url_private_download)` on the same session into `~/Downloads`, with `will-download` setting a unique path.
+- **Edit and delete own messages** (M6): hover toolbar items on own messages; inline edit; `chat.update` and `chat.delete` through the outbox with `depends_on` for still-pending messages; delete confirms inline.
+
+New DMs: "Message Maya Chen" and the New message page accept any user; if no `im` exists, `openConversation` (`conversations.open { users }`) runs first and the send depends on it.
+
+## 10. AI (ADR 0006)
+
+Two tiers, one interface, deterministic checks first.
+
+| Feature | Kind | Where |
 | --- | --- | --- |
-| Clarity check | deterministic | `domain/clarity.ts`: typo table, doubled words, lowercase "i", missing "?", sentence length. No model |
-| Audience check | deterministic | `domain/audience.ts`: keyword list, public channels only |
-| Wrong-place check | decision | `routeCheck(draft, last 4 topics in channel)` → `{ topicId?, confidence }` |
-| Group Main messages | decision | `groupRun(last N Main messages)` → `{ tsList, title, confidence }` |
-| Settled | decision | `settledScore(topic tail)` → `{ score, reason }` |
-| Notification gate | decision | `urgencyGate(message, context)` → `{ urgency, chatter }` |
-| ⌘K command routing | decision | deterministic grammar first (`tell|message|dm <person> <text>`, `post in #<channel> <text>`, `resolve <query>`, `summarize …`); the model only when the grammar fails |
-| Topic titles | generation | `titleTopic(root, first replies)`; re-run on drift when `reply_count` crosses 5, 20 |
-| Catch-up summary | generation | `catchUp(unread run)` |
-| For you cards | both | `forYou(recent topics)` in the background |
-| Juno chat | generation + tools | streamed |
+| Clarity check | deterministic | `domain/clarity.ts` |
+| Audience check | deterministic | `domain/audience.ts` |
+| ⌘K routing | grammar first, model fallback | `domain/commands.ts`, `ai` task `parseCommand` |
+| Wrong-place check | decision | `routeCheck(draft, last 4 topics)` on Enter |
+| Grouping, settled | decision | run once a topic has been idle for 2 minutes, not per message |
+| Notification gate | decision | `urgencyGate` per candidate |
+| Titles | generation | new thread; re-run when `reply_count` crosses 5 and 20 |
+| Catch-up | generation | on open with 2+ unread |
+| For you | both | background, every 15 minutes and after idle topics change |
+| Juno chat | generation + tools | streamed into `juno.chat` snapshots at ~50 ms |
 
-`AiProvider` (in `ai`) has `decide(task, input)`, `generate(task, input)` and `chat(context, tools)`. Decisions force a tool call whose parameters are the output schema (TypeBox, validated with `validateToolCall`; one retry; on failure the answer is "no decision" and the UI stays quiet). `PiAiProvider` uses `@earendil-works/pi-ai` with the OpenRouter provider only, the key passed in memory from main. Model slugs are prefs with defaults: a small fast model for `decision`, a stronger one for `generation`; the catalog changes, so they are not hard-coded in logic.
+`AiProvider.decide` forces a tool call whose parameters are the output schema (TypeBox, `validateToolCall`, one retry, else "no decision"). `PiAiProvider` uses `@earendil-works/pi-ai` with only the OpenRouter provider and the key from memory. Model slugs per tier are prefs. `assistant` caches by `(task, key, input_hash)`, applies timeouts (decisions 1.5 s, generation 20 s), concurrency 2, and a daily USD budget from OpenRouter's usage field; `aiAssist=false` swaps in a no-op layer (no jobs, no sparkles, gate sends everything to digest, For you empty, Juno says assist is off). `FakeAiProvider` is deterministic and selected with `JUNO_AI=fake`. Juno chat tools: `list_topics`, `read_topic`, `list_channels`, `show_topics`, `propose_message`, `propose_resolve`; cards carry a status and nothing is sent without a click.
 
-`assistant` applies policy: cache every result in `ai_cache` by `(task, key, input_hash)` so reopening a topic or re-evaluating a rule never repeats a call; per-task timeouts (decisions 1.5 s, generation 20 s); concurrency 2; a daily budget in USD from OpenRouter's usage field, after which decisions degrade to "none" and generation to the fallback title; debounce on typing (audience 600 ms, route check only on Enter). The global `aiAssist` pref turns the whole `assistant` layer into a no-op layer: no jobs, no sparkles, catch-up absent, send checks skip to the deterministic ones, the notification gate sends everything to digest, For you is empty and Juno answers that assist is off.
+## 11. Notifications
 
-Juno chat is one persisted thread. Tools: `list_topics(filter)`, `read_topic(id, limit)`, `list_channels()`, `show_topics(ids)` (renders a topics card), `propose_message(target, text, topicId?)` (renders a send card), `propose_resolve(ids)` (renders a resolve card). "This" is the renderer's last viewed topic, sent with the request. Cards are stored in the chat message's `content_json` with a status (`pending | sent | dismissed | resolved`); Send runs `message.send` and updates the card. The stream of deltas is collapsed server-side into the `juno.chat` live query at ~50 ms. Nothing is sent without a click.
+Inputs: `desktop_notification` events, plus local mention detection on `message` events when the official client has the channel muted. `notification_log` has a unique `(channel, ts)` key so the two inputs never produce two rows. The pure decision in `domain/notifications.ts` runs in the spec's order (ignored → rules → quiet hours → AI off → score vs threshold → chatter → digest); when a score is needed the pipeline calls `urgencyGate` and re-enters. `now` shows an OS notification through `Notifier` unless the topic is on screen in a focused window (`presence.viewing`); `digest` is assigned the next slot. The digest fiber sleeps until the next slot in local time, bundles undelivered rows into one notification, and marks them delivered; slots missed while the app was quit are delivered at the next launch. Rule changes re-run the pure decision over today's rows with stored scores. The dock badge is `•` when any topic has unread mentions.
 
-`FakeAiProvider` is deterministic: titles from the first six words in sentence case, route check by word overlap above a threshold, settled when the tail contains "shipped" or "done", urgency from a keyword table, canned chat replies from a fixture file keyed by prompt substring. It is selected with `JUNO_AI=fake`, which e2e always sets.
+Double notifications: while the official app runs, both clients notify. Onboarding says so and links to Slack's own "pause notifications" preference; Juno cannot suppress the other client.
 
-## 10. Notifications
+States the UI designs for (`engine.status`): first run (sign-in), booting, catching up (sidebar usable, quiet progress line), live, offline (banner, actions still work), rate-limited (quiet line), session expired (sign-in sheet over the app, data stays), engine restarting.
 
-Inputs are `desktop_notification` events (the server's candidates: mentions, DMs, keywords, followed threads) and, when the server would stay silent because the official client is muted, local mention detection on `message` events (`<@self>`, `<!here>`, `<!channel>`, self subteams). Each input runs the decision in `domain/notifications.ts`, which is pure and ordered as the spec says:
+## 12. Enterprise Grid
 
-```
-ignored channel → silent "Ignored channel"
-rules, top to bottom, first match → now | digest | silent "Rule: …"
-quiet hours (unless a rule said now) → digest "Quiet hours"
-AI off → digest "Juno off, waiting for digest"
-need score → (pipeline calls urgencyGate, then re-enters)
-score ≥ threshold → now "Juno · 89% urgent"
-chatter → silent "Juno · 66% just chatter"
-else → digest "Juno · 14% urgent, can wait"
-```
+Detection at sign-in: `localConfig_v2.teams[id].enterprise_id` and `enterprise_api_token` (import path) or `userBoot.team.enterprise_id` (both paths). When present: `slack_route=<enterprise>:<team>`, the enterprise token for org-scoped methods (which methods need it is Unknown; start with none, and switch a method to the enterprise token when it returns `not_allowed_token_type`), handle `update_global_thread_state`, key the workspace directory by `enterprise_id`, and use the team domain for permalinks. `fake-slack` has a `grid: true` fixture mode. The owner should check whether their own `localConfig_v2` has an `enterprise_id` now; if it does, Grid moves into M2 and M3.
 
-The pipeline (in `notifications`) writes a `notification_log` row with inputs and the cached score, and then: `now` → `Notifier.show` (engine→main → `new Notification`, with `topicId` for click handling) unless the topic is on screen in a focused window; `digest` → assigned the next digest slot. The digest scheduler is a fiber that sleeps until the next slot from `digest_times` (local time), bundles undelivered digest rows into one notification ("5 messages in 3 topics"), and marks them delivered. Quiet hours shift the slot to the first one after the window. The Today page subscribes to `notifications.today`; when rules change, the engine re-runs the pure decision over today's rows using the stored score, so the log updates without new AI calls. The dock badge is `•` when any topic has unread mentions, computed by the engine and set by main.
+## 13. Testing
 
-## 11. Testing
+- **End to end** (`apps/desktop/e2e`, Playwright, built app, `show: false`, temp data dir and own fake port per test, four workers, `JUNO_AI=fake`, plaintext secrets, `ELECTRON_RUN_AS_NODE` stripped). One file per spec flow: sign-in via the fake's sign-in page, boot and sidebar, open at the divider, stealth, resolve with undo, reopen tag, pin, rename, Use AI title, subscribe, ignore, tabs, send with echo, edit and delete own message, reactions, quote, suggestions, attachments (paste, drop, button) with thumbnails, New message with tracking and to a user with no DM, send checks, ⌘K, All topics, For you, Juno chat, notifications (recording `Notifier` in main read through `app.evaluate`; clicks simulated the same way), digest with `clock.advance` sent through main to the engine, reconnect and 429, dark mode. Menus are clicked by id in main. `location.protocol` is asserted to be `juno:`.
+- **Engine tests** (`packages/engine/test`, Node, in-process `fake-slack`): boot call budget, warm boot, the randomised convergence test, `topic_index` incremental versus rebuild, echo reconciliation in all three orders, outbox retry and revert, read-state conflicts, replay of redacted real payloads recorded by the live smoke.
+- **Domain and richtext tests** (vitest): rules, formatters, grammar, rendering tables.
+- **Import seam**: a fixture leveldb directory, a fixture `Cookies` file and an injected keychain password make the Slack-app import testable.
+- **Live smoke** (`pnpm smoke:live`, manual, `JUNO_LIVE=1`): read-only calls decoded through our schemas, 30 s of socket events, the search discovery spike, the `counts.latest` measurement, the upload flow check, and writes only in a private channel the script creates or the self-DM. It saves redacted payloads as engine test fixtures.
 
-**End to end** (`apps/desktop/e2e`, Playwright `_electron.launch` on the built app, `show: false`, temp data dir per test, `JUNO_SLACK_API_URL`/`JUNO_SLACK_WS_URL` pointed at `fake-slack`, `JUNO_AI=fake`, `ELECTRON_RUN_AS_NODE` stripped). Flows from the spec, one file each: sign-in via the fake's sign-in page (capture of token and cookie); cold boot shows topics and Main rows with correct tags; open topic at the "N new" divider and mark read; stealth keeps unread; resolve with undo and ⌘Z; a new message reopens with the Reopened tag; pin, rename, Use AI title; subscribe/unsubscribe; ignore channel from menu and Preferences; tabs (current tab, ⌘-click, focus existing, close); send with echo; reactions; quote; @ and # suggestions; New message with tracking; send checks (route, clarity, audience); ⌘K search and commands; All topics filters; For you cards; Juno chat with a send card; notification rules, Today log, digest (the engine accepts `JUNO_CLOCK` for a controllable clock in test mode); reconnect and reconciliation after the fake drops the socket; a 429 from the fake delays but does not lose a send; dark mode screenshot. Native menus are not in the DOM, so tests assert the menu template through a test-only `window.juno.debug.lastContextMenu` hook and invoke items by id.
+## 14. Security
 
-**Engine tests** (`packages/engine/test`, plain Node, in-process `fake-slack`): boot call budget (history calls ≤ active conversations), warm boot uses `counts_last_fetched`, read-state mirroring table, outbox retry and final-failure revert, reconnect reconciliation, overlay rules through the public routes. These test behaviour through the contract, never internal functions.
+- Secrets as in 2.3. `secrets.bin` holds the token and the AI key only; the cookie stays in the Chromium session.
+- Sign-in window: `persist:slack` partition, navigation allow-listed to Slack domains, no preload. When the page reaches `/client/<team>`, main reads `localStorage.localConfig_v2` with `executeJavaScript` and takes the token; the fallback is a `webRequest.onBeforeRequest` body sniff on the first `/api/` call, unregistered after capture.
+- Import: copies of `Local Storage/leveldb` and `Cookies` in a temp dir, `localConfig_v2` by scanning for the key and taking the newest record, the `d` cookie decrypted with the "Slack Safe Storage" keychain password, written into the session, copies deleted.
+- Renderer: `sandbox`, `contextIsolation`, no `nodeIntegration`, `webviewTag: false`, loaded from `juno://app/` (registered `standard` and `secure` before ready, path-traversal guard). CSP `default-src 'self'; img-src 'self' juno: https://*.slack-edge.com https://secure.gravatar.com data:; font-src 'self'; style-src 'self'`; `'unsafe-inline'` only in dev. The scaffold's production CSP is aligned to this in M1.
+- Window factory with forced secure `webPreferences` and a `browser-window-created` watchdog. Fuses in packaged builds.
+- Every IPC payload decoded; sender frame checked; `ipcRenderer` never exposed; `openExternal` accepts `http(s)` only; socket host validated.
 
-**Domain tests** (vitest): visibility and status, title resolution, sort orders, topic derivation from message sets, notification decision order, clarity fixes, audience keywords, relative time, command grammar, undo inverse table, mention detection. Fast, no mocks.
+## 15. Conventions for parallel agents
 
-**Gallery screenshots**: every fixture, both themes, as the visual check.
+An `AGENTS.md` at the repo root is created in M1 from this section and `docs/development.md`, and points to `node_modules/effect/ai-docs` (present in 4.0.3) and `node_modules/effect/AGENTS.md`.
 
-**Live smoke** (`pnpm smoke:live`, manual, `JUNO_LIVE=1`, never in CI): against the real workspace with the user's imported session. Read-only: `auth.test`, `client.userBoot`, `client.counts`, `subscriptions.thread.getView`, one `conversations.history`, socket `hello` and 30 s of events, all decoded through our schemas to catch drift. Writes only inside a private channel the script creates (`#juno-smoke-<date>`, `conversations.create { is_private }`) or the self-DM: post, edit, react, mark, thread subscribe/unsubscribe, delete. The script prints the exact call list before running and refuses any other channel id.
+**File ownership.** Each milestone task names the files it owns; two agents never own the same file. Hotspots are split by feature so they rarely collide: one route file per feature area in `contract/src/routes/<feature>.ts`, one handler folder per feature in `engine/src/<feature>/`, one fixture file per view, migrations with timestamp ids, and `check-deps` edges declared in each package's `package.json` (the script reads them; there is no central table to edit). The app layer file in `engine/src/layer.ts` and the `index.ts` barrels are edited only by the milestone's integration task, last.
 
-## 12. Security
+**Effect 4.0.3 names** (checked in the installed source; v3 habits on the left do not exist):
 
-- **Secrets.** `{ xoxc token, d cookie, team, OpenRouter key }` are encrypted with `safeStorage` into `userData/secrets.bin`, read only by main, and handed to the engine over `parentPort` at start. The engine keeps them in memory, redacts them in logs and never writes them; SQLite holds no secrets. Sign-out deletes the file and clears the engine.
-- **Embedded sign-in.** A `BrowserWindow` on a non-persistent partition `slack-signin`, navigation allow-listed to Slack domains, no preload. Main captures the token from the first `/api/` request body (`webRequest.onBeforeRequest` with `uploadData`, `token` field) and the `d` cookie from `session.cookies.get`, then closes the window and clears the partition. The fake sign-in page in `fake-slack` exercises the same path.
-- **Import from the Slack app.** Main copies `~/Library/Application Support/Slack/Local Storage/leveldb` and `Cookies` to a temp dir (read-only on the originals), extracts `localConfig_v2` by scanning for the key and taking the newest record, decrypts the `d` cookie with the "Slack Safe Storage" keychain password (`security find-generic-password`, which prompts the user once), and discards the copies. This path is best-effort; the embedded sign-in is the reliable one.
-- **Renderer.** `sandbox`, `contextIsolation`, no `nodeIntegration`, `webviewTag: false`, loaded from a custom `juno://app/` scheme with a path-traversal guard. CSP: `default-src 'self'; img-src 'self' https://*.slack-edge.com https://secure.gravatar.com data:; font-src 'self'; style-src 'self'` (plus `'unsafe-inline'` only in dev for Vite). Slack file thumbnails need the cookie, so they are served through `juno://files/...` handled in main with `net.fetch` and the cookie attached, never by exposing the cookie.
-- **Window factory and watchdog** as in Slack's shell. Fuses in packaged builds: `RunAsNode` off, `EnableNodeCliInspectArguments` off (e2e runs the unpackaged build), asar integrity on.
-- **IPC.** Every message on all three channels is decoded with its schema; main checks `event.senderFrame.url` against `juno://app`. The preload exposes a fixed object; `ipcRenderer` is never exposed. `openExternal` accepts `http(s)` only.
-- **Network.** All Slack calls go to the configured base URL (the workspace host in production, the fake in tests); the socket host is validated against `wss-primary.slack.com` and the configured test host.
+| Do not write | Write |
+| --- | --- |
+| `Context.Tag`, `Context.GenericTag`, `Effect.Service` | `class Foo extends Context.Service<Foo, Shape>()('juno/Foo') {}` |
+| `Effect.catchAll` | `Effect.catch`; also `catchTag`, `catchTags`, `catchCause`, `catchDefect`, `catchIf`, `catchReason` |
+| `Effect.orElse` | `Effect.orElseSucceed` or `Effect.catch` |
+| `Effect.forkDaemon` | `Effect.forkIn(scope)`, `Effect.forkScoped`, `Effect.forkChild` |
+| `Effect.makeSemaphore` | `Semaphore.make`; per-key: `PartitionedSemaphore.make` |
+| `Stream.async` | `Stream.callback` |
+| `Schema.Literal('a', 'b')` for unions | `Schema.Literals(['a', 'b'])` |
+| `@effect/schema`, `@effect/platform`, `@effect/rpc` imports | `effect` (`Schema`), `effect/http`, `effect/rpc` |
+| `@effect-atom/atom-react` | `@effect/atom-react` with `effect/reactivity/Atom` |
+| `Data.TaggedError` for wire errors | `Schema.TaggedError<E>()('Tag', fields)` (`Data.TaggedError` still exists for internal errors) |
 
-## 13. Milestones
+Other verified names used in this document: `Effect.fn`, `Effect.fnUntraced`, `Effect.gen`, `Effect.retry`, `Effect.timeout`, `Effect.tryPromise`, `Effect.acquireRelease`, `Effect.scoped`, `Layer.effect`, `Layer.succeed`, `Layer.provide`, `Layer.provideMerge`, `Layer.mock`, `ManagedRuntime.make`, `Stream.retry`, `Stream.debounce`, `Stream.throttle`, `Stream.changes`, `Stream.fromQueue`, `Stream.fromAsyncIterable`, `Schedule.exponential`, `Schedule.jittered`, `Schedule.upTo`, `Schedule.recurs`, `Schedule.cron`, `Reactivity` service methods `query`, `stream`, `mutation`, `invalidate`, `withBatch`, `SqlClient.withTransaction`, `SqlClient.reactive`, `Migrator.make`, `Migrator.fromRecord`, `SqlSchema.findAll`, `Atom.make`, `Atom.family`, `Atom.fn`, `Atom.pull`, `Atom.runtime`, `Atom.withReactivity`, `Atom.debounce`, `AtomRpc.Service`, `TestClock.adjust`, hooks `useAtomValue`, `useAtom`, `useAtomSet`, `useAtomRefresh`, `useAtomMount`, `RegistryProvider`. Prefer `Effect.gen` inline and `Effect.fn('name')` for service methods, as the Effect `AGENTS.md` says.
 
-Vertical slices in order. Each is sized so two to four agents can work in parallel in different packages. "Done" always includes typecheck, lint, the listed tests passing, and no new dependency edges outside section 3.
+**Where tests live.** `packages/<name>/test/` next to the source for domain, richtext, slack and engine tests (vitest); `apps/desktop/e2e/` for Playwright; `apps/gallery/` for screenshots; `scripts/smoke-live.ts` for the manual live check. A task is done when `pnpm typecheck`, `pnpm lint`, `pnpm check-deps`, the package's tests and the named e2e file pass.
 
-**M0 Walking skeleton** (in progress). Electron + electron-vite + React + StyleX + tokens, `app.getInfo` over typed IPC, one Playwright test.
+## 16. Milestones
 
-**M1 Foundations.** Parallel: (a) `contract` protocol schemas and route tables, client in `state`, server in `engine`, port adapter, utility process supervisor in main; (b) `store` with migrations and `Invalidation`; (c) `fake-slack` HTTP + WS skeleton with fixtures and control API; (d) `domain` visibility, title, sort, notification decision with tests; (e) `ui` primitives and `apps/gallery` with the first fixtures and the screenshot project. Done: renderer subscribes to `engine.status` through the port; engine test boots against `fake-slack` and stores `userBoot` rows; gallery renders Button and TopicRow fixtures.
+Each milestone lists parallel tracks; each track owns disjoint files. Done always includes typecheck, lint, `check-deps` and the named tests.
 
-**M2 Sign-in.** Embedded sign-in window with capture, Slack-app import, `secrets.bin`, engine receives the session, `auth.test` smoke, sign-out, `authRequired` loop. Done: e2e signs in against the fake sign-in page; the live smoke script runs read-only against the real workspace.
+**M0 Walking skeleton** (done). Electron + electron-vite + React + StyleX + tokens, typed IPC, one e2e.
 
-**M3 Boot and sidebar.** Cold and warm boot, discovery, `topic_index`, `topics.list` live query, `Sidebar`, `TopicRow`, quick filters, scope chip, Browse popover, quiet rules. Done: e2e shows the fixture workspace's topics in the right order with tags and counts; engine test asserts the call budget.
+**M1 Foundations.** (a) Protocol spike per 2.6, then the chosen client and server, port handoff, engine supervisor, `juno://` scheme, CSP alignment, `AGENTS.md`; (b) `store` with the two databases, writer/reader, migrations, `Invalidation`, FTS5; (c) `fake-slack` skeleton, fixtures, control API, sign-in page; (d) `domain` and `richtext` with tests; (e) `ui` primitives, `apps/gallery`, screenshot project; (f) `check-deps` script. Done: a live query reaches the renderer; engine test boots against the fake and stores `userBoot`; gallery renders fixtures.
 
-**M4 Topic view and tabs.** Open thread and Main, replies/history fetch, `MessageList` with grouping, chips, quotes, reactions display, "N new" divider, mark read/unread, stealth, tabs with persistence, realtime `message` events. Done: e2e opens at the divider, stealth keeps unread, an injected message appears live.
+**M2 Sign-in and session.** Sign-in window with token capture, Slack-app import with the test seam, `secrets.bin`, `persist:slack` session and `HttpTransport.ElectronNet`, cookie header for the socket, Grid detection, `authRequired` loop, sign-out, live smoke (read-only). Done: e2e signs in through the fake; smoke runs against the real workspace and records fixtures.
 
-**M5 Actions and overlay.** Resolve/reopen, pin, rename, Use AI title (fallback title for now), subscribe/unsubscribe with Slack mirroring, ignore, mark channel read/unread, native context menus, toasts, undo stack, All topics page. Done: e2e covers every row action with undo.
+**M3 Boot and sidebar.** Cold and warm boot, discovery including the search spike result, merge rules, `reindexTopics`, convergence test, `topics.list` with deltas, Sidebar, TopicRow, filters, scope, Browse, status phases. Done: e2e sidebar order, tags and counts; engine call budget test.
 
-**M6 Composer and send.** Post with echo reconciliation, edit, delete, reactions, quote and selection quote, @ and # suggestions, drafts, New message page with tracking, routed post undo. Done: e2e send flows; engine test for pending-to-echo.
+**M4 Topic view and tabs.** Open thread and Main, message rendering through `richtext`, divider snapshot, read-state rule and mirroring, stealth, tabs, realtime messages, list performance budget, local FTS search. Done: e2e divider, stealth, live message; benchmark under budget.
 
-**M7 Realtime hardening.** Reconnect, reconciliation, outbox with retry and revert, rate-limit behaviour, offline mode, engine restart and port reconnect. Done: e2e socket-drop and 429 scenarios; a 24-hour soak against the fake with injected churn shows no drift between fake and store.
+**M5 Actions and overlay.** Resolve/reopen, pin, rename, Use AI title, subscribe, ignore, mark read/unread, context menus, app menu, engine-computed undo, toasts, All topics. Done: e2e every action with undo.
 
-**M8 AI.** `AiProvider`, `PiAiProvider`, `FakeAiProvider`, `assistant` with cache and budget, titles with sparkle, catch-up, route and clarity and audience checks, settled hint, grouping, AI off switch. Done: e2e with the fake provider for every send check and card; a manual run against OpenRouter with the budget visible in Preferences.
+**M6 Composer, send and files.** Post with reconciliation in all orders, edit and delete own messages, reactions, quote, suggestions, drafts, attachments (paste, drop, button), thumbnails and download through main, New message with tracking and new DMs. Done: e2e send flows; engine reconciliation tests; upload verified in the live smoke.
 
-**M9 Search and ⌘K.** Local search over the store, `search.modules.messages` for older history, command grammar, model fallback, palette view. Done: e2e for search, the four command kinds and ⌘Enter.
+**M7 Realtime hardening.** Reconnect, discovery sweep, outbox coalescing and revert, per-method rate buckets, offline, engine restart and port reconnect, states UI. Done: e2e socket drop and 429; convergence test with drops.
 
-**M10 Notifications.** Pipeline, rules UI, threshold, digest scheduler, quiet hours, Today log with live re-evaluation, OS notifications with click-to-open, dock badge. Done: e2e with the controllable clock.
+**M8 AI.** Providers, assistant cache and budget, titles, catch-up, send checks, settled, grouping, off switch. **M9 Search and ⌘K.** **M10 Notifications** (pipeline, rules, digest, Today, OS notifications, badge, dedupe). **M11 For you and Juno chat.** **M12 Polish and ship** (Preferences with theme and accent, dark mode, accessibility, packaging, fuses, auto-update, live write smoke, signed DMG passing CI on `macos-26`).
 
-**M11 For you and Juno chat.** Background card generation, the five card types, the chat with tools and the three card kinds, "this" context, Ask Juno from cards. Done: e2e with scripted fake replies.
+## 17. Remaining open questions
 
-**M12 Polish and ship.** Preferences page with tweaks, accents, dark mode, keyboard map, accessibility pass, empty states, packaging with fuses, notarisation, auto-update feed, crash reporting, live smoke with writes to the private channel. Done: a signed DMG that passes the full e2e suite in CI on `macos-26`.
-
-## 14. Open questions for the product owner
-
-1. **Which threads belong in the sidebar?** This document shows every thread with recent activity in channels you are a member of, and "Unsubscribe" is an explicit Juno action that also unfollows in Slack. The alternative is to show only threads Slack says you follow, which is much cheaper to sync but hides most channel threads. Which one?
-2. **Resolve and Slack.** Should resolving a thread also unfollow it in Slack so the official app stops notifying, or stay purely local (current plan: local, mark read only)?
-3. **Undo of a sent message.** ⌘Z on a routed post or a ⌘K send deletes the message in Slack, which others may have already seen. Acceptable, or should undo only exist until the message is actually sent?
-4. **Sync budget while the official Slack app runs.** Both clients share the account's rate limits. Is a cold boot that fetches history only for conversations active in the quiet window acceptable, and should `quietDays` above 14 be allowed given the backfill cost?
-5. **Keychain prompt for import.** Importing from the installed Slack app triggers a macOS prompt that names Juno reading "Slack Safe Storage". Is that acceptable in onboarding, or should import be hidden behind an advanced option?
-6. **Pinned and resolved.** The prototype keeps a resolved pinned row visible with a check; the spec hides resolved rows. Which wins?
-7. **Files and images in v1.** Message attachments need authenticated fetches through main. Thumbnails and download only, or full upload too?
-8. **Digests when Juno is closed.** The engine runs only while the app runs, so a digest due while Juno is quit is delivered at next launch. Is a menu-bar/background mode wanted?
-9. **Multiple workspaces.** The data model keys by team, but v1 UI assumes one signed-in workspace. Is that enough for the first release?
+1. Does the owner's `localConfig_v2` contain an `enterprise_id`? If yes, Grid moves into M2 and M3.
+2. Search discovery depends on the spike (5.3). If `is:thread after:` is not usable with an `xoxc` session, the fallback leaves a gap for unfollowed old roots during downtime, shown as "Tracking threads since <date>". Is that acceptable?
+3. The upload flow (9) assumes the public `files.getUploadURLExternal` pair works with an `xoxc` session. If only the internal `files.getUploadURL` pair works, M6 absorbs a reverse-engineering task; is a one-milestone slip acceptable in that case?

@@ -10,7 +10,7 @@ The UI must be easy to change without touching logic, and design-review agents n
 
 Four layers with enforced dependencies: `@juno/tokens` (CSS variables) → `@juno/ui` (primitives) → `@juno/views` (feature components: props in, callbacks out; the prop types are the contract's view models) → containers in `apps/desktop/src/renderer` (atoms to props). `views` does not declare `@juno/state`, `effect` or `@juno/engine` as dependencies, so pnpm's strict layout plus `scripts/check-deps.mjs` make a logic import impossible. A view that needs the current time takes `now` as a prop.
 
-Every view exports `fixtures.ts`, a record of named prop sets. `apps/gallery` is a plain Vite + React app using the same StyleX plugin config, with a route per view and fixture and query parameters for theme and density. A Playwright project screenshots every route in light and dark into `apps/gallery/shots/`. Reviewers and agents read the PNGs; a diff against the previous run is the visual regression check. Fixtures double as seed data for `fake-slack` where shapes overlap.
+Every view exports `fixtures.ts`, a record of named prop sets. `apps/gallery` is a plain Vite + React app using the same StyleX plugin config, with a route per view and fixture and query parameters for theme and density. A Playwright project screenshots every route in light and dark into `apps/gallery/shots/`. Reviewers and agents read the PNGs; baselines are generated and compared on one CI image because font rendering differs across macOS versions, and locally the shots are review aids. View fixtures (view models) and `fake-slack` seeds (Slack payloads) are separate files, so a UI edit never changes e2e data.
 
 ## Consequences
 
