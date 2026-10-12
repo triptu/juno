@@ -124,7 +124,7 @@ flowchart TD
   ui --> tokens
   views --> ui & tokens & contract
   state --> contract
-  desktop[apps/desktop] --> engine & state & views & contract & tokens
+  desktop[apps/desktop] --> engine & state & views & contract & tokens & slack
   gallery[apps/gallery] --> views & ui & tokens
 ```
 
