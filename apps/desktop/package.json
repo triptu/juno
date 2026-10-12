@@ -45,10 +45,10 @@
       "@juno/contract",
       "@juno/engine",
       "@juno/state",
+      "@juno/tokens",
       "@juno/views"
     ],
     "exceptions": [
-      "@juno/tokens",
       "@juno/ui"
     ]
   }

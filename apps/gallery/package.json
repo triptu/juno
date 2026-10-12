@@ -32,10 +32,8 @@
   "juno": {
     "allowedDeps": [
       "@juno/tokens",
+      "@juno/ui",
       "@juno/views"
-    ],
-    "exceptions": [
-      "@juno/ui"
     ]
   }
 }

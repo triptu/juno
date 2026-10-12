@@ -118,8 +118,8 @@ flowchart TD
   ui --> tokens
   views --> ui & tokens & contract
   state --> contract
-  desktop[apps/desktop] --> engine & state & views & contract
-  gallery[apps/gallery] --> views & tokens
+  desktop[apps/desktop] --> engine & state & views & contract & tokens
+  gallery[apps/gallery] --> views & ui & tokens
 ```
 
 | Package | Rule it protects | Owns | Must not |
