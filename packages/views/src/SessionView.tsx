@@ -4,7 +4,7 @@ import { Button, Text } from '@juno/ui'
 
 export interface SessionViewProps {
   readonly teamName: string
-  /** The user's handle, for example "alex". */
+  /** The user's handle, for example "tushar". */
   readonly userName: string
   /** Enterprise Grid organisation, when there is one. */
   readonly enterpriseName?: string

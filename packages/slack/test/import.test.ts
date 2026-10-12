@@ -25,7 +25,7 @@ const team = {
   domain: 'juno-fake',
   url: 'https://juno-fake.slack.com/',
   token: 'xoxc-fresh-000000000000',
-  userId: 'U0ALEX',
+  userId: 'U0TUSHAR',
 }
 
 describe('readSlackAppSession', () => {
@@ -34,7 +34,7 @@ describe('readSlackAppSession', () => {
     const session = await readSlackAppSession({ dir, keychainPassword: 'test-password' })
     expect(session.team.id).toBe('T0JUNO')
     expect(session.team.token).toBe('xoxc-fresh-000000000000')
-    expect(session.team.user_id).toBe('U0ALEX')
+    expect(session.team.user_id).toBe('U0TUSHAR')
     expect(session.cookie).toMatchObject({ name: 'd', value: 'fixture-d-cookie', host: '.slack.com', secure: true, httpOnly: true })
     expect(session.cookie.expires).toBeGreaterThan(Date.now() / 1000)
   })

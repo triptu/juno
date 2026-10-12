@@ -32,7 +32,7 @@ export class Juno {
     const opened = this.app.waitForEvent('window')
     await this.signInButton.click()
     const page = await opened
-    await page.getByPlaceholder('Email').fill(options.email ?? 'alex@juno-fake.test')
+    await page.getByPlaceholder('Email').fill(options.email ?? 'tushar@juno-fake.test')
     await page.getByPlaceholder('Password').fill('password')
     await page.getByRole('button', { name: 'Sign in' }).click()
     await page.waitForEvent('close')
@@ -55,7 +55,7 @@ export class Juno {
     await this.win.getByRole('button', { name: 'Sign out' }).click()
   }
 
-  async expectSignedIn(teamName: string, userName = 'alex'): Promise<void> {
+  async expectSignedIn(teamName: string, userName = 'tushar'): Promise<void> {
     await expect(this.win.getByRole('status', { name: 'Session status' })).toHaveText(`Signed in to ${teamName} as ${userName}`, {
       timeout: 15_000,
     })
