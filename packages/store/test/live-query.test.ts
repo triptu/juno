@@ -1,8 +1,8 @@
 import { assert, describe, it } from '@effect/vitest'
-import { Effect, Option, Queue } from 'effect'
+import { Effect, Exit, Option, Queue, Ref, Result, Stream } from 'effect'
 import { TestClock } from 'effect/testing'
 import { DEFAULT_LIVE_QUERY_DEBOUNCE, invalidate, liveQuery, StoreReader, StoreWriter, transaction } from '../src/index'
-import { collect, freshStore, settle } from './helpers'
+import { collect, freshStore, settle, takeValue } from './helpers'
 
 const countMessages = (channel: string) =>
   Effect.gen(function* () {
@@ -38,13 +38,13 @@ describe('live queries', () => {
     Effect.gen(function* () {
       const messages = yield* collect(liveQuery({ messages: ['C1'] }, countMessages('C1')))
       const users = yield* collect(liveQuery(['users'], countUsers))
-      assert.strictEqual(yield* Queue.take(messages), 0)
-      assert.strictEqual(yield* Queue.take(users), 0)
+      assert.strictEqual(yield* takeValue(messages), 0)
+      assert.strictEqual(yield* takeValue(users), 0)
       yield* endWindow
 
       yield* transaction(insertMessage('C1', '1.000001'))
 
-      assert.strictEqual(yield* Queue.take(messages), 1)
+      assert.strictEqual(yield* takeValue(messages), 1)
       yield* expectNoEmission(users)
     }).pipe(Effect.provide(freshStore)),
   )
@@ -53,13 +53,13 @@ describe('live queries', () => {
     Effect.gen(function* () {
       const all = yield* collect(liveQuery(['messages'], countMessages('C2')))
       const c1 = yield* collect(liveQuery({ messages: ['C1'] }, countMessages('C1')))
-      yield* Queue.take(all)
-      yield* Queue.take(c1)
+      yield* takeValue(all)
+      yield* takeValue(c1)
       yield* endWindow
 
       yield* transaction(insertMessage('C2', '1.000001'))
 
-      assert.strictEqual(yield* Queue.take(all), 1)
+      assert.strictEqual(yield* takeValue(all), 1)
       yield* expectNoEmission(c1)
     }).pipe(Effect.provide(freshStore)),
   )
@@ -67,7 +67,7 @@ describe('live queries', () => {
   it.effect('invalidations inside a transaction fire once, after the commit', () =>
     Effect.gen(function* () {
       const messages = yield* collect(liveQuery(['messages'], countMessages('C1')))
-      yield* Queue.take(messages)
+      yield* takeValue(messages)
       yield* endWindow
 
       yield* transaction(
@@ -78,7 +78,7 @@ describe('live queries', () => {
         }),
       )
 
-      assert.strictEqual(yield* Queue.take(messages), 2)
+      assert.strictEqual(yield* takeValue(messages), 2)
       yield* endWindow
       yield* expectNoEmission(messages)
     }).pipe(Effect.provide(freshStore)),
@@ -87,7 +87,7 @@ describe('live queries', () => {
   it.effect('a rolled-back transaction fires nothing', () =>
     Effect.gen(function* () {
       const messages = yield* collect(liveQuery(['messages'], countMessages('C1')))
-      yield* Queue.take(messages)
+      yield* takeValue(messages)
       yield* endWindow
 
       const result = yield* transaction(
@@ -106,11 +106,11 @@ describe('live queries', () => {
   it.effect('debounce is leading-edge: the first change runs now, a burst collapses into one trailing run', () =>
     Effect.gen(function* () {
       const messages = yield* collect(liveQuery(['messages'], countMessages('C1')))
-      yield* Queue.take(messages)
+      yield* takeValue(messages)
       yield* endWindow
 
       yield* transaction(insertMessage('C1', '1.000001'))
-      assert.strictEqual(yield* Queue.take(messages), 1)
+      assert.strictEqual(yield* takeValue(messages), 1)
 
       yield* transaction(insertMessage('C1', '1.000002'))
       yield* transaction(insertMessage('C1', '1.000003'))
@@ -118,9 +118,38 @@ describe('live queries', () => {
       yield* expectNoEmission(messages)
 
       yield* endWindow
-      assert.strictEqual(yield* Queue.take(messages), 4)
+      assert.strictEqual(yield* takeValue(messages), 4)
       yield* endWindow
       yield* expectNoEmission(messages)
+    }).pipe(Effect.provide(freshStore)),
+  )
+
+  it.effect('a failed run is emitted as a value and the subscription stays alive', () =>
+    Effect.gen(function* () {
+      // The second run fails; every other run counts messages as usual.
+      const runs = yield* Ref.make(0)
+      const flaky = Effect.gen(function* () {
+        const run = yield* Ref.updateAndGet(runs, (n) => n + 1)
+        if (run === 2) return yield* Effect.fail({ _tag: 'QueryBroken' as const })
+        return yield* countMessages('C1')
+      })
+      const results = yield* collect(liveQuery(['messages'], flaky))
+      assert.deepStrictEqual(yield* Queue.take(results), Result.succeed(0))
+      yield* endWindow
+
+      yield* transaction(insertMessage('C1', '1.000001'))
+      assert.deepStrictEqual(yield* Queue.take(results), Result.fail({ _tag: 'QueryBroken' as const }))
+      yield* endWindow
+
+      yield* transaction(insertMessage('C1', '1.000002'))
+      assert.deepStrictEqual(yield* Queue.take(results), Result.succeed(2))
+    }).pipe(Effect.provide(freshStore)),
+  )
+
+  it.effect('a defect in a run fails the stream', () =>
+    Effect.gen(function* () {
+      const exit = yield* liveQuery(['messages'], Effect.die(new Error('bug'))).pipe(Stream.runCollect, Effect.exit)
+      assert.isTrue(Exit.isFailure(exit))
     }).pipe(Effect.provide(freshStore)),
   )
 })

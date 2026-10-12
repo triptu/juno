@@ -2,8 +2,12 @@
  * Row shapes of the tables the sync and topics work writes and reads. Columns
  * match the migrations one to one; JSON columns are stored as strings and
  * flags as 0 or 1. Timestamps that come from Slack (`ts`, `thread_ts`,
- * `latest_reply`) are kept as Slack's strings so they sort as Slack sorts.
+ * `latest_reply`) are kept as Slack's strings so they sort as Slack sorts;
+ * compare them with `compareTs` from `@juno/slack-schema`, never with `<`.
  */
+import type { ConversationKind, TopicKind } from '@juno/domain'
+
+export type { ConversationKind, TopicKind }
 
 export type Flag = 0 | 1
 
@@ -26,8 +30,6 @@ export interface MessageRow {
   readonly last_event_ts: string | null
   readonly version: number
 }
-
-export type ConversationKind = 'public' | 'private' | 'im' | 'mpim'
 
 export interface ConversationRow {
   readonly id: string
@@ -54,8 +56,6 @@ export interface UserRow {
   readonly deleted: Flag
   readonly updated: string | null
 }
-
-export type TopicKind = 'thread' | 'main' | 'group'
 
 export interface TopicIndexRow {
   readonly topic_id: string
