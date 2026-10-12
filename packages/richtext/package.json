@@ -12,11 +12,17 @@
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run"
   },
+  "dependencies": {
+    "@juno/slack-schema": "workspace:*"
+  },
   "devDependencies": {
+    "effect": "4.0.3",
     "typescript": "5.9.3",
     "vitest": "5.0.4"
   },
   "juno": {
-    "allowedDeps": []
+    "allowedDeps": [
+      "@juno/slack-schema"
+    ]
   }
 }

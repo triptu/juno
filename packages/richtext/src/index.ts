@@ -9,18 +9,7 @@ export type {
 } from './model'
 export { emptyBody, inlinesOf } from './model'
 
-export type {
-  MessageBlock,
-  MessageContent,
-  RichTextBlock,
-  RichTextElement,
-  RichTextInline,
-  RichTextStyle,
-  SectionBlock,
-  TextObject,
-} from './slack-types'
-
-export { bodyFromMrkdwn, messageBody, plainText, previewLine, previewText } from './body'
+export { bodyFromMrkdwn, messageBody, plainText, previewLine, previewText, type MessageContent } from './body'
 export { bodyFromBlocks } from './from-blocks'
 export { mrkdwnInlines, unescapeMrkdwn } from './from-mrkdwn'
 export { inlineText } from './inline'

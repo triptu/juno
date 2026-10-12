@@ -1,9 +1,19 @@
 /** Entry points: a Slack message in, a `MessageBody` out, plus text views of a body. */
+import type { Block } from '@juno/slack-schema'
 import type { Lookups, MessageBody } from './model'
-import type { MessageContent } from './slack-types'
 import { bodyFromBlocks } from './from-blocks'
 import { mrkdwnBlocks } from './from-mrkdwn'
 import { inlineText } from './inline'
+
+/**
+ * The part of a Slack message that carries its content. A decoded
+ * `@juno/slack-schema` `Message` is one; so is anything with the same two fields.
+ */
+export interface MessageContent {
+  /** mrkdwn, HTML-escaped (`&lt; &gt; &amp;`). */
+  readonly text?: string
+  readonly blocks?: ReadonlyArray<Block>
+}
 
 /**
  * Renders a message. `blocks` win when they produce anything; otherwise the
