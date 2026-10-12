@@ -32,6 +32,7 @@ Run these from the repo root.
 | `pnpm gallery:shots` | Builds the gallery and screenshots every fixture in light and dark into `apps/gallery/shots/`. |
 | `pnpm --filter @juno/engine test` | Runs one package's suite (here the engine's: the port protocol over an in-memory MessageChannel, live query serving). |
 | `pnpm package` | Builds a DMG and zip with electron-builder into `apps/desktop/release/`. Not run in CI yet. |
+| `JUNO_LIVE=1 pnpm smoke:live` | The read-only live smoke against your real workspace (see "Sign-in and the live smoke"). `pnpm smoke:live -- --fake` runs the same script against an in-process fake. |
 
 Before calling work done: `pnpm typecheck`, `pnpm lint`, `pnpm test`, and `pnpm test:e2e` for anything the app or gallery shows.
 
@@ -134,10 +135,43 @@ Three processes talk to each other (`docs/architecture.md` section 2):
   `packages/contract/src/routes/<feature>.ts`, served by `packages/engine`, and
   called through `liveQuery(route)` and `command(route)` from `packages/state`.
 
-`startEngine(transport, config)` in `@juno/engine` runs under plain Node too: the
-vitest suite in `packages/engine/test` connects the real state client to it over a
-`worker_threads` `MessageChannel`. Under `JUNO_E2E=1` main exposes
-`globalThis.junoTest` (engine pid and supervisor state) for Playwright.
+`startEngine(transport, config, { host, httpTransport })` in `@juno/engine` runs
+under plain Node too: the vitest suite in `packages/engine/test` connects the real
+state client to it over a `worker_threads` `MessageChannel`, with `memoryHost()` in
+place of main and Node `fetch` in place of `net.fetch`. Under `JUNO_E2E=1` main
+exposes `globalThis.junoTest` (engine pid and supervisor state) for Playwright.
+
+## Sign-in and the live smoke
+
+Two ways in, both ending in a session the engine verifies with `auth.test`
+(`docs/architecture.md` section 14):
+
+- **Sign in to Slack** opens Slack's own sign-in page in a window on the
+  `persist:slack` partition. The token is read from the page's `localConfig_v2`
+  once it reaches `/client/<team>`; the cookie is already in the session.
+- **Use the Slack app's session** reads copies of the installed Slack app's
+  `Local Storage/leveldb` and `Cookies`. macOS asks once for access to the
+  "Slack Safe Storage" keychain item (the `security` tool makes the request;
+  choose "Allow", not "Always allow", if you prefer to be asked each time).
+  The copies are deleted afterwards and the password is never stored.
+
+Secrets go to `<userData>/secrets.bin`, encrypted with `safeStorage`. Under
+`JUNO_E2E=1` the file is plain JSON and the three test seams are read from the
+environment: `JUNO_FAKE_SLACK_URL` (the fake the sign-in window and the socket
+allow-list point at), `JUNO_SLACK_APP_DIR` (a fixture Slack-app directory) and
+`JUNO_SLACK_SAFE_STORAGE_PASSWORD` (stands in for the keychain). The e2e fixtures
+in `apps/desktop/e2e/fixtures.ts` set all three; `juno.signIn()` and
+`juno.importFromSlackApp()` in `apps/desktop/e2e/driver/juno.ts` are the verbs.
+
+`JUNO_LIVE=1 pnpm smoke:live` (`scripts/smoke-live.ts`) is the manual, read-only
+check against your real workspace. It imports the session the same way (keychain
+prompt), prints its call list, calls `auth.test`, `client.userBoot`,
+`client.counts`, `subscriptions.thread.getView` and one `conversations.history`,
+connects the socket and reads 30 s of events, decodes everything through
+`@juno/slack-schema` and reports failures by path only. Redacted shapes land in
+`packages/slack-schema/test/fixtures/recorded/`. It refuses any method outside
+its allow-list. `pnpm smoke:live -- --fake` runs it against an in-process fake,
+which is how it is checked in development.
 
 ## IPC with main
 
@@ -183,7 +217,7 @@ Names are explained in `docs/architecture.md` sections 2.6 and 7.
 
 | Kind | Where | Run |
 | --- | --- | --- |
-| Pure rules, store, Slack client, engine protocol | `packages/<name>/test/` (vitest) | `pnpm test` |
+| Pure rules, store, Slack client, Slack-app import, engine protocol and session | `packages/<name>/test/` (vitest) | `pnpm test` |
 | User flows in the built app | `apps/desktop/e2e/` (Playwright, one worker) | `pnpm test:e2e` |
 | Mouse-down activation, cursor rule, in a real browser | `apps/gallery/behaviour.spec.ts` | `pnpm test:gallery` |
 | Screenshots of every fixture | `apps/gallery/shots.spec.ts` | `pnpm gallery:shots` |
