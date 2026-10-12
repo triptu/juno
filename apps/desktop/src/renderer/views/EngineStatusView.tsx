@@ -15,14 +15,14 @@ export function EngineStatusView({ line, pong, onPing }: EngineStatusViewProps) 
   return (
     <section {...stylex.props(styles.section)} aria-label="Engine">
       <div role="status" aria-label="Engine status">
-        <Text role="meta" tone="muted" numeric as="p">
+        <Text variant="meta" tone="muted" numeric as="p">
           {line}
         </Text>
       </div>
       <div {...stylex.props(styles.row)}>
         <Button onClick={onPing}>Ping engine</Button>
         {pong ? (
-          <Text role="meta" tone="muted" numeric>
+          <Text variant="meta" tone="muted" numeric>
             {pong}
           </Text>
         ) : null}

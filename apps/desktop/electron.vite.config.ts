@@ -43,10 +43,16 @@ const repoRoot = resolve(__dirname, '../..')
 // entry must bundle them. Everything else from node_modules stays external.
 const externalize = externalizeDepsPlugin({ exclude: ['@juno/contract', '@juno/engine', '@juno/state'] })
 
+// electron-vite defaults every target to `minify: false`. Minified output is
+// less than half the size and parses faster; scripts/check-bundle-size.mjs
+// holds the renderer to the budget in docs/performance.md.
+const minify = 'esbuild' as const
+
 export default defineConfig({
   main: {
     plugins: [externalize],
     build: {
+      minify,
       rollupOptions: {
         // index.js is the main process; engine.js is forked as a utility process.
         input: {
@@ -59,12 +65,14 @@ export default defineConfig({
   preload: {
     plugins: [externalize],
     build: {
+      minify,
       rollupOptions: { input: resolve(__dirname, 'src/preload/index.ts') },
     },
   },
   renderer: {
     root: resolve(__dirname, 'src/renderer'),
     build: {
+      minify,
       rollupOptions: { input: resolve(__dirname, 'src/renderer/index.html') },
     },
     plugins: [
