@@ -2,7 +2,7 @@ import { useRef } from 'react'
 import type { EngineStatus as Status } from '@juno/contract'
 import { connectionStateAtom, engineStatusAtom, pingCommand } from '@juno/state'
 import { useAtomSet, useAtomValue } from '@juno/state/react'
-import { EngineStatusView } from '../views/EngineStatusView'
+import { EngineStatusView } from '@juno/views'
 
 const phaseLabel = (phase: Status['phase']): string => {
   switch (phase._tag) {

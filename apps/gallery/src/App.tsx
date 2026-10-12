@@ -55,12 +55,13 @@ export function App() {
     const fixture = set?.fixtures[location.fixture]
     if (!set || !fixture) return <Missing component={location.component} fixture={location.fixture} />
     // Keyed by route so switching fixtures always remounts the component.
-    return <FixturePage key={`${location.component}/${location.fixture}`} set={set} fixtureName={location.fixture} />
+    const route = `${location.component}/${location.fixture}`
+    return <FixturePage key={route} route={route} set={set} fixtureName={location.fixture} />
   }
   return <Index location={location} />
 }
 
-function FixturePage({ set, fixtureName }: { readonly set: AnyFixtureSet; readonly fixtureName: string }) {
+function FixturePage({ route, set, fixtureName }: { readonly route: string; readonly set: AnyFixtureSet; readonly fixtureName: string }) {
   const fixture = set.fixtures[fixtureName]
   if (!fixture) return null
   const frame: FixtureFrame = { ...set.frame, ...fixture.frame }
@@ -69,7 +70,8 @@ function FixturePage({ set, fixtureName }: { readonly set: AnyFixtureSet; readon
   return (
     <div {...stylex.props(styles.stage)}>
       <div
-        data-fixture-frame
+        // The route, so the test runners can wait for this fixture's frame.
+        data-fixture-frame={route}
         {...stylex.props(
           styles.frame,
           frame.padded !== false && styles.framePadded,

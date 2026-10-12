@@ -9,7 +9,7 @@ The only place a colour, size, radius, shadow, font or duration is written down.
 | `src/tokens.stylex.ts` | Every variable group with its light, default-accent value. |
 | `src/themes.stylex.ts` | `dark` (colours and shadows) and the four accent themes. |
 | `src/global.css` | Body defaults, scrollbars, `::selection`, reduced motion, theme-switch suppression. |
-| `src/fonts.css` | `@font-face` imports for Inter and Instrument Serif from `@fontsource`. |
+| `src/fonts.css` | `@font-face` imports for Inter, Instrument Serif and JetBrains Mono from `@fontsource`. |
 
 Import tokens through the subpath, never a barrel: `import { colors } from '@juno/tokens/tokens.stylex'`. Import the two stylesheets once from the app entry.
 
@@ -43,20 +43,11 @@ Import tokens through the subpath, never a barrel: `import { colors } from '@jun
 
 ## Applying a theme
 
-```ts
-import * as stylex from '@stylexjs/stylex'
-import { dark, accents } from '@juno/tokens/themes.stylex'
-
-const { className } = stylex.props(...dark, accents.claret)
-document.documentElement.className = className ?? ''
-document.documentElement.style.colorScheme = 'dark'
-```
-
-Set `data-theme-switching` on `<html>` before swapping classes and remove it two animation frames later; `global.css` turns transitions off while it is present.
+Apps call `applyTheme(theme, accent)` from `@juno/ui` (re-exported by `@juno/views`). It puts the `dark` and accent classes on `<html>`, sets `color-scheme`, and sets `data-theme-switching` on `<html>` while the classes swap so `global.css` turns transitions off for two frames.
 
 ## Rules the tokens encode
 
-- Never `cursor: pointer`. `global.css` sets the arrow cursor on the body and the text cursor on inputs.
+- Never `cursor: pointer`. `global.css` sets the arrow cursor on the body and the text cursor on text inputs and textareas; checkboxes, radios and ranges keep the arrow.
 - The muted grey is `hsla(48, 5%, 42%)`, darker than the handoff, so meta text reaches 4.5:1 on paper. Muted text may sit on `--background`, `--background-subtle`, `--surface-default` and `--surface-hover`; on `--secondary-*` fills use `--foreground-subtle`.
 - `--focus-ring` is the info blue (3.9:1 on paper), not the pale selection colour. `--selection-background` is for text selection only.
 - The cyan accent takes near-black `--hl-fg`; its off-white text would be 3.8:1.

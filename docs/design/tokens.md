@@ -23,6 +23,7 @@ Warm paper. HSL values are the source of truth; hex is the sRGB result for desig
 | `--surface-default` | `hsla(48, 30%, 98%, 1)` | #FBFBF8 | css | Popovers, cards, inputs, composer |
 | `--surface-hover` | `hsla(48, 30%, 94%, 1)` | #F4F2EB | css | Hover on rows, menu items, icon buttons; send-check bar; segmented control track |
 | `--surface-active` | `hsla(48, 30%, 92%, 1)` | #F1EEE4 | css | Reserved (unused in prototype) |
+| `--surface-raised` | `hsla(48, 30%, 98%, 1)` | #FBFBF8 | proposed | Selected segment of a segmented control; must read as raised over `--surface-hover` in both themes |
 | `--secondary-default` | `hsla(48, 30%, 92%, 1)` | #F1EEE4 | css | Secondary buttons, selected row, selected filter, chips, public context pill, channel tile |
 | `--secondary-hover` | `hsla(48, 30%, 90%, 1)` | #EDEADE | css | Secondary button hover |
 | `--secondary-active` | `hsla(48, 30%, 88%, 1)` | #EAE6D7 | css | Unread count tag, For you count, pressed state |
@@ -53,6 +54,7 @@ Cool near-black. Applied with `[data-theme="dark"]` on the root.
 | `--surface-default` | `hsla(210, 5%, 11%, 1)` | #1B1C1D | css |
 | `--surface-hover` | `hsla(210, 5%, 13%, 1)` | #1F2123 | css |
 | `--surface-active` | `hsla(210, 5%, 15%, 1)` | #242628 | css |
+| `--surface-raised` | `hsla(210, 5%, 18%, 1)` | #2B2E30 | proposed |
 | `--secondary-default` | `hsla(210, 5%, 16%, 1)` | #27292B | css |
 | `--secondary-hover` | `hsla(210, 5%, 18%, 1)` | #2C2E30 | css |
 | `--secondary-active` | `hsla(210, 5%, 20%, 1)` | #303336 | css |
@@ -274,6 +276,8 @@ All [proto] measured at 1280×800 with Inter unless marked.
 | `--menu-width` | 236px context menu, 248px avatar menu, 300px Browse, 280px mention popover |
 | `--toast-max-width` | 352px |
 | `--scrollbar` | 10px, thumb `--border-strong` with 3px transparent inset, radius 10 |
+| `--search-field-width` | 260px filter search; `--keyword-field-width` 160px keyword rule input |
+| `--code-block-max-height` | 150px, then the prompt block scrolls inside |
 
 ### Controls
 
@@ -289,7 +293,8 @@ All [proto] measured at 1280×800 with Inter unless marked.
 | `--control-lg` | 32px | Nav buttons, header icon buttons, Resolve (header), menu items, rule selects, Add |
 | `--control-xl-` | 34px | Rename input (header), filter search, suggestion chips, Open notification settings, To-picker rows |
 | `--control-xl` | 36px | Discard/Send (New message), topic-list items in Juno cards, reply options (min), title input |
-| `--field-min` | 40px | Composer textarea single line (padding 9 + 22 + 9), To field 44 |
+| `--field-min` | 40px | Composer textarea single line (`--composer-padding-block` 9 + `--composer-line-height` 22 + 9), To field 44 |
+| `--row-44` / `--row-48` / `--row-52` | 44, 48, 52px | Today log row, notification rule row, All topics table row (ListRow `minHeight`) |
 
 ### Tiles and avatars
 
@@ -300,11 +305,11 @@ All [proto] measured at 1280×800 with Inter unless marked.
 | `--avatar-sm` | 28px | Bubble avatar, Juno assistant mark; initials 11 |
 | `--avatar-xs` | 24px | Titlebar me avatar; initials 9.5 |
 | `--avatar-2xs` | 20px | Mention and To-picker rows; initials 9 |
-| `--avatar-3xs` | 18px | Browse rows (8.5), avatar stack (7.5, overlap −4, 1.5px `--background-subtle` ring) |
+| `--avatar-3xs` | 18px | Browse rows (8.5), avatar stack (one initial at 8.5, overlap −4, 1.5px ring in the colour of the surface the stack sits on) |
 
 ### Icons
 
-Lucide outline, `background: currentColor` masks in the prototype; in the app use the `lucide-react` components with `stroke="currentColor"`. Sizes used: 11 (badges), 12 (row meta, tags, chevrons), 13 (pill, cards, thread link), 14 (tab, header title sparkle, buttons), 15 (menu items, nav), 16 (icon buttons, hover toolbar, palette rows), 18 (attach, palette search). Tab icons sit at 0.75 opacity.
+Lucide outline, `background: currentColor` masks in the prototype; in the app use the `lucide-react` components with `stroke="currentColor"`. Sizes used: 11 (badges), 12 (row meta, tags, chevrons), 13 (pill, cards, thread link), 14 (tab, header title sparkle, buttons), 15 (menu items, nav), 16 (icon buttons, hover toolbar, palette rows), 18 (attach, palette search). Tab icons sit at 0.75 opacity. Stroke is 2px (`--icon-stroke`); at 13px and below it is 1.75px (`--icon-stroke-small`) so small icons do not look bold next to 11px text.
 
 ### Rows
 

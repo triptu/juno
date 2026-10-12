@@ -1,10 +1,9 @@
-import '@fontsource-variable/inter/wght.css'
-import '@fontsource/instrument-serif/400.css'
+import '@juno/tokens/fonts.css'
 import './global.css'
 
-import { RegistryContext } from '@effect/atom-react'
 import { acquireRendererPort, configureConnection, registry } from '@juno/state'
 import { afterPaint, mark, measure, observeFrames } from '@juno/state/perf'
+import { RegistryContext } from '@juno/state/react'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { App } from './App'

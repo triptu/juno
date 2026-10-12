@@ -10,7 +10,6 @@
   "exports": {
     "./tokens.stylex": "./src/tokens.stylex.ts",
     "./themes.stylex": "./src/themes.stylex.ts",
-    "./fills.stylex": "./src/fills.stylex.ts",
     "./global.css": "./src/global.css",
     "./fonts.css": "./src/fonts.css"
   },

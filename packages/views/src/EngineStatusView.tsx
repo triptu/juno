@@ -1,24 +1,22 @@
 import * as stylex from '@stylexjs/stylex'
-import { Button, Text } from '@juno/ui'
 import { spacing } from '@juno/tokens/tokens.stylex'
+import { Button, Text } from '@juno/ui'
 
 export interface EngineStatusViewProps {
-  /** One short line, for example "Engine live, up 12 s". */
+  /** One short line, for example "Engine live". */
   readonly line: string
   /** The last answer to a ping, if any. */
   readonly pong?: string
   readonly onPing: () => void
 }
 
-/** Dumb view: props in, callbacks out. */
+/** The engine's phase as a status line, with a ping button for diagnostics. */
 export function EngineStatusView({ line, pong, onPing }: EngineStatusViewProps) {
   return (
     <section {...stylex.props(styles.section)} aria-label="Engine">
-      <div role="status" aria-label="Engine status">
-        <Text variant="meta" tone="muted" numeric as="p">
-          {line}
-        </Text>
-      </div>
+      <Text variant="meta" tone="muted" numeric as="p" role="status" aria-label="Engine status">
+        {line}
+      </Text>
       <div {...stylex.props(styles.row)}>
         <Button onClick={onPing}>Ping engine</Button>
         {pong ? (

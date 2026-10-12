@@ -61,7 +61,7 @@ test('screenshots every fixture in light and dark', async ({ page }) => {
     await mkdir(join(shotsDir, route.component), { recursive: true })
     for (const theme of themes) {
       await page.goto(`/#/${encodeURIComponent(route.component)}/${encodeURIComponent(route.fixture)}?theme=${theme}`)
-      const frame = page.locator('[data-fixture-frame]')
+      const frame = page.locator(`[data-fixture-frame="${route.component}/${route.fixture}"]`)
       await expect(frame).toBeVisible()
       await page.evaluate(() => document.fonts.ready)
       await page.waitForFunction(() => !document.documentElement.hasAttribute('data-theme-switching'))

@@ -175,9 +175,6 @@ importers:
 
   apps/desktop:
     dependencies:
-      '@effect/atom-react':
-        specifier: 4.0.3
-        version: 4.0.3(effect@4.0.3)(react@19.3.0)(scheduler@0.28.0)
       '@juno/contract':
         specifier: workspace:*
         version: link:../../packages/contract

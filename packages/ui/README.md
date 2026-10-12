@@ -4,18 +4,24 @@ Dumb, accessible primitives. StyleX plus `@juno/tokens` only; no app state, no d
 
 ## Conventions
 
-- No `cursor: pointer`, ever. The body sets the arrow cursor; inputs set the text cursor.
+- No `cursor: pointer`, ever. The body sets the arrow cursor; text inputs and textareas set the text cursor; checkboxes, ranges and selects keep the arrow. The gallery's behaviour spec checks every fixture for this.
 - Hover styles only under `@media (hover: hover)`, nested with `default: null` so they fall back to nothing.
 - Press feedback is `scale: var(--press-scale)` on `:active`, never on a disabled control (`pointer-events: none` makes `:active` impossible).
 - The focus ring shows on `:focus-visible` only: 2px `--focus-ring`, offset 2px (inset for tabs, segments and rows that sit flush).
 - Transitions are 150ms (`--duration-fast`) on colour, shadow, opacity and scale, and collapse under `prefers-reduced-motion` through the token itself.
+- `disabled` and `dimmed` share one look (`--opacity-disabled`); dimmed stays focusable and sets `aria-disabled`.
 - Chrome text is not selectable. `Text selectable`, `Textarea`, `TextField` and `CodeBlock` opt in.
 - Icon-only controls take a required `label`. Icons are `lucide-react` components passed as props (`icon={Hash}`), never looked up by name, so only the icons used are bundled.
-- Components do not accept `style` or `className`. A few layout containers (`Text`, `Surface`) take `sx` for StyleX styles from the owner; use it for layout, not colour.
+- Components do not accept `style` or `className`. A few layout containers (`Text`, `Surface`) take `sx` typed as `LayoutStyles`, which rejects colour and font properties, so it is layout only by construction.
+- `Text` names its type role `variant`; `role` on any primitive is always the ARIA attribute.
+- Sizes derive from one prop. `Button` has no radius, text or icon-size overrides; the sidebar nav item is `NavItem` and the quick filter is `Button variant="filter"`.
+- Muted text never sits on a secondary fill. `ListRow selected` sets `--foreground-muted` to the subtle value on itself (a variable override in `stylex.create`, never a `createTheme`, which re-emits every colour of the group and would undo dark mode on that element).
+- Primitives never know the theme: no media queries, no theme classes. `applyTheme(theme, accent)` in `src/theme.ts` is the one place that puts the `dark` and accent classes on `<html>`, sets `color-scheme` and suppresses transitions for two frames; apps reach it through `@juno/views`.
+- Composer growth is `field-sizing: content` on the inline `Textarea`; nothing reads `scrollHeight` on a keystroke.
 
 ## Mouse-down activation
 
-Things that navigate (`ListRow` with `onSelect`, `Tab`, `OptionRow`) activate on `pointerdown`, not `click`, so the app answers the moment the button goes down. The shared handlers live in `src/internal/activate.ts`:
+Things that navigate (`ListRow` with `onSelect`, `Tab`, `OptionRow`, `NavItem`) activate on `pointerdown`, not `click`, so the app answers the moment the button goes down. The shared handlers live in `src/internal/activate.ts`:
 
 - Primary button only. The secondary button goes to `onContextMenu`; ctrl-click is left alone because on macOS it is the context menu.
 - ⌘, shift and alt are passed through in the `ActivateEvent` so the owner can open in a new tab.
@@ -26,6 +32,10 @@ Things that navigate (`ListRow` with `onSelect`, `Tab`, `OptionRow`) activate on
 
 These elements have **no transition on their background**. Selected and active states change in the same frame as the press; hover is instant too (the design allows up to 150ms, instant is better). Hover changes only colour and background, never size, border width or shadow, so nothing forces layout.
 
+The gallery's `behaviour` project (`pnpm --filter @juno/gallery test:e2e`) drives the `ListRow/activation` fixture in a real browser to check each of these.
+
 ## Fixtures and the gallery
 
 Every component exports `<Name>.fixtures.tsx` built with `defineFixtures(Component, { name: fixture(props) })`, and `src/fixtures.ts` collects them under `@juno/ui/fixtures`. The gallery (`apps/gallery`) turns each entry into a route and a screenshot. `@juno/views` registers its fixtures the same way.
+
+A fixture's frame can ask the screenshot runner to put the component into a state first: `hover`, `press` (holds the primary button, with motion on so the press scale shows) and `focus` (keyboard focus, so the ring shows) each take a CSS selector inside the frame. Every primitive with such states has fixtures for them, so hover, pressed, focused and disabled are reviewed in light and dark like everything else.

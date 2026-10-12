@@ -474,7 +474,6 @@ export const sizes = stylex.defineVars({
   '--initials-24': '9.5px',
   '--initials-20': '9px',
   '--initials-18': '8.5px',
-  '--initials-stack': '7.5px',
 
   '--icon-11': '11px',
   '--icon-12': '12px',

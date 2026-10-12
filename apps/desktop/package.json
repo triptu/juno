@@ -14,7 +14,6 @@
     "package": "pnpm build && electron-builder --config electron-builder.yml"
   },
   "dependencies": {
-    "@effect/atom-react": "4.0.3",
     "@juno/contract": "workspace:*",
     "@juno/engine": "workspace:*",
     "@juno/state": "workspace:*",

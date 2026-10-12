@@ -9,9 +9,9 @@ interface Route {
  * Behaviour that a screenshot cannot show, checked against the built gallery
  * in a real browser: mouse-down activation and the cursor rule.
  */
-test.describe('mouse-down activation', () => {
-  const log = (page: Page) => page.locator('[data-activation-log]')
+const log = (page: Page) => page.locator('[data-activation-log]')
 
+test.describe('mouse-down activation', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/#/ListRow/activation')
     await expect(page.getByRole('button', { name: /Postgres 16 migration plan/ })).toBeVisible()
@@ -36,13 +36,15 @@ test.describe('mouse-down activation', () => {
 
   test('ignores ctrl-click and the secondary button', async ({ page }) => {
     const row = page.getByRole('button', { name: /Postgres 16 migration plan/ })
+    // On macOS Chromium turns ctrl-click into a context menu, like the OS.
     await row.click({ modifiers: ['Control'] })
     await row.click({ button: 'right' })
-    await expect(log(page)).toHaveText('row:contextmenu')
+    await expect(log(page)).toContainText('row:contextmenu')
+    await expect(log(page)).not.toContainText('row:pointer')
   })
 
   test('leaves a press on a nested control to that control', async ({ page }) => {
-    await page.getByRole('button', { name: 'Resolve' }).click()
+    await page.getByRole('button', { name: 'Resolve', exact: true }).click()
     await expect(log(page)).toHaveText('resolve:click')
   })
 
@@ -57,7 +59,8 @@ test.describe('mouse-down activation', () => {
  * SPEC section 16: the arrow cursor everywhere, the text cursor only over
  * editable or selectable text, never the pointer. Checked on every fixture
  * in the light theme: an element may compute `cursor: text` only when it
- * also computes `user-select: text`.
+ * also computes `user-select: text`, or when it is part of a field (a label
+ * wrapping an input), which focuses the input wherever it is clicked.
  */
 test('no fixture shows the pointer, and the text cursor only over selectable text', async ({ page }) => {
   await page.goto('/#/')
@@ -66,21 +69,23 @@ test('no fixture shows the pointer, and the text cursor only over selectable tex
 
   const offenders: string[] = []
   for (const route of routes) {
+    const name = `${route.component}/${route.fixture}`
     await page.goto(`/#/${encodeURIComponent(route.component)}/${encodeURIComponent(route.fixture)}`)
-    await expect(page.locator('[data-fixture-frame]')).toBeVisible()
-    const hits = await page.evaluate(() => {
-      const frame = document.querySelector('[data-fixture-frame]')
+    await expect(page.locator(`[data-fixture-frame="${name}"]`)).toBeVisible()
+    const hits = await page.evaluate((name) => {
+      const frame = document.querySelector(`[data-fixture-frame="${name}"]`)
       if (!frame) return ['no frame']
       const bad: string[] = []
       for (const element of Array.from(frame.querySelectorAll('*'))) {
         const style = getComputedStyle(element)
         const describe = () => `${element.tagName.toLowerCase()}${element.id ? `#${element.id}` : ''}[cursor=${style.cursor}]`
         if (style.cursor === 'pointer') bad.push(describe())
-        if (style.cursor === 'text' && style.userSelect !== 'text') bad.push(describe())
+        const inField = element.closest('label') !== null && element.closest('label')!.querySelector('input, textarea') !== null
+        if (style.cursor === 'text' && style.userSelect !== 'text' && !inField) bad.push(describe())
       }
       return bad
-    })
-    for (const hit of hits) offenders.push(`${route.component}/${route.fixture}: ${hit}`)
+    }, name)
+    for (const hit of hits) offenders.push(`${name}: ${hit}`)
   }
   expect(offenders).toEqual([])
 })

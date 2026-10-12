@@ -1,6 +1,5 @@
 import * as stylex from '@stylexjs/stylex'
 import type { HTMLAttributes, ReactNode } from 'react'
-import { onSecondaryFill } from '@juno/tokens/fills.stylex'
 import { colors, radii, sizes, spacing } from '@juno/tokens/tokens.stylex'
 import { activateHandlers, type ActivateEvent } from './internal/activate'
 import { interactive } from './internal/interactive'
@@ -62,7 +61,6 @@ export function ListRow({
         isButton && interactive.focusRingInset,
         isButton && styles.button,
         selected && styles.selected,
-        selected && onSecondaryFill,
       )}
     >
       {leading !== undefined ? <span {...stylex.props(styles.leading)}>{leading}</span> : null}
@@ -95,8 +93,13 @@ const styles = stylex.create({
       ':hover': { default: null, [HOVER]: colors['--surface-hover'] },
     },
   },
+  // Muted text fails contrast on a secondary fill (tokens.md 1.7), so the
+  // selected row points --foreground-muted at the subtle value for its
+  // subtree. It is a plain variable override on this element, not a theme:
+  // a createTheme would re-emit every colour and undo dark mode here.
   selected: {
     backgroundColor: colors['--secondary-default'],
+    '--foreground-muted': colors['--foreground-subtle'],
   },
   leading: {
     display: 'inline-flex',
