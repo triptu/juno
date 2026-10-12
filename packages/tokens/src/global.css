@@ -49,7 +49,9 @@ select,
   user-select: text;
 }
 
-input,
+/* The text cursor only over editable text. Checkboxes, radios and ranges
+   keep the arrow (SPEC section 16). */
+input:not([type='checkbox']):not([type='radio']):not([type='range']),
 textarea {
   cursor: text;
 }

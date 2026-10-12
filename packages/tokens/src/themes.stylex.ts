@@ -17,6 +17,7 @@ export const darkColors = stylex.createTheme(colors, {
   '--surface-default': 'hsla(210, 5%, 11%, 1)',
   '--surface-hover': 'hsla(210, 5%, 13%, 1)',
   '--surface-active': 'hsla(210, 5%, 15%, 1)',
+  '--surface-raised': 'hsla(210, 5%, 18%, 1)',
 
   '--secondary-default': 'hsla(210, 5%, 16%, 1)',
   '--secondary-hover': 'hsla(210, 5%, 18%, 1)',

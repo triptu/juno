@@ -30,6 +30,9 @@ export const colors = stylex.defineVars({
   '--surface-default': 'hsla(48, 30%, 98%, 1)',
   '--surface-hover': 'hsla(48, 30%, 94%, 1)',
   '--surface-active': 'hsla(48, 30%, 92%, 1)',
+  // A surface that sits on top of --surface-hover and must read as raised in
+  // both themes (the selected segment of a segmented control).
+  '--surface-raised': 'hsla(48, 30%, 98%, 1)',
 
   // Secondary fills: secondary buttons, selected rows, chips, tiles.
   '--secondary-default': 'hsla(48, 30%, 92%, 1)',
@@ -184,13 +187,14 @@ export const spacing = stylex.defineVars({
 /* -------------------------------------------------------------------------- */
 
 /**
- * Families. Inter (variable) for UI and Instrument Serif for page titles,
- * both bundled from @fontsource through fonts.css. Mono is the system's.
+ * Families. Inter (variable) for UI, Instrument Serif for page titles and
+ * JetBrains Mono for hints and code, all bundled from @fontsource through
+ * fonts.css.
  */
 export const fonts = stylex.defineVars({
   '--font-sans': "'Inter Variable', 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
   '--font-serif': "'Instrument Serif', ui-serif, 'Iowan Old Style', Georgia, serif",
-  '--font-mono': "ui-monospace, 'SF Mono', Menlo, Consolas, monospace",
+  '--font-mono': "'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace",
 })
 
 export const weights = stylex.defineVars({
@@ -408,7 +412,12 @@ export const layout = stylex.defineVars({
   '--reading-width': '800px',
   '--composer-width': '752px',
   '--composer-max-height': '194px',
+  '--composer-line-height': '22px',
+  '--composer-padding-block': '9px',
   '--assistant-input-max-height': '160px',
+  '--code-block-max-height': '150px',
+  '--search-field-width': '260px',
+  '--keyword-field-width': '160px',
   '--page-width-narrow': '680px',
   '--page-width': '720px',
   '--page-width-settings': '760px',
@@ -444,6 +453,10 @@ export const sizes = stylex.defineVars({
   '--control-40': '40px',
   '--control-44': '44px',
 
+  '--row-44': '44px',
+  '--row-48': '48px',
+  '--row-52': '52px',
+
   '--tile-44': '44px',
   '--tile-36': '36px',
   '--avatar-32': '32px',
@@ -471,6 +484,9 @@ export const sizes = stylex.defineVars({
   '--icon-16': '16px',
   '--icon-18': '18px',
   '--icon-stroke': '2px',
+  // Icons at 13px and below use a thinner stroke so they do not look bold
+  // next to 11px text.
+  '--icon-stroke-small': '1.75px',
 
   '--checkbox': '15px',
   '--slider-track': '4px',
