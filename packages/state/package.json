@@ -2,23 +2,33 @@
   "name": "@juno/state",
   "version": "0.1.0",
   "private": true,
-  "description": "The renderer's bridge to the engine: the port client and the atoms. The only package that imports effect/reactivity/Atom, effect/rpc and effect/workers.",
+  "description": "The renderer's bridge to the engine: the port client and the atoms. The only package that imports effect/reactivity/Atom, effect/rpc, effect/workers and @effect/atom-react.",
   "type": "module",
   "sideEffects": false,
   "exports": {
     ".": "./src/index.ts",
+    "./react": "./src/react.ts",
     "./transport": "./src/transport.ts",
     "./perf": "./src/perf.ts"
   },
   "scripts": {
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
   },
   "dependencies": {
+    "@effect/atom-react": "4.0.3",
     "@juno/contract": "workspace:*",
     "effect": "4.0.3"
   },
+  "peerDependencies": {
+    "react": "^19.0.0"
+  },
   "devDependencies": {
-    "typescript": "5.9.3"
+    "@types/node": "24.19.2",
+    "@types/react": "19.3.0",
+    "react": "19.3.0",
+    "typescript": "5.9.3",
+    "vitest": "5.0.4"
   },
   "juno": {
     "allowedDeps": [

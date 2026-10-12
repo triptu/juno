@@ -2,7 +2,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { Channels, Events, PORT_HANDOFF_TAG, type JunoBridge } from '@juno/contract/channels'
 
-// The whole bridge. Add one function per contract route; never expose
+// The whole bridge. Add one function per shell route; never expose
 // ipcRenderer or Node APIs. The renderer validates every answer.
 const bridge: JunoBridge = {
   app: {

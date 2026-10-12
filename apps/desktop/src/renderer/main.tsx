@@ -12,7 +12,7 @@ import { App } from './App'
 mark('juno.start')
 
 // The engine port comes from main through the preload; reconnects reuse this.
-configureConnection({ acquire: acquireRendererPort })
+configureConnection(registry, { acquire: acquireRendererPort })
 
 // Frame and input observers run always; tests and DevTools read the counters.
 Object.assign(window, { __juno: { perf: observeFrames() } })
