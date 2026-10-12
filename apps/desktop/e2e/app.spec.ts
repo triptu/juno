@@ -78,7 +78,14 @@ test('exposes only the bridge to the page', async ({ win }) => {
       process: typeof globals['process'],
       juno: Object.keys(window.juno),
       app: Object.keys(window.juno.app),
+      engine: Object.keys(window.juno.engine),
     }
   })
-  expect(exposed).toEqual({ require: 'undefined', process: 'undefined', juno: ['app'], app: ['getInfo'] })
+  expect(exposed).toEqual({
+    require: 'undefined',
+    process: 'undefined',
+    juno: ['app', 'engine', 'launch'],
+    app: ['getInfo'],
+    engine: ['requestPort'],
+  })
 })
