@@ -2,18 +2,18 @@
   "name": "@juno/slack",
   "version": "0.1.0",
   "private": true,
-  "description": "The Slack client shared by the engine and the fake: Effect services for the HTTP API, the edge API and the socket, plus the Effect Schemas for every payload Juno reads or sends.",
+  "description": "The Slack client shared by the engine and the fake: Effect services for the HTTP API, the edge API and the socket. Payload schemas live in @juno/slack-schema.",
   "type": "module",
   "sideEffects": false,
   "exports": {
-    ".": "./src/index.ts",
-    "./schemas": "./src/schemas/index.ts"
+    ".": "./src/index.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run"
   },
   "dependencies": {
+    "@juno/slack-schema": "workspace:*",
     "effect": "4.0.3",
     "ws": "8.22.0"
   },
@@ -28,7 +28,7 @@
   },
   "juno": {
     "allowedDeps": [
-      "@juno/domain"
+      "@juno/slack-schema"
     ],
     "testDeps": [
       "@juno/fake-slack"

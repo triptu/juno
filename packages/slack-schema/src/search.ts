@@ -9,7 +9,8 @@
  */
 import { Schema as S } from 'effect'
 import { Blocks } from './blocks.ts'
-import { FormNumber, ResponseMetadata, Ts } from './common.ts'
+import { FormNumber, ResponseMetadata } from './common.ts'
+import { Ts } from './ts.ts'
 import { Attachment, File } from './message.ts'
 
 const opt = S.optionalKey

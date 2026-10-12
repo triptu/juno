@@ -6,7 +6,7 @@
  * Understood: `> ` quote lines, `<@U…>`, `<#C…|name>`, `<!here>`, `<!channel>`,
  * `<https://…|label>` and bare URLs.
  */
-import type { Blocks, RichTextElement, RichTextInline } from '@juno/slack/schemas'
+import type { Blocks, RichTextElement, RichTextInline } from '@juno/slack-schema'
 
 const TOKEN = /<@([A-Z0-9]+)>|<#([A-Z0-9]+)\|([^>]*)>|<!(here|channel|everyone)>|<(https?:\/\/[^|>]+)(?:\|([^>]*))?>|(https?:\/\/\S+)/g
 

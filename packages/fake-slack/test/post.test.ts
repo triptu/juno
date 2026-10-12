@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { isMessagePosted, isMessageReplied, type MessagePostedEvent, type RtmFrame } from '@juno/slack/schemas'
+import { isMessagePosted, isMessageReplied, Ts, type MessagePostedEvent, type RtmFrame } from '@juno/slack-schema'
 import { startFakeSlack, type FakeSlack } from '../src/index.ts'
 import { isType, TestClient, type SocketClient } from './helpers.ts'
 
@@ -92,7 +92,7 @@ describe('posting', () => {
   it('rejects an empty message and a reply to a missing thread', async () => {
     const empty = await client.call('chat.postMessage', { channel: 'C0ENG', text: '', client_msg_id: 'x' })
     expect(empty.body).toEqual({ ok: false, error: 'no_text' })
-    const missing = await client.call('chat.postMessage', { channel: 'C0ENG', thread_ts: '1000000000.000001', text: 'hi', client_msg_id: 'y' })
+    const missing = await client.call('chat.postMessage', { channel: 'C0ENG', thread_ts: Ts.make('1000000000.000001'), text: 'hi', client_msg_id: 'y' })
     expect(missing.body).toEqual({ ok: false, error: 'thread_not_found' })
     const notMember = await client.call('chat.postMessage', { channel: 'C0NOPE', text: 'hi', client_msg_id: 'z' })
     expect(notMember.body).toEqual({ ok: false, error: 'channel_not_found' })

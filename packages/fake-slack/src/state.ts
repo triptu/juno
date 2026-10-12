@@ -17,8 +17,8 @@ import type {
   ThreadSubscription,
   User,
   UserPrefs,
-} from '@juno/slack/schemas'
-import { compareTs, isReply, millisToTs } from '@juno/slack/schemas'
+} from '@juno/slack-schema'
+import { compareTs, isReply, millisToTs, Ts } from '@juno/slack-schema'
 import type { Clock } from './clock.ts'
 import { textToBlocks, toMrkdwn } from './richtext.ts'
 
@@ -38,8 +38,8 @@ export interface ConversationRecord {
 
 export interface Subscription {
   readonly channel: string
-  readonly threadTs: string
-  lastRead: string
+  readonly threadTs: Ts
+  lastRead: Ts
   subscribed: boolean
   readonly dateCreate: number
 }
@@ -59,7 +59,7 @@ export interface PostInput {
   readonly user: string
   readonly text?: string
   readonly blocks?: Message['blocks']
-  readonly threadTs?: string
+  readonly threadTs?: Ts
   readonly broadcast?: boolean
   readonly clientMsgId?: string
   readonly files?: ReadonlyArray<File>
@@ -69,21 +69,26 @@ export interface PostInput {
   readonly silent?: boolean
 }
 
-export const NEVER_READ = '0000000000.000000'
+export const NEVER_READ: Ts = Ts.make('0000000000.000000')
+
+/** A ts from outside the schemas (the control API, a fixture). Throws on anything that is not one. */
+export function asTs(value: string): Ts {
+  return Ts.make(value)
+}
 
 export class Workspace {
   readonly users = new Map<string, User>()
   readonly conversations = new Map<string, ConversationRecord>()
   readonly messages = new Map<string, Message[]>()
   /** Self's `last_read` per conversation. */
-  readonly reads = new Map<string, string>()
+  readonly reads = new Map<string, Ts>()
   readonly subscriptions = new Map<string, Subscription>()
   readonly files = new Map<string, StoredFile>()
   prefs: UserPrefs = {}
   readonly clock: Clock
   readonly selfId: string
   readonly team: Team
-  #lastTs = NEVER_READ
+  #lastTs: Ts = NEVER_READ
   #sequence = 0
   #listeners = new Set<(frame: RtmFrame) => void>()
 
@@ -107,17 +112,17 @@ export class Workspace {
   // Timestamps
 
   /** A ts for `at` (default now), always greater than the last one issued. */
-  nextTs(at?: number): string {
+  nextTs(at?: number): Ts {
     let ts = millisToTs(at ?? this.clock.now(), this.#sequence++ % 1000)
     if (compareTs(ts, this.#lastTs) <= 0) {
       const [seconds, fraction] = this.#lastTs.split('.') as [string, string]
-      ts = `${seconds}.${String(Number(fraction) + 1).padStart(6, '0')}`
+      ts = Ts.make(`${seconds}.${String(Number(fraction) + 1).padStart(6, '0')}`)
     }
     this.#lastTs = ts
     return ts
   }
 
-  eventTs(): string {
+  eventTs(): Ts {
     return this.nextTs()
   }
 
@@ -402,7 +407,7 @@ export class Workspace {
     return message
   }
 
-  remove(channel: string, ts: string): void {
+  remove(channel: string, ts: Ts): void {
     const list = this.all(channel)
     const index = list.findIndex((m) => m.ts === ts)
     const previous = list[index]
@@ -430,7 +435,7 @@ export class Workspace {
   }
 
   /** Marks a conversation read at `ts` (self, from any client). */
-  markConversation(channel: string, ts: string): void {
+  markConversation(channel: string, ts: Ts): void {
     const conversation = this.conversations.get(channel)
     if (conversation === undefined) throw new Error('channel_not_found')
     this.reads.set(channel, ts)
@@ -456,7 +461,7 @@ export class Workspace {
     })
   }
 
-  markThread(channel: string, threadTs: string, ts: string, read: boolean): Subscription {
+  markThread(channel: string, threadTs: Ts, ts: Ts, read: boolean): Subscription {
     const sub = this.#subscribe(channel, threadTs, undefined, true)
     if (read) {
       sub.lastRead = ts
@@ -469,21 +474,21 @@ export class Workspace {
     return sub
   }
 
-  subscribe(channel: string, threadTs: string, lastRead?: string): Subscription {
+  subscribe(channel: string, threadTs: Ts, lastRead?: Ts): Subscription {
     const sub = this.#subscribe(channel, threadTs, lastRead, true)
     sub.subscribed = true
     this.emit({ type: 'thread_subscribed', subscription: this.subscriptionObject(sub), event_ts: this.eventTs() })
     return sub
   }
 
-  unsubscribe(channel: string, threadTs: string, lastRead?: string): Subscription {
+  unsubscribe(channel: string, threadTs: Ts, lastRead?: Ts): Subscription {
     const sub = this.#subscribe(channel, threadTs, lastRead, true)
     sub.subscribed = false
     this.emit({ type: 'thread_unsubscribed', subscription: this.subscriptionObject(sub), event_ts: this.eventTs() })
     return sub
   }
 
-  react(channel: string, ts: string, name: string, user: string, add: boolean): 'already_reacted' | 'no_reaction' | undefined {
+  react(channel: string, ts: Ts, name: string, user: string, add: boolean): 'already_reacted' | 'no_reaction' | undefined {
     const list = this.all(channel)
     const index = list.findIndex((m) => m.ts === ts)
     const message = list[index]
@@ -543,13 +548,13 @@ export class Workspace {
     return { conversation: record, created: true }
   }
 
-  typing(channel: string, user: string, threadTs?: string): void {
+  typing(channel: string, user: string, threadTs?: Ts): void {
     this.emit({ type: 'user_typing', channel, user, ...(threadTs === undefined ? {} : { thread_ts: threadTs }) })
   }
 
   // Internals
 
-  #subscribe(channel: string, threadTs: string, lastRead: string | undefined, keepFlag: boolean): Subscription {
+  #subscribe(channel: string, threadTs: Ts, lastRead: Ts | undefined, keepFlag: boolean): Subscription {
     const key = `${channel}:${threadTs}`
     let sub = this.subscriptions.get(key)
     if (sub === undefined) {
@@ -563,7 +568,7 @@ export class Workspace {
   }
 
   /** Recomputes a root's reply counters after a reply was added or removed. */
-  #touchRoot(channel: string, rootTs: string): void {
+  #touchRoot(channel: string, rootTs: Ts): void {
     const list = this.all(channel)
     const index = list.findIndex((m) => m.ts === rootTs)
     const root = list[index]

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { compareTs, isMessageChanged, isMessageDeleted, millisToTs } from '@juno/slack/schemas'
+import { compareTs, isMessageChanged, isMessageDeleted, millisToTs } from '@juno/slack-schema'
 import { startFakeSlack, type FakeSlack } from '../src/index.ts'
 import { isType, TestClient } from './helpers.ts'
 

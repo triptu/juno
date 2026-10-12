@@ -8,7 +8,7 @@
  */
 import { Schema as S } from 'effect'
 import { Blocks } from './blocks.ts'
-import { Ts } from './common.ts'
+import { Ts } from './ts.ts'
 
 const opt = S.optionalKey
 

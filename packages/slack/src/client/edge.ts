@@ -10,8 +10,8 @@
  * is the next one (architecture 5.2 step 6).
  */
 import { Clock, Context, Effect, Layer, Ref, Schema as S } from 'effect'
-import { ErrorResponse } from '../schemas/common.ts'
-import { EdgeUsersInfoOk, type EdgeUsersInfoArgs } from '../schemas/users.ts'
+import { ErrorResponse } from '@juno/slack-schema'
+import { EdgeUsersInfoOk, type EdgeUsersInfoArgs } from '@juno/slack-schema'
 import { decodeResponse, SlackApi, withRetries } from './api.ts'
 import { SlackConfig } from './config.ts'
 import { SlackTransportError, type SlackApiError } from './errors.ts'

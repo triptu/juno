@@ -11,10 +11,6 @@
  */
 import { Schema as S, SchemaGetter } from 'effect'
 
-/** Message timestamp, `"<unix seconds>.<6 digits>"`. The only id-like string with a shape check. */
-export const Ts = S.String.check(S.isPattern(/^\d+\.\d+$/))
-export type Ts = typeof Ts.Type
-
 /** A JSON object whose keys we do not interpret. Keeps every key. */
 export const RawObject = S.Record(S.String, S.Unknown)
 export type RawObject = typeof RawObject.Type

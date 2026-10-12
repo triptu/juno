@@ -1,9 +1,13 @@
 /**
- * Effect Schemas for every Slack payload Juno reads or sends.
+ * @juno/slack-schema: Effect Schemas for every Slack payload Juno reads or
+ * sends, and the branded message timestamp `Ts` with its helpers.
  *
  * Decoding is tolerant: unknown keys are dropped, unknown block elements and
  * socket frame types become `{ type: 'unknown', raw }`. Encoding is used by
  * the fake so its responses cannot drift from what the client expects.
+ *
+ * This package depends on `effect` only. The client (`@juno/slack`), the fake,
+ * `richtext`, `domain` and the store all import their Slack shapes from here.
  */
 export * from './common.ts'
 export * from './ts.ts'

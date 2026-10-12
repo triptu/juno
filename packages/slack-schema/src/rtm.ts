@@ -8,7 +8,8 @@
  * Source: docs/research/slack-data-access.md section 4.
  */
 import { Schema as S, SchemaGetter } from 'effect'
-import { RawObject, Ts } from './common.ts'
+import { RawObject } from './common.ts'
+import { Ts } from './ts.ts'
 import { Channel, Im } from './conversations.ts'
 import { Message, MessageFields, StructuralSubtypes } from './message.ts'
 import { ThreadSubscription } from './threads.ts'

@@ -1,0 +1,26 @@
+{
+  "name": "@juno/slack-schema",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Effect Schemas for every Slack payload Juno reads or sends, plus the branded message timestamp and its helpers. Shared by the client, the fake, richtext, domain and the store.",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "effect": "4.0.3"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3",
+    "vite": "7.3.7",
+    "vitest": "5.0.4"
+  },
+  "juno": {
+    "allowedDeps": []
+  }
+}

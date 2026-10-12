@@ -1,6 +1,6 @@
 import { Schema } from 'effect'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { EdgeUsersInfoResponse, isThreadRoot, Message, searchMatches } from '@juno/slack/schemas'
+import { EdgeUsersInfoResponse, isThreadRoot, Message, searchMatches } from '@juno/slack-schema'
 import { CONVERSATIONS, startFakeSlack, type FakeSlack } from '../src/index.ts'
 import { isType, TestClient } from './helpers.ts'
 
