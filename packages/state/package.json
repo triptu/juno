@@ -19,5 +19,10 @@
   },
   "devDependencies": {
     "typescript": "5.9.3"
+  },
+  "juno": {
+    "allowedDeps": [
+      "@juno/contract"
+    ]
   }
 }

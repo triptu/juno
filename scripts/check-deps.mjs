@@ -2,7 +2,8 @@
 // Checks the Juno package graph (docs/architecture.md sections 3 and 15).
 //
 // Edges come from each package.json:
-//   "juno": { "allowedDeps": ["@juno/x"], "exceptions": ["@juno/y"] }
+//   "juno": { "allowedDeps": ["@juno/x"], "exceptions": ["@juno/y"], "testDeps": ["@juno/z"] }
+// testDeps are devDependencies used only by tests (for example a client used to test a server).
 // allowedDeps is the architecture graph for that package. exceptions lists
 // current @juno dependencies that are outside the graph. They are reported as
 // warnings on every run, and must still be declared, so the list cannot rot.
@@ -126,6 +127,8 @@ for (const pkg of packages) {
   }
   const allowed = new Set(readList(pkg, 'allowedDeps'))
   const exceptions = new Set(readList(pkg, 'exceptions'))
+  const testDeps = new Set(readList(pkg, 'testDeps'))
+  const devOnly = new Set(Object.keys(pkg.json.devDependencies ?? {}))
   graph.set(pkg.name, [])
 
   for (const dep of pkg.declared) {
@@ -138,6 +141,9 @@ for (const pkg of packages) {
       errors.push(`${pkg.name}: depends on ${dep}, which is not a workspace package`)
       continue
     }
+    // A test-only edge: allowed as a devDependency for tests, never imported from src
+    // (the src import scan below enforces that), and left out of the cycle check.
+    if (testDeps.has(dep) && devOnly.has(dep) && !allowed.has(dep)) continue
     graph.get(pkg.name).push(dep)
     if (allowed.has(dep)) continue
     if (exceptions.has(dep)) {
@@ -207,6 +213,10 @@ for (const pkg of packages) {
 
       if (noState.has(pkg.name) && target === '@juno/state') {
         errors.push(`${where}: imports @juno/state. ${pkg.name} must not import @juno/state.`)
+      }
+
+      if ((pkg.json.juno?.testDeps ?? []).includes(target) && !(pkg.json.juno?.allowedDeps ?? []).includes(target)) {
+        errors.push(`${where}: imports ${target}, which ${pkg.name} may only use in tests (juno.testDeps).`)
       }
 
       if (target.startsWith('@juno/') && target !== pkg.name && !pkg.declared.has(target)) {
