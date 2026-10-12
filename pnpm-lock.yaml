@@ -166,6 +166,21 @@ importers:
 
   .:
     devDependencies:
+      '@juno/fake-slack':
+        specifier: workspace:*
+        version: link:packages/fake-slack
+      '@juno/slack':
+        specifier: workspace:*
+        version: link:packages/slack
+      '@juno/slack-schema':
+        specifier: workspace:*
+        version: link:packages/slack-schema
+      '@types/node':
+        specifier: 24.19.2
+        version: 24.19.2
+      effect:
+        specifier: 4.0.3
+        version: 4.0.3
       oxlint:
         specifier: 1.87.0
         version: 1.87.0
@@ -181,6 +196,9 @@ importers:
       '@juno/engine':
         specifier: workspace:*
         version: link:../../packages/engine
+      '@juno/slack':
+        specifier: workspace:*
+        version: link:../../packages/slack
       '@juno/state':
         specifier: workspace:*
         version: link:../../packages/state
@@ -203,6 +221,9 @@ importers:
         specifier: 19.3.0
         version: 19.3.0(react@19.3.0)
     devDependencies:
+      '@juno/fake-slack':
+        specifier: workspace:*
+        version: link:../../packages/fake-slack
       '@playwright/test':
         specifier: 1.64.0
         version: 1.64.0
@@ -323,10 +344,19 @@ importers:
       '@juno/contract':
         specifier: workspace:*
         version: link:../contract
+      '@juno/slack':
+        specifier: workspace:*
+        version: link:../slack
+      '@juno/store':
+        specifier: workspace:*
+        version: link:../store
       effect:
         specifier: 4.0.3
         version: 4.0.3
     devDependencies:
+      '@juno/fake-slack':
+        specifier: workspace:*
+        version: link:../fake-slack
       '@juno/state':
         specifier: workspace:*
         version: link:../state

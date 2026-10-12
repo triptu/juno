@@ -31,7 +31,11 @@ export class EngineSupervisor {
   private attempt = 0
   private restartTimer: NodeJS.Timeout | undefined
 
-  constructor(private readonly config: EngineConfig) {}
+  constructor(
+    private readonly config: EngineConfig,
+    /** Every message from the engine other than `ready`. */
+    private readonly onMessage: (message: EngineToMain) => void = () => {},
+  ) {}
 
   get currentState(): SupervisorState {
     return this.state
@@ -64,6 +68,8 @@ export class EngineSupervisor {
         this.attempt = 0
         for (const port of this.pendingPorts.values()) this.send({ _tag: 'port' }, [port])
         this.pendingPorts.clear()
+      } else {
+        this.onMessage(message)
       }
     })
     child.on('exit', (code) => this.onExit(code))
@@ -106,7 +112,8 @@ export class EngineSupervisor {
     this.child = undefined
   }
 
-  private send(message: MainToEngine, ports?: Array<MessagePortMain>): void {
+  /** Posts a message to the engine. Dropped while it is down; the engine asks again after a restart. */
+  send(message: MainToEngine, ports?: Array<MessagePortMain>): void {
     this.child?.postMessage(message, ports)
   }
 
@@ -132,10 +139,14 @@ export class EngineSupervisor {
   }
 }
 
-export function createSupervisor(): EngineSupervisor {
-  return new EngineSupervisor({
-    userData: app.getPath('userData'),
-    e2e: process.env.JUNO_E2E === '1',
-    dev: !app.isPackaged,
-  })
+export function createSupervisor(options: { readonly fakeSlackUrl?: string; readonly onMessage?: (message: EngineToMain) => void } = {}): EngineSupervisor {
+  return new EngineSupervisor(
+    {
+      userData: app.getPath('userData'),
+      e2e: process.env.JUNO_E2E === '1',
+      dev: !app.isPackaged,
+      ...(options.fakeSlackUrl === undefined ? {} : { fakeSlackUrl: options.fakeSlackUrl }),
+    },
+    options.onMessage,
+  )
 }
