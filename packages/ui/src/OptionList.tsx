@@ -1,0 +1,341 @@
+import * as stylex from '@stylexjs/stylex'
+import { useCallback, type HTMLAttributes, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
+import { colors, radii, sizes, spacing } from '@juno/tokens/tokens.stylex'
+import { Divider } from './Divider'
+import { activateHandlers, type ActivateEvent } from './internal/activate'
+import { interactive } from './internal/interactive'
+import { roles } from './internal/type'
+import { Text } from './Text'
+
+const HOVER = '@media (hover: hover)'
+
+export interface OptionListProps extends Omit<HTMLAttributes<HTMLDivElement>, 'style' | 'className' | 'role' | 'onKeyDown'> {
+  /** `listbox` for pickers and suggestions, `menu` for action lists. */
+  readonly role?: 'listbox' | 'menu'
+  readonly label?: string
+  /** The active (highlighted) row, as `OptionRow` ids. Sets aria-activedescendant. */
+  readonly activeId?: string
+  /**
+   * Make the list itself focusable and handle arrow keys on it. Lists that
+   * sit over an input leave this off and use `useOptionListKeys` on the input.
+   */
+  readonly focusable?: boolean
+  readonly onKeyDown?: (event: KeyboardEvent<HTMLDivElement>) => void
+  readonly children?: ReactNode
+}
+
+/**
+ * The vertical list used by menus, pickers, suggestions and the palette.
+ * Dumb: the owner tracks the active id and handles selection.
+ */
+export function OptionList({ role = 'listbox', label, activeId, focusable = false, onKeyDown, children, ...rest }: OptionListProps) {
+  return (
+    <div
+      role={role}
+      aria-label={label}
+      aria-activedescendant={activeId}
+      tabIndex={focusable ? 0 : undefined}
+      onKeyDown={onKeyDown}
+      {...rest}
+      {...stylex.props(styles.list, focusable && interactive.focusRing)}
+    >
+      {children}
+    </div>
+  )
+}
+
+export type OptionRowSize = 30 | 32 | 34 | 55
+
+export interface OptionRowProps {
+  readonly id: string
+  readonly leading?: ReactNode
+  readonly label: ReactNode
+  /** Secondary text, inline after the label or on a second line (55px rows). */
+  readonly sub?: ReactNode
+  readonly subPlacement?: 'inline' | 'below' | 'end'
+  readonly trailing?: ReactNode
+  /** Highlighted by keyboard or hover. */
+  readonly active?: boolean
+  /** The current value (selected row background). */
+  readonly selected?: boolean
+  readonly disabled?: boolean
+  readonly size?: OptionRowSize
+  /** Fires on mouse down (see internal/activate.ts); `metaKey` for ⌘-click. */
+  readonly onSelect?: (event: ActivateEvent) => void
+  /** Called when the pointer moves over the row, so the owner can move `active`. */
+  readonly onActivate?: () => void
+  readonly onContextMenu?: (event: MouseEvent<HTMLDivElement>) => void
+}
+
+/**
+ * One row. Selects on mouse down and keeps focus where it is, so an input
+ * that owns the list keeps typing focus.
+ */
+export function OptionRow({
+  id,
+  leading,
+  label,
+  sub,
+  subPlacement = 'end',
+  trailing,
+  active = false,
+  selected = false,
+  disabled = false,
+  size = 32,
+  onSelect,
+  onActivate,
+  onContextMenu,
+}: OptionRowProps) {
+  const twoLine = size === 55
+  return (
+    <div
+      id={id}
+      role="option"
+      aria-selected={selected || active}
+      aria-disabled={disabled || undefined}
+      {...activateHandlers<HTMLDivElement>(onSelect, { keepFocus: true, disabled })}
+      onPointerMove={onActivate}
+      onContextMenu={onContextMenu}
+      {...stylex.props(
+        styles.row,
+        rowSizes[size],
+        twoLine && styles.rowTwoLine,
+        active && styles.rowActive,
+        selected && styles.rowSelected,
+        disabled && styles.rowDisabled,
+      )}
+    >
+      {leading ? <span {...stylex.props(styles.leading)}>{leading}</span> : null}
+      <span {...stylex.props(styles.body, twoLine && styles.bodyColumn)}>
+        <span {...stylex.props(styles.label, twoLine ? roles.body : roles.ui)}>{label}</span>
+        {sub !== undefined && subPlacement !== 'end' ? (
+          <span {...stylex.props(styles.sub, subPlacement === 'below' ? roles.meta : roles.tag)}>{sub}</span>
+        ) : null}
+      </span>
+      {sub !== undefined && subPlacement === 'end' ? <span {...stylex.props(styles.subEnd, roles.tag)}>{sub}</span> : null}
+      {trailing ? <span {...stylex.props(styles.trailing)}>{trailing}</span> : null}
+    </div>
+  )
+}
+
+export interface OptionGroupLabelProps {
+  readonly children: ReactNode
+}
+
+/** Section heading inside a list: PEOPLE, CHANNELS, RECENT. */
+export function OptionGroupLabel({ children }: OptionGroupLabelProps) {
+  return (
+    <Text role="sectionLabel" tone="muted" as="div" sx={styles.groupLabel}>
+      {children}
+    </Text>
+  )
+}
+
+/** Separator between groups of rows. */
+export function OptionSeparator() {
+  return (
+    <div {...stylex.props(styles.separator)}>
+      <Divider />
+    </div>
+  )
+}
+
+export interface OptionHeaderProps {
+  readonly leading?: ReactNode
+  readonly title: ReactNode
+  readonly sub?: ReactNode
+}
+
+/** Header above a list: avatar plus name and workspace. */
+export function OptionHeader({ leading, title, sub }: OptionHeaderProps) {
+  return (
+    <div {...stylex.props(styles.header)}>
+      {leading}
+      <span {...stylex.props(styles.headerText)}>
+        <Text role="ui" weight="semibold" truncate>
+          {title}
+        </Text>
+        {sub !== undefined ? (
+          <Text role="meta" tone="muted" truncate>
+            {sub}
+          </Text>
+        ) : null}
+      </span>
+    </div>
+  )
+}
+
+export interface OptionListKeysOptions {
+  readonly ids: ReadonlyArray<string>
+  readonly activeId: string | undefined
+  readonly onActiveChange: (id: string) => void
+  readonly onSelect: (id: string) => void
+  readonly onClose?: () => void
+  /** Keys that also select, besides Enter. Tab for @ suggestions. */
+  readonly selectKeys?: ReadonlyArray<string>
+}
+
+/**
+ * Keyboard handling for an OptionList: ArrowUp/Down move (wrapping), Home/End
+ * jump, Enter selects, Escape closes. Attach the result to the input or the
+ * list.
+ */
+export function useOptionListKeys({ ids, activeId, onActiveChange, onSelect, onClose, selectKeys = [] }: OptionListKeysOptions) {
+  return useCallback(
+    (event: KeyboardEvent<HTMLElement>) => {
+      if (ids.length === 0) {
+        if (event.key === 'Escape' && onClose) {
+          event.preventDefault()
+          onClose()
+        }
+        return
+      }
+      const index = activeId === undefined ? -1 : ids.indexOf(activeId)
+      const at = (position: number) => ids[(position + ids.length) % ids.length] as string
+      switch (event.key) {
+        case 'ArrowDown':
+          event.preventDefault()
+          onActiveChange(at(index + 1))
+          return
+        case 'ArrowUp':
+          event.preventDefault()
+          onActiveChange(at(index <= 0 ? ids.length - 1 : index - 1))
+          return
+        case 'Home':
+          event.preventDefault()
+          onActiveChange(at(0))
+          return
+        case 'End':
+          event.preventDefault()
+          onActiveChange(at(ids.length - 1))
+          return
+        case 'Escape':
+          if (onClose) {
+            event.preventDefault()
+            onClose()
+          }
+          return
+        default:
+          if (event.key === 'Enter' || selectKeys.includes(event.key)) {
+            const id = activeId ?? ids[0]
+            if (id !== undefined) {
+              event.preventDefault()
+              onSelect(id)
+            }
+          }
+      }
+    },
+    [ids, activeId, onActiveChange, onSelect, onClose, selectKeys],
+  )
+}
+
+const styles = stylex.create({
+  list: {
+    display: 'flex',
+    flexDirection: 'column',
+    minWidth: 0,
+    outlineOffset: `calc(-1 * ${sizes['--focus-ring-width']})`,
+  },
+  row: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: spacing['--space-2-5'],
+    paddingInline: spacing['--space-2'],
+    borderRadius: radii['--radius-md'],
+    color: colors['--foreground-default'],
+    userSelect: 'none',
+    minWidth: 0,
+    flexShrink: 0,
+    contain: 'content',
+    backgroundColor: {
+      default: 'transparent',
+      ':hover': { default: null, [HOVER]: colors['--surface-hover'] },
+    },
+  },
+  rowTwoLine: {
+    gap: spacing['--space-3'],
+    paddingBlock: spacing['--space-2'],
+    paddingInline: spacing['--space-2-5'],
+    borderRadius: radii['--radius-lg'],
+  },
+  rowActive: {
+    backgroundColor: colors['--surface-hover'],
+  },
+  rowSelected: {
+    backgroundColor: colors['--secondary-default'],
+  },
+  rowDisabled: {
+    color: colors['--foreground-muted'],
+  },
+  leading: {
+    display: 'inline-flex',
+    flexShrink: 0,
+    color: colors['--foreground-subtle'],
+  },
+  body: {
+    display: 'flex',
+    alignItems: 'baseline',
+    gap: spacing['--space-1-5'],
+    flexGrow: 1,
+    minWidth: 0,
+  },
+  bodyColumn: {
+    flexDirection: 'column',
+    alignItems: 'stretch',
+    gap: spacing['--space-0-5'],
+  },
+  label: {
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+    minWidth: 0,
+  },
+  sub: {
+    color: colors['--foreground-muted'],
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+    minWidth: 0,
+    fontWeight: 400,
+  },
+  subEnd: {
+    color: colors['--foreground-muted'],
+    flexShrink: 0,
+    fontWeight: 400,
+  },
+  trailing: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: spacing['--space-1-5'],
+    flexShrink: 0,
+    marginInlineStart: 'auto',
+  },
+  groupLabel: {
+    paddingBlock: `${spacing['--space-2']} ${spacing['--space-1']}`,
+    paddingInline: spacing['--space-2-5'],
+  },
+  separator: {
+    paddingBlock: spacing['--space-1'],
+    paddingInline: spacing['--space-1-5'],
+  },
+  header: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: spacing['--space-2-5'],
+    paddingBlock: `${spacing['--space-2']} ${spacing['--space-2-5']}`,
+    paddingInline: spacing['--space-2'],
+    minWidth: 0,
+  },
+  headerText: {
+    display: 'flex',
+    flexDirection: 'column',
+    minWidth: 0,
+  },
+})
+
+const rowSizes = stylex.create({
+  30: { minHeight: sizes['--control-30'] },
+  32: { minHeight: sizes['--control-32'] },
+  34: { minHeight: sizes['--control-34'] },
+  55: { minHeight: 'auto' },
+})
