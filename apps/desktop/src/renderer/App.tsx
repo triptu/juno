@@ -2,8 +2,8 @@ import * as stylex from '@stylexjs/stylex'
 import { useAtom, useAtomValue } from '@effect/atom-react'
 import { Moon, Sun } from 'lucide-react'
 import { useLayoutEffect } from 'react'
-import { Button, PageTitle } from '@juno/ui'
-import { colors, layout, spacing, type } from '@juno/tokens/tokens.stylex'
+import { Button, Text } from '@juno/ui'
+import { colors, layout, spacing } from '@juno/tokens/tokens.stylex'
 import { appInfoAtom } from './state/appInfo'
 import { applyTheme, themeAtom } from './state/theme'
 
@@ -19,14 +19,16 @@ export function App() {
     <div {...stylex.props(styles.shell)}>
       <header {...stylex.props(styles.titlebar)} aria-label="Window title bar" />
       <main {...stylex.props(styles.page)}>
-        <PageTitle>Juno</PageTitle>
-        <p {...stylex.props(styles.meta)}>
+        <Text role="pageTitle" tone="default">
+          Juno
+        </Text>
+        <Text role="meta" tone="muted" numeric as="p">
           {appInfo._tag === 'Success'
             ? `${appInfo.value.name} ${appInfo.value.version} on ${appInfo.value.platform}, Electron ${appInfo.value.electron}`
             : appInfo._tag === 'Failure'
               ? 'Could not read app info'
               : 'Loading app info'}
-        </p>
+        </Text>
         <div {...stylex.props(styles.actions)}>
           <Button onClick={() => setTheme(nextTheme)} aria-pressed={theme === 'dark'}>
             {theme === 'light' ? <Moon size={16} aria-hidden /> : <Sun size={16} aria-hidden />}
@@ -64,12 +66,6 @@ const styles = stylex.create({
     paddingInline: spacing['--space-8'],
     paddingBlock: spacing['--space-4'],
     backgroundColor: colors['--background'],
-  },
-  meta: {
-    margin: 0,
-    fontSize: type['--text-sm'],
-    color: colors['--foreground-muted'],
-    fontVariantNumeric: 'tabular-nums',
   },
   actions: {
     display: 'flex',
