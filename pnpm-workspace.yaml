@@ -1,0 +1,17 @@
+packages:
+  - apps/*
+  - packages/*
+
+# pnpm 12 refuses to run dependency install scripts unless each package is
+# approved or denied here. electron needs its postinstall to download the
+# binary; esbuild uses one to pick its platform binary.
+allowBuilds:
+  electron: true
+  esbuild: true
+  electron-winstaller: false
+
+# pnpm 12 holds back versions younger than its minimum release age. effect
+# 4.0.3 was published a day before this file was written, so it is excluded
+# from that policy on purpose.
+minimumReleaseAgeExclude:
+  - effect@4.0.3

@@ -1,0 +1,22 @@
+{
+  "name": "juno",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Juno, a topic-first desktop Slack client",
+  "packageManager": "pnpm@12.11.2",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @juno/desktop dev",
+    "build": "pnpm --filter @juno/desktop build",
+    "typecheck": "pnpm -r --parallel typecheck",
+    "lint": "oxlint . && node scripts/check-no-pointer-cursor.mjs",
+    "test:e2e": "pnpm --filter @juno/desktop test:e2e",
+    "package": "pnpm --filter @juno/desktop package"
+  },
+  "devDependencies": {
+    "oxlint": "1.87.0",
+    "typescript": "5.9.3"
+  }
+}

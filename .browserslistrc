@@ -1,0 +1,4 @@
+# Electron 44 ships Chromium 152. Without this, lightningcss (used by the
+# StyleX plugin) may rewrite modern CSS like light-dark() into a polyfill
+# that silently does nothing.
+Chrome >= 152
