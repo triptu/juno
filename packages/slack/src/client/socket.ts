@@ -206,6 +206,7 @@ export class SlackSocket extends Context.Service<SlackSocket, SlackSocketShape>(
                     yield* Effect.sync(() => socket.close(CLOSE_NO_PONG))
                     return { reason: 'no pong', sawHello: true }
                   case 'message': {
+                    config.socket.onRawFrame?.(item.data)
                     const frame = decode(item.data)
                     if (frame === undefined) {
                       yield* Effect.logWarning('socket frame skipped', { type: frameType(item.data) })

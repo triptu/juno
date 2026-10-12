@@ -47,6 +47,8 @@ export interface SlackConfigShape {
     readonly allowedHosts: ReadonlyArray<string>
     /** Sent as `agent` inside `start_args`. */
     readonly agent: string
+    /** Diagnostics only (the live smoke): sees every frame's text before decoding. Never log it in the app. */
+    readonly onRawFrame?: (data: string) => void
   }
 }
 
