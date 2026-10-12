@@ -6,21 +6,23 @@ description: Styling with StyleX in Juno. Use when writing or reviewing any UI c
 # Styling with StyleX in Juno
 
 Versions: `@stylexjs/stylex` and `@stylexjs/unplugin` 0.19.1. The reference implementations are
-`packages/ui/src/Button.tsx` (states) and `packages/tokens/src/` (tokens and themes). Copy their
-shape. Rules come from `docs/design/handoff/SPEC.md` and `docs/design/tokens.md`.
+`packages/ui/src/Button.tsx` (states) and `packages/tokens/src/` (tokens and themes); copy their
+shape, but if they use a raw value that now has a token, use the token. Rules come from `docs/design/handoff/SPEC.md` and `docs/design/tokens.md`.
 
 ## Rules
 
 1. **Every design value comes from `@juno/tokens`.** Colours, spacing, radii, type sizes, line
    heights, fonts, shadows, durations, easing and layout sizes. Nothing checks this for you:
    StyleX compiles `color: '#fff'` without complaint, so review for it.
-   - Allowed raw values, as in `Button.tsx`: `0`, `none`, `auto`, font weights, 2px ring width,
-     the 0.96 press scale. A one-off size that no other component will share stays in that
-     component as a named constant (`tokens.md` section 3, spacing); promote it to a token on the second use.
+   - Allowed raw values: `0`, `none`, `auto`, `transparent`, `1px` hairlines. Before writing any
+     other number, search `tokens.stylex.ts` for it (focus ring, press scale, disabled opacity and
+     font weights have tokens or are being added). A one-off size that no other component will
+     share stays in that component as a named constant (`tokens.md` section 3, spacing); promote
+     it to a token on the second use.
 2. **Import tokens through the subpath, never a barrel.**
-   `import { colors, spacing } from '@juno/tokens/tokens.stylex'`. Only `./tokens.stylex` and
-   `./themes.stylex` are exported. Token groups: `colors`, `shadows`, `radii`, `spacing`, `fonts`,
-   `type`, `motion`, `layout`. Read a token as `colors['--foreground-default']`.
+   `import { colors, spacing } from '@juno/tokens/tokens.stylex'`. Each group is a named export;
+   read a token as `colors['--foreground-default']`. `packages/tokens/README.md` lists the groups
+   and the naming scheme, and `tokens.stylex.ts` is the source of truth.
 3. **Never `cursor: pointer`.** Interactive elements use `cursor: 'default'`. `pnpm lint` runs
    `scripts/check-no-pointer-cursor.mjs`, which fails on it in any ts, tsx, css or html file.
 4. **Hover only for hover-capable pointers**, and nested so that it falls back to nothing:
@@ -32,33 +34,33 @@ shape. Rules come from `docs/design/handoff/SPEC.md` and `docs/design/tokens.md`
      ':disabled': colors['--secondary-default'],
    },
    ```
-5. **Focus ring on `:focus-visible` only**: 2px solid `colors['--selection-background']`, offset
-   2px, `outlineStyle: { default: 'none', ':focus-visible': 'solid' }`. Never style plain `:focus`.
-   (`tokens.md` 1.8 flags that this blue is low contrast and proposes a `--focus-ring` token; until
-   that is decided, use `--selection-background`.)
-6. **Press scale**: `transform: { default: 'none', ':active': 'scale(0.96)', ':disabled': 'none' }`
+5. **Focus ring on `:focus-visible` only**: a 2px solid outline with 2px offset,
+   `outlineStyle: { default: 'none', ':focus-visible': 'solid' }`. Never style plain `:focus`.
+   Use the `--focus-ring` colour (and `--focus-ring-width`/`-offset`) when `tokens.stylex.ts` has
+   them. `--selection-background` is the pale text-selection colour and fails contrast for a ring
+   (`tokens.md` 1.8); the first `Button.tsx` still used it.
+6. **Press scale** 0.96 (`--press-scale` when present): `transform: { default: 'none', ':active': 'scale(0.96)', ':disabled': 'none' }`
    and `pointerEvents: { default: 'auto', ':disabled': 'none' }`. Disabled controls never scale.
 7. **Motion**: at most `motion['--duration-fast']` (150ms) for hover and press feedback. Set
    `transitionDuration: { default: ..., '@media (prefers-reduced-motion: reduce)': '0ms' }`.
 8. **Components do not take `style` or `className`.** Omit them from props (as `ButtonProps` does)
    and expose variants instead. Combine styles with `stylex.props(a, b, cond && c)`; later wins.
-9. **Plain CSS is limited to `apps/desktop/src/renderer/global.css`** (reset, body, `::selection`).
-   It may read tokens as `var(--background)`. No colours are written in it.
+9. **Plain CSS is limited to the global stylesheet** (`global.css`: reset, body, `::selection`) and
+   `fonts.css`. It reads tokens as `var(--background)` and writes no colours of its own.
 
 ## Dark mode and accents
 
 - Components never know the theme. No `prefers-color-scheme` media query, no `.dark &` selector,
   no import of `themes.stylex`.
-- Dark values live in `themes.stylex.ts` as `stylex.createTheme(colors, { ... })`. `dark` is the
-  array `[darkColors, darkShadows]`. `applyTheme()` (`renderer/state/theme.ts`) puts the classes
-  from `stylex.props(...dark)` on `<html>` so portals on `<body>` are covered, and sets
-  `colorScheme`.
+- Dark values live in `themes.stylex.ts` as `stylex.createTheme(colors, { ... })`. `dark` is an
+  array of themes (colours, shadows), so spread it: `stylex.props(...dark)`. `applyTheme()` in
+  `renderer/state/theme.ts` puts those classes on `<html>` (so portals on `<body>` are covered) and
+  sets `colorScheme`.
 - **One theme per token group can be active at a time.** `createTheme` returns
   `{ [groupHash]: 'themeClass groupHash' }`, so `stylex.props(darkColors, accentTheme)` built on the
-  same `colors` group keeps only the last one (verified by compiling both). Do not make accents
-  as another `createTheme(colors, ...)`. Put the accent keys (`--hl`, `--hl-fg`, `--hl-soft`, see
-  `tokens.md` 1.3) in their own `defineVars` group, default them to `var(--accent-default)` etc.,
-  and add one `createTheme` per accent. Components then use `--hl`, never a hex value.
+  same `colors` group keeps only the last one (verified by compiling both). So an accent must not be
+  another `createTheme(colors, ...)`. Accent keys (`--hl`, `--hl-fg`, ..., `tokens.md` 1.3) live in
+  their own `defineVars` group with one `createTheme` per accent. Components use `--hl`, never a hex.
 - Tokens use `hsla()` literals, not `light-dark()`. If you do use `light-dark()`, keep
   `.browserslistrc` (`Chrome >= 152`). Without it lightningcss rewrites `light-dark()` into a
   `--lightningcss-light/dark` polyfill that silently does nothing.
