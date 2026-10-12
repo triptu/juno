@@ -16,6 +16,7 @@
   "dependencies": {
     "@juno/contract": "workspace:*",
     "@juno/engine": "workspace:*",
+    "@juno/slack": "workspace:*",
     "@juno/state": "workspace:*",
     "@juno/tokens": "workspace:*",
     "@juno/views": "workspace:*",
@@ -25,6 +26,7 @@
     "react-dom": "19.3.0"
   },
   "devDependencies": {
+    "@juno/fake-slack": "workspace:*",
     "@playwright/test": "1.64.0",
     "@stylexjs/unplugin": "0.19.1",
     "@types/node": "24.19.2",
@@ -42,9 +44,13 @@
     "allowedDeps": [
       "@juno/contract",
       "@juno/engine",
+      "@juno/slack",
       "@juno/state",
       "@juno/tokens",
       "@juno/views"
+    ],
+    "testDeps": [
+      "@juno/fake-slack"
     ]
   }
 }

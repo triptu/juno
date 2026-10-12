@@ -104,6 +104,22 @@ export const Subteam = S.Struct({
 })
 export type Subteam = typeof Subteam.Type
 
+// auth.test: the cheapest check that a token and cookie pair still works.
+// The engine calls it once at start (architecture 16, M2). `enterprise_id`
+// is present on Enterprise Grid.
+
+export const AuthTestArgs = S.Struct({})
+export const AuthTestFields = {
+  url: S.String,
+  team: S.String,
+  user: S.String,
+  team_id: S.String,
+  user_id: S.String,
+  enterprise_id: opt(S.String),
+  is_enterprise_install: opt(S.Boolean),
+  bot_id: opt(S.String),
+} as const
+
 // Edge API. JSON body with the token inside, POST <flannel url>/users/info?_x_app_name=client.
 
 export const EdgeUsersInfoArgs = S.Struct({

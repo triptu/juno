@@ -47,6 +47,7 @@ import {
   FilesGetUploadUrlFields,
 } from './files.ts'
 import { SearchMessagesArgs, SearchMessagesFields } from './search.ts'
+import { AuthTestArgs, AuthTestFields } from './users.ts'
 import {
   ThreadGetViewArgs,
   ThreadGetViewFields,
@@ -62,6 +63,7 @@ function method<A extends S.Top, const F extends S.Struct.Fields>(args: A, field
 }
 
 export const Methods = {
+  'auth.test': method(AuthTestArgs, AuthTestFields),
   'client.userBoot': method(ClientUserBootArgs, ClientUserBootFields),
   'client.counts': method(ClientCountsArgs, ClientCountsFields),
   'users.prefs.get': method(UsersPrefsGetArgs, UsersPrefsGetFields),

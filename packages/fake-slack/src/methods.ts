@@ -67,6 +67,19 @@ function withChannel(ws: Workspace, channel: string, message: Message): Message 
 }
 
 export const handlers: Handlers = {
+  'auth.test': (ctx) => {
+    const ws = ctx.workspace
+    const self = ws.users.get(ws.selfId)
+    return {
+      url: `${ctx.baseUrl}/`,
+      team: ws.team.name,
+      user: self?.name ?? ws.selfId,
+      team_id: ws.team.id,
+      user_id: ws.selfId,
+      ...(ws.team.enterprise_id === undefined ? {} : { enterprise_id: ws.team.enterprise_id }),
+    }
+  },
+
   'client.userBoot': (ctx) => {
     const ws = ctx.workspace
     const self = ws.users.get(ws.selfId)

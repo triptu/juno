@@ -21,7 +21,7 @@ function brightness(rgb: string): number {
 test('renders the shell with bundled fonts and token colours', async ({ win }) => {
   await expect(win).toHaveTitle('Juno')
 
-  const title = win.getByRole('heading', { name: 'Juno', level: 1 })
+  const title = win.getByRole('heading', { name: 'Welcome to Juno', level: 1, exact: true })
   await expect(title).toBeVisible()
 
   const button = win.getByRole('button', { name: 'Use dark theme' })
@@ -44,7 +44,8 @@ test('renders the shell with bundled fonts and token colours', async ({ win }) =
   await expect(button).toHaveCSS('cursor', 'default')
 })
 
-test('answers app.getInfo over the typed IPC bridge', async ({ app, win }) => {
+test('answers app.getInfo over the typed IPC bridge', async ({ juno, app, win }) => {
+  await juno.signIn()
   const version = await app.evaluate((electronModule) => electronModule.app.getVersion())
   const electron = await app.evaluate(() => process.versions.electron)
   await expect(win.getByText(`Juno ${version} on ${process.platform}, Electron ${electron}`)).toBeVisible()
@@ -70,7 +71,7 @@ test('switches to the dark theme in place', async ({ win }) => {
 })
 
 test('exposes only the bridge to the page', async ({ win }) => {
-  await expect(win.getByRole('heading', { name: 'Juno' })).toBeVisible()
+  await expect(win.getByRole('heading', { name: 'Welcome to Juno', exact: true })).toBeVisible()
   const exposed = await win.evaluate(() => {
     const globals = window as unknown as Record<string, unknown>
     return {

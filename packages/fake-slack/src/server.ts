@@ -332,8 +332,10 @@ export class FakeServer {
     const fields = parseFields(request.headers['content-type'], await readBody(request))
     if ((fields['email'] ?? '') === '') return html(response, 400, signInPage({ error: 'Enter an email.' }))
     const session = this.newSession(this.workspace.selfId)
+    // Like the real `d` cookie: HttpOnly, about a year long (a cookie with no
+    // expiry would not survive an app relaunch).
     response.writeHead(303, {
-      'set-cookie': `d=${session.cookie}; Path=/; HttpOnly; SameSite=Lax`,
+      'set-cookie': `d=${session.cookie}; Path=/; HttpOnly; SameSite=Lax; Max-Age=31536000`,
       location: `/client/${this.workspace.team.id}`,
     })
     response.end()
@@ -357,6 +359,7 @@ export class FakeServer {
         url: `${this.#baseUrl}/`,
         token: session.token,
         userId: session.userId,
+        ...(this.workspace.team.enterprise_id === undefined ? {} : { enterpriseId: this.workspace.team.enterprise_id }),
       }),
     )
   }

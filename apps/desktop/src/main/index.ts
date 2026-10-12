@@ -4,10 +4,14 @@ import { createSupervisor } from './engine'
 import { registerIpc } from './ipc'
 import { readLaunch, writeLaunch, type Launch } from './launch'
 import { registerAppScheme, serveAppScheme } from './scheme'
+import { SecretsStore } from './secrets'
+import { SessionHost } from './session'
 import { createMainWindow } from './window'
 
 // Every renderer runs in the Chromium sandbox. Must be called before ready.
 app.enableSandbox()
+
+const e2e = process.env.JUNO_E2E === '1'
 
 // Keep dev data apart from a packaged install. JUNO_USER_DATA lets tests
 // point at a throwaway directory. Both must be set before ready.
@@ -25,7 +29,30 @@ function updateLaunch(patch: Partial<Launch>): void {
   void writeLaunch(app.getPath('userData'), launch)
 }
 
-const supervisor = createSupervisor()
+// Test seams (architecture 13): the fake Slack to sign in against, a fixture
+// Slack-app directory to import from, and a stand-in keychain password.
+// Read only under JUNO_E2E so a real run can never be pointed elsewhere.
+const fakeSlackUrl = e2e ? process.env.JUNO_FAKE_SLACK_URL : undefined
+const slackAppDir = e2e ? process.env.JUNO_SLACK_APP_DIR : undefined
+const keychainPassword = e2e ? process.env.JUNO_SLACK_SAFE_STORAGE_PASSWORD : undefined
+
+const supervisor = createSupervisor({
+  ...(fakeSlackUrl === undefined ? {} : { fakeSlackUrl }),
+  onMessage: (message) => {
+    if (!sessionHost.handle(message)) console.warn(`main: unhandled engine message ${message._tag}`)
+  },
+})
+
+const sessionHost = new SessionHost({
+  secrets: new SecretsStore(app.getPath('userData'), { plaintext: e2e }),
+  send: (message) => supervisor.send(message),
+  signInWindow:
+    fakeSlackUrl === undefined ? {} : { startUrl: `${fakeSlackUrl}/signin`, extraHosts: [new URL(fakeSlackUrl).hostname] },
+  importOptions: {
+    ...(slackAppDir === undefined ? {} : { slackDir: slackAppDir }),
+    ...(keychainPassword === undefined ? {} : { keychainPassword }),
+  },
+})
 
 app.whenReady().then(() => {
   serveAppScheme(join(__dirname, '../renderer'))
@@ -56,7 +83,7 @@ app.on('before-quit', () => supervisor.stop())
 
 // Test hooks. Playwright reaches main through app.evaluate; the engine itself
 // is out of reach, so main exposes what tests need to know about it.
-if (process.env.JUNO_E2E === '1') {
+if (e2e) {
   Object.assign(globalThis, {
     junoTest: {
       enginePid: () => supervisor.pid,

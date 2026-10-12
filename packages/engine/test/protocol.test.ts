@@ -70,7 +70,8 @@ describe('port protocol', () => {
     const unmount = registry.mount(engineStatusAtom)
     try {
       const status = await liveStatus(registry)
-      expect(status.phase._tag).toBe('live')
+      // No stored session: the engine is up and waiting for a sign-in.
+      expect(status.phase._tag).toBe('first-run')
       expect(registry.get(connectionStateAtom)).toBe('connected')
 
       const unmountPing = registry.mount(pingCommand)
