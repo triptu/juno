@@ -14,7 +14,7 @@ import {
   GetWebSocketUrlFields,
   UsersPrefsGetArgs,
   UsersPrefsGetFields,
-} from './boot'
+} from './boot.ts'
 import {
   ChatDeleteArgs,
   ChatDeleteFields,
@@ -24,8 +24,8 @@ import {
   ChatUpdateFields,
   ReactionArgs,
   ReactionFields,
-} from './chat'
-import { ErrorResponse, okResponse } from './common'
+} from './chat.ts'
+import { ErrorResponse, okResponse } from './common.ts'
 import {
   ConversationsHistoryArgs,
   ConversationsHistoryFields,
@@ -39,14 +39,14 @@ import {
   ConversationsViewFields,
   GetFlannelHttpUrlArgs,
   GetFlannelHttpUrlFields,
-} from './conversations'
+} from './conversations.ts'
 import {
   FilesCompleteUploadArgs,
   FilesCompleteUploadFields,
   FilesGetUploadUrlArgs,
   FilesGetUploadUrlFields,
-} from './files'
-import { SearchMessagesArgs, SearchMessagesFields } from './search'
+} from './files.ts'
+import { SearchMessagesArgs, SearchMessagesFields } from './search.ts'
 import {
   ThreadGetViewArgs,
   ThreadGetViewFields,
@@ -54,7 +54,7 @@ import {
   ThreadMarkFields,
   ThreadSubscribeArgs,
   ThreadSubscribeFields,
-} from './threads'
+} from './threads.ts'
 
 function method<A extends S.Top, const F extends S.Struct.Fields>(args: A, fields: F) {
   const ok = okResponse(fields)

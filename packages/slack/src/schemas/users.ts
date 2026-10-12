@@ -4,7 +4,7 @@
  * Source: docs/research/slack-data-access.md sections 1 (edge transport) and 3.
  */
 import { Schema as S } from 'effect'
-import { ErrorResponse } from './common'
+import { ErrorResponse } from './common.ts'
 
 const opt = S.optionalKey
 

@@ -4,9 +4,9 @@
  * Source: docs/research/slack-data-access.md section 3 (Posting, Reactions).
  */
 import { Schema as S } from 'effect'
-import { Blocks } from './blocks'
-import { FormBoolean, FormJson, RawObject, Ts } from './common'
-import { Message } from './message'
+import { Blocks } from './blocks.ts'
+import { FormBoolean, FormJson, RawObject, Ts } from './common.ts'
+import { Message } from './message.ts'
 
 const opt = S.optionalKey
 

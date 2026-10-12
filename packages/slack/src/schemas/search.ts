@@ -8,9 +8,9 @@
  * `response_metadata.next_cursor`.
  */
 import { Schema as S } from 'effect'
-import { Blocks } from './blocks'
-import { FormNumber, ResponseMetadata, Ts } from './common'
-import { Attachment, File } from './message'
+import { Blocks } from './blocks.ts'
+import { FormNumber, ResponseMetadata, Ts } from './common.ts'
+import { Attachment, File } from './message.ts'
 
 const opt = S.optionalKey
 

@@ -8,11 +8,11 @@
  * Source: docs/research/slack-data-access.md section 4.
  */
 import { Schema as S, SchemaGetter } from 'effect'
-import { RawObject, Ts } from './common'
-import { Channel, Im } from './conversations'
-import { Message, MessageFields, StructuralSubtypes } from './message'
-import { ThreadSubscription } from './threads'
-import { User } from './users'
+import { RawObject, Ts } from './common.ts'
+import { Channel, Im } from './conversations.ts'
+import { Message, MessageFields, StructuralSubtypes } from './message.ts'
+import { ThreadSubscription } from './threads.ts'
+import { User } from './users.ts'
 
 const opt = S.optionalKey
 
@@ -122,6 +122,17 @@ export type MessageRepliedEvent = typeof MessageRepliedEvent.Type
 
 export const MessageEvent = S.Union([MessageChangedEvent, MessageDeletedEvent, MessageRepliedEvent, MessagePostedEvent])
 export type MessageEvent = typeof MessageEvent.Type
+
+// Guards. `MessagePostedEvent.subtype` is any string but the structural ones,
+// which TypeScript cannot express, so narrowing goes through these.
+export const isMessagePosted = (frame: { type: string; subtype?: string }): frame is MessagePostedEvent =>
+  frame.type === 'message' && !(StructuralSubtypes as ReadonlyArray<string>).includes(frame.subtype ?? '')
+export const isMessageChanged = (frame: { type: string; subtype?: string }): frame is MessageChangedEvent =>
+  frame.type === 'message' && frame.subtype === 'message_changed'
+export const isMessageDeleted = (frame: { type: string; subtype?: string }): frame is MessageDeletedEvent =>
+  frame.type === 'message' && frame.subtype === 'message_deleted'
+export const isMessageReplied = (frame: { type: string; subtype?: string }): frame is MessageRepliedEvent =>
+  frame.type === 'message' && frame.subtype === 'message_replied'
 
 // Read state.
 

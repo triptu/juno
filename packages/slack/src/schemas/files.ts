@@ -6,9 +6,9 @@
  * (architecture section 9); the fake implements it as documented publicly.
  */
 import { Schema as S } from 'effect'
-import { Blocks } from './blocks'
-import { FormJson, FormNumber, Ts } from './common'
-import { File } from './message'
+import { Blocks } from './blocks.ts'
+import { FormJson, FormNumber, Ts } from './common.ts'
+import { File } from './message.ts'
 
 const opt = S.optionalKey
 

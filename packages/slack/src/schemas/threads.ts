@@ -5,9 +5,9 @@
  * Source: docs/research/slack-data-access.md section 3.
  */
 import { Schema as S } from 'effect'
-import { ThreadCounts } from './boot'
-import { FormBit, FormBoolean, FormNumber, Ts } from './common'
-import { Message, MessageFields } from './message'
+import { ThreadCounts } from './boot.ts'
+import { FormBit, FormBoolean, FormNumber, Ts } from './common.ts'
+import { Message, MessageFields } from './message.ts'
 
 const opt = S.optionalKey
 

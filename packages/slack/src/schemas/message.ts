@@ -7,8 +7,8 @@
  * Source: docs/research/slack-data-access.md section 5.
  */
 import { Schema as S } from 'effect'
-import { Blocks } from './blocks'
-import { Ts } from './common'
+import { Blocks } from './blocks.ts'
+import { Ts } from './common.ts'
 
 const opt = S.optionalKey
 
