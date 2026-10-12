@@ -19,10 +19,11 @@ Read the parts relevant to your task before changing code. If the code and a doc
 - UI is layered: tokens, then primitives, then dumb views (props in, callbacks out), then containers that wire state to views. Views never import state, Effect or Electron.
 - Every design value comes from `@juno/tokens`. No raw colours or sizes in components.
 - The app should feel like a native macOS app. Never use `cursor: pointer`.
+- Speed is a feature. Every interaction has a budget in `docs/performance.md`, and changes must not regress it.
 
 ## Working rules
 
-- Use the project skills in `.claude/skills/` when touching the tool they cover (Effect, StyleX, and others as they are added).
+- Use the project skills in `.claude/skills/` when touching the tool they cover (Effect, StyleX, performance, and others as they are added).
 - Tests: prefer end-to-end tests that follow a user flow against the fake Slack server. Write unit tests only for pure domain rules, and test behaviour, not implementation details.
 - Run `pnpm typecheck`, `pnpm lint` and the relevant tests before calling work done.
 - Commit in small logical commits with plain messages. Only stage the paths you changed. Never add co-author trailers or mention AI tools in commits.
