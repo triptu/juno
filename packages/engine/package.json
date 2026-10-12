@@ -1,0 +1,25 @@
+{
+  "name": "@juno/engine",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The Juno engine: the app Layer, feature handlers and the port protocol server. A plain Node program; Electron hosts it in a utility process.",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@juno/contract": "workspace:*",
+    "effect": "4.0.3"
+  },
+  "devDependencies": {
+    "@juno/state": "workspace:*",
+    "@types/node": "24.19.2",
+    "typescript": "5.9.3",
+    "vitest": "5.0.4"
+  }
+}
