@@ -6,7 +6,8 @@
  * request and `[1]` to close; the runner sends `[0]` once when a port is
  * attached (ready) and `[1, message]` for every response. Each port is one
  * client id; closing a port reports it on `disconnects`, and the RPC server
- * then interrupts every fiber that belongs to that client.
+ * then interrupts every fiber that belongs to that client. When the runner
+ * itself stops (engine shutdown), every open port is closed.
  */
 import { Effect, FiberSet, Layer, Queue } from 'effect'
 import { WorkerRunner, type WorkerError } from 'effect/workers'
@@ -47,7 +48,13 @@ export function runnerPlatform(transport: Transport): Layer.Layer<WorkerRunner.W
                 port.postMessage([0])
               }
               const unsubscribe = transport.ports(attach)
-              yield* Effect.addFinalizer(() => Effect.sync(unsubscribe))
+              yield* Effect.addFinalizer(() =>
+                Effect.sync(() => {
+                  unsubscribe()
+                  for (const port of ports.values()) port.close()
+                  ports.clear()
+                }),
+              )
               yield* Effect.never
             }).pipe(Effect.scoped) as Effect.Effect<void, WorkerError.WorkerError, R>
 
