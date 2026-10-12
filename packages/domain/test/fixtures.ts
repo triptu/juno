@@ -1,4 +1,4 @@
-import { ChannelId, Ts, UserId, mainTopicId, threadTopicId, tsFromMillis, type ChannelInfo, type Topic, type TopicOverlay } from '../src/index'
+import { ChannelId, Ts, UserId, mainTopicId, threadTopicId, millisToTs, type ChannelInfo, type Topic, type TopicOverlay } from '../src/index'
 
 export const NOW = Date.UTC(2026, 9, 12, 12, 0, 0) // 2026-10-12 12:00 UTC
 export const HOUR = 60 * 60 * 1000
@@ -14,7 +14,7 @@ export const me = UserId.make('U0ME')
 export const mayaId = UserId.make('U0MAYA')
 export const leoId = UserId.make('U0LEO')
 
-export const ts = (millis: number): Ts => tsFromMillis(millis)
+export const ts = (millis: number): Ts => millisToTs(millis)
 
 export interface TopicOptions {
   readonly channel?: ChannelInfo
@@ -27,7 +27,6 @@ export interface TopicOptions {
   readonly overlay?: TopicOverlay
   readonly firstMessageText?: string
   readonly preview?: Topic['preview']
-  readonly id?: string
 }
 
 export function topic(options: TopicOptions = {}): Topic {

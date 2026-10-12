@@ -1,6 +1,6 @@
 import { assert, describe, it } from '@effect/vitest'
 import { Cause, Effect, Fiber, Queue, Stream } from 'effect'
-import { isMessagePosted } from '@juno/slack/schemas'
+import { isMessagePosted } from '@juno/slack-schema'
 import { SlackSocket, type SocketEvent } from '../src/index.ts'
 import { CHANNEL, clientLayer, collect, eventually, fakeSlack, takeUntil } from './helpers.ts'
 

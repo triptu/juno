@@ -1,5 +1,5 @@
 import { assert, describe, it } from '@effect/vitest'
-import { Effect, Queue } from 'effect'
+import { Effect } from 'effect'
 import { TestClock } from 'effect/testing'
 import { DatabaseSync } from 'node:sqlite'
 import {
@@ -12,7 +12,7 @@ import {
   transaction,
   workspacePathsFromDir,
 } from '../src/index'
-import { collect, freshStore, tempWorkspaceDir } from './helpers'
+import { collect, freshStore, takeValue, tempWorkspaceDir } from './helpers'
 
 const countMessages = Effect.gen(function* () {
   const sql = yield* StoreReader
@@ -32,12 +32,12 @@ describe('reset local cache', () => {
       const store = yield* Store
       yield* transaction(seed)
       const live = yield* collect(liveQuery(['messages'], countMessages))
-      assert.strictEqual(yield* Queue.take(live), 1)
+      assert.strictEqual(yield* takeValue(live), 1)
       yield* TestClock.adjust(DEFAULT_LIVE_QUERY_DEBOUNCE)
 
       yield* store.resetCache
 
-      assert.strictEqual(yield* Queue.take(live), 0)
+      assert.strictEqual(yield* takeValue(live), 0)
       assert.strictEqual(yield* countMessages, 0)
       assert.strictEqual(yield* prefs.get<string>('theme'), 'dark')
 

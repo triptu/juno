@@ -1,4 +1,4 @@
-import { Effect, Layer, Queue, Stream } from 'effect'
+import { Effect, Layer, Queue, Result, Stream } from 'effect'
 import * as fs from 'node:fs/promises'
 import * as os from 'node:os'
 import * as path from 'node:path'
@@ -25,6 +25,10 @@ export const collect = <A, E, R>(stream: Stream.Stream<A, E, R>) =>
     yield* Effect.forkScoped(Stream.runForEach(stream, (a) => Queue.offer(queue, a)))
     return queue
   })
+
+/** The next live-query emission, which must be a successful run. */
+export const takeValue = <A, E>(queue: Queue.Queue<Result.Result<A, E>>): Effect.Effect<A> =>
+  Effect.map(Queue.take(queue), Result.getOrThrow)
 
 /** Lets forked fibers run so pending emissions land in their queues. */
 export const settle = Effect.gen(function* () {

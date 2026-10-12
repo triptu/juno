@@ -1,6 +1,6 @@
 import { Schema } from 'effect'
 import { describe, expect, it } from 'vitest'
-import { ChannelId, TopicId, Ts, compareTs, groupTopicId, mainTopicId, maxTs, parseTopicId, threadTopicId, topicKindOf, tsFromMillis, tsToMillis } from '../src/index'
+import { ChannelId, TopicId, Ts, compareTs, groupTopicId, mainTopicId, maxTs, parseTopicId, threadTopicId, topicKindOf, millisToTs, tsToMillis } from '../src/index'
 
 const C = ChannelId.make('C0ENG')
 
@@ -52,7 +52,7 @@ describe('timestamps', () => {
 
   it('round-trips through milliseconds', () => {
     const millis = Date.UTC(2026, 9, 12, 9, 12, 30, 250)
-    expect(tsToMillis(tsFromMillis(millis))).toBe(millis)
-    expect(tsFromMillis(millis)).toBe(`${Math.floor(millis / 1000)}.250000`)
+    expect(tsToMillis(millisToTs(millis))).toBe(millis)
+    expect(millisToTs(millis)).toBe(`${Math.floor(millis / 1000)}.250000`)
   })
 })

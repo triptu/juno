@@ -8,11 +8,14 @@ import {
   encodeRtmFrame,
   Message,
   Methods,
+  maxTs,
   millisToTs,
+  minTs,
   permalinkPath,
   RichTextInline,
+  Ts,
   tsToMillis,
-} from '@juno/slack/schemas'
+} from '@juno/slack-schema'
 
 describe('tolerant decoding', () => {
   it('keeps decoding when Slack adds keys', () => {
@@ -131,8 +134,20 @@ describe('form arguments', () => {
 describe('ts helpers', () => {
   it('compares as two integers, not as floats', () => {
     expect(compareTs('1760000000.000100', '1760000000.000020')).toBe(1)
-    expect(compareTs('1760000000.5', '1760000000.500000')).toBe(0)
+    expect(compareTs('1760000000.500000', '1760000000.500000')).toBe(0)
     expect(compareTs('1759999999.999999', '1760000000.000000')).toBe(-1)
+    expect(compareTs('999999999.000000', '1000000000.000000')).toBe(-1)
+    expect(maxTs('1760000000.000100', '1760000000.000020')).toBe('1760000000.000100')
+    expect(minTs('1760000000.000100', '1760000000.000020')).toBe('1760000000.000020')
+  })
+
+  it('has one shape: seconds, a dot, six digits', () => {
+    const decode = Schema.decodeUnknownSync(Ts)
+    expect(decode('1760000000.000100')).toBe('1760000000.000100')
+    expect(() => decode('1760000000.5')).toThrow()
+    expect(() => decode('1760000000')).toThrow()
+    expect(() => decode('abc')).toThrow()
+    expect(() => compareTs('1760000000.5', '1760000000.500000')).toThrow()
   })
 
   it('round trips through milliseconds', () => {

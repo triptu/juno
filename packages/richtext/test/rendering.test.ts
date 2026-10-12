@@ -1,16 +1,6 @@
+import type { Block, RichTextElement } from '@juno/slack-schema'
 import { describe, expect, it } from 'vitest'
-import {
-  bodyFromMrkdwn,
-  inlinesOf,
-  messageBody,
-  plainText,
-  previewLine,
-  previewText,
-  type Lookups,
-  type MessageBlock,
-  type MessageBody,
-  type RichTextElement,
-} from '../src/index'
+import { bodyFromMrkdwn, inlinesOf, messageBody, plainText, previewLine, previewText, type Lookups, type MessageBody } from '../src/index'
 
 const lookups: Lookups = {
   me: 'U0ME',
@@ -21,7 +11,7 @@ const lookups: Lookups = {
 }
 
 /** The shape Slack sends for an ordinary message typed in the official client. */
-function richText(elements: ReadonlyArray<RichTextElement>): MessageBlock[] {
+function richText(elements: ReadonlyArray<RichTextElement>): Block[] {
   return [{ type: 'rich_text', block_id: 'abc', elements }]
 }
 
@@ -226,7 +216,7 @@ describe('rich_text blocks', () => {
             elements: [
               { type: 'text', text: 'Due ' },
               { type: 'date', timestamp: 1700000000, format: '{date_short}', fallback: 'Nov 14, 2023' },
-              { type: 'unknown' },
+              { type: 'unknown', raw: { type: 'workflowtoken', workflow_id: 'W1' } },
             ],
           },
         ]),
@@ -243,7 +233,7 @@ describe('rich_text blocks', () => {
           { type: 'header', text: { type: 'plain_text', text: 'Deploy finished' } },
           { type: 'section', text: { type: 'mrkdwn', text: '*prod* is on <https://example.com/r/42|release 42>' } },
           { type: 'divider' },
-          { type: 'context', elements: [{ type: 'image' }, { type: 'mrkdwn', text: 'by <@U0LEO>' }] },
+          { type: 'context', elements: [{ type: 'image', alt_text: 'avatar' }, { type: 'mrkdwn', text: 'by <@U0LEO>' }] },
         ],
       },
       lookups,

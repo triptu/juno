@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { compareTs, searchMatches, type Message } from '@juno/slack/schemas'
+import { compareTs, searchMatches, type Message, type Ts } from '@juno/slack-schema'
 import { startFakeSlack, type FakeSlack } from '../src/index.ts'
 import { TestClient } from './helpers.ts'
 
@@ -76,7 +76,7 @@ describe('pagination', () => {
     const latest = (t: (typeof all.threads)[number]) => t.root_msg.latest_reply!
     for (let i = 1; i < all.threads.length; i++) expect(compareTs(latest(all.threads[i - 1]!), latest(all.threads[i]!))).toBe(1)
     const seen: string[] = []
-    let current: string | undefined
+    let current: Ts | undefined
     for (;;) {
       const page = await client.ok('subscriptions.thread.getView', { limit: 2, ...(current === undefined ? {} : { current_ts: current }) })
       seen.push(...page.threads.map((t) => t.root_msg.ts))

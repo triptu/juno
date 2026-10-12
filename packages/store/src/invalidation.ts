@@ -6,9 +6,10 @@
  * needs on top of it: keys that are table names with optional row ids,
  * batching that fires only after a transaction commits, a wildcard key so a
  * cache reset re-runs every live query, and `liveQuery`, a stream that re-runs
- * a read when its keys are invalidated with a leading-edge debounce.
+ * a read when its keys are invalidated with a leading-edge debounce and emits
+ * each run's result as a value, so one failed run never ends a subscription.
  */
-import { Context, Duration, Effect, Exit, Layer, Option, Queue, Stream } from 'effect'
+import { Cause, Context, Duration, Effect, Exit, Layer, Option, Queue, Result, Stream } from 'effect'
 import * as Reactivity from 'effect/reactivity/Reactivity'
 
 /**
@@ -95,12 +96,16 @@ export class Invalidation extends Context.Service<
     withBatch<A, E, R>(effect: Effect.Effect<A, E, R>): Effect.Effect<A, E, R>
     /** Registers a synchronous handler for keys. Returns the function that removes it. */
     subscribeUnsafe(keys: InvalidationKeys, handler: () => void): () => void
-    /** A stream that emits the result of `query` now and again whenever `keys` are invalidated. */
+    /**
+     * A stream that emits the result of `query` now and again whenever `keys`
+     * are invalidated. A failed run is emitted as `Result.fail(e)` and the
+     * subscription stays alive; only a defect fails the stream.
+     */
     liveQuery<A, E, R>(
       keys: InvalidationKeys,
       query: Effect.Effect<A, E, R>,
       options?: LiveQueryOptions,
-    ): Stream.Stream<A, E, R>
+    ): Stream.Stream<Result.Result<A, E>, never, R>
     /** Provides the underlying `Reactivity` service to an effect. Only `clients.ts` needs this, to build SQL clients. */
     provideReactivity<A, E, R>(effect: Effect.Effect<A, E, R>): Effect.Effect<A, E, Exclude<R, Reactivity.Reactivity>>
   }
@@ -144,9 +149,9 @@ export class Invalidation extends Context.Service<
         keys: InvalidationKeys,
         query: Effect.Effect<A, E, R>,
         options?: LiveQueryOptions,
-      ): Stream.Stream<A, E, R> => {
+      ): Stream.Stream<Result.Result<A, E>, never, R> => {
         const debounce = Duration.fromInputUnsafe(options?.debounce ?? DEFAULT_LIVE_QUERY_DEBOUNCE)
-        return Stream.callback<A, E, R>((out) =>
+        return Stream.callback<Result.Result<A, E>, never, R>((out) =>
           Effect.gen(function* () {
             // One slot: invalidations that arrive while one is waiting collapse into it.
             const signal = yield* Queue.make<void>({ capacity: 1, strategy: 'dropping' })
@@ -155,14 +160,21 @@ export class Invalidation extends Context.Service<
             })
             yield* Effect.addFinalizer(() => Effect.sync(cancel))
 
+            // Emits the run's outcome. An expected error is a value and the
+            // loop goes on; a defect is a bug, so it fails the stream.
             const runOnce = Effect.gen(function* () {
               const exit = yield* Effect.exit(query)
-              if (Exit.isFailure(exit)) {
-                Queue.failCauseUnsafe(out, exit.cause)
-                return false
+              if (Exit.isSuccess(exit)) {
+                yield* Queue.offer(out, Result.succeed(exit.value))
+                return true
               }
-              yield* Queue.offer(out, exit.value)
-              return true
+              const error = Cause.findError(exit.cause)
+              if (Result.isSuccess(error)) {
+                yield* Queue.offer(out, Result.fail(error.success))
+                return true
+              }
+              Queue.failCauseUnsafe(out, error.failure)
+              return false
             })
 
             const loop = Effect.gen(function* () {
@@ -206,12 +218,14 @@ export const invalidate = (keys: InvalidationKeys): Effect.Effect<void, never, I
 
 /**
  * A stream of query results that re-runs when `keys` are invalidated. The
- * first run is immediate; a failed run fails the stream. Wrap `query` with
- * `Effect.result` to keep the subscription alive across failures.
+ * first run is immediate. Every run is emitted as a `Result`: a failed run is
+ * `Result.fail(e)` and the subscription stays alive, so the caller decides
+ * what a failure means (architecture 2.6: the engine re-emits the last value
+ * with `meta.error`). A defect fails the stream, because it is a bug.
  */
 export const liveQuery = <A, E, R>(
   keys: InvalidationKeys,
   query: Effect.Effect<A, E, R>,
   options?: LiveQueryOptions,
-): Stream.Stream<A, E, R | Invalidation> =>
+): Stream.Stream<Result.Result<A, E>, never, R | Invalidation> =>
   Stream.unwrap(Invalidation.use((i) => Effect.succeed(i.liveQuery(keys, query, options))))

@@ -3,7 +3,7 @@
  * docs/design/handoff/prototype/Threads v3.dc.html. Everything is invented.
  * Times are minutes before the clock's "now" when the seed runs.
  */
-import type { Team, User } from '@juno/slack/schemas'
+import type { Team, Ts, User } from '@juno/slack-schema'
 import { NEVER_READ, Workspace, type ConversationKind } from './state.ts'
 
 export const TEAM: Team = {
@@ -435,7 +435,7 @@ export function seedWorkspace(workspace: Workspace, avatarBase: string): void {
   }
 
   // Messages, oldest first across the whole workspace so ts order matches time order.
-  const roots: Array<{ channel: string; seed: SeedMessage; ts: string }> = []
+  const roots: Array<{ channel: string; seed: SeedMessage; ts: Ts }> = []
   const flat: Array<{ channel: string; seed: SeedMessage; parent?: SeedMessage }> = []
   for (const conversation of CONVERSATIONS) {
     for (const message of conversation.messages) {
@@ -444,7 +444,7 @@ export function seedWorkspace(workspace: Workspace, avatarBase: string): void {
     }
   }
   flat.sort((a, b) => b.seed.ago - a.seed.ago)
-  const tsOf = new Map<SeedMessage, string>()
+  const tsOf = new Map<SeedMessage, Ts>()
   for (const entry of flat) {
     const parentTs = entry.parent === undefined ? undefined : tsOf.get(entry.parent)
     const posted = workspace.post({

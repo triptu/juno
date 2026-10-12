@@ -5,11 +5,11 @@
  * controls are reachable over HTTP as `POST /control/<name>` with a JSON body,
  * for tests that drive a built app.
  */
-import type { Message, RtmFrame } from '@juno/slack/schemas'
+import type { Message, RtmFrame } from '@juno/slack-schema'
 import { Clock } from './clock.ts'
 import { seedWorkspace, SELF_ID, TEAM } from './fixtures.ts'
 import { FakeServer, type CallRecord, type Session } from './server.ts'
-import { Workspace, type Subscription } from './state.ts'
+import { asTs, Workspace, type Subscription } from './state.ts'
 
 export type { CallRecord, Session } from './server.ts'
 export type { ConversationRecord, PostInput, Subscription } from './state.ts'
@@ -124,7 +124,7 @@ export class FakeSlack {
       channel: input.channel,
       user: input.user ?? 'U0MAYA',
       text: input.text,
-      ...(input.threadTs === undefined ? {} : { threadTs: input.threadTs }),
+      ...(input.threadTs === undefined ? {} : { threadTs: asTs(input.threadTs) }),
       ...(input.broadcast === undefined ? {} : { broadcast: input.broadcast }),
       ...(input.clientMsgId === undefined ? {} : { clientMsgId: input.clientMsgId }),
     })
@@ -135,30 +135,30 @@ export class FakeSlack {
   }
 
   deleteMessage(input: { channel: string; ts: string }): void {
-    this.workspace.remove(input.channel, input.ts)
+    this.workspace.remove(input.channel, asTs(input.ts))
   }
 
   /** Self marks a conversation read from another client. */
   markRead(input: { channel: string; ts: string }): void {
-    this.workspace.markConversation(input.channel, input.ts)
+    this.workspace.markConversation(input.channel, asTs(input.ts))
   }
 
   markThreadRead(input: { channel: string; threadTs: string; ts: string; read?: boolean }): Subscription {
-    return this.workspace.markThread(input.channel, input.threadTs, input.ts, input.read ?? true)
+    return this.workspace.markThread(input.channel, asTs(input.threadTs), asTs(input.ts), input.read ?? true)
   }
 
   addReaction(input: { channel: string; ts: string; name: string; user?: string }): void {
-    const failure = this.workspace.react(input.channel, input.ts, input.name, input.user ?? 'U0MAYA', true)
+    const failure = this.workspace.react(input.channel, asTs(input.ts), input.name, input.user ?? 'U0MAYA', true)
     if (failure !== undefined) throw new Error(failure)
   }
 
   removeReaction(input: { channel: string; ts: string; name: string; user?: string }): void {
-    const failure = this.workspace.react(input.channel, input.ts, input.name, input.user ?? 'U0MAYA', false)
+    const failure = this.workspace.react(input.channel, asTs(input.ts), input.name, input.user ?? 'U0MAYA', false)
     if (failure !== undefined) throw new Error(failure)
   }
 
   typing(input: { channel: string; user?: string; threadTs?: string }): void {
-    this.workspace.typing(input.channel, input.user ?? 'U0MAYA', input.threadTs)
+    this.workspace.typing(input.channel, input.user ?? 'U0MAYA', input.threadTs === undefined ? undefined : asTs(input.threadTs))
   }
 
   /** Sends any frame to every socket, without encoding it. */

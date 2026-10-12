@@ -1,8 +1,16 @@
 /** Slack `blocks` → `MessageBody`. `rich_text` is rendered faithfully; layout blocks get a plain rendering. */
+import type { Block as SlackBlock, RichTextElement, RichTextInline, RichTextListStyle, TextObject } from '@juno/slack-schema'
 import type { Block, Inline, ListStyle, Lookups, MessageBody } from './model'
-import type { MessageBlock, RichTextElement, RichTextInline, RichTextListStyle, TextObject } from './slack-types'
 import { channelInline, emojiInline, inlineText, normalize, textRuns, toStyle, usergroupInline, userInline } from './inline'
 import { mrkdwnBlocks, mrkdwnInlines } from './from-mrkdwn'
+
+/**
+ * The text an element kind we do not render carries, if any. Slack puts it in
+ * `text` (`file`, `canvas`, `message_mention`, `workflowtoken`) or `fallback`.
+ */
+function unknownText(raw: Readonly<Record<string, unknown>>): string {
+  return typeof raw.text === 'string' ? raw.text : typeof raw.fallback === 'string' ? raw.fallback : ''
+}
 
 function inlineFromElement(el: RichTextInline, lookups: Lookups): Inline[] {
   switch (el.type) {
@@ -29,12 +37,9 @@ function inlineFromElement(el: RichTextInline, lookups: Lookups): Inline[] {
       return textRuns(el.fallback ?? '')
     case 'color':
       return textRuns(el.value)
-    default: {
-      // Kinds we do not know. Show their text if they have any.
-      const other = el as { readonly text?: unknown; readonly fallback?: unknown }
-      const text = typeof other.text === 'string' ? other.text : typeof other.fallback === 'string' ? other.fallback : ''
-      return textRuns(text)
-    }
+    case 'unknown':
+      // Kinds we do not know. Keep their text so nothing the sender wrote is lost.
+      return textRuns(unknownText(el.raw))
   }
 }
 
@@ -81,8 +86,10 @@ function blockFromElement(el: RichTextElement, lookups: Lookups): Block | undefi
     }
     case 'rich_text_divider':
       return { kind: 'divider' }
-    default:
-      return undefined
+    case 'unknown': {
+      const children = normalize(textRuns(unknownText(el.raw)))
+      return children.length === 0 ? undefined : { kind: 'paragraph', children }
+    }
   }
 }
 
@@ -90,7 +97,7 @@ function textObjectInlines(text: TextObject, lookups: Lookups): Inline[] {
   return text.type === 'mrkdwn' ? mrkdwnInlines(text.text, lookups) : normalize(textRuns(text.text))
 }
 
-function blocksFromMessageBlock(block: MessageBlock, lookups: Lookups): Block[] {
+function blocksFromMessageBlock(block: SlackBlock, lookups: Lookups): Block[] {
   switch (block.type) {
     case 'rich_text':
       return block.elements.flatMap((el) => {
@@ -110,7 +117,7 @@ function blocksFromMessageBlock(block: MessageBlock, lookups: Lookups): Block[] 
     case 'context': {
       const children: Inline[] = []
       for (const el of block.elements) {
-        if (el.type === 'image') continue
+        if (el.type !== 'mrkdwn' && el.type !== 'plain_text') continue
         if (children.length > 0) children.push({ kind: 'text', text: ' ' })
         children.push(...textObjectInlines(el, lookups))
       }
@@ -118,7 +125,8 @@ function blocksFromMessageBlock(block: MessageBlock, lookups: Lookups): Block[] 
     }
     case 'divider':
       return [{ kind: 'divider' }]
-    default:
+    case 'image':
+    case 'unknown':
       return []
   }
 }
@@ -128,6 +136,6 @@ function paragraphOf(children: Inline[]): Block[] {
 }
 
 /** Renders `blocks`. Returns an empty body when nothing in them is renderable. */
-export function bodyFromBlocks(blocks: ReadonlyArray<MessageBlock>, lookups: Lookups = {}): MessageBody {
+export function bodyFromBlocks(blocks: ReadonlyArray<SlackBlock>, lookups: Lookups = {}): MessageBody {
   return { blocks: blocks.flatMap((block) => blocksFromMessageBlock(block, lookups)) }
 }

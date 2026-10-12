@@ -4,7 +4,7 @@
  * (`users/info`) or `socket`.
  */
 import { Schema as S } from 'effect'
-import { FatalAuthErrors, RateLimitErrors } from '../schemas/common.ts'
+import { FatalAuthErrors, RateLimitErrors } from '@juno/slack-schema'
 
 /**
  * The session is unusable: one of the fatal auth errors came back, or the

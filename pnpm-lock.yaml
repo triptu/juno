@@ -313,6 +313,9 @@ importers:
       '@juno/richtext':
         specifier: workspace:*
         version: link:../richtext
+      '@juno/slack-schema':
+        specifier: workspace:*
+        version: link:../slack-schema
       effect:
         specifier: 4.0.3
         version: 4.0.3
@@ -348,9 +351,9 @@ importers:
 
   packages/fake-slack:
     dependencies:
-      '@juno/slack':
+      '@juno/slack-schema':
         specifier: workspace:*
-        version: link:../slack
+        version: link:../slack-schema
       effect:
         specifier: 4.0.3
         version: 4.0.3
@@ -375,7 +378,14 @@ importers:
         version: 5.0.4(@types/node@24.19.2)(vite@7.3.7(@types/node@24.19.2)(jiti@2.7.0)(lightningcss@1.33.0))
 
   packages/richtext:
+    dependencies:
+      '@juno/slack-schema':
+        specifier: workspace:*
+        version: link:../slack-schema
     devDependencies:
+      effect:
+        specifier: 4.0.3
+        version: 4.0.3
       typescript:
         specifier: 5.9.3
         version: 5.9.3
@@ -385,6 +395,9 @@ importers:
 
   packages/slack:
     dependencies:
+      '@juno/slack-schema':
+        specifier: workspace:*
+        version: link:../slack-schema
       effect:
         specifier: 4.0.3
         version: 4.0.3
@@ -404,6 +417,22 @@ importers:
       '@types/ws':
         specifier: 8.18.2
         version: 8.18.2
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+      vite:
+        specifier: 7.3.7
+        version: 7.3.7(@types/node@24.19.2)(jiti@2.7.0)(lightningcss@1.33.0)
+      vitest:
+        specifier: 5.0.4
+        version: 5.0.4(@types/node@24.19.2)(vite@7.3.7(@types/node@24.19.2)(jiti@2.7.0)(lightningcss@1.33.0))
+
+  packages/slack-schema:
+    dependencies:
+      effect:
+        specifier: 4.0.3
+        version: 4.0.3
+    devDependencies:
       typescript:
         specifier: 5.9.3
         version: 5.9.3
@@ -447,6 +476,12 @@ importers:
       '@effect/sql-sqlite-node':
         specifier: 4.0.3
         version: 4.0.3(effect@4.0.3)
+      '@juno/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@juno/slack-schema':
+        specifier: workspace:*
+        version: link:../slack-schema
       effect:
         specifier: 4.0.3
         version: 4.0.3

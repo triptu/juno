@@ -2,7 +2,7 @@
  * The ⌘K command grammar (spec section 10, inventory section 9). A model
  * fallback may run after this; the grammar handles the clear cases.
  */
-import { channelLabel, isDm, type ChannelInfo } from './channel'
+import { channelLabel, firstName, isDm, type ChannelInfo } from './channel'
 import type { ChannelId, TopicId, UserId } from './ids'
 
 export interface CommandPerson {
@@ -46,10 +46,6 @@ const SEND_VERBS = /^(message|tell|ask|dm|ping|text)\s+(.+)$/i
 const POST_VERBS = /^(?:post|send|say)\s+(?:in|to)\s+#?([\w-]+)\s+(.+)$/i
 const ASK_VERBS = /^(summari[sz]e|catch me up(?: on)?|tl;?dr|what did i miss)\b\s*(.*)$/i
 const RESOLVE_VERB = /^resolve\s+(.+)$/i
-
-function firstName(name: string): string {
-  return name.trim().split(/\s+/)[0] ?? name
-}
 
 export function tokens(text: string): string[] {
   return text
