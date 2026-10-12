@@ -39,6 +39,7 @@ export interface ClientPageOptions {
   readonly url: string
   readonly token: string
   readonly userId: string
+  readonly enterpriseId?: string
 }
 
 /** Writes `localConfig_v2` the way the real client page does, then shows a minimal shell. */
@@ -54,6 +55,7 @@ export function clientPage(options: ClientPageOptions): string {
         user_id: options.userId,
         user_locale: 'en-US',
         variant: 'commercial',
+        ...(options.enterpriseId === undefined ? {} : { enterprise_id: options.enterpriseId, enterprise_name: 'Juno Fake Org' }),
       },
     },
     lastActiveTeamId: options.teamId,

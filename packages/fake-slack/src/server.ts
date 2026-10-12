@@ -357,6 +357,7 @@ export class FakeServer {
         url: `${this.#baseUrl}/`,
         token: session.token,
         userId: session.userId,
+        ...(this.workspace.team.enterprise_id === undefined ? {} : { enterpriseId: this.workspace.team.enterprise_id }),
       }),
     )
   }

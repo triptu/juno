@@ -24,6 +24,8 @@ export interface FakeSlackOptions {
   readonly now?: number
   /** Replace the default seed. */
   readonly seed?: (workspace: Workspace, avatarBase: string) => void
+  /** Enterprise Grid: the team carries this `enterprise_id`, in `auth.test`, `client.userBoot` and the client page. */
+  readonly enterpriseId?: string
 }
 
 export interface Credentials {
@@ -61,7 +63,8 @@ export class FakeSlack {
 
   static async start(options: FakeSlackOptions = {}): Promise<FakeSlack> {
     const clock = new Clock(options.now)
-    const workspace = new Workspace(clock, SELF_ID, TEAM)
+    const team = options.enterpriseId === undefined ? TEAM : { ...TEAM, enterprise_id: options.enterpriseId, enterprise_name: 'Juno Fake Org' }
+    const workspace = new Workspace(clock, SELF_ID, team)
     let fake: FakeSlack | undefined
     const server = new FakeServer(workspace, (name, input) => {
       if (fake === undefined) throw new Error('not started')
@@ -236,3 +239,4 @@ export class FakeSlack {
 export function startFakeSlack(options?: FakeSlackOptions): Promise<FakeSlack> {
   return FakeSlack.start(options)
 }
+export { localConfigJson, writeSlackAppFixture, type SlackAppFixtureOptions, type SlackAppFixtureTeam } from './slackApp.ts'
