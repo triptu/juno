@@ -6,7 +6,8 @@
  */
 import { Schema as S } from 'effect'
 import { ThreadCounts } from './boot.ts'
-import { FormBit, FormBoolean, FormNumber, Ts } from './common.ts'
+import { FormBit, FormBoolean, FormNumber } from './common.ts'
+import { Ts } from './ts.ts'
 import { Message, MessageFields } from './message.ts'
 
 const opt = S.optionalKey

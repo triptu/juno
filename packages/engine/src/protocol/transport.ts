@@ -1,10 +1,11 @@
 /**
  * The only thing the engine needs from its host: a source of ports.
  *
- * Each renderer (or test client) gets one port. Electron hands them over
- * `process.parentPort`; tests push Node `MessageChannel` ports directly. The
- * engine never imports `electron`, so `parentPortTransport` is typed against
- * the shape it uses, not Electron's classes.
+ * Each renderer (or test client) gets one port. The Electron entry pushes the
+ * `MessagePortMain`s it receives over `process.parentPort` into
+ * `electronTransport`; tests push Node `MessageChannel` ports into
+ * `memoryTransport`. The engine never imports `electron`, so the Electron
+ * port is typed against the shape it uses, not Electron's classes.
  */
 
 /** A port the engine talks on. All three port flavours fit after adapting. */
@@ -21,7 +22,7 @@ export interface Transport {
 }
 
 /** Collects ports pushed in from the outside. Used by both transports below. */
-export function portSource(): Transport & { readonly add: (port: EnginePort) => void } {
+function portSource(): Transport & { readonly add: (port: EnginePort) => void } {
   const listeners = new Set<(port: EnginePort) => void>()
   const pending: Array<EnginePort> = []
   return {
@@ -48,7 +49,7 @@ export interface MessagePortMainLike {
   close(): void
 }
 
-export function fromMessagePortMain(port: MessagePortMainLike): EnginePort {
+function fromMessagePortMain(port: MessagePortMainLike): EnginePort {
   return {
     postMessage: (message) => port.postMessage(message),
     onMessage: (f) => {
@@ -70,7 +71,7 @@ export interface MessagePortLike {
   close(): void
 }
 
-export function fromMessagePort(port: MessagePortLike): EnginePort {
+function fromMessagePort(port: MessagePortLike): EnginePort {
   return {
     postMessage: (message) => port.postMessage(message),
     onMessage: (f) => {
@@ -83,28 +84,20 @@ export function fromMessagePort(port: MessagePortLike): EnginePort {
   }
 }
 
-/** The shape of `process.parentPort` in an Electron utility process. */
-export interface ParentPortLike {
-  on(event: 'message', listener: (event: { data: unknown; ports: ReadonlyArray<MessagePortMainLike> }) => void): unknown
-  postMessage(message: unknown): void
-}
-
 /**
- * Ports arrive from main as `{ _tag: 'port' }` messages carrying the port in
- * `ports[0]` (see `MainToEngine` in the contract). Every port is started
- * here; `MessagePortMain` queues messages until `start()` is called.
+ * The transport for Electron: the utility process entry adds every port main
+ * sends in a `port` message (see `MainToEngine`). Ports are started here;
+ * `MessagePortMain` queues messages until `start()` is called.
  */
-export function parentPortTransport(parent: ParentPortLike): Transport {
+export function electronTransport(): Transport & { readonly add: (port: MessagePortMainLike) => void } {
   const source = portSource()
-  parent.on('message', (event) => {
-    const data = event.data as { _tag?: unknown } | null
-    if (data && data._tag === 'port' && event.ports[0]) {
-      const port = event.ports[0]
+  return {
+    ports: source.ports,
+    add: (port) => {
       source.add(fromMessagePortMain(port))
       port.start()
-    }
-  })
-  return source
+    },
+  }
 }
 
 /** A transport for tests: push Node `MessageChannel` ports into it. */

@@ -6,7 +6,7 @@
  * This turns that into one `rich_text` block (sections and quotes) and a
  * mrkdwn `text` fallback with `<@U…>` / `<#C…|name>` encodings.
  */
-import type { RichTextBlock, RichTextElement, RichTextInline } from './slack-types'
+import type { RichTextBlock, RichTextElement, RichTextInline } from '@juno/slack-schema'
 import { emojiUnicode, isKnownEmoji } from './emoji'
 
 export interface MentionTargets {

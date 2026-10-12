@@ -5,7 +5,8 @@
  * Source: docs/research/slack-data-access.md section 2.
  */
 import { Schema as S } from 'effect'
-import { FormBoolean, FormJson, FormNumber, RawObject, Ts } from './common.ts'
+import { FormBoolean, FormJson, FormNumber, RawObject } from './common.ts'
+import { Ts } from './ts.ts'
 import { Channel, Im } from './conversations.ts'
 import { Subteam, Team, User } from './users.ts'
 

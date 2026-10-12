@@ -13,8 +13,8 @@ export class Status extends Context.Service<
   {
     readonly current: Effect.Effect<EngineStatus>
     readonly setPhase: (phase: EnginePhase) => Effect.Effect<void>
-    /** Emits whenever the phase changes. Does not emit the current value first. */
-    readonly phaseChanges: Stream.Stream<EnginePhase>
+    /** Emits the current phase at subscribe time, then every change. */
+    readonly phases: Stream.Stream<EnginePhase>
   }
 >()('juno/engine/Status') {
   static readonly layer = Layer.effect(
@@ -22,14 +22,11 @@ export class Status extends Context.Service<
     Effect.gen(function* () {
       const startedAt = yield* Clock.currentTimeMillis
       const phase = yield* SubscriptionRef.make<EnginePhase>({ _tag: 'booting' })
-      const current = Effect.gen(function* () {
-        const now = yield* Clock.currentTimeMillis
-        return { phase: yield* SubscriptionRef.get(phase), uptime: now - startedAt, startedAt }
-      })
+      const current = Effect.map(SubscriptionRef.get(phase), (value) => ({ phase: value, startedAt }))
       return Status.of({
         current,
         setPhase: (next) => SubscriptionRef.set(phase, next),
-        phaseChanges: SubscriptionRef.changes(phase).pipe(Stream.drop(1)),
+        phases: SubscriptionRef.changes(phase),
       })
     }),
   )

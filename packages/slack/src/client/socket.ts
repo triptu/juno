@@ -31,7 +31,7 @@
 import type { Agent } from 'node:http'
 import { Cause, Clock, Context, Effect, Layer, Queue, Ref, Scope, Stream } from 'effect'
 import { WebSocket } from 'ws'
-import { decodeRtmFrame, type RtmFrame, type RtmOutgoingFrame } from '../schemas/rtm.ts'
+import { decodeRtmFrame, type RtmFrame, type RtmOutgoingFrame } from '@juno/slack-schema'
 import { SlackApi } from './api.ts'
 import { SlackConfig, type SlackConfigShape } from './config.ts'
 import { SlackAuthRequired } from './errors.ts'

@@ -1,7 +1,7 @@
-import { useAtomSet, useAtomValue } from '@effect/atom-react'
 import { useRef } from 'react'
 import type { EngineStatus as Status } from '@juno/contract'
 import { connectionStateAtom, engineStatusAtom, pingCommand } from '@juno/state'
+import { useAtomSet, useAtomValue } from '@juno/state/react'
 import { EngineStatusView } from '../views/EngineStatusView'
 
 const phaseLabel = (phase: Status['phase']): string => {
@@ -32,13 +32,15 @@ export function EngineStatus() {
   const count = useRef(0)
 
   const line =
-    connection === 'reconnecting'
-      ? 'Engine restarting'
-      : status._tag === 'Success'
-        ? `${phaseLabel(status.value.phase)}, up ${Math.floor(status.value.uptime / 1000)} s`
-        : status._tag === 'Failure'
-          ? 'Engine unreachable'
-          : 'Connecting to engine'
+    connection === 'failed'
+      ? 'Engine failed'
+      : connection === 'reconnecting'
+        ? 'Engine restarting'
+        : status._tag === 'Success'
+          ? phaseLabel(status.value.phase)
+          : status._tag === 'Failure'
+            ? 'Engine unreachable'
+            : 'Connecting to engine'
 
   return (
     <EngineStatusView

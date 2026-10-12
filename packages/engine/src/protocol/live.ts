@@ -1,44 +1,79 @@
 /**
- * Helpers for live query handlers (architecture 2.6, performance 2.2 and 6).
+ * Serve helpers for live query handlers (architecture 2.6, performance 2.2
+ * and 6).
  *
- * - `liveValue` turns a stream of values into `LiveValue` messages with meta.
- * - `liveList` runs a windowed query on every invalidation and emits
- *   `ListDelta`s: the whole window first (`reset: true`), then only rows whose
- *   `rev` changed plus the ids that left the window. The last `{ order,
- *   revById }` per subscription lives here, so handlers only write the query.
+ * A handler produces a stream of query runs and passes it here; the helpers
+ * only stamp `meta` and, for lists, diff rows by `rev`. Where the runs come
+ * from is the handler's business: feature handlers use the store's
+ * `liveQuery(keys, timed(query))`, which owns the re-run and debounce rules;
+ * `status` re-runs on its own phase changes.
  *
- * Invalidations are debounced leading-edge with a 30 ms trailing run, so a
- * burst of socket events costs two query runs, and the first one is not
- * delayed.
+ * - `serveLiveValue` turns runs of a value into `LiveValue` messages.
+ * - `serveLiveList` turns runs of a windowed query into `ListDelta`s: the
+ *   whole window first (`reset: true`), then only rows whose `rev` changed
+ *   plus the ids that left the window. The last `{ order, revById }` per
+ *   subscription lives here.
+ *
+ * Failures: a run that fails before any value was sent fails the stream, so
+ * the renderer sees the route's error. A later failure re-emits the last
+ * value with `meta.error` and the subscription continues.
  */
-import { Clock, Effect, Queue, Scope, Stream } from 'effect'
+import { Clock, Effect, Result, Stream } from 'effect'
 import { LIVE_DELTA_MAX_BYTES, LIVE_SNAPSHOT_MAX_BYTES, type ListDelta, type LiveMeta, type LiveValue } from '@juno/contract'
 
-const TRAILING_DEBOUNCE_MS = 30
-
-interface Timed<A> {
+/** A successful query run: its value and how long it took. */
+export interface Timed<A> {
   readonly value: A
   readonly queryMs: number
 }
 
-const timed = <A, E, R>(effect: Effect.Effect<A, E, R>): Effect.Effect<Timed<A>, E, R> =>
+/** Measures `query`. Wrap the query a handler gives the store's `liveQuery` with this. */
+export const timed = <A, E, R>(query: Effect.Effect<A, E, R>): Effect.Effect<Timed<A>, E, R> =>
   Effect.gen(function* () {
     const start = performance.now()
-    const value = yield* effect
+    const value = yield* query
     return { value, queryMs: performance.now() - start }
   })
 
-/** Stamps every value with `LiveMeta`. `queryMs` is the time `query` took when given. */
-export function liveValue<A, E, R>(options: {
-  /** The current value, run once at subscribe time. */
-  readonly query: Effect.Effect<A, E, R>
-  /** Re-run `query` whenever this emits. */
-  readonly invalidations: Stream.Stream<unknown, E, R>
-}): Stream.Stream<LiveValue<A>, E, R> {
+/**
+ * One run as the serve helpers see it: the store's `liveQuery` emits every
+ * run as a `Result`, so a failed run is a value and the stream goes on.
+ */
+export type Run<A, E> = Result.Result<Timed<A>, E>
+
+export interface ServeOptions {
+  /** Measure `encodeMs` and the size budgets. Costs a second encode per row; dev and e2e only. */
+  readonly measure?: boolean | undefined
+}
+
+/** The error as one line for `meta.error`: the message, or the tag of a tagged error without one. */
+const describe = (error: unknown): string => {
+  if (!(error instanceof Error)) return String(error)
+  if (error.message !== '') return error.message
+  const tag = (error as { readonly _tag?: unknown })._tag
+  return typeof tag === 'string' ? tag : error.name
+}
+
+/** Stamps every run with `LiveMeta`. `encode` is the value codec of the route, used only when measuring. */
+export function serveLiveValue<A, E, SE, R>(
+  runs: Stream.Stream<Run<A, E>, SE, R>,
+  options?: ServeOptions & { readonly encode?: ((value: A) => unknown) | undefined },
+): Stream.Stream<LiveValue<A>, E | SE, R> {
   let seq = 0
-  return runs(options).pipe(
-    Stream.mapEffect(({ value, queryMs }) =>
-      Clock.currentTimeMillis.pipe(Effect.map((at) => ({ value, meta: { seq: ++seq, queryMs, encodeMs: 0, at } }))),
+  let last: { readonly value: A } | undefined
+  return runs.pipe(
+    Stream.mapEffect((run) =>
+      Effect.gen(function* () {
+        const at = yield* Clock.currentTimeMillis
+        if (Result.isFailure(run)) {
+          if (last === undefined) return yield* Effect.fail(run.failure)
+          return { value: last.value, meta: { seq: ++seq, queryMs: 0, encodeMs: 0, at, error: describe(run.failure) } }
+        }
+        const { value, queryMs } = run.success
+        last = { value }
+        const encodeMs = options?.measure && options.encode ? measureEncode(() => options.encode!(value)).encodeMs : 0
+        return { value, meta: { seq: ++seq, queryMs, encodeMs, at } }
+      }),
     ),
   )
 }
@@ -54,22 +89,27 @@ interface RowLike {
 }
 
 /**
- * Runs `query` first, then on every invalidation, and emits deltas. `encode`
- * is the row codec of the route; it is used to measure `encodeMs` and to
- * enforce the size budgets on the rows that actually travel.
+ * Emits the whole window on the first run, then deltas. `encodeRow` is the
+ * row codec of the route; when measuring it gives `encodeMs` and checks the
+ * size budgets on the rows that actually travel.
  */
-export function liveList<Row extends RowLike, E, R>(options: {
-  readonly query: Effect.Effect<ListRun<Row>, E, R>
-  readonly invalidations: Stream.Stream<unknown, E, R>
-  readonly encodeRow: (row: Row) => unknown
-}): Stream.Stream<ListDelta<Row>, E, R> {
+export function serveLiveList<Row extends RowLike, E, SE, R>(
+  runs: Stream.Stream<Run<ListRun<Row>, E>, SE, R>,
+  options: ServeOptions & { readonly encodeRow: (row: Row) => unknown },
+): Stream.Stream<ListDelta<Row>, E | SE, R> {
   let seq = 0
   let order: ReadonlyArray<string> = []
   let revById = new Map<string, number>()
-  return runs(options).pipe(
-    Stream.mapEffect(({ value: run, queryMs }) =>
+  return runs.pipe(
+    Stream.mapEffect((outcome) =>
       Effect.gen(function* () {
         const at = yield* Clock.currentTimeMillis
+        if (Result.isFailure(outcome)) {
+          if (seq === 0) return yield* Effect.fail(outcome.failure)
+          const meta: LiveMeta = { seq: ++seq, queryMs: 0, encodeMs: 0, at, error: describe(outcome.failure) }
+          return { reset: false, order, upsert: [], remove: [], meta }
+        }
+        const { value: run, queryMs } = outcome.success
         const reset = seq === 0
         const nextOrder = run.rows.map((row) => row.id)
         const nextRevById = new Map<string, number>()
@@ -80,11 +120,15 @@ export function liveList<Row extends RowLike, E, R>(options: {
         }
         const remove: Array<string> = []
         for (const id of revById.keys()) if (!nextRevById.has(id)) remove.push(id)
-        const encodeStart = performance.now()
-        const bytes = upsert.reduce((n, row) => n + JSON.stringify(options.encodeRow(row)).length, 0)
-        const encodeMs = performance.now() - encodeStart
-        const budget = reset ? LIVE_SNAPSHOT_MAX_BYTES : LIVE_DELTA_MAX_BYTES
-        if (bytes > budget) yield* Effect.logWarning(`live list message of ${bytes} bytes exceeds the ${budget} byte budget`)
+        let encodeMs = 0
+        if (options.measure) {
+          const measured = measureEncode(() => upsert.map(options.encodeRow))
+          encodeMs = measured.encodeMs
+          const budget = reset ? LIVE_SNAPSHOT_MAX_BYTES : LIVE_DELTA_MAX_BYTES
+          if (measured.bytes > budget) {
+            yield* Effect.logWarning(`live list message of ${measured.bytes} bytes exceeds the ${budget} byte budget`)
+          }
+        }
         order = sameOrder(order, nextOrder) ? order : nextOrder
         revById = nextRevById
         const meta: LiveMeta = { seq: ++seq, queryMs, encodeMs, at, ...(run.total === undefined ? {} : { total: run.total }) }
@@ -94,35 +138,17 @@ export function liveList<Row extends RowLike, E, R>(options: {
   )
 }
 
+const encoder = new TextEncoder()
+
+function measureEncode(encode: () => unknown): { readonly encodeMs: number; readonly bytes: number } {
+  const start = performance.now()
+  const json = JSON.stringify(encode())
+  const encodeMs = performance.now() - start
+  return { encodeMs, bytes: json === undefined ? 0 : encoder.encode(json).byteLength }
+}
+
 function sameOrder(a: ReadonlyArray<string>, b: ReadonlyArray<string>): boolean {
   if (a.length !== b.length) return false
   for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false
   return true
-}
-
-/**
- * One run now, then one per invalidation burst: the first invalidation runs
- * at once, anything that arrives in the next 30 ms collapses into one more.
- */
-function runs<A, E, R>(options: {
-  readonly query: Effect.Effect<A, E, R>
-  readonly invalidations: Stream.Stream<unknown, E, R>
-}): Stream.Stream<Timed<A>, E, R> {
-  return Stream.callback<Timed<A>, E, R>(
-    Effect.fnUntraced(function* (out) {
-      const emit = timed(options.query).pipe(Effect.flatMap((value) => Queue.offer(out, value)))
-      yield* emit
-      const scope = yield* Effect.scope
-      const invalidations = yield* Stream.toQueue(options.invalidations, { capacity: 'unbounded' }).pipe(Scope.provide(scope))
-      yield* Effect.gen(function* () {
-        while (true) {
-          yield* Queue.take(invalidations)
-          yield* emit
-          yield* Effect.sleep(TRAILING_DEBOUNCE_MS)
-          const more = yield* Queue.clear(invalidations)
-          if (more.length > 0) yield* emit
-        }
-      }).pipe(Effect.catchCause((cause) => Queue.failCause(out, cause)), Effect.forkIn(scope))
-    }),
-  )
 }

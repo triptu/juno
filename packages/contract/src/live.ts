@@ -3,13 +3,14 @@
  *
  * Two kinds:
  *
- * - `liveQuery` streams a single value: the current one first, then every
- *   change. Use it for status, prefs, a topic detail.
- * - `liveList` streams a window of rows as `ListDelta`s: a first message with
- *   `reset: true` carrying the whole window, then only rows whose `rev`
+ * - `liveValueRoute` streams a single value: the current one first, then
+ *   every change. Use it for status, prefs, a topic detail.
+ * - `liveListRoute` streams a window of rows as `ListDelta`s: a first message
+ *   with `reset: true` carrying the whole window, then only rows whose `rev`
  *   changed. The renderer keeps rows whose `rev` did not change, so
  *   `React.memo` holds and only changed rows are decoded. Subscriptions always
- *   cover a `Window`, never a whole history.
+ *   cover a `ListRange`, never a whole history; the route adds `range` to its
+ *   payload itself.
  *
  * Every message carries `LiveMeta` so the renderer can attribute the
  * write-to-pixels budget without a cross-process trace.
@@ -31,14 +32,14 @@ export const liveKindOf = (rpc: Rpc.Any): LiveKind | undefined => Context.getOrU
 export const LIVE_SNAPSHOT_MAX_BYTES = 200 * 1024
 export const LIVE_DELTA_MAX_BYTES = 32 * 1024
 
-/** A window into an ordered list: the row to start from and how many rows. */
-export const Window = Schema.Struct({
-  /** Id of the row the window starts at. Absent means the top of the list. */
+/** A range of an ordered list: the row to start from and how many rows. */
+export const ListRange = Schema.Struct({
+  /** Id of the row the range starts at. Absent means the top of the list. */
   anchor: Schema.optionalKey(Schema.String),
   /** Number of rows after the anchor. Capped by the engine. */
   limit: Schema.Int,
 })
-export type Window = typeof Window.Type
+export type ListRange = typeof ListRange.Type
 
 /** Timing and ordering the engine stamps on every live query message. */
 export const LiveMeta = Schema.Struct({
@@ -46,7 +47,11 @@ export const LiveMeta = Schema.Struct({
   seq: Schema.Int,
   /** Milliseconds the engine spent running the query for this message. */
   queryMs: Schema.Number,
-  /** Milliseconds the engine spent encoding the rows of this message. */
+  /**
+   * Milliseconds the engine spent encoding the rows of this message. Measured
+   * only in dev and e2e builds; 0 otherwise, because measuring encodes every
+   * row twice.
+   */
   encodeMs: Schema.Number,
   /** Engine clock (epoch milliseconds) when the message was built. */
   at: Schema.Number,
@@ -57,21 +62,21 @@ export const LiveMeta = Schema.Struct({
 })
 export type LiveMeta = typeof LiveMeta.Type
 
-/** What every row in a `liveList` carries. */
+/** What every row in a `liveListRoute` carries. */
 export const RowFields = {
   id: Schema.String,
   /** Changes whenever any field of the row changes. */
   rev: Schema.Int,
 }
 
-/** One `liveQuery` message. */
+/** One `liveValueRoute` message. */
 export function LiveValue<Value extends Schema.Top>(value: Value) {
   return Schema.Struct({ value, meta: LiveMeta })
 }
 export type LiveValue<Value> = { readonly value: Value; readonly meta: LiveMeta }
 
 /**
- * One `liveList` message. The first message of a subscription has
+ * One `liveListRoute` message. The first message of a subscription has
  * `reset: true`; `order` is then the complete window and `upsert` holds every
  * row in it. Later messages carry only rows whose `rev` changed, the ids that
  * left the window, and `order` (the same array contents when unchanged).
@@ -94,23 +99,25 @@ export type ListDelta<Row> = {
 }
 
 /** Declares a single-value live query. */
-export function liveQuery<const Tag extends string, Value extends Schema.Top, Payload extends Schema.Top | Schema.Struct.Fields = Schema.Void>(
-  tag: Tag,
-  options: { readonly value: Value; readonly payload?: Payload },
-) {
+export function liveValueRoute<
+  const Tag extends string,
+  Value extends Schema.Top,
+  Payload extends Schema.Top | Schema.Struct.Fields = Schema.Void,
+>(tag: Tag, options: { readonly value: Value; readonly payload?: Payload }) {
   return Rpc.make(tag, { payload: options.payload, success: LiveValue(options.value), stream: true }).annotate(
     LiveKindAnnotation,
     'value',
   )
 }
 
-/** Declares a windowed list live query. The payload must include a `window`. */
-export function liveList<const Tag extends string, Row extends Schema.Top, Payload extends Schema.Top | Schema.Struct.Fields = Schema.Void>(
+/**
+ * Declares a windowed list live query. The payload is the given fields plus
+ * `range: ListRange`, so every list subscription has a range by construction.
+ */
+export function liveListRoute<const Tag extends string, Row extends Schema.Top, Payload extends Schema.Struct.Fields = {}>(
   tag: Tag,
   options: { readonly row: Row; readonly payload?: Payload },
 ) {
-  return Rpc.make(tag, { payload: options.payload, success: ListDelta(options.row), stream: true }).annotate(
-    LiveKindAnnotation,
-    'list',
-  )
+  const payload = { ...(options.payload ?? ({} as Payload)), range: ListRange }
+  return Rpc.make(tag, { payload, success: ListDelta(options.row), stream: true }).annotate(LiveKindAnnotation, 'list')
 }

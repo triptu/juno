@@ -1,6 +1,6 @@
 import { app, BrowserWindow, ipcMain, type IpcMainInvokeEvent } from 'electron'
 import { Schema } from 'effect'
-import { Channels, Routes, type RouteInput, type RouteOutput } from '@juno/contract'
+import { Channels, ShellRoutes, type ShellInput, type ShellOutput } from '@juno/contract'
 import type { EngineSupervisor } from './engine'
 import type { Launch } from './launch'
 import { APP_ORIGIN } from './scheme'
@@ -10,16 +10,16 @@ import { APP_ORIGIN } from './scheme'
  * decoded and the output encoded through the route's schemas, so main never
  * trusts a renderer payload and never answers with a malformed one.
  */
-function handle<C extends keyof Routes>(
+function handle<C extends keyof ShellRoutes>(
   channel: C,
-  handler: (input: RouteInput<C>, event: IpcMainInvokeEvent) => RouteOutput<C> | Promise<RouteOutput<C>>,
+  handler: (input: ShellInput<C>, event: IpcMainInvokeEvent) => ShellOutput<C> | Promise<ShellOutput<C>>,
 ): void {
-  const route = Routes[channel]
+  const route = ShellRoutes[channel]
   const decodeInput = Schema.decodeUnknownSync(route.input)
   const encodeOutput = Schema.encodeUnknownSync(route.output)
   ipcMain.handle(channel, async (event, payload: unknown) => {
     assertTrustedSender(event)
-    const input = decodeInput(payload) as RouteInput<C>
+    const input = decodeInput(payload) as ShellInput<C>
     return encodeOutput(await handler(input, event))
   })
 }
@@ -52,10 +52,9 @@ export function registerIpc({ supervisor, setTheme }: IpcDeps): void {
   }))
 
   // The port cannot travel in the invoke answer; it goes out through
-  // webContents.postMessage and the preload forwards it to the page.
-  handle(Channels.engineRequestPort, (_input, event) => {
-    supervisor.connect(event.sender)
-  })
+  // webContents.postMessage and the preload forwards it to the page. The
+  // answer says whether one will come at all.
+  handle(Channels.engineRequestPort, (_input, event) => supervisor.connect(event.sender))
 
   handle(Channels.launchSetTheme, ({ theme }) => {
     setTheme(theme)

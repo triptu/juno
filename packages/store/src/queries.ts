@@ -3,6 +3,7 @@
  * belong to their engine feature folder; the store does not shape data for
  * the UI.
  */
+import { maxTs, minTs } from '@juno/slack-schema'
 import { Effect } from 'effect'
 import type { SqlError } from 'effect/sql/SqlError'
 import { StoreReader, StoreWriter } from './clients'
@@ -113,8 +114,8 @@ export const syncedRanges = {
       let from_ts = range.from_ts
       let to_ts = range.to_ts
       for (const r of touching) {
-        if (r.from_ts < from_ts) from_ts = r.from_ts
-        if (r.to_ts > to_ts) to_ts = r.to_ts
+        from_ts = minTs(from_ts, r.from_ts)
+        to_ts = maxTs(to_ts, r.to_ts)
       }
       if (touching.length > 0) {
         yield* sql`DELETE FROM synced_ranges

@@ -4,13 +4,15 @@
  * Forks it with the `persist:slack` partition, restarts it on exit with
  * exponential backoff (1 s base, 30 s cap) and gives up after 5 exits in two
  * minutes. Hands out MessagePorts: one end to the engine, the other to a
- * renderer. Ports requested while the engine is down are queued and sent once
- * it reports `ready`, so a renderer reconnecting after a crash just waits.
+ * renderer. A port requested while the engine is down is held, at most one
+ * per renderer, and sent once it reports `ready`, so a renderer reconnecting
+ * after a crash just waits. Once the supervisor has given up, a request is
+ * answered `failed` and the renderer shows it.
  */
 import { app, MessageChannelMain, utilityProcess, type MessagePortMain, type UtilityProcess, type WebContents } from 'electron'
 import { join } from 'node:path'
 import { Schema } from 'effect'
-import { Events, EngineToMain, type EngineConfig, type MainToEngine } from '@juno/contract'
+import { Events, EngineToMain, type EngineConfig, type MainToEngine, type PortRequestResult } from '@juno/contract'
 
 const BACKOFF_BASE_MS = 1_000
 const BACKOFF_CAP_MS = 30_000
@@ -24,7 +26,7 @@ const decodeFromEngine = Schema.decodeUnknownSync(EngineToMain)
 export class EngineSupervisor {
   private child: UtilityProcess | undefined
   private state: SupervisorState = 'stopped'
-  private readonly pendingPorts: Array<MessagePortMain> = []
+  private readonly pendingPorts = new Map<WebContents, MessagePortMain>()
   private readonly exits: Array<number> = []
   private attempt = 0
   private restartTimer: NodeJS.Timeout | undefined
@@ -60,24 +62,46 @@ export class EngineSupervisor {
       if (message._tag === 'ready') {
         this.state = 'ready'
         this.attempt = 0
-        for (const port of this.pendingPorts.splice(0)) this.send({ _tag: 'port' }, [port])
+        for (const port of this.pendingPorts.values()) this.send({ _tag: 'port' }, [port])
+        this.pendingPorts.clear()
       }
     })
     child.on('exit', (code) => this.onExit(code))
   }
 
   /** Connects a renderer: one new channel, one end to each side. */
-  connect(target: WebContents): void {
+  connect(target: WebContents): PortRequestResult {
+    if (this.state === 'failed' || this.state === 'stopped') return 'failed'
     const { port1, port2 } = new MessageChannelMain()
-    if (this.state === 'ready') this.send({ _tag: 'port' }, [port1])
-    else this.pendingPorts.push(port1)
+    if (this.state === 'ready') {
+      this.send({ _tag: 'port' }, [port1])
+    } else {
+      // A renderer that asks again while waiting replaces its earlier request.
+      this.pendingPorts.get(target)?.close()
+      this.pendingPorts.set(target, port1)
+    }
     target.postMessage(Events.enginePort, null, [port2])
+    return 'sent'
   }
 
   /** Ends the engine for good, on app quit. */
   stop(): void {
     this.state = 'stopped'
+    this.end()
+  }
+
+  /** Stops restarting. Reached after too many crashes; tests call it directly. */
+  giveUp(): void {
+    this.state = 'failed'
+    this.end()
+    // Renderers waiting on a port see it close and ask again, and get `failed`.
+    for (const port of this.pendingPorts.values()) port.close()
+    this.pendingPorts.clear()
+  }
+
+  private end(): void {
     if (this.restartTimer) clearTimeout(this.restartTimer)
+    this.restartTimer = undefined
     this.child?.kill()
     this.child = undefined
   }
@@ -88,13 +112,13 @@ export class EngineSupervisor {
 
   private onExit(code: number): void {
     this.child = undefined
-    if (this.state === 'stopped') return
+    if (this.state === 'stopped' || this.state === 'failed') return
     const now = Date.now()
     this.exits.push(now)
     while (this.exits.length > 0 && now - this.exits[0]! > CRASH_WINDOW_MS) this.exits.shift()
     if (this.exits.length >= CRASH_LIMIT) {
-      this.state = 'failed'
       console.error(`main: engine exited ${CRASH_LIMIT} times in two minutes (last code ${code}); giving up`)
+      this.giveUp()
       return
     }
     this.state = 'restarting'
@@ -109,5 +133,9 @@ export class EngineSupervisor {
 }
 
 export function createSupervisor(): EngineSupervisor {
-  return new EngineSupervisor({ userData: app.getPath('userData'), e2e: process.env.JUNO_E2E === '1' })
+  return new EngineSupervisor({
+    userData: app.getPath('userData'),
+    e2e: process.env.JUNO_E2E === '1',
+    dev: !app.isPackaged,
+  })
 }

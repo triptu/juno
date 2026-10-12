@@ -1,6 +1,6 @@
 /** Helpers shared by the block and mrkdwn parsers. */
 import type { Inline, InlineStyle, Lookups } from './model'
-import type { RichTextStyle } from './slack-types'
+import type { RichTextStyle } from '@juno/slack-schema'
 import { emojiUnicode, splitEmojiName, unicodeFromHex } from './emoji'
 
 export function toStyle(style: RichTextStyle | undefined): InlineStyle | undefined {

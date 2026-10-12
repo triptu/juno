@@ -2,14 +2,17 @@
  * `launch.json`: the few values main needs before the window exists, so the
  * first frame already has the right background and size (performance 2.1).
  * Read synchronously once before `ready`; written asynchronously after.
+ * Main keeps one `Launch` value in memory and writes it whole, so a change
+ * to one field never overwrites another.
  */
 import { readFileSync } from 'node:fs'
 import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { Schema } from 'effect'
+import { ThemeSchema } from '@juno/contract'
 
 export const Launch = Schema.Struct({
-  theme: Schema.Literals(['light', 'dark']),
+  theme: ThemeSchema,
   bounds: Schema.optionalKey(Schema.Struct({ x: Schema.Int, y: Schema.Int, width: Schema.Int, height: Schema.Int })),
 })
 export type Launch = typeof Launch.Type

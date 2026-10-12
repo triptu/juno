@@ -63,7 +63,14 @@ export function createMainWindow(launch: Launch): BrowserWindow {
 
   // electron-vite sets ELECTRON_RENDERER_URL in dev for the Vite server.
   const devUrl = !app.isPackaged && process.env.ELECTRON_RENDERER_URL
-  void window.loadURL(devUrl || APP_URL)
+  void window.loadURL(pageUrl(devUrl || APP_URL, launch))
 
   return window
+}
+
+/** The page reads `?theme=` so its first render matches the window background. */
+function pageUrl(base: string, launch: Launch): string {
+  const url = new URL(base)
+  url.searchParams.set('theme', launch.theme)
+  return url.toString()
 }

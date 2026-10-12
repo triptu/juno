@@ -3,8 +3,8 @@
  * the success fields (without `ok`) or an `ApiError`. The server encodes the
  * result through the method's schema.
  */
-import type { Message, MethodArgs, MethodName, MethodOk, SearchMatch, ThreadView } from '@juno/slack/schemas'
-import { compareTs, isReply, permalinkPath } from '@juno/slack/schemas'
+import type { Message, MethodArgs, MethodName, MethodOk, SearchMatch, ThreadView } from '@juno/slack-schema'
+import { compareTs, isReply, permalinkPath } from '@juno/slack-schema'
 import type { Workspace } from './state.ts'
 
 export class ApiError {

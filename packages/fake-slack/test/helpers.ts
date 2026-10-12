@@ -4,8 +4,8 @@
  */
 import { Schema } from 'effect'
 import { WebSocket } from 'ws'
-import type { MethodArgs, MethodName, MethodOk, MethodResponse, RtmFrame } from '@juno/slack/schemas'
-import { decodeRtmFrame, Methods } from '@juno/slack/schemas'
+import type { MethodArgs, MethodName, MethodOk, MethodResponse, RtmFrame } from '@juno/slack-schema'
+import { decodeRtmFrame, Methods } from '@juno/slack-schema'
 import type { Credentials, FakeSlack } from '../src/index.ts'
 
 export interface ApiCall<M extends MethodName> {

@@ -1,11 +1,10 @@
 export { startEngine, type EngineHandle } from './startEngine'
 export {
+  electronTransport,
   memoryTransport,
-  parentPortTransport,
   type EnginePort,
   type MessagePortLike,
   type MessagePortMainLike,
-  type ParentPortLike,
   type Transport,
 } from './protocol/transport'
-export { liveList, liveValue, type ListRun } from './protocol/live'
+export { serveLiveList, serveLiveValue, timed, type ListRun, type Run, type ServeOptions, type Timed } from './protocol/live'

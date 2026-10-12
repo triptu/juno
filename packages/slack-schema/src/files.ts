@@ -7,7 +7,8 @@
  */
 import { Schema as S } from 'effect'
 import { Blocks } from './blocks.ts'
-import { FormJson, FormNumber, Ts } from './common.ts'
+import { FormJson, FormNumber } from './common.ts'
+import { Ts } from './ts.ts'
 import { File } from './message.ts'
 
 const opt = S.optionalKey

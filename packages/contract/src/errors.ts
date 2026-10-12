@@ -1,7 +1,8 @@
 /**
  * Errors that cross the port. Every route error is one of these classes so the
- * renderer can switch on `_tag`. Internal engine errors that never reach the
- * renderer may use `Data.TaggedError` instead.
+ * renderer can switch on `_tag`. Engine handlers map `@juno/slack` errors to
+ * these before they reach a route; a store failure is a bug and becomes a
+ * defect (`Effect.orDie`), not one of these.
  */
 import { Schema } from 'effect'
 
@@ -9,14 +10,15 @@ export class NotSignedIn extends Schema.TaggedError<NotSignedIn>()('NotSignedIn'
 
 export class Offline extends Schema.TaggedError<Offline>()('Offline', {}) {}
 
-export class SlackRejected extends Schema.TaggedError<SlackRejected>()('SlackRejected', {
+/** Slack answered `ok: false`. */
+export class Rejected extends Schema.TaggedError<Rejected>()('Rejected', {
   /** Slack's `error` string, for example `not_in_channel`. */
   code: Schema.String,
 }) {}
 
 export class RateLimited extends Schema.TaggedError<RateLimited>()('RateLimited', {
-  /** Seconds until the method may be called again. */
-  retryAfter: Schema.Number,
+  /** Milliseconds until the method may be called again. */
+  retryAfterMillis: Schema.Number,
 }) {}
 
 export class NotFound extends Schema.TaggedError<NotFound>()('NotFound', {
@@ -35,7 +37,3 @@ export class Invalid extends Schema.TaggedError<Invalid>()('Invalid', {
 export class ProtocolError extends Schema.TaggedError<ProtocolError>()('ProtocolError', {
   message: Schema.String,
 }) {}
-
-/** The union every command may fail with besides its own errors. */
-export const CommonError = Schema.Union([NotSignedIn, Offline, SlackRejected, RateLimited, NotFound, Invalid])
-export type CommonError = typeof CommonError.Type

@@ -2,21 +2,31 @@
  * The engine client: one `AtomRpc` service over the port protocol, living in
  * an atom runtime so its scope outlives any single atom (ADR 0009).
  *
- * The port connection is an atom so tests can replace it with a Node
- * `MessageChannel` through the registry; the renderer sets it once at start.
+ * The port connection is an atom, set per registry: the renderer sets it once
+ * at start on the app registry; a test makes its own registry with
+ * `makeRegistry()` and gives it a Node `MessageChannel`.
  */
 import * as Atom from 'effect/reactivity/Atom'
 import * as AtomRegistry from 'effect/reactivity/AtomRegistry'
 import * as AtomRpc from 'effect/reactivity/AtomRpc'
 import { AllRoutes } from '@juno/contract'
+import { EngineFailed } from './port'
 import { portProtocol, type PortConnection } from './transport'
 
-export type ConnectionState = 'connecting' | 'connected' | 'reconnecting'
+/** A set of atom values. The app has one; tests make one each. */
+export type Registry = AtomRegistry.AtomRegistry
+
+export const makeRegistry = (): Registry => AtomRegistry.make()
 
 /** Every atom in the app lives here. The renderer root provides it to React. */
-export const registry = AtomRegistry.make()
+export const registry: Registry = makeRegistry()
 
-/** How the renderer reaches the engine right now. */
+/**
+ * How the renderer reaches the engine right now. `failed` means main's
+ * supervisor gave up on the engine; nothing will arrive until the app restarts.
+ */
+export type ConnectionState = 'connecting' | 'connected' | 'reconnecting' | 'failed'
+
 export const connectionStateAtom = Atom.make<ConnectionState>('connecting').pipe(Atom.keepAlive)
 
 const noConnection: PortConnection = {
@@ -26,14 +36,18 @@ const noConnection: PortConnection = {
 /** Set once by the renderer (or a test) before the first live query. */
 export const portConnectionAtom = Atom.make<PortConnection>(noConnection).pipe(Atom.keepAlive)
 
-export function configureConnection(connection: PortConnection): void {
+export function configureConnection(target: Registry, connection: PortConnection): void {
   let everConnected = false
-  registry.set(portConnectionAtom, {
-    acquire: connection.acquire,
+  target.set(portConnectionAtom, {
+    acquire: () =>
+      connection.acquire().catch((cause: unknown) => {
+        if (cause instanceof EngineFailed) target.set(connectionStateAtom, 'failed')
+        throw cause
+      }),
     onState: (state) => {
       connection.onState?.(state)
       if (state === 'connected') everConnected = true
-      registry.set(connectionStateAtom, state === 'connected' ? 'connected' : everConnected ? 'reconnecting' : 'connecting')
+      target.set(connectionStateAtom, state === 'connected' ? 'connected' : everConnected ? 'reconnecting' : 'connecting')
     },
   })
 }

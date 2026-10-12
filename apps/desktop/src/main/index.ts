@@ -2,7 +2,7 @@ import { app, BrowserWindow } from 'electron'
 import { join } from 'node:path'
 import { createSupervisor } from './engine'
 import { registerIpc } from './ipc'
-import { readLaunch, writeLaunch } from './launch'
+import { readLaunch, writeLaunch, type Launch } from './launch'
 import { registerAppScheme, serveAppScheme } from './scheme'
 import { createMainWindow } from './window'
 
@@ -17,7 +17,13 @@ if (userData) app.setPath('userData', userData)
 // Scheme privileges must be registered before ready. launch.json is the one
 // synchronous read: theme and bounds for a window that paints right first.
 registerAppScheme()
-const launch = readLaunch(app.getPath('userData'))
+let launch = readLaunch(app.getPath('userData'))
+
+/** The one place launch.json changes, so a theme change and a window close never overwrite each other. */
+function updateLaunch(patch: Partial<Launch>): void {
+  launch = { ...launch, ...patch }
+  void writeLaunch(app.getPath('userData'), launch)
+}
 
 const supervisor = createSupervisor()
 
@@ -25,7 +31,7 @@ app.whenReady().then(() => {
   serveAppScheme(join(__dirname, '../renderer'))
   registerIpc({
     supervisor,
-    setTheme: (theme) => void writeLaunch(app.getPath('userData'), { ...launch, theme }),
+    setTheme: (theme) => updateLaunch({ theme }),
   })
 
   // Fork the engine and open the window in the same tick; neither waits.
@@ -39,9 +45,7 @@ app.whenReady().then(() => {
 
 function openWindow(): void {
   const window = createMainWindow(launch)
-  window.on('close', () => {
-    void writeLaunch(app.getPath('userData'), { ...launch, bounds: window.getNormalBounds() })
-  })
+  window.on('close', () => updateLaunch({ bounds: window.getNormalBounds() }))
 }
 
 app.on('window-all-closed', () => {
@@ -57,6 +61,7 @@ if (process.env.JUNO_E2E === '1') {
     junoTest: {
       enginePid: () => supervisor.pid,
       engineState: () => supervisor.currentState,
+      failEngine: () => supervisor.giveUp(),
     },
   })
 }

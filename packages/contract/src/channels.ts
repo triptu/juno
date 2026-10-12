@@ -2,8 +2,12 @@
  * IPC channel names and the shape of the `window.juno` bridge.
  *
  * This file has no runtime dependencies on purpose. The preload script bundles
- * it, and a sandboxed preload should stay tiny. Schemas live in index.ts.
+ * it, and a sandboxed preload should stay tiny. Schemas live in shell.ts; the
+ * types below are imported from them, which is erased at compile time.
  */
+import type { Theme } from './shell'
+
+export type { AppInfo, Platform, Theme } from './shell'
 
 export const Channels = {
   appGetInfo: 'app.getInfo',
@@ -24,17 +28,6 @@ export const Events = {
 /** The tag the preload puts on the `window.postMessage` that forwards the port. */
 export const PORT_HANDOFF_TAG = 'juno.enginePort'
 
-export type Platform = 'darwin' | 'win32' | 'linux'
-
-export type Theme = 'light' | 'dark'
-
-export interface AppInfo {
-  readonly name: string
-  readonly version: string
-  readonly platform: Platform
-  readonly electron: string
-}
-
 /**
  * What the preload exposes to the renderer as `window.juno`.
  * Keep this surface small and typed. Never expose ipcRenderer itself.
@@ -46,8 +39,9 @@ export interface JunoBridge {
   }
   readonly engine: {
     /**
-     * Asks main for a port to the engine. Resolves when main has sent it;
-     * the port itself arrives as a `window` message tagged PORT_HANDOFF_TAG.
+     * Asks main for a port to the engine. Resolves with a `PortRequestResult`;
+     * on `sent` the port itself arrives as a `window` message tagged
+     * PORT_HANDOFF_TAG.
      */
     readonly requestPort: () => Promise<unknown>
   }

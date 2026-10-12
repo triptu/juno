@@ -1,9 +1,10 @@
 /**
  * Messages around the port, not on it.
  *
- * The port itself carries `effect/rpc` (ADR 0009). These schemas cover how a
- * port reaches each side and what main and the engine say to each other over
- * `process.parentPort`.
+ * The port itself carries `effect/rpc` (ADR 0009). These schemas cover what
+ * main and the engine say to each other over `process.parentPort`. The port
+ * handoff from preload to page is a `window.postMessage` tagged with
+ * `PORT_HANDOFF_TAG` (channels.ts); the page checks the tag by hand.
  */
 import { Schema } from 'effect'
 
@@ -13,6 +14,8 @@ export const EngineConfig = Schema.Struct({
   userData: Schema.String,
   /** True under Playwright: plaintext secrets, fake AI, test hooks. */
   e2e: Schema.Boolean,
+  /** True when the app is not packaged: extra measurement for DevTools. */
+  dev: Schema.Boolean,
 })
 export type EngineConfig = typeof EngineConfig.Type
 
@@ -29,11 +32,3 @@ export const EngineToMain = Schema.Union([
   Schema.TaggedStruct('ready', {}),
 ])
 export type EngineToMain = typeof EngineToMain.Type
-
-/**
- * The preload forwards a port to the page with `window.postMessage(message,
- * '*', ports)`. The page accepts it only when `event.source === window` and
- * the data matches this schema.
- */
-export const PortHandoff = Schema.TaggedStruct('juno.enginePort', {})
-export type PortHandoff = typeof PortHandoff.Type

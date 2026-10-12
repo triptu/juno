@@ -7,7 +7,7 @@
  */
 import { Schema } from 'effect'
 import { Rpc, RpcGroup } from 'effect/rpc'
-import { liveQuery } from '../live'
+import { liveValueRoute } from '../live'
 
 export const EnginePhase = Schema.Union([
   Schema.TaggedStruct('first-run', {}),
@@ -22,17 +22,19 @@ export type EnginePhase = typeof EnginePhase.Type
 
 export const EngineStatus = Schema.Struct({
   phase: EnginePhase,
-  /** Milliseconds since the engine process started. */
-  uptime: Schema.Number,
   /** Epoch milliseconds when the engine process started. Changes on restart. */
   startedAt: Schema.Number,
 })
 export type EngineStatus = typeof EngineStatus.Type
 
-/** The engine's phase and uptime. Changes on every phase change and once a second. */
-export const engineStatus = liveQuery('engine.status', { value: EngineStatus })
+/** The engine's phase. Emits once at subscribe time and then on every phase change. */
+export const engineStatus = liveValueRoute('engine.status', { value: EngineStatus })
 
-/** A round trip for diagnostics. Answers `n + 1` and the engine's clock. */
+/**
+ * A round trip for diagnostics. Answers `n + 1` and the engine's clock. Under
+ * `EngineConfig.e2e`, a negative `n` is a defect, so tests can check that one
+ * failed request does not close the port.
+ */
 export const enginePing = Rpc.make('engine.ping', {
   payload: { n: Schema.Int },
   success: Schema.Struct({ pong: Schema.Int, at: Schema.Number }),

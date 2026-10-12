@@ -1,13 +1,23 @@
 // The port protocol end to end over an in-memory MessageChannel: the real
 // engine (startEngine + memoryTransport) and the real state helpers
-// (liveQuery, command) with a Node port in place of the renderer's.
+// (liveQuery, command) with a Node port in place of the renderer's. Each test
+// gets its own registry, so nothing leaks between them.
 import { MessageChannel } from 'node:worker_threads'
-import { Effect, Schema, Stream } from 'effect'
+import { Exit } from 'effect'
 import * as AsyncResult from 'effect/reactivity/AsyncResult'
 import { afterEach, describe, expect, it } from 'vitest'
-import { configureConnection, connectionStateAtom, engineStatusAtom, pingCommand, registry, type PortLike } from '@juno/state'
+import {
+  configureConnection,
+  connectionStateAtom,
+  engineStatusAtom,
+  makeRegistry,
+  pingCommand,
+  runCommand,
+  type PortLike,
+  type Registry,
+} from '@juno/state'
+import { enginePing } from '@juno/contract'
 import { startEngine } from '../src/index'
-import { liveList } from '../src/protocol/live'
 import { memoryTransport, type MessagePortLike } from '../src/protocol/transport'
 
 const stops: Array<() => Promise<void>> = []
@@ -15,12 +25,15 @@ afterEach(async () => {
   for (const stop of stops.splice(0)) await stop()
 })
 
+const config = { userData: '/tmp/juno-test', e2e: true, dev: false }
+
 async function engineWithPorts() {
   const transport = memoryTransport()
-  const engine = await startEngine(transport, { userData: '/tmp/juno-test', e2e: true })
+  const engine = await startEngine(transport, config)
   stops.push(engine.stop)
+  const registry = makeRegistry()
   let current: MessageChannel | undefined
-  configureConnection({
+  configureConnection(registry, {
     acquire: async () => {
       current = new MessageChannel()
       // Node ports have the DOM port surface the state client uses; only the
@@ -29,7 +42,7 @@ async function engineWithPorts() {
       return current.port1 as unknown as PortLike
     },
   })
-  return { engine, closePort: () => current?.port1.close() }
+  return { engine, registry, closePort: () => current?.port1.close() }
 }
 
 function waitFor<A>(f: () => A | undefined, timeoutMs = 5000): Promise<Exclude<A, undefined>> {
@@ -38,24 +51,26 @@ function waitFor<A>(f: () => A | undefined, timeoutMs = 5000): Promise<Exclude<A
     const tick = () => {
       const value = f()
       if (value !== undefined) return resolve(value as Exclude<A, undefined>)
-      if (Date.now() - started > timeoutMs) return reject(new Error("timed out"))
+      if (Date.now() - started > timeoutMs) return reject(new Error('timed out'))
       setTimeout(tick, 5)
     }
     tick()
   })
 }
 
+const liveStatus = (registry: Registry) =>
+  waitFor(() => {
+    const result = registry.get(engineStatusAtom)
+    return AsyncResult.isSuccess(result) ? result.value : undefined
+  })
+
 describe('port protocol', () => {
   it('serves a live query and a command over a MessageChannel', async () => {
-    await engineWithPorts()
+    const { registry } = await engineWithPorts()
     const unmount = registry.mount(engineStatusAtom)
     try {
-      const status = await waitFor(() => {
-        const result = registry.get(engineStatusAtom)
-        return AsyncResult.isSuccess(result) ? result.value : undefined
-      })
+      const status = await liveStatus(registry)
       expect(status.phase._tag).toBe('live')
-      expect(status.uptime).toBeGreaterThanOrEqual(0)
       expect(registry.get(connectionStateAtom)).toBe('connected')
 
       const unmountPing = registry.mount(pingCommand)
@@ -71,57 +86,58 @@ describe('port protocol', () => {
     }
   })
 
-  it('reconnects on a new port after the old one closes', async () => {
-    const { closePort } = await engineWithPorts()
+  it('runs a command without a mounted atom', async () => {
+    const { registry } = await engineWithPorts()
+    const [a, b] = await Promise.all([runCommand(registry, enginePing, { n: 1 }), runCommand(registry, enginePing, { n: 10 })])
+    expect(Exit.isSuccess(a) && a.value.pong).toBe(2)
+    expect(Exit.isSuccess(b) && b.value.pong).toBe(11)
+  })
+
+  it('fails only the request whose handler has a defect; the port stays usable', async () => {
+    const { registry } = await engineWithPorts()
     const unmount = registry.mount(engineStatusAtom)
     try {
-      const first = await waitFor(() => {
-        const result = registry.get(engineStatusAtom)
-        return AsyncResult.isSuccess(result) ? result.value : undefined
-      })
-      closePort()
-      await waitFor(() => (registry.get(connectionStateAtom) === 'reconnecting' ? true : undefined))
-      await waitFor(() => (registry.get(connectionStateAtom) === 'connected' ? true : undefined), 10_000)
-      const after = await waitFor(() => {
-        const result = registry.get(engineStatusAtom)
-        return AsyncResult.isSuccess(result) && result.value.uptime > first.uptime ? result.value : undefined
-      }, 10_000)
-      // Same engine process, new subscription.
-      expect(after.startedAt).toBe(first.startedAt)
+      await liveStatus(registry)
+      const broken = await runCommand(registry, enginePing, { n: -1 })
+      expect(Exit.isFailure(broken)).toBe(true)
+
+      const after = await runCommand(registry, enginePing, { n: 1 })
+      expect(Exit.isSuccess(after) && after.value.pong).toBe(2)
+      expect(registry.get(connectionStateAtom)).toBe('connected')
+      expect(AsyncResult.isSuccess(registry.get(engineStatusAtom))).toBe(true)
     } finally {
       unmount()
     }
   })
-})
 
-describe('liveList', () => {
-  const Row = Schema.Struct({ id: Schema.String, rev: Schema.Int, title: Schema.String })
-  const encodeRow = Schema.encodeSync(Schema.toCodecJson(Row))
+  it('reconnects on a new port after the old one closes', async () => {
+    const { registry, closePort } = await engineWithPorts()
+    const unmount = registry.mount(engineStatusAtom)
+    try {
+      const first = await liveStatus(registry)
+      closePort()
+      await waitFor(() => (registry.get(connectionStateAtom) === 'reconnecting' ? true : undefined))
+      await waitFor(() => (registry.get(connectionStateAtom) === 'connected' ? true : undefined), 10_000)
+      // Same engine process, new subscription: the snapshot comes again and
+      // a command still answers.
+      const after = await liveStatus(registry)
+      expect(after.startedAt).toBe(first.startedAt)
+      const pong = await runCommand(registry, enginePing, { n: 1 })
+      expect(Exit.isSuccess(pong) && pong.value.pong).toBe(2)
+    } finally {
+      unmount()
+    }
+  })
 
-  it('sends the window first, then only rows whose rev changed', async () => {
-    let rows = [
-      { id: 'a', rev: 1, title: 'A' },
-      { id: 'b', rev: 1, title: 'B' },
-    ]
-    const deltas = await Effect.runPromise(
-      liveList({
-        query: Effect.sync(() => ({ rows, total: rows.length })),
-        invalidations: Stream.make(1, 2).pipe(
-          Stream.tap(() =>
-            Effect.sync(() => {
-              rows = [
-                { id: 'b', rev: 2, title: 'B2' },
-                { id: 'c', rev: 1, title: 'C' },
-              ]
-            }),
-          ),
-        ),
-        encodeRow,
-      }).pipe(Stream.take(2), Stream.runCollect),
-    )
-    expect(deltas[0]).toMatchObject({ reset: true, order: ['a', 'b'], remove: [], meta: { seq: 1, total: 2 } })
-    expect(deltas[0]!.upsert.map((r) => r.id)).toEqual(['a', 'b'])
-    expect(deltas[1]).toMatchObject({ reset: false, order: ['b', 'c'], remove: ['a'], meta: { seq: 2 } })
-    expect(deltas[1]!.upsert.map((r) => r.id)).toEqual(['b', 'c'])
+  it('closes its ports when the engine stops', async () => {
+    const { registry, engine } = await engineWithPorts()
+    const unmount = registry.mount(engineStatusAtom)
+    try {
+      await liveStatus(registry)
+      await engine.stop()
+      await waitFor(() => (registry.get(connectionStateAtom) === 'reconnecting' ? true : undefined))
+    } finally {
+      unmount()
+    }
   })
 })

@@ -7,7 +7,7 @@
  * agent and proxy for the socket upgrade). `SlackConfig` has defaults and
  * is overridden with `slackConfigLayer`.
  *
- * Schemas are a separate entry point, `@juno/slack/schemas`.
+ * Payload schemas and the `Ts` helpers live in `@juno/slack-schema`.
  */
 import { Layer } from 'effect'
 import { SlackApi } from './client/api.ts'

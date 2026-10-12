@@ -17,7 +17,8 @@ export function isDm(kind: ConversationKind): boolean {
   return kind === 'im' || kind === 'mpim'
 }
 
-function firstName(name: string): string {
+/** "Maya" for "Maya Chen". The whole name when it has no spaces. */
+export function firstName(name: string): string {
   return name.trim().split(/\s+/)[0] ?? name
 }
 

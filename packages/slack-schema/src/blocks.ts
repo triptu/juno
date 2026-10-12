@@ -93,6 +93,7 @@ export const RichTextPreformatted = S.Struct({
   border: opt(S.Number),
 })
 export const RichTextListStyle = S.Literals(['bullet', 'ordered', 'check', 'checked', 'unchecked'])
+export type RichTextListStyle = typeof RichTextListStyle.Type
 export const RichTextList = S.Struct({
   type: S.Literal('rich_text_list'),
   style: RichTextListStyle,
@@ -101,6 +102,12 @@ export const RichTextList = S.Struct({
   offset: opt(S.Number),
   border: opt(S.Number),
 })
+export type RichTextSection = typeof RichTextSection.Type
+export type RichTextHeader = typeof RichTextHeader.Type
+export type RichTextDivider = typeof RichTextDivider.Type
+export type RichTextQuote = typeof RichTextQuote.Type
+export type RichTextPreformatted = typeof RichTextPreformatted.Type
+export type RichTextList = typeof RichTextList.Type
 
 export const RichTextElement = S.Union([
   RichTextSection,
@@ -136,6 +143,7 @@ export const ImageElement = S.Struct({
   alt_text: S.String,
   slack_file: opt(S.Unknown),
 })
+export type ImageElement = typeof ImageElement.Type
 
 export const SectionBlock = S.Struct({
   type: S.Literal('section'),
@@ -160,6 +168,12 @@ export const ImageBlock = S.Struct({
   slack_file: opt(S.Unknown),
 })
 
+export type SectionBlock = typeof SectionBlock.Type
+export type DividerBlock = typeof DividerBlock.Type
+export type HeaderBlock = typeof HeaderBlock.Type
+export type ContextBlock = typeof ContextBlock.Type
+export type ImageBlock = typeof ImageBlock.Type
+
 export const Block = S.Union([
   RichTextBlock,
   SectionBlock,
@@ -173,8 +187,3 @@ export type Block = typeof Block.Type
 
 export const Blocks = S.Array(Block)
 export type Blocks = typeof Blocks.Type
-
-/** The smallest outgoing message: one rich_text block with one section of plain text. */
-export function plainTextBlocks(text: string): Blocks {
-  return [{ type: 'rich_text', elements: [{ type: 'rich_text_section', elements: [{ type: 'text', text }] }] }]
-}

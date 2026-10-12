@@ -25,7 +25,7 @@
  * other `ok:false` errors and decode failures are never retried.
  */
 import { Clock, Context, Effect, Layer, Result, Schema as S } from 'effect'
-import { Methods, type MethodArgs, type MethodName, type MethodOk } from '../schemas/methods.ts'
+import { Methods, type MethodArgs, type MethodName, type MethodOk } from '@juno/slack-schema'
 import { SlackConfig, type SlackConfigShape } from './config.ts'
 import {
   isFatalAuthError,
