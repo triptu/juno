@@ -7,4 +7,4 @@ export {
   type MessagePortMainLike,
   type Transport,
 } from './protocol/transport'
-export { serveLiveList, serveLiveValue, timed, type ListRun, type ServeOptions, type Timed } from './protocol/live'
+export { serveLiveList, serveLiveValue, timed, type ListRun, type Run, type ServeOptions, type Timed } from './protocol/live'

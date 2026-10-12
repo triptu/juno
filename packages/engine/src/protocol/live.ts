@@ -21,19 +21,25 @@
 import { Clock, Effect, Result, Stream } from 'effect'
 import { LIVE_DELTA_MAX_BYTES, LIVE_SNAPSHOT_MAX_BYTES, type ListDelta, type LiveMeta, type LiveValue } from '@juno/contract'
 
-/** One run of a query: its outcome and how long it took. */
-export interface Timed<A, E = never> {
-  readonly result: Result.Result<A, E>
+/** A successful query run: its value and how long it took. */
+export interface Timed<A> {
+  readonly value: A
   readonly queryMs: number
 }
 
-/** Runs `query`, catching its failure, and measures it. */
-export const timed = <A, E, R>(query: Effect.Effect<A, E, R>): Effect.Effect<Timed<A, E>, never, R> =>
+/** Measures `query`. Wrap the query a handler gives the store's `liveQuery` with this. */
+export const timed = <A, E, R>(query: Effect.Effect<A, E, R>): Effect.Effect<Timed<A>, E, R> =>
   Effect.gen(function* () {
     const start = performance.now()
-    const result = yield* Effect.result(query)
-    return { result, queryMs: performance.now() - start }
+    const value = yield* query
+    return { value, queryMs: performance.now() - start }
   })
+
+/**
+ * One run as the serve helpers see it: the store's `liveQuery` emits every
+ * run as a `Result`, so a failed run is a value and the stream goes on.
+ */
+export type Run<A, E> = Result.Result<Timed<A>, E>
 
 export interface ServeOptions {
   /** Measure `encodeMs` and the size budgets. Costs a second encode per row; dev and e2e only. */
@@ -50,20 +56,20 @@ const describe = (error: unknown): string => {
 
 /** Stamps every run with `LiveMeta`. `encode` is the value codec of the route, used only when measuring. */
 export function serveLiveValue<A, E, SE, R>(
-  runs: Stream.Stream<Timed<A, E>, SE, R>,
+  runs: Stream.Stream<Run<A, E>, SE, R>,
   options?: ServeOptions & { readonly encode?: ((value: A) => unknown) | undefined },
 ): Stream.Stream<LiveValue<A>, E | SE, R> {
   let seq = 0
   let last: { readonly value: A } | undefined
   return runs.pipe(
-    Stream.mapEffect(({ result, queryMs }) =>
+    Stream.mapEffect((run) =>
       Effect.gen(function* () {
         const at = yield* Clock.currentTimeMillis
-        if (Result.isFailure(result)) {
-          if (last === undefined) return yield* Effect.fail(result.failure)
-          return { value: last.value, meta: { seq: ++seq, queryMs, encodeMs: 0, at, error: describe(result.failure) } }
+        if (Result.isFailure(run)) {
+          if (last === undefined) return yield* Effect.fail(run.failure)
+          return { value: last.value, meta: { seq: ++seq, queryMs: 0, encodeMs: 0, at, error: describe(run.failure) } }
         }
-        const value = result.success
+        const { value, queryMs } = run.success
         last = { value }
         const encodeMs = options?.measure && options.encode ? measureEncode(() => options.encode!(value)).encodeMs : 0
         return { value, meta: { seq: ++seq, queryMs, encodeMs, at } }
@@ -88,22 +94,22 @@ interface RowLike {
  * size budgets on the rows that actually travel.
  */
 export function serveLiveList<Row extends RowLike, E, SE, R>(
-  runs: Stream.Stream<Timed<ListRun<Row>, E>, SE, R>,
+  runs: Stream.Stream<Run<ListRun<Row>, E>, SE, R>,
   options: ServeOptions & { readonly encodeRow: (row: Row) => unknown },
 ): Stream.Stream<ListDelta<Row>, E | SE, R> {
   let seq = 0
   let order: ReadonlyArray<string> = []
   let revById = new Map<string, number>()
   return runs.pipe(
-    Stream.mapEffect(({ result, queryMs }) =>
+    Stream.mapEffect((outcome) =>
       Effect.gen(function* () {
         const at = yield* Clock.currentTimeMillis
-        if (Result.isFailure(result)) {
-          if (seq === 0) return yield* Effect.fail(result.failure)
-          const meta: LiveMeta = { seq: ++seq, queryMs, encodeMs: 0, at, error: describe(result.failure) }
+        if (Result.isFailure(outcome)) {
+          if (seq === 0) return yield* Effect.fail(outcome.failure)
+          const meta: LiveMeta = { seq: ++seq, queryMs: 0, encodeMs: 0, at, error: describe(outcome.failure) }
           return { reset: false, order, upsert: [], remove: [], meta }
         }
-        const run = result.success
+        const { value: run, queryMs } = outcome.success
         const reset = seq === 0
         const nextOrder = run.rows.map((row) => row.id)
         const nextRevById = new Map<string, number>()

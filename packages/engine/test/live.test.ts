@@ -6,11 +6,11 @@ import { serveLiveList, serveLiveValue, timed, type ListRun } from '../src/index
 
 class QueryFailed extends Schema.TaggedError<QueryFailed>()('QueryFailed', { message: Schema.String }) {}
 
-/** A stream of runs from a list of outcomes: a value, or `Error` for a failed run. */
+/** A stream of runs from a list of outcomes, shaped like the store's `liveQuery(keys, timed(query))`. */
 const runsOf = <A>(outcomes: ReadonlyArray<A | Error>) =>
   Stream.fromIterable(outcomes).pipe(
     Stream.mapEffect((outcome) =>
-      timed(outcome instanceof Error ? Effect.fail(new QueryFailed({ message: outcome.message })) : Effect.succeed(outcome as A)),
+      Effect.result(timed(outcome instanceof Error ? Effect.fail(new QueryFailed({ message: outcome.message })) : Effect.succeed(outcome as A))),
     ),
   )
 

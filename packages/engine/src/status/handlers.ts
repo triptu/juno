@@ -19,7 +19,8 @@ export const StatusHandlers = EngineRoutes.toLayer(
     const config = yield* EngineConfig
     const measure = config.e2e || config.dev
     return {
-      'engine.status': () => serveLiveValue(status.phases.pipe(Stream.mapEffect(() => timed(status.current))), { measure }),
+      'engine.status': () =>
+        serveLiveValue(status.phases.pipe(Stream.mapEffect(() => Effect.result(timed(status.current)))), { measure }),
       'engine.ping': ({ n }) =>
         config.e2e && n < 0
           ? Effect.die(new Error(`engine.ping: negative n (${n}) is a defect under e2e`))
