@@ -2,7 +2,7 @@
 import { isDm } from './channel'
 import { compareTs, type ChannelId } from './ids'
 import { isUnread, sidebarPlacement } from './status'
-import type { RuleContext, Topic } from './topic'
+import { quietDaysOf, type RuleContext, type Topic } from './topic'
 
 export type KindFilter = 'all' | 'channels' | 'dms'
 
@@ -67,7 +67,7 @@ export function filterDots(topics: ReadonlyArray<Topic>, filter: SidebarFilter, 
   let dms = false
   for (const topic of topics) {
     if (!isUnread(topic)) continue
-    if (sidebarPlacement(topic, { ...ctx }) === 'hidden') continue
+    if (sidebarPlacement(topic, ctx) === 'hidden') continue
     if (filter.scope !== undefined && topic.channel.id !== filter.scope) continue
     if (isDm(topic.channel.kind)) dms = true
     else channels = true
@@ -90,7 +90,7 @@ export function sidebarEmptyState(list: SidebarList, filter: SidebarFilter, ctx:
   if (filter.kind !== 'all' || filter.scope !== undefined) {
     return { title: 'No recent topics here', body: hiding, action: 'clear-filters', actionLabel: 'Clear filters' }
   }
-  const days = ctx.quietDays ?? 7
+  const days = quietDaysOf(ctx)
   return {
     title: 'No recent topics here',
     body: `Topics with activity in the last ${days} days show up here.`,

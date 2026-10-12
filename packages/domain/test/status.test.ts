@@ -89,7 +89,7 @@ describe('sidebar placement', () => {
 })
 
 describe('sidebar list', () => {
-  const t1 = topic({ ago: 5 * HOUR, id: 'a' })
+  const t1 = topic({ ago: 5 * HOUR })
   const t2 = topic({ ago: HOUR, channel: hiring })
   const dm = topic({ ago: 2 * HOUR, channel: maya, kind: 'main', unread: 1 })
   const mpim = topic({ ago: 3 * HOUR, channel: group, kind: 'main' })

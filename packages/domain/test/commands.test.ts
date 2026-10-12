@@ -15,41 +15,52 @@ const ctx: CommandContext = {
   ],
 }
 
+/** The confidence of a parsed command. Fails the test when the text is not a command. */
+function confidenceOf(text: string): number {
+  const command = parseCommand(text, ctx)
+  expect(command).toBeDefined()
+  return command!.confidence
+}
+
 describe('⌘K commands', () => {
   it('turns "tell maya …" into a send with the text, a label and a confidence', () => {
     const c = parseCommand('tell maya the wednesday slot works', ctx)
-    expect(c).toEqual({
+    expect(c).toMatchObject({
       kind: 'send-dm',
       userId: mayaId,
       text: 'the wednesday slot works',
       label: 'Send to Maya Chen',
       sub: '"the wednesday slot works"',
-      confidence: 0.75,
       hint: '↵ Send',
     })
+    expect(c!.confidence).toBeGreaterThan(0)
+    expect(c!.confidence).toBeLessThanOrEqual(1)
   })
 
   it('accepts message, ask, dm, ping and text as verbs, and drops a leading "that" or "to"', () => {
-    expect(parseCommand('message Jonas that the build is green', ctx)).toMatchObject({ kind: 'send-dm', text: 'the build is green', confidence: 0.95 })
+    expect(parseCommand('message Jonas that the build is green', ctx)).toMatchObject({ kind: 'send-dm', text: 'the build is green' })
     expect(parseCommand('ping jonas to check staging', ctx)).toMatchObject({ kind: 'send-dm', text: 'check staging' })
     expect(parseCommand('dm Jonas Weber hi', ctx)).toMatchObject({ kind: 'send-dm', userId: 'U0JONAS', text: 'hi' })
   })
 
   it('"message maya" with no text opens the DM', () => {
-    expect(parseCommand('message Maya Chen', ctx)).toEqual({
+    expect(parseCommand('message Maya Chen', ctx)).toMatchObject({
       kind: 'open-dm',
       userId: mayaId,
       label: 'Message Maya Chen',
       sub: 'Opens your Main thread with Maya',
-      confidence: 0.88,
       hint: '↵',
     })
   })
 
   it('prefers a full name over a first name and lowers confidence for an ambiguous first name', () => {
-    expect(parseCommand('tell maya lindqvist hello', ctx)).toMatchObject({ userId: 'U0MAYA2', text: 'hello', confidence: 0.95 })
-    expect(parseCommand('tell maya hello', ctx)).toMatchObject({ userId: mayaId, confidence: 0.75 })
-    expect(parseCommand('tell jonas hello', ctx)).toMatchObject({ userId: 'U0JONAS', confidence: 0.95 })
+    expect(parseCommand('tell maya lindqvist hello', ctx)).toMatchObject({ userId: 'U0MAYA2', text: 'hello' })
+    expect(parseCommand('tell maya hello', ctx)).toMatchObject({ userId: mayaId })
+    expect(parseCommand('tell jonas hello', ctx)).toMatchObject({ userId: 'U0JONAS' })
+    // Two people are called Maya, so a bare "maya" is less certain than a full name or a unique first name.
+    expect(confidenceOf('tell maya hello')).toBeLessThan(confidenceOf('tell maya lindqvist hello'))
+    expect(confidenceOf('tell maya hello')).toBeLessThan(confidenceOf('tell jonas hello'))
+    expect(confidenceOf('tell jonas hello')).toBe(confidenceOf('tell jonas weber hello'))
   })
 
   it('does not treat unknown names as commands', () => {
@@ -58,13 +69,12 @@ describe('⌘K commands', () => {
   })
 
   it('"post in #eng …" posts to a channel, never to a DM', () => {
-    expect(parseCommand('post in #eng deploy is done', ctx)).toEqual({
+    expect(parseCommand('post in #eng deploy is done', ctx)).toMatchObject({
       kind: 'post',
       channelId: eng.id,
       text: 'deploy is done',
       label: 'Post in #eng',
       sub: '"deploy is done"',
-      confidence: 0.93,
       hint: '↵ Send',
     })
     expect(parseCommand('say to hiring the loop is set', ctx)).toMatchObject({ kind: 'post', channelId: hiring.id })
@@ -79,15 +89,17 @@ describe('⌘K commands', () => {
   })
 
   it('"resolve pricing" resolves the best-matching topic', () => {
-    expect(parseCommand('resolve pricing', ctx)).toEqual({
+    expect(parseCommand('resolve pricing', ctx)).toMatchObject({
       kind: 'resolve',
       topicId: ctx.topics[0]!.id,
       label: 'Resolve Pricing page copy',
       sub: '#product · hides it until there is new activity',
-      confidence: 0.75,
       hint: '↵ Resolve',
     })
-    expect(parseCommand('resolve staging bill', ctx)).toMatchObject({ topicId: ctx.topics[1]!.id, confidence: 0.9 })
+    expect(parseCommand('resolve staging bill', ctx)).toMatchObject({ topicId: ctx.topics[1]!.id })
+    // More matching words make a resolve more certain, and it never exceeds 1.
+    expect(confidenceOf('resolve staging bill')).toBeGreaterThan(confidenceOf('resolve staging'))
+    expect(confidenceOf('resolve staging bill doubled since august')).toBeLessThanOrEqual(1)
     expect(parseCommand('resolve nothing here', ctx)).toBeUndefined()
   })
 

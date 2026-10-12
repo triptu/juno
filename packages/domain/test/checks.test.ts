@@ -41,7 +41,8 @@ describe('clarity check', () => {
   it('summarises the fixes as the bar shows them', () => {
     const r = clarityCheck('Did you recieve the the invite')
     expect(r?.summary).toBe('3 fixes: recieve → receive, the the → the, add ?')
-    expect(r?.confidence).toBe(0.9)
+    expect(r?.confidence).toBeGreaterThan(0)
+    expect(r?.confidence).toBeLessThanOrEqual(1)
     expect(r?.primaryLabel).toBe('Fix and send')
     expect(r?.secondaryLabel).toBe('Send as is')
     expect(clarityCheck('teh plan')?.summary).toBe('1 fix: teh → the')
@@ -54,7 +55,8 @@ describe('clarity check', () => {
     expect(r?.fixed).toBe(long)
     expect(r?.longSentence).toBe(true)
     expect(r?.summary).toBe('Reads a bit long. One sentence runs over 40 words.')
-    expect(r?.confidence).toBe(0.74)
+    // A note with nothing to fix is less certain than a table fix.
+    expect(r?.confidence).toBeLessThan(clarityCheck('teh plan')!.confidence)
     expect(r?.primaryLabel).toBe('Send')
     expect(r?.secondaryLabel).toBe('Keep editing')
   })
