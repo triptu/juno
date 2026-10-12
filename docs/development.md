@@ -23,6 +23,7 @@ Run these from the repo root.
 | `pnpm build` | Builds main, preload and renderer into `apps/desktop/out/`. |
 | `pnpm typecheck` | Runs `tsc` in every package. |
 | `pnpm lint` | Runs oxlint, then a script that fails on any `cursor: pointer`. |
+| `pnpm test` | Runs every package's vitest suite (`packages/*/test`). |
 | `pnpm test:e2e` | Builds, then runs the Playwright tests against the built app. |
 | `pnpm gallery` | Starts the fixture gallery at http://localhost:4174 (browser only, no Electron). |
 | `pnpm gallery:shots` | Builds the gallery and screenshots every fixture in light and dark into `apps/gallery/shots/`. |
@@ -44,6 +45,8 @@ apps/desktop            The Electron app. Thin wiring only.
 packages/tokens         @juno/tokens. The only place design values live. See its README.
 packages/ui             @juno/ui. Primitives, StyleX only, each with *.fixtures.tsx. See its README.
 packages/contract       @juno/contract. IPC channel names and Effect Schemas.
+packages/store          @juno/store. cache.db and user.db per workspace, migrations,
+                        writer and reader clients, invalidation and live queries.
 scripts                 Small repo scripts used by package.json.
 docs                    Research, design handoff, this file.
 ```
@@ -115,7 +118,18 @@ that file so it stays a few hundred bytes. Schemas live in `index.ts`.
   `apps/desktop/node_modules/electron/dist` is missing after install, run
   `node install.js` inside that directory once.
 - **pnpm 12 minimum release age.** It refused `effect@4.0.3` as too new and wrote an
-  exclusion into `pnpm-workspace.yaml`. Expect the same for other day-old releases.
+  exclusion into `pnpm-workspace.yaml`. Expect the same for other day-old releases
+  (it did it again for `vitest@5.0.4`).
+- **`node:sqlite` and Node versions.** Electron 44 runs Node 24.21; the system Node is
+  26. `@effect/sql-sqlite-node` uses `isTransaction`, `columns()`, `setReturnArrays`
+  and `backup`, and the store uses FTS5; all were checked in Electron's own Node. To
+  run a package's tests under that Node:
+  `ELECTRON_RUN_AS_NODE=1 apps/desktop/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron node_modules/.pnpm/node_modules/vitest/vitest.mjs run`
+  from the package directory. Node 24 prints an ExperimentalWarning for `node:sqlite`;
+  it is harmless.
+- **Store tests and the test clock.** `@effect/vitest`'s `it.effect` runs with a
+  `TestClock`, so a live query's debounce window never ends on its own; tests call
+  `TestClock.adjust(DEFAULT_LIVE_QUERY_DEBOUNCE)`. Use `it.live` for real time.
 - **StyleX token imports.** Tokens must be imported through a subpath ending in
   `.stylex` (`@juno/tokens/tokens.stylex`). Re-exporting from an `index.ts` fails
   the build with "Could not resolve the path to the imported file".

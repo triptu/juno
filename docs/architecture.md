@@ -153,13 +153,17 @@ What Slack's shell taught us: one shared contract package with names, types and 
 
 `<userData>/workspaces/<enterprise_id or team_id>/` holds:
 
-- `cache.db`: the Slack mirror, `topic_index`, `messages_fts`, `emoji`, `files`, `ai_cache`. Disposable. Its schema has a version number; on mismatch it is deleted and re-synced. "Reset local cache" in Preferences does the same.
-- `user.db`: overlay, reads, groups, ignored channels, notification rules and settings and log, For you cards, Juno chat, drafts, outbox, prefs. Durable, with timestamped migrations (`202610121430_add_x.ts`).
+- `cache.db`: the Slack mirror, `topic_index`, `messages_fts`, `emoji`, `files`, `ai_cache`. Disposable. `CACHE_SCHEMA_VERSION` in `store/src/migrations/cache/index.ts` is written to `PRAGMA user_version`; when the store opens a file with another version it deletes it and recreates it, and the engine re-syncs. "Reset local cache" in Preferences (`Store.resetCache`) does the same at runtime: detach from both connections, delete, recreate, attach, re-run every live query. `cache.db` is never `VACUUM`ed, so the rowids `messages_fts` points at stay stable.
+- `user.db`: overlay, reads, groups, ignored channels, notification rules and settings and log, For you cards, Juno chat, drafts, outbox, prefs. Durable.
 - `uploads/`: staged files waiting in the outbox.
 
-The writer connection `ATTACH`es `cache.db` to `user.db` so one transaction can span both. There is one workspace directory per signed-in team; the v1 UI shows one at a time.
+Migrations: both databases use the Effect `Migrator` with timestamp ids, one file per change (`store/src/migrations/<db>/202610121430_add_x.ts`, listed in that folder's `index.ts`), recorded in a `juno_migrations` table in each file. `user.db` migrations are real, incremental and never edited once shipped. A `cache.db` change is a new migration file plus a bump of `CACHE_SCHEMA_VERSION`, so cache migrations only ever run on an empty file and never transform data. `cache.db` is migrated on a short-lived connection of its own before the writer attaches it, so its migration table lands in the right file.
 
-Connections: `@effect/sql-sqlite-node` gives one serialised connection per layer, so the store builds two: `StoreWriter` (all writes and transactions, `Reactivity`) and `StoreReader` (`PRAGMA query_only`, used by live queries). WAL mode lets readers run while the writer commits. Busy timeout is set to 250 ms (the default 5 s blocks the event loop) with retry in Effect. Backfill transactions are capped at 200 rows so a live query or a Resolve never waits more than a few milliseconds.
+The writer connection `ATTACH`es `cache.db` to `user.db` as `cache` so one transaction can span both. Table names are unique across the two files, so queries use plain table names. There is one workspace directory per signed-in team (`<userData>/workspaces/<enterprise_id or team_id>/`, `workspacePaths()` in `store`); the v1 UI shows one at a time.
+
+Connections: `@effect/sql-sqlite-node` gives one serialised connection per client, so the store builds two with one shared `Invalidation`: `StoreWriter` (all writes and transactions; `BEGIN IMMEDIATE`) and `StoreReader` (opened read-only, the same attachment, used by live queries). Both are `SqlClient`s; the service type says which connection a query runs on. WAL mode lets the reader run while the writer commits, and a reader query during an open writer transaction sees the last committed state. Busy timeout is 250 ms (the default 5 s blocks the event loop); `transaction()` retries a lock timeout a few times with backoff in Effect. Backfill writes are split with `inBatches(rows, write)` into transactions of `BATCH_ROWS` (200) so a live query or a Resolve never waits more than a few milliseconds.
+
+Invalidation and live queries (`store/src/invalidation.ts`, the only module that imports `effect/reactivity/Reactivity`): keys are table names, optionally with row ids. A subscription on `['messages']` re-runs for any write to that table; one on `{ messages: ['C1'] }` re-runs for `{ messages: ['C1'] }` and for `['messages']`, not for another channel. `transaction(effect)` wraps the writer transaction in a batch: keys invalidated inside fire once after the commit and not at all on rollback; nested calls become savepoints in the outer batch. `liveQuery(keys, query)` is a `Stream`: it runs `query` now, then again whenever its keys are invalidated, with a leading-edge debounce (the first change after an idle period runs at once; further changes inside the 30 ms window collapse into one trailing run). The engine's route layer turns these streams into the snapshot-plus-deltas wire format of section 2.6; the store itself does not shape rows for the UI.
 
 ### 4.2 Mirror tables (`cache.db`)
 
@@ -171,7 +175,7 @@ conversations   (id PK, kind 'public'|'private'|'im'|'mpim', name, user_id, memb
 messages        (channel, ts, PK(channel, ts), thread_ts, user_id, subtype, text, blocks_json,
                  files_json, attachments_json, edited_ts, deleted, client_msg_id,
                  reply_count, latest_reply, reply_users_json, last_event_ts, version)
-messages_fts    (fts5: text, content=messages)        -- fed in the same transaction as the message write
+messages_fts    (fts5: text, content=messages)        -- external content; triggers on messages keep it in step in the same transaction
 reactions       (channel, ts, name, PK(channel, ts, name), count, user_ids_json, me)
 files           (id PK, name, mimetype, size, url_private, thumb_json, permalink, user_id, created)
 emoji           (name PK, url, alias_for)

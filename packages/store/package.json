@@ -1,0 +1,25 @@
+{
+  "name": "@juno/store",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The two SQLite databases per workspace (cache.db and user.db), their migrations, writer and reader clients, and keyed invalidation for live queries.",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@effect/sql-sqlite-node": "4.0.3",
+    "effect": "4.0.3"
+  },
+  "devDependencies": {
+    "@effect/vitest": "4.0.3",
+    "@types/node": "24.19.2",
+    "typescript": "5.9.3",
+    "vitest": "5.0.4"
+  }
+}
