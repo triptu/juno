@@ -29,6 +29,9 @@
   "juno": {
     "allowedDeps": [
       "@juno/domain"
+    ],
+    "testDeps": [
+      "@juno/fake-slack"
     ]
   }
 }
