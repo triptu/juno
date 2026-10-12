@@ -11,6 +11,8 @@ const kinds = [
 export default defineFixtures(Select, {
   default: fixture({ options: kinds, defaultValue: 'all', label: 'Kind' }),
   small: fixture({ options: kinds, defaultValue: 'all', size: 30, label: 'Kind' }),
+  hover: fixture({ options: kinds, defaultValue: 'all', label: 'Kind' }, { hover: 'select' }),
+  disabled: fixture({ options: kinds, defaultValue: 'all', label: 'Kind', disabled: true }),
   'filter-row': scene(() => (
     <Row gap="sm">
       <Select size={30} label="Kind" options={kinds} defaultValue="all" />

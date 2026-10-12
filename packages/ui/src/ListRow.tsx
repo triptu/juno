@@ -1,5 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
 import type { HTMLAttributes, ReactNode } from 'react'
+import { onSecondaryFill } from '@juno/tokens/fills.stylex'
 import { colors, radii, sizes, spacing } from '@juno/tokens/tokens.stylex'
 import { activateHandlers, type ActivateEvent } from './internal/activate'
 import { interactive } from './internal/interactive'
@@ -17,7 +18,11 @@ export interface ListRowProps extends Omit<HTMLAttributes<HTMLDivElement>, 'styl
    * mouse down (see internal/activate.ts); check `metaKey` for ⌘-click.
    */
   readonly onSelect?: (event: ActivateEvent) => void
-  /** The row is the current one (selected background). */
+  /**
+   * The row is the current one (selected background). Muted text inside a
+   * selected row renders as subtle, because muted fails contrast on the
+   * secondary fill.
+   */
   readonly selected?: boolean
   /** Draw the 1px rule under the row. Default true. */
   readonly divider?: boolean
@@ -57,6 +62,7 @@ export function ListRow({
         isButton && interactive.focusRingInset,
         isButton && styles.button,
         selected && styles.selected,
+        selected && onSecondaryFill,
       )}
     >
       {leading !== undefined ? <span {...stylex.props(styles.leading)}>{leading}</span> : null}
@@ -115,9 +121,9 @@ const styles = stylex.create({
 })
 
 const heights = stylex.create({
-  44: { minHeight: sizes['--control-44'] },
-  48: { minHeight: '48px' },
-  52: { minHeight: '52px' },
+  44: { minHeight: sizes['--row-44'] },
+  48: { minHeight: sizes['--row-48'] },
+  52: { minHeight: sizes['--row-52'] },
 })
 
 const paddings = stylex.create({

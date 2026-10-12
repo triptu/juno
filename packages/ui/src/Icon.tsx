@@ -29,7 +29,7 @@ export function Icon({ icon: Lucide, size = 16, dim = false, label }: IconProps)
       aria-label={label}
       role={label ? 'img' : undefined}
       focusable={false}
-      {...stylex.props(styles.icon, sizeStyles[size], dim && styles.dim)}
+      {...stylex.props(styles.icon, sizeStyles[size], size <= 13 && styles.thin, dim && styles.dim)}
     />
   )
 }
@@ -44,6 +44,10 @@ const styles = stylex.create({
     strokeLinecap: 'round',
     strokeLinejoin: 'round',
     color: 'inherit',
+  },
+  // Small icons would look bold next to 11px text at the full stroke.
+  thin: {
+    strokeWidth: sizes['--icon-stroke-small'],
   },
   dim: {
     opacity: opacity['--opacity-tab-icon'],

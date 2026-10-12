@@ -1,5 +1,5 @@
 import * as stylex from '@stylexjs/stylex'
-import { useCallback, useLayoutEffect, useRef, type TextareaHTMLAttributes } from 'react'
+import type { TextareaHTMLAttributes } from 'react'
 import { colors, layout, radii, spacing, text } from '@juno/tokens/tokens.stylex'
 
 export type TextareaVariant = 'plain' | 'inline' | 'card'
@@ -17,28 +17,15 @@ export interface TextareaProps extends Omit<TextareaHTMLAttributes<HTMLTextAreaE
   readonly label?: string
 }
 
-/** A multi-line input. */
-export function Textarea({ variant = 'plain', maxHeight = 'composer', label, rows, onInput, ...rest }: TextareaProps) {
-  const ref = useRef<HTMLTextAreaElement>(null)
-
-  const fit = useCallback(() => {
-    const node = ref.current
-    if (!node || variant !== 'inline') return
-    node.style.height = 'auto'
-    node.style.height = `${node.scrollHeight}px`
-  }, [variant])
-
-  useLayoutEffect(fit, [fit, rest.value, rest.defaultValue])
-
+/**
+ * A multi-line input. The inline variant grows with its content through
+ * `field-sizing: content`, so no layout is read on a keystroke.
+ */
+export function Textarea({ variant = 'plain', maxHeight = 'composer', label, rows, ...rest }: TextareaProps) {
   return (
     <textarea
-      ref={ref}
       aria-label={label}
       rows={rows ?? (variant === 'inline' ? 1 : variant === 'card' ? 2 : 6)}
-      onInput={(event) => {
-        fit()
-        onInput?.(event)
-      }}
       {...rest}
       {...stylex.props(styles.base, variants[variant], variant === 'inline' && maxHeights[maxHeight])}
     />
@@ -85,16 +72,17 @@ const variants = stylex.create({
     resize: 'vertical',
   },
   inline: {
-    // 9 + 22 + 9 = the 40px single-line composer. Component-local value.
-    paddingBlock: '9px',
+    // 9 + 22 + 9 = the 40px single-line composer.
+    paddingBlock: layout['--composer-padding-block'],
     paddingInline: spacing['--space-1'],
     borderWidth: 0,
     backgroundColor: 'transparent',
     fontFamily: text['--text-body-family'],
     fontSize: text['--text-body-size'],
-    lineHeight: '22px',
+    lineHeight: layout['--composer-line-height'],
     letterSpacing: text['--text-body-tracking'],
     resize: 'none',
+    fieldSizing: 'content',
     overflowY: 'auto',
     overscrollBehavior: 'contain',
   },

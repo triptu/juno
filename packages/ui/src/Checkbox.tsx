@@ -1,6 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import type { InputHTMLAttributes, ReactNode } from 'react'
-import { colors, sizes, spacing } from '@juno/tokens/tokens.stylex'
+import { colors, sizes, spacing, text } from '@juno/tokens/tokens.stylex'
+import { interactive } from './internal/interactive'
 import { Text } from './Text'
 
 export interface CheckboxProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'style' | 'className' | 'type' | 'size'> {
@@ -11,16 +12,16 @@ export interface CheckboxProps extends Omit<InputHTMLAttributes<HTMLInputElement
 }
 
 /** A native 15px checkbox with a label and an optional description. */
-export function Checkbox({ label, description, size = 'md', ...rest }: CheckboxProps) {
+export function Checkbox({ label, description, size = 'md', disabled, ...rest }: CheckboxProps) {
   return (
-    <label {...stylex.props(styles.root)}>
-      <input type="checkbox" {...rest} {...stylex.props(styles.input)} />
+    <label {...stylex.props(styles.root, disabled && interactive.dimmed)}>
+      <input type="checkbox" disabled={disabled} {...rest} {...stylex.props(styles.input)} />
       <span {...stylex.props(styles.text)}>
-        <Text role={size === 'lg' ? 'body' : 'bodySmall'} weight="medium" tone="default" as="span">
+        <Text variant={size === 'lg' ? 'body' : 'bodySmall'} weight="medium" tone="default" as="span">
           {label}
         </Text>
         {description !== undefined ? (
-          <Text role={size === 'lg' ? 'ui' : 'meta'} tone="muted" as="span" sx={styles.description}>
+          <Text variant={size === 'lg' ? 'ui' : 'meta'} tone="muted" as="span" sx={styles.description}>
             {description}
           </Text>
         ) : null}
@@ -42,9 +43,10 @@ const styles = stylex.create({
     width: sizes['--checkbox'],
     height: sizes['--checkbox'],
     margin: 0,
-    marginTop: '2px',
+    marginTop: spacing['--space-0-5'],
     flexShrink: 0,
     accentColor: colors['--foreground-default'],
+    cursor: 'default',
     outlineStyle: {
       default: 'none',
       ':focus-visible': 'solid',
@@ -60,6 +62,6 @@ const styles = stylex.create({
     minWidth: 0,
   },
   description: {
-    lineHeight: 1.45,
+    lineHeight: text['--text-preview-leading'],
   },
 })

@@ -21,12 +21,12 @@ export default defineFixtures(
           <Section heading="Your rules" sub="Checked top to bottom. The first rule that matches wins.">
             <Surface kind="group">
               <ListRow leading={<Icon icon={Hash} size={15} />}>
-                <Text role="body">
+                <Text variant="body">
                   In <b>#incidents</b>
                 </Text>
               </ListRow>
               <ListRow leading={<Icon icon={Hash} size={15} />} divider={false}>
-                <Text role="body">
+                <Text variant="body">
                   In <b>#design-review</b>
                 </Text>
               </ListRow>
@@ -35,7 +35,7 @@ export default defineFixtures(
           <Section heading="Everything else" sub="When no rule matches.">
             <Surface kind="group">
               <ListRow divider={false}>
-                <Text role="body">Digest times</Text>
+                <Text variant="body">Digest times</Text>
               </ListRow>
             </Surface>
           </Section>
@@ -55,6 +55,32 @@ export default defineFixtures(
         </Page>
       ),
       { width: 960, height: 200, padded: false },
+    ),
+    'all-topics-header-narrow': scene(
+      () => (
+        <Page width="wide">
+          <PageHeader
+            title="All topics"
+            size="compact"
+            subtitle="Everything you're part of, including quiet, resolved and unsubscribed topics."
+            trailing={<TextField size={34} leadingIcon={Search} placeholder="Filter by title or message" width="search" label="Filter topics" />}
+          />
+        </Page>
+      ),
+      { width: 480, height: 260, padded: false },
+    ),
+    'all-topics-header-wide': scene(
+      () => (
+        <Page width="wide">
+          <PageHeader
+            title="All topics"
+            size="compact"
+            subtitle="Everything you're part of, including quiet, resolved and unsubscribed topics."
+            trailing={<TextField size={34} leadingIcon={Search} placeholder="Filter by title or message" width="search" label="Filter topics" />}
+          />
+        </Page>
+      ),
+      { width: 1400, height: 200, padded: false },
     ),
     'new-message': scene(
       () => (

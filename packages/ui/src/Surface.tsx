@@ -1,8 +1,9 @@
 import * as stylex from '@stylexjs/stylex'
 import type { ElementType, HTMLAttributes, ReactNode } from 'react'
 import { colors, radii, shadows, spacing } from '@juno/tokens/tokens.stylex'
+import type { LayoutStyles } from './internal/sx'
 
-export type SurfaceKind = 'card' | 'popover' | 'toolbar' | 'group' | 'inset' | 'toast'
+export type SurfaceKind = 'card' | 'popover' | 'toolbar' | 'group' | 'inset' | 'field' | 'toast'
 export type SurfacePadding = 'none' | 'xs' | 'sm' | 'md' | 'lg'
 export type SurfaceRadius = 'md' | 'lg' | 'lg-plus' | 'xl' | '2xl' | 'menu' | 'palette'
 
@@ -14,7 +15,7 @@ export interface SurfaceProps extends Omit<HTMLAttributes<HTMLElement>, 'style' 
   readonly radius?: SurfaceRadius
   readonly as?: ElementType
   /** Extra StyleX styles from the owner (layout only). */
-  readonly sx?: stylex.StyleXStyles
+  readonly sx?: LayoutStyles
   readonly children?: ReactNode
 }
 
@@ -24,6 +25,7 @@ const paddingByKind: Record<SurfaceKind, SurfacePadding> = {
   toolbar: 'none',
   group: 'none',
   inset: 'md',
+  field: 'none',
   toast: 'none',
 }
 
@@ -33,13 +35,16 @@ const radiusByKind: Record<SurfaceKind, SurfaceRadius> = {
   toolbar: 'lg-plus',
   group: 'xl',
   inset: 'lg',
+  field: '2xl',
   toast: 'xl',
 }
 
 /**
  * Container styles. Cards and floating surfaces use a shadow ring with a
  * transparent border, never a coloured border. Inset is the one with a real
- * border, for a block sitting inside a card.
+ * border, for a block sitting inside a card. Field is the composer frame: an
+ * input border that turns into the focus colour while anything inside has
+ * focus.
  */
 export function Surface({ kind = 'card', padding, radius, as, sx, children, ...rest }: SurfaceProps) {
   const Tag = as ?? 'div'
@@ -90,6 +95,17 @@ const kinds = stylex.create({
   inset: {
     backgroundColor: colors['--background'],
     borderColor: colors['--border-default'],
+  },
+  field: {
+    backgroundColor: colors['--surface-default'],
+    borderColor: {
+      default: colors['--input-border'],
+      ':focus-within': colors['--focus-ring'],
+    },
+    boxShadow: {
+      default: 'none',
+      ':focus-within': `0 0 0 1px ${colors['--focus-ring']}`,
+    },
   },
   toast: {
     backgroundColor: colors['--foreground-default'],

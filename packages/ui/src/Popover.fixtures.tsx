@@ -26,6 +26,6 @@ export default defineFixtures(Popover, {
         </OptionList>
       </Popover>
     ),
-    { width: 320, height: 320 },
+    { width: 320, height: 440 },
   ),
 })

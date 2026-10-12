@@ -3,6 +3,17 @@ import { defineFixtures, fixture, scene } from './fixtures/define'
 import { Row } from './fixtures/layout'
 import { IconButton } from './IconButton'
 
+function AllVariants() {
+  return (
+    <Row>
+      <IconButton icon={Quote} label="Quote" variant="ghost" />
+      <IconButton icon={Quote} label="Quote" variant="secondary" />
+      <IconButton icon={ArrowUp} label="Send" variant="primary" radius="full" size={28} />
+      <IconButton icon={Quote} label="Quote" variant="raised" />
+    </Row>
+  )
+}
+
 export default defineFixtures(IconButton, {
   titlebar: fixture({ icon: Search, label: 'Search ⌘K', size: 30 }),
   pressed: fixture({ icon: Hash, label: 'Browse channels and people', size: 30, pressed: true }),
@@ -13,6 +24,19 @@ export default defineFixtures(IconButton, {
   attach: fixture({ icon: Plus, label: 'Attach', size: 28, radius: 'full', iconSize: 18 }),
   close: fixture({ icon: X, label: 'Close tab', size: 20, tone: 'muted' }),
   dismiss: fixture({ icon: X, label: 'Dismiss', size: 22, radius: 'sm', tone: 'muted' }),
+  hover: scene(() => <AllVariants />, { hover: 'button' }),
+  'hover-secondary': fixture({ icon: Quote, label: 'Quote', variant: 'secondary' }, { hover: 'button' }),
+  'hover-raised': fixture({ icon: Quote, label: 'Quote', variant: 'raised' }, { hover: 'button' }),
+  'active-press': fixture({ icon: Pin, label: 'Pin', size: 32 }, { press: 'button' }),
+  'active-press-primary': fixture({ icon: ArrowUp, label: 'Send', size: 28, radius: 'full', variant: 'primary' }, { press: 'button' }),
+  disabled: scene(() => (
+    <Row>
+      <IconButton icon={Quote} label="Quote" variant="ghost" disabled />
+      <IconButton icon={Quote} label="Quote" variant="secondary" disabled />
+      <IconButton icon={ArrowUp} label="Send" variant="primary" radius="full" size={28} disabled />
+      <IconButton icon={Quote} label="Quote" variant="raised" disabled />
+    </Row>
+  )),
   'all-sizes': scene(() => (
     <Row>
       <IconButton icon={X} label="Close" size={20} />
@@ -27,10 +51,7 @@ export default defineFixtures(IconButton, {
   )),
   'all-variants': scene(() => (
     <Row>
-      <IconButton icon={Quote} label="Quote" variant="ghost" />
-      <IconButton icon={Quote} label="Quote" variant="secondary" />
-      <IconButton icon={ArrowUp} label="Send" variant="primary" radius="full" size={28} />
-      <IconButton icon={Quote} label="Quote" variant="raised" />
+      <AllVariants />
       <IconButton icon={Quote} label="Quote" variant="ghost" disabled />
     </Row>
   )),

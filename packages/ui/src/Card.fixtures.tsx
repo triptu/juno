@@ -1,4 +1,4 @@
-import { CalendarCheck, Hash, Reply, Terminal } from 'lucide-react'
+import { CalendarCheck, Hash, Lock, Reply, Terminal } from 'lucide-react'
 import { Button } from './Button'
 import { Card } from './Card'
 import { CodeBlock } from './CodeBlock'
@@ -37,7 +37,7 @@ export default defineFixtures(
     'waiting-on-you': fixture({
       kindIcon: Reply,
       kind: 'Waiting on you',
-      sourceIcon: Hash,
+      sourceIcon: Lock,
       source: 'Rina Sato · Staff backend',
       title: 'Elena needs a time for the Rina close call',
       body: "Rina's competing offer expires Friday. Elena asked for a 30 minute slot tomorrow.",

@@ -1,9 +1,9 @@
 import * as stylex from '@stylexjs/stylex'
 import type { LucideIcon } from 'lucide-react'
 import type { InputHTMLAttributes, ReactNode } from 'react'
-import { colors, radii, sizes, spacing } from '@juno/tokens/tokens.stylex'
+import { colors, layout, radii, sizes, spacing } from '@juno/tokens/tokens.stylex'
 import { Icon } from './Icon'
-import { roles } from './internal/type'
+import { variants as typeVariants } from './internal/type'
 
 export type TextFieldSize = 30 | 32 | 34 | 36 | 44
 
@@ -20,6 +20,8 @@ export interface TextFieldProps extends Omit<InputHTMLAttributes<HTMLInputElemen
   readonly text?: 'ui' | 'bodySmall' | 'body' | 'heading'
   /** Required when there is no visible label. */
   readonly label?: string
+  /** The value failed a check: danger border, sets aria-invalid. */
+  readonly invalid?: boolean
 }
 
 const textBySize: Record<TextFieldSize, 'ui' | 'bodySmall' | 'body' | 'heading'> = {
@@ -34,16 +36,16 @@ const textBySize: Record<TextFieldSize, 'ui' | 'bodySmall' | 'body' | 'heading'>
  * A single-line input. The container draws the border and the focus state;
  * the inner input is unstyled.
  */
-export function TextField({ size = 32, leadingIcon, leading, trailing, width = 'full', text, label, ...rest }: TextFieldProps) {
+export function TextField({ size = 32, leadingIcon, leading, trailing, width = 'full', text, label, invalid = false, ...rest }: TextFieldProps) {
   return (
-    <label {...stylex.props(styles.field, sizeStyles[size], widths[width])}>
+    <label {...stylex.props(styles.field, sizeStyles[size], widths[width], invalid && styles.invalid)}>
       {leadingIcon ? (
         <span {...stylex.props(styles.icon)}>
           <Icon icon={leadingIcon} size={size >= 44 ? 16 : 14} />
         </span>
       ) : null}
       {leading}
-      <input aria-label={label} {...rest} {...stylex.props(styles.input, roles[text ?? textBySize[size]])} />
+      <input aria-label={label} aria-invalid={invalid || undefined} {...rest} {...stylex.props(styles.input, typeVariants[text ?? textBySize[size]])} />
       {trailing}
     </label>
   )
@@ -70,6 +72,16 @@ const styles = stylex.create({
     cursor: 'text',
     minWidth: 0,
     boxSizing: 'border-box',
+  },
+  invalid: {
+    borderColor: {
+      default: colors['--danger'],
+      ':focus-within': colors['--danger'],
+    },
+    boxShadow: {
+      default: 'none',
+      ':focus-within': `0 0 0 1px ${colors['--danger']}`,
+    },
   },
   icon: {
     display: 'inline-flex',
@@ -106,6 +118,6 @@ const sizeStyles = stylex.create({
 
 const widths = stylex.create({
   full: { width: '100%' },
-  search: { width: '260px' },
-  keyword: { width: '160px' },
+  search: { width: layout['--search-field-width'] },
+  keyword: { width: layout['--keyword-field-width'] },
 })

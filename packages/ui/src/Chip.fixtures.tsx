@@ -1,4 +1,6 @@
+import * as stylex from '@stylexjs/stylex'
 import { EyeOff, Sparkles } from 'lucide-react'
+import { colors, radii, spacing } from '@juno/tokens/tokens.stylex'
 import { Button } from './Button'
 import { Chip } from './Chip'
 import { defineFixtures, fixture, scene } from './fixtures/define'
@@ -18,12 +20,14 @@ export default defineFixtures(Chip, {
   confidence: fixture({ variant: 'filled', size: 20, icon: Sparkles, title: "Juno's read of what you typed", children: '95%' }),
   reaction: fixture({ variant: 'outline', size: 24, interactive: true, 'aria-label': 'React 👍, 2 reactions', children: '👍 2' }),
   'reaction-mine': fixture({ variant: 'outline', size: 24, interactive: true, pressed: true, 'aria-label': 'React 👍, 2 reactions, including you', children: '👍 2' }),
+  'reaction-hover': fixture({ variant: 'outline', size: 24, interactive: true, 'aria-label': 'React 👍, 2 reactions', children: '👍 2' }, { hover: 'button' }),
+  'reaction-press': fixture({ variant: 'outline', size: 24, interactive: true, 'aria-label': 'React 👍, 2 reactions', children: '👍 2' }, { press: 'button' }),
   scope: fixture({ variant: 'filled', size: 26, onRemove: () => {}, removeLabel: 'Show everything', children: 'eng' }),
   'digest-time': fixture({ variant: 'filled', size: 28, onRemove: () => {}, children: '10am' }),
   stealth: scene(() => (
     <Chip variant="dashed" size={26} icon={EyeOff} iconSize={13}>
       Stealth. Not marking as read.
-      <Button size="xs" variant="secondary" radius="md">
+      <Button size="xs" variant="secondary">
         Mark read
       </Button>
     </Chip>
@@ -40,6 +44,23 @@ export default defineFixtures(Chip, {
         <b>3</b> stayed silent
       </Chip>
     </Row>
+  )),
+  // The chips that share a selected row or sit next to each other, so the
+  // contrast rule for text on a secondary fill is covered by one shot.
+  'on-selected-row': scene(() => (
+    <div {...stylex.props(styles.selectedRow)}>
+      <Chip variant="outline">Main</Chip>
+      <Chip variant="strong" numeric>
+        12
+      </Chip>
+      <Chip variant="soft">@</Chip>
+      <Chip variant="success" size={22}>
+        Resolved
+      </Chip>
+      <Chip variant="dashed" size={26} icon={EyeOff} iconSize={13}>
+        Stealth
+      </Chip>
+    </div>
   )),
   'all-variants': scene(() => (
     <Stack>
@@ -77,6 +98,9 @@ export default defineFixtures(Chip, {
         <Chip variant="quiet" size={22}>
           Silent
         </Chip>
+        <Chip variant="dashed" size={22} icon={EyeOff} iconSize={12}>
+          Stealth
+        </Chip>
       </Row>
       <Row gap="sm">
         <Chip variant="outline" size={24} interactive aria-label="React 👍, 2 reactions">
@@ -94,4 +118,16 @@ export default defineFixtures(Chip, {
       </Row>
     </Stack>
   )),
+})
+
+const styles = stylex.create({
+  selectedRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: spacing['--space-2'],
+    paddingBlock: spacing['--space-2'],
+    paddingInline: spacing['--space-3'],
+    borderRadius: radii['--radius-lg'],
+    backgroundColor: colors['--secondary-default'],
+  },
 })

@@ -16,6 +16,13 @@ export default defineFixtures(
       defaultChecked: true,
     }),
     'no-description': fixture({ label: 'Track replies as a topic', defaultChecked: false }),
+    hover: fixture({ label: 'Track replies as a topic', defaultChecked: false }, { hover: 'input' }),
+    disabled: fixture({
+      label: 'Let Juno decide',
+      description: 'Turn AI assist on in Preferences to use this.',
+      defaultChecked: true,
+      disabled: true,
+    }),
   },
   { width: 520 },
 )

@@ -4,6 +4,8 @@ import { colors, hues, radii, sizes, weights } from '@juno/tokens/tokens.stylex'
 export type AvatarKind = 'person' | 'channel' | 'group'
 export type AvatarSize = 44 | 36 | 32 | 28 | 24 | 20 | 18
 export type HueName = 'cyan' | 'claret' | 'midnight' | 'emeraldDark' | 'plum' | 'rose' | 'emerald' | 'jordy'
+/** The surface an avatar ring must cut through: page, sidebar or a card. */
+export type AvatarRingSurface = 'background' | 'subtle' | 'surface'
 
 export const hueNames: ReadonlyArray<HueName> = [
   'cyan',
@@ -26,25 +28,18 @@ export interface AvatarProps {
   readonly size?: AvatarSize
   /** Person colour. Ignored for channels. */
   readonly hue?: HueName
-  /** A ring in the sidebar background, for overlapping stacks. */
-  readonly ring?: boolean
-  /** The smaller initials used inside an AvatarStack. */
-  readonly stackInitials?: boolean
+  /**
+   * A 1.5px ring in the colour of the surface the avatar sits on, so
+   * overlapping avatars read as separate. `subtle` is the sidebar.
+   */
+  readonly ring?: AvatarRingSurface
 }
 
 /**
  * A square tile for a channel or a round avatar for a person. Colours are
  * mixed from the person's hue so they sit on both themes.
  */
-export function Avatar({
-  kind = 'person',
-  label,
-  name,
-  size = 32,
-  hue = 'rose',
-  ring = false,
-  stackInitials = false,
-}: AvatarProps) {
+export function Avatar({ kind = 'person', label, name, size = 32, hue = 'rose', ring }: AvatarProps) {
   return (
     <span
       role={name ? 'img' : undefined}
@@ -56,8 +51,7 @@ export function Avatar({
         kind === 'channel' ? styles.channel : styles.person,
         kind === 'channel' && tileRadius[size],
         kind !== 'channel' && hueStyles[hue],
-        stackInitials && styles.stackInitials,
-        ring && styles.ring,
+        ring && rings[ring],
       )}
     >
       {label}
@@ -87,12 +81,12 @@ const styles = stylex.create({
   person: {
     borderRadius: radii['--radius-full'],
   },
-  ring: {
-    boxShadow: `0 0 0 ${sizes['--avatar-ring']} ${colors['--background-subtle']}`,
-  },
-  stackInitials: {
-    fontSize: sizes['--initials-stack'],
-  },
+})
+
+const rings = stylex.create({
+  background: { boxShadow: `0 0 0 ${sizes['--avatar-ring']} ${colors['--background']}` },
+  subtle: { boxShadow: `0 0 0 ${sizes['--avatar-ring']} ${colors['--background-subtle']}` },
+  surface: { boxShadow: `0 0 0 ${sizes['--avatar-ring']} ${colors['--surface-default']}` },
 })
 
 const sizeStyles = stylex.create({

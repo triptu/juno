@@ -10,6 +10,22 @@ export interface FixtureFrame {
   readonly surface?: 'background' | 'subtle' | 'surface'
   /** Padding around the component. Default true. */
   readonly padded?: boolean
+  /**
+   * Before the screenshot, move the pointer over the first element matching
+   * this selector so the `:hover` styles show.
+   */
+  readonly hover?: string
+  /**
+   * Before the screenshot, press and hold the primary button on the first
+   * element matching this selector so the `:active` styles (press scale)
+   * show. Reduced motion is turned off for the shot.
+   */
+  readonly press?: string
+  /**
+   * Before the screenshot, focus the first element matching this selector
+   * from the keyboard, so the focus ring and `:focus-within` styles show.
+   */
+  readonly focus?: string
 }
 
 export interface Fixture<P> {
