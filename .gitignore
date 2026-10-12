@@ -16,3 +16,4 @@ test-results/
 # Licensed fonts from the design handoff must never be committed.
 *.otf
 .playwright-mcp/
+.claude/worktrees/
