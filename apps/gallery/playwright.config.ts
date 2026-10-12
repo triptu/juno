@@ -3,14 +3,15 @@ import { defineConfig } from '@playwright/test'
 const port = 4174
 
 /**
- * Screenshots every fixture in light and dark. Uses the installed Google
+ * Two projects against the built gallery. `shots` screenshots every fixture
+ * in light and dark; `behaviour` checks what a screenshot cannot show
+ * (mouse-down activation, the cursor rule). Both use the installed Google
  * Chrome (`channel: 'chrome'`) so no browser download is needed; set
  * GALLERY_BROWSER=chromium after `npx playwright install chromium` to use
  * Playwright's own build instead.
  */
 export default defineConfig({
   testDir: '.',
-  testMatch: 'shots.spec.ts',
   timeout: 120_000,
   workers: 1,
   fullyParallel: false,
@@ -23,6 +24,10 @@ export default defineConfig({
     colorScheme: 'light',
     reducedMotion: 'reduce',
   },
+  projects: [
+    { name: 'shots', testMatch: 'shots.spec.ts' },
+    { name: 'behaviour', testMatch: 'behaviour.spec.ts' },
+  ],
   webServer: {
     command: `pnpm exec vite preview --port ${port} --strictPort`,
     url: `http://localhost:${port}/`,

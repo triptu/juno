@@ -4,5 +4,5 @@
     "lib": ["ES2023", "DOM"],
     "types": ["node"]
   },
-  "include": ["shots.spec.ts", "playwright.config.ts", "vite.config.ts"]
+  "include": ["shots.spec.ts", "behaviour.spec.ts", "playwright.config.ts", "vite.config.ts"]
 }

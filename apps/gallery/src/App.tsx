@@ -1,10 +1,8 @@
 import * as stylex from '@stylexjs/stylex'
 import { useEffect, useLayoutEffect, useMemo, useState } from 'react'
 import { colors, radii, spacing, text } from '@juno/tokens/tokens.stylex'
-import type { AccentName } from '@juno/tokens/themes.stylex'
-import type { FixtureFrame } from '@juno/ui'
-import { allRoutes, registry, type AnyFixtureSet } from './registry'
-import { accentNames, applyTheme, isAccentName, isThemeName, themeNames, type ThemeName } from './theme'
+import { accentNames, applyTheme, isAccentName, isThemeName, themeNames, type AccentName, type FixtureFrame, type ThemeName } from '@juno/ui'
+import { allRoutes, registry, type AnyFixtureSet, type Route } from './registry'
 
 interface Location {
   readonly component: string | null
@@ -95,7 +93,7 @@ function Index({ location }: { readonly location: Location }) {
 
   useEffect(() => {
     // Exposed for the screenshot runner, so it never has to parse the DOM.
-    ;(window as unknown as { __galleryRoutes: ReadonlyArray<{ component: string; fixture: string }> }).__galleryRoutes = routes
+    ;(window as unknown as { __galleryRoutes: ReadonlyArray<Route> }).__galleryRoutes = routes
   }, [routes])
 
   return (

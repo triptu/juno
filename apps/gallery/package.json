@@ -9,11 +9,13 @@
     "build": "vite build",
     "preview": "vite preview --port 4174 --strictPort",
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.shots.json",
-    "shots": "vite build && playwright test"
+    "shots": "vite build && playwright test --project shots",
+    "test:e2e": "vite build && playwright test --project behaviour"
   },
   "dependencies": {
     "@juno/tokens": "workspace:*",
     "@juno/ui": "workspace:*",
+    "@juno/views": "workspace:*",
     "@stylexjs/stylex": "0.19.1",
     "react": "19.3.0",
     "react-dom": "19.3.0"
