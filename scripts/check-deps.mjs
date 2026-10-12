@@ -40,7 +40,8 @@ const isNodeBuiltin = (spec) =>
 
 // Directory rules. `dir` is a repo-relative path prefix, or `match` a regex tested on the
 // repo-relative path with forward slashes. `ban` lists package names (or NODE_BUILTIN,
-// EFFECT_ANY); `allowOnly` is a predicate for the only specifiers the directory may import.
+// EFFECT_ANY); `allowOnly` is a predicate for the only specifiers the directory may import;
+// `except` lists exact specifiers the bans do not apply to.
 const dirRules = [
   {
     dir: 'apps/desktop/src/renderer',
@@ -51,6 +52,9 @@ const dirRules = [
   {
     dir: 'apps/desktop/src/main',
     ban: ['@juno/state', '@juno/views', '@juno/ui', '@juno/engine', '@juno/store', '@juno/slack', 'react', 'react-dom'],
+    // The Slack-app import parser (leveldb and cookie files) is plain file reading that main
+    // owns (docs/architecture.md section 14) and the live smoke shares. The client stays out.
+    except: ['@juno/slack/import'],
     reason: 'Main is the shell: no UI, state or engine code. It forks the engine entry as a separate process.',
   },
   {
@@ -343,6 +347,7 @@ for (const pkg of packages) {
 
       for (const rule of dirRules) {
         if (rule.dir ? !rel.startsWith(`${rule.dir}/`) : !rule.match.test(rel)) continue
+        if ((rule.except ?? []).includes(spec)) continue
         const banned = (rule.ban ?? []).some((item) =>
           item === NODE_BUILTIN ? isNodeBuiltin(spec) : item === EFFECT_ANY ? isEffect : target === item,
         )

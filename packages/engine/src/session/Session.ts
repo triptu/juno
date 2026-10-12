@@ -16,6 +16,10 @@
  *
  * Sign-out closes the scope, has main delete the secrets and clear the
  * `persist:slack` cookies, and deletes the workspace's `cache.db`.
+ *
+ * The engine phase (`first-run`, `live`, `session-expired`) follows the
+ * session status; the composition layer wires that (`layer.ts`), so this
+ * folder depends on no other feature.
  */
 import { rm } from 'node:fs/promises'
 import { Context, Effect, Exit, Fiber, Layer, Ref, Scope, Stream, SubscriptionRef } from 'effect'
@@ -33,8 +37,7 @@ import {
 } from '@juno/slack'
 import { workspacePaths } from '@juno/store'
 import { EngineConfig } from '../config'
-import { HostLink } from '../host/Host'
-import { Status } from '../status/Status'
+import { HostLink } from '../protocol/host'
 import { hostHandshake } from './handshake'
 
 interface Active {
@@ -57,26 +60,17 @@ export class Session extends Context.Service<
     readonly api: Effect.Effect<SlackApiShape, NotSignedIn>
   }
 >()('juno/engine/Session') {
-  static readonly layer: Layer.Layer<Session, never, HostLink | EngineConfig | Status | HttpTransport> = Layer.effect(
+  static readonly layer: Layer.Layer<Session, never, HostLink | EngineConfig | HttpTransport> = Layer.effect(
     Session,
     Effect.gen(function* () {
       const host = yield* HostLink
       const config = yield* EngineConfig
-      const status = yield* Status
       const transport = yield* HttpTransport
       const serviceScope = yield* Effect.scope
       const state = yield* SubscriptionRef.make<SessionStatus>({ _tag: 'signedOut' })
       const active = yield* Ref.make<Active | undefined>(undefined)
 
-      const setStatus = (next: SessionStatus) =>
-        Effect.gen(function* () {
-          yield* SubscriptionRef.set(state, next)
-          const phase =
-            next._tag === 'ready' ? ({ _tag: 'live' } as const)
-            : next._tag === 'authRequired' ? ({ _tag: 'session-expired' } as const)
-            : ({ _tag: 'first-run' } as const)
-          yield* status.setPhase(phase)
-        })
+      const setStatus = (next: SessionStatus) => SubscriptionRef.set(state, next)
 
       const slackLayer = (secrets: SessionSecrets) =>
         SlackClient.layer.pipe(

@@ -60,7 +60,7 @@ describe('authentication', () => {
     expect(submit.status).toBe(303)
     expect(submit.headers.get('location')).toBe(`/client/${fake.teamId}`)
     const setCookie = submit.headers.get('set-cookie') ?? ''
-    expect(setCookie).toMatch(/^d=fake-d-[0-9a-f]+; Path=\/; HttpOnly; SameSite=Lax$/)
+    expect(setCookie).toMatch(/^d=fake-d-[0-9a-f]+; Path=\/; HttpOnly; SameSite=Lax; Max-Age=31536000$/)
     const cookie = /^d=([^;]+)/.exec(setCookie)![1]!
 
     const withoutCookie = await fetch(`${fake.url}/client/${fake.teamId}`, { redirect: 'manual' })

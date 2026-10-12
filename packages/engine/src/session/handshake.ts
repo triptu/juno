@@ -9,7 +9,7 @@
  */
 import { Effect, Ref } from 'effect'
 import type { SocketHandshakeShape } from '@juno/slack'
-import type { HostLink } from '../host/Host'
+import type { HostLink } from '../protocol/host'
 
 export function hostHandshake(host: HostLink['Service']): SocketHandshakeShape {
   const lastUrl = Ref.makeUnsafe<string | undefined>(undefined)

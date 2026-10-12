@@ -52,13 +52,13 @@ const READ_ONLY_METHODS = [
 ] as const satisfies ReadonlyArray<MethodName>
 type ReadOnlyMethod = (typeof READ_ONLY_METHODS)[number]
 
-const args = new Set(process.argv.slice(2))
+const flags = new Set(process.argv.slice(2))
 const flag = (name: string) => {
   const index = process.argv.indexOf(name)
   return index >= 0 ? process.argv[index + 1] : undefined
 }
-const useFake = args.has('--fake')
-const record = !args.has('--no-record')
+const useFake = flags.has('--fake')
+const record = !flags.has('--no-record')
 const seconds = Number(flag('--seconds') ?? (useFake ? 2 : 30))
 const teamId = flag('--team')
 

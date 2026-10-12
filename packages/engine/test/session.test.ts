@@ -6,7 +6,6 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { MessageChannel } from 'node:worker_threads'
 import { Cause, Exit } from 'effect'
-import * as AsyncResult from 'effect/reactivity/AsyncResult'
 import { afterEach, describe, expect, it } from 'vitest'
 import { HttpTransport } from '@juno/slack'
 import { startFakeSlack, type Credentials, type FakeSlack } from '@juno/fake-slack'
@@ -128,7 +127,7 @@ async function engine(options: { initial?: (fake: FakeSlack) => Credentials; ent
   const status = (tag: SessionStatus['_tag']) =>
     waitFor(() => {
       const result = registry.get(sessionStatusAtom)
-      return AsyncResult.isSuccess(result) && result.value._tag === tag ? result.value : undefined
+      return result._tag === 'Success' && result.value._tag === tag ? result.value : undefined
     })
   return { fake, main, registry, userData, status }
 }

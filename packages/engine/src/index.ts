@@ -1,5 +1,5 @@
 export { startEngine, type EngineHandle, type EngineHostOptions } from './startEngine'
-export { HostLink, memoryHost, silentHost, type Host, type MemoryHost } from './host/Host'
+export { HostLink, memoryHost, silentHost, type Host, type MemoryHost } from './protocol/host'
 export {
   electronTransport,
   memoryTransport,
