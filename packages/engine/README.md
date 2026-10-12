@@ -4,14 +4,15 @@ The engine: all of Juno's business logic and I/O, as Effect services in one Node
 
 ## What it owns
 
-- `startEngine(transport, config)`: builds the app layer, serves the RPC protocol, returns `{ stop }`. Services and the server come up before any boot work, so the first live query is answered from local state.
-- The protocol (`src/protocol`): the `RpcServer` over a worker-runner platform that accepts every port a `Transport` hands it, and the serve helpers.
-- Feature folders (`src/<feature>/`), each with its route handlers and services. `src/status/` is the worked example.
+- `startEngine(transport, config, { host, httpTransport })`: builds the app layer, serves the RPC protocol, returns `{ stop }`. Services and the server come up before any boot work, so the first live query is answered from local state. `host` is the parentPort line to main (`memoryHost()` in tests); `httpTransport` is the Slack HTTP seam (`net.fetch` in the app, Node `fetch` by default).
+- The protocol (`src/protocol`): the `RpcServer` over a worker-runner platform that accepts every port a `Transport` hands it, the serve helpers, and `HostLink` (`src/protocol/host.ts`), the service feature folders use to talk to main.
+- Feature folders (`src/<feature>/`), each with its route handlers and services. `src/status/` is the worked example; `src/session/` owns the sign-in state, `auth.test`, the socket for the life of a session and sign-out.
 - `src/layer.ts`: the one place that merges feature `Services` and `Handlers`.
 
 ## Public API
 
-- `startEngine`, `EngineHandle`.
+- `startEngine`, `EngineHandle`, `EngineHostOptions`.
+- `Host`, `memoryHost`, `silentHost`, `HostLink`: the parentPort line to main and its test doubles.
 - `electronTransport`, `memoryTransport`, `Transport`, `EnginePort`: where ports come from.
 - `serveLiveValue(runs, options)`, `serveLiveList(runs, { encodeRow })`, `timed(query)`: turn a stream of query runs into `meta`-stamped messages and row deltas. Feed them `liveQuery(keys, timed(query))` from `@juno/store`.
 
