@@ -1,4 +1,4 @@
-// Shared delivery rules. The two public specs supply the topic policy.
+// Read-state delivery rules. Follow uses separate event and observation clocks.
 // Assumptions: stamps are comparable change times, not message pointers.
 // One command per topic is pending. Different topics remain concurrent.
 // A reply, command acceptance, and official-client change are server writes.
@@ -8,7 +8,9 @@ module mirror {
   const followMode: bool
   const initial: int
   const mirrored: Set[int]
-  pure val topics = Set(1, 2, 3)
+  const topics: Set[int]
+  const eventLimit: int
+  const fetchLimit: int
   type Event = { key: int, value: int, at: int }
   type Fetch = { key: int, value: int, at: int, epoch: int, kind: str }
 
@@ -50,7 +52,7 @@ module mirror {
   }
 
   action serverChange(k: int, value: int, source: str): bool = all {
-    not(s.sealed), mirrored.contains(k), s.events.size() < 8,
+    not(s.sealed), mirrored.contains(k), s.events.size() < eventLimit,
     s' = { ...s, clock: s.clock + 1, server: s.server.set(k, value),
       serverAt: s.serverAt.set(k, s.clock + 1),
       events: if (s.connected) s.events.union(Set({ key: k, value: value, at: s.clock + 1 })) else s.events,
@@ -59,7 +61,7 @@ module mirror {
 
   // Success and its response are separate. An official write may fall between them.
   action accept(k: int): bool = all {
-    s.connected, s.events.size() < 8, s.pending.contains(k), s.accepted.get(k) == 0, not(s.rejected.contains(k)),
+    s.connected, s.events.size() < eventLimit, s.pending.contains(k), s.accepted.get(k) == 0, not(s.rejected.contains(k)),
     s' = { ...s, clock: s.clock + 1,
       server: s.server.set(k, s.intent.get(k)), serverAt: s.serverAt.set(k, s.clock + 1),
       accepted: s.accepted.set(k, s.clock + 1),
@@ -91,7 +93,7 @@ module mirror {
   }
 
   action startFetch(k: int, kind: str): bool = all {
-    s.connected, s.fetches.size() < 2,
+    s.connected, s.fetches.size() < fetchLimit,
     s' = { ...s, clock: s.clock + 1,
       rejected: if (kind == "failure") s.rejected.union(Set(k)) else s.rejected,
       fetches: s.fetches.union(Set({ key: k, value: s.server.get(k), at: s.clock + 1,

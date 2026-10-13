@@ -25,7 +25,7 @@ One component for every clickable control with a label. Radius, text size and ic
 
 | Prop | Values | Notes |
 | --- | --- | --- |
-| `variant` | `primary` (`--hl` / `--hl-fg`), `secondary`, `outline` (1px `--border-strong`, hover `--border-strongest` + `--surface-hover`), `ghost`, `raised` (surface + 1px `--border-default` + `--shadow-sm`; send-check primary), `filter` (quick filter: always 28px, radius 12, 13px text, muted until hovered; `pressed` = `--secondary-default` + 600) | |
+| `variant` | `primary` (`--hl` / `--hl-fg`), `secondary`, `outline` (1px `--border-strong`, hover `--border-strongest` + `--surface-hover`), `ghost`, `raised` (surface + 1px `--border-default` + `--shadow-sm`; send-check primary), `filter` (quick filter: always 28px, radius 12, 13px text, muted until hovered; `pressed` = `--secondary-default` fill and the default text colour; the weight stays 500 so the width never changes) | |
 | `size` | `xs` 22, `sm` 28, `md` 30, `lg` 32, `xl` 34, `2xl` 36 | Radius pill / 8 / 12 / pill / pill / pill (the 22px row Resolve is a label-sized control and the 32px and taller buttons are pills; 28 and 30 stay rounded rectangles so they nest in cards and toolbars), text 12 / 13 / 13.5 and icon 13 / 14 / 16 derive from the size |
 | `tone` | `default`, `subtle`, `muted` | Text colour for ghost and outline; hover turns default |
 | `iconStart`, `iconEnd` | Phosphor icon | Weight by size; `iconWeight` overrides (`fill` for a check that has landed) |

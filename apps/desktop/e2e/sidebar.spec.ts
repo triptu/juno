@@ -96,14 +96,14 @@ test('the quick filters narrow the list and the Unread toggle hides read rows', 
   await sidebar.row(OFFSITE).expectVisible()
 
   await sidebar.filter('Channels')
-  await expect(sidebar.row(OFFSITE).root).toHaveCount(0)
+  await sidebar.row(OFFSITE).expectAbsent()
   await sidebar.row(POSTGRES).expectVisible()
   // The dot only marks the group that is not being viewed.
   await sidebar.expectFilterDot('Channels', false)
   await sidebar.expectFilterDot('DMs', true)
 
   await sidebar.filter('DMs')
-  await expect(sidebar.row(POSTGRES).root).toHaveCount(0)
+  await sidebar.row(POSTGRES).expectAbsent()
   await sidebar.row(OFFSITE).expectVisible()
   await sidebar.expectFilterDot('Channels', true)
   await sidebar.expectFilterDot('DMs', false)
@@ -112,7 +112,7 @@ test('the quick filters narrow the list and the Unread toggle hides read rows', 
   await sidebar.row(POSTGRES).expectVisible()
 
   await sidebar.toggleUnread()
-  await expect(sidebar.row(POSTGRES).root).toHaveCount(0)
+  await sidebar.row(POSTGRES).expectAbsent()
   await sidebar.row(RINA).expectVisible()
   await sidebar.row(OFFSITE).expectVisible()
 
@@ -120,7 +120,7 @@ test('the quick filters narrow the list and the Unread toggle hides read rows', 
   await sidebar.row(POSTGRES).expectVisible()
 })
 
-test('the empty state offers to clear the filters', async ({ juno, fake }) => {
+test('the empty state offers to clear the filters, and shows at once when it was just on screen', async ({ juno, fake }) => {
   await juno.signIn()
   await juno.waitForSync()
   const { sidebar } = juno
@@ -138,9 +138,15 @@ test('the empty state offers to clear the filters', async ({ juno, fake }) => {
   await sidebar.toggleUnread()
   await sidebar.expectEmpty("You're all caught up")
 
-  await sidebar.list.getByRole('button', { name: 'Clear filters' }).click()
-  await expect(sidebar.filterButton('All')).toHaveAttribute('aria-pressed', 'true')
-  await expect(sidebar.unreadToggle).toHaveAttribute('aria-pressed', 'false')
+  // Toggled off and on again within a second, it shows without its entrance (friendly-layer 5).
+  await sidebar.toggleUnread()
+  await sidebar.row(OFFSITE).expectVisible()
+  await sidebar.toggleUnread()
+  const title = sidebar.list.getByText("You're all caught up", { exact: true })
+  await expect(title).toBeVisible()
+  expect(await title.evaluate((node) => node.getAnimations().length)).toBe(0)
+
+  await sidebar.clearFilters()
   await sidebar.row(POSTGRES).expectVisible()
 })
 
@@ -161,8 +167,7 @@ test('a reply from another client updates its row in place and moves it to the t
   await postgres.expectMessageCount(8)
   await postgres.expectUnread(1)
   await expect.poll(() => sidebar.titles('Recent').then((titles) => titles[0])).toBe(POSTGRES)
-  // The engine's write reached pixels inside the budget (performance.md 1: 50 ms, plus the 30 ms socket debounce).
-  expect(await juno.measure('juno.live-update')).toBeLessThan(80)
+  // The time from the engine's write to pixels is measured in perf.spec.ts.
 })
 
 test('hovering a row shows Resolve in its reserved slot without moving anything', async ({ juno, win }) => {
@@ -253,9 +258,33 @@ test('pressing a row selects it, and the keyboard moves the selection', async ({
   await sidebar.row(titles[titles.length - 1]!).expectFocused()
   await win.keyboard.press('Home')
   await first.expectFocused()
-  // Only the selected row is in the Tab order.
-  await expect(third.root).toHaveAttribute('tabindex', '0')
-  await expect(first.root).toHaveAttribute('tabindex', '-1')
+  // One row is in the Tab order: the one focused last, so Tab leaves the list and Shift-Tab comes back to it.
+  await expect(first.root).toHaveAttribute('tabindex', '0')
+  await expect(third.root).toHaveAttribute('tabindex', '-1')
+})
+
+test('after arrowing to a row, Tab reaches that row\'s Resolve', async ({ juno, win }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  const { sidebar } = juno
+  const titles = await sidebar.titles('Recent')
+  const first = sidebar.row(titles[0]!)
+  const postgres = sidebar.row(POSTGRES)
+  const steps = titles.findIndex((title) => title.startsWith(POSTGRES))
+  expect(steps).toBeGreaterThan(0)
+
+  // The first row is selected; the Postgres thread is reached with the keyboard only.
+  await first.select()
+  await first.expectSelected()
+  for (let i = 0; i < steps; i++) await win.keyboard.press('ArrowDown')
+  await postgres.expectFocused()
+  await postgres.expectSelected(false)
+
+  await win.keyboard.press('Tab')
+  await expect(postgres.resolveButton).toBeFocused()
+  // And Shift-Tab goes back to its row.
+  await win.keyboard.press('Shift+Tab')
+  await postgres.expectFocused()
 })
 
 test('the sidebar renders in dark mode', async ({ juno, win }) => {

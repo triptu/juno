@@ -11,6 +11,10 @@ export type PerfName =
   | 'juno.start'
   | 'juno.shell-paint'
   | 'juno.sidebar-rows'
+  /** Mark: the sidebar's first snapshot has reached the renderer. */
+  | 'juno.sidebar-snapshot'
+  /** From `juno.sidebar-snapshot` to the first rows painted. */
+  | 'juno.sidebar-paint'
   | 'juno.topic-open'
   | 'juno.tab-switch'
   | 'juno.filter'

@@ -1,5 +1,5 @@
 import { defineFixtures, fixture } from '@juno/ui'
-import { EngineStatusView } from './EngineStatusView'
+import { EngineNotice, EngineStatusView } from './EngineStatusView'
 
 const onPing = () => {}
 
@@ -27,3 +27,18 @@ export default defineFixtures(EngineStatusView, {
     answered: fixture({ line: 'Engine live', pong: 'Pong 3', onPing }),
   },
 })
+
+const onRestart = () => {}
+
+// The line under the sidebar's filters, as the Sidebar container draws it.
+export const engineNoticeFixtures = defineFixtures(
+  EngineNotice,
+  {
+    Sync: {
+      offline: fixture({ kind: 'offline' }),
+      'rate-limited': fixture({ kind: 'rate-limited' }),
+      stopped: fixture({ kind: 'stopped', onRestart }),
+    },
+  },
+  { width: 384, padded: false, surface: 'subtle' },
+)

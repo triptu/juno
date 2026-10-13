@@ -4,6 +4,8 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-13 23:10 · Orchestrator · The Quint follow spec, aligned with the implementation, found three ways an accepted Unsubscribe could be undone (a delayed followed event, a page requested during the command, a lost response plus a failed lookup). Fixing them in sync and making `acceptedUnfollow` pass; the old behaviour stays as bug-mode counterexamples.
+- 10-13 22:31 · Orchestrator · Follow checks cover the quiet window plus per-thread lookups on new replies, not the whole follow list (the real workspace follows more than 9,000 threads). Merged M3 fixes A and B; main green.
 - 10-13 22:04 · Orchestrator · AI decision tier: TypeSafe `jev-1.13` via `classify` for route check, settled and the notification gate (516 ms p50, 100% on examples, about $0.03 per 1k); `openai/gpt-6-luna` for grouping and ⌘K parsing; Sonnet 5.5 for generation. Tool choice forced on decisions, auto on generation. Final live eval 32/33.
 - 10-13 21:44 · Tushar · Placeholder art is the Tide generative mark, seeded per topic, for every topic (Main and threads alike) while AI is off or art has not been generated. Same size and container as the art, so swapping causes no layout shift.
 - 10-13 21:42 · Tushar · Topic art: constrained-vocabulary drawing on Gemini 3.8 Flash. Everything is a topic, so channel Main rows also get AI art (no separate generative channel marks). Next round: explain the vocabulary, compare more creative freedom, try no container (current tile is too rounded), and mute the colours, especially in dark mode.

@@ -1,6 +1,7 @@
 import { defineFixtures, scene, type FixtureFrame } from '@juno/ui'
 import { AccountMenu } from './AccountMenu'
 import { AppearanceSettings } from './AppearanceSettings'
+import { EngineNotice } from './EngineStatusView'
 import { hostileIds, NOW, pinnedIds, recentIds, rows, rowsById } from './fixtures/topics'
 import { Sidebar, type SidebarProps } from './Sidebar'
 import { relativeTime } from './time'
@@ -76,15 +77,21 @@ export default defineFixtures(
     },
     Empty: {
       'caught-up': scene(() => full({ filter: { kind: 'all', unreadOnly: true }, dots: { channels: false, dms: false } }, { sections: [], empty: 'caught-up', onClearFilters: noop })),
-      filtered: scene(() => full({ filter: { kind: 'dms', unreadOnly: false }, dots: { channels: true, dms: false } }, { sections: [], empty: 'filtered', onClearFilters: noop })),
-      quiet: scene(() => full({ dots: { channels: false, dms: false } }, { sections: [], empty: 'quiet' })),
+      filtered: scene(() => full({ filter: { kind: 'dms', unreadOnly: false }, dots: { channels: true, dms: false } }, { sections: [], empty: 'filtered', onClearFilters: noop, onViewAll: noop })),
+      quiet: scene(() => full({ dots: { channels: false, dms: false } }, { sections: [], empty: 'quiet', onViewAll: noop })),
       // Nothing has arrived from the engine yet: the chrome paints, the list stays blank.
       loading: scene(() => full({ dots: { channels: false, dms: false } }, { sections: [] })),
     },
     Scope: {
       scoped: scene(() => full({ scope: { name: 'eng', kind: 'public' }, dots: { channels: false, dms: false } }, { sections: [{ id: 'recent', ids: [rows.postgres.id, rows.file.id] }] })),
       'scoped-private': scene(() => full({ scope: { name: 'hiring', kind: 'private' }, dots: { channels: false, dms: false } }, { sections: [{ id: 'recent', ids: [rows.hiring.id] }] })),
-      'scoped-empty': scene(() => full({ scope: { name: 'design-review', kind: 'public' }, dots: { channels: false, dms: false } }, { sections: [], empty: 'filtered', onClearFilters: noop })),
+      'scoped-empty': scene(() => full({ scope: { name: 'design-review', kind: 'public' }, dots: { channels: false, dms: false } }, { sections: [], empty: 'filtered', onClearFilters: noop, onViewAll: noop })),
+    },
+    // The status line under the filters; the rows stay as they were.
+    Sync: {
+      offline: scene(() => full({ status: <EngineNotice kind="offline" /> })),
+      'rate-limited': scene(() => full({ status: <EngineNotice kind="rate-limited" /> })),
+      stopped: scene(() => full({ status: <EngineNotice kind="stopped" onRestart={noop} /> })),
     },
     Nav: {
       'all-topics-active': scene(() => full({ activeNav: 'all-topics' })),

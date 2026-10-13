@@ -26,3 +26,7 @@ Small items noticed during work that are not yet assigned to a milestone. Remove
 - AI: the assistant's preferences UI needs a third model slot (`classifier`) next to `decision` and `generation`, or a switch that empties it.
 - Quint specs (queued after M3 fix A): `specs/` with follow/unfollow and read-state models first, then merge ordering and outbox/echo reconciliation before M6. Run the model checker in CI, feed generated traces into the engine convergence test, and add the "update the spec with sync changes" rule to CLAUDE.md.
 - Orchestration: T3 auto-resumes delegated tasks after a rate-limit reset. Before restarting a stopped task elsewhere, cancel the original task (task_cancel) so two agents never share a worktree.
+- ui: `EmptyState.tsx` is skipped by the React Compiler (`step++` inside a closure); rewrite so it compiles.
+- ui: `activateHandlers` follow-ups and the `ScrollArea` gutter and hover rule from the M3 code review.
+- Sidebar times should use domain `relativeTime` (needs a `desktop → domain` edge decision).
+- "View all topics" does nothing until the All topics page lands (M5).

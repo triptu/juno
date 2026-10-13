@@ -7,7 +7,7 @@ import AccountMenu from './AccountMenu.fixtures'
 import AppearanceSettings from './AppearanceSettings.fixtures'
 import AppInfoView from './AppInfoView.fixtures'
 import ChannelIconPicker from './ChannelIconPicker.fixtures'
-import EngineStatusView from './EngineStatusView.fixtures'
+import EngineStatusView, { engineNoticeFixtures } from './EngineStatusView.fixtures'
 import SessionView from './SessionView.fixtures'
 import SignInView from './SignInView.fixtures'
 import Shell from './Shell.fixtures'
@@ -21,6 +21,7 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   AppearanceSettings,
   AppInfoView,
   ChannelIconPicker,
+  EngineNotice: engineNoticeFixtures,
   EngineStatusView,
   SessionView,
   Shell,

@@ -13,7 +13,7 @@ import { Users } from '@phosphor-icons/react/dist/icons/Users'
 import type { ReactNode } from 'react'
 import type { ConversationKind, KindFilter } from '@juno/contract'
 import { accent, colors, layout, sizes, spacing } from '@juno/tokens/tokens.stylex'
-import { AvatarButton, Button, Chip, Divider, IconButton, NavItem, Popover, type ActivateEvent, type HueName, type ThemeName } from '@juno/ui'
+import { activateHandlers, AvatarButton, Button, Chip, Divider, IconButton, NavItem, Popover, type ActivateEvent, type HueName, type ThemeName } from '@juno/ui'
 import { countLabel } from './look'
 
 export type SidebarNavTarget = 'all-topics' | 'for-you' | 'juno'
@@ -63,6 +63,8 @@ export interface SidebarProps {
   readonly onFilterKind: (kind: KindFilter) => void
   readonly onToggleUnread: () => void
   readonly onClearScope: () => void
+  /** A status line under the filters, when the list may be behind Slack (`EngineNotice`). */
+  readonly status?: ReactNode
   /** The topic list. */
   readonly children: ReactNode
 }
@@ -70,8 +72,9 @@ export interface SidebarProps {
 /**
  * The left pane (spec section 5): the title bar with the traffic-light
  * space and the five icons, the three nav items, a hairline, the quick
- * filters with their dots and the Unread toggle, the scope chip when
- * scoped, and the list the owner renders into it.
+ * filters with their dots and the Unread toggle, a status line when the
+ * list may be behind Slack, the scope chip when scoped, and the list the
+ * owner renders into it.
  */
 export function Sidebar({
   account,
@@ -92,8 +95,12 @@ export function Sidebar({
   onFilterKind,
   onToggleUnread,
   onClearScope,
+  status,
   children,
 }: SidebarProps) {
+  // A dot marks a group with unread topics that is not the one being viewed.
+  const channelsDot = dots.channels && filter.kind !== 'channels'
+  const dmsDot = dots.dms && filter.kind !== 'dms'
   return (
     <aside aria-label="Sidebar" {...stylex.props(styles.root)}>
       <header aria-label="Sidebar title bar" {...stylex.props(styles.titlebar)}>
@@ -154,25 +161,32 @@ export function Sidebar({
         <Divider />
       </div>
 
-      {/* The filter names stay fixed; the dot is a labelled image inside, so it reads on its own. */}
+      {/* Filters switch on mouse down, like the rows (performance.md 4.1). The dot is in the name ("Channels, unread"), so a screen reader hears it. */}
       <div role="group" aria-label="Quick filters" {...stylex.props(styles.filters)}>
-        <Button variant="filter" aria-label="All" pressed={filter.kind === 'all'} onClick={() => onFilterKind('all')}>
+        <Button variant="filter" aria-label="All" pressed={filter.kind === 'all'} {...activateHandlers<HTMLButtonElement>(() => onFilterKind('all'))}>
           All
         </Button>
-        <Button variant="filter" aria-label="Channels" pressed={filter.kind === 'channels'} onClick={() => onFilterKind('channels')}>
+        <Button
+          variant="filter"
+          aria-label={channelsDot ? 'Channels, unread' : 'Channels'}
+          pressed={filter.kind === 'channels'}
+          {...activateHandlers<HTMLButtonElement>(() => onFilterKind('channels'))}
+        >
           Channels
-          <Dot shown={dots.channels && filter.kind !== 'channels'} label="Unread channels" />
+          <Dot shown={channelsDot} />
         </Button>
-        <Button variant="filter" aria-label="DMs" pressed={filter.kind === 'dms'} onClick={() => onFilterKind('dms')}>
+        <Button variant="filter" aria-label={dmsDot ? 'DMs, unread' : 'DMs'} pressed={filter.kind === 'dms'} {...activateHandlers<HTMLButtonElement>(() => onFilterKind('dms'))}>
           DMs
-          <Dot shown={dots.dms && filter.kind !== 'dms'} label="Unread DMs" />
+          <Dot shown={dmsDot} />
         </Button>
         <span {...stylex.props(styles.unread)}>
-          <Button variant="filter" pressed={filter.unreadOnly} aria-label="Show unread only" onClick={onToggleUnread}>
+          <Button variant="filter" pressed={filter.unreadOnly} aria-label="Show unread only" {...activateHandlers<HTMLButtonElement>(() => onToggleUnread())}>
             Unread
           </Button>
         </span>
       </div>
+
+      {status}
 
       {scope ? (
         <div {...stylex.props(styles.scope)}>
@@ -187,9 +201,9 @@ export function Sidebar({
   )
 }
 
-/** The 5px unread dot after a filter label. Its space is always reserved; only opacity changes. */
-function Dot({ shown, label }: { readonly shown: boolean; readonly label: string }) {
-  return <span role={shown ? 'img' : undefined} aria-label={shown ? label : undefined} aria-hidden={shown ? undefined : true} {...stylex.props(styles.dot, shown && styles.dotShown)} />
+/** The 5px unread dot after a filter label. Its space is always reserved; only opacity changes. The button's name says it. */
+function Dot({ shown }: { readonly shown: boolean }) {
+  return <span aria-hidden {...stylex.props(styles.dot, shown && styles.dotShown)} />
 }
 
 function scopeIcon(kind: ConversationKind) {

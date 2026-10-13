@@ -57,6 +57,11 @@ export function registerIpc({ supervisor, setTheme, setAccent }: IpcDeps): void 
   // answer says whether one will come at all.
   handle(Channels.engineRequestPort, (_input, event) => supervisor.connect(event.sender))
 
+  // The sidebar's Restart, after the supervisor gave up on the engine.
+  handle(Channels.engineRestart, () => {
+    supervisor.restart()
+  })
+
   handle(Channels.launchSetTheme, ({ theme }) => {
     setTheme(theme)
   })
