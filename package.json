@@ -22,9 +22,12 @@
     "gallery:shots": "pnpm --filter @juno/gallery shots",
     "smoke:live": "node scripts/smoke-live.ts",
     "sync:live": "node --import ./scripts/ts-resolve-hooks.mjs scripts/sync-live-dry-run.ts",
-    "ai:eval": "pnpm --filter @juno/ai eval"
+    "ai:eval": "pnpm --filter @juno/ai eval",
+    "specs:check": "node specs/check.mjs",
+    "specs:traces": "node specs/check.mjs --traces"
   },
   "devDependencies": {
+    "@informalsystems/quint": "0.33.0",
     "@juno/engine": "workspace:*",
     "@juno/fake-slack": "workspace:*",
     "@juno/slack": "workspace:*",
