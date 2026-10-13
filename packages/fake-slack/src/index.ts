@@ -328,3 +328,5 @@ export function startFakeSlack(options?: FakeSlackOptions): Promise<FakeSlack> {
 }
 export { localConfigJson, writeSlackAppFixture, type SlackAppFixtureOptions, type SlackAppFixtureTeam } from './slackApp.ts'
 export { largeSeed, LARGE_SEED_DEFAULTS, type LargeSeedOptions, type LargeSeedSummary } from './seeds/large.ts'
+
+export { topic300Seed, TOPIC300_MAIN_CHANNEL, TOPIC300_THREAD_CHANNEL, type Topic300Summary } from './seeds/topic300.ts'
