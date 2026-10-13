@@ -6,6 +6,8 @@
 import { Effect, Layer, Ref, Stream } from 'effect'
 import type { EnginePhase, SessionStatus } from '@juno/contract'
 import type { SyncPhase } from '@juno/sync'
+import { SearchHandlers } from './search/handlers'
+import { PrefsHandlers } from './prefs/handlers'
 import { Outbox } from './outbox'
 import { SessionClientLive } from './session/client'
 import { SessionHandlers } from './session/handlers'
@@ -55,4 +57,4 @@ export const Services = EnginePhases.pipe(
 )
 
 /** One `toLayer` per feature, merged. Requires `Services`. */
-export const Handlers = Layer.mergeAll(StatusHandlers, SessionHandlers, TopicsHandlers)
+export const Handlers = Layer.mergeAll(StatusHandlers, SessionHandlers, TopicsHandlers, SearchHandlers, PrefsHandlers)

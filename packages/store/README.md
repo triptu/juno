@@ -2,6 +2,7 @@
 
 The two SQLite databases of one workspace and how to read and write them. See `docs/architecture.md` sections 4.1 to 4.3 and ADR 0008.
 
+- FTS indexes: `messages_fts`, `topic_titles_fts` (root text), `channels_fts` and `people_fts` in cache.db, and `overlay_titles_fts` (manual and AI titles) in user.db. Triggers keep them in the same transaction as their source rows.
 - `cache.db`: the Slack mirror. Disposable; deleted and rebuilt when `CACHE_SCHEMA_VERSION` changes.
 - `user.db`: Juno's own state (overlay, reads, outbox, prefs). Durable; migrations are incremental and never edited once shipped.
 

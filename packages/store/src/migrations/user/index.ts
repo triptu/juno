@@ -2,6 +2,7 @@ import type { Effect } from 'effect'
 import type { SqlClient } from 'effect/sql'
 import initial from './202610121200_initial'
 import overlayPinned from './202610131000_overlay_pinned'
+import search from './202610140100_search'
 
 /**
  * Migrations for `user.db`, keyed `<timestamp>_<name>`. Add a file per change
@@ -11,4 +12,5 @@ import overlayPinned from './202610131000_overlay_pinned'
 export const userMigrations: Record<string, Effect.Effect<void, unknown, SqlClient.SqlClient>> = {
   '202610121200_initial': initial,
   '202610131000_overlay_pinned': overlayPinned,
+  '202610140100_search': search,
 }
