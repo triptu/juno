@@ -22,3 +22,8 @@ Related existing material: `docs/design/handoff/SPEC.md` sections 12 (For you), 
 - Sync v1: one writer (the Mac), encrypted backup, and a way to move ownership. Multi-device live sync later if needed.
 - No confirmation click needed for: read-only lookups (Slack, Notion, Littlebird, topics, T3 Code status), OS notifications to the owner, scheduling its own wakeups, and starting T3 Code sessions when asked. Everything else outward is a card and runs at most once after a click.
 - Still open: how an outside app connects to T3 Code's MCP, Littlebird MCP's endpoint/auth/tools, the compaction model, and a daily spend cap (orchestrator to propose defaults).
+
+## MCP endpoints (from the owner, 10-14)
+
+- Littlebird: `https://mcp.littlebird.ai/mcp`, a custom MCP server with OAuth.
+- T3 Code: `http://192.168.1.22:3773/mcp`, a custom MCP server that connects without extra auth. It is plain HTTP on the local network, so Juno should prefer the loopback address when T3 Code runs on the same machine, make the URL a setting, and never send secrets to it.
