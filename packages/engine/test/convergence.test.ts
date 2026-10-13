@@ -1,10 +1,12 @@
 // The randomised convergence test of architecture 5.4 and ADR 0011: after a
 // seeded mix of posts, replies, edits, deletes, reactions, read marks,
-// follows and unfollows (from another client and from Juno's commands) and
-// socket drops, the store equals the fake, follow state equals the fake's
-// (specs/follow.qnt `quietAgreement`), and the incremental topic index
-// equals a full rebuild. The workspace follows more threads than one
-// getView page holds.
+// follows and unfollows (from another client and from Juno's commands),
+// follow events the socket delays across commands, and socket drops, the
+// store equals the fake, follow state equals the fake's (specs/follow.qnt
+// `quietAgreement`), and the incremental topic index equals a full rebuild.
+// Throughout, an Unsubscribe Slack accepted is never undone while it is
+// Slack's latest follow change for the thread (`acceptedUnfollow`). The
+// workspace follows more threads than one getView page holds.
 import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
 import { Effect } from 'effect'
@@ -13,7 +15,7 @@ import { Store, workspacePathsFromDir } from '@juno/store'
 import { reindexAll } from '@juno/sync'
 import { UserId } from '@juno/domain'
 import { sleep, startTestEngine, waitFor, type RunningEngine } from './harness'
-import { DAY, quiet, seedThread, subscribe, unsubscribe } from './scenario'
+import { DAY, quiet, seedThread, storedFollow, subscribe, unsubscribe, valueOf } from './scenario'
 
 let engine: RunningEngine | undefined
 afterEach(async () => {
@@ -34,6 +36,7 @@ function random(seed: number): () => number {
 }
 
 const PEOPLE = ['U0MAYA', 'U0LEO', 'U0SAM', 'U0PRIYA', 'U0JONAS', 'U0DEV']
+const FOLLOW_FRAMES = ['thread_subscribed', 'thread_unsubscribed', 'thread_marked']
 /** After a refusal the socket waits out its backoff (capped at 2 s against the fake) before the next attempt. */
 const RECONNECT_MS = 20_000
 const SEED = Number(process.env['JUNO_CONVERGENCE_SEED'] ?? 7)
@@ -68,6 +71,9 @@ describe('convergence', () => {
     const conversations = [...fake.workspace.conversations.values()].filter((c) => c.members.has(fake.selfId)).map((c) => c.id)
     const created: Array<{ channel: string; ts: string }> = []
     let connected = true
+    /** Threads whose latest follow change in Slack is an Unsubscribe by Juno that Slack accepted. */
+    const acceptedUnfollows = new Set<string>()
+    const unfollowUndone: Array<string> = []
 
     const live = (channel: string) => fake.messages(channel).filter((m) => m.subtype !== 'tombstone')
     const roots = () => conversations.flatMap((channel) => live(channel).filter((m) => (m.reply_count ?? 0) > 0 || m.thread_ts === undefined).map((m) => ({ channel, message: m })))
@@ -84,8 +90,11 @@ describe('convergence', () => {
       if (root === undefined) return
       const followed = fake.workspace.subscription(root.channel, root.message.ts)?.subscribed === true
       const id = `t:${root.channel}:${root.message.ts}`
-      if (connected && rand() < 0.5) await (followed ? unsubscribe(engine!, id) : subscribe(engine!, id))
-      else if (followed) fake.unfollowThread({ channel: root.channel, threadTs: root.message.ts })
+      acceptedUnfollows.delete(id)
+      if (connected && rand() < 0.5) {
+        const result = valueOf(await (followed ? unsubscribe(engine!, id) : subscribe(engine!, id)))
+        if (followed && result.undo !== undefined) acceptedUnfollows.add(id)
+      } else if (followed) fake.unfollowThread({ channel: root.channel, threadTs: root.message.ts })
       else fake.followThread({ channel: root.channel, threadTs: root.message.ts })
     }
 
@@ -129,7 +138,10 @@ describe('convergence', () => {
         const latest = fake.workspace.main(channel).at(-1)
         if (latest !== undefined) fake.markRead({ channel, ts: latest.ts })
       } else if (roll < 0.92) {
+        // Sometimes the socket holds follow events back, so they arrive after later commands.
+        if (connected && rand() < 0.3) fake.holdFrames({ types: FOLLOW_FRAMES })
         await changeFollow()
+        if (rand() < 0.3) fake.releaseFrames()
       } else if (roll < 0.95) {
         if (connected) {
           // The socket stays down until the reconnect step: every event in between is lost to Juno.
@@ -145,7 +157,13 @@ describe('convergence', () => {
         connected = true
       }
       if (rand() < 0.3) await sleep(5)
+      for (const id of acceptedUnfollows) {
+        const [, channel, threadTs] = id.split(':') as [string, string, string]
+        if (storedFollow(engine, channel, threadTs) === 1) unfollowUndone.push(`round ${round}: ${id}`)
+      }
     }
+    fake.releaseFrames()
+    expect(unfollowUndone).toEqual([])
     fake.goOnline()
     await engine.phase('live', RECONNECT_MS)
     await waitFor(() => (fake.socketCount() === 1 ? true : undefined), RECONNECT_MS, 'socket back')
