@@ -26,7 +26,7 @@ export function messageBody(content: MessageContent, lookups: Lookups = {}): Mes
     const width = file.original_w ?? file.thumb_360_w
     const height = file.original_h ?? file.thumb_360_h
     const dimensions = width !== undefined && height !== undefined && width > 0 && height > 0 ? { width, height } : {}
-    blocks.push({ kind: 'file', id: file.id, name: file.title || file.name || file.id, mimetype: file.mimetype ?? 'application/octet-stream', ...dimensions })
+    blocks.push({ kind: 'file', id: file.id, name: file.name || file.title || file.id, mimetype: file.mimetype ?? 'application/octet-stream', ...dimensions })
   }
   return { blocks }
 }

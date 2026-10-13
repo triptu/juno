@@ -33,6 +33,7 @@ import {
   tsToMillis,
   type ChannelId,
   type ChannelInfo,
+  type GroupMessage,
   type Topic,
   type Ts,
   type UserId,
@@ -217,11 +218,11 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
     const out: Array<MessageView> = []
     const nextRows = new Map<string, CachedRow>()
     const people = new Map<string, Person>()
-    let previous: { readonly senderId: string | null; readonly body: MessageBody; readonly isThreadRoot: boolean } | undefined
+    let previous: GroupMessage | undefined
     for (const row of rows) {
       const body = bodies.get(row.ts)!
       const isRoot = target.kind === 'thread' && row.ts === target.threadTs
-      const group = { senderId: row.user_id, body: body.body, isThreadRoot: isRoot }
+      const group: GroupMessage = { senderId: row.user_id, body: body.body, isThreadRoot: isRoot }
       const groupStart = startsGroup(previous, group)
       previous = group
       const own = reactions.get(row.ts) ?? []

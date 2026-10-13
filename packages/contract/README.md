@@ -34,3 +34,8 @@ The wire between Juno's processes. Names, schemas and types only; no logic. See 
 ## Testing
 
 No tests of its own. The routes are exercised by `packages/engine/test` (the real client against the real server over a `MessageChannel`) and by `apps/desktop/e2e`.
+
+## M4 local routes
+
+- `search.query { query, limit? }` is a live value of at most 50 `SearchResult`s: topic, channel, person or message. Titles come first, then channels, people and messages; FTS ranks matches within each group. The last word is a prefix. An empty query returns recent topics. Ignored and non-member channels are excluded. There is no search UI until M9.
+- `prefs.get { key }` is a live JSON value from the open workspace's user.db; an absent key returns null. `prefs.set { key, value }` writes one JSON value and invalidates prefs. It fails with `NotSignedIn` without an open workspace. WP5 uses the key `tabs`.

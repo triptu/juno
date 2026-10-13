@@ -12,7 +12,6 @@ Small items noticed during work that are not yet assigned to a milestone. Remove
 - Break passes with the `interfaces:break` skill at each UI milestone end, plus a final pass before shipping.
 - Edits, deletes and reactions during a socket drop are recovered only for thread text (search sweep) or when a topic is opened. Decide after the live smoke whether `cached_latest_updates` (ADR 0011) is usable.
 - The live smoke has not yet confirmed `search.modules.messages` with `is:thread after:` for an `xoxc` session (architecture 5.3, open question 17.2). `SyncConfig.discovery: 'history'` is the fallback.
-- `emojis/list` into the `emoji` table is not synced yet (architecture 5.2 step 6).
 - `topics.list` p95 is 6.7–9 ms inside the engine while events land (budget 5 ms). The cost is JavaScript row shaping, not SQL.
 - Confirm search-based thread discovery (`is:thread after:`) works with an `xoxc` session in the live smoke.
 - Edits and deletes made during a socket drop are recovered only for thread text (via search). Opening a topic, and the reconnect refresh of open topics, fetch only messages newer than the stored ones, so an edit to an older stored message is not recovered either. `cached_latest_updates` is still unknown.
@@ -35,3 +34,4 @@ Small items noticed during work that are not yet assigned to a milestone. Remove
 - Flaky: a sign-out e2e test timed out once during the row-footer run (passed on rerun). Track with the hover flake.
 - Topic view: the message's mention tint does not count the user's groups (`@group`), because the engine does not keep the groups from `client.userBoot` outside the sync. Keep them in `team` or hand them over through `SyncLink`.
 - Topic view: bot messages show the bot id as the sender name: `messages` does not keep `username` or `bot_profile`. Store the bot's name with the message.
+- Flaky: an unsubscribe-recovery engine test failed once during the WP2 run (passed on rerun). Check it alongside the other flakes.

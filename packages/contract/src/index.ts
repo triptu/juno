@@ -19,3 +19,6 @@ export * from './body'
 export * from './refs'
 export { AllRoutes } from './routes/index'
 export * from './shell'
+
+export * from './routes/search'
+export * from './routes/prefs'
