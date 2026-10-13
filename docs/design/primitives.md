@@ -107,6 +107,10 @@ Menus are not a separate primitive: an in-app menu (the account menu) is an `Opt
 
 `OptionList` (`role` `listbox` | `menu`, `activeId` → `aria-activedescendant`, `focusable` to handle keys on the list itself) + `OptionRow` (`id`, `leading`, `label`, `sub` with `subPlacement` `end` | `inline` | `below`, `trailing`, `active`, `selected`, `disabled`, `size` 30 | 32 | 34 | 55, `onSelect`, `onActivate` on pointer move, `onContextMenu`). Rows select on mouse down and keep focus in the owning input. `OptionGroupLabel` (PEOPLE, RECENT), `OptionSeparator`, `OptionHeader` (avatar + two lines). `useOptionListKeys({ ids, activeId, onActiveChange, onSelect, onClose, selectKeys })` returns the key handler for ArrowUp/Down (wrapping), Home/End, Enter (and Tab for suggestions), Esc.
 
+## 10a. ScrollArea
+
+`ScrollArea`: a vertical scroll container (`overflow-y: auto`, contained overscroll) with `scrollbar` (`always` | `hover`), `as` and a layout-only `sx`. The scrollbar is the 10px classic bar from `global.css` in both modes, so the gutter never changes size. `hover` sets a `--scrollbar-thumb` variable to transparent and to `--border-strong` under `:hover` (hover-capable pointers only); the `::-webkit-scrollbar-thumb` reads it. The track is transparent always. Keyboard and trackpad scrolling are the browser's. The sidebar topic list is a `ScrollArea scrollbar="hover"`; `Page`, `Popover` and `CodeBlock` keep the always-on bar for now.
+
 ## 11. Tabs
 
 `TabStrip` (44px drag region, full width, bottom border, `trailing` slot for the new-tab IconButton) + `Tab` (`icon` at 0.75, `label`, `active`, `onSelect`, `onClose` with `closeLabel`, `onContextMenu`; 35px, radius 8 8 0 0, flex 0 1 230, min 72; the active tab's bottom border is the page colour so it merges).
@@ -165,6 +169,6 @@ Feature components that compose the above and hold app logic: `Sidebar`, `TopicR
 
 ## Count
 
-22 primitives: Icon, Button, NavItem, IconButton, Avatar (+AvatarStack), ChannelIcon (+Swatch), Chip, ContextPill, Kbd, Text, Surface (+Divider, LabelledRule), Popover/OptionList, Tabs, Fields (TextField, Textarea, Select, Checkbox, Slider, Segmented), ListRow, Toast, EmptyState, Illustration, Logo, Page/PageHeader/Section, CodeBlock, Card.
+23 primitives: Icon, Button, NavItem, IconButton, Avatar (+AvatarStack, AvatarButton), ChannelIcon (+Swatch), Chip, ContextPill, Kbd, Text, Surface (+Divider, LabelledRule), Popover/OptionList, ScrollArea, Tabs, Fields (TextField, Textarea, Select, Checkbox, Slider, Segmented), ListRow, Toast, EmptyState, Illustration, Logo, Page/PageHeader/Section, CodeBlock, Card.
 
 Differences from the first proposal: Button's accent variant is called `primary`; Tile and Avatar are one component; Menu/MenuItem were folded into OptionList (same row anatomy, one keyboard model); PageHeader got a `Page` container for the width and padding instead of setting them itself; `Icon` takes a component rather than a name.

@@ -5,6 +5,7 @@
  */
 import type { FixtureSet } from './fixtures/define'
 import Avatar from './Avatar.fixtures'
+import AvatarButton from './AvatarButton.fixtures'
 import AvatarStack from './AvatarStack.fixtures'
 import Button from './Button.fixtures'
 import Card from './Card.fixtures'
@@ -25,6 +26,7 @@ import NavItem from './NavItem.fixtures'
 import OptionList from './OptionList.fixtures'
 import Page from './Page.fixtures'
 import Popover from './Popover.fixtures'
+import ScrollArea from './ScrollArea.fixtures'
 import Segmented from './Segmented.fixtures'
 import Select from './Select.fixtures'
 import Slider from './Slider.fixtures'
@@ -39,6 +41,7 @@ import Toast from './Toast.fixtures'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   Avatar,
+  AvatarButton,
   AvatarStack,
   Button,
   Card,
@@ -59,6 +62,7 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   OptionList,
   Page,
   Popover,
+  ScrollArea,
   Segmented,
   Select,
   Slider,
