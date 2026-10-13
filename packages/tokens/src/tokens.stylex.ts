@@ -534,6 +534,10 @@ export const layout = stylex.defineVars({
   '--composer-padding-block': '9px',
   '--assistant-input-max-height': '160px',
   '--code-block-max-height': '150px',
+  // Image thumbnails in a message: never wider or taller than this, scaled
+  // by their own aspect ratio. File cards share the width.
+  '--thumb-max-width': '360px',
+  '--thumb-max-height': '280px',
   '--search-field-width': '260px',
   '--keyword-field-width': '160px',
   '--page-width-narrow': '680px',
@@ -580,6 +584,9 @@ export const sizes = stylex.defineVars({
   // the content box, so it is the row's measured height without its 11px
   // block padding: 85px for a two-line preview (the row is 107px).
   '--row-topic-estimate': '85px',
+  // The same estimate for off-screen message rows: one line of body under a
+  // name, without the row's block padding (performance.md 3.3).
+  '--row-message-estimate': '56px',
 
   '--tile-44': '44px',
   '--tile-36': '36px',
