@@ -574,9 +574,10 @@ export const sizes = stylex.defineVars({
   '--row-44': '44px',
   '--row-48': '48px',
   '--row-52': '52px',
-  // The sidebar row's measured height (chat style, balanced density, two
-  // preview lines): the contain-intrinsic-size estimate for off-screen rows.
-  '--row-topic-estimate': '109px',
+  // The contain-intrinsic-size estimate for off-screen sidebar rows. It sizes
+  // the content box, so it is the row's measured height without its 11px
+  // block padding: 85px for a two-line preview (the row is 107px).
+  '--row-topic-estimate': '85px',
 
   '--tile-44': '44px',
   '--tile-36': '36px',

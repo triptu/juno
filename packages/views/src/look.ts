@@ -7,7 +7,7 @@
  * camel-case hues, so the two tables below translate. An icon with no
  * Phosphor counterpart draws the channel's first letter instead.
  */
-import { channelIconNames, hueForId, hueNames, type ChannelIconName, type HueName } from '@juno/ui'
+import { channelIconNames, firstGrapheme, hueForId, hueNames, type ChannelIconName, type HueName } from '@juno/ui'
 
 const icons: Readonly<Record<string, ChannelIconName>> = {
   hash: 'hash',
@@ -46,17 +46,39 @@ export function hueFor(color: string, id: string): HueName {
   return (hueNames as ReadonlyArray<string>).includes(color) ? (color as HueName) : (hues[color] ?? hueForId(id))
 }
 
-/** "Maya Chen" to "MC"; "tushar" to "T". At most two letters. */
+const LETTER = /^[\p{L}\p{N}]/u
+
+/**
+ * "Maya Chen" to "MC"; "tushar" to "T". At most two letters, taken whole
+ * (never half of an emoji). Words that start with a letter or digit win, so
+ * "🦄 Unicorn" gives "U"; a name with no such word gives its first emoji.
+ */
 export function initials(name: string): string {
   const parts = name
     .trim()
     .split(/[\s._-]+/)
     .filter((part) => part.length > 0)
-  const letters = parts.length >= 2 ? `${parts[0]!.charAt(0)}${parts[parts.length - 1]!.charAt(0)}` : (parts[0] ?? '').slice(0, 1)
+  const words = parts.filter((part) => LETTER.test(part))
+  if (words.length === 0) return firstGrapheme(parts[0] ?? '')
+  const letters = words.length >= 2 ? `${firstGrapheme(words[0]!)}${firstGrapheme(words[words.length - 1]!)}` : firstGrapheme(words[0]!)
   return letters.toUpperCase()
 }
 
-/** "1 234" style grouping is not wanted; counts over 99 read "99+". */
-export function countLabel(count: number): string {
-  return count > 99 ? '99+' : String(count)
+/** "Maya, Leo" to "ML": the first letter of each name in a group DM, at most two. */
+export function groupInitials(name: string): string {
+  return name
+    .split(',')
+    .map((part) => firstGrapheme(initials(part)))
+    .filter((letter) => letter.length > 0)
+    .slice(0, 2)
+    .join('')
+}
+
+/**
+ * The unread count as the tag shows it: counts over 99 read "99+", and a
+ * count the engine only knows as a lower bound reads "60+".
+ */
+export function countLabel(count: number, exact = true): string {
+  if (count > 99) return '99+'
+  return exact ? String(count) : `${count}+`
 }

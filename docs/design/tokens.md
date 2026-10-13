@@ -339,7 +339,7 @@ All [proto] measured at 1280×800 with Inter unless marked.
 | `--control-xl` | 36px | Discard/Send (New message), topic-list items in Juno cards, reply options (min), title input |
 | `--field-min` | 40px | Composer textarea single line (`--composer-padding-block` 9 + `--composer-line-height` 22 + 9), To field 44 |
 | `--row-44` / `--row-48` / `--row-52` | 44, 48, 52px | Today log row, notification rule row, All topics table row (ListRow `minHeight`) |
-| `--row-topic-estimate` | 109px | The sidebar row's measured height (chat, balanced, two preview lines); the `contain-intrinsic-size` estimate for rows off screen (performance.md 3.2) |
+| `--row-topic-estimate` | 85px | The `contain-intrinsic-size` estimate for sidebar rows off screen (performance.md 3.2). It sizes the content box, so it is the measured row (chat, balanced, two preview lines: 107px) minus the 22px of block padding |
 
 ### Tiles and avatars
 
@@ -437,7 +437,7 @@ Entrances are 240ms, exits 150ms, pops 220ms; rows, tabs and typing never animat
 | Token | Value | Use |
 | --- | --- | --- |
 | `--opacity-disabled` | 0.4 | Send and Ask buttons with an empty draft, Send on New message |
-| `--opacity-dim` | 0.6 | Unsubscribed rows, rows shown while "hidden" |
+| `--opacity-dim` | 0.6 | The decorative tile of a resolved or unsubscribed row. Never on text: at 0.6 muted text drops to 2.3:1 |
 | `--opacity-tab-icon` | 0.75 | Tab icon |
 | `--opacity-kbd` | 0.75 | ⌘Z inside the toast Undo button |
 

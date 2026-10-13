@@ -88,7 +88,7 @@ export const TopicRow = Schema.Struct({
   mentionsMe: Schema.Boolean,
   tags: Schema.Array(RowTag),
   pinned: Schema.Boolean,
-  /** Resolved and pinned: dimmed with a check, no hover Resolve. */
+  /** Resolved and pinned: quieter, with a check, no hover Resolve. */
   resolved: Schema.Boolean,
   canResolveOnHover: Schema.Boolean,
   /**

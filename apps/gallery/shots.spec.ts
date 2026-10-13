@@ -10,6 +10,9 @@ const themes = ['light', 'dark'] as const
 async function arrange(page: Page, route: Route): Promise<() => Promise<void>> {
   const frame = page.locator('[data-fixture-frame]')
   const { hover, press, focus } = route.frame
+  // The pointer stays where the last state left it; park it off the frame so
+  // a state that asks for no hover does not show one.
+  await page.mouse.move(0, 0)
   if (focus) {
     await frame.locator(focus).first().focus()
     // Keyboard focus, so :focus-visible matches: tab away and back.

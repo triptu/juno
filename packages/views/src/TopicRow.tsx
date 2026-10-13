@@ -4,9 +4,10 @@ import { ChatCircle } from '@phosphor-icons/react/dist/icons/ChatCircle'
 import { Check } from '@phosphor-icons/react/dist/icons/Check'
 import { CheckCircle } from '@phosphor-icons/react/dist/icons/CheckCircle'
 import { Hash } from '@phosphor-icons/react/dist/icons/Hash'
+import { Lock } from '@phosphor-icons/react/dist/icons/Lock'
 import { User } from '@phosphor-icons/react/dist/icons/User'
 import { Users } from '@phosphor-icons/react/dist/icons/Users'
-import { memo, useId, type FocusEvent, type MouseEvent } from 'react'
+import { memo, useId, type FocusEvent, type MouseEvent, type PointerEvent } from 'react'
 import type { TopicRow as TopicRowModel } from '@juno/contract'
 import { accent, colors, opacity, radii, sizes, spacing, tints } from '@juno/tokens/tokens.stylex'
 import {
@@ -23,7 +24,7 @@ import {
   type AvatarStackPerson,
   type PhosphorIcon,
 } from '@juno/ui'
-import { channelIconFor, countLabel, hueFor, initials } from './look'
+import { channelIconFor, countLabel, groupInitials, hueFor, initials } from './look'
 
 export interface TopicRowProps {
   /** The row as the engine shaped it. Identity-stable while its `rev` holds. */
@@ -50,6 +51,18 @@ const ROW_PADDING_BLOCK = '11px'
 
 const MAIN_TITLE = 'Messages posted in this channel or DM outside any thread'
 const REOPENED_TITLE = 'New activity after it was resolved'
+const PRIVATE_TITLE = 'Private channel'
+
+/**
+ * Hover on a one-line text: while it is cut off, its native tooltip shows
+ * the full value; when it fits, there is none. One width read on pointer
+ * enter, nothing on render, so a row costs nothing until it is hovered.
+ */
+function titleWhenTruncated(event: PointerEvent<HTMLElement>) {
+  const node = event.currentTarget
+  if (node.scrollWidth > node.clientWidth) node.title = node.textContent ?? ''
+  else node.removeAttribute('title')
+}
 
 /**
  * One sidebar row, chat style: the channel icon or the person's photo, then
@@ -63,7 +76,10 @@ export const TopicRow = memo(function TopicRow({ row, time, selected = false, ta
   const titleId = useId()
   const previewId = useId()
   const unread = row.unreadCount > 0
-  const dimmed = row.resolved || row.status === 'unsubscribed'
+  // Resolved and unsubscribed rows read quieter: the check or the muted bell
+  // says why, the title steps down to the subtle colour and the tile fades.
+  // The text keeps at least 4.5:1, so the row itself is never faded.
+  const quiet = row.resolved || row.status === 'unsubscribed'
   const people: ReadonlyArray<AvatarStackPerson> = row.participants.map((person) => ({
     id: person.id,
     initials: initials(person.name),
@@ -89,9 +105,9 @@ export const TopicRow = memo(function TopicRow({ row, time, selected = false, ta
       onFocus={onFocus}
       onContextMenu={onContextMenu === undefined ? undefined : (event) => onContextMenu(row.id, event)}
       {...activateHandlers<HTMLDivElement>((event) => onOpen(row.id, event))}
-      {...stylex.props(styles.row, selected && styles.selected, dimmed && styles.dimmed)}
+      {...stylex.props(styles.row, selected && styles.selected)}
     >
-      <span {...stylex.props(styles.tile)}>
+      <span {...stylex.props(styles.tile, quiet && styles.quietTile)}>
         <Tile row={row} />
       </span>
       <span {...stylex.props(styles.body)}>
@@ -101,7 +117,16 @@ export const TopicRow = memo(function TopicRow({ row, time, selected = false, ta
               <Icon icon={CheckCircle} size={14} label="Resolved" />
             </span>
           ) : null}
-          <Text variant="rowTitle" tone="default" weight={unread ? 'semibold' : 'medium'} truncate id={titleId} sx={styles.title}>
+          <Text
+            variant="rowTitle"
+            tone={quiet ? 'subtle' : 'default'}
+            weight={unread ? 'semibold' : 'medium'}
+            truncate
+            dir="auto"
+            id={titleId}
+            onPointerEnter={titleWhenTruncated}
+            sx={styles.title}
+          >
             {row.title}
           </Text>
           {row.tags.includes('main') ? (
@@ -124,8 +149,16 @@ export const TopicRow = memo(function TopicRow({ row, time, selected = false, ta
           </Text>
         </span>
         <span {...stylex.props(styles.line2)}>
-          <Text variant="preview" tone={unread ? 'subtle' : 'muted'} clamp={2} as="span" id={previewId} sx={styles.preview}>
-            {row.preview.text.length === 0 ? row.preview.sender : `${row.preview.sender}: ${row.preview.text}`}
+          {/* The message sets the direction; the sender is isolated so a Latin
+              name before Arabic text, or the reverse, keeps its own order. */}
+          <Text variant="preview" tone={unread ? 'subtle' : 'muted'} clamp={2} as="span" dir="auto" id={previewId} sx={styles.preview}>
+            {row.preview.text.length === 0 ? (
+              row.preview.sender
+            ) : (
+              <>
+                <bdi>{row.preview.sender}</bdi>: {row.preview.text}
+              </>
+            )}
           </Text>
           {row.mentionsMe || unread ? (
             <span {...stylex.props(styles.badges)}>
@@ -135,8 +168,8 @@ export const TopicRow = memo(function TopicRow({ row, time, selected = false, ta
                 </Chip>
               ) : null}
               {unread ? (
-                <Chip variant="strong" numeric title={`${row.unreadCount} unread`}>
-                  {countLabel(row.unreadCount)}
+                <Chip variant="strong" numeric title={row.unreadExact ? `${row.unreadCount} unread` : `${row.unreadCount} or more unread`}>
+                  {countLabel(row.unreadCount, row.unreadExact)}
                 </Chip>
               ) : null}
             </span>
@@ -144,8 +177,14 @@ export const TopicRow = memo(function TopicRow({ row, time, selected = false, ta
         </span>
         <span {...stylex.props(styles.line3)}>
           <span {...stylex.props(styles.where)}>
-            <Icon icon={whereIcon(row)} size={13} />
-            <Text variant="meta" tone="muted" truncate>
+            {row.channel.kind === 'private' ? (
+              <span {...stylex.props(styles.lock)} title={PRIVATE_TITLE}>
+                <Icon icon={Lock} size={13} label={PRIVATE_TITLE} />
+              </span>
+            ) : (
+              <Icon icon={whereIcon(row)} size={13} />
+            )}
+            <Text variant="meta" tone="muted" truncate dir="auto" onPointerEnter={titleWhenTruncated}>
               {row.channel.name}
             </Text>
           </span>
@@ -193,18 +232,7 @@ function Tile({ row }: { readonly row: TopicRowModel }) {
   return <ChannelIcon name={channel.name} id={channel.id} color={hueFor(channel.color, channel.id)} size={44} {...(icon === undefined ? {} : { icon })} />
 }
 
-/** "Maya, Leo" to "ML". */
-function groupInitials(name: string): string {
-  return name
-    .split(',')
-    .map((part) => part.trim().charAt(0))
-    .filter((letter) => letter.length > 0)
-    .slice(0, 2)
-    .join('')
-    .toUpperCase()
-}
-
-/** Line three's leading icon: the channel's own icon, or a person for DMs. */
+/** Line three's leading icon: the channel's own icon, or a person for DMs. A private channel shows the lock instead. */
 function whereIcon(row: TopicRowModel): PhosphorIcon {
   switch (row.channel.kind) {
     case 'im':
@@ -267,12 +295,14 @@ const styles = stylex.create({
     },
     '--foreground-muted': colors['--foreground-subtle'],
   },
-  dimmed: {
-    opacity: opacity['--opacity-dim'],
-  },
   tile: {
     display: 'inline-flex',
     flexShrink: 0,
+  },
+  // The tile is decorative (the title and line three name the place), so it
+  // alone may fade.
+  quietTile: {
+    opacity: opacity['--opacity-dim'],
   },
   body: {
     display: 'flex',
@@ -339,6 +369,13 @@ const styles = stylex.create({
     gap: spacing['--space-1'],
     minWidth: 0,
     flexShrink: 1,
+  },
+  // The private context pill's colour (tokens.md 1.4), so a lock reads the
+  // same here as on the topic header.
+  lock: {
+    display: 'inline-flex',
+    flexShrink: 0,
+    color: tints['--tint-private-fg'],
   },
   count: {
     display: 'inline-flex',

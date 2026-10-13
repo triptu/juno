@@ -1,7 +1,7 @@
 import { defineFixtures, scene, type FixtureFrame } from '@juno/ui'
 import { AccountMenu } from './AccountMenu'
 import { AppearanceSettings } from './AppearanceSettings'
-import { NOW, pinnedIds, recentIds, rows, rowsById } from './fixtures/topics'
+import { hostileIds, NOW, pinnedIds, recentIds, rows, rowsById } from './fixtures/topics'
 import { Sidebar, type SidebarProps } from './Sidebar'
 import { relativeTime } from './time'
 import { TopicList, type TopicListProps } from './TopicList'
@@ -69,6 +69,10 @@ export default defineFixtures(
       'unread-only': scene(() =>
         full({ filter: { kind: 'all', unreadOnly: true } }, { sections: [{ id: 'pinned', ids: [rows.offsite.id] }, { id: 'recent', ids: [rows.alertsMain.id, rows.hiring.id, rows.roadmap.id, rows.pricing.id, rows.flags.id] }] }),
       ),
+    },
+    Content: {
+      // Right-to-left, emoji names, a long private channel, a lower-bound count, and the resolved and unsubscribed rows.
+      hostile: scene(() => full({}, { sections: [{ id: 'recent', ids: hostileIds }] })),
     },
     Empty: {
       'caught-up': scene(() => full({ filter: { kind: 'all', unreadOnly: true }, dots: { channels: false, dms: false } }, { sections: [], empty: 'caught-up', onClearFilters: noop })),

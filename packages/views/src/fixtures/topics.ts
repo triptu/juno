@@ -25,6 +25,9 @@ export const people = {
   jonas: { id: 'U0JONAS', name: 'Jonas Weber', color: 'rose' },
   elena: { id: 'U0ELENA', name: 'Elena Ruiz', color: 'emerald' },
   grafana: { id: 'U0GRAFANA', name: 'Grafana', color: 'rose' },
+  mohammed: { id: 'U0MOHAMMED', name: 'محمد', color: 'jordy' },
+  unicorn: { id: 'U0UNICORN', name: '🦄 Unicorn', color: 'plum' },
+  party: { id: 'U0PARTY', name: '🎉', color: 'emerald' },
 } as const satisfies Record<string, Person>
 
 type RowInput = Partial<Omit<TopicRow, 'preview' | 'channel'>> & {
@@ -73,6 +76,10 @@ export const channels = {
   sam: { id: 'D0SAM', kind: 'im', name: 'Sam Okafor', label: 'Sam Okafor', tint: 'dm', icon: 'hash', color: 'emeraldDark', partner: people.sam },
   dev: { id: 'D0DEV', kind: 'im', name: 'Dev Patel', label: 'Dev Patel', tint: 'dm', icon: 'hash', color: 'cyan', partner: people.dev },
   group: { id: 'G0MAYALEO', kind: 'mpim', name: 'Maya, Leo', label: 'Maya, Leo', tint: 'dm', icon: 'hash', color: 'midnight' },
+  mohammed: { id: 'D0MOHAMMED', kind: 'im', name: 'محمد', label: 'محمد', tint: 'dm', icon: 'hash', color: 'jordy', partner: people.mohammed },
+  unicorn: { id: 'D0UNICORN', kind: 'im', name: '🦄 Unicorn', label: '🦄 Unicorn', tint: 'dm', icon: 'hash', color: 'plum', partner: people.unicorn },
+  emojiGroup: { id: 'G0EMOJI', kind: 'mpim', name: '🎉, 🦄 Unicorn, Ana', label: '🎉, 🦄 Unicorn, Ana', tint: 'dm', icon: 'hash', color: 'rose' },
+  vendors: { id: 'C0VENDORS', kind: 'private', name: 'vendor-contracts-and-renewals', label: '#vendor-contracts-and-renewals', tint: 'private', icon: 'compass', color: 'midnight' },
 } as const satisfies Record<string, TopicRow['channel']>
 
 export const rows = {
@@ -156,7 +163,7 @@ export const rows = {
     pinned: true,
     ago: 38,
   }),
-  /** Pinned and resolved: dimmed with a check, no Resolve on hover. */
+  /** Pinned and resolved: quieter, with a check, no Resolve on hover. */
   notes: row({
     id: 'D0SAM:1759900000.000600',
     section: 'pinned',
@@ -238,7 +245,96 @@ export const rows = {
     messageCount: 2,
     ago: 7 * 60,
   }),
+  /** Right-to-left: an Arabic title, sender and message in a DM. */
+  rtl: row({
+    id: 'D0MOHAMMED:1759990000.001100',
+    title: 'هل يمكننا مراجعة خطة الترحيل غدًا قبل الاجتماع الأسبوعي',
+    sender: 'محمد',
+    text: 'شكرًا جزيلًا، سأرسل الملاحظات بعد الظهر.',
+    channel: channels.mohammed,
+    participants: [people.mohammed, people.dev],
+    messageCount: 3,
+    unreadCount: 1,
+    ago: 50,
+  }),
+  /** A Latin sender before an Arabic message: each keeps its own direction. */
+  mixed: row({
+    id: 'C0ENG:1759990000.001200',
+    title: 'Release notes in Arabic',
+    titleSource: 'manual',
+    sender: 'Leo',
+    text: 'تم النشر على الخادم الجديد، والنتائج تبدو جيدة.',
+    channel: channels.eng,
+    participants: [people.leo],
+    messageCount: 2,
+    ago: 55,
+  }),
+  /** Names that start with an emoji: whole glyphs in every avatar, never half of one. */
+  emoji: row({
+    id: 'D0UNICORN:1759990000.001300',
+    title: '🎉🎉🎉',
+    sender: '🦄 Unicorn',
+    text: '🎉🎉🎉',
+    channel: channels.unicorn,
+    participants: [people.unicorn, people.party],
+    messageCount: 3,
+    unreadCount: 1,
+    ago: 70,
+  }),
+  /** A group DM of emoji names. */
+  emojiGroup: row({
+    id: 'G0EMOJI:main',
+    kind: 'main',
+    title: '🎉, 🦄 Unicorn, Ana',
+    titleSource: 'channel',
+    sender: '🎉',
+    text: 'see you there',
+    channel: channels.emojiGroup,
+    participants: [people.party, people.unicorn],
+    messageCount: 4,
+    tags: ['main'],
+    ago: 80,
+  }),
+  /** A private channel with a long name: the lock on line three, both texts cut off. */
+  vendors: row({
+    id: 'C0VENDORS:1759990000.001400',
+    title: 'Private: the vendor contract renewal numbers for next year',
+    sender: 'Sam',
+    text: 'Numbers are in the sheet. Finance wants an answer by Thursday.',
+    channel: channels.vendors,
+    participants: [people.sam, people.jonas],
+    messageCount: 2,
+    ago: 95,
+  }),
+  /** The engine knows only a lower bound for the unread count. */
+  lowerBound: row({
+    id: 'C0ENG:main',
+    kind: 'main',
+    title: '#eng',
+    titleSource: 'channel',
+    sender: 'Dev',
+    text: 'Replica lag back under a second.',
+    channel: channels.eng,
+    participants: [people.dev, people.leo],
+    messageCount: 60,
+    unreadCount: 60,
+    unreadExact: false,
+    tags: ['main'],
+    ago: 6,
+  }),
 } as const satisfies Record<string, TopicRow>
+
+/** Hostile content for the sidebar: right-to-left, emoji names, private, long and quiet rows. */
+export const hostileIds: ReadonlyArray<string> = [
+  rows.rtl.id,
+  rows.mixed.id,
+  rows.emoji.id,
+  rows.emojiGroup.id,
+  rows.vendors.id,
+  rows.lowerBound.id,
+  rows.notes.id,
+  rows.flags.id,
+]
 
 /** Every row above, keyed by id, as a container would hold them. */
 export const rowsById: ReadonlyMap<string, TopicRow> = new Map(Object.values(rows).map((entry) => [entry.id, entry]))
