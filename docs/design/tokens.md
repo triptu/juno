@@ -117,6 +117,9 @@ Used by: topic header context pill, New message To pill, Juno send-card pill. Ic
 | Notification decision chips | Now: `--hl` / `--hl-fg`. Digest: `--secondary-default` / `--foreground-subtle`. Silent: transparent / `--foreground-muted` (summary chips use `--surface-hover` instead of transparent) | proto | |
 | Mention tint (message that mentions you) | `--hl-soft` on the message row | proto | |
 | Traffic lights | #FF5F57, #FEBC2E, #28C840 | proto | Only for mock-ups; Electron draws real ones |
+| `--warm` | #E39A3B | friendly layer | Illustration fill only; never text, never a control |
+| `--warm-soft` | `color-mix(in oklch, var(--warm) 26%, var(--background))` light (#F8E2CA), `22%` dark (#3C2E1F) | friendly layer | The one flat layer inside every spot illustration |
+| `--toast-success` | `color-mix(in oklch, var(--success) 55%, var(--background))` light (6.1:1 on the ink toast), `80%` dark (7.2:1 on the paper toast) | friendly layer | The filled check in the resolve toast |
 
 ### 1.6 Person colours (avatars)
 
@@ -124,6 +127,8 @@ A person gets one brand hue; the tile derives two colours from it:
 
 - background: `color-mix(in oklch, <hue> 24%, var(--surface-default))`
 - foreground: `color-mix(in oklch, <hue> 62%, var(--foreground-default))`
+
+Mention chips (friendly layer): background `color-mix(in oklch, <hue> 16%, var(--surface-default))`, foreground `color-mix(in oklch, <hue> 40%, var(--foreground-default))`, weight 600. Lowest measured contrast 5.7:1 (midnight, dark). Tokens `--person-chip-bg-mix: 16%`, `--person-chip-fg-mix: 40%` beside the avatar mix (`--avatar-bg-mix: 24%`, `--avatar-fg-mix: 62%`). The hue is also the default colour of a channel tile (`ChannelIcon`), hashed from the channel id until the user picks another; the user can pick any of the eight.
 
 Hues from the brand palette [proto]: #008AB3 cyan, #7F1734 claret, #2E1F64 midnight, #00674F dark emerald, #E89EB8 plum, #A49496 rose quartz (also bots), #50C878 emerald, #92C2F9 jordy blue.
 
@@ -236,24 +241,29 @@ Odd values the prototype uses once (3, 5, 9, 18) are component-local; keep them 
 
 ## 4. Radii
 
-[css] `--radius-sm 4`, `--radius-md 6`, `--radius-lg 8`, `--radius-xl 10`. The prototype also uses 5, 7, 9, 12, 13, 14, 16 and 999. [proposed] full set:
+[css] `--radius-sm 4`, `--radius-md 6`, `--radius-lg 8`, `--radius-xl 10`. The prototype also uses 5, 7, 9, 12, 13, 14, 16 and 999. The friendly layer (`friendly-layer.md` §3) makes every label a pill and gives containers one step more radius. Full set:
 
 | Token | px | Use |
 | --- | --- | --- |
-| `--radius-xs` | 4 | Mention chip, kbd, tiny close buttons, Mark read |
-| `--radius-sm` | 5 | Confidence badge, dismiss buttons, segmented-control segment |
-| `--radius-md` | 6 | Tags, chips, pills, menu items, small buttons, reactions, quote block, thread link, scope chip |
-| `--radius-md-plus` | 7 | Nav buttons, filter buttons, selects, For you action buttons, topic-list items in Juno cards |
-| `--radius-lg` | 8 | Icon buttons (30–32), Resolve button, tabs (top corners), flat message hover, palette items, inputs, send-check bar, option buttons |
+| `--radius-xs` | 4 | Kbd, tiny close buttons, Mark read |
+| `--radius-sm` | 5 | Dismiss buttons, segmented-control segment, 18–20px channel tiles |
+| `--radius-md` | 6 | Menu items, small buttons (28), quote block, thread link, 24px channel tiles |
+| `--radius-md-plus` | 7 | Selects, the segmented track, For you action buttons, topic-list items in Juno cards, 28px channel tiles |
+| `--radius-lg` | 8 | Nav items, filter buttons, icon buttons (30–32), Resolve button (32), tabs (top corners), flat message hover, palette items, inputs, send-check bar, option buttons, 32–36px channel tiles |
 | `--radius-lg-plus` | 9 | Hover toolbar |
-| `--radius-xl` | 10 | Cards, chat/card rows, channel tiles, To field, toast, New message textarea |
-| `--radius-2xl` | 12 | Composer |
+| `--radius-xl` | 12 | Cards, chat/card rows, 44px channel tiles, To field, New message textarea |
+| `--radius-2xl` | 14 | Composer |
 | `--radius-menu` | 13 | Context menu, avatar menu, Browse menu, mention popover, To picker |
 | `--radius-palette` | 14 | ⌘K panel, user chat bubble (with 4px tail corner) |
+| `--radius-toast` | 14 | Toast |
 | `--radius-bubble` | 16 | Message bubbles (tail corner 4) |
-| `--radius-full` | 999 | Avatars, attach/send buttons |
+| `--radius-tag` | 999 | Tags, count badges, @ tag, status chips, decision chips, scope chip, digest chips, stealth pill, confidence badge, reaction chips, inline @person and #channel chips (padding 0 5), the row Resolve button (22) and the toast Undo button (26) |
+| `--radius-pill` | 999 | Context pill (header, To field, send card) |
+| `--radius-full` | 999 | Avatars, attach/send buttons, colour swatches |
 
-**Nesting rule (SPEC §16):** outer radius = inner radius + padding. Pairs in the prototype: palette 14 = item 8 + padding 6; Juno topics card 10 = item 7 + padding 4 (off by one, acceptable); segmented control 7 = segment 5 + padding 2; menus 13 ≈ item 6 + padding 6 (prototype is 1px over, use 12 or keep 13); hover toolbar 9 ≈ button 6 + padding 2 (use 8). When building a new container, compute it; do not pick from the table.
+A label is a pill; a control or a container is a rounded rectangle. Pills never nest in pills.
+
+**Nesting rule (SPEC §16):** outer radius = inner radius + padding. Pairs: palette 14 = item 8 + padding 6; Juno topics card 12 = item 7 + padding 4 (off by one, acceptable); segmented control 7 = segment 5 + padding 2; menus 13 = item 6 + padding 6 + 1 border; hover toolbar 8 = button 6 + padding 2; card row 12 = tile 12 only by eye (the tile is not inset evenly). When building a new container, compute it; do not pick from the table.
 
 ## 5. Sizes
 
@@ -309,7 +319,11 @@ All [proto] measured at 1280×800 with Inter unless marked.
 
 ### Icons
 
-Lucide outline, `background: currentColor` masks in the prototype; in the app use the `lucide-react` components with `stroke="currentColor"`. Sizes used: 11 (badges), 12 (row meta, tags, chevrons), 13 (pill, cards, thread link), 14 (tab, header title sparkle, buttons), 15 (menu items, nav), 16 (icon buttons, hover toolbar, palette rows), 18 (attach, palette search). Tab icons sit at 0.75 opacity. Stroke is 2px (`--icon-stroke`); at 13px and below it is 1.75px (`--icon-stroke-small`) so small icons do not look bold next to 11px text.
+Phosphor (`@phosphor-icons/react`, imported per icon). Weight by size: `bold` at 12–14, `regular` at 15–20. `fill` marks active and selected states. `duotone` only for the Juno nav item, AI sparkles, For you card kinds and illustrations. Sizes (`--icon-12` … `--icon-20`): 12 (badges, chip close), 13 (row meta, tags, tab close), 14 (pills, cards, thread link, catch-up sparkle), 15 (tab icon), 16 (nav, menu items, buttons, title sparkle), 18 (icon buttons, hover toolbar, palette rows, send), 20 (attach, palette search). Tab icons sit at 0.75 opacity. There is no stroke token; Phosphor is filled paths and the weight is the variant. The mapping from the Lucide names the prototype used is in `friendly-layer.md` §2.3.
+
+### Illustrations and the mark
+
+`--illustration-list` 96px (sidebar, tables, pickers), `--illustration-workspace` 120px (no tabs), `--illustration-figure` 40px (the seated j alone, Juno chat). Drawn on a 104 by 72 grid at stroke 4 in `--foreground-subtle` with one `--warm-soft` layer; they sit 14px above the empty-state title. The `Logo` primitive draws the laptop-two mark in `currentColor` at 16–44px (the assistant's avatar is 28).
 
 ### Rows
 
@@ -355,19 +369,33 @@ Floating surfaces have `border: 1px solid transparent` plus the ring, never a co
 
 ## 8. Motion
 
-| Token | Value | Source |
-| --- | --- | --- |
-| `--duration-fast` | 150ms | proto; all hover/press feedback |
-| `--ease-out` | ease-out | proto |
-| Press | `scale: 0.96` on `:active`, never when disabled | proto / spec |
-| Transition set | `scale, background-color, color, box-shadow` at 150ms ease-out | proto |
-| Theme switch | add `data-theme-switching` on the root; `* { transition: none !important }` while set; remove after two animation frames | proto |
-| Reduced motion | `@media (prefers-reduced-motion: reduce)`: durations 0.01ms, `scale: none` | proto |
-| Hover | Only inside `@media (hover: hover) and (pointer: fine)` | spec (prototype uses plain `:hover`) |
-| Scroll to new | On open, scroll the "new" divider to 80px below the top, else to the bottom; `requestAnimationFrame` then a 150ms retry | proto |
-| Toast life | 5000ms for undoable, 4000ms for info | proto |
+Three ideas (`friendly-layer.md` §5): instant for the things you do constantly, a quick ease-out for presses and toggles, and a small spring for the handful of moments that deserve it. Every duration and curve is a token; none is written in a component.
 
-No enter/exit animations on menus, popovers, toasts or the palette in the prototype. Keep it that way; if anything is added, cap it at 150ms.
+| Token | Value | Use |
+| --- | --- | --- |
+| `--duration-fast` | 150ms | Press scale, hover colour, focus ring, the avatar photo fade |
+| `--duration-pop` | 220ms | Reaction pop, toggle fill, resolve check |
+| `--duration-appear` | 240ms | Toast, popover, palette, card and empty-state entrance |
+| `--duration-exit` | 150ms | Every exit |
+| `--stagger` | 80ms | Between the parts of an empty state as they enter |
+| `--ease-out` | `cubic-bezier(0.2, 0, 0, 1)` | Presses, toggles, entrances, exits |
+| `--ease-spring` | `cubic-bezier(0.34, 1.4, 0.64, 1)` | The three pops only; overshoots about 8% |
+| `--press-scale` | 0.96 | On `:active`, never when disabled |
+| `--pop-scale` | 1.12 | The peak of a pop |
+| `--appear-scale` | 0.98 | Where an entrance starts |
+| `--rise-toast`, `--rise-stagger` | 8px, 6px | How far a toast and an empty-state part rise as they enter |
+| Transition set | `scale, background-color, color, border-color, box-shadow, opacity` at `--duration-fast` `--ease-out` | |
+| Toggle to active | The filled icon scales 0.8 → 1 with the spring over `--duration-pop` and cross-fades from the outline icon; off just cross-fades over `--duration-fast`. Both icons stay in the DOM | |
+| Toast | Enter `translateY(--rise-toast)` → 0 with opacity over `--duration-appear`; exit opacity over `--duration-exit`; a replacement cross-fades | |
+| Appear | Opacity 0 → 1 and scale `--appear-scale` → 1 over `--duration-appear`, origin at the anchor corner. Exit opacity only | |
+| Empty state | Illustration, title, body and action enter `--stagger` apart with opacity and `--rise-stagger`, once, when the state first appears | |
+| Theme switch | add `data-theme-switching` on the root; `* { transition: none !important }` while set; remove after two animation frames | |
+| Reduced motion | `@media (prefers-reduced-motion: reduce)` through the tokens themselves: every duration and the stagger 0.01ms / 0ms, `--press-scale`, `--pop-scale` and `--appear-scale` 1, the rise distances 0. Opacity cross-fades remain as the visible cue | |
+| Hover | Only inside `@media (hover: hover)` | |
+| Scroll to new | On open, scroll the "new" divider to 80px below the top, else to the bottom; `requestAnimationFrame` then a 150ms retry | |
+| Toast life | 5000ms for undoable, 4000ms for info | |
+
+Entrances are 240ms, exits 150ms, pops 220ms; rows, tabs and typing never animate. Never animated: row hover, selected row, tab switch, tab hover, typing, scrolling, list reorders, nav item hover and active. Only `transform` and `opacity` are animated anywhere.
 
 ## 9. Opacity
 
@@ -393,3 +421,6 @@ Apply these when porting; the prototype values are listed so no one copies them 
 | Composer max 184px | 194px (8 full lines) |
 | Söhne / Meraki | Inter / Instrument Serif, bundled |
 | Global letter-spacing 0.02em in CSS file | 0.01em (prototype root) |
+| Lucide outline icons | Phosphor, weight by size, fill for active (`friendly-layer.md` §2) |
+| Radius 6 tags, chips, pills and reactions | Pills (`--radius-tag`, `--radius-pill`); tiles, rows and cards 12, composer and toast 14 |
+| No entrances; everything 150ms | Entrances 240ms, exits 150ms, pops 220ms with a spring; rows, tabs and typing still never animate |

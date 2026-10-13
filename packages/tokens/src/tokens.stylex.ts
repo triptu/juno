@@ -73,6 +73,16 @@ export const colors = stylex.defineVars({
   '--success': '#00674F',
   '--warning': '#E0A500',
   '--info': '#008AB3',
+
+  // The one warm colour. Illustration fill only: never text, never a
+  // control, never a status. --warm-soft is 26% over the background in
+  // light and 22% in dark. Written with var() because a group cannot refer
+  // to its own keys.
+  '--warm': '#E39A3B',
+  '--warm-soft': 'color-mix(in oklch, #E39A3B 26%, var(--background))',
+  // The check in the resolve toast: success mixed into the toast's own
+  // background (the toast is ink on paper in light, paper on ink in dark).
+  '--toast-success': 'color-mix(in oklch, #00674F 55%, var(--background))',
 })
 
 /**
@@ -106,8 +116,11 @@ export const tints = stylex.defineVars({
 })
 
 /**
- * Person hues for avatars. A person gets one hue from a hash of their id;
- * the avatar mixes it into the surface (background) and the foreground.
+ * Person hues. A person gets one hue from a hash of their id; channels get
+ * one from their id too, until the user picks another. The avatar mixes the
+ * hue into the surface (24%) and the foreground (62%); the @mention chip
+ * uses a lighter mix (16% / 40%) so its text passes 4.5:1 for every hue in
+ * both themes (lowest measured 5.7:1, midnight in dark).
  */
 export const hues = stylex.defineVars({
   '--hue-cyan': '#008AB3',
@@ -118,6 +131,11 @@ export const hues = stylex.defineVars({
   '--hue-rose': '#A49496',
   '--hue-emerald': '#50C878',
   '--hue-jordy': '#92C2F9',
+
+  '--avatar-bg-mix': '24%',
+  '--avatar-fg-mix': '62%',
+  '--person-chip-bg-mix': '16%',
+  '--person-chip-fg-mix': '40%',
 })
 
 /* -------------------------------------------------------------------------- */
@@ -142,8 +160,10 @@ export const shadows = stylex.defineVars({
 /* -------------------------------------------------------------------------- */
 
 /**
- * Radii. Nesting rule: outer radius = inner radius + padding. Compute new
- * containers from that rule rather than picking from the list.
+ * Radii. A label is a pill (tag, pill); a control or a container is a
+ * rounded rectangle. Pills never nest inside pills. Nesting rule for
+ * rectangles: outer radius = inner radius + padding. Compute new containers
+ * from that rule rather than picking from the list.
  */
 export const radii = stylex.defineVars({
   '--radius-xs': '4px',
@@ -152,11 +172,16 @@ export const radii = stylex.defineVars({
   '--radius-md-plus': '7px',
   '--radius-lg': '8px',
   '--radius-lg-plus': '9px',
-  '--radius-xl': '10px',
-  '--radius-2xl': '12px',
+  '--radius-xl': '12px',
+  '--radius-2xl': '14px',
   '--radius-menu': '13px',
   '--radius-palette': '14px',
+  '--radius-toast': '14px',
   '--radius-bubble': '16px',
+  // Tags, counts, chips, reactions, the row Resolve and toast Undo buttons.
+  '--radius-tag': '999px',
+  // The context pill (header, To field, send card).
+  '--radius-pill': '999px',
   '--radius-full': '999px',
 })
 
@@ -380,17 +405,59 @@ export const text = stylex.defineVars({
 /* -------------------------------------------------------------------------- */
 
 /**
- * Feedback is instant or 150ms. Reduced motion collapses the durations and
- * the press scale, so components can use these without a media query.
+ * Three ideas: instant for what you do constantly, a quick ease-out for
+ * presses and toggles, and a small spring for the few moments that deserve
+ * it (a reaction landing, a toggle filling, a resolve check). Entrances are
+ * 240ms, exits 150ms, pops 220ms; rows, tabs and typing never animate.
+ *
+ * Reduced motion collapses every duration, the scales and the distances
+ * through the token itself, so components use these without a media query.
+ * Opacity cross-fades remain as the visible cue.
  */
 export const motion = stylex.defineVars({
   '--duration-fast': {
     default: '150ms',
     [REDUCED_MOTION]: '0.01ms',
   },
-  '--ease-out': 'ease-out',
+  '--duration-pop': {
+    default: '220ms',
+    [REDUCED_MOTION]: '0.01ms',
+  },
+  '--duration-appear': {
+    default: '240ms',
+    [REDUCED_MOTION]: '0.01ms',
+  },
+  '--duration-exit': {
+    default: '150ms',
+    [REDUCED_MOTION]: '0.01ms',
+  },
+  // The gap between the illustration, title and action of an empty state.
+  '--stagger': {
+    default: '80ms',
+    [REDUCED_MOTION]: '0ms',
+  },
+  '--ease-out': 'cubic-bezier(0.2, 0, 0, 1)',
+  // Overshoots by about 8%. The three pops only.
+  '--ease-spring': 'cubic-bezier(0.34, 1.4, 0.64, 1)',
   '--press-scale': {
     default: '0.96',
+    [REDUCED_MOTION]: '1',
+  },
+  '--pop-scale': {
+    default: '1.12',
+    [REDUCED_MOTION]: '1',
+  },
+  // Entrances: the toast rises 8px, each part of an empty state rises 6px.
+  '--rise-toast': {
+    default: '8px',
+    [REDUCED_MOTION]: '0px',
+  },
+  '--rise-stagger': {
+    default: '6px',
+    [REDUCED_MOTION]: '0px',
+  },
+  '--appear-scale': {
+    default: '0.98',
     [REDUCED_MOTION]: '1',
   },
   '--toast-life-undo': '5000ms',
@@ -475,17 +542,21 @@ export const sizes = stylex.defineVars({
   '--initials-20': '9px',
   '--initials-18': '8.5px',
 
-  '--icon-11': '11px',
+  // Phosphor glyphs are filled paths; weight comes from the variant, so
+  // there is no stroke token.
   '--icon-12': '12px',
   '--icon-13': '13px',
   '--icon-14': '14px',
   '--icon-15': '15px',
   '--icon-16': '16px',
   '--icon-18': '18px',
-  '--icon-stroke': '2px',
-  // Icons at 13px and below use a thinner stroke so they do not look bold
-  // next to 11px text.
-  '--icon-stroke-small': '1.75px',
+  '--icon-20': '20px',
+
+  // Spot illustrations: 96 wide in lists, 120 in the workspace. The Juno
+  // figure alone is 40.
+  '--illustration-list': '96px',
+  '--illustration-workspace': '120px',
+  '--illustration-figure': '40px',
 
   '--checkbox': '15px',
   '--slider-track': '4px',
