@@ -21,7 +21,7 @@ function brightness(rgb: string): number {
 test('renders the shell with bundled fonts and token colours', async ({ win }) => {
   await expect(win).toHaveTitle('Juno')
 
-  const title = win.getByRole('heading', { name: 'Welcome to Juno', level: 1, exact: true })
+  const title = win.getByRole('heading', { name: "Hi, I'm Juno", level: 1, exact: true })
   await expect(title).toBeVisible()
 
   const button = win.getByRole('button', { name: 'Use dark theme' })
@@ -71,7 +71,7 @@ test('switches to the dark theme in place', async ({ win }) => {
 })
 
 test('exposes only the bridge to the page', async ({ win }) => {
-  await expect(win.getByRole('heading', { name: 'Welcome to Juno', exact: true })).toBeVisible()
+  await expect(win.getByRole('heading', { name: "Hi, I'm Juno", exact: true })).toBeVisible()
   const exposed = await win.evaluate(() => {
     const globals = window as unknown as Record<string, unknown>
     return {
