@@ -8,10 +8,10 @@ Plain data in, plain data out. The package never touches the store, Electron or 
 
 - `AiProvider`: the service. `decide(task, input)` runs a structured task and resolves to a `Decision<Output>`. `generate(task, input)` runs a text task and resolves to a `Decision<string>`. `chat(context, tools)` streams one Juno chat turn as `ChatEvent`s (`text`, `toolCall`, then `done` or `failed`). Nothing fails: every effect has error type `never`, and a stream ends with `failed` instead of an error.
 - `Decision<A>`: `{ _tag: 'Decided', value, meta }` or `{ _tag: 'NoDecision', reason, detail?, meta }`. Reasons: `missing-key`, `timeout`, `invalid-output`, `provider-error`. `meta` has the model slug, latency, attempts and the cost in USD when pi-ai knows the model's price.
-- `tasks`: `titleTopic`, `routeCheck`, `settledScore`, `groupRun`, `urgencyGate`, `parseCommand`, `catchUp`, `forYou`, `chat`. Each is a `StructuredTask` (has `output`, a TypeBox schema, and `tool`; optionally `classify`, a decision-model mapping) or a `TextTask` (has `maxChars`). All have `name`, `version`, `tier`, `timeoutMillis`, `prompt`, `render(input)` and `key(input)`. `decisionTasks` lists the structured ones. `chatTools` holds the six Juno chat tool shapes.
+- `tasks`: `titleTopic`, `routeCheck`, `settledScore`, `groupRun`, `urgencyGate`, `parseCommand`, `catchUp`, `forYou`, `chat`, `topicArt`. Each is a `StructuredTask` (has `output`, a TypeBox schema, and `tool`; optionally `classify`, a decision-model mapping) or a `TextTask` (has `maxChars`, and may have `check`, a validation that can rewrite the text to a canonical form, and `retry`, the message a retry sends with the failure's reason). All have `name`, `version`, `tier`, `timeoutMillis`, `prompt`, `render(input)` and `key(input)`. `decisionTasks` lists the structured ones. `chatTools` holds the six Juno chat tool shapes.
 - `cacheKeyOf(task, input)`: `{ task, key, inputHash }` for the assistant's `ai_cache`. The hash covers the task version and the canonical input (sorted keys, `undefined` dropped), so equal inputs hash the same and a prompt change is made visible by bumping `version`.
 - `validateOutput(task, input, args)`: the schema check (pi-ai's validator) plus the task's `accept` rule. Both providers use it, for tool calls and for classifier answers.
-- `PiAiProvider.layer(config, models?)`: `config` is an `Effect<AiConfig>` read on every call, so a key or model added in preferences applies without a restart. `AiConfig` is `{ apiKey?, models?: { classifier?, decision?, generation? } }`. `defaultModelPrefs` holds the default slugs.
+- `PiAiProvider.layer(config, models?)`: `config` is an `Effect<AiConfig>` read on every call, so a key or model added in preferences applies without a restart. `AiConfig` is `{ apiKey?, models?: { classifier?, decision?, generation?, art? } }`. `defaultModelPrefs` holds the default slugs.
 - `FakeAiProvider.layer`, `makeFakeAiProvider()`: deterministic. Select it with `JUNO_AI=fake` in the engine (that wiring is the assistant's job).
 - `Type`, `Static`: TypeBox, re-exported so the assistant can declare tool parameters without importing pi-ai.
 
@@ -19,22 +19,23 @@ Ids in outputs are plain strings. The `accept` rule of each task guarantees they
 
 ## What it decides
 
-- **Three model slots.** `classifier` is a System One decision model for the decision tasks that carry a `classify` mapping (`routeCheck`, `settledScore`, `urgencyGate`). `decision` is a small chat model for the decisions a classifier cannot make because they name messages or extract text (`groupRun`, `parseCommand`). `generation` is the stronger chat model for text and for `forYou`. An empty `classifier` slug sends every decision to the chat `decision` model.
+- **Four model slots.** `classifier` is a System One decision model for the decision tasks that carry a `classify` mapping (`routeCheck`, `settledScore`, `urgencyGate`). `decision` is a small chat model for the decisions a classifier cannot make because they name messages or extract text (`groupRun`, `parseCommand`). `generation` is the stronger chat model for text and for `forYou`. `art` is the model that draws topic art (`topicArt`), chosen in the design study (`docs/design/topic-art/v2`). An empty `classifier` slug sends every decision to the chat `decision` model.
 - **Tier and shape are separate.** `tier` picks the model and the default timeout. Shape is structured or text. `forYou` is structured on the generation tier: cards need judgment and run in the background.
 - **A classifier decision is one System One request.** The task's `classify.ask(input)` builds a JSON state and typed questions (a choice among Main and the topics; a bool for settled; two bools for urgent and chatter); `classify.read(answers)` turns the answers into the task's raw output, which goes through the same `validateOutput` as a tool call. Probabilities come from the model, not from prose.
 - **A chat decision is one tool call.** The task's output schema is the tool's parameters. On the decision tier pi-ai forces that tool (`tool_choice` by API: Anthropic `{ type: 'tool' }`, OpenAI-compatible `{ type: 'function' }`). On the generation tier the tool choice is `auto` and the prompt asks for the call, because Sonnet 5.5 on OpenRouter rejects a forced choice (`tool_choice: type "tool" and "any" are not supported for this model`). If any model rejects a forced choice, the retry asks with `auto`. The arguments are validated, then `accept` runs.
-- **One retry inside the task's timeout.** An invalid answer or a provider error is retried once. Anything else is `NoDecision`.
+- **One retry inside the task's timeout.** An invalid answer or a provider error is retried once. A text task with `retry` continues the conversation on that retry (the failed answer, then the retry message with the reason), so the model corrects one thing; `topicArt` quotes the checker's reason this way. Anything else is `NoDecision`.
 - **The provider enforces the timeout.** The task table carries the number; the provider ties it to the request's `AbortSignal` so a slow call is cancelled, not just ignored. pi-ai's own HTTP retries are off (`maxRetries: 0`), so the task's retry and timeout are the only ones.
 - **The first call does not pay for module loading.** `openRouterModels()` starts the imports of pi-ai's lazy chat API modules (the OpenAI and Anthropic SDKs) in the background; on a busy machine those take seconds and would eat a decision's budget. The first request of a process still pays for DNS and TLS (measured 1.1 s under load, about 0.3 s idle) and a slower first answer, so it can miss `routeCheck`'s budget once; Node drops an idle connection after 4 s, so a warm-up at startup would not help a later decision.
 - **Reasoning is off.** Anthropic models get `thinkingEnabled: false`. OpenAI-compatible models get reasoning `none` through pi-ai, or the lowest level the model allows (`minimal`, else `low`) when it cannot be turned off.
 - **Unknown slugs still work.** A chat slug missing from pi-ai's catalogue is sent as an OpenAI-compatible model, a classifier slug as a System One model; the cost is then unknown and `meta.costUsd` is absent.
+- **Topic art is a text task that checks its text.** `topicArt` renders a thread (title, channel, first and latest message) or a channel's Main (name, purpose, topic, recent messages) into the art-directed brief from the study, and its `check` is `@juno/topic-art`'s `parseRecipe`: the output is the canonical recipe rebuilt from the checked drawing, never the reply's bytes. `data-confident="false"` in it is the model saying it had nothing to draw. An `avoid` on the input (the previous hue and a one-line summary) asks a redraw to differ.
 - **Prompts are code.** `src/tasks/<task>.prompt.ts` next to each task, plain template strings; the classifier instructions and criteria live in the same file. Shared rules in `src/tasks/shared.ts`: plain text, no markdown or emoji, never write for the user, quiet option when unsure.
-- **The fake validates too.** Word rules in `src/fake/rules.ts`, canned chat turns in `src/fake/replies.ts`. Their output goes through `validateOutput`, so a broken rule is a `NoDecision` in a test, never a crash.
+- **The fake validates too.** Word rules in `src/fake/rules.ts`, canned chat turns in `src/fake/replies.ts`. Their output goes through `validateOutput` and a text task's `check`, so a broken rule is a `NoDecision` in a test, never a crash. The fake's `topicArt` picks an object by words in the topic and a hue by hash, marks a very short title not confident, steps to the next hue and object on a redraw, and answers outside the vocabulary when the text contains `::invalid-art::`, so tests can see what the app does with a drawing that fails.
 - **Chat is one turn.** `chat` streams the assistant's reply and its tool calls, validated against `tools`; the caller runs the tools, appends `tool` messages and calls again. The chat system prompt plus the facts block (`now`, the topic "this" means) come from the `chat` task.
 
 ## Defaults and timeouts
 
-`typesafe/jev-1.13` for the classifier, `openai/gpt-6-luna` for chat decisions, `anthropic/claude-sonnet-5.5` for generation. Preferences override them.
+`typesafe/jev-1.13` for the classifier, `openai/gpt-6-luna` for chat decisions, `anthropic/claude-sonnet-5.5` for generation, `google/gemini-3.8-flash` for topic art. Preferences override them.
 
 | Task | Path | Timeout | Why |
 | --- | --- | --- | --- |
@@ -45,6 +46,7 @@ Ids in outputs are plain strings. The `accept` rule of each task guarantees they
 | `groupRun` | chat decision | 5 s | Background, per Main message. Luna p50 1.8 s, p95 2.9 s. Room for one retry. |
 | `forYou` | generation, structured | 30 s | Background every 15 minutes. Sonnet 5.5 takes about 7 s for four cards. |
 | `titleTopic`, `catchUp` | generation | 20 s | Measured 1.6 to 1.9 s. |
+| `topicArt` | art | 15 s | Background, when a topic first enters the sidebar; nobody waits. The study measured a median of 2.3 s and a p90 of 4.8 s with one retry inside it. |
 | `chat` | generation | 60 s | One streamed turn with tools. |
 
 ## Measurements
@@ -104,7 +106,7 @@ What the numbers say:
 
 ## Must not
 
-- Import the store, the engine, Electron or `@juno/contract`. The only `@juno` dependency is `@juno/domain`, for types.
+- Import the store, the engine, Electron or `@juno/contract`. The `@juno` dependencies are `@juno/domain`, for types, and `@juno/topic-art`, the vocabulary `topicArt` checks its output against.
 - Read the key from disk or the environment. Only `eval/run.ts` and `eval/bench.ts` read `OPENROUTER_API_KEY`, and only for the manual eval and bench.
 - Hard-code a model slug anywhere but `defaultModelPrefs` (and the bench's setup list).
 - Throw. A failure is a `NoDecision` or a `failed` event.

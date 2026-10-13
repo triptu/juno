@@ -213,6 +213,43 @@ describe('PiAiProvider generation', () => {
     const decision = await Effect.runPromise(provider.generate(tasks.titleTopic, { topicId: postgres.id, channel: '#eng', messages: postgres.recent }))
     expect(noDecision(decision)).toEqual({ reason: 'missing-key', attempts: 0 })
   })
+
+  const artInput = { kind: 'thread' as const, topicId: postgres.id, title: postgres.title, channel: '#eng', first: postgres.recent[0]!.text, last: postgres.recent.at(-1)!.text }
+  const artConfig: AiConfig = { ...chatConfig, models: { ...chatConfig.models, art: GENERATION } }
+
+  it('checks a drawing against the vocabulary and stores the canonical recipe, not the reply', async () => {
+    const reply = 'Here you go:\n```svg\n<svg viewBox="0 0 40 40" data-hue="teal"><circle cx="20" cy="20" r="10" fill="soft"/>\n<circle cx="26" cy="14" r="2" fill="accent" stroke="none" detail="1"/></svg>\n```'
+    const { provider } = scripted([fauxAssistantMessage(reply)], artConfig)
+    const decision = await Effect.runPromise(provider.generate(tasks.topicArt, artInput))
+    expect(decision).toMatchObject({ _tag: 'Decided', value: '<svg viewBox="0 0 40 40" data-hue="teal">\n  <circle cx="20" cy="20" r="10" fill="soft"/>\n  <circle cx="26" cy="14" r="2" fill="accent" stroke="none" detail="1"/>\n</svg>' })
+  })
+
+  it('sends the failed drawing and the reason back once, then takes the corrected one', async () => {
+    const seen: Array<ReadonlyArray<{ role: string; content: unknown }>> = []
+    const { provider } = scripted(
+      [
+        fauxAssistantMessage('<svg viewBox="0 0 40 40" data-hue="teal"><text x="2" y="2">db</text></svg>'),
+        (context) => {
+          seen.push(context.messages.map((message) => ({ role: message.role, content: message.content })))
+          return fauxAssistantMessage('<svg viewBox="0 0 40 40" data-hue="teal"><rect x="8" y="8" width="24" height="24" rx="4" fill="soft"/></svg>')
+        },
+      ],
+      artConfig,
+    )
+    const decision = await Effect.runPromise(provider.generate(tasks.topicArt, artInput))
+    expect(decision).toMatchObject({ _tag: 'Decided', meta: { attempts: 2 } })
+    expect(seen).toHaveLength(1)
+    const retry = seen[0]!.filter((message) => message.role !== 'system')
+    expect(retry.map((message) => message.role)).toEqual(['user', 'assistant', 'user'])
+    expect(JSON.stringify(retry[1]!.content)).toContain('<text x="2" y="2">db</text>')
+    expect(retry[2]!.content).toBe('That did not validate: element <text> is not allowed. Reply again with a corrected SVG that follows the format exactly. SVG only.')
+  })
+
+  it('gives no decision after two drawings outside the vocabulary', async () => {
+    const { provider } = scripted([fauxAssistantMessage('<svg data-hue="teal"><text>a</text></svg>'), fauxAssistantMessage('<svg data-hue="teal"><circle cx="20" cy="20" r="5" fill="#f00"/></svg>')], artConfig)
+    const decision = await Effect.runPromise(provider.generate(tasks.topicArt, artInput))
+    expect(decision).toMatchObject({ _tag: 'NoDecision', reason: 'invalid-output', detail: 'fill must be one of ink, soft, accent, accent2, none; got "#f00"', meta: { attempts: 2 } })
+  })
 })
 
 describe('PiAiProvider chat', () => {

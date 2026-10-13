@@ -9,6 +9,7 @@ import type { ParseCommandInput } from '../tasks/parseCommand'
 import type { RouteCheckInput } from '../tasks/routeCheck'
 import type { SettledScoreInput } from '../tasks/settledScore'
 import type { TitleTopicInput } from '../tasks/titleTopic'
+import type { TopicArtInput } from '../tasks/topicArt'
 import type { UrgencyGateInput } from '../tasks/urgencyGate'
 import { CHATTER, CLOSING, PROMISE, URGENT, contentWords, firstName, firstSentence, firstWords, overlap, sentenceCase } from './text'
 
@@ -137,4 +138,56 @@ export function fakeCatchUp(input: CatchUpInput): string {
   const who = senders.length <= 2 ? senders.join(' and ') : `${senders.slice(0, 2).join(', ')} and ${senders.length - 2} more`
   const head = `${input.unread.length} new from ${who}.`
   return last ? `${head} ${firstName(last.sender)}: ${firstSentence(last.text)}` : head
+}
+
+/**
+ * Topic art: a small table of literal objects keyed by words in the topic,
+ * a hue from a hash of the text, and `data-confident="false"` for a topic
+ * that says nothing (a very short or emoji-only title, as the prompt asks).
+ * A redraw (`avoid`) steps to the next hue and the next object so the
+ * drawing visibly changes. The marker `::invalid-art::` in the text makes
+ * the fake answer outside the vocabulary, so tests can see what the app does
+ * with a drawing that fails validation.
+ */
+const ART_OBJECTS: ReadonlyArray<readonly [RegExp, string]> = [
+  [/\b(bill|cost|budget|invoice|price|pricing|spend)\b/i, '<ellipse cx="20" cy="27" rx="11" ry="4.5" fill="soft"/><path d="M9 27 V20 A11 4.5 0 0 1 31 20 V27"/><path d="M9 20 A11 4.5 0 0 0 31 20"/><circle cx="30" cy="11" r="3" fill="accent" stroke="none" detail="1"/>'],
+  [/\b(postgres|database|migration|replica|sql|db)\b/i, '<path d="M9 11 V29 A11 4.5 0 0 0 31 29 V11"/><path d="M9 20 A11 4.5 0 0 0 31 20" detail="1"/><ellipse cx="20" cy="11" rx="11" ry="4.5" fill="soft"/><circle cx="26" cy="29" r="2" fill="accent" stroke="none" detail="1"/>'],
+  [/\b(offsite|meeting|schedule|calendar|slot|wednesday|friday|monday)\b/i, '<rect x="7" y="10" width="26" height="23" rx="5" fill="soft"/><line x1="7" y1="17" x2="33" y2="17"/><line x1="13" y1="7" x2="13" y2="12"/><line x1="27" y1="7" x2="27" y2="12"/><circle cx="20" cy="25" r="2.2" fill="accent" stroke="none"/>'],
+  [/\b(hiring|candidate|onsite|offer|recruit|interview|headcount)\b/i, '<rect x="7" y="9" width="26" height="22" rx="4" fill="soft"/><circle cx="15" cy="18" r="3.5" fill="ink" stroke="none"/><line x1="22" y1="16" x2="29" y2="16" stroke-width="2"/><line x1="22" y1="21" x2="29" y2="21" stroke-width="2" detail="1"/><circle cx="15" cy="26" r="1.5" fill="accent" stroke="none" detail="1"/>'],
+  [/\b(alert|incident|outage|p95|queue|firing|down|error)\b/i, '<path d="M20 7 L34 31 H6 Z" fill="soft"/><line x1="20" y1="16" x2="20" y2="23" stroke-width="3"/><circle cx="20" cy="27.5" r="1.8" fill="accent" stroke="none"/>'],
+  [/\b(deploy|release|ship|build|ci|flaky|spec|test)\b/i, '<path d="M8 14 L20 7 L32 14 V27 L20 34 L8 27 Z" fill="soft"/><path d="M8 14 L20 21 L32 14" detail="1"/><line x1="20" y1="21" x2="20" y2="34" detail="1"/><circle cx="26" cy="11" r="2" fill="accent" stroke="none" detail="1"/>'],
+  [/\b(lunch|coffee|mug|ramen|dinner|drinks|board games|social)\b/i, '<path d="M9 16 H27 V26 A9 7 0 0 1 9 26 Z" fill="soft"/><path d="M27 18 H31 A3 3 0 0 1 31 24 H27" detail="1"/><line x1="12" y1="33" x2="26" y2="33" stroke-width="2"/><circle cx="18" cy="12" r="1.6" fill="accent" stroke="none" detail="1"/>'],
+  [/\b(roadmap|plan|proposal|q[1-4]|cut|copy|design|spec)\b/i, '<rect x="8" y="7" width="24" height="26" rx="4" fill="soft"/><line x1="13" y1="15" x2="27" y2="15" stroke-width="2"/><line x1="13" y1="21" x2="24" y2="21" stroke-width="2" detail="1"/><line x1="13" y1="27" x2="20" y2="27" stroke-width="2" detail="1"/><circle cx="27" cy="27" r="2" fill="accent" stroke="none" detail="1"/>'],
+]
+const ART_DEFAULT = '<path d="M11 8 H24 L31 15 V32 H11 Z" fill="soft"/><path d="M24 8 V15 H31" detail="1"/><line x1="15" y1="21" x2="26" y2="21" stroke-width="2" detail="1"/><circle cx="20" cy="27" r="2" fill="accent" stroke="none" detail="1"/>'
+const ART_HUES = ['coral', 'amber', 'olive', 'sage', 'teal', 'sky', 'periwinkle', 'plum'] as const
+
+function artHash(text: string): number {
+  let hash = 0x811c9dc5
+  for (let index = 0; index < text.length; index++) {
+    hash ^= text.charCodeAt(index)
+    hash = Math.imul(hash, 0x01000193)
+  }
+  return hash >>> 0
+}
+
+/** The words the drawing is picked from: the title and the messages, or the channel and its recent messages. */
+function artText(input: TopicArtInput): string {
+  return input.kind === 'thread' ? `${input.title} ${input.first} ${input.last}` : `${input.channel} ${input.purpose ?? ''} ${input.topic ?? ''} ${input.recent.join(' ')}`
+}
+
+export function fakeTopicArt(input: TopicArtInput): string {
+  const text = artText(input)
+  if (text.includes('::invalid-art::')) return '<svg viewBox="0 0 40 40" data-hue="teal"><text x="4" y="24">no</text></svg>'
+  const subject = input.kind === 'thread' ? input.title : input.channel
+  const words = subject.replace(/[^\p{L}\p{N}]+/gu, ' ').trim()
+  const confident = words.length >= 4 && !/^(hmm+|ok|yes|no|thanks)$/i.test(words)
+  let objectIndex = ART_OBJECTS.findIndex(([re]) => re.test(text))
+  let hueIndex = artHash(subject) % ART_HUES.length
+  if (input.avoid !== undefined) {
+    hueIndex = (ART_HUES.indexOf(input.avoid.hue as (typeof ART_HUES)[number]) + 1 + ART_HUES.length) % ART_HUES.length
+    objectIndex = (objectIndex + 1) % ART_OBJECTS.length
+  }
+  const body = objectIndex < 0 ? ART_DEFAULT : ART_OBJECTS[objectIndex]![1]
+  return `<svg viewBox="0 0 40 40" data-hue="${ART_HUES[hueIndex]}"${confident ? '' : ' data-confident="false"'}>${body}</svg>`
 }

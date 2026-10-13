@@ -9,8 +9,9 @@ import { AiProvider, type AiCallMeta, type AiProviderShape, type ChatEvent, type
 import { cleanText, validateOutput, type StructuredTask, type TextTask } from '../task'
 import type { CatchUpInput } from '../tasks/catchUp'
 import type { TitleTopicInput } from '../tasks/titleTopic'
+import type { TopicArtInput } from '../tasks/topicArt'
 import { fakeChatTurn } from './replies'
-import { fakeCatchUp, fakeForYou, fakeGroupRun, fakeParseCommand, fakeRouteCheck, fakeSettledScore, fakeTitle, fakeUrgencyGate } from './rules'
+import { fakeCatchUp, fakeForYou, fakeGroupRun, fakeParseCommand, fakeRouteCheck, fakeSettledScore, fakeTitle, fakeTopicArt, fakeUrgencyGate } from './rules'
 
 export const FAKE_MODEL = 'fake'
 
@@ -26,6 +27,7 @@ const structuredRules: Record<string, (input: never) => unknown> = {
 const textRules: Record<string, (input: never) => string> = {
   titleTopic: fakeTitle as (input: TitleTopicInput) => string,
   catchUp: fakeCatchUp as (input: CatchUpInput) => string,
+  topicArt: fakeTopicArt as (input: TopicArtInput) => string,
 }
 
 export class FakeAiProvider extends AiProvider {
@@ -48,7 +50,10 @@ export function makeFakeAiProvider(): AiProviderShape {
       const rule = textRules[task.name]
       if (!rule) return { _tag: 'NoDecision', reason: 'invalid-output', detail: `no fake rule for ${task.name}`, meta }
       const text = cleanText(task, rule(input as never))
-      return text === undefined ? { _tag: 'NoDecision', reason: 'invalid-output', detail: 'empty answer', meta } : { _tag: 'Decided', value: text, meta }
+      if (text === undefined) return { _tag: 'NoDecision', reason: 'invalid-output', detail: 'empty answer', meta }
+      if (task.check === undefined) return { _tag: 'Decided', value: text, meta }
+      const checked = task.check(text, input)
+      return checked.ok ? { _tag: 'Decided', value: checked.value, meta } : { _tag: 'NoDecision', reason: 'invalid-output', detail: checked.message, meta }
     })
 
   const chat: AiProviderShape['chat'] = (context, tools) =>

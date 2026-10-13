@@ -43,16 +43,30 @@ export interface StructuredTask<I, S extends TSchema = TSchema> extends TaskBase
   readonly classify?: ClassifierMapping<I>
 }
 
-/** Text out: a title, a summary. */
+/** Text out: a title, a summary, or a recipe in a vocabulary the task checks. */
 export interface TextTask<I> extends TaskBase<I> {
   readonly shape: 'text'
   readonly maxChars: number
+  /**
+   * Checks the trimmed text beyond "not empty", and may rewrite it to a
+   * canonical form (topic art stores the recipe it rebuilds, not the reply).
+   * A failure is invalid output: the provider retries once.
+   */
+  readonly check?: (text: string, input: I) => Validation<string>
+  /**
+   * The message the retry sends after an invalid answer, with the failure's
+   * reason, so the model can correct the one thing that was wrong. Without
+   * it the retry repeats the original request.
+   */
+  readonly retry?: (reason: string) => string
 }
 
 export type Task<I = unknown> = StructuredTask<I, TSchema> | TextTask<I>
 
 export const DECISION_TIMEOUT_MILLIS = 1500
 export const GENERATION_TIMEOUT_MILLIS = 20_000
+/** Topic art: the study's p90 was 4.8 s, the live check on 2026-10-14 saw 4.5 to 9.5 s per call; nothing waits on it, so there is room for one retry. */
+export const ART_TIMEOUT_MILLIS = 15_000
 
 export function defineStructuredTask<I, S extends TSchema>(
   task: Omit<StructuredTask<I, S>, 'shape' | 'timeoutMillis'> & { readonly timeoutMillis?: number },
@@ -65,7 +79,14 @@ export function defineTextTask<I>(task: Omit<TextTask<I>, 'shape' | 'timeoutMill
 }
 
 function timeoutForTier(tier: Tier): number {
-  return tier === 'decision' ? DECISION_TIMEOUT_MILLIS : GENERATION_TIMEOUT_MILLIS
+  switch (tier) {
+    case 'decision':
+      return DECISION_TIMEOUT_MILLIS
+    case 'generation':
+      return GENERATION_TIMEOUT_MILLIS
+    case 'art':
+      return ART_TIMEOUT_MILLIS
+  }
 }
 
 export type Validation<O> = { readonly ok: true; readonly value: O } | { readonly ok: false; readonly message: string }
