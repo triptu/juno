@@ -2,7 +2,7 @@
 
 These specs describe the protocols and their limits. They do not certify the application code. Only the model checks are tests here.
 
-`follow.qnt` models the current follow command seam, two threads inside the quiet window, and one older thread. It includes Slack writes, socket delivery, HTTP pages, boot and hourly window passes, shorter reconnect reads, and activity lookups. Its `followProtocol` module takes constants; `follow` supplies the full simulator instance. `readstate.qnt` models Main, one followed thread, and one local-only thread. It retains its existing rules through `mirror.qnt`. Follow no longer imports that shared model: follow events and pages use different clocks, and follow commands have no retry worker.
+`follow.qnt` models the current follow command seam, two threads inside the quiet window, and one older thread. It includes Slack writes, socket delivery, HTTP pages, boot and hourly window passes, shorter reconnect reads, and activity lookups. Its `followProtocol` module takes constants; `follow` supplies the full simulator instance. `readstate.qnt` models read state as implemented in M4: Main and one followed thread that mirror, and one unfollowed thread that stays local. Its `readProtocol` module takes constants; `readstate` supplies the full simulator instance and `readstate-bounded.qnt` a small one. Like follow, it keeps Slack's event clock and Juno's observation clock apart.
 
 ## Follow rules and assumptions
 
@@ -27,15 +27,27 @@ The four reported differences are intentional protocol changes: separate clocks,
 | `missingChangesNothing`, `unknownStaysUnknown` | A missing root field leaves the flag unchanged; false from a root leaves an unknown thread unknown. |
 | `failedCallReverted` | An applied failure lookup restores Slack's snapshot when Slack has not changed since the request. It permits Unknown for the failed first Subscribe. A failed lookup changes nothing, so it is not covered. |
 | follow `quietAgreement` | After permanent quiet, delivery, and a due window pass, threads in the window or with activity agree with Slack's storage representation. Unknown is permitted for an unfollowed root that never had a row. This comparison does not define how UI reads Unknown. |
-| read `quietAgreement` | With no pending work or recovery, every mirrored read topic equals Slack. |
-| `localUnreadProtected`, `acceptedUnreadProtected` | Pending and accepted Mark unread survive older observations under the read protocol's guards. |
+| read `quietAgreement` | With no pending work, lookups or reconnect refresh, every mirrored topic's pointer equals Slack's. |
+| `pendingIntentWins` (read) | A pending mark keeps its pointer and flag visible. `localUnreadProtected` is its Mark unread case. |
+| `acceptedMarkKept`, `acceptedUnreadProtected` | While Slack's latest write is Juno's accepted mark and the user has not marked since, Juno shows that mark (with the unread flag for Mark unread). Older events and pages cannot undo it. |
 | `stealthNeverMarks` | A stealth open changes neither pointers, pending marks, nor mark traffic counters. |
-| `drainBound` | After input and failures stop, follow reaches scoped agreement within 64 transitions; read state within 40. |
+| `coalesced` | Five marks before the worker sends, and one more while it is in flight, make at most two calls (`coalesceStep`). |
+| `drainBound` | After input and failures stop, follow reaches scoped agreement within 64 transitions; read state within 48. |
 | `eventualAgreement` | Under fair recovery and permanent quiet, permanent scoped agreement follows. Typechecked only; no unbounded liveness proof is claimed. |
 | `reachedAgreement` | A coverage witness that a trace actually reached quiet agreement. |
 | `invariants` | Passing safety and drain properties for that protocol. Follow includes `acceptedUnfollow`. |
 
-The follow drain covers three pending calls and their refreshes, eight events, two responses, reconnect, three window pages and three absent-root pages. Read keeps its existing forty-transition budget. Raising queue or topic limits requires revisiting the budgets. Read pointers remain `0`, `1`, or `2` (latest); thread 3 is local only, and stealth does not mark. Read still uses comparable change stamps, generations, retained pending observations and retry. Those rules are not changed to match the follow seam.
+The follow drain covers three pending calls and their refreshes, eight events, two responses, reconnect, three window pages and three absent-root pages. The read drain covers two pending marks with coalesced resends, eight events, two responses, lookups and the reconnect refresh within 48 transitions. Raising queue or topic limits requires revisiting the budgets.
+
+## Read rules and assumptions
+
+- Pointers are `0`, `1` and `2` (latest); `unread` is the Mark as unread flag. Main (1) and a followed thread (2) mirror; thread 3 is not followed and its marks stay local. Mirroring off is not a separate instance: it makes every topic's marks local like thread 3's, while Slack's changes still arrive under the same rules.
+- `eventClock` stamps Slack's writes and events and orders events only (`updatedEvent`). `clock` stamps Juno's marks, their ends, event arrivals and fetch requests, and orders fetches only (`observedAt`).
+- A mark (`localChange`) changes the pointer at once. A mirrored topic gets one pending row whose intent the next mark replaces (`gen`); `accept` sends the current intent and Slack may or may not echo it; `respond` ends the row unless the intent changed, records Slack's pointer (`slackSeen`) and stamps `observedAt`. `retry` is a lost answer or transient error after acceptance; `reject` is a refusal, which forgets `slackSeen` and asks Slack.
+- While a mark is pending, an event or fetch that disagrees with it is only `noted`; Slack is asked when the row ends. After a topic's first mark (`commanded`), an event that contradicts the pointer asks Slack instead of applying.
+- A fetch (`page`, `scan`, `lookup`) applies only when requested after `observedAt` and when its value differs from `slackSeen`. A fetch too old to apply that disagrees with the pointer asks Slack again.
+- `disconnect` drops queued events; `reconnect` refreshes every mirrored topic (`scan`). Thread marks made elsewhere during a drop on a thread with no new reply wait for the next window pass in the code; the model assumes the reconnect refresh covers them.
+- `seal` stops input and failures. Queued work completes.
 
 ## Accepted Unsubscribe: three races and their guards
 
@@ -51,17 +63,17 @@ The stale-page regression (`stale-follow-page`) is the older race: a page reques
 
 ## Run the checks and bounds
 
-From the worktree root, run `pnpm specs:check`. This is the only verification entry point used here; it queues behind `scripts/heavy.mjs`. Quint is pinned to `@informalsystems/quint@0.33.0`. The script typechecks every `.qnt`, samples both full protocols 10,000 times with at most 160 transitions and two simulator threads, and uses seed `20261013`. Completed simulations stop at agreement. Directed schedules run once for at most 80 transitions, with guarded and bug modes for stale follow pages, the three accepted-Unsubscribe races, missing stored follows, a follow beyond the first window page, reordered follow events, rollback after a newer event, stale read observations, lost pending read observations, and stealth. Additional schedules cover Unknown, observations retained through pending commands, ambiguous command failure, fallback, and old threads with and without activity. Generated ITF JSON and Apalache output in `specs/traces/` are ignored by git.
+From the worktree root, run `pnpm specs:check`. This is the only verification entry point used here; it queues behind `scripts/heavy.mjs`. Quint is pinned to `@informalsystems/quint@0.33.0`. The script typechecks every `.qnt`, samples both full protocols 10,000 times with at most 160 transitions and two simulator threads, and uses seed `20261013`. Completed simulations stop at agreement. Directed schedules run once for at most 80 transitions, with guarded and bug modes for stale follow pages, the three accepted-Unsubscribe races, missing stored follows, a follow beyond the first window page, reordered follow events, rollback after a newer event, stale read observations, lost pending read observations, and stealth. Additional schedules cover Unknown, observations retained through pending commands, ambiguous command failure, fallback, and old threads with and without activity. Read has guarded and bug modes for a late official mark (`lateMark`), a page from before a mark (`latePage`), a page requested while a mark was pending (`pendingPage`), an official mark during a pending one (`pendingMark`) and stealth, plus `coalesceStep`, `retryAfterAcceptStep` and `stealthThenMarkStep`. Generated ITF JSON and Apalache output in `specs/traces/` are ignored by git.
 
 With Java, the bounded Apalache 0.62.1 checks use these small instances:
 
 | Instance | Constants | Bound and properties |
 | --- | --- | --- |
 | `follow-bounded.qnt` | One known window thread and one unknown older thread; one recent thread; two queued events; one HTTP response | 4 transitions, `boundedSafety`: pending intent, accepted Unsubscribe, applied failure lookup, missing fields and Unknown |
-| `readstate-bounded.qnt` | One live mirrored Main topic; one queued event; one HTTP response | 4 transitions, `boundedSafety`: pending intent and pending/accepted unread |
+| `readstate-bounded.qnt` | One mirrored Main topic; one queued event; one HTTP response | 4 transitions (`boundedStep`), `boundedSafety`: pending intent, pending unread, accepted mark and accepted unread |
 | Follow races: stale page, late event, pending page, failed lookup | Same small follow instance | 5 transitions each, `acceptedUnfollow`; each bug mode must produce an actual counterexample and each fixed mode must pass |
 
-The small instances import the same protocol actions; they do not replace them with proof-only transitions. Read imports `mirror.qnt` directly and selects live Main marks, command responses, events and background fetches. Apalache 0.62.1 fails on the broader read step (`key not found: $C$7`), so scan recovery, stealth and the local-only thread remain covered by the full simulator. This is a documented symbolic-check limit, not a protocol change. The four-transition check is a shallow safety check, not a convergence or exhaustive protocol proof. Long recovery and read bug traces are checked by simulation, not thirty-step symbolic exploration. The whole script has a nine-minute execution budget, excluding the machine-lock wait. Each Quint process has a 60-second deadline, including each of the ten Apalache runs; a timeout is a failure and its process group is killed. The script reports total execution time excluding the machine-lock wait. The completed check on this worktree took 203.3 seconds, including both full simulations, every regression and all ten Apalache runs, excluding the machine-lock wait. This bounds normal verification to well below ten minutes; it avoids the previous twelve-step full-state and thirty-step regression checks. Without Java the script clearly reports simulator-only mode. A checker, runtime or syntax error never counts as an expected violation.
+The small instances import the same protocol actions; they do not replace them with proof-only transitions. The read instance selects marks, acceptance, answers, retries, refusals, events, pages and lookups for one Main topic; the reconnect refresh, stealth and the local-only thread are covered by the full simulator. The four-transition check is a shallow safety check, not a convergence or exhaustive protocol proof. Long recovery and read bug traces are checked by simulation, not thirty-step symbolic exploration. The whole script has a nine-minute execution budget, excluding the machine-lock wait. Each Quint process has a 60-second deadline, including each of the ten Apalache runs; a timeout is a failure and its process group is killed. The script reports total execution time excluding the machine-lock wait. The completed check on this worktree took 203.3 seconds, including both full simulations, every regression and all ten Apalache runs, excluding the machine-lock wait. This bounds normal verification to well below ten minutes; it avoids the previous twelve-step full-state and thirty-step regression checks. Without Java the script clearly reports simulator-only mode. A checker, runtime or syntax error never counts as an expected violation.
 
 `QUINT_SIMULATOR=typescript pnpm specs:check` selects the TypeScript evaluator when Rust is unavailable. The temporal formula is typechecked but not executed. See the [Quint CLI reference](https://quint.sh/docs/quint) and [model checker guide](https://quint.sh/docs/model-checkers).
 
@@ -86,8 +98,18 @@ ITF `states[0]` is initial. In each state find the variable ending in `::s`, the
 | `hourlyPass` | Make the next window pass due |
 | `disconnect`, `reconnect`, `seal` | Drop/restore the socket; stop input and allow quiet recovery |
 
-Read actions and `mirror.qnt` retain their previous meanings: mark read/unread, local-only thread, stealth, retry, retained pending observations, and reconnect refresh of all mirrored topics. Network acceptance, response, event delivery and fetch completion are separate transitions in both models.
+| Read action | Engine or fake Slack event |
+| --- | --- |
+| `markRead`, `markUnread` / `localChange` | `reads.markRead`, `reads.markUnread`: local transaction and the topic's `mark` row |
+| `accept` | `MarkWorker` sends `conversations.mark` or `subscriptions.thread.mark`; the fake's handler runs (`holdNext` holds the answer) |
+| `respond` | Release the answer; `endMark` |
+| `retry`, `reject` | `loseResponse` or a transient error (`forceError internal_error`, `force429`); a refusal (`forceError` with another error) |
+| `officialMark`, `deliver` | `markRead` / `markThreadRead` from another client, and its frame (`holdFrames` delays it) |
+| `startFetch` kind `page`, `scan`, `lookup`, `finishFetch` | `client.counts` or a `getView` row; the reconnect's counts; `conversations.info` or a root lookup |
+| `stealth` | A stealth tab: no command |
+
+Network acceptance, response, event delivery and fetch completion are separate transitions in both models.
 
 ## Maintain the protocol
 
-Read the sync README's follow rule table and architecture section 5 before changing a follow rule. Keep the event and observation clocks separate. Add a directed schedule for a new race, show the broken rule fails, run `pnpm specs:check`, and document bounds and any expected implementation violations. Shared read delivery rules remain in `mirror.qnt`; product rules remain in the public specs.
+Read the sync README's follow and read rule tables and architecture section 5 before changing a rule. Keep the event and observation clocks separate. Add a directed schedule for a new race, show the broken rule fails, run `pnpm specs:check`, and document bounds and any expected implementation violations. Product rules remain in the public specs.

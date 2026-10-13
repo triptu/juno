@@ -64,6 +64,7 @@ const regressions = [
   ['follow', 'fallbackObservation', 'fallbackKeepsLatestEvent', 'fallback-observation'],
   ['readstate', 'lateMark', 'acceptedUnreadProtected', 'late-read-event'],
   ['readstate', 'latePage', 'acceptedUnreadProtected', 'late-read-page'],
+  ['readstate', 'pendingPage', 'acceptedUnreadProtected', 'pending-read-page'],
   ['readstate', 'pendingMark', 'quietAgreement', 'pending-read-event'],
 ]
 
@@ -81,6 +82,10 @@ for (const [file, schedule, invariant, name, guardedInvariant = 'invariants'] of
 simulate('readstate', 'stealthBugStep', 'stealthNeverMarks', 'stealth-bug.itf.json', true)
 for (const schedule of ['ambiguousFailure', 'pendingObservation', 'failedFirstSubscribe', 'unknownRoot', 'oldFollowActivity', 'oldFollowQuiet']) {
   simulate('follow', `${schedule}Step`, 'invariants', `${schedule}.itf.json`)
+}
+simulate('readstate', 'coalesceStep', 'coalescingSafety', 'read-coalesce.itf.json')
+for (const schedule of ['retryAfterAccept', 'stealthThenMark']) {
+  simulate('readstate', `${schedule}Step`, 'invariants', `read-${schedule}.itf.json`)
 }
 
 if (!tracesOnly) {
@@ -104,8 +109,8 @@ if (!tracesOnly) {
     console.log(`Correct protocols: ${samples} samples each, up to ${steps} steps, seed ${seed}.`)
     console.log('Temporal formulas are typechecked. Simulation checks follow/read drain bounds of 64/40 steps, not unbounded liveness.')
   } else {
-    for (const file of ['follow', 'readstate']) {
-      quint(['verify', `specs/${file}-bounded.qnt`, '--main', `${file}_bounded`,
+    for (const [file, step] of [['follow', 'step'], ['readstate', 'boundedStep']]) {
+      quint(['verify', `specs/${file}-bounded.qnt`, '--main', `${file}_bounded`, '--step', step,
         '--invariant', 'boundedSafety', '--max-steps', '4',
         '--apalache-version', apalacheVersion, '--verbosity', '1'])
     }
