@@ -21,7 +21,7 @@
  * followed list and checks the follows it left out; `runSync` schedules it.
  */
 import { compareTs, maxTs, millisToTs, type Ts, type UsergroupId } from '@juno/domain'
-import { SlackApi, type SlackApiError } from '@juno/slack'
+import { SlackApi, type SlackApiError, type SlackAuthRequired } from '@juno/slack'
 import { SlackEdge, SlackSession } from '@juno/slack'
 import type { Channel, ClientCountsArgs, CountEntry, Message, ThreadView } from '@juno/slack-schema'
 import { Invalidation, StoreWriter, transaction, type SqlError } from '@juno/store'
@@ -311,6 +311,15 @@ const loadHistoryWindow = (ctx: SyncContext, channel: string, start: Ts, options
     yield* applyPage(ctx, channel, page.messages, { kind: 'page', requestedAt }, { alsoTouch: [mainTopicOf(channel)], ...options })
   })
 
+/**
+ * One conversation's history, skipped when Slack refuses it (a channel
+ * deleted or left between `client.counts` and the call): one conversation
+ * must not fail the whole boot and make it retry forever. Transport, rate
+ * limit and auth failures still fail the step.
+ */
+const skipRejected = (load: Effect.Effect<void, BootError, BootServices>): Effect.Effect<void, BootError, BootServices> =>
+  load.pipe(Effect.catchTag('SlackRejected', (error) => Effect.logWarning('sync: history refused, skipped', { tag: error._tag, reason: error.error })))
+
 /** History since the synced range, in pages, for a conversation whose `latest` moved. */
 const loadHistorySince = (ctx: SyncContext, channel: string, since: string): Effect.Effect<void, BootError, BootServices> =>
   Effect.gen(function* () {
@@ -370,6 +379,20 @@ const loadThreadPreviews = (ctx: SyncContext, seedReadBefore: string): Effect.Ef
     }
   })
 
+/**
+ * Runs a discovery sweep and says whether it finished. It fills gaps but
+ * nothing depends on it, so a failure other than an expired session is
+ * logged and does not fail the boot or the catch-up; the caller keeps the
+ * gap's start so the next sweep searches it again.
+ */
+const discoverOrLog = (sweep: Effect.Effect<void, SlackApiError | SqlError, BootServices>): Effect.Effect<boolean, SlackAuthRequired, BootServices> =>
+  sweep.pipe(
+    Effect.as(true),
+    Effect.catch((error) =>
+      error._tag === 'SlackAuthRequired' ? Effect.fail(error) : Effect.as(Effect.logWarning('sync: discovery failed', { tag: error._tag }), false),
+    ),
+  )
+
 /** True when a synced range already covers `[start, latest]`: an interrupted cold boot fetched this conversation. */
 const covered = (channel: string, start: Ts, latest: Ts): Effect.Effect<boolean, SqlError, StoreWriter> =>
   Effect.map(latestSyncedRange(channel), (range) => range !== undefined && compareTs(range.from_ts, start) <= 0 && compareTs(range.to_ts, latest) >= 0)
@@ -391,19 +414,20 @@ export const coldBoot = (ctx: SyncContext, phase: Phase): Effect.Effect<void, Bo
     let done = 0
     for (const conversation of active) {
       // A boot that failed half way left ranges behind; what they cover is not fetched again.
-      if (!(yield* covered(conversation.id, start, conversation.latest))) yield* loadHistoryWindow(ctx, conversation.id, start, { seedReadBefore: bootTs })
+      if (!(yield* covered(conversation.id, start, conversation.latest))) yield* skipRejected(loadHistoryWindow(ctx, conversation.id, start, { seedReadBefore: bootTs }))
       yield* phase({ _tag: 'catching-up', done: ++done, total: active.length })
       yield* Effect.yieldNow
     }
     yield* fillUsers(ctx)
     yield* loadThreadPreviews(ctx, bootTs)
     // Replies inside the window to roots older than it: Main's activity, which windowed history cannot see.
-    yield* discoverSince(ctx, windowStart, counts.entries, { seedReadBefore: bootTs })
+    const discovered = yield* discoverOrLog(discoverSince(ctx, windowStart, counts.entries, { seedReadBefore: bootTs }))
     yield* fillUsers(ctx)
     const state: BootState = {
       completedAt: yield* Clock.currentTimeMillis,
       ...(counts.fetched === undefined ? {} : { countsLastFetched: counts.fetched }),
-      lastSyncAt: startedAt,
+      // A failed discovery leaves the gap for the next sweep to search again.
+      lastSyncAt: discovered ? startedAt : windowStart,
     }
     yield* transaction(setSyncState(BOOT_KEY, state))
   })
@@ -437,8 +461,8 @@ export const catchUp = (ctx: SyncContext, previous: BootState, phase: Phase, opt
     if (moved.length > 0) yield* phase({ _tag: 'catching-up', done: 0, total: moved.length })
     let done = 0
     for (const conversation of moved) {
-      if (conversation.since === undefined) yield* loadHistoryWindow(ctx, conversation.id, start, {})
-      else yield* loadHistorySince(ctx, conversation.id, conversation.since)
+      if (conversation.since === undefined) yield* skipRejected(loadHistoryWindow(ctx, conversation.id, start, {}))
+      else yield* skipRejected(loadHistorySince(ctx, conversation.id, conversation.since))
       if (moved.length > 0) yield* phase({ _tag: 'catching-up', done: ++done, total: moved.length })
       yield* Effect.yieldNow
     }
@@ -447,12 +471,12 @@ export const catchUp = (ctx: SyncContext, previous: BootState, phase: Phase, opt
       const until = options.refreshWorkspace ? start : maxTs(start, millisToTs(previous.lastSyncAt))
       yield* loadThreadViews(ctx, { until, windowStart: start, complete: false })
     }
-    yield* discoverSince(ctx, previous.lastSyncAt, counts.entries, {})
+    const discovered = yield* discoverOrLog(discoverSince(ctx, previous.lastSyncAt, counts.entries, {}))
     yield* fillUsers(ctx)
     const state: BootState = {
       completedAt: yield* Clock.currentTimeMillis,
       ...(counts.fetched === undefined ? {} : { countsLastFetched: counts.fetched }),
-      lastSyncAt: startedAt,
+      lastSyncAt: discovered ? startedAt : previous.lastSyncAt,
     }
     yield* transaction(setSyncState(BOOT_KEY, state))
   })

@@ -24,7 +24,7 @@
  */
 import { millisToTs, type Ts } from '@juno/domain'
 import { SlackApi, type SlackApiError } from '@juno/slack'
-import { searchMatchChannelId, searchMatches, type CountEntry, type Message, type SearchMatch } from '@juno/slack-schema'
+import { searchMatchChannelId, searchMatches, type CountEntry, type FlatSearchMatch, type Message } from '@juno/slack-schema'
 import { Invalidation, StoreWriter, type SqlError } from '@juno/store'
 import { Clock, Effect } from 'effect'
 import type { SyncContext } from './context'
@@ -38,7 +38,7 @@ const DAY = 24 * 60 * 60 * 1000
 const afterDate = (sinceMillis: number): string => new Date(sinceMillis - DAY).toISOString().slice(0, 10)
 
 /** The thread a match belongs to: its `thread_ts`, else the `thread_ts` query parameter of its permalink. */
-const threadTsOf = (match: SearchMatch): Ts | undefined => {
+const threadTsOf = (match: FlatSearchMatch): Ts | undefined => {
   if (match.thread_ts !== undefined) return match.thread_ts
   if (match.permalink === undefined) return undefined
   const value = /[?&]thread_ts=(\d+\.\d+)/.exec(match.permalink)?.[1]
@@ -46,7 +46,7 @@ const threadTsOf = (match: SearchMatch): Ts | undefined => {
 }
 
 /** A match as a message, or `undefined` when it says nothing about a thread. */
-const matchToMessage = (match: SearchMatch): Message | undefined => {
+const matchToMessage = (match: FlatSearchMatch): Message | undefined => {
   const threadTs = threadTsOf(match)
   if (threadTs === undefined && (match.reply_count ?? 0) === 0) return undefined
   return {

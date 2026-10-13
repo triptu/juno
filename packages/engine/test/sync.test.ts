@@ -708,25 +708,48 @@ describe('cold boot details (review M3 finding 10)', () => {
   it('an interrupted cold boot does not fetch again the history it already has', async () => {
     const engine = await startTestEngine({
       initial: (fake) => {
-        // The discovery at the end of the boot fails; the boot waits 30 s before it tries again.
-        fake.forceError({ method: 'search.modules.messages', error: 'not_allowed' })
+        fake.holdNext({ method: 'conversations.history' })
         return fake.signIn()
       },
     })
     engines.push(engine)
     await engine.status('ready')
-    await waitFor(() => (apiCalls(engine, 'search.modules.messages').length === 1 ? true : undefined), 30_000, 'the failed discovery')
-    await engine.phase('offline', 10_000)
-    const fetched = apiCalls(engine, 'conversations.history').length
-    expect(fetched).toBe(activeMains)
+    await waitFor(() => (engine.fake.heldCount({ method: 'conversations.history' }) === 1 ? true : undefined), 20_000, 'the first history page held')
+    // The first conversation's page lands; the second keeps failing (every retry), so the boot fails and waits 30 s.
+    engine.fake.forceError({ method: 'conversations.history', error: 'internal_error', times: 3 })
+    engine.fake.release()
+    await engine.phase('offline', 30_000)
+    expect(apiCalls(engine, 'conversations.history').filter((c) => c.ok)).toHaveLength(1)
     engine.fake.resetCalls()
-    // A force_reload boots again at once.
-    engine.fake.emitFrame({ type: 'force_reload', event_ts: `${Math.floor(Date.now() / 1000)}.000100` })
+    // A force_reload boots again at once, without the conversation it already has.
+    engine.fake.emitFrame({ type: 'force_reload', event_ts: eventTs() })
     await engine.phase('live', 30_000)
     await quiet(engine)
-    expect(apiCalls(engine, 'conversations.history')).toHaveLength(0)
-    expect(apiCalls(engine, 'search.modules.messages').length).toBeGreaterThan(0)
+    expect(apiCalls(engine, 'conversations.history')).toHaveLength(activeMains - 1)
     expect((await engine.rowsUntil((rows) => rows.length >= 20, 'rows')).length).toBeGreaterThanOrEqual(20)
+  })
+
+  it('finishes a cold boot whose discovery sweep fails, and the next sweep searches the same gap', async () => {
+    const engine = await startTestEngine({
+      initial: (fake) => {
+        fake.forceError({ method: 'search.modules.messages', error: 'not_allowed' })
+        return fake.signIn()
+      },
+    })
+    engines.push(engine)
+    await engine.phase('live', 30_000)
+    await quiet(engine)
+    const searches = () => apiCalls(engine, 'search.modules.messages')
+    expect(searches().map((c) => c.ok)).toEqual([false])
+    engine.fake.resetCalls()
+    engine.fake.dropSocket()
+    await engine.phase('offline')
+    await engine.phase('live', 20_000)
+    await quiet(engine)
+    // The catch-up searched from the start of the window again, not from the failed boot.
+    const query = String(searches()[0]!.args['query'])
+    const after = Date.parse(/after:(\d{4}-\d{2}-\d{2})/.exec(query)![1]!)
+    expect(after).toBeLessThan(Date.now() - 6 * 86_400_000)
   })
 
   it("shows a channel's Main when its only activity in the window is a reply to an older, unfollowed root", async () => {

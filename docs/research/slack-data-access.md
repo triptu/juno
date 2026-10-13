@@ -383,6 +383,16 @@ Calls
 
 Problems reported by the smoke: 0. Two findings changed code: the socket must not send `start_args` (section 4), and `client.userBoot.channels` carries no membership or read state (section 2). Not yet seen live, so still only from the bundle reading: `conversations.view`, every write method, and socket frames other than the four above.
 
+### Search, observed live (2026-10-13)
+
+`search.modules.messages` with `module=messages`, `query="is:thread after:<date>"`, `count=50`, `page=1`, `no_user_profile=1`, `sort=timestamp`, `sort_dir=desc` answered `ok` with 50 items. Key names only, no values were read:
+
+- Top level: `items`, `pagination` (`page`, `page_count`, `per_page`, `total_count`, `first`, `last`), `module`, `query`, `filters`, `ai_filters`, `manual_filters`, `filter_suggestions`.
+- Every item: `channel` (an object with `id`, `name` and the `is_*` flags), `iid`, `team`, and `messages`, an array. The message fields are inside `messages`: `ts`, `text`, `user`, `username`, `permalink`, `iid`, `extracts`, sometimes `attachments` (with a numeric `ts`). No `thread_ts`, no `reply_count`, no `blocks`, no `files`, no reactions in the sample, so a reply's thread is known only from its permalink's `thread_ts` parameter.
+- The flat shape the schema expected (fields on the item) did not decode; `@juno/slack-schema` now decodes both and `searchMatches` flattens them. The fake answers in the live shape.
+
+Not yet measured: whether `is:thread` filters exactly, whether `sort=timestamp` is honoured (the sync relies on it to stop at the gap's start), and whether a root's match ever carries `reply_count`.
+
 ### The sync dry run
 
 `JUNO_LIVE=1 pnpm sync:live` (`scripts/sync-live-dry-run.ts`, docs/development.md) ran the real `@juno/sync` cold boot read-only against the same workspace into a temporary directory, with the default `SyncConfig` (7-day window, 100-message history pages) and the default lanes (background calls 1.5 s apart). Aggregate numbers only:
@@ -403,5 +413,5 @@ What this changed or confirmed:
 
 - The 418 "channels" of section 2 are 142 public + 76 private + 200 group DMs (`return_all_relevant_mpdms`). `client.counts` lists all 218 channels and 27 of the group DMs, so on this account the channels missing from `counts` are closed or stale group DMs, and membership from `counts` keeps them out of the sidebar (173 would otherwise show as Main topics). Whether `userBoot` also lists public channels the user is not in cannot be told from this account, which is in every public channel; the fake includes such channels and the sync drops them the same way.
 - `subscriptions.thread.getView` returned 10 threads per page whatever `limit` said (`limit: 50` here, 20 in the smoke, 10 each time), so paging the followed threads costs one interactive call per 10 threads: 32 calls and about 20 s before the sidebar is complete. Inferred: the page size is capped at 10 server-side. A follow-up could page in parallel or stop earlier.
-- `users.prefs.get`, `conversations.replies`, `search.modules.messages` (not called by a cold boot) and the edge `users/info` decode with the schemas as they are; `conversations.replies` with `oldest = latest_reply, inclusive, limit 2` gives the preview as designed.
+- `users.prefs.get`, `conversations.replies` and the edge `users/info` decode with the schemas as they are; `conversations.replies` with `oldest = latest_reply, inclusive, limit 2` gives the preview as designed.
 - The cost estimate of architecture 5.1 holds: about one history call per active conversation, on the background lane at 1.5 s spacing, a few minutes for 150 channels.
