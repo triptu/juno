@@ -54,16 +54,28 @@ Each finding is accepted (A) and changed in the plan, or rejected (R) with a rea
 | G2 | WP2 spec gap 2: compaction can move the view past a run's `H` | A. While a run is live, no compaction job starts on an interval that ends after its `H`, and publication rechecks it. The spec's empty-view fallback is removed | §4.2, §5.2 |
 | G3 | WP2 spec gap 3: pin edits need a revision check beyond `gen` | A. `memory_head` holds `pin_rev`, bumped by every pin change. Requests revalidate it with `gen`. A pin edit is a compare-and-swap on the pin version and its source lineage | §4.3, §4.4 |
 | G4 | WP2 spec gap 4: oversized children can block a parent compaction | A. A stored node is **at most 16 KB**. A leaf with no attempt under that copies its source. A parent keeps its shortest attempt cut to 16 KB. So a parent input is always ≤ 32 KB and every merge can start | §4.2, §5.3 |
+| W1 | WP7 review B1: run endings cannot represent failures | A. `Ending` gains `failed` (provider, key rejected, Codex signed out, offline) and `blocked.budget`; every variant has fixed copy, and a run that wrote nothing shows the line alone. After Stop the line is fixed too; Juno no longer "states what was kept" | §8, §13.2 |
+| W2 | WP7 review 1: offline sends cannot be Not delivered | A. The inbox is local, so a send is accepted offline, paused and in recovery, and **waits**. Not delivered means only that the inbox write failed | §13.2 |
+| W3 | WP7 review 3: Remove as a card fails when needed most | A. The owner's Remove is a local sheet that needs no run. The `remove` card stays for removals Juno proposes | §4.5, §12 |
+| W4 | WP7 review 4 and 9: recovery, transfer and the owner's later decisions were not in the plan | A. A Review page, an ownership block in Settings and an update-needed banner. T3 sessions run with full access in a new worktree. The LAN switch exists, off by default, and only an `https` address works over the network (spikes, finding 1). The backup folder is local by default | §1, §13.2, §13.3, §14.3, §18 |
+| W5 | WP7 review 5: a card with two machines | A. `proposedTask` and `proposedSchedule` are their own kinds with the click machine; `task` has only `phase`, which gains `unknown`; `schedule` has only `status` | §12 |
+| W6 | WP7 review 8 and 11: the clean-run rule read broader than decided, and the question hold was unbounded | A. The spec states the rule as §6.4 defines it ("has not read Slack, a connection or a session report in this reply"), and §19 records that the owner has not confirmed the narrowing. A proactive run waits for an open question at most until it expires or 24 hours, and job reports never wait | §8, §18 |
+| W7 | WP7 review 12: "Stop these" could kill a T3 session from a label | A. The label's action is "Pause schedule" or "Mute updates". Jobs stop only from their Task card (B5) | §13.1 |
+| W8 | WP7 review 17 and nits: pins from the context menu, `deliver: silent`, the budget card's kind | A. The context-menu pin is an owner action on the trusted side, with the selection or the whole message and the 280-byte limit. `deliver` is `now \| digest \| silent`. The cap shows a `budget` card | §4.4, §5.4, §11.1 |
 
 ## 1. Owner decisions in force
 
 - **Providers:** OpenRouter and local Codex. Sign in with ChatGPT only if Juno can register. No Claude Code subscription.
 - **Chat model:** chosen in Settings from the latest Claude Sonnet, Claude Opus, Muse, GPT Sol and Grok (§7.1). The default is **Claude Sonnet 5.5**. **Compaction:** Haiku 5.5, editable. **Spend cap:** $2 a day, editable in Settings and never by the model.
 - **Proactive messages** only about things the owner set up.
-- **No click** for read lookups, OS notifications to the owner, self-scheduling, and starting T3 sessions he asked for. Everything else outward is a card and runs at most once after a click.
+- **No click** for read lookups, OS notifications to the owner, self-scheduling, and starting T3 sessions he asked for. Everything else outward is a card and runs at most once after a click. The plan applies this through the clean-run rule (§6.4), which is narrower than the words above; the spec records that in its open questions (W6).
 - **Sync in v1:** one writer, an encrypted backup, and a way to move ownership.
-- **MCP endpoints:** Littlebird: `https://mcp.littlebird.ai/mcp`, with OAuth. T3 Code: `http://192.168.1.22:3773/mcp`, no auth, plain HTTP on the LAN. Prefer loopback when T3 runs on the same machine. The URL is a setting. Never send it secrets.
-- **Still pending confirmation** (these defaults are used meanwhile): T3 sessions run in `auto-accept-edits` in a new worktree. The backup destination (proposal in §14.5). Coral owner bubbles, pending the mock review. Whether Juno can register for Sign in with ChatGPT.
+- **MCP endpoints:** Littlebird: `https://mcp.littlebird.ai/mcp`, with OAuth. T3 Code: `http://192.168.1.22:3773/mcp`; the spikes found it needs OAuth and that plain `http` works only on loopback. Prefer loopback when T3 runs on the same machine. The URL is a setting. Never send it secrets.
+- **T3 sessions** Juno starts run with full access, each in a new worktree.
+- **T3 over the network** needs the Settings switch "Allow T3 Code over the local network", off by default. With it on, only an `https` address works, because the sign-in refuses plain `http` off loopback (spikes, finding 1).
+- **Backup:** a local folder the owner chooses, under the app's data directory by default. The owner may point it at a synced drive later.
+- **Sign in with ChatGPT:** not planned. Codex local and OpenRouter cover it.
+- **Still pending:** the owner bubble colour, between options A to D in `docs/design/juno-chat/` (the mock's README recommends B).
 
 ## 2. Shape
 
@@ -144,6 +156,7 @@ Versions are pinned exactly: pi 1.2.0 and Codex SDK 0.162.1.
 - `remember(source_id, from, to)` is Tier 1. `source_id` must be a `user` message admitted in this run. The trusted side copies `text = bytes[from, to)` (at most 280 bytes) and records the source version.
 - An edit on "What Juno remembers" writes `kind: owner`, which supersedes the old pin and keeps its `source_id`, so a later redaction of that source still removes it. The 4 KB active budget is checked in the same transaction as the insert. Over budget, Juno asks in words which pin to drop.
 - **Revisions (G3).** Every pin insert, edit, deactivation and Undo bumps `memory_head.pin_rev` in the same transaction. An edit is a compare-and-swap: it names the pin version it replaces, and commits only if that version is still active and its source is not redacted. Otherwise the page reloads the pin and shows "This changed. Check it and save again."
+- **The context menu path.** "Remember this" on an owner message is an owner action on the trusted side, not the `remember` tool: the renderer sends the message id and the selected byte range (or none, for the whole message), and the agent writes the pin with the same 280-byte limit. The renderer disables the item when the message, or the selection, is longer than that.
 - A redaction deactivates pins sourced from that message in the redaction transaction. **Claim:** pins are attributed exact text from the owner's own messages. They do not make injection impossible. A pin shows "Remembered · Undo". The recall eval includes "remember …" requests, so the line is reliable.
 
 ### 4.5 Redaction (R4, L2)
@@ -181,7 +194,7 @@ Versions are pinned exactly: pi 1.2.0 and Codex SDK 0.162.1.
 ### 5.4 Spend (R15)
 - A `spend` ledger holds per-day `reserved`, `actual` and `unknown`. Before each billable call the guard reserves `upper(input) × price + maxOutput × price`. Actual usage reconciles it. A lost stream keeps its reservation as `unknown` spend.
 - The cap defaults to $2 a day. It is a hard cap over all OpenRouter paths. Compaction has a separate allowance of 25%.
-- At the cap: New runs are Blocked with a `question` card: "Juno has used today's budget. [Allow $1 more today] [Wait until tomorrow]". The click is the owner's, and it is a one-day raise. Compaction pauses at its allowance, and the tail placeholder covers the gap.
+- At the cap: New runs are Blocked with a `budget` card: "Juno has used today's budget. [Allow $1 more today] [Wait until tomorrow]". A run that reaches the cap mid-way, or inside a subagent, ends `blocked (budget)` with the same line and the same card. The click is the owner's, and it is a one-day raise. Compaction pauses at its allowance, and the tail placeholder covers the gap.
 - Codex turns are counted, not charged. Only Settings can change the cap. No tool exists for it.
 
 ## 6. Actions (R7, R8, R11, R12)
@@ -250,8 +263,8 @@ unknown ─reconcile─▶ done (positive evidence) | unknown (kept, shown) ; re
 
 ## 8. Orchestration behind the status bubble (B1, B5, M7, M8, M11)
 
-- **The router** owns the current run, `H`, and the clean or tainted flag. An idle owner input: reset, then the input. A busy owner input: a steer, with "Queued" shown after 500 ms. A report or wake: a steer if a run is active, otherwise a new run. Several reports within 30 s are coalesced. A proactive run waits while Juno has an open question of its own.
-- **The status bubble covers runs only.**. Dots only until the first token (the bubble becomes the reply in place) or the first tool call (text appears, specific and counting real things, changing at most every 2 s). It clears when the run settles. Esc with the composer empty, or its Stop, aborts **the run only**. After a Stop, a queued steer starts a fresh run, and Juno states what was kept.
+- **The router** owns the current run, `H`, and the clean or tainted flag. An idle owner input: reset, then the input. A busy owner input: a steer, with "Queued" shown after 500 ms. A report or wake: a steer if a run is active, otherwise a new run. Several reports within 30 s are coalesced. A proactive run waits while Juno has an open question of its own, at most until the question expires or 24 hours pass; job reports never wait.
+- **The status bubble covers runs only.**. Dots only until the first token (the bubble becomes the reply in place) or the first tool call (text appears, specific and counting real things, changing at most every 2 s). It clears when the run settles. Esc with the composer empty, or its Stop, aborts **the run only**. After a Stop, a queued steer starts a fresh run, and the reply ends with the fixed line "Stopped. Nothing after this was sent." If the run then calls tools between tokens, the bubble reappears below the streaming reply, and the next token clears it: one run is one Juno bubble. A run whose provider call fails (pi-ai runs with `maxRetries: 0`) ends `failed` with a fixed line per cause, never a model-written one.
 - **Background jobs** (`jobs` table: subagents and T3 sessions) never use the bubble. Each job has a **Task card** under the message that started it, with a live state line ("T3 Code · tests running, 2 of 5"), Open and Stop. The sidebar's Juno row shows the duotone sparkle while any job runs. "How is it going?" is answered from turn state, which lists the jobs.
 - **Subagents** follow pi's background pattern behind a `delegate` tool, with depth 1 and a cheaper model. Their first message is pins + view + task. Reports post once each (`report:<task>:<seq>`).
 - **T3 jobs:** A watcher fiber loops `t3_thread_wait(10 min)` and `t3_thread_read`, updating the state line. It posts a `work` report only on a milestone: started, a question or pending approval, done (with the PR), failed, or quiet for 30 minutes after the last step change. The last one reads: "T3 Code has been quiet for 30 minutes. I'll keep watching, or you can stop it." A pending approval becomes a `question` card headed "T3 Code asks" (Tier 3). Juno never merges or pushes.
@@ -298,7 +311,7 @@ Fakes for all three servers (WP10) mirror the shapes above. Real adapters are bu
 ## 11. Proactive scheduling and delivery (B2, H3, H4)
 
 ### 11.1 Schedules
-- `schedule_create({ at | every | cron, reason, prompt, deliver: now | digest, source_op })` works only in a clean owner run. `source_op` must be an owner input from that run, and the call mints the schedule's grant.
+- `schedule_create({ at | every | cron, reason, prompt, deliver: now | digest | silent, source_op })` works only in a clean owner run. `source_op` must be an owner input from that run, and the call mints the schedule's grant.
 - From wake and report runs, only `schedule_pause` and `schedule_delete` on the schedule that woke them are available.
 - Limits: 20 active schedules, intervals of at least 15 minutes, and one-shot wakes at most a year ahead. A schedule untouched for 30 days pauses itself and says so once.
 - Wakes are admitted once per `(schedule_id, schedule_rev, due_at)` through the inbox, revalidating the revision and the grant first.
@@ -318,17 +331,19 @@ Fakes for all three servers (WP10) mirror the shapes above. Real adapters are bu
 
 | Kind | Props | Actions | After |
 | --- | --- | --- | --- |
-| `sendMessage` | `messages[1..5]: { target pill, text (editable) }`, `because?` | Send (all), Dismiss | A status per row: "Sent · Open" or "Not sent · Try again" |
+| `sendMessage` | `messages[1..5]: { target pill, text (editable), result }`, `because?` | Send (all), Dismiss | A result per row: "Sent · Open" or "Not sent · Try again"; the card's status derives from the rows (`sendMessageStatus`) |
 | `resolve` | topics[] | Resolve, Dismiss | "Resolved 3 · Undo" |
 | `topics` | links | open | none |
-| `task` | job, title, where, live state | Open, Stop (and Start, when used as a card) | "Done · Open PR 412" |
+| `proposedTask` | kind, title, where | Start, Dismiss | "Started" |
+| `task` | job, title, where, phase, live state. No `status`: `phase` is its only machine | Open, Stop | "Done · Open PR 412", "Failed · Show in Activity", "Stopped", or the can't-tell line |
 | `question` | source header ("T3 Code asks", "Juno asks"), prompt, 2–4 options, free text | option, Reply | "You chose …" |
-| `schedule` | what, when, deliver | Keep or Start, Pause, Delete | "Paused" |
-| `connect` | server, scopes, what leaves the machine | Connect, Not now | "Connected" |
+| `proposedSchedule` | what, when, deliver | Start, Dismiss | "Started" |
+| `schedule` | what, when, deliver | Keep, Pause, Delete | "Kept", "Paused" or "Deleted" |
+| `connect` | server, scopes, what leaves the machine | Connect, Skip | "Connected" |
 | `change` | server, target, a field preview **rendered from the payload**, model caption | Apply, Dismiss | "Applied · Open" |
-| `remove` | messages | Remove, Keep | "Removed 2 messages" |
+| `remove` | messages, only for a removal Juno proposes; the owner's Remove is the local sheet (§4.5) | Remove, Keep | "Removed 2 messages" |
 | `budget` | spend today, cap | Allow $1 more today, Wait | "Allowed until midnight" |
-| `provider` | OpenRouter key or Codex | Set up | "Using Claude Sonnet 5.5" |
+| `provider` | "Choose a model provider": OpenRouter key or Codex, with the fixed disclosure | Set up | "Using Claude Sonnet 5.5" |
 
 - The model cannot invent a kind. Cards expire after 7 days, or when the source changes ("Expired · Ask again"). An unknown kind renders "This card needs a newer Juno".
 
@@ -337,12 +352,12 @@ Fakes for all three servers (WP10) mirror the shapes above. Real adapters are bu
 ### 13.1 Look
 The chat has four item kinds: owner bubble, Juno bubble with cards, the status bubble (only during a run), and separators.
 
-- **Owner bubbles** use `--hl` fill and `--hl-fg` text (coral, pending a mock review that includes a 200-message transcript and both themes). The fallback is `--secondary-default`. `--radius-bubble` 16, with the 4 px tail on the last bubble of a group. Max width 76%, 14 px text, padding 8×12.
+- **Owner bubbles**: the colour is pending the owner's choice between options A to D in `docs/design/juno-chat/README.md`, which recommends B (an accent tint, `--hl-bubble`, with `--foreground-default` text). `--radius-bubble` 16, with the 4 px tail on the last bubble of a group. Max width 76%, 14 px text, padding 8×12.
 - **Juno bubbles** use `--surface-hover`, with the 28 px mark beside the last bubble of a group. Plain text. Recall answers cite the day ("On 12 Mar you said …") with a link that scrolls to the message.
-- **Groups** are formed by sender within 2 minutes **and the same origin**. A proactive group carries an 11 px uppercase label ("SCHEDULED · DAILY CATCH-UP") with "Why this?" and "Stop these".
+- **Groups** are formed by sender within 2 minutes **and the same origin**. A proactive group carries an 11 px uppercase label ("SCHEDULED · DAILY CATCH-UP") with "Why this?" and one quiet action: "Pause schedule" or "Mute updates". Neither stops a job (B5).
 - **Cards:** Column width up to 560 px, `--radius-card` 20. Light theme: the wide soft shadow. Dark theme: the ring from `docs/design/dark-theme/`. Laid out at full height, with a `--duration-appear` fade.
 - **Status bubble:** three dots looping over `--duration-pop` (static under reduced motion), 13 px status text with a 150 ms cross-fade, and Stop on hover or focus.
-- **Inline lines:** "Remembered · Undo", "Removed".
+- **Inline lines:** "Remembered · Undo" (Undo until the next send or 60 s), "Removed", and the fixed secret-blocked line.
 - **Times** show on hover. **Day and gap separators** follow SPEC §17 wording. **Scroll:** the "New" divider, and a "New message" pill when scrolled up. The list uses `@tanstack/react-virtual`.
 
 ### 13.2 States (B4), with copy
@@ -352,25 +367,33 @@ The chat has four item kinds: owner bubble, Juno bubble with cards, the status b
 | Idle | Nothing extra |
 | Running | The status bubble |
 | Queued | "Queued" under the last owner bubble, at 70% opacity, after 500 ms |
-| Not delivered | "Not delivered · Try again". Retrying resubmits the same `op_id` text |
-| Interrupted | "Juno was interrupted. Your message is kept. [Try again]" |
+| Waiting | "Waiting for network", "Waiting for Resume" or "Waiting for your review". The inbox write succeeded; the run starts when it can |
+| Not delivered | "Not delivered · Try again". Only when the inbox write failed. Retrying resubmits the same `op_id` text |
+| Stopped | "Stopped. Nothing after this was sent." |
+| Interrupted | "Juno was interrupted. Your message is kept. [Try again]". No Try again for wake and report runs |
+| Failed | "Juno didn't answer. Give it a moment and try again." (provider), "OpenRouter rejected the key. Check it in Settings.", "Codex is signed out on this Mac. Sign in to Codex and try again.", "Juno lost the connection. Try again when you are back online." |
 | Blocked (too large) | §5.2 copy, with no card |
-| Offline | The composer works. A send that needs the network ends as "Not delivered". Wakes that fall due offline are admitted once when back |
-| No provider | A `provider` card: "Pick how Juno thinks", with OpenRouter and Codex. It says once that Juno sends its memory of the chat to the chosen provider each turn |
+| Blocked (budget) | "Juno has used today's budget." with the `budget` card |
+| Offline | A chip, "You're offline". The composer works and a send that needs the network waits. Wakes that fall due offline are admitted once when back |
+| No provider | A `provider` card: "Choose a model provider", with OpenRouter and Codex. Its fixed line says Juno sends its memory of the chat to the chosen provider each turn |
 | Budget reached | A `budget` card |
 | Paused | A header chip, "Juno is paused · Resume". The composer works, and messages queue until Resume |
 | AI off | One line, "Juno is off. Turn on AI assist in Settings." The composer is disabled and schedules show as paused |
 | Expired card | "Expired · Ask again" |
-| Recovery mode | "Juno restored from backup. It won't act until you check pending actions. [Review]" |
+| Recovery mode | A chip, "Juno restored from backup · Review". The composer works and sends wait for the review. Review opens the Review page (§13.3) |
+| Update needed | A chip, "Juno needs an update" (§3 step 6). The composer is disabled |
 | Another device owns | "Juno is working on your other Mac", with the chat read-only |
-| Removal pending | A Settings line (§4.5) |
+| Removal pending | A Settings line, "Removal pending · 1 copy in a running job · Stop job" (§4.5) |
+| Secret blocked | A note line, "Juno stopped a tool call that held a key or a token. Nothing was sent." |
+
+The banner chips are not exclusive conditions; the container shows one by precedence: another device, update needed, recovery, AI off, paused, offline. Every line in this table is fixed copy in `chatCopy`; the model writes none of them.
 
 ### 13.3 Pages
 Pages open from the Juno header menu:
 
 - **Scheduled:** next run, deliver, Pause, Edit and Delete. **What Juno remembers:** pins, editable. **Memory of this chat:** the view as a dated timeline, with masked lines shown as "being updated".
 - **Activity:** grouped by run: who asked, when, outcome. Under each run, one row per Tier 1–3 action with its decision, and one folded read line ("Read 3 topics, looked back 4 times"). Failures appear in plain words with "Copy details".
-- **Connections:** status, address in use, discovered tools with tiers. **Settings › Juno:** chat model picker, compaction model picker, spend today and the cap, Codex status, rules, Pause, and backup.
+- **Connections:** status, address in use, discovered tools with tiers; the T3 row holds the address and the local-network switch. **Settings › Juno:** chat model picker, compaction model picker, spend today and the cap, Codex status, the OpenRouter key (with a rejected state), rules, Pause, backup, and ownership (state, export recovery phrase, move, restore). **Review** (recovery only): the pending cards, each "may already have happened", and Activate.
 
 ### 13.4 Elsewhere (M4)
 - Ask Juno on the home and ⌘J open the Juno tab with the composer focused. Inside the chat, ⌘J focuses the composer. The nav item shows a grey count of unread Juno messages. The home's Ask Juno field shows a running job's state line, as a text swap with no reflow.
@@ -391,7 +414,7 @@ Budgets go in `docs/performance.md`: send to bubble under 16 ms, status bubble u
 ### 14.3 Restore from backup, and forced recovery
 - The owner must confirm the old Mac is off, erased, or has Juno removed. Juno cannot check this, and the UI says so.
 - The restored store opens in **recovery**: Dispatch is off. Every approval and unconsumed authorization is void. Pending intents are quarantined as `restored`. Every attempt without a receipt is `unknown`. A new journal incarnation and archive incarnation start.
-- The owner reviews pending actions and re-approves them with "may already have happened" wording, then activates. The recovery point is the last backup, at most 5 minutes old.
+- The owner reviews pending actions on the Review page and re-approves them with "may already have happened" wording, then presses Activate; cards still open are expired. The composer works in recovery and sends wait for the review. The recovery point is the last backup, at most 5 minutes old.
 
 ### 14.4 Backup format
 - **Layout:** a generation `g` with a fresh data key `K_g` per generation, a schema version, a snapshot at commit position P, and ordered delta segments `P..Q`. The capture method is decided in S6: the SQLite session extension if it is available in the utility-process runtime, otherwise an application change log from Juno's own write paths.
@@ -402,8 +425,9 @@ Budgets go in `docs/performance.md`: send to bubble under 16 ms, status bubble u
 - **Deletion record:** the latest redaction generation and a hash are stored in the keychain and the manifest. Restoring a generation older than that record keeps it quarantined.
 - **Keys:** data keys are wrapped by a backup key kept in the keychain. The owner exports a recovery phrase, which wraps the backup key. Destroying `K_g` means removing its wrapped copy from every manifest Juno writes.
 
-### 14.5 Backup destination (pending confirmation)
-- **Proposed default:** the folder `Juno Backup` in the owner's iCloud Drive, with per-generation keys.
+### 14.5 Backup destination
+- **Decided (W4):** a local folder the owner chooses, under the app's data directory by default. The owner may point it at a synced drive later, so the trade-off below is stated in Settings when the folder is on one.
+- **Earlier proposal, kept for the trade-off:** the folder `Juno Backup` in the owner's iCloud Drive, with per-generation keys.
 - **The trade-off, as Settings will state it:** iCloud keeps deleted files in Recently Deleted for 30 days, and those old manifests still hold the wrapped `K_g`. So someone with the recovery phrase could read a removed message from iCloud's trash for up to 30 days.
 - **The strict option:** Settings › Backup › "Rotate recovery phrase after removals". This rotates the backup key on each redaction and needs the owner to save a new phrase. An external disk or NAS folder is offered as the alternative destination.
 
@@ -557,8 +581,8 @@ Each UI milestone ends with the design and performance reviews. WP23 runs from M
 
 ## 18. Open questions for the owner
 
-1. **T3 runtime mode** for sessions Juno starts: `auto-accept-edits` in a new worktree (the current default)?
-2. **Backup:** the iCloud folder with a 30-day residue as stated, the strict rotate-on-removal option, or an external disk?
-3. **Coral owner bubbles** after the mock review, or the neutral fallback?
-4. **Sign in with ChatGPT:** can Juno register for it?
-5. **T3 on the LAN:** since anyone on the network can drive it, should Juno refuse the LAN address unless the owner turns on "Allow T3 over the local network"? The proposed default is yes, require that toggle.
+Answered by the owner on 10-14 (see §1): T3 sessions run with full access in a new worktree; the backup is a local folder; Sign in with ChatGPT is not planned; T3 over the network needs the switch, off by default.
+
+1. **Owner bubble colour:** A (accent fill), B (accent tint), C (neutral tint) or D (ink), from `docs/design/juno-chat/`. The mock's README recommends B.
+2. **The clean-run narrowing (W6):** the owner said "no click to start T3 sessions I asked for". The rule as built needs no click only while Juno has not read Slack, a connection or a session report in the same reply. Confirm the narrowing, or say which reads should not count.
+3. **Juno's voice:** does Juno say "I" in its own bubbles? The spec proposes yes.
