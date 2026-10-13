@@ -1,0 +1,602 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Juno · living home</title>
+<style>
+@font-face { font-family: 'Figtree Variable'; font-style: normal; font-weight: 300 900; font-display: block;
+  src: url('fonts/figtree-latin-wght-normal.woff2') format('woff2-variations'); }
+@font-face { font-family: 'Instrument Serif'; font-style: normal; font-weight: 400; font-display: block;
+  src: url('fonts/instrument-serif-latin-400-normal.woff2') format('woff2'); }
+@font-face { font-family: 'JetBrains Mono'; font-style: normal; font-weight: 400; font-display: block;
+  src: url('fonts/jetbrains-mono-latin-400-normal.woff2') format('woff2'); }
+
+/* ---------- tokens (docs/design/tokens.md) ---------- */
+.theme-light {
+  --background: hsla(48, 50%, 98%, 1);
+  --background-subtle: hsla(48, 35%, 97%, 1);
+  --surface-default: hsla(48, 30%, 98%, 1);
+  --surface-hover: hsla(48, 30%, 94%, 1);
+  --secondary-default: hsla(48, 30%, 92%, 1);
+  --border-subtle: hsla(48, 30%, 92%, 1);
+  --border-default: hsla(48, 30%, 91%, 1);
+  --border-strong: hsla(48, 30%, 88%, 1);
+  --input-border: hsla(48, 14%, 82%, 1);
+  --foreground-default: hsla(48, 15%, 12%, 1);
+  --foreground-subtle: hsla(48, 8%, 35%, 1);
+  --foreground-muted: hsla(48, 5%, 42%, 1);
+  --hl: #CC4628; --hl-fg: #FFFFFF; --hl-text: #B4351F;
+  --hl-soft: color-mix(in oklch, var(--hl) 10%, var(--background));
+  --warm: #E39A3B;
+  --warm-soft: color-mix(in oklch, var(--warm) 26%, var(--background));
+  --avatar-bg-mix: 24%; --avatar-fg-mix: 62%;
+  --shadow-sm: 0 1px 2px 0 rgba(27,28,21,.04);
+  --sheet: #E9E6DC; --sheet-ink: #605E52;
+  color-scheme: light;
+}
+.theme-dark {
+  --background: #1B1916;
+  --background-subtle: #151411;
+  --surface-default: #252421;
+  --surface-hover: #2D2B28;
+  --secondary-default: #302F2C;
+  --border-subtle: #2B2A27;
+  --border-default: #32302D;
+  --border-strong: #3C3A37;
+  --input-border: #464541;
+  --foreground-default: #EEEBE2;
+  --foreground-subtle: #C6C4BE;
+  --foreground-muted: #A09E9A;
+  --hl: #FF8A73; --hl-fg: #2A0D06; --hl-text: #FF9C87;
+  --hl-soft: color-mix(in oklch, var(--hl) 14%, var(--background));
+  --warm: #E39A3B;
+  --warm-soft: color-mix(in oklch, var(--warm) 22%, var(--background));
+  --avatar-bg-mix: 32%; --avatar-fg-mix: 46%;
+  --shadow-sm: 0 1px 2px 0 rgba(0,0,0,.30);
+  --sheet: #0E0D0B; --sheet-ink: #A09E9A;
+  color-scheme: dark;
+}
+:root {
+  --font-sans: 'Figtree Variable', 'Figtree', ui-sans-serif, system-ui, sans-serif;
+  --font-serif: 'Instrument Serif', ui-serif, Georgia, serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+  --hue-jordy: #92C2F9; --hue-emerald: #50C878; --hue-rose: #A49496; --hue-cyan: #008AB3;
+  --duration-appear: 240ms; --stagger: 80ms; --ease-out: cubic-bezier(0.2, 0, 0, 1);
+  --radius-xl: 12px; --radius-3xl: 16px; --radius-pill: 999px; --radius-xs: 4px;
+}
+@media (prefers-reduced-motion: reduce) { :root { --duration-appear: 0ms; --stagger: 0ms; } }
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: var(--font-sans); font-size: 14.5px; line-height: 1.5; letter-spacing: 0;
+  -webkit-font-smoothing: antialiased; background: #cfcbc0; cursor: default; user-select: none; }
+section[data-key] { display: inline-block; vertical-align: top; }
+.sheet { background: var(--sheet); color: var(--sheet-ink); padding: 28px 32px 32px; }
+.sheet h1 { font: 400 22px/1.2 var(--font-serif); margin: 0 0 4px; color: var(--sheet-ink); }
+.sheet .lede { font-size: 12.5px; margin: 0 0 20px; max-width: 760px; }
+.grid { display: grid; grid-template-columns: repeat(2, auto); gap: 28px 28px; }
+.cap { font-size: 12px; margin: 0 0 8px; }
+.cap b { font-weight: 600; }
+
+/* ---------- the workspace frame ---------- */
+.frame { width: 720px; height: 560px; background: var(--background); color: var(--foreground-default);
+  display: flex; flex-direction: column; overflow: hidden; border-radius: 10px; box-shadow: 0 1px 2px rgba(0,0,0,.08), 0 10px 30px -8px rgba(0,0,0,.18); }
+.tabstrip { height: 44px; flex: none; background: var(--background-subtle); border-bottom: 1px solid var(--border-default); }
+.page { flex: 1; min-height: 0; display: flex; }
+
+/* ---------- the home ---------- */
+.home { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 48px; }
+.scene { display: block; color: var(--foreground-subtle); flex: none; }
+.scene-ws { width: 120px; height: 83px; }
+.greet { font: 400 36px/1.15 var(--font-serif); color: var(--foreground-default); margin: 14px 0 0; text-align: center; }
+.sub { margin: 6px 0 0; color: var(--foreground-muted); font-size: 14.5px; text-align: center; }
+.items { list-style: none; margin: 24px 0 0; padding: 0; width: 100%; max-width: 480px; display: flex; flex-direction: column; gap: 2px; }
+.item { display: flex; align-items: center; gap: 12px; padding: 8px 12px 8px 10px; border-radius: var(--radius-3xl); color: inherit; text-decoration: none; min-width: 0; }
+.item.hover { background: var(--surface-hover); }
+.tile { width: 28px; height: 28px; border-radius: 8px; flex: none; display: grid; place-items: center;
+  background: color-mix(in oklch, var(--hue) var(--avatar-bg-mix), var(--surface-default));
+  color: color-mix(in oklch, var(--hue) var(--avatar-fg-mix), var(--foreground-default)); }
+.tile svg { width: 14px; height: 14px; fill: currentColor; }
+.item-text { flex: 1; min-width: 0; }
+.item-title { display: block; font-size: 13.5px; font-weight: 500; line-height: 20px; color: var(--foreground-default); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.item-meta { display: block; font-size: 12.5px; line-height: 18px; color: var(--foreground-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+.item-meta .sep { margin: 0 4px; }
+.caret { width: 13px; height: 13px; fill: var(--foreground-muted); flex: none; opacity: 0; }
+.item.hover .caret { opacity: 1; }
+.ask { margin: 24px 0 0; width: 100%; max-width: 480px; height: 40px; border-radius: var(--radius-pill); background: var(--surface-default);
+  border: 1px solid var(--input-border); display: flex; align-items: center; gap: 10px; padding: 0 12px 0 14px; color: var(--foreground-muted); }
+.ask .ph { width: 16px; height: 16px; fill: var(--foreground-subtle); flex: none; }
+.ask .placeholder { flex: 1; font-size: 14.5px; }
+.kbd { font: 400 10.5px/1 var(--font-mono); color: var(--foreground-muted); border: 1px solid var(--border-strong); border-radius: var(--radius-xs); padding: 3px 5px 2px; }
+.quiet-link { margin-top: 18px; font-size: 13.5px; color: var(--foreground-muted); text-decoration: none; }
+
+/* entrance: scene, greeting, items, ask rise 80ms apart; collapses under reduced motion */
+@keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.enter > * { animation: rise var(--duration-appear) var(--ease-out) both; }
+.enter > :nth-child(1) { animation-delay: 0ms; } .enter > :nth-child(2) { animation-delay: var(--stagger); }
+.enter > :nth-child(3) { animation-delay: calc(var(--stagger) * 2); } .enter > :nth-child(4) { animation-delay: calc(var(--stagger) * 3); }
+.enter > :nth-child(5) { animation-delay: calc(var(--stagger) * 4); }
+
+/* variant B: scene left, text and items right */
+.home-b { align-items: center; }
+.home-b .row { display: grid; grid-template-columns: 150px 1fr; gap: 40px; align-items: start; width: 100%; max-width: 640px; }
+.home-b .scene-ws { width: 150px; height: 104px; margin: 0 auto; }
+.home-b .greet, .home-b .sub { text-align: left; }
+.home-b .greet { margin-top: 0; }
+.home-b .items, .home-b .ask { max-width: none; }
+
+/* variant C: compact, a page */
+.home-c { align-items: flex-start; justify-content: flex-start; padding: 40px 32px; }
+.home-c .head { display: flex; align-items: center; gap: 20px; }
+.home-c .scene-ws { width: 84px; height: 58px; }
+.home-c .greet { margin-top: 0; font-size: 34px; text-align: left; }
+.home-c .sub { text-align: left; margin-top: 2px; }
+.home-c .items { max-width: 520px; margin-top: 20px; }
+.home-c .ask { max-width: 520px; margin-top: 20px; }
+
+/* ---------- scenes strip ---------- */
+.strip { display: grid; grid-template-columns: repeat(8, 150px); gap: 16px; padding: 24px 20px; border-radius: 12px; }
+.strip .cell { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.strip .scene { width: 120px; height: 83px; }
+.strip .name { font-size: 12px; color: var(--foreground-muted); text-align: center; line-height: 1.3; }
+.strip .name b { display: block; font-weight: 600; color: var(--foreground-subtle); }
+.strip-light { background: hsla(48, 50%, 98%, 1); }
+.strip-dark { background: #1B1916; margin-top: 16px; }
+.marks { display: flex; gap: 28px; align-items: flex-end; margin-top: 20px; padding: 20px; border-radius: 12px; background: hsla(48, 50%, 98%, 1); color: #605E52; }
+.marks .m { display: flex; flex-direction: column; align-items: center; gap: 8px; font-size: 12px; color: #706E66; }
+.marks svg { display: block; }
+
+/* ---------- in context ---------- */
+.window { width: 1200px; height: 800px; display: flex; overflow: hidden; background: var(--background); color: var(--foreground-default);
+  border-radius: 12px; box-shadow: 0 1px 2px rgba(0,0,0,.1), 0 20px 50px -12px rgba(0,0,0,.3); }
+.sidebar-shot { width: 384px; height: 800px; flex: none; overflow: hidden; border-right: 1px solid var(--border-default); }
+.sidebar-shot img { width: 1200px; height: 800px; display: block; }
+.workspace { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.wrap { padding: 32px; display: inline-block; }
+</style>
+</head>
+<body>
+<!-- Scenes: the seated j from the logo (head r7, spine stroke 8.5) on the illustration grid (104 by 72, stroke 4,
+     round caps, one flat --warm-soft layer). Everything is currentColor except the warm layer. -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<defs>
+  <!-- the figure, upright: the logo's own drawing -->
+  <g id="fig-up">
+    <circle cx="40" cy="10" r="7" fill="currentColor"/>
+    <path d="M47.5 25 C47.5 35.5 46 42.5 40.5 46.5 C37.5 48.6 34.5 48.6 31 48.6" fill="none" stroke="currentColor" stroke-width="8.5" stroke-linecap="round"/>
+  </g>
+  <!-- leaning back: head behind the hips, legs out -->
+  <g id="fig-lean">
+    <circle cx="46.5" cy="12.5" r="7" fill="currentColor"/>
+    <path d="M53.5 27.5 C53.5 37.5 50.5 43.5 43.5 47 C40 48.6 35 48.6 27 48.6" fill="none" stroke="currentColor" stroke-width="8.5" stroke-linecap="round"/>
+  </g>
+  <!-- sunk back: the caught-up recline -->
+  <g id="fig-sink">
+    <circle cx="50" cy="16" r="7" fill="currentColor"/>
+    <path d="M57 31 C57 40 54 45 46 47.6 C42 48.6 36 48.6 25 48.6" fill="none" stroke="currentColor" stroke-width="8.5" stroke-linecap="round"/>
+  </g>
+  <!-- the open laptop: the logo's two dots -->
+  <g id="laptop-open">
+    <circle cx="20" cy="48.6" r="5" fill="currentColor"/>
+    <circle cx="10.5" cy="36.5" r="4.5" fill="currentColor"/>
+  </g>
+  <!-- the closed laptop: the screen dot has come down to the table -->
+  <g id="laptop-closed">
+    <circle cx="20" cy="48.6" r="5" fill="currentColor"/>
+    <circle cx="8" cy="48.6" r="4.5" fill="currentColor"/>
+  </g>
+  <!-- a mug with steam -->
+  <g id="mug" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="6" y="36" width="16" height="12.6" rx="3" style="fill:var(--warm-soft)" stroke="none"/>
+    <path d="M6 39 H18 M6 36 H22 V45.6 A3 3 0 0 1 19 48.6 H9 A3 3 0 0 1 6 45.6 Z"/>
+    <path d="M22 39 C27.5 39 27.5 46.5 22 46.5"/>
+    <path d="M10.5 30 C8 27.5 13 25.5 10.5 22.5" opacity=".4"/>
+    <path d="M17.5 30 C14.5 26.5 20.5 24.5 17.5 19.5" opacity=".4"/>
+  </g>
+
+  <!-- 1 · morning: coffee -->
+  <symbol id="scene-morning" viewBox="0 0 104 72">
+    <g transform="translate(26 8)"><use href="#fig-up"/></g>
+    <g transform="translate(21 8)"><use href="#mug"/></g>
+  </symbol>
+  <!-- 2 · midday: at the laptop, sun high -->
+  <symbol id="scene-midday" viewBox="0 0 104 72">
+    <circle cx="22" cy="18" r="9" style="fill:var(--warm-soft)" stroke="currentColor" stroke-width="4"/>
+    <g transform="translate(26 8)"><use href="#fig-up"/><use href="#laptop-open"/></g>
+  </symbol>
+  <!-- 3 · evening: leaning back, laptop closed, sun low -->
+  <symbol id="scene-evening" viewBox="0 0 104 72">
+    <clipPath id="above-table"><rect x="0" y="0" width="104" height="56.6"/></clipPath>
+    <circle cx="14" cy="56.6" r="13" style="fill:var(--warm-soft)" clip-path="url(#above-table)"/>
+    <path d="M2 56.6 H28" stroke="currentColor" stroke-width="4" stroke-linecap="round" fill="none"/>
+    <g transform="translate(26 8)"><use href="#fig-lean"/><use href="#laptop-closed"/></g>
+  </symbol>
+  <!-- 4 · late night: a moon -->
+  <symbol id="scene-night" viewBox="0 0 104 72">
+    <path d="M24 10 A12 12 0 1 0 36 27 A9.5 9.5 0 0 1 24 10 Z" style="fill:var(--warm-soft)" stroke="currentColor" stroke-width="4" stroke-linejoin="round"/>
+    <g transform="translate(26 8)"><use href="#fig-up"/><use href="#laptop-open"/></g>
+  </symbol>
+  <!-- 5 · Friday: a plant on the desk -->
+  <symbol id="scene-friday" viewBox="0 0 104 72">
+    <g transform="translate(26 8)"><use href="#fig-up"/><use href="#laptop-open"/></g>
+    <g fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M8 46 H26 L23.5 56.6 H10.5 Z" style="fill:var(--warm-soft)"/>
+      <path d="M17 46 V34"/>
+      <path d="M17 40 C12 40 9 37 8.5 32 C13.5 32 17 35 17 40 Z"/>
+      <path d="M17 36 C22 36 25 33 25.5 28 C20.5 28 17 31 17 36 Z"/>
+    </g>
+  </symbol>
+  <!-- 6 · winter (seasonal): coffee and a snowflake -->
+  <symbol id="scene-winter" viewBox="0 0 104 72">
+    <g transform="translate(26 8)"><use href="#fig-up"/></g>
+    <g transform="translate(21 8)"><use href="#mug"/></g>
+    <g fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" opacity=".55" transform="translate(16 18)">
+      <path d="M0 -9 V9 M-7.8 -4.5 L7.8 4.5 M-7.8 4.5 L7.8 -4.5"/>
+    </g>
+  </symbol>
+  <!-- 7 · autumn (seasonal): a leaf drifting down -->
+  <symbol id="scene-autumn" viewBox="0 0 104 72">
+    <g transform="translate(26 8)"><use href="#fig-up"/><use href="#laptop-open"/></g>
+    <g fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" transform="rotate(20 18 22)">
+      <path d="M8 32 C8 20 18 12 30 12 C30 24 20 32 8 32 Z" style="fill:var(--warm-soft)"/>
+      <path d="M11 29 L24 16"/>
+    </g>
+  </symbol>
+  <!-- 8 · all caught up: sunk into a beanbag, laptop put away -->
+  <symbol id="scene-caught-up" viewBox="0 0 104 72">
+    <rect x="50" y="43" width="48" height="22" rx="11" style="fill:var(--warm-soft)"/>
+    <g transform="translate(26 8)"><use href="#fig-sink"/></g>
+    <g transform="translate(4 8)"><use href="#laptop-closed"/></g>
+  </symbol>
+
+  <!-- Phosphor icons (regular, bold for 13px, duotone sparkle), 256 grid -->
+<symbol id="ph-sparkle" viewBox="0 0 256 256"><path d="M194.82,151.43l-55.09,20.3-20.3,55.09a7.92,7.92,0,0,1-14.86,0l-20.3-55.09-55.09-20.3a7.92,7.92,0,0,1,0-14.86l55.09-20.3,20.3-55.09a7.92,7.92,0,0,1,14.86,0l20.3,55.09,55.09,20.3A7.92,7.92,0,0,1,194.82,151.43Z" opacity="0.2"/><path d="M197.58,129.06,146,110l-19-51.62a15.92,15.92,0,0,0-29.88,0L78,110l-51.62,19a15.92,15.92,0,0,0,0,29.88L78,178l19,51.62a15.92,15.92,0,0,0,29.88,0L146,178l51.62-19a15.92,15.92,0,0,0,0-29.88ZM137,164.22a8,8,0,0,0-4.74,4.74L112,223.85,91.78,169A8,8,0,0,0,87,164.22L32.15,144,87,123.78A8,8,0,0,0,91.78,119L112,64.15,132.22,119a8,8,0,0,0,4.74,4.74L191.85,144ZM144,40a8,8,0,0,1,8-8h16V16a8,8,0,0,1,16,0V32h16a8,8,0,0,1,0,16H184V64a8,8,0,0,1-16,0V48H152A8,8,0,0,1,144,40ZM248,88a8,8,0,0,1-8,8h-8v8a8,8,0,0,1-16,0V96h-8a8,8,0,0,1,0-16h8V72a8,8,0,0,1,16,0v8h8A8,8,0,0,1,248,88Z"/></symbol>
+<symbol id="ph-shield" viewBox="0 0 256 256"><path d="M208,40H48A16,16,0,0,0,32,56v56c0,52.72,25.52,84.67,46.93,102.19,23.06,18.86,46,25.27,47,25.53a8,8,0,0,0,4.2,0c1-.26,23.91-6.67,47-25.53C198.48,196.67,224,164.72,224,112V56A16,16,0,0,0,208,40Zm0,72c0,37.07-13.66,67.16-40.6,89.42A129.3,129.3,0,0,1,128,223.62a128.25,128.25,0,0,1-38.92-21.81C61.82,179.51,48,149.3,48,112l0-56,160,0Z"/></symbol>
+<symbol id="ph-wrench" viewBox="0 0 256 256"><path d="M226.76,69a8,8,0,0,0-12.84-2.88l-40.3,37.19-17.23-3.7-3.7-17.23,37.19-40.3A8,8,0,0,0,187,29.24,72,72,0,0,0,88,96,72.34,72.34,0,0,0,94,124.94L33.79,177c-.15.12-.29.26-.43.39a32,32,0,0,0,45.26,45.26c.13-.13.27-.28.39-.42L131.06,162A72,72,0,0,0,232,96,71.56,71.56,0,0,0,226.76,69ZM160,152a56.14,56.14,0,0,1-27.07-7,8,8,0,0,0-9.92,1.77L67.11,211.51a16,16,0,0,1-22.62-22.62L109.18,133a8,8,0,0,0,1.77-9.93,56,56,0,0,1,58.36-82.31l-31.2,33.81a8,8,0,0,0-1.94,7.1L141.83,108a8,8,0,0,0,6.14,6.14l26.35,5.66a8,8,0,0,0,7.1-1.94l33.81-31.2A56.06,56.06,0,0,1,160,152Z"/></symbol>
+<symbol id="ph-hash" viewBox="0 0 256 256"><path d="M224,88H175.4l8.47-46.57a8,8,0,0,0-15.74-2.86l-9,49.43H111.4l8.47-46.57a8,8,0,0,0-15.74-2.86L95.14,88H48a8,8,0,0,0,0,16H92.23L83.5,152H32a8,8,0,0,0,0,16H80.6l-8.47,46.57a8,8,0,0,0,6.44,9.3A7.79,7.79,0,0,0,80,224a8,8,0,0,0,7.86-6.57l9-49.43H144.6l-8.47,46.57a8,8,0,0,0,6.44,9.3A7.79,7.79,0,0,0,144,224a8,8,0,0,0,7.86-6.57l9-49.43H208a8,8,0,0,0,0-16H163.77l8.73-48H224a8,8,0,0,0,0-16Zm-76.5,64H99.77l8.73-48h47.73Z"/></symbol>
+<symbol id="ph-caret" viewBox="0 0 256 256"><path d="M184.49,136.49l-80,80a12,12,0,0,1-17-17L159,128,87.51,56.49a12,12,0,1,1,17-17l80,80A12,12,0,0,1,184.49,136.49Z"/></symbol>
+<symbol id="ph-question" viewBox="0 0 256 256"><path d="M140,180a12,12,0,1,1-12-12A12,12,0,0,1,140,180ZM128,72c-22.06,0-40,16.15-40,36v4a8,8,0,0,0,16,0v-4c0-11,10.77-20,24-20s24,9,24,20-10.77,20-24,20a8,8,0,0,0-8,8v8a8,8,0,0,0,16,0v-.72c18.24-3.35,32-17.9,32-35.28C168,88.15,150.06,72,128,72Zm104,56A104,104,0,1,1,128,24,104.11,104.11,0,0,1,232,128Zm-16,0a88,88,0,1,0-88,88A88.1,88.1,0,0,0,216,128Z"/></symbol>
+<symbol id="ph-resume" viewBox="0 0 256 256"><path d="M224,128a96,96,0,0,1-94.71,96H128A95.38,95.38,0,0,1,62.1,197.8a8,8,0,0,1,11-11.63A80,80,0,1,0,71.43,71.39a3.07,3.07,0,0,1-.26.25L44.59,96H72a8,8,0,0,1,0,16H24a8,8,0,0,1-8-8V56a8,8,0,0,1,16,0V85.8L60.25,60A96,96,0,0,1,224,128Z"/></symbol>
+<symbol id="ph-trend" viewBox="0 0 256 256"><path d="M240,56v64a8,8,0,0,1-16,0V75.31l-82.34,82.35a8,8,0,0,1-11.32,0L96,123.31,29.66,189.66a8,8,0,0,1-11.32-11.32l72-72a8,8,0,0,1,11.32,0L136,140.69,212.69,64H168a8,8,0,0,1,0-16h64A8,8,0,0,1,240,56Z"/></symbol>
+<symbol id="ph-lightbulb" viewBox="0 0 256 256"><path d="M176,232a8,8,0,0,1-8,8H88a8,8,0,0,1,0-16h80A8,8,0,0,1,176,232Zm40-128a87.55,87.55,0,0,1-33.64,69.21A16.24,16.24,0,0,0,176,186v6a16,16,0,0,1-16,16H96a16,16,0,0,1-16-16v-6a16,16,0,0,0-6.23-12.66A87.59,87.59,0,0,1,40,104.49C39.74,56.83,78.26,17.14,125.88,16A88,88,0,0,1,216,104Zm-16,0a72,72,0,0,0-73.74-72c-39,.92-70.47,33.39-70.26,72.39a71.65,71.65,0,0,0,27.64,56.3A32,32,0,0,1,96,186v6h64v-6a32.15,32.15,0,0,1,12.47-25.35A71.65,71.65,0,0,0,200,104Zm-16.11-9.34a57.6,57.6,0,0,0-46.56-46.55,8,8,0,0,0-2.66,15.78c16.57,2.79,30.63,16.85,33.44,33.45A8,8,0,0,0,176,104a9,9,0,0,0,1.35-.11A8,8,0,0,0,183.89,94.66Z"/></symbol>
+<symbol id="ph-list" viewBox="0 0 256 256"><path d="M80,64a8,8,0,0,1,8-8H216a8,8,0,0,1,0,16H88A8,8,0,0,1,80,64Zm136,56H88a8,8,0,0,0,0,16H216a8,8,0,0,0,0-16Zm0,64H88a8,8,0,0,0,0,16H216a8,8,0,0,0,0-16ZM44,52A12,12,0,1,0,56,64,12,12,0,0,0,44,52Zm0,64a12,12,0,1,0,12,12A12,12,0,0,0,44,116Zm0,64a12,12,0,1,0,12,12A12,12,0,0,0,44,180Z"/></symbol>
+<symbol id="ph-search" viewBox="0 0 256 256"><path d="M229.66,218.34l-50.07-50.06a88.11,88.11,0,1,0-11.31,11.31l50.06,50.07a8,8,0,0,0,11.32-11.32ZM40,112a72,72,0,1,1,72,72A72.08,72.08,0,0,1,40,112Z"/></symbol>
+<symbol id="ph-pencil" viewBox="0 0 256 256"><path d="M227.32,73.37,182.63,28.69a16,16,0,0,0-22.63,0L36.69,152A15.86,15.86,0,0,0,32,163.31V208a16,16,0,0,0,16,16H216a8,8,0,0,0,0-16H115.32l112-112A16,16,0,0,0,227.32,73.37ZM92.69,208H48V163.31l88-88L180.69,120ZM192,108.69,147.32,64l24-24L216,84.69Z"/></symbol>
+<symbol id="ph-moon" viewBox="0 0 256 256"><path d="M233.54,142.23a8,8,0,0,0-8-2,88.08,88.08,0,0,1-109.8-109.8,8,8,0,0,0-10-10,104.84,104.84,0,0,0-52.91,37A104,104,0,0,0,136,224a103.09,103.09,0,0,0,62.52-20.88,104.84,104.84,0,0,0,37-52.91A8,8,0,0,0,233.54,142.23ZM188.9,190.34A88,88,0,0,1,65.66,67.11a89,89,0,0,1,31.4-26A106,106,0,0,0,96,56,104.11,104.11,0,0,0,200,160a106,106,0,0,0,14.92-1.06A89,89,0,0,1,188.9,190.34Z"/></symbol>
+</defs>
+</svg>
+
+<section data-key="home-variants-light" class="sheet theme-light">
+  <h1>Living home · layout variants (light)</h1>
+  <p class="lede">Three layouts for the empty workspace, and the caught-up state. Each shows a different scene so the sheet also shows the scene rule at work. Row one hovered in A.</p>
+  <div class="grid">
+    <div><p class="cap"><b>A · Centred.</b> Scene over the greeting, items in a narrow column, Ask Juno last. The existing empty state, grown up.</p>
+      <div class="frame"><div class="tabstrip"></div><div class="page">
+  <div class="home enter">
+    <svg class="scene scene-ws" aria-hidden="true"><use href="#scene-morning"/></svg>
+    <h2 class="greet">Morning, Tushar.</h2>
+    <p class="sub">Three things want you.</p>
+    <ul class="items">
+      <li><a class="item hover" href="#topic">
+        <span class="tile" style="--hue: var(--hue-jordy)"><svg class="" aria-hidden="true"><use href="#ph-shield"/></svg></span>
+        <span class="item-text">
+          <span class="item-title">Elena asked you something</span>
+          <span class="item-meta">Rina finished the onsite. Panel notes…<span class="sep">·</span>hiring<span class="sep">·</span>12m</span>
+        </span>
+        <svg class="caret" aria-hidden="true"><use href="#ph-caret"/></svg>
+      </a></li>
+      <li><a class="item" href="#topic">
+        <span class="tile" style="--hue: var(--hue-emerald)"><svg class="" aria-hidden="true"><use href="#ph-wrench"/></svg></span>
+        <span class="item-text">
+          <span class="item-title">Pick up where you left off</span>
+          <span class="item-meta">Postgres 16 migration plan<span class="sep">·</span>eng<span class="sep">·</span>Yesterday</span>
+        </span>
+        <svg class="caret" aria-hidden="true"><use href="#ph-caret"/></svg>
+      </a></li>
+      <li><a class="item" href="#topic">
+        <span class="tile" style="--hue: var(--hue-rose)"><svg class="" aria-hidden="true"><use href="#ph-shield"/></svg></span>
+        <span class="item-text">
+          <span class="item-title">Moved a lot since you looked</span>
+          <span class="item-meta">Proposal: cut offline mode and pu…<span class="sep">·</span>product<span class="sep">·</span>14 new</span>
+        </span>
+        <svg class="caret" aria-hidden="true"><use href="#ph-caret"/></svg>
+      </a></li>
+    </ul>
+    <div class="ask" role="button" aria-label="Ask Juno"><svg class="ph" aria-hidden="true"><use href="#ph-sparkle"/></svg><span class="placeholder">Ask Juno…</span><span class="kbd">⌘J</span></div>
+  </div></div></div></div>
+    <div><p class="cap"><b>B · Scene left.</b> The scene sits beside the text like a card, items run full width. Uses the wide window.</p>
+      <div class="frame"><div class="tabstrip"></div><div class="page">
+  <div class="home home-b">
+    <div class="row enter">
+      <svg class="scene scene-ws" aria-hidden="true"><use href="#scene-evening"/></svg>
+      <div>
+        <h2 class="greet">Evening, Tushar.</h2>
+        <p class="sub">Three things want you.</p>
+        <ul class="items">
+      <li><a class="item" href="#topic">
+        <span class="tile" style="--hue: var(--hue-jordy)"><svg class="" aria-hidden="true"><use href="#ph-shield"/></svg></span>
+        <span class="item-text">
+          <span class="item-title">Elena asked you something</span>
+          <span class="item-meta">Rina finished the onsite. Panel notes…<span class="sep">·</span>hiring<span class="sep">·</span>12m</span>
+        </span>
+        <svg class="caret" aria-hidden="true"><use href="#ph-caret"/></svg>
+      </a></li>
+      <li><a class="item" href="#topic">
+        <span class="tile" style="--hue: var(--hue-emerald)"><svg class="" aria-hidden="true"><use href="#ph-wrench"/></svg></span>
+        <span class="item-text">
+          <span class="item-title">Pick up where you left off</span>
+          <span class="item-meta">Postgres 16 migration plan<span class="sep">·</span>eng<span class="sep">·</span>Yesterday</span>
+        </span>
+        <svg class="caret" aria-hidden="true"><use href="#ph-caret"/></svg>
+      </a></li>
+      <li><a class="item" href="#topic">
+        <span class="tile" style="--hue: var(--hue-rose)"><svg class="" aria-hidden="true"><use href="#ph-shield"/></svg></span>
+        <span class="item-text">
+          <span class="item-title">Moved a lot since you looked</span>
+          <span class="item-meta">Proposal: cut offline mode and pu…<span class="sep">·</span>product<span class="sep">·</span>14 new</span>
+        </span>
+        <svg class="caret" aria-hidden="true"><use href="#ph-caret"/></svg>
+      </a></li>
+    </ul>
+        <div class="ask" role="button" aria-label="Ask Juno"><svg class="ph" aria-hidden="true"><use href="#ph-sparkle"/></svg><span class="placeholder">Ask Juno…</span><span class="kbd">⌘J</span></div>
+      </div>
+    </div>
+  </div></div></div></div>
+    <div><p class="cap"><b>C · Compact page.</b> Top-left aligned like For you, a small scene in the header. Dense, less ceremony.</p>
+      <div class="frame"><div class="tabstrip"></div><div class="page">
+  <div class="home home-c enter">
+    <div class="head">
+      <svg class="scene scene-ws" aria-hidden="true"><use href="#scene-friday"/></svg>
+      <div><h2 class="greet">Happy Friday, Tushar.</h2><p class="sub">Three things want you.</p></div>
+    </div>
+    <ul class="items">
+      <li><a class="item" href="#topic">
+        <span class="tile" style="--hue: var(--hue-jordy)"><svg class="" aria-hidden="true"><use href="#ph-shield"/></svg></span>
+        <span class="item-text">
+          <span class="item-title">Elena asked you something</span>
+          <span class="item-meta">Rina finished the onsite. Panel notes…<span class="sep">·</span>hiring<span class="sep">·</span>12m</span>
+        </span>
+        <svg class="caret" aria-hidden="true"><use href="#ph-caret"/></svg>
+      </a></li>
+      <li><a class="item" href="#topic">
+        <span class="tile" style="--hue: var(--hue-emerald)"><svg class="" aria-hidden="true"><use href="#ph-wrench"/></svg></span>
+        <span class="item-text">
+          <span class="item-title">Pick up where you left off</span>
+          <span class="item-meta">Postgres 16 migration plan<span class="sep">·</span>eng<span class="sep">·</span>Yesterday</span>
+        </span>
+        <svg class="caret" aria-hidden="true"><use href="#ph-caret"/></svg>
+      </a></li>
+      <li><a class="item" href="#topic">
+        <span class="tile" style="--hue: var(--hue-rose)"><svg class="" aria-hidden="true"><use href="#ph-shield"/></svg></span>
+        <span class="item-text">
+          <span class="item-title">Moved a lot since you looked</span>
+          <span class="item-meta">Proposal: cut offline mode and pu…<span class="sep">·</span>product<span class="sep">·</span>14 new</span>
+        </span>
+        <svg class="caret" aria-hidden="true"><use href="#ph-caret"/></svg>
+      </a></li>
+    </ul>
+    <div class="ask" role="button" aria-label="Ask Juno"><svg class="ph" aria-hidden="true"><use href="#ph-sparkle"/></svg><span class="placeholder">Ask Juno…</span><span class="kbd">⌘J</span></div>
+  </div></div></div></div>
+    <div><p class="cap"><b>All caught up</b> (in layout A). No items, the figure sinks back, the ask field stays.</p>
+      <div class="frame"><div class="tabstrip"></div><div class="page">
+  <div class="home enter">
+    <svg class="scene scene-ws" aria-hidden="true"><use href="#scene-caught-up"/></svg>
+    <h2 class="greet">All caught up.</h2>
+    <p class="sub">Nothing is waiting on you.</p>
+    <div class="ask" role="button" aria-label="Ask Juno"><svg class="ph" aria-hidden="true"><use href="#ph-sparkle"/></svg><span class="placeholder">Ask Juno…</span><span class="kbd">⌘J</span></div>
+    <a class="quiet-link" href="#all-topics">Browse all topics</a>
+  </div></div></div></div>
+  </div>
+</section>
+
+<section data-key="home-variants-dark" class="sheet theme-dark">
+  <h1>Living home · layout variants (dark)</h1>
+  <p class="lede">Three layouts for the empty workspace, and the caught-up state. Each shows a different scene so the sheet also shows the scene rule at work. Row one hovered in A.</p>
+  <div class="grid">
+    <div><p class="cap"><b>A · Centred.</b> Scene over the greeting, items in a narrow column, Ask Juno last. The existing empty state, grown up.</p>
+      <div class="frame"><div class="tabstrip"></div><div class="page">
+  <div class="home enter">
+    <svg class="scene scene-ws" aria-hidden="true"><use href="#scene-morning"/></svg>
+    <h2 class="greet">Morning, Tushar.</h2>
+    <p class="sub">Three things want you.</p>
+    <ul class="items">
+      <li><a class="item hover" href="#topic">
+        <span class="tile" style="--hue: var(--hue-jordy)"><svg class="" aria-hidden="true"><use href="#ph-shield"/></svg></span>
+        <span class="item-text">
+          <span class="item-title">Elena asked you something</span>
+          <span class="item-meta">Rina finished the onsite. Panel notes…<span class="sep">·</span>hiring<span class="sep">·</span>12m</span>
+        </span>
+        <svg class="caret" aria-hidden="true"><use href="#ph-caret"/></svg>
+      </a></li>
+      <li><a class="item" href="#topic">
+        <span class="tile" style="--hue: var(--hue-emerald)"><svg class="" aria-hidden="true"><use href="#ph-wrench"/></svg></span>
+        <span class="item-text">
+          <span class="item-title">Pick up where you left off</span>
+          <span class="item-meta">Postgres 16 migration plan<span class="sep">·</span>eng<span class="sep">·</span>Yesterday</span>
+        </span>
+        <svg class="caret" aria-hidden="true"><use href="#ph-caret"/></svg>
+      </a></li>
+      <li><a class="item" href="#topic">
+        <span class="tile" style="--hue: var(--hue-rose)"><svg class="" aria-hidden="true"><use href="#ph-shield"/></svg></span>
+        <span class="item-text">
+          <span class="item-title">Moved a lot since you looked</span>
+          <span class="item-meta">Proposal: cut offline mode and pu…<span class="sep">·</span>product<span class="sep">·</span>14 new</span>
+        </span>
+        <svg class="caret" aria-hidden="true"><use href="#ph-caret"/></svg>
+      </a></li>
+    </ul>
+    <div class="ask" role="button" aria-label="Ask Juno"><svg class="ph" aria-hidden="true"><use href="#ph-sparkle"/></svg><span class="placeholder">Ask Juno…</span><span class="kbd">⌘J</span></div>
+  </div></div></div></div>
+    <div><p class="cap"><b>B · Scene left.</b> The scene sits beside the text like a card, items run full width. Uses the wide window.</p>
+      <div class="frame"><div class="tabstrip"></div><div class="page">
+  <div class="home home-b">
+    <div class="row enter">
+      <svg class="scene scene-ws" aria-hidden="true"><use href="#scene-evening"/></svg>
+      <div>
+        <h2 class="greet">Evening, Tushar.</h2>
+        <p class="sub">Three things want you.</p>
+        <ul class="items">
+      <li><a class="item" href="#topic">
+        <span class="tile" style="--hue: var(--hue-jordy)"><svg class="" aria-hidden="true"><use href="#ph-shield"/></svg></span>
+        <span class="item-text">
+          <span class="item-title">Elena asked you something</span>
+          <span class="item-meta">Rina finished the onsite. Panel notes…<span class="sep">·</span>hiring<span class="sep">·</span>12m</span>
+        </span>
+        <svg class="caret" aria-hidden="true"><use href="#ph-caret"/></svg>
+      </a></li>
+      <li><a class="item" href="#topic">
+        <span class="tile" style="--hue: var(--hue-emerald)"><svg class="" aria-hidden="true"><use href="#ph-wrench"/></svg></span>
+        <span class="item-text">
+          <span class="item-title">Pick up where you left off</span>
+          <span class="item-meta">Postgres 16 migration plan<span class="sep">·</span>eng<span class="sep">·</span>Yesterday</span>
+        </span>
+        <svg class="caret" aria-hidden="true"><use href="#ph-caret"/></svg>
+      </a></li>
+      <li><a class="item" href="#topic">
+        <span class="tile" style="--hue: var(--hue-rose)"><svg class="" aria-hidden="true"><use href="#ph-shield"/></svg></span>
+        <span class="item-text">
+          <span class="item-title">Moved a lot since you looked</span>
+          <span class="item-meta">Proposal: cut offline mode and pu…<span class="sep">·</span>product<span class="sep">·</span>14 new</span>
+        </span>
+        <svg class="caret" aria-hidden="true"><use href="#ph-caret"/></svg>
+      </a></li>
+    </ul>
+        <div class="ask" role="button" aria-label="Ask Juno"><svg class="ph" aria-hidden="true"><use href="#ph-sparkle"/></svg><span class="placeholder">Ask Juno…</span><span class="kbd">⌘J</span></div>
+      </div>
+    </div>
+  </div></div></div></div>
+    <div><p class="cap"><b>C · Compact page.</b> Top-left aligned like For you, a small scene in the header. Dense, less ceremony.</p>
+      <div class="frame"><div class="tabstrip"></div><div class="page">
+  <div class="home home-c enter">
+    <div class="head">
+      <svg class="scene scene-ws" aria-hidden="true"><use href="#scene-friday"/></svg>
+      <div><h2 class="greet">Happy Friday, Tushar.</h2><p class="sub">Three things want you.</p></div>
+    </div>
+    <ul class="items">
+      <li><a class="item" href="#topic">
+        <span class="tile" style="--hue: var(--hue-jordy)"><svg class="" aria-hidden="true"><use href="#ph-shield"/></svg></span>
+        <span class="item-text">
+          <span class="item-title">Elena asked you something</span>
+          <span class="item-meta">Rina finished the onsite. Panel notes…<span class="sep">·</span>hiring<span class="sep">·</span>12m</span>
+        </span>
+        <svg class="caret" aria-hidden="true"><use href="#ph-caret"/></svg>
+      </a></li>
+      <li><a class="item" href="#topic">
+        <span class="tile" style="--hue: var(--hue-emerald)"><svg class="" aria-hidden="true"><use href="#ph-wrench"/></svg></span>
+        <span class="item-text">
+          <span class="item-title">Pick up where you left off</span>
+          <span class="item-meta">Postgres 16 migration plan<span class="sep">·</span>eng<span class="sep">·</span>Yesterday</span>
+        </span>
+        <svg class="caret" aria-hidden="true"><use href="#ph-caret"/></svg>
+      </a></li>
+      <li><a class="item" href="#topic">
+        <span class="tile" style="--hue: var(--hue-rose)"><svg class="" aria-hidden="true"><use href="#ph-shield"/></svg></span>
+        <span class="item-text">
+          <span class="item-title">Moved a lot since you looked</span>
+          <span class="item-meta">Proposal: cut offline mode and pu…<span class="sep">·</span>product<span class="sep">·</span>14 new</span>
+        </span>
+        <svg class="caret" aria-hidden="true"><use href="#ph-caret"/></svg>
+      </a></li>
+    </ul>
+    <div class="ask" role="button" aria-label="Ask Juno"><svg class="ph" aria-hidden="true"><use href="#ph-sparkle"/></svg><span class="placeholder">Ask Juno…</span><span class="kbd">⌘J</span></div>
+  </div></div></div></div>
+    <div><p class="cap"><b>All caught up</b> (in layout A). No items, the figure sinks back, the ask field stays.</p>
+      <div class="frame"><div class="tabstrip"></div><div class="page">
+  <div class="home enter">
+    <svg class="scene scene-ws" aria-hidden="true"><use href="#scene-caught-up"/></svg>
+    <h2 class="greet">All caught up.</h2>
+    <p class="sub">Nothing is waiting on you.</p>
+    <div class="ask" role="button" aria-label="Ask Juno"><svg class="ph" aria-hidden="true"><use href="#ph-sparkle"/></svg><span class="placeholder">Ask Juno…</span><span class="kbd">⌘J</span></div>
+    <a class="quiet-link" href="#all-topics">Browse all topics</a>
+  </div></div></div></div>
+  </div>
+</section>
+
+<section data-key="scenes" class="sheet theme-light">
+  <h1>The scenes</h1>
+  <p class="lede">Eight scenes in the logo's language: the seated j at its own weight, props at stroke 4 with round caps, one flat warm layer. Shown at the workspace size (120px) in light and dark, then the parts.</p>
+  <div class="strip strip-light theme-light">
+    <div class="cell"><svg class="scene" aria-hidden="true"><use href="#scene-morning"/></svg><div class="name"><b>Morning</b>5 to 11 · coffee</div></div>
+    <div class="cell"><svg class="scene" aria-hidden="true"><use href="#scene-midday"/></svg><div class="name"><b>Midday</b>11 to 17 · at the laptop</div></div>
+    <div class="cell"><svg class="scene" aria-hidden="true"><use href="#scene-evening"/></svg><div class="name"><b>Evening</b>17 to 22 · leaning back, laptop closed</div></div>
+    <div class="cell"><svg class="scene" aria-hidden="true"><use href="#scene-night"/></svg><div class="name"><b>Late night</b>22 to 5 · a moon</div></div>
+    <div class="cell"><svg class="scene" aria-hidden="true"><use href="#scene-friday"/></svg><div class="name"><b>Friday</b>any daytime hour · a plant</div></div>
+    <div class="cell"><svg class="scene" aria-hidden="true"><use href="#scene-winter"/></svg><div class="name"><b>Winter</b>seasonal, rare · snowflake</div></div>
+    <div class="cell"><svg class="scene" aria-hidden="true"><use href="#scene-autumn"/></svg><div class="name"><b>Autumn</b>seasonal, rare · a leaf</div></div>
+    <div class="cell"><svg class="scene" aria-hidden="true"><use href="#scene-caught-up"/></svg><div class="name"><b>All caught up</b>nothing waiting · sunk back</div></div>
+  </div>
+  <div class="strip strip-dark theme-dark">
+    <div class="cell"><svg class="scene" aria-hidden="true"><use href="#scene-morning"/></svg><div class="name"><b>Morning</b>5 to 11 · coffee</div></div>
+    <div class="cell"><svg class="scene" aria-hidden="true"><use href="#scene-midday"/></svg><div class="name"><b>Midday</b>11 to 17 · at the laptop</div></div>
+    <div class="cell"><svg class="scene" aria-hidden="true"><use href="#scene-evening"/></svg><div class="name"><b>Evening</b>17 to 22 · leaning back, laptop closed</div></div>
+    <div class="cell"><svg class="scene" aria-hidden="true"><use href="#scene-night"/></svg><div class="name"><b>Late night</b>22 to 5 · a moon</div></div>
+    <div class="cell"><svg class="scene" aria-hidden="true"><use href="#scene-friday"/></svg><div class="name"><b>Friday</b>any daytime hour · a plant</div></div>
+    <div class="cell"><svg class="scene" aria-hidden="true"><use href="#scene-winter"/></svg><div class="name"><b>Winter</b>seasonal, rare · snowflake</div></div>
+    <div class="cell"><svg class="scene" aria-hidden="true"><use href="#scene-autumn"/></svg><div class="name"><b>Autumn</b>seasonal, rare · a leaf</div></div>
+    <div class="cell"><svg class="scene" aria-hidden="true"><use href="#scene-caught-up"/></svg><div class="name"><b>All caught up</b>nothing waiting · sunk back</div></div>
+  </div>
+  <div class="marks theme-light">
+    <div class="m"><svg width="64" height="64" viewBox="0 0 64 64"><use href="#fig-up"/><use href="#laptop-open"/></svg>the logo</div>
+    <div class="m"><svg width="64" height="64" viewBox="0 0 64 64"><use href="#fig-up"/></svg>upright</div>
+    <div class="m"><svg width="64" height="64" viewBox="0 0 64 64"><use href="#fig-lean"/></svg>leaning</div>
+    <div class="m"><svg width="64" height="64" viewBox="0 0 64 64"><use href="#fig-sink"/></svg>sunk back</div>
+    <div class="m"><svg width="64" height="64" viewBox="0 0 64 64"><use href="#laptop-open"/></svg>laptop open</div>
+    <div class="m"><svg width="64" height="64" viewBox="0 0 64 64"><use href="#laptop-closed"/></svg>laptop closed</div>
+    <div class="m"><svg width="64" height="64" viewBox="0 0 64 64"><g transform="translate(18 8)"><use href="#mug"/></g></svg>mug</div>
+  </div>
+</section>
+
+<section data-key="in-context-light" class="theme-light"><div class="wrap">
+  <div class="window">
+    <div class="sidebar-shot"><img src="../screens/sidebar-light.png" alt=""></div>
+    <div class="workspace"><div class="tabstrip"></div><div class="page">
+  <div class="home enter">
+    <svg class="scene scene-ws" aria-hidden="true"><use href="#scene-morning"/></svg>
+    <h2 class="greet">Morning, Tushar.</h2>
+    <p class="sub">Two things want you.</p>
+    <ul class="items">
+      <li><a class="item" href="#topic">
+        <span class="tile" style="--hue: var(--hue-jordy)"><svg class="" aria-hidden="true"><use href="#ph-shield"/></svg></span>
+        <span class="item-text">
+          <span class="item-title">Elena asked you something</span>
+          <span class="item-meta">Rina finished the onsite. Panel notes…<span class="sep">·</span>hiring<span class="sep">·</span>12m</span>
+        </span>
+        <svg class="caret" aria-hidden="true"><use href="#ph-caret"/></svg>
+      </a></li>
+      <li><a class="item" href="#topic">
+        <span class="tile" style="--hue: var(--hue-emerald)"><svg class="" aria-hidden="true"><use href="#ph-wrench"/></svg></span>
+        <span class="item-text">
+          <span class="item-title">Pick up where you left off</span>
+          <span class="item-meta">Postgres 16 migration plan<span class="sep">·</span>eng<span class="sep">·</span>Yesterday</span>
+        </span>
+        <svg class="caret" aria-hidden="true"><use href="#ph-caret"/></svg>
+      </a></li>
+    </ul>
+    <div class="ask" role="button" aria-label="Ask Juno"><svg class="ph" aria-hidden="true"><use href="#ph-sparkle"/></svg><span class="placeholder">Ask Juno…</span><span class="kbd">⌘J</span></div>
+  </div></div></div>
+  </div>
+</div></section>
+
+<section data-key="in-context-dark" class="theme-dark"><div class="wrap">
+  <div class="window">
+    <div class="sidebar-shot"><img src="../screens/sidebar-dark.png" alt=""></div>
+    <div class="workspace"><div class="tabstrip"></div><div class="page">
+  <div class="home enter">
+    <svg class="scene scene-ws" aria-hidden="true"><use href="#scene-night"/></svg>
+    <h2 class="greet">Still up, Tushar.</h2>
+    <p class="sub">One thing wants you.</p>
+    <ul class="items">
+      <li><a class="item" href="#topic">
+        <span class="tile" style="--hue: var(--hue-jordy)"><svg class="" aria-hidden="true"><use href="#ph-shield"/></svg></span>
+        <span class="item-text">
+          <span class="item-title">Elena asked you something</span>
+          <span class="item-meta">Rina finished the onsite. Panel notes…<span class="sep">·</span>hiring<span class="sep">·</span>12m</span>
+        </span>
+        <svg class="caret" aria-hidden="true"><use href="#ph-caret"/></svg>
+      </a></li>
+    </ul>
+    <div class="ask" role="button" aria-label="Ask Juno"><svg class="ph" aria-hidden="true"><use href="#ph-sparkle"/></svg><span class="placeholder">Ask Juno…</span><span class="kbd">⌘J</span></div>
+  </div></div></div>
+  </div>
+</div></section>
+</body>
+</html>
