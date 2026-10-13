@@ -1,0 +1,22 @@
+{
+  "name": "@juno/topic-art",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Topic art as a vocabulary: the whitelist parser for the model's recipe, the renderer that rebuilds SVG from the checked recipe, and the Tide pebble placeholder. Pure functions, no dependencies.",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3",
+    "vitest": "5.0.4"
+  },
+  "juno": {
+    "allowedDeps": []
+  }
+}
