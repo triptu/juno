@@ -4,6 +4,11 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-13 23:38 · Tushar · Topic art sits with no container. Art-directed constrained drawing on Gemini 3.8 Flash.
+- 10-13 23:38 · Tushar · Main's active threads are behind a "Threads" button in Main's header.
+- 10-13 23:38 · Tushar · Opening a topic marks it read; later messages mark read only at the bottom of a focused window; stealth never marks.
+- 10-13 23:38 · Tushar · Read marks are not mirrored to the real Slack workspace until turned on in a setting.
+- 10-13 23:38 · Orchestrator · Image thumbnails move from M6 into M4.
 - 10-13 23:10 · Orchestrator · The Quint follow spec, aligned with the implementation, found three ways an accepted Unsubscribe could be undone (a delayed followed event, a page requested during the command, a lost response plus a failed lookup). Fixing them in sync and making `acceptedUnfollow` pass; the old behaviour stays as bug-mode counterexamples.
 - 10-13 22:31 · Orchestrator · Follow checks cover the quiet window plus per-thread lookups on new replies, not the whole follow list (the real workspace follows more than 9,000 threads). Merged M3 fixes A and B; main green.
 - 10-13 22:04 · Orchestrator · AI decision tier: TypeSafe `jev-1.13` via `classify` for route check, settled and the notification gate (516 ms p50, 100% on examples, about $0.03 per 1k); `openai/gpt-6-luna` for grouping and ⌘K parsing; Sonnet 5.5 for generation. Tool choice forced on decisions, auto on generation. Final live eval 32/33.
