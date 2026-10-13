@@ -33,3 +33,4 @@ Small items noticed during work that are not yet assigned to a milestone. Remove
 - Engine: `unreadExact` is false (shown as "9+") whenever synced history stops short of the read pointer, even when the full history is stored. Fix the coverage check, then restore the exact count assertion in the sidebar e2e (#alerts-prod Main shows "9").
 - Main rows: engine field for "threads started since Main was last read" (contract + topics query), wired to the TopicRow `newThreads` prop. After M4 WP1 merges.
 - Topic art track: placeholder is a library of free-form Tide-style shapes picked per topic, no container (owner decision 10-13).
+- Flaky: the sidebar hover layout-shift e2e test failed once during the unfollow-fix run and passed on rerun. Investigate in the maintenance pass.
