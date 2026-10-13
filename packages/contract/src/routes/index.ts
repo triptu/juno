@@ -4,7 +4,8 @@
  */
 import { EngineRoutes } from './engine'
 import { SessionRoutes } from './session'
+import { TopicsRoutes } from './topics'
 
-export const AllRoutes = EngineRoutes.merge(SessionRoutes)
+export const AllRoutes = EngineRoutes.merge(SessionRoutes).merge(TopicsRoutes)
 
 export type AllRoutes = typeof AllRoutes
