@@ -135,40 +135,62 @@ test('scroll frame times on a large workspace', async () => {
       const list = juno.sidebar.list
       const box = (await list.boundingBox())!
       await win.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
-      const longBefore = await win.evaluate(() => (window as unknown as { __juno: { perf: { longFrames: number } } }).__juno.perf.longFrames)
-      // A frame sampler for the length of the scroll.
+      // Long animation frames with their scripts, so a slow frame can be explained.
       await win.evaluate(() => {
-        const w = window as unknown as { __frames: number[]; __sampling: boolean }
-        w.__frames = []
-        w.__sampling = true
-        let last = performance.now()
-        const tick = (now: number) => {
-          w.__frames.push(now - last)
-          last = now
-          if (w.__sampling) requestAnimationFrame(tick)
+        const w = window as unknown as { __loaf: string[] }
+        w.__loaf = []
+        new PerformanceObserver((entries) => {
+          for (const entry of entries.getEntries()) {
+            const detail = entry as PerformanceEntry & { blockingDuration?: number; scripts?: ReadonlyArray<{ duration: number; invoker: string; sourceURL: string; sourceFunctionName: string; sourceCharPosition: number }> }
+            const scripts = (detail.scripts ?? []).map((script) => `${script.invoker} ${script.sourceFunctionName || '?'}@${script.sourceURL.split('/').pop()}:${script.sourceCharPosition} ${script.duration.toFixed(0)}ms`)
+            w.__loaf.push(`+${Math.round(entry.startTime)}ms ${entry.duration.toFixed(0)}ms blocking ${(detail.blockingDuration ?? 0).toFixed(0)}ms [${scripts.join('; ')}]`)
+          }
+        }).observe({ type: 'long-animation-frame', buffered: false })
+      })
+      const sweep = async (label: string) => {
+        await win.evaluate(() => {
+          const w = window as unknown as { __frames: number[]; __sampling: boolean }
+          w.__frames = []
+          w.__sampling = true
+          let last = performance.now()
+          const tick = (now: number) => {
+            w.__frames.push(now - last)
+            last = now
+            if (w.__sampling) requestAnimationFrame(tick)
+          }
+          requestAnimationFrame(tick)
+        })
+        // About 2 000 px/s for 3 s, down then up.
+        for (let i = 0; i < 30; i++) {
+          await win.mouse.wheel(0, 200)
+          await win.waitForTimeout(100)
         }
-        requestAnimationFrame(tick)
-      })
-      // About 2 000 px/s for 3 s, down then up.
-      for (let i = 0; i < 30; i++) {
-        await win.mouse.wheel(0, 200)
-        await win.waitForTimeout(100)
+        for (let i = 0; i < 30; i++) {
+          await win.mouse.wheel(0, -200)
+          await win.waitForTimeout(100)
+        }
+        const frames = await win.evaluate(() => {
+          const w = window as unknown as { __frames: number[]; __sampling: boolean }
+          w.__sampling = false
+          return w.__frames.slice(1)
+        })
+        const loaf = await win.evaluate(() => {
+          const w = window as unknown as { __loaf: string[] }
+          const out = w.__loaf
+          w.__loaf = []
+          return out
+        })
+        const sorted = frames.toSorted((a, b) => a - b)
+        const p95 = sorted[Math.floor(0.95 * sorted.length)] ?? 0
+        const max = sorted[sorted.length - 1] ?? 0
+        const over = frames.filter((f) => f > 16.7 * 1.5).length
+        console.log(`scroll ${label}: ${frames.length} frames, p95 ${p95.toFixed(1)} ms, max ${max.toFixed(1)} ms, frames over 25 ms ${over}, long animation frames ${loaf.length}`)
+        for (const line of loaf) console.log(`  loaf ${line}`)
       }
-      for (let i = 0; i < 30; i++) {
-        await win.mouse.wheel(0, -200)
-        await win.waitForTimeout(100)
-      }
-      const frames = await win.evaluate(() => {
-        const w = window as unknown as { __frames: number[]; __sampling: boolean }
-        w.__sampling = false
-        return w.__frames.slice(1)
-      })
-      const longAfter = await win.evaluate(() => (window as unknown as { __juno: { perf: { longFrames: number } } }).__juno.perf.longFrames)
-      const sorted = frames.toSorted((a, b) => a - b)
-      const p95 = sorted[Math.floor(0.95 * sorted.length)] ?? 0
-      const max = sorted[sorted.length - 1] ?? 0
-      const over = frames.filter((f) => f > 16.7 * 1.5).length
-      console.log(`scroll: ${frames.length} frames, p95 ${p95.toFixed(1)} ms, max ${max.toFixed(1)} ms, frames over 25 ms ${over}, long animation frames ${longAfter - longBefore}`)
+      // The first pass lays out rows the window has never shown; the second is the steady state.
+      await sweep('first pass')
+      await win.waitForTimeout(1000)
+      await sweep('second pass')
       console.log(`scrollTop after the run: ${await list.evaluate((node) => node.scrollTop)}`)
     } finally {
       await running.close()
