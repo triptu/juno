@@ -1,4 +1,5 @@
 export { AppInfoView, type AppInfoViewProps } from './AppInfoView'
+export { ChannelIconPicker, type ChannelIconPickerProps } from './ChannelIconPicker'
 export { EngineStatusView, type EngineStatusViewProps } from './EngineStatusView'
 export { SessionView, type SessionViewProps } from './SessionView'
 export { SignInView, type SignInViewProps } from './SignInView'

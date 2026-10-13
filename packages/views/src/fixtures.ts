@@ -4,6 +4,7 @@
  */
 import type { FixtureSet } from '@juno/ui'
 import AppInfoView from './AppInfoView.fixtures'
+import ChannelIconPicker from './ChannelIconPicker.fixtures'
 import EngineStatusView from './EngineStatusView.fixtures'
 import SessionView from './SessionView.fixtures'
 import SignInView from './SignInView.fixtures'
@@ -13,6 +14,7 @@ import ThemeToggleView from './ThemeToggleView.fixtures'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   AppInfoView,
+  ChannelIconPicker,
   EngineStatusView,
   SessionView,
   Shell,
