@@ -64,7 +64,7 @@ describe('cold boot', () => {
     const postgres = byTitle('Draft plan is in the doc.…')
     expect(postgres).toMatchObject({
       kind: 'thread',
-      preview: { sender: 'Dev', text: 'Booked 2–4pm. Will post results here.', line: 'Dev: Booked 2–4pm. Will post results here.' },
+      preview: { sender: 'Dev', text: 'Booked 2–4pm. Will post results here.' },
       channel: { id: 'C0ENG', kind: 'public', name: 'eng', label: '#eng', tint: 'public' },
       messageCount: 7,
       unreadCount: 0,
@@ -81,7 +81,7 @@ describe('cold boot', () => {
     // Main is "subscribed" until the user unsubscribes it (a client-only flag).
     const eng = byTitle('#eng')
     expect(eng).toMatchObject({ kind: 'main', tags: ['main'], unreadCount: 2, unreadExact: true, mentionsMe: false, subscribed: true })
-    expect(eng?.preview.line).toBe('Dev: @Leo I think the preview environments never shut down. Will check.')
+    expect(eng?.preview).toEqual({ sender: 'Dev', text: '@Leo I think the preview environments never shut down. Will check.' })
     expect(eng?.channel.icon).toBeTruthy()
     expect(eng?.channel.color).toBeTruthy()
 
@@ -275,7 +275,7 @@ describe('realtime', () => {
 
     const after = await engine.rowsUntil((rows) => rows[0]?.id === postgres.id && rows[0].messageCount === 8, 'the reply on top')
     expect(after[0]).toMatchObject({
-      preview: { line: 'Leo: Dry run passed. @Tushar we are good for Thursday.' },
+      preview: { sender: 'Leo', text: 'Dry run passed. @Tushar we are good for Thursday.' },
       unreadCount: 1,
       unreadExact: true,
       mentionsMe: true,
@@ -307,7 +307,7 @@ describe('realtime', () => {
 
     engine.fake.injectMessage({ channel: 'C0PRODUCT', user: 'U0MAYA', text: 'Legal signed off.', threadTs: pricing.id.split(':')[2]! })
     const after = await engine.rowsUntil((rows) => rows.find((r) => r.id === pricing.id)?.tags.includes('reopened') === true, 'the reopened tag')
-    expect(after.find((r) => r.id === pricing.id)).toMatchObject({ tags: ['reopened'], resolved: false, preview: { line: 'Maya: Legal signed off.' } })
+    expect(after.find((r) => r.id === pricing.id)).toMatchObject({ tags: ['reopened'], resolved: false, preview: { sender: 'Maya', text: 'Legal signed off.' } })
   })
 
   it('an edit and a delete reach the row through the merge guards', async () => {
@@ -319,7 +319,7 @@ describe('realtime', () => {
     await engine.rowsUntil((rows) => rows[0]?.preview.text === 'typo here', 'the edit')
     engine.fake.deleteMessage({ channel: 'D0SAM', ts: posted.ts })
     const rows = await engine.rowsUntil((list) => list.find((r) => r.title === 'Sam')?.preview.text !== 'typo here', 'the delete')
-    expect(rows.find((r) => r.title === 'Sam')?.preview.line).toBe('Sam: Notes from today: promo packet for Dev, on-call load, Q1 planning.')
+    expect(rows.find((r) => r.title === 'Sam')?.preview).toEqual({ sender: 'Sam', text: 'Notes from today: promo packet for Dev, on-call load, Q1 planning.' })
   })
 
   it('goes offline while the socket is down and comes back live after a reconnect', async () => {
@@ -372,7 +372,7 @@ describe('subscriptions (spec section 5, "Subscribe works on any thread")', () =
     const id = threadId(engine, 'C0ENG', 'checkout.spec')
     engine.fake.injectMessage({ channel: 'C0ENG', user: SELF_ID, text: 'Yes, until Friday.', threadTs: id.split(':')[2]! })
     const rows = await engine.rowsUntil((list) => list.some((r) => r.id === id), 'the thread the user replied in')
-    expect(rows.find((r) => r.id === id)).toMatchObject({ subscribed: true, messageCount: 7, tags: [], preview: { line: 'You: Yes, until Friday.' } })
+    expect(rows.find((r) => r.id === id)).toMatchObject({ subscribed: true, messageCount: 7, tags: [], preview: { sender: 'You', text: 'Yes, until Friday.' } })
   })
 
   it('an unfollow from another client arrives as an event and removes the row', async () => {
