@@ -242,8 +242,8 @@ export class FakeSlack {
    * request has started (its `requestedAt` is set), the events arrive, then
    * the page lands.
    */
-  holdNext(input: { method: string; times?: number }): void {
-    this.server.holdNext(input.method, input.times ?? 1)
+  holdNext(input: { method: string; times?: number; before?: boolean }): void {
+    this.server.holdNext(input.method, input.times ?? 1, input.before ?? false)
   }
 
   /** Answers the held calls of `method`, or of every method. */
@@ -258,6 +258,29 @@ export class FakeSlack {
   /** The arguments of the held calls, oldest first. */
   heldCalls(input: { method?: string } = {}): ReadonlyArray<Record<string, unknown>> {
     return this.server.heldCalls(input.method)
+  }
+
+  /**
+   * The next `times` calls of `method` change Slack, then the connection
+   * closes with no answer: Slack accepted a call whose answer was lost. The
+   * client retries a lost answer, so lose every attempt to fail the call.
+   */
+  loseResponse(input: { method: string; times?: number }): void {
+    this.server.loseResponse(input.method, input.times ?? 1)
+  }
+
+  /** Frames of these types wait for `releaseFrames`, so a test can deliver an event late or never. */
+  holdFrames(input: { types: ReadonlyArray<string> }): void {
+    this.server.holdFrames(input.types)
+  }
+
+  /** Sends (or with `drop`, discards) the oldest `count` held frames; all of them, and stop holding, when `count` is omitted. */
+  releaseFrames(input: { count?: number; drop?: boolean } = {}): void {
+    this.server.releaseFrames(input.count, input.drop ?? false)
+  }
+
+  heldFrames(): ReadonlyArray<RtmFrame> {
+    return this.server.heldFrames()
   }
 
   /** Every session stops working: API calls get `invalid_auth`, sockets get `user_session_expiration` and close. */
@@ -303,6 +326,10 @@ export class FakeSlack {
       release: (i) => this.release(i),
       heldCount: (i) => this.heldCount(i),
       heldCalls: (i) => this.heldCalls(i),
+      loseResponse: (i) => this.loseResponse(i),
+      holdFrames: (i) => this.holdFrames(i),
+      releaseFrames: (i) => this.releaseFrames(i),
+      heldFrames: () => this.heldFrames(),
       expireSession: () => this.expireSession(),
       advanceClock: (i) => this.advanceClock(i),
       setNow: (i) => this.setNow(i),
