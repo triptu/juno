@@ -1,5 +1,5 @@
 import { defineFixtures, scene, type FixtureFrame } from '@juno/ui'
-import { newThreadsById, NOW, rows } from './fixtures/topics'
+import { art, newThreadsById, NOW, rows } from './fixtures/topics'
 import { relativeTime } from './time'
 import { TopicRow, type TopicRowProps } from './TopicRow'
 
@@ -39,6 +39,16 @@ export default defineFixtures(
       mention: state(rows.hiring),
       selected: state(rows.postgres, { selected: true }),
       'selected-unread': state(rows.roadmap, { selected: true }),
+    },
+    Tile: {
+      art: state(rows.postgres),
+      placeholder: state({ ...rows.postgres, art: undefined }),
+      'dm-thread-art': state(rows.offsite),
+      'dm-main-photo': state(rows.mayaMain),
+      'main-art': state(rows.alertsMain),
+      'main-placeholder': state({ ...rows.alertsMain, art: undefined }),
+      'placeholder-quiet': state(rows.notes),
+      'art-quiet': state({ ...rows.flags, art: art.coins }),
     },
     Kind: {
       main: state(rows.alertsMain),

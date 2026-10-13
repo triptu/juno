@@ -22,6 +22,7 @@ Import tokens through the subpath, never a barrel: `import { colors } from '@jun
 | `accentSwatches` | `--swatch-<accent>` / `-fg` | the eight fills for the accent picker, with a dark override |
 | `tints` | `--tint-<context>-bg` / `-fg` | `public`, `private`, `dm`, `resolved`, `warning`, `mention` |
 | `hues` | `--hue-<name>` | the eight person colours for avatars |
+| `art` | `--art-<hue>-<role>`, `--tide-<hue>-<tone>` | topic art: four roles and five Tide tones per hue, written by `@juno/topic-art`; dark values in `darkArt` |
 | `shadows` | `--shadow-*`, `--card-ring`, `--pop-shadow` | drop shadows and the rings floating surfaces use instead of borders |
 | `radii` | `--radius-<step>` | `xs` 4 to `bubble` 16 and `full` |
 | `spacing` | `--space-<n>` | 4px scale in px, with `0-5` (2px), `1-5` (6px), `2-5` (10px), `3-5` (14px) |

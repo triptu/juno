@@ -348,6 +348,9 @@ importers:
       '@juno/domain':
         specifier: workspace:*
         version: link:../domain
+      '@juno/topic-art':
+        specifier: workspace:*
+        version: link:../topic-art
       effect:
         specifier: 4.0.3
         version: 4.0.3
@@ -399,6 +402,9 @@ importers:
 
   packages/engine:
     dependencies:
+      '@juno/ai':
+        specifier: workspace:*
+        version: link:../ai
       '@juno/contract':
         specifier: workspace:*
         version: link:../contract
@@ -417,6 +423,9 @@ importers:
       '@juno/sync':
         specifier: workspace:*
         version: link:../sync
+      '@juno/topic-art':
+        specifier: workspace:*
+        version: link:../topic-art
       effect:
         specifier: 4.0.3
         version: 4.0.3
@@ -646,11 +655,23 @@ importers:
         specifier: 5.9.3
         version: 5.9.3
 
+  packages/topic-art:
+    devDependencies:
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: 5.0.4
+        version: 5.0.4(@types/node@24.19.2)(vite@7.3.7(@types/node@24.19.2)(jiti@2.7.0)(lightningcss@1.33.0)(yaml@2.9.1))
+
   packages/ui:
     dependencies:
       '@juno/tokens':
         specifier: workspace:*
         version: link:../tokens
+      '@juno/topic-art':
+        specifier: workspace:*
+        version: link:../topic-art
       '@phosphor-icons/react':
         specifier: 2.1.10
         version: 2.1.10(react-dom@19.3.0(react@19.3.0))(react@19.3.0)

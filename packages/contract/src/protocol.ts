@@ -24,6 +24,10 @@ export const EngineConfig = Schema.Struct({
   dev: Schema.Boolean,
   /** Tests only: the fake Slack's base URL, so its host is allowed for the socket. */
   fakeSlackUrl: Schema.optionalKey(Schema.String),
+  /** Which AI provider the engine builds: the deterministic fake (tests, `JUNO_AI=fake`) or pi-ai over OpenRouter. */
+  ai: Schema.optionalKey(Schema.Literals(['fake', 'live'])),
+  /** The OpenRouter key, in memory, for the live provider. Absent means every AI task answers "no decision" (ADR 0006). */
+  openRouterApiKey: Schema.optionalKey(Schema.String),
 })
 export type EngineConfig = typeof EngineConfig.Type
 

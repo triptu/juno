@@ -8,7 +8,7 @@
  *   which every message write fires for each topic that shows the message),
  *   `users`, `conversations` and `emoji` for the names and images bodies
  *   use, `topic_overlay` for thread titles, `team` for the signed-in user;
- * - `topics.get`: its index row, overlay and read state by id, the
+ * - `topics.get`: its index row, overlay, art and read state by id, the
  *   conversation, the follow flags, users and prefs, and for Main every
  *   topic (its thread count);
  * - `channel.threads`: topics, overlays, follow flags, users and prefs.
@@ -130,8 +130,8 @@ export const MessagesHandlers = MessagesRoutes.toLayer(
         if (target === undefined) return Stream.die(new Error(`topics.get: ${payload.id} is not a topic id`))
         const keys: InvalidationKeys =
           target.kind === 'main'
-            ? ['topics', 'conversations', 'thread_subs', 'users', 'prefs', 'team', 'ignored_channels', 'topic_overlay', 'topic_reads']
-            : { topics: [payload.id], topic_overlay: [payload.id], topic_reads: [payload.id], conversations: [], thread_subs: [], users: [], prefs: [], team: [], messages: [payload.id] }
+            ? ['topics', 'conversations', 'thread_subs', 'users', 'prefs', 'team', 'ignored_channels', 'topic_overlay', 'topic_reads', 'topic_art']
+            : { topics: [payload.id], topic_overlay: [payload.id], topic_reads: [payload.id], conversations: [], thread_subs: [], users: [], prefs: [], team: [], messages: [payload.id], topic_art: [] }
         const setup = Effect.succeed(Effect.flatMap(now, (at) => topicDetail(payload.id, target, at)))
         const served = serveLiveValue(runs(keys, setup), { measure }).pipe(retryFirstRun('topics.get'), Stream.orDie)
         // Shown for as long as the header is subscribed.

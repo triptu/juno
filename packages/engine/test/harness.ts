@@ -167,7 +167,7 @@ export async function startTestEngine(options: EngineOptions = {}): Promise<Runn
   const userData = options.reuse?.userData ?? join(tmpdir(), `juno-engine-test-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`)
   await mkdir(userData, { recursive: true })
   const transport = memoryTransport()
-  const handle = await startEngine(transport, { userData, e2e: true, dev: false, fakeSlackUrl: fake.url }, { host: main.host, httpTransport: main.httpTransport })
+  const handle = await startEngine(transport, { userData, e2e: true, dev: false, fakeSlackUrl: fake.url, ai: 'fake' }, { host: main.host, httpTransport: main.httpTransport })
   const registry = makeRegistry()
   configureConnection(registry, {
     acquire: async () => {

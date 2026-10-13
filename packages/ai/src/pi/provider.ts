@@ -32,10 +32,13 @@ export { OPENROUTER, openRouterModels, resolveClassifier, resolveModel, type PiM
 
 const DECISION_MAX_TOKENS = 1024
 const GENERATION_MAX_TOKENS = 2048
+/** A drawing is 400 to 900 bytes, but a reasoning model spends most of its output thinking before it (median 600 to 1,000 tokens). */
+const ART_MAX_TOKENS = 4096
 
 type Outcome<A> =
   | { readonly kind: 'ok'; readonly value: A }
-  | { readonly kind: NoDecisionReason; readonly detail?: string }
+  /** `raw` is the answer that failed, so a retry can show it back with the reason. */
+  | { readonly kind: NoDecisionReason; readonly detail?: string; readonly raw?: string }
 
 /** How the tool call is asked for. `forced` is fastest; `auto` relies on the prompt's "answer by calling the tool". */
 export type ToolChoiceMode = 'forced' | 'auto'
@@ -47,6 +50,8 @@ interface Request<A> {
   readonly toolChoice: ToolChoiceMode
   readonly maxTokens: number
   readonly read: (message: AssistantMessage) => Outcome<A>
+  /** When set, a retry after invalid output continues the conversation: the failed answer, then this message with the reason. */
+  readonly retry?: ((reason: string) => string) | undefined
 }
 
 /** One decision: up to two attempts inside the task's timeout, then a `Decision` with its meta. */
@@ -82,9 +87,9 @@ export class PiAiProvider extends AiProvider {
 }
 
 export function makePiAiProvider(readConfig: Effect.Effect<AiConfig>, models: PiModels): AiProviderShape {
-  const complete = (request: Request<unknown>, apiKey: string, toolChoice: ToolChoiceMode) =>
+  const complete = (request: Request<unknown>, apiKey: string, toolChoice: ToolChoiceMode, context: PiContext) =>
     Effect.tryPromise((signal) => {
-      const { model, context, tool, maxTokens } = request
+      const { model, tool, maxTokens } = request
       const base = { apiKey, signal, maxTokens, maxRetries: 0 }
       if (hasApi(model, 'anthropic-messages')) {
         return models.complete(model, context, {
@@ -110,7 +115,7 @@ export function makePiAiProvider(readConfig: Effect.Effect<AiConfig>, models: Pi
     (previous, cost) =>
       Effect.gen(function* () {
         const toolChoice = rejectsForcedToolChoice(previous) ? 'auto' : request.toolChoice
-        const result = yield* Effect.result(complete(request, apiKey, toolChoice))
+        const result = yield* Effect.result(complete(request, apiKey, toolChoice, retryContext(request, previous)))
         if (result._tag === 'Failure') return { kind: 'provider-error', detail: String(result.failure.cause) } as Outcome<A>
         const message = result.success
         cost.usd += message.usage.cost.total
@@ -173,11 +178,16 @@ export function makePiAiProvider(readConfig: Effect.Effect<AiConfig>, models: Pi
       const request: Request<string> = {
         model,
         toolChoice: 'auto',
-        maxTokens: GENERATION_MAX_TOKENS,
+        maxTokens: task.tier === 'art' ? ART_MAX_TOKENS : GENERATION_MAX_TOKENS,
         context: { systemPrompt: task.prompt, messages: [userMessage(task.render(input))] },
+        retry: task.retry,
         read: (message) => {
-          const text = cleanText(task, textOf(message))
-          return text === undefined ? { kind: 'invalid-output', detail: 'empty answer' } : { kind: 'ok', value: text }
+          const raw = textOf(message)
+          const text = cleanText(task, raw)
+          if (text === undefined) return { kind: 'invalid-output', detail: 'empty answer', raw }
+          if (task.check === undefined) return { kind: 'ok', value: text }
+          const checked = task.check(text, input)
+          return checked.ok ? { kind: 'ok', value: checked.value } : { kind: 'invalid-output', detail: checked.message, raw }
         },
       }
       return yield* run<string>({ modelId: model.id, priced, timeoutMillis: task.timeoutMillis, started, attempt: chatAttempt(request, config.apiKey) })
@@ -273,6 +283,26 @@ function run<A>(call: Call<A>): Effect.Effect<Decision<A>> {
     if (value.kind === 'ok') return { _tag: 'Decided', value: value.value, meta }
     return { _tag: 'NoDecision', reason: value.kind, detail: value.detail, meta }
   })
+}
+
+/**
+ * The context of an attempt. After invalid output, a task with a retry
+ * message continues the conversation (the failed answer, then the reason),
+ * so the model corrects one thing instead of starting over.
+ */
+function retryContext<A>(request: Request<A>, previous: Outcome<A> | undefined): PiContext {
+  if (request.retry === undefined || previous === undefined || previous.kind !== 'invalid-output' || previous.raw === undefined) return request.context
+  const assistant: PiMessage = {
+    role: 'assistant',
+    content: [{ type: 'text', text: previous.raw }],
+    api: request.model.api,
+    provider: OPENROUTER,
+    model: request.model.id,
+    usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
+    stopReason: 'stop',
+    timestamp: Date.now(),
+  }
+  return { ...request.context, messages: [...request.context.messages, assistant, userMessage(request.retry(previous.detail ?? 'the answer did not validate'))] }
 }
 
 function noKey(model: string, started: number): Decision<never> {

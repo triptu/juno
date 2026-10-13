@@ -26,7 +26,7 @@
  * starts it again with backoff instead.
  */
 import { Clock, Effect, Option, Result, Schedule, Stream } from 'effect'
-import { LIVE_DELTA_MAX_BYTES, LIVE_SNAPSHOT_MAX_BYTES, type ChannelRef, type ListDelta, type LiveMeta, type LiveValue, type Person, type Refs } from '@juno/contract'
+import { LIVE_DELTA_MAX_BYTES, LIVE_SNAPSHOT_MAX_BYTES, type ChannelRef, type ListDelta, type LiveMeta, type LiveValue, type Person, type Refs, type TopicArt } from '@juno/contract'
 
 /** A successful query run: its value and how long it took. */
 export interface Timed<A> {
@@ -131,6 +131,7 @@ export interface ListRun<Row> {
   readonly refs?: {
     readonly people?: ReadonlyArray<Person>
     readonly channels?: ReadonlyArray<ChannelRef>
+    readonly art?: ReadonlyArray<TopicArt>
   }
 }
 
@@ -160,6 +161,7 @@ export function serveLiveList<Row extends RowLike, E, SE, R>(
   let revById = new Map<string, number>()
   const sentPeople = new Map<string, Person>()
   const sentChannels = new Map<string, ChannelRef>()
+  const sentArt = new Map<string, TopicArt>()
   return runs.pipe(
     Stream.mapEffect((outcome) =>
       Effect.gen(function* (): Generator<Effect.Effect<unknown, E>, Option.Option<ListDelta<Row>>> {
@@ -182,10 +184,11 @@ export function serveLiveList<Row extends RowLike, E, SE, R>(
         for (const id of revById.keys()) if (!nextRevById.has(id)) remove.push(id)
         const people = unsent(sentPeople, run.refs?.people)
         const channels = unsent(sentChannels, run.refs?.channels)
+        const art = unsent(sentArt, run.refs?.art)
         const refs: Refs | undefined =
-          people.length === 0 && channels.length === 0
+          people.length === 0 && channels.length === 0 && art.length === 0
             ? undefined
-            : { ...(people.length === 0 ? {} : { people }), ...(channels.length === 0 ? {} : { channels }) }
+            : { ...(people.length === 0 ? {} : { people }), ...(channels.length === 0 ? {} : { channels }), ...(art.length === 0 ? {} : { art }) }
         if (!reset && upsert.length === 0 && remove.length === 0 && refs === undefined && sameOrder(order, nextOrder)) return Option.none()
         let encodeMs = 0
         if (options.measure) {
@@ -200,6 +203,7 @@ export function serveLiveList<Row extends RowLike, E, SE, R>(
         revById = nextRevById
         for (const person of people) sentPeople.set(person.id, person)
         for (const channel of channels) sentChannels.set(channel.id, channel)
+        for (const drawing of art) sentArt.set(drawing.id, drawing)
         const meta: LiveMeta = { seq: ++seq, queryMs, encodeMs, at, ...(run.total === undefined ? {} : { total: run.total }) }
         return Option.some({ reset, order, upsert, remove, ...(refs === undefined ? {} : { refs }), meta })
       }),

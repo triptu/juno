@@ -187,6 +187,24 @@ Dark mode muted (#A09E9A) is 6.56:1 on the page, 5.8:1 on cards, 4.57:1 on popov
 
 Prototype: `outline: 2px solid var(--selection-background); outline-offset: 2px` on `:focus-visible`. #B3D4E6 on the light paper is about 1.5:1, below the 3:1 WCAG 2.2 focus-appearance minimum. Decided: `--focus-ring` is the accent text colour (`--hl-text`, 1.3), which is held to 4.5:1 on the page in both themes; `--selection-background` is the accent at 28% over the page and is for text selection only. Both live in the `accent` group so an accent owns them. Ink keeps the info blue it had before.
 
+### 1.9 Topic art
+
+The `art` group: eight hues (coral 32, amber 72, olive 112, sage 150, teal 185, sky 235, periwinkle 275, plum 320, as OKLCH hue angles) times four roles a recipe may name, and five Tide tones for the placeholder. `@juno/topic-art` writes them as `var(--art-<hue>-<role>)` and `var(--tide-<hue>-<tone>)`; the values come from `docs/design/topic-art/v2/palette.mjs` (RAMP and TIDE_RAMP) and are written as `oklch()` so the browser maps chroma into gamut itself. Only the hue angle is shared between light and dark.
+
+| Role | Light (L, C) | Dark (L, C) | Use |
+| --- | --- | --- | --- |
+| `--art-<hue>-ink` | 0.43, 0.022 | 0.78, 0.028 | The line and dark fills. 7.6:1 or better on the sidebar in light, 9.1:1 in dark |
+| `--art-<hue>-soft` | 0.885, 0.038 | 0.36, 0.032 | One quiet flat area that gives the object mass |
+| `--art-<hue>-accent` | 0.60, 0.10 | 0.72, 0.085 | One small highlight, 3.6 to 3.9:1 light and 7.2 to 7.7:1 dark, never the only carrier of meaning |
+| `--art-<hue>-accent2` | 0.76, 0.06 | 0.56, 0.05 | A second, quieter highlight |
+| `--tide-<hue>-base` | 0.905, 0.02 | 0.33, 0.012 | The pebble's ground |
+| `--tide-<hue>-soft` | 0.865, 0.028 | 0.37, 0.017 | The upper band of a three-band pebble |
+| `--tide-<hue>-mid` | 0.815, 0.036 | 0.415, 0.022 | The middle band |
+| `--tide-<hue>-deep` | 0.75, 0.042 | 0.48, 0.026 | The lowest band |
+| `--tide-<hue>-pale` | 0.945, 0.012 | 0.48, 0.026 | The dot: a highlight in light, a shadow in dark (it takes the deep value there) |
+
+The dark Tide tones sit 0.045 above the study's (base 0.285 there): on the near-black sidebar (L 0.19) the study's pebbles read too dim. In dark they stay near neutral on purpose (chroma 0.012 to 0.026): at low lightness amber, olive and coral turn to mud at any real chroma, so the bands step in lightness instead.
+
 ## 2. Typography
 
 ### 2.1 Families

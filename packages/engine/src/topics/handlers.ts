@@ -6,7 +6,8 @@
  * switch to its store.
  *
  * The sidebar query re-runs on `topics`, the overlay, conversations, users,
- * the ignored list, Slack's follow flags and prefs (the quiet window), and
+ * the ignored list, Slack's follow flags, prefs (the quiet window, AI
+ * assist) and the art table, and
  * once a minute for its own subscription so a topic can turn quiet on time.
  * Each subscription keeps a `RowCache` per workspace, so a run reshapes
  * only the rows whose inputs changed and reads only the users it has not
@@ -31,7 +32,7 @@ import { Workspace, type StoreServices } from '../workspace'
 import { setSubscribed } from './commands'
 import { countTopics, forgetUsers, listTopics, makeRowCache } from './query'
 
-const LIST_KEYS: InvalidationKeys = ['topics', 'topic_overlay', 'conversations', 'users', 'ignored_channels', 'thread_subs', 'prefs']
+const LIST_KEYS: InvalidationKeys = ['topics', 'topic_overlay', 'conversations', 'users', 'ignored_channels', 'thread_subs', 'prefs', 'topic_art']
 const COUNT_KEYS: InvalidationKeys = ['topics', 'topic_overlay', 'conversations', 'ignored_channels', 'thread_subs']
 const QUIET_TICK = '1 minute'
 

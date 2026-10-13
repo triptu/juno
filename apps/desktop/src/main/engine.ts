@@ -148,12 +148,20 @@ export class EngineSupervisor {
 }
 
 export function createSupervisor(options: { readonly fakeSlackUrl?: string; readonly onMessage?: (message: EngineToMain) => void } = {}): EngineSupervisor {
+  const e2e = process.env.JUNO_E2E === '1'
+  // Tests and `JUNO_AI=fake` get the deterministic provider. The OpenRouter key
+  // comes from the environment for now (ADR 0006: the key stays in memory);
+  // without it every AI task answers "no decision" and the app runs as before.
+  const ai = e2e || process.env.JUNO_AI === 'fake' ? 'fake' : 'live'
+  const openRouterApiKey = e2e ? undefined : process.env.OPENROUTER_API_KEY
   return new EngineSupervisor(
     {
       userData: app.getPath('userData'),
-      e2e: process.env.JUNO_E2E === '1',
+      e2e,
       dev: !app.isPackaged,
       ...(options.fakeSlackUrl === undefined ? {} : { fakeSlackUrl: options.fakeSlackUrl }),
+      ai,
+      ...(openRouterApiKey ? { openRouterApiKey } : {}),
     },
     options.onMessage,
   )
