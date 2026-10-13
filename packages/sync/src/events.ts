@@ -1,0 +1,217 @@
+/**
+ * Socket events into the store (architecture section 6). Each event is one
+ * writer transaction; keys invalidated inside fire once after the commit,
+ * and `reindexTopics` runs for the topics the event touched.
+ */
+import { compareTs, type Ts } from '@juno/domain'
+import {
+  isMessageChanged,
+  isMessageDeleted,
+  isMessagePosted,
+  isMessageReplied,
+  type Message,
+  type RtmFrame,
+} from '@juno/slack-schema'
+import { Invalidation, StoreWriter, transaction, type SqlError } from '@juno/store'
+import { Clock, Effect } from 'effect'
+import { reindexOptions, type SyncContext } from './context'
+import { mergeRootCounters, mergeTombstone } from './merge'
+import { mainTopicOf, mergeOne, threadTopicOf } from './pages'
+import { reindexTopics, topicsOfMessages } from './reindex'
+import {
+  applyServerMark,
+  changeReaction,
+  patchConversation,
+  readMessage,
+  reopenIfResolved,
+  setChannelReads,
+  setPref,
+  setThreadSub,
+  threadMessages,
+  toConversationRow,
+  topicOfMessage,
+  upsertConversations,
+  upsertUsers,
+  writeMessage,
+} from './write'
+
+type Services = StoreWriter | Invalidation
+
+const eventTsOf = (frame: { readonly event_ts?: Ts; readonly ts?: Ts }, now: number): string =>
+  frame.event_ts ?? frame.ts ?? `${Math.floor(now / 1000)}.000000`
+
+/** Applies one decoded frame. Frames that carry nothing for the store are ignored. */
+export const applyFrame = (ctx: SyncContext, frame: RtmFrame): Effect.Effect<void, SqlError, Services> =>
+  Effect.gen(function* () {
+    const now = yield* Clock.currentTimeMillis
+    switch (frame.type) {
+      case 'message':
+        return yield* applyMessageFrame(ctx, frame, now)
+      case 'channel_marked':
+      case 'group_marked':
+      case 'im_marked':
+      case 'mpim_marked':
+        return yield* transaction(
+          Effect.gen(function* () {
+            const topic = mainTopicOf(frame.channel)
+            yield* applyServerMark(topic, frame.ts, eventTsOf(frame, now))
+            const sql = yield* StoreWriter
+            const rows = yield* sql<{ latest: string | null }>`SELECT latest FROM channel_reads WHERE channel = ${frame.channel}`
+            const unread = frame.unread_count ?? frame.unread_count_display
+            yield* setChannelReads(
+              [
+                {
+                  id: frame.channel,
+                  last_read: frame.ts,
+                  latest: (rows[0]?.latest ?? null) as Ts | null,
+                  has_unreads: unread === undefined ? false : unread > 0,
+                  mention_count: frame.mention_count ?? frame.num_mentions ?? 0,
+                },
+              ],
+              now,
+            )
+            yield* reindexTopics([topic], reindexOptions(ctx))
+          }),
+        )
+      case 'thread_marked':
+      case 'thread_subscribed':
+      case 'thread_unsubscribed':
+        return yield* transaction(
+          Effect.gen(function* () {
+            const sub = frame.subscription
+            const subscribed = frame.type === 'thread_unsubscribed' ? false : (sub.active ?? true)
+            yield* setThreadSub(sub.channel, sub.thread_ts, subscribed, sub.last_read)
+            const topic = threadTopicOf(sub.channel, sub.thread_ts)
+            if (sub.last_read !== undefined) yield* applyServerMark(topic, sub.last_read, eventTsOf(frame, now))
+            yield* reindexTopics([topic], reindexOptions(ctx))
+          }),
+        )
+      case 'reaction_added':
+      case 'reaction_removed': {
+        if (frame.item.type !== 'message') return
+        const { channel, ts } = frame.item
+        return yield* transaction(
+          Effect.gen(function* () {
+            const existing = yield* readMessage(channel, ts)
+            if (existing === undefined) return
+            yield* changeReaction(channel, ts, frame.reaction, frame.user, frame.type === 'reaction_added', ctx.me.userId)
+            const last = existing.last_event_ts === null ? frame.event_ts : compareTs(frame.event_ts, existing.last_event_ts) > 0 ? frame.event_ts : existing.last_event_ts
+            if (last !== existing.last_event_ts) yield* writeMessage({ ...existing, last_event_ts: last, version: existing.version + 1 })
+          }),
+        )
+      }
+      case 'channel_joined':
+      case 'channel_left':
+      case 'channel_created':
+      case 'channel_rename':
+      case 'channel_archive':
+      case 'channel_unarchive':
+      case 'channel_deleted':
+      case 'channel_converted_to_shared':
+      case 'group_joined':
+      case 'group_left':
+      case 'group_archive':
+      case 'group_unarchive':
+      case 'group_rename':
+      case 'group_deleted':
+        return yield* transaction(
+          Effect.gen(function* () {
+            const id = typeof frame.channel === 'string' ? frame.channel : frame.channel.id
+            if (typeof frame.channel !== 'string') yield* upsertConversations([toConversationRow(frame.channel, ctx.me.userId)])
+            switch (frame.type) {
+              case 'channel_joined':
+              case 'group_joined':
+                return yield* patchConversation(id, { is_member: 1, is_archived: 0 })
+              case 'channel_left':
+              case 'group_left':
+                return yield* patchConversation(id, { is_member: 0 })
+              case 'channel_archive':
+              case 'group_archive':
+                return yield* patchConversation(id, { is_archived: 1 })
+              case 'channel_unarchive':
+              case 'group_unarchive':
+                return yield* patchConversation(id, { is_archived: 0 })
+              case 'channel_deleted':
+              case 'group_deleted':
+                return yield* patchConversation(id, { is_archived: 1, is_member: 0 })
+              default:
+                return
+            }
+          }),
+        )
+      case 'im_open':
+      case 'im_close':
+      case 'im_created':
+      case 'mpim_open':
+      case 'mpim_close':
+      case 'mpim_joined':
+        if (typeof frame.channel === 'string') return
+        return yield* transaction(upsertConversations([toConversationRow(frame.channel, ctx.me.userId)]))
+      case 'member_joined_channel':
+      case 'member_left_channel':
+        if (frame.user !== ctx.me.userId) return
+        return yield* transaction(patchConversation(frame.channel, { is_member: frame.type === 'member_joined_channel' ? 1 : 0 }))
+      case 'user_change':
+        return yield* transaction(upsertUsers([frame.user]))
+      case 'pref_change':
+        return yield* transaction(setPref(frame.name, frame.value))
+      default:
+        return
+    }
+  })
+
+const applyMessageFrame = (ctx: SyncContext, frame: Extract<RtmFrame, { type: 'message' }>, now: number): Effect.Effect<void, SqlError, Services> => {
+  if (isMessagePosted(frame)) {
+    const { event_ts: _e, hidden: _h, suppress_notification: _s, ...message } = frame
+    return transaction(
+      Effect.gen(function* () {
+        const rows = yield* mergeOne(ctx, frame.channel, message as Message, { kind: 'event', eventTs: eventTsOf(frame, now) })
+        const topics = topicsOfMessages(rows)
+        // Activity after a resolve reopens the topic, except the user's own messages are activity too.
+        for (const row of rows) if (row.ts === frame.ts) yield* reopenIfResolved(topicOfMessage(row), frame.ts, now)
+        yield* reindexTopics(topics, reindexOptions(ctx))
+      }),
+    )
+  }
+  if (isMessageChanged(frame)) {
+    return transaction(
+      Effect.gen(function* () {
+        const rows = yield* mergeOne(ctx, frame.channel, frame.message, { kind: 'event', eventTs: eventTsOf(frame, now) })
+        yield* reindexTopics(topicsOfMessages(rows), reindexOptions(ctx))
+      }),
+    )
+  }
+  if (isMessageDeleted(frame)) {
+    return transaction(
+      Effect.gen(function* () {
+        const existing = yield* readMessage(frame.channel, frame.deleted_ts)
+        const merged = mergeTombstone(existing, frame.channel, frame.deleted_ts, { kind: 'event', eventTs: eventTsOf(frame, now) })
+        if (merged.changed) yield* writeMessage(merged.row)
+        const topics = topicsOfMessages([merged.row])
+        // A deleted reply: the root's counters follow the stored replies when they are complete.
+        const root = merged.row.thread_ts !== null && merged.row.thread_ts !== merged.row.ts ? yield* readMessage(frame.channel, merged.row.thread_ts) : undefined
+        if (root !== undefined) {
+          const stored = (yield* threadMessages(frame.channel, root.ts)).filter((m) => m.ts !== root.ts && m.deleted === 0)
+          if (stored.length < root.reply_count) {
+            const latest = stored.reduce<string | null>((acc, m) => (acc === null || compareTs(m.ts, acc) > 0 ? m.ts : acc), null)
+            yield* writeMessage({ ...root, reply_count: stored.length, latest_reply: latest, version: root.version + 1 })
+          }
+          topics.add(threadTopicOf(frame.channel, root.ts))
+        }
+        yield* reindexTopics(topics, reindexOptions(ctx))
+      }),
+    )
+  }
+  if (isMessageReplied(frame)) {
+    return transaction(
+      Effect.gen(function* () {
+        const root = yield* readMessage(frame.channel, frame.message.ts)
+        if (root === undefined) return
+        const merged = mergeRootCounters(root, frame.message, { kind: 'event', eventTs: eventTsOf(frame, now) })
+        if (merged.changed) yield* writeMessage(merged.row)
+        yield* reindexTopics([threadTopicOf(frame.channel, root.ts)], reindexOptions(ctx))
+      }),
+    )
+  }
+  return Effect.void
+}

@@ -1,0 +1,52 @@
+/**
+ * Tunables of the sync. A `Context.Reference` with defaults, so nothing has
+ * to provide it; the engine and tests override the parts they need with
+ * `syncConfigLayer({ ... })`. The numbers follow docs/architecture.md
+ * section 5.
+ */
+import { Context, Layer } from 'effect'
+
+export interface SyncConfigShape {
+  /** Days without activity before a topic is quiet. The boot window and the sidebar use the same number. */
+  readonly quietDays: number
+  /** Messages per `conversations.history` page. */
+  readonly historyPageLimit: number
+  /** Threads per `subscriptions.thread.getView` page. */
+  readonly getViewPageLimit: number
+  /** Unfollowed threads whose latest reply is fetched at cold boot so their row has a preview. */
+  readonly previewThreads: number
+  /** Ids per edge `users/info` call. */
+  readonly usersChunk: number
+  /** How often the discovery sweep runs while live. */
+  readonly sweepIntervalMillis: number
+  /** `search` uses `search.modules.messages`; `history` is the fallback of architecture 5.3. */
+  readonly discovery: 'search' | 'history'
+  /** Matches per search page and pages per sweep. */
+  readonly searchPageCount: number
+  readonly searchMaxPages: number
+  /** Most history pages fetched for one conversation when catching up since a cursor. */
+  readonly catchUpPages: number
+  /** Wait before a failed boot is tried again. */
+  readonly bootRetryMillis: number
+}
+
+export const defaultSyncConfig: SyncConfigShape = {
+  quietDays: 7,
+  historyPageLimit: 100,
+  getViewPageLimit: 50,
+  previewThreads: 50,
+  usersChunk: 100,
+  sweepIntervalMillis: 10 * 60_000,
+  discovery: 'search',
+  searchPageCount: 50,
+  searchMaxPages: 3,
+  catchUpPages: 5,
+  bootRetryMillis: 30_000,
+}
+
+export const SyncConfig = Context.Reference<SyncConfigShape>('juno/sync/SyncConfig', {
+  defaultValue: () => defaultSyncConfig,
+})
+
+export const syncConfigLayer = (overrides: Partial<SyncConfigShape> = {}): Layer.Layer<never> =>
+  Layer.succeed(SyncConfig, { ...defaultSyncConfig, ...overrides })
