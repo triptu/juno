@@ -82,13 +82,19 @@ test('exposes only the bridge to the page', async ({ win }) => {
       juno: Object.keys(window.juno),
       app: Object.keys(window.juno.app),
       engine: Object.keys(window.juno.engine),
+      contextMenu: Object.keys(window.juno.contextMenu),
+      shell: Object.keys(window.juno.shell),
+      menu: Object.keys(window.juno.menu),
     }
   })
   expect(exposed).toEqual({
     require: 'undefined',
     process: 'undefined',
-    juno: ['app', 'engine', 'launch'],
+    juno: ['app', 'engine', 'launch', 'contextMenu', 'shell', 'menu'],
     app: ['getInfo'],
     engine: ['requestPort', 'restart'],
+    contextMenu: ['popup'],
+    shell: ['openExternal'],
+    menu: ['onCommand'],
   })
 })
