@@ -27,3 +27,7 @@ Related existing material: `docs/design/handoff/SPEC.md` sections 12 (For you), 
 
 - Littlebird: `https://mcp.littlebird.ai/mcp`, a custom MCP server with OAuth.
 - T3 Code: `http://192.168.1.22:3773/mcp`, a custom MCP server that connects without extra auth. It is plain HTTP on the local network, so Juno should prefer the loopback address when T3 Code runs on the same machine, make the URL a setting, and never send secrets to it.
+
+## Model defaults (owner, 10-14 02:20)
+
+Pick sensible defaults (chat: Sonnet 5.5; compaction: Haiku 5.5; spend cap: $2/day). Settings must let the owner change the chat model across the latest models of Claude Sonnet, Claude Opus, Muse, GPT Sol and Grok (resolved from the provider catalogue at runtime), plus the compaction model and the spend cap. The model can never change these.
