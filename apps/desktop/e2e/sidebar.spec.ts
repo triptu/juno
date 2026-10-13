@@ -352,3 +352,12 @@ test('zooming in from the View menu keeps the whole sidebar inside the window', 
   await app.evaluate(({ BrowserWindow, Menu }) => Menu.getApplicationMenu()!.getMenuItemById('zoom-reset')!.click(undefined, BrowserWindow.getAllWindows()[0]!))
   expect(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.getMinimumSize())).toEqual([720, 480])
 })
+
+test('a row says its unread count and a mention in words, not only in tooltips', async ({ juno }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  const rina = juno.sidebar.row(RINA)
+  await rina.expectVisible()
+  await expect(rina.root).toHaveAccessibleDescription(/^2 unread, mentions you\. \S/)
+  await expect(juno.sidebar.row(POSTGRES).root).toHaveAccessibleDescription('Dev: Booked 2–4pm. Will post results here.')
+})

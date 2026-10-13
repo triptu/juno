@@ -75,11 +75,14 @@ function titleWhenTruncated(event: PointerEvent<HTMLElement>) {
 export const TopicRow = memo(function TopicRow({ row, time, selected = false, tabbable = true, onOpen, onResolve, onPrefetch, onContextMenu }: TopicRowProps) {
   const titleId = useId()
   const previewId = useId()
+  const stateId = useId()
   const unread = row.unreadCount > 0
   // Resolved and unsubscribed rows read quieter: the check or the muted bell
   // says why, the title steps down to the subtle colour and the tile fades.
   // The text keeps at least 4.5:1, so the row itself is never faded.
   const quiet = row.resolved || row.status === 'unsubscribed'
+  const unreadLabel = row.unreadExact ? `${row.unreadCount} unread` : `${row.unreadCount} or more unread`
+  const state = rowState(row, unreadLabel)
   const people: ReadonlyArray<AvatarStackPerson> = row.participants.map((person) => ({
     id: person.id,
     initials: initials(person.name),
@@ -98,7 +101,7 @@ export const TopicRow = memo(function TopicRow({ row, time, selected = false, ta
       tabIndex={tabbable ? 0 : -1}
       aria-pressed={selected}
       aria-labelledby={titleId}
-      aria-describedby={previewId}
+      aria-describedby={state === undefined ? previewId : `${stateId} ${previewId}`}
       data-topic-row=""
       data-topic-id={row.id}
       onPointerEnter={onPrefetch === undefined ? undefined : () => onPrefetch(row.id)}
@@ -168,7 +171,7 @@ export const TopicRow = memo(function TopicRow({ row, time, selected = false, ta
                 </Chip>
               ) : null}
               {unread ? (
-                <Chip variant="strong" numeric title={row.unreadExact ? `${row.unreadCount} unread` : `${row.unreadCount} or more unread`}>
+                <Chip variant="strong" numeric title={unreadLabel}>
                   {countLabel(row.unreadCount, row.unreadExact)}
                 </Chip>
               ) : null}
@@ -212,6 +215,14 @@ export const TopicRow = memo(function TopicRow({ row, time, selected = false, ta
           </span>
         </span>
       </span>
+      {/* The count and the @ are tags whose meaning is only in a tooltip; the
+          row's description says it in words, before the preview. Hidden, so
+          it takes no space. */}
+      {state === undefined ? null : (
+        <span id={stateId} hidden>
+          {state}
+        </span>
+      )}
     </div>
   )
 })
@@ -230,6 +241,17 @@ function Tile({ row }: { readonly row: TopicRowModel }) {
   }
   const icon = channelIconFor(channel.icon)
   return <ChannelIcon name={channel.name} id={channel.id} color={hueFor(channel.color, channel.id)} size={44} {...(icon === undefined ? {} : { icon })} />
+}
+
+/** What the tags and icons say, for the row's description: "2 unread, mentions you." */
+function rowState(row: TopicRowModel, unreadLabel: string): string | undefined {
+  const parts = [
+    row.unreadCount > 0 ? unreadLabel : undefined,
+    row.mentionsMe ? 'mentions you' : undefined,
+    row.resolved ? 'resolved' : undefined,
+    row.status === 'unsubscribed' ? 'unsubscribed' : undefined,
+  ].filter((part) => part !== undefined)
+  return parts.length === 0 ? undefined : `${parts.join(', ')}.`
 }
 
 /** Line three's leading icon: the channel's own icon, or a person for DMs. A private channel shows the lock instead. */
