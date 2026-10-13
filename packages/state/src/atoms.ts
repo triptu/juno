@@ -184,30 +184,34 @@ export function runCommand<R extends Rpc.Any>(
 }
 
 const PREFETCH_LIMIT = 3
-const warmByRegistry = new WeakMap<Registry, Array<{ readonly atom: Atom.Atom<unknown>; readonly release: () => void }>>()
+const warmByRegistry = new WeakMap<Registry, Array<{ readonly key: Atom.Atom<unknown>; readonly release: () => void }>>()
 
 /**
- * Keeps a live query's subscription running (performance.md 4.2): call on
+ * Keeps live queries' subscriptions running (performance.md 4.2): call on
  * hover, focus or keyboard selection. One warm set per registry holds at
- * most three; the oldest is released first. The warm set mounts the
- * subscription under the atom, not the atom, so a released prefetch that
+ * most three entries, one per call (a topic's messages and header are one
+ * entry); the oldest is released first. The warm set mounts the
+ * subscription under each atom, not the atom, so a released prefetch that
  * was never opened ends at once instead of living out the 30 s idle TTL.
- * An open topic (the active tab) reads the atom itself, so its
- * subscription outlives any eviction.
+ * An open topic (the active tab) reads the atoms themselves, so its
+ * subscriptions outlive any eviction.
  */
-export function prefetch(registry: Registry, atom: Atom.Atom<unknown>): void {
-  const target = subscriptionOf.get(atom) ?? atom
+export function prefetch(registry: Registry, atoms: Atom.Atom<unknown> | ReadonlyArray<Atom.Atom<unknown>>): void {
+  const targets = (Array.isArray(atoms) ? atoms : [atoms]).map((atom: Atom.Atom<unknown>) => subscriptionOf.get(atom) ?? atom)
+  const key = targets[0]
+  if (key === undefined) return
   let warm = warmByRegistry.get(registry)
   if (!warm) {
     warm = []
     warmByRegistry.set(registry, warm)
   }
-  const index = warm.findIndex((entry) => entry.atom === target)
+  const index = warm.findIndex((entry) => entry.key === key)
   if (index >= 0) {
     const [entry] = warm.splice(index, 1)
     warm.push(entry!)
     return
   }
-  warm.push({ atom: target, release: registry.mount(target) })
+  const releases = targets.map((target) => registry.mount(target))
+  warm.push({ key, release: () => releases.forEach((release) => release()) })
   while (warm.length > PREFETCH_LIMIT) warm.shift()!.release()
 }

@@ -155,9 +155,10 @@ export const openTopic = (registry: Registry, id: string) => runCommand(registry
 export const loadOlderMessages = (registry: Registry, id: string, before: string) => runCommand(registry, messagesLoadOlder, { id, before })
 
 /**
- * Warms a topic for an open (performance 4.2): the window its tab would
- * show, at most three per registry (`prefetch`). A local query only.
+ * Warms a topic for an open (performance 4.2): its header and the window
+ * its tab would show, one entry of at most three per registry (`prefetch`).
+ * Local queries only.
  */
 export function prefetchTopic(registry: Registry, id: string): void {
-  prefetch(registry, messagesAtom(id, registry.get(messageWindowSpecAtom(id))))
+  prefetch(registry, [messagesAtom(id, registry.get(messageWindowSpecAtom(id))), topicAtom(id)])
 }

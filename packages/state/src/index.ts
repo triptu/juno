@@ -38,6 +38,26 @@ export {
   type MessageWindow,
   type MessageWindowSpec,
 } from './messages'
+export {
+  activateTab,
+  closeTab,
+  cycleTab,
+  dividerIndex,
+  endStealth,
+  MOUNTED_TABS,
+  mountedTabs,
+  noTabs,
+  openTab,
+  parseTabs,
+  scrollSnapshotAtom,
+  TABS_PREF,
+  tabsAtom,
+  updateTabs,
+  type OpenOptions,
+  type ScrollSnapshot,
+  type Tabs,
+  type TopicTab,
+} from './tabs'
 export { errorOf } from './result'
 export { acquireRendererPort, EngineFailed } from './port'
 export { accentAtom, appInfoAtom, persistAccent, persistTheme, themeAtom, type Accent, type Theme } from './shell'
