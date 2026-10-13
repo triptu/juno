@@ -177,10 +177,22 @@ test('hovering a row shows Resolve in its reserved slot without moving anything'
   await expect(postgres.resolveButton).toHaveAttribute('title', 'Resolve')
   await expect(postgres.resolveButton).toHaveAccessibleName(`Resolve ${POSTGRES}…`)
 
-  // Leaving hides it again; keyboard focus shows it too.
+  // Leaving hides it again.
   await expectNoLayoutShift(win, () => win.mouse.move(900, 400), { root: 'aside' })
   await expect(slot).toHaveCSS('opacity', '0')
+
+  // A mouse press selects the row and leaves focus on it, but that is not keyboard focus.
+  await postgres.select()
+  await win.mouse.move(900, 400)
+  await expect(postgres.root).toBeFocused()
+  await expect(slot).toHaveCSS('opacity', '0')
+
+  // Keyboard focus shows it, and Tab reaches it (the selected row is the one in the Tab order).
+  await win.keyboard.press('Shift')
   await expectNoLayoutShift(win, () => postgres.focus(), { root: 'aside' })
+  await expect(slot).toHaveCSS('opacity', '1')
+  await win.keyboard.press('Tab')
+  await expect(postgres.resolveButton).toBeFocused()
   await expect(slot).toHaveCSS('opacity', '1')
 })
 

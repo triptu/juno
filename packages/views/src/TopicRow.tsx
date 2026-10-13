@@ -248,11 +248,14 @@ const styles = stylex.create({
     outlineOffset: `calc(-1 * ${sizes['--focus-ring-width']})`,
     outlineColor: accent['--focus-ring'],
     // The Resolve check reads this: hidden until the pointer is over the row
-    // or focus is inside it. Only opacity changes, so nothing moves.
+    // or keyboard focus is on the row or the check itself (a mouse press
+    // leaves focus on the row too, and must not show it). Only opacity
+    // changes, so nothing moves.
     '--row-action-opacity': {
       default: '0',
       ':hover': { default: null, [HOVER]: '1' },
-      ':focus-within': '1',
+      ':focus-visible': '1',
+      ':has(:focus-visible)': '1',
     },
   },
   // Muted text fails contrast on the secondary fill (tokens.md 1.7); the
