@@ -1,0 +1,24 @@
+{
+  "approach": "A",
+  "model": "google/gemini-3.8-flash",
+  "topic": "ramen",
+  "ok": true,
+  "free": {
+    "ok": true,
+    "svg": "<svg width=\"40\" height=\"40\" aria-hidden=\"true\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\">\n  <path d=\"M14 11c-1.5-2.5 1.5-4 0-6.5\" fill=\"none\" stroke=\"#CC4628\" stroke-width=\"3\" stroke-linecap=\"round\"/>\n  <path d=\"M23 11c-1.5-2.5 1.5-4 0-6.5\" fill=\"none\" stroke=\"#CC4628\" stroke-width=\"3\" stroke-linecap=\"round\"/>\n  <path d=\"M7 19c0 9.5 6 14.5 13 14.5s13-5 13-14.5Z\" fill=\"#CFE3E8\" stroke=\"#2E5F6B\" stroke-width=\"3\" stroke-linejoin=\"round\"/>\n  <line x1=\"16\" y1=\"36.5\" x2=\"24\" y2=\"36.5\" stroke=\"#2E5F6B\" stroke-width=\"3\" stroke-linecap=\"round\"/>\n  <line x1=\"5\" y1=\"17\" x2=\"35\" y2=\"14\" stroke=\"#2E5F6B\" stroke-width=\"3\" stroke-linecap=\"round\"/>\n</svg>",
+    "elements": 5,
+    "gradients": false
+  },
+  "attempts": 1,
+  "latencyMs": 3224,
+  "costUsd": 0.009183,
+  "tokens": {
+    "in": 279,
+    "out": 2393
+  },
+  "raw": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\">\n  <path d=\"M14 11c-1.5-2.5 1.5-4 0-6.5\" fill=\"none\" stroke=\"#CC4628\" stroke-width=\"3\" stroke-linecap=\"round\"/>\n  <path d=\"M23 11c-1.5-2.5 1.5-4 0-6.5\" fill=\"none\" stroke=\"#CC4628\" stroke-width=\"3\" stroke-linecap=\"round\"/>\n  <path d=\"M7 19c0 9.5 6 14.5 13 14.5s13-5 13-14.5Z\" fill=\"#CFE3E8\" stroke=\"#2E5F6B\" stroke-width=\"3\" stroke-linejoin=\"round\"/>\n  <line x1=\"16\" y1=\"36.5\" x2=\"24\" y2=\"36.5\" stroke=\"#2E5F6B\" stroke-width=\"3\" stroke-linecap=\"round\"/>\n  <line x1=\"5\" y1=\"17\" x2=\"35\" y2=\"14\" stroke=\"#2E5F6B\" stroke-width=\"3\" stroke-linecap=\"round\"/>\n</svg>",
+  "svg": {
+    "light": "<svg width=\"40\" height=\"40\" aria-hidden=\"true\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\">\n  <path d=\"M14 11c-1.5-2.5 1.5-4 0-6.5\" fill=\"none\" stroke=\"#CC4628\" stroke-width=\"3\" stroke-linecap=\"round\"/>\n  <path d=\"M23 11c-1.5-2.5 1.5-4 0-6.5\" fill=\"none\" stroke=\"#CC4628\" stroke-width=\"3\" stroke-linecap=\"round\"/>\n  <path d=\"M7 19c0 9.5 6 14.5 13 14.5s13-5 13-14.5Z\" fill=\"#CFE3E8\" stroke=\"#2E5F6B\" stroke-width=\"3\" stroke-linejoin=\"round\"/>\n  <line x1=\"16\" y1=\"36.5\" x2=\"24\" y2=\"36.5\" stroke=\"#2E5F6B\" stroke-width=\"3\" stroke-linecap=\"round\"/>\n  <line x1=\"5\" y1=\"17\" x2=\"35\" y2=\"14\" stroke=\"#2E5F6B\" stroke-width=\"3\" stroke-linecap=\"round\"/>\n</svg>",
+    "dark": "<svg width=\"40\" height=\"40\" aria-hidden=\"true\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\">\n  <path d=\"M14 11c-1.5-2.5 1.5-4 0-6.5\" fill=\"none\" stroke=\"#CC4628\" stroke-width=\"3\" stroke-linecap=\"round\"/>\n  <path d=\"M23 11c-1.5-2.5 1.5-4 0-6.5\" fill=\"none\" stroke=\"#CC4628\" stroke-width=\"3\" stroke-linecap=\"round\"/>\n  <path d=\"M7 19c0 9.5 6 14.5 13 14.5s13-5 13-14.5Z\" fill=\"#CFE3E8\" stroke=\"#2E5F6B\" stroke-width=\"3\" stroke-linejoin=\"round\"/>\n  <line x1=\"16\" y1=\"36.5\" x2=\"24\" y2=\"36.5\" stroke=\"#2E5F6B\" stroke-width=\"3\" stroke-linecap=\"round\"/>\n  <line x1=\"5\" y1=\"17\" x2=\"35\" y2=\"14\" stroke=\"#2E5F6B\" stroke-width=\"3\" stroke-linecap=\"round\"/>\n</svg>"
+  }
+}

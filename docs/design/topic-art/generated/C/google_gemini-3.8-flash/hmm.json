@@ -1,0 +1,40 @@
+{
+  "approach": "C",
+  "model": "google/gemini-3.8-flash",
+  "topic": "hmm",
+  "ok": true,
+  "spec": {
+    "hue": "periwinkle",
+    "elements": [
+      {
+        "tag": "motif",
+        "attrs": {
+          "name": "question",
+          "x": "0",
+          "y": "0",
+          "scale": "1"
+        }
+      }
+    ]
+  },
+  "decision": {
+    "main": "question",
+    "secondary": null,
+    "hue": "periwinkle",
+    "confident": false,
+    "why": "Vague non-descriptive topic gives nothing concrete to draw"
+  },
+  "attempts": 1,
+  "latencyMs": 2170,
+  "costUsd": 0.00114675,
+  "tokens": {
+    "in": 1299,
+    "out": 46
+  },
+  "raw": "```json\n{\"main\": \"question\", \"secondary\": null, \"hue\": \"periwinkle\", \"confident\": false, \"why\": \"Vague non-descriptive topic gives nothing concrete to draw\"}\n```",
+  "svg": {
+    "light": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"l-C-google_gemini-3.8-flash-hmm\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#l-C-google_gemini-3.8-flash-hmm)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#d7defb\"/><g fill=\"none\" stroke=\"#3d4685\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><g transform=\"translate(0 0) scale(1)\" stroke-width=\"3.00\"><circle cx=\"20\" cy=\"20\" r=\"11\" fill=\"#afbbef\"/><path d=\"M16 16.5 A4 4 0 1 1 20 21 V23\"/><circle cx=\"20\" cy=\"27.5\" r=\"1.6\" fill=\"#3d4685\" stroke=\"none\"/></g></g></g></svg>",
+    "dark": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"d-C-google_gemini-3.8-flash-hmm\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#d-C-google_gemini-3.8-flash-hmm)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#2e334f\"/><g fill=\"none\" stroke=\"#ccd5fd\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><g transform=\"translate(0 0) scale(1)\" stroke-width=\"3.00\"><circle cx=\"20\" cy=\"20\" r=\"11\" fill=\"#4a527c\"/><path d=\"M16 16.5 A4 4 0 1 1 20 21 V23\"/><circle cx=\"20\" cy=\"27.5\" r=\"1.6\" fill=\"#ccd5fd\" stroke=\"none\"/></g></g></g></svg>"
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"periwinkle\">\n  <motif name=\"question\" x=\"0\" y=\"0\" scale=\"1\"/>\n</svg>"
+}

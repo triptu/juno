@@ -1,0 +1,61 @@
+{
+  "approach": "C",
+  "model": "google/gemini-3.8-flash",
+  "topic": "pricing-copy",
+  "ok": true,
+  "spec": {
+    "hue": "plum",
+    "elements": [
+      {
+        "tag": "motif",
+        "attrs": {
+          "name": "pencil",
+          "x": "-2",
+          "y": "-2",
+          "scale": "0.9"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "30",
+          "cy": "30",
+          "r": "9.5",
+          "fill": "tile",
+          "stroke": "none",
+          "detail": "1"
+        }
+      },
+      {
+        "tag": "motif",
+        "attrs": {
+          "name": "tag",
+          "x": "21",
+          "y": "21",
+          "scale": "0.45",
+          "detail": "1"
+        }
+      }
+    ]
+  },
+  "decision": {
+    "main": "pencil",
+    "secondary": "tag",
+    "hue": "plum",
+    "confident": true,
+    "why": "Writing and editing final copy specifically for product pricing"
+  },
+  "attempts": 1,
+  "latencyMs": 1772,
+  "costUsd": 0.0011475,
+  "tokens": {
+    "in": 1320,
+    "out": 42
+  },
+  "raw": "```json\n{\"main\": \"pencil\", \"secondary\": \"tag\", \"hue\": \"plum\", \"confident\": true, \"why\": \"Writing and editing final copy specifically for product pricing\"}\n```",
+  "svg": {
+    "light": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"l-C-google_gemini-3.8-flash-pricing-copy\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#l-C-google_gemini-3.8-flash-pricing-copy)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#ecd8f1\"/><g fill=\"none\" stroke=\"#663870\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><g transform=\"translate(-2 -2) scale(0.9)\" stroke-width=\"3.33\"><path d=\"M10 30 L12 24 L26 10 L30 14 L16 28 Z\" fill=\"#d4afdc\"/><line x1=\"23\" y1=\"13\" x2=\"27\" y2=\"17\"/></g><circle cx=\"30\" cy=\"30\" r=\"9.5\" fill=\"#ecd8f1\" stroke=\"none\"/><g transform=\"translate(21 21) scale(0.45)\" stroke-width=\"6.67\"><path d=\"M9 9 H20 L32 21 L21 32 L9 20 Z\" fill=\"#d4afdc\"/><circle cx=\"15\" cy=\"15\" r=\"2\" fill=\"#663870\" stroke=\"none\"/></g></g></g></svg>",
+    "dark": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"d-C-google_gemini-3.8-flash-pricing-copy\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#d-C-google_gemini-3.8-flash-pricing-copy)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#412d45\"/><g fill=\"none\" stroke=\"#edc9f5\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><g transform=\"translate(-2 -2) scale(0.9)\" stroke-width=\"3.33\"><path d=\"M10 30 L12 24 L26 10 L30 14 L16 28 Z\" fill=\"#67486d\"/><line x1=\"23\" y1=\"13\" x2=\"27\" y2=\"17\"/></g><circle cx=\"30\" cy=\"30\" r=\"9.5\" fill=\"#412d45\" stroke=\"none\"/><g transform=\"translate(21 21) scale(0.45)\" stroke-width=\"6.67\"><path d=\"M9 9 H20 L32 21 L21 32 L9 20 Z\" fill=\"#67486d\"/><circle cx=\"15\" cy=\"15\" r=\"2\" fill=\"#edc9f5\" stroke=\"none\"/></g></g></g></svg>"
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"plum\">\n  <motif name=\"pencil\" x=\"-2\" y=\"-2\" scale=\"0.9\"/>\n  <circle cx=\"30\" cy=\"30\" r=\"9.5\" fill=\"tile\" stroke=\"none\" detail=\"1\"/>\n  <motif name=\"tag\" x=\"21\" y=\"21\" scale=\"0.45\" detail=\"1\"/>\n</svg>"
+}

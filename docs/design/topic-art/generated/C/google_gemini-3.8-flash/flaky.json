@@ -1,0 +1,40 @@
+{
+  "approach": "C",
+  "model": "google/gemini-3.8-flash",
+  "topic": "flaky",
+  "ok": true,
+  "spec": {
+    "hue": "coral",
+    "elements": [
+      {
+        "tag": "motif",
+        "attrs": {
+          "name": "bug",
+          "x": "0",
+          "y": "0",
+          "scale": "1"
+        }
+      }
+    ]
+  },
+  "decision": {
+    "main": "bug",
+    "secondary": null,
+    "hue": "coral",
+    "confident": true,
+    "why": "Flaky test failing repeatedly on the main branch"
+  },
+  "attempts": 1,
+  "latencyMs": 1821,
+  "costUsd": 0.00112575,
+  "tokens": {
+    "in": 1321,
+    "out": 36
+  },
+  "raw": "{\"main\": \"bug\", \"secondary\": null, \"hue\": \"coral\", \"confident\": true, \"why\": \"Flaky test failing repeatedly on the main branch\"}",
+  "svg": {
+    "light": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"l-C-google_gemini-3.8-flash-flaky\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#l-C-google_gemini-3.8-flash-flaky)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#f9d7cf\"/><g fill=\"none\" stroke=\"#7c3326\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><g transform=\"translate(0 0) scale(1)\" stroke-width=\"3.00\"><ellipse cx=\"20\" cy=\"22\" rx=\"8\" ry=\"9\" fill=\"#eaaca0\"/><circle cx=\"20\" cy=\"11\" r=\"4\" fill=\"#eaaca0\"/><line x1=\"12\" y1=\"18\" x2=\"7\" y2=\"15\"/><line x1=\"12\" y1=\"24\" x2=\"7\" y2=\"24\"/><line x1=\"12\" y1=\"30\" x2=\"8\" y2=\"33\"/><line x1=\"28\" y1=\"18\" x2=\"33\" y2=\"15\"/><line x1=\"28\" y1=\"24\" x2=\"33\" y2=\"24\"/><line x1=\"28\" y1=\"30\" x2=\"32\" y2=\"33\"/><line x1=\"20\" y1=\"14\" x2=\"20\" y2=\"31\"/></g></g></g></svg>",
+    "dark": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"d-C-google_gemini-3.8-flash-flaky\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#d-C-google_gemini-3.8-flash-flaky)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#4c2b25\"/><g fill=\"none\" stroke=\"#fdcabf\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><g transform=\"translate(0 0) scale(1)\" stroke-width=\"3.00\"><ellipse cx=\"20\" cy=\"22\" rx=\"8\" ry=\"9\" fill=\"#77463c\"/><circle cx=\"20\" cy=\"11\" r=\"4\" fill=\"#77463c\"/><line x1=\"12\" y1=\"18\" x2=\"7\" y2=\"15\"/><line x1=\"12\" y1=\"24\" x2=\"7\" y2=\"24\"/><line x1=\"12\" y1=\"30\" x2=\"8\" y2=\"33\"/><line x1=\"28\" y1=\"18\" x2=\"33\" y2=\"15\"/><line x1=\"28\" y1=\"24\" x2=\"33\" y2=\"24\"/><line x1=\"28\" y1=\"30\" x2=\"32\" y2=\"33\"/><line x1=\"20\" y1=\"14\" x2=\"20\" y2=\"31\"/></g></g></g></svg>"
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"coral\">\n  <motif name=\"bug\" x=\"0\" y=\"0\" scale=\"1\"/>\n</svg>"
+}

@@ -1,0 +1,54 @@
+{
+  "approach": "B",
+  "model": "anthropic/claude-sonnet-5.5",
+  "topic": "q4-cuts",
+  "ok": true,
+  "spec": {
+    "hue": "periwinkle",
+    "elements": [
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M8 11 V29"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M8 13 H29 L25 18 L29 23 H8",
+          "fill": "soft"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M8 29 H12",
+          "detail": "1"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "23",
+          "y1": "30",
+          "x2": "33",
+          "y2": "30",
+          "detail": "1"
+        }
+      }
+    ]
+  },
+  "attempts": 1,
+  "latencyMs": 1171,
+  "costUsd": 0.00413,
+  "tokens": {
+    "in": 1380,
+    "out": 137
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"periwinkle\">\n  <path d=\"M8 11 V29\"/>\n  <path d=\"M8 13 H29 L25 18 L29 23 H8\" fill=\"soft\"/>\n  <path d=\"M8 29 H12\" detail=\"1\"/>\n  <line x1=\"23\" y1=\"30\" x2=\"33\" y2=\"30\" detail=\"1\"/>\n</svg>",
+  "svg": {
+    "light": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"l-B-anthropic_claude-sonnet-5.5-q4-cuts\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#l-B-anthropic_claude-sonnet-5.5-q4-cuts)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#d7defb\"/><g fill=\"none\" stroke=\"#3d4685\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M8 11 V29\"/><path d=\"M8 13 H29 L25 18 L29 23 H8\" fill=\"#afbbef\"/><path d=\"M8 29 H12\"/><line x1=\"23\" y1=\"30\" x2=\"33\" y2=\"30\"/></g></g></svg>",
+    "dark": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"d-B-anthropic_claude-sonnet-5.5-q4-cuts\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#d-B-anthropic_claude-sonnet-5.5-q4-cuts)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#2e334f\"/><g fill=\"none\" stroke=\"#ccd5fd\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M8 11 V29\"/><path d=\"M8 13 H29 L25 18 L29 23 H8\" fill=\"#4a527c\"/><path d=\"M8 29 H12\"/><line x1=\"23\" y1=\"30\" x2=\"33\" y2=\"30\"/></g></g></svg>"
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"periwinkle\">\n  <path d=\"M8 11 V29\"/>\n  <path d=\"M8 13 H29 L25 18 L29 23 H8\" fill=\"soft\"/>\n  <path d=\"M8 29 H12\" detail=\"1\"/>\n  <line x1=\"23\" y1=\"30\" x2=\"33\" y2=\"30\" detail=\"1\"/>\n</svg>"
+}

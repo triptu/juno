@@ -1,0 +1,74 @@
+{
+  "approach": "B",
+  "model": "anthropic/claude-sonnet-5.5",
+  "topic": "ramen",
+  "ok": true,
+  "spec": {
+    "hue": "coral",
+    "elements": [
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M8 20 H32 A12 11 0 0 1 8 20 Z",
+          "fill": "soft"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M15 17 C15 14 17 14 17 11 C17 9 16 9 16 8",
+          "detail": "1"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M22 17 C22 14 24 14 24 11 C24 9 23 9 23 8",
+          "detail": "1"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "27",
+          "y1": "7",
+          "x2": "32",
+          "y2": "17"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "31",
+          "y1": "6",
+          "x2": "35",
+          "y2": "14",
+          "detail": "1"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "16",
+          "cy": "25",
+          "r": "1.5",
+          "fill": "accent",
+          "stroke": "none"
+        }
+      }
+    ]
+  },
+  "attempts": 1,
+  "latencyMs": 2117,
+  "costUsd": 0.005172,
+  "tokens": {
+    "in": 1331,
+    "out": 251
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"coral\">\n  <path d=\"M8 20 H32 A12 11 0 0 1 8 20 Z\" fill=\"soft\"/>\n  <path d=\"M15 17 C15 14 17 14 17 11 C17 9 16 9 16 8\" detail=\"1\"/>\n  <path d=\"M22 17 C22 14 24 14 24 11 C24 9 23 9 23 8\" detail=\"1\"/>\n  <line x1=\"27\" y1=\"7\" x2=\"32\" y2=\"17\"/>\n  <line x1=\"31\" y1=\"6\" x2=\"35\" y2=\"14\" detail=\"1\"/>\n  <circle cx=\"16\" cy=\"25\" r=\"1.5\" fill=\"accent\" stroke=\"none\"/>\n</svg>",
+  "svg": {
+    "light": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"l-B-anthropic_claude-sonnet-5.5-ramen\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#l-B-anthropic_claude-sonnet-5.5-ramen)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#f9d7cf\"/><g fill=\"none\" stroke=\"#7c3326\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M8 20 H32 A12 11 0 0 1 8 20 Z\" fill=\"#eaaca0\"/><path d=\"M15 17 C15 14 17 14 17 11 C17 9 16 9 16 8\"/><path d=\"M22 17 C22 14 24 14 24 11 C24 9 23 9 23 8\"/><line x1=\"27\" y1=\"7\" x2=\"32\" y2=\"17\"/><line x1=\"31\" y1=\"6\" x2=\"35\" y2=\"14\"/><circle cx=\"16\" cy=\"25\" r=\"1.5\" fill=\"#c68206\" stroke=\"none\"/></g></g></svg>",
+    "dark": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"d-B-anthropic_claude-sonnet-5.5-ramen\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#d-B-anthropic_claude-sonnet-5.5-ramen)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#4c2b25\"/><g fill=\"none\" stroke=\"#fdcabf\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M8 20 H32 A12 11 0 0 1 8 20 Z\" fill=\"#77463c\"/><path d=\"M15 17 C15 14 17 14 17 11 C17 9 16 9 16 8\"/><path d=\"M22 17 C22 14 24 14 24 11 C24 9 23 9 23 8\"/><line x1=\"27\" y1=\"7\" x2=\"32\" y2=\"17\"/><line x1=\"31\" y1=\"6\" x2=\"35\" y2=\"14\"/><circle cx=\"16\" cy=\"25\" r=\"1.5\" fill=\"#e4a249\" stroke=\"none\"/></g></g></svg>"
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"coral\">\n  <path d=\"M8 20 H32 A12 11 0 0 1 8 20 Z\" fill=\"soft\"/>\n  <path d=\"M15 17 C15 14 17 14 17 11 C17 9 16 9 16 8\" detail=\"1\"/>\n  <path d=\"M22 17 C22 14 24 14 24 11 C24 9 23 9 23 8\" detail=\"1\"/>\n  <line x1=\"27\" y1=\"7\" x2=\"32\" y2=\"17\"/>\n  <line x1=\"31\" y1=\"6\" x2=\"35\" y2=\"14\" detail=\"1\"/>\n  <circle cx=\"16\" cy=\"25\" r=\"1.5\" fill=\"accent\" stroke=\"none\"/>\n</svg>"
+}

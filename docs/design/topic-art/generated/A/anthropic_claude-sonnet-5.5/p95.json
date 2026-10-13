@@ -1,0 +1,24 @@
+{
+  "approach": "A",
+  "model": "anthropic/claude-sonnet-5.5",
+  "topic": "p95",
+  "ok": true,
+  "free": {
+    "ok": true,
+    "svg": "<svg width=\"40\" height=\"40\" aria-hidden=\"true\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" fill=\"none\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"17\" cy=\"17\" r=\"10\" fill=\"#CFE3E8\" stroke=\"#2E5F6B\" stroke-width=\"3\"/><path d=\"M24.5 24.5L34 34\" stroke=\"#2E5F6B\" stroke-width=\"3\"/><path d=\"M11.5 20L15 16L18 18.5L22.5 12.5\" stroke=\"#CC4628\" stroke-width=\"3\"/></svg>",
+    "elements": 3,
+    "gradients": false
+  },
+  "attempts": 1,
+  "latencyMs": 1071,
+  "costUsd": 0.002946,
+  "tokens": {
+    "in": 458,
+    "out": 203
+  },
+  "raw": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" fill=\"none\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"17\" cy=\"17\" r=\"10\" fill=\"#CFE3E8\" stroke=\"#2E5F6B\" stroke-width=\"3\"/><path d=\"M24.5 24.5L34 34\" stroke=\"#2E5F6B\" stroke-width=\"3\"/><path d=\"M11.5 20L15 16L18 18.5L22.5 12.5\" stroke=\"#CC4628\" stroke-width=\"3\"/></svg>",
+  "svg": {
+    "light": "<svg width=\"40\" height=\"40\" aria-hidden=\"true\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" fill=\"none\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"17\" cy=\"17\" r=\"10\" fill=\"#CFE3E8\" stroke=\"#2E5F6B\" stroke-width=\"3\"/><path d=\"M24.5 24.5L34 34\" stroke=\"#2E5F6B\" stroke-width=\"3\"/><path d=\"M11.5 20L15 16L18 18.5L22.5 12.5\" stroke=\"#CC4628\" stroke-width=\"3\"/></svg>",
+    "dark": "<svg width=\"40\" height=\"40\" aria-hidden=\"true\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" fill=\"none\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"17\" cy=\"17\" r=\"10\" fill=\"#CFE3E8\" stroke=\"#2E5F6B\" stroke-width=\"3\"/><path d=\"M24.5 24.5L34 34\" stroke=\"#2E5F6B\" stroke-width=\"3\"/><path d=\"M11.5 20L15 16L18 18.5L22.5 12.5\" stroke=\"#CC4628\" stroke-width=\"3\"/></svg>"
+  }
+}

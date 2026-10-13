@@ -1,0 +1,24 @@
+{
+  "approach": "A",
+  "model": "google/gemini-3.8-flash",
+  "topic": "icons",
+  "ok": true,
+  "free": {
+    "ok": true,
+    "svg": "<svg width=\"40\" height=\"40\" aria-hidden=\"true\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" fill=\"none\">\n  <!-- Sparkling clean diamond / icon badge -->\n  <path d=\"M20 7L31 18L20 29L9 18Z\" fill=\"#CFE3E8\" stroke=\"#2E5F6B\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>\n  <!-- Refresh / sparkle star at top right -->\n  <path d=\"M29 6V12M26 9H32\" stroke=\"#CC4628\" stroke-width=\"3\" stroke-linecap=\"round\"/>\n  <!-- Subtle inner facet highlight -->\n  <path d=\"M15 18L20 23L25 18\" stroke=\"#2E5F6B\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>\n</svg>",
+    "elements": 3,
+    "gradients": false
+  },
+  "attempts": 1,
+  "latencyMs": 1709,
+  "costUsd": 0.00110475,
+  "tokens": {
+    "in": 278,
+    "out": 239
+  },
+  "raw": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" fill=\"none\">\n  <!-- Sparkling clean diamond / icon badge -->\n  <path d=\"M20 7L31 18L20 29L9 18Z\" fill=\"#CFE3E8\" stroke=\"#2E5F6B\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>\n  <!-- Refresh / sparkle star at top right -->\n  <path d=\"M29 6V12M26 9H32\" stroke=\"#CC4628\" stroke-width=\"3\" stroke-linecap=\"round\"/>\n  <!-- Subtle inner facet highlight -->\n  <path d=\"M15 18L20 23L25 18\" stroke=\"#2E5F6B\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>\n</svg>",
+  "svg": {
+    "light": "<svg width=\"40\" height=\"40\" aria-hidden=\"true\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" fill=\"none\">\n  <!-- Sparkling clean diamond / icon badge -->\n  <path d=\"M20 7L31 18L20 29L9 18Z\" fill=\"#CFE3E8\" stroke=\"#2E5F6B\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>\n  <!-- Refresh / sparkle star at top right -->\n  <path d=\"M29 6V12M26 9H32\" stroke=\"#CC4628\" stroke-width=\"3\" stroke-linecap=\"round\"/>\n  <!-- Subtle inner facet highlight -->\n  <path d=\"M15 18L20 23L25 18\" stroke=\"#2E5F6B\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>\n</svg>",
+    "dark": "<svg width=\"40\" height=\"40\" aria-hidden=\"true\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" fill=\"none\">\n  <!-- Sparkling clean diamond / icon badge -->\n  <path d=\"M20 7L31 18L20 29L9 18Z\" fill=\"#CFE3E8\" stroke=\"#2E5F6B\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>\n  <!-- Refresh / sparkle star at top right -->\n  <path d=\"M29 6V12M26 9H32\" stroke=\"#CC4628\" stroke-width=\"3\" stroke-linecap=\"round\"/>\n  <!-- Subtle inner facet highlight -->\n  <path d=\"M15 18L20 23L25 18\" stroke=\"#2E5F6B\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>\n</svg>"
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "approach": "D",
+  "model": "google/gemini-3.8-flash",
+  "topic": "games",
+  "ok": true,
+  "spec": {
+    "hue": "periwinkle",
+    "elements": [
+      {
+        "tag": "motif",
+        "attrs": {
+          "name": "dice"
+        }
+      }
+    ]
+  },
+  "attempts": 1,
+  "latencyMs": 3324,
+  "costUsd": 0.003489,
+  "tokens": {
+    "in": 2642,
+    "out": 402
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"periwinkle\">\n  <motif name=\"dice\"/>\n</svg>",
+  "svg": {
+    "light": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"l-D-google_gemini-3.8-flash-games\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#l-D-google_gemini-3.8-flash-games)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#d7defb\"/><g fill=\"none\" stroke=\"#3d4685\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><g transform=\"translate(0 0) scale(1)\" stroke-width=\"3.00\"><rect x=\"8\" y=\"8\" width=\"24\" height=\"24\" rx=\"6\" fill=\"#afbbef\"/><circle cx=\"14\" cy=\"14\" r=\"2\" fill=\"#3d4685\" stroke=\"none\"/><circle cx=\"20\" cy=\"20\" r=\"2\" fill=\"#3d4685\" stroke=\"none\"/><circle cx=\"26\" cy=\"26\" r=\"2\" fill=\"#3d4685\" stroke=\"none\"/><circle cx=\"26\" cy=\"14\" r=\"2\" fill=\"#df6a55\" stroke=\"none\"/><circle cx=\"14\" cy=\"26\" r=\"2\" fill=\"#df6a55\" stroke=\"none\"/></g></g></g></svg>",
+    "dark": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"d-D-google_gemini-3.8-flash-games\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#d-D-google_gemini-3.8-flash-games)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#2e334f\"/><g fill=\"none\" stroke=\"#ccd5fd\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><g transform=\"translate(0 0) scale(1)\" stroke-width=\"3.00\"><rect x=\"8\" y=\"8\" width=\"24\" height=\"24\" rx=\"6\" fill=\"#4a527c\"/><circle cx=\"14\" cy=\"14\" r=\"2\" fill=\"#ccd5fd\" stroke=\"none\"/><circle cx=\"20\" cy=\"20\" r=\"2\" fill=\"#ccd5fd\" stroke=\"none\"/><circle cx=\"26\" cy=\"26\" r=\"2\" fill=\"#ccd5fd\" stroke=\"none\"/><circle cx=\"26\" cy=\"14\" r=\"2\" fill=\"#f8907c\" stroke=\"none\"/><circle cx=\"14\" cy=\"26\" r=\"2\" fill=\"#f8907c\" stroke=\"none\"/></g></g></g></svg>"
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"periwinkle\">\n  <motif name=\"dice\"/>\n</svg>"
+}

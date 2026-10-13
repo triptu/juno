@@ -1,0 +1,75 @@
+{
+  "approach": "B",
+  "model": "anthropic/claude-sonnet-5.5",
+  "topic": "oncall",
+  "ok": true,
+  "spec": {
+    "hue": "teal",
+    "elements": [
+      {
+        "tag": "rect",
+        "attrs": {
+          "x": "8",
+          "y": "11",
+          "width": "24",
+          "height": "21",
+          "rx": "4",
+          "fill": "soft"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "8",
+          "y1": "18",
+          "x2": "32",
+          "y2": "18"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "14",
+          "y1": "8",
+          "x2": "14",
+          "y2": "13"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "26",
+          "y1": "8",
+          "x2": "26",
+          "y2": "13"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M14 25 H25"
+        }
+      },
+      {
+        "tag": "polyline",
+        "attrs": {
+          "points": "22 22 25 25 22 28",
+          "detail": "1"
+        }
+      }
+    ]
+  },
+  "attempts": 1,
+  "latencyMs": 4601,
+  "costUsd": 0.004566,
+  "tokens": {
+    "in": 1353,
+    "out": 186
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"teal\">\n  <rect x=\"8\" y=\"11\" width=\"24\" height=\"21\" rx=\"4\" fill=\"soft\"/>\n  <line x1=\"8\" y1=\"18\" x2=\"32\" y2=\"18\"/>\n  <line x1=\"14\" y1=\"8\" x2=\"14\" y2=\"13\"/>\n  <line x1=\"26\" y1=\"8\" x2=\"26\" y2=\"13\"/>\n  <path d=\"M14 25 H25\"/>\n  <polyline points=\"22 22 25 25 22 28\" detail=\"1\"/>\n</svg>",
+  "svg": {
+    "light": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"l-B-anthropic_claude-sonnet-5.5-oncall\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#l-B-anthropic_claude-sonnet-5.5-oncall)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#c3e9e3\"/><g fill=\"none\" stroke=\"#0c5952\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"8\" y=\"11\" width=\"24\" height=\"21\" rx=\"4\" fill=\"#84cec4\"/><line x1=\"8\" y1=\"18\" x2=\"32\" y2=\"18\"/><line x1=\"14\" y1=\"8\" x2=\"14\" y2=\"13\"/><line x1=\"26\" y1=\"8\" x2=\"26\" y2=\"13\"/><path d=\"M14 25 H25\"/><polyline points=\"22 22 25 25 22 28\"/></g></g></svg>",
+    "dark": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"d-B-anthropic_claude-sonnet-5.5-oncall\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#d-B-anthropic_claude-sonnet-5.5-oncall)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#0f3e39\"/><g fill=\"none\" stroke=\"#a3e7dd\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"8\" y=\"11\" width=\"24\" height=\"21\" rx=\"4\" fill=\"#1a625a\"/><line x1=\"8\" y1=\"18\" x2=\"32\" y2=\"18\"/><line x1=\"14\" y1=\"8\" x2=\"14\" y2=\"13\"/><line x1=\"26\" y1=\"8\" x2=\"26\" y2=\"13\"/><path d=\"M14 25 H25\"/><polyline points=\"22 22 25 25 22 28\"/></g></g></svg>"
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"teal\">\n  <rect x=\"8\" y=\"11\" width=\"24\" height=\"21\" rx=\"4\" fill=\"soft\"/>\n  <line x1=\"8\" y1=\"18\" x2=\"32\" y2=\"18\"/>\n  <line x1=\"14\" y1=\"8\" x2=\"14\" y2=\"13\"/>\n  <line x1=\"26\" y1=\"8\" x2=\"26\" y2=\"13\"/>\n  <path d=\"M14 25 H25\"/>\n  <polyline points=\"22 22 25 25 22 28\" detail=\"1\"/>\n</svg>"
+}

@@ -1,0 +1,56 @@
+{
+  "approach": "B",
+  "model": "google/gemini-3.8-flash",
+  "topic": "headcount",
+  "ok": true,
+  "spec": {
+    "hue": "sage",
+    "elements": [
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "15",
+          "cy": "14",
+          "r": "4.5",
+          "fill": "soft"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M7 31 C7 24 10.5 21 15 21 C19.5 21 23 24 23 31"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "27",
+          "cy": "15",
+          "r": "3.5",
+          "fill": "soft",
+          "detail": "1"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M24 29 C25 24.5 26 23 27.5 23 C31 23 33 26 33 31",
+          "detail": "1"
+        }
+      }
+    ]
+  },
+  "attempts": 1,
+  "latencyMs": 2887,
+  "costUsd": 0.00229125,
+  "tokens": {
+    "in": 1055,
+    "out": 400
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"sage\">\n  <circle cx=\"15\" cy=\"14\" r=\"4.5\" fill=\"soft\"/>\n  <path d=\"M7 31 C7 24 10.5 21 15 21 C19.5 21 23 24 23 31\"/>\n  <circle cx=\"27\" cy=\"15\" r=\"3.5\" fill=\"soft\" detail=\"1\"/>\n  <path d=\"M24 29 C25 24.5 26 23 27.5 23 C31 23 33 26 33 31\" detail=\"1\"/>\n</svg>",
+  "svg": {
+    "light": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"l-B-google_gemini-3.8-flash-headcount\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#l-B-google_gemini-3.8-flash-headcount)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#cee8d2\"/><g fill=\"none\" stroke=\"#135c2c\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"15\" cy=\"14\" r=\"4.5\" fill=\"#9ccca4\"/><path d=\"M7 31 C7 24 10.5 21 15 21 C19.5 21 23 24 23 31\"/><circle cx=\"27\" cy=\"15\" r=\"3.5\" fill=\"#9ccca4\"/><path d=\"M24 29 C25 24.5 26 23 27.5 23 C31 23 33 26 33 31\"/></g></g></svg>",
+    "dark": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"d-B-google_gemini-3.8-flash-headcount\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#d-B-google_gemini-3.8-flash-headcount)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#223d27\"/><g fill=\"none\" stroke=\"#b7e5bf\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"15\" cy=\"14\" r=\"4.5\" fill=\"#376040\"/><path d=\"M7 31 C7 24 10.5 21 15 21 C19.5 21 23 24 23 31\"/><circle cx=\"27\" cy=\"15\" r=\"3.5\" fill=\"#376040\"/><path d=\"M24 29 C25 24.5 26 23 27.5 23 C31 23 33 26 33 31\"/></g></g></svg>"
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"sage\">\n  <circle cx=\"15\" cy=\"14\" r=\"4.5\" fill=\"soft\"/>\n  <path d=\"M7 31 C7 24 10.5 21 15 21 C19.5 21 23 24 23 31\"/>\n  <circle cx=\"27\" cy=\"15\" r=\"3.5\" fill=\"soft\" detail=\"1\"/>\n  <path d=\"M24 29 C25 24.5 26 23 27.5 23 C31 23 33 26 33 31\" detail=\"1\"/>\n</svg>"
+}

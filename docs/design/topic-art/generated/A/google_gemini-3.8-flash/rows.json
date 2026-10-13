@@ -1,0 +1,24 @@
+{
+  "approach": "A",
+  "model": "google/gemini-3.8-flash",
+  "topic": "rows",
+  "ok": true,
+  "free": {
+    "ok": true,
+    "svg": "<svg width=\"40\" height=\"40\" aria-hidden=\"true\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" fill=\"none\" stroke=\"#2E5F6B\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\">\n  <rect x=\"5\" y=\"6\" rx=\"5\" fill=\"#CFE3E8\"/>\n  <path d=\"M11 13h10\"/>\n  <path d=\"M11 18h18\" stroke=\"#CC4628\"/>\n  <path d=\"M11 24h8\"/>\n  <path d=\"M11 29h14\"/>\n</svg>",
+    "elements": 5,
+    "gradients": false
+  },
+  "attempts": 1,
+  "latencyMs": 1670,
+  "costUsd": 0.0009195,
+  "tokens": {
+    "in": 316,
+    "out": 182
+  },
+  "raw": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" fill=\"none\" stroke=\"#2E5F6B\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\">\n  <rect x=\"5\" y=\"6\" width=\"30\" height=\"28\" rx=\"5\" fill=\"#CFE3E8\"/>\n  <path d=\"M11 13h10\"/>\n  <path d=\"M11 18h18\" stroke=\"#CC4628\"/>\n  <path d=\"M11 24h8\"/>\n  <path d=\"M11 29h14\"/>\n</svg>",
+  "svg": {
+    "light": "<svg width=\"40\" height=\"40\" aria-hidden=\"true\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" fill=\"none\" stroke=\"#2E5F6B\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\">\n  <rect x=\"5\" y=\"6\" rx=\"5\" fill=\"#CFE3E8\"/>\n  <path d=\"M11 13h10\"/>\n  <path d=\"M11 18h18\" stroke=\"#CC4628\"/>\n  <path d=\"M11 24h8\"/>\n  <path d=\"M11 29h14\"/>\n</svg>",
+    "dark": "<svg width=\"40\" height=\"40\" aria-hidden=\"true\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" fill=\"none\" stroke=\"#2E5F6B\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\">\n  <rect x=\"5\" y=\"6\" rx=\"5\" fill=\"#CFE3E8\"/>\n  <path d=\"M11 13h10\"/>\n  <path d=\"M11 18h18\" stroke=\"#CC4628\"/>\n  <path d=\"M11 24h8\"/>\n  <path d=\"M11 29h14\"/>\n</svg>"
+  }
+}

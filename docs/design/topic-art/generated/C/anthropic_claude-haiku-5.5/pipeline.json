@@ -1,0 +1,40 @@
+{
+  "approach": "C",
+  "model": "anthropic/claude-haiku-5.5",
+  "topic": "pipeline",
+  "ok": true,
+  "spec": {
+    "hue": "periwinkle",
+    "elements": [
+      {
+        "tag": "motif",
+        "attrs": {
+          "name": "calendar-check",
+          "x": "0",
+          "y": "0",
+          "scale": "1"
+        }
+      }
+    ]
+  },
+  "decision": {
+    "main": "calendar-check",
+    "secondary": null,
+    "hue": "periwinkle",
+    "confident": true,
+    "why": "A scheduled Thursday review with forecast numbers ready"
+  },
+  "attempts": 1,
+  "latencyMs": 1125,
+  "costUsd": 0.0002288,
+  "tokens": {
+    "in": 1978,
+    "out": 62
+  },
+  "raw": "{\"main\": \"calendar-check\", \"secondary\": null, \"hue\": \"periwinkle\", \"confident\": true, \"why\": \"A scheduled Thursday review with forecast numbers ready\"}",
+  "svg": {
+    "light": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"l-C-anthropic_claude-haiku-5.5-pipeline\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#l-C-anthropic_claude-haiku-5.5-pipeline)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#d7defb\"/><g fill=\"none\" stroke=\"#3d4685\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><g transform=\"translate(0 0) scale(1)\" stroke-width=\"3.00\"><rect x=\"9\" y=\"11\" width=\"22\" height=\"20\" rx=\"4\" fill=\"#afbbef\"/><line x1=\"9\" y1=\"17\" x2=\"31\" y2=\"17\"/><line x1=\"14\" y1=\"8\" x2=\"14\" y2=\"13\"/><line x1=\"26\" y1=\"8\" x2=\"26\" y2=\"13\"/><path d=\"M15 24 L19 28 L26 21\"/></g></g></g></svg>",
+    "dark": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"d-C-anthropic_claude-haiku-5.5-pipeline\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#d-C-anthropic_claude-haiku-5.5-pipeline)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#2e334f\"/><g fill=\"none\" stroke=\"#ccd5fd\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><g transform=\"translate(0 0) scale(1)\" stroke-width=\"3.00\"><rect x=\"9\" y=\"11\" width=\"22\" height=\"20\" rx=\"4\" fill=\"#4a527c\"/><line x1=\"9\" y1=\"17\" x2=\"31\" y2=\"17\"/><line x1=\"14\" y1=\"8\" x2=\"14\" y2=\"13\"/><line x1=\"26\" y1=\"8\" x2=\"26\" y2=\"13\"/><path d=\"M15 24 L19 28 L26 21\"/></g></g></g></svg>"
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"periwinkle\">\n  <motif name=\"calendar-check\" x=\"0\" y=\"0\" scale=\"1\"/>\n</svg>"
+}

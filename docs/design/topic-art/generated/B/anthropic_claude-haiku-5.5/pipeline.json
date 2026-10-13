@@ -1,0 +1,55 @@
+{
+  "approach": "B",
+  "model": "anthropic/claude-haiku-5.5",
+  "topic": "pipeline",
+  "ok": true,
+  "spec": {
+    "hue": "amber",
+    "elements": [
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M10 33 V21"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M17 33 V16"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M24 33 V11"
+        }
+      },
+      {
+        "tag": "polyline",
+        "attrs": {
+          "points": "8 17 16 11 22 15 32 8"
+        }
+      },
+      {
+        "tag": "polyline",
+        "attrs": {
+          "points": "27 8 32 8 32 13",
+          "detail": "1"
+        }
+      }
+    ]
+  },
+  "attempts": 1,
+  "latencyMs": 1503,
+  "costUsd": 0.0002013,
+  "tokens": {
+    "in": 1353,
+    "out": 132
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"amber\">\n  <path d=\"M10 33 V21\"/>\n  <path d=\"M17 33 V16\"/>\n  <path d=\"M24 33 V11\"/>\n  <polyline points=\"8 17 16 11 22 15 32 8\"/>\n  <polyline points=\"27 8 32 8 32 13\" detail=\"1\"/>\n</svg>",
+  "svg": {
+    "light": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"l-B-anthropic_claude-haiku-5.5-pipeline\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#l-B-anthropic_claude-haiku-5.5-pipeline)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#f1dcc3\"/><g fill=\"none\" stroke=\"#6b4300\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M10 33 V21\"/><path d=\"M17 33 V16\"/><path d=\"M24 33 V11\"/><polyline points=\"8 17 16 11 22 15 32 8\"/><polyline points=\"27 8 32 8 32 13\"/></g></g></svg>",
+    "dark": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"d-B-anthropic_claude-haiku-5.5-pipeline\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#d-B-anthropic_claude-haiku-5.5-pipeline)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#453116\"/><g fill=\"none\" stroke=\"#f5d1a5\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M10 33 V21\"/><path d=\"M17 33 V16\"/><path d=\"M24 33 V11\"/><polyline points=\"8 17 16 11 22 15 32 8\"/><polyline points=\"27 8 32 8 32 13\"/></g></g></svg>"
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"amber\">\n  <path d=\"M10 33 V21\"/>\n  <path d=\"M17 33 V16\"/>\n  <path d=\"M24 33 V11\"/>\n  <polyline points=\"8 17 16 11 22 15 32 8\"/>\n  <polyline points=\"27 8 32 8 32 13\" detail=\"1\"/>\n</svg>"
+}
