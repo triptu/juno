@@ -1,0 +1,175 @@
+// The randomised convergence test of architecture 5.4 and ADR 0011: after a
+// seeded mix of posts, replies, edits, deletes, reactions, read marks and
+// socket drops, the store equals the fake, and the incremental topic index
+// equals a full rebuild.
+import { DatabaseSync } from 'node:sqlite'
+import { join } from 'node:path'
+import { Effect } from 'effect'
+import { afterEach, describe, expect, it } from 'vitest'
+import { Store, workspacePathsFromDir } from '@juno/store'
+import { reindexAll } from '@juno/sync'
+import { UserId } from '@juno/domain'
+import { sleep, startTestEngine, waitFor, type RunningEngine } from './harness'
+
+let engine: RunningEngine | undefined
+afterEach(async () => {
+  await engine?.stop()
+  engine = undefined
+})
+
+/** mulberry32, so a failure is reproducible from the seed. */
+function random(seed: number): () => number {
+  let a = seed >>> 0
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0
+    let t = a
+    t = Math.imul(t ^ (t >>> 15), t | 1)
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+}
+
+const PEOPLE = ['U0MAYA', 'U0LEO', 'U0SAM', 'U0PRIYA', 'U0JONAS', 'U0DEV']
+const SEED = Number(process.env['JUNO_CONVERGENCE_SEED'] ?? 7)
+const ROUNDS = Number(process.env['JUNO_CONVERGENCE_ROUNDS'] ?? 80)
+
+interface StoredMessage {
+  readonly channel: string
+  readonly ts: string
+  readonly thread_ts: string | null
+  readonly text: string
+  readonly edited_ts: string | null
+  readonly deleted: 0 | 1
+  readonly reply_count: number
+  readonly latest_reply: string | null
+}
+
+describe('convergence', () => {
+  it(`after ${ROUNDS} random events with drops (seed ${SEED}) the store matches the fake and the index matches a rebuild`, async () => {
+    engine = await startTestEngine({ initial: (fake) => fake.signIn() })
+    await engine.status('ready')
+    await engine.phase('live', 30_000)
+    await engine.rowsUntil((rows) => rows.length >= 20, 'rows')
+    const { fake } = engine
+    const rand = random(SEED)
+    const pick = <T>(list: ReadonlyArray<T>): T => list[Math.floor(rand() * list.length)]!
+    const conversations = [...fake.workspace.conversations.values()].filter((c) => c.members.has(fake.selfId)).map((c) => c.id)
+    const created: Array<{ channel: string; ts: string }> = []
+    let connected = true
+
+    const live = (channel: string) => fake.messages(channel).filter((m) => m.subtype !== 'tombstone')
+    const roots = () => conversations.flatMap((channel) => live(channel).filter((m) => (m.reply_count ?? 0) > 0 || m.thread_ts === undefined).map((m) => ({ channel, message: m })))
+    const anyMessage = () => conversations.flatMap((channel) => live(channel).map((m) => ({ channel, message: m })))
+
+    for (let round = 0; round < ROUNDS; round++) {
+      const roll = rand()
+      if (roll < 0.3) {
+        const channel = pick(conversations)
+        created.push({ channel, ts: fake.injectMessage({ channel, user: pick(PEOPLE), text: `main ${round} ${pick(['ok', 'hmm', 'ship it', 'checking'])}` }).ts })
+      } else if (roll < 0.55) {
+        const root = pick(roots())
+        created.push({ channel: root.channel, ts: fake.injectMessage({ channel: root.channel, user: pick(PEOPLE), text: `reply ${round}`, threadTs: root.message.ts }).ts })
+      } else if (!connected) {
+        // Only new messages while the socket is down: edits and deletes during a drop are a known gap (sync README).
+        const channel = pick(conversations)
+        created.push({ channel, ts: fake.injectMessage({ channel, user: pick(PEOPLE), text: `offline ${round}` }).ts })
+      } else if (roll < 0.65) {
+        const target = pick(anyMessage())
+        fake.editMessage({ channel: target.channel, ts: target.message.ts, text: `edited ${round}` })
+      } else if (roll < 0.72) {
+        const target = pick(anyMessage().filter((m) => created.some((c) => c.ts === m.message.ts)))
+        if (target !== undefined) fake.deleteMessage({ channel: target.channel, ts: target.message.ts })
+      } else if (roll < 0.82) {
+        const target = pick(anyMessage())
+        const name = pick(['eyes', '+1', 'tada'])
+        const user = pick(PEOPLE)
+        const has = target.message.reactions?.find((r) => r.name === name)?.users?.includes(user) === true
+        if (has) fake.removeReaction({ channel: target.channel, ts: target.message.ts, name, user })
+        else fake.addReaction({ channel: target.channel, ts: target.message.ts, name, user })
+      } else if (roll < 0.9) {
+        const channel = pick(conversations)
+        const latest = fake.workspace.main(channel).at(-1)
+        if (latest !== undefined) fake.markRead({ channel, ts: latest.ts })
+      } else if (roll < 0.95) {
+        fake.dropSocket()
+        connected = false
+      } else {
+        // Let the socket come back before the next connected-only event.
+        await engine.phase('live', 20_000)
+        await waitFor(() => (fake.socketCount() === 1 ? true : undefined), 20_000, 'socket back')
+        connected = true
+      }
+      if (rand() < 0.3) await sleep(5)
+    }
+    await engine.phase('live', 20_000)
+    await waitFor(() => (fake.socketCount() === 1 ? true : undefined), 20_000, 'socket back')
+
+    // Quiescence: the engine stops calling the fake and every created message is stored.
+    const paths = workspacePathsFromDir(join(engine.userData, 'workspaces', fake.teamId))
+    const db = new DatabaseSync(paths.userDb, { readOnly: true })
+    db.exec(`ATTACH DATABASE '${paths.cacheDb}' AS cache`)
+    const stored = () => db.prepare('SELECT channel, ts, thread_ts, text, edited_ts, deleted, reply_count, latest_reply FROM messages').all() as unknown as Array<StoredMessage>
+    await waitFor(
+      () => {
+        const rows = stored()
+        return created.every((c) => rows.some((r) => r.channel === c.channel && r.ts === c.ts)) ? true : undefined
+      },
+      30_000,
+      'every created message stored',
+    )
+    let calls = fake.callCount()
+    await waitFor(
+      async () => {
+        await sleep(300)
+        const now = fake.callCount()
+        const settled = now === calls
+        calls = now
+        return settled ? true : undefined
+      },
+      30_000,
+      'the fake to go quiet',
+    )
+    await sleep(200)
+
+    // 1. Every stored message says what the fake says; every created message is there; deleted ones are tombstones.
+    const mismatches: Array<string> = []
+    for (const row of stored()) {
+      const actual = fake.messages(row.channel).find((m) => m.ts === row.ts)
+      const describe = (what: string) => mismatches.push(`${row.channel}/${row.ts}: ${what}`)
+      if (actual === undefined || actual.subtype === 'tombstone') {
+        if (row.deleted !== 1) describe('deleted in the fake but live in the store')
+        continue
+      }
+      if (row.deleted === 1) {
+        describe('live in the fake but a tombstone in the store')
+        continue
+      }
+      if (row.text !== (actual.text ?? '')) describe(`text ${JSON.stringify(row.text)} vs ${JSON.stringify(actual.text)}`)
+      if ((row.edited_ts ?? null) !== (actual.edited?.ts ?? null)) describe('edited_ts differs')
+      const withFields = fake.workspace.withThreadFields({ ...actual, channel: row.channel })
+      if (row.reply_count !== (withFields.reply_count ?? 0)) describe(`reply_count ${row.reply_count} vs ${withFields.reply_count ?? 0}`)
+      if ((row.latest_reply ?? null) !== (withFields.latest_reply ?? null)) describe(`latest_reply ${row.latest_reply} vs ${withFields.latest_reply}`)
+      // Reactions: compared for messages posted during the test. A fixture message first stored from a search
+      // match carries no reaction state until a page or an event brings it (sync README).
+      if (!created.some((c) => c.channel === row.channel && c.ts === row.ts)) continue
+      const reactions = db.prepare('SELECT name, user_ids_json FROM reactions WHERE channel = ? AND ts = ? ORDER BY name').all(row.channel, row.ts) as Array<{ name: string; user_ids_json: string }>
+      const expectedReactions = [...(actual.reactions ?? [])].toSorted((a, b) => a.name.localeCompare(b.name)).map((r) => `${r.name}:${[...(r.users ?? [])].toSorted().join(',')}`)
+      const storedReactions = reactions.map((r) => `${r.name}:${(JSON.parse(r.user_ids_json) as Array<string>).toSorted().join(',')}`)
+      if (storedReactions.join('|') !== expectedReactions.join('|')) describe(`reactions ${storedReactions.join('|')} vs ${expectedReactions.join('|')}`)
+    }
+    expect(mismatches).toEqual([])
+
+    // 2. Read pointers follow the server marks.
+    for (const channel of conversations) {
+      const read = db.prepare('SELECT last_read_ts FROM topic_reads WHERE topic_id = ?').get(`m:${channel}`) as { last_read_ts: string } | undefined
+      expect(read?.last_read_ts, channel).toBe(fake.workspace.reads.get(channel))
+    }
+    db.close()
+
+    // 3. The incremental index equals a full rebuild: re-indexing every topic changes nothing.
+    const changed = await Effect.runPromise(
+      reindexAll({ me: { userId: UserId.make(fake.selfId) } }).pipe(Effect.provide(Store.layer(paths)), Effect.scoped),
+    )
+    expect(changed).toEqual([])
+  }, 120_000)
+})

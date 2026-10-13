@@ -2,49 +2,57 @@
  * The signed-in session (architecture 2.3, 14, 16 M2).
  *
  * The engine owns the state machine; main does the Electron work on request
- * (`HostLink`). At start the engine asks main for the stored secrets and
- * verifies them with `auth.test`. A sign-in or import asks main to capture a
- * session, verifies it the same way, and only then tells main to store it,
- * so `secrets.bin` never holds a session Slack has not accepted.
+ * (`HostLink`). At start the engine asks main for the stored secrets, opens
+ * the workspace store (so the first live query is answered from the cache)
+ * and verifies the secrets with `auth.test`. A sign-in or import asks main
+ * to capture a session, verifies it the same way, and only then tells main
+ * to store it, so `secrets.bin` never holds a session Slack has not
+ * accepted.
  *
  * While `ready`, the Slack client for that session lives in its own scope:
- * `SlackApi`, `SlackEdge` and `SlackSocket` built on the handed-over
- * secrets. The socket runs for the life of the session; its only failure is
- * `SlackAuthRequired` (a fatal auth error or `user_session_expiration`),
- * which moves the session to `authRequired`, closes the scope and tells
- * main. Local data stays; a new sign-in replaces the secrets.
+ * `SlackApi`, `SlackEdge`, `SlackSocket` and `RequestQueue` built on the
+ * handed-over secrets. `active` hands that context and its scope to the
+ * sync runner, which runs the socket and the sync inside the scope; a fatal
+ * auth condition reaches `expire`, which closes the scope, moves the status
+ * to `authRequired` and tells main. Local data stays; a new sign-in replaces
+ * the secrets.
  *
- * Sign-out closes the scope, has main delete the secrets and clear the
- * `persist:slack` cookies, and deletes the workspace's `cache.db`.
+ * Sign-out closes the scope (which ends the sync), closes the store, has
+ * main delete the secrets and clear the `persist:slack` cookies, and deletes
+ * the workspace's `cache.db`.
  *
- * The engine phase (`first-run`, `live`, `session-expired`) follows the
- * session status; the composition layer wires that (`layer.ts`), so this
- * folder depends on no other feature.
+ * The engine phase (`first-run`, boot phases, `live`, `session-expired`)
+ * follows the session status and the sync; the composition layer wires that
+ * (`layer.ts`), so this folder depends on no other feature.
  */
 import { rm } from 'node:fs/promises'
 import { Context, Effect, Exit, Fiber, Layer, Ref, Scope, Stream, SubscriptionRef } from 'effect'
 import { NotSignedIn, SignInFailed, type MainToEngine, type SessionSecrets, type SessionStatus, type SignInMethod } from '@juno/contract'
 import {
   HttpTransport,
+  RequestQueue,
   SlackApi,
   SlackClient,
+  SlackEdge,
   SlackSession,
   SlackSocket,
   slackConfigLayer,
   SocketHandshake,
-  type SlackApiShape,
   type SlackSessionShape,
 } from '@juno/slack'
-import { workspacePaths } from '@juno/store'
 import { EngineConfig } from '../config'
 import { HostLink } from '../protocol/host'
+import { Workspace } from '../workspace'
 import { hostHandshake } from './handshake'
 
-interface Active {
+export type SlackServices = SlackApi | SlackEdge | SlackSocket | RequestQueue | SlackSession
+
+/** The Slack client of the ready session and the scope it lives in. Work forked into the scope ends with the session. */
+export interface ActiveSession {
   readonly secrets: SessionSecrets
   readonly scope: Scope.Closeable
-  readonly api: SlackApiShape
-  /** `enterprise_id` as `auth.test` reported it (Grid detection, architecture 12). */
+  readonly context: Context.Context<SlackServices>
+  /** `enterprise_id` as `auth.test` reported it, else the team id (Grid detection, architecture 12). */
   readonly workspaceId: string
 }
 
@@ -56,60 +64,57 @@ export class Session extends Context.Service<
     readonly statuses: Stream.Stream<SessionStatus>
     readonly signIn: (method: SignInMethod) => Effect.Effect<void, SignInFailed>
     readonly signOut: Effect.Effect<void>
-    /** The Slack API of the current session, for the features that come after M2. */
-    readonly api: Effect.Effect<SlackApiShape, NotSignedIn>
+    /** The Slack client of the current session. */
+    readonly active: Effect.Effect<ActiveSession, NotSignedIn>
+    /** Slack no longer accepts the session: close it, keep local data, ask for a sign-in. */
+    readonly expire: (reason: string) => Effect.Effect<void>
   }
 >()('juno/engine/Session') {
-  static readonly layer: Layer.Layer<Session, never, HostLink | EngineConfig | HttpTransport> = Layer.effect(
+  static readonly layer: Layer.Layer<Session, never, HostLink | EngineConfig | HttpTransport | Workspace> = Layer.effect(
     Session,
     Effect.gen(function* () {
       const host = yield* HostLink
       const config = yield* EngineConfig
       const transport = yield* HttpTransport
+      const workspace = yield* Workspace
       const serviceScope = yield* Effect.scope
       const state = yield* SubscriptionRef.make<SessionStatus>({ _tag: 'signedOut' })
-      const active = yield* Ref.make<Active | undefined>(undefined)
+      const active = yield* Ref.make<ActiveSession | undefined>(undefined)
 
       const setStatus = (next: SessionStatus) => SubscriptionRef.set(state, next)
 
       const slackLayer = (secrets: SessionSecrets) =>
         SlackClient.layer.pipe(
+          Layer.provideMerge(SlackSession.layer(toSlackSession(secrets))),
           Layer.provide(
             Layer.mergeAll(
-              SlackSession.layer(toSlackSession(secrets)),
               Layer.succeed(HttpTransport, transport),
               Layer.succeed(SocketHandshake, hostHandshake(host)),
               slackConfigLayer(
-                config.fakeSlackUrl === undefined ? {} : { socket: { allowedHosts: ['slack.com', new URL(config.fakeSlackUrl).hostname] } },
+                config.fakeSlackUrl === undefined
+                  ? {}
+                  : {
+                      socket: { allowedHosts: ['slack.com', new URL(config.fakeSlackUrl).hostname] },
+                      // The fake has no rate limits; spacing background calls would only slow tests.
+                      lanes: { backgroundMinIntervalMillis: 0 },
+                    },
               ),
             ),
           ),
         )
 
-      /** Closes the current session's scope, if any. */
+      /** Closes the current session's scope, if any. Work forked into it (the sync, the socket) ends here. */
       const closeActive = Effect.gen(function* () {
         const current = yield* Ref.getAndSet(active, undefined)
         if (current !== undefined) yield* Scope.close(current.scope, Exit.void)
       })
 
-      const authRequired = (reason: string) =>
+      const expire = (reason: string) =>
         Effect.gen(function* () {
           yield* closeActive
           yield* setStatus({ _tag: 'authRequired', reason })
           yield* host.send({ _tag: 'authRequired', reason })
         })
-
-      /** Watches the socket for the life of the session; a fatal auth condition ends the session. */
-      const watch = (context: Context.Context<SlackSocket>, scope: Scope.Closeable) =>
-        Effect.gen(function* () {
-          const socket = Context.get(context, SlackSocket)
-          const events = yield* socket.events
-          yield* Stream.runDrain(events)
-        }).pipe(
-          Effect.catchTag('SlackAuthRequired', (error) => authRequired(error.error)),
-          Scope.provide(scope),
-          Effect.forkIn(scope),
-        )
 
       /**
        * Builds the client for `secrets`, calls `auth.test` and, on success,
@@ -118,6 +123,7 @@ export class Session extends Context.Service<
        */
       const activate = (secrets: SessionSecrets) =>
         Effect.gen(function* () {
+          yield* workspace.open(workspaceIdOf(secrets)).pipe(Effect.orDie)
           const scope = yield* Scope.make()
           const context = yield* Layer.buildWithScope(slackLayer(secrets), scope).pipe(Effect.onError(() => Scope.close(scope, Exit.void)))
           const api = Context.get(context, SlackApi)
@@ -128,8 +134,10 @@ export class Session extends Context.Service<
           }
           const auth = result.success
           const enterpriseId = auth.enterprise_id ?? secrets.enterprise?.id
+          const workspaceId = enterpriseId ?? auth.team_id
           yield* closeActive
-          yield* Ref.set(active, { secrets, scope, api, workspaceId: enterpriseId ?? auth.team_id })
+          if (workspaceId !== workspaceIdOf(secrets)) yield* workspace.open(workspaceId).pipe(Effect.orDie)
+          yield* Ref.set(active, { secrets, scope, context, workspaceId })
           yield* setStatus({
             _tag: 'ready',
             teamId: auth.team_id,
@@ -138,7 +146,6 @@ export class Session extends Context.Service<
             userName: auth.user,
             ...(enterpriseId === undefined ? {} : { enterprise: { id: enterpriseId, ...(secrets.enterprise?.name === undefined ? {} : { name: secrets.enterprise.name }) } }),
           })
-          yield* watch(context, scope)
         })
 
       /** Sends `request` and waits for main's `secrets` or `sessionFailed` answer. */
@@ -161,7 +168,7 @@ export class Session extends Context.Service<
         const result = yield* Effect.result(activate(answer.secrets))
         if (result._tag === 'Success') return
         const error = result.failure
-        if (error._tag === 'SlackAuthRequired') return yield* authRequired(error.error)
+        if (error._tag === 'SlackAuthRequired') return yield* expire(error.error)
         // Slack could not be reached or answered oddly: keep the session on file and show what we know.
         yield* Effect.logWarning('session: auth.test failed at start', { tag: error._tag })
         yield* setStatus({
@@ -212,24 +219,26 @@ export class Session extends Context.Service<
         Effect.gen(function* () {
           const current = yield* Ref.get(active)
           yield* closeActive
+          const paths = (yield* workspace.current)?.paths
+          yield* workspace.close
           const messages = yield* host.messages
           const done = yield* Effect.forkScoped(Stream.runHead(Stream.filter(messages, (m) => m._tag === 'signedOut')))
           yield* host.send({ _tag: 'signOut' })
           yield* Fiber.join(done)
-          if (current !== undefined) {
-            const paths = workspacePaths(config.userData, current.workspaceId)
-            yield* Effect.promise(() => rm(paths.cacheDb, { force: true }))
-            yield* Effect.promise(() => rm(`${paths.cacheDb}-wal`, { force: true }))
-            yield* Effect.promise(() => rm(`${paths.cacheDb}-shm`, { force: true }))
+          const cacheDb = paths?.cacheDb ?? (current === undefined ? undefined : workspacePathsOf(config.userData, current.workspaceId))
+          if (cacheDb !== undefined) {
+            yield* Effect.promise(() => rm(cacheDb, { force: true }))
+            yield* Effect.promise(() => rm(`${cacheDb}-wal`, { force: true }))
+            yield* Effect.promise(() => rm(`${cacheDb}-shm`, { force: true }))
           }
           yield* setStatus({ _tag: 'signedOut' })
         }),
       )
 
-      const api = Effect.gen(function* () {
+      const activeSession = Effect.gen(function* () {
         const current = yield* Ref.get(active)
         if (current === undefined) return yield* new NotSignedIn()
-        return current.api
+        return current
       })
 
       yield* Effect.forkIn(start, serviceScope)
@@ -240,7 +249,8 @@ export class Session extends Context.Service<
         statuses: SubscriptionRef.changes(state),
         signIn,
         signOut,
-        api,
+        active: activeSession,
+        expire,
       })
     }),
   )
@@ -264,4 +274,10 @@ function toSlackSession(secrets: SessionSecrets): SlackSessionShape {
           },
         }),
   }
+}
+
+const workspaceIdOf = (secrets: SessionSecrets) => secrets.enterprise?.id ?? secrets.teamId
+
+function workspacePathsOf(userData: string, workspaceId: string): string {
+  return `${userData}/workspaces/${workspaceId}/cache.db`
 }

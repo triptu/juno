@@ -344,16 +344,25 @@ importers:
       '@juno/contract':
         specifier: workspace:*
         version: link:../contract
+      '@juno/domain':
+        specifier: workspace:*
+        version: link:../domain
       '@juno/slack':
         specifier: workspace:*
         version: link:../slack
       '@juno/store':
         specifier: workspace:*
         version: link:../store
+      '@juno/sync':
+        specifier: workspace:*
+        version: link:../sync
       effect:
         specifier: 4.0.3
         version: 4.0.3
     devDependencies:
+      '@effect/vitest':
+        specifier: 4.0.3
+        version: 4.0.3(effect@4.0.3)(vitest@5.0.4(@types/node@24.19.2)(vite@7.3.7(@types/node@24.19.2)(jiti@2.7.0)(lightningcss@1.33.0)))
       '@juno/fake-slack':
         specifier: workspace:*
         version: link:../fake-slack
@@ -510,6 +519,34 @@ importers:
       '@effect/vitest':
         specifier: 4.0.3
         version: 4.0.3(effect@4.0.3)(vitest@5.0.4(@types/node@24.19.2)(vite@7.3.7(@types/node@24.19.2)(jiti@2.7.0)(lightningcss@1.33.0)))
+      '@types/node':
+        specifier: 24.19.2
+        version: 24.19.2
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: 5.0.4
+        version: 5.0.4(@types/node@24.19.2)(vite@7.3.7(@types/node@24.19.2)(jiti@2.7.0)(lightningcss@1.33.0))
+
+  packages/sync:
+    dependencies:
+      '@juno/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@juno/slack':
+        specifier: workspace:*
+        version: link:../slack
+      '@juno/slack-schema':
+        specifier: workspace:*
+        version: link:../slack-schema
+      '@juno/store':
+        specifier: workspace:*
+        version: link:../store
+      effect:
+        specifier: 4.0.3
+        version: 4.0.3
+    devDependencies:
       '@types/node':
         specifier: 24.19.2
         version: 24.19.2

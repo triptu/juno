@@ -13,6 +13,7 @@ export {
 export { configureConnection, connectionStateAtom, makeRegistry, registry, type ConnectionState, type Registry } from './client'
 export { engineStatusAtom, pingCommand } from './engine'
 export { importFromSlackAppCommand, sessionStatusAtom, signInCommand, signOutCommand } from './session'
+export { defaultTopicListFilter, SIDEBAR_WINDOW, topicCountsAtom, topicListAtom, type TopicListFilter } from './topics'
 export { applyListDelta, emptyWindow, type ListWindow } from './list'
 export { errorOf } from './result'
 export { acquireRendererPort, EngineFailed } from './port'

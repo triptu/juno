@@ -12,3 +12,7 @@ Small items noticed during work that are not yet assigned to a milestone. Remove
 - Gallery: adopt the state-machine pattern (states grouped in product terms, switcher beside the component, `__state` links, loading states held, each view lists only states its code can reach). Starts after the look update merges.
 - Layout-shift guard: a test helper that records `layout-shift` entries during an interaction and fails on any shift. Use it in gallery behaviour tests (hover/press/focus every interactive fixture), app e2e (sidebar hover, tab switch, live message, image load) and the perf harness.
 - Break passes with the `interfaces:break` skill at each UI milestone end, plus a final pass before shipping.
+- The 300-row `topics.list` snapshot is 346 KB on the large seed (budget 200 KB), mostly participant names and avatar URLs repeated per row. If the UI track keeps the self-contained row, add a `people` live value and carry ids in rows; see architecture 16, M3.
+- Edits, deletes and reactions during a socket drop are recovered only for thread text (search sweep) or when a topic is opened. Decide after the live smoke whether `cached_latest_updates` (ADR 0011) is usable.
+- The live smoke has not yet confirmed `search.modules.messages` with `is:thread after:` for an `xoxc` session (architecture 5.3, open question 17.2). `SyncConfig.discovery: 'history'` is the fallback.
+- `emojis/list` into the `emoji` table is not synced yet (architecture 5.2 step 6).
