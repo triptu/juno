@@ -4,11 +4,12 @@
  * `juno://app/` serves the built renderer. `standard` gives it a real origin
  * and relative URLs, `secure` lets it use secure-context APIs, `codeCache`
  * lets Chromium keep the V8 code cache for the bundle between launches.
- * `juno://files/` (thumbnails on the Slack session) comes in M6.
+ * `juno://files/` serves message thumbnails on the Slack session (files.ts).
  */
 import { net, protocol } from 'electron'
 import { resolve, sep } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { serveThumbnail } from './files'
 
 export const APP_SCHEME = 'juno'
 export const APP_ORIGIN = `${APP_SCHEME}://app`
@@ -21,11 +22,16 @@ export function registerAppScheme(): void {
   ])
 }
 
-/** Must run after `app.whenReady()`. `rendererDir` is the built renderer folder. */
-export function serveAppScheme(rendererDir: string): void {
+/**
+ * Must run after `app.whenReady()`. `rendererDir` is the built renderer
+ * folder; `fakeSlackOrigin` is the fake Slack thumbnails may also come from
+ * under JUNO_E2E.
+ */
+export function serveAppScheme(rendererDir: string, fakeSlackOrigin?: string): void {
   const root = resolve(rendererDir)
   protocol.handle(APP_SCHEME, (request) => {
     const url = new URL(request.url)
+    if (url.host === 'files') return serveThumbnail(url, fakeSlackOrigin)
     if (url.host !== 'app') return new Response('Not found', { status: 404 })
     const pathname = url.pathname === '/' ? '/index.html' : decodeURIComponent(url.pathname)
     // Resolve against the root and refuse anything that escapes it. Chromium
