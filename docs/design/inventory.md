@@ -132,13 +132,15 @@ Centered, padding `48 16`, gap 8: title 14/500, body 13 muted lh 1.5, button 30p
 
 - Container: `role="button" tabindex="0"`, flex, gap 12, align start, padding `11 12`, radius 10, transparent. Hover `--surface-hover`. Selected (open in the active tab) `--secondary-default`.
 - Tile (chat style only): 44×44 (36 compact). Channel: first letter uppercase, 14/600, bg `--secondary-default`, fg subtle, radius 10. DM: person avatar, round, person colours (tokens §1.6). Group DM: first initials of each member ("ML").
-- Line 1 (22px box, gap 6): title 14.5px (13.5 compact), weight 500 (600 unread), letter-spacing 0, single line ellipsis, `flex: 0 1 auto` so tags stay visible. Then optional tags in order: **Main**, **Reopened**, unsubscribed `bell-off` 13 muted. Spacer. Then time 12px tabular, muted (subtle when unread).
-  - Main tag: 18px, padding 0 6, radius 6, 1px `--border-strong`, 11/500 subtle, title "Messages posted in this channel or DM outside any thread".
-  - Reopened tag: same but filled `--secondary-default`, no border, title "New activity after it was resolved".
+- Line 1 (22px box, gap 6): title 14.5px (13.5 compact), weight 500 (600 unread), letter-spacing 0, single line ellipsis, `flex: 0 1 auto` so the icons stay visible. Then the optional unsubscribed `bell-off` 13 muted. Spacer. Then time 12px tabular, muted (subtle when unread).
 - Line 2 (gap 8): preview 13px lh 1.45, muted (subtle when unread), `-webkit-line-clamp` 1 or 2 (tweak `previewLines`, default 2), `text-wrap: pretty`. Text is "Sender: text" with "You:" for own messages and ">" quote lines stripped. Right column (gap 4, padding-top 1):
   - **@ tag** when the latest unread run mentions you: 18px, min-width 18, radius 6, bg `--hl-soft`, inset 1px ring `--border-strong`, "@" 11/500 subtle, title "Mentions you".
   - **count tag** = unread count: 18px, min-width 18, padding 0 5, radius 6, 11/500 tabular; unread row bg `--secondary-active` fg subtle; otherwise `--secondary-default` fg muted. Hidden at 0.
-- Line 3 (12px muted, gap 12, margin-top 3): channel icon 12 + name (no "#"); for Main rows the icon is `messages-square` and the text is "Messages outside threads" (prototype) — **[spec]** line 3 should be the channel icon and name; see open questions. Then the avatar stack (18px circles, −4 overlap, 1.5px `--background-subtle` ring, initials 7.5/600, up to 4 participants) — in the prototype it shows only in list and cards styles and only when `showAvatars` is on; **[spec]** lists it as part of every row. Then `message-square` 12 + total message count.
+- Line 3 (12px muted, gap 12, margin-top 3): channel icon 12 + name (no "#"), on Main rows too (the prototype's "Messages outside threads" label is gone). Then the avatar stack (18px circles, −4 overlap, 1.5px `--background-subtle` ring, initials 7.5/600, up to 4 participants) — in the prototype it shows only in list and cards styles and only when `showAvatars` is on; **[spec]** lists it as part of every row. Then optional tags in order (gap 6):
+  - Main tag: 18px, padding 0 6, radius 6, 1px `--border-strong`, 11/500 subtle.
+  - Reopened tag: same but filled `--secondary-default`, no border, title "New activity after it was resolved".
+  - Then, on Main rows only, `chats-circle` 13 + the number of threads started since Main was last read (tabular, title "3 new threads"). Hidden at 0. No message count on any row.
+  - The Resolve slot (22px) ends the line.
 - Title text: manual title, else AI title, else first ~6 words of the first message with "…" (a cut on the end of a sentence keeps the sentence and adds no "…"; a final full stop is dropped). Main rows show the channel label ("#eng", "Maya Chen").
 
 ### 3.2 States

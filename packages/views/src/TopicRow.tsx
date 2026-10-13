@@ -1,8 +1,8 @@
 import * as stylex from '@stylexjs/stylex'
 import { BellSlash } from '@phosphor-icons/react/dist/icons/BellSlash'
-import { ChatCircle } from '@phosphor-icons/react/dist/icons/ChatCircle'
 import { Check } from '@phosphor-icons/react/dist/icons/Check'
 import { CheckCircle } from '@phosphor-icons/react/dist/icons/CheckCircle'
+import { ChatsCircle } from '@phosphor-icons/react/dist/icons/ChatsCircle'
 import { Hash } from '@phosphor-icons/react/dist/icons/Hash'
 import { Lock } from '@phosphor-icons/react/dist/icons/Lock'
 import { User } from '@phosphor-icons/react/dist/icons/User'
@@ -41,6 +41,12 @@ export interface TopicRowProps {
   /** Pointer enter or keyboard focus: warm the topic's query. */
   readonly onPrefetch?: (id: string) => void
   readonly onContextMenu?: (id: string, event: MouseEvent<HTMLDivElement>) => void
+  /**
+   * Main rows only: threads started in the channel since its Main was last
+   * read. Hidden at 0. The engine does not supply it yet; only the gallery
+   * passes it.
+   */
+  readonly newThreads?: number
 }
 
 const HOVER = '@media (hover: hover)'
@@ -49,7 +55,6 @@ const HOVER = '@media (hover: hover)'
 // spacing scale and nothing else uses it.
 const ROW_PADDING_BLOCK = '11px'
 
-const MAIN_TITLE = 'Messages posted in this channel or DM outside any thread'
 const REOPENED_TITLE = 'New activity after it was resolved'
 const PRIVATE_TITLE = 'Private channel'
 
@@ -67,12 +72,13 @@ function titleWhenTruncated(event: PointerEvent<HTMLElement>) {
 /**
  * One sidebar row, chat style: the channel icon or the person's photo, then
  * the title and time, a two-line "Sender: text" preview with the @ and count
- * tags, and the meta line with the channel, the people, the message count
- * and the Resolve check. The check sits in a slot that is always reserved
- * and shows on hover or keyboard focus, so nothing ever moves. The row
- * activates on mouse down; Resolve on click.
+ * tags, and the meta line with the channel, the people, the Main and
+ * Reopened tags, a Main row's new-thread count and the Resolve check. The
+ * check sits in a slot that is always reserved and shows on hover or
+ * keyboard focus, so nothing ever moves. The row activates on mouse down;
+ * Resolve on click.
  */
-export const TopicRow = memo(function TopicRow({ row, time, selected = false, tabbable = true, onOpen, onResolve, onPrefetch, onContextMenu }: TopicRowProps) {
+export const TopicRow = memo(function TopicRow({ row, time, selected = false, tabbable = true, onOpen, onResolve, onPrefetch, onContextMenu, newThreads = 0 }: TopicRowProps) {
   const titleId = useId()
   const previewId = useId()
   const stateId = useId()
@@ -81,8 +87,12 @@ export const TopicRow = memo(function TopicRow({ row, time, selected = false, ta
   // says why, the title steps down to the subtle colour and the tile fades.
   // The text keeps at least 4.5:1, so the row itself is never faded.
   const quiet = row.resolved || row.status === 'unsubscribed'
+  const main = row.tags.includes('main')
+  const reopened = row.tags.includes('reopened')
+  const threads = main && newThreads > 0 ? newThreads : 0
+  const threadsLabel = threads === 1 ? '1 new thread' : `${threads} new threads`
   const unreadLabel = row.unreadExact ? `${row.unreadCount} unread` : `${row.unreadCount} or more unread`
-  const state = rowState(row, unreadLabel)
+  const state = rowState(row, unreadLabel, threads > 0 ? threadsLabel : undefined)
   const people: ReadonlyArray<AvatarStackPerson> = row.participants.map((person) => ({
     id: person.id,
     initials: initials(person.name),
@@ -132,16 +142,6 @@ export const TopicRow = memo(function TopicRow({ row, time, selected = false, ta
           >
             {row.title}
           </Text>
-          {row.tags.includes('main') ? (
-            <Chip variant="outline" title={MAIN_TITLE}>
-              Main
-            </Chip>
-          ) : null}
-          {row.tags.includes('reopened') ? (
-            <Chip variant="filled" title={REOPENED_TITLE}>
-              Reopened
-            </Chip>
-          ) : null}
           {row.tags.includes('unsubscribed') ? (
             <span {...stylex.props(styles.mutedIcon)}>
               <Icon icon={BellSlash} size={13} label="Unsubscribed" />
@@ -192,12 +192,24 @@ export const TopicRow = memo(function TopicRow({ row, time, selected = false, ta
             </Text>
           </span>
           {people.length > 0 ? <AvatarStack people={people} surface={selected ? 'surface' : 'subtle'} /> : null}
-          <span {...stylex.props(styles.count)} title={`${row.messageCount} messages`}>
-            <Icon icon={ChatCircle} size={13} />
-            <Text variant="meta" tone="muted" numeric>
-              {row.messageCount}
-            </Text>
-          </span>
+          {main || reopened ? (
+            <span {...stylex.props(styles.tags)}>
+              {main ? <Chip variant="outline">Main</Chip> : null}
+              {reopened ? (
+                <Chip variant="filled" title={REOPENED_TITLE}>
+                  Reopened
+                </Chip>
+              ) : null}
+            </span>
+          ) : null}
+          {threads > 0 ? (
+            <span {...stylex.props(styles.threads)} title={threadsLabel}>
+              <Icon icon={ChatsCircle} size={13} />
+              <Text variant="meta" tone="muted" numeric>
+                {threads}
+              </Text>
+            </span>
+          ) : null}
           <span {...stylex.props(styles.actionSlot)}>
             {row.canResolveOnHover ? (
               <IconButton
@@ -215,7 +227,7 @@ export const TopicRow = memo(function TopicRow({ row, time, selected = false, ta
           </span>
         </span>
       </span>
-      {/* The count and the @ are tags whose meaning is only in a tooltip; the
+      {/* The counts and the @ are tags whose meaning is only in a tooltip; the
           row's description says it in words, before the preview. Hidden, so
           it takes no space. */}
       {state === undefined ? null : (
@@ -244,10 +256,11 @@ function Tile({ row }: { readonly row: TopicRowModel }) {
 }
 
 /** What the tags and icons say, for the row's description: "2 unread, mentions you." */
-function rowState(row: TopicRowModel, unreadLabel: string): string | undefined {
+function rowState(row: TopicRowModel, unreadLabel: string, threadsLabel: string | undefined): string | undefined {
   const parts = [
     row.unreadCount > 0 ? unreadLabel : undefined,
     row.mentionsMe ? 'mentions you' : undefined,
+    threadsLabel,
     row.resolved ? 'resolved' : undefined,
     row.status === 'unsubscribed' ? 'unsubscribed' : undefined,
   ].filter((part) => part !== undefined)
@@ -399,7 +412,13 @@ const styles = stylex.create({
     flexShrink: 0,
     color: tints['--tint-private-fg'],
   },
-  count: {
+  tags: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: spacing['--space-1-5'],
+    flexShrink: 0,
+  },
+  threads: {
     display: 'inline-flex',
     alignItems: 'center',
     gap: spacing['--space-1'],
