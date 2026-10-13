@@ -142,9 +142,6 @@ export function TopicHeader({ detail, stealth = false, art, threadsOpen = false,
             <Text variant="topicTitle" tone="default" truncate dir="auto" sx={styles.title}>
               {channel.label} · Main
             </Text>
-            <Text variant="ui" tone="muted" truncate sx={styles.sub}>
-              Messages posted outside threads
-            </Text>
           </>
         ) : (
           <>
@@ -236,10 +233,6 @@ const styles = stylex.create({
     overflow: 'hidden',
   },
   title: {
-    flexShrink: 1,
-    minWidth: 0,
-  },
-  sub: {
     flexShrink: 1,
     minWidth: 0,
   },
