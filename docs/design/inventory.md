@@ -201,6 +201,7 @@ Density also changes the message list (§6.1).
 - Stealth tab: opened via "Open in stealth"; icon `eye-off`; unread stays; header shows the stealth pill (§5). Sending a reply or "Mark read" ends stealth.
 - Right-click on a topic tab: the row context menu for that topic. Page tabs have no menu.
 - Keyboard: tabs are `role="button" tabindex="0"`; Enter/Space activates. [proposed] ⌘W closes the active tab, ⌘⇧[ / ⌘⇧] switch tabs (not in prototype).
+- [built M4] `Workspace` in `@juno/views` draws the strip from `WorkspaceTab`s. The 15px icon slot is fixed in size and takes the topic's art (`art`) in place of the kind icon, so art drops in with no shift; stealth replaces either with `eye-off`. Tab radius is 8 (`--radius-lg`).
 
 ## 5. Topic header
 
@@ -232,6 +233,7 @@ Row 2 (gap 8):
 - AI sparkle `sparkles` 14 muted after the title when the title is AI-generated and no manual title exists (title attribute "Title suggested by AI. Double-click to rename."). Hidden when AI assist is off.
 - Main header: title "#eng · Main" (DM: "Maya Chen · Main") followed by "Messages posted outside threads" 13 muted. No sparkle.
 - Rename input: 34px, margin `−3 0 −3 −8`, padding 0 8, 1px `--border-strongest`, radius 8, bg surface, 20/600 −0.01em; preselected. Enter saves, Esc cancels, blur saves. Saving an empty title, or the same text as the AI title, clears the manual title.
+- [built M4] `TopicHeader`. Row 2 starts with a fixed 32px icon slot (`art`) that shows the channel icon, or the DM partner's photo, until the topic art track fills it. Main shows a "Threads · 12" outline button (`chats-circle` 16) before the bell; it opens a 300px popover with `ActiveThreads` (title, "12 replies · 4m", the unread count and the Subscribe bell, 52px rows). The stealth pill is the dashed `Chip` and "Mark read" is a separate 22px secondary button beside it (pills never nest in pills). Pin, Resolve and More are not drawn until M5 wires them: a button that does nothing is worse than none. The context pill and stealth pill are pills (`--radius-pill`).
 
 ## 6. Message list
 
@@ -247,6 +249,7 @@ Scroll container `[data-scroll]` with contained scroll; inner column max-width 8
 - Header: name 14/600, time 12 muted, gap 8, baseline aligned.
 - Body: 13.5/14/14.5 by density, lh 1.6, `overflow-wrap: anywhere`, `white-space: pre-wrap`, `text-wrap: pretty`; blocks stacked with gap 2. Selectable.
 - Timestamps: "9:12" (same day), "Yesterday", weekday "Sat", "Oct 3".
+- [built M4] `MessageList` and `Message`: balanced density only (padding `4 8`, radius 14, body 14.5/1.6). A continuation shows its time in the avatar column on hover or focus (tag size, muted). "edited" is a muted tag under the body; a broadcast reply says "also sent to the channel" after the time. A deleted message reads "This message was deleted." in muted italic; an unloaded root reads "Loading message". An emoji-only message (one to three emoji) is drawn at 1.75× the body size. Rows carry `content-visibility: auto` with `--row-message-estimate` (56px) and `contain: content`. Custom emoji are 1.25em images on the line; a `date` element is formatted in the reader's time zone ("Thursday at 14:00").
 
 ### 6.2 Inline chips
 
@@ -270,6 +273,8 @@ Contents: three quick reactions 👍 ✅ 👀 (28×28, radius 6, emoji 15px, nam
 
 Picker: clicking More replaces the toolbar contents with 12 emoji (👍 ❤️ 😂 🎉 👀 ✅ 🙏 🔥 💯 😮 😢 🚀), 28×28 each, width 364. Esc or leaving the message closes it. [proposed] v1 ships this fixed set; a full emoji picker is a later addition.
 
+[built M4] `HoverToolbar` is the shell: `Surface toolbar` (radius 16, `--pop-shadow`, padding 4), 28px buttons with radius 12 (`EmojiButton` for the three reactions, `IconButton` for `smiley`, `quotes` and `arrow-bend-up-left`), a 1px vertical rule between. It sits inside the message's box at top 4, right 8 (not at −14: rows have paint containment, so anything outside the box is clipped), hidden with opacity until the row is hovered or has keyboard focus, so showing it moves nothing. The picker and every action wait for M6; the app does not mount the toolbar until then.
+
 ### 6.6 Selection quote
 
 Selecting text inside a message (`[data-msg-text]`) shows a floating **Quote** button centered 38px above the selection: 30px, padding 0 10, gap 6, 1px `--border-default`, radius 8, bg surface, `--shadow-md`, `quote` 14 + "Quote" 12.5/500, z 35. Mouse-down on it inserts "> {selection}" lines into the composer, clears the selection and focuses the composer. Any other mouse-down dismisses it.
@@ -281,6 +286,7 @@ Under a Main message that has a thread: button 26px, margin-top 6, padding `0 8 
 ### 6.8 New divider and catch-up card
 
 - Divider at the first unread message (never before the first message): margin `14 0 6`, gap 10, "3 NEW" 11/600 uppercase 0.06em in `--hl`, then a 1px rule `color-mix(var(--hl) 30%, transparent)`. The list opens scrolled so the divider sits 80px from the top; otherwise it opens at the bottom.
+- [built M4] `NewDivider` (a `LabelledRule`) goes before `dividerBefore`; the message after it starts a group with no top margin. `NewMessagesPill` is a raised 28px button ("2 new messages", "Jump to latest", `arrow-down`) that `TopicView` floats 12px above the list's bottom edge. Image thumbnails: a box of the final size (from `thumb`'s dimensions, capped at `--thumb-max-width` × `--thumb-max-height`, radius 12, `--secondary-default` behind) with the image fading in; a failed image keeps the box and shows an `image` glyph. Other files are 360px `Surface inset` cards (radius 12) with a kind icon, the name and "PDF · 1.2 MB"; a deleted file reads "File no longer available".
 - Catch-up card, right after the divider when 2+ messages are new, AI assist on and a summary exists: margin `2 0 10`, padding `12 14`, radius 10, bg surface, `--card-ring`, gap 4. Header `sparkles` 13 + "Catch up" 12/500 muted. Body 13.5 lh 1.6 subtle.
 
 ### 6.9 Grouping suggestion (Main only)
@@ -311,6 +317,7 @@ Card at the top of a thread when AI thinks it is settled: margin-bottom 16, padd
 - Box: bg `--surface-default`, 1px `--input-border`, radius 12, overflow hidden. Rows inside: optional guard line, optional check bar, then the input row.
 - Input row (align end, gap 4): **Attach** 28 round `plus` 18 subtle, margin `6 0 6 6`, name "Attach" (no behaviour in prototype; [proposed] opens the OS file picker) · textarea 1 row, padding `9 0 9 4`, 14px, lh 22px, min 40px, grows to 194px **[spec: ~8 lines]** then `overflow-y: auto` · **Send** 28 round bg `--hl` fg `--hl-fg` `arrow-up` 16, margin `6 6 6 0`, opacity .4 when the draft is empty (not disabled, so it stays focusable; [proposed] set `aria-disabled`).
 - Placeholder: "Reply" in threads, "Message #eng" / "Message Maya Chen" in Main. No helper text anywhere.
+- [built M4] `ComposerSlot` holds the place at the single-line height (40px field in the 752px column, padding `8 24 20`): the attach and send marks are drawn inert and the placeholder is muted body text. M6 swaps the composer in with no shift.
 - Drafts are kept per topic and survive tab switches.
 - Keys: Enter sends; Shift+Enter newline. Sending clears the draft, ends stealth, marks the topic read, and reopens it if it was resolved.
 

@@ -1,12 +1,64 @@
-import { defineFixtures, fixture } from '@juno/ui'
-import { Workspace } from './Workspace'
+import { defineFixtures, scene, type FixtureFrame } from '@juno/ui'
+import { ComposerSlot } from './ComposerSlot'
+import { details, main, mainDividerBefore, thread } from './fixtures/messages'
+import { NOW } from './fixtures/topics'
+import { MessageList } from './MessageList'
+import { TopicHeader } from './TopicHeader'
+import { TopicView } from './TopicView'
+import { Workspace, type WorkspaceProps, type WorkspaceTab } from './Workspace'
+
+const noop = () => {}
+
+const tabs = {
+  eng: { id: 'C0ENG:main', title: 'eng', icon: 'hash' } satisfies WorkspaceTab,
+  postgres: { id: 'C0ENG:1760000000.000100', title: 'Postgres 16 migration plan', icon: 'hash' } satisfies WorkspaceTab,
+  density: { id: 'C0DESIGNREV:1759900000.000900', title: 'Thread list density', icon: 'hash' } satisfies WorkspaceTab,
+  hiring: { id: 'C0HIRING:1760000000.000300', title: 'Rina Sato · Staff backend', icon: 'lock', stealth: true } satisfies WorkspaceTab,
+  maya: { id: 'D0MAYA:1759990000.000500', title: 'Offsite: Wednesday afternoon slot', icon: 'user' } satisfies WorkspaceTab,
+  forYou: { id: 'page:for-you', title: 'For you', icon: 'for-you' } satisfies WorkspaceTab,
+} as const
+
+const base: Omit<WorkspaceProps, 'children'> = { tabs: [tabs.postgres, tabs.density], activeId: tabs.postgres.id, onSelectTab: noop, onCloseTab: noop, onNewTab: noop, onTabContextMenu: noop }
+
+const postgresPage = (
+  <TopicView header={<TopicHeader detail={details.postgres} onSubscribe={noop} onUnsubscribe={noop} onMarkRead={noop} onRename={noop} />} composer={<ComposerSlot placeholder="Reply" />}>
+    <MessageList items={thread} main={false} now={NOW} onOpenThread={noop} onChannel={noop} onLink={noop} />
+  </TopicView>
+)
+
+const engPage = (
+  <TopicView header={<TopicHeader detail={details.engMain} onThreads={noop} onSubscribe={noop} onUnsubscribe={noop} onMarkRead={noop} />} composer={<ComposerSlot placeholder="Message #eng" />}>
+    <MessageList items={main} main now={NOW} dividerBefore={mainDividerBefore} onOpenThread={noop} onChannel={noop} onLink={noop} />
+  </TopicView>
+)
+
+const workspace = (props: Partial<WorkspaceProps> = {}, page?: React.ReactNode, frame?: FixtureFrame) =>
+  scene<WorkspaceProps>(
+    () => (
+      <Workspace {...base} {...props}>
+        {page}
+      </Workspace>
+    ),
+    frame,
+  )
 
 export default defineFixtures(
   Workspace,
   {
     Page: {
-      'nothing-open': fixture({}),
+      'nothing-open': workspace({ tabs: [] }),
+      'topic-open': workspace({}, postgresPage),
+      'main-open': workspace({ tabs: [tabs.eng, tabs.density], activeId: tabs.eng.id }, engPage),
+      'stealth-tab': workspace({ tabs: [tabs.eng, tabs.density, tabs.hiring], activeId: tabs.hiring.id }, postgresPage),
+      'many-tabs': workspace({ tabs: [tabs.postgres, tabs.hiring, tabs.eng, tabs.density, tabs.maya, tabs.forYou], activeId: tabs.eng.id }, engPage),
+      'minimum-window': workspace({ tabs: [tabs.postgres, tabs.hiring, tabs.eng, tabs.density, tabs.maya], activeId: tabs.eng.id }, engPage, { width: 720, height: 480 }),
+    },
+    Interaction: {
+      'hover-tab': workspace({}, postgresPage, { hover: '[role="tab"]:nth-of-type(2)' }),
+      'hover-close': workspace({}, postgresPage, { hover: '[role="tab"]:nth-of-type(1) button' }),
+      'hover-new-tab': workspace({}, postgresPage, { hover: '[aria-label="New message"]' }),
+      'focus-tab': workspace({}, postgresPage, { focus: '[role="tab"]:nth-of-type(2)' }),
     },
   },
-  { width: 816, height: 560, padded: false },
+  { width: 900, height: 640, padded: false },
 )

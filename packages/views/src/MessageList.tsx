@@ -1,0 +1,200 @@
+import * as stylex from '@stylexjs/stylex'
+import { useState, type KeyboardEvent, type ReactNode, type Ref } from 'react'
+import type { MessageView, Person } from '@juno/contract'
+import { layout, sizes, spacing } from '@juno/tokens/tokens.stylex'
+import { EmptyState, hueForId, ScrollArea, Text, type ActivateEvent, type HueName } from '@juno/ui'
+import { Message } from './Message'
+import { NewDivider } from './NewDivider'
+import { messageTime } from './time'
+
+/** One row as the container holds it: the message and its sender from the window's refs. */
+export interface MessageListItem {
+  readonly message: MessageView
+  readonly sender: Person | undefined
+}
+
+/** What the list shows while it has no rows. `offline`: the topic is not cached and Slack could not be reached. */
+export type MessageListStatus = 'ready' | 'loading' | 'offline'
+
+/** Whether older messages exist above the window, and whether a page is on its way. */
+export type OlderStatus = 'none' | 'more' | 'loading'
+
+export interface MessageListProps {
+  readonly items: ReadonlyArray<MessageListItem>
+  /** Main: thread links under messages, "Message #eng" wording. */
+  readonly main: boolean
+  /** Epoch milliseconds, for the times. */
+  readonly now: number
+  readonly status?: MessageListStatus
+  /** The `ts` of the first unread message: the "N new" divider goes before it. */
+  readonly dividerBefore?: string
+  readonly older?: OlderStatus
+  /** The scroll element, for the container's open position and stick-to-bottom. */
+  readonly scrollRef?: Ref<HTMLElement>
+  /** The divider, for the container to scroll it 80px from the top on open. */
+  readonly anchorRef?: Ref<HTMLDivElement>
+  /** The person hue for @mention chips. Default: the id's hash. */
+  readonly hueOf?: (id: string) => HueName
+  /** The hover toolbar for a row. M4 passes none in the app; the gallery shows it. */
+  readonly renderToolbar?: (message: MessageView) => ReactNode
+  readonly onOpenThread?: (id: string, event: ActivateEvent) => void
+  readonly onChannel?: (id: string) => void
+  readonly onLink?: (url: string) => void
+  readonly onToggleReaction?: (ts: string, name: string) => void
+}
+
+const ROW = '[data-message-row]'
+
+/** Arrow keys move focus between rows; the row that takes focus becomes the tabbable one. */
+function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+  if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
+  const target = event.target
+  if (!(target instanceof HTMLElement) || !target.matches(ROW)) return
+  const rows = Array.from(event.currentTarget.querySelectorAll<HTMLElement>(ROW))
+  const index = rows.indexOf(target)
+  const next = rows[event.key === 'ArrowDown' ? index + 1 : index - 1]
+  if (next === undefined) return
+  event.preventDefault()
+  next.focus()
+  next.scrollIntoView({ block: 'nearest', behavior: 'instant' })
+}
+
+/**
+ * The messages of one topic, oldest first, in the centred 800px column
+ * (inventory 6). Rows stay in flow with `content-visibility: auto`, so the
+ * browser's scroll anchoring handles prepends and nothing runs on scroll.
+ * The list owns no scroll logic: the container reads and sets the position
+ * through `scrollRef` and `anchorRef`. One row is tabbable (the last, until
+ * a row takes focus); arrow keys move between rows.
+ */
+export function MessageList({
+  items,
+  main,
+  now,
+  status = 'ready',
+  dividerBefore,
+  older = 'none',
+  scrollRef,
+  anchorRef,
+  hueOf = hueForId,
+  renderToolbar,
+  onOpenThread,
+  onChannel,
+  onLink,
+  onToggleReaction,
+}: MessageListProps) {
+  const [focusedTs, setFocusedTs] = useState<string | undefined>(undefined)
+  const last = items[items.length - 1]
+  const tabbable = focusedTs !== undefined && items.some((item) => item.message.ts === focusedTs) ? focusedTs : last?.message.ts
+  const dividerIndex = dividerBefore === undefined ? -1 : items.findIndex((item) => item.message.ts >= dividerBefore)
+  const newCount = dividerIndex < 0 ? 0 : items.length - dividerIndex
+
+  return (
+    <ScrollArea scrollbar="hover" ref={scrollRef} data-scroll="" sx={styles.scroller}>
+      <div role="list" aria-label="Messages" aria-busy={status === 'loading'} onKeyDown={onKeyDown} {...stylex.props(styles.column)}>
+        {older !== 'none' ? (
+          <div aria-live="polite" {...stylex.props(styles.olderLine)}>
+            {older === 'loading' ? (
+              <Text variant="meta" tone="muted">
+                Loading older messages
+              </Text>
+            ) : null}
+          </div>
+        ) : null}
+        {items.length === 0 ? <Empty main={main} status={status} /> : null}
+        {items.map((item, index) => {
+          const atDivider = index === dividerIndex && index > 0
+          return (
+            <Row key={item.message.ts} atDivider={atDivider} newCount={newCount} anchorRef={anchorRef}>
+              <Message
+                message={item.message}
+                sender={item.sender}
+                time={messageTime(item.message.at, now)}
+                now={now}
+                main={main}
+                startsGroup={index === 0 || atDivider}
+                flush={index === 0 || atDivider}
+                tabbable={item.message.ts === tabbable}
+                hueOf={hueOf}
+                toolbar={renderToolbar?.(item.message)}
+                onOpenThread={onOpenThread}
+                onChannel={onChannel}
+                onLink={onLink}
+                onToggleReaction={onToggleReaction}
+                onFocus={setFocusedTs}
+              />
+            </Row>
+          )
+        })}
+      </div>
+    </ScrollArea>
+  )
+}
+
+/** The divider before a row, when the row is the first unread one. Not before the first message. */
+function Row({ atDivider, newCount, anchorRef, children }: { readonly atDivider: boolean; readonly newCount: number; readonly anchorRef: Ref<HTMLDivElement> | undefined; readonly children: ReactNode }) {
+  if (!atDivider) return children
+  return (
+    <>
+      <NewDivider ref={anchorRef} count={newCount} />
+      {children}
+    </>
+  )
+}
+
+function Empty({ main, status }: { readonly main: boolean; readonly status: MessageListStatus }) {
+  if (status === 'loading') {
+    return (
+      <div {...stylex.props(styles.quiet)}>
+        <Text variant="meta" tone="muted">
+          Loading messages
+        </Text>
+      </div>
+    )
+  }
+  if (status === 'offline') {
+    return <EmptyState illustration="nothing-here" title="Nothing here yet" body="Slack couldn't be reached. Juno fetches this topic when you're back online." enter={false} />
+  }
+  return main ? (
+    <EmptyState illustration="nothing-here" title="Nothing posted outside threads" body="Messages posted in the channel itself show up here." enter={false} />
+  ) : (
+    <EmptyState illustration="nothing-here" title="No messages yet" body="Replies show up here as they arrive." enter={false} />
+  )
+}
+
+const styles = stylex.create({
+  scroller: {
+    flexGrow: 1,
+    width: '100%',
+  },
+  column: {
+    display: 'flex',
+    flexDirection: 'column',
+    width: '100%',
+    maxWidth: layout['--reading-width'],
+    minHeight: '100%',
+    marginInline: 'auto',
+    paddingTop: spacing['--space-5'],
+    paddingInline: spacing['--space-6'],
+    paddingBottom: spacing['--space-4'],
+    boxSizing: 'border-box',
+  },
+  // A fixed slot above the first row, so "Loading older messages" appearing
+  // or going away never moves the rows below it.
+  olderLine: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: sizes['--control-28'],
+    flexShrink: 0,
+    userSelect: 'none',
+  },
+  quiet: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexGrow: 1,
+    paddingBlock: spacing['--space-12'],
+    userSelect: 'none',
+  },
+})
