@@ -20,7 +20,7 @@ Small items noticed during work that are not yet assigned to a milestone. Remove
 - Edits and deletes made during a socket drop are recovered only for thread text (via search) or when the topic is opened. `cached_latest_updates` is still unknown.
 - Sync: `subscriptions.thread.getView` returns 10 threads per page regardless of `limit` (32 calls on the real workspace). Consider paging in parallel within the lane budget.
 - Cold boot on the real workspace takes about 7 minutes to reach `live` (sidebar data complete after 29 s) because of the 1.5 s background lane spacing. Revisit the spacing once the rate-limit behaviour is measured.
-- AI: evaluate TypeSafe System One decision models (served on OpenRouter through pi-ai's `classify` API) for the decision tier. The spec suggests a decision-model approach like this.
-- AI: OpenAI-compatible reasoning models keep their default reasoning effort, which may miss the 1.5 s decision budget. Set effort low for the decision tier if such a model is chosen.
-- AI: evaluate TypeSafe System One decision models (served on OpenRouter through pi-ai's `classify` API) for the decision tier. The spec suggests a decision-model approach like this.
-- AI: OpenAI-compatible reasoning models keep their default reasoning effort, which may miss the 1.5 s decision budget. Set effort low for the decision tier if such a model is chosen.
+- AI: the eval's expectations test the direction of each judgement, not calibration. Before the assistant fixes its confidence thresholds, collect a few hundred real decisions from the classifier and check its probabilities against them.
+- AI: `routeCheck` has a 1.5 s budget that only the classifier meets. With the classifier preference empty, the chat model answers in about 1.5 s and the check mostly times out; either accept that or give the chat path its own budget.
+- AI: the first decision of a process pays DNS and TLS to OpenRouter (0.3 s idle, more under load) and misses `routeCheck`'s 1.5 s budget once in the live eval. If that shows in use, keep a connection warm from the assistant (an undici agent with a longer keep-alive) or accept the single miss.
+- AI: the assistant's preferences UI needs a third model slot (`classifier`) next to `decision` and `generation`, or a switch that empties it.
