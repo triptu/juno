@@ -70,11 +70,14 @@ Each row is a tile followed by three lines. The tile is the channel's icon or a 
 
 ### What shows up
 
+- **Which threads.** The sidebar shows threads you follow, plus any thread with an unread mention of you. Following is Slack's "Get notified about new replies": you follow a thread when you start it, reply, are mentioned, or subscribe. Other threads are not in the sidebar. They are reachable from their channel's Main (as thread links), All topics and ⌘K. Subscribing to one from there adds it to the sidebar.
+- **Subscribe works on any thread.** Subscribe and unsubscribe are mirrored to Slack's follow state.
+- **First sign-in.** Threads you do not follow start as read, so Juno does not open with hundreds of unread topics. Followed threads and Main keep Slack's unread state.
 - **Quiet.** Topics with no activity in the last 7 days are hidden unless pinned or unread. The window can be configured.
 - **Resolved.** Resolved topics are hidden until a new message arrives, which brings them back tagged "Reopened".
 - **Unsubscribed.** Unsubscribed topics are hidden from the all-topics view.
 - **Ignored.** Ignored channels, such as noisy alert or deploy channels, are hidden everywhere in Juno and never notify.
-- **Main threads** follow the same rules. A channel with no recent activity simply does not appear.
+- **Main threads** follow the same rules. A channel's Main appears only when the channel had recent activity of any kind, including replies in its threads. A channel with no recent activity simply does not appear.
 
 ![Context menu on a topic row](screenshots/02-ui.png)
 
