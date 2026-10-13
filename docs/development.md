@@ -221,7 +221,7 @@ first), so there is no keychain prompt and no import from the Slack app.
 Read-only by construction: `SlackApi.call` is wrapped so any method outside its allow-list
 (`auth.test`, `client.userBoot`, `users.prefs.get`, `client.counts`, `client.getWebSocketURL`,
 `api.getFlannelHttpUrl`, `subscriptions.thread.getView`, `conversations.history`,
-`conversations.replies`, `search.modules.messages`, edge `users/info`) dies before a request
+`conversations.replies`, `conversations.info`, `search.modules.messages`, edge `users/info`) dies before a request
 is made, and `HttpTransport` checks the URL of every request the same way. Only the sync runs:
 no outbox, no mark, no command handler. The output is counts and milliseconds: calls by
 method and total time, conversations by kind and membership, topics by kind and how many the

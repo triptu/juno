@@ -64,6 +64,7 @@ const READ_ONLY_METHODS = [
   'subscriptions.thread.getView',
   'conversations.history',
   'conversations.replies',
+  'conversations.info',
   'search.modules.messages',
 ] as const satisfies ReadonlyArray<MethodName>
 const READ_ONLY_EDGE = ['users/info'] as const
