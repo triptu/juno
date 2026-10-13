@@ -1,0 +1,32 @@
+{
+  "name": "@juno/ai",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Provider isolation. The AiProvider service with PiAiProvider (pi-ai, OpenRouter) and FakeAiProvider, and the task table (prompts, output schemas, tiers). Plain data in, plain data out. Never touches the store.",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "eval": "node --import ../../scripts/ts-resolve-hooks.mjs eval/run.ts"
+  },
+  "dependencies": {
+    "@earendil-works/pi-ai": "1.1.0",
+    "@juno/domain": "workspace:*",
+    "effect": "4.0.3"
+  },
+  "devDependencies": {
+    "@effect/vitest": "4.0.3",
+    "@types/node": "24.19.2",
+    "typescript": "5.9.3",
+    "vitest": "5.0.4"
+  },
+  "juno": {
+    "allowedDeps": [
+      "@juno/domain"
+    ]
+  }
+}

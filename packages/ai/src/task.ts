@@ -1,0 +1,109 @@
+/**
+ * The task table's row type. A task is plain data: a prompt, a renderer for
+ * its input, a tier (which model and how long to wait), and for structured
+ * tasks the TypeBox schema of the one tool the model must call.
+ */
+import { validateToolArguments, type Static, type TSchema } from '@earendil-works/pi-ai'
+import { createHash } from 'node:crypto'
+import type { Tier } from './config'
+
+interface TaskBase<I> {
+  readonly name: string
+  /** Bump when the prompt or the output changes meaning, so cached results are not reused. */
+  readonly version: number
+  readonly tier: Tier
+  readonly timeoutMillis: number
+  /** The system prompt. */
+  readonly prompt: string
+  /** The user message: the input as plain text the model reads. */
+  readonly render: (input: I) => string
+  /** The entity a result belongs to (a topic id, a channel id), for the cache. '' when none. */
+  readonly key: (input: I) => string
+}
+
+/** A decision: the model answers by calling one tool whose parameters are `output`. */
+export interface StructuredTask<I, S extends TSchema = TSchema> extends TaskBase<I> {
+  readonly shape: 'structured'
+  readonly tool: { readonly name: string; readonly description: string }
+  readonly output: S
+  /** Checks the schema cannot: ids point into the input, counts hold. False means invalid output. */
+  readonly accept?: (output: Static<S>, input: I) => boolean
+}
+
+/** Text out: a title, a summary. */
+export interface TextTask<I> extends TaskBase<I> {
+  readonly shape: 'text'
+  readonly maxChars: number
+}
+
+export type Task<I = unknown> = StructuredTask<I, TSchema> | TextTask<I>
+
+export const DECISION_TIMEOUT_MILLIS = 1500
+export const GENERATION_TIMEOUT_MILLIS = 20_000
+
+export function defineStructuredTask<I, S extends TSchema>(
+  task: Omit<StructuredTask<I, S>, 'shape' | 'timeoutMillis'> & { readonly timeoutMillis?: number },
+): StructuredTask<I, S> {
+  return { ...task, shape: 'structured', timeoutMillis: task.timeoutMillis ?? timeoutForTier(task.tier) }
+}
+
+export function defineTextTask<I>(task: Omit<TextTask<I>, 'shape' | 'timeoutMillis'> & { readonly timeoutMillis?: number }): TextTask<I> {
+  return { ...task, shape: 'text', timeoutMillis: task.timeoutMillis ?? timeoutForTier(task.tier) }
+}
+
+function timeoutForTier(tier: Tier): number {
+  return tier === 'decision' ? DECISION_TIMEOUT_MILLIS : GENERATION_TIMEOUT_MILLIS
+}
+
+export type Validation<O> = { readonly ok: true; readonly value: O } | { readonly ok: false; readonly message: string }
+
+/** Schema check with pi-ai's validator (coercing where TypeBox allows), then the task's `accept`. */
+export function validateOutput<I, S extends TSchema>(task: StructuredTask<I, S>, input: I, args: unknown): Validation<Static<S>> {
+  if (typeof args !== 'object' || args === null || Array.isArray(args)) return { ok: false, message: 'arguments are not an object' }
+  let value: Static<S>
+  try {
+    const tool = { name: task.tool.name, description: task.tool.description, parameters: task.output }
+    value = validateToolArguments(tool, { type: 'toolCall', id: 'out', name: task.tool.name, arguments: args as Record<string, never> })
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : String(error) }
+  }
+  if (task.accept && !task.accept(value, input)) return { ok: false, message: 'output does not fit the input' }
+  return { ok: true, value }
+}
+
+/** Text output trimmed to the task's limit, or undefined when there is nothing usable. */
+export function cleanText(task: { readonly maxChars: number }, text: string): string | undefined {
+  const trimmed = text.trim()
+  if (trimmed.length === 0) return undefined
+  return trimmed.length <= task.maxChars ? trimmed : trimmed.slice(0, task.maxChars).trimEnd()
+}
+
+export interface CacheKey {
+  readonly task: string
+  readonly key: string
+  /** Hash of the task version and the canonical input. Same input, same hash, in any key order. */
+  readonly inputHash: string
+}
+
+export function cacheKeyOf<I>(task: Task<I>, input: I): CacheKey {
+  const hash = createHash('sha256').update(`${task.version}\n${canonicalJson(input)}`).digest('hex').slice(0, 16)
+  return { task: task.name, key: task.key(input), inputHash: hash }
+}
+
+/** JSON with object keys sorted and undefined values dropped, so equal inputs serialize the same. */
+export function canonicalJson(value: unknown): string {
+  return JSON.stringify(sortKeys(value))
+}
+
+function sortKeys(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(sortKeys)
+  if (typeof value === 'object' && value !== null) {
+    const out: Record<string, unknown> = {}
+    for (const key of Object.keys(value).toSorted()) {
+      const item = (value as Record<string, unknown>)[key]
+      if (item !== undefined) out[key] = sortKeys(item)
+    }
+    return out
+  }
+  return value
+}
