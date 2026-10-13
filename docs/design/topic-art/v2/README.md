@@ -9,7 +9,7 @@ Round 1 (`../README.md`) chose constrained-vocabulary drawing on Gemini 3.8 Flas
 - art for channel Main rows too;
 - the Tide mark as the placeholder for every topic.
 
-This folder holds that study. Everything here is a design study, not app code.
+This folder holds that study. Everything here is a design study, not app code. The owner's decision from it (decision log, 10-13 23:38 and 23:40): art-directed drawing on Gemini 3.8 Flash, no container, and a placeholder that is a free-form shape picked per topic, not a rounded box. The renders reflect that decision; the subtle container stays in the sheet for the record.
 
 ## What to look at
 
@@ -19,10 +19,10 @@ This folder holds that study. Everything here is a design study, not app code.
 | `palette.png` | The muted palette per hue, light and dark, with contrast against the sidebar, and the Tide tones under each hue. |
 | `strict-*.png`, `relaxed-*.png`, `art-*.png` | Each freedom level in each container (`none`, `subtle`, `tile`). Every grid has 35 topics (24 threads and 11 channel Mains) at 40px and 16px, in light and dark, plus four Tide placeholders. |
 | `placeholders.png` | The Tide placeholder for every topic in each container and theme, and the cross-fade from placeholder to art. |
-| `sidebar-art-subtle.png` | Mock sidebar, first choice: art-directed in the subtle container, light and dark. |
-| `sidebar-art-none.png` | Mock sidebar, second choice: art-directed with no container. |
+| `sidebar-art-none.png` | Mock sidebar, the decision: art-directed with no container, light and dark, with two pebble placeholders. |
+| `sidebar-art-subtle.png` | Mock sidebar, the alternative that was not chosen: art-directed in the subtle container. |
 | `sheet.html` | The source of every PNG. Open it from this folder; it reads `results.js`. |
-| `iterations/` | Pass 1 renders and generated files, and the pass 2 renders from before the last palette and inset changes. |
+| `iterations/` | Pass 1 renders and generated files, and the pass 2 renders from before the last palette and inset changes, when the no-container placeholder was still a 32px rounded square. |
 
 The sidebar mocks use the C1 + D1 look: Figtree, Coral accent, rounder shapes. Each has about 10 rows:
 
@@ -31,7 +31,7 @@ The sidebar mocks use the C1 + D1 look: Figtree, Coral accent, rounder shapes. E
 - DMs with photo placeholders;
 - two Tide placeholders: a thread whose art is still generating, and a Main where the model was not confident.
 
-Next to each sidebar are the tabs at 16px and the topic header at 20px.
+The row footer follows the 10-13 spec change: channel icon and name, the avatar stack and tags, no message count, no "Messages outside threads" label, and on a Main row a thread icon with the number of new threads when it is not zero. Next to each sidebar are the tabs at 16px and the topic header at 20px.
 
 ## The vocabulary in brief
 
@@ -112,7 +112,8 @@ What the numbers say:
 
 - *Inset inside a container.* The art was composed for no container, so inside a box it touched the edges. The renderer now scales it to 80% inside a container and keeps the 2.75 line weight.
 - *No container below 20px.* A box around a 16px tab glyph is noise.
-- *Tide in dark.* At low lightness, amber, olive and coral turned to mud at any real chroma. The dark Tide tones now stay near neutral (chroma 0.012 to 0.026) and step in lightness instead. With no container, the Tide bands sit in a 32px square inside the 40px box. A full 40px block was the heaviest thing in the list, heavier than any line drawing.
+- *Tide in dark.* At low lightness, amber, olive and coral turned to mud at any real chroma. The dark Tide tones now stay near neutral (chroma 0.012 to 0.026) and step in lightness instead.
+- *Tide with no container.* A full 40px block was the heaviest thing in the list, heavier than any line drawing, and a 32px rounded square was still a box among drawings. The owner asked for a free-form shape, so with no container the bands are now clipped to a pebble: a smooth closed curve through six or seven points around a circle, radius 13.5 to 16.5 with seeded jitter, so each topic gets its own outline at about 30px across. The light tones went one step deeper (base L 0.905) so the pebble still reads on paper. Inside a container the frame is the container's box, as before.
 
 **Colour.**
 
@@ -123,11 +124,14 @@ What the numbers say:
 
 ## Recommendation
 
-1. **Art-directed, subtle container.** First choice.
+The owner has decided: art-directed, no container (decision log, 10-13 23:38). The ranking below is kept so the reasoning stays with the renders.
+
+1. **Art-directed, no container.** The decision.
    - It has the best drawings at the same cost, latency and failure rate as strict.
-   - The box gives a steady rhythm down the list and matches the dark theme's tiles.
-   - Placeholder and art share exactly the same box.
-2. **Art-directed, no container.** The calmer alternative, if the owner prefers glyphs to tiles. It is lighter and separates topics from DMs more clearly. The cost is a slightly uneven left edge, because drawings vary in width.
+   - It is the lightest look and separates topics (glyphs) from DMs (round photos) at a glance.
+   - The placeholder is a pebble of the same weight, so the swap moves nothing.
+   - The cost is a slightly uneven left edge, because drawings vary in width; the brief's 5..35 margin keeps it small.
+2. **Art-directed, subtle container.** The alternative that was not chosen. The box gives a steady rhythm down the list and matches the dark theme's letter tiles, at the price of a box on every row.
 3. **Strict, subtle container.** The fallback if art-directed ever drifts in production. Strict's checker is a tighter guarantee of weight and size, at the cost of weaker ideas.
 4. **Relaxed** in any container is dominated: it is no better looking than art-directed and the only level that failed.
 5. **Round 1 tile** in any level: too loud and too round, as the owner said.
@@ -175,7 +179,7 @@ Topic art is a client-only decoration, like titles. It never reaches Slack.
   Nothing in the row says which case it is.
 - **Seeding.** Tide is seeded by topic id (thread ts or channel id), so it is stable and the same on every client.
 - **Colour.** It uses the muted Tide tones in `palette.mjs`, tuned separately per theme.
-- **Box.** It occupies the same 40px box as the art, in the same container. With no container, the bands sit in a 32px square so their weight matches a line drawing. Swapping never moves anything.
+- **Shape.** It occupies the same 40px box as the art. With no container (the decision) the bands are clipped to a free-form pebble picked per topic, about 30px across, so it weighs the same as a line drawing and is a shape among shapes, not a box among drawings. Inside a container it fills the container's box. Swapping never moves anything.
 - **Cross-fade.** When art arrives for a row on screen, the art fades in over the placeholder in 240 ms, ease-out, opacity only. Under `prefers-reduced-motion` it swaps instantly. Art that is already cached paints directly, with no fade.
 
 **Theme handling.**
@@ -254,4 +258,4 @@ Changing the palette, containers or Tide needs only the last two commands. No mo
 
 ## Spend
 
-Total OpenRouter spend for round 2 is $1.04, summed from the cost OpenRouter reported on every call (`spend.log`): two passes of 35 topics at three levels. The cap was $5. The final palette, container and placeholder changes needed no model calls.
+Total OpenRouter spend for round 2 is $1.04, summed from the cost OpenRouter reported on every call (`spend.log`): two passes of 35 topics at three levels. The cap was $5. The final palette, container and placeholder changes, including the pebble, needed no model calls.
