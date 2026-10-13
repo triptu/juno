@@ -8,6 +8,7 @@ import type { EnginePhase, SessionStatus } from '@juno/contract'
 import type { SyncPhase } from '@juno/sync'
 import { SearchHandlers } from './search/handlers'
 import { PrefsHandlers } from './prefs/handlers'
+import { MessagesHandlers } from './messages/handlers'
 import { ReadsHandlers } from './reads/handlers'
 import { MarkWorker } from './reads/worker'
 import { Outbox } from './outbox'
@@ -17,6 +18,7 @@ import { Session } from './session/Session'
 import { StatusHandlers } from './status/handlers'
 import { Status } from './status/Status'
 import { SyncRunner } from './session/SyncRunner'
+import { SyncLink } from './syncLink'
 import { TopicsHandlers } from './topics/handlers'
 import { Workspace } from './workspace'
 
@@ -52,6 +54,7 @@ const EnginePhases = Layer.effectDiscard(
 export const Services = EnginePhases.pipe(
   Layer.provideMerge(MarkWorker.layer),
   Layer.provideMerge(SyncRunner.layer),
+  Layer.provideMerge(SyncLink.layer),
   Layer.provideMerge(Outbox.layer),
   Layer.provideMerge(SessionClientLive),
   Layer.provideMerge(Session.layer),
@@ -60,4 +63,4 @@ export const Services = EnginePhases.pipe(
 )
 
 /** One `toLayer` per feature, merged. Requires `Services`. */
-export const Handlers = Layer.mergeAll(StatusHandlers, SessionHandlers, TopicsHandlers, SearchHandlers, PrefsHandlers, ReadsHandlers)
+export const Handlers = Layer.mergeAll(StatusHandlers, SessionHandlers, TopicsHandlers, SearchHandlers, PrefsHandlers, MessagesHandlers, ReadsHandlers)

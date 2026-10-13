@@ -28,8 +28,10 @@ import { syncEmoji } from './emoji'
 import { SyncConfig } from './config'
 import { reindexOptions, type RootFetch, type SyncContext } from './context'
 import { applyFrame } from './events'
+import { fetchOlder, fetchTopic, type FetchLane, type FetchReport, type OpenError } from './open'
 import { applyPage } from './pages'
 import { reindexTopics } from './reindex'
+import { fetchUsers } from './users'
 import { clearPendingFollows, endEventCoverage, observeRead } from './write'
 
 export type SyncPhase =
@@ -41,6 +43,22 @@ export type SyncPhase =
 export interface RunSyncOptions {
   /** Called on every phase change. */
   readonly onPhase: (phase: SyncPhase) => Effect.Effect<void>
+  /** Called once, before the sync connects, with the fetcher the engine's topic commands use while this sync runs. */
+  readonly onFetcher?: (fetcher: TopicFetcher) => Effect.Effect<void>
+  /** The topics open in a tab the user can see. They are fetched again after a reconnect and with each sweep (architecture 5.8). */
+  readonly openTopics?: Effect.Effect<ReadonlyArray<string>>
+}
+
+/**
+ * Fetches for opened topics (`open.ts`), run in the sync's context so they
+ * share its queues: stub roots get fetched and unknown senders named, both
+ * in the background. On the interactive lane; when Slack rate-limits the
+ * call, the same fetch is queued on the background lane and the error is
+ * returned, so the caller shows what the store has.
+ */
+export interface TopicFetcher {
+  readonly open: (topicId: string) => Effect.Effect<FetchReport, OpenError>
+  readonly older: (topicId: string, before: string) => Effect.Effect<FetchReport, OpenError>
 }
 
 export type SyncServices = SlackApi | SlackEdge | SlackSocket | SlackSession | StoreWriter | StoreReader | Invalidation
@@ -70,6 +88,51 @@ export const runSync = (options: RunSyncOptions): Effect.Effect<never, SlackAuth
     // Catch-ups and reboots run in the background; joining the set below is what lets their auth failures end the sync.
     const background = yield* FiberSet.make<void, SlackAuthRequired>()
 
+    /** Names the senders an open fetch found unknown, in the background. */
+    const nameSenders = (report: FetchReport) =>
+      report.unknownUsers.length === 0
+        ? Effect.void
+        : FiberSet.run(
+            background,
+            fetchUsers(ctx, report.unknownUsers.filter((id) => !ctx.unknownUsers.has(id))).pipe(
+              Effect.catchIf(isNotAuth, (error) => Effect.logWarning('sync: senders not named', { tag: error._tag })),
+            ),
+          ).pipe(Effect.asVoid)
+    const services = yield* Effect.context<SyncServices>()
+    const fetched = (run: (lane: FetchLane) => Effect.Effect<FetchReport, OpenError, SyncServices>, label: string): Effect.Effect<FetchReport, OpenError> =>
+      run('interactive').pipe(
+        Effect.tap(nameSenders),
+        Effect.tapError((error) =>
+          error._tag === 'SlackRateLimited'
+            ? FiberSet.run(
+                background,
+                run('background').pipe(
+                  Effect.tap(nameSenders),
+                  Effect.asVoid,
+                  Effect.catchIf(isNotAuth, (retry) => Effect.logWarning(`sync: ${label} failed on the background lane`, { tag: retry._tag })),
+                ),
+              ).pipe(Effect.asVoid)
+            : Effect.void,
+        ),
+        Effect.provide(services),
+      )
+    const fetcher: TopicFetcher = {
+      open: (topicId) => fetched((lane) => fetchTopic(ctx, topicId, lane), 'open'),
+      older: (topicId, before) => fetched((lane) => fetchOlder(ctx, topicId, before, lane), 'older page'),
+    }
+    if (options.onFetcher !== undefined) yield* options.onFetcher(fetcher)
+
+    /** After a reconnect or a sweep: what changed in the open topics while the socket was down. */
+    const refreshOpen = Effect.gen(function* () {
+      const open = options.openTopics === undefined ? [] : yield* options.openTopics
+      for (const topicId of open) {
+        yield* fetchTopic(ctx, topicId, 'interactive').pipe(
+          Effect.tap(nameSenders),
+          Effect.catchIf(isNotAuth, (error) => Effect.logWarning('sync: open topic not refreshed', { tag: error._tag })),
+        )
+      }
+    })
+
     // No command is in flight before the sync runs; `follow` outbox rows are left over from a crash.
     yield* transaction(clearPendingFollows).pipe(Effect.catchCause((cause) => Effect.logError('sync: pending follows not cleared', { cause })))
     const events = yield* socket.events
@@ -95,6 +158,7 @@ export const runSync = (options: RunSyncOptions): Effect.Effect<never, SlackAuth
       if (previous === undefined) return
       yield* catchUp(ctx, previous, reportBoot, { refreshWorkspace: false, refreshThreads: true })
       state.lastBoot = yield* bootState()
+      yield* refreshOpen
     }).pipe(
       work.withPermit,
       Effect.tapError((error) => Effect.logWarning('sync: catch-up failed', { tag: error._tag })),

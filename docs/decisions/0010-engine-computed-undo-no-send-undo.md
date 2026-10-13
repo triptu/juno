@@ -8,7 +8,7 @@ v1 gave the renderer a static table of inverse routes (`resolve` ↔ `reopen`, a
 
 ## Decision
 
-Every command handler runs in one transaction and returns `{ undo?: Command }`, computed from the state before the change. `topic.resolve` returns an undo that restores `resolved_at`, `resolved_activity_ts`, `reopened_at` and the read pointer together; `channel.ignore`, `topic.unsubscribe`, `topic.pin`, `topic.markRead` and friends do the same. The renderer's undo stack stores up to 20 returned commands and replays the last one on ⌘Z or the toast's Undo; it never computes an inverse itself.
+Every command handler runs in one transaction and returns `{ undo?: Command }`, computed from the state before the change. `topic.resolve` returns an undo that restores `resolved_at`, `resolved_activity_ts`, `reopened_at` and the read pointer together; `channel.ignore`, `topic.unsubscribe`, `topic.pin`, `reads.markRead` and friends do the same. The renderer's undo stack stores up to 20 returned commands and replays the last one on ⌘Z or the toast's Undo; it never computes an inverse itself.
 
 `message.send`, `message.edit`, `message.delete`, reactions and uploads return no undo. The toast for a routed post reads "Posted in …" with no Undo. Deleting a message asks for an inline confirmation in the hover toolbar; editing is inline in the message list. Both go through the outbox with `depends_on` for messages that are still pending.
 

@@ -1,11 +1,14 @@
-// Every sidebar statement has an index (performance 6): the plan may not
-// scan messages, topic_index, reactions or topic_overlay.
+// Every live query statement has an index (performance 6): the plan may not
+// scan messages, topic_index, reactions or topic_overlay. The sidebar's
+// statements, and the topic view's: the Main and thread windows, their
+// reactions and thread titles, and a channel's active threads.
 import { assert, describe, it } from '@effect/vitest'
 import { Effect, Layer } from 'effect'
 import * as fs from 'node:fs/promises'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import { Store, StoreReader, workspacePathsFromDir, type StoreError } from '@juno/store'
+import { reactionsStatement, threadsStatements, threadTitlesStatement, windowStatements, type WindowTarget } from '../src/messages/window'
 import { countsStatement, listStatements, type ListFilter } from '../src/topics/query'
 
 const tempDir = Effect.acquireRelease(
@@ -62,6 +65,40 @@ describe('query plans', () => {
         const statement = countsStatement(scope)
         const lines = yield* plan(statement.sql, statement.params)
         assert.deepStrictEqual(scans(lines), [], lines.join('\n'))
+      }
+    }).pipe(Effect.provide(freshStore)),
+  )
+
+  it.effect('messages.list reads the Main and thread windows through their indexes', () =>
+    Effect.gen(function* () {
+      const targets: ReadonlyArray<WindowTarget> = [
+        { kind: 'main', channel: 'C0ENG' },
+        { kind: 'thread', channel: 'C0ENG', threadTs: '1700000000.000100' },
+      ]
+      for (const target of targets) {
+        for (const anchor of [undefined, '1700000000.000200']) {
+          for (const statement of windowStatements(target, { anchor, before: 50, limit: 300 })) {
+            const lines = yield* plan(statement.sql, statement.params)
+            assert.deepStrictEqual(scans(lines), [], `${target.kind} ${anchor ?? 'bottom'}\n${lines.join('\n')}`)
+            const index = target.kind === 'main' ? 'messages_main' : 'messages_thread'
+            assert.isTrue(lines.some((line) => line.includes(index)), `${target.kind} uses ${index}\n${lines.join('\n')}`)
+          }
+        }
+      }
+      for (const statement of [reactionsStatement('C0ENG', ['1700000000.000100', '1700000000.000200']), threadTitlesStatement(['t:C0ENG:1700000000.000100'])]) {
+        const lines = yield* plan(statement.sql, statement.params)
+        assert.deepStrictEqual(scans(lines), [], lines.join('\n'))
+      }
+    }).pipe(Effect.provide(freshStore)),
+  )
+
+  it.effect("channel.threads reads a channel's threads through the channel index", () =>
+    Effect.gen(function* () {
+      const statements = threadsStatements('C0ENG', '1700000000.000000', 100)
+      for (const statement of [statements.list, statements.count]) {
+        const lines = yield* plan(statement.sql, statement.params)
+        assert.deepStrictEqual(scans(lines), [], lines.join('\n'))
+        assert.isTrue(lines.some((line) => line.includes('topic_index_channel_activity')), lines.join('\n'))
       }
     }).pipe(Effect.provide(freshStore)),
   )

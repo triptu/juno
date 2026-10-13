@@ -20,6 +20,7 @@
  */
 import { Context, Schema } from 'effect'
 import { Rpc } from 'effect/rpc'
+import { Refs } from './refs'
 
 export type LiveKind = 'value' | 'list'
 
@@ -28,7 +29,7 @@ export class LiveKindAnnotation extends Context.Service<LiveKindAnnotation, Live
 
 export const liveKindOf = (rpc: Rpc.Any): LiveKind | undefined => Context.getOrUndefined(rpc.annotations, LiveKindAnnotation)
 
-/** Size budgets for one live query message (performance section 1). */
+/** Size budgets for one live query message (performance section 1). Rows only; `refs` are counted separately. */
 export const LIVE_SNAPSHOT_MAX_BYTES = 200 * 1024
 export const LIVE_DELTA_MAX_BYTES = 32 * 1024
 
@@ -80,6 +81,12 @@ export type LiveValue<Value> = { readonly value: Value; readonly meta: LiveMeta 
  * `reset: true`; `order` is then the complete window and `upsert` holds every
  * row in it. Later messages carry only rows whose `rev` changed, the ids that
  * left the window, and `order` (the same array contents when unchanged).
+ *
+ * `refs` carries the people and channels the rows name by id (`refs.ts`):
+ * each one the first time the subscription needs it and again when it
+ * changes, never otherwise. The renderer applies them before the rows of
+ * the same message, so a row never arrives before what it names. A change
+ * to a person alone is a message with `refs` and no rows.
  */
 export function ListDelta<Row extends Schema.Top>(row: Row) {
   return Schema.Struct({
@@ -87,6 +94,7 @@ export function ListDelta<Row extends Schema.Top>(row: Row) {
     order: Schema.Array(Schema.String),
     upsert: Schema.Array(row),
     remove: Schema.Array(Schema.String),
+    refs: Schema.optionalKey(Refs),
     meta: LiveMeta,
   })
 }
@@ -95,6 +103,7 @@ export type ListDelta<Row> = {
   readonly order: ReadonlyArray<string>
   readonly upsert: ReadonlyArray<Row>
   readonly remove: ReadonlyArray<string>
+  readonly refs?: Refs
   readonly meta: LiveMeta
 }
 

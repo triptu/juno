@@ -15,7 +15,9 @@
  * catch-up instead of hourly.
  *
  * `phases` is the sync's phase while one runs, `undefined` otherwise; the
- * composition layer folds it into `engine.status`.
+ * composition layer folds it into `engine.status`. While a sync runs, its
+ * fetcher for opened topics is in `SyncLink`, and the topics `SyncLink`
+ * lists as shown are fetched again after each reconnect.
  */
 import { Cause, Context, Effect, Fiber, Layer, Stream, SubscriptionRef } from 'effect'
 import { quietDaysOf } from '@juno/domain'
@@ -24,6 +26,7 @@ import { prefs } from '@juno/store'
 import { runSync, syncConfigLayer, type SyncPhase } from '@juno/sync'
 import { EngineConfig } from '../config'
 import { Session, type ActiveSession } from './Session'
+import { SyncLink } from '../syncLink'
 import { Workspace } from '../workspace'
 
 export class SyncRunner extends Context.Service<
@@ -33,12 +36,13 @@ export class SyncRunner extends Context.Service<
     readonly phases: Stream.Stream<SyncPhase | undefined>
   }
 >()('juno/engine/SyncRunner') {
-  static readonly layer: Layer.Layer<SyncRunner, never, Session | Workspace | EngineConfig> = Layer.effect(
+  static readonly layer: Layer.Layer<SyncRunner, never, Session | Workspace | EngineConfig | SyncLink> = Layer.effect(
     SyncRunner,
     Effect.gen(function* () {
       const session = yield* Session
       const workspace = yield* Workspace
       const engineConfig = yield* EngineConfig
+      const link = yield* SyncLink
       const scope = yield* Effect.scope
       const phase = yield* SubscriptionRef.make<SyncPhase | undefined>(undefined)
       let running: { readonly active: ActiveSession; readonly fiber: Fiber.Fiber<never, SlackAuthRequired> } | undefined
@@ -47,6 +51,7 @@ export class SyncRunner extends Context.Service<
         const current = running
         running = undefined
         if (current !== undefined) yield* Fiber.interrupt(current.fiber)
+        yield* link.setFetcher(undefined)
         yield* SubscriptionRef.set(phase, undefined)
       })
 
@@ -58,7 +63,12 @@ export class SyncRunner extends Context.Service<
             Effect.provide(open.context),
             Effect.catch(() => Effect.succeed(undefined)),
           )
-          const program = runSync({ onPhase: (next) => SubscriptionRef.set(phase, next) }).pipe(
+          const program = runSync({
+            onPhase: (next) => SubscriptionRef.set(phase, next),
+            // The topic view's fetches run in this sync's context while it lives.
+            onFetcher: (fetcher) => link.setFetcher(fetcher),
+            openTopics: link.shown,
+          }).pipe(
             Effect.provide(active.context),
             Effect.provide(open.context),
             Effect.provide(
@@ -76,7 +86,10 @@ export class SyncRunner extends Context.Service<
           yield* Effect.forkIn(
             Effect.gen(function* () {
               const exit = yield* Effect.exit(Fiber.join(fiber))
-              if (running?.fiber === fiber) running = undefined
+              if (running?.fiber === fiber) {
+                running = undefined
+                yield* link.setFetcher(undefined)
+              }
               if (exit._tag === 'Failure') {
                 const error = Cause.findErrorOption(exit.cause)
                 if (error._tag === 'Some') yield* session.expire(error.value.error)

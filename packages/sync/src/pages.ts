@@ -27,7 +27,7 @@ export const mergeOne = (
     const merged = mergeMessage(existing, message, channel, source)
     const touched: Array<MessageRow> = [merged.row]
     if (merged.changed) yield* writeMessage(merged.row)
-    if (merged.applyReactions) yield* replaceReactions(channel, message.ts, message.reactions ?? [], ctx.me.userId)
+    if (merged.applyReactions) yield* replaceReactions(merged.row, message.reactions ?? [], ctx.me.userId)
     // A reaction event came before this message was stored; a page requested before it does not have it.
     if (source.kind !== 'event') {
       const key = `${channel}:${message.ts}`

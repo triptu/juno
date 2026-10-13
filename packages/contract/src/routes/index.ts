@@ -5,10 +5,11 @@
 import { SearchRoutes } from './search'
 import { PrefsRoutes } from './prefs'
 import { EngineRoutes } from './engine'
+import { MessagesRoutes } from './messages'
 import { ReadsRoutes } from './reads'
 import { SessionRoutes } from './session'
 import { TopicsRoutes } from './topics'
 
-export const AllRoutes = EngineRoutes.merge(SessionRoutes).merge(TopicsRoutes).merge(SearchRoutes).merge(PrefsRoutes).merge(ReadsRoutes)
+export const AllRoutes = EngineRoutes.merge(SessionRoutes).merge(TopicsRoutes).merge(SearchRoutes).merge(PrefsRoutes).merge(MessagesRoutes).merge(ReadsRoutes)
 
 export type AllRoutes = typeof AllRoutes

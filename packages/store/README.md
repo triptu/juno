@@ -17,8 +17,9 @@ The two SQLite databases of one workspace and how to read and write them. See `d
 
 To change a schema, add a timestamped migration file in `src/migrations/<db>/` and list it in that folder's `index.ts`. For `cache.db`, also bump `CACHE_SCHEMA_VERSION`.
 
-Indexes the sidebar relies on (`docs/performance.md` section 6): `topic_index (last_activity_ts DESC)`, `topic_index (channel, last_activity_ts DESC)`, the partial `topic_index (last_activity_ts DESC) WHERE unread_count > 0`, and the partial `topic_overlay (pinned_at) WHERE pinned_at IS NOT NULL`. `thread_cursors.complete_from`, `thread_subs.updated_event_ts`, `observed_at` and `commanded`, and `topic_reads.last_server_event_ts`, `observed_at`, `slack_read_ts` and `commanded` are the sync's coverage and ordering columns (architecture 5.4 and 5.6). Pending read marks are `outbox` rows of kind `mark`, found by `outbox (kind, next_at)`.
+The topic view's Main window reads the partial index `messages_main (channel, ts)` over roots and broadcast replies; a query uses it only when its WHERE clause repeats the index's condition. Invalidation keys in the record form may give a table an empty id list (`{ messages: [topicId], users: [] }`), which subscribes to the whole table.
 
+Indexes the sidebar relies on (`docs/performance.md` section 6): `topic_index (last_activity_ts DESC)`, `topic_index (channel, last_activity_ts DESC)`, the partial `topic_index (last_activity_ts DESC) WHERE unread_count > 0`, and the partial `topic_overlay (pinned_at) WHERE pinned_at IS NOT NULL`. `thread_cursors.complete_from`, `thread_subs.updated_event_ts`, `observed_at` and `commanded`, and `topic_reads.last_server_event_ts`, `observed_at`, `slack_read_ts` and `commanded` are the sync's coverage and ordering columns (architecture 5.4 and 5.6). Pending read marks are `outbox` rows of kind `mark`, found by `outbox (kind, next_at)`.
 ## Must not
 
 - Call Slack or AI, or shape data for the UI. The engine turns query results into view models.

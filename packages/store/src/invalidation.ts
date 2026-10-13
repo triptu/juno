@@ -17,7 +17,9 @@ import * as Reactivity from 'effect/reactivity/Reactivity'
  * row ids (`{ messages: ['C1'] }`). A live query registered on a table name
  * re-runs when any row of that table is invalidated; one registered on
  * `{ messages: ['C1'] }` re-runs for `['messages']` and for
- * `{ messages: ['C1'] }` but not for `{ messages: ['C2'] }`.
+ * `{ messages: ['C1'] }` but not for `{ messages: ['C2'] }`. In the record
+ * form an empty id list (`{ users: [] }`) registers the whole table, so one
+ * subscription can mix row keys and table keys.
  */
 export type InvalidationKeys = ReadonlyArray<string> | Readonly<Record<string, ReadonlyArray<string>>>
 
@@ -44,8 +46,8 @@ const PendingKeys = Context.Reference<Set<string> | undefined>('juno/store/Inval
  * Keys are flattened to strings before `Reactivity` sees them, so the matching
  * rule is the wrapper's, not the library's:
  *
- * - a subscription on `['t']` listens on `t`; one on `{ t: [id] }` listens on
- *   `t:*` and `t:id`;
+ * - a subscription on `['t']` or `{ t: [] }` listens on `t`; one on
+ *   `{ t: [id] }` listens on `t:*` and `t:id`;
  * - an invalidation of `['t']` fires `t` and `t:*`; one of `{ t: [id] }` fires
  *   `t` and `t:id`.
  *
@@ -65,6 +67,11 @@ const subscriptionKeys = (keys: InvalidationKeys): Array<string> => {
     return out
   }
   for (const [table, ids] of record) {
+    // No ids: the whole table, as in the array form.
+    if (ids.length === 0) {
+      out.push(table)
+      continue
+    }
     out.push(`${table}:*`)
     for (const id of ids) out.push(`${table}:${id}`)
   }

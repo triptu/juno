@@ -2,7 +2,7 @@ export { command, liveQuery, prefetch, rowAtom, runCommand, type CommandAtom, ty
 export { configureConnection, connectionStateAtom, makeRegistry, registry, restartEngine, type ConnectionState, type Registry } from './client'
 export { engineStatusAtom, pingCommand } from './engine'
 export { importFromSlackAppCommand, sessionStatusAtom, signedInAtom, signInCommand, signOutCommand, type ReadySession } from './session'
-export { defaultTopicListFilter, topicCountsAtom, topicListAtom, type TopicListFilter } from './topics'
+export { defaultTopicListFilter, joinTopicWindow, topicCountsAtom, topicListAtom, type TopicListFilter } from './topics'
 export { mirrorReadsAtom, shouldMarkRead, type ReadTrigger, type ReadView } from './reads'
 export {
   currentRowAtom,
@@ -19,7 +19,25 @@ export {
   type SidebarSections,
   type SidebarWindow,
 } from './sidebar'
-export { applyListDelta, emptyWindow, sameOrder, type ListWindow } from './list'
+export { applyListDelta, emptyWindow, sameOrder, type ListWindow, type WindowRefs } from './list'
+export {
+  bottomWindow,
+  channelThreadsAtom,
+  loadOlderMessages,
+  messageItem,
+  messageItemAtom,
+  messageListAtom,
+  messageOrderAtom,
+  messagesAtom,
+  messageWindowSpecAtom,
+  openTopic,
+  prefetchTopic,
+  topicAtom,
+  type MessageItem,
+  type MessageOrder,
+  type MessageWindow,
+  type MessageWindowSpec,
+} from './messages'
 export { errorOf } from './result'
 export { acquireRendererPort, EngineFailed } from './port'
 export { accentAtom, appInfoAtom, persistAccent, persistTheme, themeAtom, type Accent, type Theme } from './shell'

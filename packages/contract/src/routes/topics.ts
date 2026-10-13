@@ -15,6 +15,7 @@ import { Rpc, RpcGroup } from 'effect/rpc'
 import { AllTopicsStatus, ChannelColor, ChannelIcon, ContextTint, ConversationKind, RowTag, TopicKind } from '@juno/domain'
 import { NotFound, NotSignedIn, Offline, RateLimited, Rejected } from '../errors'
 import { liveListRoute, liveValueRoute, RowFields } from '../live'
+import { ChannelRef, Person } from '../refs'
 
 // The vocabulary is `@juno/domain`'s. It is re-exported so a renderer package
 // that may not import domain still names the same literals.
@@ -32,29 +33,11 @@ export const SIDEBAR_WINDOW = 300
 export const SidebarSection = Schema.Literals(['pinned', 'recent'])
 export type SidebarSection = typeof SidebarSection.Type
 
-/** A person on a row: the participant stack, a DM partner. `avatarUrl` is the Slack profile photo when there is one. */
-export const Person = Schema.Struct({
-  id: Schema.String,
-  name: Schema.String,
-  avatarUrl: Schema.optionalKey(Schema.String),
-  /** The ui hue for the initials when there is no photo. */
-  color: ChannelColor,
-})
-export type Person = typeof Person.Type
+const { partnerId: _partnerId, ...channelFields } = ChannelRef.fields
 
-/** Where a topic lives, with everything the tile and line three need. */
+/** Where a topic lives, with everything the tile and line three need: a `ChannelRef` with the DM partner joined in. */
 export const RowChannel = Schema.Struct({
-  id: Schema.String,
-  kind: ConversationKind,
-  /** "eng", "Maya Chen", "Maya, Leo": the text next to the icon, without "#". */
-  name: Schema.String,
-  /** "#eng", "Maya Chen": the text a toast or tab uses. */
-  label: Schema.String,
-  tint: ContextTint,
-  /** The ui icon key for the channel tile and line three. DMs use the avatar instead. */
-  icon: ChannelIcon,
-  /** The ui hue for the tile, from the channel id until the user picks one. */
-  color: ChannelColor,
+  ...channelFields,
   /** The other person in a DM, for the tile. */
   partner: Schema.optionalKey(Person),
 })
@@ -69,8 +52,8 @@ export const TopicPreview = Schema.Struct({
 })
 export type TopicPreview = typeof TopicPreview.Type
 
-/** One sidebar row. Flat, JSON-shaped, no histories (performance 2.2). */
-export const TopicRow = Schema.Struct({
+/** What every sidebar row says about itself, on the wire and in the view. */
+const TopicRowFields = {
   ...RowFields,
   kind: TopicKind,
   section: SidebarSection,
@@ -78,9 +61,6 @@ export const TopicRow = Schema.Struct({
   title: Schema.String,
   titleSource: TitleSource,
   preview: TopicPreview,
-  channel: RowChannel,
-  /** Most recent first, at most four. */
-  participants: Schema.Array(Person),
   messageCount: Schema.Int,
   unreadCount: Schema.Int,
   /** False when the count is a lower bound and the row should show a dot. */
@@ -100,8 +80,35 @@ export const TopicRow = Schema.Struct({
   lastActivityTs: Schema.String,
   /** Epoch milliseconds of `lastActivityTs`, for the relative time. */
   lastActivityAt: Schema.Number,
+}
+
+/**
+ * One sidebar row as the view gets it: flat, JSON-shaped, no histories
+ * (performance 2.2), with its channel and people joined in. `@juno/state`
+ * builds it from a `TopicListRow` and the window's `refs`; the row's
+ * object changes when the row's `rev` or anything it names changes.
+ */
+export const TopicRow = Schema.Struct({
+  ...TopicRowFields,
+  channel: RowChannel,
+  /** Most recent first, at most four. */
+  participants: Schema.Array(Person),
 })
 export type TopicRow = typeof TopicRow.Type
+
+/**
+ * One sidebar row on the wire: a `TopicRow` that names its channel and
+ * people by id. They travel in the delta's `refs` (`ChannelRef`, `Person`),
+ * once per subscription and again when they change, so a 300-row window
+ * does not repeat them and a new photo does not change any row's `rev`.
+ */
+export const TopicListRow = Schema.Struct({
+  ...TopicRowFields,
+  channelId: Schema.String,
+  /** Most recent first, at most four. */
+  participantIds: Schema.Array(Schema.String),
+})
+export type TopicListRow = typeof TopicListRow.Type
 
 export const KindFilter = Schema.Literals(['all', 'channels', 'dms'])
 export type KindFilter = typeof KindFilter.Type
@@ -114,8 +121,8 @@ export const TopicListFilter = {
   scope: Schema.optionalKey(Schema.String),
 }
 
-/** The sidebar list. Window of 300 rows, pinned first, then recent by latest activity. */
-export const topicsList = liveListRoute('topics.list', { row: TopicRow, payload: TopicListFilter })
+/** The sidebar list. Window of 300 rows, pinned first, then recent by latest activity. Rows name their channel and people; both are in `refs`. */
+export const topicsList = liveListRoute('topics.list', { row: TopicListRow, payload: TopicListFilter })
 
 export const TopicCounts = Schema.Struct({
   /** Unread topics the sidebar would show, per group, within the scope. */

@@ -20,8 +20,8 @@
 import { Option } from 'effect'
 import * as Atom from 'effect/reactivity/Atom'
 import * as AsyncResult from 'effect/reactivity/AsyncResult'
-import type { TopicRow } from '@juno/contract'
-import { emptyWindow, sameOrder, type ListWindow } from './list'
+import type { RowChannel, TopicRow } from '@juno/contract'
+import { emptyWindow, samePerson, sameOrder, type ListWindow } from './list'
 import { defaultTopicListFilter, topicCountsAtom, topicListAtom, type TopicListFilter } from './topics'
 
 /** The quick filters (All, Channels, DMs, Unread) and the scope chip. */
@@ -71,9 +71,27 @@ function carryOver(shown: SidebarWindow | undefined, next: ListWindow<TopicRow>,
   const rows = new Map<string, TopicRow>()
   for (const [id, row] of next.rows) {
     const old = shown.rows.get(id)
-    rows.set(id, old !== undefined && old.rev === row.rev ? old : row)
+    rows.set(id, old !== undefined && sameRow(old, row) ? old : row)
   }
-  return { order: sameOrder(shown.order, next.order) ? shown.order : next.order, rows, meta: next.meta, filter }
+  return { order: sameOrder(shown.order, next.order) ? shown.order : next.order, rows, refs: next.refs, meta: next.meta, filter }
+}
+
+/**
+ * The same row as far as a view can tell: the same `rev`, and the same
+ * channel and people. A person's new photo leaves the `rev` alone (it
+ * travels in `refs`), so the joined parts are compared too.
+ */
+function sameRow(a: TopicRow, b: TopicRow): boolean {
+  if (a === b) return true
+  if (a.rev !== b.rev || a.participants.length !== b.participants.length) return false
+  if (!sameChannel(a.channel, b.channel)) return false
+  return a.participants.every((person, i) => samePerson(person, b.participants[i]!))
+}
+
+function sameChannel(a: RowChannel, b: RowChannel): boolean {
+  if (a === b) return true
+  const partners = a.partner === undefined || b.partner === undefined ? a.partner === b.partner : samePerson(a.partner, b.partner)
+  return partners && a.id === b.id && a.kind === b.kind && a.name === b.name && a.label === b.label && a.tint === b.tint && a.icon === b.icon && a.color === b.color
 }
 
 /**

@@ -406,7 +406,7 @@ const report = (bootMillis: number, phases: ReadonlyArray<string>) =>
       const started = performance.now()
       const window = yield* listTopics({ kind: 'all', unreadOnly: false }, { now, limit: SIDEBAR_WINDOW })
       timings.push(performance.now() - started)
-      snapshot = JSON.stringify(window.rows).length
+      snapshot = JSON.stringify({ rows: window.rows, refs: window.refs }).length
     }
     timings.sort((a, b) => a - b)
     console.log(`  query time (window ${SIDEBAR_WINDOW}): ${ms(timings[0]!)} best, ${ms(timings[Math.floor(timings.length / 2)]!)} median of 5`)
