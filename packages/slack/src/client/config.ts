@@ -45,10 +45,10 @@ export interface SlackConfigShape {
     readonly reconnectUrlTtlMillis: number
     /** Hosts a socket URL may point at (exact or any subdomain). The official client only accepts slack.com hosts. */
     readonly allowedHosts: ReadonlyArray<string>
-    /** Sent as `agent` inside `start_args`. */
-    readonly agent: string
     /** Diagnostics only (the live smoke): sees every frame's text before decoding. Never log it in the app. */
     readonly onRawFrame?: (data: string) => void
+    /** Diagnostics only (the live smoke): one line per connection step (upgrade status, open, close code and reason). No secrets. */
+    readonly onDiagnostic?: (line: string) => void
   }
 }
 
@@ -74,7 +74,6 @@ export const defaultSlackConfig: SlackConfigShape = {
     backoffCapMillis: 60_000,
     reconnectUrlTtlMillis: 285_000,
     allowedHosts: ['slack.com'],
-    agent: 'client',
   },
 }
 

@@ -12,7 +12,7 @@
     "dev": "pnpm --filter @juno/desktop dev",
     "build": "pnpm --filter @juno/desktop build",
     "typecheck": "pnpm -r --parallel typecheck && tsc -p scripts/tsconfig.json",
-    "lint": "oxlint . && node scripts/check-no-pointer-cursor.mjs && node scripts/check-deps.mjs",
+    "lint": "oxlint . && node scripts/check-no-pointer-cursor.mjs && node scripts/check-deps.mjs && node scripts/check-fixtures-redacted.mjs",
     "check-deps": "node scripts/check-deps.mjs",
     "test": "pnpm -r --if-present test",
     "test:e2e": "pnpm --filter @juno/desktop test:e2e && pnpm --filter @juno/gallery test:e2e",

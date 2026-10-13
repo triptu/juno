@@ -93,7 +93,7 @@ describe('every fixture response decodes with @juno/slack schemas', () => {
     expect(view.threads.length).toBeGreaterThan(5)
     const hiring = view.threads.find((t) => t.root_msg.channel === 'C0HIRING' && t.root_msg.reply_count === 2)
     expect(hiring?.unread_replies).toHaveLength(2)
-    expect(hiring?.unread_replies.some((m) => m.text?.includes(`<@${fake.selfId}>`))).toBe(true)
+    expect(hiring?.unread_replies?.some((m) => m.text?.includes(`<@${fake.selfId}>`))).toBe(true)
     expect(view.threads.some((t) => t.root_msg.text?.startsWith('checkout.spec'))).toBe(false)
     expect(view.threads_state?.unread_count_by_channel?.['C0HIRING']).toBe(2)
 

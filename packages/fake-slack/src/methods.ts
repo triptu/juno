@@ -239,7 +239,7 @@ export const handlers: Handlers = {
       views.push({
         latest,
         view: {
-          root_msg: { ...full, channel: sub.channel, thread_ts: root.ts, reply_count: replies.length },
+          root_msg: { ...full, channel: sub.channel, thread_ts: root.ts, reply_count: replies.length, latest_reply: latest },
           unread_replies: replies
             .filter((r) => compareTs(r.ts, sub.lastRead) > 0 && r.user !== ws.selfId)
             .map((r) => withChannel(ws, sub.channel, r)),

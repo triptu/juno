@@ -52,7 +52,13 @@ export const ClientUserBootFields = {
   self: User,
   team: Team,
   prefs: opt(UserPrefs),
-  /** Public and private channels plus group DMs (`is_mpim`). */
+  /**
+   * Public and private channels plus group DMs (`is_mpim`). Observed live
+   * with `version_all_channels`: every channel of the workspace, without
+   * `is_member`, `last_read`, `latest` or `unread_count`. Membership and
+   * read state come from `client.counts`, which lists only the user's own
+   * conversations.
+   */
   channels: S.Array(Channel),
   ims: S.Array(Im),
   is_open: opt(S.Array(S.String)),
@@ -67,8 +73,9 @@ export const ClientUserBootFields = {
   workspaces: opt(S.Unknown),
   default_workspace: opt(S.String),
   account_types: opt(S.Unknown),
-  emoji_cache_ts: opt(S.Number),
-  app_commands_cache_ts: opt(S.Number),
+  /** Observed live as a string, not a number. Juno does not read it. */
+  emoji_cache_ts: opt(S.Unknown),
+  app_commands_cache_ts: opt(S.Unknown),
   paid_features: opt(S.Array(S.String)),
   can_access_client_v2: opt(S.Boolean),
   auth_min_last_fetched: opt(S.Number),
@@ -112,6 +119,7 @@ export const ThreadCounts = S.Struct({
   unread_count_by_channel: opt(S.Record(S.String, S.Number)),
   mention_count_by_channel: opt(S.Record(S.String, S.Number)),
   timestamp: opt(Ts),
+  vip_count: opt(S.Number),
 })
 export type ThreadCounts = typeof ThreadCounts.Type
 

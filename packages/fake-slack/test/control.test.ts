@@ -101,7 +101,7 @@ describe('control API', () => {
     const socket = await client.connect()
     await socket.next(isType('hello'))
     const view = await client.ok('subscriptions.thread.getView', { limit: 50 })
-    const thread = view.threads.find((t) => t.unread_replies.length > 0)!
+    const thread = view.threads.find((t) => (t.unread_replies?.length ?? 0) > 0)!
     fake.markThreadRead({ channel: thread.root_msg.channel, threadTs: thread.root_msg.ts, ts: thread.root_msg.latest_reply! })
     const marked = await socket.next(isType('thread_marked'))
     expect(marked.subscription.thread_ts).toBe(thread.root_msg.ts)

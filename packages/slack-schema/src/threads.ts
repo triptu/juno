@@ -34,18 +34,25 @@ export const ThreadGetViewArgs = S.Struct({
 })
 export type ThreadGetViewArgs = typeof ThreadGetViewArgs.Type
 
-/** A root in the threads view always says where it lives and how many replies it has. */
+/**
+ * A root in the threads view always says where it lives, how many replies it
+ * has and when the last one came (the page marker). Observed live on every
+ * root; `last_read` and `subscribed` were present on every root too but stay
+ * optional, as the research marks them so.
+ */
 export const ThreadViewRoot = S.Struct({
   ...MessageFields,
   channel: S.String,
   thread_ts: Ts,
   reply_count: S.Number,
+  latest_reply: Ts,
 })
 export type ThreadViewRoot = typeof ThreadViewRoot.Type
 
 export const ThreadView = S.Struct({
   root_msg: ThreadViewRoot,
-  unread_replies: S.Array(Message),
+  /** Absent live when the thread has no unread replies. */
+  unread_replies: opt(S.Array(Message)),
   latest_replies: S.Array(Message),
   priority: opt(S.Boolean),
 })
@@ -56,6 +63,9 @@ export const ThreadGetViewFields = {
   has_more: S.Boolean,
   total_unread_replies: S.Number,
   threads_state: opt(ThreadCounts),
+  /** Observed live, not in the research: the newest `latest_reply` on the page and a count of new threads. */
+  max_ts: opt(Ts),
+  new_threads_count: opt(S.Number),
 } as const
 
 // subscriptions.thread.mark

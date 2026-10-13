@@ -32,7 +32,9 @@ export const Channel = S.Struct({
   is_mpim: opt(S.Boolean),
   is_private: opt(S.Boolean),
   is_archived: opt(S.Boolean),
+  is_frozen: opt(S.Boolean),
   is_general: opt(S.Boolean),
+  /** Absent in `client.userBoot` live (see `ClientUserBootFields.channels`); present on `conversations.*` objects. */
   is_member: opt(S.Boolean),
   is_open: opt(S.Boolean),
   is_shared: opt(S.Boolean),

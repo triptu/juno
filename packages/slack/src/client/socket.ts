@@ -12,9 +12,9 @@
  *
  * Connect sequence: a fresh `reconnect_url` if one arrived within its TTL,
  * else `client.getWebSocketURL`; query params as the official client
- * (`token`, `sync_desync`, `slack_client=desktop`, `start_args`,
- * `no_query_on_subscribe`, `flannel=3`, `lazy_channels`,
- * `batch_presence_aware`, `gateway_server`, `slack_route`); the host is
+ * (`token`, `sync_desync`, `slack_client=desktop`, `no_query_on_subscribe`,
+ * `flannel=3`, `lazy_channels`, `batch_presence_aware`, `gateway_server`,
+ * `slack_route`) but never `start_args` (see `resolveUrl`); the host is
  * checked against `config.socket.allowedHosts`; `ws` opens it with the
  * headers from `SocketHandshake` (cookie, origin, user agent) and an
  * optional proxy agent; the first frame must be `hello` within
@@ -84,9 +84,10 @@ export interface SlackSocketShape {
 }
 
 type Incoming =
+  | { readonly kind: 'upgraded'; readonly status: number }
   | { readonly kind: 'open' }
   | { readonly kind: 'message'; readonly data: string }
-  | { readonly kind: 'close'; readonly code: number }
+  | { readonly kind: 'close'; readonly code: number; readonly reason: string }
   | { readonly kind: 'error'; readonly message: string }
   | { readonly kind: 'rejected'; readonly status: number }
   | { readonly kind: 'cookies'; readonly cookies: ReadonlyArray<string> }
@@ -118,6 +119,7 @@ export class SlackSocket extends Context.Service<SlackSocket, SlackSocketShape>(
       const api = yield* SlackApi
       const handshake = yield* SocketHandshake
       const state = yield* Ref.make<State>({ reconnect: undefined, current: undefined })
+      const diagnostic = (line: string) => config.socket.onDiagnostic?.(line)
 
       /** The URL for the next connect: a fresh `reconnect_url`, else a new one from the API. */
       const resolveUrl = Effect.gen(function* () {
@@ -132,10 +134,9 @@ export class SlackSocket extends Context.Service<SlackSocket, SlackSocketShape>(
         url.searchParams.set('token', session.token)
         url.searchParams.set('sync_desync', '1')
         url.searchParams.set('slack_client', 'desktop')
-        url.searchParams.set(
-          'start_args',
-          JSON.stringify({ agent: config.socket.agent, org_wide_aware: true, connect_only: true, ms_latest: true, cache_ts: 0 }),
-        )
+        // No `start_args`. Observed live: any `start_args` value (even `{}`) makes the server accept the
+        // upgrade and then send nothing, not even `hello`, for over a minute. Without it `hello` arrives
+        // in under a second. Juno loads boot data over HTTP (`client.userBoot`), so it needs no start payload.
         url.searchParams.set('no_query_on_subscribe', '1')
         url.searchParams.set('flannel', '3')
         url.searchParams.set('lazy_channels', '1')
@@ -166,7 +167,7 @@ export class SlackSocket extends Context.Service<SlackSocket, SlackSocketShape>(
           const headers = yield* handshake.headers(url)
           const agent = yield* handshake.agent(url)
           const socket = yield* Effect.acquireRelease(
-            Effect.sync(() => open(url, headers, agent, incoming)),
+            Effect.sync(() => open(url, headers, agent, config.socket.helloTimeoutMillis, incoming)),
             (ws) =>
               Effect.gen(function* () {
                 yield* Ref.update(state, (s) => (s.current?.socket === ws ? { ...s, current: undefined } : s))
@@ -190,14 +191,18 @@ export class SlackSocket extends Context.Service<SlackSocket, SlackSocketShape>(
               while (true) {
                 const item = yield* Queue.take(incoming)
                 switch (item.kind) {
+                  case 'upgraded':
+                    diagnostic(`upgrade ${item.status}`)
+                    break
                   case 'open':
+                    diagnostic('open')
                     yield* Ref.update(state, (s) => ({ ...s, current: { socket, nextId } }))
                     break
                   case 'cookies':
                     yield* handshake.setCookies(item.cookies)
                     break
                   case 'close':
-                    return { reason: `closed ${item.code}`, sawHello: !untilHello }
+                    return { reason: `closed ${item.code}${item.reason === '' ? '' : ` ${item.reason}`}`, sawHello: !untilHello }
                   case 'error':
                     return { reason: `error: ${item.message}`, sawHello: !untilHello }
                   case 'rejected':
@@ -307,20 +312,28 @@ export class SlackSocket extends Context.Service<SlackSocket, SlackSocketShape>(
   )
 }
 
-function open(url: string, headers: Readonly<Record<string, string>>, agent: Agent | undefined, incoming: Queue.Queue<Incoming>): WebSocket {
-  const socket = new WebSocket(url, { headers, ...(agent === undefined ? {} : { agent }), followRedirects: false })
+function open(
+  url: string,
+  headers: Readonly<Record<string, string>>,
+  agent: Agent | undefined,
+  handshakeTimeout: number,
+  incoming: Queue.Queue<Incoming>,
+): WebSocket {
+  const socket = new WebSocket(url, { headers, ...(agent === undefined ? {} : { agent }), followRedirects: false, handshakeTimeout })
   const push = (item: Incoming) => {
     Queue.offerUnsafe(incoming, item)
   }
   socket.on('open', () => push({ kind: 'open' }))
   socket.on('message', (data) => push({ kind: 'message', data: String(data) }))
-  socket.on('close', (code) => push({ kind: 'close', code }))
+  // The reason is the server's short close text (never a payload); it is kept for the reconnect log.
+  socket.on('close', (code, reason) => push({ kind: 'close', code, reason: reason.toString('utf8').slice(0, 120) }))
   socket.on('error', (error) => push({ kind: 'error', message: error.message }))
   socket.on('unexpected-response', (_request, response) => {
     response.resume()
     push({ kind: 'rejected', status: response.statusCode ?? 0 })
   })
   socket.on('upgrade', (response) => {
+    push({ kind: 'upgraded', status: response.statusCode ?? 0 })
     const cookies = response.headers['set-cookie']
     if (cookies !== undefined && cookies.length > 0) push({ kind: 'cookies', cookies })
   })
