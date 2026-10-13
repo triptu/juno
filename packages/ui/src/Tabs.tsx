@@ -87,8 +87,10 @@ const styles = stylex.create({
   strip: {
     display: 'flex',
     alignItems: 'flex-end',
-    // Fills the window so the strip and its bottom border run edge to edge.
+    // Fills the window so the strip and its bottom border run edge to edge,
+    // and never gives up height to a tall page under it.
     width: '100%',
+    flexShrink: 0,
     boxSizing: 'border-box',
     height: layout['--titlebar-height'],
     paddingInline: spacing['--space-2-5'],

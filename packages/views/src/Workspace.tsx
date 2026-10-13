@@ -80,7 +80,11 @@ export function Workspace({ tabs = [], activeId, onSelectTab, onCloseTab, onNewT
         ))}
       </TabStrip>
       <main {...stylex.props(styles.page)}>
-        {children ?? <EmptyState variant="workspace" illustration="nothing-open" title="Nothing open yet" body="Pick a topic on the left, or press ⌘K." padding="page" />}
+        {children ?? (
+          <div {...stylex.props(styles.empty)}>
+            <EmptyState variant="workspace" illustration="nothing-open" title="Nothing open yet" body="Pick a topic on the left, or press ⌘K." padding="page" />
+          </div>
+        )}
       </main>
     </section>
   )
@@ -91,6 +95,9 @@ const styles = stylex.create({
     display: 'flex',
     flexDirection: 'column',
     flexGrow: 1,
+    // Fills the shell's row beside the sidebar, and the full width of a
+    // column that holds it alone.
+    alignSelf: 'stretch',
     minWidth: 0,
     height: '100%',
     // When the window is as narrow as the sidebar (at the minimum size under
@@ -99,13 +106,21 @@ const styles = stylex.create({
     overflow: 'hidden',
     backgroundColor: colors['--background'],
   },
+  // The page fills the pane under the strip; a tall page scrolls inside
+  // itself and never pushes the strip.
   page: {
     display: 'flex',
     flexDirection: 'column',
+    flexGrow: 1,
+    minWidth: 0,
+    minHeight: 0,
+    backgroundColor: colors['--background'],
+  },
+  empty: {
+    display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     flexGrow: 1,
     minHeight: 0,
-    backgroundColor: colors['--background'],
   },
 })

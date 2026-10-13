@@ -32,9 +32,12 @@ export function TopicView({ header, children, pill, composer }: TopicViewProps) 
 }
 
 const styles = stylex.create({
+  // Fills whatever holds it (the workspace page, a gallery frame) and
+  // keeps its own height to that, so the list scrolls instead of growing.
   root: {
     display: 'flex',
     flexDirection: 'column',
+    flexGrow: 1,
     width: '100%',
     height: '100%',
     minWidth: 0,
