@@ -52,7 +52,11 @@ export interface ActiveSession {
   readonly secrets: SessionSecrets
   readonly scope: Scope.Closeable
   readonly context: Context.Context<SlackServices>
-  /** `enterprise_id` as `auth.test` reported it, else the team id (Grid detection, architecture 12). */
+  /**
+   * The workspace directory key: the team id, prefixed with the
+   * `enterprise_id` on Grid (`E…-T…`), so two teams of one org never share
+   * a `cache.db` (architecture 12).
+   */
   readonly workspaceId: string
 }
 
@@ -94,7 +98,8 @@ export class Session extends Context.Service<
                 config.fakeSlackUrl === undefined
                   ? {}
                   : {
-                      socket: { allowedHosts: ['slack.com', new URL(config.fakeSlackUrl).hostname] },
+                      // A refused reconnect against the fake should not wait out a 60 s backoff in a test.
+                      socket: { allowedHosts: ['slack.com', new URL(config.fakeSlackUrl).hostname], backoffCapMillis: 2_000 },
                       // The fake has no rate limits; spacing background calls would only slow tests.
                       lanes: { backgroundMinIntervalMillis: 0 },
                     },
@@ -134,7 +139,7 @@ export class Session extends Context.Service<
           }
           const auth = result.success
           const enterpriseId = auth.enterprise_id ?? secrets.enterprise?.id
-          const workspaceId = enterpriseId ?? auth.team_id
+          const workspaceId = workspaceKey(enterpriseId, auth.team_id)
           yield* closeActive
           if (workspaceId !== workspaceIdOf(secrets)) yield* workspace.open(workspaceId).pipe(Effect.orDie)
           yield* Ref.set(active, { secrets, scope, context, workspaceId })
@@ -276,7 +281,10 @@ function toSlackSession(secrets: SessionSecrets): SlackSessionShape {
   }
 }
 
-const workspaceIdOf = (secrets: SessionSecrets) => secrets.enterprise?.id ?? secrets.teamId
+/** One directory per team, also on Grid, where several teams share an `enterprise_id`. */
+const workspaceKey = (enterpriseId: string | undefined, teamId: string) => (enterpriseId === undefined ? teamId : `${enterpriseId}-${teamId}`)
+
+const workspaceIdOf = (secrets: SessionSecrets) => workspaceKey(secrets.enterprise?.id, secrets.teamId)
 
 function workspacePathsOf(userData: string, workspaceId: string): string {
   return `${userData}/workspaces/${workspaceId}/cache.db`

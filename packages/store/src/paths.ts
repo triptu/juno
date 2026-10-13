@@ -27,8 +27,8 @@ export const workspacePathsFromDir = (dir: string): WorkspacePaths => ({
 
 /**
  * Paths for a workspace under the app's user data directory. `workspaceId` is
- * the `enterprise_id` when the workspace is on Enterprise Grid, otherwise the
- * `team_id`.
+ * the `team_id`, prefixed with the `enterprise_id` on Enterprise Grid
+ * (`<enterprise_id>-<team_id>`), so two teams of one org keep apart.
  */
 export const workspacePaths = (userData: string, workspaceId: string): WorkspacePaths =>
   workspacePathsFromDir(path.join(userData, 'workspaces', workspaceId))

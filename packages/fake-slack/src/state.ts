@@ -82,13 +82,18 @@ export class Workspace {
   readonly messages = new Map<string, Message[]>()
   /** Self's `last_read` per conversation. */
   readonly reads = new Map<string, Ts>()
+  /** When a conversation last changed for self (a message, a read mark, membership), in ms. An incremental `client.counts` lists only these. */
+  readonly changedAt = new Map<string, number>()
   readonly subscriptions = new Map<string, Subscription>()
   readonly files = new Map<string, StoredFile>()
   prefs: UserPrefs = {}
+  /** The user groups self belongs to, as `client.userBoot.subteams.self` lists them. */
+  selfUsergroups: Array<string> = []
   readonly clock: Clock
   readonly selfId: string
   readonly team: Team
   #lastTs: Ts = NEVER_READ
+  readonly #backdated = new Set<string>()
   #sequence = 0
   #listeners = new Set<(frame: RtmFrame) => void>()
 
@@ -114,6 +119,15 @@ export class Workspace {
   /** A ts for `at` (default now), always greater than the last one issued. */
   nextTs(at?: number): Ts {
     let ts = millisToTs(at ?? this.clock.now(), this.#sequence++ % 1000)
+    // A post well in the past (a test setting up an old thread after the seed ran) keeps its time; it only has to be unique.
+    if (at !== undefined && at < Number(this.#lastTs.split('.')[0]) * 1000 - 1000) {
+      while (this.#backdated.has(ts)) {
+        const [seconds, fraction] = ts.split('.') as [string, string]
+        ts = Ts.make(`${seconds}.${String(Number(fraction) + 1).padStart(6, '0')}`)
+      }
+      this.#backdated.add(ts)
+      return ts
+    }
     if (compareTs(ts, this.#lastTs) <= 0) {
       const [seconds, fraction] = this.#lastTs.split('.') as [string, string]
       ts = Ts.make(`${seconds}.${String(Number(fraction) + 1).padStart(6, '0')}`)
@@ -161,6 +175,16 @@ export class Workspace {
 
   subscription(channel: string, threadTs: string): Subscription | undefined {
     return this.subscriptions.get(`${channel}:${threadTs}`)
+  }
+
+  /** True when the conversation changed for self after `seconds` (the `counts_last_fetched` of an earlier `client.counts`). */
+  changedSince(channel: string, seconds: number): boolean {
+    const at = this.changedAt.get(channel)
+    return at !== undefined && Math.floor(at / 1000) >= seconds
+  }
+
+  #touchConversation(channel: string, at?: number): void {
+    this.changedAt.set(channel, Math.max(this.changedAt.get(channel) ?? 0, at ?? this.clock.now()))
   }
 
   mentionsSelf(message: Message): boolean {
@@ -366,16 +390,23 @@ export class Workspace {
     list.sort((a, b) => compareTs(a.ts, b.ts))
 
     if (root !== undefined) this.#touchRoot(input.channel, root.ts)
+    this.#touchConversation(input.channel, input.at)
 
     if (input.silent === true) return message
 
-    // Posting marks the sender's own view read, and replying follows the thread.
+    // Posting marks the sender's own view read, and replying follows the thread (Slack says so with `thread_subscribed`).
+    let followed: Subscription | undefined
     if (input.user === this.selfId) {
       if (root === undefined) this.reads.set(input.channel, ts)
-      else this.#subscribe(input.channel, root.ts, ts, false)
+      else {
+        const before = this.subscription(input.channel, root.ts)?.subscribed === true
+        followed = this.#subscribe(input.channel, root.ts, ts, false)
+        if (before) followed = undefined
+      }
     }
 
     this.emit({ ...message, type: 'message', channel: input.channel, event_ts: ts })
+    if (followed !== undefined) this.emit({ type: 'thread_subscribed', subscription: this.subscriptionObject(followed), event_ts: this.eventTs() })
     if (root !== undefined) {
       const updated = this.withThreadFields({ ...this.find(input.channel, root.ts)!, channel: input.channel })
       this.emit({
@@ -413,6 +444,7 @@ export class Workspace {
       edited: { user: editor, ts: editTs },
     }
     list[index] = message
+    this.#touchConversation(channel)
     this.emit({
       type: 'message',
       subtype: 'message_changed',
@@ -441,6 +473,7 @@ export class Workspace {
     }
     const eventTs = this.eventTs()
     if (isReply(previous) && previous.thread_ts !== undefined) this.#touchRoot(channel, previous.thread_ts)
+    this.#touchConversation(channel)
     this.emit({
       type: 'message',
       subtype: 'message_deleted',
@@ -458,6 +491,7 @@ export class Workspace {
     const conversation = this.conversations.get(channel)
     if (conversation === undefined) throw new Error('channel_not_found')
     this.reads.set(channel, ts)
+    this.#touchConversation(channel)
     const entry = this.countEntry(conversation)
     const type =
       conversation.kind === 'im'
@@ -559,6 +593,7 @@ export class Workspace {
       archived: false,
     }
     this.addConversation(record)
+    this.#touchConversation(id)
     this.emit(
       kind === 'im'
         ? { type: 'im_created', channel: this.imObject(record), user: this.selfId }
@@ -578,6 +613,7 @@ export class Workspace {
     if (conversation.kind === 'im' || conversation.kind === 'mpim') throw new Error('method_not_supported_for_channel_type')
     if (conversation.members.has(user)) throw new Error('already_in_channel')
     conversation.members.add(user)
+    if (user === this.selfId) this.#touchConversation(channel)
     if (user === this.selfId) {
       this.emit({ type: conversation.kind === 'private' ? 'group_joined' : 'channel_joined', channel: this.channelObject(conversation), event_ts: this.eventTs() })
     }
@@ -591,10 +627,25 @@ export class Workspace {
     if (conversation.kind === 'im' || conversation.kind === 'mpim') throw new Error('method_not_supported_for_channel_type')
     if (!conversation.members.has(user)) throw new Error('not_in_channel')
     conversation.members.delete(user)
+    if (user === this.selfId) this.#touchConversation(channel)
     this.emit({ type: 'member_left_channel', user, channel, channel_type: conversation.kind === 'private' ? 'G' : 'C', team: this.team.id, event_ts: this.eventTs() })
     if (user === this.selfId) {
       this.emit({ type: conversation.kind === 'private' ? 'group_left' : 'channel_left', channel, actor_id: user, event_ts: this.eventTs() })
     }
+  }
+
+  /** Renames a channel. Slack sends `channel_rename` / `group_rename` with a partial channel object (`id`, `name`, `name_normalized`, `created`). */
+  rename(channel: string, name: string): void {
+    const conversation = this.conversations.get(channel)
+    if (conversation === undefined) throw new Error('channel_not_found')
+    if (conversation.kind === 'im' || conversation.kind === 'mpim') throw new Error('method_not_supported_for_channel_type')
+    conversation.name = name
+    this.#touchConversation(channel)
+    this.emit({
+      type: conversation.kind === 'private' ? 'group_rename' : 'channel_rename',
+      channel: { id: channel, name, name_normalized: name, created: Math.floor(conversation.created / 1000) },
+      event_ts: this.eventTs(),
+    })
   }
 
   typing(channel: string, user: string, threadTs?: Ts): void {

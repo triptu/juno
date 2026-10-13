@@ -19,6 +19,12 @@ export interface SyncConfigShape {
   readonly usersChunk: number
   /** How often the discovery sweep runs while live. */
   readonly sweepIntervalMillis: number
+  /**
+   * The pass over the followed threads of the window (`followPass`) runs
+   * with a catch-up or sweep at most this often after the last boot or pass.
+   * 0 runs it with every catch-up.
+   */
+  readonly followPassMillis: number
   /** `search` uses `search.modules.messages`; `history` is the fallback of architecture 5.3. */
   readonly discovery: 'search' | 'history'
   /** Matches per search page and pages per sweep. */
@@ -37,6 +43,7 @@ export const defaultSyncConfig: SyncConfigShape = {
   previewThreads: 50,
   usersChunk: 100,
   sweepIntervalMillis: 10 * 60_000,
+  followPassMillis: 60 * 60_000,
   discovery: 'search',
   searchPageCount: 50,
   searchMaxPages: 3,

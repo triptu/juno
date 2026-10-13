@@ -31,6 +31,8 @@ export type MethodResult<M extends MethodName> = Omit<MethodOk<M>, 'ok'> | ApiEr
 export type Handlers = { readonly [M in MethodName]: (ctx: MethodContext, args: MethodArgs<M>) => MethodResult<M> }
 
 const DEFAULT_LIMIT = 28
+/** `subscriptions.thread.getView` pages are capped server-side (research section 10). */
+export const GET_VIEW_PAGE_CAP = 10
 
 function cursorFor(ts: string): string {
   return Buffer.from(`ts:${ts}`).toString('base64')
@@ -101,7 +103,7 @@ export const handlers: Handlers = {
       ims,
       is_open: records.filter((c) => c.isOpen && (c.kind === 'im' || c.kind === 'mpim')).map((c) => c.id),
       starred: [],
-      subteams: { self: [] },
+      subteams: { self: ws.selfUsergroups },
       read_only_channels: [],
       thread_only_channels: [],
       has_more_mpdms: false,
@@ -114,12 +116,19 @@ export const handlers: Handlers = {
     }
   },
 
-  /** The user's own conversations with their read state, as recorded live. A channel the user is not in is not listed. */
+  /**
+   * The user's own conversations with their read state, as recorded live. A
+   * channel the user is not in is not listed. With `counts_last_fetched`
+   * only the conversations that changed since then are listed (research
+   * section 2 marks this Unknown; the fake takes the strict reading so the
+   * sync cannot lean on an incremental answer being complete).
+   */
   'client.counts': (ctx, args) => {
     const ws = ctx.workspace
     const wanted = args.channel_ids === undefined ? undefined : new Set(args.channel_ids)
+    const since = args.counts_last_fetched
     const records = [...ws.conversations.values()].filter(
-      (c) => c.members.has(ws.selfId) && (wanted === undefined || wanted.has(c.id)),
+      (c) => c.members.has(ws.selfId) && (wanted === undefined || wanted.has(c.id)) && (since === undefined || ws.changedSince(c.id, since)),
     )
     const channels = records.filter((c) => c.kind === 'public' || c.kind === 'private').map((c) => ws.countEntry(c))
     const ims = records.filter((c) => c.kind === 'im').map((c) => ws.countEntry(c))
@@ -219,6 +228,12 @@ export const handlers: Handlers = {
     }
   },
 
+  'conversations.info': (ctx, args) => {
+    const conversation = requireConversation(ctx, args.channel)
+    if (conversation instanceof ApiError) return conversation
+    return { channel: ctx.workspace.channelObject(conversation) }
+  },
+
   'conversations.mark': (ctx, args) => {
     const conversation = requireConversation(ctx, args.channel, true)
     if (conversation instanceof ApiError) return conversation
@@ -267,7 +282,8 @@ export const handlers: Handlers = {
       })
     }
     views.sort((a, b) => compareTs(b.latest, a.latest))
-    const limit = args.limit ?? 10
+    // Slack returns at most 10 threads per page whatever `limit` says (research section 10).
+    const limit = Math.min(args.limit ?? GET_VIEW_PAGE_CAP, GET_VIEW_PAGE_CAP)
     const page = views.slice(0, limit)
     const state = ws.threadCounts()
     return {
@@ -366,6 +382,9 @@ export const handlers: Handlers = {
         const text = (full.text ?? '').toLowerCase()
         if (!query.terms.every((term) => text.includes(term))) continue
         const user = full.user === undefined ? undefined : ws.users.get(full.user)
+        // As observed live: one item per match holding the message in `messages[]`. The thread is in the
+        // permalink only; there is no `thread_ts`, `reply_count`, blocks, files or reactions, so a client must
+        // not take a match for the whole message (review M3 finding 3).
         matches.push({
           iid: `${conversation.id}-${full.ts}`,
           team: ws.team.id,
@@ -377,19 +396,27 @@ export const handlers: Handlers = {
             is_mpim: conversation.kind === 'mpim',
             is_private: conversation.kind === 'private' || conversation.kind === 'mpim',
           },
-          type: 'message',
-          ...(full.user === undefined ? {} : { user: full.user }),
-          ...(user?.name === undefined ? {} : { username: user.name }),
-          ts: full.ts,
-          text: full.text ?? '',
-          permalink: `${ctx.baseUrl}${permalinkPath(conversation.id, full.ts, full.thread_ts)}`,
-          ...(full.thread_ts === undefined ? {} : { thread_ts: full.thread_ts }),
-          ...(full.reply_count === undefined ? {} : { reply_count: full.reply_count }),
-          ...(full.blocks === undefined ? {} : { blocks: full.blocks }),
+          messages: [
+            {
+              iid: `${conversation.id}-${full.ts}-m`,
+              ts: full.ts,
+              text: full.text ?? '',
+              ...(full.user === undefined ? {} : { user: full.user }),
+              ...(user?.name === undefined ? {} : { username: user.name }),
+              permalink: `${ctx.baseUrl}${permalinkPath(conversation.id, full.ts, full.thread_ts)}`,
+            },
+          ],
         })
       }
     }
-    matches.sort((a, b) => compareTs(b.ts, a.ts))
+    // Slack sorts by relevance unless asked for `sort=timestamp`. Relevance is not time order, so the fake
+    // uses a stable shuffle of the ids: a client that assumes newest-first without asking gets an arbitrary sample.
+    if (args.sort === 'timestamp') {
+      const tsOf = (match: SearchMatch) => match.messages?.[0]?.ts ?? match.ts ?? ''
+      matches.sort((a, b) => (args.sort_dir === 'asc' ? compareTs(tsOf(a), tsOf(b)) : compareTs(tsOf(b), tsOf(a))))
+    } else {
+      matches.sort((a, b) => relevance(a.iid ?? '') - relevance(b.iid ?? ''))
+    }
     const perPage = args.count ?? 20
     const page = Math.max(1, args.page ?? pageFromCursor(args.cursor) ?? 1)
     const start = (page - 1) * perPage
@@ -498,6 +525,16 @@ function parseQuery(query: string): ParsedQuery {
     else parsed.terms.push(token.toLowerCase())
   }
   return parsed
+}
+
+/** A stable pseudo-score for a match id (FNV-1a), so relevance order is deterministic but unrelated to time. */
+function relevance(id: string): number {
+  let hash = 0x811c9dc5
+  for (let i = 0; i < id.length; i++) {
+    hash ^= id.charCodeAt(i)
+    hash = Math.imul(hash, 0x01000193) >>> 0
+  }
+  return hash
 }
 
 function pageFromCursor(cursor: string | undefined): number | undefined {

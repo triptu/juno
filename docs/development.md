@@ -223,14 +223,15 @@ first), so there is no keychain prompt and no import from the Slack app.
 Read-only by construction: `SlackApi.call` is wrapped so any method outside its allow-list
 (`auth.test`, `client.userBoot`, `users.prefs.get`, `client.counts`, `client.getWebSocketURL`,
 `api.getFlannelHttpUrl`, `subscriptions.thread.getView`, `conversations.history`,
-`conversations.replies`, `search.modules.messages`, edge `users/info`) dies before a request
+`conversations.replies`, `conversations.info`, `search.modules.messages`, edge `users/info`) dies before a request
 is made, and `HttpTransport` checks the URL of every request the same way. Only the sync runs:
 no outbox, no mark, no command handler. The output is counts and milliseconds: calls by
 method and total time, conversations by kind and membership, topics by kind and how many the
 sidebar shows under the quiet rule, unread and mention counts, decode issues by path, rate-limit
 hits, the `topics.list` query time and snapshot size. Titles, names, message text and ids are
 never printed; the Effect logger is replaced by one that prints messages and enum-like fields
-only. `pnpm sync:live -- --fake` runs the same script against an in-process fake, which is how
+only. `-- --until-quiet` keeps it running after `live` until no call has been made for 30 s, so the
+background pass over the followed threads of the window is counted too (raise `--seconds` for it). `pnpm sync:live -- --fake` runs the same script against an in-process fake, which is how
 it is checked in development.
 
 Both live scripts run under plain Node (type stripping). `@juno/sync`, `@juno/store` and

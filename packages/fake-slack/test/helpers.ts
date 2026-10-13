@@ -41,6 +41,18 @@ export class TestClient {
     return { status: response.status, retryAfter: response.headers.get('retry-after'), body }
   }
 
+  /** Every followed thread, paged by `current_ts` the way the sync does (pages are capped at 10). */
+  async allThreadViews(): Promise<MethodOk<'subscriptions.thread.getView'>['threads']> {
+    const threads: Array<MethodOk<'subscriptions.thread.getView'>['threads'][number]> = []
+    let current: string | undefined
+    for (;;) {
+      const page = await this.ok('subscriptions.thread.getView', { limit: 50, ...(current === undefined ? {} : { current_ts: current as never }) })
+      threads.push(...page.threads)
+      if (!page.has_more) return threads
+      current = page.threads.at(-1)!.root_msg.latest_reply
+    }
+  }
+
   /** Like `call`, but fails the test unless the response is `ok: true`. */
   async ok<M extends MethodName>(method: M, args: MethodArgs<M>): Promise<MethodOk<M>> {
     const result = await this.call(method, args)

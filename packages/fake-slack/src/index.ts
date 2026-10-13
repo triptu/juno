@@ -150,6 +150,21 @@ export class FakeSlack {
     return this.workspace.markThread(input.channel, asTs(input.threadTs), asTs(input.ts), input.read ?? true)
   }
 
+  /** Self follows a thread from another client. Emits `thread_subscribed`. */
+  followThread(input: { channel: string; threadTs: string }): Subscription {
+    return this.workspace.subscribe(input.channel, asTs(input.threadTs))
+  }
+
+  /** Self unfollows a thread from another client. Emits `thread_unsubscribed`. */
+  unfollowThread(input: { channel: string; threadTs: string }): Subscription {
+    return this.workspace.unsubscribe(input.channel, asTs(input.threadTs))
+  }
+
+  /** The user groups self belongs to (`client.userBoot.subteams.self`). */
+  setSelfUsergroups(input: { ids: ReadonlyArray<string> }): void {
+    this.workspace.selfUsergroups = [...input.ids]
+  }
+
   addReaction(input: { channel: string; ts: string; name: string; user?: string }): void {
     const failure = this.workspace.react(input.channel, asTs(input.ts), input.name, input.user ?? 'U0MAYA', true)
     if (failure !== undefined) throw new Error(failure)
@@ -170,6 +185,11 @@ export class FakeSlack {
     this.workspace.leave(input.channel, input.user ?? this.selfId)
   }
 
+  /** Renames a channel from another client. Emits `channel_rename` or `group_rename` with Slack's partial channel object. */
+  renameChannel(input: { channel: string; name: string }): void {
+    this.workspace.rename(input.channel, input.name)
+  }
+
   typing(input: { channel: string; user?: string; threadTs?: string }): void {
     this.workspace.typing(input.channel, input.user ?? 'U0MAYA', input.threadTs === undefined ? undefined : asTs(input.threadTs))
   }
@@ -182,6 +202,16 @@ export class FakeSlack {
   /** Terminates every socket without a close frame, like a dropped connection. */
   dropSocket(): void {
     this.server.dropSockets()
+  }
+
+  /** Drops every socket and refuses new ones until `goOnline`: events in between reach no client. */
+  goOffline(): void {
+    this.server.refuseSockets = true
+    this.server.dropSockets()
+  }
+
+  goOnline(): void {
+    this.server.refuseSockets = false
   }
 
   socketCount(): number {
@@ -204,6 +234,30 @@ export class FakeSlack {
 
   clearError(input: { method?: string } = {}): void {
     this.server.clearError(input.method)
+  }
+
+  /**
+   * The next `times` calls of `method` run as usual but their answer waits
+   * for `release`. For tests that land events while a page is in flight: the
+   * request has started (its `requestedAt` is set), the events arrive, then
+   * the page lands.
+   */
+  holdNext(input: { method: string; times?: number }): void {
+    this.server.holdNext(input.method, input.times ?? 1)
+  }
+
+  /** Answers the held calls of `method`, or of every method. */
+  release(input: { method?: string } = {}): void {
+    this.server.release(input.method)
+  }
+
+  heldCount(input: { method?: string } = {}): number {
+    return this.server.heldCount(input.method)
+  }
+
+  /** The arguments of the held calls, oldest first. */
+  heldCalls(input: { method?: string } = {}): ReadonlyArray<Record<string, unknown>> {
+    return this.server.heldCalls(input.method)
   }
 
   /** Every session stops working: API calls get `invalid_auth`, sockets get `user_session_expiration` and close. */
@@ -232,13 +286,23 @@ export class FakeSlack {
       removeReaction: (i) => this.removeReaction(i),
       joinChannel: (i) => this.joinChannel(i),
       leaveChannel: (i) => this.leaveChannel(i),
+      renameChannel: (i) => this.renameChannel(i),
+      followThread: (i) => this.followThread(i),
+      unfollowThread: (i) => this.unfollowThread(i),
+      setSelfUsergroups: (i) => this.setSelfUsergroups(i),
       typing: (i) => this.typing(i),
       emitFrame: (i) => this.emitFrame(i),
       dropSocket: () => this.dropSocket(),
+      goOffline: () => this.goOffline(),
+      goOnline: () => this.goOnline(),
       force429: (i) => this.force429(i),
       clear429: (i) => this.clear429(i),
       forceError: (i) => this.forceError(i),
       clearError: (i) => this.clearError(i),
+      holdNext: (i) => this.holdNext(i),
+      release: (i) => this.release(i),
+      heldCount: (i) => this.heldCount(i),
+      heldCalls: (i) => this.heldCalls(i),
       expireSession: () => this.expireSession(),
       advanceClock: (i) => this.advanceClock(i),
       setNow: (i) => this.setNow(i),

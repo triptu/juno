@@ -39,6 +39,11 @@ export const fetchUsers = (
         for (const topic of ctx.missingUsers.get(user.id) ?? []) topics.add(topic)
         ctx.missingUsers.delete(user.id)
       }
+      // Ids the edge does not know stay unknown; asking again every sweep would never answer differently.
+      for (const id of answer.failed_ids ?? []) {
+        ctx.unknownUsers.add(id)
+        ctx.missingUsers.delete(id)
+      }
       yield* transaction(
         Effect.gen(function* () {
           yield* upsertUsers(answer.results)
@@ -54,5 +59,6 @@ export const fillUsers = (ctx: SyncContext): Effect.Effect<void, SlackApiError |
   Effect.gen(function* () {
     const ids = new Set(yield* unknownUserIds())
     for (const id of ctx.missingUsers.keys()) ids.add(id)
+    for (const id of ctx.unknownUsers) ids.delete(id)
     yield* fetchUsers(ctx, [...ids])
   })

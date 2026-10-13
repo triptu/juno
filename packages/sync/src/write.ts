@@ -4,7 +4,7 @@
  * the caller opened, reads the current row there (so it sees the
  * transaction's own writes) and fires specific invalidation keys.
  */
-import { applyServerRead, compareTs, mainTopicId, threadTopicId, type ChannelId, type ReadState, type Ts } from '@juno/domain'
+import { applyServerRead, compareTs, mainTopicId, maxTs, threadTopicId, type ChannelId, type ReadState, type Ts } from '@juno/domain'
 import { conversationKind, type Channel, type CountEntry, type Im, type Reaction, type Team, type User } from '@juno/slack-schema'
 import { Invalidation, StoreWriter, type ConversationRow, type MessageRow, type SqlError, type UserRow } from '@juno/store'
 import { Effect } from 'effect'
@@ -222,29 +222,135 @@ export const setChannelReads = (entries: ReadonlyArray<CountEntry>, countsUpdate
 export interface ThreadSubRow {
   readonly subscribed: boolean
   readonly slackLastRead?: string
+  /** Slack's `event_ts` of the last socket event that wrote the row. */
+  readonly updatedEventTs?: string
+  /** Juno's clock when the row was last observed or changed: a page's request start, an event's arrival, a command. */
+  readonly observedAt?: string
 }
 
 /** Slack's follow state for a thread as the store knows it; `undefined` when Slack has said nothing. */
 export const threadSub = (channel: string, threadTs: string): Effect.Effect<ThreadSubRow | undefined, SqlError, StoreWriter> =>
   Effect.gen(function* () {
     const sql = yield* StoreWriter
-    const rows = yield* sql<{ subscribed: 0 | 1; slack_last_read: string | null }>`
-      SELECT subscribed, slack_last_read FROM thread_subs WHERE channel = ${channel} AND thread_ts = ${threadTs}`
+    const rows = yield* sql<{ subscribed: 0 | 1; slack_last_read: string | null; updated_event_ts: string | null; observed_at: string | null }>`
+      SELECT subscribed, slack_last_read, updated_event_ts, observed_at FROM thread_subs WHERE channel = ${channel} AND thread_ts = ${threadTs}`
     const row = rows[0]
     if (row === undefined) return undefined
-    return { subscribed: row.subscribed === 1, ...(row.slack_last_read === null ? {} : { slackLastRead: row.slack_last_read }) }
+    return {
+      subscribed: row.subscribed === 1,
+      ...(row.slack_last_read === null ? {} : { slackLastRead: row.slack_last_read }),
+      ...(row.updated_event_ts === null ? {} : { updatedEventTs: row.updated_event_ts }),
+      ...(row.observed_at === null ? {} : { observedAt: row.observed_at }),
+    }
   })
 
-/** Writes Slack's follow state for a thread. Fires `thread_subs`, which the sidebar query subscribes to. */
-export const setThreadSub = (channel: string, threadTs: string, subscribed: boolean, slackLastRead: string | undefined): Writer =>
+/**
+ * Who says the follow flag changed, and when (the sync README, "Follow
+ * state", has the whole rule):
+ *
+ * - `event`: a socket event. `eventTs` is Slack's clock and orders events
+ *   among themselves; `observedAt` is Juno's clock at arrival.
+ * - `page`: a `getView` row, a root on a history or replies page, or a root
+ *   lookup. `requestedAt` is Juno's clock when the request started; the page
+ *   applies only when that is after the row's `observedAt`.
+ * - `command`: Juno's own Subscribe or Unsubscribe, at `at` on Juno's clock.
+ *
+ * While a command on the thread is pending (an outbox row of kind
+ * `follow`), events and pages do not change the flag; they mark the row
+ * `seen` so the command refreshes from Slack after its acknowledgement.
+ */
+export type ThreadSubSource =
+  | { readonly kind: 'event'; readonly eventTs: string; readonly observedAt: string }
+  | { readonly kind: 'page'; readonly requestedAt: string }
+  | { readonly kind: 'command'; readonly at: string }
+
+/** Writes Slack's follow state for a thread. Fires `thread_subs`, which the sidebar query subscribes to. Returns whether it applied. */
+export const setThreadSub = (
+  channel: string,
+  threadTs: string,
+  subscribed: boolean,
+  slackLastRead: string | undefined,
+  source: ThreadSubSource,
+): Effect.Effect<boolean, SqlError, StoreWriter | Invalidation> =>
   Effect.gen(function* () {
     const sql = yield* StoreWriter
-    yield* sql`INSERT INTO thread_subs (channel, thread_ts, subscribed, slack_last_read)
-      VALUES (${channel}, ${threadTs}, ${subscribed ? 1 : 0}, ${slackLastRead ?? null})
+    const existing = yield* threadSub(channel, threadTs)
+    if (source.kind === 'event' && existing?.updatedEventTs !== undefined && compareTs(source.eventTs, existing.updatedEventTs) < 0) return false
+    if (source.kind === 'page' && existing?.observedAt !== undefined && compareTs(source.requestedAt, existing.observedAt) <= 0) return false
+    if (source.kind !== 'command' && (yield* notePendingFollow(channel, threadTs))) return false
+    const at = source.kind === 'event' ? source.observedAt : source.kind === 'page' ? source.requestedAt : source.at
+    const observedAt = existing?.observedAt === undefined ? at : maxTs(existing.observedAt, at)
+    const eventTs = source.kind === 'event' ? source.eventTs : (existing?.updatedEventTs ?? null)
+    yield* sql`INSERT INTO thread_subs (channel, thread_ts, subscribed, slack_last_read, updated_event_ts, observed_at)
+      VALUES (${channel}, ${threadTs}, ${subscribed ? 1 : 0}, ${slackLastRead ?? null}, ${eventTs}, ${observedAt})
       ON CONFLICT (channel, thread_ts) DO UPDATE SET subscribed = excluded.subscribed,
-        slack_last_read = COALESCE(excluded.slack_last_read, thread_subs.slack_last_read)`
-    yield* invalidate(syncKeys.threadSubs)
+        slack_last_read = COALESCE(excluded.slack_last_read, thread_subs.slack_last_read),
+        updated_event_ts = excluded.updated_event_ts, observed_at = excluded.observed_at`
+    const changed = existing?.subscribed !== subscribed || (slackLastRead !== undefined && existing.slackLastRead !== slackLastRead)
+    if (changed) yield* invalidate(syncKeys.threadSubs)
+    return true
   })
+
+/**
+ * The `subscribed` and `last_read` a root carries on a page (history,
+ * replies and thread views all send them live, research section 3). `true`
+ * sets the flag, `false` clears a stored follow, and a root that says
+ * nothing changes nothing. A `false` for a thread Slack never mentioned
+ * stays unknown, so the sidebar's mention rule still applies to it.
+ */
+export const applyRootSubscription = (
+  channel: string,
+  root: { readonly ts: string; readonly subscribed?: boolean; readonly last_read?: string },
+  requestedAt: string,
+): Effect.Effect<boolean, SqlError, StoreWriter | Invalidation> =>
+  Effect.gen(function* () {
+    if (root.subscribed === undefined) return false
+    if (root.subscribed === false && (yield* threadSub(channel, root.ts)) === undefined) return false
+    return yield* setThreadSub(channel, root.ts, root.subscribed, root.subscribed ? root.last_read : undefined, { kind: 'page', requestedAt })
+  })
+
+/** The topic id an outbox row of kind `follow` targets. */
+const followTarget = (channel: string, threadTs: string) => threadTopicId(channel as ChannelId, threadTs as Ts)
+
+/**
+ * Juno's Subscribe or Unsubscribe is in flight for a thread: one outbox row
+ * of kind `follow` per thread, written in the command's transaction and
+ * removed by `endPendingFollow`. Not retried yet (the full outbox is a later
+ * milestone); `clearPendingFollows` drops rows a crash left behind.
+ */
+export const beginPendingFollow = (channel: string, threadTs: string, subscribed: boolean, at: number): Effect.Effect<void, SqlError, StoreWriter> =>
+  Effect.gen(function* () {
+    const sql = yield* StoreWriter
+    yield* sql`INSERT INTO outbox (kind, target_key, payload_json, created_at)
+      VALUES ('follow', ${followTarget(channel, threadTs)}, ${JSON.stringify({ subscribed, seen: false })}, ${String(at)})`
+  })
+
+/** Ends the pending command on a thread. Returns whether Slack said anything about the thread meanwhile. */
+export const endPendingFollow = (channel: string, threadTs: string): Effect.Effect<boolean, SqlError, StoreWriter> =>
+  Effect.gen(function* () {
+    const sql = yield* StoreWriter
+    const target = followTarget(channel, threadTs)
+    const rows = yield* sql<{ payload_json: string }>`SELECT payload_json FROM outbox WHERE kind = 'follow' AND target_key = ${target}`
+    yield* sql`DELETE FROM outbox WHERE kind = 'follow' AND target_key = ${target}`
+    return rows.some((row) => (JSON.parse(row.payload_json) as { seen?: boolean }).seen === true)
+  })
+
+/** True, and the observation noted, when a command on the thread is pending. */
+const notePendingFollow = (channel: string, threadTs: string): Effect.Effect<boolean, SqlError, StoreWriter> =>
+  Effect.gen(function* () {
+    const sql = yield* StoreWriter
+    const target = followTarget(channel, threadTs)
+    const rows = yield* sql<{ id: number }>`SELECT id FROM outbox WHERE kind = 'follow' AND target_key = ${target}`
+    if (rows.length === 0) return false
+    yield* sql`UPDATE outbox SET payload_json = json_set(payload_json, '$.seen', json('true')) WHERE kind = 'follow' AND target_key = ${target}`
+    return true
+  })
+
+/** At sync start: no command is in flight, so `follow` rows are left over from a crash. */
+export const clearPendingFollows: Effect.Effect<void, SqlError, StoreWriter> = Effect.gen(function* () {
+  const sql = yield* StoreWriter
+  yield* sql`DELETE FROM outbox WHERE kind = 'follow'`
+})
 
 /** Forgets a `thread_subs` row (the revert of a first subscribe), so Slack's silence is stored as silence again. */
 export const clearThreadSub = (channel: string, threadTs: string): Writer =>
@@ -267,6 +373,21 @@ export const markRepliesComplete = (channel: string, threadTs: string, complete:
           WHEN excluded.complete_from < thread_cursors.complete_from THEN excluded.complete_from
           ELSE thread_cursors.complete_from END`
   })
+
+/**
+ * The socket dropped: replies sent during the gap may never arrive as
+ * events, so "every reply from `complete_from` on is stored" stops being
+ * known for threads the user does not follow. Followed threads keep it: the
+ * reconnect pages `getView` over every thread with activity since the store
+ * was last in step and marks their coverage again from Slack's pointer, and
+ * a followed thread with no activity since then missed nothing.
+ */
+export const endEventCoverage: Effect.Effect<void, SqlError, StoreWriter> = Effect.gen(function* () {
+  const sql = yield* StoreWriter
+  yield* sql`UPDATE thread_cursors SET complete_from = NULL
+    WHERE complete_from IS NOT NULL AND NOT EXISTS (
+      SELECT 1 FROM thread_subs s WHERE s.channel = thread_cursors.channel AND s.thread_ts = thread_cursors.thread_ts AND s.subscribed = 1)`
+})
 
 interface ReadRow {
   readonly last_read_ts: string | null

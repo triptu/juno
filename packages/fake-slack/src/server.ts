@@ -48,6 +48,12 @@ interface FailureRule {
   remaining: number
 }
 
+/** Responses of one method held back until `release`, so a test can land events while a page is in flight. */
+interface HoldRule {
+  remaining: number
+  readonly waiting: Array<{ readonly resume: () => void; readonly args: Record<string, unknown> }>
+}
+
 export type ControlHandler = (input: Record<string, unknown>) => unknown
 
 export class FakeServer {
@@ -56,6 +62,7 @@ export class FakeServer {
   readonly sockets = new Set<WebSocket>()
   readonly #rateLimits = new Map<string, RateLimitRule>()
   readonly #failures = new Map<string, FailureRule>()
+  readonly #holds = new Map<string, HoldRule>()
   readonly workspace: Workspace
   readonly #control: (name: string, input: Record<string, unknown>) => unknown
   readonly #http: Server
@@ -90,6 +97,7 @@ export class FakeServer {
   }
 
   async close(): Promise<void> {
+    this.release()
     this.dropSockets()
     this.#wss.close()
     await new Promise<void>((resolve, reject) => this.#http.close((error) => (error ? reject(error) : resolve())))
@@ -159,6 +167,45 @@ export class FakeServer {
     return rule.error
   }
 
+  // Held responses
+
+  /** The next `times` calls of `method` run their handler, then wait for `release` before answering. */
+  holdNext(method: string, times: number): void {
+    const existing = this.#holds.get(method)
+    if (existing === undefined) this.#holds.set(method, { remaining: times, waiting: [] })
+    else existing.remaining += times
+  }
+
+  /** Answers every held call of `method` (every method when omitted) and forgets the rule. */
+  release(method?: string): void {
+    for (const [name, rule] of this.#holds) {
+      if (method !== undefined && name !== method) continue
+      this.#holds.delete(name)
+      for (const held of rule.waiting.splice(0)) held.resume()
+    }
+  }
+
+  /** How many calls are waiting for `release`. */
+  heldCount(method?: string): number {
+    let n = 0
+    for (const [name, rule] of this.#holds) if (method === undefined || name === method) n += rule.waiting.length
+    return n
+  }
+
+  /** The arguments of the calls waiting for `release`, oldest first. */
+  heldCalls(method?: string): ReadonlyArray<Record<string, unknown>> {
+    const calls: Array<Record<string, unknown>> = []
+    for (const [name, rule] of this.#holds) if (method === undefined || name === method) calls.push(...rule.waiting.map((held) => held.args))
+    return calls
+  }
+
+  #hold(method: string, args: Record<string, unknown>): Promise<void> | undefined {
+    const rule = this.#holds.get(method)
+    if (rule === undefined || rule.remaining <= 0) return undefined
+    rule.remaining -= 1
+    return new Promise((resolve) => rule.waiting.push({ resume: resolve, args }))
+  }
+
   // Socket
 
   socketUrl(): string {
@@ -182,7 +229,15 @@ export class FakeServer {
     this.sockets.clear()
   }
 
+  /** While true, socket upgrades are refused with 503, so a client stays offline until it is false again. */
+  refuseSockets = false
+
   #upgrade(request: IncomingMessage, socket: Duplex, head: Buffer): void {
+    if (this.refuseSockets) {
+      socket.write('HTTP/1.1 503 Service Unavailable\r\nConnection: close\r\n\r\n')
+      socket.destroy()
+      return
+    }
     const url = new URL(request.url ?? '/', this.#baseUrl)
     const cookie = parseCookies(request.headers.cookie)['d']
     const auth = url.pathname.startsWith('/websocket/') ? this.#authenticate(cookie, url.searchParams.get('token') ?? undefined) : 'invalid_auth'
@@ -266,8 +321,12 @@ export class FakeServer {
     }
     if (!isMethodName(method)) return record(200, { ok: false, error: 'unknown_method' })
     const forced = this.#takeFailure(method)
+    const result = forced === undefined ? this.#run(method, fields) : undefined
+    // The handler has run (state changed, events sent), or a forced error stands in for it; only the answer waits.
+    const held = this.#hold(method, redact(fields))
+    if (held !== undefined) await held
     if (forced !== undefined) return record(200, { ok: false, error: forced })
-    const result = this.#run(method, fields)
+    if (result === undefined) return
     if (result instanceof ApiError) {
       if (result.retryAfter !== undefined) response.setHeader('Retry-After', String(result.retryAfter))
       return record(result.status, { ok: false, error: result.error })

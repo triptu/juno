@@ -7,6 +7,7 @@ import { Effect, Layer, Ref, Stream } from 'effect'
 import type { EnginePhase, SessionStatus } from '@juno/contract'
 import type { SyncPhase } from '@juno/sync'
 import { Outbox } from './outbox'
+import { SessionClientLive } from './session/client'
 import { SessionHandlers } from './session/handlers'
 import { Session } from './session/Session'
 import { StatusHandlers } from './status/handlers'
@@ -47,6 +48,7 @@ const EnginePhases = Layer.effectDiscard(
 export const Services = EnginePhases.pipe(
   Layer.provideMerge(SyncRunner.layer),
   Layer.provideMerge(Outbox.layer),
+  Layer.provideMerge(SessionClientLive),
   Layer.provideMerge(Session.layer),
   Layer.provideMerge(Workspace.layer),
   Layer.provideMerge(Status.layer),

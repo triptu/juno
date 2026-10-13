@@ -5,21 +5,26 @@
  *
  * Cold boot, in order: `client.userBoot` and `users.prefs.get`,
  * `client.counts`, the followed threads from `subscriptions.thread.getView`
- * (paged until the roots are older than the quiet window), one history page
- * per active conversation (newest first, background lane), unknown users
- * from the edge, then a latest-reply fetch for the unfollowed threads with
- * the most recent activity so their rows have a preview.
+ * (10 per page live, paged back to the quiet window), one history page per active conversation (newest first,
+ * background lane, skipping conversations an interrupted boot already
+ * covered), unknown users from the edge, a latest-reply fetch for the
+ * unfollowed threads with the most recent activity so their rows have a
+ * preview, and the discovery sweep over the window so Main knows about
+ * replies to roots older than the window.
  *
  * Warm boot: `client.userBoot`, a full `client.counts` (membership is
  * derived from it), history since the synced range for conversations whose
- * `latest` moved, the first `getView` page, the discovery sweep for the gap,
- * users. The reconnect catch-up is the same without the workspace refresh
- * and with `counts_last_fetched`.
+ * `latest` moved, `getView` back to the window, the discovery sweep for
+ * the gap, users. The reconnect catch-up and the sweep are the same without
+ * the workspace refresh, with `counts_last_fetched`, and with `getView` back
+ * to the last moment the store was in step. `followPass` reads the followed
+ * threads over the window and checks the follows it left out; `runSync`
+ * schedules it.
  */
-import { millisToTs, type Ts } from '@juno/domain'
-import { SlackApi, type SlackApiError } from '@juno/slack'
+import { compareTs, maxTs, millisToTs, type Ts, type UsergroupId } from '@juno/domain'
+import { SlackApi, type SlackApiError, type SlackAuthRequired } from '@juno/slack'
 import { SlackEdge, SlackSession } from '@juno/slack'
-import type { ClientCountsArgs, CountEntry, Message, ThreadView } from '@juno/slack-schema'
+import type { Channel, ClientCountsArgs, CountEntry, Message, ThreadView } from '@juno/slack-schema'
 import { Invalidation, StoreWriter, transaction, type SqlError } from '@juno/store'
 import { Clock, Effect } from 'effect'
 import { reindexOptions, type SyncContext } from './context'
@@ -52,7 +57,7 @@ export const BOOT_KEY = 'boot'
 export interface BootState {
   readonly completedAt: number
   readonly countsLastFetched?: number
-  /** The last moment the store was known to be in step with Slack; discovery sweeps start here. */
+  /** The last moment the store was known to be in step with Slack; discovery sweeps and the reconnect `getView` start here. */
   readonly lastSyncAt: number
 }
 
@@ -65,13 +70,14 @@ const DAY = 24 * 60 * 60 * 1000
 
 export const bootState = (): Effect.Effect<BootState | undefined, SqlError, StoreWriter> => getSyncState<BootState>(BOOT_KEY)
 
-const windowStart = (ctx: SyncContext) => Effect.map(Clock.currentTimeMillis, (now) => millisToTs(now - ctx.config.quietDays * DAY))
+const windowStartMillis = (ctx: SyncContext) => Effect.map(Clock.currentTimeMillis, (now) => now - ctx.config.quietDays * DAY)
 const nowTs = Effect.map(Clock.currentTimeMillis, (now) => millisToTs(now))
 
 /**
- * `client.userBoot`: team, self and the metadata of every conversation of
- * the workspace (member or not; the response carries no membership or read
- * state, observed live). `prefs` only on a cold boot.
+ * `client.userBoot`: team, self, the user groups self belongs to, and the
+ * metadata of every conversation of the workspace (member or not; the
+ * response carries no membership or read state, observed live). `prefs`
+ * only on a cold boot.
  */
 const loadWorkspace = (ctx: SyncContext, withPrefs: boolean): Effect.Effect<void, BootError, BootServices> =>
   Effect.gen(function* () {
@@ -79,6 +85,7 @@ const loadWorkspace = (ctx: SyncContext, withPrefs: boolean): Effect.Effect<void
     const boot = yield* api.call('client.userBoot', { version_all_channels: true, return_all_relevant_mpdms: true }, { lane: 'interactive', reason: 'fetch-client-data' })
     const prefs = withPrefs ? (yield* api.call('users.prefs.get', {}, { lane: 'interactive', reason: 'prefs' })).prefs : (boot.prefs ?? undefined)
     const selfId = ctx.me.userId
+    ctx.me = { userId: selfId, usergroupIds: (boot.subteams?.self ?? []) as ReadonlyArray<UsergroupId> }
     yield* transaction(
       Effect.gen(function* () {
         yield* upsertTeam(boot.team, selfId, prefs, undefined)
@@ -93,19 +100,30 @@ const loadWorkspace = (ctx: SyncContext, withPrefs: boolean): Effect.Effect<void
  * and unread flags for each, and the first read pointer of every Main.
  * Without `counts_last_fetched` the list is complete and membership is
  * replaced by it; with it the entries only add members (what the server
- * leaves out of an incremental answer is Unknown, research section 2).
+ * leaves out of an incremental answer is Unknown, research section 2). An
+ * entry for a conversation the store has never seen (joined while the
+ * socket was down) is fetched with `conversations.info` first, so the
+ * membership write has a row to land on.
  */
 const loadCounts = (ctx: SyncContext, sinceFetched: number | undefined): Effect.Effect<{ entries: ReadonlyArray<CountEntry>; fetched: number | undefined }, BootError, BootServices> =>
   Effect.gen(function* () {
     const api = yield* SlackApi
     const args: ClientCountsArgs = { thread_counts_by_channel: true, ...(sinceFetched === undefined ? {} : { counts_last_fetched: sinceFetched }) }
-    const counts = yield* api.call('client.counts', args, { lane: 'interactive', reason: 'counts' })
-    const entries = [...counts.channels, ...counts.ims, ...counts.mpims]
+    // The time before the call: a `*_marked` event that lands while counts is in flight is newer than the answer.
     const now = yield* Clock.currentTimeMillis
     const eventTs = millisToTs(now)
+    const counts = yield* api.call('client.counts', args, { lane: 'interactive', reason: 'counts' })
+    const entries = [...counts.channels, ...counts.ims, ...counts.mpims]
+    const unknown = yield* unknownConversations(entries.map((e) => e.id))
+    const fetched: Array<Channel> = []
+    for (const id of unknown) {
+      const info = yield* api.call('conversations.info', { channel: id }, { lane: 'interactive', reason: 'conversation' }).pipe(Effect.catchTag('SlackRejected', () => Effect.succeed(undefined)))
+      if (info !== undefined) fetched.push(info.channel)
+    }
     yield* transaction(
       Effect.gen(function* () {
         const ids = entries.map((e) => e.id)
+        if (fetched.length > 0) yield* upsertConversations(fetched.map((c) => toConversationRow(c)))
         if (sinceFetched === undefined) yield* replaceMembership(ids)
         else yield* setMembership(ids, true)
         yield* setChannelReads(entries, now)
@@ -119,9 +137,22 @@ const loadCounts = (ctx: SyncContext, sinceFetched: number | undefined): Effect.
     return { entries, fetched: counts.counts_last_fetched }
   })
 
+/** Ids among `ids` with no `conversations` row. */
+const unknownConversations = (ids: ReadonlyArray<string>): Effect.Effect<ReadonlyArray<string>, SqlError, StoreWriter> =>
+  Effect.gen(function* () {
+    if (ids.length === 0) return []
+    const sql = yield* StoreWriter
+    const known = new Set<string>()
+    for (let i = 0; i < ids.length; i += 500) {
+      const rows = yield* sql<{ id: string }>`SELECT id FROM conversations WHERE id IN ${sql.in(ids.slice(i, i + 500))}`
+      for (const row of rows) known.add(row.id)
+    }
+    return ids.filter((id) => !known.has(id))
+  })
+
 interface Active {
   readonly id: string
-  readonly latest: string
+  readonly latest: Ts
 }
 
 /** Member conversations with activity inside the window, newest first. */
@@ -147,7 +178,8 @@ const applyThreadView = (ctx: SyncContext, view: ThreadView, requestedAt: Ts): E
     const topic = threadTopicOf(channel, root.ts)
     yield* transaction(
       Effect.gen(function* () {
-        yield* setThreadSub(channel, root.ts, root.subscribed ?? true, root.last_read)
+        // The view lists followed threads: a root without the flag is followed. Later events win over this page.
+        yield* setThreadSub(channel, root.ts, root.subscribed ?? true, root.last_read, { kind: 'page', requestedAt })
         yield* seedTopicRead(topic, root.last_read ?? root.latest_reply ?? root.ts)
         if (root.last_read !== undefined) yield* applyServerMark(topic, root.last_read, requestedAt)
       }),
@@ -160,29 +192,124 @@ const applyThreadView = (ctx: SyncContext, view: ThreadView, requestedAt: Ts): E
     yield* transaction(markRepliesComplete(channel, root.ts, replies >= root.reply_count, yield* Clock.currentTimeMillis, completeFrom))
   })
 
-/** Followed threads, newest first, until the page's oldest root is outside the window (`all: false` stops after one page). */
-const loadThreadViews = (ctx: SyncContext, start: Ts, all: boolean): Effect.Effect<void, BootError, BootServices> =>
+/**
+ * Followed threads from `subscriptions.thread.getView`, newest activity
+ * first, 10 per page live whatever `limit` says (research section 10),
+ * until the last root on a page is older than `until`.
+ *
+ * Because the list is sorted by activity, the pages list every followed
+ * thread with activity between `until` and the first request. With `probe`,
+ * every stored follow in that range that no page listed is then looked up
+ * by its root (`probeUnlisted`): absence is never read as "unfollowed" by
+ * itself (specs/follow.qnt: `startScan` .. `finishScan`, then
+ * `probeAbsent`). Live an account can follow thousands of threads (over
+ * 9,000 measured), so no pass reads the whole list; a follow older than the
+ * window is checked when its thread next gets a reply (`events.ts`).
+ */
+const loadThreadViews = (
+  ctx: SyncContext,
+  options: { readonly until: Ts; readonly probe: boolean; readonly lane: 'interactive' | 'background' },
+): Effect.Effect<void, BootError, BootServices> =>
   Effect.gen(function* () {
     const api = yield* SlackApi
+    const listed = new Set<string>()
+    let firstRequestedAt: Ts | undefined
     let current: Ts | undefined
+    // `until` when the pages stopped there; undefined when they reached the end of the list.
+    let coveredFrom: Ts | undefined = options.until
     while (true) {
       const requestedAt = yield* nowTs
+      firstRequestedAt ??= requestedAt
       const page = yield* api.call(
         'subscriptions.thread.getView',
         { limit: ctx.config.getViewPageLimit, ...(current === undefined ? {} : { current_ts: current }) },
-        { lane: 'interactive', reason: 'threads' },
+        { lane: options.lane, reason: 'threads' },
       )
-      for (const view of page.threads) yield* applyThreadView(ctx, view, requestedAt)
+      for (const view of page.threads) {
+        listed.add(`${view.root_msg.channel}:${view.root_msg.ts}`)
+        yield* applyThreadView(ctx, view, requestedAt)
+      }
       const last = page.threads.at(-1)
       const lastActivity = last?.root_msg.latest_reply ?? last?.root_msg.ts
-      if (!all || !page.has_more || lastActivity === undefined || lastActivity < start) return
+      if (lastActivity === undefined) {
+        // An empty page that says there is more has no cursor to go on: the list is incomplete, nothing is probed.
+        if (page.has_more) return yield* Effect.logWarning('sync: getView stopped without a cursor')
+        coveredFrom = undefined
+        break
+      }
+      if (!page.has_more) {
+        coveredFrom = undefined
+        break
+      }
+      if (compareTs(lastActivity, options.until) < 0) break
       current = lastActivity
+      yield* Effect.yieldNow
+    }
+    if (options.probe) yield* probeUnlisted(ctx, listed, coveredFrom, firstRequestedAt)
+  })
+
+/**
+ * The pass over the followed threads with activity inside the quiet window,
+ * then the lookup of stored follows in that range it left out. On the
+ * background lane. `runSync` runs it with a catch-up or sweep at most every
+ * `SyncConfig.followPassMillis`; the boots make the same pass themselves.
+ */
+export const followPass = (ctx: SyncContext): Effect.Effect<void, BootError, BootServices> =>
+  Effect.gen(function* () {
+    const windowStart = millisToTs(yield* windowStartMillis(ctx))
+    yield* loadThreadViews(ctx, { until: windowStart, probe: true, lane: 'background' })
+  })
+
+/**
+ * Looks up the root of every stored follow the `getView` pages should have
+ * listed and did not, in conversations the user is still in, and applies
+ * the `subscribed` the root carries (`false` clears the follow; a root
+ * without the field changes nothing). In range: activity at or after
+ * `coveredFrom` (any activity when the pages reached the end) and before
+ * the first page was requested. A follow observed or changed since then (an
+ * event, a command) is left alone.
+ */
+const probeUnlisted = (
+  ctx: SyncContext,
+  listed: ReadonlySet<string>,
+  coveredFrom: Ts | undefined,
+  listRequestedAt: Ts,
+): Effect.Effect<void, BootError, BootServices> =>
+  Effect.gen(function* () {
+    const sql = yield* StoreWriter
+    const api = yield* SlackApi
+    const followed = yield* sql<{ channel: string; thread_ts: string; observed_at: string | null; activity: string }>`
+      SELECT s.channel, s.thread_ts, s.observed_at, COALESCE(m.latest_reply, m.ts, s.thread_ts) AS activity
+      FROM thread_subs s JOIN conversations c ON c.id = s.channel
+      LEFT JOIN messages m ON m.channel = s.channel AND m.ts = s.thread_ts
+      WHERE s.subscribed = 1 AND c.is_member = 1`
+    for (const row of followed) {
+      if (listed.has(`${row.channel}:${row.thread_ts}`)) continue
+      if (coveredFrom !== undefined && compareTs(row.activity, coveredFrom) < 0) continue
+      if (compareTs(row.activity, listRequestedAt) >= 0) continue
+      if (row.observed_at !== null && compareTs(row.observed_at, listRequestedAt) >= 0) continue
+      const requestedAt = yield* nowTs
+      const page = yield* api
+        .call(
+          'conversations.replies',
+          { channel: row.channel, ts: row.thread_ts as Ts, oldest: row.thread_ts as Ts, inclusive: true, limit: 1 },
+          { lane: 'background', reason: 'root' },
+        )
+        .pipe(Effect.catchTag('SlackRejected', () => Effect.succeed(undefined)))
+      const root = page?.messages.find((m) => m.ts === row.thread_ts)
+      if (root === undefined) continue
+      yield* applyPage(ctx, row.channel, [root], { kind: 'page', requestedAt })
       yield* Effect.yieldNow
     }
   })
 
+interface HistoryOptions {
+  /** Cold boot: see `ApplyPageOptions.seedReadBefore`. */
+  readonly seedReadBefore?: string
+}
+
 /** The newest history page of a conversation inside the window. Records the range it covered. */
-const loadHistoryWindow = (ctx: SyncContext, channel: string, start: Ts): Effect.Effect<void, BootError, BootServices> =>
+const loadHistoryWindow = (ctx: SyncContext, channel: string, start: Ts, options: HistoryOptions): Effect.Effect<void, BootError, BootServices> =>
   Effect.gen(function* () {
     const api = yield* SlackApi
     const requestedAt = yield* nowTs
@@ -194,8 +321,17 @@ const loadHistoryWindow = (ctx: SyncContext, channel: string, start: Ts): Effect
     // The range first, so the index of this page already knows what history covers.
     const oldest = page.messages.at(-1)?.ts
     yield* transaction(addSyncedRange(channel, page.has_more && oldest !== undefined ? oldest : start, requestedAt))
-    yield* applyPage(ctx, channel, page.messages, { kind: 'page', requestedAt }, [mainTopicOf(channel)])
+    yield* applyPage(ctx, channel, page.messages, { kind: 'page', requestedAt }, { alsoTouch: [mainTopicOf(channel)], ...options })
   })
+
+/**
+ * One conversation's history, skipped when Slack refuses it (a channel
+ * deleted or left between `client.counts` and the call): one conversation
+ * must not fail the whole boot and make it retry forever. Transport, rate
+ * limit and auth failures still fail the step.
+ */
+const skipRejected = (load: Effect.Effect<void, BootError, BootServices>): Effect.Effect<void, BootError, BootServices> =>
+  load.pipe(Effect.catchTag('SlackRejected', (error) => Effect.logWarning('sync: history refused, skipped', { tag: error._tag, reason: error.error })))
 
 /** History since the synced range, in pages, for a conversation whose `latest` moved. */
 const loadHistorySince = (ctx: SyncContext, channel: string, since: string): Effect.Effect<void, BootError, BootServices> =>
@@ -223,14 +359,14 @@ const loadHistorySince = (ctx: SyncContext, channel: string, since: string): Eff
       cursor = page.response_metadata?.next_cursor
       complete = !page.has_more || cursor === undefined || cursor === ''
       yield* transaction(addSyncedRange(channel, complete || oldestSeen === undefined ? since : oldestSeen, requestedAt))
-      yield* applyPage(ctx, channel, page.messages, { kind: 'page', requestedAt }, [mainTopicOf(channel)])
+      yield* applyPage(ctx, channel, page.messages, { kind: 'page', requestedAt }, { alsoTouch: [mainTopicOf(channel)] })
       if (complete) break
       yield* Effect.yieldNow
     }
   })
 
 /** Rows for unfollowed threads discovered through history have only the root; fetch the latest reply for a preview. */
-const loadThreadPreviews = (ctx: SyncContext): Effect.Effect<void, BootError, BootServices> =>
+const loadThreadPreviews = (ctx: SyncContext, seedReadBefore: string): Effect.Effect<void, BootError, BootServices> =>
   Effect.gen(function* () {
     const sql = yield* StoreWriter
     const api = yield* SlackApi
@@ -251,36 +387,60 @@ const loadThreadPreviews = (ctx: SyncContext): Effect.Effect<void, BootError, Bo
         )
         .pipe(Effect.catchTag('SlackRejected', () => Effect.succeed(undefined)))
       if (page === undefined) continue
-      yield* applyPage(ctx, root.channel, page.messages, { kind: 'page', requestedAt })
+      yield* applyPage(ctx, root.channel, page.messages, { kind: 'page', requestedAt }, { seedReadBefore })
       yield* Effect.yieldNow
     }
   })
+
+/**
+ * Runs a discovery sweep and says whether it finished. It fills gaps but
+ * nothing depends on it, so a failure other than an expired session is
+ * logged and does not fail the boot or the catch-up; the caller keeps the
+ * gap's start so the next sweep searches it again.
+ */
+const discoverOrLog = (sweep: Effect.Effect<void, SlackApiError | SqlError, BootServices>): Effect.Effect<boolean, SlackAuthRequired, BootServices> =>
+  sweep.pipe(
+    Effect.as(true),
+    Effect.catch((error) =>
+      error._tag === 'SlackAuthRequired' ? Effect.fail(error) : Effect.as(Effect.logWarning('sync: discovery failed', { tag: error._tag }), false),
+    ),
+  )
+
+/** True when a synced range already covers `[start, latest]`: an interrupted cold boot fetched this conversation. */
+const covered = (channel: string, start: Ts, latest: Ts): Effect.Effect<boolean, SqlError, StoreWriter> =>
+  Effect.map(latestSyncedRange(channel), (range) => range !== undefined && compareTs(range.from_ts, start) <= 0 && compareTs(range.to_ts, latest) >= 0)
 
 /** Everything Slack knows about the workspace, into an empty cache (architecture 5.2). */
 export const coldBoot = (ctx: SyncContext, phase: Phase): Effect.Effect<void, BootError, BootServices> =>
   Effect.gen(function* () {
     yield* phase({ _tag: 'booting' })
     const startedAt = yield* Clock.currentTimeMillis
-    const start = yield* windowStart(ctx)
+    // Unfollowed threads count as read up to here; a reply during the boot stays unread.
+    const bootTs = millisToTs(startedAt)
+    const windowStart = yield* windowStartMillis(ctx)
+    const start = millisToTs(windowStart)
     yield* loadWorkspace(ctx, true)
     const counts = yield* loadCounts(ctx, undefined)
-    yield* loadThreadViews(ctx, start, true)
+    yield* loadThreadViews(ctx, { until: start, probe: true, lane: 'interactive' })
     const active = yield* activeConversations(counts.entries, start)
     yield* phase({ _tag: 'catching-up', done: 0, total: active.length })
-    ctx.seedNewThreadsAsRead = true
     let done = 0
     for (const conversation of active) {
-      yield* loadHistoryWindow(ctx, conversation.id, start)
+      // A boot that failed half way left ranges behind; what they cover is not fetched again.
+      if (!(yield* covered(conversation.id, start, conversation.latest))) yield* skipRejected(loadHistoryWindow(ctx, conversation.id, start, { seedReadBefore: bootTs }))
       yield* phase({ _tag: 'catching-up', done: ++done, total: active.length })
       yield* Effect.yieldNow
     }
     yield* fillUsers(ctx)
-    yield* loadThreadPreviews(ctx)
-    ctx.seedNewThreadsAsRead = false
+    yield* loadThreadPreviews(ctx, bootTs)
+    // Replies inside the window to roots older than it: Main's activity, which windowed history cannot see.
+    const discovered = yield* discoverOrLog(discoverSince(ctx, windowStart, counts.entries, { seedReadBefore: bootTs }))
+    yield* fillUsers(ctx)
     const state: BootState = {
       completedAt: yield* Clock.currentTimeMillis,
       ...(counts.fetched === undefined ? {} : { countsLastFetched: counts.fetched }),
-      lastSyncAt: startedAt,
+      // A failed discovery leaves the gap for the next sweep to search again.
+      lastSyncAt: discovered ? startedAt : windowStart,
     }
     yield* transaction(setSyncState(BOOT_KEY, state))
   })
@@ -288,20 +448,20 @@ export const coldBoot = (ctx: SyncContext, phase: Phase): Effect.Effect<void, Bo
 export interface CatchUpOptions {
   /** Refresh team, conversations and self first, and take the full counts list (warm boot: yes; reconnect: no). */
   readonly refreshWorkspace: boolean
-  /** Fetch the first page of followed threads again. */
+  /** Page the followed threads with activity since the window (warm boot) or `lastSyncAt` (reconnect). */
   readonly refreshThreads: boolean
 }
 
 /**
  * Brings a populated cache up to date: counts, history since the synced
- * ranges where `latest` moved, the first `getView` page, the discovery sweep
- * for the gap since `since`, and unknown users. Used by the warm boot and
- * after every reconnect.
+ * ranges where `latest` moved, the followed threads with activity since the
+ * store was last in step, the discovery sweep for the gap since `since`, and
+ * unknown users. Used by the warm boot and after every reconnect.
  */
 export const catchUp = (ctx: SyncContext, previous: BootState, phase: Phase, options: CatchUpOptions): Effect.Effect<void, BootError, BootServices> =>
   Effect.gen(function* () {
     const startedAt = yield* Clock.currentTimeMillis
-    const start = yield* windowStart(ctx)
+    const start = millisToTs(yield* windowStartMillis(ctx))
     if (options.refreshWorkspace) yield* loadWorkspace(ctx, false)
     // A full list after a workspace refresh, so a channel left while the app was closed drops out.
     const counts = yield* loadCounts(ctx, options.refreshWorkspace ? undefined : previous.countsLastFetched)
@@ -314,18 +474,22 @@ export const catchUp = (ctx: SyncContext, previous: BootState, phase: Phase, opt
     if (moved.length > 0) yield* phase({ _tag: 'catching-up', done: 0, total: moved.length })
     let done = 0
     for (const conversation of moved) {
-      if (conversation.since === undefined) yield* loadHistoryWindow(ctx, conversation.id, start)
-      else yield* loadHistorySince(ctx, conversation.id, conversation.since)
+      if (conversation.since === undefined) yield* skipRejected(loadHistoryWindow(ctx, conversation.id, start, {}))
+      else yield* skipRejected(loadHistorySince(ctx, conversation.id, conversation.since))
       if (moved.length > 0) yield* phase({ _tag: 'catching-up', done: ++done, total: moved.length })
       yield* Effect.yieldNow
     }
-    if (options.refreshThreads) yield* loadThreadViews(ctx, start, false)
-    yield* discoverSince(ctx, previous.lastSyncAt, counts.entries)
+    if (options.refreshThreads) {
+      // A warm boot reads the whole window and checks the follows it left out; a reconnect only what moved since the last sync.
+      const until = options.refreshWorkspace ? start : maxTs(start, millisToTs(previous.lastSyncAt))
+      yield* loadThreadViews(ctx, { until, probe: options.refreshWorkspace, lane: 'interactive' })
+    }
+    const discovered = yield* discoverOrLog(discoverSince(ctx, previous.lastSyncAt, counts.entries, {}))
     yield* fillUsers(ctx)
     const state: BootState = {
       completedAt: yield* Clock.currentTimeMillis,
       ...(counts.fetched === undefined ? {} : { countsLastFetched: counts.fetched }),
-      lastSyncAt: startedAt,
+      lastSyncAt: discovered ? startedAt : previous.lastSyncAt,
     }
     yield* transaction(setSyncState(BOOT_KEY, state))
   })

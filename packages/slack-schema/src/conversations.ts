@@ -155,6 +155,17 @@ export const ConversationsRepliesFields = PageFields
 
 // conversations.view (the client's "open this channel" call; response shape is inferred, research section 2)
 
+// conversations.info
+
+export const ConversationsInfoArgs = S.Struct({
+  channel: S.String,
+  include_num_members: opt(FormBoolean),
+  include_locale: opt(FormBoolean),
+})
+export type ConversationsInfoArgs = typeof ConversationsInfoArgs.Type
+
+export const ConversationsInfoFields = { channel: Channel } as const
+
 export const ConversationsViewArgs = S.Struct({
   channel: opt(S.String),
   count: opt(FormNumber),

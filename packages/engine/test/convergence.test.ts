@@ -1,7 +1,10 @@
 // The randomised convergence test of architecture 5.4 and ADR 0011: after a
-// seeded mix of posts, replies, edits, deletes, reactions, read marks and
-// socket drops, the store equals the fake, and the incremental topic index
-// equals a full rebuild.
+// seeded mix of posts, replies, edits, deletes, reactions, read marks,
+// follows and unfollows (from another client and from Juno's commands) and
+// socket drops, the store equals the fake, follow state equals the fake's
+// (specs/follow.qnt `quietAgreement`), and the incremental topic index
+// equals a full rebuild. The workspace follows more threads than one
+// getView page holds.
 import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
 import { Effect } from 'effect'
@@ -10,6 +13,7 @@ import { Store, workspacePathsFromDir } from '@juno/store'
 import { reindexAll } from '@juno/sync'
 import { UserId } from '@juno/domain'
 import { sleep, startTestEngine, waitFor, type RunningEngine } from './harness'
+import { DAY, quiet, seedThread, subscribe, unsubscribe } from './scenario'
 
 let engine: RunningEngine | undefined
 afterEach(async () => {
@@ -30,6 +34,8 @@ function random(seed: number): () => number {
 }
 
 const PEOPLE = ['U0MAYA', 'U0LEO', 'U0SAM', 'U0PRIYA', 'U0JONAS', 'U0DEV']
+/** After a refusal the socket waits out its backoff (capped at 2 s against the fake) before the next attempt. */
+const RECONNECT_MS = 20_000
 const SEED = Number(process.env['JUNO_CONVERGENCE_SEED'] ?? 7)
 const ROUNDS = Number(process.env['JUNO_CONVERGENCE_ROUNDS'] ?? 80)
 
@@ -46,7 +52,13 @@ interface StoredMessage {
 
 describe('convergence', () => {
   it(`after ${ROUNDS} random events with drops (seed ${SEED}) the store matches the fake and the index matches a rebuild`, async () => {
-    engine = await startTestEngine({ initial: (fake) => fake.signIn() })
+    engine = await startTestEngine({
+      initial: (fake) => {
+        // Enough followed threads that getView takes three pages.
+        for (let i = 0; i < 15; i++) seedThread(fake, { channel: 'C0PLATFORM', text: `Rollout ${i + 1}`, ago: 3 * DAY, replies: [2 * DAY + i * 60_000], follow: true })
+        return fake.signIn()
+      },
+    })
     await engine.status('ready')
     await engine.phase('live', 30_000)
     await engine.rowsUntil((rows) => rows.length >= 20, 'rows')
@@ -61,6 +73,22 @@ describe('convergence', () => {
     const roots = () => conversations.flatMap((channel) => live(channel).filter((m) => (m.reply_count ?? 0) > 0 || m.thread_ts === undefined).map((m) => ({ channel, message: m })))
     const anyMessage = () => conversations.flatMap((channel) => live(channel).map((m) => ({ channel, message: m })))
 
+    /**
+     * A follow change: from another client, or Juno's own command while connected. Offline it is mostly an
+     * unfollow of a followed thread, the change no event will tell Juno about.
+     */
+    const changeFollow = async () => {
+      const threads = roots().filter((r) => (r.message.reply_count ?? 0) > 0)
+      const followedThreads = threads.filter((r) => fake.workspace.subscription(r.channel, r.message.ts)?.subscribed === true)
+      const root = pick(!connected && followedThreads.length > 0 && rand() < 0.8 ? followedThreads : threads)
+      if (root === undefined) return
+      const followed = fake.workspace.subscription(root.channel, root.message.ts)?.subscribed === true
+      const id = `t:${root.channel}:${root.message.ts}`
+      if (connected && rand() < 0.5) await (followed ? unsubscribe(engine!, id) : subscribe(engine!, id))
+      else if (followed) fake.unfollowThread({ channel: root.channel, threadTs: root.message.ts })
+      else fake.followThread({ channel: root.channel, threadTs: root.message.ts })
+    }
+
     for (let round = 0; round < ROUNDS; round++) {
       const roll = rand()
       if (roll < 0.3) {
@@ -70,9 +98,19 @@ describe('convergence', () => {
         const root = pick(roots())
         created.push({ channel: root.channel, ts: fake.injectMessage({ channel: root.channel, user: pick(PEOPLE), text: `reply ${round}`, threadTs: root.message.ts }).ts })
       } else if (!connected) {
-        // Only new messages while the socket is down: edits and deletes during a drop are a known gap (sync README).
-        const channel = pick(conversations)
-        created.push({ channel, ts: fake.injectMessage({ channel, user: pick(PEOPLE), text: `offline ${round}` }).ts })
+        // While the socket is down: new messages and follow changes. Edits and deletes during a drop are a known
+        // gap (sync README).
+        if (roll < 0.75) {
+          const channel = pick(conversations)
+          created.push({ channel, ts: fake.injectMessage({ channel, user: pick(PEOPLE), text: `offline ${round}` }).ts })
+        } else if (roll < 0.9) {
+          await changeFollow()
+        } else {
+          fake.goOnline()
+          await engine.phase('live', RECONNECT_MS)
+          await waitFor(() => (fake.socketCount() === 1 ? true : undefined), RECONNECT_MS, 'socket back')
+          connected = true
+        }
       } else if (roll < 0.65) {
         const target = pick(anyMessage())
         fake.editMessage({ channel: target.channel, ts: target.message.ts, text: `edited ${round}` })
@@ -86,21 +124,36 @@ describe('convergence', () => {
         const has = target.message.reactions?.find((r) => r.name === name)?.users?.includes(user) === true
         if (has) fake.removeReaction({ channel: target.channel, ts: target.message.ts, name, user })
         else fake.addReaction({ channel: target.channel, ts: target.message.ts, name, user })
-      } else if (roll < 0.9) {
+      } else if (roll < 0.86) {
         const channel = pick(conversations)
         const latest = fake.workspace.main(channel).at(-1)
         if (latest !== undefined) fake.markRead({ channel, ts: latest.ts })
+      } else if (roll < 0.92) {
+        await changeFollow()
       } else if (roll < 0.95) {
-        fake.dropSocket()
-        connected = false
+        if (connected) {
+          // The socket stays down until the reconnect step: every event in between is lost to Juno.
+          fake.goOffline()
+          await engine.phase('offline', 20_000)
+          connected = false
+        }
       } else {
         // Let the socket come back before the next connected-only event.
-        await engine.phase('live', 20_000)
-        await waitFor(() => (fake.socketCount() === 1 ? true : undefined), 20_000, 'socket back')
+        fake.goOnline()
+        await engine.phase('live', RECONNECT_MS)
+        await waitFor(() => (fake.socketCount() === 1 ? true : undefined), RECONNECT_MS, 'socket back')
         connected = true
       }
       if (rand() < 0.3) await sleep(5)
     }
+    fake.goOnline()
+    await engine.phase('live', RECONNECT_MS)
+    await waitFor(() => (fake.socketCount() === 1 ? true : undefined), RECONNECT_MS, 'socket back')
+    // One more complete getView pass once quiet, as the sweep would make: a thread that moved ahead of the
+    // cursor during a pass is listed by the next one (specs/follow.qnt, "A moving real cursor").
+    await quiet(engine)
+    fake.dropSocket()
+    await engine.phase('offline', 20_000)
     await engine.phase('live', 20_000)
     await waitFor(() => (fake.socketCount() === 1 ? true : undefined), 20_000, 'socket back')
 
@@ -159,17 +212,37 @@ describe('convergence', () => {
     }
     expect(mismatches).toEqual([])
 
-    // 2. Read pointers follow the server marks.
+    // 2. Follow state equals Slack's: a followed thread is stored as followed, any other is not.
+    const follows = new Map(
+      (db.prepare('SELECT channel, thread_ts, subscribed FROM thread_subs').all() as Array<{ channel: string; thread_ts: string; subscribed: number }>).map((r) => [
+        `${r.channel}:${r.thread_ts}`,
+        r.subscribed,
+      ]),
+    )
+    const followMismatches: Array<string> = []
+    for (const sub of fake.workspace.subscriptions.values()) {
+      if (!conversations.includes(sub.channel)) continue
+      const here = follows.get(`${sub.channel}:${sub.threadTs}`)
+      if (sub.subscribed && here !== 1) followMismatches.push(`${sub.channel}/${sub.threadTs}: followed in Slack, ${here ?? 'unknown'} here`)
+      if (!sub.subscribed && here === 1) followMismatches.push(`${sub.channel}/${sub.threadTs}: unfollowed in Slack, followed here`)
+    }
+    for (const [key, here] of follows) {
+      const [channel, threadTs] = key.split(':') as [string, string]
+      if (here === 1 && fake.workspace.subscription(channel, threadTs)?.subscribed !== true) followMismatches.push(`${key}: followed here only`)
+    }
+    expect([...new Set(followMismatches)]).toEqual([])
+
+    // 3. Read pointers follow the server marks.
     for (const channel of conversations) {
       const read = db.prepare('SELECT last_read_ts FROM topic_reads WHERE topic_id = ?').get(`m:${channel}`) as { last_read_ts: string } | undefined
       expect(read?.last_read_ts, channel).toBe(fake.workspace.reads.get(channel))
     }
     db.close()
 
-    // 3. The incremental index equals a full rebuild: re-indexing every topic changes nothing.
+    // 4. The incremental index equals a full rebuild: re-indexing every topic changes nothing.
     const changed = await Effect.runPromise(
       reindexAll({ me: { userId: UserId.make(fake.selfId) } }).pipe(Effect.provide(Store.layer(paths)), Effect.scoped),
     )
     expect(changed).toEqual([])
-  }, 120_000)
+  }, 180_000)
 })

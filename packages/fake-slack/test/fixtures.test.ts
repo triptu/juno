@@ -101,21 +101,24 @@ describe('every fixture response decodes with @juno/slack schemas', () => {
 
   it('thread view, marks, subscriptions', async () => {
     const view = await client.ok('subscriptions.thread.getView', { limit: 50, fetch_threads_state: true })
-    expect(view.has_more).toBe(false)
-    expect(view.threads.length).toBeGreaterThan(5)
-    const hiring = view.threads.find((t) => t.root_msg.channel === 'C0HIRING' && t.root_msg.reply_count === 2)
+    // More than one page of followed threads, so the sync has to page as it does live.
+    expect(view.has_more).toBe(true)
+    expect(view.threads).toHaveLength(10)
+    const threads = await client.allThreadViews()
+    expect(threads.length).toBeGreaterThan(10)
+    const hiring = threads.find((t) => t.root_msg.channel === 'C0HIRING' && t.root_msg.reply_count === 2)
     expect(hiring?.unread_replies).toHaveLength(2)
     expect(hiring?.unread_replies?.some((m) => m.text?.includes(`<@${fake.selfId}>`))).toBe(true)
-    expect(view.threads.some((t) => t.root_msg.text?.startsWith('checkout.spec'))).toBe(false)
+    expect(threads.some((t) => t.root_msg.text?.startsWith('checkout.spec'))).toBe(false)
     // Threads in channels self is not in are not followed.
-    expect(view.threads.some((t) => t.root_msg.channel === 'C0SALES' || t.root_msg.channel === 'C0SOCIAL')).toBe(false)
+    expect(threads.some((t) => t.root_msg.channel === 'C0SALES' || t.root_msg.channel === 'C0SOCIAL')).toBe(false)
     expect(view.threads_state?.unread_count_by_channel?.['C0HIRING']).toBe(2)
 
     const root = hiring!.root_msg
     const latest = root.latest_reply!
     expect(await client.ok('subscriptions.thread.mark', { channel: root.channel, thread_ts: root.thread_ts, ts: latest, read: true })).toEqual({ ok: true })
-    const after = await client.ok('subscriptions.thread.getView', { limit: 50 })
-    expect(after.threads.find((t) => t.root_msg.ts === root.ts)?.unread_replies).toHaveLength(0)
+    const after = await client.allThreadViews()
+    expect(after.find((t) => t.root_msg.ts === root.ts)?.unread_replies).toHaveLength(0)
 
     const removed = await client.ok('subscriptions.thread.remove', { channel: root.channel, thread_ts: root.thread_ts, last_read: latest })
     expect(removed.subscription?.active).toBe(false)
@@ -156,11 +159,13 @@ describe('every fixture response decodes with @juno/slack schemas', () => {
     expect(history.messages).toHaveLength(0)
   })
 
-  it('search finds thread messages and marks carry channel and thread_ts', async () => {
+  it('search answers like the live module API: items holding messages, a reply naming its thread only in the permalink', async () => {
     const result = await client.ok('search.modules.messages', { module: 'messages', query: 'is:thread', count: 100, extracts: 1, highlight: 1 })
+    expect(result.items?.every((item) => item.ts === undefined && item.messages?.length === 1)).toBe(true)
     const matches = searchMatches(result)
     expect(matches.length).toBeGreaterThan(10)
-    expect(matches.every((m) => m.thread_ts !== undefined)).toBe(true)
+    expect(matches.every((m) => m.thread_ts === undefined && m.reply_count === undefined && m.blocks === undefined && m.files === undefined)).toBe(true)
+    expect(matches.filter((m) => m.permalink?.includes('?thread_ts=') === true).length).toBeGreaterThan(10)
     expect(matches.every((m) => typeof m.channel === 'object' && m.channel.id.length > 0)).toBe(true)
     const words = await client.ok('search.modules.messages', { module: 'messages', query: 'rollback in:#eng', count: 20 })
     expect(searchMatches(words).length).toBeGreaterThanOrEqual(2)
