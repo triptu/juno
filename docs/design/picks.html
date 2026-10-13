@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Juno · open design picks</title>
+<style>
+  :root { color-scheme: light dark; --bg: #fbf9f3; --fg: #1d1c17; --muted: #6f6c63; --line: #ebe6d8; --card: #fff; --accent: #cc4628; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #161513; --fg: #ece8de; --muted: #a29d91; --line: #2a2825; --card: #1e1d1a; --accent: #ff8a73; } }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.55 -apple-system, system-ui, sans-serif; }
+  main { max-width: 980px; margin: 0 auto; padding: 40px 24px 80px; }
+  h1 { font-size: 26px; margin: 0 0 6px; }
+  h2 { font-size: 19px; margin: 40px 0 8px; }
+  p, li { color: var(--muted); }
+  strong { color: var(--fg); }
+  a { color: var(--accent); }
+  .links { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0 18px; }
+  .links a { border: 1px solid var(--line); background: var(--card); border-radius: 999px; padding: 6px 14px; text-decoration: none; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; }
+  .card h3 { margin: 0 0 4px; font-size: 15px; color: var(--fg); }
+  .card img { width: 100%; border-radius: 10px; margin-top: 10px; border: 1px solid var(--line); }
+  .rec { color: var(--accent); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+</style>
+</head>
+<body><main>
+<h1>Two open design picks</h1>
+<p>Both are about the square tile at the start of each sidebar row. Thread topics get <strong>topic art</strong> about what the thread discusses. Channel Main rows, and any topic whose art is still generating or when AI is off, use the channel's <strong>channel mark</strong>. People in DMs always show their Slack photo.</p>
+
+<h2>1. Topic art approach</h2>
+<p>An AI model looks at a thread's title and messages and picks or draws a small illustration about it. Generated once per topic and cached; you can ask for a redraw.</p>
+<div class="links">
+  <a href="topic-art/sheet.html">Full comparison sheet (all approaches × models, light and dark)</a>
+  <a href="topic-art/kit.html">The motif kit (every hand-designed motif)</a>
+  <a href="topic-art/README.md">README with costs and notes</a>
+</div>
+<div class="grid">
+  <div class="card">
+    <div class="rec">Recommended</div>
+    <h3>C · Motif kit, picked by Claude Haiku</h3>
+    <p>About 80 hand-designed motifs in Juno's style. The model only chooses and combines them, so every icon is consistent and theme-correct. About $0.0002 per topic (6 cents for 300 topics), about 1 s. Vague topics fall back to the channel mark.</p>
+    <img src="topic-art/sidebar-C-anthropic_claude-haiku-5.5.png" alt="Sidebar with motif-kit topic art">
+  </div>
+  <div class="card">
+    <h3>B · Constrained drawing, by Claude Sonnet</h3>
+    <p>The model draws each icon itself, but only with a small validated vocabulary (shapes, stroke style, palette tokens), so it stays theme-safe. Best individual drawings; about 20× the cost of C and slightly less consistent.</p>
+    <img src="topic-art/sidebar-B-anthropic_claude-sonnet-5.5.png" alt="Sidebar with constrained-drawing topic art">
+  </div>
+</div>
+<p>Dropped: free-form SVG (ignored the theme, inconsistent, collapsed many topics into one glyph) and a hybrid (C's results at 2–3× the cost). If you want something more painterly than icon-like, say "more artistic" and I'll explore a richer drawing style.</p>
+
+<h2>2. Channel mark style</h2>
+<p>Generative marks: each channel gets a unique, deterministic mark from its ID, with colours nudged by its name (alerts lean coral, eng leans teal). Instant, free, and you can shuffle or pin one per channel.</p>
+<div class="links">
+  <a href="channel-marks/sheet.html">Live sheet (all families, light and dark)</a>
+  <a href="channel-marks/README.md">README</a>
+</div>
+<div class="grid">
+  <div class="card">
+    <div class="rec">Recommended</div>
+    <h3>B · Blocks</h3>
+    <p>Bauhaus quarter discs, bars and arches on a 2×2 grid, flat colour. The most intentional, and recognisable by shape even at 16 px on the meta line.</p>
+    <img src="channel-marks/family-B.png" alt="Blocks channel marks">
+  </div>
+  <div class="card">
+    <h3>F · Hills</h3>
+    <p>A tiny landscape: sky gradient, sun and hills. The friendliest and most picture-like, but a little muddier at 16 px.</p>
+    <img src="channel-marks/family-F.png" alt="Hills channel marks">
+  </div>
+</div>
+<p>Also explored: A Bloom (gradient orbs, suggested for group DMs), C Sunset, E Tide. Their sheets are <a href="channel-marks/">in the folder</a>.</p>
+</main></body></html>
