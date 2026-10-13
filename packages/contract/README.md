@@ -21,6 +21,7 @@ The wire between Juno's processes. Names, schemas and types only; no logic. See 
 - Declare a command with `Rpc.make(tag, { payload, success, error })`.
 - Import from `@juno/contract`. The preload imports only `@juno/contract/channels`.
 - `routes/messages.ts` is the topic view: `messages.list` (a window of `MessageView` rows around an anchor ts), `topics.get` (the header, `TopicDetail`), `channel.threads` (Main's active threads, `ThreadSummary`), and the two commands that call Slack, `topics.open` and `messages.loadOlder`. Rows name people by id; the people travel in the delta's `refs`.
+- `topics.list` sends `TopicListRow`s, which name their channel and people by id; `TopicRow` is the joined row `@juno/state` builds for the views, with `RowChannel` and `Person` filled in from the refs.
 - `routes/topics.ts` re-exports the vocabulary `@juno/domain` owns (`TopicKind`, `ConversationKind`, `ContextTint`, `RowTag`, `ChannelIcon`, `ChannelColor`; `TopicStatus` is domain's `AllTopicsStatus`) and declares `SIDEBAR_WINDOW`, the 300-row cap the engine applies and the renderer asks for. `TopicPreview` is `{ sender, text }`; the view joins them.
 
 ## Must not

@@ -10,14 +10,12 @@ Small items noticed during work that are not yet assigned to a milestone. Remove
 - Dark and tinted macOS 26 app icons. electron-builder 26.15 supports an Icon Composer `.icon` file in `mac.icon` (it compiles it with `actool`, which needs Xcode 26 or newer, and still bundles `icon.icns`). We ship the light `.icns` only. A hand-written `.icon` compiled, but its dark fill was ignored, so author it in Icon Composer from `assets/icon.svg` and `assets/icon-dark.svg`, check the dark and tinted looks, then point `mac.icon` at it.
 - Layout-shift guard: the helper and the gallery test exist (`@juno/testing`). Still to wire into the app e2e (sidebar hover, tab switch, live message, image load) and the perf harness.
 - Break passes with the `interfaces:break` skill at each UI milestone end, plus a final pass before shipping.
-- The 300-row `topics.list` snapshot is 346 KB on the large seed (budget 200 KB), mostly participant names and avatar URLs repeated per row. If the UI track keeps the self-contained row, add a `people` live value and carry ids in rows; see architecture 16, M3.
 - Edits, deletes and reactions during a socket drop are recovered only for thread text (search sweep) or when a topic is opened. Decide after the live smoke whether `cached_latest_updates` (ADR 0011) is usable.
 - The live smoke has not yet confirmed `search.modules.messages` with `is:thread after:` for an `xoxc` session (architecture 5.3, open question 17.2). `SyncConfig.discovery: 'history'` is the fallback.
 - `emojis/list` into the `emoji` table is not synced yet (architecture 5.2 step 6).
-- `topics.list` snapshot is 346 KB on the large seed (budget 200 KB). Plan: rows carry person ids only, plus a separate `people` live value with names and avatar URLs.
 - `topics.list` p95 is 6.7–9 ms inside the engine while events land (budget 5 ms). The cost is JavaScript row shaping, not SQL.
 - Confirm search-based thread discovery (`is:thread after:`) works with an `xoxc` session in the live smoke.
-- Edits and deletes made during a socket drop are recovered only for thread text (via search) or when the topic is opened. `cached_latest_updates` is still unknown.
+- Edits and deletes made during a socket drop are recovered only for thread text (via search). Opening a topic, and the reconnect refresh of open topics, fetch only messages newer than the stored ones, so an edit to an older stored message is not recovered either. `cached_latest_updates` is still unknown.
 - Sync: `subscriptions.thread.getView` returns 10 threads per page regardless of `limit` (32 calls on the real workspace). Consider paging in parallel within the lane budget.
 - Cold boot on the real workspace takes about 7 minutes to reach `live` (sidebar data complete after 29 s) because of the 1.5 s background lane spacing. Revisit the spacing once the rate-limit behaviour is measured.
 - AI: the eval's expectations test the direction of each judgement, not calibration. Before the assistant fixes its confidence thresholds, collect a few hundred real decisions from the classifier and check its probabilities against them.
@@ -30,4 +28,6 @@ Small items noticed during work that are not yet assigned to a milestone. Remove
 - ui: `activateHandlers` follow-ups and the `ScrollArea` gutter and hover rule from the M3 code review.
 - Sidebar times should use domain `relativeTime` (needs a `desktop → domain` edge decision).
 - "View all topics" does nothing until the All topics page lands (M5).
-- Engine: `unreadExact` is false (shown as "9+") whenever synced history stops short of the read pointer, even when the full history is stored. Fix the coverage check, then restore the exact count assertion in the sidebar e2e (#alerts-prod Main shows "9").
+- Engine: `unreadExact` is false (shown as "9+") whenever synced history stops short of the read pointer, even when the full history is stored. Opening a topic now fetches back to the pointer (M4), which makes it exact for opened topics; topics never opened still show the dot. Fix the coverage check, then restore the exact count assertion in the sidebar e2e (#alerts-prod Main shows "9").
+- Topic view: the message's mention tint does not count the user's groups (`@group`), because the engine does not keep the groups from `client.userBoot` outside the sync. Keep them in `team` or hand them over through `SyncLink`.
+- Topic view: bot messages show the bot id as the sender name: `messages` does not keep `username` or `bot_profile`. Store the bot's name with the message.
