@@ -7,7 +7,7 @@
 //   JUNO_PERF=1 pnpm --filter @juno/desktop exec playwright test e2e/perf.spec.ts
 import { rm } from 'node:fs/promises'
 import { loadavg } from 'node:os'
-import { largeSeed, startFakeSlack, topic300Seed, TOPIC300_THREAD_CHANNEL, type FakeSlack } from '@juno/fake-slack'
+import { largeSeed, startFakeSlack, topic300Seed, TOPIC300_MAIN_CHANNEL, TOPIC300_THREAD_CHANNEL, type FakeSlack } from '@juno/fake-slack'
 import { expect, launchApp, tempUserData, test, writeSlackApp, type RunningApp, type SlackAppFixture } from './fixtures'
 import { Juno, type SidebarFilterName } from './driver/juno'
 
@@ -387,7 +387,7 @@ test.describe.serial('topic view', () => {
       await juno.tabs.expectCount(2)
       const mounted: number[] = []
       for (let i = 0; i < 20; i++) {
-        const title = i % 2 === 0 ? THREAD : 'perf-main'
+        const title = i % 2 === 0 ? 'perf-main' : THREAD
         const before = (await juno.measures('juno.tab-switch')).length
         await juno.tabs.select(title)
         mounted.push(await nextMeasure(juno, 'juno.tab-switch', before))
@@ -468,16 +468,27 @@ test.describe.serial('topic view', () => {
       await juno.topic.expectAtBottom()
       await juno.topic.scrollUp(2_000)
       const anchor = await juno.topic.firstVisibleRow()
-      // Five more tabs push the thread's tab out of the mounted set.
-      const others = await juno.sidebar.titles('Recent')
-      const extra = others.filter((title) => !title.startsWith(THREAD)).slice(0, 5)
+      // Five more tabs push the thread's tab out of the mounted set: five small threads that mention the user.
+      const extra = [1, 2, 3, 4, 5].map((k) => `Side topic ${k} ${Date.now()}`)
+      for (const title of extra) {
+        const root = fake.injectMessage({ channel: TOPIC300_MAIN_CHANNEL, user: 'U0PERFLEO', text: title })
+        fake.injectMessage({ channel: TOPIC300_MAIN_CHANNEL, threadTs: root.ts, user: 'U0PERFMAYA', text: `<@U0TUSHAR> thoughts?` })
+      }
       for (const title of extra) await juno.sidebar.row(title).openInNewTab()
       await juno.tabs.expectCount(1 + extra.length)
       const samples: number[] = []
-      const before = (await juno.measures('juno.tab-switch')).length
+      let before = (await juno.measures('juno.tab-switch')).length
       await juno.tabs.select(THREAD.slice(0, 20))
       samples.push(await nextMeasure(juno, 'juno.tab-switch', before))
       expect(Math.abs((await juno.topic.rowTop(anchor.ts)) - anchor.top)).toBeLessThan(2)
+      // Round-robin over six tabs with five mounted: the next tab is always the one that was unmounted.
+      for (let round = 0; round < 2; round++) {
+        for (const title of extra) {
+          before = (await juno.measures('juno.tab-switch')).length
+          await juno.tabs.select(title)
+          samples.push(await nextMeasure(juno, 'juno.tab-switch', before))
+        }
+      }
       stats('tab switch, unmounted with scroll restore (juno.tab-switch)', samples)
     } finally {
       await running.close()
@@ -491,21 +502,24 @@ test.describe.serial('topic view', () => {
       await juno.sidebar.row(THREAD).open()
       await juno.topic.expectAtBottom()
       const root = fake.messages(TOPIC300_THREAD_CHANNEL)[0]!
-      const measured: number[] = []
+      // Every juno.live-update of the message list, before the next update of any route replaces it.
+      await running.win.evaluate(() => {
+        const w = window as unknown as { __live: number[] }
+        w.__live = []
+        new PerformanceObserver((list) => {
+          for (const entry of list.getEntries() as Array<PerformanceEntry & { detail?: { devtools?: { properties?: ReadonlyArray<readonly [string, unknown]> } } }>) {
+            if (entry.name === 'juno.live-update' && entry.detail?.devtools?.properties?.some((property) => property[0] === 'route' && property[1] === 'messages.list')) w.__live.push(entry.duration)
+          }
+        }).observe({ type: 'measure' })
+      })
       for (let i = 0; i < 9; i++) {
         const text = `Perf sample ${i} ${Date.now()}`
         fake.injectMessage({ channel: TOPIC300_THREAD_CHANNEL, threadTs: root.ts, user: 'U0PERFLEO', text })
         await juno.topic.expectMessage(text)
         await juno.topic.expectAtBottom()
-        // The latest juno.live-update is the newest route update to paint; read the message list's.
-        const value = await running.win.evaluate(() => {
-          const entry = performance.getEntriesByName('juno.live-update', 'measure').at(-1) as (PerformanceMeasure & { detail?: { devtools?: { properties?: ReadonlyArray<readonly [string, unknown]> } } }) | undefined
-          const route = entry?.detail?.devtools?.properties?.find((property: readonly [string, unknown]) => property[0] === 'route')?.[1]
-          return { duration: entry?.duration, route }
-        })
-        if (value.route === 'messages.list' && value.duration !== undefined) measured.push(value.duration)
         await running.win.waitForTimeout(300)
       }
+      const measured = await running.win.evaluate(() => (window as unknown as { __live: number[] }).__live)
       stats('live update in the topic, engine commit to pixels (juno.live-update, messages.list)', measured)
     } finally {
       await running.close()
