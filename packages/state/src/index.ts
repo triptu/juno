@@ -19,6 +19,24 @@ export {
   type SidebarWindow,
 } from './sidebar'
 export { applyListDelta, emptyWindow, sameOrder, type ListWindow, type WindowRefs } from './list'
+export {
+  bottomWindow,
+  channelThreadsAtom,
+  loadOlderMessages,
+  messageItem,
+  messageItemAtom,
+  messageListAtom,
+  messageOrderAtom,
+  messagesAtom,
+  messageWindowSpecAtom,
+  openTopic,
+  prefetchTopic,
+  topicAtom,
+  type MessageItem,
+  type MessageOrder,
+  type MessageWindow,
+  type MessageWindowSpec,
+} from './messages'
 export { errorOf } from './result'
 export { acquireRendererPort, EngineFailed } from './port'
 export { accentAtom, appInfoAtom, persistAccent, persistTheme, themeAtom, type Accent, type Theme } from './shell'

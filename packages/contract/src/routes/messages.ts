@@ -30,6 +30,8 @@ import { RowChannel, TitleSource, TopicStatus } from './topics'
 
 /** Most rows a message window holds (performance 3.3). The engine caps `range.limit` here. */
 export const MESSAGE_WINDOW_MAX = 500
+/** The window a topic opens with when the container has no reason to pick another. */
+export const MESSAGE_WINDOW_DEFAULT = 150
 /** Rows before the anchor when the payload does not say (`messages.list` `before`). */
 export const MESSAGE_WINDOW_BEFORE = 50
 /** Messages `topics.open` fetches at most to reach the read pointer, so the "N new" count is exact. */

@@ -105,13 +105,19 @@ export function fakeMain(fake: FakeSlack, initial?: Credentials) {
     }
   })
   // The engine's HTTP transport: the cookie Chromium would attach comes from the "session".
+  // With `network.offline` every request fails the way a dropped connection does.
+  const network = { offline: false }
   const httpTransport = HttpTransport.nodeFetch({
     fetch: (input, init) =>
-      fetch(input, { ...init, headers: { ...(init?.headers as Record<string, string>), ...(current === undefined ? {} : { cookie: `d=${current.cookie}` }) } }),
+      network.offline
+        ? Promise.reject(new TypeError('fetch failed'))
+        : fetch(input, { ...init, headers: { ...(init?.headers as Record<string, string>), ...(current === undefined ? {} : { cookie: `d=${current.cookie}` }) } }),
   })
   return {
     host,
     httpTransport,
+    /** Set `offline` to fail every Slack API request as a dropped connection would. */
+    network,
     get stored() {
       return stored
     },
