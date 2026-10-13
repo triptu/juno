@@ -2,7 +2,6 @@
 
 Small items noticed during work that are not yet assigned to a milestone. Remove an item when it is done.
 
-- `pnpm test` was SIGKILLed once right after `pnpm install` (could not reproduce in 8 runs). Watch for it; if it recurs, find the package and check vitest worker memory and timeouts.
 - Identity-provider sign-in (Google, Okta) leaves slack.com and is blocked by the sign-in window allow-list. The Slack-app import covers it for now.
 - The socket does not use the system proxy yet: main resolves it, but no `ws` agent is passed.
 - `pnpm smoke:live` always imports from the Slack app; it cannot reuse `secrets.bin` outside Electron.
@@ -20,3 +19,5 @@ Small items noticed during work that are not yet assigned to a milestone. Remove
 - `topics.list` p95 is 6.7–9 ms inside the engine while events land (budget 5 ms). The cost is JavaScript row shaping, not SQL.
 - Confirm search-based thread discovery (`is:thread after:`) works with an `xoxc` session in the live smoke.
 - Edits and deletes made during a socket drop are recovered only for thread text (via search) or when the topic is opened. `cached_latest_updates` is still unknown.
+- Sync: `subscriptions.thread.getView` returns 10 threads per page regardless of `limit` (32 calls on the real workspace). Consider paging in parallel within the lane budget.
+- Cold boot on the real workspace takes about 7 minutes to reach `live` (sidebar data complete after 29 s) because of the 1.5 s background lane spacing. Revisit the spacing once the rate-limit behaviour is measured.
