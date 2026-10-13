@@ -28,6 +28,7 @@ export class EngineSupervisor {
   private state: SupervisorState = 'stopped'
   private readonly pendingPorts = new Map<WebContents, MessagePortMain>()
   private readonly exits: Array<number> = []
+  private readonly readyListeners = new Set<() => void>()
   private attempt = 0
   private restartTimer: NodeJS.Timeout | undefined
 
@@ -68,11 +69,17 @@ export class EngineSupervisor {
         this.attempt = 0
         for (const port of this.pendingPorts.values()) this.send({ _tag: 'port' }, [port])
         this.pendingPorts.clear()
+        for (const listener of this.readyListeners) listener()
       } else {
         this.onMessage(message)
       }
     })
     child.on('exit', (code) => this.onExit(code))
+  }
+
+  /** Calls `f` each time the engine reports ready, after a restart too. */
+  onReady(f: () => void): void {
+    this.readyListeners.add(f)
   }
 
   /** Connects a renderer: one new channel, one end to each side. */

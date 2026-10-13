@@ -13,6 +13,8 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@juno/agent-contract": "workspace:*",
+    "@juno/agent-juno": "workspace:*",
     "@juno/contract": "workspace:*",
     "@juno/domain": "workspace:*",
     "@juno/richtext": "workspace:*",
@@ -31,6 +33,8 @@
   },
   "juno": {
     "allowedDeps": [
+      "@juno/agent-contract",
+      "@juno/agent-juno",
       "@juno/contract",
       "@juno/domain",
       "@juno/richtext",

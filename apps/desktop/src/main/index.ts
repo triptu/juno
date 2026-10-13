@@ -1,5 +1,6 @@
 import { app, BrowserWindow } from 'electron'
 import { join } from 'node:path'
+import { createAgentSupervisor } from './agent'
 import { createSupervisor } from './engine'
 import { registerIpc } from './ipc'
 import { readLaunch, writeLaunch, type Launch } from './launch'
@@ -43,6 +44,10 @@ const supervisor = createSupervisor({
   },
 })
 
+// The agent process starts only on request until the chat ships (ADR 0012, M2).
+const agent = process.env.JUNO_AGENT === '1' ? createAgentSupervisor((port) => supervisor.send({ _tag: 'agentPort' }, [port])) : undefined
+supervisor.onReady(() => agent?.linkHost())
+
 const sessionHost = new SessionHost({
   secrets: new SecretsStore(app.getPath('userData'), { plaintext: e2e }),
   send: (message) => supervisor.send(message),
@@ -66,6 +71,7 @@ app.whenReady().then(() => {
 
   // Fork the engine and open the window in the same tick; neither waits.
   supervisor.start()
+  agent?.start()
   openWindow()
 
   app.on('activate', () => {
@@ -82,7 +88,10 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
 })
 
-app.on('before-quit', () => supervisor.stop())
+app.on('before-quit', () => {
+  supervisor.stop()
+  agent?.stop()
+})
 
 // Test hooks. Playwright reaches main through app.evaluate; the engine itself
 // is out of reach, so main exposes what tests need to know about it.
@@ -92,6 +101,8 @@ if (e2e) {
       enginePid: () => supervisor.pid,
       engineState: () => supervisor.currentState,
       failEngine: () => supervisor.giveUp(),
+      agentState: () => agent?.currentState ?? 'stopped',
+      agentHost: () => agent?.host?.host,
     },
   })
 }
