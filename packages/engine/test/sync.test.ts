@@ -168,6 +168,7 @@ describe('cold boot', () => {
       // Discovery over the window at the end of the cold boot: more than 50 thread messages, so two pages.
       'api:search.modules.messages': 2,
       'edge:users/info': 1,
+      'edge:emojis/list': 1,
     })
   })
 
@@ -272,6 +273,8 @@ describe('warm boot', () => {
     expect(apiCalls(second, 'conversations.history').map((c) => c.args['channel'])).toEqual(['C0PRODUCT'])
     expect(callMap(second)).toEqual({
       'api:auth.test': 1,
+      'api:api.getFlannelHttpUrl': 1,
+      'edge:emojis/list': 1,
       'api:client.getWebSocketURL': 1,
       'api:client.userBoot': 1,
       'api:client.counts': 1,

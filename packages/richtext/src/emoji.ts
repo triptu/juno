@@ -8,6 +8,8 @@
  * from the `emoji` lookup, not from here.
  */
 
+import type { CustomEmoji } from '@juno/slack-schema'
+
 const table: Readonly<Record<string, string>> = {
   // Quick reactions and the picker
   '+1': '👍',
@@ -361,4 +363,20 @@ export function reactionDisplay(
   const url = customUrl?.(splitEmojiName(name).name)
   if (url !== undefined) return { kind: 'image', url }
   return { kind: 'name', value: name }
+}
+
+/** A workspace lookup, including aliases. Missing targets and cycles keep their shortcode. */
+export function customEmojiLookup(emojis: ReadonlyArray<CustomEmoji>): (name: string) => string | undefined {
+  const byName = new Map(emojis.map((emoji) => [emoji.name, emoji]))
+  return (name) => {
+    const seen = new Set<string>()
+    let current: string | null | undefined = name
+    while (current && !seen.has(current)) {
+      seen.add(current)
+      const emoji = byName.get(current)
+      if (emoji?.url) return emoji.url
+      current = emoji?.alias_for
+    }
+    return undefined
+  }
 }

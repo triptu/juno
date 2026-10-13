@@ -77,6 +77,7 @@ export function asTs(value: string): Ts {
 }
 
 export class Workspace {
+  readonly emoji = new Map<string, { readonly name: string; readonly url?: string; readonly alias_for?: string }>()
   readonly users = new Map<string, User>()
   readonly conversations = new Map<string, ConversationRecord>()
   readonly messages = new Map<string, Message[]>()

@@ -31,3 +31,5 @@ export {
   type ThreadSubRow,
   type ThreadSubSource,
 } from './write'
+
+export { syncEmoji } from './emoji'

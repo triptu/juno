@@ -24,6 +24,7 @@ import { Invalidation, StoreReader, StoreWriter, transaction } from '@juno/store
 import { Clock, Effect, FiberSet, Queue, Scope, Semaphore } from 'effect'
 import { Stream } from 'effect'
 import { bootState, catchUp, coldBoot, followPass, warmBoot, type BootState, type Phase } from './boot'
+import { syncEmoji } from './emoji'
 import { SyncConfig } from './config'
 import type { RootFetch, SyncContext } from './context'
 import { applyFrame } from './events'
@@ -150,6 +151,7 @@ export const runSync = (options: RunSyncOptions): Effect.Effect<never, SlackAuth
       }
       state.booted = true
       yield* settle()
+      yield* syncEmoji().pipe(Effect.catchIf(isNotAuth, (error) => Effect.logWarning('sync: emoji refresh failed', { tag: error._tag })))
       yield* followPassIfDue
       // The periodic discovery sweep while live.
       while (true) {

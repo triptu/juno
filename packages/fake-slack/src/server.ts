@@ -11,7 +11,7 @@ import type { Duplex } from 'node:stream'
 import { Schema } from 'effect'
 import { WebSocketServer, type WebSocket } from 'ws'
 import type { MethodName, RtmFrame } from '@juno/slack-schema'
-import { EdgeUsersInfoArgs, EdgeUsersInfoOk, encodeRtmFrame, isMethodName, Methods } from '@juno/slack-schema'
+import { EdgeEmojisListOk, EdgeUsersInfoArgs, EdgeUsersInfoOk, encodeRtmFrame, isMethodName, Methods } from '@juno/slack-schema'
 import { parseCookies, parseFields, parseJson, readBody, type FormFields } from './body.ts'
 import { ApiError, handlers, type MethodContext } from './methods.ts'
 import { clientPage, signInPage } from './signin.ts'
@@ -374,6 +374,7 @@ export class FakeServer {
       response.setHeader('Retry-After', String(limit.retryAfter))
       return record(429, { ok: false, error: 'ratelimited' })
     }
+    if (method === 'emojis/list') return record(200, Schema.encodeSync(EdgeEmojisListOk)({ ok: true, results: [...this.workspace.emoji.values()] }))
     if (method !== 'users/info') return record(200, { ok: false, error: 'unknown_method' })
     let args: EdgeUsersInfoArgs
     try {

@@ -16,6 +16,7 @@ export { inlineText } from './inline'
 export { composeOutgoing } from './outgoing'
 export type { MentionTargets, OutgoingMessage } from './outgoing'
 export {
+  customEmojiLookup,
   PICKER_EMOJI,
   QUICK_REACTIONS,
   emojiUnicode,
