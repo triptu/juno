@@ -15,6 +15,7 @@ import { Rpc, RpcGroup } from 'effect/rpc'
 import { AllTopicsStatus, ChannelColor, ChannelIcon, ContextTint, ConversationKind, RowTag, TopicKind } from '@juno/domain'
 import { NotFound, NotSignedIn, Offline, RateLimited, Rejected } from '../errors'
 import { liveListRoute, liveValueRoute, RowFields } from '../live'
+import { Person } from '../refs'
 
 // The vocabulary is `@juno/domain`'s. It is re-exported so a renderer package
 // that may not import domain still names the same literals.
@@ -31,16 +32,6 @@ export const SIDEBAR_WINDOW = 300
 
 export const SidebarSection = Schema.Literals(['pinned', 'recent'])
 export type SidebarSection = typeof SidebarSection.Type
-
-/** A person on a row: the participant stack, a DM partner. `avatarUrl` is the Slack profile photo when there is one. */
-export const Person = Schema.Struct({
-  id: Schema.String,
-  name: Schema.String,
-  avatarUrl: Schema.optionalKey(Schema.String),
-  /** The ui hue for the initials when there is no photo. */
-  color: ChannelColor,
-})
-export type Person = typeof Person.Type
 
 /** Where a topic lives, with everything the tile and line three need. */
 export const RowChannel = Schema.Struct({

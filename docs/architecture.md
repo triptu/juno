@@ -118,7 +118,7 @@ flowchart TD
   assistant --> ai & store & domain & contract
   notifications --> store & domain & ai
   files --> slack & store & sync
-  engine --> contract & sync & store & domain & assistant & notifications & files & slack
+  engine --> contract & sync & store & domain & richtext & assistant & notifications & files & slack
   fake_slack[fake-slack] --> slack_schema
   tokens
   ui --> tokens

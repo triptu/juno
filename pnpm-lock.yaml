@@ -399,6 +399,9 @@ importers:
       '@juno/domain':
         specifier: workspace:*
         version: link:../domain
+      '@juno/richtext':
+        specifier: workspace:*
+        version: link:../richtext
       '@juno/slack':
         specifier: workspace:*
         version: link:../slack
