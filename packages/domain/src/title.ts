@@ -14,7 +14,13 @@ export interface ResolvedTitle {
 
 export const FALLBACK_TITLE_WORDS = 6
 
-/** The first `count` words of a message, with an ellipsis when it was cut. */
+/**
+ * The first `count` words of a message, with an ellipsis when it was cut.
+ * A cut that lands on the end of a sentence keeps the sentence and adds no
+ * ellipsis ("Draft plan is in the doc", not "doc.…"); a final full stop is
+ * dropped, a question or exclamation mark stays. A cut after a comma, colon
+ * or dash drops that mark before the ellipsis.
+ */
 export function firstWords(text: string, count = FALLBACK_TITLE_WORDS): string {
   const words = text
     .split('\n')
@@ -26,7 +32,12 @@ export function firstWords(text: string, count = FALLBACK_TITLE_WORDS): string {
     .filter((w) => w.length > 0)
   if (words.length === 0) return ''
   const head = words.slice(0, count).join(' ')
-  return words.length > count ? `${head}…` : head
+  if (words.length <= count) return head
+  // A single full stop ends the sentence; "..." and "…" are the writer's own trailing off.
+  if (/[^.]\.$/.test(head)) return head.slice(0, -1)
+  if (/[?!…]$|\.\.$/.test(head)) return head
+  const trimmed = head.replace(/[\s,;:\-–—]+$/, '')
+  return `${trimmed.length > 0 ? trimmed : head}…`
 }
 
 export function resolveTitle(topic: Topic): ResolvedTitle {

@@ -68,7 +68,7 @@ describe('cold boot', () => {
     expect(rows.every((r) => r.section === 'recent')).toBe(true)
 
     const byTitle = (title: string) => rows.find((r) => r.title === title)
-    const postgres = byTitle('Draft plan is in the doc.…')
+    const postgres = byTitle('Draft plan is in the doc')
     expect(postgres).toMatchObject({
       kind: 'thread',
       preview: { sender: 'Dev', text: 'Booked 2–4pm. Will post results here.' },
@@ -293,7 +293,7 @@ describe('realtime', () => {
   it('a reply from the socket updates one row and leaves the others as they were', async () => {
     const engine = await bootedEngine()
     const before = await engine.rowsUntil((rows) => rows.length >= 20, 'rows')
-    const postgres = before.find((r) => r.title === 'Draft plan is in the doc.…')!
+    const postgres = before.find((r) => r.title === 'Draft plan is in the doc')!
     const other = before.find((r) => r.title === '#deploys')!
 
     engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0LEO', text: 'Dry run passed. <@U0TUSHAR> we are good for Thursday.', threadTs: postgres.id.split(':')[2]! })
@@ -323,7 +323,7 @@ describe('realtime', () => {
   it('a message after a resolve brings the topic back with the Reopened tag', async () => {
     const engine = await bootedEngine()
     const before = await engine.rowsUntil((rows) => rows.length >= 20, 'rows')
-    const pricing = before.find((r) => r.title === 'Final copy for pricing is in.…')!
+    const pricing = before.find((r) => r.title === 'Final copy for pricing is in')!
 
     // The overlay exists before the resolve command does: write the resolve the way the command will.
     const db = new DatabaseSync(join(engine.userData, 'workspaces', engine.fake.teamId, 'user.db'))

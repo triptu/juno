@@ -15,7 +15,7 @@ test('the sidebar, light and dark', async ({ juno, win }) => {
   await juno.signIn()
   await juno.waitForSync()
   const { sidebar } = juno
-  const postgres = sidebar.row('Draft plan is in the doc.')
+  const postgres = sidebar.row('Draft plan is in the doc')
   await postgres.select()
   await postgres.expectSelected()
   // The pointer rests on the empty workspace, so no row is hovered.

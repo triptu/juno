@@ -12,7 +12,7 @@ import { expect, test } from './fixtures'
 test.describe.configure({ timeout: 60_000 })
 
 // Titles are the first six words of the root message, so a prefix is enough.
-const POSTGRES = 'Draft plan is in the doc.'
+const POSTGRES = 'Draft plan is in the doc'
 const RINA = 'Rina finished the onsite.'
 const ROADMAP = 'Proposal: cut offline mode and public'
 const OFFSITE = 'Can eng take the Wednesday afternoon'
@@ -158,7 +158,7 @@ test('a reply from another client updates its row in place and moves it to the t
   await postgres.expectPreview('Leo: Results look good. Cutover is a go.')
   await postgres.expectMessageCount(8)
   await postgres.expectUnread(1)
-  await expect.poll(() => sidebar.titles('Recent').then((titles) => titles[0])).toBe(`${POSTGRES}…`)
+  await expect.poll(() => sidebar.titles('Recent').then((titles) => titles[0])).toBe(POSTGRES)
   // The engine's write reached pixels inside the budget (performance.md 1: 50 ms, plus the 30 ms socket debounce).
   expect(await juno.measure('juno.live-update')).toBeLessThan(80)
 })
@@ -175,7 +175,7 @@ test('hovering a row shows Resolve in its reserved slot without moving anything'
   await expectNoLayoutShift(win, () => postgres.hover(), { root: 'aside' })
   await expect(slot).toHaveCSS('opacity', '1')
   await expect(postgres.resolveButton).toHaveAttribute('title', 'Resolve')
-  await expect(postgres.resolveButton).toHaveAccessibleName(`Resolve ${POSTGRES}…`)
+  await expect(postgres.resolveButton).toHaveAccessibleName(`Resolve ${POSTGRES}`)
 
   // Leaving hides it again.
   await expectNoLayoutShift(win, () => win.mouse.move(900, 400), { root: 'aside' })

@@ -131,7 +131,7 @@ export const rows = {
   /** Back after a resolve. */
   pricing: row({
     id: 'C0PRODUCT:1759990000.000400',
-    title: 'Final copy for pricing is in.…',
+    title: 'Final copy for pricing is in',
     sender: 'Priya',
     text: 'Legal flagged the annual discount line. Reopening this.',
     channel: channels.product,

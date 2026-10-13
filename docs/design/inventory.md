@@ -139,7 +139,7 @@ Centered, padding `48 16`, gap 8: title 14/500, body 13 muted lh 1.5, button 30p
   - **@ tag** when the latest unread run mentions you: 18px, min-width 18, radius 6, bg `--hl-soft`, inset 1px ring `--border-strong`, "@" 11/500 subtle, title "Mentions you".
   - **count tag** = unread count: 18px, min-width 18, padding 0 5, radius 6, 11/500 tabular; unread row bg `--secondary-active` fg subtle; otherwise `--secondary-default` fg muted. Hidden at 0.
 - Line 3 (12px muted, gap 12, margin-top 3): channel icon 12 + name (no "#"); for Main rows the icon is `messages-square` and the text is "Messages outside threads" (prototype) — **[spec]** line 3 should be the channel icon and name; see open questions. Then the avatar stack (18px circles, −4 overlap, 1.5px `--background-subtle` ring, initials 7.5/600, up to 4 participants) — in the prototype it shows only in list and cards styles and only when `showAvatars` is on; **[spec]** lists it as part of every row. Then `message-square` 12 + total message count.
-- Title text: manual title, else AI title, else first ~6 words of the first message with "…". Main rows show the channel label ("#eng", "Maya Chen").
+- Title text: manual title, else AI title, else first ~6 words of the first message with "…" (a cut on the end of a sentence keeps the sentence and adds no "…"; a final full stop is dropped). Main rows show the channel label ("#eng", "Maya Chen").
 
 ### 3.2 States
 

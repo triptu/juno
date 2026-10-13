@@ -11,7 +11,7 @@ import { Juno } from './driver/juno'
 
 test.skip(process.env['JUNO_PERF'] !== '1', 'set JUNO_PERF=1 to measure')
 
-const POSTGRES = 'Draft plan is in the doc.'
+const POSTGRES = 'Draft plan is in the doc'
 
 function stats(name: string, samples: ReadonlyArray<number>): { readonly median: number; readonly p95: number } {
   const sorted = samples.toSorted((a, b) => a - b)

@@ -43,6 +43,17 @@ describe('first words', () => {
     ['> quoted line\nactual reply here', 'actual reply here'],
     ['line one\nline two', 'line one line two'],
     ['', ''],
+    // A cut on the end of a sentence keeps the sentence, never "doc.…".
+    ['Draft plan is in the doc. Short version: logical replication.', 'Draft plan is in the doc'],
+    ['p95 on /v2/search jumped to 1.8s. Looking now.', 'p95 on /v2/search jumped to 1.8s'],
+    ['Can we ship the pricing today? Legal is fine.', 'Can we ship the pricing today?'],
+    ['We have 142 flags and still... more coming', 'We have 142 flags and still...'],
+    // A cut after a comma, colon or dash drops the mark before the ellipsis.
+    ['Two options for the cutover window, both tested', 'Two options for the cutover window…'],
+    ['Heads up on the deploy freeze: starts Friday', 'Heads up on the deploy freeze…'],
+    ['one two three four five six – seven', 'one two three four five six…'],
+    // A text that is not cut keeps its punctuation.
+    ['Final copy for pricing is in.', 'Final copy for pricing is in.'],
   ])('%j → %j', (text, expected) => {
     expect(firstWords(text)).toBe(expected)
   })
