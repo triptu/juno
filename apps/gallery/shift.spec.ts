@@ -15,7 +15,7 @@ import { openState, readRoutes, type Route } from './support'
  */
 test.use({ reducedMotion: 'no-preference' })
 
-/** What a person can point at or tab to. Disabled controls cannot be pointed at. */
+/** What a person can point at or tab to, plus scroll areas. Disabled controls cannot be pointed at. */
 const interactive = [
   'button:not(:disabled)',
   'a[href]',
@@ -30,6 +30,8 @@ const interactive = [
   '[role="switch"]',
   '[role="slider"]',
   '[tabindex]:not([tabindex="-1"])',
+  // Scroll areas show their thumb on hover; the gutter must not change.
+  '[data-scroll-area]',
 ].join(', ')
 
 /** Elements tried per state. A state with more (an icon grid) is sampled from both ends. */
