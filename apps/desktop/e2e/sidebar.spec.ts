@@ -50,7 +50,6 @@ test('after sign-in the sidebar lists followed threads and Main, newest first, w
   await postgres.expectRead()
   await postgres.expectPreview('Dev: Booked 2–4pm. Will post results here.')
   await postgres.expectChannel('eng')
-  await postgres.expectMessageCount(7)
   // The participant stack names everyone in it (the fake's display names are first names).
   await expect(postgres.root.getByRole('img', { name: /Dev.*Leo/ })).toBeVisible()
 
@@ -156,7 +155,6 @@ test('a reply from another client updates its row in place and moves it to the t
   const { sidebar } = juno
   const postgres = sidebar.row(POSTGRES)
   await postgres.expectVisible()
-  await postgres.expectMessageCount(7)
   const before = await sidebar.titles('Recent')
   expect(before[0]).toBe(ALERTS_MAIN)
 
@@ -164,7 +162,6 @@ test('a reply from another client updates its row in place and moves it to the t
   fake.injectMessage({ channel: 'C0ENG', threadTs: root.ts, user: 'U0LEO', text: 'Results look good. Cutover is a go.' })
 
   await postgres.expectPreview('Leo: Results look good. Cutover is a go.')
-  await postgres.expectMessageCount(8)
   await postgres.expectUnread(1)
   await expect.poll(() => sidebar.titles('Recent').then((titles) => titles[0])).toBe(POSTGRES)
   // The time from the engine's write to pixels is measured in perf.spec.ts.

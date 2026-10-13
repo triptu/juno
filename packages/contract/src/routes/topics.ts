@@ -152,9 +152,11 @@ export const CommandResult = Schema.Struct({ undo: Schema.optionalKey(UndoComman
 export type CommandResult = typeof CommandResult.Type
 
 /**
- * Why a subscribe or unsubscribe did not stick. The local change is already
- * reverted when one of these arrives. `NotFound` is a topic id the store does
- * not know; the others are Slack's answer to the mirror call of a thread.
+ * Why a subscribe or unsubscribe may not have stuck. When one of these
+ * arrives the thread shows what Slack said when asked afterwards; if Slack
+ * could not be asked, it keeps the change until Slack answers, since the call
+ * may have reached Slack. `NotFound` is a topic id the store does not know;
+ * the others are Slack's answer to the mirror call of a thread.
  */
 export const SubscribeError = Schema.Union([NotSignedIn, NotFound, Rejected, RateLimited, Offline])
 export type SubscribeError = typeof SubscribeError.Type

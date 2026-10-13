@@ -29,5 +29,9 @@ Small items noticed during work that are not yet assigned to a milestone. Remove
 - Sidebar times should use domain `relativeTime` (needs a `desktop → domain` edge decision).
 - "View all topics" does nothing until the All topics page lands (M5).
 - Engine: `unreadExact` is false (shown as "9+") whenever synced history stops short of the read pointer, even when the full history is stored. Opening a topic now fetches back to the pointer (M4), which makes it exact for opened topics; topics never opened still show the dot. Fix the coverage check, then restore the exact count assertion in the sidebar e2e (#alerts-prod Main shows "9").
+- Main rows: engine field for "threads started since Main was last read" (contract + topics query), wired to the TopicRow `newThreads` prop. After M4 WP1 merges.
+- Topic art track: placeholder is a library of free-form Tide-style shapes picked per topic, no container (owner decision 10-13).
+- Flaky: the sidebar hover layout-shift e2e test failed once during the unfollow-fix run and passed on rerun. Investigate in the maintenance pass.
+- Flaky: a sign-out e2e test timed out once during the row-footer run (passed on rerun). Track with the hover flake.
 - Topic view: the message's mention tint does not count the user's groups (`@group`), because the engine does not keep the groups from `client.userBoot` outside the sync. Keep them in `team` or hand them over through `SyncLink`.
 - Topic view: bot messages show the bot id as the sender name: `messages` does not keep `username` or `bot_profile`. Store the bot's name with the message.

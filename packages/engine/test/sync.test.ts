@@ -28,6 +28,7 @@ import {
   tsOf,
   unsubscribe,
   valueOf,
+  watchFollow,
   type SeededThread,
 } from './scenario'
 
@@ -543,6 +544,82 @@ describe('follow state (review M3 finding 1, specs/follow.qnt)', () => {
     // The noted observation made the command ask for the root: Slack's newer unfollow wins.
     await engine.rowsUntil((rows) => !rows.some((r) => r.id === id), 'the thread gone after the refresh')
     expect(storedFollow(engine, 'C0PLATFORM', tsOf(id))).toBe(0)
+  })
+})
+
+describe('an Unsubscribe Slack accepted sticks (specs/follow.qnt acceptedUnfollow)', () => {
+  /** Thread events wait in the fake, so one can arrive late and Slack's echo of Juno's own call can be dropped. */
+  const followFrames = ['thread_subscribed', 'thread_unsubscribed', 'thread_marked']
+
+  it('a followed event Slack sent before it accepted the Unsubscribe, arriving after the answer, does not bring the follow back', async () => {
+    const engine = await bootedEngine()
+    await engine.rowsUntil((rows) => rows.length >= 20, 'rows')
+    const id = threadId(engine, 'C0ENG', 'Draft plan is in the doc.')
+    engine.fake.holdFrames({ types: followFrames })
+    // Followed again on another device; its event is delayed on the socket.
+    engine.fake.followThread({ channel: 'C0ENG', threadTs: tsOf(id) })
+    expect(valueOf(await unsubscribe(engine, id))).toEqual({ undo: { _tag: 'topics.subscribe', id } })
+    await engine.rowsUntil((rows) => !rows.some((r) => r.id === id), 'the thread gone')
+    expect(engine.fake.workspace.subscription('C0ENG', tsOf(id))?.subscribed).toBe(false)
+    engine.fake.resetCalls()
+    const watch = watchFollow(engine, 'C0ENG', tsOf(id))
+    // The delayed follow arrives now; Slack never echoes the Unsubscribe.
+    engine.fake.releaseFrames({ count: 1 })
+    engine.fake.releaseFrames({ drop: true })
+    await sleep(300)
+    await quiet(engine)
+    expect(watch.stop()).toEqual(new Set([0]))
+    expect((await engine.rows()).some((r) => r.id === id)).toBe(false)
+    // The event could not be ordered against the Unsubscribe, so Slack was asked.
+    expect(apiCalls(engine, 'conversations.replies').map((c) => c.args['ts'])).toContain(tsOf(id))
+  })
+
+  it('a getView page requested while the Unsubscribe was pending, answered after it, does not bring the follow back', async () => {
+    const engine = await bootedEngine()
+    const rows = await engine.rowsUntil((list) => list.length >= 20, 'rows')
+    const newest = rows.filter((r) => r.kind === 'thread').toSorted((a, b) => (a.lastActivityTs < b.lastActivityTs ? 1 : -1))[0]!
+    const channel = newest.channel.id
+    engine.fake.holdFrames({ types: followFrames })
+    // Slack sees the Unsubscribe only on release; the reconnect's getView page is taken before that and answered late.
+    engine.fake.holdNext({ method: 'subscriptions.thread.remove', before: true })
+    engine.fake.holdNext({ method: 'subscriptions.thread.getView' })
+    const pending = unsubscribe(engine, newest.id)
+    await waitFor(() => (engine.fake.heldCount({ method: 'subscriptions.thread.remove' }) === 1 ? true : undefined), 10_000, 'the held remove')
+    await engine.rowsUntil((list) => !list.some((r) => r.id === newest.id), 'the thread gone')
+    engine.fake.dropSocket()
+    await waitFor(() => (engine.fake.heldCount({ method: 'subscriptions.thread.getView' }) === 1 ? true : undefined), 20_000, 'the held page')
+    engine.fake.release({ method: 'subscriptions.thread.remove' })
+    expect(valueOf(await pending)).toEqual({ undo: { _tag: 'topics.subscribe', id: newest.id } })
+    const watch = watchFollow(engine, channel, tsOf(newest.id))
+    engine.fake.release()
+    await engine.phase('live', 20_000)
+    await quiet(engine)
+    engine.fake.releaseFrames({ drop: true })
+    expect(watch.stop()).toEqual(new Set([0]))
+    expect((await engine.rows()).some((r) => r.id === newest.id)).toBe(false)
+    expect(engine.fake.workspace.subscription(channel, tsOf(newest.id))?.subscribed).toBe(false)
+  })
+
+  it('an Unsubscribe whose answer is lost, and whose root lookup fails, keeps the unfollow and asks Slack again', async () => {
+    const engine = await bootedEngine()
+    await engine.rowsUntil((rows) => rows.length >= 20, 'rows')
+    const id = threadId(engine, 'C0ENG', 'Draft plan is in the doc.')
+    engine.fake.holdFrames({ types: followFrames })
+    // Slack accepts every attempt the client makes, and every answer is lost; then the first lookup fails.
+    engine.fake.loseResponse({ method: 'subscriptions.thread.remove', times: 3 })
+    engine.fake.forceError({ method: 'conversations.replies', error: 'not_allowed' })
+    engine.fake.resetCalls()
+    const pending = unsubscribe(engine, id)
+    await engine.rowsUntil((rows) => !rows.some((r) => r.id === id), 'the thread gone')
+    const watch = watchFollow(engine, 'C0ENG', tsOf(id))
+    expect(errorOf(await pending)).toMatchObject({ _tag: 'Offline' })
+    expect(engine.fake.workspace.subscription('C0ENG', tsOf(id))?.subscribed).toBe(false)
+    // The lookup is retried in the background until Slack answers.
+    await waitFor(() => (apiCalls(engine, 'conversations.replies').some((c) => c.ok && c.args['ts'] === tsOf(id)) ? true : undefined), 20_000, 'a lookup that worked')
+    await quiet(engine)
+    engine.fake.releaseFrames({ drop: true })
+    expect(watch.stop()).toEqual(new Set([0]))
+    expect((await engine.rows()).some((r) => r.id === id)).toBe(false)
   })
 })
 

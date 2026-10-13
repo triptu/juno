@@ -2,7 +2,12 @@
 // -1 is Unknown (no stored row), 0 is unfollowed, 1 is followed.
 // Slack event stamps order only events. Juno observations order only pages.
 // No persisted retry worker is modelled. A failed call asks for the root,
-// even when Slack accepted the call before its response was lost.
+// even when Slack accepted the call before its response was lost, and asks
+// again while that lookup fails. Three guards keep an accepted Unsubscribe:
+// a command's end stamps the observation clock (`acknowledge`, `reject`),
+// an event that contradicts a commanded row asks for the root (`deliver`),
+// and a failed lookup keeps the command's state (`failLookup`). Their
+// switches exist only so the bug schedules can show what each one prevents.
 module followProtocol {
   const threads: Set[int]
   const window: Set[int]
@@ -18,7 +23,7 @@ module followProtocol {
     local: int -> int, server: int -> int, serverAt: int -> int,
     observedAt: int -> int, updatedEvent: int -> int,
     intent: int -> int, previous: int -> int, wroteAt: int -> int,
-    accepted: int -> int, unfollowAt: int -> int,
+    accepted: int -> int, unfollowAt: int -> int, commanded: Set[int],
     pending: Set[int], noted: Set[int], refresh: Set[int], failed: Set[int], success: Set[int],
     activity: Set[int], stale: Set[int], events: Set[Event], fetches: Set[Fetch],
     connected: bool, duePass: bool, catchup: bool,
@@ -35,7 +40,7 @@ module followProtocol {
       serverAt: threads.mapBy(_ => 0), observedAt: threads.mapBy(_ => 0),
       updatedEvent: threads.mapBy(_ => 0), intent: threads.mapBy(_ => 1),
       previous: threads.mapBy(_ => -1), wroteAt: threads.mapBy(_ => 0),
-      accepted: threads.mapBy(_ => 0), unfollowAt: threads.mapBy(_ => 0),
+      accepted: threads.mapBy(_ => 0), unfollowAt: threads.mapBy(_ => 0), commanded: Set(),
       pending: Set(), noted: Set(), refresh: Set(), failed: Set(), success: Set(), activity: Set(),
       stale: threads.exclude(window), events: Set(), fetches: Set(), connected: true, duePass: true, catchup: false,
       scan: List(), phase: "idle", listed: Set(), passAt: 0, pageDone: false,
@@ -50,7 +55,9 @@ module followProtocol {
     s' = { ...s, clock: s.clock + 1, local: s.local.set(k, value),
       observedAt: s.observedAt.set(k, s.clock + 1), wroteAt: s.wroteAt.set(k, s.clock + 1),
       previous: s.previous.set(k, s.local.get(k)), intent: s.intent.set(k, value),
-      stale: s.stale.exclude(Set(k)),
+      stale: s.stale.exclude(Set(k)), commanded: s.commanded.union(Set(k)),
+      // A new command supersedes an earlier accepted Unsubscribe.
+      unfollowAt: s.unfollowAt.set(k, 0),
       pending: s.pending.union(Set(k)), label: "localChange", target: k }
   }
   action subscribe(k: int): bool = localChange(k, 1)
@@ -65,21 +72,29 @@ module followProtocol {
       unfollowAt: if (s.intent.get(k) == 0) s.unfollowAt.set(k, s.eventClock + 1) else s.unfollowAt,
       label: "accept", target: k }
   }
-  action acknowledge(k: int): bool = all {
+  // The end of a command stamps the observation clock again (`restamp`), so a
+  // page requested while the command was pending cannot apply afterwards.
+  action acknowledgeWith(k: int, restamp: bool): bool = all {
     s.pending.contains(k), s.accepted.get(k) > 0,
     s' = { ...s, pending: s.pending.exclude(Set(k)), accepted: s.accepted.set(k, 0),
+      clock: if (restamp) s.clock + 1 else s.clock,
+      observedAt: if (restamp) s.observedAt.set(k, s.clock + 1) else s.observedAt,
       refresh: if (s.noted.contains(k)) s.refresh.union(Set(k)) else s.refresh,
       success: if (s.noted.contains(k)) s.success.union(Set(k)) else s.success,
       noted: s.noted.exclude(Set(k)), label: "acknowledge", target: k }
   }
+  action acknowledge(k: int): bool = acknowledgeWith(k, true)
   // Every error ends the pending row and schedules one lookup, not another send.
-  action reject(k: int): bool = all {
+  action rejectWith(k: int, restamp: bool): bool = all {
     not(s.sealed), s.pending.contains(k),
     s' = { ...s, pending: s.pending.exclude(Set(k)), accepted: s.accepted.set(k, 0),
+      clock: if (restamp) s.clock + 1 else s.clock,
+      observedAt: if (restamp) s.observedAt.set(k, s.clock + 1) else s.observedAt,
       refresh: s.refresh.union(Set(k)), failed: s.failed.union(Set(k)),
       success: s.success.exclude(Set(k)),
       noted: s.noted.exclude(Set(k)), label: "reject", target: k }
   }
+  action reject(k: int): bool = rejectWith(k, true)
 
   action serverChange(k: int, value: int, source: str): bool = all {
     not(s.sealed), s.events.size() < eventLimit,
@@ -93,14 +108,19 @@ module followProtocol {
   action reply(k: int): bool = serverChange(k, 1, "reply")
   action threadMarked(k: int): bool = serverChange(k, s.server.get(k), "threadMarked")
 
-  action deliver(e: Event, guard: bool): bool = {
+  // An event stamp cannot be ordered against a command. With `verify`, an
+  // event that contradicts a row a command wrote asks for the root instead.
+  action deliverWith(e: Event, guard: bool, verify: bool): bool = {
     // Own replies do not rewrite a row that already says followed.
     val ownAlreadyFollowed = e.kind == "reply" and s.local.get(e.key) == 1
     val newer = not(ownAlreadyFollowed) and (not(guard) or e.at >= s.updatedEvent.get(e.key))
-    val applies = newer and not(s.pending.contains(e.key))
+    val unordered = verify and s.commanded.contains(e.key) and e.value != s.local.get(e.key)
+    val free = newer and not(s.pending.contains(e.key))
+    val applies = free and not(unordered)
     all {
       s.connected, s.events.contains(e),
       s' = { ...s, clock: s.clock + 1, events: s.events.exclude(Set(e)),
+        refresh: if (free and unordered) s.refresh.union(Set(e.key)) else s.refresh,
         local: if (applies) s.local.set(e.key, e.value) else s.local,
         updatedEvent: if (applies) s.updatedEvent.set(e.key, e.at) else s.updatedEvent,
         observedAt: if (applies) s.observedAt.set(e.key, s.clock + 1) else s.observedAt,
@@ -109,6 +129,7 @@ module followProtocol {
         label: "deliver", target: e.key }
     }
   }
+  action deliver(e: Event, guard: bool): bool = deliverWith(e, guard, true)
 
   action startFetch(k: int, kind: str): bool = all {
     s.connected, s.fetches.size() < fetchLimit,
@@ -137,6 +158,7 @@ module followProtocol {
         local: if (applies) s.local.set(f.key, value) else s.local,
         observedAt: if (applies and not(keepUnknown)) s.observedAt.set(f.key, if (forget) 0 else f.at) else s.observedAt,
         updatedEvent: if (applies and forget) s.updatedEvent.set(f.key, 0) else s.updatedEvent,
+        commanded: if (applies and forget) s.commanded.exclude(Set(f.key)) else s.commanded,
         stale: if (applies and not(keepUnknown)) s.stale.exclude(Set(f.key)) else s.stale,
         noted: if (present and newer and s.pending.contains(f.key)) s.noted.union(Set(f.key)) else s.noted,
         refresh: if (Set("success", "failure", "lookup").contains(f.kind)) s.refresh.exclude(Set(f.key)) else s.refresh,
@@ -151,21 +173,29 @@ module followProtocol {
         target: f.key, failedVersion: f.version, before: s.local.get(f.key) }
     }
   }
-  // Only a failed lookup permits rollback, and only if the row still equals
-  // the command's own write. No server agreement is promised by this fallback.
-  action failLookupWith(k: int, guard: bool): bool = {
-    val unchanged = not(guard) or (s.local.get(k) == s.intent.get(k) and s.observedAt.get(k) == s.wroteAt.get(k))
+  // The failure lookup failed too. Slack may have accepted the call, so the
+  // row keeps the command's state and the lookup stays queued ("retry").
+  // The old fallbacks restore the previous row: "restore" only while the row
+  // still equals the command's own write, "blind" always. They exist for the
+  // bug schedules.
+  action failLookupWith(k: int, mode: str): bool = {
+    val restores = mode == "blind" or
+      (mode == "restore" and s.local.get(k) == s.intent.get(k) and s.observedAt.get(k) == s.wroteAt.get(k))
+    val forgets = restores and s.previous.get(k) == -1
     all {
       not(s.sealed), s.refresh.contains(k), s.failed.contains(k),
       not(s.fetches.exists(f => f.key == k)),
-      s' = { ...s, refresh: s.refresh.exclude(Set(k)), failed: s.failed.exclude(Set(k)),
-        local: if (unchanged) s.local.set(k, s.previous.get(k)) else s.local,
-        observedAt: if (unchanged and s.previous.get(k) == -1) s.observedAt.set(k, 0) else s.observedAt,
-        updatedEvent: if (unchanged and s.previous.get(k) == -1) s.updatedEvent.set(k, 0) else s.updatedEvent,
-        label: "lookupFailed", target: k }
+      s' = { ...s,
+        refresh: if (mode == "retry") s.refresh else s.refresh.exclude(Set(k)),
+        failed: if (mode == "retry") s.failed else s.failed.exclude(Set(k)),
+        local: if (restores) s.local.set(k, s.previous.get(k)) else s.local,
+        observedAt: if (forgets) s.observedAt.set(k, 0) else s.observedAt,
+        updatedEvent: if (forgets) s.updatedEvent.set(k, 0) else s.updatedEvent,
+        commanded: if (forgets) s.commanded.exclude(Set(k)) else s.commanded,
+        label: "lookupFailed", target: k, before: s.local.get(k) }
     }
   }
-  action failLookup(k: int): bool = failLookupWith(k, true)
+  action failLookup(k: int): bool = failLookupWith(k, "retry")
 
   // Passage of the quiet window can make an old observation stale.
   action age(k: int): bool = all {
@@ -235,19 +265,21 @@ module followProtocol {
   val agreed = covered.forall(k => s.local.get(k) == s.server.get(k) or (s.local.get(k) == -1 and s.server.get(k) == 0))
   val quietAgreement = s.sealed and quiet implies agreed
   val pendingIntentWins = threads.forall(k => s.pending.contains(k) implies s.local.get(k) == s.intent.get(k))
-  // Keep this strong property. The implementation violates it: see lateEventStep.
+  // The strong property the three guards exist for; its bug schedules show each one.
+  // It holds until the user's next command on the thread, or a newer Slack write.
   val acceptedUnfollow = threads.forall(k => not(s.pending.contains(k)) and s.unfollowAt.get(k) > 0 and
     s.serverAt.get(k) == s.unfollowAt.get(k) implies s.local.get(k) == 0)
   val failedCallReverted = s.label == "failureRecovered" and s.serverAt.get(s.target) == s.failedVersion implies
     (s.local.get(s.target) == s.server.get(s.target) or (s.local.get(s.target) == -1 and s.server.get(s.target) == 0))
   val missingChangesNothing = s.label == "missingIgnored" implies s.local.get(s.target) == s.before
   val unknownStaysUnknown = s.label == "unknownPreserved" implies s.local.get(s.target) == -1
-  val fallbackKeepsLatestEvent = s.label == "lookupFailed" and s.updatedEvent.get(s.target) > 0 and
-    s.updatedEvent.get(s.target) == s.serverAt.get(s.target) and s.observedAt.get(s.target) > s.wroteAt.get(s.target)
+  // A failed lookup that changes the row must not replace a newer applied event.
+  val fallbackKeepsLatestEvent = s.label == "lookupFailed" and s.local.get(s.target) != s.before and
+    s.updatedEvent.get(s.target) > 0 and s.updatedEvent.get(s.target) == s.serverAt.get(s.target)
     implies s.local.get(s.target) == s.server.get(s.target)
   val reachedAgreement = s.sealed and quiet and agreed
   val drainBound = remaining > 0 or reachedAgreement
-  val invariants = pendingIntentWins and quietAgreement and failedCallReverted and
+  val invariants = pendingIntentWins and acceptedUnfollow and quietAgreement and failedCallReverted and
     missingChangesNothing and unknownStaysUnknown and fallbackKeepsLatestEvent and drainBound
 
   action work(fetchGuard: bool, eventGuard: bool): bool = any {
@@ -298,7 +330,6 @@ module followProtocol {
   )
   action stalePageStep = stalePage(true)
   action stalePageBugStep = stalePage(false)
-  val stalePageSafety = invariants and acceptedUnfollow
 
   action missedUnfollow(recoverAbsent: bool): bool = tick(
     if (s.sealed) progress(true, true, false, recoverAbsent) else
@@ -320,17 +351,19 @@ module followProtocol {
   action missedFollowStep = missedFollow(false)
   action missedFollowBugStep = missedFollow(true)
 
-  // This is the real implementation, not a disabled guard: a pre-command
-  // event arrives after the response. It passes the event-only watermark.
-  action lateEventStep = tick(
+  // A pre-command event arrives after the response. It passes the
+  // event-only watermark; without `verify` it restores the follow.
+  action lateEvent(verify: bool): bool = tick(
     if (s.sealed) progress(true, true, false, true) else
     if (s.label == "init") officialFollow(1, 1) else
     if (s.label == "officialFollow") unsubscribe(1) else
     if (s.label == "localChange") accept(1) else
     if (s.label == "accept") acknowledge(1) else
-    if (s.label == "acknowledge") { nondet e = s.events.oneOf(); deliver(e, true) } else
+    if (s.label == "acknowledge") { nondet e = s.events.oneOf(); deliverWith(e, true, verify) } else
     if (s.label == "deliver") seal else progress(true, true, false, true)
   )
+  action lateEventStep = lateEvent(true)
+  action lateEventBugStep = lateEvent(false)
 
   action reorderedEvents(guard: bool): bool = tick(
     if (s.sealed) progress(true, guard, false, true) else
@@ -368,7 +401,7 @@ module followProtocol {
     if (s.label == "accept") reject(1) else
     if (s.label == "reject") officialFollow(1, 0) else
     if (s.label == "officialFollow") { nondet e = s.events.oneOf(); deliver(e, true) } else
-    if (s.label == "deliver") failLookupWith(1, guard) else
+    if (s.label == "deliver") failLookupWith(1, if (guard) "retry" else "blind") else
     if (s.label == "lookupFailed") seal else progress(true, true, false, true)
   )
   action fallbackObservationStep = fallbackObservation(true)
@@ -379,26 +412,33 @@ module followProtocol {
     if (s.label == "localChange") reject(3) else
     if (s.label == "reject") seal else progress(true, true, false, true)
   )
-  // A second real violation: the lookup also fails after Slack accepted.
-  action failedLookupStep = tick(
+  // Slack accepts, the response is lost and the lookup fails too. The old
+  // fallback restored the previous follow; the fix keeps the unfollow and
+  // looks up again.
+  action failedLookup(retry: bool): bool = tick(
     if (s.sealed) progress(true, true, false, true) else
     if (s.label == "init") unsubscribe(1) else
     if (s.label == "localChange") accept(1) else
-    if (s.label == "accept") reject(1) else
-    if (s.label == "reject") failLookup(1) else
+    if (s.label == "accept") rejectWith(1, retry) else
+    if (s.label == "reject") failLookupWith(1, if (retry) "retry" else "restore") else
     if (s.label == "lookupFailed") seal else progress(true, true, false, true)
   )
+  action failedLookupStep = failedLookup(true)
+  action failedLookupBugStep = failedLookup(false)
   // A page requested after the local write but before Slack acceptance is
-  // also stale. The command does not stamp observedAt again on success.
-  action pendingPageStep = tick(
+  // also stale. Without `restamp` the command does not stamp observedAt at
+  // its end, and the page applies after the acknowledgement.
+  action pendingPage(restamp: bool): bool = tick(
     if (s.sealed) progress(true, true, false, true) else
     if (s.label == "init") unsubscribe(1) else
     if (s.label == "localChange") startFetch(1, "view") else
     if (s.label == "startFetch") accept(1) else
-    if (s.label == "accept") acknowledge(1) else
+    if (s.label == "accept") acknowledgeWith(1, restamp) else
     if (s.label == "acknowledge") { nondet f = s.fetches.oneOf(); finishFetch(f, true) } else
     if (s.label == "finishFetch" and not(s.sealed)) seal else progress(true, true, false, true)
   )
+  action pendingPageStep = pendingPage(true)
+  action pendingPageBugStep = pendingPage(false)
   action unknownRootStep = tick(
     if (s.sealed) progress(true, true, false, true) else
     if (s.label == "init") startFetch(3, "root") else

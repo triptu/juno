@@ -4,14 +4,16 @@
  * A command writes its local change in one transaction, then mirrors it to
  * Slack through `Outbox.send`. Today `send` calls the method at once on the
  * `send` lane of the ready session and maps the client's errors to the
- * contract's (architecture 2.6); the caller reverts its local change when
- * the call fails. The full outbox (persisted rows, retry with backoff,
- * coalescing, revert on final failure) is a later milestone and replaces
- * this module without touching the commands' shape: local transaction,
- * mirror, revert.
+ * contract's (architecture 2.6); after a failure the caller asks Slack
+ * (`lookup`) what it has, since a lost answer does not mean Slack refused.
+ * The full outbox (persisted rows, retry with backoff, coalescing, revert on
+ * final failure) is a later milestone and replaces this module without
+ * touching the commands' shape: local transaction, mirror, settle.
  *
- * `exclusive(key)` runs commands on the same target one at a time, so a
- * revert never interleaves with a later command on the same thread.
+ * `exclusive(key)` runs commands on the same target one at a time, so their
+ * outcomes never interleave on the same thread. `background(effect)` runs
+ * work that outlives a command, such as asking Slack again after a lookup
+ * failed; it ends with the engine.
  *
  * A top-level module, like `workspace.ts`. It reaches Slack through the
  * top-level `SessionClient`, so it imports no feature folder.
@@ -21,7 +23,7 @@ import { NotSignedIn, Offline, RateLimited, Rejected } from '@juno/contract'
 import type { SlackApiError, SlackApiShape } from '@juno/slack'
 import { SessionClient } from './sessionClient'
 
-/** What a mirror call can fail with, as the contract names it. The local change is already reverted when a command returns one. */
+/** What a mirror call can fail with, as the contract names it. */
 export type MirrorError = NotSignedIn | Offline | RateLimited | Rejected
 
 export class Outbox extends Context.Service<
@@ -36,6 +38,8 @@ export class Outbox extends Context.Service<
     readonly lookup: <A>(call: (api: SlackApiShape) => Effect.Effect<A, SlackApiError>) => Effect.Effect<A, MirrorError>
     /** Runs `effect` after every earlier `exclusive` effect with the same key has finished. */
     readonly exclusive: (key: string) => <A, E, R>(effect: Effect.Effect<A, E, R>) => Effect.Effect<A, E, R>
+    /** Starts `effect` and returns at once. Its failures are ignored; it is interrupted when the engine stops. */
+    readonly background: <A, E>(effect: Effect.Effect<A, E>) => Effect.Effect<void>
   }
 >()('juno/engine/Outbox') {
   static readonly layer: Layer.Layer<Outbox, never, SessionClient> = Layer.effect(
@@ -76,7 +80,10 @@ export class Outbox extends Context.Service<
             )
           })
 
-      return Outbox.of({ send, lookup, exclusive })
+      const scope = yield* Effect.scope
+      const background = <A, E>(effect: Effect.Effect<A, E>): Effect.Effect<void> => Effect.asVoid(Effect.forkIn(Effect.ignore(effect), scope))
+
+      return Outbox.of({ send, lookup, exclusive, background })
     }),
   )
 }

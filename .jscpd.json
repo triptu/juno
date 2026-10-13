@@ -1,0 +1,8 @@
+{
+  "minTokens": 100,
+  "minLines": 8,
+  "mode": "weak",
+  "format": ["typescript", "tsx", "javascript", "jsx", "css"],
+  "reporters": ["json"],
+  "output": ".juno-status"
+}

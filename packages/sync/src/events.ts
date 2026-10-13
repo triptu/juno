@@ -99,7 +99,9 @@ export const applyFrame = (ctx: SyncContext, frame: RtmFrame): Effect.Effect<voi
             // `thread_marked` says whether the thread is followed only when it carries `active`.
             const subscribed = frame.type === 'thread_unsubscribed' ? false : frame.type === 'thread_subscribed' ? (sub.active ?? true) : sub.active
             const source = { kind: 'event', eventTs, observedAt: millisToTs(now) } as const
-            if (subscribed !== undefined) yield* setThreadSub(sub.channel, sub.thread_ts, subscribed, sub.last_read, source)
+            // An event that contradicts Juno's own command may predate it: Slack's root decides (specs/follow.qnt).
+            const outcome = subscribed === undefined ? 'ignored' : yield* setThreadSub(sub.channel, sub.thread_ts, subscribed, sub.last_read, source)
+            if (outcome === 'lookup') yield* Queue.offer(ctx.rootFetches, { channel: sub.channel, ts: sub.thread_ts })
             const topic = threadTopicOf(sub.channel, sub.thread_ts)
             if (sub.last_read !== undefined) yield* applyServerMark(topic, sub.last_read, eventTs)
             yield* reindexTopics([topic], reindexOptions(ctx))
@@ -277,7 +279,8 @@ const followOnReply = (ctx: SyncContext, channel: string, reply: MessageRow | un
       yield* Queue.offer(ctx.rootFetches, { channel, ts: threadTs })
     }
     if (reply.user_id === ctx.me.userId) {
-      if ((yield* threadSub(channel, threadTs))?.subscribed !== true) yield* setThreadSub(channel, threadTs, true, undefined, source)
+      if ((yield* threadSub(channel, threadTs))?.subscribed === true) return
+      if ((yield* setThreadSub(channel, threadTs, true, undefined, source)) === 'lookup') yield* Queue.offer(ctx.rootFetches, { channel, ts: threadTs })
       return
     }
     const root = yield* readMessage(channel, threadTs)

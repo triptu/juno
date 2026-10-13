@@ -5,8 +5,11 @@
 //
 // The random stream, wave path and composition are the channel-marks ones;
 // what changed is the palette (TIDE_RAMP in palette.mjs), the hue step
-// (always analogous, so a list of placeholders stays calm) and the frame,
-// which is the art's container so the box never moves when art arrives.
+// (always analogous, so a list of placeholders stays calm) and the frame.
+// With no container (the owner's decision) the bands are clipped to a
+// free-form shape picked per topic, not a box: a soft pebble about 32px
+// across, so it weighs the same as a line drawing beside it. Inside a
+// container the frame is the container's box, as before.
 
 import { HUES, HUE_NAMES, tideTones, SURFACES } from './palette.mjs'
 import { CONTAINERS } from './vocab.mjs'
@@ -40,6 +43,28 @@ function wavePath(y, amp, phase, wavelength) {
   return d
 }
 
+// A closed smooth shape through six to seven points around a circle with
+// seeded radius jitter, as cubic beziers (Catmull-Rom). The shape stays
+// convex enough to read as one pebble and never leaves the 40 box.
+function pebblePath(r) {
+  const n = r.pick([6, 6, 7])
+  const rot = r.range(0, Math.PI * 2)
+  const pts = []
+  for (let k = 0; k < n; k++) {
+    const ang = rot + (k / n) * Math.PI * 2 + r.range(-0.12, 0.12)
+    const rad = r.range(13.5, 16.5)
+    pts.push([20 + Math.cos(ang) * rad, 20 + Math.sin(ang) * rad])
+  }
+  let d = `M${f(pts[0][0])} ${f(pts[0][1])}`
+  for (let k = 0; k < n; k++) {
+    const p0 = pts[(k - 1 + n) % n], p1 = pts[k], p2 = pts[(k + 1) % n], p3 = pts[(k + 2) % n]
+    const c1 = [p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6]
+    const c2 = [p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6]
+    d += ` C${f(c1[0])} ${f(c1[1])} ${f(c2[0])} ${f(c2[1])} ${f(p2[0])} ${f(p2[1])}`
+  }
+  return d + ' Z'
+}
+
 // `topicId` is the only input the drawing depends on. For the study it is
 // the topic's id in topics.mjs; in the app it is the topic id (thread ts
 // or channel id), so every client of one workspace draws the same thing.
@@ -60,15 +85,12 @@ export function tide(topicId, { theme = 'light', size = 40, container = 'none', 
     ? [{ y: r.range(16, 22), fill: a.mid }, { y: r.range(28, 34), fill: b.mid }]
     : [{ y: r.range(11, 16), fill: b.soft }, { y: r.range(22, 27), fill: a.mid }, { y: r.range(31, 35), fill: a.deep }]
   const uid = id ?? `t${h.toString(36)}${theme[0]}${small ? 's' : ''}`
-  // The frame is the art's container: the same radius, so the placeholder
-  // and the art occupy the same box. With no container the bands still
-  // need an edge, so they take the subtle radius without the fill or line.
-  // With no container the bands are inset to a 32px square inside the 40px
-  // box: a line drawing reads at about 28 to 32px, so a full 40px block would
-  // be the heaviest thing in the list. The box itself is still 40px.
-  const bare = container === 'none' && !small
-  const radius = container === 'none' ? (bare ? 9 : CONTAINERS.subtle.radius) : CONTAINERS[container].radius
-  const clip = bare ? `<rect x="4" y="4" width="32" height="32" rx="${radius}"/>` : `<rect width="40" height="40" rx="${radius}"/>`
+  // No container: a free-form pebble per topic, at every size, so the
+  // placeholder is a shape among shapes and not a box among drawings.
+  // In a container: the container's box, so placeholder and art share it.
+  const bare = container === 'none'
+  const radius = bare ? 0 : CONTAINERS[container].radius
+  const clip = bare ? `<path d="${pebblePath(r)}"/>` : `<rect width="40" height="40" rx="${radius}"/>`
   let inner = `<rect width="40" height="40" fill="${a.base}"/>`
   inner += `<g transform="rotate(${tilt} 20 20)">`
   layers.forEach((l, k) => {
@@ -76,7 +98,7 @@ export function tide(topicId, { theme = 'light', size = 40, container = 'none', 
     inner += `<path d="${wavePath(l.y, amp, k * Math.PI, wavelength)}" fill="${l.fill}"/>`
   })
   inner += '</g>'
-  if (!small && r.chance(0.4)) inner += `<circle cx="${r.pick([11, 29])}" cy="${bare ? 11 : 8}" r="${bare ? 3.5 : 4}" fill="${theme === 'dark' ? a.deep : a.pale}"/>`
+  if (!small && r.chance(0.4)) inner += `<circle cx="${r.pick([13, 27])}" cy="${bare ? 12 : 8}" r="${bare ? 3.2 : 4}" fill="${theme === 'dark' ? a.deep : a.pale}"/>`
   const edge = container === 'subtle' ? `<rect x="0.5" y="0.5" width="39" height="39" rx="${radius - 0.5}" fill="none" stroke="${SURFACES[theme].edge}"/>` : ''
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 40 40" aria-hidden="true">` +
     `<defs><clipPath id="${uid}c">${clip}</clipPath></defs>` +

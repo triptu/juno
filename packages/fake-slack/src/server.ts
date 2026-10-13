@@ -48,9 +48,14 @@ interface FailureRule {
   remaining: number
 }
 
-/** Responses of one method held back until `release`, so a test can land events while a page is in flight. */
+/**
+ * Calls of one method held back until `release`, so a test can land events
+ * while a page is in flight. `before` holds a call before its handler runs
+ * (Slack has not seen it yet); otherwise the handler runs and the answer waits.
+ */
 interface HoldRule {
   remaining: number
+  readonly before: boolean
   readonly waiting: Array<{ readonly resume: () => void; readonly args: Record<string, unknown> }>
 }
 
@@ -63,6 +68,10 @@ export class FakeServer {
   readonly #rateLimits = new Map<string, RateLimitRule>()
   readonly #failures = new Map<string, FailureRule>()
   readonly #holds = new Map<string, HoldRule>()
+  readonly #stalls = new Map<string, HoldRule>()
+  readonly #lost = new Map<string, number>()
+  #frameHold: ReadonlySet<string> | undefined
+  readonly #heldFrames: RtmFrame[] = []
   readonly workspace: Workspace
   readonly #control: (name: string, input: Record<string, unknown>) => unknown
   readonly #http: Server
@@ -81,7 +90,10 @@ export class FakeServer {
       })
     })
     this.#http.on('upgrade', (request, socket, head) => this.#upgrade(request, socket, head))
-    workspace.onEvent((frame) => this.broadcast(frame))
+    workspace.onEvent((frame) => {
+      if (this.#frameHold?.has(frame.type) === true) this.#heldFrames.push(frame)
+      else this.broadcast(frame)
+    })
   }
 
   get url(): string {
@@ -98,6 +110,7 @@ export class FakeServer {
 
   async close(): Promise<void> {
     this.release()
+    this.releaseFrames(undefined, true)
     this.dropSockets()
     this.#wss.close()
     await new Promise<void>((resolve, reject) => this.#http.close((error) => (error ? reject(error) : resolve())))
@@ -167,43 +180,84 @@ export class FakeServer {
     return rule.error
   }
 
-  // Held responses
+  // Held calls
 
-  /** The next `times` calls of `method` run their handler, then wait for `release` before answering. */
-  holdNext(method: string, times: number): void {
-    const existing = this.#holds.get(method)
-    if (existing === undefined) this.#holds.set(method, { remaining: times, waiting: [] })
+  /**
+   * The next `times` calls of `method` wait for `release`: before their
+   * handler runs when `before`, else after it, before answering.
+   */
+  holdNext(method: string, times: number, before = false): void {
+    const rules = before ? this.#stalls : this.#holds
+    const existing = rules.get(method)
+    if (existing === undefined) rules.set(method, { remaining: times, before, waiting: [] })
     else existing.remaining += times
   }
 
-  /** Answers every held call of `method` (every method when omitted) and forgets the rule. */
+  #rules(method: string | undefined): Array<[Map<string, HoldRule>, string, HoldRule]> {
+    const found: Array<[Map<string, HoldRule>, string, HoldRule]> = []
+    for (const rules of [this.#stalls, this.#holds]) for (const [name, rule] of rules) if (method === undefined || name === method) found.push([rules, name, rule])
+    return found
+  }
+
+  /** Lets every held call of `method` (every method when omitted) go on, and forgets the rule. */
   release(method?: string): void {
-    for (const [name, rule] of this.#holds) {
-      if (method !== undefined && name !== method) continue
-      this.#holds.delete(name)
+    for (const [rules, name, rule] of this.#rules(method)) {
+      rules.delete(name)
       for (const held of rule.waiting.splice(0)) held.resume()
     }
   }
 
   /** How many calls are waiting for `release`. */
   heldCount(method?: string): number {
-    let n = 0
-    for (const [name, rule] of this.#holds) if (method === undefined || name === method) n += rule.waiting.length
-    return n
+    return this.#rules(method).reduce((n, [, , rule]) => n + rule.waiting.length, 0)
   }
 
   /** The arguments of the calls waiting for `release`, oldest first. */
   heldCalls(method?: string): ReadonlyArray<Record<string, unknown>> {
-    const calls: Array<Record<string, unknown>> = []
-    for (const [name, rule] of this.#holds) if (method === undefined || name === method) calls.push(...rule.waiting.map((held) => held.args))
-    return calls
+    return this.#rules(method).flatMap(([, , rule]) => rule.waiting.map((held) => held.args))
   }
 
-  #hold(method: string, args: Record<string, unknown>): Promise<void> | undefined {
-    const rule = this.#holds.get(method)
+  #hold(rules: Map<string, HoldRule>, method: string, args: Record<string, unknown>): Promise<void> | undefined {
+    const rule = rules.get(method)
     if (rule === undefined || rule.remaining <= 0) return undefined
     rule.remaining -= 1
     return new Promise((resolve) => rule.waiting.push({ resume: resolve, args }))
+  }
+
+  // Lost answers
+
+  /** The next `times` calls of `method` run their handler, then the connection closes with no answer. */
+  loseResponse(method: string, times: number): void {
+    this.#lost.set(method, (this.#lost.get(method) ?? 0) + times)
+  }
+
+  #takeLost(method: string): boolean {
+    const remaining = this.#lost.get(method) ?? 0
+    if (remaining <= 0) return false
+    this.#lost.set(method, remaining - 1)
+    return true
+  }
+
+  // Held frames
+
+  /** From now on, frames of these types wait for `releaseFrames` instead of reaching the sockets. */
+  holdFrames(types: ReadonlyArray<string>): void {
+    this.#frameHold = new Set(types)
+  }
+
+  /**
+   * Sends (or with `drop`, discards) the oldest `count` held frames, all of
+   * them when omitted. Without a count, frames stop being held.
+   */
+  releaseFrames(count?: number, drop = false): void {
+    const frames = this.#heldFrames.splice(0, count ?? this.#heldFrames.length)
+    if (count === undefined) this.#frameHold = undefined
+    if (!drop) for (const frame of frames) this.broadcast(frame)
+  }
+
+  /** The frames waiting for `releaseFrames`, oldest first. */
+  heldFrames(): ReadonlyArray<RtmFrame> {
+    return [...this.#heldFrames]
   }
 
   // Socket
@@ -320,11 +374,18 @@ export class FakeServer {
       return record(429, { ok: false, error: 'ratelimited' })
     }
     if (!isMethodName(method)) return record(200, { ok: false, error: 'unknown_method' })
+    const stalled = this.#hold(this.#stalls, method, redact(fields))
+    if (stalled !== undefined) await stalled
     const forced = this.#takeFailure(method)
     const result = forced === undefined ? this.#run(method, fields) : undefined
     // The handler has run (state changed, events sent), or a forced error stands in for it; only the answer waits.
-    const held = this.#hold(method, redact(fields))
+    const held = this.#hold(this.#holds, method, redact(fields))
     if (held !== undefined) await held
+    if (this.#takeLost(method)) {
+      this.calls.push({ at: this.workspace.clock.now(), kind: 'api', method, args: redact(fields), status: 0, ok: false, error: 'lost' })
+      response.socket?.destroy()
+      return
+    }
     if (forced !== undefined) return record(200, { ok: false, error: forced })
     if (result === undefined) return
     if (result instanceof ApiError) {

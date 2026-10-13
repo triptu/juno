@@ -336,6 +336,16 @@ export const hostileIds: ReadonlyArray<string> = [
   rows.flags.id,
 ]
 
+/**
+ * Threads started in a channel since its Main was last read, for the Main
+ * rows' thread count. Not in the contract yet, so the gallery passes it to
+ * `TopicRow` as `newThreads`. The group DM's Main has none.
+ */
+export const newThreadsById: ReadonlyMap<string, number> = new Map([
+  [rows.alertsMain.id, 4],
+  [rows.lowerBound.id, 12],
+])
+
 /** Every row above, keyed by id, as a container would hold them. */
 export const rowsById: ReadonlyMap<string, TopicRow> = new Map(Object.values(rows).map((entry) => [entry.id, entry]))
 

@@ -18,7 +18,7 @@ To change a schema, add a timestamped migration file in `src/migrations/<db>/` a
 
 The topic view's Main window reads the partial index `messages_main (channel, ts)` over roots and broadcast replies; a query uses it only when its WHERE clause repeats the index's condition. Invalidation keys in the record form may give a table an empty id list (`{ messages: [topicId], users: [] }`), which subscribes to the whole table.
 
-Indexes the sidebar relies on (`docs/performance.md` section 6): `topic_index (last_activity_ts DESC)`, `topic_index (channel, last_activity_ts DESC)`, the partial `topic_index (last_activity_ts DESC) WHERE unread_count > 0`, and the partial `topic_overlay (pinned_at) WHERE pinned_at IS NOT NULL`. `thread_cursors.complete_from`, `thread_subs.updated_event_ts` and `observed_at`, and `topic_reads.last_server_event_ts` are the sync's coverage and ordering columns (architecture 5.4 and 5.6).
+Indexes the sidebar relies on (`docs/performance.md` section 6): `topic_index (last_activity_ts DESC)`, `topic_index (channel, last_activity_ts DESC)`, the partial `topic_index (last_activity_ts DESC) WHERE unread_count > 0`, and the partial `topic_overlay (pinned_at) WHERE pinned_at IS NOT NULL`. `thread_cursors.complete_from`, `thread_subs.updated_event_ts`, `observed_at` and `commanded`, and `topic_reads.last_server_event_ts` are the sync's coverage and ordering columns (architecture 5.4 and 5.6).
 
 ## Must not
 

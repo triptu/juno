@@ -2,7 +2,7 @@ import { defineFixtures, scene, type FixtureFrame } from '@juno/ui'
 import { AccountMenu } from './AccountMenu'
 import { AppearanceSettings } from './AppearanceSettings'
 import { EngineNotice } from './EngineStatusView'
-import { hostileIds, NOW, pinnedIds, recentIds, rows, rowsById } from './fixtures/topics'
+import { hostileIds, newThreadsById, NOW, pinnedIds, recentIds, rows, rowsById } from './fixtures/topics'
 import { Sidebar, type SidebarProps } from './Sidebar'
 import { relativeTime } from './time'
 import { TopicList, type TopicListProps } from './TopicList'
@@ -33,7 +33,18 @@ const chrome: Omit<SidebarProps, 'children'> = {
 const renderRow = (id: string, selected?: string) => {
   const row = rowsById.get(id)
   if (row === undefined) return null
-  return <TopicRow key={id} row={row} time={relativeTime(row.lastActivityAt, NOW)} selected={id === selected} tabbable={id === (selected ?? pinnedIds[0])} onOpen={noop} onResolve={noop} />
+  return (
+    <TopicRow
+      key={id}
+      row={row}
+      time={relativeTime(row.lastActivityAt, NOW)}
+      selected={id === selected}
+      tabbable={id === (selected ?? pinnedIds[0])}
+      newThreads={newThreadsById.get(id)}
+      onOpen={noop}
+      onResolve={noop}
+    />
+  )
 }
 
 const list = (props: Partial<TopicListProps> & { readonly selected?: string } = {}) => {

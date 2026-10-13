@@ -1,5 +1,5 @@
 import { defineFixtures, scene, type FixtureFrame } from '@juno/ui'
-import { NOW, rows } from './fixtures/topics'
+import { newThreadsById, NOW, rows } from './fixtures/topics'
 import { relativeTime } from './time'
 import { TopicRow, type TopicRowProps } from './TopicRow'
 
@@ -42,6 +42,9 @@ export default defineFixtures(
     },
     Kind: {
       main: state(rows.alertsMain),
+      'main-new-threads': state(rows.alertsMain, { newThreads: newThreadsById.get(rows.alertsMain.id) }),
+      'main-one-new-thread': state(rows.lunch, { newThreads: 1 }),
+      'main-new-threads-selected': state(rows.alertsMain, { newThreads: newThreadsById.get(rows.alertsMain.id), selected: true }),
       reopened: state(rows.pricing),
       'pinned-resolved': state(rows.notes),
       'pinned-resolved-selected': state(rows.notes, { selected: true }),
@@ -59,7 +62,7 @@ export default defineFixtures(
       'no-photo': state(rows.packet),
       'no-text': state(rows.file),
       'count-99-plus': state(rows.alertsMain),
-      'count-lower-bound': state(rows.lowerBound),
+      'count-lower-bound': state(rows.lowerBound, { newThreads: newThreadsById.get(rows.lowerBound.id) }),
     },
     Interaction: {
       hover: state(rows.postgres, {}, { hover: ROW }),
@@ -73,7 +76,7 @@ export default defineFixtures(
       'all-states': scene(() => (
         <div style={column}>
           {[rows.alertsMain, rows.postgres, rows.hiring, rows.roadmap, rows.pricing, rows.notes, rows.flags].map((row) => (
-            <TopicRow key={row.id} {...one(row)} />
+            <TopicRow key={row.id} {...one(row, { newThreads: newThreadsById.get(row.id) })} />
           ))}
         </div>
       )),

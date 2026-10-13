@@ -60,7 +60,7 @@ export const SURFACES = {
 // and a narrower lightness span than channel-marks' RAMP, so a placeholder
 // is quieter than any finished drawing next to it.
 export const TIDE_RAMP = {
-  light: { base: [0.925, 0.018], soft: [0.885, 0.026], mid: [0.835, 0.034], deep: [0.77, 0.04], pale: [0.955, 0.012] },
+  light: { base: [0.905, 0.02], soft: [0.865, 0.028], mid: [0.815, 0.036], deep: [0.75, 0.042], pale: [0.945, 0.012] },
   // Dark sits closer to neutral: at low lightness, amber, olive and coral
   // turn to mud at any real chroma, so chroma stays near 0.02 and the bands
   // step in lightness instead.

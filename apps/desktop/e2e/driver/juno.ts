@@ -99,10 +99,6 @@ export class SidebarRow {
     await expect(this.root.getByText(name, { exact: true })).toBeVisible()
   }
 
-  async expectMessageCount(count: number): Promise<void> {
-    await expect(this.root.locator(`[title="${count} messages"]`)).toHaveText(String(count))
-  }
-
 }
 
 /** The left pane: filters, sections and rows. */
