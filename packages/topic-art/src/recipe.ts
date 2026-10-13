@@ -13,7 +13,7 @@
  * attributes, numbers on the grid, role tokens), the size limit, and a nest
  * depth for groups. Composition is the prompt's business.
  */
-import { HUE_NAMES, isHueName, ROLES, type HueName, type Role } from './palette'
+import { HUE_NAMES, isHueName, ROLES, type HueName } from './palette'
 
 export interface RecipeElement {
   readonly tag: ElementTag
