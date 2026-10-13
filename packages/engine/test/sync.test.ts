@@ -528,6 +528,21 @@ describe('follow state (review M3 finding 1, specs/follow.qnt)', () => {
   })
 })
 
+describe('follow events without a time (specs/follow.qnt)', () => {
+  it('an undated thread_unsubscribed is not trusted: Slack is asked for the root, and its answer wins', async () => {
+    const engine = await bootedEngine()
+    await engine.rowsUntil((rows) => rows.length >= 20, 'rows')
+    const id = threadId(engine, 'C0ENG', 'Draft plan is in the doc.')
+    engine.fake.resetCalls()
+    // Slack still has the thread followed; the frame carries no event_ts.
+    engine.fake.emitFrame({ type: 'thread_unsubscribed', subscription: { type: 'thread', channel: 'C0ENG', thread_ts: tsOf(id), active: false } })
+    await waitFor(() => (apiCalls(engine, 'conversations.replies').some((c) => c.args['ts'] === tsOf(id)) ? true : undefined), 10_000, 'the root lookup')
+    await quiet(engine)
+    expect(storedFollow(engine, 'C0ENG', tsOf(id))).toBe(1)
+    expect((await engine.rows()).some((r) => r.id === id)).toBe(true)
+  })
+})
+
 describe('followed threads past one getView page (review M3 finding 2)', () => {
   it('a warm boot reads every page: reads on another device clear, and a follow made elsewhere appears', async () => {
     const threads: Array<SeededThread> = []
