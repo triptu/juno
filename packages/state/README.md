@@ -4,14 +4,22 @@ The renderer's bridge to the engine: the port client and every atom. The only pa
 
 ## Public API
 
-- `liveQuery(route)(payload)`: an atom for a stream route. A `liveValueRoute` gives the latest value; a `liveListRoute` gives a `ListWindow` kept by `applyListDelta`, with `orderAtom` and `rowAtom` for per-row subscriptions. Memoized per route.
-- `command(route)`: a writable atom that runs the command and exposes its `AsyncResult`. `runCommand(registry, route, payload)` runs one without a component.
-- `prefetch(atom)`: warms a query through the registry.
+- `liveQuery(route)(payload)`: an atom for a stream route. A `liveValueRoute` gives the latest value; a `liveListRoute` gives a `ListWindow` kept by `applyListDelta`, with `rowAtom(list)(id)` for per-row subscriptions. Memoized per route. The atom keeps its subscription for a 30 s idle TTL after the last reader leaves.
+- `applyListDelta`: rows with an unchanged `rev` keep their objects, across a `reset` too (a reconnect re-renders only what changed); `order` keeps its array when equal.
+- `command(route)`: a writable atom that runs the command and exposes its `AsyncResult`. It runs one call at a time: a second write interrupts the first, so per-row actions use `runCommand(registry, route, payload)`, which gives each call its own atom.
+- `prefetch(registry, atom)`: warms a query (hover, focus, keyboard selection). One warm set per registry, at most three; it holds the subscription under the atom, not the atom, so an evicted prefetch that was never opened ends at once. An open topic reads the atom itself and is never evicted.
 - `registry`, `makeRegistry()`, `configureConnection(registry, { acquire })`, `connectionStateAtom`, `acquireRendererPort`: the client and its connection. Tests make their own registry.
-- Feature atoms, declared once at module level in `src/<feature>.ts`: `engineStatusAtom`, `pingCommand`, `appInfoAtom`, `themeAtom`, `persistTheme`, `sessionStatusAtom` and `signedInAtom` (the last ready session, held while the engine restarts so the shell stays up), `topicListAtom(filter)`, `topicCountsAtom(scope)`.
-- Sidebar UI state in `src/sidebar.ts`, none of it persisted: `sidebarFilterAtom` (kind, unread, scope), `selectedTopicAtom` and `topicSelectedAtom(id)` (only the rows whose answer changes re-render), `nowAtom` (a half-minute clock the row owners format times against), `sidebarSectionsAtom(list)` (the window's order split into Pinned and Recent, equal splits do not notify).
+- Feature atoms, declared once at module level in `src/<feature>.ts`: `engineStatusAtom`, `pingCommand`, `appInfoAtom`, `themeAtom`, `persistTheme`, `sessionStatusAtom` and `signedInAtom` (the last ready session, held while the engine restarts so the shell stays up), `topicListAtom(filter)` (one filter's window), `topicCountsAtom(scope)`.
+- Sidebar state in `src/sidebar.ts`, none of it persisted. The list container and its rows read only these:
+  - `sidebarFilterAtom` (kind, unread, scope) and `selectedTopicAtom`.
+  - `sidebarListAtom`: the window shown, a `SidebarWindow` (`ListWindow<TopicRow>` plus the `filter` it belongs to). After a filter change it keeps the old window until the new filter's first snapshot arrives, then replaces it in one update, never with an empty list in between. A row whose `rev` is unchanged keeps its object across the swap.
+  - `sidebarSectionsAtom`: `{ ready, pinned, recent, total, filter }`, the shown window's ids split into Pinned and Recent. Equal splits do not notify. Use its `filter`, not `sidebarFilterAtom`, to pick the empty state.
+  - `sidebarRowAtom(id)`: one row, keyed by id alone, so a row keeps its atom and its component across filters and notifies only when its object changes.
+  - `topicSelectedAtom(id)` and `currentRowAtom(id)`: booleans for "selected" and "takes Tab focus" (the selection while it is shown, otherwise the first row). Only the rows whose answer changes are notified.
+  - `sidebarDotAtom('channels' | 'dms')`: whether that filter shows a dot, from the counts of the current scope, as a boolean.
+  - `nowAtom`: wall-clock milliseconds, refreshed on each minute boundary while something reads it. Read it through a selector that returns the label, `useAtomValue(nowAtom, (now) => relativeTime(at, now))`, so a tick re-renders only rows whose label changed.
 - `@juno/state/react`: `useAtomValue`, `useAtom`, `useAtomSet`, `useAtomRefresh`, `RegistryContext`. Containers import hooks only from here.
-- `@juno/state/perf`: the fixed performance marks and `observeFrames()`.
+- `@juno/state/perf`: the fixed performance marks and `observeFrames()`. `juno.live-update` is measured for every live message and replaces the previous entry, so the buffer holds the latest one only.
 
 Transport errors are retried every second and never reach an atom. Route errors reach it typed.
 
@@ -24,4 +32,4 @@ Transport errors are retried every second and never reach an atom. Route errors 
 
 ## Testing
 
-`pnpm --filter @juno/state test` covers `applyListDelta` (identity of unchanged rows, order, removal). The client and helpers are tested end to end in `packages/engine/test/protocol.test.ts`, which uses a registry per test and a Node `MessageChannel` in place of the renderer's port.
+`pnpm --filter @juno/state test` covers `applyListDelta` (identity of unchanged rows, order, removal, reset). The client and helpers are tested end to end in `packages/engine/test/protocol.test.ts`, and the sidebar atoms in `packages/engine/test/sidebar-state.test.ts`; both use a registry per test and a Node `MessageChannel` in place of the renderer's port.

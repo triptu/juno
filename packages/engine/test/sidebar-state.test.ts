@@ -1,0 +1,124 @@
+// The sidebar's renderer state against the real engine: what the list
+// container and its rows would see while the user changes filters
+// (performance 5.3: old rows stay, the new window replaces them in one step,
+// unchanged rows keep their objects).
+import { afterEach, describe, expect, it } from 'vitest'
+import {
+  currentRowAtom,
+  defaultTopicListFilter,
+  selectedTopicAtom,
+  sidebarFilterAtom,
+  sidebarListAtom,
+  sidebarRowAtom,
+  sidebarSectionsAtom,
+  type SidebarWindow,
+} from '@juno/state'
+import { startTestEngine, waitFor, type RunningEngine } from './harness'
+
+const engines: Array<RunningEngine> = []
+const unmounts: Array<() => void> = []
+afterEach(async () => {
+  for (const unmount of unmounts.splice(0)) unmount()
+  for (const engine of engines.splice(0)) await engine.stop()
+})
+
+async function liveEngine(): Promise<RunningEngine> {
+  const engine = await startTestEngine({ initial: (fake) => fake.signIn() })
+  engines.push(engine)
+  await engine.status('ready')
+  await engine.phase('live')
+  return engine
+}
+
+/** Mounts the shown window the way the list container does, and records every value it takes. */
+function watchList(engine: RunningEngine) {
+  const { registry } = engine
+  const seen: Array<SidebarWindow> = []
+  unmounts.push(registry.mount(sidebarListAtom), registry.mount(sidebarSectionsAtom), registry.subscribe(sidebarListAtom, (window) => seen.push(window)))
+  const shown = (kind: string) =>
+    waitFor(
+      () => {
+        const window = registry.get(sidebarListAtom)
+        return window.filter.kind === kind && window.order.length > 0 ? window : undefined
+      },
+      undefined,
+      `the ${kind} window`,
+    )
+  return { seen, shown }
+}
+
+describe('the sidebar list across filter changes', () => {
+  it('keeps the old rows until the new window arrives, never shows an empty list, and keeps unchanged rows as the same objects', async () => {
+    const engine = await liveEngine()
+    const { registry } = engine
+    registry.set(sidebarFilterAtom, defaultTopicListFilter)
+    const { seen, shown } = watchList(engine)
+    const all = await shown('all')
+    const shared = all.order.find((id) => all.rows.get(id)!.channel.kind === 'public')!
+    let sharedNotified = 0
+    const stopRow = registry.subscribe(sidebarRowAtom(shared), () => sharedNotified++)
+    seen.length = 0
+
+    registry.set(sidebarFilterAtom, { kind: 'channels', unreadOnly: false })
+    // The Channels window is not in yet: the All rows stay, under their own filter.
+    expect(registry.get(sidebarListAtom).filter.kind).toBe('all')
+    expect(registry.get(sidebarSectionsAtom).ready).toBe(true)
+
+    const channels = await shown('channels')
+    stopRow()
+    expect(seen.every((window) => window.order.length > 0)).toBe(true)
+    // One step from All to Channels: no value in between.
+    expect(seen.filter((window) => window.filter.kind === 'channels').length).toBeGreaterThan(0)
+    expect(channels.order.every((id) => all.rows.get(id) === undefined || channels.rows.get(id)!.channel.kind !== 'im')).toBe(true)
+    // A row in both windows with the same rev is the same object, so its row atom did not notify.
+    expect(channels.rows.get(shared)).toBe(all.rows.get(shared))
+    expect(sharedNotified).toBe(0)
+    const sameRev = channels.order.filter((id) => all.rows.get(id)?.rev === channels.rows.get(id)!.rev)
+    expect(sameRev.length).toBeGreaterThan(0)
+    for (const id of sameRev) expect(channels.rows.get(id)).toBe(all.rows.get(id))
+
+    // Back to All while its subscription is still warm (idle TTL): the swap is immediate.
+    registry.set(sidebarFilterAtom, defaultTopicListFilter)
+    const back = registry.get(sidebarListAtom)
+    expect(back.filter.kind).toBe('all')
+    expect(back.rows.get(shared)).toBe(all.rows.get(shared))
+  })
+
+  it('marks one row tabbable: the first, or the selection while it is shown', async () => {
+    const engine = await liveEngine()
+    const { registry } = engine
+    registry.set(sidebarFilterAtom, defaultTopicListFilter)
+    registry.set(selectedTopicAtom, undefined)
+    const { shown } = watchList(engine)
+    const all = await shown('all')
+    const [first, second] = all.order
+    const stops = [registry.mount(currentRowAtom(first!)), registry.mount(currentRowAtom(second!))]
+    expect(registry.get(currentRowAtom(first!))).toBe(true)
+    expect(registry.get(currentRowAtom(second!))).toBe(false)
+
+    registry.set(selectedTopicAtom, second)
+    expect(registry.get(currentRowAtom(first!))).toBe(false)
+    expect(registry.get(currentRowAtom(second!))).toBe(true)
+
+    // A selection that is not in the window falls back to the first row.
+    registry.set(selectedTopicAtom, 't:C0NOWHERE:1.000000')
+    expect(registry.get(currentRowAtom(first!))).toBe(true)
+    stops.forEach((stop) => stop())
+    registry.set(selectedTopicAtom, undefined)
+  })
+})
+
+describe('the sidebar rows across a profile change', () => {
+  it('a renamed person reaches every row that names them, though the query keeps the users it has read', async () => {
+    const engine = await liveEngine()
+    const before = await engine.rowsUntil((rows) => rows.some((r) => r.participants.some((p) => p.id === 'U0LEO')), 'a row with Leo')
+    const named = before.filter((r) => r.participants.some((p) => p.id === 'U0LEO')).map((r) => r.id)
+    const leo = engine.fake.workspace.users.get('U0LEO')!
+    engine.fake.emitFrame({ type: 'user_change', user: { ...leo, profile: { ...leo.profile, display_name: 'Leonard', real_name: 'Leonard Park' } }, event_ts: '1.000001' })
+    const after = await engine.rowsUntil(
+      (rows) => named.every((id) => rows.find((r) => r.id === id)?.participants.find((p) => p.id === 'U0LEO')?.name === 'Leonard'),
+      'Leo renamed on every row',
+    )
+    expect(after.filter((r) => r.participants.some((p) => p.name === 'Leo')).map((r) => r.id)).toEqual([])
+  })
+})
