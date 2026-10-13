@@ -182,12 +182,26 @@ in `apps/desktop/e2e/fixtures.ts` set all three; `juno.signIn()` and
 `JUNO_LIVE=1 pnpm smoke:live` (`scripts/smoke-live.ts`) is the manual, read-only
 check against your real workspace. It imports the session the same way (keychain
 prompt), prints its call list, calls `auth.test`, `client.userBoot`,
-`client.counts`, `subscriptions.thread.getView` and one `conversations.history`,
-connects the socket and reads 30 s of events, decodes everything through
-`@juno/slack-schema` and reports failures by path only. Redacted shapes land in
-`packages/slack-schema/test/fixtures/recorded/`. It refuses any method outside
-its allow-list. `pnpm smoke:live -- --fake` runs it against an in-process fake,
-which is how it is checked in development.
+`client.counts`, `subscriptions.thread.getView` and one `conversations.history`
+on a channel you are a member of, connects the socket and reads 30 s of events
+(`--seconds N` for longer), decodes everything through `@juno/slack-schema` and
+reports failures by path only. Redacted shapes land in
+`packages/slack-schema/test/fixtures/recorded/` (one file per method, one per
+socket frame type), `packages/slack-schema/test/recorded.test.ts` decodes them,
+and `pnpm lint` runs `scripts/check-fixtures-redacted.mjs` over them so no id,
+URL, email, timestamp or free text can be committed. The smoke refuses any
+method outside its allow-list. `pnpm smoke:live -- --fake` runs it against an
+in-process fake, which is how it is checked in development.
+
+Skipping the keychain prompt on later runs: `JUNO_LIVE=1 pnpm smoke:live --
+--cache-session` imports the session once (the Slack prompt appears) and keeps
+the token, `d` cookie and team URL in a generic password of your login keychain
+named `juno-dev-slack-session` (`security add-generic-password`, value passed on
+stdin). Every later run finds it with `security find-generic-password` without a
+prompt, because `security` itself created the item. `pnpm smoke:live --
+--forget-session` deletes it. Delete it when the session stops working
+(`auth.test: SlackAuthRequired`) and cache again, or before handing the machine
+to someone else. The desktop app never reads this item.
 
 ## IPC with main
 

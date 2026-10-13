@@ -15,10 +15,18 @@
  * before every call, and the call list is printed before the first one.
  *
  * Flags:
- *   --fake         run against an in-process fake Slack instead (no keychain, no JUNO_LIVE)
- *   --seconds N    how long to read socket events (default 30; 2 with --fake)
- *   --team T       pick this team id out of localConfig_v2 when several are signed in
- *   --no-record    do not write fixtures
+ *   --fake             run against an in-process fake Slack instead (no keychain, no JUNO_LIVE)
+ *   --seconds N        how long to read socket events (default 30; 2 with --fake)
+ *   --team T           pick this team id out of localConfig_v2 when several are signed in
+ *   --no-record        do not write fixtures
+ *   --cache-session    after importing, keep the session (token, d cookie, team URL) in a
+ *                      Juno-owned login keychain item so later runs do not prompt
+ *   --forget-session   delete that keychain item and exit
+ *
+ * The session cache is a generic password named `juno-dev-slack-session`,
+ * written with `security add-generic-password` (its value is passed on
+ * stdin, never in argv). `security` created it, so `security
+ * find-generic-password` reads it back without a prompt.
  */
 import { execFile } from 'node:child_process'
 import { cp, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
@@ -59,6 +67,7 @@ const flag = (name: string) => {
 }
 const useFake = flags.has('--fake')
 const record = !flags.has('--no-record')
+const cacheSession = flags.has('--cache-session')
 const seconds = Number(flag('--seconds') ?? (useFake ? 2 : 30))
 const teamId = flag('--team')
 
@@ -66,6 +75,11 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const fixtureDir = join(root, 'packages/slack-schema/test/fixtures/recorded')
 
 async function main(): Promise<number> {
+  if (flags.has('--forget-session')) {
+    const forgotten = await forgetCachedSession()
+    console.log(forgotten ? 'smoke-live: cached session deleted' : 'smoke-live: no cached session')
+    return 0
+  }
   if (!useFake && process.env['JUNO_LIVE'] !== '1') {
     console.error('smoke-live: refusing to touch a real workspace without JUNO_LIVE=1 (or pass --fake)')
     return 2
@@ -92,20 +106,30 @@ interface Target {
 }
 
 async function liveTarget(): Promise<Target> {
+  const cached = await readCachedSession()
+  const { session, cookie } = cached ?? (await importFromSlackApp())
+  console.log(
+    `smoke-live: ${cached === undefined ? 'imported' : 'cached'} session, team ${session.teamId}${session.enterprise === undefined ? '' : ' (Enterprise Grid)'}, user ${session.userId}`,
+  )
+  if (cached === undefined && cacheSession) {
+    await storeCachedSession({ session, cookie })
+    console.log(`smoke-live: session kept in the login keychain as "${SESSION_SERVICE}" (--forget-session deletes it)`)
+  }
+  return { session, cookie, allowedHosts: ['slack.com'], close: async () => {} }
+}
+
+/** The Slack app's session, read the way the desktop app does it. macOS asks once for the keychain item. */
+async function importFromSlackApp(): Promise<CachedSession> {
   const slackDir = join(homedir(), 'Library', 'Application Support', 'Slack')
   const copy = await mkdtemp(join(tmpdir(), 'juno-smoke-'))
   try {
     await cp(join(slackDir, LOCAL_STORAGE_DIR), join(copy, LOCAL_STORAGE_DIR), { recursive: true })
     await cp(join(slackDir, COOKIES_FILE), join(copy, COOKIES_FILE))
     console.log('smoke-live: reading the "Slack Safe Storage" keychain item (macOS will ask)')
-    const keychainPassword = await new Promise<string>((resolvePassword, reject) => {
-      execFile('/usr/bin/security', ['find-generic-password', '-w', '-s', 'Slack Safe Storage'], { timeout: 120_000 }, (error, stdout) => {
-        if (error) reject(new Error('keychain access was declined or the item is missing'))
-        else resolvePassword(stdout.replace(/\n$/, ''))
-      })
-    })
+    const answer = await security(['find-generic-password', '-w', '-s', 'Slack Safe Storage'])
+    if (answer.code !== 0) throw new Error('keychain access was declined or the item is missing')
+    const keychainPassword = answer.stdout.replace(/\n$/, '')
     const { team, cookie } = await readSlackAppSession({ dir: copy, keychainPassword, ...(teamId === undefined ? {} : { teamId }) })
-    console.log(`smoke-live: team ${team.id}${team.enterprise_id === undefined ? '' : ' (Enterprise Grid)'}, user ${team.user_id}`)
     return {
       session: {
         teamId: team.id,
@@ -115,12 +139,54 @@ async function liveTarget(): Promise<Target> {
         ...(team.enterprise_id === undefined ? {} : { enterprise: { id: team.enterprise_id } }),
       },
       cookie: `${cookie.name}=${cookie.value}`,
-      allowedHosts: ['slack.com'],
-      close: async () => {},
     }
   } finally {
     await rm(copy, { recursive: true, force: true })
   }
+}
+
+// The session cache: one generic password in the login keychain, owned by `security`.
+
+const SESSION_SERVICE = 'juno-dev-slack-session'
+
+interface CachedSession {
+  readonly session: SlackSessionShape
+  /** The `Cookie` header value, `d=...`. */
+  readonly cookie: string
+}
+
+function security(args: ReadonlyArray<string>, stdin?: string): Promise<{ code: number; stdout: string }> {
+  return new Promise((resolvePromise) => {
+    const child = execFile('/usr/bin/security', [...args], { timeout: 120_000 }, (error, stdout) => {
+      resolvePromise({ code: error === null ? 0 : ((error as { code?: unknown }).code as number | undefined) ?? 1, stdout })
+    })
+    if (stdin !== undefined) child.stdin?.end(stdin)
+  })
+}
+
+/** The cached session for `--team` (or the only one), or undefined when there is none. */
+async function readCachedSession(): Promise<CachedSession | undefined> {
+  const answer = await security(['find-generic-password', '-w', '-s', SESSION_SERVICE, ...(teamId === undefined ? [] : ['-a', teamId])])
+  if (answer.code !== 0) return undefined
+  try {
+    const parsed = JSON.parse(Buffer.from(answer.stdout.trim(), 'base64').toString('utf8')) as CachedSession
+    if (typeof parsed.cookie !== 'string' || typeof parsed.session?.token !== 'string') return undefined
+    return parsed
+  } catch {
+    return undefined
+  }
+}
+
+/** `add-generic-password -U` replaces an item with the same service and account. The value goes in on stdin via `security -i`. */
+async function storeCachedSession(cached: CachedSession): Promise<void> {
+  const value = Buffer.from(JSON.stringify(cached), 'utf8').toString('base64')
+  const answer = await security(['-i'], `add-generic-password -U -s ${SESSION_SERVICE} -a ${cached.session.teamId} -w ${value}\n`)
+  if (answer.code !== 0) throw new Error('could not write the session to the keychain')
+}
+
+async function forgetCachedSession(): Promise<boolean> {
+  const answer = await security(['delete-generic-password', '-s', SESSION_SERVICE])
+  return answer.code === 0
 }
 
 async function fakeTarget(): Promise<Target> {
@@ -167,7 +233,12 @@ async function run(target: Target): Promise<number> {
         recordingTransport(target.cookie),
         SocketHandshake.fixed({ cookie: target.cookie, userAgent: 'Juno smoke' }),
         slackConfigLayer({
-          socket: { allowedHosts: [...target.allowedHosts], helloTimeoutMillis: 20_000, onRawFrame: (data) => rawFrames.push(data) },
+          socket: {
+            allowedHosts: [...target.allowedHosts],
+            helloTimeoutMillis: 20_000,
+            onRawFrame: (data) => rawFrames.push(data),
+            onDiagnostic: (line) => console.log(`  socket: ${line}`),
+          },
         }),
       ),
     ),
@@ -198,12 +269,16 @@ async function run(target: Target): Promise<number> {
     if (counts !== undefined) console.log(`    counts for ${counts.channels.length} channels`)
     const view = yield* call('subscriptions.thread.getView', { limit: 20 })
     if (view !== undefined) console.log(`    ${view.threads.length} followed threads`)
-    const channel = boot?.channels.find((c) => c.is_member === true && c.is_archived !== true) ?? boot?.channels[0]
+    // userBoot lists every channel without membership; client.counts lists only the user's own, so a channel in both is one they are a member of.
+    const member = new Set(counts?.channels.map((c) => c.id) ?? [])
+    const channel =
+      boot?.channels.find((c) => member.has(c.id) && c.is_archived !== true && c.is_mpim !== true) ??
+      boot?.channels.find((c) => c.is_member === true && c.is_archived !== true)
     if (channel !== undefined) {
       const history = yield* call('conversations.history', { channel: channel.id, limit: 20, ignore_replies: true })
-      if (history !== undefined) console.log(`    ${history.messages.length} messages in one channel`)
+      if (history !== undefined) console.log(`    ${history.messages.length} messages in one member channel`)
     } else {
-      console.log('    no channel to read history from')
+      console.log('    no member channel to read history from')
     }
 
     console.log('smoke-live: decoding recorded responses')
@@ -339,10 +414,12 @@ function issuePaths(issue: SchemaIssue.Issue, path: ReadonlyArray<PropertyKey>):
 
 const format = (path: ReadonlyArray<PropertyKey>) => (path.length === 0 ? '(root)' : path.map(String).join('.'))
 
+/** `type`, plus `.subtype` for message frames, so each subtype gets its own shape file. */
 function frameTypeOf(data: string): string {
   try {
-    const parsed = JSON.parse(data) as { type?: unknown }
-    return typeof parsed.type === 'string' ? parsed.type : 'untyped'
+    const parsed = JSON.parse(data) as { type?: unknown; subtype?: unknown }
+    if (typeof parsed.type !== 'string') return 'untyped'
+    return parsed.type === 'message' && typeof parsed.subtype === 'string' ? `message.${parsed.subtype}` : parsed.type
   } catch {
     return 'not-json'
   }
@@ -366,6 +443,7 @@ function redact(value: unknown, key?: string): unknown {
     if (TS.test(value)) return '1700000000.000001'
     if (ID.test(value)) return `${value[0]}0REDACTED`
     if (/^https?:\/\//.test(value)) return 'https://redacted.invalid/'
+    if (/^wss?:\/\//.test(value)) return 'wss://redacted.invalid/'
     if (value.startsWith('xox')) return 'xoxc-redacted'
     return value === '' ? '' : 'redacted'
   }
