@@ -10,7 +10,9 @@
  * scope can close.
  *
  * The boot window is the user's quiet window (the `quietDays` pref, the
- * same one the sidebar reads), read when the sync starts.
+ * same one the sidebar reads), read when the sync starts. Against the fake
+ * (`EngineConfig.fakeSlackUrl`) the complete follow pass runs with every
+ * catch-up instead of hourly.
  *
  * `phases` is the sync's phase while one runs, `undefined` otherwise; the
  * composition layer folds it into `engine.status`.
@@ -20,6 +22,7 @@ import { quietDaysOf } from '@juno/domain'
 import type { SlackAuthRequired } from '@juno/slack'
 import { prefs } from '@juno/store'
 import { runSync, syncConfigLayer, type SyncPhase } from '@juno/sync'
+import { EngineConfig } from '../config'
 import { Session, type ActiveSession } from './Session'
 import { Workspace } from '../workspace'
 
@@ -30,11 +33,12 @@ export class SyncRunner extends Context.Service<
     readonly phases: Stream.Stream<SyncPhase | undefined>
   }
 >()('juno/engine/SyncRunner') {
-  static readonly layer: Layer.Layer<SyncRunner, never, Session | Workspace> = Layer.effect(
+  static readonly layer: Layer.Layer<SyncRunner, never, Session | Workspace | EngineConfig> = Layer.effect(
     SyncRunner,
     Effect.gen(function* () {
       const session = yield* Session
       const workspace = yield* Workspace
+      const engineConfig = yield* EngineConfig
       const scope = yield* Effect.scope
       const phase = yield* SubscriptionRef.make<SyncPhase | undefined>(undefined)
       let running: { readonly active: ActiveSession; readonly fiber: Fiber.Fiber<never, SlackAuthRequired> } | undefined
@@ -57,7 +61,13 @@ export class SyncRunner extends Context.Service<
           const program = runSync({ onPhase: (next) => SubscriptionRef.set(phase, next) }).pipe(
             Effect.provide(active.context),
             Effect.provide(open.context),
-            Effect.provide(syncConfigLayer({ quietDays: quietDaysOf({ now: 0, ...(typeof quietDays === 'number' ? { quietDays } : {}) }) })),
+            Effect.provide(
+              syncConfigLayer({
+                quietDays: quietDaysOf({ now: 0, ...(typeof quietDays === 'number' ? { quietDays } : {}) }),
+                // Against the fake the complete follow pass runs with every catch-up, so tests see it each time.
+                ...(engineConfig.fakeSlackUrl === undefined ? {} : { followPassMillis: 0 }),
+              }),
+            ),
             Effect.scoped,
           )
           const fiber = yield* Effect.forkIn(program, active.scope)

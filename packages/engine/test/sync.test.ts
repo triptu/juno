@@ -158,8 +158,9 @@ describe('cold boot', () => {
       'api:client.userBoot': 1,
       'api:users.prefs.get': 1,
       'api:client.counts': 1,
-      // The fixture follows 12 threads; Slack pages them 10 at a time.
-      'api:subscriptions.thread.getView': 2,
+      // The fixture follows 12 threads; Slack pages them 10 at a time. Two pages back to the window at the
+      // boot, then the complete pass after it (against the fake it runs with every catch-up).
+      'api:subscriptions.thread.getView': 4,
       // A conversation whose only recent activity is a reply under an older root has nothing for history in the window.
       'api:conversations.history': activeMains,
       // The latest reply of the unfollowed threads with recent activity, for their preview.
@@ -275,7 +276,8 @@ describe('warm boot', () => {
       'api:client.userBoot': 1,
       'api:client.counts': 1,
       'api:conversations.history': 1,
-      'api:subscriptions.thread.getView': 2,
+      // Back to the window, then the complete pass.
+      'api:subscriptions.thread.getView': 4,
       'api:search.modules.messages': 1,
       // The searched reply is newer than its root's counters, so the root is fetched for Slack's reply_count.
       'api:conversations.replies': 1,
@@ -568,8 +570,9 @@ describe('followed threads past one getView page (review M3 finding 2)', () => {
       'every thread read and the new follow',
     )
     expect(rows.find((r) => r.id === flaky)).toMatchObject({ subscribed: true })
-    // 12 fixture follows, 25 seeded and the new one: four pages of ten.
-    expect(apiCalls(second, 'subscriptions.thread.getView')).toHaveLength(4)
+    await quiet(second)
+    // 12 fixture follows, 25 seeded and the new one: four pages of ten back to the window, and four in the complete pass.
+    expect(apiCalls(second, 'subscriptions.thread.getView')).toHaveLength(8)
   })
 })
 

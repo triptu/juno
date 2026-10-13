@@ -73,8 +73,8 @@ describe('reconnect', () => {
       'api:conversations.info': 1,
       // The two conversations whose latest moved.
       'api:conversations.history': 2,
-      // Every followed thread, ten a page.
-      'api:subscriptions.thread.getView': 2,
+      // One page back to the last sync (its last thread is older), then the complete pass of two pages.
+      'api:subscriptions.thread.getView': 3,
       // The root of the one stored follow the list left out.
       'api:conversations.replies': 1,
       'api:search.modules.messages': 1,
@@ -97,7 +97,8 @@ describe('reconnect', () => {
     })
     const rows = await engine.rowsUntil((list) => threads.every((t) => list.find((r) => r.id === t.id)?.unreadCount === 1), 'every thread unread again')
     expect(rows.filter((r) => threads.some((t) => t.id === r.id))).toHaveLength(15)
-    expect(apiCalls(engine, 'subscriptions.thread.getView')).toHaveLength(3)
+    // One page back to the last sync, then the complete pass: 27 followed threads, three pages.
+    expect(apiCalls(engine, 'subscriptions.thread.getView')).toHaveLength(4)
   })
 
   it('a channel_marked that lands while client.counts is in flight is not undone by the older answer', async () => {

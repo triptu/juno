@@ -4,8 +4,10 @@
  * It opens the socket first (so nothing during backfill is lost), then boots
  * cold or warm, then stays live: every socket event is one transaction, a
  * reconnect runs the catch-up of architecture 5.8, and a discovery sweep
- * runs every `sweepIntervalMillis`. Boot, catch-up and sweep share one
- * permit so two never interleave; events never wait for them.
+ * runs every `sweepIntervalMillis`. After the boot, and then with a catch-up
+ * or sweep at most every `followPassMillis`, the complete pass over the
+ * followed threads runs (`followPass`). Boot, catch-up, sweep and that pass
+ * share one permit so two never interleave; events never wait for them.
  *
  * Failures: a fatal auth condition from the socket or from any call, boot,
  * catch-up, sweep or root fetch included, fails the effect with
@@ -20,7 +22,7 @@ import { SlackApi, SlackAuthRequired, SlackEdge, SlackSession, SlackSocket, type
 import { Invalidation, StoreReader, StoreWriter, transaction } from '@juno/store'
 import { Clock, Effect, FiberSet, Queue, Scope, Semaphore } from 'effect'
 import { Stream } from 'effect'
-import { bootState, catchUp, coldBoot, warmBoot, type BootState, type Phase } from './boot'
+import { bootState, catchUp, coldBoot, followPass, warmBoot, type BootState, type Phase } from './boot'
 import { SyncConfig } from './config'
 import type { RootFetch, SyncContext } from './context'
 import { applyFrame } from './events'
@@ -55,7 +57,7 @@ export const runSync = (options: RunSyncOptions): Effect.Effect<never, SlackAuth
       unknownUsers: new Set(),
       lateReactions: new Map(),
     }
-    const state = { connected: false, booted: false, lastBoot: undefined as BootState | undefined }
+    const state = { connected: false, booted: false, lastBoot: undefined as BootState | undefined, lastFollowPass: undefined as number | undefined }
     const work = yield* Semaphore.make(1)
     const phase = options.onPhase
     const settle = () => phase(state.connected ? { _tag: 'live' } : { _tag: 'offline' })
@@ -67,7 +69,22 @@ export const runSync = (options: RunSyncOptions): Effect.Effect<never, SlackAuth
     yield* transaction(clearPendingFollows).pipe(Effect.catchCause((cause) => Effect.logError('sync: pending follows not cleared', { cause })))
     const events = yield* socket.events
 
-    /** The catch-up after a reconnect, under the work permit. */
+    /**
+     * The complete pass over the followed threads (`followPass`), when the
+     * last one started more than `followPassMillis` ago. After the phase has
+     * settled: it runs on the background lane and can take minutes.
+     */
+    const followPassIfDue = Effect.gen(function* () {
+      const now = yield* Clock.currentTimeMillis
+      if (state.lastFollowPass !== undefined && now - state.lastFollowPass < config.followPassMillis) return
+      yield* followPass(ctx)
+      state.lastFollowPass = now
+    }).pipe(
+      work.withPermit,
+      Effect.catchIf(isNotAuth, (error) => Effect.logWarning('sync: follow pass failed', { tag: error._tag })),
+    )
+
+    /** The catch-up after a reconnect, under the work permit, then the follow pass if it is due. */
     const reconcile = Effect.gen(function* () {
       const previous = state.lastBoot ?? (yield* bootState())
       if (previous === undefined) return
@@ -78,6 +95,7 @@ export const runSync = (options: RunSyncOptions): Effect.Effect<never, SlackAuth
       Effect.tapError((error) => Effect.logWarning('sync: catch-up failed', { tag: error._tag })),
       Effect.andThen(settle),
       Effect.catchIf(isNotAuth, () => settle()),
+      Effect.andThen(followPassIfDue),
     )
 
     const handle = (event: SocketEvent): Effect.Effect<void, never, SyncServices | Scope.Scope> => {
@@ -112,6 +130,7 @@ export const runSync = (options: RunSyncOptions): Effect.Effect<never, SlackAuth
     /** A `force_reload`: boot again from the current store. */
     const reboot = bootOnce.pipe(
       Effect.andThen(settle),
+      Effect.andThen(followPassIfDue),
       Effect.catchIf(isNotAuth, (error) => Effect.logWarning('sync: reboot failed', { tag: error._tag })),
     )
 
@@ -127,6 +146,7 @@ export const runSync = (options: RunSyncOptions): Effect.Effect<never, SlackAuth
       }
       state.booted = true
       yield* settle()
+      yield* followPassIfDue
       // The periodic discovery sweep while live.
       while (true) {
         yield* Effect.sleep(config.sweepIntervalMillis)

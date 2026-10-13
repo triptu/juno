@@ -5,7 +5,7 @@
  *
  * Cold boot, in order: `client.userBoot` and `users.prefs.get`,
  * `client.counts`, the followed threads from `subscriptions.thread.getView`
- * (10 per page live, paged to the end), one history page per active conversation (newest first,
+ * (10 per page live, paged back to the quiet window), one history page per active conversation (newest first,
  * background lane, skipping conversations an interrupted boot already
  * covered), unknown users from the edge, a latest-reply fetch for the
  * unfollowed threads with the most recent activity so their rows have a
@@ -14,10 +14,11 @@
  *
  * Warm boot: `client.userBoot`, a full `client.counts` (membership is
  * derived from it), history since the synced range for conversations whose
- * `latest` moved, `getView` paged to the end with the stored follows it
- * left out looked up by root, the discovery sweep for the gap, users. The
- * reconnect catch-up and the sweep are the same without the workspace
- * refresh and with `counts_last_fetched`.
+ * `latest` moved, `getView` back to the window, the discovery sweep for
+ * the gap, users. The reconnect catch-up and the sweep are the same without
+ * the workspace refresh, with `counts_last_fetched`, and with `getView` back
+ * to the last moment the store was in step. `followPass` reads the whole
+ * followed list and checks the follows it left out; `runSync` schedules it.
  */
 import { compareTs, maxTs, millisToTs, type Ts, type UsergroupId } from '@juno/domain'
 import { SlackApi, type SlackApiError } from '@juno/slack'
@@ -191,35 +192,44 @@ const applyThreadView = (ctx: SyncContext, view: ThreadView, requestedAt: Ts): E
   })
 
 /**
- * Every followed thread, newest activity first, page after page to the end.
- * Live a page holds 10 threads whatever `limit` says (research section 10).
- * Pages with activity since `until` (the window at a boot, the last moment
- * the store was in step at a reconnect) are on the interactive lane, so the
- * sidebar is current first; the rest are on the background lane.
+ * Followed threads from `subscriptions.thread.getView`, newest activity
+ * first, 10 per page live whatever `limit` says (research section 10).
  *
- * Then every stored follow the complete list left out is looked up by its
- * root, which says `subscribed` explicitly (`probeUnlisted`). Absence from
- * the list is never read as "unfollowed" by itself (specs/follow.qnt:
- * `startScan` .. `finishScan`, then `probeAbsent`).
+ * A recent pass (`complete: false`, the boots and every catch-up) pages on
+ * the interactive lane until the last root on a page is older than `until`
+ * (the window at a boot, the last moment the store was in step at a
+ * reconnect). A complete pass (`followPass`) pages to the end on the
+ * background lane and then looks up every stored follow the complete list
+ * left out (`probeUnlisted`): absence from a list is never read as
+ * "unfollowed" by itself, and a partial list concludes nothing
+ * (specs/follow.qnt: `startScan` .. `finishScan`, then `probeAbsent`).
+ *
+ * A thread whose activity is inside the window is applied in full (root,
+ * replies, read pointer, coverage); an older one only has its follow flag
+ * and Slack's pointer written, since it is not a row until it gets a reply.
  */
-const loadThreadViews = (ctx: SyncContext, until: Ts): Effect.Effect<void, BootError, BootServices> =>
+const loadThreadViews = (
+  ctx: SyncContext,
+  options: { readonly until: Ts; readonly windowStart: Ts; readonly complete: boolean },
+): Effect.Effect<void, BootError, BootServices> =>
   Effect.gen(function* () {
     const api = yield* SlackApi
     const listed = new Set<string>()
     let firstRequestedAt: Ts | undefined
     let current: Ts | undefined
-    let recent = true
     while (true) {
       const requestedAt = yield* nowTs
       firstRequestedAt ??= requestedAt
       const page = yield* api.call(
         'subscriptions.thread.getView',
         { limit: ctx.config.getViewPageLimit, ...(current === undefined ? {} : { current_ts: current }) },
-        { lane: recent ? 'interactive' : 'background', reason: 'threads' },
+        { lane: options.complete ? 'background' : 'interactive', reason: 'threads' },
       )
       for (const view of page.threads) {
         listed.add(`${view.root_msg.channel}:${view.root_msg.ts}`)
-        yield* applyThreadView(ctx, view, requestedAt)
+        const activity = view.root_msg.latest_reply ?? view.root_msg.ts
+        if (compareTs(activity, options.windowStart) >= 0) yield* applyThreadView(ctx, view, requestedAt)
+        else yield* transaction(setThreadSub(view.root_msg.channel, view.root_msg.ts, view.root_msg.subscribed ?? true, view.root_msg.last_read, { kind: 'page', requestedAt }))
       }
       const last = page.threads.at(-1)
       const lastActivity = last?.root_msg.latest_reply ?? last?.root_msg.ts
@@ -229,11 +239,23 @@ const loadThreadViews = (ctx: SyncContext, until: Ts): Effect.Effect<void, BootE
         break
       }
       if (!page.has_more) break
-      if (compareTs(lastActivity, until) < 0) recent = false
+      if (!options.complete && compareTs(lastActivity, options.until) < 0) return
       current = lastActivity
       yield* Effect.yieldNow
     }
     yield* probeUnlisted(ctx, listed, firstRequestedAt)
+  })
+
+/**
+ * The complete pass over every followed thread, then the lookup of stored
+ * follows it left out. On the background lane. `runSync` runs it after a
+ * boot and then at most every `SyncConfig.followPassMillis`, because a
+ * workspace can follow thousands of threads (one call per 10).
+ */
+export const followPass = (ctx: SyncContext): Effect.Effect<void, BootError, BootServices> =>
+  Effect.gen(function* () {
+    const windowStart = millisToTs(yield* windowStartMillis(ctx))
+    yield* loadThreadViews(ctx, { until: yield* nowTs, windowStart, complete: true })
   })
 
 /**
@@ -363,7 +385,7 @@ export const coldBoot = (ctx: SyncContext, phase: Phase): Effect.Effect<void, Bo
     const start = millisToTs(windowStart)
     yield* loadWorkspace(ctx, true)
     const counts = yield* loadCounts(ctx, undefined)
-    yield* loadThreadViews(ctx, start)
+    yield* loadThreadViews(ctx, { until: start, windowStart: start, complete: false })
     const active = yield* activeConversations(counts.entries, start)
     yield* phase({ _tag: 'catching-up', done: 0, total: active.length })
     let done = 0
@@ -389,7 +411,7 @@ export const coldBoot = (ctx: SyncContext, phase: Phase): Effect.Effect<void, Bo
 export interface CatchUpOptions {
   /** Refresh team, conversations and self first, and take the full counts list (warm boot: yes; reconnect: no). */
   readonly refreshWorkspace: boolean
-  /** Page the followed threads again, all of them; activity since the window (warm boot) or `lastSyncAt` (reconnect) first. */
+  /** Page the followed threads with activity since the window (warm boot) or `lastSyncAt` (reconnect). */
   readonly refreshThreads: boolean
 }
 
@@ -420,8 +442,11 @@ export const catchUp = (ctx: SyncContext, previous: BootState, phase: Phase, opt
       if (moved.length > 0) yield* phase({ _tag: 'catching-up', done: ++done, total: moved.length })
       yield* Effect.yieldNow
     }
-    // Followed threads: the whole list, the part with activity since the store was last in step first.
-    if (options.refreshThreads) yield* loadThreadViews(ctx, options.refreshWorkspace ? start : maxTs(start, millisToTs(previous.lastSyncAt)))
+    // Followed threads with activity since the store was last in step; the complete pass is `followPass`.
+    if (options.refreshThreads) {
+      const until = options.refreshWorkspace ? start : maxTs(start, millisToTs(previous.lastSyncAt))
+      yield* loadThreadViews(ctx, { until, windowStart: start, complete: false })
+    }
     yield* discoverSince(ctx, previous.lastSyncAt, counts.entries, {})
     yield* fillUsers(ctx)
     const state: BootState = {
