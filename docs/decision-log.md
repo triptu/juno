@@ -1,0 +1,32 @@
+# Decision log
+
+A short, dated record of product and engineering decisions, newest first. Big structural decisions also get an ADR in `docs/decisions/`. Times are local (IST). A `~` means the time was reconstructed from nearby commits.
+
+Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
+
+- 10-13 10:50 · Tushar · The gallery follows the state-machine pattern; break passes run at each UI milestone and before shipping; layout shift must never happen (automated guard in tests).
+- 10-13 10:48 · Orchestrator · Unfollowed threads start as read at first sign-in, so Juno does not open with hundreds of unread topics. Waiting for Tushar to confirm.
+- 10-13 10:44 · Tushar · Sidebar row Resolve is an icon-only check button at the right of the meta line, in a reserved slot. The time stays. No layout shift on hover.
+- 10-13 10:40 · Tushar · Unread counts stay soft grey; coral counts felt loud.
+- 10-13 10:35 · Tushar · Look: Figtree UI font, Coral accent, rounder shapes (options C1 + D1). Accent colour becomes a user preference. The dark theme needs a redesign; light is good.
+- 10-13 10:35 · Tushar · Live Slack: read-only, plus writes to the self-DM or a new private channel with only Tushar in it.
+- 10-13 10:30 · Orchestrator · Store the imported dev session in a Juno-owned keychain item so the live smoke does not ask for "Slack Safe Storage" every run.
+- 10-13 09:40 · Tushar · People show their Slack profile photos. Channels get a client-only icon and colour, auto-assigned and changeable.
+- 10-13 ~09:35 · Tushar · Logo: laptop-two (a seated j at an open laptop, which is also a message with two replies).
+- 10-13 ~04:20 · Tushar · Friendly layer on top of the calm design; Phosphor icons instead of Lucide.
+- 10-13 ~01:00 · Tushar · Tushar owns the product and spec. The handoff's placeholder name is removed everywhere.
+- 10-13 ~00:50 · Tushar · Run a better-interface design review at each UI milestone.
+- 10-13 00:12 · Orchestrator · Slack wire shapes live in one package, `@juno/slack-schema`, with one branded `Ts` (from the M1 code review).
+- 10-12 23:16 · Orchestrator · The renderer and engine talk over `effect/rpc` on a MessagePort (spike result, ADR 0009).
+- 10-12 23:16 · Orchestrator · Lists use in-flow rows with `content-visibility: auto`. `@tanstack/react-virtual` is the only allowed virtualization library.
+- 10-12 ~19:30 · Tushar · E2E tests use a typed, plain-language driver in Playwright, not Maestro or Gherkin.
+- 10-12 ~19:20 · Tushar · Performance is a first-class feature: rows activate on mouse down, there are budgets and regression tests, and a performance reviewer looks at each milestone.
+- 10-12 19:04 · Orchestrator · Engine in an Electron utility process; Electron `net` for Slack calls; two SQLite databases per workspace (disposable cache and durable user data); field-level merge rules.
+- 10-12 19:04 · Orchestrator · Keep many small packages, even though a reviewer suggested merging five into the engine. Tushar asked for a package per smaller thing.
+- 10-12 ~19:00 · Orchestrator · Not Enterprise Grid (checked the local Slack config), so Grid support can wait.
+- 10-12 ~18:55 · Tushar · Sidebar shows every thread with recent activity plus each channel's Main. Resolve is local and marks read. No undo for sends; edit and delete own messages instead. Full file upload in v1.
+- 10-12 ~18:30 · Tushar · Ship the default design only (tweaks later). Pinned and resolved topics stay in Pinned with a check. New DMs can go to anyone.
+- 10-12 ~18:15 · Orchestrator · Effect 4 with `@effect/atom-react`; `@earendil-works/pi-ai` with OpenRouter; pnpm workspaces; electron-vite; Playwright.
+- 10-12 ~17:50 · Tushar · Sign in two ways: Juno's own Slack sign-in window, and import from the installed Slack app.
+- 10-12 ~17:50 · Tushar · Free fonts only, bundled locally (no licensed Söhne or Meraki).
+- 10-12 ~17:45 · Tushar · Build Juno on Electron, React, TypeScript, StyleX, Effect and pi-ai with OpenRouter, as a monorepo, by reverse engineering Slack's own client.

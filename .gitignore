@@ -17,3 +17,4 @@ test-results/
 *.otf
 .playwright-mcp/
 .claude/worktrees/
+.juno-status/
