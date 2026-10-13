@@ -7,6 +7,19 @@ import type { Person, TopicRow } from '@juno/contract'
 
 export const NOW = 1_760_000_000_000
 
+/**
+ * Topic art recipes in the vocabulary (`@juno/topic-art`), from the design
+ * study's examples. A row without one shows the Tide placeholder, as a
+ * topic does until its art is drawn.
+ */
+export const art = {
+  database: '<svg viewBox="0 0 40 40" data-hue="teal">\n  <path d="M9 11 V29 A11 4.5 0 0 0 31 29 V11"/>\n  <path d="M9 20 A11 4.5 0 0 0 31 20" detail="1"/>\n  <ellipse cx="20" cy="11" rx="11" ry="4.5" fill="soft"/>\n  <circle cx="26" cy="29" r="2" fill="accent" stroke="none" detail="1"/>\n</svg>',
+  calendar: '<svg viewBox="0 0 40 40" data-hue="periwinkle">\n  <rect x="7" y="10" width="26" height="23" rx="5" fill="soft"/>\n  <line x1="7" y1="17" x2="33" y2="17"/>\n  <line x1="13" y1="7" x2="13" y2="12"/>\n  <line x1="27" y1="7" x2="27" y2="12"/>\n  <circle cx="20" cy="25" r="2.2" fill="accent" stroke="none"/>\n</svg>',
+  people: '<svg viewBox="0 0 40 40" data-hue="sage">\n  <circle cx="15" cy="13" r="5" fill="soft"/>\n  <path d="M6 33 C6 25 10 22 15 22 C20 22 24 25 24 33"/>\n  <circle cx="28" cy="15" r="4" fill="soft" detail="1"/>\n  <path d="M25 31 C26 26 27 24 28.5 24 C32 24 34 27 34 33" detail="1"/>\n</svg>',
+  coins: '<svg viewBox="0 0 40 40" data-hue="amber">\n  <g>\n    <ellipse cx="18" cy="26" rx="11" ry="4.5" fill="soft"/>\n    <path d="M7 26 V21 A11 4.5 0 0 1 29 21 V26"/>\n    <path d="M7 21 A11 4.5 0 0 0 29 21"/>\n    <path d="M7 26 A11 4.5 0 0 0 29 26" detail="1"/>\n  </g>\n  <polyline points="22 15 27 10 33 13" stroke-width="2.5"/>\n  <circle cx="33" cy="13" r="2" fill="accent" stroke="none"/>\n</svg>',
+  bell: '<svg viewBox="0 0 40 40" data-hue="coral">\n  <path d="M11 27 V19 A9 9 0 0 1 29 19 V27 L32 31 H8 Z" fill="soft"/>\n  <path d="M16 31 A4 4 0 0 0 24 31" detail="1"/>\n  <line x1="20" y1="6" x2="20" y2="10"/>\n  <circle cx="27" cy="12" r="2.2" fill="accent" stroke="none" detail="1"/>\n</svg>',
+} as const
+
 const MINUTE = 60_000
 const HOUR = 60 * MINUTE
 const DAY = 24 * HOUR
@@ -92,6 +105,7 @@ export const rows = {
     channel: channels.eng,
     participants: [people.dev, people.leo, people.maya, people.sam],
     messageCount: 7,
+    art: art.database,
     ago: 4,
   }),
   /** Unread with a count: semibold title, subtle preview. */
@@ -118,6 +132,7 @@ export const rows = {
     messageCount: 3,
     unreadCount: 2,
     mentionsMe: true,
+    art: art.people,
     ago: 12,
   }),
   /** A channel's Main: the channel label as the title, the Main tag, a 99+ count. */
@@ -133,6 +148,7 @@ export const rows = {
     messageCount: 412,
     unreadCount: 128,
     tags: ['main'],
+    art: art.bell,
     ago: 3,
   }),
   /** Back after a resolve. */
@@ -161,6 +177,7 @@ export const rows = {
     messageCount: 3,
     unreadCount: 1,
     pinned: true,
+    art: art.calendar,
     ago: 38,
   }),
   /** Pinned and resolved: quieter, with a check, no Resolve on hover. */
@@ -179,6 +196,20 @@ export const rows = {
     resolved: true,
     canResolveOnHover: false,
     ago: DAY / MINUTE + 60,
+  }),
+  /** A DM's Main: the tile is the person's photo, never art. */
+  mayaMain: row({
+    id: 'm:D0MAYA',
+    kind: 'main',
+    title: 'Maya Chen',
+    titleSource: 'channel',
+    sender: 'Maya',
+    text: 'Sent you the deck. Tell me if the pricing slide reads.',
+    channel: channels.maya,
+    participants: [people.maya],
+    messageCount: 9,
+    tags: ['main'],
+    ago: 16,
   }),
   /** A DM thread, read, no photo for the partner. */
   packet: row({
