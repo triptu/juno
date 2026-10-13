@@ -17,6 +17,14 @@ export type OpId = typeof OpId.Type
 export const CardId = Schema.String.pipe(Schema.brand('CardId'))
 export type CardId = typeof CardId.Type
 
+/** One row of a Send message card: a child action with its own outcome. */
+export const ProposedMessageId = Schema.String.pipe(Schema.brand('ProposedMessageId'))
+export type ProposedMessageId = typeof ProposedMessageId.Type
+
+/** One option of a Question card. */
+export const QuestionOptionId = Schema.String.pipe(Schema.brand('QuestionOptionId'))
+export type QuestionOptionId = typeof QuestionOptionId.Type
+
 /** A background job: a subagent or a T3 Code session. */
 export const JobId = Schema.String.pipe(Schema.brand('JobId'))
 export type JobId = typeof JobId.Type
