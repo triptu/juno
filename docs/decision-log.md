@@ -4,6 +4,8 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-13 11:30 · Orchestrator · The socket connects without `start_args` (with it, real Slack never sends hello). Membership and read state come from `client.counts`, not `client.userBoot` (observed live).
+- 10-13 11:30 · Orchestrator · Add a read-only live sync dry run that prints only aggregate numbers, to validate sync against the real workspace before the sidebar UI.
 - 10-13 10:50 · Tushar · The gallery follows the state-machine pattern; break passes run at each UI milestone and before shipping; layout shift must never happen (automated guard in tests).
 - 10-13 10:48 · Orchestrator · Unfollowed threads start as read at first sign-in, so Juno does not open with hundreds of unread topics. Waiting for Tushar to confirm.
 - 10-13 10:44 · Tushar · Sidebar row Resolve is an icon-only check button at the right of the meta line, in a reserved slot. The time stays. No layout shift on hover.
