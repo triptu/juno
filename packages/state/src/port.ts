@@ -36,6 +36,12 @@ export class EngineFailed extends Error {
 
 const decodeResult = Schema.decodeUnknownSync(PortRequestResult)
 
+/** Asks main to start the engine again after its supervisor gave up. */
+export function requestEngineRestart(): Promise<void> {
+  const win = globalThis as unknown as WindowLike
+  return win.juno.engine.restart().then(() => undefined)
+}
+
 export function acquireRendererPort(): Promise<PortLike> {
   const win = globalThis as unknown as WindowLike
   return new Promise((resolve, reject) => {

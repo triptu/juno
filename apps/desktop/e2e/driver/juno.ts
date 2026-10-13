@@ -57,6 +57,11 @@ export class SidebarRow {
     await expect(this.root).toBeFocused()
   }
 
+  /** The row is not in the list at all. */
+  async expectAbsent(): Promise<void> {
+    await expect(this.root).toHaveCount(0)
+  }
+
   /** The title element, which names the row. */
   get titleText() {
     return this.root.locator('[id]').first()
@@ -148,8 +153,9 @@ export class Sidebar {
     await expect(this.section(section)).toHaveCount(0)
   }
 
+  /** A quick filter. Its name gains ", unread" while its dot shows. */
   filterButton(name: SidebarFilterName) {
-    return this.root.getByRole('group', { name: 'Quick filters' }).getByRole('button', { name, exact: true })
+    return this.root.getByRole('group', { name: 'Quick filters' }).getByRole('button', { name: new RegExp(`^${name}(, unread)?$`) })
   }
 
   get unreadToggle() {
@@ -167,10 +173,33 @@ export class Sidebar {
     await expect(this.unreadToggle).toHaveAttribute('aria-pressed', String(!was))
   }
 
-  /** The unread dot after a filter: a labelled image while shown, hidden (and invisible) otherwise. */
+  /** The unread dot after a filter, which a screen reader hears as part of the filter's name. */
   async expectFilterDot(name: 'Channels' | 'DMs', shown: boolean): Promise<void> {
-    const dot = this.filterButton(name).getByRole('img', { name: `Unread ${name === 'DMs' ? 'DMs' : 'channels'}` })
-    await expect(dot).toHaveCount(shown ? 1 : 0)
+    await expect(this.filterButton(name)).toHaveAccessibleName(shown ? `${name}, unread` : name)
+  }
+
+  /** Clears the filters from the empty state. */
+  async clearFilters(): Promise<void> {
+    await this.list.getByRole('button', { name: 'Clear filters' }).click()
+    await expect(this.filterButton('All')).toHaveAttribute('aria-pressed', 'true')
+    await expect(this.unreadToggle).toHaveAttribute('aria-pressed', 'false')
+  }
+
+  /** The status line under the filters, shown when the list may be behind Slack. */
+  get syncStatus() {
+    return this.root.getByRole('status', { name: 'Sync status' })
+  }
+
+  get restartButton() {
+    return this.root.getByRole('region', { name: 'Sync' }).getByRole('button', { name: 'Restart' })
+  }
+
+  async expectSyncStatus(text: string | RegExp): Promise<void> {
+    await expect(this.syncStatus).toContainText(text, { timeout: 15_000 })
+  }
+
+  async expectNoSyncStatus(timeout = 15_000): Promise<void> {
+    await expect(this.syncStatus).toHaveCount(0, { timeout })
   }
 
   /**

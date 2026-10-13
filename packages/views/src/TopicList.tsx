@@ -1,5 +1,5 @@
 import * as stylex from '@stylexjs/stylex'
-import type { KeyboardEvent, ReactNode } from 'react'
+import type { FocusEvent, KeyboardEvent, ReactNode } from 'react'
 import { colors, spacing } from '@juno/tokens/tokens.stylex'
 import { Button, EmptyState, ScrollArea, Text } from '@juno/ui'
 
@@ -27,6 +27,10 @@ export interface TopicListProps {
   /** The window is full: say where the rest is instead of paging. */
   readonly truncated?: boolean
   readonly onClearFilters?: () => void
+  /** Opens All topics, offered by the quiet and filtered empty states. */
+  readonly onViewAll?: () => void
+  /** A row got focus, by keyboard or pointer. The owner moves the roving tabindex to it. */
+  readonly onRowFocus?: (id: string) => void
 }
 
 const labels: Record<TopicListSectionId, string> = { pinned: 'Pinned', recent: 'Recent' }
@@ -38,13 +42,20 @@ const labels: Record<TopicListSectionId, string> = { pinned: 'Pinned', recent: '
  * the pointer is over the list. Arrow keys move focus between rows; the
  * rows themselves activate on Enter.
  */
-export function TopicList({ sections, renderRow, empty, quietDays = 7, enterEmpty = true, truncated = false, onClearFilters }: TopicListProps) {
+export function TopicList({ sections, renderRow, empty, quietDays = 7, enterEmpty = true, truncated = false, onClearFilters, onViewAll, onRowFocus }: TopicListProps) {
   const shown = sections.filter((section) => section.ids.length > 0)
   const isEmpty = shown.length === 0
+  const onFocus =
+    onRowFocus === undefined
+      ? undefined
+      : (event: FocusEvent<HTMLDivElement>) => {
+          const target = event.target
+          if (target instanceof HTMLElement && target.matches(ROW) && target.dataset['topicId'] !== undefined) onRowFocus(target.dataset['topicId'])
+        }
   return (
-    <ScrollArea role="group" aria-label="Topics" scrollbar="hover" onKeyDown={moveFocus} sx={styles.scroller}>
+    <ScrollArea role="group" aria-label="Topics" scrollbar="hover" onKeyDown={moveFocus} onFocus={onFocus} sx={styles.scroller}>
       {isEmpty && empty !== undefined ? (
-        <Empty kind={empty} quietDays={quietDays} enter={enterEmpty} onClearFilters={onClearFilters} />
+        <Empty kind={empty} quietDays={quietDays} enter={enterEmpty} onClearFilters={onClearFilters} onViewAll={onViewAll} />
       ) : (
         shown.map((section) => (
           <section key={section.id} aria-label={labels[section.id]} data-topic-section={section.id} {...stylex.props(styles.section)}>
@@ -69,11 +80,26 @@ export function TopicList({ sections, renderRow, empty, quietDays = 7, enterEmpt
   )
 }
 
-function Empty({ kind, quietDays, enter, onClearFilters }: { readonly kind: TopicListEmpty; readonly quietDays: number; readonly enter: boolean; readonly onClearFilters?: () => void }) {
+interface EmptyProps {
+  readonly kind: TopicListEmpty
+  readonly quietDays: number
+  readonly enter: boolean
+  readonly onClearFilters?: (() => void) | undefined
+  readonly onViewAll?: (() => void) | undefined
+}
+
+/** The empty list: why it is empty, and the next step (SPEC section 16). */
+function Empty({ kind, quietDays, enter, onClearFilters, onViewAll }: EmptyProps) {
   const clear =
     onClearFilters === undefined ? undefined : (
       <Button variant="secondary" size="md" onClick={onClearFilters}>
         Clear filters
+      </Button>
+    )
+  const viewAll = (variant: 'secondary' | 'ghost') =>
+    onViewAll === undefined ? undefined : (
+      <Button variant={variant} size="md" onClick={onViewAll}>
+        View all topics
       </Button>
     )
   switch (kind) {
@@ -87,10 +113,21 @@ function Empty({ kind, quietDays, enter, onClearFilters }: { readonly kind: Topi
           enter={enter}
         />
       )
-    case 'filtered':
-      return <EmptyState illustration="nothing-here" title="Nothing here with these filters" body="Older and resolved topics live in All topics." action={clear} enter={enter} />
+    case 'filtered': {
+      const second = viewAll('ghost')
+      const action =
+        clear !== undefined && second !== undefined ? (
+          <span {...stylex.props(styles.actions)}>
+            {clear}
+            {second}
+          </span>
+        ) : (
+          (clear ?? second)
+        )
+      return <EmptyState illustration="nothing-here" title="Nothing here with these filters" body="Older and resolved topics live in All topics." action={action} enter={enter} />
+    }
     case 'quiet':
-      return <EmptyState illustration="nothing-here" title="It's quiet" body={`Topics with activity in the last ${quietDays} days show up here.`} enter={enter} />
+      return <EmptyState illustration="nothing-here" title="It's quiet" body={`Topics with activity in the last ${quietDays} days show up here.`} action={viewAll('secondary')} enter={enter} />
   }
 }
 
@@ -138,6 +175,12 @@ const styles = stylex.create({
     flexDirection: 'column',
     gap: spacing['--space-0-5'],
     minWidth: 0,
+  },
+  actions: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: spacing['--space-2'],
   },
   footer: {
     textAlign: 'center',

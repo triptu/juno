@@ -126,9 +126,20 @@ export const sidebarSectionsAtom = Atom.make((get): SidebarSections => {
   return { ready: window.meta.seq > 0, pinned, recent, total: window.meta.total, filter: window.filter }
 }).pipe(Atom.withEquality(sameSections))
 
-/** The row that takes Tab focus: the selection while it is shown, otherwise the first row. */
+/**
+ * The row that had focus last, by keyboard or pointer. Tab returns to it, so
+ * after arrowing to a row, Tab reaches that row's Resolve button.
+ */
+export const focusedTopicAtom = Atom.make<string | undefined>(undefined).pipe(Atom.keepAlive)
+
+/**
+ * The row that takes Tab focus (roving tabindex): the row focused last while
+ * it is shown, else the selection while it is shown, else the first row.
+ */
 const currentTopicAtom = Atom.make((get): string | undefined => {
   const window = get(sidebarListAtom)
+  const focused = get(focusedTopicAtom)
+  if (focused !== undefined && window.rows.has(focused)) return focused
   const selected = get(selectedTopicAtom)
   return selected !== undefined && window.rows.has(selected) ? selected : window.order[0]
 })
