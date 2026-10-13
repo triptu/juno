@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-13 16:51 · Orchestrator · Sidebar rule implemented: followed threads, unread-mention threads Slack has said nothing about, and Main for channels with any activity in the window. An explicit unfollow hides the thread. Subscribe and unsubscribe mirror through an outbox seam and revert on failure. Real workspace: 452 rows (303 threads, 149 Main).
 - 10-13 16:00 · Orchestrator · `@juno/ai` exists: `AiProvider` with `decide`, `generate` and streaming `chat`; a task table where tier (model, timeout) and shape (structured with a TypeBox schema, or text) are separate; nothing fails, a missing key or a bad answer is a `NoDecision` value. Defaults `anthropic/claude-haiku-5.5` for decisions and `anthropic/claude-sonnet-5.5` for generation, from OpenRouter's list that day. `pnpm ai:eval` judges prompt quality by eye, with the fake or live.
 - 10-13 15:52 · Tushar · The sidebar scrollbar is hidden unless the pointer is over the list, with no layout shift. Built as a reusable scroll-area option so other areas can follow.
 - 10-13 15:22 · Tushar · New subagents run on the second Claude instance (claudeAgent_2airclaude) via delegate_task; the orchestrator stays here. The two agents stopped by this instance's Fable limit continue there from their worktrees.
