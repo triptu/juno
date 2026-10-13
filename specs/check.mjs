@@ -1,15 +1,16 @@
-import { actionCases } from './agent-checks.mjs'
 import { spawnSync } from 'node:child_process'
 import { mkdirSync, readdirSync, readFileSync, rmSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { actionCases, recoveryCases } from './agent-checks.mjs'
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)))
 const require = createRequire(import.meta.url)
 const pkg = require.resolve('@informalsystems/quint/package.json')
 const cli = join(dirname(pkg), 'dist/src/cli.js')
 const tracesOnly = process.argv.includes('--traces')
+const recoveryOnly = process.argv.includes('--recovery')
 const actionsOnly = process.argv.includes('--actions')
 const memoryOnly = process.argv.includes('--memory')
 const boundedOnly = process.argv.includes('--bounded')
@@ -29,9 +30,9 @@ function quint(args, { violation = false, timeout = 60000 } = {}) {
   // Keep Apalache's generated directory inside the ignored trace directory.
   const verify = args[0] === 'verify'
   const commandArgs = verify ? [args[0], join(root, args[1]), ...args.slice(2)] : args
-  const memoryVerify = verify && args[1].startsWith('specs/agent-')
+  const agentVerify = verify && args[1].startsWith('specs/agent-')
   const option = name => args[args.indexOf(name) + 1]
-  const command = memoryVerify ? [fileURLToPath(import.meta.url), '--verify-memory', JSON.stringify({
+  const command = agentVerify ? [fileURLToPath(import.meta.url), '--verify-agent', JSON.stringify({
     input: join(root, args[1]), main: option('--main'), init: 'init', step: option('--step'),
     invariant: option('--invariant'), maxSteps: Number(option('--max-steps')),
     apalacheVersion, verbosity: 1, backend: 'apalache',
@@ -84,7 +85,7 @@ function simulate(file, step, invariant, output, violation = false, randomized =
 // effects and lookup entries whose IDs occur in the compiled main module. The
 // module and all of its expressions remain unchanged. Run in a timed child just
 // like the CLI; this adapter uses the pinned Quint 0.33.0 pipeline.
-if (process.argv[2] === '--verify-memory') {
+if (process.argv[2] === '--verify-agent') {
   const commands = require(join(dirname(pkg), 'dist/src/cliCommands.js'))
   const { parseServerEndpoint } = require(join(dirname(pkg), 'dist/src/apalache.js'))
   const args = JSON.parse(process.argv[3])
@@ -105,7 +106,7 @@ if (process.argv[2] === '--verify-memory') {
     collect(compiled.mainModule)
     const keep = entries => new Map([...entries].filter(([id]) => ids.has(id)))
     const reduced = { ...compiled, types: keep(compiled.types), effects: keep(compiled.effects), table: keep(compiled.table) }
-    console.log(`Memory checker metadata: ${reduced.types.size}/${compiled.types.size} live type entries`)
+    console.log(`Agent checker metadata: ${reduced.types.size}/${compiled.types.size} live type entries`)
     result = await commands.verifySpec(reduced)
   }
   if (result.isLeft()) {
@@ -134,7 +135,7 @@ for (const file of readdirSync(join(root, 'specs')).filter(name => name.endsWith
   quint(['typecheck', `specs/${file}`])
 }
 
-if (!memoryOnly && !actionsOnly && !boundedOnly) {
+if (!memoryOnly && !actionsOnly && !recoveryOnly && !boundedOnly) {
   for (const file of ['follow', 'readstate']) {
     simulate(file, 'simulationStep', 'invariants', `${file}.itf.json`, false, true)
   }
@@ -153,7 +154,7 @@ if (!memoryOnly && !actionsOnly && !boundedOnly) {
 }
 
 // WP2 uses real transactions for both random runs and directed failure pairs.
-if (!boundedOnly && !actionsOnly) {
+if (!boundedOnly && !actionsOnly && !recoveryOnly) {
   const memoryOptions = { main: 'agent_memory' }
   simulate('agent-memory', 'simulationStep', 'invariants', 'agent-memory.itf.json', false, true,
     { ...memoryOptions, samples: tracesOnly ? 100 : 1000, steps: 140 })
@@ -193,15 +194,32 @@ if (!boundedOnly && !actionsOnly) {
   }
 }
 
-if (!boundedOnly && !memoryOnly) {
+if (!boundedOnly && !memoryOnly && !recoveryOnly) {
   const options = { main: 'agent_actions' }
   simulate('agent-actions', 'simulationStep', 'invariants', 'agent-actions.itf.json', false, true,
     { ...options, samples: tracesOnly ? 100 : 1000, steps: 100 })
   simulate('agent-actions', 'suiteStep', 'invariants', 'actions-corrected.itf.json', false, true,
     { ...options, init: 'suiteInit', samples: 1024, steps: 80,
       witnesses: ['reachedAgreement', ...actionCases.map((_, index) => `case${index}`)], requireCompletion: true })
+  simulate('agent-actions', 'clickedGrantStep', 'invariants', 'actions-clicked-grant.itf.json', false, false, options)
   for (const [schedule, invariant] of actionCases) {
     simulate('agent-actions', `${schedule}BugStep`, invariant, `actions-${schedule}-bug.itf.json`, true, false, options)
+  }
+}
+
+if (!boundedOnly && !memoryOnly && !actionsOnly) {
+  const options = { main: 'agent_recovery' }
+  simulate('agent-recovery', 'simulationStep', 'cooperativeSafety', 'agent-recovery.itf.json', false, true,
+    { ...options, samples: tracesOnly ? 100 : 1000, steps: 140 })
+  simulate('agent-recovery', 'suiteStep', 'cooperativeSafety', 'recovery-corrected.itf.json', false, true,
+    { ...options, init: 'suiteInit', samples: 1024, steps: 100,
+      witnesses: ['reachedAgreement', ...recoveryCases.map((_, index) => `case${index}`)], requireCompletion: true })
+  for (const [schedule, invariant] of recoveryCases) {
+    simulate('agent-recovery', `${schedule}BugStep`, invariant, `recovery-${schedule}-bug.itf.json`, true, false,
+      { ...options, steps: 100 })
+  }
+  for (const schedule of ['journalAhead', 'unsupportedSchema', 'cooperativeTransfer']) {
+    simulate('agent-recovery', `${schedule}Step`, 'cooperativeSafety', `recovery-${schedule}.itf.json`, false, false, options)
   }
 }
 
@@ -224,9 +242,9 @@ if (!tracesOnly) {
   if (!javaPath) {
     console.log('Mode: randomized simulator only (Java unavailable).')
     console.log(`Seed ${seed}; memory: 1000 random samples and all 25 corrected witnesses (unless --bounded).`)
-    console.log('Temporal formulas are typechecked only. Drain bounds: follow 64, read 48, memory 64.')
+    console.log('Temporal formulas are typechecked only. Drain bounds: follow 64, read 48, memory 64, actions 32, recovery 64.')
   } else {
-    if (!memoryOnly && !actionsOnly) {
+    if (!memoryOnly && !actionsOnly && !recoveryOnly) {
       for (const [file, step] of [['follow', 'step'], ['readstate', 'boundedStep']]) {
         quint(['verify', `specs/${file}-bounded.qnt`, '--main', `${file}_bounded`, '--step', step,
           '--invariant', 'boundedSafety', '--max-steps', '4',
@@ -242,18 +260,18 @@ if (!tracesOnly) {
         }
       }
     }
-    if (!actionsOnly) {
-    const memoryBounded = 'specs/agent-memory.qnt'
-    quint(['verify', memoryBounded, '--main', 'agent_memory_bounded',
-      '--step', 'boundedStep', '--invariant', 'boundedSafety', '--max-steps', '4',
-      '--apalache-version', apalacheVersion, '--verbosity', '1'])
-    for (const [step, violation] of [['boundedRaceBugStep', true], ['boundedRaceStep', false]]) {
+    if (!actionsOnly && !recoveryOnly) {
+      const memoryBounded = 'specs/agent-memory.qnt'
       quint(['verify', memoryBounded, '--main', 'agent_memory_bounded',
-        '--step', step, '--invariant', 'nodeInputsCurrent', '--max-steps', '6',
-        '--apalache-version', apalacheVersion, '--verbosity', '1'], { violation })
+        '--step', 'boundedStep', '--invariant', 'boundedSafety', '--max-steps', '4',
+        '--apalache-version', apalacheVersion, '--verbosity', '1'])
+      for (const [step, violation] of [['boundedRaceBugStep', true], ['boundedRaceStep', false]]) {
+        quint(['verify', memoryBounded, '--main', 'agent_memory_bounded',
+          '--step', step, '--invariant', 'nodeInputsCurrent', '--max-steps', '6',
+          '--apalache-version', apalacheVersion, '--verbosity', '1'], { violation })
+      }
     }
-    }
-    if (!memoryOnly) {
+    if (!memoryOnly && !recoveryOnly) {
       quint(['verify', 'specs/agent-actions.qnt', '--main', 'agent_actions_bounded', '--step', 'boundedStep',
         '--invariant', 'boundedSafety', '--max-steps', '4', '--apalache-version', apalacheVersion, '--verbosity', '1'])
       for (const [step, violation] of [['boundedRaceBugStep', true], ['boundedRaceStep', false]]) {
@@ -261,7 +279,15 @@ if (!tracesOnly) {
           '--invariant', 'pauseBlocksAuthorization', '--max-steps', '4', '--apalache-version', apalacheVersion, '--verbosity', '1'], { violation })
       }
     }
-    console.log(`Mode: ${boundedOnly ? 'bounded Apalache' : 'simulator and bounded Apalache'}${memoryOnly ? ' (memory only)' : ''}.`)
+    if (!memoryOnly && !actionsOnly) {
+      quint(['verify', 'specs/agent-recovery.qnt', '--main', 'agent_recovery_bounded', '--step', 'boundedStep',
+        '--invariant', 'boundedSafety', '--max-steps', '4', '--apalache-version', apalacheVersion, '--verbosity', '1'])
+      for (const [step, violation] of [['boundedRaceBugStep', true], ['boundedRaceStep', false]]) {
+        quint(['verify', 'specs/agent-recovery.qnt', '--main', 'agent_recovery_bounded', '--step', step,
+          '--invariant', 'singleLocalOwner', '--max-steps', '2', '--apalache-version', apalacheVersion, '--verbosity', '1'], { violation })
+      }
+    }
+    console.log(`Mode: ${boundedOnly ? 'bounded Apalache' : 'simulator and bounded Apalache'}${memoryOnly ? ' (memory only)' : actionsOnly ? ' (actions only)' : recoveryOnly ? ' (recovery only)' : ''}.`)
     console.log('Memory bounds: 4 archive transitions; 6 publication-race transitions. Temporal liveness is typechecked only.')
   }
 }
