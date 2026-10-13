@@ -311,8 +311,7 @@ export class Juno {
     const page = await opened
     await page.getByPlaceholder('Email').fill(options.email ?? 'tushar@juno-fake.test')
     await page.getByPlaceholder('Password').fill('password')
-    await page.getByRole('button', { name: 'Sign in' }).click()
-    await page.waitForEvent('close')
+    await Promise.all([page.waitForEvent('close'), page.getByRole('button', { name: 'Sign in' }).click()])
   }
 
   /** Clicks "Sign in to Slack" and closes the window without signing in. */

@@ -29,9 +29,7 @@ Small items noticed during work that are not yet assigned to a milestone. Remove
 - "View all topics" does nothing until the All topics page lands (M5).
 - Main rows: engine field for "threads started since Main was last read" (contract + topics query), wired to the TopicRow `newThreads` prop. After M4 WP1 merges.
 - Topic art track: placeholder is a library of free-form Tide-style shapes picked per topic, no container (owner decision 10-13).
-- Flaky: the sidebar hover layout-shift e2e test failed once during the unfollow-fix run and passed on rerun. Investigate in the maintenance pass.
-- Flaky: a sign-out e2e test timed out once during the row-footer run (passed on rerun). Track with the hover flake.
 - Topic view: the message's mention tint does not count the user's groups (`@group`), because the engine does not keep the groups from `client.userBoot` outside the sync. Keep them in `team` or hand them over through `SyncLink`.
 - Topic view: bot messages show the bot id as the sender name: `messages` does not keep `username` or `bot_profile`. Store the bot's name with the message.
-- Flaky: an unsubscribe-recovery engine test failed once during the WP2 run (passed on rerun). Check it alongside the other flakes.
-- Flaky: `reconnect.test.ts` "reads followed threads past the first getView page" counted 5 `getView` calls instead of 4 once in a full run on a loaded machine (passed 3 of 3 on rerun). Probably a second pass overlapping the reconnect.
+- Session durability: sign-in does not wait for main to finish writing `secrets.bin` before publishing ready. An immediate quit can race persistence; the relaunch test now waits for the saved session. Add a storage acknowledgement before reporting sign-in complete.
+- Sign-out: one loaded baseline run stalled after sync stopped, with Sign out disabled and the session still signed in. It did not recur in 40 loaded runs after the driver fix. Capture teardown stages if it returns.
