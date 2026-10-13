@@ -1,0 +1,17 @@
+{
+  "name": "@juno/agent-cards",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Juno Agent's card catalogue: card kinds and their schemas, canonical payloads, digests, child-action expansion and card status machines. No UI, no I/O.",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3"
+  },
+  "juno": {
+    "allowedDeps": []
+  }
+}

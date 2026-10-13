@@ -1,0 +1,28 @@
+{
+  "name": "@juno/agent-juno",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Juno as the agent's host, inside the engine: the AgentHost handlers (Slack reads, sends and resolve through the outbox, the open topic, presence, the notification gate). Never calls a model.",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@juno/agent-contract": "workspace:*",
+    "effect": "4.0.3"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3"
+  },
+  "juno": {
+    "allowedDeps": [
+      "@juno/agent-contract",
+      "@juno/contract",
+      "@juno/domain"
+    ]
+  }
+}
