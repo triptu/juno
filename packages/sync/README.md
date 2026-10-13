@@ -4,13 +4,14 @@ Slack into the store. Cold and warm boot, thread discovery, the merge rules, soc
 
 ## Public API
 
-- `runSync({ onPhase })`: the whole sync for one session, until interrupted. Needs the Slack client (`SlackApi`, `SlackEdge`, `SlackSocket`, `SlackSession`) and the store (`StoreWriter`, `StoreReader`, `Invalidation`) in its context, plus a `Scope`. It opens the socket first, boots cold (empty cache) or warm (`sync_state.boot` present), then stays live: every event is one transaction, a reconnect runs the catch-up, a discovery sweep runs every ten minutes. It fails only with `SlackAuthRequired`; the engine then ends the session.
+- `runSync({ onPhase, onFetcher?, openTopics? })`: the whole sync for one session, until interrupted. Needs the Slack client (`SlackApi`, `SlackEdge`, `SlackSocket`, `SlackSession`) and the store (`StoreWriter`, `StoreReader`, `Invalidation`) in its context, plus a `Scope`. It opens the socket first, boots cold (empty cache) or warm (`sync_state.boot` present), then stays live: every event is one transaction, a reconnect runs the catch-up, a discovery sweep runs every ten minutes. It fails only with `SlackAuthRequired`; the engine then ends the session.
 - `SyncPhase`: `booting`, `catching-up { done, total }`, `live`, `offline`. `onPhase` is called on every change; the engine folds it into `engine.status`.
 - `SyncConfig` / `syncConfigLayer({ ... })`: the quiet window, page sizes, sweep interval, `discovery: 'search' | 'history'`.
 - `reindexTopics(ids, { me })`, `reindexAll`: the one writer of `topic_index`. Call it at the end of any transaction that touched a topic's messages, reads or coverage. `topicsOfMessages(rows)` gives the ids a set of message rows belongs to.
 - `mergeMessage`, `mergeTombstone`, `mergeRootCounters`, `stubRoot`, `toMessageRow`: the pure merge rules, for tests and for the outbox work to come.
 - `threadSub`, `setThreadSub`, `clearThreadSub`, `beginPendingFollow`, `endPendingFollow`, `readMessage`, `readState`: the writer-side reads and writes the engine's commands share with the sync, so a command's transaction uses the same rows and fires the same keys. `setThreadSub` takes a `ThreadSubSource` (`event`, `page` or `command`) and applies the ordering rule below.
-- `syncKeys`: the invalidation keys the sync fires (`topics`, `{ topics: [id] }`, `{ messages: [topicId] }`, `conversations`, `users`, `team`, `channel_reads`, `thread_subs`, `{ topic_reads: [id] }`, `{ topic_overlay: [id] }`).
+- `syncKeys`: the invalidation keys the sync fires (`topics`, `{ topics: [id] }`, `{ messages: [topicId] }`, `conversations`, `users`, `team`, `channel_reads`, `thread_subs`, `{ topic_reads: [id] }`, `{ topic_overlay: [id] }`). A message write, and a change to its reactions, fires `{ messages: [...] }` for every topic that shows the message (`messageTopics`): Main and the thread for a root with replies, the thread and Main for a broadcast reply.
+- `TopicFetcher` (from `onFetcher`) and `fetchTopic`, `fetchOlder` (`open.ts`): what an opened topic needs from Slack, in the sync's context. See "Opening a topic" below.
 
 ## What it decides
 
@@ -28,6 +29,15 @@ Beyond the architecture document, these are the rules the code settled:
 - **Users.** Ids referenced by messages and DMs with no `users` row are fetched from the edge in chunks of 100 after the history pages; the topics whose preview waited for a name are re-indexed when the users land. Ids the edge reports in `failed_ids` (bots, Slack Connect users) are not asked for again in the session. The user groups the user belongs to (`userBoot.subteams.self`) count as mentions.
 - **Live shapes.** `hello.start` is a boolean live and is not read; `reconnect_url` arrives after `hello` and again every 30 to 60 s, and the socket keeps the latest one; `getView` pages by `current_ts = latest_reply` of the last root on the page; `unread_replies` is absent when nothing is unread. The fake sends the same shapes.
 - **Errors.** `SlackAuthRequired` from any step (the socket, a boot, a catch-up, the sweep, a root fetch) ends the sync; the catch-up and reboot fibers run in a `FiberSet` that `runSync` joins, so their failure reaches the engine. Any other boot failure sets the phase to `offline` and retries after 30 s; any other catch-up failure is logged and the phase settles. A store error while applying one event is logged and the event is skipped, so one bad frame does not end the stream.
+
+## Opening a topic
+
+`open.ts`, called only by the engine's `topics.open` and `messages.loadOlder` commands and by the reconnect step, never by a live query (architecture 5.5, M4):
+
+- A thread whose replies are not all stored: `conversations.replies` from the root, pages of 100, at most 500 messages (`OPEN_FETCH_MAX`); a thread longer than that starts at the read pointer, so every unread reply is stored. When the pages reach the end, `thread_cursors` records complete coverage from where they started, so the unread count is exact. Once every reply is stored, an open asks only for replies after the newest stored one.
+- Main: `conversations.history` since the newest synced range (one page of 50 when there is none), then older pages until history reaches the read pointer, at most 500 messages. Each page records its range in the same transaction as its messages, so the "N new" count is exact once the range reaches the pointer. A page with nothing more and no `oldest` bound covers back to the start of the conversation (`HISTORY_START`).
+- Older pages: a Main page is fetched only when the synced range that holds the first row has fewer than 100 stored messages before it; a thread page only while the stored replies have a gap at the start.
+- `runSync` hands the engine a `TopicFetcher` that runs these on the interactive lane in the sync's context, so stub roots it finds are fetched and unknown senders named in the background. When Slack rate-limits the call, the same fetch is queued on the background lane and the caller gets the error. After each reconnect and sweep, the topics `openTopics` names (the engine's open tabs) are fetched again.
 
 ## Follow state against `specs/follow.qnt`
 
@@ -53,7 +63,7 @@ The model preserves `acceptedUnfollow`, but the implemented rules violate it in 
 
 ## Known gaps
 
-- Edits, deletes and reactions that happen during a disconnect are recovered for threads by the search sweep (text) and otherwise only when the topic is opened (M4's refresh of the visible window). ADR 0011's `cached_latest_updates` path waits on the live smoke.
+- Edits, deletes and reactions that happen during a disconnect are recovered for threads by the search sweep (text) and otherwise only when the topic is opened or is open at the reconnect, and then only for messages newer than the stored ones (the open fetch asks for what is new, not for the whole window). ADR 0011's `cached_latest_updates` path waits on the live smoke.
 - A message first stored from a search match has no reaction state, files or blocks until a page or an event brings it.
 - A follow changed elsewhere during a drop, on a thread with no activity since the last sync, waits for the next window pass (at most an hour). A follow older than the window waits for its thread's next reply.
 - The sweep reads at most 150 matches per gap; a longer outage in a busy workspace misses older thread activity until the next sweep or open.

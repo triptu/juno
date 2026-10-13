@@ -18,11 +18,8 @@
 import {
   compareTs,
   indexTopic,
-  mainTopicId,
   maxTs,
   parseTopicId,
-  threadTopicId,
-  type ChannelId,
   type IndexInput,
   type IndexMessage,
   type Me,
@@ -32,7 +29,7 @@ import {
 import type { Block } from '@juno/slack-schema'
 import { Invalidation, StoreWriter, type MessageRow, type SqlError, type TopicIndexRow } from '@juno/store'
 import { Effect } from 'effect'
-import { syncKeys } from './keys'
+import { messageTopics, syncKeys } from './keys'
 import { latestSyncedRange, readState, threadMessages } from './write'
 
 export interface ReindexOptions {
@@ -86,17 +83,7 @@ export const reindexAll = (options: ReindexOptions): Effect.Effect<ReadonlyArray
 /** Topic ids a set of message rows belongs to: Main for roots, the thread for replies, both for broadcasts. */
 export function topicsOfMessages(rows: Iterable<Pick<MessageRow, 'channel' | 'ts' | 'thread_ts' | 'subtype' | 'reply_count'>>): Set<string> {
   const ids = new Set<string>()
-  for (const row of rows) {
-    const channel = row.channel as ChannelId
-    const isReply = row.thread_ts !== null && row.thread_ts !== row.ts
-    if (isReply) {
-      ids.add(threadTopicId(channel, row.thread_ts as Ts))
-      if (row.subtype === 'thread_broadcast') ids.add(mainTopicId(channel))
-    } else {
-      ids.add(mainTopicId(channel))
-      if (row.reply_count > 0 || row.thread_ts === row.ts) ids.add(threadTopicId(channel, row.ts as Ts))
-    }
-  }
+  for (const row of rows) for (const id of messageTopics(row)) ids.add(id)
   return ids
 }
 

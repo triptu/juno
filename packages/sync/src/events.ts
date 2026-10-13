@@ -113,7 +113,7 @@ export const applyFrame = (ctx: SyncContext, frame: RtmFrame): Effect.Effect<voi
           Effect.gen(function* () {
             const existing = yield* readMessage(channel, ts)
             if (existing === undefined) return yield* noteLateReaction(ctx, channel, ts, frame.event_ts)
-            yield* changeReaction(channel, ts, frame.reaction, frame.user, frame.type === 'reaction_added', ctx.me.userId)
+            yield* changeReaction(existing, frame.reaction, frame.user, frame.type === 'reaction_added', ctx.me.userId)
             const last = existing.last_event_ts === null ? frame.event_ts : compareTs(frame.event_ts, existing.last_event_ts) > 0 ? frame.event_ts : existing.last_event_ts
             if (last !== existing.last_event_ts) yield* writeMessage({ ...existing, last_event_ts: last, version: existing.version + 1 })
           }),

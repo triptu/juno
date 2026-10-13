@@ -4,9 +4,10 @@
  * and `reindexTopics` are exported for tests and for the engine's commands
  * (which re-index the topics they touch).
  */
-export { runSync, type RunSyncOptions, type SyncPhase, type SyncServices } from './sync'
+export { runSync, type RunSyncOptions, type SyncPhase, type SyncServices, type TopicFetcher } from './sync'
+export { fetchOlder, fetchTopic, HISTORY_START, OPEN_FETCH_MAX, type FetchReport, type OpenError } from './open'
 export { SyncConfig, defaultSyncConfig, syncConfigLayer, type SyncConfigShape } from './config'
-export { syncKeys } from './keys'
+export { messageTopics, syncKeys } from './keys'
 export {
   mergeMessage,
   mergeRootCounters,
