@@ -1,6 +1,6 @@
 import { startTransition, useState } from 'react'
 import type { KindFilter } from '@juno/contract'
-import { accentAtom, persistAccent, persistTheme, sidebarDotAtom, sidebarFilterAtom, signedInAtom, themeAtom, type Accent, type Theme } from '@juno/state'
+import { accentAtom, persistAccent, persistTheme, sidebarDotAtom, sidebarFilterAtom, sidebarListAtom, signedInAtom, themeAtom, type Accent, type Theme } from '@juno/state'
 import { useAtom, useAtomValue } from '@juno/state/react'
 import { AccountMenu, AppearanceSettings, hueFor, initials, Sidebar as SidebarView, type SidebarNavTarget } from '@juno/views'
 import { AppInfo } from './AppInfo'
@@ -10,7 +10,7 @@ import { Session } from './Session'
 import { TopicList } from './TopicList'
 
 function navigate(target: SidebarNavTarget): void {
-  // TODO(M4/M9/M11): open the All topics, For you or Juno page in a tab.
+  // TODO(M5/M9/M11): open the All topics, For you or Juno page in a tab.
   void target
 }
 
@@ -30,6 +30,8 @@ export function Sidebar() {
   const dmsDot = useAtomValue(sidebarDotAtom('dms'))
   const user = useAtomValue(signedInAtom)
   const [menuOpen, setMenuOpen] = useState(false)
+  // The scope chip names the channel the list is narrowed to; its rows' refs carry it.
+  const scopeChannel = useAtomValue(sidebarListAtom, (list) => (filter.scope === undefined ? undefined : list.refs.channels.get(filter.scope)))
 
   const name = user?.userName ?? ''
   const account = { name, initials: initials(name) || '?', hue: hueFor('', user?.userId ?? '') }
@@ -68,7 +70,7 @@ export function Sidebar() {
       forYouCount={0}
       filter={{ kind: filter.kind, unreadOnly: filter.unreadOnly }}
       dots={dots}
-      {...(filter.scope === undefined ? {} : { scope: { name: filter.scope, kind: 'public' as const } })}
+      {...(filter.scope === undefined ? {} : { scope: { name: scopeChannel?.name ?? filter.scope, kind: scopeChannel?.kind ?? 'public' } })}
       accountMenuOpen={menuOpen}
       onAccountMenu={setMenuOpen}
       accountMenu={

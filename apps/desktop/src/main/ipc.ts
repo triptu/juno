@@ -38,6 +38,13 @@ function isAppUrl(url: string): boolean {
   return Boolean(devUrl && url.startsWith(devUrl))
 }
 
+/**
+ * Native menus are out of Playwright's reach. Under JUNO_E2E a test sets the
+ * item the next context menu picks; that menu answers at once without
+ * showing, and keeps the labels it was asked to show.
+ */
+export const contextMenuForTests: { next: string | null | undefined; lastLabels: ReadonlyArray<string> } = { next: undefined, lastLabels: [] }
+
 export interface IpcDeps {
   readonly supervisor: EngineSupervisor
   readonly setTheme: (theme: Launch['theme']) => void
@@ -75,6 +82,12 @@ export function registerIpc({ supervisor, setTheme, setAccent }: IpcDeps): void 
     Channels.contextMenuPopup,
     ({ items }, event) =>
       new Promise<string | null>((resolve) => {
+        if (contextMenuForTests.next !== undefined) {
+          const next = contextMenuForTests.next
+          contextMenuForTests.next = undefined
+          contextMenuForTests.lastLabels = items.map((item) => item.label)
+          return resolve(next)
+        }
         let chosen: string | null = null
         const menu = Menu.buildFromTemplate(items.map((item) => ({ label: item.label, click: () => (chosen = item.id) })))
         const window = BrowserWindow.fromWebContents(event.sender) ?? undefined

@@ -1,7 +1,7 @@
 import { app, BrowserWindow } from 'electron'
 import { join } from 'node:path'
 import { createSupervisor } from './engine'
-import { registerIpc } from './ipc'
+import { contextMenuForTests, registerIpc } from './ipc'
 import { readLaunch, writeLaunch, type Launch } from './launch'
 import { registerAppScheme, serveAppScheme } from './scheme'
 import { SecretsStore } from './secrets'
@@ -57,7 +57,7 @@ const sessionHost = new SessionHost({
 app.whenReady().then(() => {
   // A packaged app gets its icon from the bundle. In dev the Dock would show Electron's.
   if (process.platform === 'darwin' && !app.isPackaged) app.dock?.setIcon(join(__dirname, '../../build/icon.png'))
-  serveAppScheme(join(__dirname, '../renderer'))
+  serveAppScheme(join(__dirname, '../renderer'), fakeSlackUrl === undefined ? undefined : new URL(fakeSlackUrl).origin)
   registerIpc({
     supervisor,
     setTheme: (theme) => updateLaunch({ theme }),
@@ -92,6 +92,7 @@ if (e2e) {
       enginePid: () => supervisor.pid,
       engineState: () => supervisor.currentState,
       failEngine: () => supervisor.giveUp(),
+      contextMenu: contextMenuForTests,
     },
   })
 }

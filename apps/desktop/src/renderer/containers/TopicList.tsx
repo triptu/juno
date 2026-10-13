@@ -6,7 +6,6 @@ import {
   focusedTopicAtom,
   nowAtom,
   registry,
-  selectedTopicAtom,
   sidebarFilterAtom,
   sidebarRowAtom,
   sidebarSectionsAtom,
@@ -18,6 +17,7 @@ import { afterPaint, mark, measure } from '@juno/state/perf'
 import { useAtomValue } from '@juno/state/react'
 import { relativeTime, TopicList as TopicListView, TopicRow as TopicRowView, type ActivateEvent, type TopicListEmpty } from '@juno/views'
 import { markFilterChange, takeFilterMark } from './filterMark'
+import { openTopic, showTopicMenu, warmTopic } from './navigation'
 
 /**
  * Rows in the first commit of a new list. The rest mount in a transition
@@ -34,14 +34,9 @@ const KINDS: ReadonlyArray<KindFilter> = ['all', 'channels', 'dms']
 // Row callbacks are created once and take the id, so no row ever receives
 // a new function (performance.md 5.1).
 
-/** Mouse down on a row: it becomes the selection. ⌘ asks for a new tab, which opens nothing until M4. */
+/** Mouse down on a row (or Enter): opens the topic in the current tab, or a new one with ⌘. */
 function open(id: string, event: ActivateEvent): void {
-  if (event.metaKey) {
-    // TODO(M4): open the topic in a new tab.
-    return
-  }
-  // TODO(M4): open the topic in the current tab. Until then the row is only marked.
-  registry.set(selectedTopicAtom, id)
+  openTopic(id, { newTab: event.metaKey })
 }
 
 /** The Resolve check. */
@@ -51,10 +46,9 @@ function resolve(id: string): void {
   void id
 }
 
-/** Pointer enter or keyboard focus on a row. */
-function warm(id: string): void {
-  // TODO(M4): prefetch(registry, messagesAtom(id)) once the topic query exists.
-  void id
+/** Right-click on a row: Open in new tab, Open in stealth. */
+function rowMenu(id: string): void {
+  void showTopicMenu(id)
 }
 
 /** A row got focus: Tab comes back to it, and reaches its Resolve button next. */
@@ -64,7 +58,7 @@ function focusRow(id: string): void {
 
 /** "View all topics" in the empty states. */
 function viewAllTopics(): void {
-  // TODO(M4): open the All topics page in a tab.
+  // TODO(M5): open the All topics page in a tab.
 }
 
 /** "Clear filters" in the empty states: back to All, everything. */
@@ -82,7 +76,7 @@ const Row = memo(function Row({ id }: { readonly id: string }) {
   // The minute tick re-renders a row only when its label changes.
   const time = useAtomValue(nowAtom, (now) => relativeTime(at, now))
   if (row === undefined) return null
-  return <TopicRowView row={row} time={time} selected={selected} tabbable={tabbable} newThreads={row.newThreads} onOpen={open} onResolve={resolve} onPrefetch={warm} />
+  return <TopicRowView row={row} time={time} selected={selected} tabbable={tabbable} newThreads={row.newThreads} onOpen={open} onResolve={resolve} onPrefetch={warmTopic} onContextMenu={rowMenu} />
 })
 
 const renderRow = (id: string) => <Row key={id} id={id} />

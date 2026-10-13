@@ -1,9 +1,10 @@
 import { useLayoutEffect } from 'react'
 import { accentAtom, persistAccent, persistTheme, signedInAtom, themeAtom, type Accent, type Theme } from '@juno/state'
 import { useAtom, useAtomValue } from '@juno/state/react'
-import { AppearanceSettings, applyTheme, Shell, Workspace, type AccentName, type ThemeName } from '@juno/views'
+import { AppearanceSettings, applyTheme, Shell, type AccentName, type ThemeName } from '@juno/views'
 import { Session } from './containers/Session'
 import { Sidebar } from './containers/Sidebar'
+import { Workspace } from './containers/Workspace'
 
 // The contract's names and the tokens' names must be the same set. These
 // assignments fail to compile if either side drifts.

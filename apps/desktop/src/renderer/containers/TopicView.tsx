@@ -1,0 +1,427 @@
+import { memo, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { MESSAGE_WINDOW_MAX, readsMarkRead, topicsSubscribe, topicsUnsubscribe, type MessageView, type TopicDetail } from '@juno/contract'
+import {
+  bottomWindow,
+  channelThreadsAtom,
+  dividerIndex,
+  endStealth,
+  loadOlderMessages,
+  messageListAtom,
+  messageWindowSpecAtom,
+  nowAtom,
+  openExternal,
+  openTopic as fetchTopic,
+  registry,
+  runCommand,
+  scrollSnapshotAtom,
+  shouldMarkRead,
+  sidebarFilterAtom,
+  topicAtom,
+  updateTabs,
+  type MessageWindow,
+  type ScrollSnapshot,
+} from '@juno/state'
+import { afterPaint, measure } from '@juno/state/perf'
+import { useAtomValue } from '@juno/state/react'
+import {
+  ActiveThreads,
+  ComposerSlot,
+  hueFor,
+  MessageList,
+  NewMessagesPill,
+  TopicHeader,
+  TopicView as TopicViewFrame,
+  type ActivateEvent,
+  type MessageListItem,
+  type MessageListStatus,
+  type OlderStatus,
+} from '@juno/views'
+import { markFilterChange } from './filterMark'
+import { closeTopicTab, openTopic, takeOpenStart } from './navigation'
+
+/** Within this of the end counts as at the bottom (performance 3.3). */
+const BOTTOM_SLACK = 32
+/** The "N new" divider's distance from the top of the list when a topic opens at it. */
+const DIVIDER_TOP = 80
+/** Rows each older page adds to the window. */
+const OLDER_PAGE = 100
+/** The next page is asked for when the first row comes this close to the top. */
+const OLDER_MARGIN = '1000px 0px 0px 0px'
+/** No "Loading messages" line before this (performance 4.4). */
+const LOADING_DELAY_MS = 300
+/** Message times change at most at a day boundary; re-render the rows for it this often, not every minute. */
+const TIME_STEP = 10 * 60_000
+
+const ROW = '[data-message-row]'
+
+// Callbacks every row gets, created once and taking ids (performance 5.1).
+
+function openThread(id: string, event: ActivateEvent): void {
+  openTopic(id, { newTab: event.metaKey })
+}
+
+/** A #channel chip scopes the sidebar to that channel. */
+function scopeToChannel(channel: string): void {
+  markFilterChange()
+  registry.set(sidebarFilterAtom, { ...registry.get(sidebarFilterAtom), scope: channel })
+}
+
+const markRead = (id: string) => runCommand(registry, readsMarkRead, { id })
+const subscribe = (id: string) => void runCommand(registry, topicsSubscribe, { id })
+const unsubscribe = (id: string) => void runCommand(registry, topicsUnsubscribe, { id })
+
+/** The stealth pill's Mark read: marks the topic and ends stealth. */
+function markReadAndEndStealth(id: string): void {
+  void markRead(id)
+  updateTabs(registry, (tabs) => endStealth(tabs, id))
+}
+
+const items = new WeakMap<MessageView, MessageListItem>()
+
+/** The window's rows with their senders. A row keeps its object while its message and sender do, so `Message` stays memoized. */
+function itemsOf(window: MessageWindow): ReadonlyArray<MessageListItem> {
+  return window.order.map((ts) => {
+    const message = window.rows.get(ts)!
+    const sender = message.senderId === undefined ? undefined : window.refs.people.get(message.senderId)
+    const held = items.get(message)
+    if (held !== undefined && held.sender === sender) return held
+    const item = { message, sender }
+    items.set(message, item)
+    return item
+  })
+}
+
+const rowSelector = (ts: string) => `[data-message-row="${CSS.escape(ts)}"]`
+
+/** The first row in view and its offset from the top of the scroller. */
+function rowInView(scroller: HTMLElement): { readonly element: HTMLElement; readonly anchorKey: string; readonly offset: number } | undefined {
+  const box = scroller.getBoundingClientRect()
+  const element = document.elementFromPoint(box.left + box.width / 2, box.top + 1)?.closest<HTMLElement>(ROW) ?? scroller.querySelector<HTMLElement>(ROW)
+  const anchorKey = element?.dataset['messageRow']
+  if (element == null || anchorKey === undefined) return undefined
+  return { element, anchorKey, offset: element.getBoundingClientRect().top - box.top }
+}
+
+function snapshotOf(scroller: HTMLElement): ScrollSnapshot | undefined {
+  const row = rowInView(scroller)
+  return row === undefined ? undefined : { anchorKey: row.anchorKey, offset: row.offset }
+}
+
+/**
+ * What the list holds still while its rows reach their real height. Rows
+ * are `content-visibility: auto`, so a row is laid out at its estimate
+ * until it comes into view and grows in that frame. `bottom` keeps the end
+ * in view; `row` keeps an element at an offset from the top (the divider
+ * on open, a snapshot's row on restore) until the user scrolls.
+ */
+type Pin = { readonly kind: 'bottom' } | { readonly kind: 'row'; readonly element: Element; readonly offset: number }
+
+function holdPin(scroller: HTMLElement, pin: Pin): void {
+  if (pin.kind === 'bottom') scroller.scrollTop = scroller.scrollHeight
+  else scroller.scrollTop += pin.element.getBoundingClientRect().top - scroller.getBoundingClientRect().top - pin.offset
+}
+
+function distanceFromBottom(scroller: HTMLElement): number {
+  return scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight
+}
+
+function useWindowFocused(): boolean {
+  const [focused, setFocused] = useState(() => document.hasFocus())
+  useEffect(() => {
+    const onFocus = () => setFocused(true)
+    const onBlur = () => setFocused(false)
+    window.addEventListener('focus', onFocus)
+    window.addEventListener('blur', onBlur)
+    return () => {
+      window.removeEventListener('focus', onFocus)
+      window.removeEventListener('blur', onBlur)
+    }
+  }, [])
+  return focused
+}
+
+/** Main's "Threads" popover: the channel's active threads. Mounted only while open. */
+function MainThreads({ channel, onClose }: { readonly channel: string; readonly onClose: () => void }) {
+  const result = useAtomValue(channelThreadsAtom(channel))
+  const now = useAtomValue(nowAtom)
+  const window = result._tag === 'Success' ? result.value : undefined
+  const threads = window === undefined ? [] : window.order.map((id) => window.rows.get(id)!)
+  const open = (id: string, event: ActivateEvent) => {
+    onClose()
+    openTopic(id, { newTab: event.metaKey })
+  }
+  return <ActiveThreads threads={threads} now={now} status={window === undefined ? 'loading' : 'ready'} onOpen={open} onSubscribe={subscribe} onUnsubscribe={unsubscribe} />
+}
+
+export interface TopicTabProps {
+  readonly id: string
+  readonly stealth: boolean
+}
+
+/**
+ * One topic tab (spec section 7; performance 3.3, 4.3 and 4.5). The tab
+ * lives in an `<Activity>`: while hidden its effects are gone, so it marks
+ * nothing and asks for nothing, and its DOM keeps the scroll position.
+ *
+ * - Opens at the "N new" divider, 80px from the top, or at the bottom, in
+ *   the layout effect of the first frame that has rows. A tab that was
+ *   unmounted comes back at its `ScrollSnapshot` instead.
+ * - The divider sits where the read pointer was when the tab first showed
+ *   the topic, so marking read does not move it.
+ * - At the bottom, a new message is scrolled into view before paint;
+ *   scrolled up, the "N new messages" pill counts them.
+ * - Near the top, the next older page is fetched, one request at a time,
+ *   and the window widens; scroll anchoring keeps the rows in view still.
+ * - Marks read by `shouldMarkRead`: on open and when shown, then at the
+ *   bottom of a focused window. A stealth tab marks only from Mark read.
+ */
+export const TopicTab = memo(function TopicTab({ id, stealth }: TopicTabProps) {
+  const result = useAtomValue(topicAtom(id))
+  const detail = result._tag === 'Success' ? result.value : undefined
+  // A topic the store does not know (a saved tab whose topic is gone) closes its tab.
+  useEffect(() => {
+    if (detail === null) closeTopicTab(id)
+  }, [id, detail])
+  if (detail == null) return null
+  return <Topic id={id} stealth={stealth} detail={detail} />
+})
+
+function Topic({ id, stealth, detail }: { readonly id: string; readonly stealth: boolean; readonly detail: TopicDetail }) {
+  const list = useAtomValue(messageListAtom(id))
+  const now = useAtomValue(nowAtom, (time) => Math.floor(time / TIME_STEP) * TIME_STEP)
+  const focused = useWindowFocused()
+  const scrollRef = useRef<HTMLElement>(null)
+  const anchorRef = useRef<HTMLDivElement>(null)
+
+  // The read pointer when this tab first showed the topic, for the divider.
+  const [readAtOpen] = useState(() => ({ lastReadTs: detail.lastReadTs }))
+  const at = dividerIndex(list.order, readAtOpen.lastReadTs)
+  const dividerBefore = at > 0 ? list.order[at] : undefined
+
+  const [positioned, setPositioned] = useState(false)
+  const [atBottom, setAtBottom] = useState(true)
+  const [far, setFar] = useState(false)
+  // The newest message the user has seen at the bottom; the pill counts those after it.
+  const [seenTs, setSeenTs] = useState<string | undefined>(undefined)
+  // What the position holds to while rows reach their real height, and the scrollTop it last set.
+  const pin = useRef<Pin | undefined>(undefined)
+  const pinnedTop = useRef(0)
+  const last = list.order.at(-1)
+  const first = list.order[0]
+  // The window holds the newest message: no anchor.
+  const atEnd = list.spec.anchor === undefined
+  const lastRef = useRef(last)
+  const atEndRef = useRef(atEnd)
+  useLayoutEffect(() => {
+    lastRef.current = last
+    atEndRef.current = atEnd
+  })
+
+  const hold = (scroller: HTMLElement) => {
+    const held = pin.current
+    if (held === undefined) return
+    if (held.kind === 'row' && !held.element.isConnected) {
+      pin.current = undefined
+      return
+    }
+    holdPin(scroller, held)
+    pinnedTop.current = scroller.scrollTop
+  }
+
+  // The open position, before the first frame with rows is painted.
+  useLayoutEffect(() => {
+    const scroller = scrollRef.current
+    if (scroller === null || positioned || !list.ready || last === undefined) return
+    const snapshot = registry.get(scrollSnapshotAtom(id))
+    const row = snapshot === undefined ? null : scroller.querySelector(rowSelector(snapshot.anchorKey))
+    pin.current =
+      snapshot !== undefined && row !== null
+        ? { kind: 'row', element: row, offset: snapshot.offset }
+        : anchorRef.current !== null
+          ? { kind: 'row', element: anchorRef.current, offset: DIVIDER_TOP }
+          : { kind: 'bottom' }
+    hold(scroller)
+    const distance = distanceFromBottom(scroller)
+    const bottom = atEnd && distance <= BOTTOM_SLACK
+    if (bottom) pin.current = { kind: 'bottom' }
+    setAtBottom(bottom)
+    setFar(distance > scroller.clientHeight)
+    setSeenTs(last)
+    setPositioned(true)
+  }, [id, positioned, list.ready, last, atEnd])
+
+  // Rows are drawn at their estimate until they come into view, then grow in the same frame; this
+  // puts the pinned row or the bottom back before that frame is painted (the one ResizeObserver that writes).
+  useLayoutEffect(() => {
+    const scroller = scrollRef.current
+    const column = scroller?.firstElementChild
+    if (scroller == null || column == null) return
+    const observer = new ResizeObserver(() => hold(scroller))
+    observer.observe(column)
+    return () => observer.disconnect()
+  }, [])
+
+  // `juno.topic-open` (or `juno.tab-switch` back to an unmounted tab): to the first frame with the header and the list in place.
+  useLayoutEffect(() => {
+    if (!list.ready || (list.order.length > 0 && !positioned)) return
+    const started = takeOpenStart(id)
+    if (started !== undefined) afterPaint(() => measure(started.name, started.at, { detail: { id, rows: list.order.length } }))
+  }, [id, list.ready, list.order.length, positioned])
+
+  // Stick to the bottom: a message that arrives while at the bottom is scrolled into view before paint.
+  useLayoutEffect(() => {
+    const scroller = scrollRef.current
+    if (scroller === null || !positioned || pin.current?.kind !== 'bottom' || !atEnd) return
+    hold(scroller)
+    setSeenTs(last)
+  }, [positioned, last, atEnd])
+
+  // The user's own scrolling lets go of the pin; where the list comes to rest decides the next one.
+  useEffect(() => {
+    const scroller = scrollRef.current
+    if (scroller === null) return
+    const letGo = () => {
+      pin.current = undefined
+    }
+    const onScrollEnd = () => {
+      if (pin.current?.kind === 'row' && Math.abs(scroller.scrollTop - pinnedTop.current) > 1) pin.current = undefined
+      const distance = distanceFromBottom(scroller)
+      const bottom = atEndRef.current && distance <= BOTTOM_SLACK
+      if (bottom) pin.current = { kind: 'bottom' }
+      else if (pin.current?.kind === 'bottom') pin.current = undefined
+      setAtBottom(bottom)
+      setFar(distance > scroller.clientHeight)
+      if (bottom) setSeenTs(lastRef.current)
+      registry.set(scrollSnapshotAtom(id), snapshotOf(scroller))
+    }
+    const inputs = ['wheel', 'touchstart', 'pointerdown', 'keydown'] as const
+    for (const type of inputs) scroller.addEventListener(type, letGo, { passive: true })
+    scroller.addEventListener('scrollend', onScrollEnd)
+    return () => {
+      for (const type of inputs) scroller.removeEventListener(type, letGo)
+      scroller.removeEventListener('scrollend', onScrollEnd)
+    }
+  }, [id])
+
+  // Older pages. A thread whose root is in the window has nothing older.
+  const [complete, setComplete] = useState(false)
+  const [loadingOlder, setLoadingOlder] = useState(false)
+  const rootShown = first !== undefined && list.rows.get(first)?.root === true
+  const windowFull = list.order.length >= list.spec.limit
+  const older: OlderStatus = loadingOlder ? 'loading' : rootShown || (complete && !windowFull) ? 'none' : 'more'
+  useEffect(() => {
+    const scroller = scrollRef.current
+    if (scroller === null || !positioned || older !== 'more' || first === undefined) return
+    const row = scroller.querySelector(rowSelector(first))
+    if (row === null) return
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((entry) => entry.isIntersecting)) return
+        observer.disconnect()
+        setLoadingOlder(true)
+        void loadOlderMessages(registry, id, first).then((exit) => {
+          if (exit._tag === 'Success' && exit.value.complete) setComplete(true)
+          const spec = registry.get(messageWindowSpecAtom(id))
+          // Up to the cap the window grows at the top; past it, it holds the 500 rows from the new page down.
+          const next =
+            spec.anchor === undefined && spec.limit + OLDER_PAGE <= MESSAGE_WINDOW_MAX
+              ? { limit: spec.limit + OLDER_PAGE }
+              : { anchor: first, before: OLDER_PAGE, limit: MESSAGE_WINDOW_MAX }
+          // Scroll anchoring keeps the rows in view still, except at offset 0, where Chromium does not anchor; the pin covers both.
+          const inView = rowInView(scroller)
+          if (inView !== undefined) {
+            pin.current = { kind: 'row', element: inView.element, offset: inView.offset }
+            pinnedTop.current = scroller.scrollTop
+          }
+          registry.set(messageWindowSpecAtom(id), next)
+          setLoadingOlder(false)
+        })
+      },
+      { root: scroller, rootMargin: OLDER_MARGIN },
+    )
+    observer.observe(row)
+    return () => observer.disconnect()
+  }, [id, positioned, older, first])
+
+  // What Slack has that the store lacks, once per mount; a hidden tab coming back does not ask again.
+  const [fetchState, setFetchState] = useState<'pending' | 'done' | 'offline'>('pending')
+  const fetched = useRef(false)
+  useEffect(() => {
+    if (fetched.current) return
+    fetched.current = true
+    void fetchTopic(registry, id).then((exit) => setFetchState(exit._tag === 'Success' && exit.value.outcome === 'offline' ? 'offline' : 'done'))
+  }, [id])
+  const [slow, setSlow] = useState(false)
+  useEffect(() => {
+    if (fetchState !== 'pending') return
+    const timer = setTimeout(() => setSlow(true), LOADING_DELAY_MS)
+    return () => clearTimeout(timer)
+  }, [fetchState])
+
+  // The read rule. Opening, and showing the tab again, marks the topic read.
+  useEffect(() => {
+    if (shouldMarkRead('open', { stealth, active: true, focused: true, atBottom: false })) void markRead(id)
+  }, [id, stealth])
+  const unread = detail.unreadCount
+  useEffect(() => {
+    if (unread === 0 || !positioned) return
+    if (shouldMarkRead('bottom', { stealth, active: true, focused, atBottom })) void markRead(id)
+  }, [id, unread, positioned, stealth, focused, atBottom])
+
+  const jumpToLatest = () => {
+    const scroller = scrollRef.current
+    pin.current = { kind: 'bottom' }
+    setAtBottom(true)
+    setFar(false)
+    if (!atEnd) registry.set(messageWindowSpecAtom(id), bottomWindow)
+    if (scroller !== null) hold(scroller)
+    setSeenTs(last)
+  }
+
+  const [threadsOpen, setThreadsOpen] = useState(false)
+  const main = detail.kind === 'main'
+  const people = list.refs.people
+  const hueOf = (personId: string) => hueFor(people.get(personId)?.color ?? '', personId)
+
+  const seenAt = seenTs === undefined ? -1 : list.order.indexOf(seenTs)
+  const newCount = seenAt < 0 ? 0 : list.order.length - seenAt - 1
+  const showPill = positioned && !atBottom && (newCount > 0 || far || !atEnd)
+
+  // An empty list says nothing until Slack has answered or 300 ms have passed.
+  const status: MessageListStatus =
+    list.order.length > 0 ? 'ready' : fetchState === 'offline' ? 'offline' : list.ready && fetchState === 'done' ? 'ready' : slow ? 'loading' : 'pending'
+
+  return (
+    <TopicViewFrame
+      header={
+        <TopicHeader
+          detail={detail}
+          stealth={stealth}
+          threadsOpen={threadsOpen}
+          onThreads={main ? setThreadsOpen : undefined}
+          threads={threadsOpen ? <MainThreads channel={detail.channel.id} onClose={() => setThreadsOpen(false)} /> : null}
+          onSubscribe={subscribe}
+          onUnsubscribe={unsubscribe}
+          onMarkRead={markReadAndEndStealth}
+        />
+      }
+      pill={showPill ? <NewMessagesPill count={newCount} onJump={jumpToLatest} /> : undefined}
+      composer={<ComposerSlot placeholder={main ? `Message ${detail.channel.label}` : 'Reply'} />}
+    >
+      <MessageList
+        items={itemsOf(list)}
+        main={main}
+        now={now}
+        status={status}
+        older={list.order.length === 0 ? 'none' : older}
+        {...(dividerBefore === undefined ? {} : { dividerBefore })}
+        scrollRef={scrollRef}
+        anchorRef={anchorRef}
+        hueOf={hueOf}
+        onOpenThread={openThread}
+        onChannel={scopeToChannel}
+        onLink={openExternal}
+      />
+    </TopicViewFrame>
+  )
+}

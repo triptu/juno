@@ -52,10 +52,12 @@ export {
   scrollSnapshotAtom,
   TABS_PREF,
   tabsAtom,
+  tabStripAtom,
   updateTabs,
   type OpenOptions,
   type ScrollSnapshot,
   type Tabs,
+  type TabSummary,
   type TopicTab,
 } from './tabs'
 export { errorOf } from './result'

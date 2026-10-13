@@ -19,9 +19,10 @@
 import { Option, Schema } from 'effect'
 import * as AsyncResult from 'effect/reactivity/AsyncResult'
 import * as Atom from 'effect/reactivity/Atom'
-import { prefsGet, prefsSet } from '@juno/contract'
+import { prefsGet, prefsSet, type TopicDetail } from '@juno/contract'
 import { liveQuery, runCommand } from './atoms'
 import type { Registry } from './client'
+import { topicAtom } from './messages'
 import { signedInAtom } from './session'
 
 /** One open topic. A topic is open in at most one tab, so its id is the tab's. */
@@ -165,6 +166,27 @@ export function updateTabs(registry: Registry, change: (tabs: Tabs) => Tabs): Ta
   void runCommand(registry, prefsSet, { key: TABS_PREF, value: { tabs: next.tabs, active: next.active ?? null, recent: next.recent } })
   return next
 }
+
+/** A tab as the strip draws it. */
+export interface TabSummary {
+  readonly id: string
+  readonly stealth: boolean
+  /** The topic's header: undefined until it arrives, null for a topic the store does not know. */
+  readonly detail: TopicDetail | null | undefined
+}
+
+const sameStrip = (a: ReadonlyArray<TabSummary>, b: ReadonlyArray<TabSummary>) => a.length === b.length && a.every((tab, i) => tab === b[i])
+
+/** The tabs with their headers, for the strip. A tab keeps its object while its flag and header hold. */
+export const tabStripAtom = Atom.make((get): ReadonlyArray<TabSummary> => {
+  const previous = new Map(Option.getOrElse(get.self<ReadonlyArray<TabSummary>>(), () => []).map((tab) => [tab.id, tab]))
+  return get(tabsAtom).tabs.map((tab) => {
+    const result = get(topicAtom(tab.id))
+    const detail = AsyncResult.isSuccess(result) ? result.value : undefined
+    const held = previous.get(tab.id)
+    return held !== undefined && held.stealth === tab.stealth && held.detail === detail ? held : { ...tab, detail }
+  })
+}).pipe(Atom.withEquality(sameStrip))
 
 /** Where an unmounted tab was scrolled: the first row in view and its offset from the top of the list. */
 export interface ScrollSnapshot {
