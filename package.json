@@ -20,12 +20,16 @@
     "package": "pnpm --filter @juno/desktop package",
     "gallery": "pnpm --filter @juno/gallery dev",
     "gallery:shots": "pnpm --filter @juno/gallery shots",
-    "smoke:live": "node scripts/smoke-live.ts"
+    "smoke:live": "node scripts/smoke-live.ts",
+    "sync:live": "node --import ./scripts/ts-resolve-hooks.mjs scripts/sync-live-dry-run.ts"
   },
   "devDependencies": {
+    "@juno/engine": "workspace:*",
     "@juno/fake-slack": "workspace:*",
     "@juno/slack": "workspace:*",
     "@juno/slack-schema": "workspace:*",
+    "@juno/store": "workspace:*",
+    "@juno/sync": "workspace:*",
     "@types/node": "24.19.2",
     "effect": "4.0.3",
     "oxlint": "1.87.0",

@@ -80,13 +80,19 @@ export const handlers: Handlers = {
     }
   },
 
+  /**
+   * As recorded live: every channel of the workspace (member or not) as
+   * metadata only, every DM, and no read state anywhere. Membership and read
+   * state come from `client.counts`.
+   */
   'client.userBoot': (ctx) => {
     const ws = ctx.workspace
     const self = ws.users.get(ws.selfId)
     if (self === undefined) return new ApiError('user_not_found')
     const records = [...ws.conversations.values()]
-    const channels = records.filter((c) => c.kind !== 'im').map((c) => ws.channelObject(c))
+    const channels = records.filter((c) => c.kind !== 'im').map((c) => ws.bootChannelObject(c))
     const ims = records.filter((c) => c.kind === 'im').map((c) => ws.imObject(c))
+    const cacheTs = `${Math.floor(ws.clock.now() / 1000)}.000000`
     return {
       self,
       team: { ...ws.team, url: `${ctx.baseUrl}/` },
@@ -95,30 +101,43 @@ export const handlers: Handlers = {
       ims,
       is_open: records.filter((c) => c.isOpen && (c.kind === 'im' || c.kind === 'mpim')).map((c) => c.id),
       starred: [],
-      subteams: { self: [], all: [] },
+      subteams: { self: [] },
       read_only_channels: [],
       thread_only_channels: [],
       has_more_mpdms: false,
-      emoji_cache_ts: 1_700_000_000,
-      app_commands_cache_ts: 1_700_000_000,
+      // Ts-formatted strings live, not numbers.
+      emoji_cache_ts: cacheTs,
+      app_commands_cache_ts: cacheTs,
       paid_features: [],
       can_access_client_v2: true,
       cache_ts: Math.floor(ws.clock.now() / 1000),
     }
   },
 
+  /** The user's own conversations with their read state, as recorded live. A channel the user is not in is not listed. */
   'client.counts': (ctx, args) => {
     const ws = ctx.workspace
     const wanted = args.channel_ids === undefined ? undefined : new Set(args.channel_ids)
     const records = [...ws.conversations.values()].filter(
       (c) => c.members.has(ws.selfId) && (wanted === undefined || wanted.has(c.id)),
     )
+    const channels = records.filter((c) => c.kind === 'public' || c.kind === 'private').map((c) => ws.countEntry(c))
+    const ims = records.filter((c) => c.kind === 'im').map((c) => ws.countEntry(c))
+    const mpims = records.filter((c) => c.kind === 'mpim').map((c) => ws.countEntry(c))
+    // `threads` carries no `timestamp` in client.counts (it does in getView's threads_state).
+    const { timestamp: _timestamp, ...threads } = ws.threadCounts()
     return {
-      channels: records.filter((c) => c.kind === 'public' || c.kind === 'private').map((c) => ws.countEntry(c)),
-      ims: records.filter((c) => c.kind === 'im').map((c) => ws.countEntry(c)),
-      mpims: records.filter((c) => c.kind === 'mpim').map((c) => ws.countEntry(c)),
-      threads: ws.threadCounts(),
-      channel_badges: {},
+      channels,
+      ims,
+      mpims,
+      threads,
+      channel_badges: {
+        channels: channels.filter((c) => c.has_unreads).length,
+        dms: [...ims, ...mpims].filter((c) => c.has_unreads).length,
+        app_dms: 0,
+        thread_mentions: threads.mention_count,
+        thread_unreads: Object.values(threads.unread_count_by_channel ?? {}).reduce((a, b) => a + b, 0),
+      },
       counts_last_fetched: Math.floor(ws.clock.now() / 1000),
     }
   },

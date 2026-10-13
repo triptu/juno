@@ -35,6 +35,9 @@ export interface CallRecord {
   readonly error?: string
 }
 
+const RECONNECT_URL_FIRST_MILLIS = 200
+const RECONNECT_URL_INTERVAL_MILLIS = 30_000
+
 interface RateLimitRule {
   retryAfter: number
   remaining: number
@@ -163,12 +166,29 @@ export class FakeServer {
       socket.destroy()
       return
     }
-    this.#wss.handleUpgrade(request, socket, head, (ws) => this.#connected(ws))
+    this.#wss.handleUpgrade(request, socket, head, (ws) => this.#connected(ws, auth))
   }
 
-  #connected(ws: WebSocket): void {
+  /**
+   * Like the real server (research section 4): `hello` with `start: true`,
+   * a `reconnect_url` about 0.2 s later and again every 30 s. The URL is
+   * complete (token included), so a client can reconnect with it as it is.
+   */
+  #connected(ws: WebSocket, session: Session): void {
     this.sockets.add(ws)
-    ws.on('close', () => this.sockets.delete(ws))
+    const reconnectUrl = () => {
+      if (ws.readyState !== ws.OPEN) return
+      const url = new URL(this.socketUrl())
+      url.searchParams.set('token', session.token)
+      ws.send(JSON.stringify(encodeRtmFrame({ type: 'reconnect_url', url: url.toString() })))
+    }
+    const first = setTimeout(reconnectUrl, RECONNECT_URL_FIRST_MILLIS).unref()
+    const repeat = setInterval(reconnectUrl, RECONNECT_URL_INTERVAL_MILLIS).unref()
+    ws.on('close', () => {
+      clearTimeout(first)
+      clearInterval(repeat)
+      this.sockets.delete(ws)
+    })
     ws.on('message', (raw) => {
       let frame: Record<string, unknown>
       try {
@@ -183,7 +203,7 @@ export class FakeServer {
         if (users.length > 0) ws.send(JSON.stringify(encodeRtmFrame({ type: 'presence_change', presence: 'active', users })))
       }
     })
-    ws.send(JSON.stringify(encodeRtmFrame({ type: 'hello', region: 'fake', host_id: 'fake-1', fast_reconnect: false })))
+    ws.send(JSON.stringify(encodeRtmFrame({ type: 'hello', region: 'fake', host_id: 'fake-1', fast_reconnect: false, start: true })))
   }
 
   // HTTP

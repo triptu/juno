@@ -43,18 +43,22 @@ describe('SlackSocket', () => {
         const socket = yield* SlackSocket
         const { queue } = yield* collect(yield* socket.events)
         yield* takeUntil(queue, isConnected)
+        // The server hands out a reconnect_url shortly after hello (and again every 30 s); the next connect uses it.
+        yield* takeUntil(queue, (event: SocketEvent) => event._tag === 'Frame' && event.frame.type === 'reconnect_url')
 
         fake.dropSocket()
         const down = yield* takeUntil(queue, isDisconnected)
         assert.isAtMost(down.retryInMillis, 200)
-        yield* takeUntil(queue, isConnected)
+        const back = yield* takeUntil(queue, isConnected)
+        assert.isTrue(back.fast)
 
         fake.injectMessage({ channel: CHANNEL, text: 'after reconnect' })
         const posted = yield* takeUntil(queue, isPostedMessage)
         if (isMessagePosted(posted.frame)) assert.strictEqual(posted.frame.text, 'after reconnect')
       })
       yield* program.pipe(Effect.provide(clientLayer(fake)), Effect.scoped)
-      assert.strictEqual(fake.callCount('client.getWebSocketURL'), 2)
+      // One URL from the API; the reconnect used the reconnect_url.
+      assert.strictEqual(fake.callCount('client.getWebSocketURL'), 1)
     }),
   )
 

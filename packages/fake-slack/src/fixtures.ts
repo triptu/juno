@@ -262,6 +262,41 @@ export const CONVERSATIONS: ReadonlyArray<SeedConversation> = [
       { from: 'U0DEPLOYBOT', text: 'api@91be07 deployed to prod', ago: 9 },
     ],
   },
+  // Public channels the self user is not a member of. The real `client.userBoot` lists them too;
+  // they must never reach the sidebar, and no history is fetched for them.
+  {
+    id: 'C0SALES',
+    name: 'sales',
+    kind: 'public',
+    members: ['U0MAYA', 'U0ELENA', 'U0SAM'],
+    topic: 'Pipeline and deals',
+    messages: [
+      {
+        from: 'U0ELENA',
+        text: 'Q4 pipeline review is on Thursday. Bring your numbers.',
+        ago: 48,
+        replies: [{ from: 'U0MAYA', text: 'I will have the forecast ready.', ago: 35 }],
+      },
+      { from: 'U0SAM', text: 'Acme renewal is signed.', ago: 22 },
+    ],
+  },
+  {
+    id: 'C0SOCIAL',
+    name: 'social',
+    kind: 'public',
+    members: ['U0PRIYA', 'U0LEO', 'U0DEV', 'U0JONAS'],
+    messages: [
+      {
+        from: 'U0PRIYA',
+        text: 'Board games at six?',
+        ago: 205,
+        replies: [
+          { from: 'U0LEO', text: 'In.', ago: 198 },
+          { from: 'U0DEV', text: 'Same.', ago: 180 },
+        ],
+      },
+    ],
+  },
   {
     id: 'C0HIRING',
     name: 'hiring',
@@ -462,8 +497,9 @@ export function seedWorkspace(workspace: Workspace, avatarBase: string): void {
     if (entry.parent === undefined && entry.seed.replies !== undefined) roots.push({ channel: entry.channel, seed: entry.seed, ts: posted.ts })
   }
 
-  // Thread subscriptions and read state.
+  // Thread subscriptions and read state. Self follows every thread by default, in the channels self is in.
   for (const root of roots) {
+    if (!workspace.isMember(root.channel)) continue
     const replies = workspace.replies(root.channel, root.ts)
     const settings = root.seed.thread ?? {}
     const unread = settings.unread ?? 0

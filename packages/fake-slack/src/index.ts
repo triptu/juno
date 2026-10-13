@@ -160,6 +160,16 @@ export class FakeSlack {
     if (failure !== undefined) throw new Error(failure)
   }
 
+  /** `user` (self by default) joins a channel. Emits `channel_joined`/`group_joined` to self and `member_joined_channel`. */
+  joinChannel(input: { channel: string; user?: string }): void {
+    this.workspace.join(input.channel, input.user ?? this.selfId)
+  }
+
+  /** `user` (self by default) leaves a channel. Emits `member_left_channel` and, for self, `channel_left`/`group_left`. */
+  leaveChannel(input: { channel: string; user?: string }): void {
+    this.workspace.leave(input.channel, input.user ?? this.selfId)
+  }
+
   typing(input: { channel: string; user?: string; threadTs?: string }): void {
     this.workspace.typing(input.channel, input.user ?? 'U0MAYA', input.threadTs === undefined ? undefined : asTs(input.threadTs))
   }
@@ -211,6 +221,8 @@ export class FakeSlack {
       markThreadRead: (i) => this.markThreadRead(i),
       addReaction: (i) => this.addReaction(i),
       removeReaction: (i) => this.removeReaction(i),
+      joinChannel: (i) => this.joinChannel(i),
+      leaveChannel: (i) => this.leaveChannel(i),
       typing: (i) => this.typing(i),
       emitFrame: (i) => this.emitFrame(i),
       dropSocket: () => this.dropSocket(),

@@ -132,6 +132,7 @@ interface CountEntry {
 Observed live (`client.userBoot` with `version_all_channels=true`, `return_all_relevant_mpdms=true`; `client.counts` with `thread_counts_by_channel=true`)
 
 - `client.userBoot.channels` lists every channel of the workspace, not only the user's (418 channels against 218 in `client.counts`). The channel objects carry no `is_member`, `last_read`, `latest`, `unread_count` or `is_open`; the keys present on all of them are `id, name, name_normalized, is_channel, is_group, is_im, is_mpim, is_private, is_archived, is_general, is_shared, is_ext_shared, is_org_shared, is_pending_ext_shared, is_frozen, is_slackbot_channel_enabled, created, creator, updated, unlinked, context_team_id, shared_team_ids, pending_shared, pending_connected_team_ids, parent_conversation (null), topic, purpose, properties`; `members` is present on about half, `previous_names` on half, `connected_team_ids`/`conversation_host_id`/`internal_team_ids` on shared channels only, `use_case` rarely. So membership and read state must come from `client.counts`, whose entries are the user's own conversations.
+- **Membership, as Juno derives it.** `userBoot` is channel metadata only. A conversation is the user's own when `client.counts` lists it (`channels`, `mpims`, `ims`); a full counts answer (no `counts_last_fetched`) replaces the membership set, an incremental one only adds. Between counts calls the membership events keep it current: `channel_joined`/`group_joined`, `member_joined_channel` (self), `im_open`, `im_created`, `mpim_open`, `mpim_joined` add; `channel_left`/`group_left`, `member_left_channel` (self), `channel_deleted`/`group_deleted` remove. `im_close`/`mpim_close` do not remove: they hide the DM in Slack's sidebar but it stays the user's. The sync (`packages/sync/src/boot.ts`, `events.ts`) and the fake (`packages/fake-slack`) follow this; the sidebar query filters on it. Unknown: whether an incremental `client.counts` (with `counts_last_fetched`) lists only changed entries or everything; Juno assumes the former and takes a full list at every warm boot, so a channel left while the app was closed drops out then.
 - `client.userBoot.ims` entries always have `id, user, is_im, is_open, is_archived, is_frozen, is_org_shared, is_slackbot_channel_enabled, created, updated, context_team_id`; `is_shared`/`is_ext_shared`/`shared_team_ids`/`connected_team_ids` only on shared DMs.
 - `emoji_cache_ts`, `app_commands_cache_ts` and `translations_cache_ts` are ts-formatted strings, not numbers. `subteams` had only `self` (no `all`). `self.profile` includes `email`, `status_*`, `huddle_state*`, `start_date`. Extra top-level keys not in the bundle reading: `cache_ts_version, cache_version, prefs_version, slack_route, dnd, non_threadable_channels, accept_tos_url (null), is_europe, mobile_app_requires_upgrade` and several `is_*_eligible` flags.
 - `client.counts` entries (channels, mpims, ims) all carry `id, last_read, latest, updated, history_invalid` (all ts strings), `mention_count` and `has_unreads`; `mention_count_display` and `vip_count` were absent on entries, while `threads` has `has_unreads, mention_count, vip_count, unread_count_by_channel, mention_count_by_channel` (no `timestamp`). `channel_badges` is `{ channels, dms, app_dms, thread_mentions, thread_unreads }` (numbers). `alerts`, `saved` and `activity_v2` are flat objects of numeric counters.
@@ -380,4 +381,27 @@ Calls
 | `client.getWebSocketURL` | ok | yes |
 | socket, 90 s | `hello`, `reconnect_url` ×2, `pong` ×8, `message` ×2 (`bot_message`, `message_changed`) | all known frames |
 
-Problems reported by the smoke: 0. Two findings changed code: the socket must not send `start_args` (section 4), and `client.userBoot.channels` carries no membership or read state (section 2). Not yet seen live, so still only from the bundle reading: `conversations.replies`, `conversations.view`, `users.prefs.get`, every write method, and socket frames other than the four above.
+Problems reported by the smoke: 0. Two findings changed code: the socket must not send `start_args` (section 4), and `client.userBoot.channels` carries no membership or read state (section 2). Not yet seen live, so still only from the bundle reading: `conversations.view`, every write method, and socket frames other than the four above.
+
+### The sync dry run
+
+`JUNO_LIVE=1 pnpm sync:live` (`scripts/sync-live-dry-run.ts`, docs/development.md) ran the real `@juno/sync` cold boot read-only against the same workspace into a temporary directory, with the default `SyncConfig` (7-day window, 100-message history pages) and the default lanes (background calls 1.5 s apart). Aggregate numbers only:
+
+| What | Number |
+| --- | --- |
+| Boot to `live` | 424 s; the sidebar data (`userBoot`, `counts`, `getView`) was complete after 29 s |
+| Web API calls | 298: `conversations.history` 147 (312 s on the background lane), `conversations.replies` 114 (50 thread previews plus roots fetched for replies whose root was outside the window), `subscriptions.thread.getView` 32, one each of `client.userBoot`, `users.prefs.get`, `client.counts`, `client.getWebSocketURL`, `api.getFlannelHttpUrl`; edge `users/info` 2 |
+| Rate-limit hits, decode issues, failed calls | 0, 0, 0 |
+| `client.userBoot` conversations | 418 channels = 142 public, 76 private, 200 group DMs; 47 DMs |
+| `client.counts` entries (members) | 142 public, 76 private, 27 group DMs, 47 DMs; 20 with unreads, 3 mentions |
+| Followed threads (`getView`) | 322, in 32 pages of 10 |
+| Stored after boot | 4 721 messages in 152 conversations (773 thread roots, 850 replies, 844 reactions), 147 synced ranges, 105 users |
+| Topics | 152 Main, 773 threads; 19 Main and 34 threads unread, 6 Main as a dot (history does not reach the read pointer) |
+| Sidebar, all topics, 7-day quiet rule | 910 rows (762 threads, 148 Main), 52 unread, 1 mention; `topics.list` for the 300-row window 3 to 4 ms, 386 KB of JSON |
+
+What this changed or confirmed:
+
+- The 418 "channels" of section 2 are 142 public + 76 private + 200 group DMs (`return_all_relevant_mpdms`). `client.counts` lists all 218 channels and 27 of the group DMs, so on this account the channels missing from `counts` are closed or stale group DMs, and membership from `counts` keeps them out of the sidebar (173 would otherwise show as Main topics). Whether `userBoot` also lists public channels the user is not in cannot be told from this account, which is in every public channel; the fake includes such channels and the sync drops them the same way.
+- `subscriptions.thread.getView` returned 10 threads per page whatever `limit` said (`limit: 50` here, 20 in the smoke, 10 each time), so paging the followed threads costs one interactive call per 10 threads: 32 calls and about 20 s before the sidebar is complete. Inferred: the page size is capped at 10 server-side. A follow-up could page in parallel or stop earlier.
+- `users.prefs.get`, `conversations.replies`, `search.modules.messages` (not called by a cold boot) and the edge `users/info` decode with the schemas as they are; `conversations.replies` with `oldest = latest_reply, inclusive, limit 2` gives the preview as designed.
+- The cost estimate of architecture 5.1 holds: about one history call per active conversation, on the background lane at 1.5 s spacing, a few minutes for 150 channels.
