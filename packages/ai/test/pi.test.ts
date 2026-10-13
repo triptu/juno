@@ -241,7 +241,8 @@ describe('PiAiProvider generation', () => {
     expect(seen).toHaveLength(1)
     const retry = seen[0]!.filter((message) => message.role !== 'system')
     expect(retry.map((message) => message.role)).toEqual(['user', 'assistant', 'user'])
-    expect(JSON.stringify(retry[1]!.content)).toContain('<text x="2" y="2">db</text>')
+    const shownBack = retry[1]!.content as ReadonlyArray<{ text?: string }>
+    expect(shownBack[0]?.text).toContain('<text x="2" y="2">db</text>')
     expect(retry[2]!.content).toBe('That did not validate: element <text> is not allowed. Reply again with a corrected SVG that follows the format exactly. SVG only.')
   })
 
