@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-13 18:51 · Orchestrator · Quint specs for follow state and read state merged (`specs/`). Simulator mode: 10,000 runs per protocol converge; seven past-bug schedules produce counterexamples. The sync fix must guard fetches by generation and observation time, page fully and probe absent follows, keep newer observations while a change is pending, and refresh after a final outbox failure.
 - 10-13 18:14 · Tushar · Model routing: Codex for well-defined code and maths-like work (it starts the Quint specs), never UI or tests coupled to implementation; Fable for design; Opus for correctness work and reviews. When limits hit, wait for resets rather than giving design to Codex.
 - 10-13 17:56 · Tushar · Formal specs in Quint for the concurrent sync protocols: follow/unfollow and read state first (after the M3 sync fixes), then merge ordering and the outbox before M6. Model checker in CI; specs generate event orderings for the convergence test; changing sync behaviour means updating the spec.
 - 10-13 17:52 · Tushar · Topic tiles get AI-generated art about each topic's content (not random generative marks). Explore approaches before building. Channel marks stay for Main rows and as the fallback.
