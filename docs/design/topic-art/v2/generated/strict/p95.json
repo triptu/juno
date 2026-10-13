@@ -1,0 +1,92 @@
+{
+  "level": "strict",
+  "model": "google/gemini-3.8-flash",
+  "topic": "p95",
+  "ok": true,
+  "spec": {
+    "hue": "coral",
+    "confident": true,
+    "elements": [
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M7 28 A13 13 0 1 1 33 28 Z",
+          "fill": "soft"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "20",
+          "cy": "27",
+          "r": "2.5",
+          "fill": "ink",
+          "stroke": "none"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "20",
+          "y1": "27",
+          "x2": "27",
+          "y2": "18",
+          "stroke-width": "2.5"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "28",
+          "cy": "17",
+          "r": "1.75",
+          "fill": "accent",
+          "stroke": "none"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "8",
+          "y1": "21",
+          "x2": "11",
+          "y2": "21",
+          "stroke-width": "2",
+          "detail": "1"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "20",
+          "y1": "9",
+          "x2": "20",
+          "y2": "12",
+          "stroke-width": "2",
+          "detail": "1"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "29",
+          "y1": "21",
+          "x2": "32",
+          "y2": "21",
+          "stroke-width": "2",
+          "detail": "1"
+        }
+      }
+    ]
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"coral\">\n  <path d=\"M7 28 A13 13 0 1 1 33 28 Z\" fill=\"soft\"/>\n  <circle cx=\"20\" cy=\"27\" r=\"2.5\" fill=\"ink\" stroke=\"none\"/>\n  <line x1=\"20\" y1=\"27\" x2=\"27\" y2=\"18\" stroke-width=\"2.5\"/>\n  <circle cx=\"28\" cy=\"17\" r=\"1.75\" fill=\"accent\" stroke=\"none\"/>\n  <line x1=\"8\" y1=\"21\" x2=\"11\" y2=\"21\" stroke-width=\"2\" detail=\"1\"/>\n  <line x1=\"20\" y1=\"9\" x2=\"20\" y2=\"12\" stroke-width=\"2\" detail=\"1\"/>\n  <line x1=\"29\" y1=\"21\" x2=\"32\" y2=\"21\" stroke-width=\"2\" detail=\"1\"/>\n</svg>",
+  "elements": 7,
+  "attempts": 1,
+  "latencyMs": 1246,
+  "costUsd": 0.00200475,
+  "tokens": {
+    "in": 1353,
+    "out": 264
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"coral\">\n  <path d=\"M7 28 A13 13 0 1 1 33 28 Z\" fill=\"soft\"/>\n  <circle cx=\"20\" cy=\"27\" r=\"2.5\" fill=\"ink\" stroke=\"none\"/>\n  <line x1=\"20\" y1=\"27\" x2=\"27\" y2=\"18\" stroke-width=\"2.5\"/>\n  <circle cx=\"28\" cy=\"17\" r=\"1.75\" fill=\"accent\" stroke=\"none\"/>\n  <line x1=\"8\" y1=\"21\" x2=\"11\" y2=\"21\" stroke-width=\"2\" detail=\"1\"/>\n  <line x1=\"20\" y1=\"9\" x2=\"20\" y2=\"12\" stroke-width=\"2\" detail=\"1\"/>\n  <line x1=\"29\" y1=\"21\" x2=\"32\" y2=\"21\" stroke-width=\"2\" detail=\"1\"/>\n</svg>"
+}

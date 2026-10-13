@@ -1,0 +1,65 @@
+{
+  "level": "relaxed",
+  "model": "google/gemini-3.8-flash",
+  "topic": "tf-lock",
+  "ok": true,
+  "spec": {
+    "hue": "teal",
+    "elements": [
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M14 18 V13 A6 6 0 0 1 26 13 V18",
+          "stroke": "ink",
+          "stroke-width": "2.75",
+          "fill": "none"
+        }
+      },
+      {
+        "tag": "rect",
+        "attrs": {
+          "x": "9",
+          "y": "18",
+          "width": "22",
+          "height": "15",
+          "rx": "3.5",
+          "fill": "soft",
+          "stroke": "ink",
+          "stroke-width": "2.75"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "20",
+          "cy": "24.5",
+          "r": "2",
+          "fill": "accent",
+          "stroke": "none"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "20",
+          "y1": "26",
+          "x2": "20",
+          "y2": "29",
+          "stroke": "ink",
+          "stroke-width": "2",
+          "stroke-linecap": "round"
+        }
+      }
+    ]
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"teal\">\n  <path d=\"M14 18 V13 A6 6 0 0 1 26 13 V18\" stroke=\"ink\" stroke-width=\"2.75\" fill=\"none\"/>\n  <rect x=\"9\" y=\"18\" width=\"22\" height=\"15\" rx=\"3.5\" fill=\"soft\" stroke=\"ink\" stroke-width=\"2.75\"/>\n  <circle cx=\"20\" cy=\"24.5\" r=\"2\" fill=\"accent\" stroke=\"none\"/>\n  <line x1=\"20\" y1=\"26\" x2=\"20\" y2=\"29\" stroke=\"ink\" stroke-width=\"2\" stroke-linecap=\"round\"/>\n</svg>",
+  "elements": 4,
+  "attempts": 1,
+  "latencyMs": 1935,
+  "costUsd": 0.00167325,
+  "tokens": {
+    "in": 1261,
+    "out": 194
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"teal\">\n  <path d=\"M14 18 V13 A6 6 0 0 1 26 13 V18\" stroke=\"ink\" stroke-width=\"2.75\" fill=\"none\"/>\n  <rect x=\"9\" y=\"18\" width=\"22\" height=\"15\" rx=\"3.5\" fill=\"soft\" stroke=\"ink\" stroke-width=\"2.75\"/>\n  <circle cx=\"20\" cy=\"24.5\" r=\"2\" fill=\"accent\" stroke=\"none\"/>\n  <line x1=\"20\" y1=\"26\" x2=\"20\" y2=\"29\" stroke=\"ink\" stroke-width=\"2\" stroke-linecap=\"round\"/>\n</svg>"
+}

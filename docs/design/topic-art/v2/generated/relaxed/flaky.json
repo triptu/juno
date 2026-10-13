@@ -1,0 +1,89 @@
+{
+  "level": "relaxed",
+  "model": "google/gemini-3.8-flash",
+  "topic": "flaky",
+  "ok": true,
+  "spec": {
+    "hue": "coral",
+    "confident": true,
+    "elements": [
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M16 7 H24 V16 L32 29 A3 3 0 0 1 29 33 H11 A3 3 0 0 1 8 29 L16 16 Z",
+          "stroke": "ink",
+          "stroke-width": "2.75",
+          "stroke-linecap": "round",
+          "stroke-linejoin": "round",
+          "fill": "none"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M12.5 24 H27.5 L30.5 30 A2 2 0 0 1 28.8 32 H11.2 A2 2 0 0 1 9.5 30 Z",
+          "fill": "soft",
+          "stroke": "none"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "14",
+          "y1": "7",
+          "x2": "26",
+          "y2": "7",
+          "stroke": "ink",
+          "stroke-width": "2.75",
+          "stroke-linecap": "round"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "17",
+          "cy": "27",
+          "r": "1.6",
+          "fill": "accent",
+          "stroke": "none",
+          "detail": "1"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "23",
+          "cy": "29",
+          "r": "1.2",
+          "fill": "accent2",
+          "stroke": "none",
+          "detail": "1"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "20",
+          "y1": "11",
+          "x2": "20",
+          "y2": "14",
+          "stroke": "ink",
+          "stroke-dasharray": "1 2.5",
+          "stroke-width": "2",
+          "stroke-linecap": "round",
+          "detail": "1"
+        }
+      }
+    ]
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"coral\">\n  <path d=\"M16 7 H24 V16 L32 29 A3 3 0 0 1 29 33 H11 A3 3 0 0 1 8 29 L16 16 Z\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" fill=\"none\"/>\n  <path d=\"M12.5 24 H27.5 L30.5 30 A2 2 0 0 1 28.8 32 H11.2 A2 2 0 0 1 9.5 30 Z\" fill=\"soft\" stroke=\"none\"/>\n  <line x1=\"14\" y1=\"7\" x2=\"26\" y2=\"7\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linecap=\"round\"/>\n  <circle cx=\"17\" cy=\"27\" r=\"1.6\" fill=\"accent\" stroke=\"none\" detail=\"1\"/>\n  <circle cx=\"23\" cy=\"29\" r=\"1.2\" fill=\"accent2\" stroke=\"none\" detail=\"1\"/>\n  <line x1=\"20\" y1=\"11\" x2=\"20\" y2=\"14\" stroke=\"ink\" stroke-dasharray=\"1 2.5\" stroke-width=\"2\" stroke-linecap=\"round\" detail=\"1\"/>\n</svg>",
+  "elements": 6,
+  "attempts": 1,
+  "latencyMs": 1868,
+  "costUsd": 0.00241125,
+  "tokens": {
+    "in": 1395,
+    "out": 364
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"coral\">\n  <path d=\"M16 7 H24 V16 L32 29 A3 3 0 0 1 29 33 H11 A3 3 0 0 1 8 29 L16 16 Z\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" fill=\"none\"/>\n  <path d=\"M12.5 24 H27.5 L30.5 30 A2 2 0 0 1 28.8 32 H11.2 A2 2 0 0 1 9.5 30 Z\" fill=\"soft\" stroke=\"none\"/>\n  <line x1=\"14\" y1=\"7\" x2=\"26\" y2=\"7\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linecap=\"round\"/>\n  <circle cx=\"17\" cy=\"27\" r=\"1.6\" fill=\"accent\" stroke=\"none\" detail=\"1\"/>\n  <circle cx=\"23\" cy=\"29\" r=\"1.2\" fill=\"accent2\" stroke=\"none\" detail=\"1\"/>\n  <line x1=\"20\" y1=\"11\" x2=\"20\" y2=\"14\" stroke=\"ink\" stroke-dasharray=\"1 2.5\" stroke-width=\"2\" stroke-linecap=\"round\" detail=\"1\"/>\n</svg>"
+}

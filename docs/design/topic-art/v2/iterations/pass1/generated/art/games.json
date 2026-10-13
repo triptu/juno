@@ -1,0 +1,110 @@
+{
+  "level": "art",
+  "model": "google/gemini-3.8-flash",
+  "topic": "games",
+  "ok": true,
+  "spec": {
+    "hue": "coral",
+    "elements": [
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M10 13 L20 7 L30 13 L20 19 Z",
+          "fill": "soft",
+          "stroke": "ink",
+          "stroke-width": "2.75",
+          "stroke-linejoin": "round"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M10 13 L20 19 L20 33 L10 27 Z",
+          "fill": "soft",
+          "stroke": "ink",
+          "stroke-width": "2.75",
+          "stroke-linejoin": "round"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M20 19 L30 13 L30 27 L20 33 Z",
+          "fill": "soft",
+          "stroke": "ink",
+          "stroke-width": "2.75",
+          "stroke-linejoin": "round"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "20",
+          "cy": "13",
+          "r": "1.5",
+          "fill": "accent"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "14",
+          "cy": "22",
+          "r": "1.5",
+          "fill": "ink",
+          "detail": "1"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "16",
+          "cy": "28",
+          "r": "1.5",
+          "fill": "ink",
+          "detail": "1"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "24",
+          "cy": "23",
+          "r": "1.5",
+          "fill": "ink",
+          "detail": "1"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "26",
+          "cy": "26",
+          "r": "1.5",
+          "fill": "ink",
+          "detail": "1"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "24",
+          "cy": "29",
+          "r": "1.5",
+          "fill": "ink",
+          "detail": "1"
+        }
+      }
+    ]
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"coral\">\n  <path d=\"M10 13 L20 7 L30 13 L20 19 Z\" fill=\"soft\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linejoin=\"round\"/>\n  <path d=\"M10 13 L20 19 L20 33 L10 27 Z\" fill=\"soft\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linejoin=\"round\"/>\n  <path d=\"M20 19 L30 13 L30 27 L20 33 Z\" fill=\"soft\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linejoin=\"round\"/>\n  <circle cx=\"20\" cy=\"13\" r=\"1.5\" fill=\"accent\"/>\n  <circle cx=\"14\" cy=\"22\" r=\"1.5\" fill=\"ink\" detail=\"1\"/>\n  <circle cx=\"16\" cy=\"28\" r=\"1.5\" fill=\"ink\" detail=\"1\"/>\n  <circle cx=\"24\" cy=\"23\" r=\"1.5\" fill=\"ink\" detail=\"1\"/>\n  <circle cx=\"26\" cy=\"26\" r=\"1.5\" fill=\"ink\" detail=\"1\"/>\n  <circle cx=\"24\" cy=\"29\" r=\"1.5\" fill=\"ink\" detail=\"1\"/>\n</svg>",
+  "elements": 9,
+  "attempts": 2,
+  "latencyMs": 4311,
+  "costUsd": 0.01772775,
+  "tokens": {
+    "in": 1897,
+    "out": 4348
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"coral\">\n  <path d=\"M10 13 L20 7 L30 13 L20 19 Z\" fill=\"soft\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linejoin=\"round\"/>\n  <path d=\"M10 13 L20 19 L20 33 L10 27 Z\" fill=\"soft\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linejoin=\"round\"/>\n  <path d=\"M20 19 L30 13 L30 27 L20 33 Z\" fill=\"soft\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linejoin=\"round\"/>\n  <circle cx=\"20\" cy=\"13\" r=\"1.5\" fill=\"accent\"/>\n  <circle cx=\"14\" cy=\"22\" r=\"1.5\" fill=\"ink\" detail=\"1\"/>\n  <circle cx=\"16\" cy=\"28\" r=\"1.5\" fill=\"ink\" detail=\"1\"/>\n  <circle cx=\"24\" cy=\"23\" r=\"1.5\" fill=\"ink\" detail=\"1\"/>\n  <circle cx=\"26\" cy=\"26\" r=\"1.5\" fill=\"ink\" detail=\"1\"/>\n  <circle cx=\"24\" cy=\"29\" r=\"1.5\" fill=\"ink\" detail=\"1\"/>\n</svg>"
+}

@@ -1,0 +1,51 @@
+{
+  "level": "strict",
+  "model": "google/gemini-3.8-flash",
+  "topic": "flags",
+  "ok": true,
+  "spec": {
+    "hue": "teal",
+    "confident": true,
+    "elements": [
+      {
+        "tag": "rect",
+        "attrs": {
+          "x": "5",
+          "y": "10",
+          "width": "30",
+          "height": "20",
+          "rx": "10",
+          "fill": "soft"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "25",
+          "cy": "20",
+          "r": "6.5"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "25",
+          "cy": "20",
+          "r": "2.5",
+          "fill": "accent",
+          "stroke": "none"
+        }
+      }
+    ]
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"teal\">\n  <rect x=\"5\" y=\"10\" width=\"30\" height=\"20\" rx=\"10\" fill=\"soft\"/>\n  <circle cx=\"25\" cy=\"20\" r=\"6.5\"/>\n  <circle cx=\"25\" cy=\"20\" r=\"2.5\" fill=\"accent\" stroke=\"none\"/>\n</svg>",
+  "elements": 3,
+  "attempts": 1,
+  "latencyMs": 2624,
+  "costUsd": 0.00784425,
+  "tokens": {
+    "in": 1339,
+    "out": 1824
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"teal\">\n  <rect x=\"5\" y=\"10\" width=\"30\" height=\"20\" rx=\"10\" fill=\"soft\"/>\n  <circle cx=\"25\" cy=\"20\" r=\"6.5\"/>\n  <circle cx=\"25\" cy=\"20\" r=\"2.5\" fill=\"accent\" stroke=\"none\"/>\n</svg>"
+}

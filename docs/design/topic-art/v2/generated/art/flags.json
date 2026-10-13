@@ -1,0 +1,77 @@
+{
+  "level": "art",
+  "model": "google/gemini-3.8-flash",
+  "topic": "flags",
+  "ok": true,
+  "spec": {
+    "hue": "teal",
+    "confident": true,
+    "elements": [
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M10 7.5h20.5l-5.5 8 5.5 8H10Z",
+          "fill": "soft",
+          "stroke": "ink",
+          "stroke-width": "2.75",
+          "stroke-linejoin": "round"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "17.5",
+          "cy": "15.5",
+          "r": "2.5",
+          "fill": "accent",
+          "detail": "1"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "10",
+          "y1": "6",
+          "x2": "10",
+          "y2": "35",
+          "stroke": "ink",
+          "stroke-width": "2.75",
+          "stroke-linecap": "round"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "6",
+          "y1": "35",
+          "x2": "14",
+          "y2": "35",
+          "stroke": "ink",
+          "stroke-width": "2.75",
+          "stroke-linecap": "round"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "10",
+          "cy": "5",
+          "r": "2",
+          "fill": "accent",
+          "stroke": "ink",
+          "stroke-width": "2"
+        }
+      }
+    ]
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"teal\">\n  <path d=\"M10 7.5h20.5l-5.5 8 5.5 8H10Z\" fill=\"soft\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linejoin=\"round\"/>\n  <circle cx=\"17.5\" cy=\"15.5\" r=\"2.5\" fill=\"accent\" detail=\"1\"/>\n  <line x1=\"10\" y1=\"6\" x2=\"10\" y2=\"35\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linecap=\"round\"/>\n  <line x1=\"6\" y1=\"35\" x2=\"14\" y2=\"35\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linecap=\"round\"/>\n  <circle cx=\"10\" cy=\"5\" r=\"2\" fill=\"accent\" stroke=\"ink\" stroke-width=\"2\"/>\n</svg>",
+  "elements": 5,
+  "attempts": 1,
+  "latencyMs": 2395,
+  "costUsd": 0.01230375,
+  "tokens": {
+    "in": 1085,
+    "out": 3064
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"teal\">\n  <path d=\"M10 7.5h20.5l-5.5 8 5.5 8H10Z\" fill=\"soft\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linejoin=\"round\"/>\n  <circle cx=\"17.5\" cy=\"15.5\" r=\"2.5\" fill=\"accent\" detail=\"1\"/>\n  <line x1=\"10\" y1=\"6\" x2=\"10\" y2=\"35\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linecap=\"round\"/>\n  <line x1=\"6\" y1=\"35\" x2=\"14\" y2=\"35\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linecap=\"round\"/>\n  <circle cx=\"10\" cy=\"5\" r=\"2\" fill=\"accent\" stroke=\"ink\" stroke-width=\"2\"/>\n</svg>"
+}

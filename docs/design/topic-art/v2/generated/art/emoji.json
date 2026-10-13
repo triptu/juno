@@ -1,0 +1,77 @@
+{
+  "level": "art",
+  "model": "google/gemini-3.8-flash",
+  "topic": "emoji",
+  "ok": true,
+  "spec": {
+    "hue": "sky",
+    "confident": false,
+    "elements": [
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M17 26 C17 30.5 18.5 34.5 20 35.5 C21.5 34.5 23 30.5 23 26 Z",
+          "fill": "accent",
+          "stroke": "ink",
+          "stroke-width": "2.5",
+          "stroke-linejoin": "round"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M13.5 19 C10 21.5 7 24.5 6.5 28.5 C10 28.5 13 27.5 14.5 25",
+          "fill": "soft",
+          "stroke": "ink",
+          "stroke-width": "2.75",
+          "stroke-linecap": "round",
+          "stroke-linejoin": "round"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M26.5 19 C30 21.5 33 24.5 33.5 28.5 C30 28.5 27 27.5 25.5 25",
+          "fill": "soft",
+          "stroke": "ink",
+          "stroke-width": "2.75",
+          "stroke-linecap": "round",
+          "stroke-linejoin": "round"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M20 5 C14 12 13 20 14 26 L26 26 C27 20 26 12 20 5 Z",
+          "fill": "soft",
+          "stroke": "ink",
+          "stroke-width": "2.75",
+          "stroke-linecap": "round",
+          "stroke-linejoin": "round"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "20",
+          "cy": "15.5",
+          "r": "3",
+          "fill": "accent2",
+          "stroke": "ink",
+          "stroke-width": "2",
+          "detail": "1"
+        }
+      }
+    ]
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"sky\" data-confident=\"false\">\n  <path d=\"M17 26 C17 30.5 18.5 34.5 20 35.5 C21.5 34.5 23 30.5 23 26 Z\" fill=\"accent\" stroke=\"ink\" stroke-width=\"2.5\" stroke-linejoin=\"round\"/>\n  <path d=\"M13.5 19 C10 21.5 7 24.5 6.5 28.5 C10 28.5 13 27.5 14.5 25\" fill=\"soft\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>\n  <path d=\"M26.5 19 C30 21.5 33 24.5 33.5 28.5 C30 28.5 27 27.5 25.5 25\" fill=\"soft\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>\n  <path d=\"M20 5 C14 12 13 20 14 26 L26 26 C27 20 26 12 20 5 Z\" fill=\"soft\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>\n  <circle cx=\"20\" cy=\"15.5\" r=\"3\" fill=\"accent2\" stroke=\"ink\" stroke-width=\"2\" detail=\"1\"/>\n</svg>",
+  "elements": 5,
+  "attempts": 1,
+  "latencyMs": 2869,
+  "costUsd": 0.0071985,
+  "tokens": {
+    "in": 1068,
+    "out": 1706
+  },
+  "raw": "```xml\n<svg viewBox=\"0 0 40 40\" data-hue=\"sky\" data-confident=\"false\">\n  <path d=\"M17 26 C17 30.5 18.5 34.5 20 35.5 C21.5 34.5 23 30.5 23 26 Z\" fill=\"accent\" stroke=\"ink\" stroke-width=\"2.5\" stroke-linejoin=\"round\"/>\n  <path d=\"M13.5 19 C10 21.5 7 24.5 6.5 28.5 C10 28.5 13 27.5 14.5 25\" fill=\"soft\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>\n  <path d=\"M26.5 19 C30 21.5 33 24.5 33.5 28.5 C30 28.5 27 27.5 25.5 25\" fill=\"soft\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>\n  <path d=\"M20 5 C14 12 13 20 14 26 L26 26 C27 20 26 12 20 5 Z\" fill=\"soft\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>\n  <circle cx=\"20\" cy=\"15.5\" r=\"3\" fill=\"accent2\" stroke=\"ink\" stroke-width=\"2\" detail=\"1\"/>\n</svg>\n```"
+}

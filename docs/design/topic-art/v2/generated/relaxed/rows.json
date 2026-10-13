@@ -1,0 +1,106 @@
+{
+  "level": "relaxed",
+  "model": "google/gemini-3.8-flash",
+  "topic": "rows",
+  "ok": true,
+  "spec": {
+    "hue": "periwinkle",
+    "confident": true,
+    "elements": [
+      {
+        "tag": "rect",
+        "attrs": {
+          "x": "7",
+          "y": "6",
+          "width": "26",
+          "height": "28",
+          "rx": "4",
+          "fill": "soft"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "12.5",
+          "cy": "13.5",
+          "r": "2",
+          "fill": "accent",
+          "stroke": "none"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "18",
+          "y1": "12",
+          "x2": "28",
+          "y2": "12",
+          "stroke-width": "2.5"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "18",
+          "y1": "16",
+          "x2": "25",
+          "y2": "16",
+          "stroke-width": "1.75",
+          "detail": "1"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "8.5",
+          "y1": "20",
+          "x2": "31.5",
+          "y2": "20",
+          "stroke-width": "1.5",
+          "opacity": "0.4"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "12.5",
+          "cy": "26.5",
+          "r": "2",
+          "fill": "none",
+          "stroke-width": "1.75"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "18",
+          "y1": "25",
+          "x2": "28",
+          "y2": "25",
+          "stroke-width": "2.5"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "18",
+          "y1": "29",
+          "x2": "23",
+          "y2": "29",
+          "stroke-width": "1.75",
+          "detail": "1"
+        }
+      }
+    ]
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"periwinkle\">\n  <rect x=\"7\" y=\"6\" width=\"26\" height=\"28\" rx=\"4\" fill=\"soft\"/>\n  <circle cx=\"12.5\" cy=\"13.5\" r=\"2\" fill=\"accent\" stroke=\"none\"/>\n  <line x1=\"18\" y1=\"12\" x2=\"28\" y2=\"12\" stroke-width=\"2.5\"/>\n  <line x1=\"18\" y1=\"16\" x2=\"25\" y2=\"16\" stroke-width=\"1.75\" detail=\"1\"/>\n  <line x1=\"8.5\" y1=\"20\" x2=\"31.5\" y2=\"20\" stroke-width=\"1.5\" opacity=\"0.4\"/>\n  <circle cx=\"12.5\" cy=\"26.5\" r=\"2\" fill=\"none\" stroke-width=\"1.75\"/>\n  <line x1=\"18\" y1=\"25\" x2=\"28\" y2=\"25\" stroke-width=\"2.5\"/>\n  <line x1=\"18\" y1=\"29\" x2=\"23\" y2=\"29\" stroke-width=\"1.75\" detail=\"1\"/>\n</svg>",
+  "elements": 8,
+  "attempts": 1,
+  "latencyMs": 2701,
+  "costUsd": 0.004449,
+  "tokens": {
+    "in": 1417,
+    "out": 903
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"periwinkle\">\n  <rect x=\"7\" y=\"6\" width=\"26\" height=\"28\" rx=\"4\" fill=\"soft\"/>\n  <circle cx=\"12.5\" cy=\"13.5\" r=\"2\" fill=\"accent\" stroke=\"none\"/>\n  <line x1=\"18\" y1=\"12\" x2=\"28\" y2=\"12\" stroke-width=\"2.5\"/>\n  <line x1=\"18\" y1=\"16\" x2=\"25\" y2=\"16\" stroke-width=\"1.75\" detail=\"1\"/>\n  <line x1=\"8.5\" y1=\"20\" x2=\"31.5\" y2=\"20\" stroke-width=\"1.5\" opacity=\"0.4\"/>\n  <circle cx=\"12.5\" cy=\"26.5\" r=\"2\" fill=\"none\" stroke-width=\"1.75\"/>\n  <line x1=\"18\" y1=\"25\" x2=\"28\" y2=\"25\" stroke-width=\"2.5\"/>\n  <line x1=\"18\" y1=\"29\" x2=\"23\" y2=\"29\" stroke-width=\"1.75\" detail=\"1\"/>\n</svg>"
+}

@@ -1,0 +1,82 @@
+{
+  "level": "relaxed",
+  "model": "google/gemini-3.8-flash",
+  "topic": "one-on-one",
+  "ok": true,
+  "spec": {
+    "hue": "periwinkle",
+    "elements": [
+      {
+        "tag": "rect",
+        "attrs": {
+          "x": "9",
+          "y": "8",
+          "width": "22",
+          "height": "25",
+          "rx": "3.5",
+          "fill": "soft"
+        }
+      },
+      {
+        "tag": "rect",
+        "attrs": {
+          "x": "9",
+          "y": "8",
+          "width": "22",
+          "height": "25",
+          "rx": "3.5"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "14",
+          "y1": "15",
+          "x2": "26",
+          "y2": "15",
+          "stroke-width": "2.5"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "14",
+          "y1": "20.5",
+          "x2": "26",
+          "y2": "20.5",
+          "stroke-width": "2.5"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "14",
+          "y1": "26",
+          "x2": "21",
+          "y2": "26",
+          "stroke-width": "2.5"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "28",
+          "cy": "10",
+          "r": "2.5",
+          "fill": "accent",
+          "stroke": "none"
+        }
+      }
+    ]
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"periwinkle\">\n  <rect x=\"9\" y=\"8\" width=\"22\" height=\"25\" rx=\"3.5\" fill=\"soft\"/>\n  <rect x=\"9\" y=\"8\" width=\"22\" height=\"25\" rx=\"3.5\"/>\n  <line x1=\"14\" y1=\"15\" x2=\"26\" y2=\"15\" stroke-width=\"2.5\"/>\n  <line x1=\"14\" y1=\"20.5\" x2=\"26\" y2=\"20.5\" stroke-width=\"2.5\"/>\n  <line x1=\"14\" y1=\"26\" x2=\"21\" y2=\"26\" stroke-width=\"2.5\"/>\n  <circle cx=\"28\" cy=\"10\" r=\"2.5\" fill=\"accent\" stroke=\"none\"/>\n</svg>",
+  "elements": 6,
+  "attempts": 1,
+  "latencyMs": 2187,
+  "costUsd": 0.0018135,
+  "tokens": {
+    "in": 1288,
+    "out": 226
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"periwinkle\">\n  <rect x=\"9\" y=\"8\" width=\"22\" height=\"25\" rx=\"3.5\" fill=\"soft\"/>\n  <rect x=\"9\" y=\"8\" width=\"22\" height=\"25\" rx=\"3.5\"/>\n  <line x1=\"14\" y1=\"15\" x2=\"26\" y2=\"15\" stroke-width=\"2.5\"/>\n  <line x1=\"14\" y1=\"20.5\" x2=\"26\" y2=\"20.5\" stroke-width=\"2.5\"/>\n  <line x1=\"14\" y1=\"26\" x2=\"21\" y2=\"26\" stroke-width=\"2.5\"/>\n  <circle cx=\"28\" cy=\"10\" r=\"2.5\" fill=\"accent\" stroke=\"none\"/>\n</svg>"
+}

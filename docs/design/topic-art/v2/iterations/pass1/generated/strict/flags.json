@@ -1,0 +1,48 @@
+{
+  "level": "strict",
+  "model": "google/gemini-3.8-flash",
+  "topic": "flags",
+  "ok": true,
+  "spec": {
+    "hue": "teal",
+    "elements": [
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "9",
+          "y1": "7",
+          "x2": "9",
+          "y2": "33"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M9 8 H28 L23.5 15.5 L28 23 H9 Z",
+          "fill": "soft"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "27",
+          "cy": "28",
+          "r": "2.2",
+          "fill": "accent",
+          "stroke": "none",
+          "detail": "1"
+        }
+      }
+    ]
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"teal\">\n  <line x1=\"9\" y1=\"7\" x2=\"9\" y2=\"33\"/>\n  <path d=\"M9 8 H28 L23.5 15.5 L28 23 H9 Z\" fill=\"soft\"/>\n  <circle cx=\"27\" cy=\"28\" r=\"2.2\" fill=\"accent\" stroke=\"none\" detail=\"1\"/>\n</svg>",
+  "elements": 3,
+  "attempts": 2,
+  "latencyMs": 4103,
+  "costUsd": 0.011711250000000001,
+  "tokens": {
+    "in": 2545,
+    "out": 2614
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"teal\">\n  <line x1=\"9\" y1=\"7\" x2=\"9\" y2=\"33\"/>\n  <path d=\"M9 8 H28 L23.5 15.5 L28 23 H9 Z\" fill=\"soft\"/>\n  <circle cx=\"27\" cy=\"28\" r=\"2.2\" fill=\"accent\" stroke=\"none\" detail=\"1\"/>\n</svg>"
+}

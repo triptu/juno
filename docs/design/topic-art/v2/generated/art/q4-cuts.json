@@ -1,0 +1,109 @@
+{
+  "level": "art",
+  "model": "google/gemini-3.8-flash",
+  "topic": "q4-cuts",
+  "ok": true,
+  "spec": {
+    "hue": "coral",
+    "confident": true,
+    "elements": [
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M12 28 C8 32 7 35 10 37 C13 39 16 37 19 32 L22 25 L16 21 Z",
+          "fill": "soft",
+          "stroke": "ink",
+          "stroke-width": "2.5",
+          "stroke-linejoin": "round"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "12",
+          "cy": "33",
+          "r": "3",
+          "fill": "none",
+          "stroke": "ink",
+          "stroke-width": "2.5"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M25 19 L34 11 C35.5 9.5 35 7.5 33 7.5 C31.5 7.5 28 10 20 18 Z",
+          "fill": "soft",
+          "stroke": "ink",
+          "stroke-width": "2.5",
+          "stroke-linejoin": "round"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M28 12 C32 8 35 7 37 10 C39 13 37 16 32 19 L25 22 L21 16 Z",
+          "fill": "soft",
+          "stroke": "ink",
+          "stroke-width": "2.5",
+          "stroke-linejoin": "round"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "33",
+          "cy": "12",
+          "r": "3",
+          "fill": "none",
+          "stroke": "ink",
+          "stroke-width": "2.5"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M19 25 L11 34 C9.5 35.5 7.5 35 7.5 33 C7.5 31.5 10 28 18 20 Z",
+          "fill": "soft",
+          "stroke": "ink",
+          "stroke-width": "2.5",
+          "stroke-linejoin": "round"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "21",
+          "cy": "21",
+          "r": "2.5",
+          "fill": "accent",
+          "stroke": "ink",
+          "stroke-width": "2"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "6",
+          "y1": "9",
+          "x2": "16",
+          "y2": "9",
+          "stroke": "ink",
+          "stroke-width": "2",
+          "stroke-linecap": "round",
+          "stroke-dasharray": "2 3",
+          "detail": "1"
+        }
+      }
+    ]
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"coral\">\n  <path d=\"M12 28 C8 32 7 35 10 37 C13 39 16 37 19 32 L22 25 L16 21 Z\" fill=\"soft\" stroke=\"ink\" stroke-width=\"2.5\" stroke-linejoin=\"round\"/>\n  <circle cx=\"12\" cy=\"33\" r=\"3\" fill=\"none\" stroke=\"ink\" stroke-width=\"2.5\"/>\n  <path d=\"M25 19 L34 11 C35.5 9.5 35 7.5 33 7.5 C31.5 7.5 28 10 20 18 Z\" fill=\"soft\" stroke=\"ink\" stroke-width=\"2.5\" stroke-linejoin=\"round\"/>\n  <path d=\"M28 12 C32 8 35 7 37 10 C39 13 37 16 32 19 L25 22 L21 16 Z\" fill=\"soft\" stroke=\"ink\" stroke-width=\"2.5\" stroke-linejoin=\"round\"/>\n  <circle cx=\"33\" cy=\"12\" r=\"3\" fill=\"none\" stroke=\"ink\" stroke-width=\"2.5\"/>\n  <path d=\"M19 25 L11 34 C9.5 35.5 7.5 35 7.5 33 C7.5 31.5 10 28 18 20 Z\" fill=\"soft\" stroke=\"ink\" stroke-width=\"2.5\" stroke-linejoin=\"round\"/>\n  <circle cx=\"21\" cy=\"21\" r=\"2.5\" fill=\"accent\" stroke=\"ink\" stroke-width=\"2\"/>\n  <line x1=\"6\" y1=\"9\" x2=\"16\" y2=\"9\" stroke=\"ink\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-dasharray=\"2 3\" detail=\"1\"/>\n</svg>",
+  "elements": 8,
+  "attempts": 1,
+  "latencyMs": 2148,
+  "costUsd": 0.00374775,
+  "tokens": {
+    "in": 1102,
+    "out": 779
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"coral\">\n  <path d=\"M12 28 C8 32 7 35 10 37 C13 39 16 37 19 32 L22 25 L16 21 Z\" fill=\"soft\" stroke=\"ink\" stroke-width=\"2.5\" stroke-linejoin=\"round\"/>\n  <circle cx=\"12\" cy=\"33\" r=\"3\" fill=\"none\" stroke=\"ink\" stroke-width=\"2.5\"/>\n  <path d=\"M25 19 L34 11 C35.5 9.5 35 7.5 33 7.5 C31.5 7.5 28 10 20 18 Z\" fill=\"soft\" stroke=\"ink\" stroke-width=\"2.5\" stroke-linejoin=\"round\"/>\n  <path d=\"M28 12 C32 8 35 7 37 10 C39 13 37 16 32 19 L25 22 L21 16 Z\" fill=\"soft\" stroke=\"ink\" stroke-width=\"2.5\" stroke-linejoin=\"round\"/>\n  <circle cx=\"33\" cy=\"12\" r=\"3\" fill=\"none\" stroke=\"ink\" stroke-width=\"2.5\"/>\n  <path d=\"M19 25 L11 34 C9.5 35.5 7.5 35 7.5 33 C7.5 31.5 10 28 18 20 Z\" fill=\"soft\" stroke=\"ink\" stroke-width=\"2.5\" stroke-linejoin=\"round\"/>\n  <circle cx=\"21\" cy=\"21\" r=\"2.5\" fill=\"accent\" stroke=\"ink\" stroke-width=\"2\"/>\n  <line x1=\"6\" y1=\"9\" x2=\"16\" y2=\"9\" stroke=\"ink\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-dasharray=\"2 3\" detail=\"1\"/>\n</svg>"
+}

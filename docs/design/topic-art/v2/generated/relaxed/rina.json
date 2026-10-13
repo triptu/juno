@@ -1,0 +1,106 @@
+{
+  "level": "relaxed",
+  "model": "google/gemini-3.8-flash",
+  "topic": "rina",
+  "ok": true,
+  "spec": {
+    "hue": "sage",
+    "confident": true,
+    "elements": [
+      {
+        "tag": "rect",
+        "attrs": {
+          "x": "9",
+          "y": "11",
+          "width": "22",
+          "height": "25",
+          "rx": "3",
+          "fill": "soft"
+        }
+      },
+      {
+        "tag": "rect",
+        "attrs": {
+          "x": "17",
+          "y": "14.5",
+          "width": "6",
+          "height": "2",
+          "rx": "1",
+          "fill": "ink",
+          "stroke": "none"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M15 4 L18.5 9 M25 4 L21.5 9",
+          "stroke-width": "2.5"
+        }
+      },
+      {
+        "tag": "rect",
+        "attrs": {
+          "x": "17",
+          "y": "8.5",
+          "width": "6",
+          "height": "4.5",
+          "rx": "1",
+          "fill": "accent",
+          "stroke-width": "2"
+        }
+      },
+      {
+        "tag": "rect",
+        "attrs": {
+          "x": "13",
+          "y": "20",
+          "width": "6",
+          "height": "6.5",
+          "rx": "1",
+          "stroke-width": "2"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "22.5",
+          "y1": "21.5",
+          "x2": "27",
+          "y2": "21.5",
+          "stroke-width": "2"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "22.5",
+          "y1": "25",
+          "x2": "26",
+          "y2": "25",
+          "stroke-width": "2"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "13",
+          "y1": "31",
+          "x2": "27",
+          "y2": "31",
+          "stroke-width": "2",
+          "detail": "1"
+        }
+      }
+    ]
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"sage\">\n  <rect x=\"9\" y=\"11\" width=\"22\" height=\"25\" rx=\"3\" fill=\"soft\"/>\n  <rect x=\"17\" y=\"14.5\" width=\"6\" height=\"2\" rx=\"1\" fill=\"ink\" stroke=\"none\"/>\n  <path d=\"M15 4 L18.5 9 M25 4 L21.5 9\" stroke-width=\"2.5\"/>\n  <rect x=\"17\" y=\"8.5\" width=\"6\" height=\"4.5\" rx=\"1\" fill=\"accent\" stroke-width=\"2\"/>\n  <rect x=\"13\" y=\"20\" width=\"6\" height=\"6.5\" rx=\"1\" stroke-width=\"2\"/>\n  <line x1=\"22.5\" y1=\"21.5\" x2=\"27\" y2=\"21.5\" stroke-width=\"2\"/>\n  <line x1=\"22.5\" y1=\"25\" x2=\"26\" y2=\"25\" stroke-width=\"2\"/>\n  <line x1=\"13\" y1=\"31\" x2=\"27\" y2=\"31\" stroke-width=\"2\" detail=\"1\"/>\n</svg>",
+  "elements": 8,
+  "attempts": 1,
+  "latencyMs": 2750,
+  "costUsd": 0.00991425,
+  "tokens": {
+    "in": 1409,
+    "out": 2362
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"sage\">\n  <rect x=\"9\" y=\"11\" width=\"22\" height=\"25\" rx=\"3\" fill=\"soft\"/>\n  <rect x=\"17\" y=\"14.5\" width=\"6\" height=\"2\" rx=\"1\" fill=\"ink\" stroke=\"none\"/>\n  <path d=\"M15 4 L18.5 9 M25 4 L21.5 9\" stroke-width=\"2.5\"/>\n  <rect x=\"17\" y=\"8.5\" width=\"6\" height=\"4.5\" rx=\"1\" fill=\"accent\" stroke-width=\"2\"/>\n  <rect x=\"13\" y=\"20\" width=\"6\" height=\"6.5\" rx=\"1\" stroke-width=\"2\"/>\n  <line x1=\"22.5\" y1=\"21.5\" x2=\"27\" y2=\"21.5\" stroke-width=\"2\"/>\n  <line x1=\"22.5\" y1=\"25\" x2=\"26\" y2=\"25\" stroke-width=\"2\"/>\n  <line x1=\"13\" y1=\"31\" x2=\"27\" y2=\"31\" stroke-width=\"2\" detail=\"1\"/>\n</svg>"
+}

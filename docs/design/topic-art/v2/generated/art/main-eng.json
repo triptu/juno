@@ -1,0 +1,88 @@
+{
+  "level": "art",
+  "model": "google/gemini-3.8-flash",
+  "topic": "main-eng",
+  "ok": true,
+  "spec": {
+    "hue": "teal",
+    "confident": true,
+    "elements": [
+      {
+        "tag": "rect",
+        "attrs": {
+          "x": "7",
+          "y": "10",
+          "width": "26",
+          "height": "20",
+          "rx": "3.5",
+          "fill": "soft",
+          "stroke": "ink",
+          "stroke-width": "2.75",
+          "stroke-linejoin": "round"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M12 7h16",
+          "stroke": "ink",
+          "stroke-width": "2.75",
+          "stroke-linecap": "round"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M15 7v3M25 7v3",
+          "stroke": "ink",
+          "stroke-width": "2.5",
+          "stroke-linecap": "round"
+        }
+      },
+      {
+        "tag": "polyline",
+        "attrs": {
+          "points": "13 17 17 20 13 23",
+          "fill": "none",
+          "stroke": "accent",
+          "stroke-width": "2.25",
+          "stroke-linecap": "round",
+          "stroke-linejoin": "round"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "20",
+          "y1": "23",
+          "x2": "26",
+          "y2": "23",
+          "stroke": "ink",
+          "stroke-width": "2.25",
+          "stroke-linecap": "round",
+          "detail": "1"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M13 30v3a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3",
+          "fill": "none",
+          "stroke": "ink",
+          "stroke-width": "2.5",
+          "stroke-linejoin": "round"
+        }
+      }
+    ]
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"teal\">\n  <rect x=\"7\" y=\"10\" width=\"26\" height=\"20\" rx=\"3.5\" fill=\"soft\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linejoin=\"round\"/>\n  <path d=\"M12 7h16\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linecap=\"round\"/>\n  <path d=\"M15 7v3M25 7v3\" stroke=\"ink\" stroke-width=\"2.5\" stroke-linecap=\"round\"/>\n  <polyline points=\"13 17 17 20 13 23\" fill=\"none\" stroke=\"accent\" stroke-width=\"2.25\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>\n  <line x1=\"20\" y1=\"23\" x2=\"26\" y2=\"23\" stroke=\"ink\" stroke-width=\"2.25\" stroke-linecap=\"round\" detail=\"1\"/>\n  <path d=\"M13 30v3a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3\" fill=\"none\" stroke=\"ink\" stroke-width=\"2.5\" stroke-linejoin=\"round\"/>\n</svg>",
+  "elements": 6,
+  "attempts": 1,
+  "latencyMs": 1250,
+  "costUsd": 0.00208275,
+  "tokens": {
+    "in": 1157,
+    "out": 324
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"teal\">\n  <rect x=\"7\" y=\"10\" width=\"26\" height=\"20\" rx=\"3.5\" fill=\"soft\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linejoin=\"round\"/>\n  <path d=\"M12 7h16\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linecap=\"round\"/>\n  <path d=\"M15 7v3M25 7v3\" stroke=\"ink\" stroke-width=\"2.5\" stroke-linecap=\"round\"/>\n  <polyline points=\"13 17 17 20 13 23\" fill=\"none\" stroke=\"accent\" stroke-width=\"2.25\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>\n  <line x1=\"20\" y1=\"23\" x2=\"26\" y2=\"23\" stroke=\"ink\" stroke-width=\"2.25\" stroke-linecap=\"round\" detail=\"1\"/>\n  <path d=\"M13 30v3a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3\" fill=\"none\" stroke=\"ink\" stroke-width=\"2.5\" stroke-linejoin=\"round\"/>\n</svg>"
+}

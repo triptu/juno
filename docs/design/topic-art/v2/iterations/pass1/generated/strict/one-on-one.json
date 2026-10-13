@@ -1,0 +1,75 @@
+{
+  "level": "strict",
+  "model": "google/gemini-3.8-flash",
+  "topic": "one-on-one",
+  "ok": true,
+  "spec": {
+    "hue": "plum",
+    "elements": [
+      {
+        "tag": "rect",
+        "attrs": {
+          "x": "9",
+          "y": "9",
+          "width": "22",
+          "height": "24",
+          "rx": "4",
+          "fill": "soft"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M15 10 V7 A2 2 0 0 1 17 5 H23 A2 2 0 0 1 25 7 V10 Z"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "14",
+          "y1": "16",
+          "x2": "26",
+          "y2": "16"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "14",
+          "y1": "21",
+          "x2": "26",
+          "y2": "21"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "14",
+          "y1": "26",
+          "x2": "20",
+          "y2": "26"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "25",
+          "cy": "26",
+          "r": "2",
+          "fill": "accent",
+          "stroke": "none"
+        }
+      }
+    ]
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"plum\">\n  <rect x=\"9\" y=\"9\" width=\"22\" height=\"24\" rx=\"4\" fill=\"soft\"/>\n  <path d=\"M15 10 V7 A2 2 0 0 1 17 5 H23 A2 2 0 0 1 25 7 V10 Z\"/>\n  <line x1=\"14\" y1=\"16\" x2=\"26\" y2=\"16\"/>\n  <line x1=\"14\" y1=\"21\" x2=\"26\" y2=\"21\"/>\n  <line x1=\"14\" y1=\"26\" x2=\"20\" y2=\"26\"/>\n  <circle cx=\"25\" cy=\"26\" r=\"2\" fill=\"accent\" stroke=\"none\"/>\n</svg>",
+  "elements": 6,
+  "attempts": 1,
+  "latencyMs": 2744,
+  "costUsd": 0.0037215,
+  "tokens": {
+    "in": 1232,
+    "out": 746
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"plum\">\n  <rect x=\"9\" y=\"9\" width=\"22\" height=\"24\" rx=\"4\" fill=\"soft\"/>\n  <path d=\"M15 10 V7 A2 2 0 0 1 17 5 H23 A2 2 0 0 1 25 7 V10 Z\"/>\n  <line x1=\"14\" y1=\"16\" x2=\"26\" y2=\"16\"/>\n  <line x1=\"14\" y1=\"21\" x2=\"26\" y2=\"21\"/>\n  <line x1=\"14\" y1=\"26\" x2=\"20\" y2=\"26\"/>\n  <circle cx=\"25\" cy=\"26\" r=\"2\" fill=\"accent\" stroke=\"none\"/>\n</svg>"
+}

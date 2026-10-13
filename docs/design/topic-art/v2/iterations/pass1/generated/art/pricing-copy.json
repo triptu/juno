@@ -1,0 +1,71 @@
+{
+  "level": "art",
+  "model": "google/gemini-3.8-flash",
+  "topic": "pricing-copy",
+  "ok": true,
+  "spec": {
+    "hue": "amber",
+    "elements": [
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M7.8 21.2 L19.8 9.2 C20.6 8.4 21.7 8 22.8 8 L30.5 8 C32.4 8 34 9.6 34 11.5 L34 19.2 C34 20.3 33.6 21.4 32.8 22.2 L20.8 34.2 C19.2 35.8 16.6 35.8 15 34.2 L7.8 27 C6.2 25.4 6.2 22.8 7.8 21.2 Z",
+          "fill": "soft",
+          "stroke": "ink",
+          "stroke-width": "2.75",
+          "stroke-linejoin": "round"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "27.5",
+          "cy": "14.5",
+          "r": "2.5",
+          "fill": "none",
+          "stroke": "ink",
+          "stroke-width": "2.75"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M15.5 24.5 L23.5 16.5",
+          "stroke": "ink",
+          "stroke-width": "2.2",
+          "stroke-linecap": "round",
+          "detail": "1"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "15.5",
+          "cy": "24.5",
+          "r": "1.5",
+          "fill": "accent"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M29 6 C28 3.5 24.5 3 23 4.5",
+          "fill": "none",
+          "stroke": "ink",
+          "stroke-width": "2",
+          "stroke-linecap": "round"
+        }
+      }
+    ]
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"amber\">\n  <path d=\"M7.8 21.2 L19.8 9.2 C20.6 8.4 21.7 8 22.8 8 L30.5 8 C32.4 8 34 9.6 34 11.5 L34 19.2 C34 20.3 33.6 21.4 32.8 22.2 L20.8 34.2 C19.2 35.8 16.6 35.8 15 34.2 L7.8 27 C6.2 25.4 6.2 22.8 7.8 21.2 Z\" fill=\"soft\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linejoin=\"round\"/>\n  <circle cx=\"27.5\" cy=\"14.5\" r=\"2.5\" fill=\"none\" stroke=\"ink\" stroke-width=\"2.75\"/>\n  <path d=\"M15.5 24.5 L23.5 16.5\" stroke=\"ink\" stroke-width=\"2.2\" stroke-linecap=\"round\" detail=\"1\"/>\n  <circle cx=\"15.5\" cy=\"24.5\" r=\"1.5\" fill=\"accent\"/>\n  <path d=\"M29 6 C28 3.5 24.5 3 23 4.5\" fill=\"none\" stroke=\"ink\" stroke-width=\"2\" stroke-linecap=\"round\"/>\n</svg>",
+  "elements": 5,
+  "attempts": 1,
+  "latencyMs": 9304,
+  "costUsd": 0.0056265,
+  "tokens": {
+    "in": 872,
+    "out": 1326
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"amber\">\n  <path d=\"M7.8 21.2 L19.8 9.2 C20.6 8.4 21.7 8 22.8 8 L30.5 8 C32.4 8 34 9.6 34 11.5 L34 19.2 C34 20.3 33.6 21.4 32.8 22.2 L20.8 34.2 C19.2 35.8 16.6 35.8 15 34.2 L7.8 27 C6.2 25.4 6.2 22.8 7.8 21.2 Z\" fill=\"soft\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linejoin=\"round\"/>\n  <circle cx=\"27.5\" cy=\"14.5\" r=\"2.5\" fill=\"none\" stroke=\"ink\" stroke-width=\"2.75\"/>\n  <path d=\"M15.5 24.5 L23.5 16.5\" stroke=\"ink\" stroke-width=\"2.2\" stroke-linecap=\"round\" detail=\"1\"/>\n  <circle cx=\"15.5\" cy=\"24.5\" r=\"1.5\" fill=\"accent\"/>\n  <path d=\"M29 6 C28 3.5 24.5 3 23 4.5\" fill=\"none\" stroke=\"ink\" stroke-width=\"2\" stroke-linecap=\"round\"/>\n</svg>"
+}

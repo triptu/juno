@@ -1,0 +1,118 @@
+{
+  "level": "art",
+  "model": "google/gemini-3.8-flash",
+  "topic": "p95",
+  "ok": true,
+  "spec": {
+    "hue": "coral",
+    "confident": true,
+    "elements": [
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M17 5h6",
+          "stroke": "ink",
+          "stroke-width": "2.75",
+          "stroke-linecap": "round"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M20 5v4",
+          "stroke": "ink",
+          "stroke-width": "2.75"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M28.5 10.5l2-2",
+          "stroke": "ink",
+          "stroke-width": "2.5",
+          "stroke-linecap": "round",
+          "detail": "1"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "20",
+          "cy": "23",
+          "r": "13",
+          "fill": "soft",
+          "stroke": "ink",
+          "stroke-width": "2.75"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M20 14v2",
+          "stroke": "ink",
+          "stroke-width": "2",
+          "stroke-linecap": "round",
+          "detail": "1"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M29 23h-2",
+          "stroke": "ink",
+          "stroke-width": "2",
+          "stroke-linecap": "round",
+          "detail": "1"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M20 32v-2",
+          "stroke": "ink",
+          "stroke-width": "2",
+          "stroke-linecap": "round",
+          "detail": "1"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M11 23h2",
+          "stroke": "ink",
+          "stroke-width": "2",
+          "stroke-linecap": "round",
+          "detail": "1"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M20 23l6.5-6.5",
+          "stroke": "accent",
+          "stroke-width": "2.5",
+          "stroke-linecap": "round"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "20",
+          "cy": "23",
+          "r": "2.25",
+          "fill": "ink"
+        }
+      }
+    ]
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"coral\">\n  <path d=\"M17 5h6\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linecap=\"round\"/>\n  <path d=\"M20 5v4\" stroke=\"ink\" stroke-width=\"2.75\"/>\n  <path d=\"M28.5 10.5l2-2\" stroke=\"ink\" stroke-width=\"2.5\" stroke-linecap=\"round\" detail=\"1\"/>\n  <circle cx=\"20\" cy=\"23\" r=\"13\" fill=\"soft\" stroke=\"ink\" stroke-width=\"2.75\"/>\n  <path d=\"M20 14v2\" stroke=\"ink\" stroke-width=\"2\" stroke-linecap=\"round\" detail=\"1\"/>\n  <path d=\"M29 23h-2\" stroke=\"ink\" stroke-width=\"2\" stroke-linecap=\"round\" detail=\"1\"/>\n  <path d=\"M20 32v-2\" stroke=\"ink\" stroke-width=\"2\" stroke-linecap=\"round\" detail=\"1\"/>\n  <path d=\"M11 23h2\" stroke=\"ink\" stroke-width=\"2\" stroke-linecap=\"round\" detail=\"1\"/>\n  <path d=\"M20 23l6.5-6.5\" stroke=\"accent\" stroke-width=\"2.5\" stroke-linecap=\"round\"/>\n  <circle cx=\"20\" cy=\"23\" r=\"2.25\" fill=\"ink\"/>\n</svg>",
+  "elements": 10,
+  "attempts": 1,
+  "latencyMs": 2177,
+  "costUsd": 0.00484425,
+  "tokens": {
+    "in": 1099,
+    "out": 1072
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"coral\">\n  <path d=\"M17 5h6\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linecap=\"round\"/>\n  <path d=\"M20 5v4\" stroke=\"ink\" stroke-width=\"2.75\"/>\n  <path d=\"M28.5 10.5l2-2\" stroke=\"ink\" stroke-width=\"2.5\" stroke-linecap=\"round\" detail=\"1\"/>\n  <circle cx=\"20\" cy=\"23\" r=\"13\" fill=\"soft\" stroke=\"ink\" stroke-width=\"2.75\"/>\n  <path d=\"M20 14v2\" stroke=\"ink\" stroke-width=\"2\" stroke-linecap=\"round\" detail=\"1\"/>\n  <path d=\"M29 23h-2\" stroke=\"ink\" stroke-width=\"2\" stroke-linecap=\"round\" detail=\"1\"/>\n  <path d=\"M20 32v-2\" stroke=\"ink\" stroke-width=\"2\" stroke-linecap=\"round\" detail=\"1\"/>\n  <path d=\"M11 23h2\" stroke=\"ink\" stroke-width=\"2\" stroke-linecap=\"round\" detail=\"1\"/>\n  <path d=\"M20 23l6.5-6.5\" stroke=\"accent\" stroke-width=\"2.5\" stroke-linecap=\"round\"/>\n  <circle cx=\"20\" cy=\"23\" r=\"2.25\" fill=\"ink\"/>\n</svg>"
+}

@@ -1,0 +1,61 @@
+{
+  "level": "relaxed",
+  "model": "google/gemini-3.8-flash",
+  "topic": "pricing-copy",
+  "ok": true,
+  "spec": {
+    "hue": "amber",
+    "elements": [
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M10 22 L22 10 L30 10 L30 18 L18 30 Z",
+          "fill": "soft",
+          "stroke": "none"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M8.5 20.5 L20.5 8.5 C21.5 7.5 22.8 7 24.2 7 H31 C32.1 7 33 7.9 33 9 V15.8 C33 17.2 32.5 18.5 31.5 19.5 L19.5 31.5 C17.3 33.7 13.7 33.7 11.5 31.5 L8.5 28.5 C6.3 26.3 6.3 22.7 8.5 20.5 Z",
+          "stroke": "ink",
+          "stroke-width": "2.75",
+          "fill": "none"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "27",
+          "cy": "13",
+          "r": "2",
+          "fill": "accent",
+          "stroke": "none"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "14",
+          "y1": "23",
+          "x2": "21",
+          "y2": "16",
+          "stroke": "ink",
+          "stroke-width": "2",
+          "stroke-linecap": "round",
+          "detail": "1"
+        }
+      }
+    ]
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"amber\">\n  <path d=\"M10 22 L22 10 L30 10 L30 18 L18 30 Z\" fill=\"soft\" stroke=\"none\"/>\n  <path d=\"M8.5 20.5 L20.5 8.5 C21.5 7.5 22.8 7 24.2 7 H31 C32.1 7 33 7.9 33 9 V15.8 C33 17.2 32.5 18.5 31.5 19.5 L19.5 31.5 C17.3 33.7 13.7 33.7 11.5 31.5 L8.5 28.5 C6.3 26.3 6.3 22.7 8.5 20.5 Z\" stroke=\"ink\" stroke-width=\"2.75\" fill=\"none\"/>\n  <circle cx=\"27\" cy=\"13\" r=\"2\" fill=\"accent\" stroke=\"none\"/>\n  <line x1=\"14\" y1=\"23\" x2=\"21\" y2=\"16\" stroke=\"ink\" stroke-width=\"2\" stroke-linecap=\"round\" detail=\"1\"/>\n</svg>",
+  "elements": 4,
+  "attempts": 1,
+  "latencyMs": 1589,
+  "costUsd": 0.0022275,
+  "tokens": {
+    "in": 1265,
+    "out": 341
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"amber\">\n  <path d=\"M10 22 L22 10 L30 10 L30 18 L18 30 Z\" fill=\"soft\" stroke=\"none\"/>\n  <path d=\"M8.5 20.5 L20.5 8.5 C21.5 7.5 22.8 7 24.2 7 H31 C32.1 7 33 7.9 33 9 V15.8 C33 17.2 32.5 18.5 31.5 19.5 L19.5 31.5 C17.3 33.7 13.7 33.7 11.5 31.5 L8.5 28.5 C6.3 26.3 6.3 22.7 8.5 20.5 Z\" stroke=\"ink\" stroke-width=\"2.75\" fill=\"none\"/>\n  <circle cx=\"27\" cy=\"13\" r=\"2\" fill=\"accent\" stroke=\"none\"/>\n  <line x1=\"14\" y1=\"23\" x2=\"21\" y2=\"16\" stroke=\"ink\" stroke-width=\"2\" stroke-linecap=\"round\" detail=\"1\"/>\n</svg>"
+}

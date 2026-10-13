@@ -1,0 +1,73 @@
+{
+  "level": "strict",
+  "model": "google/gemini-3.8-flash",
+  "topic": "pipeline",
+  "ok": true,
+  "spec": {
+    "hue": "amber",
+    "confident": true,
+    "elements": [
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "6",
+          "y1": "33",
+          "x2": "34",
+          "y2": "33"
+        }
+      },
+      {
+        "tag": "rect",
+        "attrs": {
+          "x": "8",
+          "y": "21",
+          "width": "6",
+          "height": "12",
+          "rx": "1.5"
+        }
+      },
+      {
+        "tag": "rect",
+        "attrs": {
+          "x": "17",
+          "y": "14",
+          "width": "6",
+          "height": "19",
+          "rx": "1.5",
+          "fill": "soft"
+        }
+      },
+      {
+        "tag": "rect",
+        "attrs": {
+          "x": "26",
+          "y": "8",
+          "width": "6",
+          "height": "25",
+          "rx": "1.5"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "29",
+          "cy": "13",
+          "r": "1.5",
+          "fill": "accent",
+          "stroke": "none",
+          "detail": "1"
+        }
+      }
+    ]
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"amber\">\n  <line x1=\"6\" y1=\"33\" x2=\"34\" y2=\"33\"/>\n  <rect x=\"8\" y=\"21\" width=\"6\" height=\"12\" rx=\"1.5\"/>\n  <rect x=\"17\" y=\"14\" width=\"6\" height=\"19\" rx=\"1.5\" fill=\"soft\"/>\n  <rect x=\"26\" y=\"8\" width=\"6\" height=\"25\" rx=\"1.5\"/>\n  <circle cx=\"29\" cy=\"13\" r=\"1.5\" fill=\"accent\" stroke=\"none\" detail=\"1\"/>\n</svg>",
+  "elements": 5,
+  "attempts": 2,
+  "latencyMs": 3994,
+  "costUsd": 0.01210275,
+  "tokens": {
+    "in": 2797,
+    "out": 2668
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"amber\">\n  <line x1=\"6\" y1=\"33\" x2=\"34\" y2=\"33\"/>\n  <rect x=\"8\" y=\"21\" width=\"6\" height=\"12\" rx=\"1.5\"/>\n  <rect x=\"17\" y=\"14\" width=\"6\" height=\"19\" rx=\"1.5\" fill=\"soft\"/>\n  <rect x=\"26\" y=\"8\" width=\"6\" height=\"25\" rx=\"1.5\"/>\n  <circle cx=\"29\" cy=\"13\" r=\"1.5\" fill=\"accent\" stroke=\"none\" detail=\"1\"/>\n</svg>"
+}

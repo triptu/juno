@@ -1,0 +1,101 @@
+{
+  "level": "art",
+  "model": "google/gemini-3.8-flash",
+  "topic": "oncall",
+  "ok": true,
+  "spec": {
+    "hue": "teal",
+    "confident": true,
+    "elements": [
+      {
+        "tag": "rect",
+        "attrs": {
+          "x": "6",
+          "y": "9",
+          "width": "28",
+          "height": "25",
+          "rx": "5",
+          "fill": "soft",
+          "stroke": "ink",
+          "stroke-width": "2.75",
+          "stroke-linejoin": "round"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M6 16h28",
+          "stroke": "ink",
+          "stroke-width": "2.75",
+          "stroke-linecap": "round"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "12",
+          "y1": "6",
+          "x2": "12",
+          "y2": "10",
+          "stroke": "ink",
+          "stroke-width": "2.75",
+          "stroke-linecap": "round"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "28",
+          "y1": "6",
+          "x2": "28",
+          "y2": "10",
+          "stroke": "ink",
+          "stroke-width": "2.75",
+          "stroke-linecap": "round"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "14",
+          "cy": "24",
+          "r": "3",
+          "fill": "accent",
+          "stroke": "ink",
+          "stroke-width": "2"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M21 24h7",
+          "stroke": "ink",
+          "stroke-width": "2.25",
+          "stroke-linecap": "round",
+          "detail": "1"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M25 21l3 3-3 3",
+          "stroke": "ink",
+          "stroke-width": "2.25",
+          "stroke-linecap": "round",
+          "stroke-linejoin": "round",
+          "detail": "1"
+        }
+      }
+    ]
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"teal\">\n  <rect x=\"6\" y=\"9\" width=\"28\" height=\"25\" rx=\"5\" fill=\"soft\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linejoin=\"round\"/>\n  <path d=\"M6 16h28\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linecap=\"round\"/>\n  <line x1=\"12\" y1=\"6\" x2=\"12\" y2=\"10\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linecap=\"round\"/>\n  <line x1=\"28\" y1=\"6\" x2=\"28\" y2=\"10\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linecap=\"round\"/>\n  <circle cx=\"14\" cy=\"24\" r=\"3\" fill=\"accent\" stroke=\"ink\" stroke-width=\"2\"/>\n  <path d=\"M21 24h7\" stroke=\"ink\" stroke-width=\"2.25\" stroke-linecap=\"round\" detail=\"1\"/>\n  <path d=\"M25 21l3 3-3 3\" stroke=\"ink\" stroke-width=\"2.25\" stroke-linecap=\"round\" stroke-linejoin=\"round\" detail=\"1\"/>\n</svg>",
+  "elements": 7,
+  "attempts": 1,
+  "latencyMs": 5287,
+  "costUsd": 0.0020115,
+  "tokens": {
+    "in": 1087,
+    "out": 319
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"teal\">\n  <rect x=\"6\" y=\"9\" width=\"28\" height=\"25\" rx=\"5\" fill=\"soft\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linejoin=\"round\"/>\n  <path d=\"M6 16h28\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linecap=\"round\"/>\n  <line x1=\"12\" y1=\"6\" x2=\"12\" y2=\"10\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linecap=\"round\"/>\n  <line x1=\"28\" y1=\"6\" x2=\"28\" y2=\"10\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linecap=\"round\"/>\n  <circle cx=\"14\" cy=\"24\" r=\"3\" fill=\"accent\" stroke=\"ink\" stroke-width=\"2\"/>\n  <path d=\"M21 24h7\" stroke=\"ink\" stroke-width=\"2.25\" stroke-linecap=\"round\" detail=\"1\"/>\n  <path d=\"M25 21l3 3-3 3\" stroke=\"ink\" stroke-width=\"2.25\" stroke-linecap=\"round\" stroke-linejoin=\"round\" detail=\"1\"/>\n</svg>"
+}

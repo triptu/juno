@@ -1,0 +1,55 @@
+{
+  "level": "relaxed",
+  "model": "google/gemini-3.8-flash",
+  "topic": "main-platform",
+  "ok": true,
+  "spec": {
+    "hue": "teal",
+    "elements": [
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M25 7 A8 8 0 0 0 17.5 17.2 L9 25.7 A3.5 3.5 0 0 0 14 30.7 L22.5 22.2 A8 8 0 0 0 32.7 14.7 L28 17.5 L22.5 12 Z",
+          "fill": "soft"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M25 7 A8 8 0 0 0 17.5 17.2 L9 25.7 A3.5 3.5 0 0 0 14 30.7 L22.5 22.2 A8 8 0 0 0 32.7 14.7 L28 17.5 L22.5 12 Z"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "11.5",
+          "cy": "28.2",
+          "r": "1.5",
+          "fill": "ink",
+          "stroke": "none",
+          "detail": "1"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "28",
+          "cy": "10",
+          "r": "1.75",
+          "fill": "accent",
+          "stroke": "none"
+        }
+      }
+    ]
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"teal\">\n  <path d=\"M25 7 A8 8 0 0 0 17.5 17.2 L9 25.7 A3.5 3.5 0 0 0 14 30.7 L22.5 22.2 A8 8 0 0 0 32.7 14.7 L28 17.5 L22.5 12 Z\" fill=\"soft\"/>\n  <path d=\"M25 7 A8 8 0 0 0 17.5 17.2 L9 25.7 A3.5 3.5 0 0 0 14 30.7 L22.5 22.2 A8 8 0 0 0 32.7 14.7 L28 17.5 L22.5 12 Z\"/>\n  <circle cx=\"11.5\" cy=\"28.2\" r=\"1.5\" fill=\"ink\" stroke=\"none\" detail=\"1\"/>\n  <circle cx=\"28\" cy=\"10\" r=\"1.75\" fill=\"accent\" stroke=\"none\"/>\n</svg>",
+  "elements": 4,
+  "attempts": 1,
+  "latencyMs": 2248,
+  "costUsd": 0.003057,
+  "tokens": {
+    "in": 1286,
+    "out": 558
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"teal\">\n  <path d=\"M25 7 A8 8 0 0 0 17.5 17.2 L9 25.7 A3.5 3.5 0 0 0 14 30.7 L22.5 22.2 A8 8 0 0 0 32.7 14.7 L28 17.5 L22.5 12 Z\" fill=\"soft\"/>\n  <path d=\"M25 7 A8 8 0 0 0 17.5 17.2 L9 25.7 A3.5 3.5 0 0 0 14 30.7 L22.5 22.2 A8 8 0 0 0 32.7 14.7 L28 17.5 L22.5 12 Z\"/>\n  <circle cx=\"11.5\" cy=\"28.2\" r=\"1.5\" fill=\"ink\" stroke=\"none\" detail=\"1\"/>\n  <circle cx=\"28\" cy=\"10\" r=\"1.75\" fill=\"accent\" stroke=\"none\"/>\n</svg>"
+}

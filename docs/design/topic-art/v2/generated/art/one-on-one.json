@@ -1,0 +1,81 @@
+{
+  "level": "art",
+  "model": "google/gemini-3.8-flash",
+  "topic": "one-on-one",
+  "ok": true,
+  "spec": {
+    "hue": "periwinkle",
+    "confident": true,
+    "elements": [
+      {
+        "tag": "rect",
+        "attrs": {
+          "x": "8",
+          "y": "5",
+          "width": "24",
+          "height": "30",
+          "rx": "3",
+          "fill": "soft",
+          "stroke": "ink",
+          "stroke-width": "2.75",
+          "stroke-linejoin": "round"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "13.5",
+          "y1": "5",
+          "x2": "13.5",
+          "y2": "35",
+          "stroke": "ink",
+          "stroke-width": "2"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M 19 5 L 19 38 L 22 35.5 L 25 38 L 25 5 Z",
+          "fill": "accent",
+          "stroke": "ink",
+          "stroke-width": "2",
+          "stroke-linejoin": "round"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "19",
+          "y1": "15",
+          "x2": "19",
+          "y2": "15",
+          "stroke": "none"
+        }
+      },
+      {
+        "tag": "rect",
+        "attrs": {
+          "x": "17",
+          "y": "13",
+          "width": "10",
+          "height": "7",
+          "rx": "1.5",
+          "fill": "none",
+          "stroke": "ink",
+          "stroke-width": "1.75",
+          "detail": "1"
+        }
+      }
+    ]
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"periwinkle\">\n  <rect x=\"8\" y=\"5\" width=\"24\" height=\"30\" rx=\"3\" fill=\"soft\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linejoin=\"round\"/>\n  <line x1=\"13.5\" y1=\"5\" x2=\"13.5\" y2=\"35\" stroke=\"ink\" stroke-width=\"2\"/>\n  <path d=\"M 19 5 L 19 38 L 22 35.5 L 25 38 L 25 5 Z\" fill=\"accent\" stroke=\"ink\" stroke-width=\"2\" stroke-linejoin=\"round\"/>\n  <line x1=\"19\" y1=\"15\" x2=\"19\" y2=\"15\" stroke=\"none\"/>\n  <rect x=\"17\" y=\"13\" width=\"10\" height=\"7\" rx=\"1.5\" fill=\"none\" stroke=\"ink\" stroke-width=\"1.75\" detail=\"1\"/>\n</svg>",
+  "elements": 5,
+  "attempts": 1,
+  "latencyMs": 2416,
+  "costUsd": 0.01063275,
+  "tokens": {
+    "in": 1107,
+    "out": 2614
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"periwinkle\">\n  <rect x=\"8\" y=\"5\" width=\"24\" height=\"30\" rx=\"3\" fill=\"soft\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linejoin=\"round\"/>\n  <line x1=\"13.5\" y1=\"5\" x2=\"13.5\" y2=\"35\" stroke=\"ink\" stroke-width=\"2\"/>\n  <path d=\"M 19 5 L 19 38 L 22 35.5 L 25 38 L 25 5 Z\" fill=\"accent\" stroke=\"ink\" stroke-width=\"2\" stroke-linejoin=\"round\"/>\n  <line x1=\"19\" y1=\"15\" x2=\"19\" y2=\"15\" stroke=\"none\"/>\n  <rect x=\"17\" y=\"13\" width=\"10\" height=\"7\" rx=\"1.5\" fill=\"none\" stroke=\"ink\" stroke-width=\"1.75\" detail=\"1\"/>\n</svg>"
+}

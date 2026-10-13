@@ -1,0 +1,83 @@
+{
+  "level": "art",
+  "model": "google/gemini-3.8-flash",
+  "topic": "pg16",
+  "ok": true,
+  "spec": {
+    "hue": "sky",
+    "elements": [
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M8 12v16c0 3.5 5.5 6 12 6s12-2.5 12-6V12",
+          "fill": "soft",
+          "stroke": "none"
+        }
+      },
+      {
+        "tag": "ellipse",
+        "attrs": {
+          "cx": "20",
+          "cy": "11",
+          "rx": "12",
+          "ry": "4.5",
+          "fill": "soft",
+          "stroke": "ink",
+          "stroke-width": "2.75"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M8 11v8c0 3.2 5.2 5.5 12 5.5s12-2.3 12-5.5v-8",
+          "fill": "none",
+          "stroke": "ink",
+          "stroke-width": "2.75",
+          "stroke-linecap": "round"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M8 19v8c0 3.2 5.2 5.5 12 5.5s12-2.3 12-5.5v-8",
+          "fill": "none",
+          "stroke": "ink",
+          "stroke-width": "2.75",
+          "stroke-linecap": "round"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "28",
+          "cy": "27",
+          "r": "7",
+          "fill": "accent",
+          "stroke": "ink",
+          "stroke-width": "2.5"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M28 31V23m-2.5 2.5L28 23l2.5 2.5",
+          "fill": "none",
+          "stroke": "ink",
+          "stroke-width": "2.2",
+          "stroke-linecap": "round",
+          "stroke-linejoin": "round"
+        }
+      }
+    ]
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"sky\">\n  <path d=\"M8 12v16c0 3.5 5.5 6 12 6s12-2.5 12-6V12\" fill=\"soft\" stroke=\"none\"/>\n  <ellipse cx=\"20\" cy=\"11\" rx=\"12\" ry=\"4.5\" fill=\"soft\" stroke=\"ink\" stroke-width=\"2.75\"/>\n  <path d=\"M8 11v8c0 3.2 5.2 5.5 12 5.5s12-2.3 12-5.5v-8\" fill=\"none\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linecap=\"round\"/>\n  <path d=\"M8 19v8c0 3.2 5.2 5.5 12 5.5s12-2.3 12-5.5v-8\" fill=\"none\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linecap=\"round\"/>\n  <circle cx=\"28\" cy=\"27\" r=\"7\" fill=\"accent\" stroke=\"ink\" stroke-width=\"2.5\"/>\n  <path d=\"M28 31V23m-2.5 2.5L28 23l2.5 2.5\" fill=\"none\" stroke=\"ink\" stroke-width=\"2.2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>\n</svg>",
+  "elements": 6,
+  "attempts": 1,
+  "latencyMs": 2908,
+  "costUsd": 0.002433,
+  "tokens": {
+    "in": 899,
+    "out": 469
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"sky\">\n  <path d=\"M8 12v16c0 3.5 5.5 6 12 6s12-2.5 12-6V12\" fill=\"soft\" stroke=\"none\" />\n  <ellipse cx=\"20\" cy=\"11\" rx=\"12\" ry=\"4.5\" fill=\"soft\" stroke=\"ink\" stroke-width=\"2.75\" />\n  <path d=\"M8 11v8c0 3.2 5.2 5.5 12 5.5s12-2.3 12-5.5v-8\" fill=\"none\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linecap=\"round\" />\n  <path d=\"M8 19v8c0 3.2 5.2 5.5 12 5.5s12-2.3 12-5.5v-8\" fill=\"none\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linecap=\"round\" />\n  <circle cx=\"28\" cy=\"27\" r=\"7\" fill=\"accent\" stroke=\"ink\" stroke-width=\"2.5\" />\n  <path d=\"M28 31V23m-2.5 2.5L28 23l2.5 2.5\" fill=\"none\" stroke=\"ink\" stroke-width=\"2.2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" />\n</svg>"
+}

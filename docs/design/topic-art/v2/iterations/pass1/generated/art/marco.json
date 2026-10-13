@@ -1,0 +1,96 @@
+{
+  "level": "art",
+  "model": "google/gemini-3.8-flash",
+  "topic": "marco",
+  "ok": true,
+  "spec": {
+    "hue": "sage",
+    "elements": [
+      {
+        "tag": "rect",
+        "attrs": {
+          "x": "7",
+          "y": "5",
+          "width": "22",
+          "height": "29",
+          "rx": "3.5",
+          "fill": "soft",
+          "stroke": "ink",
+          "stroke-width": "2.75",
+          "stroke-linejoin": "round"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "12",
+          "y1": "12",
+          "x2": "22",
+          "y2": "12",
+          "stroke": "ink",
+          "stroke-width": "2",
+          "stroke-linecap": "round",
+          "detail": "1"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "12",
+          "y1": "17",
+          "x2": "24",
+          "y2": "17",
+          "stroke": "ink",
+          "stroke-width": "2",
+          "stroke-linecap": "round",
+          "detail": "1"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "12",
+          "y1": "22",
+          "x2": "18",
+          "y2": "22",
+          "stroke": "ink",
+          "stroke-width": "2",
+          "stroke-linecap": "round",
+          "detail": "1"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "27",
+          "cy": "27",
+          "r": "7",
+          "fill": "accent",
+          "stroke": "ink",
+          "stroke-width": "2.5"
+        }
+      },
+      {
+        "tag": "polyline",
+        "attrs": {
+          "points": "23.5 27 25.8 29.3 30.5 24.5",
+          "fill": "none",
+          "stroke": "ink",
+          "stroke-width": "2.25",
+          "stroke-linecap": "round",
+          "stroke-linejoin": "round"
+        }
+      }
+    ]
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"sage\">\n  <rect x=\"7\" y=\"5\" width=\"22\" height=\"29\" rx=\"3.5\" fill=\"soft\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linejoin=\"round\"/>\n  <line x1=\"12\" y1=\"12\" x2=\"22\" y2=\"12\" stroke=\"ink\" stroke-width=\"2\" stroke-linecap=\"round\" detail=\"1\"/>\n  <line x1=\"12\" y1=\"17\" x2=\"24\" y2=\"17\" stroke=\"ink\" stroke-width=\"2\" stroke-linecap=\"round\" detail=\"1\"/>\n  <line x1=\"12\" y1=\"22\" x2=\"18\" y2=\"22\" stroke=\"ink\" stroke-width=\"2\" stroke-linecap=\"round\" detail=\"1\"/>\n  <circle cx=\"27\" cy=\"27\" r=\"7\" fill=\"accent\" stroke=\"ink\" stroke-width=\"2.5\"/>\n  <polyline points=\"23.5 27 25.8 29.3 30.5 24.5\" fill=\"none\" stroke=\"ink\" stroke-width=\"2.25\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>\n</svg>",
+  "elements": 6,
+  "attempts": 1,
+  "latencyMs": 2031,
+  "costUsd": 0.0070755,
+  "tokens": {
+    "in": 879,
+    "out": 1711
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"sage\">\n  <rect x=\"7\" y=\"5\" width=\"22\" height=\"29\" rx=\"3.5\" fill=\"soft\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linejoin=\"round\"/>\n  <line x1=\"12\" y1=\"12\" x2=\"22\" y2=\"12\" stroke=\"ink\" stroke-width=\"2\" stroke-linecap=\"round\" detail=\"1\"/>\n  <line x1=\"12\" y1=\"17\" x2=\"24\" y2=\"17\" stroke=\"ink\" stroke-width=\"2\" stroke-linecap=\"round\" detail=\"1\"/>\n  <line x1=\"12\" y1=\"22\" x2=\"18\" y2=\"22\" stroke=\"ink\" stroke-width=\"2\" stroke-linecap=\"round\" detail=\"1\"/>\n  <circle cx=\"27\" cy=\"27\" r=\"7\" fill=\"accent\" stroke=\"ink\" stroke-width=\"2.5\"/>\n  <polyline points=\"23.5 27 25.8 29.3 30.5 24.5\" fill=\"none\" stroke=\"ink\" stroke-width=\"2.25\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>\n</svg>"
+}

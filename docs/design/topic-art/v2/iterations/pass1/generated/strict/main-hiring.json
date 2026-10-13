@@ -1,0 +1,85 @@
+{
+  "level": "strict",
+  "model": "google/gemini-3.8-flash",
+  "topic": "main-hiring",
+  "ok": true,
+  "spec": {
+    "hue": "sage",
+    "elements": [
+      {
+        "tag": "rect",
+        "attrs": {
+          "x": "9",
+          "y": "12",
+          "width": "22",
+          "height": "22",
+          "rx": "4",
+          "fill": "soft"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M16 12 V7 C16 6 17 5 18 5 H22 C23 5 24 6 24 7 V12"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "17",
+          "y1": "16",
+          "x2": "23",
+          "y2": "16"
+        }
+      },
+      {
+        "tag": "rect",
+        "attrs": {
+          "x": "13",
+          "y": "21",
+          "width": "5",
+          "height": "5",
+          "rx": "1.5"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "22",
+          "y1": "22",
+          "x2": "27",
+          "y2": "22"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "22",
+          "y1": "26",
+          "x2": "25",
+          "y2": "26"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "26.5",
+          "cy": "26",
+          "r": "1.5",
+          "fill": "accent",
+          "stroke": "none"
+        }
+      }
+    ]
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"sage\">\n  <rect x=\"9\" y=\"12\" width=\"22\" height=\"22\" rx=\"4\" fill=\"soft\"/>\n  <path d=\"M16 12 V7 C16 6 17 5 18 5 H22 C23 5 24 6 24 7 V12\"/>\n  <line x1=\"17\" y1=\"16\" x2=\"23\" y2=\"16\"/>\n  <rect x=\"13\" y=\"21\" width=\"5\" height=\"5\" rx=\"1.5\"/>\n  <line x1=\"22\" y1=\"22\" x2=\"27\" y2=\"22\"/>\n  <line x1=\"22\" y1=\"26\" x2=\"25\" y2=\"26\"/>\n  <circle cx=\"26.5\" cy=\"26\" r=\"1.5\" fill=\"accent\" stroke=\"none\"/>\n</svg>",
+  "elements": 7,
+  "attempts": 1,
+  "latencyMs": 2290,
+  "costUsd": 0.0038985,
+  "tokens": {
+    "in": 1228,
+    "out": 794
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"sage\">\n  <rect x=\"9\" y=\"12\" width=\"22\" height=\"22\" rx=\"4\" fill=\"soft\"/>\n  <path d=\"M16 12 V7 C16 6 17 5 18 5 H22 C23 5 24 6 24 7 V12\"/>\n  <line x1=\"17\" y1=\"16\" x2=\"23\" y2=\"16\"/>\n  <rect x=\"13\" y=\"21\" width=\"5\" height=\"5\" rx=\"1.5\"/>\n  <line x1=\"22\" y1=\"22\" x2=\"27\" y2=\"22\"/>\n  <line x1=\"22\" y1=\"26\" x2=\"25\" y2=\"26\"/>\n  <circle cx=\"26.5\" cy=\"26\" r=\"1.5\" fill=\"accent\" stroke=\"none\"/>\n</svg>"
+}

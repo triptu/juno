@@ -1,0 +1,63 @@
+{
+  "level": "relaxed",
+  "model": "google/gemini-3.8-flash",
+  "topic": "flags",
+  "ok": true,
+  "spec": {
+    "hue": "teal",
+    "elements": [
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "10",
+          "y1": "7",
+          "x2": "10",
+          "y2": "33",
+          "stroke": "ink",
+          "stroke-width": "2.75",
+          "stroke-linecap": "round"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M10 9 H27 C28.5 9 29.5 10 29 11.5 L26.5 15.5 L29 19.5 C29.5 21 28.5 22 27 22 H10 Z",
+          "fill": "soft",
+          "stroke": "ink",
+          "stroke-width": "2.75",
+          "stroke-linejoin": "round"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "10",
+          "cy": "7",
+          "r": "2",
+          "fill": "accent",
+          "stroke": "none"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M22 26 L27 31 M27 26 L22 31",
+          "stroke": "ink",
+          "stroke-width": "2.5",
+          "stroke-linecap": "round",
+          "stroke-linejoin": "round"
+        }
+      }
+    ]
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"teal\">\n  <line x1=\"10\" y1=\"7\" x2=\"10\" y2=\"33\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linecap=\"round\"/>\n  <path d=\"M10 9 H27 C28.5 9 29.5 10 29 11.5 L26.5 15.5 L29 19.5 C29.5 21 28.5 22 27 22 H10 Z\" fill=\"soft\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linejoin=\"round\"/>\n  <circle cx=\"10\" cy=\"7\" r=\"2\" fill=\"accent\" stroke=\"none\"/>\n  <path d=\"M22 26 L27 31 M27 26 L22 31\" stroke=\"ink\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>\n</svg>",
+  "elements": 4,
+  "attempts": 1,
+  "latencyMs": 2076,
+  "costUsd": 0.00190575,
+  "tokens": {
+    "in": 1266,
+    "out": 255
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"teal\">\n  <line x1=\"10\" y1=\"7\" x2=\"10\" y2=\"33\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linecap=\"round\"/>\n  <path d=\"M10 9 H27 C28.5 9 29.5 10 29 11.5 L26.5 15.5 L29 19.5 C29.5 21 28.5 22 27 22 H10 Z\" fill=\"soft\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linejoin=\"round\"/>\n  <circle cx=\"10\" cy=\"7\" r=\"2\" fill=\"accent\" stroke=\"none\"/>\n  <path d=\"M22 26 L27 31 M27 26 L22 31\" stroke=\"ink\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>\n</svg>"
+}

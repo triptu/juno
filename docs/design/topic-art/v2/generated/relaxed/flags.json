@@ -1,0 +1,56 @@
+{
+  "level": "relaxed",
+  "model": "google/gemini-3.8-flash",
+  "topic": "flags",
+  "ok": true,
+  "spec": {
+    "hue": "teal",
+    "confident": true,
+    "elements": [
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M10 7 H28 A2 2 0 0 1 30 9.5 L26.5 16 L30 22.5 A2 2 0 0 1 28 25 H10 Z",
+          "fill": "soft"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "10",
+          "y1": "5",
+          "x2": "10",
+          "y2": "35"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "10",
+          "cy": "5",
+          "r": "1.5",
+          "fill": "accent",
+          "stroke": "none"
+        }
+      },
+      {
+        "tag": "polyline",
+        "attrs": {
+          "points": "16 16 19 19 25 13",
+          "stroke-width": "2.5",
+          "detail": "1"
+        }
+      }
+    ]
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"teal\">\n  <path d=\"M10 7 H28 A2 2 0 0 1 30 9.5 L26.5 16 L30 22.5 A2 2 0 0 1 28 25 H10 Z\" fill=\"soft\"/>\n  <line x1=\"10\" y1=\"5\" x2=\"10\" y2=\"35\"/>\n  <circle cx=\"10\" cy=\"5\" r=\"1.5\" fill=\"accent\" stroke=\"none\"/>\n  <polyline points=\"16 16 19 19 25 13\" stroke-width=\"2.5\" detail=\"1\"/>\n</svg>",
+  "elements": 4,
+  "attempts": 2,
+  "latencyMs": 3512,
+  "costUsd": 0.01413525,
+  "tokens": {
+    "in": 2937,
+    "out": 3182
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"teal\">\n  <path d=\"M10 7 H28 A2 2 0 0 1 30 9.5 L26.5 16 L30 22.5 A2 2 0 0 1 28 25 H10 Z\" fill=\"soft\"/>\n  <line x1=\"10\" y1=\"5\" x2=\"10\" y2=\"35\"/>\n  <circle cx=\"10\" cy=\"5\" r=\"1.5\" fill=\"accent\" stroke=\"none\"/>\n  <polyline points=\"16 16 19 19 25 13\" stroke-width=\"2.5\" detail=\"1\"/>\n</svg>"
+}

@@ -1,0 +1,82 @@
+{
+  "level": "relaxed",
+  "model": "google/gemini-3.8-flash",
+  "topic": "staging-bill",
+  "ok": true,
+  "spec": {
+    "hue": "amber",
+    "confident": true,
+    "elements": [
+      {
+        "tag": "g",
+        "attrs": {},
+        "children": [
+          {
+            "tag": "ellipse",
+            "attrs": {
+              "cx": "18",
+              "cy": "27",
+              "rx": "11",
+              "ry": "4.5",
+              "fill": "soft"
+            }
+          },
+          {
+            "tag": "path",
+            "attrs": {
+              "d": "M7 27 V22 A11 4.5 0 0 1 29 22 V27"
+            }
+          },
+          {
+            "tag": "path",
+            "attrs": {
+              "d": "M7 22 A11 4.5 0 0 0 29 22"
+            }
+          },
+          {
+            "tag": "path",
+            "attrs": {
+              "d": "M7 27 A11 4.5 0 0 0 29 27",
+              "detail": "1"
+            }
+          },
+          {
+            "tag": "path",
+            "attrs": {
+              "d": "M7 17 V22 A11 4.5 0 0 1 29 22 V17 A11 4.5 0 0 0 7 17 Z",
+              "fill": "soft",
+              "opacity": "0.6"
+            }
+          }
+        ]
+      },
+      {
+        "tag": "polyline",
+        "attrs": {
+          "points": "22 14 28 8 33 11",
+          "stroke-width": "2.5"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "33",
+          "cy": "11",
+          "r": "2",
+          "fill": "accent",
+          "stroke": "none"
+        }
+      }
+    ]
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"amber\">\n  <g >\n    <ellipse cx=\"18\" cy=\"27\" rx=\"11\" ry=\"4.5\" fill=\"soft\"/>\n    <path d=\"M7 27 V22 A11 4.5 0 0 1 29 22 V27\"/>\n    <path d=\"M7 22 A11 4.5 0 0 0 29 22\"/>\n    <path d=\"M7 27 A11 4.5 0 0 0 29 27\" detail=\"1\"/>\n    <path d=\"M7 17 V22 A11 4.5 0 0 1 29 22 V17 A11 4.5 0 0 0 7 17 Z\" fill=\"soft\" opacity=\"0.6\"/>\n  </g>\n  <polyline points=\"22 14 28 8 33 11\" stroke-width=\"2.5\"/>\n  <circle cx=\"33\" cy=\"11\" r=\"2\" fill=\"accent\" stroke=\"none\"/>\n</svg>",
+  "elements": 7,
+  "attempts": 1,
+  "latencyMs": 2050,
+  "costUsd": 0.00213825,
+  "tokens": {
+    "in": 1406,
+    "out": 289
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"amber\">\n  <g>\n    <ellipse cx=\"18\" cy=\"27\" rx=\"11\" ry=\"4.5\" fill=\"soft\"/>\n    <path d=\"M7 27 V22 A11 4.5 0 0 1 29 22 V27\"/>\n    <path d=\"M7 22 A11 4.5 0 0 0 29 22\"/>\n    <path d=\"M7 27 A11 4.5 0 0 0 29 27\" detail=\"1\"/>\n    <path d=\"M7 17 V22 A11 4.5 0 0 1 29 22 V17 A11 4.5 0 0 0 7 17 Z\" fill=\"soft\" opacity=\"0.6\"/>\n  </g>\n  <polyline points=\"22 14 28 8 33 11\" stroke-width=\"2.5\"/>\n  <circle cx=\"33\" cy=\"11\" r=\"2\" fill=\"accent\" stroke=\"none\"/>\n</svg>"
+}

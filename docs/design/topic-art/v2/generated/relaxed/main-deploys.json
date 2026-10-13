@@ -1,0 +1,86 @@
+{
+  "level": "relaxed",
+  "model": "google/gemini-3.8-flash",
+  "topic": "main-deploys",
+  "ok": true,
+  "spec": {
+    "hue": "teal",
+    "confident": true,
+    "elements": [
+      {
+        "tag": "polygon",
+        "attrs": {
+          "points": "20 8 33 15 20 22 7 15",
+          "fill": "soft",
+          "stroke": "none"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M20 8 L33 15 V26 L20 33 L7 26 V15 Z",
+          "fill": "none",
+          "stroke": "ink",
+          "stroke-width": "2.75",
+          "stroke-linejoin": "round",
+          "stroke-linecap": "round"
+        }
+      },
+      {
+        "tag": "polyline",
+        "attrs": {
+          "points": "7 15 20 22 33 15",
+          "fill": "none",
+          "stroke": "ink",
+          "stroke-width": "2.75",
+          "stroke-linejoin": "round",
+          "stroke-linecap": "round"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "20",
+          "y1": "22",
+          "x2": "20",
+          "y2": "33",
+          "fill": "none",
+          "stroke": "ink",
+          "stroke-width": "2.75",
+          "stroke-linecap": "round"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "20",
+          "y1": "8",
+          "x2": "20",
+          "y2": "22",
+          "stroke": "ink",
+          "stroke-width": "1.75",
+          "stroke-linecap": "round",
+          "detail": "1"
+        }
+      },
+      {
+        "tag": "polygon",
+        "attrs": {
+          "points": "23.5 24 29 21.25 29 26.75 23.5 29.5",
+          "fill": "accent",
+          "stroke": "none"
+        }
+      }
+    ]
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"teal\">\n  <polygon points=\"20 8 33 15 20 22 7 15\" fill=\"soft\" stroke=\"none\"/>\n  <path d=\"M20 8 L33 15 V26 L20 33 L7 26 V15 Z\" fill=\"none\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n  <polyline points=\"7 15 20 22 33 15\" fill=\"none\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n  <line x1=\"20\" y1=\"22\" x2=\"20\" y2=\"33\" fill=\"none\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linecap=\"round\"/>\n  <line x1=\"20\" y1=\"8\" x2=\"20\" y2=\"22\" stroke=\"ink\" stroke-width=\"1.75\" stroke-linecap=\"round\" detail=\"1\"/>\n  <polygon points=\"23.5 24 29 21.25 29 26.75 23.5 29.5\" fill=\"accent\" stroke=\"none\"/>\n</svg>",
+  "elements": 6,
+  "attempts": 1,
+  "latencyMs": 2507,
+  "costUsd": 0.01079775,
+  "tokens": {
+    "in": 1412,
+    "out": 2597
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"teal\">\n  <polygon points=\"20 8 33 15 20 22 7 15\" fill=\"soft\" stroke=\"none\"/>\n  <path d=\"M20 8 L33 15 V26 L20 33 L7 26 V15 Z\" fill=\"none\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n  <polyline points=\"7 15 20 22 33 15\" fill=\"none\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n  <line x1=\"20\" y1=\"22\" x2=\"20\" y2=\"33\" fill=\"none\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linecap=\"round\"/>\n  <line x1=\"20\" y1=\"8\" x2=\"20\" y2=\"22\" stroke=\"ink\" stroke-width=\"1.75\" stroke-linecap=\"round\" detail=\"1\"/>\n  <polygon points=\"23.5 24 29 21.25 29 26.75 23.5 29.5\" fill=\"accent\" stroke=\"none\"/>\n</svg>"
+}

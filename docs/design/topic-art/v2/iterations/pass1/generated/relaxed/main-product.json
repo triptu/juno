@@ -1,0 +1,82 @@
+{
+  "level": "relaxed",
+  "model": "google/gemini-3.8-flash",
+  "topic": "main-product",
+  "ok": true,
+  "spec": {
+    "hue": "periwinkle",
+    "elements": [
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M11 7 H23 L31 15 V31 A2 2 0 0 1 29 33 H11 A2 2 0 0 1 9 31 V9 A2 2 0 0 1 11 7 Z",
+          "fill": "soft"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M11 7 H23 L31 15 V31 A2 2 0 0 1 29 33 H11 A2 2 0 0 1 9 31 V9 A2 2 0 0 1 11 7 Z"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M23 7 V15 H31"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "15",
+          "cy": "20",
+          "r": "1.75",
+          "fill": "accent",
+          "stroke": "none"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "19",
+          "y1": "20",
+          "x2": "25",
+          "y2": "20",
+          "stroke-width": "2"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "15",
+          "cy": "26",
+          "r": "1.75",
+          "fill": "accent2",
+          "stroke": "none",
+          "detail": "1"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "19",
+          "y1": "26",
+          "x2": "25",
+          "y2": "26",
+          "stroke-width": "2",
+          "detail": "1"
+        }
+      }
+    ]
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"periwinkle\">\n  <path d=\"M11 7 H23 L31 15 V31 A2 2 0 0 1 29 33 H11 A2 2 0 0 1 9 31 V9 A2 2 0 0 1 11 7 Z\" fill=\"soft\"/>\n  <path d=\"M11 7 H23 L31 15 V31 A2 2 0 0 1 29 33 H11 A2 2 0 0 1 9 31 V9 A2 2 0 0 1 11 7 Z\"/>\n  <path d=\"M23 7 V15 H31\"/>\n  <circle cx=\"15\" cy=\"20\" r=\"1.75\" fill=\"accent\" stroke=\"none\"/>\n  <line x1=\"19\" y1=\"20\" x2=\"25\" y2=\"20\" stroke-width=\"2\"/>\n  <circle cx=\"15\" cy=\"26\" r=\"1.75\" fill=\"accent2\" stroke=\"none\" detail=\"1\"/>\n  <line x1=\"19\" y1=\"26\" x2=\"25\" y2=\"26\" stroke-width=\"2\" detail=\"1\"/>\n</svg>",
+  "elements": 7,
+  "attempts": 1,
+  "latencyMs": 2015,
+  "costUsd": 0.0022275,
+  "tokens": {
+    "in": 1295,
+    "out": 335
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"periwinkle\">\n  <path d=\"M11 7 H23 L31 15 V31 A2 2 0 0 1 29 33 H11 A2 2 0 0 1 9 31 V9 A2 2 0 0 1 11 7 Z\" fill=\"soft\"/>\n  <path d=\"M11 7 H23 L31 15 V31 A2 2 0 0 1 29 33 H11 A2 2 0 0 1 9 31 V9 A2 2 0 0 1 11 7 Z\"/>\n  <path d=\"M23 7 V15 H31\"/>\n  <circle cx=\"15\" cy=\"20\" r=\"1.75\" fill=\"accent\" stroke=\"none\"/>\n  <line x1=\"19\" y1=\"20\" x2=\"25\" y2=\"20\" stroke-width=\"2\"/>\n  <circle cx=\"15\" cy=\"26\" r=\"1.75\" fill=\"accent2\" stroke=\"none\" detail=\"1\"/>\n  <line x1=\"19\" y1=\"26\" x2=\"25\" y2=\"26\" stroke-width=\"2\" detail=\"1\"/>\n</svg>"
+}

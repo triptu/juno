@@ -1,0 +1,89 @@
+{
+  "level": "relaxed",
+  "model": "google/gemini-3.8-flash",
+  "topic": "main-product",
+  "ok": true,
+  "spec": {
+    "hue": "periwinkle",
+    "confident": true,
+    "elements": [
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M10 32 L26 8 L32 12 L16 36 H10 Z",
+          "fill": "soft",
+          "stroke": "none"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M9 34 L15 35 L33 13 C34 11.5 34 9 32 7 C30 5 27.5 5 26 6 L8 24 L7 30 Z",
+          "stroke-width": "2.75",
+          "stroke-linejoin": "round"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "23.5",
+          "y1": "8.5",
+          "x2": "30.5",
+          "y2": "13.5",
+          "stroke-width": "2"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "12",
+          "y1": "20",
+          "x2": "15",
+          "y2": "22",
+          "stroke-width": "2",
+          "detail": "1"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "16",
+          "y1": "24",
+          "x2": "19",
+          "y2": "26",
+          "stroke-width": "2",
+          "detail": "1"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "20",
+          "y1": "28",
+          "x2": "23",
+          "y2": "30",
+          "stroke-width": "2",
+          "detail": "1"
+        }
+      },
+      {
+        "tag": "polygon",
+        "attrs": {
+          "points": "7 30 11 31 8 28",
+          "fill": "accent",
+          "stroke": "none"
+        }
+      }
+    ]
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"periwinkle\">\n  <path d=\"M10 32 L26 8 L32 12 L16 36 H10 Z\" fill=\"soft\" stroke=\"none\"/>\n  <path d=\"M9 34 L15 35 L33 13 C34 11.5 34 9 32 7 C30 5 27.5 5 26 6 L8 24 L7 30 Z\" stroke-width=\"2.75\" stroke-linejoin=\"round\"/>\n  <line x1=\"23.5\" y1=\"8.5\" x2=\"30.5\" y2=\"13.5\" stroke-width=\"2\"/>\n  <line x1=\"12\" y1=\"20\" x2=\"15\" y2=\"22\" stroke-width=\"2\" detail=\"1\"/>\n  <line x1=\"16\" y1=\"24\" x2=\"19\" y2=\"26\" stroke-width=\"2\" detail=\"1\"/>\n  <line x1=\"20\" y1=\"28\" x2=\"23\" y2=\"30\" stroke-width=\"2\" detail=\"1\"/>\n  <polygon points=\"7 30 11 31 8 28\" fill=\"accent\" stroke=\"none\"/>\n</svg>",
+  "elements": 7,
+  "attempts": 1,
+  "latencyMs": 1552,
+  "costUsd": 0.0023355,
+  "tokens": {
+    "in": 1424,
+    "out": 338
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"periwinkle\">\n  <path d=\"M10 32 L26 8 L32 12 L16 36 H10 Z\" fill=\"soft\" stroke=\"none\"/>\n  <path d=\"M9 34 L15 35 L33 13 C34 11.5 34 9 32 7 C30 5 27.5 5 26 6 L8 24 L7 30 Z\" stroke-width=\"2.75\" stroke-linejoin=\"round\"/>\n  <line x1=\"23.5\" y1=\"8.5\" x2=\"30.5\" y2=\"13.5\" stroke-width=\"2\"/>\n  <line x1=\"12\" y1=\"20\" x2=\"15\" y2=\"22\" stroke-width=\"2\" detail=\"1\"/>\n  <line x1=\"16\" y1=\"24\" x2=\"19\" y2=\"26\" stroke-width=\"2\" detail=\"1\"/>\n  <line x1=\"20\" y1=\"28\" x2=\"23\" y2=\"30\" stroke-width=\"2\" detail=\"1\"/>\n  <polygon points=\"7 30 11 31 8 28\" fill=\"accent\" stroke=\"none\"/>\n</svg>"
+}
