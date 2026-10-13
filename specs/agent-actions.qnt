@@ -83,7 +83,8 @@ module actionsProtocol {
       (bug == "retry" or not(s.auths.exists(a => a.intent.id == k)) or a.warning or i.deduped))
     val grant = i.tier == 2 and s.ownerRun and s.clean and liveGrant(k)
     val allowed = (mayAuthorize or bug == "owner" or bug == "pause") and
-      (valid(i) or bug == "current") and (i.tier < 4 or bug == "tier4") and
+      (valid(i) or bug == "current") and
+      (not(i.deduped) or s.auths.forall(a => a.intent.id != k or a.intent.payload == i.payload)) and (i.tier < 4 or bug == "tier4") and
       (not(done(k)) or bug == "batch") and
       (approvals != Set() or grant or bug == "grant" or bug == "tier4" or bug == "batch")
     if (allowed) {
@@ -156,6 +157,10 @@ module actionsProtocol {
   action grantWith(k: int, guard: bool): bool =
     if (guard and not(s.ownerRun and s.clean and s.sourceInRun and mayAuthorize)) idle else
     s' = { ...s, grants: s.grants.union(Set({ target: k, opClass: 2, source: s.gen, rev: 1 })), label: "grant", target: k }
+  action grantClick(k: int): bool =
+    if (not(currentIntent(k).exists(i => valid(i) and s.approvals.exists(p =>
+      p.child == k and p.rev == i.rev and p.digest == i.payload)))) idle else
+    s' = { ...s, grants: s.grants.union(Set({ target: k, opClass: 2, source: s.gen, rev: 1 })), label: "grantClick", target: k }
   action scheduleWith(guard: bool): bool =
     if (guard and not(s.ownerRun and s.clean and s.sourceInRun and mayAuthorize)) idle else
     s' = { ...s, schedule: true, scheduleSourceClean: s.ownerRun and s.clean and s.sourceInRun,
@@ -218,7 +223,9 @@ module actionsProtocol {
   val scopedNoClickGrant = newAuths.forall(a => not(a.grant) or
     (a.intent.tier == 2 and before.grants.exists(g => g.target == a.intent.id and g.opClass == 2 and g.source == before.gen)))
   val untrustedCannotGrant = s.grants.exclude(before.grants).isEmpty() or
-    (before.ownerRun and before.clean and before.sourceInRun)
+    (before.ownerRun and before.clean and before.sourceInRun) or
+    (s.label == "grantClick" and before.approvals.exists(p => p.child == s.target and
+      before.intents.exists(i => i.id == p.child and i.rev == p.rev and i.payload == p.digest)))
   val tier4NeverDispatched = s.auths.forall(a => a.intent.tier < 4)
   val allWritesGated = s.attempts.listSet().forall(t => s.auths.exists(a => a.id == t.auth and a.consumed and a.intent.payload == t.payload))
   // This is the local ownership authority only. WP4 deliberately disproves
@@ -308,6 +315,7 @@ module actionsProtocol {
     if (op == "cancel") cancel(bug != "evidence") else
     if (op == "report") taint(true) else
     if (op == "wakeRun") taint(false) else
+    if (op == "grantClick") grantClick(k) else
     if (op == "grant") grantWith(k, bug != "untrusted") else
     if (op == "schedule") scheduleWith(bug != "schedule") else
     if (op == "queue") queueWake else
@@ -487,6 +495,8 @@ module actionsProtocol {
   val case37 = scenario == 37 and reachedAgreement
   val case38 = scenario == 38 and reachedAgreement
   val case39 = scenario == 39 and reachedAgreement
+  action clickedGrantStep = script(List(c("report", 0), c("tier2", 0), c("click", 0),
+    c("grantClick", 0), c("authorize", 0), c("send", 0), c("accept", 0), c("receipt", 0)), "")
   action boundedStep = tick(any {
     all { s.current.get(0) == 0, propose(0, 3, false) },
     all { currentIntent(0) != Set(), s.nextApproval < 3, click(0, false) },
