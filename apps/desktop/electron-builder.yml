@@ -14,5 +14,6 @@ mac:
     - dmg
     - zip
   darkModeSupport: true
+  icon: build/icon.icns
   hardenedRuntime: true
 npmRebuild: false

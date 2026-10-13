@@ -55,6 +55,8 @@ const sessionHost = new SessionHost({
 })
 
 app.whenReady().then(() => {
+  // A packaged app gets its icon from the bundle. In dev the Dock would show Electron's.
+  if (process.platform === 'darwin' && !app.isPackaged) app.dock?.setIcon(join(__dirname, '../../build/icon.png'))
   serveAppScheme(join(__dirname, '../renderer'))
   registerIpc({
     supervisor,

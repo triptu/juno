@@ -31,6 +31,7 @@ Run these from the repo root.
 | `pnpm gallery` | Starts the fixture gallery at http://localhost:4174 (browser only, no Electron). |
 | `pnpm gallery:shots` | Builds the gallery and screenshots every fixture in light and dark into `apps/gallery/shots/`. |
 | `pnpm --filter @juno/engine test` | Runs one package's suite (here the engine's: the port protocol over an in-memory MessageChannel, live query serving). |
+| `node scripts/build-icons.mjs` | Rebuilds `apps/desktop/build/icon.icns` and `icon.png` from `assets/icon.svg`. See "App icon". |
 | `pnpm package` | Builds a DMG and zip with electron-builder into `apps/desktop/release/`. Not run in CI yet. |
 | `JUNO_LIVE=1 pnpm smoke:live` | The read-only live smoke against your real workspace (see "Sign-in and the live smoke"). `pnpm smoke:live -- --fake` runs the same script against an in-process fake. |
 
@@ -65,7 +66,7 @@ packages/slack-schema   @juno/slack-schema. Effect Schemas for Slack payloads an
 packages/slack          @juno/slack. The Slack client as Effect services (SlackApi,
                         RequestQueue, SlackEdge, SlackSocket).
 packages/fake-slack     @juno/fake-slack. In-process fake Slack with a control API.
-scripts                 Repo scripts used by package.json (check-deps, bundle size, cursor rule).
+scripts                 Repo scripts used by package.json (check-deps, bundle size, cursor rule, build-icons).
 docs                    Research, design handoff, architecture, this file.
 ```
 
@@ -78,6 +79,21 @@ Each package has its own `tsconfig.json` that extends `tsconfig.base.json` (stri
 `moduleResolution: bundler`, `verbatimModuleSyntax`). The desktop app has three:
 `tsconfig.node.json` for main and preload, `tsconfig.web.json` for the renderer and
 `tsconfig.e2e.json` for tests, because they need different `lib` and `types`.
+
+## App icon
+
+The source is `assets/icon.svg` (the laptop-two app icon; `assets/icon-dark.svg` and
+`assets/mark.svg` sit next to it). `node scripts/build-icons.mjs` renders every iconset size
+(16 to 1024, with @2x pairs) from the SVG in Chrome through Playwright, runs `iconutil`, and
+writes two files that are committed:
+
+- `apps/desktop/build/icon.icns`, used by electron-builder (`mac.icon` in `electron-builder.yml`).
+- `apps/desktop/build/icon.png` (1024px), set as the Dock icon in development
+  (`app.dock.setIcon` in `src/main/index.ts`), so `pnpm dev` does not show Electron's icon.
+
+Rerun the script after editing `assets/icon.svg`. It needs macOS (`iconutil`) and Google Chrome
+or Playwright's Chromium. The favicon is `src/renderer/public/favicon.svg` (and the same file in
+`apps/gallery/public/`); it switches to a light mark in dark mode.
 
 ## How tokens flow into StyleX
 
