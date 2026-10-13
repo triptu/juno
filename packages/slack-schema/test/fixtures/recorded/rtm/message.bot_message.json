@@ -1,0 +1,79 @@
+{
+  "type": "message",
+  "subtype": "bot_message",
+  "channel": "C0REDACTED",
+  "text": "redacted",
+  "blocks": [
+    {
+      "type": "section",
+      "block_id": "redacted",
+      "text": {
+        "type": "mrkdwn",
+        "text": "redacted",
+        "verbatim": false
+      }
+    },
+    {
+      "type": "actions",
+      "block_id": "redacted",
+      "elements": [
+        {
+          "type": "button",
+          "action_id": "redacted",
+          "text": {
+            "type": "plain_text",
+            "text": "redacted",
+            "emoji": true
+          },
+          "url": "https://redacted.invalid/"
+        },
+        {
+          "type": "button",
+          "action_id": "redacted",
+          "text": {
+            "type": "plain_text",
+            "text": "redacted",
+            "emoji": true
+          },
+          "url": "https://redacted.invalid/"
+        },
+        {
+          "type": "button",
+          "action_id": "redacted",
+          "text": {
+            "type": "plain_text",
+            "text": "redacted",
+            "emoji": true
+          },
+          "url": "https://redacted.invalid/"
+        }
+      ]
+    }
+  ],
+  "username": "redacted",
+  "icons": {
+    "emoji": "redacted"
+  },
+  "bot_id": "B0REDACTED",
+  "app_id": "A0REDACTED",
+  "bot_profile": {
+    "id": "B0REDACTED",
+    "deleted": false,
+    "name": "redacted",
+    "updated": 1700000000,
+    "app_id": "A0REDACTED",
+    "user_id": "U0REDACTED",
+    "icons": {
+      "image_36": "https://redacted.invalid/",
+      "image_48": "https://redacted.invalid/",
+      "image_72": "https://redacted.invalid/"
+    },
+    "team_id": "T0REDACTED"
+  },
+  "team": "T0REDACTED",
+  "source_team": "T0REDACTED",
+  "user_team": "T0REDACTED",
+  "suppress_notification": false,
+  "event_ts": "1700000000.000001",
+  "ts": "1700000000.000001"
+}

@@ -1,0 +1,148 @@
+{
+  "type": "message",
+  "subtype": "message_changed",
+  "message": {
+    "user": "U0REDACTED",
+    "type": "message",
+    "edited": {
+      "user": "U0REDACTED",
+      "ts": "1700000000.000001"
+    },
+    "bot_id": "B0REDACTED",
+    "app_id": "A0REDACTED",
+    "text": "",
+    "team": "T0REDACTED",
+    "bot_profile": {
+      "id": "B0REDACTED",
+      "app_id": "A0REDACTED",
+      "user_id": "U0REDACTED",
+      "name": "redacted",
+      "icons": {
+        "image_36": "https://redacted.invalid/",
+        "image_48": "https://redacted.invalid/",
+        "image_72": "https://redacted.invalid/"
+      },
+      "deleted": false,
+      "updated": 1700000000,
+      "team_id": "T0REDACTED"
+    },
+    "attachments": [
+      {
+        "id": 1,
+        "footer_icon": "https://redacted.invalid/",
+        "ts": 1700000000,
+        "color": "redacted",
+        "fallback": "redacted",
+        "text": "redacted",
+        "pretext": "redacted",
+        "title": "redacted",
+        "callback_id": "redacted",
+        "footer": "redacted",
+        "fields": [
+          {
+            "value": "redacted",
+            "title": "redacted",
+            "short": true
+          },
+          {
+            "value": "redacted",
+            "title": "redacted",
+            "short": true
+          }
+        ],
+        "mrkdwn_in": [
+          "redacted"
+        ],
+        "actions": [
+          {
+            "id": "redacted",
+            "name": "redacted",
+            "text": "redacted",
+            "type": "button",
+            "value": "redacted",
+            "style": ""
+          }
+        ]
+      }
+    ],
+    "metadata": {
+      "event_type": "redacted"
+    },
+    "ts": "1700000000.000001",
+    "source_team": "T0REDACTED",
+    "user_team": "T0REDACTED"
+  },
+  "previous_message": {
+    "user": "U0REDACTED",
+    "type": "message",
+    "ts": "1700000000.000001",
+    "edited": {
+      "user": "U0REDACTED",
+      "ts": "1700000000.000001"
+    },
+    "bot_id": "B0REDACTED",
+    "app_id": "A0REDACTED",
+    "text": "",
+    "team": "T0REDACTED",
+    "bot_profile": {
+      "id": "B0REDACTED",
+      "app_id": "A0REDACTED",
+      "user_id": "U0REDACTED",
+      "name": "redacted",
+      "icons": {
+        "image_36": "https://redacted.invalid/",
+        "image_48": "https://redacted.invalid/",
+        "image_72": "https://redacted.invalid/"
+      },
+      "deleted": false,
+      "updated": 1700000000,
+      "team_id": "T0REDACTED"
+    },
+    "attachments": [
+      {
+        "id": 1,
+        "footer_icon": "https://redacted.invalid/",
+        "ts": 1700000000,
+        "color": "redacted",
+        "fallback": "redacted",
+        "text": "redacted",
+        "pretext": "redacted",
+        "title": "redacted",
+        "callback_id": "redacted",
+        "footer": "redacted",
+        "fields": [
+          {
+            "value": "redacted",
+            "title": "redacted",
+            "short": true
+          },
+          {
+            "value": "redacted",
+            "title": "redacted",
+            "short": true
+          }
+        ],
+        "mrkdwn_in": [
+          "redacted"
+        ],
+        "actions": [
+          {
+            "id": "redacted",
+            "name": "redacted",
+            "text": "redacted",
+            "type": "button",
+            "value": "redacted",
+            "style": ""
+          }
+        ]
+      }
+    ],
+    "metadata": {
+      "event_type": "redacted"
+    }
+  },
+  "channel": "C0REDACTED",
+  "hidden": true,
+  "ts": "1700000000.000001",
+  "event_ts": "1700000000.000001"
+}

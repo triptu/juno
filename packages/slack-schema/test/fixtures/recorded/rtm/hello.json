@@ -1,0 +1,7 @@
+{
+  "type": "hello",
+  "fast_reconnect": false,
+  "region": "redacted",
+  "start": true,
+  "host_id": "redacted"
+}

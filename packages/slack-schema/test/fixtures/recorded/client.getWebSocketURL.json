@@ -1,0 +1,7 @@
+{
+  "ok": true,
+  "primary_websocket_url": "wss://redacted.invalid/",
+  "fallback_websocket_url": "wss://redacted.invalid/",
+  "ttl_seconds": 604800,
+  "routing_context": "redacted"
+}
