@@ -35,3 +35,4 @@ Small items noticed during work that are not yet assigned to a milestone. Remove
 - Topic view: the message's mention tint does not count the user's groups (`@group`), because the engine does not keep the groups from `client.userBoot` outside the sync. Keep them in `team` or hand them over through `SyncLink`.
 - Topic view: bot messages show the bot id as the sender name: `messages` does not keep `username` or `bot_profile`. Store the bot's name with the message.
 - Flaky: an unsubscribe-recovery engine test failed once during the WP2 run (passed on rerun). Check it alongside the other flakes.
+- Flaky: `reconnect.test.ts` "reads followed threads past the first getView page" counted 5 `getView` calls instead of 4 once in a full run on a loaded machine (passed 3 of 3 on rerun). Probably a second pass overlapping the reconnect.
