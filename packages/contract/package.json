@@ -13,6 +13,7 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@juno/domain": "workspace:*",
     "effect": "4.0.3"
   },
   "devDependencies": {

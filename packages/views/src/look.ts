@@ -7,7 +7,7 @@
  * camel-case hues, so the two tables below translate. An icon with no
  * Phosphor counterpart draws the channel's first letter instead.
  */
-import { hueForId, type ChannelIconName, type HueName } from '@juno/ui'
+import { channelIconNames, hueForId, hueNames, type ChannelIconName, type HueName } from '@juno/ui'
 
 const icons: Readonly<Record<string, ChannelIconName>> = {
   hash: 'hash',
@@ -36,14 +36,14 @@ const hues: Readonly<Record<string, HueName>> = {
   jordy: 'jordy',
 }
 
-/** The Phosphor icon for a channel's icon name, or undefined for the first letter. */
+/** The Phosphor icon for a channel's icon name, or undefined for the first letter. Rows now carry ui keys; the table covers older fixtures. */
 export function channelIconFor(name: string): ChannelIconName | undefined {
-  return icons[name]
+  return (channelIconNames as ReadonlyArray<string>).includes(name) ? (name as ChannelIconName) : icons[name]
 }
 
 /** The hue for a colour name; falls back to the id's hash so a row never loses its colour. */
 export function hueFor(color: string, id: string): HueName {
-  return hues[color] ?? hueForId(id)
+  return (hueNames as ReadonlyArray<string>).includes(color) ? (color as HueName) : (hues[color] ?? hueForId(id))
 }
 
 /** "Maya Chen" to "MC"; "tushar" to "T". At most two letters. */

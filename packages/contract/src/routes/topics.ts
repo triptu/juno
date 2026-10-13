@@ -12,27 +12,22 @@
  */
 import { Schema } from 'effect'
 import { Rpc, RpcGroup } from 'effect/rpc'
+import { AllTopicsStatus, ChannelColor, ChannelIcon, ContextTint, ConversationKind, RowTag, TopicKind } from '@juno/domain'
 import { NotFound, NotSignedIn, Offline, RateLimited, Rejected } from '../errors'
 import { liveListRoute, liveValueRoute, RowFields } from '../live'
 
-export const TopicKind = Schema.Literals(['thread', 'main', 'group'])
-export type TopicKind = typeof TopicKind.Type
-
-export const ConversationKind = Schema.Literals(['public', 'private', 'im', 'mpim'])
-export type ConversationKind = typeof ConversationKind.Type
-
-/** Which tint a context pill or a channel label gets: neutral, amber or blue. */
-export const ContextTint = Schema.Literals(['public', 'private', 'dm'])
-export type ContextTint = typeof ContextTint.Type
+// The vocabulary is `@juno/domain`'s. It is re-exported so a renderer package
+// that may not import domain still names the same literals.
+export { ChannelColor, ChannelIcon, ContextTint, ConversationKind, RowTag, TopicKind }
+/** The status a sidebar row shows. `ignored` never reaches a row. */
+export const TopicStatus = AllTopicsStatus
+export type TopicStatus = typeof TopicStatus.Type
 
 export const TitleSource = Schema.Literals(['manual', 'ai', 'fallback', 'channel'])
 export type TitleSource = typeof TitleSource.Type
 
-export const TopicStatus = Schema.Literals(['open', 'quiet', 'resolved', 'unsubscribed'])
-export type TopicStatus = typeof TopicStatus.Type
-
-export const RowTag = Schema.Literals(['main', 'reopened', 'unsubscribed'])
-export type RowTag = typeof RowTag.Type
+/** The sidebar holds at most this many rows (performance 3.2). The engine caps `range.limit` here; the renderer asks for it. */
+export const SIDEBAR_WINDOW = 300
 
 export const SidebarSection = Schema.Literals(['pinned', 'recent'])
 export type SidebarSection = typeof SidebarSection.Type
@@ -42,8 +37,8 @@ export const Person = Schema.Struct({
   id: Schema.String,
   name: Schema.String,
   avatarUrl: Schema.optionalKey(Schema.String),
-  /** Hue for the initials when there is no photo (`--hue-<color>`). */
-  color: Schema.String,
+  /** The ui hue for the initials when there is no photo. */
+  color: ChannelColor,
 })
 export type Person = typeof Person.Type
 
@@ -56,22 +51,21 @@ export const RowChannel = Schema.Struct({
   /** "#eng", "Maya Chen": the text a toast or tab uses. */
   label: Schema.String,
   tint: ContextTint,
-  /** Lucide icon for the channel tile and line three. DMs use the avatar instead. */
-  icon: Schema.String,
-  /** Hue name for the tile (`--hue-<color>`), from the channel id until the user picks one. */
-  color: Schema.String,
+  /** The ui icon key for the channel tile and line three. DMs use the avatar instead. */
+  icon: ChannelIcon,
+  /** The ui hue for the tile, from the channel id until the user picks one. */
+  color: ChannelColor,
   /** The other person in a DM, for the tile. */
   partner: Schema.optionalKey(Person),
 })
 export type RowChannel = typeof RowChannel.Type
 
+/** The row's preview. The view joins them as "Sender: text", or shows the sender alone when the text is empty. */
 export const TopicPreview = Schema.Struct({
   /** "You" for own messages, otherwise the sender's display name. */
   sender: Schema.String,
   /** Latest message with quote lines stripped. May be empty. */
   text: Schema.String,
-  /** "Sender: text", or just the sender when the text is empty. */
-  line: Schema.String,
 })
 export type TopicPreview = typeof TopicPreview.Type
 

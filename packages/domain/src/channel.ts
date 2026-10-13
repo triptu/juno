@@ -1,7 +1,13 @@
-/** Conversations as Juno sees them, and the labels the UI prints for them. */
+/**
+ * Conversations as Juno sees them, and the labels the UI prints for them.
+ * The vocabulary (`ConversationKind`, `ContextTint`) is declared here once,
+ * as schemas, and `@juno/contract` re-exports it for the wire.
+ */
+import { Schema } from 'effect'
 import type { ChannelId } from './ids'
 
-export type ConversationKind = 'public' | 'private' | 'im' | 'mpim'
+export const ConversationKind = Schema.Literals(['public', 'private', 'im', 'mpim'])
+export type ConversationKind = typeof ConversationKind.Type
 
 export interface ChannelInfo {
   readonly id: ChannelId
@@ -66,7 +72,9 @@ export function contextPillText(channel: ChannelInfo): string {
   return `${channelLabelBare(channel)} · ${channelKindLabel(channel.kind)}`
 }
 
-export type ContextTint = 'public' | 'private' | 'dm'
+/** Which tint a context pill or a channel label gets: neutral, amber or blue. */
+export const ContextTint = Schema.Literals(['public', 'private', 'dm'])
+export type ContextTint = typeof ContextTint.Type
 
 /** Which tint a context pill gets: neutral, amber or blue. */
 export function contextTint(kind: ConversationKind): ContextTint {

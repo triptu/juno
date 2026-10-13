@@ -18,6 +18,7 @@ The wire between Juno's processes. Names, schemas and types only; no logic. See 
 - Declare a stream route with `liveValueRoute(tag, { value, payload? })` or `liveListRoute(tag, { row, payload? })`. The list route adds `range: ListRange` to the payload, and rows carry `id` and `rev`.
 - Declare a command with `Rpc.make(tag, { payload, success, error })`.
 - Import from `@juno/contract`. The preload imports only `@juno/contract/channels`.
+- `routes/topics.ts` re-exports the vocabulary `@juno/domain` owns (`TopicKind`, `ConversationKind`, `ContextTint`, `RowTag`, `ChannelIcon`, `ChannelColor`; `TopicStatus` is domain's `AllTopicsStatus`) and declares `SIDEBAR_WINDOW`, the 300-row cap the engine applies and the renderer asks for. `TopicPreview` is `{ sender, text }`; the view joins them.
 
 ## Must not
 
