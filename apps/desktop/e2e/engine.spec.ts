@@ -72,3 +72,23 @@ test('says so when the supervisor gives up on the engine', async ({ juno, app })
   expect(await hooks(app, 'engineState')).toBe('failed')
   expect(await hooks(app, 'enginePid')).toBeUndefined()
 })
+
+test('says so under the filters when the engine stops for good, and Restart brings it back', async ({ juno, app }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  const { sidebar } = juno
+  await sidebar.expectNoSyncStatus()
+
+  await hooks(app, 'failEngine')
+
+  // The rows stay; the line under the filters says what happened and offers the one action.
+  await sidebar.expectSyncStatus('Sync stopped')
+  await sidebar.expectRows()
+  expect(await hooks(app, 'engineState')).toBe('failed')
+
+  await sidebar.restartButton.click()
+  await sidebar.expectNoSyncStatus(30_000)
+  await expect.poll(() => hooks(app, 'engineState'), { timeout: 30_000 }).toBe('ready')
+  await juno.expectEngineLive()
+  await sidebar.expectRows()
+})

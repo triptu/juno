@@ -2,7 +2,7 @@ export { AccountMenu, type AccountMenuProps, type AccountMenuSection } from './A
 export { AppearanceSettings, type AppearanceSettingsProps } from './AppearanceSettings'
 export { AppInfoView, type AppInfoViewProps } from './AppInfoView'
 export { ChannelIconPicker, type ChannelIconPickerProps } from './ChannelIconPicker'
-export { EngineStatusView, type EngineStatusViewProps } from './EngineStatusView'
+export { EngineNotice, EngineStatusView, type EngineNoticeKind, type EngineNoticeProps, type EngineStatusViewProps } from './EngineStatusView'
 export { SessionView, type SessionViewProps } from './SessionView'
 export { SignInView, type SignInViewProps } from './SignInView'
 export { Shell, type ShellProps } from './Shell'

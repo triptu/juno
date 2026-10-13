@@ -8,8 +8,9 @@ import { variants as typeVariants } from './internal/type'
 
 /**
  * `filter` is the quick-filter chip (All, Channels, DMs, Unread): ghost on
- * the sidebar, muted until hovered, and semibold on a secondary fill when
- * `pressed`. It has one size, 28px, with the 8px radius.
+ * the sidebar, muted until hovered, and on a secondary fill when `pressed`.
+ * The weight stays medium when pressed, so selecting a filter never changes
+ * its width. It has one size, 28px, with the 8px radius.
  */
 export type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'raised' | 'filter'
 /** Height: xs 22, sm 28, md 30, lg 32, xl 34, 2xl 36. */
@@ -256,7 +257,6 @@ const pressedStyles = stylex.create({
   raised: {},
   filter: {
     color: colors['--foreground-default'],
-    fontWeight: weights['--weight-semibold'],
     backgroundColor: {
       default: colors['--secondary-default'],
       ':hover': { default: null, [HOVER]: colors['--secondary-hover'] },

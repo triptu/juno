@@ -10,6 +10,7 @@ const bridge: JunoBridge = {
   },
   engine: {
     requestPort: () => ipcRenderer.invoke(Channels.engineRequestPort),
+    restart: () => ipcRenderer.invoke(Channels.engineRestart),
   },
   launch: {
     setTheme: (theme) => ipcRenderer.invoke(Channels.launchSetTheme, { theme }),
