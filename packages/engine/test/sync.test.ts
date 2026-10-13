@@ -596,7 +596,7 @@ describe('an Unsubscribe Slack accepted sticks (specs/follow.qnt acceptedUnfollo
     const watch = watchFollow(engine, channel, tsOf(newest.id))
     engine.fake.release()
     await engine.phase('live', 20_000)
-    await quiet(engine)
+    await engine.syncIdle()
     engine.fake.releaseFrames({ drop: true })
     expect(watch.stop()).toEqual(new Set([0]))
     expect((await engine.rows()).some((r) => r.id === newest.id)).toBe(false)
@@ -619,7 +619,7 @@ describe('an Unsubscribe Slack accepted sticks (specs/follow.qnt acceptedUnfollo
     expect(engine.fake.workspace.subscription('C0ENG', tsOf(id))?.subscribed).toBe(false)
     // The lookup is retried in the background until Slack answers.
     await waitFor(() => (apiCalls(engine, 'conversations.replies').some((c) => c.ok && c.args['ts'] === tsOf(id)) ? true : undefined), 20_000, 'a lookup that worked')
-    await quiet(engine)
+    await engine.handle.commandIdle()
     engine.fake.releaseFrames({ drop: true })
     expect(watch.stop()).toEqual(new Set([0]))
     expect((await engine.rows()).some((r) => r.id === id)).toBe(false)
@@ -666,7 +666,7 @@ describe('followed threads past one getView page (review M3 finding 2)', () => {
       'every thread read and the new follow',
     )
     expect(rows.find((r) => r.id === flaky)).toMatchObject({ subscribed: true })
-    await quiet(second)
+    await second.syncIdle()
     // 12 fixture follows, 25 seeded and the new one: four pages of ten back to the window, and four in the complete pass.
     expect(apiCalls(second, 'subscriptions.thread.getView')).toHaveLength(8)
   })

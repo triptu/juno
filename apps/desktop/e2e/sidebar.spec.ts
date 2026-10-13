@@ -5,7 +5,7 @@
 // the sidebar under the followed-threads rule as well as the older
 // every-active-thread rule.
 import type { Page } from '@playwright/test'
-import { expectNoLayoutShift } from '@juno/testing/layout-shift'
+import { expectNoLayoutShift, waitForLayoutReady } from '@juno/testing/layout-shift'
 import { expect, test } from './fixtures'
 
 // Every test signs in and waits for the sync before it looks at rows.
@@ -169,6 +169,7 @@ test('a reply from another client updates its row in place and moves it to the t
 test('hovering a row shows Resolve in its reserved slot without moving anything', async ({ juno, win }) => {
   await juno.signIn()
   await juno.waitForSync()
+  await waitForLayoutReady(win)
   const { sidebar } = juno
   const postgres = sidebar.row(POSTGRES)
   await postgres.expectVisible()

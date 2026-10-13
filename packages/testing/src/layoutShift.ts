@@ -88,6 +88,14 @@ const stateKey = '__junoLayoutShiftGuard'
 
 const defaults = { root: '[data-fixture-frame]', settleMs: 0, tolerance: 0.5 }
 
+/** Waits for loaded fonts and their layout to paint before starting an interaction measurement. */
+export async function waitForLayoutReady(page: Page): Promise<void> {
+  await page.evaluate(async () => {
+    await document.fonts.ready
+    await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
+  })
+}
+
 /** Runs `action` and returns what shifted. Use `expectNoLayoutShift` in tests. */
 export async function measureLayoutShift(page: Page, action: () => Promise<unknown>, options: LayoutShiftOptions = {}): Promise<LayoutShiftReport> {
   const root = options.root ?? defaults.root

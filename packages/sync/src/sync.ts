@@ -41,6 +41,8 @@ export type SyncPhase =
   | { readonly _tag: 'offline' }
 
 export interface RunSyncOptions {
+  /** Brackets each boot, reboot or reconciliation, including its background follow pass. */
+  readonly onCycle?: (event: 'started' | 'finished') => Effect.Effect<void>
   /** Called on every phase change. */
   readonly onPhase: (phase: SyncPhase) => Effect.Effect<void>
   /** Called once, before the sync connects, with the fetcher the engine's topic commands use while this sync runs. */
@@ -82,6 +84,11 @@ export const runSync = (options: RunSyncOptions): Effect.Effect<never, SlackAuth
     const state = { connected: false, booted: false, lastBoot: undefined as BootState | undefined, lastFollowPass: undefined as number | undefined }
     const work = yield* Semaphore.make(1)
     const phase = options.onPhase
+    const cycle = <A, E, R>(effect: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> =>
+      (options.onCycle?.('started') ?? Effect.void).pipe(
+        Effect.andThen(effect),
+        Effect.ensuring(options.onCycle?.('finished') ?? Effect.void),
+      )
     const settle = () => phase(state.connected ? { _tag: 'live' } : { _tag: 'offline' })
     const refreshEmoji = syncEmoji().pipe(Effect.catchIf(isNotAuth, (error) => Effect.logWarning('sync: emoji refresh failed', { tag: error._tag })))
     const reportBoot: Phase = phase
@@ -153,7 +160,7 @@ export const runSync = (options: RunSyncOptions): Effect.Effect<never, SlackAuth
     )
 
     /** The catch-up after a reconnect, under the work permit, then the follow pass if it is due. */
-    const reconcile = Effect.gen(function* () {
+    const reconcile = cycle(Effect.gen(function* () {
       const previous = state.lastBoot ?? (yield* bootState())
       if (previous === undefined) return
       yield* catchUp(ctx, previous, reportBoot, { refreshWorkspace: false, refreshThreads: true })
@@ -165,7 +172,7 @@ export const runSync = (options: RunSyncOptions): Effect.Effect<never, SlackAuth
       Effect.andThen(settle),
       Effect.catchIf(isNotAuth, () => settle()),
       Effect.andThen(followPassIfDue),
-    )
+    ))
 
     const handle = (event: SocketEvent): Effect.Effect<void, never, SyncServices | Scope.Scope> => {
       switch (event._tag) {
@@ -200,14 +207,14 @@ export const runSync = (options: RunSyncOptions): Effect.Effect<never, SlackAuth
     }).pipe(work.withPermit)
 
     /** A `force_reload`: boot again from the current store. */
-    const reboot = bootOnce.pipe(
+    const reboot = cycle(bootOnce.pipe(
       Effect.andThen(settle),
       Effect.andThen(refreshEmoji),
       Effect.andThen(followPassIfDue),
       Effect.catchIf(isNotAuth, (error) => Effect.logWarning('sync: reboot failed', { tag: error._tag })),
-    )
+    ))
 
-    const bootLoop = Effect.gen(function* () {
+    const initialize = cycle(Effect.gen(function* () {
       while (true) {
         const result = yield* Effect.result(bootOnce)
         if (result._tag === 'Success') break
@@ -221,6 +228,11 @@ export const runSync = (options: RunSyncOptions): Effect.Effect<never, SlackAuth
       yield* settle()
       yield* refreshEmoji
       yield* followPassIfDue
+    }))
+
+    const bootLoop = Effect.gen(function* () {
+      yield* initialize
+      if (config.sweepIntervalMillis === 0) return yield* Effect.never
       // The periodic discovery sweep while live.
       while (true) {
         yield* Effect.sleep(config.sweepIntervalMillis)
