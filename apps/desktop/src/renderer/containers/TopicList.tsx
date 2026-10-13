@@ -82,7 +82,7 @@ const Row = memo(function Row({ id }: { readonly id: string }) {
   // The minute tick re-renders a row only when its label changes.
   const time = useAtomValue(nowAtom, (now) => relativeTime(at, now))
   if (row === undefined) return null
-  return <TopicRowView row={row} time={time} selected={selected} tabbable={tabbable} onOpen={open} onResolve={resolve} onPrefetch={warm} />
+  return <TopicRowView row={row} time={time} selected={selected} tabbable={tabbable} newThreads={row.newThreads} onOpen={open} onResolve={resolve} onPrefetch={warm} />
 })
 
 const renderRow = (id: string) => <Row key={id} id={id} />

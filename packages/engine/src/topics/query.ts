@@ -104,7 +104,7 @@ export interface RowCache {
 }
 
 interface CacheEntry {
-  readonly source: JoinedRow
+  readonly source: ListRow
   readonly parsed: ParsedColumns
   readonly topic: Topic
   /** Every person the topic and row read, in any role. */
@@ -161,11 +161,26 @@ const settings = Effect.gen(function* () {
  * `topic_index_channel_activity`), which only the quiet rule reads. Rows
  * inside the activity window are never quiet, so the window skips the probe.
  */
-const SELECT = `${TOPIC_COLUMNS},
-    CASE WHEN i.kind = 'main' THEN (SELECT max(t.last_activity_ts) FROM topic_index t WHERE t.channel = i.channel) END AS channel_activity_ts`
-const SELECT_IN_WINDOW = `${TOPIC_COLUMNS}, NULL AS channel_activity_ts`
+/**
+ * Main rows: the threads started in the channel since Main's read pointer.
+ * A thread started after the pointer has its root, and so its latest
+ * activity, after it too, so the probe is a range on
+ * `topic_index_channel_activity`. No pointer counts nothing.
+ */
+const NEW_THREADS = `CASE WHEN i.kind = 'main' THEN (SELECT count(*) FROM topic_index t
+      WHERE t.channel = i.channel AND t.last_activity_ts > r.last_read_ts AND t.kind = 'thread' AND t.root_ts > r.last_read_ts) ELSE 0 END AS new_threads`
 
-const FROM = TOPIC_FROM
+const SELECT = `${TOPIC_COLUMNS}, ${NEW_THREADS},
+    CASE WHEN i.kind = 'main' THEN (SELECT max(t.last_activity_ts) FROM topic_index t WHERE t.channel = i.channel) END AS channel_activity_ts`
+const SELECT_IN_WINDOW = `${TOPIC_COLUMNS}, ${NEW_THREADS}, NULL AS channel_activity_ts`
+
+const FROM = `${TOPIC_FROM}
+  LEFT JOIN topic_reads r ON r.topic_id = i.topic_id`
+
+/** A sidebar row: the joined topic and its new-threads count. */
+interface ListRow extends JoinedRow {
+  readonly new_threads: number
+}
 
 /**
  * Spec section 5, "Which threads": a thread row is a candidate when followed
@@ -256,9 +271,9 @@ export const listTopics = (filter: ListFilter, options: QueryOptions, cache: Row
     const cutoffMillis = options.now - quietDaysOf(ctx) * DAY
     const cutoff = `${Math.floor(cutoffMillis / 1000)}.000000`
 
-    const byId = new Map<string, JoinedRow>()
+    const byId = new Map<string, ListRow>()
     const run = (statement: ReturnType<typeof listStatements>[number]) =>
-      Effect.map(sql.unsafe<JoinedRow>(statement.sql, statement.params), (rows) => {
+      Effect.map(sql.unsafe<ListRow>(statement.sql, statement.params), (rows) => {
         for (const row of rows) byId.set(row.topic_id, row)
         return rows
       })
@@ -359,7 +374,7 @@ export const listTopics = (filter: ListFilter, options: QueryOptions, cache: Row
   })
 
 /** Every column of the joined row equal: the topic built from it still holds. */
-function sameSource(a: JoinedRow, b: JoinedRow): boolean {
+function sameSource(a: ListRow, b: ListRow): boolean {
   const left = a as unknown as Record<string, unknown>
   const right = b as unknown as Record<string, unknown>
   for (const key in right) if (left[key] !== right[key]) return false
@@ -421,6 +436,7 @@ function shape(entry: CacheEntry, section: TopicListRow['section'], status: Topi
     row.pinned_at,
     row.unsubscribed_at,
     row.subscribed,
+    row.new_threads,
     row.c_name,
     row.c_kind,
     topic.channel.name,
@@ -452,6 +468,7 @@ function shape(entry: CacheEntry, section: TopicListRow['section'], status: Topi
     resolved: isResolved(topic),
     canResolveOnHover: canResolveOnHover(topic),
     subscribed: isSubscribed(topic),
+    newThreads: row.new_threads,
     lastActivityTs: topic.activity.lastActivityTs,
     lastActivityAt: tsToMillis(topic.activity.lastActivityTs),
   }

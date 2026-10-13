@@ -31,7 +31,7 @@ import { Workspace, type StoreServices } from '../workspace'
 import { setSubscribed } from './commands'
 import { countTopics, forgetUsers, listTopics, makeRowCache } from './query'
 
-const LIST_KEYS: InvalidationKeys = ['topics', 'topic_overlay', 'conversations', 'users', 'ignored_channels', 'thread_subs', 'prefs']
+const LIST_KEYS: InvalidationKeys = ['topics', 'topic_overlay', 'topic_reads', 'conversations', 'users', 'ignored_channels', 'thread_subs', 'prefs']
 const COUNT_KEYS: InvalidationKeys = ['topics', 'topic_overlay', 'conversations', 'ignored_channels', 'thread_subs']
 const QUIET_TICK = '1 minute'
 

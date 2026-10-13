@@ -101,6 +101,22 @@ describe('marking read', () => {
   })
 })
 
+describe("Main's new threads", () => {
+  it('counts the threads started since Main was last read; reading Main clears it', async () => {
+    const engine = await bootedEngine()
+    const engMain = 'm:C0ENG'
+    // #eng was read up to the Postgres plan; the staging bill thread started after it.
+    await rowWhen(engine, engMain, (r) => r.newThreads === 1, 'one new thread')
+    const root = engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0SAM', text: 'Load test results are in.' })
+    engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0DEV', text: 'Looking now.', threadTs: root.ts })
+    await rowWhen(engine, engMain, (r) => r.newThreads === 2, 'two new threads')
+    expect((await engine.rows()).filter((r) => r.kind === 'thread' && r.newThreads !== 0)).toEqual([])
+
+    valueOf(await markRead(engine, engMain))
+    await rowWhen(engine, engMain, (r) => r.newThreads === 0, 'no new threads once Main is read')
+  })
+})
+
 describe('the outbox', () => {
   it('five marks in a row make one call with the last intent', async () => {
     const engine = await bootedEngine()

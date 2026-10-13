@@ -77,6 +77,8 @@ const TopicRowFields = {
    * (true unless the user unsubscribed it). The menu offers Unsubscribe when true.
    */
   subscribed: Schema.Boolean,
+  /** Main rows: threads started in the channel since Main was last read ("2 new threads"). 0 for a thread, and for a Main never read. */
+  newThreads: Schema.Int,
   lastActivityTs: Schema.String,
   /** Epoch milliseconds of `lastActivityTs`, for the relative time. */
   lastActivityAt: Schema.Number,

@@ -59,6 +59,7 @@ function row(input: RowInput): TopicRow {
     resolved: false,
     canResolveOnHover: true,
     subscribed: true,
+    newThreads: 0,
     lastActivityTs: `${Math.floor(at / 1000)}.000100`,
     lastActivityAt: at,
     preview: { sender, text },
