@@ -30,3 +30,4 @@ Small items noticed during work that are not yet assigned to a milestone. Remove
 - ui: `activateHandlers` follow-ups and the `ScrollArea` gutter and hover rule from the M3 code review.
 - Sidebar times should use domain `relativeTime` (needs a `desktop → domain` edge decision).
 - "View all topics" does nothing until the All topics page lands (M5).
+- Engine: `unreadExact` is false (shown as "9+") whenever synced history stops short of the read pointer, even when the full history is stored. Fix the coverage check, then restore the exact count assertion in the sidebar e2e (#alerts-prod Main shows "9").
