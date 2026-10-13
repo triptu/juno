@@ -21,7 +21,8 @@
     "gallery": "pnpm --filter @juno/gallery dev",
     "gallery:shots": "pnpm --filter @juno/gallery shots",
     "smoke:live": "node scripts/smoke-live.ts",
-    "sync:live": "node --import ./scripts/ts-resolve-hooks.mjs scripts/sync-live-dry-run.ts"
+    "sync:live": "node --import ./scripts/ts-resolve-hooks.mjs scripts/sync-live-dry-run.ts",
+    "ai:eval": "pnpm --filter @juno/ai eval"
   },
   "devDependencies": {
     "@juno/engine": "workspace:*",
