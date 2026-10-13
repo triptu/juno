@@ -26,6 +26,7 @@ import { Wrench } from '@phosphor-icons/react/dist/icons/Wrench'
 import { radii, sizes, weights } from '@juno/tokens/tokens.stylex'
 import { hueStyles, type AvatarSize } from './Avatar'
 import { Icon, type IconSize, type PhosphorIcon } from './Icon'
+import { firstGrapheme } from './internal/grapheme'
 import { hueForId, hueNames, type HueName } from './internal/hue'
 
 /**
@@ -83,7 +84,7 @@ export function defaultChannelLook(id: string): ChannelLook {
 }
 
 export interface ChannelIconProps {
-  /** The channel name without "#". Its first letter is the default glyph. */
+  /** The channel name without "#". Its first character (a whole emoji, never half of one) is the default glyph. */
   readonly name: string
   /** The chosen icon; unset shows the first letter. */
   readonly icon?: ChannelIconName
@@ -113,7 +114,7 @@ export function ChannelIcon({ name, icon, color, id, size = 44, label }: Channel
       aria-hidden={label ? undefined : true}
       {...stylex.props(styles.tile, sizeStyles[size], tileRadius[size], hueStyles[hue])}
     >
-      {Glyph ? <Icon icon={Glyph} size={iconBySize[size]} /> : name.slice(0, 1)}
+      {Glyph ? <Icon icon={Glyph} size={iconBySize[size]} /> : firstGrapheme(name)}
     </span>
   )
 }

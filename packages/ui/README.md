@@ -13,6 +13,7 @@ Dumb, accessible primitives. StyleX plus `@juno/tokens` only; no app state, no d
 - Chrome text is not selectable. `Text selectable`, `Textarea`, `TextField` and `CodeBlock` opt in.
 - Icon-only controls take a required `label`. Icons are Phosphor components passed as props (`icon={Hash}`), never looked up by name, and imported one at a time from `@phosphor-icons/react/dist/icons/<Name>` (the root entry pulls the whole set into dev builds). `Icon` picks the weight from the size (bold at 14 and below, regular above); call sites name only `fill` (through `active`) and `duotone`.
 - A person's colour comes from `hueForId(slackId)`; a channel's default look from `defaultChannelLook(channelId)`. Both are stable across lists and machines.
+- Initials and channel letters take `firstGrapheme(name)`, never `charAt(0)`: a name that starts with an emoji or another character outside the Basic Multilingual Plane would otherwise draw half a glyph.
 - `Avatar` takes `src` for a profile photo and never shifts layout: the box is sized up front and the initials stay underneath until the photo has loaded, or for good if it fails.
 - Components do not accept `style` or `className`. A few layout containers (`Text`, `Surface`) take `sx` typed as `LayoutStyles`, which rejects colour and font properties, so it is layout only by construction.
 - `Text` names its type role `variant`; `role` on any primitive is always the ARIA attribute.

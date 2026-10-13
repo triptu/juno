@@ -1,6 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import { sizes } from '@juno/tokens/tokens.stylex'
 import { Avatar, type AvatarRingSurface, type AvatarSize, type HueName } from './Avatar'
+import { firstGrapheme } from './internal/grapheme'
 
 export interface AvatarStackPerson {
   readonly id: string
@@ -33,7 +34,7 @@ export function AvatarStack({ people, max = 4, size = 18, surface = 'subtle', la
     <span role="img" aria-label={label ?? shown.map((person) => person.name).join(', ')} {...stylex.props(styles.stack)}>
       {shown.map((person, index) => (
         <span key={person.id} {...stylex.props(styles.item, index > 0 && styles.overlap)}>
-          <Avatar label={person.initials.slice(0, 1)} size={size} hue={person.hue} ring={surface} {...(person.src === undefined ? {} : { src: person.src })} />
+          <Avatar label={firstGrapheme(person.initials)} size={size} hue={person.hue} ring={surface} {...(person.src === undefined ? {} : { src: person.src })} />
         </span>
       ))}
     </span>

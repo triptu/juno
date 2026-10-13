@@ -55,6 +55,7 @@ export { Textarea, type TextareaProps, type TextareaVariant } from './Textarea'
 export { TextField, type TextFieldProps, type TextFieldSize } from './TextField'
 export { Toast, ToastRegion, type ToastAction, type ToastProps, type ToastRegionProps } from './Toast'
 export { accentLabels, accentNames, applyTheme, defaultAccent, isAccentName, isThemeName, themeNames, type AccentName, type ThemeName } from './theme'
+export { firstGrapheme } from './internal/grapheme'
 export { activateHandlers, type ActivateEvent, type ActivateHandler, type ActivateHandlers, type ActivateOptions } from './internal/activate'
 export type { LayoutStyles } from './internal/sx'
 export {
