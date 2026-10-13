@@ -18,3 +18,4 @@ test-results/
 .playwright-mcp/
 .claude/worktrees/
 .juno-status/
+_apalache-out/
