@@ -122,8 +122,8 @@ describe('cold boot', () => {
     const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000
     expect(rows.filter((r) => r.id !== leadership!.id).every((r) => r.lastActivityAt > weekAgo)).toBe(true)
 
-    // A never-read channel shows what is stored and says the count is not exact.
-    expect(byTitle('#alerts-prod')).toMatchObject({ unreadCount: 9, unreadExact: false })
+    // A never-read channel: the history page reached back to its read pointer, so the count is exact.
+    expect(byTitle('#alerts-prod')).toMatchObject({ unreadCount: 9, unreadExact: true })
   })
 
   it('shows exactly the rows of spec section 5: active Main rows and followed threads, no unfollowed thread at first sign-in', async () => {
@@ -881,8 +881,11 @@ describe('cold boot details (review M3 finding 10)', () => {
     const engine = await startTestEngine({ reuse: { userData, fake, credentials }, initial: () => credentials })
     engines.push({ ...engine, stop: async () => (await engine.stop(), await fake.close(), await rm(userData, { recursive: true, force: true })) })
     await engine.phase('live', 30_000)
-    const oldest = Number(apiCalls(engine, 'conversations.history')[0]!.args['oldest'])
-    expect(Math.abs(oldest - (Date.now() / 1000 - 3 * 86_400))).toBeLessThan(120)
+    // Pages start at the window, or earlier at a read pointer older than it (so the unread count is exact).
+    const start = Date.now() / 1000 - 3 * 86_400
+    const oldest = apiCalls(engine, 'conversations.history').map((call) => Number(call.args['oldest']))
+    expect(oldest.some((o) => Math.abs(o - start) < 120)).toBe(true)
+    expect(oldest.every((o) => o < start + 120)).toBe(true)
   })
 
   it('discovery asks search for newest first, so a long gap is read in full and not sampled', async () => {
