@@ -179,7 +179,8 @@ describe('session', () => {
     fake.expireSession()
 
     const expired = await status('authRequired')
-    expect(expired._tag === 'authRequired' && expired.reason).toBe('user_session_expiration')
+    // Whichever notices first: the socket's `user_session_expiration` frame or a sync call answered `invalid_auth`.
+    expect(['user_session_expiration', 'invalid_auth']).toContain(expired._tag === 'authRequired' && expired.reason)
     expect(sentTags(main)).toContain('authRequired')
     // The session's client is gone with it: no socket comes back on its own.
     await new Promise((resolve) => setTimeout(resolve, 100))

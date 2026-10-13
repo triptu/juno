@@ -14,8 +14,10 @@
   },
   "dependencies": {
     "@juno/contract": "workspace:*",
+    "@juno/domain": "workspace:*",
     "@juno/slack": "workspace:*",
     "@juno/store": "workspace:*",
+    "@juno/sync": "workspace:*",
     "effect": "4.0.3"
   },
   "devDependencies": {
@@ -28,8 +30,10 @@
   "juno": {
     "allowedDeps": [
       "@juno/contract",
+      "@juno/domain",
       "@juno/slack",
-      "@juno/store"
+      "@juno/store",
+      "@juno/sync"
     ],
     "testDeps": [
       "@juno/fake-slack",
