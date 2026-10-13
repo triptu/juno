@@ -43,9 +43,9 @@ async function arrange(page: Page, route: Route): Promise<() => Promise<void>> {
  * declared without a group).
  */
 test('screenshots every state in light and dark', async ({ page }) => {
-  // One test walks every state twice, a navigation each; about 600 states
-  // take a quarter of an hour, so the default timeout is far too short.
-  test.setTimeout(45 * 60_000)
+  // One test walks every state twice, a navigation each: a few minutes for
+  // the whole gallery, past the default timeout.
+  test.setTimeout(10 * 60_000)
   const routes = await readRoutes(page)
   await page.evaluate(() => document.fonts.ready)
 
