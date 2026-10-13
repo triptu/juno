@@ -5,9 +5,9 @@
  * it, and a sandboxed preload should stay tiny. Schemas live in shell.ts; the
  * types below are imported from them, which is erased at compile time.
  */
-import type { Theme } from './shell'
+import type { Accent, Theme } from './shell'
 
-export type { AppInfo, Platform, Theme } from './shell'
+export type { Accent, AppInfo, Platform, Theme } from './shell'
 
 export const Channels = {
   appGetInfo: 'app.getInfo',
@@ -15,6 +15,8 @@ export const Channels = {
   engineRequestPort: 'engine.requestPort',
   /** Remember the theme so the next launch paints the window in it. */
   launchSetTheme: 'launch.setTheme',
+  /** Remember the accent so the next launch's first render already uses it. */
+  launchSetAccent: 'launch.setAccent',
 } as const
 
 export type Channel = (typeof Channels)[keyof typeof Channels]
@@ -47,5 +49,6 @@ export interface JunoBridge {
   }
   readonly launch: {
     readonly setTheme: (theme: Theme) => Promise<unknown>
+    readonly setAccent: (accent: Accent) => Promise<unknown>
   }
 }

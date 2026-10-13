@@ -1,6 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
 import type { InputHTMLAttributes, ReactNode } from 'react'
-import { colors, layout, radii, sizes, spacing } from '@juno/tokens/tokens.stylex'
+import { accent, colors, layout, radii, sizes, spacing } from '@juno/tokens/tokens.stylex'
 import { Icon, type PhosphorIcon } from './Icon'
 import { variants as typeVariants } from './internal/type'
 
@@ -61,11 +61,11 @@ const styles = stylex.create({
     borderStyle: 'solid',
     borderColor: {
       default: colors['--input-border'],
-      ':focus-within': colors['--focus-ring'],
+      ':focus-within': accent['--focus-ring'],
     },
     boxShadow: {
       default: 'none',
-      ':focus-within': `0 0 0 1px ${colors['--focus-ring']}`,
+      ':focus-within': `0 0 0 1px ${accent['--focus-ring']}`,
     },
     color: colors['--foreground-default'],
     cursor: 'text',

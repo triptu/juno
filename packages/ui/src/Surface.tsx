@@ -1,6 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
 import type { ElementType, HTMLAttributes, ReactNode } from 'react'
-import { colors, radii, shadows, spacing } from '@juno/tokens/tokens.stylex'
+import { accent, colors, radii, shadows, spacing } from '@juno/tokens/tokens.stylex'
 import type { LayoutStyles } from './internal/sx'
 
 export type SurfaceKind = 'card' | 'popover' | 'toolbar' | 'group' | 'inset' | 'field' | 'toast'
@@ -103,11 +103,11 @@ const kinds = stylex.create({
     backgroundColor: colors['--surface-default'],
     borderColor: {
       default: colors['--input-border'],
-      ':focus-within': colors['--focus-ring'],
+      ':focus-within': accent['--focus-ring'],
     },
     boxShadow: {
       default: 'none',
-      ':focus-within': `0 0 0 1px ${colors['--focus-ring']}`,
+      ':focus-within': `0 0 0 1px ${accent['--focus-ring']}`,
     },
   },
   toast: {

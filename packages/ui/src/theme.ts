@@ -1,11 +1,26 @@
 import * as stylex from '@stylexjs/stylex'
-import { accents, dark, type AccentName } from '@juno/tokens/themes.stylex'
+import { accentNames, accents, dark, type AccentName } from '@juno/tokens/themes.stylex'
 
 export type ThemeName = 'light' | 'dark'
 export type { AccentName }
 
 export const themeNames: ReadonlyArray<ThemeName> = ['light', 'dark']
-export const accentNames: ReadonlyArray<AccentName> = ['ink', 'midnight', 'emerald', 'claret', 'cyan']
+export { accentNames }
+
+/** Coral. Matches `DEFAULT_ACCENT` in `@juno/contract`. */
+export const defaultAccent: AccentName = 'coral'
+
+/** What the picker calls each accent. */
+export const accentLabels: Readonly<Record<AccentName, string>> = {
+  coral: 'Coral',
+  ink: 'Near-black',
+  marigold: 'Marigold',
+  teal: 'Teal',
+  midnight: 'Midnight blue',
+  emerald: 'Dark emerald',
+  claret: 'Claret',
+  cyan: 'Cyan',
+}
 
 export function isThemeName(value: unknown): value is ThemeName {
   return value === 'light' || value === 'dark'
@@ -20,19 +35,20 @@ let previous: ReadonlyArray<string> = []
 /**
  * Puts the theme classes on <html>, so every token under it switches,
  * including portals attached to <body> and the tints mixed on the root.
+ * The accent has a theme per colour scheme, so the pair is chosen here.
  * Transitions are suppressed for two frames while the classes swap
  * (`data-theme-switching`, see tokens/global.css), so the theme changes in
  * one frame instead of cross-fading element by element.
  */
-export function applyTheme(theme: ThemeName, accent: AccentName = 'ink'): void {
+export function applyTheme(theme: ThemeName, accent: AccentName = defaultAccent): void {
   const root = document.documentElement
   root.setAttribute('data-theme-switching', '')
   for (const name of previous) root.classList.remove(name)
-  const accentTheme = accents[accent]
-  const { className } = stylex.props(theme === 'dark' && dark, accentTheme ?? null)
+  const { className } = stylex.props(theme === 'dark' && dark, accents[accent][theme])
   previous = (className ?? '').split(' ').filter(Boolean)
   for (const name of previous) root.classList.add(name)
   root.style.colorScheme = theme
   root.dataset['theme'] = theme
+  root.dataset['accent'] = accent
   requestAnimationFrame(() => requestAnimationFrame(() => root.removeAttribute('data-theme-switching')))
 }

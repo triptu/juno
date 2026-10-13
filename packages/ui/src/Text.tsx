@@ -118,6 +118,6 @@ const tones = stylex.create({
   default: { color: colors['--foreground-default'] },
   subtle: { color: colors['--foreground-subtle'] },
   muted: { color: colors['--foreground-muted'] },
-  accent: { color: accent['--hl'] },
+  accent: { color: accent['--hl-text'] },
   danger: { color: colors['--danger'] },
 })

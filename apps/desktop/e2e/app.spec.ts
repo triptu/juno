@@ -24,7 +24,7 @@ test('renders the shell with bundled fonts and token colours', async ({ win }) =
   const title = win.getByRole('heading', { name: "Hi, I'm Juno", level: 1, exact: true })
   await expect(title).toBeVisible()
 
-  const button = win.getByRole('button', { name: 'Use dark theme' })
+  const button = win.getByRole('button', { name: 'Sign in to Slack' })
   await expect(button).toBeVisible()
 
   // Fonts come from @fontsource, not the system or the network.
@@ -56,17 +56,17 @@ test('switches to the dark theme in place', async ({ win }) => {
   const lightBackground = await resolveColorVar(win, '--background')
   await expect(main).toHaveCSS('background-color', lightBackground)
 
-  const toggle = win.getByRole('button', { name: 'Use dark theme' })
-  await expect(toggle).toHaveAttribute('aria-pressed', 'false')
-  await toggle.click()
+  const dark = win.getByRole('radio', { name: 'Dark' })
+  await expect(dark).toHaveAttribute('aria-checked', 'false')
+  await dark.click()
 
-  await expect(win.getByRole('button', { name: 'Use light theme' })).toHaveAttribute('aria-pressed', 'true')
+  await expect(dark).toHaveAttribute('aria-checked', 'true')
   const darkBackground = await resolveColorVar(win, '--background')
   expect(darkBackground).not.toBe(lightBackground)
   expect(brightness(darkBackground)).toBeLessThan(brightness(lightBackground))
   await expect(main).toHaveCSS('background-color', darkBackground)
 
-  await win.getByRole('button', { name: 'Use light theme' }).click()
+  await win.getByRole('radio', { name: 'Light' }).click()
   await expect(main).toHaveCSS('background-color', lightBackground)
 })
 

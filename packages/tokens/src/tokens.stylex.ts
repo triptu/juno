@@ -60,10 +60,6 @@ export const colors = stylex.defineVars({
   '--accent-foreground-subtle': 'hsla(48, 20%, 90%, 1)',
   '--accent-foreground-muted': 'hsla(48, 20%, 70%, 1)',
 
-  // Text selection only. The focus ring has its own, more visible colour.
-  '--selection-background': 'hsla(200, 50%, 80%, 1)',
-  '--focus-ring': '#008AB3',
-
   // The dim behind the command palette.
   '--overlay': 'rgba(27, 28, 21, 0.16)',
 
@@ -86,15 +82,56 @@ export const colors = stylex.defineVars({
 })
 
 /**
- * The accent. Everything that uses the accent goes through these three, so
- * an accent theme only has to override --hl and --hl-fg.
+ * The accent. Everything that uses the accent goes through this group, so
+ * an accent is one theme that overrides these keys (themes.stylex.ts has
+ * one per accent and theme). The defaults are Coral in light.
+ *
+ * - --hl: the fill (primary button, send, @you chip, Now chip)
+ * - --hl-fg: text on the fill
+ * - --hl-text: accent-coloured text and icons on paper or on a tint (the
+ *   "new" label, the selected nav item, the subscribed bell)
+ * - --hl-soft: the tint behind a message that mentions you, my reaction
+ * - --hl-nav: the selected nav item's fill, over the sidebar
+ * - --hl-rule, --hl-ring: the new divider's rule and the mine-reaction ring
+ * - --focus-ring: the accent text colour, so it meets 4.5:1 on the page
+ * - --selection-background: text selection
+ *
+ * Unread counts are never the accent; they stay the soft grey tag.
  */
 export const accent = stylex.defineVars({
-  '--hl': colors['--accent-default'],
-  '--hl-fg': colors['--accent-foreground'],
-  '--hl-soft': `color-mix(in oklch, ${colors['--accent-default']} 9%, ${colors['--background']})`,
-  '--hl-rule': `color-mix(in oklch, ${colors['--accent-default']} 30%, transparent)`,
-  '--hl-ring': `color-mix(in oklch, ${colors['--accent-default']} 45%, transparent)`,
+  '--hl': '#CC4628',
+  '--hl-fg': '#FFFFFF',
+  '--hl-text': '#B4351F',
+  '--hl-soft': `color-mix(in oklch, #CC4628 10%, ${colors['--background']})`,
+  '--hl-nav': `color-mix(in oklch, #CC4628 9%, ${colors['--background-subtle']})`,
+  '--hl-rule': 'color-mix(in oklch, #CC4628 30%, transparent)',
+  '--hl-ring': 'color-mix(in oklch, #CC4628 45%, transparent)',
+  '--focus-ring': '#B4351F',
+  '--selection-background': `color-mix(in oklch, #CC4628 28%, ${colors['--background']})`,
+})
+
+/**
+ * The eight accent fills and their text, for the accent picker's swatches.
+ * The same values as the accent themes in themes.stylex.ts, repeated here
+ * because a swatch shows every accent at once while only one theme is on.
+ */
+export const accentSwatches = stylex.defineVars({
+  '--swatch-coral': '#CC4628',
+  '--swatch-coral-fg': '#FFFFFF',
+  '--swatch-ink': 'hsla(48, 30%, 8%, 1)',
+  '--swatch-ink-fg': 'hsla(48, 20%, 95%, 1)',
+  '--swatch-marigold': '#F2A900',
+  '--swatch-marigold-fg': '#2B1E00',
+  '--swatch-teal': '#0B7A75',
+  '--swatch-teal-fg': '#FFFFFF',
+  '--swatch-midnight': '#2E1F64',
+  '--swatch-midnight-fg': '#FFFAEB',
+  '--swatch-emerald': '#00674F',
+  '--swatch-emerald-fg': '#FFFAEB',
+  '--swatch-claret': '#7F1734',
+  '--swatch-claret-fg': '#FFFAEB',
+  '--swatch-cyan': '#008AB3',
+  '--swatch-cyan-fg': 'hsla(48, 10%, 2%, 1)',
 })
 
 /**

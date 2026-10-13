@@ -1,10 +1,10 @@
 /** Atoms backed by main through the bridge, not the engine. */
 import { Effect, Schema } from 'effect'
 import * as Atom from 'effect/reactivity/Atom'
-import { AppInfo, ThemeSchema, type Theme } from '@juno/contract'
+import { AccentSchema, AppInfo, DEFAULT_ACCENT, ThemeSchema, type Accent, type Theme } from '@juno/contract'
 import type { JunoBridge } from '@juno/contract/channels'
 
-export type { Theme } from '@juno/contract'
+export type { Accent, Theme } from '@juno/contract'
 
 declare const window: { readonly juno: JunoBridge }
 
@@ -20,17 +20,28 @@ export const appInfoAtom = Atom.make(
 )
 
 const isTheme = Schema.is(ThemeSchema)
+const isAccent = Schema.is(AccentSchema)
+
+/** One value of the page's query string, or undefined without a location (tests). */
+function launchParam(name: string): string | undefined {
+  const search = (globalThis as { readonly location?: { readonly search: string } }).location?.search ?? ''
+  return new RegExp(`[?&]${name}=([^&]*)`).exec(search)?.[1]
+}
 
 /**
- * Main loads the page as `index.html?theme=<saved theme>`, so the first
- * render already uses the theme the window was painted in (performance 2.1).
- * Light when the page has no location (tests) or no theme.
+ * Main loads the page as `index.html?theme=<saved>&accent=<saved>`, so the
+ * first render already uses the theme the window was painted in and the
+ * saved accent (performance 2.1). Light and Coral when the page has no
+ * location (tests) or no parameter.
  */
 function savedTheme(): Theme {
-  const search = (globalThis as { readonly location?: { readonly search: string } }).location?.search ?? ''
-  const match = /[?&]theme=([^&]*)/.exec(search)
-  const theme = match?.[1]
+  const theme = launchParam('theme')
   return isTheme(theme) ? theme : 'light'
+}
+
+function savedAccent(): Accent {
+  const accent = launchParam('accent')
+  return isAccent(accent) ? accent : DEFAULT_ACCENT
 }
 
 /** The current theme. Starts as the saved theme; the OS setting is not read yet. */
@@ -39,4 +50,12 @@ export const themeAtom = Atom.make<Theme>(savedTheme())
 /** Tells main, so the next launch paints the window in this theme before the page loads. */
 export function persistTheme(theme: Theme): void {
   window.juno.launch.setTheme(theme).catch(() => {})
+}
+
+/** The current accent. Starts as the saved accent. */
+export const accentAtom = Atom.make<Accent>(savedAccent())
+
+/** Tells main, so the next launch's first render already uses this accent. */
+export function persistAccent(accent: Accent): void {
+  window.juno.launch.setAccent(accent).catch(() => {})
 }

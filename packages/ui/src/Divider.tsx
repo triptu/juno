@@ -65,7 +65,7 @@ const styles = stylex.create({
     width: '100%',
     userSelect: 'none',
   },
-  labelAccent: { color: accent['--hl'] },
+  labelAccent: { color: accent['--hl-text'] },
   labelMuted: { color: colors['--foreground-muted'] },
   rule: {
     flexGrow: 1,

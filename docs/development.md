@@ -104,8 +104,9 @@ or Playwright's Chromium. The favicon is `src/renderer/public/favicon.svg` (and 
    Values come from `docs/design/tokens.md`; `packages/tokens/README.md` explains
    the naming.
 2. `packages/tokens/src/themes.stylex.ts` calls `stylex.createTheme` with the dark
-   values. `dark` is the pair of classes (colours and shadows) to apply. The four
-   accent themes override the `accent` group only, so they combine with `dark`.
+   values. `dark` is the set of classes (colours, shadows, swatches) to apply. Each
+   accent has a light and a dark theme on the `accent` group only, so they combine
+   with `dark`; `applyTheme(theme, accent)` picks the pair.
 3. Components import tokens through the subpath, never a barrel:
    `import { colors } from '@juno/tokens/tokens.stylex'`, then use
    `colors['--background']` inside `stylex.create`.

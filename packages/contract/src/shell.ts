@@ -13,6 +13,15 @@ export type Platform = typeof PlatformSchema.Type
 export const ThemeSchema = Schema.Literals(['light', 'dark'])
 export type Theme = typeof ThemeSchema.Type
 
+/**
+ * The accent names, in the order the picker shows them. Coral is the
+ * default. The colours themselves live in `@juno/tokens/themes.stylex`,
+ * which must list the same names.
+ */
+export const AccentSchema = Schema.Literals(['coral', 'ink', 'marigold', 'teal', 'midnight', 'emerald', 'claret', 'cyan'])
+export type Accent = typeof AccentSchema.Type
+export const DEFAULT_ACCENT: Accent = 'coral'
+
 export const AppInfo = Schema.Struct({
   name: Schema.String,
   version: Schema.String,
@@ -34,6 +43,7 @@ export const ShellRoutes = {
   [Channels.appGetInfo]: { input: Schema.Void, output: AppInfo },
   [Channels.engineRequestPort]: { input: Schema.Void, output: PortRequestResult },
   [Channels.launchSetTheme]: { input: Schema.Struct({ theme: ThemeSchema }), output: Schema.Void },
+  [Channels.launchSetAccent]: { input: Schema.Struct({ accent: AccentSchema }), output: Schema.Void },
 } as const
 
 export type ShellRoutes = typeof ShellRoutes

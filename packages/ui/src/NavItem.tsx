@@ -1,6 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
 import type { MouseEvent, ReactNode } from 'react'
-import { colors, radii, sizes, spacing, weights } from '@juno/tokens/tokens.stylex'
+import { accent, colors, radii, sizes, spacing, weights } from '@juno/tokens/tokens.stylex'
 import { Icon, type IconWeight, type PhosphorIcon } from './Icon'
 import { Kbd } from './Kbd'
 import { activateHandlers, type ActivateEvent } from './internal/activate'
@@ -31,9 +31,9 @@ export interface NavItemProps {
 
 /**
  * A sidebar navigation item (All topics, For you, Juno): 32px, full width,
- * icon then label, ghost until hovered, a secondary fill and a filled icon
- * when it is the open page. Navigates on mouse down like rows and tabs, and
- * never animates.
+ * icon then label, ghost until hovered. The open page gets the accent's nav
+ * tint, accent text, 600 and a filled icon. Navigates on mouse down like
+ * rows and tabs, and never animates.
  */
 export function NavItem({ icon, iconWeight, children, active = false, trailing, kbd, onSelect, onContextMenu }: NavItemProps) {
   return (
@@ -74,9 +74,11 @@ const styles = stylex.create({
     },
   },
   active: {
+    color: accent['--hl-text'],
+    fontWeight: weights['--weight-semibold'],
     backgroundColor: {
-      default: colors['--secondary-default'],
-      ':hover': { default: null, [HOVER]: colors['--secondary-hover'] },
+      default: accent['--hl-nav'],
+      ':hover': { default: null, [HOVER]: accent['--hl-nav'] },
     },
   },
   label: {

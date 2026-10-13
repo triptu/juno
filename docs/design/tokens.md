@@ -74,21 +74,45 @@ Cool near-black. Applied with `[data-theme="dark"]` on the root.
 | `--selection-background` | `hsla(200, 97%, 20%, 1)` | #024364 | css |
 | `--input-border` | `hsla(210, 5%, 24%, 1)` | #3A3D40 | proto |
 
-### 1.3 Accent variants (tweak)
+### 1.3 Accents
 
-The accent is near-black by default. Four optional accents come from the Littlebird brand palette. The prototype exposes them as three derived variables so every accent use goes through `--hl`.
+The accent is a user setting (`AppearanceSettings`, persisted in `launch.json` like the theme and applied before first paint). Coral is the default; the original near-black is "ink". Every accent use goes through the `accent` token group, and each accent is one StyleX theme per colour scheme, because a fill that reads on paper is too dark to glow on ink.
 
-| Token | Default (ink) | Midnight blue | Dark emerald | Claret | Cyan | Source |
-| --- | --- | --- | --- | --- | --- | --- |
-| `--hl` | `var(--accent-default)` | #2E1F64 | #00674F | #7F1734 | #008AB3 | proto |
-| `--hl-fg` | `var(--accent-foreground)` | #FFFAEB | #FFFAEB | #FFFAEB | #FFFAEB | proto |
-| `--hl-soft` | `color-mix(in oklch, var(--hl) 9%, var(--background))` | same formula | same | same | same | proto |
+| Token | What it is | Coral light | Coral dark |
+| --- | --- | --- | --- |
+| `--hl` | The fill: primary button, send, @you chip, Now chip, own bubbles | #CC4628 | #FF8A73 |
+| `--hl-fg` | Text on the fill | #FFFFFF | #2A0D06 |
+| `--hl-text` | Accent text and icons on paper or a tint: the "new" label, the selected nav item, the subscribed bell | #B4351F | #FF9C87 |
+| `--hl-soft` | `color-mix(in oklch, var(--hl) <mix>, var(--background))`: mention-row tint, my reaction, the @ tag | 10% | 14% |
+| `--hl-nav` | `color-mix(in oklch, var(--hl) <mix>, var(--background-subtle))`: the selected nav item's fill | 9% | 16% |
+| `--hl-rule`, `--hl-ring` | `--hl` at 30% and 45% alpha: the new divider's rule, the mine-reaction ring | | |
+| `--focus-ring` | The accent text colour, so the ring meets 4.5:1 on the page (3:1 is the minimum) | #B4351F | #FF9C87 |
+| `--selection-background` | `color-mix(in oklch, var(--hl) 28%, var(--background))` | | |
 
-Resolved `--hl-soft` for ink: light #E8E2E4, dark #262324 (measured).
+Ink keeps the old grey states: `--hl-nav` is `--secondary-default`, its tint mixes are 9% and 18%, and its focus ring stays the info blue (#008AB3 light, 3.8:1 on paper; `hsla(200, 80%, 65%)` dark).
 
-Contrast of `--hl-fg` (#FFFAEB) on each accent: ink 17.0, midnight 13.5, emerald 6.6, claret 9.7, **cyan 3.8**. Cyan fails 4.5:1 for small text (the "Now" chip and the send-card Send label are 12–13px). Either drop cyan, or switch `--hl-fg` to `--foreground-default` for cyan. Flagged as an open question.
+**What the accent does not touch.** Unread counts, the For you count and the quiet "@" tag on rows stay the soft grey tags (SPEC: "unread counts are soft grey, not black badges"); the "@" tag's background is `--hl-soft`, its text `--foreground-subtle`. Coral is for the primary button, the selected nav item, the user's own @mention chip, the focus ring and text selection.
 
-Accent is used for: send/ask buttons, "N new" divider and its rule (30% alpha), @you mention chip, mine-reaction border (45% alpha), unread dots on Channels/DMs filters, "Now" chips in Notifications, own bubbles in bubble style, the @ badge in Browse, `--hl-soft` tints.
+**Values and measured contrast.** Measured in Chromium from the built gallery (WCAG 2, sRGB; `color-mix()` resolved by the browser). Targets: 4.5:1 for text on the fill, accent text on the page, on the selected nav and on the soft tint, and for body text on the selection; the focus ring is the accent text so it meets the same bar. The fill against the page is information only: Marigold in light is 1.94:1, so a marigold button is identified by its label, never by colour alone. The dark column was measured against the dark palette in 1.2.
+
+| Accent | Theme | Fill | Text on fill | Accent text | Text on fill | Fill vs page (info) | Accent text and ring on page | On selected nav | On soft tint | Body on selection |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Coral | Light | #CC4628 | #FFFFFF | #B4351F | 4.69 | 4.53 | 5.85 | 5.11 | 5.13 | 10.76 |
+| Coral | Dark | #FF8A73 | #2A0D06 | #FF9C87 | 7.88 | 8.02 | 9.10 | 6.98 | 7.51 | 9.53 |
+| Near-black (ink) | Light | #1B180E | #F5F4F0 | #1B180E | 16.12 | 17.14 | 17.14 | 15.28 | 13.87 | 10.10 |
+| Near-black (ink) | Dark | #EDEADE | #060505 | #EDEADE | 16.89 | 15.30 | 15.30 | 12.11 | 12.97 | 10.30 |
+| Marigold | Light | #F2A900 | #2B1E00 | #7F5200 | 8.11 | 1.94 | 6.52 | 6.00 | 6.05 | 13.12 |
+| Marigold | Dark | #F5B83A | #2B1E00 | #F5B83A | 9.16 | 10.36 | 10.36 | 7.63 | 8.30 | 8.79 |
+| Teal | Light | #0B7A75 | #FFFFFF | #096762 | 5.18 | 5.00 | 6.48 | 5.65 | 5.69 | 10.59 |
+| Teal | Dark | #45C2BB | #04201E | #5ED0CA | 7.87 | 8.51 | 9.97 | 7.54 | 8.12 | 9.32 |
+| Midnight blue | Light | #2E1F64 | #FFFAEB | #2E1F64 | 13.45 | 13.56 | 13.56 | 11.05 | 11.03 | 9.30 |
+| Midnight blue | Dark | #B3A5EA | #1A1238 | #BDB0F0 | 7.99 | 8.33 | 9.34 | 7.15 | 7.65 | 9.37 |
+| Dark emerald | Light | #00674F | #FFFAEB | #00674F | 6.59 | 6.64 | 6.64 | 5.69 | 5.73 | 9.96 |
+| Dark emerald | Dark | #4FC4A1 | #04261B | #63D0AF | 7.50 | 8.56 | 9.81 | 7.42 | 8.00 | 9.36 |
+| Claret | Light | #7F1734 | #FFFAEB | #7F1734 | 9.70 | 9.78 | 9.78 | 8.16 | 8.16 | 9.47 |
+| Claret | Dark | #F08BA0 | #3B0A18 | #F59DB0 | 7.17 | 7.82 | 9.07 | 6.98 | 7.51 | 9.57 |
+| Cyan | Light | #008AB3 | #060505 | #006A8A | 5.12 | 3.84 | 5.92 | 5.27 | 5.27 | 11.22 |
+| Cyan | Dark | #5AC6EC | #04212E | #6CCFF2 | 8.50 | 9.42 | 10.40 | 7.77 | 8.39 | 9.02 |
 
 ### 1.4 Context tints (public / private / DM)
 
@@ -154,7 +178,7 @@ Dark mode muted (#8F8D8A) is 5.57:1 on the background and 4.43:1 on `--secondary
 
 ### 1.8 Focus ring
 
-Prototype: `outline: 2px solid var(--selection-background); outline-offset: 2px` on `:focus-visible`. #B3D4E6 on the light paper is about 1.5:1, below the 3:1 WCAG 2.2 focus-appearance minimum. [proposed] add `--focus-ring: var(--info)` (#008AB3, 3.85:1 light) and dark `hsla(200, 80%, 65%)`; keep `--selection-background` for text selection only. Open question for the owner.
+Prototype: `outline: 2px solid var(--selection-background); outline-offset: 2px` on `:focus-visible`. #B3D4E6 on the light paper is about 1.5:1, below the 3:1 WCAG 2.2 focus-appearance minimum. Decided: `--focus-ring` is the accent text colour (`--hl-text`, 1.3), which is held to 4.5:1 on the page in both themes; `--selection-background` is the accent at 28% over the page and is for text selection only. Both live in the `accent` group so an accent owns them. Ink keeps the info blue it had before.
 
 ## 2. Typography
 

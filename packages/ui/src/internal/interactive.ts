@@ -5,7 +5,7 @@
  * under the `hover` media query from here.
  */
 import * as stylex from '@stylexjs/stylex'
-import { colors, motion, opacity, sizes } from '@juno/tokens/tokens.stylex'
+import { accent, motion, opacity, sizes } from '@juno/tokens/tokens.stylex'
 
 export const interactive = stylex.create({
   reset: {
@@ -52,7 +52,7 @@ export const interactive = stylex.create({
     },
     outlineWidth: sizes['--focus-ring-width'],
     outlineOffset: sizes['--focus-ring-offset'],
-    outlineColor: colors['--focus-ring'],
+    outlineColor: accent['--focus-ring'],
   },
   // A tighter ring for controls that sit flush against others (tabs,
   // segments) where a 2px offset would clip.
@@ -63,7 +63,7 @@ export const interactive = stylex.create({
     },
     outlineWidth: sizes['--focus-ring-width'],
     outlineOffset: `calc(-1 * ${sizes['--focus-ring-width']})`,
-    outlineColor: colors['--focus-ring'],
+    outlineColor: accent['--focus-ring'],
   },
   // The disabled look, also used by `dimmed` controls that look disabled but
   // stay focusable (Send with an empty draft).

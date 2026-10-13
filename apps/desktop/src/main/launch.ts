@@ -9,10 +9,12 @@ import { readFileSync } from 'node:fs'
 import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { Schema } from 'effect'
-import { ThemeSchema } from '@juno/contract'
+import { AccentSchema, ThemeSchema } from '@juno/contract'
 
 export const Launch = Schema.Struct({
   theme: ThemeSchema,
+  // Optional so a launch.json written before accents existed still decodes.
+  accent: Schema.optionalKey(AccentSchema),
   bounds: Schema.optionalKey(Schema.Struct({ x: Schema.Int, y: Schema.Int, width: Schema.Int, height: Schema.Int })),
 })
 export type Launch = typeof Launch.Type

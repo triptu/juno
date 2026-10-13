@@ -6,8 +6,8 @@ The only place a colour, size, radius, shadow, font or duration is written down.
 
 | File | What it holds |
 | --- | --- |
-| `src/tokens.stylex.ts` | Every variable group with its light, default-accent value. |
-| `src/themes.stylex.ts` | `dark` (colours and shadows) and the four accent themes. |
+| `src/tokens.stylex.ts` | Every variable group with its light, Coral value. |
+| `src/themes.stylex.ts` | `dark` (colours, shadows, swatches) and a light and a dark theme for each of the eight accents. |
 | `src/global.css` | Body defaults, scrollbars, `::selection`, reduced motion, theme-switch suppression. |
 | `src/fonts.css` | `@font-face` imports for Figtree, Instrument Serif and JetBrains Mono from `@fontsource`. |
 
@@ -17,8 +17,9 @@ Import tokens through the subpath, never a barrel: `import { colors } from '@jun
 
 | Export | Prefix | Examples |
 | --- | --- | --- |
-| `colors` | `--background`, `--surface-*`, `--secondary-*`, `--border-*`, `--foreground-*`, `--accent-*`, `--input-border`, `--focus-ring`, `--selection-background`, `--overlay`, status | the base palette |
-| `accent` | `--hl`, `--hl-fg`, `--hl-soft`, `--hl-rule`, `--hl-ring` | the accent and its derived mixes; the only accent variables components use |
+| `colors` | `--background`, `--surface-*`, `--secondary-*`, `--border-*`, `--foreground-*`, `--accent-*`, `--input-border`, `--overlay`, status | the base palette |
+| `accent` | `--hl`, `--hl-fg`, `--hl-text`, `--hl-soft`, `--hl-nav`, `--hl-rule`, `--hl-ring`, `--focus-ring`, `--selection-background` | the accent and its derived mixes; the only accent variables components use |
+| `accentSwatches` | `--swatch-<accent>` / `-fg` | the eight fills for the accent picker, with a dark override |
 | `tints` | `--tint-<context>-bg` / `-fg` | `public`, `private`, `dm`, `resolved`, `warning`, `mention` |
 | `hues` | `--hue-<name>` | the eight person colours for avatars |
 | `shadows` | `--shadow-*`, `--card-ring`, `--pop-shadow` | drop shadows and the rings floating surfaces use instead of borders |
@@ -43,12 +44,12 @@ Import tokens through the subpath, never a barrel: `import { colors } from '@jun
 
 ## Applying a theme
 
-Apps call `applyTheme(theme, accent)` from `@juno/ui` (re-exported by `@juno/views`). It puts the `dark` and accent classes on `<html>`, sets `color-scheme`, and sets `data-theme-switching` on `<html>` while the classes swap so `global.css` turns transitions off for two frames.
+Apps call `applyTheme(theme, accent)` from `@juno/ui` (re-exported by `@juno/views`). It puts the `dark` classes and the accent's theme for that colour scheme on `<html>`, sets `color-scheme` and `data-accent`, and sets `data-theme-switching` on `<html>` while the classes swap so `global.css` turns transitions off for two frames.
 
 ## Rules the tokens encode
 
 - Never `cursor: pointer`. `global.css` sets the arrow cursor on the body and the text cursor on text inputs and textareas; checkboxes, radios and ranges keep the arrow.
 - The muted grey is `hsla(48, 5%, 42%)`, darker than the handoff, so meta text reaches 4.5:1 on paper. Muted text may sit on `--background`, `--background-subtle`, `--surface-default` and `--surface-hover`; on `--secondary-*` fills use `--foreground-subtle`.
-- `--focus-ring` is the info blue (3.9:1 on paper), not the pale selection colour. `--selection-background` is for text selection only.
-- The cyan accent takes near-black `--hl-fg`; its off-white text would be 3.8:1.
+- `--focus-ring` is the accent's text colour (4.5:1 or better on the page for every accent; ink keeps the info blue), never the pale selection colour. `--selection-background` is the accent at 28% over the page and is for text selection only.
+- The cyan accent takes near-black `--hl-fg`; its off-white text would be 3.8:1. Unread counts never take the accent.
 - Floating surfaces use `--pop-shadow` or `--card-ring` with a transparent 1px border, never a coloured border. Inputs keep `--input-border`.

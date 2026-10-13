@@ -1,6 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
 import type { InputHTMLAttributes, ReactNode } from 'react'
-import { colors, sizes, spacing, text } from '@juno/tokens/tokens.stylex'
+import { accent, colors, sizes, spacing, text } from '@juno/tokens/tokens.stylex'
 import { interactive } from './internal/interactive'
 import { Text } from './Text'
 
@@ -53,7 +53,7 @@ const styles = stylex.create({
     },
     outlineWidth: sizes['--focus-ring-width'],
     outlineOffset: sizes['--focus-ring-offset'],
-    outlineColor: colors['--focus-ring'],
+    outlineColor: accent['--focus-ring'],
   },
   text: {
     display: 'flex',
