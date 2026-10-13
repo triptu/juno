@@ -127,8 +127,9 @@ const applyThreadView = (ctx: SyncContext, view: ThreadView, requestedAt: Ts): E
   Effect.gen(function* () {
     const root = view.root_msg
     const channel = root.channel
-    const seen = new Map<string, (typeof view.unread_replies)[number]>()
-    for (const reply of [...view.latest_replies, ...view.unread_replies]) seen.set(reply.ts, reply)
+    const seen = new Map<string, (typeof view.latest_replies)[number]>()
+    // Slack omits unread_replies when nothing in the thread is unread.
+    for (const reply of [...view.latest_replies, ...(view.unread_replies ?? [])]) seen.set(reply.ts, reply)
     const topic = threadTopicOf(channel, root.ts)
     yield* transaction(
       Effect.gen(function* () {
