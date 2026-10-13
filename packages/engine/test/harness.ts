@@ -122,6 +122,8 @@ export interface RunningEngine {
   readonly handle: EngineHandle
   readonly status: (tag: SessionStatus['_tag']) => Promise<SessionStatus>
   readonly phase: (tag: EngineStatus['phase']['_tag'], timeoutMs?: number) => Promise<EngineStatus['phase']>
+  /** The mounted list atom for a filter. */
+  readonly topicsAtom: (filter?: TopicListFilter) => ReturnType<typeof topicListAtom>
   /** The sidebar window for a filter, once it has at least one message from the engine. */
   readonly topics: (filter?: TopicListFilter) => Promise<ListWindow<TopicRow>>
   readonly rows: (filter?: TopicListFilter) => Promise<ReadonlyArray<TopicRow>>
@@ -200,13 +202,14 @@ export async function startTestEngine(options: EngineOptions = {}): Promise<Runn
         timeoutMs,
         `phase ${tag}`,
       ),
+    topicsAtom: topicsOf,
     topics,
     rows: async (filter) => rowsFrom(await topics(filter)),
     rowsUntil: (predicate, label = 'rows', filter) =>
       waitFor(
         () => {
           const result = registry.get(topicsOf(filter))
-          if (!result._tag === 'Success' || result.value.meta.seq === 0) return undefined
+          if (result._tag !== 'Success' || result.value.meta.seq === 0) return undefined
           const rows = rowsFrom(result.value)
           return predicate(rows) ? rows : undefined
         },

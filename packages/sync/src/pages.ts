@@ -6,7 +6,7 @@
  * here; the socket events have their own path in `events.ts` but use the
  * same merge.
  */
-import { mainTopicId, threadTopicId, type ChannelId, type Ts } from '@juno/domain'
+import { compareTs, mainTopicId, threadTopicId, type ChannelId, type Ts } from '@juno/domain'
 import { isReply, type Message } from '@juno/slack-schema'
 import { Invalidation, StoreWriter, transaction, type MessageRow, type SqlError } from '@juno/store'
 import { Effect, Queue } from 'effect'
@@ -38,9 +38,17 @@ export const mergeOne = (
         yield* Queue.offer(ctx.rootFetches, { channel, ts: message.thread_ts })
         touched.push(stub)
       } else {
-        const counters = mergeRootCounters(root, { reply_count: 0, latest_reply: message.ts }, source)
+        // The root has at least as many replies as the store holds; a page may bring one the counters never saw.
+        const sql = yield* StoreWriter
+        const stored = yield* sql<{ n: number }>`
+          SELECT count(*) AS n FROM messages WHERE channel = ${channel} AND thread_ts = ${message.thread_ts} AND ts <> ${message.thread_ts} AND deleted = 0`
+        const counters = mergeRootCounters(root, { reply_count: stored[0]?.n ?? 0, latest_reply: message.ts }, source)
         if (counters.changed) yield* writeMessage(counters.row)
         touched.push(counters.row)
+        // A reply from a page that the root's counters never saw (no `message_replied` reached us):
+        // fetch the root again so `reply_count` is Slack's, not a lower bound.
+        const stale = root.latest_reply === null || compareTs(message.ts, root.latest_reply) > 0
+        if (source.kind === 'page' && stale && !isStub(root)) yield* Queue.offer(ctx.rootFetches, { channel, ts: root.ts })
       }
     }
     return touched
@@ -85,6 +93,9 @@ const seedThreadsRead = (rows: ReadonlyArray<MessageRow>): Effect.Effect<void, S
       yield* markRepliesComplete(row.channel, row.ts, false, 0, from)
     }
   })
+
+/** A root the store only knows from one of its replies; its fetch is already queued. */
+const isStub = (row: MessageRow): boolean => row.user_id === null && row.text === '' && row.blocks_json === null
 
 /** The thread topic a root or reply belongs to. */
 export const threadTopicOf = (channel: string, threadTs: string): string => threadTopicId(channel as ChannelId, threadTs as Ts)

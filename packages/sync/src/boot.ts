@@ -20,12 +20,14 @@ import { SlackEdge, SlackSession } from '@juno/slack'
 import type { ClientCountsArgs, CountEntry, ThreadView } from '@juno/slack-schema'
 import { Invalidation, StoreWriter, transaction, type SqlError } from '@juno/store'
 import { Clock, Effect } from 'effect'
-import type { SyncContext } from './context'
+import { reindexOptions, type SyncContext } from './context'
 import { discoverSince } from './discovery'
 import { applyPage, mainTopicOf, threadTopicOf } from './pages'
+import { reindexTopics } from './reindex'
 import { fillUsers } from './users'
 import {
   addSyncedRange,
+  applyServerMark,
   getSyncState,
   latestSyncedRange,
   markRepliesComplete,
@@ -82,17 +84,22 @@ const loadWorkspace = (ctx: SyncContext, withPrefs: boolean): Effect.Effect<void
   })
 
 /** `client.counts`: Slack's read pointers and unread flags per conversation, and the first read pointer of every Main. */
-const loadCounts = (sinceFetched: number | undefined): Effect.Effect<{ entries: ReadonlyArray<CountEntry>; fetched: number | undefined }, BootError, BootServices> =>
+const loadCounts = (ctx: SyncContext, sinceFetched: number | undefined): Effect.Effect<{ entries: ReadonlyArray<CountEntry>; fetched: number | undefined }, BootError, BootServices> =>
   Effect.gen(function* () {
     const api = yield* SlackApi
     const args: ClientCountsArgs = { thread_counts_by_channel: true, ...(sinceFetched === undefined ? {} : { counts_last_fetched: sinceFetched }) }
     const counts = yield* api.call('client.counts', args, { lane: 'interactive', reason: 'counts' })
     const entries = [...counts.channels, ...counts.ims, ...counts.mpims]
     const now = yield* Clock.currentTimeMillis
+    const eventTs = millisToTs(now)
     yield* transaction(
       Effect.gen(function* () {
         yield* setChannelReads(entries, now)
-        for (const entry of entries) yield* seedTopicRead(mainTopicOf(entry.id), entry.last_read)
+        // A pointer Juno has never seen is Slack's; a known one is a server mark that may have been missed.
+        for (const entry of entries) {
+          yield* seedTopicRead(mainTopicOf(entry.id), entry.last_read)
+          if (yield* applyServerMark(mainTopicOf(entry.id), entry.last_read, eventTs)) yield* reindexTopics([mainTopicOf(entry.id)], reindexOptions(ctx))
+        }
       }),
     )
     return { entries, fetched: counts.counts_last_fetched }
@@ -127,6 +134,7 @@ const applyThreadView = (ctx: SyncContext, view: ThreadView, requestedAt: Ts): E
       Effect.gen(function* () {
         yield* setThreadSub(channel, root.ts, root.subscribed ?? true, root.last_read)
         yield* seedTopicRead(topic, root.last_read ?? root.latest_reply ?? root.ts)
+        if (root.last_read !== undefined) yield* applyServerMark(topic, root.last_read, requestedAt)
       }),
     )
     yield* applyPage(ctx, channel, [root, ...seen.values()], { kind: 'page', requestedAt })
@@ -240,7 +248,7 @@ export const coldBoot = (ctx: SyncContext, phase: Phase): Effect.Effect<void, Bo
     const startedAt = yield* Clock.currentTimeMillis
     const start = yield* windowStart(ctx)
     yield* loadWorkspace(ctx, true)
-    const counts = yield* loadCounts(undefined)
+    const counts = yield* loadCounts(ctx, undefined)
     yield* loadThreadViews(ctx, start, true)
     const active = yield* activeConversations(counts.entries, start)
     yield* phase({ _tag: 'catching-up', done: 0, total: active.length })
@@ -280,7 +288,7 @@ export const catchUp = (ctx: SyncContext, previous: BootState, phase: Phase, opt
     const startedAt = yield* Clock.currentTimeMillis
     const start = yield* windowStart(ctx)
     if (options.refreshWorkspace) yield* loadWorkspace(ctx, false)
-    const counts = yield* loadCounts(previous.countsLastFetched)
+    const counts = yield* loadCounts(ctx, previous.countsLastFetched)
     const active = yield* activeConversations(counts.entries, start)
     const moved: Array<{ id: string; since: string | undefined }> = []
     for (const conversation of active) {

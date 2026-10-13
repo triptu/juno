@@ -125,12 +125,8 @@ export const runSync = (options: RunSyncOptions): Effect.Effect<never, SlackAuth
 
     const fetchRoots = Effect.gen(function* () {
       const api = yield* SlackApi
-      const seen = new Set<string>()
       while (true) {
         const { channel, ts } = yield* Queue.take(ctx.rootFetches)
-        const key = `${channel}:${ts}`
-        if (seen.has(key)) continue
-        seen.add(key)
         const requestedAt = yield* Effect.map(Clock.currentTimeMillis, (now) => `${Math.floor(now / 1000)}.000000`)
         const result = yield* Effect.result(
           api.call('conversations.replies', { channel, ts: ts as Ts, oldest: ts, inclusive: true, limit: 1 }, { lane: 'background', reason: 'root' }),

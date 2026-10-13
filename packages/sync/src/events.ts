@@ -188,13 +188,19 @@ const applyMessageFrame = (ctx: SyncContext, frame: Extract<RtmFrame, { type: 'm
         const merged = mergeTombstone(existing, frame.channel, frame.deleted_ts, { kind: 'event', eventTs: eventTsOf(frame, now) })
         if (merged.changed) yield* writeMessage(merged.row)
         const topics = topicsOfMessages([merged.row])
-        // A deleted reply: the root's counters follow the stored replies when they are complete.
-        const root = merged.row.thread_ts !== null && merged.row.thread_ts !== merged.row.ts ? yield* readMessage(frame.channel, merged.row.thread_ts) : undefined
+        // A deleted reply: the root's counters follow the stored replies when they are complete, else drop by one.
+        const wasLiveReply = existing !== undefined && existing.deleted === 0 && existing.thread_ts !== null && existing.thread_ts !== existing.ts
+        const root = wasLiveReply ? yield* readMessage(frame.channel, existing.thread_ts!) : undefined
         if (root !== undefined) {
+          const sql = yield* StoreWriter
+          const cursor = yield* sql<{ replies_complete: 0 | 1 }>`SELECT replies_complete FROM thread_cursors WHERE channel = ${frame.channel} AND thread_ts = ${root.ts}`
           const stored = (yield* threadMessages(frame.channel, root.ts)).filter((m) => m.ts !== root.ts && m.deleted === 0)
-          if (stored.length < root.reply_count) {
-            const latest = stored.reduce<string | null>((acc, m) => (acc === null || compareTs(m.ts, acc) > 0 ? m.ts : acc), null)
-            yield* writeMessage({ ...root, reply_count: stored.length, latest_reply: latest, version: root.version + 1 })
+          const latestStored = stored.reduce<string | null>((acc, m) => (acc === null || compareTs(m.ts, acc) > 0 ? m.ts : acc), null)
+          const complete = cursor[0]?.replies_complete === 1 || stored.length + 1 >= root.reply_count
+          const replyCount = complete ? stored.length : Math.max(stored.length, root.reply_count - 1)
+          const latestReply = root.latest_reply === frame.deleted_ts || complete ? latestStored : root.latest_reply
+          if (replyCount !== root.reply_count || latestReply !== root.latest_reply) {
+            yield* writeMessage({ ...root, reply_count: replyCount, latest_reply: latestReply, version: root.version + 1 })
           }
           topics.add(threadTopicOf(frame.channel, root.ts))
         }

@@ -41,12 +41,20 @@ export interface ReindexOptions {
   readonly onMissingUser?: (userId: string, topicId: string) => void
 }
 
-/** The stored preview: what the row shows plus the sender id, so a later name change can be applied at read time. */
+/**
+ * The stored preview: what the row shows plus the sender id, so a later name
+ * change can be applied at read time, and the start of the root's text for
+ * the fallback title, so the sidebar query needs no join on `messages`.
+ */
 export interface StoredPreview {
   readonly sender: string
   readonly text: string
   readonly senderId?: string
+  readonly rootText?: string
 }
+
+/** Enough of a root for `firstWords`, never a whole message. */
+export const ROOT_TEXT_CHARS = 240
 
 const MENTION = /<@([A-Z0-9]+)(?:\|[^>]*)?>/g
 const CHANNEL_MENTION = /<#([A-Z0-9]+)(?:\|[^>]*)?>/g
@@ -198,10 +206,12 @@ const reindexOne = (id: string, options: ReindexOptions): Effect.Effect<boolean,
         if (!participants.includes(user as UserId)) participants.push(user as UserId)
       }
     }
+    const rootText = root !== undefined && root.deleted === 0 && root.text !== '' ? root.text.slice(0, ROOT_TEXT_CHARS) : undefined
     const preview: StoredPreview = {
       sender: indexed.preview?.sender ?? '',
       text: indexed.preview?.text ?? '',
       ...(latest?.user_id === null || latest?.user_id === undefined ? {} : { senderId: latest.user_id }),
+      ...(rootText === undefined ? {} : { rootText }),
     }
     const next: TopicIndexRow = {
       topic_id: id,

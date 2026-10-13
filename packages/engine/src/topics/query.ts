@@ -1,20 +1,21 @@
 /**
  * The sidebar query (architecture 4.4, 4.5, performance 6): three indexed
- * lookups on `topic_index` joined to the overlay, the conversation, the
- * ignored list, the root message and Slack's follow flag; then the pure
- * rules in `@juno/domain` decide placement, status, title and tags, and the
- * rows are shaped as `TopicRow`.
+ * lookups on `topic_index`; then the pure rules in `@juno/domain` decide
+ * placement, status, title and tags, and the rows are shaped as `TopicRow`.
  *
- * The three lookups, each a `SEARCH` (the plan test checks):
+ * The three lookups, each a `SEARCH` (the plan test checks), joined to the
+ * overlay, the conversation, the ignored list and Slack's follow flag; the
+ * root's text for the fallback title is in the index row itself:
  * 1. the activity window: `last_activity_ts >= cutoff`, newest first, at
  *    most the window size (`topic_index_activity`, or the channel index when
  *    scoped);
  * 2. pinned rows, whatever their age (`topic_overlay_pinned`);
  * 3. rows older than the cutoff that are still unread (`topic_index_unread`).
  *
- * `rev` is a hash of the shaped row, so a change in any joined table (a
- * rename, a pin, a new avatar) is a new rev and reaches the renderer as a
- * delta; an unchanged row keeps its identity there.
+ * `rev` is a hash of every input the shaped row depends on (the index row's
+ * own rev, the overlay, the conversation, the people on the row, the
+ * placement), so a change in any joined table is a new rev and reaches the
+ * renderer as a delta; an unchanged row keeps its identity there.
  */
 import {
   canResolveOnHover,
@@ -73,7 +74,6 @@ interface JoinedRow extends TopicIndexRow {
   readonly pinned_at: string | null
   readonly unsubscribed_at: string | null
   readonly subscribed: 0 | 1 | null
-  readonly root_text: string | null
 }
 
 interface UserRow {
@@ -102,15 +102,14 @@ const settings = Effect.gen(function* () {
 const SELECT = `
   SELECT i.*, c.kind AS c_kind, c.name AS c_name, c.user_id AS c_user_id, c.member_ids_json AS c_members,
     o.manual_title, o.ai_title, o.resolved_at, o.resolved_activity_ts, o.reopened_at, o.pinned_at, o.unsubscribed_at,
-    s.subscribed AS subscribed, root.text AS root_text`
+    s.subscribed AS subscribed`
 
 const FROM = `
   FROM topic_index i
   JOIN conversations c ON c.id = i.channel
   LEFT JOIN topic_overlay o ON o.topic_id = i.topic_id
   LEFT JOIN ignored_channels ig ON ig.channel = i.channel
-  LEFT JOIN thread_subs s ON i.kind = 'thread' AND s.channel = i.channel AND s.thread_ts = i.root_ts
-  LEFT JOIN messages root ON root.channel = i.channel AND root.ts = i.root_ts`
+  LEFT JOIN thread_subs s ON i.kind = 'thread' AND s.channel = i.channel AND s.thread_ts = i.root_ts`
 
 const kindClause = (kind: ListFilter['kind']): string =>
   kind === 'channels' ? ` AND c.kind IN ('public', 'private')` : kind === 'dms' ? ` AND c.kind IN ('im', 'mpim')` : ''
@@ -166,11 +165,14 @@ export const listTopics = (filter: ListFilter, options: QueryOptions): Effect.Ef
 
     // Names and photos: participants, DM partners and group DM members, in one lookup.
     const userIds = new Set<string>()
+    const parsed = new Map<JoinedRow, Parsed>()
     for (const row of byId.values()) {
-      for (const id of parseIds(row.participants_json)) userIds.add(id)
+      const participants = parseIds(row.participants_json).slice(0, MAX_PARTICIPANTS)
+      const preview = parsePreview(row.preview_json)
+      parsed.set(row, { participants, preview })
+      for (const id of participants) userIds.add(id)
       if (row.c_user_id !== null) userIds.add(row.c_user_id)
       if (row.c_kind === 'mpim') for (const id of parseIds(row.c_members)) userIds.add(id)
-      const preview = parsePreview(row.preview_json)
       if (preview.senderId !== undefined) userIds.add(preview.senderId)
     }
     const users = new Map<string, UserRow>()
@@ -178,16 +180,24 @@ export const listTopics = (filter: ListFilter, options: QueryOptions): Effect.Ef
       const found = yield* sql<UserRow>`SELECT id, name, display_name, real_name, avatar_url FROM users WHERE id IN ${sql.in([...userIds])}`
       for (const user of found) users.set(user.id, user)
     }
-    const nameOf = (id: string) => users.get(id)?.display_name ?? users.get(id)?.real_name ?? users.get(id)?.name ?? id
+    const people = new Map<string, Person>()
     const personOf = (id: string): Person => {
-      const user = users.get(id)
-      return { id, name: nameOf(id), ...(user?.avatar_url ? { avatarUrl: user.avatar_url } : {}), color: defaultPersonColor(id) }
+      let person = people.get(id)
+      if (person === undefined) {
+        const user = users.get(id)
+        const name = user?.display_name ?? user?.real_name ?? user?.name ?? id
+        person = { id, name, ...(user?.avatar_url ? { avatarUrl: user.avatar_url } : {}), color: defaultPersonColor(id) }
+        people.set(id, person)
+      }
+      return person
     }
+    const nameOf = (id: string) => personOf(id).name
 
     const pinned: Array<{ topic: Topic; row: JoinedRow }> = []
     const recent: Array<{ topic: Topic; row: JoinedRow }> = []
     for (const row of byId.values()) {
       if (row.last_activity_ts === null) continue
+      const { participants, preview } = parsed.get(row)!
       const channel = channelOf(row, selfId, nameOf)
       const topic: Topic = {
         id: row.topic_id as Topic['id'],
@@ -199,7 +209,7 @@ export const listTopics = (filter: ListFilter, options: QueryOptions): Effect.Ef
           unreadCount: row.unread_count,
           unreadExact: row.unread_exact === 1,
           mentionsMe: row.mentions_me === 1,
-          participants: parseIds(row.participants_json) as ReadonlyArray<UserId>,
+          participants: participants as unknown as ReadonlyArray<UserId>,
         },
         overlay: {
           ...(row.manual_title === null ? {} : { manualTitle: row.manual_title }),
@@ -211,7 +221,7 @@ export const listTopics = (filter: ListFilter, options: QueryOptions): Effect.Ef
           ...(millis(row.unsubscribed_at) === undefined ? {} : { unsubscribedAt: millis(row.unsubscribed_at)! }),
         },
         ...(row.subscribed === null ? {} : { slackSubscribed: row.subscribed === 1 }),
-        ...(row.root_text === null ? {} : { firstMessageText: row.root_text }),
+        ...(preview.rootText === undefined ? {} : { firstMessageText: preview.rootText }),
       }
       const placement = sidebarPlacement(topic, ctx)
       if (placement === 'pinned') pinned.push({ topic, row })
@@ -221,22 +231,55 @@ export const listTopics = (filter: ListFilter, options: QueryOptions): Effect.Ef
     recent.sort((a, b) => byLatestActivity(a.topic, b.topic))
 
     const rows: Array<TopicRow> = []
-    for (const { topic, row } of pinned) rows.push(shape(topic, row, 'pinned', ctx, personOf))
+    for (const { topic, row } of pinned) rows.push(shape(topic, row, parsed.get(row)!.preview, 'pinned', ctx, personOf))
     for (const { topic, row } of recent) {
       if (rows.length >= options.limit) break
-      rows.push(shape(topic, row, 'recent', ctx, personOf))
+      rows.push(shape(topic, row, parsed.get(row)!.preview, 'recent', ctx, personOf))
     }
     return { rows, total: rows.length }
   })
 
-function shape(topic: Topic, row: JoinedRow, section: TopicRow['section'], ctx: { now: number; quietDays?: number }, personOf: (id: string) => Person): TopicRow {
-  const title = resolveTitle(topic)
-  const stored = parsePreview(row.preview_json)
-  const sender = stored.senderId !== undefined && stored.sender !== 'You' ? personOf(stored.senderId).name : stored.sender
-  const preview = { sender, text: stored.text, line: stored.text.length === 0 ? sender : `${sender}: ${stored.text}` }
+interface Parsed {
+  readonly participants: ReadonlyArray<string>
+  readonly preview: StoredPreview
+}
+
+function shape(
+  topic: Topic,
+  row: JoinedRow,
+  stored: StoredPreview,
+  section: TopicRow['section'],
+  ctx: { now: number; quietDays?: number },
+  personOf: (id: string) => Person,
+): TopicRow {
   const status = topicStatus(topic, ctx)
-  const resolved = isResolved(topic)
   const partner = topic.channel.kind === 'im' && row.c_user_id !== null ? personOf(row.c_user_id) : undefined
+  const people = topic.activity.participants.map(personOf)
+  const sender = stored.senderId !== undefined && stored.sender !== 'You' ? personOf(stored.senderId).name : stored.sender
+  // Everything the row is built from, in one short string; the row's rev is its hash.
+  const revKey = [
+    row.rev,
+    row.manual_title,
+    row.ai_title,
+    row.resolved_at,
+    row.resolved_activity_ts,
+    row.reopened_at,
+    row.pinned_at,
+    row.unsubscribed_at,
+    row.subscribed,
+    row.c_name,
+    row.c_kind,
+    topic.channel.name,
+    section,
+    status,
+    sender,
+    ...(partner === undefined ? [] : [partner.name, partner.avatarUrl]),
+    ...people.flatMap((p) => [p.name, p.avatarUrl]),
+  ].join('\u0001')
+
+  const title = resolveTitle(topic)
+  const preview = { sender, text: stored.text, line: stored.text.length === 0 ? sender : `${sender}: ${stored.text}` }
+  const resolved = isResolved(topic)
   const style = defaultChannelStyle(topic.channel.id, topic.channel.kind)
   const shaped: Omit<TopicRow, 'rev'> = {
     id: topic.id,
@@ -256,7 +299,7 @@ function shape(topic: Topic, row: JoinedRow, section: TopicRow['section'], ctx: 
       color: style.color,
       ...(partner === undefined ? {} : { partner }),
     },
-    participants: topic.activity.participants.slice(0, MAX_PARTICIPANTS).map(personOf),
+    participants: people,
     messageCount: topic.activity.messageCount,
     unreadCount: topic.activity.unreadCount,
     unreadExact: topic.activity.unreadExact !== false,
@@ -269,7 +312,7 @@ function shape(topic: Topic, row: JoinedRow, section: TopicRow['section'], ctx: 
     lastActivityTs: topic.activity.lastActivityTs,
     lastActivityAt: tsToMillis(topic.activity.lastActivityTs),
   }
-  return { ...shaped, rev: hashId(JSON.stringify(shaped)) }
+  return { ...shaped, rev: hashId(revKey) }
 }
 
 function channelOf(row: JoinedRow, selfId: string | undefined, nameOf: (id: string) => string): ChannelInfo {
