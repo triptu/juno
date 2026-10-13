@@ -5,8 +5,9 @@
  *
  * Default: the fake provider. `JUNO_AI=live` uses OpenRouter through pi-ai with
  * `OPENROUTER_API_KEY` from the environment or the repo's `.env`. Without a key
- * it says so and exits 0. `JUNO_AI_DECISION_MODEL` and `JUNO_AI_GENERATION_MODEL`
- * override the default slugs for the run.
+ * it says so and exits 0. `JUNO_AI_CLASSIFIER_MODEL` (empty for none),
+ * `JUNO_AI_DECISION_MODEL` and `JUNO_AI_GENERATION_MODEL` override the default
+ * slugs for the run.
  */
 import { Effect } from 'effect'
 import { fileURLToPath } from 'node:url'
@@ -33,6 +34,7 @@ function pickProvider(): { provider: AiProviderShape; mode: 'fake' | 'live' } | 
   const config: AiConfig = {
     apiKey,
     models: {
+      ...(process.env.JUNO_AI_CLASSIFIER_MODEL !== undefined ? { classifier: process.env.JUNO_AI_CLASSIFIER_MODEL } : {}),
       ...(process.env.JUNO_AI_DECISION_MODEL ? { decision: process.env.JUNO_AI_DECISION_MODEL } : {}),
       ...(process.env.JUNO_AI_GENERATION_MODEL ? { generation: process.env.JUNO_AI_GENERATION_MODEL } : {}),
     },
@@ -57,6 +59,8 @@ async function main(): Promise<void> {
   let totalCost = 0
   let totalLatency = 0
   let noDecisions = 0
+  let expected = 0
+  let matched = 0
   const chosen = only ? examples.filter((e) => e.task.name === only) : examples
   console.log(`ai:eval, ${mode} provider, ${chosen.length} examples\n`)
   for (const example of chosen) {
@@ -65,13 +69,20 @@ async function main(): Promise<void> {
     totalCost += meta.costUsd ?? 0
     totalLatency += meta.latencyMillis
     if (decision._tag === 'NoDecision') noDecisions++
+    let verdict = ''
+    if (example.expect) {
+      expected++
+      const ok = decision._tag === 'Decided' && example.expect(decision.value as never)
+      if (ok) matched++
+      verdict = ok ? ', as expected' : ', NOT as expected'
+    }
     const cost = meta.costUsd === undefined ? 'cost unknown' : `$${meta.costUsd.toFixed(5)}`
     console.log(`## ${example.task.name} (${example.task.tier}): ${example.label}`)
-    console.log(`   ${meta.model}, ${meta.latencyMillis} ms, ${cost}, ${meta.attempts} attempt(s)`)
+    console.log(`   ${meta.model}, ${meta.latencyMillis} ms, ${cost}, ${meta.attempts} attempt(s)${verdict}`)
     console.log(show(decision).replace(/^/gm, '   '))
     console.log()
   }
-  console.log(`total: ${chosen.length} runs, ${noDecisions} no decision, ${totalLatency} ms, $${totalCost.toFixed(5)}`)
+  console.log(`total: ${chosen.length} runs, ${noDecisions} no decision, ${matched}/${expected} as expected, ${totalLatency} ms, $${totalCost.toFixed(5)}`)
 }
 
 await main()
