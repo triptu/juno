@@ -55,4 +55,14 @@ export { Toast, ToastRegion, type ToastAction, type ToastProps, type ToastRegion
 export { accentLabels, accentNames, applyTheme, defaultAccent, isAccentName, isThemeName, themeNames, type AccentName, type ThemeName } from './theme'
 export type { ActivateEvent, ActivateHandler } from './internal/activate'
 export type { LayoutStyles } from './internal/sx'
-export { defineFixtures, fixture, scene, type Fixture, type FixtureFrame, type FixtureSet } from './fixtures/define'
+export {
+  defineFixtures,
+  fixture,
+  scene,
+  type Fixture,
+  type FixtureDeclaration,
+  type FixtureFrame,
+  type FixtureGroup,
+  type FixtureSet,
+  type FixtureState,
+} from './fixtures/define'

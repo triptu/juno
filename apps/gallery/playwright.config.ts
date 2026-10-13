@@ -3,9 +3,10 @@ import { defineConfig } from '@playwright/test'
 const port = 4174
 
 /**
- * Two projects against the built gallery. `shots` screenshots every fixture
+ * Two projects against the built gallery. `shots` screenshots every state
  * in light and dark; `behaviour` checks what a screenshot cannot show
- * (mouse-down activation, the cursor rule). Both use the installed Google
+ * (mouse-down activation, the cursor rule, the state switcher) and runs the
+ * layout-shift guard over every interactive element. Both use the installed Google
  * Chrome (`channel: 'chrome'`) so no browser download is needed; set
  * GALLERY_BROWSER=chromium after `npx playwright install chromium` to use
  * Playwright's own build instead.
@@ -13,8 +14,10 @@ const port = 4174
 export default defineConfig({
   testDir: '.',
   timeout: 120_000,
-  workers: 1,
-  fullyParallel: false,
+  // Tests are independent pages against a static server. The shift guard
+  // splits itself into parts to use the workers.
+  workers: process.env.CI ? 2 : 6,
+  fullyParallel: true,
   reporter: process.env.CI ? 'github' : 'list',
   use: {
     baseURL: `http://localhost:${port}`,
@@ -25,8 +28,9 @@ export default defineConfig({
     reducedMotion: 'reduce',
   },
   projects: [
-    { name: 'shots', testMatch: 'shots.spec.ts' },
-    { name: 'behaviour', testMatch: 'behaviour.spec.ts' },
+    // Wide enough for the 240px switcher plus the widest frame (1400px).
+    { name: 'shots', testMatch: 'shots.spec.ts', use: { viewport: { width: 1800, height: 1000 } } },
+    { name: 'behaviour', testMatch: ['behaviour.spec.ts', 'shift.spec.ts'] },
   ],
   webServer: {
     command: `pnpm exec vite preview --port ${port} --strictPort`,

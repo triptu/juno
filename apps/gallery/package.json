@@ -21,6 +21,7 @@
     "react-dom": "19.3.0"
   },
   "devDependencies": {
+    "@juno/testing": "workspace:*",
     "@playwright/test": "1.64.0",
     "@stylexjs/unplugin": "0.19.1",
     "@types/node": "24.19.2",
@@ -36,6 +37,9 @@
       "@juno/tokens",
       "@juno/ui",
       "@juno/views"
+    ],
+    "testDeps": [
+      "@juno/testing"
     ]
   }
 }

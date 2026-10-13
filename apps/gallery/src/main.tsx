@@ -1,5 +1,6 @@
 import '@juno/tokens/fonts.css'
 import '@juno/tokens/global.css'
+import './gallery.css'
 
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'

@@ -14,14 +14,20 @@ function Live() {
 export default defineFixtures(
   ChannelIconPicker,
   {
-    letter: fixture({ name: 'eng', color: 'emeraldDark', onIconChange: noop, onColorChange: noop }),
-    chosen: fixture({ name: 'eng', icon: 'rocket', color: 'cyan', onIconChange: noop, onColorChange: noop }),
-    live: scene(() => <Live />),
-    'icon-hover': fixture({ name: 'eng', icon: 'rocket', color: 'cyan', onIconChange: noop, onColorChange: noop }, { hover: '[aria-label="Bug"]' }),
-    'icon-press': fixture({ name: 'eng', icon: 'rocket', color: 'cyan', onIconChange: noop, onColorChange: noop }, { press: '[aria-label="Bug"]' }),
-    'icon-focus': fixture({ name: 'eng', icon: 'rocket', color: 'cyan', onIconChange: noop, onColorChange: noop }, { focus: '[aria-label="Bug"]' }),
-    'color-hover': fixture({ name: 'eng', icon: 'rocket', color: 'cyan', onIconChange: noop, onColorChange: noop }, { hover: '[aria-label="Claret"]' }),
-    'color-press': fixture({ name: 'eng', icon: 'rocket', color: 'cyan', onIconChange: noop, onColorChange: noop }, { press: '[aria-label="Claret"]' }),
+    Choice: {
+      letter: fixture({ name: 'eng', color: 'emeraldDark', onIconChange: noop, onColorChange: noop }),
+      chosen: fixture({ name: 'eng', icon: 'rocket', color: 'cyan', onIconChange: noop, onColorChange: noop }),
+    },
+    Interactive: {
+      live: scene(() => <Live />),
+    },
+    Interaction: {
+      'icon-hover': fixture({ name: 'eng', icon: 'rocket', color: 'cyan', onIconChange: noop, onColorChange: noop }, { hover: '[aria-label="Bug"]' }),
+      'icon-press': fixture({ name: 'eng', icon: 'rocket', color: 'cyan', onIconChange: noop, onColorChange: noop }, { press: '[aria-label="Bug"]' }),
+      'icon-focus': fixture({ name: 'eng', icon: 'rocket', color: 'cyan', onIconChange: noop, onColorChange: noop }, { focus: '[aria-label="Bug"]' }),
+      'color-hover': fixture({ name: 'eng', icon: 'rocket', color: 'cyan', onIconChange: noop, onColorChange: noop }, { hover: '[aria-label="Claret"]' }),
+      'color-press': fixture({ name: 'eng', icon: 'rocket', color: 'cyan', onIconChange: noop, onColorChange: noop }, { press: '[aria-label="Claret"]' }),
+    },
   },
   { width: 360, surface: 'surface' },
 )

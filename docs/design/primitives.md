@@ -13,7 +13,7 @@ Shared conventions for every primitive (details in `packages/ui/README.md`):
 - `user-select: none` by default; text-bearing primitives (Text `selectable`, TextField, Textarea, CodeBlock) opt in.
 - Things that navigate (ListRow with `onSelect`, Tab, OptionRow, NavItem) activate on `pointerdown` with the primary button; ⌘ passes through for "open in new tab", right-click goes to `onContextMenu`, Enter/Space work, nested controls are ignored. No transition on their background.
 - Muted text never sits on a secondary fill: a container with such a fill (ListRow `selected`) sets `--foreground-muted` to the subtle value on itself, so muted descendants turn subtle in both themes. Do this with a variable override in `stylex.create`, never with a `createTheme` (that re-emits every colour of the group and undoes dark mode).
-- Every primitive ships `<Name>.fixtures.tsx`, rendered by `apps/gallery`. A fixture frame can ask the screenshot runner to `hover`, `press` or `focus` an element first, so hover, pressed and focused states are reviewed like any other.
+- Every primitive ships `<Name>.fixtures.tsx`, rendered by `apps/gallery`, with its states grouped under headings and only states the component can reach. A fixture frame can ask the screenshot runner to `hover`, `press` or `focus` an element first, so hover, pressed and focused states are reviewed like any other.
 
 ## 1. Icon
 

@@ -10,8 +10,10 @@ const prompt = `In infra/preview-envs, add a reaper that deletes preview environ
 export default defineFixtures(
   CodeBlock,
   {
-    prompt: fixture({ children: prompt, label: 'Prompt' }),
-    long: fixture({ children: `${prompt}\n${prompt}\n${prompt}`, label: 'Prompt' }),
+    Length: {
+      prompt: fixture({ children: prompt, label: 'Prompt' }),
+      long: fixture({ children: `${prompt}\n${prompt}\n${prompt}`, label: 'Prompt' }),
+    },
   },
   { width: 520 },
 )

@@ -71,4 +71,4 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   Toast,
 }
 
-export type { Fixture, FixtureFrame, FixtureSet } from './fixtures/define'
+export type { Fixture, FixtureFrame, FixtureGroup, FixtureSet, FixtureState } from './fixtures/define'

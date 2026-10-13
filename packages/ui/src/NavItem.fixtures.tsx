@@ -34,12 +34,16 @@ function Nav({ active = 'all' }: { readonly active?: 'all' | 'for-you' | 'juno' 
 export default defineFixtures(
   NavItem,
   {
-    nav: scene(() => <Nav />),
-    'for-you-active': scene(() => <Nav active="for-you" />),
-    'juno-active': scene(() => <Nav active="juno" />),
-    hover: scene(() => <Nav />, { hover: '[role="button"]:nth-of-type(2)' }),
-    'hover-active': scene(() => <Nav />, { hover: '[role="button"]:nth-of-type(1)' }),
-    focus: scene(() => <Nav />, { focus: '[role="button"]:nth-of-type(2)' }),
+    Selection: {
+      nav: scene(() => <Nav />),
+      'for-you-active': scene(() => <Nav active="for-you" />),
+      'juno-active': scene(() => <Nav active="juno" />),
+    },
+    Interaction: {
+      hover: scene(() => <Nav />, { hover: '[role="button"]:nth-of-type(2)' }),
+      'hover-active': scene(() => <Nav />, { hover: '[role="button"]:nth-of-type(1)' }),
+      focus: scene(() => <Nav />, { focus: '[role="button"]:nth-of-type(2)' }),
+    },
   },
   { surface: 'subtle' },
 )

@@ -1,42 +1,11 @@
-import * as stylex from '@stylexjs/stylex'
-import { useEffect, useLayoutEffect, useMemo, useState } from 'react'
-import { accent, colors, radii, spacing, text } from '@juno/tokens/tokens.stylex'
-import { accentNames, applyTheme, defaultAccent, isAccentName, isThemeName, themeNames, type AccentName, type FixtureFrame, type ThemeName } from '@juno/ui'
-import { allRoutes, registry, type AnyFixtureSet, type Route } from './registry'
+import { useEffect, useLayoutEffect, useState } from 'react'
+import { applyTheme } from '@juno/ui'
+import { ComponentPage } from './ComponentPage'
+import { Index } from './Index'
+import { href, parseHash, type GalleryLocation } from './location'
+import { allRoutes, components, findComponent, findState } from './registry'
 
-interface Location {
-  readonly component: string | null
-  readonly fixture: string | null
-  readonly theme: ThemeName
-  readonly accent: AccentName
-  readonly query: string
-}
-
-function parseHash(hash: string): Location {
-  const [pathPart = '', search = ''] = hash.replace(/^#\/?/, '').split('?')
-  const params = new URLSearchParams(search)
-  const [component = null, fixture = null] = pathPart.split('/').map((part) => (part ? decodeURIComponent(part) : null))
-  const theme = params.get('theme')
-  const accent = params.get('accent')
-  return {
-    component,
-    fixture,
-    theme: isThemeName(theme) ? theme : 'light',
-    accent: isAccentName(accent) ? accent : defaultAccent,
-    query: params.get('q') ?? '',
-  }
-}
-
-function href(component: string | null, fixture: string | null, theme: ThemeName, accent: AccentName): string {
-  const path = component ? `/${encodeURIComponent(component)}${fixture ? `/${encodeURIComponent(fixture)}` : ''}` : '/'
-  const params = new URLSearchParams()
-  if (theme !== 'light') params.set('theme', theme)
-  if (accent !== defaultAccent) params.set('accent', accent)
-  const search = params.toString()
-  return `#${path}${search ? `?${search}` : ''}`
-}
-
-function useLocation(): Location {
+function useLocation(): GalleryLocation {
   const [location, setLocation] = useState(() => parseHash(window.location.hash))
   useEffect(() => {
     const update = () => setLocation(parseHash(window.location.hash))
@@ -46,268 +15,100 @@ function useLocation(): Location {
   return location
 }
 
+/** Moves without adding a history entry, so holding j does not fill the back stack. */
+function replace(hash: string) {
+  window.location.replace(hash)
+}
+
 export function App() {
   const location = useLocation()
   useLayoutEffect(() => applyTheme(location.theme, location.accent), [location.theme, location.accent])
 
-  if (location.component && location.fixture) {
-    const set = registry[location.component]
-    const fixture = set?.fixtures[location.fixture]
-    if (!set || !fixture) return <Missing component={location.component} fixture={location.fixture} />
-    // Keyed by route so switching fixtures always remounts the component.
-    const route = `${location.component}/${location.fixture}`
-    return <FixturePage key={route} route={route} set={set} fixtureName={location.fixture} />
-  }
-  return <Index location={location} />
-}
-
-function FixturePage({ route, set, fixtureName }: { readonly route: string; readonly set: AnyFixtureSet; readonly fixtureName: string }) {
-  const fixture = set.fixtures[fixtureName]
-  if (!fixture) return null
-  const frame: FixtureFrame = { ...set.frame, ...fixture.frame }
-  const Component = set.component
-  const content = fixture.render ? fixture.render() : <Component {...fixture.props} />
-  return (
-    <div {...stylex.props(styles.stage)}>
-      <div
-        // The route, so the test runners can wait for this fixture's frame.
-        data-fixture-frame={route}
-        {...stylex.props(
-          styles.frame,
-          frame.padded !== false && styles.framePadded,
-          surfaces[frame.surface ?? 'background'],
-          frame.width !== undefined && styles.frameWidth(frame.width),
-          frame.height !== undefined && styles.frameHeight(frame.height),
-        )}
-      >
-        {content}
-      </div>
-    </div>
-  )
-}
-
-function Index({ location }: { readonly location: Location }) {
-  const [query, setQuery] = useState(location.query)
-  const routes = useMemo(() => allRoutes(), [])
-  const needle = query.trim().toLowerCase()
-  const visible = needle ? routes.filter((route) => `${route.component}/${route.fixture}`.toLowerCase().includes(needle)) : routes
-  const components = [...new Set(visible.map((route) => route.component))]
-
   useEffect(() => {
-    // Exposed for the screenshot runner, so it never has to parse the DOM.
-    ;(window as unknown as { __galleryRoutes: ReadonlyArray<Route> }).__galleryRoutes = routes
-  }, [routes])
+    // Exposed for the test runners, so they never have to parse the DOM.
+    ;(window as unknown as { __galleryRoutes: typeof allRoutes }).__galleryRoutes = allRoutes
+  }, [])
 
+  const entry = location.component ? findComponent(location.component) : undefined
+  const state = entry ? findState(entry, location.state) : undefined
+
+  useKeys()
+
+  if (!location.component) return <Index theme={location.theme} accent={location.accent} query={location.query} />
+  if (!entry) return <Missing text={`No component named ${location.component}.`} />
+  if (!state) return <Missing text={`No state ${location.state ?? ''} on ${entry.name}.`} />
+  return <ComponentPage entry={entry} state={state} theme={location.theme} accent={location.accent} />
+}
+
+const isEditable = (target: EventTarget | null): boolean =>
+  target instanceof HTMLElement && target.closest('input, textarea, select, [contenteditable=""], [contenteditable="true"]') !== null
+
+/**
+ * j and k, or the arrow keys, walk the states of the open component; [ and ]
+ * walk the components. Typing in a field is left alone, and so are the arrow
+ * keys while focus is inside the fixture, because the component under test
+ * may use them (a slider, a segmented control, a list).
+ *
+ * The handler reads the address when the key goes down, not from React state,
+ * so a held key never acts on a page that has already been replaced.
+ */
+function useKeys() {
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || isEditable(event.target)) return
+      const location = parseHash(window.location.hash)
+      const entry = location.component ? findComponent(location.component) : undefined
+      if (!entry) return
+      const { theme, accent } = location
+      const state = findState(entry, location.state)
+      const inFrame = event.target instanceof HTMLElement && event.target.closest('[data-fixture-frame]') !== null
+      const states = entry.states
+      const index = state ? states.indexOf(state) : 0
+      const goState = (offset: number) => {
+        const next = states[Math.min(states.length - 1, Math.max(0, index + offset))]
+        if (next && next !== state) replace(href(entry.name, next.id, theme, accent))
+      }
+      const goComponent = (offset: number) => {
+        const next = components[(components.indexOf(entry) + offset + components.length) % components.length]
+        if (next) replace(href(next.name, null, theme, accent))
+      }
+      switch (event.key) {
+        case 'j':
+          goState(1)
+          break
+        case 'k':
+          goState(-1)
+          break
+        case 'ArrowDown':
+          if (inFrame) return
+          goState(1)
+          break
+        case 'ArrowUp':
+          if (inFrame) return
+          goState(-1)
+          break
+        case ']':
+          goComponent(1)
+          break
+        case '[':
+          goComponent(-1)
+          break
+        default:
+          return
+      }
+      event.preventDefault()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [])
+}
+
+function Missing({ text }: { readonly text: string }) {
   return (
-    <div {...stylex.props(styles.index)}>
-      <header {...stylex.props(styles.indexHeader)}>
-        <h1 {...stylex.props(styles.title)}>Juno gallery</h1>
-        <div {...stylex.props(styles.controls)}>
-          <input
-            type="search"
-            placeholder="Filter"
-            aria-label="Filter fixtures"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            {...stylex.props(styles.search)}
-          />
-          <span {...stylex.props(styles.group)}>
-            {themeNames.map((theme) => (
-              <a
-                key={theme}
-                href={href(null, null, theme, location.accent)}
-                aria-current={theme === location.theme ? 'true' : undefined}
-                {...stylex.props(styles.pill, theme === location.theme && styles.pillActive)}
-              >
-                {theme}
-              </a>
-            ))}
-          </span>
-          <span {...stylex.props(styles.group)}>
-            {accentNames.map((name) => (
-              <a
-                key={name}
-                href={href(null, null, location.theme, name)}
-                aria-current={name === location.accent ? 'true' : undefined}
-                {...stylex.props(styles.pill, name === location.accent && styles.pillActive)}
-              >
-                {name}
-              </a>
-            ))}
-          </span>
-        </div>
-      </header>
-      <p {...stylex.props(styles.hint)}>
-        {routes.length} fixtures. Routes look like <code>#/Button/primary?theme=dark&amp;accent=claret</code>. Screenshots:{' '}
-        <code>pnpm gallery:shots</code>.
+    <div className="g-chrome g-index">
+      <p className="g-hint">
+        {text} <a className="g-link" href="#/">Back to the index</a>.
       </p>
-      <div {...stylex.props(styles.grid)}>
-        {components.map((component) => (
-          <section key={component} {...stylex.props(styles.section)}>
-            <h2 {...stylex.props(styles.sectionTitle)}>{component}</h2>
-            <ul {...stylex.props(styles.list)}>
-              {visible
-                .filter((route) => route.component === component)
-                .map((route) => (
-                  <li key={route.fixture}>
-                    <a href={href(route.component, route.fixture, location.theme, location.accent)} {...stylex.props(styles.link)}>
-                      {route.fixture}
-                    </a>
-                  </li>
-                ))}
-            </ul>
-          </section>
-        ))}
-      </div>
     </div>
   )
 }
-
-function Missing({ component, fixture }: { readonly component: string; readonly fixture: string }) {
-  return (
-    <div {...stylex.props(styles.index)}>
-      <p {...stylex.props(styles.hint)}>
-        No fixture <code>{fixture}</code> on <code>{component}</code>. <a href="#/">Back to the index</a>.
-      </p>
-    </div>
-  )
-}
-
-const styles = stylex.create({
-  stage: {
-    minHeight: '100vh',
-    display: 'flex',
-    alignItems: 'flex-start',
-    justifyContent: 'flex-start',
-    padding: spacing['--space-6'],
-    backgroundColor: colors['--background'],
-    overflow: 'auto',
-  },
-  frame: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'flex-start',
-    position: 'relative',
-    boxSizing: 'border-box',
-    maxWidth: '100%',
-    overflow: 'hidden',
-  },
-  framePadded: {
-    padding: spacing['--space-6'],
-  },
-  frameWidth: (px: number) => ({ width: px }),
-  frameHeight: (px: number) => ({ height: px }),
-  index: {
-    maxWidth: '960px',
-    marginInline: 'auto',
-    paddingBlock: spacing['--space-10'],
-    paddingInline: spacing['--space-8'],
-    minHeight: '100vh',
-    overflow: 'auto',
-    userSelect: 'text',
-  },
-  indexHeader: {
-    display: 'flex',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing['--space-4'],
-  },
-  title: {
-    margin: 0,
-    fontFamily: text['--text-page-title-family'],
-    fontSize: text['--text-page-title-size'],
-    fontWeight: text['--text-page-title-weight'],
-    lineHeight: text['--text-page-title-leading'],
-    letterSpacing: text['--text-page-title-tracking'],
-  },
-  controls: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: spacing['--space-3'],
-    flexWrap: 'wrap',
-  },
-  search: {
-    height: '30px',
-    paddingInline: spacing['--space-2-5'],
-    borderWidth: '1px',
-    borderStyle: 'solid',
-    borderColor: colors['--input-border'],
-    borderRadius: radii['--radius-md-plus'],
-    backgroundColor: colors['--surface-default'],
-    color: 'inherit',
-    fontFamily: 'inherit',
-    fontSize: text['--text-ui-size'],
-    outlineColor: accent['--focus-ring'],
-  },
-  group: {
-    display: 'inline-flex',
-    gap: spacing['--space-0-5'],
-    padding: spacing['--space-0-5'],
-    backgroundColor: colors['--surface-hover'],
-    borderRadius: radii['--radius-md-plus'],
-  },
-  pill: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    height: '24px',
-    paddingInline: spacing['--space-2'],
-    borderRadius: radii['--radius-sm'],
-    fontSize: text['--text-meta-size'],
-    fontWeight: 500,
-    color: colors['--foreground-muted'],
-    textDecoration: 'none',
-  },
-  pillActive: {
-    color: colors['--foreground-default'],
-    backgroundColor: colors['--surface-default'],
-  },
-  hint: {
-    marginBlock: spacing['--space-3'],
-    fontSize: text['--text-ui-size'],
-    color: colors['--foreground-muted'],
-  },
-  grid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-    gap: spacing['--space-6'],
-    marginTop: spacing['--space-6'],
-  },
-  section: {
-    minWidth: 0,
-  },
-  sectionTitle: {
-    margin: 0,
-    marginBottom: spacing['--space-1-5'],
-    fontSize: text['--text-heading-size'],
-    fontWeight: text['--text-heading-weight'],
-  },
-  list: {
-    listStyle: 'none',
-    margin: 0,
-    padding: 0,
-    display: 'flex',
-    flexDirection: 'column',
-    gap: spacing['--space-0-5'],
-  },
-  link: {
-    display: 'block',
-    paddingBlock: spacing['--space-0-5'],
-    paddingInline: spacing['--space-1-5'],
-    marginInline: `calc(-1 * ${spacing['--space-1-5']})`,
-    borderRadius: radii['--radius-sm'],
-    fontSize: text['--text-ui-size'],
-    color: colors['--foreground-subtle'],
-    textDecoration: 'none',
-    backgroundColor: {
-      default: 'transparent',
-      ':hover': { default: null, '@media (hover: hover)': colors['--surface-hover'] },
-    },
-  },
-})
-
-const surfaces = stylex.create({
-  background: { backgroundColor: colors['--background'] },
-  subtle: { backgroundColor: colors['--background-subtle'] },
-  surface: { backgroundColor: colors['--surface-default'] },
-})

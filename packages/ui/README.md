@@ -38,6 +38,34 @@ The gallery's `behaviour` project (`pnpm --filter @juno/gallery test:e2e`) drive
 
 ## Fixtures and the gallery
 
-Every component exports `<Name>.fixtures.tsx` built with `defineFixtures(Component, { name: fixture(props) })`, and `src/fixtures.ts` collects them under `@juno/ui/fixtures`. The gallery (`apps/gallery`) turns each entry into a route and a screenshot. `@juno/views` registers its fixtures the same way.
+Every component exports `<Name>.fixtures.tsx`, and `src/fixtures.ts` collects them under `@juno/ui/fixtures`. `@juno/views` registers its fixtures the same way. The gallery (`apps/gallery`) shows one state at a time and screenshots each one.
 
-A fixture's frame can ask the screenshot runner to put the component into a state first: `hover`, `press` (holds the primary button, with motion on so the press scale shows) and `focus` (keyboard focus, so the ring shows) each take a CSS selector inside the frame. Every primitive with such states has fixtures for them, so hover, pressed, focused and disabled are reviewed in light and dark like everything else.
+Declare the states grouped under headings in product words:
+
+```ts
+export default defineFixtures(Component, {
+  Data: {
+    loading: fixture({ ... }),
+    empty: fixture({ ... }),
+    error: fixture({ ... }),
+    long: fixture({ ... }),
+  },
+  Session: {
+    expired: fixture({ ... }),
+  },
+  Interaction: {
+    'row-hover': fixture({ ... }, { hover: '[role="button"]' }),
+  },
+  Overview: {
+    'all-sizes': scene(() => <Row>...</Row>),
+  },
+}, { width: 720 }) // optional frame for every state
+```
+
+- A group key is the heading as the switcher shows it (`Data`, `Photo`, `In context`). A state key is kebab-case and shows in sentence case. Both become URL parts: `#/Component?__state=data/loading` (group id, then state key). Keys must be unique within a component; `defineFixtures` throws on a duplicate.
+- Group by what the user sees (`Data`, `Session`, `Failure`, `Availability`, `Interaction`), not by prop name. `Overview` holds comparison sheets that put several states side by side.
+- A bare `name: fixture(...)` at the top level still works; those states are listed first with no heading. Prefer groups.
+- List only states the component's code can reach. If a fixture shows something production cannot produce, remove it; do not add a branch to the component to make it possible. Copy in a view's fixtures is the copy its container passes.
+- A pending or loading state holds still. Never resolve a fixture with a timeout. For a thing that never arrives, point at a request the gallery server holds open (Avatar `photo/pending` uses `/__fixture/pending.png`); tests answer it when they need the arrival.
+- A state's frame can ask the screenshot runner to put the component into a look first: `hover`, `press` (holds the primary button, with motion on so the press scale shows) and `focus` (keyboard focus, so the ring shows) each take a CSS selector inside the frame. Every primitive with such looks has states for them, so hover, pressed, focused and disabled are reviewed in light and dark like everything else. Do not add a `press` state for a disabled control: it cannot be pressed.
+- The layout-shift test (`apps/gallery/shift.spec.ts`) hovers, presses and focuses every interactive element of every state and fails on any movement. Hover and focus may change colour, shadow and outline, never size, position or border width.
