@@ -3,11 +3,16 @@
  * the window to roots outside it, in threads the user does not follow, which
  * windowed history, history since a cursor and the reconnect path all miss.
  *
- * Preferred source: `search.modules.messages` with `is:thread after:<date>`.
- * One to three pages cover the gap and reach old roots. Matches from
- * conversations the user is not a member of are dropped (search also covers
- * public channels the user is not in). A match is merged as a page message
- * without reactions; an unknown root becomes a stub and is fetched.
+ * Preferred source: `search.modules.messages` with `is:thread after:<date>`,
+ * newest first (`sort=timestamp`; without it Slack orders by relevance and
+ * the pages are an arbitrary sample). One to three pages cover the gap and
+ * reach old roots. Matches from conversations the user is not a member of
+ * are dropped (search also covers public channels the user is not in). A
+ * match is a partial message: it creates rows the store lacks, fills stub
+ * roots and moves counters, but never replaces stored content (it carries
+ * no files and no reactions). An unknown root becomes a stub and is fetched.
+ * A match that says nothing about its thread (no `thread_ts`, not in the
+ * permalink, no `reply_count`) is dropped.
  *
  * Fallback (`discovery: 'history'`): history since the synced range for
  * conversations whose `latest` moved (the catch-up already did that), plus
@@ -32,20 +37,38 @@ const DAY = 24 * 60 * 60 * 1000
 /** `after:` takes a date; the day before `since` keeps every message since that moment in the result. */
 const afterDate = (sinceMillis: number): string => new Date(sinceMillis - DAY).toISOString().slice(0, 10)
 
-const matchToMessage = (match: SearchMatch): Message => ({
-  type: 'message',
-  ts: match.ts,
-  ...(match.user === undefined ? {} : { user: match.user }),
-  ...(match.text === undefined ? {} : { text: match.text }),
-  ...(match.blocks === undefined ? {} : { blocks: match.blocks }),
-  ...(match.attachments === undefined ? {} : { attachments: match.attachments }),
-  ...(match.files === undefined ? {} : { files: match.files }),
-  ...(match.thread_ts === undefined ? {} : { thread_ts: match.thread_ts }),
-  ...(match.reply_count === undefined ? {} : { reply_count: match.reply_count }),
-})
+/** The thread a match belongs to: its `thread_ts`, else the `thread_ts` query parameter of its permalink. */
+const threadTsOf = (match: SearchMatch): Ts | undefined => {
+  if (match.thread_ts !== undefined) return match.thread_ts
+  if (match.permalink === undefined) return undefined
+  const value = /[?&]thread_ts=(\d+\.\d+)/.exec(match.permalink)?.[1]
+  return value === undefined ? undefined : (value as Ts)
+}
+
+/** A match as a message, or `undefined` when it says nothing about a thread. */
+const matchToMessage = (match: SearchMatch): Message | undefined => {
+  const threadTs = threadTsOf(match)
+  if (threadTs === undefined && (match.reply_count ?? 0) === 0) return undefined
+  return {
+    type: 'message',
+    ts: match.ts,
+    ...(match.user === undefined ? {} : { user: match.user }),
+    ...(match.text === undefined ? {} : { text: match.text }),
+    ...(match.blocks === undefined ? {} : { blocks: match.blocks }),
+    ...(match.attachments === undefined ? {} : { attachments: match.attachments }),
+    ...(match.files === undefined ? {} : { files: match.files }),
+    ...(threadTs === undefined ? {} : { thread_ts: threadTs }),
+    ...(match.reply_count === undefined ? {} : { reply_count: match.reply_count }),
+  }
+}
+
+export interface DiscoverOptions {
+  /** Cold boot: a thread first seen here that the user does not follow starts read (see `ApplyPageOptions`). */
+  readonly seedThreadsRead: boolean
+}
 
 /** Thread activity since `sinceMillis`, by search. */
-const discoverBySearch = (ctx: SyncContext, sinceMillis: number): Effect.Effect<void, SlackApiError | SqlError, Services> =>
+const discoverBySearch = (ctx: SyncContext, sinceMillis: number, options: DiscoverOptions): Effect.Effect<void, SlackApiError | SqlError, Services> =>
   Effect.gen(function* () {
     const api = yield* SlackApi
     const sql = yield* StoreWriter
@@ -56,7 +79,7 @@ const discoverBySearch = (ctx: SyncContext, sinceMillis: number): Effect.Effect<
       const requestedAt = yield* Effect.map(Clock.currentTimeMillis, (now) => `${Math.floor(now / 1000)}.000000` as Ts)
       const answer = yield* api.call(
         'search.modules.messages',
-        { module: 'messages', query, count: ctx.config.searchPageCount, page, no_user_profile: 1 },
+        { module: 'messages', query, count: ctx.config.searchPageCount, page, no_user_profile: 1, sort: 'timestamp', sort_dir: 'desc' },
         { lane: 'background', reason: 'discovery' },
       )
       const matches = searchMatches(answer)
@@ -66,14 +89,16 @@ const discoverBySearch = (ctx: SyncContext, sinceMillis: number): Effect.Effect<
         if (match.ts < sinceTs) reachedSince = true
         const channel = searchMatchChannelId(match)
         if (!members.has(channel)) continue
+        const message = matchToMessage(match)
+        if (message === undefined) continue
         let list = byChannel.get(channel)
         if (list === undefined) {
           list = []
           byChannel.set(channel, list)
         }
-        list.push(matchToMessage(match))
+        list.push(message)
       }
-      for (const [channel, messages] of byChannel) yield* applyPage(ctx, channel, messages, { kind: 'page', requestedAt })
+      for (const [channel, messages] of byChannel) yield* applyPage(ctx, channel, messages, { kind: 'partial', requestedAt }, { seedThreadsRead: options.seedThreadsRead })
       const pageCount = answer.pagination?.page_count ?? answer.messages?.pagination?.page_count
       const next = answer.response_metadata?.next_cursor
       const hasMore = (pageCount !== undefined && page < pageCount) || (next !== undefined && next !== '')
@@ -83,7 +108,7 @@ const discoverBySearch = (ctx: SyncContext, sinceMillis: number): Effect.Effect<
   })
 
 /** The fallback: replies since the stored ones for every root whose `latest_reply` moved. */
-const discoverByReplies = (ctx: SyncContext): Effect.Effect<void, SlackApiError | SqlError, Services> =>
+const discoverByReplies = (ctx: SyncContext, options: DiscoverOptions): Effect.Effect<void, SlackApiError | SqlError, Services> =>
   Effect.gen(function* () {
     const api = yield* SlackApi
     const sql = yield* StoreWriter
@@ -103,7 +128,7 @@ const discoverByReplies = (ctx: SyncContext): Effect.Effect<void, SlackApiError 
         )
         .pipe(Effect.catchTag('SlackRejected', () => Effect.succeed(undefined)))
       if (page === undefined) continue
-      yield* applyPage(ctx, root.channel, page.messages, { kind: 'page', requestedAt })
+      yield* applyPage(ctx, root.channel, page.messages, { kind: 'page', requestedAt }, { seedThreadsRead: options.seedThreadsRead })
       yield* Effect.yieldNow
     }
   })
@@ -117,5 +142,6 @@ export const discoverSince = (
   ctx: SyncContext,
   sinceMillis: number,
   _counts: ReadonlyArray<CountEntry>,
+  options: DiscoverOptions,
 ): Effect.Effect<void, SlackApiError | SqlError, Services> =>
-  ctx.config.discovery === 'search' ? discoverBySearch(ctx, sinceMillis) : discoverByReplies(ctx)
+  ctx.config.discovery === 'search' ? discoverBySearch(ctx, sinceMillis, options) : discoverByReplies(ctx, options)

@@ -21,8 +21,14 @@ import type { Flag, MessageRow } from '@juno/store'
 
 /** Where an incoming message came from, for the reaction guard and `last_event_ts`. */
 export type MergeSource =
-  /** A history, replies, thread view or search page. `requestedAt` is the ts of the request start. */
+  /** A history, replies or thread view page: a complete message. `requestedAt` is the ts of the request start. */
   | { readonly kind: 'page'; readonly requestedAt: string }
+  /**
+   * A search match: an incomplete message (no files, no reactions, often no
+   * blocks). It creates a row the store lacks and fills a stub root, but for
+   * a stored message it only moves the counters and `thread_ts`.
+   */
+  | { readonly kind: 'partial'; readonly requestedAt: string }
   /** A socket event. */
   | { readonly kind: 'event'; readonly eventTs: string }
 
@@ -102,7 +108,7 @@ export function mergeMessage(existing: MessageRow | undefined, incoming: Message
   const fresh = toMessageRow(channel, incoming)
   if (existing === undefined) {
     const row = source.kind === 'event' ? { ...fresh, last_event_ts: source.eventTs } : fresh
-    return { row, changed: true, applyReactions: incoming.reactions !== undefined && !row.deleted }
+    return { row, changed: true, applyReactions: incoming.reactions !== undefined && source.kind !== 'partial' && !row.deleted }
   }
 
   const eventTs = source.kind === 'event' ? source.eventTs : undefined
@@ -125,13 +131,21 @@ export function mergeMessage(existing: MessageRow | undefined, incoming: Message
     return finish(existing, row, false)
   }
 
+  // A stub root has no content at all; any page fills it.
+  const isStub = existing.user_id === null && existing.text === '' && existing.blocks_json === null
+  // A partial message never replaces stored content: it only fills a stub and moves the counters below.
+  if (source.kind === 'partial' && !isStub) {
+    const withThread = existing.thread_ts === null && fresh.thread_ts !== null ? { ...existing, thread_ts: fresh.thread_ts } : existing
+    const isRoot = withThread.thread_ts === null || withThread.thread_ts === withThread.ts
+    if (!isRoot || fresh.reply_count === 0) return finish(existing, withThread, false)
+    const counters = mergeRootCounters(withThread, { reply_count: fresh.reply_count, ...(fresh.latest_reply === null ? {} : { latest_reply: fresh.latest_reply }) }, source)
+    return finish(existing, counters.row, false)
+  }
   // Content: an edit applies only when newer; unedited content never replaces an edit.
   const incomingEdit = fresh.edited_ts
   const storedEdit = existing.edited_ts
   const takeContent =
     storedEdit === null ? true : incomingEdit !== null && compareTs(incomingEdit, storedEdit) >= 0
-  // A stub root has no content at all; any page fills it.
-  const isStub = existing.user_id === null && existing.text === '' && existing.blocks_json === null
   const content = takeContent || isStub ? fresh : existing
 
   const replyCount = Math.max(existing.reply_count, fresh.reply_count)
@@ -158,6 +172,7 @@ export function mergeMessage(existing: MessageRow | undefined, incoming: Message
   // Reactions from a page apply only if no event touched the message after the request started.
   const applyReactions =
     incoming.reactions !== undefined &&
+    source.kind !== 'partial' &&
     (source.kind === 'event' || existing.last_event_ts === null || compareTs(existing.last_event_ts, source.requestedAt) < 0)
   return finish(existing, row, applyReactions)
 }

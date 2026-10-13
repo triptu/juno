@@ -8,7 +8,6 @@ export { runSync, type RunSyncOptions, type SyncPhase, type SyncServices } from 
 export { SyncConfig, defaultSyncConfig, syncConfigLayer, type SyncConfigShape } from './config'
 export { syncKeys } from './keys'
 export {
-  isTombstone,
   mergeMessage,
   mergeRootCounters,
   mergeTombstone,
@@ -19,5 +18,16 @@ export {
   type RootCounters,
 } from './merge'
 export { reindexAll, reindexTopics, topicsOfMessages, type ReindexOptions, type StoredPreview } from './reindex'
-export { BOOT_KEY, bootState, type BootState } from './boot'
-export { clearThreadSub, readMessage, readState, setThreadSub, threadSub, topicOfMessage, type ThreadSubRow } from './write'
+export type { BootState } from './boot'
+export {
+  applyRootSubscription,
+  beginPendingFollow,
+  clearThreadSub,
+  endPendingFollow,
+  readMessage,
+  readState,
+  setThreadSub,
+  threadSub,
+  type ThreadSubRow,
+  type ThreadSubSource,
+} from './write'

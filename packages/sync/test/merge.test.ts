@@ -9,6 +9,7 @@ const ts = (n: number): Ts => Ts.make(`1700000${String(n).padStart(3, '0')}.0001
 const message = (overrides: Partial<Message> & { ts: string }): Message => ({ type: 'message', user: 'U0MAYA', text: 'hello', ...overrides }) as Message
 const page = (at: number) => ({ kind: 'page' as const, requestedAt: ts(at) })
 const event = (at: number) => ({ kind: 'event' as const, eventTs: ts(at) })
+const partial = (at: number) => ({ kind: 'partial' as const, requestedAt: ts(at) })
 
 describe('mergeMessage', () => {
   it('stores a new message and takes reactions from any source', () => {
@@ -66,6 +67,27 @@ describe('mergeMessage', () => {
     const filled = mergeMessage(stub, message({ ts: ts(1), text: 'the root', reply_count: 1, latest_reply: ts(2) }), C, page(3))
     expect(filled.changed).toBe(true)
     expect(filled.row).toMatchObject({ text: 'the root', user_id: 'U0MAYA', reply_count: 1 })
+  })
+
+  it('a search match never replaces stored content: files, blocks and reactions stay; counters and the thread move', () => {
+    const file = { id: 'F1', name: 'plan.pdf' } as NonNullable<Message['files']>[number]
+    const blocks = [{ type: 'rich_text', elements: [] }] as unknown as Message['blocks']
+    const stored = toMessageRow(C, message({ ts: ts(1), text: 'the plan', files: [file], blocks, reply_count: 2, latest_reply: ts(3) }))
+    const match = mergeMessage(stored, message({ ts: ts(1), text: 'the plan', reply_count: 4, reactions: [] }), C, partial(5))
+    expect(match.applyReactions).toBe(false)
+    expect(match.row).toMatchObject({ text: 'the plan', files_json: stored.files_json, blocks_json: stored.blocks_json, reply_count: 4 })
+    expect(match.row.files_json).not.toBeNull()
+
+    // A reply stored without its thread learns it from the match.
+    const orphan = toMessageRow(C, message({ ts: ts(2), text: 'a reply' }))
+    expect(mergeMessage(orphan, message({ ts: ts(2), text: 'a reply', thread_ts: ts(1) }), C, partial(5)).row.thread_ts).toBe(ts(1))
+
+    // A stub root is filled by the match, and a message the store lacks is created from it.
+    const filled = mergeMessage(stubRoot(C, ts(1), { ts: ts(2), user: 'U0LEO' }), message({ ts: ts(1), text: 'the root', reply_count: 1 }), C, partial(3))
+    expect(filled.row).toMatchObject({ text: 'the root', user_id: 'U0MAYA' })
+    const created = mergeMessage(undefined, message({ ts: ts(4), text: 'new', reactions: [{ name: 'eyes', users: ['U0LEO'], count: 1 }] }), C, partial(5))
+    expect(created.row.text).toBe('new')
+    expect(created.applyReactions).toBe(false)
   })
 
   it('a message the store already has verbatim is not a change', () => {

@@ -158,9 +158,11 @@ const reindexOne = (id: string, options: ReindexOptions): Effect.Effect<boolean,
     if (parsed.kind === 'thread') {
       const replyCount = root?.reply_count ?? 0
       const storedReplies = live.filter((r) => r.ts !== parsed.threadTs).length
-      const cursor = yield* sql<{ replies_complete: 0 | 1; complete_from: string | null }>`
-        SELECT replies_complete, complete_from FROM thread_cursors WHERE channel = ${channel} AND thread_ts = ${parsed.threadTs}`
-      const complete = cursor[0]?.replies_complete === 1 || storedReplies >= replyCount
+      const cursor = yield* sql<{ complete_from: string | null }>`
+        SELECT complete_from FROM thread_cursors WHERE channel = ${channel} AND thread_ts = ${parsed.threadTs}`
+      // Complete means every reply the root counts is stored. `replies_complete` is not trusted here: it was true
+      // when a page landed, and `reply_count` may have grown since without the replies (a drop).
+      const complete = storedReplies >= replyCount
       const latestReply = root?.latest_reply ?? null
       const readPast = latestReply !== null && reads.lastReadTs !== undefined && compareTs(reads.lastReadTs, latestReply) >= 0
       // Every reply since the read pointer is stored when coverage starts at or before it.

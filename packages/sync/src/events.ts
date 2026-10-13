@@ -3,7 +3,7 @@
  * writer transaction; keys invalidated inside fire once after the commit,
  * and `reindexTopics` runs for the topics the event touched.
  */
-import { compareTs, type Ts } from '@juno/domain'
+import { compareTs, millisToTs, type Ts } from '@juno/domain'
 import {
   isMessageChanged,
   isMessageDeleted,
@@ -13,7 +13,7 @@ import {
   type RtmFrame,
 } from '@juno/slack-schema'
 import { Invalidation, StoreWriter, transaction, type MessageRow, type SqlError } from '@juno/store'
-import { Clock, Effect } from 'effect'
+import { Clock, Effect, Queue } from 'effect'
 import { reindexOptions, type SyncContext } from './context'
 import { mergeRootCounters, mergeTombstone } from './merge'
 import { mainTopicOf, mergeOne, threadTopicOf } from './pages'
@@ -34,6 +34,7 @@ import {
   upsertConversations,
   upsertUsers,
   writeMessage,
+  type ThreadSubSource,
 } from './write'
 
 type Services = StoreWriter | Invalidation
@@ -77,13 +78,18 @@ export const applyFrame = (ctx: SyncContext, frame: RtmFrame): Effect.Effect<voi
       case 'thread_marked':
       case 'thread_subscribed':
       case 'thread_unsubscribed':
+        // An event without `event_ts` has no place in the order: ask Slack for the root instead (specs/follow.qnt).
+        if (frame.event_ts === undefined) return yield* Queue.offer(ctx.rootFetches, { channel: frame.subscription.channel, ts: frame.subscription.thread_ts })
         return yield* transaction(
           Effect.gen(function* () {
             const sub = frame.subscription
-            const subscribed = frame.type === 'thread_unsubscribed' ? false : (sub.active ?? true)
-            yield* setThreadSub(sub.channel, sub.thread_ts, subscribed, sub.last_read)
+            const eventTs = frame.event_ts as string
+            // `thread_marked` says whether the thread is followed only when it carries `active`.
+            const subscribed = frame.type === 'thread_unsubscribed' ? false : frame.type === 'thread_subscribed' ? (sub.active ?? true) : sub.active
+            const source = { kind: 'event', eventTs, observedAt: millisToTs(now) } as const
+            if (subscribed !== undefined) yield* setThreadSub(sub.channel, sub.thread_ts, subscribed, sub.last_read, source)
             const topic = threadTopicOf(sub.channel, sub.thread_ts)
-            if (sub.last_read !== undefined) yield* applyServerMark(topic, sub.last_read, eventTsOf(frame, now))
+            if (sub.last_read !== undefined) yield* applyServerMark(topic, sub.last_read, eventTs)
             yield* reindexTopics([topic], reindexOptions(ctx))
           }),
         )
@@ -101,11 +107,16 @@ export const applyFrame = (ctx: SyncContext, frame: RtmFrame): Effect.Effect<voi
           }),
         )
       }
+      // A rename carries a partial object (`id`, `name`, `name_normalized`, `created`): only the name changes.
+      case 'channel_rename':
+      case 'group_rename': {
+        if (typeof frame.channel === 'string' || frame.channel.name === undefined) return
+        return yield* transaction(patchConversation(frame.channel.id, { name: frame.channel.name }))
+      }
       // Conversations: an object refreshes the metadata; membership follows the event, never the object's `is_member`.
       case 'channel_joined':
       case 'channel_left':
       case 'channel_created':
-      case 'channel_rename':
       case 'channel_archive':
       case 'channel_unarchive':
       case 'channel_deleted':
@@ -114,7 +125,6 @@ export const applyFrame = (ctx: SyncContext, frame: RtmFrame): Effect.Effect<voi
       case 'group_left':
       case 'group_archive':
       case 'group_unarchive':
-      case 'group_rename':
       case 'group_deleted':
         return yield* transaction(
           Effect.gen(function* () {
@@ -175,11 +185,12 @@ const applyMessageFrame = (ctx: SyncContext, frame: Extract<RtmFrame, { type: 'm
     const { event_ts: _e, hidden: _h, suppress_notification: _s, ...message } = frame
     return transaction(
       Effect.gen(function* () {
-        const rows = yield* mergeOne(ctx, frame.channel, message as Message, { kind: 'event', eventTs: eventTsOf(frame, now) })
+        const eventTs = eventTsOf(frame, now)
+        const rows = yield* mergeOne(ctx, frame.channel, message as Message, { kind: 'event', eventTs })
         const topics = topicsOfMessages(rows)
         // Activity after a resolve reopens the topic, except the user's own messages are activity too.
         for (const row of rows) if (row.ts === frame.ts) yield* reopenIfResolved(topicOfMessage(row), frame.ts, now)
-        yield* followOnReply(ctx, frame.channel, rows.find((row) => row.ts === frame.ts))
+        yield* followOnReply(ctx, frame.channel, rows.find((row) => row.ts === frame.ts), { kind: 'event', eventTs, observedAt: millisToTs(now) })
         yield* reindexTopics(topics, reindexOptions(ctx))
       }),
     )
@@ -239,16 +250,19 @@ const applyMessageFrame = (ctx: SyncContext, frame: Extract<RtmFrame, { type: 'm
  * `thread_subscribed` frame usually says so too, but not always, so a live
  * reply keeps the follow flag fresh on its own: a reply by the user always
  * follows; a reply to the user's root follows unless Slack has already said
- * otherwise. Pages never do this, because at boot `getView` is the truth and
- * a thread it does not list was unfollowed on purpose.
+ * otherwise. Pages do not need this: a root on a page carries `subscribed`
+ * and `mergeOne` applies it.
  */
-const followOnReply = (ctx: SyncContext, channel: string, reply: MessageRow | undefined): Effect.Effect<void, SqlError, Services> =>
+const followOnReply = (ctx: SyncContext, channel: string, reply: MessageRow | undefined, source: ThreadSubSource): Effect.Effect<void, SqlError, Services> =>
   Effect.gen(function* () {
     if (reply === undefined || reply.thread_ts === null || reply.thread_ts === reply.ts) return
     const threadTs = reply.thread_ts
-    if (reply.user_id === ctx.me.userId) return yield* setThreadSub(channel, threadTs, true, undefined)
+    if (reply.user_id === ctx.me.userId) {
+      if ((yield* threadSub(channel, threadTs))?.subscribed !== true) yield* setThreadSub(channel, threadTs, true, undefined, source)
+      return
+    }
     const root = yield* readMessage(channel, threadTs)
     if (root?.user_id !== ctx.me.userId) return
     if ((yield* threadSub(channel, threadTs)) !== undefined) return
-    yield* setThreadSub(channel, threadTs, true, undefined)
+    yield* setThreadSub(channel, threadTs, true, undefined, source)
   })
