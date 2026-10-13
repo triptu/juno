@@ -7,6 +7,8 @@ export interface AvatarStackPerson {
   readonly initials: string
   readonly name: string
   readonly hue: HueName
+  /** The profile photo; the initial stays underneath until it arrives. */
+  readonly src?: string
 }
 
 export interface AvatarStackProps {
@@ -31,7 +33,7 @@ export function AvatarStack({ people, max = 4, size = 18, surface = 'subtle', la
     <span role="img" aria-label={label ?? shown.map((person) => person.name).join(', ')} {...stylex.props(styles.stack)}>
       {shown.map((person, index) => (
         <span key={person.id} {...stylex.props(styles.item, index > 0 && styles.overlap)}>
-          <Avatar label={person.initials.slice(0, 1)} size={size} hue={person.hue} ring={surface} />
+          <Avatar label={person.initials.slice(0, 1)} size={size} hue={person.hue} ring={surface} {...(person.src === undefined ? {} : { src: person.src })} />
         </span>
       ))}
     </span>

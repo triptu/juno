@@ -1,4 +1,5 @@
 export { Avatar, hueForId, hueNames, type AvatarKind, type AvatarProps, type AvatarRingSurface, type AvatarSize, type HueName } from './Avatar'
+export { AvatarButton, type AvatarButtonProps } from './AvatarButton'
 export { AvatarStack, type AvatarStackPerson, type AvatarStackProps } from './AvatarStack'
 export { Button, type ButtonProps, type ButtonSize, type ButtonTone, type ButtonVariant } from './Button'
 export { Card, type CardProps } from './Card'
@@ -42,6 +43,7 @@ export {
 } from './OptionList'
 export { Page, PageHeader, Section, type PageHeaderProps, type PageProps, type PageWidth, type SectionProps } from './Page'
 export { Popover, type PopoverLayer, type PopoverPlacement, type PopoverProps, type PopoverWidth } from './Popover'
+export { ScrollArea, type ScrollAreaProps, type ScrollAreaScrollbar } from './ScrollArea'
 export { Segmented, type SegmentedOption, type SegmentedProps } from './Segmented'
 export { Select, type SelectOption, type SelectProps } from './Select'
 export { Slider, type SliderProps } from './Slider'
@@ -53,7 +55,7 @@ export { Textarea, type TextareaProps, type TextareaVariant } from './Textarea'
 export { TextField, type TextFieldProps, type TextFieldSize } from './TextField'
 export { Toast, ToastRegion, type ToastAction, type ToastProps, type ToastRegionProps } from './Toast'
 export { accentLabels, accentNames, applyTheme, defaultAccent, isAccentName, isThemeName, themeNames, type AccentName, type ThemeName } from './theme'
-export type { ActivateEvent, ActivateHandler } from './internal/activate'
+export { activateHandlers, type ActivateEvent, type ActivateHandler, type ActivateHandlers, type ActivateOptions } from './internal/activate'
 export type { LayoutStyles } from './internal/sx'
 export {
   defineFixtures,

@@ -8,4 +8,7 @@ export default defineFixtures(AppInfoView, {
     loading: fixture({ line: 'Loading app info' }),
     failed: fixture({ line: 'Could not read app info' }),
   },
+  Diagnostics: {
+    compact: fixture({ line: 'Juno 0.1.0 on darwin, Electron 44.7.0', compact: true }),
+  },
 })

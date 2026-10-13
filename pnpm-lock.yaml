@@ -233,6 +233,9 @@ importers:
       '@juno/fake-slack':
         specifier: workspace:*
         version: link:../../packages/fake-slack
+      '@juno/testing':
+        specifier: workspace:*
+        version: link:../../packages/testing
       '@playwright/test':
         specifier: 1.64.0
         version: 1.64.0
@@ -646,6 +649,9 @@ importers:
 
   packages/views:
     dependencies:
+      '@juno/contract':
+        specifier: workspace:*
+        version: link:../contract
       '@juno/tokens':
         specifier: workspace:*
         version: link:../tokens

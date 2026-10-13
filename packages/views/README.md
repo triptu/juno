@@ -4,7 +4,9 @@ Feature views: React components built from `@juno/ui` that take view models and 
 
 ## Public API
 
-- The views: `Shell` (title bar and page), `SignInView`, `SessionView`, `EngineStatusView`, `AppInfoView`, `AppearanceSettings` (theme and accent; lives in the shell until Preferences exists), `ChannelIconPicker` (change a channel's icon and colour; not wired to a container yet), each with its props type.
+- The views: `Shell` (the two panes, or a drag strip over a page when signed out), `Sidebar` (title bar icons, nav, quick filters, scope chip; takes the list as children), `TopicList` (sticky Pinned and Recent labels over rows the owner renders, the empty states, arrow-key focus), `TopicRow` (one chat-style row from a contract `TopicRow`, memoized; the Resolve check in a reserved slot), `AccountMenu` (the avatar popover's content), `Workspace` (tab strip placeholder over the empty page), `SignInView`, `SessionView`, `EngineStatusView`, `AppInfoView`, `AppearanceSettings` (theme and accent; in the account menu until Preferences exists), `ChannelIconPicker` (not wired yet), each with its props type.
+- `relativeTime(at, now)`, `hueFor`, `initials`: the row's formatting helpers, repeated from `@juno/domain` because views cannot depend on it.
+- `src/fixtures/topics.ts`: invented `TopicRow` view models shaped like the fake Slack seed, shared by the sidebar and row fixtures.
 - Copy lives in the views and their fixtures and follows `docs/design/friendly-layer.md` §7 within SPEC §17: short titles, one-sentence bodies, no exclamation marks, "Juno" or "I" only on the sign-in and Juno surfaces.
 - `applyTheme`, `accentNames`, `defaultAccent`, `AccentName`, `ThemeName`, re-exported from `@juno/ui`. The desktop app does not depend on `ui`, so it reaches the theme entry point here.
 - `@juno/views/fixtures`: `fixtures`, every view's fixture sets keyed by view name. The gallery renders them, and each gets a screenshot in light and dark.

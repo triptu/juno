@@ -14,7 +14,7 @@ test('starts signed out with the sign-in page', async ({ juno, win }) => {
   await expect(win.getByRole('status', { name: 'Engine status' })).toHaveCount(0)
 })
 
-test('signs in through Slack’s sign-in page: the token and cookie are captured and the session verified', async ({ juno, fake, win, userData }) => {
+test('signs in through Slack’s sign-in page: the token and cookie are captured and the session verified', async ({ juno, fake, userData }) => {
   await juno.expectSignedOut()
   await juno.signIn()
   await juno.expectSignedIn('Juno Fake')
@@ -28,7 +28,8 @@ test('signs in through Slack’s sign-in page: the token and cookie are captured
   const stored = JSON.parse(await readFile(join(userData, 'secrets.bin'), 'utf8')) as { teamId: string; token: string }
   expect(stored.teamId).toBe(fake.teamId)
   expect(stored.token.startsWith('xoxc-')).toBe(true)
-  await expect(win.getByRole('status', { name: 'Engine status' })).toHaveText('Engine live')
+  await juno.accountMenu.open()
+  await expect(juno.accountMenu.engineStatus).toHaveText('Engine live')
 })
 
 test('comes back signed in after a relaunch', async ({ juno, fake, userData, running }) => {

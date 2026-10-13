@@ -20,6 +20,7 @@ Dumb, accessible primitives. StyleX plus `@juno/tokens` only; no app state, no d
 - Muted text never sits on a secondary fill. `ListRow selected` sets `--foreground-muted` to the subtle value on itself (a variable override in `stylex.create`, never a `createTheme`, which re-emits every colour of the group and would undo dark mode on that element).
 - Primitives never know the theme: no media queries, no theme classes. `applyTheme(theme, accent)` in `src/theme.ts` is the one place that puts the `dark` and accent classes on `<html>`, sets `color-scheme` and suppresses transitions for two frames; apps reach it through `@juno/views`.
 - Composer growth is `field-sizing: content` on the inline `Textarea`; nothing reads `scrollHeight` on a keystroke.
+- Scroll containers are `ScrollArea`. Its gutter is always the 10px from `global.css`; `scrollbar="hover"` keeps the track and thumb transparent until the pointer is over the area by changing one colour variable, so showing the thumb never moves content. The sidebar list uses it; other scroll areas adopt it by prop.
 
 ## Mouse-down activation
 

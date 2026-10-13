@@ -319,7 +319,7 @@ All [proto] measured at 1280×800 with Inter unless marked.
 | `--palette-width` | 560px, max calc(100% − 48px), top offset 96px |
 | `--menu-width` | 236px context menu, 248px avatar menu, 300px Browse, 280px mention popover |
 | `--toast-max-width` | 352px |
-| `--scrollbar` | 10px, thumb `--border-strong` with 3px transparent inset, radius 10 |
+| `--scrollbar` | 10px, thumb `--border-strong` with 3px transparent inset, radius 10. `ScrollArea scrollbar="hover"` keeps the thumb transparent until the area is hovered; the 10px gutter stays |
 | `--search-field-width` | 260px filter search; `--keyword-field-width` 160px keyword rule input |
 | `--code-block-max-height` | 150px, then the prompt block scrolls inside |
 
@@ -339,6 +339,7 @@ All [proto] measured at 1280×800 with Inter unless marked.
 | `--control-xl` | 36px | Discard/Send (New message), topic-list items in Juno cards, reply options (min), title input |
 | `--field-min` | 40px | Composer textarea single line (`--composer-padding-block` 9 + `--composer-line-height` 22 + 9), To field 44 |
 | `--row-44` / `--row-48` / `--row-52` | 44, 48, 52px | Today log row, notification rule row, All topics table row (ListRow `minHeight`) |
+| `--row-topic-estimate` | 109px | The sidebar row's measured height (chat, balanced, two preview lines); the `contain-intrinsic-size` estimate for rows off screen (performance.md 3.2) |
 
 ### Tiles and avatars
 
