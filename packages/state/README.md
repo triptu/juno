@@ -8,7 +8,8 @@ The renderer's bridge to the engine: the port client and every atom. The only pa
 - `command(route)`: a writable atom that runs the command and exposes its `AsyncResult`. `runCommand(registry, route, payload)` runs one without a component.
 - `prefetch(atom)`: warms a query through the registry.
 - `registry`, `makeRegistry()`, `configureConnection(registry, { acquire })`, `connectionStateAtom`, `acquireRendererPort`: the client and its connection. Tests make their own registry.
-- Feature atoms, declared once at module level in `src/<feature>.ts`: `engineStatusAtom`, `pingCommand`, `appInfoAtom`, `themeAtom`, `persistTheme`.
+- Feature atoms, declared once at module level in `src/<feature>.ts`: `engineStatusAtom`, `pingCommand`, `appInfoAtom`, `themeAtom`, `persistTheme`, `sessionStatusAtom` and `signedInAtom` (the last ready session, held while the engine restarts so the shell stays up), `topicListAtom(filter)`, `topicCountsAtom(scope)`.
+- Sidebar UI state in `src/sidebar.ts`, none of it persisted: `sidebarFilterAtom` (kind, unread, scope), `selectedTopicAtom` and `topicSelectedAtom(id)` (only the rows whose answer changes re-render), `nowAtom` (a half-minute clock the row owners format times against), `sidebarSectionsAtom(list)` (the window's order split into Pinned and Recent, equal splits do not notify).
 - `@juno/state/react`: `useAtomValue`, `useAtom`, `useAtomSet`, `useAtomRefresh`, `RegistryContext`. Containers import hooks only from here.
 - `@juno/state/perf`: the fixed performance marks and `observeFrames()`.
 
