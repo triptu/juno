@@ -1,0 +1,259 @@
+/**
+ * Sample sidebar rows for the gallery, shaped like `TopicRow` from the
+ * contract and modelled on the fake Slack seed. Everything is invented.
+ * Times are relative to `NOW` so the fixtures hold still.
+ */
+import type { Person, TopicRow } from '@juno/contract'
+
+export const NOW = 1_760_000_000_000
+
+const MINUTE = 60_000
+const HOUR = 60 * MINUTE
+const DAY = 24 * HOUR
+
+const photo = (fill: string) =>
+  `data:image/svg+xml;utf8,${encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" fill="${fill}"/><circle cx="32" cy="26" r="12" fill="#F4E6D3"/><path d="M10 64c2-14 11-20 22-20s20 6 22 20Z" fill="#F4E6D3"/></svg>`,
+  )}`
+
+export const people = {
+  maya: { id: 'U0MAYA', name: 'Maya Chen', color: 'claret', avatarUrl: photo('#8EB5C9') },
+  leo: { id: 'U0LEO', name: 'Leo Park', color: 'midnight', avatarUrl: photo('#A7B8A0') },
+  dev: { id: 'U0DEV', name: 'Dev Patel', color: 'cyan' },
+  sam: { id: 'U0SAM', name: 'Sam Okafor', color: 'emerald-dark', avatarUrl: photo('#C9A98E') },
+  priya: { id: 'U0PRIYA', name: 'Priya Raman', color: 'plum' },
+  jonas: { id: 'U0JONAS', name: 'Jonas Weber', color: 'rose' },
+  elena: { id: 'U0ELENA', name: 'Elena Ruiz', color: 'emerald' },
+  grafana: { id: 'U0GRAFANA', name: 'Grafana', color: 'rose' },
+} as const satisfies Record<string, Person>
+
+type RowInput = Partial<Omit<TopicRow, 'preview' | 'channel'>> & {
+  readonly id: string
+  readonly title: string
+  readonly sender: string
+  readonly text: string
+  readonly channel: TopicRow['channel']
+  /** Minutes ago. */
+  readonly ago: number
+}
+
+function row(input: RowInput): TopicRow {
+  const { sender, text, ago, ...rest } = input
+  const at = NOW - ago * MINUTE
+  return {
+    rev: 1,
+    kind: 'thread',
+    section: 'recent',
+    status: 'open',
+    titleSource: 'fallback',
+    participants: [],
+    messageCount: 1,
+    unreadCount: 0,
+    unreadExact: true,
+    mentionsMe: false,
+    tags: [],
+    pinned: false,
+    resolved: false,
+    canResolveOnHover: true,
+    subscribed: true,
+    lastActivityTs: `${Math.floor(at / 1000)}.000100`,
+    lastActivityAt: at,
+    preview: { sender, text, line: text.length === 0 ? sender : `${sender}: ${text}` },
+    ...rest,
+  }
+}
+
+export const channels = {
+  eng: { id: 'C0ENG', kind: 'public', name: 'eng', label: '#eng', tint: 'public', icon: 'wrench', color: 'cyan' },
+  product: { id: 'C0PRODUCT', kind: 'public', name: 'product', label: '#product', tint: 'public', icon: 'rocket', color: 'plum' },
+  alerts: { id: 'C0ALERTSPROD', kind: 'public', name: 'alerts-prod', label: '#alerts-prod', tint: 'public', icon: 'chart-line', color: 'claret' },
+  hiring: { id: 'C0HIRING', kind: 'private', name: 'hiring', label: '#hiring', tint: 'private', icon: 'shield', color: 'emerald-dark' },
+  design: { id: 'C0DESIGNREV', kind: 'public', name: 'design-review', label: '#design-review', tint: 'public', icon: 'heart', color: 'rose' },
+  maya: { id: 'D0MAYA', kind: 'im', name: 'Maya Chen', label: 'Maya Chen', tint: 'dm', icon: 'hash', color: 'claret', partner: people.maya },
+  sam: { id: 'D0SAM', kind: 'im', name: 'Sam Okafor', label: 'Sam Okafor', tint: 'dm', icon: 'hash', color: 'emerald-dark', partner: people.sam },
+  dev: { id: 'D0DEV', kind: 'im', name: 'Dev Patel', label: 'Dev Patel', tint: 'dm', icon: 'hash', color: 'cyan', partner: people.dev },
+  group: { id: 'G0MAYALEO', kind: 'mpim', name: 'Maya, Leo', label: 'Maya, Leo', tint: 'dm', icon: 'hash', color: 'midnight' },
+} as const satisfies Record<string, TopicRow['channel']>
+
+export const rows = {
+  /** Read, two-line preview, four participants. */
+  postgres: row({
+    id: 'C0ENG:1760000000.000100',
+    title: 'Postgres 16 migration plan',
+    sender: 'Dev',
+    text: 'Booked 2–4pm. Will post results here.',
+    channel: channels.eng,
+    participants: [people.dev, people.leo, people.maya, people.sam],
+    messageCount: 7,
+    ago: 4,
+  }),
+  /** Unread with a count: semibold title, subtle preview. */
+  roadmap: row({
+    id: 'C0PRODUCT:1760000000.000200',
+    title: 'Q4 roadmap cuts',
+    sender: 'Maya',
+    text: "Draft is up. Cross-posting to #leadership once @Tushar has looked.",
+    channel: channels.product,
+    participants: [people.maya, people.priya],
+    messageCount: 6,
+    unreadCount: 3,
+    ago: 25,
+  }),
+  /** A mention: the quiet @ tag before the count. */
+  hiring: row({
+    id: 'C0HIRING:1760000000.000300',
+    title: 'Rina Sato · Staff backend',
+    titleSource: 'ai',
+    sender: 'Elena',
+    text: '@Tushar she has a competing offer with a Friday deadline. Can you do a 30 min close call tomorrow?',
+    channel: channels.hiring,
+    participants: [people.elena, people.sam],
+    messageCount: 3,
+    unreadCount: 2,
+    mentionsMe: true,
+    ago: 12,
+  }),
+  /** A channel's Main: the channel label as the title, the Main tag, a 99+ count. */
+  alertsMain: row({
+    id: 'C0ALERTSPROD:main',
+    kind: 'main',
+    title: '#alerts-prod',
+    titleSource: 'channel',
+    sender: 'Grafana',
+    text: '[RESOLVED] queue depth > 5k on billing-consumer',
+    channel: channels.alerts,
+    participants: [people.grafana],
+    messageCount: 412,
+    unreadCount: 128,
+    tags: ['main'],
+    ago: 3,
+  }),
+  /** Back after a resolve. */
+  pricing: row({
+    id: 'C0PRODUCT:1759990000.000400',
+    title: 'Final copy for pricing is in.…',
+    sender: 'Priya',
+    text: 'Legal flagged the annual discount line. Reopening this.',
+    channel: channels.product,
+    participants: [people.priya, people.maya],
+    messageCount: 3,
+    unreadCount: 1,
+    tags: ['reopened'],
+    ago: 4 * 60,
+  }),
+  /** Pinned, still open. */
+  offsite: row({
+    id: 'D0MAYA:1759990000.000500',
+    section: 'pinned',
+    title: 'Offsite: Wednesday afternoon slot',
+    titleSource: 'manual',
+    sender: 'Maya',
+    text: 'Perfect. Send me a one-line description when you have it.',
+    channel: channels.maya,
+    participants: [people.maya],
+    messageCount: 3,
+    unreadCount: 1,
+    pinned: true,
+    ago: 38,
+  }),
+  /** Pinned and resolved: dimmed with a check, no Resolve on hover. */
+  notes: row({
+    id: 'D0SAM:1759900000.000600',
+    section: 'pinned',
+    status: 'resolved',
+    title: '1:1 notes',
+    titleSource: 'manual',
+    sender: 'You',
+    text: "Thanks. I'll review Dev's packet this week.",
+    channel: channels.sam,
+    participants: [people.sam],
+    messageCount: 2,
+    pinned: true,
+    resolved: true,
+    canResolveOnHover: false,
+    ago: DAY / MINUTE + 60,
+  }),
+  /** A DM thread, read, no photo for the partner. */
+  packet: row({
+    id: 'D0DEV:1759980000.000700',
+    title: 'Promo packet draft',
+    titleSource: 'manual',
+    sender: 'You',
+    text: 'Looks good. Two comments inline.',
+    channel: channels.dev,
+    participants: [people.dev],
+    messageCount: 5,
+    ago: 2 * 60 + 10,
+  }),
+  /** A group DM Main. */
+  lunch: row({
+    id: 'G0MAYALEO:main',
+    kind: 'main',
+    title: 'Maya, Leo',
+    titleSource: 'channel',
+    sender: 'Leo',
+    text: 'lunch friday?',
+    channel: channels.group,
+    participants: [people.leo, people.maya],
+    messageCount: 3,
+    tags: ['main'],
+    ago: 2 * DAY / MINUTE + 50,
+  }),
+  /** Unsubscribed but shown because it mentions you. */
+  flags: row({
+    id: 'C0PLATFORM:1759900000.000800',
+    title: "We have 142 flags. 61 haven't…",
+    sender: 'Jonas',
+    text: '@Tushar ship it?',
+    channel: { id: 'C0PLATFORM', kind: 'public', name: 'platform', label: '#platform', tint: 'public', icon: 'globe', color: 'jordy' },
+    participants: [people.jonas, people.leo],
+    messageCount: 3,
+    unreadCount: 1,
+    mentionsMe: true,
+    tags: ['unsubscribed'],
+    status: 'unsubscribed',
+    subscribed: false,
+    ago: 5 * 60,
+  }),
+  /** A long title and a long channel name, so the ellipses show. */
+  long: row({
+    id: 'C0DESIGNREV:1759900000.000900',
+    title: 'Two options for the thread list: compact rows versus two-line previews, and what we lose with each one',
+    sender: 'Priya',
+    text: "That's where I landed too. Shipping two-line as the default, with the reply count kept because it tells you whether to open it now or later.",
+    channel: { ...channels.design, name: 'design-review-and-critique-sessions' },
+    participants: [people.priya, people.leo],
+    messageCount: 4,
+    ago: 2 * 60 + 20,
+  }),
+  /** The latest message had no text (a file). */
+  file: row({
+    id: 'C0ENG:1759900000.001000',
+    title: 'Replica sizing',
+    titleSource: 'manual',
+    sender: 'Dev',
+    text: '',
+    channel: channels.eng,
+    participants: [people.dev],
+    messageCount: 2,
+    ago: 7 * 60,
+  }),
+} as const satisfies Record<string, TopicRow>
+
+/** Every row above, keyed by id, as a container would hold them. */
+export const rowsById: ReadonlyMap<string, TopicRow> = new Map(Object.values(rows).map((entry) => [entry.id, entry]))
+
+/** The default sidebar: the pinned pair, then recent by latest activity. */
+export const pinnedIds: ReadonlyArray<string> = [rows.offsite.id, rows.notes.id]
+export const recentIds: ReadonlyArray<string> = [
+  rows.alertsMain.id,
+  rows.postgres.id,
+  rows.hiring.id,
+  rows.roadmap.id,
+  rows.packet.id,
+  rows.long.id,
+  rows.pricing.id,
+  rows.flags.id,
+  rows.file.id,
+  rows.lunch.id,
+]
