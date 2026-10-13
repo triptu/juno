@@ -71,10 +71,14 @@ describe('pagination', () => {
     expect(tail.messages.map((m) => m.ts)).toEqual([root.latest_reply])
   })
 
-  it('thread view pages by current_ts', async () => {
-    const all = await client.ok('subscriptions.thread.getView', { limit: 100 })
-    const latest = (t: (typeof all.threads)[number]) => t.root_msg.latest_reply!
-    for (let i = 1; i < all.threads.length; i++) expect(compareTs(latest(all.threads[i - 1]!), latest(all.threads[i]!))).toBe(1)
+  it('thread view pages by current_ts and caps a page at 10 whatever limit says', async () => {
+    const first = await client.ok('subscriptions.thread.getView', { limit: 100 })
+    expect(first.threads).toHaveLength(10)
+    expect(first.has_more).toBe(true)
+    const all = await client.allThreadViews()
+    expect(all.length).toBeGreaterThan(10)
+    const latest = (t: (typeof all)[number]) => t.root_msg.latest_reply!
+    for (let i = 1; i < all.length; i++) expect(compareTs(latest(all[i - 1]!), latest(all[i]!))).toBe(1)
     const seen: string[] = []
     let current: Ts | undefined
     for (;;) {
@@ -83,7 +87,17 @@ describe('pagination', () => {
       if (!page.has_more) break
       current = latest(page.threads.at(-1)!)
     }
-    expect(seen).toEqual(all.threads.map((t) => t.root_msg.ts))
+    expect(seen).toEqual(all.map((t) => t.root_msg.ts))
+  })
+
+  it('search sorts by relevance unless asked for timestamp order', async () => {
+    const byRelevance = searchMatches(await client.ok('search.modules.messages', { module: 'messages', query: 'is:thread', count: 50 }))
+    const newestFirst = searchMatches(await client.ok('search.modules.messages', { module: 'messages', query: 'is:thread', count: 50, sort: 'timestamp', sort_dir: 'desc' }))
+    expect(newestFirst.length).toBe(byRelevance.length)
+    for (let i = 1; i < newestFirst.length; i++) expect(compareTs(newestFirst[i - 1]!.ts, newestFirst[i]!.ts)).toBe(1)
+    expect(byRelevance.map((m) => m.ts)).not.toEqual(newestFirst.map((m) => m.ts))
+    const oldestFirst = searchMatches(await client.ok('search.modules.messages', { module: 'messages', query: 'is:thread', count: 50, sort: 'timestamp', sort_dir: 'asc' }))
+    for (let i = 1; i < oldestFirst.length; i++) expect(compareTs(oldestFirst[i - 1]!.ts, oldestFirst[i]!.ts)).toBe(-1)
   })
 
   it('search pages by page number and by cursor', async () => {

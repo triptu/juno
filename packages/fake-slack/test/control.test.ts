@@ -32,6 +32,68 @@ describe('control API', () => {
     socket.close()
   })
 
+  it('holdNext runs the handler but answers only on release, so events can land while a page is in flight', async () => {
+    fake.holdNext({ method: 'conversations.history' })
+    const held = client.ok('conversations.history', { channel: 'C0ENG', limit: 5 })
+    let answered = false
+    void held.then(() => (answered = true))
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(fake.heldCount({ method: 'conversations.history' })).toBe(1)
+    expect(answered).toBe(false)
+    // A different method is not held.
+    expect((await client.ok('client.counts', {})).channels.length).toBeGreaterThan(0)
+    fake.release({ method: 'conversations.history' })
+    const page = await held
+    expect(page.messages).toHaveLength(5)
+    expect(fake.heldCount()).toBe(0)
+    // The rule was for one call only.
+    expect((await client.ok('conversations.history', { channel: 'C0ENG', limit: 1 })).messages).toHaveLength(1)
+  })
+
+  it('an incremental client.counts lists only the conversations that changed since counts_last_fetched', async () => {
+    const full = await client.ok('client.counts', { thread_counts_by_channel: true })
+    expect(full.channels.length).toBeGreaterThan(3)
+    const fetched = full.counts_last_fetched!
+    fake.advanceClock({ millis: 5_000 })
+    const quiet = await client.ok('client.counts', { thread_counts_by_channel: true, counts_last_fetched: fetched + 1 })
+    expect([...quiet.channels, ...quiet.ims, ...quiet.mpims]).toHaveLength(0)
+    fake.injectMessage({ channel: 'C0ENG', user: 'U0SAM', text: 'hello' })
+    fake.markRead({ channel: 'D0MAYA', ts: fake.messages('D0MAYA').at(-1)!.ts })
+    fake.joinChannel({ channel: 'C0SALES' })
+    const changed = await client.ok('client.counts', { thread_counts_by_channel: true, counts_last_fetched: fetched + 1 })
+    expect(changed.channels.map((c) => c.id).toSorted()).toEqual(['C0ENG', 'C0SALES'])
+    expect(changed.ims.map((c) => c.id)).toEqual(['D0MAYA'])
+  })
+
+  it('a reply by self follows the thread and Slack says so with thread_subscribed', async () => {
+    const socket = await client.connect()
+    await socket.next(isType('hello'))
+    const root = fake.messages('C0ENG').find((m) => m.text?.startsWith('checkout.spec'))!
+    expect(fake.workspace.subscription('C0ENG', root.ts)?.subscribed).toBe(false)
+    fake.injectMessage({ channel: 'C0ENG', user: fake.selfId, text: 'Yes, until Friday.', threadTs: root.ts })
+    const subscribed = await socket.next(isType('thread_subscribed'))
+    expect(subscribed.subscription.thread_ts).toBe(root.ts)
+    expect(fake.workspace.subscription('C0ENG', root.ts)?.subscribed).toBe(true)
+    // A second reply in a thread already followed sends no second event.
+    fake.injectMessage({ channel: 'C0ENG', user: fake.selfId, text: 'Ping.', threadTs: root.ts })
+    await socket.next((f) => f.type === 'message' && f.text === 'Ping.')
+    expect(socket.frames.some((f) => f.type === 'thread_subscribed')).toBe(false)
+    socket.close()
+  })
+
+  it('renameChannel emits the partial channel object Slack sends, and conversations.info answers with the full one', async () => {
+    const socket = await client.connect()
+    await socket.next(isType('hello'))
+    fake.renameChannel({ channel: 'C0HIRING', name: 'recruiting' })
+    const renamed = await socket.next(isType('group_rename'))
+    expect(renamed.channel).toEqual({ id: 'C0HIRING', name: 'recruiting', name_normalized: 'recruiting', created: expect.any(Number) })
+    const info = await client.ok('conversations.info', { channel: 'C0HIRING' })
+    expect(info.channel).toMatchObject({ id: 'C0HIRING', name: 'recruiting', is_private: true, is_member: true })
+    const missing = await client.call('conversations.info', { channel: 'C0NOPE' })
+    expect(missing.body).toEqual({ ok: false, error: 'channel_not_found' })
+    socket.close()
+  })
+
   it('force429 answers the next calls of a method with 429 and Retry-After, then recovers', async () => {
     fake.force429({ method: 'conversations.history', retryAfter: 7, times: 2 })
     const first = await client.call('conversations.history', { channel: 'C0ENG' })

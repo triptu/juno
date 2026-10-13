@@ -48,6 +48,12 @@ interface FailureRule {
   remaining: number
 }
 
+/** Responses of one method held back until `release`, so a test can land events while a page is in flight. */
+interface HoldRule {
+  remaining: number
+  readonly waiting: Array<() => void>
+}
+
 export type ControlHandler = (input: Record<string, unknown>) => unknown
 
 export class FakeServer {
@@ -56,6 +62,7 @@ export class FakeServer {
   readonly sockets = new Set<WebSocket>()
   readonly #rateLimits = new Map<string, RateLimitRule>()
   readonly #failures = new Map<string, FailureRule>()
+  readonly #holds = new Map<string, HoldRule>()
   readonly workspace: Workspace
   readonly #control: (name: string, input: Record<string, unknown>) => unknown
   readonly #http: Server
@@ -90,6 +97,7 @@ export class FakeServer {
   }
 
   async close(): Promise<void> {
+    this.release()
     this.dropSockets()
     this.#wss.close()
     await new Promise<void>((resolve, reject) => this.#http.close((error) => (error ? reject(error) : resolve())))
@@ -157,6 +165,38 @@ export class FakeServer {
     if (rule === undefined || rule.remaining <= 0) return undefined
     rule.remaining -= 1
     return rule.error
+  }
+
+  // Held responses
+
+  /** The next `times` calls of `method` run their handler, then wait for `release` before answering. */
+  holdNext(method: string, times: number): void {
+    const existing = this.#holds.get(method)
+    if (existing === undefined) this.#holds.set(method, { remaining: times, waiting: [] })
+    else existing.remaining += times
+  }
+
+  /** Answers every held call of `method` (every method when omitted) and forgets the rule. */
+  release(method?: string): void {
+    for (const [name, rule] of this.#holds) {
+      if (method !== undefined && name !== method) continue
+      this.#holds.delete(name)
+      for (const resume of rule.waiting.splice(0)) resume()
+    }
+  }
+
+  /** How many calls are waiting for `release`. */
+  heldCount(method?: string): number {
+    let n = 0
+    for (const [name, rule] of this.#holds) if (method === undefined || name === method) n += rule.waiting.length
+    return n
+  }
+
+  #hold(method: string): Promise<void> | undefined {
+    const rule = this.#holds.get(method)
+    if (rule === undefined || rule.remaining <= 0) return undefined
+    rule.remaining -= 1
+    return new Promise((resolve) => rule.waiting.push(resolve))
   }
 
   // Socket
@@ -268,6 +308,9 @@ export class FakeServer {
     const forced = this.#takeFailure(method)
     if (forced !== undefined) return record(200, { ok: false, error: forced })
     const result = this.#run(method, fields)
+    // The handler has run (state changed, events sent); only the answer waits.
+    const held = this.#hold(method)
+    if (held !== undefined) await held
     if (result instanceof ApiError) {
       if (result.retryAfter !== undefined) response.setHeader('Retry-After', String(result.retryAfter))
       return record(result.status, { ok: false, error: result.error })

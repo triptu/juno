@@ -31,6 +31,8 @@ export type MethodResult<M extends MethodName> = Omit<MethodOk<M>, 'ok'> | ApiEr
 export type Handlers = { readonly [M in MethodName]: (ctx: MethodContext, args: MethodArgs<M>) => MethodResult<M> }
 
 const DEFAULT_LIMIT = 28
+/** `subscriptions.thread.getView` pages are capped server-side (research section 10). */
+export const GET_VIEW_PAGE_CAP = 10
 
 function cursorFor(ts: string): string {
   return Buffer.from(`ts:${ts}`).toString('base64')
@@ -114,12 +116,19 @@ export const handlers: Handlers = {
     }
   },
 
-  /** The user's own conversations with their read state, as recorded live. A channel the user is not in is not listed. */
+  /**
+   * The user's own conversations with their read state, as recorded live. A
+   * channel the user is not in is not listed. With `counts_last_fetched`
+   * only the conversations that changed since then are listed (research
+   * section 2 marks this Unknown; the fake takes the strict reading so the
+   * sync cannot lean on an incremental answer being complete).
+   */
   'client.counts': (ctx, args) => {
     const ws = ctx.workspace
     const wanted = args.channel_ids === undefined ? undefined : new Set(args.channel_ids)
+    const since = args.counts_last_fetched
     const records = [...ws.conversations.values()].filter(
-      (c) => c.members.has(ws.selfId) && (wanted === undefined || wanted.has(c.id)),
+      (c) => c.members.has(ws.selfId) && (wanted === undefined || wanted.has(c.id)) && (since === undefined || ws.changedSince(c.id, since)),
     )
     const channels = records.filter((c) => c.kind === 'public' || c.kind === 'private').map((c) => ws.countEntry(c))
     const ims = records.filter((c) => c.kind === 'im').map((c) => ws.countEntry(c))
@@ -219,6 +228,12 @@ export const handlers: Handlers = {
     }
   },
 
+  'conversations.info': (ctx, args) => {
+    const conversation = requireConversation(ctx, args.channel)
+    if (conversation instanceof ApiError) return conversation
+    return { channel: ctx.workspace.channelObject(conversation) }
+  },
+
   'conversations.mark': (ctx, args) => {
     const conversation = requireConversation(ctx, args.channel, true)
     if (conversation instanceof ApiError) return conversation
@@ -267,7 +282,8 @@ export const handlers: Handlers = {
       })
     }
     views.sort((a, b) => compareTs(b.latest, a.latest))
-    const limit = args.limit ?? 10
+    // Slack returns at most 10 threads per page whatever `limit` says (research section 10).
+    const limit = Math.min(args.limit ?? GET_VIEW_PAGE_CAP, GET_VIEW_PAGE_CAP)
     const page = views.slice(0, limit)
     const state = ws.threadCounts()
     return {
@@ -389,7 +405,13 @@ export const handlers: Handlers = {
         })
       }
     }
-    matches.sort((a, b) => compareTs(b.ts, a.ts))
+    // Slack sorts by relevance unless asked for `sort=timestamp`. Relevance is not time order, so the fake
+    // uses a stable shuffle of the ids: a client that assumes newest-first without asking gets an arbitrary sample.
+    if (args.sort === 'timestamp') {
+      matches.sort((a, b) => (args.sort_dir === 'asc' ? compareTs(a.ts, b.ts) : compareTs(b.ts, a.ts)))
+    } else {
+      matches.sort((a, b) => relevance(a.iid ?? a.ts) - relevance(b.iid ?? b.ts))
+    }
     const perPage = args.count ?? 20
     const page = Math.max(1, args.page ?? pageFromCursor(args.cursor) ?? 1)
     const start = (page - 1) * perPage
@@ -498,6 +520,16 @@ function parseQuery(query: string): ParsedQuery {
     else parsed.terms.push(token.toLowerCase())
   }
   return parsed
+}
+
+/** A stable pseudo-score for a match id (FNV-1a), so relevance order is deterministic but unrelated to time. */
+function relevance(id: string): number {
+  let hash = 0x811c9dc5
+  for (let i = 0; i < id.length; i++) {
+    hash ^= id.charCodeAt(i)
+    hash = Math.imul(hash, 0x01000193) >>> 0
+  }
+  return hash
 }
 
 function pageFromCursor(cursor: string | undefined): number | undefined {

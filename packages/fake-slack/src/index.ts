@@ -170,6 +170,11 @@ export class FakeSlack {
     this.workspace.leave(input.channel, input.user ?? this.selfId)
   }
 
+  /** Renames a channel from another client. Emits `channel_rename` or `group_rename` with Slack's partial channel object. */
+  renameChannel(input: { channel: string; name: string }): void {
+    this.workspace.rename(input.channel, input.name)
+  }
+
   typing(input: { channel: string; user?: string; threadTs?: string }): void {
     this.workspace.typing(input.channel, input.user ?? 'U0MAYA', input.threadTs === undefined ? undefined : asTs(input.threadTs))
   }
@@ -206,6 +211,25 @@ export class FakeSlack {
     this.server.clearError(input.method)
   }
 
+  /**
+   * The next `times` calls of `method` run as usual but their answer waits
+   * for `release`. For tests that land events while a page is in flight: the
+   * request has started (its `requestedAt` is set), the events arrive, then
+   * the page lands.
+   */
+  holdNext(input: { method: string; times?: number }): void {
+    this.server.holdNext(input.method, input.times ?? 1)
+  }
+
+  /** Answers the held calls of `method`, or of every method. */
+  release(input: { method?: string } = {}): void {
+    this.server.release(input.method)
+  }
+
+  heldCount(input: { method?: string } = {}): number {
+    return this.server.heldCount(input.method)
+  }
+
   /** Every session stops working: API calls get `invalid_auth`, sockets get `user_session_expiration` and close. */
   expireSession(): void {
     this.server.expireSessions()
@@ -232,6 +256,7 @@ export class FakeSlack {
       removeReaction: (i) => this.removeReaction(i),
       joinChannel: (i) => this.joinChannel(i),
       leaveChannel: (i) => this.leaveChannel(i),
+      renameChannel: (i) => this.renameChannel(i),
       typing: (i) => this.typing(i),
       emitFrame: (i) => this.emitFrame(i),
       dropSocket: () => this.dropSocket(),
@@ -239,6 +264,9 @@ export class FakeSlack {
       clear429: (i) => this.clear429(i),
       forceError: (i) => this.forceError(i),
       clearError: (i) => this.clearError(i),
+      holdNext: (i) => this.holdNext(i),
+      release: (i) => this.release(i),
+      heldCount: (i) => this.heldCount(i),
       expireSession: () => this.expireSession(),
       advanceClock: (i) => this.advanceClock(i),
       setNow: (i) => this.setNow(i),
