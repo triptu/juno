@@ -17,6 +17,8 @@ export interface SyncContext {
   readonly config: SyncConfigShape
   /** Messages to fetch again (`conversations.replies`, `limit: 1`): stub roots, and messages whose page was older than an event. A background fiber fetches them. */
   readonly rootFetches: Queue.Queue<RootFetch>
+  /** Channels whose Main read pointer Slack must settle (`conversations.info`): an event Juno cannot order, or a page too old to apply. A background fiber asks. */
+  readonly readLookups: Queue.Queue<string>
   /**
    * Reactions that arrived for a message the store did not have yet, by
    * `channel:ts`, with the event's `event_ts`. A page that stores the message

@@ -68,9 +68,8 @@ test('after sign-in the sidebar lists followed threads and Main, newest first, w
   // A channel's Main: the channel label as the title and the Main tag.
   const alerts = sidebar.row(ALERTS_MAIN)
   await alerts.expectTag('Main')
-  // Nine unread. The engine marks a Main's count as a lower bound ("9+") until
-  // its synced history reaches the read pointer, so either form is right here.
-  await expect(alerts.root.getByTitle(/^9 (or more )?unread$/)).toHaveText(/^9\+?$/)
+  // Nine unread, exactly: the boot's history page reaches back to the read pointer.
+  await expect(alerts.root.getByTitle(/^9 unread$/)).toHaveText('9')
   await alerts.expectPreview('Grafana: [RESOLVED] queue depth > 5k on billing-consumer')
 
   // Newest activity first.

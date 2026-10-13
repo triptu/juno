@@ -18,16 +18,25 @@ export {
   type RootCounters,
 } from './merge'
 export { reindexAll, reindexTopics, topicsOfMessages, type ReindexOptions, type StoredPreview } from './reindex'
-export type { BootState } from './boot'
+export { storedMe, type BootState } from './boot'
 export {
   applyRootSubscription,
   beginPendingFollow,
   clearThreadSub,
+  deferMark,
+  dropMark,
+  endMark,
   endPendingFollow,
+  observeRead,
+  pendingMark,
+  pendingMarks,
   readMessage,
   readState,
+  rejectMark,
   setThreadSub,
   threadSub,
+  writeLocalMark,
+  type PendingMark,
   type ThreadSubOutcome,
   type ThreadSubRow,
   type ThreadSubSource,

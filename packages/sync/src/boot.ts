@@ -21,12 +21,12 @@
  * threads over the window and checks the follows it left out; `runSync`
  * schedules it.
  */
-import { compareTs, maxTs, millisToTs, type Ts, type UsergroupId } from '@juno/domain'
+import { compareTs, maxTs, millisToTs, type Me, type Ts, type UsergroupId } from '@juno/domain'
 import { SlackApi, type SlackApiError, type SlackAuthRequired } from '@juno/slack'
 import { SlackEdge, SlackSession } from '@juno/slack'
 import type { Channel, ClientCountsArgs, CountEntry, Message, ThreadView } from '@juno/slack-schema'
 import { Invalidation, StoreWriter, transaction, type SqlError } from '@juno/store'
-import { Clock, Effect } from 'effect'
+import { Clock, Effect, Queue } from 'effect'
 import { reindexOptions, type SyncContext } from './context'
 import { discoverSince } from './discovery'
 import { applyPage, mainTopicOf, threadTopicOf } from './pages'
@@ -34,10 +34,11 @@ import { reindexTopics } from './reindex'
 import { fillUsers } from './users'
 import {
   addSyncedRange,
-  applyServerMark,
   getSyncState,
   latestSyncedRange,
   markRepliesComplete,
+  observeRead,
+  readState,
   replaceMembership,
   seedTopicRead,
   setChannelReads,
@@ -52,6 +53,8 @@ import {
 } from './write'
 
 export const BOOT_KEY = 'boot'
+/** `sync_state.me`: the user and their user groups, so a command outside the sync re-indexes with the same mention rules. */
+export const ME_KEY = 'me'
 
 /** What `sync_state.boot` records once a boot completes. */
 export interface BootState {
@@ -69,6 +72,20 @@ export type BootServices = SlackApi | SlackEdge | SlackSession | StoreWriter | I
 const DAY = 24 * 60 * 60 * 1000
 
 export const bootState = (): Effect.Effect<BootState | undefined, SqlError, StoreWriter> => getSyncState<BootState>(BOOT_KEY)
+
+/**
+ * The user as the last boot saw them, with their user groups, for a
+ * command that re-indexes outside the sync. Before any boot, the team's
+ * self id without groups; `undefined` when the store has neither.
+ */
+export const storedMe: Effect.Effect<Me | undefined, SqlError, StoreWriter> = Effect.gen(function* () {
+  const me = yield* getSyncState<Me>(ME_KEY)
+  if (me !== undefined) return me
+  const sql = yield* StoreWriter
+  const team = yield* sql<{ self_user_id: string | null }>`SELECT self_user_id FROM team LIMIT 1`
+  const self = team[0]?.self_user_id
+  return self === null || self === undefined ? undefined : { userId: self as Me['userId'] }
+})
 
 const windowStartMillis = (ctx: SyncContext) => Effect.map(Clock.currentTimeMillis, (now) => now - ctx.config.quietDays * DAY)
 const nowTs = Effect.map(Clock.currentTimeMillis, (now) => millisToTs(now))
@@ -89,6 +106,7 @@ const loadWorkspace = (ctx: SyncContext, withPrefs: boolean): Effect.Effect<void
     yield* transaction(
       Effect.gen(function* () {
         yield* upsertTeam(boot.team, selfId, prefs, undefined)
+        yield* setSyncState(ME_KEY, ctx.me)
         yield* upsertUsers([boot.self])
         yield* upsertConversations([...boot.channels.map((c) => toConversationRow(c)), ...boot.ims.map((im) => toConversationRow(im))])
       }),
@@ -111,7 +129,7 @@ const loadCounts = (ctx: SyncContext, sinceFetched: number | undefined): Effect.
     const args: ClientCountsArgs = { thread_counts_by_channel: true, ...(sinceFetched === undefined ? {} : { counts_last_fetched: sinceFetched }) }
     // The time before the call: a `*_marked` event that lands while counts is in flight is newer than the answer.
     const now = yield* Clock.currentTimeMillis
-    const eventTs = millisToTs(now)
+    const requestedAt = millisToTs(now)
     const counts = yield* api.call('client.counts', args, { lane: 'interactive', reason: 'counts' })
     const entries = [...counts.channels, ...counts.ims, ...counts.mpims]
     const unknown = yield* unknownConversations(entries.map((e) => e.id))
@@ -127,10 +145,11 @@ const loadCounts = (ctx: SyncContext, sinceFetched: number | undefined): Effect.
         if (sinceFetched === undefined) yield* replaceMembership(ids)
         else yield* setMembership(ids, true)
         yield* setChannelReads(entries, now)
-        // A pointer Juno has never seen is Slack's; a known one is a server mark that may have been missed.
+        // A pointer Juno has never seen is Slack's; a known one applies when Slack's changed (specs/readstate.qnt).
         for (const entry of entries) {
-          yield* seedTopicRead(mainTopicOf(entry.id), entry.last_read)
-          if (yield* applyServerMark(mainTopicOf(entry.id), entry.last_read, eventTs)) yield* reindexTopics([mainTopicOf(entry.id)], reindexOptions(ctx))
+          const outcome = yield* observeRead(mainTopicOf(entry.id), { kind: 'page', lastReadTs: entry.last_read, requestedAt })
+          if (outcome === 'applied') yield* reindexTopics([mainTopicOf(entry.id)], reindexOptions(ctx))
+          if (outcome === 'lookup') yield* Queue.offer(ctx.readLookups, entry.id)
         }
       }),
     )
@@ -180,8 +199,11 @@ const applyThreadView = (ctx: SyncContext, view: ThreadView, requestedAt: Ts): E
       Effect.gen(function* () {
         // The view lists followed threads: a root without the flag is followed. Later events win over this page.
         yield* setThreadSub(channel, root.ts, root.subscribed ?? true, root.last_read, { kind: 'page', requestedAt })
-        yield* seedTopicRead(topic, root.last_read ?? root.latest_reply ?? root.ts)
-        if (root.last_read !== undefined) yield* applyServerMark(topic, root.last_read, requestedAt)
+        // Slack's pointer for a followed thread. Without one, a thread seen for the first time starts read to its latest reply.
+        if (root.last_read === undefined) yield* seedTopicRead(topic, root.latest_reply ?? root.ts)
+        else if ((yield* observeRead(topic, { kind: 'page', lastReadTs: root.last_read, requestedAt })) === 'lookup') {
+          yield* Queue.offer(ctx.rootFetches, { channel, ts: root.ts })
+        }
       }),
     )
     yield* applyPage(ctx, channel, [root, ...seen.values()], { kind: 'page', requestedAt })
@@ -308,19 +330,25 @@ interface HistoryOptions {
   readonly seedReadBefore?: string
 }
 
-/** The newest history page of a conversation inside the window. Records the range it covered. */
+/**
+ * The newest history page of a conversation inside the window, reaching
+ * back to Main's read pointer when that is older, so one page can make the
+ * unread count exact. Records the range it covered.
+ */
 const loadHistoryWindow = (ctx: SyncContext, channel: string, start: Ts, options: HistoryOptions): Effect.Effect<void, BootError, BootServices> =>
   Effect.gen(function* () {
     const api = yield* SlackApi
     const requestedAt = yield* nowTs
+    const pointer = (yield* readState(mainTopicOf(channel))).lastReadTs
+    const from = pointer !== undefined && compareTs(pointer, start) < 0 ? pointer : start
     const page = yield* api.call(
       'conversations.history',
-      { channel, oldest: start, inclusive: true, limit: ctx.config.historyPageLimit, ignore_replies: true, no_user_profile: true },
+      { channel, oldest: from, inclusive: true, limit: ctx.config.historyPageLimit, ignore_replies: true, no_user_profile: true },
       { lane: 'background', reason: 'history' },
     )
     // The range first, so the index of this page already knows what history covers.
     const oldest = page.messages.at(-1)?.ts
-    yield* transaction(addSyncedRange(channel, page.has_more && oldest !== undefined ? oldest : start, requestedAt))
+    yield* transaction(addSyncedRange(channel, page.has_more && oldest !== undefined ? oldest : from, requestedAt))
     yield* applyPage(ctx, channel, page.messages, { kind: 'page', requestedAt }, { alsoTouch: [mainTopicOf(channel)], ...options })
   })
 

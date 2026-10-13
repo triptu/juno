@@ -18,7 +18,7 @@
  * store error is a bug; it is logged per event so one bad frame does not
  * end the sync, and surfaces in the engine log.
  */
-import { millisToTs, type Ts } from '@juno/domain'
+import { mainTopicId, millisToTs, type ChannelId, type Ts } from '@juno/domain'
 import { SlackApi, SlackAuthRequired, SlackEdge, SlackSession, SlackSocket, type SocketEvent } from '@juno/slack'
 import { Invalidation, StoreReader, StoreWriter, transaction } from '@juno/store'
 import { Clock, Effect, FiberSet, Queue, Scope, Semaphore } from 'effect'
@@ -26,10 +26,11 @@ import { Stream } from 'effect'
 import { bootState, catchUp, coldBoot, followPass, warmBoot, type BootState, type Phase } from './boot'
 import { syncEmoji } from './emoji'
 import { SyncConfig } from './config'
-import type { RootFetch, SyncContext } from './context'
+import { reindexOptions, type RootFetch, type SyncContext } from './context'
 import { applyFrame } from './events'
 import { applyPage } from './pages'
-import { clearPendingFollows, endEventCoverage } from './write'
+import { reindexTopics } from './reindex'
+import { clearPendingFollows, endEventCoverage, observeRead } from './write'
 
 export type SyncPhase =
   | { readonly _tag: 'booting' }
@@ -55,6 +56,7 @@ export const runSync = (options: RunSyncOptions): Effect.Effect<never, SlackAuth
       me: { userId: session.userId as SyncContext['me']['userId'] },
       config,
       rootFetches: yield* Queue.unbounded<RootFetch>(),
+      readLookups: yield* Queue.unbounded<string>(),
       missingUsers: new Map(),
       unknownUsers: new Set(),
       lateReactions: new Map(),
@@ -183,6 +185,37 @@ export const runSync = (options: RunSyncOptions): Effect.Effect<never, SlackAuth
       }
     })
 
-    yield* Effect.all([consumer, bootLoop, fetchRoots, FiberSet.join(background)], { concurrency: 'unbounded', discard: true })
+    /**
+     * Main's read pointer when Slack must settle it (specs/readstate.qnt):
+     * `conversations.info` carries `last_read`, and its answer is a page.
+     * A failure is dropped: the next counts call (a reconnect or the
+     * periodic catch-up) brings the pointer too.
+     */
+    const lookUpReads = Effect.gen(function* () {
+      const api = yield* SlackApi
+      while (true) {
+        const channel = yield* Queue.take(ctx.readLookups)
+        const requestedAt = yield* Effect.map(Clock.currentTimeMillis, (now) => millisToTs(now))
+        const result = yield* Effect.result(api.call('conversations.info', { channel }, { lane: 'background', reason: 'conversation' }))
+        if (result._tag === 'Failure') {
+          if (result.failure._tag === 'SlackAuthRequired') return yield* result.failure
+          yield* Effect.logDebug('sync: read lookup failed', { tag: result.failure._tag })
+          continue
+        }
+        const lastRead = result.success.channel.last_read
+        if (lastRead === undefined) continue
+        yield* transaction(
+          Effect.gen(function* () {
+            const topic = mainTopicId(channel as ChannelId)
+            const outcome = yield* observeRead(topic, { kind: 'page', lastReadTs: lastRead, requestedAt })
+            if (outcome === 'applied') yield* reindexTopics([topic], reindexOptions(ctx))
+            // Something newer was observed while it was in flight and Slack still disagrees: ask again.
+            if (outcome === 'lookup') yield* Queue.offer(ctx.readLookups, channel)
+          }),
+        ).pipe(Effect.catchCause((cause) => Effect.logError('sync: read lookup not applied', { cause })))
+      }
+    })
+
+    yield* Effect.all([consumer, bootLoop, fetchRoots, lookUpReads, FiberSet.join(background)], { concurrency: 'unbounded', discard: true })
     return yield* Effect.never
   })

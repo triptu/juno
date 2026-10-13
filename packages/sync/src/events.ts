@@ -19,8 +19,8 @@ import { mergeRootCounters, mergeTombstone } from './merge'
 import { mainTopicOf, mergeOne, threadTopicOf } from './pages'
 import { reindexTopics, topicsOfMessages } from './reindex'
 import {
-  applyServerMark,
   changeReaction,
+  observeRead,
   patchConversation,
   readMessage,
   reopenIfResolved,
@@ -68,7 +68,12 @@ export const applyFrame = (ctx: SyncContext, frame: RtmFrame): Effect.Effect<voi
         return yield* transaction(
           Effect.gen(function* () {
             const topic = mainTopicOf(frame.channel)
-            yield* applyServerMark(topic, frame.ts, eventTsOf(frame, now))
+            // A mark without `event_ts` has no place in the event order: ask Slack (specs/readstate.qnt).
+            const outcome =
+              frame.event_ts === undefined
+                ? 'lookup'
+                : yield* observeRead(topic, { kind: 'event', lastReadTs: frame.ts, eventTs: frame.event_ts, observedAt: millisToTs(now) })
+            if (outcome === 'lookup') yield* Queue.offer(ctx.readLookups, frame.channel)
             const sql = yield* StoreWriter
             const rows = yield* sql<{ latest: string | null }>`SELECT latest FROM channel_reads WHERE channel = ${frame.channel}`
             const unread = frame.unread_count ?? frame.unread_count_display
@@ -90,20 +95,21 @@ export const applyFrame = (ctx: SyncContext, frame: RtmFrame): Effect.Effect<voi
       case 'thread_marked':
       case 'thread_subscribed':
       case 'thread_unsubscribed':
-        // An event without `event_ts` has no place in the order: ask Slack for the root instead (specs/follow.qnt).
+        // An event without `event_ts` has no place in the order: ask Slack for the root instead (specs/follow.qnt, readstate.qnt).
         if (frame.event_ts === undefined) return yield* Queue.offer(ctx.rootFetches, { channel: frame.subscription.channel, ts: frame.subscription.thread_ts })
         return yield* transaction(
           Effect.gen(function* () {
             const sub = frame.subscription
-            const eventTs = frame.event_ts as string
+            const eventTs = frame.event_ts as Ts
             // `thread_marked` says whether the thread is followed only when it carries `active`.
             const subscribed = frame.type === 'thread_unsubscribed' ? false : frame.type === 'thread_subscribed' ? (sub.active ?? true) : sub.active
             const source = { kind: 'event', eventTs, observedAt: millisToTs(now) } as const
             // An event that contradicts Juno's own command may predate it: Slack's root decides (specs/follow.qnt).
             const outcome = subscribed === undefined ? 'ignored' : yield* setThreadSub(sub.channel, sub.thread_ts, subscribed, sub.last_read, source)
-            if (outcome === 'lookup') yield* Queue.offer(ctx.rootFetches, { channel: sub.channel, ts: sub.thread_ts })
             const topic = threadTopicOf(sub.channel, sub.thread_ts)
-            if (sub.last_read !== undefined) yield* applyServerMark(topic, sub.last_read, eventTs)
+            // The same holds for the read pointer after Juno's own mark (specs/readstate.qnt).
+            const read = sub.last_read === undefined ? 'ignored' : yield* observeRead(topic, { kind: 'event', lastReadTs: sub.last_read, eventTs, observedAt: source.observedAt })
+            if (outcome === 'lookup' || read === 'lookup') yield* Queue.offer(ctx.rootFetches, { channel: sub.channel, ts: sub.thread_ts })
             yield* reindexTopics([topic], reindexOptions(ctx))
           }),
         )

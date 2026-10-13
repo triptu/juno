@@ -13,7 +13,7 @@ import { Effect, Queue } from 'effect'
 import { reindexOptions, type SyncContext } from './context'
 import { mergeMessage, mergeRootCounters, stubRoot, type MergeSource } from './merge'
 import { reindexTopics, topicsOfMessages } from './reindex'
-import { applyRootSubscription, applyServerMark, markRepliesComplete, readMessage, replaceReactions, seedTopicRead, writeMessage } from './write'
+import { applyRootSubscription, markRepliesComplete, observeRead, readMessage, replaceReactions, seedTopicRead, writeMessage } from './write'
 
 /** Merges one message and returns the rows it produced (the message, and a stub root when needed). */
 export const mergeOne = (
@@ -44,8 +44,9 @@ export const mergeOne = (
       yield* applyRootSubscription(channel, message, source.requestedAt)
       if (message.subscribed && message.last_read !== undefined) {
         const topic = threadTopicOf(channel, message.ts)
-        yield* seedTopicRead(topic, message.last_read)
-        yield* applyServerMark(topic, message.last_read, source.requestedAt)
+        const read = { kind: 'page', lastReadTs: message.last_read, requestedAt: source.requestedAt as Ts } as const
+        // An event Juno cannot order, or a page too old to apply that disagrees: ask for the root again (specs/readstate.qnt).
+        if ((yield* observeRead(topic, read)) === 'lookup') yield* Queue.offer(ctx.rootFetches, { channel, ts: message.ts })
       }
     }
 
