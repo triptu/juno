@@ -80,6 +80,9 @@ export function inlineText(inlines: ReadonlyArray<Inline>, breakAs = '\n'): stri
       case 'link':
         out += inline.text
         break
+      case 'date':
+        out += inline.fallback
+        break
       case 'user':
         out += `@${inline.name}`
         break

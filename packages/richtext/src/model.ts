@@ -23,6 +23,7 @@ export type Inline =
   | { readonly kind: 'usergroup'; readonly id: string; readonly handle: string }
   | { readonly kind: 'broadcast'; readonly range: BroadcastRange }
   | { readonly kind: 'emoji'; readonly name: string; readonly unicode?: string; readonly url?: string }
+  | { readonly kind: 'date'; readonly timestamp: number; readonly format: string; readonly fallback: string; readonly url?: string }
   | { readonly kind: 'break' }
 
 export type ListStyle = 'bullet' | 'ordered' | 'checked' | 'unchecked'
@@ -39,6 +40,7 @@ export type Block =
     }
   | { readonly kind: 'heading'; readonly children: ReadonlyArray<Inline> }
   | { readonly kind: 'divider' }
+  | { readonly kind: 'file'; readonly id: string; readonly name: string; readonly mimetype: string; readonly width?: number; readonly height?: number }
 
 export interface MessageBody {
   readonly blocks: ReadonlyArray<Block>
@@ -80,6 +82,9 @@ export function inlinesOf(body: MessageBody): ReadonlyArray<Inline> {
         out.push({ kind: 'text', text: block.text, style: { code: true } })
         break
       case 'divider':
+        break
+      case 'file':
+        out.push({ kind: 'text', text: block.name })
         break
     }
   }

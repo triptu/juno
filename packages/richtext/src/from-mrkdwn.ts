@@ -28,8 +28,8 @@ function parseAngle(content: string, lookups: Lookups): Inline {
   m = /^!(here|channel|everyone)(?:\|.*)?$/.exec(content)
   if (m && (m[1] === 'here' || m[1] === 'channel' || m[1] === 'everyone')) return { kind: 'broadcast', range: m[1] }
   // <!date^1392734382^{date_short}|fallback>
-  m = /^!date\^\d+\^[^|]*(?:\^[^|]*)?\|(.*)$/.exec(content)
-  if (m) return { kind: 'text', text: m[1] ?? '' }
+  m = /^!date\^(\d+)\^([^|^]*)(?:\^([^|]*))?\|(.*)$/.exec(content)
+  if (m && m[1] !== undefined && m[2] !== undefined) return { kind: 'date', timestamp: Number(m[1]), format: m[2], fallback: m[4] || new Date(Number(m[1]) * 1000).toISOString(), ...(m[3] === undefined ? {} : { url: m[3] }) }
   // Other special tokens: <!sf:…> and unknown. Show the label if any.
   if (content.startsWith('!')) {
     const bar = content.indexOf('|')
