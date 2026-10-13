@@ -4,14 +4,21 @@
  * The runner watches the session. When it becomes ready it forks `runSync`
  * into the session's scope with the session's Slack context and the open
  * workspace's store, so the sync ends with the session (sign-out, a new
- * sign-in, `authRequired`). A sync that fails with `SlackAuthRequired` is
- * reported back to the session as `expire`, from a fiber outside the
- * session scope so the scope can close.
+ * sign-in, `authRequired`). A sync that fails with `SlackAuthRequired`
+ * (from the socket, the boot, a catch-up or the sweep) is reported back to
+ * the session as `expire`, from a fiber outside the session scope so the
+ * scope can close.
+ *
+ * The boot window is the user's quiet window (the `quietDays` pref, the
+ * same one the sidebar reads), read when the sync starts.
  *
  * `phases` is the sync's phase while one runs, `undefined` otherwise; the
  * composition layer folds it into `engine.status`.
  */
-import { Cause, Context, Effect, Exit, Fiber, Layer, Stream, SubscriptionRef } from 'effect'
+import { Cause, Context, Effect, Fiber, Layer, Stream, SubscriptionRef } from 'effect'
+import { quietDaysOf } from '@juno/domain'
+import type { SlackAuthRequired } from '@juno/slack'
+import { prefs } from '@juno/store'
 import { runSync, syncConfigLayer, type SyncPhase } from '@juno/sync'
 import { Session, type ActiveSession } from './Session'
 import { Workspace } from '../workspace'
@@ -30,7 +37,7 @@ export class SyncRunner extends Context.Service<
       const workspace = yield* Workspace
       const scope = yield* Effect.scope
       const phase = yield* SubscriptionRef.make<SyncPhase | undefined>(undefined)
-      let running: { readonly active: ActiveSession; readonly fiber: Fiber.Fiber<never, unknown> } | undefined
+      let running: { readonly active: ActiveSession; readonly fiber: Fiber.Fiber<never, SlackAuthRequired> } | undefined
 
       const stop = Effect.gen(function* () {
         const current = running
@@ -43,10 +50,14 @@ export class SyncRunner extends Context.Service<
         Effect.gen(function* () {
           const open = yield* workspace.current
           if (open === undefined) return yield* Effect.logWarning('sync: no workspace open for the ready session')
+          const quietDays = yield* prefs.get<unknown>('quietDays').pipe(
+            Effect.provide(open.context),
+            Effect.catch(() => Effect.succeed(undefined)),
+          )
           const program = runSync({ onPhase: (next) => SubscriptionRef.set(phase, next) }).pipe(
             Effect.provide(active.context),
             Effect.provide(open.context),
-            Effect.provide(syncConfigLayer()),
+            Effect.provide(syncConfigLayer({ quietDays: quietDaysOf({ now: 0, ...(typeof quietDays === 'number' ? { quietDays } : {}) }) })),
             Effect.scoped,
           )
           const fiber = yield* Effect.forkIn(program, active.scope)
@@ -56,10 +67,9 @@ export class SyncRunner extends Context.Service<
             Effect.gen(function* () {
               const exit = yield* Effect.exit(Fiber.join(fiber))
               if (running?.fiber === fiber) running = undefined
-              if (Exit.isFailure(exit)) {
+              if (exit._tag === 'Failure') {
                 const error = Cause.findErrorOption(exit.cause)
-                const reason = error._tag === 'Some' && isAuthRequired(error.value) ? error.value.error : undefined
-                if (reason !== undefined) yield* session.expire(reason)
+                if (error._tag === 'Some') yield* session.expire(error.value.error)
                 else if (!Cause.hasInterruptsOnly(exit.cause)) yield* Effect.logError('sync ended unexpectedly', { cause: exit.cause })
               }
               yield* SubscriptionRef.set(phase, undefined)
@@ -85,6 +95,3 @@ export class SyncRunner extends Context.Service<
     }),
   )
 }
-
-const isAuthRequired = (error: unknown): error is { readonly _tag: 'SlackAuthRequired'; readonly error: string } =>
-  typeof error === 'object' && error !== null && (error as { _tag?: unknown })._tag === 'SlackAuthRequired'

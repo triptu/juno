@@ -10,14 +10,16 @@
  * this module without touching the commands' shape: local transaction,
  * mirror, revert.
  *
- * A top-level module, like `workspace.ts`, because feature folders do not
- * import each other: the session owns the Slack client and the topic
- * commands need it.
+ * `exclusive(key)` runs commands on the same target one at a time, so a
+ * revert never interleaves with a later command on the same thread.
+ *
+ * A top-level module, like `workspace.ts`. It reaches Slack through the
+ * top-level `SessionClient`, so it imports no feature folder.
  */
-import { Context, Effect, Layer } from 'effect'
+import { Context, Effect, Layer, Semaphore } from 'effect'
 import { NotSignedIn, Offline, RateLimited, Rejected } from '@juno/contract'
-import { SlackApi, type SlackApiError, type SlackApiShape } from '@juno/slack'
-import { Session } from './session/Session'
+import type { SlackApiError, SlackApiShape } from '@juno/slack'
+import { SessionClient } from './sessionClient'
 
 /** What a mirror call can fail with, as the contract names it. The local change is already reverted when a command returns one. */
 export type MirrorError = NotSignedIn | Offline | RateLimited | Rejected
@@ -30,20 +32,51 @@ export class Outbox extends Context.Service<
      * `send` lane. Fails with `NotSignedIn` when there is no session.
      */
     readonly send: <A>(call: (api: SlackApiShape) => Effect.Effect<A, SlackApiError>) => Effect.Effect<A, MirrorError>
+    /** Like `send`, on the `interactive` lane: an authoritative lookup after a change, such as a thread's root. */
+    readonly lookup: <A>(call: (api: SlackApiShape) => Effect.Effect<A, SlackApiError>) => Effect.Effect<A, MirrorError>
+    /** Runs `effect` after every earlier `exclusive` effect with the same key has finished. */
+    readonly exclusive: (key: string) => <A, E, R>(effect: Effect.Effect<A, E, R>) => Effect.Effect<A, E, R>
   }
 >()('juno/engine/Outbox') {
-  static readonly layer: Layer.Layer<Outbox, never, Session> = Layer.effect(
+  static readonly layer: Layer.Layer<Outbox, never, SessionClient> = Layer.effect(
     Outbox,
     Effect.gen(function* () {
-      const session = yield* Session
-      const send = <A>(call: (api: SlackApiShape) => Effect.Effect<A, SlackApiError>) =>
-        Effect.gen(function* () {
-          const active = yield* session.active
-          const api = Context.get(active.context, SlackApi)
-          const onSendLane: SlackApiShape = { call: (method, args, options) => api.call(method, args, { ...options, lane: 'send' }) }
-          return yield* call(onSendLane).pipe(Effect.catch(mapSlackError))
-        })
-      return Outbox.of({ send })
+      const client = yield* SessionClient
+      const onLane =
+        (lane: 'send' | 'interactive') =>
+        <A>(call: (api: SlackApiShape) => Effect.Effect<A, SlackApiError>) =>
+          Effect.gen(function* () {
+            const api = yield* client.api
+            const laned: SlackApiShape = { call: (method, args, options) => api.call(method, args, { ...options, lane }) }
+            return yield* call(laned).pipe(Effect.catch(mapSlackError))
+          })
+      const send = onLane('send')
+      const lookup = onLane('interactive')
+
+      // One permit per key. A key is dropped once nothing holds or waits for it.
+      const locks = new Map<string, { readonly semaphore: Semaphore.Semaphore; users: number }>()
+      const exclusive =
+        (key: string) =>
+        <A, E, R>(effect: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> =>
+          Effect.suspend(() => {
+            let lock = locks.get(key)
+            if (lock === undefined) {
+              lock = { semaphore: Semaphore.makeUnsafe(1), users: 0 }
+              locks.set(key, lock)
+            }
+            const held = lock
+            held.users += 1
+            return held.semaphore.withPermit(effect).pipe(
+              Effect.ensuring(
+                Effect.sync(() => {
+                  held.users -= 1
+                  if (held.users === 0) locks.delete(key)
+                }),
+              ),
+            )
+          })
+
+      return Outbox.of({ send, lookup, exclusive })
     }),
   )
 }
