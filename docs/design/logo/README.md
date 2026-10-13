@@ -1,6 +1,8 @@
 # Juno logo, phase 1: exploration
 
-Six concepts for the Juno mark and macOS app icon. Nothing here is wired into the app yet; `assets/icon.svg` is unchanged.
+**Chosen: laptop-two.** Its files are copied to `assets/` (`icon.svg`, `icon-dark.svg`, `mark.svg`) and wired in as the app icon and favicon. This folder stays as the exploration record. See "App icon" in `docs/development.md` for how the icon is built.
+
+Six concepts for the Juno mark and macOS app icon.
 
 ## What is in this folder
 
