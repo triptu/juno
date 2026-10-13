@@ -2,10 +2,11 @@
  * `search.modules.messages`, used for thread discovery (`is:thread after:<date>`).
  *
  * The response shape is partly Unknown (research section 3; architecture 5.3):
- * matches may come as `items` or as `messages.matches`, and paging may be by
- * `page` or `cursor`. Everything uncertain is optional and `searchMatches`
- * hides the difference. The fake answers with `items` + `pagination` and a
- * `response_metadata.next_cursor`.
+ * matches may come as `items` or as `messages.matches`, an item may hold its
+ * messages in `messages[]` (observed live), and paging may be by `page` or
+ * `cursor`. Everything uncertain is optional and `searchMatches` hides the
+ * difference. The fake answers like the live module API: `items[]` with
+ * `messages[]`, `pagination` and a `response_metadata.next_cursor`.
  */
 import { Schema as S } from 'effect'
 import { Blocks } from './blocks.ts'
@@ -61,15 +62,44 @@ export const SearchChannel = S.Struct({
   is_ext_shared: opt(S.Boolean),
 })
 
+/** The fields of one matched message. */
+const searchMessageFields = {
+  iid: opt(S.String),
+  type: opt(S.String),
+  user: opt(S.String),
+  username: opt(S.String),
+  text: opt(S.String),
+  permalink: opt(S.String),
+  thread_ts: opt(Ts),
+  reply_count: opt(S.Number),
+  blocks: opt(Blocks),
+  attachments: opt(S.Array(Attachment)),
+  files: opt(S.Array(File)),
+  score: opt(S.Number),
+} as const
+
+/** A message inside a module item (observed live: `items[].messages[]`, with `ts`, `text`, `user`, `username`, `permalink`, `iid`, sometimes `attachments`). */
+export const SearchItemMessage = S.Struct({ ...searchMessageFields, ts: Ts })
+export type SearchItemMessage = typeof SearchItemMessage.Type
+
+/**
+ * One result. Observed live (2026-10-13, `is:thread`, `sort=timestamp`):
+ * the module API answers `items[]` of `{ channel, iid, team, messages[] }`,
+ * the message fields inside `messages`, with no `thread_ts` and no
+ * `reply_count` (a reply's thread is only in its permalink). The flat shape,
+ * the fields on the item with a `ts`, is the public API's and the fake's
+ * older one; both decode, and `searchMatches` flattens them.
+ */
 export const SearchMatch = S.Struct({
   iid: opt(S.String),
   team: opt(S.String),
   /** An object in the public API; a bare id is tolerated in case the module API differs. */
   channel: S.Union([SearchChannel, S.String]),
+  messages: opt(S.Array(SearchItemMessage)),
   type: opt(S.String),
   user: opt(S.String),
   username: opt(S.String),
-  ts: Ts,
+  ts: opt(Ts),
   text: opt(S.String),
   permalink: opt(S.String),
   thread_ts: opt(Ts),
@@ -115,9 +145,21 @@ type SearchMessagesOk = {
   readonly messages?: { readonly matches: ReadonlyArray<SearchMatch> }
 }
 
-/** The matches of a search response wherever the server put them. */
-export function searchMatches(response: SearchMessagesOk): ReadonlyArray<SearchMatch> {
-  return response.items ?? response.messages?.matches ?? []
+/** A matched message with its conversation, whichever shape it came in. */
+export type FlatSearchMatch = SearchItemMessage & { readonly channel: SearchMatch['channel']; readonly team?: string }
+
+/** The matched messages of a search response wherever the server put them, one per message. */
+export function searchMatches(response: SearchMessagesOk): ReadonlyArray<FlatSearchMatch> {
+  const out: Array<FlatSearchMatch> = []
+  for (const item of response.items ?? response.messages?.matches ?? []) {
+    const { messages, channel, team, ts, ...fields } = item
+    if (messages !== undefined) {
+      for (const message of messages) out.push({ ...message, channel, ...(team === undefined ? {} : { team }) })
+    } else if (ts !== undefined) {
+      out.push({ ...fields, ts, channel, ...(team === undefined ? {} : { team }) })
+    }
+  }
+  return out
 }
 
 export function searchMatchChannelId(match: Pick<SearchMatch, 'channel'>): string {

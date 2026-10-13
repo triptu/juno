@@ -13,6 +13,7 @@ import {
   minTs,
   permalinkPath,
   RichTextInline,
+  searchMatches,
   Ts,
   tsToMillis,
 } from '@juno/slack-schema'
@@ -73,6 +74,30 @@ describe('tolerant decoding', () => {
       'rich_text_list',
       'rich_text_divider',
     ])
+  })
+})
+
+describe('search', () => {
+  it('decodes the module shape observed live (items holding messages) and the flat one, and flattens both', () => {
+    const decode = Schema.decodeUnknownSync(Methods['search.modules.messages'].ok)
+    const live = decode({
+      ok: true,
+      module: 'messages',
+      items: [
+        {
+          iid: 'i1',
+          team: 'T0JUNO',
+          channel: { id: 'C0ENG', name: 'eng', is_channel: true },
+          messages: [
+            { iid: 'm1', ts: '1760000000.000200', text: 'a reply', user: 'U0MAYA', username: 'maya', permalink: 'https://x.test/archives/C0ENG/p1760000000000200?thread_ts=1760000000.000100&cid=C0ENG', attachments: [{ id: 1, ts: 1760000000 }] },
+          ],
+        },
+      ],
+      pagination: { page: 1, page_count: 1, total_count: 1 },
+    })
+    expect(searchMatches(live)).toMatchObject([{ ts: '1760000000.000200', channel: { id: 'C0ENG' }, team: 'T0JUNO', permalink: expect.stringContaining('thread_ts=') }])
+    const flat = decode({ ok: true, items: [{ channel: 'C0ENG', ts: '1760000000.000300', text: 'flat', thread_ts: '1760000000.000100' }] })
+    expect(searchMatches(flat)).toMatchObject([{ ts: '1760000000.000300', channel: 'C0ENG', thread_ts: '1760000000.000100' }])
   })
 })
 

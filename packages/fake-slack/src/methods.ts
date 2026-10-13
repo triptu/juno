@@ -382,6 +382,9 @@ export const handlers: Handlers = {
         const text = (full.text ?? '').toLowerCase()
         if (!query.terms.every((term) => text.includes(term))) continue
         const user = full.user === undefined ? undefined : ws.users.get(full.user)
+        // As observed live: one item per match holding the message in `messages[]`. The thread is in the
+        // permalink only; there is no `thread_ts`, `reply_count`, blocks, files or reactions, so a client must
+        // not take a match for the whole message (review M3 finding 3).
         matches.push({
           iid: `${conversation.id}-${full.ts}`,
           team: ws.team.id,
@@ -393,24 +396,26 @@ export const handlers: Handlers = {
             is_mpim: conversation.kind === 'mpim',
             is_private: conversation.kind === 'private' || conversation.kind === 'mpim',
           },
-          type: 'message',
-          ...(full.user === undefined ? {} : { user: full.user }),
-          ...(user?.name === undefined ? {} : { username: user.name }),
-          ts: full.ts,
-          text: full.text ?? '',
-          // The thread is in the permalink only, and a match has no blocks, files or reactions: a client must not
-          // take a match for the whole message (review M3 finding 3).
-          permalink: `${ctx.baseUrl}${permalinkPath(conversation.id, full.ts, full.thread_ts)}`,
-          ...(full.reply_count === undefined ? {} : { reply_count: full.reply_count }),
+          messages: [
+            {
+              iid: `${conversation.id}-${full.ts}-m`,
+              ts: full.ts,
+              text: full.text ?? '',
+              ...(full.user === undefined ? {} : { user: full.user }),
+              ...(user?.name === undefined ? {} : { username: user.name }),
+              permalink: `${ctx.baseUrl}${permalinkPath(conversation.id, full.ts, full.thread_ts)}`,
+            },
+          ],
         })
       }
     }
     // Slack sorts by relevance unless asked for `sort=timestamp`. Relevance is not time order, so the fake
     // uses a stable shuffle of the ids: a client that assumes newest-first without asking gets an arbitrary sample.
     if (args.sort === 'timestamp') {
-      matches.sort((a, b) => (args.sort_dir === 'asc' ? compareTs(a.ts, b.ts) : compareTs(b.ts, a.ts)))
+      const tsOf = (match: SearchMatch) => match.messages?.[0]?.ts ?? match.ts ?? ''
+      matches.sort((a, b) => (args.sort_dir === 'asc' ? compareTs(tsOf(a), tsOf(b)) : compareTs(tsOf(b), tsOf(a))))
     } else {
-      matches.sort((a, b) => relevance(a.iid ?? a.ts) - relevance(b.iid ?? b.ts))
+      matches.sort((a, b) => relevance(a.iid ?? '') - relevance(b.iid ?? ''))
     }
     const perPage = args.count ?? 20
     const page = Math.max(1, args.page ?? pageFromCursor(args.cursor) ?? 1)
