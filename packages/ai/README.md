@@ -46,7 +46,7 @@ Ids in outputs are plain strings. The `accept` rule of each task guarantees they
 | `groupRun` | chat decision | 5 s | Background, per Main message. Luna p50 1.8 s, p95 2.9 s. Room for one retry. |
 | `forYou` | generation, structured | 30 s | Background every 15 minutes. Sonnet 5.5 takes about 7 s for four cards. |
 | `titleTopic`, `catchUp` | generation | 20 s | Measured 1.6 to 1.9 s. |
-| `topicArt` | art | 15 s | Background, when a topic first enters the sidebar; nobody waits. The study measured a median of 2.3 s and a p90 of 4.8 s with one retry inside it. |
+| `topicArt` | art | 15 s | Background, when a topic first enters the sidebar; nobody waits. The study measured a median of 2.3 s and a p90 of 4.8 s; the live check on 2026-10-14 saw 4.2 to 14.0 s per call (median 4.5 s, 9 of 10 valid first time, about $0.003 per icon), so there is room for one slow call. |
 | `chat` | generation | 60 s | One streamed turn with tools. |
 
 ## Measurements
