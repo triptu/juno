@@ -1,0 +1,17 @@
+{
+  "name": "juno-agent-spikes",
+  "version": "0.0.0",
+  "private": true,
+  "description": "WP0 spike scripts for Juno Agent. Findings are in ../spikes.md. Not part of the app.",
+  "type": "module",
+  "dependencies": {
+    "@earendil-works/chord": "1.2.0",
+    "@earendil-works/pi-ai": "1.2.0",
+    "@earendil-works/pi-durable": "1.2.0",
+    "@earendil-works/pi-mcp": "1.2.0",
+    "@openai/codex-sdk": "0.162.1"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2"
+  }
+}

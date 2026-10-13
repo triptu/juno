@@ -1,0 +1,34 @@
+{
+  "name": "@juno/agent",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The Juno Agent core: the durable runtime (the only pi-durable user), store, inbox, projection, recovery, requests and the provider guard, spend, jobs, actions, MCP, scheduling, ownership and backup. A plain Node program that runs in its own utility process. Never imports Electron or Slack.",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@earendil-works/chord": "1.2.0",
+    "@earendil-works/pi-ai": "1.2.0",
+    "@earendil-works/pi-durable": "1.2.0",
+    "@earendil-works/pi-mcp": "1.2.0",
+    "@juno/agent-contract": "workspace:*",
+    "@openai/codex-sdk": "0.162.1",
+    "effect": "4.0.3"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "typescript": "5.9.3"
+  },
+  "juno": {
+    "allowedDeps": [
+      "@juno/agent-cards",
+      "@juno/agent-contract",
+      "@juno/agent-memory"
+    ]
+  }
+}

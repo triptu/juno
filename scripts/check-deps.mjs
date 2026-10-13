@@ -11,8 +11,9 @@
 // Fails on: a missing allowedDeps field, a declared @juno dependency outside
 // the allowed list, an unknown @juno package, a dependency cycle, an import of
 // an undeclared @juno package in src, test or e2e, and the hard rules below
-// (package rules, directory rules, the unstable Effect module allow-list, engine
-// feature folders and the sendSync ban).
+// (package rules, the Juno Agent bans, directory rules, the unstable Effect
+// module allow-list, the pi and Codex import sites, engine feature folders and
+// the sendSync ban).
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { builtinModules } from 'node:module'
 import { dirname, join, relative, resolve, sep } from 'node:path'
@@ -24,14 +25,30 @@ const warnings = []
 
 // Packages whose src may import only effect's Schema (exactly that named import
 // from the root 'effect' module, as used today by domain/ids.ts).
-const schemaOnlyEffect = new Set(['@juno/domain', '@juno/richtext'])
+const schemaOnlyEffect = new Set(['@juno/domain', '@juno/richtext', '@juno/agent-memory', '@juno/agent-cards'])
 // Packages whose src must not import effect at all.
 // (@juno/views is covered by the `views` directory rule below.)
-const noEffect = new Set(['@juno/ui', '@juno/tokens', '@juno/domain', '@juno/richtext'])
+const noEffect = new Set(['@juno/ui', '@juno/tokens', '@juno/domain', '@juno/richtext', '@juno/agent-memory', '@juno/agent-cards'])
 // Packages whose src must not import @juno/state.
 const noState = new Set(['@juno/ui'])
 // The only package allowed to import electron.
 const electronOwner = '@juno/desktop'
+
+// Juno Agent (docs/juno-agent/plan-v3.md section 2.1, ADR 0012). The agent is portable: no
+// agent package reaches Electron or Slack, and the core does not reach Juno's store, sync or
+// engine either. Checked against declared dependencies and against every import, so adding a
+// package to allowedDeps does not get around it.
+const agentSlackBan = ['electron', '@juno/slack', '@juno/slack-schema', '@juno/fake-slack']
+const agentBans = new Map([
+  ['@juno/agent', [...agentSlackBan, '@juno/store', '@juno/sync', '@juno/engine', '@juno/state', '@juno/views', '@juno/ui']],
+  ['@juno/agent-memory', agentSlackBan],
+  ['@juno/agent-cards', agentSlackBan],
+  ['@juno/agent-contract', agentSlackBan],
+  ['@juno/agent-juno', agentSlackBan],
+  ['@juno/agent-testing', agentSlackBan],
+])
+const agentBanReason =
+  'Juno Agent packages are portable: none imports Electron or Slack, and the core does not import the store, sync, engine or UI (docs/juno-agent/plan-v3.md section 2.1).'
 
 const NODE_BUILTIN = '<node built-in>'
 const EFFECT_ANY = '<effect>'
@@ -51,7 +68,7 @@ const dirRules = [
   },
   {
     dir: 'apps/desktop/src/main',
-    ban: ['@juno/state', '@juno/views', '@juno/ui', '@juno/engine', '@juno/store', '@juno/slack', 'react', 'react-dom'],
+    ban: ['@juno/state', '@juno/views', '@juno/ui', '@juno/engine', '@juno/store', '@juno/slack', '@juno/agent', 'react', 'react-dom'],
     // The Slack-app import parser (leveldb and cookie files) is plain file reading that main
     // owns (docs/architecture.md section 14) and the live smoke shares. The client stays out.
     except: ['@juno/slack/import'],
@@ -59,8 +76,13 @@ const dirRules = [
   },
   {
     dir: 'apps/desktop/src/engine',
-    ban: ['@juno/state', '@juno/views', '@juno/ui', 'react', 'react-dom'],
-    reason: 'The engine entry is a Node program with no UI code.',
+    ban: ['@juno/state', '@juno/views', '@juno/ui', '@juno/agent', 'react', 'react-dom'],
+    reason: 'The engine entry is a Node program with no UI code. The agent core runs in its own process (ADR 0012).',
+  },
+  {
+    dir: 'apps/desktop/src/agent',
+    ban: ['@juno/engine', '@juno/store', '@juno/sync', '@juno/slack', '@juno/slack-schema', '@juno/state', '@juno/views', '@juno/ui', '@juno/agent-juno', 'react', 'react-dom'],
+    reason: 'The agent entry hosts the portable agent core. It reaches Juno only through the AgentHost port (ADR 0012).',
   },
   {
     dir: 'apps/desktop/src/preload',
@@ -104,12 +126,12 @@ const unstable = [
   {
     label: 'effect/rpc',
     spec: /^effect\/rpc(?:\/|$)/,
-    allow: ['packages/contract/src/', 'packages/engine/src/protocol/', 'packages/state/src/'],
+    allow: ['packages/contract/src/', 'packages/engine/src/protocol/', 'packages/state/src/', 'packages/agent-contract/src/', 'packages/agent/src/host/'],
   },
   {
     label: 'effect/workers',
     spec: /^effect\/workers(?:\/|$)/,
-    allow: ['packages/state/src/transport.ts', 'packages/engine/src/protocol/runner.ts'],
+    allow: ['packages/state/src/transport.ts', 'packages/engine/src/protocol/runner.ts', 'packages/agent/src/host/port.ts'],
   },
   {
     label: 'effect/sql and @effect/sql-sqlite-node',
@@ -129,6 +151,23 @@ const unstable = [
       'ErrorReporter', 'Arbitrary', 'Crypto',
     ]),
     allow: [],
+  },
+]
+
+// pi and Codex (docs/juno-agent/plan-v3.md section 2.1): each may be imported only from the
+// agent directory that wraps it, plus the test doubles in agent-testing. pi-ai is also the
+// provider of @juno/ai. Same shape as `unstable`.
+const thirdParty = [
+  {
+    label: 'pi-durable',
+    spec: /^@earendil-works\/(?:pi-durable|chord)(?:\/|$)/,
+    allow: ['packages/agent/src/runtime/', 'packages/agent-testing/'],
+  },
+  { label: 'pi-mcp', spec: /^@earendil-works\/pi-mcp(?:\/|$)/, allow: ['packages/agent/src/mcp/', 'packages/agent-testing/'] },
+  {
+    label: 'pi-ai and the Codex SDK',
+    spec: /^(?:@earendil-works\/pi-ai|@openai\/codex-sdk)(?:\/|$)/,
+    allow: ['packages/agent/src/providers/', 'packages/agent-testing/', 'packages/ai/'],
   },
 ]
 
@@ -274,6 +313,11 @@ for (const pkg of packages) {
     )
   }
 
+  for (const banned of agentBans.get(pkg.name) ?? []) {
+    const declared = ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies'].some((field) => pkg.json[field]?.[banned] !== undefined)
+    if (declared) errors.push(`${pkg.name}: declares ${banned}. ${agentBanReason}`)
+  }
+
   for (const dep of exceptions) {
     if (!pkg.declared.has(dep)) {
       errors.push(`${pkg.name}: juno.exceptions lists ${dep}, but package.json does not declare it. Remove it from the list.`)
@@ -343,6 +387,14 @@ for (const pkg of packages) {
 
       if (target === 'electron' && pkg.name !== electronOwner) {
         errors.push(`${where}: imports electron. Only ${electronOwner} may import electron.`)
+      }
+
+      if ((agentBans.get(pkg.name) ?? []).includes(target)) errors.push(`${where}: imports ${spec}. ${agentBanReason}`)
+
+      for (const rule of thirdParty) {
+        if (rule.spec.test(spec) && !underAllowed(rel, rule.allow)) {
+          errors.push(`${where}: imports ${spec}; only ${rule.allow.join(', ')} may import ${rule.label}. Wrap it there (docs/juno-agent/plan-v3.md section 2.1).`)
+        }
       }
 
       for (const rule of dirRules) {

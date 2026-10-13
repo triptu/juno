@@ -1,0 +1,17 @@
+{
+  "name": "@juno/agent-memory",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Juno Agent's pure memory rules: node keys, due order, batches, view rendering, the local window, the dependency closure, the request partition and budget, pin spans and the compaction task text. No I/O, no Effect services, no pi.",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3"
+  },
+  "juno": {
+    "allowedDeps": []
+  }
+}

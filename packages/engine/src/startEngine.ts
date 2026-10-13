@@ -17,6 +17,7 @@ import { Context, Effect, Exit, Layer, Scope } from 'effect'
 import type { EngineConfig as Config } from '@juno/contract'
 import { HttpTransport } from '@juno/slack'
 import { EngineConfig, SyncControl, type SyncControlOptions } from './config'
+import { agentHostServer } from './protocol/agentHost'
 import { HostLink, silentHost, type Host } from './protocol/host'
 import { Outbox } from './outbox'
 import { Handlers, Services } from './layer'
@@ -37,13 +38,16 @@ export interface EngineHostOptions {
   readonly host?: Host
   /** The HTTP seam for Slack (ADR 0007). */
   readonly httpTransport?: Layer.Layer<HttpTransport>
+  /** Ports from the agent utility process. When set, the engine serves the AgentHost group on them (ADR 0012). */
+  readonly agentTransport?: Transport
 }
 
 export function startEngine(transport: Transport, config: Config, options: EngineHostOptions = {}): Promise<EngineHandle> {
   return Effect.runPromise(
     Effect.gen(function* () {
       const scope = yield* Scope.make()
-      const app = protocolServer(transport).pipe(
+      const servers = options.agentTransport === undefined ? protocolServer(transport) : Layer.merge(protocolServer(transport), agentHostServer(options.agentTransport))
+      const app = servers.pipe(
         Layer.provide(Handlers),
         Layer.provideMerge(Services),
         Layer.provide(

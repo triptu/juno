@@ -35,6 +35,8 @@ export type EngineConfig = typeof EngineConfig.Type
 export const MainToEngine = Schema.Union([
   Schema.TaggedStruct('config', { config: EngineConfig }),
   Schema.TaggedStruct('port', {}),
+  /** A port to the agent utility process, in `ports[0]`. The engine serves the AgentHost group on it (ADR 0012). */
+  Schema.TaggedStruct('agentPort', {}),
   /** The answer to `requestSecrets`, `signIn` and `importFromSlackApp`: the stored or just captured session, or nothing. */
   Schema.TaggedStruct('secrets', { secrets: Schema.NullOr(SessionSecrets) }),
   /** A sign-in or import ended without a session. */

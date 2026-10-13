@@ -8,6 +8,8 @@
  * - `Host`: every parentPort message that is not `config` or `port` goes to
  *   the engine's `HostLink`; messages that arrive before it subscribes are
  *   kept in order.
+ * - `agentTransport`: ports main brokers to the agent utility process, on
+ *   which the engine serves the AgentHost group (ADR 0012).
  * - `HttpTransport.ElectronNet`: `net.fetch` on this process's session (ADR
  *   0007), so Chromium attaches the `d` cookie, stores rotations and uses
  *   the system proxy and CAs.
@@ -21,6 +23,7 @@ import { HttpTransport, HttpTransportError, type HttpResponse } from '@juno/slac
 const parent = process.parentPort
 const decode = Schema.decodeUnknownSync(MainToEngine)
 const transport = electronTransport()
+const agentTransport = electronTransport()
 // parentPort has no target origin; the unicorn rule is about window.postMessage.
 // oxlint-disable-next-line unicorn/require-post-message-target-origin
 const send = (message: EngineToMain) => parent.postMessage(message)
@@ -74,7 +77,7 @@ parent.on('message', (event) => {
     case 'config': {
       if (started) return
       started = true
-      startEngine(transport, message.config, { host, httpTransport: ElectronNet }).then(
+      startEngine(transport, message.config, { host, httpTransport: ElectronNet, agentTransport }).then(
         () => send({ _tag: 'ready' }),
         (cause: unknown) => {
           console.error('engine: failed to start', cause)
@@ -86,6 +89,11 @@ parent.on('message', (event) => {
     case 'port': {
       const port = event.ports[0]
       if (port) transport.add(port)
+      return
+    }
+    case 'agentPort': {
+      const port = event.ports[0]
+      if (port) agentTransport.add(port)
       return
     }
     default: {
