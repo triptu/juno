@@ -82,7 +82,7 @@ Each row is a tile followed by three lines. The tile is the channel's icon or a 
 
 ### Row actions
 
-- **Hover** swaps the time for a **Resolve** button. Resolving hides the row, marks it read and shows a toast with Undo. ⌘Z also undoes. Main threads resolve the same way.
+- **Hover** (or keyboard focus) shows an icon-only **Resolve** button (a check) at the right end of the meta line. The time stays in place, and the button's slot is always reserved, so nothing shifts. Its tooltip and accessible name say "Resolve" (with the topic title for screen readers). Resolving hides the row, marks it read and shows a toast with Undo. ⌘Z also undoes. Main threads resolve the same way.
 - **Context menu** (right-click, or the context-menu key):
   - Open in new tab (⌘-click)
   - Open in stealth

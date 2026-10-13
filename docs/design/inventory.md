@@ -148,7 +148,7 @@ Centered, padding `48 16`, gap 8: title 14/500, body 13 muted lh 1.5, button 30p
 | Read | Title 500, preview muted, time muted, no count tag |
 | Unread | Title 600, preview subtle, time subtle, count tag `--secondary-active` |
 | Mention | @ tag before the count tag (count may be absent) |
-| Hover (pointer) / focus-within | Time hidden; **Resolve** button in its place: 22px, padding 0 8, margin-right −4, 1px `--border-strong`, radius 6, bg `--surface-default`, `check` 12 + "Resolve" 11.5/500, hover border `--border-strongest`, title "Resolve and hide until there is new activity". Not shown on resolved rows or while renaming |
+| Hover (pointer) / focus-within | Time stays. An icon-only **Resolve** IconButton (check icon, small size) appears at the right end of the meta line (line three), in a slot that is always reserved so nothing shifts. Tooltip "Resolve", accessible name "Resolve {title}". Not shown on resolved rows or while renaming. (Owner decision, overrides the prototype's text button that replaced the time.) |
 | Focused (keyboard) | 2px focus ring; Resolve button visible; Enter/Space opens |
 | Selected | bg `--secondary-default`; stays while hovered |
 | Main | Main tag after the title; title is the channel label |
