@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-14 02:04 · Tushar · Living home: layout A (centred scene, greeting, up to three smart items, Ask Juno field, all-caught-up state), with the eight mascot scenes in docs/design/home/.
 - 10-14 01:59 · Tushar · Juno Agent: providers are local Codex and OpenRouter (no Claude Code subscription); proactive messages only about things he set up; v1 sync is one writer plus encrypted backup and movable ownership; no click needed for read-only lookups, OS notifications, self-scheduling and starting T3 Code sessions.
 - 10-14 01:24 · Tushar · Juno Agent is its own workstream: a standalone, portable agent (embeddable, synced across devices on SQLite) on pi's latest version with durability and MCP (T3 Code, Littlebird, Notion), an iMessage-like simple chat hiding orchestration, optmem memory with formal verification, OpenRouter plus local Codex or Claude Code subscriptions as providers, self-scheduling, OS notifications, acting on the owner's behalf with JSON-rendered action cards. Opus leads; Astra and Fable research independently, review, and write code. Brief: docs/juno-agent/BRIEF.md.
 - 10-14 01:10 · Tushar · The empty workspace becomes a "living home": a changing scene with the logo's seated-j mascot, a greeting, 2–3 smart items computed from data, an Ask Juno field, and an all-caught-up state. Mock-ups first.

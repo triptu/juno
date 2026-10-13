@@ -52,6 +52,7 @@ Titles resolve in this order. A title you set by renaming (stored in Juno only) 
 - **Two panes.** A fixed sidebar about 384px wide on the left, and a tabbed workspace on the right.
 - **Title bar.** The macOS traffic lights sit in the sidebar's top bar. The workspace's top bar is the tab strip. Both bars are window drag regions.
 - **Workspace tabs** work like browser tabs. Every page opens in a tab: a topic, All topics, For you, Juno, a new message, Notifications or Preferences.
+- **Home.** With no tab open, the workspace shows a calm home: a small scene with Juno's mascot that changes with the time of day, a short greeting, at most three items that want you (computed from data, sharpened by AI when it is on), an "Ask Juno…" field, and an all-caught-up scene when nothing needs you. Design: `docs/design/home/` (layout A).
 - **Reading width.** Message columns are capped around 800px and centered, so long lines stay readable on wide windows.
 
 ## 5. Sidebar
