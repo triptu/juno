@@ -1,11 +1,17 @@
 /**
- * Status and visibility (architecture 4.4, spec section 5).
+ * Status and visibility (architecture 4.4, spec section 5 "What shows up").
  *
- * ignored channel → ignored; unsubscribed → unsubscribed; resolved with no
- * later activity → resolved; no activity within the quiet window and not
- * pinned and nothing unread → quiet; else open.
+ * Status: ignored channel → ignored; unsubscribed → unsubscribed; resolved
+ * with no later activity → resolved; no activity within the quiet window
+ * and not pinned and nothing unread → quiet; else open. For Main, "activity"
+ * is anything in the channel, including replies in its threads.
+ *
+ * The sidebar shows open topics, but only threads the user follows in Slack
+ * or threads with an unread mention of the user; other threads stay topics
+ * (All topics, the channel's Main) without a row. Every pinned topic is in
+ * Pinned; only an ignored channel hides a pinned topic.
  */
-import { compareTs, tsToMillis } from './ids'
+import { compareTs, maxTs, tsToMillis } from './ids'
 import { quietDaysOf, type RuleContext, type Topic } from './topic'
 
 export type TopicStatus = 'open' | 'quiet' | 'resolved' | 'unsubscribed' | 'ignored'
@@ -20,6 +26,26 @@ export function isUnread(topic: Topic): boolean {
   return topic.activity.unreadCount > 0
 }
 
+/** An unread message that mentions the user directly. */
+export function hasUnreadMention(topic: Topic): boolean {
+  return isUnread(topic) && topic.activity.mentionsMe
+}
+
+/** The user follows the thread in Slack ("Get notified about new replies"). Main is never followed. */
+export function isFollowed(topic: Topic): boolean {
+  return topic.kind === 'thread' && topic.slackSubscribed === true
+}
+
+/**
+ * The user unsubscribed the topic: Juno's client-only flag (any kind), or
+ * an explicit unfollow in Slack for a thread. A thread Slack has said
+ * nothing about is not unsubscribed, only not followed.
+ */
+export function isUnsubscribed(topic: Topic): boolean {
+  if (topic.overlay.unsubscribedAt !== undefined) return true
+  return topic.kind === 'thread' && topic.slackSubscribed === false
+}
+
 /** True when new activity arrived after the last resolve. */
 export function hasActivityAfterResolve(topic: Topic): boolean {
   const { resolvedAt, resolvedActivityTs } = topic.overlay
@@ -32,14 +58,20 @@ export function isResolved(topic: Topic): boolean {
   return topic.overlay.resolvedAt !== undefined && !hasActivityAfterResolve(topic)
 }
 
+/** The latest activity the quiet rule looks at: the topic's own, or for Main anything in the channel. */
+export function latestActivityTs(topic: Topic): Topic['activity']['lastActivityTs'] {
+  const channel = topic.kind === 'main' ? topic.activity.channelLastActivityTs : undefined
+  return channel === undefined ? topic.activity.lastActivityTs : maxTs(topic.activity.lastActivityTs, channel)
+}
+
 /** Whether the quiet window has passed since the last activity. Pins and unread do not count here. */
 export function isOlderThanQuietWindow(topic: Topic, ctx: RuleContext): boolean {
-  return ctx.now - tsToMillis(topic.activity.lastActivityTs) > quietDaysOf(ctx) * DAY
+  return ctx.now - tsToMillis(latestActivityTs(topic)) > quietDaysOf(ctx) * DAY
 }
 
 export function topicStatus(topic: Topic, ctx: RuleContext): TopicStatus {
   if (topic.channel.ignored) return 'ignored'
-  if (topic.overlay.unsubscribedAt !== undefined) return 'unsubscribed'
+  if (isUnsubscribed(topic)) return 'unsubscribed'
   if (isResolved(topic)) return 'resolved'
   if (isOlderThanQuietWindow(topic, ctx) && !isPinned(topic) && !isUnread(topic)) return 'quiet'
   return 'open'
@@ -56,17 +88,28 @@ export function showsReopenedTag(topic: Topic): boolean {
   return topic.overlay.reopenedAt !== undefined || hasActivityAfterResolve(topic)
 }
 
+/**
+ * Whether an open topic belongs in the sidebar at all (spec section 5,
+ * "Which threads"): Main always; a thread only when the user follows it in
+ * Slack or it has an unread mention of the user.
+ */
+export function isSidebarCandidate(topic: Topic): boolean {
+  if (topic.kind !== 'thread') return true
+  return isFollowed(topic) || hasUnreadMention(topic)
+}
+
 export type SidebarPlacement = 'pinned' | 'recent' | 'hidden'
 
 /**
- * Where a topic sits in the sidebar. Open topics are in Recent; every pinned
- * topic is in Pinned, even when resolved or quiet; ignored channels never show.
+ * Where a topic sits in the sidebar. Every pinned topic is in Pinned, even
+ * when resolved, quiet or unfollowed; ignored channels never show; an open
+ * topic is in Recent when it is a sidebar candidate.
  */
 export function sidebarPlacement(topic: Topic, ctx: RuleContext): SidebarPlacement {
   const status = topicStatus(topic, ctx)
   if (status === 'ignored') return 'hidden'
   if (isPinned(topic)) return 'pinned'
-  return status === 'open' ? 'recent' : 'hidden'
+  return status === 'open' && isSidebarCandidate(topic) ? 'recent' : 'hidden'
 }
 
 /** A pinned resolved row is dimmed with a check and has no hover Resolve. */
@@ -85,8 +128,17 @@ export function rowTags(topic: Topic): ReadonlyArray<RowTag> {
   const tags: RowTag[] = []
   if (topic.kind === 'main') tags.push('main')
   if (showsReopenedTag(topic)) tags.push('reopened')
-  if (topic.overlay.unsubscribedAt !== undefined) tags.push('unsubscribed')
+  if (isUnsubscribed(topic)) tags.push('unsubscribed')
   return tags
+}
+
+/**
+ * What Subscribe and Unsubscribe toggle: Slack's follow flag for a thread,
+ * the client-only flag for Main (architecture 4.4). The row's menu offers
+ * Unsubscribe when this is true.
+ */
+export function isSubscribed(topic: Topic): boolean {
+  return topic.kind === 'thread' ? isFollowed(topic) : topic.overlay.unsubscribedAt === undefined
 }
 
 /** Whether a topic appears on All topics: everything except ignored channels. */

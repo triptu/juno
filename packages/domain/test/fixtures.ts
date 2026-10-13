@@ -24,6 +24,10 @@ export interface TopicOptions {
   readonly unread?: number
   readonly mentionsMe?: boolean
   readonly messages?: number
+  /** Slack's follow flag for a thread. Default: followed. `null` leaves it unknown. */
+  readonly subscribed?: boolean | null
+  /** Main only: millis ago of the latest activity anywhere in the channel (thread replies included). */
+  readonly channelAgo?: number
   readonly overlay?: TopicOverlay
   readonly firstMessageText?: string
   readonly preview?: Topic['preview']
@@ -44,8 +48,10 @@ export function topic(options: TopicOptions = {}): Topic {
       unreadCount: options.unread ?? 0,
       mentionsMe: options.mentionsMe ?? false,
       participants: [mayaId, leoId],
+      ...(kind === 'main' && options.channelAgo !== undefined ? { channelLastActivityTs: ts(NOW - options.channelAgo) } : {}),
     },
     overlay: options.overlay ?? {},
+    ...(kind === 'thread' && options.subscribed !== null ? { slackSubscribed: options.subscribed ?? true } : {}),
     ...(options.firstMessageText !== undefined ? { firstMessageText: options.firstMessageText } : {}),
     ...(options.preview !== undefined ? { preview: options.preview } : {}),
   }

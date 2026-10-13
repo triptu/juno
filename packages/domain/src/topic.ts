@@ -21,6 +21,12 @@ export interface TopicOverlay {
 
 export interface TopicActivity {
   readonly lastActivityTs: Ts
+  /**
+   * Main only: the latest activity anywhere in the channel, including replies
+   * in its threads. Decides whether the Main row is quiet (spec section 5);
+   * the row itself still sorts and shows its own `lastActivityTs`.
+   */
+  readonly channelLastActivityTs?: Ts
   readonly messageCount: number
   readonly unreadCount: number
   /** False when local history may not cover everything since the read pointer. */
@@ -43,7 +49,12 @@ export interface Topic {
   readonly channel: ChannelInfo
   readonly activity: TopicActivity
   readonly overlay: TopicOverlay
-  /** Slack's follow flag, for the bell. Juno's own flag is `overlay.unsubscribedAt`. */
+  /**
+   * Slack's follow flag ("Get notified about new replies"), threads only.
+   * `true` when Slack lists the thread as followed, `false` when the user
+   * unfollowed it, absent when Slack has said nothing (not followed). Decides
+   * whether a thread is in the sidebar; Main has only `overlay.unsubscribedAt`.
+   */
   readonly slackSubscribed?: boolean
   /** First message of a thread, for the fallback title. */
   readonly firstMessageText?: string
