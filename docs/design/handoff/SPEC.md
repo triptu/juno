@@ -41,7 +41,7 @@ Slack has no concept of a topic. Juno builds one on top of Slack's data. Anythin
 | Follow / unfollow thread | Subscribe / unsubscribe. Unsubscribed topics leave the sidebar. |
 | Mark unread | Works on a topic or on a whole channel. |
 | Quote (the ">" prefix) | Rendered as a soft quote block. Quoting inserts ">" lines. There is no separate reply object. |
-| Not in Slack | Client-only: topic titles, resolved state, pins, stealth reads, groupings of Main messages, ignored channels, notification rules. |
+| Not in Slack | Client-only: topic titles, resolved state, pins, stealth reads, groupings of Main messages, ignored channels, notification rules, channel icons. |
 
 ### Topic titles
 
@@ -66,7 +66,7 @@ Titles resolve in this order. A title you set by renaming (stored in Juno only) 
 
 ### Row anatomy
 
-Each row is a tile followed by three lines. The tile is a channel letter or a person's avatar. Line one is the title and time. Line two is a two-line preview of the latest message as "Sender: text", with any ">" quote lines stripped. Line three is meta: channel icon and name, a small stack of participant avatars, the message count, and tags such as Main or Reopened. Unread topics have a semibold title and a soft grey count tag. Mentions of you get a quiet "@" tag. Row style (chat, list or cards), density and preview lines are tweaks. Chat is the default.
+Each row is a tile followed by three lines. The tile is the channel's icon or a person's avatar. Person avatars are their Slack profile photos, with coloured initials when there is no photo. Slack has no channel icons, so Juno adds them: each channel gets an icon and a colour, picked automatically at first and changeable by the user (client-only). Line one is the title and time. Line two is a two-line preview of the latest message as "Sender: text", with any ">" quote lines stripped. Line three is meta: channel icon and name, a small stack of participant avatars, the message count, and tags such as Main or Reopened. Unread topics have a semibold title and a soft grey count tag. Mentions of you get a quiet "@" tag. Row style (chat, list or cards), density and preview lines are tweaks. Chat is the default.
 
 ### What shows up
 
@@ -94,7 +94,7 @@ Each row is a tile followed by three lines. The tile is a channel letter or a pe
   - Resolve or reopen
   - Copy Slack link
   - Ignore #channel
-- **Channel context menu** (from Browse channels): Show its topics, Open Main, Open Main in stealth, Mark channel as read or unread, and Ignore channel.
+- **Channel context menu** (from Browse channels): Show its topics, Open Main, Open Main in stealth, Mark channel as read or unread, Change icon and colour, and Ignore channel.
 - **Rename** happens inline in the row or the topic header. Enter saves and Esc cancels.
 - **Undo toasts** appear bottom-left for reversible actions only. Info-only toasts like "Prompt copied" never show Undo.
 
