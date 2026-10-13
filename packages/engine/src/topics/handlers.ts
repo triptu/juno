@@ -1,28 +1,35 @@
 /**
  * Handlers for the topic routes. Both live queries follow the open
- * workspace: with none open they serve an empty window, and when one opens
- * (or a sign-out closes it) they switch to its store, so a renderer that
- * subscribed before the session was ready sees the rows arrive.
+ * workspace: while none is open they send nothing, so a renderer that
+ * subscribed before the session was ready keeps whatever it shows until the
+ * rows arrive, and when the workspace opens (or a sign-out closes it) they
+ * switch to its store.
  *
  * The sidebar query re-runs on `topics`, the overlay, conversations, users,
  * the ignored list, Slack's follow flags and prefs (the quiet window), and
- * once a minute so a topic can turn quiet on time.
+ * once a minute for its own subscription so a topic can turn quiet on time.
+ * Each subscription keeps a `RowCache` per workspace, so a run reshapes
+ * only the rows whose inputs changed and reads only the users it has not
+ * read since the `users` table last changed.
+ *
+ * Errors: a failed query run is a value from the store's `liveQuery`, and
+ * the serve helpers re-emit the last message with `meta.error`, so a busy
+ * reader or a bad migration never ends a subscription. A failure before the
+ * first value has nothing to re-emit, so the subscription starts again with
+ * backoff and the renderer keeps what it shows until a run succeeds.
  *
  * The two commands (`commands.ts`) write the current store and mirror to
  * Slack through the `Outbox` seam.
  */
-import { Clock, Effect, Result, Schedule, Schema, Stream } from 'effect'
-import { TopicRow, TopicsRoutes, type TopicCounts } from '@juno/contract'
-import { invalidate, liveQuery, type InvalidationKeys } from '@juno/store'
+import { Clock, Effect, Schema, type Scope, Semaphore, Stream } from 'effect'
+import { SIDEBAR_WINDOW, TopicRow, TopicsRoutes } from '@juno/contract'
+import { Invalidation, liveQuery, type InvalidationKeys, type SqlError } from '@juno/store'
 import { EngineConfig } from '../config'
 import { Outbox } from '../outbox'
-import { serveLiveList, serveLiveValue, timed, type ListRun, type Run } from '../protocol/live'
-import { Workspace } from '../workspace'
+import { retryFirstRun, serveLiveList, serveLiveValue, timed, type Run } from '../protocol/live'
+import { Workspace, type StoreServices } from '../workspace'
 import { setSubscribed } from './commands'
-import { countTopics, listTopics } from './query'
-
-/** The sidebar holds at most this many rows (performance 3.2). */
-export const SIDEBAR_WINDOW = 300
+import { countTopics, forgetUsers, listTopics, makeRowCache } from './query'
 
 const LIST_KEYS: InvalidationKeys = ['topics', 'topic_overlay', 'conversations', 'users', 'ignored_channels', 'thread_subs', 'prefs']
 const COUNT_KEYS: InvalidationKeys = ['topics', 'topic_overlay', 'conversations', 'ignored_channels', 'thread_subs']
@@ -37,45 +44,56 @@ export const TopicsHandlers = TopicsRoutes.toLayer(
     const config = yield* EngineConfig
     const measure = config.e2e || config.dev
 
-    /** Query runs from the current store, or one empty run while no workspace is open. */
-    const runs = <A>(keys: InvalidationKeys, query: Effect.Effect<A, never, never>, empty: A, tick: boolean) =>
+    /**
+     * Query runs from the current store; nothing while no workspace is open.
+     * `setup` runs once per open workspace, in a scope that lasts as long as
+     * the workspace does, and returns the query. With `tick`, the query also
+     * runs once a minute so a topic turns quiet on time; only this
+     * subscription re-runs. Runs of one subscription never overlap, so a
+     * later run's value is never sent before an earlier one's.
+     */
+    const runs = <A>(
+      keys: InvalidationKeys,
+      setup: Effect.Effect<Effect.Effect<A, SqlError, StoreServices>, never, StoreServices | Scope.Scope>,
+      tick: boolean,
+    ): Stream.Stream<Run<A, SqlError>> =>
       workspace.changes.pipe(
-        Stream.switchMap((open) =>
-          open === undefined
-            ? Stream.succeed(Result.succeed({ value: empty, queryMs: 0 }) as Run<A, never>)
-            : Stream.scoped(
-                liveQuery(keys, timed(query)).pipe(
-                  Stream.provide(open.context),
-                  tick
-                    ? (stream) =>
-                        Stream.unwrap(
-                          Effect.gen(function* () {
-                            yield* Effect.forkScoped(
-                              Effect.repeat(invalidate(['topics']).pipe(Effect.provide(open.context)), Schedule.spaced(QUIET_TICK)),
-                            )
-                            return stream
-                          }),
-                        )
-                    : (stream) => stream,
-                ),
-              ),
-        ),
+        Stream.switchMap((open) => {
+          if (open === undefined) return Stream.empty
+          const opened = Effect.gen(function* () {
+            const query = yield* setup
+            const lane = Semaphore.makeUnsafe(1)
+            const run = lane.withPermit(timed(query))
+            const live = liveQuery(keys, run)
+            // `Stream.tick` emits at once; the live query already runs at subscribe time.
+            const ticks = Stream.tick(QUIET_TICK).pipe(Stream.drop(1), Stream.mapEffect(() => Effect.result(run)))
+            return tick ? Stream.merge(live, ticks) : live
+          })
+          return Stream.scoped(Stream.unwrap(opened).pipe(Stream.provide(open.context)))
+        }),
       )
 
     return {
       'topics.list': (payload) => {
         const limit = Math.max(1, Math.min(SIDEBAR_WINDOW, payload.range.limit))
         const filter = { kind: payload.kind, unreadOnly: payload.unreadOnly, scope: payload.scope }
-        const query = Effect.gen(function* () {
-          const now = yield* Clock.currentTimeMillis
-          return yield* listTopics(filter, { now, limit })
-        }).pipe(Effect.orDie)
-        return serveLiveList(runs(LIST_KEYS, query as Effect.Effect<ListRun<TopicRow>, never, never>, { rows: [], total: 0 }, true), { encodeRow, measure })
+        // One row cache per workspace. It keeps the users it has read until the `users` table changes.
+        const setup = Effect.gen(function* () {
+          const cache = makeRowCache({ keepUsers: true })
+          const invalidation = yield* Invalidation
+          yield* Effect.acquireRelease(
+            Effect.sync(() => invalidation.subscribeUnsafe(['users'], () => forgetUsers(cache))),
+            (cancel) => Effect.sync(cancel),
+          )
+          return Effect.gen(function* () {
+            const now = yield* Clock.currentTimeMillis
+            return yield* listTopics(filter, { now, limit }, cache)
+          })
+        })
+        return serveLiveList(runs(LIST_KEYS, setup, true), { encodeRow, measure }).pipe(retryFirstRun('topics.list'), Stream.orDie)
       },
-      'topics.counts': (payload) => {
-        const query = countTopics(payload.scope).pipe(Effect.orDie)
-        return serveLiveValue(runs(COUNT_KEYS, query as Effect.Effect<TopicCounts, never, never>, { channelsUnread: 0, dmsUnread: 0 }, false), { measure })
-      },
+      'topics.counts': (payload) =>
+        serveLiveValue(runs(COUNT_KEYS, Effect.succeed(countTopics(payload.scope)), false), { measure }).pipe(retryFirstRun('topics.counts'), Stream.orDie),
       'topics.subscribe': (payload) => setSubscribed(payload.id, true).pipe(Effect.provideService(Workspace, workspace), Effect.provideService(Outbox, outbox)),
       'topics.unsubscribe': (payload) => setSubscribed(payload.id, false).pipe(Effect.provideService(Workspace, workspace), Effect.provideService(Outbox, outbox)),
     }

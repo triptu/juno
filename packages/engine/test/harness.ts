@@ -24,7 +24,14 @@ import {
 import { memoryHost, startEngine, type EngineHandle } from '../src/index'
 import { memoryTransport, type MessagePortLike } from '../src/protocol/transport'
 
-export function waitFor<A>(f: () => A | undefined, timeoutMs = 10_000, label = 'condition'): Promise<Exclude<A, undefined>> {
+/**
+ * How long a harness wait allows by default: half the test timeout
+ * (`vitest.config.ts`), so a slow step on a loaded machine still fails with
+ * the step's label before the test itself times out.
+ */
+export const WAIT_MS = 45_000
+
+export function waitFor<A>(f: () => A | undefined, timeoutMs = WAIT_MS, label = 'condition'): Promise<Exclude<A, undefined>> {
   return new Promise((resolve, reject) => {
     const started = Date.now()
     const tick = () => {
@@ -177,7 +184,7 @@ export async function startTestEngine(options: EngineOptions = {}): Promise<Runn
     waitFor(() => {
       const result = registry.get(topicsOf(filter))
       return result._tag === 'Success' && result.value.meta.seq > 0 ? result.value : undefined
-    }, 10_000, 'the topic list')
+    }, WAIT_MS, 'the topic list')
   return {
     fake,
     main,
@@ -190,10 +197,10 @@ export async function startTestEngine(options: EngineOptions = {}): Promise<Runn
           const result = registry.get(sessionStatusAtom)
           return result._tag === 'Success' && result.value._tag === tag ? result.value : undefined
         },
-        10_000,
+        WAIT_MS,
         `session ${tag}`,
       ),
-    phase: (tag, timeoutMs = 20_000) =>
+    phase: (tag, timeoutMs = WAIT_MS) =>
       waitFor(
         () => {
           const result = registry.get(engineStatusAtom)
@@ -213,7 +220,7 @@ export async function startTestEngine(options: EngineOptions = {}): Promise<Runn
           const rows = rowsFrom(result.value)
           return predicate(rows) ? rows : undefined
         },
-        15_000,
+        WAIT_MS,
         label,
       ),
     stop: async () => {

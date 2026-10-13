@@ -26,6 +26,7 @@ interface PerformanceLike {
   now(): number
   mark(name: string, options?: { readonly detail?: unknown }): { readonly startTime: number }
   measure(name: string, options: { readonly start: string | number; readonly end: number; readonly detail?: unknown }): unknown
+  clearMeasures?(name?: string): void
 }
 
 interface EntryLike {
@@ -56,11 +57,19 @@ export function mark(name: PerfName, detail?: Record<string, unknown>): number {
 
 /**
  * Records a span on the Juno track. `start` is a mark name or a timestamp on
- * the `performance.now()` clock; the end is now unless given.
+ * the `performance.now()` clock; the end is now unless given. `replace`
+ * drops the earlier measures of that name first, for a measure taken on
+ * every update: the buffer keeps the latest, which is the one tests read,
+ * and a DevTools recording still shows each one.
  */
-export function measure(name: PerfName, start: PerfName | number, options?: { readonly end?: number; readonly detail?: Record<string, unknown> }): void {
+export function measure(
+  name: PerfName,
+  start: PerfName | number,
+  options?: { readonly end?: number; readonly detail?: Record<string, unknown>; readonly replace?: boolean },
+): void {
   if (!perf) return
   try {
+    if (options?.replace) perf.clearMeasures?.(name)
     perf.measure(name, {
       start,
       end: options?.end ?? perf.now(),

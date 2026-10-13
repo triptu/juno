@@ -10,9 +10,13 @@ export default defineConfig({
     maxWorkers: 2,
     include: ['test/**/*.test.ts'],
     // Engine tests boot a whole engine against an in-process fake Slack. On a
-    // loaded machine the first boot pays module transform time too, so the
-    // default 5 s is too tight. A real hang still fails well within this.
-    testTimeout: 30_000,
-    hookTimeout: 30_000,
+    // shared, loaded machine (load average 20 and up) a cold boot alone can take
+    // tens of seconds, and boots in parallel files slow each other down, so the
+    // files run one at a time and a test gets 90 s. The harness waits take at
+    // most half of that, so a slow step fails with its own label, not a bare
+    // timeout. A real hang still fails.
+    fileParallelism: false,
+    testTimeout: 90_000,
+    hookTimeout: 90_000,
   },
 })

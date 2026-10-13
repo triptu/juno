@@ -125,7 +125,7 @@ export const TopicRow = memo(function TopicRow({ row, time, selected = false, ta
         </span>
         <span {...stylex.props(styles.line2)}>
           <Text variant="preview" tone={unread ? 'subtle' : 'muted'} clamp={2} as="span" id={previewId} sx={styles.preview}>
-            {row.preview.line}
+            {row.preview.text.length === 0 ? row.preview.sender : `${row.preview.sender}: ${row.preview.text}`}
           </Text>
           {row.mentionsMe || unread ? (
             <span {...stylex.props(styles.badges)}>

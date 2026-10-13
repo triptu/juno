@@ -11,10 +11,15 @@
  * (All topics, the channel's Main) without a row. Every pinned topic is in
  * Pinned; only an ignored channel hides a pinned topic.
  */
+import { Schema } from 'effect'
 import { compareTs, maxTs, tsToMillis } from './ids'
 import { quietDaysOf, type RuleContext, type Topic } from './topic'
 
 export type TopicStatus = 'open' | 'quiet' | 'resolved' | 'unsubscribed' | 'ignored'
+
+/** The status a row or an All topics chip can show: every status but `ignored`, which hides the topic. */
+export const AllTopicsStatus = Schema.Literals(['open', 'quiet', 'resolved', 'unsubscribed'])
+export type AllTopicsStatus = typeof AllTopicsStatus.Type
 
 const DAY = 24 * 60 * 60 * 1000
 
@@ -121,7 +126,8 @@ export function canResolveOnHover(topic: Topic): boolean {
   return !isResolved(topic)
 }
 
-export type RowTag = 'main' | 'reopened' | 'unsubscribed'
+export const RowTag = Schema.Literals(['main', 'reopened', 'unsubscribed'])
+export type RowTag = typeof RowTag.Type
 
 /** Tags after the title, in display order. */
 export function rowTags(topic: Topic): ReadonlyArray<RowTag> {
@@ -145,8 +151,6 @@ export function isSubscribed(topic: Topic): boolean {
 export function showsInAllTopics(topic: Topic): boolean {
   return !topic.channel.ignored
 }
-
-export type AllTopicsStatus = Exclude<TopicStatus, 'ignored'>
 
 /** The status chip on All topics. Only call for topics that pass `showsInAllTopics`. */
 export function allTopicsStatus(topic: Topic, ctx: RuleContext): AllTopicsStatus {

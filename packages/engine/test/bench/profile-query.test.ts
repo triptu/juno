@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { Effect } from 'effect'
 import { largeSeed } from '@juno/fake-slack'
 import { Store, StoreReader, workspacePathsFromDir } from '@juno/store'
-import { listStatements, listTopics } from '../../src/topics/query'
+import { listStatements, listTopics, makeRowCache } from '../../src/topics/query'
 import { startTestEngine } from '../harness'
 
 describe.skipIf(process.env['JUNO_BENCH'] !== '1')('profile topics.list', () => {
@@ -37,7 +37,10 @@ describe.skipIf(process.env['JUNO_BENCH'] !== '1')('profile topics.list', () => 
         for (const row of rows) for (const id of JSON.parse(row.participants_json ?? '[]') as Array<string>) ids.add(id)
         console.log(`user ids: ${ids.size}`)
         yield* time('users IN', sql`SELECT id, name, display_name, real_name, avatar_url FROM users WHERE id IN ${sql.in([...ids])}`)
-        yield* time('listTopics', listTopics({ kind: 'all', unreadOnly: false }, { now, limit: 300 }))
+        yield* time('listTopics, no cache', listTopics({ kind: 'all', unreadOnly: false }, { now, limit: 300 }))
+        // A subscription's re-run: the same cache from run to run, nothing changed in between.
+        const cache = makeRowCache({ keepUsers: true })
+        yield* time('listTopics, warm cache', listTopics({ kind: 'all', unreadOnly: false }, { now, limit: 300 }, cache))
         yield* time('count only', sql`SELECT count(*) AS n FROM topic_index`)
       })
       await Effect.runPromise(program.pipe(Effect.provide(Store.layer(paths)), Effect.scoped))
