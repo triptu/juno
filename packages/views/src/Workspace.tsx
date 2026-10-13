@@ -30,6 +30,10 @@ const styles = stylex.create({
     flexGrow: 1,
     minWidth: 0,
     height: '100%',
+    // When the window is as narrow as the sidebar (at the minimum size under
+    // zoom) the pane shrinks to nothing; its content must not paint over the
+    // sidebar.
+    overflow: 'hidden',
     backgroundColor: colors['--background'],
   },
   page: {

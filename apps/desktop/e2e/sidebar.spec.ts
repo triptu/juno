@@ -69,7 +69,9 @@ test('after sign-in the sidebar lists followed threads and Main, newest first, w
   // A channel's Main: the channel label as the title and the Main tag.
   const alerts = sidebar.row(ALERTS_MAIN)
   await alerts.expectTag('Main')
-  await alerts.expectUnread(9)
+  // Nine unread. The engine marks a Main's count as a lower bound ("9+") until
+  // its synced history reaches the read pointer, so either form is right here.
+  await expect(alerts.root.getByTitle(/^9 (or more )?unread$/)).toHaveText(/^9\+?$/)
   await alerts.expectPreview('Grafana: [RESOLVED] queue depth > 5k on billing-consumer')
 
   // Newest activity first.
@@ -276,4 +278,48 @@ test('the sidebar renders in dark mode', async ({ juno, win }) => {
 
   await sidebar.themeButton.click()
   await expect(sidebar.root).toHaveCSS('background-color', lightSidebar)
+})
+
+test('a title cut off by the row shows in full on hover, and one that fits shows no tooltip', async ({ juno }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  const { sidebar } = juno
+  const rina = sidebar.row(RINA)
+  await rina.expectVisible()
+  expect(await rina.titleText.evaluate((node) => node.scrollWidth > node.clientWidth)).toBe(true)
+  await rina.titleText.hover()
+  await expect(rina.titleText).toHaveAttribute('title', (await rina.titleText.textContent()) ?? '')
+
+  const alerts = sidebar.row(ALERTS_MAIN)
+  await alerts.titleText.hover()
+  await expect(alerts.titleText).not.toHaveAttribute('title')
+})
+
+test('zooming in from the View menu keeps the whole sidebar inside the window', async ({ juno, app, win }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  await juno.sidebar.row(POSTGRES).expectVisible()
+
+  // The smallest window, then View > Zoom In eight times (about 200%).
+  await app.evaluate(({ BrowserWindow, Menu }) => {
+    const window = BrowserWindow.getAllWindows()[0]!
+    window.setSize(720, 480)
+    const zoomIn = Menu.getApplicationMenu()!.getMenuItemById('zoom-in')!
+    for (let step = 0; step < 8; step++) zoomIn.click(undefined, window)
+  })
+  expect(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.webContents.getZoomFactor())).toBeGreaterThan(1.9)
+  const right = (selector: string) => win.evaluate((query) => ({ right: document.querySelector(query)!.getBoundingClientRect().right, width: window.innerWidth }), selector)
+  await expect.poll(async () => { const { right: edge, width } = await right('aside'); return edge <= width }).toBe(true)
+  const account = await right('aside [aria-label="Account and preferences"]')
+  expect(account.right).toBeLessThanOrEqual(account.width)
+
+  // The account menu ends inside the window; what does not fit scrolls inside it.
+  await win.evaluate(() => document.querySelector<HTMLElement>('aside [aria-label="Account and preferences"]')!.click())
+  const menu = () => win.evaluate(() => ({ bottom: document.querySelector('[role="dialog"][aria-label="Account"]')?.getBoundingClientRect().bottom ?? Infinity, height: window.innerHeight }))
+  await expect.poll(async () => { const { bottom, height } = await menu(); return bottom <= height }).toBe(true)
+  await win.keyboard.press('Escape')
+
+  // Actual Size brings the 720 × 480 minimum back.
+  await app.evaluate(({ BrowserWindow, Menu }) => Menu.getApplicationMenu()!.getMenuItemById('zoom-reset')!.click(undefined, BrowserWindow.getAllWindows()[0]!))
+  expect(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.getMinimumSize())).toEqual([720, 480])
 })

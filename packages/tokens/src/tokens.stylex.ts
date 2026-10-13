@@ -546,7 +546,9 @@ export const layout = stylex.defineVars({
   '--menu-width-account': '248px',
   '--menu-width-browse': '300px',
   '--menu-width-mention': '280px',
-  '--popover-max-height': '400px',
+  // Never taller than the window below a title-bar anchor, so a menu fits
+  // at the minimum size and under zoom; the content scrolls inside.
+  '--popover-max-height': 'min(400px, calc(100vh - var(--titlebar-height) - var(--space-5)))',
   '--picker-max-height': '300px',
   '--toast-max-width': '352px',
   '--toast-inset': '16px',
