@@ -7,20 +7,25 @@
  * The sidebar query re-runs on `topics`, the overlay, conversations, users,
  * the ignored list, Slack's follow flags and prefs (the quiet window), and
  * once a minute so a topic can turn quiet on time.
+ *
+ * The two commands (`commands.ts`) write the current store and mirror to
+ * Slack through the `Outbox` seam.
  */
 import { Clock, Effect, Result, Schedule, Schema, Stream } from 'effect'
 import { TopicRow, TopicsRoutes, type TopicCounts } from '@juno/contract'
 import { invalidate, liveQuery, type InvalidationKeys } from '@juno/store'
 import { EngineConfig } from '../config'
+import { Outbox } from '../outbox'
 import { serveLiveList, serveLiveValue, timed, type ListRun, type Run } from '../protocol/live'
 import { Workspace } from '../workspace'
+import { setSubscribed } from './commands'
 import { countTopics, listTopics } from './query'
 
 /** The sidebar holds at most this many rows (performance 3.2). */
 export const SIDEBAR_WINDOW = 300
 
 const LIST_KEYS: InvalidationKeys = ['topics', 'topic_overlay', 'conversations', 'users', 'ignored_channels', 'thread_subs', 'prefs']
-const COUNT_KEYS: InvalidationKeys = ['topics', 'topic_overlay', 'conversations', 'ignored_channels']
+const COUNT_KEYS: InvalidationKeys = ['topics', 'topic_overlay', 'conversations', 'ignored_channels', 'thread_subs']
 const QUIET_TICK = '1 minute'
 
 const encodeRow = Schema.encodeSync(Schema.toCodecJson(TopicRow))
@@ -28,6 +33,7 @@ const encodeRow = Schema.encodeSync(Schema.toCodecJson(TopicRow))
 export const TopicsHandlers = TopicsRoutes.toLayer(
   Effect.gen(function* () {
     const workspace = yield* Workspace
+    const outbox = yield* Outbox
     const config = yield* EngineConfig
     const measure = config.e2e || config.dev
 
@@ -70,6 +76,8 @@ export const TopicsHandlers = TopicsRoutes.toLayer(
         const query = countTopics(payload.scope).pipe(Effect.orDie)
         return serveLiveValue(runs(COUNT_KEYS, query as Effect.Effect<TopicCounts, never, never>, { channelsUnread: 0, dmsUnread: 0 }, false), { measure })
       },
+      'topics.subscribe': (payload) => setSubscribed(payload.id, true).pipe(Effect.provideService(Workspace, workspace), Effect.provideService(Outbox, outbox)),
+      'topics.unsubscribe': (payload) => setSubscribed(payload.id, false).pipe(Effect.provideService(Workspace, workspace), Effect.provideService(Outbox, outbox)),
     }
   }),
 )

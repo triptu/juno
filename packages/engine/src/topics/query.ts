@@ -1,16 +1,27 @@
 /**
- * The sidebar query (architecture 4.4, 4.5, performance 6): three indexed
+ * The sidebar query (architecture 4.4, 4.5, performance 6): four indexed
  * lookups on `topic_index`; then the pure rules in `@juno/domain` decide
  * placement, status, title and tags, and the rows are shaped as `TopicRow`.
  *
- * The three lookups, each a `SEARCH` (the plan test checks), joined to the
+ * The lookups, each a `SEARCH` (the plan test checks), joined to the
  * overlay, the conversation, the ignored list and Slack's follow flag; the
  * root's text for the fallback title is in the index row itself:
  * 1. the activity window: `last_activity_ts >= cutoff`, newest first, at
  *    most the window size (`topic_index_activity`, or the channel index when
  *    scoped);
  * 2. pinned rows, whatever their age (`topic_overlay_pinned`);
- * 3. rows older than the cutoff that are still unread (`topic_index_unread`).
+ * 3. rows older than the cutoff that are still unread (`topic_index_unread`);
+ * 4. Main rows whose own messages are older than the cutoff but whose
+ *    channel has a thread with activity inside it (the window on
+ *    `topic_index_activity`, then the Main row by primary key).
+ *
+ * Threads are filtered in SQL before the LIMIT by the rule of spec section 5
+ * ("What shows up"): followed in Slack (`thread_subs.subscribed`) or with an
+ * unread mention of the user; `sidebarPlacement` applies the same rule again
+ * on the shaped topic, so the pure rule stays the one that decides. Main
+ * rows carry `channel_activity_ts`, the latest activity anywhere in the
+ * channel, so the quiet rule counts thread replies (one indexed `max` per
+ * Main row on `topic_index_channel_activity`).
  *
  * `rev` is a hash of every input the shaped row depends on (the index row's
  * own rev, the overlay, the conversation, the people on the row, the
@@ -26,6 +37,7 @@ import {
   hashId,
   isDm,
   isResolved,
+  isSubscribed,
   quietDaysOf,
   resolveTitle,
   rowTags,
@@ -74,6 +86,8 @@ interface JoinedRow extends TopicIndexRow {
   readonly pinned_at: string | null
   readonly unsubscribed_at: string | null
   readonly subscribed: 0 | 1 | null
+  /** Main rows only: the latest `last_activity_ts` of any topic in the channel. */
+  readonly channel_activity_ts: string | null
 }
 
 interface UserRow {
@@ -102,7 +116,8 @@ const settings = Effect.gen(function* () {
 const SELECT = `
   SELECT i.*, c.kind AS c_kind, c.name AS c_name, c.user_id AS c_user_id, c.member_ids_json AS c_members,
     o.manual_title, o.ai_title, o.resolved_at, o.resolved_activity_ts, o.reopened_at, o.pinned_at, o.unsubscribed_at,
-    s.subscribed AS subscribed`
+    s.subscribed AS subscribed,
+    CASE WHEN i.kind = 'main' THEN (SELECT max(t.last_activity_ts) FROM topic_index t WHERE t.channel = i.channel) END AS channel_activity_ts`
 
 const FROM = `
   FROM topic_index i
@@ -111,17 +126,24 @@ const FROM = `
   LEFT JOIN ignored_channels ig ON ig.channel = i.channel
   LEFT JOIN thread_subs s ON i.kind = 'thread' AND s.channel = i.channel AND s.thread_ts = i.root_ts`
 
+/**
+ * Spec section 5, "Which threads": a thread row is a candidate when followed
+ * in Slack, or when it carries an unread mention of the user and Slack has
+ * said nothing about it (an explicit unfollow is `unsubscribed`, hidden).
+ */
+const THREAD_RULE = ` AND (i.kind <> 'thread' OR s.subscribed = 1 OR (s.subscribed IS NULL AND i.mentions_me = 1 AND i.unread_count > 0))`
+
 const kindClause = (kind: ListFilter['kind']): string =>
   kind === 'channels' ? ` AND c.kind IN ('public', 'private')` : kind === 'dms' ? ` AND c.kind IN ('im', 'mpim')` : ''
 
-/** The three statements, as SQL text with positional parameters, so the plan test can run them too. */
+/** The four statements, as SQL text with positional parameters, so the plan test can run them too. */
 export function listStatements(filter: ListFilter, cutoff: string, limit: number): ReadonlyArray<{ readonly sql: string; readonly params: ReadonlyArray<unknown> }> {
   const common = ` AND c.is_member = 1 AND ig.channel IS NULL${kindClause(filter.kind)}${filter.unreadOnly ? ' AND i.unread_count > 0' : ''}`
   const scope = filter.scope === undefined ? '' : ' AND i.channel = ?'
   const scopeParams = filter.scope === undefined ? [] : [filter.scope]
   return [
     {
-      sql: `${SELECT}${FROM} WHERE i.last_activity_ts >= ?${scope}${common} ORDER BY i.last_activity_ts DESC LIMIT ?`,
+      sql: `${SELECT}${FROM} WHERE i.last_activity_ts >= ?${scope}${common}${THREAD_RULE} ORDER BY i.last_activity_ts DESC LIMIT ?`,
       params: [cutoff, ...scopeParams, limit],
     },
     {
@@ -129,8 +151,14 @@ export function listStatements(filter: ListFilter, cutoff: string, limit: number
       params: scopeParams,
     },
     {
-      sql: `${SELECT}${FROM} WHERE i.unread_count > 0 AND i.last_activity_ts < ?${scope}${common} ORDER BY i.last_activity_ts DESC LIMIT ?`,
+      sql: `${SELECT}${FROM} WHERE i.unread_count > 0 AND i.last_activity_ts < ?${scope}${common}${THREAD_RULE} ORDER BY i.last_activity_ts DESC LIMIT ?`,
       params: [cutoff, ...scopeParams, limit],
+    },
+    {
+      // Main rows kept alive by replies in the channel's threads: the channels with a topic inside the window, then each Main by key.
+      sql: `${SELECT}${FROM} WHERE i.topic_id IN (SELECT 'm:' || t.channel FROM topic_index t WHERE t.last_activity_ts >= ?${filter.scope === undefined ? '' : ' AND t.channel = ?'})
+        AND i.last_activity_ts < ?${common} LIMIT ?`,
+      params: [cutoff, ...scopeParams, cutoff, limit],
     },
   ]
 }
@@ -142,7 +170,8 @@ export function countsStatement(scope: string | undefined): { readonly sql: stri
       JOIN conversations c ON c.id = i.channel
       LEFT JOIN ignored_channels ig ON ig.channel = i.channel
       LEFT JOIN topic_overlay o ON o.topic_id = i.topic_id
-      WHERE i.unread_count > 0 AND i.last_activity_ts > '0' AND c.is_member = 1 AND ig.channel IS NULL AND o.unsubscribed_at IS NULL${scope === undefined ? '' : ' AND i.channel = ?'}
+      LEFT JOIN thread_subs s ON i.kind = 'thread' AND s.channel = i.channel AND s.thread_ts = i.root_ts
+      WHERE i.unread_count > 0 AND i.last_activity_ts > '0' AND c.is_member = 1 AND ig.channel IS NULL AND o.unsubscribed_at IS NULL${THREAD_RULE}${scope === undefined ? '' : ' AND i.channel = ?'}
       GROUP BY c.kind`,
     params: scope === undefined ? [] : [scope],
   }
@@ -205,6 +234,7 @@ export const listTopics = (filter: ListFilter, options: QueryOptions): Effect.Ef
         channel,
         activity: {
           lastActivityTs: row.last_activity_ts as Ts,
+          ...(row.channel_activity_ts === null ? {} : { channelLastActivityTs: row.channel_activity_ts as Ts }),
           messageCount: row.message_count,
           unreadCount: row.unread_count,
           unreadExact: row.unread_exact === 1,
@@ -308,7 +338,7 @@ function shape(
     pinned: topic.overlay.pinnedAt !== undefined,
     resolved,
     canResolveOnHover: canResolveOnHover(topic),
-    subscribed: topic.kind === 'thread' && (topic.slackSubscribed ?? false),
+    subscribed: isSubscribed(topic),
     lastActivityTs: topic.activity.lastActivityTs,
     lastActivityAt: tsToMillis(topic.activity.lastActivityTs),
   }
