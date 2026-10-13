@@ -4,6 +4,8 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-14 04:12 · Orchestrator · Juno Agent spikes change plan v3: T3 Code's MCP needs a one-time OAuth sign-in, and pi-mcp finishes sign-in only on loopback, so v1 talks to T3 on localhost (the network switch needs HTTPS on T3's side); durable writes use `fullfsync` on macOS and pi's streaming saves move from 100 ms to 250 ms; the owner lock is an SQLite exclusive lock; local Codex runs with its own `CODEX_HOME` and tools set to approve. Details in docs/juno-agent/spikes.md.
+- 10-14 04:12 · Orchestrator · Flaky tests fixed at the root rather than with longer waits: sync reports when a cycle (including its follow pass) finishes, the outbox reports when background recoveries finish, engine tests turn off the periodic sweep, and the e2e driver waits for the window close before acting. 20 of 20 runs passed under load for every former flake.
 - 10-14 02:42 · Tushar · Add a "feel pass": recorded, slowed-down interaction filmstrips with automated stability checks, plus a feel reviewer at each UI milestone, so the app feels as stable as a native one (no shift, jank, flicker, or jumpy scroll).
 - 10-14 02:31 · Tushar · Juno Agent: T3 sessions run with full access in a new worktree; backup goes to a local folder he chooses (path is a setting); bubble colour decided after a mock; T3 over a network address needs a switch, off by default.
 - 10-14 02:20 · Tushar · Juno Agent defaults: Sonnet 5.5 for chat, Haiku 5.5 for compaction, $2/day; a Settings picker for the chat model across the latest Sonnet, Opus, Muse, Sol and Grok models. MCP: Littlebird at mcp.littlebird.ai (OAuth) and T3 Code's local MCP (no auth).
