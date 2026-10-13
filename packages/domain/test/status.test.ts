@@ -3,6 +3,7 @@ import {
   allTopicsList,
   canResolveOnHover,
   filterDots,
+  isSubscribed,
   rowTags,
   showsReopenedTag,
   showsResolvedCheck,
@@ -27,8 +28,12 @@ describe('topic status', () => {
     ['resolved, then a new message', topic({ ago: HOUR, overlay: { resolvedAt: NOW - DAY, resolvedActivityTs: ts(NOW - DAY) } }), 'open'],
     ['unsubscribed', topic({ ago: HOUR, overlay: { unsubscribedAt: NOW } }), 'unsubscribed'],
     ['unsubscribed and resolved', topic({ overlay: { unsubscribedAt: NOW, resolvedAt: NOW, resolvedActivityTs: ts(NOW - HOUR) } }), 'unsubscribed'],
+    ['unfollowed in Slack', topic({ ago: HOUR, subscribed: false }), 'unsubscribed'],
+    ['not followed, Slack said nothing', topic({ ago: HOUR, subscribed: null }), 'open'],
     ['in an ignored channel', topic({ channel: alerts, unread: 3 }), 'ignored'],
     ['a Main with no recent activity', topic({ kind: 'main', ago: 10 * DAY }), 'quiet'],
+    ['a Main with no recent message but a reply in one of its threads', topic({ kind: 'main', ago: 10 * DAY, channelAgo: HOUR }), 'open'],
+    ['a Main whose channel went quiet, threads included', topic({ kind: 'main', ago: 10 * DAY, channelAgo: 8 * DAY }), 'quiet'],
   ] as const)('%s → %s', (_name, t, expected) => {
     expect(topicStatus(t, ctx)).toBe(expected)
   })
@@ -54,7 +59,51 @@ describe('reopened tag', () => {
 
   it('is listed after Main in the row tags', () => {
     expect(rowTags(topic({ kind: 'main', overlay: { reopenedAt: NOW, unsubscribedAt: NOW } }))).toEqual(['main', 'reopened', 'unsubscribed'])
+    expect(rowTags(topic({ subscribed: false }))).toEqual(['unsubscribed'])
     expect(rowTags(topic())).toEqual([])
+  })
+})
+
+describe('what shows up (spec section 5)', () => {
+  // "The sidebar shows threads you follow, plus any thread with an unread mention of you. Other threads are not in the sidebar."
+  it.each([
+    ['a thread you follow', topic({ subscribed: true }), 'recent'],
+    ['a followed thread with unread replies', topic({ subscribed: true, unread: 1 }), 'recent'],
+    ['a thread you do not follow, even with recent activity', topic({ subscribed: null, ago: HOUR }), 'hidden'],
+    ['a thread you do not follow, even unread', topic({ subscribed: null, unread: 2 }), 'hidden'],
+    ['a thread you do not follow with an unread mention of you', topic({ subscribed: null, unread: 1, mentionsMe: true }), 'recent'],
+    ['a thread you do not follow with a mention you already read', topic({ subscribed: null, unread: 0, mentionsMe: false }), 'hidden'],
+    ['a thread you unfollowed in Slack', topic({ subscribed: false }), 'hidden'],
+    ['a thread you unfollowed, with an unread mention', topic({ subscribed: false, unread: 1, mentionsMe: true }), 'hidden'],
+    // "Quiet. Topics with no activity in the last 7 days are hidden unless pinned or unread."
+    ['a followed thread with no activity for 8 days', topic({ subscribed: true, ago: 8 * DAY }), 'hidden'],
+    ['a followed thread with no activity for 8 days but unread', topic({ subscribed: true, ago: 8 * DAY, unread: 1 }), 'recent'],
+    ['an old unfollowed thread with an unread mention', topic({ subscribed: null, ago: 8 * DAY, unread: 1, mentionsMe: true }), 'recent'],
+    // "Pinned first": a pin keeps any thread in the sidebar; only an ignored channel hides a pinned topic.
+    ['a pinned thread you do not follow', topic({ subscribed: null, overlay: { pinnedAt: NOW } }), 'pinned'],
+    ['a pinned thread you unfollowed', topic({ subscribed: false, overlay: { pinnedAt: NOW } }), 'pinned'],
+    // "Main threads follow the same rules. A channel's Main appears only when the channel had recent activity of any kind, including replies in its threads."
+    ['a Main with a message this hour', topic({ kind: 'main', ago: HOUR }), 'recent'],
+    ['a Main with no message for 10 days but a thread reply today', topic({ kind: 'main', ago: 10 * DAY, channelAgo: HOUR }), 'recent'],
+    ['a Main with no activity of any kind for 8 days', topic({ kind: 'main', ago: 10 * DAY, channelAgo: 8 * DAY }), 'hidden'],
+    ['a Main with no activity for 8 days but unread', topic({ kind: 'main', ago: 8 * DAY, unread: 1 }), 'recent'],
+    ['an unsubscribed Main', topic({ kind: 'main', ago: HOUR, overlay: { unsubscribedAt: NOW } }), 'hidden'],
+    // "Ignored channels are hidden everywhere in Juno."
+    ['a followed thread in an ignored channel', topic({ channel: alerts, subscribed: true, unread: 1, mentionsMe: true }), 'hidden'],
+    ['a Main in an ignored channel', topic({ channel: alerts, kind: 'main', ago: HOUR }), 'hidden'],
+  ] as const)('%s → %s', (_name, t, expected) => {
+    expect(sidebarPlacement(t, ctx)).toBe(expected)
+  })
+
+  // "Subscribe works on any thread": the menu toggles Slack's follow flag for a thread and the client-only flag for Main.
+  it.each([
+    ['a followed thread', topic({ subscribed: true }), true],
+    ['a thread you do not follow', topic({ subscribed: null }), false],
+    ['a thread you unfollowed', topic({ subscribed: false }), false],
+    ['a Main', topic({ kind: 'main' }), true],
+    ['an unsubscribed Main', topic({ kind: 'main', overlay: { unsubscribedAt: NOW } }), false],
+  ] as const)('isSubscribed: %s → %s', (_name, t, expected) => {
+    expect(isSubscribed(t)).toBe(expected)
   })
 })
 
@@ -124,6 +173,8 @@ describe('sidebar list', () => {
     expect(filterDots(all, { kind: 'all', unreadOnly: false }, ctx)).toEqual({ channels: false, dms: true })
     expect(filterDots(all, { kind: 'dms', unreadOnly: false }, ctx)).toEqual({ channels: false, dms: false })
     expect(filterDots([...all, topic({ unread: 2 })], { kind: 'dms', unreadOnly: false }, ctx)).toEqual({ channels: true, dms: false })
+    // An unread thread the user does not follow is not in the sidebar, so it lights no dot.
+    expect(filterDots([...all, topic({ unread: 2, subscribed: null })], { kind: 'dms', unreadOnly: false }, ctx)).toEqual({ channels: false, dms: false })
   })
 
   it('explains an empty list and offers one next step', () => {

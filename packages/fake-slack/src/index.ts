@@ -197,6 +197,15 @@ export class FakeSlack {
     this.server.clear429(input.method)
   }
 
+  /** The next `times` calls of `method` answer `ok: false` with `error` (default `internal_error`), for failure paths. */
+  forceError(input: { method: string; error?: string; times?: number }): void {
+    this.server.forceError(input.method, input.error ?? 'internal_error', input.times ?? 1)
+  }
+
+  clearError(input: { method?: string } = {}): void {
+    this.server.clearError(input.method)
+  }
+
   /** Every session stops working: API calls get `invalid_auth`, sockets get `user_session_expiration` and close. */
   expireSession(): void {
     this.server.expireSessions()
@@ -228,6 +237,8 @@ export class FakeSlack {
       dropSocket: () => this.dropSocket(),
       force429: (i) => this.force429(i),
       clear429: (i) => this.clear429(i),
+      forceError: (i) => this.forceError(i),
+      clearError: (i) => this.clearError(i),
       expireSession: () => this.expireSession(),
       advanceClock: (i) => this.advanceClock(i),
       setNow: (i) => this.setNow(i),

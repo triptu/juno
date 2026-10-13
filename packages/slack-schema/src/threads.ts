@@ -53,7 +53,8 @@ export const ThreadView = S.Struct({
   root_msg: ThreadViewRoot,
   /** Absent live when the thread has no unread replies. */
   unread_replies: opt(S.Array(Message)),
-  latest_replies: S.Array(Message),
+  /** Observed live without it on some threads (the live dry run of 2026-10-13), so optional too. */
+  latest_replies: opt(S.Array(Message)),
   priority: opt(S.Boolean),
 })
 export type ThreadView = typeof ThreadView.Type

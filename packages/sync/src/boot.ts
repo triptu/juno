@@ -19,7 +19,7 @@
 import { millisToTs, type Ts } from '@juno/domain'
 import { SlackApi, type SlackApiError } from '@juno/slack'
 import { SlackEdge, SlackSession } from '@juno/slack'
-import type { ClientCountsArgs, CountEntry, ThreadView } from '@juno/slack-schema'
+import type { ClientCountsArgs, CountEntry, Message, ThreadView } from '@juno/slack-schema'
 import { Invalidation, StoreWriter, transaction, type SqlError } from '@juno/store'
 import { Clock, Effect } from 'effect'
 import { reindexOptions, type SyncContext } from './context'
@@ -141,9 +141,9 @@ const applyThreadView = (ctx: SyncContext, view: ThreadView, requestedAt: Ts): E
   Effect.gen(function* () {
     const root = view.root_msg
     const channel = root.channel
-    const seen = new Map<string, (typeof view.latest_replies)[number]>()
+    const seen = new Map<string, Message>()
     // Slack omits unread_replies when nothing in the thread is unread.
-    for (const reply of [...view.latest_replies, ...(view.unread_replies ?? [])]) seen.set(reply.ts, reply)
+    for (const reply of [...(view.latest_replies ?? []), ...(view.unread_replies ?? [])]) seen.set(reply.ts, reply)
     const topic = threadTopicOf(channel, root.ts)
     yield* transaction(
       Effect.gen(function* () {

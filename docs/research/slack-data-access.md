@@ -179,7 +179,7 @@ interface ThreadsGetView {
   threads_state?: { has_unreads: boolean; mention_count: number; unread_count_by_channel; mention_count_by_channel; timestamp: Ts };
 }
 ```
-- Observed live (`subscriptions.thread.getView` with `limit` only): the response also has `max_ts` (ts) and `new_threads_count` (number); `threads_state` is absent unless asked for. `unread_replies` is absent, not empty, on threads with nothing unread (3 of 10 had it). Every `root_msg` had `channel, thread_ts, ts, reply_count, reply_users, reply_users_count, latest_reply, last_read, subscribed, is_locked, text, type`; `latest_replies` entries carry `channel` too. Bot roots can carry `agent_session` and `icons`.
+- Observed live (`subscriptions.thread.getView` with `limit` only): the response also has `max_ts` (ts) and `new_threads_count` (number); `threads_state` is absent unless asked for. `unread_replies` is absent, not empty, on threads with nothing unread (3 of 10 had it); `latest_replies` was absent on at least one thread in a later run (2026-10-13), so both are optional in the schema. Every `root_msg` had `channel, thread_ts, ts, reply_count, reply_users, reply_users_count, latest_reply, last_read, subscribed, is_locked, text, type`; `latest_replies` entries carry `channel` too. Bot roots can carry `agent_session` and `icons`.
 - `subscriptions.thread.getTimestamps` `{ mode, limit, org_wide_aware: true }`.
 - `client.counts.threads` (section 2) gives the global threads unread/mention state.
 

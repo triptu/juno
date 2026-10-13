@@ -5,9 +5,14 @@
  * for a row, so the renderer draws and never computes. Pinned rows come
  * first, then Recent, both by latest activity. `topics.counts` feeds the
  * small dots after the Channels and DMs filters.
+ *
+ * `topics.subscribe` and `topics.unsubscribe` are the first commands: one
+ * local transaction, then the mirror to Slack for a thread. They return the
+ * undo the engine computed (ADR 0010).
  */
 import { Schema } from 'effect'
-import { RpcGroup } from 'effect/rpc'
+import { Rpc, RpcGroup } from 'effect/rpc'
+import { NotFound, NotSignedIn, Offline, RateLimited, Rejected } from '../errors'
 import { liveListRoute, liveValueRoute, RowFields } from '../live'
 
 export const TopicKind = Schema.Literals(['thread', 'main', 'group'])
@@ -92,7 +97,11 @@ export const TopicRow = Schema.Struct({
   /** Resolved and pinned: dimmed with a check, no hover Resolve. */
   resolved: Schema.Boolean,
   canResolveOnHover: Schema.Boolean,
-  /** Slack's follow flag, for the bell. */
+  /**
+   * What Subscribe and Unsubscribe toggle: Slack's follow flag for a thread
+   * (true means Slack lists it as followed), the client-only flag for Main
+   * (true unless the user unsubscribed it). The menu offers Unsubscribe when true.
+   */
   subscribed: Schema.Boolean,
   lastActivityTs: Schema.String,
   /** Epoch milliseconds of `lastActivityTs`, for the relative time. */
@@ -124,4 +133,40 @@ export type TopicCounts = typeof TopicCounts.Type
 /** Counts for the filter dots: a dot shows next to a group that has unread topics and is not selected. */
 export const topicsCounts = liveValueRoute('topics.counts', { value: TopicCounts, payload: { scope: Schema.optionalKey(Schema.String) } })
 
-export const TopicsRoutes = RpcGroup.make(topicsList, topicsCounts)
+// Commands
+
+/**
+ * A command the renderer can replay as it is: the undo of another command
+ * (ADR 0010). The undo stack stores these and writes the matching command
+ * atom on ⌘Z or the toast's Undo. Later commands add their shape here.
+ */
+export const UndoCommand = Schema.Union([
+  Schema.TaggedStruct('topics.subscribe', { id: Schema.String }),
+  Schema.TaggedStruct('topics.unsubscribe', { id: Schema.String }),
+])
+export type UndoCommand = typeof UndoCommand.Type
+
+/** What a command returns: the undo computed from the state before the change, when there is one. */
+export const CommandResult = Schema.Struct({ undo: Schema.optionalKey(UndoCommand) })
+export type CommandResult = typeof CommandResult.Type
+
+/**
+ * Why a subscribe or unsubscribe did not stick. The local change is already
+ * reverted when one of these arrives. `NotFound` is a topic id the store does
+ * not know; the others are Slack's answer to the mirror call of a thread.
+ */
+export const SubscribeError = Schema.Union([NotSignedIn, NotFound, Rejected, RateLimited, Offline])
+export type SubscribeError = typeof SubscribeError.Type
+
+const topicPayload = { id: Schema.String }
+
+/**
+ * Follows a thread in Slack ("Get notified about new replies") and shows it
+ * in the sidebar, or un-hides a Main. Returns an undo when something changed.
+ */
+export const topicsSubscribe = Rpc.make('topics.subscribe', { payload: topicPayload, success: CommandResult, error: SubscribeError })
+
+/** Unfollows a thread in Slack, or hides a Main (client-only). Returns an undo that subscribes again. */
+export const topicsUnsubscribe = Rpc.make('topics.unsubscribe', { payload: topicPayload, success: CommandResult, error: SubscribeError })
+
+export const TopicsRoutes = RpcGroup.make(topicsList, topicsCounts, topicsSubscribe, topicsUnsubscribe)

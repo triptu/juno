@@ -2,9 +2,13 @@
  * Atoms for the topics feature (architecture 7). `topicListAtom(filter)` is
  * the sidebar window; a container subscribes to `orderAtom(list)` and each
  * row to `rowAtom(list)(id)`. Equal filters share one atom.
+ *
+ * `subscribeTopicCommand` and `unsubscribeTopicCommand` take `{ id }` and
+ * resolve with `{ undo? }` (ADR 0010); the undo stack replays an undo by
+ * writing the atom named by its `_tag` (`commandAtomFor`).
  */
-import { topicsCounts, topicsList, type KindFilter } from '@juno/contract'
-import { liveQuery } from './atoms'
+import { topicsCounts, topicsList, topicsSubscribe, topicsUnsubscribe, type KindFilter, type UndoCommand } from '@juno/contract'
+import { command, liveQuery } from './atoms'
 
 export interface TopicListFilter {
   readonly kind: KindFilter
@@ -31,3 +35,19 @@ export const topicListAtom = (filter: TopicListFilter = defaultTopicListFilter) 
 
 /** Unread topics per group, for the dots after the Channels and DMs filters. */
 export const topicCountsAtom = (scope?: string) => countsFamily(scope === undefined ? {} : { scope })
+
+/** Follows a thread in Slack and shows it in the sidebar, or un-hides a Main. */
+export const subscribeTopicCommand = command(topicsSubscribe)
+
+/** Unfollows a thread in Slack, or hides a Main. The result carries the undo. */
+export const unsubscribeTopicCommand = command(topicsUnsubscribe)
+
+/** The command atom an undo replays, by the undo's tag. */
+export function commandAtomFor(undo: UndoCommand) {
+  switch (undo._tag) {
+    case 'topics.subscribe':
+      return subscribeTopicCommand
+    case 'topics.unsubscribe':
+      return unsubscribeTopicCommand
+  }
+}

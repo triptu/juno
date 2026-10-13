@@ -6,6 +6,7 @@
 import { Effect, Layer, Ref, Stream } from 'effect'
 import type { EnginePhase, SessionStatus } from '@juno/contract'
 import type { SyncPhase } from '@juno/sync'
+import { Outbox } from './outbox'
 import { SessionHandlers } from './session/handlers'
 import { Session } from './session/Session'
 import { StatusHandlers } from './status/handlers'
@@ -45,6 +46,7 @@ const EnginePhases = Layer.effectDiscard(
 /** Everything the route handlers need. Requires the host seams (`HostLink`, `HttpTransport`) and `EngineConfig`. */
 export const Services = EnginePhases.pipe(
   Layer.provideMerge(SyncRunner.layer),
+  Layer.provideMerge(Outbox.layer),
   Layer.provideMerge(Session.layer),
   Layer.provideMerge(Workspace.layer),
   Layer.provideMerge(Status.layer),

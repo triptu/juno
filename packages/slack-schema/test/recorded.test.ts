@@ -66,7 +66,7 @@ describe('recorded responses', () => {
       expect(thread.root_msg.channel).toMatch(/^[CDG]/)
       expect(thread.root_msg.thread_ts).toBe(thread.root_msg.ts)
       expect(thread.root_msg.reply_count).toBeGreaterThan(0)
-      expect(thread.latest_replies.length).toBeGreaterThan(0)
+      expect(thread.latest_replies?.length).toBeGreaterThan(0)
     }
   })
 

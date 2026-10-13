@@ -219,6 +219,23 @@ export const setChannelReads = (entries: ReadonlyArray<CountEntry>, countsUpdate
     yield* invalidate(syncKeys.channelReads)
   })
 
+export interface ThreadSubRow {
+  readonly subscribed: boolean
+  readonly slackLastRead?: string
+}
+
+/** Slack's follow state for a thread as the store knows it; `undefined` when Slack has said nothing. */
+export const threadSub = (channel: string, threadTs: string): Effect.Effect<ThreadSubRow | undefined, SqlError, StoreWriter> =>
+  Effect.gen(function* () {
+    const sql = yield* StoreWriter
+    const rows = yield* sql<{ subscribed: 0 | 1; slack_last_read: string | null }>`
+      SELECT subscribed, slack_last_read FROM thread_subs WHERE channel = ${channel} AND thread_ts = ${threadTs}`
+    const row = rows[0]
+    if (row === undefined) return undefined
+    return { subscribed: row.subscribed === 1, ...(row.slack_last_read === null ? {} : { slackLastRead: row.slack_last_read }) }
+  })
+
+/** Writes Slack's follow state for a thread. Fires `thread_subs`, which the sidebar query subscribes to. */
 export const setThreadSub = (channel: string, threadTs: string, subscribed: boolean, slackLastRead: string | undefined): Writer =>
   Effect.gen(function* () {
     const sql = yield* StoreWriter
@@ -226,6 +243,14 @@ export const setThreadSub = (channel: string, threadTs: string, subscribed: bool
       VALUES (${channel}, ${threadTs}, ${subscribed ? 1 : 0}, ${slackLastRead ?? null})
       ON CONFLICT (channel, thread_ts) DO UPDATE SET subscribed = excluded.subscribed,
         slack_last_read = COALESCE(excluded.slack_last_read, thread_subs.slack_last_read)`
+    yield* invalidate(syncKeys.threadSubs)
+  })
+
+/** Forgets a `thread_subs` row (the revert of a first subscribe), so Slack's silence is stored as silence again. */
+export const clearThreadSub = (channel: string, threadTs: string): Writer =>
+  Effect.gen(function* () {
+    const sql = yield* StoreWriter
+    yield* sql`DELETE FROM thread_subs WHERE channel = ${channel} AND thread_ts = ${threadTs}`
     yield* invalidate(syncKeys.threadSubs)
   })
 

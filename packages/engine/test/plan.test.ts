@@ -17,7 +17,7 @@ const freshStore: Layer.Layer<Layer.Success<ReturnType<typeof Store.layer>>, Sto
 )
 
 /** Table aliases the statements use, back to the tables the rule names. */
-const ALIASES: Record<string, string> = { i: 'topic_index', o: 'topic_overlay', m: 'messages' }
+const ALIASES: Record<string, string> = { i: 'topic_index', t: 'topic_index', o: 'topic_overlay', m: 'messages' }
 const GUARDED = new Set(['messages', 'topic_index', 'reactions', 'topic_overlay'])
 
 const plan = (sql: string, params: ReadonlyArray<unknown>) =>
