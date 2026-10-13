@@ -1,0 +1,40 @@
+{
+  "approach": "C",
+  "model": "google/gemini-3.8-flash",
+  "topic": "ramen",
+  "ok": true,
+  "spec": {
+    "hue": "coral",
+    "elements": [
+      {
+        "tag": "motif",
+        "attrs": {
+          "name": "bowl",
+          "x": "0",
+          "y": "0",
+          "scale": "1"
+        }
+      }
+    ]
+  },
+  "decision": {
+    "main": "bowl",
+    "secondary": null,
+    "hue": "coral",
+    "confident": true,
+    "why": "Lunch and ramen are directly represented by a food bowl"
+  },
+  "attempts": 1,
+  "latencyMs": 1370,
+  "costUsd": 0.00111825,
+  "tokens": {
+    "in": 1306,
+    "out": 37
+  },
+  "raw": "{\"main\": \"bowl\", \"secondary\": null, \"hue\": \"coral\", \"confident\": true, \"why\": \"Lunch and ramen are directly represented by a food bowl\"}",
+  "svg": {
+    "light": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"l-C-google_gemini-3.8-flash-ramen\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#l-C-google_gemini-3.8-flash-ramen)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#f9d7cf\"/><g fill=\"none\" stroke=\"#7c3326\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><g transform=\"translate(0 0) scale(1)\" stroke-width=\"3.00\"><path d=\"M7 18 H33 A13 13 0 0 1 20 31 A13 13 0 0 1 7 18 Z\" fill=\"#eaaca0\"/><line x1=\"23\" y1=\"6\" x2=\"30\" y2=\"18\"/><line x1=\"28\" y1=\"7\" x2=\"33\" y2=\"16\"/></g></g></g></svg>",
+    "dark": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"d-C-google_gemini-3.8-flash-ramen\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#d-C-google_gemini-3.8-flash-ramen)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#4c2b25\"/><g fill=\"none\" stroke=\"#fdcabf\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><g transform=\"translate(0 0) scale(1)\" stroke-width=\"3.00\"><path d=\"M7 18 H33 A13 13 0 0 1 20 31 A13 13 0 0 1 7 18 Z\" fill=\"#77463c\"/><line x1=\"23\" y1=\"6\" x2=\"30\" y2=\"18\"/><line x1=\"28\" y1=\"7\" x2=\"33\" y2=\"16\"/></g></g></g></svg>"
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"coral\">\n  <motif name=\"bowl\" x=\"0\" y=\"0\" scale=\"1\"/>\n</svg>"
+}

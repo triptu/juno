@@ -1,0 +1,61 @@
+{
+  "approach": "C",
+  "model": "google/gemini-3.8-flash",
+  "topic": "icons",
+  "ok": true,
+  "spec": {
+    "hue": "plum",
+    "elements": [
+      {
+        "tag": "motif",
+        "attrs": {
+          "name": "picture",
+          "x": "-2",
+          "y": "-2",
+          "scale": "0.9"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "30",
+          "cy": "30",
+          "r": "9.5",
+          "fill": "tile",
+          "stroke": "none",
+          "detail": "1"
+        }
+      },
+      {
+        "tag": "motif",
+        "attrs": {
+          "name": "refresh",
+          "x": "21",
+          "y": "21",
+          "scale": "0.45",
+          "detail": "1"
+        }
+      }
+    ]
+  },
+  "decision": {
+    "main": "picture",
+    "secondary": "refresh",
+    "hue": "plum",
+    "confident": true,
+    "why": "Design icons updated and refreshed in the project."
+  },
+  "attempts": 1,
+  "latencyMs": 1649,
+  "costUsd": 0.0011175,
+  "tokens": {
+    "in": 1305,
+    "out": 37
+  },
+  "raw": "{\"main\": \"picture\", \"secondary\": \"refresh\", \"hue\": \"plum\", \"confident\": true, \"why\": \"Design icons updated and refreshed in the project.\"}",
+  "svg": {
+    "light": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"l-C-google_gemini-3.8-flash-icons\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#l-C-google_gemini-3.8-flash-icons)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#ecd8f1\"/><g fill=\"none\" stroke=\"#663870\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><g transform=\"translate(-2 -2) scale(0.9)\" stroke-width=\"3.33\"><rect x=\"8\" y=\"9\" width=\"24\" height=\"22\" rx=\"4\" fill=\"#d4afdc\"/><circle cx=\"15\" cy=\"16\" r=\"2.4\" fill=\"#df6a55\" stroke=\"none\"/><path d=\"M8 27 L15 20 L21 26 L25 22 L32 29\"/></g><circle cx=\"30\" cy=\"30\" r=\"9.5\" fill=\"#ecd8f1\" stroke=\"none\"/><g transform=\"translate(21 21) scale(0.45)\" stroke-width=\"6.67\"><path d=\"M29 16 A10 10 0 1 0 31 23\"/><path d=\"M30 9 V16 H23\"/></g></g></g></svg>",
+    "dark": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"d-C-google_gemini-3.8-flash-icons\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#d-C-google_gemini-3.8-flash-icons)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#412d45\"/><g fill=\"none\" stroke=\"#edc9f5\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><g transform=\"translate(-2 -2) scale(0.9)\" stroke-width=\"3.33\"><rect x=\"8\" y=\"9\" width=\"24\" height=\"22\" rx=\"4\" fill=\"#67486d\"/><circle cx=\"15\" cy=\"16\" r=\"2.4\" fill=\"#f8907c\" stroke=\"none\"/><path d=\"M8 27 L15 20 L21 26 L25 22 L32 29\"/></g><circle cx=\"30\" cy=\"30\" r=\"9.5\" fill=\"#412d45\" stroke=\"none\"/><g transform=\"translate(21 21) scale(0.45)\" stroke-width=\"6.67\"><path d=\"M29 16 A10 10 0 1 0 31 23\"/><path d=\"M30 9 V16 H23\"/></g></g></g></svg>"
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"plum\">\n  <motif name=\"picture\" x=\"-2\" y=\"-2\" scale=\"0.9\"/>\n  <circle cx=\"30\" cy=\"30\" r=\"9.5\" fill=\"tile\" stroke=\"none\" detail=\"1\"/>\n  <motif name=\"refresh\" x=\"21\" y=\"21\" scale=\"0.45\" detail=\"1\"/>\n</svg>"
+}

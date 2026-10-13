@@ -1,0 +1,30 @@
+{
+  "approach": "D",
+  "model": "google/gemini-3.8-flash",
+  "topic": "p95",
+  "ok": true,
+  "spec": {
+    "hue": "coral",
+    "elements": [
+      {
+        "tag": "motif",
+        "attrs": {
+          "name": "chart-up"
+        }
+      }
+    ]
+  },
+  "attempts": 1,
+  "latencyMs": 2505,
+  "costUsd": 0.0053595,
+  "tokens": {
+    "in": 2671,
+    "out": 895
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"coral\">\n  <motif name=\"chart-up\"/>\n</svg>",
+  "svg": {
+    "light": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"l-D-google_gemini-3.8-flash-p95\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#l-D-google_gemini-3.8-flash-p95)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#f9d7cf\"/><g fill=\"none\" stroke=\"#7c3326\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><g transform=\"translate(0 0) scale(1)\" stroke-width=\"3.00\"><path d=\"M9 28 L16 20 L22 24 L31 12\"/><circle cx=\"31\" cy=\"12\" r=\"2.6\" fill=\"#c68206\" stroke=\"none\"/></g></g></g></svg>",
+    "dark": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"d-D-google_gemini-3.8-flash-p95\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#d-D-google_gemini-3.8-flash-p95)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#4c2b25\"/><g fill=\"none\" stroke=\"#fdcabf\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><g transform=\"translate(0 0) scale(1)\" stroke-width=\"3.00\"><path d=\"M9 28 L16 20 L22 24 L31 12\"/><circle cx=\"31\" cy=\"12\" r=\"2.6\" fill=\"#e4a249\" stroke=\"none\"/></g></g></g></svg>"
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"coral\">\n  <motif name=\"chart-up\"/>\n</svg>"
+}

@@ -1,0 +1,24 @@
+{
+  "approach": "A",
+  "model": "anthropic/claude-haiku-5.5",
+  "topic": "pricing-copy",
+  "ok": true,
+  "free": {
+    "ok": true,
+    "svg": "<svg width=\"40\" height=\"40\" aria-hidden=\"true\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" fill=\"none\" stroke=\"#2E5F6B\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"8\" y=\"5\" rx=\"4\" fill=\"#CFE3E8\"/><line x1=\"14\" y1=\"13\" x2=\"26\" y2=\"13\"/><line x1=\"14\" y1=\"19\" x2=\"26\" y2=\"19\"/><line x1=\"14\" y1=\"25\" x2=\"21\" y2=\"25\"/><circle cx=\"29\" cy=\"29\" r=\"5\" fill=\"#CC4628\" stroke=\"#CC4628\"/></svg>",
+    "elements": 5,
+    "gradients": false
+  },
+  "attempts": 1,
+  "latencyMs": 1727,
+  "costUsd": 0.0001594,
+  "tokens": {
+    "in": 444,
+    "out": 230
+  },
+  "raw": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" fill=\"none\" stroke=\"#2E5F6B\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"8\" y=\"5\" width=\"24\" height=\"30\" rx=\"4\" fill=\"#CFE3E8\"/><line x1=\"14\" y1=\"13\" x2=\"26\" y2=\"13\"/><line x1=\"14\" y1=\"19\" x2=\"26\" y2=\"19\"/><line x1=\"14\" y1=\"25\" x2=\"21\" y2=\"25\"/><circle cx=\"29\" cy=\"29\" r=\"5\" fill=\"#CC4628\" stroke=\"#CC4628\"/></svg>",
+  "svg": {
+    "light": "<svg width=\"40\" height=\"40\" aria-hidden=\"true\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" fill=\"none\" stroke=\"#2E5F6B\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"8\" y=\"5\" rx=\"4\" fill=\"#CFE3E8\"/><line x1=\"14\" y1=\"13\" x2=\"26\" y2=\"13\"/><line x1=\"14\" y1=\"19\" x2=\"26\" y2=\"19\"/><line x1=\"14\" y1=\"25\" x2=\"21\" y2=\"25\"/><circle cx=\"29\" cy=\"29\" r=\"5\" fill=\"#CC4628\" stroke=\"#CC4628\"/></svg>",
+    "dark": "<svg width=\"40\" height=\"40\" aria-hidden=\"true\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" fill=\"none\" stroke=\"#2E5F6B\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"8\" y=\"5\" rx=\"4\" fill=\"#CFE3E8\"/><line x1=\"14\" y1=\"13\" x2=\"26\" y2=\"13\"/><line x1=\"14\" y1=\"19\" x2=\"26\" y2=\"19\"/><line x1=\"14\" y1=\"25\" x2=\"21\" y2=\"25\"/><circle cx=\"29\" cy=\"29\" r=\"5\" fill=\"#CC4628\" stroke=\"#CC4628\"/></svg>"
+  }
+}

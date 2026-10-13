@@ -1,0 +1,84 @@
+{
+  "approach": "D",
+  "model": "anthropic/claude-haiku-5.5",
+  "topic": "q4-cuts",
+  "ok": true,
+  "spec": {
+    "hue": "periwinkle",
+    "elements": [
+      {
+        "tag": "rect",
+        "attrs": {
+          "x": "9",
+          "y": "8",
+          "width": "22",
+          "height": "26",
+          "rx": "4",
+          "fill": "soft"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "14",
+          "y1": "15",
+          "x2": "26",
+          "y2": "15"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "14",
+          "y1": "21",
+          "x2": "26",
+          "y2": "21"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "14",
+          "y1": "27",
+          "x2": "21",
+          "y2": "27"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "23",
+          "y1": "31",
+          "x2": "31",
+          "y2": "23",
+          "stroke-width": "3",
+          "detail": "1"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "30",
+          "cy": "10",
+          "r": "4",
+          "fill": "accent",
+          "stroke": "none",
+          "detail": "1"
+        }
+      }
+    ]
+  },
+  "attempts": 1,
+  "latencyMs": 10967,
+  "costUsd": 0.0004575,
+  "tokens": {
+    "in": 3460,
+    "out": 223
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"periwinkle\">\n  <rect x=\"9\" y=\"8\" width=\"22\" height=\"26\" rx=\"4\" fill=\"soft\"/>\n  <line x1=\"14\" y1=\"15\" x2=\"26\" y2=\"15\"/>\n  <line x1=\"14\" y1=\"21\" x2=\"26\" y2=\"21\"/>\n  <line x1=\"14\" y1=\"27\" x2=\"21\" y2=\"27\"/>\n  <line x1=\"23\" y1=\"31\" x2=\"31\" y2=\"23\" stroke-width=\"3\" detail=\"1\"/>\n  <circle cx=\"30\" cy=\"10\" r=\"4\" fill=\"accent\" stroke=\"none\" detail=\"1\"/>\n</svg>",
+  "svg": {
+    "light": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"l-D-anthropic_claude-haiku-5.5-q4-cuts\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#l-D-anthropic_claude-haiku-5.5-q4-cuts)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#d7defb\"/><g fill=\"none\" stroke=\"#3d4685\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"9\" y=\"8\" width=\"22\" height=\"26\" rx=\"4\" fill=\"#afbbef\"/><line x1=\"14\" y1=\"15\" x2=\"26\" y2=\"15\"/><line x1=\"14\" y1=\"21\" x2=\"26\" y2=\"21\"/><line x1=\"14\" y1=\"27\" x2=\"21\" y2=\"27\"/><line x1=\"23\" y1=\"31\" x2=\"31\" y2=\"23\" stroke-width=\"3.00\"/><circle cx=\"30\" cy=\"10\" r=\"4\" fill=\"#df6a55\" stroke=\"none\"/></g></g></svg>",
+    "dark": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"d-D-anthropic_claude-haiku-5.5-q4-cuts\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#d-D-anthropic_claude-haiku-5.5-q4-cuts)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#2e334f\"/><g fill=\"none\" stroke=\"#ccd5fd\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"9\" y=\"8\" width=\"22\" height=\"26\" rx=\"4\" fill=\"#4a527c\"/><line x1=\"14\" y1=\"15\" x2=\"26\" y2=\"15\"/><line x1=\"14\" y1=\"21\" x2=\"26\" y2=\"21\"/><line x1=\"14\" y1=\"27\" x2=\"21\" y2=\"27\"/><line x1=\"23\" y1=\"31\" x2=\"31\" y2=\"23\" stroke-width=\"3.00\"/><circle cx=\"30\" cy=\"10\" r=\"4\" fill=\"#f8907c\" stroke=\"none\"/></g></g></svg>"
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"periwinkle\">\n  <rect x=\"9\" y=\"8\" width=\"22\" height=\"26\" rx=\"4\" fill=\"soft\"/>\n  <line x1=\"14\" y1=\"15\" x2=\"26\" y2=\"15\"/>\n  <line x1=\"14\" y1=\"21\" x2=\"26\" y2=\"21\"/>\n  <line x1=\"14\" y1=\"27\" x2=\"21\" y2=\"27\"/>\n  <line x1=\"23\" y1=\"31\" x2=\"31\" y2=\"23\" stroke-width=\"3\" detail=\"1\"/>\n  <circle cx=\"30\" cy=\"10\" r=\"4\" fill=\"accent\" stroke=\"none\" detail=\"1\"/>\n</svg>"
+}

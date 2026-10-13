@@ -354,3 +354,8 @@ Nothing may move when the pointer or the keyboard touches it. `expectNoLayoutShi
 
 Effect and StyleX pitfalls are in their skills: `.claude/skills/effect/SKILL.md` ("Pitfalls") and
 `.claude/skills/stylex/SKILL.md`.
+
+## Heavy jobs share one queue
+
+Tests, e2e runs, gallery shots, benchmarks and spec checks spawn many processes. Several agents often work in separate worktrees on the same machine, so the root scripts (`pnpm test`, `pnpm test:e2e`, `pnpm test:gallery`, `pnpm gallery:shots`, `pnpm specs:check`) run through `scripts/heavy.mjs`. It takes a machine-wide lock in the system temp folder, shared by every worktree, and waits for a free slot. `JUNO_HEAVY_SLOTS` raises the number of slots (default 1). Running a package's tests directly bypasses the queue, so prefer the root scripts.
+

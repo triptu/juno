@@ -1,0 +1,46 @@
+{
+  "approach": "B",
+  "model": "anthropic/claude-haiku-5.5",
+  "topic": "flags",
+  "ok": true,
+  "spec": {
+    "hue": "teal",
+    "elements": [
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "12",
+          "y1": "8",
+          "x2": "12",
+          "y2": "32"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M12 9 H28 L24 14 L28 19 H12"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M20 27 L25 32 L33 23",
+          "detail": "1"
+        }
+      }
+    ]
+  },
+  "attempts": 1,
+  "latencyMs": 1246,
+  "costUsd": 0.0001911,
+  "tokens": {
+    "in": 1341,
+    "out": 114
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"teal\">\n  <line x1=\"12\" y1=\"8\" x2=\"12\" y2=\"32\"/>\n  <path d=\"M12 9 H28 L24 14 L28 19 H12\"/>\n  <path d=\"M20 27 L25 32 L33 23\" detail=\"1\"/>\n</svg>",
+  "svg": {
+    "light": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"l-B-anthropic_claude-haiku-5.5-flags\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#l-B-anthropic_claude-haiku-5.5-flags)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#c3e9e3\"/><g fill=\"none\" stroke=\"#0c5952\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><line x1=\"12\" y1=\"8\" x2=\"12\" y2=\"32\"/><path d=\"M12 9 H28 L24 14 L28 19 H12\"/><path d=\"M20 27 L25 32 L33 23\"/></g></g></svg>",
+    "dark": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"d-B-anthropic_claude-haiku-5.5-flags\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#d-B-anthropic_claude-haiku-5.5-flags)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#0f3e39\"/><g fill=\"none\" stroke=\"#a3e7dd\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><line x1=\"12\" y1=\"8\" x2=\"12\" y2=\"32\"/><path d=\"M12 9 H28 L24 14 L28 19 H12\"/><path d=\"M20 27 L25 32 L33 23\"/></g></g></svg>"
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"teal\">\n  <line x1=\"12\" y1=\"8\" x2=\"12\" y2=\"32\"/>\n  <path d=\"M12 9 H28 L24 14 L28 19 H12\"/>\n  <path d=\"M20 27 L25 32 L33 23\" detail=\"1\"/>\n</svg>"
+}

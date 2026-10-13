@@ -4,33 +4,42 @@
  * at first and changeable by the user"). Both come from a hash of the
  * channel id, so a channel looks the same on every launch and in every
  * list. DMs show the person's avatar instead; group DMs show initials.
+ *
+ * The names are the keys `@juno/ui` draws (`channelIcons` in
+ * `ChannelIcon.tsx`, `hueNames` in `Avatar.tsx`), so a row model carries
+ * them as they are and no layer translates. Domain cannot import ui, so
+ * the lists are repeated here; a name ui does not know draws as the
+ * channel's first letter.
  */
+import { Schema } from 'effect'
 import type { ConversationKind } from './channel'
 
-/** Lucide icon names the UI knows how to draw for a channel tile. */
+/** Icons a channel tile can show, by the key `@juno/ui` draws. */
 export const CHANNEL_ICONS = [
   'hash',
   'megaphone',
   'rocket',
   'wrench',
   'bug',
-  'flask-conical',
-  'chart-line',
-  'bell',
-  'book-open',
+  'flask',
+  'code',
+  'star',
+  'book',
   'coffee',
   'globe',
   'heart',
-  'zap',
-  'cloud',
+  'lightning',
+  'compass',
   'shield',
   'leaf',
 ] as const
-export type ChannelIcon = (typeof CHANNEL_ICONS)[number]
+export const ChannelIcon = Schema.Literals(CHANNEL_ICONS)
+export type ChannelIcon = typeof ChannelIcon.Type
 
-/** The brand hues in `@juno/tokens` (`--hue-*`), minus the ones too light for a tile. */
-export const CHANNEL_COLORS = ['cyan', 'claret', 'midnight', 'emerald-dark', 'plum', 'rose', 'emerald', 'jordy'] as const
-export type ChannelColor = (typeof CHANNEL_COLORS)[number]
+/** The eight person hues of `@juno/ui` (`hueNames`), the ones dark enough for a tile. */
+export const CHANNEL_COLORS = ['cyan', 'claret', 'midnight', 'emeraldDark', 'plum', 'rose', 'emerald', 'jordy'] as const
+export const ChannelColor = Schema.Literals(CHANNEL_COLORS)
+export type ChannelColor = typeof ChannelColor.Type
 
 export interface ChannelStyle {
   readonly icon: ChannelIcon

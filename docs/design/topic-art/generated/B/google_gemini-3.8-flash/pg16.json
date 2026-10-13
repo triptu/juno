@@ -1,0 +1,47 @@
+{
+  "approach": "B",
+  "model": "google/gemini-3.8-flash",
+  "topic": "pg16",
+  "ok": true,
+  "spec": {
+    "hue": "teal",
+    "elements": [
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M10 12 V28 A10 4 0 0 0 30 28 V12"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M10 20 A10 4 0 0 0 30 20",
+          "detail": "1"
+        }
+      },
+      {
+        "tag": "ellipse",
+        "attrs": {
+          "cx": "20",
+          "cy": "12",
+          "rx": "10",
+          "ry": "4",
+          "fill": "soft"
+        }
+      }
+    ]
+  },
+  "attempts": 1,
+  "latencyMs": 2853,
+  "costUsd": 0.00125925,
+  "tokens": {
+    "in": 1074,
+    "out": 121
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"teal\">\n  <path d=\"M10 12 V28 A10 4 0 0 0 30 28 V12\"/>\n  <path d=\"M10 20 A10 4 0 0 0 30 20\" detail=\"1\"/>\n  <ellipse cx=\"20\" cy=\"12\" rx=\"10\" ry=\"4\" fill=\"soft\"/>\n</svg>",
+  "svg": {
+    "light": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"l-B-google_gemini-3.8-flash-pg16\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#l-B-google_gemini-3.8-flash-pg16)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#c3e9e3\"/><g fill=\"none\" stroke=\"#0c5952\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M10 12 V28 A10 4 0 0 0 30 28 V12\"/><path d=\"M10 20 A10 4 0 0 0 30 20\"/><ellipse cx=\"20\" cy=\"12\" rx=\"10\" ry=\"4\" fill=\"#84cec4\"/></g></g></svg>",
+    "dark": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"d-B-google_gemini-3.8-flash-pg16\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#d-B-google_gemini-3.8-flash-pg16)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#0f3e39\"/><g fill=\"none\" stroke=\"#a3e7dd\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M10 12 V28 A10 4 0 0 0 30 28 V12\"/><path d=\"M10 20 A10 4 0 0 0 30 20\"/><ellipse cx=\"20\" cy=\"12\" rx=\"10\" ry=\"4\" fill=\"#1a625a\"/></g></g></svg>"
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"teal\">\n  <path d=\"M10 12 V28 A10 4 0 0 0 30 28 V12\"/>\n  <path d=\"M10 20 A10 4 0 0 0 30 20\" detail=\"1\"/>\n  <ellipse cx=\"20\" cy=\"12\" rx=\"10\" ry=\"4\" fill=\"soft\"/>\n</svg>"
+}

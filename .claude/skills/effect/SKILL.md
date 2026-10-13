@@ -188,5 +188,7 @@ tests, so test a service through its public layer.
   several background calls in a row set `backgroundMinIntervalMillis: 0` (the lane spaces calls 1.5 s)
   or use `it.live`.
 - **Errors are mapped at the engine edge.** `@juno/slack` and `@juno/store` errors never reach a route
-  as they are: handlers map Slack errors to `@juno/contract` errors and turn `StoreError` into a defect
-  (`Effect.orDie`). See `docs/architecture.md` section 2.6.
+  as they are: handlers map Slack errors to `@juno/contract` errors, and a command turns `StoreError`
+  into a defect (`Effect.orDie`). A live query does not: a failed run is a value (`meta.error`), and a
+  route with no error of its own retries a failed first run (`retryFirstRun`). See
+  `docs/architecture.md` section 2.6.

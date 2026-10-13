@@ -1,0 +1,61 @@
+{
+  "approach": "B",
+  "model": "anthropic/claude-haiku-5.5",
+  "topic": "vague",
+  "ok": true,
+  "spec": {
+    "hue": "periwinkle",
+    "elements": [
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M8 13 A5 5 0 0 1 13 8 H27 A5 5 0 0 1 32 13 V23 A5 5 0 0 1 27 28 H19 L13 33 V28 H13 A5 5 0 0 1 8 23 Z",
+          "fill": "soft"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "14",
+          "cy": "18",
+          "r": "1.8",
+          "fill": "ink",
+          "stroke": "none"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "20",
+          "cy": "18",
+          "r": "1.8",
+          "fill": "ink",
+          "stroke": "none"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "26",
+          "cy": "18",
+          "r": "1.8",
+          "fill": "ink",
+          "stroke": "none"
+        }
+      }
+    ]
+  },
+  "attempts": 1,
+  "latencyMs": 1407,
+  "costUsd": 0.000289,
+  "tokens": {
+    "in": 1340,
+    "out": 310
+  },
+  "raw": "The topic is vague, a follow-up on something unnamed. A speech bubble-like cue would fit a conversation thread in random. I'll draw one chat bubble with a second small dot for the ongoing exchange.\n\n<svg viewBox=\"0 0 40 40\" data-hue=\"periwinkle\">\n  <path d=\"M8 13 A5 5 0 0 1 13 8 H27 A5 5 0 0 1 32 13 V23 A5 5 0 0 1 27 28 H19 L13 33 V28 H13 A5 5 0 0 1 8 23 Z\" fill=\"soft\"/>\n  <circle cx=\"14\" cy=\"18\" r=\"1.8\" fill=\"ink\" stroke=\"none\"/>\n  <circle cx=\"20\" cy=\"18\" r=\"1.8\" fill=\"ink\" stroke=\"none\"/>\n  <circle cx=\"26\" cy=\"18\" r=\"1.8\" fill=\"ink\" stroke=\"none\"/>\n</svg>",
+  "svg": {
+    "light": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"l-B-anthropic_claude-haiku-5.5-vague\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#l-B-anthropic_claude-haiku-5.5-vague)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#d7defb\"/><g fill=\"none\" stroke=\"#3d4685\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M8 13 A5 5 0 0 1 13 8 H27 A5 5 0 0 1 32 13 V23 A5 5 0 0 1 27 28 H19 L13 33 V28 H13 A5 5 0 0 1 8 23 Z\" fill=\"#afbbef\"/><circle cx=\"14\" cy=\"18\" r=\"1.8\" fill=\"#3d4685\" stroke=\"none\"/><circle cx=\"20\" cy=\"18\" r=\"1.8\" fill=\"#3d4685\" stroke=\"none\"/><circle cx=\"26\" cy=\"18\" r=\"1.8\" fill=\"#3d4685\" stroke=\"none\"/></g></g></svg>",
+    "dark": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"d-B-anthropic_claude-haiku-5.5-vague\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#d-B-anthropic_claude-haiku-5.5-vague)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#2e334f\"/><g fill=\"none\" stroke=\"#ccd5fd\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M8 13 A5 5 0 0 1 13 8 H27 A5 5 0 0 1 32 13 V23 A5 5 0 0 1 27 28 H19 L13 33 V28 H13 A5 5 0 0 1 8 23 Z\" fill=\"#4a527c\"/><circle cx=\"14\" cy=\"18\" r=\"1.8\" fill=\"#ccd5fd\" stroke=\"none\"/><circle cx=\"20\" cy=\"18\" r=\"1.8\" fill=\"#ccd5fd\" stroke=\"none\"/><circle cx=\"26\" cy=\"18\" r=\"1.8\" fill=\"#ccd5fd\" stroke=\"none\"/></g></g></svg>"
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"periwinkle\">\n  <path d=\"M8 13 A5 5 0 0 1 13 8 H27 A5 5 0 0 1 32 13 V23 A5 5 0 0 1 27 28 H19 L13 33 V28 H13 A5 5 0 0 1 8 23 Z\" fill=\"soft\"/>\n  <circle cx=\"14\" cy=\"18\" r=\"1.8\" fill=\"ink\" stroke=\"none\"/>\n  <circle cx=\"20\" cy=\"18\" r=\"1.8\" fill=\"ink\" stroke=\"none\"/>\n  <circle cx=\"26\" cy=\"18\" r=\"1.8\" fill=\"ink\" stroke=\"none\"/>\n</svg>"
+}

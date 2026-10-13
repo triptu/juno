@@ -170,7 +170,7 @@ Navigation (sidebar rows, tabs, nav items, filter chips, ⌘K rows, Browse rows,
 
 ### 5.1 Granularity
 
-- The list container subscribes to `order: Id[]` only. Each row subscribes to `topicRowAtom(id)`, an `Atom.family` member derived from the live query's row cache. A delta that touches one row re-renders one row.
+- The list container subscribes to `order: Id[]` only. Each row subscribes to its own `Atom.family` member derived from the live query's row cache (`sidebarRowAtom(id)` in the sidebar). A delta that touches one row re-renders one row.
 - Rows and messages are `React.memo`. Props are primitives or identity-stable objects from the `rev` cache. Callbacks take the id as an argument (`onOpen(id)`) and are created once in the container, so no row receives a new function on each render.
 - Time is a leaf: `RelativeTime` subscribes to `nowAtom` and formats a `ts` prop. Rows pass `ts` and never read `nowAtom`, so the minute tick re-renders only the visible time labels.
 - Context providers that change often (theme, now, tabs) sit as low as possible; nothing above a list may change on a tick.
@@ -184,7 +184,8 @@ Navigation (sidebar rows, tabs, nav items, filter chips, ⌘K rows, Browse rows,
 ### 5.3 Transitions
 
 - ⌘K: the input is local state; `useDeferredValue(query)` feeds `searchAtom`, and results render inside the deferred value so typing is never blocked ([useDeferredValue](https://react.dev/reference/react/useDeferredValue)). The local FTS query has no debounce; the AI `commandParseAtom` keeps its 150 ms debounce and renders as a separate row when it arrives.
-- Sidebar filter and scope changes, tab switches and theme changes are wrapped in `startTransition` ([startTransition](https://react.dev/reference/react/startTransition)) so React keeps the old UI until the new one is ready and never shows a blank list.
+- Tab switches and theme changes are wrapped in `startTransition` ([startTransition](https://react.dev/reference/react/startTransition)) so React keeps the old UI until the new one is ready.
+- A transition does not hold atom state. `useAtomValue` is a `useSyncExternalStore` subscription, and React commits those updates synchronously even inside `startTransition`, so a list whose source atom changes (a new filter's live query starts as `Initial`) renders empty until the data arrives. The atom must hold the previous value itself. The sidebar does this in `sidebarListAtom` (`@juno/state`): it keeps the window shown until the new filter's first snapshot arrives, then replaces it in one update, and rows whose `rev` is unchanged keep their objects, so only the rows that enter, leave or differ re-render. Any other list that switches its source (All topics filters, the message window on topic switch) follows the same pattern.
 - Large commits (a 100-row prepend) are plain updates, not transitions: they must land in the same frame as the scroll adjustment.
 
 ### 5.4 Compiler and memo
@@ -202,7 +203,8 @@ Navigation (sidebar rows, tabs, nav items, filter chips, ⌘K rows, Browse rows,
 
 - **Indexes.** Every live query has a test that runs `EXPLAIN QUERY PLAN` against the large fixture and fails on `SCAN` of `messages`, `topic_index`, `reactions` or `topic_overlay`. Required at minimum: `topic_index(last_activity_ts DESC)`, `topic_index(channel, last_activity_ts DESC)`, `messages(channel, thread_ts, ts)`, `messages(channel, ts)` (the primary key), `reactions(channel, ts)`, `topic_reads(topic_id)`, `outbox(target_key, created_at)`, `notification_log(at)`. `messages_fts` uses `prefix='2 3'` for the palette.
 - **Windows.** A query takes an anchor and a count and returns at most the window. A query that can return unbounded rows is rejected in review.
-- **Deltas.** The engine keeps the last emitted `{ order, revById }` per subscription and sends only rows whose `rev` changed plus the new `order` when it differs.
+- **Deltas.** The engine keeps the last emitted `{ order, revById }` per subscription and sends only rows whose `rev` changed plus the new `order` when it differs. A run that changes nothing sends nothing, and a value equal to the last one is not sent again.
+- **Reuse between runs.** A list query whose rows are expensive to shape keeps what it built for its subscription and rebuilds only rows whose inputs changed. The sidebar query (`engine/src/topics/query.ts`, `RowCache`) reuses each topic and row object while the joined columns and the people are unchanged, and keeps the users it has read until the `users` table is invalidated. On the large seed this takes a re-run from about 6 ms to about 2.5 ms; the SQL is about 1 ms of it.
 - **Batching.** One writer transaction per socket event or command, wrapped in `Reactivity.withBatch`, so dependent queries re-run once. Invalidation keys are specific (`['messages', topicId]`, `['topics']`), never a global key. Backfill pages commit in 200-row transactions and `Effect.yieldNow` between them.
 - **Debounce.** Leading-edge, 30 ms trailing on live query re-runs (architecture 2.6). A command's own invalidation is never delayed.
 - **The event loop.** `node:sqlite` is synchronous, so statements are prepared once and small. Nothing after boot may run more than 50 ms synchronously; large JSON (a `userBoot` response) is parsed once at boot and never on the interactive path. `PRAGMA journal_mode=WAL`, `synchronous=NORMAL`, `cache_size` sized for the large workspace, `busy_timeout=250`.
@@ -232,7 +234,7 @@ Navigation (sidebar rows, tabs, nav items, filter chips, ⌘K rows, Browse rows,
 
 ### 7.3 The perf harness
 
-Status: the fixture and the engine benchmark exist; the Playwright harness does not. `scripts/check-bundle-size.mjs` runs in `pnpm build`, the marks live in `@juno/state/perf`, `largeSeed()` in `@juno/fake-slack` is the fixture below (generated in about 5 s, never checked in), and `packages/engine/test/bench` boots the engine on it and reports the sidebar query time, the snapshot and delta sizes and the inject-to-row time (`JUNO_BENCH=1`). First numbers are in `docs/architecture.md` section 16, M3. The rest of this section is the plan.
+Status: the fixture and the engine benchmark exist; the Playwright harness does not. `scripts/check-bundle-size.mjs` runs in `pnpm build`, the marks live in `@juno/state/perf`, `largeSeed()` in `@juno/fake-slack` is the fixture below (generated in about 5 s, never checked in), and `packages/engine/test/bench` boots the engine on it and reports the sidebar query time alone and inside the engine, the snapshot and delta sizes, the encode, clone and decode times and the inject-to-row time, with the load average (`JUNO_BENCH=1`). On Apple silicon the first run after an idle gap is about twice as slow as the same run on a busy CPU (power management), so `meta.queryMs` after an injected event is higher than the isolated time even on a quiet machine. First numbers are in `docs/architecture.md` section 16, M3. The rest of this section is the plan.
 
 Location: `apps/desktop/perf/`, a separate Playwright project `perf` (`pnpm perf`, `pnpm perf:baseline`). It is not part of `test:e2e`, because it needs a quiet machine and a longer timeout.
 
