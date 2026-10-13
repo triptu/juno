@@ -1,0 +1,65 @@
+{
+  "approach": "B",
+  "model": "google/gemini-3.8-flash",
+  "topic": "ramen",
+  "ok": true,
+  "spec": {
+    "hue": "amber",
+    "elements": [
+      {
+        "tag": "ellipse",
+        "attrs": {
+          "cx": "20",
+          "cy": "21",
+          "rx": "11",
+          "ry": "4",
+          "fill": "soft"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M9 21 C9 28.5 14 32 20 32 C26 32 31 28.5 31 21"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "13",
+          "y1": "20",
+          "x2": "28",
+          "y2": "8"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "16",
+          "y1": "22",
+          "x2": "32",
+          "y2": "10"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M14 14 C14 11 16 11 16 8",
+          "detail": "1"
+        }
+      }
+    ]
+  },
+  "attempts": 1,
+  "latencyMs": 3459,
+  "costUsd": 0.00603225,
+  "tokens": {
+    "in": 1033,
+    "out": 1402
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"amber\">\n  <ellipse cx=\"20\" cy=\"21\" rx=\"11\" ry=\"4\" fill=\"soft\"/>\n  <path d=\"M9 21 C9 28.5 14 32 20 32 C26 32 31 28.5 31 21\"/>\n  <line x1=\"13\" y1=\"20\" x2=\"28\" y2=\"8\"/>\n  <line x1=\"16\" y1=\"22\" x2=\"32\" y2=\"10\"/>\n  <path d=\"M14 14 C14 11 16 11 16 8\" detail=\"1\"/>\n</svg>",
+  "svg": {
+    "light": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"l-B-google_gemini-3.8-flash-ramen\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#l-B-google_gemini-3.8-flash-ramen)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#f1dcc3\"/><g fill=\"none\" stroke=\"#6b4300\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><ellipse cx=\"20\" cy=\"21\" rx=\"11\" ry=\"4\" fill=\"#dcb688\"/><path d=\"M9 21 C9 28.5 14 32 20 32 C26 32 31 28.5 31 21\"/><line x1=\"13\" y1=\"20\" x2=\"28\" y2=\"8\"/><line x1=\"16\" y1=\"22\" x2=\"32\" y2=\"10\"/><path d=\"M14 14 C14 11 16 11 16 8\"/></g></g></svg>",
+    "dark": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"d-B-google_gemini-3.8-flash-ramen\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#d-B-google_gemini-3.8-flash-ramen)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#453116\"/><g fill=\"none\" stroke=\"#f5d1a5\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><ellipse cx=\"20\" cy=\"21\" rx=\"11\" ry=\"4\" fill=\"#6d4f26\"/><path d=\"M9 21 C9 28.5 14 32 20 32 C26 32 31 28.5 31 21\"/><line x1=\"13\" y1=\"20\" x2=\"28\" y2=\"8\"/><line x1=\"16\" y1=\"22\" x2=\"32\" y2=\"10\"/><path d=\"M14 14 C14 11 16 11 16 8\"/></g></g></svg>"
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"amber\">\n  <ellipse cx=\"20\" cy=\"21\" rx=\"11\" ry=\"4\" fill=\"soft\"/>\n  <path d=\"M9 21 C9 28.5 14 32 20 32 C26 32 31 28.5 31 21\"/>\n  <line x1=\"13\" y1=\"20\" x2=\"28\" y2=\"8\"/>\n  <line x1=\"16\" y1=\"22\" x2=\"32\" y2=\"10\"/>\n  <path d=\"M14 14 C14 11 16 11 16 8\" detail=\"1\"/>\n</svg>"
+}

@@ -1,0 +1,48 @@
+{
+  "approach": "B",
+  "model": "anthropic/claude-sonnet-5.5",
+  "topic": "lag",
+  "ok": true,
+  "spec": {
+    "hue": "coral",
+    "elements": [
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M30 22 A11 11 0 1 1 18 10 A9 9 0 0 0 30 22 Z",
+          "fill": "soft"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M26 7 L28 11 L32 13 L28 15 L26 19",
+          "detail": "1"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "22",
+          "cy": "20",
+          "r": "2",
+          "fill": "accent",
+          "stroke": "none"
+        }
+      }
+    ]
+  },
+  "attempts": 1,
+  "latencyMs": 1266,
+  "costUsd": 0.00425,
+  "tokens": {
+    "in": 1355,
+    "out": 154
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"coral\">\n  <path d=\"M30 22 A11 11 0 1 1 18 10 A9 9 0 0 0 30 22 Z\" fill=\"soft\"/>\n  <path d=\"M26 7 L28 11 L32 13 L28 15 L26 19\" detail=\"1\"/>\n  <circle cx=\"22\" cy=\"20\" r=\"2\" fill=\"accent\" stroke=\"none\"/>\n</svg>",
+  "svg": {
+    "light": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"l-B-anthropic_claude-sonnet-5.5-lag\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#l-B-anthropic_claude-sonnet-5.5-lag)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#f9d7cf\"/><g fill=\"none\" stroke=\"#7c3326\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M30 22 A11 11 0 1 1 18 10 A9 9 0 0 0 30 22 Z\" fill=\"#eaaca0\"/><path d=\"M26 7 L28 11 L32 13 L28 15 L26 19\"/><circle cx=\"22\" cy=\"20\" r=\"2\" fill=\"#c68206\" stroke=\"none\"/></g></g></svg>",
+    "dark": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"d-B-anthropic_claude-sonnet-5.5-lag\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#d-B-anthropic_claude-sonnet-5.5-lag)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#4c2b25\"/><g fill=\"none\" stroke=\"#fdcabf\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M30 22 A11 11 0 1 1 18 10 A9 9 0 0 0 30 22 Z\" fill=\"#77463c\"/><path d=\"M26 7 L28 11 L32 13 L28 15 L26 19\"/><circle cx=\"22\" cy=\"20\" r=\"2\" fill=\"#e4a249\" stroke=\"none\"/></g></g></svg>"
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"coral\">\n  <path d=\"M30 22 A11 11 0 1 1 18 10 A9 9 0 0 0 30 22 Z\" fill=\"soft\"/>\n  <path d=\"M26 7 L28 11 L32 13 L28 15 L26 19\" detail=\"1\"/>\n  <circle cx=\"22\" cy=\"20\" r=\"2\" fill=\"accent\" stroke=\"none\"/>\n</svg>"
+}

@@ -1,0 +1,24 @@
+{
+  "approach": "A",
+  "model": "anthropic/claude-haiku-5.5",
+  "topic": "pipeline",
+  "ok": true,
+  "free": {
+    "ok": true,
+    "svg": "<svg width=\"40\" height=\"40\" aria-hidden=\"true\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" fill=\"none\" stroke=\"#2E5F6B\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"5\" y=\"8\" rx=\"4\" fill=\"#CFE3E8\"/><path d=\"M5 16h30\"/><path d=\"M13 4v7M27 4v7\"/><path d=\"M11 26l5-5 4 3 7-7\" stroke=\"#CC4628\"/><circle cx=\"27\" cy=\"22\" r=\"1.5\" fill=\"#CC4628\" stroke=\"none\"/></svg>",
+    "elements": 5,
+    "gradients": false
+  },
+  "attempts": 1,
+  "latencyMs": 1267,
+  "costUsd": 0.0001554,
+  "tokens": {
+    "in": 449,
+    "out": 221
+  },
+  "raw": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" fill=\"none\" stroke=\"#2E5F6B\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"5\" y=\"8\" width=\"30\" height=\"27\" rx=\"4\" fill=\"#CFE3E8\"/><path d=\"M5 16h30\"/><path d=\"M13 4v7M27 4v7\"/><path d=\"M11 26l5-5 4 3 7-7\" stroke=\"#CC4628\"/><circle cx=\"27\" cy=\"22\" r=\"1.5\" fill=\"#CC4628\" stroke=\"none\"/></svg>",
+  "svg": {
+    "light": "<svg width=\"40\" height=\"40\" aria-hidden=\"true\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" fill=\"none\" stroke=\"#2E5F6B\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"5\" y=\"8\" rx=\"4\" fill=\"#CFE3E8\"/><path d=\"M5 16h30\"/><path d=\"M13 4v7M27 4v7\"/><path d=\"M11 26l5-5 4 3 7-7\" stroke=\"#CC4628\"/><circle cx=\"27\" cy=\"22\" r=\"1.5\" fill=\"#CC4628\" stroke=\"none\"/></svg>",
+    "dark": "<svg width=\"40\" height=\"40\" aria-hidden=\"true\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" fill=\"none\" stroke=\"#2E5F6B\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"5\" y=\"8\" rx=\"4\" fill=\"#CFE3E8\"/><path d=\"M5 16h30\"/><path d=\"M13 4v7M27 4v7\"/><path d=\"M11 26l5-5 4 3 7-7\" stroke=\"#CC4628\"/><circle cx=\"27\" cy=\"22\" r=\"1.5\" fill=\"#CC4628\" stroke=\"none\"/></svg>"
+  }
+}

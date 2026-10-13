@@ -1,0 +1,68 @@
+{
+  "approach": "B",
+  "model": "anthropic/claude-sonnet-5.5",
+  "topic": "emoji",
+  "ok": true,
+  "spec": {
+    "hue": "coral",
+    "elements": [
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M20 7 C25 11 27 17 26 24 H14 C13 17 15 11 20 7 Z",
+          "fill": "soft"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "20",
+          "cy": "17",
+          "r": "2.5",
+          "detail": "1"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M14 20 L9 26 L14 25"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M26 20 L31 26 L26 25"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M17 29 L20 33 L23 29"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "30",
+          "cy": "10",
+          "r": "1.8",
+          "fill": "accent",
+          "stroke": "none"
+        }
+      }
+    ]
+  },
+  "attempts": 1,
+  "latencyMs": 1157,
+  "costUsd": 0.004802,
+  "tokens": {
+    "in": 1331,
+    "out": 214
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"coral\">\n  <path d=\"M20 7 C25 11 27 17 26 24 H14 C13 17 15 11 20 7 Z\" fill=\"soft\"/>\n  <circle cx=\"20\" cy=\"17\" r=\"2.5\" detail=\"1\"/>\n  <path d=\"M14 20 L9 26 L14 25\"/>\n  <path d=\"M26 20 L31 26 L26 25\"/>\n  <path d=\"M17 29 L20 33 L23 29\"/>\n  <circle cx=\"30\" cy=\"10\" r=\"1.8\" fill=\"accent\" stroke=\"none\"/>\n</svg>",
+  "svg": {
+    "light": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"l-B-anthropic_claude-sonnet-5.5-emoji\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#l-B-anthropic_claude-sonnet-5.5-emoji)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#f9d7cf\"/><g fill=\"none\" stroke=\"#7c3326\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M20 7 C25 11 27 17 26 24 H14 C13 17 15 11 20 7 Z\" fill=\"#eaaca0\"/><circle cx=\"20\" cy=\"17\" r=\"2.5\"/><path d=\"M14 20 L9 26 L14 25\"/><path d=\"M26 20 L31 26 L26 25\"/><path d=\"M17 29 L20 33 L23 29\"/><circle cx=\"30\" cy=\"10\" r=\"1.8\" fill=\"#c68206\" stroke=\"none\"/></g></g></svg>",
+    "dark": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"d-B-anthropic_claude-sonnet-5.5-emoji\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#d-B-anthropic_claude-sonnet-5.5-emoji)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#4c2b25\"/><g fill=\"none\" stroke=\"#fdcabf\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M20 7 C25 11 27 17 26 24 H14 C13 17 15 11 20 7 Z\" fill=\"#77463c\"/><circle cx=\"20\" cy=\"17\" r=\"2.5\"/><path d=\"M14 20 L9 26 L14 25\"/><path d=\"M26 20 L31 26 L26 25\"/><path d=\"M17 29 L20 33 L23 29\"/><circle cx=\"30\" cy=\"10\" r=\"1.8\" fill=\"#e4a249\" stroke=\"none\"/></g></g></svg>"
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"coral\">\n  <path d=\"M20 7 C25 11 27 17 26 24 H14 C13 17 15 11 20 7 Z\" fill=\"soft\"/>\n  <circle cx=\"20\" cy=\"17\" r=\"2.5\" detail=\"1\"/>\n  <path d=\"M14 20 L9 26 L14 25\"/>\n  <path d=\"M26 20 L31 26 L26 25\"/>\n  <path d=\"M17 29 L20 33 L23 29\"/>\n  <circle cx=\"30\" cy=\"10\" r=\"1.8\" fill=\"accent\" stroke=\"none\"/>\n</svg>"
+}

@@ -1,0 +1,53 @@
+{
+  "approach": "D",
+  "model": "anthropic/claude-sonnet-5.5",
+  "topic": "vague",
+  "ok": true,
+  "spec": {
+    "hue": "periwinkle",
+    "elements": [
+      {
+        "tag": "motif",
+        "attrs": {
+          "name": "chat",
+          "x": "-2",
+          "y": "-2",
+          "scale": "0.9"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "30",
+          "cy": "30",
+          "r": "9",
+          "fill": "tile",
+          "stroke": "none",
+          "detail": "1"
+        }
+      },
+      {
+        "tag": "motif",
+        "attrs": {
+          "name": "clock",
+          "x": "21",
+          "y": "21",
+          "scale": "0.45"
+        }
+      }
+    ]
+  },
+  "attempts": 1,
+  "latencyMs": 1526,
+  "costUsd": 0.008124,
+  "tokens": {
+    "in": 3422,
+    "out": 128
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"periwinkle\">\n  <motif name=\"chat\" x=\"-2\" y=\"-2\" scale=\"0.9\"/>\n  <circle cx=\"30\" cy=\"30\" r=\"9\" fill=\"tile\" stroke=\"none\" detail=\"1\"/>\n  <motif name=\"clock\" x=\"21\" y=\"21\" scale=\"0.45\"/>\n</svg>",
+  "svg": {
+    "light": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"l-D-anthropic_claude-sonnet-5.5-vague\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#l-D-anthropic_claude-sonnet-5.5-vague)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#d7defb\"/><g fill=\"none\" stroke=\"#3d4685\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><g transform=\"translate(-2 -2) scale(0.9)\" stroke-width=\"3.33\"><path d=\"M12 9 H28 Q32 9 32 13 V22 Q32 26 28 26 H19 L13 31 V26 H12 Q8 26 8 22 V13 Q8 9 12 9 Z\" fill=\"#afbbef\"/><circle cx=\"15\" cy=\"17.5\" r=\"1.6\" fill=\"#3d4685\" stroke=\"none\"/><circle cx=\"20\" cy=\"17.5\" r=\"1.6\" fill=\"#3d4685\" stroke=\"none\"/><circle cx=\"25\" cy=\"17.5\" r=\"1.6\" fill=\"#3d4685\" stroke=\"none\"/></g><circle cx=\"30\" cy=\"30\" r=\"9\" fill=\"#d7defb\" stroke=\"none\"/><g transform=\"translate(21 21) scale(0.45)\" stroke-width=\"6.67\"><circle cx=\"20\" cy=\"20\" r=\"11\" fill=\"#afbbef\"/><path d=\"M20 13 V20 L25 23\"/></g></g></g></svg>",
+    "dark": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"d-D-anthropic_claude-sonnet-5.5-vague\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#d-D-anthropic_claude-sonnet-5.5-vague)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#2e334f\"/><g fill=\"none\" stroke=\"#ccd5fd\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><g transform=\"translate(-2 -2) scale(0.9)\" stroke-width=\"3.33\"><path d=\"M12 9 H28 Q32 9 32 13 V22 Q32 26 28 26 H19 L13 31 V26 H12 Q8 26 8 22 V13 Q8 9 12 9 Z\" fill=\"#4a527c\"/><circle cx=\"15\" cy=\"17.5\" r=\"1.6\" fill=\"#ccd5fd\" stroke=\"none\"/><circle cx=\"20\" cy=\"17.5\" r=\"1.6\" fill=\"#ccd5fd\" stroke=\"none\"/><circle cx=\"25\" cy=\"17.5\" r=\"1.6\" fill=\"#ccd5fd\" stroke=\"none\"/></g><circle cx=\"30\" cy=\"30\" r=\"9\" fill=\"#2e334f\" stroke=\"none\"/><g transform=\"translate(21 21) scale(0.45)\" stroke-width=\"6.67\"><circle cx=\"20\" cy=\"20\" r=\"11\" fill=\"#4a527c\"/><path d=\"M20 13 V20 L25 23\"/></g></g></g></svg>"
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"periwinkle\">\n  <motif name=\"chat\" x=\"-2\" y=\"-2\" scale=\"0.9\"/>\n  <circle cx=\"30\" cy=\"30\" r=\"9\" fill=\"tile\" stroke=\"none\" detail=\"1\"/>\n  <motif name=\"clock\" x=\"21\" y=\"21\" scale=\"0.45\"/>\n</svg>"
+}

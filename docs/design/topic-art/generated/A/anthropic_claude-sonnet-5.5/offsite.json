@@ -1,0 +1,24 @@
+{
+  "approach": "A",
+  "model": "anthropic/claude-sonnet-5.5",
+  "topic": "offsite",
+  "ok": true,
+  "free": {
+    "ok": true,
+    "svg": "<svg width=\"40\" height=\"40\" aria-hidden=\"true\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" fill=\"none\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"5\" y=\"8\" rx=\"5\" fill=\"#CFE3E8\" stroke=\"#2E5F6B\" stroke-width=\"3\"/><path d=\"M5 16h30\" stroke=\"#2E5F6B\" stroke-width=\"3\"/><path d=\"M12 4v7M28 4v7\" stroke=\"#2E5F6B\" stroke-width=\"3\"/><circle cx=\"20\" cy=\"26\" r=\"6\" fill=\"#fff\" stroke=\"#2E5F6B\" stroke-width=\"3\"/><path d=\"M20 23v3.5l2.5 1.5\" stroke=\"#CC4628\" stroke-width=\"2.5\"/></svg>",
+    "elements": 5,
+    "gradients": false
+  },
+  "attempts": 1,
+  "latencyMs": 1167,
+  "costUsd": 0.00375,
+  "tokens": {
+    "in": 470,
+    "out": 281
+  },
+  "raw": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" fill=\"none\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"5\" y=\"8\" width=\"30\" height=\"27\" rx=\"5\" fill=\"#CFE3E8\" stroke=\"#2E5F6B\" stroke-width=\"3\"/><path d=\"M5 16h30\" stroke=\"#2E5F6B\" stroke-width=\"3\"/><path d=\"M12 4v7M28 4v7\" stroke=\"#2E5F6B\" stroke-width=\"3\"/><circle cx=\"20\" cy=\"26\" r=\"6\" fill=\"#fff\" stroke=\"#2E5F6B\" stroke-width=\"3\"/><path d=\"M20 23v3.5l2.5 1.5\" stroke=\"#CC4628\" stroke-width=\"2.5\"/></svg>",
+  "svg": {
+    "light": "<svg width=\"40\" height=\"40\" aria-hidden=\"true\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" fill=\"none\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"5\" y=\"8\" rx=\"5\" fill=\"#CFE3E8\" stroke=\"#2E5F6B\" stroke-width=\"3\"/><path d=\"M5 16h30\" stroke=\"#2E5F6B\" stroke-width=\"3\"/><path d=\"M12 4v7M28 4v7\" stroke=\"#2E5F6B\" stroke-width=\"3\"/><circle cx=\"20\" cy=\"26\" r=\"6\" fill=\"#fff\" stroke=\"#2E5F6B\" stroke-width=\"3\"/><path d=\"M20 23v3.5l2.5 1.5\" stroke=\"#CC4628\" stroke-width=\"2.5\"/></svg>",
+    "dark": "<svg width=\"40\" height=\"40\" aria-hidden=\"true\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" fill=\"none\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"5\" y=\"8\" rx=\"5\" fill=\"#CFE3E8\" stroke=\"#2E5F6B\" stroke-width=\"3\"/><path d=\"M5 16h30\" stroke=\"#2E5F6B\" stroke-width=\"3\"/><path d=\"M12 4v7M28 4v7\" stroke=\"#2E5F6B\" stroke-width=\"3\"/><circle cx=\"20\" cy=\"26\" r=\"6\" fill=\"#fff\" stroke=\"#2E5F6B\" stroke-width=\"3\"/><path d=\"M20 23v3.5l2.5 1.5\" stroke=\"#CC4628\" stroke-width=\"2.5\"/></svg>"
+  }
+}

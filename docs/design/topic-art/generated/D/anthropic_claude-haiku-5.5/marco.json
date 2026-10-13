@@ -1,0 +1,62 @@
+{
+  "approach": "D",
+  "model": "anthropic/claude-haiku-5.5",
+  "topic": "marco",
+  "ok": true,
+  "spec": {
+    "hue": "olive",
+    "elements": [
+      {
+        "tag": "motif",
+        "attrs": {
+          "name": "id-card",
+          "x": "-2",
+          "y": "-2",
+          "scale": "0.9"
+        }
+      },
+      {
+        "tag": "motif",
+        "attrs": {
+          "name": "check",
+          "x": "21",
+          "y": "21",
+          "scale": "0.45"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "30",
+          "cy": "30",
+          "r": "9",
+          "fill": "tile",
+          "stroke": "none",
+          "detail": "1"
+        }
+      },
+      {
+        "tag": "motif",
+        "attrs": {
+          "name": "check",
+          "x": "21",
+          "y": "21",
+          "scale": "0.45"
+        }
+      }
+    ]
+  },
+  "attempts": 1,
+  "latencyMs": 1312,
+  "costUsd": 0.0004168,
+  "tokens": {
+    "in": 3433,
+    "out": 147
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"olive\">\n<motif name=\"id-card\" x=\"-2\" y=\"-2\" scale=\"0.9\"/>\n<motif name=\"check\" x=\"21\" y=\"21\" scale=\"0.45\"/>\n<circle cx=\"30\" cy=\"30\" r=\"9\" fill=\"tile\" stroke=\"none\" detail=\"1\"/>\n<motif name=\"check\" x=\"21\" y=\"21\" scale=\"0.45\"/>\n</svg>",
+  "svg": {
+    "light": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"l-D-anthropic_claude-haiku-5.5-marco\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#l-D-anthropic_claude-haiku-5.5-marco)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#e0e3c5\"/><g fill=\"none\" stroke=\"#4f5106\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><g transform=\"translate(-2 -2) scale(0.9)\" stroke-width=\"3.33\"><rect x=\"8\" y=\"11\" width=\"24\" height=\"18\" rx=\"4\" fill=\"#bec38b\"/><circle cx=\"15\" cy=\"19\" r=\"3\"/><line x1=\"21\" y1=\"17\" x2=\"27\" y2=\"17\"/><line x1=\"21\" y1=\"22\" x2=\"26\" y2=\"22\"/></g><g transform=\"translate(21 21) scale(0.45)\" stroke-width=\"6.67\"><circle cx=\"20\" cy=\"20\" r=\"11\" fill=\"#bec38b\"/><path d=\"M14 20 L18.5 24.5 L27 15\"/></g><circle cx=\"30\" cy=\"30\" r=\"9\" fill=\"#e0e3c5\" stroke=\"none\"/><g transform=\"translate(21 21) scale(0.45)\" stroke-width=\"6.67\"><circle cx=\"20\" cy=\"20\" r=\"11\" fill=\"#bec38b\"/><path d=\"M14 20 L18.5 24.5 L27 15\"/></g></g></g></svg>",
+    "dark": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"d-D-anthropic_claude-haiku-5.5-marco\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#d-D-anthropic_claude-haiku-5.5-marco)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#363818\"/><g fill=\"none\" stroke=\"#d8dda8\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><g transform=\"translate(-2 -2) scale(0.9)\" stroke-width=\"3.33\"><rect x=\"8\" y=\"11\" width=\"24\" height=\"18\" rx=\"4\" fill=\"#565928\"/><circle cx=\"15\" cy=\"19\" r=\"3\"/><line x1=\"21\" y1=\"17\" x2=\"27\" y2=\"17\"/><line x1=\"21\" y1=\"22\" x2=\"26\" y2=\"22\"/></g><g transform=\"translate(21 21) scale(0.45)\" stroke-width=\"6.67\"><circle cx=\"20\" cy=\"20\" r=\"11\" fill=\"#565928\"/><path d=\"M14 20 L18.5 24.5 L27 15\"/></g><circle cx=\"30\" cy=\"30\" r=\"9\" fill=\"#363818\" stroke=\"none\"/><g transform=\"translate(21 21) scale(0.45)\" stroke-width=\"6.67\"><circle cx=\"20\" cy=\"20\" r=\"11\" fill=\"#565928\"/><path d=\"M14 20 L18.5 24.5 L27 15\"/></g></g></g></svg>"
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"olive\">\n  <motif name=\"id-card\" x=\"-2\" y=\"-2\" scale=\"0.9\"/>\n  <motif name=\"check\" x=\"21\" y=\"21\" scale=\"0.45\"/>\n  <circle cx=\"30\" cy=\"30\" r=\"9\" fill=\"tile\" stroke=\"none\" detail=\"1\"/>\n  <motif name=\"check\" x=\"21\" y=\"21\" scale=\"0.45\"/>\n</svg>"
+}

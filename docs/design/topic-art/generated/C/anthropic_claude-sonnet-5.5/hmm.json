@@ -1,0 +1,40 @@
+{
+  "approach": "C",
+  "model": "anthropic/claude-sonnet-5.5",
+  "topic": "hmm",
+  "ok": true,
+  "spec": {
+    "hue": "sky",
+    "elements": [
+      {
+        "tag": "motif",
+        "attrs": {
+          "name": "question",
+          "x": "0",
+          "y": "0",
+          "scale": "1"
+        }
+      }
+    ]
+  },
+  "decision": {
+    "main": "question",
+    "secondary": null,
+    "hue": "sky",
+    "confident": false,
+    "why": "Title and messages give nothing concrete to draw."
+  },
+  "attempts": 1,
+  "latencyMs": 1049,
+  "costUsd": 0.004394,
+  "tokens": {
+    "in": 1942,
+    "out": 51
+  },
+  "raw": "{\"main\": \"question\", \"secondary\": null, \"hue\": \"sky\", \"confident\": false, \"why\": \"Title and messages give nothing concrete to draw.\"}",
+  "svg": {
+    "light": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"l-C-anthropic_claude-sonnet-5.5-hmm\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#l-C-anthropic_claude-sonnet-5.5-hmm)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#c7e5f7\"/><g fill=\"none\" stroke=\"#0a5475\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><g transform=\"translate(0 0) scale(1)\" stroke-width=\"3.00\"><circle cx=\"20\" cy=\"20\" r=\"11\" fill=\"#8ec6e7\"/><path d=\"M16 16.5 A4 4 0 1 1 20 21 V23\"/><circle cx=\"20\" cy=\"27.5\" r=\"1.6\" fill=\"#0a5475\" stroke=\"none\"/></g></g></g></svg>",
+    "dark": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"d-C-anthropic_claude-sonnet-5.5-hmm\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#d-C-anthropic_claude-sonnet-5.5-hmm)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#18394b\"/><g fill=\"none\" stroke=\"#aedffd\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><g transform=\"translate(0 0) scale(1)\" stroke-width=\"3.00\"><circle cx=\"20\" cy=\"20\" r=\"11\" fill=\"#295b77\"/><path d=\"M16 16.5 A4 4 0 1 1 20 21 V23\"/><circle cx=\"20\" cy=\"27.5\" r=\"1.6\" fill=\"#aedffd\" stroke=\"none\"/></g></g></g></svg>"
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"sky\">\n  <motif name=\"question\" x=\"0\" y=\"0\" scale=\"1\"/>\n</svg>"
+}
