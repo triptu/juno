@@ -34,3 +34,4 @@ Small items noticed during work that are not yet assigned to a milestone. Remove
 - Main rows: engine field for "threads started since Main was last read" (contract + topics query), wired to the TopicRow `newThreads` prop. After M4 WP1 merges.
 - Topic art track: placeholder is a library of free-form Tide-style shapes picked per topic, no container (owner decision 10-13).
 - Flaky: the sidebar hover layout-shift e2e test failed once during the unfollow-fix run and passed on rerun. Investigate in the maintenance pass.
+- Flaky: a sign-out e2e test timed out once during the row-footer run (passed on rerun). Track with the hover flake.
