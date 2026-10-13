@@ -1,4 +1,4 @@
-import { memo, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { memo, useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
 import { MESSAGE_WINDOW_MAX, readsMarkRead, topicsSubscribe, topicsUnsubscribe, type MessageView, type TopicDetail } from '@juno/contract'
 import {
   bottomWindow,
@@ -116,9 +116,17 @@ function snapshotOf(scroller: HTMLElement): ScrollSnapshot | undefined {
  */
 type Pin = { readonly kind: 'bottom' } | { readonly kind: 'row'; readonly element: Element; readonly offset: number }
 
-function holdPin(scroller: HTMLElement, pin: Pin): void {
-  if (pin.kind === 'bottom') scroller.scrollTop = scroller.scrollHeight
-  else scroller.scrollTop += pin.element.getBoundingClientRect().top - scroller.getBoundingClientRect().top - pin.offset
+/** Puts the pinned row or the bottom back, and remembers the scrollTop it set. A row that left the list ends the pin. */
+function hold(scroller: HTMLElement, pin: RefObject<Pin | undefined>, pinnedTop: RefObject<number>): void {
+  const held = pin.current
+  if (held === undefined) return
+  if (held.kind === 'row' && !held.element.isConnected) {
+    pin.current = undefined
+    return
+  }
+  if (held.kind === 'bottom') scroller.scrollTop = scroller.scrollHeight
+  else scroller.scrollTop += held.element.getBoundingClientRect().top - scroller.getBoundingClientRect().top - held.offset
+  pinnedTop.current = scroller.scrollTop
 }
 
 function distanceFromBottom(scroller: HTMLElement): number {
@@ -217,17 +225,6 @@ function Topic({ id, stealth, detail }: { readonly id: string; readonly stealth:
     atEndRef.current = atEnd
   })
 
-  const hold = (scroller: HTMLElement) => {
-    const held = pin.current
-    if (held === undefined) return
-    if (held.kind === 'row' && !held.element.isConnected) {
-      pin.current = undefined
-      return
-    }
-    holdPin(scroller, held)
-    pinnedTop.current = scroller.scrollTop
-  }
-
   // The open position, before the first frame with rows is painted.
   useLayoutEffect(() => {
     const scroller = scrollRef.current
@@ -240,7 +237,7 @@ function Topic({ id, stealth, detail }: { readonly id: string; readonly stealth:
         : anchorRef.current !== null
           ? { kind: 'row', element: anchorRef.current, offset: DIVIDER_TOP }
           : { kind: 'bottom' }
-    hold(scroller)
+    hold(scroller, pin, pinnedTop)
     const distance = distanceFromBottom(scroller)
     const bottom = atEnd && distance <= BOTTOM_SLACK
     if (bottom) pin.current = { kind: 'bottom' }
@@ -256,7 +253,7 @@ function Topic({ id, stealth, detail }: { readonly id: string; readonly stealth:
     const scroller = scrollRef.current
     const column = scroller?.firstElementChild
     if (scroller == null || column == null) return
-    const observer = new ResizeObserver(() => hold(scroller))
+    const observer = new ResizeObserver(() => hold(scroller, pin, pinnedTop))
     observer.observe(column)
     return () => observer.disconnect()
   }, [])
@@ -272,7 +269,7 @@ function Topic({ id, stealth, detail }: { readonly id: string; readonly stealth:
   useLayoutEffect(() => {
     const scroller = scrollRef.current
     if (scroller === null || !positioned || pin.current?.kind !== 'bottom' || !atEnd) return
-    hold(scroller)
+    hold(scroller, pin, pinnedTop)
     setSeenTs(last)
   }, [positioned, last, atEnd])
 
@@ -374,7 +371,7 @@ function Topic({ id, stealth, detail }: { readonly id: string; readonly stealth:
     setAtBottom(true)
     setFar(false)
     if (!atEnd) registry.set(messageWindowSpecAtom(id), bottomWindow)
-    if (scroller !== null) hold(scroller)
+    if (scroller !== null) hold(scroller, pin, pinnedTop)
     setSeenTs(last)
   }
 
