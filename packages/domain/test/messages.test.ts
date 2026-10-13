@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { mainLabel, startsGroup, threadLinkLabel, type GroupMessage } from '../src/messages'
+import { startsGroup, threadLinkLabel, type GroupMessage } from '../src/messages'
 
 const message: GroupMessage = { senderId: 'U0LEO', body: { blocks: [] }, isThreadRoot: false }
 
@@ -20,6 +20,3 @@ it.each([[0, 'Thread'], [1, '1 reply'], [2, '2 replies']] satisfies ReadonlyArra
   expect(threadLinkLabel(count)).toBe(label)
 })
 
-it.each([['#eng', '#eng · Main'], ['Maya Chen', 'Maya Chen · Main']])('labels Main in %s', (channel, expected) => {
-  expect(mainLabel(channel)).toBe(expected)
-})

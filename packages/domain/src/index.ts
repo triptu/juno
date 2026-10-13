@@ -16,4 +16,4 @@ export * from './mentions'
 export * from './index-topic'
 export * from './channel-style'
 
-export { startsGroup, threadLinkLabel, mainLabel, type GroupMessage } from './messages'
+export { startsGroup, threadLinkLabel, type GroupMessage } from './messages'

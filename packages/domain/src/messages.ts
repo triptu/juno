@@ -17,7 +17,4 @@ export function threadLinkLabel(replyCount: number): string {
   return replyCount <= 0 ? 'Thread' : replyCount === 1 ? '1 reply' : `${replyCount} replies`
 }
 
-/** Takes the channel's display label, including # for channels. */
-export function mainLabel(channelLabel: string): string {
-  return `${channelLabel} · Main`
-}
+export { mainLabel } from './channel'
