@@ -19,6 +19,7 @@ export { Chip, type ChipButtonProps, type ChipLabelProps, type ChipProps, type C
 export { CodeBlock, type CodeBlockProps } from './CodeBlock'
 export { ContextPill, type ContextPillProps, type ContextPillSize, type ContextTint } from './ContextPill'
 export { Divider, LabelledRule, type DividerProps, type LabelledRuleProps } from './Divider'
+export { EmojiButton, type EmojiButtonProps } from './EmojiButton'
 export { EmptyState, type EmptyStateProps } from './EmptyState'
 export { Icon, defaultIconWeight, type IconProps, type IconSize, type IconWeight, type PhosphorIcon } from './Icon'
 export { IconButton, type IconButtonProps, type IconButtonRadius, type IconButtonSize, type IconButtonTone, type IconButtonVariant } from './IconButton'

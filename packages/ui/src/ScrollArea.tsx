@@ -1,5 +1,5 @@
 import * as stylex from '@stylexjs/stylex'
-import type { ElementType, HTMLAttributes, ReactNode } from 'react'
+import type { ElementType, HTMLAttributes, ReactNode, Ref } from 'react'
 import { colors } from '@juno/tokens/tokens.stylex'
 import type { LayoutStyles } from './internal/sx'
 
@@ -12,6 +12,8 @@ export interface ScrollAreaProps extends Omit<HTMLAttributes<HTMLElement>, 'styl
    * the pointer is over the area. Default `always`.
    */
   readonly scrollbar?: ScrollAreaScrollbar
+  /** The scroll element, for an owner that reads or restores its position. */
+  readonly ref?: Ref<HTMLElement>
   readonly as?: ElementType
   /** Extra StyleX styles from the owner (layout only: padding, flex). */
   readonly sx?: LayoutStyles

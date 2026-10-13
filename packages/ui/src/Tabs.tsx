@@ -1,7 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import { X } from '@phosphor-icons/react/dist/icons/X'
 import type { MouseEvent, ReactNode } from 'react'
-import { colors, layout, radii, spacing, weights } from '@juno/tokens/tokens.stylex'
+import { colors, layout, radii, sizes, spacing, weights } from '@juno/tokens/tokens.stylex'
 import { Icon, type PhosphorIcon } from './Icon'
 import { IconButton } from './IconButton'
 import { activateHandlers, type ActivateEvent } from './internal/activate'
@@ -29,6 +29,12 @@ export function TabStrip({ label = 'Tabs', trailing, children }: TabStripProps) 
 
 export interface TabProps {
   readonly icon: PhosphorIcon
+  /**
+   * Fills the 15px icon slot instead of `icon`: a topic's art, drawn at the
+   * slot's size. The slot keeps its size either way, so swapping one for
+   * the other never moves the label.
+   */
+  readonly leading?: ReactNode
   readonly label: string
   readonly active?: boolean
   /** Fires on mouse down (see internal/activate.ts); `metaKey` for ⌘-click. */
@@ -44,7 +50,7 @@ export interface TabProps {
  * regular even when active: tab switches do not animate and a filled set
  * is too heavy in a strip.
  */
-export function Tab({ icon, label, active = false, onSelect, onClose, onContextMenu, closeLabel = 'Close tab' }: TabProps) {
+export function Tab({ icon, leading, label, active = false, onSelect, onClose, onContextMenu, closeLabel = 'Close tab' }: TabProps) {
   return (
     <div
       role="tab"
@@ -55,7 +61,7 @@ export function Tab({ icon, label, active = false, onSelect, onClose, onContextM
       {...activateHandlers<HTMLDivElement>(onSelect)}
       {...stylex.props(interactive.focusRingInset, styles.tab, typeVariants.ui, active ? styles.tabActive : styles.tabInactive)}
     >
-      <Icon icon={icon} size={15} dim />
+      <span {...stylex.props(styles.iconSlot)}>{leading ?? <Icon icon={icon} size={15} dim />}</span>
       <span {...stylex.props(styles.label)}>{label}</span>
       {onClose ? (
         <span {...stylex.props(styles.close)}>
@@ -81,8 +87,10 @@ const styles = stylex.create({
   strip: {
     display: 'flex',
     alignItems: 'flex-end',
-    // Fills the window so the strip and its bottom border run edge to edge.
+    // Fills the window so the strip and its bottom border run edge to edge,
+    // and never gives up height to a tall page under it.
     width: '100%',
+    flexShrink: 0,
     boxSizing: 'border-box',
     height: layout['--titlebar-height'],
     paddingInline: spacing['--space-2-5'],
@@ -137,6 +145,15 @@ const styles = stylex.create({
       ':hover': { default: null, [HOVER]: colors['--foreground-default'] },
     },
     fontWeight: weights['--weight-regular'],
+  },
+  iconSlot: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+    width: sizes['--icon-15'],
+    height: sizes['--icon-15'],
+    overflow: 'hidden',
   },
   label: {
     flexGrow: 1,

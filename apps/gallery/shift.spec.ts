@@ -178,6 +178,41 @@ test.describe('Avatar photo', () => {
   })
 })
 
+test.describe('Message thumbnail', () => {
+  const picture = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800"><rect width="1200" height="800" fill="#8EB5C9"/></svg>`
+  const arrive = (route: NetworkRoute) => route.fulfill({ status: 200, contentType: 'image/svg+xml', body: picture })
+
+  test('arriving late does not move anything', async ({ page }) => {
+    const release = await holdPhoto(page, arrive)
+    await page.goto('/#/MessageList?__state=files/thumbnail-pending')
+    const thumb = page.getByRole('img', { name: 'staging-screenshot.png' })
+    const image = thumb.locator('img')
+    await expect(image).toHaveCSS('opacity', '0')
+    const before = await thumb.boundingBox()
+
+    await expectNoLayoutShift(page, async () => {
+      release()
+      await expect(image).not.toHaveCSS('opacity', '0')
+    })
+    await expect(image).toHaveCSS('opacity', '1')
+    // The box was its final size before the bytes came.
+    expect(await thumb.boundingBox()).toEqual(before)
+  })
+
+  test('failing to arrive does not move anything', async ({ page }) => {
+    const release = await holdPhoto(page, (route) => route.fulfill({ status: 404, contentType: 'text/plain', body: 'missing' }))
+    await page.goto('/#/MessageList?__state=files/thumbnail-pending')
+    const thumb = page.getByRole('img', { name: 'staging-screenshot.png' })
+    await expect(thumb.locator('img')).toHaveCount(1)
+    const before = await thumb.boundingBox()
+    await expectNoLayoutShift(page, async () => {
+      release()
+      await expect(thumb.locator('img')).toHaveCount(0)
+    })
+    expect(await thumb.boundingBox()).toEqual(before)
+  })
+})
+
 /**
  * The guard has to fail when something moves, or a green run means nothing.
  * These pages are made on the spot, so they do not depend on any component.
