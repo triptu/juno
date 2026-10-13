@@ -170,30 +170,51 @@ export class Workspace {
 
   // Shapes for the wire
 
-  channelObject(c: ConversationRecord): Channel {
-    const main = this.main(c.id)
-    const latest = main.at(-1)
+  /**
+   * A channel as `client.userBoot.channels` lists it, matching the shape
+   * recorded live: metadata only. No `is_member`, `last_read`, `latest`,
+   * `unread_count` or `is_open`; `members` only on private channels and
+   * group DMs. Membership and read state are in `client.counts`.
+   */
+  bootChannelObject(c: ConversationRecord): Channel {
+    const seconds = Math.floor(c.created / 1000)
     return {
       id: c.id,
       name: c.name,
       name_normalized: c.name,
       is_channel: c.kind === 'public' || c.kind === 'private',
       is_group: false,
-      is_im: c.kind === 'im',
+      is_im: false,
       is_mpim: c.kind === 'mpim',
       is_private: c.kind === 'private' || c.kind === 'mpim',
       is_archived: c.archived,
       is_general: c.name === 'general',
-      is_member: c.members.has(this.selfId),
-      is_open: c.isOpen,
       is_shared: false,
+      is_ext_shared: false,
       is_org_shared: false,
-      created: Math.floor(c.created / 1000),
+      is_pending_ext_shared: false,
+      is_frozen: false,
+      created: seconds,
       creator: [...c.members][0] ?? this.selfId,
       updated: c.created,
       context_team_id: this.team.id,
-      topic: { value: c.topic, creator: this.selfId, last_set: Math.floor(c.created / 1000) },
-      purpose: { value: c.purpose, creator: this.selfId, last_set: Math.floor(c.created / 1000) },
+      shared_team_ids: [this.team.id],
+      parent_conversation: null,
+      topic: { value: c.topic, creator: this.selfId, last_set: seconds },
+      purpose: { value: c.purpose, creator: this.selfId, last_set: seconds },
+      previous_names: [],
+      ...(c.kind === 'public' ? {} : { members: [...c.members] }),
+    }
+  }
+
+  /** A channel as `conversations.*` and the `channel_joined` family return it: the boot shape plus the user's own view of it. */
+  channelObject(c: ConversationRecord): Channel {
+    const latest = this.main(c.id).at(-1)
+    return {
+      ...this.bootChannelObject(c),
+      is_im: c.kind === 'im',
+      is_member: c.members.has(this.selfId),
+      is_open: c.isOpen,
       members: [...c.members],
       num_members: c.members.size,
       last_read: this.reads.get(c.id) ?? NEVER_READ,
@@ -202,8 +223,8 @@ export class Workspace {
     }
   }
 
+  /** A DM as `client.userBoot.ims` lists it: no read state (that is in `client.counts`). */
   imObject(c: ConversationRecord): Im {
-    const latest = this.main(c.id).at(-1)
     return {
       id: c.id,
       user: this.imPartner(c),
@@ -215,8 +236,6 @@ export class Workspace {
       updated: c.created,
       priority: 0,
       context_team_id: this.team.id,
-      last_read: this.reads.get(c.id) ?? NEVER_READ,
-      ...(latest === undefined ? {} : { latest: latest.ts }),
     }
   }
 
@@ -237,8 +256,8 @@ export class Workspace {
       latest: latest?.ts ?? null,
       has_unreads: unread.length > 0,
       mention_count: mentions,
-      mention_count_display: mentions,
       updated: latest?.ts ?? lastRead,
+      history_invalid: NEVER_READ,
     }
   }
 
@@ -546,6 +565,36 @@ export class Workspace {
         : { type: 'mpim_joined', channel: this.channelObject(record), user: this.selfId },
     )
     return { conversation: record, created: true }
+  }
+
+  /**
+   * `user` joins a channel. Everyone in it gets `member_joined_channel`; the
+   * user themself also gets `channel_joined` (or `group_joined`) with the
+   * full channel object, as Slack sends it to the joining client.
+   */
+  join(channel: string, user: string): void {
+    const conversation = this.conversations.get(channel)
+    if (conversation === undefined) throw new Error('channel_not_found')
+    if (conversation.kind === 'im' || conversation.kind === 'mpim') throw new Error('method_not_supported_for_channel_type')
+    if (conversation.members.has(user)) throw new Error('already_in_channel')
+    conversation.members.add(user)
+    if (user === this.selfId) {
+      this.emit({ type: conversation.kind === 'private' ? 'group_joined' : 'channel_joined', channel: this.channelObject(conversation), event_ts: this.eventTs() })
+    }
+    this.emit({ type: 'member_joined_channel', user, channel, channel_type: conversation.kind === 'private' ? 'G' : 'C', team: this.team.id, event_ts: this.eventTs() })
+  }
+
+  /** `user` leaves a channel: `member_left_channel` to everyone, plus `channel_left` (or `group_left`) with the bare id to the user. */
+  leave(channel: string, user: string): void {
+    const conversation = this.conversations.get(channel)
+    if (conversation === undefined) throw new Error('channel_not_found')
+    if (conversation.kind === 'im' || conversation.kind === 'mpim') throw new Error('method_not_supported_for_channel_type')
+    if (!conversation.members.has(user)) throw new Error('not_in_channel')
+    conversation.members.delete(user)
+    this.emit({ type: 'member_left_channel', user, channel, channel_type: conversation.kind === 'private' ? 'G' : 'C', team: this.team.id, event_ts: this.eventTs() })
+    if (user === this.selfId) {
+      this.emit({ type: conversation.kind === 'private' ? 'group_left' : 'channel_left', channel, actor_id: user, event_ts: this.eventTs() })
+    }
   }
 
   typing(channel: string, user: string, threadTs?: Ts): void {

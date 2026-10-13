@@ -25,8 +25,20 @@ describe('every fixture response decodes with @juno/slack schemas', () => {
     expect(boot.channels.filter((c) => c.is_mpim)).toHaveLength(1)
     expect(boot.ims).toHaveLength(2)
     expect(boot.prefs?.muted_channels).toBe('C0DEPLOYS')
+    // As recorded live: every channel of the workspace, metadata only; membership and read state are in counts.
+    expect(boot.channels.map((c) => c.name)).toEqual(expect.arrayContaining(['sales', 'social']))
+    for (const channel of boot.channels) {
+      expect(channel.is_member).toBeUndefined()
+      expect(channel.last_read).toBeUndefined()
+      expect(channel.latest).toBeUndefined()
+      expect(channel.unread_count).toBeUndefined()
+    }
+    for (const im of boot.ims) expect(im.last_read).toBeUndefined()
 
     const counts = await client.ok('client.counts', { thread_counts_by_channel: true, org_wide_aware: true })
+    const memberIds = CONVERSATIONS.filter((c) => c.members.includes(fake.selfId)).map((c) => c.id)
+    expect([...counts.channels, ...counts.ims, ...counts.mpims].map((c) => c.id).toSorted()).toEqual(memberIds.toSorted())
+    expect(counts.threads.timestamp).toBeUndefined()
     const eng = counts.channels.find((c) => c.id === 'C0ENG')
     expect(eng?.has_unreads).toBe(true)
     expect(counts.threads.has_unreads).toBe(true)
@@ -95,6 +107,8 @@ describe('every fixture response decodes with @juno/slack schemas', () => {
     expect(hiring?.unread_replies).toHaveLength(2)
     expect(hiring?.unread_replies?.some((m) => m.text?.includes(`<@${fake.selfId}>`))).toBe(true)
     expect(view.threads.some((t) => t.root_msg.text?.startsWith('checkout.spec'))).toBe(false)
+    // Threads in channels self is not in are not followed.
+    expect(view.threads.some((t) => t.root_msg.channel === 'C0SALES' || t.root_msg.channel === 'C0SOCIAL')).toBe(false)
     expect(view.threads_state?.unread_count_by_channel?.['C0HIRING']).toBe(2)
 
     const root = hiring!.root_msg
