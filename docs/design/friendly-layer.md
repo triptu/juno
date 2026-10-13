@@ -4,7 +4,7 @@ Direction for making Juno feel playful and friendly without giving up what makes
 
 Where this document and `tokens.md`, `primitives.md` or `inventory.md` disagree, this document wins; section 9 lists the edits to apply to `tokens.md` so they stop disagreeing. `docs/design/handoff/SPEC.md` still decides behaviour.
 
-The before/after mock is `docs/design/friendly-layer/mock.html` (renders: `mock-light.png`, `mock-dark.png`). Serve the repo root over HTTP to open it; the fonts load from `packages/tokens/node_modules`.
+The before/after mock is `docs/design/friendly-layer/mock.html` (renders: `mock-light.png`, `mock-dark.png`). Serve the repo root over HTTP to open it; the fonts load from `packages/tokens/node_modules`. The mock follows the tokens for the font (Figtree) and the dark palette (`tokens.md` 1.2), but keeps the friendly-layer radii and the ink accent so the two columns stay a fair before and after; the later options review (`options.html`: C1 + D1, Coral and the rounder shapes) is implemented in the app, not in this mock.
 
 ## Status
 
@@ -18,7 +18,7 @@ Implemented in `packages/tokens`, `packages/ui`, `packages/views` and the galler
 - §7 Copy: the sign-in, session, empty-state, toast and engine-status copy is in the views and fixtures. The engine-status container strings in `apps/desktop` still read "Engine …" until that container is reworked.
 - Beyond this document: SPEC §5 now says person avatars are Slack profile photos and channels get a client-only icon and colour. `Avatar` takes `src` with a no-shift fade; `ChannelIcon` draws a chosen icon or the first letter on a chosen hue, with `defaultChannelLook(id)` for the untouched case; `channelIcons` and `channelColorNames` are the picker's data and `ChannelIconPicker` in `@juno/views` is the (unwired) picker.
 
-Open: the four questions in §10, plus whether an untouched channel should show its first letter (as built) or a hash icon.
+Open: the four questions in §10, plus whether an untouched channel should show its first letter (as built) or a hash icon. Decided since, from `options.html`: Figtree (C1), Coral as the default accent with the accent a user setting, and the D1 rounder shapes; and the dark palette was redesigned (`docs/design/dark-theme/`). `tokens.md` carries the values.
 
 ## 1. What friendly means here
 
@@ -61,7 +61,7 @@ Phosphor glyphs fill about 73% of their box; Lucide fills about 83%. To keep the
 | 16 | 18 regular | Title bar buttons, header icon buttons, hover toolbar, palette rows, send arrow (bold) |
 | 18 | 20 regular | Attach, palette search |
 
-`IconSize` becomes `12 | 13 | 14 | 15 | 16 | 18 | 20`. Icons centre on the flex line box next to Inter with no manual nudge; Phosphor's 32-unit margin already sits the glyph on the cap height. Check at 13 next to 11px tags in the gallery and nudge in the SVG, not with a margin, if anything looks high.
+`IconSize` becomes `12 | 13 | 14 | 15 | 16 | 18 | 20`. Icons centre on the flex line box next to the sans with no manual nudge; Phosphor's 32-unit margin already sits the glyph on the cap height. Check at 13 next to 11px tags in the gallery and nudge in the SVG, not with a margin, if anything looks high.
 
 ### 2.3 Mapping from the Lucide icons in use
 
@@ -272,7 +272,7 @@ Rules that fall out of the table:
 - **Calm by default.** Unread counts stay soft grey. No red, no accent-coloured badges, no dots that pulse. The For you count stays a quiet chip.
 - **The AI rules.** AI still shows nothing unless confident, never writes for you, never adds labels to the sidebar, never sends without a click. Duotone sparkles do not make AI more visible; they only mark where it already appeared.
 - **Native feel.** Arrow cursor everywhere, native menus, instant rows and tabs, keyboard reach, 4.5:1 text, reduced motion respected, no pointer cursor.
-- **Type.** Inter and Instrument Serif, same roles and sizes. No display face, no rounded sans.
+- **Type.** One sans and Instrument Serif, same roles. The sans is Figtree since the options review (`tokens.md` 2.1), with the roles re-tuned by half a pixel so nothing moved. No display face.
 - **Context tints.** Public, private and DM pills keep their colours; only their radius changes.
 - **Chrome has no emoji and no character.** The seated j appears in illustrations and the Juno surfaces only, never in the sidebar, the header or a toast.
 

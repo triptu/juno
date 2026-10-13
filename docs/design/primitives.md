@@ -25,8 +25,8 @@ One component for every clickable control with a label. Radius, text size and ic
 
 | Prop | Values | Notes |
 | --- | --- | --- |
-| `variant` | `primary` (`--hl` / `--hl-fg`), `secondary`, `outline` (1px `--border-strong`, hover `--border-strongest` + `--surface-hover`), `ghost`, `raised` (surface + `--card-ring` + `--shadow-sm`; send-check primary), `filter` (quick filter: always 28px, radius 8, 13px text, muted until hovered; `pressed` = `--secondary-default` + 600) | |
-| `size` | `xs` 22, `sm` 28, `md` 30, `lg` 32, `xl` 34, `2xl` 36 | Radius pill / 6 / 7 / 8 / 8 / 8 (the 22px row Resolve is a label-sized control, so a pill), text 11.5 / 12.5 / 13 and icon 13 / 14 / 16 derive from the size |
+| `variant` | `primary` (`--hl` / `--hl-fg`), `secondary`, `outline` (1px `--border-strong`, hover `--border-strongest` + `--surface-hover`), `ghost`, `raised` (surface + 1px `--border-default` + `--shadow-sm`; send-check primary), `filter` (quick filter: always 28px, radius 12, 13px text, muted until hovered; `pressed` = `--secondary-default` + 600) | |
+| `size` | `xs` 22, `sm` 28, `md` 30, `lg` 32, `xl` 34, `2xl` 36 | Radius pill / 8 / 12 / pill / pill / pill (the 22px row Resolve is a label-sized control and the 32px and taller buttons are pills; 28 and 30 stay rounded rectangles so they nest in cards and toolbars), text 12 / 13 / 13.5 and icon 13 / 14 / 16 derive from the size |
 | `tone` | `default`, `subtle`, `muted` | Text colour for ghost and outline; hover turns default |
 | `iconStart`, `iconEnd` | Phosphor icon | Weight by size; `iconWeight` overrides (`fill` for a check that has landed) |
 | `kbd` | string | Trailing mono hint ("↵", "⌘J") |
@@ -38,7 +38,7 @@ Covers: quick filters, status chips, Resolve (row and header), Group into topic,
 
 ## 2a. NavItem
 
-The sidebar navigation item (All topics, For you, Juno): 32px, full width, radius 8, 16px `icon` then the label, ghost until hovered, `--secondary-default` and a filled icon when `active` (sets `aria-current="page"`). `iconWeight` overrides the outline/fill pair; the Juno item passes `duotone` so it stays marked as the one AI surface whether or not it is open. `trailing` takes the count Chip, `kbd` the "⌘J" hint. Navigates on mouse down through `onSelect` like rows and tabs; `onContextMenu` for the right button. Never animates.
+The sidebar navigation item (All topics, For you, Juno): 32px, full width, radius 12, 16px `icon` then the label, ghost until hovered; when `active` (sets `aria-current="page"`) it takes the accent's nav tint `--hl-nav`, accent text `--hl-text`, weight 600 and a filled icon (the ink accent keeps the plain `--secondary-default`). `iconWeight` overrides the outline/fill pair; the Juno item passes `duotone` so it stays marked as the one AI surface whether or not it is open. `trailing` takes the count Chip, `kbd` the "⌘J" hint. Navigates on mouse down through `onSelect` like rows and tabs; `onContextMenu` for the right button. Never animates.
 
 ## 3. IconButton
 
@@ -47,7 +47,7 @@ Button with only an icon. `label` is required and doubles as the tooltip (`noToo
 | Prop | Values |
 | --- | --- |
 | `size` | 20, 22, 26, 28, 30, 32, 36 |
-| `radius` | derived (4 for 20–22, 6 for 26–28, 8 for 30+), or `sm` (5, dismiss), `full` (attach, send) |
+| `radius` | derived (4 for 20–22, 6 for 26, 12 for 28 (the hover-toolbar button), 8 for 30+), or `sm` (5, dismiss), `full` (attach, send) |
 | `variant` | `ghost` (default), `secondary`, `primary` (send), `raised` |
 | `tone` | `subtle` (default), `muted`, `default` for ghost |
 | `icon`, `iconSize`, `iconWeight`, `dimmed` | as Button. Icon 12 / 12 / 13 / 18 / 18 / 18 / 20 by size; the send arrow passes `iconWeight="bold"`, attach `iconSize={20}` |
@@ -63,9 +63,9 @@ Channels are `ChannelIcon` (section 4a).
 
 ## 4a. ChannelIcon and Swatch
 
-`ChannelIcon` is the square tile for a channel: a chosen Phosphor icon, or the first letter of `name`, on a chosen colour, in the same hue mix as avatars so tiles and initials sit together in a row. `icon` is one of `channelIconNames` (24 plain objects that read at 16px: hash, megaphone, chats, rocket, code, bug, wrench, flask, shield, lightning, globe, compass, flag, star, heart, leaf, coffee, gift, trophy, book, briefcase, calendar, camera, truck; `channelIcons` maps a name to its component), `color` one of `channelColorNames` (the eight person hues). `defaultChannelLook(id)` is what a channel gets before anyone changes it: a colour hashed from its id and no icon, so a list of untouched channels still tells them apart by letter. `size` as Avatar; radius 12 / 8 / 8 / 7 / 6 / 5 / 5 by size. `label` for the accessible name when the channel name is not visible beside it. The choice is client-only (SPEC §3) and the view that changes it is `ChannelIconPicker` in `@juno/views`.
+`ChannelIcon` is the square tile for a channel: a chosen Phosphor icon, or the first letter of `name`, on a chosen colour, in the same hue mix as avatars so tiles and initials sit together in a row. `icon` is one of `channelIconNames` (24 plain objects that read at 16px: hash, megaphone, chats, rocket, code, bug, wrench, flask, shield, lightning, globe, compass, flag, star, heart, leaf, coffee, gift, trophy, book, briefcase, calendar, camera, truck; `channelIcons` maps a name to its component), `color` one of `channelColorNames` (the eight person hues). `defaultChannelLook(id)` is what a channel gets before anyone changes it: a colour hashed from its id and no icon, so a list of untouched channels still tells them apart by letter. `size` as Avatar; radius 16 / 12 / 12 / 8 / 7 / 6 / 5 by size. `label` for the accessible name when the channel name is not visible beside it. The choice is client-only (SPEC §3) and the view that changes it is `ChannelIconPicker` in `@juno/views`.
 
-`Swatch`: a round 24px colour choice in the hue's avatar mix, a bold check and a ring when `selected` (`aria-pressed`). Required `label`. Used by the channel picker; the accent picker will use it too.
+`Swatch`: a round 24px colour choice, a bold check and a ring when `selected` (`aria-pressed`). Required `label`. `hue` draws a person or channel colour in the avatar mix (the channel picker); `accent` draws an accent's solid fill from the `accentSwatches` tokens (the appearance settings). The accent picker uses it too.
 
 ## 5. Chip
 
@@ -95,7 +95,7 @@ Typography. `variant` maps to the five variables of a type role in tokens: `sect
 
 ## 9. Surface, Divider, LabelledRule
 
-`Surface` `kind`: `card` (surface + `--card-ring`, radius 12, padding 14), `popover` (`--pop-shadow`, radius 13, padding 6), `toolbar` (radius 9), `group` (card with no padding, clips children), `inset` (`--background` + 1px `--border-default`, radius 8), `field` (the composer frame: surface + 1px `--input-border`, focus colour and 1px ring on `:focus-within`, radius 14), `toast` (ink on paper, `--shadow-lg`, radius 14). `padding` `none` | `xs` 4 | `sm` 6 | `md` 12 | `lg` 14 and `radius` override the defaults. Floating kinds carry a transparent 1px border so a ring never changes layout.
+`Surface` `kind`: `card` (surface + `--card-ring`, radius 20, padding 14), `popover` (`--pop-shadow`, radius 13, padding 6), `toolbar` (`--pop-shadow`, radius 16), `group` (card with no padding, clips children), `inset` (`--background` + 1px `--border-default`, radius 8), `field` (the composer frame: surface + 1px `--input-border`, focus colour and 1px ring on `:focus-within`, radius 20, a pill at its single-line height), `toast` (ink on paper, `--shadow-lg`, radius 14). `--card-ring` and `--pop-shadow` are wide soft shadows with no ring. `padding` `none` | `xs` 4 | `sm` 6 | `md` 12 | `lg` 14 and `radius` override the defaults. Floating kinds carry a transparent 1px border so a ring never changes layout.
 
 `Divider`: 1px, `tone` `default` | `subtle`, `vertical`, `inset`. `LabelledRule`: the "3 NEW" divider, `label` + rule in `--hl` / `--hl-rule` (or `muted`); fills its row.
 
@@ -129,7 +129,7 @@ The composer is a feature component: `Surface field` + slots + `IconButton` + `T
 
 ## 13. ListRow
 
-Generic row for settings groups, logs and tables: `minHeight` 44 | 48 | 52, `padding` `settings` | `table` | `log`, bottom `divider` (default on), `leading`, `trailing`, children. With `onSelect` it is a focusable `role="button"` with a hover background and radius 8 (`selected` for the current row; muted text inside a selected row renders subtle). Rows set `contain: content`. Sidebar topic rows and All topics rows are feature components built on this.
+Generic row for settings groups, logs and tables: `minHeight` 44 | 48 | 52, `padding` `settings` | `table` | `log`, bottom `divider` (default on), `leading`, `trailing`, children. With `onSelect` it is a focusable `role="button"` with a hover background and radius 16 (`selected` for the current row; muted text inside a selected row renders subtle). Rows set `contain: content`. Sidebar topic rows and All topics rows are feature components built on this.
 
 ## 14. Toast
 

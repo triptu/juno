@@ -60,7 +60,9 @@ shape, but if they use a raw value that now has a token, use the token. Rules co
   `{ [groupHash]: 'themeClass groupHash' }`, so `stylex.props(darkColors, accentTheme)` built on the
   same `colors` group keeps only the last one (verified by compiling both). So an accent must not be
   another `createTheme(colors, ...)`. Accent keys (`--hl`, `--hl-fg`, ..., `tokens.md` 1.3) live in
-  their own `defineVars` group with one `createTheme` per accent. Components use `--hl`, never a hex.
+  their own `defineVars` group with one `createTheme` per accent and colour scheme (`accents[name].light`
+  / `.dark`), because a fill that reads on paper is too dark to glow on ink. Components use `--hl`,
+  `--hl-text`, `--focus-ring` and friends, never a hex. Unread counts never take the accent.
 - Tokens use `hsla()` literals, not `light-dark()`. If you do use `light-dark()`, keep
   `.browserslistrc` (`Chrome >= 152`). Without it lightningcss rewrites `light-dark()` into a
   `--lightningcss-light/dark` polyfill that silently does nothing.
@@ -99,7 +101,7 @@ shape, but if they use a raw value that now has a token, use the token. Rules co
   dependency. The plugin sits before `react()` in `electron.vite.config.ts` and gets
   `unstable_moduleResolution: { type: 'commonJS', rootDir: repoRoot }` so builds work from any cwd.
 - **Fonts**: bundled `@fontsource` packages, imported once per app from `@juno/tokens/fonts.css`
-  (Inter, Instrument Serif, JetBrains Mono). Pick them through the `fonts` tokens. Instrument Serif
+  (Figtree, Instrument Serif, JetBrains Mono). Pick them through the `fonts` tokens. Instrument Serif
   has one weight (400); never set bold on it.
 - **Main process** cannot use StyleX. The one raw colour there (`BrowserWindow.backgroundColor` in
   `main/window.ts`) must match `--background`; update both together.

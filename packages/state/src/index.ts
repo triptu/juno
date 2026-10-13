@@ -17,5 +17,5 @@ export { defaultTopicListFilter, SIDEBAR_WINDOW, topicCountsAtom, topicListAtom,
 export { applyListDelta, emptyWindow, type ListWindow } from './list'
 export { errorOf } from './result'
 export { acquireRendererPort, EngineFailed } from './port'
-export { appInfoAtom, persistTheme, themeAtom, type Theme } from './shell'
+export { accentAtom, appInfoAtom, persistAccent, persistTheme, themeAtom, type Accent, type Theme } from './shell'
 export type { PortConnection, PortLike } from './transport'

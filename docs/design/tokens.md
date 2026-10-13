@@ -45,50 +45,79 @@ Warm paper. HSL values are the source of truth; hex is the sRGB result for desig
 
 ### 1.2 Base palette, dark
 
-Cool near-black. Applied with `[data-theme="dark"]` on the root.
+A warm-neutral near-black: the same paper seen at night, not a cool system grey. Built in OKLCH at hue 85 and chroma 0.006 (text at hue 90), so every step is one hue and only lightness moves. Three clear layers: the sidebar and tab strip sit lowest (L 0.19), the page above them (0.215), and cards, inputs and the composer on top (0.26); popovers and the hover toolbar go one step higher again (0.33, `--surface-raised`). Borders are two steps above what they sit on, so they still separate. Applied with the `dark` theme classes on `<html>`. Before and after renders of the friendly mock: `docs/design/dark-theme/before.png` (the cool palette the handoff CSS gave) and `after.png`.
 
-| Token | Value | Hex | Source |
+| Token | Hex | OKLCH L | Measured | Source |
+| --- | --- | --- | --- | --- |
+| `--background` | #1B1916 | 0.215 | | redesign |
+| `--background-subtle` | #151411 | 0.19 | 1.05:1 under the page | redesign |
+| `--surface-default` | #252421 | 0.26 | 1.13:1 over the page | redesign |
+| `--surface-hover` | #2D2B28 | 0.29 | 1.31:1 over the sidebar | redesign |
+| `--surface-active` | #32302D | 0.31 | | redesign |
+| `--surface-raised` | #373532 | 0.33 | 1.43:1 over the page, 1.27:1 over a card | redesign |
+| `--secondary-default` | #302F2C | 0.305 | 1.38:1 over the sidebar (selected row) | redesign |
+| `--secondary-hover` | #383633 | 0.335 | | redesign |
+| `--secondary-active` | #403E3B | 0.365 | | redesign |
+| `--border-subtle` | #2B2A27 | 0.285 | 1.22:1 on the page (topic header rule) | redesign |
+| `--border-default` | #32302D | 0.31 | 1.40:1 on the sidebar edge, 1.33:1 on the page | redesign |
+| `--border-strong` | #3C3A37 | 0.35 | 1.37:1 on a card | redesign |
+| `--border-strongest` | #4C4A47 | 0.41 | 1.99:1 on the page | redesign |
+| `--input-border` | #464541 | 0.39 | 1.62:1 on the composer | redesign |
+| `--foreground-default` | #EEEBE2 | 0.94 | 14.7:1 on the page | redesign |
+| `--foreground-subtle` | #C6C4BE | 0.82 | 10.1:1 page, 7.7:1 `--secondary-default`, 6.1:1 `--secondary-active`, 7.0:1 popovers | redesign |
+| `--foreground-muted` | #A09E9A | 0.70 | 6.6:1 page, 6.9:1 sidebar, 5.8:1 cards, 5.3:1 hover, 5.0:1 `--secondary-default`, 4.6:1 popovers | redesign |
+| `--accent-default` | `hsla(48, 30%, 90%, 1)` #EDEADE | | The ink accent's dark fill | css |
+| `--accent-hover` | `hsla(48, 30%, 95%, 1)` | | | css |
+| `--accent-active` | `hsla(48, 30%, 99%, 1)` | | | css |
+| `--accent-foreground` | `hsla(48, 10%, 2%, 1)` | | | css |
+| `--accent-foreground-subtle` | `hsla(48, 10%, 5%, 1)` | | | css |
+| `--accent-foreground-muted` | `hsla(48, 10%, 10%, 1)` | | | css |
+| `--danger` | #F8767E | 0.72 | 6.6:1 page, 5.8:1 cards (the light red is 3.0:1 on ink) | redesign |
+| `--overlay` | `rgba(0, 0, 0, 0.5)` | | | redesign |
+
+Dark-only overrides on other groups: `--tint-resolved-fg` takes 52% of the green instead of 70% (1.5); `--avatar-bg-mix` 32% and `--avatar-fg-mix` 46% instead of 24% / 62% (1.6); the shadows (6); the accent swatches (1.3). `BrowserWindow.backgroundColor` in `apps/desktop/src/main/launch.ts` repeats `--background` for both themes.
+
+The handoff's dark values (`hsla(210, 5%, 8%)` and up, cool and two to three lightness points apart) are kept in the git history; they made the sidebar, page and cards one flat black with invisible borders.
+
+### 1.3 Accents
+
+The accent is a user setting (`AppearanceSettings`, persisted in `launch.json` like the theme and applied before first paint). Coral is the default; the original near-black is "ink". Every accent use goes through the `accent` token group, and each accent is one StyleX theme per colour scheme, because a fill that reads on paper is too dark to glow on ink.
+
+| Token | What it is | Coral light | Coral dark |
 | --- | --- | --- | --- |
-| `--background` | `hsla(210, 5%, 8%, 1)` | #131415 | css |
-| `--background-subtle` | `hsla(210, 5%, 9%, 1)` | #161718 | css |
-| `--surface-default` | `hsla(210, 5%, 11%, 1)` | #1B1C1D | css |
-| `--surface-hover` | `hsla(210, 5%, 13%, 1)` | #1F2123 | css |
-| `--surface-active` | `hsla(210, 5%, 15%, 1)` | #242628 | css |
-| `--surface-raised` | `hsla(210, 5%, 18%, 1)` | #2B2E30 | proposed |
-| `--secondary-default` | `hsla(210, 5%, 16%, 1)` | #27292B | css |
-| `--secondary-hover` | `hsla(210, 5%, 18%, 1)` | #2C2E30 | css |
-| `--secondary-active` | `hsla(210, 5%, 20%, 1)` | #303336 | css |
-| `--border-subtle` | `hsla(210, 5%, 12%, 1)` | #1D1F20 | css |
-| `--border-default` | `hsla(210, 5%, 15%, 1)` | #242628 | css |
-| `--border-strong` | `hsla(210, 5%, 16%, 1)` | #27292B | css |
-| `--border-strongest` | `hsla(210, 5%, 21%, 1)` | #333638 | css |
-| `--foreground-default` | `hsla(45, 30%, 90%, 1)` | #EDE9DE | css |
-| `--foreground-subtle` | `hsla(45, 10%, 80%, 1)` | #D1CFC7 | css |
-| `--foreground-muted` | `hsla(45, 2%, 55%, 1)` | #8F8D8A | css (5.57:1 on bg, no override needed) |
-| `--accent-default` | `hsla(48, 30%, 90%, 1)` | #EDEADE | css |
-| `--accent-hover` | `hsla(48, 30%, 95%, 1)` | #F6F5F0 | css |
-| `--accent-active` | `hsla(48, 30%, 99%, 1)` | #FDFDFC | css |
-| `--accent-foreground` | `hsla(48, 10%, 2%, 1)` | #060505 | css |
-| `--accent-foreground-subtle` | `hsla(48, 10%, 5%, 1)` | #0E0D0B | css |
-| `--accent-foreground-muted` | `hsla(48, 10%, 10%, 1)` | #1C1A17 | css |
-| `--selection-background` | `hsla(200, 97%, 20%, 1)` | #024364 | css |
-| `--input-border` | `hsla(210, 5%, 24%, 1)` | #3A3D40 | proto |
+| `--hl` | The fill: primary button, send, @you chip, Now chip, own bubbles | #CC4628 | #FF8A73 |
+| `--hl-fg` | Text on the fill | #FFFFFF | #2A0D06 |
+| `--hl-text` | Accent text and icons on paper or a tint: the "new" label, the selected nav item, the subscribed bell | #B4351F | #FF9C87 |
+| `--hl-soft` | `color-mix(in oklch, var(--hl) <mix>, var(--background))`: mention-row tint, my reaction, the @ tag | 10% | 14% |
+| `--hl-nav` | `color-mix(in oklch, var(--hl) <mix>, var(--background-subtle))`: the selected nav item's fill | 9% | 16% |
+| `--hl-rule`, `--hl-ring` | `--hl` at 30% and 45% alpha: the new divider's rule, the mine-reaction ring | | |
+| `--focus-ring` | The accent text colour, so the ring meets 4.5:1 on the page (3:1 is the minimum) | #B4351F | #FF9C87 |
+| `--selection-background` | `color-mix(in oklch, var(--hl) 28%, var(--background))` | | |
 
-### 1.3 Accent variants (tweak)
+Ink keeps the old grey states: `--hl-nav` is `--secondary-default`, its tint mixes are 9% and 18%, and its focus ring stays the info blue (#008AB3 light, 3.8:1 on paper; `hsla(200, 80%, 65%)` dark).
 
-The accent is near-black by default. Four optional accents come from the Littlebird brand palette. The prototype exposes them as three derived variables so every accent use goes through `--hl`.
+**What the accent does not touch.** Unread counts, the For you count and the quiet "@" tag on rows stay the soft grey tags (SPEC: "unread counts are soft grey, not black badges"); the "@" tag's background is `--hl-soft`, its text `--foreground-subtle`. Coral is for the primary button, the selected nav item, the user's own @mention chip, the focus ring and text selection.
 
-| Token | Default (ink) | Midnight blue | Dark emerald | Claret | Cyan | Source |
-| --- | --- | --- | --- | --- | --- | --- |
-| `--hl` | `var(--accent-default)` | #2E1F64 | #00674F | #7F1734 | #008AB3 | proto |
-| `--hl-fg` | `var(--accent-foreground)` | #FFFAEB | #FFFAEB | #FFFAEB | #FFFAEB | proto |
-| `--hl-soft` | `color-mix(in oklch, var(--hl) 9%, var(--background))` | same formula | same | same | same | proto |
+**Values and measured contrast.** Measured in Chromium from the built gallery (WCAG 2, sRGB; `color-mix()` resolved by the browser). Targets: 4.5:1 for text on the fill, accent text on the page, on the selected nav and on the soft tint, and for body text on the selection; the focus ring is the accent text so it meets the same bar. The fill against the page is information only: Marigold in light is 1.94:1, so a marigold button is identified by its label, never by colour alone. The dark column was measured against the dark palette in 1.2.
 
-Resolved `--hl-soft` for ink: light #E8E2E4, dark #262324 (measured).
-
-Contrast of `--hl-fg` (#FFFAEB) on each accent: ink 17.0, midnight 13.5, emerald 6.6, claret 9.7, **cyan 3.8**. Cyan fails 4.5:1 for small text (the "Now" chip and the send-card Send label are 12–13px). Either drop cyan, or switch `--hl-fg` to `--foreground-default` for cyan. Flagged as an open question.
-
-Accent is used for: send/ask buttons, "N new" divider and its rule (30% alpha), @you mention chip, mine-reaction border (45% alpha), unread dots on Channels/DMs filters, "Now" chips in Notifications, own bubbles in bubble style, the @ badge in Browse, `--hl-soft` tints.
+| Accent | Theme | Fill | Text on fill | Accent text | Text on fill | Fill vs page (info) | Accent text and ring on page | On selected nav | On soft tint | Body on selection |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Coral | Light | #CC4628 | #FFFFFF | #B4351F | 4.69 | 4.53 | 5.85 | 5.11 | 5.13 | 10.76 |
+| Coral | Dark | #FF8A73 | #2A0D06 | #FF9C87 | 7.88 | 7.63 | 8.65 | 7.24 | 7.01 | 9.05 |
+| Near-black (ink) | Light | #1B180E | #F5F4F0 | #1B180E | 16.12 | 17.14 | 17.14 | 15.28 | 13.87 | 10.10 |
+| Near-black (ink) | Dark | #EDEADE | #060505 | #EDEADE | 16.89 | 14.55 | 14.55 | 11.11 | 12.19 | 9.77 |
+| Marigold | Light | #F2A900 | #2B1E00 | #7F5200 | 8.11 | 1.94 | 6.52 | 6.00 | 6.05 | 13.12 |
+| Marigold | Dark | #F5B83A | #2B1E00 | #F5B83A | 9.16 | 9.86 | 9.86 | 7.93 | 7.74 | 8.29 |
+| Teal | Light | #0B7A75 | #FFFFFF | #096762 | 5.18 | 5.00 | 6.48 | 5.65 | 5.69 | 10.59 |
+| Teal | Dark | #45C2BB | #04201E | #5ED0CA | 7.87 | 8.09 | 9.48 | 7.86 | 7.63 | 8.84 |
+| Midnight blue | Light | #2E1F64 | #FFFAEB | #2E1F64 | 13.45 | 13.56 | 13.56 | 11.05 | 11.03 | 9.30 |
+| Midnight blue | Dark | #B3A5EA | #1A1238 | #BDB0F0 | 7.99 | 7.92 | 8.88 | 7.33 | 7.14 | 8.94 |
+| Dark emerald | Light | #00674F | #FFFAEB | #00674F | 6.59 | 6.64 | 6.64 | 5.69 | 5.73 | 9.96 |
+| Dark emerald | Dark | #4FC4A1 | #04261B | #63D0AF | 7.50 | 8.14 | 9.33 | 7.67 | 7.45 | 8.88 |
+| Claret | Light | #7F1734 | #FFFAEB | #7F1734 | 9.70 | 9.78 | 9.78 | 8.16 | 8.16 | 9.47 |
+| Claret | Dark | #F08BA0 | #3B0A18 | #F59DB0 | 7.17 | 7.44 | 8.63 | 7.24 | 6.99 | 9.08 |
+| Cyan | Light | #008AB3 | #060505 | #006A8A | 5.12 | 3.84 | 5.92 | 5.27 | 5.27 | 11.22 |
+| Cyan | Dark | #5AC6EC | #04212E | #6CCFF2 | 8.50 | 8.96 | 9.89 | 8.01 | 7.79 | 8.52 |
 
 ### 1.4 Context tints (public / private / DM)
 
@@ -96,9 +125,9 @@ Always derived from the base palette so they follow dark mode. Formulas from the
 
 | Context | Background | Foreground | Light hex (bg / fg) | Dark hex (bg / fg) | Contrast light / dark |
 | --- | --- | --- | --- | --- | --- |
-| Public channel | `var(--secondary-default)` | `var(--foreground-subtle)` | #F1EEE4 / #605E52 | #27292B / #D1CFC7 | 5.65 / 9.36 |
-| Private channel | `color-mix(in oklch, var(--warning) 15%, var(--background))` | `color-mix(in oklch, var(--warning) 42%, var(--foreground-default))` | #F9EFDB / #6D5524 | #2E271A / #E9CD99 | 6.21 / 9.61 |
-| Direct message, group DM | `color-mix(in oklch, var(--info) 12%, var(--background))` | `color-mix(in oklch, var(--info) 55%, var(--foreground-default))` | #DFEEF6 / #1F5970 | #172125 / #7CB6D0 | 6.52 / 7.39 |
+| Public channel | `var(--secondary-default)` | `var(--foreground-subtle)` | #F1EEE4 / #605E52 | #302F2C / #C6C4BE | 5.62 / 7.68 |
+| Private channel | `color-mix(in oklch, var(--warning) 15%, var(--background))` | `color-mix(in oklch, var(--warning) 42%, var(--foreground-default))` | #F9EEDB / #6C5424 | #342C1C / #EACE9C | 6.24 / 9.07 |
+| Direct message, group DM | `color-mix(in oklch, var(--info) 12%, var(--background))` | `color-mix(in oklch, var(--info) 55%, var(--foreground-default))` | #DFEEF5 / #20596F | #1A262B / #7EB7D0 | 6.50 / 7.06 |
 
 Token names [proposed]: `--tint-public-bg/fg`, `--tint-private-bg/fg`, `--tint-dm-bg/fg`.
 
@@ -108,31 +137,33 @@ Used by: topic header context pill, New message To pill, Juno send-card pill. Ic
 
 | Token | Value | Source | Notes |
 | --- | --- | --- | --- |
-| `--danger` | #C41E3A | css | Unused in prototype. 5.66:1 on light bg |
+| `--danger` | #C41E3A light, #F8767E dark | css / redesign | Sign-in error line. 5.64:1 on paper, 6.59:1 on ink |
 | `--success` | #00674F | css | Resolved check icon in rows; Resolved status chip tint |
 | `--warning` | #E0A500 | css | Only ever mixed (private tint, audience guard). As text it is 2.13:1, never use raw |
 | `--info` | #008AB3 | css | Only mixed (DM tint). 3.85:1 as text |
-| Resolved chip | bg `color-mix(in oklch, var(--success) 12%, var(--background))`, fg `color-mix(in oklch, var(--success) 70%, var(--foreground-default))` | proto | Light #DDEAE4 / #165240 (7.34:1); dark #161E1B / #548E7A (4.48:1, borderline) |
-| Audience guard | bg `color-mix(in oklch, var(--warning) 14%, var(--surface-default))`, fg `color-mix(in oklch, var(--warning) 45%, var(--foreground-default))` | proto | |
+| Resolved chip | bg `color-mix(in oklch, var(--success) 12%, var(--background))`, fg `color-mix(in oklch, var(--success) 70%, var(--foreground-default))` light, `52%` dark | proto / redesign | Light #DCE9E4 / #165240 (7.27:1); dark #18231F / #7AA696 (5.94:1; 70% was 4.27:1 on the new palette) |
+| Audience guard | bg `color-mix(in oklch, var(--warning) 14%, var(--surface-default))`, fg `color-mix(in oklch, var(--warning) 45%, var(--foreground-default))` | proto | Light #F9EFDE / #725824 (5.88:1); dark #3C3426 / #E9CC96 (7.91:1) |
 | Notification decision chips | Now: `--hl` / `--hl-fg`. Digest: `--secondary-default` / `--foreground-subtle`. Silent: transparent / `--foreground-muted` (summary chips use `--surface-hover` instead of transparent) | proto | |
 | Mention tint (message that mentions you) | `--hl-soft` on the message row | proto | |
 | Traffic lights | #FF5F57, #FEBC2E, #28C840 | proto | Only for mock-ups; Electron draws real ones |
 | `--warm` | #E39A3B | friendly layer | Illustration fill only; never text, never a control |
-| `--warm-soft` | `color-mix(in oklch, var(--warm) 26%, var(--background))` light (#F8E2CA), `22%` dark (#3C2E1F) | friendly layer | The one flat layer inside every spot illustration |
-| `--toast-success` | `color-mix(in oklch, var(--success) 55%, var(--background))` light (6.1:1 on the ink toast), `80%` dark (7.2:1 on the paper toast) | friendly layer | The filled check in the resolve toast |
+| `--warm-soft` | `color-mix(in oklch, var(--warm) 26%, var(--background))` light (#F8E2CA), `22%` dark (#423221) | friendly layer | The one flat layer inside every spot illustration |
+| `--toast-success` | `color-mix(in oklch, var(--success) 55%, var(--background))` light (6.1:1 on the ink toast), `80%` dark (7.1:1 on the paper toast) | friendly layer | The filled check in the resolve toast |
 
 ### 1.6 Person colours (avatars)
 
 A person gets one brand hue; the tile derives two colours from it:
 
-- background: `color-mix(in oklch, <hue> 24%, var(--surface-default))`
-- foreground: `color-mix(in oklch, <hue> 62%, var(--foreground-default))`
+- background: `color-mix(in oklch, <hue> 24%, var(--surface-default))` light, `32%` dark
+- foreground: `color-mix(in oklch, <hue> 62%, var(--foreground-default))` light, `46%` dark
 
-Mention chips (friendly layer): background `color-mix(in oklch, <hue> 16%, var(--surface-default))`, foreground `color-mix(in oklch, <hue> 40%, var(--foreground-default))`, weight 600. Lowest measured contrast 5.7:1 (midnight, dark). Tokens `--person-chip-bg-mix: 16%`, `--person-chip-fg-mix: 40%` beside the avatar mix (`--avatar-bg-mix: 24%`, `--avatar-fg-mix: 62%`). The hue is also the default colour of a channel tile (`ChannelIcon`), hashed from the channel id until the user picks another; the user can pick any of the eight.
+Dark takes more of the hue in the tile and less in the initials: at 24% a dark hue (midnight, claret) barely tints ink, and at 62% it makes the initials a mid tone on a dark tile (midnight was 3.0:1).
+
+Mention chips (friendly layer): background `color-mix(in oklch, <hue> 16%, var(--surface-default))`, foreground `color-mix(in oklch, <hue> 40%, var(--foreground-default))`, weight 600, the same in both themes. Measured light / dark: cyan 7.8 / 7.0, claret 9.8 / 5.8, midnight 10.5 / 5.3, dark emerald 9.0 / 6.3, plum 6.3 / 7.9, rose 7.1 / 7.4, emerald 6.3 / 7.9, jordy 6.1 / 8.0; lowest 5.3:1 (midnight, dark). Tokens `--person-chip-bg-mix: 16%`, `--person-chip-fg-mix: 40%` beside the avatar mix (`--avatar-bg-mix: 24%` / `32%` dark, `--avatar-fg-mix: 62%` / `46%` dark). The hue is also the default colour of a channel tile (`ChannelIcon`), hashed from the channel id until the user picks another; the user can pick any of the eight.
 
 Hues from the brand palette [proto]: #008AB3 cyan, #7F1734 claret, #2E1F64 midnight, #00674F dark emerald, #E89EB8 plum, #A49496 rose quartz (also bots), #50C878 emerald, #92C2F9 jordy blue.
 
-Measured examples: midnight #C3C3D8 / #28224D (8.5:1), claret #E2C3C6 / #5D1F2C (7.6:1), emerald #D5F0DA / #3F8454 (3.7:1). Initials are 7.5–14px; light hues (emerald, jordy, plum, yellow) fall under 4.5:1. Acceptable for decorative initials, but do not use the derived foreground for text. [proposed] Assign hues deterministically from a hash of the user id, and skip `--lb-yellow`.
+Measured, light: midnight #C3C2D9 / #28214D (8.5:1), claret #E3C3C6 / #5D1F2C (7.6:1), emerald #D5F0DA / #3F8454 (3.7:1); the light hues (emerald, jordy, plum) fall under 4.5:1 on paper. Dark, with the dark mixes: every hue is 4.5:1 or better (midnight #26243A / #8C89B1 4.5, claret 4.8, cyan 5.3, dark emerald 5.1, plum 5.5, rose 5.4, emerald 5.5, jordy 5.5). Initials are 7.5–14px; acceptable for decorative initials, but do not use the derived foreground for text. [proposed] Assign hues deterministically from a hash of the user id, and skip `--lb-yellow`.
 
 ### 1.7 Muted grey contrast (light mode)
 
@@ -150,11 +181,11 @@ Measured examples: midnight #C3C3D8 / #28224D (8.5:1), claret #E2C3C6 / #5D1F2C 
 
 Rule that follows: muted text may sit on `--background`, `--background-subtle`, `--surface-default` and `--surface-hover`. On `--secondary-*` surfaces use `--foreground-subtle` (the prototype already does this for unread count tags, status chips and pills). The read-count tag (muted on `--secondary-default`, 4.39:1) is the one exception; [proposed] use `--foreground-subtle` there too.
 
-Dark mode muted (#8F8D8A) is 5.57:1 on the background and 4.43:1 on `--secondary-default`; same rule applies.
+Dark mode muted (#A09E9A) is 6.56:1 on the page, 5.8:1 on cards, 4.57:1 on popovers and 5.01:1 on `--secondary-default`, so in dark the rule is not needed, but keep to it so the two themes share one set of pairings.
 
 ### 1.8 Focus ring
 
-Prototype: `outline: 2px solid var(--selection-background); outline-offset: 2px` on `:focus-visible`. #B3D4E6 on the light paper is about 1.5:1, below the 3:1 WCAG 2.2 focus-appearance minimum. [proposed] add `--focus-ring: var(--info)` (#008AB3, 3.85:1 light) and dark `hsla(200, 80%, 65%)`; keep `--selection-background` for text selection only. Open question for the owner.
+Prototype: `outline: 2px solid var(--selection-background); outline-offset: 2px` on `:focus-visible`. #B3D4E6 on the light paper is about 1.5:1, below the 3:1 WCAG 2.2 focus-appearance minimum. Decided: `--focus-ring` is the accent text colour (`--hl-text`, 1.3), which is held to 4.5:1 on the page in both themes; `--selection-background` is the accent at 28% over the page and is for text selection only. Both live in the `accent` group so an accent owns them. Ink keeps the info blue it had before.
 
 ## 2. Typography
 
@@ -162,44 +193,45 @@ Prototype: `outline: 2px solid var(--selection-background); outline-offset: 2px`
 
 | Token | Value | Source |
 | --- | --- | --- |
-| `--font-sans` | `'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif` | proposed (replaces Söhne) |
+| `--font-sans` | `'Figtree Variable', 'Figtree', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif` | decided (replaces Söhne; Inter until the friendly-layer options review) |
 | `--font-serif` | `'Instrument Serif', ui-serif, 'Iowan Old Style', Georgia, serif` | proposed (replaces Meraki) |
 | `--font-mono` | `'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace` | css (PP Neue Montreal Mono dropped) |
 
-Bundle Inter 400/500/600 (variable file is fine), Instrument Serif 400 regular + italic, JetBrains Mono 400/500 locally; no Google Fonts import.
+Bundle Figtree (variable, `@fontsource-variable/figtree` 5.3.0, Latin subset 20 KB), Instrument Serif 400 regular + italic, JetBrains Mono 400/500 locally; no Google Fonts import.
 
-Root text settings [proto]: `font-size: 14px; line-height: 1.5; letter-spacing: 0.01em; -webkit-font-smoothing: antialiased`. Note `colors_and_type.css` says 0.02em globally; the prototype root uses 0.01em and that is what the screenshots show. Use 0.01em.
+Root text settings: `font-size: 14.5px; line-height: 1.5; letter-spacing: 0; -webkit-font-smoothing: antialiased`. The prototype root used 0.01em for Inter (`colors_and_type.css` says 0.02em); Figtree's sidebearings are wide enough on their own, so the root and every sans role use 0.
 
 **Metrics differences to expect**
 
-- Inter has a larger x-height and a wider average character than Söhne. Titles and previews truncate a few characters earlier at the same size. The row heights in §5 were measured with Inter, so they are already correct for what we ship.
-- The prototype loaded Söhne only at 400/600/700, so every `font-weight: 500` in the prototype rendered as Söhne 400 when the designer looked at it. With Inter, 500 renders as a true Medium and reads slightly heavier. If the UI feels heavy, map `500 → 450` on the variable font or use 400 for nav items, filters and previews; keep 500 for buttons and row titles.
+- Figtree's x-height is about 8% smaller than Inter's (0.50em against 0.545em) and it sets about 6% narrower at the same size. So every sans role at or below 15px is half a pixel larger than the prototype's Inter value: the text reads at the same optical size and a line of body text wraps within a character of where Inter did, so the row heights in §5 (measured with Inter) still hold. Sizes above 15px (topic title, the serif roles) are unchanged.
+- Figtree's 500 is a true Medium and sits between Inter's 400 and 500; it is right for nav items, filters, buttons and row titles without the `500 → 450` mapping Inter needed. 600 stays for unread titles, names and pills.
+- Checked at 12–15px (gallery `Text/all-roles`, light and dark): counters, tags and the 12.5px meta line stay legible; the single-storey g and open a are the main visible change.
 - Instrument Serif is more condensed and has a smaller x-height than Meraki. Page titles at 34px look smaller than the handoff screenshots. [proposed] Page titles 36px (Juno empty state 40px) with Instrument Serif. Verify once against a screenshot.
-- Enable `font-variant-numeric: tabular-nums` wherever a number is shown (times, counts, table cells); Inter supports it.
+- Enable `font-variant-numeric: tabular-nums` wherever a number is shown (times, counts, table cells). Figtree has `tnum`: measured in Chromium at 12px, "1111" and "0000" are 19.84 / 30.77px proportional and both 29.92px tabular.
 
 ### 2.2 Type roles
 
-All values [proto] unless noted. Family is sans unless stated.
+Sizes are the Figtree values; the prototype's Inter value is half a pixel smaller for every sans role at or below 15px (see 2.1). Letter spacing is 0 for every sans role except the three uppercase labels. Family is sans unless stated.
 
 | Role | Size | Weight | Line height | Letter spacing | Colour | Where |
 | --- | --- | --- | --- | --- | --- | --- |
-| Section label | 10.5px | 500 | normal | 0.06em, uppercase | muted | Pinned / Recent / channel groups, popover headings (People, Channels, Recent, Results, Juno) |
-| Table header | 11px | 500 | normal | 0.06em, uppercase | muted | All topics columns |
-| New divider | 11px | 600 | normal | 0.06em, uppercase | `--hl` | "3 NEW" |
-| Tag | 11px | 500 | 18px box | 0 | subtle / muted | Main, Reopened, counts, @, confidence badge, menu hints, ⌘ hints |
-| Tag small | 11.5px | 500 / 400 | | | | Row Resolve button, card footnotes, "Use", Mark read |
-| Meta | 12px | 400 | normal | | muted | Row line 3, times, message timestamps, card headers, status chips (500), bubble name line, log reasons |
-| Pill | 12.5px | 600 (+400 kind) | 26px box | | tint fg | Context pill, scope chip (500) |
-| Small button | 12.5px | 500 | 28px box | | | Group into topic, Resolve (hint), Fix and send, Stop ignoring, Not yet |
-| Thread link | 12.5px | 400 (count 600) | 26px box | | subtle | "2 replies · Title ›" |
-| UI default | 13px | 400 / 500 | 1.5 | | default | Nav, menu items, filters, buttons, selects, inputs, toast, table "Where" |
-| Preview | 13px | 400 | 1.45 | | muted (subtle if unread) | Row line 2, clamped to 1 or 2 lines |
-| Body small | 13.5px | 400 | 1.55–1.6 | | subtle | Catch-up text, For you card body, reply options, picker rows, compact-density message body |
-| Body | 14px | 400 | 1.6 | | default | Message body (balanced), composer (lh 22px), rule rows, palette labels, textareas |
-| Row title | 14.5px (13.5 compact) | 500, 600 unread | 22px box | 0 | default | Sidebar row line 1; All topics title is 14px |
-| Message name | 14px | 600 | | | default | Flat message header |
-| Body large | 14.5px | 400 | 1.6 | | | Airy-density message body |
-| Heading | 15px | 600 | normal | | default | Settings section titles, For you card titles (lh 1.35), palette input (400) |
+| Section label | 11px | 500 | normal | 0.06em, uppercase | muted | Pinned / Recent / channel groups, popover headings (People, Channels, Recent, Results, Juno) |
+| Table header | 11.5px | 500 | normal | 0.06em, uppercase | muted | All topics columns |
+| New divider | 11.5px | 600 | normal | 0.06em, uppercase | `--hl` | "3 NEW" |
+| Tag | 11.5px | 500 | 18px box | 0 | subtle / muted | Main, Reopened, counts, @, confidence badge, menu hints, ⌘ hints |
+| Tag small | 12px | 500 / 400 | | 0 | | Row Resolve button, card footnotes, "Use", Mark read |
+| Meta | 12.5px | 400 | normal | 0 | muted | Row line 3, times, message timestamps, card headers, status chips (500), bubble name line, log reasons |
+| Pill | 13px | 600 (+400 kind) | 26px box | 0 | tint fg | Context pill, scope chip (500) |
+| Small button | 13px | 500 | 28px box | 0 | | Group into topic, Resolve (hint), Fix and send, Stop ignoring, Not yet |
+| Thread link | 13px | 400 (count 600) | 26px box | 0 | subtle | "2 replies · Title ›" |
+| UI default | 13.5px | 400 / 500 | 1.5 | 0 | default | Nav, menu items, filters, buttons, selects, inputs, toast, table "Where" |
+| Preview | 13.5px | 400 | 1.45 | 0 | muted (subtle if unread) | Row line 2, clamped to 1 or 2 lines |
+| Body small | 14px | 400 | 1.55–1.6 | 0 | subtle | Catch-up text, For you card body, reply options, picker rows, compact-density message body |
+| Body | 14.5px | 400 | 1.6 | 0 | default | Message body (balanced), composer (lh 22px), rule rows, palette labels, textareas |
+| Row title | 15px (14 compact) | 500, 600 unread | 22px box | 0 | default | Sidebar row line 1; All topics title is 14.5px |
+| Message name | 14.5px | 600 | | 0 | default | Flat message header |
+| Body large | 15px | 400 | 1.6 | 0 | | Airy-density message body |
+| Heading | 15.5px | 600 | 1.35 | 0 | default | Settings section titles, For you card titles (lh 1.35), palette input (400) |
 | Topic title | 20px | 600 | 1.3 | -0.01em | default | Topic header, rename input |
 | Page title | serif 34px (32 All topics) | 400 | 1.1–1.15 | 0 | default | New message, For you, Notifications, Preferences, All topics |
 | Display | serif 38px | 400 | 1.1 | 0 | default | "What do you need?" |
@@ -241,7 +273,7 @@ Odd values the prototype uses once (3, 5, 9, 18) are component-local; keep them 
 
 ## 4. Radii
 
-[css] `--radius-sm 4`, `--radius-md 6`, `--radius-lg 8`, `--radius-xl 10`. The prototype also uses 5, 7, 9, 12, 13, 14, 16 and 999. The friendly layer (`friendly-layer.md` §3) makes every label a pill and gives containers one step more radius. Full set:
+[css] `--radius-sm 4`, `--radius-md 6`, `--radius-lg 8`, `--radius-xl 10`. The prototype also uses 5, 7, 9, 12, 13, 14, 16 and 999. The friendly layer (`friendly-layer.md` §3) makes every label a pill and gives containers one step more radius; the options review (`friendly-layer/options.html`, D1 "rounder") then took rows and tiles to 16, cards to 20, nav and filter buttons to 12, the composer and the 32px and taller buttons to pills, the hover toolbar to 16 with 12 buttons, and replaced the card and popover rings with wide soft shadows. Full set:
 
 | Token | px | Use |
 | --- | --- | --- |
@@ -249,21 +281,23 @@ Odd values the prototype uses once (3, 5, 9, 18) are component-local; keep them 
 | `--radius-sm` | 5 | Dismiss buttons, segmented-control segment, 18–20px channel tiles |
 | `--radius-md` | 6 | Menu items, small buttons (28), quote block, thread link, 24px channel tiles |
 | `--radius-md-plus` | 7 | Selects, the segmented track, For you action buttons, topic-list items in Juno cards, 28px channel tiles |
-| `--radius-lg` | 8 | Nav items, filter buttons, icon buttons (30–32), Resolve button (32), tabs (top corners), flat message hover, palette items, inputs, send-check bar, option buttons, 32–36px channel tiles |
-| `--radius-lg-plus` | 9 | Hover toolbar |
-| `--radius-xl` | 12 | Cards, chat/card rows, 44px channel tiles, To field, New message textarea |
-| `--radius-2xl` | 14 | Composer |
+| `--radius-lg` | 8 | 28px buttons, icon buttons (30–32), tabs (top corners), palette items, inputs, send-check bar, option buttons, 28px channel tiles |
+| `--radius-xl` | 12 | Nav items, filter buttons, 30px buttons, hover-toolbar buttons (28), To field, New message textarea, 32–36px channel tiles |
+| `--radius-2xl` | 14 | Flat message hover row |
+| `--radius-3xl` | 16 | Sidebar and list rows (and the selected row), 44px channel tile, hover toolbar |
+| `--radius-card` | 20 | Cards (catch-up, grouping, For you, Juno cards) and settings groups |
+| `--radius-composer` | 20 | The composer frame: a pill at its 40px single-line height, and the same corner once it has grown, so a tall draft is not a capsule |
 | `--radius-menu` | 13 | Context menu, avatar menu, Browse menu, mention popover, To picker |
 | `--radius-palette` | 14 | ⌘K panel, user chat bubble (with 4px tail corner) |
 | `--radius-toast` | 14 | Toast |
 | `--radius-bubble` | 16 | Message bubbles (tail corner 4) |
 | `--radius-tag` | 999 | Tags, count badges, @ tag, status chips, decision chips, scope chip, digest chips, stealth pill, confidence badge, reaction chips, inline @person and #channel chips (padding 0 5), the row Resolve button (22) and the toast Undo button (26) |
-| `--radius-pill` | 999 | Context pill (header, To field, send card) |
+| `--radius-pill` | 999 | Context pill (header, To field, send card); the 32px and taller buttons (header Resolve, Discard/Send, Sign in) |
 | `--radius-full` | 999 | Avatars, attach/send buttons, colour swatches |
 
 A label is a pill; a control or a container is a rounded rectangle. Pills never nest in pills.
 
-**Nesting rule (SPEC §16):** outer radius = inner radius + padding. Pairs: palette 14 = item 8 + padding 6; Juno topics card 12 = item 7 + padding 4 (off by one, acceptable); segmented control 7 = segment 5 + padding 2; menus 13 = item 6 + padding 6 + 1 border; hover toolbar 8 = button 6 + padding 2; card row 12 = tile 12 only by eye (the tile is not inset evenly). When building a new container, compute it; do not pick from the table.
+**Nesting rule (SPEC §16):** outer radius = inner radius + padding. Pairs: palette 14 = item 8 + padding 6; Juno topics card 20 = item 12 + padding 8 (the items use `--radius-xl`); segmented control 7 = segment 5 + padding 2; menus 13 = item 6 + padding 6 + 1 border; hover toolbar 16 = button 12 + padding 2 + 2 (off by two: the sheet's values, kept so the toolbar matches the rows); card 20 = inset block 8 + padding 12; settings group 20 = row 16 + 4; card row 16 = tile 16 only by eye (the tile is not inset evenly). When building a new container, compute it; do not pick from the table.
 
 ## 5. Sizes
 
@@ -349,10 +383,10 @@ Single line 40px; grows to `max-height` then scrolls inside. Prototype max is 18
 | `--shadow-md` | `0 2px 6px 0 rgba(27,28,21,.06)` | `0 2px 6px 0 rgba(0,0,0,.40)` | css | Floating Quote button |
 | `--shadow-card` | `0 0 12px 0 rgba(27,28,21,.12)` | `0 0 12px 0 rgba(0,0,0,.45)` | css | Unused in prototype; prefer `--card-ring` |
 | `--shadow-lg` | `0 8px 24px 0 rgba(27,28,21,.10)` | `0 8px 24px 0 rgba(0,0,0,.50)` | css | Toast |
-| `--card-ring` | `0 0 0 1px oklch(0 0 0 / .06), 0 1px 2px -1px oklch(0 0 0 / .06), 0 2px 4px 0 oklch(0 0 0 / .04)` | `0 0 0 1px oklch(1 0 0 / .08)` | proto | Cards: catch-up, grouping, settled hint, For you, Juno cards, settings groups |
-| `--pop-shadow` | `0 0 0 1px oklch(0 0 0 / .06), 0 1px 2px -1px oklch(0 0 0 / .08), 0 10px 28px -6px oklch(0 0 0 / .14)` | `0 0 0 1px oklch(1 0 0 / .1), 0 8px 24px oklch(0 0 0 / .5)` | proto | Menus, popovers, palette, hover toolbar |
+| `--card-ring` | `0 1px 2px 0 oklch(0 0 0 / .03), 0 6px 20px -4px oklch(0 0 0 / .07)` | `0 1px 2px 0 oklch(0 0 0 / .3), 0 6px 20px -4px oklch(0 0 0 / .35)` | options D1 | Cards: catch-up, grouping, settled hint, For you, Juno cards, settings groups. The name is historical; there is no ring any more |
+| `--pop-shadow` | `0 2px 6px -1px oklch(0 0 0 / .05), 0 14px 36px -8px oklch(0 0 0 / .13)` | `0 2px 6px -1px oklch(0 0 0 / .3), 0 14px 36px -8px oklch(0 0 0 / .5)` | options D1 | Menus, popovers, palette, hover toolbar |
 
-Floating surfaces have `border: 1px solid transparent` plus the ring, never a coloured border. Inputs keep a real 1px `--input-border`.
+Floating surfaces have `border: 1px solid transparent` plus the shadow, never a coloured border. Inputs keep a real 1px `--input-border`. The raised button (`Button variant="raised"`) is a control, not a floating surface: it keeps a 1px `--border-default` edge plus `--shadow-sm`. In dark the shadows alone do not separate a popover from the page, so popovers and the hover toolbar sit on `--surface-raised` (1.2).
 
 ## 7. Z-index layers
 
@@ -419,8 +453,8 @@ Apply these when porting; the prototype values are listed so no one copies them 
 | Focus ring in `--selection-background` | `--focus-ring` = `--info` light, `hsla(200, 80%, 65%)` dark (decided) |
 | Cyan accent with off-white text (3.8:1) | Cyan takes near-black `--hl-fg` (`hsla(48, 10%, 2%)`) |
 | Composer max 184px | 194px (8 full lines) |
-| Söhne / Meraki | Inter / Instrument Serif, bundled |
-| Global letter-spacing 0.02em in CSS file | 0.01em (prototype root) |
+| Söhne / Meraki | Figtree / Instrument Serif, bundled (Inter was the first replacement; swapped for Figtree in the friendly-layer options review) |
+| Global letter-spacing 0.02em in CSS file | 0 (Figtree; 0.01em was the Inter value) |
 | Lucide outline icons | Phosphor, weight by size, fill for active (`friendly-layer.md` §2) |
-| Radius 6 tags, chips, pills and reactions | Pills (`--radius-tag`, `--radius-pill`); tiles, rows and cards 12, composer and toast 14 |
+| Radius 6 tags, chips, pills and reactions | Pills (`--radius-tag`, `--radius-pill`); rows and tiles 16, cards 20, nav 12, composer 20 (a pill at one line), 32px+ buttons pills, toast 14 |
 | No entrances; everything 150ms | Entrances 240ms, exits 150ms, pops 220ms with a spring; rows, tabs and typing still never animate |

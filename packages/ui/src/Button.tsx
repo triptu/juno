@@ -39,16 +39,18 @@ export interface ButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement
 // StyleX cannot read constants from other modules.
 const HOVER = '@media (hover: hover)'
 
-type Radius = 'tag' | 'md' | 'md-plus' | 'lg'
+type Radius = 'tag' | 'lg' | 'xl' | 'pill'
 
-// The 22px button is the row Resolve, a label-sized control, so it is a pill.
+// The 22px row Resolve is a label-sized control and the 32px and taller
+// buttons (header Resolve, Sign in, Send) are pills; the 28px and 30px
+// buttons stay rounded rectangles so they nest in cards and toolbars.
 const radiusBySize: Record<ButtonSize, Radius> = {
   xs: 'tag',
-  sm: 'md',
-  md: 'md-plus',
-  lg: 'lg',
-  xl: 'lg',
-  '2xl': 'lg',
+  sm: 'lg',
+  md: 'xl',
+  lg: 'pill',
+  xl: 'pill',
+  '2xl': 'pill',
 }
 
 const textBySize: Record<ButtonSize, 'tagSmall' | 'buttonSmall' | 'ui'> = {
@@ -111,7 +113,7 @@ export function Button({
         typeVariants[filter ? 'ui' : textBySize[effectiveSize]],
         styles.weightMedium,
         sizeStyles[effectiveSize],
-        radiusStyles[filter ? 'lg' : radiusBySize[effectiveSize]],
+        radiusStyles[filter ? 'xl' : radiusBySize[effectiveSize]],
         variantStyles[variant],
         (variant === 'ghost' || variant === 'outline') && tones[tone],
         pressed && pressedStyles[variant],
@@ -161,9 +163,9 @@ const sizeStyles = stylex.create({
 
 const radiusStyles = stylex.create({
   tag: { borderRadius: radii['--radius-tag'] },
-  md: { borderRadius: radii['--radius-md'] },
-  'md-plus': { borderRadius: radii['--radius-md-plus'] },
   lg: { borderRadius: radii['--radius-lg'] },
+  xl: { borderRadius: radii['--radius-xl'] },
+  pill: { borderRadius: radii['--radius-pill'] },
 })
 
 const variantStyles = stylex.create({
@@ -196,15 +198,17 @@ const variantStyles = stylex.create({
       ':hover': { default: null, [HOVER]: colors['--surface-hover'] },
     },
   },
-  // The ring gives the raised button an edge on light paper, where the soft
-  // shadow alone reads like a ghost button.
+  // A real hairline gives the raised button an edge on light paper, where
+  // the small shadow alone reads like a ghost button. It is a control, not
+  // a floating surface, so the no-coloured-border rule does not apply.
   raised: {
     color: colors['--foreground-default'],
     backgroundColor: {
       default: colors['--surface-default'],
       ':hover': { default: null, [HOVER]: colors['--background'] },
     },
-    boxShadow: `${shadows['--card-ring']}, ${shadows['--shadow-sm']}`,
+    borderColor: colors['--border-default'],
+    boxShadow: shadows['--shadow-sm'],
   },
   filter: {
     color: {

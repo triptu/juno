@@ -147,11 +147,11 @@ const sizeStyles = stylex.create({
 
 // Tile radius follows the nesting rule against the row it sits in.
 const tileRadius = stylex.create({
-  44: { borderRadius: radii['--radius-xl'] },
-  36: { borderRadius: radii['--radius-lg'] },
-  32: { borderRadius: radii['--radius-lg'] },
-  28: { borderRadius: radii['--radius-md-plus'] },
-  24: { borderRadius: radii['--radius-md'] },
-  20: { borderRadius: radii['--radius-sm'] },
+  44: { borderRadius: radii['--radius-3xl'] },
+  36: { borderRadius: radii['--radius-xl'] },
+  32: { borderRadius: radii['--radius-xl'] },
+  28: { borderRadius: radii['--radius-lg'] },
+  24: { borderRadius: radii['--radius-md-plus'] },
+  20: { borderRadius: radii['--radius-md'] },
   18: { borderRadius: radii['--radius-sm'] },
 })

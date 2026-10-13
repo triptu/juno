@@ -41,9 +41,10 @@ function isAppUrl(url: string): boolean {
 export interface IpcDeps {
   readonly supervisor: EngineSupervisor
   readonly setTheme: (theme: Launch['theme']) => void
+  readonly setAccent: (accent: NonNullable<Launch['accent']>) => void
 }
 
-export function registerIpc({ supervisor, setTheme }: IpcDeps): void {
+export function registerIpc({ supervisor, setTheme, setAccent }: IpcDeps): void {
   handle(Channels.appGetInfo, () => ({
     name: app.getName(),
     version: app.getVersion(),
@@ -58,5 +59,9 @@ export function registerIpc({ supervisor, setTheme }: IpcDeps): void {
 
   handle(Channels.launchSetTheme, ({ theme }) => {
     setTheme(theme)
+  })
+
+  handle(Channels.launchSetAccent, ({ accent }) => {
+    setAccent(accent)
   })
 }

@@ -1,6 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
 import type { SelectHTMLAttributes } from 'react'
-import { colors, radii, sizes, spacing } from '@juno/tokens/tokens.stylex'
+import { accent, colors, radii, sizes, spacing } from '@juno/tokens/tokens.stylex'
 import { variants as typeVariants } from './internal/type'
 
 export interface SelectOption {
@@ -48,7 +48,7 @@ const styles = stylex.create({
     },
     outlineWidth: sizes['--focus-ring-width'],
     outlineOffset: sizes['--focus-ring-offset'],
-    outlineColor: colors['--focus-ring'],
+    outlineColor: accent['--focus-ring'],
     // A chevron drawn in the muted text colour.
     backgroundImage:
       "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23706E66' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='m6 9 6 6 6-6'/></svg>\")",

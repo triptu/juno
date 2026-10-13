@@ -52,7 +52,7 @@ export { Text, type TextProps, type TextTone, type TextVariant, type Weight } fr
 export { Textarea, type TextareaProps, type TextareaVariant } from './Textarea'
 export { TextField, type TextFieldProps, type TextFieldSize } from './TextField'
 export { Toast, ToastRegion, type ToastAction, type ToastProps, type ToastRegionProps } from './Toast'
-export { accentNames, applyTheme, isAccentName, isThemeName, themeNames, type AccentName, type ThemeName } from './theme'
+export { accentLabels, accentNames, applyTheme, defaultAccent, isAccentName, isThemeName, themeNames, type AccentName, type ThemeName } from './theme'
 export type { ActivateEvent, ActivateHandler } from './internal/activate'
 export type { LayoutStyles } from './internal/sx'
 export { defineFixtures, fixture, scene, type Fixture, type FixtureFrame, type FixtureSet } from './fixtures/define'

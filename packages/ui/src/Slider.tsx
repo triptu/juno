@@ -1,6 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
 import type { InputHTMLAttributes } from 'react'
-import { colors, radii, sizes } from '@juno/tokens/tokens.stylex'
+import { accent, colors, radii, sizes } from '@juno/tokens/tokens.stylex'
 import { interactive } from './internal/interactive'
 
 export interface SliderProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'style' | 'className' | 'type' | 'value' | 'min' | 'max' | 'step'> {
@@ -51,7 +51,7 @@ const styles = stylex.create({
     },
     outlineWidth: sizes['--focus-ring-width'],
     outlineOffset: sizes['--focus-ring-offset'],
-    outlineColor: colors['--focus-ring'],
+    outlineColor: accent['--focus-ring'],
     borderRadius: radii['--radius-full'],
     '::-webkit-slider-runnable-track': {
       height: sizes['--slider-track'],

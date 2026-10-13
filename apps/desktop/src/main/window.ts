@@ -1,5 +1,6 @@
 import { app, BrowserWindow, shell, type BrowserWindowConstructorOptions } from 'electron'
 import { join } from 'node:path'
+import { DEFAULT_ACCENT } from '@juno/contract'
 import { BACKGROUND, type Launch } from './launch'
 import { APP_URL } from './scheme'
 
@@ -68,9 +69,10 @@ export function createMainWindow(launch: Launch): BrowserWindow {
   return window
 }
 
-/** The page reads `?theme=` so its first render matches the window background. */
+/** The page reads `?theme=` and `?accent=` so its first render matches the window background and the saved accent. */
 function pageUrl(base: string, launch: Launch): string {
   const url = new URL(base)
   url.searchParams.set('theme', launch.theme)
+  url.searchParams.set('accent', launch.accent ?? DEFAULT_ACCENT)
   return url.toString()
 }

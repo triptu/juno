@@ -1,10 +1,10 @@
 /*
- * The bundled fonts. Inter (variable, 100-900) for UI, Instrument Serif
+ * The bundled fonts. Figtree (variable, 300-900) for UI, Instrument Serif
  * (400 regular and italic) for page titles and JetBrains Mono (400, 500) for
  * hints and code. All come from @fontsource and are served by Vite from
  * node_modules; nothing is ever loaded from a URL.
  */
-@import '@fontsource-variable/inter/wght.css';
+@import '@fontsource-variable/figtree/wght.css';
 @import '@fontsource/instrument-serif/400.css';
 @import '@fontsource/instrument-serif/400-italic.css';
 @import '@fontsource/jetbrains-mono/400.css';

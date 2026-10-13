@@ -1,7 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import { useEffect, useLayoutEffect, useMemo, useState } from 'react'
-import { colors, radii, spacing, text } from '@juno/tokens/tokens.stylex'
-import { accentNames, applyTheme, isAccentName, isThemeName, themeNames, type AccentName, type FixtureFrame, type ThemeName } from '@juno/ui'
+import { accent, colors, radii, spacing, text } from '@juno/tokens/tokens.stylex'
+import { accentNames, applyTheme, defaultAccent, isAccentName, isThemeName, themeNames, type AccentName, type FixtureFrame, type ThemeName } from '@juno/ui'
 import { allRoutes, registry, type AnyFixtureSet, type Route } from './registry'
 
 interface Location {
@@ -22,7 +22,7 @@ function parseHash(hash: string): Location {
     component,
     fixture,
     theme: isThemeName(theme) ? theme : 'light',
-    accent: isAccentName(accent) ? accent : 'ink',
+    accent: isAccentName(accent) ? accent : defaultAccent,
     query: params.get('q') ?? '',
   }
 }
@@ -31,7 +31,7 @@ function href(component: string | null, fixture: string | null, theme: ThemeName
   const path = component ? `/${encodeURIComponent(component)}${fixture ? `/${encodeURIComponent(fixture)}` : ''}` : '/'
   const params = new URLSearchParams()
   if (theme !== 'light') params.set('theme', theme)
-  if (accent !== 'ink') params.set('accent', accent)
+  if (accent !== defaultAccent) params.set('accent', accent)
   const search = params.toString()
   return `#${path}${search ? `?${search}` : ''}`
 }
@@ -124,14 +124,14 @@ function Index({ location }: { readonly location: Location }) {
             ))}
           </span>
           <span {...stylex.props(styles.group)}>
-            {accentNames.map((accent) => (
+            {accentNames.map((name) => (
               <a
-                key={accent}
-                href={href(null, null, location.theme, accent)}
-                aria-current={accent === location.accent ? 'true' : undefined}
-                {...stylex.props(styles.pill, accent === location.accent && styles.pillActive)}
+                key={name}
+                href={href(null, null, location.theme, name)}
+                aria-current={name === location.accent ? 'true' : undefined}
+                {...stylex.props(styles.pill, name === location.accent && styles.pillActive)}
               >
-                {accent}
+                {name}
               </a>
             ))}
           </span>
@@ -238,7 +238,7 @@ const styles = stylex.create({
     color: 'inherit',
     fontFamily: 'inherit',
     fontSize: text['--text-ui-size'],
-    outlineColor: colors['--focus-ring'],
+    outlineColor: accent['--focus-ring'],
   },
   group: {
     display: 'inline-flex',

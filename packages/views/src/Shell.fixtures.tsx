@@ -1,7 +1,7 @@
 import { defineFixtures, scene } from '@juno/ui'
+import { AppearanceSettings } from './AppearanceSettings'
 import { AppInfoView } from './AppInfoView'
 import { Shell } from './Shell'
-import { ThemeToggleView } from './ThemeToggleView'
 
 export default defineFixtures(
   Shell,
@@ -10,7 +10,7 @@ export default defineFixtures(
     'm1-shell': scene(() => (
       <Shell>
         <AppInfoView line="Juno 0.1.0 on darwin, Electron 44.7.0" />
-        <ThemeToggleView theme="light" onToggle={() => {}} />
+        <AppearanceSettings theme="light" accent="coral" onThemeChange={() => {}} onAccentChange={() => {}} />
       </Shell>
     )),
   },

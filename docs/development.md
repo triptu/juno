@@ -105,8 +105,9 @@ or Playwright's Chromium. The favicon is `src/renderer/public/favicon.svg` (and 
    Values come from `docs/design/tokens.md`; `packages/tokens/README.md` explains
    the naming.
 2. `packages/tokens/src/themes.stylex.ts` calls `stylex.createTheme` with the dark
-   values. `dark` is the pair of classes (colours and shadows) to apply. The four
-   accent themes override the `accent` group only, so they combine with `dark`.
+   values. `dark` is the set of classes (colours, shadows, swatches) to apply. Each
+   accent has a light and a dark theme on the `accent` group only, so they combine
+   with `dark`; `applyTheme(theme, accent)` picks the pair.
 3. Components import tokens through the subpath, never a barrel:
    `import { colors } from '@juno/tokens/tokens.stylex'`, then use
    `colors['--background']` inside `stylex.create`.
@@ -129,7 +130,7 @@ Rules that come from the design spec and are enforced in `@juno/ui`:
 - Hover styles only inside `@media (hover: hover)`.
 - 2px focus ring in `--focus-ring` on `:focus-visible` only.
 - Rows, tabs and option rows navigate on `pointerdown` (see `packages/ui/README.md`).
-- Fonts are bundled by Vite from `@juno/tokens/fonts.css` (Inter, Instrument Serif,
+- Fonts are bundled by Vite from `@juno/tokens/fonts.css` (Figtree, Instrument Serif,
   JetBrains Mono), which both apps import. Never load fonts from a URL. Instrument
   Serif has one weight (400).
 

@@ -87,7 +87,7 @@ const styles = stylex.create({
     borderBottomColor: colors['--border-subtle'],
   },
   button: {
-    borderRadius: radii['--radius-lg'],
+    borderRadius: radii['--radius-3xl'],
     backgroundColor: {
       default: 'transparent',
       ':hover': { default: null, [HOVER]: colors['--surface-hover'] },

@@ -1,6 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
 import type { TextareaHTMLAttributes } from 'react'
-import { colors, layout, radii, spacing, text } from '@juno/tokens/tokens.stylex'
+import { accent, colors, layout, radii, spacing, text } from '@juno/tokens/tokens.stylex'
 
 export type TextareaVariant = 'plain' | 'inline' | 'card'
 
@@ -58,11 +58,11 @@ const variants = stylex.create({
     borderStyle: 'solid',
     borderColor: {
       default: colors['--input-border'],
-      ':focus': colors['--focus-ring'],
+      ':focus': accent['--focus-ring'],
     },
     boxShadow: {
       default: 'none',
-      ':focus': `0 0 0 1px ${colors['--focus-ring']}`,
+      ':focus': `0 0 0 1px ${accent['--focus-ring']}`,
     },
     borderRadius: radii['--radius-xl'],
     fontFamily: text['--text-body-family'],
@@ -93,11 +93,11 @@ const variants = stylex.create({
     borderStyle: 'solid',
     borderColor: {
       default: colors['--input-border'],
-      ':focus': colors['--focus-ring'],
+      ':focus': accent['--focus-ring'],
     },
     boxShadow: {
       default: 'none',
-      ':focus': `0 0 0 1px ${colors['--focus-ring']}`,
+      ':focus': `0 0 0 1px ${accent['--focus-ring']}`,
     },
     borderRadius: radii['--radius-lg'],
     backgroundColor: colors['--background'],

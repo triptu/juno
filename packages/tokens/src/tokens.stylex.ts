@@ -22,7 +22,7 @@ const REDUCED_MOTION = '@media (prefers-reduced-motion: reduce)'
 /* Colour                                                                     */
 /* -------------------------------------------------------------------------- */
 
-/** Base palette. Warm paper in light, cool near-black in dark. */
+/** Base palette. Warm paper in light; themes.stylex.ts has the warm near-black for dark. */
 export const colors = stylex.defineVars({
   // Backgrounds and surfaces.
   '--background': 'hsla(48, 50%, 98%, 1)',
@@ -60,10 +60,6 @@ export const colors = stylex.defineVars({
   '--accent-foreground-subtle': 'hsla(48, 20%, 90%, 1)',
   '--accent-foreground-muted': 'hsla(48, 20%, 70%, 1)',
 
-  // Text selection only. The focus ring has its own, more visible colour.
-  '--selection-background': 'hsla(200, 50%, 80%, 1)',
-  '--focus-ring': '#008AB3',
-
   // The dim behind the command palette.
   '--overlay': 'rgba(27, 28, 21, 0.16)',
 
@@ -86,15 +82,56 @@ export const colors = stylex.defineVars({
 })
 
 /**
- * The accent. Everything that uses the accent goes through these three, so
- * an accent theme only has to override --hl and --hl-fg.
+ * The accent. Everything that uses the accent goes through this group, so
+ * an accent is one theme that overrides these keys (themes.stylex.ts has
+ * one per accent and theme). The defaults are Coral in light.
+ *
+ * - --hl: the fill (primary button, send, @you chip, Now chip)
+ * - --hl-fg: text on the fill
+ * - --hl-text: accent-coloured text and icons on paper or on a tint (the
+ *   "new" label, the selected nav item, the subscribed bell)
+ * - --hl-soft: the tint behind a message that mentions you, my reaction
+ * - --hl-nav: the selected nav item's fill, over the sidebar
+ * - --hl-rule, --hl-ring: the new divider's rule and the mine-reaction ring
+ * - --focus-ring: the accent text colour, so it meets 4.5:1 on the page
+ * - --selection-background: text selection
+ *
+ * Unread counts are never the accent; they stay the soft grey tag.
  */
 export const accent = stylex.defineVars({
-  '--hl': colors['--accent-default'],
-  '--hl-fg': colors['--accent-foreground'],
-  '--hl-soft': `color-mix(in oklch, ${colors['--accent-default']} 9%, ${colors['--background']})`,
-  '--hl-rule': `color-mix(in oklch, ${colors['--accent-default']} 30%, transparent)`,
-  '--hl-ring': `color-mix(in oklch, ${colors['--accent-default']} 45%, transparent)`,
+  '--hl': '#CC4628',
+  '--hl-fg': '#FFFFFF',
+  '--hl-text': '#B4351F',
+  '--hl-soft': `color-mix(in oklch, #CC4628 10%, ${colors['--background']})`,
+  '--hl-nav': `color-mix(in oklch, #CC4628 9%, ${colors['--background-subtle']})`,
+  '--hl-rule': 'color-mix(in oklch, #CC4628 30%, transparent)',
+  '--hl-ring': 'color-mix(in oklch, #CC4628 45%, transparent)',
+  '--focus-ring': '#B4351F',
+  '--selection-background': `color-mix(in oklch, #CC4628 28%, ${colors['--background']})`,
+})
+
+/**
+ * The eight accent fills and their text, for the accent picker's swatches.
+ * The same values as the accent themes in themes.stylex.ts, repeated here
+ * because a swatch shows every accent at once while only one theme is on.
+ */
+export const accentSwatches = stylex.defineVars({
+  '--swatch-coral': '#CC4628',
+  '--swatch-coral-fg': '#FFFFFF',
+  '--swatch-ink': 'hsla(48, 30%, 8%, 1)',
+  '--swatch-ink-fg': 'hsla(48, 20%, 95%, 1)',
+  '--swatch-marigold': '#F2A900',
+  '--swatch-marigold-fg': '#2B1E00',
+  '--swatch-teal': '#0B7A75',
+  '--swatch-teal-fg': '#FFFFFF',
+  '--swatch-midnight': '#2E1F64',
+  '--swatch-midnight-fg': '#FFFAEB',
+  '--swatch-emerald': '#00674F',
+  '--swatch-emerald-fg': '#FFFAEB',
+  '--swatch-claret': '#7F1734',
+  '--swatch-claret-fg': '#FFFAEB',
+  '--swatch-cyan': '#008AB3',
+  '--swatch-cyan-fg': 'hsla(48, 10%, 2%, 1)',
 })
 
 /**
@@ -143,16 +180,17 @@ export const hues = stylex.defineVars({
 /* -------------------------------------------------------------------------- */
 
 /**
- * Floating surfaces get a ring (a 1px shadow) plus a soft drop, never a
- * coloured border. Inputs are the exception and keep --input-border.
+ * Cards and floating surfaces get a wide, soft drop shadow and no ring,
+ * never a coloured border. Inputs are the exception and keep --input-border.
+ * The names --card-ring and --pop-shadow are kept so nothing has to move.
  */
 export const shadows = stylex.defineVars({
   '--shadow-sm': '0 1px 2px 0 rgba(27, 28, 21, 0.04)',
   '--shadow-md': '0 2px 6px 0 rgba(27, 28, 21, 0.06)',
   '--shadow-card': '0 0 12px 0 rgba(27, 28, 21, 0.12)',
   '--shadow-lg': '0 8px 24px 0 rgba(27, 28, 21, 0.10)',
-  '--card-ring': '0 0 0 1px oklch(0 0 0 / 0.06), 0 1px 2px -1px oklch(0 0 0 / 0.06), 0 2px 4px 0 oklch(0 0 0 / 0.04)',
-  '--pop-shadow': '0 0 0 1px oklch(0 0 0 / 0.06), 0 1px 2px -1px oklch(0 0 0 / 0.08), 0 10px 28px -6px oklch(0 0 0 / 0.14)',
+  '--card-ring': '0 1px 2px 0 oklch(0 0 0 / 0.03), 0 6px 20px -4px oklch(0 0 0 / 0.07)',
+  '--pop-shadow': '0 2px 6px -1px oklch(0 0 0 / 0.05), 0 14px 36px -8px oklch(0 0 0 / 0.13)',
 })
 
 /* -------------------------------------------------------------------------- */
@@ -171,9 +209,18 @@ export const radii = stylex.defineVars({
   '--radius-md': '6px',
   '--radius-md-plus': '7px',
   '--radius-lg': '8px',
-  '--radius-lg-plus': '9px',
+  // Nav and filter buttons, hover-toolbar buttons, 30px buttons, 32-36px
+  // tiles, the To field.
   '--radius-xl': '12px',
+  // Flat message hover row.
   '--radius-2xl': '14px',
+  // Sidebar and list rows, the 44px channel tile, the hover toolbar.
+  '--radius-3xl': '16px',
+  // Cards and settings groups.
+  '--radius-card': '20px',
+  // The composer: a pill at its single-line height of 40px, and the same
+  // 20px corner once it has grown, so a tall draft is not a capsule.
+  '--radius-composer': '20px',
   '--radius-menu': '13px',
   '--radius-palette': '14px',
   '--radius-toast': '14px',
@@ -212,12 +259,12 @@ export const spacing = stylex.defineVars({
 /* -------------------------------------------------------------------------- */
 
 /**
- * Families. Inter (variable) for UI, Instrument Serif for page titles and
+ * Families. Figtree (variable) for UI, Instrument Serif for page titles and
  * JetBrains Mono for hints and code, all bundled from @fontsource through
  * fonts.css.
  */
 export const fonts = stylex.defineVars({
-  '--font-sans': "'Inter Variable', 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+  '--font-sans': "'Figtree Variable', 'Figtree', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
   '--font-serif': "'Instrument Serif', ui-serif, 'Iowan Old Style', Georgia, serif",
   '--font-mono': "'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace",
 })
@@ -230,7 +277,7 @@ export const weights = stylex.defineVars({
 
 export const tracking = stylex.defineVars({
   '--tracking-tight': '-0.01em',
-  '--tracking-normal': '0.01em',
+  '--tracking-normal': '0',
   '--tracking-wide': '0.06em',
   '--tracking-none': '0',
 })
@@ -242,113 +289,117 @@ export const tracking = stylex.defineVars({
  * variables rather than inventing a size.
  *
  * The half-pixel sizes are deliberate; they are what keeps the hierarchy
- * quiet. Do not round them.
+ * quiet. Do not round them. Sizes are tuned for Figtree: its x-height is
+ * about 8% smaller than Inter's and it runs about 6% narrower, so every sans
+ * role at or below 15px is half a pixel larger than the prototype's Inter
+ * value and lines come out the same width. Figtree's sidebearings are wide
+ * enough that the 0.01em tracking Inter needed is gone.
  */
 export const text = stylex.defineVars({
   // Pinned / Recent / People / Channels headings. Rendered uppercase.
   '--text-section-label-family': fonts['--font-sans'],
-  '--text-section-label-size': '10.5px',
+  '--text-section-label-size': '11px',
   '--text-section-label-weight': '500',
   '--text-section-label-leading': 'normal',
   '--text-section-label-tracking': '0.06em',
 
   // Table column headers. Rendered uppercase.
   '--text-table-header-family': fonts['--font-sans'],
-  '--text-table-header-size': '11px',
+  '--text-table-header-size': '11.5px',
   '--text-table-header-weight': '500',
   '--text-table-header-leading': 'normal',
   '--text-table-header-tracking': '0.06em',
 
   // "3 NEW" divider label. Rendered uppercase.
   '--text-divider-family': fonts['--font-sans'],
-  '--text-divider-size': '11px',
+  '--text-divider-size': '11.5px',
   '--text-divider-weight': '600',
   '--text-divider-leading': 'normal',
   '--text-divider-tracking': '0.06em',
 
   // Tags and count badges: Main, Reopened, unread count, @, hints.
   '--text-tag-family': fonts['--font-sans'],
-  '--text-tag-size': '11px',
+  '--text-tag-size': '11.5px',
   '--text-tag-weight': '500',
   '--text-tag-leading': '18px',
   '--text-tag-tracking': '0',
 
   // Row Resolve button, card footnotes, "Use", Mark read.
   '--text-tag-small-family': fonts['--font-sans'],
-  '--text-tag-small-size': '11.5px',
+  '--text-tag-small-size': '12px',
   '--text-tag-small-weight': '500',
   '--text-tag-small-leading': 'normal',
-  '--text-tag-small-tracking': '0.01em',
+  '--text-tag-small-tracking': '0',
 
   // Times, timestamps, card headers, status chips, log reasons.
   '--text-meta-family': fonts['--font-sans'],
-  '--text-meta-size': '12px',
+  '--text-meta-size': '12.5px',
   '--text-meta-weight': '400',
   '--text-meta-leading': 'normal',
-  '--text-meta-tracking': '0.01em',
+  '--text-meta-tracking': '0',
 
   // Context pill and scope chip.
   '--text-pill-family': fonts['--font-sans'],
-  '--text-pill-size': '12.5px',
+  '--text-pill-size': '13px',
   '--text-pill-weight': '600',
   '--text-pill-leading': 'normal',
-  '--text-pill-tracking': '0.01em',
+  '--text-pill-tracking': '0',
 
   // 28px buttons: Group into topic, Fix and send, Stop ignoring, Not yet.
   '--text-button-small-family': fonts['--font-sans'],
-  '--text-button-small-size': '12.5px',
+  '--text-button-small-size': '13px',
   '--text-button-small-weight': '500',
   '--text-button-small-leading': 'normal',
-  '--text-button-small-tracking': '0.01em',
+  '--text-button-small-tracking': '0',
 
   // Nav, menu items, filters, buttons, selects, inputs, toast.
   '--text-ui-family': fonts['--font-sans'],
-  '--text-ui-size': '13px',
+  '--text-ui-size': '13.5px',
   '--text-ui-weight': '400',
   '--text-ui-leading': '1.5',
-  '--text-ui-tracking': '0.01em',
+  '--text-ui-tracking': '0',
 
   // Row line 2, clamped to one or two lines.
   '--text-preview-family': fonts['--font-sans'],
-  '--text-preview-size': '13px',
+  '--text-preview-size': '13.5px',
   '--text-preview-weight': '400',
   '--text-preview-leading': '1.45',
-  '--text-preview-tracking': '0.01em',
+  '--text-preview-tracking': '0',
 
   // Catch-up text, card bodies, reply options, picker rows.
   '--text-body-small-family': fonts['--font-sans'],
-  '--text-body-small-size': '13.5px',
+  '--text-body-small-size': '14px',
   '--text-body-small-weight': '400',
   '--text-body-small-leading': '1.55',
-  '--text-body-small-tracking': '0.01em',
+  '--text-body-small-tracking': '0',
 
   // Message body, composer, rule rows, palette labels, textareas.
   '--text-body-family': fonts['--font-sans'],
-  '--text-body-size': '14px',
+  '--text-body-size': '14.5px',
   '--text-body-weight': '400',
   '--text-body-leading': '1.6',
-  '--text-body-tracking': '0.01em',
+  '--text-body-tracking': '0',
 
   // Sidebar row title. 600 when unread.
   '--text-row-title-family': fonts['--font-sans'],
-  '--text-row-title-size': '14.5px',
+  '--text-row-title-size': '15px',
   '--text-row-title-weight': '500',
   '--text-row-title-leading': '22px',
   '--text-row-title-tracking': '0',
 
   // Flat message sender name.
   '--text-message-name-family': fonts['--font-sans'],
-  '--text-message-name-size': '14px',
+  '--text-message-name-size': '14.5px',
   '--text-message-name-weight': '600',
   '--text-message-name-leading': 'normal',
-  '--text-message-name-tracking': '0.01em',
+  '--text-message-name-tracking': '0',
 
   // Settings section titles, For you card titles.
   '--text-heading-family': fonts['--font-sans'],
-  '--text-heading-size': '15px',
+  '--text-heading-size': '15.5px',
   '--text-heading-weight': '600',
   '--text-heading-leading': '1.35',
-  '--text-heading-tracking': '0.01em',
+  '--text-heading-tracking': '0',
 
   // Topic header title and its rename input.
   '--text-topic-title-family': fonts['--font-sans'],

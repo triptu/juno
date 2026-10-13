@@ -61,6 +61,7 @@ app.whenReady().then(() => {
   registerIpc({
     supervisor,
     setTheme: (theme) => updateLaunch({ theme }),
+    setAccent: (accent) => updateLaunch({ accent }),
   })
 
   // Fork the engine and open the window in the same tick; neither waits.
