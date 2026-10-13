@@ -12,8 +12,9 @@
  * 2. pinned rows, whatever their age (`topic_overlay_pinned`);
  * 3. rows older than the cutoff that are still unread (`topic_index_unread`);
  * 4. Main rows whose own messages are older than the cutoff but whose
- *    channel has a thread with activity inside it (the window on
- *    `topic_index_activity`, then the Main row by primary key).
+ *    channel has a topic with activity inside it (one probe per member
+ *    conversation on `topic_index_channel_activity`, then the Main row by
+ *    primary key).
  *
  * Threads are filtered in SQL before the LIMIT by the rule of spec section 5
  * ("What shows up"): followed in Slack (`thread_subs.subscribed`) or with an
@@ -155,10 +156,14 @@ export function listStatements(filter: ListFilter, cutoff: string, limit: number
       params: [cutoff, ...scopeParams, limit],
     },
     {
-      // Main rows kept alive by replies in the channel's threads: the channels with a topic inside the window, then each Main by key.
-      sql: `${SELECT}${FROM} WHERE i.topic_id IN (SELECT 'm:' || t.channel FROM topic_index t WHERE t.last_activity_ts >= ?${filter.scope === undefined ? '' : ' AND t.channel = ?'})
+      // Main rows kept alive by replies in the channel's threads: one indexed probe per member conversation for a topic
+      // inside the window (the channel index is newest first, so the probe reads one row), then each Main by key.
+      sql: `${SELECT}${FROM} WHERE i.topic_id IN (
+          SELECT 'm:' || cv.id FROM conversations cv
+          WHERE cv.is_member = 1${filter.scope === undefined ? '' : ' AND cv.id = ?'}
+            AND EXISTS (SELECT 1 FROM topic_index t WHERE t.channel = cv.id AND t.last_activity_ts >= ?))
         AND i.last_activity_ts < ?${common} LIMIT ?`,
-      params: [cutoff, ...scopeParams, cutoff, limit],
+      params: [...scopeParams, cutoff, cutoff, limit],
     },
   ]
 }
