@@ -173,6 +173,30 @@ export class Sidebar {
     await expect(dot).toHaveCount(shown ? 1 : 0)
   }
 
+  /**
+   * Counts the rows in the list on every frame until the returned function
+   * is called, which answers with the number of frames and how many of them
+   * showed no rows at all.
+   */
+  async watchFrames(): Promise<() => Promise<{ readonly frames: number; readonly blank: number; readonly fewest: number }>> {
+    await this.list.evaluate((list) => {
+      const w = window as unknown as { __rowFrames?: { counts: number[]; on: boolean } }
+      const state = { counts: [] as number[], on: true }
+      w.__rowFrames = state
+      const tick = () => {
+        state.counts.push(list.querySelectorAll('[data-topic-row]').length)
+        if (state.on) requestAnimationFrame(tick)
+      }
+      requestAnimationFrame(tick)
+    })
+    return () =>
+      this.win.evaluate(() => {
+        const state = (window as unknown as { __rowFrames: { counts: number[]; on: boolean } }).__rowFrames
+        state.on = false
+        return { frames: state.counts.length, blank: state.counts.filter((count) => count === 0).length, fewest: Math.min(...state.counts) }
+      })
+  }
+
   async expectEmpty(title: string): Promise<void> {
     await expect(this.list.getByText(title, { exact: true })).toBeVisible({ timeout: 15_000 })
   }
@@ -311,9 +335,7 @@ export class Juno {
    */
   async waitForSync(): Promise<void> {
     await this.sidebar.expectRows()
-    await this.accountMenu.open()
-    await expect(this.accountMenu.engineStatus).toHaveText('Engine live', { timeout: 30_000 })
-    await this.accountMenu.close()
+    await this.expectEngineLive()
     // Park the pointer and the focus on the empty workspace.
     await this.win.mouse.click(900, 400)
   }
@@ -326,6 +348,13 @@ export class Juno {
     await this.accountMenu.close()
   }
 
+  /** Waits until the engine has caught up with Slack and says it is live. */
+  async expectEngineLive(timeout = 30_000): Promise<void> {
+    await this.accountMenu.open()
+    await expect(this.accountMenu.engineStatus).toHaveText('Engine live', { timeout })
+    await this.accountMenu.close()
+  }
+
   /** Reads one of the app's performance measures (`@juno/state/perf`), in milliseconds. */
   async measure(name: string): Promise<number | undefined> {
     return this.win.evaluate((measureName) => {
@@ -334,4 +363,71 @@ export class Juno {
       return last === undefined ? undefined : last.duration
     }, name)
   }
+
+  /** Every recorded duration of one measure, oldest first. */
+  async measures(name: string): Promise<number[]> {
+    return this.win.evaluate((measureName) => performance.getEntriesByName(measureName, 'measure').map((entry) => entry.duration), name)
+  }
+
+  /**
+   * How this launch went, in milliseconds: from the main process's creation
+   * to the shell and to the first rows painted, from the sidebar snapshot to
+   * those rows, and the longest frame up to a second after them. Call it
+   * once the rows are on screen.
+   */
+  async startupTimes(): Promise<StartupTimes> {
+    await expect.poll(() => this.measure('juno.sidebar-rows'), { timeout: 15_000 }).not.toBeUndefined()
+    // Let the work queued after the first paint run, so its frames are counted.
+    await this.win.waitForTimeout(1_000)
+    const created = await this.app.evaluate(({ app }) => app.getAppMetrics().find((metric) => metric.type === 'Browser')?.creationTime ?? 0)
+    const page = await this.win.evaluate(async () => {
+      const last = (name: string) => performance.getEntriesByName(name, 'measure').at(-1)
+      const shell = last('juno.shell-paint')
+      const rows = last('juno.sidebar-rows')
+      const paint = last('juno.sidebar-paint')
+      const frames = await new Promise<ReadonlyArray<PerformanceEntry & { readonly blockingDuration?: number }>>((resolve) => {
+        const timer = setTimeout(() => resolve([]), 250)
+        const observer = new PerformanceObserver((list) => {
+          clearTimeout(timer)
+          observer.disconnect()
+          resolve(list.getEntries())
+        })
+        observer.observe({ type: 'long-animation-frame', buffered: true })
+      })
+      const rowsEnd = rows === undefined ? 0 : rows.startTime + rows.duration
+      const early = frames.filter((frame) => frame.startTime < rowsEnd + 1_000)
+      const longest = early.reduce<(typeof early)[number] | undefined>((max, frame) => (max === undefined || frame.duration > max.duration ? frame : max), undefined)
+      return {
+        origin: performance.timeOrigin,
+        shellEnd: shell === undefined ? 0 : shell.startTime + shell.duration,
+        rowsEnd,
+        snapshotToRows: paint?.duration ?? Number.NaN,
+        longestFrame: longest?.duration ?? 0,
+        longestBlocking: longest?.blockingDuration ?? 0,
+        longFrames: early.length,
+        rows: document.querySelectorAll('[data-topic-row]').length,
+      }
+    })
+    return {
+      mainToShell: page.origin + page.shellEnd - created,
+      mainToRows: page.origin + page.rowsEnd - created,
+      snapshotToRows: page.snapshotToRows,
+      longestFrame: page.longestFrame,
+      longestBlocking: page.longestBlocking,
+      longFrames: page.longFrames,
+      rows: page.rows,
+    }
+  }
+}
+
+export interface StartupTimes {
+  readonly mainToShell: number
+  readonly mainToRows: number
+  readonly snapshotToRows: number
+  /** The longest animation frame (over 50 ms) up to a second after the rows painted; 0 when there was none. */
+  readonly longestFrame: number
+  readonly longestBlocking: number
+  readonly longFrames: number
+  /** Rows in the list a second after the first paint. */
+  readonly rows: number
 }

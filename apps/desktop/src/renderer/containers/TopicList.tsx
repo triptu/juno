@@ -1,4 +1,4 @@
-import { memo, useEffect, useRef } from 'react'
+import { memo, useEffect, useLayoutEffect, useRef } from 'react'
 import { SIDEBAR_WINDOW } from '@juno/contract'
 import {
   currentRowAtom,
@@ -11,7 +11,7 @@ import {
   sidebarSectionsAtom,
   topicSelectedAtom,
 } from '@juno/state'
-import { afterPaint, measure } from '@juno/state/perf'
+import { afterPaint, mark, measure } from '@juno/state/perf'
 import { useAtomSet, useAtomValue } from '@juno/state/react'
 import { relativeTime, TopicList as TopicListView, TopicRow as TopicRowView, type ActivateEvent, type TopicListEmpty } from '@juno/views'
 import { takeFilterMark } from './filterMark'
@@ -66,11 +66,26 @@ export function TopicList() {
 
   const count = sections.pinned.length + sections.recent.length
 
+  // Marks when the first snapshot lands, before React renders it.
+  useLayoutEffect(() => {
+    if (registry.get(sidebarSectionsAtom).ready) return
+    let done = false
+    const off = registry.subscribe(sidebarSectionsAtom, (next) => {
+      if (done || !next.ready) return
+      done = true
+      mark('juno.sidebar-snapshot')
+    })
+    return off
+  }, [])
+
   useEffect(() => {
     if (!sections.ready) return
     if (!painted.current && count > 0) {
       painted.current = true
-      afterPaint(() => measure('juno.sidebar-rows', 'juno.start', { detail: { rows: count } }))
+      afterPaint(() => {
+        measure('juno.sidebar-rows', 'juno.start', { detail: { rows: count } })
+        measure('juno.sidebar-paint', 'juno.sidebar-snapshot', { detail: { rows: count } })
+      })
     }
     if (takeFilterMark()) afterPaint(() => measure('juno.filter', 'juno.filter', { detail: { rows: count } }))
   }, [sections, count])
