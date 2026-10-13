@@ -50,6 +50,10 @@ Each finding is accepted (A) and changed in the plan, or rejected (R) with a rea
 | L4 | Cards in dark mode | A. Use the dark theme's ring, and run a 200-message transcript in the mock review | §13.1 |
 | L5 | Interrupted copy | A. "Juno was interrupted. Your message is kept. [Try again]" | §13.2 |
 | L6 | What leaves the machine | A. The first-run provider card says it once. Settings shows spend today | §13.2 |
+| G1 | WP2 spec gap 1: the 16 KB window does not bound the rebuild after a redaction, and pin inputs are untracked | A, with a design change: the compaction context is **raw archive messages**, not summaries, and compaction does **not read pins**. A redaction now rebuilds only nodes within 16 KB after the removed message plus their ancestors | §4.2, §4.5 |
+| G2 | WP2 spec gap 2: compaction can move the view past a run's `H` | A. While a run is live, no compaction job starts on an interval that ends after its `H`, and publication rechecks it. The spec's empty-view fallback is removed | §4.2, §5.2 |
+| G3 | WP2 spec gap 3: pin edits need a revision check beyond `gen` | A. `memory_head` holds `pin_rev`, bumped by every pin change. Requests revalidate it with `gen`. A pin edit is a compare-and-swap on the pin version and its source lineage | §4.3, §4.4 |
+| G4 | WP2 spec gap 4: oversized children can block a parent compaction | A. A stored node is **at most 16 KB**. A leaf with no attempt under that copies its source. A parent keeps its shortest attempt cut to 16 KB. So a parent input is always ≤ 32 KB and every merge can start | §4.2, §5.3 |
 
 ## 1. Owner decisions in force
 
@@ -119,24 +123,27 @@ Versions are pinned exactly: pi 1.2.0 and Codex SDK 0.162.1.
 
 ### 4.1 Records
 - `messages(id, kind, bytes, text, at, origin_op, incarnation, source_pos, redacted_gen)`. Ids are dense and never reassigned. The kinds are `user`, `juno`, `tool`, `echo`, `work`, `wake`, `card` and `note`. Long text is split into chunks of at most 16 KB.
-- `nodes(l, i, ver, text, bytes, inputs, input_digest, model, prompt_ver, gen, built_at)`. `inputs` lists the exact child or source versions **plus every context line it read** (node versions).
-- `memory_head(singleton: rev, gen)` and `view_rev(rev, entries, covered, gen)`. `entries` is an ordered list of `{node: (l,i,ver)}` or `{masked: (l,i)}`.
+- `nodes(l, i, ver, text, bytes, cut, inputs, input_digest, model, prompt_ver, gen, built_at)`. `inputs` lists the exact child versions or source, **plus every context message it read** (source ids). `text` is at most 16 KB. `cut` is set when a parent's text was cut to fit (§4.2).
+- `memory_head(singleton: rev, gen, pin_rev)` and `view_rev(rev, entries, covered, gen)`. `entries` is an ordered list of `{node: (l,i,ver)}` or `{masked: (l,i)}`.
 - `queue(l, i, ver, due_at, attempts, last_error)`, with retries at 30 s, 2 min, 10 min, then hourly. A worker fiber wakes at `due_at`; no new message is needed.
 - `pins(id, kind: span | owner, source_id, source_ver, from, to, text, active, supersedes, at)`.
 - `redactions(message_id, gen, at)`, plus the `purge` jobs.
 
 ### 4.2 Tree, view and publication
 - **The gist's rules hold:** Nodes target 512 bytes, with a ruler and up to 5 retries, keeping the shortest. 512 is a target, not an invariant. A source that fits is copied. Merges happen only between siblings with a built parent, in due order measured from the pair's last message, ties going to the oldest. Batches run from 128,000 bytes down to a 64,000-byte target. At most 8 jobs run at once, and a leaf starts once fewer than 8 earlier leaves are unbuilt. The `T=10` case is a test and a Quint witness.
-- **Compaction context (changed from the gist, R4).** Instead of a coarse whole-history view, a job reads a **local window**: the clean view lines just before its interval, newest first, up to 16 KB, plus active pins. Every context line is recorded in `inputs`. Why: the gist's whole-history context makes every later node depend on every earlier message, so a redaction would have to rebuild nearly the whole tree. A local window makes taint exact and small. The cost: less long-range context for resolving references. The compaction eval (WP23) compares the local window with the gist's view on recall. If recall drops past the target, the window grows. It never returns to an untracked whole view.
+- **Compaction context (changed from the gist, R4, G1).** Instead of a coarse whole-history view, a job reads a **local window**: the archive messages just before its interval, newest first, rendered as tail items, up to 16 KB. Removed messages are skipped. The window stops before the first message that does not fit; it does not skip it to reach an older one. Every context message is recorded in `inputs`. Compaction does not read pins; every chat request carries them anyway (§5.2). Why: summaries as context form a chain, because each node read earlier nodes that read earlier nodes, so one redaction could taint every later summary. Raw messages have no dependencies of their own, so the taint of a redaction is the nodes whose interval contains the message, the nodes whose window reached it, and their ancestors (§4.5). Pins read by every job would form the same chain. The cost: less long-range context for resolving references than the gist's view. The compaction eval (WP23) compares the local window with the gist's view on recall. If recall drops past the target, the window grows. The rebuild bound grows with it, linearly. It never returns to summaries or an untracked whole view as context.
+- **Node size (G4).** A stored node is at most 16 KB. If none of the five attempts fits, a leaf stores a copy of its source (a chunk is at most 16 KB), and a parent stores its shortest attempt, cut at a character boundary to 16 KB and ending with "(cut)", with `cut` set and logged. Why: a parent then reads at most two 16 KB children, so its input is always within 32 KB and no merge is blocked by an earlier output. The cut loses text, but only after five failed attempts, and the eval counts cuts.
+- **Cutoff ceiling (G2).** While a run is live, no job starts on an interval that ends after the run's `H`, and publication rechecks this in its transaction. So `covered ≤ H` for the whole run, and the view never overlaps the active suffix. Jobs for the run's own messages start when it settles. Why: it keeps one head for every reader, with no historical copy to mask or purge. The run's messages are in the active suffix meanwhile, which has its own 64 KB cap.
 - **Publication.** A job snapshots its inputs and `gen`, then builds outside any transaction. In one transaction it checks that the input digest and `gen` are still current, inserts the node, and, if the change affects the view, writes `view_rev(rev+1)` and advances `memory_head` from the expected `rev`. A stale job is discarded and re-queued.
 - **Restart** loads `memory_head` and its `view_rev`. The view is never rebuilt from the log.
 
 ### 4.3 What a request reads
-- One read transaction gives pins, `view_rev`, `covered`, `gen` and the tail cutoff. The builder prepares outside the transaction, then **revalidates `gen`** at admission (§5). If it changed, the request is rebuilt.
+- One read transaction gives pins, `pin_rev`, `view_rev`, `covered`, `gen` and the tail cutoff. The builder prepares outside the transaction, then **revalidates `gen` and `pin_rev`** at admission (§5). If either changed, the request is rebuilt. Why `pin_rev` (G3): a pin edit does not change `gen`, and a request must carry the current pins exactly.
 
 ### 4.4 Pins (R9, M6)
 - `remember(source_id, from, to)` is Tier 1. `source_id` must be a `user` message admitted in this run. The trusted side copies `text = bytes[from, to)` (at most 280 bytes) and records the source version.
-- An edit on "What Juno remembers" writes `kind: owner`, which supersedes the old pin. The 4 KB active budget is checked in the same transaction as the insert. Over budget, Juno asks in words which pin to drop.
+- An edit on "What Juno remembers" writes `kind: owner`, which supersedes the old pin and keeps its `source_id`, so a later redaction of that source still removes it. The 4 KB active budget is checked in the same transaction as the insert. Over budget, Juno asks in words which pin to drop.
+- **Revisions (G3).** Every pin insert, edit, deactivation and Undo bumps `memory_head.pin_rev` in the same transaction. An edit is a compare-and-swap: it names the pin version it replaces, and commits only if that version is still active and its source is not redacted. Otherwise the page reloads the pin and shows "This changed. Check it and save again."
 - A redaction deactivates pins sourced from that message in the redaction transaction. **Claim:** pins are attributed exact text from the owner's own messages. They do not make injection impossible. A pin shows "Remembered · Undo". The recall eval includes "remember …" requests, so the line is reliable.
 
 ### 4.5 Redaction (R4, L2)
@@ -147,7 +154,7 @@ Versions are pinned exactly: pi 1.2.0 and Codex SDK 0.162.1.
 
 **Steps:**
 
-1. **The redaction transaction** (the owner's click): Tombstone the messages and `gen += 1`. Compute the taint closure over `nodes.inputs`. Write `view_rev` with `masked` entries for tainted lines, and advance the head. Deactivate the pins. Mark tainted pending proposals `expired` and revoke grants from tainting runs. Enqueue rebuilds at `ver+1`, and enqueue `purge` jobs for old node versions and attachments. From this commit on, no request, zoom or publication can expose tainted text: the builder renders masked lines as `(being updated)`, zoom returns `removed`, and jobs with an older `gen` are discarded.
+1. **The redaction transaction** (the owner's click): Tombstone the messages and `gen += 1`, and bump `pin_rev` if a pin is deactivated. Compute the taint closure over `nodes.inputs`. Because context is raw messages (§4.2), the closure of a message `m` holds only nodes whose interval contains `m`, nodes that start within 16 KB of archive after `m`, and their ancestors: about two nodes per message in that 16 KB, plus two per tree level. Write `view_rev` with `masked` entries for tainted lines, and advance the head. Deactivate the pins. Mark tainted pending proposals `expired` and revoke grants from tainting runs. Enqueue rebuilds at `ver+1`, and enqueue `purge` jobs for old node versions and attachments. From this commit on, no request, zoom or publication can expose tainted text: the builder renders masked lines as `(being updated)`, zoom returns `removed`, and jobs with an older `gen` are discarded.
 2. **In-flight work:** the active run is aborted if its request included tainted content, and its queued steer starts a fresh run. Running subagents spawned in tainting runs are stopped, and their reports are quarantined.
 3. **Purge**, eventually: Delete old node versions and attachment pages. Delete the Codex session files. Rotate the journal within 24 hours. If a background job blocks rotation, Settings shows "Removal pending: 1 copy in a running job [Stop job]". Start a new backup generation (§14).
 4. The chat shows "Removed". "Memory of this chat" shows masked lines until they are rebuilt.
@@ -160,7 +167,7 @@ Versions are pinned exactly: pi 1.2.0 and Codex SDK 0.162.1.
 - **Model compatibility.** A model is offered only if `contextWindow ≥ required`, where `required` = system and tools + 4 KB of pins + the 128 KB view high mark + the 24 KB tail cap + the 64 KB active-run cap + the reserve. That is about 250k tokens under the bound. Codex's 272k window passes.
 
 ### 5.2 Partition (R10)
-- At run start the router commits the **history cutoff `H`**: the archive position before the run's first input.
+- At run start the router commits the **history cutoff `H`**: the archive position before the run's first input. The compactor does not move `covered` past `H` while the run is live (§4.2), so the view always ends at or before `H`.
 - A request contains: **View**: the clean entries of the snapshot covering `[0, covered)`. **Tail**: archive records in `[covered, H)`, verbatim. Beyond the 24 KB cap they become **one range placeholder** ("messages 900–1400 not summarized yet: zoom them"), which is bounded no matter how far the compactor lags. **Active suffix**: pi's entries for this run with `source_pos ≥ H`. Steers come in order, and tool call and result pairs keep their ids and provider metadata.
 - No source id appears in two parts. The builder asserts this, and Quint checks `requestCoverageDeclared`.
 - **Truncation per kind:** A tool result over 2 KB is shown as head and tail with "(paged: zoom N)". Tool-call arguments over 8 KB are refused at the tool. The model gets an error. An owner input over 64 KB is refused locally: "That is too long to send as one message. Split it up and send the parts." It is stored, marked not sent.
@@ -169,7 +176,7 @@ Versions are pinned exactly: pi 1.2.0 and Codex SDK 0.162.1.
 ### 5.3 The guard at the provider boundary
 - Every model path (chat, compaction, subagent, harness prompt) goes through `providers/guard.ts`. The guard checks the builder's stamp (the snapshot `rev` and `gen`, plus a hash of the messages) and the admission bound, and reserves spend.
 - A request without a valid stamp, such as pi's raw context after a hook error, is refused with a local error. The run fails visibly as interrupted.
-- Compaction requests are bounded the same way: fixed text, the local window (≤ 16 KB), and the input (≤ 32 KB, either two 512-byte nodes or one ≤ 16 KB chunk).
+- Compaction requests are bounded the same way: fixed text, the local window (≤ 16 KB), the input (≤ 32 KB, either two nodes of at most 16 KB or one ≤ 16 KB chunk), and the 16k output reserve. No pins. The compaction model is offered only if its window fits that sum under the bound, about 70k tokens.
 
 ### 5.4 Spend (R15)
 - A `spend` ledger holds per-day `reserved`, `actual` and `unknown`. Before each billable call the guard reserves `upper(input) × price + maxOutput × price`. Actual usage reconciles it. A lost stream keeps its reservation as `unknown` spend.
@@ -411,8 +418,8 @@ The property names and meanings below follow `review/astra-v2.md`. Where this pl
 **WP2 `specs/agent-memory.qnt`, safety:**
 
 - Astra's 24: `sourceIdentityStable`, `retainedSourceExact`, `redactionMonotone`, `nodeIdentityStable`, `nodeInputsCurrent`, `treeClosed`, `viewPartition`, `viewReferencesValid`, `viewCAS`, `restartPreservesHead`, `mergePreservesCoverage`, `mergeDueOrder`, `prefixBetweenBatches`, `pinAuthorityExact`, `pinBudget`, `redactionExcludesReads`, `retrievalSound`, `requestSnapshotConsistent`, `requestCoverageDeclared`, `requestProtocolValid`, `requestBounded`, `mandatoryPinsIncluded`, `compactorLimits`, `pendingWorkRecoverable`.
-- Changed: `nodeInputsCurrent` includes the local-window context lines.
-- Added: `taintClosureExact`: masked entries are exactly the closure of a redaction over recorded inputs. `guardStampRequired`: no dispatch without a valid builder stamp.
+- Changed: `nodeInputsCurrent` includes the local-window context messages, and nodes record no pins (G1). `requestSnapshotConsistent` revalidates `pin_rev` as well as `gen` (G3). The empty-view fallback for `covered > H` is removed (G2).
+- Added: `taintClosureExact`: masked entries are exactly the closure of a redaction over recorded inputs. `guardStampRequired`: no dispatch without a valid builder stamp. `taintLocal` (G1), `viewWithinCutoff` (G2), `pinEditCurrent` (G3), `nodeBounded` and `parentInputFits` (G4). Exact definitions are in `review/wp2-gaps.md`.
 
 **WP3 `specs/agent-actions.qnt`, safety:**
 
@@ -447,9 +454,13 @@ The property names and meanings below follow `review/astra-v2.md`. Where this pl
 | 14 | One child of a multi-send succeeds, a crash follows, then the rest retry | actions |
 | 15 | A schedule cancellation races a persisted wake | actions |
 | 16 | A manifest arrives before its segment, or a redaction replaces the chain during restore | recovery |
-| 17–20 | Merging non-siblings; due measured from `first` (`T=10`); a stale job after an edit; an approval reused after an edit | memory, actions |
+| 17–20 | Merging non-siblings; due measured from `first` (`T=10`); a stale request after a pin edit; an approval reused after an edit | memory, actions |
 | 21 | A wake run creates a schedule | actions |
 | 22 | A tool schema changes between approval and dispatch | actions |
+| 23 | A redaction early in a long chat taints only the local nodes and their ancestors (G1) | memory |
+| 24 | A steer is compacted and published while its run is live (G2) | memory |
+| 25 | Two saves edit the same pin version (G3) | memory |
+| 26 | Every attempt for two children is oversized, then their parent is queued (G4) | memory |
 
 The due-against-push check (t = 0…20,000) is a TypeScript property test in WP5.
 
@@ -481,7 +492,7 @@ The due-against-push check (t = 0…20,000) is a TypeScript property test in WP5
 **Unit tests** cover the pure rules in `agent-memory` and `agent-cards` (digest canonicalization, child expansion) and policy tiers.
 
 **Evals** (manual):
-- Recall: target ≥ 90%. If missed, turn on the `search_memory` flag. Compaction: the local window against the gist's view, and Haiku against Flash. Remember reliability, and truncation honesty.
+- Recall: target ≥ 90%. If missed, turn on the `search_memory` flag. Compaction: the local window against the gist's view, Haiku against Flash, and the rate of cut parents (G4). Remember reliability, and truncation honesty.
 
 **Bench:** the 30,000-message cache simulation.
 
