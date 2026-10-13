@@ -29,6 +29,7 @@ import {
   hueFor,
   MessageList,
   NewMessagesPill,
+  TopicArt,
   TopicHeader,
   TopicView as TopicViewFrame,
   type ActivateEvent,
@@ -159,6 +160,11 @@ function MainThreads({ channel, onClose }: { readonly channel: string; readonly 
     openTopic(id, { newTab: event.metaKey })
   }
   return <ActiveThreads threads={threads} now={now} status={window === undefined ? 'loading' : 'ready'} onOpen={open} onSubscribe={subscribe} onUnsubscribe={unsubscribe} />
+}
+
+/** Every topic draws its art (or the Tide placeholder) except a DM's Main, which keeps the person, as the sidebar tile does. */
+export function hasArt(detail: TopicDetail): boolean {
+  return !(detail.kind === 'main' && (detail.channel.kind === 'im' || detail.channel.kind === 'mpim'))
 }
 
 export interface TopicTabProps {
@@ -394,6 +400,7 @@ function Topic({ id, stealth, detail }: { readonly id: string; readonly stealth:
         <TopicHeader
           detail={detail}
           stealth={stealth}
+          {...(hasArt(detail) ? { art: <TopicArt topicId={detail.id} recipe={detail.art} size={20} /> } : {})}
           threadsOpen={threadsOpen}
           onThreads={main ? setThreadsOpen : undefined}
           threads={threadsOpen ? <MainThreads channel={detail.channel.id} onClose={() => setThreadsOpen(false)} /> : null}

@@ -2,9 +2,9 @@ import { Activity, useEffect } from 'react'
 import type { TopicDetail } from '@juno/contract'
 import { mountedTabs, onMenuCommand, tabsAtom, tabStripAtom, type TabSummary } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
-import { Workspace as WorkspaceView, type ActivateEvent, type WorkspaceTab, type WorkspaceTabIcon } from '@juno/views'
+import { TopicArt, Workspace as WorkspaceView, type ActivateEvent, type WorkspaceTab, type WorkspaceTabIcon } from '@juno/views'
 import { closeTopicTab, runMenuCommand, showTabMenu, switchToTab } from './navigation'
-import { TopicTab } from './TopicView'
+import { hasArt, TopicTab } from './TopicView'
 
 const kindIcons: Record<TopicDetail['channel']['kind'], WorkspaceTabIcon> = {
   public: 'hash',
@@ -15,7 +15,7 @@ const kindIcons: Record<TopicDetail['channel']['kind'], WorkspaceTabIcon> = {
 
 const tabs = new WeakMap<TabSummary, WorkspaceTab>()
 
-/** A tab as the strip draws it: the topic title, or the channel name for Main. */
+/** A tab as the strip draws it: the topic title, or the channel name for Main, with the topic's art in the icon slot. */
 function stripTab(summary: TabSummary): WorkspaceTab {
   const held = tabs.get(summary)
   if (held !== undefined) return held
@@ -25,6 +25,7 @@ function stripTab(summary: TabSummary): WorkspaceTab {
     title: detail == null ? '' : detail.kind === 'main' ? detail.channel.name : detail.title,
     icon: detail == null ? 'hash' : kindIcons[detail.channel.kind],
     stealth: summary.stealth,
+    ...(detail != null && hasArt(detail) ? { art: <TopicArt topicId={detail.id} recipe={detail.art} size={16} /> } : {}),
   }
   tabs.set(summary, tab)
   return tab
