@@ -22,7 +22,7 @@
  * Against the fake, search is honoured as documented; whether a real `xoxc`
  * session honours `is:thread` is still to be confirmed by the live smoke.
  */
-import type { Ts } from '@juno/domain'
+import { millisToTs, type Ts } from '@juno/domain'
 import { SlackApi, type SlackApiError } from '@juno/slack'
 import { searchMatchChannelId, searchMatches, type CountEntry, type Message, type SearchMatch } from '@juno/slack-schema'
 import { Invalidation, StoreWriter, type SqlError } from '@juno/store'
@@ -63,8 +63,8 @@ const matchToMessage = (match: SearchMatch): Message | undefined => {
 }
 
 export interface DiscoverOptions {
-  /** Cold boot: a thread first seen here that the user does not follow starts read (see `ApplyPageOptions`). */
-  readonly seedThreadsRead: boolean
+  /** Cold boot: a thread first seen here that the user does not follow starts read as of this ts (see `ApplyPageOptions`). */
+  readonly seedReadBefore?: string
 }
 
 /** Thread activity since `sinceMillis`, by search. */
@@ -76,7 +76,7 @@ const discoverBySearch = (ctx: SyncContext, sinceMillis: number, options: Discov
     const sinceTs = `${Math.floor(sinceMillis / 1000)}.000000`
     const query = `is:thread after:${afterDate(sinceMillis)}`
     for (let page = 1; page <= ctx.config.searchMaxPages; page++) {
-      const requestedAt = yield* Effect.map(Clock.currentTimeMillis, (now) => `${Math.floor(now / 1000)}.000000` as Ts)
+      const requestedAt = yield* Effect.map(Clock.currentTimeMillis, (now) => millisToTs(now))
       const answer = yield* api.call(
         'search.modules.messages',
         { module: 'messages', query, count: ctx.config.searchPageCount, page, no_user_profile: 1, sort: 'timestamp', sort_dir: 'desc' },
@@ -98,7 +98,7 @@ const discoverBySearch = (ctx: SyncContext, sinceMillis: number, options: Discov
         }
         list.push(message)
       }
-      for (const [channel, messages] of byChannel) yield* applyPage(ctx, channel, messages, { kind: 'partial', requestedAt }, { seedThreadsRead: options.seedThreadsRead })
+      for (const [channel, messages] of byChannel) yield* applyPage(ctx, channel, messages, { kind: 'partial', requestedAt }, options.seedReadBefore === undefined ? {} : { seedReadBefore: options.seedReadBefore })
       const pageCount = answer.pagination?.page_count ?? answer.messages?.pagination?.page_count
       const next = answer.response_metadata?.next_cursor
       const hasMore = (pageCount !== undefined && page < pageCount) || (next !== undefined && next !== '')
@@ -119,7 +119,7 @@ const discoverByReplies = (ctx: SyncContext, options: DiscoverOptions): Effect.E
       WHERE m.reply_count > 0 AND m.latest_reply IS NOT NULL AND c.is_member = 1`
     for (const root of roots) {
       if (root.last_stored !== null && root.last_stored >= root.latest_reply) continue
-      const requestedAt = yield* Effect.map(Clock.currentTimeMillis, (now) => `${Math.floor(now / 1000)}.000000` as Ts)
+      const requestedAt = yield* Effect.map(Clock.currentTimeMillis, (now) => millisToTs(now))
       const page = yield* api
         .call(
           'conversations.replies',
@@ -128,7 +128,7 @@ const discoverByReplies = (ctx: SyncContext, options: DiscoverOptions): Effect.E
         )
         .pipe(Effect.catchTag('SlackRejected', () => Effect.succeed(undefined)))
       if (page === undefined) continue
-      yield* applyPage(ctx, root.channel, page.messages, { kind: 'page', requestedAt }, { seedThreadsRead: options.seedThreadsRead })
+      yield* applyPage(ctx, root.channel, page.messages, { kind: 'page', requestedAt }, options.seedReadBefore === undefined ? {} : { seedReadBefore: options.seedReadBefore })
       yield* Effect.yieldNow
     }
   })

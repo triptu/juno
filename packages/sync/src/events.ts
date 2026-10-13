@@ -39,6 +39,17 @@ import {
 
 type Services = StoreWriter | Invalidation
 
+const LATE_REACTIONS_MAX = 1000
+
+/** A reaction to a message the store does not have yet; see `SyncContext.lateReactions`. */
+const noteLateReaction = (ctx: SyncContext, channel: string, ts: string, eventTs: string): Effect.Effect<void> =>
+  Effect.sync(() => {
+    const key = `${channel}:${ts}`
+    ctx.lateReactions.delete(key)
+    ctx.lateReactions.set(key, eventTs)
+    if (ctx.lateReactions.size > LATE_REACTIONS_MAX) ctx.lateReactions.delete(ctx.lateReactions.keys().next().value!)
+  })
+
 const eventTsOf = (frame: { readonly event_ts?: Ts; readonly ts?: Ts }, now: number): string =>
   frame.event_ts ?? frame.ts ?? `${Math.floor(now / 1000)}.000000`
 
@@ -100,7 +111,7 @@ export const applyFrame = (ctx: SyncContext, frame: RtmFrame): Effect.Effect<voi
         return yield* transaction(
           Effect.gen(function* () {
             const existing = yield* readMessage(channel, ts)
-            if (existing === undefined) return
+            if (existing === undefined) return yield* noteLateReaction(ctx, channel, ts, frame.event_ts)
             yield* changeReaction(channel, ts, frame.reaction, frame.user, frame.type === 'reaction_added', ctx.me.userId)
             const last = existing.last_event_ts === null ? frame.event_ts : compareTs(frame.event_ts, existing.last_event_ts) > 0 ? frame.event_ts : existing.last_event_ts
             if (last !== existing.last_event_ts) yield* writeMessage({ ...existing, last_event_ts: last, version: existing.version + 1 })

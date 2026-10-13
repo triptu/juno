@@ -15,7 +15,7 @@
  * store error is a bug; it is logged per event so one bad frame does not
  * end the sync, and surfaces in the engine log.
  */
-import type { Ts } from '@juno/domain'
+import { millisToTs, type Ts } from '@juno/domain'
 import { SlackApi, SlackAuthRequired, SlackEdge, SlackSession, SlackSocket, type SocketEvent } from '@juno/slack'
 import { Invalidation, StoreReader, StoreWriter, transaction } from '@juno/store'
 import { Clock, Effect, FiberSet, Queue, Scope, Semaphore } from 'effect'
@@ -53,6 +53,7 @@ export const runSync = (options: RunSyncOptions): Effect.Effect<never, SlackAuth
       rootFetches: yield* Queue.unbounded<RootFetch>(),
       missingUsers: new Map(),
       unknownUsers: new Set(),
+      lateReactions: new Map(),
     }
     const state = { connected: false, booted: false, lastBoot: undefined as BootState | undefined }
     const work = yield* Semaphore.make(1)
@@ -138,7 +139,7 @@ export const runSync = (options: RunSyncOptions): Effect.Effect<never, SlackAuth
       const api = yield* SlackApi
       while (true) {
         const { channel, ts } = yield* Queue.take(ctx.rootFetches)
-        const requestedAt = yield* Effect.map(Clock.currentTimeMillis, (now) => `${Math.floor(now / 1000)}.000000`)
+        const requestedAt = yield* Effect.map(Clock.currentTimeMillis, (now) => millisToTs(now))
         const result = yield* Effect.result(
           api.call('conversations.replies', { channel, ts: ts as Ts, oldest: ts, inclusive: true, limit: 1 }, { lane: 'background', reason: 'root' }),
         )

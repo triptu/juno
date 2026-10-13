@@ -269,7 +269,8 @@ const probeUnlisted = (ctx: SyncContext, listed: ReadonlySet<string>, listReques
   })
 
 interface HistoryOptions {
-  readonly seedThreadsRead: boolean
+  /** Cold boot: see `ApplyPageOptions.seedReadBefore`. */
+  readonly seedReadBefore?: string
 }
 
 /** The newest history page of a conversation inside the window. Records the range it covered. */
@@ -285,7 +286,7 @@ const loadHistoryWindow = (ctx: SyncContext, channel: string, start: Ts, options
     // The range first, so the index of this page already knows what history covers.
     const oldest = page.messages.at(-1)?.ts
     yield* transaction(addSyncedRange(channel, page.has_more && oldest !== undefined ? oldest : start, requestedAt))
-    yield* applyPage(ctx, channel, page.messages, { kind: 'page', requestedAt }, { alsoTouch: [mainTopicOf(channel)], seedThreadsRead: options.seedThreadsRead })
+    yield* applyPage(ctx, channel, page.messages, { kind: 'page', requestedAt }, { alsoTouch: [mainTopicOf(channel)], ...options })
   })
 
 /** History since the synced range, in pages, for a conversation whose `latest` moved. */
@@ -321,7 +322,7 @@ const loadHistorySince = (ctx: SyncContext, channel: string, since: string): Eff
   })
 
 /** Rows for unfollowed threads discovered through history have only the root; fetch the latest reply for a preview. */
-const loadThreadPreviews = (ctx: SyncContext): Effect.Effect<void, BootError, BootServices> =>
+const loadThreadPreviews = (ctx: SyncContext, seedReadBefore: string): Effect.Effect<void, BootError, BootServices> =>
   Effect.gen(function* () {
     const sql = yield* StoreWriter
     const api = yield* SlackApi
@@ -342,7 +343,7 @@ const loadThreadPreviews = (ctx: SyncContext): Effect.Effect<void, BootError, Bo
         )
         .pipe(Effect.catchTag('SlackRejected', () => Effect.succeed(undefined)))
       if (page === undefined) continue
-      yield* applyPage(ctx, root.channel, page.messages, { kind: 'page', requestedAt }, { seedThreadsRead: true })
+      yield* applyPage(ctx, root.channel, page.messages, { kind: 'page', requestedAt }, { seedReadBefore })
       yield* Effect.yieldNow
     }
   })
@@ -356,6 +357,8 @@ export const coldBoot = (ctx: SyncContext, phase: Phase): Effect.Effect<void, Bo
   Effect.gen(function* () {
     yield* phase({ _tag: 'booting' })
     const startedAt = yield* Clock.currentTimeMillis
+    // Unfollowed threads count as read up to here; a reply during the boot stays unread.
+    const bootTs = millisToTs(startedAt)
     const windowStart = yield* windowStartMillis(ctx)
     const start = millisToTs(windowStart)
     yield* loadWorkspace(ctx, true)
@@ -366,14 +369,14 @@ export const coldBoot = (ctx: SyncContext, phase: Phase): Effect.Effect<void, Bo
     let done = 0
     for (const conversation of active) {
       // A boot that failed half way left ranges behind; what they cover is not fetched again.
-      if (!(yield* covered(conversation.id, start, conversation.latest))) yield* loadHistoryWindow(ctx, conversation.id, start, { seedThreadsRead: true })
+      if (!(yield* covered(conversation.id, start, conversation.latest))) yield* loadHistoryWindow(ctx, conversation.id, start, { seedReadBefore: bootTs })
       yield* phase({ _tag: 'catching-up', done: ++done, total: active.length })
       yield* Effect.yieldNow
     }
     yield* fillUsers(ctx)
-    yield* loadThreadPreviews(ctx)
+    yield* loadThreadPreviews(ctx, bootTs)
     // Replies inside the window to roots older than it: Main's activity, which windowed history cannot see.
-    yield* discoverSince(ctx, windowStart, counts.entries, { seedThreadsRead: true })
+    yield* discoverSince(ctx, windowStart, counts.entries, { seedReadBefore: bootTs })
     yield* fillUsers(ctx)
     const state: BootState = {
       completedAt: yield* Clock.currentTimeMillis,
@@ -412,14 +415,14 @@ export const catchUp = (ctx: SyncContext, previous: BootState, phase: Phase, opt
     if (moved.length > 0) yield* phase({ _tag: 'catching-up', done: 0, total: moved.length })
     let done = 0
     for (const conversation of moved) {
-      if (conversation.since === undefined) yield* loadHistoryWindow(ctx, conversation.id, start, { seedThreadsRead: false })
+      if (conversation.since === undefined) yield* loadHistoryWindow(ctx, conversation.id, start, {})
       else yield* loadHistorySince(ctx, conversation.id, conversation.since)
       if (moved.length > 0) yield* phase({ _tag: 'catching-up', done: ++done, total: moved.length })
       yield* Effect.yieldNow
     }
     // Followed threads: the whole list, the part with activity since the store was last in step first.
     if (options.refreshThreads) yield* loadThreadViews(ctx, options.refreshWorkspace ? start : maxTs(start, millisToTs(previous.lastSyncAt)))
-    yield* discoverSince(ctx, previous.lastSyncAt, counts.entries, { seedThreadsRead: false })
+    yield* discoverSince(ctx, previous.lastSyncAt, counts.entries, {})
     yield* fillUsers(ctx)
     const state: BootState = {
       completedAt: yield* Clock.currentTimeMillis,

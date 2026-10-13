@@ -28,6 +28,15 @@ export const mergeOne = (
     const touched: Array<MessageRow> = [merged.row]
     if (merged.changed) yield* writeMessage(merged.row)
     if (merged.applyReactions) yield* replaceReactions(channel, message.ts, message.reactions ?? [], ctx.me.userId)
+    // A reaction event came before this message was stored; a page requested before it does not have it.
+    if (source.kind !== 'event') {
+      const key = `${channel}:${message.ts}`
+      const lateAt = ctx.lateReactions.get(key)
+      if (lateAt !== undefined) {
+        ctx.lateReactions.delete(key)
+        if (compareTs(lateAt, source.requestedAt) >= 0) yield* Queue.offer(ctx.rootFetches, { channel, ts: message.ts })
+      }
+    }
     // A root on a page says whether the user follows its thread and, when followed, Slack's read pointer
     // (research section 3). Events say so with their own frames. A thread older than the window becomes a
     // row this way as soon as its root is fetched.
@@ -69,11 +78,12 @@ export interface ApplyPageOptions {
   /** Topics to re-index as well, such as Main for a history page that brought nothing. */
   readonly alsoTouch?: Iterable<string>
   /**
-   * Cold boot history only: a thread discovered through history that the
-   * user does not follow starts read at its latest reply, so a first boot
-   * does not light up every old thread. Later discoveries start unread.
+   * Cold boot only: a thread first seen here that the user does not follow
+   * starts read as of this moment (the cold boot's start), so a first boot
+   * does not light up every old thread, while a reply that arrives during
+   * the boot stays unread. Later discoveries start unread.
    */
-  readonly seedThreadsRead?: boolean
+  readonly seedReadBefore?: string
 }
 
 /** Applies a page in one transaction and re-indexes what it touched. Returns the touched topic ids. */
@@ -90,7 +100,7 @@ export const applyPage = (
       for (const message of messages) rows.push(...(yield* mergeOne(ctx, channel, message, source)))
       const topics = topicsOfMessages(rows)
       for (const id of options.alsoTouch ?? []) topics.add(id)
-      if (options.seedThreadsRead === true && source.kind !== 'event') yield* seedThreadsRead(rows, source.requestedAt)
+      if (options.seedReadBefore !== undefined) yield* seedThreadsRead(rows, options.seedReadBefore)
       yield* reindexTopics(topics, reindexOptions(ctx))
       return topics
     }),
@@ -98,12 +108,12 @@ export const applyPage = (
 
 /**
  * Roots in `rows` whose thread has no read pointer yet start read at their
- * latest reply as of the page request (`ApplyPageOptions.seedThreadsRead`):
- * a reply that reached the store by event while the page was in flight is
- * newer than `requestedAt` and stays unread. From the pointer on every reply
- * arrives as an event, so coverage is complete from that point.
+ * latest reply before `before` (`ApplyPageOptions.seedReadBefore`); a reply
+ * after it, which can only have come by event, stays unread. From the
+ * pointer on every reply arrives as an event, so coverage is complete from
+ * that point.
  */
-const seedThreadsRead = (rows: ReadonlyArray<MessageRow>, requestedAt: string): Effect.Effect<void, SqlError, StoreWriter | Invalidation> =>
+const seedThreadsRead = (rows: ReadonlyArray<MessageRow>, before: string): Effect.Effect<void, SqlError, StoreWriter | Invalidation> =>
   Effect.gen(function* () {
     const sql = yield* StoreWriter
     for (const row of rows) {
@@ -113,20 +123,10 @@ const seedThreadsRead = (rows: ReadonlyArray<MessageRow>, requestedAt: string): 
       const existing = yield* sql<{ topic_id: string }>`SELECT topic_id FROM topic_reads WHERE topic_id = ${topic}`
       if (existing.length > 0) continue
       const latest = row.latest_reply ?? row.ts
-      const from = compareTs(latest, requestedAt) > 0 ? yield* latestReplyBefore(row.channel, row.ts, requestedAt) : latest
+      const from = compareTs(latest, before) > 0 ? before : latest
       yield* seedTopicRead(topic, from)
       yield* markRepliesComplete(row.channel, row.ts, false, 0, from)
     }
-  })
-
-/** The newest stored reply of a thread older than `before`, else the root. */
-const latestReplyBefore = (channel: string, rootTs: string, before: string): Effect.Effect<string, SqlError, StoreWriter> =>
-  Effect.gen(function* () {
-    const sql = yield* StoreWriter
-    const rows = yield* sql<{ ts: string }>`
-      SELECT ts FROM messages WHERE channel = ${channel} AND thread_ts = ${rootTs} AND ts <> ${rootTs} AND ts < ${before}
-      ORDER BY ts DESC LIMIT 1`
-    return rows[0]?.ts ?? rootTs
   })
 
 /** A root the store only knows from one of its replies; its fetch is already queued. */
