@@ -22,7 +22,7 @@
  * Slack through the `Outbox` seam.
  */
 import { Clock, Effect, Schema, type Scope, Semaphore, Stream } from 'effect'
-import { SIDEBAR_WINDOW, TopicRow, TopicsRoutes } from '@juno/contract'
+import { SIDEBAR_WINDOW, TopicListRow, TopicsRoutes } from '@juno/contract'
 import { Invalidation, liveQuery, type InvalidationKeys, type SqlError } from '@juno/store'
 import { EngineConfig } from '../config'
 import { Outbox } from '../outbox'
@@ -35,7 +35,7 @@ const LIST_KEYS: InvalidationKeys = ['topics', 'topic_overlay', 'conversations',
 const COUNT_KEYS: InvalidationKeys = ['topics', 'topic_overlay', 'conversations', 'ignored_channels', 'thread_subs']
 const QUIET_TICK = '1 minute'
 
-const encodeRow = Schema.encodeSync(Schema.toCodecJson(TopicRow))
+const encodeRow = Schema.encodeSync(Schema.toCodecJson(TopicListRow))
 
 export const TopicsHandlers = TopicsRoutes.toLayer(
   Effect.gen(function* () {

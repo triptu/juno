@@ -28,6 +28,12 @@
  * placement), so a change in any joined table is a new rev and reaches the
  * renderer as a delta; an unchanged row keeps its identity there.
  *
+ * Rows name their channel and people by id; the run also returns the
+ * channels and people the window names (`ListRun.refs`), and the serve
+ * helper sends each one only when the subscription has not seen it or it
+ * changed. So a person's new photo is one `refs` entry: the rows that show
+ * the person keep their `rev`.
+ *
  * A `RowCache` carries the work of the last run for one subscription: a
  * topic whose joined columns and people did not change is not parsed or
  * built again, and its row object is reused, so a run where one row changed
@@ -36,9 +42,6 @@
 import {
   canResolveOnHover,
   channelLabel,
-  contextTint,
-  defaultChannelStyle,
-  defaultPersonColor,
   hashId,
   isDm,
   isResolved,
@@ -50,18 +53,26 @@ import {
   topicStatus,
   tsToMillis,
   byLatestActivity,
-  type ChannelId,
-  type ChannelInfo,
   type Topic,
   type TopicStatus,
-  type Ts,
-  type UserId,
 } from '@juno/domain'
-import type { Person, TopicCounts, TopicRow } from '@juno/contract'
-import { StoreReader, type SqlError, type TopicIndexRow } from '@juno/store'
-import type { StoredPreview } from '@juno/sync'
+import type { ChannelRef, Person, TopicCounts, TopicListRow } from '@juno/contract'
+import { StoreReader, type SqlError } from '@juno/store'
 import { Effect } from 'effect'
 import type { ListRun } from '../protocol/live'
+import {
+  channelInfoOf,
+  channelRefOf,
+  parseColumns,
+  personFrom,
+  topicFrom,
+  TOPIC_COLUMNS,
+  TOPIC_FROM,
+  userIdsOf,
+  type JoinedRow,
+  type ParsedColumns,
+  type UserRow,
+} from '../topicRows'
 
 /**
  * What one subscription remembers between runs. A run reads every row
@@ -94,15 +105,17 @@ export interface RowCache {
 
 interface CacheEntry {
   readonly source: JoinedRow
-  readonly parsed: Parsed
+  readonly parsed: ParsedColumns
   readonly topic: Topic
   /** Every person the topic and row read, in any role. */
   readonly people: ReadonlyArray<Person>
-  readonly partner: Person | undefined
-  readonly participants: ReadonlyArray<Person>
+  readonly channel: ChannelRef
+  /** The people the row names: the participants and the DM partner. */
+  readonly named: ReadonlyArray<Person>
+  readonly participantIds: ReadonlyArray<string>
   /** The preview's sender as the row shows it. */
   readonly sender: string
-  readonly shaped?: { readonly section: TopicRow['section']; readonly status: TopicStatus; readonly row: TopicRow }
+  readonly shaped?: { readonly section: TopicListRow['section']; readonly status: TopicStatus; readonly row: TopicListRow }
 }
 
 export const makeRowCache = (options?: { readonly keepUsers?: boolean }): RowCache => ({
@@ -133,38 +146,6 @@ export interface QueryOptions {
 }
 
 const DAY = 24 * 60 * 60 * 1000
-const MAX_PARTICIPANTS = 4
-
-interface JoinedRow extends TopicIndexRow {
-  readonly c_kind: 'public' | 'private' | 'im' | 'mpim'
-  readonly c_name: string | null
-  readonly c_user_id: string | null
-  readonly c_members: string | null
-  readonly manual_title: string | null
-  readonly ai_title: string | null
-  readonly resolved_at: string | null
-  readonly resolved_activity_ts: string | null
-  readonly reopened_at: string | null
-  readonly pinned_at: string | null
-  readonly unsubscribed_at: string | null
-  readonly subscribed: 0 | 1 | null
-  /** Main rows only: the latest `last_activity_ts` of any topic in the channel. */
-  readonly channel_activity_ts: string | null
-}
-
-interface UserRow {
-  readonly id: string
-  readonly name: string | null
-  readonly display_name: string | null
-  readonly real_name: string | null
-  readonly avatar_url: string | null
-}
-
-const millis = (value: string | null): number | undefined => {
-  if (value === null) return undefined
-  const n = Number(value)
-  return Number.isFinite(n) ? n : undefined
-}
 
 /** The quiet window from prefs (clamped by the domain rule) and the signed-in user. */
 const settings = Effect.gen(function* () {
@@ -175,26 +156,16 @@ const settings = Effect.gen(function* () {
   return { quietDays: typeof raw === 'number' ? raw : undefined, selfId: team[0]?.self_user_id ?? undefined }
 })
 
-const COLUMNS = `
-  SELECT i.*, c.kind AS c_kind, c.name AS c_name, c.user_id AS c_user_id, c.member_ids_json AS c_members,
-    o.manual_title, o.ai_title, o.resolved_at, o.resolved_activity_ts, o.reopened_at, o.pinned_at, o.unsubscribed_at,
-    s.subscribed AS subscribed`
-
 /**
  * The latest activity anywhere in a Main row's channel (one probe on
  * `topic_index_channel_activity`), which only the quiet rule reads. Rows
  * inside the activity window are never quiet, so the window skips the probe.
  */
-const SELECT = `${COLUMNS},
+const SELECT = `${TOPIC_COLUMNS},
     CASE WHEN i.kind = 'main' THEN (SELECT max(t.last_activity_ts) FROM topic_index t WHERE t.channel = i.channel) END AS channel_activity_ts`
-const SELECT_IN_WINDOW = `${COLUMNS}, NULL AS channel_activity_ts`
+const SELECT_IN_WINDOW = `${TOPIC_COLUMNS}, NULL AS channel_activity_ts`
 
-const FROM = `
-  FROM topic_index i
-  JOIN conversations c ON c.id = i.channel
-  LEFT JOIN topic_overlay o ON o.topic_id = i.topic_id
-  LEFT JOIN ignored_channels ig ON ig.channel = i.channel
-  LEFT JOIN thread_subs s ON i.kind = 'thread' AND s.channel = i.channel AND s.thread_ts = i.root_ts`
+const FROM = TOPIC_FROM
 
 /**
  * Spec section 5, "Which threads": a thread row is a candidate when followed
@@ -272,11 +243,12 @@ export function countsStatement(scope: string | undefined): { readonly sql: stri
 }
 
 /**
- * The sidebar window as `TopicRow`s, pinned first, then recent, both newest
- * first. Pass the subscription's `RowCache` to reuse unchanged rows between
- * runs; without one every run shapes every row.
+ * The sidebar window as `TopicListRow`s, pinned first, then recent, both
+ * newest first, with the channels and people the rows name. Pass the
+ * subscription's `RowCache` to reuse unchanged rows between runs; without
+ * one every run shapes every row.
  */
-export const listTopics = (filter: ListFilter, options: QueryOptions, cache: RowCache = makeRowCache()): Effect.Effect<ListRun<TopicRow>, SqlError, StoreReader> =>
+export const listTopics = (filter: ListFilter, options: QueryOptions, cache: RowCache = makeRowCache()): Effect.Effect<ListRun<TopicListRow>, SqlError, StoreReader> =>
   Effect.gen(function* () {
     const sql = yield* StoreReader
     const { quietDays, selfId } = yield* settings
@@ -306,22 +278,15 @@ export const listTopics = (filter: ListFilter, options: QueryOptions, cache: Row
 
     // Names and photos: participants, DM partners, group DM members and senders, in one lookup.
     const userIds = new Set<string>()
-    const parsed = new Map<JoinedRow, Parsed>()
+    const parsed = new Map<JoinedRow, ParsedColumns>()
     for (const row of byId.values()) {
       const hit = previous.get(row.topic_id)
-      const columns: Parsed =
+      const columns =
         hit !== undefined && hit.source.participants_json === row.participants_json && hit.source.preview_json === row.preview_json && hit.source.c_members === row.c_members
           ? hit.parsed
-          : {
-              participants: parseIds(row.participants_json).slice(0, MAX_PARTICIPANTS),
-              preview: parsePreview(row.preview_json),
-              members: row.c_kind === 'mpim' ? parseIds(row.c_members) : [],
-            }
+          : parseColumns(row)
       parsed.set(row, columns)
-      for (const id of columns.participants) userIds.add(id)
-      for (const id of columns.members) userIds.add(id)
-      if (row.c_user_id !== null) userIds.add(row.c_user_id)
-      if (columns.preview.senderId !== undefined) userIds.add(columns.preview.senderId)
+      userIdsOf(row, columns, userIds)
     }
     // Only the ids no earlier run has read, when the cache keeps users; every id otherwise.
     const users: Map<string, UserRow | null> = cache.keepUsers ? (cache.users ??= new Map()) : new Map()
@@ -344,11 +309,7 @@ export const listTopics = (filter: ListFilter, options: QueryOptions, cache: Row
         if (person !== undefined) people.set(id, person)
       }
       if (person === undefined) {
-        const user = users.get(id) ?? undefined
-        const name = user?.display_name ?? user?.real_name ?? user?.name ?? id
-        const avatarUrl = user?.avatar_url ? user.avatar_url : undefined
-        const known = knownPeople.get(id)
-        person = known !== undefined && known.name === name && known.avatarUrl === avatarUrl ? known : { id, name, ...(avatarUrl === undefined ? {} : { avatarUrl }), color: defaultPersonColor(id) }
+        person = personFrom(id, users.get(id), knownPeople.get(id))
         people.set(id, person)
       }
       return person
@@ -365,7 +326,7 @@ export const listTopics = (filter: ListFilter, options: QueryOptions, cache: Row
       const entry: CacheEntry =
         hit !== undefined && sameSource(hit.source, row) && (peopleHold || samePeople(hit.people, personOf))
           ? hit
-          : { ...topicOf(row, columns, selfId, personOf), source: row, parsed: columns }
+          : { ...entryOf(row, columns, selfId, personOf), source: row, parsed: columns }
       next.set(row.topic_id, entry)
       const placement = sidebarPlacement(entry.topic, ctx)
       if (placement === 'pinned') pinned.push(entry)
@@ -374,12 +335,16 @@ export const listTopics = (filter: ListFilter, options: QueryOptions, cache: Row
     pinned.sort((a, b) => byLatestActivity(a.topic, b.topic))
     recent.sort((a, b) => byLatestActivity(a.topic, b.topic))
 
-    const rows: Array<TopicRow> = []
-    const place = (entry: CacheEntry, section: TopicRow['section']) => {
+    const rows: Array<TopicListRow> = []
+    const channels = new Map<string, ChannelRef>()
+    const named = new Map<string, Person>()
+    const place = (entry: CacheEntry, section: TopicListRow['section']) => {
       const status = topicStatus(entry.topic, ctx)
       const shaped = entry.shaped !== undefined && entry.shaped.section === section && entry.shaped.status === status ? entry.shaped : { section, status, row: shape(entry, section, status) }
       if (shaped !== entry.shaped) next.set(entry.topic.id, { ...entry, shaped })
       rows.push(shaped.row)
+      channels.set(entry.channel.id, entry.channel)
+      for (const person of entry.named) named.set(person.id, person)
     }
     for (const entry of pinned) place(entry, 'pinned')
     for (const entry of recent) {
@@ -390,15 +355,8 @@ export const listTopics = (filter: ListFilter, options: QueryOptions, cache: Row
     cache.entries = next
     cache.people = people
     cache.usersRead = users
-    return { rows, total: rows.length }
+    return { rows, total: rows.length, refs: { channels: [...channels.values()], people: [...named.values()] } }
   })
-
-interface Parsed {
-  readonly participants: ReadonlyArray<string>
-  readonly preview: StoredPreview
-  /** Group DM members, empty for any other kind. */
-  readonly members: ReadonlyArray<string>
-}
 
 /** Every column of the joined row equal: the topic built from it still holds. */
 function sameSource(a: JoinedRow, b: JoinedRow): boolean {
@@ -414,8 +372,13 @@ function samePeople(people: ReadonlyArray<Person>, personOf: (id: string) => Per
   return true
 }
 
-/** The domain topic for an index row, with the people it was built from. */
-function topicOf(row: JoinedRow, columns: Parsed, selfId: string | undefined, personOf: (id: string) => Person): Pick<CacheEntry, 'topic' | 'people' | 'partner' | 'participants' | 'sender'> {
+/** The domain topic for an index row, the channel and people the row names, and the people it was built from. */
+function entryOf(
+  row: JoinedRow,
+  columns: ParsedColumns,
+  selfId: string | undefined,
+  personOf: (id: string) => Person,
+): Pick<CacheEntry, 'topic' | 'people' | 'channel' | 'named' | 'participantIds' | 'sender'> {
   const { participants, preview } = columns
   const used: Array<Person> = []
   const use = (id: string): Person => {
@@ -423,41 +386,28 @@ function topicOf(row: JoinedRow, columns: Parsed, selfId: string | undefined, pe
     used.push(person)
     return person
   }
-  const channel = channelOf(row, columns, selfId, (id) => use(id).name)
+  const info = channelInfoOf(row, columns, selfId, (id) => use(id).name)
   const partner = row.c_kind === 'im' && row.c_user_id !== null ? use(row.c_user_id) : undefined
-  const people = participants.map(use)
+  const named = participants.map(use)
+  if (partner !== undefined) named.push(partner)
   const sender = preview.senderId !== undefined && preview.sender !== 'You' ? use(preview.senderId).name : preview.sender
-  const topic: Topic = {
-    id: row.topic_id as Topic['id'],
-    kind: row.kind,
-    channel,
-    activity: {
-      lastActivityTs: row.last_activity_ts as Ts,
-      ...(row.channel_activity_ts === null ? {} : { channelLastActivityTs: row.channel_activity_ts as Ts }),
-      messageCount: row.message_count,
-      unreadCount: row.unread_count,
-      unreadExact: row.unread_exact === 1,
-      mentionsMe: row.mentions_me === 1,
-      participants: participants as unknown as ReadonlyArray<UserId>,
-    },
-    overlay: {
-      ...(row.manual_title === null ? {} : { manualTitle: row.manual_title }),
-      ...(row.ai_title === null ? {} : { aiTitle: row.ai_title }),
-      ...(millis(row.resolved_at) === undefined ? {} : { resolvedAt: millis(row.resolved_at)! }),
-      ...(row.resolved_activity_ts === null ? {} : { resolvedActivityTs: row.resolved_activity_ts as Ts }),
-      ...(millis(row.reopened_at) === undefined ? {} : { reopenedAt: millis(row.reopened_at)! }),
-      ...(millis(row.pinned_at) === undefined ? {} : { pinnedAt: millis(row.pinned_at)! }),
-      ...(millis(row.unsubscribed_at) === undefined ? {} : { unsubscribedAt: millis(row.unsubscribed_at)! }),
-    },
-    ...(row.subscribed === null ? {} : { slackSubscribed: row.subscribed === 1 }),
-    ...(preview.rootText === undefined ? {} : { firstMessageText: preview.rootText }),
+  return {
+    topic: topicFrom(row, columns, info),
+    people: used,
+    channel: channelRefOf(info, partner?.id),
+    named,
+    participantIds: participants,
+    sender,
   }
-  return { topic, people: used, partner, participants: people, sender }
 }
 
-/** The row for a topic in a section. `rev` hashes every input, so equal inputs give an equal rev on any run and in any subscription. */
-function shape(entry: CacheEntry, section: TopicRow['section'], status: TopicStatus): TopicRow {
-  const { topic, source: row, partner, participants: people, sender } = entry
+/**
+ * The row for a topic in a section. `rev` hashes every input the row itself
+ * shows, so equal inputs give an equal rev on any run and in any
+ * subscription. The channel and people are refs and not part of it.
+ */
+function shape(entry: CacheEntry, section: TopicListRow['section'], status: TopicStatus): TopicListRow {
+  const { topic, source: row, sender } = entry
   const stored = entry.parsed.preview
   const label = channelLabel(topic.channel)
   // Everything the row is built from, in one short string; the row's rev is its hash.
@@ -478,13 +428,10 @@ function shape(entry: CacheEntry, section: TopicRow['section'], status: TopicSta
     section,
     status,
     sender,
-    ...(partner === undefined ? [] : [partner.name, partner.avatarUrl]),
-    ...people.flatMap((p) => [p.name, p.avatarUrl]),
+    ...entry.participantIds,
   ].join('\u0001')
 
   const title = resolveTitle(topic)
-  const resolved = isResolved(topic)
-  const style = defaultChannelStyle(topic.channel.id, topic.channel.kind)
   return {
     id: topic.id,
     rev: hashId(key),
@@ -494,61 +441,19 @@ function shape(entry: CacheEntry, section: TopicRow['section'], status: TopicSta
     title: title.text,
     titleSource: title.source,
     preview: { sender, text: stored.text },
-    channel: {
-      id: topic.channel.id,
-      kind: topic.channel.kind,
-      name: topic.channel.kind === 'public' || topic.channel.kind === 'private' ? topic.channel.name : label,
-      label,
-      tint: contextTint(topic.channel.kind),
-      icon: style.icon,
-      color: style.color,
-      ...(partner === undefined ? {} : { partner }),
-    },
-    participants: people,
+    channelId: topic.channel.id,
+    participantIds: entry.participantIds,
     messageCount: topic.activity.messageCount,
     unreadCount: topic.activity.unreadCount,
     unreadExact: topic.activity.unreadExact !== false,
     mentionsMe: topic.activity.mentionsMe,
     tags: rowTags(topic),
     pinned: topic.overlay.pinnedAt !== undefined,
-    resolved,
+    resolved: isResolved(topic),
     canResolveOnHover: canResolveOnHover(topic),
     subscribed: isSubscribed(topic),
     lastActivityTs: topic.activity.lastActivityTs,
     lastActivityAt: tsToMillis(topic.activity.lastActivityTs),
-  }
-}
-
-function channelOf(row: JoinedRow, columns: Parsed, selfId: string | undefined, nameOf: (id: string) => string): ChannelInfo {
-  const id = row.channel as ChannelId
-  switch (row.c_kind) {
-    case 'im':
-      return { id, kind: 'im', name: row.c_user_id === null ? (row.c_name ?? id) : nameOf(row.c_user_id) }
-    case 'mpim': {
-      const members = columns.members.filter((member) => member !== selfId)
-      return { id, kind: 'mpim', name: row.c_name ?? id, memberNames: members.map(nameOf) }
-    }
-    default:
-      return { id, kind: row.c_kind, name: row.c_name ?? id }
-  }
-}
-
-function parseIds(json: string | null): ReadonlyArray<string> {
-  if (json === null) return []
-  try {
-    const parsed = JSON.parse(json) as unknown
-    return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === 'string') : []
-  } catch {
-    return []
-  }
-}
-
-function parsePreview(json: string | null): StoredPreview {
-  if (json === null) return { sender: '', text: '' }
-  try {
-    return JSON.parse(json) as StoredPreview
-  } catch {
-    return { sender: '', text: '' }
   }
 }
 

@@ -26,7 +26,7 @@
  * starts it again with backoff instead.
  */
 import { Clock, Effect, Option, Result, Schedule, Stream } from 'effect'
-import { LIVE_DELTA_MAX_BYTES, LIVE_SNAPSHOT_MAX_BYTES, type ListDelta, type LiveMeta, type LiveValue } from '@juno/contract'
+import { LIVE_DELTA_MAX_BYTES, LIVE_SNAPSHOT_MAX_BYTES, type ChannelRef, type ListDelta, type LiveMeta, type LiveValue, type Person, type Refs } from '@juno/contract'
 
 /** A successful query run: its value and how long it took. */
 export interface Timed<A> {
@@ -124,6 +124,14 @@ export function serveLiveValue<A, E, SE, R>(
 export interface ListRun<Row> {
   readonly rows: ReadonlyArray<Row>
   readonly total?: number
+  /**
+   * Every person and channel the rows name. `serveLiveList` sends only the
+   * ones the subscription has not been sent, or that changed since.
+   */
+  readonly refs?: {
+    readonly people?: ReadonlyArray<Person>
+    readonly channels?: ReadonlyArray<ChannelRef>
+  }
 }
 
 interface RowLike {
@@ -133,9 +141,15 @@ interface RowLike {
 
 /**
  * Emits the whole window on the first run, then deltas, and nothing for a
- * run that changed no row and kept the order. `encodeRow` is the row codec
- * of the route; when measuring it gives `encodeMs` and checks the size
- * budgets on the rows that actually travel.
+ * run that changed no row, no ref and kept the order. `encodeRow` is the row
+ * codec of the route; when measuring it gives `encodeMs` and checks the size
+ * budgets on the rows that actually travel (refs are counted on their own).
+ *
+ * Refs: the subscription remembers every person and channel it has sent.
+ * A run's ref goes out when it is new to the subscription or differs from
+ * the one sent, in the same message as the rows of that run, so a row never
+ * arrives before what it names. A changed ref alone is a message with no
+ * rows.
  */
 export function serveLiveList<Row extends RowLike, E, SE, R>(
   runs: Stream.Stream<Run<ListRun<Row>, E>, SE, R>,
@@ -144,6 +158,8 @@ export function serveLiveList<Row extends RowLike, E, SE, R>(
   let seq = 0
   let order: ReadonlyArray<string> = []
   let revById = new Map<string, number>()
+  const sentPeople = new Map<string, Person>()
+  const sentChannels = new Map<string, ChannelRef>()
   return runs.pipe(
     Stream.mapEffect((outcome) =>
       Effect.gen(function* (): Generator<Effect.Effect<unknown, E>, Option.Option<ListDelta<Row>>> {
@@ -164,7 +180,13 @@ export function serveLiveList<Row extends RowLike, E, SE, R>(
         }
         const remove: Array<string> = []
         for (const id of revById.keys()) if (!nextRevById.has(id)) remove.push(id)
-        if (!reset && upsert.length === 0 && remove.length === 0 && sameOrder(order, nextOrder)) return Option.none()
+        const people = unsent(sentPeople, run.refs?.people)
+        const channels = unsent(sentChannels, run.refs?.channels)
+        const refs: Refs | undefined =
+          people.length === 0 && channels.length === 0
+            ? undefined
+            : { ...(people.length === 0 ? {} : { people }), ...(channels.length === 0 ? {} : { channels }) }
+        if (!reset && upsert.length === 0 && remove.length === 0 && refs === undefined && sameOrder(order, nextOrder)) return Option.none()
         let encodeMs = 0
         if (options.measure) {
           const measured = measureEncode(() => upsert.map(options.encodeRow))
@@ -176,13 +198,26 @@ export function serveLiveList<Row extends RowLike, E, SE, R>(
         }
         order = sameOrder(order, nextOrder) ? order : nextOrder
         revById = nextRevById
+        for (const person of people) sentPeople.set(person.id, person)
+        for (const channel of channels) sentChannels.set(channel.id, channel)
         const meta: LiveMeta = { seq: ++seq, queryMs, encodeMs, at, ...(run.total === undefined ? {} : { total: run.total }) }
-        return Option.some({ reset, order, upsert, remove, meta })
+        return Option.some({ reset, order, upsert, remove, ...(refs === undefined ? {} : { refs }), meta })
       }),
     ),
     Stream.filter(Option.isSome),
     Stream.map((message) => message.value),
   )
+}
+
+/** The entries of `incoming` that `sent` lacks or holds with other values. */
+function unsent<A extends { readonly id: string }>(sent: ReadonlyMap<string, A>, incoming: ReadonlyArray<A> | undefined): ReadonlyArray<A> {
+  if (incoming === undefined) return []
+  const out: Array<A> = []
+  for (const entry of incoming) {
+    const held = sent.get(entry.id)
+    if (held === undefined || (held !== entry && !sameValue(held, entry))) out.push(entry)
+  }
+  return out
 }
 
 const encoder = new TextEncoder()

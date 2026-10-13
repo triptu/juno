@@ -1,6 +1,7 @@
 // The engine benchmark on the large seed (performance 1 and 6): the sidebar
-// query within 5 ms, a snapshot within 200 KB, a delta within 32 KB, encode
-// and decode within 5 ms each. It boots the engine against 300 channels,
+// query within 5 ms, a snapshot within 200 KB (rows; the people and channels
+// they name travel once as refs and are reported on their own), a delta
+// within 32 KB, encode and decode within 5 ms each. It boots the engine against 300 channels,
 // 5 000 threads and 100 000 messages, which takes a while, so it runs only
 // with JUNO_BENCH=1:
 //
@@ -15,13 +16,15 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { largeSeed } from '@juno/fake-slack'
 import { Effect, Schema } from 'effect'
-import { TopicRow } from '@juno/contract'
+import { ChannelRef, Person, TopicListRow } from '@juno/contract'
 import { Store, StoreReader, workspacePathsFromDir } from '@juno/store'
 import { listTopics, makeRowCache } from '../../src/topics/query'
 import { sleep, startTestEngine } from '../harness'
 
-const encodeRow = Schema.encodeSync(Schema.toCodecJson(TopicRow))
-const decodeRow = Schema.decodeUnknownSync(Schema.toCodecJson(TopicRow))
+const encodeRow = Schema.encodeSync(Schema.toCodecJson(TopicListRow))
+const decodeRow = Schema.decodeUnknownSync(Schema.toCodecJson(TopicListRow))
+const encodePerson = Schema.encodeSync(Schema.toCodecJson(Person))
+const encodeChannel = Schema.encodeSync(Schema.toCodecJson(ChannelRef))
 const bytes = (value: unknown) => new TextEncoder().encode(JSON.stringify(value)).byteLength
 const sorted = (samples: ReadonlyArray<number>) => samples.toSorted((a, b) => a - b)
 const median = (samples: ReadonlyArray<number>) => Number(sorted(samples)[Math.floor(samples.length / 2)]!.toFixed(2))
@@ -50,14 +53,6 @@ describe.skipIf(process.env['JUNO_BENCH'] !== '1')('topics.list on the large see
       const bootMs = Date.now() - bootStarted
       const window = await engine.topics()
       const rows = window.order.map((id) => window.rows.get(id)!)
-      const snapshotBytes = bytes(rows.map((row) => encodeRow(row)))
-      const withoutAvatar = ({ avatarUrl: _a, ...person }: TopicRow['participants'][number]) => person
-      const stripAvatars = (row: TopicRow) => ({
-        ...row,
-        participants: row.participants.map(withoutAvatar),
-        channel: { ...row.channel, ...(row.channel.partner === undefined ? {} : { partner: withoutAvatar(row.channel.partner) }) },
-      })
-      const snapshotBytesWithoutAvatars = bytes(rows.map((row) => encodeRow(stripAvatars(row) as TopicRow)))
       const calls = engine.fake.callCount()
 
       // Re-runs after boot: the query time the renderer sees in meta.
@@ -83,7 +78,8 @@ describe.skipIf(process.env['JUNO_BENCH'] !== '1')('topics.list on the large see
           const previous = before._tag === 'Success' ? before.value.rows.get(row.id) : undefined
           return previous === undefined || previous.rev !== row.rev
         })
-        deltas.push(bytes(changed.map((row) => encodeRow(row))))
+        // On the wire a row names its channel and people by id.
+        deltas.push(bytes(changed.map(({ channel, participants, ...row }) => encodeRow({ ...row, channelId: channel.id, participantIds: participants.map((p) => p.id) }))))
         await sleep(50)
       }
       // The query alone, on a reader of its own: every row shaped (no cache), then a subscription's re-run (warm cache).
@@ -107,13 +103,21 @@ describe.skipIf(process.env['JUNO_BENCH'] !== '1')('topics.list on the large see
           const cold = yield* time(40, listTopics(filter, { now, limit: 300 }))
           const cache = makeRowCache({ keepUsers: true })
           const warm = yield* time(40, listTopics(filter, { now, limit: 300 }, cache))
-          return { cold, warm }
+          const snapshot = yield* listTopics(filter, { now, limit: 300 }).pipe(Effect.provideService(StoreReader, reader))
+          return { cold, warm, snapshot }
         }).pipe(Effect.provide(Store.layer(paths)), Effect.scoped),
       )
 
+      // The snapshot as it travels: rows that name their channel and people, and the refs once each.
+      const wire = isolated.snapshot.rows
+      const snapshotBytes = bytes(wire.map((row) => encodeRow(row)))
+      const refsBytes = bytes({
+        people: (isolated.snapshot.refs?.people ?? []).map((person) => encodePerson(person)),
+        channels: (isolated.snapshot.refs?.channels ?? []).map((channel) => encodeChannel(channel)),
+      })
       // The codec and the port: encode the snapshot, clone it as postMessage does, decode it on the other side.
-      const encoded = rows.map((row) => encodeRow(row))
-      const encodeMs = timeEach(20, () => rows.map((row) => encodeRow(row)))
+      const encoded = wire.map((row) => encodeRow(row))
+      const encodeMs = timeEach(20, () => wire.map((row) => encodeRow(row)))
       const cloneMs = timeEach(20, () => structuredClone(encoded))
       const decodeMs = timeEach(20, () => encoded.map((row) => decodeRow(row)))
 
@@ -131,7 +135,7 @@ describe.skipIf(process.env['JUNO_BENCH'] !== '1')('topics.list on the large see
         queryMsMedian: median(samples),
         queryMsP95: p95(samples),
         snapshotBytes,
-        snapshotBytesWithoutAvatars,
+        refsBytes,
         deltaBytesMax: Math.max(...deltas),
         encodeMsMedian: median(encodeMs),
         cloneMsMedian: median(cloneMs),
