@@ -37,8 +37,11 @@ describe('control API', () => {
     const held = client.ok('conversations.history', { channel: 'C0ENG', limit: 5 })
     let answered = false
     void held.then(() => (answered = true))
-    await new Promise((resolve) => setTimeout(resolve, 50))
+    for (let waited = 0; fake.heldCount({ method: 'conversations.history' }) === 0 && waited < 5_000; waited += 10) {
+      await new Promise((resolve) => setTimeout(resolve, 10))
+    }
     expect(fake.heldCount({ method: 'conversations.history' })).toBe(1)
+    expect(fake.heldCalls({ method: 'conversations.history' })[0]).toMatchObject({ channel: 'C0ENG' })
     expect(answered).toBe(false)
     // A different method is not held.
     expect((await client.ok('client.counts', {})).channels.length).toBeGreaterThan(0)
