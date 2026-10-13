@@ -29,6 +29,9 @@ const inline = (s) => esc(s).replace(/`([^`]+)`/g, '<code>$1</code>')
 const nowPath = join(outDir, 'now.json')
 const now = existsSync(nowPath) ? JSON.parse(readFileSync(nowPath, 'utf8')) : { needsYou: [], running: [], next: [] }
 
+const healthPath = join(outDir, 'health.json')
+const health = existsSync(healthPath) ? JSON.parse(readFileSync(healthPath, 'utf8')) : undefined
+
 const logPath = join(root, 'docs/decision-log.md')
 const decisions = existsSync(logPath)
   ? readFileSync(logPath, 'utf8')
@@ -81,6 +84,22 @@ const running = now.running?.length
   : `<p class="empty">No agents running.</p>`
 
 const next = now.next?.length ? `<ol class="next">${now.next.map((n) => `<li>${inline(n)}</li>`).join('')}</ol>` : ''
+
+const healthBody = health
+  ? (() => {
+      const c = health.counts ?? {}
+      const items = [
+        ['Unused files', c.unusedFiles],
+        ['Unused exports', c.unusedExports],
+        ['Unused types', c.unusedTypes],
+        ['Unused dependencies', c.unusedDependencies],
+        ['Duplication', `${health.duplication?.percentage ?? '?'}%`],
+        ['Files over 400 lines', c.oversizedFiles],
+        ['Functions over 80 lines', c.oversizedFunctions],
+      ]
+      return `<table>${items.map(([k, v]) => `<tr><td>${esc(k)}</td><td class="time">${esc(v ?? '?')}</td></tr>`).join('')}</table><p class="meta">From \`pnpm health\` (report-only) at ${esc(new Date(health.timestamp).toLocaleString('en-GB', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' }))}.</p>`
+    })()
+  : '<p class="empty">Run <code>pnpm health</code> to fill this in.</p>'
 
 const decisionRows = decisions
   .map(
@@ -135,7 +154,7 @@ const html = `<!doctype html>
 <header><h1>Juno status</h1><span class="meta">updated ${esc(now.updated ?? generated)} · page built ${esc(generated)} · reloads every 20 s</span></header>
 ${section('Needs you', needs, now.needsYou?.length ?? 0)}
 <div class="grid">
-  <div>${section('Running now', running, now.running?.length ?? 0)}${next ? section('Up next', next) : ''}</div>
+  <div>${section('Running now', running, now.running?.length ?? 0)}${next ? section('Up next', next) : ''}${section('Codebase health', healthBody)}</div>
   <div>${section('Decisions', `<table>${decisionRows}</table>`, decisions.length)}</div>
 </div>
 ${section('Commits', `<table>${commitRows}</table>`, commits.length)}
