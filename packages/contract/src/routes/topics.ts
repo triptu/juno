@@ -95,6 +95,13 @@ export const TopicRow = Schema.Struct({
   channel: RowChannel,
   /** Most recent first, at most four. */
   participants: Schema.Array(Person),
+  /**
+   * The topic's art as a recipe (`@juno/topic-art`), joined from the
+   * window's `refs.art`. Absent while the art is not drawn yet, when the
+   * model was not confident, or when AI assist is off: the tile then shows
+   * the Tide placeholder. A DM's Main never has one; it shows the photo.
+   */
+  art: Schema.optionalKey(Schema.String),
 })
 export type TopicRow = typeof TopicRow.Type
 

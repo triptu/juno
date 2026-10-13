@@ -73,6 +73,8 @@ Custom protocols are not supported in utility processes (checked), so `juno://fi
 | renderer ↔ engine | `MessageChannelMain`; main gives one port to the engine (`utilityProcess.postMessage({ _tag: 'port' }, [port])`) and the other to the renderer (`webContents.postMessage('engine.port', null, [port])`; the preload forwards it with `window.postMessage({ _tag: 'juno.enginePort' }, '*', ports)`, the page checks `event.source === window` and the tag) | live queries, commands, engine events, as `effect/rpc` (2.6) |
 | renderer ↔ main | `contextBridge` + `ipcRenderer.invoke` | `engine.requestPort`, `launch.setTheme`, `launch.setAccent`, context menu popup, app-menu commands, title-bar double click, clipboard, open external, file dialogs, `webUtils.getPathForFile` for dropped files |
 | engine ↔ main | `process.parentPort` | main→engine (`MainToEngine`): `config` (userData, e2e), `port`, later secrets, cookie header, proxy, `clock.advance` (e2e), sign-in completed; engine→main (`EngineToMain`): `ready`, later `notify`, `setBadge`, `authRequired`, `setCookies`, `openExternal` |
+| agent ↔ engine | `MessageChannelMain`; on every engine `ready`, main sends one end to the engine (`agentPort`) and the other to the agent (`hostPort`) | the AgentHost group (`@juno/agent-contract`), as `effect/rpc`; the agent is the client (ADR 0012) |
+| agent ↔ main | `process.parentPort` | main→agent (`MainToAgent`): `config`, `hostPort`; agent→main (`AgentToMain`): `ready` with the host's hello. Keychain and OAuth requests come in WP13 |
 
 Every payload is an Effect `Schema` in `@juno/contract` (`protocol.ts` for the parentPort messages and the handoff, `shell.ts` for the invoke routes (`ShellRoutes`), `channels.ts` for their names), decoded on receipt. The preload imports only `@juno/contract/channels` (names and types, no runtime imports). Main checks `event.senderFrame.url` against `juno://app/` (or the Vite dev URL in dev).
 
@@ -114,20 +116,31 @@ flowchart TD
   slack --> slack_schema
   store --> domain & slack_schema
   sync --> slack & store & domain & slack_schema
-  ai --> domain
+  topic_art[topic-art]
+  ai --> domain & topic_art
   assistant --> ai & store & domain & contract
   notifications --> store & domain & ai
   files --> slack & store & sync
-  engine --> contract & sync & store & domain & richtext & assistant & notifications & files & slack
+  engine --> contract & sync & store & domain & richtext & assistant & notifications & files & slack & ai & topic_art
   fake_slack[fake-slack] --> slack_schema
   tokens
-  ui --> tokens
+  ui --> tokens & topic_art
   views --> ui & tokens & contract
   state --> contract
   desktop[apps/desktop] --> engine & state & views & contract & tokens & slack
   gallery[apps/gallery] --> views & ui & tokens
   gallery -.tests.-> testing[testing]
+  agent_contract[agent-contract] --> agent_cards[agent-cards]
+  agent --> agent_memory[agent-memory] & agent_cards & agent_contract
+  agent_juno[agent-juno] --> agent_contract & domain & contract
+  agent_testing[agent-testing] --> agent & agent_contract
+  engine --> agent_juno
+  state --> agent_contract
+  views --> agent_contract
+  desktop --> agent & agent_contract
 ```
+
+The bottom block is Juno Agent (section 10, ADR 0012). Some of its edges are allowed but not used yet: `agent` declares only `agent-contract` today, `state` and `views` take `agent-contract` in M2.
 
 | Package | Rule it protects | Owns | Must not |
 | --- | --- | --- | --- |
@@ -140,6 +153,7 @@ flowchart TD
 | `@juno/store` | the schema | `cache.db` and `user.db` schemas, timestamped migrations, writer and reader clients, `Invalidation` (wraps `Reactivity`), FTS5 table | call Slack or AI, shape data for the UI |
 | `@juno/sync` | Slack ↔ store | boot, discovery, backfill, merge rules, event application, read-state mirroring, outbox and its worker, reconnect reconciliation, `reindexTopics` calls | render, call AI |
 | `@juno/files` | authenticated bytes | upload staging and the upload flow, file metadata rows, thumbnail URL resolution, download requests to main | touch the renderer |
+| `@juno/topic-art` | no model text reaches a page | the topic art vocabulary: the whitelist parser for the model's recipe, the renderer that rebuilds SVG from the checked recipe with the `art` tokens' CSS variables, the Tide pebble placeholder | import anything |
 | `@juno/ai` | provider isolation | `AiProvider` with `PiAiProvider` and `FakeAiProvider`, task table (prompts, output schemas, tier) | touch the store |
 | `@juno/assistant` | AI policy | when tasks run, `ai_cache`, budget, concurrency, the off switch, For you generation, the Juno chat with tools and cards | call OpenRouter directly |
 | `@juno/notifications` | one decision path | pipeline, Today log, digest scheduler, `Notifier` interface | show anything itself |
@@ -148,8 +162,14 @@ flowchart TD
 | `@juno/ui` | primitives | the 18 primitives from `primitives.md` plus `Icon` | import contract, state, data |
 | `@juno/views` | dumb UI | feature components, each with `*.fixtures.tsx`; the `applyTheme` entry point for apps | import `@juno/state`, `effect`, `window.juno` |
 | `@juno/state` | the bridge | engine client, `liveQuery`/`command` helpers, atoms, undo stack, toasts, tabs, drafts, clock; `@juno/state/react` re-exports the atom hooks | JSX |
-| `apps/desktop` | wiring | `src/main`, `src/preload`, `src/engine` (utility entry), `src/renderer` with containers, `e2e/` | |
+| `apps/desktop` | wiring | `src/main`, `src/preload`, `src/engine` and `src/agent` (utility entries), `src/renderer` with containers, `e2e/` | |
 | `@juno/testing` | one set of test helpers | Playwright helpers shared by the gallery and the desktop e2e, starting with `expectNoLayoutShift` | be imported by any `src` |
+| `@juno/agent-memory` | pure agent memory | node keys, due order, batches, view rendering, the local window, the dependency closure, the request partition and budget, pin spans | I/O, Effect services, pi |
+| `@juno/agent-cards` | one card catalogue | card kinds and schemas, canonical payloads and digests, child-action expansion, card status machines | UI, I/O |
+| `@juno/agent-contract` | the agent's wire | the AgentHost port (`AgentHostRpcs`) and the main↔agent messages, the agent's RPC groups for the renderer, chat view models | logic |
+| `@juno/agent` | a portable agent | the agent core (plan v3): runtime on pi-durable, store, inbox, requests and the provider guard, jobs, actions, MCP, scheduling, ownership and backup; `startAgent()` | import Electron, Slack, `store`, `sync`, `engine` or UI |
+| `@juno/agent-juno` | Juno as the agent's host | the AgentHost handlers the engine serves | call a model |
+| `@juno/agent-testing` | agent test doubles | the scripted model provider, fake MCP servers, later the crash harness and memory simulator | be imported by any `src` |
 | `apps/gallery` | review | browser-only fixture gallery (one state at a time), its screenshot project and its behaviour project, including the layout-shift guard (`pnpm test:gallery`) | Electron |
 
 `testDeps` in a package.json names a devDependency that tests may import and src may not: `engine` uses `state` (the real client against the real server) and `slack` uses `fake-slack`.
@@ -159,7 +179,8 @@ What `check-deps` fails on, beyond the graph (all of it runs in `pnpm lint`):
 - **Undeclared imports** of a `@juno/*` package in `src`, `test` or `e2e`.
 - **Package rules.** `ui`, `tokens`, `domain` and `richtext` import no `effect` (`domain` and `richtext` may import `{ Schema }`); `ui` does not import `state`; only `apps/desktop` imports `electron`.
 - **Directory rules.** `apps/desktop/src/renderer` imports no `engine`, `store`, `slack`, `electron` or Node built-in. `src/main` imports no `state`, `views`, `ui`, `engine`, `store`, `slack` or React. `src/engine` imports no UI. `src/preload` imports only `electron` and `@juno/contract/channels`. Any `views/` directory (including `packages/views`) imports no `state`, `engine`, `store`, `electron`, Node built-in or `effect`, and neither it nor `ui` mentions `window.juno`.
-- **Unstable Effect modules** (list in the effect skill) only from the files that wrap them: `effect/reactivity` Atom, AtomRegistry, AtomRpc and AsyncResult in `state/src` (and one engine test); `Reactivity` in `store/src/invalidation.ts`; `@effect/atom-react` in `state/src/react.ts`; `effect/rpc` in `contract/src`, `engine/src/protocol` and `state/src`; `effect/workers` in `state/src/transport.ts` and `engine/src/protocol/runner.ts`; `effect/sql` and `@effect/sql-sqlite-node` in `store`. Every other unstable module is allowed nowhere until someone adds a wrapper and an entry in the script.
+- **Unstable Effect modules** (list in the effect skill) only from the files that wrap them: `effect/reactivity` Atom, AtomRegistry, AtomRpc and AsyncResult in `state/src` (and one engine test); `Reactivity` in `store/src/invalidation.ts`; `@effect/atom-react` in `state/src/react.ts`; `effect/rpc` in `contract/src`, `engine/src/protocol`, `state/src`, `agent-contract/src` and `agent/src/host`; `effect/workers` in `state/src/transport.ts`, `engine/src/protocol/runner.ts` and `agent/src/host/port.ts`; `effect/sql` and `@effect/sql-sqlite-node` in `store`. Every other unstable module is allowed nowhere until someone adds a wrapper and an entry in the script.
+- **Juno Agent.** No `agent-*` package imports or declares `electron` or a Slack package; `@juno/agent` also stays away from `store`, `sync`, `engine`, `state` and the UI packages. `@earendil-works/pi-durable` and `chord` are imported only in `agent/src/runtime/`, `pi-mcp` only in `agent/src/mcp/`, `pi-ai` and `@openai/codex-sdk` only in `agent/src/providers/` (and `pi-ai` in `@juno/ai`); `agent-testing` may import all of them. `agent-memory` and `agent-cards` import only `{ Schema }` from `effect`. `src/agent` in the desktop app imports no engine, store, sync, Slack or UI code, and `src/main` and `src/engine` do not import `@juno/agent`.
 - **Engine feature folders.** A folder in `engine/src` other than `protocol` may not import another feature folder or `layer`, `startEngine` or `index`.
 - **`sendSync`** anywhere in `src`.
 
@@ -230,6 +251,8 @@ juno_chat       (id PK, role, content_json, created_at)
 drafts          (topic_id PK, text, updated_at)
 outbox          (id PK, kind, target_key, payload_json, depends_on, created_at, attempts, next_at, last_error)
 prefs           (key PK, value_json)
+topic_art       (topic_id PK, recipe, recipe_hash, input_hash, model, status 'ok'|'unsure'|'failed', hue,
+                 title_source, source 'ai'|'redraw', created_at)
 ```
 
 ### 4.4 Topics are derived (ADR 0004)
@@ -377,7 +400,7 @@ Each event is one writer transaction wrapped in `Reactivity.withBatch` so querie
 
 Granularity (performance.md 5.1): a list container subscribes to the order only; each row subscribes to its own `Atom.family` member derived from the window's row cache (`rowAtom(listAtom)(id)`), so a delta that touches one row re-renders one row. The sidebar reads its window through `sidebarListAtom`, which holds the window shown until a new filter's first snapshot arrives and then swaps in one update, keeping the objects of rows whose `rev` is unchanged; the container reads `sidebarSectionsAtom` (the ids split into Pinned and Recent) and each row reads `sidebarRowAtom(id)`, keyed by id alone so a row survives a filter change (performance 5.3). The container is memoized with no props, mounts a new window's first 24 rows and then the rest in a transition after that frame paints, and keeps the other quick filters' lists subscribed once the first rows are on screen, so a filter change is a cache hit (performance 3.2). The roving tabindex follows focus: `focusedTopicAtom` holds the row focused last, and `currentRowAtom(id)` answers whether a row is the tabbable one (that row, else the selection, else the first row). The Channels and DMs dots are `sidebarDotAtom(group)` booleans, so a count that changes without a dot changing re-renders nothing. Live query atoms carry a 30 s idle TTL, and `prefetch(registry, atom)` keeps the subscription under an atom running (hover, focus, keyboard selection), at most three per registry; an evicted prefetch that was never opened ends at once, so a topic open after a prefetch is a cache hit and ten hovers do not keep ten queries alive. Search atoms have no debounce; containers feed them through `useDeferredValue`. `@juno/state/perf` holds the fixed performance marks (`juno.start`, `juno.shell-paint`, `juno.live-update`, …) with `detail.devtools`, and `observeFrames()` counts long animation frames and slow input events for the harness (`window.__juno.perf`). The connection to the engine is `connectionStateAtom` (`connecting | connected | reconnecting | failed`), set by the port transport.
 
-**People and channels in the same update (M4).** Rows and messages name people and channels by id, and `ListDelta` carries side tables, `refs: { people?: Person[], channels?: ChannelRef[] }`, in the same message as the rows that name them, so a row never arrives before its people and no second live value has to be joined. The engine's `serveLiveList` remembers what each subscription was sent and sends a person or channel only when it is new to the subscription or changed. `@juno/state` keeps the two maps per window (`window.refs`), applied before the rows of the same delta; an entry that arrives equal keeps its object. A person's new photo is then one side-table upsert instead of a new `rev` on every row they appear on. `topics.list` sends `TopicListRow`s (with `channelId` and `participantIds`) and `topicListAtom` joins them back into the `TopicRow` the views take, keeping a joined row's object while its wire row and the refs it names keep theirs; messages carry `senderId` and `messageItem(id, ts)` joins the sender. Measured on the large seed (October 2026, load 4 to 8), the 300-row sidebar snapshot fell from 321 KB to 175 KB of rows, plus 92 KB of refs sent once per subscription; a 300-message window is 167 KB of rows and under 1 KB of refs. The size budget reads: rows ≤ 200 KB, side tables counted separately, encode and decode ≤ 5 ms each.
+**People and channels in the same update (M4).** Rows and messages name people and channels by id, and `ListDelta` carries side tables, `refs: { people?: Person[], channels?: ChannelRef[] }`, in the same message as the rows that name them, so a row never arrives before its people and no second live value has to be joined. The engine's `serveLiveList` remembers what each subscription was sent and sends a person or channel only when it is new to the subscription or changed. `@juno/state` keeps the two maps per window (`window.refs`), applied before the rows of the same delta; an entry that arrives equal keeps its object. A person's new photo is then one side-table upsert instead of a new `rev` on every row they appear on. Topic art travels the same way: `refs.art` carries `{ id, recipe }` per topic, once per subscription and again on a redraw, and `topicListAtom` joins it into `TopicRow.art`; an entry with an empty recipe means "not shown" (AI assist off), so a renderer that holds the recipe drops it. `topics.list` sends `TopicListRow`s (with `channelId` and `participantIds`) and `topicListAtom` joins them back into the `TopicRow` the views take, keeping a joined row's object while its wire row and the refs it names keep theirs; messages carry `senderId` and `messageItem(id, ts)` joins the sender. Measured on the large seed (October 2026, load 4 to 8), the 300-row sidebar snapshot fell from 321 KB to 175 KB of rows, plus 92 KB of refs sent once per subscription; a 300-message window is 167 KB of rows and under 1 KB of refs. The size budget reads: rows ≤ 200 KB, side tables counted separately, encode and decode ≤ 5 ms each.
 
 Atoms: `engineStatusAtom`, `connectionStateAtom`, `appInfoAtom`, `themeAtom`, `sessionAtom`, `nowAtom` (engine `clock.tick` plus local elapsed time, so renderer and engine share one clock), `topicListAtom(filter)` (family by `{ kind, unreadOnly, scope }`), `topicAtom(id)`, `messagesAtom(id, window)` (with `messageWindowSpecAtom`, `messageListAtom`, `messageOrderAtom` and `messageItem` for a tab), `channelThreadsAtom(channel)`, `allTopicsAtom(filters)`, `forYouAtom`, `junoChatAtom`, `notificationSettingsAtom`, `notificationTodayAtom`, `prefsAtom`, `browseAtom`, `peopleAtom`, `ignoredAtom`, `searchAtom(query)` and `commandParseAtom(query)` (one-shot, debounced 150 ms), `undoStackAtom`, `toastAtom`, `tabsAtom`, `sendingAtom(topicId)`, `attachmentsAtom(topicId)`.
 
@@ -430,6 +453,7 @@ Two tiers, one interface, deterministic checks first.
 | Grouping, settled | decision | run once a topic has been idle for 2 minutes, not per message |
 | Notification gate | decision | `urgencyGate` per candidate |
 | Titles | generation | new thread; re-run when `reply_count` crosses 5 and 20 |
+| Topic art | generation (its own `art` model slot) | background, when a topic first enters the sidebar, and again when a thread drawn from its first words gets an AI title; Redraw on request |
 | Catch-up | generation | on open with 2+ unread |
 | For you | both | background, every 15 minutes and after idle topics change |
 | Juno chat | generation + tools | streamed into `juno.chat` snapshots at ~50 ms |
@@ -444,6 +468,25 @@ What `@juno/ai` settled (its README has the detail):
 - Tool choice is forced on the decision tier and `auto` on the generation tier, because Sonnet 5.5 on OpenRouter rejects a forced choice; a model that rejects it gets the retry with `auto`. Reasoning is off, or at the lowest level a model allows.
 - Nothing fails: `Decision<A>` is `Decided` or `NoDecision` with a reason (`missing-key`, `timeout`, `invalid-output`, `provider-error`) and a meta (model, latency, attempts, cost when known); a chat stream ends with `done` or `failed`. The missing key is a reason, not an error, so the app runs before the owner adds one. The config is an `Effect<AiConfig>` read per call, so a key or slug set in preferences applies at once.
 - `pnpm ai:eval` runs every task on invented examples with the fake, and with `JUNO_AI=live` plus `OPENROUTER_API_KEY` against OpenRouter, printing outputs, latency, cost and how many judgements matched the examples' expectations. `pnpm --filter @juno/ai bench` compares models and request shapes on the same examples. Prompt quality is judged there, not in tests; tests never depend on prompt wording.
+
+**Topic art** (SPEC section 5, "Row anatomy"; the study in `docs/design/topic-art/v2`; decision log 10-13 23:38 and 23:40). Every topic's tile is a small drawing of what it is about, with no container; a DM's Main keeps the person's photo (a group DM's Main its initials), and until a topic has art, or while AI assist is off, it shows the Tide pebble, a free-form shape seeded by the topic id.
+
+- **The vocabulary** is `@juno/topic-art`: the model sends a recipe in a tiny SVG dialect (seven shapes and `g` on a 40 by 40 grid, colours as roles, at most 40 elements), `parseRecipe` checks every tag, attribute and number against a whitelist and fails the whole drawing on anything else, and `renderArt` rebuilds the SVG from the checked recipe with `var(--art-<hue>-<role>)` colours from `@juno/tokens`, so one stored string serves light and dark. There is no HTML sanitiser and there must not be one. The same parse runs in `@juno/ai` on the reply and in `@juno/ui` on the stored text.
+- **The task** is `topicArt` in `@juno/ai`: a text task on its own `art` tier (`defaultModelPrefs.art`, `google/gemini-3.8-flash`, the `aiModels` pref overrides it), 15 s timeout, whose `check` is the parse and whose `retry` sends the failed drawing and the checker's reason back once. Its output is the canonical recipe; `data-confident="false"` in it means the model had nothing to draw.
+- **The job** is `engine/src/art/`: for each open workspace a live query on topics, the overlay, prefs and `topic_art` lists the sidebar candidates with no finished attempt (or drawn from their first words and now titled by AI), debounced 1.5 s, and draws them newest first, 4 at a time, inside a budget of 500 calls per workspace per day counted from `topic_art` rows plus this process's unfinished calls. A finished attempt is stored once (`ok` shown; `unsure` and `failed` keep the placeholder and are not asked again); a call that did not finish defers the topic with backoff in memory, a missing key defers the pass for ten minutes. Nothing runs while `aiAssist` is false. `art.redraw { id }` draws again with the previous hue named as the thing to avoid and replaces the row.
+- **The wire**: `topics.list` sends recipes as `refs.art` (architecture 7), so a drawing's arrival changes no row's `rev`; `topics.get` carries `TopicDetail.art`. AI assist off sends an empty recipe for every stored drawing in the window, so the renderer drops them without a reset.
+- **The tile** is `TopicArt` in `@juno/ui` (`topicId`, `recipe?`, `size` 40, 20 or 16): the pebble under the art in a fixed box, a 240 ms opacity cross-fade when art arrives on screen, no fade for art present at the first paint, and nothing moves. `TopicRow` uses it for every topic but a DM's Main; the header and tab containers take it from `@juno/views` with `TopicDetail.art` or `topicArtAtom(id)`.
+- **Which provider runs** is `EngineConfig.ai`: `fake` under tests, e2e and `JUNO_AI=fake`, `live` otherwise with `openRouterApiKey` from main's environment for now (the key stays in memory, never in a file). Measured live on 2026-10-14 (`JUNO_AI=live pnpm ai:eval topicArt`, two runs of the five study topics, 10 calls): 9 of 10 valid drawings on the first attempt and one timeout at the former 10 s cap; 4.2 to 14.0 s per call, median 4.5 s; $0.0018 to $0.0066 per icon, $0.0029 on average, so about $0.90 per 300 topics. Slower than the study's 2.3 s median under the same model and reasoning level, which is why the timeout is 15 s.
+
+### Juno Agent (ADR 0012)
+
+Juno Agent is the assistant of the brief in `docs/juno-agent/BRIEF.md`, designed in `docs/juno-agent/plan-v3.md`, with the library findings in `docs/juno-agent/spikes.md`. It replaces the Juno chat row above from M2 on; the other AI features stay in `@juno/ai`.
+
+- **Portable core.** `@juno/agent` is a plain Node program with no Electron, Slack or Juno store code (section 3 lists the packages and the `check-deps` rules). It keeps its own state in a per-user `agent/` directory under userData: `agent.sqlite`, the pi-durable journals and `owner.lock`.
+- **Its own process.** Main forks `out/main/agent.js` as a second utility process, without the Slack partition. Until the chat ships it starts only with `JUNO_AGENT=1`.
+- **The AgentHost port.** The agent reaches Juno only through `AgentHostRpcs`, which the engine serves with `@juno/agent-juno`'s handlers on ports main brokers (section 2.4). Today the group has `host.hello`; Slack reads, outbox sends, resolve, presence and the notification gate follow in WP13. The renderer gets its own port to the agent for the chat.
+- **Durability.** pi-durable runs over Juno's SQLite facade at `synchronous = FULL` with `fullfsync`, because macOS `fsync` alone does not survive power loss. Owner input enters an inbox in `agent.sqlite` before it is acknowledged (plan v3 §3).
+- **Tests.** `@juno/agent-testing` has the scripted provider and the fake MCP server. `apps/desktop/e2e/juno-agent/` holds the agent's e2e flows, starting with the hello round trip.
 
 ## 11. Notifications
 

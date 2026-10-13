@@ -17,7 +17,7 @@ export interface SyncConfigShape {
   readonly previewThreads: number
   /** Ids per edge `users/info` call. */
   readonly usersChunk: number
-  /** How often the discovery sweep runs while live. */
+  /** How often the discovery sweep runs while live. 0 disables the timer; reconnects still catch up. */
   readonly sweepIntervalMillis: number
   /**
    * The pass over the followed threads of the window (`followPass`) runs

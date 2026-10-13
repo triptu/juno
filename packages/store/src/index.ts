@@ -36,6 +36,7 @@ export type {
   MessageRow,
   OutboxRow,
   SyncedRangeRow,
+  TopicArtRow,
   TopicIndexRow,
   TopicKind,
   UserRow,

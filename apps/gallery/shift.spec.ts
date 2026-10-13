@@ -213,6 +213,32 @@ test.describe('Message thumbnail', () => {
   })
 })
 
+test.describe('Topic art', () => {
+  for (const [state, size] of [
+    ['arrival', 40],
+    ['arrival-header', 20],
+    ['arrival-tab', 16],
+  ] as const) {
+    test(`art arriving over the placeholder at ${size}px moves nothing`, async ({ page }) => {
+      await page.goto(`/#/TopicArt?__state=swap/${state}`)
+      const tile = page.locator('[data-topic-art]')
+      await expect(tile).toHaveAttribute('data-topic-art', 'placeholder')
+      const before = await tile.boundingBox()
+      expect(before?.width).toBe(size)
+      expect(before?.height).toBe(size)
+      await expectNoLayoutShift(page, async () => {
+        await page.getByRole('button', { name: 'Art arrives' }).click()
+        await expect(tile).toHaveAttribute('data-topic-art', 'art')
+      })
+      // The art is drawn over the pebble; both layers kept the box.
+      await expect(tile.locator('svg')).toHaveCount(2)
+      await expect(tile.locator('span').nth(1)).toHaveCSS('opacity', '1')
+      await expect(tile.locator('span').nth(0)).toHaveCSS('opacity', '0')
+      expect(await tile.boundingBox()).toEqual(before)
+    })
+  }
+})
+
 /**
  * The guard has to fail when something moves, or a green run means nothing.
  * These pages are made on the spot, so they do not depend on any component.

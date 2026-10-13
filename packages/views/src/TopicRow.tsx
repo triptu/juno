@@ -14,12 +14,12 @@ import {
   activateHandlers,
   Avatar,
   AvatarStack,
-  ChannelIcon,
   channelIcons,
   Chip,
   Icon,
   IconButton,
   Text,
+  TopicArt,
   type ActivateEvent,
   type AvatarStackPerson,
   type PhosphorIcon,
@@ -239,20 +239,29 @@ export const TopicRow = memo(function TopicRow({ row, time, selected = false, ta
   )
 })
 
-/** The 44px tile: a person for a DM, two initials for a group DM, the channel's icon otherwise. */
+/**
+ * The tile (SPEC section 5, "Row anatomy"): a DM's Main is the person, so it
+ * keeps the photo (two initials for a group DM); every other topic, a
+ * channel's Main and threads inside DMs included, shows its art, or the
+ * Tide placeholder until the art exists or while AI assist is off. The art
+ * is 40px in a 44px slot, so its text column lines up with a photo row's.
+ */
 function Tile({ row }: { readonly row: TopicRowModel }) {
   const { channel } = row
-  if (channel.kind === 'im') {
+  if (row.kind === 'main' && channel.kind === 'im') {
     const partner = channel.partner
     const name = partner?.name ?? channel.name
     const hue = hueFor(partner?.color ?? channel.color, partner?.id ?? channel.id)
     return <Avatar label={initials(name)} size={44} hue={hue} {...(partner?.avatarUrl === undefined ? {} : { src: partner.avatarUrl })} />
   }
-  if (channel.kind === 'mpim') {
+  if (row.kind === 'main' && channel.kind === 'mpim') {
     return <Avatar kind="group" label={groupInitials(channel.name)} size={44} hue={hueFor(channel.color, channel.id)} />
   }
-  const icon = channelIconFor(channel.icon)
-  return <ChannelIcon name={channel.name} id={channel.id} color={hueFor(channel.color, channel.id)} size={44} {...(icon === undefined ? {} : { icon })} />
+  return (
+    <span {...stylex.props(styles.artSlot)}>
+      <TopicArt topicId={row.id} recipe={row.art} size={40} />
+    </span>
+  )
 }
 
 /** What the tags and icons say, for the row's description: "2 unread, mentions you." */
@@ -333,6 +342,13 @@ const styles = stylex.create({
   tile: {
     display: 'inline-flex',
     flexShrink: 0,
+  },
+  artSlot: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: sizes['--tile-44'],
+    height: sizes['--tile-44'],
   },
   // The tile is decorative (the title and line three name the place), so it
   // alone may fade.

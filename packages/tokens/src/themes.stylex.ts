@@ -11,7 +11,7 @@
  * and the app can switch back to it.
  */
 import * as stylex from '@stylexjs/stylex'
-import { accent, accentSwatches, colors, hues, shadows, tints } from './tokens.stylex'
+import { accent, accentSwatches, art, colors, hues, shadows, tints } from './tokens.stylex'
 
 export const darkColors = stylex.createTheme(colors, {
   // A warm-neutral near-black (OKLCH hue 85, chroma 0.006), so dark is the
@@ -105,8 +105,92 @@ export const darkHues = stylex.createTheme(hues, {
   '--avatar-fg-mix': '46%',
 })
 
+
+/**
+ * Topic art on ink. Lines are a pale warm neutral a step below the text,
+ * the soft fill and the accents sit near neutral. The Tide tones step in
+ * lightness from 0.33, lifted from the study's 0.285 because the pebbles
+ * read too dim on the near-black sidebar; the dark `pale` dot takes the
+ * `deep` value, so it reads as a shadow where the light dot is a highlight.
+ */
+export const darkArt = stylex.createTheme(art, {
+  '--art-coral-ink': 'oklch(0.78 0.028 32)',
+  '--art-coral-soft': 'oklch(0.36 0.032 32)',
+  '--art-coral-accent': 'oklch(0.72 0.085 32)',
+  '--art-coral-accent2': 'oklch(0.56 0.05 32)',
+  '--art-amber-ink': 'oklch(0.78 0.028 72)',
+  '--art-amber-soft': 'oklch(0.36 0.032 72)',
+  '--art-amber-accent': 'oklch(0.72 0.085 72)',
+  '--art-amber-accent2': 'oklch(0.56 0.05 72)',
+  '--art-olive-ink': 'oklch(0.78 0.028 112)',
+  '--art-olive-soft': 'oklch(0.36 0.032 112)',
+  '--art-olive-accent': 'oklch(0.72 0.085 112)',
+  '--art-olive-accent2': 'oklch(0.56 0.05 112)',
+  '--art-sage-ink': 'oklch(0.78 0.028 150)',
+  '--art-sage-soft': 'oklch(0.36 0.032 150)',
+  '--art-sage-accent': 'oklch(0.72 0.085 150)',
+  '--art-sage-accent2': 'oklch(0.56 0.05 150)',
+  '--art-teal-ink': 'oklch(0.78 0.028 185)',
+  '--art-teal-soft': 'oklch(0.36 0.032 185)',
+  '--art-teal-accent': 'oklch(0.72 0.085 185)',
+  '--art-teal-accent2': 'oklch(0.56 0.05 185)',
+  '--art-sky-ink': 'oklch(0.78 0.028 235)',
+  '--art-sky-soft': 'oklch(0.36 0.032 235)',
+  '--art-sky-accent': 'oklch(0.72 0.085 235)',
+  '--art-sky-accent2': 'oklch(0.56 0.05 235)',
+  '--art-periwinkle-ink': 'oklch(0.78 0.028 275)',
+  '--art-periwinkle-soft': 'oklch(0.36 0.032 275)',
+  '--art-periwinkle-accent': 'oklch(0.72 0.085 275)',
+  '--art-periwinkle-accent2': 'oklch(0.56 0.05 275)',
+  '--art-plum-ink': 'oklch(0.78 0.028 320)',
+  '--art-plum-soft': 'oklch(0.36 0.032 320)',
+  '--art-plum-accent': 'oklch(0.72 0.085 320)',
+  '--art-plum-accent2': 'oklch(0.56 0.05 320)',
+
+  '--tide-coral-base': 'oklch(0.33 0.012 32)',
+  '--tide-coral-soft': 'oklch(0.37 0.017 32)',
+  '--tide-coral-mid': 'oklch(0.415 0.022 32)',
+  '--tide-coral-deep': 'oklch(0.48 0.026 32)',
+  '--tide-coral-pale': 'oklch(0.48 0.026 32)',
+  '--tide-amber-base': 'oklch(0.33 0.012 72)',
+  '--tide-amber-soft': 'oklch(0.37 0.017 72)',
+  '--tide-amber-mid': 'oklch(0.415 0.022 72)',
+  '--tide-amber-deep': 'oklch(0.48 0.026 72)',
+  '--tide-amber-pale': 'oklch(0.48 0.026 72)',
+  '--tide-olive-base': 'oklch(0.33 0.012 112)',
+  '--tide-olive-soft': 'oklch(0.37 0.017 112)',
+  '--tide-olive-mid': 'oklch(0.415 0.022 112)',
+  '--tide-olive-deep': 'oklch(0.48 0.026 112)',
+  '--tide-olive-pale': 'oklch(0.48 0.026 112)',
+  '--tide-sage-base': 'oklch(0.33 0.012 150)',
+  '--tide-sage-soft': 'oklch(0.37 0.017 150)',
+  '--tide-sage-mid': 'oklch(0.415 0.022 150)',
+  '--tide-sage-deep': 'oklch(0.48 0.026 150)',
+  '--tide-sage-pale': 'oklch(0.48 0.026 150)',
+  '--tide-teal-base': 'oklch(0.33 0.012 185)',
+  '--tide-teal-soft': 'oklch(0.37 0.017 185)',
+  '--tide-teal-mid': 'oklch(0.415 0.022 185)',
+  '--tide-teal-deep': 'oklch(0.48 0.026 185)',
+  '--tide-teal-pale': 'oklch(0.48 0.026 185)',
+  '--tide-sky-base': 'oklch(0.33 0.012 235)',
+  '--tide-sky-soft': 'oklch(0.37 0.017 235)',
+  '--tide-sky-mid': 'oklch(0.415 0.022 235)',
+  '--tide-sky-deep': 'oklch(0.48 0.026 235)',
+  '--tide-sky-pale': 'oklch(0.48 0.026 235)',
+  '--tide-periwinkle-base': 'oklch(0.33 0.012 275)',
+  '--tide-periwinkle-soft': 'oklch(0.37 0.017 275)',
+  '--tide-periwinkle-mid': 'oklch(0.415 0.022 275)',
+  '--tide-periwinkle-deep': 'oklch(0.48 0.026 275)',
+  '--tide-periwinkle-pale': 'oklch(0.48 0.026 275)',
+  '--tide-plum-base': 'oklch(0.33 0.012 320)',
+  '--tide-plum-soft': 'oklch(0.37 0.017 320)',
+  '--tide-plum-mid': 'oklch(0.415 0.022 320)',
+  '--tide-plum-deep': 'oklch(0.48 0.026 320)',
+  '--tide-plum-pale': 'oklch(0.48 0.026 320)',
+})
+
 /** Everything that changes in dark mode. Spread into stylex.props(). */
-export const dark = [darkColors, darkShadows, darkAccentSwatches, darkTints, darkHues] as const
+export const dark = [darkColors, darkShadows, darkAccentSwatches, darkTints, darkHues, darkArt] as const
 
 /*
  * Accent themes. Each sets the fill, the text on it, the accent text, and

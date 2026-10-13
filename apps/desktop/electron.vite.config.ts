@@ -45,7 +45,9 @@ const repoRoot = resolve(__dirname, '../..')
 // Measured on the M1 shell (7 runs, median): launch to first window 416 ms
 // external vs 314 ms bundled; launch to "Engine live" 526 ms vs 379 ms.
 // Everything else from node_modules stays external.
-const externalize = externalizeDepsPlugin({ exclude: ['@juno/contract', '@juno/engine', '@juno/slack', '@juno/state', 'effect'] })
+const externalize = externalizeDepsPlugin({
+  exclude: ['@juno/agent', '@juno/agent-contract', '@juno/agent-juno', '@juno/contract', '@juno/engine', '@juno/slack', '@juno/state', 'effect'],
+})
 
 // electron-vite defaults every target to `minify: false`. Minified output is
 // less than half the size and parses faster; scripts/check-bundle-size.mjs
@@ -74,10 +76,11 @@ export default defineConfig({
     build: {
       minify,
       rollupOptions: {
-        // index.js is the main process; engine.js is forked as a utility process.
+        // index.js is the main process; engine.js and agent.js are forked as utility processes.
         input: {
           index: resolve(__dirname, 'src/main/index.ts'),
           engine: resolve(__dirname, 'src/engine/index.ts'),
+          agent: resolve(__dirname, 'src/agent/index.ts'),
         },
       },
     },

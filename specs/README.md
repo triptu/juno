@@ -108,8 +108,105 @@ ITF `states[0]` is initial. In each state find the variable ending in `::s`, the
 | `startFetch` kind `page`, `scan`, `lookup`, `finishFetch` | `client.counts` or a `getView` row; the reconnect's counts; `conversations.info` or a root lookup |
 | `stealth` | A stealth tab: no command |
 
-Network acceptance, response, event delivery and fetch completion are separate transitions in both models.
+Network acceptance, response, event delivery and fetch completion are separate transitions in both models. Engine tests disable the periodic sweep timer and trigger reconnects explicitly. `syncIdle()` waits for scan completion, including a due follow pass, and `commandIdle()` waits for command recovery to finish applying its answer. These observation hooks do not change the protocol actions or their ordering rules.
 
 ## Maintain the protocol
 
 Read the sync README's follow and read rule tables and architecture section 5 before changing a rule. Keep the event and observation clocks separate. Add a directed schedule for a new race, show the broken rule fails, run `pnpm specs:check`, and document bounds and any expected implementation violations. Product rules remain in the public specs.
+
+## Juno Agent memory (WP2)
+
+`agent-memory.qnt` describes [plan v3](../docs/juno-agent/plan-v3.md), sections 3–5 and 15. It is a protocol contract for the future implementation, not a claim about existing application code. `memoryProtocol` supplies every transition; `agent_memory` supplies the simulator and directed schedules, and `agent_memory_bounded` supplies the small Apalache instance in the same file.
+
+### Records, transactions and abstractions
+
+- A durable inbox count precedes ordered projection into a dense archive. A source ID denotes an immutable opaque byte string. Redaction replaces its payload with a tombstone without reusing the ID. Each ID represents one chunk, up to 16,000 bytes; attachment storage and byte-page iteration are abstracted by that exact payload. Archive incarnations and two-journal power loss belong to WP4.
+- Tree keys are aligned `(start, width)` intervals. Immutable node versions record source IDs, exact child and context node versions, and exact pin versions. `deps` caches the transitive source closure of those recorded reads. The separate `read` field records what the job actually saw, so a missing dependency is detectable. Model output may omit every fact, copy a read source, invent a fact, exceed 512 bytes, or fail. Provenance is conservative even when the output omits a source. Nothing here proves recall, factual accuracy, or instruction authority.
+- `start`, `complete`, and `publish` are separate transitions. New messages, pin edits, removal and crashes can intervene. Publication revalidates inputs, pin revision, redaction generation and the expected head revision in the same transaction as node insertion and head advancement. Stale results leave durable work queued. A crash loses jobs and request preparation but preserves the archive, queue, deadlines, pins and exact committed head.
+- The persisted head names exact node versions, ordered lines, a coverage watermark and a generation. Masked lines retain their intervals and render a fixed placeholder. The tail is everything after the published prefix. Out-of-order completed leaves wait until the prefix reaches them. Only sibling lines with a clean built parent can merge. Priorities use integer cross multiplication, age from the pair's inclusive last message, and oldest-start tie breaking.
+- A compaction reads the nearest clean lines before its interval, newest first, stopping when another line would exceed 16,384 bytes. It also reads active pins. Both are recorded. Direct compaction input is at most 32,768 bytes; all compaction calls also pass an admission bound. The model keeps the shortest of at most five output attempts. Each shortening call reuses the bounded original input and fixed template, revalidates freshness, and passes the same provider bound; it does not accumulate previous attempts into a transcript. Deadlines use two abstract clock ticks instead of the production backoff ladder; the clock and worker advance without new messages.
+- Pins are trusted copies of an owner source span (at most 280 bytes) or explicit owner edits. Edits preserve source lineage and supersede the previous version. Admission enforces 4,096 active bytes atomically. A removal deactivates matching pins immediately, including owner-edited descendants; delayed edits recheck lineage. The span's integer payload abstracts exact byte slicing, not its implementation or UTF-8 validation.
+- Removal increments the generation, masks precisely the affected published lines, queues affected node keys, removes pins, invalidates prepared requests and clears affected live report/retrieval handles in one transaction. Clean versions outside the dependency closure remain usable. Rebuilds get new identities; purge removes obsolete text-bearing node records. Local journal/Codex files, grant and action invalidation, backups and the 24-hour purge deadline belong to WP3/4/16. Already sent provider copies and independently stored later replies are outside this memory guarantee.
+- Requests capture pins, head, generation and cutoffs in one snapshot. Historical coverage, tail and active source IDs partition the selected prefix. A large tail has **one** bounded range placeholder. Uncollapsed tail items keep their exact source payload. Active tool-result paging preserves IDs and metadata; a modeled call/result pair must stay ordered and paired. Request cost includes fixed system/tools/framing, a 16,384 output reserve, pins, view, tail and active input. The final result is admitted or locally blocked. The provider guard rechecks the generation and pin revision, a trusted stamp over the complete request, and the budget. Spend reservations belong to WP3.
+
+### Properties
+
+Relational properties compare `s` with the ghost pre-state `before`, captured by `tick`. `safety` includes all 26 WP2 names and `pinsSurviveCompaction`; `invariants` also includes the finite drain bound.
+
+| Property | Plain meaning |
+| --- | --- |
+| `sourceIdentityStable`, `retainedSourceExact` | The archive grows in order; retained source payloads stay exact. Removal does not reassign an ID. |
+| `redactionMonotone` | Tombstones and the redaction generation never roll back within this archive history. |
+| `nodeIdentityStable` | An existing node identity never changes payload or inputs; rebuilds use another version. |
+| `nodeInputsCurrent` | A newly published node records everything it read and validates those inputs and pin versions at commit. |
+| `treeClosed` | A readable parent has compatible, committed, clean children. |
+| `viewPartition` | Ordered aligned intervals cover exactly the published prefix, without gaps or overlap. |
+| `viewReferencesValid` | Every readable line names a clean committed version; other lines are explicitly masked. |
+| `viewCAS` | A publication changing the head uses its actual expected revision and generation. |
+| `restartPreservesHead` | Restart reloads the exact committed partition, versions and coverage. |
+| `mergePreservesCoverage` | A merge replaces two siblings by their parent and removes exactly one line without moving coverage. |
+| `mergeDueOrder` | The selected pair has greatest due priority measured from its last message, with the oldest tie winner. |
+| `prefixBetweenBatches` | Outside merges, removal and masked-line replacement, the old rendered lines remain a prefix. |
+| `pinAuthorityExact` | A new span comes from an owner message in the current run; active text is that exact span or an owner edit. |
+| `pinBudget` | Active pins fit the total and per-pin byte limits. |
+| `pinsSurviveCompaction` | Building, publishing, merging and ordinary crashes do not change pins. |
+| `redactionExcludesReads` | Live views, pins, retrievals, reports and newly dispatched requests expose no removed source or tracked derivative, immediately after removal. |
+| `retrievalSound` | Zoom returns exact permitted source payloads, exact clean children covering the requested interval, or an explicit unavailable result. |
+| `requestSnapshotConsistent` | Preparation uses one snapshot; admission uses the current redaction generation. |
+| `requestCoverageDeclared` | View, tail and active suffix have no overlap or gaps; omitted tail content is explicitly declared. |
+| `requestProtocolValid` | Dispatch preserves modeled tool pairing, IDs, order and metadata. |
+| `requestBounded` | Chat and compaction dispatch costs fit their window including output reserve. Blocked turns make no call. |
+| `mandatoryPinsIncluded` | A dispatched chat request contains every current active pin exactly. |
+| `compactorLimits` | Worker count, earlier-leaf admission, context/input bounds and output-attempt limits hold. |
+| `pendingWorkRecoverable` | The queue names exactly the missing or dirty current intervals. Crashes retain it; obsolete versions awaiting purge cannot strand an extra retry row. |
+| `taintClosureExact` | Redaction masks exactly the published lines reached through recorded dependencies; unrelated lines stay clean. |
+| `guardStampRequired` | Every dispatched payload has its builder's authentic stamp, including its revision, generation and content. |
+| `drainBound`, `reachedAgreement` | After sealing, normal worker transitions complete projection, summaries, publication, purge and feasible batches within the drain budget. A finished trace is a coverage witness. |
+
+The five temporal formulas are **typechecked only**: `eventuallyProjected`, `eventuallySummarized`, `retryEventuallyRuns`, `redactionEventuallySettles`, and `batchEventuallyFinishes`. Their antecedents require permanent quiet, fair recovery, storage and compaction allowance, and eventually successful model calls. `batchEventuallyFinishes` also requires a feasible low-mark partition; its explicit witness is four sources with a built root no larger than the low mark. No hard 512-byte node limit, always-achievable low watermark, unbounded liveness proof or semantic forgetting is claimed.
+
+### Directed broken/corrected pairs
+
+Each row names `<schedule>Step` and `<schedule>BugStep`. The corrected schedule checks all invariants and must finish its real drain; the broken schedule must produce an invariant counterexample. A disabled action, parser error, checker error or timeout does not count. Script counters are ghost state; the same protocol actions implement every scheduled operation.
+
+| Schedule | Failure switched on in bug mode |
+| --- | --- |
+| `redactionRace` (plan #6) | Redaction lands after a job reads/checks inputs but before publication; commit skips revalidation. |
+| `contextRace` (#7) | Redaction follows tree ancestry only and misses another interval that read the removed source as context. |
+| `unrecordedContext` (#7) | A job reads context but omits it from its recorded read set. |
+| `lateReport`, `latePin`, `lateRequest` (#8) | Respectively, a delayed report, owner pin edit or active-run request bypasses redaction validation. |
+| `overflow` (#9) | Five oversized outputs leave pins plus view above a small model window; the final fallback dispatches anyway. |
+| `overlap`, `fastCompactor` (#10) | Projection or compaction puts the current input in historical memory as well as the active suffix. |
+| `siblings` (#17) | Adjacent non-siblings merge into an invalid interval. |
+| `dueOrder` (#18) | The `T=10` partition `0+4, 4+4, 8+1, 9+1` measures age from the first message and chooses the wrong pair. |
+| `editedJob` (#19) | An owner edits a pin after a worker reads it; stale output commits without a current-input check. |
+| `casRace` | Two workers capture the same head; the second bypasses the expected-revision check. |
+| `atomicPublish` | A readable view line is published before its node is committed. |
+| `restart` | Restart reconstructs a different head instead of reloading the persisted one. |
+| `crashTail` | A new source arrives while compaction runs; a crash after projection drops the queue for both uncovered sources. |
+| `retryQuiet` | A final failed job retries only on new input, so the quiet drain expires. |
+| `rawRequest`, `alteredRequest` | A hook fallback has no builder stamp, or the stamped payload changes before dispatch. |
+| `mixedSnapshot` | Pins and the view are read from different snapshots. |
+| `pinText`, `pinBudget` | Arbitrary text is attributed to an owner source, or a fifteenth 280-byte pin exceeds 4 KB. |
+| `toolPair` | A malformed tool result is admitted with another call ID. |
+| `compactionPins` | A view merge silently drops mandatory pins. |
+| `queueCurrent` | A second removal before purge queues a clean rebuilt key because its obsolete version is still tainted. |
+
+The due-order, non-sibling and pin-preservation schedules start from explicit valid persisted fixtures; the choices under test still use shared transitions. Other schedules start empty. Plan #20 (approval reuse), all action races and all ownership/backup races belong to WP3/4, not this file.
+
+### Memory bounds and plan clarifications
+
+The simulator instance has ten possible source IDs and aligned widths 1, 2, 4 and 8. Random admission stops at four sources (seven possible built intervals); the ten-source fixture exists for the exact due-order witness. Worker capacity remains eight. View watermarks are reduced to 2,048/1,024 bytes so short histories exercise batching; pin, context, input, tail, active and output-reserve limits keep their production byte values. Random model outputs are 512, 2,048 or 8,192 bytes, with arbitrary provenance subsets and an invented marker. This includes soft-target failures without asserting that all production outputs fit a parent request.
+
+The runner takes 1,000 samples of up to 140 transitions with seed `20261013` and two simulator threads. Directed schedules take at most 80 transitions. The 25 corrected schedules share one 512-sample run; the runner requires a completed witness for every case, so a missing sample is a failure. Each broken schedule runs separately and writes its own counterexample. This avoids paying checker startup twice for every pair. A 64-transition drain covers up to seven pending intervals, outstanding/stale jobs, retry deadlines, projection, ordered publication, removal rebuilds, purge and feasible merges. It assumes no new inputs, edits, crashes or failures after `seal`; successful draining outputs are 512 bytes. Quiet recovery is exercised through the actual worker actions. A positive directed trace must end with `label = finished`.
+
+Apalache uses two sources, two workers and the same actions. It checks archive projection, removal, queue durability and restart (`boundedSafety`) for four transitions. Separate broken/corrected `boundedRace` schedules check the six-transition `redactionRace` through the same worker actions. The symbolic schedules omit the general string-command decoder. Quint otherwise sends type metadata for unused declarations and exceeds Apalache’s 20 MB JSON-string limit. The runner uses the pinned Quint compiler in a timed child, retaining only analysis metadata whose IDs occur in the compiled main module. It leaves the compiled module, expressions and types of all live IDs unchanged before calling the normal Apalache backend. No transaction is replaced by a proof-only action. These are shallow bounded checks, not exhaustive verification of every invariant. The simulator covers requests, pins, context closure, batches and longer recovery schedules. `pnpm specs:check --memory` selects these checks during development; the ordinary `pnpm specs:check` includes them with the existing sync checks. `pnpm specs:check --memory --bounded` reruns only the memory symbolic checks. All modes use the machine-wide lock and existing nine-minute execution/60-second process deadlines. `--traces` reduces memory sampling to 100 and skips Apalache. The complete `pnpm specs:check` run on 2026-10-14 passed in **326.3 seconds (5m 26s)**, excluding the machine-lock wait. This includes both existing sync protocols, all 1,000 random memory traces, all 512 corrected-schedule traces (every case witnessed), all 25 memory counterexamples and the bounded Apalache checks. The sync-only timing above is the earlier baseline.
+
+The model makes these plan ambiguities explicit:
+
+1. **R4 does not bound transitive rebuild size.** A 16 KB direct window can form a dependency chain through every later summary. Rebuilding exactly the recorded closure is sound; claiming that closure is always small is not. Pin inputs also need recorded versions and source lineage, not only context-node versions.
+2. **A live head can pass the run-start cutoff `H`.** The model then renders an empty historical view and uses the ordinary tail/range placeholder up to `H`, while retaining the actual snapshot revision. This conservative bounded fallback avoids splitting a straddling summary or duplicating active inputs. A production implementation may instead retain a historical head or expand nodes at `H`, but it must choose a rule.
+3. **Pin edits race jobs and requests without changing redaction generation.** The model validates a pin revision as part of both digests. Validating only `gen` is insufficient for current mandatory pins and stale pin-dependent jobs. Owner-edited pins retain removal lineage.
+4. **Oversized immutable children can exceed the 32 KB parent-input limit.** Keeping the shortest of five outputs does not guarantee that a future pair fits. The bounded model's sampled outputs avoid that separate input-feasibility obstruction. Production needs a bounded input representation, another shortening policy, or an explicit unavailable/blocked state; unconditional compaction progress cannot be inferred from the plan as written.
+
+Token arithmetic is an abstract conservative cost contract. This spec does not validate a provider tokenizer, real serialized framing, spend accounting, SQLite durability, Unicode slicing, attachment pagination, pi resumption or storage erasure. Those need implementation tests and the planned spikes.

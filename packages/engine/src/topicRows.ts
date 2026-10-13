@@ -19,7 +19,7 @@ import {
   type Ts,
   type UserId,
 } from '@juno/domain'
-import type { ChannelRef, Person } from '@juno/contract'
+import type { ChannelRef, Person, TopicArt } from '@juno/contract'
 import type { TopicIndexRow } from '@juno/store'
 import type { StoredPreview } from '@juno/sync'
 
@@ -36,6 +36,9 @@ export interface JoinedRow extends TopicIndexRow {
   readonly pinned_at: string | null
   readonly unsubscribed_at: string | null
   readonly subscribed: 0 | 1 | null
+  /** The stored drawing (`topic_art`): the recipe and whether it is shown (`ok`), or null when the topic was never drawn. */
+  readonly art_recipe: string | null
+  readonly art_status: 'ok' | 'unsure' | 'failed' | null
   /** Main rows only: the latest `last_activity_ts` of any topic in the channel. */
   readonly channel_activity_ts: string | null
 }
@@ -44,15 +47,16 @@ export interface JoinedRow extends TopicIndexRow {
 export const TOPIC_COLUMNS = `
   SELECT i.*, c.kind AS c_kind, c.name AS c_name, c.user_id AS c_user_id, c.member_ids_json AS c_members,
     o.manual_title, o.ai_title, o.resolved_at, o.resolved_activity_ts, o.reopened_at, o.pinned_at, o.unsubscribed_at,
-    s.subscribed AS subscribed`
+    s.subscribed AS subscribed, a.recipe AS art_recipe, a.status AS art_status`
 
-/** `topic_index` as `i` with its conversation `c`, overlay `o`, ignored flag `ig` and Slack follow flag `s`. */
+/** `topic_index` as `i` with its conversation `c`, overlay `o`, ignored flag `ig`, Slack follow flag `s` and drawing `a`. */
 export const TOPIC_FROM = `
   FROM topic_index i
   JOIN conversations c ON c.id = i.channel
   LEFT JOIN topic_overlay o ON o.topic_id = i.topic_id
   LEFT JOIN ignored_channels ig ON ig.channel = i.channel
-  LEFT JOIN thread_subs s ON i.kind = 'thread' AND s.channel = i.channel AND s.thread_ts = i.root_ts`
+  LEFT JOIN thread_subs s ON i.kind = 'thread' AND s.channel = i.channel AND s.thread_ts = i.root_ts
+  LEFT JOIN topic_art a ON a.topic_id = i.topic_id`
 
 export interface UserRow {
   readonly id: string
@@ -130,6 +134,17 @@ export function channelInfoOf(row: JoinedRow, columns: ParsedColumns, selfId: st
     default:
       return { id, kind: row.c_kind, name: row.c_name ?? id }
   }
+}
+
+/**
+ * The art ref a row sends (`refs.art`): the recipe when the drawing is shown,
+ * and an empty recipe when a drawing exists but AI assist is off, so a
+ * renderer that holds the recipe drops it. Nothing for a topic never drawn,
+ * or drawn without confidence: the placeholder is the default.
+ */
+export function artRefOf(row: Pick<JoinedRow, 'topic_id' | 'art_recipe' | 'art_status'>, aiAssist: boolean): TopicArt | undefined {
+  if (row.art_status !== 'ok' || row.art_recipe === null || row.art_recipe === '') return undefined
+  return { id: row.topic_id, recipe: aiAssist ? row.art_recipe : '' }
 }
 
 /** The wire's channel for a topic's channel. `partnerId` is the DM partner, a `Person` in the same refs. */

@@ -12,6 +12,10 @@ export interface JunoTestHooks {
   readonly engineState: () => string
   /** Makes the supervisor give up on the engine, as after too many crashes. */
   readonly failEngine: () => void
+  /** `stopped` unless the app was launched with `agent: true`. */
+  readonly agentState: () => string
+  /** The host name from the agent's `host.hello`, once it reached the engine. */
+  readonly agentHost: () => string | undefined
 }
 
 export interface RunningApp {
@@ -32,6 +36,8 @@ export interface LaunchOptions {
   readonly slackAppDir?: string
   /** The stand-in for the "Slack Safe Storage" keychain password. */
   readonly keychainPassword?: string
+  /** Start the Juno Agent utility process (JUNO_AGENT=1). */
+  readonly agent?: boolean
 }
 
 /**
@@ -49,6 +55,7 @@ export async function launchApp(userData: string, options: LaunchOptions = {}): 
   if (options.fakeSlackUrl !== undefined) env.JUNO_FAKE_SLACK_URL = options.fakeSlackUrl
   if (options.slackAppDir !== undefined) env.JUNO_SLACK_APP_DIR = options.slackAppDir
   if (options.keychainPassword !== undefined) env.JUNO_SLACK_SAFE_STORAGE_PASSWORD = options.keychainPassword
+  if (options.agent === true) env.JUNO_AGENT = '1'
 
   // Launch the package directory (like `electron .`), not the script, so
   // Electron reads package.json for the app name and version.

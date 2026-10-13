@@ -29,6 +29,7 @@
   },
   "juno": {
     "allowedDeps": [
+      "@juno/agent-contract",
       "@juno/contract",
       "@juno/tokens",
       "@juno/ui"

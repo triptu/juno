@@ -42,6 +42,20 @@ export const ChannelRef = Schema.Struct({
 export type ChannelRef = typeof ChannelRef.Type
 
 /**
+ * A topic's art: the canonical recipe `@juno/topic-art` rebuilds the SVG
+ * from (200 to 900 bytes). Keyed by the topic id, which is the row's id, so
+ * a row carries no art field of its own: the renderer joins by id. A topic
+ * with no entry shows its Tide placeholder. Sent once per subscription and
+ * again on a redraw, never on a row change.
+ */
+export const TopicArt = Schema.Struct({
+  /** The topic id. */
+  id: Schema.String,
+  recipe: Schema.String,
+})
+export type TopicArt = typeof TopicArt.Type
+
+/**
  * The side tables of one `ListDelta`. Each entry is new to the subscription
  * or changed since it was last sent; the renderer upserts them by id before
  * it applies the rows of the same message.
@@ -49,5 +63,6 @@ export type ChannelRef = typeof ChannelRef.Type
 export const Refs = Schema.Struct({
   people: Schema.optionalKey(Schema.Array(Person)),
   channels: Schema.optionalKey(Schema.Array(ChannelRef)),
+  art: Schema.optionalKey(Schema.Array(TopicArt)),
 })
 export type Refs = typeof Refs.Type

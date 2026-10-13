@@ -47,6 +47,7 @@ interface Joined {
   readonly channel: ChannelRef | undefined
   readonly partner: Person | undefined
   readonly people: ReadonlyArray<Person | undefined>
+  readonly art: string | undefined
 }
 
 /** By wire row object: rows with an unchanged `rev` keep their object (`applyListDelta`), so this is a hit while nothing changed. */
@@ -60,8 +61,11 @@ function joinRow(wire: TopicListRow, refs: WindowRefs): TopicRow {
   const channel = refs.channels.get(wire.channelId)
   const partner = channel?.partnerId === undefined ? undefined : refs.people.get(channel.partnerId)
   const people = wire.participantIds.map((id) => refs.people.get(id))
+  // An empty recipe is the engine saying "not shown" (AI assist off); the row then has no art.
+  const recipe = refs.art.get(wire.id)?.recipe
+  const art = recipe === undefined || recipe === '' ? undefined : recipe
   const held = joins.get(wire)
-  if (held !== undefined && held.channel === channel && held.partner === partner && held.people.length === people.length && held.people.every((p, i) => p === people[i])) {
+  if (held !== undefined && held.channel === channel && held.partner === partner && held.art === art && held.people.length === people.length && held.people.every((p, i) => p === people[i])) {
     return held.row
   }
   const { channelId: _channelId, participantIds: _participantIds, ...fields } = wire
@@ -72,8 +76,9 @@ function joinRow(wire: TopicListRow, refs: WindowRefs): TopicRow {
     ...fields,
     channel: rowChannel,
     participants: people.map((person, i) => person ?? unknownPerson(wire.participantIds[i]!)),
+    ...(art === undefined ? {} : { art }),
   }
-  joins.set(wire, { row, channel, partner, people })
+  joins.set(wire, { row, channel, partner, people, art })
   return row
 }
 

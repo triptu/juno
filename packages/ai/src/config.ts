@@ -3,7 +3,7 @@
  * slug per tier. Both are preferences the owner can change; the defaults below
  * are the only place a slug is written.
  */
-export type Tier = 'decision' | 'generation'
+export type Tier = 'decision' | 'generation' | 'art'
 
 export interface ModelPrefs {
   /**
@@ -16,6 +16,8 @@ export interface ModelPrefs {
   readonly decision: string
   /** OpenRouter slug for generation: stronger, used sparingly. */
   readonly generation: string
+  /** OpenRouter slug for topic art: a model that draws well in the SVG vocabulary (`docs/design/topic-art/v2`). */
+  readonly art: string
 }
 
 /**
@@ -29,6 +31,8 @@ export const defaultModelPrefs: ModelPrefs = {
   classifier: 'typesafe/jev-1.13',
   decision: 'openai/gpt-6-luna',
   generation: 'anthropic/claude-sonnet-5.5',
+  // The topic art study (docs/design/topic-art/v2, 2026-10-13): 35 of 35 valid drawings, median 2.3 s, about $0.006 per icon.
+  art: 'google/gemini-3.8-flash',
 }
 
 export interface AiConfig {

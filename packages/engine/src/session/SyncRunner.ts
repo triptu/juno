@@ -24,7 +24,7 @@ import { quietDaysOf } from '@juno/domain'
 import type { SlackAuthRequired } from '@juno/slack'
 import { prefs } from '@juno/store'
 import { runSync, syncConfigLayer, type SyncPhase } from '@juno/sync'
-import { EngineConfig } from '../config'
+import { EngineConfig, SyncControl } from '../config'
 import { Session, type ActiveSession } from './Session'
 import { SyncLink } from '../syncLink'
 import { Workspace } from '../workspace'
@@ -42,6 +42,7 @@ export class SyncRunner extends Context.Service<
       const session = yield* Session
       const workspace = yield* Workspace
       const engineConfig = yield* EngineConfig
+      const control = yield* SyncControl
       const link = yield* SyncLink
       const scope = yield* Effect.scope
       const phase = yield* SubscriptionRef.make<SyncPhase | undefined>(undefined)
@@ -64,6 +65,7 @@ export class SyncRunner extends Context.Service<
             Effect.catch(() => Effect.succeed(undefined)),
           )
           const program = runSync({
+            onCycle: (event) => Effect.sync(() => control.onCycle?.(event)),
             onPhase: (next) => SubscriptionRef.set(phase, next),
             // The topic view's fetches run in this sync's context while it lives.
             onFetcher: (fetcher) => link.setFetcher(fetcher),
@@ -76,6 +78,7 @@ export class SyncRunner extends Context.Service<
                 quietDays: quietDaysOf({ now: 0, ...(typeof quietDays === 'number' ? { quietDays } : {}) }),
                 // Against the fake the complete follow pass runs with every catch-up, so tests see it each time.
                 ...(engineConfig.fakeSlackUrl === undefined ? {} : { followPassMillis: 0 }),
+                ...control.config,
               }),
             ),
             Effect.scoped,

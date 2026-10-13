@@ -89,3 +89,21 @@ export interface OutboxRow {
   readonly next_at: string | null
   readonly last_error: string | null
 }
+
+/** `topic_art`: one drawing, or one finished attempt, per topic (user.db). */
+export interface TopicArtRow {
+  readonly topic_id: string
+  /** The canonical recipe; empty for a failed attempt. */
+  readonly recipe: string
+  readonly recipe_hash: string
+  readonly input_hash: string
+  readonly model: string
+  /** `ok` is shown; `unsure` and `failed` keep the placeholder and stop the topic being tried again. */
+  readonly status: 'ok' | 'unsure' | 'failed'
+  readonly hue: string
+  /** The title the drawing was made from: `manual`, `ai`, `fallback` or `channel`. */
+  readonly title_source: string
+  readonly source: 'ai' | 'redraw'
+  /** Epoch milliseconds, as a string like the other timestamps. */
+  readonly created_at: string
+}

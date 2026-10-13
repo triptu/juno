@@ -56,11 +56,12 @@ import {
   type Topic,
   type TopicStatus,
 } from '@juno/domain'
-import type { ChannelRef, Person, TopicCounts, TopicListRow } from '@juno/contract'
+import type { ChannelRef, Person, TopicArt, TopicCounts, TopicListRow } from '@juno/contract'
 import { StoreReader, type SqlError } from '@juno/store'
 import { Effect } from 'effect'
 import type { ListRun } from '../protocol/live'
 import {
+  artRefOf,
   channelInfoOf,
   channelRefOf,
   parseColumns,
@@ -147,13 +148,17 @@ export interface QueryOptions {
 
 const DAY = 24 * 60 * 60 * 1000
 
-/** The quiet window from prefs (clamped by the domain rule) and the signed-in user. */
+/** The quiet window from prefs (clamped by the domain rule), the AI assist switch and the signed-in user. */
 const settings = Effect.gen(function* () {
   const sql = yield* StoreReader
-  const prefs = yield* sql<{ value_json: string }>`SELECT value_json FROM prefs WHERE key = 'quietDays'`
+  const prefs = yield* sql<{ key: string; value_json: string }>`SELECT key, value_json FROM prefs WHERE key IN ('quietDays', 'aiAssist')`
   const team = yield* sql<{ self_user_id: string | null }>`SELECT self_user_id FROM team LIMIT 1`
-  const raw = prefs[0] === undefined ? undefined : (JSON.parse(prefs[0].value_json) as unknown)
-  return { quietDays: typeof raw === 'number' ? raw : undefined, selfId: team[0]?.self_user_id ?? undefined }
+  const raw = (key: string): unknown => {
+    const row = prefs.find((entry) => entry.key === key)
+    return row === undefined ? undefined : (JSON.parse(row.value_json) as unknown)
+  }
+  const quietDays = raw('quietDays')
+  return { quietDays: typeof quietDays === 'number' ? quietDays : undefined, aiAssist: raw('aiAssist') !== false, selfId: team[0]?.self_user_id ?? undefined }
 })
 
 /**
@@ -266,7 +271,7 @@ export function countsStatement(scope: string | undefined): { readonly sql: stri
 export const listTopics = (filter: ListFilter, options: QueryOptions, cache: RowCache = makeRowCache()): Effect.Effect<ListRun<TopicListRow>, SqlError, StoreReader> =>
   Effect.gen(function* () {
     const sql = yield* StoreReader
-    const { quietDays, selfId } = yield* settings
+    const { quietDays, aiAssist, selfId } = yield* settings
     const ctx = { now: options.now, ...(quietDays === undefined ? {} : { quietDays }) }
     const cutoffMillis = options.now - quietDaysOf(ctx) * DAY
     const cutoff = `${Math.floor(cutoffMillis / 1000)}.000000`
@@ -353,6 +358,7 @@ export const listTopics = (filter: ListFilter, options: QueryOptions, cache: Row
     const rows: Array<TopicListRow> = []
     const channels = new Map<string, ChannelRef>()
     const named = new Map<string, Person>()
+    const art: Array<TopicArt> = []
     const place = (entry: CacheEntry, section: TopicListRow['section']) => {
       const status = topicStatus(entry.topic, ctx)
       const shaped = entry.shaped !== undefined && entry.shaped.section === section && entry.shaped.status === status ? entry.shaped : { section, status, row: shape(entry, section, status) }
@@ -360,6 +366,9 @@ export const listTopics = (filter: ListFilter, options: QueryOptions, cache: Row
       rows.push(shaped.row)
       channels.set(entry.channel.id, entry.channel)
       for (const person of entry.named) named.set(person.id, person)
+      // The drawing is a ref, not part of the row: its arrival changes no `rev`.
+      const drawing = artRefOf(entry.source, aiAssist)
+      if (drawing !== undefined) art.push(drawing)
     }
     for (const entry of pinned) place(entry, 'pinned')
     for (const entry of recent) {
@@ -370,7 +379,7 @@ export const listTopics = (filter: ListFilter, options: QueryOptions, cache: Row
     cache.entries = next
     cache.people = people
     cache.usersRead = users
-    return { rows, total: rows.length, refs: { channels: [...channels.values()], people: [...named.values()] } }
+    return { rows, total: rows.length, refs: { channels: [...channels.values()], people: [...named.values()], art } }
   })
 
 /** Every column of the joined row equal: the topic built from it still holds. */

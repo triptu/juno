@@ -20,6 +20,7 @@ import { StoreReader, type SqlClient, type SqlError } from '@juno/store'
 import { Effect } from 'effect'
 import type { ListRun } from '../protocol/live'
 import {
+  artRefOf,
   channelInfoOf,
   channelRefOf,
   parseColumns,
@@ -41,12 +42,16 @@ const DAY = 24 * 60 * 60 * 1000
 /** The quiet window from prefs, clamped by the domain rule, and the signed-in user. */
 const settings = (sql: SqlClient.SqlClient, now: number) =>
   Effect.gen(function* () {
-    const prefs = yield* sql<{ value_json: string }>`SELECT value_json FROM prefs WHERE key = 'quietDays'`
+    const prefs = yield* sql<{ key: string; value_json: string }>`SELECT key, value_json FROM prefs WHERE key IN ('quietDays', 'aiAssist')`
     const team = yield* sql<{ self_user_id: string | null }>`SELECT self_user_id FROM team LIMIT 1`
-    const raw = prefs[0] === undefined ? undefined : (JSON.parse(prefs[0].value_json) as unknown)
-    const ctx = { now, ...(typeof raw === 'number' ? { quietDays: raw } : {}) }
+    const raw = (key: string): unknown => {
+      const row = prefs.find((entry) => entry.key === key)
+      return row === undefined ? undefined : (JSON.parse(row.value_json) as unknown)
+    }
+    const quietDays = raw('quietDays')
+    const ctx = { now, ...(typeof quietDays === 'number' ? { quietDays } : {}) }
     const cutoff = `${Math.floor((now - quietDaysOf(ctx) * DAY) / 1000)}.000000`
-    return { ctx, cutoff, selfId: team[0]?.self_user_id ?? undefined }
+    return { ctx, cutoff, aiAssist: raw('aiAssist') !== false, selfId: team[0]?.self_user_id ?? undefined }
   })
 
 const readUsers = (sql: SqlClient.SqlClient, ids: ReadonlySet<string>) =>
@@ -71,8 +76,9 @@ const bareRow = (sql: SqlClient.SqlClient, id: string, target: WindowTarget) =>
         '[]' AS participants_json, ${rootTs} AS root_ts, 0 AS unread_count, 1 AS unread_exact, 0 AS mentions_me, NULL AS preview_json, 0 AS rev,
         c.kind AS c_kind, c.name AS c_name, c.user_id AS c_user_id, c.member_ids_json AS c_members,
         o.manual_title, o.ai_title, o.resolved_at, o.resolved_activity_ts, o.reopened_at, o.pinned_at, o.unsubscribed_at,
-        s.subscribed AS subscribed, NULL AS channel_activity_ts
+        s.subscribed AS subscribed, a.recipe AS art_recipe, a.status AS art_status, NULL AS channel_activity_ts
       FROM conversations c
+      LEFT JOIN topic_art a ON a.topic_id = ${id}
       LEFT JOIN topic_overlay o ON o.topic_id = ${id}
       LEFT JOIN thread_subs s ON s.channel = c.id AND s.thread_ts = ${rootTs ?? ''}
       WHERE c.id = ${target.channel}`
@@ -88,7 +94,7 @@ const bareRow = (sql: SqlClient.SqlClient, id: string, target: WindowTarget) =>
 export const topicDetail = (id: string, target: WindowTarget, now: number): Effect.Effect<TopicDetail | null, SqlError, StoreReader> =>
   Effect.gen(function* () {
     const sql = yield* StoreReader
-    const { ctx, cutoff, selfId } = yield* settings(sql, now)
+    const { ctx, cutoff, aiAssist, selfId } = yield* settings(sql, now)
     const indexed = yield* sql.unsafe<JoinedRow>(`${TOPIC_COLUMNS}, NULL AS channel_activity_ts ${TOPIC_FROM} WHERE i.topic_id = ?`, [id])
     const row = indexed[0] ?? (yield* bareRow(sql, id, target))
     if (row === undefined) return null
@@ -104,6 +110,7 @@ export const topicDetail = (id: string, target: WindowTarget, now: number): Effe
     const lastReadTs = reads[0]?.last_read_ts ?? undefined
     const title = resolveTitle(topic)
     const status = topicStatus(topic, ctx)
+    const art = artRefOf(row, aiAssist)
     let threadCount: number | undefined
     if (target.kind === 'main') {
       const count = threadsStatements(target.channel, cutoff, 0).count
@@ -127,6 +134,7 @@ export const topicDetail = (id: string, target: WindowTarget, now: number): Effe
       ...(row.last_activity_ts === null ? {} : { lastActivityTs: row.last_activity_ts }),
       ...(target.kind === 'thread' ? { rootTs: target.threadTs } : {}),
       ...(threadCount === undefined ? {} : { threadCount }),
+      ...(art === undefined || art.recipe === '' ? {} : { art: art.recipe }),
     }
   })
 

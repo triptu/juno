@@ -13,12 +13,16 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@juno/agent-contract": "workspace:*",
+    "@juno/agent-juno": "workspace:*",
+    "@juno/ai": "workspace:*",
     "@juno/contract": "workspace:*",
     "@juno/domain": "workspace:*",
     "@juno/richtext": "workspace:*",
     "@juno/slack": "workspace:*",
     "@juno/store": "workspace:*",
     "@juno/sync": "workspace:*",
+    "@juno/topic-art": "workspace:*",
     "effect": "4.0.3"
   },
   "devDependencies": {
@@ -31,12 +35,16 @@
   },
   "juno": {
     "allowedDeps": [
+      "@juno/agent-contract",
+      "@juno/agent-juno",
+      "@juno/ai",
       "@juno/contract",
       "@juno/domain",
       "@juno/richtext",
       "@juno/slack",
       "@juno/store",
-      "@juno/sync"
+      "@juno/sync",
+      "@juno/topic-art"
     ],
     "testDeps": [
       "@juno/fake-slack",

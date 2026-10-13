@@ -86,14 +86,14 @@ export class SidebarRow {
     await expect(this.root).toHaveCount(0)
   }
 
-  /** The title element, which names the row. */
+  /** The title element, which names the row. The row's text spans carry ids; the tile's SVG has an id of its own, hence `span`. */
   get titleText() {
-    return this.root.locator('[id]').first()
+    return this.root.locator('span[id]').first()
   }
 
   /** The "Sender: text" preview under the title. */
   get preview() {
-    return this.root.locator('[id]').nth(1)
+    return this.root.locator('span[id]').nth(1)
   }
 
   async expectPreview(text: string | RegExp): Promise<void> {
@@ -362,8 +362,7 @@ export class Juno {
     const page = await opened
     await page.getByPlaceholder('Email').fill(options.email ?? 'tushar@juno-fake.test')
     await page.getByPlaceholder('Password').fill('password')
-    await page.getByRole('button', { name: 'Sign in' }).click()
-    await page.waitForEvent('close')
+    await Promise.all([page.waitForEvent('close'), page.getByRole('button', { name: 'Sign in' }).click()])
   }
 
   /** Clicks "Sign in to Slack" and closes the window without signing in. */

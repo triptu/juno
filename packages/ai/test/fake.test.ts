@@ -2,7 +2,7 @@
 import { Effect, Stream } from 'effect'
 import { describe, expect, it } from 'vitest'
 import { AiProvider, FakeAiProvider, chatTools, tasks, type ChatEvent, type Decision } from '../src/index'
-import { C, NOW, channels, msg, people, postgres, stagingBill } from './fixtures'
+import { C, NOW, T, channels, msg, people, postgres, stagingBill } from './fixtures'
 
 const run = <A>(f: (p: typeof AiProvider.Service) => Effect.Effect<A>) =>
   Effect.runPromise(Effect.gen(function* () {
@@ -95,6 +95,46 @@ describe('FakeAiProvider generation', () => {
     const title = decided(await run((p) => p.generate(tasks.titleTopic, { topicId: stagingBill.id, channel: '#eng', messages: stagingBill.recent })))
     expect(title).toBe('Staging bill doubled since August')
     expect(title.length).toBeLessThanOrEqual(tasks.titleTopic.maxChars)
+  })
+
+  it('draws a thread as a recipe in the vocabulary, with the hue and object following the words', async () => {
+    const recipe = decided(
+      await run((p) =>
+        p.generate(tasks.topicArt, {
+          kind: 'thread',
+          topicId: stagingBill.id,
+          title: stagingBill.title,
+          channel: '#eng',
+          first: stagingBill.recent[0]!.text,
+          last: stagingBill.recent[1]!.text,
+        }),
+      ),
+    )
+    expect(recipe).toMatch(/^<svg viewBox="0 0 40 40" data-hue="(coral|amber|olive|sage|teal|sky|periwinkle|plum)">\n/)
+    expect(recipe).not.toContain('data-confident')
+    expect(recipe).toContain('fill="soft"')
+    expect(recipe).toContain('fill="accent"')
+  })
+
+  it('draws a channel Main from its recent messages and marks a topic with nothing in it as not confident', async () => {
+    const main = decided(await run((p) => p.generate(tasks.topicArt, { kind: 'main', topicId: T('m:C0HIRING'), channel: '#hiring', topic: 'Open roles and candidates', recent: ['Rina finished the onsite.'] })))
+    expect(main).not.toContain('data-confident')
+    const nothing = decided(await run((p) => p.generate(tasks.topicArt, { kind: 'thread', topicId: T('t:C0SOCIAL:1.000001'), title: 'hmm', channel: '#social', first: 'hmm', last: 'yeah' })))
+    expect(nothing).toContain('data-confident="false"')
+  })
+
+  it('redraws with another hue and another object when told what to avoid', async () => {
+    const input = { kind: 'thread' as const, topicId: stagingBill.id, title: stagingBill.title, channel: '#eng', first: stagingBill.recent[0]!.text, last: stagingBill.recent[1]!.text }
+    const first = decided(await run((p) => p.generate(tasks.topicArt, input)))
+    const hue = /data-hue="(\w+)"/.exec(first)![1]!
+    const second = decided(await run((p) => p.generate(tasks.topicArt, { ...input, avoid: { hue, summary: 'coins' } })))
+    expect(second).not.toBe(first)
+    expect(second).not.toContain(`data-hue="${hue}"`)
+  })
+
+  it('answers no decision, not a drawing, when the fake is asked to draw outside the vocabulary', async () => {
+    const decision = await run((p) => p.generate(tasks.topicArt, { kind: 'thread', topicId: T('t:C0ENG:1.000002'), title: 'Broken ::invalid-art::', channel: '#eng', first: 'x', last: 'y' }))
+    expect(decision).toMatchObject({ _tag: 'NoDecision', reason: 'invalid-output', detail: 'element <text> is not allowed' })
   })
 
   it('writes a catch-up that names the senders and the last message', async () => {

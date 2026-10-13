@@ -24,6 +24,10 @@ export const EngineConfig = Schema.Struct({
   dev: Schema.Boolean,
   /** Tests only: the fake Slack's base URL, so its host is allowed for the socket. */
   fakeSlackUrl: Schema.optionalKey(Schema.String),
+  /** Which AI provider the engine builds: the deterministic fake (tests, `JUNO_AI=fake`) or pi-ai over OpenRouter. */
+  ai: Schema.optionalKey(Schema.Literals(['fake', 'live'])),
+  /** The OpenRouter key, in memory, for the live provider. Absent means every AI task answers "no decision" (ADR 0006). */
+  openRouterApiKey: Schema.optionalKey(Schema.String),
 })
 export type EngineConfig = typeof EngineConfig.Type
 
@@ -31,6 +35,8 @@ export type EngineConfig = typeof EngineConfig.Type
 export const MainToEngine = Schema.Union([
   Schema.TaggedStruct('config', { config: EngineConfig }),
   Schema.TaggedStruct('port', {}),
+  /** A port to the agent utility process, in `ports[0]`. The engine serves the AgentHost group on it (ADR 0012). */
+  Schema.TaggedStruct('agentPort', {}),
   /** The answer to `requestSecrets`, `signIn` and `importFromSlackApp`: the stored or just captured session, or nothing. */
   Schema.TaggedStruct('secrets', { secrets: Schema.NullOr(SessionSecrets) }),
   /** A sign-in or import ended without a session. */

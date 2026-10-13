@@ -14,6 +14,7 @@ import type { SyncedRangeRow } from './rows'
 export const keys = {
   syncState: ['sync_state'] satisfies InvalidationKeys,
   prefs: ['prefs'] satisfies InvalidationKeys,
+  topicArt: ['topic_art'] satisfies InvalidationKeys,
   syncedRanges: (channel: string) => ({ synced_ranges: [channel] }) satisfies InvalidationKeys,
   messages: (channel: string) => ({ messages: [channel] }) satisfies InvalidationKeys,
 }

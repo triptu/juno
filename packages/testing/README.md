@@ -20,3 +20,15 @@ Options: `root` (default the gallery's `[data-fixture-frame]`, else `body`), `se
 `measureLayoutShift` returns the report without throwing; `formatLayoutShiftReport` renders it.
 
 Chromium only (the `layout-shift` entry type); the box comparison runs anywhere.
+
+## `waitForLayoutReady(page)`
+
+After the expected UI and data are visible, wait for `document.fonts.ready` and two animation frames before starting a layout-shift measurement. This lets the font layout and earlier UI changes paint outside the interaction being measured. It does not wait for application data or stop animations.
+
+```ts
+import { expectNoLayoutShift, waitForLayoutReady } from '@juno/testing/layout-shift'
+
+await row.waitFor({ state: 'visible' })
+await waitForLayoutReady(page)
+await expectNoLayoutShift(page, () => row.hover())
+```

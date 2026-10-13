@@ -78,12 +78,12 @@ function carryOver(shown: SidebarWindow | undefined, next: ListWindow<TopicRow>,
 
 /**
  * The same row as far as a view can tell: the same `rev`, and the same
- * channel and people. A person's new photo leaves the `rev` alone (it
- * travels in `refs`), so the joined parts are compared too.
+ * channel, people and art. A person's new photo or a new drawing leaves the
+ * `rev` alone (both travel in `refs`), so the joined parts are compared too.
  */
 function sameRow(a: TopicRow, b: TopicRow): boolean {
   if (a === b) return true
-  if (a.rev !== b.rev || a.participants.length !== b.participants.length) return false
+  if (a.rev !== b.rev || a.art !== b.art || a.participants.length !== b.participants.length) return false
   if (!sameChannel(a.channel, b.channel)) return false
   return a.participants.every((person, i) => samePerson(person, b.participants[i]!))
 }

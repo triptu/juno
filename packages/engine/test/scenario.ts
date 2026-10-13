@@ -15,12 +15,13 @@ import { sleep, startTestEngine, waitFor, type EngineOptions, type RunningEngine
 const MINUTE = 60_000
 export const DAY = 24 * 60 * MINUTE
 
-/** Starts an engine on a fresh fake and waits for `live`. `track` collects engines for `afterEach` to stop. */
+/** Starts an engine on a fresh fake and waits for `live` and the follow pass. `track` collects engines for `afterEach` to stop. */
 export async function bootedEngine(track: Array<RunningEngine>, options: EngineOptions = {}): Promise<RunningEngine> {
   const engine = await startTestEngine({ initial: (fake) => fake.signIn(), ...options })
   track.push(engine)
   await engine.status('ready')
   await engine.phase('live', 30_000)
+  await engine.syncIdle()
   return engine
 }
 
@@ -34,6 +35,7 @@ export async function restart(track: Array<RunningEngine>, engine: RunningEngine
   const credentials = fake.credentials()
   // Background work (the follow pass) must not answer after the stop and count against the next engine.
   await quiet(engine)
+  engine.registry.dispose()
   await engine.handle.stop()
   track.splice(track.indexOf(engine), 1)
   whileStopped(fake)
@@ -51,6 +53,7 @@ export async function restart(track: Array<RunningEngine>, engine: RunningEngine
   track.push(owned)
   await owned.status('ready')
   await owned.phase('live', 30_000)
+  await owned.syncIdle()
   return owned
 }
 
@@ -64,8 +67,9 @@ export const callMap = (engine: RunningEngine): Record<string, number> => {
   return map
 }
 
-/** Waits until the engine has made no call to the fake for a while. */
+/** Drains sync cycles, then waits for a quiet API window. For command recovery, use `handle.commandIdle()`. */
 export async function quiet(engine: RunningEngine, label = 'the engine to go quiet'): Promise<void> {
+  await engine.syncIdle()
   let calls = engine.fake.calls.length
   await waitFor(
     async () => {

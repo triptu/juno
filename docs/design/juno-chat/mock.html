@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Juno chat · bubble options</title>
+<style>
+@font-face { font-family: 'Figtree Variable'; font-weight: 300 900; font-display: block; src: url('../home/fonts/figtree-latin-wght-normal.woff2') format('woff2-variations'); }
+@font-face { font-family: 'Instrument Serif'; font-weight: 400; font-display: block; src: url('../home/fonts/instrument-serif-latin-400-normal.woff2') format('woff2'); }
+
+/* Tokens: packages/tokens/src/tokens.stylex.ts and themes.stylex.ts, Coral light. */
+.theme-light {
+  --background: hsla(48, 50%, 98%, 1); --background-subtle: hsla(48, 35%, 97%, 1);
+  --surface-default: hsla(48, 30%, 98%, 1); --surface-hover: hsla(48, 30%, 94%, 1);
+  --secondary-default: hsla(48, 30%, 92%, 1); --secondary-hover: hsla(48, 30%, 90%, 1);
+  --border-subtle: hsla(48, 30%, 92%, 1); --border-default: hsla(48, 30%, 91%, 1); --border-strong: hsla(48, 30%, 88%, 1); --input-border: hsla(48, 14%, 82%, 1);
+  --foreground-default: hsla(48, 15%, 12%, 1); --foreground-subtle: hsla(48, 8%, 35%, 1); --foreground-muted: hsla(48, 5%, 42%, 1);
+  --accent-default: hsla(48, 30%, 8%, 1); --accent-foreground: hsla(48, 20%, 95%, 1);
+  --danger: #C41E3A; --warm-soft: color-mix(in oklch, #E39A3B 26%, var(--background));
+  --hl: #CC4628; --hl-fg: #FFFFFF; --hl-text: #B4351F; --hl-soft: color-mix(in oklch, #CC4628 10%, var(--background));
+  --card-ring: 0 1px 2px 0 oklch(0 0 0 / .03), 0 6px 20px -4px oklch(0 0 0 / .07);
+  --sheet: #EFEDE6;
+}
+.theme-dark {
+  --background: #1B1916; --background-subtle: #151411;
+  --surface-default: #252421; --surface-hover: #2D2B28;
+  --secondary-default: #302F2C; --secondary-hover: #383633;
+  --border-subtle: #2B2A27; --border-default: #32302D; --border-strong: #3C3A37; --input-border: #464541;
+  --foreground-default: #EEEBE2; --foreground-subtle: #C6C4BE; --foreground-muted: #A09E9A;
+  --accent-default: hsla(48, 30%, 90%, 1); --accent-foreground: hsla(48, 10%, 2%, 1);
+  --danger: #F8767E; --warm-soft: color-mix(in oklch, #E39A3B 22%, var(--background));
+  --hl: #FF8A73; --hl-fg: #2A0D06; --hl-text: #FF9C87; --hl-soft: color-mix(in oklch, #FF8A73 14%, var(--background));
+  --card-ring: 0 1px 2px 0 oklch(0 0 0 / .3), 0 6px 20px -4px oklch(0 0 0 / .35);
+  --sheet: #0F0E0C;
+}
+:root {
+  --font-sans: 'Figtree Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-serif: 'Instrument Serif', ui-serif, Georgia, serif;
+  --radius-bubble: 16px; --radius-card: 20px; --radius-lg: 8px; --radius-xl: 12px; --radius-pill: 999px; --radius-composer: 20px;
+  --duration-pop: 220ms; --ease-out: cubic-bezier(0.2, 0, 0, 1);
+}
+/* The four options. A: the accent fill. B: a tint of the accent. C: the neutral tint. D: ink. */
+.opt-a { --owner-bg: var(--hl); --owner-fg: var(--hl-fg); }
+.opt-b { --owner-bg: color-mix(in oklch, var(--hl) 16%, var(--background)); --owner-fg: var(--foreground-default); }
+.theme-dark .opt-b { --owner-bg: color-mix(in oklch, var(--hl) 22%, var(--background)); }
+.opt-c { --owner-bg: var(--secondary-default); --owner-fg: var(--foreground-default); }
+.opt-d { --owner-bg: var(--accent-default); --owner-fg: var(--accent-foreground); }
+
+* { box-sizing: border-box; cursor: default; }
+body { margin: 0; font-family: var(--font-sans); font-size: 14px; line-height: 1.5; letter-spacing: 0.01em; -webkit-font-smoothing: antialiased; background: #ddd; }
+section.sheet { background: var(--sheet); color: var(--foreground-default); padding: 32px 36px 40px; }
+h1 { font: 400 26px/1.15 var(--font-serif); margin: 0 0 4px; }
+.lede { margin: 0 0 24px; color: var(--foreground-muted); font-size: 13px; max-width: 760px; }
+.row { display: flex; gap: 20px; align-items: flex-start; }
+.col { width: 372px; flex: none; }
+.col h2 { font: 500 11px/1 var(--font-sans); letter-spacing: .06em; text-transform: uppercase; color: var(--foreground-muted); margin: 0 0 10px; }
+.col h2 b { font-weight: 600; color: var(--foreground-default); letter-spacing: 0; text-transform: none; font-size: 13px; margin-right: 8px; }
+
+/* The chat window. */
+.chat { background: var(--background); border-radius: 14px; box-shadow: var(--card-ring); overflow: hidden; display: flex; flex-direction: column; }
+.chat .list { flex: 1; padding: 20px 20px 8px; display: flex; flex-direction: column; gap: 2px; }
+.chat.tall { height: auto; }
+.chat.tall .list { overflow: visible; }
+.day { align-self: center; font: 600 11.5px/1 var(--font-sans); letter-spacing: .06em; text-transform: uppercase; color: var(--foreground-muted); padding: 14px 0 12px; }
+.gap { height: 10px; }
+
+/* Bubbles. 76% max, 8 x 12 padding, 14px text, radius 16, tail 4 on the last of a group. */
+.msg { display: flex; align-items: flex-end; gap: 10px; }
+.msg.owner { justify-content: flex-end; }
+.bubble { max-width: 76%; padding: 8px 12px; border-radius: var(--radius-bubble); font-size: 14px; line-height: 1.55; white-space: pre-wrap; user-select: text; cursor: text; }
+.owner .bubble { background: var(--owner-bg); color: var(--owner-fg); }
+.owner.last .bubble { border-bottom-right-radius: 4px; }
+.juno .bubble { background: var(--surface-hover); color: var(--foreground-default); }
+.juno.last .bubble { border-bottom-left-radius: 4px; }
+.mark { width: 28px; height: 28px; flex: none; color: var(--foreground-subtle); }
+.mark svg { display: block; width: 28px; height: 28px; }
+.mark.blank { visibility: hidden; }
+.cite { text-decoration: underline; text-decoration-color: var(--foreground-muted); color: var(--foreground-subtle); }
+.line { font-size: 12.5px; color: var(--foreground-muted); padding: 2px 0 0; }
+.line.right { text-align: right; }
+.line .act { color: var(--foreground-default); font-weight: 500; }
+.line.dim { opacity: .6; }
+.juno-col { display: flex; flex-direction: column; gap: 2px; max-width: 100%; min-width: 0; flex: 1; }
+.under { margin-left: 38px; }
+.note { align-self: center; font-size: 12.5px; color: var(--foreground-muted); padding: 4px 0; }
+.note .act { color: var(--foreground-default); font-weight: 500; }
+.glabel { font: 500 11px/1 var(--font-sans); letter-spacing: .06em; text-transform: uppercase; color: var(--foreground-muted); margin: 10px 0 4px 38px; display: flex; gap: 8px; }
+.glabel span { text-transform: none; letter-spacing: 0; color: var(--foreground-subtle); }
+
+/* Status bubble: three 6px dots, text at 13 once there is something to say. */
+.status .bubble { display: flex; align-items: center; gap: 10px; padding: 10px 14px; min-width: 52px; }
+.dots { display: flex; gap: 4px; }
+.dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--foreground-muted); animation: pulse 1.2s infinite var(--ease-out); }
+.dots i:nth-child(2) { animation-delay: .2s; } .dots i:nth-child(3) { animation-delay: .4s; }
+@keyframes pulse { 0%, 60%, 100% { transform: scale(1); } 30% { transform: scale(1.35); } }
+@media (prefers-reduced-motion: reduce) { .dots i { animation: none; opacity: .6; } }
+.status .txt { font-size: 13px; color: var(--foreground-subtle); }
+.stop { font-size: 12.5px; color: var(--foreground-subtle); padding: 2px 8px; border-radius: var(--radius-lg); background: var(--surface-hover); align-self: center; }
+.caret::after { content: ''; display: inline-block; width: 2px; height: 1em; vertical-align: -2px; margin-left: 2px; background: var(--foreground-muted); opacity: .6; }
+
+/* Cards: column width, radius 20, the soft shadow in light and the ring in dark. */
+.card { margin: 8px 0 0 38px; max-width: 560px; background: var(--surface-default); border-radius: var(--radius-card); box-shadow: var(--card-ring); padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+.card .head { font-size: 12.5px; color: var(--foreground-muted); display: flex; align-items: center; gap: 8px; }
+.card .head b { font-weight: 500; color: var(--foreground-subtle); white-space: nowrap; }
+.card .title { font-weight: 500; font-size: 14px; }
+.card .meta { font-size: 12.5px; color: var(--foreground-muted); }
+.card .state { font-size: 13px; color: var(--foreground-subtle); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card .foot { display: flex; justify-content: flex-end; gap: 6px; }
+.btn { height: 30px; padding: 0 12px; border-radius: var(--radius-lg); font-size: 13px; font-weight: 500; display: inline-flex; align-items: center; color: var(--foreground-subtle); }
+.btn.secondary { background: var(--secondary-default); color: var(--foreground-default); }
+.btn.primary { background: var(--hl); color: var(--hl-fg); }
+.btn.danger { color: var(--danger); }
+.pill { display: inline-flex; align-items: center; gap: 4px; height: 22px; padding: 0 8px; border-radius: var(--radius-pill); background: var(--secondary-default); color: var(--foreground-subtle); font-size: 12px; font-weight: 600; }
+.pill svg { width: 11px; height: 11px; }
+.textarea { border: 1px solid var(--input-border); background: var(--background); border-radius: var(--radius-lg); padding: 8px 10px; font-size: 14px; line-height: 1.55; min-height: 54px; cursor: text; }
+.because { font-size: 12.5px; color: var(--foreground-muted); }
+
+/* Composer. */
+.composer { padding: 8px 20px 18px; }
+.composer .box { display: flex; align-items: flex-end; border: 1px solid var(--input-border); background: var(--surface-default); border-radius: var(--radius-composer); padding: 6px 6px 6px 14px; }
+.composer .ph { flex: 1; padding: 3px 0; color: var(--foreground-muted); font-size: 14px; line-height: 22px; cursor: text; }
+.composer .send { width: 28px; height: 28px; border-radius: 50%; background: var(--hl); color: var(--hl-fg); display: grid; place-items: center; opacity: .4; }
+.composer .send svg { width: 16px; height: 16px; }
+
+/* Empty state. */
+.empty { flex: 1; min-height: 560px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 40px 32px; gap: 14px; }
+.empty .fig { width: 40px; height: 40px; color: var(--foreground-subtle); }
+.empty h3 { font: 400 38px/1.1 var(--font-serif); margin: 4px 0 0; }
+.empty p { margin: 0; color: var(--foreground-subtle); max-width: 300px; font-size: 14px; line-height: 1.6; }
+.chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 4px; }
+.chip { height: 34px; padding: 0 12px; border: 1px solid var(--border-strong); background: var(--surface-default); border-radius: var(--radius-pill); display: inline-flex; align-items: center; font-size: 13px; }
+
+/* Accent strip: option A across the eight accents. */
+.accents { display: grid; grid-template-columns: repeat(8, 1fr); gap: 14px; }
+.acc { background: var(--background); border-radius: 14px; padding: 14px; box-shadow: var(--card-ring); display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }
+.acc .name { align-self: flex-start; font-size: 11px; color: var(--foreground-muted); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 4px; }
+.acc .bubble { background: var(--owner-bg); color: var(--owner-fg); font-size: 13px; }
+.acc .bubble.j { background: var(--surface-hover); color: var(--foreground-default); align-self: flex-start; }
+</style>
+</head>
+<body>
+
+<template id="transcript">
+  <div class="list">
+    <div class="day">Today</div>
+
+    <div class="msg owner"><div class="bubble">Catch me up on #eng since yesterday.</div></div>
+    <div class="msg owner last"><div class="bubble">And did anyone answer Maya about the Wednesday slot?</div></div>
+
+    <div class="gap"></div>
+    <div class="msg juno"><div class="mark blank"></div><div class="bubble">Three threads moved. The staging bill thread settled on a budget cap, Leo shipped the sidebar fix, and the hiring loop for the platform role has two new scores.</div></div>
+    <div class="msg juno last"><div class="mark">MARK</div><div class="juno-col"><div class="bubble">Nobody has answered Maya yet. <span class="cite">On 2 Oct you said</span> the Wednesday slot works for eng, so I can tell her that.</div></div></div>
+    <div class="card">
+      <div class="head"><b>Send message</b><span>·</span><span class="pill">HASH eng</span><span>in Wednesday sync</span></div>
+      <div class="textarea">Wednesday works for eng. Shall we lock 14:00?</div>
+      <div class="foot"><span class="btn">Dismiss</span><span class="btn primary">Send</span></div>
+    </div>
+
+    <div class="gap"></div>
+    <div class="msg owner last"><div class="bubble">Yes, and remember that eng syncs are Wednesdays from now on.</div></div>
+    <div class="line right">Not delivered · <span class="act">Try again</span></div>
+
+    <div class="gap"></div>
+    <div class="msg owner last"><div class="bubble">Fix the sidebar flake in juno and open a PR.</div></div>
+    <div class="note">Remembered · <span class="act">Undo</span></div>
+
+    <div class="msg juno last"><div class="mark">MARK</div><div class="juno-col"><div class="bubble">On it. I've started T3 Code in a new worktree and I'll tell you when it needs you or when the PR is up.</div></div></div>
+    <div class="card">
+      <div class="head"><b>Task</b><span>·</span><span>T3 Code · juno</span></div>
+      <div class="title">Fix the sidebar flake</div>
+      <div class="state">Tests running, 2 of 5</div>
+      <div class="foot"><span class="btn">Open</span><span class="btn danger">Stop</span></div>
+    </div>
+
+    <div class="gap"></div>
+    <div class="msg owner last"><div class="bubble">While that runs, what did I promise Elena last week?</div></div>
+
+    <div class="msg juno status"><div class="mark">MARK</div><div class="bubble"><div class="dots"><i></i><i></i><i></i></div><span class="txt">Looking back through last week</span></div><span class="stop">Stop</span></div>
+
+    <div class="gap"></div>
+    <div class="msg juno last"><div class="mark">MARK</div><div class="juno-col"><div class="bubble"><span class="cite">On 7 Oct you said</span> you'd send Elena the comp band for the platform role before her Friday call. I don't see a message to her since<span class="caret"></span></div></div></div>
+  </div>
+  <div class="composer"><div class="box"><div class="ph">Ask Juno, like "what did I miss in #eng?"</div><div class="send">ARROW</div></div></div>
+</template>
+
+<template id="emptyChat">
+  <div class="empty">
+    <svg class="fig" viewBox="0 0 64 64">FIGURE</svg>
+    <h3>What do you need?</h3>
+    <p>Ask me to find, summarize, catch you up or tidy up. I can read your topics and propose messages, but nothing is sent until you press Send.</p>
+    <div class="chips"><span class="chip">Catch me up on today</span><span class="chip">Summarize this topic</span><span class="chip">Tell Maya the Wednesday slot works for eng</span><span class="chip">Anything settled I can resolve?</span></div>
+  </div>
+  <div class="composer"><div class="box"><div class="ph">Ask Juno, like "what did I miss in #eng?"</div><div class="send">ARROW</div></div></div>
+</template>
+
+<section data-key="mock-light" class="sheet theme-light">
+  <h1>Juno chat · owner bubble options · light</h1>
+  <p class="lede">The same transcript four times. Only the owner bubble changes; Juno's bubbles stay on the hover surface in every option. A streaming reply, a status bubble with text, a Task card, a Send card, a failed send and a remembered line are all in each column. The last column is the all-quiet state.</p>
+  <div class="row" data-options></div>
+</section>
+
+<section data-key="mock-dark" class="sheet theme-dark">
+  <h1>Juno chat · owner bubble options · dark</h1>
+  <p class="lede">The dark palette with Coral's dark fill (#FF8A73 on #2A0D06). Cards take the ring from the dark theme instead of the soft shadow.</p>
+  <div class="row" data-options></div>
+</section>
+
+<section data-key="accents-light" class="sheet theme-light">
+  <h1>Option A across the eight accents · light</h1>
+  <p class="lede">The accent is a user setting. With option A the owner's bubbles follow it. Marigold light is the pair to check: its fill is 1.9:1 against the page and its dark text passes only on the fill.</p>
+  <div class="accents" data-accents></div>
+</section>
+
+<section data-key="accents-dark" class="sheet theme-dark">
+  <h1>Option A across the eight accents · dark</h1>
+  <p class="lede">Dark accent fills are pale, so the owner's text turns dark on them. The bubble is the biggest area of accent in the app, so this is where a loud accent shows.</p>
+  <div class="accents" data-accents></div>
+</section>
+
+<section data-key="rhythm-light" class="sheet theme-light">
+  <h1>Rhythm over a long stretch · light</h1>
+  <p class="lede">Forty generated messages, options A and C. The question is whether the accent in every other group turns the chat into a wall of colour, or reads as "mine" the way iMessage blue does.</p>
+  <div class="row" data-rhythm></div>
+</section>
+
+<section data-key="rhythm-dark" class="sheet theme-dark">
+  <h1>Rhythm over a long stretch · dark</h1>
+  <p class="lede">The same forty messages in dark.</p>
+  <div class="row" data-rhythm></div>
+</section>
+
+<script>
+const MARK = '<svg viewBox="0 0 64 64"><circle cx="40" cy="10" r="7" fill="currentColor"/><path d="M47.5 25 C47.5 35.5 46 42.5 40.5 46.5 C37.5 48.6 34.5 48.6 31 48.6" fill="none" stroke="currentColor" stroke-width="8.5" stroke-linecap="round"/><circle cx="20" cy="48.6" r="5" fill="currentColor"/><circle cx="10.5" cy="36.5" r="4.5" fill="currentColor"/></svg>'
+const FIGURE = '<circle cx="40" cy="10" r="7" fill="currentColor"/><path d="M47.5 25 C47.5 35.5 46 42.5 40.5 46.5 C37.5 48.6 34.5 48.6 31 48.6" fill="none" stroke="currentColor" stroke-width="8.5" stroke-linecap="round"/>'
+const ARROW = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 13V3M3.5 7.5 8 3l4.5 4.5"/></svg>'
+const HASH = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h10M3 10h10M6.5 2.5l-1 11M10.5 2.5l-1 11"/></svg>'
+const fill = (html) => html.replaceAll('MARK', MARK).replaceAll('FIGURE', FIGURE).replaceAll('ARROW', ARROW).replaceAll('HASH', HASH)
+
+const options = [
+  ['opt-a', 'A', 'Accent fill (--hl / --hl-fg)'],
+  ['opt-b', 'B', 'Accent tint (16% of --hl over the page)'],
+  ['opt-c', 'C', 'Neutral tint (--secondary-default)'],
+  ['opt-d', 'D', 'Ink (--accent-default)'],
+]
+for (const row of document.querySelectorAll('[data-options]')) {
+  for (const [cls, letter, name] of options) {
+    row.insertAdjacentHTML('beforeend', `<div class="col ${cls}"><h2><b>${letter}</b>${name}</h2><div class="chat">${fill(document.getElementById('transcript').innerHTML)}</div></div>`)
+  }
+  row.insertAdjacentHTML('beforeend', `<div class="col opt-a"><h2><b>Quiet</b>Nothing running, nothing unread</h2><div class="chat">${fill(document.getElementById('emptyChat').innerHTML)}</div></div>`)
+}
+
+// Accent fills from themes.stylex.ts, light and dark.
+const accents = {
+  coral: ['#CC4628', '#FFFFFF', '#FF8A73', '#2A0D06'], ink: ['hsla(48, 30%, 8%, 1)', 'hsla(48, 20%, 95%, 1)', 'hsla(48, 30%, 90%, 1)', 'hsla(48, 10%, 2%, 1)'],
+  marigold: ['#F2A900', '#2B1E00', '#F5B83A', '#2B1E00'], teal: ['#0B7A75', '#FFFFFF', '#45C2BB', '#04201E'],
+  midnight: ['#2E1F64', '#FFFAEB', '#B3A5EA', '#1A1238'], emerald: ['#00674F', '#FFFAEB', '#4FC4A1', '#04261B'],
+  claret: ['#7F1734', '#FFFAEB', '#F08BA0', '#3B0A18'], cyan: ['#008AB3', 'hsla(48, 10%, 2%, 1)', '#5AC6EC', '#04212E'],
+}
+for (const grid of document.querySelectorAll('[data-accents]')) {
+  const dark = grid.closest('.theme-dark') !== null
+  for (const [name, v] of Object.entries(accents)) {
+    const [bg, fg] = dark ? [v[2], v[3]] : [v[0], v[1]]
+    grid.insertAdjacentHTML('beforeend', `<div class="acc" style="--owner-bg:${bg};--owner-fg:${fg}"><div class="name">${name}</div><div class="bubble">Tell Maya Wednesday works.</div><div class="bubble">And lock 14:00 if she agrees.</div><div class="bubble j">Done. I'll send it once you press Send.</div></div>`)
+  }
+}
+
+// Forty messages, generated, for the rhythm check.
+const owner = ['Catch me up on #eng.', 'What did Leo say about the flake?', 'Resolve anything that settled.', 'Did Maya reply?', 'Remind me Friday at 9 about the comp band.', 'How is the fix going?', 'Summarize the staging bill thread.', 'Tell Elena the band is 180 to 210.', 'Anything from Littlebird today?', 'Stop watching the deploy channel.']
+const juno = ['Two threads moved. The staging bill settled on a cap and the hiring loop has new scores.', 'Leo said the flake is a race in the sidebar test. He is on it.', 'Three topics look settled. Resolve them?', 'Not yet. Her last message was Tuesday.', 'Scheduled. I will say so on Friday at 9.', 'Tests are running, 4 of 5. No questions so far.', 'The bill doubled because staging stayed up over the weekend. Ops set a cap at $400.', 'Here is the message. It goes to Elena as a DM.', 'One meeting note from the platform sync, nothing that needs you.', 'Done. I will stay quiet about #deploys.']
+for (const row of document.querySelectorAll('[data-rhythm]')) {
+  for (const [cls, letter, name] of [options[0], options[2]]) {
+    let html = '<div class="list"><div class="day">Yesterday</div>'
+    for (let i = 0; i < 20; i++) {
+      const two = i % 3 === 0
+      html += two ? `<div class="msg owner"><div class="bubble">${owner[i % 10]}</div></div><div class="msg owner last"><div class="bubble">${owner[(i + 3) % 10]}</div></div>` : `<div class="msg owner last"><div class="bubble">${owner[i % 10]}</div></div>`
+      html += `<div class="gap"></div><div class="msg juno last"><div class="mark">MARK</div><div class="juno-col"><div class="bubble">${juno[i % 10]}</div></div></div><div class="gap"></div>`
+      if (i === 9) html += '<div class="day">Today</div>'
+    }
+    html += '</div>'
+    row.insertAdjacentHTML('beforeend', `<div class="col ${cls}"><h2><b>${letter}</b>${name}</h2><div class="chat tall">${fill(html)}</div></div>`)
+  }
+}
+</script>
+</body>
+</html>

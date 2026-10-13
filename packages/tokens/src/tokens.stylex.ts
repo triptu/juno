@@ -175,6 +175,92 @@ export const hues = stylex.defineVars({
   '--person-chip-fg-mix': '40%',
 })
 
+
+/**
+ * Topic art (docs/design/topic-art/v2). Eight hues, each with four roles the
+ * recipe may name and five Tide tones for the placeholder. The renderer in
+ * `@juno/topic-art` writes these as `var(--art-<hue>-<role>)` and
+ * `var(--tide-<hue>-<tone>)`, so one SVG string serves both themes; the dark
+ * values are in themes.stylex.ts. Lightness and chroma are the study's RAMP
+ * and TIDE_RAMP; the hue angle is the only value a hue shares across roles.
+ * Written as oklch() so the browser maps out-of-gamut chroma itself.
+ */
+export const art = stylex.defineVars({
+  '--art-coral-ink': 'oklch(0.43 0.022 32)',
+  '--art-coral-soft': 'oklch(0.885 0.038 32)',
+  '--art-coral-accent': 'oklch(0.6 0.1 32)',
+  '--art-coral-accent2': 'oklch(0.76 0.06 32)',
+  '--art-amber-ink': 'oklch(0.43 0.022 72)',
+  '--art-amber-soft': 'oklch(0.885 0.038 72)',
+  '--art-amber-accent': 'oklch(0.6 0.1 72)',
+  '--art-amber-accent2': 'oklch(0.76 0.06 72)',
+  '--art-olive-ink': 'oklch(0.43 0.022 112)',
+  '--art-olive-soft': 'oklch(0.885 0.038 112)',
+  '--art-olive-accent': 'oklch(0.6 0.1 112)',
+  '--art-olive-accent2': 'oklch(0.76 0.06 112)',
+  '--art-sage-ink': 'oklch(0.43 0.022 150)',
+  '--art-sage-soft': 'oklch(0.885 0.038 150)',
+  '--art-sage-accent': 'oklch(0.6 0.1 150)',
+  '--art-sage-accent2': 'oklch(0.76 0.06 150)',
+  '--art-teal-ink': 'oklch(0.43 0.022 185)',
+  '--art-teal-soft': 'oklch(0.885 0.038 185)',
+  '--art-teal-accent': 'oklch(0.6 0.1 185)',
+  '--art-teal-accent2': 'oklch(0.76 0.06 185)',
+  '--art-sky-ink': 'oklch(0.43 0.022 235)',
+  '--art-sky-soft': 'oklch(0.885 0.038 235)',
+  '--art-sky-accent': 'oklch(0.6 0.1 235)',
+  '--art-sky-accent2': 'oklch(0.76 0.06 235)',
+  '--art-periwinkle-ink': 'oklch(0.43 0.022 275)',
+  '--art-periwinkle-soft': 'oklch(0.885 0.038 275)',
+  '--art-periwinkle-accent': 'oklch(0.6 0.1 275)',
+  '--art-periwinkle-accent2': 'oklch(0.76 0.06 275)',
+  '--art-plum-ink': 'oklch(0.43 0.022 320)',
+  '--art-plum-soft': 'oklch(0.885 0.038 320)',
+  '--art-plum-accent': 'oklch(0.6 0.1 320)',
+  '--art-plum-accent2': 'oklch(0.76 0.06 320)',
+
+  '--tide-coral-base': 'oklch(0.905 0.02 32)',
+  '--tide-coral-soft': 'oklch(0.865 0.028 32)',
+  '--tide-coral-mid': 'oklch(0.815 0.036 32)',
+  '--tide-coral-deep': 'oklch(0.75 0.042 32)',
+  '--tide-coral-pale': 'oklch(0.945 0.012 32)',
+  '--tide-amber-base': 'oklch(0.905 0.02 72)',
+  '--tide-amber-soft': 'oklch(0.865 0.028 72)',
+  '--tide-amber-mid': 'oklch(0.815 0.036 72)',
+  '--tide-amber-deep': 'oklch(0.75 0.042 72)',
+  '--tide-amber-pale': 'oklch(0.945 0.012 72)',
+  '--tide-olive-base': 'oklch(0.905 0.02 112)',
+  '--tide-olive-soft': 'oklch(0.865 0.028 112)',
+  '--tide-olive-mid': 'oklch(0.815 0.036 112)',
+  '--tide-olive-deep': 'oklch(0.75 0.042 112)',
+  '--tide-olive-pale': 'oklch(0.945 0.012 112)',
+  '--tide-sage-base': 'oklch(0.905 0.02 150)',
+  '--tide-sage-soft': 'oklch(0.865 0.028 150)',
+  '--tide-sage-mid': 'oklch(0.815 0.036 150)',
+  '--tide-sage-deep': 'oklch(0.75 0.042 150)',
+  '--tide-sage-pale': 'oklch(0.945 0.012 150)',
+  '--tide-teal-base': 'oklch(0.905 0.02 185)',
+  '--tide-teal-soft': 'oklch(0.865 0.028 185)',
+  '--tide-teal-mid': 'oklch(0.815 0.036 185)',
+  '--tide-teal-deep': 'oklch(0.75 0.042 185)',
+  '--tide-teal-pale': 'oklch(0.945 0.012 185)',
+  '--tide-sky-base': 'oklch(0.905 0.02 235)',
+  '--tide-sky-soft': 'oklch(0.865 0.028 235)',
+  '--tide-sky-mid': 'oklch(0.815 0.036 235)',
+  '--tide-sky-deep': 'oklch(0.75 0.042 235)',
+  '--tide-sky-pale': 'oklch(0.945 0.012 235)',
+  '--tide-periwinkle-base': 'oklch(0.905 0.02 275)',
+  '--tide-periwinkle-soft': 'oklch(0.865 0.028 275)',
+  '--tide-periwinkle-mid': 'oklch(0.815 0.036 275)',
+  '--tide-periwinkle-deep': 'oklch(0.75 0.042 275)',
+  '--tide-periwinkle-pale': 'oklch(0.945 0.012 275)',
+  '--tide-plum-base': 'oklch(0.905 0.02 320)',
+  '--tide-plum-soft': 'oklch(0.865 0.028 320)',
+  '--tide-plum-mid': 'oklch(0.815 0.036 320)',
+  '--tide-plum-deep': 'oklch(0.75 0.042 320)',
+  '--tide-plum-pale': 'oklch(0.945 0.012 320)',
+})
+
 /* -------------------------------------------------------------------------- */
 /* Shadows and rings                                                          */
 /* -------------------------------------------------------------------------- */

@@ -7,6 +7,7 @@ import { parseCommand } from './parseCommand'
 import { routeCheck } from './routeCheck'
 import { settledScore } from './settledScore'
 import { titleTopic } from './titleTopic'
+import { topicArt } from './topicArt'
 import { urgencyGate } from './urgencyGate'
 
 export const tasks = {
@@ -19,6 +20,7 @@ export const tasks = {
   catchUp,
   forYou,
   chat,
+  topicArt,
 } as const
 
 export type TaskName = keyof typeof tasks
@@ -36,3 +38,4 @@ export * from './parseCommand'
 export * from './catchUp'
 export * from './forYou'
 export * from './chat'
+export * from './topicArt'
