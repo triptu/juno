@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { startFakeSlack, writeSlackAppFixture, type Credentials, type FakeSlack } from '@juno/fake-slack'
 import { Juno } from './driver/juno'
+import { Slack } from './driver/slack'
 
 /** What main exposes on `globalThis.junoTest` under JUNO_E2E. */
 export interface JunoTestHooks {
@@ -89,6 +90,8 @@ export interface Fixtures {
   readonly app: ElectronApplication
   readonly win: Page
   readonly juno: Juno
+  /** Other people in Slack, through the fake: `slack.as('Leo').replyIn(...)`. */
+  readonly slack: Slack
 }
 
 /** Launches the app once per test with a fresh user-data directory, against its own fake Slack. */
@@ -124,6 +127,9 @@ export const test = base.extend<Fixtures>({
   },
   juno: async ({ running }, use) => {
     await use(new Juno(running.app, running.win))
+  },
+  slack: async ({ fake }, use) => {
+    await use(new Slack(fake))
   },
 })
 

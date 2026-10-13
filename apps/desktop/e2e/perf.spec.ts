@@ -7,7 +7,7 @@
 //   JUNO_PERF=1 pnpm --filter @juno/desktop exec playwright test e2e/perf.spec.ts
 import { rm } from 'node:fs/promises'
 import { loadavg } from 'node:os'
-import { largeSeed, startFakeSlack, type FakeSlack } from '@juno/fake-slack'
+import { largeSeed, startFakeSlack, topic300Seed, TOPIC300_THREAD_CHANNEL, type FakeSlack } from '@juno/fake-slack'
 import { expect, launchApp, tempUserData, test, writeSlackApp, type RunningApp, type SlackAppFixture } from './fixtures'
 import { Juno, type SidebarFilterName } from './driver/juno'
 
@@ -248,6 +248,265 @@ test.describe.serial('large workspace', () => {
       for (const metric of metrics) console.log(`memory ${metric.type}${metric.name ? ` ${metric.name}` : ''}: ${metric.mb.toFixed(0)} MB working set`)
       const page = await win.evaluate(() => ({ heap: (performance as unknown as { memory?: { usedJSHeapSize: number } }).memory?.usedJSHeapSize ?? 0, nodes: document.getElementsByTagName('*').length }))
       console.log(`renderer JS heap ${(page.heap / 1024 / 1024).toFixed(1)} MB, ${page.nodes} DOM elements`)
+    } finally {
+      await running.close()
+    }
+  })
+})
+
+test('topic open, uncached: a thread whose replies were never fetched, to the header and what the store has', async () => {
+  test.setTimeout(600_000)
+  const samples: number[] = []
+  for (let i = 0; i < 5; i++) {
+    const fake = await startFakeSlack()
+    const dir = await tempUserData()
+    const appDir = await tempUserData()
+    const slackApp = await writeSlackApp(fake, appDir)
+    const running = await launchApp(dir, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword })
+    try {
+      const juno = new Juno(running.app, running.win)
+      await juno.signIn()
+      await juno.waitForSync()
+      await juno.sidebar.row('#eng').open()
+      const threads = await juno.topic.openThreads()
+      // Not followed, so the boot never fetched its replies.
+      const before = (await juno.measures('juno.topic-open')).length
+      await threads.open('checkout.spec failed again')
+      await expect.poll(async () => (await juno.measures('juno.topic-open')).length).toBeGreaterThan(before)
+      samples.push((await juno.measures('juno.topic-open')).at(-1)!)
+      await juno.topic.expectMessage('Can you add a wait')
+    } finally {
+      await running.close()
+      await fake.close()
+      await rm(dir, { recursive: true, force: true })
+      await rm(appDir, { recursive: true, force: true })
+    }
+  }
+  stats('topic open, uncached, press to header and stored rows painted (juno.topic-open)', samples)
+})
+
+// The M4 gate (performance 3.4) on the topic300 seed: a 300-message thread
+// and a 300-message Main, 20 % images and 10 % code blocks. One synced
+// user-data directory; every scenario launches the app warm on it.
+test.describe.serial('topic view', () => {
+  let fake: FakeSlack
+  let userData: string
+  let slackDir: string
+  let slackApp: SlackAppFixture
+  const THREAD = 'Review the rollout checklist 1.'
+  const MAIN = '#perf-main'
+
+  const launch = (): Promise<RunningApp> => launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword })
+
+  /** Launches warm, waits for the sync, and closes any tab a previous launch left. */
+  async function ready(): Promise<{ readonly running: RunningApp; readonly juno: Juno }> {
+    const running = await launch()
+    const juno = new Juno(running.app, running.win)
+    await juno.sidebar.expectRows()
+    await juno.expectEngineLive(120_000)
+    for (let i = 0; i < 10 && (await juno.tabs.root.getByRole('tab').count()) > 0; i++) await juno.tabs.menu('close-tab')
+    await juno.tabs.expectCount(0)
+    await running.win.mouse.move(900, 400)
+    return { running, juno }
+  }
+
+  /** Mouse down on a sidebar row without hovering it first, as a quick click does. */
+  async function pressRow(juno: Juno, title: string): Promise<void> {
+    const box = (await juno.sidebar.row(title).root.boundingBox())!
+    await juno.win.mouse.move(box.x + 40, box.y + box.height / 2, { steps: 1 })
+    await juno.win.mouse.down()
+    await juno.win.mouse.up()
+  }
+
+  async function nextMeasure(juno: Juno, name: string, before: number): Promise<number> {
+    await expect.poll(async () => (await juno.measures(name)).length, { timeout: 15_000 }).toBeGreaterThan(before)
+    return (await juno.measures(name)).at(-1)!
+  }
+
+  test.beforeAll(async () => {
+    test.setTimeout(300_000)
+    fake = await startFakeSlack({ seed: (workspace, avatars) => void topic300Seed()(workspace, avatars) })
+    userData = await tempUserData()
+    slackDir = await tempUserData()
+    slackApp = await writeSlackApp(fake, slackDir)
+    const running = await launch()
+    try {
+      const juno = new Juno(running.app, running.win)
+      await juno.signIn()
+      await juno.sidebar.expectRows()
+      await juno.expectEngineLive(120_000)
+      // Read both once, so later opens are at the bottom of a cached, read topic.
+      for (const title of [THREAD, MAIN]) {
+        await juno.sidebar.row(title).open()
+        await juno.topic.expectAtBottom()
+        await juno.sidebar.row(title).expectRead()
+      }
+    } finally {
+      await running.close()
+    }
+  })
+
+  test.afterAll(async () => {
+    await fake?.close()
+    await rm(userData, { recursive: true, force: true })
+    await rm(slackDir, { recursive: true, force: true })
+  })
+
+  test('topic open: cached, prefetched, and switching tabs', async () => {
+    test.setTimeout(300_000)
+    const { running, juno } = await ready()
+    try {
+      const cached: number[] = []
+      const prefetched: number[] = []
+      for (let i = 0; i < 10; i++) {
+        // A topic the renderer has not read for over 30 s would be colder still; this is a quick click after a fresh launch window.
+        for (const [title, samples] of [
+          [THREAD, cached],
+          [MAIN, cached],
+        ] as const) {
+          const before = (await juno.measures('juno.topic-open')).length
+          await pressRow(juno, title)
+          samples.push(await nextMeasure(juno, 'juno.topic-open', before))
+          await juno.topic.expectAtBottom()
+        }
+      }
+      for (let i = 0; i < 10; i++) {
+        for (const title of [THREAD, MAIN]) {
+          await juno.sidebar.row(title).hover()
+          await running.win.waitForTimeout(300)
+          const before = (await juno.measures('juno.topic-open')).length
+          await juno.sidebar.row(title).open()
+          prefetched.push(await nextMeasure(juno, 'juno.topic-open', before))
+        }
+      }
+      stats('topic open, cached 300 rows, press to rows painted at position (juno.topic-open)', cached)
+      stats('topic open, prefetched (juno.topic-open)', prefetched)
+
+      // Tab switch: two mounted tabs.
+      await juno.sidebar.row(THREAD).openInNewTab()
+      await juno.tabs.expectCount(2)
+      const mounted: number[] = []
+      for (let i = 0; i < 20; i++) {
+        const title = i % 2 === 0 ? THREAD : 'perf-main'
+        const before = (await juno.measures('juno.tab-switch')).length
+        await juno.tabs.select(title)
+        mounted.push(await nextMeasure(juno, 'juno.tab-switch', before))
+      }
+      stats('tab switch, mounted (juno.tab-switch)', mounted)
+    } finally {
+      await running.close()
+    }
+  })
+
+  test('scroll the 300-message thread, and prepend older pages with zero shift', async () => {
+    test.setTimeout(300_000)
+    const { running, juno } = await ready()
+    const { win } = running
+    try {
+      await juno.sidebar.row(THREAD).open()
+      await juno.topic.expectAtBottom()
+      // Up to the top until the window holds the whole thread; each prepend must leave the row in view where it was.
+      const shifts: number[] = []
+      for (let page = 0; page < 3 && (await juno.topic.rowCount()) < 300; page++) {
+        const count = await juno.topic.rowCount()
+        await juno.topic.scrollToTop()
+        const anchor = await juno.topic.firstVisibleRow()
+        await expect.poll(() => juno.topic.rowCount(), { timeout: 15_000 }).toBeGreaterThan(count)
+        await win.waitForTimeout(200)
+        shifts.push(Math.abs((await juno.topic.rowTop(anchor.ts)) - anchor.top))
+      }
+      console.log(`prepend: rows ${await juno.topic.rowCount()}, anchor moved by ${shifts.map((s) => s.toFixed(1)).join(' ')} px`)
+      expect(Math.max(...shifts)).toBeLessThan(1)
+
+      const box = (await juno.topic.scroller.boundingBox())!
+      await win.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+      await win.evaluate(() => {
+        const w = window as unknown as { __frames: number[]; __sampling: boolean; __loaf: number }
+        w.__frames = []
+        w.__loaf = 0
+        w.__sampling = true
+        new PerformanceObserver((entries) => {
+          w.__loaf += entries.getEntries().length
+        }).observe({ type: 'long-animation-frame', buffered: false })
+        let last = performance.now()
+        const tick = (now: number) => {
+          w.__frames.push(now - last)
+          last = now
+          if (w.__sampling) requestAnimationFrame(tick)
+        }
+        requestAnimationFrame(tick)
+      })
+      // About 2 000 px/s for 3 s, down then up, twice.
+      for (let pass = 0; pass < 2; pass++) {
+        for (let i = 0; i < 30; i++) {
+          await win.mouse.wheel(0, 200)
+          await win.waitForTimeout(100)
+        }
+        for (let i = 0; i < 30; i++) {
+          await win.mouse.wheel(0, -200)
+          await win.waitForTimeout(100)
+        }
+      }
+      const result = await win.evaluate(() => {
+        const w = window as unknown as { __frames: number[]; __sampling: boolean; __loaf: number }
+        w.__sampling = false
+        return { frames: w.__frames.slice(1), loaf: w.__loaf }
+      })
+      const over = result.frames.filter((frame) => frame > 16.7 * 1.5).length
+      stats('scroll messages, frame interval', result.frames)
+      console.log(`scroll messages: ${result.frames.length} frames, dropped (over 25 ms) ${over} = ${((100 * over) / result.frames.length).toFixed(2)} %, long animation frames ${result.loaf}`)
+    } finally {
+      await running.close()
+    }
+  })
+
+  test('tab switch back to an unmounted tab, restored at its scroll position', async () => {
+    test.setTimeout(300_000)
+    const { running, juno } = await ready()
+    try {
+      await juno.sidebar.row(THREAD).open()
+      await juno.topic.expectAtBottom()
+      await juno.topic.scrollUp(2_000)
+      const anchor = await juno.topic.firstVisibleRow()
+      // Five more tabs push the thread's tab out of the mounted set.
+      const others = await juno.sidebar.titles('Recent')
+      const extra = others.filter((title) => !title.startsWith(THREAD)).slice(0, 5)
+      for (const title of extra) await juno.sidebar.row(title).openInNewTab()
+      await juno.tabs.expectCount(1 + extra.length)
+      const samples: number[] = []
+      const before = (await juno.measures('juno.tab-switch')).length
+      await juno.tabs.select(THREAD.slice(0, 20))
+      samples.push(await nextMeasure(juno, 'juno.tab-switch', before))
+      expect(Math.abs((await juno.topic.rowTop(anchor.ts)) - anchor.top)).toBeLessThan(2)
+      stats('tab switch, unmounted with scroll restore (juno.tab-switch)', samples)
+    } finally {
+      await running.close()
+    }
+  })
+
+  test('live update in the open thread: write to pixels', async () => {
+    test.setTimeout(300_000)
+    const { running, juno } = await ready()
+    try {
+      await juno.sidebar.row(THREAD).open()
+      await juno.topic.expectAtBottom()
+      const root = fake.messages(TOPIC300_THREAD_CHANNEL)[0]!
+      const measured: number[] = []
+      for (let i = 0; i < 9; i++) {
+        const text = `Perf sample ${i} ${Date.now()}`
+        fake.injectMessage({ channel: TOPIC300_THREAD_CHANNEL, threadTs: root.ts, user: 'U0PERFLEO', text })
+        await juno.topic.expectMessage(text)
+        await juno.topic.expectAtBottom()
+        // The latest juno.live-update is the newest route update to paint; read the message list's.
+        const value = await running.win.evaluate(() => {
+          const entry = performance.getEntriesByName('juno.live-update', 'measure').at(-1) as (PerformanceMeasure & { detail?: { devtools?: { properties?: ReadonlyArray<readonly [string, unknown]> } } }) | undefined
+          const route = entry?.detail?.devtools?.properties?.find((property: readonly [string, unknown]) => property[0] === 'route')?.[1]
+          return { duration: entry?.duration, route }
+        })
+        if (value.route === 'messages.list' && value.duration !== undefined) measured.push(value.duration)
+        await running.win.waitForTimeout(300)
+      }
+      stats('live update in the topic, engine commit to pixels (juno.live-update, messages.list)', measured)
     } finally {
       await running.close()
     }

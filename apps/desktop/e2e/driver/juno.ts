@@ -38,11 +38,35 @@ export class SidebarRow {
 
   /** Selects the row with the mouse (it activates on mouse down). */
   async select(): Promise<void> {
+    await this.root.scrollIntoViewIfNeeded()
     const box = await this.root.boundingBox()
     if (!box) throw new Error(`Row "${this.title}" is not on screen`)
     await this.win.mouse.move(box.x + 40, box.y + box.height / 2)
     await this.win.mouse.down()
     await this.win.mouse.up()
+  }
+
+  /** Opens the topic in the current tab. */
+  open(): Promise<void> {
+    return this.select()
+  }
+
+  /** ⌘-click: opens the topic in a new tab. */
+  async openInNewTab(): Promise<void> {
+    await this.win.keyboard.down('Meta')
+    await this.select()
+    await this.win.keyboard.up('Meta')
+  }
+
+  /** Right-click, then Open in stealth. */
+  async openInStealth(): Promise<void> {
+    await chooseNextMenuItem(this.win, 'stealth')
+    await this.root.click({ button: 'right', position: { x: 40, y: 20 } })
+  }
+
+  /** Main rows: "2 new threads" under the title. */
+  async expectNewThreads(count: number): Promise<void> {
+    await expect(this.root.getByTitle(count === 1 ? '1 new thread' : `${count} new threads`)).toHaveText(String(count))
   }
 
   async expectVisible(): Promise<void> {
@@ -143,6 +167,11 @@ export class Sidebar {
   /** Waits until at least one row has arrived from the engine. */
   async expectRows(): Promise<void> {
     await expect(this.rows.first()).toBeVisible({ timeout: 15_000 })
+  }
+
+  /** The scope chip under the filters names the channel the list is narrowed to. */
+  async expectScope(name: string): Promise<void> {
+    await expect(this.root.getByTitle(`Showing ${name} only`)).toBeVisible({ timeout: 15_000 })
   }
 
   async expectNoSection(section: SidebarSectionName): Promise<void> {
@@ -284,12 +313,34 @@ export class Juno {
   readonly win: Page
   readonly sidebar: Sidebar
   readonly accountMenu: AccountMenu
+  readonly topic: TopicPane
+  readonly tabs: TabStrip
 
   constructor(app: ElectronApplication, win: Page) {
     this.app = app
     this.win = win
+    appOf.set(win, app)
     this.sidebar = new Sidebar(win)
     this.accountMenu = new AccountMenu(win, this.sidebar)
+    this.topic = new TopicPane(win)
+    this.tabs = new TabStrip(app, win)
+  }
+
+  /** The empty workspace shown when no tab is open. */
+  async expectNothingOpen(): Promise<void> {
+    await expect(this.win.getByText('Nothing open yet', { exact: true })).toBeVisible()
+  }
+
+  /**
+   * The window loses focus, as when the user switches to another app.
+   * Playwright keeps the page focused, so this sends the event the app listens for.
+   */
+  async blurWindow(): Promise<void> {
+    await this.win.evaluate(() => window.dispatchEvent(new FocusEvent('blur')))
+  }
+
+  async focusWindow(): Promise<void> {
+    await this.win.evaluate(() => window.dispatchEvent(new FocusEvent('focus')))
   }
 
   /** The sign-in page's primary and secondary actions. */
@@ -455,4 +506,317 @@ export interface StartupTimes {
   readonly longFrames: number
   /** Rows in the list a second after the first paint. */
   readonly rows: number
+}
+
+const appOf = new WeakMap<Page, ElectronApplication>()
+
+/** Makes the next native context menu pick `id` without showing (main's JUNO_E2E hook). */
+async function chooseNextMenuItem(win: Page, id: string): Promise<void> {
+  const app = appOf.get(win)
+  if (app === undefined) throw new Error('chooseNextMenuItem needs the app; use the Juno driver')
+  await app.evaluate((_electron, choice) => {
+    ;(globalThis as unknown as { junoTest: { contextMenu: { next: string | null | undefined } } }).junoTest.contextMenu.next = choice
+  }, id)
+}
+
+const BOTTOM_SLACK = 2
+
+/** The topic shown in the active tab. Hidden tabs stay in the page with `display: none`. */
+export class TopicPane {
+  readonly root: Locator
+
+  constructor(readonly win: Page) {
+    this.root = win.locator('[data-topic-view]').filter({ visible: true })
+  }
+
+  get header() {
+    return this.root.locator('[data-topic-header]')
+  }
+
+  get list() {
+    return this.root.getByRole('list', { name: 'Messages' })
+  }
+
+  get scroller() {
+    return this.root.locator('[data-scroll]')
+  }
+
+  get divider() {
+    return this.root.locator('[data-new-divider]')
+  }
+
+  /** A message by the start of its text. */
+  message(text: string): Locator {
+    return this.list.locator('[data-message-row]').filter({ hasText: text })
+  }
+
+  async expectTitle(title: string | RegExp): Promise<void> {
+    await expect(this.header).toContainText(title, { timeout: 15_000 })
+  }
+
+  async expectMessage(text: string): Promise<void> {
+    await expect(this.message(text)).toBeVisible({ timeout: 15_000 })
+  }
+
+  /**
+   * The "N new" divider sits right before the message that starts with
+   * `text`, 80px from the top of the list, or as near as the list can
+   * scroll when the topic is short.
+   */
+  async expectDividerBefore(text: string): Promise<void> {
+    await expect(this.root.locator('[data-new-divider] + [data-message-row]')).toContainText(text, { timeout: 15_000 })
+    const { offset, scrollTop, max } = await this.scroller.evaluate((scroller) => {
+      const divider = scroller.querySelector('[data-new-divider]')
+      if (divider === null) throw new Error('No divider')
+      return {
+        offset: divider.getBoundingClientRect().top - scroller.getBoundingClientRect().top,
+        scrollTop: scroller.scrollTop,
+        max: scroller.scrollHeight - scroller.clientHeight,
+      }
+    })
+    if (scrollTop > 0.5 && scrollTop < max - 0.5) expect(Math.abs(offset - 80)).toBeLessThanOrEqual(2)
+    else expect(offset).toBeGreaterThanOrEqual(0)
+  }
+
+  /** How far the divider is from the top of the list, in CSS pixels. */
+  dividerOffset(): Promise<number> {
+    return this.scroller.evaluate((scroller) => {
+      const divider = scroller.querySelector('[data-new-divider]')
+      if (divider === null) throw new Error('No divider')
+      return divider.getBoundingClientRect().top - scroller.getBoundingClientRect().top
+    })
+  }
+
+  async expectNew(count: number): Promise<void> {
+    await expect(this.divider).toHaveText(`${count} new`)
+  }
+
+  async expectNoDivider(): Promise<void> {
+    await expect(this.divider).toHaveCount(0)
+  }
+
+  distanceFromBottom(): Promise<number> {
+    return this.scroller.evaluate((scroller) => scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight)
+  }
+
+  async expectAtBottom(): Promise<void> {
+    await expect.poll(() => this.distanceFromBottom(), { timeout: 5_000 }).toBeLessThanOrEqual(BOTTOM_SLACK)
+  }
+
+  /** Scrolls the list up by `pixels` and waits for the scroll to settle. */
+  async scrollUp(pixels: number): Promise<void> {
+    await this.scrollTo({ by: -pixels })
+  }
+
+  async scrollToBottom(): Promise<void> {
+    await this.scrollTo({ to: 'bottom' })
+  }
+
+  async scrollToTop(): Promise<void> {
+    await this.scrollTo({ to: 'top' })
+  }
+
+  private async scrollTo(where: { readonly by: number } | { readonly to: 'top' | 'bottom' }): Promise<void> {
+    await this.scroller.evaluate(
+      (scroller, target) =>
+        new Promise<void>((resolve) => {
+          const max = scroller.scrollHeight - scroller.clientHeight
+          const to = 'by' in target ? scroller.scrollTop + target.by : target.to === 'top' ? 0 : max
+          if (Math.abs(Math.min(max, Math.max(0, to)) - scroller.scrollTop) < 1) return resolve()
+          scroller.addEventListener('scrollend', () => resolve(), { once: true })
+          scroller.scrollTop = to
+        }),
+      where,
+    )
+  }
+
+  /** The "N new messages" or "Jump to latest" pill over the bottom of the list. */
+  get pill() {
+    return this.root.getByRole('button', { name: /new message|Jump to latest/ })
+  }
+
+  async expectPill(text: string): Promise<void> {
+    await expect(this.pill).toHaveText(text)
+  }
+
+  async expectNoPill(): Promise<void> {
+    await expect(this.pill).toHaveCount(0)
+  }
+
+  async jumpToLatest(): Promise<void> {
+    await this.pill.click()
+  }
+
+  /** The stealth pill in the header. */
+  get stealthPill() {
+    return this.header.getByText('Stealth. Not marking as read.')
+  }
+
+  async expectStealth(stealth = true): Promise<void> {
+    await expect(this.stealthPill).toHaveCount(stealth ? 1 : 0)
+  }
+
+  /** The stealth pill's Mark read. */
+  async markRead(): Promise<void> {
+    await this.header.getByRole('button', { name: 'Mark read', exact: true }).click()
+  }
+
+  /** A "2 replies · Title" link under a Main message, by its label or title. */
+  threadLink(text: string | RegExp): ThreadLinkDriver {
+    return new ThreadLinkDriver(this.win, this.list.getByRole('button', { name: text }))
+  }
+
+  /** A #channel chip in a message: clicking it scopes the sidebar. */
+  async clickChannel(name: string): Promise<void> {
+    await this.list.getByRole('button', { name: `#${name}` }).first().click()
+  }
+
+  /** Main's "Threads" button and its popover. */
+  get threadsButton() {
+    return this.header.getByRole('button', { name: /^Threads/ })
+  }
+
+  async openThreads(): Promise<ThreadsPopover> {
+    await this.threadsButton.click()
+    const popover = new ThreadsPopover(this.win)
+    await expect(popover.root).toBeVisible()
+    return popover
+  }
+
+  /** The first message row in view and its top, for checking that nothing moved. */
+  firstVisibleRow(): Promise<{ readonly ts: string; readonly top: number }> {
+    return this.scroller.evaluate((scroller) => {
+      const box = scroller.getBoundingClientRect()
+      for (const row of scroller.querySelectorAll<HTMLElement>('[data-message-row]')) {
+        const top = row.getBoundingClientRect().top
+        if (top >= box.top) return { ts: row.dataset['messageRow'] ?? '', top }
+      }
+      throw new Error('No row in view')
+    })
+  }
+
+  /** The top of the row with `ts`. */
+  rowTop(ts: string): Promise<number> {
+    return this.scroller.evaluate((scroller, key) => {
+      const row = scroller.querySelector(`[data-message-row="${CSS.escape(key)}"]`)
+      if (row === null) throw new Error(`No row ${key}`)
+      return row.getBoundingClientRect().top
+    }, ts)
+  }
+
+  /** At least one image thumbnail in view has its bytes, served by main from the Slack session. */
+  async expectThumbnailsLoaded(): Promise<void> {
+    await expect
+      .poll(() => this.list.locator('img[src^="juno://files/"]').evaluateAll((images) => images.filter((image) => (image as HTMLImageElement).naturalWidth > 0).length), { timeout: 15_000 })
+      .toBeGreaterThan(0)
+  }
+
+  rowCount(): Promise<number> {
+    return this.list.locator('[data-message-row]').count()
+  }
+}
+
+export class ThreadLinkDriver {
+  constructor(
+    readonly win: Page,
+    readonly root: Locator,
+  ) {}
+
+  /** Mouse down on the link. */
+  async open(options: { readonly newTab?: boolean } = {}): Promise<void> {
+    await this.root.scrollIntoViewIfNeeded()
+    const box = await this.root.boundingBox()
+    if (!box) throw new Error('Thread link is not on screen')
+    if (options.newTab) await this.win.keyboard.down('Meta')
+    await this.win.mouse.move(box.x + 8, box.y + box.height / 2)
+    await this.win.mouse.down()
+    await this.win.mouse.up()
+    if (options.newTab) await this.win.keyboard.up('Meta')
+  }
+}
+
+/** The list behind Main's "Threads" button. */
+export class ThreadsPopover {
+  readonly root: Locator
+
+  constructor(readonly win: Page) {
+    this.root = win.getByRole('dialog', { name: 'Threads' })
+  }
+
+  entry(title: string): Locator {
+    return this.root.getByRole('listitem').filter({ hasText: title })
+  }
+
+  async open(title: string): Promise<void> {
+    await this.entry(title).scrollIntoViewIfNeeded()
+    const box = await this.entry(title).boundingBox()
+    if (!box) throw new Error(`No thread "${title}" in the list`)
+    await this.win.mouse.move(box.x + 24, box.y + box.height / 2)
+    await this.win.mouse.down()
+    await this.win.mouse.up()
+  }
+
+  async subscribe(title: string): Promise<void> {
+    const bell = this.entry(title).getByRole('button', { name: /^Unsubscribed/ })
+    await bell.click()
+    await expect(this.entry(title).getByRole('button', { name: /^Subscribed/ })).toBeVisible()
+  }
+}
+
+/** The tab strip over the workspace. */
+export class TabStrip {
+  readonly root: Locator
+
+  constructor(
+    readonly app: ElectronApplication,
+    readonly win: Page,
+  ) {
+    this.root = win.getByRole('tablist')
+  }
+
+  tab(title: string): Locator {
+    return this.root.getByRole('tab', { name: new RegExp(`^${escapeRegExp(title)}`) })
+  }
+
+  /** Tab titles, left to right. */
+  titles(): Promise<string[]> {
+    return this.root.getByRole('tab').evaluateAll((tabs) => tabs.map((tab) => tab.getAttribute('title') ?? ''))
+  }
+
+  async expectCount(count: number): Promise<void> {
+    await expect(this.root.getByRole('tab')).toHaveCount(count, { timeout: 15_000 })
+  }
+
+  async expectActive(title: string): Promise<void> {
+    await expect(this.tab(title)).toHaveAttribute('aria-selected', 'true', { timeout: 15_000 })
+  }
+
+  async expectStealth(title: string, stealth = true): Promise<void> {
+    if (stealth) await expect(this.tab(title)).toHaveAttribute('aria-description', 'Stealth')
+    else await expect(this.tab(title)).not.toHaveAttribute('aria-description', 'Stealth')
+  }
+
+  /** Mouse down on a tab. */
+  async select(title: string): Promise<void> {
+    const box = await this.tab(title).boundingBox()
+    if (!box) throw new Error(`No tab "${title}"`)
+    await this.win.mouse.move(box.x + 24, box.y + box.height / 2)
+    await this.win.mouse.down()
+    await this.win.mouse.up()
+  }
+
+  /** The close button on a tab. */
+  async close(title: string): Promise<void> {
+    await this.tab(title).hover()
+    await this.tab(title).getByRole('button', { name: 'Close tab' }).click()
+  }
+
+  /** An item of the app menu, as ⌘W, ⌘⇧] or ⌘⇧[ would choose it. */
+  async menu(id: 'close-tab' | 'next-tab' | 'previous-tab'): Promise<void> {
+    await this.app.evaluate(({ Menu, BrowserWindow }, itemId) => {
+      const item = Menu.getApplicationMenu()?.getMenuItemById(itemId)
+      if (!item) throw new Error(`No menu item ${itemId}`)
+      item.click(undefined, BrowserWindow.getAllWindows()[0])
+    }, id)
+  }
 }
