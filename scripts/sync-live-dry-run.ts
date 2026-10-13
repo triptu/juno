@@ -27,6 +27,8 @@
  * Flags:
  *   --fake        run against an in-process fake Slack instead (no keychain, no JUNO_LIVE)
  *   --seconds N   time limit for boot and discovery (default 900)
+ *   --until-quiet after `live`, keep running until no call has been made for 30 s
+ *                 (the background follow pass), within the same time limit
  *   --team T      pick this cached session when several teams are cached
  */
 import { mkdtemp, rm } from 'node:fs/promises'
@@ -77,6 +79,7 @@ const flag = (name: string) => {
 }
 const useFake = process.argv.includes('--fake')
 const seconds = Number(flag('--seconds') ?? (useFake ? 60 : 900))
+const untilQuiet = process.argv.includes('--until-quiet')
 const teamId = flag('--team')
 
 // Aggregates. Keys are method names and schema paths; values are counts and milliseconds.
@@ -91,7 +94,11 @@ const statuses = new Map<string, Map<number, number>>()
 const decodeProblems = new Map<string, number>()
 let rateLimitHits = 0
 
+/** `performance.now()` of the last call any method made. */
+let lastCallAt = 0
+
 const stat = (method: string): CallStat => {
+  lastCallAt = performance.now()
   let entry = calls.get(method)
   if (entry === undefined) {
     entry = { n: 0, ms: 0, failures: new Map() }
@@ -307,6 +314,11 @@ async function run(target: Target, workspaceDir: string): Promise<number> {
     const outcome = yield* Deferred.await(booted).pipe(Effect.timeoutOption(seconds * 1000))
     const bootTime = performance.now() - startedAt
     console.log(outcome._tag === 'Some' ? `sync-live: boot and discovery finished in ${ms(bootTime)}` : `sync-live: time limit reached after ${ms(bootTime)}; reporting what is there`)
+    if (untilQuiet && outcome._tag === 'Some') {
+      const deadline = startedAt + seconds * 1000
+      while (performance.now() < deadline && performance.now() - lastCallAt < 30_000) yield* Effect.sleep(1_000)
+      console.log(`sync-live: ${performance.now() - lastCallAt >= 30_000 ? 'quiet' : 'time limit reached'} after ${ms(performance.now() - startedAt)}`)
+    }
     // A little time for root fetches and users already in flight, then stop everything before reading the store.
     yield* Effect.sleep(2_000)
     yield* Scope.close(scope, Exit.void)

@@ -228,7 +228,8 @@ method and total time, conversations by kind and membership, topics by kind and 
 sidebar shows under the quiet rule, unread and mention counts, decode issues by path, rate-limit
 hits, the `topics.list` query time and snapshot size. Titles, names, message text and ids are
 never printed; the Effect logger is replaced by one that prints messages and enum-like fields
-only. `pnpm sync:live -- --fake` runs the same script against an in-process fake, which is how
+only. `-- --until-quiet` keeps it running after `live` until no call has been made for 30 s, so the
+background pass over every followed thread is counted too (raise `--seconds` for it). `pnpm sync:live -- --fake` runs the same script against an in-process fake, which is how
 it is checked in development.
 
 Both live scripts run under plain Node (type stripping). `@juno/sync`, `@juno/store` and
