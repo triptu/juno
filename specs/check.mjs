@@ -1,7 +1,6 @@
 import { spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from 'node:fs'
+import { mkdirSync, readdirSync, readFileSync, rmSync } from 'node:fs'
 import { createRequire } from 'node:module'
-import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -66,11 +65,23 @@ for (const [file, schedule, invariant, name] of regressions) {
 simulate('readstate', 'stealthBugStep', 'stealthNeverMarks', 'stealth-bug.itf.json', true)
 
 if (!tracesOnly) {
-  const java = spawnSync('java', ['-version'], { encoding: 'utf8' })
-  const apalache = join(process.env.QUINT_HOME ?? join(homedir(), '.quint'),
-    `apalache-dist-${apalacheVersion}`, 'apalache/bin/apalache-mc')
-  if (java.status !== 0 || !existsSync(apalache)) {
-    console.log(`Mode: randomized simulator only (${java.status !== 0 ? 'Java unavailable' : 'Apalache unavailable'}).`)
+  // Find a working Java: PATH first, then JAVA_HOME, then Homebrew's keg-only JDKs.
+  // macOS ships a /usr/bin/java stub that fails when no JDK is installed.
+  const javaCandidates = [
+    'java',
+    process.env.JAVA_HOME && join(process.env.JAVA_HOME, 'bin/java'),
+    '/opt/homebrew/opt/openjdk@21/bin/java',
+    '/opt/homebrew/opt/openjdk/bin/java',
+    '/usr/local/opt/openjdk@21/bin/java',
+  ].filter(Boolean)
+  const javaPath = javaCandidates.find((candidate) => spawnSync(candidate, ['-version'], { encoding: 'utf8' }).status === 0)
+  if (javaPath && javaPath !== 'java') {
+    process.env.PATH = `${dirname(javaPath)}:${process.env.PATH}`
+    process.env.JAVA_HOME = dirname(dirname(javaPath))
+  }
+  // Quint downloads Apalache on the first `verify` when it is missing.
+  if (!javaPath) {
+    console.log('Mode: randomized simulator only (Java unavailable).')
     console.log(`Correct protocols: ${samples} samples each, up to ${steps} steps, seed ${seed}.`)
     console.log('The temporal formula is typechecked. The simulator checks its 40-step drain bound, not unbounded liveness.')
   } else {
