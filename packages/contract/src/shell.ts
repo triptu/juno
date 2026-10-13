@@ -38,6 +38,8 @@ export type AppInfo = typeof AppInfo.Type
 export const PortRequestResult = Schema.Literals(['sent', 'failed'])
 export type PortRequestResult = typeof PortRequestResult.Type
 
+export const ContextMenuItems = Schema.Array(Schema.Struct({ id: Schema.String, label: Schema.String })).check(Schema.isMaxLength(20))
+
 /** renderer -> main request/response routes over `ipcRenderer.invoke`. */
 export const ShellRoutes = {
   [Channels.appGetInfo]: { input: Schema.Void, output: AppInfo },
@@ -45,6 +47,8 @@ export const ShellRoutes = {
   [Channels.engineRestart]: { input: Schema.Void, output: Schema.Void },
   [Channels.launchSetTheme]: { input: Schema.Struct({ theme: ThemeSchema }), output: Schema.Void },
   [Channels.launchSetAccent]: { input: Schema.Struct({ accent: AccentSchema }), output: Schema.Void },
+  [Channels.contextMenuPopup]: { input: Schema.Struct({ items: ContextMenuItems }), output: Schema.NullOr(Schema.String) },
+  [Channels.shellOpenExternal]: { input: Schema.Struct({ url: Schema.String }), output: Schema.Void },
 } as const
 
 export type ShellRoutes = typeof ShellRoutes

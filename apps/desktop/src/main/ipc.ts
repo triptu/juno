@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, type IpcMainInvokeEvent } from 'electron'
+import { app, BrowserWindow, ipcMain, Menu, shell, type IpcMainInvokeEvent } from 'electron'
 import { Schema } from 'effect'
 import { Channels, ShellRoutes, type ShellInput, type ShellOutput } from '@juno/contract'
 import type { EngineSupervisor } from './engine'
@@ -69,4 +69,31 @@ export function registerIpc({ supervisor, setTheme, setAccent }: IpcDeps): void 
   handle(Channels.launchSetAccent, ({ accent }) => {
     setAccent(accent)
   })
+
+  // A native menu at the pointer. The answer is the chosen item's id, or null.
+  handle(
+    Channels.contextMenuPopup,
+    ({ items }, event) =>
+      new Promise<string | null>((resolve) => {
+        let chosen: string | null = null
+        const menu = Menu.buildFromTemplate(items.map((item) => ({ label: item.label, click: () => (chosen = item.id) })))
+        const window = BrowserWindow.fromWebContents(event.sender) ?? undefined
+        // The item's click runs before the menu reports it closed.
+        menu.popup({ ...(window === undefined ? {} : { window }), callback: () => setImmediate(() => resolve(chosen)) })
+      }),
+  )
+
+  handle(Channels.shellOpenExternal, ({ url }) => {
+    if (isWebUrl(url)) void shell.openExternal(url)
+  })
+}
+
+/** Links from messages open in the browser only when they are http or https. */
+function isWebUrl(url: string): boolean {
+  try {
+    const protocol = new URL(url).protocol
+    return protocol === 'https:' || protocol === 'http:'
+  } catch {
+    return false
+  }
 }

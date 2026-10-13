@@ -2,7 +2,7 @@
 import { Effect, Schema } from 'effect'
 import * as Atom from 'effect/reactivity/Atom'
 import { AccentSchema, AppInfo, DEFAULT_ACCENT, ThemeSchema, type Accent, type Theme } from '@juno/contract'
-import type { JunoBridge } from '@juno/contract/channels'
+import type { ContextMenuItem, JunoBridge, MenuCommand } from '@juno/contract/channels'
 
 export type { Accent, Theme } from '@juno/contract'
 
@@ -58,4 +58,20 @@ export const accentAtom = Atom.make<Accent>(savedAccent())
 /** Tells main, so the next launch's first render already uses this accent. */
 export function persistAccent(accent: Accent): void {
   window.juno.launch.setAccent(accent).catch(() => {})
+}
+
+/** Shows a native context menu at the pointer. Resolves with the chosen item's id, or undefined. */
+export async function popupContextMenu(items: ReadonlyArray<ContextMenuItem>): Promise<string | undefined> {
+  const chosen = await window.juno.contextMenu.popup(items).catch(() => null)
+  return typeof chosen === 'string' && items.some((item) => item.id === chosen) ? chosen : undefined
+}
+
+/** Opens an http or https link in the browser. */
+export function openExternal(url: string): void {
+  window.juno.shell.openExternal(url).catch(() => {})
+}
+
+/** Calls `listener` for each app-menu command (⌘W, ⌘⇧], ⌘⇧[). Returns the unsubscribe. */
+export function onMenuCommand(listener: (command: MenuCommand) => void): () => void {
+  return window.juno.menu.onCommand(listener)
 }

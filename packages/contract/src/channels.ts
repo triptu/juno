@@ -19,6 +19,10 @@ export const Channels = {
   launchSetTheme: 'launch.setTheme',
   /** Remember the accent so the next launch's first render already uses it. */
   launchSetAccent: 'launch.setAccent',
+  /** Shows a native context menu at the pointer and answers with the chosen item's id, or null. */
+  contextMenuPopup: 'contextMenu.popup',
+  /** Opens an http or https link in the default browser. */
+  shellOpenExternal: 'shell.openExternal',
 } as const
 
 export type Channel = (typeof Channels)[keyof typeof Channels]
@@ -27,7 +31,18 @@ export type Channel = (typeof Channels)[keyof typeof Channels]
 export const Events = {
   /** Carries one MessagePort in `ports[0]`. */
   enginePort: 'engine.port',
+  /** An app-menu item the renderer acts on, with a `MenuCommand`. */
+  menuCommand: 'menu.command',
 } as const
+
+/** The app-menu items main hands to the renderer: ⌘W, ⌘⇧] and ⌘⇧[. */
+export type MenuCommand = 'tab.close' | 'tab.next' | 'tab.previous'
+
+/** One item of a context menu the renderer asks for. */
+export interface ContextMenuItem {
+  readonly id: string
+  readonly label: string
+}
 
 /** The tag the preload puts on the `window.postMessage` that forwards the port. */
 export const PORT_HANDOFF_TAG = 'juno.enginePort'
@@ -54,5 +69,17 @@ export interface JunoBridge {
   readonly launch: {
     readonly setTheme: (theme: Theme) => Promise<unknown>
     readonly setAccent: (accent: Accent) => Promise<unknown>
+  }
+  readonly contextMenu: {
+    /** Resolves with the chosen item's id, or null when the menu closed without a choice. */
+    readonly popup: (items: ReadonlyArray<ContextMenuItem>) => Promise<unknown>
+  }
+  readonly shell: {
+    /** Only http and https links open; main ignores anything else. */
+    readonly openExternal: (url: string) => Promise<unknown>
+  }
+  readonly menu: {
+    /** Calls `listener` for each app-menu command. Returns the unsubscribe. */
+    readonly onCommand: (listener: (command: MenuCommand) => void) => () => void
   }
 }

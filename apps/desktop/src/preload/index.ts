@@ -1,6 +1,6 @@
 /// <reference lib="dom" />
 import { contextBridge, ipcRenderer } from 'electron'
-import { Channels, Events, PORT_HANDOFF_TAG, type JunoBridge } from '@juno/contract/channels'
+import { Channels, Events, PORT_HANDOFF_TAG, type JunoBridge, type MenuCommand } from '@juno/contract/channels'
 
 // The whole bridge. Add one function per shell route; never expose
 // ipcRenderer or Node APIs. The renderer validates every answer.
@@ -15,6 +15,21 @@ const bridge: JunoBridge = {
   launch: {
     setTheme: (theme) => ipcRenderer.invoke(Channels.launchSetTheme, { theme }),
     setAccent: (accent) => ipcRenderer.invoke(Channels.launchSetAccent, { accent }),
+  },
+  contextMenu: {
+    popup: (items) => ipcRenderer.invoke(Channels.contextMenuPopup, { items: items.map(({ id, label }) => ({ id, label })) }),
+  },
+  shell: {
+    openExternal: (url) => ipcRenderer.invoke(Channels.shellOpenExternal, { url }),
+  },
+  menu: {
+    onCommand: (listener) => {
+      const forward = (_event: unknown, command: MenuCommand) => listener(command)
+      ipcRenderer.on(Events.menuCommand, forward)
+      return () => {
+        ipcRenderer.off(Events.menuCommand, forward)
+      }
+    },
   },
 }
 

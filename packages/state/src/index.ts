@@ -60,5 +60,5 @@ export {
 } from './tabs'
 export { errorOf } from './result'
 export { acquireRendererPort, EngineFailed } from './port'
-export { accentAtom, appInfoAtom, persistAccent, persistTheme, themeAtom, type Accent, type Theme } from './shell'
+export { accentAtom, appInfoAtom, onMenuCommand, openExternal, persistAccent, persistTheme, popupContextMenu, themeAtom, type Accent, type Theme } from './shell'
 export type { PortConnection, PortLike } from './transport'

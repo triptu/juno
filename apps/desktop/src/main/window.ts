@@ -1,6 +1,6 @@
 import { app, BrowserWindow, Menu, screen, shell, type BaseWindow, type BrowserWindowConstructorOptions, type MenuItemConstructorOptions } from 'electron'
 import { join } from 'node:path'
-import { DEFAULT_ACCENT } from '@juno/contract'
+import { DEFAULT_ACCENT, Events, type MenuCommand } from '@juno/contract'
 import { BACKGROUND, type Launch } from './launch'
 import { APP_URL } from './scheme'
 
@@ -59,6 +59,9 @@ export function createWindow(options: BrowserWindowConstructorOptions = {}): Bro
   return window
 }
 
+/** Windows that show the app page, which take the tab commands. Others (sign-in) just close on ⌘W. */
+const mainWindows = new WeakSet<BaseWindow>()
+
 export function createMainWindow(launch: Launch): BrowserWindow {
   const window = createWindow({
     title: 'Juno',
@@ -70,6 +73,7 @@ export function createMainWindow(launch: Launch): BrowserWindow {
     backgroundColor: BACKGROUND[launch.theme],
   })
 
+  mainWindows.add(window)
   setAppMenu()
   // Zoom outlives a reload (Chromium keeps it per origin), and pinch or
   // Control-scroll can change it without the menu.
@@ -109,6 +113,16 @@ function zoom(window: BaseWindow | undefined, step: number | 'reset'): void {
   fitMinimumSizeToZoom(target)
 }
 
+/** Hands a tab command to the app page of `window`. ⌘W closes any other window. */
+function tabCommand(window: BaseWindow | undefined, command: MenuCommand): void {
+  if (window === undefined || window.isDestroyed()) return
+  if (!mainWindows.has(window) || !(window instanceof BrowserWindow)) {
+    if (command === 'tab.close') window.close()
+    return
+  }
+  window.webContents.send(Events.menuCommand, command)
+}
+
 let menuSet = false
 
 /**
@@ -132,13 +146,29 @@ function setAppMenu(): void {
     { type: 'separator' },
     { role: 'togglefullscreen' },
   ]
+  // ⌘W closes the tab, not the window; ⌘⇧W closes the window.
+  const file: MenuItemConstructorOptions[] = [
+    { id: 'close-tab', label: 'Close Tab', accelerator: 'CommandOrControl+W', click: (_item, window) => tabCommand(window, 'tab.close') },
+    { role: 'close', accelerator: 'CommandOrControl+Shift+W' },
+  ]
+  const windowItems: MenuItemConstructorOptions[] = [
+    { role: 'minimize' },
+    { role: 'zoom' },
+    { type: 'separator' },
+    { id: 'previous-tab', label: 'Show Previous Tab', accelerator: 'CommandOrControl+Shift+[', click: (_item, window) => tabCommand(window, 'tab.previous') },
+    { id: 'next-tab', label: 'Show Next Tab', accelerator: 'CommandOrControl+Shift+]', click: (_item, window) => tabCommand(window, 'tab.next') },
+    { label: 'Show Previous Tab', accelerator: 'Control+Shift+Tab', visible: false, acceleratorWorksWhenHidden: true, click: (_item, window) => tabCommand(window, 'tab.previous') },
+    { label: 'Show Next Tab', accelerator: 'Control+Tab', visible: false, acceleratorWorksWhenHidden: true, click: (_item, window) => tabCommand(window, 'tab.next') },
+    { type: 'separator' },
+    { role: 'front' },
+  ]
   Menu.setApplicationMenu(
     Menu.buildFromTemplate([
       ...(process.platform === 'darwin' ? [{ role: 'appMenu' } satisfies MenuItemConstructorOptions] : []),
-      { role: 'fileMenu' },
+      { label: 'File', submenu: file },
       { role: 'editMenu' },
       { label: 'View', submenu: view },
-      { role: 'windowMenu' },
+      { role: 'window', submenu: windowItems },
     ]),
   )
 }
