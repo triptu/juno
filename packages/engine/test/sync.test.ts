@@ -1,54 +1,61 @@
 // Sync end to end: the engine boots against the fake, the sidebar rows reach
 // the state atoms over the port, and socket events update them live.
+import { existsSync } from 'node:fs'
+import { mkdir, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
-import { Cause, Exit, Option } from 'effect'
+import { Effect } from 'effect'
 import { afterEach, describe, expect, it } from 'vitest'
-import { topicsSubscribe, topicsUnsubscribe, type UndoCommand } from '@juno/contract'
-import { CONVERSATIONS, SELF_ID } from '@juno/fake-slack'
-import { runCommand, topicCountsAtom } from '@juno/state'
+import type { UndoCommand } from '@juno/contract'
+import { CONVERSATIONS, SELF_ID, startFakeSlack } from '@juno/fake-slack'
+import { prefs, Store, workspacePaths } from '@juno/store'
+import { topicCountsAtom } from '@juno/state'
 import { sleep, startTestEngine, waitFor, type RunningEngine } from './harness'
+import {
+  apiCalls,
+  bootedEngine as boot,
+  callMap,
+  DAY,
+  errorOf,
+  quiet,
+  readDb,
+  restart,
+  seedThread,
+  storedFollow,
+  subscribe,
+  threadId as threadIdIn,
+  tsOf,
+  unsubscribe,
+  valueOf,
+  type SeededThread,
+} from './scenario'
 
 const engines: Array<RunningEngine> = []
 afterEach(async () => {
   for (const engine of engines.splice(0).toReversed()) await engine.stop()
 })
 
-async function bootedEngine(options: Parameters<typeof startTestEngine>[0] = {}) {
-  const engine = await startTestEngine({ initial: (fake) => fake.signIn(), ...options })
-  engines.push(engine)
-  await engine.status('ready')
-  await engine.phase('live', 30_000)
-  return engine
-}
-
-const apiCalls = (engine: RunningEngine, method?: string) =>
-  engine.fake.calls.filter((c) => c.kind === 'api' && (method === undefined || c.method === method))
+const bootedEngine = (options: Parameters<typeof startTestEngine>[0] = {}) => boot(engines, options)
 
 /** The quiet window, in the fixture's unit (minutes before now). */
 const WINDOW = 7 * 24 * 60
 
-/** The fixture conversations the self user is in, and those with activity inside the quiet window. */
+/** The fixture conversations the self user is in, and the channels they are not in. */
 const memberConversations = CONVERSATIONS.filter((c) => c.members.includes(SELF_ID))
 const nonMemberChannels = CONVERSATIONS.filter((c) => !c.members.includes(SELF_ID)).map((c) => c.id)
-const activeConversations = memberConversations.filter((c) => {
-  const newest = Math.min(...c.messages.flatMap((m) => [m.ago, ...(m.replies ?? []).map((r) => r.ago)]))
-  return newest < WINDOW
-}).length
+
+/** A fresh `event_ts` for a frame a test emits. */
+const eventTs = () => `${Math.floor(Date.now() / 1000)}.${String(Math.floor(Math.random() * 1e6)).padStart(6, '0')}`
+
+/** Member conversations with a Main message (not just a reply) inside the window: the ones cold boot reads history for. */
+const activeMains = memberConversations.filter((c) => c.messages.some((m) => m.ago < WINDOW)).length
 
 /** The topic id of a thread in the fake, by the start of its root's text. */
-const threadId = (engine: RunningEngine, channel: string, prefix: string) =>
-  `t:${channel}:${engine.fake.messages(channel).find((m) => m.text?.startsWith(prefix))!.ts}`
+const threadId = (engine: RunningEngine, channel: string, prefix: string) => threadIdIn(engine.fake, channel, prefix)
 
-const subscribe = (engine: RunningEngine, id: string) => runCommand(engine.registry, topicsSubscribe, { id })
-const unsubscribe = (engine: RunningEngine, id: string) => runCommand(engine.registry, topicsUnsubscribe, { id })
 /** Replays an undo the way the renderer's undo stack does: the command its tag names. */
 const replay = (engine: RunningEngine, undo: UndoCommand) => (undo._tag === 'topics.subscribe' ? subscribe(engine, undo.id) : unsubscribe(engine, undo.id))
-const valueOf = <A, E>(exit: Exit.Exit<A, E>): A => {
-  if (Exit.isSuccess(exit)) return exit.value
-  throw new Error(`command failed: ${Cause.pretty(exit.cause)}`)
-}
-const errorOf = <A, E>(exit: Exit.Exit<A, E>): E | undefined => (Exit.isFailure(exit) ? Option.getOrUndefined(Cause.findErrorOption(exit.cause)) : undefined)
 
 describe('cold boot', () => {
   it('discovers the fixture workspace: titles, previews, counts, tags and order', async () => {
@@ -138,18 +145,29 @@ describe('cold boot', () => {
     expect(rows.map((r) => r.id)).toHaveLength(expected.size)
   })
 
-  it('spends one history call per active conversation and no more', async () => {
+  it('spends an exact call budget: one history call per active conversation, every getView page, no call per row', async () => {
     const engine = await bootedEngine()
     await engine.rowsUntil((rows) => rows.length >= 20, 'rows')
+    await quiet(engine)
     const history = apiCalls(engine, 'conversations.history')
-    expect(history.length).toBeLessThanOrEqual(activeConversations)
     expect(new Set(history.map((c) => c.args['channel'])).size).toBe(history.length)
-    expect(apiCalls(engine, 'client.userBoot')).toHaveLength(1)
-    expect(apiCalls(engine, 'client.counts')).toHaveLength(1)
-    expect(apiCalls(engine, 'subscriptions.thread.getView')).toHaveLength(1)
-    expect(engine.fake.calls.filter((c) => c.kind === 'edge')).toHaveLength(1)
-    // The store is the source of the rows: no call is made per row.
-    expect(apiCalls(engine).length).toBeLessThan(activeConversations + 10)
+    expect(callMap(engine)).toEqual({
+      'api:auth.test': 1,
+      'api:client.getWebSocketURL': 1,
+      'api:api.getFlannelHttpUrl': 1,
+      'api:client.userBoot': 1,
+      'api:users.prefs.get': 1,
+      'api:client.counts': 1,
+      // The fixture follows 12 threads; Slack pages them 10 at a time.
+      'api:subscriptions.thread.getView': 2,
+      // A conversation whose only recent activity is a reply under an older root has nothing for history in the window.
+      'api:conversations.history': activeMains,
+      // The latest reply of the unfollowed threads with recent activity, for their preview.
+      'api:conversations.replies': 2,
+      // Discovery over the window at the end of the cold boot: more than 50 thread messages, so two pages.
+      'api:search.modules.messages': 2,
+      'edge:users/info': 1,
+    })
   })
 
   it('filters by kind, unread and scope, and counts for the dots', async () => {
@@ -249,14 +267,19 @@ describe('warm boot', () => {
     expect(flaky).toMatchObject({ message_count: 7, unread_count: 1 })
 
     // Only the conversation whose latest moved was fetched; the thread reply came from the discovery search.
-    const history = apiCalls(second, 'conversations.history')
-    expect(history.map((c) => c.args['channel'])).toEqual(['C0PRODUCT'])
-    expect(apiCalls(second, 'client.userBoot')).toHaveLength(1)
-    expect(apiCalls(second, 'client.counts')).toHaveLength(1)
-    expect(apiCalls(second, 'subscriptions.thread.getView')).toHaveLength(1)
-    expect(apiCalls(second, 'search.modules.messages')).toHaveLength(1)
-    expect(apiCalls(second).length).toBeLessThanOrEqual(10)
-    expect(apiCalls(second, 'users.prefs.get')).toHaveLength(0)
+    await quiet(second)
+    expect(apiCalls(second, 'conversations.history').map((c) => c.args['channel'])).toEqual(['C0PRODUCT'])
+    expect(callMap(second)).toEqual({
+      'api:auth.test': 1,
+      'api:client.getWebSocketURL': 1,
+      'api:client.userBoot': 1,
+      'api:client.counts': 1,
+      'api:conversations.history': 1,
+      'api:subscriptions.thread.getView': 2,
+      'api:search.modules.messages': 1,
+      // The searched reply is newer than its root's counters, so the root is fetched for Slack's reply_count.
+      'api:conversations.replies': 1,
+    })
 
     await second.stop()
     engines.splice(engines.indexOf(second), 1)
@@ -431,5 +454,387 @@ describe('subscriptions (spec section 5, "Subscribe works on any thread")', () =
     expect(errorOf(await subscribe(engine, 't:C0ENG:1.000'))).toMatchObject({ _tag: 'NotFound' })
     expect(errorOf(await unsubscribe(engine, 'm:C0NOPE'))).toMatchObject({ _tag: 'NotFound' })
     expect(apiCalls(engine)).toHaveLength(0)
+  })
+})
+
+describe('follow state (review M3 finding 1, specs/follow.qnt)', () => {
+  it('a thread unfollowed in Slack while Juno was closed leaves the sidebar at the next start, and comes back when followed again', async () => {
+    const first = await bootedEngine()
+    const id = threadId(first, 'C0ENG', 'Draft plan is in the doc.')
+    expect((await first.rowsUntil((rows) => rows.length >= 20, 'rows')).find((r) => r.id === id)).toMatchObject({ subscribed: true })
+
+    const second = await restart(engines, first, (fake) => fake.unfollowThread({ channel: 'C0ENG', threadTs: tsOf(id) }))
+    await second.rowsUntil((rows) => rows.length >= 20 && !rows.some((r) => r.id === id), 'the unfollowed thread gone')
+    expect(storedFollow(second, 'C0ENG', tsOf(id))).toBe(0)
+    // The thread was missing from the complete getView list, so its root was asked; nothing else was.
+    expect(apiCalls(second, 'conversations.replies').map((c) => c.args['ts'])).toEqual([tsOf(id)])
+
+    const third = await restart(engines, second, (fake) => fake.followThread({ channel: 'C0ENG', threadTs: tsOf(id) }))
+    await third.rowsUntil((rows) => rows.some((r) => r.id === id), 'the thread followed again')
+    expect(storedFollow(third, 'C0ENG', tsOf(id))).toBe(1)
+  })
+
+  it('a getView page in flight cannot bring back a thread the user unsubscribed meanwhile', async () => {
+    const engine = await bootedEngine()
+    const rows = await engine.rowsUntil((list) => list.length >= 20, 'rows')
+    const newest = rows.filter((r) => r.kind === 'thread').toSorted((a, b) => (a.lastActivityTs < b.lastActivityTs ? 1 : -1))[0]!
+    // The reconnect's first getView page is taken while the thread is still followed, and answered late.
+    engine.fake.holdNext({ method: 'subscriptions.thread.getView' })
+    engine.fake.dropSocket()
+    await waitFor(() => (engine.fake.heldCount({ method: 'subscriptions.thread.getView' }) === 1 ? true : undefined), 20_000, 'the held page')
+    expect(valueOf(await unsubscribe(engine, newest.id))).toEqual({ undo: { _tag: 'topics.subscribe', id: newest.id } })
+    await engine.rowsUntil((list) => !list.some((r) => r.id === newest.id), 'the thread gone')
+    engine.fake.release()
+    await engine.phase('live', 20_000)
+    await quiet(engine)
+    expect((await engine.rows()).some((r) => r.id === newest.id)).toBe(false)
+    expect(storedFollow(engine, newest.channel.id, tsOf(newest.id))).toBe(0)
+    expect(engine.fake.workspace.subscription(newest.channel.id, tsOf(newest.id))?.subscribed).toBe(false)
+  })
+
+  it('a followed thread older than the quiet window becomes a row when it gets a reply', async () => {
+    let old: SeededThread | undefined
+    const engine = await bootedEngine({
+      initial: (fake) => {
+        old = seedThread(fake, { channel: 'C0ENG', text: 'Old capacity plan', ago: 20 * DAY, replies: [20 * DAY, 19 * DAY], follow: true })
+        return fake.signIn()
+      },
+    })
+    await engine.rowsUntil((rows) => rows.length >= 20, 'rows')
+    expect((await engine.rows()).some((r) => r.id === old!.id)).toBe(false)
+    engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0MAYA', text: 'Revisiting this for Q3.', threadTs: old!.ts })
+    const rows = await engine.rowsUntil((list) => list.some((r) => r.id === old!.id), 'the old followed thread')
+    expect(rows.find((r) => r.id === old!.id)).toMatchObject({ subscribed: true, unreadCount: 1, preview: { text: 'Revisiting this for Q3.' } })
+  })
+
+  it('a reply from Slack while a Subscribe is in flight does not hide the intent, and Slack is asked again afterwards', async () => {
+    const engine = await bootedEngine()
+    await engine.rowsUntil((rows) => rows.length >= 20, 'rows')
+    const id = threadId(engine, 'C0PLATFORM', 'We have 142 flags')
+    engine.fake.holdNext({ method: 'subscriptions.thread.add' })
+    const pending = subscribe(engine, id)
+    await waitFor(() => (engine.fake.heldCount({ method: 'subscriptions.thread.add' }) === 1 ? true : undefined), 10_000, 'the held add')
+    // Slack accepted the add (its handler ran and sent thread_subscribed), then another client unfollowed.
+    engine.fake.unfollowThread({ channel: 'C0PLATFORM', threadTs: tsOf(id) })
+    await waitFor(() => (engine.fake.frames.some((f) => f.type === 'thread_unsubscribed') ? true : undefined), 10_000, 'the unfollow event')
+    await sleep(200)
+    // The command is still pending, so its intent stays visible.
+    expect((await engine.rows()).some((r) => r.id === id)).toBe(true)
+    engine.fake.release()
+    expect(valueOf(await pending)).toEqual({ undo: { _tag: 'topics.unsubscribe', id } })
+    // The noted observation made the command ask for the root: Slack's newer unfollow wins.
+    await engine.rowsUntil((rows) => !rows.some((r) => r.id === id), 'the thread gone after the refresh')
+    expect(storedFollow(engine, 'C0PLATFORM', tsOf(id))).toBe(0)
+  })
+})
+
+describe('followed threads past one getView page (review M3 finding 2)', () => {
+  it('a warm boot reads every page: reads on another device clear, and a follow made elsewhere appears', async () => {
+    const threads: Array<SeededThread> = []
+    const first = await bootedEngine({
+      initial: (fake) => {
+        for (let i = 0; i < 25; i++) {
+          threads.push(seedThread(fake, { channel: 'C0PLATFORM', text: `Rollout step ${i + 1}`, ago: 3 * DAY, replies: [2 * DAY + i * 60_000, DAY + i * 60_000], follow: true, unread: 1 }))
+        }
+        return fake.signIn()
+      },
+    })
+    const ids = new Set(threads.map((t) => t.id))
+    await first.rowsUntil((rows) => rows.filter((r) => ids.has(r.id) && r.unreadCount === 1).length === 25, 'the 25 unread threads')
+
+    const flaky = threadId(first, 'C0ENG', 'checkout.spec')
+    const second = await restart(engines, first, (fake) => {
+      // Read on the phone overnight, and a thread followed there.
+      for (const t of threads) fake.markThreadRead({ channel: t.channel, threadTs: t.ts, ts: fake.workspace.replies(t.channel, t.ts as never).at(-1)!.ts })
+      fake.followThread({ channel: 'C0ENG', threadTs: tsOf(flaky) })
+    })
+    const rows = await second.rowsUntil(
+      (list) => list.filter((r) => ids.has(r.id) && r.unreadCount === 0).length === 25 && list.some((r) => r.id === flaky),
+      'every thread read and the new follow',
+    )
+    expect(rows.find((r) => r.id === flaky)).toMatchObject({ subscribed: true })
+    // 12 fixture follows, 25 seeded and the new one: four pages of ten.
+    expect(apiCalls(second, 'subscriptions.thread.getView')).toHaveLength(4)
+  })
+})
+
+describe('search matches (review M3 finding 3)', () => {
+  it('the discovery sweep keeps the files and blocks of a stored reply', async () => {
+    const engine = await bootedEngine()
+    await engine.rowsUntil((rows) => rows.length >= 20, 'rows')
+    const id = threadId(engine, 'C0ENG', 'Draft plan is in the doc.')
+    const file = { id: 'F0PLAN', name: 'plan.pdf', title: 'plan.pdf', mimetype: 'application/pdf', filetype: 'pdf', size: 1024 }
+    const posted = engine.fake.workspace.post({ channel: 'C0ENG', user: 'U0MAYA', text: 'Here is the plan.', threadTs: tsOf(id) as never, files: [file] })
+    await engine.rowsUntil((rows) => rows.find((r) => r.id === id)?.preview.text === 'Here is the plan.', 'the reply')
+    const stored = () =>
+      readDb(engine, 'cache.db', (db) => db.prepare('SELECT files_json, blocks_json FROM messages WHERE channel = ? AND ts = ?').get('C0ENG', posted.ts)) as {
+        files_json: string | null
+        blocks_json: string | null
+      }
+    const before = stored()
+    expect(before.files_json).toContain('F0PLAN')
+    expect(before.blocks_json).not.toBeNull()
+
+    engine.fake.resetCalls()
+    engine.fake.dropSocket()
+    await engine.phase('offline')
+    await engine.phase('live', 20_000)
+    await quiet(engine)
+    // The sweep matched the reply (search has no files or blocks) and left the stored message alone.
+    expect(apiCalls(engine, 'search.modules.messages').length).toBeGreaterThan(0)
+    expect(stored()).toEqual(before)
+  })
+})
+
+describe('an expired session (review M3 finding 4)', () => {
+  it('found by the catch-up after a reconnect ends the session as session-expired', async () => {
+    const engine = await bootedEngine()
+    await engine.rowsUntil((rows) => rows.length >= 20, 'rows')
+    // The socket reconnects with its reconnect_url; the first API call of the catch-up meets the expired session.
+    engine.fake.forceError({ method: 'client.counts', error: 'invalid_auth', times: 10 })
+    engine.fake.dropSocket()
+    await engine.status('authRequired')
+    await engine.phase('session-expired')
+  })
+})
+
+describe('subscriptions after a failure (review M3 finding 10)', () => {
+  it('a rejected unsubscribe asks Slack and keeps the follow Slack still has', async () => {
+    const engine = await bootedEngine()
+    await engine.rowsUntil((rows) => rows.length >= 20, 'rows')
+    const id = threadId(engine, 'C0ENG', 'Draft plan is in the doc.')
+    engine.fake.forceError({ method: 'subscriptions.thread.remove', error: 'not_allowed' })
+    expect(errorOf(await unsubscribe(engine, id))).toMatchObject({ _tag: 'Rejected', code: 'not_allowed' })
+    await engine.rowsUntil((rows) => rows.some((r) => r.id === id), 'the thread back')
+    expect(storedFollow(engine, 'C0ENG', tsOf(id))).toBe(1)
+    expect(apiCalls(engine, 'conversations.replies').some((c) => c.args['ts'] === tsOf(id))).toBe(true)
+  })
+
+  it('a failed Subscribe does not undo a follow Slack made meanwhile', async () => {
+    const engine = await bootedEngine()
+    await engine.rowsUntil((rows) => rows.length >= 20, 'rows')
+    const id = threadId(engine, 'C0PLATFORM', 'We have 142 flags')
+    engine.fake.forceError({ method: 'subscriptions.thread.add', error: 'not_allowed' })
+    engine.fake.holdNext({ method: 'subscriptions.thread.add' })
+    const pending = subscribe(engine, id)
+    await waitFor(() => (engine.fake.heldCount({ method: 'subscriptions.thread.add' }) === 1 ? true : undefined), 10_000, 'the held add')
+    // Another client follows the thread while Juno's call is failing.
+    engine.fake.followThread({ channel: 'C0PLATFORM', threadTs: tsOf(id) })
+    await sleep(200)
+    engine.fake.release()
+    expect(errorOf(await pending)).toMatchObject({ _tag: 'Rejected' })
+    await quiet(engine)
+    expect((await engine.rows()).some((r) => r.id === id)).toBe(true)
+    expect(storedFollow(engine, 'C0PLATFORM', tsOf(id))).toBe(1)
+  })
+
+  it('commands on one thread run in order: an Unsubscribe waits for a Subscribe whose call then fails', async () => {
+    const engine = await bootedEngine()
+    await engine.rowsUntil((rows) => rows.length >= 20, 'rows')
+    const id = threadId(engine, 'C0PLATFORM', 'We have 142 flags')
+    engine.fake.forceError({ method: 'subscriptions.thread.add', error: 'not_allowed' })
+    engine.fake.holdNext({ method: 'subscriptions.thread.add' })
+    const first = subscribe(engine, id)
+    await waitFor(() => (engine.fake.heldCount({ method: 'subscriptions.thread.add' }) === 1 ? true : undefined), 10_000, 'the held add')
+    const second = unsubscribe(engine, id)
+    await sleep(200)
+    expect(apiCalls(engine, 'subscriptions.thread.remove')).toHaveLength(0)
+    engine.fake.release()
+    expect(errorOf(await first)).toMatchObject({ _tag: 'Rejected' })
+    // By its turn the thread is unfollowed again, so there is nothing to change and nothing to undo.
+    expect(valueOf(await second)).toEqual({})
+    expect(apiCalls(engine, 'subscriptions.thread.remove')).toHaveLength(0)
+    expect(storedFollow(engine, 'C0PLATFORM', tsOf(id))).toBeUndefined()
+  })
+
+  it('subscribing to a thread Juno has no read pointer for sends the root as last_read', async () => {
+    const engine = await bootedEngine()
+    await engine.rowsUntil((rows) => rows.length >= 20, 'rows')
+    const root = engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0LEO', text: 'Who owns the flaky runner?' })
+    engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0SAM', text: 'Platform, I think.', threadTs: root.ts })
+    engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0DEV', text: 'Confirmed.', threadTs: root.ts })
+    const id = `t:C0ENG:${root.ts}`
+    await waitFor(
+      () => (readDb(engine, 'cache.db', (db) => db.prepare('SELECT message_count FROM topic_index WHERE topic_id = ?').get(id)) as { message_count: number } | undefined)?.message_count === 3 || undefined,
+      10_000,
+      'the thread indexed',
+    )
+    valueOf(await subscribe(engine, id))
+    expect(apiCalls(engine, 'subscriptions.thread.add').at(-1)!.args['last_read']).toBe(root.ts)
+    const rows = await engine.rowsUntil((list) => list.some((r) => r.id === id), 'the thread')
+    expect(rows.find((r) => r.id === id)).toMatchObject({ unreadCount: 2 })
+  })
+})
+
+describe('cold boot details (review M3 finding 10)', () => {
+  it('a mention that arrives while history is loading stays unread', async () => {
+    const engine = await startTestEngine({
+      initial: (fake) => {
+        fake.holdNext({ method: 'conversations.history' })
+        return fake.signIn()
+      },
+    })
+    engines.push(engine)
+    await engine.status('ready')
+    await waitFor(() => (engine.fake.heldCount({ method: 'conversations.history' }) === 1 ? true : undefined), 20_000, 'the first history page held')
+    const id = threadId(engine, 'C0ENG', 'checkout.spec')
+    engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0SAM', text: '<@U0TUSHAR> can you take a look?', threadTs: tsOf(id) })
+    await sleep(100)
+    engine.fake.release()
+    await engine.phase('live', 30_000)
+    // Unfollowed, but an unread mention brings it in; the replies before the boot count as read.
+    const rows = await engine.rowsUntil((list) => list.some((r) => r.id === id), 'the mentioned thread')
+    expect(rows.find((r) => r.id === id)).toMatchObject({ mentionsMe: true, unreadCount: 1, subscribed: false })
+  })
+
+  it('an interrupted cold boot does not fetch again the history it already has', async () => {
+    const engine = await startTestEngine({
+      initial: (fake) => {
+        // The discovery at the end of the boot fails; the boot waits 30 s before it tries again.
+        fake.forceError({ method: 'search.modules.messages', error: 'not_allowed' })
+        return fake.signIn()
+      },
+    })
+    engines.push(engine)
+    await engine.status('ready')
+    await waitFor(() => (apiCalls(engine, 'search.modules.messages').length === 1 ? true : undefined), 30_000, 'the failed discovery')
+    await engine.phase('offline', 10_000)
+    const fetched = apiCalls(engine, 'conversations.history').length
+    expect(fetched).toBe(activeMains)
+    engine.fake.resetCalls()
+    // A force_reload boots again at once.
+    engine.fake.emitFrame({ type: 'force_reload', event_ts: `${Math.floor(Date.now() / 1000)}.000100` })
+    await engine.phase('live', 30_000)
+    await quiet(engine)
+    expect(apiCalls(engine, 'conversations.history')).toHaveLength(0)
+    expect(apiCalls(engine, 'search.modules.messages').length).toBeGreaterThan(0)
+    expect((await engine.rowsUntil((rows) => rows.length >= 20, 'rows')).length).toBeGreaterThanOrEqual(20)
+  })
+
+  it("shows a channel's Main when its only activity in the window is a reply to an older, unfollowed root", async () => {
+    const engine = await bootedEngine({
+      initial: (fake) => {
+        // A channel the user is in with nothing in the window but one reply, from yesterday, to a month-old root.
+        fake.workspace.addConversation({
+          id: 'C0ARCHITECTURE',
+          name: 'architecture',
+          kind: 'public',
+          members: new Set([SELF_ID, 'U0LEO', 'U0MAYA']),
+          created: fake.now() - 90 * DAY,
+          topic: '',
+          purpose: '',
+          isOpen: true,
+          archived: false,
+        })
+        seedThread(fake, { channel: 'C0ARCHITECTURE', text: 'Old proposal', ago: 30 * DAY, replies: [30 * DAY, DAY], follow: false })
+        return fake.signIn()
+      },
+    })
+    const rows = await engine.rowsUntil((list) => list.some((r) => r.id === 'm:C0ARCHITECTURE'), 'the Main kept alive by the reply')
+    expect(rows.find((r) => r.id === 'm:C0ARCHITECTURE')).toMatchObject({ kind: 'main', title: '#architecture' })
+  })
+
+  it('reads history over the quiet window the user chose', async () => {
+    const fake = await startFakeSlack()
+    const userData = join(tmpdir(), `juno-quiet-${process.pid}-${Date.now()}`)
+    await mkdir(userData, { recursive: true })
+    const paths = workspacePaths(userData, fake.teamId)
+    await Effect.runPromise(prefs.set('quietDays', 3).pipe(Effect.provide(Store.layer(paths)), Effect.scoped))
+    const credentials = fake.signIn()
+    const engine = await startTestEngine({ reuse: { userData, fake, credentials }, initial: () => credentials })
+    engines.push({ ...engine, stop: async () => (await engine.stop(), await fake.close(), await rm(userData, { recursive: true, force: true })) })
+    await engine.phase('live', 30_000)
+    const oldest = Number(apiCalls(engine, 'conversations.history')[0]!.args['oldest'])
+    expect(Math.abs(oldest - (Date.now() / 1000 - 3 * 86_400))).toBeLessThan(120)
+  })
+
+  it('discovery asks search for newest first, so a long gap is read in full and not sampled', async () => {
+    const first = await bootedEngine()
+    await first.rowsUntil((rows) => rows.length >= 20, 'rows')
+    const flags = threadId(first, 'C0PLATFORM', 'We have 142 flags')
+    const posted: Array<string> = []
+    const second = await restart(engines, first, (fake) => {
+      for (let i = 0; i < 70; i++) posted.push(fake.injectMessage({ channel: 'C0PLATFORM', user: 'U0LEO', text: `Flag ${i} removed.`, threadTs: tsOf(flags) }).ts)
+    })
+    await quiet(second)
+    expect(apiCalls(second, 'search.modules.messages').every((c) => c.args['sort'] === 'timestamp' && c.args['sort_dir'] === 'desc')).toBe(true)
+    const stored = readDb(second, 'cache.db', (db) => db.prepare('SELECT ts FROM messages WHERE channel = ? AND thread_ts = ?').all('C0PLATFORM', tsOf(flags)) as Array<{ ts: string }>)
+    const storedTs = new Set(stored.map((r) => r.ts))
+    expect(posted.filter((ts) => !storedTs.has(ts))).toEqual([])
+  })
+})
+
+describe('workspace events', () => {
+  it('archive, unarchive, delete, leaving, closing a DM and a rename change only what they say', async () => {
+    const engine = await bootedEngine()
+    await engine.rowsUntil((rows) => rows.length >= 20, 'rows')
+    const conversation = (id: string) =>
+      readDb(engine, 'cache.db', (db) => db.prepare('SELECT kind, name, topic, is_member, is_archived FROM conversations WHERE id = ?').get(id)) as
+        | { kind: string; name: string; topic: string | null; is_member: number; is_archived: number }
+        | undefined
+    const cases: ReadonlyArray<{ name: string; act: () => void; expect: () => boolean }> = [
+      { name: 'archive', act: () => engine.fake.emitFrame({ type: 'channel_archive', channel: 'C0DEPLOYS', user: 'U0SAM', event_ts: eventTs() }), expect: () => conversation('C0DEPLOYS')?.is_archived === 1 },
+      { name: 'unarchive', act: () => engine.fake.emitFrame({ type: 'channel_unarchive', channel: 'C0DEPLOYS', user: 'U0SAM', event_ts: eventTs() }), expect: () => conversation('C0DEPLOYS')?.is_archived === 0 },
+      { name: 'delete', act: () => engine.fake.emitFrame({ type: 'channel_deleted', channel: 'C0SOCIAL', event_ts: eventTs() }), expect: () => conversation('C0SOCIAL')?.is_member === 0 },
+      {
+        name: 'self leaves',
+        act: () => engine.fake.emitFrame({ type: 'member_left_channel', user: SELF_ID, channel: 'C0INCIDENTS', channel_type: 'C', team: engine.fake.teamId, event_ts: eventTs() }),
+        expect: () => conversation('C0INCIDENTS')?.is_member === 0,
+      },
+      {
+        name: 'im_close',
+        act: () => engine.fake.emitFrame({ type: 'im_close', channel: 'D0SAM', user: SELF_ID, event_ts: eventTs() }),
+        expect: () => conversation('D0SAM')?.is_member === 1,
+      },
+    ]
+    for (const step of cases) {
+      step.act()
+      await waitFor(() => (step.expect() ? true : undefined), 10_000, step.name)
+    }
+    const rows = await engine.rowsUntil((list) => !list.some((r) => r.channel.id === 'C0SOCIAL' || r.channel.id === 'C0INCIDENTS'), 'left channels gone')
+    expect(rows.some((r) => r.channel.id === 'D0SAM')).toBe(true)
+
+    // A rename sends a partial channel object: the private channel keeps its kind and topic.
+    const hiring = conversation('C0HIRING')!
+    engine.fake.renameChannel({ channel: 'C0HIRING', name: 'recruiting' })
+    await engine.rowsUntil((list) => list.some((r) => r.channel.label === '#recruiting'), 'the renamed channel')
+    expect(conversation('C0HIRING')).toEqual({ ...hiring, name: 'recruiting' })
+    expect((await engine.rows()).find((r) => r.channel.label === '#recruiting')?.channel.kind).toBe('private')
+  })
+
+  it('a mention of a user group the user belongs to counts as a mention', async () => {
+    const engine = await bootedEngine({
+      initial: (fake) => {
+        fake.setSelfUsergroups({ ids: ['S0PLATFORM'] })
+        return fake.signIn()
+      },
+    })
+    await engine.rowsUntil((rows) => rows.length >= 20, 'rows')
+    const id = threadId(engine, 'C0ENG', 'Draft plan is in the doc.')
+    engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0LEO', text: 'Heads up <!subteam^S0PLATFORM|@platform>, review please.', threadTs: tsOf(id) })
+    const rows = await engine.rowsUntil((list) => list.find((r) => r.id === id)?.unreadCount === 1, 'the reply')
+    expect(rows.find((r) => r.id === id)).toMatchObject({ mentionsMe: true })
+  })
+
+  it('a user the edge does not know is asked for once per session', async () => {
+    const engine = await bootedEngine()
+    await engine.rowsUntil((rows) => rows.length >= 20, 'rows')
+    engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0GHOST', text: 'Hello from another org.' })
+    await engine.rowsUntil((rows) => rows.some((r) => r.preview.text === 'Hello from another org.'), 'the message')
+    const asked = () => engine.fake.calls.filter((c) => c.kind === 'edge' && JSON.stringify(c.args).includes('U0GHOST')).length
+    for (let i = 0; i < 2; i++) {
+      engine.fake.dropSocket()
+      await engine.phase('offline')
+      await engine.phase('live', 20_000)
+      await quiet(engine)
+    }
+    expect(asked()).toBe(1)
+  })
+
+  it('keys the workspace directory by enterprise and team on Grid', async () => {
+    const engine = await bootedEngine({ enterpriseId: 'E0ORG' })
+    await engine.rowsUntil((rows) => rows.length >= 20, 'rows')
+    expect(existsSync(join(engine.userData, 'workspaces', `E0ORG-${engine.fake.teamId}`, 'cache.db'))).toBe(true)
+    expect(existsSync(join(engine.userData, 'workspaces', 'E0ORG'))).toBe(false)
   })
 })

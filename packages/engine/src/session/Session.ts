@@ -98,7 +98,8 @@ export class Session extends Context.Service<
                 config.fakeSlackUrl === undefined
                   ? {}
                   : {
-                      socket: { allowedHosts: ['slack.com', new URL(config.fakeSlackUrl).hostname] },
+                      // A refused reconnect against the fake should not wait out a 60 s backoff in a test.
+                      socket: { allowedHosts: ['slack.com', new URL(config.fakeSlackUrl).hostname], backoffCapMillis: 2_000 },
                       // The fake has no rate limits; spacing background calls would only slow tests.
                       lanes: { backgroundMinIntervalMillis: 0 },
                     },
