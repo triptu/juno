@@ -71,6 +71,12 @@ export function emojiInline(rawName: string, lookups: Lookups, hex?: string): In
   return { kind: 'emoji', name: rawName }
 }
 
+export function dateInline(timestamp: number, format: string, fallback?: string, url?: string): Inline {
+  const date = new Date(timestamp * 1000)
+  const text = fallback || (Number.isNaN(date.getTime()) ? String(timestamp) : date.toISOString())
+  return { kind: 'date', timestamp, format, fallback: text, ...(url === undefined ? {} : { url }) }
+}
+
 /** Text of a run of inlines, for previews, search and code blocks. */
 export function inlineText(inlines: ReadonlyArray<Inline>, breakAs = '\n'): string {
   let out = ''
@@ -79,6 +85,9 @@ export function inlineText(inlines: ReadonlyArray<Inline>, breakAs = '\n'): stri
       case 'text':
       case 'link':
         out += inline.text
+        break
+      case 'date':
+        out += inline.fallback
         break
       case 'user':
         out += `@${inline.name}`

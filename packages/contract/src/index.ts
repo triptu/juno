@@ -16,3 +16,6 @@ export * from './routes/session'
 export * from './routes/topics'
 export { AllRoutes } from './routes/index'
 export * from './shell'
+
+export * from './routes/search'
+export * from './routes/prefs'

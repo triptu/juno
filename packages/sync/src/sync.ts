@@ -24,6 +24,7 @@ import { Invalidation, StoreReader, StoreWriter, transaction } from '@juno/store
 import { Clock, Effect, FiberSet, Queue, Scope, Semaphore } from 'effect'
 import { Stream } from 'effect'
 import { bootState, catchUp, coldBoot, followPass, warmBoot, type BootState, type Phase } from './boot'
+import { syncEmoji } from './emoji'
 import { SyncConfig } from './config'
 import type { RootFetch, SyncContext } from './context'
 import { applyFrame } from './events'
@@ -62,6 +63,7 @@ export const runSync = (options: RunSyncOptions): Effect.Effect<never, SlackAuth
     const work = yield* Semaphore.make(1)
     const phase = options.onPhase
     const settle = () => phase(state.connected ? { _tag: 'live' } : { _tag: 'offline' })
+    const refreshEmoji = syncEmoji().pipe(Effect.catchIf(isNotAuth, (error) => Effect.logWarning('sync: emoji refresh failed', { tag: error._tag })))
     const reportBoot: Phase = phase
     // Catch-ups and reboots run in the background; joining the set below is what lets their auth failures end the sync.
     const background = yield* FiberSet.make<void, SlackAuthRequired>()
@@ -134,6 +136,7 @@ export const runSync = (options: RunSyncOptions): Effect.Effect<never, SlackAuth
     /** A `force_reload`: boot again from the current store. */
     const reboot = bootOnce.pipe(
       Effect.andThen(settle),
+      Effect.andThen(refreshEmoji),
       Effect.andThen(followPassIfDue),
       Effect.catchIf(isNotAuth, (error) => Effect.logWarning('sync: reboot failed', { tag: error._tag })),
     )
@@ -150,6 +153,7 @@ export const runSync = (options: RunSyncOptions): Effect.Effect<never, SlackAuth
       }
       state.booted = true
       yield* settle()
+      yield* refreshEmoji
       yield* followPassIfDue
       // The periodic discovery sweep while live.
       while (true) {

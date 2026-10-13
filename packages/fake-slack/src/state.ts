@@ -5,6 +5,7 @@
  * handlers and the control API both go through here.
  */
 import type {
+  CustomEmoji,
   Channel,
   CountEntry,
   File,
@@ -77,6 +78,7 @@ export function asTs(value: string): Ts {
 }
 
 export class Workspace {
+  readonly emoji = new Map<string, CustomEmoji>()
   readonly users = new Map<string, User>()
   readonly conversations = new Map<string, ConversationRecord>()
   readonly messages = new Map<string, Message[]>()
