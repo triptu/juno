@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Juno channel marks</title>
+<style>
+@font-face { font-family: 'Figtree'; src: url('../friendly-layer/options/fonts/figtree-latin-wght-normal.woff2') format('woff2'); font-weight: 300 900; }
+@font-face { font-family: 'Instrument Serif'; src: url('../../../node_modules/.pnpm/@fontsource+instrument-serif@5.3.0/node_modules/@fontsource/instrument-serif/files/instrument-serif-latin-400-normal.woff2') format('woff2'); font-weight: 400; }
+
+:root {
+  --font-sans: 'Figtree', ui-sans-serif, system-ui, sans-serif;
+  --font-serif: 'Instrument Serif', Georgia, serif;
+}
+.light {
+  --background: #FCFBF7; --background-subtle: #FAF9F5; --surface-default: #FBFBF8; --surface-hover: #F4F2EB;
+  --secondary-default: #F1EEE4; --secondary-active: #EAE6D7; --border-subtle: #F1EEE4; --border-default: #EFECE1;
+  --foreground-default: #23211A; --foreground-subtle: #605E52; --foreground-muted: #706E66;
+  --hl: #CC4628; --hl-fg: #fff; --hl-text: #B4351F; --hl-soft: color-mix(in oklch, var(--hl) 10%, var(--background));
+  --hl-nav: color-mix(in oklch, var(--hl) 9%, var(--background-subtle));
+  color-scheme: light;
+}
+.dark {
+  --background: #1B1916; --background-subtle: #151411; --surface-default: #252421; --surface-hover: #2D2B28;
+  --secondary-default: #302F2C; --secondary-active: #403E3B; --border-subtle: #2B2A27; --border-default: #32302D;
+  --foreground-default: #EEEBE2; --foreground-subtle: #C6C4BE; --foreground-muted: #A09E9A;
+  --hl: #FF8A73; --hl-fg: #2A0D06; --hl-text: #FF9C87; --hl-soft: color-mix(in oklch, var(--hl) 14%, var(--background));
+  --hl-nav: color-mix(in oklch, var(--hl) 16%, var(--background-subtle));
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; padding: 32px; background: #ECE9E0; font-family: var(--font-sans); color: #23211A; font-size: 14px; -webkit-font-smoothing: antialiased; }
+h1 { font: 400 34px/1.1 var(--font-serif); margin: 0 0 6px; }
+.intro { color: #706E66; margin: 0 0 28px; max-width: 760px; font-size: 13px; }
+
+section.family { margin-bottom: 48px; background: #F5F3EC; border-radius: 16px; padding: 24px; box-shadow: 0 0 0 1px rgba(0,0,0,.06); }
+.fh { display: flex; align-items: baseline; gap: 14px; margin-bottom: 18px; }
+.fh .letter { width: 34px; height: 34px; border-radius: 10px; background: #23211A; color: #FCFBF7; font: 600 16px var(--font-sans); display: grid; place-items: center; align-self: center; }
+.fh h2 { font: 400 26px/1 var(--font-serif); margin: 0; }
+.fh p { margin: 0; color: #706E66; font-size: 13px; }
+
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.panel { border-radius: 14px; padding: 16px; background: var(--background); color: var(--foreground-default); box-shadow: 0 0 0 1px rgba(0,0,0,.08); }
+.panel.dark { box-shadow: 0 0 0 1px rgba(255,255,255,.1); }
+.plabel { font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--foreground-muted); font-weight: 500; margin-bottom: 12px; }
+
+.grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 10px 8px; }
+.cell { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+.cell .marks { display: flex; align-items: center; gap: 6px; }
+.cell .marks svg { display: block; }
+.cell .n { font-size: 10px; color: var(--foreground-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+
+/* strip: the same marks at 16px in a dense line, how the meta line sees them */
+.strip { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-default); }
+.strip svg { display: block; }
+
+/* sidebar mock, C1 + D1 */
+.sidebar { width: 384px; background: var(--background-subtle); border-radius: 14px; overflow: hidden; box-shadow: 0 0 0 1px rgba(0,0,0,.08); color: var(--foreground-default); }
+.dark .sidebar { box-shadow: 0 0 0 1px rgba(255,255,255,.1); }
+.titlebar { height: 44px; display: flex; align-items: center; padding: 0 10px 0 16px; }
+.lights { display: flex; gap: 6px; }
+.lights i { width: 12px; height: 12px; border-radius: 999px; display: block; }
+.lights i:nth-child(1) { background: #FF5F57; } .lights i:nth-child(2) { background: #FEBC2E; } .lights i:nth-child(3) { background: #28C840; }
+.nav { padding: 4px 10px 0; display: flex; flex-direction: column; gap: 2px; }
+.nav a { height: 32px; border-radius: 12px; padding: 0 10px; display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 500; }
+.nav a.active { background: var(--hl-nav); color: var(--hl-text); }
+.nav .count { margin-left: auto; height: 18px; min-width: 18px; padding: 0 5px; border-radius: 999px; background: var(--secondary-active); color: var(--foreground-subtle); font-size: 11px; font-weight: 500; display: grid; place-items: center; }
+.hair { height: 1px; background: var(--border-default); margin: 10px 16px 8px; }
+.filters { padding: 0 10px 8px; display: flex; gap: 2px; }
+.filters a { height: 28px; border-radius: 12px; padding: 0 10px; display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; color: var(--foreground-muted); }
+.filters a.on { background: var(--secondary-default); color: var(--foreground-default); font-weight: 600; }
+.filters a .dot { width: 5px; height: 5px; border-radius: 999px; background: var(--hl); }
+.filters .sp { flex: 1; }
+.list { padding: 0 8px 12px; }
+.sec { font-size: 10.5px; font-weight: 500; letter-spacing: .06em; text-transform: uppercase; color: var(--foreground-muted); padding: 10px 12px 6px; }
+.row { display: flex; gap: 12px; padding: 10px 12px; border-radius: 16px; align-items: flex-start; }
+.row + .row { margin-top: 2px; }
+.row.sel { background: var(--secondary-default); }
+.tile { width: 40px; height: 40px; border-radius: 16px; flex-shrink: 0; overflow: hidden; }
+.tile svg { display: block; }
+.tile.person { border-radius: 999px; }
+.rb { flex: 1; min-width: 0; }
+.l1 { display: flex; align-items: center; gap: 6px; height: 22px; }
+.l1 .t { font-size: 15px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row.unread .l1 .t { font-weight: 600; }
+.l1 .time { margin-left: auto; font-size: 12px; color: var(--foreground-muted); font-variant-numeric: tabular-nums; }
+.tag { height: 18px; padding: 0 7px; border-radius: 999px; border: 1px solid var(--border-default); font-size: 11px; font-weight: 500; color: var(--foreground-subtle); display: inline-flex; align-items: center; }
+.l2 { display: flex; gap: 8px; }
+.l2 .p { flex: 1; font-size: 13px; line-height: 1.45; color: var(--foreground-muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.row.unread .l2 .p { color: var(--foreground-subtle); }
+.cnt { height: 18px; min-width: 18px; padding: 0 5px; border-radius: 999px; font-size: 11px; font-weight: 500; display: grid; place-items: center; background: var(--secondary-active); color: var(--foreground-subtle); margin-top: 1px; }
+.l3 { display: flex; align-items: center; gap: 12px; margin-top: 3px; font-size: 12px; color: var(--foreground-muted); }
+.l3 span { display: inline-flex; align-items: center; gap: 5px; }
+.l3 svg { display: block; }
+.stack { display: flex; }
+.stack b { width: 16px; height: 16px; border-radius: 999px; display: block; box-shadow: 0 0 0 1.5px var(--background-subtle); overflow: hidden; }
+.stack b + b { margin-left: -4px; }
+.stack b svg { display: block; }
+
+.sem table { border-collapse: collapse; font-size: 12px; }
+.sem th, .sem td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--border-default); vertical-align: middle; }
+.sem th { font-weight: 500; color: var(--foreground-muted); font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; }
+.sem td .marks { display: flex; gap: 8px; align-items: center; }
+.sem td.k { color: var(--foreground-muted); }
+</style>
+</head>
+<body>
+<h1>Channel marks</h1>
+<p class="intro">Deterministic generative marks for channels. The seed is the channel id. Each family shows about forty invented channel names at 40px and 16px, in light and dark, then a sidebar mock in the C1 + D1 look next to person photos. The last section shows the semantic layer: the same ids with keywords in the name biasing hue and motif.</p>
+<div id="root"></div>
+<script src="generator.js"></script>
+<script>
+const M = globalThis.ChannelMarks;
+const NAMES = ['eng','alerts-prod','deploys','incidents','design-review','hiring','product','platform','random','social','sales','leadership','q4-planning','frontend','infra','support','marketing','general','announcements','backend','data','security','mobile','ios','android','growth','finance','legal','ops','customer-success','onboarding','release-notes','ci','music','pets','lunch','docs','analytics','billing','payments'];
+// Fake ids. Real ids look like C0A1B2C3D; the hash of the id is the only thing that matters.
+const ids = NAMES.map((n, i) => 'C' + (0x1a2b3c + i * 7919).toString(16).toUpperCase());
+const CH = NAMES.map((name, i) => ({ id: ids[i], name }));
+
+function svgs(ch, style, theme, size, semantic) { return M.mark(ch, { style, theme, size, semantic }); }
+
+// Person avatars: a simple silhouette on a person-hue tint. Stand-ins for Slack photos.
+const PERSON = { cyan: 230, claret: 10, midnight: 290, emeraldDark: 165, plum: 340, rose: 20, emerald: 150, jordy: 250 };
+function person(hue, theme, size) {
+  const t = M.tones(hue, theme);
+  const id = 'p' + hue + theme + size;
+  return `<svg width="${size}" height="${size}" viewBox="0 0 40 40" aria-hidden="true"><defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${t.soft}"/><stop offset="1" stop-color="${t.base}"/></linearGradient><clipPath id="${id}c"><circle cx="20" cy="20" r="20"/></clipPath></defs><g clip-path="url(#${id}c)"><rect width="40" height="40" fill="url(#${id})"/><circle cx="20" cy="15" r="7.5" fill="${t.deep}"/><ellipse cx="20" cy="38" rx="14" ry="12" fill="${t.deep}"/></g></svg>`;
+}
+
+const ROWS = [
+  { kind: 'ch', ch: CH[1], title: '#alerts-prod', main: true, time: '3m', p: 'Grafana: [RESOLVED] queue depth > 5k on billing-consumer', cnt: 9, unread: true, meta: 'Messages outside threads', n: 5 },
+  { kind: 'dm', hue: 'emeraldDark', title: 'Sam Okafor', time: '12m', p: 'Sam: Thanks. I’ll review Dev’s packet this week.', meta: 'Sam Okafor', n: 2 },
+  { kind: 'ch', ch: CH[0], title: 'Postgres 16 migration plan', time: '25m', p: 'Dev: Booked 2–4pm. Will post results here.', meta: 'eng', n: 7, sel: true, stack: ['midnight','cyan','rose'] },
+  { kind: 'ch', ch: CH[5], title: 'Rina Sato · Staff backend', time: '41m', p: 'Elena: she has a competing offer with a Friday deadline. Can you look today?', cnt: 2, unread: true, meta: 'hiring', n: 3, stack: ['claret','midnight'] },
+  { kind: 'ch', ch: CH[6], title: 'Q4 roadmap cuts', time: '1h', p: 'Maya: Draft is up. Cross-posting to #leadership once Tushar has looked.', cnt: 3, unread: true, meta: 'product', n: 6, stack: ['plum','midnight','emeraldDark'] },
+  { kind: 'dm', hue: 'plum', title: 'Maya Chen', time: '2h', p: 'You: Sounds good, Thursday then.', meta: 'Maya Chen', n: 4 },
+  { kind: 'ch', ch: CH[4], title: 'Composer spacing pass', time: '3h', p: 'Ana: Pushed the 14px variant to the gallery for a look.', meta: 'design-review', n: 12, stack: ['rose','jordy'] },
+  { kind: 'ch', ch: CH[2], title: '#deploys', main: true, time: 'Yesterday', p: 'deploybot: web 2024.10.12-3 is live in prod (4m12s)', meta: 'Messages outside threads', n: 31 },
+];
+
+const icoChats = (c) => `<svg width="13" height="13" viewBox="0 0 256 256" fill="${c}"><path d="M232,96a16,16,0,0,0-16-16H184V48a16,16,0,0,0-16-16H40A16,16,0,0,0,24,48V176a8,8,0,0,0,13,6.22L72,154V184a16,16,0,0,0,16,16h93.59L219,230.22a8,8,0,0,0,5,1.78,8,8,0,0,0,8-8V96Zm-42.55,89.78a8,8,0,0,0-5-1.78H88V152h80a16,16,0,0,0,16-16V96h32V207.25Z"/></svg>`;
+const icoChat = (c) => `<svg width="13" height="13" viewBox="0 0 256 256" fill="${c}"><path d="M128,24A104,104,0,0,0,36.18,176.88L24.83,210.93a16,16,0,0,0,20.24,20.24l34.05-11.35A104,104,0,1,0,128,24Zm0,192a87.87,87.87,0,0,1-44.06-11.81,8,8,0,0,0-6.54-.67L40,216,52.47,178.6a8,8,0,0,0-.66-6.54A88,88,0,1,1,128,216Z"/></svg>`;
+const icoUser = (c) => `<svg width="13" height="13" viewBox="0 0 256 256" fill="${c}"><path d="M230.93,220a8,8,0,0,1-6.93,4H32a8,8,0,0,1-6.92-12c15.23-26.33,38.7-45.21,66.09-54.16a72,72,0,1,1,73.66,0c27.39,8.95,50.86,27.83,66.09,54.16A8,8,0,0,1,230.93,220Z"/></svg>`;
+
+function sidebar(style, theme, semantic) {
+  const fg = theme === 'dark' ? '#A09E9A' : '#706E66';
+  const rows = ROWS.map((r) => {
+    const tile = r.kind === 'ch' ? svgs(r.ch, style, theme, 40, semantic) : person(PERSON[r.hue], theme, 40);
+    const meta = r.kind === 'ch'
+      ? (r.main ? `<span>${icoChats(fg)}${r.meta}</span>` : `<span>${svgs(r.ch, style, theme, 14, semantic)}${r.meta}</span>`)
+      : `<span>${icoUser(fg)}${r.meta}</span>`;
+    const stack = r.stack ? `<span class="stack">${r.stack.map((h) => `<b>${person(PERSON[h], theme, 16)}</b>`).join('')}</span>` : '';
+    return `<div class="row${r.unread ? ' unread' : ''}${r.sel ? ' sel' : ''}">
+      <div class="tile${r.kind === 'dm' ? ' person' : ''}">${tile}</div>
+      <div class="rb">
+        <div class="l1"><span class="t">${r.title}</span>${r.main ? '<span class="tag">Main</span>' : ''}<span class="time">${r.time}</span></div>
+        <div class="l2"><div class="p">${r.p}</div>${r.cnt ? `<span class="cnt">${r.cnt}</span>` : ''}</div>
+        <div class="l3">${meta}${stack}<span>${icoChat(fg)}${r.n}</span></div>
+      </div></div>`;
+  }).join('');
+  return `<div class="sidebar">
+    <div class="titlebar"><div class="lights"><i></i><i></i><i></i></div></div>
+    <nav class="nav"><a class="active">All topics</a><a>For you<span class="count">5</span></a><a>Juno</a></nav>
+    <div class="hair"></div>
+    <div class="filters"><a class="on">All</a><a>Channels<i class="dot"></i></a><a>DMs</a><span class="sp"></span><a>Unread</a></div>
+    <div class="list"><div class="sec">Recent</div>${rows}</div></div>`;
+}
+
+function familySection(letter) {
+  const s = M.STYLES[letter];
+  if (s.dropped) {
+    return `<section class="family" data-family="${letter}">
+    <div class="fh"><div class="letter">${letter}</div><h2>${s.name}</h2><p>${DESC[letter]} Dropped: ${s.dropped}.</p></div>
+    <div class="pair"><div class="panel light"><div class="plabel">light · 40px and 16px</div><div class="strip" style="border:0;margin:0;padding:0">${CH.slice(0, 16).map((ch) => svgs(ch, letter, 'light', 40, false) + svgs(ch, letter, 'light', 16, false)).join('')}</div></div><div class="panel dark"><div class="plabel">dark · 40px and 16px</div><div class="strip" style="border:0;margin:0;padding:0">${CH.slice(0, 16).map((ch) => svgs(ch, letter, 'dark', 40, false) + svgs(ch, letter, 'dark', 16, false)).join('')}</div></div></div>
+  </section>`;
+  }
+  const panel = (theme, semantic) => `<div class="panel ${theme}"><div class="plabel">${theme} · 40px and 16px</div><div class="grid">${CH.map((ch) => `<div class="cell"><div class="marks">${svgs(ch, letter, theme, 40, semantic)}${svgs(ch, letter, theme, 16, semantic)}</div><div class="n">${ch.name}</div></div>`).join('')}</div><div class="strip">${CH.map((ch) => svgs(ch, letter, theme, 16, semantic)).join('')}</div></div>`;
+  const side = (theme) => `<div class="panel ${theme}"><div class="plabel">${theme} · sidebar</div>${sidebar(letter, theme, false)}</div>`;
+  return `<section class="family" data-family="${letter}">
+    <div class="fh"><div class="letter">${letter}</div><h2>${s.name}</h2><p>${DESC[letter]}</p></div>
+    <div class="pair">${panel('light', false)}${panel('dark', false)}</div>
+    <div class="pair" style="margin-top:16px">${side('light')}${side('dark')}</div>
+  </section>`;
+}
+
+const DESC = {
+  A: 'Two or three soft radial blobs on a tinted base. Mesh-like, close to a photo.',
+  B: 'Bauhaus: quarter and half discs, bars and dots on a 2 x 2 grid, flat colour.',
+  C: 'A sun with one or two halos sitting on a horizon.',
+  D: 'Terrazzo: three or four big rounded chips in three tones.',
+  E: 'Two or three wavy bands, sometimes tilted, sometimes a small sun.',
+  F: 'A tiny landscape: sky gradient, often a sun, hills in four arrangements.',
+};
+
+function semanticSection() {
+  const sample = ['eng','alerts-prod','deploys','design-review','hiring','product','random','sales','leadership','support','security','general'];
+  const styles = Object.keys(M.STYLES).filter((k) => !M.STYLES[k].dropped);
+  const panel = (theme) => `<div class="panel ${theme} sem"><div class="plabel">${theme} · plain, then semantic, per family</div><table>
+    <tr><th>Channel</th><th>Keyword</th>${styles.map((s) => `<th>${s}</th>`).join('')}</tr>
+    ${sample.map((n) => { const ch = CH[NAMES.indexOf(n)]; const k = M.semantics(n); return `<tr><td>#${n}</td><td class="k">${k ? k.hue + ' · ' + k.motif : '—'}</td>${styles.map((s) => `<td><div class="marks">${svgs(ch, s, theme, 28, false)}${svgs(ch, s, theme, 28, true)}</div></td>`).join('')}</tr>`; }).join('')}
+  </table></div>`;
+  const group = (theme) => `<div class="panel ${theme}"><div class="plabel">${theme} · group DMs, Bloom built from the participants’ person hues</div><div style="display:flex;gap:12px">${[[230,340],[10,165,250],[290,20,150],[340,250],[165,10,290]].map((g) => M.mark({ id: 'G' + g.join('') }, { style: 'A', theme, size: 40, group: g })).join('')}</div></div>`;
+  return `<section class="family" data-family="semantic">
+    <div class="fh"><div class="letter">S</div><h2>Semantic layer and group DMs</h2><p>Left mark in each pair is plain; right mark has the keyword bias (hue and motif).</p></div>
+    <div class="pair">${panel('light')}${panel('dark')}</div>
+    <div class="pair" style="margin-top:16px">${group('light')}${group('dark')}</div>
+  </section>`;
+}
+
+document.getElementById('root').innerHTML = Object.keys(M.STYLES).map(familySection).join('') + semanticSection();
+</script>
+</body>
+</html>
