@@ -16,6 +16,22 @@ afterEach(async () => {
 })
 
 describe('control API', () => {
+  it('forceError answers the next call of a method with ok: false before the handler runs, then recovers', async () => {
+    fake.forceError({ method: 'subscriptions.thread.add', error: 'internal_error' })
+    const root = fake.messages('C0ENG').find((m) => m.text?.startsWith('checkout.spec'))!
+    const socket = await client.connect()
+    const first = await client.call('subscriptions.thread.add', { channel: 'C0ENG', thread_ts: root.ts })
+    expect(first.status).toBe(200)
+    expect(first.body).toEqual({ ok: false, error: 'internal_error' })
+    // The handler never ran: no subscription changed and no event was sent.
+    expect(fake.workspace.subscription('C0ENG', root.ts)?.subscribed).toBe(false)
+    const second = await client.call('subscriptions.thread.add', { channel: 'C0ENG', thread_ts: root.ts })
+    expect(second.body.ok).toBe(true)
+    await socket.next(isType('thread_subscribed'))
+    expect(socket.frames.some((f) => f.type === 'thread_subscribed')).toBe(false)
+    socket.close()
+  })
+
   it('force429 answers the next calls of a method with 429 and Retry-After, then recovers', async () => {
     fake.force429({ method: 'conversations.history', retryAfter: 7, times: 2 })
     const first = await client.call('conversations.history', { channel: 'C0ENG' })

@@ -43,6 +43,11 @@ interface RateLimitRule {
   remaining: number
 }
 
+interface FailureRule {
+  error: string
+  remaining: number
+}
+
 export type ControlHandler = (input: Record<string, unknown>) => unknown
 
 export class FakeServer {
@@ -50,6 +55,7 @@ export class FakeServer {
   readonly calls: CallRecord[] = []
   readonly sockets = new Set<WebSocket>()
   readonly #rateLimits = new Map<string, RateLimitRule>()
+  readonly #failures = new Map<string, FailureRule>()
   readonly workspace: Workspace
   readonly #control: (name: string, input: Record<string, unknown>) => unknown
   readonly #http: Server
@@ -132,6 +138,25 @@ export class FakeServer {
     if (rule === undefined || rule.remaining <= 0) return undefined
     rule.remaining -= 1
     return rule
+  }
+
+  // Forced `ok: false` answers
+
+  /** The next `times` calls of `method` answer `ok: false` with `error`, before the handler runs. */
+  forceError(method: string, error: string, times: number): void {
+    this.#failures.set(method, { error, remaining: times })
+  }
+
+  clearError(method?: string): void {
+    if (method === undefined) this.#failures.clear()
+    else this.#failures.delete(method)
+  }
+
+  #takeFailure(method: string): string | undefined {
+    const rule = this.#failures.get(method)
+    if (rule === undefined || rule.remaining <= 0) return undefined
+    rule.remaining -= 1
+    return rule.error
   }
 
   // Socket
@@ -240,6 +265,8 @@ export class FakeServer {
       return record(429, { ok: false, error: 'ratelimited' })
     }
     if (!isMethodName(method)) return record(200, { ok: false, error: 'unknown_method' })
+    const forced = this.#takeFailure(method)
+    if (forced !== undefined) return record(200, { ok: false, error: forced })
     const result = this.#run(method, fields)
     if (result instanceof ApiError) {
       if (result.retryAfter !== undefined) response.setHeader('Retry-After', String(result.retryAfter))
