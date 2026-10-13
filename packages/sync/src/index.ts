@@ -28,6 +28,7 @@ export {
   readState,
   setThreadSub,
   threadSub,
+  type ThreadSubOutcome,
   type ThreadSubRow,
   type ThreadSubSource,
 } from './write'

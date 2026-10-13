@@ -97,6 +97,23 @@ export const storedFollow = (engine: RunningEngine, channel: string, threadTs: s
     return row?.subscribed
   })
 
+/**
+ * Every value `storedFollow` takes for a thread while it runs, read every
+ * few milliseconds, so a test can tell that a value never came back even
+ * for a moment. `stop` returns them.
+ */
+export function watchFollow(engine: RunningEngine, channel: string, threadTs: string): { readonly stop: () => ReadonlySet<number | undefined> } {
+  const seen = new Set<number | undefined>([storedFollow(engine, channel, threadTs)])
+  const timer = setInterval(() => seen.add(storedFollow(engine, channel, threadTs)), 5)
+  return {
+    stop: () => {
+      clearInterval(timer)
+      seen.add(storedFollow(engine, channel, threadTs))
+      return seen
+    },
+  }
+}
+
 /** The topic id of a thread in the fake, by the start of its root's text. */
 export const threadId = (fake: FakeSlack, channel: string, prefix: string) => `t:${channel}:${fake.messages(channel).find((m) => m.text?.startsWith(prefix))!.ts}`
 export const tsOf = (topicId: string) => topicId.split(':')[2]!

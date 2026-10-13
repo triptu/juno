@@ -15,16 +15,19 @@
  *    socket events and pages about the thread do not change the flag (the
  *    command's intent stays visible) but are noted. After success, a noted
  *    observation means Slack may have changed since it accepted the call,
- *    so the root is looked up and its `subscribed` applies. After a final
- *    failure the root is always looked up; restoring the state from before
- *    the command could restore something stale. Only when that lookup fails
- *    too is the old state put back, and then only while the row is still
- *    what step 1 wrote. The command then fails with the contract's error.
+ *    so the root is looked up and its `subscribed` applies. After a failure
+ *    the root is always looked up: the answer may have been lost after Slack
+ *    accepted the call, so the state from before the command is never put
+ *    back unasked. When the lookup fails too, the row keeps the command's
+ *    state and the lookup is retried in the background with backoff, until
+ *    Slack answers or something newer about the thread is observed. The
+ *    command then fails with the contract's error.
  *
  * Commands on the same thread run one at a time (`Outbox.exclusive`). A
- * command stamps `thread_subs.observed_at` with its own time, so a page
- * requested before it cannot bring the old state back. specs/follow.qnt
- * models this: `localChange`, `accept`, `acknowledge`, `reject`.
+ * command stamps `thread_subs.observed_at` with its own time, and again when
+ * it ends, so a page requested before or during it cannot bring the old
+ * state back. specs/follow.qnt models this: `localChange`, `accept`,
+ * `acknowledge`, `reject`, `failLookup`.
  *
  * The undo is computed from the state before the change: a change returns
  * the opposite command, no change returns nothing.
@@ -33,9 +36,9 @@
  * `topic_overlay.unsubscribed_at`. The pure rules in `@juno/domain` read
  * both (`isSubscribed`, `sidebarPlacement`).
  */
-import { Clock, Effect } from 'effect'
+import { Clock, Effect, Schedule } from 'effect'
 import { NotFound, NotSignedIn, type CommandResult, type SubscribeError } from '@juno/contract'
-import { compareTs, millisToTs, parseTopicId, type Ts } from '@juno/domain'
+import { compareTs, maxTs, millisToTs, parseTopicId, type Ts } from '@juno/domain'
 import { Invalidation, StoreWriter, transaction, type SqlError } from '@juno/store'
 import {
   beginPendingFollow,
@@ -74,10 +77,14 @@ export const setSubscribed = (id: string, subscribed: boolean): Effect.Effect<Co
     const { channel, threadTs } = parsed
     const outbox = yield* Outbox
 
-    /** Slack's root for the thread, applied as a page. Returns false when Slack could not say. */
-    const refresh = (previous: ThreadSubRow | undefined, forgetIfUnfollowed: boolean) =>
+    /**
+     * Slack's root for the thread, applied as a page. `endedAt` is when the
+     * command ended; the lookup starts after it, so its stamp is later even
+     * within the same millisecond. Returns false when Slack could not say.
+     */
+    const refresh = (previous: ThreadSubRow | undefined, forgetIfUnfollowed: boolean, endedAt: number) =>
       Effect.gen(function* () {
-        const requestedAt = millisToTs(yield* Clock.currentTimeMillis)
+        const requestedAt = maxTs(millisToTs(yield* Clock.currentTimeMillis), millisToTs(endedAt, 1)) as Ts
         const answer = yield* Effect.result(
           outbox.lookup((api) => api.call('conversations.replies', { channel, ts: threadTs as Ts, oldest: threadTs as Ts, inclusive: true, limit: 1 })),
         )
@@ -86,6 +93,14 @@ export const setSubscribed = (id: string, subscribed: boolean): Effect.Effect<Co
         yield* local(transaction(applyLookup(channel, threadTs, root.subscribed, root.last_read, requestedAt, forgetIfUnfollowed && previous === undefined)))
         return true
       })
+
+    /** `refresh` again after a second, then with backoff, while nothing about the thread was observed after the command ended. */
+    const retryRefresh = (previous: ThreadSubRow | undefined, forgetIfUnfollowed: boolean, endedAt: number, ended: Ts) =>
+      Effect.gen(function* () {
+        const current = yield* local(threadSub(channel, threadTs))
+        if (current?.observedAt === undefined || compareTs(current.observedAt, ended) > 0) return
+        if (!(yield* refresh(previous, forgetIfUnfollowed, endedAt))) return yield* Effect.fail('unanswered' as const)
+      }).pipe(Effect.retry({ schedule: Schedule.exponential('1 second'), times: LOOKUP_RETRIES }), Effect.delay('1 second'))
 
     return yield* outbox.exclusive(id)(
       Effect.gen(function* () {
@@ -96,18 +111,23 @@ export const setSubscribed = (id: string, subscribed: boolean): Effect.Effect<Co
         if (before === 'unchanged') return {}
         const args = { channel, thread_ts: threadTs, last_read: before.lastRead }
         const result = yield* Effect.result(outbox.send((api) => api.call(subscribed ? 'subscriptions.thread.add' : 'subscriptions.thread.remove', args)))
-        const seen = yield* local(transaction(endPendingFollow(channel, threadTs)))
-        if (result._tag === 'Success') {
-          if (seen) yield* refresh(before.previous, false)
-          return undo
+        const endedAt = yield* Clock.currentTimeMillis
+        const ended = millisToTs(endedAt)
+        const seen = yield* local(transaction(endPendingFollow(channel, threadTs, ended)))
+        // After a failure Slack is always asked: the answer may have been lost after Slack accepted the call.
+        const failed = result._tag === 'Failure'
+        if ((seen || failed) && !(yield* refresh(before.previous, failed, endedAt))) {
+          yield* outbox.background(retryRefresh(before.previous, failed, endedAt, ended))
         }
-        if (!(yield* refresh(before.previous, true))) yield* local(transaction(revertThreadSub(channel, threadTs, { subscribed, stamp }, before.previous)))
-        return yield* result.failure
+        return result._tag === 'Success' ? undo : yield* result.failure
       }),
     )
   })
 
-/** The state a failed mirror call may fall back to, and the read pointer the mirror call sends. */
+/** Retries after the first background lookup: seven tries over about a minute in all. */
+const LOOKUP_RETRIES = 6
+
+/** The state before the command (a failed first Subscribe can forget the row again), and the read pointer the mirror call sends. */
 interface ThreadBefore {
   readonly previous: ThreadSubRow | undefined
   readonly lastRead: Ts
@@ -152,20 +172,6 @@ const applyLookup = (
     if (current?.observedAt !== undefined && compareTs(current.observedAt, requestedAt) >= 0) return
     if (!subscribed && forget) return yield* clearThreadSub(channel, threadTs)
     yield* setThreadSub(channel, threadTs, subscribed, subscribed ? lastRead : undefined, { kind: 'page', requestedAt })
-  })
-
-/** The fallback when Slack cannot be asked: `previous` back, but only while the row is still what the command wrote. */
-const revertThreadSub = (
-  channel: string,
-  threadTs: string,
-  wrote: { readonly subscribed: boolean; readonly stamp: Ts },
-  previous: ThreadSubRow | undefined,
-): Effect.Effect<void, SqlError, StoreWriter | Invalidation> =>
-  Effect.gen(function* () {
-    const current = yield* threadSub(channel, threadTs)
-    if (current?.subscribed !== wrote.subscribed || current.observedAt !== wrote.stamp) return
-    if (previous === undefined) return yield* clearThreadSub(channel, threadTs)
-    yield* setThreadSub(channel, threadTs, previous.subscribed, previous.slackLastRead, { kind: 'command', at: wrote.stamp })
   })
 
 /** Main's client-only flag. Returns whether anything changed, or `missing` for a conversation the store does not know. */

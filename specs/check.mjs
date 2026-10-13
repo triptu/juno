@@ -54,7 +54,10 @@ function simulate(file, step, invariant, output, violation = false, randomized =
 }
 
 const regressions = [
-  ['follow', 'stalePage', 'acceptedUnfollow', 'stale-follow-page', 'stalePageSafety'],
+  ['follow', 'stalePage', 'acceptedUnfollow', 'stale-follow-page'],
+  ['follow', 'lateEvent', 'acceptedUnfollow', 'accepted-unsubscribe-late-event'],
+  ['follow', 'pendingPage', 'acceptedUnfollow', 'accepted-unsubscribe-pending-page'],
+  ['follow', 'failedLookup', 'acceptedUnfollow', 'accepted-unsubscribe-failed-lookup'],
   ['follow', 'missedUnfollow', 'quietAgreement', 'missed-unfollow'],
   ['follow', 'missedFollow', 'quietAgreement', 'single-page'],
   ['follow', 'reorderedEvents', 'latestEventWins', 'reordered-follow-events', 'eventOrderSafety'],
@@ -76,12 +79,7 @@ for (const [file, schedule, invariant, name, guardedInvariant = 'invariants'] of
   simulate(file, `${schedule}BugStep`, invariant, `${name}-bug.itf.json`, true)
 }
 simulate('readstate', 'stealthBugStep', 'stealthNeverMarks', 'stealth-bug.itf.json', true)
-// Preserve the strong property and expose the implementation's violation.
-simulate('follow', 'lateEventStep', 'acceptedUnfollow', 'accepted-unsubscribe-late-event.itf.json', true)
-simulate('follow', 'lateEventStep', 'invariants', 'accepted-unsubscribe-recovery.itf.json')
-simulate('follow', 'failedLookupStep', 'acceptedUnfollow', 'accepted-unsubscribe-failed-lookup.itf.json', true)
-simulate('follow', 'pendingPageStep', 'acceptedUnfollow', 'accepted-unsubscribe-pending-page.itf.json', true)
-for (const schedule of ['ambiguousFailure', 'pendingObservation', 'failedFirstSubscribe', 'failedLookup', 'unknownRoot', 'oldFollowActivity', 'oldFollowQuiet']) {
+for (const schedule of ['ambiguousFailure', 'pendingObservation', 'failedFirstSubscribe', 'unknownRoot', 'oldFollowActivity', 'oldFollowQuiet']) {
   simulate('follow', `${schedule}Step`, 'invariants', `${schedule}.itf.json`)
 }
 
@@ -111,13 +109,16 @@ if (!tracesOnly) {
         '--invariant', 'boundedSafety', '--max-steps', '4',
         '--apalache-version', apalacheVersion, '--verbosity', '1'])
     }
-    // Long recovery regressions run in the simulator. Keep symbolic races short.
-    for (const step of ['stalePageBugStep', 'lateEventStep']) {
-      quint(['verify', 'specs/follow-bounded.qnt', '--main', 'follow_bounded',
-        '--step', step, '--invariant', 'acceptedUnfollow', '--max-steps', '5',
-        '--apalache-version', apalacheVersion, '--verbosity', '1'], { violation: true })
+    // Long recovery regressions run in the simulator. Keep symbolic races short:
+    // each old rule must break `acceptedUnfollow` within 5 steps, and its fix must not.
+    for (const schedule of ['stalePage', 'lateEvent', 'pendingPage', 'failedLookup']) {
+      for (const [step, violation] of [[`${schedule}BugStep`, true], [`${schedule}Step`, false]]) {
+        quint(['verify', 'specs/follow-bounded.qnt', '--main', 'follow_bounded',
+          '--step', step, '--invariant', 'acceptedUnfollow', '--max-steps', '5',
+          '--apalache-version', apalacheVersion, '--verbosity', '1'], { violation })
+      }
     }
-    console.log('Mode: randomized simulator and Apalache (small instances: 4 steps; two counterexamples: 5 steps).')
+    console.log('Mode: randomized simulator and Apalache (small instances: 4 steps; four races, old and fixed: 5 steps).')
     console.log('Unbounded temporal liveness is not checked. Simulation checks follow/read drain bounds of 64/40 steps.')
   }
 }
