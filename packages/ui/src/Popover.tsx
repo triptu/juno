@@ -1,6 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
 import { useEffect, useRef, type ReactNode } from 'react'
-import { layout, spacing, z } from '@juno/tokens/tokens.stylex'
+import { layout, motion, spacing, z } from '@juno/tokens/tokens.stylex'
 import { Surface, type SurfacePadding, type SurfaceRadius } from './Surface'
 
 export type PopoverPlacement = 'bottom-start' | 'bottom-end' | 'top-start' | 'top-end'
@@ -29,8 +29,10 @@ export interface PopoverProps {
 }
 
 /**
- * Floats a popover Surface next to its anchor. No enter or exit animation.
- * Scrolling is contained so the page behind never moves.
+ * Floats a popover Surface next to its anchor. Appears with a short fade
+ * and scale from the anchor corner (--duration-appear); closing is instant,
+ * since the panel is unmounted. Scrolling is contained so the page behind
+ * never moves.
  */
 export function Popover({
   open,
@@ -87,7 +89,7 @@ export function Popover({
             padding={padding}
             role={role}
             aria-label={label}
-            sx={[styles.surface, maxHeights[maxHeight]]}
+            sx={[styles.surface, origins[placement], maxHeights[maxHeight]]}
           >
             {children}
           </Surface>
@@ -96,6 +98,11 @@ export function Popover({
     </div>
   )
 }
+
+const appear = stylex.keyframes({
+  from: { opacity: 0, transform: `scale(${motion['--appear-scale']})` },
+  to: { opacity: 1, transform: 'scale(1)' },
+})
 
 const styles = stylex.create({
   root: {
@@ -111,6 +118,10 @@ const styles = stylex.create({
     flexDirection: 'column',
     overflowY: 'auto',
     overscrollBehavior: 'contain',
+    animationName: appear,
+    animationDuration: motion['--duration-appear'],
+    animationTimingFunction: motion['--ease-out'],
+    animationFillMode: 'both',
   },
 })
 
@@ -119,6 +130,14 @@ const placements = stylex.create({
   'bottom-end': { top: `calc(100% + ${spacing['--space-1']})`, right: 0 },
   'top-start': { bottom: `calc(100% + ${spacing['--space-1-5']})`, left: 0 },
   'top-end': { bottom: `calc(100% + ${spacing['--space-1-5']})`, right: 0 },
+})
+
+// The scale grows out of the corner that touches the anchor.
+const origins = stylex.create({
+  'bottom-start': { transformOrigin: 'top left' },
+  'bottom-end': { transformOrigin: 'top right' },
+  'top-start': { transformOrigin: 'bottom left' },
+  'top-end': { transformOrigin: 'bottom right' },
 })
 
 const widths = stylex.create({

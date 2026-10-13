@@ -1,14 +1,27 @@
 import * as stylex from '@stylexjs/stylex'
-import type { LucideIcon } from 'lucide-react'
+import type { Icon as PhosphorIcon, IconWeight as PhosphorWeight } from '@phosphor-icons/react'
 import { opacity, sizes } from '@juno/tokens/tokens.stylex'
 
-export type IconSize = 11 | 12 | 13 | 14 | 15 | 16 | 18
+export type { PhosphorIcon }
+
+/**
+ * `regular` for chrome at 15px and up, `bold` at 14px and below (regular
+ * drops under 1px there and goes faint next to 11–12px text), `fill` for
+ * active and selected states only, `duotone` for the few deliberate friendly
+ * spots: the Juno nav item, AI sparkles, For you card kinds, illustrations.
+ */
+export type IconWeight = 'regular' | 'bold' | 'fill' | 'duotone'
+export type IconSize = 12 | 13 | 14 | 15 | 16 | 18 | 20
 
 export interface IconProps {
-  /** A lucide-react icon component, for example `Hash`. */
-  readonly icon: LucideIcon
+  /** A Phosphor icon component, for example `Hash`. */
+  readonly icon: PhosphorIcon
   /** Rendered size in px. Default 16. */
   readonly size?: IconSize
+  /** Default: bold at 14 and below, regular at 15 and above. */
+  readonly weight?: IconWeight
+  /** Shorthand for `weight="fill"`: the outline/fill pair of a toggle. */
+  readonly active?: boolean
   /** Dim to the tab-icon opacity. */
   readonly dim?: boolean
   /**
@@ -19,17 +32,28 @@ export interface IconProps {
   readonly label?: string
 }
 
+/** The weight a size gets when none is named. */
+export function defaultIconWeight(size: IconSize): IconWeight {
+  return size <= 14 ? 'bold' : 'regular'
+}
+
 /**
- * Lucide outline icon drawn in the surrounding text colour. Never filled.
+ * A Phosphor icon drawn in the surrounding text colour. Outline by default;
+ * fill marks state. The weight comes from the size unless named, so call
+ * sites only say `fill` or `duotone`.
  */
-export function Icon({ icon: Lucide, size = 16, dim = false, label }: IconProps) {
+export function Icon({ icon: Glyph, size = 16, weight, active = false, dim = false, label }: IconProps) {
+  const resolved: PhosphorWeight = weight ?? (active ? 'fill' : defaultIconWeight(size))
   return (
-    <Lucide
+    <Glyph
+      size={size}
+      weight={resolved}
+      color="currentColor"
       aria-hidden={label ? undefined : true}
       aria-label={label}
       role={label ? 'img' : undefined}
       focusable={false}
-      {...stylex.props(styles.icon, sizeStyles[size], size <= 13 && styles.thin, dim && styles.dim)}
+      {...stylex.props(styles.icon, sizeStyles[size], dim && styles.dim)}
     />
   )
 }
@@ -38,16 +62,7 @@ const styles = stylex.create({
   icon: {
     display: 'block',
     flexShrink: 0,
-    stroke: 'currentColor',
-    fill: 'none',
-    strokeWidth: sizes['--icon-stroke'],
-    strokeLinecap: 'round',
-    strokeLinejoin: 'round',
     color: 'inherit',
-  },
-  // Small icons would look bold next to 11px text at the full stroke.
-  thin: {
-    strokeWidth: sizes['--icon-stroke-small'],
   },
   dim: {
     opacity: opacity['--opacity-tab-icon'],
@@ -55,11 +70,11 @@ const styles = stylex.create({
 })
 
 const sizeStyles = stylex.create({
-  11: { width: sizes['--icon-11'], height: sizes['--icon-11'] },
   12: { width: sizes['--icon-12'], height: sizes['--icon-12'] },
   13: { width: sizes['--icon-13'], height: sizes['--icon-13'] },
   14: { width: sizes['--icon-14'], height: sizes['--icon-14'] },
   15: { width: sizes['--icon-15'], height: sizes['--icon-15'] },
   16: { width: sizes['--icon-16'], height: sizes['--icon-16'] },
   18: { width: sizes['--icon-18'], height: sizes['--icon-18'] },
+  20: { width: sizes['--icon-20'], height: sizes['--icon-20'] },
 })

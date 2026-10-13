@@ -1,4 +1,7 @@
-import { ArrowUp, Bell, Check, CircleCheck } from 'lucide-react'
+import { ArrowUp } from '@phosphor-icons/react/dist/icons/ArrowUp'
+import { Bell } from '@phosphor-icons/react/dist/icons/Bell'
+import { Check } from '@phosphor-icons/react/dist/icons/Check'
+import { CheckCircle } from '@phosphor-icons/react/dist/icons/CheckCircle'
 import { Button } from './Button'
 import { defineFixtures, fixture, scene } from './fixtures/define'
 import { Row, Stack } from './fixtures/layout'
@@ -6,11 +9,13 @@ import { Row, Stack } from './fixtures/layout'
 export default defineFixtures(Button, {
   primary: fixture({ variant: 'primary', size: '2xl', children: 'Send' }),
   secondary: fixture({ variant: 'secondary', size: '2xl', children: 'Discard' }),
-  outline: fixture({ variant: 'outline', size: 'lg', iconStart: CircleCheck, children: 'Resolve' }),
+  outline: fixture({ variant: 'outline', size: 'lg', iconStart: CheckCircle, children: 'Resolve' }),
   ghost: fixture({ variant: 'ghost', size: 'md', tone: 'subtle', children: 'Open topic' }),
   raised: fixture({ variant: 'raised', size: 'sm', kbd: '↵', children: 'Fix and send' }),
   'small-action': fixture({ variant: 'secondary', size: 'sm', children: 'Group into topic' }),
   'row-resolve': fixture({ variant: 'outline', size: 'xs', iconStart: Check, children: 'Resolve', title: 'Resolve and hide until there is new activity' }),
+  // The check has landed: filled, as in the resolve toast.
+  'resolved-fill': fixture({ variant: 'outline', size: 'lg', iconStart: CheckCircle, iconWeight: 'fill', children: 'Resolved' }),
   disabled: fixture({ variant: 'primary', size: '2xl', disabled: true, children: 'Send' }),
   dimmed: fixture({ variant: 'primary', size: '2xl', dimmed: true, children: 'Send' }),
   hover: scene(
@@ -27,9 +32,10 @@ export default defineFixtures(Button, {
     { hover: 'button' },
   ),
   'hover-secondary': fixture({ variant: 'secondary', size: '2xl', children: 'Discard' }, { hover: 'button' }),
-  'hover-outline': fixture({ variant: 'outline', size: 'lg', iconStart: CircleCheck, children: 'Resolve' }, { hover: 'button' }),
+  'hover-outline': fixture({ variant: 'outline', size: 'lg', iconStart: CheckCircle, children: 'Resolve' }, { hover: 'button' }),
   'hover-ghost': fixture({ variant: 'ghost', size: 'md', tone: 'subtle', children: 'Open topic' }, { hover: 'button' }),
   'hover-raised': fixture({ variant: 'raised', size: 'sm', kbd: '↵', children: 'Fix and send' }, { hover: 'button' }),
+  'hover-row-resolve': fixture({ variant: 'outline', size: 'xs', iconStart: Check, children: 'Resolve' }, { hover: 'button' }),
   'active-press': fixture({ variant: 'primary', size: '2xl', children: 'Send' }, { press: 'button' }),
   'active-press-secondary': fixture({ variant: 'secondary', size: '2xl', children: 'Discard' }, { press: 'button' }),
   'active-press-disabled': fixture({ variant: 'primary', size: '2xl', disabled: true, children: 'Send' }, { press: 'button' }),
@@ -66,7 +72,7 @@ export default defineFixtures(Button, {
       </Button>
       <Button size="sm">Group into topic</Button>
       <Button size="md">Open topic</Button>
-      <Button size="lg" variant="outline" iconStart={CircleCheck}>
+      <Button size="lg" variant="outline" iconStart={CheckCircle}>
         Resolve
       </Button>
       <Button size="xl" variant="outline" iconStart={Bell}>

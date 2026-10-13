@@ -1,4 +1,5 @@
-import { Moon, Sun } from 'lucide-react'
+import { Moon } from '@phosphor-icons/react/dist/icons/Moon'
+import { Sun } from '@phosphor-icons/react/dist/icons/Sun'
 import { Button, type ThemeName } from '@juno/ui'
 
 export interface ThemeToggleViewProps {

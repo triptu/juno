@@ -8,10 +8,12 @@ Dumb, accessible primitives. StyleX plus `@juno/tokens` only; no app state, no d
 - Hover styles only under `@media (hover: hover)`, nested with `default: null` so they fall back to nothing.
 - Press feedback is `scale: var(--press-scale)` on `:active`, never on a disabled control (`pointer-events: none` makes `:active` impossible).
 - The focus ring shows on `:focus-visible` only: 2px `--focus-ring`, offset 2px (inset for tabs, segments and rows that sit flush).
-- Transitions are 150ms (`--duration-fast`) on colour, shadow, opacity and scale, and collapse under `prefers-reduced-motion` through the token itself.
+- Transitions are 150ms (`--duration-fast`) on colour, shadow, opacity and scale. Entrances (Toast, Popover, EmptyState) are 240ms (`--duration-appear`) and pops (an IconButton toggle filling, a reaction Chip with `pop`) 220ms (`--duration-pop`) on the spring. Every duration, scale and distance collapses under `prefers-reduced-motion` through the token itself, so no component has a media query. Only `transform` and `opacity` animate; rows, tabs and nav items never do.
 - `disabled` and `dimmed` share one look (`--opacity-disabled`); dimmed stays focusable and sets `aria-disabled`.
 - Chrome text is not selectable. `Text selectable`, `Textarea`, `TextField` and `CodeBlock` opt in.
-- Icon-only controls take a required `label`. Icons are `lucide-react` components passed as props (`icon={Hash}`), never looked up by name, so only the icons used are bundled.
+- Icon-only controls take a required `label`. Icons are Phosphor components passed as props (`icon={Hash}`), never looked up by name, and imported one at a time from `@phosphor-icons/react/dist/icons/<Name>` (the root entry pulls the whole set into dev builds). `Icon` picks the weight from the size (bold at 14 and below, regular above); call sites name only `fill` (through `active`) and `duotone`.
+- A person's colour comes from `hueForId(slackId)`; a channel's default look from `defaultChannelLook(channelId)`. Both are stable across lists and machines.
+- `Avatar` takes `src` for a profile photo and never shifts layout: the box is sized up front and the initials stay underneath until the photo has loaded, or for good if it fails.
 - Components do not accept `style` or `className`. A few layout containers (`Text`, `Surface`) take `sx` typed as `LayoutStyles`, which rejects colour and font properties, so it is layout only by construction.
 - `Text` names its type role `variant`; `role` on any primitive is always the ARIA attribute.
 - Sizes derive from one prop. `Button` has no radius, text or icon-size overrides; the sidebar nav item is `NavItem` and the quick filter is `Button variant="filter"`.

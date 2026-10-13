@@ -1,4 +1,7 @@
-import { Hash, Lock, User, Users } from 'lucide-react'
+import { Hash } from '@phosphor-icons/react/dist/icons/Hash'
+import { Lock } from '@phosphor-icons/react/dist/icons/Lock'
+import { User } from '@phosphor-icons/react/dist/icons/User'
+import { Users } from '@phosphor-icons/react/dist/icons/Users'
 import { ContextPill } from './ContextPill'
 import { defineFixtures, fixture, scene } from './fixtures/define'
 import { Row } from './fixtures/layout'

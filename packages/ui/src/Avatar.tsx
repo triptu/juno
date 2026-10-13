@@ -1,33 +1,31 @@
 import * as stylex from '@stylexjs/stylex'
-import { colors, hues, radii, sizes, weights } from '@juno/tokens/tokens.stylex'
+import { useState } from 'react'
+import { colors, hues, motion, radii, sizes, weights } from '@juno/tokens/tokens.stylex'
+import { hueForId, hueNames, type HueName } from './internal/hue'
 
-export type AvatarKind = 'person' | 'channel' | 'group'
+export { hueForId, hueNames, type HueName }
+
+export type AvatarKind = 'person' | 'group'
 export type AvatarSize = 44 | 36 | 32 | 28 | 24 | 20 | 18
-export type HueName = 'cyan' | 'claret' | 'midnight' | 'emeraldDark' | 'plum' | 'rose' | 'emerald' | 'jordy'
 /** The surface an avatar ring must cut through: page, sidebar or a card. */
 export type AvatarRingSurface = 'background' | 'subtle' | 'surface'
 
-export const hueNames: ReadonlyArray<HueName> = [
-  'cyan',
-  'claret',
-  'midnight',
-  'emeraldDark',
-  'plum',
-  'rose',
-  'emerald',
-  'jordy',
-]
-
 export interface AvatarProps {
-  /** Channel tiles are square with one letter; people and groups are round. */
+  /** People and groups are both round; a group shows two initials. */
   readonly kind?: AvatarKind
-  /** The letter or initials to draw. */
+  /** The initials to draw, and the fallback while a photo loads or when it fails. */
   readonly label: string
   /** The person's full name, for the accessible name. Omit for decoration. */
   readonly name?: string
   readonly size?: AvatarSize
-  /** Person colour. Ignored for channels. */
+  /** Person colour. Use `hueForId` to pick one from a Slack id. */
   readonly hue?: HueName
+  /**
+   * The Slack profile photo. The box is reserved at `size` before the bytes
+   * arrive and the photo fades in over the initials, so nothing moves. If
+   * it fails, the initials stay.
+   */
+  readonly src?: string
   /**
    * A 1.5px ring in the colour of the surface the avatar sits on, so
    * overlapping avatars read as separate. `subtle` is the sidebar.
@@ -36,35 +34,49 @@ export interface AvatarProps {
 }
 
 /**
- * A square tile for a channel or a round avatar for a person. Colours are
- * mixed from the person's hue so they sit on both themes.
+ * A round avatar for a person or a group: the profile photo when there is
+ * one, coloured initials otherwise. Colours are mixed from the person's hue
+ * so they sit on both themes. Channels are `ChannelIcon`.
  */
-export function Avatar({ kind = 'person', label, name, size = 32, hue = 'rose', ring }: AvatarProps) {
+export function Avatar({ kind = 'person', label, name, size = 32, hue = 'rose', src, ring }: AvatarProps) {
+  // Keyed by src so a row that is reused for another person starts over.
+  const [loaded, setLoaded] = useState<string | undefined>(undefined)
+  const [failed, setFailed] = useState<string | undefined>(undefined)
+  const showImage = src !== undefined && failed !== src
+  const shown = showImage && loaded === src
   return (
     <span
       role={name ? 'img' : undefined}
       aria-label={name}
       aria-hidden={name ? undefined : true}
-      {...stylex.props(
-        styles.base,
-        sizeStyles[size],
-        kind === 'channel' ? styles.channel : styles.person,
-        kind === 'channel' && tileRadius[size],
-        kind !== 'channel' && hueStyles[hue],
-        ring && rings[ring],
-      )}
+      data-kind={kind}
+      {...stylex.props(styles.base, sizeStyles[size], hueStyles[hue], ring && rings[ring])}
     >
       {label}
+      {showImage ? (
+        <img
+          src={src}
+          alt=""
+          draggable={false}
+          decoding="async"
+          loading="lazy"
+          onLoad={() => setLoaded(src)}
+          onError={() => setFailed(src)}
+          {...stylex.props(styles.image, shown && styles.imageShown)}
+        />
+      ) : null}
     </span>
   )
 }
 
 const styles = stylex.create({
   base: {
+    position: 'relative',
     display: 'inline-flex',
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
+    borderRadius: radii['--radius-full'],
     fontWeight: weights['--weight-semibold'],
     lineHeight: 1,
     letterSpacing: 0,
@@ -73,13 +85,21 @@ const styles = stylex.create({
     overflow: 'hidden',
     whiteSpace: 'nowrap',
   },
-  channel: {
-    backgroundColor: colors['--secondary-default'],
-    color: colors['--foreground-subtle'],
-    textTransform: 'uppercase',
+  // Sits over the initials in the same box; only opacity changes, and the
+  // fade collapses to nothing under reduced motion through the token.
+  image: {
+    position: 'absolute',
+    inset: 0,
+    width: '100%',
+    height: '100%',
+    objectFit: 'cover',
+    opacity: 0,
+    transitionProperty: 'opacity',
+    transitionDuration: motion['--duration-fast'],
+    transitionTimingFunction: motion['--ease-out'],
   },
-  person: {
-    borderRadius: radii['--radius-full'],
+  imageShown: {
+    opacity: 1,
   },
 })
 
@@ -99,50 +119,40 @@ const sizeStyles = stylex.create({
   18: { width: sizes['--avatar-18'], height: sizes['--avatar-18'], fontSize: sizes['--initials-18'] },
 })
 
-// Tile radius follows the nesting rule against the row it sits in.
-const tileRadius = stylex.create({
-  44: { borderRadius: radii['--radius-xl'] },
-  36: { borderRadius: radii['--radius-lg'] },
-  32: { borderRadius: radii['--radius-lg'] },
-  28: { borderRadius: radii['--radius-md-plus'] },
-  24: { borderRadius: radii['--radius-md'] },
-  20: { borderRadius: radii['--radius-sm'] },
-  18: { borderRadius: radii['--radius-sm'] },
-})
-
-// Background: 24% of the hue over the surface. Foreground: 62% over the text
-// colour. Written out per hue because StyleX evaluates styles statically.
-const hueStyles = stylex.create({
+// Background: the avatar mix of the hue over the surface. Foreground: the
+// hue over the text colour. Written out per hue because StyleX evaluates
+// styles statically. ChannelIcon shares this table.
+export const hueStyles = stylex.create({
   cyan: {
-    backgroundColor: `color-mix(in oklch, ${hues['--hue-cyan']} 24%, ${colors['--surface-default']})`,
-    color: `color-mix(in oklch, ${hues['--hue-cyan']} 62%, ${colors['--foreground-default']})`,
+    backgroundColor: `color-mix(in oklch, ${hues['--hue-cyan']} ${hues['--avatar-bg-mix']}, ${colors['--surface-default']})`,
+    color: `color-mix(in oklch, ${hues['--hue-cyan']} ${hues['--avatar-fg-mix']}, ${colors['--foreground-default']})`,
   },
   claret: {
-    backgroundColor: `color-mix(in oklch, ${hues['--hue-claret']} 24%, ${colors['--surface-default']})`,
-    color: `color-mix(in oklch, ${hues['--hue-claret']} 62%, ${colors['--foreground-default']})`,
+    backgroundColor: `color-mix(in oklch, ${hues['--hue-claret']} ${hues['--avatar-bg-mix']}, ${colors['--surface-default']})`,
+    color: `color-mix(in oklch, ${hues['--hue-claret']} ${hues['--avatar-fg-mix']}, ${colors['--foreground-default']})`,
   },
   midnight: {
-    backgroundColor: `color-mix(in oklch, ${hues['--hue-midnight']} 24%, ${colors['--surface-default']})`,
-    color: `color-mix(in oklch, ${hues['--hue-midnight']} 62%, ${colors['--foreground-default']})`,
+    backgroundColor: `color-mix(in oklch, ${hues['--hue-midnight']} ${hues['--avatar-bg-mix']}, ${colors['--surface-default']})`,
+    color: `color-mix(in oklch, ${hues['--hue-midnight']} ${hues['--avatar-fg-mix']}, ${colors['--foreground-default']})`,
   },
   emeraldDark: {
-    backgroundColor: `color-mix(in oklch, ${hues['--hue-emerald-dark']} 24%, ${colors['--surface-default']})`,
-    color: `color-mix(in oklch, ${hues['--hue-emerald-dark']} 62%, ${colors['--foreground-default']})`,
+    backgroundColor: `color-mix(in oklch, ${hues['--hue-emerald-dark']} ${hues['--avatar-bg-mix']}, ${colors['--surface-default']})`,
+    color: `color-mix(in oklch, ${hues['--hue-emerald-dark']} ${hues['--avatar-fg-mix']}, ${colors['--foreground-default']})`,
   },
   plum: {
-    backgroundColor: `color-mix(in oklch, ${hues['--hue-plum']} 24%, ${colors['--surface-default']})`,
-    color: `color-mix(in oklch, ${hues['--hue-plum']} 62%, ${colors['--foreground-default']})`,
+    backgroundColor: `color-mix(in oklch, ${hues['--hue-plum']} ${hues['--avatar-bg-mix']}, ${colors['--surface-default']})`,
+    color: `color-mix(in oklch, ${hues['--hue-plum']} ${hues['--avatar-fg-mix']}, ${colors['--foreground-default']})`,
   },
   rose: {
-    backgroundColor: `color-mix(in oklch, ${hues['--hue-rose']} 24%, ${colors['--surface-default']})`,
-    color: `color-mix(in oklch, ${hues['--hue-rose']} 62%, ${colors['--foreground-default']})`,
+    backgroundColor: `color-mix(in oklch, ${hues['--hue-rose']} ${hues['--avatar-bg-mix']}, ${colors['--surface-default']})`,
+    color: `color-mix(in oklch, ${hues['--hue-rose']} ${hues['--avatar-fg-mix']}, ${colors['--foreground-default']})`,
   },
   emerald: {
-    backgroundColor: `color-mix(in oklch, ${hues['--hue-emerald']} 24%, ${colors['--surface-default']})`,
-    color: `color-mix(in oklch, ${hues['--hue-emerald']} 62%, ${colors['--foreground-default']})`,
+    backgroundColor: `color-mix(in oklch, ${hues['--hue-emerald']} ${hues['--avatar-bg-mix']}, ${colors['--surface-default']})`,
+    color: `color-mix(in oklch, ${hues['--hue-emerald']} ${hues['--avatar-fg-mix']}, ${colors['--foreground-default']})`,
   },
   jordy: {
-    backgroundColor: `color-mix(in oklch, ${hues['--hue-jordy']} 24%, ${colors['--surface-default']})`,
-    color: `color-mix(in oklch, ${hues['--hue-jordy']} 62%, ${colors['--foreground-default']})`,
+    backgroundColor: `color-mix(in oklch, ${hues['--hue-jordy']} ${hues['--avatar-bg-mix']}, ${colors['--surface-default']})`,
+    color: `color-mix(in oklch, ${hues['--hue-jordy']} ${hues['--avatar-fg-mix']}, ${colors['--foreground-default']})`,
   },
 })

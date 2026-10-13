@@ -1,4 +1,4 @@
-import { Sparkles } from 'lucide-react'
+import { Sparkle } from '@phosphor-icons/react/dist/icons/Sparkle'
 import { defineFixtures, fixture, scene } from './fixtures/define'
 import { Row } from './fixtures/layout'
 import { Icon } from './Icon'
@@ -9,7 +9,7 @@ function CatchUp() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 4, width: 480 }}>
       <Row gap="sm">
-        <Icon icon={Sparkles} size={13} />
+        <Icon icon={Sparkle} size={14} weight="duotone" />
         <Text variant="meta" weight="medium" tone="muted">
           Catch up
         </Text>

@@ -62,11 +62,11 @@ export class Juno {
   }
 
   async expectSignedOut(): Promise<void> {
-    await expect(this.win.getByRole('heading', { name: 'Welcome to Juno', exact: true })).toBeVisible({ timeout: 15_000 })
+    await expect(this.win.getByRole('heading', { name: "Hi, I'm Juno", exact: true })).toBeVisible({ timeout: 15_000 })
   }
 
   async expectSessionExpired(): Promise<void> {
-    await expect(this.win.getByRole('heading', { name: 'Sign in again', exact: true })).toBeVisible({ timeout: 15_000 })
+    await expect(this.win.getByRole('heading', { name: 'Slack signed you out', exact: true })).toBeVisible({ timeout: 15_000 })
   }
 
   async expectSignInError(text: string | RegExp): Promise<void> {

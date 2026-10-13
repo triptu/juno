@@ -43,6 +43,10 @@ export const darkColors = stylex.createTheme(colors, {
   '--selection-background': 'hsla(200, 97%, 20%, 1)',
   '--focus-ring': 'hsla(200, 80%, 65%, 1)',
   '--overlay': 'rgba(0, 0, 0, 0.45)',
+
+  '--warm-soft': 'color-mix(in oklch, #E39A3B 22%, var(--background))',
+  // The dark toast is paper on ink, so the check takes more of the green.
+  '--toast-success': 'color-mix(in oklch, #00674F 80%, var(--background))',
 })
 
 export const darkShadows = stylex.createTheme(shadows, {

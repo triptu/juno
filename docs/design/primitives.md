@@ -5,7 +5,8 @@ The dumb, reusable primitives in `packages/ui`, derived from the repeated patter
 Shared conventions for every primitive (details in `packages/ui/README.md`):
 
 - No `cursor: pointer`. Hover styles only under `@media (hover: hover)`.
-- Press feedback `scale(0.96)` at 150ms ease-out, suppressed when disabled.
+- Press feedback `scale(0.96)` at 150ms `--ease-out`, suppressed when disabled. Entrances (toast, popover, empty state) are 240ms, pops (a toggle filling, a reaction landing) 220ms with the spring; everything collapses under reduced motion through the tokens (`tokens.md` §8).
+- Icons are Phosphor: bold at 14px and below, regular at 15 and above, `fill` for an active or selected state, `duotone` only for the deliberate friendly spots (Juno nav item, AI sparkles, card kinds, illustrations).
 - Visible focus ring (`--focus-ring`, 2px) only on `:focus-visible`.
 - Icon-only controls require an accessible name (`label`).
 - Sizes, colours, radii and durations come from tokens; no literal values in components.
@@ -16,7 +17,7 @@ Shared conventions for every primitive (details in `packages/ui/README.md`):
 
 ## 1. Icon
 
-Lucide wrapper. Takes the icon component (`icon={Hash}`), not a name, so only used icons are bundled. `size` 11–18 (default 16), `dim` for the 0.75 tab icon, optional `label` (otherwise hidden from assistive technology). Stroke is `currentColor`.
+Phosphor wrapper. Takes the icon component (`icon={Hash}`, imported from `@phosphor-icons/react/dist/icons/Hash`), not a name, so only used icons are bundled. `size` 12 | 13 | 14 | 15 | 16 | 18 | 20 (default 16); `weight` `regular` | `bold` | `fill` | `duotone`, defaulting to bold at 14 and below and regular at 15 and above, so call sites only name `fill` and `duotone`; `active` is shorthand for `weight="fill"` (the outline/fill pair of a toggle); `dim` for the 0.75 tab icon; optional `label` (otherwise hidden from assistive technology). Drawn in `currentColor`. The Lucide name mapping is in `friendly-layer.md` §2.3.
 
 ## 2. Button
 
@@ -24,10 +25,10 @@ One component for every clickable control with a label. Radius, text size and ic
 
 | Prop | Values | Notes |
 | --- | --- | --- |
-| `variant` | `primary` (`--hl` / `--hl-fg`), `secondary`, `outline` (1px `--border-strong`, hover `--border-strongest` + `--surface-hover`), `ghost`, `raised` (surface + `--card-ring` + `--shadow-sm`; send-check primary), `filter` (quick filter: always 28px, radius 7, 13px text, muted until hovered; `pressed` = `--secondary-default` + 600) | |
-| `size` | `xs` 22, `sm` 28, `md` 30, `lg` 32, `xl` 34, `2xl` 36 | Radius 6 / 6 / 7 / 8 / 8 / 8, text 11.5 / 12.5 / 13 and icon 12 / 13 / 14 derive from the size |
+| `variant` | `primary` (`--hl` / `--hl-fg`), `secondary`, `outline` (1px `--border-strong`, hover `--border-strongest` + `--surface-hover`), `ghost`, `raised` (surface + `--card-ring` + `--shadow-sm`; send-check primary), `filter` (quick filter: always 28px, radius 8, 13px text, muted until hovered; `pressed` = `--secondary-default` + 600) | |
+| `size` | `xs` 22, `sm` 28, `md` 30, `lg` 32, `xl` 34, `2xl` 36 | Radius pill / 6 / 7 / 8 / 8 / 8 (the 22px row Resolve is a label-sized control, so a pill), text 11.5 / 12.5 / 13 and icon 13 / 14 / 16 derive from the size |
 | `tone` | `default`, `subtle`, `muted` | Text colour for ghost and outline; hover turns default |
-| `iconStart`, `iconEnd` | lucide icon | |
+| `iconStart`, `iconEnd` | Phosphor icon | Weight by size; `iconWeight` overrides (`fill` for a check that has landed) |
 | `kbd` | string | Trailing mono hint ("↵", "⌘J") |
 | `pressed` | boolean | Toggle state (Pin, filters); sets `aria-pressed` |
 | `dimmed` | boolean | opacity .4, still focusable, `aria-disabled` (Send with empty draft) |
@@ -37,7 +38,7 @@ Covers: quick filters, status chips, Resolve (row and header), Group into topic,
 
 ## 2a. NavItem
 
-The sidebar navigation item (All topics, For you, Juno): 32px, full width, radius 7, 15px `icon` then the label, ghost until hovered, `--secondary-default` when `active` (sets `aria-current="page"`). `trailing` takes the count Chip, `kbd` the "⌘J" hint. Navigates on mouse down through `onSelect` like rows and tabs; `onContextMenu` for the right button.
+The sidebar navigation item (All topics, For you, Juno): 32px, full width, radius 8, 16px `icon` then the label, ghost until hovered, `--secondary-default` and a filled icon when `active` (sets `aria-current="page"`). `iconWeight` overrides the outline/fill pair; the Juno item passes `duotone` so it stays marked as the one AI surface whether or not it is open. `trailing` takes the count Chip, `kbd` the "⌘J" hint. Navigates on mouse down through `onSelect` like rows and tabs; `onContextMenu` for the right button. Never animates.
 
 ## 3. IconButton
 
@@ -49,13 +50,22 @@ Button with only an icon. `label` is required and doubles as the tooltip (`noToo
 | `radius` | derived (4 for 20–22, 6 for 26–28, 8 for 30+), or `sm` (5, dismiss), `full` (attach, send) |
 | `variant` | `ghost` (default), `secondary`, `primary` (send), `raised` |
 | `tone` | `subtle` (default), `muted`, `default` for ghost |
-| `icon`, `iconSize`, `pressed`, `dimmed` | as Button |
+| `icon`, `iconSize`, `iconWeight`, `dimmed` | as Button. Icon 12 / 12 / 13 / 18 / 18 / 18 / 20 by size; the send arrow passes `iconWeight="bold"`, attach `iconSize={20}` |
+| `pressed` | Toggle state (subscribe, pin): `aria-pressed` and the filled icon. Both icons stay in the DOM; the fill scales 0.8 → 1 with the spring over `--duration-pop` and cross-fades in, off just cross-fades over `--duration-fast` |
 
 ## 4. Avatar and AvatarStack
 
-One `Avatar` component. `kind` `person` (round, initials, person colour), `channel` (square tile with one letter, `--secondary-default`), `group` (round, two initials). `size` 44, 36, 32, 28, 24, 20, 18 sets the initials size. `hue` picks one of the eight person colours (`hueNames`); background and foreground are mixed from it. `name` gives the accessible name; without it the avatar is decorative. `ring` takes the surface the avatar sits on (`background` | `subtle` | `surface`) and adds a 1.5px ring in that colour.
+`Avatar` is a person or a group, always round. `kind` `person` (initials) or `group` (two initials). `size` 44, 36, 32, 28, 24, 20, 18 sets the initials size. `hue` picks one of the eight person colours (`hueNames`; `hueForId(slackId)` picks one deterministically); background and foreground are mixed from it. `src` is the Slack profile photo: the box is reserved at `size` before the bytes arrive, the photo fades in over the initials (`--duration-fast`, nothing under reduced motion), and if it fails the initials stay, so nothing ever moves. `name` gives the accessible name; without it the avatar is decorative. `ring` takes the surface the avatar sits on (`background` | `subtle` | `surface`) and adds a 1.5px ring in that colour.
+
+Channels are `ChannelIcon` (section 4a).
 
 `AvatarStack`: `people[]` (`id`, `initials`, `name`, `hue`), `max` (4), `size` (18), overlap −4. Each avatar shows one initial (two would be clipped by the next avatar) and a ring in the colour of `surface` (`subtle` by default, the sidebar; `background` or `surface` elsewhere) so the overlap reads as a cut.
+
+## 4a. ChannelIcon and Swatch
+
+`ChannelIcon` is the square tile for a channel: a chosen Phosphor icon, or the first letter of `name`, on a chosen colour, in the same hue mix as avatars so tiles and initials sit together in a row. `icon` is one of `channelIconNames` (24 plain objects that read at 16px: hash, megaphone, chats, rocket, code, bug, wrench, flask, shield, lightning, globe, compass, flag, star, heart, leaf, coffee, gift, trophy, book, briefcase, calendar, camera, truck; `channelIcons` maps a name to its component), `color` one of `channelColorNames` (the eight person hues). `defaultChannelLook(id)` is what a channel gets before anyone changes it: a colour hashed from its id and no icon, so a list of untouched channels still tells them apart by letter. `size` as Avatar; radius 12 / 8 / 8 / 7 / 6 / 5 / 5 by size. `label` for the accessible name when the channel name is not visible beside it. The choice is client-only (SPEC §3) and the view that changes it is `ChannelIconPicker` in `@juno/views`.
+
+`Swatch`: a round 24px colour choice in the hue's avatar mix, a bold check and a ring when `selected` (`aria-pressed`). Required `label`. Used by the channel picker; the accent picker will use it too.
 
 ## 5. Chip
 
@@ -63,17 +73,17 @@ Small inline label. Replaces tags, count badges, status chips, decision chips, s
 
 | Prop | Values | Notes |
 | --- | --- | --- |
-| `variant` | `outline` (Main), `filled` (Reopened, Open, Digest), `strong` (`--secondary-active`; unread count), `soft` (`--hl-soft` + inset ring; @), `accent` (`--hl`; Now, @ in Browse), `success` (resolved tint), `quiet` (transparent, muted), `surface` (`--surface-hover`), `dashed` (stealth pill) | |
-| `size` | 18 (tag), 20 (badge), 22 (status), 24 (summary, reaction), 26 (scope), 28 (digest time) | Text 11 / 11 / 12 / 12 / 12.5 / 13 |
-| `icon`, `iconSize` | 11–13 | sparkle in the confidence badge |
+| `variant` | `outline` (Main), `filled` (Reopened, Open, Digest, #channel), `strong` (`--secondary-active`; unread count), `soft` (`--hl-soft` + inset ring; @), `accent` (`--hl`; Now, @ in Browse, @you), `success` (resolved tint), `quiet` (transparent, muted), `surface` (`--surface-hover`), `dashed` (stealth pill), `person` (the inline @mention: `hue` mixed 16% into the surface and 40% into the text, weight 600; `hue` as Avatar) | Every chip is a pill (`--radius-tag`) |
+| `size` | 18 (tag), 20 (badge), 22 (status), 24 (summary, reaction), 26 (scope), 28 (digest time), `inline` (follows the surrounding line; padding 0 5) | Text 11 / 11 / 12 / 12 / 12.5 / 13 / inherited |
+| `icon`, `iconSize` | 12–13, bold | sparkle in the confidence badge, eye-slash in the stealth pill |
 | `numeric` | boolean | tabular figures |
-| `onRemove`, `removeLabel` | | Adds a 20×20 close IconButton |
-| `interactive`, `pressed` | | Renders a toggle `button` (reaction chips: 1px `--border-default`, pressed = `--hl-soft` + `--hl-ring` border) |
+| `onRemove`, `removeLabel` | | Adds a 20×20 close IconButton (12px bold X) |
+| `interactive`, `pressed`, `pop` | | Renders a toggle `button` (reaction chips: 1px `--border-default`, pressed = `--hl-soft` + `--hl-ring` border and the count in `--foreground-default`). `pop` plays the spring once (1 → 1.12 → 1 over `--duration-pop`); set it only when the toggle was the user's own action |
 | `title` | tooltip | |
 
 ## 6. ContextPill
 
-The tinted "where" pill. It draws what it is given and knows nothing about conversation kinds: `tint` `public` | `private` | `dm` (the three tints in the tokens; group DMs use `dm`), `icon` (`Hash`, `Lock`, `User`, `Users`), `name` without "#", `kindLabel` ("Public channel", also the tooltip) shown after a dot at 400 when `showKind` is set; `size` 22 (card), 26 (header), 28 (To field). The kind → tint, icon and label mapping is a `@juno/domain` rule applied by the view.
+The tinted "where" pill, fully round (`--radius-pill`). It draws what it is given and knows nothing about conversation kinds: `tint` `public` | `private` | `dm` (the three tints in the tokens; group DMs use `dm`), `icon` (`Hash`, `Lock`, `User`, `Users`, bold at 12 / 14 / 14), `name` without "#", `kindLabel` ("Public channel", also the tooltip) shown after a dot at 400 when `showKind` is set; `size` 22 (card), 26 (header), 28 (To field). The kind → tint, icon and label mapping is a `@juno/domain` rule applied by the view.
 
 ## 7. Kbd
 
@@ -85,13 +95,13 @@ Typography. `variant` maps to the five variables of a type role in tokens: `sect
 
 ## 9. Surface, Divider, LabelledRule
 
-`Surface` `kind`: `card` (surface + `--card-ring`, radius 10, padding 14), `popover` (`--pop-shadow`, radius 13, padding 6), `toolbar` (radius 9), `group` (card with no padding, clips children), `inset` (`--background` + 1px `--border-default`, radius 8), `field` (the composer frame: surface + 1px `--input-border`, focus colour and 1px ring on `:focus-within`, radius 12), `toast` (ink on paper, `--shadow-lg`). `padding` `none` | `xs` 4 | `sm` 6 | `md` 12 | `lg` 14 and `radius` override the defaults. Floating kinds carry a transparent 1px border so a ring never changes layout.
+`Surface` `kind`: `card` (surface + `--card-ring`, radius 12, padding 14), `popover` (`--pop-shadow`, radius 13, padding 6), `toolbar` (radius 9), `group` (card with no padding, clips children), `inset` (`--background` + 1px `--border-default`, radius 8), `field` (the composer frame: surface + 1px `--input-border`, focus colour and 1px ring on `:focus-within`, radius 14), `toast` (ink on paper, `--shadow-lg`, radius 14). `padding` `none` | `xs` 4 | `sm` 6 | `md` 12 | `lg` 14 and `radius` override the defaults. Floating kinds carry a transparent 1px border so a ring never changes layout.
 
 `Divider`: 1px, `tone` `default` | `subtle`, `vertical`, `inset`. `LabelledRule`: the "3 NEW" divider, `label` + rule in `--hl` / `--hl-rule` (or `muted`); fills its row.
 
 ## 10. Popover and OptionList
 
-`Popover`: renders `anchor` in place and, when `open`, a `popover` Surface next to it. `placement` (`bottom-start` | `bottom-end` | `top-start` | `top-end`), `width` (`menu` 236, `account` 248, `browse` 300, `mention` 280, `anchor`), `maxHeight` (`popover` 400, `picker` 300), `layer` (`mention` | `picker` | `menu` | `context`), `role`, `label`. Closes on Esc, outside pointer-down and focus leaving (`closeOnBlur`). Scroll is contained. No animation.
+`Popover`: renders `anchor` in place and, when `open`, a `popover` Surface next to it. `placement` (`bottom-start` | `bottom-end` | `top-start` | `top-end`), `width` (`menu` 236, `account` 248, `browse` 300, `mention` 280, `anchor`), `maxHeight` (`popover` 400, `picker` 300), `layer` (`mention` | `picker` | `menu` | `context`), `role`, `label`. Closes on Esc, outside pointer-down and focus leaving (`closeOnBlur`). Scroll is contained. Appears with opacity and a 0.98 → 1 scale from the anchor corner over `--duration-appear`; closing is instant (the panel unmounts).
 
 Menus are not a separate primitive: an in-app menu (the account menu) is an `OptionList` with `role="menu"` inside a `Popover`; its rows become `menuitem`s. In a `listbox`, rows are `option`s and `aria-selected` is the real selection only (the keyboard highlight is `aria-activedescendant`). Real context menus are native.
 
@@ -123,11 +133,17 @@ Generic row for settings groups, logs and tables: `minHeight` 44 | 48 | 52, `pad
 
 ## 14. Toast
 
-`Toast`: `toast` Surface, 13px text (one line, ellipsis), optional `action` (`label`, `kbd`, `onAction`) drawn as a 26px translucent button. `ToastRegion` pins its child bottom-left (16/16, z 45). Lifetimes and replacement are the owner's job.
+`Toast`: `toast` Surface (radius 14), optional filled `icon` in `--toast-success` (the check in the resolve toast), 13px text (one line, ellipsis), optional `action` (`label`, `kbd`, `onAction`) drawn as a 26px translucent pill. Rises in 8px with opacity over `--duration-appear`. `ToastRegion` pins its child bottom-left (16/16, z 45). Lifetimes, the exit fade (`--duration-exit`) and replacement (key the toast so a replacement cross-fades rather than sliding again) are the owner's job.
 
 ## 15. EmptyState
 
-Centered `title`, `body` (why it is empty) and one `action`. `variant` `list` (14/500 title) or `workspace` (serif 30 subtle). `padding` `list` (48 16) or `page` (48).
+Centered `illustration` (optional; an `IllustrationName`, 96 wide in `list`, 120 in `workspace`, 14px above the title), `title`, `body` (why it is empty) and one `action`. `variant` `list` (14/500 title) or `workspace` (serif 30 subtle). `padding` `list` (48 16) or `page` (48). The parts enter staggered 80ms apart (opacity and a 6px rise) once, when the state mounts; the owner passes `enter={false}` when the state was visible less than a second ago so a filter change just shows it. Copy for each empty state is in `friendly-layer.md` §7.
+
+## 15a. Illustration and Logo
+
+`Illustration` `name`: `caught-up` (the seated j with a tablet on its lap and a check; Unread filter with nothing unread, For you with no cards), `nothing-here` (a tray with two faded rows; a filter hides everything, All topics and Browse with no match), `nothing-open` (a blank tablet with two reply dots; no tabs), `no-results` (a magnifying glass over two rows; ⌘K), `juno` (the seated j alone on a warm disc; the Juno chat empty state). `size` `list` 96 | `workspace` 120 | `figure` 40. One colour (`--foreground-subtle` through `currentColor`), stroke 4 on a 104 by 72 grid, round caps, filled dots, one `--warm-soft` layer. Decorative; the title says what it means.
+
+`Logo`: the laptop-two mark in `currentColor`. `size` 16 | 18 | 20 | 24 | 28 | 32 | 40 | 44; `label` ("Juno") when it is not decorative. The sign-in page shows it at 40; the assistant's avatar is 28.
 
 ## 16. Page, PageHeader, Section
 
@@ -149,6 +165,6 @@ Feature components that compose the above and hold app logic: `Sidebar`, `TopicR
 
 ## Count
 
-19 primitives: Icon, Button, NavItem, IconButton, Avatar (+AvatarStack), Chip, ContextPill, Kbd, Text, Surface (+Divider, LabelledRule), Popover/OptionList, Tabs, Fields (TextField, Textarea, Select, Checkbox, Slider, Segmented), ListRow, Toast, EmptyState, Page/PageHeader/Section, CodeBlock, Card.
+22 primitives: Icon, Button, NavItem, IconButton, Avatar (+AvatarStack), ChannelIcon (+Swatch), Chip, ContextPill, Kbd, Text, Surface (+Divider, LabelledRule), Popover/OptionList, Tabs, Fields (TextField, Textarea, Select, Checkbox, Slider, Segmented), ListRow, Toast, EmptyState, Illustration, Logo, Page/PageHeader/Section, CodeBlock, Card.
 
 Differences from the first proposal: Button's accent variant is called `primary`; Tile and Avatar are one component; Menu/MenuItem were folded into OptionList (same row anatomy, one keyboard model); PageHeader got a `Page` container for the width and padding instead of setting them itself; `Icon` takes a component rather than a name.

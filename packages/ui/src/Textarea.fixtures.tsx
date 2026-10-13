@@ -1,5 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
-import { ArrowUp, Plus } from 'lucide-react'
+import { ArrowUp } from '@phosphor-icons/react/dist/icons/ArrowUp'
+import { Plus } from '@phosphor-icons/react/dist/icons/Plus'
 import { sizes, spacing } from '@juno/tokens/tokens.stylex'
 import { defineFixtures, fixture, scene } from './fixtures/define'
 import { IconButton } from './IconButton'
@@ -17,11 +18,11 @@ function Composer({ value, dimmed }: { readonly value?: string; readonly dimmed?
     <Surface kind="field" sx={styles.composer}>
       <div {...stylex.props(styles.row)}>
         <span {...stylex.props(styles.button)}>
-          <IconButton icon={Plus} label="Attach" size={28} radius="full" iconSize={18} />
+          <IconButton icon={Plus} label="Attach" size={28} radius="full" iconSize={20} />
         </span>
         <Textarea variant="inline" placeholder="Reply" label="Reply" defaultValue={value} />
         <span {...stylex.props(styles.button)}>
-          <IconButton icon={ArrowUp} label="Send" size={28} radius="full" variant="primary" dimmed={dimmed} />
+          <IconButton icon={ArrowUp} label="Send" size={28} radius="full" variant="primary" iconWeight="bold" dimmed={dimmed} />
         </span>
       </div>
     </Surface>

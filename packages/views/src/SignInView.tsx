@@ -1,6 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
-import { layout, spacing } from '@juno/tokens/tokens.stylex'
-import { Button, Text } from '@juno/ui'
+import { colors, layout, spacing } from '@juno/tokens/tokens.stylex'
+import { Button, Logo, Text } from '@juno/ui'
 
 export interface SignInViewProps {
   /** `first-run` has never signed in; `expired` had a session Slack no longer accepts. */
@@ -14,22 +14,27 @@ export interface SignInViewProps {
 }
 
 /**
- * The page shown when there is no usable session: the serif title, one
- * primary action that opens Slack's sign-in, one secondary action that reads
- * the installed Slack app's session, and a quiet line for what went wrong.
+ * The page shown when there is no usable session: the mark, the serif
+ * title, one primary action that opens Slack's sign-in, one secondary action
+ * that reads the installed Slack app's session, and a quiet line for what
+ * went wrong. This is the one surface where Juno speaks in the first person.
  */
 export function SignInView({ mode, busy, error, onSignIn, onImport }: SignInViewProps) {
   const waiting = busy !== undefined
+  const expired = mode === 'expired'
   return (
     <section {...stylex.props(styles.root)} aria-labelledby="sign-in-title">
       <div {...stylex.props(styles.text)}>
+        <span {...stylex.props(styles.mark)}>
+          <Logo size={40} />
+        </span>
         <Text variant="pageTitle" tone="default" id="sign-in-title">
-          {mode === 'expired' ? 'Sign in again' : 'Welcome to Juno'}
+          {expired ? 'Slack signed you out' : "Hi, I'm Juno"}
         </Text>
         <Text variant="body" tone="subtle" as="p">
-          {mode === 'expired'
-            ? 'Slack no longer accepts the saved session. Your topics and settings are kept.'
-            : 'Juno reads your Slack workspace and organises it by topic. Sign in to connect it.'}
+          {expired
+            ? 'Sign in again to pick up where you left off. Your topics and settings are kept.'
+            : "Sign in to Slack and I'll sort your conversations into topics. Nothing is sent without you."}
         </Text>
       </div>
       <div {...stylex.props(styles.actions)}>
@@ -75,6 +80,11 @@ const styles = stylex.create({
     display: 'flex',
     flexDirection: 'column',
     gap: spacing['--space-3'],
+  },
+  mark: {
+    display: 'inline-flex',
+    color: colors['--foreground-default'],
+    marginBottom: spacing['--space-2'],
   },
   actions: {
     display: 'flex',

@@ -4,7 +4,8 @@ Feature views: React components built from `@juno/ui` that take view models and 
 
 ## Public API
 
-- The views: `Shell` (title bar and page), `EngineStatusView`, `AppInfoView`, `ThemeToggleView`, each with its props type.
+- The views: `Shell` (title bar and page), `SignInView`, `SessionView`, `EngineStatusView`, `AppInfoView`, `ThemeToggleView`, `ChannelIconPicker` (change a channel's icon and colour; not wired to a container yet), each with its props type.
+- Copy lives in the views and their fixtures and follows `docs/design/friendly-layer.md` §7 within SPEC §17: short titles, one-sentence bodies, no exclamation marks, "Juno" or "I" only on the sign-in and Juno surfaces.
 - `applyTheme`, `AccentName`, `ThemeName`, re-exported from `@juno/ui`. The desktop app does not depend on `ui`, so it reaches the theme entry point here.
 - `@juno/views/fixtures`: `fixtures`, every view's fixture sets keyed by view name. The gallery renders them, and each gets a screenshot in light and dark.
 

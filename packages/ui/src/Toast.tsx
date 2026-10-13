@@ -1,6 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import type { ReactNode } from 'react'
-import { colors, layout, radii, sizes, spacing, weights, z } from '@juno/tokens/tokens.stylex'
+import { colors, layout, motion, radii, sizes, spacing, weights, z } from '@juno/tokens/tokens.stylex'
+import { Icon, type PhosphorIcon } from './Icon'
 import { Kbd } from './Kbd'
 import { interactive } from './internal/interactive'
 import { variants as typeVariants } from './internal/type'
@@ -16,13 +17,25 @@ export interface ToastAction {
 
 export interface ToastProps {
   readonly text: string
+  /** A filled icon before the text: the check in the resolve toast. */
+  readonly icon?: PhosphorIcon
   readonly action?: ToastAction
 }
 
-/** One line of dark text on a floating ink surface, with an optional Undo. */
-export function Toast({ text, action }: ToastProps) {
+/**
+ * One line of text on a floating ink surface, with an optional filled icon
+ * and an optional Undo. Rises in over --duration-appear; the owner removes
+ * it (fade over --duration-exit) and keys a replacement so it cross-fades
+ * instead of sliding again.
+ */
+export function Toast({ text, icon, action }: ToastProps) {
   return (
     <Surface kind="toast" role="status" aria-live="polite" sx={styles.toast}>
+      {icon ? (
+        <span {...stylex.props(styles.icon)}>
+          <Icon icon={icon} size={16} weight="fill" />
+        </span>
+      ) : null}
       <span {...stylex.props(typeVariants.ui, styles.text)}>{text}</span>
       {action ? (
         <button
@@ -47,6 +60,11 @@ export function ToastRegion({ children }: ToastRegionProps) {
   return <div {...stylex.props(styles.region)}>{children}</div>
 }
 
+const rise = stylex.keyframes({
+  from: { opacity: 0, transform: `translateY(${motion['--rise-toast']})` },
+  to: { opacity: 1, transform: 'translateY(0)' },
+})
+
 const styles = stylex.create({
   region: {
     position: 'absolute',
@@ -65,6 +83,17 @@ const styles = stylex.create({
     paddingInlineEnd: spacing['--space-2'],
     pointerEvents: 'auto',
     userSelect: 'none',
+    animationName: rise,
+    animationDuration: motion['--duration-appear'],
+    animationTimingFunction: motion['--ease-out'],
+    animationFillMode: 'both',
+  },
+  icon: {
+    display: 'inline-flex',
+    flexShrink: 0,
+    // Success mixed into the toast's own background, not the accent.
+    color: colors['--toast-success'],
+    marginInlineEnd: `calc(-1 * ${spacing['--space-1']})`,
   },
   text: {
     overflow: 'hidden',
@@ -78,8 +107,8 @@ const styles = stylex.create({
     gap: spacing['--space-1-5'],
     flexShrink: 0,
     height: sizes['--control-26'],
-    paddingInline: spacing['--space-2'],
-    borderRadius: radii['--radius-md'],
+    paddingInline: spacing['--space-2-5'],
+    borderRadius: radii['--radius-tag'],
     fontWeight: weights['--weight-semibold'],
     color: 'inherit',
     backgroundColor: {

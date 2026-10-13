@@ -29,7 +29,8 @@ export default defineFixtures(
       onImport: noop,
     }),
     'primary-hover': fixture({ mode: 'first-run', onSignIn: noop, onImport: noop }, { hover: 'button' }),
+    'primary-press': fixture({ mode: 'first-run', onSignIn: noop, onImport: noop }, { press: 'button' }),
     'primary-focus': fixture({ mode: 'first-run', onSignIn: noop, onImport: noop }, { focus: 'button' }),
   },
-  { width: 760, height: 480, surface: 'background' },
+  { width: 760, height: 520, surface: 'background' },
 )
