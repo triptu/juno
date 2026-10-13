@@ -1,0 +1,24 @@
+{
+  "approach": "A",
+  "model": "anthropic/claude-sonnet-5.5",
+  "topic": "q4-cuts",
+  "ok": true,
+  "free": {
+    "ok": true,
+    "svg": "<svg width=\"40\" height=\"40\" aria-hidden=\"true\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" fill=\"none\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M6 8v24h28\" stroke=\"#2E5F6B\" stroke-width=\"3\"/><path d=\"M11 14h12v5H11z\" fill=\"#CFE3E8\" stroke=\"#2E5F6B\" stroke-width=\"3\"/><path d=\"M11 24h8v5h-8z\" fill=\"#CFE3E8\" stroke=\"#2E5F6B\" stroke-width=\"3\"/><path d=\"M27 10l7 7M34 10l-7 7\" stroke=\"#CC4628\" stroke-width=\"3\"/></svg>",
+    "elements": 4,
+    "gradients": false
+  },
+  "attempts": 1,
+  "latencyMs": 1115,
+  "costUsd": 0.003352,
+  "tokens": {
+    "in": 476,
+    "out": 240
+  },
+  "raw": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" fill=\"none\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M6 8v24h28\" stroke=\"#2E5F6B\" stroke-width=\"3\"/><path d=\"M11 14h12v5H11z\" fill=\"#CFE3E8\" stroke=\"#2E5F6B\" stroke-width=\"3\"/><path d=\"M11 24h8v5h-8z\" fill=\"#CFE3E8\" stroke=\"#2E5F6B\" stroke-width=\"3\"/><path d=\"M27 10l7 7M34 10l-7 7\" stroke=\"#CC4628\" stroke-width=\"3\"/></svg>",
+  "svg": {
+    "light": "<svg width=\"40\" height=\"40\" aria-hidden=\"true\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" fill=\"none\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M6 8v24h28\" stroke=\"#2E5F6B\" stroke-width=\"3\"/><path d=\"M11 14h12v5H11z\" fill=\"#CFE3E8\" stroke=\"#2E5F6B\" stroke-width=\"3\"/><path d=\"M11 24h8v5h-8z\" fill=\"#CFE3E8\" stroke=\"#2E5F6B\" stroke-width=\"3\"/><path d=\"M27 10l7 7M34 10l-7 7\" stroke=\"#CC4628\" stroke-width=\"3\"/></svg>",
+    "dark": "<svg width=\"40\" height=\"40\" aria-hidden=\"true\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" fill=\"none\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M6 8v24h28\" stroke=\"#2E5F6B\" stroke-width=\"3\"/><path d=\"M11 14h12v5H11z\" fill=\"#CFE3E8\" stroke=\"#2E5F6B\" stroke-width=\"3\"/><path d=\"M11 24h8v5h-8z\" fill=\"#CFE3E8\" stroke=\"#2E5F6B\" stroke-width=\"3\"/><path d=\"M27 10l7 7M34 10l-7 7\" stroke=\"#CC4628\" stroke-width=\"3\"/></svg>"
+  }
+}

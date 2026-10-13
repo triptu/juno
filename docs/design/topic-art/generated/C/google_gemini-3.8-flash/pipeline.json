@@ -1,0 +1,61 @@
+{
+  "approach": "C",
+  "model": "google/gemini-3.8-flash",
+  "topic": "pipeline",
+  "ok": true,
+  "spec": {
+    "hue": "amber",
+    "elements": [
+      {
+        "tag": "motif",
+        "attrs": {
+          "name": "board",
+          "x": "-2",
+          "y": "-2",
+          "scale": "0.9"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "30",
+          "cy": "30",
+          "r": "9.5",
+          "fill": "tile",
+          "stroke": "none",
+          "detail": "1"
+        }
+      },
+      {
+        "tag": "motif",
+        "attrs": {
+          "name": "calendar",
+          "x": "21",
+          "y": "21",
+          "scale": "0.45",
+          "detail": "1"
+        }
+      }
+    ]
+  },
+  "decision": {
+    "main": "board",
+    "secondary": "calendar",
+    "hue": "amber",
+    "confident": true,
+    "why": "Scheduled pipeline review meeting assessing sales forecast numbers"
+  },
+  "attempts": 1,
+  "latencyMs": 1606,
+  "costUsd": 0.00112425,
+  "tokens": {
+    "in": 1319,
+    "out": 36
+  },
+  "raw": "{\"main\": \"board\", \"secondary\": \"calendar\", \"hue\": \"amber\", \"confident\": true, \"why\": \"Scheduled pipeline review meeting assessing sales forecast numbers\"}",
+  "svg": {
+    "light": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"l-C-google_gemini-3.8-flash-pipeline\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#l-C-google_gemini-3.8-flash-pipeline)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#f1dcc3\"/><g fill=\"none\" stroke=\"#6b4300\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><g transform=\"translate(-2 -2) scale(0.9)\" stroke-width=\"3.33\"><rect x=\"7\" y=\"9\" width=\"26\" height=\"17\" rx=\"3\" fill=\"#dcb688\"/><path d=\"M12 21 L17 15 L22 18 L28 12\"/><line x1=\"20\" y1=\"26\" x2=\"20\" y2=\"32\"/><path d=\"M15 32 L20 26 L25 32\"/></g><circle cx=\"30\" cy=\"30\" r=\"9.5\" fill=\"#f1dcc3\" stroke=\"none\"/><g transform=\"translate(21 21) scale(0.45)\" stroke-width=\"6.67\"><rect x=\"9\" y=\"11\" width=\"22\" height=\"20\" rx=\"4\" fill=\"#dcb688\"/><line x1=\"9\" y1=\"17\" x2=\"31\" y2=\"17\"/><line x1=\"14\" y1=\"8\" x2=\"14\" y2=\"13\"/><line x1=\"26\" y1=\"8\" x2=\"26\" y2=\"13\"/><circle cx=\"20\" cy=\"24\" r=\"2\" fill=\"#df6a55\" stroke=\"none\"/></g></g></g></svg>",
+    "dark": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"d-C-google_gemini-3.8-flash-pipeline\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#d-C-google_gemini-3.8-flash-pipeline)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#453116\"/><g fill=\"none\" stroke=\"#f5d1a5\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><g transform=\"translate(-2 -2) scale(0.9)\" stroke-width=\"3.33\"><rect x=\"7\" y=\"9\" width=\"26\" height=\"17\" rx=\"3\" fill=\"#6d4f26\"/><path d=\"M12 21 L17 15 L22 18 L28 12\"/><line x1=\"20\" y1=\"26\" x2=\"20\" y2=\"32\"/><path d=\"M15 32 L20 26 L25 32\"/></g><circle cx=\"30\" cy=\"30\" r=\"9.5\" fill=\"#453116\" stroke=\"none\"/><g transform=\"translate(21 21) scale(0.45)\" stroke-width=\"6.67\"><rect x=\"9\" y=\"11\" width=\"22\" height=\"20\" rx=\"4\" fill=\"#6d4f26\"/><line x1=\"9\" y1=\"17\" x2=\"31\" y2=\"17\"/><line x1=\"14\" y1=\"8\" x2=\"14\" y2=\"13\"/><line x1=\"26\" y1=\"8\" x2=\"26\" y2=\"13\"/><circle cx=\"20\" cy=\"24\" r=\"2\" fill=\"#f8907c\" stroke=\"none\"/></g></g></g></svg>"
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"amber\">\n  <motif name=\"board\" x=\"-2\" y=\"-2\" scale=\"0.9\"/>\n  <circle cx=\"30\" cy=\"30\" r=\"9.5\" fill=\"tile\" stroke=\"none\" detail=\"1\"/>\n  <motif name=\"calendar\" x=\"21\" y=\"21\" scale=\"0.45\" detail=\"1\"/>\n</svg>"
+}

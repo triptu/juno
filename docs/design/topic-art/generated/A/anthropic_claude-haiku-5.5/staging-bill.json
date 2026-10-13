@@ -1,0 +1,24 @@
+{
+  "approach": "A",
+  "model": "anthropic/claude-haiku-5.5",
+  "topic": "staging-bill",
+  "ok": true,
+  "free": {
+    "ok": true,
+    "svg": "<svg width=\"40\" height=\"40\" aria-hidden=\"true\" viewBox=\"0 0 40 40\" xmlns=\"http://www.w3.org/2000/svg\" fill=\"none\" stroke=\"#2E5F6B\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><ellipse cx=\"18\" cy=\"11\" rx=\"10\" ry=\"4\" fill=\"#CFE3E8\"/><path d=\"M8 11v8c0 2.2 4.5 4 10 4s10-1.8 10-4v-8\"/><path d=\"M8 19v8c0 2.2 4.5 4 10 4s10-1.8 10-4v-8\"/><path d=\"M28 24v-6\" stroke=\"#CC4628\"/><path d=\"M25 21l3-3 3 3\" stroke=\"#CC4628\"/></svg>",
+    "elements": 5,
+    "gradients": false
+  },
+  "attempts": 1,
+  "latencyMs": 6042,
+  "costUsd": 0.0001749,
+  "tokens": {
+    "in": 459,
+    "out": 258
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" xmlns=\"http://www.w3.org/2000/svg\" fill=\"none\" stroke=\"#2E5F6B\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><ellipse cx=\"18\" cy=\"11\" rx=\"10\" ry=\"4\" fill=\"#CFE3E8\"/><path d=\"M8 11v8c0 2.2 4.5 4 10 4s10-1.8 10-4v-8\"/><path d=\"M8 19v8c0 2.2 4.5 4 10 4s10-1.8 10-4v-8\"/><path d=\"M28 24v-6\" stroke=\"#CC4628\"/><path d=\"M25 21l3-3 3 3\" stroke=\"#CC4628\"/></svg>",
+  "svg": {
+    "light": "<svg width=\"40\" height=\"40\" aria-hidden=\"true\" viewBox=\"0 0 40 40\" xmlns=\"http://www.w3.org/2000/svg\" fill=\"none\" stroke=\"#2E5F6B\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><ellipse cx=\"18\" cy=\"11\" rx=\"10\" ry=\"4\" fill=\"#CFE3E8\"/><path d=\"M8 11v8c0 2.2 4.5 4 10 4s10-1.8 10-4v-8\"/><path d=\"M8 19v8c0 2.2 4.5 4 10 4s10-1.8 10-4v-8\"/><path d=\"M28 24v-6\" stroke=\"#CC4628\"/><path d=\"M25 21l3-3 3 3\" stroke=\"#CC4628\"/></svg>",
+    "dark": "<svg width=\"40\" height=\"40\" aria-hidden=\"true\" viewBox=\"0 0 40 40\" xmlns=\"http://www.w3.org/2000/svg\" fill=\"none\" stroke=\"#2E5F6B\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><ellipse cx=\"18\" cy=\"11\" rx=\"10\" ry=\"4\" fill=\"#CFE3E8\"/><path d=\"M8 11v8c0 2.2 4.5 4 10 4s10-1.8 10-4v-8\"/><path d=\"M8 19v8c0 2.2 4.5 4 10 4s10-1.8 10-4v-8\"/><path d=\"M28 24v-6\" stroke=\"#CC4628\"/><path d=\"M25 21l3-3 3 3\" stroke=\"#CC4628\"/></svg>"
+  }
+}

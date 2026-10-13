@@ -1,0 +1,40 @@
+{
+  "approach": "C",
+  "model": "anthropic/claude-sonnet-5.5",
+  "topic": "games",
+  "ok": true,
+  "spec": {
+    "hue": "plum",
+    "elements": [
+      {
+        "tag": "motif",
+        "attrs": {
+          "name": "dice",
+          "x": "0",
+          "y": "0",
+          "scale": "1"
+        }
+      }
+    ]
+  },
+  "decision": {
+    "main": "dice",
+    "secondary": null,
+    "hue": "plum",
+    "confident": true,
+    "why": "Board games is a social play evening, dice fits literally."
+  },
+  "attempts": 1,
+  "latencyMs": 2180,
+  "costUsd": 0.00442,
+  "tokens": {
+    "in": 1945,
+    "out": 53
+  },
+  "raw": "{\"main\": \"dice\", \"secondary\": null, \"hue\": \"plum\", \"confident\": true, \"why\": \"Board games is a social play evening, dice fits literally.\"}",
+  "svg": {
+    "light": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"l-C-anthropic_claude-sonnet-5.5-games\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#l-C-anthropic_claude-sonnet-5.5-games)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#ecd8f1\"/><g fill=\"none\" stroke=\"#663870\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><g transform=\"translate(0 0) scale(1)\" stroke-width=\"3.00\"><rect x=\"8\" y=\"8\" width=\"24\" height=\"24\" rx=\"6\" fill=\"#d4afdc\"/><circle cx=\"14\" cy=\"14\" r=\"2\" fill=\"#663870\" stroke=\"none\"/><circle cx=\"20\" cy=\"20\" r=\"2\" fill=\"#663870\" stroke=\"none\"/><circle cx=\"26\" cy=\"26\" r=\"2\" fill=\"#663870\" stroke=\"none\"/><circle cx=\"26\" cy=\"14\" r=\"2\" fill=\"#df6a55\" stroke=\"none\"/><circle cx=\"14\" cy=\"26\" r=\"2\" fill=\"#df6a55\" stroke=\"none\"/></g></g></g></svg>",
+    "dark": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"d-C-anthropic_claude-sonnet-5.5-games\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#d-C-anthropic_claude-sonnet-5.5-games)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#412d45\"/><g fill=\"none\" stroke=\"#edc9f5\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><g transform=\"translate(0 0) scale(1)\" stroke-width=\"3.00\"><rect x=\"8\" y=\"8\" width=\"24\" height=\"24\" rx=\"6\" fill=\"#67486d\"/><circle cx=\"14\" cy=\"14\" r=\"2\" fill=\"#edc9f5\" stroke=\"none\"/><circle cx=\"20\" cy=\"20\" r=\"2\" fill=\"#edc9f5\" stroke=\"none\"/><circle cx=\"26\" cy=\"26\" r=\"2\" fill=\"#edc9f5\" stroke=\"none\"/><circle cx=\"26\" cy=\"14\" r=\"2\" fill=\"#f8907c\" stroke=\"none\"/><circle cx=\"14\" cy=\"26\" r=\"2\" fill=\"#f8907c\" stroke=\"none\"/></g></g></g></svg>"
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"plum\">\n  <motif name=\"dice\" x=\"0\" y=\"0\" scale=\"1\"/>\n</svg>"
+}

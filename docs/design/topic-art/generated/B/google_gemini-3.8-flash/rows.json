@@ -1,0 +1,95 @@
+{
+  "approach": "B",
+  "model": "google/gemini-3.8-flash",
+  "topic": "rows",
+  "ok": true,
+  "failure": "no <svg> element found",
+  "spec": {
+    "hue": "periwinkle",
+    "elements": [
+      {
+        "tag": "rect",
+        "attrs": {
+          "x": "8",
+          "y": "9",
+          "width": "24",
+          "height": "22",
+          "rx": "4",
+          "fill": "soft"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "8",
+          "y1": "20",
+          "x2": "32",
+          "y2": "20"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "13",
+          "y1": "14.5",
+          "x2": "23",
+          "y2": "14.5"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "27",
+          "cy": "14.5",
+          "r": "1.5",
+          "fill": "ink",
+          "stroke": "none",
+          "detail": "1"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "13",
+          "y1": "25",
+          "x2": "23",
+          "y2": "25"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "13",
+          "y1": "28",
+          "x2": "19",
+          "y2": "28",
+          "stroke-width": "2",
+          "detail": "1"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "27",
+          "cy": "25",
+          "r": "1.5",
+          "fill": "accent",
+          "stroke": "none"
+        }
+      }
+    ]
+  },
+  "attempts": 2,
+  "latencyMs": 6336,
+  "costUsd": 0.011970749999999999,
+  "tokens": {
+    "in": 2266,
+    "out": 2739
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"periwinkle\">\n  <rect x=\"8\" y=\"9\" width=\"24\" height=\"22\" rx=\"4\" fill=\"soft\"/>\n  <line x1=\"8\" y1=\"20\" x2=\"32\" y2=\"20\"/>\n  <line x1=\"13\" y1=\"14.5\" x2=\"23\" y2=\"14.5\"/>\n  <circle cx=\"27\" cy=\"14.5\" r=\"1.5\" fill=\"ink\" stroke=\"none\" detail=\"1\"/>\n  <line x1=\"13\" y1=\"25\" x2=\"23\" y2=\"25\"/>\n  <line x1=\"13\" y1=\"28\" x2=\"19\" y2=\"28\" stroke-width=\"2\" detail=\"1\"/>\n  <circle cx=\"27\" cy=\"25\" r=\"1.5\" fill=\"accent\" stroke=\"none\"/>\n</svg>",
+  "svg": {
+    "light": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"l-B-google_gemini-3.8-flash-rows\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#l-B-google_gemini-3.8-flash-rows)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#d7defb\"/><g fill=\"none\" stroke=\"#3d4685\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"8\" y=\"9\" width=\"24\" height=\"22\" rx=\"4\" fill=\"#afbbef\"/><line x1=\"8\" y1=\"20\" x2=\"32\" y2=\"20\"/><line x1=\"13\" y1=\"14.5\" x2=\"23\" y2=\"14.5\"/><circle cx=\"27\" cy=\"14.5\" r=\"1.5\" fill=\"#3d4685\" stroke=\"none\"/><line x1=\"13\" y1=\"25\" x2=\"23\" y2=\"25\"/><line x1=\"13\" y1=\"28\" x2=\"19\" y2=\"28\" stroke-width=\"2.00\"/><circle cx=\"27\" cy=\"25\" r=\"1.5\" fill=\"#df6a55\" stroke=\"none\"/></g></g></svg>",
+    "dark": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"d-B-google_gemini-3.8-flash-rows\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#d-B-google_gemini-3.8-flash-rows)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#2e334f\"/><g fill=\"none\" stroke=\"#ccd5fd\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"8\" y=\"9\" width=\"24\" height=\"22\" rx=\"4\" fill=\"#4a527c\"/><line x1=\"8\" y1=\"20\" x2=\"32\" y2=\"20\"/><line x1=\"13\" y1=\"14.5\" x2=\"23\" y2=\"14.5\"/><circle cx=\"27\" cy=\"14.5\" r=\"1.5\" fill=\"#ccd5fd\" stroke=\"none\"/><line x1=\"13\" y1=\"25\" x2=\"23\" y2=\"25\"/><line x1=\"13\" y1=\"28\" x2=\"19\" y2=\"28\" stroke-width=\"2.00\"/><circle cx=\"27\" cy=\"25\" r=\"1.5\" fill=\"#f8907c\" stroke=\"none\"/></g></g></svg>"
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"periwinkle\">\n  <rect x=\"8\" y=\"9\" width=\"24\" height=\"22\" rx=\"4\" fill=\"soft\"/>\n  <line x1=\"8\" y1=\"20\" x2=\"32\" y2=\"20\"/>\n  <line x1=\"13\" y1=\"14.5\" x2=\"23\" y2=\"14.5\"/>\n  <circle cx=\"27\" cy=\"14.5\" r=\"1.5\" fill=\"ink\" stroke=\"none\" detail=\"1\"/>\n  <line x1=\"13\" y1=\"25\" x2=\"23\" y2=\"25\"/>\n  <line x1=\"13\" y1=\"28\" x2=\"19\" y2=\"28\" stroke-width=\"2\" detail=\"1\"/>\n  <circle cx=\"27\" cy=\"25\" r=\"1.5\" fill=\"accent\" stroke=\"none\"/>\n</svg>"
+}

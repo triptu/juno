@@ -1,0 +1,24 @@
+{
+  "approach": "A",
+  "model": "anthropic/claude-haiku-5.5",
+  "topic": "oncall",
+  "ok": true,
+  "free": {
+    "ok": true,
+    "svg": "<svg width=\"40\" height=\"40\" aria-hidden=\"true\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" fill=\"none\" stroke=\"#2E5F6B\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"6\" y=\"9\" rx=\"4\" fill=\"#CFE3E8\"/><path d=\"M6 16h28\"/><path d=\"M13 5v7\"/><path d=\"M27 5v7\"/><path d=\"M13 24h4\"/><path d=\"M13 29h10\"/><circle cx=\"28\" cy=\"26\" r=\"3\" fill=\"#CC4628\" stroke=\"#CC4628\"/></svg>",
+    "elements": 7,
+    "gradients": false
+  },
+  "attempts": 1,
+  "latencyMs": 5911,
+  "costUsd": 0.0001553,
+  "tokens": {
+    "in": 448,
+    "out": 221
+  },
+  "raw": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" fill=\"none\" stroke=\"#2E5F6B\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"6\" y=\"9\" width=\"28\" height=\"25\" rx=\"4\" fill=\"#CFE3E8\"/><path d=\"M6 16h28\"/><path d=\"M13 5v7\"/><path d=\"M27 5v7\"/><path d=\"M13 24h4\"/><path d=\"M13 29h10\"/><circle cx=\"28\" cy=\"26\" r=\"3\" fill=\"#CC4628\" stroke=\"#CC4628\"/></svg>",
+  "svg": {
+    "light": "<svg width=\"40\" height=\"40\" aria-hidden=\"true\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" fill=\"none\" stroke=\"#2E5F6B\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"6\" y=\"9\" rx=\"4\" fill=\"#CFE3E8\"/><path d=\"M6 16h28\"/><path d=\"M13 5v7\"/><path d=\"M27 5v7\"/><path d=\"M13 24h4\"/><path d=\"M13 29h10\"/><circle cx=\"28\" cy=\"26\" r=\"3\" fill=\"#CC4628\" stroke=\"#CC4628\"/></svg>",
+    "dark": "<svg width=\"40\" height=\"40\" aria-hidden=\"true\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" fill=\"none\" stroke=\"#2E5F6B\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"6\" y=\"9\" rx=\"4\" fill=\"#CFE3E8\"/><path d=\"M6 16h28\"/><path d=\"M13 5v7\"/><path d=\"M27 5v7\"/><path d=\"M13 24h4\"/><path d=\"M13 29h10\"/><circle cx=\"28\" cy=\"26\" r=\"3\" fill=\"#CC4628\" stroke=\"#CC4628\"/></svg>"
+  }
+}

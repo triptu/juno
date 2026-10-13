@@ -1,0 +1,53 @@
+{
+  "approach": "D",
+  "model": "anthropic/claude-haiku-5.5",
+  "topic": "tf-lock",
+  "ok": true,
+  "spec": {
+    "hue": "teal",
+    "elements": [
+      {
+        "tag": "motif",
+        "attrs": {
+          "name": "lock",
+          "x": "-2",
+          "y": "-2",
+          "scale": "0.9"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "30",
+          "cy": "30",
+          "r": "9",
+          "fill": "tile",
+          "stroke": "none",
+          "detail": "1"
+        }
+      },
+      {
+        "tag": "motif",
+        "attrs": {
+          "name": "refresh",
+          "x": "21",
+          "y": "21",
+          "scale": "0.45"
+        }
+      }
+    ]
+  },
+  "attempts": 1,
+  "latencyMs": 1545,
+  "costUsd": 0.0004057,
+  "tokens": {
+    "in": 3427,
+    "out": 126
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"teal\">\n  <motif name=\"lock\" x=\"-2\" y=\"-2\" scale=\"0.9\"/>\n  <circle cx=\"30\" cy=\"30\" r=\"9\" fill=\"tile\" stroke=\"none\" detail=\"1\"/>\n  <motif name=\"refresh\" x=\"21\" y=\"21\" scale=\"0.45\"/>\n</svg>",
+  "svg": {
+    "light": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"l-D-anthropic_claude-haiku-5.5-tf-lock\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#l-D-anthropic_claude-haiku-5.5-tf-lock)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#c3e9e3\"/><g fill=\"none\" stroke=\"#0c5952\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><g transform=\"translate(-2 -2) scale(0.9)\" stroke-width=\"3.33\"><rect x=\"10\" y=\"18\" width=\"20\" height=\"14\" rx=\"4\" fill=\"#84cec4\"/><path d=\"M14 18 V13 A6 6 0 0 1 26 13 V18\"/><circle cx=\"20\" cy=\"25\" r=\"2\" fill=\"#0c5952\" stroke=\"none\"/></g><circle cx=\"30\" cy=\"30\" r=\"9\" fill=\"#c3e9e3\" stroke=\"none\"/><g transform=\"translate(21 21) scale(0.45)\" stroke-width=\"6.67\"><path d=\"M29 16 A10 10 0 1 0 31 23\"/><path d=\"M30 9 V16 H23\"/></g></g></g></svg>",
+    "dark": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"d-D-anthropic_claude-haiku-5.5-tf-lock\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#d-D-anthropic_claude-haiku-5.5-tf-lock)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#0f3e39\"/><g fill=\"none\" stroke=\"#a3e7dd\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><g transform=\"translate(-2 -2) scale(0.9)\" stroke-width=\"3.33\"><rect x=\"10\" y=\"18\" width=\"20\" height=\"14\" rx=\"4\" fill=\"#1a625a\"/><path d=\"M14 18 V13 A6 6 0 0 1 26 13 V18\"/><circle cx=\"20\" cy=\"25\" r=\"2\" fill=\"#a3e7dd\" stroke=\"none\"/></g><circle cx=\"30\" cy=\"30\" r=\"9\" fill=\"#0f3e39\" stroke=\"none\"/><g transform=\"translate(21 21) scale(0.45)\" stroke-width=\"6.67\"><path d=\"M29 16 A10 10 0 1 0 31 23\"/><path d=\"M30 9 V16 H23\"/></g></g></g></svg>"
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"teal\">\n  <motif name=\"lock\" x=\"-2\" y=\"-2\" scale=\"0.9\"/>\n  <circle cx=\"30\" cy=\"30\" r=\"9\" fill=\"tile\" stroke=\"none\" detail=\"1\"/>\n  <motif name=\"refresh\" x=\"21\" y=\"21\" scale=\"0.45\"/>\n</svg>"
+}

@@ -1,0 +1,53 @@
+{
+  "approach": "D",
+  "model": "anthropic/claude-haiku-5.5",
+  "topic": "p95",
+  "ok": true,
+  "spec": {
+    "hue": "coral",
+    "elements": [
+      {
+        "tag": "motif",
+        "attrs": {
+          "name": "chart-up",
+          "x": "-2",
+          "y": "-2",
+          "scale": "0.9"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "30",
+          "cy": "30",
+          "r": "9",
+          "fill": "tile",
+          "stroke": "none",
+          "detail": "1"
+        }
+      },
+      {
+        "tag": "motif",
+        "attrs": {
+          "name": "warning",
+          "x": "21",
+          "y": "21",
+          "scale": "0.45"
+        }
+      }
+    ]
+  },
+  "attempts": 1,
+  "latencyMs": 1536,
+  "costUsd": 0.0004027,
+  "tokens": {
+    "in": 3442,
+    "out": 117
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"coral\"><motif name=\"chart-up\" x=\"-2\" y=\"-2\" scale=\"0.9\"/><circle cx=\"30\" cy=\"30\" r=\"9\" fill=\"tile\" stroke=\"none\" detail=\"1\"/><motif name=\"warning\" x=\"21\" y=\"21\" scale=\"0.45\"/></svg>",
+  "svg": {
+    "light": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"l-D-anthropic_claude-haiku-5.5-p95\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#l-D-anthropic_claude-haiku-5.5-p95)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#f9d7cf\"/><g fill=\"none\" stroke=\"#7c3326\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><g transform=\"translate(-2 -2) scale(0.9)\" stroke-width=\"3.33\"><path d=\"M9 28 L16 20 L22 24 L31 12\"/><circle cx=\"31\" cy=\"12\" r=\"2.6\" fill=\"#c68206\" stroke=\"none\"/></g><circle cx=\"30\" cy=\"30\" r=\"9\" fill=\"#f9d7cf\" stroke=\"none\"/><g transform=\"translate(21 21) scale(0.45)\" stroke-width=\"6.67\"><path d=\"M20 9 L33 31 H7 Z\" fill=\"#eaaca0\"/><line x1=\"20\" y1=\"17\" x2=\"20\" y2=\"23\"/><circle cx=\"20\" cy=\"27\" r=\"1.7\" fill=\"#7c3326\" stroke=\"none\"/></g></g></g></svg>",
+    "dark": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"d-D-anthropic_claude-haiku-5.5-p95\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#d-D-anthropic_claude-haiku-5.5-p95)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#4c2b25\"/><g fill=\"none\" stroke=\"#fdcabf\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><g transform=\"translate(-2 -2) scale(0.9)\" stroke-width=\"3.33\"><path d=\"M9 28 L16 20 L22 24 L31 12\"/><circle cx=\"31\" cy=\"12\" r=\"2.6\" fill=\"#e4a249\" stroke=\"none\"/></g><circle cx=\"30\" cy=\"30\" r=\"9\" fill=\"#4c2b25\" stroke=\"none\"/><g transform=\"translate(21 21) scale(0.45)\" stroke-width=\"6.67\"><path d=\"M20 9 L33 31 H7 Z\" fill=\"#77463c\"/><line x1=\"20\" y1=\"17\" x2=\"20\" y2=\"23\"/><circle cx=\"20\" cy=\"27\" r=\"1.7\" fill=\"#fdcabf\" stroke=\"none\"/></g></g></g></svg>"
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"coral\">\n  <motif name=\"chart-up\" x=\"-2\" y=\"-2\" scale=\"0.9\"/>\n  <circle cx=\"30\" cy=\"30\" r=\"9\" fill=\"tile\" stroke=\"none\" detail=\"1\"/>\n  <motif name=\"warning\" x=\"21\" y=\"21\" scale=\"0.45\"/>\n</svg>"
+}

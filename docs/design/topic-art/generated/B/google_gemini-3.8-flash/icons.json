@@ -1,0 +1,42 @@
+{
+  "approach": "B",
+  "model": "google/gemini-3.8-flash",
+  "topic": "icons",
+  "ok": true,
+  "spec": {
+    "hue": "plum",
+    "elements": [
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M20 7 C20 14.5 25.5 20 33 20 C25.5 20 20 25.5 20 33 C20 25.5 14.5 20 7 20 C14.5 20 20 14.5 20 7 Z",
+          "fill": "soft"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "29",
+          "cy": "11",
+          "r": "2",
+          "fill": "accent",
+          "stroke": "none",
+          "detail": "1"
+        }
+      }
+    ]
+  },
+  "attempts": 1,
+  "latencyMs": 3556,
+  "costUsd": 0.00908025,
+  "tokens": {
+    "in": 1032,
+    "out": 2215
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"plum\">\n  <path d=\"M20 7 C20 14.5 25.5 20 33 20 C25.5 20 20 25.5 20 33 C20 25.5 14.5 20 7 20 C14.5 20 20 14.5 20 7 Z\" fill=\"soft\"/>\n  <circle cx=\"29\" cy=\"11\" r=\"2\" fill=\"accent\" stroke=\"none\" detail=\"1\"/>\n</svg>",
+  "svg": {
+    "light": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"l-B-google_gemini-3.8-flash-icons\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#l-B-google_gemini-3.8-flash-icons)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#ecd8f1\"/><g fill=\"none\" stroke=\"#663870\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M20 7 C20 14.5 25.5 20 33 20 C25.5 20 20 25.5 20 33 C20 25.5 14.5 20 7 20 C14.5 20 20 14.5 20 7 Z\" fill=\"#d4afdc\"/><circle cx=\"29\" cy=\"11\" r=\"2\" fill=\"#df6a55\" stroke=\"none\"/></g></g></svg>",
+    "dark": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"d-B-google_gemini-3.8-flash-icons\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#d-B-google_gemini-3.8-flash-icons)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#412d45\"/><g fill=\"none\" stroke=\"#edc9f5\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M20 7 C20 14.5 25.5 20 33 20 C25.5 20 20 25.5 20 33 C20 25.5 14.5 20 7 20 C14.5 20 20 14.5 20 7 Z\" fill=\"#67486d\"/><circle cx=\"29\" cy=\"11\" r=\"2\" fill=\"#f8907c\" stroke=\"none\"/></g></g></svg>"
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"plum\">\n  <path d=\"M20 7 C20 14.5 25.5 20 33 20 C25.5 20 20 25.5 20 33 C20 25.5 14.5 20 7 20 C14.5 20 20 14.5 20 7 Z\" fill=\"soft\"/>\n  <circle cx=\"29\" cy=\"11\" r=\"2\" fill=\"accent\" stroke=\"none\" detail=\"1\"/>\n</svg>"
+}

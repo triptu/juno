@@ -1,0 +1,40 @@
+{
+  "approach": "C",
+  "model": "anthropic/claude-haiku-5.5",
+  "topic": "marco",
+  "ok": true,
+  "spec": {
+    "hue": "sage",
+    "elements": [
+      {
+        "tag": "motif",
+        "attrs": {
+          "name": "id-card",
+          "x": "0",
+          "y": "0",
+          "scale": "1"
+        }
+      }
+    ]
+  },
+  "decision": {
+    "main": "id-card",
+    "secondary": null,
+    "hue": "sage",
+    "confident": true,
+    "why": "Candidate references in hiring channel, a person record"
+  },
+  "attempts": 1,
+  "latencyMs": 1069,
+  "costUsd": 0.0002242,
+  "tokens": {
+    "in": 1977,
+    "out": 53
+  },
+  "raw": "{\"main\": \"id-card\", \"secondary\": null, \"hue\": \"sage\", \"confident\": true, \"why\": \"Candidate references in hiring channel, a person record\"}",
+  "svg": {
+    "light": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"l-C-anthropic_claude-haiku-5.5-marco\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#l-C-anthropic_claude-haiku-5.5-marco)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#cee8d2\"/><g fill=\"none\" stroke=\"#135c2c\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><g transform=\"translate(0 0) scale(1)\" stroke-width=\"3.00\"><rect x=\"8\" y=\"11\" width=\"24\" height=\"18\" rx=\"4\" fill=\"#9ccca4\"/><circle cx=\"15\" cy=\"19\" r=\"3\"/><line x1=\"21\" y1=\"17\" x2=\"27\" y2=\"17\"/><line x1=\"21\" y1=\"22\" x2=\"26\" y2=\"22\"/></g></g></g></svg>",
+    "dark": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"d-C-anthropic_claude-haiku-5.5-marco\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#d-C-anthropic_claude-haiku-5.5-marco)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#223d27\"/><g fill=\"none\" stroke=\"#b7e5bf\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><g transform=\"translate(0 0) scale(1)\" stroke-width=\"3.00\"><rect x=\"8\" y=\"11\" width=\"24\" height=\"18\" rx=\"4\" fill=\"#376040\"/><circle cx=\"15\" cy=\"19\" r=\"3\"/><line x1=\"21\" y1=\"17\" x2=\"27\" y2=\"17\"/><line x1=\"21\" y1=\"22\" x2=\"26\" y2=\"22\"/></g></g></g></svg>"
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"sage\">\n  <motif name=\"id-card\" x=\"0\" y=\"0\" scale=\"1\"/>\n</svg>"
+}
