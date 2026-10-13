@@ -159,7 +159,7 @@ The `stylex` skill (`.claude/skills/stylex/SKILL.md`) has the full rules and the
 
 ## Processes
 
-Three processes talk to each other (`docs/architecture.md` section 2):
+Three processes talk to each other, four with Juno Agent on (`docs/architecture.md` section 2):
 
 - **main** forks the **engine** as an Electron utility process (`src/main/engine.ts`,
   built from `src/engine/index.ts` to `out/main/engine.js`) with the `persist:slack`
@@ -179,6 +179,13 @@ under plain Node too: the vitest suite in `packages/engine/test` connects the re
 state client to it over a `worker_threads` `MessageChannel`, with `memoryHost()` in
 place of main and Node `fetch` in place of `net.fetch`. Under `JUNO_E2E=1` main
 exposes `globalThis.junoTest` (engine pid and supervisor state) for Playwright.
+
+With `JUNO_AGENT=1` (for example `JUNO_AGENT=1 pnpm dev`), main also forks the Juno
+Agent utility process (`src/main/agent.ts`, built from `src/agent/index.ts` to
+`out/main/agent.js`) without the Slack partition, and on every engine `ready` brokers
+a port between the agent and the engine's AgentHost server (ADR 0012). It stays off
+by default until the chat ships. The spike scripts behind the agent's design are in
+`docs/juno-agent/spikes/`, with their results in `docs/juno-agent/spikes.md`.
 
 ## Sign-in and the live smoke
 

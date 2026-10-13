@@ -73,6 +73,8 @@ Custom protocols are not supported in utility processes (checked), so `juno://fi
 | renderer ↔ engine | `MessageChannelMain`; main gives one port to the engine (`utilityProcess.postMessage({ _tag: 'port' }, [port])`) and the other to the renderer (`webContents.postMessage('engine.port', null, [port])`; the preload forwards it with `window.postMessage({ _tag: 'juno.enginePort' }, '*', ports)`, the page checks `event.source === window` and the tag) | live queries, commands, engine events, as `effect/rpc` (2.6) |
 | renderer ↔ main | `contextBridge` + `ipcRenderer.invoke` | `engine.requestPort`, `launch.setTheme`, `launch.setAccent`, context menu popup, app-menu commands, title-bar double click, clipboard, open external, file dialogs, `webUtils.getPathForFile` for dropped files |
 | engine ↔ main | `process.parentPort` | main→engine (`MainToEngine`): `config` (userData, e2e), `port`, later secrets, cookie header, proxy, `clock.advance` (e2e), sign-in completed; engine→main (`EngineToMain`): `ready`, later `notify`, `setBadge`, `authRequired`, `setCookies`, `openExternal` |
+| agent ↔ engine | `MessageChannelMain`; on every engine `ready`, main sends one end to the engine (`agentPort`) and the other to the agent (`hostPort`) | the AgentHost group (`@juno/agent-contract`), as `effect/rpc`; the agent is the client (ADR 0012) |
+| agent ↔ main | `process.parentPort` | main→agent (`MainToAgent`): `config`, `hostPort`; agent→main (`AgentToMain`): `ready` with the host's hello. Keychain and OAuth requests come in WP13 |
 
 Every payload is an Effect `Schema` in `@juno/contract` (`protocol.ts` for the parentPort messages and the handoff, `shell.ts` for the invoke routes (`ShellRoutes`), `channels.ts` for their names), decoded on receipt. The preload imports only `@juno/contract/channels` (names and types, no runtime imports). Main checks `event.senderFrame.url` against `juno://app/` (or the Vite dev URL in dev).
 
@@ -127,7 +129,17 @@ flowchart TD
   desktop[apps/desktop] --> engine & state & views & contract & tokens & slack
   gallery[apps/gallery] --> views & ui & tokens
   gallery -.tests.-> testing[testing]
+  agent_contract[agent-contract] --> agent_cards[agent-cards]
+  agent --> agent_memory[agent-memory] & agent_cards & agent_contract
+  agent_juno[agent-juno] --> agent_contract & domain & contract
+  agent_testing[agent-testing] --> agent & agent_contract
+  engine --> agent_juno
+  state --> agent_contract
+  views --> agent_contract
+  desktop --> agent & agent_contract
 ```
+
+The bottom block is Juno Agent (section 10, ADR 0012). Some of its edges are allowed but not used yet: `agent` declares only `agent-contract` today, `state` and `views` take `agent-contract` in M2.
 
 | Package | Rule it protects | Owns | Must not |
 | --- | --- | --- | --- |
@@ -148,8 +160,14 @@ flowchart TD
 | `@juno/ui` | primitives | the 18 primitives from `primitives.md` plus `Icon` | import contract, state, data |
 | `@juno/views` | dumb UI | feature components, each with `*.fixtures.tsx`; the `applyTheme` entry point for apps | import `@juno/state`, `effect`, `window.juno` |
 | `@juno/state` | the bridge | engine client, `liveQuery`/`command` helpers, atoms, undo stack, toasts, tabs, drafts, clock; `@juno/state/react` re-exports the atom hooks | JSX |
-| `apps/desktop` | wiring | `src/main`, `src/preload`, `src/engine` (utility entry), `src/renderer` with containers, `e2e/` | |
+| `apps/desktop` | wiring | `src/main`, `src/preload`, `src/engine` and `src/agent` (utility entries), `src/renderer` with containers, `e2e/` | |
 | `@juno/testing` | one set of test helpers | Playwright helpers shared by the gallery and the desktop e2e, starting with `expectNoLayoutShift` | be imported by any `src` |
+| `@juno/agent-memory` | pure agent memory | node keys, due order, batches, view rendering, the local window, the dependency closure, the request partition and budget, pin spans | I/O, Effect services, pi |
+| `@juno/agent-cards` | one card catalogue | card kinds and schemas, canonical payloads and digests, child-action expansion, card status machines | UI, I/O |
+| `@juno/agent-contract` | the agent's wire | the AgentHost port (`AgentHostRpcs`) and the main↔agent messages, the agent's RPC groups for the renderer, chat view models | logic |
+| `@juno/agent` | a portable agent | the agent core (plan v3): runtime on pi-durable, store, inbox, requests and the provider guard, jobs, actions, MCP, scheduling, ownership and backup; `startAgent()` | import Electron, Slack, `store`, `sync`, `engine` or UI |
+| `@juno/agent-juno` | Juno as the agent's host | the AgentHost handlers the engine serves | call a model |
+| `@juno/agent-testing` | agent test doubles | the scripted model provider, fake MCP servers, later the crash harness and memory simulator | be imported by any `src` |
 | `apps/gallery` | review | browser-only fixture gallery (one state at a time), its screenshot project and its behaviour project, including the layout-shift guard (`pnpm test:gallery`) | Electron |
 
 `testDeps` in a package.json names a devDependency that tests may import and src may not: `engine` uses `state` (the real client against the real server) and `slack` uses `fake-slack`.
@@ -159,7 +177,8 @@ What `check-deps` fails on, beyond the graph (all of it runs in `pnpm lint`):
 - **Undeclared imports** of a `@juno/*` package in `src`, `test` or `e2e`.
 - **Package rules.** `ui`, `tokens`, `domain` and `richtext` import no `effect` (`domain` and `richtext` may import `{ Schema }`); `ui` does not import `state`; only `apps/desktop` imports `electron`.
 - **Directory rules.** `apps/desktop/src/renderer` imports no `engine`, `store`, `slack`, `electron` or Node built-in. `src/main` imports no `state`, `views`, `ui`, `engine`, `store`, `slack` or React. `src/engine` imports no UI. `src/preload` imports only `electron` and `@juno/contract/channels`. Any `views/` directory (including `packages/views`) imports no `state`, `engine`, `store`, `electron`, Node built-in or `effect`, and neither it nor `ui` mentions `window.juno`.
-- **Unstable Effect modules** (list in the effect skill) only from the files that wrap them: `effect/reactivity` Atom, AtomRegistry, AtomRpc and AsyncResult in `state/src` (and one engine test); `Reactivity` in `store/src/invalidation.ts`; `@effect/atom-react` in `state/src/react.ts`; `effect/rpc` in `contract/src`, `engine/src/protocol` and `state/src`; `effect/workers` in `state/src/transport.ts` and `engine/src/protocol/runner.ts`; `effect/sql` and `@effect/sql-sqlite-node` in `store`. Every other unstable module is allowed nowhere until someone adds a wrapper and an entry in the script.
+- **Unstable Effect modules** (list in the effect skill) only from the files that wrap them: `effect/reactivity` Atom, AtomRegistry, AtomRpc and AsyncResult in `state/src` (and one engine test); `Reactivity` in `store/src/invalidation.ts`; `@effect/atom-react` in `state/src/react.ts`; `effect/rpc` in `contract/src`, `engine/src/protocol`, `state/src`, `agent-contract/src` and `agent/src/host`; `effect/workers` in `state/src/transport.ts`, `engine/src/protocol/runner.ts` and `agent/src/host/port.ts`; `effect/sql` and `@effect/sql-sqlite-node` in `store`. Every other unstable module is allowed nowhere until someone adds a wrapper and an entry in the script.
+- **Juno Agent.** No `agent-*` package imports or declares `electron` or a Slack package; `@juno/agent` also stays away from `store`, `sync`, `engine`, `state` and the UI packages. `@earendil-works/pi-durable` and `chord` are imported only in `agent/src/runtime/`, `pi-mcp` only in `agent/src/mcp/`, `pi-ai` and `@openai/codex-sdk` only in `agent/src/providers/` (and `pi-ai` in `@juno/ai`); `agent-testing` may import all of them. `agent-memory` and `agent-cards` import only `{ Schema }` from `effect`. `src/agent` in the desktop app imports no engine, store, sync, Slack or UI code, and `src/main` and `src/engine` do not import `@juno/agent`.
 - **Engine feature folders.** A folder in `engine/src` other than `protocol` may not import another feature folder or `layer`, `startEngine` or `index`.
 - **`sendSync`** anywhere in `src`.
 
@@ -444,6 +463,16 @@ What `@juno/ai` settled (its README has the detail):
 - Tool choice is forced on the decision tier and `auto` on the generation tier, because Sonnet 5.5 on OpenRouter rejects a forced choice; a model that rejects it gets the retry with `auto`. Reasoning is off, or at the lowest level a model allows.
 - Nothing fails: `Decision<A>` is `Decided` or `NoDecision` with a reason (`missing-key`, `timeout`, `invalid-output`, `provider-error`) and a meta (model, latency, attempts, cost when known); a chat stream ends with `done` or `failed`. The missing key is a reason, not an error, so the app runs before the owner adds one. The config is an `Effect<AiConfig>` read per call, so a key or slug set in preferences applies at once.
 - `pnpm ai:eval` runs every task on invented examples with the fake, and with `JUNO_AI=live` plus `OPENROUTER_API_KEY` against OpenRouter, printing outputs, latency, cost and how many judgements matched the examples' expectations. `pnpm --filter @juno/ai bench` compares models and request shapes on the same examples. Prompt quality is judged there, not in tests; tests never depend on prompt wording.
+
+### Juno Agent (ADR 0012)
+
+Juno Agent is the assistant of the brief in `docs/juno-agent/BRIEF.md`, designed in `docs/juno-agent/plan-v3.md`, with the library findings in `docs/juno-agent/spikes.md`. It replaces the Juno chat row above from M2 on; the other AI features stay in `@juno/ai`.
+
+- **Portable core.** `@juno/agent` is a plain Node program with no Electron, Slack or Juno store code (section 3 lists the packages and the `check-deps` rules). It keeps its own state in a per-user `agent/` directory under userData: `agent.sqlite`, the pi-durable journals and `owner.lock`.
+- **Its own process.** Main forks `out/main/agent.js` as a second utility process, without the Slack partition. Until the chat ships it starts only with `JUNO_AGENT=1`.
+- **The AgentHost port.** The agent reaches Juno only through `AgentHostRpcs`, which the engine serves with `@juno/agent-juno`'s handlers on ports main brokers (section 2.4). Today the group has `host.hello`; Slack reads, outbox sends, resolve, presence and the notification gate follow in WP13. The renderer gets its own port to the agent for the chat.
+- **Durability.** pi-durable runs over Juno's SQLite facade at `synchronous = FULL` with `fullfsync`, because macOS `fsync` alone does not survive power loss. Owner input enters an inbox in `agent.sqlite` before it is acknowledged (plan v3 §3).
+- **Tests.** `@juno/agent-testing` has the scripted provider and the fake MCP server. `apps/desktop/e2e/juno-agent/` holds the agent's e2e flows, starting with the hello round trip.
 
 ## 11. Notifications
 
