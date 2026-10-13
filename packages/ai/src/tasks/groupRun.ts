@@ -27,11 +27,16 @@ export const GroupRunOutput = Type.Object({
   confidence: Type.Number({ minimum: 0, maximum: 1 }),
 })
 
-/** Decision. Runs on each new Main message (spec section 15), once the window has 3 or more. */
+/**
+ * Decision. Runs in the background on each new Main message (spec section 15),
+ * once the window has 3 or more. No classifier fits (it names messages and
+ * writes a title), so a chat model answers: GPT-6 Luna p50 1.8 s, p95 2.9 s.
+ */
 export const groupRun = defineStructuredTask<GroupRunInput, typeof GroupRunOutput>({
   name: 'groupRun',
   version: 1,
   tier: 'decision',
+  timeoutMillis: 5000,
   prompt,
   tool: { name: 'group', description: 'Report the run of messages that form one conversation, or null.' },
   output: GroupRunOutput,

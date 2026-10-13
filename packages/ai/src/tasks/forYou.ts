@@ -43,11 +43,15 @@ export const ForYouOutput = Type.Object({
   ),
 })
 
-/** Structured output on the generation tier: cards need judgment, and run in the background every 15 minutes. */
+/**
+ * Structured output on the generation tier: cards need judgment, and run in the
+ * background every 15 minutes. Sonnet 5.5 takes about 7 s for four cards.
+ */
 export const forYou = defineStructuredTask<ForYouInput, typeof ForYouOutput>({
   name: 'forYou',
   version: 1,
   tier: 'generation',
+  timeoutMillis: 30_000,
   prompt,
   tool: { name: 'cards', description: 'Report the For you cards, most useful first. An empty list is allowed.' },
   output: ForYouOutput,

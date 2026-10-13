@@ -7,3 +7,8 @@ A draft is not a reply when it starts a new subject, is a general announcement, 
 Prefer the quiet option: when the draft could stand on its own in Main, answer null.
 Confidence is your probability that the user meant to reply in that topic.
 ${DECISION_RULES}`
+
+/** The same judgement as a classifier question: one choice among Main and the topics. */
+export const classifierInstructions = prompt.replace(DECISION_RULES, '').trim()
+export const mainCriterion = 'The draft starts a new subject, is a general announcement, fits several topics equally, or can stand on its own in Main'
+export const topicCriterion = (title: string): string => `The draft is a reply to the topic "${title}": it answers a question asked there, continues its subject, or refers to something only said there`

@@ -25,11 +25,17 @@ export const ParseCommandOutput = Type.Object({
   confidence,
 })
 
-/** Decision. The model fallback after `parseCommand` in @juno/domain found nothing (spec section 10). */
+/**
+ * Decision. The model fallback after `parseCommand` in @juno/domain found
+ * nothing (spec section 10). The palette shows search results meanwhile. It
+ * extracts text, so a chat model answers: GPT-6 Luna p50 1.5 s, p95 2.3 s,
+ * with the odd call near 3 s; 4 s keeps those without waiting for a retry.
+ */
 export const parseCommand = defineStructuredTask<ParseCommandInput, typeof ParseCommandOutput>({
   name: 'parseCommand',
   version: 1,
   tier: 'decision',
+  timeoutMillis: 4000,
   prompt,
   tool: { name: 'command', description: 'Report the command the text means, or null when it is a search.' },
   output: ParseCommandOutput,

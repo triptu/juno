@@ -3,9 +3,20 @@
  * its input, a tier (which model and how long to wait), and for structured
  * tasks the TypeBox schema of the one tool the model must call.
  */
-import { validateToolArguments, type Static, type TSchema } from '@earendil-works/pi-ai'
+import { validateToolArguments, type ClassifierAnswer, type ClassifierContext, type Static, type TSchema } from '@earendil-works/pi-ai'
 import { createHash } from 'node:crypto'
 import type { Tier } from './config'
+
+/**
+ * How a decision model (System One classifier) answers the task: `ask` turns
+ * the input into a JSON state and typed questions, `read` turns the answers
+ * into the task's raw output, which then goes through `validateOutput` like a
+ * tool call. A task without a mapping always uses the chat model.
+ */
+export interface ClassifierMapping<I> {
+  readonly ask: (input: I) => ClassifierContext
+  readonly read: (answers: Readonly<Record<string, ClassifierAnswer>>, input: I) => unknown
+}
 
 interface TaskBase<I> {
   readonly name: string
@@ -28,6 +39,8 @@ export interface StructuredTask<I, S extends TSchema = TSchema> extends TaskBase
   readonly output: S
   /** Checks the schema cannot: ids point into the input, counts hold. False means invalid output. */
   readonly accept?: (output: Static<S>, input: I) => boolean
+  /** Present when a decision model can answer the task. Used when the classifier slug is set. */
+  readonly classify?: ClassifierMapping<I>
 }
 
 /** Text out: a title, a summary. */
