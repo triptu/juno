@@ -5,7 +5,7 @@ import type { LayoutStyles } from './internal/sx'
 
 export type SurfaceKind = 'card' | 'popover' | 'toolbar' | 'group' | 'inset' | 'field' | 'toast'
 export type SurfacePadding = 'none' | 'xs' | 'sm' | 'md' | 'lg'
-export type SurfaceRadius = 'md' | 'lg' | 'lg-plus' | 'xl' | '2xl' | 'menu' | 'palette'
+export type SurfaceRadius = 'md' | 'lg' | 'lg-plus' | 'xl' | '2xl' | 'menu' | 'palette' | 'toast'
 
 export interface SurfaceProps extends Omit<HTMLAttributes<HTMLElement>, 'style' | 'className'> {
   readonly kind?: SurfaceKind
@@ -36,7 +36,7 @@ const radiusByKind: Record<SurfaceKind, SurfaceRadius> = {
   group: 'xl',
   inset: 'lg',
   field: '2xl',
-  toast: 'xl',
+  toast: 'toast',
 }
 
 /**
@@ -122,6 +122,7 @@ const radii_ = stylex.create({
   '2xl': { borderRadius: radii['--radius-2xl'] },
   menu: { borderRadius: radii['--radius-menu'] },
   palette: { borderRadius: radii['--radius-palette'] },
+  toast: { borderRadius: radii['--radius-toast'] },
 })
 
 const paddings = stylex.create({

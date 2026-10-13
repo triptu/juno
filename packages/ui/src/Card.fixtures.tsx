@@ -1,4 +1,8 @@
-import { CalendarCheck, Hash, Lock, Reply, Terminal } from 'lucide-react'
+import { CalendarCheck } from '@phosphor-icons/react/dist/icons/CalendarCheck'
+import { ChatCircleDots } from '@phosphor-icons/react/dist/icons/ChatCircleDots'
+import { Hash } from '@phosphor-icons/react/dist/icons/Hash'
+import { Lock } from '@phosphor-icons/react/dist/icons/Lock'
+import { Terminal } from '@phosphor-icons/react/dist/icons/Terminal'
 import { Button } from './Button'
 import { Card } from './Card'
 import { CodeBlock } from './CodeBlock'
@@ -35,7 +39,7 @@ export default defineFixtures(
       onDismiss: () => {},
     }),
     'waiting-on-you': fixture({
-      kindIcon: Reply,
+      kindIcon: ChatCircleDots,
       kind: 'Waiting on you',
       sourceIcon: Lock,
       source: 'Rina Sato · Staff backend',
@@ -72,6 +76,18 @@ export default defineFixtures(
       ),
       onDismiss: () => {},
     }),
+    'dismiss-hover': fixture(
+      {
+        kindIcon: CalendarCheck,
+        kind: 'Follow-up',
+        sourceIcon: Hash,
+        source: 'Q4 roadmap cuts',
+        title: 'Tushar has not looked at the roadmap draft',
+        body: 'Maya is waiting on your review before cross-posting to #leadership.',
+        onDismiss: () => {},
+      },
+      { hover: 'button' },
+    ),
   },
   { width: 720 },
 )

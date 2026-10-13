@@ -1,8 +1,8 @@
 import * as stylex from '@stylexjs/stylex'
-import { X, type LucideIcon } from 'lucide-react'
+import { X } from '@phosphor-icons/react/dist/icons/X'
 import type { MouseEvent, ReactNode } from 'react'
 import { colors, layout, radii, spacing, weights } from '@juno/tokens/tokens.stylex'
-import { Icon } from './Icon'
+import { Icon, type PhosphorIcon } from './Icon'
 import { IconButton } from './IconButton'
 import { activateHandlers, type ActivateEvent } from './internal/activate'
 import { interactive } from './internal/interactive'
@@ -28,7 +28,7 @@ export function TabStrip({ label = 'Tabs', trailing, children }: TabStripProps) 
 }
 
 export interface TabProps {
-  readonly icon: LucideIcon
+  readonly icon: PhosphorIcon
   readonly label: string
   readonly active?: boolean
   /** Fires on mouse down (see internal/activate.ts); `metaKey` for ⌘-click. */
@@ -39,7 +39,11 @@ export interface TabProps {
   readonly closeLabel?: string
 }
 
-/** One tab. The active one merges into the page below it. */
+/**
+ * One tab. The active one merges into the page below it. The icon stays
+ * regular even when active: tab switches do not animate and a filled set
+ * is too heavy in a strip.
+ */
 export function Tab({ icon, label, active = false, onSelect, onClose, onContextMenu, closeLabel = 'Close tab' }: TabProps) {
   return (
     <div
@@ -51,7 +55,7 @@ export function Tab({ icon, label, active = false, onSelect, onClose, onContextM
       {...activateHandlers<HTMLDivElement>(onSelect)}
       {...stylex.props(interactive.focusRingInset, styles.tab, typeVariants.ui, active ? styles.tabActive : styles.tabInactive)}
     >
-      <Icon icon={icon} size={14} dim />
+      <Icon icon={icon} size={15} dim />
       <span {...stylex.props(styles.label)}>{label}</span>
       {onClose ? (
         <span {...stylex.props(styles.close)}>
@@ -59,7 +63,7 @@ export function Tab({ icon, label, active = false, onSelect, onClose, onContextM
             icon={X}
             label={closeLabel}
             size={20}
-            iconSize={12}
+            iconSize={13}
             tone="muted"
             noTooltip
             onClick={(event) => {

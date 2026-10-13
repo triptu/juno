@@ -1,4 +1,9 @@
-import { CircleCheck, Hash, Inbox, ListFilter, Lock, Send } from 'lucide-react'
+import { CheckCircle } from '@phosphor-icons/react/dist/icons/CheckCircle'
+import { FunnelSimple } from '@phosphor-icons/react/dist/icons/FunnelSimple'
+import { Hash } from '@phosphor-icons/react/dist/icons/Hash'
+import { Lock } from '@phosphor-icons/react/dist/icons/Lock'
+import { PaperPlaneTilt } from '@phosphor-icons/react/dist/icons/PaperPlaneTilt'
+import { Tray } from '@phosphor-icons/react/dist/icons/Tray'
 import { Avatar } from './Avatar'
 import { Chip } from './Chip'
 import { defineFixtures, scene } from './fixtures/define'
@@ -12,11 +17,11 @@ export default defineFixtures(OptionList, {
     () => (
       <Surface kind="popover" sx={undefined}>
         <OptionList label="Channels and people" activeId="eng">
-          <OptionRow id="all" leading={<Icon icon={Inbox} size={15} />} label="All topics" selected trailing={<Chip variant="strong" numeric>14</Chip>} />
-          <OptionRow id="eng" leading={<Icon icon={Hash} size={15} />} label={<b>eng</b>} active trailing={<Chip variant="strong" numeric>9</Chip>} />
-          <OptionRow id="hiring" leading={<Icon icon={Lock} size={15} />} label="hiring" sub="private" trailing={<Chip variant="accent">@</Chip>} />
+          <OptionRow id="all" leading={<Icon icon={Tray} size={16} />} label="All topics" selected trailing={<Chip variant="strong" numeric>14</Chip>} />
+          <OptionRow id="eng" leading={<Icon icon={Hash} size={16} />} label={<b>eng</b>} active trailing={<Chip variant="strong" numeric>9</Chip>} />
+          <OptionRow id="hiring" leading={<Icon icon={Lock} size={16} />} label="hiring" sub="private" trailing={<Chip variant="accent">@</Chip>} />
           <OptionRow id="maya" leading={<Avatar label="MC" hue="claret" size={18} />} label="Maya Chen" />
-          <OptionRow id="product" leading={<Icon icon={Hash} size={15} />} label="product" sub="quiet" />
+          <OptionRow id="product" leading={<Icon icon={Hash} size={16} />} label="product" sub="quiet" />
         </OptionList>
       </Surface>
     ),
@@ -39,8 +44,8 @@ export default defineFixtures(OptionList, {
     () => (
       <Surface kind="popover">
         <OptionList label="Channel or person" activeId="eng">
-          <OptionRow id="eng" size={34} leading={<Icon icon={Hash} size={15} />} label="eng" sub="Public channel" active />
-          <OptionRow id="hiring" size={34} leading={<Icon icon={Lock} size={15} />} label="hiring" sub="Private channel" />
+          <OptionRow id="eng" size={34} leading={<Icon icon={Hash} size={16} />} label="eng" sub="Public channel" active />
+          <OptionRow id="hiring" size={34} leading={<Icon icon={Lock} size={16} />} label="hiring" sub="Private channel" />
           <OptionRow id="maya" size={34} leading={<Avatar label="MC" hue="claret" size={20} />} label="Maya Chen" sub="Direct message" />
         </OptionList>
       </Surface>
@@ -55,7 +60,7 @@ export default defineFixtures(OptionList, {
           <OptionRow
             id="send"
             size={55}
-            leading={<Icon icon={Send} size={16} />}
+            leading={<Icon icon={PaperPlaneTilt} size={18} />}
             label="Send to Maya Chen"
             sub="“the wednesday slot works”"
             subPlacement="below"
@@ -72,8 +77,8 @@ export default defineFixtures(OptionList, {
         </OptionList>
         <OptionGroupLabel>Results</OptionGroupLabel>
         <OptionList label="Results">
-          <OptionRow id="t1" size={55} leading={<Icon icon={CircleCheck} size={16} />} label="Resolve Pricing page copy" sub="#product · hides it until there is new activity" subPlacement="below" />
-          <OptionRow id="t2" size={55} leading={<Icon icon={ListFilter} size={16} />} label="eng" sub="Public channel · show its topics" subPlacement="below" />
+          <OptionRow id="t1" size={55} leading={<Icon icon={CheckCircle} size={18} />} label="Resolve Pricing page copy" sub="#product · hides it until there is new activity" subPlacement="below" />
+          <OptionRow id="t2" size={55} leading={<Icon icon={FunnelSimple} size={18} />} label="eng" sub="Public channel · show its topics" subPlacement="below" />
         </OptionList>
       </Surface>
     ),

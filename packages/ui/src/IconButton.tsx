@@ -1,8 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
-import type { LucideIcon } from 'lucide-react'
 import type { ButtonHTMLAttributes } from 'react'
-import { accent, colors, radii, shadows, sizes } from '@juno/tokens/tokens.stylex'
-import { Icon, type IconSize } from './Icon'
+import { accent, colors, motion, radii, shadows, sizes } from '@juno/tokens/tokens.stylex'
+import { Icon, type IconSize, type IconWeight, type PhosphorIcon } from './Icon'
 import { interactive } from './internal/interactive'
 
 export type IconButtonSize = 20 | 22 | 26 | 28 | 30 | 32 | 36
@@ -11,14 +10,20 @@ export type IconButtonVariant = 'ghost' | 'secondary' | 'primary' | 'raised'
 export type IconButtonTone = 'default' | 'subtle' | 'muted'
 
 export interface IconButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'style' | 'className' | 'children'> {
-  readonly icon: LucideIcon
+  readonly icon: PhosphorIcon
   /** Required accessible name; also the tooltip. */
   readonly label: string
   readonly size?: IconButtonSize
   readonly iconSize?: IconSize
+  /** Icon weight override (`bold` for the send arrow). Default by icon size, `fill` when pressed. */
+  readonly iconWeight?: IconWeight
   readonly radius?: IconButtonRadius
   readonly variant?: IconButtonVariant
   readonly tone?: IconButtonTone
+  /**
+   * Toggle state (subscribed, pinned). Sets aria-pressed and fills the icon;
+   * the fill pops in with the spring, toggling off just cross-fades.
+   */
   readonly pressed?: boolean
   readonly dimmed?: boolean
   /** Hides the native tooltip when the label would repeat visible text. */
@@ -39,22 +44,28 @@ const radiusBySize: Record<IconButtonSize, IconButtonRadius> = {
   36: 'lg',
 }
 
+// One step up from the Lucide sizes: Phosphor glyphs fill less of their box.
 const iconBySize: Record<IconButtonSize, IconSize> = {
   20: 12,
   22: 12,
   26: 13,
-  28: 16,
-  30: 16,
-  32: 16,
-  36: 18,
+  28: 18,
+  30: 18,
+  32: 18,
+  36: 20,
 }
 
-/** A button that is only an icon. Needs a label. */
+/**
+ * A button that is only an icon. Needs a label. A `pressed` toggle keeps
+ * both the outline and the filled icon in the DOM and cross-fades them, so
+ * only opacity and transform ever animate.
+ */
 export function IconButton({
   icon,
   label,
   size = 30,
   iconSize,
+  iconWeight,
   radius,
   variant = 'ghost',
   tone = 'subtle',
@@ -65,6 +76,8 @@ export function IconButton({
   disabled,
   ...rest
 }: IconButtonProps) {
+  const px = iconSize ?? iconBySize[size]
+  const toggle = pressed !== undefined
   return (
     <button
       type={type}
@@ -88,7 +101,20 @@ export function IconButton({
         (dimmed || disabled) && interactive.dimmed,
       )}
     >
-      <Icon icon={icon} size={iconSize ?? iconBySize[size]} />
+      {toggle ? (
+        <span {...stylex.props(styles.pair)}>
+          <span {...stylex.props(styles.layer, styles.outline, pressed && styles.outlineHidden)}>
+            {iconWeight === undefined ? <Icon icon={icon} size={px} /> : <Icon icon={icon} size={px} weight={iconWeight} />}
+          </span>
+          <span {...stylex.props(styles.layer, styles.filled, pressed ? styles.filledShown : styles.filledHidden)}>
+            <Icon icon={icon} size={px} weight="fill" />
+          </span>
+        </span>
+      ) : iconWeight === undefined ? (
+        <Icon icon={icon} size={px} />
+      ) : (
+        <Icon icon={icon} size={px} weight={iconWeight} />
+      )}
     </button>
   )
 }
@@ -100,6 +126,39 @@ const styles = stylex.create({
     justifyContent: 'center',
     flexShrink: 0,
     verticalAlign: 'middle',
+  },
+  pair: {
+    display: 'grid',
+    placeItems: 'center',
+  },
+  // Both icons share one grid cell.
+  layer: {
+    gridArea: '1 / 1',
+    display: 'inline-flex',
+    transitionProperty: 'opacity, transform',
+  },
+  outline: {
+    transitionDuration: motion['--duration-fast'],
+    transitionTimingFunction: motion['--ease-out'],
+    opacity: 1,
+  },
+  outlineHidden: {
+    opacity: 0,
+  },
+  filled: {
+    transitionTimingFunction: motion['--ease-spring'],
+  },
+  filledHidden: {
+    opacity: 0,
+    transform: 'scale(0.8)',
+    transitionDuration: motion['--duration-fast'],
+    transitionTimingFunction: motion['--ease-out'],
+  },
+  // The spring overshoots to --pop-scale on its own; the target is 1.
+  filledShown: {
+    opacity: 1,
+    transform: 'scale(1)',
+    transitionDuration: motion['--duration-pop'],
   },
 })
 

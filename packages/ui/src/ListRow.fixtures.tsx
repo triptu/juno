@@ -1,5 +1,8 @@
 import * as stylex from '@stylexjs/stylex'
-import { AtSign, Hash, User, X } from 'lucide-react'
+import { At } from '@phosphor-icons/react/dist/icons/At'
+import { Hash } from '@phosphor-icons/react/dist/icons/Hash'
+import { User } from '@phosphor-icons/react/dist/icons/User'
+import { X } from '@phosphor-icons/react/dist/icons/X'
 import { useState } from 'react'
 import { spacing } from '@juno/tokens/tokens.stylex'
 import { Button } from './Button'
@@ -101,7 +104,7 @@ export default defineFixtures(
     'rules-group': scene(() => (
       <Surface kind="group">
         <ListRow
-          leading={<Icon icon={Hash} size={15} />}
+          leading={<Icon icon={Hash} size={16} />}
           trailing={
             <>
               <Text variant="meta" tone="muted" numeric>
@@ -117,7 +120,7 @@ export default defineFixtures(
           </Text>
         </ListRow>
         <ListRow
-          leading={<Icon icon={User} size={15} />}
+          leading={<Icon icon={User} size={16} />}
           trailing={
             <>
               <Text variant="meta" tone="muted" numeric>
@@ -133,7 +136,7 @@ export default defineFixtures(
           </Text>
         </ListRow>
         <ListRow
-          leading={<Icon icon={AtSign} size={15} />}
+          leading={<Icon icon={At} size={16} />}
           divider={false}
           trailing={
             <>
@@ -151,7 +154,7 @@ export default defineFixtures(
     'ignored-channel': scene(() => (
       <Surface kind="group">
         <ListRow
-          leading={<Icon icon={Hash} size={15} />}
+          leading={<Icon icon={Hash} size={16} />}
           divider={false}
           trailing={
             <Button size="sm" variant="secondary">

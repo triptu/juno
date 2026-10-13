@@ -1,4 +1,5 @@
-import { Hash, Search } from 'lucide-react'
+import { Hash } from '@phosphor-icons/react/dist/icons/Hash'
+import { MagnifyingGlass } from '@phosphor-icons/react/dist/icons/MagnifyingGlass'
 import { Button } from './Button'
 import { defineFixtures, scene } from './fixtures/define'
 import { Icon } from './Icon'
@@ -20,12 +21,12 @@ export default defineFixtures(
           />
           <Section heading="Your rules" sub="Checked top to bottom. The first rule that matches wins.">
             <Surface kind="group">
-              <ListRow leading={<Icon icon={Hash} size={15} />}>
+              <ListRow leading={<Icon icon={Hash} size={16} />}>
                 <Text variant="body">
                   In <b>#incidents</b>
                 </Text>
               </ListRow>
-              <ListRow leading={<Icon icon={Hash} size={15} />} divider={false}>
+              <ListRow leading={<Icon icon={Hash} size={16} />} divider={false}>
                 <Text variant="body">
                   In <b>#design-review</b>
                 </Text>
@@ -50,7 +51,7 @@ export default defineFixtures(
             title="All topics"
             size="compact"
             subtitle="Everything you're part of, including quiet, resolved and unsubscribed topics."
-            trailing={<TextField size={34} leadingIcon={Search} placeholder="Filter by title or message" width="search" label="Filter topics" />}
+            trailing={<TextField size={34} leadingIcon={MagnifyingGlass} placeholder="Filter by title or message" width="search" label="Filter topics" />}
           />
         </Page>
       ),
@@ -63,7 +64,7 @@ export default defineFixtures(
             title="All topics"
             size="compact"
             subtitle="Everything you're part of, including quiet, resolved and unsubscribed topics."
-            trailing={<TextField size={34} leadingIcon={Search} placeholder="Filter by title or message" width="search" label="Filter topics" />}
+            trailing={<TextField size={34} leadingIcon={MagnifyingGlass} placeholder="Filter by title or message" width="search" label="Filter topics" />}
           />
         </Page>
       ),
@@ -76,7 +77,7 @@ export default defineFixtures(
             title="All topics"
             size="compact"
             subtitle="Everything you're part of, including quiet, resolved and unsubscribed topics."
-            trailing={<TextField size={34} leadingIcon={Search} placeholder="Filter by title or message" width="search" label="Filter topics" />}
+            trailing={<TextField size={34} leadingIcon={MagnifyingGlass} placeholder="Filter by title or message" width="search" label="Filter topics" />}
           />
         </Page>
       ),

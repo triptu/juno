@@ -1,10 +1,13 @@
 import * as stylex from '@stylexjs/stylex'
-import { EyeOff, Sparkles } from 'lucide-react'
+import { EyeSlash } from '@phosphor-icons/react/dist/icons/EyeSlash'
+import { Sparkle } from '@phosphor-icons/react/dist/icons/Sparkle'
 import { colors, radii, spacing } from '@juno/tokens/tokens.stylex'
+import { hueNames } from './Avatar'
 import { Button } from './Button'
 import { Chip } from './Chip'
 import { defineFixtures, fixture, scene } from './fixtures/define'
 import { Row, Stack } from './fixtures/layout'
+import { Text } from './Text'
 
 export default defineFixtures(Chip, {
   main: fixture({ variant: 'outline', size: 18, title: 'Messages posted in this channel or DM outside any thread', children: 'Main' }),
@@ -17,15 +20,46 @@ export default defineFixtures(Chip, {
   'status-resolved': fixture({ variant: 'success', size: 22, children: 'Resolved' }),
   'status-quiet': fixture({ variant: 'quiet', size: 22, children: 'Quiet' }),
   'decision-now': fixture({ variant: 'accent', size: 22, children: 'Now' }),
-  confidence: fixture({ variant: 'filled', size: 20, icon: Sparkles, title: "Juno's read of what you typed", children: '95%' }),
+  confidence: fixture({ variant: 'filled', size: 20, icon: Sparkle, title: "Juno's read of what you typed", children: '95%' }),
   reaction: fixture({ variant: 'outline', size: 24, interactive: true, 'aria-label': 'React 👍, 2 reactions', children: '👍 2' }),
   'reaction-mine': fixture({ variant: 'outline', size: 24, interactive: true, pressed: true, 'aria-label': 'React 👍, 2 reactions, including you', children: '👍 2' }),
   'reaction-hover': fixture({ variant: 'outline', size: 24, interactive: true, 'aria-label': 'React 👍, 2 reactions', children: '👍 2' }, { hover: 'button' }),
   'reaction-press': fixture({ variant: 'outline', size: 24, interactive: true, 'aria-label': 'React 👍, 2 reactions', children: '👍 2' }, { press: 'button' }),
+  'reaction-focus': fixture({ variant: 'outline', size: 24, interactive: true, 'aria-label': 'React 👍, 2 reactions', children: '👍 2' }, { focus: 'button' }),
   scope: fixture({ variant: 'filled', size: 26, onRemove: () => {}, removeLabel: 'Show everything', children: 'eng' }),
   'digest-time': fixture({ variant: 'filled', size: 28, onRemove: () => {}, children: '10am' }),
+  // The person chip in running text, next to @you and #channel.
+  'mentions-in-text': scene(
+    () => (
+      <Text variant="body" tone="default" as="p" selectable>
+        Thursday works. I&apos;ll pair.{' '}
+        <Chip variant="accent" size="inline">
+          @Tushar
+        </Chip>{' '}
+        can you grab the replica sizing for{' '}
+        <Chip variant="filled" size="inline">
+          #platform
+        </Chip>
+        ? On it.{' '}
+        <Chip variant="person" hue="cyan" size="inline">
+          @Dev
+        </Chip>{' '}
+        I&apos;ll send the numbers before the dry run.
+      </Text>
+    ),
+    { width: 420 },
+  ),
+  'person-all-hues': scene(() => (
+    <Row gap="sm">
+      {hueNames.map((hue, index) => (
+        <Chip key={hue} variant="person" hue={hue} size="inline">
+          @{['Maya', 'Leo', 'Dev', 'Sam', 'Priya', 'Jonas', 'Elena', 'Rina'][index]}
+        </Chip>
+      ))}
+    </Row>
+  )),
   stealth: scene(() => (
-    <Chip variant="dashed" size={26} icon={EyeOff} iconSize={13}>
+    <Chip variant="dashed" size={26} icon={EyeSlash}>
       Stealth. Not marking as read.
       <Button size="xs" variant="secondary">
         Mark read
@@ -57,7 +91,7 @@ export default defineFixtures(Chip, {
       <Chip variant="success" size={22}>
         Resolved
       </Chip>
-      <Chip variant="dashed" size={26} icon={EyeOff} iconSize={13}>
+      <Chip variant="dashed" size={26} icon={EyeSlash}>
         Stealth
       </Chip>
     </div>
@@ -72,7 +106,7 @@ export default defineFixtures(Chip, {
         </Chip>
         <Chip variant="soft">@</Chip>
         <Chip variant="accent">@</Chip>
-        <Chip variant="filled" size={20} icon={Sparkles}>
+        <Chip variant="filled" size={20} icon={Sparkle}>
           95%
         </Chip>
       </Row>
@@ -98,7 +132,7 @@ export default defineFixtures(Chip, {
         <Chip variant="quiet" size={22}>
           Silent
         </Chip>
-        <Chip variant="dashed" size={22} icon={EyeOff} iconSize={12}>
+        <Chip variant="dashed" size={22} icon={EyeSlash}>
           Stealth
         </Chip>
       </Row>
@@ -114,6 +148,9 @@ export default defineFixtures(Chip, {
         </Chip>
         <Chip variant="filled" size={28} onRemove={() => {}}>
           4:30pm
+        </Chip>
+        <Chip variant="person" hue="claret" size="inline">
+          @Maya
         </Chip>
       </Row>
     </Stack>

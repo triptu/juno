@@ -1,8 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
-import type { LucideIcon } from 'lucide-react'
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
 import { accent, colors, radii, shadows, sizes, spacing, weights } from '@juno/tokens/tokens.stylex'
-import { Icon, type IconSize } from './Icon'
+import { Icon, type IconSize, type IconWeight, type PhosphorIcon } from './Icon'
 import { Kbd } from './Kbd'
 import { interactive } from './internal/interactive'
 import { variants as typeVariants } from './internal/type'
@@ -10,7 +9,7 @@ import { variants as typeVariants } from './internal/type'
 /**
  * `filter` is the quick-filter chip (All, Channels, DMs, Unread): ghost on
  * the sidebar, muted until hovered, and semibold on a secondary fill when
- * `pressed`. It has one size, 28px, with the 7px radius.
+ * `pressed`. It has one size, 28px, with the 8px radius.
  */
 export type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'raised' | 'filter'
 /** Height: xs 22, sm 28, md 30, lg 32, xl 34, 2xl 36. */
@@ -23,8 +22,10 @@ export interface ButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement
   readonly size?: ButtonSize
   /** Text colour for ghost and outline buttons. */
   readonly tone?: ButtonTone
-  readonly iconStart?: LucideIcon
-  readonly iconEnd?: LucideIcon
+  readonly iconStart?: PhosphorIcon
+  readonly iconEnd?: PhosphorIcon
+  /** Icon weight override; `fill` for a check that has landed. Default by size. */
+  readonly iconWeight?: IconWeight
   /** Trailing keyboard hint, for example "↵". */
   readonly kbd?: string
   /** Selected state for toggles (Pin, filters). Sets aria-pressed. */
@@ -38,10 +39,11 @@ export interface ButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement
 // StyleX cannot read constants from other modules.
 const HOVER = '@media (hover: hover)'
 
-type Radius = 'md' | 'md-plus' | 'lg'
+type Radius = 'tag' | 'md' | 'md-plus' | 'lg'
 
+// The 22px button is the row Resolve, a label-sized control, so it is a pill.
 const radiusBySize: Record<ButtonSize, Radius> = {
-  xs: 'md',
+  xs: 'tag',
   sm: 'md',
   md: 'md-plus',
   lg: 'lg',
@@ -58,13 +60,14 @@ const textBySize: Record<ButtonSize, 'tagSmall' | 'buttonSmall' | 'ui'> = {
   '2xl': 'ui',
 }
 
+// One step up from the Lucide sizes: Phosphor glyphs fill less of their box.
 const iconBySize: Record<ButtonSize, IconSize> = {
-  xs: 12,
-  sm: 13,
-  md: 14,
-  lg: 14,
-  xl: 14,
-  '2xl': 14,
+  xs: 13,
+  sm: 14,
+  md: 16,
+  lg: 16,
+  xl: 16,
+  '2xl': 16,
 }
 
 /**
@@ -79,6 +82,7 @@ export function Button({
   tone = 'default',
   iconStart,
   iconEnd,
+  iconWeight,
   kbd,
   pressed,
   dimmed = false,
@@ -90,6 +94,7 @@ export function Button({
   const filter = variant === 'filter'
   const effectiveSize: ButtonSize = filter ? 'sm' : size
   const iconPx = iconBySize[effectiveSize]
+  const iconProps = iconWeight === undefined ? { size: iconPx } : { size: iconPx, weight: iconWeight }
   return (
     <button
       type={type}
@@ -106,7 +111,7 @@ export function Button({
         typeVariants[filter ? 'ui' : textBySize[effectiveSize]],
         styles.weightMedium,
         sizeStyles[effectiveSize],
-        radiusStyles[filter ? 'md-plus' : radiusBySize[effectiveSize]],
+        radiusStyles[filter ? 'lg' : radiusBySize[effectiveSize]],
         variantStyles[variant],
         (variant === 'ghost' || variant === 'outline') && tones[tone],
         pressed && pressedStyles[variant],
@@ -114,9 +119,9 @@ export function Button({
         disabled && interactive.dimmed,
       )}
     >
-      {iconStart ? <Icon icon={iconStart} size={iconPx} /> : null}
+      {iconStart ? <Icon icon={iconStart} {...iconProps} /> : null}
       {children !== undefined && children !== null ? <span {...stylex.props(styles.label)}>{children}</span> : null}
-      {iconEnd ? <Icon icon={iconEnd} size={iconPx} /> : null}
+      {iconEnd ? <Icon icon={iconEnd} {...iconProps} /> : null}
       {kbd ? <Kbd>{kbd}</Kbd> : null}
     </button>
   )
@@ -155,6 +160,7 @@ const sizeStyles = stylex.create({
 })
 
 const radiusStyles = stylex.create({
+  tag: { borderRadius: radii['--radius-tag'] },
   md: { borderRadius: radii['--radius-md'] },
   'md-plus': { borderRadius: radii['--radius-md-plus'] },
   lg: { borderRadius: radii['--radius-lg'] },

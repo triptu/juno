@@ -1,7 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
-import type { LucideIcon } from 'lucide-react'
 import { radii, sizes, spacing, tints, weights } from '@juno/tokens/tokens.stylex'
-import { Icon, type IconSize } from './Icon'
+import { Icon, type IconSize, type PhosphorIcon } from './Icon'
 import { variants as typeVariants } from './internal/type'
 
 /** The three context tints from the tokens: neutral, amber and blue. */
@@ -10,8 +9,8 @@ export type ContextPillSize = 22 | 26 | 28
 
 export interface ContextPillProps {
   readonly tint: ContextTint
-  /** The icon for the kind of place: hash, lock, user, users. */
-  readonly icon: LucideIcon
+  /** The icon for the kind of place: Hash, Lock, User, Users. */
+  readonly icon: PhosphorIcon
   /** Channel or person name without the "#". */
   readonly name: string
   /** The kind, appended after a dot at regular weight ("Public channel"). Also the tooltip. */
@@ -21,7 +20,7 @@ export interface ContextPillProps {
   readonly size?: ContextPillSize
 }
 
-const iconBySize: Record<ContextPillSize, IconSize> = { 22: 11, 26: 13, 28: 13 }
+const iconBySize: Record<ContextPillSize, IconSize> = { 22: 12, 26: 14, 28: 14 }
 
 /**
  * The tinted pill that says where a topic lives. The owner maps the
@@ -50,7 +49,7 @@ const styles = stylex.create({
     flexShrink: 0,
     gap: spacing['--space-1-5'],
     paddingInline: spacing['--space-2-5'],
-    borderRadius: radii['--radius-md'],
+    borderRadius: radii['--radius-pill'],
     whiteSpace: 'nowrap',
     userSelect: 'none',
     verticalAlign: 'middle',

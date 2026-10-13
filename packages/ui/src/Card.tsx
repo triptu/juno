@@ -1,17 +1,17 @@
 import * as stylex from '@stylexjs/stylex'
-import { X, type LucideIcon } from 'lucide-react'
+import { X } from '@phosphor-icons/react/dist/icons/X'
 import type { ReactNode } from 'react'
 import { colors, spacing } from '@juno/tokens/tokens.stylex'
-import { Icon } from './Icon'
+import { Icon, type PhosphorIcon } from './Icon'
 import { IconButton } from './IconButton'
 import { Surface } from './Surface'
 import { Text } from './Text'
 
 export interface CardProps {
-  /** Header line: kind icon and name, then an optional source. */
-  readonly kindIcon?: LucideIcon
+  /** Header line: kind icon (duotone, the friendly spot) and name, then an optional source. */
+  readonly kindIcon?: PhosphorIcon
   readonly kind?: string
-  readonly sourceIcon?: LucideIcon
+  readonly sourceIcon?: PhosphorIcon
   readonly source?: string
   readonly title?: string
   readonly body?: ReactNode
@@ -33,14 +33,14 @@ export function Card({ kindIcon, kind, sourceIcon, source, title, body, children
     <Surface kind="card" as="article" sx={styles.card}>
       {hasHeader ? (
         <div {...stylex.props(styles.header)}>
-          {kindIcon ? <Icon icon={kindIcon} size={13} /> : null}
+          {kindIcon ? <Icon icon={kindIcon} size={14} weight="duotone" /> : null}
           {kind ? (
             <Text variant="meta" weight="medium" tone="subtle">
               {kind}
             </Text>
           ) : null}
           {kind && source ? <span aria-hidden>·</span> : null}
-          {sourceIcon ? <Icon icon={sourceIcon} size={11} /> : null}
+          {sourceIcon ? <Icon icon={sourceIcon} size={12} /> : null}
           {source ? (
             <Text variant="meta" tone="muted" truncate>
               {source}

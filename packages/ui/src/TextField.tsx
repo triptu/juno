@@ -1,8 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
-import type { LucideIcon } from 'lucide-react'
 import type { InputHTMLAttributes, ReactNode } from 'react'
 import { colors, layout, radii, sizes, spacing } from '@juno/tokens/tokens.stylex'
-import { Icon } from './Icon'
+import { Icon, type PhosphorIcon } from './Icon'
 import { variants as typeVariants } from './internal/type'
 
 export type TextFieldSize = 30 | 32 | 34 | 36 | 44
@@ -10,7 +9,7 @@ export type TextFieldSize = 30 | 32 | 34 | 36 | 44
 export interface TextFieldProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'style' | 'className' | 'size'> {
   readonly size?: TextFieldSize
   /** An icon before the text (search). */
-  readonly leadingIcon?: LucideIcon
+  readonly leadingIcon?: PhosphorIcon
   /** Content before the text: the "To" label and a ContextPill. */
   readonly leading?: ReactNode
   readonly trailing?: ReactNode
@@ -41,7 +40,7 @@ export function TextField({ size = 32, leadingIcon, leading, trailing, width = '
     <label {...stylex.props(styles.field, sizeStyles[size], widths[width], invalid && styles.invalid)}>
       {leadingIcon ? (
         <span {...stylex.props(styles.icon)}>
-          <Icon icon={leadingIcon} size={size >= 44 ? 16 : 14} />
+          <Icon icon={leadingIcon} size={size >= 44 ? 18 : 16} />
         </span>
       ) : null}
       {leading}
