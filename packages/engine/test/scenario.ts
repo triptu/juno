@@ -32,6 +32,8 @@ export async function bootedEngine(track: Array<RunningEngine>, options: EngineO
 export async function restart(track: Array<RunningEngine>, engine: RunningEngine, whileStopped: (fake: FakeSlack) => void = () => {}): Promise<RunningEngine> {
   const { fake, userData } = engine
   const credentials = fake.credentials()
+  // Background work (the follow pass) must not answer after the stop and count against the next engine.
+  await quiet(engine)
   await engine.handle.stop()
   track.splice(track.indexOf(engine), 1)
   whileStopped(fake)
