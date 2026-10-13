@@ -14,10 +14,5 @@ type Assert<T extends true> = T
 /** Every body richtext builds encodes with the contract's schema. */
 export type RichtextFitsTheWire = Assert<[RichBody] extends [WireBody] ? true : false>
 
-/**
- * Every body the wire carries is one richtext can build. The contract
- * already has the `date` inline and the `file` block of M4's richtext work
- * (WP2); until richtext has them too, only the direction above is checked.
- * Once both have them this becomes `Assert<[WireBody] extends [RichBody] ? true : false>`.
- */
-export type WireFitsRichtext = [WireBody] extends [RichBody] ? true : false
+/** Every body the wire carries is one richtext can build. */
+export type WireFitsRichtext = Assert<[WireBody] extends [RichBody] ? true : false>

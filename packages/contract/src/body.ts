@@ -78,7 +78,7 @@ export const BodyBlock = Schema.Union([
     kind: Schema.Literal('file'),
     id: Schema.String,
     name: Schema.String,
-    mimetype: Schema.optionalKey(Schema.String),
+    mimetype: Schema.String,
     width: Schema.optionalKey(Schema.Number),
     height: Schema.optionalKey(Schema.Number),
   }),
