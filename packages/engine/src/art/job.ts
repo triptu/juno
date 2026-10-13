@@ -44,13 +44,16 @@ const DAY = 24 * 60 * 60 * 1000
 
 /**
  * The topics to draw, newest activity first: sidebar candidates (the
- * sidebar query's rules, `topics/query.ts`) that are not a DM's Main and
- * have no finished attempt, or whose drawing came from the first words of a
- * thread that now has an AI title.
+ * sidebar query's rules, `topics/query.ts`: a thread inside the quiet
+ * window, or unread or pinned beyond it; every channel's Main, since a Main
+ * stays in the sidebar on its threads' activity and channels are few) that
+ * are not a DM's Main and have no finished
+ * attempt, or whose drawing came from the first words of a thread that now
+ * has an AI title.
  */
 export const candidatesStatement = (cutoff: string, limit: number): { readonly sql: string; readonly params: ReadonlyArray<unknown> } => ({
   sql: `${ART_SELECT}
-    WHERE i.last_activity_ts >= ? AND c.is_member = 1 AND c.is_archived = 0 AND ig.channel IS NULL
+    WHERE (i.kind = 'main' OR i.last_activity_ts >= ? OR i.unread_count > 0 OR o.pinned_at IS NOT NULL) AND c.is_member = 1 AND c.is_archived = 0 AND ig.channel IS NULL
       AND NOT (i.kind = 'main' AND c.kind IN ('im', 'mpim'))
       AND (i.kind <> 'thread' OR s.subscribed = 1 OR (s.subscribed IS NULL AND i.mentions_me = 1 AND i.unread_count > 0))
       AND o.unsubscribed_at IS NULL

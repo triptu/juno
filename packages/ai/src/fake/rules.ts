@@ -180,8 +180,9 @@ export function fakeTopicArt(input: TopicArtInput): string {
   const text = artText(input)
   if (text.includes('::invalid-art::')) return '<svg viewBox="0 0 40 40" data-hue="teal"><text x="4" y="24">no</text></svg>'
   const subject = input.kind === 'thread' ? input.title : input.channel
+  // A channel is a subject by itself; a thread says nothing when its title is a word or an emoji.
   const words = subject.replace(/[^\p{L}\p{N}]+/gu, ' ').trim()
-  const confident = words.length >= 4 && !/^(hmm+|ok|yes|no|thanks)$/i.test(words)
+  const confident = input.kind === 'main' || (words.length >= 4 && !/^(hmm+|ok|yes|no|thanks)$/i.test(words))
   let objectIndex = ART_OBJECTS.findIndex(([re]) => re.test(text))
   let hueIndex = artHash(subject) % ART_HUES.length
   if (input.avoid !== undefined) {

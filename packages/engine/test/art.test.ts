@@ -21,15 +21,22 @@ afterEach(async () => {
 const bootedEngine = (options: Parameters<typeof boot>[1] = {}) => boot(engines, options)
 
 const isMain = (row: TopicRow) => row.kind === 'main'
-const isDmMain = (row: TopicRow) => row.kind === 'main' && row.channel.kind === 'im'
+const isDmMain = (row: TopicRow) => row.kind === 'main' && (row.channel.kind === 'im' || row.channel.kind === 'mpim')
 const hasArt = (row: TopicRow) => typeof row.art === 'string' && row.art.length > 0
-
-/** The rows once every thread and channel Main shows a drawing. */
-const drawnRows = (engine: RunningEngine) =>
-  engine.rowsUntil((rows) => rows.length > 0 && rows.filter((row) => !isDmMain(row)).every(hasArt), 'every drawable row to have art')
 
 const storedArt = (engine: RunningEngine) =>
   readDb(engine, 'user.db', (db) => db.prepare('SELECT topic_id, recipe, status, source, hue FROM topic_art ORDER BY topic_id').all() as Array<{ topic_id: string; recipe: string; status: string; source: string; hue: string }>)
+
+/** The rows once every thread and channel Main in the window has been drawn, or finished trying, and every finished drawing shows. */
+const drawnRows = (engine: RunningEngine) =>
+  engine.rowsUntil((rows) => {
+    if (rows.length === 0) return false
+    const stored = new Map(storedArt(engine).map((entry) => [entry.topic_id, entry]))
+    return rows.filter((row) => !isDmMain(row)).every((row) => {
+      const entry = stored.get(row.id)
+      return entry !== undefined && (entry.status === 'ok' ? row.art === entry.recipe : row.art === undefined)
+    })
+  }, 'every drawable row drawn')
 
 const setPref = (engine: RunningEngine, key: string, value: unknown) => runCommand(engine.registry, prefsSet, { key, value: value as never })
 
@@ -44,9 +51,10 @@ describe('topic art', () => {
   it('draws every thread and channel Main in the sidebar, keeps the photo on a DM Main, and stores each drawing once', async () => {
     const engine = await bootedEngine()
     const rows = await drawnRows(engine)
-    const drawn = rows.filter((row) => !isDmMain(row))
+    const drawn = rows.filter((row) => !isDmMain(row) && hasArt(row))
     expect(drawn.length).toBeGreaterThan(3)
     expect(drawn.some(isMain)).toBe(true)
+    expect(drawn.some((row) => row.kind === 'thread' && row.channel.kind === 'im')).toBe(true)
     for (const row of drawn) {
       const parsed = parseRecipe(row.art!)
       expect(parsed.ok, `${row.title}: ${row.art}`).toBe(true)
@@ -73,6 +81,7 @@ describe('topic art', () => {
   it('shows the placeholder everywhere while AI assist is off, draws nothing new, and brings the drawings back when it is on again', async () => {
     const engine = await bootedEngine()
     const before = await drawnRows(engine)
+    expect(before.some(hasArt)).toBe(true)
     const count = storedArt(engine).length
 
     valueOf(await setPref(engine, 'aiAssist', false))
@@ -111,10 +120,10 @@ describe('topic art', () => {
   it('keeps the placeholder for a topic the model cannot draw within the vocabulary, and does not ask again', async () => {
     const engine = await bootedEngine()
     const thread = liveThread(engine, 'Broken drawing ::invalid-art:: for this thread')
-    const rows = await engine.rowsUntil((next) => next.some((row) => row.id === thread.id) && next.filter((row) => !isDmMain(row) && row.id !== thread.id).every(hasArt), 'the others drawn')
-    expect(rows.find((row) => row.id === thread.id)!.art).toBeUndefined()
     const stored = await waitFor(() => storedArt(engine).find((row) => row.topic_id === thread.id), WAIT_MS, 'the failed attempt stored')
     expect(stored).toMatchObject({ status: 'failed', recipe: '' })
+    const rows = await drawnRows(engine)
+    expect(rows.find((row) => row.id === thread.id)!.art).toBeUndefined()
     await new Promise((resolve) => setTimeout(resolve, 2_000))
     const again = engine.registry.get(engine.topicsAtom())
     expect(again._tag === 'Success' ? again.value.rows.get(thread.id)?.art : 'no rows').toBeUndefined()
