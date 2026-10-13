@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-13 17:56 · Tushar · Formal specs in Quint for the concurrent sync protocols: follow/unfollow and read state first (after the M3 sync fixes), then merge ordering and the outbox before M6. Model checker in CI; specs generate event orderings for the convergence test; changing sync behaviour means updating the spec.
 - 10-13 17:52 · Tushar · Topic tiles get AI-generated art about each topic's content (not random generative marks). Explore approaches before building. Channel marks stay for Main rows and as the fallback.
 - 10-13 17:52 · Tushar · OpenRouter key added. First live eval: generation is good; decisions on Claude Haiku via OpenRouter take about 1.5 s and mostly hit the timeout, so the decision tier needs tuning.
 - 10-13 16:51 · Orchestrator · Sidebar rule implemented: followed threads, unread-mention threads Slack has said nothing about, and Main for channels with any activity in the window. An explicit unfollow hides the thread. Subscribe and unsubscribe mirror through an outbox seam and revert on failure. Real workspace: 452 rows (303 threads, 149 Main).

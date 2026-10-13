@@ -24,3 +24,4 @@ Small items noticed during work that are not yet assigned to a milestone. Remove
 - AI: OpenAI-compatible reasoning models keep their default reasoning effort, which may miss the 1.5 s decision budget. Set effort low for the decision tier if such a model is chosen.
 - AI: evaluate TypeSafe System One decision models (served on OpenRouter through pi-ai's `classify` API) for the decision tier. The spec suggests a decision-model approach like this.
 - AI: OpenAI-compatible reasoning models keep their default reasoning effort, which may miss the 1.5 s decision budget. Set effort low for the decision tier if such a model is chosen.
+- Quint specs (queued after M3 fix A): `specs/` with follow/unfollow and read-state models first, then merge ordering and outbox/echo reconciliation before M6. Run the model checker in CI, feed generated traces into the engine convergence test, and add the "update the spec with sync changes" rule to CLAUDE.md.
