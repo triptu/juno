@@ -113,12 +113,12 @@ flowchart TD
   contract --> domain
   slack --> slack_schema
   store --> domain & slack_schema
-  sync --> slack & store & domain
+  sync --> slack & store & domain & slack_schema
   ai --> domain
   assistant --> ai & store & domain & contract
   notifications --> store & domain & ai
   files --> slack & store & sync
-  engine --> contract & sync & store & assistant & notifications & files & slack
+  engine --> contract & sync & store & domain & assistant & notifications & files & slack
   fake_slack[fake-slack] --> slack_schema
   tokens
   ui --> tokens
@@ -142,7 +142,7 @@ flowchart TD
 | `@juno/ai` | provider isolation | `AiProvider` with `PiAiProvider` and `FakeAiProvider`, task table (prompts, output schemas, tier) | touch the store |
 | `@juno/assistant` | AI policy | when tasks run, `ai_cache`, budget, concurrency, the off switch, For you generation, the Juno chat with tools and cards | call OpenRouter directly |
 | `@juno/notifications` | one decision path | pipeline, Today log, digest scheduler, `Notifier` interface | show anything itself |
-| `@juno/engine` | composition | the app `Layer`, feature folders (`topics/`, `messages/`, `reads/`, `search/`, `notifications/`, `assistant/`, `files/`, `session/`) each with its route handlers and live queries, the port transport, config from env, `startEngine()` | hold domain rules |
+| `@juno/engine` | composition | the app `Layer`, feature folders (`topics/`, `messages/`, `reads/`, `search/`, `notifications/`, `assistant/`, `files/`, `session/`) each with its route handlers and live queries, the shared `workspace.ts` (the open store), the port transport, config from env, `startEngine()` | hold domain rules (it applies them from `@juno/domain` when shaping view models) |
 | `@juno/tokens` | design values | `defineVars` with `--` keys, `createTheme` for dark and accents | |
 | `@juno/ui` | primitives | the 18 primitives from `primitives.md` plus `Icon` | import contract, state, data |
 | `@juno/views` | dumb UI | feature components, each with `*.fixtures.tsx`; the `applyTheme` entry point for apps | import `@juno/state`, `effect`, `window.juno` |
@@ -200,7 +200,7 @@ emoji           (name PK, url, alias_for)
 thread_subs     (channel, thread_ts, PK, subscribed, slack_last_read)
 channel_reads   (channel PK, slack_last_read, latest, has_unreads, mention_count, counts_updated)
 synced_ranges   (channel, from_ts, to_ts, PK(channel, from_ts))   -- explicit, never moved by socket events
-thread_cursors  (channel, thread_ts, PK, replies_complete, synced_at)
+thread_cursors  (channel, thread_ts, PK, replies_complete, synced_at, complete_from)
 topic_index     (topic_id PK, channel, kind, last_activity_ts, message_count, participants_json,
                  root_ts, unread_count, unread_exact, mentions_me, preview_json, rev)
 sync_state      (key PK, value_json)
@@ -213,7 +213,7 @@ ai_cache        (task, key, PK, input_hash, output_json, model, cost_usd, create
 topic_overlay   (topic_id PK, manual_title, ai_title, ai_title_source_hash, ai_title_at,
                  resolved_at, resolved_activity_ts, reopened_at, pinned_at, unsubscribed_at,
                  tracked, settled_dismissed_ts, grouping_dismissed_ts)
-topic_reads     (topic_id PK, last_read_ts, marked_unread, local_write_ack_ts)
+topic_reads     (topic_id PK, last_read_ts, marked_unread, local_write_ack_ts, last_server_event_ts)
 main_groups     (id PK, channel, title, created_at)
 main_group_msgs (group_id, ts, PK)
 ignored_channels(channel PK, ignored_at)
@@ -257,7 +257,9 @@ Every live query has a supporting index. A test runs `EXPLAIN QUERY PLAN` agains
 
 The official client allows 10 concurrent requests per team and the user will often run it at the same time, against the same limits. `RequestQueue` keeps three lanes with separate permits, so one lane cannot starve another: `interactive` (concurrency 3), `background` (concurrency 2, starts spaced 1.5 s apart, about 40 calls per minute) and `send` (one in flight). Limits are tracked per method: a 429 pauses that method's bucket until `Retry-After` (default 60 s, capped at 180 s), other methods continue. Retries: 3 attempts; a 429 waits on the bucket, 5xx, timeouts and connection failures back off exponentially (1 s base, 15 s cap, jittered); the fatal auth list fails with `SlackAuthRequired` at once and the engine raises `authRequired`. The interactive lane never blocks the UI: if the method is paused for longer than 5 s, `SlackApi.call` fails at once with `SlackRateLimited`, the route returns (the live query already shows cached data), the engine schedules the fetch on the background lane, and `engine.status` shows `rate-limited`. The numbers live in `SlackConfig` (`packages/slack/src/client/config.ts`); the query string and form fields sent with every call are listed in `packages/slack/src/client/api.ts`. Boot progress is reported as `catching-up { done, total }` so the sidebar can show a quiet "Catching up" line.
 
-Cost estimate for a manager in 150 active channels: cold boot is about 150 history calls plus 50 reply calls, 4 to 5 minutes on the background lane. The sidebar is usable after `getView` (a few seconds); the rest fills in. Warm boot is 5 to 10 calls.
+Cost estimate for a manager in 150 active channels: cold boot is about 150 history calls plus 50 reply calls, 4 to 5 minutes on the background lane. The sidebar is usable after `getView` (a few seconds); the rest fills in. Warm boot is 5 to 10 calls. Measured on the `large` fake seed (300 channels, 5 k threads, 100 k messages): 379 calls and about 5 s with the background spacing off, which is what the engine does when it is pointed at the fake (`EngineConfig.fakeSlackUrl`); the default fixture's cold boot is 12 history calls, one per active conversation, and its warm boot is 5 calls (`packages/engine/test/sync.test.ts`).
+
+Where it runs: `@juno/sync`'s `runSync` is started by the engine's `SyncRunner` (`engine/src/session/SyncRunner.ts`) for every ready session, forked into the session's scope with the session's Slack client and the open workspace's store, so sign-out, a new sign-in and `authRequired` end it. `userBoot`, `prefs`, `counts` and `getView` use the interactive lane; history, replies, search and users use the background lane. The engine phase while the sync runs is the sync's phase (`booting`, `catching-up`, `live`, `offline`); a ready session with no sync yet is `offline`.
 
 ### 5.2 Cold boot
 
@@ -266,8 +268,10 @@ Cost estimate for a manager in 150 active channels: cold boot is about 150 histo
 3. `client.getWebSocketURL` → connect the socket first, so nothing during backfill is lost.
 4. `subscriptions.thread.getView` (limit 50, paged by `current_ts`) until roots are older than the quiet window → followed threads with previews and unread counts.
 5. For every conversation with `counts.latest` inside the quiet window, newest first: `conversations.history` (`ignore_replies=true`, `limit=100`). Roots carry `reply_count`, `latest_reply`, `reply_users`, so threads are discovered without fetching replies. Each page records a `synced_ranges` row.
-6. Unknown users → edge `users/info` in chunks of 100. Edge `emojis/list` → `emoji`.
+6. Unknown users → edge `users/info` in chunks of 100; the topics whose preview waited for a name are re-indexed when the users land. Edge `emojis/list` → `emoji` (not built yet).
 7. Previews for unfollowed threads: for the top 50 by activity, `conversations.replies` (`oldest=latest_reply`, `inclusive=true`, `limit=2`), background lane.
+
+Read pointers at boot: Main takes `counts.last_read`, a followed thread its root's `last_read`, and a thread the user does not follow starts read at its latest reply (a first boot does not light up every old thread; a thread discovered later starts unread). `sync_state.boot` records the completed boot, `counts_last_fetched` and the moment the store was last in step (`lastSyncAt`), which decides cold against warm next time.
 
 ### 5.3 Discovery of thread activity after boot
 
@@ -278,7 +282,9 @@ Plan, in order of preference:
 1. **Search as the discovery source.** `search.modules.messages` with `query: "is:thread after:<date>"`, `count: 50`, paged, for the gap since the last successful sync (warm boot, reconnect, and a periodic sweep every 10 minutes while live). One to three calls replace 30 to 150 history calls and cover old roots. Unknowns to verify in the live smoke before M3: whether `is:thread` is honoured for an `xoxc` session, whether matches carry `channel.id` and `thread_ts`, whether paging is by `page` or `cursor`, and the rate tier. Results from channels the user is not a member of must be dropped (search also covers public channels you are not in).
 2. **Fallback if search fails the spike.** History since cursor for conversations whose `latest` moved, plus incremental `conversations.replies` for every stored root whose `latest_reply` is newer than stored (`getView` gives this for followed threads; for others, `message_replied` events while live). The gap then remains for unfollowed old roots during downtime, and All topics shows a quiet "Tracking threads since <date>" note.
 
-A reply for a root not in the store creates the thread topic with a stub root and queues a fetch of the root (`conversations.replies` with `limit=1`).
+A reply for a root not in the store creates the thread topic with a stub root and queues a fetch of the root (`conversations.replies` with `limit=1`). The same fetch runs when a reply arrives from a page and the root's counters never saw it (a `message_replied` lost during a drop), so `reply_count` is Slack's and not a lower bound.
+
+Status: both paths are built in `@juno/sync` (`discovery.ts`, `SyncConfig.discovery`); search is the default and works against the fake, which honours `is:thread`, `after:` and `page`. The live smoke still has to confirm it for a real `xoxc` session (open question 17.2). Matches merge as page messages without reaction state; a match's reactions arrive with the next page or event.
 
 ### 5.4 Merge rules (ADR 0011)
 
@@ -291,8 +297,9 @@ Writes merge field by field with guards, so pages, events and echoes can arrive 
 - Socket events never move `synced_ranges`.
 - Warm boot and reconnect pass `cached_latest_updates` to `conversations.history` and `conversations.replies` for the visible window and apply `latest_updates`, `unchanged_messages` and `deleted` from the response. The value format of `latest_updates` is Unknown (research section 3); until the live smoke confirms it, the fallback is to re-fetch the visible window and merge with the rules above.
 - Frames of a known type with an unexpected shape are logged with a redacted copy in a 50-entry ring buffer and skipped; they never fail the stream.
+- A root's `reply_count` never goes below the live replies the store holds. A deleted reply recounts the root from the store when the thread is complete, else drops the count by one.
 
-A seeded randomised engine test interleaves fake socket events, page responses, drops and outbox sends, then asserts that the store equals the fake's state. It runs in seconds and replaces most of the soak test.
+The rules are one module, `packages/sync/src/merge.ts`, with a table test. A seeded randomised engine test (`packages/engine/test/convergence.test.ts`) interleaves fake socket events, page responses and drops (outbox sends come with M6), then asserts that the store equals the fake's state and that a full `reindexAll` changes no index row. It runs in seconds and replaces most of the soak test. Known gap: edits, deletes and reactions during a disconnect are recovered for threads by the search sweep (text only) and otherwise when the topic is opened; the `cached_latest_updates` path above waits on the live smoke.
 
 ### 5.5 Opening a topic
 
@@ -312,7 +319,7 @@ A seeded randomised engine test interleaves fake socket events, page responses, 
 | Thread, not subscribed | local only | local only |
 | Group | local only; it moves the channel watermark through the Main rule above | local only |
 
-Counts: Main uses `client.counts` (`has_unreads`, `mention_count`) and shows an exact number only when local history covers everything since `last_read` (`unread_exact`); otherwise the row shows a dot. Threads count from stored replies, which `getView` and the open fetch make complete.
+Counts: Main uses `client.counts` (`has_unreads`, `mention_count`) and shows an exact number only when local history covers everything since `last_read` (`unread_exact`); otherwise the row shows a dot. Threads count from stored replies and are exact when coverage reaches back to the read pointer: `thread_cursors.complete_from` records where complete coverage starts (a thread view stores every unread reply, so it is Slack's pointer), `replies_complete` says the whole thread is stored, and a pointer at or past `latest_reply` is exact by itself. A pointer seen in `counts` or `getView` after a disconnect is applied as a server mark through the conflict rule, with the fetch time as its event time; `topic_reads.last_server_event_ts` keeps marks in order.
 
 ### 5.7 Outbox and echo reconciliation (ADR 0011)
 
@@ -324,7 +331,7 @@ Sends: `postMessage` inserts a `pending_messages` row keyed by `client_msg_id` a
 
 ### 5.8 Reconnect
 
-After `hello`: `client.counts(counts_last_fetched)`; history since `synced_ranges` for conversations whose `latest` moved; `getView` first page; the discovery sweep of 5.3 for the outage; replies refresh for open and visible topics; flush the outbox. `force_reload` or a schema version change triggers a full cold boot over the existing store.
+After `hello`: `client.counts(counts_last_fetched)`; history since `synced_ranges` for conversations whose `latest` moved; `getView` first page; the discovery sweep of 5.3 for the outage; replies refresh for open and visible topics (M4); flush the outbox (M6). The same `catchUp` is the warm boot with a `userBoot` refresh in front, and the periodic sweep while live. `force_reload` boots again over the existing store; a schema version change empties the cache and the next boot is cold.
 
 ## 6. Realtime
 
@@ -428,7 +435,7 @@ End-to-end and perf tests use a typed user-language driver, so they read as spec
 
 - **End to end** (`apps/desktop/e2e`, Playwright, built app, `show: false`, temp data dir and own fake port per test, one worker because the tests share the built app in `out/`, `JUNO_AI=fake`, plaintext secrets, `ELECTRON_RUN_AS_NODE` stripped). One file per spec flow: sign-in via the fake's sign-in page, boot and sidebar, open at the divider, stealth, resolve with undo, reopen tag, pin, rename, Use AI title, subscribe, ignore, tabs, send with echo, edit and delete own message, reactions, quote, suggestions, attachments (paste, drop, button) with thumbnails, New message with tracking and to a user with no DM, send checks, ⌘K, All topics, For you, Juno chat, notifications (recording `Notifier` in main read through `app.evaluate`; clicks simulated the same way), digest with `clock.advance` sent through main to the engine, reconnect and 429, dark mode. Menus are clicked by id in main. `location.protocol` is asserted to be `juno:`.
 - **Perf** (`apps/desktop/perf`, separate Playwright project `perf`, `pnpm perf`; not part of `test:e2e`). Scenarios run against the `large` fake-slack seed (300 channels, about 5 k topics, 100 k messages) with prebuilt `cache.db` and `user.db` per seed hash, and use the same user-language driver as e2e. Each scenario reports the median and p95 of 7 measured runs. The build fails when a p95 exceeds the host's budget, when a median regresses more than 15 % against the stored baseline for that host (`dev-apple-silicon` or `ci-macos-26`), or when a memory soak grows more than 5 %. `scripts/check-bundle-size.mjs` checks the renderer bundle budget in the same run. Scenarios, budgets and stability rules are in `docs/performance.md` section 7.3.
-- **Engine tests** (`packages/engine/test`, Node, in-process `fake-slack`): boot call budget, warm boot, the randomised convergence test, `topic_index` incremental versus rebuild, echo reconciliation in all three orders, outbox retry and revert, read-state conflicts, replay of redacted real payloads recorded by the live smoke.
+- **Engine tests** (`packages/engine/test`, Node, in-process `fake-slack`, the harness in `test/harness.ts`): boot call budget, warm boot, the randomised convergence test (`JUNO_CONVERGENCE_SEED` and `_ROUNDS` to vary it), `topic_index` incremental versus rebuild, the `EXPLAIN QUERY PLAN` test, echo reconciliation in all three orders, outbox retry and revert, read-state conflicts, replay of redacted real payloads recorded by the live smoke. `JUNO_BENCH=1` runs the large-seed benchmark in `test/bench` (report only; `JUNO_BENCH_STRICT=1` fails it on the budgets).
 - **Domain and richtext tests** (vitest): rules, formatters, grammar, rendering tables.
 - **Import seam**: a fixture leveldb directory, a fixture `Cookies` file and an injected keychain password make the Slack-app import testable.
 - **Live smoke** (`pnpm smoke:live`, manual, `JUNO_LIVE=1`): read-only calls decoded through our schemas, 30 s of socket events, the search discovery spike, the `counts.latest` measurement, the upload flow check, and writes only in a private channel the script creates or the self-DM. It saves redacted payloads as engine test fixtures.
@@ -480,7 +487,7 @@ Each milestone lists parallel tracks; each track owns disjoint files. Done alway
 
 **M2 Sign-in and session.** Sign-in window with token capture, Slack-app import with the test seam, `secrets.bin`, `persist:slack` session and `HttpTransport.ElectronNet`, cookie header for the socket, Grid detection, `authRequired` loop, sign-out, live smoke (read-only). Done: e2e signs in through the fake; smoke runs against the real workspace and records fixtures.
 
-**M3 Boot and sidebar.** Cold and warm boot, discovery including the search spike result, merge rules, `reindexTopics`, convergence test, `topics.list` with deltas, Sidebar, TopicRow, filters, scope, Browse, status phases. Done: e2e sidebar order, tags and counts; engine call budget test.
+**M3 Boot and sidebar.** Cold and warm boot, discovery including the search spike result, merge rules, `reindexTopics`, convergence test, `topics.list` with deltas, Sidebar, TopicRow, filters, scope, Browse, status phases. Done: e2e sidebar order, tags and counts; engine call budget test. Engine side done: `@juno/sync`, the `Workspace` store holder and `SyncRunner`, `topics.list` and `topics.counts` with the sidebar indexes and the plan test, the `large` fake seed and the benchmark in `packages/engine/test/bench`, the convergence test. Measured on the large seed: the sidebar query runs in about 5 ms in isolation and 5 to 9 ms p95 inside the engine while events are applied (budget 5 ms); the 300-row snapshot is 346 KB on the fake's short avatar URLs, 280 KB without any avatar URL (budget 200 KB); a one-row delta is 1 KB; an injected message reaches the row in about 15 ms. Open for the UI track: whether participants keep names and avatar URLs in the row (the view model the sidebar asked for) or the rows carry ids and a `people` live value supplies names and photos, which is what the snapshot budget needs.
 
 **M4 Topic view and tabs.** Open thread and Main, message rendering through `richtext`, divider snapshot, read-state rule and mirroring, stealth, tabs, realtime messages, list performance budget, local FTS search. Done: e2e divider, stealth, live message; the performance gate in `docs/performance.md` section 3.4 passes: topic open with 300 cached messages in 50 ms or less, scroll within the frame budget, and prepending a 100-row page with zero visible shift.
 

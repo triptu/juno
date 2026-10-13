@@ -165,8 +165,8 @@ yield* TestClock.adjust(60_000)
 yield* Fiber.join(f)
 ```
 
-Tests: `@effect/vitest` 4.0.3 is installed in `store` and `slack` (add it as a devDependency where
-needed). `it.effect` runs with a `TestClock`; `it.live` uses real time. Juno prefers end-to-end
+Tests: `@effect/vitest` 4.0.3 is installed in `store`, `slack` and `engine` (add it as a devDependency
+where needed). `it.effect` runs with a `TestClock`; `it.live` uses real time. Juno prefers end-to-end
 tests, so test a service through its public layer.
 
 ## Pitfalls met in this repo

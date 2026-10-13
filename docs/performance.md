@@ -232,7 +232,7 @@ Navigation (sidebar rows, tabs, nav items, filter chips, ⌘K rows, Browse rows,
 
 ### 7.3 The perf harness
 
-Status: not built yet. Today only `scripts/check-bundle-size.mjs` (run by `pnpm build`) and the marks in `@juno/state/perf` exist. The rest of this section is the plan for M3 and later.
+Status: the fixture and the engine benchmark exist; the Playwright harness does not. `scripts/check-bundle-size.mjs` runs in `pnpm build`, the marks live in `@juno/state/perf`, `largeSeed()` in `@juno/fake-slack` is the fixture below (generated in about 5 s, never checked in), and `packages/engine/test/bench` boots the engine on it and reports the sidebar query time, the snapshot and delta sizes and the inject-to-row time (`JUNO_BENCH=1`). First numbers are in `docs/architecture.md` section 16, M3. The rest of this section is the plan.
 
 Location: `apps/desktop/perf/`, a separate Playwright project `perf` (`pnpm perf`, `pnpm perf:baseline`). It is not part of `test:e2e`, because it needs a quiet machine and a longer timeout.
 

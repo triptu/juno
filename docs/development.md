@@ -58,6 +58,7 @@ packages/contract       @juno/contract. Routes (effect/rpc groups), live-query s
 packages/store          @juno/store. cache.db and user.db per workspace, migrations,
                         writer and reader clients, invalidation and live queries.
 packages/engine         @juno/engine. The engine: protocol server, feature handlers, startEngine().
+packages/sync           @juno/sync. Slack into the store: boot, discovery, merge rules, events, reindexTopics.
 packages/state          @juno/state. The renderer's engine client and every atom.
 packages/domain         @juno/domain. Pure product rules: ids, topic status, titles, sorting, notifications, checks.
 packages/richtext       @juno/richtext. Slack blocks and mrkdwn to a message view model, and back.
@@ -217,7 +218,8 @@ Names are explained in `docs/architecture.md` sections 2.6 and 7.
 
 | Kind | Where | Run |
 | --- | --- | --- |
-| Pure rules, store, Slack client, Slack-app import, engine protocol and session | `packages/<name>/test/` (vitest) | `pnpm test` |
+| Pure rules, store, Slack client, Slack-app import, merge rules, engine protocol, session and sync | `packages/<name>/test/` (vitest) | `pnpm test` |
+| The sidebar query and boot on the large seed (report only) | `packages/engine/test/bench/` | `JUNO_BENCH=1 pnpm --filter @juno/engine exec vitest run test/bench` |
 | User flows in the built app | `apps/desktop/e2e/` (Playwright, one worker) | `pnpm test:e2e` |
 | Mouse-down activation, cursor rule, in a real browser | `apps/gallery/behaviour.spec.ts` | `pnpm test:gallery` |
 | Screenshots of every fixture | `apps/gallery/shots.spec.ts` | `pnpm gallery:shots` |
