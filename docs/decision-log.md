@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-13 16:00 · Orchestrator · `@juno/ai` exists: `AiProvider` with `decide`, `generate` and streaming `chat`; a task table where tier (model, timeout) and shape (structured with a TypeBox schema, or text) are separate; nothing fails, a missing key or a bad answer is a `NoDecision` value. Defaults `anthropic/claude-haiku-5.5` for decisions and `anthropic/claude-sonnet-5.5` for generation, from OpenRouter's list that day. `pnpm ai:eval` judges prompt quality by eye, with the fake or live.
 - 10-13 12:52 · Tushar · Sidebar shows followed threads (Slack "Get notified about new replies") and threads with unread mentions, plus Main for channels with recent activity of any kind. Other threads are reached through Main's thread links, All topics and ⌘K. Subscribe and unsubscribe work on any thread and mirror to Slack. Replaces the "every active thread" rule (910 rows on the real workspace).
 - 10-13 12:52 · Tushar · Confirmed: unfollowed threads start as read at first sign-in.
 - 10-13 11:18 · Orchestrator · Dark theme: warm-neutral near-black with three surface layers (sidebar, page, cards, popovers). Accent themes: Coral default plus 7 others, all meeting 4.5:1. "System" theme deferred because main must resolve it before first paint.
