@@ -547,8 +547,8 @@ Native menus **[spec]**. Prototype rendering for reference: 236px, padding 5, ra
 
 - Trigger: Theme button in the sidebar bar (or OS setting; [proposed] default "follow system", with the button overriding). Root gets `data-theme="dark"` and the dark token block (tokens §1.2) applies; nothing else changes.
 - During the switch the root carries `data-theme-switching` for two frames so every transition is disabled and colours change at once.
-- Dark-only values: `--input-border hsla(210,5%,24%)`, `--card-ring 0 0 0 1px oklch(1 0 0/.08)`, `--pop-shadow 0 0 0 1px oklch(1 0 0/.1), 0 8px 24px oklch(0 0 0/.5)`; tints and `--hl-soft` recompute from the dark base. Accent ink flips to light (#EDEADE) with near-black text; the four colour accents stay the same hex.
-- Everything else (sizes, weights, icons) is identical. Check: resolved chip text in dark is 4.48:1 (borderline); cyan accent chip text fails (tokens §1.3).
+- Dark-only values: the dark base palette (tokens §1.2), the dark shadows, `--tint-resolved-fg` at 52%, the avatar mixes 32% / 46%; the other tints and `--hl-soft` recompute from the dark base. Every accent has its own dark values (tokens §1.3): ink flips to light (#EDEADE) with near-black text, Coral goes from #CC4628 to #FF8A73.
+- Everything else (sizes, weights, icons) is identical. Check: resolved chip text in dark is 5.94:1; cyan takes near-black text on its fill (tokens §1.3).
 
 ## 19. Tweaks and defaults
 

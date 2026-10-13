@@ -45,34 +45,39 @@ Warm paper. HSL values are the source of truth; hex is the sRGB result for desig
 
 ### 1.2 Base palette, dark
 
-Cool near-black. Applied with `[data-theme="dark"]` on the root.
+A warm-neutral near-black: the same paper seen at night, not a cool system grey. Built in OKLCH at hue 85 and chroma 0.006 (text at hue 90), so every step is one hue and only lightness moves. Three clear layers: the sidebar and tab strip sit lowest (L 0.19), the page above them (0.215), and cards, inputs and the composer on top (0.26); popovers and the hover toolbar go one step higher again (0.33, `--surface-raised`). Borders are two steps above what they sit on, so they still separate. Applied with the `dark` theme classes on `<html>`. Before and after renders of the friendly mock: `docs/design/dark-theme/before.png` (the cool palette the handoff CSS gave) and `after.png`.
 
-| Token | Value | Hex | Source |
-| --- | --- | --- | --- |
-| `--background` | `hsla(210, 5%, 8%, 1)` | #131415 | css |
-| `--background-subtle` | `hsla(210, 5%, 9%, 1)` | #161718 | css |
-| `--surface-default` | `hsla(210, 5%, 11%, 1)` | #1B1C1D | css |
-| `--surface-hover` | `hsla(210, 5%, 13%, 1)` | #1F2123 | css |
-| `--surface-active` | `hsla(210, 5%, 15%, 1)` | #242628 | css |
-| `--surface-raised` | `hsla(210, 5%, 18%, 1)` | #2B2E30 | proposed |
-| `--secondary-default` | `hsla(210, 5%, 16%, 1)` | #27292B | css |
-| `--secondary-hover` | `hsla(210, 5%, 18%, 1)` | #2C2E30 | css |
-| `--secondary-active` | `hsla(210, 5%, 20%, 1)` | #303336 | css |
-| `--border-subtle` | `hsla(210, 5%, 12%, 1)` | #1D1F20 | css |
-| `--border-default` | `hsla(210, 5%, 15%, 1)` | #242628 | css |
-| `--border-strong` | `hsla(210, 5%, 16%, 1)` | #27292B | css |
-| `--border-strongest` | `hsla(210, 5%, 21%, 1)` | #333638 | css |
-| `--foreground-default` | `hsla(45, 30%, 90%, 1)` | #EDE9DE | css |
-| `--foreground-subtle` | `hsla(45, 10%, 80%, 1)` | #D1CFC7 | css |
-| `--foreground-muted` | `hsla(45, 2%, 55%, 1)` | #8F8D8A | css (5.57:1 on bg, no override needed) |
-| `--accent-default` | `hsla(48, 30%, 90%, 1)` | #EDEADE | css |
-| `--accent-hover` | `hsla(48, 30%, 95%, 1)` | #F6F5F0 | css |
-| `--accent-active` | `hsla(48, 30%, 99%, 1)` | #FDFDFC | css |
-| `--accent-foreground` | `hsla(48, 10%, 2%, 1)` | #060505 | css |
-| `--accent-foreground-subtle` | `hsla(48, 10%, 5%, 1)` | #0E0D0B | css |
-| `--accent-foreground-muted` | `hsla(48, 10%, 10%, 1)` | #1C1A17 | css |
-| `--selection-background` | `hsla(200, 97%, 20%, 1)` | #024364 | css |
-| `--input-border` | `hsla(210, 5%, 24%, 1)` | #3A3D40 | proto |
+| Token | Hex | OKLCH L | Measured | Source |
+| --- | --- | --- | --- | --- |
+| `--background` | #1B1916 | 0.215 | | redesign |
+| `--background-subtle` | #151411 | 0.19 | 1.05:1 under the page | redesign |
+| `--surface-default` | #252421 | 0.26 | 1.13:1 over the page | redesign |
+| `--surface-hover` | #2D2B28 | 0.29 | 1.31:1 over the sidebar | redesign |
+| `--surface-active` | #32302D | 0.31 | | redesign |
+| `--surface-raised` | #373532 | 0.33 | 1.43:1 over the page, 1.27:1 over a card | redesign |
+| `--secondary-default` | #302F2C | 0.305 | 1.38:1 over the sidebar (selected row) | redesign |
+| `--secondary-hover` | #383633 | 0.335 | | redesign |
+| `--secondary-active` | #403E3B | 0.365 | | redesign |
+| `--border-subtle` | #2B2A27 | 0.285 | 1.22:1 on the page (topic header rule) | redesign |
+| `--border-default` | #32302D | 0.31 | 1.40:1 on the sidebar edge, 1.33:1 on the page | redesign |
+| `--border-strong` | #3C3A37 | 0.35 | 1.37:1 on a card | redesign |
+| `--border-strongest` | #4C4A47 | 0.41 | 1.99:1 on the page | redesign |
+| `--input-border` | #464541 | 0.39 | 1.62:1 on the composer | redesign |
+| `--foreground-default` | #EEEBE2 | 0.94 | 14.7:1 on the page | redesign |
+| `--foreground-subtle` | #C6C4BE | 0.82 | 10.1:1 page, 7.7:1 `--secondary-default`, 6.1:1 `--secondary-active`, 7.0:1 popovers | redesign |
+| `--foreground-muted` | #A09E9A | 0.70 | 6.6:1 page, 6.9:1 sidebar, 5.8:1 cards, 5.3:1 hover, 5.0:1 `--secondary-default`, 4.6:1 popovers | redesign |
+| `--accent-default` | `hsla(48, 30%, 90%, 1)` #EDEADE | | The ink accent's dark fill | css |
+| `--accent-hover` | `hsla(48, 30%, 95%, 1)` | | | css |
+| `--accent-active` | `hsla(48, 30%, 99%, 1)` | | | css |
+| `--accent-foreground` | `hsla(48, 10%, 2%, 1)` | | | css |
+| `--accent-foreground-subtle` | `hsla(48, 10%, 5%, 1)` | | | css |
+| `--accent-foreground-muted` | `hsla(48, 10%, 10%, 1)` | | | css |
+| `--danger` | #F8767E | 0.72 | 6.6:1 page, 5.8:1 cards (the light red is 3.0:1 on ink) | redesign |
+| `--overlay` | `rgba(0, 0, 0, 0.5)` | | | redesign |
+
+Dark-only overrides on other groups: `--tint-resolved-fg` takes 52% of the green instead of 70% (1.5); `--avatar-bg-mix` 32% and `--avatar-fg-mix` 46% instead of 24% / 62% (1.6); the shadows (6); the accent swatches (1.3). `BrowserWindow.backgroundColor` in `apps/desktop/src/main/launch.ts` repeats `--background` for both themes.
+
+The handoff's dark values (`hsla(210, 5%, 8%)` and up, cool and two to three lightness points apart) are kept in the git history; they made the sidebar, page and cards one flat black with invisible borders.
 
 ### 1.3 Accents
 
@@ -98,21 +103,21 @@ Ink keeps the old grey states: `--hl-nav` is `--secondary-default`, its tint mix
 | Accent | Theme | Fill | Text on fill | Accent text | Text on fill | Fill vs page (info) | Accent text and ring on page | On selected nav | On soft tint | Body on selection |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Coral | Light | #CC4628 | #FFFFFF | #B4351F | 4.69 | 4.53 | 5.85 | 5.11 | 5.13 | 10.76 |
-| Coral | Dark | #FF8A73 | #2A0D06 | #FF9C87 | 7.88 | 8.02 | 9.10 | 6.98 | 7.51 | 9.53 |
+| Coral | Dark | #FF8A73 | #2A0D06 | #FF9C87 | 7.88 | 7.63 | 8.65 | 7.24 | 7.01 | 9.05 |
 | Near-black (ink) | Light | #1B180E | #F5F4F0 | #1B180E | 16.12 | 17.14 | 17.14 | 15.28 | 13.87 | 10.10 |
-| Near-black (ink) | Dark | #EDEADE | #060505 | #EDEADE | 16.89 | 15.30 | 15.30 | 12.11 | 12.97 | 10.30 |
+| Near-black (ink) | Dark | #EDEADE | #060505 | #EDEADE | 16.89 | 14.55 | 14.55 | 11.11 | 12.19 | 9.77 |
 | Marigold | Light | #F2A900 | #2B1E00 | #7F5200 | 8.11 | 1.94 | 6.52 | 6.00 | 6.05 | 13.12 |
-| Marigold | Dark | #F5B83A | #2B1E00 | #F5B83A | 9.16 | 10.36 | 10.36 | 7.63 | 8.30 | 8.79 |
+| Marigold | Dark | #F5B83A | #2B1E00 | #F5B83A | 9.16 | 9.86 | 9.86 | 7.93 | 7.74 | 8.29 |
 | Teal | Light | #0B7A75 | #FFFFFF | #096762 | 5.18 | 5.00 | 6.48 | 5.65 | 5.69 | 10.59 |
-| Teal | Dark | #45C2BB | #04201E | #5ED0CA | 7.87 | 8.51 | 9.97 | 7.54 | 8.12 | 9.32 |
+| Teal | Dark | #45C2BB | #04201E | #5ED0CA | 7.87 | 8.09 | 9.48 | 7.86 | 7.63 | 8.84 |
 | Midnight blue | Light | #2E1F64 | #FFFAEB | #2E1F64 | 13.45 | 13.56 | 13.56 | 11.05 | 11.03 | 9.30 |
-| Midnight blue | Dark | #B3A5EA | #1A1238 | #BDB0F0 | 7.99 | 8.33 | 9.34 | 7.15 | 7.65 | 9.37 |
+| Midnight blue | Dark | #B3A5EA | #1A1238 | #BDB0F0 | 7.99 | 7.92 | 8.88 | 7.33 | 7.14 | 8.94 |
 | Dark emerald | Light | #00674F | #FFFAEB | #00674F | 6.59 | 6.64 | 6.64 | 5.69 | 5.73 | 9.96 |
-| Dark emerald | Dark | #4FC4A1 | #04261B | #63D0AF | 7.50 | 8.56 | 9.81 | 7.42 | 8.00 | 9.36 |
+| Dark emerald | Dark | #4FC4A1 | #04261B | #63D0AF | 7.50 | 8.14 | 9.33 | 7.67 | 7.45 | 8.88 |
 | Claret | Light | #7F1734 | #FFFAEB | #7F1734 | 9.70 | 9.78 | 9.78 | 8.16 | 8.16 | 9.47 |
-| Claret | Dark | #F08BA0 | #3B0A18 | #F59DB0 | 7.17 | 7.82 | 9.07 | 6.98 | 7.51 | 9.57 |
+| Claret | Dark | #F08BA0 | #3B0A18 | #F59DB0 | 7.17 | 7.44 | 8.63 | 7.24 | 6.99 | 9.08 |
 | Cyan | Light | #008AB3 | #060505 | #006A8A | 5.12 | 3.84 | 5.92 | 5.27 | 5.27 | 11.22 |
-| Cyan | Dark | #5AC6EC | #04212E | #6CCFF2 | 8.50 | 9.42 | 10.40 | 7.77 | 8.39 | 9.02 |
+| Cyan | Dark | #5AC6EC | #04212E | #6CCFF2 | 8.50 | 8.96 | 9.89 | 8.01 | 7.79 | 8.52 |
 
 ### 1.4 Context tints (public / private / DM)
 
@@ -120,9 +125,9 @@ Always derived from the base palette so they follow dark mode. Formulas from the
 
 | Context | Background | Foreground | Light hex (bg / fg) | Dark hex (bg / fg) | Contrast light / dark |
 | --- | --- | --- | --- | --- | --- |
-| Public channel | `var(--secondary-default)` | `var(--foreground-subtle)` | #F1EEE4 / #605E52 | #27292B / #D1CFC7 | 5.65 / 9.36 |
-| Private channel | `color-mix(in oklch, var(--warning) 15%, var(--background))` | `color-mix(in oklch, var(--warning) 42%, var(--foreground-default))` | #F9EFDB / #6D5524 | #2E271A / #E9CD99 | 6.21 / 9.61 |
-| Direct message, group DM | `color-mix(in oklch, var(--info) 12%, var(--background))` | `color-mix(in oklch, var(--info) 55%, var(--foreground-default))` | #DFEEF6 / #1F5970 | #172125 / #7CB6D0 | 6.52 / 7.39 |
+| Public channel | `var(--secondary-default)` | `var(--foreground-subtle)` | #F1EEE4 / #605E52 | #302F2C / #C6C4BE | 5.62 / 7.68 |
+| Private channel | `color-mix(in oklch, var(--warning) 15%, var(--background))` | `color-mix(in oklch, var(--warning) 42%, var(--foreground-default))` | #F9EEDB / #6C5424 | #342C1C / #EACE9C | 6.24 / 9.07 |
+| Direct message, group DM | `color-mix(in oklch, var(--info) 12%, var(--background))` | `color-mix(in oklch, var(--info) 55%, var(--foreground-default))` | #DFEEF5 / #20596F | #1A262B / #7EB7D0 | 6.50 / 7.06 |
 
 Token names [proposed]: `--tint-public-bg/fg`, `--tint-private-bg/fg`, `--tint-dm-bg/fg`.
 
@@ -132,31 +137,33 @@ Used by: topic header context pill, New message To pill, Juno send-card pill. Ic
 
 | Token | Value | Source | Notes |
 | --- | --- | --- | --- |
-| `--danger` | #C41E3A | css | Unused in prototype. 5.66:1 on light bg |
+| `--danger` | #C41E3A light, #F8767E dark | css / redesign | Sign-in error line. 5.64:1 on paper, 6.59:1 on ink |
 | `--success` | #00674F | css | Resolved check icon in rows; Resolved status chip tint |
 | `--warning` | #E0A500 | css | Only ever mixed (private tint, audience guard). As text it is 2.13:1, never use raw |
 | `--info` | #008AB3 | css | Only mixed (DM tint). 3.85:1 as text |
-| Resolved chip | bg `color-mix(in oklch, var(--success) 12%, var(--background))`, fg `color-mix(in oklch, var(--success) 70%, var(--foreground-default))` | proto | Light #DDEAE4 / #165240 (7.34:1); dark #161E1B / #548E7A (4.48:1, borderline) |
-| Audience guard | bg `color-mix(in oklch, var(--warning) 14%, var(--surface-default))`, fg `color-mix(in oklch, var(--warning) 45%, var(--foreground-default))` | proto | |
+| Resolved chip | bg `color-mix(in oklch, var(--success) 12%, var(--background))`, fg `color-mix(in oklch, var(--success) 70%, var(--foreground-default))` light, `52%` dark | proto / redesign | Light #DCE9E4 / #165240 (7.27:1); dark #18231F / #7AA696 (5.94:1; 70% was 4.27:1 on the new palette) |
+| Audience guard | bg `color-mix(in oklch, var(--warning) 14%, var(--surface-default))`, fg `color-mix(in oklch, var(--warning) 45%, var(--foreground-default))` | proto | Light #F9EFDE / #725824 (5.88:1); dark #3C3426 / #E9CC96 (7.91:1) |
 | Notification decision chips | Now: `--hl` / `--hl-fg`. Digest: `--secondary-default` / `--foreground-subtle`. Silent: transparent / `--foreground-muted` (summary chips use `--surface-hover` instead of transparent) | proto | |
 | Mention tint (message that mentions you) | `--hl-soft` on the message row | proto | |
 | Traffic lights | #FF5F57, #FEBC2E, #28C840 | proto | Only for mock-ups; Electron draws real ones |
 | `--warm` | #E39A3B | friendly layer | Illustration fill only; never text, never a control |
-| `--warm-soft` | `color-mix(in oklch, var(--warm) 26%, var(--background))` light (#F8E2CA), `22%` dark (#3C2E1F) | friendly layer | The one flat layer inside every spot illustration |
-| `--toast-success` | `color-mix(in oklch, var(--success) 55%, var(--background))` light (6.1:1 on the ink toast), `80%` dark (7.2:1 on the paper toast) | friendly layer | The filled check in the resolve toast |
+| `--warm-soft` | `color-mix(in oklch, var(--warm) 26%, var(--background))` light (#F8E2CA), `22%` dark (#423221) | friendly layer | The one flat layer inside every spot illustration |
+| `--toast-success` | `color-mix(in oklch, var(--success) 55%, var(--background))` light (6.1:1 on the ink toast), `80%` dark (7.1:1 on the paper toast) | friendly layer | The filled check in the resolve toast |
 
 ### 1.6 Person colours (avatars)
 
 A person gets one brand hue; the tile derives two colours from it:
 
-- background: `color-mix(in oklch, <hue> 24%, var(--surface-default))`
-- foreground: `color-mix(in oklch, <hue> 62%, var(--foreground-default))`
+- background: `color-mix(in oklch, <hue> 24%, var(--surface-default))` light, `32%` dark
+- foreground: `color-mix(in oklch, <hue> 62%, var(--foreground-default))` light, `46%` dark
 
-Mention chips (friendly layer): background `color-mix(in oklch, <hue> 16%, var(--surface-default))`, foreground `color-mix(in oklch, <hue> 40%, var(--foreground-default))`, weight 600. Lowest measured contrast 5.7:1 (midnight, dark). Tokens `--person-chip-bg-mix: 16%`, `--person-chip-fg-mix: 40%` beside the avatar mix (`--avatar-bg-mix: 24%`, `--avatar-fg-mix: 62%`). The hue is also the default colour of a channel tile (`ChannelIcon`), hashed from the channel id until the user picks another; the user can pick any of the eight.
+Dark takes more of the hue in the tile and less in the initials: at 24% a dark hue (midnight, claret) barely tints ink, and at 62% it makes the initials a mid tone on a dark tile (midnight was 3.0:1).
+
+Mention chips (friendly layer): background `color-mix(in oklch, <hue> 16%, var(--surface-default))`, foreground `color-mix(in oklch, <hue> 40%, var(--foreground-default))`, weight 600, the same in both themes. Measured light / dark: cyan 7.8 / 7.0, claret 9.8 / 5.8, midnight 10.5 / 5.3, dark emerald 9.0 / 6.3, plum 6.3 / 7.9, rose 7.1 / 7.4, emerald 6.3 / 7.9, jordy 6.1 / 8.0; lowest 5.3:1 (midnight, dark). Tokens `--person-chip-bg-mix: 16%`, `--person-chip-fg-mix: 40%` beside the avatar mix (`--avatar-bg-mix: 24%` / `32%` dark, `--avatar-fg-mix: 62%` / `46%` dark). The hue is also the default colour of a channel tile (`ChannelIcon`), hashed from the channel id until the user picks another; the user can pick any of the eight.
 
 Hues from the brand palette [proto]: #008AB3 cyan, #7F1734 claret, #2E1F64 midnight, #00674F dark emerald, #E89EB8 plum, #A49496 rose quartz (also bots), #50C878 emerald, #92C2F9 jordy blue.
 
-Measured examples: midnight #C3C3D8 / #28224D (8.5:1), claret #E2C3C6 / #5D1F2C (7.6:1), emerald #D5F0DA / #3F8454 (3.7:1). Initials are 7.5–14px; light hues (emerald, jordy, plum, yellow) fall under 4.5:1. Acceptable for decorative initials, but do not use the derived foreground for text. [proposed] Assign hues deterministically from a hash of the user id, and skip `--lb-yellow`.
+Measured, light: midnight #C3C2D9 / #28214D (8.5:1), claret #E3C3C6 / #5D1F2C (7.6:1), emerald #D5F0DA / #3F8454 (3.7:1); the light hues (emerald, jordy, plum) fall under 4.5:1 on paper. Dark, with the dark mixes: every hue is 4.5:1 or better (midnight #26243A / #8C89B1 4.5, claret 4.8, cyan 5.3, dark emerald 5.1, plum 5.5, rose 5.4, emerald 5.5, jordy 5.5). Initials are 7.5–14px; acceptable for decorative initials, but do not use the derived foreground for text. [proposed] Assign hues deterministically from a hash of the user id, and skip `--lb-yellow`.
 
 ### 1.7 Muted grey contrast (light mode)
 
@@ -174,7 +181,7 @@ Measured examples: midnight #C3C3D8 / #28224D (8.5:1), claret #E2C3C6 / #5D1F2C 
 
 Rule that follows: muted text may sit on `--background`, `--background-subtle`, `--surface-default` and `--surface-hover`. On `--secondary-*` surfaces use `--foreground-subtle` (the prototype already does this for unread count tags, status chips and pills). The read-count tag (muted on `--secondary-default`, 4.39:1) is the one exception; [proposed] use `--foreground-subtle` there too.
 
-Dark mode muted (#8F8D8A) is 5.57:1 on the background and 4.43:1 on `--secondary-default`; same rule applies.
+Dark mode muted (#A09E9A) is 6.56:1 on the page, 5.8:1 on cards, 4.57:1 on popovers and 5.01:1 on `--secondary-default`, so in dark the rule is not needed, but keep to it so the two themes share one set of pairings.
 
 ### 1.8 Focus ring
 

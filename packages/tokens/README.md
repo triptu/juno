@@ -49,7 +49,8 @@ Apps call `applyTheme(theme, accent)` from `@juno/ui` (re-exported by `@juno/vie
 ## Rules the tokens encode
 
 - Never `cursor: pointer`. `global.css` sets the arrow cursor on the body and the text cursor on text inputs and textareas; checkboxes, radios and ranges keep the arrow.
-- The muted grey is `hsla(48, 5%, 42%)`, darker than the handoff, so meta text reaches 4.5:1 on paper. Muted text may sit on `--background`, `--background-subtle`, `--surface-default` and `--surface-hover`; on `--secondary-*` fills use `--foreground-subtle`.
+- The muted grey is `hsla(48, 5%, 42%)`, darker than the handoff, so meta text reaches 4.5:1 on paper. Muted text may sit on `--background`, `--background-subtle`, `--surface-default`, `--surface-hover` and `--surface-raised`; on `--secondary-*` fills use `--foreground-subtle`.
+- Dark is a warm-neutral near-black with three layers (sidebar below the page, cards above it, popovers and the hover toolbar on `--surface-raised` above that), not the handoff's cool flat grey. `docs/design/tokens.md` 1.2 has the values and the measured pairs; `docs/design/dark-theme/` the before and after.
 - `--focus-ring` is the accent's text colour (4.5:1 or better on the page for every accent; ink keeps the info blue), never the pale selection colour. `--selection-background` is the accent at 28% over the page and is for text selection only.
 - The cyan accent takes near-black `--hl-fg`; its off-white text would be 3.8:1. Unread counts never take the accent.
 - Floating surfaces use `--pop-shadow` or `--card-ring` with a transparent 1px border, never a coloured border. Inputs keep `--input-border`.

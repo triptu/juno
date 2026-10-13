@@ -4,7 +4,7 @@ Direction for making Juno feel playful and friendly without giving up what makes
 
 Where this document and `tokens.md`, `primitives.md` or `inventory.md` disagree, this document wins; section 9 lists the edits to apply to `tokens.md` so they stop disagreeing. `docs/design/handoff/SPEC.md` still decides behaviour.
 
-The before/after mock is `docs/design/friendly-layer/mock.html` (renders: `mock-light.png`, `mock-dark.png`). Serve the repo root over HTTP to open it; the fonts load from `packages/tokens/node_modules`.
+The before/after mock is `docs/design/friendly-layer/mock.html` (renders: `mock-light.png`, `mock-dark.png`). Serve the repo root over HTTP to open it; the fonts load from `packages/tokens/node_modules`. The mock follows the tokens for the font (Figtree) and the dark palette (`tokens.md` 1.2), but keeps the friendly-layer radii and the ink accent so the two columns stay a fair before and after; the later options review (`options.html`: C1 + D1, Coral and the rounder shapes) is implemented in the app, not in this mock.
 
 ## Status
 
@@ -18,7 +18,7 @@ Implemented in `packages/tokens`, `packages/ui`, `packages/views` and the galler
 - §7 Copy: the sign-in, session, empty-state, toast and engine-status copy is in the views and fixtures. The engine-status container strings in `apps/desktop` still read "Engine …" until that container is reworked.
 - Beyond this document: SPEC §5 now says person avatars are Slack profile photos and channels get a client-only icon and colour. `Avatar` takes `src` with a no-shift fade; `ChannelIcon` draws a chosen icon or the first letter on a chosen hue, with `defaultChannelLook(id)` for the untouched case; `channelIcons` and `channelColorNames` are the picker's data and `ChannelIconPicker` in `@juno/views` is the (unwired) picker.
 
-Open: the four questions in §10, plus whether an untouched channel should show its first letter (as built) or a hash icon.
+Open: the four questions in §10, plus whether an untouched channel should show its first letter (as built) or a hash icon. Decided since, from `options.html`: Figtree (C1), Coral as the default accent with the accent a user setting, and the D1 rounder shapes; and the dark palette was redesigned (`docs/design/dark-theme/`). `tokens.md` carries the values.
 
 ## 1. What friendly means here
 

@@ -11,29 +11,35 @@
  * and the app can switch back to it.
  */
 import * as stylex from '@stylexjs/stylex'
-import { accent, accentSwatches, colors, shadows } from './tokens.stylex'
+import { accent, accentSwatches, colors, hues, shadows, tints } from './tokens.stylex'
 
 export const darkColors = stylex.createTheme(colors, {
-  '--background': 'hsla(210, 5%, 8%, 1)',
-  '--background-subtle': 'hsla(210, 5%, 9%, 1)',
-  '--surface-default': 'hsla(210, 5%, 11%, 1)',
-  '--surface-hover': 'hsla(210, 5%, 13%, 1)',
-  '--surface-active': 'hsla(210, 5%, 15%, 1)',
-  '--surface-raised': 'hsla(210, 5%, 18%, 1)',
+  // A warm-neutral near-black (OKLCH hue 85, chroma 0.006), so dark is the
+  // same paper seen at night rather than a cool system grey. Three clear
+  // layers: the sidebar sits lowest (L 0.19), the page above it (0.215), and
+  // cards, inputs and the composer on top (0.26); popovers go one step
+  // higher again (0.33). Borders are two steps above what they sit on so
+  // they still separate. Values and contrast: docs/design/tokens.md 1.2.
+  '--background': '#1B1916',
+  '--background-subtle': '#151411',
+  '--surface-default': '#252421',
+  '--surface-hover': '#2D2B28',
+  '--surface-active': '#32302D',
+  '--surface-raised': '#373532',
 
-  '--secondary-default': 'hsla(210, 5%, 16%, 1)',
-  '--secondary-hover': 'hsla(210, 5%, 18%, 1)',
-  '--secondary-active': 'hsla(210, 5%, 20%, 1)',
+  '--secondary-default': '#302F2C',
+  '--secondary-hover': '#383633',
+  '--secondary-active': '#403E3B',
 
-  '--border-subtle': 'hsla(210, 5%, 12%, 1)',
-  '--border-default': 'hsla(210, 5%, 15%, 1)',
-  '--border-strong': 'hsla(210, 5%, 16%, 1)',
-  '--border-strongest': 'hsla(210, 5%, 21%, 1)',
-  '--input-border': 'hsla(210, 5%, 24%, 1)',
+  '--border-subtle': '#2B2A27',
+  '--border-default': '#32302D',
+  '--border-strong': '#3C3A37',
+  '--border-strongest': '#4C4A47',
+  '--input-border': '#464541',
 
-  '--foreground-default': 'hsla(45, 30%, 90%, 1)',
-  '--foreground-subtle': 'hsla(45, 10%, 80%, 1)',
-  '--foreground-muted': 'hsla(45, 2%, 55%, 1)',
+  '--foreground-default': '#EEEBE2',
+  '--foreground-subtle': '#C6C4BE',
+  '--foreground-muted': '#A09E9A',
 
   '--accent-default': 'hsla(48, 30%, 90%, 1)',
   '--accent-hover': 'hsla(48, 30%, 95%, 1)',
@@ -42,7 +48,10 @@ export const darkColors = stylex.createTheme(colors, {
   '--accent-foreground-subtle': 'hsla(48, 10%, 5%, 1)',
   '--accent-foreground-muted': 'hsla(48, 10%, 10%, 1)',
 
-  '--overlay': 'rgba(0, 0, 0, 0.45)',
+  '--overlay': 'rgba(0, 0, 0, 0.5)',
+
+  // The light danger red is 3.0:1 on ink; this one is 6.6:1.
+  '--danger': '#F8767E',
 
   '--warm-soft': 'color-mix(in oklch, #E39A3B 22%, var(--background))',
   // The dark toast is paper on ink, so the check takes more of the green.
@@ -78,8 +87,26 @@ export const darkAccentSwatches = stylex.createTheme(accentSwatches, {
   '--swatch-cyan-fg': '#04212E',
 })
 
+/**
+ * The resolved chip's text: 70% of the green over the light text is 4.3:1 on
+ * its tint in dark, so dark takes less of it. The other tints pass as mixed.
+ */
+export const darkTints = stylex.createTheme(tints, {
+  '--tint-resolved-fg': `color-mix(in oklch, ${colors['--success']} 52%, ${colors['--foreground-default']})`,
+})
+
+/**
+ * Tiles and initials on ink. A dark hue (midnight, claret) at 24% barely
+ * tints a dark surface, so the tile takes more of it; and 62% of that hue
+ * over the light text is a mid tone, so the initials take less.
+ */
+export const darkHues = stylex.createTheme(hues, {
+  '--avatar-bg-mix': '32%',
+  '--avatar-fg-mix': '46%',
+})
+
 /** Everything that changes in dark mode. Spread into stylex.props(). */
-export const dark = [darkColors, darkShadows, darkAccentSwatches] as const
+export const dark = [darkColors, darkShadows, darkAccentSwatches, darkTints, darkHues] as const
 
 /*
  * Accent themes. Each sets the fill, the text on it, the accent text, and

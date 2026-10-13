@@ -5,8 +5,8 @@
 <title>Juno · friendly layer · before and after</title>
 <style>
 /* Fonts: the bundled files from the workspace (served over HTTP from the repo root). */
-@font-face { font-family: 'Inter Variable'; font-style: normal; font-weight: 100 900; font-display: block;
-  src: url('../../../packages/tokens/node_modules/@fontsource-variable/inter/files/inter-latin-wght-normal.woff2') format('woff2-variations'); }
+@font-face { font-family: 'Figtree Variable'; font-style: normal; font-weight: 300 900; font-display: block;
+  src: url('../../../packages/tokens/node_modules/@fontsource-variable/figtree/files/figtree-latin-wght-normal.woff2') format('woff2-variations'); }
 @font-face { font-family: 'Instrument Serif'; font-style: normal; font-weight: 400; font-display: block;
   src: url('../../../packages/tokens/node_modules/@fontsource/instrument-serif/files/instrument-serif-latin-400-normal.woff2') format('woff2'); }
 @font-face { font-family: 'JetBrains Mono'; font-style: normal; font-weight: 400; font-display: block;
@@ -49,34 +49,36 @@
   --card-ring: 0 0 0 1px oklch(0 0 0 / .06), 0 1px 2px -1px oklch(0 0 0 / .06), 0 2px 4px 0 oklch(0 0 0 / .04);
   --pop-shadow: 0 0 0 1px oklch(0 0 0 / .06), 0 1px 2px -1px oklch(0 0 0 / .08), 0 10px 28px -6px oklch(0 0 0 / .14);
   --sheet: #EFEDE6;
-  --font-sans: 'Inter Variable', Inter, system-ui, sans-serif;
+  --font-sans: 'Figtree Variable', system-ui, sans-serif;
   --font-serif: 'Instrument Serif', Georgia, serif;
   --font-mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;
   /* person-hue mix strengths (friendly layer) */
   --person-bg-mix: 24%; --person-fg-mix: 62%;
 }
 html[data-theme="dark"] {
-  --background: hsla(210, 5%, 8%, 1);
-  --background-subtle: hsla(210, 5%, 9%, 1);
-  --surface-default: hsla(210, 5%, 11%, 1);
-  --surface-hover: hsla(210, 5%, 13%, 1);
-  --secondary-default: hsla(210, 5%, 16%, 1);
-  --secondary-hover: hsla(210, 5%, 18%, 1);
-  --secondary-active: hsla(210, 5%, 20%, 1);
-  --border-subtle: hsla(210, 5%, 12%, 1);
-  --border-default: hsla(210, 5%, 15%, 1);
-  --border-strong: hsla(210, 5%, 16%, 1);
-  --border-strongest: hsla(210, 5%, 21%, 1);
-  --input-border: hsla(210, 5%, 24%, 1);
-  --foreground-default: hsla(45, 30%, 90%, 1);
-  --foreground-subtle: hsla(45, 10%, 80%, 1);
-  --foreground-muted: hsla(45, 2%, 55%, 1);
+  --background: #1B1916;
+  --background-subtle: #151411;
+  --surface-default: #252421;
+  --surface-hover: #2D2B28;
+  --secondary-default: #302F2C;
+  --secondary-hover: #383633;
+  --secondary-active: #403E3B;
+  --border-subtle: #2B2A27;
+  --border-default: #32302D;
+  --border-strong: #3C3A37;
+  --border-strongest: #4C4A47;
+  --input-border: #464541;
+  --foreground-default: #EEEBE2;
+  --foreground-subtle: #C6C4BE;
+  --foreground-muted: #A09E9A;
   --accent-default: hsla(48, 30%, 90%, 1);
   --accent-foreground: hsla(48, 10%, 2%, 1);
   --shadow-sm: 0 1px 2px 0 rgba(0,0,0,.30);
   --shadow-lg: 0 8px 24px 0 rgba(0,0,0,.50);
-  --card-ring: 0 0 0 1px oklch(1 0 0 / .08);
-  --pop-shadow: 0 0 0 1px oklch(1 0 0 / .1), 0 8px 24px oklch(0 0 0 / .5);
+  --card-ring: 0 1px 2px 0 oklch(0 0 0 / .3), 0 6px 20px -4px oklch(0 0 0 / .35);
+  --pop-shadow: 0 2px 6px -1px oklch(0 0 0 / .3), 0 14px 36px -8px oklch(0 0 0 / .5);
+  /* tiles take more of a dark hue on ink, initials less (tokens 1.6) */
+  --person-bg-mix: 32%; --person-fg-mix: 46%;
   --sheet: #0B0C0D;
 }
 
@@ -629,8 +631,8 @@ html[data-theme="dark"] .legend span { box-shadow: 0 0 0 1px oklch(1 0 0 / .12);
   const hues = { cyan: '#008AB3', claret: '#7F1734', midnight: '#2E1F64', 'emerald-dark': '#00674F', plum: '#E89EB8', rose: '#A49496', emerald: '#50C878', jordy: '#92C2F9' }
   for (const el of document.querySelectorAll('[data-hue]')) {
     const h = hues[el.dataset.hue]
-    el.style.background = `color-mix(in oklch, ${h} 24%, var(--surface-default))`
-    el.style.color = `color-mix(in oklch, ${h} 62%, var(--foreground-default))`
+    el.style.background = `color-mix(in oklch, ${h} var(--person-bg-mix), var(--surface-default))`
+    el.style.color = `color-mix(in oklch, ${h} var(--person-fg-mix), var(--foreground-default))`
   }
   const q = new URLSearchParams(location.search)
   if (q.get('theme') === 'dark') document.documentElement.dataset.theme = 'dark'

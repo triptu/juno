@@ -26,7 +26,7 @@ const DEFAULTS: Launch = { theme: 'light' }
  * packages/tokens/src/tokens.stylex.ts and themes.stylex.ts. Main cannot
  * import StyleX files, so the two values are repeated here; keep them in sync.
  */
-export const BACKGROUND = { light: '#fdfcf8', dark: '#131415' } as const
+export const BACKGROUND = { light: '#fdfcf8', dark: '#1b1916' } as const
 
 const decode = Schema.decodeUnknownSync(Launch)
 const encode = Schema.encodeSync(Launch)

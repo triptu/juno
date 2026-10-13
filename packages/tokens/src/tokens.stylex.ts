@@ -22,7 +22,7 @@ const REDUCED_MOTION = '@media (prefers-reduced-motion: reduce)'
 /* Colour                                                                     */
 /* -------------------------------------------------------------------------- */
 
-/** Base palette. Warm paper in light, cool near-black in dark. */
+/** Base palette. Warm paper in light; themes.stylex.ts has the warm near-black for dark. */
 export const colors = stylex.defineVars({
   // Backgrounds and surfaces.
   '--background': 'hsla(48, 50%, 98%, 1)',
