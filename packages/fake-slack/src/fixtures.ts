@@ -106,17 +106,19 @@ export const CONVERSATIONS: ReadonlyArray<SeedConversation> = [
           { from: 'U0DEV', text: 'Booked 2–4pm. Will post results here.', ago: 4 },
         ],
       },
-      // Flaky checkout spec, not followed
+      // Flaky checkout spec: active, not followed, and the last reply mentions self. Slack never told Juno
+      // about it (no subscription), so at first sign-in it starts read and stays out of the sidebar.
       {
         from: 'U0DEV',
         text: 'checkout.spec failed again on main. Third time today.',
         ago: 229,
-        thread: { subscribed: false },
+        thread: { subscribed: false, unread: 1 },
         replies: [
           { from: 'U0SAM', text: 'Quarantining it. Ticket filed.', ago: 221 },
           { from: 'U0DEV', text: 'Looks like a race in the payment iframe load.', ago: 200 },
           { from: 'U0SAM', text: 'Can you add a wait on the frame ready event?', ago: 191 },
           { from: 'U0DEV', text: 'On it.', ago: 190 },
+          { from: 'U0SAM', text: '<@U0TUSHAR> can we live with the quarantine until Friday?', ago: 185 },
         ],
       },
       // Kafka consumer lag, old
@@ -168,10 +170,12 @@ export const CONVERSATIONS: ReadonlyArray<SeedConversation> = [
     members: HUMANS,
     topic: 'Platform and infra',
     messages: [
+      // An active thread self never took part in: a topic, but not a sidebar row until self follows it.
       {
         from: 'U0JONAS',
         text: "We have 142 flags. 61 haven't changed in 90 days.",
         ago: 1730,
+        thread: { subscribed: false },
         replies: [
           { from: 'U0LEO', text: "Let's delete anything fully rolled out. I'll script the PRs.", ago: 1715 },
           { from: 'U0JONAS', text: 'Ship it.', ago: 1700 },
@@ -327,15 +331,17 @@ export const CONVERSATIONS: ReadonlyArray<SeedConversation> = [
     name: 'leadership',
     kind: 'private',
     members: ['U0TUSHAR', 'U0MAYA', 'U0SAM'],
+    // No message in Main for 9 days, but a followed thread with replies this week: the thread is a
+    // sidebar row, and the channel's Main stays visible because of it.
     messages: [
       {
         from: 'U0MAYA',
         text: 'Finance wants the 2027 plan by the 20th.',
-        ago: 3030,
+        ago: 9 * DAY + 30,
         thread: { unread: 1 },
         replies: [
-          { from: 'U0SAM', text: 'Eng ask is six: four backend, one SRE, one EM.', ago: 3015 },
-          { from: 'U0MAYA', text: '<@U0TUSHAR> can you own the narrative for the SRE role?', ago: 3000 },
+          { from: 'U0SAM', text: 'Eng ask is six: four backend, one SRE, one EM.', ago: 9 * DAY + 15 },
+          { from: 'U0MAYA', text: '<@U0TUSHAR> can you own the narrative for the SRE role?', ago: 2 * DAY },
         ],
       },
       { from: 'U0MAYA', text: 'Retro notes are in the doc.', ago: 18 * DAY + 80 },
