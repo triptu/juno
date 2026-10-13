@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-14 02:42 · Tushar · Add a "feel pass": recorded, slowed-down interaction filmstrips with automated stability checks, plus a feel reviewer at each UI milestone, so the app feels as stable as a native one (no shift, jank, flicker, or jumpy scroll).
 - 10-14 02:31 · Tushar · Juno Agent: T3 sessions run with full access in a new worktree; backup goes to a local folder he chooses (path is a setting); bubble colour decided after a mock; T3 over a network address needs a switch, off by default.
 - 10-14 02:20 · Tushar · Juno Agent defaults: Sonnet 5.5 for chat, Haiku 5.5 for compaction, $2/day; a Settings picker for the chat model across the latest Sonnet, Opus, Muse, Sol and Grok models. MCP: Littlebird at mcp.littlebird.ai (OAuth) and T3 Code's local MCP (no auth).
 - 10-14 02:04 · Tushar · Living home: layout A (centred scene, greeting, up to three smart items, Ask Juno field, all-caught-up state), with the eight mascot scenes in docs/design/home/.
