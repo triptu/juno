@@ -6,6 +6,20 @@ Where this document and `tokens.md`, `primitives.md` or `inventory.md` disagree,
 
 The before/after mock is `docs/design/friendly-layer/mock.html` (renders: `mock-light.png`, `mock-dark.png`). Serve the repo root over HTTP to open it; the fonts load from `packages/tokens/node_modules`.
 
+## Status
+
+Implemented in `packages/tokens`, `packages/ui`, `packages/views` and the gallery:
+
+- §2 Icons: Phosphor replaces Lucide everywhere; `Icon` has `weight` and `active`; `Button`, `IconButton`, `NavItem`, `Chip`, `ContextPill`, `Tab`, `Card` and `TextField` take Phosphor icons at the sizes in §2.2. `IconButton` toggles and `NavItem` fill when active with the spring; tabs stay regular. Bundle: initial JS 426 → 435 KB, CSS 69 → 75 KB.
+- §3 Shape: `--radius-tag`, `--radius-pill`, `--radius-toast`; `--radius-xl` 12, `--radius-2xl` 14; nav and filter buttons on `--radius-lg`.
+- §4 Colour: `person` Chip variant with the 16% / 40% mix (`--person-chip-bg-mix`, `--person-chip-fg-mix`), `--warm`, `--warm-soft`, `--toast-success`. Reactions keep no hue; the pressed count turns `--foreground-default`.
+- §5 Motion: every token in the table plus `--stagger`, `--appear-scale`, `--rise-toast` and `--rise-stagger`, all collapsing under reduced motion. Toggle fill, reaction `pop`, toast rise, popover appear and the staggered empty state are in the primitives; resolve row removal and the catch-up card wait for those features.
+- §6 Illustrations: the five drawings as `Illustration`, `EmptyState` takes `illustration`, and `Logo` draws the laptop-two mark.
+- §7 Copy: the sign-in, session, empty-state, toast and engine-status copy is in the views and fixtures. The engine-status container strings in `apps/desktop` still read "Engine …" until that container is reworked.
+- Beyond this document: SPEC §5 now says person avatars are Slack profile photos and channels get a client-only icon and colour. `Avatar` takes `src` with a no-shift fade; `ChannelIcon` draws a chosen icon or the first letter on a chosen hue, with `defaultChannelLook(id)` for the untouched case; `channelIcons` and `channelColorNames` are the picker's data and `ChannelIconPicker` in `@juno/views` is the (unwired) picker.
+
+Open: the four questions in §10, plus whether an untouched channel should show its first letter (as built) or a hash icon.
+
 ## 1. What friendly means here
 
 - Rounded, not boxy. Small labels are pills; containers get one step more radius.
