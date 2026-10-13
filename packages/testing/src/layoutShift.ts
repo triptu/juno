@@ -11,9 +11,9 @@ import type { Page } from '@playwright/test'
  * 1. A `PerformanceObserver` for `layout-shift` entries, started just before
  *    the action (nothing buffered from earlier). Entries with
  *    `hadRecentInput` are kept: Chromium sets that flag on every shift within
- *    500 ms of an input event, which is exactly when a hover or a press
- *    moves something, so the usual "ignore recent input" filter would hide
- *    the bugs this guard exists for.
+ *    500 ms of a keypress or pointer press. Hovering alone need not set it.
+ *    The usual "ignore recent input" filter would hide shifts caused by
+ *    pressing a control.
  * 2. A geometry fallback. The layout box of every HTML element under the root
  *    is taken before and after, relative to the root, and any element that
  *    moved or resized is reported. The boxes come from `offsetLeft`,

@@ -6,6 +6,7 @@
 import type { Fixture, FixtureFrame, FixtureSet } from '@juno/ui'
 import { fixtures as ui } from '@juno/ui/fixtures'
 import { fixtures as views } from '@juno/views/fixtures'
+import { testFixtures } from './testFixtures'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type AnyFixtureSet = FixtureSet<any>
@@ -43,7 +44,10 @@ export interface ComponentEntry {
   readonly states: ReadonlyArray<StateEntry>
 }
 
-const sets: Readonly<Record<string, AnyFixtureSet>> = { ...ui, ...views }
+/** `/?test-fixtures#/...` adds the fixtures of the gallery's own tests (testFixtures.tsx). */
+const withTestFixtures = new URLSearchParams(window.location.search).has('test-fixtures')
+
+const sets: Readonly<Record<string, AnyFixtureSet>> = { ...ui, ...views, ...(withTestFixtures ? testFixtures : {}) }
 
 /** Every component, sorted by name. */
 export const components: ReadonlyArray<ComponentEntry> = Object.keys(sets)

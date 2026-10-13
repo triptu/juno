@@ -189,8 +189,14 @@ test.describe('the guard itself', () => {
     await page.setContent(
       frame('.b{display:block;width:100px;height:30px;font:12px sans-serif}.b:hover{height:60px}p{margin:0}', '<button class="b">Hover me</button><p>Below</p>'),
     )
+    // Paint the initial layout before asking the browser to score a shift.
+    await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))))
     const box = (await page.locator('.b').boundingBox())!
-    const error = await expectNoLayoutShift(page, () => page.mouse.move(box.x + 10, box.y + 10)).then(
+    const error = await expectNoLayoutShift(page, async () => {
+      // A keypress sets hadRecentInput; hovering alone does not.
+      await page.keyboard.press('a')
+      await page.mouse.move(box.x + 10, box.y + 10)
+    }).then(
       () => null,
       (reason: Error) => reason,
     )

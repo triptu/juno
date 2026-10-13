@@ -1,6 +1,7 @@
 import { defineConfig } from '@playwright/test'
 
-const port = 4174
+// GALLERY_PORT lets two worktrees run the tests at the same time.
+const port = Number(process.env.GALLERY_PORT ?? 4174)
 
 /**
  * Two projects against the built gallery. `shots` screenshots every state
