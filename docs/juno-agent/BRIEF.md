@@ -31,3 +31,11 @@ Related existing material: `docs/design/handoff/SPEC.md` sections 12 (For you), 
 ## Model defaults (owner, 10-14 02:20)
 
 Pick sensible defaults (chat: Sonnet 5.5; compaction: Haiku 5.5; spend cap: $2/day). Settings must let the owner change the chat model across the latest models of Claude Sonnet, Claude Opus, Muse, GPT Sol and Grok (resolved from the provider catalogue at runtime), plus the compaction model and the spend cap. The model can never change these.
+
+## Owner decisions on plan v3 (10-14 02:31)
+
+- T3 Code sessions started by Juno run with full access, each in a new worktree.
+- Backup: a local folder on disk that the owner chooses (he may point it at a synced drive later). Default to a folder under the app's data directory and make the path a setting.
+- Owner bubble colour: decide after a mock of coral and neutral in both themes.
+- Using T3 Code over a network (non-loopback) address needs a Settings switch, off by default.
+- Sign in with ChatGPT: not planned for now (Codex local and OpenRouter cover it).
