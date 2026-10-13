@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-13 21:42 · Tushar · Topic art: constrained-vocabulary drawing on Gemini 3.8 Flash. Everything is a topic, so channel Main rows also get AI art (no separate generative channel marks). Next round: explain the vocabulary, compare more creative freedom, try no container (current tile is too rounded), and mute the colours, especially in dark mode.
 - 10-13 20:27 · Orchestrator · Heavy jobs (tests, e2e, gallery, shots, spec checks) run through a machine-wide queue, `scripts/heavy.mjs`, one at a time by default; vitest capped at 2 workers and the gallery at 3. The machine hit a load average of 175 when several agents tested at once.
 - 10-13 18:51 · Orchestrator · Quint specs for follow state and read state merged (`specs/`). Simulator mode: 10,000 runs per protocol converge; seven past-bug schedules produce counterexamples. The sync fix must guard fetches by generation and observation time, page fully and probe absent follows, keep newer observations while a change is pending, and refresh after a final outbox failure.
 - 10-13 18:14 · Tushar · Model routing: Codex for well-defined code and maths-like work (it starts the Quint specs), never UI or tests coupled to implementation; Fable for design; Opus for correctness work and reviews. When limits hit, wait for resets rather than giving design to Codex.
