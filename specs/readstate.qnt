@@ -9,7 +9,7 @@
 // with Slack. Marks on the same target are serialized; queued coalescing and
 // changing channel/group watermarks are outside this model.
 module readstate {
-  import mirror(followMode = false, initial = 2, mirrored = Set(1, 2)).* from "./mirror"
+  import mirror(followMode = false, initial = 2, mirrored = Set(1, 2), topics = Set(1, 2, 3), eventLimit = 8, fetchLimit = 2).* from "./mirror"
 
   var stealthBefore: Set[int]
   var stealthReads: int -> int
