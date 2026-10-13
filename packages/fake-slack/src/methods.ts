@@ -103,7 +103,7 @@ export const handlers: Handlers = {
       ims,
       is_open: records.filter((c) => c.isOpen && (c.kind === 'im' || c.kind === 'mpim')).map((c) => c.id),
       starred: [],
-      subteams: { self: [] },
+      subteams: { self: ws.selfUsergroups },
       read_only_channels: [],
       thread_only_channels: [],
       has_more_mpdms: false,
@@ -398,10 +398,10 @@ export const handlers: Handlers = {
           ...(user?.name === undefined ? {} : { username: user.name }),
           ts: full.ts,
           text: full.text ?? '',
+          // The thread is in the permalink only, and a match has no blocks, files or reactions: a client must not
+          // take a match for the whole message (review M3 finding 3).
           permalink: `${ctx.baseUrl}${permalinkPath(conversation.id, full.ts, full.thread_ts)}`,
-          ...(full.thread_ts === undefined ? {} : { thread_ts: full.thread_ts }),
           ...(full.reply_count === undefined ? {} : { reply_count: full.reply_count }),
-          ...(full.blocks === undefined ? {} : { blocks: full.blocks }),
         })
       }
     }

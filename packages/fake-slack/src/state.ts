@@ -87,10 +87,13 @@ export class Workspace {
   readonly subscriptions = new Map<string, Subscription>()
   readonly files = new Map<string, StoredFile>()
   prefs: UserPrefs = {}
+  /** The user groups self belongs to, as `client.userBoot.subteams.self` lists them. */
+  selfUsergroups: Array<string> = []
   readonly clock: Clock
   readonly selfId: string
   readonly team: Team
   #lastTs: Ts = NEVER_READ
+  readonly #backdated = new Set<string>()
   #sequence = 0
   #listeners = new Set<(frame: RtmFrame) => void>()
 
@@ -116,6 +119,15 @@ export class Workspace {
   /** A ts for `at` (default now), always greater than the last one issued. */
   nextTs(at?: number): Ts {
     let ts = millisToTs(at ?? this.clock.now(), this.#sequence++ % 1000)
+    // A post well in the past (a test setting up an old thread after the seed ran) keeps its time; it only has to be unique.
+    if (at !== undefined && at < Number(this.#lastTs.split('.')[0]) * 1000 - 1000) {
+      while (this.#backdated.has(ts)) {
+        const [seconds, fraction] = ts.split('.') as [string, string]
+        ts = Ts.make(`${seconds}.${String(Number(fraction) + 1).padStart(6, '0')}`)
+      }
+      this.#backdated.add(ts)
+      return ts
+    }
     if (compareTs(ts, this.#lastTs) <= 0) {
       const [seconds, fraction] = this.#lastTs.split('.') as [string, string]
       ts = Ts.make(`${seconds}.${String(Number(fraction) + 1).padStart(6, '0')}`)

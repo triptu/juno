@@ -159,11 +159,12 @@ describe('every fixture response decodes with @juno/slack schemas', () => {
     expect(history.messages).toHaveLength(0)
   })
 
-  it('search finds thread messages and marks carry channel and thread_ts', async () => {
+  it('search finds thread messages; a reply names its thread only in the permalink, and no match carries blocks or files', async () => {
     const result = await client.ok('search.modules.messages', { module: 'messages', query: 'is:thread', count: 100, extracts: 1, highlight: 1 })
     const matches = searchMatches(result)
     expect(matches.length).toBeGreaterThan(10)
-    expect(matches.every((m) => m.thread_ts !== undefined)).toBe(true)
+    expect(matches.every((m) => m.thread_ts === undefined && m.blocks === undefined && m.files === undefined)).toBe(true)
+    expect(matches.every((m) => (m.reply_count ?? 0) > 0 || m.permalink?.includes('?thread_ts=') === true)).toBe(true)
     expect(matches.every((m) => typeof m.channel === 'object' && m.channel.id.length > 0)).toBe(true)
     const words = await client.ok('search.modules.messages', { module: 'messages', query: 'rollback in:#eng', count: 20 })
     expect(searchMatches(words).length).toBeGreaterThanOrEqual(2)

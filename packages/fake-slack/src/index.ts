@@ -150,6 +150,21 @@ export class FakeSlack {
     return this.workspace.markThread(input.channel, asTs(input.threadTs), asTs(input.ts), input.read ?? true)
   }
 
+  /** Self follows a thread from another client. Emits `thread_subscribed`. */
+  followThread(input: { channel: string; threadTs: string }): Subscription {
+    return this.workspace.subscribe(input.channel, asTs(input.threadTs))
+  }
+
+  /** Self unfollows a thread from another client. Emits `thread_unsubscribed`. */
+  unfollowThread(input: { channel: string; threadTs: string }): Subscription {
+    return this.workspace.unsubscribe(input.channel, asTs(input.threadTs))
+  }
+
+  /** The user groups self belongs to (`client.userBoot.subteams.self`). */
+  setSelfUsergroups(input: { ids: ReadonlyArray<string> }): void {
+    this.workspace.selfUsergroups = [...input.ids]
+  }
+
   addReaction(input: { channel: string; ts: string; name: string; user?: string }): void {
     const failure = this.workspace.react(input.channel, asTs(input.ts), input.name, input.user ?? 'U0MAYA', true)
     if (failure !== undefined) throw new Error(failure)
@@ -187,6 +202,16 @@ export class FakeSlack {
   /** Terminates every socket without a close frame, like a dropped connection. */
   dropSocket(): void {
     this.server.dropSockets()
+  }
+
+  /** Drops every socket and refuses new ones until `goOnline`: events in between reach no client. */
+  goOffline(): void {
+    this.server.refuseSockets = true
+    this.server.dropSockets()
+  }
+
+  goOnline(): void {
+    this.server.refuseSockets = false
   }
 
   socketCount(): number {
@@ -257,9 +282,14 @@ export class FakeSlack {
       joinChannel: (i) => this.joinChannel(i),
       leaveChannel: (i) => this.leaveChannel(i),
       renameChannel: (i) => this.renameChannel(i),
+      followThread: (i) => this.followThread(i),
+      unfollowThread: (i) => this.unfollowThread(i),
+      setSelfUsergroups: (i) => this.setSelfUsergroups(i),
       typing: (i) => this.typing(i),
       emitFrame: (i) => this.emitFrame(i),
       dropSocket: () => this.dropSocket(),
+      goOffline: () => this.goOffline(),
+      goOnline: () => this.goOnline(),
       force429: (i) => this.force429(i),
       clear429: (i) => this.clear429(i),
       forceError: (i) => this.forceError(i),

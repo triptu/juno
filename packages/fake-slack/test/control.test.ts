@@ -76,7 +76,7 @@ describe('control API', () => {
     expect(fake.workspace.subscription('C0ENG', root.ts)?.subscribed).toBe(true)
     // A second reply in a thread already followed sends no second event.
     fake.injectMessage({ channel: 'C0ENG', user: fake.selfId, text: 'Ping.', threadTs: root.ts })
-    await socket.next((f) => f.type === 'message' && f.text === 'Ping.')
+    await socket.next((f) => f.type === 'message' && 'text' in f && f.text === 'Ping.')
     expect(socket.frames.some((f) => f.type === 'thread_subscribed')).toBe(false)
     socket.close()
   })

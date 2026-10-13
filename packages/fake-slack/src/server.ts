@@ -222,7 +222,15 @@ export class FakeServer {
     this.sockets.clear()
   }
 
+  /** While true, socket upgrades are refused with 503, so a client stays offline until it is false again. */
+  refuseSockets = false
+
   #upgrade(request: IncomingMessage, socket: Duplex, head: Buffer): void {
+    if (this.refuseSockets) {
+      socket.write('HTTP/1.1 503 Service Unavailable\r\nConnection: close\r\n\r\n')
+      socket.destroy()
+      return
+    }
     const url = new URL(request.url ?? '/', this.#baseUrl)
     const cookie = parseCookies(request.headers.cookie)['d']
     const auth = url.pathname.startsWith('/websocket/') ? this.#authenticate(cookie, url.searchParams.get('token') ?? undefined) : 'invalid_auth'
@@ -306,11 +314,12 @@ export class FakeServer {
     }
     if (!isMethodName(method)) return record(200, { ok: false, error: 'unknown_method' })
     const forced = this.#takeFailure(method)
-    if (forced !== undefined) return record(200, { ok: false, error: forced })
-    const result = this.#run(method, fields)
-    // The handler has run (state changed, events sent); only the answer waits.
+    const result = forced === undefined ? this.#run(method, fields) : undefined
+    // The handler has run (state changed, events sent), or a forced error stands in for it; only the answer waits.
     const held = this.#hold(method)
     if (held !== undefined) await held
+    if (forced !== undefined) return record(200, { ok: false, error: forced })
+    if (result === undefined) return
     if (result instanceof ApiError) {
       if (result.retryAfter !== undefined) response.setHeader('Retry-After', String(result.retryAfter))
       return record(result.status, { ok: false, error: result.error })
