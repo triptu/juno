@@ -166,6 +166,9 @@ importers:
 
   .:
     devDependencies:
+      '@juno/engine':
+        specifier: workspace:*
+        version: link:packages/engine
       '@juno/fake-slack':
         specifier: workspace:*
         version: link:packages/fake-slack
@@ -175,6 +178,12 @@ importers:
       '@juno/slack-schema':
         specifier: workspace:*
         version: link:packages/slack-schema
+      '@juno/store':
+        specifier: workspace:*
+        version: link:packages/store
+      '@juno/sync':
+        specifier: workspace:*
+        version: link:packages/sync
       '@types/node':
         specifier: 24.19.2
         version: 24.19.2

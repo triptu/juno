@@ -34,6 +34,7 @@ Run these from the repo root.
 | `node scripts/build-icons.mjs` | Rebuilds `apps/desktop/build/icon.icns` and `icon.png` from `assets/icon.svg`. See "App icon". |
 | `pnpm package` | Builds a DMG and zip with electron-builder into `apps/desktop/release/`. Not run in CI yet. |
 | `JUNO_LIVE=1 pnpm smoke:live` | The read-only live smoke against your real workspace (see "Sign-in and the live smoke"). `pnpm smoke:live -- --fake` runs the same script against an in-process fake. |
+| `JUNO_LIVE=1 pnpm sync:live` | The read-only sync dry run: the real `@juno/sync` cold boot against your workspace into a temporary directory, numbers only (see "The live sync dry run"). `pnpm sync:live -- --fake` runs it against an in-process fake. |
 
 Before calling work done: `pnpm typecheck`, `pnpm lint`, `pnpm test`, and `pnpm test:e2e` for anything the app or gallery shows.
 
@@ -203,6 +204,34 @@ prompt, because `security` itself created the item. `pnpm smoke:live --
 --forget-session` deletes it. Delete it when the session stops working
 (`auth.test: SlackAuthRequired`) and cache again, or before handing the machine
 to someone else. The desktop app never reads this item.
+
+## The live sync dry run
+
+`JUNO_LIVE=1 pnpm sync:live` (`scripts/sync-live-dry-run.ts`) runs the real `@juno/sync`
+cold boot (`runSync`, with the default `SyncConfig`) against your real workspace into a
+temporary data directory, waits until boot and discovery finish (`live`) or `--seconds N`
+(default 900) pass, prints aggregate numbers and deletes the directory. It reuses the
+session the smoke cached (`juno-dev-slack-session`; run the smoke with `--cache-session`
+first), so there is no keychain prompt and no import from the Slack app.
+
+Read-only by construction: `SlackApi.call` is wrapped so any method outside its allow-list
+(`auth.test`, `client.userBoot`, `users.prefs.get`, `client.counts`, `client.getWebSocketURL`,
+`api.getFlannelHttpUrl`, `subscriptions.thread.getView`, `conversations.history`,
+`conversations.replies`, `search.modules.messages`, edge `users/info`) dies before a request
+is made, and `HttpTransport` checks the URL of every request the same way. Only the sync runs:
+no outbox, no mark, no command handler. The output is counts and milliseconds: calls by
+method and total time, conversations by kind and membership, topics by kind and how many the
+sidebar shows under the quiet rule, unread and mention counts, decode issues by path, rate-limit
+hits, the `topics.list` query time and snapshot size. Titles, names, message text and ids are
+never printed; the Effect logger is replaced by one that prints messages and enum-like fields
+only. `pnpm sync:live -- --fake` runs the same script against an in-process fake, which is how
+it is checked in development.
+
+Both live scripts run under plain Node (type stripping). `@juno/sync`, `@juno/store` and
+`@juno/engine` use bundler-style relative imports (`./sync` for `./sync.ts`), which Node does
+not resolve on its own, so `pnpm sync:live` starts Node with
+`--import ./scripts/ts-resolve-hooks.mjs`, a small `module.registerHooks` resolver that tries
+`.ts`, `.tsx` and `/index.ts`.
 
 ## IPC with main
 

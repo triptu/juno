@@ -23,18 +23,14 @@
  *                      Juno-owned login keychain item so later runs do not prompt
  *   --forget-session   delete that keychain item and exit
  *
- * The session cache is a generic password named `juno-dev-slack-session`,
- * written with `security add-generic-password` (its value is passed on
- * stdin, never in argv). `security` created it, so `security
- * find-generic-password` reads it back without a prompt.
+ * The session cache is a generic password named `juno-dev-slack-session`
+ * (see `live-common.ts`); `sync-live-dry-run.ts` reuses it.
  */
-import { execFile } from 'node:child_process'
 import { cp, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { Effect, Exit, Fiber, Layer, Queue, Schema, Scope, Stream } from 'effect'
-import type { SchemaIssue } from 'effect'
+import { Effect, Exit, Fiber, Layer, Queue, Scope, Stream } from 'effect'
 import { startFakeSlack } from '@juno/fake-slack'
 import { Methods, RtmFrame, type MethodName } from '@juno/slack-schema'
 import {
@@ -49,6 +45,7 @@ import {
   type SlackSessionShape,
 } from '@juno/slack'
 import { COOKIES_FILE, LOCAL_STORAGE_DIR, readSlackAppSession } from '@juno/slack/import'
+import { decodeIssues, forgetCachedSession, readCachedSession, SESSION_SERVICE, security, storeCachedSession, type CachedSession } from './live-common.ts'
 
 const READ_ONLY_METHODS = [
   'auth.test',
@@ -106,7 +103,7 @@ interface Target {
 }
 
 async function liveTarget(): Promise<Target> {
-  const cached = await readCachedSession()
+  const cached = await readCachedSession(teamId)
   const { session, cookie } = cached ?? (await importFromSlackApp())
   console.log(
     `smoke-live: ${cached === undefined ? 'imported' : 'cached'} session, team ${session.teamId}${session.enterprise === undefined ? '' : ' (Enterprise Grid)'}, user ${session.userId}`,
@@ -143,50 +140,6 @@ async function importFromSlackApp(): Promise<CachedSession> {
   } finally {
     await rm(copy, { recursive: true, force: true })
   }
-}
-
-// The session cache: one generic password in the login keychain, owned by `security`.
-
-const SESSION_SERVICE = 'juno-dev-slack-session'
-
-interface CachedSession {
-  readonly session: SlackSessionShape
-  /** The `Cookie` header value, `d=...`. */
-  readonly cookie: string
-}
-
-function security(args: ReadonlyArray<string>, stdin?: string): Promise<{ code: number; stdout: string }> {
-  return new Promise((resolvePromise) => {
-    const child = execFile('/usr/bin/security', [...args], { timeout: 120_000 }, (error, stdout) => {
-      resolvePromise({ code: error === null ? 0 : ((error as { code?: unknown }).code as number | undefined) ?? 1, stdout })
-    })
-    if (stdin !== undefined) child.stdin?.end(stdin)
-  })
-}
-
-/** The cached session for `--team` (or the only one), or undefined when there is none. */
-async function readCachedSession(): Promise<CachedSession | undefined> {
-  const answer = await security(['find-generic-password', '-w', '-s', SESSION_SERVICE, ...(teamId === undefined ? [] : ['-a', teamId])])
-  if (answer.code !== 0) return undefined
-  try {
-    const parsed = JSON.parse(Buffer.from(answer.stdout.trim(), 'base64').toString('utf8')) as CachedSession
-    if (typeof parsed.cookie !== 'string' || typeof parsed.session?.token !== 'string') return undefined
-    return parsed
-  } catch {
-    return undefined
-  }
-}
-
-/** `add-generic-password -U` replaces an item with the same service and account. The value goes in on stdin via `security -i`. */
-async function storeCachedSession(cached: CachedSession): Promise<void> {
-  const value = Buffer.from(JSON.stringify(cached), 'utf8').toString('base64')
-  const answer = await security(['-i'], `add-generic-password -U -s ${SESSION_SERVICE} -a ${cached.session.teamId} -w ${value}\n`)
-  if (answer.code !== 0) throw new Error('could not write the session to the keychain')
-}
-
-async function forgetCachedSession(): Promise<boolean> {
-  const answer = await security(['delete-generic-password', '-s', SESSION_SERVICE])
-  return answer.code === 0
 }
 
 async function fakeTarget(): Promise<Target> {
@@ -363,56 +316,6 @@ async function run(target: Target): Promise<number> {
   console.log(problems === 0 ? 'smoke-live: ok' : `smoke-live: ${problems} problem(s)`)
   return problems === 0 ? 0 : 1
 }
-
-// Decode issues as paths, never values.
-
-function decodeIssues(schema: Schema.Codec<unknown, unknown>, text: string): Array<string> {
-  let json: unknown
-  try {
-    json = JSON.parse(text)
-  } catch {
-    return ['(not JSON)']
-  }
-  const exit = Effect.runSyncExit(Schema.decodeUnknownEffect(schema)(json))
-  if (Exit.isSuccess(exit)) return []
-  const error = Exit.isFailure(exit) ? (exit.cause as { failures?: ReadonlyArray<{ error?: unknown }> }) : undefined
-  const failure = findSchemaError(error)
-  return failure === undefined ? ['(decode failed, no issue tree)'] : issuePaths(failure.issue, [])
-}
-
-function findSchemaError(cause: unknown): { issue: SchemaIssue.Issue } | undefined {
-  const stack: Array<unknown> = [cause]
-  while (stack.length > 0) {
-    const current = stack.pop()
-    if (current === null || typeof current !== 'object') continue
-    if ('issue' in current && current.issue !== null && typeof current.issue === 'object' && '_tag' in (current.issue as object)) {
-      return current as { issue: SchemaIssue.Issue }
-    }
-    for (const value of Object.values(current as Record<string, unknown>)) {
-      if (value !== null && typeof value === 'object') stack.push(value)
-    }
-  }
-  return undefined
-}
-
-function issuePaths(issue: SchemaIssue.Issue, path: ReadonlyArray<PropertyKey>): Array<string> {
-  switch (issue._tag) {
-    case 'Pointer':
-      return issuePaths(issue.issue, [...path, ...issue.path])
-    case 'Composite':
-      return issue.issues.flatMap((child) => issuePaths(child, path))
-    case 'AnyOf':
-      // A union: report the deepest problems of the longest-matching member only, to keep the list short.
-      return issue.issues.length === 0 ? [`${format(path)}: no union member matched`] : issuePaths(issue.issues[0]!, path)
-    case 'Filter':
-    case 'Encoding':
-      return issuePaths(issue.issue, path)
-    default:
-      return [`${format(path)}: ${issue._tag}`]
-  }
-}
-
-const format = (path: ReadonlyArray<PropertyKey>) => (path.length === 0 ? '(root)' : path.map(String).join('.'))
 
 /** `type`, plus `.subtype` for message frames, so each subtype gets its own shape file. */
 function frameTypeOf(data: string): string {
