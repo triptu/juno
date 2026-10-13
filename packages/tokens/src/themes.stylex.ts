@@ -54,8 +54,8 @@ export const darkShadows = stylex.createTheme(shadows, {
   '--shadow-md': '0 2px 6px 0 rgba(0, 0, 0, 0.40)',
   '--shadow-card': '0 0 12px 0 rgba(0, 0, 0, 0.45)',
   '--shadow-lg': '0 8px 24px 0 rgba(0, 0, 0, 0.50)',
-  '--card-ring': '0 0 0 1px oklch(1 0 0 / 0.08)',
-  '--pop-shadow': '0 0 0 1px oklch(1 0 0 / 0.1), 0 8px 24px oklch(0 0 0 / 0.5)',
+  '--card-ring': '0 1px 2px 0 oklch(0 0 0 / 0.3), 0 6px 20px -4px oklch(0 0 0 / 0.35)',
+  '--pop-shadow': '0 2px 6px -1px oklch(0 0 0 / 0.3), 0 14px 36px -8px oklch(0 0 0 / 0.5)',
 })
 
 /** Everything that changes in dark mode. Spread into stylex.props(). */

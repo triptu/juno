@@ -5,7 +5,7 @@ import { Icon, type IconSize, type IconWeight, type PhosphorIcon } from './Icon'
 import { interactive } from './internal/interactive'
 
 export type IconButtonSize = 20 | 22 | 26 | 28 | 30 | 32 | 36
-export type IconButtonRadius = 'xs' | 'sm' | 'md' | 'lg' | 'full'
+export type IconButtonRadius = 'xs' | 'sm' | 'md' | 'lg' | 'xl' | 'full'
 export type IconButtonVariant = 'ghost' | 'secondary' | 'primary' | 'raised'
 export type IconButtonTone = 'default' | 'subtle' | 'muted'
 
@@ -34,11 +34,12 @@ export interface IconButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonEle
 // StyleX cannot read constants from other modules.
 const HOVER = '@media (hover: hover)'
 
+// The 28px button is the hover-toolbar button: 12 inside the toolbar's 16.
 const radiusBySize: Record<IconButtonSize, IconButtonRadius> = {
   20: 'xs',
   22: 'xs',
   26: 'md',
-  28: 'md',
+  28: 'xl',
   30: 'lg',
   32: 'lg',
   36: 'lg',
@@ -177,6 +178,7 @@ const radiusStyles = stylex.create({
   sm: { borderRadius: radii['--radius-sm'] },
   md: { borderRadius: radii['--radius-md'] },
   lg: { borderRadius: radii['--radius-lg'] },
+  xl: { borderRadius: radii['--radius-xl'] },
   full: { borderRadius: radii['--radius-full'] },
 })
 

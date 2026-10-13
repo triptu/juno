@@ -143,16 +143,17 @@ export const hues = stylex.defineVars({
 /* -------------------------------------------------------------------------- */
 
 /**
- * Floating surfaces get a ring (a 1px shadow) plus a soft drop, never a
- * coloured border. Inputs are the exception and keep --input-border.
+ * Cards and floating surfaces get a wide, soft drop shadow and no ring,
+ * never a coloured border. Inputs are the exception and keep --input-border.
+ * The names --card-ring and --pop-shadow are kept so nothing has to move.
  */
 export const shadows = stylex.defineVars({
   '--shadow-sm': '0 1px 2px 0 rgba(27, 28, 21, 0.04)',
   '--shadow-md': '0 2px 6px 0 rgba(27, 28, 21, 0.06)',
   '--shadow-card': '0 0 12px 0 rgba(27, 28, 21, 0.12)',
   '--shadow-lg': '0 8px 24px 0 rgba(27, 28, 21, 0.10)',
-  '--card-ring': '0 0 0 1px oklch(0 0 0 / 0.06), 0 1px 2px -1px oklch(0 0 0 / 0.06), 0 2px 4px 0 oklch(0 0 0 / 0.04)',
-  '--pop-shadow': '0 0 0 1px oklch(0 0 0 / 0.06), 0 1px 2px -1px oklch(0 0 0 / 0.08), 0 10px 28px -6px oklch(0 0 0 / 0.14)',
+  '--card-ring': '0 1px 2px 0 oklch(0 0 0 / 0.03), 0 6px 20px -4px oklch(0 0 0 / 0.07)',
+  '--pop-shadow': '0 2px 6px -1px oklch(0 0 0 / 0.05), 0 14px 36px -8px oklch(0 0 0 / 0.13)',
 })
 
 /* -------------------------------------------------------------------------- */
@@ -171,9 +172,18 @@ export const radii = stylex.defineVars({
   '--radius-md': '6px',
   '--radius-md-plus': '7px',
   '--radius-lg': '8px',
-  '--radius-lg-plus': '9px',
+  // Nav and filter buttons, hover-toolbar buttons, 30px buttons, 32-36px
+  // tiles, the To field.
   '--radius-xl': '12px',
+  // Flat message hover row.
   '--radius-2xl': '14px',
+  // Sidebar and list rows, the 44px channel tile, the hover toolbar.
+  '--radius-3xl': '16px',
+  // Cards and settings groups.
+  '--radius-card': '20px',
+  // The composer: a pill at its single-line height of 40px, and the same
+  // 20px corner once it has grown, so a tall draft is not a capsule.
+  '--radius-composer': '20px',
   '--radius-menu': '13px',
   '--radius-palette': '14px',
   '--radius-toast': '14px',

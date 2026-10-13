@@ -242,7 +242,7 @@ Odd values the prototype uses once (3, 5, 9, 18) are component-local; keep them 
 
 ## 4. Radii
 
-[css] `--radius-sm 4`, `--radius-md 6`, `--radius-lg 8`, `--radius-xl 10`. The prototype also uses 5, 7, 9, 12, 13, 14, 16 and 999. The friendly layer (`friendly-layer.md` §3) makes every label a pill and gives containers one step more radius. Full set:
+[css] `--radius-sm 4`, `--radius-md 6`, `--radius-lg 8`, `--radius-xl 10`. The prototype also uses 5, 7, 9, 12, 13, 14, 16 and 999. The friendly layer (`friendly-layer.md` §3) makes every label a pill and gives containers one step more radius; the options review (`friendly-layer/options.html`, D1 "rounder") then took rows and tiles to 16, cards to 20, nav and filter buttons to 12, the composer and the 32px and taller buttons to pills, the hover toolbar to 16 with 12 buttons, and replaced the card and popover rings with wide soft shadows. Full set:
 
 | Token | px | Use |
 | --- | --- | --- |
@@ -250,21 +250,23 @@ Odd values the prototype uses once (3, 5, 9, 18) are component-local; keep them 
 | `--radius-sm` | 5 | Dismiss buttons, segmented-control segment, 18–20px channel tiles |
 | `--radius-md` | 6 | Menu items, small buttons (28), quote block, thread link, 24px channel tiles |
 | `--radius-md-plus` | 7 | Selects, the segmented track, For you action buttons, topic-list items in Juno cards, 28px channel tiles |
-| `--radius-lg` | 8 | Nav items, filter buttons, icon buttons (30–32), Resolve button (32), tabs (top corners), flat message hover, palette items, inputs, send-check bar, option buttons, 32–36px channel tiles |
-| `--radius-lg-plus` | 9 | Hover toolbar |
-| `--radius-xl` | 12 | Cards, chat/card rows, 44px channel tiles, To field, New message textarea |
-| `--radius-2xl` | 14 | Composer |
+| `--radius-lg` | 8 | 28px buttons, icon buttons (30–32), tabs (top corners), palette items, inputs, send-check bar, option buttons, 28px channel tiles |
+| `--radius-xl` | 12 | Nav items, filter buttons, 30px buttons, hover-toolbar buttons (28), To field, New message textarea, 32–36px channel tiles |
+| `--radius-2xl` | 14 | Flat message hover row |
+| `--radius-3xl` | 16 | Sidebar and list rows (and the selected row), 44px channel tile, hover toolbar |
+| `--radius-card` | 20 | Cards (catch-up, grouping, For you, Juno cards) and settings groups |
+| `--radius-composer` | 20 | The composer frame: a pill at its 40px single-line height, and the same corner once it has grown, so a tall draft is not a capsule |
 | `--radius-menu` | 13 | Context menu, avatar menu, Browse menu, mention popover, To picker |
 | `--radius-palette` | 14 | ⌘K panel, user chat bubble (with 4px tail corner) |
 | `--radius-toast` | 14 | Toast |
 | `--radius-bubble` | 16 | Message bubbles (tail corner 4) |
 | `--radius-tag` | 999 | Tags, count badges, @ tag, status chips, decision chips, scope chip, digest chips, stealth pill, confidence badge, reaction chips, inline @person and #channel chips (padding 0 5), the row Resolve button (22) and the toast Undo button (26) |
-| `--radius-pill` | 999 | Context pill (header, To field, send card) |
+| `--radius-pill` | 999 | Context pill (header, To field, send card); the 32px and taller buttons (header Resolve, Discard/Send, Sign in) |
 | `--radius-full` | 999 | Avatars, attach/send buttons, colour swatches |
 
 A label is a pill; a control or a container is a rounded rectangle. Pills never nest in pills.
 
-**Nesting rule (SPEC §16):** outer radius = inner radius + padding. Pairs: palette 14 = item 8 + padding 6; Juno topics card 12 = item 7 + padding 4 (off by one, acceptable); segmented control 7 = segment 5 + padding 2; menus 13 = item 6 + padding 6 + 1 border; hover toolbar 8 = button 6 + padding 2; card row 12 = tile 12 only by eye (the tile is not inset evenly). When building a new container, compute it; do not pick from the table.
+**Nesting rule (SPEC §16):** outer radius = inner radius + padding. Pairs: palette 14 = item 8 + padding 6; Juno topics card 20 = item 12 + padding 8 (the items use `--radius-xl`); segmented control 7 = segment 5 + padding 2; menus 13 = item 6 + padding 6 + 1 border; hover toolbar 16 = button 12 + padding 2 + 2 (off by two: the sheet's values, kept so the toolbar matches the rows); card 20 = inset block 8 + padding 12; settings group 20 = row 16 + 4; card row 16 = tile 16 only by eye (the tile is not inset evenly). When building a new container, compute it; do not pick from the table.
 
 ## 5. Sizes
 
@@ -350,10 +352,10 @@ Single line 40px; grows to `max-height` then scrolls inside. Prototype max is 18
 | `--shadow-md` | `0 2px 6px 0 rgba(27,28,21,.06)` | `0 2px 6px 0 rgba(0,0,0,.40)` | css | Floating Quote button |
 | `--shadow-card` | `0 0 12px 0 rgba(27,28,21,.12)` | `0 0 12px 0 rgba(0,0,0,.45)` | css | Unused in prototype; prefer `--card-ring` |
 | `--shadow-lg` | `0 8px 24px 0 rgba(27,28,21,.10)` | `0 8px 24px 0 rgba(0,0,0,.50)` | css | Toast |
-| `--card-ring` | `0 0 0 1px oklch(0 0 0 / .06), 0 1px 2px -1px oklch(0 0 0 / .06), 0 2px 4px 0 oklch(0 0 0 / .04)` | `0 0 0 1px oklch(1 0 0 / .08)` | proto | Cards: catch-up, grouping, settled hint, For you, Juno cards, settings groups |
-| `--pop-shadow` | `0 0 0 1px oklch(0 0 0 / .06), 0 1px 2px -1px oklch(0 0 0 / .08), 0 10px 28px -6px oklch(0 0 0 / .14)` | `0 0 0 1px oklch(1 0 0 / .1), 0 8px 24px oklch(0 0 0 / .5)` | proto | Menus, popovers, palette, hover toolbar |
+| `--card-ring` | `0 1px 2px 0 oklch(0 0 0 / .03), 0 6px 20px -4px oklch(0 0 0 / .07)` | `0 1px 2px 0 oklch(0 0 0 / .3), 0 6px 20px -4px oklch(0 0 0 / .35)` | options D1 | Cards: catch-up, grouping, settled hint, For you, Juno cards, settings groups. The name is historical; there is no ring any more |
+| `--pop-shadow` | `0 2px 6px -1px oklch(0 0 0 / .05), 0 14px 36px -8px oklch(0 0 0 / .13)` | `0 2px 6px -1px oklch(0 0 0 / .3), 0 14px 36px -8px oklch(0 0 0 / .5)` | options D1 | Menus, popovers, palette, hover toolbar |
 
-Floating surfaces have `border: 1px solid transparent` plus the ring, never a coloured border. Inputs keep a real 1px `--input-border`.
+Floating surfaces have `border: 1px solid transparent` plus the shadow, never a coloured border. Inputs keep a real 1px `--input-border`. The raised button (`Button variant="raised"`) is a control, not a floating surface: it keeps a 1px `--border-default` edge plus `--shadow-sm`. In dark the shadows alone do not separate a popover from the page, so popovers and the hover toolbar sit on `--surface-raised` (1.2).
 
 ## 7. Z-index layers
 
@@ -423,5 +425,5 @@ Apply these when porting; the prototype values are listed so no one copies them 
 | Söhne / Meraki | Figtree / Instrument Serif, bundled (Inter was the first replacement; swapped for Figtree in the friendly-layer options review) |
 | Global letter-spacing 0.02em in CSS file | 0 (Figtree; 0.01em was the Inter value) |
 | Lucide outline icons | Phosphor, weight by size, fill for active (`friendly-layer.md` §2) |
-| Radius 6 tags, chips, pills and reactions | Pills (`--radius-tag`, `--radius-pill`); tiles, rows and cards 12, composer and toast 14 |
+| Radius 6 tags, chips, pills and reactions | Pills (`--radius-tag`, `--radius-pill`); rows and tiles 16, cards 20, nav 12, composer 20 (a pill at one line), 32px+ buttons pills, toast 14 |
 | No entrances; everything 150ms | Entrances 240ms, exits 150ms, pops 220ms with a spring; rows, tabs and typing still never animate |

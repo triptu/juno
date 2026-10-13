@@ -61,7 +61,7 @@ const styles = stylex.create({
     width: '100%',
     height: sizes['--control-32'],
     paddingInline: spacing['--space-3'],
-    borderRadius: radii['--radius-lg'],
+    borderRadius: radii['--radius-xl'],
     fontWeight: weights['--weight-medium'],
     whiteSpace: 'nowrap',
     userSelect: 'none',
