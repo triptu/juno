@@ -51,7 +51,7 @@ interface FailureRule {
 /** Responses of one method held back until `release`, so a test can land events while a page is in flight. */
 interface HoldRule {
   remaining: number
-  readonly waiting: Array<() => void>
+  readonly waiting: Array<{ readonly resume: () => void; readonly args: Record<string, unknown> }>
 }
 
 export type ControlHandler = (input: Record<string, unknown>) => unknown
@@ -181,7 +181,7 @@ export class FakeServer {
     for (const [name, rule] of this.#holds) {
       if (method !== undefined && name !== method) continue
       this.#holds.delete(name)
-      for (const resume of rule.waiting.splice(0)) resume()
+      for (const held of rule.waiting.splice(0)) held.resume()
     }
   }
 
@@ -192,11 +192,18 @@ export class FakeServer {
     return n
   }
 
-  #hold(method: string): Promise<void> | undefined {
+  /** The arguments of the calls waiting for `release`, oldest first. */
+  heldCalls(method?: string): ReadonlyArray<Record<string, unknown>> {
+    const calls: Array<Record<string, unknown>> = []
+    for (const [name, rule] of this.#holds) if (method === undefined || name === method) calls.push(...rule.waiting.map((held) => held.args))
+    return calls
+  }
+
+  #hold(method: string, args: Record<string, unknown>): Promise<void> | undefined {
     const rule = this.#holds.get(method)
     if (rule === undefined || rule.remaining <= 0) return undefined
     rule.remaining -= 1
-    return new Promise((resolve) => rule.waiting.push(resolve))
+    return new Promise((resolve) => rule.waiting.push({ resume: resolve, args }))
   }
 
   // Socket
@@ -316,7 +323,7 @@ export class FakeServer {
     const forced = this.#takeFailure(method)
     const result = forced === undefined ? this.#run(method, fields) : undefined
     // The handler has run (state changed, events sent), or a forced error stands in for it; only the answer waits.
-    const held = this.#hold(method)
+    const held = this.#hold(method, redact(fields))
     if (held !== undefined) await held
     if (forced !== undefined) return record(200, { ok: false, error: forced })
     if (result === undefined) return

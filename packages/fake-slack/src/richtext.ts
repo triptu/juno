@@ -3,12 +3,12 @@
  * (HTML-escaped, `<@U…>` mentions) and one `rich_text` block. This is only
  * for the fake; the real conversion lives in @juno/richtext.
  *
- * Understood: `> ` quote lines, `<@U…>`, `<#C…|name>`, `<!here>`, `<!channel>`,
+ * Understood: `> ` quote lines, `<@U…>`, `<#C…|name>`, `<!subteam^S…|@handle>`, `<!here>`, `<!channel>`,
  * `<https://…|label>` and bare URLs.
  */
 import type { Blocks, RichTextElement, RichTextInline } from '@juno/slack-schema'
 
-const TOKEN = /<@([A-Z0-9]+)>|<#([A-Z0-9]+)\|([^>]*)>|<!(here|channel|everyone)>|<(https?:\/\/[^|>]+)(?:\|([^>]*))?>|(https?:\/\/\S+)/g
+const TOKEN = /<@([A-Z0-9]+)>|<#([A-Z0-9]+)\|([^>]*)>|<!(here|channel|everyone)>|<(https?:\/\/[^|>]+)(?:\|([^>]*))?>|(https?:\/\/\S+)|<!subteam\^([A-Z0-9]+)(?:\|[^>]*)?>/g
 
 /** Escapes `&`, `<` and `>` in the literal parts of a line and leaves Slack's own `<…>` tokens alone. */
 export function escapeText(text: string): string {
@@ -59,8 +59,9 @@ function parseInline(text: string): RichTextInline[] {
   for (const match of text.matchAll(TOKEN)) {
     const index = match.index
     if (index > last) out.push({ type: 'text', text: text.slice(last, index) })
-    const [, user, channel, , range, url, label, bareUrl] = match
+    const [, user, channel, , range, url, label, bareUrl, usergroup] = match
     if (user !== undefined) out.push({ type: 'user', user_id: user })
+    else if (usergroup !== undefined) out.push({ type: 'usergroup', usergroup_id: usergroup })
     else if (channel !== undefined) out.push({ type: 'channel', channel_id: channel })
     else if (range !== undefined) out.push({ type: 'broadcast', range: range as 'here' | 'channel' | 'everyone' })
     else if (url !== undefined) out.push(label === undefined ? { type: 'link', url } : { type: 'link', url, text: label })

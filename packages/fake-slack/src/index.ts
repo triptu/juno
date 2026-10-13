@@ -255,6 +255,11 @@ export class FakeSlack {
     return this.server.heldCount(input.method)
   }
 
+  /** The arguments of the held calls, oldest first. */
+  heldCalls(input: { method?: string } = {}): ReadonlyArray<Record<string, unknown>> {
+    return this.server.heldCalls(input.method)
+  }
+
   /** Every session stops working: API calls get `invalid_auth`, sockets get `user_session_expiration` and close. */
   expireSession(): void {
     this.server.expireSessions()
@@ -297,6 +302,7 @@ export class FakeSlack {
       holdNext: (i) => this.holdNext(i),
       release: (i) => this.release(i),
       heldCount: (i) => this.heldCount(i),
+      heldCalls: (i) => this.heldCalls(i),
       expireSession: () => this.expireSession(),
       advanceClock: (i) => this.advanceClock(i),
       setNow: (i) => this.setNow(i),
