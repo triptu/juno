@@ -48,6 +48,8 @@ Button with only an icon. `label` is required and doubles as the tooltip (`noToo
 | --- | --- |
 | `size` | 20, 22, 26, 28, 30, 32, 36 |
 | `radius` | derived (4 for 20–22, 6 for 26, 12 for 28 (the hover-toolbar button), 8 for 30+), or `sm` (5, dismiss), `full` (attach, send) |
+
+`EmojiButton`: the 28px hover-toolbar button whose icon is an emoji (`emoji` as text, or `src` for a custom emoji's image, with `emoji` as the alt), radius 12, the same feedback as `IconButton`. Needs a `label` ("React 👍").
 | `variant` | `ghost` (default), `secondary`, `primary` (send), `raised` |
 | `tone` | `subtle` (default), `muted`, `default` for ghost |
 | `icon`, `iconSize`, `iconWeight`, `dimmed` | as Button. Icon 12 / 12 / 13 / 18 / 18 / 18 / 20 by size; the send arrow passes `iconWeight="bold"`, attach `iconSize={20}` |
@@ -109,11 +111,11 @@ Menus are not a separate primitive: an in-app menu (the account menu) is an `Opt
 
 ## 10a. ScrollArea
 
-`ScrollArea`: a vertical scroll container (`overflow-y: auto`, contained overscroll) with `scrollbar` (`always` | `hover`), `as` and a layout-only `sx`. The scrollbar is the 10px classic bar from `global.css` in both modes, so the gutter never changes size. `hover` sets a `--scrollbar-thumb` variable to transparent and to `--border-strong` under `:hover` (hover-capable pointers only); the `::-webkit-scrollbar-thumb` reads it. The track is transparent always. Keyboard and trackpad scrolling are the browser's. The sidebar topic list is a `ScrollArea scrollbar="hover"`; `Page`, `Popover` and `CodeBlock` keep the always-on bar for now.
+`ScrollArea`: a vertical scroll container (`overflow-y: auto`, contained overscroll) with `scrollbar` (`always` | `hover`), `as`, a `ref` to the scroll element (the message list's container reads and sets the position through it) and a layout-only `sx`. The scrollbar is the 10px classic bar from `global.css` in both modes, so the gutter never changes size. `hover` sets a `--scrollbar-thumb` variable to transparent and to `--border-strong` under `:hover` (hover-capable pointers only); the `::-webkit-scrollbar-thumb` reads it. The track is transparent always. Keyboard and trackpad scrolling are the browser's. The sidebar topic list and the message list are `ScrollArea scrollbar="hover"`; `Page`, `Popover` and `CodeBlock` keep the always-on bar for now.
 
 ## 11. Tabs
 
-`TabStrip` (44px drag region, full width, bottom border, `trailing` slot for the new-tab IconButton) + `Tab` (`icon` at 0.75, `label`, `active`, `onSelect`, `onClose` with `closeLabel`, `onContextMenu`; 35px, radius 8 8 0 0, flex 0 1 230, min 72; the active tab's bottom border is the page colour so it merges).
+`TabStrip` (44px drag region, full width, bottom border, `trailing` slot for the new-tab IconButton) + `Tab` (`icon` at 0.75, or `leading` to fill the fixed 15px icon slot with a topic's art, `label`, `active`, `onSelect`, `onClose` with `closeLabel`, `onContextMenu`; 35px, radius 8 8 0 0, flex 0 1 230, min 72; the active tab's bottom border is the page colour so it merges).
 
 ## 12. Fields
 

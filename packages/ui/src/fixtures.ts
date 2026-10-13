@@ -15,6 +15,7 @@ import Chip from './Chip.fixtures'
 import CodeBlock from './CodeBlock.fixtures'
 import ContextPill from './ContextPill.fixtures'
 import Divider from './Divider.fixtures'
+import EmojiButton from './EmojiButton.fixtures'
 import EmptyState from './EmptyState.fixtures'
 import Icon from './Icon.fixtures'
 import IconButton from './IconButton.fixtures'
@@ -51,6 +52,7 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   CodeBlock,
   ContextPill,
   Divider,
+  EmojiButton,
   EmptyState,
   Icon,
   IconButton,
