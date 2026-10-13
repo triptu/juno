@@ -314,7 +314,7 @@ Every state the chat can be in, and what it shows.
 | Blocked | "Juno can't fit this in one request. Removing a pin or starting a smaller task helps." No card |
 | Budget reached mid-reply | "Juno has used today's budget." under the reply, with the Budget card |
 | Offline | A chip, "You're offline". The composer works and a send that needs the network waits. Schedules that fall due offline run once when back |
-| No provider | A Provider card: "Pick how Juno thinks" |
+| No provider | A Provider card: "Choose a model provider" |
 | Budget reached | A Budget card |
 | Paused | A header chip, "Juno is paused · Resume". The composer works and messages wait for Resume |
 | AI off | One line, "Juno is off. Turn on AI assist in Settings." The composer is disabled and schedules show as paused |
