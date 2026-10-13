@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Juno topic art</title>
+<style>
+@font-face { font-family: 'Figtree'; src: url('../friendly-layer/options/fonts/figtree-latin-wght-normal.woff2') format('woff2'); font-weight: 300 900; }
+@font-face { font-family: 'Instrument Serif'; src: url('../../../node_modules/.pnpm/@fontsource+instrument-serif@5.3.0/node_modules/@fontsource/instrument-serif/files/instrument-serif-latin-400-normal.woff2') format('woff2'); font-weight: 400; }
+:root { --font-sans: 'Figtree', ui-sans-serif, system-ui, sans-serif; --font-serif: 'Instrument Serif', Georgia, serif; }
+.light {
+  --background: #FCFBF7; --background-subtle: #FAF9F5; --surface-default: #FBFBF8; --surface-hover: #F4F2EB;
+  --secondary-default: #F1EEE4; --secondary-active: #EAE6D7; --border-subtle: #F1EEE4; --border-default: #EFECE1;
+  --foreground-default: #23211A; --foreground-subtle: #605E52; --foreground-muted: #706E66;
+  --hl: #CC4628; --hl-fg: #fff; --hl-text: #B4351F; --hl-nav: color-mix(in oklch, var(--hl) 9%, var(--background-subtle));
+  color-scheme: light;
+}
+.dark {
+  --background: #1B1916; --background-subtle: #151411; --surface-default: #252421; --surface-hover: #2D2B28;
+  --secondary-default: #302F2C; --secondary-active: #403E3B; --border-subtle: #2B2A27; --border-default: #32302D;
+  --foreground-default: #EEEBE2; --foreground-subtle: #C6C4BE; --foreground-muted: #A09E9A;
+  --hl: #FF8A73; --hl-fg: #2A0D06; --hl-text: #FF9C87; --hl-nav: color-mix(in oklch, var(--hl) 16%, var(--background-subtle));
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; padding: 32px; background: #ECE9E0; font-family: var(--font-sans); color: #23211A; font-size: 14px; -webkit-font-smoothing: antialiased; }
+h1 { font: 400 34px/1.1 var(--font-serif); margin: 0 0 6px; }
+.intro { color: #706E66; margin: 0 0 28px; max-width: 760px; font-size: 13px; }
+section { margin-bottom: 40px; background: #F5F3EC; border-radius: 16px; padding: 24px; box-shadow: 0 0 0 1px rgba(0,0,0,.06); }
+.fh { display: flex; align-items: baseline; gap: 14px; margin-bottom: 16px; }
+.fh h2 { font: 400 26px/1 var(--font-serif); margin: 0; }
+.fh p { margin: 0; color: #706E66; font-size: 13px; }
+.fh .stats { margin-left: auto; font-size: 12px; color: #706E66; font-variant-numeric: tabular-nums; }
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.panel { border-radius: 14px; padding: 16px; background: var(--background); color: var(--foreground-default); box-shadow: 0 0 0 1px rgba(0,0,0,.08); }
+.panel.dark { box-shadow: 0 0 0 1px rgba(255,255,255,.1); }
+.plabel { font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--foreground-muted); font-weight: 500; margin-bottom: 12px; }
+.grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px 8px; }
+.cell { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+.cell .marks { display: flex; align-items: center; gap: 6px; }
+.cell .marks svg { display: block; }
+.cell .tile { width: 40px; height: 40px; border-radius: 16px; overflow: hidden; background: var(--secondary-default); display: grid; place-items: center; }
+.cell .tile.s { width: 16px; height: 16px; border-radius: 6.4px; }
+.cell .tile svg { width: 100%; height: 100%; display: block; }
+.cell .n { font-size: 10px; color: var(--foreground-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; text-align: center; }
+.cell.fail .tile { outline: 1.5px dashed var(--hl); outline-offset: -1.5px; }
+.cell.fb .f { color: var(--foreground-muted); }
+.cell .f { font-size: 9px; color: var(--hl-text); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.sidebar { width: 384px; background: var(--background-subtle); border-radius: 14px; overflow: hidden; box-shadow: 0 0 0 1px rgba(0,0,0,.08); color: var(--foreground-default); }
+.dark .sidebar { box-shadow: 0 0 0 1px rgba(255,255,255,.1); }
+.titlebar { height: 44px; display: flex; align-items: center; padding: 0 10px 0 16px; }
+.lights { display: flex; gap: 6px; }
+.lights i { width: 12px; height: 12px; border-radius: 999px; display: block; }
+.lights i:nth-child(1) { background: #FF5F57; } .lights i:nth-child(2) { background: #FEBC2E; } .lights i:nth-child(3) { background: #28C840; }
+.nav { padding: 4px 10px 0; display: flex; flex-direction: column; gap: 2px; }
+.nav a { height: 32px; border-radius: 12px; padding: 0 10px; display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 500; }
+.nav a.active { background: var(--hl-nav); color: var(--hl-text); }
+.nav .count { margin-left: auto; height: 18px; min-width: 18px; padding: 0 5px; border-radius: 999px; background: var(--secondary-active); color: var(--foreground-subtle); font-size: 11px; font-weight: 500; display: grid; place-items: center; }
+.hair { height: 1px; background: var(--border-default); margin: 10px 16px 8px; }
+.filters { padding: 0 10px 8px; display: flex; gap: 2px; }
+.filters a { height: 28px; border-radius: 12px; padding: 0 10px; display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; color: var(--foreground-muted); }
+.filters a.on { background: var(--secondary-default); color: var(--foreground-default); font-weight: 600; }
+.filters .sp { flex: 1; }
+.list { padding: 0 8px 12px; }
+.sec { font-size: 10.5px; font-weight: 500; letter-spacing: .06em; text-transform: uppercase; color: var(--foreground-muted); padding: 10px 12px 6px; }
+.row { display: flex; gap: 12px; padding: 10px 12px; border-radius: 16px; align-items: flex-start; }
+.row + .row { margin-top: 2px; }
+.row.sel { background: var(--secondary-default); }
+.rtile { width: 40px; height: 40px; border-radius: 16px; flex-shrink: 0; overflow: hidden; background: var(--secondary-default); }
+.rtile svg { display: block; width: 100%; height: 100%; }
+.rtile.person { border-radius: 999px; }
+.rb { flex: 1; min-width: 0; }
+.l1 { display: flex; align-items: center; gap: 6px; height: 22px; }
+.l1 .t { font-size: 15px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row.unread .l1 .t { font-weight: 600; }
+.l1 .time { margin-left: auto; font-size: 12px; color: var(--foreground-muted); font-variant-numeric: tabular-nums; }
+.tag { height: 18px; padding: 0 7px; border-radius: 999px; border: 1px solid var(--border-default); font-size: 11px; font-weight: 500; color: var(--foreground-subtle); display: inline-flex; align-items: center; }
+.l2 { display: flex; gap: 8px; }
+.l2 .p { flex: 1; font-size: 13px; line-height: 1.45; color: var(--foreground-muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.row.unread .l2 .p { color: var(--foreground-subtle); }
+.cnt { height: 18px; min-width: 18px; padding: 0 5px; border-radius: 999px; font-size: 11px; font-weight: 500; display: grid; place-items: center; background: var(--secondary-active); color: var(--foreground-subtle); margin-top: 1px; }
+.l3 { display: flex; align-items: center; gap: 12px; margin-top: 3px; font-size: 12px; color: var(--foreground-muted); }
+.l3 span { display: inline-flex; align-items: center; gap: 5px; }
+.l3 svg { display: block; }
+.stack { display: flex; }
+.stack b { width: 16px; height: 16px; border-radius: 999px; display: block; box-shadow: 0 0 0 1.5px var(--background-subtle); overflow: hidden; }
+.stack b + b { margin-left: -4px; }
+.stack b svg { display: block; }
+.tabs { display: flex; gap: 2px; padding: 8px 10px 0; align-items: flex-end; }
+.tab { height: 32px; padding: 0 12px; border-radius: 10px 10px 0 0; display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--foreground-muted); background: var(--background-subtle); }
+.tab.on { background: var(--background); color: var(--foreground-default); font-weight: 500; }
+.tab .ti { width: 16px; height: 16px; border-radius: 6px; overflow: hidden; opacity: .9; }
+.tab .ti svg { display: block; width: 100%; height: 100%; }
+.header { display: flex; align-items: center; gap: 10px; padding: 14px 16px; background: var(--background); border-top: 1px solid var(--border-default); }
+.header .hi { width: 20px; height: 20px; border-radius: 8px; overflow: hidden; }
+.header .hi svg { display: block; width: 100%; height: 100%; }
+.header h3 { margin: 0; font-size: 17px; font-weight: 500; }
+.ws { width: 520px; border-radius: 14px; overflow: hidden; background: var(--background); box-shadow: 0 0 0 1px rgba(0,0,0,.08); }
+.dark .ws { box-shadow: 0 0 0 1px rgba(255,255,255,.1); }
+.sbpair { display: flex; gap: 16px; align-items: flex-start; }
+</style>
+</head>
+<body>
+<h1>Topic art</h1>
+<p class="intro">AI-drawn icons for thread topics. Each section is one approach on one model: the 24 study topics at 40px and 16px, light and dark. A dashed tile is a failure (the channel mark would show instead). The last sections mock the sidebar, tabs and a header for the two best setups.</p>
+<div id="root"></div>
+<script src="results.js"></script>
+<script src="../channel-marks/generator.js"></script>
+<script>
+const R = window.RESULTS;
+const M = globalThis.ChannelMarks;
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+function cell(item, theme) {
+  if (!item.ok) return `<div class="cell fail"><div class="marks"><div class="tile"></div><div class="tile s"></div></div><div class="n">${esc(item.title)}</div><div class="f">${esc(item.failure ?? '')}</div></div>`;
+  if (item.fallback) {
+    const ch = { id: 'C' + item.channel, name: item.channel };
+    return `<div class="cell fb"><div class="marks"><div class="tile">${M.mark(ch, { style: 'B', theme, size: 40, semantic: true })}</div><div class="tile s">${M.mark(ch, { style: 'B', theme, size: 16, semantic: true })}</div></div><div class="n">${esc(item.title)}</div><div class="f">not confident · channel mark</div></div>`;
+  }
+  return `<div class="cell"><div class="marks"><div class="tile">${item.svg[theme]}</div><div class="tile s">${item.small[theme]}</div></div><div class="n">${esc(item.title)}</div></div>`;
+}
+function panel(run, theme) {
+  return `<div class="panel ${theme}"><div class="plabel">${theme} · 40px and 16px</div><div class="grid">${run.items.map((i) => cell(i, theme)).join('')}</div></div>`;
+}
+function runSection(run) {
+  const s = run.stats;
+  return `<section data-key="${run.key}"><div class="fh"><h2>${esc(run.label)}</h2><p>${esc(run.model)}</p>
+    <div class="stats">${s.ok}/${s.n} ok · median ${(s.medianMs / 1000).toFixed(1)} s · p90 ${(s.p90Ms / 1000).toFixed(1)} s · $${s.meanCost.toFixed(4)} per icon · $${s.cost300.toFixed(2)} per 300</div></div>
+    <div class="pair">${panel(run, 'light')}${panel(run, 'dark')}</div></section>`;
+}
+
+// Sidebar mock. Channel ids for the Main rows, person placeholders for DMs.
+const CH = { 'alerts-prod': { id: 'C1A2B4A', name: 'alerts-prod' }, deploys: { id: 'C1A2B4C', name: 'deploys' }, eng: { id: 'C1A2B3C', name: 'eng' }, hiring: { id: 'C1A2C01', name: 'hiring' }, product: { id: 'C1A2C02', name: 'product' }, platform: { id: 'C1A2C03', name: 'platform' } };
+function person(hue, theme, size) {
+  const t = M.tones(hue, theme);
+  const id = 'p' + hue + theme + size;
+  return `<svg width="${size}" height="${size}" viewBox="0 0 40 40" aria-hidden="true"><defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${t.soft}"/><stop offset="1" stop-color="${t.base}"/></linearGradient><clipPath id="${id}c"><circle cx="20" cy="20" r="20"/></clipPath></defs><g clip-path="url(#${id}c)"><rect width="40" height="40" fill="url(#${id})"/><circle cx="20" cy="15" r="7.5" fill="${t.deep}"/><ellipse cx="20" cy="38" rx="14" ry="12" fill="${t.deep}"/></g></svg>`;
+}
+const ROWS = [
+  { kind: 'main', ch: 'alerts-prod', title: '#alerts-prod', time: '3m', p: 'Grafana: [RESOLVED] queue depth > 5k on billing-consumer', cnt: 9, unread: true, n: 5 },
+  { kind: 'topic', topic: 'pg16', time: '25m', p: 'Dev: Booked 2–4pm. Will post results here.', meta: 'eng', n: 7, sel: true, stack: [275, 185, 20] },
+  { kind: 'dm', hue: 165, title: 'Sam Okafor', time: '12m', p: 'Sam: Thanks. I’ll review Dev’s packet this week.', meta: 'Sam Okafor', n: 2 },
+  { kind: 'topic', topic: 'rina', time: '41m', p: 'Elena: she has a competing offer with a Friday deadline. Can you look today?', cnt: 2, unread: true, meta: 'hiring', n: 3, stack: [10, 290] },
+  { kind: 'topic', topic: 'staging-bill', time: '1h', p: 'Jonas: Preview environments have no TTL. I can add a 48h reaper.', cnt: 3, unread: true, meta: 'eng', n: 4, stack: [20, 290, 165] },
+  { kind: 'dm', hue: 340, title: 'Maya Chen', time: '2h', p: 'You: Sounds good, Thursday then.', meta: 'Maya Chen', n: 4 },
+  { kind: 'topic', topic: 'q4-cuts', time: '3h', p: 'Maya: Draft is up. Cross-posting to #leadership once Tushar has looked.', meta: 'product', n: 6, stack: [340, 290] },
+  { kind: 'main', ch: 'deploys', title: '#deploys', time: 'Yesterday', p: 'deploybot: api@91be07 deployed to prod', n: 31 },
+];
+const icoChats = (c) => `<svg width="13" height="13" viewBox="0 0 256 256" fill="${c}"><path d="M232,96a16,16,0,0,0-16-16H184V48a16,16,0,0,0-16-16H40A16,16,0,0,0,24,48V176a8,8,0,0,0,13,6.22L72,154V184a16,16,0,0,0,16,16h93.59L219,230.22a8,8,0,0,0,5,1.78,8,8,0,0,0,8-8V96Zm-42.55,89.78a8,8,0,0,0-5-1.78H88V152h80a16,16,0,0,0,16-16V96h32V207.25Z"/></svg>`;
+const icoChat = (c) => `<svg width="13" height="13" viewBox="0 0 256 256" fill="${c}"><path d="M128,24A104,104,0,0,0,36.18,176.88L24.83,210.93a16,16,0,0,0,20.24,20.24l34.05-11.35A104,104,0,1,0,128,24Zm0,192a87.87,87.87,0,0,1-44.06-11.81,8,8,0,0,0-6.54-.67L40,216,52.47,178.6a8,8,0,0,0-.66-6.54A88,88,0,1,1,128,216Z"/></svg>`;
+const icoUser = (c) => `<svg width="13" height="13" viewBox="0 0 256 256" fill="${c}"><path d="M230.92,212c-15.23-26.33-38.7-45.21-66.09-54.16a72,72,0,1,0-73.66,0C63.78,166.78,40.31,185.66,25.08,212a8,8,0,1,0,13.85,8c18.84-32.56,52.14-52,89.07-52s70.23,19.44,89.07,52a8,8,0,1,0,13.85-8ZM72,96a56,56,0,1,1,56,56A56.06,56.06,0,0,1,72,96Z"/></svg>`;
+
+function tile(row, run, theme) {
+  if (row.kind === 'dm') return `<div class="rtile person">${person(row.hue, theme, 40)}</div>`;
+  if (row.kind === 'main') return `<div class="rtile">${M.mark(CH[row.ch], { style: 'B', theme, size: 40, semantic: true })}</div>`;
+  const item = run.items.find((i) => i.topic === row.topic);
+  const art = item && item.ok ? item.svg[theme] : M.mark(CH[row.meta] ?? CH.eng, { style: 'B', theme, size: 40, semantic: true });
+  return `<div class="rtile">${art}</div>`;
+}
+function rowHtml(row, run, theme) {
+  const fg = getComputedStyle(document.documentElement).getPropertyValue('--x') || 'currentColor';
+  const title = row.kind === 'topic' ? R.topics.find((t) => t.id === row.topic).title : row.title;
+  const l3 = row.kind === 'main'
+    ? `<span>${icoChats('currentColor')} Messages outside threads</span><span>${icoChat('currentColor')} ${row.n}</span>`
+    : row.kind === 'dm'
+      ? `<span>${icoUser('currentColor')} ${esc(row.meta)}</span><span>${icoChat('currentColor')} ${row.n}</span>`
+      : `<span><b style="display:block;width:14px;height:14px;border-radius:5px;overflow:hidden">${M.mark(CH[row.meta] ?? CH.eng, { style: 'B', theme, size: 14, semantic: true })}</b> ${esc(row.meta)}</span>` +
+        `<span class="stack">${(row.stack ?? []).map((h) => `<b>${person(h, theme, 16)}</b>`).join('')}</span><span>${icoChat('currentColor')} ${row.n}</span>`;
+  return `<div class="row ${row.sel ? 'sel' : ''} ${row.unread ? 'unread' : ''}">${tile(row, run, theme)}<div class="rb">
+    <div class="l1"><span class="t">${esc(title)}</span>${row.kind === 'main' ? '<span class="tag">Main</span>' : ''}<span class="time">${row.time}</span></div>
+    <div class="l2"><div class="p">${esc(row.p)}</div>${row.cnt ? `<span class="cnt">${row.cnt}</span>` : ''}</div>
+    <div class="l3">${l3}</div></div></div>`;
+}
+function sidebar(run, theme) {
+  return `<div class="sidebar"><div class="titlebar"><div class="lights"><i></i><i></i><i></i></div></div>
+    <div class="nav"><a class="active">All topics</a><a>For you <span class="count">5</span></a><a>Juno</a></div><div class="hair"></div>
+    <div class="filters"><a class="on">All</a><a>Channels</a><a>DMs</a><span class="sp"></span><a>Unread</a></div>
+    <div class="list"><div class="sec">Recent</div>${ROWS.map((r) => rowHtml(r, run, theme)).join('')}</div></div>`;
+}
+function workspace(run, theme) {
+  const small = (id) => { const i = run.items.find((x) => x.topic === id); return i && i.ok ? i.small[theme] : ''; };
+  const big = (id) => { const i = run.items.find((x) => x.topic === id); return i && i.ok ? i.svg[theme] : ''; };
+  return `<div class="ws"><div class="tabs">
+      <div class="tab on"><span class="ti">${small('pg16')}</span>Postgres 16 migration plan</div>
+      <div class="tab"><span class="ti">${small('staging-bill')}</span>Staging bill doubled…</div>
+      <div class="tab"><span class="ti">${small('rina')}</span>Rina Sato · Staff backend</div>
+      <div class="tab"><span class="ti">${small('ramen')}</span>Lunch Friday</div></div>
+    <div class="header"><span class="hi">${big('pg16')}</span><h3>Postgres 16 migration plan</h3></div>
+    <div style="padding:14px 16px;font-size:13px;color:var(--foreground-muted)">Tabs at 16px, header at 20px. The tile is the same drawing; detail elements drop below 20px.</div></div>`;
+}
+function sidebarSection(run) {
+  return `<section data-key="sidebar-${run.key}"><div class="fh"><h2>Sidebar · ${esc(run.label)}</h2><p>${esc(run.model)} · thread topics with art, Main rows with channel marks, DMs with photo placeholders</p></div>
+    <div class="pair">
+      <div class="panel light"><div class="plabel">light</div><div class="sbpair">${sidebar(run, 'light')}${workspace(run, 'light')}</div></div>
+      <div class="panel dark"><div class="plabel">dark</div><div class="sbpair">${sidebar(run, 'dark')}${workspace(run, 'dark')}</div></div>
+    </div></section>`;
+}
+
+const root = document.getElementById('root');
+let html = R.runs.map(runSection).join('');
+for (const key of R.top) {
+  const run = R.runs.find((r) => r.key === key.replace('/', '-'));
+  if (run) html += sidebarSection(run);
+}
+root.innerHTML = html;
+</script>
+</body>
+</html>

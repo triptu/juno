@@ -20,7 +20,7 @@ export const people = {
   maya: { id: 'U0MAYA', name: 'Maya Chen', color: 'claret', avatarUrl: photo('#8EB5C9') },
   leo: { id: 'U0LEO', name: 'Leo Park', color: 'midnight', avatarUrl: photo('#A7B8A0') },
   dev: { id: 'U0DEV', name: 'Dev Patel', color: 'cyan' },
-  sam: { id: 'U0SAM', name: 'Sam Okafor', color: 'emerald-dark', avatarUrl: photo('#C9A98E') },
+  sam: { id: 'U0SAM', name: 'Sam Okafor', color: 'emeraldDark', avatarUrl: photo('#C9A98E') },
   priya: { id: 'U0PRIYA', name: 'Priya Raman', color: 'plum' },
   jonas: { id: 'U0JONAS', name: 'Jonas Weber', color: 'rose' },
   elena: { id: 'U0ELENA', name: 'Elena Ruiz', color: 'emerald' },
@@ -58,7 +58,7 @@ function row(input: RowInput): TopicRow {
     subscribed: true,
     lastActivityTs: `${Math.floor(at / 1000)}.000100`,
     lastActivityAt: at,
-    preview: { sender, text, line: text.length === 0 ? sender : `${sender}: ${text}` },
+    preview: { sender, text },
     ...rest,
   }
 }
@@ -66,11 +66,11 @@ function row(input: RowInput): TopicRow {
 export const channels = {
   eng: { id: 'C0ENG', kind: 'public', name: 'eng', label: '#eng', tint: 'public', icon: 'wrench', color: 'cyan' },
   product: { id: 'C0PRODUCT', kind: 'public', name: 'product', label: '#product', tint: 'public', icon: 'rocket', color: 'plum' },
-  alerts: { id: 'C0ALERTSPROD', kind: 'public', name: 'alerts-prod', label: '#alerts-prod', tint: 'public', icon: 'chart-line', color: 'claret' },
-  hiring: { id: 'C0HIRING', kind: 'private', name: 'hiring', label: '#hiring', tint: 'private', icon: 'shield', color: 'emerald-dark' },
+  alerts: { id: 'C0ALERTSPROD', kind: 'public', name: 'alerts-prod', label: '#alerts-prod', tint: 'public', icon: 'code', color: 'claret' },
+  hiring: { id: 'C0HIRING', kind: 'private', name: 'hiring', label: '#hiring', tint: 'private', icon: 'shield', color: 'emeraldDark' },
   design: { id: 'C0DESIGNREV', kind: 'public', name: 'design-review', label: '#design-review', tint: 'public', icon: 'heart', color: 'rose' },
   maya: { id: 'D0MAYA', kind: 'im', name: 'Maya Chen', label: 'Maya Chen', tint: 'dm', icon: 'hash', color: 'claret', partner: people.maya },
-  sam: { id: 'D0SAM', kind: 'im', name: 'Sam Okafor', label: 'Sam Okafor', tint: 'dm', icon: 'hash', color: 'emerald-dark', partner: people.sam },
+  sam: { id: 'D0SAM', kind: 'im', name: 'Sam Okafor', label: 'Sam Okafor', tint: 'dm', icon: 'hash', color: 'emeraldDark', partner: people.sam },
   dev: { id: 'D0DEV', kind: 'im', name: 'Dev Patel', label: 'Dev Patel', tint: 'dm', icon: 'hash', color: 'cyan', partner: people.dev },
   group: { id: 'G0MAYALEO', kind: 'mpim', name: 'Maya, Leo', label: 'Maya, Leo', tint: 'dm', icon: 'hash', color: 'midnight' },
 } as const satisfies Record<string, TopicRow['channel']>

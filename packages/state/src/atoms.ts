@@ -3,15 +3,16 @@
  *
  * - `liveQuery(route)` gives a memoized `(payload) => atom` for a stream
  *   route. A `liveValueRoute` yields the latest value; a `liveListRoute`
- *   yields a `ListWindow` kept by `applyListDelta`, with `rowAtom` and
- *   `orderAtom` for per-row subscriptions.
+ *   yields a `ListWindow` kept by `applyListDelta`, with `rowAtom` for
+ *   per-row subscriptions.
  * - `command(route)` gives a writable atom that runs the command when
  *   written to and exposes the result as an `AsyncResult`.
  *
  * Both are memoized per route, so two modules asking for the same route get
  * the same atoms: one subscription, one result. Live query atoms carry a 30 s
- * idle TTL, so a prefetch or a hidden tab keeps its subscription warm across
- * a quick unmount and remount.
+ * idle TTL, so a hidden tab keeps its subscription warm across a quick
+ * unmount and remount. `prefetch` warms the subscription underneath, which
+ * has no TTL, so a prefetch that is never opened ends when it is evicted.
  *
  * Errors: a route's declared errors reach the atom as typed failures.
  * `RpcClientError` (the transport: a closed port, a reconnect) is retried
@@ -78,11 +79,14 @@ function liveStream<A, E>(tag: string, payload: unknown): Stream.Stream<A, E, En
   )
 }
 
+/** One `juno.live-update` measure per message, replacing the last, so the buffer does not grow with every update. */
 function recordUpdate(tag: string, meta: { readonly at: number; readonly seq: number; readonly queryMs: number }): void {
-  afterPaint(() => measure('juno.live-update', fromEpochMillis(meta.at), { detail: { route: tag, seq: meta.seq, queryMs: meta.queryMs } }))
+  afterPaint(() => measure('juno.live-update', fromEpochMillis(meta.at), { detail: { route: tag, seq: meta.seq, queryMs: meta.queryMs }, replace: true }))
 }
 
 const liveFamilies = new WeakMap<Rpc.Any, (payload: unknown) => Atom.Atom<unknown>>()
+/** From a live query atom to the TTL-free subscription under it, for `prefetch`. */
+const subscriptionOf = new WeakMap<Atom.Atom<unknown>, Atom.Atom<unknown>>()
 
 /** See the module comment. */
 export function liveQuery<R extends Rpc.Any>(route: R): (payload: Payload<R>) => LiveAtomFor<R> {
@@ -91,47 +95,57 @@ export function liveQuery<R extends Rpc.Any>(route: R): (payload: Payload<R>) =>
   const tag = route._tag
   const kind = liveKindOf(route)
   if (kind === undefined) throw new Error(`${tag} is not a live query route`)
-  const family = Atom.family((key: string) => {
+  // The subscription itself, with no TTL: it ends as soon as nothing reads it.
+  const subscriptions = Atom.family((key: string) => {
     const payload: unknown = key === 'undefined' ? undefined : JSON.parse(key)
-    const atom =
-      kind === 'value'
-        ? EngineClient.runtime.atom(
-            liveStream<LiveValue<unknown>, unknown>(tag, payload).pipe(
-              Stream.map((message) => {
-                recordUpdate(tag, message.meta)
-                return message.value
-              }),
-            ),
-          )
-        : EngineClient.runtime.atom(
-            liveStream<ListDelta<{ readonly id: string; readonly rev: number }>, unknown>(tag, payload).pipe(
-              Stream.scan(emptyWindow<{ readonly id: string; readonly rev: number }>, (window, delta) => {
-                recordUpdate(tag, delta.meta)
-                return applyListDelta(window, delta)
-              }),
-              Stream.drop(1),
-            ),
-          )
-    return atom.pipe(Atom.setIdleTTL(IDLE_TTL))
+    return kind === 'value'
+      ? EngineClient.runtime.atom(
+          liveStream<LiveValue<unknown>, unknown>(tag, payload).pipe(
+            Stream.map((message) => {
+              recordUpdate(tag, message.meta)
+              return message.value
+            }),
+          ),
+        )
+      : EngineClient.runtime.atom(
+          liveStream<ListDelta<{ readonly id: string; readonly rev: number }>, unknown>(tag, payload).pipe(
+            Stream.scan(emptyWindow<{ readonly id: string; readonly rev: number }>, (window, delta) => {
+              recordUpdate(tag, delta.meta)
+              return applyListDelta(window, delta)
+            }),
+            Stream.drop(1),
+          ),
+        )
+  })
+  // What containers read: the subscription, kept for the idle TTL after the last reader leaves.
+  const family = Atom.family((key: string) => {
+    const subscription = subscriptions(key)
+    const atom = Atom.make((get) => get(subscription)).pipe(Atom.setIdleTTL(IDLE_TTL))
+    subscriptionOf.set(atom, subscription)
+    return atom
   })
   const make = (payload: unknown) => family(payloadKey(payload))
   liveFamilies.set(route, make)
   return make as (payload: Payload<R>) => LiveAtomFor<R>
 }
 
-/** The ids of a list window, identity-stable while the order does not change. */
-export const orderAtom = Atom.family(<Row, E>(list: LiveListAtom<Row, E>) =>
-  Atom.make((get) => AsyncResult.getOrElse(get(list), () => emptyWindow<Row>()).order).pipe(Atom.withEquality((a, b) => a === b)),
-)
+const rowFamilies = new WeakMap<Atom.Atom<unknown>, (id: string) => Atom.Atom<unknown>>()
 
-/** One row of a list window. Re-renders its subscriber only when that row's `rev` changes. */
-export const rowAtom = Atom.family(<Row, E>(list: LiveListAtom<Row, E>) =>
-  Atom.family((id: string) =>
-    Atom.make((get) => AsyncResult.getOrElse(get(list), () => emptyWindow<Row>()).rows.get(id)).pipe(
-      Atom.withEquality((a, b) => a === b),
-    ),
-  ),
-)
+/**
+ * One row of a list window. Re-renders its subscriber only when that row's
+ * `rev` changes. The per-list families are held by the list atom, so a row
+ * keeps its atom for as long as the list exists.
+ */
+export function rowAtom<Row, E>(list: LiveListAtom<Row, E>): (id: string) => Atom.Atom<Row | undefined> {
+  let rows = rowFamilies.get(list)
+  if (rows === undefined) {
+    rows = Atom.family((id: string) =>
+      Atom.make((get) => AsyncResult.getOrElse(get(list), () => emptyWindow<Row>()).rows.get(id)).pipe(Atom.withEquality((a, b) => a === b)),
+    )
+    rowFamilies.set(list, rows)
+  }
+  return rows as (id: string) => Atom.Atom<Row | undefined>
+}
 
 export type CommandAtom<R> = Atom.AtomResultFn<Payload<R>, SuccessOf<R>, ErrorOf<R> | RpcClientError>
 
@@ -173,23 +187,27 @@ const PREFETCH_LIMIT = 3
 const warmByRegistry = new WeakMap<Registry, Array<{ readonly atom: Atom.Atom<unknown>; readonly release: () => void }>>()
 
 /**
- * Keeps a live query mounted (performance.md 4.2): call on hover, focus or
- * keyboard selection. At most three are kept per registry; the oldest is
- * released first, and its idle TTL then keeps the subscription for another
- * 30 s.
+ * Keeps a live query's subscription running (performance.md 4.2): call on
+ * hover, focus or keyboard selection. One warm set per registry holds at
+ * most three; the oldest is released first. The warm set mounts the
+ * subscription under the atom, not the atom, so a released prefetch that
+ * was never opened ends at once instead of living out the 30 s idle TTL.
+ * An open topic (the active tab) reads the atom itself, so its
+ * subscription outlives any eviction.
  */
 export function prefetch(registry: Registry, atom: Atom.Atom<unknown>): void {
+  const target = subscriptionOf.get(atom) ?? atom
   let warm = warmByRegistry.get(registry)
   if (!warm) {
     warm = []
     warmByRegistry.set(registry, warm)
   }
-  const index = warm.findIndex((entry) => entry.atom === atom)
+  const index = warm.findIndex((entry) => entry.atom === target)
   if (index >= 0) {
     const [entry] = warm.splice(index, 1)
     warm.push(entry!)
     return
   }
-  warm.push({ atom, release: registry.mount(atom) })
+  warm.push({ atom: target, release: registry.mount(target) })
   while (warm.length > PREFETCH_LIMIT) warm.shift()!.release()
 }

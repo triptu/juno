@@ -1,0 +1,24 @@
+{
+  "approach": "A",
+  "model": "anthropic/claude-sonnet-5.5",
+  "topic": "flags",
+  "ok": true,
+  "free": {
+    "ok": true,
+    "svg": "<svg width=\"40\" height=\"40\" aria-hidden=\"true\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" fill=\"none\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M10 35V6\" stroke=\"#2E5F6B\" stroke-width=\"3\"/><path d=\"M10 7h20l-5 7 5 7H10z\" fill=\"#CFE3E8\" stroke=\"#2E5F6B\" stroke-width=\"3\"/><path d=\"M24 28l8 8M32 28l-8 8\" stroke=\"#CC4628\" stroke-width=\"3\"/></svg>",
+    "elements": 3,
+    "gradients": false
+  },
+  "attempts": 1,
+  "latencyMs": 1285,
+  "costUsd": 0.002836,
+  "tokens": {
+    "in": 438,
+    "out": 196
+  },
+  "raw": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" fill=\"none\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M10 35V6\" stroke=\"#2E5F6B\" stroke-width=\"3\"/><path d=\"M10 7h20l-5 7 5 7H10z\" fill=\"#CFE3E8\" stroke=\"#2E5F6B\" stroke-width=\"3\"/><path d=\"M24 28l8 8M32 28l-8 8\" stroke=\"#CC4628\" stroke-width=\"3\"/></svg>",
+  "svg": {
+    "light": "<svg width=\"40\" height=\"40\" aria-hidden=\"true\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" fill=\"none\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M10 35V6\" stroke=\"#2E5F6B\" stroke-width=\"3\"/><path d=\"M10 7h20l-5 7 5 7H10z\" fill=\"#CFE3E8\" stroke=\"#2E5F6B\" stroke-width=\"3\"/><path d=\"M24 28l8 8M32 28l-8 8\" stroke=\"#CC4628\" stroke-width=\"3\"/></svg>",
+    "dark": "<svg width=\"40\" height=\"40\" aria-hidden=\"true\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" fill=\"none\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M10 35V6\" stroke=\"#2E5F6B\" stroke-width=\"3\"/><path d=\"M10 7h20l-5 7 5 7H10z\" fill=\"#CFE3E8\" stroke=\"#2E5F6B\" stroke-width=\"3\"/><path d=\"M24 28l8 8M32 28l-8 8\" stroke=\"#CC4628\" stroke-width=\"3\"/></svg>"
+  }
+}

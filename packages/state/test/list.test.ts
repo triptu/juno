@@ -24,6 +24,22 @@ describe('applyListDelta', () => {
     expect(third.rows.get('b')).toBe(b2)
   })
 
+  it('keeps the objects of rows a reset repeats with the same rev, so a reconnect re-renders only what changed', () => {
+    const a = { id: 'a', rev: 1, title: 'A' }
+    const b = { id: 'b', rev: 1, title: 'B' }
+    const first = applyListDelta(emptyWindow<typeof a>(), { reset: true, order: ['a', 'b'], upsert: [a, b], remove: [], meta })
+    const again = applyListDelta(first, {
+      reset: true,
+      order: ['a', 'b'],
+      upsert: [{ ...a }, { id: 'b', rev: 2, title: 'B2' }],
+      remove: [],
+      meta: { ...meta, seq: 1 },
+    })
+    expect(again.rows.get('a')).toBe(a)
+    expect(again.rows.get('b')).toEqual({ id: 'b', rev: 2, title: 'B2' })
+    expect(again.order).toBe(first.order)
+  })
+
   it('drops everything on reset', () => {
     const a = { id: 'a', rev: 1 }
     const first = applyListDelta(emptyWindow<typeof a>(), { reset: true, order: ['a'], upsert: [a], remove: [], meta })

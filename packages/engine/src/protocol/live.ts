@@ -14,11 +14,18 @@
  *   plus the ids that left the window. The last `{ order, revById }` per
  *   subscription lives here.
  *
+ * A run that changes nothing sends nothing: a value equal to the last one,
+ * or a list run with no changed row, no removed id and the same order.
+ * Every re-run of an invalidated query would otherwise cross the port and
+ * wake the renderer for no visible change. `seq` counts sent messages only.
+ *
  * Failures: a run that fails before any value was sent fails the stream, so
  * the renderer sees the route's error. A later failure re-emits the last
- * value with `meta.error` and the subscription continues.
+ * value with `meta.error` and the subscription continues. A route with no
+ * error of its own to show pipes the stream through `retryFirstRun`, which
+ * starts it again with backoff instead.
  */
-import { Clock, Effect, Result, Stream } from 'effect'
+import { Clock, Effect, Option, Result, Schedule, Stream } from 'effect'
 import { LIVE_DELTA_MAX_BYTES, LIVE_SNAPSHOT_MAX_BYTES, type ListDelta, type LiveMeta, type LiveValue } from '@juno/contract'
 
 /** A successful query run: its value and how long it took. */
@@ -46,35 +53,71 @@ export interface ServeOptions {
   readonly measure?: boolean | undefined
 }
 
-/** The error as one line for `meta.error`: the message, or the tag of a tagged error without one. */
-const describe = (error: unknown): string => {
-  if (!(error instanceof Error)) return String(error)
-  if (error.message !== '') return error.message
-  const tag = (error as { readonly _tag?: unknown })._tag
-  return typeof tag === 'string' ? tag : error.name
+/** Structural equality for the JSON-shaped values live queries carry (performance 2.2: no `Date`, `Map` or class instances). */
+export function sameValue(a: unknown, b: unknown): boolean {
+  if (Object.is(a, b)) return true
+  if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null) return false
+  if (Array.isArray(a) || Array.isArray(b)) {
+    if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false
+    for (let i = 0; i < a.length; i++) if (!sameValue(a[i], b[i])) return false
+    return true
+  }
+  const left = a as Record<string, unknown>
+  const right = b as Record<string, unknown>
+  const keys = Object.keys(left)
+  if (keys.length !== Object.keys(right).length) return false
+  for (const key of keys) if (!(key in right) || !sameValue(left[key], right[key])) return false
+  return true
 }
 
-/** Stamps every run with `LiveMeta`. `encode` is the value codec of the route, used only when measuring. */
+/**
+ * The error as one line for `meta.error`: the message, or the tag of a
+ * tagged error without one, followed by the innermost cause's message when
+ * it says more ("Failed to execute statement: no such table: x").
+ */
+const describe = (error: unknown): string => {
+  if (!(error instanceof Error)) return String(error)
+  const tag = (error as { readonly _tag?: unknown })._tag
+  const own = error.message !== '' ? error.message : typeof tag === 'string' ? tag : error.name
+  let inner: unknown = error
+  let root: string | undefined
+  for (let depth = 0; depth < 4 && typeof inner === 'object' && inner !== null; depth++) {
+    const next: unknown = (inner as { readonly cause?: unknown }).cause ?? (inner as { readonly reason?: unknown }).reason
+    if (next instanceof Error && next.message !== '' && next.message !== own) root = next.message
+    inner = next
+  }
+  return root === undefined ? own : `${own}: ${root}`
+}
+
+/**
+ * Stamps every run with `LiveMeta` and drops a run whose value equals the
+ * last one sent (`equals`, structural by default). `encode` is the value
+ * codec of the route, used only when measuring.
+ */
 export function serveLiveValue<A, E, SE, R>(
   runs: Stream.Stream<Run<A, E>, SE, R>,
-  options?: ServeOptions & { readonly encode?: ((value: A) => unknown) | undefined },
+  options?: ServeOptions & { readonly encode?: ((value: A) => unknown) | undefined; readonly equals?: ((a: A, b: A) => boolean) | undefined },
 ): Stream.Stream<LiveValue<A>, E | SE, R> {
+  const equals = options?.equals ?? sameValue
   let seq = 0
   let last: { readonly value: A } | undefined
   return runs.pipe(
     Stream.mapEffect((run) =>
-      Effect.gen(function* () {
+      Effect.gen(function* (): Generator<Effect.Effect<number, E>, Option.Option<LiveValue<A>>> {
         const at = yield* Clock.currentTimeMillis
         if (Result.isFailure(run)) {
           if (last === undefined) return yield* Effect.fail(run.failure)
-          return { value: last.value, meta: { seq: ++seq, queryMs: 0, encodeMs: 0, at, error: describe(run.failure) } }
+          return Option.some({ value: last.value, meta: { seq: ++seq, queryMs: 0, encodeMs: 0, at, error: describe(run.failure) } })
         }
         const { value, queryMs } = run.success
+        if (last !== undefined && equals(last.value, value)) return Option.none()
         last = { value }
         const encodeMs = options?.measure && options.encode ? measureEncode(() => options.encode!(value)).encodeMs : 0
-        return { value, meta: { seq: ++seq, queryMs, encodeMs, at } }
+        return Option.some({ value, meta: { seq: ++seq, queryMs, encodeMs, at } })
       }),
     ),
+    Stream.filter(Option.isSome),
+    Stream.map((message) => message.value),
   )
 }
 
@@ -89,9 +132,10 @@ interface RowLike {
 }
 
 /**
- * Emits the whole window on the first run, then deltas. `encodeRow` is the
- * row codec of the route; when measuring it gives `encodeMs` and checks the
- * size budgets on the rows that actually travel.
+ * Emits the whole window on the first run, then deltas, and nothing for a
+ * run that changed no row and kept the order. `encodeRow` is the row codec
+ * of the route; when measuring it gives `encodeMs` and checks the size
+ * budgets on the rows that actually travel.
  */
 export function serveLiveList<Row extends RowLike, E, SE, R>(
   runs: Stream.Stream<Run<ListRun<Row>, E>, SE, R>,
@@ -102,12 +146,12 @@ export function serveLiveList<Row extends RowLike, E, SE, R>(
   let revById = new Map<string, number>()
   return runs.pipe(
     Stream.mapEffect((outcome) =>
-      Effect.gen(function* () {
+      Effect.gen(function* (): Generator<Effect.Effect<unknown, E>, Option.Option<ListDelta<Row>>> {
         const at = yield* Clock.currentTimeMillis
         if (Result.isFailure(outcome)) {
           if (seq === 0) return yield* Effect.fail(outcome.failure)
           const meta: LiveMeta = { seq: ++seq, queryMs: 0, encodeMs: 0, at, error: describe(outcome.failure) }
-          return { reset: false, order, upsert: [], remove: [], meta }
+          return Option.some({ reset: false, order, upsert: [], remove: [], meta })
         }
         const { value: run, queryMs } = outcome.success
         const reset = seq === 0
@@ -120,6 +164,7 @@ export function serveLiveList<Row extends RowLike, E, SE, R>(
         }
         const remove: Array<string> = []
         for (const id of revById.keys()) if (!nextRevById.has(id)) remove.push(id)
+        if (!reset && upsert.length === 0 && remove.length === 0 && sameOrder(order, nextOrder)) return Option.none()
         let encodeMs = 0
         if (options.measure) {
           const measured = measureEncode(() => upsert.map(options.encodeRow))
@@ -132,9 +177,11 @@ export function serveLiveList<Row extends RowLike, E, SE, R>(
         order = sameOrder(order, nextOrder) ? order : nextOrder
         revById = nextRevById
         const meta: LiveMeta = { seq: ++seq, queryMs, encodeMs, at, ...(run.total === undefined ? {} : { total: run.total }) }
-        return { reset, order, upsert, remove, meta }
+        return Option.some({ reset, order, upsert, remove, meta })
       }),
     ),
+    Stream.filter(Option.isSome),
+    Stream.map((message) => message.value),
   )
 }
 
@@ -152,3 +199,21 @@ function sameOrder(a: ReadonlyArray<string>, b: ReadonlyArray<string>): boolean 
   for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false
   return true
 }
+
+/** 0.5 s, doubling, at most 30 s apart. */
+const FIRST_RUN_RETRY = Schedule.min([Schedule.exponential('500 millis'), Schedule.spaced('30 seconds')])
+
+/**
+ * For a served stream (`serveLiveValue`, `serveLiveList`): a failure, which
+ * can only come from the first run, is logged and the stream starts again
+ * with backoff, so a busy reader or a missing table at boot does not end the
+ * subscription for good. The renderer keeps what it shows until a run
+ * succeeds. Defects are not retried.
+ */
+export const retryFirstRun =
+  (label: string, schedule: Schedule.Schedule<unknown, unknown> = FIRST_RUN_RETRY) =>
+  <A, E, R>(served: Stream.Stream<A, E, R>): Stream.Stream<A, E, R> =>
+    served.pipe(
+      Stream.tapError((error) => Effect.logWarning(`${label}: the first run failed; retrying`, error)),
+      Stream.retry(schedule),
+    )

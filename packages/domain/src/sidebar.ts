@@ -32,9 +32,19 @@ export function matchesSidebarFilter(topic: Topic, filter: SidebarFilter): boole
   return true
 }
 
+/**
+ * Numeric order of two timestamps. Two well-formed ts of the same length
+ * have the dot in the same place, so their text order is their numeric
+ * order, which spares the parse on the sidebar's hot path.
+ */
+function compareActivity(a: string, b: string): number {
+  if (a.length === b.length) return a < b ? -1 : a > b ? 1 : 0
+  return compareTs(a, b)
+}
+
 /** Latest activity first; ties break on id so the order is stable. */
 export function byLatestActivity(a: Topic, b: Topic): number {
-  const c = compareTs(b.activity.lastActivityTs, a.activity.lastActivityTs)
+  const c = compareActivity(b.activity.lastActivityTs, a.activity.lastActivityTs)
   return c !== 0 ? c : a.id < b.id ? -1 : a.id > b.id ? 1 : 0
 }
 

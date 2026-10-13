@@ -1,0 +1,40 @@
+{
+  "approach": "C",
+  "model": "anthropic/claude-sonnet-5.5",
+  "topic": "flaky",
+  "ok": true,
+  "spec": {
+    "hue": "teal",
+    "elements": [
+      {
+        "tag": "motif",
+        "attrs": {
+          "name": "bug",
+          "x": "0",
+          "y": "0",
+          "scale": "1"
+        }
+      }
+    ]
+  },
+  "decision": {
+    "main": "bug",
+    "secondary": null,
+    "hue": "teal",
+    "confident": true,
+    "why": "Flaky test maps directly to the bug motif."
+  },
+  "attempts": 1,
+  "latencyMs": 1438,
+  "costUsd": 0.004468,
+  "tokens": {
+    "in": 1974,
+    "out": 52
+  },
+  "raw": "{\"main\": \"bug\", \"secondary\": null, \"hue\": \"teal\", \"confident\": true, \"why\": \"Flaky test maps directly to the bug motif.\"}",
+  "svg": {
+    "light": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"l-C-anthropic_claude-sonnet-5.5-flaky\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#l-C-anthropic_claude-sonnet-5.5-flaky)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#c3e9e3\"/><g fill=\"none\" stroke=\"#0c5952\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><g transform=\"translate(0 0) scale(1)\" stroke-width=\"3.00\"><ellipse cx=\"20\" cy=\"22\" rx=\"8\" ry=\"9\" fill=\"#84cec4\"/><circle cx=\"20\" cy=\"11\" r=\"4\" fill=\"#84cec4\"/><line x1=\"12\" y1=\"18\" x2=\"7\" y2=\"15\"/><line x1=\"12\" y1=\"24\" x2=\"7\" y2=\"24\"/><line x1=\"12\" y1=\"30\" x2=\"8\" y2=\"33\"/><line x1=\"28\" y1=\"18\" x2=\"33\" y2=\"15\"/><line x1=\"28\" y1=\"24\" x2=\"33\" y2=\"24\"/><line x1=\"28\" y1=\"30\" x2=\"32\" y2=\"33\"/><line x1=\"20\" y1=\"14\" x2=\"20\" y2=\"31\"/></g></g></g></svg>",
+    "dark": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"d-C-anthropic_claude-sonnet-5.5-flaky\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#d-C-anthropic_claude-sonnet-5.5-flaky)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#0f3e39\"/><g fill=\"none\" stroke=\"#a3e7dd\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><g transform=\"translate(0 0) scale(1)\" stroke-width=\"3.00\"><ellipse cx=\"20\" cy=\"22\" rx=\"8\" ry=\"9\" fill=\"#1a625a\"/><circle cx=\"20\" cy=\"11\" r=\"4\" fill=\"#1a625a\"/><line x1=\"12\" y1=\"18\" x2=\"7\" y2=\"15\"/><line x1=\"12\" y1=\"24\" x2=\"7\" y2=\"24\"/><line x1=\"12\" y1=\"30\" x2=\"8\" y2=\"33\"/><line x1=\"28\" y1=\"18\" x2=\"33\" y2=\"15\"/><line x1=\"28\" y1=\"24\" x2=\"33\" y2=\"24\"/><line x1=\"28\" y1=\"30\" x2=\"32\" y2=\"33\"/><line x1=\"20\" y1=\"14\" x2=\"20\" y2=\"31\"/></g></g></g></svg>"
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"teal\">\n  <motif name=\"bug\" x=\"0\" y=\"0\" scale=\"1\"/>\n</svg>"
+}

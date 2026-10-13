@@ -1,0 +1,85 @@
+{
+  "approach": "B",
+  "model": "anthropic/claude-haiku-5.5",
+  "topic": "games",
+  "ok": true,
+  "spec": {
+    "hue": "amber",
+    "elements": [
+      {
+        "tag": "rect",
+        "attrs": {
+          "x": "9",
+          "y": "9",
+          "width": "22",
+          "height": "22",
+          "rx": "4",
+          "fill": "soft"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "15",
+          "cy": "15",
+          "r": "2",
+          "fill": "ink",
+          "stroke": "none"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "25",
+          "cy": "25",
+          "r": "2",
+          "fill": "ink",
+          "stroke": "none"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "25",
+          "cy": "15",
+          "r": "2",
+          "fill": "ink",
+          "stroke": "none"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "15",
+          "cy": "25",
+          "r": "2",
+          "fill": "ink",
+          "stroke": "none"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "20",
+          "cy": "20",
+          "r": "2",
+          "fill": "accent",
+          "stroke": "none"
+        }
+      }
+    ]
+  },
+  "attempts": 1,
+  "latencyMs": 1030,
+  "costUsd": 0.0002469,
+  "tokens": {
+    "in": 1319,
+    "out": 230
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"amber\">\n  <rect x=\"9\" y=\"9\" width=\"22\" height=\"22\" rx=\"4\" fill=\"soft\"/>\n  <circle cx=\"15\" cy=\"15\" r=\"2\" fill=\"ink\" stroke=\"none\"/>\n  <circle cx=\"25\" cy=\"25\" r=\"2\" fill=\"ink\" stroke=\"none\"/>\n  <circle cx=\"25\" cy=\"15\" r=\"2\" fill=\"ink\" stroke=\"none\"/>\n  <circle cx=\"15\" cy=\"25\" r=\"2\" fill=\"ink\" stroke=\"none\"/>\n  <circle cx=\"20\" cy=\"20\" r=\"2\" fill=\"accent\" stroke=\"none\"/>\n</svg>",
+  "svg": {
+    "light": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"l-B-anthropic_claude-haiku-5.5-games\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#l-B-anthropic_claude-haiku-5.5-games)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#f1dcc3\"/><g fill=\"none\" stroke=\"#6b4300\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"9\" y=\"9\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#dcb688\"/><circle cx=\"15\" cy=\"15\" r=\"2\" fill=\"#6b4300\" stroke=\"none\"/><circle cx=\"25\" cy=\"25\" r=\"2\" fill=\"#6b4300\" stroke=\"none\"/><circle cx=\"25\" cy=\"15\" r=\"2\" fill=\"#6b4300\" stroke=\"none\"/><circle cx=\"15\" cy=\"25\" r=\"2\" fill=\"#6b4300\" stroke=\"none\"/><circle cx=\"20\" cy=\"20\" r=\"2\" fill=\"#df6a55\" stroke=\"none\"/></g></g></svg>",
+    "dark": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"d-B-anthropic_claude-haiku-5.5-games\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#d-B-anthropic_claude-haiku-5.5-games)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#453116\"/><g fill=\"none\" stroke=\"#f5d1a5\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"9\" y=\"9\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#6d4f26\"/><circle cx=\"15\" cy=\"15\" r=\"2\" fill=\"#f5d1a5\" stroke=\"none\"/><circle cx=\"25\" cy=\"25\" r=\"2\" fill=\"#f5d1a5\" stroke=\"none\"/><circle cx=\"25\" cy=\"15\" r=\"2\" fill=\"#f5d1a5\" stroke=\"none\"/><circle cx=\"15\" cy=\"25\" r=\"2\" fill=\"#f5d1a5\" stroke=\"none\"/><circle cx=\"20\" cy=\"20\" r=\"2\" fill=\"#f8907c\" stroke=\"none\"/></g></g></svg>"
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"amber\">\n  <rect x=\"9\" y=\"9\" width=\"22\" height=\"22\" rx=\"4\" fill=\"soft\"/>\n  <circle cx=\"15\" cy=\"15\" r=\"2\" fill=\"ink\" stroke=\"none\"/>\n  <circle cx=\"25\" cy=\"25\" r=\"2\" fill=\"ink\" stroke=\"none\"/>\n  <circle cx=\"25\" cy=\"15\" r=\"2\" fill=\"ink\" stroke=\"none\"/>\n  <circle cx=\"15\" cy=\"25\" r=\"2\" fill=\"ink\" stroke=\"none\"/>\n  <circle cx=\"20\" cy=\"20\" r=\"2\" fill=\"accent\" stroke=\"none\"/>\n</svg>"
+}

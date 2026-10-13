@@ -1,0 +1,24 @@
+{
+  "approach": "A",
+  "model": "anthropic/claude-sonnet-5.5",
+  "topic": "lag",
+  "ok": true,
+  "free": {
+    "ok": true,
+    "svg": "<svg width=\"40\" height=\"40\" aria-hidden=\"true\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" fill=\"none\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"3\"><circle cx=\"18\" cy=\"22\" r=\"13\" fill=\"#CFE3E8\" stroke=\"#2E5F6B\"/><path d=\"M18 14v8l5 3\" stroke=\"#2E5F6B\"/><path d=\"M31 4.5l4 4M35 4.5l-4 4\" stroke=\"#CC4628\" stroke-width=\"0\"/><path d=\"M32 5a5 5 0 0 1 4 4\" stroke=\"#CC4628\"/><circle cx=\"33\" cy=\"9\" r=\"1.5\" fill=\"#CC4628\" stroke=\"#CC4628\" stroke-width=\"1\"/></svg>",
+    "elements": 5,
+    "gradients": false
+  },
+  "attempts": 1,
+  "latencyMs": 1179,
+  "costUsd": 0.003612,
+  "tokens": {
+    "in": 451,
+    "out": 271
+  },
+  "raw": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" fill=\"none\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"3\"><circle cx=\"18\" cy=\"22\" r=\"13\" fill=\"#CFE3E8\" stroke=\"#2E5F6B\"/><path d=\"M18 14v8l5 3\" stroke=\"#2E5F6B\"/><path d=\"M31 4.5l4 4M35 4.5l-4 4\" stroke=\"#CC4628\" stroke-width=\"0\"/><path d=\"M32 5a5 5 0 0 1 4 4\" stroke=\"#CC4628\"/><circle cx=\"33\" cy=\"9\" r=\"1.5\" fill=\"#CC4628\" stroke=\"#CC4628\" stroke-width=\"1\"/></svg>",
+  "svg": {
+    "light": "<svg width=\"40\" height=\"40\" aria-hidden=\"true\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" fill=\"none\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"3\"><circle cx=\"18\" cy=\"22\" r=\"13\" fill=\"#CFE3E8\" stroke=\"#2E5F6B\"/><path d=\"M18 14v8l5 3\" stroke=\"#2E5F6B\"/><path d=\"M31 4.5l4 4M35 4.5l-4 4\" stroke=\"#CC4628\" stroke-width=\"0\"/><path d=\"M32 5a5 5 0 0 1 4 4\" stroke=\"#CC4628\"/><circle cx=\"33\" cy=\"9\" r=\"1.5\" fill=\"#CC4628\" stroke=\"#CC4628\" stroke-width=\"1\"/></svg>",
+    "dark": "<svg width=\"40\" height=\"40\" aria-hidden=\"true\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" fill=\"none\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"3\"><circle cx=\"18\" cy=\"22\" r=\"13\" fill=\"#CFE3E8\" stroke=\"#2E5F6B\"/><path d=\"M18 14v8l5 3\" stroke=\"#2E5F6B\"/><path d=\"M31 4.5l4 4M35 4.5l-4 4\" stroke=\"#CC4628\" stroke-width=\"0\"/><path d=\"M32 5a5 5 0 0 1 4 4\" stroke=\"#CC4628\"/><circle cx=\"33\" cy=\"9\" r=\"1.5\" fill=\"#CC4628\" stroke=\"#CC4628\" stroke-width=\"1\"/></svg>"
+  }
+}

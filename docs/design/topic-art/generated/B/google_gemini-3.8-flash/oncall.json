@@ -1,0 +1,72 @@
+{
+  "approach": "B",
+  "model": "google/gemini-3.8-flash",
+  "topic": "oncall",
+  "ok": true,
+  "spec": {
+    "hue": "amber",
+    "elements": [
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M13 12 V8 H19 V12"
+        }
+      },
+      {
+        "tag": "rect",
+        "attrs": {
+          "x": "9",
+          "y": "12",
+          "width": "22",
+          "height": "18",
+          "rx": "3.5",
+          "fill": "soft"
+        }
+      },
+      {
+        "tag": "rect",
+        "attrs": {
+          "x": "13",
+          "y": "16",
+          "width": "10",
+          "height": "9",
+          "rx": "1.5"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "26.5",
+          "cy": "18",
+          "r": "1.5",
+          "fill": "accent",
+          "stroke": "none"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "25",
+          "y1": "23",
+          "x2": "28",
+          "y2": "23",
+          "stroke-width": "2",
+          "detail": "1"
+        }
+      }
+    ]
+  },
+  "attempts": 1,
+  "latencyMs": 4427,
+  "costUsd": 0.003495,
+  "tokens": {
+    "in": 1050,
+    "out": 722
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"amber\">\n  <path d=\"M13 12 V8 H19 V12\"/>\n  <rect x=\"9\" y=\"12\" width=\"22\" height=\"18\" rx=\"3.5\" fill=\"soft\"/>\n  <rect x=\"13\" y=\"16\" width=\"10\" height=\"9\" rx=\"1.5\"/>\n  <circle cx=\"26.5\" cy=\"18\" r=\"1.5\" fill=\"accent\" stroke=\"none\"/>\n  <line x1=\"25\" y1=\"23\" x2=\"28\" y2=\"23\" stroke-width=\"2\" detail=\"1\"/>\n</svg>",
+  "svg": {
+    "light": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"l-B-google_gemini-3.8-flash-oncall\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#l-B-google_gemini-3.8-flash-oncall)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#f1dcc3\"/><g fill=\"none\" stroke=\"#6b4300\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M13 12 V8 H19 V12\"/><rect x=\"9\" y=\"12\" width=\"22\" height=\"18\" rx=\"3.5\" fill=\"#dcb688\"/><rect x=\"13\" y=\"16\" width=\"10\" height=\"9\" rx=\"1.5\"/><circle cx=\"26.5\" cy=\"18\" r=\"1.5\" fill=\"#df6a55\" stroke=\"none\"/><line x1=\"25\" y1=\"23\" x2=\"28\" y2=\"23\" stroke-width=\"2.00\"/></g></g></svg>",
+    "dark": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"d-B-google_gemini-3.8-flash-oncall\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#d-B-google_gemini-3.8-flash-oncall)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#453116\"/><g fill=\"none\" stroke=\"#f5d1a5\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M13 12 V8 H19 V12\"/><rect x=\"9\" y=\"12\" width=\"22\" height=\"18\" rx=\"3.5\" fill=\"#6d4f26\"/><rect x=\"13\" y=\"16\" width=\"10\" height=\"9\" rx=\"1.5\"/><circle cx=\"26.5\" cy=\"18\" r=\"1.5\" fill=\"#f8907c\" stroke=\"none\"/><line x1=\"25\" y1=\"23\" x2=\"28\" y2=\"23\" stroke-width=\"2.00\"/></g></g></svg>"
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"amber\">\n  <path d=\"M13 12 V8 H19 V12\"/>\n  <rect x=\"9\" y=\"12\" width=\"22\" height=\"18\" rx=\"3.5\" fill=\"soft\"/>\n  <rect x=\"13\" y=\"16\" width=\"10\" height=\"9\" rx=\"1.5\"/>\n  <circle cx=\"26.5\" cy=\"18\" r=\"1.5\" fill=\"accent\" stroke=\"none\"/>\n  <line x1=\"25\" y1=\"23\" x2=\"28\" y2=\"23\" stroke-width=\"2\" detail=\"1\"/>\n</svg>"
+}

@@ -1,0 +1,51 @@
+{
+  "approach": "B",
+  "model": "anthropic/claude-sonnet-5.5",
+  "topic": "flags",
+  "ok": true,
+  "spec": {
+    "hue": "teal",
+    "elements": [
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "12",
+          "y1": "7",
+          "x2": "12",
+          "y2": "33"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M12 10 H29 L25 15.5 L29 21 H12",
+          "fill": "soft"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "26",
+          "cy": "29",
+          "r": "2",
+          "fill": "accent",
+          "stroke": "none",
+          "detail": "1"
+        }
+      }
+    ]
+  },
+  "attempts": 1,
+  "latencyMs": 1574,
+  "costUsd": 0.004004,
+  "tokens": {
+    "in": 1342,
+    "out": 132
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"teal\">\n  <line x1=\"12\" y1=\"7\" x2=\"12\" y2=\"33\"/>\n  <path d=\"M12 10 H29 L25 15.5 L29 21 H12\" fill=\"soft\"/>\n  <circle cx=\"26\" cy=\"29\" r=\"2\" fill=\"accent\" stroke=\"none\" detail=\"1\"/>\n</svg>",
+  "svg": {
+    "light": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"l-B-anthropic_claude-sonnet-5.5-flags\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#l-B-anthropic_claude-sonnet-5.5-flags)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#c3e9e3\"/><g fill=\"none\" stroke=\"#0c5952\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><line x1=\"12\" y1=\"7\" x2=\"12\" y2=\"33\"/><path d=\"M12 10 H29 L25 15.5 L29 21 H12\" fill=\"#84cec4\"/><circle cx=\"26\" cy=\"29\" r=\"2\" fill=\"#df6a55\" stroke=\"none\"/></g></g></svg>",
+    "dark": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"d-B-anthropic_claude-sonnet-5.5-flags\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#d-B-anthropic_claude-sonnet-5.5-flags)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#0f3e39\"/><g fill=\"none\" stroke=\"#a3e7dd\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><line x1=\"12\" y1=\"7\" x2=\"12\" y2=\"33\"/><path d=\"M12 10 H29 L25 15.5 L29 21 H12\" fill=\"#1a625a\"/><circle cx=\"26\" cy=\"29\" r=\"2\" fill=\"#f8907c\" stroke=\"none\"/></g></g></svg>"
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"teal\">\n  <line x1=\"12\" y1=\"7\" x2=\"12\" y2=\"33\"/>\n  <path d=\"M12 10 H29 L25 15.5 L29 21 H12\" fill=\"soft\"/>\n  <circle cx=\"26\" cy=\"29\" r=\"2\" fill=\"accent\" stroke=\"none\" detail=\"1\"/>\n</svg>"
+}

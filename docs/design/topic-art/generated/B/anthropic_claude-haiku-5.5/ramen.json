@@ -1,0 +1,70 @@
+{
+  "approach": "B",
+  "model": "anthropic/claude-haiku-5.5",
+  "topic": "ramen",
+  "ok": true,
+  "spec": {
+    "hue": "amber",
+    "elements": [
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M8 19 H32 A12 10 0 0 1 8 19 Z",
+          "fill": "soft"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "8",
+          "y1": "19",
+          "x2": "32",
+          "y2": "19"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M14 12 C13 10 15 8 14 6",
+          "detail": "1"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M20 12 C19 10 21 8 20 6",
+          "detail": "1"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M26 12 C25 10 27 8 26 6",
+          "detail": "1"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "6",
+          "y1": "30",
+          "x2": "34",
+          "y2": "30"
+        }
+      }
+    ]
+  },
+  "attempts": 1,
+  "latencyMs": 1174,
+  "costUsd": 0.000241,
+  "tokens": {
+    "in": 1330,
+    "out": 216
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"amber\">\n  <path d=\"M8 19 H32 A12 10 0 0 1 8 19 Z\" fill=\"soft\"/>\n  <line x1=\"8\" y1=\"19\" x2=\"32\" y2=\"19\"/>\n  <path d=\"M14 12 C13 10 15 8 14 6\" detail=\"1\"/>\n  <path d=\"M20 12 C19 10 21 8 20 6\" detail=\"1\"/>\n  <path d=\"M26 12 C25 10 27 8 26 6\" detail=\"1\"/>\n  <line x1=\"6\" y1=\"30\" x2=\"34\" y2=\"30\"/>\n</svg>",
+  "svg": {
+    "light": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"l-B-anthropic_claude-haiku-5.5-ramen\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#l-B-anthropic_claude-haiku-5.5-ramen)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#f1dcc3\"/><g fill=\"none\" stroke=\"#6b4300\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M8 19 H32 A12 10 0 0 1 8 19 Z\" fill=\"#dcb688\"/><line x1=\"8\" y1=\"19\" x2=\"32\" y2=\"19\"/><path d=\"M14 12 C13 10 15 8 14 6\"/><path d=\"M20 12 C19 10 21 8 20 6\"/><path d=\"M26 12 C25 10 27 8 26 6\"/><line x1=\"6\" y1=\"30\" x2=\"34\" y2=\"30\"/></g></g></svg>",
+    "dark": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"d-B-anthropic_claude-haiku-5.5-ramen\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#d-B-anthropic_claude-haiku-5.5-ramen)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#453116\"/><g fill=\"none\" stroke=\"#f5d1a5\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M8 19 H32 A12 10 0 0 1 8 19 Z\" fill=\"#6d4f26\"/><line x1=\"8\" y1=\"19\" x2=\"32\" y2=\"19\"/><path d=\"M14 12 C13 10 15 8 14 6\"/><path d=\"M20 12 C19 10 21 8 20 6\"/><path d=\"M26 12 C25 10 27 8 26 6\"/><line x1=\"6\" y1=\"30\" x2=\"34\" y2=\"30\"/></g></g></svg>"
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"amber\">\n  <path d=\"M8 19 H32 A12 10 0 0 1 8 19 Z\" fill=\"soft\"/>\n  <line x1=\"8\" y1=\"19\" x2=\"32\" y2=\"19\"/>\n  <path d=\"M14 12 C13 10 15 8 14 6\" detail=\"1\"/>\n  <path d=\"M20 12 C19 10 21 8 20 6\" detail=\"1\"/>\n  <path d=\"M26 12 C25 10 27 8 26 6\" detail=\"1\"/>\n  <line x1=\"6\" y1=\"30\" x2=\"34\" y2=\"30\"/>\n</svg>"
+}

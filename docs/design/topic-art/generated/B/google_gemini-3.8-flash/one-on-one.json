@@ -1,0 +1,90 @@
+{
+  "approach": "B",
+  "model": "google/gemini-3.8-flash",
+  "topic": "one-on-one",
+  "ok": true,
+  "spec": {
+    "hue": "sage",
+    "elements": [
+      {
+        "tag": "rect",
+        "attrs": {
+          "x": "10",
+          "y": "9",
+          "width": "20",
+          "height": "23",
+          "rx": "3",
+          "fill": "soft"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "14",
+          "y1": "6",
+          "x2": "14",
+          "y2": "11"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "20",
+          "y1": "6",
+          "x2": "20",
+          "y2": "11"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "26",
+          "y1": "6",
+          "x2": "26",
+          "y2": "11"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "15",
+          "y1": "17",
+          "x2": "25",
+          "y2": "17"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "15",
+          "y1": "22",
+          "x2": "25",
+          "y2": "22"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "15",
+          "y1": "27",
+          "x2": "21",
+          "y2": "27",
+          "detail": "1"
+        }
+      }
+    ]
+  },
+  "attempts": 1,
+  "latencyMs": 2602,
+  "costUsd": 0.0038925,
+  "tokens": {
+    "in": 1070,
+    "out": 824
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"sage\">\n  <rect x=\"10\" y=\"9\" width=\"20\" height=\"23\" rx=\"3\" fill=\"soft\"/>\n  <line x1=\"14\" y1=\"6\" x2=\"14\" y2=\"11\"/>\n  <line x1=\"20\" y1=\"6\" x2=\"20\" y2=\"11\"/>\n  <line x1=\"26\" y1=\"6\" x2=\"26\" y2=\"11\"/>\n  <line x1=\"15\" y1=\"17\" x2=\"25\" y2=\"17\"/>\n  <line x1=\"15\" y1=\"22\" x2=\"25\" y2=\"22\"/>\n  <line x1=\"15\" y1=\"27\" x2=\"21\" y2=\"27\" detail=\"1\"/>\n</svg>",
+  "svg": {
+    "light": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"l-B-google_gemini-3.8-flash-one-on-one\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#l-B-google_gemini-3.8-flash-one-on-one)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#cee8d2\"/><g fill=\"none\" stroke=\"#135c2c\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"10\" y=\"9\" width=\"20\" height=\"23\" rx=\"3\" fill=\"#9ccca4\"/><line x1=\"14\" y1=\"6\" x2=\"14\" y2=\"11\"/><line x1=\"20\" y1=\"6\" x2=\"20\" y2=\"11\"/><line x1=\"26\" y1=\"6\" x2=\"26\" y2=\"11\"/><line x1=\"15\" y1=\"17\" x2=\"25\" y2=\"17\"/><line x1=\"15\" y1=\"22\" x2=\"25\" y2=\"22\"/><line x1=\"15\" y1=\"27\" x2=\"21\" y2=\"27\"/></g></g></svg>",
+    "dark": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"d-B-google_gemini-3.8-flash-one-on-one\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#d-B-google_gemini-3.8-flash-one-on-one)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#223d27\"/><g fill=\"none\" stroke=\"#b7e5bf\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"10\" y=\"9\" width=\"20\" height=\"23\" rx=\"3\" fill=\"#376040\"/><line x1=\"14\" y1=\"6\" x2=\"14\" y2=\"11\"/><line x1=\"20\" y1=\"6\" x2=\"20\" y2=\"11\"/><line x1=\"26\" y1=\"6\" x2=\"26\" y2=\"11\"/><line x1=\"15\" y1=\"17\" x2=\"25\" y2=\"17\"/><line x1=\"15\" y1=\"22\" x2=\"25\" y2=\"22\"/><line x1=\"15\" y1=\"27\" x2=\"21\" y2=\"27\"/></g></g></svg>"
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"sage\">\n  <rect x=\"10\" y=\"9\" width=\"20\" height=\"23\" rx=\"3\" fill=\"soft\"/>\n  <line x1=\"14\" y1=\"6\" x2=\"14\" y2=\"11\"/>\n  <line x1=\"20\" y1=\"6\" x2=\"20\" y2=\"11\"/>\n  <line x1=\"26\" y1=\"6\" x2=\"26\" y2=\"11\"/>\n  <line x1=\"15\" y1=\"17\" x2=\"25\" y2=\"17\"/>\n  <line x1=\"15\" y1=\"22\" x2=\"25\" y2=\"22\"/>\n  <line x1=\"15\" y1=\"27\" x2=\"21\" y2=\"27\" detail=\"1\"/>\n</svg>"
+}

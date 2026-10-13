@@ -1,0 +1,51 @@
+{
+  "approach": "B",
+  "model": "google/gemini-3.8-flash",
+  "topic": "pipeline",
+  "ok": true,
+  "spec": {
+    "hue": "amber",
+    "elements": [
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M9 12 H31 L23 22 V30 H17 V22 Z",
+          "fill": "soft"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "13",
+          "y1": "17",
+          "x2": "27",
+          "y2": "17",
+          "detail": "1"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "20",
+          "cy": "8",
+          "r": "2",
+          "fill": "accent",
+          "stroke": "none"
+        }
+      }
+    ]
+  },
+  "attempts": 1,
+  "latencyMs": 2983,
+  "costUsd": 0.0060195,
+  "tokens": {
+    "in": 1046,
+    "out": 1396
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"amber\">\n  <path d=\"M9 12 H31 L23 22 V30 H17 V22 Z\" fill=\"soft\"/>\n  <line x1=\"13\" y1=\"17\" x2=\"27\" y2=\"17\" detail=\"1\"/>\n  <circle cx=\"20\" cy=\"8\" r=\"2\" fill=\"accent\" stroke=\"none\"/>\n</svg>",
+  "svg": {
+    "light": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"l-B-google_gemini-3.8-flash-pipeline\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#l-B-google_gemini-3.8-flash-pipeline)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#f1dcc3\"/><g fill=\"none\" stroke=\"#6b4300\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M9 12 H31 L23 22 V30 H17 V22 Z\" fill=\"#dcb688\"/><line x1=\"13\" y1=\"17\" x2=\"27\" y2=\"17\"/><circle cx=\"20\" cy=\"8\" r=\"2\" fill=\"#df6a55\" stroke=\"none\"/></g></g></svg>",
+    "dark": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"d-B-google_gemini-3.8-flash-pipeline\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#d-B-google_gemini-3.8-flash-pipeline)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#453116\"/><g fill=\"none\" stroke=\"#f5d1a5\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M9 12 H31 L23 22 V30 H17 V22 Z\" fill=\"#6d4f26\"/><line x1=\"13\" y1=\"17\" x2=\"27\" y2=\"17\"/><circle cx=\"20\" cy=\"8\" r=\"2\" fill=\"#f8907c\" stroke=\"none\"/></g></g></svg>"
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"amber\">\n  <path d=\"M9 12 H31 L23 22 V30 H17 V22 Z\" fill=\"soft\"/>\n  <line x1=\"13\" y1=\"17\" x2=\"27\" y2=\"17\" detail=\"1\"/>\n  <circle cx=\"20\" cy=\"8\" r=\"2\" fill=\"accent\" stroke=\"none\"/>\n</svg>"
+}

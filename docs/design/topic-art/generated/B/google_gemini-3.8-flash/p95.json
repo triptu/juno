@@ -1,0 +1,51 @@
+{
+  "approach": "B",
+  "model": "google/gemini-3.8-flash",
+  "topic": "p95",
+  "ok": true,
+  "spec": {
+    "hue": "coral",
+    "elements": [
+      {
+        "tag": "rect",
+        "attrs": {
+          "x": "8",
+          "y": "9",
+          "width": "24",
+          "height": "22",
+          "rx": "4",
+          "fill": "soft"
+        }
+      },
+      {
+        "tag": "polyline",
+        "attrs": {
+          "points": "12 25 18 23 23 15 28 18"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "23",
+          "cy": "15",
+          "r": "2",
+          "fill": "accent",
+          "stroke": "none"
+        }
+      }
+    ]
+  },
+  "attempts": 1,
+  "latencyMs": 3394,
+  "costUsd": 0.00340275,
+  "tokens": {
+    "in": 1062,
+    "out": 695
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"coral\">\n  <rect x=\"8\" y=\"9\" width=\"24\" height=\"22\" rx=\"4\" fill=\"soft\"/>\n  <polyline points=\"12 25 18 23 23 15 28 18\"/>\n  <circle cx=\"23\" cy=\"15\" r=\"2\" fill=\"accent\" stroke=\"none\"/>\n</svg>",
+  "svg": {
+    "light": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"l-B-google_gemini-3.8-flash-p95\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#l-B-google_gemini-3.8-flash-p95)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#f9d7cf\"/><g fill=\"none\" stroke=\"#7c3326\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"8\" y=\"9\" width=\"24\" height=\"22\" rx=\"4\" fill=\"#eaaca0\"/><polyline points=\"12 25 18 23 23 15 28 18\"/><circle cx=\"23\" cy=\"15\" r=\"2\" fill=\"#c68206\" stroke=\"none\"/></g></g></svg>",
+    "dark": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"d-B-google_gemini-3.8-flash-p95\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#d-B-google_gemini-3.8-flash-p95)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#4c2b25\"/><g fill=\"none\" stroke=\"#fdcabf\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"8\" y=\"9\" width=\"24\" height=\"22\" rx=\"4\" fill=\"#77463c\"/><polyline points=\"12 25 18 23 23 15 28 18\"/><circle cx=\"23\" cy=\"15\" r=\"2\" fill=\"#e4a249\" stroke=\"none\"/></g></g></svg>"
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"coral\">\n  <rect x=\"8\" y=\"9\" width=\"24\" height=\"22\" rx=\"4\" fill=\"soft\"/>\n  <polyline points=\"12 25 18 23 23 15 28 18\"/>\n  <circle cx=\"23\" cy=\"15\" r=\"2\" fill=\"accent\" stroke=\"none\"/>\n</svg>"
+}

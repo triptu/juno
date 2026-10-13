@@ -1,0 +1,49 @@
+{
+  "approach": "B",
+  "model": "google/gemini-3.8-flash",
+  "topic": "hmm",
+  "ok": true,
+  "spec": {
+    "hue": "amber",
+    "elements": [
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M15 25 C13 21 12 18 12 15 A8 8 0 1 1 28 15 C28 18 27 21 25 25 Z",
+          "fill": "soft"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "16",
+          "y1": "29",
+          "x2": "24",
+          "y2": "29"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "18",
+          "y1": "33",
+          "x2": "22",
+          "y2": "33"
+        }
+      }
+    ]
+  },
+  "attempts": 1,
+  "latencyMs": 2373,
+  "costUsd": 0.004482,
+  "tokens": {
+    "in": 1026,
+    "out": 990
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"amber\">\n  <path d=\"M15 25 C13 21 12 18 12 15 A8 8 0 1 1 28 15 C28 18 27 21 25 25 Z\" fill=\"soft\"/>\n  <line x1=\"16\" y1=\"29\" x2=\"24\" y2=\"29\"/>\n  <line x1=\"18\" y1=\"33\" x2=\"22\" y2=\"33\"/>\n</svg>",
+  "svg": {
+    "light": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"l-B-google_gemini-3.8-flash-hmm\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#l-B-google_gemini-3.8-flash-hmm)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#f1dcc3\"/><g fill=\"none\" stroke=\"#6b4300\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M15 25 C13 21 12 18 12 15 A8 8 0 1 1 28 15 C28 18 27 21 25 25 Z\" fill=\"#dcb688\"/><line x1=\"16\" y1=\"29\" x2=\"24\" y2=\"29\"/><line x1=\"18\" y1=\"33\" x2=\"22\" y2=\"33\"/></g></g></svg>",
+    "dark": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"d-B-google_gemini-3.8-flash-hmm\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#d-B-google_gemini-3.8-flash-hmm)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#453116\"/><g fill=\"none\" stroke=\"#f5d1a5\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M15 25 C13 21 12 18 12 15 A8 8 0 1 1 28 15 C28 18 27 21 25 25 Z\" fill=\"#6d4f26\"/><line x1=\"16\" y1=\"29\" x2=\"24\" y2=\"29\"/><line x1=\"18\" y1=\"33\" x2=\"22\" y2=\"33\"/></g></g></svg>"
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"amber\">\n  <path d=\"M15 25 C13 21 12 18 12 15 A8 8 0 1 1 28 15 C28 18 27 21 25 25 Z\" fill=\"soft\"/>\n  <line x1=\"16\" y1=\"29\" x2=\"24\" y2=\"29\"/>\n  <line x1=\"18\" y1=\"33\" x2=\"22\" y2=\"33\"/>\n</svg>"
+}

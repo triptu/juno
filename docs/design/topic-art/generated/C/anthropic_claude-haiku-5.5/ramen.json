@@ -1,0 +1,40 @@
+{
+  "approach": "C",
+  "model": "anthropic/claude-haiku-5.5",
+  "topic": "ramen",
+  "ok": true,
+  "spec": {
+    "hue": "amber",
+    "elements": [
+      {
+        "tag": "motif",
+        "attrs": {
+          "name": "bowl",
+          "x": "0",
+          "y": "0",
+          "scale": "1"
+        }
+      }
+    ]
+  },
+  "decision": {
+    "main": "bowl",
+    "secondary": null,
+    "hue": "amber",
+    "confident": true,
+    "why": "Friday lunch at a ramen place is clearly a meal together."
+  },
+  "attempts": 1,
+  "latencyMs": 1062,
+  "costUsd": 0.0002245,
+  "tokens": {
+    "in": 1955,
+    "out": 58
+  },
+  "raw": "{\"main\": \"bowl\", \"secondary\": null, \"hue\": \"amber\", \"confident\": true, \"why\": \"Friday lunch at a ramen place is clearly a meal together.\"}",
+  "svg": {
+    "light": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"l-C-anthropic_claude-haiku-5.5-ramen\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#l-C-anthropic_claude-haiku-5.5-ramen)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#f1dcc3\"/><g fill=\"none\" stroke=\"#6b4300\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><g transform=\"translate(0 0) scale(1)\" stroke-width=\"3.00\"><path d=\"M7 18 H33 A13 13 0 0 1 20 31 A13 13 0 0 1 7 18 Z\" fill=\"#dcb688\"/><line x1=\"23\" y1=\"6\" x2=\"30\" y2=\"18\"/><line x1=\"28\" y1=\"7\" x2=\"33\" y2=\"16\"/></g></g></g></svg>",
+    "dark": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"d-C-anthropic_claude-haiku-5.5-ramen\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#d-C-anthropic_claude-haiku-5.5-ramen)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#453116\"/><g fill=\"none\" stroke=\"#f5d1a5\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><g transform=\"translate(0 0) scale(1)\" stroke-width=\"3.00\"><path d=\"M7 18 H33 A13 13 0 0 1 20 31 A13 13 0 0 1 7 18 Z\" fill=\"#6d4f26\"/><line x1=\"23\" y1=\"6\" x2=\"30\" y2=\"18\"/><line x1=\"28\" y1=\"7\" x2=\"33\" y2=\"16\"/></g></g></g></svg>"
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"amber\">\n  <motif name=\"bowl\" x=\"0\" y=\"0\" scale=\"1\"/>\n</svg>"
+}

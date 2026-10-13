@@ -1,0 +1,40 @@
+{
+  "approach": "C",
+  "model": "anthropic/claude-haiku-5.5",
+  "topic": "rows",
+  "ok": true,
+  "spec": {
+    "hue": "periwinkle",
+    "elements": [
+      {
+        "tag": "motif",
+        "attrs": {
+          "name": "rows",
+          "x": "0",
+          "y": "0",
+          "scale": "1"
+        }
+      }
+    ]
+  },
+  "decision": {
+    "main": "rows",
+    "secondary": null,
+    "hue": "periwinkle",
+    "confident": true,
+    "why": "Thread list layout choice, a rows-style list in design"
+  },
+  "attempts": 1,
+  "latencyMs": 1085,
+  "costUsd": 0.0002281,
+  "tokens": {
+    "in": 1996,
+    "out": 57
+  },
+  "raw": "{\"main\": \"rows\", \"secondary\": null, \"hue\": \"periwinkle\", \"confident\": true, \"why\": \"Thread list layout choice, a rows-style list in design\"}",
+  "svg": {
+    "light": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"l-C-anthropic_claude-haiku-5.5-rows\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#l-C-anthropic_claude-haiku-5.5-rows)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#d7defb\"/><g fill=\"none\" stroke=\"#3d4685\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><g transform=\"translate(0 0) scale(1)\" stroke-width=\"3.00\"><rect x=\"8\" y=\"8\" width=\"24\" height=\"10\" rx=\"3\" fill=\"#afbbef\"/><rect x=\"8\" y=\"22\" width=\"24\" height=\"10\" rx=\"3\"/></g></g></g></svg>",
+    "dark": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 40 40\" width=\"40\" height=\"40\" aria-hidden=\"true\"><clipPath id=\"d-C-anthropic_claude-haiku-5.5-rows\"><rect width=\"40\" height=\"40\" rx=\"16\"/></clipPath><g clip-path=\"url(#d-C-anthropic_claude-haiku-5.5-rows)\"><rect width=\"40\" height=\"40\" rx=\"16\" fill=\"#2e334f\"/><g fill=\"none\" stroke=\"#ccd5fd\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><g transform=\"translate(0 0) scale(1)\" stroke-width=\"3.00\"><rect x=\"8\" y=\"8\" width=\"24\" height=\"10\" rx=\"3\" fill=\"#4a527c\"/><rect x=\"8\" y=\"22\" width=\"24\" height=\"10\" rx=\"3\"/></g></g></g></svg>"
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"periwinkle\">\n  <motif name=\"rows\" x=\"0\" y=\"0\" scale=\"1\"/>\n</svg>"
+}
