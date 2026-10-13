@@ -44,13 +44,9 @@ export {
   cycleTab,
   dividerIndex,
   endStealth,
-  MOUNTED_TABS,
   mountedTabs,
-  noTabs,
   openTab,
-  parseTabs,
   scrollSnapshotAtom,
-  TABS_PREF,
   tabsAtom,
   tabStripAtom,
   updateTabs,
@@ -58,7 +54,6 @@ export {
   type ScrollSnapshot,
   type Tabs,
   type TabSummary,
-  type TopicTab,
 } from './tabs'
 export { errorOf } from './result'
 export { acquireRendererPort, EngineFailed } from './port'
