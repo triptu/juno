@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-14 00:02 · Orchestrator · Codebase health: `pnpm health` (knip, jscpd, size limits) in report-only mode first, blocking once clean; a maintenance and simplification pass at every milestone boundary plus a light weekly sweep; health numbers on the status page.
 - 10-13 23:43 · Tushar · Code lives in the private GitHub repo triptu/juno; main is pushed after each merge. Commits are authored as Tushar <helloworld2907@gmail.com>.
 - 10-13 23:40 · Tushar · Row footer: no message icon or count, and no "Messages outside threads" label on Main rows. Main rows may show a thread icon with the number of threads started since Main was last read (hidden when zero). DMs have threads too; each is its own topic.
 - 10-13 23:40 · Tushar · Topic art and its placeholder have no container. The placeholder is a free-form shape picked per topic (Tide-style), not a rounded box.
