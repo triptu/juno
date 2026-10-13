@@ -282,6 +282,9 @@ importers:
         specifier: 19.3.0
         version: 19.3.0(react@19.3.0)
     devDependencies:
+      '@juno/testing':
+        specifier: workspace:*
+        version: link:../../packages/testing
       '@playwright/test':
         specifier: 1.64.0
         version: 1.64.0
@@ -556,6 +559,15 @@ importers:
       vitest:
         specifier: 5.0.4
         version: 5.0.4(@types/node@24.19.2)(vite@7.3.7(@types/node@24.19.2)(jiti@2.7.0)(lightningcss@1.33.0))
+
+  packages/testing:
+    devDependencies:
+      '@playwright/test':
+        specifier: 1.64.0
+        version: 1.64.0
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
 
   packages/tokens:
     dependencies:

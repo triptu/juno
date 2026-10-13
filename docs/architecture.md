@@ -126,6 +126,7 @@ flowchart TD
   state --> contract
   desktop[apps/desktop] --> engine & state & views & contract & tokens & slack
   gallery[apps/gallery] --> views & ui & tokens
+  gallery -.tests.-> testing[testing]
 ```
 
 | Package | Rule it protects | Owns | Must not |
@@ -148,7 +149,8 @@ flowchart TD
 | `@juno/views` | dumb UI | feature components, each with `*.fixtures.tsx`; the `applyTheme` entry point for apps | import `@juno/state`, `effect`, `window.juno` |
 | `@juno/state` | the bridge | engine client, `liveQuery`/`command` helpers, atoms, undo stack, toasts, tabs, drafts, clock; `@juno/state/react` re-exports the atom hooks | JSX |
 | `apps/desktop` | wiring | `src/main`, `src/preload`, `src/engine` (utility entry), `src/renderer` with containers, `e2e/` | |
-| `apps/gallery` | review | browser-only fixture gallery, its screenshot project and its behaviour project (`pnpm test:gallery`) | Electron |
+| `@juno/testing` | one set of test helpers | Playwright helpers shared by the gallery and the desktop e2e, starting with `expectNoLayoutShift` | be imported by any `src` |
+| `apps/gallery` | review | browser-only fixture gallery (one state at a time), its screenshot project and its behaviour project, including the layout-shift guard (`pnpm test:gallery`) | Electron |
 
 `testDeps` in a package.json names a devDependency that tests may import and src may not: `engine` uses `state` (the real client against the real server) and `slack` uses `fake-slack`.
 
@@ -383,7 +385,7 @@ Shortcuts and the app menu: main builds the application menu (Juno, File, Edit, 
 
 The theme is applied in one place: `applyTheme(theme, accent)` in `packages/ui/src/theme.ts`. It puts the dark and accent classes on `<html>` and pauses transitions for two frames. `@juno/views` re-exports it, so the desktop app (which does not depend on `ui`) reaches it as `import { applyTheme } from '@juno/views'`; the gallery imports it from `@juno/ui`. The theme and accent values (`Theme`, `Accent`) are owned by `@juno/contract`; both are saved in `launch.json` and passed to the page as `?theme=&accent=` so the first render is right.
 
-`apps/gallery` renders every view with every fixture at `/#/<View>/<fixture>?theme=dark`; a Playwright project screenshots them into `apps/gallery/shots/`. Baselines are generated and compared on one CI image because font rendering differs across macOS versions; locally the shots are review aids. A second Playwright project, `behaviour`, checks what a screenshot cannot show in a real browser (mouse-down activation, the cursor rule); run it with `pnpm test:gallery`. `pnpm test:e2e` runs it after the desktop tests. View fixtures and `fake-slack` seeds are separate files: view models on one side, Slack payloads on the other.
+`apps/gallery` renders every view one state at a time at `/#/<View>?__state=<group>/<state>&theme=dark`, with the states grouped under headings in product words; a Playwright project screenshots each state into `apps/gallery/shots/`. Baselines are generated and compared on one CI image because font rendering differs across macOS versions; locally the shots are review aids. A second Playwright project, `behaviour`, checks what a screenshot cannot show in a real browser (mouse-down activation, the cursor rule, the state switcher, and no layout shift on hover, press or focus through `@juno/testing`); run it with `pnpm test:gallery`. `pnpm test:e2e` runs it after the desktop tests. View fixtures and `fake-slack` seeds are separate files: view models on one side, Slack payloads on the other.
 
 ## 9. Message rendering, emoji and files
 

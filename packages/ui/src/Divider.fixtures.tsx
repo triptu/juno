@@ -5,18 +5,22 @@ import { Stack } from './fixtures/layout'
 export default defineFixtures(
   Divider,
   {
-    default: fixture({}),
-    subtle: fixture({ tone: 'subtle' }),
-    'labelled-new': scene(() => (
-      <Stack width={480}>
-        <LabelledRule label="3 new" />
-      </Stack>
-    )),
-    'labelled-muted': scene(() => (
-      <Stack width={480}>
-        <LabelledRule label="Earlier" tone="muted" />
-      </Stack>
-    )),
+    Plain: {
+      default: fixture({}),
+      subtle: fixture({ tone: 'subtle' }),
+    },
+    Labelled: {
+      'labelled-new': scene(() => (
+        <Stack width={480}>
+          <LabelledRule label="3 new" />
+        </Stack>
+      )),
+      'labelled-muted': scene(() => (
+        <Stack width={480}>
+          <LabelledRule label="Earlier" tone="muted" />
+        </Stack>
+      )),
+    },
   },
   { width: 480 },
 )

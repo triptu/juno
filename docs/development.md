@@ -27,9 +27,9 @@ Run these from the repo root.
 | `pnpm check-deps` | The package graph and the import rules in `docs/architecture.md` section 3. Part of `pnpm lint`; run it alone for a quicker loop. |
 | `pnpm test` | Runs every package's vitest suite (`packages/*/test`). |
 | `pnpm test:e2e` | Builds, runs the Playwright tests against the built app, then the gallery behaviour tests. |
-| `pnpm test:gallery` | Builds the gallery and runs only its behaviour tests (mouse-down activation, cursor rule). |
+| `pnpm test:gallery` | Builds the gallery and runs only its behaviour tests (mouse-down activation, cursor rule, state switcher, layout-shift guard). |
 | `pnpm gallery` | Starts the fixture gallery at http://localhost:4174 (browser only, no Electron). |
-| `pnpm gallery:shots` | Builds the gallery and screenshots every fixture in light and dark into `apps/gallery/shots/`. |
+| `pnpm gallery:shots` | Builds the gallery and screenshots every state in light and dark into `apps/gallery/shots/<Component>/<group>/<state>-<theme>.png`. |
 | `pnpm --filter @juno/engine test` | Runs one package's suite (here the engine's: the port protocol over an in-memory MessageChannel, live query serving). |
 | `node scripts/build-icons.mjs` | Rebuilds `apps/desktop/build/icon.icns` and `icon.png` from `assets/icon.svg`. See "App icon". |
 | `pnpm package` | Builds a DMG and zip with electron-builder into `apps/desktop/release/`. Not run in CI yet. |
@@ -42,7 +42,7 @@ Copy `.env.example` to `.env` for local secrets. `.env` is ignored by git.
 ## Layout
 
 ```
-apps/gallery            Vite + React gallery: a route and a screenshot per fixture, plus behaviour tests.
+apps/gallery            Vite + React gallery: a page per component, an address and a screenshot per state, plus behaviour tests.
 apps/desktop            The Electron app. Thin wiring only.
   src/main              Window factory, IPC handlers, engine supervisor, juno:// scheme, launch.json.
   src/engine            Entry of the engine utility process: parentPort in, startEngine().
@@ -54,6 +54,7 @@ apps/desktop            The Electron app. Thin wiring only.
 packages/tokens         @juno/tokens. The only place design values live.
 packages/ui             @juno/ui. Primitives, StyleX only, each with *.fixtures.tsx. Owns applyTheme.
 packages/views          @juno/views. Feature views (props in, callbacks out) with fixtures.
+packages/testing        @juno/testing. Shared Playwright helpers (the layout-shift guard). Test code only.
 packages/contract       @juno/contract. Routes (effect/rpc groups), live-query schemas, errors,
                         parentPort and port-handoff messages, main IPC routes.
 packages/store          @juno/store. cache.db and user.db per workspace, migrations,
@@ -240,7 +241,7 @@ Names are explained in `docs/architecture.md` sections 2.6 and 7.
 4. **Container.** `apps/desktop/src/renderer/containers/<Feature>.tsx`: reads atoms with `useAtomValue`
    and `useAtomSet` from `@juno/state/react`, maps results to view props, binds callbacks to commands.
 5. **View.** `packages/views/src/<Feature>View.tsx` with `<Feature>View.fixtures.tsx`, registered in
-   `src/fixtures.ts` and exported from `index.ts`. Check it in `pnpm gallery`. Props in, callbacks out;
+   `src/fixtures.ts` and exported from `index.ts`. Check it in `pnpm gallery`, one state at a time. Props in, callbacks out;
    no state, Effect or `window.juno`.
 6. **Test.** `apps/desktop/e2e/<feature>.spec.ts` follows the user flow against the built app (and the
    fake Slack server once sign-in exists). Add engine or domain unit tests only for pure rules.
@@ -252,10 +253,26 @@ Names are explained in `docs/architecture.md` sections 2.6 and 7.
 | Pure rules, store, Slack client, Slack-app import, merge rules, engine protocol, session and sync | `packages/<name>/test/` (vitest) | `pnpm test` |
 | The sidebar query and boot on the large seed (report only) | `packages/engine/test/bench/` | `JUNO_BENCH=1 pnpm --filter @juno/engine exec vitest run test/bench` |
 | User flows in the built app | `apps/desktop/e2e/` (Playwright, one worker) | `pnpm test:e2e` |
-| Mouse-down activation, cursor rule, in a real browser | `apps/gallery/behaviour.spec.ts` | `pnpm test:gallery` |
-| Screenshots of every fixture | `apps/gallery/shots.spec.ts` | `pnpm gallery:shots` |
+| Mouse-down activation, cursor rule, state switcher, in a real browser | `apps/gallery/behaviour.spec.ts` | `pnpm test:gallery` |
+| No layout shift on hover, press or focus, in every state | `apps/gallery/shift.spec.ts` (helper: `packages/testing`) | `pnpm test:gallery` |
+| Screenshots of every state | `apps/gallery/shots.spec.ts` | `pnpm gallery:shots` |
 
 Tests that need the Effect test clock use `@effect/vitest`; see the effect skill.
+
+## The gallery
+
+`pnpm gallery` serves every primitive and view at http://localhost:4174. A component page shows one state at a time, with the states listed beside it under group headings (a select above the frame in a narrow window). The list is plain system styling on purpose, so it is never mistaken for product UI.
+
+- **Addresses.** `#/Button?__state=variant/primary&theme=dark&accent=claret`. `__state` is `<group>/<state>` (just `<state>` for a state declared without a group); no `__state` opens the first state. `theme` and `accent` are left out when they are the defaults. `#/` is the index, which lists each component with its groups and states. The old `#/Button/primary` still opens the first state with that key.
+- **Keys.** `j` / `k` or the down / up arrows move between states; `[` and `]` switch components (wrapping). Keys are ignored while typing in a field, and the arrows are left to the component while focus is inside the frame.
+- **Declaring states.** Group them under headings in product words (`Data`, `Session`, `Failure`, `Interaction`, `Overview`). See `packages/ui/README.md`. List only states the component's code can reach, add no branch to a component to make a state possible, and keep pending states still: nothing resolves on a timer. An unreachable fixture is removed, not kept for show.
+- **Screenshots.** `pnpm gallery:shots` writes `apps/gallery/shots/<Component>/<group>/<state>-<theme>.png`.
+
+### The layout-shift guard
+
+Nothing may move when the pointer or the keyboard touches it. `expectNoLayoutShift(page, action)` from `@juno/testing/layout-shift` (`packages/testing`) runs `action` and fails with a report (the node, the old and new box, the delta) if anything shifted. It starts a `PerformanceObserver` for `layout-shift` entries just before the action, waits two frames plus the longest transition or animation declared under the frame, and counts every entry with a value above 0, including those Chromium marks `hadRecentInput` (every hover-driven shift is within 500 ms of input). As a fallback it compares the layout box of every element in the frame (`offsetLeft`, `offsetTop`, `offsetWidth`, `offsetHeight`, relative to the frame) before and after. Those ignore transforms, so the press scale is not a shift but a change of size, border or position is, and nothing has to be excluded.
+
+`apps/gallery/shift.spec.ts` hovers, leaves, presses, releases, focuses from the keyboard and blurs every interactive element of every state, with motion on, and checks that an Avatar photo arriving late or failing moves nothing (the `photo/pending` state points at `/__fixture/pending.png`, which the gallery server never answers; the test answers it). The desktop e2e can import the same helper for sidebar hover, tab switches, live messages and image loads.
 
 ## Pitfalls met while setting this up
 

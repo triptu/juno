@@ -12,11 +12,15 @@ const people: ReadonlyArray<AvatarStackPerson> = [
 export default defineFixtures(
   AvatarStack,
   {
-    two: fixture({ people: people.slice(0, 2) }),
-    four: fixture({ people }),
-    'two-at-20': fixture({ people: people.slice(0, 2), size: 20 }),
-    'on-background': fixture({ people, surface: 'background' }, { surface: 'background' }),
-    'on-card': fixture({ people, surface: 'surface' }, { surface: 'surface' }),
+    People: {
+      two: fixture({ people: people.slice(0, 2) }),
+      four: fixture({ people }),
+      'two-at-20': fixture({ people: people.slice(0, 2), size: 20 }),
+    },
+    Surface: {
+      'on-background': fixture({ people, surface: 'background' }, { surface: 'background' }),
+      'on-card': fixture({ people, surface: 'surface' }, { surface: 'surface' }),
+    },
   },
   { surface: 'subtle' },
 )

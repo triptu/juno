@@ -34,35 +34,14 @@ function StripWithPage() {
 export default defineFixtures(
   TabStrip,
   {
-    'two-tabs': scene(() => (
-      <TabStrip trailing={newTab}>
-        <Tab icon={Hash} label="Postgres 16 migration plan" active onClose={() => {}} />
-        <Tab icon={Hash} label="Thread list density" onClose={() => {}} />
-      </TabStrip>
-    )),
-    'with-page': scene(() => <StripWithPage />, { height: 160 }),
-    'with-page-narrow': scene(() => <StripWithPage />, { width: 480, height: 160 }),
-    'with-page-wide': scene(() => <StripWithPage />, { width: 1400, height: 160 }),
-    hover: scene(() => <StripWithPage />, { height: 160, hover: '[role="tab"]:nth-of-type(1)' }),
-    'close-hover': scene(() => <StripWithPage />, { height: 160, hover: '[role="tab"]:nth-of-type(2) button' }),
-    stealth: scene(() => (
-      <TabStrip trailing={newTab}>
-        <Tab icon={Hash} label="eng" onClose={() => {}} />
-        <Tab icon={EyeSlash} label="Rina Sato · Staff backend" active onClose={() => {}} />
-        <Tab icon={Lightbulb} label="For you" onClose={() => {}} />
-      </TabStrip>
-    )),
-    many: scene(() => (
-      <TabStrip trailing={newTab}>
-        <Tab icon={Hash} label="Postgres 16 migration plan" onClose={() => {}} />
-        <Tab icon={Lock} label="Rina Sato · Staff backend" onClose={() => {}} />
-        <Tab icon={Hash} label="Q4 roadmap cuts" active onClose={() => {}} />
-        <Tab icon={Hash} label="Staging bill doubled since August" onClose={() => {}} />
-        <Tab icon={Lightbulb} label="For you" onClose={() => {}} />
-      </TabStrip>
-    )),
-    'many-narrow': scene(
-      () => (
+    Strip: {
+      'two-tabs': scene(() => (
+        <TabStrip trailing={newTab}>
+          <Tab icon={Hash} label="Postgres 16 migration plan" active onClose={() => {}} />
+          <Tab icon={Hash} label="Thread list density" onClose={() => {}} />
+        </TabStrip>
+      )),
+      many: scene(() => (
         <TabStrip trailing={newTab}>
           <Tab icon={Hash} label="Postgres 16 migration plan" onClose={() => {}} />
           <Tab icon={Lock} label="Rina Sato · Staff backend" onClose={() => {}} />
@@ -70,9 +49,36 @@ export default defineFixtures(
           <Tab icon={Hash} label="Staging bill doubled since August" onClose={() => {}} />
           <Tab icon={Lightbulb} label="For you" onClose={() => {}} />
         </TabStrip>
+      )),
+      'many-narrow': scene(
+        () => (
+          <TabStrip trailing={newTab}>
+            <Tab icon={Hash} label="Postgres 16 migration plan" onClose={() => {}} />
+            <Tab icon={Lock} label="Rina Sato · Staff backend" onClose={() => {}} />
+            <Tab icon={Hash} label="Q4 roadmap cuts" active onClose={() => {}} />
+            <Tab icon={Hash} label="Staging bill doubled since August" onClose={() => {}} />
+            <Tab icon={Lightbulb} label="For you" onClose={() => {}} />
+          </TabStrip>
+        ),
+        { width: 480 },
       ),
-      { width: 480 },
-    ),
+      stealth: scene(() => (
+        <TabStrip trailing={newTab}>
+          <Tab icon={Hash} label="eng" onClose={() => {}} />
+          <Tab icon={EyeSlash} label="Rina Sato · Staff backend" active onClose={() => {}} />
+          <Tab icon={Lightbulb} label="For you" onClose={() => {}} />
+        </TabStrip>
+      )),
+    },
+    'With page': {
+      'with-page': scene(() => <StripWithPage />, { height: 160 }),
+      'with-page-narrow': scene(() => <StripWithPage />, { width: 480, height: 160 }),
+      'with-page-wide': scene(() => <StripWithPage />, { width: 1400, height: 160 }),
+    },
+    Interaction: {
+      hover: scene(() => <StripWithPage />, { height: 160, hover: '[role="tab"]:nth-of-type(1)' }),
+      'close-hover': scene(() => <StripWithPage />, { height: 160, hover: '[role="tab"]:nth-of-type(2) button' }),
+    },
   },
   { width: 720, padded: false },
 )

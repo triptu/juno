@@ -1,0 +1,280 @@
+/*
+ * The gallery's own chrome: the state switcher, the index and the key hints.
+ *
+ * This file is deliberately plain. It uses system fonts, fixed neutral greys
+ * and no Juno tokens, so nothing here can be mistaken for product UI and the
+ * chrome looks the same in every theme and accent. Only the frame a state is
+ * drawn in (Frame.tsx) uses the design system.
+ */
+
+.g-chrome {
+  font: 13px/1.4 system-ui, -apple-system, 'Segoe UI', sans-serif;
+  letter-spacing: normal;
+  color: #1d1d1f;
+  background: #efefef;
+  color-scheme: light;
+  cursor: default;
+  user-select: none;
+}
+
+.g-chrome * {
+  box-sizing: border-box;
+}
+
+/* Links keep the arrow, like the app (the browser default is the hand). */
+.g-chrome a,
+.g-chrome select {
+  cursor: default;
+}
+
+.g-chrome code,
+.g-chrome kbd {
+  font: 12px ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.g-chrome kbd {
+  display: inline-block;
+  min-width: 18px;
+  padding: 0 4px;
+  text-align: center;
+  background: #fff;
+  border: 1px solid #c4c4c4;
+  border-radius: 3px;
+}
+
+.g-link {
+  color: #0b57d0;
+  text-decoration: none;
+}
+
+.g-link:hover {
+  text-decoration: underline;
+}
+
+/* The page: switcher on the left, the frame on the right. */
+
+.g-shell {
+  display: flex;
+  height: 100%;
+}
+
+.g-main {
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+  min-width: 0;
+}
+
+.g-panel {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  gap: 12px;
+  width: 248px;
+  padding: 12px;
+  overflow-y: auto;
+  border-right: 1px solid #c4c4c4;
+}
+
+.g-panel-head {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.g-select {
+  width: 100%;
+  min-width: 0;
+  height: 26px;
+  font: inherit;
+  color: #1d1d1f;
+  background: #fff;
+  border: 1px solid #b4b4b4;
+  border-radius: 4px;
+}
+
+.g-appearance {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.g-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+}
+
+.g-pill {
+  padding: 1px 6px;
+  color: #444;
+  text-decoration: none;
+  background: #e0e0e0;
+  border-radius: 3px;
+}
+
+.g-pill[aria-current='true'] {
+  color: #fff;
+  background: #3c3c3f;
+}
+
+.g-groups {
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+  gap: 10px;
+}
+
+.g-heading {
+  margin: 0 0 2px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: #6b6b6f;
+  text-transform: uppercase;
+}
+
+.g-states {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.g-state {
+  display: block;
+  padding: 2px 6px;
+  color: #1d1d1f;
+  text-decoration: none;
+  border-radius: 3px;
+}
+
+.g-state:hover {
+  background: #e0e0e0;
+}
+
+.g-state[aria-current='true'] {
+  color: #fff;
+  background: #3c3c3f;
+}
+
+.g-keys {
+  margin: 0;
+  color: #6b6b6f;
+}
+
+/* The bar that replaces the panel in a narrow window. */
+
+.g-bar {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-bottom: 1px solid #c4c4c4;
+}
+
+.g-bar .g-select {
+  width: auto;
+  flex: 1 1 0;
+}
+
+.g-count {
+  color: #6b6b6f;
+  white-space: nowrap;
+}
+
+@media (max-width: 760px) {
+  .g-panel {
+    display: none;
+  }
+
+  .g-bar {
+    display: flex;
+  }
+}
+
+/* The index. */
+
+.g-index {
+  height: 100%;
+  padding: 32px max(24px, calc((100% - 960px) / 2));
+  overflow: auto;
+  user-select: text;
+}
+
+.g-index-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.g-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.g-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.g-search {
+  height: 26px;
+  padding: 0 8px;
+  font: inherit;
+  color: #1d1d1f;
+  background: #fff;
+  border: 1px solid #b4b4b4;
+  border-radius: 4px;
+  cursor: text;
+  user-select: text;
+}
+
+.g-hint {
+  margin: 12px 0;
+  color: #555;
+}
+
+.g-components {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px 24px;
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.g-component {
+  min-width: 0;
+}
+
+.g-component-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1d1d1f;
+  text-decoration: none;
+}
+
+.g-component-name:hover {
+  text-decoration: underline;
+}
+
+.g-component-groups {
+  margin-top: 2px;
+}
+
+.g-group-line {
+  margin: 0 0 2px;
+  color: #555;
+}
+
+.g-group-name {
+  font-weight: 600;
+  color: #1d1d1f;
+}

@@ -22,32 +22,36 @@ function CatchUp() {
 }
 
 export default defineFixtures(Surface, {
-  card: fixture({ kind: 'card', padding: 'md', children: <CatchUp /> }),
-  popover: fixture({ kind: 'popover', children: <div style={{ width: 224, height: 120 }} /> }),
-  toolbar: fixture({ kind: 'toolbar', padding: 'xs', children: <div style={{ width: 180, height: 28 }} /> }),
-  group: fixture({ kind: 'group', children: <div style={{ width: 480, height: 96 }} /> }),
-  inset: fixture({ kind: 'inset', children: <Text variant="code">add a dry-run flag and tests for the selection logic</Text> }),
-  toast: fixture({ kind: 'toast', padding: 'md', children: <Text variant="ui">Resolved · Postgres 16 migration plan</Text> }),
-  'all-kinds': scene(() => (
-    <Row gap="lg">
-      <Surface kind="card">
-        <Text variant="ui">card</Text>
-      </Surface>
-      <Surface kind="popover" padding="md">
-        <Text variant="ui">popover</Text>
-      </Surface>
-      <Surface kind="toolbar" padding="sm">
-        <Text variant="ui">toolbar</Text>
-      </Surface>
-      <Surface kind="group" padding="md">
-        <Text variant="ui">group</Text>
-      </Surface>
-      <Surface kind="inset">
-        <Text variant="ui">inset</Text>
-      </Surface>
-      <Surface kind="toast" padding="md">
-        <Text variant="ui">toast</Text>
-      </Surface>
-    </Row>
-  )),
+  Kind: {
+    card: fixture({ kind: 'card', padding: 'md', children: <CatchUp /> }),
+    popover: fixture({ kind: 'popover', children: <div style={{ width: 224, height: 120 }} /> }),
+    toolbar: fixture({ kind: 'toolbar', padding: 'xs', children: <div style={{ width: 180, height: 28 }} /> }),
+    group: fixture({ kind: 'group', children: <div style={{ width: 480, height: 96 }} /> }),
+    inset: fixture({ kind: 'inset', children: <Text variant="code">add a dry-run flag and tests for the selection logic</Text> }),
+    toast: fixture({ kind: 'toast', padding: 'md', children: <Text variant="ui">Resolved · Postgres 16 migration plan</Text> }),
+  },
+  Overview: {
+    'all-kinds': scene(() => (
+      <Row gap="lg">
+        <Surface kind="card">
+          <Text variant="ui">card</Text>
+        </Surface>
+        <Surface kind="popover" padding="md">
+          <Text variant="ui">popover</Text>
+        </Surface>
+        <Surface kind="toolbar" padding="sm">
+          <Text variant="ui">toolbar</Text>
+        </Surface>
+        <Surface kind="group" padding="md">
+          <Text variant="ui">group</Text>
+        </Surface>
+        <Surface kind="inset">
+          <Text variant="ui">inset</Text>
+        </Surface>
+        <Surface kind="toast" padding="md">
+          <Text variant="ui">toast</Text>
+        </Surface>
+      </Row>
+    )),
+  },
 })

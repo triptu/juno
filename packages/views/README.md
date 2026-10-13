@@ -9,7 +9,7 @@ Feature views: React components built from `@juno/ui` that take view models and 
 - `applyTheme`, `accentNames`, `defaultAccent`, `AccentName`, `ThemeName`, re-exported from `@juno/ui`. The desktop app does not depend on `ui`, so it reaches the theme entry point here.
 - `@juno/views/fixtures`: `fixtures`, every view's fixture sets keyed by view name. The gallery renders them, and each gets a screenshot in light and dark.
 
-Every view has a `<View>.fixtures.tsx` next to it, registered in `src/fixtures.ts`. Add a fixture for each state a reviewer needs to see: empty, loading, error, long text.
+Every view has a `<View>.fixtures.tsx` next to it, registered in `src/fixtures.ts`. Group its states under headings in product words (`Data: loading, empty, error, long`; `Session: expired`) as `@juno/ui`'s README shows. List only states the view's container can produce today: the lines and props its container passes, not copy it might pass later. A loading state holds still; nothing resolves on a timer.
 
 ## Must not
 
@@ -21,4 +21,4 @@ Every view has a `<View>.fixtures.tsx` next to it, registered in `src/fixtures.t
 
 ## Testing
 
-Visual and behaviour checks run in the gallery, not in the package: `pnpm gallery` to look, `pnpm gallery:shots` for screenshots, `pnpm test:gallery` for behaviour (mouse-down activation, cursor rule). A view's user flow is covered by an e2e spec against the built app.
+Visual and behaviour checks run in the gallery, not in the package: `pnpm gallery` to look, `pnpm gallery:shots` for screenshots, `pnpm test:gallery` for behaviour (mouse-down activation, cursor rule, state switcher, no layout shift on hover, press or focus). In the gallery a view is one state per address (`#/SignInView?__state=failure/keychain`), and `j` `k` `[` `]` move between states and components. A view's user flow is covered by an e2e spec against the built app.

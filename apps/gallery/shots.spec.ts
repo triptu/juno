@@ -1,21 +1,12 @@
 import { mkdir, rm } from 'node:fs/promises'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { expect, test, type Page } from '@playwright/test'
-
-interface Route {
-  readonly component: string
-  readonly fixture: string
-  readonly frame: {
-    readonly hover?: string
-    readonly press?: string
-    readonly focus?: string
-  }
-}
+import { openState, readRoutes, type Route } from './support'
 
 const shotsDir = join(import.meta.dirname, 'shots')
 const themes = ['light', 'dark'] as const
 
-/** Puts the fixture into the state its frame asks for; returns the cleanup. */
+/** Puts the state into the look its frame asks for; returns the cleanup. */
 async function arrange(page: Page, route: Route): Promise<() => Promise<void>> {
   const frame = page.locator('[data-fixture-frame]')
   const { hover, press, focus } = route.frame
@@ -31,7 +22,7 @@ async function arrange(page: Page, route: Route): Promise<() => Promise<void>> {
     // shot runs with motion on and waits for the 150ms to finish.
     await page.emulateMedia({ reducedMotion: 'no-preference' })
     const box = await frame.locator(press).first().boundingBox()
-    if (!box) throw new Error(`Nothing to press at ${press} in ${route.component}/${route.fixture}`)
+    if (!box) throw new Error(`Nothing to press at ${press} in ${route.route}`)
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
     await page.mouse.down()
     await page.waitForTimeout(200)
@@ -44,33 +35,25 @@ async function arrange(page: Page, route: Route): Promise<() => Promise<void>> {
 }
 
 /**
- * Opens the index once to read the route list, then screenshots every fixture
- * frame in both themes into shots/<component>/<fixture>-<theme>.png.
+ * Screenshots every state frame in both themes into
+ * shots/<Component>/<group>/<state>-<theme>.png (no group folder for a state
+ * declared without a group).
  */
-test('screenshots every fixture in light and dark', async ({ page }) => {
-  await page.goto('/#/')
+test('screenshots every state in light and dark', async ({ page }) => {
+  const routes = await readRoutes(page)
   await page.evaluate(() => document.fonts.ready)
-  const routes = await page.evaluate(
-    () => (window as unknown as { __galleryRoutes: ReadonlyArray<Route> }).__galleryRoutes,
-  )
-  expect(routes.length).toBeGreaterThan(0)
 
   await rm(shotsDir, { recursive: true, force: true })
 
   for (const route of routes) {
-    await mkdir(join(shotsDir, route.component), { recursive: true })
     for (const theme of themes) {
-      await page.goto(`/#/${encodeURIComponent(route.component)}/${encodeURIComponent(route.fixture)}?theme=${theme}`)
-      const frame = page.locator(`[data-fixture-frame="${route.component}/${route.fixture}"]`)
-      await expect(frame).toBeVisible()
-      await page.evaluate(() => document.fonts.ready)
-      await page.waitForFunction(() => !document.documentElement.hasAttribute('data-theme-switching'))
+      const path = join(shotsDir, `${route.route}-${theme}.png`)
+      await mkdir(dirname(path), { recursive: true })
+      await openState(page, route, theme)
       const release = await arrange(page, route)
-      await frame.screenshot({
-        path: join(shotsDir, route.component, `${route.fixture}-${theme}.png`),
-        animations: 'disabled',
-      })
+      await page.locator(`[data-fixture-frame="${route.route}"]`).screenshot({ path, animations: 'disabled' })
       await release()
     }
   }
+  expect(routes.length).toBeGreaterThan(0)
 })

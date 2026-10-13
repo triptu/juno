@@ -25,11 +25,17 @@ function All({ selected }: { readonly selected: (typeof hueNames)[number] }) {
 }
 
 export default defineFixtures(Swatch, {
-  default: fixture({ hue: 'claret', label: 'Claret' }),
-  selected: fixture({ hue: 'claret', label: 'Claret', selected: true }),
-  'all-hues': scene(() => <All selected="cyan" />),
-  hover: scene(() => <All selected="cyan" />, { hover: 'button:nth-of-type(2)' }),
-  press: scene(() => <All selected="cyan" />, { press: 'button:nth-of-type(2)' }),
-  focus: scene(() => <All selected="cyan" />, { focus: 'button:nth-of-type(2)' }),
-  'on-surface': scene(() => <All selected="midnight" />, { surface: 'surface' }),
+  Value: {
+    default: fixture({ hue: 'claret', label: 'Claret' }),
+    selected: fixture({ hue: 'claret', label: 'Claret', selected: true }),
+  },
+  Interaction: {
+    hover: scene(() => <All selected="cyan" />, { hover: 'button:nth-of-type(2)' }),
+    press: scene(() => <All selected="cyan" />, { press: 'button:nth-of-type(2)' }),
+    focus: scene(() => <All selected="cyan" />, { focus: 'button:nth-of-type(2)' }),
+  },
+  Overview: {
+    'all-hues': scene(() => <All selected="cyan" />),
+    'on-surface': scene(() => <All selected="midnight" />, { surface: 'surface' }),
+  },
 })
