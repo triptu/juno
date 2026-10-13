@@ -215,7 +215,8 @@ const sizeStyles = stylex.create({
   24: { height: sizes['--control-24'], paddingInline: spacing['--space-2'], gap: spacing['--space-1-5'] },
   26: { height: sizes['--control-26'], paddingInline: spacing['--space-2-5'], gap: spacing['--space-1-5'], fontWeight: weights['--weight-medium'] },
   28: { height: sizes['--control-28'], paddingInline: spacing['--space-2-5'], gap: spacing['--space-1-5'] },
-  inline: { display: 'inline', paddingInline: MENTION_PADDING, lineHeight: 'inherit', verticalAlign: 'baseline' },
+  // Part of the message text, so it selects and copies with it.
+  inline: { display: 'inline', paddingInline: MENTION_PADDING, lineHeight: 'inherit', verticalAlign: 'baseline', userSelect: 'text' },
 })
 
 const variants = stylex.create({
