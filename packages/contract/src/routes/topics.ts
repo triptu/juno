@@ -137,6 +137,8 @@ export const topicsCounts = liveValueRoute('topics.counts', { value: TopicCounts
 export const UndoCommand = Schema.Union([
   Schema.TaggedStruct('topics.subscribe', { id: Schema.String }),
   Schema.TaggedStruct('topics.unsubscribe', { id: Schema.String }),
+  Schema.TaggedStruct('reads.markRead', { id: Schema.String, upTo: Schema.optionalKey(Schema.String) }),
+  Schema.TaggedStruct('reads.markUnread', { id: Schema.String, from: Schema.optionalKey(Schema.String) }),
 ])
 export type UndoCommand = typeof UndoCommand.Type
 

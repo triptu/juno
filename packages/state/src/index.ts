@@ -3,6 +3,7 @@ export { configureConnection, connectionStateAtom, makeRegistry, registry, resta
 export { engineStatusAtom, pingCommand } from './engine'
 export { importFromSlackAppCommand, sessionStatusAtom, signedInAtom, signInCommand, signOutCommand, type ReadySession } from './session'
 export { defaultTopicListFilter, topicCountsAtom, topicListAtom, type TopicListFilter } from './topics'
+export { mirrorReadsAtom, shouldMarkRead, type ReadTrigger, type ReadView } from './reads'
 export {
   currentRowAtom,
   focusedTopicAtom,

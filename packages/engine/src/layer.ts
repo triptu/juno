@@ -8,6 +8,8 @@ import type { EnginePhase, SessionStatus } from '@juno/contract'
 import type { SyncPhase } from '@juno/sync'
 import { SearchHandlers } from './search/handlers'
 import { PrefsHandlers } from './prefs/handlers'
+import { ReadsHandlers } from './reads/handlers'
+import { MarkWorker } from './reads/worker'
 import { Outbox } from './outbox'
 import { SessionClientLive } from './session/client'
 import { SessionHandlers } from './session/handlers'
@@ -48,6 +50,7 @@ const EnginePhases = Layer.effectDiscard(
 
 /** Everything the route handlers need. Requires the host seams (`HostLink`, `HttpTransport`) and `EngineConfig`. */
 export const Services = EnginePhases.pipe(
+  Layer.provideMerge(MarkWorker.layer),
   Layer.provideMerge(SyncRunner.layer),
   Layer.provideMerge(Outbox.layer),
   Layer.provideMerge(SessionClientLive),
@@ -57,4 +60,4 @@ export const Services = EnginePhases.pipe(
 )
 
 /** One `toLayer` per feature, merged. Requires `Services`. */
-export const Handlers = Layer.mergeAll(StatusHandlers, SessionHandlers, TopicsHandlers, SearchHandlers, PrefsHandlers)
+export const Handlers = Layer.mergeAll(StatusHandlers, SessionHandlers, TopicsHandlers, SearchHandlers, PrefsHandlers, ReadsHandlers)

@@ -14,6 +14,7 @@ export * from './protocol'
 export * from './routes/engine'
 export * from './routes/session'
 export * from './routes/topics'
+export * from './routes/reads'
 export { AllRoutes } from './routes/index'
 export * from './shell'
 
