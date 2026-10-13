@@ -14,11 +14,13 @@
  * that arrives equal to the one held keeps the held object, so joins that
  * compare by identity stay put across a reset.
  */
-import type { ChannelRef, ListDelta, LiveMeta, Person, Refs } from '@juno/contract'
+import type { ChannelRef, ListDelta, LiveMeta, Person, Refs, TopicArt } from '@juno/contract'
 
 export interface WindowRefs {
   readonly people: ReadonlyMap<string, Person>
   readonly channels: ReadonlyMap<string, ChannelRef>
+  /** By topic id. An entry with an empty recipe means the topic's drawing is not shown (AI assist off). */
+  readonly art: ReadonlyMap<string, TopicArt>
 }
 
 export interface ListWindow<Row> {
@@ -28,7 +30,7 @@ export interface ListWindow<Row> {
   readonly meta: LiveMeta
 }
 
-const noRefs: WindowRefs = { people: new Map(), channels: new Map() }
+const noRefs: WindowRefs = { people: new Map(), channels: new Map(), art: new Map() }
 
 export const emptyWindow = <Row>(): ListWindow<Row> => ({
   order: [],
@@ -68,10 +70,12 @@ export function sameOrder(a: ReadonlyArray<string>, b: ReadonlyArray<string>): b
 function applyRefs(previous: WindowRefs, incoming: Refs | undefined, reset: boolean): WindowRefs {
   const people = incoming?.people ?? []
   const channels = incoming?.channels ?? []
-  if (!reset && people.length === 0 && channels.length === 0) return previous
+  const art = incoming?.art ?? []
+  if (!reset && people.length === 0 && channels.length === 0 && art.length === 0) return previous
   return {
     people: upsertAll(previous.people, people, reset, samePerson),
     channels: upsertAll(previous.channels, channels, reset, sameChannel),
+    art: upsertAll(previous.art, art, reset, sameArt),
   }
 }
 
@@ -102,3 +106,5 @@ const sameChannel = (a: ChannelRef, b: ChannelRef): boolean =>
     a.icon === b.icon &&
     a.color === b.color &&
     a.partnerId === b.partnerId)
+
+const sameArt = (a: TopicArt, b: TopicArt): boolean => a === b || (a.id === b.id && a.recipe === b.recipe)
