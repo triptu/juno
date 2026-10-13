@@ -169,10 +169,16 @@ describe('opening a topic', () => {
 
 describe('older messages', () => {
   it('fetches the page before the window once, then reports the start', async () => {
-    const engine = await boot(engines)
-    // 150 deploys from three weeks ago, before the quiet window the boot read.
-    const start = engine.fake.now() - 21 * DAY
-    for (let i = 0; i < 150; i++) engine.fake.workspace.post({ channel: 'C0DEPLOYS', user: 'U0DEPLOYBOT', text: `old deploy ${i}`, at: start + i * 60_000, silent: true })
+    // 150 deploys from three weeks ago, before the quiet window the boot reads. The channel is read, so the
+    // boot's page does not reach back to an older read pointer.
+    const engine = await boot(engines, {
+      initial: (fake) => {
+        const start = fake.now() - 21 * DAY
+        for (let i = 0; i < 150; i++) fake.workspace.post({ channel: 'C0DEPLOYS', user: 'U0DEPLOYBOT', text: `old deploy ${i}`, at: start + i * 60_000, silent: true })
+        fake.markRead({ channel: 'C0DEPLOYS', ts: fake.messages('C0DEPLOYS').at(-1)!.ts })
+        return fake.signIn()
+      },
+    })
     await quiet(engine)
     const id = 'm:C0DEPLOYS'
     const bottom = await watchList(engine, messagesAtom(id)).until((window) => window.order.length === 6, 'the recent deploys')
