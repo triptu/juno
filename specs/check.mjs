@@ -1,3 +1,4 @@
+import { actionCases } from './agent-checks.mjs'
 import { spawnSync } from 'node:child_process'
 import { mkdirSync, readdirSync, readFileSync, rmSync } from 'node:fs'
 import { createRequire } from 'node:module'
@@ -9,6 +10,7 @@ const require = createRequire(import.meta.url)
 const pkg = require.resolve('@informalsystems/quint/package.json')
 const cli = join(dirname(pkg), 'dist/src/cli.js')
 const tracesOnly = process.argv.includes('--traces')
+const actionsOnly = process.argv.includes('--actions')
 const memoryOnly = process.argv.includes('--memory')
 const boundedOnly = process.argv.includes('--bounded')
 const backend = process.env.QUINT_SIMULATOR ?? 'rust'
@@ -27,7 +29,7 @@ function quint(args, { violation = false, timeout = 60000 } = {}) {
   // Keep Apalache's generated directory inside the ignored trace directory.
   const verify = args[0] === 'verify'
   const commandArgs = verify ? [args[0], join(root, args[1]), ...args.slice(2)] : args
-  const memoryVerify = verify && args[1] === 'specs/agent-memory.qnt'
+  const memoryVerify = verify && args[1].startsWith('specs/agent-')
   const option = name => args[args.indexOf(name) + 1]
   const command = memoryVerify ? [fileURLToPath(import.meta.url), '--verify-memory', JSON.stringify({
     input: join(root, args[1]), main: option('--main'), init: 'init', step: option('--step'),
@@ -61,18 +63,18 @@ function simulate(file, step, invariant, output, violation = false, randomized =
     '--out-itf', path, '--mbt', ...(options.witnesses ? ['--witnesses', ...options.witnesses] : randomized ? ['--witnesses', 'reachedAgreement'] : [])], { violation })
   for (const witness of options.witnesses ?? []) {
     if (!new RegExp(`${witness} was witnessed in [1-9][0-9]* trace`).test(report)) {
-      throw new Error(`Missing completed memory schedule: ${witness}`)
+      throw new Error(`Missing completed agent schedule: ${witness}`)
     }
   }
   if (options.requireCompletion && !report.includes(`reachedAgreement was witnessed in ${options.samples} trace(s) out of ${options.samples}`)) {
-    throw new Error('A corrected memory schedule stopped before completing its drain')
+    throw new Error('A corrected agent schedule stopped before completing its drain')
   }
   const trace = JSON.parse(readFileSync(path, 'utf8'))
   if (!Array.isArray(trace.states) || trace.states.length < 2) throw new Error(`No usable trace in ${path}`)
-  if (file === 'agent-memory' && !violation && !randomized) {
+  if (file.startsWith('agent-') && !violation && !randomized) {
     const last = trace.states.at(-1)
     const state = Object.entries(last).find(([key]) => key === 's' || key.endsWith('::s'))?.[1]
-    if (state?.label !== 'finished') throw new Error(`Memory schedule did not finish its drain: ${step}`)
+    if (state?.label !== 'finished') throw new Error(`Agent schedule did not finish its drain: ${step}`)
   }
   console.log(`${violation ? 'Expected counterexample' : 'Example trace'}: specs/traces/${output}`)
 }
@@ -132,7 +134,7 @@ for (const file of readdirSync(join(root, 'specs')).filter(name => name.endsWith
   quint(['typecheck', `specs/${file}`])
 }
 
-if (!memoryOnly && !boundedOnly) {
+if (!memoryOnly && !actionsOnly && !boundedOnly) {
   for (const file of ['follow', 'readstate']) {
     simulate(file, 'simulationStep', 'invariants', `${file}.itf.json`, false, true)
   }
@@ -151,7 +153,7 @@ if (!memoryOnly && !boundedOnly) {
 }
 
 // WP2 uses real transactions for both random runs and directed failure pairs.
-if (!boundedOnly) {
+if (!boundedOnly && !actionsOnly) {
   const memoryOptions = { main: 'agent_memory' }
   simulate('agent-memory', 'simulationStep', 'invariants', 'agent-memory.itf.json', false, true,
     { ...memoryOptions, samples: tracesOnly ? 100 : 1000, steps: 140 })
@@ -191,6 +193,18 @@ if (!boundedOnly) {
   }
 }
 
+if (!boundedOnly && !memoryOnly) {
+  const options = { main: 'agent_actions' }
+  simulate('agent-actions', 'simulationStep', 'invariants', 'agent-actions.itf.json', false, true,
+    { ...options, samples: tracesOnly ? 100 : 1000, steps: 100 })
+  simulate('agent-actions', 'suiteStep', 'invariants', 'actions-corrected.itf.json', false, true,
+    { ...options, init: 'suiteInit', samples: 1024, steps: 80,
+      witnesses: ['reachedAgreement', ...actionCases.map((_, index) => `case${index}`)], requireCompletion: true })
+  for (const [schedule, invariant] of actionCases) {
+    simulate('agent-actions', `${schedule}BugStep`, invariant, `actions-${schedule}-bug.itf.json`, true, false, options)
+  }
+}
+
 if (!tracesOnly) {
   // Find a working Java: PATH first, then JAVA_HOME, then Homebrew's keg-only JDKs.
   // macOS ships a /usr/bin/java stub that fails when no JDK is installed.
@@ -212,7 +226,7 @@ if (!tracesOnly) {
     console.log(`Seed ${seed}; memory: 1000 random samples and all 25 corrected witnesses (unless --bounded).`)
     console.log('Temporal formulas are typechecked only. Drain bounds: follow 64, read 48, memory 64.')
   } else {
-    if (!memoryOnly) {
+    if (!memoryOnly && !actionsOnly) {
       for (const [file, step] of [['follow', 'step'], ['readstate', 'boundedStep']]) {
         quint(['verify', `specs/${file}-bounded.qnt`, '--main', `${file}_bounded`, '--step', step,
           '--invariant', 'boundedSafety', '--max-steps', '4',
@@ -228,6 +242,7 @@ if (!tracesOnly) {
         }
       }
     }
+    if (!actionsOnly) {
     const memoryBounded = 'specs/agent-memory.qnt'
     quint(['verify', memoryBounded, '--main', 'agent_memory_bounded',
       '--step', 'boundedStep', '--invariant', 'boundedSafety', '--max-steps', '4',
@@ -236,6 +251,15 @@ if (!tracesOnly) {
       quint(['verify', memoryBounded, '--main', 'agent_memory_bounded',
         '--step', step, '--invariant', 'nodeInputsCurrent', '--max-steps', '6',
         '--apalache-version', apalacheVersion, '--verbosity', '1'], { violation })
+    }
+    }
+    if (!memoryOnly) {
+      quint(['verify', 'specs/agent-actions.qnt', '--main', 'agent_actions_bounded', '--step', 'boundedStep',
+        '--invariant', 'boundedSafety', '--max-steps', '4', '--apalache-version', apalacheVersion, '--verbosity', '1'])
+      for (const [step, violation] of [['boundedRaceBugStep', true], ['boundedRaceStep', false]]) {
+        quint(['verify', 'specs/agent-actions.qnt', '--main', 'agent_actions_bounded', '--step', step,
+          '--invariant', 'pauseBlocksAuthorization', '--max-steps', '4', '--apalache-version', apalacheVersion, '--verbosity', '1'], { violation })
+      }
     }
     console.log(`Mode: ${boundedOnly ? 'bounded Apalache' : 'simulator and bounded Apalache'}${memoryOnly ? ' (memory only)' : ''}.`)
     console.log('Memory bounds: 4 archive transitions; 6 publication-race transitions. Temporal liveness is typechecked only.')
