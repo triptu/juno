@@ -30,10 +30,10 @@ test('renders the shell with bundled fonts and token colours', async ({ win }) =
   // Fonts come from @fontsource, not the system or the network.
   await win.evaluate(() => document.fonts.ready)
   await expect(title).toHaveCSS('font-family', /Instrument Serif/)
-  await expect(button).toHaveCSS('font-family', /Inter Variable/)
+  await expect(button).toHaveCSS('font-family', /Figtree Variable/)
   const loaded = await win.evaluate(() => ({
     serif: document.fonts.check('24px "Instrument Serif"'),
-    sans: document.fonts.check('16px "Inter Variable"'),
+    sans: document.fonts.check('16px "Figtree Variable"'),
   }))
   expect(loaded).toEqual({ serif: true, sans: true })
 

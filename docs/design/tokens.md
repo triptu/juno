@@ -162,44 +162,45 @@ Prototype: `outline: 2px solid var(--selection-background); outline-offset: 2px`
 
 | Token | Value | Source |
 | --- | --- | --- |
-| `--font-sans` | `'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif` | proposed (replaces Söhne) |
+| `--font-sans` | `'Figtree Variable', 'Figtree', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif` | decided (replaces Söhne; Inter until the friendly-layer options review) |
 | `--font-serif` | `'Instrument Serif', ui-serif, 'Iowan Old Style', Georgia, serif` | proposed (replaces Meraki) |
 | `--font-mono` | `'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace` | css (PP Neue Montreal Mono dropped) |
 
-Bundle Inter 400/500/600 (variable file is fine), Instrument Serif 400 regular + italic, JetBrains Mono 400/500 locally; no Google Fonts import.
+Bundle Figtree (variable, `@fontsource-variable/figtree` 5.3.0, Latin subset 20 KB), Instrument Serif 400 regular + italic, JetBrains Mono 400/500 locally; no Google Fonts import.
 
-Root text settings [proto]: `font-size: 14px; line-height: 1.5; letter-spacing: 0.01em; -webkit-font-smoothing: antialiased`. Note `colors_and_type.css` says 0.02em globally; the prototype root uses 0.01em and that is what the screenshots show. Use 0.01em.
+Root text settings: `font-size: 14.5px; line-height: 1.5; letter-spacing: 0; -webkit-font-smoothing: antialiased`. The prototype root used 0.01em for Inter (`colors_and_type.css` says 0.02em); Figtree's sidebearings are wide enough on their own, so the root and every sans role use 0.
 
 **Metrics differences to expect**
 
-- Inter has a larger x-height and a wider average character than Söhne. Titles and previews truncate a few characters earlier at the same size. The row heights in §5 were measured with Inter, so they are already correct for what we ship.
-- The prototype loaded Söhne only at 400/600/700, so every `font-weight: 500` in the prototype rendered as Söhne 400 when the designer looked at it. With Inter, 500 renders as a true Medium and reads slightly heavier. If the UI feels heavy, map `500 → 450` on the variable font or use 400 for nav items, filters and previews; keep 500 for buttons and row titles.
+- Figtree's x-height is about 8% smaller than Inter's (0.50em against 0.545em) and it sets about 6% narrower at the same size. So every sans role at or below 15px is half a pixel larger than the prototype's Inter value: the text reads at the same optical size and a line of body text wraps within a character of where Inter did, so the row heights in §5 (measured with Inter) still hold. Sizes above 15px (topic title, the serif roles) are unchanged.
+- Figtree's 500 is a true Medium and sits between Inter's 400 and 500; it is right for nav items, filters, buttons and row titles without the `500 → 450` mapping Inter needed. 600 stays for unread titles, names and pills.
+- Checked at 12–15px (gallery `Text/all-roles`, light and dark): counters, tags and the 12.5px meta line stay legible; the single-storey g and open a are the main visible change.
 - Instrument Serif is more condensed and has a smaller x-height than Meraki. Page titles at 34px look smaller than the handoff screenshots. [proposed] Page titles 36px (Juno empty state 40px) with Instrument Serif. Verify once against a screenshot.
-- Enable `font-variant-numeric: tabular-nums` wherever a number is shown (times, counts, table cells); Inter supports it.
+- Enable `font-variant-numeric: tabular-nums` wherever a number is shown (times, counts, table cells). Figtree has `tnum`: measured in Chromium at 12px, "1111" and "0000" are 19.84 / 30.77px proportional and both 29.92px tabular.
 
 ### 2.2 Type roles
 
-All values [proto] unless noted. Family is sans unless stated.
+Sizes are the Figtree values; the prototype's Inter value is half a pixel smaller for every sans role at or below 15px (see 2.1). Letter spacing is 0 for every sans role except the three uppercase labels. Family is sans unless stated.
 
 | Role | Size | Weight | Line height | Letter spacing | Colour | Where |
 | --- | --- | --- | --- | --- | --- | --- |
-| Section label | 10.5px | 500 | normal | 0.06em, uppercase | muted | Pinned / Recent / channel groups, popover headings (People, Channels, Recent, Results, Juno) |
-| Table header | 11px | 500 | normal | 0.06em, uppercase | muted | All topics columns |
-| New divider | 11px | 600 | normal | 0.06em, uppercase | `--hl` | "3 NEW" |
-| Tag | 11px | 500 | 18px box | 0 | subtle / muted | Main, Reopened, counts, @, confidence badge, menu hints, ⌘ hints |
-| Tag small | 11.5px | 500 / 400 | | | | Row Resolve button, card footnotes, "Use", Mark read |
-| Meta | 12px | 400 | normal | | muted | Row line 3, times, message timestamps, card headers, status chips (500), bubble name line, log reasons |
-| Pill | 12.5px | 600 (+400 kind) | 26px box | | tint fg | Context pill, scope chip (500) |
-| Small button | 12.5px | 500 | 28px box | | | Group into topic, Resolve (hint), Fix and send, Stop ignoring, Not yet |
-| Thread link | 12.5px | 400 (count 600) | 26px box | | subtle | "2 replies · Title ›" |
-| UI default | 13px | 400 / 500 | 1.5 | | default | Nav, menu items, filters, buttons, selects, inputs, toast, table "Where" |
-| Preview | 13px | 400 | 1.45 | | muted (subtle if unread) | Row line 2, clamped to 1 or 2 lines |
-| Body small | 13.5px | 400 | 1.55–1.6 | | subtle | Catch-up text, For you card body, reply options, picker rows, compact-density message body |
-| Body | 14px | 400 | 1.6 | | default | Message body (balanced), composer (lh 22px), rule rows, palette labels, textareas |
-| Row title | 14.5px (13.5 compact) | 500, 600 unread | 22px box | 0 | default | Sidebar row line 1; All topics title is 14px |
-| Message name | 14px | 600 | | | default | Flat message header |
-| Body large | 14.5px | 400 | 1.6 | | | Airy-density message body |
-| Heading | 15px | 600 | normal | | default | Settings section titles, For you card titles (lh 1.35), palette input (400) |
+| Section label | 11px | 500 | normal | 0.06em, uppercase | muted | Pinned / Recent / channel groups, popover headings (People, Channels, Recent, Results, Juno) |
+| Table header | 11.5px | 500 | normal | 0.06em, uppercase | muted | All topics columns |
+| New divider | 11.5px | 600 | normal | 0.06em, uppercase | `--hl` | "3 NEW" |
+| Tag | 11.5px | 500 | 18px box | 0 | subtle / muted | Main, Reopened, counts, @, confidence badge, menu hints, ⌘ hints |
+| Tag small | 12px | 500 / 400 | | 0 | | Row Resolve button, card footnotes, "Use", Mark read |
+| Meta | 12.5px | 400 | normal | 0 | muted | Row line 3, times, message timestamps, card headers, status chips (500), bubble name line, log reasons |
+| Pill | 13px | 600 (+400 kind) | 26px box | 0 | tint fg | Context pill, scope chip (500) |
+| Small button | 13px | 500 | 28px box | 0 | | Group into topic, Resolve (hint), Fix and send, Stop ignoring, Not yet |
+| Thread link | 13px | 400 (count 600) | 26px box | 0 | subtle | "2 replies · Title ›" |
+| UI default | 13.5px | 400 / 500 | 1.5 | 0 | default | Nav, menu items, filters, buttons, selects, inputs, toast, table "Where" |
+| Preview | 13.5px | 400 | 1.45 | 0 | muted (subtle if unread) | Row line 2, clamped to 1 or 2 lines |
+| Body small | 14px | 400 | 1.55–1.6 | 0 | subtle | Catch-up text, For you card body, reply options, picker rows, compact-density message body |
+| Body | 14.5px | 400 | 1.6 | 0 | default | Message body (balanced), composer (lh 22px), rule rows, palette labels, textareas |
+| Row title | 15px (14 compact) | 500, 600 unread | 22px box | 0 | default | Sidebar row line 1; All topics title is 14.5px |
+| Message name | 14.5px | 600 | | 0 | default | Flat message header |
+| Body large | 15px | 400 | 1.6 | 0 | | Airy-density message body |
+| Heading | 15.5px | 600 | 1.35 | 0 | default | Settings section titles, For you card titles (lh 1.35), palette input (400) |
 | Topic title | 20px | 600 | 1.3 | -0.01em | default | Topic header, rename input |
 | Page title | serif 34px (32 All topics) | 400 | 1.1–1.15 | 0 | default | New message, For you, Notifications, Preferences, All topics |
 | Display | serif 38px | 400 | 1.1 | 0 | default | "What do you need?" |
@@ -419,8 +420,8 @@ Apply these when porting; the prototype values are listed so no one copies them 
 | Focus ring in `--selection-background` | `--focus-ring` = `--info` light, `hsla(200, 80%, 65%)` dark (decided) |
 | Cyan accent with off-white text (3.8:1) | Cyan takes near-black `--hl-fg` (`hsla(48, 10%, 2%)`) |
 | Composer max 184px | 194px (8 full lines) |
-| Söhne / Meraki | Inter / Instrument Serif, bundled |
-| Global letter-spacing 0.02em in CSS file | 0.01em (prototype root) |
+| Söhne / Meraki | Figtree / Instrument Serif, bundled (Inter was the first replacement; swapped for Figtree in the friendly-layer options review) |
+| Global letter-spacing 0.02em in CSS file | 0 (Figtree; 0.01em was the Inter value) |
 | Lucide outline icons | Phosphor, weight by size, fill for active (`friendly-layer.md` §2) |
 | Radius 6 tags, chips, pills and reactions | Pills (`--radius-tag`, `--radius-pill`); tiles, rows and cards 12, composer and toast 14 |
 | No entrances; everything 150ms | Entrances 240ms, exits 150ms, pops 220ms with a spring; rows, tabs and typing still never animate |

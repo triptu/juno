@@ -128,7 +128,7 @@ Rules that come from the design spec and are enforced in `@juno/ui`:
 - Hover styles only inside `@media (hover: hover)`.
 - 2px focus ring in `--focus-ring` on `:focus-visible` only.
 - Rows, tabs and option rows navigate on `pointerdown` (see `packages/ui/README.md`).
-- Fonts are bundled by Vite from `@juno/tokens/fonts.css` (Inter, Instrument Serif,
+- Fonts are bundled by Vite from `@juno/tokens/fonts.css` (Figtree, Instrument Serif,
   JetBrains Mono), which both apps import. Never load fonts from a URL. Instrument
   Serif has one weight (400).
 

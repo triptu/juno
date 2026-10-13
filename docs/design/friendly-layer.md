@@ -61,7 +61,7 @@ Phosphor glyphs fill about 73% of their box; Lucide fills about 83%. To keep the
 | 16 | 18 regular | Title bar buttons, header icon buttons, hover toolbar, palette rows, send arrow (bold) |
 | 18 | 20 regular | Attach, palette search |
 
-`IconSize` becomes `12 | 13 | 14 | 15 | 16 | 18 | 20`. Icons centre on the flex line box next to Inter with no manual nudge; Phosphor's 32-unit margin already sits the glyph on the cap height. Check at 13 next to 11px tags in the gallery and nudge in the SVG, not with a margin, if anything looks high.
+`IconSize` becomes `12 | 13 | 14 | 15 | 16 | 18 | 20`. Icons centre on the flex line box next to the sans with no manual nudge; Phosphor's 32-unit margin already sits the glyph on the cap height. Check at 13 next to 11px tags in the gallery and nudge in the SVG, not with a margin, if anything looks high.
 
 ### 2.3 Mapping from the Lucide icons in use
 
@@ -272,7 +272,7 @@ Rules that fall out of the table:
 - **Calm by default.** Unread counts stay soft grey. No red, no accent-coloured badges, no dots that pulse. The For you count stays a quiet chip.
 - **The AI rules.** AI still shows nothing unless confident, never writes for you, never adds labels to the sidebar, never sends without a click. Duotone sparkles do not make AI more visible; they only mark where it already appeared.
 - **Native feel.** Arrow cursor everywhere, native menus, instant rows and tabs, keyboard reach, 4.5:1 text, reduced motion respected, no pointer cursor.
-- **Type.** Inter and Instrument Serif, same roles and sizes. No display face, no rounded sans.
+- **Type.** One sans and Instrument Serif, same roles. The sans is Figtree since the options review (`tokens.md` 2.1), with the roles re-tuned by half a pixel so nothing moved. No display face.
 - **Context tints.** Public, private and DM pills keep their colours; only their radius changes.
 - **Chrome has no emoji and no character.** The seated j appears in illustrations and the Juno surfaces only, never in the sidebar, the header or a toast.
 

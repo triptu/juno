@@ -9,7 +9,7 @@ The only place a colour, size, radius, shadow, font or duration is written down.
 | `src/tokens.stylex.ts` | Every variable group with its light, default-accent value. |
 | `src/themes.stylex.ts` | `dark` (colours and shadows) and the four accent themes. |
 | `src/global.css` | Body defaults, scrollbars, `::selection`, reduced motion, theme-switch suppression. |
-| `src/fonts.css` | `@font-face` imports for Inter, Instrument Serif and JetBrains Mono from `@fontsource`. |
+| `src/fonts.css` | `@font-face` imports for Figtree, Instrument Serif and JetBrains Mono from `@fontsource`. |
 
 Import tokens through the subpath, never a barrel: `import { colors } from '@juno/tokens/tokens.stylex'`. Import the two stylesheets once from the app entry.
 
