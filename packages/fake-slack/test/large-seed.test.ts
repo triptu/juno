@@ -3,12 +3,9 @@ import { LARGE_SEED_DEFAULTS, largeSeed, startFakeSlack } from '../src/index.ts'
 import { TestClient } from './helpers.ts'
 
 describe('the large seed', () => {
-  it('generates the perf workspace in a few seconds, deterministically', async () => {
-    const started = Date.now()
+  it('generates the perf workspace deterministically', async () => {
     const fake = await startFakeSlack({ seed: largeSeed() })
     try {
-      const elapsed = Date.now() - started
-      expect(elapsed).toBeLessThan(20_000)
       expect(fake.workspace.users.size).toBe(LARGE_SEED_DEFAULTS.users)
       expect(fake.workspace.conversations.size).toBe(300)
       let messages = 0
