@@ -1,0 +1,116 @@
+{
+  "level": "relaxed",
+  "model": "google/gemini-3.8-flash",
+  "topic": "main-mpdm",
+  "ok": true,
+  "spec": {
+    "hue": "amber",
+    "confident": true,
+    "elements": [
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M7 18 C7 27 12 32 20 32 C28 32 33 27 33 18 Z",
+          "fill": "soft"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M7 18 C7 27 12 32 20 32 C28 32 33 18 Z"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "15",
+          "y1": "32",
+          "x2": "25",
+          "y2": "32",
+          "stroke-width": "3"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "5",
+          "y1": "18",
+          "x2": "35",
+          "y2": "18"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "6",
+          "y1": "12",
+          "x2": "34",
+          "y2": "15",
+          "stroke-width": "2.25"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "6",
+          "y1": "9",
+          "x2": "33",
+          "y2": "13",
+          "stroke-width": "2.25"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "15",
+          "cy": "22",
+          "r": "3",
+          "fill": "accent",
+          "stroke": "none"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "15",
+          "cy": "22",
+          "r": "1.5",
+          "fill": "ink",
+          "stroke": "none",
+          "opacity": "0.3",
+          "detail": "1"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M21 7 C20 10 22 11 21 13",
+          "stroke-width": "2",
+          "stroke-linecap": "round",
+          "fill": "none",
+          "detail": "1"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M26 6 C25 9 27 10 26 12",
+          "stroke-width": "2",
+          "stroke-linecap": "round",
+          "fill": "none",
+          "detail": "1"
+        }
+      }
+    ]
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"amber\">\n  <path d=\"M7 18 C7 27 12 32 20 32 C28 32 33 27 33 18 Z\" fill=\"soft\"/>\n  <path d=\"M7 18 C7 27 12 32 20 32 C28 32 33 18 Z\"/>\n  <line x1=\"15\" y1=\"32\" x2=\"25\" y2=\"32\" stroke-width=\"3\"/>\n  <line x1=\"5\" y1=\"18\" x2=\"35\" y2=\"18\"/>\n  <line x1=\"6\" y1=\"12\" x2=\"34\" y2=\"15\" stroke-width=\"2.25\"/>\n  <line x1=\"6\" y1=\"9\" x2=\"33\" y2=\"13\" stroke-width=\"2.25\"/>\n  <circle cx=\"15\" cy=\"22\" r=\"3\" fill=\"accent\" stroke=\"none\"/>\n  <circle cx=\"15\" cy=\"22\" r=\"1.5\" fill=\"ink\" stroke=\"none\" opacity=\"0.3\" detail=\"1\"/>\n  <path d=\"M21 7 C20 10 22 11 21 13\" stroke-width=\"2\" stroke-linecap=\"round\" fill=\"none\" detail=\"1\"/>\n  <path d=\"M26 6 C25 9 27 10 26 12\" stroke-width=\"2\" stroke-linecap=\"round\" fill=\"none\" detail=\"1\"/>\n</svg>",
+  "elements": 10,
+  "attempts": 1,
+  "latencyMs": 2493,
+  "costUsd": 0.0033705,
+  "tokens": {
+    "in": 1389,
+    "out": 621
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"amber\">\n  <path d=\"M7 18 C7 27 12 32 20 32 C28 32 33 27 33 18 Z\" fill=\"soft\"/>\n  <path d=\"M7 18 C7 27 12 32 20 32 C28 32 33 18 Z\"/>\n  <line x1=\"15\" y1=\"32\" x2=\"25\" y2=\"32\" stroke-width=\"3\"/>\n  <line x1=\"5\" y1=\"18\" x2=\"35\" y2=\"18\"/>\n  <line x1=\"6\" y1=\"12\" x2=\"34\" y2=\"15\" stroke-width=\"2.25\"/>\n  <line x1=\"6\" y1=\"9\" x2=\"33\" y2=\"13\" stroke-width=\"2.25\"/>\n  <circle cx=\"15\" cy=\"22\" r=\"3\" fill=\"accent\" stroke=\"none\"/>\n  <circle cx=\"15\" cy=\"22\" r=\"1.5\" fill=\"ink\" stroke=\"none\" opacity=\"0.3\" detail=\"1\"/>\n  <path d=\"M21 7 C20 10 22 11 21 13\" stroke-width=\"2\" stroke-linecap=\"round\" fill=\"none\" detail=\"1\"/>\n  <path d=\"M26 6 C25 9 27 10 26 12\" stroke-width=\"2\" stroke-linecap=\"round\" fill=\"none\" detail=\"1\"/>\n</svg>"
+}

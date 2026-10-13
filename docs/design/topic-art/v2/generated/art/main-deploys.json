@@ -1,0 +1,85 @@
+{
+  "level": "art",
+  "model": "google/gemini-3.8-flash",
+  "topic": "main-deploys",
+  "ok": true,
+  "spec": {
+    "hue": "teal",
+    "confident": true,
+    "elements": [
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M20,6 L34,14 L34,27 L20,35 L6,27 L6,14 Z",
+          "fill": "soft",
+          "stroke": "ink",
+          "stroke-width": "2.75",
+          "stroke-linejoin": "round"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "20",
+          "y1": "22",
+          "x2": "20",
+          "y2": "35",
+          "stroke": "ink",
+          "stroke-width": "2.5",
+          "stroke-linecap": "round"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "6",
+          "y1": "14",
+          "x2": "20",
+          "y2": "22",
+          "stroke": "ink",
+          "stroke-width": "2.5",
+          "stroke-linecap": "round",
+          "stroke-linejoin": "round"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "34",
+          "y1": "14",
+          "x2": "20",
+          "y2": "22",
+          "stroke": "ink",
+          "stroke-width": "2.5",
+          "stroke-linecap": "round",
+          "stroke-linejoin": "round"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M18,7.5 L22,7.5 L22,21.2 L22,24.8 L20,26 L18,24.8 L18,21.2 Z",
+          "fill": "accent"
+        }
+      },
+      {
+        "tag": "polygon",
+        "attrs": {
+          "points": "24,19.5 30,16 30,21.5 24,25",
+          "fill": "accent2",
+          "detail": "1"
+        }
+      }
+    ]
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"teal\">\n  <path d=\"M20,6 L34,14 L34,27 L20,35 L6,27 L6,14 Z\" fill=\"soft\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linejoin=\"round\"/>\n  <line x1=\"20\" y1=\"22\" x2=\"20\" y2=\"35\" stroke=\"ink\" stroke-width=\"2.5\" stroke-linecap=\"round\"/>\n  <line x1=\"6\" y1=\"14\" x2=\"20\" y2=\"22\" stroke=\"ink\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>\n  <line x1=\"34\" y1=\"14\" x2=\"20\" y2=\"22\" stroke=\"ink\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>\n  <path d=\"M18,7.5 L22,7.5 L22,21.2 L22,24.8 L20,26 L18,24.8 L18,21.2 Z\" fill=\"accent\"/>\n  <polygon points=\"24,19.5 30,16 30,21.5 24,25\" fill=\"accent2\" detail=\"1\"/>\n</svg>",
+  "elements": 6,
+  "attempts": 1,
+  "latencyMs": 2162,
+  "costUsd": 0.015099,
+  "tokens": {
+    "in": 1102,
+    "out": 3806
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"teal\">\n  <path d=\"M20,6 L34,14 L34,27 L20,35 L6,27 L6,14 Z\" fill=\"soft\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linejoin=\"round\" />\n  <line x1=\"20\" y1=\"22\" x2=\"20\" y2=\"35\" stroke=\"ink\" stroke-width=\"2.5\" stroke-linecap=\"round\" />\n  <line x1=\"6\" y1=\"14\" x2=\"20\" y2=\"22\" stroke=\"ink\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" />\n  <line x1=\"34\" y1=\"14\" x2=\"20\" y2=\"22\" stroke=\"ink\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" />\n  <path d=\"M18,7.5 L22,7.5 L22,21.2 L22,24.8 L20,26 L18,24.8 L18,21.2 Z\" fill=\"accent\" />\n  <polygon points=\"24,19.5 30,16 30,21.5 24,25\" fill=\"accent2\" detail=\"1\" />\n</svg>"
+}

@@ -1,0 +1,74 @@
+{
+  "level": "relaxed",
+  "model": "google/gemini-3.8-flash",
+  "topic": "q4-cuts",
+  "ok": true,
+  "spec": {
+    "hue": "plum",
+    "confident": true,
+    "elements": [
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M12 14 L20 20 L33 11 C31 16 26 19 20 20 Z",
+          "fill": "soft"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M12 26 L20 20 L33 29 C31 24 26 21 20 20 Z",
+          "fill": "soft"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "10",
+          "cy": "13",
+          "r": "4.5"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "10",
+          "cy": "27",
+          "r": "4.5"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M13.5 15.5 L34 30"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M13.5 24.5 L34 10"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "20",
+          "cy": "20",
+          "r": "2.2",
+          "fill": "accent",
+          "stroke": "none"
+        }
+      }
+    ]
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"plum\">\n  <path d=\"M12 14 L20 20 L33 11 C31 16 26 19 20 20 Z\" fill=\"soft\"/>\n  <path d=\"M12 26 L20 20 L33 29 C31 24 26 21 20 20 Z\" fill=\"soft\"/>\n  <circle cx=\"10\" cy=\"13\" r=\"4.5\"/>\n  <circle cx=\"10\" cy=\"27\" r=\"4.5\"/>\n  <path d=\"M13.5 15.5 L34 30\"/>\n  <path d=\"M13.5 24.5 L34 10\"/>\n  <circle cx=\"20\" cy=\"20\" r=\"2.2\" fill=\"accent\" stroke=\"none\"/>\n</svg>",
+  "elements": 7,
+  "attempts": 2,
+  "latencyMs": 4803,
+  "costUsd": 0.014359499999999999,
+  "tokens": {
+    "in": 2996,
+    "out": 3230
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"plum\">\n  <path d=\"M12 14 L20 20 L33 11 C31 16 26 19 20 20 Z\" fill=\"soft\"/>\n  <path d=\"M12 26 L20 20 L33 29 C31 24 26 21 20 20 Z\" fill=\"soft\"/>\n  <circle cx=\"10\" cy=\"13\" r=\"4.5\"/>\n  <circle cx=\"10\" cy=\"27\" r=\"4.5\"/>\n  <path d=\"M13.5 15.5 L34 30\"/>\n  <path d=\"M13.5 24.5 L34 10\"/>\n  <circle cx=\"20\" cy=\"20\" r=\"2.2\" fill=\"accent\" stroke=\"none\"/>\n</svg>"
+}

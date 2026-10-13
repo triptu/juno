@@ -1,0 +1,82 @@
+{
+  "level": "strict",
+  "model": "google/gemini-3.8-flash",
+  "topic": "games",
+  "ok": true,
+  "spec": {
+    "hue": "coral",
+    "elements": [
+      {
+        "tag": "rect",
+        "attrs": {
+          "x": "8",
+          "y": "8",
+          "width": "24",
+          "height": "24",
+          "rx": "5",
+          "fill": "soft"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "14",
+          "cy": "14",
+          "r": "2",
+          "fill": "ink",
+          "stroke": "none"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "26",
+          "cy": "14",
+          "r": "2",
+          "fill": "ink",
+          "stroke": "none"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "20",
+          "cy": "20",
+          "r": "2",
+          "fill": "accent",
+          "stroke": "none"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "14",
+          "cy": "26",
+          "r": "2",
+          "fill": "ink",
+          "stroke": "none"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "26",
+          "cy": "26",
+          "r": "2",
+          "fill": "ink",
+          "stroke": "none"
+        }
+      }
+    ]
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"coral\">\n  <rect x=\"8\" y=\"8\" width=\"24\" height=\"24\" rx=\"5\" fill=\"soft\"/>\n  <circle cx=\"14\" cy=\"14\" r=\"2\" fill=\"ink\" stroke=\"none\"/>\n  <circle cx=\"26\" cy=\"14\" r=\"2\" fill=\"ink\" stroke=\"none\"/>\n  <circle cx=\"20\" cy=\"20\" r=\"2\" fill=\"accent\" stroke=\"none\"/>\n  <circle cx=\"14\" cy=\"26\" r=\"2\" fill=\"ink\" stroke=\"none\"/>\n  <circle cx=\"26\" cy=\"26\" r=\"2\" fill=\"ink\" stroke=\"none\"/>\n</svg>",
+  "elements": 6,
+  "attempts": 1,
+  "latencyMs": 1272,
+  "costUsd": 0.00158625,
+  "tokens": {
+    "in": 1195,
+    "out": 184
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"coral\">\n  <rect x=\"8\" y=\"8\" width=\"24\" height=\"24\" rx=\"5\" fill=\"soft\"/>\n  <circle cx=\"14\" cy=\"14\" r=\"2\" fill=\"ink\" stroke=\"none\"/>\n  <circle cx=\"26\" cy=\"14\" r=\"2\" fill=\"ink\" stroke=\"none\"/>\n  <circle cx=\"20\" cy=\"20\" r=\"2\" fill=\"accent\" stroke=\"none\"/>\n  <circle cx=\"14\" cy=\"26\" r=\"2\" fill=\"ink\" stroke=\"none\"/>\n  <circle cx=\"26\" cy=\"26\" r=\"2\" fill=\"ink\" stroke=\"none\"/>\n</svg>"
+}

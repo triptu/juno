@@ -1,0 +1,89 @@
+{
+  "level": "art",
+  "model": "google/gemini-3.8-flash",
+  "topic": "staging-bill",
+  "ok": true,
+  "spec": {
+    "hue": "coral",
+    "elements": [
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M9 32 L9 9 C9 7.34 10.34 6 12 6 L28 6 C29.66 6 31 7.34 31 9 L31 32 L26.5 29.5 L22 32 L17.5 29.5 L13.5 32 Z",
+          "fill": "soft",
+          "stroke": "ink",
+          "stroke-width": "2.75",
+          "stroke-linecap": "round",
+          "stroke-linejoin": "round"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "14",
+          "y1": "12",
+          "x2": "26",
+          "y2": "12",
+          "stroke": "ink",
+          "stroke-width": "2",
+          "stroke-linecap": "round"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "14",
+          "y1": "17",
+          "x2": "22",
+          "y2": "17",
+          "stroke": "ink",
+          "stroke-width": "2",
+          "stroke-linecap": "round"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "27",
+          "cy": "27",
+          "r": "7",
+          "fill": "accent",
+          "stroke": "ink",
+          "stroke-width": "2.75"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M24.5 28 L27 24.5 L29.5 28",
+          "stroke": "ink",
+          "stroke-width": "2",
+          "stroke-linecap": "round",
+          "stroke-linejoin": "round"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "27",
+          "y1": "25",
+          "x2": "27",
+          "y2": "30.5",
+          "stroke": "ink",
+          "stroke-width": "2",
+          "stroke-linecap": "round"
+        }
+      }
+    ]
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"coral\">\n  <path d=\"M9 32 L9 9 C9 7.34 10.34 6 12 6 L28 6 C29.66 6 31 7.34 31 9 L31 32 L26.5 29.5 L22 32 L17.5 29.5 L13.5 32 Z\" fill=\"soft\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>\n  <line x1=\"14\" y1=\"12\" x2=\"26\" y2=\"12\" stroke=\"ink\" stroke-width=\"2\" stroke-linecap=\"round\"/>\n  <line x1=\"14\" y1=\"17\" x2=\"22\" y2=\"17\" stroke=\"ink\" stroke-width=\"2\" stroke-linecap=\"round\"/>\n  <circle cx=\"27\" cy=\"27\" r=\"7\" fill=\"accent\" stroke=\"ink\" stroke-width=\"2.75\"/>\n  <path d=\"M24.5 28 L27 24.5 L29.5 28\" stroke=\"ink\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>\n  <line x1=\"27\" y1=\"25\" x2=\"27\" y2=\"30.5\" stroke=\"ink\" stroke-width=\"2\" stroke-linecap=\"round\"/>\n</svg>",
+  "elements": 6,
+  "attempts": 1,
+  "latencyMs": 2192,
+  "costUsd": 0.0020805,
+  "tokens": {
+    "in": 884,
+    "out": 378
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"coral\">\n  <path d=\"M9 32 L9 9 C9 7.34 10.34 6 12 6 L28 6 C29.66 6 31 7.34 31 9 L31 32 L26.5 29.5 L22 32 L17.5 29.5 L13.5 32 Z\" fill=\"soft\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>\n  <line x1=\"14\" y1=\"12\" x2=\"26\" y2=\"12\" stroke=\"ink\" stroke-width=\"2\" stroke-linecap=\"round\"/>\n  <line x1=\"14\" y1=\"17\" x2=\"22\" y2=\"17\" stroke=\"ink\" stroke-width=\"2\" stroke-linecap=\"round\"/>\n  <circle cx=\"27\" cy=\"27\" r=\"7\" fill=\"accent\" stroke=\"ink\" stroke-width=\"2.75\"/>\n  <path d=\"M24.5 28 L27 24.5 L29.5 28\" stroke=\"ink\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>\n  <line x1=\"27\" y1=\"25\" x2=\"27\" y2=\"30.5\" stroke=\"ink\" stroke-width=\"2\" stroke-linecap=\"round\"/>\n</svg>"
+}

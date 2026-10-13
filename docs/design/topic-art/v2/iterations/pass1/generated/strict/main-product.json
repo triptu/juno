@@ -1,0 +1,46 @@
+{
+  "level": "strict",
+  "model": "google/gemini-3.8-flash",
+  "topic": "main-product",
+  "ok": true,
+  "spec": {
+    "hue": "periwinkle",
+    "elements": [
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M8 8 L32 8 L24 20 L32 32 L8 32 Z",
+          "fill": "soft"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M12 15 L20 20 L12 25",
+          "stroke-width": "2.5",
+          "detail": "1"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "27",
+          "cy": "20",
+          "r": "2",
+          "fill": "accent",
+          "stroke": "none"
+        }
+      }
+    ]
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"periwinkle\">\n  <path d=\"M8 8 L32 8 L24 20 L32 32 L8 32 Z\" fill=\"soft\"/>\n  <path d=\"M12 15 L20 20 L12 25\" stroke-width=\"2.5\" detail=\"1\"/>\n  <circle cx=\"27\" cy=\"20\" r=\"2\" fill=\"accent\" stroke=\"none\"/>\n</svg>",
+  "elements": 3,
+  "attempts": 1,
+  "latencyMs": 1601,
+  "costUsd": 0.0014055,
+  "tokens": {
+    "in": 1239,
+    "out": 127
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"periwinkle\">\n  <path d=\"M8 8 L32 8 L24 20 L32 32 L8 32 Z\" fill=\"soft\"/>\n  <path d=\"M12 15 L20 20 L12 25\" stroke-width=\"2.5\" detail=\"1\"/>\n  <circle cx=\"27\" cy=\"20\" r=\"2\" fill=\"accent\" stroke=\"none\"/>\n</svg>"
+}

@@ -1,0 +1,55 @@
+{
+  "level": "art",
+  "model": "google/gemini-3.8-flash",
+  "topic": "icons",
+  "ok": true,
+  "spec": {
+    "hue": "periwinkle",
+    "elements": [
+      {
+        "tag": "rect",
+        "attrs": {
+          "x": "7",
+          "y": "7",
+          "width": "26",
+          "height": "26",
+          "rx": "6",
+          "fill": "soft",
+          "stroke": "ink",
+          "stroke-width": "2.75",
+          "stroke-linejoin": "round"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M20 12 C20 16 16 20 12 20 C16 20 20 24 20 28 C20 24 24 20 28 20 C24 20 20 16 20 12 Z",
+          "fill": "accent",
+          "stroke": "ink",
+          "stroke-width": "2",
+          "stroke-linejoin": "round"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "27",
+          "cy": "13",
+          "r": "1.5",
+          "fill": "ink",
+          "detail": "1"
+        }
+      }
+    ]
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"periwinkle\">\n  <rect x=\"7\" y=\"7\" width=\"26\" height=\"26\" rx=\"6\" fill=\"soft\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linejoin=\"round\"/>\n  <path d=\"M20 12 C20 16 16 20 12 20 C16 20 20 24 20 28 C20 24 24 20 28 20 C24 20 20 16 20 12 Z\" fill=\"accent\" stroke=\"ink\" stroke-width=\"2\" stroke-linejoin=\"round\"/>\n  <circle cx=\"27\" cy=\"13\" r=\"1.5\" fill=\"ink\" detail=\"1\"/>\n</svg>",
+  "elements": 3,
+  "attempts": 1,
+  "latencyMs": 2941,
+  "costUsd": 0.00242025,
+  "tokens": {
+    "in": 857,
+    "out": 474
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"periwinkle\">\n  <rect x=\"7\" y=\"7\" width=\"26\" height=\"26\" rx=\"6\" fill=\"soft\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linejoin=\"round\"/>\n  <path d=\"M20 12 C20 16 16 20 12 20 C16 20 20 24 20 28 C20 24 24 20 28 20 C24 20 20 16 20 12 Z\" fill=\"accent\" stroke=\"ink\" stroke-width=\"2\" stroke-linejoin=\"round\"/>\n  <circle cx=\"27\" cy=\"13\" r=\"1.5\" fill=\"ink\" detail=\"1\"/>\n</svg>"
+}

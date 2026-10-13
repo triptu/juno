@@ -1,0 +1,67 @@
+{
+  "level": "strict",
+  "model": "google/gemini-3.8-flash",
+  "topic": "main-random",
+  "ok": true,
+  "spec": {
+    "hue": "sky",
+    "elements": [
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M10 15 V25 C10 29.5 13.5 32 18 32 C22.5 32 26 29.5 26 25 V15 Z",
+          "fill": "soft"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "8.5",
+          "y1": "15",
+          "x2": "27.5",
+          "y2": "15"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M26 18 H29 C31.5 18 33 19.5 33 22 C33 24.5 31.5 26 29 26 H26"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M14 6 C13 8 15 9.5 14 11.5",
+          "detail": "1"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M21 6 C20 8 22 9.5 21 11.5",
+          "detail": "1"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "18",
+          "cy": "23",
+          "r": "2",
+          "fill": "accent",
+          "stroke": "none"
+        }
+      }
+    ]
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"sky\">\n  <path d=\"M10 15 V25 C10 29.5 13.5 32 18 32 C22.5 32 26 29.5 26 25 V15 Z\" fill=\"soft\"/>\n  <line x1=\"8.5\" y1=\"15\" x2=\"27.5\" y2=\"15\"/>\n  <path d=\"M26 18 H29 C31.5 18 33 19.5 33 22 C33 24.5 31.5 26 29 26 H26\"/>\n  <path d=\"M14 6 C13 8 15 9.5 14 11.5\" detail=\"1\"/>\n  <path d=\"M21 6 C20 8 22 9.5 21 11.5\" detail=\"1\"/>\n  <circle cx=\"18\" cy=\"23\" r=\"2\" fill=\"accent\" stroke=\"none\"/>\n</svg>",
+  "elements": 6,
+  "attempts": 1,
+  "latencyMs": 2096,
+  "costUsd": 0.0036705,
+  "tokens": {
+    "in": 1199,
+    "out": 739
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"sky\">\n  <path d=\"M10 15 V25 C10 29.5 13.5 32 18 32 C22.5 32 26 29.5 26 25 V15 Z\" fill=\"soft\"/>\n  <line x1=\"8.5\" y1=\"15\" x2=\"27.5\" y2=\"15\"/>\n  <path d=\"M26 18 H29 C31.5 18 33 19.5 33 22 C33 24.5 31.5 26 29 26 H26\"/>\n  <path d=\"M14 6 C13 8 15 9.5 14 11.5\" detail=\"1\"/>\n  <path d=\"M21 6 C20 8 22 9.5 21 11.5\" detail=\"1\"/>\n  <circle cx=\"18\" cy=\"23\" r=\"2\" fill=\"accent\" stroke=\"none\"/>\n</svg>"
+}

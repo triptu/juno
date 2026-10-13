@@ -1,0 +1,59 @@
+{
+  "level": "strict",
+  "model": "google/gemini-3.8-flash",
+  "topic": "p95",
+  "ok": true,
+  "spec": {
+    "hue": "coral",
+    "elements": [
+      {
+        "tag": "rect",
+        "attrs": {
+          "x": "7",
+          "y": "8",
+          "width": "26",
+          "height": "24",
+          "rx": "4",
+          "fill": "soft"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "10",
+          "y1": "27",
+          "x2": "30",
+          "y2": "27",
+          "opacity": "0.35",
+          "detail": "1"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M10 23 L16 23 L22 13 L26 19 L30 19"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "22",
+          "cy": "13",
+          "r": "2.2",
+          "fill": "accent",
+          "stroke": "none"
+        }
+      }
+    ]
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"coral\">\n  <rect x=\"7\" y=\"8\" width=\"26\" height=\"24\" rx=\"4\" fill=\"soft\"/>\n  <line x1=\"10\" y1=\"27\" x2=\"30\" y2=\"27\" opacity=\"0.35\" detail=\"1\"/>\n  <path d=\"M10 23 L16 23 L22 13 L26 19 L30 19\"/>\n  <circle cx=\"22\" cy=\"13\" r=\"2.2\" fill=\"accent\" stroke=\"none\"/>\n</svg>",
+  "elements": 4,
+  "attempts": 1,
+  "latencyMs": 3039,
+  "costUsd": 0.0068655,
+  "tokens": {
+    "in": 1224,
+    "out": 1586
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"coral\">\n  <rect x=\"7\" y=\"8\" width=\"26\" height=\"24\" rx=\"4\" fill=\"soft\"/>\n  <line x1=\"10\" y1=\"27\" x2=\"30\" y2=\"27\" opacity=\"0.35\" detail=\"1\"/>\n  <path d=\"M10 23 L16 23 L22 13 L26 19 L30 19\"/>\n  <circle cx=\"22\" cy=\"13\" r=\"2.2\" fill=\"accent\" stroke=\"none\"/>\n</svg>"
+}

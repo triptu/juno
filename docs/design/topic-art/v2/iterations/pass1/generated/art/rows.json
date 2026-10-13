@@ -1,0 +1,129 @@
+{
+  "level": "art",
+  "model": "google/gemini-3.8-flash",
+  "topic": "rows",
+  "ok": true,
+  "spec": {
+    "hue": "periwinkle",
+    "elements": [
+      {
+        "tag": "rect",
+        "attrs": {
+          "x": "6",
+          "y": "6",
+          "width": "28",
+          "height": "28",
+          "rx": "5",
+          "fill": "soft",
+          "stroke": "ink",
+          "stroke-width": "2.75",
+          "stroke-linejoin": "round"
+        }
+      },
+      {
+        "tag": "rect",
+        "attrs": {
+          "x": "9.5",
+          "y": "9.5",
+          "width": "21",
+          "height": "9.5",
+          "rx": "3",
+          "fill": "none",
+          "stroke": "ink",
+          "stroke-width": "1.75"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "13.5",
+          "cy": "14.25",
+          "r": "1.75",
+          "fill": "accent"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "18",
+          "y1": "12.5",
+          "x2": "27",
+          "y2": "12.5",
+          "stroke": "ink",
+          "stroke-width": "2",
+          "stroke-linecap": "round"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "18",
+          "y1": "16",
+          "x2": "24.5",
+          "y2": "16",
+          "stroke": "ink",
+          "stroke-width": "1.5",
+          "stroke-linecap": "round",
+          "detail": "1"
+        }
+      },
+      {
+        "tag": "rect",
+        "attrs": {
+          "x": "9.5",
+          "y": "21",
+          "width": "21",
+          "height": "9.5",
+          "rx": "3",
+          "fill": "none",
+          "stroke": "ink",
+          "stroke-width": "1.75"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "13.5",
+          "cy": "25.75",
+          "r": "1.75",
+          "fill": "ink"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "18",
+          "y1": "24",
+          "x2": "27",
+          "y2": "24",
+          "stroke": "ink",
+          "stroke-width": "2",
+          "stroke-linecap": "round"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "18",
+          "y1": "27.5",
+          "x2": "23",
+          "y2": "27.5",
+          "stroke": "ink",
+          "stroke-width": "1.5",
+          "stroke-linecap": "round",
+          "detail": "1"
+        }
+      }
+    ]
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"periwinkle\">\n  <rect x=\"6\" y=\"6\" width=\"28\" height=\"28\" rx=\"5\" fill=\"soft\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linejoin=\"round\"/>\n  <rect x=\"9.5\" y=\"9.5\" width=\"21\" height=\"9.5\" rx=\"3\" fill=\"none\" stroke=\"ink\" stroke-width=\"1.75\"/>\n  <circle cx=\"13.5\" cy=\"14.25\" r=\"1.75\" fill=\"accent\"/>\n  <line x1=\"18\" y1=\"12.5\" x2=\"27\" y2=\"12.5\" stroke=\"ink\" stroke-width=\"2\" stroke-linecap=\"round\"/>\n  <line x1=\"18\" y1=\"16\" x2=\"24.5\" y2=\"16\" stroke=\"ink\" stroke-width=\"1.5\" stroke-linecap=\"round\" detail=\"1\"/>\n  <rect x=\"9.5\" y=\"21\" width=\"21\" height=\"9.5\" rx=\"3\" fill=\"none\" stroke=\"ink\" stroke-width=\"1.75\"/>\n  <circle cx=\"13.5\" cy=\"25.75\" r=\"1.75\" fill=\"ink\"/>\n  <line x1=\"18\" y1=\"24\" x2=\"27\" y2=\"24\" stroke=\"ink\" stroke-width=\"2\" stroke-linecap=\"round\"/>\n  <line x1=\"18\" y1=\"27.5\" x2=\"23\" y2=\"27.5\" stroke=\"ink\" stroke-width=\"1.5\" stroke-linecap=\"round\" detail=\"1\"/>\n</svg>",
+  "elements": 9,
+  "attempts": 1,
+  "latencyMs": 2833,
+  "costUsd": 0.00300375,
+  "tokens": {
+    "in": 895,
+    "out": 622
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"periwinkle\">\n  <rect x=\"6\" y=\"6\" width=\"28\" height=\"28\" rx=\"5\" fill=\"soft\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linejoin=\"round\"/>\n  <rect x=\"9.5\" y=\"9.5\" width=\"21\" height=\"9.5\" rx=\"3\" fill=\"none\" stroke=\"ink\" stroke-width=\"1.75\"/>\n  <circle cx=\"13.5\" cy=\"14.25\" r=\"1.75\" fill=\"accent\"/>\n  <line x1=\"18\" y1=\"12.5\" x2=\"27\" y2=\"12.5\" stroke=\"ink\" stroke-width=\"2\" stroke-linecap=\"round\"/>\n  <line x1=\"18\" y1=\"16\" x2=\"24.5\" y2=\"16\" stroke=\"ink\" stroke-width=\"1.5\" stroke-linecap=\"round\" detail=\"1\"/>\n  <rect x=\"9.5\" y=\"21\" width=\"21\" height=\"9.5\" rx=\"3\" fill=\"none\" stroke=\"ink\" stroke-width=\"1.75\"/>\n  <circle cx=\"13.5\" cy=\"25.75\" r=\"1.75\" fill=\"ink\"/>\n  <line x1=\"18\" y1=\"24\" x2=\"27\" y2=\"24\" stroke=\"ink\" stroke-width=\"2\" stroke-linecap=\"round\"/>\n  <line x1=\"18\" y1=\"27.5\" x2=\"23\" y2=\"27.5\" stroke=\"ink\" stroke-width=\"1.5\" stroke-linecap=\"round\" detail=\"1\"/>\n</svg>"
+}

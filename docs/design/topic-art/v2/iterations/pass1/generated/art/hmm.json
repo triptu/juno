@@ -1,0 +1,116 @@
+{
+  "level": "art",
+  "model": "google/gemini-3.8-flash",
+  "topic": "hmm",
+  "ok": true,
+  "spec": {
+    "hue": "amber",
+    "elements": [
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M14 24C12 21.5 11 18.5 11 15.5C11 10.5 15 6.5 20 6.5C25 6.5 29 10.5 29 15.5C29 18.5 28 21.5 26 24C25 25.2 24.5 26.5 24.5 28H15.5C15.5 26.5 15 25.2 14 24Z",
+          "fill": "soft",
+          "stroke": "ink",
+          "stroke-width": "2.75",
+          "stroke-linejoin": "round"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M16 28H24",
+          "stroke": "ink",
+          "stroke-width": "2.75",
+          "stroke-linecap": "round"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M17 31.5H23",
+          "stroke": "ink",
+          "stroke-width": "2.75",
+          "stroke-linecap": "round"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M18.5 35H21.5",
+          "stroke": "ink",
+          "stroke-width": "2.75",
+          "stroke-linecap": "round"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M17 17C17 15 18.3 13.5 20 13.5C21.7 13.5 23 15 23 17",
+          "fill": "none",
+          "stroke": "accent",
+          "stroke-width": "2",
+          "stroke-linecap": "round"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "20",
+          "cy": "18",
+          "r": "1.25",
+          "fill": "accent"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "20",
+          "y1": "2",
+          "x2": "20",
+          "y2": "4",
+          "stroke": "accent",
+          "stroke-width": "2",
+          "stroke-linecap": "round",
+          "detail": "1"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "31",
+          "y1": "7",
+          "x2": "29.5",
+          "y2": "8.5",
+          "stroke": "accent",
+          "stroke-width": "2",
+          "stroke-linecap": "round",
+          "detail": "1"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "9",
+          "y1": "7",
+          "x2": "10.5",
+          "y2": "8.5",
+          "stroke": "accent",
+          "stroke-width": "2",
+          "stroke-linecap": "round",
+          "detail": "1"
+        }
+      }
+    ]
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"amber\">\n  <path d=\"M14 24C12 21.5 11 18.5 11 15.5C11 10.5 15 6.5 20 6.5C25 6.5 29 10.5 29 15.5C29 18.5 28 21.5 26 24C25 25.2 24.5 26.5 24.5 28H15.5C15.5 26.5 15 25.2 14 24Z\" fill=\"soft\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linejoin=\"round\"/>\n  <path d=\"M16 28H24\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linecap=\"round\"/>\n  <path d=\"M17 31.5H23\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linecap=\"round\"/>\n  <path d=\"M18.5 35H21.5\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linecap=\"round\"/>\n  <path d=\"M17 17C17 15 18.3 13.5 20 13.5C21.7 13.5 23 15 23 17\" fill=\"none\" stroke=\"accent\" stroke-width=\"2\" stroke-linecap=\"round\"/>\n  <circle cx=\"20\" cy=\"18\" r=\"1.25\" fill=\"accent\"/>\n  <line x1=\"20\" y1=\"2\" x2=\"20\" y2=\"4\" stroke=\"accent\" stroke-width=\"2\" stroke-linecap=\"round\" detail=\"1\"/>\n  <line x1=\"31\" y1=\"7\" x2=\"29.5\" y2=\"8.5\" stroke=\"accent\" stroke-width=\"2\" stroke-linecap=\"round\" detail=\"1\"/>\n  <line x1=\"9\" y1=\"7\" x2=\"10.5\" y2=\"8.5\" stroke=\"accent\" stroke-width=\"2\" stroke-linecap=\"round\" detail=\"1\"/>\n</svg>",
+  "elements": 9,
+  "attempts": 1,
+  "latencyMs": 2876,
+  "costUsd": 0.00419325,
+  "tokens": {
+    "in": 851,
+    "out": 948
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"amber\">\n  <path d=\"M14 24C12 21.5 11 18.5 11 15.5C11 10.5 15 6.5 20 6.5C25 6.5 29 10.5 29 15.5C29 18.5 28 21.5 26 24C25 25.2 24.5 26.5 24.5 28H15.5C15.5 26.5 15 25.2 14 24Z\" fill=\"soft\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linejoin=\"round\"/>\n  <path d=\"M16 28H24\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linecap=\"round\"/>\n  <path d=\"M17 31.5H23\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linecap=\"round\"/>\n  <path d=\"M18.5 35H21.5\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linecap=\"round\"/>\n  <path d=\"M17 17C17 15 18.3 13.5 20 13.5C21.7 13.5 23 15 23 17\" fill=\"none\" stroke=\"accent\" stroke-width=\"2\" stroke-linecap=\"round\"/>\n  <circle cx=\"20\" cy=\"18\" r=\"1.25\" fill=\"accent\"/>\n  <line x1=\"20\" y1=\"2\" x2=\"20\" y2=\"4\" stroke=\"accent\" stroke-width=\"2\" stroke-linecap=\"round\" detail=\"1\"/>\n  <line x1=\"31\" y1=\"7\" x2=\"29.5\" y2=\"8.5\" stroke=\"accent\" stroke-width=\"2\" stroke-linecap=\"round\" detail=\"1\"/>\n  <line x1=\"9\" y1=\"7\" x2=\"10.5\" y2=\"8.5\" stroke=\"accent\" stroke-width=\"2\" stroke-linecap=\"round\" detail=\"1\"/>\n</svg>"
+}

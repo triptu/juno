@@ -1,0 +1,76 @@
+{
+  "level": "strict",
+  "model": "google/gemini-3.8-flash",
+  "topic": "oncall",
+  "ok": true,
+  "spec": {
+    "hue": "amber",
+    "elements": [
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M12 13 V9 C12 7.9 12.9 7 14 7 H22 C23.1 7 24 7.9 24 9 V13"
+        }
+      },
+      {
+        "tag": "rect",
+        "attrs": {
+          "x": "7",
+          "y": "13",
+          "width": "24",
+          "height": "18",
+          "rx": "4",
+          "fill": "soft"
+        }
+      },
+      {
+        "tag": "rect",
+        "attrs": {
+          "x": "11",
+          "y": "17",
+          "width": "12",
+          "height": "10",
+          "rx": "2"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "31",
+          "y1": "18",
+          "x2": "33",
+          "y2": "18"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "31",
+          "y1": "24",
+          "x2": "33",
+          "y2": "24"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "17",
+          "cy": "22",
+          "r": "2",
+          "fill": "accent",
+          "stroke": "none"
+        }
+      }
+    ]
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"amber\">\n  <path d=\"M12 13 V9 C12 7.9 12.9 7 14 7 H22 C23.1 7 24 7.9 24 9 V13\"/>\n  <rect x=\"7\" y=\"13\" width=\"24\" height=\"18\" rx=\"4\" fill=\"soft\"/>\n  <rect x=\"11\" y=\"17\" width=\"12\" height=\"10\" rx=\"2\"/>\n  <line x1=\"31\" y1=\"18\" x2=\"33\" y2=\"18\"/>\n  <line x1=\"31\" y1=\"24\" x2=\"33\" y2=\"24\"/>\n  <circle cx=\"17\" cy=\"22\" r=\"2\" fill=\"accent\" stroke=\"none\"/>\n</svg>",
+  "elements": 6,
+  "attempts": 1,
+  "latencyMs": 3015,
+  "costUsd": 0.00888525,
+  "tokens": {
+    "in": 1212,
+    "out": 2127
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"amber\">\n  <path d=\"M12 13 V9 C12 7.9 12.9 7 14 7 H22 C23.1 7 24 7.9 24 9 V13\"/>\n  <rect x=\"7\" y=\"13\" width=\"24\" height=\"18\" rx=\"4\" fill=\"soft\"/>\n  <rect x=\"11\" y=\"17\" width=\"12\" height=\"10\" rx=\"2\"/>\n  <line x1=\"31\" y1=\"18\" x2=\"33\" y2=\"18\"/>\n  <line x1=\"31\" y1=\"24\" x2=\"33\" y2=\"24\"/>\n  <circle cx=\"17\" cy=\"22\" r=\"2\" fill=\"accent\" stroke=\"none\"/>\n</svg>"
+}

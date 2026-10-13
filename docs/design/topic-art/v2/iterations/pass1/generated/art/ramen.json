@@ -1,0 +1,119 @@
+{
+  "level": "art",
+  "model": "google/gemini-3.8-flash",
+  "topic": "ramen",
+  "ok": true,
+  "spec": {
+    "hue": "amber",
+    "elements": [
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M 9 12 C 8 10 10 8 9 5",
+          "fill": "none",
+          "stroke": "ink",
+          "stroke-width": "2",
+          "stroke-linecap": "round",
+          "detail": "1"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M 14 11 C 13 9 15 7 14 4",
+          "fill": "none",
+          "stroke": "ink",
+          "stroke-width": "2",
+          "stroke-linecap": "round",
+          "detail": "1"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "20",
+          "y1": "20",
+          "x2": "33",
+          "y2": "6",
+          "stroke": "ink",
+          "stroke-width": "2.5",
+          "stroke-linecap": "round"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "23",
+          "y1": "21",
+          "x2": "36",
+          "y2": "8.5",
+          "stroke": "ink",
+          "stroke-width": "2.5",
+          "stroke-linecap": "round"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M 15 33.5 L 14 36 A 1 1 0 0 0 15 37 L 25 37 A 1 1 0 0 0 26 36 L 25 33.5",
+          "fill": "soft",
+          "stroke": "ink",
+          "stroke-width": "2.25",
+          "stroke-linejoin": "round"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M 7 18 C 7 30 14 33.5 20 33.5 C 26 33.5 33 30 33 18 Z",
+          "fill": "soft",
+          "stroke": "ink",
+          "stroke-width": "2.75",
+          "stroke-linejoin": "round"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M 7.5 18 Q 20 21 32.5 18",
+          "fill": "none",
+          "stroke": "ink",
+          "stroke-width": "2",
+          "stroke-linecap": "round"
+        }
+      },
+      {
+        "tag": "ellipse",
+        "attrs": {
+          "cx": "14",
+          "cy": "18",
+          "rx": "4.5",
+          "ry": "4",
+          "fill": "soft",
+          "stroke": "ink",
+          "stroke-width": "2"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "14",
+          "cy": "18",
+          "r": "2.25",
+          "fill": "accent",
+          "stroke": "none"
+        }
+      }
+    ]
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"amber\">\n  <path d=\"M 9 12 C 8 10 10 8 9 5\" fill=\"none\" stroke=\"ink\" stroke-width=\"2\" stroke-linecap=\"round\" detail=\"1\"/>\n  <path d=\"M 14 11 C 13 9 15 7 14 4\" fill=\"none\" stroke=\"ink\" stroke-width=\"2\" stroke-linecap=\"round\" detail=\"1\"/>\n  <line x1=\"20\" y1=\"20\" x2=\"33\" y2=\"6\" stroke=\"ink\" stroke-width=\"2.5\" stroke-linecap=\"round\"/>\n  <line x1=\"23\" y1=\"21\" x2=\"36\" y2=\"8.5\" stroke=\"ink\" stroke-width=\"2.5\" stroke-linecap=\"round\"/>\n  <path d=\"M 15 33.5 L 14 36 A 1 1 0 0 0 15 37 L 25 37 A 1 1 0 0 0 26 36 L 25 33.5\" fill=\"soft\" stroke=\"ink\" stroke-width=\"2.25\" stroke-linejoin=\"round\"/>\n  <path d=\"M 7 18 C 7 30 14 33.5 20 33.5 C 26 33.5 33 30 33 18 Z\" fill=\"soft\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linejoin=\"round\"/>\n  <path d=\"M 7.5 18 Q 20 21 32.5 18\" fill=\"none\" stroke=\"ink\" stroke-width=\"2\" stroke-linecap=\"round\"/>\n  <ellipse cx=\"14\" cy=\"18\" rx=\"4.5\" ry=\"4\" fill=\"soft\" stroke=\"ink\" stroke-width=\"2\"/>\n  <circle cx=\"14\" cy=\"18\" r=\"2.25\" fill=\"accent\" stroke=\"none\"/>\n</svg>",
+  "elements": 9,
+  "attempts": 1,
+  "latencyMs": 3084,
+  "costUsd": 0.00782475,
+  "tokens": {
+    "in": 858,
+    "out": 1915
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"amber\">\n  <path d=\"M 9 12 C 8 10 10 8 9 5\" fill=\"none\" stroke=\"ink\" stroke-width=\"2\" stroke-linecap=\"round\" detail=\"1\"/>\n  <path d=\"M 14 11 C 13 9 15 7 14 4\" fill=\"none\" stroke=\"ink\" stroke-width=\"2\" stroke-linecap=\"round\" detail=\"1\"/>\n  <line x1=\"20\" y1=\"20\" x2=\"33\" y2=\"6\" stroke=\"ink\" stroke-width=\"2.5\" stroke-linecap=\"round\"/>\n  <line x1=\"23\" y1=\"21\" x2=\"36\" y2=\"8.5\" stroke=\"ink\" stroke-width=\"2.5\" stroke-linecap=\"round\"/>\n  <path d=\"M 15 33.5 L 14 36 A 1 1 0 0 0 15 37 L 25 37 A 1 1 0 0 0 26 36 L 25 33.5\" fill=\"soft\" stroke=\"ink\" stroke-width=\"2.25\" stroke-linejoin=\"round\"/>\n  <path d=\"M 7 18 C 7 30 14 33.5 20 33.5 C 26 33.5 33 30 33 18 Z\" fill=\"soft\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linejoin=\"round\"/>\n  <path d=\"M 7.5 18 Q 20 21 32.5 18\" fill=\"none\" stroke=\"ink\" stroke-width=\"2\" stroke-linecap=\"round\"/>\n  <ellipse cx=\"14\" cy=\"18\" rx=\"4.5\" ry=\"4\" fill=\"soft\" stroke=\"ink\" stroke-width=\"2\"/>\n  <circle cx=\"14\" cy=\"18\" r=\"2.25\" fill=\"accent\" stroke=\"none\"/>\n</svg>"
+}

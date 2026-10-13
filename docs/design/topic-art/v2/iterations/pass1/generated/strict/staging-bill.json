@@ -1,0 +1,77 @@
+{
+  "level": "strict",
+  "model": "google/gemini-3.8-flash",
+  "topic": "staging-bill",
+  "ok": true,
+  "spec": {
+    "hue": "amber",
+    "elements": [
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M9 24.5 V29 A6 2.5 0 0 0 21 29 V24.5"
+        }
+      },
+      {
+        "tag": "ellipse",
+        "attrs": {
+          "cx": "15",
+          "cy": "24.5",
+          "rx": "6",
+          "ry": "2.5",
+          "fill": "soft"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M19 13.5 V29 A6 2.5 0 0 0 31 29 V13.5"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M19 18.5 A6 2.5 0 0 0 31 18.5",
+          "detail": "1"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M19 23.5 A6 2.5 0 0 0 31 23.5",
+          "detail": "1"
+        }
+      },
+      {
+        "tag": "ellipse",
+        "attrs": {
+          "cx": "25",
+          "cy": "13.5",
+          "rx": "6",
+          "ry": "2.5",
+          "fill": "soft"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "25",
+          "cy": "8",
+          "r": "2",
+          "fill": "accent",
+          "stroke": "none"
+        }
+      }
+    ]
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"amber\">\n  <path d=\"M9 24.5 V29 A6 2.5 0 0 0 21 29 V24.5\"/>\n  <ellipse cx=\"15\" cy=\"24.5\" rx=\"6\" ry=\"2.5\" fill=\"soft\"/>\n  <path d=\"M19 13.5 V29 A6 2.5 0 0 0 31 29 V13.5\"/>\n  <path d=\"M19 18.5 A6 2.5 0 0 0 31 18.5\" detail=\"1\"/>\n  <path d=\"M19 23.5 A6 2.5 0 0 0 31 23.5\" detail=\"1\"/>\n  <ellipse cx=\"25\" cy=\"13.5\" rx=\"6\" ry=\"2.5\" fill=\"soft\"/>\n  <circle cx=\"25\" cy=\"8\" r=\"2\" fill=\"accent\" stroke=\"none\"/>\n</svg>",
+  "elements": 7,
+  "attempts": 1,
+  "latencyMs": 3494,
+  "costUsd": 0.00652575,
+  "tokens": {
+    "in": 1221,
+    "out": 1496
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"amber\">\n  <path d=\"M9 24.5 V29 A6 2.5 0 0 0 21 29 V24.5\"/>\n  <ellipse cx=\"15\" cy=\"24.5\" rx=\"6\" ry=\"2.5\" fill=\"soft\"/>\n  <path d=\"M19 13.5 V29 A6 2.5 0 0 0 31 29 V13.5\"/>\n  <path d=\"M19 18.5 A6 2.5 0 0 0 31 18.5\" detail=\"1\"/>\n  <path d=\"M19 23.5 A6 2.5 0 0 0 31 23.5\" detail=\"1\"/>\n  <ellipse cx=\"25\" cy=\"13.5\" rx=\"6\" ry=\"2.5\" fill=\"soft\"/>\n  <circle cx=\"25\" cy=\"8\" r=\"2\" fill=\"accent\" stroke=\"none\"/>\n</svg>"
+}

@@ -1,0 +1,86 @@
+{
+  "level": "strict",
+  "model": "google/gemini-3.8-flash",
+  "topic": "staging-bill",
+  "ok": true,
+  "spec": {
+    "hue": "amber",
+    "confident": true,
+    "elements": [
+      {
+        "tag": "ellipse",
+        "attrs": {
+          "cx": "25",
+          "cy": "13",
+          "rx": "7",
+          "ry": "3.5",
+          "fill": "soft"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M18 13 V28 A7 3.5 0 0 0 32 28 V13"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M18 18 A7 3.5 0 0 0 32 18",
+          "detail": "1"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M18 23 A7 3.5 0 0 0 32 23",
+          "detail": "1"
+        }
+      },
+      {
+        "tag": "ellipse",
+        "attrs": {
+          "cx": "15",
+          "cy": "21",
+          "rx": "7",
+          "ry": "3.5",
+          "fill": "soft"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M8 21 V30 A7 3.5 0 0 0 22 30 V21"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M8 25.5 A7 3.5 0 0 0 22 25.5",
+          "detail": "1"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "25",
+          "cy": "28",
+          "r": "1.8",
+          "fill": "accent",
+          "stroke": "none",
+          "detail": "1"
+        }
+      }
+    ]
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"amber\">\n  <ellipse cx=\"25\" cy=\"13\" rx=\"7\" ry=\"3.5\" fill=\"soft\"/>\n  <path d=\"M18 13 V28 A7 3.5 0 0 0 32 28 V13\"/>\n  <path d=\"M18 18 A7 3.5 0 0 0 32 18\" detail=\"1\"/>\n  <path d=\"M18 23 A7 3.5 0 0 0 32 23\" detail=\"1\"/>\n  <ellipse cx=\"15\" cy=\"21\" rx=\"7\" ry=\"3.5\" fill=\"soft\"/>\n  <path d=\"M8 21 V30 A7 3.5 0 0 0 22 30 V21\"/>\n  <path d=\"M8 25.5 A7 3.5 0 0 0 22 25.5\" detail=\"1\"/>\n  <circle cx=\"25\" cy=\"28\" r=\"1.8\" fill=\"accent\" stroke=\"none\" detail=\"1\"/>\n</svg>",
+  "elements": 8,
+  "attempts": 2,
+  "latencyMs": 5448,
+  "costUsd": 0.0126465,
+  "tokens": {
+    "in": 2917,
+    "out": 2789
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"amber\">\n  <ellipse cx=\"25\" cy=\"13\" rx=\"7\" ry=\"3.5\" fill=\"soft\"/>\n  <path d=\"M18 13 V28 A7 3.5 0 0 0 32 28 V13\"/>\n  <path d=\"M18 18 A7 3.5 0 0 0 32 18\" detail=\"1\"/>\n  <path d=\"M18 23 A7 3.5 0 0 0 32 23\" detail=\"1\"/>\n  <ellipse cx=\"15\" cy=\"21\" rx=\"7\" ry=\"3.5\" fill=\"soft\"/>\n  <path d=\"M8 21 V30 A7 3.5 0 0 0 22 30 V21\"/>\n  <path d=\"M8 25.5 A7 3.5 0 0 0 22 25.5\" detail=\"1\"/>\n  <circle cx=\"25\" cy=\"28\" r=\"1.8\" fill=\"accent\" stroke=\"none\" detail=\"1\"/>\n</svg>"
+}

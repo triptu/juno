@@ -1,0 +1,109 @@
+{
+  "level": "art",
+  "model": "google/gemini-3.8-flash",
+  "topic": "pipeline",
+  "ok": true,
+  "spec": {
+    "hue": "amber",
+    "confident": true,
+    "elements": [
+      {
+        "tag": "rect",
+        "attrs": {
+          "x": "7",
+          "y": "7",
+          "width": "26",
+          "height": "29",
+          "rx": "3.5",
+          "fill": "soft",
+          "stroke": "ink",
+          "stroke-width": "2.75",
+          "stroke-linejoin": "round"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M16.5 4.5V3C16.5 2.45 16.95 2 17.5 2H22.5C23.05 2 23.5 2.45 23.5 3V4.5",
+          "fill": "none",
+          "stroke": "ink",
+          "stroke-width": "2",
+          "stroke-linecap": "round",
+          "stroke-linejoin": "round"
+        }
+      },
+      {
+        "tag": "rect",
+        "attrs": {
+          "x": "14",
+          "y": "4.5",
+          "width": "12",
+          "height": "4.5",
+          "rx": "1.5",
+          "fill": "accent",
+          "stroke": "ink",
+          "stroke-width": "2",
+          "stroke-linejoin": "round"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "12",
+          "y1": "29",
+          "x2": "28",
+          "y2": "29",
+          "stroke": "ink",
+          "stroke-width": "2",
+          "stroke-linecap": "round"
+        }
+      },
+      {
+        "tag": "rect",
+        "attrs": {
+          "x": "13.25",
+          "y": "22",
+          "width": "3.5",
+          "height": "7",
+          "rx": "1",
+          "fill": "ink"
+        }
+      },
+      {
+        "tag": "rect",
+        "attrs": {
+          "x": "18.25",
+          "y": "17",
+          "width": "3.5",
+          "height": "12",
+          "rx": "1",
+          "fill": "ink"
+        }
+      },
+      {
+        "tag": "rect",
+        "attrs": {
+          "x": "23.25",
+          "y": "12",
+          "width": "3.5",
+          "height": "17",
+          "rx": "1",
+          "fill": "accent",
+          "stroke": "ink",
+          "stroke-width": "1.75",
+          "stroke-linejoin": "round"
+        }
+      }
+    ]
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"amber\">\n  <rect x=\"7\" y=\"7\" width=\"26\" height=\"29\" rx=\"3.5\" fill=\"soft\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linejoin=\"round\"/>\n  <path d=\"M16.5 4.5V3C16.5 2.45 16.95 2 17.5 2H22.5C23.05 2 23.5 2.45 23.5 3V4.5\" fill=\"none\" stroke=\"ink\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>\n  <rect x=\"14\" y=\"4.5\" width=\"12\" height=\"4.5\" rx=\"1.5\" fill=\"accent\" stroke=\"ink\" stroke-width=\"2\" stroke-linejoin=\"round\"/>\n  <line x1=\"12\" y1=\"29\" x2=\"28\" y2=\"29\" stroke=\"ink\" stroke-width=\"2\" stroke-linecap=\"round\"/>\n  <rect x=\"13.25\" y=\"22\" width=\"3.5\" height=\"7\" rx=\"1\" fill=\"ink\"/>\n  <rect x=\"18.25\" y=\"17\" width=\"3.5\" height=\"12\" rx=\"1\" fill=\"ink\"/>\n  <rect x=\"23.25\" y=\"12\" width=\"3.5\" height=\"17\" rx=\"1\" fill=\"accent\" stroke=\"ink\" stroke-width=\"1.75\" stroke-linejoin=\"round\"/>\n</svg>",
+  "elements": 7,
+  "attempts": 1,
+  "latencyMs": 3247,
+  "costUsd": 0.0095085,
+  "tokens": {
+    "in": 1083,
+    "out": 2319
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"amber\">\n  <rect x=\"7\" y=\"7\" width=\"26\" height=\"29\" rx=\"3.5\" fill=\"soft\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linejoin=\"round\"/>\n  <path d=\"M16.5 4.5V3C16.5 2.45 16.95 2 17.5 2H22.5C23.05 2 23.5 2.45 23.5 3V4.5\" fill=\"none\" stroke=\"ink\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>\n  <rect x=\"14\" y=\"4.5\" width=\"12\" height=\"4.5\" rx=\"1.5\" fill=\"accent\" stroke=\"ink\" stroke-width=\"2\" stroke-linejoin=\"round\"/>\n  <line x1=\"12\" y1=\"29\" x2=\"28\" y2=\"29\" stroke=\"ink\" stroke-width=\"2\" stroke-linecap=\"round\"/>\n  <rect x=\"13.25\" y=\"22\" width=\"3.5\" height=\"7\" rx=\"1\" fill=\"ink\"/>\n  <rect x=\"18.25\" y=\"17\" width=\"3.5\" height=\"12\" rx=\"1\" fill=\"ink\"/>\n  <rect x=\"23.25\" y=\"12\" width=\"3.5\" height=\"17\" rx=\"1\" fill=\"accent\" stroke=\"ink\" stroke-width=\"1.75\" stroke-linejoin=\"round\"/>\n</svg>"
+}

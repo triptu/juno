@@ -1,0 +1,84 @@
+{
+  "level": "relaxed",
+  "model": "google/gemini-3.8-flash",
+  "topic": "marco",
+  "ok": true,
+  "spec": {
+    "hue": "sage",
+    "confident": true,
+    "elements": [
+      {
+        "tag": "rect",
+        "attrs": {
+          "x": "9",
+          "y": "7",
+          "width": "22",
+          "height": "26",
+          "rx": "3",
+          "fill": "soft",
+          "stroke": "ink",
+          "stroke-width": "2.5"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M14 14 H26",
+          "stroke": "ink",
+          "stroke-width": "2",
+          "stroke-linecap": "round"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M14 19 H26",
+          "stroke": "ink",
+          "stroke-width": "2",
+          "stroke-linecap": "round"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M14 24 H21",
+          "stroke": "ink",
+          "stroke-width": "2",
+          "stroke-linecap": "round"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "27",
+          "cy": "27",
+          "r": "6",
+          "fill": "soft",
+          "stroke": "ink",
+          "stroke-width": "2.5"
+        }
+      },
+      {
+        "tag": "polyline",
+        "attrs": {
+          "points": "24.5 27 26.5 29 29.5 25",
+          "stroke": "accent",
+          "stroke-width": "2",
+          "stroke-linecap": "round",
+          "stroke-linejoin": "round",
+          "fill": "none"
+        }
+      }
+    ]
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"sage\">\n  <rect x=\"9\" y=\"7\" width=\"22\" height=\"26\" rx=\"3\" fill=\"soft\" stroke=\"ink\" stroke-width=\"2.5\"/>\n  <path d=\"M14 14 H26\" stroke=\"ink\" stroke-width=\"2\" stroke-linecap=\"round\"/>\n  <path d=\"M14 19 H26\" stroke=\"ink\" stroke-width=\"2\" stroke-linecap=\"round\"/>\n  <path d=\"M14 24 H21\" stroke=\"ink\" stroke-width=\"2\" stroke-linecap=\"round\"/>\n  <circle cx=\"27\" cy=\"27\" r=\"6\" fill=\"soft\" stroke=\"ink\" stroke-width=\"2.5\"/>\n  <polyline points=\"24.5 27 26.5 29 29.5 25\" stroke=\"accent\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" fill=\"none\"/>\n</svg>",
+  "elements": 6,
+  "attempts": 1,
+  "latencyMs": 4063,
+  "costUsd": 0.00199575,
+  "tokens": {
+    "in": 1401,
+    "out": 252
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"sage\">\n  <rect x=\"9\" y=\"7\" width=\"22\" height=\"26\" rx=\"3\" fill=\"soft\" stroke=\"ink\" stroke-width=\"2.5\"/>\n  <path d=\"M14 14 H26\" stroke=\"ink\" stroke-width=\"2\" stroke-linecap=\"round\"/>\n  <path d=\"M14 19 H26\" stroke=\"ink\" stroke-width=\"2\" stroke-linecap=\"round\"/>\n  <path d=\"M14 24 H21\" stroke=\"ink\" stroke-width=\"2\" stroke-linecap=\"round\"/>\n  <circle cx=\"27\" cy=\"27\" r=\"6\" fill=\"soft\" stroke=\"ink\" stroke-width=\"2.5\"/>\n  <polyline points=\"24.5 27 26.5 29 29.5 25\" stroke=\"accent\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" fill=\"none\"/>\n</svg>"
+}

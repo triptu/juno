@@ -1,0 +1,75 @@
+{
+  "level": "relaxed",
+  "model": "google/gemini-3.8-flash",
+  "topic": "main-leadership",
+  "ok": true,
+  "spec": {
+    "hue": "periwinkle",
+    "confident": true,
+    "elements": [
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M11 7 H24 L31 14 V33 A2 2 0 0 1 29 35 H11 A2 2 0 0 1 9 33 V9 A2 2 0 0 1 11 7 Z",
+          "fill": "soft"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M24 7 V14 H31"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "14",
+          "y1": "18",
+          "x2": "26",
+          "y2": "18",
+          "stroke-width": "2.5"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "14",
+          "y1": "23",
+          "x2": "26",
+          "y2": "23",
+          "stroke-width": "2.5"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "14",
+          "y1": "28",
+          "x2": "20",
+          "y2": "28",
+          "stroke-width": "2.5"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "26",
+          "cy": "28",
+          "r": "2",
+          "fill": "accent",
+          "stroke": "none"
+        }
+      }
+    ]
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"periwinkle\">\n  <path d=\"M11 7 H24 L31 14 V33 A2 2 0 0 1 29 35 H11 A2 2 0 0 1 9 33 V9 A2 2 0 0 1 11 7 Z\" fill=\"soft\"/>\n  <path d=\"M24 7 V14 H31\"/>\n  <line x1=\"14\" y1=\"18\" x2=\"26\" y2=\"18\" stroke-width=\"2.5\"/>\n  <line x1=\"14\" y1=\"23\" x2=\"26\" y2=\"23\" stroke-width=\"2.5\"/>\n  <line x1=\"14\" y1=\"28\" x2=\"20\" y2=\"28\" stroke-width=\"2.5\"/>\n  <circle cx=\"26\" cy=\"28\" r=\"2\" fill=\"accent\" stroke=\"none\"/>\n</svg>",
+  "elements": 6,
+  "attempts": 1,
+  "latencyMs": 13184,
+  "costUsd": 0.002019,
+  "tokens": {
+    "in": 1402,
+    "out": 258
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"periwinkle\">\n  <path d=\"M11 7 H24 L31 14 V33 A2 2 0 0 1 29 35 H11 A2 2 0 0 1 9 33 V9 A2 2 0 0 1 11 7 Z\" fill=\"soft\"/>\n  <path d=\"M24 7 V14 H31\"/>\n  <line x1=\"14\" y1=\"18\" x2=\"26\" y2=\"18\" stroke-width=\"2.5\"/>\n  <line x1=\"14\" y1=\"23\" x2=\"26\" y2=\"23\" stroke-width=\"2.5\"/>\n  <line x1=\"14\" y1=\"28\" x2=\"20\" y2=\"28\" stroke-width=\"2.5\"/>\n  <circle cx=\"26\" cy=\"28\" r=\"2\" fill=\"accent\" stroke=\"none\"/>\n</svg>"
+}

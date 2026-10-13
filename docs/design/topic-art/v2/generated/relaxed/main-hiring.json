@@ -1,0 +1,85 @@
+{
+  "level": "relaxed",
+  "model": "google/gemini-3.8-flash",
+  "topic": "main-hiring",
+  "ok": true,
+  "spec": {
+    "hue": "sage",
+    "confident": true,
+    "elements": [
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M16 10 V6 C16 4.2 24 4.2 24 6 V10",
+          "stroke-width": "2.5",
+          "fill": "none"
+        }
+      },
+      {
+        "tag": "rect",
+        "attrs": {
+          "x": "8",
+          "y": "10",
+          "width": "24",
+          "height": "24",
+          "rx": "3.5",
+          "fill": "soft"
+        }
+      },
+      {
+        "tag": "rect",
+        "attrs": {
+          "x": "17",
+          "y": "11.5",
+          "width": "6",
+          "height": "2",
+          "rx": "1",
+          "fill": "ink",
+          "stroke": "none"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "20",
+          "cy": "18",
+          "r": "3",
+          "fill": "accent",
+          "stroke": "ink",
+          "stroke-width": "2"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M14.5 25.5 C14.5 22.5 17 22.5 20 22.5 C23 22.5 25.5 22.5 25.5 25.5",
+          "stroke-width": "2",
+          "stroke-linecap": "round",
+          "fill": "none"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "14",
+          "y1": "29.5",
+          "x2": "26",
+          "y2": "29.5",
+          "stroke-width": "2",
+          "stroke-linecap": "round",
+          "detail": "1"
+        }
+      }
+    ]
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"sage\">\n  <path d=\"M16 10 V6 C16 4.2 24 4.2 24 6 V10\" stroke-width=\"2.5\" fill=\"none\"/>\n  <rect x=\"8\" y=\"10\" width=\"24\" height=\"24\" rx=\"3.5\" fill=\"soft\"/>\n  <rect x=\"17\" y=\"11.5\" width=\"6\" height=\"2\" rx=\"1\" fill=\"ink\" stroke=\"none\"/>\n  <circle cx=\"20\" cy=\"18\" r=\"3\" fill=\"accent\" stroke=\"ink\" stroke-width=\"2\"/>\n  <path d=\"M14.5 25.5 C14.5 22.5 17 22.5 20 22.5 C23 22.5 25.5 22.5 25.5 25.5\" stroke-width=\"2\" stroke-linecap=\"round\" fill=\"none\"/>\n  <line x1=\"14\" y1=\"29.5\" x2=\"26\" y2=\"29.5\" stroke-width=\"2\" stroke-linecap=\"round\" detail=\"1\"/>\n</svg>",
+  "elements": 6,
+  "attempts": 1,
+  "latencyMs": 3040,
+  "costUsd": 0.006306,
+  "tokens": {
+    "in": 1413,
+    "out": 1399
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"sage\">\n  <path d=\"M16 10 V6 C16 4.2 24 4.2 24 6 V10\" stroke-width=\"2.5\" fill=\"none\"/>\n  <rect x=\"8\" y=\"10\" width=\"24\" height=\"24\" rx=\"3.5\" fill=\"soft\"/>\n  <rect x=\"17\" y=\"11.5\" width=\"6\" height=\"2\" rx=\"1\" fill=\"ink\" stroke=\"none\"/>\n  <circle cx=\"20\" cy=\"18\" r=\"3\" fill=\"accent\" stroke=\"ink\" stroke-width=\"2\"/>\n  <path d=\"M14.5 25.5 C14.5 22.5 17 22.5 20 22.5 C23 22.5 25.5 22.5 25.5 25.5\" stroke-width=\"2\" stroke-linecap=\"round\" fill=\"none\"/>\n  <line x1=\"14\" y1=\"29.5\" x2=\"26\" y2=\"29.5\" stroke-width=\"2\" stroke-linecap=\"round\" detail=\"1\"/>\n</svg>"
+}

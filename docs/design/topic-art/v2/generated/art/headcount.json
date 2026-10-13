@@ -1,0 +1,111 @@
+{
+  "level": "art",
+  "model": "google/gemini-3.8-flash",
+  "topic": "headcount",
+  "ok": true,
+  "spec": {
+    "hue": "sage",
+    "confident": true,
+    "elements": [
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M 11.5 23.5 V 19.5 H 28.5 V 23.5 M 20 15.5 V 19.5",
+          "fill": "none",
+          "stroke": "ink",
+          "stroke-width": "2.75",
+          "stroke-linecap": "round",
+          "stroke-linejoin": "round"
+        }
+      },
+      {
+        "tag": "rect",
+        "attrs": {
+          "x": "11.5",
+          "y": "5.5",
+          "width": "17",
+          "height": "10",
+          "rx": "2.5",
+          "fill": "soft",
+          "stroke": "ink",
+          "stroke-width": "2.75"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "16",
+          "y1": "10.5",
+          "x2": "24",
+          "y2": "10.5",
+          "stroke": "ink",
+          "stroke-width": "2",
+          "stroke-linecap": "round",
+          "opacity": "0.6",
+          "detail": "1"
+        }
+      },
+      {
+        "tag": "rect",
+        "attrs": {
+          "x": "5",
+          "y": "23.5",
+          "width": "13",
+          "height": "11",
+          "rx": "2.5",
+          "fill": "soft",
+          "stroke": "ink",
+          "stroke-width": "2.75"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "8.5",
+          "y1": "29",
+          "x2": "14.5",
+          "y2": "29",
+          "stroke": "ink",
+          "stroke-width": "2",
+          "stroke-linecap": "round",
+          "opacity": "0.6",
+          "detail": "1"
+        }
+      },
+      {
+        "tag": "rect",
+        "attrs": {
+          "x": "22",
+          "y": "23.5",
+          "width": "13",
+          "height": "11",
+          "rx": "2.5",
+          "fill": "accent",
+          "stroke": "ink",
+          "stroke-width": "2.75"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M 28.5 26.5 V 31.5 M 26 29 H 31",
+          "fill": "none",
+          "stroke": "ink",
+          "stroke-width": "2",
+          "stroke-linecap": "round",
+          "detail": "1"
+        }
+      }
+    ]
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"sage\">\n  <path d=\"M 11.5 23.5 V 19.5 H 28.5 V 23.5 M 20 15.5 V 19.5\" fill=\"none\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>\n  <rect x=\"11.5\" y=\"5.5\" width=\"17\" height=\"10\" rx=\"2.5\" fill=\"soft\" stroke=\"ink\" stroke-width=\"2.75\"/>\n  <line x1=\"16\" y1=\"10.5\" x2=\"24\" y2=\"10.5\" stroke=\"ink\" stroke-width=\"2\" stroke-linecap=\"round\" opacity=\"0.6\" detail=\"1\"/>\n  <rect x=\"5\" y=\"23.5\" width=\"13\" height=\"11\" rx=\"2.5\" fill=\"soft\" stroke=\"ink\" stroke-width=\"2.75\"/>\n  <line x1=\"8.5\" y1=\"29\" x2=\"14.5\" y2=\"29\" stroke=\"ink\" stroke-width=\"2\" stroke-linecap=\"round\" opacity=\"0.6\" detail=\"1\"/>\n  <rect x=\"22\" y=\"23.5\" width=\"13\" height=\"11\" rx=\"2.5\" fill=\"accent\" stroke=\"ink\" stroke-width=\"2.75\"/>\n  <path d=\"M 28.5 26.5 V 31.5 M 26 29 H 31\" fill=\"none\" stroke=\"ink\" stroke-width=\"2\" stroke-linecap=\"round\" detail=\"1\"/>\n</svg>",
+  "elements": 7,
+  "attempts": 1,
+  "latencyMs": 2210,
+  "costUsd": 0.0126315,
+  "tokens": {
+    "in": 1092,
+    "out": 3150
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"sage\">\n  <path d=\"M 11.5 23.5 V 19.5 H 28.5 V 23.5 M 20 15.5 V 19.5\" fill=\"none\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>\n  <rect x=\"11.5\" y=\"5.5\" width=\"17\" height=\"10\" rx=\"2.5\" fill=\"soft\" stroke=\"ink\" stroke-width=\"2.75\"/>\n  <line x1=\"16\" y1=\"10.5\" x2=\"24\" y2=\"10.5\" stroke=\"ink\" stroke-width=\"2\" stroke-linecap=\"round\" opacity=\"0.6\" detail=\"1\"/>\n  <rect x=\"5\" y=\"23.5\" width=\"13\" height=\"11\" rx=\"2.5\" fill=\"soft\" stroke=\"ink\" stroke-width=\"2.75\"/>\n  <line x1=\"8.5\" y1=\"29\" x2=\"14.5\" y2=\"29\" stroke=\"ink\" stroke-width=\"2\" stroke-linecap=\"round\" opacity=\"0.6\" detail=\"1\"/>\n  <rect x=\"22\" y=\"23.5\" width=\"13\" height=\"11\" rx=\"2.5\" fill=\"accent\" stroke=\"ink\" stroke-width=\"2.75\"/>\n  <path d=\"M 28.5 26.5 V 31.5 M 26 29 H 31\" fill=\"none\" stroke=\"ink\" stroke-width=\"2\" stroke-linecap=\"round\" detail=\"1\"/>\n</svg>"
+}

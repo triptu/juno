@@ -1,0 +1,117 @@
+{
+  "level": "art",
+  "model": "google/gemini-3.8-flash",
+  "topic": "one-on-one",
+  "ok": true,
+  "spec": {
+    "hue": "periwinkle",
+    "elements": [
+      {
+        "tag": "rect",
+        "attrs": {
+          "x": "8",
+          "y": "7",
+          "width": "20",
+          "height": "26",
+          "rx": "3",
+          "fill": "soft",
+          "stroke": "ink",
+          "stroke-width": "2.75",
+          "stroke-linejoin": "round"
+        }
+      },
+      {
+        "tag": "rect",
+        "attrs": {
+          "x": "13",
+          "y": "4",
+          "width": "10",
+          "height": "5",
+          "rx": "1.5",
+          "fill": "accent",
+          "stroke": "ink",
+          "stroke-width": "2",
+          "stroke-linejoin": "round"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "13",
+          "y1": "15",
+          "x2": "23",
+          "y2": "15",
+          "stroke": "ink",
+          "stroke-width": "2",
+          "stroke-linecap": "round"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "13",
+          "y1": "20",
+          "x2": "21",
+          "y2": "20",
+          "stroke": "ink",
+          "stroke-width": "2",
+          "stroke-linecap": "round"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "13",
+          "y1": "25",
+          "x2": "18",
+          "y2": "25",
+          "stroke": "ink",
+          "stroke-width": "2",
+          "stroke-linecap": "round"
+        }
+      },
+      {
+        "tag": "g",
+        "attrs": {
+          "transform": "rotate(-35 29 27)"
+        },
+        "children": [
+          {
+            "tag": "rect",
+            "attrs": {
+              "x": "27.5",
+              "y": "16",
+              "width": "4.5",
+              "height": "15",
+              "rx": "1",
+              "fill": "accent2",
+              "stroke": "ink",
+              "stroke-width": "2",
+              "stroke-linejoin": "round"
+            }
+          },
+          {
+            "tag": "path",
+            "attrs": {
+              "d": "M27.5 31 L29.75 35.5 L32 31 Z",
+              "fill": "ink",
+              "stroke": "ink",
+              "stroke-width": "1.5",
+              "stroke-linejoin": "round"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"periwinkle\">\n  <rect x=\"8\" y=\"7\" width=\"20\" height=\"26\" rx=\"3\" fill=\"soft\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linejoin=\"round\"/>\n  <rect x=\"13\" y=\"4\" width=\"10\" height=\"5\" rx=\"1.5\" fill=\"accent\" stroke=\"ink\" stroke-width=\"2\" stroke-linejoin=\"round\"/>\n  <line x1=\"13\" y1=\"15\" x2=\"23\" y2=\"15\" stroke=\"ink\" stroke-width=\"2\" stroke-linecap=\"round\"/>\n  <line x1=\"13\" y1=\"20\" x2=\"21\" y2=\"20\" stroke=\"ink\" stroke-width=\"2\" stroke-linecap=\"round\"/>\n  <line x1=\"13\" y1=\"25\" x2=\"18\" y2=\"25\" stroke=\"ink\" stroke-width=\"2\" stroke-linecap=\"round\"/>\n  <g transform=\"rotate(-35 29 27)\">\n    <rect x=\"27.5\" y=\"16\" width=\"4.5\" height=\"15\" rx=\"1\" fill=\"accent2\" stroke=\"ink\" stroke-width=\"2\" stroke-linejoin=\"round\"/>\n    <path d=\"M27.5 31 L29.75 35.5 L32 31 Z\" fill=\"ink\" stroke=\"ink\" stroke-width=\"1.5\" stroke-linejoin=\"round\"/>\n  </g>\n</svg>",
+  "elements": 7,
+  "attempts": 1,
+  "latencyMs": 1616,
+  "costUsd": 0.00211125,
+  "tokens": {
+    "in": 895,
+    "out": 384
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"periwinkle\">\n  <rect x=\"8\" y=\"7\" width=\"20\" height=\"26\" rx=\"3\" fill=\"soft\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linejoin=\"round\"/>\n  <rect x=\"13\" y=\"4\" width=\"10\" height=\"5\" rx=\"1.5\" fill=\"accent\" stroke=\"ink\" stroke-width=\"2\" stroke-linejoin=\"round\"/>\n  <line x1=\"13\" y1=\"15\" x2=\"23\" y2=\"15\" stroke=\"ink\" stroke-width=\"2\" stroke-linecap=\"round\"/>\n  <line x1=\"13\" y1=\"20\" x2=\"21\" y2=\"20\" stroke=\"ink\" stroke-width=\"2\" stroke-linecap=\"round\"/>\n  <line x1=\"13\" y1=\"25\" x2=\"18\" y2=\"25\" stroke=\"ink\" stroke-width=\"2\" stroke-linecap=\"round\"/>\n  <g transform=\"rotate(-35 29 27)\">\n    <rect x=\"27.5\" y=\"16\" width=\"4.5\" height=\"15\" rx=\"1\" fill=\"accent2\" stroke=\"ink\" stroke-width=\"2\" stroke-linejoin=\"round\"/>\n    <path d=\"M27.5 31 L29.75 35.5 L32 31 Z\" fill=\"ink\" stroke=\"ink\" stroke-width=\"1.5\" stroke-linejoin=\"round\"/>\n  </g>\n</svg>"
+}

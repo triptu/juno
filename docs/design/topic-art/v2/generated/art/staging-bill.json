@@ -1,0 +1,101 @@
+{
+  "level": "art",
+  "model": "google/gemini-3.8-flash",
+  "topic": "staging-bill",
+  "ok": true,
+  "spec": {
+    "hue": "amber",
+    "confident": true,
+    "elements": [
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M 7.5 18 L 7.5 30.5 C 7.5 33 13 35 19.5 35 C 26 35 31.5 33 31.5 30.5 L 31.5 18 Z",
+          "fill": "soft"
+        }
+      },
+      {
+        "tag": "ellipse",
+        "attrs": {
+          "cx": "19.5",
+          "cy": "18",
+          "rx": "12",
+          "ry": "5",
+          "fill": "soft",
+          "stroke": "ink",
+          "stroke-width": "2.75"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M 7.5 24 C 7.5 26.5 13 28.5 19.5 28.5 C 26 28.5 31.5 26.5 31.5 24",
+          "fill": "none",
+          "stroke": "ink",
+          "stroke-width": "2",
+          "detail": "1"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M 7.5 30 C 7.5 32.5 13 34.5 19.5 34.5 C 26 34.5 31.5 32.5 31.5 30",
+          "fill": "none",
+          "stroke": "ink",
+          "stroke-width": "2.75"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M 7.5 18 L 7.5 30",
+          "fill": "none",
+          "stroke": "ink",
+          "stroke-width": "2.75",
+          "stroke-linecap": "round"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M 31.5 18 L 31.5 30",
+          "fill": "none",
+          "stroke": "ink",
+          "stroke-width": "2.75",
+          "stroke-linecap": "round"
+        }
+      },
+      {
+        "tag": "ellipse",
+        "attrs": {
+          "cx": "19.5",
+          "cy": "10",
+          "rx": "12",
+          "ry": "5",
+          "fill": "accent",
+          "stroke": "ink",
+          "stroke-width": "2.75"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M 7.5 10 L 7.5 14 C 7.5 16.5 13 18.5 19.5 18.5 C 26 18.5 31.5 16.5 31.5 14 L 31.5 10",
+          "fill": "none",
+          "stroke": "ink",
+          "stroke-width": "2.75"
+        }
+      }
+    ]
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"amber\">\n  <path d=\"M 7.5 18 L 7.5 30.5 C 7.5 33 13 35 19.5 35 C 26 35 31.5 33 31.5 30.5 L 31.5 18 Z\" fill=\"soft\"/>\n  <ellipse cx=\"19.5\" cy=\"18\" rx=\"12\" ry=\"5\" fill=\"soft\" stroke=\"ink\" stroke-width=\"2.75\"/>\n  <path d=\"M 7.5 24 C 7.5 26.5 13 28.5 19.5 28.5 C 26 28.5 31.5 26.5 31.5 24\" fill=\"none\" stroke=\"ink\" stroke-width=\"2\" detail=\"1\"/>\n  <path d=\"M 7.5 30 C 7.5 32.5 13 34.5 19.5 34.5 C 26 34.5 31.5 32.5 31.5 30\" fill=\"none\" stroke=\"ink\" stroke-width=\"2.75\"/>\n  <path d=\"M 7.5 18 L 7.5 30\" fill=\"none\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linecap=\"round\"/>\n  <path d=\"M 31.5 18 L 31.5 30\" fill=\"none\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linecap=\"round\"/>\n  <ellipse cx=\"19.5\" cy=\"10\" rx=\"12\" ry=\"5\" fill=\"accent\" stroke=\"ink\" stroke-width=\"2.75\"/>\n  <path d=\"M 7.5 10 L 7.5 14 C 7.5 16.5 13 18.5 19.5 18.5 C 26 18.5 31.5 16.5 31.5 14 L 31.5 10\" fill=\"none\" stroke=\"ink\" stroke-width=\"2.75\"/>\n</svg>",
+  "elements": 8,
+  "attempts": 2,
+  "latencyMs": 10032,
+  "costUsd": 0.018894750000000002,
+  "tokens": {
+    "in": 2378,
+    "out": 4563
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"amber\">\n  <path d=\"M 7.5 18 L 7.5 30.5 C 7.5 33 13 35 19.5 35 C 26 35 31.5 33 31.5 30.5 L 31.5 18 Z\" fill=\"soft\"/>\n  <ellipse cx=\"19.5\" cy=\"18\" rx=\"12\" ry=\"5\" fill=\"soft\" stroke=\"ink\" stroke-width=\"2.75\"/>\n  <path d=\"M 7.5 24 C 7.5 26.5 13 28.5 19.5 28.5 C 26 28.5 31.5 26.5 31.5 24\" fill=\"none\" stroke=\"ink\" stroke-width=\"2\" detail=\"1\"/>\n  <path d=\"M 7.5 30 C 7.5 32.5 13 34.5 19.5 34.5 C 26 34.5 31.5 32.5 31.5 30\" fill=\"none\" stroke=\"ink\" stroke-width=\"2.75\"/>\n  <path d=\"M 7.5 18 L 7.5 30\" fill=\"none\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linecap=\"round\"/>\n  <path d=\"M 31.5 18 L 31.5 30\" fill=\"none\" stroke=\"ink\" stroke-width=\"2.75\" stroke-linecap=\"round\"/>\n  <ellipse cx=\"19.5\" cy=\"10\" rx=\"12\" ry=\"5\" fill=\"accent\" stroke=\"ink\" stroke-width=\"2.75\"/>\n  <path d=\"M 7.5 10 L 7.5 14 C 7.5 16.5 13 18.5 19.5 18.5 C 26 18.5 31.5 16.5 31.5 14 L 31.5 10\" fill=\"none\" stroke=\"ink\" stroke-width=\"2.75\"/>\n</svg>"
+}

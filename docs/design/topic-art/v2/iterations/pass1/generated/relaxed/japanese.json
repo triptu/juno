@@ -1,0 +1,100 @@
+{
+  "level": "relaxed",
+  "model": "google/gemini-3.8-flash",
+  "topic": "japanese",
+  "ok": true,
+  "spec": {
+    "hue": "periwinkle",
+    "elements": [
+      {
+        "tag": "rect",
+        "attrs": {
+          "x": "8",
+          "y": "10",
+          "width": "24",
+          "height": "23",
+          "rx": "3.5",
+          "fill": "soft",
+          "stroke": "ink"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M8 17 H32"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "14",
+          "y1": "7",
+          "x2": "14",
+          "y2": "12"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "26",
+          "y1": "7",
+          "x2": "26",
+          "y2": "12"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "15",
+          "cy": "23",
+          "r": "1.75",
+          "fill": "accent",
+          "stroke": "none"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "21",
+          "cy": "23",
+          "r": "1.5",
+          "fill": "ink",
+          "stroke": "none",
+          "opacity": "0.3",
+          "detail": "1"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "27",
+          "cy": "23",
+          "r": "1.5",
+          "fill": "ink",
+          "stroke": "none",
+          "opacity": "0.3",
+          "detail": "1"
+        }
+      },
+      {
+        "tag": "polyline",
+        "attrs": {
+          "points": "18 28 21 30 27 24",
+          "stroke": "accent",
+          "stroke-width": "2.5",
+          "fill": "none"
+        }
+      }
+    ]
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"periwinkle\">\n  <rect x=\"8\" y=\"10\" width=\"24\" height=\"23\" rx=\"3.5\" fill=\"soft\" stroke=\"ink\"/>\n  <path d=\"M8 17 H32\"/>\n  <line x1=\"14\" y1=\"7\" x2=\"14\" y2=\"12\"/>\n  <line x1=\"26\" y1=\"7\" x2=\"26\" y2=\"12\"/>\n  <circle cx=\"15\" cy=\"23\" r=\"1.75\" fill=\"accent\" stroke=\"none\"/>\n  <circle cx=\"21\" cy=\"23\" r=\"1.5\" fill=\"ink\" stroke=\"none\" opacity=\"0.3\" detail=\"1\"/>\n  <circle cx=\"27\" cy=\"23\" r=\"1.5\" fill=\"ink\" stroke=\"none\" opacity=\"0.3\" detail=\"1\"/>\n  <polyline points=\"18 28 21 30 27 24\" stroke=\"accent\" stroke-width=\"2.5\" fill=\"none\"/>\n</svg>",
+  "elements": 8,
+  "attempts": 1,
+  "latencyMs": 1684,
+  "costUsd": 0.0019995,
+  "tokens": {
+    "in": 1281,
+    "out": 277
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"periwinkle\">\n  <rect x=\"8\" y=\"10\" width=\"24\" height=\"23\" rx=\"3.5\" fill=\"soft\" stroke=\"ink\"/>\n  <path d=\"M8 17 H32\"/>\n  <line x1=\"14\" y1=\"7\" x2=\"14\" y2=\"12\"/>\n  <line x1=\"26\" y1=\"7\" x2=\"26\" y2=\"12\"/>\n  <circle cx=\"15\" cy=\"23\" r=\"1.75\" fill=\"accent\" stroke=\"none\"/>\n  <circle cx=\"21\" cy=\"23\" r=\"1.5\" fill=\"ink\" stroke=\"none\" opacity=\"0.3\" detail=\"1\"/>\n  <circle cx=\"27\" cy=\"23\" r=\"1.5\" fill=\"ink\" stroke=\"none\" opacity=\"0.3\" detail=\"1\"/>\n  <polyline points=\"18 28 21 30 27 24\" stroke=\"accent\" stroke-width=\"2.5\" fill=\"none\"/>\n</svg>"
+}

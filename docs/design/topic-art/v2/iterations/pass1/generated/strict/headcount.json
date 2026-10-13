@@ -1,0 +1,64 @@
+{
+  "level": "strict",
+  "model": "google/gemini-3.8-flash",
+  "topic": "headcount",
+  "ok": true,
+  "spec": {
+    "hue": "sage",
+    "elements": [
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "15",
+          "cy": "13",
+          "r": "5",
+          "fill": "soft"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M6 33 C6 25 10 22 15 22 C20 22 24 25 24 33"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "28",
+          "cy": "15",
+          "r": "4",
+          "fill": "soft",
+          "detail": "1"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M25 31 C26 26 27 24 28.5 24 C32 24 34 27 34 33",
+          "detail": "1"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "28",
+          "cy": "8",
+          "r": "1.75",
+          "fill": "accent",
+          "stroke": "none",
+          "detail": "1"
+        }
+      }
+    ]
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"sage\">\n  <circle cx=\"15\" cy=\"13\" r=\"5\" fill=\"soft\"/>\n  <path d=\"M6 33 C6 25 10 22 15 22 C20 22 24 25 24 33\"/>\n  <circle cx=\"28\" cy=\"15\" r=\"4\" fill=\"soft\" detail=\"1\"/>\n  <path d=\"M25 31 C26 26 27 24 28.5 24 C32 24 34 27 34 33\" detail=\"1\"/>\n  <circle cx=\"28\" cy=\"8\" r=\"1.75\" fill=\"accent\" stroke=\"none\" detail=\"1\"/>\n</svg>",
+  "elements": 5,
+  "attempts": 1,
+  "latencyMs": 2318,
+  "costUsd": 0.00476775,
+  "tokens": {
+    "in": 1217,
+    "out": 1028
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"sage\">\n  <circle cx=\"15\" cy=\"13\" r=\"5\" fill=\"soft\"/>\n  <path d=\"M6 33 C6 25 10 22 15 22 C20 22 24 25 24 33\"/>\n  <circle cx=\"28\" cy=\"15\" r=\"4\" fill=\"soft\" detail=\"1\"/>\n  <path d=\"M25 31 C26 26 27 24 28.5 24 C32 24 34 27 34 33\" detail=\"1\"/>\n  <circle cx=\"28\" cy=\"8\" r=\"1.75\" fill=\"accent\" stroke=\"none\" detail=\"1\"/>\n</svg>"
+}

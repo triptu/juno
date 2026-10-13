@@ -1,0 +1,64 @@
+{
+  "level": "strict",
+  "model": "google/gemini-3.8-flash",
+  "topic": "main-platform",
+  "ok": true,
+  "spec": {
+    "hue": "teal",
+    "elements": [
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M14 26 L8 32 A2.8 2.8 0 0 1 4 28 L10 22",
+          "transform": "translate(6, -2)"
+        }
+      },
+      {
+        "tag": "rect",
+        "attrs": {
+          "x": "18",
+          "y": "18",
+          "width": "13",
+          "height": "4",
+          "rx": "2",
+          "transform": "rotate(-45 20 20)",
+          "fill": "soft"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M14 16 L24 26"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M22 8 C23 7 25 7 27 8 L29 10 C32 9 34 11 34 14 C34 16.5 32 18.5 29.5 19 L19 29.5 C17.5 31 15 31 13.5 29.5 L10.5 26.5 C9 25 9 22.5 10.5 21 L21 10.5 C21.5 8 23.5 6 26 6",
+          "fill": "soft"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "28",
+          "cy": "12",
+          "r": "2",
+          "fill": "accent",
+          "stroke": "none",
+          "detail": "1"
+        }
+      }
+    ]
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"teal\">\n  <path d=\"M14 26 L8 32 A2.8 2.8 0 0 1 4 28 L10 22\" transform=\"translate(6, -2)\"/>\n  <rect x=\"18\" y=\"18\" width=\"13\" height=\"4\" rx=\"2\" transform=\"rotate(-45 20 20)\" fill=\"soft\"/>\n  <path d=\"M14 16 L24 26\"/>\n  <path d=\"M22 8 C23 7 25 7 27 8 L29 10 C32 9 34 11 34 14 C34 16.5 32 18.5 29.5 19 L19 29.5 C17.5 31 15 31 13.5 29.5 L10.5 26.5 C9 25 9 22.5 10.5 21 L21 10.5 C21.5 8 23.5 6 26 6\" fill=\"soft\"/>\n  <circle cx=\"28\" cy=\"12\" r=\"2\" fill=\"accent\" stroke=\"none\" detail=\"1\"/>\n</svg>",
+  "elements": 5,
+  "attempts": 1,
+  "latencyMs": 1670,
+  "costUsd": 0.00218625,
+  "tokens": {
+    "in": 1230,
+    "out": 337
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"teal\">\n  <path d=\"M14 26 L8 32 A2.8 2.8 0 0 1 4 28 L10 22\" transform=\"translate(6, -2)\"/>\n  <rect x=\"18\" y=\"18\" width=\"13\" height=\"4\" rx=\"2\" transform=\"rotate(-45 20 20)\" fill=\"soft\"/>\n  <path d=\"M14 16 L24 26\"/>\n  <path d=\"M22 8 C23 7 25 7 27 8 L29 10 C32 9 34 11 34 14 C34 16.5 32 18.5 29.5 19 L19 29.5 C17.5 31 15 31 13.5 29.5 L10.5 26.5 C9 25 9 22.5 10.5 21 L21 10.5 C21.5 8 23.5 6 26 6\" fill=\"soft\"/>\n  <circle cx=\"28\" cy=\"12\" r=\"2\" fill=\"accent\" stroke=\"none\" detail=\"1\"/>\n</svg>"
+}

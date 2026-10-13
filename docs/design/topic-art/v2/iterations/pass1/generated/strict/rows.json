@@ -1,0 +1,91 @@
+{
+  "level": "strict",
+  "model": "google/gemini-3.8-flash",
+  "topic": "rows",
+  "ok": true,
+  "spec": {
+    "hue": "plum",
+    "elements": [
+      {
+        "tag": "rect",
+        "attrs": {
+          "x": "7",
+          "y": "7",
+          "width": "26",
+          "height": "26",
+          "rx": "4",
+          "fill": "soft"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "7",
+          "y1": "20",
+          "x2": "33",
+          "y2": "20"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "12",
+          "y1": "12",
+          "x2": "25",
+          "y2": "12"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "12",
+          "y1": "16",
+          "x2": "20",
+          "y2": "16",
+          "stroke-width": "2.2",
+          "detail": "1"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "12",
+          "y1": "25",
+          "x2": "26",
+          "y2": "25"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "12",
+          "y1": "29",
+          "x2": "19",
+          "y2": "29",
+          "stroke-width": "2.2",
+          "detail": "1"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "28",
+          "cy": "14",
+          "r": "2",
+          "fill": "accent",
+          "stroke": "none"
+        }
+      }
+    ]
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"plum\">\n  <rect x=\"7\" y=\"7\" width=\"26\" height=\"26\" rx=\"4\" fill=\"soft\"/>\n  <line x1=\"7\" y1=\"20\" x2=\"33\" y2=\"20\"/>\n  <line x1=\"12\" y1=\"12\" x2=\"25\" y2=\"12\"/>\n  <line x1=\"12\" y1=\"16\" x2=\"20\" y2=\"16\" stroke-width=\"2.2\" detail=\"1\"/>\n  <line x1=\"12\" y1=\"25\" x2=\"26\" y2=\"25\"/>\n  <line x1=\"12\" y1=\"29\" x2=\"19\" y2=\"29\" stroke-width=\"2.2\" detail=\"1\"/>\n  <circle cx=\"28\" cy=\"14\" r=\"2\" fill=\"accent\" stroke=\"none\"/>\n</svg>",
+  "elements": 7,
+  "attempts": 1,
+  "latencyMs": 2262,
+  "costUsd": 0.00416025,
+  "tokens": {
+    "in": 1232,
+    "out": 863
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"plum\">\n  <rect x=\"7\" y=\"7\" width=\"26\" height=\"26\" rx=\"4\" fill=\"soft\"/>\n  <line x1=\"7\" y1=\"20\" x2=\"33\" y2=\"20\"/>\n  <line x1=\"12\" y1=\"12\" x2=\"25\" y2=\"12\"/>\n  <line x1=\"12\" y1=\"16\" x2=\"20\" y2=\"16\" stroke-width=\"2.2\" detail=\"1\"/>\n  <line x1=\"12\" y1=\"25\" x2=\"26\" y2=\"25\"/>\n  <line x1=\"12\" y1=\"29\" x2=\"19\" y2=\"29\" stroke-width=\"2.2\" detail=\"1\"/>\n  <circle cx=\"28\" cy=\"14\" r=\"2\" fill=\"accent\" stroke=\"none\"/>\n</svg>"
+}

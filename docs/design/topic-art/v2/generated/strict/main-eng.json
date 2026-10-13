@@ -1,0 +1,55 @@
+{
+  "level": "strict",
+  "model": "google/gemini-3.8-flash",
+  "topic": "main-eng",
+  "ok": true,
+  "spec": {
+    "hue": "teal",
+    "confident": true,
+    "elements": [
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M29 6 L34 11 L29 16 L25 12 L13 24 C11 26 11 29 13 31 C15 33 18 33 20 31 L32 19 L28 15",
+          "stroke": "none",
+          "fill": "none"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M12 9 C8.5 12.5 8.5 18 12 21.5 L24 33.5 C25.5 35 28 35 29.5 33.5 L33.5 29.5 C35 28 35 25.5 33.5 24 L21.5 12 C18 8.5 12.5 8.5 9 12",
+          "stroke": "none"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M27 7 A7.5 7.5 0 0 0 17.5 8.5 L9.5 16.5 C8.5 17.5 8.5 19 9.5 20 L20 30.5 C21 31.5 22.5 31.5 23.5 30.5 L31.5 22.5 A7.5 7.5 0 0 0 33 13 L28.5 17.5 L22.5 11.5 Z",
+          "fill": "soft"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "14",
+          "cy": "26",
+          "r": "2",
+          "fill": "accent",
+          "stroke": "none",
+          "detail": "1"
+        }
+      }
+    ]
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"teal\">\n  <path d=\"M29 6 L34 11 L29 16 L25 12 L13 24 C11 26 11 29 13 31 C15 33 18 33 20 31 L32 19 L28 15\" stroke=\"none\" fill=\"none\"/>\n  <path d=\"M12 9 C8.5 12.5 8.5 18 12 21.5 L24 33.5 C25.5 35 28 35 29.5 33.5 L33.5 29.5 C35 28 35 25.5 33.5 24 L21.5 12 C18 8.5 12.5 8.5 9 12\" stroke=\"none\"/>\n  <path d=\"M27 7 A7.5 7.5 0 0 0 17.5 8.5 L9.5 16.5 C8.5 17.5 8.5 19 9.5 20 L20 30.5 C21 31.5 22.5 31.5 23.5 30.5 L31.5 22.5 A7.5 7.5 0 0 0 33 13 L28.5 17.5 L22.5 11.5 Z\" fill=\"soft\"/>\n  <circle cx=\"14\" cy=\"26\" r=\"2\" fill=\"accent\" stroke=\"none\" detail=\"1\"/>\n</svg>",
+  "elements": 4,
+  "attempts": 2,
+  "latencyMs": 4757,
+  "costUsd": 0.013209,
+  "tokens": {
+    "in": 2947,
+    "out": 2933
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"teal\">\n  <path d=\"M29 6 L34 11 L29 16 L25 12 L13 24 C11 26 11 29 13 31 C15 33 18 33 20 31 L32 19 L28 15\" stroke=\"none\" fill=\"none\"/>\n  <path d=\"M12 9 C8.5 12.5 8.5 18 12 21.5 L24 33.5 C25.5 35 28 35 29.5 33.5 L33.5 29.5 C35 28 35 25.5 33.5 24 L21.5 12 C18 8.5 12.5 8.5 9 12\" stroke=\"none\"/>\n  <path d=\"M27 7 A7.5 7.5 0 0 0 17.5 8.5 L9.5 16.5 C8.5 17.5 8.5 19 9.5 20 L20 30.5 C21 31.5 22.5 31.5 23.5 30.5 L31.5 22.5 A7.5 7.5 0 0 0 33 13 L28.5 17.5 L22.5 11.5 Z\" fill=\"soft\"/>\n  <circle cx=\"14\" cy=\"26\" r=\"2\" fill=\"accent\" stroke=\"none\" detail=\"1\"/>\n</svg>"
+}

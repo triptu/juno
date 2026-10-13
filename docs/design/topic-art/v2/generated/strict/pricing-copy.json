@@ -1,0 +1,50 @@
+{
+  "level": "strict",
+  "model": "google/gemini-3.8-flash",
+  "topic": "pricing-copy",
+  "ok": true,
+  "spec": {
+    "hue": "amber",
+    "confident": true,
+    "elements": [
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M7 20 L19.5 7.5 L29.5 7.5 C31.5 7.5 33 9 33 11 L33 21 L20.5 33.5 C19 35 16.5 35 15 33.5 L7 25.5 C5.5 24 5.5 21.5 7 20 Z",
+          "fill": "soft"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "26",
+          "cy": "14.5",
+          "r": "2.5",
+          "fill": "accent",
+          "stroke": "none"
+        }
+      },
+      {
+        "tag": "line",
+        "attrs": {
+          "x1": "14",
+          "y1": "23",
+          "x2": "20",
+          "y2": "17",
+          "stroke-width": "2.5",
+          "detail": "1"
+        }
+      }
+    ]
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"amber\">\n  <path d=\"M7 20 L19.5 7.5 L29.5 7.5 C31.5 7.5 33 9 33 11 L33 21 L20.5 33.5 C19 35 16.5 35 15 33.5 L7 25.5 C5.5 24 5.5 21.5 7 20 Z\" fill=\"soft\"/>\n  <circle cx=\"26\" cy=\"14.5\" r=\"2.5\" fill=\"accent\" stroke=\"none\"/>\n  <line x1=\"14\" y1=\"23\" x2=\"20\" y2=\"17\" stroke-width=\"2.5\" detail=\"1\"/>\n</svg>",
+  "elements": 3,
+  "attempts": 1,
+  "latencyMs": 2299,
+  "costUsd": 0.0077085,
+  "tokens": {
+    "in": 1338,
+    "out": 1788
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"amber\">\n  <path d=\"M7 20 L19.5 7.5 L29.5 7.5 C31.5 7.5 33 9 33 11 L33 21 L20.5 33.5 C19 35 16.5 35 15 33.5 L7 25.5 C5.5 24 5.5 21.5 7 20 Z\" fill=\"soft\"/>\n  <circle cx=\"26\" cy=\"14.5\" r=\"2.5\" fill=\"accent\" stroke=\"none\"/>\n  <line x1=\"14\" y1=\"23\" x2=\"20\" y2=\"17\" stroke-width=\"2.5\" detail=\"1\"/>\n</svg>"
+}

@@ -1,0 +1,67 @@
+{
+  "level": "strict",
+  "model": "google/gemini-3.8-flash",
+  "topic": "rina",
+  "ok": true,
+  "spec": {
+    "hue": "sage",
+    "elements": [
+      {
+        "tag": "rect",
+        "attrs": {
+          "x": "8",
+          "y": "11",
+          "width": "24",
+          "height": "23",
+          "rx": "4",
+          "fill": "soft"
+        }
+      },
+      {
+        "tag": "rect",
+        "attrs": {
+          "x": "16",
+          "y": "6",
+          "width": "8",
+          "height": "5",
+          "rx": "1.5"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "20",
+          "cy": "19",
+          "r": "3.5"
+        }
+      },
+      {
+        "tag": "path",
+        "attrs": {
+          "d": "M13 29 C13 25 16 24 20 24 C24 24 27 25 27 29"
+        }
+      },
+      {
+        "tag": "circle",
+        "attrs": {
+          "cx": "27",
+          "cy": "15",
+          "r": "2",
+          "fill": "accent",
+          "stroke": "none",
+          "detail": "1"
+        }
+      }
+    ]
+  },
+  "canonical": "<svg viewBox=\"0 0 40 40\" data-hue=\"sage\">\n  <rect x=\"8\" y=\"11\" width=\"24\" height=\"23\" rx=\"4\" fill=\"soft\"/>\n  <rect x=\"16\" y=\"6\" width=\"8\" height=\"5\" rx=\"1.5\"/>\n  <circle cx=\"20\" cy=\"19\" r=\"3.5\"/>\n  <path d=\"M13 29 C13 25 16 24 20 24 C24 24 27 25 27 29\"/>\n  <circle cx=\"27\" cy=\"15\" r=\"2\" fill=\"accent\" stroke=\"none\" detail=\"1\"/>\n</svg>",
+  "elements": 5,
+  "attempts": 1,
+  "latencyMs": 2295,
+  "costUsd": 0.00447675,
+  "tokens": {
+    "in": 1224,
+    "out": 949
+  },
+  "raw": "<svg viewBox=\"0 0 40 40\" data-hue=\"sage\">\n  <rect x=\"8\" y=\"11\" width=\"24\" height=\"23\" rx=\"4\" fill=\"soft\"/>\n  <rect x=\"16\" y=\"6\" width=\"8\" height=\"5\" rx=\"1.5\"/>\n  <circle cx=\"20\" cy=\"19\" r=\"3.5\"/>\n  <path d=\"M13 29 C13 25 16 24 20 24 C24 24 27 25 27 29\"/>\n  <circle cx=\"27\" cy=\"15\" r=\"2\" fill=\"accent\" stroke=\"none\" detail=\"1\"/>\n</svg>"
+}
