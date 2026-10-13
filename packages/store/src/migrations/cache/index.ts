@@ -3,6 +3,7 @@ import type { SqlClient } from 'effect/sql'
 import initial from './202610121200_initial'
 import topicIndexes from './202610131000_topic_indexes'
 import threadSubsEventTs from './202610131800_thread_subs_event_ts'
+import mainWindow from './202610140900_main_window'
 
 /**
  * Schema version of `cache.db`, stored in `PRAGMA user_version`. A cache file
@@ -11,11 +12,12 @@ import threadSubsEventTs from './202610131800_thread_subs_event_ts'
  * mirror is disposable, so its migrations only ever run on an empty file and
  * never transform data (ADR 0008).
  */
-export const CACHE_SCHEMA_VERSION = 3
+export const CACHE_SCHEMA_VERSION = 4
 
 /** Migrations for `cache.db`, keyed `<timestamp>_<name>`. */
 export const cacheMigrations: Record<string, Effect.Effect<void, unknown, SqlClient.SqlClient>> = {
   '202610121200_initial': initial,
   '202610131000_topic_indexes': topicIndexes,
   '202610131800_thread_subs_event_ts': threadSubsEventTs,
+  '202610140900_main_window': mainWindow,
 }

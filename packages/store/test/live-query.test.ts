@@ -64,6 +64,22 @@ describe('live queries', () => {
     }).pipe(Effect.provide(freshStore)),
   )
 
+  it.effect('one subscription can mix row keys and whole tables; an empty id list is the whole table', () =>
+    Effect.gen(function* () {
+      const mixed = yield* collect(liveQuery({ messages: ['C1'], users: [] }, countMessages('C1')))
+      yield* takeValue(mixed)
+      yield* endWindow
+
+      // A row-level write to the table named whole re-runs it.
+      yield* transaction(invalidate({ users: ['U1'] }))
+      yield* takeValue(mixed)
+      yield* endWindow
+      // Another channel's messages do not.
+      yield* transaction(insertMessage('C2', '1.000001'))
+      yield* expectNoEmission(mixed)
+    }).pipe(Effect.provide(freshStore)),
+  )
+
   it.effect('invalidations inside a transaction fire once, after the commit', () =>
     Effect.gen(function* () {
       const messages = yield* collect(liveQuery(['messages'], countMessages('C1')))
