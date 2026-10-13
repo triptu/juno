@@ -72,6 +72,7 @@ export function Workspace({ tabs = [], activeId, onSelectTab, onCloseTab, onNewT
             icon={tab.stealth ? EyeSlash : icons[tab.icon]}
             leading={tab.stealth ? undefined : tab.art}
             label={tab.title}
+            {...(tab.stealth ? { description: 'Stealth' } : {})}
             active={tab.id === activeId}
             onSelect={onSelectTab === undefined ? undefined : (event) => onSelectTab(tab.id, event)}
             onClose={onCloseTab === undefined ? undefined : () => onCloseTab(tab.id)}

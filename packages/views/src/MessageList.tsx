@@ -13,8 +13,12 @@ export interface MessageListItem {
   readonly sender: Person | undefined
 }
 
-/** What the list shows while it has no rows. `offline`: the topic is not cached and Slack could not be reached. */
-export type MessageListStatus = 'ready' | 'loading' | 'offline'
+/**
+ * What the list shows while it has no rows. `pending`: nothing yet, for the
+ * first 300 ms of an open. `offline`: the topic is not cached and Slack
+ * could not be reached.
+ */
+export type MessageListStatus = 'ready' | 'pending' | 'loading' | 'offline'
 
 /** Whether older messages exist above the window, and whether a page is on its way. */
 export type OlderStatus = 'none' | 'more' | 'loading'
@@ -91,7 +95,7 @@ export function MessageList({
 
   return (
     <ScrollArea scrollbar="hover" ref={scrollRef} data-scroll="" sx={styles.scroller}>
-      <div role="list" aria-label="Messages" aria-busy={status === 'loading'} onKeyDown={onKeyDown} {...stylex.props(styles.column)}>
+      <div role="list" aria-label="Messages" aria-busy={status === 'loading' || status === 'pending'} onKeyDown={onKeyDown} {...stylex.props(styles.column)}>
         {older !== 'none' ? (
           <div aria-live="polite" {...stylex.props(styles.olderLine)}>
             {older === 'loading' ? (
@@ -143,6 +147,7 @@ function Row({ atDivider, newCount, anchorRef, children }: { readonly atDivider:
 }
 
 function Empty({ main, status }: { readonly main: boolean; readonly status: MessageListStatus }) {
+  if (status === 'pending') return null
   if (status === 'loading') {
     return (
       <div {...stylex.props(styles.quiet)}>

@@ -44,6 +44,9 @@ const styles = stylex.create({
   area: {
     minHeight: 0,
     overflowY: 'auto',
+    // The gutter is there before the content overflows too, so the first
+    // overflow (a new message) never narrows the content.
+    scrollbarGutter: 'stable',
     overscrollBehavior: 'contain',
   },
   // global.css draws the thumb in --scrollbar-thumb, so the pseudo-element

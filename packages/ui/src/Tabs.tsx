@@ -36,6 +36,8 @@ export interface TabProps {
    */
   readonly leading?: ReactNode
   readonly label: string
+  /** Read after the label by assistive technology, for a state the icon shows ("Stealth"). */
+  readonly description?: string
   readonly active?: boolean
   /** Fires on mouse down (see internal/activate.ts); `metaKey` for ⌘-click. */
   readonly onSelect?: (event: ActivateEvent) => void
@@ -50,12 +52,13 @@ export interface TabProps {
  * regular even when active: tab switches do not animate and a filled set
  * is too heavy in a strip.
  */
-export function Tab({ icon, leading, label, active = false, onSelect, onClose, onContextMenu, closeLabel = 'Close tab' }: TabProps) {
+export function Tab({ icon, leading, label, description, active = false, onSelect, onClose, onContextMenu, closeLabel = 'Close tab' }: TabProps) {
   return (
     <div
       role="tab"
       tabIndex={0}
       aria-selected={active}
+      aria-description={description}
       title={label}
       onContextMenu={onContextMenu}
       {...activateHandlers<HTMLDivElement>(onSelect)}
