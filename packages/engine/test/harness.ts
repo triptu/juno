@@ -31,17 +31,15 @@ import { memoryTransport, type MessagePortLike } from '../src/protocol/transport
  */
 export const WAIT_MS = 45_000
 
-export function waitFor<A>(f: () => A | undefined, timeoutMs = WAIT_MS, label = 'condition'): Promise<Exclude<A, undefined>> {
-  return new Promise((resolve, reject) => {
-    const started = Date.now()
-    const tick = () => {
-      const value = f()
-      if (value !== undefined) return resolve(value as Exclude<A, undefined>)
-      if (Date.now() - started > timeoutMs) return reject(new Error(`timed out waiting for ${label}`))
-      setTimeout(tick, 5)
-    }
-    tick()
-  })
+/** Polls a condition, awaiting async predicates before deciding whether to poll again. */
+export async function waitFor<A>(f: () => A | undefined | Promise<A | undefined>, timeoutMs = WAIT_MS, label = 'condition'): Promise<Exclude<A, undefined>> {
+  const started = Date.now()
+  while (true) {
+    const value = await f()
+    if (value !== undefined) return value as Exclude<A, undefined>
+    if (Date.now() - started > timeoutMs) throw new Error(`timed out waiting for ${label}`)
+    await sleep(5)
+  }
 }
 
 export const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
@@ -134,6 +132,8 @@ export interface RunningEngine {
   readonly userData: string
   readonly handle: EngineHandle
   readonly status: (tag: SessionStatus['_tag']) => Promise<SessionStatus>
+  /** Waits for boot or reconnect and its follow pass to finish. Does not drain socket events or command retries. */
+  readonly syncIdle: () => Promise<void>
   readonly phase: (tag: EngineStatus['phase']['_tag'], timeoutMs?: number) => Promise<EngineStatus['phase']>
   /** The mounted list atom for a filter. */
   readonly topicsAtom: (filter?: TopicListFilter) => ReturnType<typeof topicListAtom>
@@ -167,7 +167,21 @@ export async function startTestEngine(options: EngineOptions = {}): Promise<Runn
   const userData = options.reuse?.userData ?? join(tmpdir(), `juno-engine-test-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`)
   await mkdir(userData, { recursive: true })
   const transport = memoryTransport()
-  const handle = await startEngine(transport, { userData, e2e: true, dev: false, fakeSlackUrl: fake.url }, { host: main.host, httpTransport: main.httpTransport })
+  let cycles = 0
+  let pendingCycles = 0
+  const handle = await startEngine(transport, { userData, e2e: true, dev: false, fakeSlackUrl: fake.url }, {
+    host: main.host,
+    httpTransport: main.httpTransport,
+    sync: {
+      config: { sweepIntervalMillis: 0 },
+      onCycle: (event) => {
+        if (event === 'started') {
+          cycles += 1
+          pendingCycles += 1
+        } else pendingCycles -= 1
+      },
+    },
+  })
   const registry = makeRegistry()
   configureConnection(registry, {
     acquire: async () => {
@@ -206,6 +220,9 @@ export async function startTestEngine(options: EngineOptions = {}): Promise<Runn
         WAIT_MS,
         `session ${tag}`,
       ),
+    syncIdle: async () => {
+      await waitFor(() => (cycles > 0 && pendingCycles === 0 ? true : undefined), WAIT_MS, 'the sync cycle to finish')
+    },
     phase: (tag, timeoutMs = WAIT_MS) =>
       waitFor(
         () => {
@@ -231,6 +248,7 @@ export async function startTestEngine(options: EngineOptions = {}): Promise<Runn
       ),
     stop: async () => {
       for (const unmount of unmounts.splice(0)) unmount()
+      registry.dispose()
       await handle.stop()
       if (options.reuse === undefined) {
         await fake.close()

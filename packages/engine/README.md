@@ -4,7 +4,7 @@ The engine: all of Juno's business logic and I/O, as Effect services in one Node
 
 ## What it owns
 
-- `startEngine(transport, config, { host, httpTransport })`: builds the app layer, serves the RPC protocol, returns `{ stop }`. Services and the server come up before any boot work, so the first live query is answered from local state. `host` is the parentPort line to main (`memoryHost()` in tests); `httpTransport` is the Slack HTTP seam (`net.fetch` in the app, Node `fetch` by default).
+- `startEngine(transport, config, { host, httpTransport })`: builds the app layer, serves the RPC protocol, returns `{ stop, commandIdle }`. Services and the server come up before any boot work, so the first live query is answered from local state. `host` is the parentPort line to main (`memoryHost()` in tests); `httpTransport` is the Slack HTTP seam (`net.fetch` in the app, Node `fetch` by default).
 - The protocol (`src/protocol`): the `RpcServer` over a worker-runner platform that accepts every port a `Transport` hands it, the serve helpers, and `HostLink` (`src/protocol/host.ts`), the service feature folders use to talk to main.
 - Feature folders (`src/<feature>/`), each with its route handlers and services. `src/status/` is the worked example; `src/session/` owns the sign-in state, `auth.test`, sign-out, and `SyncRunner`, which runs `@juno/sync` inside the session's scope for every ready session; `src/topics/` serves `topics.list` and `topics.counts` from the open store and runs the `topics.subscribe` and `topics.unsubscribe` commands (`commands.ts`: one local transaction with a pending outbox row, the mirror to Slack, a root lookup after a failure or when Slack said something meanwhile, the undo in the result); `src/messages/` serves the topic view (`messages.list`, `topics.get`, `channel.threads`) and runs `topics.open` and `messages.loadOlder` (see "The topic view" below).
 - `src/search/` serves `search.query` over local FTS indexes for titles, messages, channels and people; ignored and non-member channels are excluded before the limit. `src/prefs/` serves one durable JSON preference through `prefs.get` and `prefs.set`.
@@ -18,7 +18,7 @@ The engine: all of Juno's business logic and I/O, as Effect services in one Node
 
 ## Public API
 
-- `startEngine`, `EngineHandle`, `EngineHostOptions`.
+- `startEngine`, `EngineHandle`, `EngineHostOptions`. `commandIdle()` waits for scheduled background command recovery, including its store writes. Host options can observe sync cycles and override the sync schedule. See [the test harness](test/README.md).
 - `Host`, `memoryHost`, `silentHost`, `HostLink`: the parentPort line to main and its test doubles.
 - `electronTransport`, `memoryTransport`, `Transport`, `EnginePort`: where ports come from.
 - `listTopics(filter, options, cache?)`, `makeRowCache()`, `SIDEBAR_WINDOW`: the sidebar query, for the live dry run (`scripts/sync-live-dry-run.ts`) and the benchmark.

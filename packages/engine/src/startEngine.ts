@@ -13,11 +13,12 @@
  * tests). Both default to the Node flavour so a bare `startEngine` still
  * serves.
  */
-import { Effect, Exit, Layer, Scope } from 'effect'
+import { Context, Effect, Exit, Layer, Scope } from 'effect'
 import type { EngineConfig as Config } from '@juno/contract'
 import { HttpTransport } from '@juno/slack'
-import { EngineConfig } from './config'
+import { EngineConfig, SyncControl, type SyncControlOptions } from './config'
 import { HostLink, silentHost, type Host } from './protocol/host'
+import { Outbox } from './outbox'
 import { Handlers, Services } from './layer'
 import { protocolServer } from './protocol/server'
 import type { Transport } from './protocol/transport'
@@ -26,9 +27,13 @@ export interface EngineHandle {
   readonly config: Config
   /** Closes every port and releases every service. */
   readonly stop: () => Promise<void>
+  /** Waits for scheduled background command recoveries, including their local writes. */
+  readonly commandIdle: () => Promise<void>
 }
 
 export interface EngineHostOptions {
+  /** Optional cycle observer and sync schedule overrides, used by the test harness. */
+  readonly sync?: SyncControlOptions
   readonly host?: Host
   /** The HTTP seam for Slack (ADR 0007). */
   readonly httpTransport?: Layer.Layer<HttpTransport>
@@ -44,14 +49,20 @@ export function startEngine(transport: Transport, config: Config, options: Engin
         Layer.provide(
           Layer.mergeAll(
             EngineConfig.layer(config),
+            Layer.succeed(SyncControl, options.sync ?? {}),
             HostLink.layer(options.host ?? silentHost()),
             options.httpTransport ?? HttpTransport.nodeFetch(),
           ),
         ),
       )
       // A failed build must not leak what was already acquired.
-      yield* Layer.buildWithScope(app, scope).pipe(Effect.onError(() => Scope.close(scope, Exit.void)))
-      return { config, stop: () => Effect.runPromise(Scope.close(scope, Exit.void)) }
+      const context = yield* Layer.buildWithScope(app, scope).pipe(Effect.onError(() => Scope.close(scope, Exit.void)))
+      const outbox = Context.get(context, Outbox)
+      return {
+        config,
+        stop: () => Effect.runPromise(Scope.close(scope, Exit.void)),
+        commandIdle: () => Effect.runPromise(outbox.idle),
+      }
     }),
   )
 }

@@ -18,7 +18,7 @@
  * A top-level module, like `workspace.ts`. It reaches Slack through the
  * top-level `SessionClient`, so it imports no feature folder.
  */
-import { Context, Effect, Layer, Semaphore } from 'effect'
+import { Context, Effect, FiberSet, Layer, Semaphore } from 'effect'
 import { NotSignedIn, Offline, RateLimited, Rejected } from '@juno/contract'
 import type { SlackApiError, SlackApiShape } from '@juno/slack'
 import { SessionClient } from './sessionClient'
@@ -38,6 +38,8 @@ export class Outbox extends Context.Service<
     readonly lookup: <A>(call: (api: SlackApiShape) => Effect.Effect<A, SlackApiError>) => Effect.Effect<A, MirrorError>
     /** Runs `effect` after every earlier `exclusive` effect with the same key has finished. */
     readonly exclusive: (key: string) => <A, E, R>(effect: Effect.Effect<A, E, R>) => Effect.Effect<A, E, R>
+    /** Waits for the background command recoveries already scheduled to finish. */
+    readonly idle: Effect.Effect<void>
     /** Starts `effect` and returns at once. Its failures are ignored; it is interrupted when the engine stops. */
     readonly background: <A, E>(effect: Effect.Effect<A, E>) => Effect.Effect<void>
   }
@@ -80,10 +82,11 @@ export class Outbox extends Context.Service<
             )
           })
 
-      const scope = yield* Effect.scope
-      const background = <A, E>(effect: Effect.Effect<A, E>): Effect.Effect<void> => Effect.asVoid(Effect.forkIn(Effect.ignore(effect), scope))
+      const recoveries = yield* FiberSet.make<void>()
+      const background = <A, E>(effect: Effect.Effect<A, E>): Effect.Effect<void> =>
+        FiberSet.run(recoveries, Effect.ignore(effect).pipe(Effect.asVoid)).pipe(Effect.asVoid)
 
-      return Outbox.of({ send, lookup, exclusive, background })
+      return Outbox.of({ send, lookup, exclusive, background, idle: FiberSet.awaitEmpty(recoveries) })
     }),
   )
 }

@@ -19,7 +19,7 @@ async function offline(engine: RunningEngine, whileOffline: () => void): Promise
   engine.fake.resetCalls()
   engine.fake.goOnline()
   await engine.phase('live', 30_000)
-  await quiet(engine)
+  await engine.syncIdle()
 }
 
 describe('reconnect', () => {

@@ -108,7 +108,7 @@ ITF `states[0]` is initial. In each state find the variable ending in `::s`, the
 | `startFetch` kind `page`, `scan`, `lookup`, `finishFetch` | `client.counts` or a `getView` row; the reconnect's counts; `conversations.info` or a root lookup |
 | `stealth` | A stealth tab: no command |
 
-Network acceptance, response, event delivery and fetch completion are separate transitions in both models.
+Network acceptance, response, event delivery and fetch completion are separate transitions in both models. Engine tests disable the periodic sweep timer and trigger reconnects explicitly. `syncIdle()` waits for scan completion, including a due follow pass, and `commandIdle()` waits for command recovery to finish applying its answer. These observation hooks do not change the protocol actions or their ordering rules.
 
 ## Maintain the protocol
 
