@@ -2,7 +2,7 @@
 
 Reverse-engineering notes for Juno. Scope: the web client (app.slack.com, "gantry-v2" build) that the Slack desktop app 4.52.178 runs, its HTTP API calls, its real-time websocket, and where the desktop app stores credentials.
 
-Everything below comes from static reading of the cached JS bundles. No network requests were made and nothing was executed. No token, cookie or message content is reproduced here; only names, formats and locations.
+Everything below comes from static reading of the cached JS bundles, plus the "Observed live" notes, which come from the read-only live smoke (`scripts/smoke-live.ts`, section 10) against one single-workspace account. No token, cookie or message content is reproduced here; only names, formats and locations.
 
 ## 0. Sources and method
 
@@ -59,6 +59,11 @@ Inferred
 - The `d` cookie is decrypted the standard Chromium way on macOS: `encrypted_value` starts with `v10`, AES-128-CBC, key = PBKDF2-SHA1(password from Keychain item "Slack Safe Storage", salt `saltysalt`, 1003 iterations, 16 bytes), IV = 16 spaces. Recent Chromium versions prefix the plaintext with a 32-byte SHA-256 of `host_key`. (Standard Chromium `OSCrypt` behaviour; not visible in the web bundles.)
 - `_x_app_name` is `client` (from `document.documentElement.dataset.app` = `client-v2` with `data-app-name-override="client"`).
 - The `xoxc-` token alone is rejected without the matching `d` cookie session (server-side; consistent with `withCredentials` always being set for `xoxc-`).
+
+Observed live
+
+- The `xoxc-` token in the form body plus a `Cookie: d=<value>` header is enough for every call the smoke makes and for the socket upgrade. No other cookie (`d-s`, `b`, `lc`, …) was sent and none was needed. Of the query params, only `_x_id`, `slack_route` and `_x_app_name=client` are sent; `fp`, `_x_version_ts`, `_x_gantry`, `_x_sonic` and the b3 trace ids are not, and nothing was rejected.
+- A session read from the installed Slack app (`localConfig_v2` token, decrypted `d` cookie) works unchanged from plain Node, outside any Chromium profile.
 
 Unknown
 
@@ -124,6 +129,13 @@ interface CountEntry {
 }
 ```
 
+Observed live (`client.userBoot` with `version_all_channels=true`, `return_all_relevant_mpdms=true`; `client.counts` with `thread_counts_by_channel=true`)
+
+- `client.userBoot.channels` lists every channel of the workspace, not only the user's (418 channels against 218 in `client.counts`). The channel objects carry no `is_member`, `last_read`, `latest`, `unread_count` or `is_open`; the keys present on all of them are `id, name, name_normalized, is_channel, is_group, is_im, is_mpim, is_private, is_archived, is_general, is_shared, is_ext_shared, is_org_shared, is_pending_ext_shared, is_frozen, is_slackbot_channel_enabled, created, creator, updated, unlinked, context_team_id, shared_team_ids, pending_shared, pending_connected_team_ids, parent_conversation (null), topic, purpose, properties`; `members` is present on about half, `previous_names` on half, `connected_team_ids`/`conversation_host_id`/`internal_team_ids` on shared channels only, `use_case` rarely. So membership and read state must come from `client.counts`, whose entries are the user's own conversations.
+- `client.userBoot.ims` entries always have `id, user, is_im, is_open, is_archived, is_frozen, is_org_shared, is_slackbot_channel_enabled, created, updated, context_team_id`; `is_shared`/`is_ext_shared`/`shared_team_ids`/`connected_team_ids` only on shared DMs.
+- `emoji_cache_ts`, `app_commands_cache_ts` and `translations_cache_ts` are ts-formatted strings, not numbers. `subteams` had only `self` (no `all`). `self.profile` includes `email`, `status_*`, `huddle_state*`, `start_date`. Extra top-level keys not in the bundle reading: `cache_ts_version, cache_version, prefs_version, slack_route, dnd, non_threadable_channels, accept_tos_url (null), is_europe, mobile_app_requires_upgrade` and several `is_*_eligible` flags.
+- `client.counts` entries (channels, mpims, ims) all carry `id, last_read, latest, updated, history_invalid` (all ts strings), `mention_count` and `has_unreads`; `mention_count_display` and `vip_count` were absent on entries, while `threads` has `has_unreads, mention_count, vip_count, unread_count_by_channel, mention_count_by_channel` (no `timestamp`). `channel_badges` is `{ channels, dms, app_dms, thread_mentions, thread_unreads }` (numbers). `alerts`, `saved` and `activity_v2` are flat objects of numeric counters.
+
 Inferred
 
 - `conversations.view` returns `{ messages, channel, pins?, … }` like `conversations.history` plus channel metadata; it is the client's "open this channel" call.
@@ -145,6 +157,7 @@ History (`shared`, module with `fetchHistory`/`fetchReplies`, around `determineD
 - `conversations.history` args: `{ channel, limit (default 28), oldest?, latest?, inclusive: true, ignore_replies: true, include_pin_count: true, no_user_profile: true, include_stories: true, include_free_team_extra_messages: true, include_date_joined?, include_tombstones?, cursor?, cached_latest_updates: {[ts]: version} }`. Response: `{ messages, has_more, is_limited, pin_count, channel_actions_count, deleted: Ts[], response_metadata: { next_cursor? }, latest_updates?, unchanged_messages?: Ts[], date_joined? }`.
 - `conversations.replies` args: `{ channel, ts: thread_ts, inclusive: true, limit, oldest?, latest?, cursor?, include_tombstones?, cached_latest_updates }`. Response: `{ messages, has_more, response_metadata, deleted, latest_updates, unchanged_messages }`. First message is the root. Error `thread_not_found` is handled.
 - `conversations.view` (section 2).
+- Observed live (`conversations.history` with `limit`, `ignore_replies=true`): `{ ok, messages, has_more, pin_count, channel_actions_count, channel_actions_ts (null), response_metadata: { next_cursor } }`. Every message had `type, ts, text, client_msg_id, user`; `blocks` on nearly all, `attachments` on about two thirds, `reactions` on half; roots carry `thread_ts, reply_count, reply_users, reply_users_count, latest_reply, subscribed, is_locked` and sometimes `last_read`; `thread_broadcast` messages carry `root`.
 - `conversations.historyChanges` returns `{ ekm_change_ts }` (enterprise key management only).
 
 Thread subscriptions and unreads (`shared`, module `ZUxn`; `boot-async` `WhFy` `refreshThreads`, `zvzS` `processThreads`)
@@ -165,6 +178,7 @@ interface ThreadsGetView {
   threads_state?: { has_unreads: boolean; mention_count: number; unread_count_by_channel; mention_count_by_channel; timestamp: Ts };
 }
 ```
+- Observed live (`subscriptions.thread.getView` with `limit` only): the response also has `max_ts` (ts) and `new_threads_count` (number); `threads_state` is absent unless asked for. `unread_replies` is absent, not empty, on threads with nothing unread (3 of 10 had it). Every `root_msg` had `channel, thread_ts, ts, reply_count, reply_users, reply_users_count, latest_reply, last_read, subscribed, is_locked, text, type`; `latest_replies` entries carry `channel` too. Bot roots can carry `agent_session` and `icons`.
 - `subscriptions.thread.getTimestamps` `{ mode, limit, org_wide_aware: true }`.
 - `client.counts.threads` (section 2) gives the global threads unread/mention state.
 
@@ -254,6 +268,13 @@ Event types with payloads relevant to Juno (handlers in `boot-async` unless note
 { type:"subteam_*" } ; { type:"channel_history_changed"|"im_history_changed", channel, latest, event_ts } ; { type:"force_reload" } ; { type:"user_session_expiration" }
 ```
 
+Observed live (plain Node `ws`, headers `Cookie: d=…`, `Origin: https://app.slack.com`, a non-browser `User-Agent`)
+
+- `client.getWebSocketURL` answers `{ primary_websocket_url, fallback_websocket_url, ttl_seconds: 604800, routing_context }`; the primary URL is `wss://wss-primary.slack.com/` with no query of its own.
+- **`start_args` must not be sent.** With any `start_args` value in the query, even `{}`, the server completes the upgrade (101) and then sends nothing: no `hello`, no reply to a `ping`, no close, for over 75 s. This held with and without `flannel=3`, with the full official parameter set and with a Chrome-like `User-Agent`. Without `start_args`, `hello` arrives within about 0.5 s. Juno loads its boot data over HTTP, so it never sends `start_args`; `token, sync_desync=1, slack_client=desktop, no_query_on_subscribe=1, flannel=3, lazy_channels=1, batch_presence_aware=1, slack_route, gateway_server` are sent and accepted.
+- The upgrade response carries no `Sec-WebSocket-Extensions` (no compression) and no `Set-Cookie`.
+- First frames: `{ type: "hello", fast_reconnect: false, region, host_id, start: true }` (so `start` is a boolean here, not a payload), then `{ type: "reconnect_url", url }` about 0.2 s later and again every 30 to 60 s. `pong` is `{ type: "pong", reply_to }`. `message` frames arrive with `event_ts`, `suppress_notification`, `source_team`, `user_team` next to the usual message fields; `message_changed` carries `message`, `previous_message`, `hidden: true`, `ts`, `event_ts`.
+
 Inferred
 
 - `channel_marked` family payloads follow the public RTM API (`unread_count`, `unread_count_display`, `mention_count` fields are consumed elsewhere via counts).
@@ -261,7 +282,9 @@ Inferred
 
 Unknown
 
-- The full `hello.start` payload and `flannel=3` semantics (the `flannel` socket subtype lets the client run edge queries without HTTP; Juno can use HTTP edge calls instead).
+- The full `hello.start` payload and `flannel=3` semantics (the `flannel` socket subtype lets the client run edge queries without HTTP; Juno can use HTTP edge calls instead). Live, `hello.start` was the boolean `true`.
+- Why `start_args` silences the socket from Node. The official client sends it and gets `hello`, so the server must be waiting for something only the official client supplies (a first frame, a cookie the browser attaches, or a parameter tied to its build). Not needed: Juno works without it.
+- Whether `reconnect_url` frames keep arriving every 30 to 60 s for the life of the connection (seen twice in 90 s) and whether an unused one expires server-side before the client's 285 s window.
 
 ## 5. Message format
 
@@ -338,7 +361,23 @@ Calls
 - Token and cookie coupling: `xoxc-` tokens are only valid with the `d` cookie session. Decrypting `Cookies` needs the "Slack Safe Storage" Keychain item (user prompt). If Slack rotates the session (`user_session_expiration`, `invalid_auth`, `token_revoked`) Juno must re-read `localConfig_v2` and the cookie, or ask the user to re-sign-in in Slack. The desktop app may re-encrypt cookies with a different scheme on Chromium upgrades.
 - Undocumented methods (`client.userBoot`, `client.counts`, `subscriptions.thread.*`, `search.modules.*`, edge `users/list`) can change without notice; version-gate by `_x_version_ts` and keep fallbacks on public methods (`conversations.list`, `users.conversations`, `conversations.history`, `search.messages`).
 - Rate limits: the official client stays under limits with one message in flight and 10 concurrent reads per team. Thread fan-out (one `conversations.replies` per topic) must be batched and cached; prefer `subscriptions.thread.getView` and `client.counts` deltas.
-- Fingerprint/anti-bot params (`fp`, `_x_sonic`, `_x_gantry`, `slack_client=desktop`): unknown whether validated. Mimicking the desktop client's query params and User-Agent is the safest default.
+- Fingerprint/anti-bot params (`fp`, `_x_sonic`, `_x_gantry`, `slack_client=desktop`): unknown whether validated. Observed live: calls without `fp`, `_x_gantry`, `_x_sonic` and `_x_version_ts` succeed, and a socket without `start_args` and with a non-browser `User-Agent` receives events. Copying the official client's query params blindly is not safe either: `start_args` broke the socket (section 4).
 - Enterprise Grid differences: `enterprise_id`/`enterprise_api_token` per team, `slack_route=<enterprise>:<team>`, org-wide threads (`update_global_thread_state`), `org_login_required`, and edge API URL per enterprise. The test account here is a single workspace; Grid paths are untested.
 - Websocket allow-list: the client only accepts `wss-primary.slack.com`-style hosts; `fallback_websocket_url` is a backup region, not an alternate protocol.
 - Local state coupling: reading `localConfig_v2` while Slack is running is safe (read-only leveldb copy), but writing to Slack's storage must never happen.
+
+## 10. Live smoke results
+
+`JUNO_LIVE=1 pnpm smoke:live` (`docs/development.md`, "Sign-in and the live smoke") against one single-workspace account, read-only. Counts and decode status only; the redacted shapes are in `packages/slack-schema/test/fixtures/recorded/` and decode in `packages/slack-schema/test/recorded.test.ts`.
+
+| Call | Result | Decodes with `@juno/slack-schema` |
+| --- | --- | --- |
+| `auth.test` | ok | yes |
+| `client.userBoot` | ok: 418 channels, 47 ims, no enterprise | yes, after making `emoji_cache_ts`/`app_commands_cache_ts` untyped (they are ts strings) |
+| `client.counts` | ok: 218 channels, 27 mpims, 47 ims | yes |
+| `subscriptions.thread.getView` | ok: 10 followed threads | yes, after making `unread_replies` optional |
+| `conversations.history` | ok: 20 messages from one member channel | yes |
+| `client.getWebSocketURL` | ok | yes |
+| socket, 90 s | `hello`, `reconnect_url` ×2, `pong` ×8, `message` ×2 (`bot_message`, `message_changed`) | all known frames |
+
+Problems reported by the smoke: 0. Two findings changed code: the socket must not send `start_args` (section 4), and `client.userBoot.channels` carries no membership or read state (section 2). Not yet seen live, so still only from the bundle reading: `conversations.replies`, `conversations.view`, `users.prefs.get`, every write method, and socket frames other than the four above.
