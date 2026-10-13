@@ -240,3 +240,4 @@ export function startFakeSlack(options?: FakeSlackOptions): Promise<FakeSlack> {
   return FakeSlack.start(options)
 }
 export { localConfigJson, writeSlackAppFixture, type SlackAppFixtureOptions, type SlackAppFixtureTeam } from './slackApp.ts'
+export { largeSeed, LARGE_SEED_DEFAULTS, type LargeSeedOptions, type LargeSeedSummary } from './seeds/large.ts'
