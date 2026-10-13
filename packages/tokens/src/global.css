@@ -63,7 +63,9 @@ textarea {
   background: var(--selection-background);
 }
 
-/* Scrollbars: 10px, transparent track, a soft thumb inset by 3px. */
+/* Scrollbars: 10px, transparent track, a soft thumb inset by 3px. A scroll
+   area that shows its thumb only on hover sets --scrollbar-thumb on itself
+   (ScrollArea in @juno/ui); the gutter never changes. */
 ::-webkit-scrollbar {
   width: var(--scrollbar-size);
   height: var(--scrollbar-size);
@@ -74,7 +76,7 @@ textarea {
 }
 
 ::-webkit-scrollbar-thumb {
-  background-color: var(--border-strong);
+  background-color: var(--scrollbar-thumb, var(--border-strong));
   border: 3px solid transparent;
   background-clip: padding-box;
   border-radius: var(--radius-xl);
