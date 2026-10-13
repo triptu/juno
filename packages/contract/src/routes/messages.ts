@@ -204,6 +204,8 @@ export const TopicDetail = Schema.Struct({
   rootTs: Schema.optionalKey(Schema.String),
   /** Main: the channel's threads with activity inside the quiet window, for the "Threads" button. */
   threadCount: Schema.optionalKey(Schema.Int),
+  /** The topic's art as a recipe, as on `TopicRow.art`; the header and the tab draw it at 20 and 16px. Absent means the Tide placeholder. */
+  art: Schema.optionalKey(Schema.String),
 })
 export type TopicDetail = typeof TopicDetail.Type
 

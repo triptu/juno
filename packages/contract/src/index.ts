@@ -22,3 +22,4 @@ export * from './shell'
 
 export * from './routes/search'
 export * from './routes/prefs'
+export * from './routes/art'
