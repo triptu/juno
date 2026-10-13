@@ -1,5 +1,5 @@
 /** Entry points: a Slack message in, a `MessageBody` out, plus text views of a body. */
-import type { Block } from '@juno/slack-schema'
+import type { Message } from '@juno/slack-schema'
 import type { Lookups, MessageBody } from './model'
 import { bodyFromBlocks } from './from-blocks'
 import { mrkdwnBlocks } from './from-mrkdwn'
@@ -9,25 +9,26 @@ import { inlineText } from './inline'
  * The part of a Slack message that carries its content. A decoded
  * `@juno/slack-schema` `Message` is one; so is anything with the same two fields.
  */
-export interface MessageContent {
-  /** mrkdwn, HTML-escaped (`&lt; &gt; &amp;`). */
-  readonly text?: string
-  readonly blocks?: ReadonlyArray<Block>
-}
+export type MessageContent = Pick<Message, 'text' | 'blocks' | 'files' | 'attachments'>
 
 /**
  * Renders a message. `blocks` win when they produce anything; otherwise the
  * mrkdwn `text` is parsed. A message with neither gives an empty body.
  */
 export function messageBody(content: MessageContent, lookups: Lookups = {}): MessageBody {
-  if (content.blocks && content.blocks.length > 0) {
-    const body = bodyFromBlocks(content.blocks, lookups)
-    if (body.blocks.length > 0) return body
+  const blocks = [...bodyFromBlocks(content.blocks ?? [], lookups).blocks]
+  if (blocks.length === 0 && content.text) blocks.push(...mrkdwnBlocks(content.text, lookups))
+  for (const attachment of content.attachments ?? []) {
+    const text = attachment.fallback || [attachment.pretext, attachment.title, attachment.text, ...(attachment.fields ?? []).map((field) => [field.title, field.value].filter(Boolean).join(': '))].filter(Boolean).join('\n')
+    if (text) blocks.push(...mrkdwnBlocks(text, lookups))
   }
-  if (content.text !== undefined && content.text.length > 0) {
-    return { blocks: mrkdwnBlocks(content.text, lookups) }
+  for (const file of content.files ?? []) {
+    const width = file.original_w ?? file.thumb_360_w
+    const height = file.original_h ?? file.thumb_360_h
+    const dimensions = width !== undefined && height !== undefined && width > 0 && height > 0 ? { width, height } : {}
+    blocks.push({ kind: 'file', id: file.id, name: file.title || file.name || file.id, mimetype: file.mimetype ?? 'application/octet-stream', ...dimensions })
   }
-  return { blocks: [] }
+  return { blocks }
 }
 
 /** Parses mrkdwn text on its own, for callers that only have `text`. */
@@ -58,6 +59,9 @@ export function plainText(body: MessageBody): string {
       case 'code':
         parts.push(block.text)
         break
+      case 'file':
+        parts.push(block.name)
+        break
       case 'list':
         parts.push(block.items.map((item) => inlineText(item)).join('\n'))
         break
@@ -82,6 +86,9 @@ export function previewText(body: MessageBody): string {
         break
       case 'code':
         parts.push(block.text)
+        break
+      case 'file':
+        parts.push(block.name)
         break
       case 'list':
         parts.push(block.items.map((item) => inlineText(item, ' ')).join(' '))

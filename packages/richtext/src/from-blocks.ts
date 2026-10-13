@@ -34,7 +34,7 @@ function inlineFromElement(el: RichTextInline, lookups: Lookups): Inline[] {
       return [style ? { kind: 'link', url: el.url, text, style } : { kind: 'link', url: el.url, text }]
     }
     case 'date':
-      return textRuns(el.fallback ?? '')
+      return [{ kind: 'date', timestamp: el.timestamp, format: el.format, fallback: el.fallback || new Date(el.timestamp * 1000).toISOString(), ...(el.url === undefined ? {} : { url: el.url }) }]
     case 'color':
       return textRuns(el.value)
     case 'unknown':
