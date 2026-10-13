@@ -1,6 +1,7 @@
 packages:
   - apps/*
   - packages/*
+  - docs/juno-agent/spikes
 
 # pnpm 12 refuses to run dependency install scripts unless each package is
 # approved or denied here. electron needs its postinstall to download the
@@ -23,3 +24,9 @@ minimumReleaseAgeExclude:
   # set up.
   - vitest@5.0.4
   - "@vitest/*"
+  - "@earendil-works/chord@1.2.0"
+  - "@earendil-works/pi-ai@1.2.0"
+  - "@earendil-works/pi-codemode@1.2.0"
+  - "@earendil-works/pi-durable@1.2.0"
+  - "@earendil-works/pi-mcp@1.2.0"
+  - "@earendil-works/pi-telemetry@1.2.0"
