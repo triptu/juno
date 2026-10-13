@@ -182,10 +182,10 @@ function placeholderSection() {
     if (!item) return '';
     const key = `${container}-${theme}-40`;
     const step = (a, b) => `<div><div class="step"><div style="opacity:${a}">${ph.svg[key]}</div><div style="opacity:${b};position:absolute;inset:0">${item.svg[key]}</div></div></div>`;
-    return `<div class="plabel">${theme} · cross-fade when the art arrives, 240ms ease-out, none under reduced motion</div><div class="fade">${step(1, 0)}${step(0.66, 0.34)}${step(0.34, 0.66)}${step(0, 1)}<span style="font-size:12px;color:var(--foreground-muted)">placeholder → art, same 40px box, nothing moves</span></div>`;
+    return `<div class="plabel">${theme} · cross-fade when the art arrives, 240ms ease-out, none under reduced motion</div><div class="fade">${step(1, 0)}${step(0.66, 0.34)}${step(0.34, 0.66)}${step(0, 1)}<span style="font-size:12px;color:var(--foreground-muted)">placeholder → art, same 40px box, nothing moves; opacity only</span></div>`;
   };
   const panelT = (theme) => `<div class="panel ${theme}">${CONTAINERS.map((c) => grid(theme, c)).join('')}${fade(theme, R.top[0] ? R.top[0].split('/')[1] : 'none')}</div>`;
-  return `<section data-key="placeholders"><div class="fh"><h2>Placeholder · Tide</h2><p>seeded per topic id, retuned to the muted palette; the frame is the art's container</p></div><div class="pair">${panelT('light')}${panelT('dark')}</div></section>`;
+  return `<section data-key="placeholders"><div class="fh"><h2>Placeholder · Tide</h2><p>seeded per topic id, retuned to the muted palette; a free-form pebble with no container, the container's box otherwise</p></div><div class="pair">${panelT('light')}${panelT('dark')}</div></section>`;
 }
 
 // Sidebar mock.
@@ -196,17 +196,17 @@ function person(hue, theme, size) {
   return `<svg width="${size}" height="${size}" viewBox="0 0 40 40" aria-hidden="true"><defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${soft}"/><stop offset="1" stop-color="${base}"/></linearGradient><clipPath id="${id}c"><circle cx="20" cy="20" r="20"/></clipPath></defs><g clip-path="url(#${id}c)"><rect width="40" height="40" fill="url(#${id})"/><circle cx="20" cy="15" r="7.5" fill="${deep}"/><ellipse cx="20" cy="38" rx="14" ry="12" fill="${deep}"/></g></svg>`;
 }
 const ROWS = [
-  { kind: 'main', topic: 'main-alerts', title: '#alerts-prod', time: '3m', p: 'Grafana: [RESOLVED] queue depth > 5k on billing-consumer', cnt: 9, unread: true, n: 5 },
+  { kind: 'main', topic: 'main-alerts', title: '#alerts-prod', time: '3m', p: 'Grafana: [RESOLVED] queue depth > 5k on billing-consumer', cnt: 9, unread: true, threads: 0 },
   { kind: 'topic', topic: 'pg16', time: '25m', p: 'Dev: Booked 2–4pm. Will post results here.', meta: 'eng', n: 7, sel: true, stack: [275, 185, 20] },
   { kind: 'dm', hue: 165, title: 'Sam Okafor', time: '12m', p: 'Sam: Thanks. I’ll review Dev’s packet this week.', meta: 'Sam Okafor', n: 2 },
   { kind: 'topic', topic: 'rina', time: '41m', p: 'Elena: she has a competing offer with a Friday deadline. Can you do a 30 min close call tomorrow?', cnt: 2, unread: true, at: true, meta: 'hiring', n: 3, stack: [10, 290] },
-  { kind: 'main', topic: 'main-eng', title: '#eng', time: '58m', p: 'Leo: Unrelated: has anyone looked at the staging bill? It doubled since August.', n: 12 },
+  { kind: 'main', topic: 'main-eng', title: '#eng', time: '58m', p: 'Leo: Unrelated: has anyone looked at the staging bill? It doubled since August.', threads: 2 },
   { kind: 'topic', topic: 'staging-bill', time: '1h', p: 'Jonas: Preview environments have no TTL. I can add a 48h reaper.', cnt: 3, unread: true, meta: 'eng', n: 4, stack: [20, 290, 165] },
   { kind: 'placeholder', topic: 'retro', title: 'Retro notes are in the doc', time: '1h', p: 'Maya: Retro notes are in the doc.', meta: 'leadership', n: 1, stack: [340] },
   { kind: 'dm', hue: 340, title: 'Maya Chen', time: '2h', p: 'You: Sounds good, Thursday then.', meta: 'Maya Chen', n: 4 },
   { kind: 'topic', topic: 'q4-cuts', time: '3h', p: 'Maya: Draft is up. Cross-posting to #leadership once Tushar has looked.', meta: 'product', n: 6, stack: [340, 290] },
-  { kind: 'main', topic: 'main-deploys', title: '#deploys', time: 'Yesterday', p: 'deploybot: api@91be07 deployed to prod', n: 31 },
-  { kind: 'placeholder', topic: 'main-random', title: '#random', isMain: true, time: 'Yesterday', p: 'Leo: the blue one', n: 2 },
+  { kind: 'main', topic: 'main-deploys', title: '#deploys', time: 'Yesterday', p: 'deploybot: api@91be07 deployed to prod', threads: 0 },
+  { kind: 'placeholder', topic: 'main-random', title: '#random', isMain: true, time: 'Yesterday', p: 'Leo: the blue one', threads: 1 },
 ];
 const icoChats = (c) => `<svg width="13" height="13" viewBox="0 0 256 256" fill="${c}"><path d="M232,96a16,16,0,0,0-16-16H184V48a16,16,0,0,0-16-16H40A16,16,0,0,0,24,48V176a8,8,0,0,0,13,6.22L72,154V184a16,16,0,0,0,16,16h93.59L219,230.22a8,8,0,0,0,5,1.78,8,8,0,0,0,8-8V96Zm-42.55,89.78a8,8,0,0,0-5-1.78H88V152h80a16,16,0,0,0,16-16V96h32V207.25Z"/></svg>`;
 const icoChat = (c) => `<svg width="13" height="13" viewBox="0 0 256 256" fill="${c}"><path d="M128,24A104,104,0,0,0,36.18,176.88L24.83,210.93a16,16,0,0,0,20.24,20.24l34.05-11.35A104,104,0,1,0,128,24Zm0,192a87.87,87.87,0,0,1-44.06-11.81,8,8,0,0,0-6.54-.67L40,216,52.47,178.6a8,8,0,0,0-.66-6.54A88,88,0,1,1,128,216Z"/></svg>`;
@@ -228,11 +228,11 @@ function rowHtml(row, run, theme, container) {
   const title = row.kind === 'topic' ? R.topics.find((t) => t.id === row.topic).title : row.title;
   const isMain = row.kind === 'main' || row.isMain;
   const l3 = isMain
-    ? `<span>${icoChats('currentColor')} Messages outside threads</span><span>${icoChat('currentColor')} ${row.n}</span>`
+    ? `<span>${icoHash('currentColor')} ${esc(row.title.replace('#', ''))}</span>${row.threads ? `<span>${icoChats('currentColor')} ${row.threads}</span>` : ''}`
     : row.kind === 'dm'
-      ? `<span>${icoUser('currentColor')} ${esc(row.meta)}</span><span>${icoChat('currentColor')} ${row.n}</span>`
+      ? `<span>${icoUser('currentColor')} ${esc(row.meta)}</span>`
       : `<span>${icoHash('currentColor')} ${esc(row.meta)}</span>` +
-        `<span class="stack">${(row.stack ?? []).map((h) => `<b>${person(h, theme, 16)}</b>`).join('')}</span><span>${icoChat('currentColor')} ${row.n}</span>`;
+        `<span class="stack">${(row.stack ?? []).map((h) => `<b>${person(h, theme, 16)}</b>`).join('')}</span>`;
   return `<div class="row ${row.sel ? 'sel' : ''} ${row.unread ? 'unread' : ''}">${tile(row, run, theme, container)}<div class="rb">
     <div class="l1"><span class="t">${esc(title)}</span>${isMain ? '<span class="tag">Main</span>' : ''}<span class="time">${row.time}</span></div>
     <div class="l2"><div class="p">${esc(row.p)}</div>${row.at ? '<span class="tag at">@</span>' : ''}${row.cnt ? `<span class="cnt">${row.cnt}</span>` : ''}</div>
@@ -252,7 +252,7 @@ function workspace(run, theme, container) {
       <div class="tab"><span class="ti">${get('rina', 16)}</span><span class="tl">Rina Sato · Staff backend</span></div>
       <div class="tab"><span class="ti">${get('ramen', 16)}</span><span class="tl">Lunch Friday</span></div></div>
     <div class="header"><span class="hi">${get('pg16', 40).replace('width="40" height="40"', 'width="20" height="20"')}</span><h3>Postgres 16 migration plan</h3></div>
-    <div class="note">Tabs at 16px, header at 20px. Same drawing as the row; below 20px the container is dropped and detail elements go. Two rows show the Tide placeholder: a thread whose art is still generating, and a Main where the model was not confident.</div></div>`;
+    <div class="note">Tabs at 16px, header at 20px. Same drawing as the row; below 20px detail elements go. Two rows show the Tide placeholder, a pebble shape picked per topic: a thread whose art is still generating, and a Main where the model was not confident.</div></div>`;
 }
 function sidebarSection(run, container) {
   return `<section data-key="sidebar-${run.level}-${container}"><div class="fh"><h2>Sidebar · ${esc(run.label)}</h2><p>${esc(R.containers[container].label)} · thread topics and Main rows with art, DMs with photo placeholders, two Tide placeholders</p></div>
