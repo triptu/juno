@@ -89,6 +89,6 @@ test('exposes only the bridge to the page', async ({ win }) => {
     process: 'undefined',
     juno: ['app', 'engine', 'launch'],
     app: ['getInfo'],
-    engine: ['requestPort'],
+    engine: ['requestPort', 'restart'],
   })
 })

@@ -1,13 +1,15 @@
 // The sidebar's numbers against docs/performance.md section 1, measured on
 // the built app. Not part of the suite: the numbers depend on the machine
 // and the budgets are checked by hand until the perf harness exists
-// (performance.md 7.3). Each scenario prints its samples.
+// (performance.md 7.3). Each scenario prints its samples and the load
+// average; the filter scenario also fails on a frame with no rows.
 //
 //   JUNO_PERF=1 pnpm --filter @juno/desktop exec playwright test e2e/perf.spec.ts
 import { rm } from 'node:fs/promises'
-import { largeSeed, startFakeSlack } from '@juno/fake-slack'
-import { expect, launchApp, tempUserData, test, writeSlackApp } from './fixtures'
-import { Juno } from './driver/juno'
+import { loadavg } from 'node:os'
+import { largeSeed, startFakeSlack, type FakeSlack } from '@juno/fake-slack'
+import { expect, launchApp, tempUserData, test, writeSlackApp, type RunningApp, type SlackAppFixture } from './fixtures'
+import { Juno, type SidebarFilterName } from './driver/juno'
 
 test.skip(process.env['JUNO_PERF'] !== '1', 'set JUNO_PERF=1 to measure')
 
@@ -18,43 +20,10 @@ function stats(name: string, samples: ReadonlyArray<number>): { readonly median:
   const at = (q: number) => sorted[Math.min(sorted.length - 1, Math.floor(q * sorted.length))] ?? 0
   const median = at(0.5)
   const p95 = at(0.95)
-  console.log(`${name}: median ${median.toFixed(1)} ms, p95 ${p95.toFixed(1)} ms, n=${samples.length}, samples ${sorted.map((s) => s.toFixed(1)).join(' ')}`)
+  const load = loadavg()[0]!.toFixed(1)
+  console.log(`${name}: median ${median.toFixed(1)} ms, p95 ${p95.toFixed(1)} ms, n=${samples.length}, load ${load}, samples ${sorted.map((s) => s.toFixed(1)).join(' ')}`)
   return { median, p95 }
 }
-
-test('warm start: first sidebar rows from the local cache', async ({ fake, slackApp }) => {
-  test.setTimeout(300_000)
-  const userData = await tempUserData()
-  try {
-    const first = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword })
-    const juno = new Juno(first.app, first.win)
-    await juno.signIn()
-    await juno.waitForSync()
-    await first.close()
-
-    const fromStart: number[] = []
-    const fromLaunch: number[] = []
-    for (let i = 0; i < 5; i++) {
-      const launched = Date.now()
-      const again = await launchApp(userData, { fakeSlackUrl: fake.url })
-      try {
-        const sidebar = new Juno(again.app, again.win).sidebar
-        await sidebar.row(POSTGRES).expectVisible()
-        fromLaunch.push(Date.now() - launched)
-        await expect.poll(() => new Juno(again.app, again.win).measure('juno.sidebar-rows')).not.toBeUndefined()
-        fromStart.push((await new Juno(again.app, again.win).measure('juno.sidebar-rows'))!)
-      } finally {
-        await again.close()
-      }
-    }
-    // The in-page measure runs from the renderer's first script to the rows' paint.
-    stats('warm start, renderer script start to sidebar rows painted', fromStart)
-    // The wall clock includes Electron's process start and the window.
-    stats('warm start, launch call to first row visible to Playwright', fromLaunch)
-  } finally {
-    await rm(userData, { recursive: true, force: true })
-  }
-})
 
 test('row hover to paint', async ({ juno, win }) => {
   test.setTimeout(120_000)
@@ -112,23 +81,104 @@ test('live update: a reply from another client to pixels', async ({ juno, fake }
   stats('live update, inject call to new preview seen by Playwright', wall)
 })
 
-test('scroll frame times on a large workspace', async () => {
-  test.setTimeout(900_000)
-  // Enough topics to fill the 300-row window; fewer messages than the full
-  // large seed so the first sync fits the test.
-  const fake = await startFakeSlack({ seed: largeSeed({ topics: 1_200, messages: 12_000, users: 400, channels: { public: 60, private: 20, dms: 30, mpims: 10 } }) })
-  const userData = await tempUserData()
-  try {
-    const slackApp = await writeSlackApp(fake, userData)
-    const running = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword })
+// The large-workspace scenarios share one synced user-data directory: the
+// fake's 1,200-topic seed fills the 300-row window, and syncing it once
+// keeps the run short. Every scenario launches the app warm on it.
+test.describe.serial('large workspace', () => {
+  let fake: FakeSlack
+  let userData: string
+  let slackDir: string
+  let slackApp: SlackAppFixture
+
+  const launch = (): Promise<RunningApp> => launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword })
+
+  test.beforeAll(async () => {
+    test.setTimeout(900_000)
+    fake = await startFakeSlack({ seed: largeSeed({ topics: 1_200, messages: 12_000, users: 400, channels: { public: 60, private: 20, dms: 30, mpims: 10 } }) })
+    userData = await tempUserData()
+    slackDir = await tempUserData()
+    slackApp = await writeSlackApp(fake, slackDir)
+    const running = await launch()
+    try {
+      const juno = new Juno(running.app, running.win)
+      await juno.signIn()
+      await juno.sidebar.expectRows()
+      await juno.expectEngineLive(600_000)
+    } finally {
+      await running.close()
+    }
+  })
+
+  test.afterAll(async () => {
+    await fake?.close()
+    await rm(userData, { recursive: true, force: true })
+    await rm(slackDir, { recursive: true, force: true })
+  })
+
+  test('warm start: main process to shell and rows, snapshot to rows, the longest frame', async () => {
+    test.setTimeout(300_000)
+    const runs: Array<Awaited<ReturnType<Juno['startupTimes']>>> = []
+    // The first launch warms the OS and V8 caches and is not counted.
+    for (let i = 0; i < 6; i++) {
+      const running = await launch()
+      try {
+        const juno = new Juno(running.app, running.win)
+        await juno.sidebar.expectRows()
+        const times = await juno.startupTimes()
+        if (i > 0) runs.push(times)
+      } finally {
+        await running.close()
+      }
+    }
+    console.log(`rows in the window: ${runs.map((run) => run.rows).join(' ')}`)
+    stats('warm start, main process created to shell painted', runs.map((run) => run.mainToShell))
+    stats('warm start, main process created to sidebar rows painted', runs.map((run) => run.mainToRows))
+    stats('warm start, sidebar snapshot to rows painted (juno.sidebar-paint)', runs.map((run) => run.snapshotToRows))
+    stats('warm start, longest animation frame up to 1 s after the rows', runs.map((run) => run.longestFrame))
+    stats('warm start, blocking time of that frame', runs.map((run) => run.longestBlocking))
+    console.log(`long animation frames up to 1 s after the rows: ${runs.map((run) => run.longFrames).join(' ')}`)
+  })
+
+  test('filter change: never an empty frame, and the time to the new list', async () => {
+    test.setTimeout(300_000)
+    const running = await launch()
+    try {
+      const juno = new Juno(running.app, running.win)
+      const { sidebar } = juno
+      await sidebar.expectRows()
+      await juno.expectEngineLive(120_000)
+      await running.win.mouse.move(900, 400)
+      // The other filters' subscriptions are warmed on idle after the first paint.
+      await running.win.waitForTimeout(1_000)
+
+      const stop = await sidebar.watchFrames()
+      const order: ReadonlyArray<SidebarFilterName> = ['Channels', 'DMs', 'All']
+      for (let round = 0; round < 5; round++) {
+        for (const name of order) {
+          const before = (await juno.measures('juno.filter')).length
+          await sidebar.filter(name)
+          await expect.poll(async () => (await juno.measures('juno.filter')).length).toBe(before + 1)
+          await running.win.waitForTimeout(250)
+        }
+      }
+      const frames = await stop()
+      const durations = await juno.measures('juno.filter')
+      console.log(`filter frames: ${frames.frames}, with no rows: ${frames.blank}, fewest rows in a frame: ${frames.fewest}`)
+      stats('filter change, press to new list painted (juno.filter)', durations)
+      expect(frames.blank).toBe(0)
+    } finally {
+      await running.close()
+    }
+  })
+
+  test('scroll frame times, and memory after scrolling', async () => {
+    test.setTimeout(300_000)
+    const running = await launch()
     try {
       const juno = new Juno(running.app, running.win)
       const { win } = running
-      await juno.signIn()
       await juno.sidebar.expectRows()
-      await juno.accountMenu.open()
-      await expect(juno.accountMenu.engineStatus).toHaveText('Engine live', { timeout: 600_000 })
-      await juno.accountMenu.close()
+      await juno.expectEngineLive(120_000)
       const rows = await juno.sidebar.rows.count()
       console.log(`rows in the window: ${rows}`)
 
@@ -184,7 +234,7 @@ test('scroll frame times on a large workspace', async () => {
         const p95 = sorted[Math.floor(0.95 * sorted.length)] ?? 0
         const max = sorted[sorted.length - 1] ?? 0
         const over = frames.filter((f) => f > 16.7 * 1.5).length
-        console.log(`scroll ${label}: ${frames.length} frames, p95 ${p95.toFixed(1)} ms, max ${max.toFixed(1)} ms, frames over 25 ms ${over}, long animation frames ${loaf.length}`)
+        console.log(`scroll ${label}: ${frames.length} frames, p95 ${p95.toFixed(1)} ms, max ${max.toFixed(1)} ms, frames over 25 ms ${over}, long animation frames ${loaf.length}, load ${loadavg()[0]!.toFixed(1)}`)
         for (const line of loaf) console.log(`  loaf ${line}`)
       }
       // The first pass lays out rows the window has never shown; the second is the steady state.
@@ -192,11 +242,14 @@ test('scroll frame times on a large workspace', async () => {
       await win.waitForTimeout(1000)
       await sweep('second pass')
       console.log(`scrollTop after the run: ${await list.evaluate((node) => node.scrollTop)}`)
+
+      // Memory per process (working set, MB) and the renderer's JS heap and DOM size.
+      const metrics = await running.app.evaluate(({ app }) => app.getAppMetrics().map((metric) => ({ type: metric.type, name: metric.serviceName ?? metric.name ?? '', mb: metric.memory.workingSetSize / 1024 })))
+      for (const metric of metrics) console.log(`memory ${metric.type}${metric.name ? ` ${metric.name}` : ''}: ${metric.mb.toFixed(0)} MB working set`)
+      const page = await win.evaluate(() => ({ heap: (performance as unknown as { memory?: { usedJSHeapSize: number } }).memory?.usedJSHeapSize ?? 0, nodes: document.getElementsByTagName('*').length }))
+      console.log(`renderer JS heap ${(page.heap / 1024 / 1024).toFixed(1)} MB, ${page.nodes} DOM elements`)
     } finally {
       await running.close()
     }
-  } finally {
-    await fake.close()
-    await rm(userData, { recursive: true, force: true })
-  }
+  })
 })

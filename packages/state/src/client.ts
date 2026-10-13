@@ -10,7 +10,7 @@ import * as Atom from 'effect/reactivity/Atom'
 import * as AtomRegistry from 'effect/reactivity/AtomRegistry'
 import * as AtomRpc from 'effect/reactivity/AtomRpc'
 import { AllRoutes } from '@juno/contract'
-import { EngineFailed } from './port'
+import { EngineFailed, requestEngineRestart } from './port'
 import { portProtocol, type PortConnection } from './transport'
 
 /** A set of atom values. The app has one; tests make one each. */
@@ -50,6 +50,15 @@ export function configureConnection(target: Registry, connection: PortConnection
       target.set(connectionStateAtom, state === 'connected' ? 'connected' : everConnected ? 'reconnecting' : 'connecting')
     },
   })
+}
+
+/**
+ * The sidebar's Restart after the engine failed: main starts it again, and
+ * the transport, which keeps asking for a port every second, connects to it.
+ */
+export async function restartEngine(target: Registry): Promise<void> {
+  target.set(connectionStateAtom, 'reconnecting')
+  await requestEngineRestart()
 }
 
 export class EngineClient extends AtomRpc.Service<EngineClient>()('juno/state/EngineClient', {

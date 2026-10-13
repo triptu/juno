@@ -20,6 +20,20 @@ function pendingImage(): Plugin {
   return { name: 'gallery-pending-image', configureServer: hold, configurePreviewServer: hold }
 }
 
+// The React Compiler, as in the desktop renderer (apps/desktop/electron.vite.config.ts),
+// so the gallery renders the same compiled components the app does.
+const reactCompiler = [
+  'babel-plugin-react-compiler',
+  {
+    target: '19',
+    logger: {
+      logEvent(filename: string | null, event: { kind: string; detail?: { reason?: string } }) {
+        if (event.kind === 'CompileError' || event.kind === 'PipelineError') console.warn(`react-compiler: skipped a function in ${filename}: ${event.detail?.reason ?? event.kind}`)
+      },
+    },
+  },
+] as const
+
 export default defineConfig({
   root: __dirname,
   base: './',
@@ -36,6 +50,6 @@ export default defineConfig({
       useCSSLayers: true,
       unstable_moduleResolution: { type: 'commonJS', rootDir: repoRoot },
     }),
-    react(),
+    react({ babel: { plugins: [reactCompiler] } }),
   ],
 })

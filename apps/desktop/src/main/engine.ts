@@ -3,7 +3,7 @@
  *
  * Forks it with the `persist:slack` partition, restarts it on exit with
  * exponential backoff (1 s base, 30 s cap) and gives up after 5 exits in two
- * minutes. Hands out MessagePorts: one end to the engine, the other to a
+ * minutes; the user's Restart starts it again. Hands out MessagePorts: one end to the engine, the other to a
  * renderer. A port requested while the engine is down is held, at most one
  * per renderer, and sent once it reports `ready`, so a renderer reconnecting
  * after a crash just waits. Once the supervisor has given up, a request is
@@ -94,6 +94,14 @@ export class EngineSupervisor {
   stop(): void {
     this.state = 'stopped'
     this.end()
+  }
+
+  /** Starts the engine again after the supervisor gave up on it, with a fresh crash count. Does nothing otherwise. */
+  restart(): void {
+    if (this.state !== 'failed') return
+    this.exits.length = 0
+    this.attempt = 0
+    this.start()
   }
 
   /** Stops restarting. Reached after too many crashes; tests call it directly. */

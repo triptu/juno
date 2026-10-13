@@ -42,6 +42,7 @@ export type PortRequestResult = typeof PortRequestResult.Type
 export const ShellRoutes = {
   [Channels.appGetInfo]: { input: Schema.Void, output: AppInfo },
   [Channels.engineRequestPort]: { input: Schema.Void, output: PortRequestResult },
+  [Channels.engineRestart]: { input: Schema.Void, output: Schema.Void },
   [Channels.launchSetTheme]: { input: Schema.Struct({ theme: ThemeSchema }), output: Schema.Void },
   [Channels.launchSetAccent]: { input: Schema.Struct({ accent: AccentSchema }), output: Schema.Void },
 } as const

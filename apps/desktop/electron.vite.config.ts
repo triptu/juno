@@ -52,6 +52,22 @@ const externalize = externalizeDepsPlugin({ exclude: ['@juno/contract', '@juno/e
 // holds the renderer to the budget in docs/performance.md.
 const minify = 'esbuild' as const
 
+// The React Compiler memoizes components and hooks at build time
+// (performance.md 5.4). It runs as a Babel plugin inside plugin-react 5, on
+// the workspace packages' source too. A component it cannot compile is left
+// as written; the build prints which one and why.
+const reactCompiler = [
+  'babel-plugin-react-compiler',
+  {
+    target: '19',
+    logger: {
+      logEvent(filename: string | null, event: { kind: string; detail?: { reason?: string } }) {
+        if (event.kind === 'CompileError' || event.kind === 'PipelineError') console.warn(`react-compiler: skipped a function in ${filename}: ${event.detail?.reason ?? event.kind}`)
+      },
+    },
+  },
+] as const
+
 export default defineConfig({
   main: {
     plugins: [externalize],
@@ -85,7 +101,7 @@ export default defineConfig({
         useCSSLayers: true,
         unstable_moduleResolution: { type: 'commonJS', rootDir: repoRoot },
       }),
-      react(),
+      react({ babel: { plugins: [reactCompiler] } }),
     ],
   },
 })

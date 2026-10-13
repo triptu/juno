@@ -13,6 +13,8 @@ export const Channels = {
   appGetInfo: 'app.getInfo',
   /** Renderer asks main for a fresh engine port. The port arrives on `Events.enginePort`. */
   engineRequestPort: 'engine.requestPort',
+  /** Starts the engine again after the supervisor gave up on it. */
+  engineRestart: 'engine.restart',
   /** Remember the theme so the next launch paints the window in it. */
   launchSetTheme: 'launch.setTheme',
   /** Remember the accent so the next launch's first render already uses it. */
@@ -46,6 +48,8 @@ export interface JunoBridge {
      * PORT_HANDOFF_TAG.
      */
     readonly requestPort: () => Promise<unknown>
+    /** Starts the engine again after main's supervisor gave up on it. A renderer waiting for a port then gets one. */
+    readonly restart: () => Promise<unknown>
   }
   readonly launch: {
     readonly setTheme: (theme: Theme) => Promise<unknown>
