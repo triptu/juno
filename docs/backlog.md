@@ -20,3 +20,5 @@ Small items noticed during work that are not yet assigned to a milestone. Remove
 - Edits and deletes made during a socket drop are recovered only for thread text (via search) or when the topic is opened. `cached_latest_updates` is still unknown.
 - Sync: `subscriptions.thread.getView` returns 10 threads per page regardless of `limit` (32 calls on the real workspace). Consider paging in parallel within the lane budget.
 - Cold boot on the real workspace takes about 7 minutes to reach `live` (sidebar data complete after 29 s) because of the 1.5 s background lane spacing. Revisit the spacing once the rate-limit behaviour is measured.
+- AI: evaluate TypeSafe System One decision models (served on OpenRouter through pi-ai's `classify` API) for the decision tier. The spec suggests a decision-model approach like this.
+- AI: OpenAI-compatible reasoning models keep their default reasoning effort, which may miss the 1.5 s decision budget. Set effort low for the decision tier if such a model is chosen.

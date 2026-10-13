@@ -35,6 +35,7 @@ Run these from the repo root.
 | `pnpm package` | Builds a DMG and zip with electron-builder into `apps/desktop/release/`. Not run in CI yet. |
 | `JUNO_LIVE=1 pnpm smoke:live` | The read-only live smoke against your real workspace (see "Sign-in and the live smoke"). `pnpm smoke:live -- --fake` runs the same script against an in-process fake. |
 | `JUNO_LIVE=1 pnpm sync:live` | The read-only sync dry run: the real `@juno/sync` cold boot against your workspace into a temporary directory, numbers only (see "The live sync dry run"). `pnpm sync:live -- --fake` runs it against an in-process fake. |
+| `pnpm ai:eval` | Runs every AI task on invented examples with the fake provider and prints the outputs. `JUNO_AI=live pnpm ai:eval` uses OpenRouter through pi-ai with `OPENROUTER_API_KEY` (environment or `.env`) and prints outputs, latency and cost; without a key it says so and exits. `pnpm ai:eval routeCheck` runs one task. See `packages/ai/README.md`. |
 
 Before calling work done: `pnpm typecheck`, `pnpm lint`, `pnpm test`, and `pnpm test:e2e` for anything the app or gallery shows.
 
@@ -62,6 +63,7 @@ packages/store          @juno/store. cache.db and user.db per workspace, migrati
                         writer and reader clients, invalidation and live queries.
 packages/engine         @juno/engine. The engine: protocol server, feature handlers, startEngine().
 packages/sync           @juno/sync. Slack into the store: boot, discovery, merge rules, events, reindexTopics.
+packages/ai             @juno/ai. The AiProvider service (pi-ai over OpenRouter, and a fake), the task table with prompts.
 packages/state          @juno/state. The renderer's engine client and every atom.
 packages/domain         @juno/domain. Pure product rules: ids, topic status, titles, sorting, notifications, checks.
 packages/richtext       @juno/richtext. Slack blocks and mrkdwn to a message view model, and back.
@@ -279,7 +281,7 @@ Names are explained in `docs/architecture.md` sections 2.6 and 7.
 
 | Kind | Where | Run |
 | --- | --- | --- |
-| Pure rules, store, Slack client, Slack-app import, merge rules, engine protocol, session and sync | `packages/<name>/test/` (vitest) | `pnpm test` |
+| Pure rules, store, Slack client, Slack-app import, merge rules, engine protocol, session, sync and the AI provider (fake, and pi-ai's scripted faux provider) | `packages/<name>/test/` (vitest) | `pnpm test` |
 | The sidebar query and boot on the large seed (report only) | `packages/engine/test/bench/` | `JUNO_BENCH=1 pnpm --filter @juno/engine exec vitest run test/bench` |
 | User flows in the built app | `apps/desktop/e2e/` (Playwright, one worker) | `pnpm test:e2e` |
 | Mouse-down activation, cursor rule, state switcher, in a real browser | `apps/gallery/behaviour.spec.ts` | `pnpm test:gallery` |

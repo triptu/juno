@@ -9,6 +9,10 @@ allowBuilds:
   electron: true
   esbuild: true
   electron-winstaller: false
+  # pi-ai pulls in the Google and gRPC SDKs as lazy chunks; Juno uses only its
+  # OpenRouter provider and does not need their postinstall scripts.
+  "@google/genai": false
+  protobufjs: false
 
 # pnpm 12 holds back versions younger than its minimum release age. effect
 # 4.0.3 was published a day before this file was written, so it is excluded
