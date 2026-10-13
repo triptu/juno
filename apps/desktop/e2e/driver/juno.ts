@@ -144,25 +144,8 @@ export class Sidebar {
     await expect(this.rows.first()).toBeVisible({ timeout: 15_000 })
   }
 
-  /** The rows a section shows, in order; `titles` are the starts of the titles. */
-  async expectOrder(section: SidebarSectionName, titles: ReadonlyArray<string>): Promise<void> {
-    await expect
-      .poll(async () => (await this.titles(section)).map((title, index) => (titles[index] !== undefined && title.startsWith(titles[index]) ? titles[index] : title)), { timeout: 15_000 })
-      .toEqual(titles)
-  }
-
-  async expectSectionCount(section: SidebarSectionName, count: number): Promise<void> {
-    await expect(this.section(section).locator('[data-topic-row]')).toHaveCount(count, { timeout: 15_000 })
-  }
-
   async expectNoSection(section: SidebarSectionName): Promise<void> {
     await expect(this.section(section)).toHaveCount(0)
-  }
-
-  /** The first title in a section, once there is one. */
-  async firstTitle(section: SidebarSectionName): Promise<string> {
-    await expect(this.section(section).locator('[data-topic-row]').first()).toBeVisible({ timeout: 15_000 })
-    return (await this.titles(section))[0] ?? ''
   }
 
   filterButton(name: SidebarFilterName) {
@@ -192,14 +175,6 @@ export class Sidebar {
 
   async expectEmpty(title: string): Promise<void> {
     await expect(this.list.getByText(title, { exact: true })).toBeVisible({ timeout: 15_000 })
-  }
-
-  navItem(name: 'All topics' | 'For you' | 'Juno') {
-    return this.root.getByRole('navigation', { name: 'Pages' }).getByRole('button', { name: new RegExp(`^${name}`) })
-  }
-
-  get searchButton() {
-    return this.root.getByRole('button', { name: 'Search ⌘K' })
   }
 
   get themeButton() {
