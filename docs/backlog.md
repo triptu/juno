@@ -16,3 +16,7 @@ Small items noticed during work that are not yet assigned to a milestone. Remove
 - Edits, deletes and reactions during a socket drop are recovered only for thread text (search sweep) or when a topic is opened. Decide after the live smoke whether `cached_latest_updates` (ADR 0011) is usable.
 - The live smoke has not yet confirmed `search.modules.messages` with `is:thread after:` for an `xoxc` session (architecture 5.3, open question 17.2). `SyncConfig.discovery: 'history'` is the fallback.
 - `emojis/list` into the `emoji` table is not synced yet (architecture 5.2 step 6).
+- `topics.list` snapshot is 346 KB on the large seed (budget 200 KB). Plan: rows carry person ids only, plus a separate `people` live value with names and avatar URLs.
+- `topics.list` p95 is 6.7–9 ms inside the engine while events land (budget 5 ms). The cost is JavaScript row shaping, not SQL.
+- Confirm search-based thread discovery (`is:thread after:`) works with an `xoxc` session in the live smoke.
+- Edits and deletes made during a socket drop are recovered only for thread text (via search) or when the topic is opened. `cached_latest_updates` is still unknown.
