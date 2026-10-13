@@ -20,4 +20,4 @@ export {
 } from './merge'
 export { reindexAll, reindexTopics, topicsOfMessages, type ReindexOptions, type StoredPreview } from './reindex'
 export { BOOT_KEY, bootState, type BootState } from './boot'
-export { topicOfMessage } from './write'
+export { clearThreadSub, readMessage, readState, setThreadSub, threadSub, topicOfMessage, type ThreadSubRow } from './write'

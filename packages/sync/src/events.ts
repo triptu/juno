@@ -12,7 +12,7 @@ import {
   type Message,
   type RtmFrame,
 } from '@juno/slack-schema'
-import { Invalidation, StoreWriter, transaction, type SqlError } from '@juno/store'
+import { Invalidation, StoreWriter, transaction, type MessageRow, type SqlError } from '@juno/store'
 import { Clock, Effect } from 'effect'
 import { reindexOptions, type SyncContext } from './context'
 import { mergeRootCounters, mergeTombstone } from './merge'
@@ -28,6 +28,7 @@ import {
   setPref,
   setThreadSub,
   threadMessages,
+  threadSub,
   toConversationRow,
   topicOfMessage,
   upsertConversations,
@@ -178,6 +179,7 @@ const applyMessageFrame = (ctx: SyncContext, frame: Extract<RtmFrame, { type: 'm
         const topics = topicsOfMessages(rows)
         // Activity after a resolve reopens the topic, except the user's own messages are activity too.
         for (const row of rows) if (row.ts === frame.ts) yield* reopenIfResolved(topicOfMessage(row), frame.ts, now)
+        yield* followOnReply(ctx, frame.channel, rows.find((row) => row.ts === frame.ts))
         yield* reindexTopics(topics, reindexOptions(ctx))
       }),
     )
@@ -230,3 +232,23 @@ const applyMessageFrame = (ctx: SyncContext, frame: Extract<RtmFrame, { type: 'm
   }
   return Effect.void
 }
+
+/**
+ * Slack follows a thread for you when you reply in it or when someone
+ * replies to a thread you started (spec section 5, "Which threads"). A
+ * `thread_subscribed` frame usually says so too, but not always, so a live
+ * reply keeps the follow flag fresh on its own: a reply by the user always
+ * follows; a reply to the user's root follows unless Slack has already said
+ * otherwise. Pages never do this, because at boot `getView` is the truth and
+ * a thread it does not list was unfollowed on purpose.
+ */
+const followOnReply = (ctx: SyncContext, channel: string, reply: MessageRow | undefined): Effect.Effect<void, SqlError, Services> =>
+  Effect.gen(function* () {
+    if (reply === undefined || reply.thread_ts === null || reply.thread_ts === reply.ts) return
+    const threadTs = reply.thread_ts
+    if (reply.user_id === ctx.me.userId) return yield* setThreadSub(channel, threadTs, true, undefined)
+    const root = yield* readMessage(channel, threadTs)
+    if (root?.user_id !== ctx.me.userId) return
+    if ((yield* threadSub(channel, threadTs)) !== undefined) return
+    yield* setThreadSub(channel, threadTs, true, undefined)
+  })
