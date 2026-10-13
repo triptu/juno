@@ -11,7 +11,8 @@
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run",
-    "eval": "node --import ../../scripts/ts-resolve-hooks.mjs eval/run.ts"
+    "eval": "node --import ../../scripts/ts-resolve-hooks.mjs eval/run.ts",
+    "bench": "node --import ../../scripts/ts-resolve-hooks.mjs eval/bench.ts"
   },
   "dependencies": {
     "@earendil-works/pi-ai": "1.1.0",

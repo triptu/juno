@@ -14,6 +14,11 @@ export function renderMessages(messages: ReadonlyArray<AiMessage>): string {
   return messages.map((m) => `[${m.at}] ${m.sender}${m.fromMe ? ' (me)' : ''}: ${oneLine(m.text)}`).join('\n')
 }
 
+/** The same messages as JSON state for a decision model. */
+export function messagesState(messages: ReadonlyArray<AiMessage>): Array<{ at: string; sender: string; fromMe: boolean; text: string }> {
+  return messages.map((m) => ({ at: m.at, sender: m.sender, fromMe: m.fromMe ?? false, text: m.text }))
+}
+
 export function oneLine(text: string): string {
   return text.replace(/\s+/g, ' ').trim()
 }

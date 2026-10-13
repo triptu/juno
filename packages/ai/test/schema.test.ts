@@ -29,6 +29,13 @@ describe('output validation', () => {
     expect(validateOutput(tasks.groupRun, input, { group: null, confidence: 0.9 }).ok).toBe(true)
   })
 
+  it('settledScore takes a score with or without a reason', () => {
+    const input = { topicId: postgres.id, title: postgres.title, channel: '#eng', now: 'now', messages: [] }
+    expect(validateOutput(tasks.settledScore, input, { score: 0.8, reason: 'closed with thanks' }).ok).toBe(true)
+    expect(validateOutput(tasks.settledScore, input, { score: 0.8 }).ok).toBe(true)
+    expect(validateOutput(tasks.settledScore, input, { reason: 'closed' }).ok).toBe(false)
+  })
+
   it('urgencyGate takes two probabilities and nothing else', () => {
     const input = { messageTs: '1', channel: '#eng', channelKind: 'public' as const, sender: 's', text: 't', mentionsMe: false, now: 'now' }
     expect(validateOutput(tasks.urgencyGate, input, { urgent: 0.9, chatter: 0.1 }).ok).toBe(true)

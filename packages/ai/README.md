@@ -8,10 +8,10 @@ Plain data in, plain data out. The package never touches the store, Electron or 
 
 - `AiProvider`: the service. `decide(task, input)` runs a structured task and resolves to a `Decision<Output>`. `generate(task, input)` runs a text task and resolves to a `Decision<string>`. `chat(context, tools)` streams one Juno chat turn as `ChatEvent`s (`text`, `toolCall`, then `done` or `failed`). Nothing fails: every effect has error type `never`, and a stream ends with `failed` instead of an error.
 - `Decision<A>`: `{ _tag: 'Decided', value, meta }` or `{ _tag: 'NoDecision', reason, detail?, meta }`. Reasons: `missing-key`, `timeout`, `invalid-output`, `provider-error`. `meta` has the model slug, latency, attempts and the cost in USD when pi-ai knows the model's price.
-- `tasks`: `titleTopic`, `routeCheck`, `settledScore`, `groupRun`, `urgencyGate`, `parseCommand`, `catchUp`, `forYou`, `chat`. Each is a `StructuredTask` (has `output`, a TypeBox schema, and `tool`) or a `TextTask` (has `maxChars`). All have `name`, `version`, `tier`, `timeoutMillis`, `prompt`, `render(input)` and `key(input)`. `decisionTasks` lists the structured ones. `chatTools` holds the six Juno chat tool shapes.
+- `tasks`: `titleTopic`, `routeCheck`, `settledScore`, `groupRun`, `urgencyGate`, `parseCommand`, `catchUp`, `forYou`, `chat`. Each is a `StructuredTask` (has `output`, a TypeBox schema, and `tool`; optionally `classify`, a decision-model mapping) or a `TextTask` (has `maxChars`). All have `name`, `version`, `tier`, `timeoutMillis`, `prompt`, `render(input)` and `key(input)`. `decisionTasks` lists the structured ones. `chatTools` holds the six Juno chat tool shapes.
 - `cacheKeyOf(task, input)`: `{ task, key, inputHash }` for the assistant's `ai_cache`. The hash covers the task version and the canonical input (sorted keys, `undefined` dropped), so equal inputs hash the same and a prompt change is made visible by bumping `version`.
-- `validateOutput(task, input, args)`: the schema check (pi-ai's validator) plus the task's `accept` rule. Both providers use it.
-- `PiAiProvider.layer(config, models?)`: `config` is an `Effect<AiConfig>` read on every call, so a key or model added in preferences applies without a restart. `AiConfig` is `{ apiKey?, models?: { decision?, generation? } }`. `defaultModelPrefs` holds the default slugs.
+- `validateOutput(task, input, args)`: the schema check (pi-ai's validator) plus the task's `accept` rule. Both providers use it, for tool calls and for classifier answers.
+- `PiAiProvider.layer(config, models?)`: `config` is an `Effect<AiConfig>` read on every call, so a key or model added in preferences applies without a restart. `AiConfig` is `{ apiKey?, models?: { classifier?, decision?, generation? } }`. `defaultModelPrefs` holds the default slugs.
 - `FakeAiProvider.layer`, `makeFakeAiProvider()`: deterministic. Select it with `JUNO_AI=fake` in the engine (that wiring is the assistant's job).
 - `Type`, `Static`: TypeBox, re-exported so the assistant can declare tool parameters without importing pi-ai.
 
@@ -19,37 +19,92 @@ Ids in outputs are plain strings. The `accept` rule of each task guarantees they
 
 ## What it decides
 
-- **Tier and shape are separate.** `tier` picks the model and the default timeout (decisions 1.5 s, generation 20 s, chat 60 s). Shape is structured or text. `forYou` is structured on the generation tier: cards need judgment and run in the background.
-- **Decisions are one forced tool call.** The task's output schema is the tool's parameters, pi-ai forces that tool (`tool_choice` by API: Anthropic `{ type: 'tool' }`, OpenAI-compatible `{ type: 'function' }`), the arguments are validated, then `accept` runs. An invalid answer or a provider error is retried once inside the task's timeout. Anything else is `NoDecision`.
-- **The provider enforces the timeout.** The task table carries the number; the provider ties it to the request's `AbortSignal` so a slow call is cancelled, not just ignored.
-- **Thinking is off for Anthropic models.** A decision has no time for it. OpenAI-compatible models keep their defaults; see Open questions.
-- **Unknown slugs still work.** A slug missing from pi-ai's catalogue is sent as an OpenAI-compatible model; its cost is then unknown and `meta.costUsd` is absent.
-- **Prompts are code.** `src/tasks/<task>.prompt.ts` next to each task, plain template strings. Shared rules in `src/tasks/shared.ts`: plain text, no markdown or emoji, never write for the user, quiet option when unsure.
+- **Three model slots.** `classifier` is a System One decision model for the decision tasks that carry a `classify` mapping (`routeCheck`, `settledScore`, `urgencyGate`). `decision` is a small chat model for the decisions a classifier cannot make because they name messages or extract text (`groupRun`, `parseCommand`). `generation` is the stronger chat model for text and for `forYou`. An empty `classifier` slug sends every decision to the chat `decision` model.
+- **Tier and shape are separate.** `tier` picks the model and the default timeout. Shape is structured or text. `forYou` is structured on the generation tier: cards need judgment and run in the background.
+- **A classifier decision is one System One request.** The task's `classify.ask(input)` builds a JSON state and typed questions (a choice among Main and the topics; a bool for settled; two bools for urgent and chatter); `classify.read(answers)` turns the answers into the task's raw output, which goes through the same `validateOutput` as a tool call. Probabilities come from the model, not from prose.
+- **A chat decision is one tool call.** The task's output schema is the tool's parameters. On the decision tier pi-ai forces that tool (`tool_choice` by API: Anthropic `{ type: 'tool' }`, OpenAI-compatible `{ type: 'function' }`). On the generation tier the tool choice is `auto` and the prompt asks for the call, because Sonnet 5.5 on OpenRouter rejects a forced choice (`tool_choice: type "tool" and "any" are not supported for this model`). If any model rejects a forced choice, the retry asks with `auto`. The arguments are validated, then `accept` runs.
+- **One retry inside the task's timeout.** An invalid answer or a provider error is retried once. Anything else is `NoDecision`.
+- **The provider enforces the timeout.** The task table carries the number; the provider ties it to the request's `AbortSignal` so a slow call is cancelled, not just ignored. pi-ai's own HTTP retries are off (`maxRetries: 0`), so the task's retry and timeout are the only ones.
+- **The first call does not pay for module loading.** `openRouterModels()` starts the imports of pi-ai's lazy chat API modules (the OpenAI and Anthropic SDKs) in the background; on a busy machine those take seconds and would eat a decision's budget. The first request of a process still pays for DNS and TLS (measured 1.1 s under load, about 0.3 s idle) and a slower first answer, so it can miss `routeCheck`'s budget once; Node drops an idle connection after 4 s, so a warm-up at startup would not help a later decision.
+- **Reasoning is off.** Anthropic models get `thinkingEnabled: false`. OpenAI-compatible models get reasoning `none` through pi-ai, or the lowest level the model allows (`minimal`, else `low`) when it cannot be turned off.
+- **Unknown slugs still work.** A chat slug missing from pi-ai's catalogue is sent as an OpenAI-compatible model, a classifier slug as a System One model; the cost is then unknown and `meta.costUsd` is absent.
+- **Prompts are code.** `src/tasks/<task>.prompt.ts` next to each task, plain template strings; the classifier instructions and criteria live in the same file. Shared rules in `src/tasks/shared.ts`: plain text, no markdown or emoji, never write for the user, quiet option when unsure.
 - **The fake validates too.** Word rules in `src/fake/rules.ts`, canned chat turns in `src/fake/replies.ts`. Their output goes through `validateOutput`, so a broken rule is a `NoDecision` in a test, never a crash.
 - **Chat is one turn.** `chat` streams the assistant's reply and its tool calls, validated against `tools`; the caller runs the tools, appends `tool` messages and calls again. The chat system prompt plus the facts block (`now`, the topic "this" means) come from the `chat` task.
 
-## Defaults
+## Defaults and timeouts
 
-`anthropic/claude-haiku-5.5` for decisions and `anthropic/claude-sonnet-5.5` for generation, checked against OpenRouter's public list on 2026-10-13 (both support tool calling; 0.10/0.50 and 2/10 USD per million tokens). Preferences override them.
+`typesafe/jev-1.13` for the classifier, `openai/gpt-6-luna` for chat decisions, `anthropic/claude-sonnet-5.5` for generation. Preferences override them.
 
-## Eval
+| Task | Path | Timeout | Why |
+| --- | --- | --- | --- |
+| `routeCheck` | classifier | 1.5 s | On Enter, the user waits. Jev p95 is 0.9 s, plus about 0.3 s when the connection is cold; past the budget the draft posts to Main unchecked. A chat model here is slower than the budget. |
+| `urgencyGate` | classifier | 2 s | Per incoming message after rules. A notification may be 2 s late; past that it goes to the digest. Room for one retry. |
+| `settledScore` | classifier | 3 s | After 2 minutes idle; nobody waits. Room for one retry. |
+| `parseCommand` | chat decision | 4 s | ⌘K fallback after the grammar; search results show meanwhile. Luna p50 1.5 s, p95 2.3 s, the odd call near 3 s. |
+| `groupRun` | chat decision | 5 s | Background, per Main message. Luna p50 1.8 s, p95 2.9 s. Room for one retry. |
+| `forYou` | generation, structured | 30 s | Background every 15 minutes. Sonnet 5.5 takes about 7 s for four cards. |
+| `titleTopic`, `catchUp` | generation | 20 s | Measured 1.6 to 1.9 s. |
+| `chat` | generation | 60 s | One streamed turn with tools. |
 
-`pnpm ai:eval` runs every task on invented examples (`eval/examples.ts`) with the fake. `JUNO_AI=live pnpm ai:eval` uses OpenRouter with `OPENROUTER_API_KEY` from the environment or the repo's `.env`, and prints each output with latency, cost and attempts. Without a key it says so and exits 0. `pnpm ai:eval routeCheck` runs one task. `JUNO_AI_DECISION_MODEL` and `JUNO_AI_GENERATION_MODEL` try other slugs for a run.
+## Measurements
+
+`pnpm --filter @juno/ai bench` on 2026-10-13, from a laptop in Europe (HTTPS round trip to OpenRouter about 0.25 s, so no setup can beat that) that other work kept at a load average above 100, so absolute times are pessimistic by a few hundred milliseconds; the setups ran side by side, so the comparison holds. Every setup runs the structured examples in `eval/examples.ts` with their `expect`; accuracy counts a run as right only when it decided and the judgement matched. Classifier rows cover the 3 mapped tasks (60 runs); chat rows cover all 6 structured tasks (66 to 99 runs). Cost is pi-ai's catalogue price per 1k decisions.
+
+| Setup | p50 | p95 | Accuracy | No decision | USD per 1k |
+| --- | --- | --- | --- | --- | --- |
+| `typesafe/jev-1.13`, classify | 516 ms | 930 ms | 100% | 0% | 0.032 |
+| `~typesafe/jev-latest`, classify | 511 ms | 891 ms | 100% | 0% | 0.032 |
+| `liquid/d1`, classify | 678 ms | 897 ms | 100% | 0% | 0.020 |
+| `perplexity/pplx-decider-v1.1-27b`, classify | 577 ms | 871 ms | 95% | 0% | 0.012 |
+| `openai/gpt-6-luna-decisions`, classify | 600 ms | 910 ms | 95% | 0% | 0.056 |
+| `cloudflare/clef-flash`, classify | 1100 ms | 1940 ms | 97% | 0% | 0.050 |
+| `jaredpalmer/kev-4b`, `upstage/solar-decide`, `respan/span-01` | | | 72%, 60%, 0% | | |
+| `openai/gpt-6-luna`, forced tool | 1711 ms | 3469 ms | 95% | 2% | 0.065 |
+| `openai/gpt-6-luna`, `provider.sort` latency or throughput | 1650 ms | 2650 to 3300 ms | 98 to 100% | 1% | 0.064 |
+| `openai/gpt-6-luna`, tool choice auto | 1777 ms | 3272 ms | 96% | 1% | 0.064 |
+| `openai/gpt-6-luna`, trimmed prompt | 1871 ms | 4728 ms | 93% | 2% | 0.056 |
+| `openai/gpt-6-luna`, JSON schema response | 1598 ms | 3173 ms | 58% | 39% | 0.030 |
+| `openai/gpt-6-luna`, not streamed | 1508 ms | 3083 ms | 99% | 0% | 0.066 |
+| `openai/gpt-6-luna`, streamed: first event 693 ms, tool call complete 1531 ms | 1534 ms | 2934 ms | 98% | 1% | 0.066 |
+| `qwen/qwen3.7-flash`, forced tool | 1091 ms | 2931 ms | 89% | 6% | 0.032 |
+| `mistralai/ministral-8b-2512`, forced tool | 922 ms | 3136 ms | 88% | 6% | 0.046 |
+| `anthropic/claude-haiku-5.5`, forced tool | 1758 ms | 3750 ms | 86% | 11% | 0.085 |
+| `google/gemini-3.1-flash-lite` | 1464 ms | 2959 ms | 86% | 3% | 0.209 |
+| `z-ai/glm-5.3-flash` | 2163 ms | 10068 ms | 86% | 8% | 0.166 |
+| `deepseek/deepseek-v4-flash` | 3512 ms | 8308 ms | 83% | 9% | 0.126 |
+| `inception/mercury-2.5` | 2459 ms | 9073 ms | 79% | 20% | 0.202 |
+| `amazon/nova-micro-v1` | 957 ms | 2399 ms | 76% | 8% | 0.043 |
+| `nvidia/nemotron-3.5-lightning` | 1108 ms | 2849 ms | 73% | 17% | 0.042 |
+| `google/gemini-2.5-flash-lite` | 1150 ms | 5552 ms | 67% | 18% | 0.071 |
+| `google/gemma-4-26b-a4b-it`, `upstage/solar-mini4`, `meta-llama/llama-3.1-8b-instruct`, `openai/gpt-4.1-nano`, `openai/gpt-5-nano` | 364 to 2158 ms | | 44 to 64% | 21 to 38% | |
+
+What the numbers say:
+
+- A decision model is both the most accurate and the fastest path: Jev answered every mapped example right at twice the network floor, for a third of a cent per 1k. Chat models trail on both axes because a tool call is 50 to 150 output tokens; with Luna the first token arrives at 0.7 s and the call completes at 1.5 s, whether streamed or not.
+- OpenRouter's `provider.sort` hints, a trimmed prompt and prompt caching do not move the chat-model number: the prompts are 150 to 300 tokens, below Anthropic's cacheable minimum, and the time is in the output. Strict JSON schema output fails on the union-typed outputs (`groupRun`, `parseCommand`), so tool calls stay.
+- Luna is the only small chat model that got every `groupRun` and `parseCommand` example right (36 of 36 over three reps). Haiku 5.5 missed a third of the command examples and was no faster.
+- Among chat models with better latency, `ministral-8b-2512` and `qwen3.7-flash` are a fair cheaper trade (about 0.9 to 1.1 s at 88 to 89%) if correctness on grouping and commands matters less than speed.
+
+## Eval and bench
+
+`pnpm ai:eval` runs every task on invented examples (`eval/examples.ts`) with the fake and prints each output. Structured examples carry `expect`, so the summary line counts how many judgements matched. `JUNO_AI=live pnpm ai:eval` uses OpenRouter with `OPENROUTER_API_KEY` from the environment or the repo's `.env`, and prints latency, cost and attempts. Without a key it says so and exits 0. `pnpm ai:eval routeCheck` runs one task. `JUNO_AI_CLASSIFIER_MODEL` (empty for none), `JUNO_AI_DECISION_MODEL` and `JUNO_AI_GENERATION_MODEL` try other slugs for a run.
+
+`pnpm --filter @juno/ai bench` measures setups (a model plus request options: forced tool, tool choice auto, JSON schema, `provider.sort`, trimmed prompt, raw non-streamed, streamed with time to first event, or classify) on the structured examples: `--reps`, `--setups a,b`, `--tasks a,b`, `--concurrency`, `--list`. Tool setups run through `makePiAiProvider`, so they measure the real code path. It is live only and costs a few cents per full run.
 
 ## Tests
 
-`pnpm --filter @juno/ai test`. Behaviour through the interface with the fake; the schema and `accept` rules; `PiAiProvider` against pi-ai's scripted faux provider (valid call, retry, two invalid answers, provider error, timeout, missing key, chat streaming); cache key stability. No test depends on prompt wording.
+`pnpm --filter @juno/ai test`. Behaviour through the interface with the fake; the schema and `accept` rules; `PiAiProvider` against pi-ai's scripted faux provider plus a scripted System One classifier (valid call, retry, two invalid answers, provider error, timeout, missing key, tool choice by tier and the `auto` fallback, classifier questions and answers, classifier off, chat streaming); cache key stability. No test depends on prompt wording.
 
 ## Open questions
 
-- OpenRouter also serves TypeSafe's System One decision models (`typesafe/jev-1.13`, and others) through pi-ai's `classify` API, which SPEC 15 mentions as a fit for decisions. Not evaluated; the forced tool call works on any chat model.
-- OpenAI-compatible reasoning models keep their default reasoning effort; a decision model that thinks by default may miss 1.5 s. Set `reasoningEffort` once a non-Anthropic decision model is chosen.
+- Calibration: Jev's probabilities are not yet checked against the thresholds the assistant will use (the eval tests direction, not calibration). Collect a few hundred real decisions before fixing thresholds.
 - `parseCommand` returns the intent (`kind`, target id, text) and a confidence; building the domain `Command` with its label and hint from that intent is a domain helper that does not exist yet.
 - Outputs return ids as plain strings; branding them at the boundary is left to the caller.
 
 ## Must not
 
 - Import the store, the engine, Electron or `@juno/contract`. The only `@juno` dependency is `@juno/domain`, for types.
-- Read the key from disk or the environment. Only `eval/run.ts` reads `OPENROUTER_API_KEY`, and only for the manual eval.
-- Hard-code a model slug anywhere but `defaultModelPrefs`.
+- Read the key from disk or the environment. Only `eval/run.ts` and `eval/bench.ts` read `OPENROUTER_API_KEY`, and only for the manual eval and bench.
+- Hard-code a model slug anywhere but `defaultModelPrefs` (and the bench's setup list).
 - Throw. A failure is a `NoDecision` or a `failed` event.

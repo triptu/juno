@@ -1,8 +1,8 @@
 import type { TopicId } from '@juno/domain'
 import { Type } from '../schema'
 import { defineStructuredTask } from '../task'
-import { prompt } from './routeCheck.prompt'
-import { oneLine, renderMessages, type AiMessage } from './shared'
+import { classifierInstructions, mainCriterion, prompt, topicCriterion } from './routeCheck.prompt'
+import { messagesState, oneLine, renderMessages, type AiMessage } from './shared'
 
 export interface RouteCheckTopic {
   readonly id: TopicId
@@ -25,15 +25,37 @@ export const RouteCheckOutput = Type.Object({
   confidence: Type.Number({ minimum: 0, maximum: 1 }),
 })
 
-/** Decision. Runs on Enter in a Main thread (spec section 8). */
+/**
+ * Decision. Runs on Enter in a Main thread (spec section 8), so the user is
+ * waiting. Jev 1.13 answers in about 0.5 s (p95 0.9 s, plus about 0.3 s for a
+ * cold connection); past 1.5 s the draft posts to Main unchecked. A chat model
+ * in its place is slower than this budget.
+ */
 export const routeCheck = defineStructuredTask<RouteCheckInput, typeof RouteCheckOutput>({
   name: 'routeCheck',
   version: 1,
   tier: 'decision',
+  timeoutMillis: 1500,
   prompt,
   tool: { name: 'route', description: 'Report which topic the draft replies to, or null for Main.' },
   output: RouteCheckOutput,
   accept: (out, input) => out.replyTo === null || input.topics.some((t) => t.id === out.replyTo),
+  classify: {
+    ask: (input) => ({
+      state: { channel: input.channel, draft: input.draft, topics: input.topics.map((t) => ({ id: t.id, title: t.title, recent: messagesState(t.recent) })) },
+      questions: {
+        replyTo: {
+          type: 'choice',
+          instructions: classifierInstructions,
+          criteria: { main: mainCriterion, ...Object.fromEntries(input.topics.map((t) => [t.id, topicCriterion(t.title)])) },
+        },
+      },
+    }),
+    read: (answers) => {
+      const a = answers.replyTo
+      return a?.type === 'choice' ? { replyTo: a.choice === 'main' ? null : a.choice, confidence: a.confidence } : undefined
+    },
+  },
   render: (input) =>
     [
       `Channel: ${input.channel}`,
