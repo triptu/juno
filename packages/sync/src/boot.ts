@@ -10,9 +10,11 @@
  * from the edge, then a latest-reply fetch for the unfollowed threads with
  * the most recent activity so their rows have a preview.
  *
- * Warm boot: `client.userBoot`, `client.counts` with `counts_last_fetched`,
- * history since the synced range for conversations whose `latest` moved, the
- * first `getView` page, the discovery sweep for the gap, users.
+ * Warm boot: `client.userBoot`, a full `client.counts` (membership is
+ * derived from it), history since the synced range for conversations whose
+ * `latest` moved, the first `getView` page, the discovery sweep for the gap,
+ * users. The reconnect catch-up is the same without the workspace refresh
+ * and with `counts_last_fetched`.
  */
 import { millisToTs, type Ts } from '@juno/domain'
 import { SlackApi, type SlackApiError } from '@juno/slack'
@@ -31,8 +33,10 @@ import {
   getSyncState,
   latestSyncedRange,
   markRepliesComplete,
+  replaceMembership,
   seedTopicRead,
   setChannelReads,
+  setMembership,
   setSyncState,
   setThreadSub,
   threadMessages,
@@ -64,7 +68,11 @@ export const bootState = (): Effect.Effect<BootState | undefined, SqlError, Stor
 const windowStart = (ctx: SyncContext) => Effect.map(Clock.currentTimeMillis, (now) => millisToTs(now - ctx.config.quietDays * DAY))
 const nowTs = Effect.map(Clock.currentTimeMillis, (now) => millisToTs(now))
 
-/** `client.userBoot`: team, self, conversations. `prefs` only on a cold boot. */
+/**
+ * `client.userBoot`: team, self and the metadata of every conversation of
+ * the workspace (member or not; the response carries no membership or read
+ * state, observed live). `prefs` only on a cold boot.
+ */
 const loadWorkspace = (ctx: SyncContext, withPrefs: boolean): Effect.Effect<void, BootError, BootServices> =>
   Effect.gen(function* () {
     const api = yield* SlackApi
@@ -75,15 +83,18 @@ const loadWorkspace = (ctx: SyncContext, withPrefs: boolean): Effect.Effect<void
       Effect.gen(function* () {
         yield* upsertTeam(boot.team, selfId, prefs, undefined)
         yield* upsertUsers([boot.self])
-        yield* upsertConversations([
-          ...boot.channels.map((c) => toConversationRow(c, selfId)),
-          ...boot.ims.map((im) => toConversationRow(im, selfId)),
-        ])
+        yield* upsertConversations([...boot.channels.map((c) => toConversationRow(c)), ...boot.ims.map((im) => toConversationRow(im))])
       }),
     )
   })
 
-/** `client.counts`: Slack's read pointers and unread flags per conversation, and the first read pointer of every Main. */
+/**
+ * `client.counts`: which conversations the user is in, Slack's read pointers
+ * and unread flags for each, and the first read pointer of every Main.
+ * Without `counts_last_fetched` the list is complete and membership is
+ * replaced by it; with it the entries only add members (what the server
+ * leaves out of an incremental answer is Unknown, research section 2).
+ */
 const loadCounts = (ctx: SyncContext, sinceFetched: number | undefined): Effect.Effect<{ entries: ReadonlyArray<CountEntry>; fetched: number | undefined }, BootError, BootServices> =>
   Effect.gen(function* () {
     const api = yield* SlackApi
@@ -94,6 +105,9 @@ const loadCounts = (ctx: SyncContext, sinceFetched: number | undefined): Effect.
     const eventTs = millisToTs(now)
     yield* transaction(
       Effect.gen(function* () {
+        const ids = entries.map((e) => e.id)
+        if (sinceFetched === undefined) yield* replaceMembership(ids)
+        else yield* setMembership(ids, true)
         yield* setChannelReads(entries, now)
         // A pointer Juno has never seen is Slack's; a known one is a server mark that may have been missed.
         for (const entry of entries) {
@@ -272,7 +286,7 @@ export const coldBoot = (ctx: SyncContext, phase: Phase): Effect.Effect<void, Bo
   })
 
 export interface CatchUpOptions {
-  /** Refresh team, conversations and self first (warm boot: yes; reconnect: no). */
+  /** Refresh team, conversations and self first, and take the full counts list (warm boot: yes; reconnect: no). */
   readonly refreshWorkspace: boolean
   /** Fetch the first page of followed threads again. */
   readonly refreshThreads: boolean
@@ -289,7 +303,8 @@ export const catchUp = (ctx: SyncContext, previous: BootState, phase: Phase, opt
     const startedAt = yield* Clock.currentTimeMillis
     const start = yield* windowStart(ctx)
     if (options.refreshWorkspace) yield* loadWorkspace(ctx, false)
-    const counts = yield* loadCounts(ctx, previous.countsLastFetched)
+    // A full list after a workspace refresh, so a channel left while the app was closed drops out.
+    const counts = yield* loadCounts(ctx, options.refreshWorkspace ? undefined : previous.countsLastFetched)
     const active = yield* activeConversations(counts.entries, start)
     const moved: Array<{ id: string; since: string | undefined }> = []
     for (const conversation of active) {

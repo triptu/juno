@@ -100,6 +100,7 @@ export const applyFrame = (ctx: SyncContext, frame: RtmFrame): Effect.Effect<voi
           }),
         )
       }
+      // Conversations: an object refreshes the metadata; membership follows the event, never the object's `is_member`.
       case 'channel_joined':
       case 'channel_left':
       case 'channel_created':
@@ -117,7 +118,7 @@ export const applyFrame = (ctx: SyncContext, frame: RtmFrame): Effect.Effect<voi
         return yield* transaction(
           Effect.gen(function* () {
             const id = typeof frame.channel === 'string' ? frame.channel : frame.channel.id
-            if (typeof frame.channel !== 'string') yield* upsertConversations([toConversationRow(frame.channel, ctx.me.userId)])
+            if (typeof frame.channel !== 'string') yield* upsertConversations([toConversationRow(frame.channel)])
             switch (frame.type) {
               case 'channel_joined':
               case 'group_joined':
@@ -139,14 +140,22 @@ export const applyFrame = (ctx: SyncContext, frame: RtmFrame): Effect.Effect<voi
             }
           }),
         )
+      // DMs: opening, creating or being added makes the conversation the user's own. Closing only hides it in Slack's sidebar.
       case 'im_open':
-      case 'im_close':
       case 'im_created':
       case 'mpim_open':
-      case 'mpim_close':
       case 'mpim_joined':
+        return yield* transaction(
+          Effect.gen(function* () {
+            const id = typeof frame.channel === 'string' ? frame.channel : frame.channel.id
+            if (typeof frame.channel !== 'string') yield* upsertConversations([toConversationRow(frame.channel)])
+            yield* patchConversation(id, { is_member: 1 })
+          }),
+        )
+      case 'im_close':
+      case 'mpim_close':
         if (typeof frame.channel === 'string') return
-        return yield* transaction(upsertConversations([toConversationRow(frame.channel, ctx.me.userId)]))
+        return yield* transaction(upsertConversations([toConversationRow(frame.channel)]))
       case 'member_joined_channel':
       case 'member_left_channel':
         if (frame.user !== ctx.me.userId) return

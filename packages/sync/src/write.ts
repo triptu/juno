@@ -104,7 +104,14 @@ export const upsertUsers = (users: ReadonlyArray<User>): Writer =>
     yield* invalidate(syncKeys.users)
   })
 
-export const toConversationRow = (c: Channel | Im, selfId: string): ConversationRow => {
+/**
+ * The metadata of a conversation object. Membership is not part of it:
+ * `client.userBoot` lists every channel of the workspace without
+ * `is_member` (observed live), so a new row starts as not a member and
+ * `setMembership` / `replaceMembership` set the flag from `client.counts`
+ * and the membership events.
+ */
+export const toConversationRow = (c: Channel | Im): ConversationRow => {
   const channel = c as Channel
   const kind = 'user' in c && !('is_channel' in c) ? 'im' : conversationKind(channel)
   const members = channel.members
@@ -114,8 +121,7 @@ export const toConversationRow = (c: Channel | Im, selfId: string): Conversation
     name: channel.name ?? null,
     user_id: kind === 'im' ? ((c as Im).user ?? null) : null,
     member_ids_json: members === undefined ? null : JSON.stringify(members),
-    // DMs have no membership flag: they are the user's own.
-    is_member: kind === 'im' || kind === 'mpim' ? 1 : channel.is_member === true || (members?.includes(selfId) ?? false) ? 1 : 0,
+    is_member: 0,
     is_archived: channel.is_archived === true ? 1 : 0,
     topic: channel.topic?.value ?? null,
     purpose: channel.purpose?.value ?? null,
@@ -124,6 +130,7 @@ export const toConversationRow = (c: Channel | Im, selfId: string): Conversation
   }
 }
 
+/** Inserts or refreshes the metadata of conversations. A row that exists keeps its `is_member`. */
 export const upsertConversations = (rows: ReadonlyArray<ConversationRow>): Writer =>
   Effect.gen(function* () {
     if (rows.length === 0) return
@@ -131,9 +138,32 @@ export const upsertConversations = (rows: ReadonlyArray<ConversationRow>): Write
     for (const row of rows) {
       yield* sql`INSERT INTO conversations ${sql.insert(row as unknown as Record<string, unknown>)}
         ON CONFLICT (id) DO UPDATE SET kind = excluded.kind, name = excluded.name, user_id = excluded.user_id,
-          member_ids_json = COALESCE(excluded.member_ids_json, conversations.member_ids_json), is_member = excluded.is_member,
+          member_ids_json = COALESCE(excluded.member_ids_json, conversations.member_ids_json),
           is_archived = excluded.is_archived, topic = excluded.topic, purpose = excluded.purpose, created = excluded.created, updated = excluded.updated`
     }
+    yield* invalidate(syncKeys.conversations)
+  })
+
+const MEMBERSHIP_BATCH = 500
+
+/** Marks conversations the user is (or is no longer) in. Ids without a row are ignored. */
+export const setMembership = (ids: ReadonlyArray<string>, member: boolean): Writer =>
+  Effect.gen(function* () {
+    if (ids.length === 0) return
+    const sql = yield* StoreWriter
+    const flag = member ? 1 : 0
+    for (let i = 0; i < ids.length; i += MEMBERSHIP_BATCH) {
+      yield* sql`UPDATE conversations SET is_member = ${flag} WHERE id IN ${sql.in(ids.slice(i, i + MEMBERSHIP_BATCH))} AND is_member <> ${flag}`
+    }
+    yield* invalidate(syncKeys.conversations)
+  })
+
+/** The full membership list (a `client.counts` without `counts_last_fetched`): exactly `ids` are members. */
+export const replaceMembership = (ids: ReadonlyArray<string>): Writer =>
+  Effect.gen(function* () {
+    const sql = yield* StoreWriter
+    yield* sql`UPDATE conversations SET is_member = 0 WHERE is_member = 1`
+    yield* setMembership(ids, true)
     yield* invalidate(syncKeys.conversations)
   })
 

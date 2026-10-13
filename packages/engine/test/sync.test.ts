@@ -3,7 +3,7 @@
 import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { CONVERSATIONS } from '@juno/fake-slack'
+import { CONVERSATIONS, SELF_ID } from '@juno/fake-slack'
 import { topicCountsAtom } from '@juno/state'
 import { sleep, startTestEngine, waitFor, type RunningEngine } from './harness'
 
@@ -23,8 +23,10 @@ async function bootedEngine(options: Parameters<typeof startTestEngine>[0] = {})
 const apiCalls = (engine: RunningEngine, method?: string) =>
   engine.fake.calls.filter((c) => c.kind === 'api' && (method === undefined || c.method === method))
 
-/** The number of conversations in the fixture with activity inside the quiet window. */
-const activeConversations = CONVERSATIONS.filter((c) => {
+/** The fixture conversations the self user is in, and those with activity inside the quiet window. */
+const memberConversations = CONVERSATIONS.filter((c) => c.members.includes(SELF_ID))
+const nonMemberChannels = CONVERSATIONS.filter((c) => !c.members.includes(SELF_ID)).map((c) => c.id)
+const activeConversations = memberConversations.filter((c) => {
   const newest = Math.min(...c.messages.flatMap((m) => [m.ago, ...(m.replies ?? []).map((r) => r.ago)]))
   return newest < 7 * 24 * 60
 }).length
@@ -129,6 +131,39 @@ describe('cold boot', () => {
   })
 })
 
+describe('membership', () => {
+  it('comes from client.counts: channels the user is not in never reach the sidebar and cost no history call', async () => {
+    const engine = await bootedEngine()
+    const rows = await engine.rowsUntil((list) => list.length >= 20, 'rows')
+    // The fake's userBoot lists every channel, like the real one; the non-member ones have recent threads.
+    expect(nonMemberChannels.length).toBeGreaterThan(0)
+    const memberIds = new Set(memberConversations.map((c) => c.id))
+    expect(rows.every((r) => memberIds.has(r.channel.id))).toBe(true)
+    for (const id of nonMemberChannels) expect(rows.find((r) => r.channel.id === id)).toBeUndefined()
+    expect(rows.find((r) => r.title === '#sales')).toBeUndefined()
+    const history = apiCalls(engine, 'conversations.history').map((c) => c.args['channel'])
+    for (const id of nonMemberChannels) expect(history).not.toContain(id)
+    // Every member conversation with recent activity has its Main row.
+    for (const c of memberConversations.filter((m) => m.messages.some((msg) => msg.ago < 7 * 24 * 60))) {
+      expect(rows.some((r) => r.kind === 'main' && r.channel.id === c.id), c.id).toBe(true)
+    }
+  })
+
+  it('follows the membership events: a joined channel shows up, a left one disappears', async () => {
+    const engine = await bootedEngine()
+    await engine.rowsUntil((list) => list.length >= 20, 'rows')
+
+    engine.fake.joinChannel({ channel: 'C0SALES' })
+    engine.fake.injectMessage({ channel: 'C0SALES', user: 'U0ELENA', text: 'Welcome to sales.' })
+    const joined = await engine.rowsUntil((list) => list.some((r) => r.channel.id === 'C0SALES'), 'the joined channel')
+    expect(joined.find((r) => r.channel.id === 'C0SALES')).toMatchObject({ kind: 'main', title: '#sales', preview: { text: 'Welcome to sales.' } })
+
+    engine.fake.leaveChannel({ channel: 'C0SALES' })
+    const left = await engine.rowsUntil((list) => !list.some((r) => r.channel.id === 'C0SALES'), 'the left channel gone')
+    expect(left.length).toBeGreaterThanOrEqual(20)
+  })
+})
+
 describe('warm boot', () => {
   it('uses incremental calls and picks up what changed while the engine was down', async () => {
     const first = await bootedEngine()
@@ -144,6 +179,9 @@ describe('warm boot', () => {
     const flakyRoot = fake.messages('C0ENG').find((m) => m.text?.startsWith('checkout.spec'))!
     fake.injectMessage({ channel: 'C0PRODUCT', user: 'U0PRIYA', text: 'Pricing page copy is live.' })
     fake.injectMessage({ channel: 'C0ENG', user: 'U0SAM', text: 'Still flaky after the wait?', threadTs: flakyRoot.ts })
+    // A reply in a public channel the user is not in: search returns it, the sync must drop it.
+    const salesRoot = fake.messages('C0SALES').find((m) => (m.reply_count ?? 0) > 0)!
+    fake.injectMessage({ channel: 'C0SALES', user: 'U0MAYA', text: 'Forecast is in the deck.', threadTs: salesRoot.ts })
     fake.resetCalls()
 
     const second = await startTestEngine({ reuse, initial: () => credentials })
@@ -156,6 +194,7 @@ describe('warm boot', () => {
     )
     expect(rows.find((r) => r.title === '#product')).toMatchObject({ unreadCount: 1 })
     expect(rows.find((r) => r.title === 'checkout.spec failed again on main. Third…')).toMatchObject({ messageCount: 6, unreadCount: 1 })
+    expect(rows.find((r) => r.channel.id === 'C0SALES')).toBeUndefined()
 
     // Only the conversation whose latest moved was fetched; the thread reply came from the discovery search.
     const history = apiCalls(second, 'conversations.history')
