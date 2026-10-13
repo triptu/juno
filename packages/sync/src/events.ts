@@ -40,6 +40,7 @@ import {
 type Services = StoreWriter | Invalidation
 
 const LATE_REACTIONS_MAX = 1000
+const DAY = 24 * 60 * 60 * 1000
 
 /** A reaction to a message the store does not have yet; see `SyncContext.lateReactions`. */
 const noteLateReaction = (ctx: SyncContext, channel: string, ts: string, eventTs: string): Effect.Effect<void> =>
@@ -201,7 +202,7 @@ const applyMessageFrame = (ctx: SyncContext, frame: Extract<RtmFrame, { type: 'm
         const topics = topicsOfMessages(rows)
         // Activity after a resolve reopens the topic, except the user's own messages are activity too.
         for (const row of rows) if (row.ts === frame.ts) yield* reopenIfResolved(topicOfMessage(row), frame.ts, now)
-        yield* followOnReply(ctx, frame.channel, rows.find((row) => row.ts === frame.ts), { kind: 'event', eventTs, observedAt: millisToTs(now) })
+        yield* followOnReply(ctx, frame.channel, rows.find((row) => row.ts === frame.ts), { kind: 'event', eventTs, observedAt: millisToTs(now) }, now)
         yield* reindexTopics(topics, reindexOptions(ctx))
       }),
     )
@@ -264,10 +265,17 @@ const applyMessageFrame = (ctx: SyncContext, frame: Extract<RtmFrame, { type: 'm
  * otherwise. Pages do not need this: a root on a page carries `subscribed`
  * and `mergeOne` applies it.
  */
-const followOnReply = (ctx: SyncContext, channel: string, reply: MessageRow | undefined, source: ThreadSubSource): Effect.Effect<void, SqlError, Services> =>
+const followOnReply = (ctx: SyncContext, channel: string, reply: MessageRow | undefined, source: ThreadSubSource, now: number): Effect.Effect<void, SqlError, Services> =>
   Effect.gen(function* () {
     if (reply === undefined || reply.thread_ts === null || reply.thread_ts === reply.ts) return
     const threadTs = reply.thread_ts
+    // No pass reads follows older than the window, so one last seen before it may be stale: ask for the root once
+    // its thread is active again. The root carries `subscribed`; until it lands the reply may show the row.
+    const known = yield* threadSub(channel, threadTs)
+    const staleBefore = millisToTs(now - ctx.config.quietDays * DAY)
+    if (reply.user_id !== ctx.me.userId && known?.subscribed === true && (known.observedAt === undefined || compareTs(known.observedAt, staleBefore) < 0)) {
+      yield* Queue.offer(ctx.rootFetches, { channel, ts: threadTs })
+    }
     if (reply.user_id === ctx.me.userId) {
       if ((yield* threadSub(channel, threadTs))?.subscribed !== true) yield* setThreadSub(channel, threadTs, true, undefined, source)
       return

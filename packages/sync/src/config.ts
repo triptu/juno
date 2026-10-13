@@ -20,9 +20,9 @@ export interface SyncConfigShape {
   /** How often the discovery sweep runs while live. */
   readonly sweepIntervalMillis: number
   /**
-   * The complete pass over every followed thread (`followPass`) runs after a
-   * boot and then with a catch-up or sweep at most this often. 0 runs it with
-   * every catch-up.
+   * The pass over the followed threads of the window (`followPass`) runs
+   * with a catch-up or sweep at most this often after the last boot or pass.
+   * 0 runs it with every catch-up.
    */
   readonly followPassMillis: number
   /** `search` uses `search.modules.messages`; `history` is the fallback of architecture 5.3. */

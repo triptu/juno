@@ -494,6 +494,22 @@ describe('follow state (review M3 finding 1, specs/follow.qnt)', () => {
     expect(engine.fake.workspace.subscription(newest.channel.id, tsOf(newest.id))?.subscribed).toBe(false)
   })
 
+  it('a follow last seen before the window is checked with Slack when its thread gets a reply', async () => {
+    const engine = await bootedEngine()
+    await engine.rowsUntil((rows) => rows.length >= 20, 'rows')
+    const id = threadId(engine, 'C0ENG', 'Draft plan is in the doc.')
+    // Juno last saw this follow a month ago, and it was dropped elsewhere since without an event reaching Juno.
+    const db = new DatabaseSync(join(engine.userData, 'workspaces', engine.fake.teamId, 'cache.db'))
+    db.prepare('UPDATE thread_subs SET observed_at = ? WHERE channel = ? AND thread_ts = ?').run(`${Math.floor(Date.now() / 1000) - 30 * 86_400}.000000`, 'C0ENG', tsOf(id))
+    db.close()
+    engine.fake.workspace.subscriptions.get(`C0ENG:${tsOf(id)}`)!.subscribed = false
+    engine.fake.resetCalls()
+    engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0LEO', text: 'Any news on the dry run?', threadTs: tsOf(id) })
+    await engine.rowsUntil((rows) => !rows.some((r) => r.id === id), 'the stale follow gone')
+    expect(storedFollow(engine, 'C0ENG', tsOf(id))).toBe(0)
+    expect(apiCalls(engine, 'conversations.replies').map((c) => c.args['ts'])).toContain(tsOf(id))
+  })
+
   it('a followed thread older than the quiet window becomes a row when it gets a reply', async () => {
     let old: SeededThread | undefined
     const engine = await bootedEngine({

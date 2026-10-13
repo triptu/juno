@@ -4,10 +4,11 @@
  * It opens the socket first (so nothing during backfill is lost), then boots
  * cold or warm, then stays live: every socket event is one transaction, a
  * reconnect runs the catch-up of architecture 5.8, and a discovery sweep
- * runs every `sweepIntervalMillis`. After the boot, and then with a catch-up
- * or sweep at most every `followPassMillis`, the complete pass over the
- * followed threads runs (`followPass`). Boot, catch-up, sweep and that pass
- * share one permit so two never interleave; events never wait for them.
+ * runs every `sweepIntervalMillis`. With a catch-up or sweep, at most every
+ * `followPassMillis` after the last boot or pass, the pass over the
+ * followed threads of the window runs (`followPass`). Boot, catch-up, sweep
+ * and that pass share one permit so two never interleave; events never wait
+ * for them.
  *
  * Failures: a fatal auth condition from the socket or from any call, boot,
  * catch-up, sweep or root fetch included, fails the effect with
@@ -70,9 +71,9 @@ export const runSync = (options: RunSyncOptions): Effect.Effect<never, SlackAuth
     const events = yield* socket.events
 
     /**
-     * The complete pass over the followed threads (`followPass`), when the
-     * last one started more than `followPassMillis` ago. After the phase has
-     * settled: it runs on the background lane and can take minutes.
+     * The pass over the followed threads of the window (`followPass`), when
+     * the last one (a boot counts) started more than `followPassMillis` ago.
+     * After the phase has settled: it runs on the background lane.
      */
     const followPassIfDue = Effect.gen(function* () {
       const now = yield* Clock.currentTimeMillis
@@ -121,10 +122,13 @@ export const runSync = (options: RunSyncOptions): Effect.Effect<never, SlackAuth
     const consumer = Stream.runForEach(events, handle)
 
     const bootOnce = Effect.gen(function* () {
+      const startedAt = yield* Clock.currentTimeMillis
       const previous = yield* bootState()
       if (previous === undefined) yield* coldBoot(ctx, reportBoot)
       else yield* warmBoot(ctx, previous, reportBoot)
       state.lastBoot = yield* bootState()
+      // Both boots read the followed threads over the window and check the ones left out: a follow pass.
+      state.lastFollowPass = startedAt
     }).pipe(work.withPermit)
 
     /** A `force_reload`: boot again from the current store. */
