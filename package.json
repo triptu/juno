@@ -14,6 +14,10 @@
     "typecheck": "pnpm -r --parallel typecheck && tsc -p scripts/tsconfig.json",
     "lint": "oxlint . && node scripts/check-no-pointer-cursor.mjs && node scripts/check-deps.mjs && node scripts/check-fixtures-redacted.mjs",
     "check-deps": "node scripts/check-deps.mjs",
+    "health": "node scripts/health.mjs",
+    "health:knip": "knip --config knip.config.mjs --no-exit-code",
+    "health:clones": "jscpd --config .jscpd.json --workers 2 --absolute packages/*/src apps/*/src",
+    "health:size": "node scripts/health-size.mjs",
     "test": "node scripts/heavy.mjs pnpm -r --workspace-concurrency=2 --if-present test",
     "test:e2e": "node scripts/heavy.mjs sh -c \"pnpm --filter @juno/desktop test:e2e && pnpm --filter @juno/gallery test:e2e\"",
     "test:gallery": "node scripts/heavy.mjs pnpm --filter @juno/gallery test:e2e",
@@ -36,6 +40,8 @@
     "@juno/sync": "workspace:*",
     "@types/node": "24.19.2",
     "effect": "4.0.3",
+    "jscpd": "5.4.1",
+    "knip": "6.41.0",
     "oxlint": "1.87.0",
     "typescript": "5.9.3"
   }

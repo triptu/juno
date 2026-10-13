@@ -1,0 +1,51 @@
+import { execFileSync } from 'node:child_process'
+import { existsSync, readFileSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import ts from 'typescript'
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+const fileLimit = 400
+const functionLimit = 80
+const bySize = (a, b) => b.lines - a.lines || a.file.localeCompare(b.file)
+
+export function collectSizeReport() {
+  // Git excludes builds, dependencies and other worktrees, and includes new source files.
+  const files = execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard', '-z',
+    '--', 'apps', 'packages', 'scripts', 'specs', 'knip.config.mjs'], { cwd: root, encoding: 'utf8' })
+    .split('\0').filter((file) => /\.(?:[cm]?[jt]sx?|css)$/.test(file) && existsSync(resolve(root, file)))
+  const oversizedFiles = []
+  const oversizedFunctions = []
+  for (const file of new Set(files)) {
+    const text = readFileSync(resolve(root, file), 'utf8')
+    const lines = text ? text.split('\n').length - Number(text.endsWith('\n')) : 0
+    if (lines > fileLimit) oversizedFiles.push({ file, lines })
+    if (file.endsWith('.css') || file.endsWith('.d.ts')) continue
+    const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true)
+    const visit = (node) => {
+      if (ts.isFunctionLike(node) && node.body) {
+        const start = source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1
+        const end = source.getLineAndCharacterOfPosition(node.end).line + 1
+        if (end - start + 1 > functionLimit) {
+          const name = node.name ?? node.parent.name
+          oversizedFunctions.push({ file, name: name?.getText(source) ?? '<callback>', line: start, lines: end - start + 1 })
+        }
+      }
+      ts.forEachChild(node, visit)
+    }
+    visit(source)
+  }
+  return { fileLimit, functionLimit, scannedFiles: new Set(files).size,
+    oversizedFiles: oversizedFiles.toSorted(bySize), oversizedFunctions: oversizedFunctions.toSorted(bySize) }
+}
+
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  try {
+    const report = collectSizeReport()
+    console.log(`Size (report only): ${report.oversizedFiles.length} files over ${fileLimit} lines, ${report.oversizedFunctions.length} functions over ${functionLimit} lines`)
+    for (const item of report.oversizedFiles) console.log(`  ${item.file}: ${item.lines} lines`)
+    for (const item of report.oversizedFunctions) console.log(`  ${item.file}:${item.line} ${item.name}: ${item.lines} lines`)
+  } catch (error) {
+    console.error(`Size report unavailable: ${error.message}`)
+  }
+}
