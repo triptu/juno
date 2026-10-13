@@ -14,3 +14,11 @@ Written down from the owner's request (10-14). This is the input for the researc
 - **Process.** Its own workstream. Opus researches and plans; Astra and Fable look into the material separately, review, help refine, and write code.
 
 Related existing material: `docs/design/handoff/SPEC.md` sections 12 (For you), 13 (Juno, the assistant) and 15 (AI system); `docs/architecture.md` AI section; `packages/ai` (the current AI provider and tasks); `docs/decision-log.md`.
+
+## Owner decisions on plan v1 (10-14 01:59)
+
+- Providers: Codex (local) and OpenRouter. Sign in with ChatGPT if feasible. No Claude Code subscription provider (terms risk).
+- Proactive messages only about what the owner set up: reminders and schedules he asked for, progress and results of work he started, and things he told Juno to watch. No unsolicited observations.
+- Sync v1: one writer (the Mac), encrypted backup, and a way to move ownership. Multi-device live sync later if needed.
+- No confirmation click needed for: read-only lookups (Slack, Notion, Littlebird, topics, T3 Code status), OS notifications to the owner, scheduling its own wakeups, and starting T3 Code sessions when asked. Everything else outward is a card and runs at most once after a click.
+- Still open: how an outside app connects to T3 Code's MCP, Littlebird MCP's endpoint/auth/tools, the compaction model, and a daily spend cap (orchestrator to propose defaults).
