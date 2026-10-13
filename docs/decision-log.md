@@ -4,6 +4,8 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-13 23:40 · Tushar · Row footer: no message icon or count, and no "Messages outside threads" label on Main rows. Main rows may show a thread icon with the number of threads started since Main was last read (hidden when zero). DMs have threads too; each is its own topic.
+- 10-13 23:40 · Tushar · Topic art and its placeholder have no container. The placeholder is a free-form shape picked per topic (Tide-style), not a rounded box.
 - 10-13 23:38 · Tushar · Topic art sits with no container. Art-directed constrained drawing on Gemini 3.8 Flash.
 - 10-13 23:38 · Tushar · Main's active threads are behind a "Threads" button in Main's header.
 - 10-13 23:38 · Tushar · Opening a topic marks it read; later messages mark read only at the bottom of a focused window; stealth never marks.
