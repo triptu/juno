@@ -207,25 +207,47 @@ function priced(inner: AssistantMessageEventStream, model: Model<string>, report
   return outer
 }
 
-/** Forwards a faux stream until about `afterChars` characters have streamed, then drops it. */
+/**
+ * Forwards a faux stream until about `afterChars` characters have streamed,
+ * then drops it. The faux core edits its partial message in place and may run
+ * ahead of the reader, so each forwarded event carries a partial rebuilt from
+ * the deltas forwarded so far: what a client would really have received.
+ */
 function cut(inner: AssistantMessageEventStream, afterChars: number): AssistantMessageEventStream {
   const outer = createAssistantMessageEventStream()
   void (async () => {
     let streamed = 0
-    let partial: AssistantMessage | undefined
+    let received: AssistantMessage | undefined
     for await (const event of inner) {
       if (event.type === 'done' || event.type === 'error') break
-      outer.push(event)
-      partial = structuredClone(event.partial)
+      received = rebuild(received, event)
+      outer.push({ ...event, partial: structuredClone(received) })
       if (event.type === 'text_delta' || event.type === 'thinking_delta' || event.type === 'toolcall_delta') streamed += event.delta.length
       if (event.type !== 'start' && streamed >= afterChars) break
     }
-    const error: AssistantMessage = { ...(partial ?? fauxAssistantMessage([])), stopReason: 'error', errorMessage: 'terminated', usage: ZERO_USAGE }
+    const error: AssistantMessage = { ...(received ?? fauxAssistantMessage([])), stopReason: 'error', errorMessage: 'terminated', usage: ZERO_USAGE }
     const last: AssistantMessageEvent = { type: 'error', reason: 'error', error }
     outer.push(last)
     outer.end(error)
   })()
   return outer
+}
+
+type PartialEvent = Exclude<AssistantMessageEvent, { type: 'done' } | { type: 'error' }>
+function rebuild(received: AssistantMessage | undefined, event: PartialEvent): AssistantMessage {
+  const message = received ?? { ...event.partial, content: [] }
+  const content = [...message.content]
+  if (event.type === 'text_start') content.push({ type: 'text', text: '' })
+  if (event.type === 'thinking_start') content.push({ type: 'thinking', thinking: '' })
+  if (event.type === 'toolcall_start') {
+    const call = event.partial.content[event.contentIndex]
+    if (call?.type === 'toolCall') content.push({ type: 'toolCall', id: call.id, name: call.name, arguments: {} })
+  }
+  const block = 'contentIndex' in event ? content[event.contentIndex] : undefined
+  if (event.type === 'text_delta' && block?.type === 'text') content[event.contentIndex] = { ...block, text: block.text + event.delta }
+  if (event.type === 'thinking_delta' && block?.type === 'thinking') content[event.contentIndex] = { ...block, thinking: block.thinking + event.delta }
+  if (event.type === 'toolcall_end') content[event.contentIndex] = event.toolCall
+  return { ...message, content }
 }
 
 function httpFailure(model: Model<string>, step: Extract<ModelStep, { kind: 'http' }>): AssistantMessageEventStream {

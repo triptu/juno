@@ -53,6 +53,8 @@ it('drops a lost stream part way, with no usage', async () => {
   expect(last.error.usage.totalTokens).toBe(0)
   expect(text(last.error).length).toBeGreaterThan(0)
   expect(text(last.error).length).toBeLessThan(answer.length)
+  const delivered = seen.map((e) => (e.type === 'text_delta' ? e.delta : '')).join('')
+  expect(text(last.error)).toBe(delivered)
 })
 
 it('fails before streaming with the status pi-ai reports for 5xx, a rejected key and a rate limit', async () => {
