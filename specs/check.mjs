@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { connect, createServer } from 'node:net'
-import { homedir, tmpdir } from 'node:os'
+import { homedir, setPriority, tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { actionCases, recoveryCases, replayCases } from './agent-checks.mjs'
@@ -111,6 +111,8 @@ function spawnQuint(args, timeout, port) {
   return new Promise(resolve => {
     // Keep Apalache's generated directory inside the ignored trace directory.
     const child = spawn(process.execPath, command, { cwd: verify ? generated : root, detached: process.platform !== 'win32' })
+    // Simulations yield to Apalache, which runs one check at a time and sets the run's length.
+    if (!verify && child.pid) try { setPriority(child.pid, 10) } catch { /* Exited already. */ }
     let stdout = ''
     let stderr = ''
     child.stdout.on('data', chunk => { stdout += chunk })
