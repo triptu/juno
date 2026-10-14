@@ -14,6 +14,7 @@
  * serves.
  */
 import { Context, Effect, Exit, Layer, Scope } from 'effect'
+import type { HandlerOptions } from '@juno/agent-juno'
 import type { EngineConfig as Config } from '@juno/contract'
 import { HttpTransport } from '@juno/slack'
 import { EngineConfig, SyncControl, type SyncControlOptions } from './config'
@@ -22,7 +23,7 @@ import { HostLink, silentHost, type Host } from './protocol/host'
 import { NotificationControl, NotificationHost } from './notificationRuntime'
 import type { Presence } from '@juno/domain'
 import { Outbox } from './outbox'
-import { Handlers, Services } from './layer'
+import { AgentHost, Handlers, Services } from './layer'
 import { protocolServer } from './protocol/server'
 import type { Transport } from './protocol/transport'
 
@@ -46,13 +47,18 @@ export interface EngineHostOptions {
   readonly httpTransport?: Layer.Layer<HttpTransport>
   /** Ports from the agent utility process. When set, the engine serves the AgentHost group on them (ADR 0012). */
   readonly agentTransport?: Transport
+  /** Whether the agent's sends reach Slack. Default `disabled`: external writes stay off until M3. Tests turn them on. */
+  readonly agentWrites?: HandlerOptions['writes']
 }
 
 export function startEngine(transport: Transport, config: Config, options: EngineHostOptions = {}): Promise<EngineHandle> {
   return Effect.runPromise(
     Effect.gen(function* () {
       const scope = yield* Scope.make()
-      const servers = options.agentTransport === undefined ? protocolServer(transport) : Layer.merge(protocolServer(transport), agentHostServer(options.agentTransport))
+      const servers =
+        options.agentTransport === undefined
+          ? protocolServer(transport)
+          : Layer.merge(protocolServer(transport), agentHostServer(options.agentTransport, { writes: options.agentWrites ?? 'disabled' }).pipe(Layer.provide(AgentHost)))
       const app = servers.pipe(
         Layer.provide(Handlers),
         Layer.provideMerge(Services),

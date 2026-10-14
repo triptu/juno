@@ -126,7 +126,10 @@ const unstable = [
   {
     label: 'effect/rpc',
     spec: /^effect\/rpc(?:\/|$)/,
-    allow: ['packages/contract/src/', 'packages/engine/src/protocol/', 'packages/state/src/', 'packages/agent-contract/src/host/', 'packages/agent-contract/src/rpc/', 'packages/agent/src/host/'],
+    allow: [
+      'packages/contract/src/', 'packages/engine/src/protocol/', 'packages/state/src/', 'packages/agent-contract/src/host/', 'packages/agent-contract/src/rpc/', 'packages/agent/src/host/',
+      'packages/engine/test/agent-host.test.ts',
+    ],
   },
   {
     label: 'effect/workers',

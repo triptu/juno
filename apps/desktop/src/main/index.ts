@@ -45,7 +45,13 @@ const supervisor = createSupervisor({
 })
 
 // The agent process starts only on request until the chat ships (ADR 0012, M2).
-const agent = process.env.JUNO_AGENT === '1' ? createAgentSupervisor((port) => supervisor.send({ _tag: 'agentPort' }, [port])) : undefined
+const agent =
+  process.env.JUNO_AGENT === '1'
+    ? createAgentSupervisor(
+        (port) => supervisor.send({ _tag: 'agentPort' }, [port]),
+        () => supervisor.currentState === 'ready',
+      )
+    : undefined
 supervisor.onReady(() => agent?.linkHost())
 
 const sessionHost = new SessionHost({
@@ -109,6 +115,7 @@ if (e2e) {
       slackLinks: slackLinksForTests,
       agentState: () => agent?.currentState ?? 'stopped',
       agentHost: () => agent?.host?.host,
+      agentPid: () => agent?.pid,
     },
   })
 }
