@@ -28,7 +28,11 @@ const files = spawnSync('git', ['ls-files', '-z', '--cached', '--others', '--exc
   encoding: 'utf8',
   maxBuffer: 64 * 1024 * 1024,
 })
-if (files.status !== 0) throw new Error(`git ls-files failed: ${files.stderr}`)
+// A copy without git (pnpm remote) has no earlier build to reuse: build.
+if (files.status !== 0) {
+  const built = spawnSync(command[0], command.slice(1), { stdio: 'inherit', shell: process.platform === 'win32' })
+  process.exit(built.status ?? 1)
+}
 
 const hash = createHash('sha256')
 hash.update(command.join(' '))
