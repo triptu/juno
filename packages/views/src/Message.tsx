@@ -99,7 +99,7 @@ export const Message = memo(function Message({
       <span {...stylex.props(styles.content)}>
         {header ? (
           <span {...stylex.props(styles.header)}>
-            <Text variant="messageName" tone="default" truncate dir="auto" as="span" sx={styles.name}>
+            <Text variant="messageName" tone="default" truncate tooltipWhenTruncated dir="auto" as="span" sx={styles.name}>
               {name}
             </Text>
             <Text variant="meta" tone="muted" numeric as="time" title={fullTime(message.at)}>
