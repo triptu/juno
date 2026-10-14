@@ -5,7 +5,7 @@ import * as C from '@juno/agent-contract'
 const op = { opId: 'operation' }
 const accepted = op
 const identity = { cardId: 'card', revision: 1, digest: '0'.repeat(64) }
-const child = { actionId: 'action', revision: 1, digest: '0'.repeat(64), duplicateWarning: false }
+const child = { actionId: 'action', revision: 1, digest: '0'.repeat(64) }
 const card = { _tag: 'unknown', id: 'card', kind: 'future' }
 const window = { limit: 20 }
 const executable = { connection_id: 'connection', account_id: 'account', destination_ids: ['channel'], tool: 'slack.send', schema_hash: '0'.repeat(64), args: { text: 'Example' }, preconditions: {}, ops: [] }

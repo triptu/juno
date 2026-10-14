@@ -17,8 +17,7 @@
  * At startup, a job that was running starts again if its driver can resume
  * it, and is `unknown` otherwise (§6.5).
  */
-import { transitionJob, type JobEvent } from '@juno/agent-cards'
-import type { JobPhase } from '@juno/agent-contract'
+import { transitionJob, type JobEvent, type JobRecordPhase as JobPhase } from '@juno/agent-cards'
 import type { Accept } from '../inbox/inbox'
 import { transaction } from '../store/database'
 import { uuidv7, type Store } from '../store/store'

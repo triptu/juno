@@ -19,14 +19,12 @@ const status = fc.oneof(
   fc.record({ _tag: fc.constant('open'), mayHaveHappened: flag }),
   fc.record({ _tag: fc.constantFrom('working', 'dismissed', 'expired') }),
   fc.record({ _tag: fc.constant('done'), line: text, undo: flag, open: optional(target) }),
-  fc.record({ _tag: fc.constant('failed'), line: text, retry: flag, mayDuplicate: flag }),
-  fc.record({ _tag: fc.constant('unknown'), line: text, check: optional(target), mayDuplicate: flag }),
+  fc.record({ _tag: fc.constant('failed'), line: text }),
 )
 const base = { id: text, status, because: optional(text) }
 const result = fc.oneof(
-  fc.record({ _tag: fc.constantFrom('pending', 'sending', 'notSent') }),
+  fc.record({ _tag: fc.constantFrom('pending', 'sending', 'failed') }),
   fc.record({ _tag: fc.constant('sent'), open: target }),
-  fc.record({ _tag: fc.constant('unknown'), check: target }),
 )
 const message = fc.record({
   id: text,
@@ -42,7 +40,7 @@ const cards = {
   proposedTask: fc.record({ ...base, _tag: fc.constant('proposedTask'), kind: jobKind, title: text, where: text }),
   task: fc.record({
     id: text, because: optional(text), _tag: fc.constant('task'), jobId: text, kind: jobKind, title: text, where: text,
-    phase: fc.constantFrom('running', 'needsYou', 'quiet', 'lostSight', 'done', 'failed', 'stopping', 'stopped', 'unknown'),
+    phase: fc.constantFrom('running', 'needsYou', 'quiet', 'lostSight', 'done', 'failed', 'stopping', 'stopped'),
     state: optional(text), open: optional(target),
   }),
   question: fc.record({
@@ -115,13 +113,12 @@ describe('send status copy', () => {
   it('matches the fixed chat copy in both status derivations', () => {
     for (const [tag, line] of [
       ['sent', chatCopy.card.sendMessage.sent],
-      ['notSent', chatCopy.card.sendMessage.notSent],
-      ['unknown', chatCopy.card.sendMessage.unknown],
+      ['failed', chatCopy.card.failed],
     ] as const) {
       const messages = Schema.decodeUnknownSync(SendMessageCard)({
         _tag: 'sendMessage', id: 'card', status: { _tag: 'open' },
         messages: [{ id: 'row', target: { channelId: 'C_TEST', name: 'test', kindLabel: 'Public channel', tint: 'public' }, text: '',
-          result: { _tag: tag, open: { _tag: 'topic', topicId: 'topic' }, check: { _tag: 'topic', topicId: 'topic' } } }],
+          result: { _tag: tag, open: { _tag: 'topic', topicId: 'topic' } } }],
       }).messages
       for (const derive of [projectedSendMessageStatus, sendMessageStatus]) {
         expect(derive(messages)).toMatchObject({ line })

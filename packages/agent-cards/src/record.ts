@@ -10,6 +10,9 @@ const recordBase = {
   sourceValid: Schema.Boolean,
 }
 const { sendMessage: _sendMessage, task: _task, ...clickPayloads } = payloadSchemas
+/** A job's phase as recorded. `unknown`: Juno cannot tell whether it started or still runs (plan v3 §6.5); the card shows it as `failed`. */
+export const JobRecordPhase = Schema.Literals([...P.JobPhase.literals, 'unknown'])
+export type JobRecordPhase = typeof JobRecordPhase.Type
 export const CardRecord = Schema.Union([
   Schema.Struct({ ...recordBase, payload: SendMessagePayload, status: P.CardStatus, children: Schema.Array(ChildEvidence) }).check(
     Schema.makeFilter((record) => {
@@ -17,7 +20,7 @@ export const CardRecord = Schema.Union([
       return new Set(record.children.map((e) => e.id)).size === record.children.length && record.children.every((e) =>
         children.some((child) => child.id === e.id && child.rev === e.rev && actionDigest(child.payload) === e.digest)) || 'Evidence must match the exact child revision and payload'
     })),
-  Schema.Struct({ ...recordBase, payload: TaskPayload, job: Schema.Struct({ phase: P.JobPhase,
+  Schema.Struct({ ...recordBase, payload: TaskPayload, job: Schema.Struct({ phase: JobRecordPhase,
     state: Schema.optionalKey(Schema.String), open: Schema.optionalKey(P.OpenTarget) }) }),
   Schema.Struct({ ...recordBase, payload: Schema.Union(Object.values(clickPayloads)), status: P.CardStatus }),
 ])
@@ -25,22 +28,25 @@ export type CardRecord = typeof CardRecord.Type
 export const CARD_LIFETIME_MS = 7 * 24 * 60 * 60 * 1000
 
 export type CardEvent =
-  | { readonly _tag: 'click'; readonly duplicateWarning: boolean }
+  | { readonly _tag: 'click' }
   | { readonly _tag: 'dismiss' }
   | { readonly _tag: 'expire' }
-  | { readonly _tag: 'result'; readonly status: Extract<P.CardStatus, { _tag: 'done' | 'failed' | 'unknown' }> }
+  | { readonly _tag: 'result'; readonly status: Extract<P.CardStatus, { _tag: 'done' | 'failed' }> }
 
-/** A retry of a status marked `mayDuplicate` needs a warned click (Quint `retryRequiresAuthority`). Clicks are UI state only. WP15 must validate revision, digest and authority before dispatch. */
+/**
+ * A card runs once: only an `open` card takes a click, and a settled one never does (Quint
+ * `noRepeatAuthorization`). Clicks are UI state only. WP15 must validate revision, digest and
+ * authority before dispatch.
+ */
 export function transitionCard(status: P.CardStatus, event: CardEvent): P.CardStatus {
   switch (event._tag) {
     case 'click':
-      return status._tag === 'open' || ((status._tag === 'failed' || status._tag === 'unknown') && (event.duplicateWarning || status.mayDuplicate !== true))
-        ? { _tag: 'working' } : status
+      return status._tag === 'open' ? { _tag: 'working' } : status
     case 'dismiss': return status._tag === 'open' ? { _tag: 'dismissed' } : status
     case 'expire': return status._tag === 'open' ? { _tag: 'expired' } : status
     case 'result':
-      if (status._tag === 'done') return status
-      if (status._tag === 'working' || (status._tag === 'unknown' && event.status._tag === 'done')) return event.status
+      // An action shown as failed because Juno could not confirm it turns done on later positive evidence.
+      if (status._tag === 'working' || (status._tag === 'failed' && event.status._tag === 'done')) return event.status
       return status
   }
 }
@@ -48,7 +54,8 @@ export function transitionCard(status: P.CardStatus, event: CardEvent): P.CardSt
 /** Decode the returned shape with WP7's Card at the wire boundary. No reverse package dependency. */
 export function toCard(record: CardRecord, now: number): P.Card {
   if ('job' in record) {
-    return { ...record.payload, id: record.id, ...record.job }
+    const { phase, ...job } = record.job
+    return { ...record.payload, id: record.id, ...job, phase: phase === 'unknown' ? 'failed' : phase }
   }
   const p = record.payload
   const base = {
@@ -63,8 +70,7 @@ export function toCard(record: CardRecord, now: number): P.Card {
         const evidence = 'children' in record ? record.children.find((e) => e.id === m.actionId) : undefined
         const outcome = evidence === undefined ? 'pending' : childOutcome(evidence)
         const target: P.OpenTarget = { _tag: 'topic', topicId: m.inTopic?.topicId ?? `m:${m.target.channelId}` }
-        const result: P.SendResult = outcome === 'sent' ? { _tag: 'sent', open: target }
-          : outcome === 'unknown' ? { _tag: 'unknown', check: target } : { _tag: outcome }
+        const result: P.SendResult = outcome === 'sent' ? { _tag: 'sent', open: target } : { _tag: outcome }
         return { id: m.id, target: m.target, text: m.text, result, ...(m.inTopic ? { inTopic: m.inTopic } : {}) }
       })
       return { ...base, _tag: p._tag, messages,
@@ -93,7 +99,7 @@ export function toCard(record: CardRecord, now: number): P.Card {
 }
 
 export type JobEvent = 'progress' | 'needsYou' | 'quiet' | 'lostSight' | 'stop' | 'cancelled' | 'done' | 'failed' | 'unknown'
-export function transitionJob(phase: P.JobPhase, event: JobEvent): P.JobPhase {
+export function transitionJob(phase: JobRecordPhase, event: JobEvent): JobRecordPhase {
   if (phase === 'done' || event === 'done') return 'done'
   if (phase === 'failed' || phase === 'stopped') return phase
   switch (event) {

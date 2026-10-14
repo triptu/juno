@@ -49,26 +49,15 @@ export function transitionAttempt(state: AttemptOutcome, event: 'submit' | 'rece
   }
 }
 
-/** A receipt for an older attempt does not settle an unrelated newer attempt. */
-export function childOutcome(evidence: ChildEvidence): 'pending' | 'sending' | 'sent' | 'notSent' | 'unknown' {
+/**
+ * What a row shows. A receipt for any attempt means sent. An attempt Juno cannot confirm shows as
+ * failed, like a rejection; the record keeps it as `unknown` and Activity shows the difference.
+ */
+export function childOutcome(evidence: ChildEvidence): 'pending' | 'sending' | 'sent' | 'failed' {
   const states = evidence.attempts.map((a) => a.outcome)
   if (states.includes('done')) return 'sent'
   if (states.some((s) => s === 'consumed' || s === 'submitted' || s === 'cancel-requested')) return 'sending'
-  if (states.includes('unknown')) return 'unknown'
-  return states.length === 0 ? 'pending' : 'notSent'
-}
-
-/** Only unresolved children are offered again. This does not authorize transport. */
-export function retryChildren(payload: CardPayload, evidence: ReadonlyArray<ChildEvidence>) {
-  return expandChildActions(payload).filter((child) => {
-    const entry = evidence.find((e) => e.id === child.id)
-    return !entry?.attempts.some((a) => a.outcome === 'done')
-  }).map((child) => ({
-    ...child,
-    digest: actionDigest(child.payload),
-    // Quint retryRequiresAuthority covers every repeat, including definite rejection.
-    requiresDuplicateWarning: !child.deduped && evidence.some((e) => e.id === child.id && e.attempts.length > 0),
-  }))
+  return states.length === 0 ? 'pending' : 'failed'
 }
 
 /** A batch click binds order, child ids, revisions and exact executable digests. */

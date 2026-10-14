@@ -73,9 +73,9 @@ export const chatCopy = {
     unknownKind: 'This card needs a newer Juno',
     dismiss: 'Dismiss',
     may: 'This may already have happened.',
-    /** Beside every retry of an action whose destination does not deduplicate, whatever the first outcome (plan v3 §6.3). */
-    mayDuplicate: 'If the first try went through, this does it again.',
-    sendMessage: { send: 'Send', sent: 'Sent', notSent: 'Not sent', open: 'Open', unknown: "Juno can't tell whether this was sent.", check: 'Check channel', sendAgain: 'Send again' },
+    /** A row, or a whole card, that was rejected or that Juno could not confirm. No button follows it. */
+    failed: 'Failed',
+    sendMessage: { send: 'Send', sent: 'Sent', open: 'Open' },
     resolve: { resolve: 'Resolve' },
     task: {
       open: 'Open',
@@ -87,7 +87,6 @@ export const chatCopy = {
       showInActivity: 'Show in Activity',
       stopping: 'Stopping',
       stopped: 'Stopped',
-      unknown: "Juno can't tell whether this is running.",
       lostSight: 'Sign in to T3 Code to keep watching',
       signIn: 'Sign in',
       quiet: "T3 Code has been quiet for 30 minutes. I'll keep watching, or you can stop it.",

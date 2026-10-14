@@ -35,21 +35,13 @@ describe('sendMessageStatus', () => {
   it('counts what was sent', () => {
     expect(sendMessageStatus([row('a', { _tag: 'sent', open })])).toEqual({ _tag: 'done', line: 'Sent' })
     expect(sendMessageStatus([row('a', { _tag: 'sent', open }), row('b', { _tag: 'sent', open })])).toEqual({ _tag: 'done', line: 'Sent 2' })
-    expect(sendMessageStatus([row('a', { _tag: 'sent', open }), row('b', { _tag: 'notSent' }), row('c', { _tag: 'unknown', check: open })])).toEqual({
+    expect(sendMessageStatus([row('a', { _tag: 'sent', open }), row('b', { _tag: 'failed' }), row('c', { _tag: 'failed' })])).toEqual({
       _tag: 'done',
       line: 'Sent 1 of 3',
     })
   })
 
-  it('is unknown when nothing was proven sent and one may have been', () => {
-    expect(sendMessageStatus([row('a', { _tag: 'notSent' }), row('b', { _tag: 'unknown', check: open })])).toEqual({
-      _tag: 'unknown',
-      line: "Juno can't tell whether this was sent.",
-      mayDuplicate: true,
-    })
-  })
-
-  it('fails with a warned retry when nothing was sent', () => {
-    expect(sendMessageStatus([row('a', { _tag: 'notSent' }), row('b', { _tag: 'notSent' })])).toEqual({ _tag: 'failed', line: 'Not sent', retry: true, mayDuplicate: true })
+  it('says Failed, with nothing to click, when no row was sent', () => {
+    expect(sendMessageStatus([row('a', { _tag: 'failed' }), row('b', { _tag: 'failed' })])).toEqual({ _tag: 'failed', line: 'Failed' })
   })
 })
