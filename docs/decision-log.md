@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-14 12:10 · Tushar · Codex credits are back. Spec work and well-defined code go to Codex again; UI and coupled tests stay on Claude.
 - 10-14 11:50 · Tushar · Juno Agent chat works like iMessage. There is no Stop button and no Esc to stop; to change course you send a message. The core has two inputs: queue a message and listen to events. A queued message joins the run at its next step (pi already works this way). SPEC 13 and the turn router are revised to match.
 - 10-14 11:50 · Tushar · An action whose result Juno can't confirm shows as failed on its card, with no special "can't tell" row and no retry warning. The owner checks by hand, or asks Juno again for a new card. Juno still never repeats an action by itself.
 - 10-14 11:50 · Tushar · Every T3 Code session start needs a one-tap Start card, whatever Juno has read. Replaces the narrower no-click rule.
