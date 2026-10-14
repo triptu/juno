@@ -7,6 +7,9 @@ set -uo pipefail
 cd /work
 pnpm install --frozen-lockfile --offline --reporter=silent || exit 70
 echo "remote: workspace linked in ${SECONDS} s" >&2
+# Electron's first start on the container's layered filesystem copies the
+# binary up; parallel test workers starting it then fail with ETXTBSY.
+electron=$(node -e "console.log(require('./apps/desktop/node_modules/electron'))" 2>/dev/null) && "$electron" --version >/dev/null 2>&1
 
 # One job per machine, so it can use all of it.
 export GALLERY_BROWSER=chromium JUNO_HEAVY_SLOTS=1 JUNO_TEST_FILE_PARALLEL=1
