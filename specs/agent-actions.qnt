@@ -21,7 +21,7 @@ module actionsProtocol {
     invalid: bool, expired: bool, gen: int, epoch: int, localEpoch: int, active: bool,
     paused: bool, off: bool, stopped: bool, crashed: bool, resumed: bool,
     ownerRun: bool, clean: bool, sourceInRun: bool, grants: Set[Grant],
-    schedule: bool, scheduleRev: int, scheduleSourceClean: bool, wake: Occurrence,
+    schedule: bool, scheduleRev: int, scheduleAuthority: str, scheduleProposal: int, scheduleApproved: int, wake: Occurrence,
     queued: bool, admissions: List[Occurrence], starts: List[Occurrence],
     quiet: bool, deliverNow: bool, notifications: int, cap: int, raises: int,
     reserved: int, actual: int, unknownSpend: int, compaction: int,
@@ -46,7 +46,7 @@ module actionsProtocol {
     invalid: false, expired: false, gen: 0, epoch: 1, localEpoch: 1, active: true,
     paused: false, off: false, stopped: false, crashed: false, resumed: false,
     ownerRun: true, clean: true, sourceInRun: true, grants: Set(),
-    schedule: false, scheduleRev: 1, scheduleSourceClean: true,
+    schedule: false, scheduleRev: 1, scheduleAuthority: "none", scheduleProposal: 0, scheduleApproved: 0,
     wake: { schedule: 1, rev: 1, due: 1 }, queued: false, admissions: List(), starts: List(),
     quiet: false, deliverNow: false, notifications: 0, cap: 8, raises: 0,
     reserved: 0, actual: 0, unknownSpend: 0, compaction: 0, sealed: false, label: "init", target: 0
@@ -181,8 +181,16 @@ module actionsProtocol {
     s' = { ...s, grants: s.grants.union(Set({ target: k, opClass: 2, source: s.gen, rev: 1 })), label: "grantClick", target: k }
   action scheduleWith(guard: bool): bool =
     if (guard and not(s.ownerRun and s.clean and s.sourceInRun and mayAuthorize)) idle else
-    s' = { ...s, schedule: true, scheduleSourceClean: s.ownerRun and s.clean and s.sourceInRun,
+    s' = { ...s, schedule: true, scheduleAuthority: if (s.ownerRun and s.clean and s.sourceInRun) "clean" else "none",
       grants: s.grants.union(Set({ target: 1, opClass: 1, source: s.gen, rev: s.scheduleRev })), label: "schedule" }
+  action proposeSchedule =
+    if (not(s.ownerRun)) idle else s' = { ...s, scheduleProposal: s.scheduleProposal + 1, label: "proposeSchedule" }
+  action clickSchedule =
+    if (s.scheduleProposal == 0) idle else s' = { ...s, scheduleApproved: s.scheduleProposal, label: "clickSchedule" }
+  action scheduleFromClick(guard: bool): bool =
+    if (guard and not(s.scheduleProposal > 0 and s.scheduleApproved == s.scheduleProposal and mayAuthorize)) idle else
+    s' = { ...s, schedule: true, scheduleAuthority: "click", scheduleApproved: 0,
+      grants: s.grants.union(Set({ target: 1, opClass: 1, source: s.gen, rev: s.scheduleRev })), label: "scheduleClick" }
   val scheduleValid = s.schedule and s.grants.exists(g => g.target == 1 and g.opClass == 1 and
     g.rev == s.scheduleRev and g.source == s.gen)
   action queueWake = s' = { ...s, queued: true, wake: { schedule: 1, rev: s.scheduleRev, due: 1 }, label: "queue" }
@@ -202,7 +210,7 @@ module actionsProtocol {
   // All model paths share one reservation transaction. Unknown usage keeps
   // its reservation; a second sub-budget never expands the owner's total cap.
   action reserve(compact: bool, guard: bool): bool =
-    if (guard and (s.reserved + s.actual + 2 > s.cap + s.raises or (compact and s.compaction + 2 > 2))) idle else
+    if (guard and (s.reserved + s.actual + 2 > s.cap + s.raises or (compact and s.compaction + 2 > (s.cap + s.raises) / 4))) idle else
     s' = { ...s, reserved: s.reserved + 2, compaction: s.compaction + (if (compact) 2 else 0), label: "reserve" }
   action settleSpend(lost: bool, guard: bool): bool =
     if (s.reserved - s.unknownSpend < 2) idle else s' = { ...s,
@@ -214,6 +222,8 @@ module actionsProtocol {
     precondition: s.precondition + (if (kind == "precondition") 1 else 0),
     sourceInRun: s.sourceInRun and kind != "redact", invalid: s.invalid or kind == "redact", expired: s.expired or kind == "expire",
     gen: s.gen + (if (kind == "redact") 1 else 0), grants: if (kind == "redact") Set() else s.grants,
+    scheduleProposal: if (kind == "redact") 0 else s.scheduleProposal,
+    scheduleApproved: if (kind == "redact") 0 else s.scheduleApproved,
     schedule: if (kind == "redact") false else s.schedule, label: "invalidate" }
 
   val newAuths = s.auths.exclude(before.auths)
@@ -244,7 +254,8 @@ module actionsProtocol {
   val untrustedCannotGrant = s.grants.exclude(before.grants).isEmpty() or
     (before.ownerRun and before.clean and before.sourceInRun) or
     (s.label == "grantClick" and before.approvals.exists(p => p.child == s.target and
-      before.intents.exists(i => i.id == p.child and i.rev == p.rev and i.payload == p.digest)))
+      before.intents.exists(i => i.id == p.child and i.rev == p.rev and i.payload == p.digest))) or
+    (s.label == "scheduleClick" and before.scheduleProposal > 0 and before.scheduleApproved == before.scheduleProposal)
   val tier4NeverDispatched = s.auths.forall(a => a.intent.tier < 4)
   val allWritesGated = s.attempts.listSet().forall(t => s.auths.exists(a => a.id == t.auth and a.consumed and a.intent.payload == t.payload))
   // This is the local ownership authority only. WP4 deliberately disproves
@@ -259,15 +270,17 @@ module actionsProtocol {
       g.opClass == 1 and g.rev == before.scheduleRev and g.source == before.gen))
   val batchEffectsIndependent = newAuths.forall(a => not(before.receipts.exists(r => r.child == a.intent.id)))
   val outcomeEvidenceStable = before.receipts.subseteq(s.receipts) and before.auths.subseteq(s.auths)
-  val scheduleFromCleanOwnerRun = not(s.schedule) or s.scheduleSourceClean
+  val scheduleFromOwnerAuthority = not(s.schedule) or s.scheduleAuthority == "clean" or
+    (s.scheduleAuthority == "click" and (s.label != "scheduleClick" or
+      (before.scheduleProposal > 0 and before.scheduleApproved == before.scheduleProposal)))
   val cleanRunForNoClick = newAuths.forall(a => not(a.grant) or (before.ownerRun and before.clean))
-  val capHard = s.reserved + s.actual <= s.cap + s.raises and s.unknownSpend <= s.reserved and s.compaction <= 2
+  val capHard = s.reserved + s.actual <= s.cap + s.raises and s.unknownSpend <= s.reserved and s.compaction <= (s.cap + s.raises) / 4
   val safety = intentBeforeDispatch and approvalExact and approvalCurrentAtAuthorization and approvalConsumption and
     noHiddenRetry and retryRequiresAuthority and unknownPreserved and dedupeIdentityStable and dedupedEffectOnce and
     receiptMatchesAction and scopedNoClickGrant and untrustedCannotGrant and tier4NeverDispatched and allWritesGated and
     currentOwnerAuthorizes and pauseBlocksAuthorization and quietHoursHoldNotifications and scheduleGrantValid and
     occurrenceAdmissionOnce and cancelWinsBeforeAdmission and batchEffectsIndependent and outcomeEvidenceStable and
-    scheduleFromCleanOwnerRun and cleanRunForNoClick and capHard
+    scheduleFromOwnerAuthority and cleanRunForNoClick and capHard
 
   val pendingApproved = ids.filter(k => not(done(k)) and currentIntent(k).exists(i => valid(i) and
     s.approvals.exists(p => p.child == k and p.rev == i.rev and p.digest == i.payload and
@@ -302,7 +315,7 @@ module actionsProtocol {
       all { currentIntent(k) != Set(), s.nextApproval < 5, click(k, true) },
       authorizeDispatch(k), transportSend(k), destinationAccept(k), recordReceipt(k), lose(k), reject(k), reconcile(k, true, true),
       crash, startup(true), pause("pause"), cancel(true), taint(true), grantWith(k, true),
-      scheduleWith(true), queueWake, deleteSchedule, admitWake(""), startWake(true),
+      proposeSchedule, clickSchedule, scheduleFromClick(true), scheduleWith(true), queueWake, deleteSchedule, admitWake(""), startWake(true),
       invalidate("redact"), invalidate("schema"), reserve(false, true), reserve(true, true), settleSpend(true, true), settleSpend(false, true), seal }
   }
   action simulationStep = all { not(reachedAgreement), tick(if (s.sealed) progress else input) }
@@ -339,6 +352,9 @@ module actionsProtocol {
     if (op == "wakeRun") taint(false) else
     if (op == "grantClick") grantClick(k) else
     if (op == "grant") grantWith(k, bug != "untrusted") else
+    if (op == "proposeSchedule") proposeSchedule else
+    if (op == "clickSchedule") clickSchedule else
+    if (op == "scheduleClick") scheduleFromClick(bug != "scheduleClick") else
     if (op == "schedule") scheduleWith(bug != "schedule") else
     if (op == "queue") queueWake else
     if (op == "delete") deleteSchedule else
@@ -483,8 +499,12 @@ module actionsProtocol {
   pure val batchOrderRace = List(c("propose", 0), c("propose", 1), c("clickBatch", 0), c("expandBatch", 0), c("reorderBatch", 0), c("authorize", 0))
   action batchOrderRaceStep = script(batchOrderRace, "")
   action batchOrderRaceBugStep = script(batchOrderRace, "batchOrder")
-  action suiteInit = { nondet which = 0.to(41).oneOf(); all { s' = initial, before' = initial, pc' = 0, remaining' = drainLimit, scenario' = which } }
-  val suiteCommands = List(negativeLookup, unknownRetry, hiddenRetry, approvalEdit, schemaRace, accountRace, connectionRace, preconditionRace, expireRace, redactRace, consumeBeforeSend, approvalReuse, startupAttempt, payloadBinding, receiptBinding, scopedGrant, reportGrant, reportLaunch, reportSchedule, wakeSchedule, destructive, ownerRace, pauseRace, stopRace, offRace, quietNotification, cancelWake, cancelQueuedWake, duplicateWake, lateCancel, partialBatch, dedupeKey, dedupeAccept, parallelBudget, unknownSpend, compactionBudget, unknownDrain, approvedDrain, wakeDrain, pauseDrain, attemptEvidence, batchOrderRace).nth(scenario)
+  pure val clickedSchedule = List(c("report", 0), c("proposeSchedule", 0), c("clickSchedule", 0),
+    c("proposeSchedule", 0), c("scheduleClick", 0))
+  action clickedScheduleStep = script(clickedSchedule, "")
+  action clickedScheduleBugStep = script(clickedSchedule, "scheduleClick")
+  action suiteInit = { nondet which = 0.to(42).oneOf(); all { s' = initial, before' = initial, pc' = 0, remaining' = drainLimit, scenario' = which } }
+  val suiteCommands = List(negativeLookup, unknownRetry, hiddenRetry, approvalEdit, schemaRace, accountRace, connectionRace, preconditionRace, expireRace, redactRace, consumeBeforeSend, approvalReuse, startupAttempt, payloadBinding, receiptBinding, scopedGrant, reportGrant, reportLaunch, reportSchedule, wakeSchedule, destructive, ownerRace, pauseRace, stopRace, offRace, quietNotification, cancelWake, cancelQueuedWake, duplicateWake, lateCancel, partialBatch, dedupeKey, dedupeAccept, parallelBudget, unknownSpend, compactionBudget, unknownDrain, approvedDrain, wakeDrain, pauseDrain, attemptEvidence, batchOrderRace, clickedSchedule).nth(scenario)
   action suiteStep = script(suiteCommands, "")
   val case0 = scenario == 0 and reachedAgreement and (s.unknown == Set(1) and s.explained == Set(1))
   val case1 = scenario == 1 and reachedAgreement and (s.auths.size() == 1)
@@ -528,6 +548,10 @@ module actionsProtocol {
   val case39 = scenario == 39 and reachedAgreement and (s.cancelled == Set(1))
   val case40 = scenario == 40 and reachedAgreement and s.unknown == Set(2) and s.receipts.size() == 1
   val case41 = scenario == 41 and reachedAgreement and s.auths == Set()
+  val case42 = scenario == 42 and reachedAgreement and not(s.schedule)
+  action clickedScheduleWitnessStep = script(List(c("report", 0), c("proposeSchedule", 0),
+    c("clickSchedule", 0), c("scheduleClick", 0)), "")
+  val clickedScheduleCreated = reachedAgreement and s.schedule and s.scheduleAuthority == "click"
   action clickedGrantStep = script(List(c("report", 0), c("tier2", 0), c("click", 0),
     c("grantClick", 0), c("authorize", 0), c("send", 0), c("accept", 0), c("receipt", 0)), "")
   action boundedStep = tick(any {

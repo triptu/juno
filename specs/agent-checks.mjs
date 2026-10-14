@@ -18,8 +18,8 @@ export const actionCases = [
   ['scopedGrant', 'scopedNoClickGrant'],
   ['reportGrant', 'untrustedCannotGrant'],
   ['reportLaunch', 'cleanRunForNoClick'],
-  ['reportSchedule', 'scheduleFromCleanOwnerRun'],
-  ['wakeSchedule', 'scheduleFromCleanOwnerRun'],
+  ['reportSchedule', 'scheduleFromOwnerAuthority'],
+  ['wakeSchedule', 'scheduleFromOwnerAuthority'],
   ['destructive', 'tier4NeverDispatched'],
   ['ownerRace', 'currentOwnerAuthorizes'],
   ['pauseRace', 'pauseBlocksAuthorization'],
@@ -42,6 +42,7 @@ export const actionCases = [
   ['pauseDrain', 'drainBound'],
   ['attemptEvidence', 'unknownPreserved'],
   ['batchOrderRace', 'approvalExact'],
+  ['clickedSchedule', 'scheduleFromOwnerAuthority'],
 ]
 
 export const recoveryCases = [
