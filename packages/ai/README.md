@@ -40,7 +40,7 @@ Ids in outputs are plain strings. The `accept` rule of each task guarantees they
 | Task | Path | Timeout | Why |
 | --- | --- | --- | --- |
 | `routeCheck` | classifier | 1.5 s | On Enter, the user waits. Jev p95 is 0.9 s, plus about 0.3 s when the connection is cold; past the budget the draft posts to Main unchecked. A chat model here is slower than the budget. |
-| `urgencyGate` | classifier | 2 s | Per incoming message after rules. A notification may be 2 s late; past that it goes to the digest. Room for one retry. |
+| `urgencyGate` | classifier | 2 s | Per incoming message not settled by the owner's settings. A notification may be 2 s late; past that the message is decided as with AI assist off (DMs and mentions notify). Room for one retry. |
 | `settledScore` | classifier | 3 s | After 2 minutes idle; nobody waits. Room for one retry. |
 | `parseCommand` | chat decision | 4 s | ⌘K fallback after the grammar; search results show meanwhile. Luna p50 1.5 s, p95 2.3 s, the odd call near 3 s. |
 | `groupRun` | chat decision | 5 s | Background, per Main message. Luna p50 1.8 s, p95 2.9 s. Room for one retry. |

@@ -1,183 +1,218 @@
 /**
- * The notification decision (spec section 14, inventory section 13).
+ * Notifications and presence (spec section 14, inventory section 13).
  *
- * Order: ignored channel → rules top to bottom, first match wins → quiet
- * hours (digest, unless a rule said Now) → Juno off (digest) → score vs
- * threshold (now) → chatter (silent) → digest.
+ * Order: ignored channel → Every message (channel or person) → Never →
+ * outside notification hours (into the summary when hours start, if it
+ * would have notified) → AI assist off (DMs and mentions) → Juno's judgement.
+ * Every message wins over Never, so nothing important is silently lost.
  */
-import { channelLabel, type ChannelInfo } from './channel'
+import { channelLabel, isDm, type ChannelInfo } from './channel'
 import type { UserId } from './ids'
 import { hourLabel } from './time'
 
-export type NotificationOutcome = 'now' | 'digest' | 'silent'
-export type RuleKind = 'person' | 'channel' | 'mention' | 'keyword'
+/** 0 is Sunday, as `Date.prototype.getDay`. */
+export type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6
 
-export interface NotificationRule {
-  readonly id: string
-  readonly kind: RuleKind
-  /** A user id, a channel id, or the keyword. */
-  readonly value: string
-  readonly action: NotificationOutcome
+/** A moment in the owner's local time. */
+export interface LocalTime {
+  readonly weekday: Weekday
+  /** Minutes since local midnight. */
+  readonly minutes: number
 }
 
-export interface QuietHours {
-  /** Start, in minutes since local midnight. */
+/**
+ * Hours on some days of the week. `to` may be before `from` to cross
+ * midnight; the span then belongs to the day it starts on. Equal `from` and
+ * `to` means no hours.
+ */
+export interface Hours {
+  readonly days: ReadonlyArray<Weekday>
   readonly from: number
-  /** End, in minutes since local midnight. May be before `from` to cross midnight. */
   readonly to: number
 }
 
+/** "When it matters" is the default and is not stored. */
+export type NotifyLevel = 'every' | 'never'
+
 export interface NotificationSettings {
-  /** "Let Juno decide". Off sends everything without a rule to digest. */
-  readonly aiGate: boolean
-  /** Percent, 50 to 95. */
-  readonly threshold: number
-  readonly quietHours?: QuietHours
-  /** Minutes since local midnight, for example [600, 780, 990]. */
-  readonly digestTimes: ReadonlyArray<number>
+  /** When the Mac (and Slack's own schedule) may notify. */
+  readonly notificationHours: Hours
+  /** When Slack shows the owner as active. Outside them, away. */
+  readonly presenceHours: Hours
+  /** "What matters to you": the owner's words, read by Juno's judgement with every message. */
+  readonly matters: string
+  /** By channel or DM id. */
+  readonly channels: Readonly<Record<string, NotifyLevel>>
+  /** By user id. */
+  readonly people: Readonly<Record<string, NotifyLevel>>
 }
 
+const weekdays: ReadonlyArray<Weekday> = [1, 2, 3, 4, 5]
+
 export const defaultNotificationSettings: NotificationSettings = {
-  aiGate: true,
-  threshold: 80,
-  quietHours: { from: 19 * 60, to: 8 * 60 },
-  digestTimes: [10 * 60, 13 * 60, 16 * 60 + 30],
+  notificationHours: { days: weekdays, from: 9 * 60, to: 19 * 60 },
+  presenceHours: { days: weekdays, from: 9 * 60, to: 19 * 60 },
+  matters: '',
+  channels: {},
+  people: {},
 }
 
 export interface NotificationCandidate {
   readonly channel: ChannelInfo
   readonly senderId: UserId
   readonly mentionsMe: boolean
-  /** Plain text of the message, for keyword rules. */
-  readonly text: string
-  /** Minutes since local midnight when it arrived. */
-  readonly localMinutes: number
+  readonly at: LocalTime
 }
 
-/** Juno's read of a message, both in 0..1. */
-export interface UrgencyScore {
-  readonly urgent: number
-  readonly chatter: number
+/** Juno's read of one message: whether it needs the owner now, and why in a few words. */
+export interface Judgement {
+  readonly notify: boolean
+  /** "asks you to approve the release before 2pm". */
+  readonly reason: string
 }
 
-/** Above this, a message is "just chatter" and stays silent. */
-export const CHATTER_CUTOFF = 0.5
+/**
+ * - now: an OS notification right away.
+ * - summary: no notification now; counted in the one notification when notification hours start.
+ * - hold: no notification. The message is in Juno as always.
+ */
+export type NotificationOutcome = 'now' | 'summary' | 'hold'
 
 export interface NotificationDecision {
   readonly outcome: NotificationOutcome
-  /** Human-readable, for the Today log: "Rule: In #incidents", "Juno · 89% urgent". */
+  /** For "Why did this notify?": "#incidents is set to Every message", "Juno: asks you to decide". */
   readonly reason: string
-  readonly ruleId?: string
 }
 
-export type DecisionResult = NotificationDecision | { readonly needsScore: true }
+export type DecisionResult = NotificationDecision | { readonly needsJudgement: true }
 
-export interface RuleNames {
-  readonly user?: (id: string) => string | undefined
-  readonly channel?: (id: string) => ChannelInfo | undefined
+export interface DecisionContext {
+  /** The global AI assist switch. Off: DMs and mentions notify. */
+  readonly aiAssist: boolean
+  /** Display names for people, for reasons. */
+  readonly userName?: (id: string) => string | undefined
 }
 
-/** "In #incidents", "From Maya Chen", "Mentions of me in hiring", 'Contains "lunch"'. */
-export function ruleLabel(rule: NotificationRule, names: RuleNames = {}): string {
-  switch (rule.kind) {
-    case 'person':
-      return `From ${names.user?.(rule.value) ?? rule.value}`
-    case 'channel': {
-      const channel = names.channel?.(rule.value)
-      return `In ${channel ? channelLabel(channel) : rule.value}`
+const DAY = 24 * 60
+
+function weekdayAfter(weekday: Weekday, days: number): Weekday {
+  return ((((weekday + days) % 7) + 7) % 7) as Weekday
+}
+
+/** Whether `at` falls inside `hours`. */
+export function inHours(at: LocalTime, hours: Hours): boolean {
+  const { from, to, days } = hours
+  if (from === to) return false
+  const m = ((at.minutes % DAY) + DAY) % DAY
+  if (from < to) return days.includes(at.weekday) && m >= from && m < to
+  return (days.includes(at.weekday) && m >= from) || (days.includes(weekdayAfter(at.weekday, -1)) && m < to)
+}
+
+function shift(at: LocalTime, minutes: number): LocalTime {
+  const total = at.minutes + minutes
+  return { weekday: weekdayAfter(at.weekday, Math.floor(total / DAY)), minutes: ((total % DAY) + DAY) % DAY }
+}
+
+export interface Switch {
+  /** True when hours start at the switch, false when they end. */
+  readonly starts: boolean
+  /** Minutes from `at` until the switch. */
+  readonly inMinutes: number
+  readonly at: LocalTime
+}
+
+/** The next time `hours` start or end after `at`, within a week. Undefined when they never change. */
+export function nextSwitch(at: LocalTime, hours: Hours): Switch | undefined {
+  const inside = inHours(at, hours)
+  const offsets: number[] = []
+  for (let day = 0; day <= 7; day++) {
+    for (const boundary of [hours.from, hours.to]) {
+      const offset = day * DAY + boundary - at.minutes
+      if (offset > 0) offsets.push(offset)
     }
-    case 'mention': {
-      const channel = names.channel?.(rule.value)
-      return `Mentions of me in ${channel ? channelLabel(channel).replace(/^#/, '') : rule.value}`
-    }
-    case 'keyword':
-      return `Contains "${rule.value}"`
   }
-}
-
-export function ruleMatches(rule: NotificationRule, candidate: NotificationCandidate): boolean {
-  switch (rule.kind) {
-    case 'person':
-      return candidate.senderId === rule.value
-    case 'channel':
-      return candidate.channel.id === rule.value
-    case 'mention':
-      return candidate.mentionsMe && candidate.channel.id === rule.value
-    case 'keyword': {
-      const keyword = rule.value.trim().toLowerCase()
-      return keyword.length > 0 && candidate.text.toLowerCase().includes(keyword)
-    }
+  for (const offset of offsets.toSorted((a, b) => a - b)) {
+    const then = shift(at, offset)
+    if (inHours(then, hours) !== inside) return { starts: !inside, inMinutes: offset, at: then }
   }
+  return undefined
 }
 
-export function firstMatchingRule(rules: ReadonlyArray<NotificationRule>, candidate: NotificationCandidate): NotificationRule | undefined {
-  return rules.find((rule) => ruleMatches(rule, candidate))
+const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const
+
+/** "until 9am", "until tomorrow 9am", "until Mon 9am": for "Away until 9am" and "Paused until 9am". */
+export function untilLabel(at: LocalTime, hours: Hours): string | undefined {
+  const next = nextSwitch(at, hours)
+  if (!next) return undefined
+  const time = hourLabel(next.at.minutes)
+  const daysAhead = Math.floor((at.minutes + next.inMinutes) / DAY)
+  if (daysAhead === 0) return `until ${time}`
+  if (daysAhead === 1) return `until tomorrow ${time}`
+  return `until ${dayNames[next.at.weekday]} ${time}`
 }
 
-/** Whether `minutes` falls in the quiet window. Equal `from` and `to` means no quiet hours. */
-export function inQuietHours(minutes: number, quiet: QuietHours | undefined): boolean {
-  if (!quiet || quiet.from === quiet.to) return false
-  const m = ((minutes % 1440) + 1440) % 1440
-  return quiet.from < quiet.to ? m >= quiet.from && m < quiet.to : m >= quiet.from || m < quiet.to
+export type Presence = 'active' | 'away'
+
+/** What the presence schedule says for `at`. The engine applies it at each switch, on launch and on wake. */
+export function scheduledPresence(at: LocalTime, presenceHours: Hours): Presence {
+  return inHours(at, presenceHours) ? 'active' : 'away'
 }
 
-function percent(value: number): number {
-  return Math.round(Math.min(1, Math.max(0, value)) * 100)
+/** Slack's `presence.set` value. Active is `auto`, so Slack still shows an idle owner as away. */
+export function slackPresence(presence: Presence): 'auto' | 'away' {
+  return presence === 'active' ? 'auto' : 'away'
 }
 
 /**
  * Decides what happens to one incoming message. When the answer depends on
- * Juno's score and none was given, it returns `{ needsScore: true }`; the
- * caller fetches the score and calls again with it.
+ * Juno's judgement and none was given, it returns `{ needsJudgement: true }`;
+ * the caller asks Juno (with `settings.matters`) and calls again.
  */
 export function decideNotification(
   candidate: NotificationCandidate,
-  rules: ReadonlyArray<NotificationRule>,
   settings: NotificationSettings,
-  names: RuleNames = {},
-  score?: UrgencyScore,
+  context: DecisionContext,
+  judgement?: Judgement,
 ): DecisionResult {
-  if (candidate.channel.ignored) return { outcome: 'silent', reason: 'Ignored channel' }
+  const { channel, senderId } = candidate
+  const where = channelLabel(channel)
+  if (channel.ignored) return { outcome: 'hold', reason: `${where} is ignored` }
 
-  const rule = firstMatchingRule(rules, candidate)
-  if (rule) return { outcome: rule.action, reason: `Rule: ${ruleLabel(rule, names)}`, ruleId: rule.id }
+  const channelLevel = settings.channels[channel.id]
+  const personLevel = settings.people[senderId]
+  const person = context.userName?.(senderId) ?? senderId
+  if (channelLevel === 'every') return { outcome: 'now', reason: `${where} is set to Every message` }
+  if (personLevel === 'every') return { outcome: 'now', reason: `${person} is set to Every message` }
+  if (channelLevel === 'never') return { outcome: 'hold', reason: `${where} is set to Never` }
+  if (personLevel === 'never') return { outcome: 'hold', reason: `${person} is set to Never` }
 
-  if (inQuietHours(candidate.localMinutes, settings.quietHours)) return { outcome: 'digest', reason: 'Quiet hours' }
+  const inside = inHours(candidate.at, settings.notificationHours)
+  const later = (decision: NotificationDecision): NotificationDecision =>
+    inside || decision.outcome !== 'now' ? decision : { outcome: 'summary', reason: `Outside your notification hours. ${decision.reason}` }
 
-  if (!settings.aiGate) return { outcome: 'digest', reason: 'Juno off, waiting for digest' }
-
-  if (!score) return { needsScore: true }
-
-  const urgent = percent(score.urgent)
-  if (urgent >= settings.threshold) return { outcome: 'now', reason: `Juno · ${urgent}% urgent` }
-  if (score.chatter > CHATTER_CUTOFF) return { outcome: 'silent', reason: `Juno · ${percent(score.chatter)}% just chatter` }
-  return { outcome: 'digest', reason: `Juno · ${urgent}% urgent, can wait` }
-}
-
-/** The next digest slot at or after `minutes`, as minutes since local midnight; wraps to the next day. */
-export function nextDigestSlot(minutes: number, digestTimes: ReadonlyArray<number>): { readonly minutes: number; readonly tomorrow: boolean } | undefined {
-  const slots = digestTimes.toSorted((a, b) => a - b)
-  const first = slots[0]
-  if (first === undefined) return undefined
-  const later = slots.find((slot) => slot > minutes)
-  return later === undefined ? { minutes: first, tomorrow: true } : { minutes: later, tomorrow: false }
-}
-
-/** "Next digest 3pm" or "Next digest tomorrow 10am", for the avatar menu hint. */
-export function nextDigestLabel(minutes: number, digestTimes: ReadonlyArray<number>): string | undefined {
-  const slot = nextDigestSlot(minutes, digestTimes)
-  if (!slot) return undefined
-  return slot.tomorrow ? `Next digest tomorrow ${hourLabel(slot.minutes)}` : `Next digest ${hourLabel(slot.minutes)}`
-}
-
-/** The decision chip in the Today log: "Now", the digest time, or "Silent". */
-export function decisionChip(decision: NotificationDecision, digestSlotMinutes?: number): string {
-  switch (decision.outcome) {
-    case 'now':
-      return 'Now'
-    case 'silent':
-      return 'Silent'
-    case 'digest':
-      return digestSlotMinutes === undefined ? 'Digest' : hourLabel(digestSlotMinutes)
+  if (!context.aiAssist) {
+    const direct = isDm(channel.kind) || candidate.mentionsMe
+    return later(
+      direct
+        ? { outcome: 'now', reason: 'AI assist is off, and DMs and mentions notify you' }
+        : { outcome: 'hold', reason: 'AI assist is off, so only DMs and mentions notify you' },
+    )
   }
+
+  if (!judgement) return { needsJudgement: true }
+  return later({ outcome: judgement.notify ? 'now' : 'hold', reason: `Juno: ${judgement.reason}` })
+}
+
+/** The one notification when notification hours start, or nothing when no message was kept for it. */
+export function hoursStartSummary(
+  held: ReadonlyArray<{ readonly decision: NotificationDecision; readonly where: string }>,
+): { readonly title: string; readonly body: string } | undefined {
+  const kept = held.filter((item) => item.decision.outcome === 'summary')
+  if (kept.length === 0) return undefined
+  const places = [...new Set(kept.map((item) => item.where))]
+  const shown = places.slice(0, 3)
+  const rest = places.length - shown.length
+  const list = rest > 0 ? `${shown.join(', ')} and ${rest} more` : shown.length > 1 ? `${shown.slice(0, -1).join(', ')} and ${shown.at(-1)}` : shown[0]
+  const title = kept.length === 1 ? '1 message needs you' : `${kept.length} messages need you`
+  return { title, body: `In ${list}` }
 }

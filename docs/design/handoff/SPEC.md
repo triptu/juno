@@ -40,7 +40,8 @@ Slack has no concept of a topic. Juno builds one on top of Slack's data. Anythin
 | Follow / unfollow thread | Subscribe / unsubscribe. Unsubscribed topics leave the sidebar. |
 | Mark unread | Works on a topic or on a whole channel. |
 | Quote (the ">" prefix) | Rendered as a soft quote block. Quoting inserts ">" lines. There is no separate reply object. |
-| Not in Slack | Client-only: topic titles, resolved state, pins, stealth reads, groupings of Main messages, ignored channels, notification rules, channel icons. |
+| Not in Slack | Client-only: topic titles, resolved state, pins, stealth reads, groupings of Main messages, ignored channels, notification settings, channel icons. |
+| Presence (active or away) | Set by your active hours and the avatar menu, and written to Slack with `presence.set`. |
 
 ### Topic titles
 
@@ -58,7 +59,7 @@ Titles resolve in this order. A title you set by renaming (stored in Juno only) 
 
 ### Top to bottom
 
-1. **Title bar icons**: Search (⌘K), Browse channels and people, Theme, and your avatar. The avatar menu holds status, Notifications, Preferences, AI assist, switch workspace and sign out. There is no footer and no name label.
+1. **Title bar icons**: Search (⌘K), Browse channels and people, Theme, and your avatar. The avatar menu holds Set yourself away or active, status, Notifications, Preferences, AI assist, switch workspace and sign out. There is no footer and no name label.
 2. **Navigation**: All topics, For you (with a quiet count) and Juno (⌘J). A properly spaced hairline separates these from the list.
 3. **Quick filters** on one row: All · Channels · DMs on the left and an Unread toggle on the right. DMs include group DMs. There are no counters or dots on Unread. A small dot appears next to Channels or DMs when that group has unread topics you are not viewing.
 4. **Scope chip**, shown only when narrowed to one channel: "#eng ×". Narrowing is rare and happens from Browse channels or ⌘K.
@@ -292,7 +293,7 @@ Juno speaks on its own only about things you set up: schedules you asked for, pr
 - **Schedules.** "Catch me up on #eng every weekday at 9" creates a schedule only from a clean conversation with you, and the Scheduled page lists them with the next run, how each delivers, Pause, Edit and Delete. Limits: 20 active, at least 15 minutes apart, one-shot at most a year ahead. A schedule nothing has touched for 30 days pauses itself and says so once.
 - **The label.** A proactive group carries a small uppercase label ("Scheduled · Daily catch-up", "T3 Code · Fix the sidebar flake") with "Why this?" and one quiet action: "Pause schedule" on a schedule's group, "Mute updates" on a job's group. Mute updates stops the milestone messages; the job runs on and stops only from its Task card. Reports from several jobs that arrive together are one message, labelled "T3 Code · 2 jobs".
 - **Monitors speak only on change.** A wake that finds nothing new says nothing in the chat; Activity records that it ran.
-- **Delivery.** The chat always gets the message. Whether your Mac notifies follows section 14.
+- **Delivery.** The chat always gets the message. Whether your Mac notifies follows section 14. A schedule either notifies or doesn't; there is no digest.
 
 ### 13.7 States
 
@@ -345,7 +346,7 @@ Juno remembers the whole chat. Older parts are kept as a summary that grows dens
 | Tier | What | Rule |
 | --- | --- | --- |
 | Read | Reading topics and channels, lookups in Notion, Littlebird and T3 Code, looking back in memory | No click. Folded into one line on Activity |
-| Local | Remember, schedules from a conversation with you, notifications to you | No click. Undo where one applies |
+| Local | Remember, schedules from a conversation with you, notifications to you, notification settings and hours from your own words | No click. Undo where one applies |
 | Work you asked for | Starting, steering or stopping a T3 Code session or a delegate | No click while Juno has not read Slack, a connection or a session report in this reply. Otherwise a card |
 | Outward | Sending to Slack, resolving, writing to Notion or Littlebird, answering a session's approval request, any connection tool not on its read list | Always a card, every time, once per click |
 | Destructive | Deleting, merging, force-pushing, buying | Not offered at all |
@@ -354,7 +355,7 @@ Juno remembers the whole chat. Older parts are kept as a summary that grows dens
 - **Secrets.** Juno never puts a key or token into a tool call or a brief. A match is blocked and a fixed line says so (13.7).
 - **Four ways to stop.** Stop (this reply), Pause Juno, a connection's own switch, and the global AI assist switch (section 15), which turns the chat off entirely. Pause stops the current reply, asks every running session and delegate to stop, and starts nothing new; the composer still works and messages wait for Resume. After Resume, telling a session something needs a card again, because Pause revokes what the conversation had allowed.
 - **Activity** lists every run: who asked, when, the outcome, each action from the Local tier up with the decision made, and one folded read line. Failures are in plain words with "Copy details".
-- **Settings are yours.** Models, the spend cap, rules, tiers and connections change only in Settings. No conversation can change them.
+- **Settings are yours.** Models, the spend cap, rules, tiers and connections change only in Settings. No conversation can change them. Notification settings and hours (section 14) are the exception: Juno changes them from your own words in a clean conversation, like a schedule, never from something it read, and the change shows "Notifications changed · Undo".
 
 ### 13.10 Settings and pages
 
@@ -374,29 +375,29 @@ Destructive actions and purchases, a mobile surface, more than one person in the
 
 ## 14. Notifications and preferences
 
-Everything is always visible when you open Juno. Notification settings only decide when the operating system interrupts you, which is the main fix for constant pings during a manager's day. Each incoming message gets one of three outcomes:
+Everything is always visible when you open Juno. Notification settings only decide when the operating system interrupts you, which is the main fix for constant pings during a manager's day. Juno's judgement does most of the work; you set a few things in plain words. Design: `docs/design/notifications/`.
 
-- **Now:** an OS notification right away.
-- **Digest:** bundled into the next digest time.
-- **Silent:** no notification.
+- **Two sets of hours**, each with days and a from and to time, both weekdays 9am to 7pm by default:
+  - **Notification hours.** Outside them your Mac does not notify. When they start, one notification sums up anything that would have notified you meanwhile, if there was any ("3 messages need you · In #eng, Maya Chen and #hiring"). Juno also writes these hours to Slack's own notification schedule, so your phone goes quiet too (once verified, section 19).
+  - **Active hours.** Inside them Slack shows you as active, outside as away. Juno sets presence at each switch, on launch and on wake. It can only do so while it runs: if it is closed when your active hours start, you stay away until you open it. The page says so in one line.
+- **Juno decides** each message inside notification hours: notify now, or hold. Held means no notification; the message is in Juno as always. There is no threshold to set.
+- **What matters to you** is a short text you write ("The launch and hiring. Anything from my reports that needs a decision today."). Juno reads it with every message.
+- **People and channels** have three settings, chosen from their context menu (Notify me): **Every message** (notifies, even outside notification hours), **When it matters** (the default: Juno decides) and **Never** (no notifications, still in Juno). There is no order: if a person and a channel disagree, Every message wins, so nothing important is silently lost.
+- **Away by hand.** The avatar menu's Set yourself away or Set yourself active changes presence until the next switch in your active hours.
+- **Why.** A message's context menu has "Why did this notify?" or "Why no notification?", with the reason in words ("#design-review is set to Never", "Juno: asks you to approve the release before 2pm"). A setting reason offers Change; a Juno reason offers Tell Juno, which opens the chat quoting the message. The page has one line for today ("4 messages interrupted you. Juno held 23.") with Show why, listing the messages that interrupted you.
+- **Say it to Juno.** "Stop pinging me about #design-review", "I'm off Friday", "Sam can always reach me" change these settings from the chat, with Undo (13.9). Extra digests are Juno schedules ("summarise what you held at 1pm on weekdays").
+- **AI assist off.** DMs and mentions notify inside notification hours, as in Slack. Every message and Never still apply.
 
-- **Your rules** come first, checked top to bottom, and the first match wins. A rule matches a person, a channel or DM, mentions of you in a channel, or a keyword. Each rule shows how many messages it caught today.
-- **Everything else** is decided by Juno. A threshold slider sets how urgent a message must look before it interrupts you. Turning Juno off sends everything to digest.
-- **Digest times** are editable chips. **Quiet hours** hold everything except rules set to Now.
-- **Today** is a log of messages so far with the decision and why, for example "Rule: In #incidents" or "Juno · 89% urgent". It updates live as you change rules.
+The order: ignored channel → Every message (channel or person) → Never → outside notification hours (into the summary if it would have notified) → AI assist off (DMs and mentions) → Juno.
 
-**Juno's own messages** (section 13.6) skip the person, channel and keyword rules and follow this table instead. Quiet hours hold them too, except schedules set to Now. The chat always gets the message; this only decides whether your Mac notifies.
+**Juno's own messages** (section 13.6) skip the people and channel settings and follow this table. The chat always gets the message; this only decides whether your Mac notifies.
 
 | Juno message | OS notification |
 | --- | --- |
-| A scheduled message | As the schedule says: Now, Digest or Silent, set from your words and editable on Scheduled |
-| A job needs a decision, failed, or has been quiet for 30 minutes | Now |
-| A job you started finished | Now |
-| A job started | Silent |
-
-![Notifications settings](screenshots/12-ui.png)
-
-*Figure 12. Notifications.*
+| A scheduled message | At its time, at any hour, since you set the time; or none if the schedule says so. Set from your words and editable on Scheduled |
+| A job needs a decision, failed, or has been quiet for 30 minutes | Now inside notification hours, in the summary outside them |
+| A job you started finished | Now inside notification hours, in the summary outside them |
+| A job started | None |
 
 **Preferences** holds the **ignore list** for noisy channels such as alerts and deploys. Ignored channels are hidden from topics, search and All topics, and never notify. Nothing changes in Slack. You can also ignore a channel from any context menu, with undo.
 
@@ -416,7 +417,7 @@ Split the AI work into two kinds. **Decisions** are fast, cheap and structured: 
 | Clarity check | Decision plus minimal fixes | On send | Concrete fixes found |
 | Audience check | Decision | Typing pause | Sensitivity does not fit the channel |
 | Settled, suggest resolve | Decision | Each new message | High score |
-| Notification gate | Decision | Each incoming message, after rules | Never in the UI, only as an outcome |
+| Notification gate | Decision, reading your What matters text | Each incoming message not settled by Every message or Never | Only as an outcome, and its short reason under "Why did this notify?" |
 | Command routing (⌘K) | Decision | As you type in ⌘K | Clear intent and target |
 | Catch-up summary | Generation | Opening a topic with 2 or more new | At the "new" divider |
 | For you cards | Both | In the background | On the For you page only |
@@ -490,7 +491,8 @@ Use the Littlebird design system's tokens.
 
 - **Not designed yet:** calls and huddles, canvases, workflows, the app directory and Slack Connect specifics. For Juno Agent: a mobile surface, several people in one chat, and live sync between running Macs (section 13.13).
 - **Starting a new DM.** How do you start a DM with someone you have never messaged? This would come through search.
-- **Syncing client-only data.** Should client-only data (titles, resolution, rules) sync across devices? Juno's own state is answered: one Mac writes, an encrypted backup follows, and moving is a handover (section 13.8). Live sync between two running Macs is later.
+- **Slack's notification schedule.** Notification hours should also set Slack's own schedule so the phone goes quiet. Which pref or endpoint holds it is not yet verified (`docs/backlog.md`); until then only the Mac follows the hours, and Slack may not let a channel set to Every message through at night.
+- **Syncing client-only data.** Should client-only data (titles, resolution, notification settings) sync across devices? Juno's own state is answered: one Mac writes, an encrypted backup follows, and moving is a handover (section 13.8). Live sync between two running Macs is later.
 - **Your bubble colour.** Pending: the owner chooses between options A (accent fill), B (accent tint), C (neutral tint) and D (ink) from the mock in `docs/design/juno-chat/`. The mock's README recommends B.
 - **Juno's voice.** Juno saying "I" in its own bubbles (13.11) is a proposal awaiting the owner.
 - **Starting work without a click.** The owner's decision is "no click to start a T3 Code session I asked for". The rule written in 13.4 and 13.9 is narrower: no click only while Juno has not read Slack, a connection or a session report in the same reply, because anything read there can carry instructions. The owner has not yet confirmed the narrowing.

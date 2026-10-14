@@ -49,11 +49,12 @@ Style: transparent, colour `--foreground-subtle`, hover `--surface-hover`, press
 
 **Avatar menu** (popover, 248px wide, anchored top 36px right 0, z 20, padding 6, radius 13, `--pop-shadow`):
 
-- Header: avatar 32 + "Tushar" 13/600 + "acme.slack.com" 12 muted; padding `8 8 10`.
+- Header: avatar 32 with a presence dot (10px, 2px ring in the menu surface: `--success` when active, hollow `--foreground-muted` ring when away) + "Tushar" 13/600 + "Active" or "Away until 9am" 12 muted (`untilLabel` on the active hours; "Active until 8pm" when a change by hand runs to the next switch); padding `8 8 10`.
 - Separator 1px `--border-default`, margin `2 6 4`.
 - Items 32px, radius 6, padding 0 8, gap 10, icon 15 `--foreground-subtle`, label 13, right hint 11 muted:
+  - Set yourself away (`moon`) / Set yourself active (`sun`) — by state; calls `presence.set` and lasts until the next switch in the active hours
   - Set status (`circle-dot`)
-  - Notifications (`bell`) — hint "Next digest 3pm" (next digest time; "Next digest tomorrow 10am" after the last one)
+  - Notifications (`bell`) — hint "Paused until 9am" outside notification hours, none inside
   - Preferences (`settings`) — hint "⌘,"
   - AI assist (`sparkles`) — [proposed] right side is a switch; prototype shows nothing
   - separator
@@ -69,7 +70,7 @@ Style: transparent, colour `--foreground-subtle`, hover `--surface-hover`, press
   - Channels and DMs sorted by latest activity; ignored channels excluded. Leading `hash`/`lock` icon 15 muted, or 18px avatar for DMs (group DMs show two initials). Name 13, weight 600 when it has unread. Meta 11 muted: "private" or "quiet" (no activity in the quiet window). Trailing count tag 18px (unread count; or "@" with `--hl` background and `--hl-fg` text when a topic there mentions you). Selected row = current scope.
   - Empty: "No match." 13 muted, padding 14 8.
 - Footer: "Right-click a channel to mark it read or unread", 11 muted, padding 8 14, border-top 1px `--border-subtle`.
-- Click a row → scope the sidebar to that channel (chip appears), popover closes. Right-click → channel context menu (§15.3).
+- Click a row → scope the sidebar to that channel (chip appears), popover closes. Right-click → channel context menu (§15.2).
 
 ### 2.2 Navigation
 
@@ -430,7 +431,7 @@ One long list, no "new chat". Scroll container; column max-width `--page-width` 
   - **Task**: title 14/500 · where 12.5 muted ("T3 Code · juno") · state line 13 subtle that swaps text with a 150ms cross-fade and never reflows (fixed one-line height, ellipsis). The card has no `status`; `phase` drives it. `lostSight`: the state line reads "Sign in to T3 Code to keep watching" and Open becomes Sign in. Footer: Open ghost · Stop ghost danger text (`--danger`). After, from `chatCopy.card.task`: "Done · Open PR 412", "Failed · Show in Activity", "Stopped", "Juno can't tell whether this is running. Open".
   - **Proposed task**: the same title and where, no state line. Footer: Start secondary · Dismiss. After: "Started".
   - **Question**: header from `asks`: "Juno asks", or "T3 Code asks" + job pill; prompt 14; options as full-width buttons min-height 36, padding `6 12`, 1px `--border-default`, `--radius-xl`, 13.5 lh 1.45, left-aligned, hover `--surface-hover`; a reply field below when `freeText` (one line, grows, `--input-border`, `--radius-lg`) with Reply 30px secondary. After: "You chose {label}" or "You replied".
-  - **Schedule**: what 14/500 · when 13 subtle · "Delivers: Now | Digest | Silent" 12.5 muted. Footer: Keep secondary · Pause ghost · Delete ghost. After: "Kept", "Paused", "Deleted".
+  - **Schedule**: what 14/500 · when 13 subtle · "Notifies you" or "No notification" 12.5 muted. Footer: Keep secondary · Pause ghost · Delete ghost. After: "Kept", "Paused", "Deleted".
   - **Proposed schedule**: the same body, then the prompt each wake runs, in full, 13 subtle in a `--surface-hover` block with `--radius-lg` (never truncated: the click approves it). Footer: Start secondary · Dismiss. After: "Started".
   - **Connect**: server 14/500 · scopes as tags (`--radius-tag`, 11.5, `--secondary-default`) · the leaves line 12.5 muted. Footer: Connect secondary · Skip ghost. After: "Connected".
   - **Change**: "{server} · {target}" header; one block per field: name 12.5 muted, before (strike, subtle) and after 14, `--background` block padding 10 12 `--radius-lg`; `long` fields show 6 lines then "Show all". Caption 12.5 muted italic-free under the fields. Footer: Apply primary · Dismiss ghost. After: "Applied · Open".
@@ -448,31 +449,39 @@ One long list, no "new chat". Scroll container; column max-width `--page-width` 
 
 ## 13. Notifications page
 
-**Shows:** S12 (top), shot 44b (digest, quiet hours), shot 44c (Today log).
+**Shows:** `docs/design/notifications/compare-light.png` (right column). SPEC 14 decides behaviour.
 
-Page max-width 880, padding `40 40 72`, gap 36.
+Page max-width 880, padding `40 40 56`, gap 36.
 
-- Title "Notifications" serif 34; sub "Everything is in Juno whenever you open it. This only decides when your Mac interrupts you: right away, in a digest, or not at all." 14 lh 1.6 subtle max-width 620.
-- **Today so far** line (13 subtle, gap 8, margin-top 8): chips 24px, padding 0 9, radius 6, gap 6, count 600 tabular + label 500: "4 interrupted you" (bg `--hl`, fg `--hl-fg`), "5 waited for a digest" (`--secondary-default` / subtle), "3 stayed silent" (`--surface-hover` / muted).
-- Section pattern: heading 15/600 + sub 13 muted (gap 2), then a group card (radius 10, bg surface, `--card-ring`, rows divided by 1px `--border-subtle`).
+- Title "Notifications" serif 34; sub "During your notification hours, Juno lets through what needs you and holds the rest. Everything is in Juno whenever you open it." 14 lh 1.6 subtle max-width 620.
+- Section pattern: heading 15/600, optional sub 13 muted (gap 2), then a group card (radius 10, bg surface, `--card-ring`, rows divided by 1px `--border-subtle`).
 
-**Your rules** — "Checked top to bottom. The first rule that matches wins."
+**Hours** (no sub)
 
-- Rule row: min-height 48, padding `8 10 8 14`, gap 12: type icon 15 muted (`hash` channel, `user` person, `at-sign` mention, `text-search` keyword) · text 14 "In **#incidents**" / "From **Maya Chen**" / "Mentions of me in **hiring**" / "Contains **"lunch"**" · hits 12 muted "2 today" (blank at zero) · segmented control · remove 26×26 radius 6 `x` 13 muted (name "Remove rule").
-- Segmented control: padding 2, bg `--surface-hover`, radius 7, gap 2; segments 24px, padding 0 9, radius 5, 12/500: **Now · Digest · Silent**. Selected: bg surface, fg default, `--shadow-sm`; others transparent muted.
-- New rule row: padding `10 10 10 14`, gap 8, wraps: "New rule" 13 muted · select type ("From a person | In a channel or DM | Mentions of me in | Contains") · select value (people, or channels/DMs; for Contains a 160px text input, placeholder "word or phrase") · select action ("Notify now | Put in digest | Stay silent") · **Add** 32px secondary. Selects/inputs 32px, radius 7, 1px `--input-border`, 13px.
+- Two rows, min-height 60, padding `8 10 8 14`, gap 12: label block 260px (title 14/500, sub 12 muted) · flexible gap · seven day toggles (28px round, gap 4, 12/500; on: bg `--secondary-default`, fg default; off: transparent, muted; names "Monday"…) · from select · "to" 13 muted · to select. Selects 32px, radius 7, 1px `--input-border`, 13px, hours in half-hour steps ("9am", "6:30pm").
+  - "Notifications" — sub "When it starts, one notification sums up what needed you." Once Slack's schedule is verified and written, the sub adds "Slack on your phone pauses too."
+  - "Active in Slack" — sub "Outside these hours you show as away."
+- Note row (border-top 1px `--border-subtle`, padding `10 14 12`, 12 muted): "Juno switches your status while it's open. If it's closed when your active hours start, you stay away until you open it."
+- Defaults: both weekdays, 9am to 7pm. A to before from crosses midnight.
 
-**Everything else** — "When no rule matches."
+**What matters to you** — "Juno reads this for every message. You can also just tell Juno."
 
-- Checkbox row (padding 14): 15px checkbox, "Let Juno decide" 14/500, "Each message gets a quick read on urgency. Off means everything waits for a digest." 13 muted lh 1.5.
-- Threshold row (only when on): "Interrupt me only when Juno is at least **80%** sure it's urgent" 14; range slider 200px, min 50, max 95, step 5, default 80, `accent-color: var(--foreground-default)`. [proposed] custom slider: 4px track `--border-strong`, filled part `--foreground-default`, 14px round thumb with `--card-ring`.
-- Digest times row: "Digest times" 14 (flex 1 1 180px) · chips 28px, radius 7, bg `--secondary-default`, padding `0 4 0 10`, 13/500, with 20×20 `x` remove (name "Remove"): "10am", "1pm", "4:30pm" · select "Add a time" offering 7:00–20:30 in half hours not already used. Defaults 10am, 1pm, 4:30pm.
-- Quiet hours row: "Quiet hours" 14 · select from (hours "12am"…"11pm") · "to" 13 muted · select to · note "Rules set to Now still come through." 12.5 muted. Default 7pm to 8am.
+- Plain multi-line text field, margin-top 12, max-width 620, min-height 68, padding `10 12`, radius 8, 1px `--input-border`, bg `--background`, 14 lh 1.55. Placeholder "For example: the launch, hiring, and anything from my reports that needs a decision today." Saved on blur. With AI assist off, the field is replaced by "AI assist is off. DMs and mentions notify you." 13 muted.
 
-**Today** — "How the messages that have arrived so far were handled. Change a rule above and this updates."
+**People and channels** (no sub)
 
-- Log rows (newest first): grid `44px minmax(0,150px) minmax(0,1fr) 84px minmax(0,170px)`, gap 14, min-height 44, padding 6 4, border-bottom 1px `--border-subtle`, 13px: time muted tabular "13:42" · where (icon 12 + name) subtle · "**Dev** @Leo I think the preview…" ellipsis · decision chip 22px radius 6 12/500: "Now" (accent), next digest time "1pm" (secondary), "Silent" (transparent muted) · why 12 muted: "Rule: In #incidents", "Rule: From Maya Chen", "Rule: Mentions of me in hiring", "Rule: Contains "lunch"", "Juno · 89% urgent", "Juno · 14% urgent, can wait", "Juno · 66% just chatter", "Quiet hours", "Juno off, waiting for digest", "Ignored channel".
-- Decision order: ignored channel → rules top to bottom → quiet hours (digest, unless a rule said Now) → Juno off (digest) → Juno score vs threshold (now) → chatter (silent) → digest.
+- Two rows, padding `10 10 10 14`: label block 260px ("Every message" / sub "Even outside notification hours"; "Never" / sub "Still in Juno, no alerts") · tags right-aligned, wrapping, gap 6. Tag: 28px, padding `0 4 0 8`, radius 7, bg `--secondary-default`, 13/500, gap 5: channel icon 13 muted or avatar 16 · name · remove 20×20 `x` (name "Remove"). Removing sets the item back to When it matters, with an Undo toast.
+- Both lists empty: one row "Every channel and person is set to When it matters." 13 muted, padding 14.
+- Hint below the card, margin-top 8, 12 muted: "Right-click a channel or person to change how it notifies you."
+
+**Today** (no sub)
+
+- One line, margin-top 8, 14 subtle: "**4** messages interrupted you. Juno held **23**." (counts 600 tabular) · ghost button **Show why** 28px. Zero: "Nothing has interrupted you today."
+- Show why expands a list under the line (rows padding `8 2`, divided by 1px `--border-subtle`, 13px): time 44px muted tabular · place 120px subtle · "**Sender** text" ellipsis; the reason on a second line, 12 muted. Only messages that notified are listed, newest first. The button becomes **Hide**.
+
+**Decision** (`@juno/domain` `decideNotification`): ignored channel → Every message (channel or person) → Never → outside notification hours (into the summary if it would have notified) → AI assist off (DMs and mentions) → Juno's judgement. Reasons are the strings the why popover shows: "#incidents is set to Every message", "Maya Chen is set to Never", "Outside your notification hours. Juno: …", "AI assist is off, and DMs and mentions notify you", "Juno: asks you to approve the release before 2pm".
+
+**Summary when notification hours start** (`hoursStartSummary`): one OS notification, "3 messages need you" / "In #eng, Maya Chen and #hiring" (three places, then "and N more"). None when nothing was kept for it.
 
 ## 14. Preferences
 
@@ -481,7 +490,7 @@ Page max-width 880, padding `40 40 72`, gap 36.
 Page max-width 760, padding `40 40 72`, gap 36. Title "Preferences" serif 34.
 
 - **Ignored channels** — "Hidden from your topics, search and All topics, and they never notify you. Nothing changes in Slack." Group card: rows min-height 48, padding `8 10 8 14`: channel icon 15 muted · name 14/500 · "3 messages hidden" 12 muted · **Stop ignoring** 28px secondary 12.5/500. Empty row "Nothing ignored." 13 muted padding 14. Add row: "Ignore" 13 muted · select of non-ignored channels 32px · **Ignore** 32px secondary · right hint "You can also right-click a channel to ignore it" 12 muted. Ignoring shows the toast "Ignoring #deploys" with Undo. DMs cannot be ignored.
-- **Notifications** — "Rules, digest times and quiet hours." Button **Open notification settings** 34px, padding 0 12, 1px `--border-strong`, radius 8, bg surface, `bell` 14, 13/500.
+- **Notifications** — "Your hours, and what Juno lets through." Button **Open notification settings** 34px, padding 0 12, 1px `--border-strong`, radius 8, bg surface, `bell` 14, 13/500.
 - [proposed] The tweaks in §19 that are user preferences (row style, density, preview lines, avatars, grouping, quiet window, message style, accent, theme, AI assist) also live on this page as a "Appearance" group; the prototype only exposes them through the design-tool panel.
 
 ## 15. Context menus
@@ -506,6 +515,7 @@ Native menus **[spec]**. Prototype rendering for reference: 236px, padding 5, ra
 | — | | | | |
 | Copy Slack link | `link` | | always | |
 | Open in Slack | `arrow-square-out` | | always | opens the Slack app at the topic (`slack://` deep link, falling back to the web permalink) |
+| Notify me | `bell` | current level | always | submenu §15.3 for the topic's channel or DM |
 | Ignore #product | `ban` | | channel is not a DM | toast "Ignoring #product" with Undo |
 
 ### 15.2 Channel menu (Browse popover rows)
@@ -518,8 +528,19 @@ Native menus **[spec]**. Prototype rendering for reference: 236px, padding 5, ra
 | — | | | |
 | Mark channel as read | `check-check` | | always (clears unread on every topic in it) |
 | Mark channel as unread | `circle-dot` | | always (marks the latest topic unread) |
-| — | | | not DM |
+| — | | | |
+| Notify me | `bell` | | always (submenu §15.3) |
 | Ignore channel | `ban` | Hide in Juno | not DM |
+
+### 15.3 Notify me submenu
+
+Shown from 15.1, 15.2 and from a person (a sender's name or avatar in a message, a DM row). Three items with a checkmark (13, `--foreground-default`) on the current one: **Every message**, **When it matters** (default), **Never**. For a person the parent reads "Notify me about Maya". Choosing one applies at once with the toast "#design-review: Never" and Undo.
+
+### 15.4 Message menu
+
+Right-click on a message, and the message's More menu (the why item is new; the others wait for M6): Copy text (`copy`), Reply in thread (`message-square-reply`, Main only), separator, **Why did this notify?** / **Why no notification?** (`circle-help`, by what happened; hidden for your own messages).
+
+The why popover anchors under the item: 300px, padding `14 16`, radius 13, bg surface, `--pop-shadow`, gap 6. Title 13/600 ("Notified you at 13:42", "Didn't notify you", "In the 9am summary") · reason 13 subtle lh 1.5 (the decision's reason) · one button right-aligned, 28px secondary: **Change** when the reason is a setting (opens §15.3 for that channel or person, or the Notifications page for hours), **Tell Juno** when it was Juno's call (opens the Juno chat with the message quoted in the composer). Esc or outside click closes.
 
 ## 16. Toasts
 
