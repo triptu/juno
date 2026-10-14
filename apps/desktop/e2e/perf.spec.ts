@@ -21,7 +21,8 @@ const POSTGRES = 'Draft plan is in the doc'
 
 function stats(name: string, samples: ReadonlyArray<number>): { readonly median: number; readonly p95: number } {
   const sorted = samples.toSorted((a, b) => a - b)
-  const at = (q: number) => sorted[Math.min(sorted.length - 1, Math.floor(q * sorted.length))] ?? 0
+  // Nearest rank: the p95 of 20 samples is the 19th, not the largest.
+  const at = (q: number) => sorted[Math.max(0, Math.ceil(q * sorted.length) - 1)] ?? 0
   const median = at(0.5)
   const p95 = at(0.95)
   const load = loadavg()[0]!.toFixed(1)
@@ -90,6 +91,8 @@ async function traced(win: Page, name: string, run: () => Promise<void>): Promis
     await cdp.send('Profiler.setSamplingInterval', { interval: 100 })
     await cdp.send('Profiler.start')
   }
+  // Starting a trace stops the renderer for a garbage collection: a 50-60 ms frame that is not the scenario's.
+  await win.waitForTimeout(500)
   try {
     await run()
   } finally {
@@ -352,20 +355,23 @@ test.describe.serial('large workspace', () => {
       })
       const interval = await refreshInterval(win)
       const sweep = async (label: string) => {
-        await win.evaluate(() => {
-          const w = window as unknown as { __frames: number[]; __sampling: boolean }
-          w.__frames = []
-          w.__sampling = true
-          let last = performance.now()
-          const tick = (now: number) => {
-            w.__frames.push(now - last)
-            last = now
-            if (w.__sampling) requestAnimationFrame(tick)
-          }
-          requestAnimationFrame(tick)
-        })
+        let frames: number[] = []
+        let loaf: string[] = []
         // About 2 000 px/s for 3 s, down then up.
         const { work } = await traced(win, `scroll-sidebar-${label.replace(' ', '-')}`, async () => {
+          await win.evaluate(() => {
+            const w = window as unknown as { __frames: number[]; __sampling: boolean; __loaf: string[] }
+            w.__frames = []
+            w.__loaf = []
+            w.__sampling = true
+            let last = performance.now()
+            const tick = (now: number) => {
+              w.__frames.push(now - last)
+              last = now
+              if (w.__sampling) requestAnimationFrame(tick)
+            }
+            requestAnimationFrame(tick)
+          })
           for (let i = 0; i < 30; i++) {
             await win.mouse.wheel(0, 200)
             await win.waitForTimeout(100)
@@ -374,17 +380,12 @@ test.describe.serial('large workspace', () => {
             await win.mouse.wheel(0, -200)
             await win.waitForTimeout(100)
           }
-        })
-        const frames = await win.evaluate(() => {
-          const w = window as unknown as { __frames: number[]; __sampling: boolean }
-          w.__sampling = false
-          return w.__frames.slice(1)
-        })
-        const loaf = await win.evaluate(() => {
-          const w = window as unknown as { __loaf: string[] }
-          const out = w.__loaf
-          w.__loaf = []
-          return out
+          // Read before the trace ends: collecting it stalls the renderer too.
+          ;({ frames, loaf } = await win.evaluate(() => {
+            const w = window as unknown as { __frames: number[]; __sampling: boolean; __loaf: string[] }
+            w.__sampling = false
+            return { frames: w.__frames.slice(1), loaf: w.__loaf }
+          }))
         })
         const sorted = frames.toSorted((a, b) => a - b)
         const p95 = sorted[Math.floor(0.95 * sorted.length)] ?? 0
@@ -596,25 +597,26 @@ test.describe.serial('topic view', () => {
 
       const box = (await juno.topic.scroller.boundingBox())!
       await win.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
-      await win.evaluate(() => {
-        const w = window as unknown as { __frames: number[]; __sampling: boolean; __loaf: number }
-        w.__frames = []
-        w.__loaf = 0
-        w.__sampling = true
-        new PerformanceObserver((entries) => {
-          w.__loaf += entries.getEntries().length
-        }).observe({ type: 'long-animation-frame', buffered: false })
-        let last = performance.now()
-        const tick = (now: number) => {
-          w.__frames.push(now - last)
-          last = now
-          if (w.__sampling) requestAnimationFrame(tick)
-        }
-        requestAnimationFrame(tick)
-      })
       const interval = await refreshInterval(win)
+      let result = { frames: [] as number[], loaf: 0 }
       // About 2 000 px/s for 3 s, down then up, twice.
       const { work } = await traced(win, 'scroll-messages', async () => {
+        await win.evaluate(() => {
+          const w = window as unknown as { __frames: number[]; __sampling: boolean; __loaf: number }
+          w.__frames = []
+          w.__loaf = 0
+          w.__sampling = true
+          new PerformanceObserver((entries) => {
+            w.__loaf += entries.getEntries().length
+          }).observe({ type: 'long-animation-frame', buffered: false })
+          let last = performance.now()
+          const tick = (now: number) => {
+            w.__frames.push(now - last)
+            last = now
+            if (w.__sampling) requestAnimationFrame(tick)
+          }
+          requestAnimationFrame(tick)
+        })
         for (let pass = 0; pass < 2; pass++) {
           for (let i = 0; i < 30; i++) {
             await win.mouse.wheel(0, 200)
@@ -625,11 +627,12 @@ test.describe.serial('topic view', () => {
             await win.waitForTimeout(100)
           }
         }
-      })
-      const result = await win.evaluate(() => {
-        const w = window as unknown as { __frames: number[]; __sampling: boolean; __loaf: number }
-        w.__sampling = false
-        return { frames: w.__frames.slice(1), loaf: w.__loaf }
+        // Read before the trace ends: collecting it stalls the renderer too.
+        result = await win.evaluate(() => {
+          const w = window as unknown as { __frames: number[]; __sampling: boolean; __loaf: number }
+          w.__sampling = false
+          return { frames: w.__frames.slice(1), loaf: w.__loaf }
+        })
       })
       const over = result.frames.filter((frame) => frame > interval * 1.5).length
       stats('scroll messages, frame interval', result.frames)
