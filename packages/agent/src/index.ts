@@ -6,5 +6,10 @@ export {
 } from './runtime'
 export type { Accept, InboxKind, InboxOp, InboxState } from './inbox/inbox'
 export type { Mode, Outcome } from './store/ledger'
-export { CORE_MIGRATIONS, LOCAL_TABLES, type MigrationSet } from './store/schema'
+export { CORE_MIGRATIONS, type MigrationSet } from './store/schema'
+import { LOCAL_TABLES as CORE_LOCAL_TABLES } from './store/schema'
+import { PROVIDER_LOCAL_TABLES } from './spend/schema'
+export const LOCAL_TABLES: ReadonlyArray<string> = [...CORE_LOCAL_TABLES, ...PROVIDER_LOCAL_TABLES]
 export { runJob, type CompactionModel, type MemoryView } from './store/memory'
+export { createSpend, Spend, dollars, DOLLAR, spendDay, SPEND_MIGRATIONS, PROVIDER_LOCAL_TABLES,
+  type SpendLedger, type SpendSnapshot, type SpendPath, type Reservation } from './spend'
