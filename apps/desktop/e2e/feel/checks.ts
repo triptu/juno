@@ -214,7 +214,9 @@ export function feedbackInOneFrame(probe: string, eventType: string, label: stri
   return (evidence) => {
     const { recording } = evidence
     const from = markTime(recording, options.from, -Infinity)
-    const event = recording.events.find((e) => e.type === eventType && e.t >= from)
+    // The event on the probed element: a pointer that travels to it passes over others first.
+    const events = recording.events.filter((e) => e.type === eventType && e.t >= from)
+    const event = events.find((e) => e.within.includes(probe)) ?? events[0]
     if (event === undefined) return fail(name, `no ${eventType} event`, [])
     const before = recording.frames[event.nextFrame - 1]?.values[probe] ?? null
     const after = recording.frames.slice(event.nextFrame)
