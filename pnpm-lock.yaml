@@ -470,10 +470,22 @@ importers:
       '@earendil-works/pi-ai':
         specifier: 1.2.0
         version: 1.2.0(@aws-sdk/credential-provider-node@3.972.85)(@smithy/signature-v4@5.7.4)(supports-color@7.2.0)(undici@7.30.0)(ws@8.22.0)(zod@4.6.7)
-    devDependencies:
       '@earendil-works/pi-mcp':
         specifier: 1.2.0
         version: 1.2.0
+      '@juno/agent-contract':
+        specifier: workspace:*
+        version: link:../agent-contract
+      effect:
+        specifier: 4.0.3
+        version: 4.0.3
+    devDependencies:
+      '@juno/agent-memory':
+        specifier: workspace:*
+        version: link:../agent-memory
+      '@openai/codex-sdk':
+        specifier: 0.162.1
+        version: 0.162.1
       '@types/node':
         specifier: 24.19.2
         version: 24.19.2
