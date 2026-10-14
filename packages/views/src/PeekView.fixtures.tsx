@@ -25,7 +25,7 @@ const peek = ({ detail, items, status, width }: Peek, frame?: Parameters<typeof 
             {...(detail.kind === 'main' ? {} : { where: detail.channel.label })}
             art={<TopicArt topicId={detail.id} recipe={detail.art} size={20} />}
           >
-            <MessageList items={items} main={detail.kind === 'main'} now={NOW} {...(status === undefined ? {} : { status })} />
+            <MessageList items={items} main={detail.kind === 'main'} now={NOW} underHeader={false} {...(status === undefined ? {} : { status })} />
           </PeekView>
         }
       />
