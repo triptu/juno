@@ -94,9 +94,8 @@ export async function undoLast(registry: Registry): Promise<boolean> {
 
 /** A command's payload: the command without its tag. */
 function payloadOf<T extends { readonly _tag: string }>(command: T): Omit<T, '_tag'> {
-  const payload: Partial<T> = { ...command }
-  delete payload._tag
-  return payload as Omit<T, '_tag'>
+  const { _tag: _, ...payload } = command
+  return payload
 }
 
 function replay(registry: Registry, undo: UndoCommand): Promise<unknown> {
