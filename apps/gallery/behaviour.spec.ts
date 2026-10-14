@@ -80,7 +80,7 @@ test.describe('truncation tooltip', () => {
   test('a name that fits has no tooltip', async ({ page }) => {
     await page.goto('/#/Message?__state=row/group-start')
     const name = await hoverName(page)
-    await expect(name).toHaveText('Maya Chen')
+    await expect(name).toHaveText('Leo Park')
     await expect(name).not.toHaveAttribute('title')
   })
 
