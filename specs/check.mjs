@@ -3,7 +3,7 @@ import { mkdirSync, readdirSync, readFileSync, rmSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { actionCases, recoveryCases } from './agent-checks.mjs'
+import { actionCases, recoveryCases, replayCases } from './agent-checks.mjs'
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)))
 const require = createRequire(import.meta.url)
@@ -132,7 +132,7 @@ const regressions = [
 ]
 
 const selectedSpec = actionsOnly ? 'agent-actions.qnt' : recoveryOnly ? 'agent-recovery.qnt' : memoryOnly ? 'agent-memory.qnt' : undefined
-for (const file of readdirSync(join(root, 'specs')).filter(name => name.endsWith('.qnt') && (!selectedSpec || name === selectedSpec)).toSorted()) {
+for (const file of readdirSync(join(root, 'specs')).filter(name => name.endsWith('.qnt') && (!selectedSpec || name === selectedSpec || (recoveryOnly && name === 'agent-recovery-replay.qnt'))).toSorted()) {
   quint(['typecheck', `specs/${file}`])
 }
 
@@ -188,6 +188,8 @@ if (!boundedOnly && !actionsOnly && !recoveryOnly) {
     ['localTaint', 'taintLocal'],
     ['doubleEdit', 'pinEditCurrent'],
     ['oversizeParent', 'nodeBounded'],
+    ['parallelLeaves', 'freshPublicationKept'],
+    ['parallelRedaction', 'nodeInputsCurrent'],
   ]
   simulate('agent-memory', 'suiteStep', 'invariants', 'memory-corrected.itf.json', false, true,
     { ...memoryOptions, init: 'suiteInit', samples: 512, steps: 80,
@@ -214,6 +216,14 @@ if (!boundedOnly && !memoryOnly && !recoveryOnly) {
 }
 
 if (!boundedOnly && !memoryOnly && !actionsOnly) {
+  simulate('agent-recovery-replay', 'suiteStep', 'safety', 'recovery-replay-corrected.itf.json', false, true,
+    { init: 'suiteInit', samples: 64, steps: 40,
+      witnesses: ['reachedAgreement', 'case0', 'case1', 'case2', 'case3'], requireCompletion: true })
+  for (const [schedule, invariant] of replayCases) {
+    simulate('agent-recovery-replay', `${schedule}BugStep`, invariant, `recovery-${schedule}-bug.itf.json`, true)
+  }
+  // The same counterexample continues to a second remote effect.
+  simulate('agent-recovery-replay', 'trailingStateBugStep', 'noRepeatedEffect', 'recovery-trailingState-effect-bug.itf.json', true)
   const options = { main: 'agent_recovery' }
   simulate('agent-recovery', 'simulationStep', 'cooperativeSafety', 'agent-recovery.itf.json', false, true,
     { ...options, samples: tracesOnly ? 100 : 1000, steps: 140 })

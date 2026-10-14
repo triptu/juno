@@ -19,7 +19,7 @@ import { projector } from '../projection/projector'
 import { commitRotation, currentIncarnation, deleteRetiredJournals } from '../recovery/incarnations'
 import { recover } from '../recovery/recover'
 import { openDatabase, StoreTooNew, type Database } from '../store/database'
-import { cancelRun, mode, setMode, type Mode } from '../store/ledger'
+import { cancelRun, mode, setMode, type JournalPosition, type Mode } from '../store/ledger'
 import type { MigrationSet } from '../store/schema'
 import { initialize, type Store } from '../store/store'
 import { crashPoint } from './crash'
@@ -49,6 +49,8 @@ export interface Core {
   /** How the journal was found at open. */
   readonly opened: 'resumed' | 'rotated'
   readonly incarnation: () => string
+  /** The journal's last commit now. A tool reads it inside `execute()` and passes it to `authorize`. */
+  readonly position: () => Promise<JournalPosition>
   /** Writes the op to the inbox (FULL) before it returns. Accepting the same op again is a no-op. */
   readonly accept: (input: { readonly opId: string; readonly kind: InboxKind; readonly text: string; readonly data?: unknown }) => Accept
   readonly mode: () => Mode
@@ -186,6 +188,7 @@ function running(store: Store, first: Journal, options: CoreOptions, opened: 're
     store,
     opened,
     incarnation: () => currentIncarnation(store)!,
+    position: async () => ({ incarnation: journal.incarnation, seq: await journal.lastCommitted() }),
     accept: (input) => {
       const result = accept(store, input)
       signal()

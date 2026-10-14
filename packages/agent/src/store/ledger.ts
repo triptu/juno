@@ -49,22 +49,47 @@ function cancelOpen(store: Store, originOp?: string): void {
 
 export type Authorize =
   | { readonly _tag: 'authorized'; readonly id: string }
-  | { readonly _tag: 'refused'; readonly reason: 'paused' | 'off' | 'notOwner' }
+  | { readonly _tag: 'refused'; readonly reason: 'paused' | 'off' | 'notOwner' | 'rotated' }
+
+/** A journal position: the incarnation and its last commit, `next_seq - 1` (`Core.position`). */
+export interface JournalPosition {
+  readonly incarnation: string
+  readonly seq: number
+}
 
 /**
  * Consumes one authorization before transport (§6.3, spec `authorize`). It
  * is refused while paused or off, and on a device that does not own Juno.
  * The dispatcher (WP15) checks approval, digest, grant and the rest first.
+ *
+ * `position` is the journal position read inside the tool's `execute()`,
+ * after pi committed the call's execute intent. The same transaction raises
+ * the incarnation's `authorized_seq` to it, and recovery never resumes a
+ * journal behind it (spec `agent-recovery-replay.qnt`). Without this, an
+ * older copy of the journal that lost only that intent resumes, pi runs the
+ * call again, and the effect is authorized twice. The tool that sends must
+ * keep pi's default `replay: "unsafe"`.
  */
 export function authorize(
   store: Store,
-  input: { readonly intentId: string; readonly child?: number; readonly approvalId?: string; readonly grantId?: string; readonly originOp?: string },
+  input: {
+    readonly intentId: string
+    readonly child?: number
+    readonly approvalId?: string
+    readonly grantId?: string
+    readonly originOp?: string
+    readonly position: JournalPosition
+  },
 ): Authorize {
   const result = transaction(store.db, (): Authorize => {
     const current = mode(store)
     if (current !== 'on') return { _tag: 'refused', reason: current }
     const owner = store.db.prepare('SELECT epoch, state FROM ownership WHERE singleton = 1').get() as { epoch: number; state: string }
     if (owner.state !== 'active') return { _tag: 'refused', reason: 'notOwner' }
+    const raised = store.db
+      .prepare('UPDATE incarnations SET authorized_seq = max(authorized_seq, ?) WHERE id = ? AND retired_at IS NULL')
+      .run(input.position.seq, input.position.incarnation)
+    if (raised.changes === 0) return { _tag: 'refused', reason: 'rotated' }
     const id = uuidv7(store.now())
     store.db
       .prepare(

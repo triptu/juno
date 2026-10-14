@@ -74,4 +74,17 @@ export const recoveryCases = [
   ['staleOwnerObserves', 'observedOwnerStops'],
   ['checkpointReopen', 'transferCheckpointComplete'],
   ['deletionOrder', 'deletionRecordedBeforeRemoved'],
+  ['cursorGaps', 'drainBound'],
+  ['foreignJournal', 'journalRollbackStopsResume'],
+  ['bridgeToolReplay', 'bridgePreservesRun'],
+]
+
+// WP8's trailing-state rollback slice (agent-recovery-replay.qnt). The
+// trailingState bug mode is WP8 before authorizations recorded the journal
+// position; the corrected schedules model the code as it is now.
+export const replayCases = [
+  ['trailingState', 'authorizedOnce'],
+  ['earlyPosition', 'authorizedOnce'],
+  ['unsafeReplay', 'authorizedOnce'],
+  ['replayUnknown', 'oneHandoffPerAuthorization'],
 ]

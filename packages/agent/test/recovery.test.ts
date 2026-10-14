@@ -31,6 +31,8 @@ interface State {
   readonly inbox: ReadonlyArray<{ readonly opId: string; readonly state: string; readonly reason?: string }>
   readonly messages: ReadonlyArray<{ readonly id: number; readonly kind: string; readonly text: string; readonly origin: string | null; readonly incarnation: string }>
   readonly authorizations: ReadonlyArray<string>
+  /** How many times the tool `act` ran in this process. */
+  readonly toolRuns: number
   readonly memory: { readonly rev: number; readonly covered: number; readonly lines: number; readonly queued: number }
   readonly chatRequests: number
   readonly compactionRequests: number
@@ -153,6 +155,42 @@ it('authorization.consumed: an authorization without a receipt is unknown at sta
   const after = await run('attempt')
   expect(after.authorizations).toEqual(['unknown'])
   expect(after.results).toEqual(['refused'])
+})
+
+it('authorization.consumed in a tool call: the journal holds the call\'s intent, so it resumes and pi does not run the call again', async () => {
+  await crash('authorization.consumed', 'tool', 'send:op-1:act', 'idle')
+  expect(raw().authorizations).toEqual(['consumed'])
+  // Spec unsafeReplay: the journal is at the authorized position, and pi settles the call as interrupted.
+  const after = await run('idle')
+  expect(after.opened).toBe('resumed')
+  expect(after.toolRuns).toBe(0)
+  expect(after.authorizations).toEqual(['unknown'])
+  expect(after.inbox).toEqual([{ opId: 'op-1', state: 'done' }])
+})
+
+it('rollback of trailing state: a journal that lost a tool call\'s intent is behind its authorization; it rotates and the action is not authorized again', async () => {
+  // The model calls `act`, and the process dies before pi commits the call's execute intent.
+  const killed = await runAgent({ args: args('tool', 'killBeforeTool', 'send:op-1:act', 'idle'), timeoutMs: 60_000 })
+  expect(killed.crashed).toBe(true)
+  const boundary = snapshotFiles(dir)
+  try {
+    // On restart pi runs the call: it commits the intent, and the tool authorizes the action.
+    await crash('authorization.consumed', 'idle')
+    expect(raw().authorizations).toEqual(['consumed'])
+    // Back to the copy without the intent. It lost only state commits, so it is not behind the archive cursor.
+    boundary.restore(journalFiles)
+    const restored = raw()
+    expect(restored.journal!.lastCommitted).toBeGreaterThanOrEqual(restored.cursor)
+
+    // Spec trailingState: resuming would run the call, and authorize the action, a second time.
+    const after = await run('idle')
+    expect(after.opened).toBe('rotated')
+    expect(after.toolRuns).toBe(0)
+    expect(after.authorizations).toEqual(['unknown'])
+    expect(after.inbox).toEqual([{ opId: 'op-1', state: 'interrupted', reason: 'rollback' }])
+  } finally {
+    boundary.discard()
+  }
 })
 
 it('rotation.drained: the old incarnation is still current; it reopens, and rotation runs again', async () => {

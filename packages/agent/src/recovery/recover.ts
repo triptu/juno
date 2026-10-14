@@ -11,6 +11,10 @@
  *   incarnation and marks every submitted op whose run did not finish
  *   `interrupted`. A file that records another incarnation, or a missing
  *   file under a non-zero cursor, is handled the same way.
+ * - Behind the position of the incarnation's latest authorization is
+ *   handled the same way. The cursor alone misses a copy that lost only
+ *   state commits, such as a tool call's execute intent; resuming it would
+ *   run the call, and its effect, again.
  * - A schema newer than this pi supports stops with "Juno needs to update
  *   its records" and writes nothing.
  * - Before pi resumes, every open authorization becomes `unknown` (§6.5).
@@ -18,8 +22,7 @@
 import { classifyAtStartup } from '../store/ledger'
 import type { Store } from '../store/store'
 import { openJournalFile, type JournalFile } from '../runtime/journal'
-import { cursor } from '../projection/projector'
-import { commitRotation, deleteRetiredJournals, ensureIncarnation } from './incarnations'
+import { commitRotation, deleteRetiredJournals, ensureIncarnation, resumeFloor } from './incarnations'
 
 export type Recovery =
   /** The journal is at or ahead of the archive: resume it. */
@@ -34,7 +37,7 @@ export async function recover(store: Store, agentDir: string): Promise<Recovery>
   deleteRetiredJournals(agentDir, incarnation)
   const opened = await openJournalFile(agentDir, incarnation)
   if (opened._tag === 'unsupported') return { _tag: 'updateNeeded', version: opened.version }
-  const behind = opened._tag === 'foreign' || opened.file.lastCommitted < cursor(store, incarnation)
+  const behind = opened._tag === 'foreign' || opened.file.lastCommitted < resumeFloor(store, incarnation)
   if (!behind && opened._tag === 'opened') {
     const classified = classifyAtStartup(store)
     return { _tag: 'resume', file: opened.file, classified }
