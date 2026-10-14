@@ -18,6 +18,7 @@
     "@earendil-works/pi-ai": "1.2.0",
     "@earendil-works/pi-durable": "1.2.0",
     "@earendil-works/pi-mcp": "1.2.0",
+    "@juno/agent-cards": "workspace:*",
     "@juno/agent-contract": "workspace:*",
     "@juno/agent-memory": "workspace:*",
     "@openai/codex-sdk": "0.162.1",
