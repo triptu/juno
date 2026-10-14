@@ -22,6 +22,8 @@ export type PerfName =
   | 'juno.palette-results'
   | 'juno.send'
   | 'juno.live-update'
+  /** From the peek key's keydown to the first frame with the peeked topic's messages. */
+  | 'juno.peek-open'
 
 const TRACK = 'Juno'
 

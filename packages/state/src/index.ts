@@ -4,6 +4,7 @@ export { engineStatusAtom, pingCommand } from './engine'
 export { importFromSlackAppCommand, sessionStatusAtom, signedInAtom, signInCommand, signOutCommand, type ReadySession } from './session'
 export { defaultTopicListFilter, joinTopicWindow, topicCountsAtom, topicListAtom, type TopicListFilter } from './topics'
 export { mirrorReadsAtom, shouldMarkRead, type ReadTrigger, type ReadView } from './reads'
+export { isPeekKey, PEEK_KEY_PREF, peekKeyAtom, setPeekKey, type PeekKey } from './peek'
 export {
   currentRowAtom,
   focusedTopicAtom,
