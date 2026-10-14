@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-15 05:00 · orchestrator · Merged New chat + Home and the floating header (B) to main. On the merged tree: typecheck, lint and unit tests pass, desktop e2e 64 of 64; the gallery had two parts time out (15 min shift part 4, 2 min cursor check) at load 15 to 17, with no layout or cursor failure reported; both branches passed the gallery on their own. Pushed; the gallery reruns remotely once remote runs land.
 - 10-15 04:40 · Tushar · Verification must not be a bottleneck: saturate remote machines (parallel inside one, fan out across several), run only the tests affected by a change while iterating, run full suites on a schedule against main, cache passed checks by input hash, and find other ways to remove waiting.
 - 10-15 04:25 · Tushar · Namespace account and `nsc` CLI are set up; remote test runs become the top priority because the Mac is overloaded (load 11 to 15, about 20 queued heavy jobs). Perf and feel stay on the Mac.
 - 10-15 02:55 · orchestrator · Merged WP13a (Juno Agent host side): the engine serves the whole AgentHost group, one send per authorization even across crashes, a lost answer stays unknown and is never resent, reconcile needs the same client_msg_id, author, text and place, and main restarts a crashed agent (1 s to 30 s backoff, give up after 5 exits in 2 minutes). Sends stay off for M2. Slack calls can now opt out of retries, because a retry after a lost answer posted twice.
