@@ -30,7 +30,7 @@ const schemaOnlyEffect = new Set(['@juno/domain', '@juno/richtext', '@juno/agent
 // (@juno/views is covered by the `views` directory rule below.)
 const noEffect = new Set(['@juno/ui', '@juno/tokens', '@juno/domain', '@juno/richtext', '@juno/agent-memory', '@juno/agent-cards'])
 // Packages whose src must not import @juno/state.
-const noState = new Set(['@juno/ui'])
+const noState = new Set(['@juno/ui', '@juno/notifications'])
 // The only package allowed to import electron.
 const electronOwner = '@juno/desktop'
 

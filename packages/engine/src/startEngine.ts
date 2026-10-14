@@ -19,12 +19,17 @@ import { HttpTransport } from '@juno/slack'
 import { EngineConfig, SyncControl, type SyncControlOptions } from './config'
 import { agentHostServer } from './protocol/agentHost'
 import { HostLink, silentHost, type Host } from './protocol/host'
+import { NotificationControl, NotificationHost } from './notificationRuntime'
+import type { Presence } from '@juno/domain'
 import { Outbox } from './outbox'
 import { Handlers, Services } from './layer'
 import { protocolServer } from './protocol/server'
 import type { Transport } from './protocol/transport'
 
 export interface EngineHandle {
+  readonly wake: () => Promise<void>
+  readonly setPresence: (presence: Presence) => Promise<void>
+  readonly currentPresence: () => Promise<Presence | undefined>
   readonly config: Config
   /** Closes every port and releases every service. */
   readonly stop: () => Promise<void>
@@ -33,6 +38,7 @@ export interface EngineHandle {
 }
 
 export interface EngineHostOptions {
+  readonly notifications?: NotificationHost
   /** Optional cycle observer and sync schedule overrides, used by the test harness. */
   readonly sync?: SyncControlOptions
   readonly host?: Host
@@ -53,6 +59,7 @@ export function startEngine(transport: Transport, config: Config, options: Engin
         Layer.provide(
           Layer.mergeAll(
             EngineConfig.layer(config),
+            Layer.succeed(NotificationHost, options.notifications ?? NotificationHost.defaultValue()),
             Layer.succeed(SyncControl, options.sync ?? {}),
             HostLink.layer(options.host ?? silentHost()),
             options.httpTransport ?? HttpTransport.nodeFetch(),
@@ -61,9 +68,13 @@ export function startEngine(transport: Transport, config: Config, options: Engin
       )
       // A failed build must not leak what was already acquired.
       const context = yield* Layer.buildWithScope(app, scope).pipe(Effect.onError(() => Scope.close(scope, Exit.void)))
+      const notifications = Context.get(context, NotificationControl)
       const outbox = Context.get(context, Outbox)
       return {
         config,
+        wake: () => Effect.runPromise(notifications.wake),
+        setPresence: (value) => Effect.runPromise(notifications.setPresence(value)),
+        currentPresence: () => Effect.runPromise(notifications.currentPresence),
         stop: () => Effect.runPromise(Scope.close(scope, Exit.void)),
         commandIdle: () => Effect.runPromise(outbox.idle),
       }

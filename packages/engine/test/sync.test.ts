@@ -153,6 +153,7 @@ describe('cold boot', () => {
     const history = apiCalls(engine, 'conversations.history')
     expect(new Set(history.map((c) => c.args['channel'])).size).toBe(history.length)
     expect(callMap(engine)).toEqual({
+      'api:presence.set': 1,
       'api:auth.test': 1,
       'api:client.getWebSocketURL': 1,
       'api:api.getFlannelHttpUrl': 1,
@@ -273,6 +274,7 @@ describe('warm boot', () => {
     await quiet(second)
     expect(apiCalls(second, 'conversations.history').map((c) => c.args['channel'])).toEqual(['C0PRODUCT'])
     expect(callMap(second)).toEqual({
+      'api:presence.set': 1,
       'api:auth.test': 1,
       'api:api.getFlannelHttpUrl': 1,
       'edge:emojis/list': 1,
@@ -772,7 +774,7 @@ describe('subscriptions after a failure (review M3 finding 10)', () => {
     )
     valueOf(await subscribe(engine, id))
     expect(apiCalls(engine, 'subscriptions.thread.add').at(-1)!.args['last_read']).toBe(root.ts)
-    const rows = await engine.rowsUntil((list) => list.some((r) => r.id === id), 'the thread')
+    const rows = await engine.rowsUntil((list) => list.some((r) => r.id === id && r.unreadCount === 2), 'the thread after the read-cursor echo')
     expect(rows.find((r) => r.id === id)).toMatchObject({ unreadCount: 2 })
   })
 })

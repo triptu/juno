@@ -20,6 +20,8 @@
  * lists as shown are fetched again after each reconnect.
  */
 import { Cause, Context, Effect, Fiber, Layer, Stream, SubscriptionRef } from 'effect'
+import { AiProvider } from '@juno/ai'
+import { NotificationControl, startNotifications } from '../notificationRuntime'
 import { quietDaysOf } from '@juno/domain'
 import type { SlackAuthRequired } from '@juno/slack'
 import { prefs } from '@juno/store'
@@ -36,7 +38,7 @@ export class SyncRunner extends Context.Service<
     readonly phases: Stream.Stream<SyncPhase | undefined>
   }
 >()('juno/engine/SyncRunner') {
-  static readonly layer: Layer.Layer<SyncRunner, never, Session | Workspace | EngineConfig | SyncLink> = Layer.effect(
+  static readonly layer: Layer.Layer<SyncRunner, never, Session | Workspace | EngineConfig | SyncLink | AiProvider | NotificationControl> = Layer.effect(
     SyncRunner,
     Effect.gen(function* () {
       const session = yield* Session
@@ -64,12 +66,16 @@ export class SyncRunner extends Context.Service<
             Effect.provide(open.context),
             Effect.catch(() => Effect.succeed(undefined)),
           )
-          const program = runSync({
-            onCycle: (event) => Effect.sync(() => control.onCycle?.(event)),
-            onPhase: (next) => SubscriptionRef.set(phase, next),
-            // The topic view's fetches run in this sync's context while it lives.
-            onFetcher: (fetcher) => link.setFetcher(fetcher),
-            openTopics: link.shown,
+          const program = Effect.gen(function* () {
+            const onEvent = yield* startNotifications
+            return yield* runSync({
+              onEvent,
+              onCycle: (event) => Effect.sync(() => control.onCycle?.(event)),
+              onPhase: (next) => SubscriptionRef.set(phase, next),
+              // The topic view's fetches run in this sync's context while it lives.
+              onFetcher: (fetcher) => link.setFetcher(fetcher),
+              openTopics: link.shown,
+            })
           }).pipe(
             Effect.provide(active.context),
             Effect.provide(open.context),

@@ -107,6 +107,8 @@ Changing notification settings from the chat is a Local action (SPEC 13.9): no c
 
 Not changed: no Quint spec, since presence and notification settings are owner-set values, not a sync protocol.
 
+The M10 engine implementation is in `packages/notifications` and `packages/engine/src/notificationRuntime.ts`. The OS and agent summary callbacks are host interfaces. The remaining host work is in `docs/backlog.md`.
+
 ## Open items
 
 - **Slack's own notification schedule.** The research shows a `dnd` object in `client.userBoot`, `dnd_updated` events, and `users.prefs.set`, but no `dnd.*` call site and no schedule pref keys. Slack's public API has `dnd.setSnooze` and `dnd.endSnooze`, and the schedule appears to be prefs (`dnd_enabled`, `dnd_start_hour`, `dnd_end_hour`, and possibly per-day keys). Unverified. Find the pref or endpoint read-only (`users.prefs.get`, the boot `dnd` object, the official client's bundle), never by writing. Until then the page does not say "on your phone".

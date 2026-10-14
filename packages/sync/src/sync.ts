@@ -41,6 +41,8 @@ export type SyncPhase =
   | { readonly _tag: 'offline' }
 
 export interface RunSyncOptions {
+  /** Observer after event application. Must enqueue work without blocking the socket. */
+  readonly onEvent?: (event: SocketEvent, me: import('@juno/domain').Me) => Effect.Effect<void>
   /** Brackets each boot, reboot or reconciliation, including its background follow pass. */
   readonly onCycle?: (event: 'started' | 'finished') => Effect.Effect<void>
   /** Called on every phase change. */
@@ -194,7 +196,7 @@ export const runSync = (options: RunSyncOptions): Effect.Effect<never, SlackAuth
       }
     }
 
-    const consumer = Stream.runForEach(events, handle)
+    const consumer = Stream.runForEach(events, (event) => handle(event).pipe(Effect.andThen(options.onEvent?.(event, ctx.me) ?? Effect.void)))
 
     const bootOnce = Effect.gen(function* () {
       const startedAt = yield* Clock.currentTimeMillis
