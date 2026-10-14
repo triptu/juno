@@ -1,5 +1,5 @@
 /** Structural projection types. Keep compatible with WP7 without reversing the package graph.
- * The public property tests decode projections with the real chat contract. */
+ * agent-contract/test/card-shape.test.ts checks the encoded AST and every card kind. */
 import { Schema } from 'effect'
 
 export const ChatMessageId = Schema.String.pipe(Schema.brand('ChatMessageId'))
