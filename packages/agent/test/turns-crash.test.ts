@@ -44,6 +44,6 @@ it('a kill mid-turn, after a tool round, resumes the same run without repeating 
   expect(after.searches).toBe(0)
   expect(after.chatRequests).toBe(1)
   expect(after.messages.map(([kind]) => kind)).toEqual(['user', 'juno', 'tool', 'juno'])
-  expect(after.messages[0]).toEqual(['user', 'find lunch'])
+  expect(after.messages[0]).toEqual(['user', '<message id="n1">find lunch</message>'])
   expect(after.messages.at(-1)).toEqual(['juno', 'Found it.'])
 })

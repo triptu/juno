@@ -19,9 +19,10 @@
  * - `undoPin`: "Undo" and removal, with the same version check.
  */
 import {
-  deactivatePin, editPin as editRule, remember, utf8Bytes,
+  deactivatePin, editPin as editRule, remember,
   type Pin, type PinChange, type Pins, type Source,
 } from '@juno/agent-memory'
+import { ownerWords } from '../router/input'
 import { transaction } from '../store/database'
 import type { Store } from '../store/store'
 
@@ -97,12 +98,13 @@ function written(store: Store, id: string): Pin | undefined {
   return row === undefined ? undefined : pinOf(row)
 }
 
-/** Byte offsets of the first occurrence of `quote` in `text`, if any. */
+/** Byte offsets of the first occurrence of `quote` among the owner's own words in `text`, if any. */
 function find(text: string, quote: string): { readonly from: number; readonly to: number } | undefined {
   if (quote === '') return undefined
-  const bytes = Buffer.from(text, 'utf8')
+  const words = ownerWords(text)
+  const bytes = Buffer.from(text, 'utf8').subarray(0, words.to)
   const needle = Buffer.from(quote, 'utf8')
-  const from = bytes.indexOf(needle)
+  const from = bytes.indexOf(needle, words.from)
   return from < 0 ? undefined : { from, to: from + needle.length }
 }
 
@@ -136,8 +138,11 @@ export function rememberQuote(store: Store, input: { readonly id: string; readon
 export function pinMessage(store: Store, input: { readonly id: string; readonly messageId: number; readonly from?: number; readonly to?: number }): PinResult {
   const found = source(store, input.messageId)
   if (found === undefined || found.removed || found.kind !== 'user') return { _tag: 'refused', reason: 'source' }
-  const from = input.from ?? 0
-  const to = input.to ?? utf8Bytes(found.text)
+  // `from` and `to` count from the start of the owner's words, as the chat shows them.
+  const words = ownerWords(found.text)
+  const from = words.from + (input.from ?? 0)
+  const to = input.to === undefined ? words.to : words.from + input.to
+  if (to > words.to) return { _tag: 'refused', reason: 'span' }
   return commit(
     store,
     (pins) => remember({ pins, id: input.id, source: found, h: found.id, cutoff: found.id + 1, from, to }),

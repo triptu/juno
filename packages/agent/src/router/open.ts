@@ -50,9 +50,9 @@ import { uuidv7 } from '../store/store'
 import type { Pins } from '@juno/agent-memory'
 import type { RunState, TurnEvent } from './events'
 import { hostTools, type HostReads } from './host-tools'
-import { createRouter, type Retry } from './router'
+import { createRouter, type Input, type Queued, type Retry } from './router'
 import { TURNS_MIGRATIONS } from './schema'
-import { find, type Accept, type InboxKind, type InboxState } from '../inbox/inbox'
+import { find, type InboxState } from '../inbox/inbox'
 import { view, type MemoryView } from '../store/memory'
 import type { JournalPosition, Mode } from '../store/ledger'
 
@@ -103,8 +103,8 @@ export interface Turns {
   readonly incarnation: () => string
   /** The journal's last commit now. A tool reads it inside its `execute()` and passes it to `authorize` (WP15). */
   readonly position: () => Promise<JournalPosition>
-  /** Owner input, a report, a wake or a click. Durable before it returns; the same op again is a no-op. */
-  readonly accept: (input: { readonly opId: string; readonly kind: InboxKind; readonly text: string; readonly data?: unknown }) => Accept
+  /** A message (maybe a reply), a reaction, a report, a wake or a click. Durable before it returns; the same op again is a no-op. */
+  readonly accept: (input: Input) => Queued
   /** "Try again" on an interrupted or failed send. */
   readonly retry: (input: { readonly opId: string; readonly interruptedOpId: string }) => Retry
   readonly mode: () => Mode
@@ -213,7 +213,7 @@ async function start(
   const jobs = createJobs({
     store,
     drivers: subagentModel ? [subagentDriver({ store, guard, builder, model: subagentModel })] : [],
-    accept: (input) => router.accept(input),
+    accept: (input) => router.message(input),
     ...(options.quietMs !== undefined ? { quietMs: options.quietMs } : {}),
     ...(options.onReport ? { onReport: options.onReport } : {}),
   })

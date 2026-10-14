@@ -3,8 +3,9 @@
 // engine's public API, with the scripted fake provider behind the provider guard.
 import { afterEach, expect, it } from 'vitest'
 import { fakeCatalogue, lostStream, rateLimited, rejectedKey, reply, serverError } from '@juno/agent-testing'
+import type { BubbleId } from '@juno/agent-contract'
 import { dollars, type HostReads } from '../src/index'
-import { answer, deferred, fakeHost, HAIKU, textOf, toolCall, turnsHarness } from './turns-harness'
+import { answer, deferred, fakeHost, HAIKU, say, textOf, toolCall, turnsHarness } from './turns-harness'
 
 let h: Awaited<ReturnType<typeof turnsHarness>> | undefined
 afterEach(async () => {
@@ -12,33 +13,33 @@ afterEach(async () => {
   h = undefined
 })
 
-it('one owner message is one run: dots, the reply streams into one bubble, and the archive and memory hold it', async () => {
+it('one owner message is one run: dots, then the bubble whole, and the archive and memory hold what the model read and wrote', async () => {
   h = await turnsHarness()
-  h.fake.script([reply('Morning. Two meetings today.')])
+  h.fake.script([reply(say('Morning. Two meetings today.'))])
   const op = h.send('what is on today?')
   const ended = await h.ended(op)
 
   expect(ended.ending).toEqual({ _tag: 'complete' })
   const run = await h.started(op)
   expect(run.origin).toBe('owner')
-  // The status bubble shows dots (no status line) until the first token replaces it.
+  // The status bubble shows dots (no status line) until the bubble takes its place.
   const tags = h.tags(run.runId)
   expect(tags[0]).toBe('started')
   expect(tags).not.toContain('status')
   expect(tags.at(-1)).toBe('ended')
-  const texts = h.events.filter((e) => e._tag === 'text' && e.runId === run.runId)
-  expect(texts.at(-1)).toMatchObject({ text: 'Morning. Two meetings today.' })
+  expect(h.bubbles()).toEqual([['Morning. Two meetings today.']])
+  expect(h.events.find((e) => e._tag === 'bubble')).toMatchObject({ runId: run.runId, id: `${run.runId}:0` })
   expect(h.turns.run()).toBeUndefined()
   expect(h.turns.op(op)?.state).toBe('done')
 
   // The archive holds the turn once, and the request carried memory before the owner's words.
   expect(h.turns.messages().map((m) => [m.kind, m.text, m.opId])).toEqual([
-    ['user', 'what is on today?', op],
-    ['juno', 'Morning. Two meetings today.', op],
+    ['user', '<message id="n1">what is on today?</message>', op],
+    ['juno', '<say>Morning. Two meetings today.</say>', op],
   ])
   const sent = h.chatRequests()[0]!.context.messages.filter((m) => m.role !== 'system').map(textOf)
   expect(sent[0]).toContain('<remembered>')
-  expect(sent.at(-1)).toBe('what is on today?')
+  expect(sent.at(-1)).toBe('<message id="n1">what is on today?</message>')
 
   // After the run, the compactor summarizes it into the published view.
   await h.turns.compaction.idle()
@@ -53,9 +54,9 @@ it('a message sent while Juno is answering joins the same run at its next step, 
     reply(async () => {
       inFlight.resolve()
       await release.promise
-      return answer('Here is the plan.')
+      return answer(say('Here is the plan.'))
     }),
-    reply('Lunch at 1 is in.'),
+    reply(say('Lunch at 1 is in.')),
   ])
   const first = h.send('plan my day')
   await inFlight.promise
@@ -69,9 +70,8 @@ it('a message sent while Juno is answering joins the same run at its next step, 
   expect(h.turns.op(steer)?.state).toBe('done')
   // pi placed the message after the first answer, and the second request saw it.
   const second = h.chatRequests()[1]!.context.messages.map(textOf)
-  expect(second.slice(-2)).toEqual(['Here is the plan.', 'also lunch at 1'])
-  expect(h.events.filter((e) => e._tag === 'text').at(-1)).toMatchObject({ text: 'Here is the plan.\n\nLunch at 1 is in.' })
-  expect(h.turns.messages().map((m) => m.text)).toEqual(['plan my day', 'Here is the plan.', 'also lunch at 1', 'Lunch at 1 is in.'])
+  expect(second.slice(-2)).toEqual([say('Here is the plan.'), '<message id="n2">also lunch at 1</message>'])
+  expect(h.bubbles()).toEqual([['Here is the plan.'], ['Lunch at 1 is in.']])
 })
 
 it('messages sent during a tool call join right after it, together, before Juno writes its answer', async () => {
@@ -90,7 +90,7 @@ it('messages sent during a tool call join right after it, together, before Juno 
     person: async (id) => ({ id, name: 'maya', displayName: 'Maya' }),
   }
   h = await turnsHarness({ host })
-  h.fake.script([reply(toolCall('slack_search', { query: 'lunch' })), reply('Two vegetarian places near the office, both open at 1.')])
+  h.fake.script([reply(toolCall('slack_search', { query: 'lunch' })), reply(say('Two vegetarian places near the office, both open at 1.'))])
   const first = h.send('find lunch')
   await searched.promise
   const steers = [h.send('only vegetarian'), h.send('near the office')]
@@ -103,15 +103,8 @@ it('messages sent during a tool call join right after it, together, before Juno 
   expect(h.chatRequests()).toHaveLength(2)
   const second = h.chatRequests()[1]!.context.messages
   expect(second.slice(-3).map((m) => m.role)).toEqual(['toolResult', 'user', 'user'])
-  expect(second.slice(-2).map(textOf)).toEqual(['only vegetarian', 'near the office'])
-  expect(h.turns.messages().map((m) => [m.kind, m.text])).toEqual([
-    ['user', 'find lunch'],
-    ['juno', '→ slack_search({"query":"lunch"})'],
-    ['tool', 'slack_search: No messages.'],
-    ['user', 'only vegetarian'],
-    ['user', 'near the office'],
-    ['juno', 'Two vegetarian places near the office, both open at 1.'],
-  ])
+  expect(second.slice(-2).map(textOf)).toEqual(['<message id="n2">only vegetarian</message>', '<message id="n3">near the office</message>'])
+  expect(h.bubbles()).toEqual([['Two vegetarian places near the office, both open at 1.']])
 })
 
 it('"stop" is a message like any other: Juno reads it at its next step and the run ends normally', async () => {
@@ -122,9 +115,9 @@ it('"stop" is a message like any other: Juno reads it at its next step and the r
     reply(async () => {
       inFlight.resolve()
       await release.promise
-      return answer('Starting the long report.')
+      return answer('Outlining the report first.')
     }),
-    reply('Stopped there. I had the outline.'),
+    reply(say('Stopped there. I had the outline.')),
   ])
   const first = h.send('write a long report')
   await inFlight.promise
@@ -134,8 +127,8 @@ it('"stop" is a message like any other: Juno reads it at its next step and the r
   expect((await h.ended(first)).ending).toEqual({ _tag: 'complete' })
   expect(h.events.filter((e) => e._tag === 'started')).toHaveLength(1)
   expect(h.turns.op(stop)?.state).toBe('done')
-  expect(h.chatRequests()[1]!.context.messages.map(textOf).at(-1)).toBe('stop')
-  expect(h.turns.messages().map((m) => m.text).at(-1)).toBe('Stopped there. I had the outline.')
+  expect(h.chatRequests()[1]!.context.messages.map(textOf).at(-1)).toBe('<message id="n2">stop</message>')
+  expect(h.bubbles()).toEqual([['Stopped there. I had the outline.']])
 })
 
 it('a message sent while a request fails starts the next run instead of waiting for another message', async () => {
@@ -148,7 +141,7 @@ it('a message sent while a request fails starts the next run instead of waiting 
       await release.promise
       throw new Error('fetch failed')
     }),
-    reply('Here is the short version.'),
+    reply(say('Here is the short version.')),
   ])
   const first = h.send('write a long report')
   await inFlight.promise
@@ -160,11 +153,109 @@ it('a message sent while a request fails starts the next run instead of waiting 
   const fresh = await h.started(second)
   expect(fresh.runId).not.toBe(run.runId)
   expect((await h.ended(second)).ending).toEqual({ _tag: 'complete' })
-  expect(h.turns.messages().map((m) => [m.kind, m.text])).toEqual([
-    ['user', 'write a long report'],
-    ['user', 'keep it short'],
-    ['juno', 'Here is the short version.'],
+  expect(h.turns.messages().map((m) => m.kind)).toEqual(['user', 'user', 'juno'])
+  expect(h.bubbles()).toEqual([['Here is the short version.']])
+})
+
+it('only text the model marks reaches the chat: bubbles whole and in order, a reply, a reaction, and nothing else', async () => {
+  h = await turnsHarness()
+  h.fake.script([
+    reply('The owner wants two things. I will answer both.<say>Lunch is at 1.</say>Checking the second.'
+      + '<say reply-to="n1">And the deploy is green.</say><react to="n1">👌</react> Done.'),
   ])
+  const op = h.send('when is lunch, and is the deploy green?')
+  expect((await h.ended(op)).ending).toEqual({ _tag: 'complete' })
+
+  expect(h.bubbles()).toEqual([['Lunch is at 1.'], ['And the deploy is green.', op]])
+  expect(h.events.filter((e) => e._tag === 'reaction')).toEqual([
+    { _tag: 'reaction', target: { kind: 'owner', id: op }, by: 'juno', emoji: '👌' },
+  ])
+  // Nothing outside the blocks left the agent.
+  const shown = JSON.stringify(h.events.filter((e) => e._tag !== 'ended'))
+  for (const hidden of ['The owner wants', 'Checking the second', 'Done.']) expect(shown).not.toContain(hidden)
+})
+
+it('a reply to a Juno bubble carries that bubble to the model in full', async () => {
+  h = await turnsHarness()
+  h.fake.script([reply(say('The deploy is green on staging. Production goes at 4.')), reply(say('The staging deploy from this morning.'))])
+  const first = h.send('status?')
+  const run = await h.started(first)
+  await h.ended(first)
+
+  const second = h.send('which deploy?', { replyTo: { _tag: 'bubble', id: `${run.runId}:0` as BubbleId } })
+  await h.ended(second)
+  expect(h.chatRequests()[1]!.context.messages.map(textOf).at(-1)).toBe(
+    '<message id="n2"><quote from="juno">The deploy is green on staging. Production goes at 4.</quote>which deploy?</message>',
+  )
+  // The owner's own words are what a pin takes, not the quote.
+  const message = h.turns.messages().find((m) => m.opId === second && m.kind === 'user')!
+  expect(h.turns.pins.pinMessage({ messageId: message.id })).toMatchObject({ _tag: 'changed', pin: { text: 'which deploy?' } })
+})
+
+it('a reaction other than a thumbs up reaches the model at its next step, with the bubble it is on', async () => {
+  h = await turnsHarness()
+  const inFlight = deferred()
+  const release = deferred()
+  h.fake.script([
+    reply(say('Lunch is at 1.')),
+    reply(async () => {
+      inFlight.resolve()
+      await release.promise
+      return answer('Looking.')
+    }),
+    reply(say('Glad that works.')),
+  ])
+  const first = h.send('when is lunch?')
+  const firstRun = await h.started(first)
+  await h.ended(first)
+  const second = h.send('and the standup?')
+  await inFlight.promise
+  const reaction = h.react(`${firstRun.runId}:0`, '🎉')
+  release.resolve()
+
+  expect((await h.ended(second)).ending).toEqual({ _tag: 'complete' })
+  expect(h.events.filter((e) => e._tag === 'started')).toHaveLength(2)
+  expect(h.turns.op(reaction)?.state).toBe('done')
+  expect(h.chatRequests()[2]!.context.messages.map(textOf).at(-1)).toBe(
+    '<reaction id="n3" emoji="🎉"><quote from="juno">Lunch is at 1.</quote></reaction>',
+  )
+  expect(h.events.find((e) => e._tag === 'reaction')).toEqual({
+    _tag: 'reaction', target: { kind: 'bubble', id: `${firstRun.runId}:0` }, by: 'owner', emoji: '🎉',
+  })
+})
+
+it('a thumbs up is only recorded: it starts no run and the model never sees it', async () => {
+  h = await turnsHarness({ compaction: false })
+  h.fake.script([reply(say('Lunch is at 1.'))])
+  const first = h.send('when is lunch?')
+  const run = await h.started(first)
+  await h.ended(first)
+
+  const thumbs = h.react(`${run.runId}:0`, '👍')
+  await h.turns.idle()
+  expect(h.events.filter((e) => e._tag === 'started')).toHaveLength(1)
+  expect(h.chatRequests()).toHaveLength(1)
+  expect(h.turns.op(thumbs)).toBeUndefined()
+  expect(h.events.filter((e) => e._tag === 'reaction').map((e) => e.emoji)).toEqual(['👍'])
+  // Removing it is recorded the same way.
+  h.react(`${run.runId}:0`, null)
+  await h.turns.idle()
+  expect(h.chatRequests()).toHaveLength(1)
+  expect(h.events.filter((e) => e._tag === 'reaction').map((e) => e.emoji)).toEqual(['👍', null])
+})
+
+it('a reaction the model chooses to ignore shows nothing', async () => {
+  h = await turnsHarness({ compaction: false })
+  h.fake.script([reply(say('Lunch is at 1.')), reply('A smile on a plain answer. Nothing to add.')])
+  const first = h.send('when is lunch?')
+  const run = await h.started(first)
+  await h.ended(first)
+
+  const reaction = h.react(`${run.runId}:0`, '🙂')
+  const second = await h.started(reaction)
+  expect((await h.ended(reaction)).ending).toEqual({ _tag: 'complete' })
+  expect(h.tags(second.runId)).toEqual(['started', 'ended'])
+  expect(h.bubbles()).toEqual([['Lunch is at 1.']])
 })
 
 it('ends a run whose provider call fails with the fixed ending for the cause, and Try again where it applies', async () => {
@@ -186,8 +277,8 @@ it('ends a run whose provider call fails with the fixed ending for the cause, an
     expect(h.turns.guard.spend.snapshot().unknown > unknown).toBe(billed)
   }
   expect(h.turns.guard.spend.snapshot().reserved).toBe(h.turns.guard.spend.snapshot().unknown)
-  // No ending writes model text.
-  expect(h.events.filter((e) => e._tag === 'text')).toEqual([])
+  // No ending writes a bubble.
+  expect(h.bubbles()).toEqual([])
 })
 
 it('blocks a request too large for the model before any provider call', async () => {
@@ -228,18 +319,19 @@ it('ends a run blocked by the budget when the cap is reached mid-run, after show
 
 it('ends a run whose stream was lost as interrupted, keeps its spend as unknown, and Try again runs it once more', async () => {
   h = await turnsHarness({ compaction: false })
-  h.fake.script([lostStream('Partial answer that never finished.', { afterChars: 8 }), reply('The full answer.')])
+  h.fake.script([lostStream('<say>Partial answer.</say> and then', { afterChars: 30 }), reply(say('The full answer.'))])
   const op = h.send('explain the outage')
   expect((await h.ended(op)).ending).toEqual({ _tag: 'interrupted', retry: op })
   expect(h.turns.op(op)?.state).toBe('interrupted')
-  expect(h.events.some((e) => e._tag === 'text' && e.text.startsWith('Partial'))).toBe(true)
+  // A bubble closed before the stream was lost was shown.
+  expect(h.bubbles()).toEqual([['Partial answer.']])
   expect(h.turns.guard.spend.snapshot().unknown).toBeGreaterThan(0)
 
   expect(h.turns.retry({ opId: 'op-retry', interruptedOpId: op })._tag).toBe('accepted')
   expect((await h.ended('op-retry')).ending).toEqual({ _tag: 'complete' })
   expect(h.turns.messages().filter((m) => m.kind === 'user').map((m) => [m.text, m.opId])).toEqual([
-    ['explain the outage', op],
-    ['explain the outage', 'op-retry'],
+    ['<message id="n1">explain the outage</message>', op],
+    ['<message id="n2">explain the outage</message>', 'op-retry'],
   ])
   // A retry is only for an interrupted or failed owner send.
   expect(h.turns.retry({ opId: 'op-again', interruptedOpId: 'op-retry' })).toEqual({ _tag: 'refused', reason: 'notRetryable' })

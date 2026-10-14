@@ -3,10 +3,14 @@
  * bridge). It owns the live run: its history cutoff `H`, its clean flag, its
  * inputs, its text and status, and how it ends.
  *
- * The chat has two inputs and nothing else: queue a message (`accept`) and
- * listen to events (`subscribe`). Nothing the owner does stops a run. To
- * change course they send another message, and Juno reads it at its next
- * step.
+ * The chat has two inputs and nothing else: queue an input (`accept`: a
+ * message, a reply or a reaction) and listen to events (`subscribe`).
+ * Nothing the owner does stops a run. To change course they send another
+ * message, and Juno reads it at its next step.
+ *
+ * The owner sees only what the model marks (`output.ts`): each closed
+ * `<say>` block is a `bubble` event, whole, and each `<react>` a `reaction`.
+ * The rest of the model's text never leaves the agent.
  *
  * One input, one run:
  *
@@ -44,10 +48,10 @@ import type { Journal, Settled } from '../runtime/journal'
 import { transaction } from '../store/database'
 import { mode, setMode, type Mode } from '../store/ledger'
 import { uuidv7, type Store } from '../store/store'
+import { THUMBS_UP, type ReplyTarget } from '@juno/agent-contract'
 import type { Origin, RunState, TurnEvent } from './events'
-
-/** The status line changes at most this often (§8). */
-export const STATUS_INTERVAL_MS = 2_000
+import { archivedBubble, modelText, ownerOpOf, runText } from './input'
+import { parseOutput } from './output'
 
 export interface Session {
   readonly journal: () => Journal
@@ -82,28 +86,55 @@ interface Live {
   partial: string
   /** The current request's response has started. */
   streamed: boolean
-  status: { text?: string } | undefined
-  statusAt: number
-  nextStatus: string | undefined
-  statusTimer: ReturnType<typeof setTimeout> | undefined
+  /** Bubbles and reactions already published, by index in the run's parsed text. */
+  readonly bubbles: Array<{ readonly id: string; readonly text: string; readonly replyTo?: string }>
+  reactions: number
+  /** The status bubble: dots, or a tool's line. */
+  status: { text?: string }
+  /** The run was started by an owner message, so Try again can resend it. */
+  readonly retryable: boolean
   readonly calls: Map<string, number>
   flushing: Promise<void>
 }
 
-const originOf = (kind: InboxKind): Origin => (kind === 'send' || kind === 'steer' || kind === 'retry' ? 'owner' : kind)
+const originOf = (kind: InboxKind): Origin => (kind === 'send' || kind === 'steer' || kind === 'retry' || kind === 'react' ? 'owner' : kind)
+const isMessage = (kind: InboxKind | undefined) => kind === 'send' || kind === 'steer' || kind === 'retry'
 const join = (...parts: ReadonlyArray<string>) => parts.filter((part) => part !== '').join('\n\n')
 const settledStates = new Set(['done', 'interrupted', 'failed'])
 
-const live = (row: { id: string; op_id: string; origin: Origin; h: number; clean: number }): Live => ({
+const live = (row: { id: string; op_id: string; origin: Origin; h: number; clean: number }, retryable: boolean): Live => ({
   runId: row.id, opId: row.op_id, origin: row.origin, h: row.h, clean: row.clean === 1,
   inputs: new Map(), failure: undefined,
-  done: '', partial: '', streamed: false, status: {}, statusAt: 0, nextStatus: undefined, statusTimer: undefined,
+  done: '', partial: '', streamed: false, bubbles: [], reactions: 0, status: {}, retryable,
   calls: new Map(), flushing: Promise.resolve(),
 })
 /** The inbox state an op settles in for a run's ending. */
 const stateFor = (ending: Ending): 'done' | 'interrupted' | 'failed' =>
   ending._tag === 'complete' ? 'done' : ending._tag === 'interrupted' ? 'interrupted' : 'failed'
 const reasonFor = (ending: Ending) => ('reason' in ending ? `${ending._tag}:${ending.reason}` : ending._tag)
+
+/** An input the owner queues: a message (maybe a reply), a reaction, or a report, wake or click. */
+export type Input =
+  | {
+      readonly opId: string
+      readonly kind: Exclude<InboxKind, 'react'>
+      readonly text: string
+      readonly data?: unknown
+      /** A reply to a Juno bubble or card. Not a click. */
+      readonly replyTo?: ReplyTarget
+    }
+  | {
+      readonly opId: string
+      readonly kind: 'react'
+      readonly target: Extract<ReplyTarget, { _tag: 'bubble' | 'card' }>
+      /** `null` removes the owner's reaction. */
+      readonly emoji: string | null
+    }
+
+export type Queued =
+  | Accept
+  /** A thumbs up or a removal: stored with the item, no run. */
+  | { readonly _tag: 'recorded' }
 
 export type Retry =
   | Accept
@@ -143,7 +174,7 @@ export function createRouter(options: RouterOptions) {
   // ---- Endings
 
   const endingOf = (run: Live, results: ReadonlyMap<string, Settled | InboxOp['state']>): Ending => {
-    const retry = run.origin === 'owner' ? { retry: run.opId as OpId } : {}
+    const retry = run.retryable ? { retry: run.opId as OpId } : {}
     if (run.failure !== undefined) {
       return run.failure._tag === 'interrupted' || run.failure._tag === 'failed' ? { ...run.failure, ...retry } : run.failure
     }
@@ -155,7 +186,6 @@ export function createRouter(options: RouterOptions) {
       store.db.prepare('UPDATE runs SET ended_at = ?, ending = ? WHERE id = ? AND ended_at IS NULL').run(store.now(), JSON.stringify(ending), run.runId)
     })
     for (const opId of run.inputs.keys()) settle(store, opId, stateFor(ending), reasonFor(ending))
-    if (run.statusTimer !== undefined) clearTimeout(run.statusTimer)
     if (current === run) current = undefined
     emit({ _tag: 'ended', runId: run.runId, opId: run.opId, ending })
     options.onRunEnded?.()
@@ -194,7 +224,12 @@ export function createRouter(options: RouterOptions) {
       })
       row = { id, op_id: first.opId, origin: originOf(first.kind), h: at.id ?? archiveLength(), clean: 0 }
     }
-    const run = live(row)
+    const run = live(row, isMessage(find(store, row.op_id)?.kind))
+    // What the run already wrote, so bubble numbers carry on where they were.
+    run.done = runText(store, run.runId)
+    const published = parseOutput(run.done)
+    run.bubbles.push(...published.bubbles.map((bubble, n) => ({ id: `${run.runId}:${n}`, text: bubble.text })))
+    run.reactions = published.reactions.length
     const inputs = store.db.prepare('SELECT op_id AS opId FROM run_inputs WHERE run_id = ?').all(run.runId) as Array<{ opId: string }>
     for (const input of inputs) run.inputs.set(input.opId, find(store, input.opId)?.submissionId ?? undefined)
     for (const op of open) {
@@ -219,7 +254,7 @@ export function createRouter(options: RouterOptions) {
         .run(row.id, row.op_id, row.origin, row.h, row.clean, store.now())
       store.db.prepare('INSERT INTO run_inputs (op_id, run_id, steer) VALUES (?, ?, 0)').run(op.opId, row.id)
     })
-    const run = live(row)
+    const run = live(row, isMessage(op.kind))
     run.inputs.set(op.opId, undefined)
     current = run
     emit({ _tag: 'started', runId: run.runId, opId: run.opId, origin })
@@ -230,7 +265,7 @@ export function createRouter(options: RouterOptions) {
     const journal = session.journal()
     const input = find(store, run.opId)
     if (input === undefined) throw new Error(`run ${run.runId} has no input`)
-    if (input.state === 'accepted') run.inputs.set(input.opId, await deliver(store, journal, input, { steer: false }))
+    if (input.state === 'accepted') run.inputs.set(input.opId, await deliver(store, journal, input, { steer: false, text: inputText(input) }))
     const results = new Map<string, Settled | InboxOp['state']>()
     for (;;) {
       const pending = [...run.inputs].filter(([opId]) => !results.has(opId))
@@ -249,32 +284,47 @@ export function createRouter(options: RouterOptions) {
 
   // ---- What the run shows
 
+  /** A bubble's text: from the live run, or from the archive. */
+  const bubbleText = (id: string) => current?.bubbles.find((bubble) => bubble.id === id)?.text ?? archivedBubble(store, id)
+  const inputText = (op: InboxOp) => modelText(store, op, bubbleText)
+
+  const recordReaction = (input: { opId: string; kind: 'bubble' | 'card' | 'owner'; id: string; by: 'owner' | 'juno'; emoji: string | null }) => {
+    const added = transaction(store.db, () =>
+      store.db
+        .prepare('INSERT OR IGNORE INTO reactions (op_id, target_kind, target_id, by, emoji, at) VALUES (?, ?, ?, ?, ?, ?)')
+        .run(input.opId, input.kind, input.id, input.by, input.emoji, store.now()).changes > 0,
+    )
+    if (added) emit({ _tag: 'reaction', target: { kind: input.kind, id: input.id }, by: input.by, emoji: input.emoji })
+  }
+
+  /** Publishes the blocks the model has closed since the last call: each bubble whole, each reaction once. */
+  const publish = (run: Live) => {
+    const output = parseOutput(text(run))
+    for (const bubble of output.bubbles.slice(run.bubbles.length)) {
+      const id = `${run.runId}:${run.bubbles.length}`
+      const replyTo = bubble.replyTo === undefined ? undefined : ownerOpOf(store, bubble.replyTo)
+      run.bubbles.push({ id, text: bubble.text, ...(replyTo ? { replyTo } : {}) })
+      run.status = {}
+      emit({ _tag: 'bubble', runId: run.runId, id, text: bubble.text, ...(replyTo ? { replyTo } : {}) })
+    }
+    for (const reaction of output.reactions.slice(run.reactions)) {
+      const target = ownerOpOf(store, reaction.to)
+      if (target !== undefined) recordReaction({ opId: `${run.runId}:r${run.reactions}`, kind: 'owner', id: target, by: 'juno', emoji: reaction.emoji })
+      run.reactions += 1
+    }
+  }
+
   const progress = (run: Live, update: StreamProgress) => {
     if (run !== current) return
     run.streamed = true
     if (update.text === run.partial) return
     run.partial = update.text
-    if (update.text === '') return
-    run.status = undefined
-    run.nextStatus = undefined
-    emit({ _tag: 'text', runId: run.runId, text: text(run) })
+    publish(run)
   }
 
   const showStatus = (run: Live, line: string) => {
-    const apply = (next: string) => {
-      run.status = { text: next }
-      run.statusAt = store.now()
-      run.nextStatus = undefined
-      emit({ _tag: 'status', runId: run.runId, text: next })
-    }
-    const wait = run.statusAt + STATUS_INTERVAL_MS - store.now()
-    if (run.status?.text === undefined || wait <= 0) return apply(line)
-    if (run.status.text === line) return
-    run.nextStatus = line
-    run.statusTimer ??= setTimeout(() => {
-      run.statusTimer = undefined
-      if (run === current && run.status !== undefined && run.nextStatus !== undefined) apply(run.nextStatus)
-    }, wait)
+    run.status = { text: line }
+    emit({ _tag: 'status', runId: run.runId, text: line })
   }
 
   const taint = (run: Live) => {
@@ -308,7 +358,7 @@ export function createRouter(options: RouterOptions) {
         transaction(store.db, () => {
           store.db.prepare('INSERT OR IGNORE INTO run_inputs (op_id, run_id, steer) VALUES (?, ?, 1)').run(op.opId, run.runId)
         })
-        run.inputs.set(op.opId, await deliver(store, session.journal(), op, { steer: true }))
+        run.inputs.set(op.opId, await deliver(store, session.journal(), op, { steer: true, text: inputText(op) }))
         emit({ _tag: 'steered', runId: run.runId, opId: op.opId })
       }
     })()
@@ -351,6 +401,7 @@ export function createRouter(options: RouterOptions) {
         }
         run.done = text(run)
         run.partial = ''
+        publish(run)
       },
       afterTools: () => flush(),
       onYield: async () => {
@@ -364,6 +415,27 @@ export function createRouter(options: RouterOptions) {
         return undefined
       },
     },
+  }
+
+  // ---- Input
+
+  const message = (input: Extract<Input, { kind: Exclude<InboxKind, 'react'> }>): Accept => {
+    const { replyTo, ...rest } = input
+    const result = accept(store, replyTo === undefined ? rest : { ...rest, data: { ...(rest.data as object | undefined), replyTo } })
+    signal()
+    return result
+  }
+
+  const react = (input: Extract<Input, { kind: 'react' }>): Queued => {
+    const reaction = { opId: input.opId, kind: input.target._tag, id: input.target.id, by: 'owner' as const, emoji: input.emoji }
+    if (input.emoji === null || input.emoji === THUMBS_UP) {
+      recordReaction(reaction)
+      return { _tag: 'recorded' }
+    }
+    const result = accept(store, { opId: input.opId, kind: 'react', text: input.emoji, data: { target: input.target, emoji: input.emoji } })
+    if (result._tag === 'accepted') recordReaction(reaction)
+    signal()
+    return result
   }
 
   // ---- The loop
@@ -405,16 +477,17 @@ export function createRouter(options: RouterOptions) {
         if (!closing) options.onReport?.(error)
       })
     },
-    /** Queues input: it joins the live run at its next step, or starts a run. */
-    accept: (input: { readonly opId: string; readonly kind: InboxKind; readonly text: string; readonly data?: unknown }): Accept => {
-      const result = accept(store, input)
-      signal()
-      return result
-    },
+    /**
+     * Queues an input: it joins the live run at its next step, or starts a run. A thumbs up or a
+     * removed reaction is only recorded. A reaction is never a click and never a pin.
+     */
+    accept: (input: Input): Queued => (input.kind === 'react' ? react(input) : message(input)),
+    /** A message, report, wake or click: always an inbox op. */
+    message,
     /** "Try again" on an interrupted or failed owner send: a new op with the same text. */
     retry: (input: { readonly opId: string; readonly interruptedOpId: string }): Retry => {
       const earlier = find(store, input.interruptedOpId)
-      if (earlier === undefined || originOf(earlier.kind) !== 'owner' || (earlier.state !== 'interrupted' && earlier.state !== 'failed')) {
+      if (earlier === undefined || !isMessage(earlier.kind) || (earlier.state !== 'interrupted' && earlier.state !== 'failed')) {
         return { _tag: 'refused', reason: 'notRetryable' }
       }
       const result = accept(store, { opId: input.opId, kind: 'retry', text: earlier.text, data: { retryOf: earlier.opId } })
@@ -429,7 +502,7 @@ export function createRouter(options: RouterOptions) {
     state: (): RunState | undefined => {
       const run = current
       if (run === undefined) return undefined
-      return { runId: run.runId, opId: run.opId, origin: run.origin, text: text(run), status: run.status }
+      return { runId: run.runId, opId: run.opId, origin: run.origin, bubbles: run.bubbles, status: run.status }
     },
     /** The live run's cutoff, for the compactor's ceiling (G2). */
     cutoff: (): number | undefined => current?.h,
