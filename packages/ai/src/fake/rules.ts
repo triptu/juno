@@ -2,8 +2,6 @@
  * Word rules per task. Each returns the raw arguments the model would have put
  * in the tool call; the provider validates them like any other output.
  */
-import type { CatchUpInput } from '../tasks/catchUp'
-import type { GroupRunInput } from '../tasks/groupRun'
 import type { ParseCommandInput } from '../tasks/parseCommand'
 import type { RouteCheckInput } from '../tasks/routeCheck'
 import type { SettledScoreInput } from '../tasks/settledScore'
@@ -29,29 +27,6 @@ export function fakeSettledScore(input: SettledScoreInput): unknown {
   if (CLOSING.test(last.text)) return { score: 0.9, reason: 'closing message' }
   if (/\?\s*$/.test(last.text.trim())) return { score: 0.1, reason: 'open question' }
   return { score: 0.4, reason: 'no closing message' }
-}
-
-export function fakeGroupRun(input: GroupRunInput): unknown {
-  // A run: messages whose words overlap with an earlier message of the run.
-  let bestRun: Array<GroupRunInput['messages'][number]> = []
-  for (let start = 0; start < input.messages.length; start++) {
-    const first = input.messages[start]!
-    const run = [first]
-    let words = contentWords(first.text)
-    for (const next of input.messages.slice(start + 1)) {
-      const theirs = contentWords(next.text)
-      if (overlap(words, theirs) >= 1) {
-        run.push(next)
-        words = new Set([...words, ...theirs])
-      }
-    }
-    if (run.length > bestRun.length) bestRun = run
-  }
-  if (bestRun.length < 3) return { group: null, confidence: 0.9 }
-  return {
-    group: { messageTs: bestRun.map((m) => m.ts), title: sentenceCase(firstWords(firstSentence(bestRun[0]!.text), 6)) },
-    confidence: Math.min(0.95, 0.6 + 0.1 * bestRun.length),
-  }
 }
 
 export function fakeUrgencyGate(input: UrgencyGateInput): unknown {
@@ -106,14 +81,6 @@ export function fakeTitle(input: TitleTopicInput): string {
   const first = input.messages[0]
   if (!first) return 'Untitled'
   return sentenceCase(firstWords(firstSentence(first.text), 6))
-}
-
-export function fakeCatchUp(input: CatchUpInput): string {
-  const senders = [...new Set(input.unread.map((m) => firstName(m.sender)))]
-  const last = input.unread.at(-1)
-  const who = senders.length <= 2 ? senders.join(' and ') : `${senders.slice(0, 2).join(', ')} and ${senders.length - 2} more`
-  const head = `${input.unread.length} new from ${who}.`
-  return last ? `${head} ${firstName(last.sender)}: ${firstSentence(last.text)}` : head
 }
 
 /**

@@ -183,9 +183,9 @@ describe('PiAiProvider decisions on a decision model', () => {
   })
 
   it('sends a task without a classifier mapping to the chat model', async () => {
-    const group = { channelId: 'C0ENG', channel: '#eng', messages: [] }
-    const { provider, asked } = scriptedWithClassifier([fauxAssistantMessage(fauxToolCall('group', { group: null, confidence: 0.9 }))], [])
-    expect(await Effect.runPromise(provider.decide(tasks.groupRun, group as never))).toMatchObject({ _tag: 'Decided', value: { group: null }, meta: { model: DECISION } })
+    const search = { text: 'postgres', people: [], channels: [], topics: [] }
+    const { provider, asked } = scriptedWithClassifier([fauxAssistantMessage(fauxToolCall('command', { command: null, confidence: 0.9 }))], [])
+    expect(await Effect.runPromise(provider.decide(tasks.parseCommand, search))).toMatchObject({ _tag: 'Decided', value: { command: null }, meta: { model: DECISION } })
     expect(asked).toHaveLength(0)
   })
 

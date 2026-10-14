@@ -16,7 +16,7 @@ const sample: ReadonlyArray<[TextVariant, string]> = [
   ['ui', 'All topics'],
   ['preview', 'Maya: Draft is up. Cross-posting to #leadership once @Tushar has looked.'],
   ['pill', 'eng · Public channel'],
-  ['buttonSmall', 'Group into topic'],
+  ['buttonSmall', 'Not yet'],
   ['meta', 'Yesterday'],
   ['tagSmall', 'Resolve'],
   ['tag', 'Main'],

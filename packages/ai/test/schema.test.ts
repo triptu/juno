@@ -1,7 +1,7 @@
 /** Task outputs: what the schema and the accept rule let through. */
 import { describe, expect, it } from 'vitest'
 import { decisionTasks, tasks, validateOutput } from '../src/index'
-import { C, channels, people, postgres, stagingBill } from './fixtures'
+import { channels, people, postgres, stagingBill } from './fixtures'
 
 describe('output validation', () => {
   it('every structured task rejects arguments that are not an object', () => {
@@ -20,14 +20,6 @@ describe('output validation', () => {
     expect(validateOutput(tasks.routeCheck, input, { confidence: 0.5 }).ok).toBe(false)
   })
 
-  it('groupRun needs three distinct known ts values', () => {
-    const input = { channelId: C('C0ENG'), channel: '#eng', messages: ['1', '2', '3'].map((ts) => ({ ts, sender: 's', text: 't', at: 'now' })) }
-    expect(validateOutput(tasks.groupRun, input, { group: { messageTs: ['1', '2', '3'], title: 'A run' }, confidence: 0.8 }).ok).toBe(true)
-    expect(validateOutput(tasks.groupRun, input, { group: { messageTs: ['1', '2'], title: 'A run' }, confidence: 0.8 }).ok).toBe(false)
-    expect(validateOutput(tasks.groupRun, input, { group: { messageTs: ['1', '1', '2'], title: 'A run' }, confidence: 0.8 }).ok).toBe(false)
-    expect(validateOutput(tasks.groupRun, input, { group: { messageTs: ['1', '2', '9'], title: 'A run' }, confidence: 0.8 }).ok).toBe(false)
-    expect(validateOutput(tasks.groupRun, input, { group: null, confidence: 0.9 }).ok).toBe(true)
-  })
 
   it('settledScore takes a score with or without a reason', () => {
     const input = { topicId: postgres.id, title: postgres.title, channel: '#eng', now: 'now', messages: [] }

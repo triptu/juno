@@ -472,7 +472,7 @@ export const text = stylex.defineVars({
   '--text-pill-leading': 'normal',
   '--text-pill-tracking': '0',
 
-  // 28px buttons: Group into topic, Fix and send, Stop ignoring, Not yet.
+  // 28px buttons: Fix and send, Stop ignoring, Not yet.
   '--text-button-small-family': fonts['--font-sans'],
   '--text-button-small-size': '13px',
   '--text-button-small-weight': '500',
@@ -493,7 +493,7 @@ export const text = stylex.defineVars({
   '--text-preview-leading': '1.45',
   '--text-preview-tracking': '0',
 
-  // Catch-up text, card bodies, reply options, picker rows.
+  // Card bodies, reply options, picker rows.
   '--text-body-small-family': fonts['--font-sans'],
   '--text-body-small-size': '14px',
   '--text-body-small-weight': '400',

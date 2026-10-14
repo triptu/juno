@@ -5,13 +5,13 @@ import { Icon } from './Icon'
 import { Surface } from './Surface'
 import { Text } from './Text'
 
-function CatchUp() {
+function Note() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 4, width: 480 }}>
       <Row gap="sm">
         <Icon icon={Sparkle} size={14} weight="duotone" />
         <Text variant="meta" weight="medium" tone="muted">
-          Catch up
+          Juno
         </Text>
       </Row>
       <Text variant="bodySmall" tone="subtle">
@@ -23,7 +23,7 @@ function CatchUp() {
 
 export default defineFixtures(Surface, {
   Kind: {
-    card: fixture({ kind: 'card', padding: 'md', children: <CatchUp /> }),
+    card: fixture({ kind: 'card', padding: 'md', children: <Note /> }),
     popover: fixture({ kind: 'popover', children: <div style={{ width: 224, height: 120 }} /> }),
     toolbar: fixture({ kind: 'toolbar', padding: 'xs', children: <div style={{ width: 180, height: 28 }} /> }),
     group: fixture({ kind: 'group', children: <div style={{ width: 480, height: 96 }} /> }),

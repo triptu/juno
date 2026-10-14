@@ -7,25 +7,22 @@ import { validateToolCall, type Static, type TSchema, type Tool } from '@earendi
 import { Effect, Layer, Stream } from 'effect'
 import { AiProvider, type AiCallMeta, type AiProviderShape, type ChatEvent, type ChatToolCall, type Decision } from '../provider'
 import { cleanText, validateOutput, type StructuredTask, type TextTask } from '../task'
-import type { CatchUpInput } from '../tasks/catchUp'
 import type { TitleTopicInput } from '../tasks/titleTopic'
 import type { TopicArtInput } from '../tasks/topicArt'
 import { fakeChatTurn } from './replies'
-import { fakeCatchUp, fakeGroupRun, fakeParseCommand, fakeRouteCheck, fakeSettledScore, fakeTitle, fakeTopicArt, fakeUrgencyGate } from './rules'
+import { fakeParseCommand, fakeRouteCheck, fakeSettledScore, fakeTitle, fakeTopicArt, fakeUrgencyGate } from './rules'
 
 export const FAKE_MODEL = 'fake'
 
 const structuredRules: Record<string, (input: never) => unknown> = {
   routeCheck: fakeRouteCheck,
   settledScore: fakeSettledScore,
-  groupRun: fakeGroupRun,
   urgencyGate: fakeUrgencyGate,
   parseCommand: fakeParseCommand,
 }
 
 const textRules: Record<string, (input: never) => string> = {
   titleTopic: fakeTitle as (input: TitleTopicInput) => string,
-  catchUp: fakeCatchUp as (input: CatchUpInput) => string,
   topicArt: fakeTopicArt as (input: TopicArtInput) => string,
 }
 

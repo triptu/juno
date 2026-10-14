@@ -31,7 +31,7 @@ export const ArtHandlers = ArtRoutes.toLayer(
           const open = yield* workspace.current
           if (open === undefined) return yield* new NotSignedIn()
           const parsed = parseTopicId(id)
-          if (parsed === undefined || parsed.kind === 'group') return yield* new NotFound({ kind: 'topic', id })
+          if (parsed === undefined) return yield* new NotFound({ kind: 'topic', id })
           // A store failure is a bug, not a state the user can act on (architecture 2.6).
           const local = <A>(effect: Effect.Effect<A, SqlError, StoreServices | AiProvider>): Effect.Effect<A> =>
             effect.pipe(Effect.provide(open.context), Effect.provideService(AiProvider, provider), Effect.orDie)

@@ -1,7 +1,7 @@
 /**
  * Branded ids. Slack ids stay strings; the brands stop a channel id from
  * being passed where a user id is expected. Topic ids follow ADR 0004:
- * `t:<channel>:<thread_ts>`, `m:<channel>`, `g:<channel>:<group_id>`.
+ * `t:<channel>:<thread_ts>` and `m:<channel>`.
  *
  * The message timestamp `Ts` and its helpers are owned by `@juno/slack-schema`
  * and re-exported here so rules can use them without a second import.
@@ -20,16 +20,15 @@ export type UserId = typeof UserId.Type
 export const UsergroupId = Schema.String.pipe(Schema.brand('UsergroupId'))
 export type UsergroupId = typeof UsergroupId.Type
 
-export const TopicId = Schema.String.check(Schema.isPattern(/^(t:[^:]+:\d+\.\d{6}|m:[^:]+|g:[^:]+:[^:]+)$/)).pipe(Schema.brand('TopicId'))
+export const TopicId = Schema.String.check(Schema.isPattern(/^(t:[^:]+:\d+\.\d{6}|m:[^:]+)$/)).pipe(Schema.brand('TopicId'))
 export type TopicId = typeof TopicId.Type
 
-export const TopicKind = Schema.Literals(['thread', 'main', 'group'])
+export const TopicKind = Schema.Literals(['thread', 'main'])
 export type TopicKind = typeof TopicKind.Type
 
 export type ParsedTopicId =
   | { readonly kind: 'thread'; readonly channel: ChannelId; readonly threadTs: Ts }
   | { readonly kind: 'main'; readonly channel: ChannelId }
-  | { readonly kind: 'group'; readonly channel: ChannelId; readonly groupId: string }
 
 export function threadTopicId(channel: ChannelId, threadTs: Ts): TopicId {
   return TopicId.make(`t:${channel}:${threadTs}`)
@@ -37,10 +36,6 @@ export function threadTopicId(channel: ChannelId, threadTs: Ts): TopicId {
 
 export function mainTopicId(channel: ChannelId): TopicId {
   return TopicId.make(`m:${channel}`)
-}
-
-export function groupTopicId(channel: ChannelId, groupId: string): TopicId {
-  return TopicId.make(`g:${channel}:${groupId}`)
 }
 
 /** Splits a topic id into its parts. Returns `undefined` for anything that is not a topic id. */
@@ -55,13 +50,11 @@ export function parseTopicId(id: string): ParsedTopicId | undefined {
   const channel = ChannelId.make(rest.slice(0, second))
   const tail = rest.slice(second + 1)
   if (tail.length === 0 || tail.includes(':')) return undefined
-  if (kind === 't') return isTs(tail) ? { kind: 'thread', channel, threadTs: tail } : undefined
-  if (kind === 'g') return { kind: 'group', channel, groupId: tail }
-  return undefined
+  return kind === 't' && isTs(tail) ? { kind: 'thread', channel, threadTs: tail } : undefined
 }
 
 export function topicKindOf(id: TopicId): TopicKind {
-  return id.startsWith('t:') ? 'thread' : id.startsWith('g:') ? 'group' : 'main'
+  return id.startsWith('t:') ? 'thread' : 'main'
 }
 
 export function channelOfTopic(id: TopicId): ChannelId {

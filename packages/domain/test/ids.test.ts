@@ -1,30 +1,27 @@
 import { Schema } from 'effect'
 import { describe, expect, it } from 'vitest'
-import { ChannelId, TopicId, Ts, compareTs, groupTopicId, mainTopicId, maxTs, parseTopicId, threadTopicId, topicKindOf, millisToTs, tsToMillis } from '../src/index'
+import { ChannelId, TopicId, Ts, compareTs, mainTopicId, maxTs, parseTopicId, threadTopicId, topicKindOf, millisToTs, tsToMillis } from '../src/index'
 
 const C = ChannelId.make('C0ENG')
 
 describe('topic ids', () => {
-  it('builds the three kinds from ADR 0004', () => {
+  it('builds the two kinds', () => {
     expect(threadTopicId(C, Ts.make('1728000000.123456'))).toBe('t:C0ENG:1728000000.123456')
     expect(mainTopicId(C)).toBe('m:C0ENG')
-    expect(groupTopicId(C, 'g1')).toBe('g:C0ENG:g1')
   })
 
   it('parses them back', () => {
     expect(parseTopicId('t:C0ENG:1728000000.123456')).toEqual({ kind: 'thread', channel: 'C0ENG', threadTs: '1728000000.123456' })
     expect(parseTopicId('m:C0ENG')).toEqual({ kind: 'main', channel: 'C0ENG' })
-    expect(parseTopicId('g:C0ENG:g1')).toEqual({ kind: 'group', channel: 'C0ENG', groupId: 'g1' })
   })
 
-  it.each(['', 'x:C0ENG', 'm:', 'm:C0ENG:extra', 't:C0ENG', 't:C0ENG:notats', 'g::g1', 'C0ENG'])('rejects %j', (bad) => {
+  it.each(['', 'x:C0ENG', 'm:', 'm:C0ENG:extra', 't:C0ENG', 't:C0ENG:notats', 'g:C0ENG:g1', 'C0ENG'])('rejects %j', (bad) => {
     expect(parseTopicId(bad)).toBeUndefined()
   })
 
   it('knows the kind without parsing', () => {
     expect(topicKindOf(mainTopicId(C))).toBe('main')
     expect(topicKindOf(threadTopicId(C, Ts.make('1.000000')))).toBe('thread')
-    expect(topicKindOf(groupTopicId(C, 'g'))).toBe('group')
   })
 
   it('rejects malformed timestamps and topic ids at the schema', () => {

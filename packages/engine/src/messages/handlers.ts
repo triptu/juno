@@ -47,7 +47,7 @@ const encodeThread = Schema.encodeSync(Schema.toCodecJson(ThreadSummary))
 /** The window a topic id names, or `undefined` for anything else (groups come later). */
 const targetOf = (id: string): WindowTarget | undefined => {
   const parsed = parseTopicId(id)
-  if (parsed === undefined || parsed.kind === 'group') return undefined
+  if (parsed === undefined) return undefined
   return parsed.kind === 'thread' ? { kind: 'thread', channel: parsed.channel, threadTs: parsed.threadTs } : { kind: 'main', channel: parsed.channel }
 }
 
