@@ -31,6 +31,10 @@ The renderer's bridge to the engine: the port client and every atom. The only pa
   - `sidebarDotAtom('channels' | 'dms')`: whether that filter shows a dot, from the counts of the current scope, as a boolean.
   - `nowAtom`: wall-clock milliseconds, refreshed on each minute boundary while something reads it. Read it through a selector that returns the label, `useAtomValue(nowAtom, (now) => relativeTime(at, now))`, so a tick re-renders only rows whose label changed.
 - Topic art in `src/art.ts`: `topicArtAtom(id)`, the recipe of a topic's drawing or `undefined` for the placeholder, from the sidebar row when it is shown (no extra subscription) and otherwise from the topic's header value; it notifies only when the recipe changes. `redrawTopic(registry, id)` runs `art.redraw`. A sidebar row's `art` is joined from `refs.art` in `topicListAtom`; an empty recipe (AI assist off) joins as no art.
+- `@juno/state/agent`: the Juno chat, over the agent's own port (ADR 0012, plan v3 §12).
+  - `configureAgentConnection(registry, { acquire: acquireAgentPort })`, `agentConnectionStateAtom` (`off` while main says no agent runs; the transport keeps asking), `AgentClient`.
+  - `chatPageAtom(window)`: the agent's `ChatPageSnapshot` for a window (`latest`, `unread`, `around`, `above`, `below`), with each card's binding beside the view. `chatItemsAtom(window)`: the same `ChatPage` with the sends the agent has not stored yet, which is what the list renders. `chatSummaryAtom`: unread count, busy and job line.
+  - `chatActions(registry)`: `send(text, { context?, replyTo? })` mints the op id (UUIDv7) and shows the bubble at once as `sending`; the agent's row replaces it after the inbox commit; a failed write shows `failed: notDelivered` and a text over 64 KB `failed: tooLong` without a call. `onRetry(opId)` resends a send that was not stored with the same op, or asks the agent to resend an interrupted or failed message. `react`, `read(through)` and `onCard(id, command)`: a card command maps to the card RPCs with the binding from the last page (Send rows edited first, a choice prepared, then approved; `signIn` is the container's). `onRetry` and `onCard` match the views' `ChatActions`.
 - `@juno/state/react`: `useAtomValue`, `useAtom`, `useAtomSet`, `useAtomRefresh`, `RegistryContext`. Containers import hooks only from here.
 - `@juno/state/perf`: the fixed performance marks and `observeFrames()`. `juno.live-update` is measured for every live message and replaces the previous entry, so the buffer holds the latest one only.
 
@@ -40,9 +44,9 @@ Transport errors are retried every second and never reach an atom. Route errors 
 
 - Contain JSX or import React components. Only the hooks module touches React.
 - Use the DOM lib. It must typecheck without it because the engine's tests import it; reach browser globals through `globalThis` with local types.
-- Import `@juno/engine` or `@juno/views`. It depends on `@juno/contract` only.
+- Import `@juno/engine` or `@juno/views`. It depends on `@juno/contract` and `@juno/agent-contract` only.
 - Be bypassed: nothing outside the allow-list imports Atom, `effect/rpc` or `effect/workers` (`check-deps` enforces it).
 
 ## Testing
 
-`pnpm --filter @juno/state test` covers `applyListDelta` (identity of unchanged rows, order, removal, reset, refs), the read rule and the tab rules. The topic view atoms are tested end to end in `packages/engine/test/messages.test.ts`. The client and helpers are tested end to end in `packages/engine/test/protocol.test.ts`, and the sidebar atoms in `packages/engine/test/sidebar-state.test.ts`; both use a registry per test and a Node `MessageChannel` in place of the renderer's port.
+`pnpm --filter @juno/state test` covers `applyListDelta` (identity of unchanged rows, order, removal, reset, refs), the read rule and the tab rules. The topic view atoms are tested end to end in `packages/engine/test/messages.test.ts`. The client and helpers are tested end to end in `packages/engine/test/protocol.test.ts`, and the sidebar atoms in `packages/engine/test/sidebar-state.test.ts`; both use a registry per test and a Node `MessageChannel` in place of the renderer's port. `test/agent-chat.test.ts` runs the chat atoms and actions against the agent's real renderer server and turn engine (`@juno/agent` and `@juno/agent-testing` are test-only dependencies).
