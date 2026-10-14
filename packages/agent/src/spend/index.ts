@@ -49,10 +49,19 @@ export function createSpend(store: Store, cap: () => number = () => 2 * DOLLAR) 
       codexTurns: Number(db.prepare('SELECT count(*) AS n FROM codex_turns WHERE day = ?').get(day)!.n),
     }
   }
+  /**
+   * A provider may report more than was reserved, and the ledger records what
+   * it reports, so a day can end above its cap. Once a day (or compaction's
+   * share) is at or over its limit, nothing new is reserved, whatever the
+   * amount, until midnight or a raise.
+   */
   const fits = (day: string, path: SpendPath, amount: number) => {
     const s = snapshot(day)
     const limit = money(s.cap + s.raises)
-    return s.reserved + s.actual + amount <= limit && (path !== 'compaction' || s.compaction + amount <= Math.floor(limit / 4))
+    const used = s.reserved + s.actual
+    if (used >= limit || used + amount > limit) return false
+    const share = Math.floor(limit / 4)
+    return path !== 'compaction' || (s.compaction < share && s.compaction + amount <= share)
   }
   return {
     snapshot,
@@ -78,8 +87,10 @@ export function createSpend(store: Store, cap: () => number = () => 2 * DOLLAR) 
       return true
     }),
     /**
-     * Known usage releases the rest of the reservation. Unknown usage keeps all
-     * of it for that day, including after a restart, and is final (spec
+     * Known usage releases the rest of the reservation. It is recorded as
+     * reported, also when it is more than was reserved: the ledger never
+     * records less than the provider charged. Unknown usage keeps all of the
+     * reservation for that day, including after a restart, and is final (spec
      * `settleSpend`). Only the first settlement counts.
      */
     settle: (id: string, actual: number | undefined): void => {
