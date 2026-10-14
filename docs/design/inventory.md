@@ -198,7 +198,7 @@ No bar and no rule. Two islands float over the top of the topic area (below the 
 
 Left island (`flex: 0 1 auto`, `min-width: 0`, padding `3 3 3 5`):
 
-- **Context pill**: `ContextPill size={24}`: `--radius-pill`, padding 0 9, gap 5, 12.5/600, icon 13, the channel name only. The kind is the tint, the icon, the tooltip and the accessible name ("eng, public channel"). Click narrows the sidebar to the channel (§2.4); right-click opens the channel menu (§15.2). Never hidden.
+- **Context pill**: `ContextPill size={24}`: `--radius-pill`, padding 0 8, gap 6, 12.5/600, icon 13, the channel name only, at most 160px with an ellipsis. The kind is the tint, the icon, the tooltip and the accessible name ("eng, public channel"). Click narrows the sidebar to the channel (§2.4); right-click opens the channel menu (§15.2). Never hidden.
 
   | Kind | Icon | Text | Colours |
   | --- | --- | --- | --- |
@@ -207,14 +207,14 @@ Left island (`flex: 0 1 auto`, `min-width: 0`, padding `3 3 3 5`):
   | Direct message | `user` | "Maya Chen" | `--tint-dm` (blue) |
   | Group DM | `users` | "Maya, Leo" | `--tint-dm` |
 
-- **Title button**: 28px, `--radius-pill`, padding 0 8, gap 6: title 14/600 single line ellipsis, `dir="auto"`, then `caret-down` 12 muted. Hover `--surface-hover`; open `--secondary-default`. A menu button (`aria-haspopup="menu"`, `aria-expanded`) inside the page's `h1`. Click, Enter, Space or ↓ opens the topic menu (§15.1, the row's menu) anchored under the island, left-aligned, 6px below. The context-menu key and right-click open it too. Main's title is "Main".
-- **Rename** (from the menu): the title button becomes an input in place: 28px, padding 0 8, 14/600, 1px `--border-strongest`, `--radius-pill`, bg `--surface-default`, preselected. Enter saves, Esc cancels, blur saves. Saving an empty title, or the same text as the AI title, clears the manual title. There is no double-click rename in the header.
+- **Title button**: 28px, `--radius-pill`, padding 0 8, gap 6: title 14/600 single line ellipsis, `dir="auto"`, then `caret-down` 12 muted. At least 72px wide; it shortens before the pill does. Hover `--surface-hover`; open `--secondary-default`. A menu button (`aria-haspopup="menu"`, `aria-expanded`) inside the page's `h1`. Click, Enter, Space or ↓ opens the topic menu (§15.1, the row's menu) anchored under the island, left-aligned, 6px below. The context-menu key and right-click open it too. Main's title is "Main".
+- **Rename** (from the menu; [not built] the item shows disabled until the rename command lands in M5): the title button becomes an input in place: 28px, padding 0 8, 14/600, 1px `--border-strongest`, `--radius-pill`, bg `--surface-default`, preselected. Enter saves, Esc cancels, blur saves. Saving an empty title, or the same text as the AI title, clears the manual title. There is no double-click rename in the header.
 
 Right island (`flex: none`, padding 3):
 
-- **Resolve / Reopen**: 28px, `--radius-pill`, padding 0 10, gap 6, 12.5/500 `--foreground-default`, icon 14 subtle (`circle-check` / `rotate-ccw`), hover `--surface-hover`. Undo toast. Not on Main.
+- **Resolve / Reopen**: 28px, `--radius-pill`, padding 0 10, gap 6, 12.5/500 `--foreground-default`, icon 14 subtle (`circle-check` / `rotate-ccw`), hover `--surface-hover`. Undo toast. Not on Main. [not built] It shares the row check's resolve call, which waits for the resolve command (M5).
 - **Threads** (Main only, in Resolve's place): the same button, `chats-circle` 14, "Threads · 12". Opens the 300px `ActiveThreads` popover, anchored under it, right-aligned (§2 behaviour unchanged: rows are buttons named by the title and described by the counts; Escape closes and puts focus back on Threads).
-- **Juno**: 28 round icon button (`sparkle` 16 duotone), a toggle (`aria-pressed`) for the panel (§12.1). Name "Juno ⌘J". Pressed: `--secondary-default`. Hidden when AI assist is off.
+- **Juno**: 28 round icon button (`sparkle` 16 duotone), a toggle (`aria-pressed`) for the panel (§12.1). Name "Juno ⌘J". Pressed: `--secondary-default`. Hidden when AI assist is off. [not built] Shown, but it opens nothing until the panel is built.
 - Pin, Notify me and More are not in the header. They are in the topic menu, which is the row's menu.
 
 Narrow (a container query on the topic area): under 480px, Resolve is a 28px icon button (name still "Resolve" / "Reopen") and Threads shows `chats-circle` and the count only ("12", name "Threads, 12"). The pill shows its full name up to 160px, then takes an ellipsis; the title takes the rest and shortens first. The pill's icon and tint always show. At the minimum window (720 by 480, sidebar shown) the topic is 336px and every variant fits.
@@ -517,8 +517,10 @@ Native menus **[spec]**. Prototype rendering for reference: 236px, padding 5, ra
 | — | | | | |
 | Copy Slack link | `link` | | always | |
 | Open in Slack | `arrow-square-out` | | always | opens the Slack app at the topic (`slack://` deep link, falling back to the web permalink) |
-| Notify me | `bell` | current level | always | submenu §15.3: for a thread, the thread's own choice (Every message and When it matters follow it in Slack, Never unfollows it; SPEC §5); for Main, the channel's or DM's |
+| Notify me | `bell` | current level | always | submenu §15.3: for a thread, the thread's own choice (Every message and When it matters follow it in Slack, Never unfollows it; SPEC §5); for Main, the channel's or DM's. [built] Threads only, through `topics.subscribe` and `topics.unsubscribe`: a followed thread shows When it matters, since the Every message level is not stored yet; Main has no item until channel levels are |
 | Ignore #product | `ban` | | channel is not a DM | toast "Ignoring #product" with Undo |
+
+[built] The row and the header's title show this menu. Rename, Pin, Resolve and Ignore show disabled until their commands land (M5); the hints are not drawn, since a native menu has only a shortcut column.
 
 ### 15.2 Channel menu (context pill, #channel chip, ⌘K channel result)
 

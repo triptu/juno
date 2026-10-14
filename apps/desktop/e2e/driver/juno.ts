@@ -108,7 +108,7 @@ export class SidebarRow {
 
   /** Right-click, then Open in new tab. */
   async openInNewTabFromMenu(): Promise<void> {
-    await chooseNextMenuItem(this.win, 'new-tab')
+    await chooseNextMenuItem(this.win, 'open-new-tab')
     await this.root.click({ button: 'right', position: { x: 40, y: 20 } })
   }
 
@@ -570,6 +570,16 @@ export interface StartupTimes {
 const appOf = new WeakMap<Page, ElectronApplication>()
 
 /** Makes the next native context menu pick `id` without showing (main's JUNO_E2E hook). */
+/** What the last native menu showed and where it was asked to open (see `contextMenuForTests` in main). */
+async function lastMenu(win: Page): Promise<{ readonly labels: string[]; readonly at: { readonly x: number; readonly y: number } | null }> {
+  const app = appOf.get(win)
+  if (app === undefined) throw new Error('lastMenu needs the app; use the Juno driver')
+  return app.evaluate(() => {
+    const menu = (globalThis as unknown as { junoTest: { contextMenu: { lastLabels: string[]; lastAt: { x: number; y: number } | null } } }).junoTest.contextMenu
+    return { labels: [...menu.lastLabels], at: menu.lastAt }
+  })
+}
+
 async function chooseNextMenuItem(win: Page, id: string): Promise<void> {
   const app = appOf.get(win)
   if (app === undefined) throw new Error('chooseNextMenuItem needs the app; use the Juno driver')
@@ -579,6 +589,11 @@ async function chooseNextMenuItem(win: Page, id: string): Promise<void> {
 }
 
 const BOTTOM_SLACK = 2
+/** The "N new" divider's offset from the list's top on open: the 68px header band, then 80px (inventory 5). */
+const DIVIDER_OFFSET = 148
+
+/** The ids of the topic menu's items (inventory 15.1). */
+export type TopicMenuItem = 'open-new-tab' | 'mark-read' | 'mark-unread' | 'copy-link' | 'open-in-slack' | 'notify-every' | 'notify-matters' | 'notify-never'
 
 /** The topic shown in the active tab. Hidden tabs stay in the page with `display: none`. */
 /** A New chat tab: the two pickers, the composer and the preview (spec section 9). */
@@ -703,10 +718,32 @@ export class TopicPane {
     await expect(this.message(text)).toBeVisible({ timeout: 15_000 })
   }
 
+  /** The context pill, a button named by the channel and its kind. */
+  get contextPill() {
+    return this.header.locator('[data-island="left"]').getByRole('button').first()
+  }
+
+  /** The title, a menu button inside the page's heading. */
+  get titleButton() {
+    return this.header.getByRole('heading').getByRole('button')
+  }
+
+  /**
+   * Clicks the title and picks `item` in the topic menu. Returns the menu's
+   * labels ("-" a separator, "(label)" disabled, "label ✓" checked, "> "
+   * before a submenu's items) and where it was asked to open.
+   */
+  async chooseInMenu(item: TopicMenuItem): Promise<{ readonly labels: string[]; readonly at: { readonly x: number; readonly y: number } | null }> {
+    await chooseNextMenuItem(this.win, item)
+    await this.titleButton.click()
+    return lastMenu(this.win)
+  }
+
   /**
    * The "N new" divider sits right before the message that starts with
-   * `text`, 80px from the top of the list, or as near as the list can
-   * scroll when the topic is short.
+   * `text`, 80px below the header band (148px from the top of the list,
+   * which runs under the band), or as near as the list can scroll when the
+   * topic is short.
    */
   async expectDividerBefore(text: string): Promise<void> {
     await expect(this.root.locator('[data-new-divider] + [data-message-row]')).toContainText(text, { timeout: 15_000 })
@@ -719,7 +756,7 @@ export class TopicPane {
         max: scroller.scrollHeight - scroller.clientHeight,
       }
     })
-    if (scrollTop > 0.5 && scrollTop < max - 0.5) expect(Math.abs(offset - 80)).toBeLessThanOrEqual(2)
+    if (scrollTop > 0.5 && scrollTop < max - 0.5) expect(Math.abs(offset - DIVIDER_OFFSET)).toBeLessThanOrEqual(2)
     else expect(offset).toBeGreaterThanOrEqual(0)
   }
 

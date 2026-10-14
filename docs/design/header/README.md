@@ -52,7 +52,7 @@ Everything is CSS. No script runs on scroll.
 | Top inset | `padding-top: --header-inset` (56) before the column's 16, so at scroll top the first message starts at 72, below the band's end at 68 |
 | Scrollbar | Starts below the band: `::-webkit-scrollbar-track { margin-top: --header-band }` on this scroller only. The thumb never goes under an island, and its whole track stays usable |
 | Focus and find | `scroll-padding-top: --header-band`, so keyboard moves, `scrollIntoView` and find-in-page stop below the islands |
-| "N new" on open | The divider lands 80px below the band: offset `--header-band` + 80 (148) from the scroller's top. It is the same pin as today, with a larger offset (`DIVIDER_TOP` in `TopicView`) |
+| "N new" on open | The divider lands 80px below the band: offset `--header-band` + 80 (148) from the scroller's top. It is the same pin as before, with a larger offset (`dividerTop()` in the `TopicView` container reads the band from the scroller's `scroll-padding-top`) |
 | Saved positions | Unchanged. Pins are a row and an offset inside the scroller, and the scroller's size never changes with the header |
 | Header changes | Rename, the menu, Juno pressed and the narrow switch happen in an absolute layer, so they cannot shift the list. Today a header change can |
 

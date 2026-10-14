@@ -45,7 +45,8 @@ test('Main shows thread links; a link opens the thread in the tab, and Threads l
   const main = juno.sidebar.row(ENG_MAIN)
   await main.expectNewThreads(1)
   await main.open()
-  await juno.topic.expectTitle('#eng')
+  await juno.topic.expectTitle('Main')
+  await expect(juno.topic.contextPill).toHaveAccessibleName('eng, public channel. Show in sidebar.')
   await expect(juno.topic.threadLink(/^6 replies: Draft plan/).root).toBeVisible()
 
   await juno.topic.threadLink(/^6 replies: Draft plan/).open()
@@ -69,6 +70,72 @@ test('Main shows thread links; a link opens the thread in the tab, and Threads l
   await juno.win.keyboard.press('Escape')
   await expect(threads.root).toHaveCount(0)
   await expect(juno.topic.threadsButton).toBeFocused()
+})
+
+test('the title opens the topic menu under the left island, and Notify me follows and unfollows the thread', async ({ juno, slack }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  const rina = juno.sidebar.row(RINA)
+  await rina.open()
+  await juno.topic.expectTitle(RINA)
+  await expect(juno.topic.titleButton).toHaveAttribute('aria-haspopup', 'menu')
+
+  // Never unfollows the thread in Slack, so it leaves the sidebar. The tab stays open on it.
+  const never = await juno.topic.chooseInMenu('notify-never')
+  expect(never.labels).toEqual([
+    'Open in new tab',
+    '-',
+    '(Rename)',
+    'Mark as unread',
+    '(Pin)',
+    '(Resolve)',
+    '-',
+    'Copy Slack link',
+    'Open in Slack',
+    'Notify me',
+    '> Every message',
+    '> When it matters ✓',
+    '> Never',
+    '(Ignore #hiring)',
+  ])
+  const island = (await juno.topic.header.locator('[data-island="left"]').boundingBox())!
+  expect(never.at).not.toBeNull()
+  expect(Math.round(never.at!.x)).toBe(Math.round(island.x))
+  expect(Math.round(never.at!.y - (island.y + island.height))).toBe(6)
+  await rina.expectAbsent()
+  await expect.poll(() => slack.fake.calls.some((call) => call.method === 'subscriptions.thread.remove'), { timeout: 10_000 }).toBe(true)
+
+  // Every message follows it again, and it comes back.
+  const every = await juno.topic.chooseInMenu('notify-every')
+  expect(every.labels).toContain('> Never ✓')
+  await rina.expectVisible()
+  await expect.poll(() => slack.fake.calls.some((call) => call.method === 'subscriptions.thread.add'), { timeout: 10_000 }).toBe(true)
+})
+
+test('Main’s menu has no Notify me of its own, and the header is reached pill, title, Threads, Juno', async ({ juno, win }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  await juno.sidebar.row(ENG_MAIN).open()
+  await juno.topic.expectTitle('Main')
+  const { labels } = await juno.topic.chooseInMenu('copy-link')
+  expect(labels).not.toContain('Notify me')
+  expect(labels).not.toContain('(Rename)')
+
+  await juno.topic.contextPill.focus()
+  const order: string[] = []
+  for (let i = 0; i < 4; i++) {
+    order.push(await win.evaluate(() => document.activeElement?.getAttribute('aria-label') ?? document.activeElement?.textContent ?? ''))
+    await win.keyboard.press('Tab')
+  }
+  expect(order).toEqual(['eng, public channel. Show in sidebar.', 'Main', 'Threads, 3', 'Juno ⌘J'])
+})
+
+test('the context pill scopes the sidebar to its channel', async ({ juno }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  await juno.sidebar.row(POSTGRES).open()
+  await juno.topic.contextPill.click()
+  await juno.sidebar.expectScope('eng')
 })
 
 test('a #channel chip scopes the sidebar to that channel', async ({ juno }) => {
@@ -104,7 +171,7 @@ test.describe('a long thread', () => {
   })
   const THREAD = 'Review the rollout checklist 1.'
 
-  longTest('opens 80px above the first new reply, and older pages load without moving what is on screen', async ({ juno, slack }) => {
+  longTest('opens with the first new reply 80px below the header band, and older pages load without moving what is on screen', async ({ juno, slack }) => {
     await juno.signIn()
     await juno.waitForSync()
     const row = juno.sidebar.row(THREAD)
@@ -119,7 +186,8 @@ test.describe('a long thread', () => {
     await row.open()
     await juno.topic.expectDividerBefore('Follow-up 1 on the checklist.')
     await juno.topic.expectThumbnailsLoaded()
-    expect(Math.round(await juno.topic.dividerOffset())).toBe(80)
+    // The list runs under the 68px band, so 80px below it is 148px from the list's top.
+    expect(Math.round(await juno.topic.dividerOffset())).toBe(148)
     await juno.topic.expectNew(40)
 
     // Up to the top: the next page goes in above the rows in view, which stay put.

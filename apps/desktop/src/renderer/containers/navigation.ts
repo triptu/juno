@@ -12,7 +12,25 @@
  * between (performance 4.4). Slack is asked only after that, by the tab
  * itself.
  */
-import { MESSAGE_WINDOW_DEFAULT, MESSAGE_WINDOW_MAX, type MenuCommand, type TopicDetail } from '@juno/contract'
+import {
+  followsThread,
+  MESSAGE_WINDOW_DEFAULT,
+  MESSAGE_WINDOW_MAX,
+  notifyChoiceOf,
+  readsMarkRead,
+  readsMarkUnread,
+  threadNotifyChoice,
+  topicMenuItems,
+  topicsSubscribe,
+  topicsUnsubscribe,
+  type ContextMenuAt,
+  type ContextMenuItem,
+  type ContextMenuLeaf,
+  type MenuCommand,
+  type MenuItem,
+  type TopicDetail,
+  type TopicMenuAction,
+} from '@juno/contract'
 import {
   activateTab,
   activeTab,
@@ -38,10 +56,12 @@ import {
   prefetchTopic,
   registry,
   reopenClosedTab,
+  runCommand,
   scrollSnapshotAtom,
   selectedTopicAtom,
   setPinned,
   settleNewChat,
+  sidebarRowAtom,
   signedInAtom,
   slackLink,
   tabByNumber,
@@ -329,10 +349,66 @@ export function warmTopic(id: string): void {
   prefetchTopic(registry, id)
 }
 
-/** The menu on a sidebar row or a thread entry (M5 adds the rest). */
-export async function showTopicMenu(id: string): Promise<void> {
-  const chosen = await popupContextMenu([{ id: 'new-tab', label: 'Open in new tab' }])
-  if (chosen === 'new-tab') openTopic(id, { newTab: true })
+/** What the topic menu reads from a sidebar row or the header's detail. Copy Slack link and Open in Slack need the detail. */
+export type MenuTopic = Pick<TopicDetail, 'id' | 'kind' | 'channel' | 'unreadCount' | 'pinned' | 'resolved' | 'subscribed'> & { readonly rootTs?: string | undefined }
+
+/** The items that have a command today. Rename, Pin, Resolve and Ignore come with their commands in M5; until then they show disabled. */
+const topicActions: ReadonlySet<TopicMenuAction> = new Set(['open-new-tab', 'mark-read', 'mark-unread', 'copy-link', 'open-in-slack', 'notify-every', 'notify-matters', 'notify-never'])
+
+function nativeItem(item: MenuItem<TopicMenuAction>, linkable: boolean): ContextMenuItem {
+  switch (item.type) {
+    case 'separator':
+      return { separator: true }
+    case 'submenu':
+      return { label: item.label, submenu: item.items.map((sub) => nativeItem(sub, linkable) as ContextMenuLeaf) }
+    case 'item': {
+      const enabled = topicActions.has(item.id) && (linkable || (item.id !== 'copy-link' && item.id !== 'open-in-slack'))
+      return { id: item.id, label: item.label, ...(enabled ? {} : { enabled: false }), ...(item.checked === undefined ? {} : { checked: item.checked }) }
+    }
+  }
+}
+
+/**
+ * The topic menu (inventory 15.1), on a sidebar row, a thread entry and
+ * the header's title, at the pointer or at `at`. Notify me on a thread is
+ * how it is followed: Every message and When it matters follow it in Slack,
+ * Never unfollows it (SPEC section 5). Juno does not keep Every message
+ * apart yet, so both follow and the menu shows a followed thread as When
+ * it matters.
+ */
+export async function showTopicMenu(topic: MenuTopic, at?: ContextMenuAt): Promise<void> {
+  const state = { kind: topic.kind, channel: topic.channel, unread: topic.unreadCount > 0, pinned: topic.pinned, resolved: topic.resolved, notify: threadNotifyChoice(topic.subscribed) }
+  const linkable = topic.kind === 'main' || topic.rootTs !== undefined
+  const chosen = (await popupContextMenu(topicMenuItems(state).map((item) => nativeItem(item, linkable)), at)) as TopicMenuAction | undefined
+  const session = registry.get(signedInAtom)
+  switch (chosen) {
+    case 'open-new-tab':
+      return openTopic(topic.id, { newTab: true })
+    case 'mark-read':
+      return void runCommand(registry, readsMarkRead, { id: topic.id })
+    case 'mark-unread':
+      return void runCommand(registry, readsMarkUnread, { id: topic.id })
+    case 'copy-link':
+      if (session !== undefined) copyText(slackLink(session.workspaceUrl, topic))
+      return
+    case 'open-in-slack':
+      if (session !== undefined) openInSlack({ teamId: session.teamId, channelId: topic.channel.id })
+      return
+    case 'notify-every':
+    case 'notify-matters':
+    case 'notify-never': {
+      const follow = followsThread(notifyChoiceOf(chosen))
+      if (follow !== topic.subscribed) void runCommand(registry, follow ? topicsSubscribe : topicsUnsubscribe, { id: topic.id })
+      return
+    }
+  }
+}
+
+/** A sidebar row's menu: the row, with the detail when it is loaded, for the link items. */
+export function showRowMenu(id: string): void {
+  const header = registry.get(topicAtom(id))
+  const topic = header._tag === 'Success' && header.value !== null ? header.value : registry.get(sidebarRowAtom(id))
+  if (topic !== undefined) void showTopicMenu(topic)
 }
 
 /** The tab menu (inventory 15.5). Copy Slack link and Open in Slack only on a topic tab whose header is local. */
