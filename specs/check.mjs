@@ -81,7 +81,10 @@ function apalacheServer() {
     const port = await freePort()
     const exe = join(process.env.QUINT_HOME ?? join(homedir(), '.quint'), `apalache-dist-${apalacheVersion}`, 'apalache/bin/apalache-mc')
     if (!existsSync(exe)) return { port, stop: () => {} }
-    const child = spawn(exe, ['server', `--port=${port}`], { cwd: generated, stdio: 'ignore', detached: process.platform !== 'win32' })
+    // Apalache's default 4 GB heap gets swapped out on a loaded 8 GB machine and
+    // stalls a check past its deadline. The bounded checks fit in much less.
+    const env = { ...process.env, JVM_ARGS: process.env.JVM_ARGS ?? `-Xmx${process.env.SPECS_APALACHE_HEAP ?? '1536m'}` }
+    const child = spawn(exe, ['server', `--port=${port}`], { cwd: generated, env, stdio: 'ignore', detached: process.platform !== 'win32' })
     const stop = () => { try { process.kill(process.platform === 'win32' ? child.pid : -child.pid, 'SIGKILL') } catch { /* Already exited. */ } }
     process.on('exit', stop)
     const ready = () => new Promise(resolve => {
