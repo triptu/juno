@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-14 16:10 · Tushar · Browser-like navigation: back and forward in the sidebar header (per-tab history), a resizable and collapsible sidebar, a native tab menu (Pin, Close, Close others, Close to the right, Close all), the usual browser shortcuts including ⌘⇧T to reopen a closed tab, and an unread dot on tabs. Specced in the simplification pass; built after fix B.
 - 10-14 15:30 · Tushar · Keep the interface dead simple: anything Juno can do from the owner's words happens in chat, per-item choices live in that item's menu, and settings stay few.
 - 10-14 15:30 · Tushar · For you folds into Home and the Juno chat; Home needs a visible way in. All topics stays: it is the guarantee that everything in Slack is findable with filters and recency, which lets the sidebar stay small.
 - 10-14 15:30 · Tushar · Cuts: stealth (peek replaces it), the separate Subscribe bell (it becomes the same Notify me choice as channels), "Use AI title" (AI titles just happen; Rename stays), channel icon and colour, the Browse channels and Theme icons in the title bar, the "Group into topic" suggestion (ambiguous semantics), the inline catch-up card, and every prototype tweak except density. Settled hint and Tidy up stay.
