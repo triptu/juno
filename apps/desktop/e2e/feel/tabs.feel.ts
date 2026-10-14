@@ -3,8 +3,8 @@
 import { seedWorkspace, startFakeSlack, topic300Seed } from '@juno/fake-slack'
 import { contentHoldsStill, firstFrameRight, neverBlank, noFlicker, noLayoutShift, switchesOnce } from './checks'
 import { test as base } from './feel'
-import { edge, edgeKey, header, paneRegions, topEdgeNow, topicProbes } from './pane'
-import type { ProbeFrame } from './recorder'
+import { edgeKey, header, paneRegions, topEdgeNow, topicProbes } from './pane'
+import type { Probe, ProbeFrame } from './recorder'
 
 const test = base.extend({
   // oxlint-disable-next-line no-empty-pattern
@@ -38,11 +38,11 @@ test('switching back to a scrolled tab restores it before the first paint', asyn
 
   const isThread = (v: ProbeFrame['values']) => header(v).includes(THREAD)
   const restored = (v: ProbeFrame['values']) => {
-    const top = edge(v, 'top')
-    if (top === null) return 'no rows'
-    if (top.key !== saved.key) return `row ${top.key} at the top instead of ${saved.key}`
-    return Math.abs(top.at - saved.at) <= 1 ? null : `the top row at ${top.at}px instead of ${saved.at}px`
+    const at = v['saved']
+    if (typeof at !== 'number') return `the saved row ${saved.key} is not in the list`
+    return Math.abs(at - saved.at) <= 1 ? null : `the saved row at ${at}px from the top instead of ${saved.at}px`
   }
+  const probes: ReadonlyArray<Probe> = [...topicProbes, { kind: 'row', name: 'saved', scroller: '[data-topic-view] [data-scroll]', rowKey: 'data-message-row', key: saved.key }]
   const checks = [
     firstFrameRight('the first frame of the tab is at the saved position', isThread, restored, { from: 'press' }),
     switchesOnce('header and rows together', (v) => `${header(v)} / ${edgeKey(v, 'top')}`, { from: 'press' }),
@@ -52,7 +52,7 @@ test('switching back to a scrolled tab restores it before the first paint', asyn
     noFlicker('pane', 'the message list'),
   ]
 
-  await feel.run({ name: 'tab-switch-mounted', title: 'Switch back to a thread scrolled 2,500 px up, still mounted: it shows at that position in its first frame', probes: topicProbes, regions: paneRegions, checks }, async (rec) => {
+  await feel.run({ name: 'tab-switch-mounted', title: 'Switch back to a thread scrolled 2,500 px up, still mounted: it shows at that position in its first frame', probes, regions: paneRegions, checks }, async (rec) => {
     await rec.mark('press')
     await juno.tabs.select(THREAD)
     await juno.tabs.expectActive(THREAD)
@@ -64,7 +64,7 @@ test('switching back to a scrolled tab restores it before the first paint', asyn
   await juno.tabs.expectCount(6)
   await juno.win.waitForTimeout(500)
 
-  await feel.run({ name: 'tab-switch-restored', title: 'Switch back to the same thread after four newer tabs unmounted it: it remounts at the saved position in its first frame', probes: topicProbes, regions: paneRegions, settleMs: 1_000, checks }, async (rec) => {
+  await feel.run({ name: 'tab-switch-restored', title: 'Switch back to the same thread after four newer tabs unmounted it: it remounts at the saved position in its first frame', probes, regions: paneRegions, settleMs: 1_000, checks }, async (rec) => {
     await rec.mark('press')
     await juno.tabs.select(THREAD)
     await juno.tabs.expectActive(THREAD)

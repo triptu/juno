@@ -1,7 +1,7 @@
 /** Probes and helpers the scenarios share: the visible topic pane, and tagging an element so a probe can find it. */
 import type { Locator } from '@playwright/test'
 import { noLayoutShift } from './checks'
-import type { EdgeValue, Probe, ProbeFrame } from './recorder'
+import type { Probe, ProbeFrame } from './recorder'
 
 const VIEW = '[data-topic-view]'
 const SCROLLER = `${VIEW} [data-scroll]`
@@ -32,11 +32,6 @@ export const header = (values: ProbeFrame['values']): string => (typeof values['
 export const edgeKey = (values: ProbeFrame['values'], edge: 'top' | 'bottom'): string => {
   const value = values[edge]
   return typeof value === 'object' && value !== null && 'key' in value ? value.key : 'no rows'
-}
-
-export const edge = (values: ProbeFrame['values'], side: 'top' | 'bottom'): EdgeValue | null => {
-  const value = values[side]
-  return typeof value === 'object' && value !== null && 'key' in value ? value : null
 }
 
 export const count = (values: ProbeFrame['values'], name: string): number => (typeof values[name] === 'number' ? values[name] : 0)

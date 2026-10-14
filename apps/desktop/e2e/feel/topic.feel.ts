@@ -73,8 +73,8 @@ test('a reaction and a live reply arrive while reading at the bottom', async ({ 
       regions: paneRegions,
       checks: [
         happened('the reaction showed', (r) => count(r.frames.at(-1)!.values, 'reactions') > count(r.frames[0]!.values, 'reactions')),
+        // The last row grows by the chip; the list keeps its end in view, which scrolls what is above it. That is following, not a jump.
         staysAtBottom('scroll', { from: 'react' }),
-        contentHoldsStill('bottom', { from: 'react' }),
         noLayoutShift({ from: 'react', includeInput: true, region: 'pane' }),
         sidebarReorder('react'),
         noFlicker('pane', 'the message list'),

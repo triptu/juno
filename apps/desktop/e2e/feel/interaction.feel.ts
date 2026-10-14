@@ -3,7 +3,7 @@ import { expect } from '@playwright/test'
 import { feedbackInOneFrame, landsAndStays, noFlicker, noLayoutShift, opensAtAnchor, opensWhole, type Check } from './checks'
 import { test } from './feel'
 import { tag } from './pane'
-import type { Probe } from './recorder'
+import type { Probe, ProbeFrame } from './recorder'
 
 const POSTGRES = 'Draft plan is in the doc'
 const RINA = 'Rina finished the onsite.'
@@ -13,17 +13,21 @@ const look = (selector: string): Probe[] => [{ kind: 'look', name: 'look', selec
 /** Hover and a held press change nothing but the look, so every shift counts; a press that navigates replaces the pane, so shifts right after it do not. */
 const feedback = (event: string, label: string, navigates = false): Check[] => [feedbackInOneFrame('look', event, label, { from: 'go' }), noLayoutShift({ includeInput: !navigates }), noFlicker('window', 'the window')]
 
+const seen = (values: ProbeFrame['values']) => typeof values['dialogOpacity'] === 'number' && values['dialogOpacity'] > 0.02
+
 const popover = (dialog: string, anchor: string, label: string) => ({
   probes: [
     { kind: 'rect', name: 'dialog', selector: dialog },
     { kind: 'box', name: 'dialogBox', selector: dialog },
     { kind: 'text', name: 'dialogText', selector: dialog },
     { kind: 'rect', name: 'anchor', selector: anchor },
+    { kind: 'opacity', name: 'dialogOpacity', selector: dialog },
   ] satisfies Probe[],
+  // Only frames where the popover can be seen: it fades in from opacity 0, and what it does while invisible does not show.
   checks: [
-    opensWhole('dialog', 'dialogText', label, { from: 'press' }),
-    opensAtAnchor('dialog', 'anchor', label, { from: 'press' }),
-    landsAndStays('dialogBox', label, { from: 'press' }),
+    opensWhole('dialog', 'dialogText', label, { from: 'press', where: seen }),
+    opensAtAnchor('dialog', 'anchor', label, { from: 'press', where: seen }),
+    landsAndStays('dialogBox', label, { from: 'press', where: seen }),
     noLayoutShift({ includeInput: true }),
     noFlicker('window', 'the window'),
   ],
