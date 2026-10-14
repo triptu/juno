@@ -66,7 +66,7 @@ test('closing a tab from the keyboard leaves focus in the strip', async ({ juno 
   await tabs.expectFocused(POSTGRES)
   await tabs.closeWithKeyboard(POSTGRES)
   await tabs.expectCount(0)
-  await expect(tabs.newMessageButton).toBeFocused()
+  await expect(tabs.newTabButton).toBeFocused()
 })
 
 test('the app menu closes the tab and moves between tabs', async ({ juno }) => {
