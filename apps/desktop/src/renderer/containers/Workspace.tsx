@@ -1,5 +1,5 @@
-import { Activity, useEffect, useLayoutEffect } from 'react'
-import type { MenuCommand, TopicDetail } from '@juno/contract'
+import { Activity, useEffect } from 'react'
+import type { TopicDetail } from '@juno/contract'
 import { mountedTabs, onMenuCommand, tabsAtom, tabStripAtom, type TabSummary } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import { TopicArt, Workspace as WorkspaceView, type ActivateEvent, type WorkspaceTab, type WorkspaceTabIcon } from '@juno/views'
@@ -39,51 +39,6 @@ function tabMenu(id: string): void {
   void showTabMenu(id)
 }
 
-const STRIP = 'section[aria-label="Workspace"] [role="tablist"]'
-const TAB = '[role="tab"]'
-
-/**
- * Where keyboard focus goes after a close: the position in the strip of
- * the tab that was closed. Undefined when focus was somewhere that the
- * close does not take away (the sidebar, say).
- */
-let refocusAt: number | undefined
-
-/**
- * Notes where focus was before a tab closes. Focus on the tab or its close
- * button, or in the page that goes away with it (⌘W), would otherwise fall
- * to the body and the next Tab would start from the top of the window.
- */
-function rememberFocus(): void {
-  const tabs = [...(document.querySelector(STRIP)?.querySelectorAll<HTMLElement>(TAB) ?? [])]
-  const focused = document.activeElement
-  const onTab = tabs.findIndex((tab) => tab.contains(focused))
-  const inPage = focused === null || focused === document.body || focused.closest('section[aria-label="Workspace"] main') !== null
-  refocusAt = onTab >= 0 ? onTab : inPage ? tabs.findIndex((tab) => tab.getAttribute('aria-selected') === 'true') : undefined
-  if (refocusAt !== undefined && refocusAt < 0) refocusAt = undefined
-}
-
-/** Focuses the tab that took the closed one's place, the last tab, or the New message button when none is left. */
-function restoreFocus(): void {
-  if (refocusAt === undefined) return
-  const at = refocusAt
-  refocusAt = undefined
-  const strip = document.querySelector(STRIP)
-  const tabs = strip?.querySelectorAll<HTMLElement>(TAB) ?? []
-  const target = tabs[Math.min(at, tabs.length - 1)] ?? strip?.querySelector<HTMLElement>('button[aria-label="New message"]')
-  target?.focus()
-}
-
-function closeTab(id: string): void {
-  rememberFocus()
-  closeTopicTab(id)
-}
-
-function menuCommand(command: MenuCommand): void {
-  if (command === 'tab.close') rememberFocus()
-  runMenuCommand(command)
-}
-
 /**
  * The tab strip and the open topics. The active tab and the 4 most
  * recently active stay mounted in `<Activity>` (performance 4.3), so a
@@ -95,12 +50,10 @@ export function Workspace() {
   const strip = useAtomValue(tabStripAtom)
   const mounted = mountedTabs(state)
 
-  useEffect(() => onMenuCommand(menuCommand), [])
-  // The strip after a close is in the DOM now; move focus before paint.
-  useLayoutEffect(restoreFocus, [state])
+  useEffect(() => onMenuCommand(runMenuCommand), [])
 
   return (
-    <WorkspaceView tabs={strip.map(stripTab)} {...(state.active === undefined ? {} : { activeId: state.active })} onSelectTab={selectTab} onCloseTab={closeTab} onTabContextMenu={tabMenu}>
+    <WorkspaceView tabs={strip.map(stripTab)} {...(state.active === undefined ? {} : { activeId: state.active })} onSelectTab={selectTab} onCloseTab={closeTopicTab} onTabContextMenu={tabMenu}>
       {state.active === undefined
         ? undefined
         : state.tabs
