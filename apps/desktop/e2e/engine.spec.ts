@@ -22,7 +22,7 @@ test('answers a command from the engine', async ({ juno }) => {
 test('is served from the juno: scheme', async ({ win }) => {
   await expect(win.getByRole('heading', { name: "Hi, I'm Juno", exact: true })).toBeVisible()
   expect(await win.evaluate(() => location.protocol)).toBe('juno:')
-  expect(await win.evaluate(() => location.href)).toBe('juno://app/index.html?theme=light&accent=coral')
+  expect(await win.evaluate(() => location.href)).toBe('juno://app/index.html?theme=light&accent=coral&sidebar=384')
   // Nothing outside the renderer folder is served: a traversal attempt ends
   // as a 404 (Chromium normalises the path; main refuses what is left).
   const escaped = await win.evaluate(() =>

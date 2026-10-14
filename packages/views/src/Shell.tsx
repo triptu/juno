@@ -85,7 +85,8 @@ function SidebarEdge({ shell, width, onResize, onReset, onCollapse }: SidebarEdg
     const current = drag.current
     if (current === undefined) return
     current.raw = width + event.clientX - current.startX
-    current.frame ??= requestAnimationFrame(() => {
+    if (current.frame !== undefined) return
+    current.frame = requestAnimationFrame(() => {
       current.frame = undefined
       write(clamp(current.raw))
     })
