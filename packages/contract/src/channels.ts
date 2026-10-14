@@ -5,9 +5,9 @@
  * it, and a sandboxed preload should stay tiny. Schemas live in shell.ts; the
  * types below are imported from them, which is erased at compile time.
  */
-import type { Accent, Theme } from './shell'
+import type { Accent, SidebarLayout, SlackTarget, Theme } from './shell'
 
-export type { Accent, AppInfo, Platform, Theme } from './shell'
+export type { Accent, AppInfo, Platform, SidebarLayout, SlackTarget, Theme } from './shell'
 
 export const Channels = {
   appGetInfo: 'app.getInfo',
@@ -19,10 +19,16 @@ export const Channels = {
   launchSetTheme: 'launch.setTheme',
   /** Remember the accent so the next launch's first render already uses it. */
   launchSetAccent: 'launch.setAccent',
+  /** Remember the sidebar's width and hidden state so the next launch's first render has them. */
+  launchSetSidebar: 'launch.setSidebar',
   /** Shows a native context menu at the pointer and answers with the chosen item's id, or null. */
   contextMenuPopup: 'contextMenu.popup',
   /** Opens an http or https link in the default browser. */
   shellOpenExternal: 'shell.openExternal',
+  /** Opens a conversation in the Slack app through its `slack://` link. */
+  shellOpenInSlack: 'shell.openInSlack',
+  /** Puts text on the clipboard. */
+  clipboardWriteText: 'clipboard.writeText',
 } as const
 
 export type Channel = (typeof Channels)[keyof typeof Channels]
@@ -35,14 +41,36 @@ export const Events = {
   menuCommand: 'menu.command',
 } as const
 
-/** The app-menu items main hands to the renderer: ⌘W, ⌘⇧] and ⌘⇧[. */
-export type MenuCommand = 'tab.close' | 'tab.next' | 'tab.previous'
+/**
+ * The app-menu items main hands to the renderer (architecture, shortcuts):
+ * the tab keys, Back and Forward (also the three-finger swipe), and Hide
+ * Sidebar.
+ */
+export type MenuCommand =
+  | 'tab.new'
+  | 'tab.close'
+  | 'tab.reopen'
+  | 'tab.next'
+  | 'tab.previous'
+  | `tab.select.${1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9}`
+  | 'history.back'
+  | 'history.forward'
+  | 'sidebar.toggle'
 
-/** One item of a context menu the renderer asks for. */
-export interface ContextMenuItem {
-  readonly id: string
-  readonly label: string
-}
+/** One item of a context menu the renderer asks for, or a separator. */
+export type ContextMenuItem =
+  | {
+      readonly id: string
+      readonly label: string
+      /** Default true. */
+      readonly enabled?: boolean
+      /** Shown in the shortcut column, in Electron's accelerator form ("CommandOrControl+W"). Display only. */
+      readonly accelerator?: string
+    }
+  | { readonly separator: true }
+
+/** The sidebar's width range in CSS pixels, and the width a double-click on its edge resets to (spec section 4). */
+export const SIDEBAR_WIDTH = { min: 280, max: 480, default: 384 } as const
 
 /** The tag the preload puts on the `window.postMessage` that forwards the port. */
 export const PORT_HANDOFF_TAG = 'juno.enginePort'
@@ -69,6 +97,7 @@ export interface JunoBridge {
   readonly launch: {
     readonly setTheme: (theme: Theme) => Promise<unknown>
     readonly setAccent: (accent: Accent) => Promise<unknown>
+    readonly setSidebar: (sidebar: SidebarLayout) => Promise<unknown>
   }
   readonly contextMenu: {
     /** Resolves with the chosen item's id, or null when the menu closed without a choice. */
@@ -77,6 +106,10 @@ export interface JunoBridge {
   readonly shell: {
     /** Only http and https links open; main ignores anything else. */
     readonly openExternal: (url: string) => Promise<unknown>
+    readonly openInSlack: (target: SlackTarget) => Promise<unknown>
+  }
+  readonly clipboard: {
+    readonly writeText: (text: string) => Promise<unknown>
   }
   readonly menu: {
     /** Calls `listener` for each app-menu command. Returns the unsubscribe. */

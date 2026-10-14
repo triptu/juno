@@ -1,6 +1,6 @@
 import { app, BrowserWindow, Menu, screen, shell, type BaseWindow, type BrowserWindowConstructorOptions, type MenuItemConstructorOptions } from 'electron'
 import { join } from 'node:path'
-import { DEFAULT_ACCENT, Events, type MenuCommand } from '@juno/contract'
+import { DEFAULT_ACCENT, DEFAULT_SIDEBAR, Events, type MenuCommand } from '@juno/contract'
 import { BACKGROUND, type Launch } from './launch'
 import { APP_URL } from './scheme'
 
@@ -74,7 +74,12 @@ export function createMainWindow(launch: Launch): BrowserWindow {
   })
 
   mainWindows.add(window)
-  setAppMenu()
+  setAppMenu(launch.sidebar?.collapsed ?? false)
+  // The three-finger swipe (Electron does not see the two-finger one): left is Back, as in Safari.
+  window.on('swipe', (_event, direction) => {
+    if (direction === 'left') tabCommand(window, 'history.back')
+    else if (direction === 'right') tabCommand(window, 'history.forward')
+  })
   // Zoom outlives a reload (Chromium keeps it per origin), and pinch or
   // Control-scroll can change it without the menu.
   window.webContents.on('did-finish-load', () => fitMinimumSizeToZoom(window))
@@ -123,17 +128,37 @@ function tabCommand(window: BaseWindow | undefined, command: MenuCommand): void 
   window.webContents.send(Events.menuCommand, command)
 }
 
-let menuSet = false
+/** Whether the menu is built and with which View › Hide or Show Sidebar label. */
+let menuSidebarHidden: boolean | undefined
+
+/** Rebuilds the app menu when the sidebar is hidden or shown, so View names the action it will take. */
+export function setSidebarHidden(hidden: boolean): void {
+  if (menuSidebarHidden !== undefined && menuSidebarHidden !== hidden) setAppMenu(hidden, true)
+}
+
+/** A menu item that hands `command` to the focused app window. */
+const command = (id: string, label: string, accelerator: string, menuCommand: MenuCommand, hidden = false): MenuItemConstructorOptions => ({
+  id,
+  label,
+  accelerator,
+  ...(hidden ? { visible: false, acceleratorWorksWhenHidden: true } : {}),
+  click: (_item, window) => tabCommand(window, menuCommand),
+})
+
+const tabNumbers = [1, 2, 3, 4, 5, 6, 7, 8] as const
 
 /**
- * Electron's default menu, with the zoom items wired through
- * `fitMinimumSizeToZoom`: the default roles change the zoom without telling
- * main, so the minimum size could not follow.
+ * The app menu (architecture, shortcuts): Electron's default menu with the
+ * tab, history and sidebar items, which the renderer acts on, and the zoom
+ * items wired through `fitMinimumSizeToZoom`: the default roles change the
+ * zoom without telling main, so the minimum size could not follow.
  */
-function setAppMenu(): void {
-  if (menuSet) return
-  menuSet = true
+function setAppMenu(sidebarHidden: boolean, rebuild = false): void {
+  if (menuSidebarHidden !== undefined && !rebuild) return
+  menuSidebarHidden = sidebarHidden
   const view: MenuItemConstructorOptions[] = [
+    command('toggle-sidebar', sidebarHidden ? 'Show Sidebar' : 'Hide Sidebar', 'Control+Command+S', 'sidebar.toggle'),
+    { type: 'separator' },
     { role: 'reload' },
     { role: 'forceReload' },
     { role: 'toggleDevTools' },
@@ -146,19 +171,31 @@ function setAppMenu(): void {
     { type: 'separator' },
     { role: 'togglefullscreen' },
   ]
-  // ⌘W closes the tab, not the window; ⌘⇧W closes the window.
+  // ⌘N and ⌘T both open a new tab (a New chat, spec section 9). ⌘W closes
+  // the tab, not the window; ⌘⇧W closes the window.
   const file: MenuItemConstructorOptions[] = [
-    { id: 'close-tab', label: 'Close Tab', accelerator: 'CommandOrControl+W', click: (_item, window) => tabCommand(window, 'tab.close') },
+    command('new-chat', 'New Chat', 'CommandOrControl+N', 'tab.new'),
+    command('new-tab', 'New Tab', 'CommandOrControl+T', 'tab.new'),
+    command('reopen-tab', 'Reopen Closed Tab', 'CommandOrControl+Shift+T', 'tab.reopen'),
+    { type: 'separator' },
+    command('close-tab', 'Close Tab', 'CommandOrControl+W', 'tab.close'),
     { role: 'close', accelerator: 'CommandOrControl+Shift+W' },
+  ]
+  const go: MenuItemConstructorOptions[] = [
+    command('back', 'Back', 'CommandOrControl+[', 'history.back'),
+    command('forward', 'Forward', 'CommandOrControl+]', 'history.forward'),
   ]
   const windowItems: MenuItemConstructorOptions[] = [
     { role: 'minimize' },
     { role: 'zoom' },
     { type: 'separator' },
-    { id: 'previous-tab', label: 'Show Previous Tab', accelerator: 'CommandOrControl+Shift+[', click: (_item, window) => tabCommand(window, 'tab.previous') },
-    { id: 'next-tab', label: 'Show Next Tab', accelerator: 'CommandOrControl+Shift+]', click: (_item, window) => tabCommand(window, 'tab.next') },
-    { label: 'Show Previous Tab', accelerator: 'Control+Shift+Tab', visible: false, acceleratorWorksWhenHidden: true, click: (_item, window) => tabCommand(window, 'tab.previous') },
-    { label: 'Show Next Tab', accelerator: 'Control+Tab', visible: false, acceleratorWorksWhenHidden: true, click: (_item, window) => tabCommand(window, 'tab.next') },
+    command('previous-tab', 'Show Previous Tab', 'CommandOrControl+Shift+[', 'tab.previous'),
+    command('next-tab', 'Show Next Tab', 'CommandOrControl+Shift+]', 'tab.next'),
+    command('previous-tab-control', 'Show Previous Tab', 'Control+Shift+Tab', 'tab.previous', true),
+    command('next-tab-control', 'Show Next Tab', 'Control+Tab', 'tab.next', true),
+    // ⌘1 to ⌘8 by position, ⌘9 the last tab, as in browsers. Hidden, as Safari hides them.
+    ...tabNumbers.map((n) => command(`tab-${n}`, `Show Tab ${n}`, `CommandOrControl+${n}`, `tab.select.${n}`, true)),
+    command('tab-last', 'Show Last Tab', 'CommandOrControl+9', 'tab.select.9', true),
     { type: 'separator' },
     { role: 'front' },
   ]
@@ -168,15 +205,18 @@ function setAppMenu(): void {
       { label: 'File', submenu: file },
       { role: 'editMenu' },
       { label: 'View', submenu: view },
+      { label: 'Go', submenu: go },
       { role: 'window', submenu: windowItems },
     ]),
   )
 }
 
-/** The page reads `?theme=` and `?accent=` so its first render matches the window background and the saved accent. */
+/** The page reads `?theme=`, `?accent=` and `?sidebar=` so its first render matches the window background, the saved accent and the saved sidebar. */
 function pageUrl(base: string, launch: Launch): string {
   const url = new URL(base)
   url.searchParams.set('theme', launch.theme)
   url.searchParams.set('accent', launch.accent ?? DEFAULT_ACCENT)
+  const sidebar = launch.sidebar ?? DEFAULT_SIDEBAR
+  url.searchParams.set('sidebar', `${sidebar.width}${sidebar.collapsed ? '-hidden' : ''}`)
   return url.toString()
 }

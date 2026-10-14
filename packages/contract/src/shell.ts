@@ -4,7 +4,7 @@
  * live in channels.ts, which the preload bundles without any runtime import.
  */
 import { Schema } from 'effect'
-import { Channels } from './channels'
+import { Channels, SIDEBAR_WIDTH } from './channels'
 
 export const PlatformSchema = Schema.Literals(['darwin', 'win32', 'linux'])
 export type Platform = typeof PlatformSchema.Type
@@ -38,7 +38,24 @@ export type AppInfo = typeof AppInfo.Type
 export const PortRequestResult = Schema.Literals(['sent', 'failed'])
 export type PortRequestResult = typeof PortRequestResult.Type
 
-export const ContextMenuItems = Schema.Array(Schema.Struct({ id: Schema.String, label: Schema.String })).check(Schema.isMaxLength(20))
+/** The sidebar's width in CSS pixels (280 to 480) and whether it is hidden (spec section 4). */
+export const SidebarLayout = Schema.Struct({
+  width: Schema.Int.check(Schema.isBetween({ minimum: SIDEBAR_WIDTH.min, maximum: SIDEBAR_WIDTH.max })),
+  collapsed: Schema.Boolean,
+})
+export type SidebarLayout = typeof SidebarLayout.Type
+export const DEFAULT_SIDEBAR: SidebarLayout = { width: SIDEBAR_WIDTH.default, collapsed: false }
+
+/** A conversation for Open in Slack. Main builds the `slack://` link from it. */
+export const SlackTarget = Schema.Struct({ teamId: Schema.String, channelId: Schema.String })
+export type SlackTarget = typeof SlackTarget.Type
+
+export const ContextMenuItems = Schema.Array(
+  Schema.Union([
+    Schema.Struct({ id: Schema.String, label: Schema.String, enabled: Schema.optionalKey(Schema.Boolean), accelerator: Schema.optionalKey(Schema.String) }),
+    Schema.Struct({ separator: Schema.Literal(true) }),
+  ]),
+).check(Schema.isMaxLength(20))
 
 /** renderer -> main request/response routes over `ipcRenderer.invoke`. */
 export const ShellRoutes = {
@@ -47,8 +64,11 @@ export const ShellRoutes = {
   [Channels.engineRestart]: { input: Schema.Void, output: Schema.Void },
   [Channels.launchSetTheme]: { input: Schema.Struct({ theme: ThemeSchema }), output: Schema.Void },
   [Channels.launchSetAccent]: { input: Schema.Struct({ accent: AccentSchema }), output: Schema.Void },
+  [Channels.launchSetSidebar]: { input: SidebarLayout, output: Schema.Void },
   [Channels.contextMenuPopup]: { input: Schema.Struct({ items: ContextMenuItems }), output: Schema.NullOr(Schema.String) },
   [Channels.shellOpenExternal]: { input: Schema.Struct({ url: Schema.String }), output: Schema.Void },
+  [Channels.shellOpenInSlack]: { input: SlackTarget, output: Schema.Void },
+  [Channels.clipboardWriteText]: { input: Schema.Struct({ text: Schema.String.check(Schema.isMaxLength(2048)) }), output: Schema.Void },
 } as const
 
 export type ShellRoutes = typeof ShellRoutes

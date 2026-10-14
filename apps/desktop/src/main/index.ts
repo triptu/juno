@@ -2,12 +2,12 @@ import { app, BrowserWindow } from 'electron'
 import { join } from 'node:path'
 import { createAgentSupervisor } from './agent'
 import { createSupervisor } from './engine'
-import { contextMenuForTests, registerIpc } from './ipc'
+import { contextMenuForTests, registerIpc, slackLinksForTests } from './ipc'
 import { readLaunch, writeLaunch, type Launch } from './launch'
 import { registerAppScheme, serveAppScheme } from './scheme'
 import { SecretsStore } from './secrets'
 import { SessionHost } from './session'
-import { createMainWindow } from './window'
+import { createMainWindow, setSidebarHidden } from './window'
 
 // Every renderer runs in the Chromium sandbox. Must be called before ready.
 app.enableSandbox()
@@ -67,6 +67,10 @@ app.whenReady().then(() => {
     supervisor,
     setTheme: (theme) => updateLaunch({ theme }),
     setAccent: (accent) => updateLaunch({ accent }),
+    setSidebar: (sidebar) => {
+      updateLaunch({ sidebar })
+      setSidebarHidden(sidebar.collapsed)
+    },
   })
 
   // Fork the engine and open the window in the same tick; neither waits.
@@ -102,6 +106,7 @@ if (e2e) {
       engineState: () => supervisor.currentState,
       failEngine: () => supervisor.giveUp(),
       contextMenu: contextMenuForTests,
+      slackLinks: slackLinksForTests,
       agentState: () => agent?.currentState ?? 'stopped',
       agentHost: () => agent?.host?.host,
     },

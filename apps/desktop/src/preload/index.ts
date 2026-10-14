@@ -15,12 +15,24 @@ const bridge: JunoBridge = {
   launch: {
     setTheme: (theme) => ipcRenderer.invoke(Channels.launchSetTheme, { theme }),
     setAccent: (accent) => ipcRenderer.invoke(Channels.launchSetAccent, { accent }),
+    setSidebar: ({ width, collapsed }) => ipcRenderer.invoke(Channels.launchSetSidebar, { width, collapsed }),
   },
   contextMenu: {
-    popup: (items) => ipcRenderer.invoke(Channels.contextMenuPopup, { items: items.map(({ id, label }) => ({ id, label })) }),
+    popup: (items) =>
+      ipcRenderer.invoke(Channels.contextMenuPopup, {
+        items: items.map((item) =>
+          'separator' in item
+            ? { separator: true }
+            : { id: item.id, label: item.label, ...(item.enabled === undefined ? {} : { enabled: item.enabled }), ...(item.accelerator === undefined ? {} : { accelerator: item.accelerator }) },
+        ),
+      }),
   },
   shell: {
     openExternal: (url) => ipcRenderer.invoke(Channels.shellOpenExternal, { url }),
+    openInSlack: ({ teamId, channelId }) => ipcRenderer.invoke(Channels.shellOpenInSlack, { teamId, channelId }),
+  },
+  clipboard: {
+    writeText: (text) => ipcRenderer.invoke(Channels.clipboardWriteText, { text }),
   },
   menu: {
     onCommand: (listener) => {

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Menu, shell, type IpcMainInvokeEvent } from 'electron'
+import { app, BrowserWindow, clipboard, ipcMain, Menu, shell, type IpcMainInvokeEvent, type MenuItemConstructorOptions } from 'electron'
 import { Schema } from 'effect'
 import { Channels, ShellRoutes, type ShellInput, type ShellOutput } from '@juno/contract'
 import type { EngineSupervisor } from './engine'
@@ -45,13 +45,18 @@ function isAppUrl(url: string): boolean {
  */
 export const contextMenuForTests: { next: string | null | undefined; lastLabels: ReadonlyArray<string> } = { next: undefined, lastLabels: [] }
 
+/** Under JUNO_E2E, links for the Slack app are recorded here instead of opening it. */
+export const slackLinksForTests: string[] = []
+const e2e = process.env.JUNO_E2E === '1'
+
 export interface IpcDeps {
   readonly supervisor: EngineSupervisor
   readonly setTheme: (theme: Launch['theme']) => void
   readonly setAccent: (accent: NonNullable<Launch['accent']>) => void
+  readonly setSidebar: (sidebar: NonNullable<Launch['sidebar']>) => void
 }
 
-export function registerIpc({ supervisor, setTheme, setAccent }: IpcDeps): void {
+export function registerIpc({ supervisor, setTheme, setAccent, setSidebar }: IpcDeps): void {
   handle(Channels.appGetInfo, () => ({
     name: app.getName(),
     version: app.getVersion(),
@@ -77,6 +82,10 @@ export function registerIpc({ supervisor, setTheme, setAccent }: IpcDeps): void 
     setAccent(accent)
   })
 
+  handle(Channels.launchSetSidebar, (sidebar) => {
+    setSidebar(sidebar)
+  })
+
   // A native menu at the pointer. The answer is the chosen item's id, or null.
   handle(
     Channels.contextMenuPopup,
@@ -85,11 +94,23 @@ export function registerIpc({ supervisor, setTheme, setAccent }: IpcDeps): void 
         if (contextMenuForTests.next !== undefined) {
           const next = contextMenuForTests.next
           contextMenuForTests.next = undefined
-          contextMenuForTests.lastLabels = items.map((item) => item.label)
+          contextMenuForTests.lastLabels = items.map((item) => ('separator' in item ? '-' : item.enabled === false ? `(${item.label})` : item.label))
           return resolve(next)
         }
         let chosen: string | null = null
-        const menu = Menu.buildFromTemplate(items.map((item) => ({ label: item.label, click: () => (chosen = item.id) })))
+        const menu = Menu.buildFromTemplate(
+          items.map((item): MenuItemConstructorOptions =>
+            'separator' in item
+              ? { type: 'separator' }
+              : {
+                  label: item.label,
+                  enabled: item.enabled ?? true,
+                  // Shown only: the app menu owns the shortcut.
+                  ...(item.accelerator === undefined ? {} : { accelerator: item.accelerator, registerAccelerator: false }),
+                  click: () => (chosen = item.id),
+                },
+          ),
+        )
         const window = BrowserWindow.fromWebContents(event.sender) ?? undefined
         // The item's click runs before the menu reports it closed.
         menu.popup({ ...(window === undefined ? {} : { window }), callback: () => setImmediate(() => resolve(chosen)) })
@@ -98,6 +119,19 @@ export function registerIpc({ supervisor, setTheme, setAccent }: IpcDeps): void 
 
   handle(Channels.shellOpenExternal, ({ url }) => {
     if (isWebUrl(url)) void shell.openExternal(url)
+  })
+
+  // Built here from ids, so the renderer can never open an arbitrary slack:// link.
+  handle(Channels.shellOpenInSlack, ({ teamId, channelId }) => {
+    const url = new URL('slack://channel')
+    url.searchParams.set('team', teamId)
+    url.searchParams.set('id', channelId)
+    if (e2e) slackLinksForTests.push(url.toString())
+    else void shell.openExternal(url.toString())
+  })
+
+  handle(Channels.clipboardWriteText, ({ text }) => {
+    clipboard.writeText(text)
   })
 }
 

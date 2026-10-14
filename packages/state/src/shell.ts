@@ -1,7 +1,7 @@
 /** Atoms backed by main through the bridge, not the engine. */
 import { Effect, Schema } from 'effect'
 import * as Atom from 'effect/reactivity/Atom'
-import { AccentSchema, AppInfo, DEFAULT_ACCENT, ThemeSchema, type Accent, type Theme } from '@juno/contract'
+import { AccentSchema, AppInfo, DEFAULT_ACCENT, DEFAULT_SIDEBAR, SIDEBAR_WIDTH, ThemeSchema, type Accent, type SidebarLayout, type SlackTarget, type Theme } from '@juno/contract'
 import type { ContextMenuItem, JunoBridge, MenuCommand } from '@juno/contract/channels'
 
 export type { Accent, Theme } from '@juno/contract'
@@ -60,10 +60,39 @@ export function persistAccent(accent: Accent): void {
   window.juno.launch.setAccent(accent).catch(() => {})
 }
 
+/**
+ * The saved sidebar from the page's `?sidebar=<width>` or
+ * `?sidebar=<width>-hidden`, so the first render already has it.
+ */
+function savedSidebar(): SidebarLayout {
+  const match = /^(\d+)(-hidden)?$/.exec(launchParam('sidebar') ?? '')
+  if (match === null) return DEFAULT_SIDEBAR
+  const width = Number(match[1])
+  return { width: width >= SIDEBAR_WIDTH.min && width <= SIDEBAR_WIDTH.max ? width : SIDEBAR_WIDTH.default, collapsed: match[2] !== undefined }
+}
+
+/** The sidebar's width and hidden state. The width changes only when a drag ends; during the drag only a CSS variable moves. */
+export const sidebarLayoutAtom = Atom.make<SidebarLayout>(savedSidebar()).pipe(Atom.keepAlive)
+
+/** Tells main, so the next launch's first render has this sidebar and View › Hide Sidebar names the right action. */
+export function persistSidebar(sidebar: SidebarLayout): void {
+  window.juno.launch.setSidebar(sidebar).catch(() => {})
+}
+
 /** Shows a native context menu at the pointer. Resolves with the chosen item's id, or undefined. */
 export async function popupContextMenu(items: ReadonlyArray<ContextMenuItem>): Promise<string | undefined> {
   const chosen = await window.juno.contextMenu.popup(items).catch(() => null)
-  return typeof chosen === 'string' && items.some((item) => item.id === chosen) ? chosen : undefined
+  return typeof chosen === 'string' && items.some((item) => 'id' in item && item.id === chosen) ? chosen : undefined
+}
+
+/** Puts text on the clipboard. */
+export function copyText(text: string): void {
+  window.juno.clipboard.writeText(text).catch(() => {})
+}
+
+/** Opens a conversation in the Slack app. */
+export function openInSlack(target: SlackTarget): void {
+  window.juno.shell.openInSlack(target).catch(() => {})
 }
 
 /** Opens an http or https link in the browser. */
@@ -71,7 +100,7 @@ export function openExternal(url: string): void {
   window.juno.shell.openExternal(url).catch(() => {})
 }
 
-/** Calls `listener` for each app-menu command (⌘W, ⌘⇧], ⌘⇧[). Returns the unsubscribe. */
+/** Calls `listener` for each app-menu command (the tab keys, Back and Forward, Hide Sidebar). Returns the unsubscribe. */
 export function onMenuCommand(listener: (command: MenuCommand) => void): () => void {
   return window.juno.menu.onCommand(listener)
 }
