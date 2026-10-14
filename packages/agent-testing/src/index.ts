@@ -14,3 +14,7 @@ export {
   T3_ANSWER_TOOLS, T3_READ_TOOLS, T3_WORK_TOOLS, startFakeT3,
   type FakeT3, type FakeT3Options, type T3Item, type T3Project, type T3Request, type T3Status, type T3Thread, type T3ToolName,
 } from './mcp/t3'
+export {
+  FAKE_SECRET, HOSTILE_CHANNEL, HOSTILE_USER, forgedSendReceipt, hostile, hostileMessages, hostilePage, hostilePerson,
+  type HostileFixture, type SlackMessage,
+} from './slack/hostile'
