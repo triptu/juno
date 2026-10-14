@@ -23,6 +23,7 @@ import { conversationKind, type Channel, type CountEntry, type Im, type Reaction
 import { Invalidation, StoreWriter, type ConversationRow, type MessageRow, type SqlError, type UserRow } from '@juno/store'
 import { Effect } from 'effect'
 import { syncKeys } from './keys'
+import { reconcilePost } from './posts'
 
 type Writer = Effect.Effect<void, SqlError, StoreWriter | Invalidation>
 
@@ -47,6 +48,8 @@ export const writeMessage = (row: MessageRow): Writer =>
         edited_ts = excluded.edited_ts, deleted = excluded.deleted, client_msg_id = excluded.client_msg_id,
         reply_count = excluded.reply_count, latest_reply = excluded.latest_reply, reply_users_json = excluded.reply_users_json,
         last_event_ts = excluded.last_event_ts, version = excluded.version`
+    // Whichever of the answer, the echo or a page stores Juno's own message first ends its pending row (5.7).
+    if (row.client_msg_id !== null) yield* reconcilePost(row.client_msg_id)
     yield* invalidate(syncKeys.messagesOf(row))
   })
 

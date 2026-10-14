@@ -43,4 +43,21 @@ export {
   type ThreadSubSource,
 } from './write'
 
+export {
+  claimPost,
+  deferLookup,
+  discardPost,
+  failPost,
+  flushPosts,
+  pendingPosts,
+  postTopic,
+  postUnknown,
+  queuePost,
+  recoverPosts,
+  requeuePost,
+  retryPost,
+  type PendingPost,
+  type PostState,
+} from './posts'
+export { applyOpened } from './events'
 export { syncEmoji } from './emoji'
