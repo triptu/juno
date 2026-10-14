@@ -18,8 +18,8 @@ export const actionCases = [
   ['scopedGrant', 'scopedNoClickGrant'],
   ['reportGrant', 'untrustedCannotGrant'],
   ['reportLaunch', 'cleanRunForNoClick'],
-  ['reportSchedule', 'scheduleFromCleanOwnerRun'],
-  ['wakeSchedule', 'scheduleFromCleanOwnerRun'],
+  ['reportSchedule', 'scheduleFromOwnerAuthority'],
+  ['wakeSchedule', 'scheduleFromOwnerAuthority'],
   ['destructive', 'tier4NeverDispatched'],
   ['ownerRace', 'currentOwnerAuthorizes'],
   ['pauseRace', 'pauseBlocksAuthorization'],
@@ -42,6 +42,7 @@ export const actionCases = [
   ['pauseDrain', 'drainBound'],
   ['attemptEvidence', 'unknownPreserved'],
   ['batchOrderRace', 'approvalExact'],
+  ['clickedSchedule', 'scheduleFromOwnerAuthority'],
 ]
 
 export const recoveryCases = [
@@ -54,7 +55,7 @@ export const recoveryCases = [
   ['rotationIdentity', 'journalIdentityUnique'],
   ['authorityCrash', 'ordinaryCrashPreservesCommittedAuthority'],
   ['incompleteCheckpoint', 'transferCheckpointComplete'],
-  ['releaseCrash', 'transferCheckpointComplete'],
+  ['releaseCrash', 'checkpointHoldsRelease'],
   ['restoreApproval', 'restoreDoesNotAuthorize'],
   ['restoreAttempt', 'restoreDoesNotAuthorize'],
   ['manifestBeforeSegment', 'backupChainComplete'],
@@ -68,6 +69,9 @@ export const recoveryCases = [
   ['epochReadRace', 'staleOwnerCannotAuthorize'],
   ['transferDrain', 'drainBound'],
   ['backupDrain', 'drainBound'],
-  ['exportFeedback', 'drainBound'],
-  ['missingDeletion', 'restoreRespectsDeletion'],
+  ['exportFeedback', 'exportNotCaptured'],
+  ['staleFolder', 'staleFolderCannotRestoreRemoved'],
+  ['staleOwnerObserves', 'observedOwnerStops'],
+  ['checkpointReopen', 'transferCheckpointComplete'],
+  ['deletionOrder', 'deletionRecordedBeforeRemoved'],
 ]

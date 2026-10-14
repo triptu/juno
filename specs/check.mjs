@@ -206,6 +206,8 @@ if (!boundedOnly && !memoryOnly && !recoveryOnly) {
     { ...options, init: 'suiteInit', samples: 1024, steps: 80,
       witnesses: ['reachedAgreement', ...actionCases.map((_, index) => `case${index}`)], requireCompletion: true })
   simulate('agent-actions', 'clickedGrantStep', 'invariants', 'actions-clicked-grant.itf.json', false, false, options)
+  simulate('agent-actions', 'clickedScheduleWitnessStep', 'invariants', 'actions-clicked-schedule.itf.json', false, true,
+    { ...options, samples: 1, witnesses: ['reachedAgreement', 'clickedScheduleCreated'], requireCompletion: true })
   for (const [schedule, invariant] of actionCases) {
     simulate('agent-actions', `${schedule}BugStep`, invariant, `actions-${schedule}-bug.itf.json`, true, false, options)
   }
@@ -221,6 +223,10 @@ if (!boundedOnly && !memoryOnly && !actionsOnly) {
   for (const [schedule, invariant] of recoveryCases) {
     simulate('agent-recovery', `${schedule}BugStep`, invariant, `recovery-${schedule}-bug.itf.json`, true, false,
       { ...options, steps: 100 })
+  }
+  for (const [schedule, witness] of [['deletionAhead', 'deletionAheadRecovered'], ['moveCodeRestore', 'moveCodeRestored']]) {
+    simulate('agent-recovery', `${schedule}Step`, 'cooperativeSafety', `recovery-${schedule}.itf.json`, false, true,
+      { ...options, samples: 1, witnesses: ['reachedAgreement', witness], requireCompletion: true })
   }
   for (const schedule of ['journalAhead', 'unsupportedSchema', 'cooperativeTransfer', 'reviewedRestore']) {
     simulate('agent-recovery', `${schedule}Step`, 'cooperativeSafety', `recovery-${schedule}.itf.json`, false, false, options)
