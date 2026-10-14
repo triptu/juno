@@ -57,6 +57,8 @@ function scriptedWithClassifier(chat: FauxResponseStep[], answers: ClassifierScr
 }
 
 const routeInput = { draft: 'Jonas scaled it down', channel: '#eng', topics: [stagingBill, postgres] }
+/** A structured task on the generation tier. */
+const writtenRoute = defineStructuredTask({ ...tasks.routeCheck, tier: 'generation' })
 const noDecision = (d: Decision<unknown>) => (d._tag === 'NoDecision' ? { reason: d.reason, attempts: d.meta.attempts } : d)
 
 describe('PiAiProvider decisions', () => {
@@ -113,9 +115,9 @@ describe('PiAiProvider decisions', () => {
   })
 
   it('uses the tier model from the config, and reports a cost only for a priced model', async () => {
-    const { provider } = scripted([fauxAssistantMessage(fauxToolCall('cards', { cards: [] }))])
-    const decision = await Effect.runPromise(provider.decide(tasks.forYou, { me: 'Tushar', now: NOW, topics: [] }))
-    expect(decision).toMatchObject({ _tag: 'Decided', value: { cards: [] }, meta: { model: GENERATION } })
+    const { provider } = scripted([fauxAssistantMessage(fauxToolCall('route', { replyTo: null, confidence: 1 }))])
+    const decision = await Effect.runPromise(provider.decide(writtenRoute, routeInput))
+    expect(decision).toMatchObject({ _tag: 'Decided', value: { replyTo: null, confidence: 1 }, meta: { model: GENERATION } })
     expect(decision.meta.costUsd).toBeTypeOf('number')
   })
 
@@ -125,9 +127,9 @@ describe('PiAiProvider decisions', () => {
       choices.push(options?.toolChoice)
       return reply
     }
-    const { provider } = scripted([record(fauxAssistantMessage(fauxToolCall('route', { replyTo: null, confidence: 1 }))), record(fauxAssistantMessage(fauxToolCall('cards', { cards: [] })))])
+    const { provider } = scripted([record(fauxAssistantMessage(fauxToolCall('route', { replyTo: null, confidence: 1 }))), record(fauxAssistantMessage(fauxToolCall('route', { replyTo: null, confidence: 1 })))])
     await Effect.runPromise(provider.decide(tasks.routeCheck, routeInput))
-    await Effect.runPromise(provider.decide(tasks.forYou, { me: 'Tushar', now: NOW, topics: [] }))
+    await Effect.runPromise(provider.decide(writtenRoute, routeInput))
     expect(choices).toEqual([{ type: 'function', function: { name: 'route' } }, 'auto'])
   })
 

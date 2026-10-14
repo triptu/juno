@@ -11,7 +11,7 @@ import type { CatchUpInput } from '../tasks/catchUp'
 import type { TitleTopicInput } from '../tasks/titleTopic'
 import type { TopicArtInput } from '../tasks/topicArt'
 import { fakeChatTurn } from './replies'
-import { fakeCatchUp, fakeForYou, fakeGroupRun, fakeParseCommand, fakeRouteCheck, fakeSettledScore, fakeTitle, fakeTopicArt, fakeUrgencyGate } from './rules'
+import { fakeCatchUp, fakeGroupRun, fakeParseCommand, fakeRouteCheck, fakeSettledScore, fakeTitle, fakeTopicArt, fakeUrgencyGate } from './rules'
 
 export const FAKE_MODEL = 'fake'
 
@@ -21,7 +21,6 @@ const structuredRules: Record<string, (input: never) => unknown> = {
   groupRun: fakeGroupRun,
   urgencyGate: fakeUrgencyGate,
   parseCommand: fakeParseCommand,
-  forYou: fakeForYou,
 }
 
 const textRules: Record<string, (input: never) => string> = {

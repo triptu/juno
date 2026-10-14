@@ -24,7 +24,7 @@ export interface CardProps {
 }
 
 /**
- * A For you or assistant card: a meta header, a title, body text, an
+ * An assistant card: a meta header, a title, body text, an
  * optional block and a row of actions.
  */
 export function Card({ kindIcon, kind, sourceIcon, source, title, body, children, actions, onDismiss, dismissLabel = 'Dismiss' }: CardProps) {

@@ -3,7 +3,6 @@
  * in the tool call; the provider validates them like any other output.
  */
 import type { CatchUpInput } from '../tasks/catchUp'
-import type { ForYouInput } from '../tasks/forYou'
 import type { GroupRunInput } from '../tasks/groupRun'
 import type { ParseCommandInput } from '../tasks/parseCommand'
 import type { RouteCheckInput } from '../tasks/routeCheck'
@@ -11,7 +10,7 @@ import type { SettledScoreInput } from '../tasks/settledScore'
 import type { TitleTopicInput } from '../tasks/titleTopic'
 import type { TopicArtInput } from '../tasks/topicArt'
 import type { UrgencyGateInput } from '../tasks/urgencyGate'
-import { CHATTER, CLOSING, PROMISE, URGENT, contentWords, firstName, firstSentence, firstWords, overlap, sentenceCase } from './text'
+import { CHATTER, CLOSING, URGENT, contentWords, firstName, firstSentence, firstWords, overlap, sentenceCase } from './text'
 
 export function fakeRouteCheck(input: RouteCheckInput): unknown {
   const draft = contentWords(input.draft)
@@ -101,29 +100,6 @@ export function fakeParseCommand(input: ParseCommandInput): unknown {
   }
   if (ASK.test(text)) return { command: { kind: 'ask', prompt: text }, confidence: 0.8 }
   return { command: null, confidence: 0.9 }
-}
-
-export function fakeForYou(input: ForYouInput): unknown {
-  const cards: Array<Record<string, unknown>> = []
-  for (const topic of input.topics) {
-    const last = topic.messages.at(-1)
-    if (!last) continue
-    if (!last.fromMe && /\?\s*$/.test(last.text.trim())) {
-      cards.push({
-        type: 'waiting_on_you',
-        topicId: topic.id,
-        title: `${firstName(last.sender)} is waiting on you`,
-        body: `${firstName(last.sender)} asks: ${firstSentence(last.text)}`,
-        options: ['Yes, that works', 'Not yet', 'Let me check'],
-      })
-    } else if (last.fromMe && PROMISE.test(last.text)) {
-      cards.push({ type: 'follow_up', topicId: topic.id, title: `You said you would follow up`, body: `In ${topic.title}: ${firstSentence(last.text)}` })
-    } else if (CLOSING.test(last.text) && topic.unread === 0) {
-      cards.push({ type: 'tidy_up', topicId: topic.id, title: `${topic.title} looks settled`, body: `The last message closes it: ${firstSentence(last.text)}` })
-    }
-    if (cards.length === 5) break
-  }
-  return { cards }
 }
 
 export function fakeTitle(input: TitleTopicInput): string {

@@ -55,13 +55,4 @@ describe('output validation', () => {
     expect(validateOutput(tasks.parseCommand, input, { command: null, confidence: 0.9 }).ok).toBe(true)
   })
 
-  it('forYou allows an empty list, caps cards at 5, and rejects a card for an unknown topic', () => {
-    const input = { me: 'Tushar', now: 'now', topics: [{ id: postgres.id, title: postgres.title, channel: '#eng', unread: 0, messages: [] }] }
-    const card = { type: 'tidy_up', topicId: postgres.id, title: 'Done', body: 'Looks finished.' }
-    expect(validateOutput(tasks.forYou, input, { cards: [] }).ok).toBe(true)
-    expect(validateOutput(tasks.forYou, input, { cards: [card] }).ok).toBe(true)
-    expect(validateOutput(tasks.forYou, input, { cards: Array.from({ length: 6 }, () => ({ ...card })) }).ok).toBe(false)
-    expect(validateOutput(tasks.forYou, input, { cards: [{ ...card, topicId: 't:C0ENG:9.000001' }] }).ok).toBe(false)
-    expect(validateOutput(tasks.forYou, input, { cards: [{ ...card, type: 'nag' }] }).ok).toBe(false)
-  })
 })

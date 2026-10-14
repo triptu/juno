@@ -37,12 +37,6 @@ export default defineFixtures(
     },
     Page: {
       workspace: fixture({ variant: 'workspace', illustration: 'nothing-open', title: 'Nothing open yet', body: 'Pick a topic on the left.', padding: 'page' }),
-      'for-you': fixture({
-        illustration: 'caught-up',
-        title: 'Nothing for you right now',
-        body: 'Juno adds a card here when something needs you.',
-        padding: 'page',
-      }),
       table: fixture({
         illustration: 'nothing-here',
         title: 'No topics match',

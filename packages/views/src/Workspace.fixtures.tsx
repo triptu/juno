@@ -15,7 +15,6 @@ const tabs = {
   density: { id: 'C0DESIGNREV:1759900000.000900', title: 'Thread list density', icon: 'hash' } satisfies WorkspaceTab,
   hiring: { id: 'C0HIRING:1760000000.000300', title: 'Rina Sato · Staff backend', icon: 'lock' } satisfies WorkspaceTab,
   maya: { id: 'D0MAYA:1759990000.000500', title: 'Offsite: Wednesday afternoon slot', icon: 'user' } satisfies WorkspaceTab,
-  forYou: { id: 'page:for-you', title: 'For you', icon: 'for-you' } satisfies WorkspaceTab,
 } as const
 
 /** Thirty-seven topic tabs, the last one active, so the strip has to scroll to show it. */
@@ -56,7 +55,7 @@ export default defineFixtures(
       'nothing-open': workspace({ tabs: [] }),
       'topic-open': workspace({}, postgresPage),
       'main-open': workspace({ tabs: [tabs.eng, tabs.density], activeId: tabs.eng.id }, engPage),
-      'many-tabs': workspace({ tabs: [tabs.postgres, tabs.hiring, tabs.eng, tabs.density, tabs.maya, tabs.forYou], activeId: tabs.eng.id }, engPage),
+      'many-tabs': workspace({ tabs: [tabs.postgres, tabs.hiring, tabs.eng, tabs.density, tabs.maya], activeId: tabs.eng.id }, engPage),
       'minimum-window': workspace({ tabs: [tabs.postgres, tabs.hiring, tabs.eng, tabs.density, tabs.maya], activeId: tabs.eng.id }, engPage, { width: 720, height: 480 }),
       'thirty-seven-tabs': workspace({ tabs: thirtySeven, ...(lastTab === undefined ? {} : { activeId: lastTab }) }, postgresPage),
       'thirty-seven-tabs-minimum-window': workspace({ tabs: thirtySeven, ...(lastTab === undefined ? {} : { activeId: lastTab }) }, postgresPage, { width: 720, height: 480 }),

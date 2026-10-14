@@ -17,7 +17,6 @@ function SignedIn() {
       sidebar={
         <Sidebar
           account={{ name: 'Tushar', initials: 'T', hue: 'cyan' }}
-          forYouCount={5}
           filter={{ kind: 'all', unreadOnly: false }}
           dots={{ channels: true, dms: true }}
           accountMenuOpen={false}

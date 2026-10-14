@@ -1,6 +1,5 @@
 import * as stylex from '@stylexjs/stylex'
 import { Hash } from '@phosphor-icons/react/dist/icons/Hash'
-import { Lightbulb } from '@phosphor-icons/react/dist/icons/Lightbulb'
 import { ListBullets } from '@phosphor-icons/react/dist/icons/ListBullets'
 import { Lock } from '@phosphor-icons/react/dist/icons/Lock'
 import { MagnifyingGlass } from '@phosphor-icons/react/dist/icons/MagnifyingGlass'
@@ -13,7 +12,7 @@ import { accent, colors, layout, sizes, spacing } from '@juno/tokens/tokens.styl
 import { activateHandlers, AvatarButton, Button, Chip, Divider, IconButton, NavItem, Popover, type ActivateEvent, type HueName } from '@juno/ui'
 import { countLabel } from './look'
 
-export type SidebarNavTarget = 'all-topics' | 'for-you' | 'juno'
+export type SidebarNavTarget = 'all-topics' | 'juno'
 
 export interface SidebarAccount {
   readonly name: string
@@ -41,7 +40,6 @@ export interface SidebarScope {
 
 export interface SidebarProps {
   readonly account: SidebarAccount
-  readonly forYouCount: number
   /** Unread Juno messages: the soft grey count on the Juno item, never an accent badge. */
   readonly junoUnread?: number
   /** A background job is running: the Juno item's sparkle turns duotone. A run alone does not light it (SPEC 13.2). */
@@ -68,14 +66,13 @@ export interface SidebarProps {
 
 /**
  * The left pane (spec section 5): the title bar with the traffic-light
- * space, Search and the account button, the three nav items, a hairline, the quick
+ * space, Search and the account button, the nav items, a hairline, the quick
  * filters with their dots and the Unread toggle, a status line when the
  * list may be behind Slack, the scope chip when scoped, and the list the
  * owner renders into it.
  */
 export function Sidebar({
   account,
-  forYouCount,
   junoUnread = 0,
   junoBusy = false,
   activeNav,
@@ -129,20 +126,6 @@ export function Sidebar({
       <nav aria-label="Pages" {...stylex.props(styles.nav)}>
         <NavItem icon={ListBullets} active={activeNav === 'all-topics'} onSelect={(event) => onNavigate('all-topics', event)}>
           All topics
-        </NavItem>
-        <NavItem
-          icon={Lightbulb}
-          active={activeNav === 'for-you'}
-          onSelect={(event) => onNavigate('for-you', event)}
-          trailing={
-            forYouCount > 0 ? (
-              <Chip variant="strong" numeric title={`${forYouCount} for you`}>
-                {countLabel(forYouCount)}
-              </Chip>
-            ) : undefined
-          }
-        >
-          For you
         </NavItem>
         <NavItem
           icon={Sparkle}

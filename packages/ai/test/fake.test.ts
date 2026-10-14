@@ -74,20 +74,6 @@ describe('FakeAiProvider decisions', () => {
     expect(search.command).toBeNull()
   })
 
-  it('builds a waiting-on-you card for an unanswered question and points it at the topic', async () => {
-    const out = decided(
-      await run((p) =>
-        p.decide(tasks.forYou, {
-          me: 'Tushar',
-          now: NOW,
-          topics: [{ id: postgres.id, title: postgres.title, channel: '#eng', unread: 1, messages: [...postgres.recent, msg('Sam Okafor', 'Can you be on call Saturday?', 5)] }],
-        }),
-      ),
-    )
-    expect(out.cards).toHaveLength(1)
-    expect(out.cards[0]).toMatchObject({ type: 'waiting_on_you', topicId: postgres.id })
-    expect(out.cards[0]!.options!.length).toBeGreaterThan(0)
-  })
 })
 
 describe('FakeAiProvider generation', () => {

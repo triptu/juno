@@ -10,7 +10,7 @@ import { Session } from './Session'
 import { TopicList } from './TopicList'
 
 function navigate(target: SidebarNavTarget): void {
-  // TODO(M5/M9/M11): open the All topics, For you or Juno page in a tab.
+  // TODO(M5/M9/M11): open the All topics or Juno page in a tab.
   void target
 }
 
@@ -66,7 +66,6 @@ export function Sidebar() {
   return (
     <SidebarView
       account={account}
-      forYouCount={0}
       filter={{ kind: filter.kind, unreadOnly: filter.unreadOnly }}
       dots={dots}
       {...(filter.scope === undefined ? {} : { scope: { name: scopeChannel?.name ?? filter.scope, kind: scopeChannel?.kind ?? 'public' } })}

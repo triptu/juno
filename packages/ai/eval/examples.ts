@@ -274,44 +274,6 @@ export const examples: ReadonlyArray<Example> = [
   ex(tasks.parseCommand, 'ask for a catch-up', { text: 'what did I miss in eng this morning', people, channels, topics: topicList }, (o) => o.command?.kind === 'ask'),
   ex(tasks.parseCommand, 'resolve with no matching topic', { text: 'close the hiring thread', people, channels, topics: topicList }, (o) => o.command === null),
 
-  ex(
-    tasks.forYou,
-    'a morning of topics',
-    {
-      me: 'Tushar',
-      now: NOW,
-      topics: [
-        { id: postgres.id, title: postgres.title, channel: '#eng', unread: 1, messages: postgres.recent },
-        {
-          id: stagingBill.id,
-          title: stagingBill.title,
-          channel: '#eng',
-          unread: 0,
-          messages: [...stagingBill.recent, m('Jonas Weber', 'Alert added. Scaled down too.', 60), m('Leo Park', 'Perfect, thanks!', 55)],
-        },
-        {
-          id: T('t:D0MAYA:1728500000.000400'),
-          title: 'Offsite dates',
-          channel: 'Maya Chen',
-          unread: 0,
-          messages: [m('Maya Chen', 'Can you send the offsite dates to the team today?', 700), m('Tushar', 'Yes, I will send them this afternoon.', 690, true)],
-        },
-        {
-          id: T('t:C0PLATFORM:1728400000.000500'),
-          title: 'Flaky e2e on CI',
-          channel: '#platform',
-          unread: 3,
-          messages: [
-            m('Dev Patel', 'The sign-in e2e fails about one run in five on CI, always on the cookie step.', 200),
-            m('Sam Okafor', 'Looks like a race between the fake server start and the first request. A retry on connect would fix it.', 190),
-            m('Dev Patel', 'Agreed, want to pair on it?', 185),
-          ],
-        },
-      ],
-    },
-    (o) => o.cards.length > 0 && o.cards.some((c) => c.topicId === 't:D0MAYA:1728500000.000400' && (c.type === 'follow_up' || c.type === 'waiting_on_you')),
-  ),
-
   text(tasks.titleTopic, 'new thread', {
     topicId: T('t:C0ENG:1728900000.000100'),
     channel: '#eng',

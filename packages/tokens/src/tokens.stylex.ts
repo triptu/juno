@@ -521,7 +521,7 @@ export const text = stylex.defineVars({
   '--text-message-name-leading': 'normal',
   '--text-message-name-tracking': '0',
 
-  // Settings section titles, For you card titles.
+  // Settings section titles.
   '--text-heading-family': fonts['--font-sans'],
   '--text-heading-size': '15.5px',
   '--text-heading-weight': '600',
@@ -535,7 +535,7 @@ export const text = stylex.defineVars({
   '--text-topic-title-leading': '1.3',
   '--text-topic-title-tracking': '-0.01em',
 
-  // Page titles: For you, Notifications, Preferences.
+  // Page titles: Notifications, Preferences.
   '--text-page-title-family': fonts['--font-serif'],
   '--text-page-title-size': '34px',
   '--text-page-title-weight': '400',
