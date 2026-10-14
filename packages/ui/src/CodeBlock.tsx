@@ -8,7 +8,11 @@ export interface CodeBlockProps {
   readonly label?: string
 }
 
-/** A selectable, scrolling mono block on the page background. */
+/**
+ * A selectable mono block on the page background. A long one scrolls inside
+ * a capped box; at its edges the wheel goes on to the page, as it does for
+ * any inline content (contained overscroll is for overlays).
+ */
 export function CodeBlock({ children, label }: CodeBlockProps) {
   return (
     <Surface kind="inset" as="pre" aria-label={label} sx={styles.block}>
@@ -24,7 +28,6 @@ const styles = stylex.create({
     paddingInline: spacing['--space-3'],
     maxHeight: layout['--code-block-max-height'],
     overflowY: 'auto',
-    overscrollBehavior: 'contain',
     whiteSpace: 'pre-wrap',
     overflowWrap: 'anywhere',
     userSelect: 'text',

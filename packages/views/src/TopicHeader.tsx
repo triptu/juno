@@ -142,7 +142,7 @@ export function TopicHeader({ detail, stealth = false, art, threadsOpen = false,
             />
           ) : main ? (
             <>
-              <Text variant="topicTitle" tone="default" truncate dir="auto" sx={styles.title}>
+              <Text variant="topicTitle" tone="default" truncate tooltipWhenTruncated dir="auto" sx={styles.title}>
                 {channel.label} · Main
               </Text>
             </>
@@ -152,6 +152,7 @@ export function TopicHeader({ detail, stealth = false, art, threadsOpen = false,
                 variant="topicTitle"
                 tone="default"
                 truncate
+                tooltipWhenTruncated
                 dir="auto"
                 onDoubleClick={onRename === undefined ? undefined : () => setDraft(detail.title)}
                 sx={styles.title}
