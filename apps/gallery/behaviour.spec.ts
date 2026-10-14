@@ -59,20 +59,28 @@ test.describe('mouse-down activation', () => {
  */
 test.describe('truncation tooltip', () => {
   const hoverText = async (page: Page, text: string | RegExp) => {
-    const node = page.locator('[data-fixture-frame]').getByText(text).first()
+    const node = page.locator('[data-fixture-frame]').getByText(text, { exact: true }).first()
     await node.hover()
     return node
+  }
+  /** The sender name: the one span with its own direction in the row's header. */
+  const hoverName = async (page: Page) => {
+    const name = page.locator('[data-message-row] span[dir="auto"]').first()
+    await name.hover()
+    return name
   }
 
   test('a cut-off sender name shows the full name', async ({ page }) => {
     await page.goto('/#/Message?__state=row/long-name')
-    const name = await hoverText(page, /^Maximilian-Alexander/)
+    const name = await hoverName(page)
+    await expect(name).toHaveText('Maximilian-Alexander Fitzgerald-Montgomery-Rutherford of the platform team')
     await expect(name).toHaveAttribute('title', 'Maximilian-Alexander Fitzgerald-Montgomery-Rutherford of the platform team')
   })
 
   test('a name that fits has no tooltip', async ({ page }) => {
     await page.goto('/#/Message?__state=row/group-start')
-    const name = await hoverText(page, 'Maya Chen')
+    const name = await hoverName(page)
+    await expect(name).toHaveText('Maya Chen')
     await expect(name).not.toHaveAttribute('title')
   })
 
