@@ -352,11 +352,11 @@ const styles = stylex.create({
   },
   unset: {
     color: colors['--foreground-subtle'],
-    backgroundColor: colors['--secondary-default'],
+    backgroundColor: { default: colors['--secondary-default'], ':hover': { default: null, '@media (hover: hover)': colors['--secondary-hover'] } },
   },
   plain: {
     color: colors['--foreground-default'],
-    backgroundColor: colors['--secondary-default'],
+    backgroundColor: { default: colors['--secondary-default'], ':hover': { default: null, '@media (hover: hover)': colors['--secondary-hover'] } },
   },
   buttonLabel: {
     overflow: 'hidden',
