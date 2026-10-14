@@ -35,9 +35,9 @@ export function EmptyChat({ onSuggest, enter = true }: EmptyChatProps) {
         </Text>
       </span>
       <div role="group" aria-label="Suggestions" {...stylex.props(styles.pills, enter && styles.enter, enter && styles.delay3)}>
-        {copy.suggestions.map((text) => (
-          <button key={text} type="button" onClick={() => onSuggest(text)} {...stylex.props(styles.pill)}>
-            {text}
+        {copy.suggestions.map((suggestion) => (
+          <button key={suggestion} type="button" onClick={() => onSuggest(suggestion)} {...stylex.props(styles.pill)}>
+            {suggestion}
           </button>
         ))}
       </div>

@@ -37,7 +37,6 @@ const outcomeLabel: Record<ActivityAction['outcome'], string | undefined> = {
  * reason lives behind that button and never in the chat.
  */
 export function ActivityPage({ page, now, onCopyDetails, onLoadMore }: ActivityPageProps) {
-  const copy = chatCopy.pages.activity
   return (
     <Page>
       <PageHeader title="Activity" subtitle="Every run Juno made: what it read, what it did, and what you decided." />
