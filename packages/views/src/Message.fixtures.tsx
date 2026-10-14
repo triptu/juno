@@ -1,4 +1,5 @@
-import { defineFixtures, fixture, hueForId, type FixtureFrame } from '@juno/ui'
+import * as stylex from '@stylexjs/stylex'
+import { defineFixtures, hueForId, scene, type Fixture, type FixtureFrame } from '@juno/ui'
 import { hostile, longFirstLine, main, mentions, thread } from './fixtures/messages'
 import { NOW } from './fixtures/topics'
 import { HoverToolbar } from './HoverToolbar'
@@ -8,23 +9,31 @@ import { messageTime } from './time'
 
 const noop = () => {}
 
-const one = (item: MessageListItem, extra: Partial<MessageProps> = {}, frame?: FixtureFrame) =>
-  fixture<MessageProps>(
-    {
-      message: item.message,
-      sender: item.sender,
-      time: messageTime(item.message.at, NOW),
-      now: NOW,
-      main: false,
-      startsGroup: false,
-      flush: true,
-      tabbable: true,
-      hueOf: hueForId,
-      onOpenThread: noop,
-      onChannel: noop,
-      onLink: noop,
-      ...extra,
-    },
+// The frame sizes a lone component to its content; the list column sizes a
+// row to its width, so the row fills the frame as it would the column.
+const column = stylex.create({ fill: { width: '100%' } })
+
+const one = (item: MessageListItem, extra: Partial<MessageProps> = {}, frame?: FixtureFrame): Fixture<MessageProps> =>
+  scene(
+    () => (
+      <div {...stylex.props(column.fill)}>
+        <Message
+          message={item.message}
+          sender={item.sender}
+          time={messageTime(item.message.at, NOW)}
+          now={NOW}
+          main={false}
+          startsGroup={false}
+          flush
+          tabbable
+          hueOf={hueForId}
+          onOpenThread={noop}
+          onChannel={noop}
+          onLink={noop}
+          {...extra}
+        />
+      </div>
+    ),
     frame,
   )
 
