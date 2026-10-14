@@ -162,28 +162,23 @@ function canPaint(id: string): boolean {
  */
 function useWhenReady(peeking: Peeking | undefined): Peeking | undefined {
   const [shown, setShown] = useState<Peeking | undefined>(undefined)
-  useLayoutEffect(() => {
-    if (peeking === undefined) {
-      setShown(undefined)
-      return
-    }
-    if (canPaint(peeking.id)) {
-      setShown(peeking)
-      return
-    }
+  // The peek whose topic arrived after it was asked for.
+  const [arrived, setArrived] = useState<Peeking | undefined>(undefined)
+  const ready = peeking !== undefined && (arrived === peeking || canPaint(peeking.id))
+  const next = peeking === undefined ? undefined : ready ? peeking : shown
+  if (next !== shown) setShown(next)
+  useEffect(() => {
+    if (peeking === undefined || ready) return
     const check = () => {
-      if (!canPaint(peeking.id)) return
-      for (const off of offs) off()
-      setShown(peeking)
+      if (canPaint(peeking.id)) setArrived(peeking)
     }
-    const offs = [registry.subscribe(topicAtom(peeking.id), check, { immediate: false }), registry.subscribe(messageListAtom(peeking.id), check, { immediate: false })]
-    // It may have arrived between the first look and the subscriptions.
-    check()
+    // Each subscription also looks once now, in case the topic arrived after this render.
+    const offs = [registry.subscribe(topicAtom(peeking.id), check, { immediate: true }), registry.subscribe(messageListAtom(peeking.id), check, { immediate: true })]
     return () => {
       for (const off of offs) off()
     }
-  }, [peeking])
-  return shown
+  }, [peeking, ready])
+  return next
 }
 
 const items = new WeakMap<MessageView, MessageListItem>()
