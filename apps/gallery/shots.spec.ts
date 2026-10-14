@@ -49,7 +49,6 @@ test('screenshots every state in light and dark', async ({ page }) => {
   // One test walks every state twice, a navigation each: a few minutes for
   // the whole gallery, past the default timeout.
   test.setTimeout(10 * 60_000)
-  const only = process.env['GALLERY_SHOTS_ONLY']?.split(',')
   const routes = (await readRoutes(page)).filter((route) => !only || only.includes(route.component))
   await page.evaluate(() => document.fonts.ready)
 
