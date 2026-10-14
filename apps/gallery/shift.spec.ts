@@ -102,7 +102,8 @@ for (let shard = 0; shard < shards; shard++) {
   // The states come from the built gallery, so the list can only be read once
   // a page is open; each component is a step so the report groups by component.
   test(`no interaction shifts the layout, in any state of any component (part ${shard + 1} of ${shards})`, async ({ page }) => {
-    test.setTimeout(10 * 60_000)
+    // Each part walks about forty states, at up to eight elements and six touches each, with a wait per touch for the longest declared motion.
+    test.setTimeout(15 * 60_000)
     const routes = await readRoutes(page)
     const components = partsOf(routes)[shard] ?? []
     const failures: string[] = []
