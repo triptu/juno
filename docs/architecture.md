@@ -562,9 +562,9 @@ Each milestone lists parallel tracks; each track owns disjoint files. Done alway
 
 **M4 Topic view and tabs.** Open thread and Main, message rendering through `richtext`, divider snapshot, read-state rule and mirroring, stealth, tabs, realtime messages, list performance budget, local FTS search. Done: e2e divider, stealth, live message; the performance gate in `docs/performance.md` section 3.4 passes: topic open with 300 cached messages in 50 ms or less, scroll within the frame budget, and prepending a 100-row page with zero visible shift.
 
-**M5 Actions and overlay.** Resolve/reopen, pin, rename, Use AI title, subscribe, ignore, mark read/unread, context menus, app menu, engine-computed undo, toasts, All topics. Done: e2e every action with undo.
+**M5 Actions and overlay.** Resolve/reopen, pin, rename, Use AI title, subscribe, ignore, mark read/unread, context menus (with Copy Slack link and Open in Slack), app menu, engine-computed undo, toasts, All topics, peek (hold ⌥ or Space over a sidebar row). Done: e2e every action with undo.
 
-**M6 Composer, send and files.** Post with reconciliation in all orders, edit and delete own messages, reactions, quote, suggestions, drafts, attachments (paste, drop, button), thumbnails and download through main, New message with tracking and new DMs. Done: e2e send flows; engine reconciliation tests; upload verified in the live smoke.
+**M6 Composer, send and files.** Post with reconciliation in all orders, edit and delete own messages (also from the keyboard: ↑ from an empty composer selects, E edits, Delete deletes), reactions, quote, suggestions, drafts, attachments (paste, drop, button), thumbnails and download through main, New message with tracking and new DMs. Done: e2e send flows; engine reconciliation tests; upload verified in the live smoke.
 
 **M7 Realtime hardening.** Reconnect, discovery sweep, outbox coalescing and revert, per-method rate buckets, offline, engine restart and port reconnect, states UI. Done: e2e socket drop and 429; convergence test with drops.
 

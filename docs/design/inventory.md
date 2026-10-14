@@ -516,6 +516,7 @@ Native menus **[spec]**. Prototype rendering for reference: 236px, padding 5, ra
 | Resolve / Reopen | `circle-check` / `rotate-ccw` | | by state | undo toast; resolve clears unread and mention |
 | — | | | | |
 | Copy Slack link | `link` | | always | |
+| Open in Slack | `arrow-square-out` | | always | opens the Slack app at the topic (`slack://` deep link, falling back to the web permalink) |
 | Ignore #product | `ban` | | channel is not a DM | toast "Ignoring #product" with Undo |
 
 ### 15.2 Channel menu (Browse popover rows)

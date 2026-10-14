@@ -97,8 +97,10 @@ Each row is a tile followed by three lines. The tile is the topic's art: a small
   - Subscribe or unsubscribe
   - Resolve or reopen
   - Copy Slack link
+  - Open in Slack
   - Ignore #channel
 - **Channel context menu** (from Browse channels): Show its topics, Open Main, Open Main in stealth, Mark channel as read or unread, Change icon and colour, and Ignore channel.
+- **Peek.** Hold the peek key while the pointer is over a sidebar row and the topic opens in a popover to the right of the sidebar. It is read-only and scrolls, and it does not mark anything read, open a tab or move focus, so you stay where you were. Moving to another row while holding the key switches the peek; releasing it closes the popover. The key defaults to ⌥ Option, which works while you type; Preferences can change it to Space, which works only when no text field has focus. (Fn is not offered: macOS does not report it to apps reliably.)
 - **Rename** happens inline in the row or the topic header. Enter saves and Esc cancels.
 - **Undo toasts** appear bottom-left for reversible actions only. Info-only toasts like "Prompt copied" never show Undo.
 
@@ -134,6 +136,8 @@ Each row is a tile followed by three lines. The tile is the topic's art: a small
   - A full emoji picker.
   - Quote.
   - In Main threads, Reply in thread.
+  - More: Edit and Delete on your own messages, Copy Slack link and Open in Slack.
+- **Keyboard.** ↑ in an empty composer selects the newest message; ↑ and ↓ move the selection, and Esc returns to the composer. On your own selected message, E edits it inline and Delete or Backspace deletes it after one inline confirm (Enter confirms, Esc cancels).
 - **Quoting** follows Slack. Quoting inserts "> " lines into your reply. Selecting any part of a message shows a floating Quote button that quotes only the selection.
 - **Thread links.** In Main, a message that has a thread shows a small "2 replies · Title ›" link under it.
 
@@ -482,6 +486,8 @@ Use the Littlebird design system's tokens.
 | ⌘J | Open Juno with the composer focused. Inside the chat, focus the composer |
 | ⌘Z | Undo the last resolve, unsubscribe, ignore or routed post |
 | ⌘ click / ⌘ Enter | Open in a new tab |
+| ↑ in an empty composer, then ↑ ↓ | Select a message. E edits and Delete or Backspace deletes your own selected message |
+| Hold ⌥ (or Space) over a sidebar row | Peek at the topic without opening it or marking it read |
 | Enter / Shift Enter | Send / new line. During a send check, Enter takes the first option. |
 | Esc | Close a menu or palette, or dismiss a send check. In the Juno chat with an empty composer, stop Juno's current reply (never a background job) |
 

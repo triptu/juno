@@ -4,6 +4,9 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-14 14:05 · Tushar · Open in Slack sits next to Copy Slack link in the topic menu and the message's More menu (M5).
+- 10-14 14:05 · Tushar · Keyboard edit and delete: ↑ from an empty composer selects the newest message, ↑ ↓ move, E edits your own message, Delete or Backspace deletes it after one inline confirm (M6). The owner uses few shortcuts; this is the one that matters.
+- 10-14 14:05 · Tushar · Peek: hold a key over a sidebar row to see the topic in a popover to the right, without opening it or marking it read (M5). The key defaults to ⌥ Option because it works while typing; Space is the alternative in Preferences. Fn is not offered because macOS does not report it to apps reliably.
 - 10-14 13:35 · Tushar · New feature Slack lacks: a schedule for presence (away or active by time of day), beside the manual switch. Juno sets it with `presence.set` while running and applies the current state on launch or wake. Designed together with the notification timing in the notifications pass.
 - 10-14 13:20 · Tushar · The New message page, its sidebar icon and "Track replies as a topic" are removed. To post, open a conversation's Main from the sidebar or search and type there. Tracking replies as a topic can't be done reliably and was scope creep. The tab strip's "+" becomes New tab: it opens search once ⌘K exists (M9), All topics until then.
 - 10-14 12:50 · Tushar · Juno Agent conversation is the model's judgement, not hard-coded rules. No limits on bubble length or count, no fixed pacing or milestone rules. Hard rules stay only for safety (one click per outward action, no automatic repeat, spend cap, untrusted content, memory trust) and perf budgets. SPEC 13 and plan-v3 get a simplification pass.
