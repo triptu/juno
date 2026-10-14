@@ -12,8 +12,19 @@ import type { Store } from '../store/store'
 /** What a request was built against. An admitted `Request` is one. */
 export type Revision = { readonly gen: number; readonly pinRev: number }
 export type ProviderFailure = { readonly ending: Ending; readonly rateLimited: boolean }
+/** What a stamped request has streamed so far: its text and how many tool calls it has started. */
+export type StreamProgress = { readonly text: string; readonly toolCalls: number }
+type Observer = (progress: StreamProgress) => void
+const progressOf = (message: AssistantMessage): StreamProgress => ({
+  text: message.content.flatMap(part => (part.type === 'text' ? [part.text] : [])).join(''),
+  toolCalls: message.content.filter(part => part.type === 'toolCall').length,
+})
 export class AdmissionError extends Error {
-  constructor(readonly ending: Ending) { super(code(ending)) }
+  readonly ending: Ending
+  constructor(ending: Ending) {
+    super(code(ending))
+    this.ending = ending
+  }
 }
 type Reason = Exclude<Ending, { _tag: 'complete' | 'stopped' }>
 /** The guard's failures travel through pi as `errorMessage`. Only this fixed code is kept, never a provider's error body. */
@@ -85,7 +96,7 @@ export interface GuardOptions {
 export function createProviderGuard(options: GuardOptions) {
   const { store, transport } = options
   const spend = options.spend ?? createSpend(store)
-  const stamps = new Map<string, Array<{ revision: Revision; path: SpendPath }>>()
+  const stamps = new Map<string, Array<{ revision: Revision; path: SpendPath; observe?: Observer }>>()
   const multiplier = (provider: string): 1 | 1.25 => store.db.prepare('SELECT 1 FROM provider_bounds WHERE provider = ?').get(provider) ? 1.25 : 1
   const check = (model: Model<Api>, context: Context, revision: Revision): number => {
     if (!sameRevision(revision, readRevision(store))) throw new AdmissionError({ _tag: 'interrupted' })
@@ -157,12 +168,14 @@ export function createProviderGuard(options: GuardOptions) {
             const cost = usage.cost.total
             // A zero report from an interrupted or missing-usage stream is not a receipt.
             spend.settle(held.id, usage.totalTokens > 0 && Number.isFinite(cost) && cost >= 0 ? dollars(cost) : undefined)
+            stamp.observe?.(progressOf(event.message))
             outer.push(event)
             outer.end(event.message)
             return
           }
           partial = event.partial
           started = true
+          stamp.observe?.(progressOf(event.partial))
           outer.push(event)
         }
         throw new Error('terminated')
@@ -192,14 +205,14 @@ export function createProviderGuard(options: GuardOptions) {
     /**
      * Called only by the trusted builder hook, after persisting any emergency
      * merge. Pass the admitted `Request` (it is a `Revision`) and the context
-     * built from it. One use.
+     * built from it. One use. `observe` sees the request's text as it streams.
      */
-    stamp: (revision: Revision, model: Model<Api>, context: Context, path: SpendPath = 'chat'): Context => {
+    stamp: (revision: Revision, model: Model<Api>, context: Context, path: SpendPath = 'chat', observe?: Observer): Context => {
       const copy = structuredClone(context)
       check(model, copy, revision)
       const key = hash(model, copy)
       const pending = stamps.get(key) ?? []
-      pending.push({ revision: { gen: revision.gen, pinRev: revision.pinRev }, path })
+      pending.push({ revision: { gen: revision.gen, pinRev: revision.pinRev }, path, ...(observe ? { observe } : {}) })
       stamps.set(key, pending)
       return copy
     },
