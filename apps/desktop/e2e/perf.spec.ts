@@ -413,6 +413,45 @@ test.describe.serial('large workspace', () => {
       await running.close()
     }
   })
+
+  test('sidebar drag: main-thread work per frame while the edge moves', async () => {
+    test.setTimeout(300_000)
+    const running = await launch()
+    try {
+      const juno = new Juno(running.app, running.win)
+      const { win } = running
+      await juno.sidebar.expectRows()
+      await juno.expectEngineLive(120_000)
+      // A topic open beside the list, so the drag reflows both panes.
+      const first = (await juno.sidebar.titles())[0]!
+      await juno.sidebar.row(first).open()
+      await juno.topic.expectAtBottom()
+      await win.evaluate(() => {
+        const w = window as unknown as { __loaf: number }
+        w.__loaf = 0
+        new PerformanceObserver((entries) => {
+          w.__loaf += entries.getEntries().length
+        }).observe({ type: 'long-animation-frame', buffered: false })
+      })
+      const box = (await juno.frame.edge.boundingBox())!
+      const x = box.x + box.width / 2
+      const y = box.y + box.height / 2
+      const { work } = await traced(win, 'sidebar-drag', async () => {
+        await win.mouse.move(x, y)
+        await win.mouse.down()
+        // Out to the widest, in to the narrowest and back: about 3 s of moves.
+        for (const to of [x + 96, x - 104, x]) await win.mouse.move(to, y, { steps: 60 })
+        await win.mouse.up()
+      })
+      const loaf = await win.evaluate(() => (window as unknown as { __loaf: number }).__loaf)
+      const perFrame = stats('sidebar drag, main-thread work per frame', work)
+      within('sidebar drag, main-thread work per frame, p95', perFrame.p95, 8.3)
+      expect(loaf).toBe(0)
+      await juno.frame.expectWidth(384)
+    } finally {
+      await running.close()
+    }
+  })
 })
 
 test('topic open, uncached: a thread whose replies were never fetched, to the header and what the store has', async () => {

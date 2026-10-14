@@ -369,6 +369,8 @@ export class Juno {
   readonly accountMenu: AccountMenu
   readonly topic: TopicPane
   readonly tabs: TabStrip
+  readonly nav: Navigation
+  readonly frame: SidebarFrame
 
   constructor(app: ElectronApplication, win: Page) {
     this.app = app
@@ -378,6 +380,8 @@ export class Juno {
     this.accountMenu = new AccountMenu(win, this.sidebar)
     this.topic = new TopicPane(win)
     this.tabs = new TabStrip(app, win)
+    this.nav = new Navigation(app, win)
+    this.frame = new SidebarFrame(app, win)
   }
 
   /** The empty workspace shown when no tab is open. */
@@ -900,8 +904,8 @@ export class TabStrip {
   }
 
   async expectStealth(title: string, stealth = true): Promise<void> {
-    if (stealth) await expect(this.tab(title)).toHaveAttribute('aria-description', 'Stealth')
-    else await expect(this.tab(title)).not.toHaveAttribute('aria-description', 'Stealth')
+    if (stealth) await expect(this.tab(title)).toHaveAttribute('aria-description', /^Stealth/)
+    else await expect(this.tab(title)).not.toHaveAttribute('aria-description', /^Stealth/)
   }
 
   /** Mouse down on a tab. */
@@ -930,15 +934,166 @@ export class TabStrip {
 
   /** The "+" after the last tab. */
   get newMessageButton() {
-    return this.win.getByRole('region', { name: 'Workspace' }).getByRole('button', { name: 'New message', exact: true })
+    return this.win.getByRole('region', { name: 'Workspace' }).getByRole('button', { name: 'New chat ⌘T', exact: true })
   }
 
-  /** An item of the app menu, as ⌘W, ⌘⇧] or ⌘⇧[ would choose it. */
-  async menu(id: 'close-tab' | 'next-tab' | 'previous-tab'): Promise<void> {
-    await this.app.evaluate(({ Menu, BrowserWindow }, itemId) => {
-      const item = Menu.getApplicationMenu()?.getMenuItemById(itemId)
-      if (!item) throw new Error(`No menu item ${itemId}`)
-      item.click(undefined, BrowserWindow.getAllWindows()[0])
-    }, id)
+  /** An item of the app menu, as its shortcut would choose it. */
+  async menu(id: AppMenuItem): Promise<void> {
+    await clickAppMenu(this.app, id)
+  }
+
+  /** Right-clicks a tab and picks `item` in the tab menu. Returns the menu's labels, "-" for a separator and "(label)" for a disabled item. */
+  async contextMenu(title: string, item: 'pin' | 'close' | 'close-others' | 'close-right' | 'close-all' | 'copy-link' | 'open-in-slack'): Promise<string[]> {
+    await chooseNextMenuItem(this.win, item)
+    await this.tab(title).click({ button: 'right' })
+    return this.app.evaluate(() => [...(globalThis as unknown as { junoTest: { contextMenu: { lastLabels: string[] } } }).junoTest.contextMenu.lastLabels])
+  }
+
+  async expectPinned(title: string, pinned = true): Promise<void> {
+    if (pinned) await expect(this.tab(title)).toHaveAttribute('data-pinned', '')
+    else await expect(this.tab(title)).not.toHaveAttribute('data-pinned')
+  }
+
+  /** The soft grey dot of an inactive tab whose topic has unread messages. */
+  async expectUnread(title: string, unread = true): Promise<void> {
+    const tab = this.tab(title)
+    if (unread) await expect(tab).toHaveAttribute('data-unread', '', { timeout: 15_000 })
+    else await expect(tab).not.toHaveAttribute('data-unread', { timeout: 15_000 })
+  }
+
+  /** Whether the tab shows a close button. */
+  closeButton(title: string): Locator {
+    return this.tab(title).getByRole('button', { name: 'Close tab' })
+  }
+}
+
+/** App menu items the tests click, as their shortcuts would. */
+export type AppMenuItem =
+  | 'close-tab'
+  | 'next-tab'
+  | 'previous-tab'
+  | 'next-tab-control'
+  | 'previous-tab-control'
+  | 'new-tab'
+  | 'new-chat'
+  | 'reopen-tab'
+  | 'back'
+  | 'forward'
+  | 'toggle-sidebar'
+  | `tab-${1 | 2 | 3 | 4 | 5 | 6 | 7 | 8}`
+  | 'tab-last'
+
+async function clickAppMenu(app: ElectronApplication, id: AppMenuItem): Promise<void> {
+  await app.evaluate(({ Menu, BrowserWindow }, itemId) => {
+    const item = Menu.getApplicationMenu()?.getMenuItemById(itemId)
+    if (!item) throw new Error(`No menu item ${itemId}`)
+    item.click(undefined, BrowserWindow.getAllWindows()[0])
+  }, id)
+}
+
+/** Back and Forward: the title bar buttons, the app menu (⌘[ and ⌘]), the mouse's side buttons and the swipe. */
+export class Navigation {
+  constructor(
+    readonly app: ElectronApplication,
+    readonly win: Page,
+  ) {}
+
+  /** The visible Back button: in the sidebar's bar, or in the tab strip while the sidebar is hidden. */
+  get backButton(): Locator {
+    return this.win.getByRole('button', { name: 'Back ⌘[' }).locator('visible=true')
+  }
+
+  get forwardButton(): Locator {
+    return this.win.getByRole('button', { name: 'Forward ⌘]' }).locator('visible=true')
+  }
+
+  async back(): Promise<void> {
+    await this.backButton.click()
+  }
+
+  async forward(): Promise<void> {
+    await this.forwardButton.click()
+  }
+
+  async menu(id: 'back' | 'forward'): Promise<void> {
+    await clickAppMenu(this.app, id)
+  }
+
+  /** The mouse's back (3) or forward (4) button. Playwright's mouse has neither, so the event is sent as the page would get it. */
+  async mouseButton(button: 3 | 4): Promise<void> {
+    await this.win.evaluate((which) => window.dispatchEvent(new MouseEvent('mouseup', { button: which })), button)
+  }
+
+  /** The three-finger swipe, as macOS reports it to the window. */
+  async swipe(direction: 'left' | 'right'): Promise<void> {
+    await this.app.evaluate(({ BrowserWindow }, way) => {
+      BrowserWindow.getAllWindows()[0]?.emit('swipe', {}, way)
+    }, direction)
+  }
+
+  async expectCanGo(back: boolean, forward: boolean): Promise<void> {
+    if (back) await expect(this.backButton).toBeEnabled()
+    else await expect(this.backButton).toBeDisabled()
+    if (forward) await expect(this.forwardButton).toBeEnabled()
+    else await expect(this.forwardButton).toBeDisabled()
+  }
+}
+
+/** The sidebar's width and hidden state, driven through its edge, its button and View › Hide Sidebar. */
+export class SidebarFrame {
+  readonly sidebar: Locator
+  readonly edge: Locator
+
+  constructor(
+    readonly app: ElectronApplication,
+    readonly win: Page,
+  ) {
+    this.sidebar = win.getByRole('complementary', { name: 'Sidebar' })
+    this.edge = win.getByRole('separator', { name: 'Resize sidebar' })
+  }
+
+  async width(): Promise<number> {
+    const box = await this.sidebar.boundingBox()
+    if (!box) throw new Error('The sidebar is not shown')
+    return Math.round(box.width)
+  }
+
+  async expectWidth(width: number): Promise<void> {
+    await expect.poll(() => this.width()).toBe(width)
+  }
+
+  /** Drags the edge by `dx` pixels in `steps` pointer moves. */
+  async drag(dx: number, steps = 10): Promise<void> {
+    const box = await this.edge.boundingBox()
+    if (!box) throw new Error('No sidebar edge')
+    const x = box.x + box.width / 2
+    const y = box.y + box.height / 2
+    await this.win.mouse.move(x, y)
+    await this.win.mouse.down()
+    await this.win.mouse.move(x + dx, y, { steps })
+    await this.win.mouse.up()
+  }
+
+  async doubleClickEdge(): Promise<void> {
+    await this.edge.dblclick()
+  }
+
+  /** The title bar button that hides or shows the sidebar. */
+  async toggleWithButton(): Promise<void> {
+    await this.win.getByRole('button', { name: /^(Hide|Show) sidebar/ }).locator('visible=true').click()
+  }
+
+  async toggleWithMenu(): Promise<void> {
+    await clickAppMenu(this.app, 'toggle-sidebar')
+  }
+
+  async expectHidden(hidden = true): Promise<void> {
+    if (hidden) await expect(this.sidebar).toBeHidden()
+    else await expect(this.sidebar).toBeVisible()
+  }
+
+  /** View › Hide Sidebar's label, which names what it will do. */
+  async menuLabel(): Promise<string | undefined> {
+    return this.app.evaluate(({ Menu }) => Menu.getApplicationMenu()?.getMenuItemById('toggle-sidebar')?.label)
   }
 }
