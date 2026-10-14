@@ -259,6 +259,10 @@ Location: `apps/desktop/perf/`, a separate Playwright project `perf` (`pnpm perf
 
 **Baselines.** `apps/desktop/perf/baselines.json` is committed: `{ host, scenario, metric, median, p95, commit, date }`. `pnpm perf:baseline` rewrites it from a fresh run and is only used in a PR whose description says why the numbers changed (new feature, intentional trade-off, hardware change). On every merge to `main` CI appends the run to `perf-history.ndjson` on the `perf-data` branch and uploads the traces as artifacts for 30 days, so a slow drift is visible even when each step stays under 15 %.
 
+### 7.3a The feel suite
+
+`pnpm test:feel` (`apps/desktop/e2e/feel/`, described in `docs/development.md`) checks the rules in section 4 that a timing cannot: content that arrives late does not move what is on screen, a topic opens at its position with no later jump, feedback shows in the next frame, a tab restores before its first paint, and no frame is empty between two states. It records frames and DOM probes per animation frame and counts frames rather than timing them, so it can fail the run on a loaded machine. Only its long-frame check uses durations (over 100 ms fails).
+
 ### 7.4 Review checklist for any UI, list, IPC, query or startup change
 
 1. Does the interaction paint on the next frame? Trace it once.
