@@ -33,20 +33,40 @@ export function textRuns(text: string, style?: InlineStyle): Inline[] {
   return out
 }
 
-/** Merges adjacent text runs with the same style and drops empty ones. */
+/** At most one blank line between two lines of text. */
+const MAX_BREAK_RUN = 2
+
+const isBlankLine = (inline: Inline | undefined) => inline === undefined || inline.kind === 'break'
+
+/**
+ * Merges adjacent text runs with the same style and drops empty ones. Blank
+ * lines are tidied the way a reader expects: a line of only spaces is a
+ * blank line, more than one blank line in a row collapses to one, and a run
+ * never starts or ends with a blank line.
+ */
 export function normalize(inlines: ReadonlyArray<Inline>): Inline[] {
-  const out: Inline[] = []
+  const merged: Inline[] = []
   for (const inline of inlines) {
     if (inline.kind === 'text' && inline.text.length === 0) continue
-    const last = out[out.length - 1]
+    const last = merged[merged.length - 1]
     if (inline.kind === 'text' && last?.kind === 'text' && sameStyle(last.style, inline.style)) {
-      out[out.length - 1] = { ...last, text: last.text + inline.text }
+      merged[merged.length - 1] = { ...last, text: last.text + inline.text }
       continue
+    }
+    merged.push(inline)
+  }
+  const out: Inline[] = []
+  let breaks = 0
+  for (const [index, inline] of merged.entries()) {
+    if (inline.kind === 'text' && inline.text.trim() === '' && isBlankLine(merged[index - 1]) && isBlankLine(merged[index + 1])) continue
+    if (inline.kind === 'break') {
+      breaks += 1
+      if (out.length === 0 || breaks > MAX_BREAK_RUN) continue
+    } else {
+      breaks = 0
     }
     out.push(inline)
   }
-  // A body never starts or ends with a break.
-  while (out[0]?.kind === 'break') out.shift()
   while (out[out.length - 1]?.kind === 'break') out.pop()
   return out
 }
