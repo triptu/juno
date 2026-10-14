@@ -1,6 +1,6 @@
 import { Schema } from 'effect'
 import { describe, expect, it } from 'vitest'
-import { OpenTarget, sendMessageStatus, type ProposedMessage } from '../src/index'
+import { Emoji, OpenTarget, sendMessageStatus, type ProposedMessage } from '../src/index'
 
 const decodeOpen = Schema.decodeUnknownSync(OpenTarget)
 
@@ -15,6 +15,16 @@ describe('OpenTarget url', () => {
     for (const url of ['file:///etc/passwd', 'javascript:alert(1)', 'x-juno://open', 'http://192.168.1.22:3773/mcp', 'http://localhost.evil.com/', 'https://', 'notaurl']) {
       expect(() => decodeOpen({ _tag: 'url', url, label: 'Open' })).toThrow()
     }
+  })
+})
+
+describe('Emoji', () => {
+  it('takes any single emoji, including sequences, flags and skin tones', () => {
+    for (const emoji of ['👍', '🎉', '❤️', '👍🏽', '👩‍💻', '🇮🇳', '1️⃣']) expect(Schema.decodeUnknownSync(Emoji)(emoji)).toBe(emoji)
+  })
+
+  it('refuses text, two emoji and the empty string', () => {
+    for (const text of ['', 'ok', '👍👍', '👍 ', 'a👍']) expect(() => Schema.decodeUnknownSync(Emoji)(text)).toThrow()
   })
 })
 

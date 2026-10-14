@@ -2,7 +2,8 @@ import { Schema } from 'effect'
 import { Rpc, RpcGroup } from 'effect/rpc'
 import { Revision } from '@juno/agent-cards'
 import { CardBinding } from './identity'
-import { ChatMessageId, OpId } from '../chat/ids'
+import { BubbleId, CardId, ChatMessageId, OpId } from '../chat/ids'
+import { Emoji, ReplyTarget } from '../chat/items'
 import { ChatPage, ChatSummary } from '../chat/page'
 import { Place } from '../chat/place'
 import { Accepted, AgentCommandError, PageLimit, operation } from './common'
@@ -24,9 +25,25 @@ export const ChatPageSnapshot = Schema.Struct({
 })
 export const chatPage = Rpc.make('agent.chat.page', { payload: { window: ChatWindow }, success: ChatPageSnapshot, stream: true, error: AgentCommandError })
 export const chatSummary = Rpc.make('agent.chat.summary', { success: ChatSummary, stream: true })
-/** The one way to talk to Juno. While a run is live the message joins it at its next step; otherwise it starts one. */
+/**
+ * A message, maybe a reply to a Juno bubble or card. While a run is live it joins the run at its next
+ * step; otherwise it starts one. A reply to a card is not a click.
+ */
 export const chatSend = Rpc.make('agent.chat.send', {
-  payload: { ...operation, text: Schema.String, context: Schema.optionalKey(Place) }, success: Accepted, error: AgentCommandError,
+  payload: { ...operation, text: Schema.String, context: Schema.optionalKey(Place), replyTo: Schema.optionalKey(ReplyTarget) },
+  success: Accepted, error: AgentCommandError,
+})
+/**
+ * The owner's reaction on a Juno bubble or card; `emoji: null` removes it. A thumbs up or a removal is
+ * only recorded. Any other emoji is queued to Juno like a message, and Juno may ignore it. Never a click.
+ */
+export const chatReact = Rpc.make('agent.chat.react', {
+  payload: {
+    ...operation,
+    target: Schema.Union([Schema.TaggedStruct('bubble', { id: BubbleId }), Schema.TaggedStruct('card', { id: CardId })]),
+    emoji: Schema.NullOr(Emoji),
+  },
+  success: Accepted, error: AgentCommandError,
 })
 export const chatRetry = Rpc.make('agent.chat.retry', {
   payload: { ...operation, interruptedOpId: OpId }, success: Accepted, error: AgentCommandError,
@@ -35,4 +52,4 @@ export const chatRead = Rpc.make('agent.chat.read', { payload: { through: ChatMe
 export const chatRemove = Rpc.make('agent.chat.remove', {
   payload: { ...operation, messageId: ChatMessageId, alsoRemoveReply: Schema.Boolean }, success: Accepted, error: AgentCommandError,
 })
-export const ChatRpcs = RpcGroup.make(chatPage, chatSummary, chatSend, chatRetry, chatRead, chatRemove)
+export const ChatRpcs = RpcGroup.make(chatPage, chatSummary, chatSend, chatReact, chatRetry, chatRead, chatRemove)

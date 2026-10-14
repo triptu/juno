@@ -32,6 +32,10 @@ export type JobId = typeof JobId.Type
 export const ScheduleId = Schema.String.pipe(Schema.brand('ScheduleId'))
 export type ScheduleId = typeof ScheduleId.Type
 
+/** One Juno bubble: the run and the bubble's place in it, `<runId>:<n>`. */
+export const BubbleId = Schema.String.pipe(Schema.brand('BubbleId'))
+export type BubbleId = typeof BubbleId.Type
+
 export const RunId = Schema.String.pipe(Schema.brand('RunId'))
 export type RunId = typeof RunId.Type
 

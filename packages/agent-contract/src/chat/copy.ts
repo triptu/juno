@@ -108,6 +108,15 @@ export const chatCopy = {
     remove: 'Remove',
     keep: 'Keep',
   },
+  /** Reactions and replies. The emoji itself is content; these are the labels around it. */
+  react: {
+    react: 'React',
+    reply: 'Reply',
+    /** The sender beside a quote of a Juno bubble. */
+    juno: 'Juno',
+    /** A quote whose target was removed. */
+    removed: 'Removed',
+  },
   contextMenu: {
     copy: 'Copy',
     remember: 'Remember this',

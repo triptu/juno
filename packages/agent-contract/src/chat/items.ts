@@ -3,15 +3,57 @@
  * item is one row. The container derives these from the archive and the
  * run state; the views read them and call back with ids.
  *
- * Five kinds of row carry content: an owner bubble, a Juno bubble with its
- * cards, the one status bubble (only while a run is active), a note line
- * ("Remembered · Undo"), and a group label over a proactive group. The rest
- * are separators.
+ * The chat is not a transcript. Juno's bubbles are only the text the model
+ * marked for the owner; its other text never shows. Rows that carry
+ * content: an owner bubble, a Juno bubble, a card, a run's ending line,
+ * the one status bubble (typing dots, only while a run is active), a note
+ * line ("Remembered · Undo"), and a group label over a proactive group. The
+ * rest are separators.
  */
 import { Schema } from 'effect'
 import { Card } from './cards'
-import { ChatMessageId, OpId, RunId, ScheduleId } from './ids'
+import { BubbleId, CardId, ChatMessageId, OpId, RunId, ScheduleId } from './ids'
 import { JobRef } from './place'
+
+/** Exactly one emoji, any emoji. A reaction is content, so it shows as the emoji itself. */
+export const isEmoji = (text: string): boolean => {
+  const graphemes = [...new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(text)]
+  return graphemes.length === 1 && /\p{Extended_Pictographic}|\p{Regional_Indicator}|\u20E3/u.test(text)
+}
+export const Emoji = Schema.String.check(Schema.makeFilter((text: string) => isEmoji(text) || 'one emoji', { title: 'Emoji' }))
+export type Emoji = typeof Emoji.Type
+
+/** The thumbs up. From the owner it is only recorded: it starts no run and Juno never sees it. */
+export const THUMBS_UP = '👍'
+
+/**
+ * A reaction on a bubble or a card, by either side, at most one per side
+ * per item. A reaction is never a click: it approves nothing and pins
+ * nothing.
+ */
+export const Reaction = Schema.Struct({ by: Schema.Literals(['owner', 'juno']), emoji: Emoji })
+export type Reaction = typeof Reaction.Type
+
+/** What a reply points at. The owner replies to a Juno bubble or card; Juno replies to an owner message. */
+export const ReplyTarget = Schema.Union([
+  Schema.TaggedStruct('bubble', { id: BubbleId }),
+  Schema.TaggedStruct('card', { id: CardId }),
+  Schema.TaggedStruct('owner', { opId: OpId }),
+])
+export type ReplyTarget = typeof ReplyTarget.Type
+
+/**
+ * The one-line quote above a reply. `preview` is computed by the agent (the
+ * first line of a bubble or message, or the card's kind and place). A click
+ * scrolls to the target. `removed` when the target was removed: the quote
+ * reads "Removed".
+ */
+export const Quote = Schema.Struct({
+  target: ReplyTarget,
+  preview: Schema.String,
+  removed: Schema.optionalKey(Schema.Literal(true)),
+})
+export type Quote = typeof Quote.Type
 
 /**
  * Where a bubble sits in its group. Groups are formed by sender within
@@ -73,12 +115,16 @@ export const OwnerMessageItem = Schema.TaggedStruct('owner', {
   text: Schema.String,
   at: Schema.Number,
   delivery: Delivery,
+  /** The owner replied to a Juno bubble or card. */
+  replyTo: Schema.optionalKey(Quote),
+  /** Juno may react instead of replying. */
+  reactions: Schema.Array(Reaction),
   group: GroupPosition,
 })
 export type OwnerMessageItem = typeof OwnerMessageItem.Type
 
 /**
- * Juno's text is plain: no markdown, no emoji. The only mark-up is a recall
+ * Juno's text is plain. The only mark-up is a recall
  * citation, which links to the day it quotes and scrolls the chat there
  * ("On 12 Mar you said …").
  */
@@ -89,9 +135,9 @@ export const JunoInline = Schema.Union([
 export type JunoInline = typeof JunoInline.Type
 
 /**
- * How a Juno message ended. `complete` is the normal case. Every other
- * variant adds one fixed line under the bubble from `chatCopy.ending`; the
- * model never writes it, because an aborted or failed run writes nothing.
+ * How a run ended. `complete` is the normal case and shows nothing. Every
+ * other variant is one fixed line from `chatCopy.ending` (an `ending`
+ * row); the model never writes it.
  *
  * - `interrupted`: the process died or the request was refused at the
  *   provider guard. `retry` is the owner op to resubmit, when the run had
@@ -101,8 +147,7 @@ export type JunoInline = typeof JunoInline.Type
  * - `failed`: the provider did not answer, with the reason that picks the
  *   copy. `retry` as for `interrupted`.
  *
- * A run can end before its first token. That Juno item has an empty `body`
- * and renders only the ending line, with no bubble.
+ * A run can end before its first bubble; then the line is all that shows.
  */
 export const Ending = Schema.Union([
   Schema.TaggedStruct('complete', {}),
@@ -115,35 +160,45 @@ export const Ending = Schema.Union([
 ])
 export type Ending = typeof Ending.Type
 
-export const JunoMessageItem = Schema.TaggedStruct('juno', {
-  id: ChatMessageId,
+/**
+ * One Juno bubble. It arrives whole, when the model closes it; nothing
+ * streams into it. A run can post any number of bubbles, of any length:
+ * the model decides.
+ */
+export const JunoBubbleItem = Schema.TaggedStruct('juno', {
+  id: BubbleId,
   runId: RunId,
-  /** Empty when the run ended before its first token: only the ending line shows. */
   body: Schema.Array(JunoInline),
   at: Schema.Number,
   origin: Origin,
-  /**
-   * The run is still active and this bubble takes its text. It stays true
-   * through tool calls between tokens; the status bubble sits below it then.
-   */
-  streaming: Schema.Boolean,
-  ending: Ending,
-  cards: Schema.Array(Card),
+  /** Juno replied to one owner message. */
+  replyTo: Schema.optionalKey(Quote),
+  reactions: Schema.Array(Reaction),
   group: GroupPosition,
   /** Not yet seen by the owner: the Juno nav count counts these. */
   unread: Schema.Boolean,
 })
-export type JunoMessageItem = typeof JunoMessageItem.Type
+export type JunoBubbleItem = typeof JunoBubbleItem.Type
+
+/** A card under Juno's bubbles. The owner can react to it or reply to it; neither is a click. */
+export const CardItem = Schema.TaggedStruct('card', {
+  runId: RunId,
+  card: Card,
+  reactions: Schema.Array(Reaction),
+  unread: Schema.Boolean,
+})
+export type CardItem = typeof CardItem.Type
+
+/** The fixed line of a run that did not end `complete`. */
+export const EndingItem = Schema.TaggedStruct('ending', { runId: RunId, ending: Ending })
+export type EndingItem = typeof EndingItem.Type
 
 /**
- * The one status bubble. It exists only while a run is active and is always
- * the last item. Dots alone until the first tool call gives it text
- * ("Reading 3 topics"), which counts real things and changes at most every
- * 2 s. On the first token it is replaced in place by a streaming Juno
- * bubble. If the run then calls tools, the status bubble reappears below
- * that bubble, and the next token clears it again: the text joins the same
- * bubble, so a run has one Juno bubble however many tool rounds it makes.
- * It has no Stop: to change course the owner sends another message.
+ * The one status bubble: typing dots while a run is active, always the last
+ * item. It sits between bubbles: each bubble takes its place when it
+ * arrives, and it shows again below while the run goes on. A tool call
+ * gives it a line that names real things ("Reading 3 topics"). It has no
+ * Stop: to change course the owner sends another message.
  */
 export const StatusItem = Schema.TaggedStruct('status', {
   runId: RunId,
@@ -189,7 +244,7 @@ export type DayItem = typeof DayItem.Type
 export const NewDividerItem = Schema.TaggedStruct('newDivider', { count: Schema.Int })
 export type NewDividerItem = typeof NewDividerItem.Type
 
-export const ChatItem = Schema.Union([OwnerMessageItem, JunoMessageItem, StatusItem, NoteItem, GroupLabelItem, DayItem, NewDividerItem])
+export const ChatItem = Schema.Union([OwnerMessageItem, JunoBubbleItem, CardItem, EndingItem, StatusItem, NoteItem, GroupLabelItem, DayItem, NewDividerItem])
 export type ChatItem = typeof ChatItem.Type
 
 /**
