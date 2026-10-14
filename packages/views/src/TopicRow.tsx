@@ -25,6 +25,7 @@ import {
   type PhosphorIcon,
 } from '@juno/ui'
 import { channelIconFor, countLabel, groupInitials, hueFor, initials } from './look'
+import { RenameField } from './RenameField'
 
 export interface TopicRowProps {
   /** The row as the engine shaped it. Identity-stable while its `rev` holds. */
@@ -41,6 +42,12 @@ export interface TopicRowProps {
   /** Pointer enter or keyboard focus: warm the topic's query. */
   readonly onPrefetch?: (id: string) => void
   readonly onContextMenu?: (id: string, event: MouseEvent<HTMLDivElement>) => void
+  /** The title is a field for Rename: the row does not open and shows no Resolve until it ends. */
+  readonly renaming?: boolean
+  /** Rename saved (Enter or leaving the field) with the text as typed. */
+  readonly onRename?: (id: string, title: string) => void
+  /** Rename cancelled (Esc). */
+  readonly onRenameCancel?: (id: string) => void
   /**
    * Main rows only: threads started in the channel since its Main was last
    * read. Hidden at 0. The engine does not supply it yet; only the gallery
@@ -71,7 +78,20 @@ const PRIVATE_TITLE = 'Private channel'
  * presentational, so the Resolve button inside it would be flattened away.
  * Enter and Space open it, as on a button.
  */
-export const TopicRow = memo(function TopicRow({ row, time, selected = false, tabbable = true, onOpen, onResolve, onPrefetch, onContextMenu, newThreads = 0 }: TopicRowProps) {
+export const TopicRow = memo(function TopicRow({
+  row,
+  time,
+  selected = false,
+  tabbable = true,
+  onOpen,
+  onResolve,
+  onPrefetch,
+  onContextMenu,
+  renaming = false,
+  onRename,
+  onRenameCancel,
+  newThreads = 0,
+}: TopicRowProps) {
   const titleId = useId()
   const previewId = useId()
   const stateId = useId()
@@ -110,7 +130,7 @@ export const TopicRow = memo(function TopicRow({ row, time, selected = false, ta
       onPointerEnter={onPrefetch === undefined ? undefined : () => onPrefetch(row.id)}
       onFocus={onFocus}
       onContextMenu={onContextMenu === undefined ? undefined : (event) => onContextMenu(row.id, event)}
-      {...activateHandlers<HTMLDivElement>((event) => onOpen(row.id, event))}
+      {...activateHandlers<HTMLDivElement>((event) => onOpen(row.id, event), { disabled: renaming })}
       {...stylex.props(styles.row, selected && styles.selected)}
     >
       <span {...stylex.props(styles.tile, quiet && styles.quietTile)}>
@@ -123,18 +143,22 @@ export const TopicRow = memo(function TopicRow({ row, time, selected = false, ta
               <Icon icon={CheckCircle} size={14} label="Resolved" />
             </span>
           ) : null}
-          <Text
-            variant="rowTitle"
-            tone={quiet ? 'subtle' : 'default'}
-            weight={unread ? 'semibold' : 'medium'}
-            truncate
-            dir="auto"
-            id={titleId}
-            tooltipWhenTruncated
-            sx={styles.title}
-          >
-            {row.title}
-          </Text>
+          {renaming ? (
+            <RenameField title={row.title} size="row" onSave={(title) => onRename?.(row.id, title)} onCancel={() => onRenameCancel?.(row.id)} />
+          ) : (
+            <Text
+              variant="rowTitle"
+              tone={quiet ? 'subtle' : 'default'}
+              weight={unread ? 'semibold' : 'medium'}
+              truncate
+              dir="auto"
+              id={titleId}
+              tooltipWhenTruncated
+              sx={styles.title}
+            >
+              {row.title}
+            </Text>
+          )}
           {row.tags.includes('unsubscribed') ? (
             <span {...stylex.props(styles.mutedIcon)}>
               <Icon icon={BellSlash} size={13} label="Unsubscribed" />
@@ -204,7 +228,7 @@ export const TopicRow = memo(function TopicRow({ row, time, selected = false, ta
             </span>
           ) : null}
           <span {...stylex.props(styles.actionSlot)}>
-            {row.canResolveOnHover ? (
+            {row.canResolveOnHover && !renaming ? (
               <IconButton
                 icon={Check}
                 label={`Resolve ${row.title}`}
