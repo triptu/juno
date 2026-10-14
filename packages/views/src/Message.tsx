@@ -1,7 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import { memo, type FocusEvent, type ReactNode } from 'react'
 import type { MessageView, Person } from '@juno/contract'
-import { accent, colors, radii, sizes, spacing, tints, z } from '@juno/tokens/tokens.stylex'
+import { accent, colors, layout, radii, sizes, spacing, tints, z } from '@juno/tokens/tokens.stylex'
 import { Avatar, Text, type ActivateEvent, type HueName } from '@juno/ui'
 import { Files } from './FileCard'
 import { hueFor, initials } from './look'
@@ -51,7 +51,9 @@ const HOVER = '@media (hover: hover)'
  * time on the first message of a run, the body, files, reactions and, in
  * Main, the thread link. A message that mentions you sits on the accent
  * tint. The hover toolbar's slot is reserved at the top right of the row,
- * inside its box, so showing it never forces a layout.
+ * inside its box, so showing it never forces a layout: on a row with a
+ * toolbar the header keeps its end free and is as tall as the toolbar, so
+ * neither the name nor the first body line runs under it.
  */
 export const Message = memo(function Message({
   message,
@@ -98,7 +100,7 @@ export const Message = memo(function Message({
       </span>
       <span {...stylex.props(styles.content)}>
         {header ? (
-          <span {...stylex.props(styles.header)}>
+          <span {...stylex.props(styles.header, toolbar !== undefined && styles.headerWithToolbar)}>
             <Text variant="messageName" tone="default" truncate tooltipWhenTruncated dir="auto" as="span" sx={styles.name}>
               {name}
             </Text>
@@ -152,7 +154,7 @@ const styles = stylex.create({
     containIntrinsicSize: `auto ${sizes['--row-message-estimate']}`,
     backgroundColor: {
       default: 'transparent',
-      ':hover': { default: null, [HOVER]: colors['--background-subtle'] },
+      ':hover': { default: null, [HOVER]: colors['--surface-hover'] },
     },
     outlineStyle: {
       default: 'none',
@@ -213,6 +215,13 @@ const styles = stylex.create({
     minWidth: 0,
     marginBottom: spacing['--space-0-5'],
     userSelect: 'none',
+  },
+  // The toolbar's footprint (inventory 6.5). A continuation row has no
+  // header, so its first line is not protected; M6 decides the toolbar's
+  // final place.
+  headerWithToolbar: {
+    paddingInlineEnd: layout['--toolbar-reserve'],
+    minHeight: `calc(${layout['--toolbar-height']} - ${spacing['--space-0-5']})`,
   },
   name: {
     flexShrink: 1,
