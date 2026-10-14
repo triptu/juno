@@ -12,6 +12,7 @@ import { ArtJob } from './art/job'
 import { SearchHandlers } from './search/handlers'
 import { PrefsHandlers } from './prefs/handlers'
 import { MessagesHandlers } from './messages/handlers'
+import { NewChatHandlers } from './newchat/handlers'
 import { ReadsHandlers } from './reads/handlers'
 import { MarkWorker } from './reads/worker'
 import { Outbox } from './outbox'
@@ -67,4 +68,4 @@ export const Services = Layer.mergeAll(EnginePhases, ArtJob).pipe(
 )
 
 /** One `toLayer` per feature, merged. Requires `Services`. */
-export const Handlers = Layer.mergeAll(StatusHandlers, SessionHandlers, TopicsHandlers, SearchHandlers, PrefsHandlers, MessagesHandlers, ReadsHandlers, ArtHandlers)
+export const Handlers = Layer.mergeAll(StatusHandlers, SessionHandlers, TopicsHandlers, SearchHandlers, PrefsHandlers, MessagesHandlers, ReadsHandlers, ArtHandlers, NewChatHandlers)
