@@ -49,8 +49,10 @@ Titles resolve in this order. A title you set by renaming (stored in Juno only) 
 
 ## 4. Window and layout
 
-- **Two panes.** A fixed sidebar about 384px wide on the left, and a tabbed workspace on the right.
-- **Title bar.** The macOS traffic lights sit in the sidebar's top bar. The workspace's top bar is the tab strip. Both bars are window drag regions.
+- **Two panes.** A sidebar on the left, 384px wide by default, and a tabbed workspace on the right.
+- **Resizing the sidebar.** Drag its right edge to make it between 280 and 480px wide; double-click the edge to go back to 384. The width is remembered. The list does not re-render while you drag.
+- **Hiding the sidebar.** The sidebar button in its top bar, ⌃⌘S, or View › Hide Sidebar hides it; the same again shows it. ⌃⌘S is the macOS standard for Show and Hide Sidebar (Mail, Notes, Reminders and SwiftUI's default sidebar command use it). Dragging the edge far enough left also hides it. Hidden or shown is remembered. While hidden, the traffic lights, the sidebar button, Back and Forward move to the start of the tab strip, so nothing becomes unreachable.
+- **Title bar.** The macOS traffic lights sit in the sidebar's top bar, followed by the sidebar button, Back and Forward. The workspace's top bar is the tab strip. Both bars are window drag regions.
 - **Workspace tabs** work like browser tabs. The "+" button is labelled "New chat" and opens a New chat in a new tab (section 9): a new tab is a new chat. Every page opens in a tab: a topic, a New chat, Home, All topics, Juno, Notifications or Preferences.
 - **Home** (section 12) is what the workspace shows with no tab open, and the Home item in the sidebar opens it as a tab.
 - **Reading width.** Message columns are capped around 800px and centered, so long lines stay readable on wide windows.
@@ -59,7 +61,7 @@ Titles resolve in this order. A title you set by renaming (stored in Juno only) 
 
 ### Top to bottom
 
-1. **Title bar icons**: Search (⌘K), New chat (⌘N, section 9), and your avatar. The avatar menu holds Set yourself away or active, status, Notifications, Preferences, AI assist, switch workspace and sign out. There is no footer and no name label.
+1. **Title bar**: on the left, after the traffic lights, the sidebar button, Back and Forward (section 6); on the right, Search (⌘K), New chat (⌘N, section 9), and your avatar. The avatar menu holds Set yourself away or active, status, Notifications, Preferences, AI assist, switch workspace and sign out. There is no footer and no name label.
 2. **Navigation**: Home, All topics and Juno (⌘J). Only Juno shows a count: its unread messages, as a soft grey tag. A properly spaced hairline separates these from the list.
 3. **Quick filters** on one row: All · Channels · DMs on the left and an Unread toggle on the right. DMs include group DMs. There are no counters or dots on Unread. A small dot appears next to Channels or DMs when that group has unread topics you are not viewing.
 4. **Scope chip**, shown only when narrowed to one channel: "#eng ×". Narrowing is rare. It happens from ⌘K (a channel's "Show its topics" result), by clicking a #channel chip in a message, or by clicking a topic's context pill.
@@ -107,6 +109,12 @@ Each row is a tile followed by three lines. The tile is the topic's art: a small
 - Everything opens in the **current tab**. A new tab opens only on ⌘-click or "Open in new tab".
 - If the topic is already open in another tab, that tab is focused instead of opening a duplicate.
 - Tabs carry the topic's art and title, or the channel name for a Main thread. Closing a tab focuses its neighbour.
+- **Unread dot.** A tab whose topic has unread messages shows a small soft grey dot after its title, the same grey as unread counts. One style for all unread, mentions included. The active tab never shows it, since opening marks read.
+- **Back and Forward.** Each tab has its own history, like a browser tab. An entry is a topic or page opened in that tab; scrolling, peeks, popovers and the Juno panel are not entries. Back returns to the previous topic where you left it in it. A New chat that sends replaces its own entry with the topic. Back and Forward are the buttons in the title bar, ⌘[ and ⌘], the mouse's back and forward buttons, and a three-finger swipe. Holding a button lists the tab's history.
+- **Tab menu** (right-click a tab): Pin tab, Close tab, Close other tabs, Close tabs to the right, Close all tabs, and for a topic Copy Slack link and Open in Slack.
+- **Pinned tabs** sit first, as small icon-only tabs with no close button. "Close other", "to the right" and "all" leave them open, as in browsers; closing one directly works.
+- **Reopen closed tab.** ⌘⇧T reopens the last closed tab with its history, and again for the one before, up to 20.
+- The usual browser keys work: ⌘T new tab, ⌘W close, ⌘1 to ⌘8 a tab by position, ⌘9 the last tab, ⌃Tab and ⌃⇧Tab or ⌘⇧] and ⌘⇧[ for the next and previous tab (section 18).
 - To read a topic without marking it read, peek at it (section 5).
 
 ## 7. Topic view
@@ -502,7 +510,12 @@ Use the Littlebird design system's tokens.
 | Keys | Action |
 | --- | --- |
 | ⌘K | Search and commands |
-| ⌘N | New chat in a new tab (section 9) |
+| ⌘N or ⌘T | New chat in a new tab (section 9) |
+| ⌘W / ⌘⇧T | Close the tab / reopen the last closed tab |
+| ⌘1 to ⌘8, ⌘9 | Go to that tab, or the last tab |
+| ⌃Tab / ⌃⇧Tab, ⌘⇧] / ⌘⇧[ | Next / previous tab |
+| ⌘[ / ⌘] | Back / forward in the tab's history |
+| ⌃⌘S | Hide or show the sidebar |
 | ⌘J | In a topic, open or close the Juno panel. Elsewhere, open the Juno tab with the composer focused |
 | ⌘Z | Undo the last resolve, Notify me change, ignore or routed post |
 | ⌘ click / ⌘ Enter | Open in a new tab |
