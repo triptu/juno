@@ -1,5 +1,5 @@
 import * as stylex from '@stylexjs/stylex'
-import { useLayoutEffect, useRef, type PointerEvent, type ReactNode, type RefObject } from 'react'
+import { useLayoutEffect, useRef, type PointerEvent, type ReactNode } from 'react'
 import { SIDEBAR_WIDTH } from '@juno/contract/channels'
 import { colors, layout, spacing } from '@juno/tokens/tokens.stylex'
 
@@ -43,7 +43,7 @@ export function Shell({ sidebar, sidebarWidth = SIDEBAR_WIDTH.default, sidebarHi
       <div {...stylex.props(styles.shell, styles.panes)}>
         <div ref={slot} {...stylex.props(styles.sidebarSlot, sidebarHidden && styles.hidden)}>
           {sidebar}
-          <SidebarEdge slot={slot} width={sidebarWidth} onResize={onSidebarResize} onReset={onSidebarResetWidth} onCollapse={onSidebarCollapse} />
+          <SidebarEdge width={sidebarWidth} onResize={onSidebarResize} onReset={onSidebarResetWidth} onCollapse={onSidebarCollapse} />
         </div>
         {children}
       </div>
@@ -58,11 +58,14 @@ export function Shell({ sidebar, sidebarWidth = SIDEBAR_WIDTH.default, sidebarHi
 }
 
 interface SidebarEdgeProps {
-  readonly slot: RefObject<HTMLDivElement | null>
   readonly width: number
   readonly onResize: ((width: number) => void) | undefined
   readonly onReset: (() => void) | undefined
   readonly onCollapse: (() => void) | undefined
+}
+
+function write(box: HTMLElement, width: number): void {
+  box.style.width = `${width}px`
 }
 
 const clamp = (width: number) => Math.round(Math.min(SIDEBAR_WIDTH.max, Math.max(SIDEBAR_WIDTH.min, width)))
@@ -72,18 +75,17 @@ const clamp = (width: number) => Math.round(Math.min(SIDEBAR_WIDTH.max, Math.max
  * writes the sidebar's width at most once per frame and
  * reports it when it ends; a double-click asks for the default.
  */
-function SidebarEdge({ slot, width, onResize, onReset, onCollapse }: SidebarEdgeProps) {
-  const drag = useRef<{ readonly startX: number; raw: number; frame: number | undefined } | undefined>(undefined)
-
-  const write = (value: number) => {
-    if (slot.current !== null) slot.current.style.width = `${value}px`
-  }
+function SidebarEdge({ width, onResize, onReset, onCollapse }: SidebarEdgeProps) {
+  /** The drag in progress, with the sidebar's box: the edge's parent. */
+  const drag = useRef<{ readonly box: HTMLElement; readonly startX: number; raw: number; frame: number | undefined } | undefined>(undefined)
 
   const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) return
     event.preventDefault()
+    const box = event.currentTarget.parentElement
+    if (box === null) return
     event.currentTarget.setPointerCapture(event.pointerId)
-    drag.current = { startX: event.clientX, raw: width, frame: undefined }
+    drag.current = { box, startX: event.clientX, raw: width, frame: undefined }
   }
   const onPointerMove = (event: PointerEvent<HTMLDivElement>) => {
     const current = drag.current
@@ -92,7 +94,7 @@ function SidebarEdge({ slot, width, onResize, onReset, onCollapse }: SidebarEdge
     if (current.frame !== undefined) return
     current.frame = requestAnimationFrame(() => {
       current.frame = undefined
-      write(clamp(current.raw))
+      write(current.box, clamp(current.raw))
     })
   }
   const end = (event: PointerEvent<HTMLDivElement>) => {
@@ -102,14 +104,13 @@ function SidebarEdge({ slot, width, onResize, onReset, onCollapse }: SidebarEdge
     if (current.frame !== undefined) cancelAnimationFrame(current.frame)
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
     if (event.type === 'pointerup' && current.raw < COLLAPSE_BELOW) {
-      write(width)
+      write(current.box, width)
       onCollapse?.()
       return
     }
-    const next = clamp(current.raw)
-    write(next)
-    if (event.type === 'pointerup' && next !== width) onResize?.(next)
-    else if (event.type !== 'pointerup') write(width)
+    const next = event.type === 'pointerup' ? clamp(current.raw) : width
+    write(current.box, next)
+    if (next !== width) onResize?.(next)
   }
 
   return (
