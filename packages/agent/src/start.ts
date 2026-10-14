@@ -6,8 +6,11 @@
  * then, given `turns`, opens the turn engine on the agent directory with
  * the Slack reads bound to the host (`host/reads.ts`): the owner lock,
  * recovery, the guarded provider, pi, the router, the jobs and the
- * compactor (`router/open.ts`). `stop` closes the engine before the host
- * client, so the owner lock is released last of the engine's resources.
+ * compactor (`router/open.ts`). Given `renderer`, it serves the
+ * renderer's RPCs (`AgentRpcs`) on the ports that transport gives
+ * (`serve/server.ts`). `stop` closes the renderer server, then the engine,
+ * then the host client, so the owner lock is released last of the engine's
+ * resources.
  */
 import { Context, Effect, Exit, Layer, Schema, Scope } from 'effect'
 import { AGENT_HOST_PROTOCOL, HostHello, type AgentConfig } from '@juno/agent-contract'
@@ -16,6 +19,9 @@ import { bindHost, type BoundHost } from './host/reads'
 import type { HostConnection } from './host/port'
 import type { Turns, TurnsOptions } from './router/open'
 import { open } from './router/service'
+import type { RendererTransport } from './serve/runner'
+import { rendererServer } from './serve/server'
+import { CHAT_MIGRATIONS } from './serve/schema'
 import type { UpdateNeeded } from './runtime/core'
 
 export interface AgentHandle {
@@ -35,10 +41,18 @@ export interface AgentHandle {
 /** What the engine needs beside the agent directory, which comes from `config`, and the host reads, which come from the port. */
 export type AgentTurns = Omit<TurnsOptions, 'agentDir' | 'host'>
 
+export interface AgentOptions {
+  /** Opens the turn engine. Without it the agent only reaches its host. */
+  readonly turns?: AgentTurns
+  /** Serves the renderer's RPCs on these ports. */
+  readonly renderer?: RendererTransport
+}
+
 /** The host speaks another AgentHost protocol version than this agent. */
 export class HostProtocolMismatch extends Schema.TaggedError<HostProtocolMismatch>()('HostProtocolMismatch', { host: HostHello }) {}
 
-export function startAgent(config: AgentConfig, connection: HostConnection, turns?: AgentTurns): Promise<AgentHandle> {
+export function startAgent(config: AgentConfig, connection: HostConnection, options: AgentOptions = {}): Promise<AgentHandle> {
+  const { turns, renderer } = options
   return Effect.runPromise(
     Effect.gen(function* () {
       const scope = yield* Scope.make()
@@ -48,7 +62,16 @@ export function startAgent(config: AgentConfig, connection: HostConnection, turn
         const hello = yield* client['host.hello']({ protocol: AGENT_HOST_PROTOCOL })
         if (hello.protocol !== AGENT_HOST_PROTOCOL) return yield* new HostProtocolMismatch({ host: hello })
         const bound = yield* bindHost.pipe(Effect.provide(context), Scope.provide(scope))
-        const engine = turns === undefined ? undefined : yield* Scope.provide(open({ ...turns, agentDir: config.agentDir, host: bound.reads }), scope)
+        const engine =
+          turns === undefined
+            ? undefined
+            : yield* Scope.provide(
+                open({ ...turns, agentDir: config.agentDir, host: bound.reads, migrations: [CHAT_MIGRATIONS, ...(turns.migrations ?? [])] }),
+                scope,
+              )
+        if (renderer !== undefined) {
+          yield* Layer.buildWithScope(rendererServer(renderer, { turns: engine, presence: bound.presence, presenceChanges: bound.presenceChanges }), scope)
+        }
         return { hello, engine, bound }
       }).pipe(Effect.onError(() => Scope.close(scope, Exit.void)))
       return {

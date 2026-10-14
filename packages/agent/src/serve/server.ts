@@ -1,0 +1,249 @@
+/**
+ * The agent's RPCs for the renderer (`AgentRpcs`, plan v3 §12), served on
+ * the ports main brokers between the renderer and the agent (ADR 0012).
+ *
+ * The chat group is served over the turn engine: the page and summary are
+ * rebuilt from the agent's records (`chat.ts`) whenever a run moves, a
+ * command lands or presence changes; send, react and retry go to the
+ * engine's inbox, and each answers only after the inbox commit. The other
+ * groups (cards, pages, settings) belong to later work packages: until they
+ * exist, their commands fail with `unavailable` and their streams end with
+ * a defect, so a container shows the failure instead of waiting forever.
+ *
+ * The header banner, by precedence: `updateNeeded` (the records are newer
+ * than this build), `aiOff` (AI assist is off in Juno), `paused`, `offline`
+ * (the host is not live), else `none`. `otherDevice` and `recovery` come
+ * with ownership (WP21).
+ */
+import { Effect, Layer, Queue, Stream } from 'effect'
+import { RpcServer } from 'effect/rpc'
+import {
+  AgentCommandError,
+  AgentRpcs,
+  ChatMessageId,
+  type Banner,
+  type ChatItem,
+  type ChatPage,
+} from '@juno/agent-contract'
+import { Revision } from '@juno/agent-cards'
+import type { Presence } from '../host/reads'
+import type { Turns } from '../router/open'
+import type { UpdateNeeded } from '../runtime/core'
+import { chatItems, chatSummary, readMarkOf, windowOf, type ChatWindow } from './chat'
+import { runnerPlatform, type RendererTransport } from './runner'
+
+export interface ChatHost {
+  /** The turn engine, the "update needed" stop, or nothing when the engine could not open. */
+  readonly turns: Turns | UpdateNeeded | undefined
+  readonly presence: () => Presence | undefined
+  readonly presenceChanges: Stream.Stream<Presence | undefined>
+}
+
+const unavailable = (message: string) => Effect.fail(new AgentCommandError({ reason: 'unavailable', message }))
+const notYet = (what: string) => () => unavailable(`${what} is not available yet.`)
+const notServed = (what: string) => () => Stream.die(new Error(`${what} is not served yet`))
+
+const dayOf = (at: number) => new Date(at).setHours(0, 0, 0, 0)
+
+const readAt = (store: Turns['store']) =>
+  (store.db.prepare('SELECT through_at AS at FROM chat_read WHERE singleton = 1').get() as { at: number } | undefined)?.at ?? 0
+
+/** The chat server's state over one engine: the change signal and the times live bubbles were first seen. */
+function chatState(host: ChatHost) {
+  const turns = host.turns?._tag === 'running' ? host.turns : undefined
+  const listeners = new Set<() => void>()
+  const changed = () => {
+    for (const listener of listeners) listener()
+  }
+  const seen = new Map<string, number>()
+  const unsubscribe = turns?.subscribe((event) => {
+    if (event._tag === 'bubble') seen.set(event.id, Date.now())
+    if (event._tag === 'ended') {
+      for (const id of seen.keys()) if (id.startsWith(`${event.runId}:`)) seen.delete(id)
+    }
+    changed()
+  })
+
+  /** Emits now, then on every change. */
+  const changes: Stream.Stream<void> = Stream.merge(
+    Stream.callback<void>((queue) =>
+      Effect.acquireRelease(
+        Effect.sync(() => {
+          const listener = () => void Queue.offerUnsafe(queue, undefined)
+          listener()
+          listeners.add(listener)
+          return listener
+        }),
+        (listener) => Effect.sync(() => listeners.delete(listener)),
+      ),
+    ),
+    host.presenceChanges.pipe(Stream.drop(1), Stream.map(() => undefined)),
+  )
+
+  const items = (): ReadonlyArray<ChatItem> => {
+    if (turns === undefined) return []
+    const presence = host.presence()
+    const mode = turns.mode()
+    return chatItems({
+      store: turns.store,
+      live: turns.run(),
+      seen: (id) => {
+        const at = seen.get(id) ?? Date.now()
+        seen.set(id, at)
+        return at
+      },
+      jobs: turns.jobs.list(),
+      readAt: readAt(turns.store),
+      waiting: mode === 'paused' ? 'resume' : presence?.online === false ? 'network' : undefined,
+      dayOf,
+    })
+  }
+
+  const banner = (): Banner => {
+    if (host.turns?._tag === 'updateNeeded') return { _tag: 'updateNeeded' }
+    const presence = host.presence()
+    if (presence?.aiEnabled === false || turns?.mode() === 'off') return { _tag: 'aiOff' }
+    if (turns?.mode() === 'paused') return { _tag: 'paused' }
+    if (presence?.online === false) return { _tag: 'offline' }
+    return { _tag: 'none' }
+  }
+
+  const page = (window: ChatWindow) => {
+    const all = items()
+    const slice = windowOf(all, window)
+    const current = banner()
+    const view: ChatPage = {
+      items: slice.items,
+      banner: current,
+      moreAbove: slice.moreAbove,
+      moreBelow: slice.moreBelow,
+      composerEnabled: turns !== undefined && current._tag !== 'aiOff' && current._tag !== 'updateNeeded',
+    }
+    const ids = slice.items.flatMap((item) => (item._tag === 'owner' && item.id !== undefined ? [Number(item.id)] : []))
+    const versions = turns === undefined || ids.length === 0
+      ? []
+      : (turns.store.db.prepare(`SELECT id, version FROM messages WHERE id IN (${ids.map(() => '?').join(',')})`).all(...ids) as Array<{ id: number; version: number }>)
+    return {
+      page: view,
+      cards: [],
+      messages: versions.map((row) => ({ id: ChatMessageId.make(String(row.id)), revision: Revision.make(row.version) })),
+    }
+  }
+
+  return { turns, changed, changes, items, page, close: () => unsubscribe?.() }
+}
+
+/** The engine, or why a command cannot reach it. */
+const engine = (state: ReturnType<typeof chatState>, host: ChatHost) =>
+  Effect.suspend(() => {
+    if (host.turns?._tag === 'updateNeeded') return unavailable('Juno needs to update its records.')
+    if (state.turns === undefined) return unavailable('Juno is not running.')
+    if (host.presence()?.aiEnabled === false) return unavailable('AI assist is off.')
+    return Effect.succeed(state.turns)
+  })
+
+type Accepted = { readonly _tag: 'accepted' } | { readonly _tag: 'recorded' } | { readonly _tag: 'refused'; readonly reason: string }
+
+/** An inbox answer as the RPC's: the op id once it is durable, or why nothing was written. */
+const answer = (opId: string, write: () => Accepted) =>
+  Effect.suspend(() => {
+    let result: Accepted
+    try {
+      result = write()
+    } catch {
+      return Effect.fail(new AgentCommandError({ reason: 'notDelivered', message: 'Juno could not store the message.' }))
+    }
+    switch (result._tag) {
+      case 'accepted':
+      case 'recorded':
+        return Effect.succeed({ opId: opId as never })
+      case 'refused':
+        return result.reason === 'tooLong'
+          ? Effect.fail(new AgentCommandError({ reason: 'tooLong', message: 'The message is too long.' }))
+          : result.reason === 'notRetryable'
+            ? Effect.fail(new AgentCommandError({ reason: 'invalid', message: 'That message cannot be sent again.' }))
+            : unavailable('Juno is off.')
+    }
+  })
+
+export function agentHandlers(host: ChatHost) {
+  return AgentRpcs.toLayer(
+    Effect.gen(function* () {
+      const state = yield* Effect.acquireRelease(
+        Effect.sync(() => chatState(host)),
+        (opened) => Effect.sync(opened.close),
+      )
+      const changed = <A, E, R>(effect: Effect.Effect<A, E, R>) => Effect.tap(effect, () => Effect.sync(state.changed))
+      return AgentRpcs.of({
+        'agent.chat.page': ({ window }) =>
+          state.changes.pipe(
+            Stream.map(() => state.page(window)),
+            Stream.changesWith((a, b) => JSON.stringify(a) === JSON.stringify(b)),
+          ),
+        'agent.chat.summary': () =>
+          state.changes.pipe(
+            Stream.map(() => chatSummary(state.items(), state.turns?.jobs.active() ?? [])),
+            Stream.changesWith((a, b) => JSON.stringify(a) === JSON.stringify(b)),
+          ),
+        'agent.chat.send': ({ opId, text, context, replyTo }) =>
+          Effect.flatMap(engine(state, host), (turns) =>
+            changed(answer(opId, () => turns.accept({ opId, kind: 'send', text, ...(replyTo ? { replyTo } : {}), ...(context ? { data: { context } } : {}) }))),
+          ),
+        'agent.chat.react': ({ opId, target, emoji }) =>
+          Effect.flatMap(engine(state, host), (turns) => changed(answer(opId, () => turns.accept({ opId, kind: 'react', target, emoji })))),
+        'agent.chat.retry': ({ opId, interruptedOpId }) =>
+          Effect.flatMap(engine(state, host), (turns) => changed(answer(opId, () => turns.retry({ opId, interruptedOpId })))),
+        'agent.chat.read': ({ through }) =>
+          Effect.sync(() => {
+            const turns = state.turns
+            if (turns === undefined) return
+            const at = readMarkOf(state.items(), through)
+            if (at === undefined) return
+            turns.store.db
+              .prepare('INSERT INTO chat_read (singleton, through_at) VALUES (1, ?) ON CONFLICT (singleton) DO UPDATE SET through_at = max(through_at, excluded.through_at)')
+              .run(at)
+            state.changed()
+          }),
+        'agent.chat.remove': notYet('Removing a message'),
+
+        'agent.cards.prepare': notYet('This card'),
+        'agent.cards.approve': notYet('This card'),
+        'agent.cards.dismiss': notYet('This card'),
+        'agent.cards.askAgain': notYet('This card'),
+        'agent.cards.editMessage': notYet('This card'),
+        'agent.cards.undo': notYet('This card'),
+        'agent.jobs.stop': ({ opId, jobId }) =>
+          Effect.flatMap(engine(state, host), (turns) => changed(Effect.promise(() => turns.jobs.stop(jobId)).pipe(Effect.as({ opId })))),
+
+        'agent.scheduled.page': notServed('The Scheduled page'),
+        'agent.scheduled.edit': notYet('Scheduled'),
+        'agent.scheduled.action': notYet('Scheduled'),
+        'agent.remembers.page': notServed('The What Juno remembers page'),
+        'agent.remembers.edit': notYet('What Juno remembers'),
+        'agent.remembers.remove': notYet('What Juno remembers'),
+        'agent.remembers.pin': notYet('Remember this'),
+        'agent.memory.page': notServed('The Memory page'),
+        'agent.activity.page': notServed('The Activity page'),
+        'agent.connections.page': notServed('The Connections page'),
+        'agent.connections.action': notYet('Connections'),
+        'agent.connections.tier': notYet('Connections'),
+        'agent.connections.address': notYet('Connections'),
+        'agent.review.page': notServed('The Review page'),
+        'agent.review.activate': notYet('Review'),
+        'agent.settings.page': notServed('Settings › Juno'),
+        'agent.settings.change': notYet('Settings › Juno'),
+        'agent.settings.credentials': notYet('Settings › Juno'),
+        'agent.settings.ownership': notYet('Settings › Juno'),
+      })
+    }),
+  )
+}
+
+/** Serves `AgentRpcs` on every renderer port `transport` gives, for as long as the layer lives. */
+export function rendererServer(transport: RendererTransport, host: ChatHost) {
+  return RpcServer.layer(AgentRpcs, { disableFatalDefects: true, disableTracing: true, spanPrefix: 'juno-agent' }).pipe(
+    Layer.provide(agentHandlers(host)),
+    Layer.provide(RpcServer.layerProtocolWorkerRunner),
+    Layer.provide(runnerPlatform(transport)),
+  )
+}
