@@ -21,6 +21,40 @@ export async function press(win: Page): Promise<void> {
   await win.mouse.up()
 }
 
+/** Mouse moves per pointing gesture, so the pointer travels as a hand moves it rather than jumping. */
+const POINT_STEPS = 4
+
+/**
+ * Points at an element: real stepped mouse moves, then waits until the
+ * element matches `:hover`. If hover did not land, or was taken back,
+ * it moves again, up to three times, then fails with what is hovered.
+ * `position` is relative to the element's box, default its centre.
+ */
+export async function pointAt(win: Page, target: Locator, position?: { readonly x: number; readonly y: number }): Promise<void> {
+  await target.scrollIntoViewIfNeeded()
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const box = await target.boundingBox()
+    if (!box) throw new Error('Nothing on screen to point at')
+    const x = box.x + (position?.x ?? box.width / 2)
+    const y = box.y + (position?.y ?? box.height / 2)
+    await win.mouse.move(x, y, { steps: POINT_STEPS })
+    const hovered = () => target.evaluate((node) => node.matches(':hover'))
+    try {
+      await expect.poll(hovered, { timeout: 1_000, intervals: [16, 32, 64] }).toBe(true)
+      // Two frames later it must still be hovered.
+      await target.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
+      if (await hovered()) return
+    } catch {
+      // Move again.
+    }
+  }
+  const deepest = await target.evaluate(() => {
+    const node = [...document.querySelectorAll(':hover')].at(-1)
+    return node === undefined ? 'nothing' : node.outerHTML.slice(0, 120)
+  })
+  throw new Error(`Pointing did not hover the element; hovered: ${deepest}`)
+}
+
 export type SidebarSectionName = 'Pinned' | 'Recent'
 export type SidebarFilterName = 'All' | 'Channels' | 'DMs'
 
@@ -43,8 +77,8 @@ export class SidebarRow {
     return this.root.getByRole('button', { name: new RegExp(`^Resolve ${escapeRegExp(this.title)}`) })
   }
 
-  hover() {
-    return this.root.hover()
+  hover(): Promise<void> {
+    return pointAt(this.win, this.root)
   }
 
   focus() {
@@ -150,6 +184,11 @@ export class Sidebar {
 
   get list() {
     return this.root.getByRole('group', { name: 'Topics' })
+  }
+
+  /** Points at the list near its top-left corner, away from any row's controls. */
+  hoverList(): Promise<void> {
+    return pointAt(this.win, this.list, { x: 10, y: 10 })
   }
 
   get rows() {
@@ -840,6 +879,11 @@ export class TabStrip {
 
   tab(title: string): Locator {
     return this.root.getByRole('tab', { name: new RegExp(`^${escapeRegExp(title)}`) })
+  }
+
+  /** Points at a tab. */
+  hover(title: string): Promise<void> {
+    return pointAt(this.win, this.tab(title))
   }
 
   /** Tab titles, left to right. */
