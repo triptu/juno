@@ -217,7 +217,7 @@ Right island (`flex: none`, padding 3):
 - **Juno**: 28 round icon button (`sparkle` 16 duotone), a toggle (`aria-pressed`) for the panel (§12.1). Name "Juno ⌘J". Pressed: `--secondary-default`. Hidden when AI assist is off.
 - Pin, Notify me and More are not in the header. They are in the topic menu, which is the row's menu.
 
-Narrow (a container query on the topic area): under 480px, Resolve is a 28px icon button (name still "Resolve" / "Reopen") and Threads shows `chats-circle` and the count only ("12", name "Threads, 12"). The pill never shrinks below its full name unless that name is wider than 45% of the island; the title takes the rest and shortens first. The pill's icon and tint always show. At the minimum window (720 by 480, sidebar shown) the topic is 336px and every variant fits.
+Narrow (a container query on the topic area): under 480px, Resolve is a 28px icon button (name still "Resolve" / "Reopen") and Threads shows `chats-circle` and the count only ("12", name "Threads, 12"). The pill shows its full name up to 160px, then takes an ellipsis; the title takes the rest and shortens first. The pill's icon and tint always show. At the minimum window (720 by 480, sidebar shown) the topic is 336px and every variant fits.
 
 The message list under the header (`MessageList`, `TopicView`):
 
