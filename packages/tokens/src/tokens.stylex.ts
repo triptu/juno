@@ -494,7 +494,7 @@ export const text = stylex.defineVars({
   '--text-topic-title-leading': '1.3',
   '--text-topic-title-tracking': '-0.01em',
 
-  // Page titles: New message, For you, Notifications, Preferences.
+  // Page titles: For you, Notifications, Preferences.
   '--text-page-title-family': fonts['--font-serif'],
   '--text-page-title-size': '34px',
   '--text-page-title-weight': '400',

@@ -131,7 +131,7 @@ Always derived from the base palette so they follow dark mode. Formulas from the
 
 Token names [proposed]: `--tint-public-bg/fg`, `--tint-private-bg/fg`, `--tint-dm-bg/fg`.
 
-Used by: topic header context pill, New message To pill, Juno send-card pill. Icons: `hash` (public), `lock` (private), `user` (DM), `users` (group DM).
+Used by: topic header context pill, Juno send-card pill. Icons: `hash` (public), `lock` (private), `user` (DM), `users` (group DM).
 
 ### 1.5 Status and semantic colours
 
@@ -251,7 +251,7 @@ Sizes are the Figtree values; the prototype's Inter value is half a pixel smalle
 | Body large | 15px | 400 | 1.6 | 0 | | Airy-density message body |
 | Heading | 15.5px | 600 | 1.35 | 0 | default | Settings section titles, For you card titles (lh 1.35), palette input (400) |
 | Topic title | 20px | 600 | 1.3 | -0.01em | default | Topic header, rename input |
-| Page title | serif 34px (32 All topics) | 400 | 1.1–1.15 | 0 | default | New message, For you, Notifications, Preferences, All topics |
+| Page title | serif 34px (32 All topics) | 400 | 1.1–1.15 | 0 | default | For you, Notifications, Preferences, All topics |
 | Display | serif 38px | 400 | 1.1 | 0 | default | "What do you need?" |
 | Empty title | serif 30px | 400 | | | subtle | "Nothing open" |
 | Kbd / confidence | mono 10–11px | 400 | | | subtle / muted | esc, ⌘J, ⌘Z, ↵, "95%" |
@@ -283,7 +283,7 @@ Line-height tokens: `--leading-title 1.3`, `--leading-card 1.35`, `--leading-pre
 | `--space-9` | 36 | Settings section gap |
 | `--space-10` | 40 | Page padding top |
 | `--space-12` | 48 | Empty-state padding |
-| `--space-14` | 56 | New message page top |
+| `--space-14` | 56 | Large page spacing |
 | `--space-16` | 64 | For you page bottom |
 | `--space-18` | 72 | Settings page bottom |
 
@@ -300,7 +300,7 @@ Odd values the prototype uses once (3, 5, 9, 18) are component-local; keep them 
 | `--radius-md` | 6 | Menu items, small buttons (28), quote block, thread link, 24px channel tiles |
 | `--radius-md-plus` | 7 | Selects, the segmented track, For you action buttons, topic-list items in Juno cards, 28px channel tiles |
 | `--radius-lg` | 8 | 28px buttons, icon buttons (30–32), tabs (top corners), palette items, inputs, send-check bar, option buttons, 28px channel tiles |
-| `--radius-xl` | 12 | Nav items, filter buttons, 30px buttons, hover-toolbar buttons (28), To field, New message textarea, 32–36px channel tiles |
+| `--radius-xl` | 12 | Nav items, filter buttons, 30px buttons, hover-toolbar buttons (28), 32–36px channel tiles |
 | `--radius-2xl` | 14 | Flat message hover row |
 | `--radius-3xl` | 16 | Sidebar and list rows (and the selected row), 44px channel tile, hover toolbar |
 | `--radius-card` | 20 | Cards (catch-up, grouping, For you, Juno cards) and settings groups |
@@ -331,7 +331,7 @@ All [proto] measured at 1280×800 with Inter unless marked.
 | `--tab-width` | flex 0 1 230px; `--tab-min-width` 120px (the prototype's 72 fit only the icon and the close button). The strip scrolls sideways once the tabs reach the floor |
 | `--topic-header-height` | 100px at one-line title (padding 14 + 32 pill row + 8 gap + 32 title row + 14; the rows are the height of their 32px buttons). The prototype measured 95 with 26px rows |
 | `--reading-width` | 800px message column, centred; composer inner max 752px (800 − 2×24) |
-| `--page-width-narrow` | 680px (New message) |
+| `--page-width-narrow` | 680px |
 | `--page-width` | 720px (For you, Juno) |
 | `--page-width-settings` | 760px (Preferences), 880px (Notifications) |
 | `--palette-width` | 560px, max calc(100% − 48px), top offset 96px |
@@ -357,7 +357,7 @@ All [proto] measured at 1280×800 with Inter unless marked.
 | `--control-lg-` | 30px | Titlebar icon buttons, selects (All topics), card actions, Quote button, empty-state button, context menu item |
 | `--control-lg` | 32px | Nav buttons, header icon buttons, Resolve (header), menu items, rule selects, Add |
 | `--control-xl-` | 34px | Rename input (header), filter search, suggestion chips, Open notification settings, To-picker rows |
-| `--control-xl` | 36px | Discard/Send (New message), topic-list items in Juno cards, reply options (min), title input |
+| `--control-xl` | 36px | topic-list items in Juno cards, reply options (min), title input |
 | `--field-min` | 40px | Composer textarea single line (`--composer-padding-block` 9 + `--composer-line-height` 22 + 9), To field 44 |
 | `--row-44` / `--row-48` / `--row-52` | 44, 48, 52px | Today log row, notification rule row, All topics table row (ListRow `minHeight`) |
 | `--row-topic-estimate` | 85px | The `contain-intrinsic-size` estimate for sidebar rows off screen (performance.md 3.2). It sizes the content box, so it is the measured row (chat, balanced, two preview lines: 107px) minus the 22px of block padding |
@@ -417,7 +417,7 @@ Floating surfaces have `border: 1px solid transparent` plus the shadow, never a 
 | --- | --- | --- |
 | `--z-toolbar` | 2 | Message hover toolbar (relative to message) |
 | `--z-mention` | 5 | @/# suggestion popover above composer |
-| `--z-picker` | 10 | New message To picker |
+| `--z-picker` | 10 | Picker overlay |
 | `--z-menu` | 20 | Avatar menu, Browse menu |
 | `--z-palette` | 30 | ⌘K overlay and panel |
 | `--z-selection` | 35 | Floating Quote button |
@@ -458,7 +458,7 @@ Entrances are 240ms, exits 150ms, pops 220ms; rows, tabs and typing never animat
 
 | Token | Value | Use |
 | --- | --- | --- |
-| `--opacity-disabled` | 0.4 | Send and Ask buttons with an empty draft, Send on New message |
+| `--opacity-disabled` | 0.4 | Send and Ask buttons with an empty draft |
 | `--opacity-dim` | 0.6 | The decorative tile of a resolved or unsubscribed row. Never on text: at 0.6 muted text drops to 2.3:1 |
 | `--opacity-tab-icon` | 0.75 | Tab icon |
 | `--opacity-kbd` | 0.75 | ⌘Z inside the toast Undo button |

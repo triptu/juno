@@ -36,7 +36,6 @@ Slack has no concept of a topic. Juno builds one on top of Slack's data. Anythin
 | DM and group DM | Treated exactly like a channel. A DM has a Main thread and can have topics too. |
 | Thread (a message with replies) | A **topic**. Its first message is the thread root. |
 | Top-level channel messages that are not in a thread | That channel's **Main** thread, one per channel or DM. Rows read "#eng" with a small Main tag, never a bare "Main thread". |
-| Starting a new message | Always a post in Main. Optionally "Track replies as a topic", which links it to a topic in Juno. |
 | Replying in thread | Replying inside a topic. From Main, "Reply in thread" turns that message into a topic. |
 | Follow / unfollow thread | Subscribe / unsubscribe. Unsubscribed topics leave the sidebar. |
 | Mark unread | Works on a topic or on a whole channel. |
@@ -51,7 +50,7 @@ Titles resolve in this order. A title you set by renaming (stored in Juno only) 
 
 - **Two panes.** A fixed sidebar about 384px wide on the left, and a tabbed workspace on the right.
 - **Title bar.** The macOS traffic lights sit in the sidebar's top bar. The workspace's top bar is the tab strip. Both bars are window drag regions.
-- **Workspace tabs** work like browser tabs. Every page opens in a tab: a topic, All topics, For you, Juno, a new message, Notifications or Preferences.
+- **Workspace tabs** work like browser tabs. The "+" button is labelled "New tab" and opens search (⌘K) from M9; until then it opens All topics in a new tab. Every page opens in a tab: a topic, All topics, For you, Juno, Notifications or Preferences.
 - **Home.** With no tab open, the workspace shows a calm home: a small scene with Juno's mascot that changes with the time of day, a short greeting, at most three items that want you (computed from data, sharpened by AI when it is on), an "Ask Juno…" field, and an all-caught-up scene when nothing needs you. Design: `docs/design/home/` (layout A).
 - **Reading width.** Message columns are capped around 800px and centered, so long lines stay readable on wide windows.
 
@@ -59,7 +58,7 @@ Titles resolve in this order. A title you set by renaming (stored in Juno only) 
 
 ### Top to bottom
 
-1. **Title bar icons**: Search (⌘K), Browse channels and people, Theme, New message, and your avatar. The avatar menu holds status, Notifications, Preferences, AI assist, switch workspace and sign out. There is no footer and no name label.
+1. **Title bar icons**: Search (⌘K), Browse channels and people, Theme, and your avatar. The avatar menu holds status, Notifications, Preferences, AI assist, switch workspace and sign out. There is no footer and no name label.
 2. **Navigation**: All topics, For you (with a quiet count) and Juno (⌘J). A properly spaced hairline separates these from the list.
 3. **Quick filters** on one row: All · Channels · DMs on the left and an Unread toggle on the right. DMs include group DMs. There are no counters or dots on Unread. A small dot appears next to Channels or DMs when that group has unread topics you are not viewing.
 4. **Scope chip**, shown only when narrowed to one channel: "#eng ×". Narrowing is rare and happens from Browse channels or ⌘K.
@@ -171,13 +170,9 @@ Pressing Enter runs fast checks before anything goes out. If they find nothing, 
 
 *Figure 6. The clarity check listing fixes before sending.*
 
-## 9. New message
+## 9. Removed
 
-The New icon opens a New message page. **To** is a searchable picker of channels and people. It is prefilled with the channel you were viewing and shows the same tinted context pill. Every new message posts to Main, as in Slack. An optional **Track replies as a topic** checkbox (off by default) adds an optional, client-only title. With it on, the message posts to Main with a thread link and opens as a topic. With it off, you land in Main.
-
-![New message page](screenshots/08-ui.png)
-
-*Figure 7. New message, with tracking turned on.*
+Removed on 10-14: open a channel, DM or group’s Main from the sidebar kind icon or search (⌘K) and post there; a separate page is redundant, and reply tracking is unreliable and out of scope.
 
 ## 10. Search and commands (⌘K)
 
@@ -436,7 +431,7 @@ The Juno chat runs apart from the decision features: its own process, its own me
 Use the Littlebird design system's tokens.
 
 - **Colour.** Warm paper backgrounds (hsla 48 50% 98%). Warm near-black text. Nearly invisible borders. A single accent, near-black by default. Midnight blue, dark emerald, claret and cyan are optional tweaks.
-- **Type.** Söhne for UI and Meraki serif only for page titles such as "All topics", "For you", "Notifications" and "New message".
+- **Type.** Söhne for UI and Meraki serif only for page titles such as "All topics", "For you", "Notifications" and "Preferences".
 - **Icons.** Lucide outline icons, tinted with the surrounding text colour.
 - **Radii.** 6–10px. Inner and outer radii nest, so the outer radius equals the inner radius plus the padding.
 - **Surfaces.** Popovers, menus and toolbars float on a layered shadow ring, not a hard border. Cards use a 1px shadow ring. Inputs keep a soft border.
@@ -494,7 +489,7 @@ Use the Littlebird design system's tokens.
 ## 19. Not in v1, and open questions
 
 - **Not designed yet:** calls and huddles, canvases, workflows, the app directory and Slack Connect specifics. For Juno Agent: a mobile surface, several people in one chat, and live sync between running Macs (section 13.13).
-- **Starting a new DM.** How do you start a DM with someone you have never messaged?
+- **Starting a new DM.** How do you start a DM with someone you have never messaged? This would come through search.
 - **Syncing client-only data.** Should client-only data (titles, resolution, rules) sync across devices? Juno's own state is answered: one Mac writes, an encrypted backup follows, and moving is a handover (section 13.8). Live sync between two running Macs is later.
 - **Your bubble colour.** Pending: the owner chooses between options A (accent fill), B (accent tint), C (neutral tint) and D (ink) from the mock in `docs/design/juno-chat/`. The mock's README recommends B.
 - **Juno's voice.** Juno saying "I" in its own bubbles (13.11) is a proposal awaiting the owner.

@@ -49,13 +49,19 @@ test('screenshots every state in light and dark', async ({ page }) => {
   // One test walks every state twice, a navigation each: a few minutes for
   // the whole gallery, past the default timeout.
   test.setTimeout(10 * 60_000)
-  const routes = await readRoutes(page)
+  const only = process.env['GALLERY_SHOTS_ONLY']?.split(',')
+  const routes = (await readRoutes(page)).filter((route) => !only || only.includes(route.component))
   await page.evaluate(() => document.fonts.ready)
 
-  if (only === undefined) await rm(shotsDir, { recursive: true, force: true })
+  if (only) {
+    for (const component of new Set(routes.map((route) => route.component))) {
+      await rm(join(shotsDir, component), { recursive: true, force: true })
+    }
+  } else {
+    await rm(shotsDir, { recursive: true, force: true })
+  }
 
   for (const route of routes) {
-    if (only && !only.includes(route.component)) continue
     for (const theme of themes) {
       const path = join(shotsDir, `${route.route}-${theme}.png`)
       await mkdir(dirname(path), { recursive: true })

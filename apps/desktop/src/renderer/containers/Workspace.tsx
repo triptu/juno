@@ -52,6 +52,7 @@ export function Workspace() {
 
   useEffect(() => onMenuCommand(runMenuCommand), [])
 
+  // TODO(M5/M9): Wire onNewTab to All topics in a new tab, then search once ⌘K exists.
   return (
     <WorkspaceView tabs={strip.map(stripTab)} {...(state.active === undefined ? {} : { activeId: state.active })} onSelectTab={selectTab} onCloseTab={closeTopicTab} onTabContextMenu={tabMenu}>
       {state.active === undefined

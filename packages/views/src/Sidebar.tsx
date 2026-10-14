@@ -5,7 +5,6 @@ import { ListBullets } from '@phosphor-icons/react/dist/icons/ListBullets'
 import { Lock } from '@phosphor-icons/react/dist/icons/Lock'
 import { MagnifyingGlass } from '@phosphor-icons/react/dist/icons/MagnifyingGlass'
 import { Moon } from '@phosphor-icons/react/dist/icons/Moon'
-import { NotePencil } from '@phosphor-icons/react/dist/icons/NotePencil'
 import { Sparkle } from '@phosphor-icons/react/dist/icons/Sparkle'
 import { Sun } from '@phosphor-icons/react/dist/icons/Sun'
 import { User } from '@phosphor-icons/react/dist/icons/User'
@@ -57,7 +56,6 @@ export interface SidebarProps {
   readonly onSearch: () => void
   readonly onBrowse: () => void
   readonly onToggleTheme: () => void
-  readonly onNewMessage: () => void
   /** Fires on mouse down; `event.metaKey` asks for a new tab. */
   readonly onNavigate: (target: SidebarNavTarget, event: ActivateEvent) => void
   readonly onFilterKind: (kind: KindFilter) => void
@@ -71,7 +69,7 @@ export interface SidebarProps {
 
 /**
  * The left pane (spec section 5): the title bar with the traffic-light
- * space and the five icons, the three nav items, a hairline, the quick
+ * space and the four icons, the three nav items, a hairline, the quick
  * filters with their dots and the Unread toggle, a status line when the
  * list may be behind Slack, the scope chip when scoped, and the list the
  * owner renders into it.
@@ -90,7 +88,6 @@ export function Sidebar({
   onSearch,
   onBrowse,
   onToggleTheme,
-  onNewMessage,
   onNavigate,
   onFilterKind,
   onToggleUnread,
@@ -108,7 +105,6 @@ export function Sidebar({
           <IconButton icon={MagnifyingGlass} label="Search ⌘K" size={30} onClick={onSearch} />
           <IconButton icon={Hash} label="Browse channels and people" size={30} onClick={onBrowse} />
           <IconButton icon={theme === 'dark' ? Sun : Moon} label="Toggle theme" size={30} onClick={onToggleTheme} />
-          <IconButton icon={NotePencil} label="New message" size={30} onClick={onNewMessage} />
           <span {...stylex.props(styles.account)}>
             <Popover
               open={accountMenuOpen}

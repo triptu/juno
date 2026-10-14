@@ -6,6 +6,8 @@ The two SQLite databases of one workspace and how to read and write them. See `d
 - `cache.db`: the Slack mirror. Disposable; deleted and rebuilt when `CACHE_SCHEMA_VERSION` changes.
 - `user.db`: Juno's own state (overlay, reads, outbox, prefs). Durable; migrations are incremental and never edited once shipped.
 
+The unused `topic_overlay.tracked` column remains from the initial migration. Reply tracking was removed on 10-14; no code reads or writes this column, and shipped migrations stay unchanged.
+
 ## Public API
 
 - `Store.layer(workspacePaths(...))`: provides `StoreWriter`, `StoreReader`, `Invalidation`, `StorePaths` and `Store` for one workspace directory. Both clients are `SqlClient`s on one serialised connection each; the writer attaches `cache.db` so a transaction can span both files.

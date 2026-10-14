@@ -99,9 +99,6 @@ export function Sidebar() {
         // TODO(M3 Browse): open the Browse channels and people popover.
       }}
       onToggleTheme={() => changeTheme(theme === 'dark' ? 'light' : 'dark')}
-      onNewMessage={() => {
-        // TODO(M6): open the New message page.
-      }}
       onNavigate={navigate}
       onFilterKind={changeKind}
       onToggleUnread={toggleUnread}
