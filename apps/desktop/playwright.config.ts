@@ -8,8 +8,10 @@ export default defineConfig({
   testDir: 'e2e',
   timeout: 30_000,
   expect: { timeout: 5_000 },
-  // One Electron app at a time. Tests share the built app in out/.
-  workers: 1,
+  // One Electron app at a time on the shared Mac. Each test has its own fake
+  // Slack and user-data directory, so a machine of its own (pnpm remote) can
+  // run more with JUNO_E2E_WORKERS.
+  workers: Number(process.env.JUNO_E2E_WORKERS ?? 1),
   fullyParallel: false,
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? 'github' : 'list',
