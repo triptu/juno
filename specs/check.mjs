@@ -1,6 +1,9 @@
-import { spawnSync } from 'node:child_process'
-import { mkdirSync, readdirSync, readFileSync, rmSync } from 'node:fs'
+import { spawn, spawnSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
+import { createServer } from 'node:net'
+import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { actionCases, recoveryCases, replayCases } from './agent-checks.mjs'
@@ -23,61 +26,163 @@ const apalacheVersion = '0.62.1' // Quint 0.33.0's default distribution.
 const generated = join(root, 'specs/traces')
 mkdirSync(generated, { recursive: true })
 
-function quint(args, { violation = false, timeout = 60000 } = {}) {
-  const budget = 720000 - (Date.now() - startedAt)
-  if (budget <= 0) throw new Error('Spec check exceeded its twelve-minute execution budget')
-  console.log(`quint ${args.join(' ')}`)
-  // Keep Apalache's generated directory inside the ignored trace directory.
+// Jobs are collected first, then run a few at a time (SPECS_JOBS, default 3).
+// Apalache runs one at a time, each on its own port, since every run starts a JVM.
+// A passing job is cached under a hash of its arguments, its spec file, this
+// runner and the Quint and Apalache versions, so an unchanged check is not run
+// again. The cache is shared by every worktree. SPECS_CACHE=off or --no-cache runs everything.
+const jobs = []
+const cacheDir = join(tmpdir(), 'juno-cache', 'specs')
+const useCache = process.env.SPECS_CACHE !== 'off' && !process.argv.includes('--no-cache')
+const parallel = Math.max(1, Number(process.env.SPECS_JOBS ?? 3))
+const sha = (...parts) => {
+  const hash = createHash('sha256')
+  for (const part of parts) hash.update(String(part)).update('\0')
+  return hash.digest('hex')
+}
+const runnerHash = sha(readFileSync(fileURLToPath(import.meta.url)), readFileSync(join(root, 'specs/agent-checks.mjs')),
+  require('@informalsystems/quint/package.json').version, apalacheVersion, backend, seed)
+function specHash(file, seen = new Set()) {
+  if (seen.has(file)) return ''
+  seen.add(file)
+  const text = readFileSync(join(root, file), 'utf8')
+  const imports = [...text.matchAll(/from\s+"\.\/([\w-]+)(?:\.qnt)?"/g)].map(match => `specs/${match[1]}.qnt`)
+  return sha(text, ...imports.map(name => specHash(name, seen)))
+}
+
+function quint(args, { violation = false, timeout = 60000, trace, check = () => {} } = {}) {
+  jobs.push({ args, violation, timeout, trace, check })
+}
+
+function freePort() {
+  return new Promise((resolve, reject) => {
+    const server = createServer()
+    server.on('error', reject)
+    server.listen(0, '127.0.0.1', () => {
+      const { port } = server.address()
+      server.close(() => resolve(port))
+    })
+  })
+}
+
+function spawnQuint(args, timeout, port) {
   const verify = args[0] === 'verify'
-  const commandArgs = verify ? [args[0], join(root, args[1]), ...args.slice(2)] : args
+  const commandArgs = verify ? [args[0], join(root, args[1]), ...args.slice(2), '--server-endpoint', `localhost:${port}`] : args
   const agentVerify = verify && args[1].startsWith('specs/agent-')
   const option = name => args[args.indexOf(name) + 1]
   const command = agentVerify ? [fileURLToPath(import.meta.url), '--verify-agent', JSON.stringify({
     input: join(root, args[1]), main: option('--main'), init: 'init', step: option('--step'),
     invariant: option('--invariant'), maxSteps: Number(option('--max-steps')),
-    apalacheVersion, verbosity: 1, backend: 'apalache',
+    apalacheVersion, verbosity: 1, backend: 'apalache', port,
   })] : [cli, ...commandArgs]
-  const result = spawnSync(process.execPath, command, {
-    cwd: verify ? generated : root, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024,
-    timeout: Math.min(timeout, budget), detached: process.platform !== 'win32',
+  return new Promise(resolve => {
+    // Keep Apalache's generated directory inside the ignored trace directory.
+    const child = spawn(process.execPath, command, { cwd: verify ? generated : root, detached: process.platform !== 'win32' })
+    let stdout = ''
+    let stderr = ''
+    child.stdout.on('data', chunk => { stdout += chunk })
+    child.stderr.on('data', chunk => { stderr += chunk })
+    let timedOut = false
+    const timer = setTimeout(() => {
+      timedOut = true
+      // Do not leave a timed-out checker or its Java child holding machine resources.
+      try { process.kill(process.platform === 'win32' ? child.pid : -child.pid, 'SIGKILL') } catch { /* Already exited. */ }
+    }, timeout)
+    child.on('error', error => { clearTimeout(timer); resolve({ status: null, stdout, stderr, error }) })
+    child.on('close', status => {
+      clearTimeout(timer)
+      resolve({ status, stdout, stderr, error: timedOut ? new Error(`Quint timed out after ${timeout} ms`) : undefined })
+    })
   })
-  if (result.error && result.pid && process.platform !== 'win32') {
-    // Do not leave a timed-out checker or its Java child holding machine resources.
-    try { process.kill(-result.pid, 'SIGKILL') } catch { /* Already exited. */ }
+}
+
+async function runJob(job) {
+  const { args, violation, timeout, trace, check } = job
+  const label = `quint ${args.join(' ')}`
+  const key = sha(runnerHash, JSON.stringify(args), violation, specHash(args[1]))
+  const cached = join(cacheDir, `${key}.json`)
+  if (useCache && existsSync(cached)) {
+    const saved = JSON.parse(readFileSync(cached, 'utf8'))
+    if (trace) writeFileSync(trace, saved.trace)
+    check(saved.output)
+    return `${label}\n(unchanged, passed before: cached)\n${saved.notes}`
   }
-  if (result.stdout) process.stdout.write(result.stdout)
-  if (result.stderr) process.stderr.write(result.stderr)
+  const budget = 720000 - (Date.now() - startedAt)
+  if (budget <= 0) throw new Error('Spec check exceeded its twelve-minute execution budget')
+  if (trace) rmSync(trace, { force: true })
+  const result = await spawnQuint(args, Math.min(timeout, budget), args[0] === 'verify' ? await freePort() : undefined)
+  const output = result.stdout + result.stderr
+  const log = `${label}\n${output}`
   // A syntax, runtime, download, or tool failure is never an expected counterexample.
-  if (result.error || (violation ? result.status !== 1 || !/Invariant violated|found a counterexample/.test(result.stderr + result.stdout) : result.status !== 0)) {
-    throw new Error(result.error?.message ?? `Quint failed with status ${result.status}`)
+  if (result.error || (violation ? result.status !== 1 || !/Invariant violated|found a counterexample/.test(output) : result.status !== 0)) {
+    throw Object.assign(new Error(result.error?.message ?? `Quint failed with status ${result.status}`), { log })
   }
-  return result.stdout + result.stderr
+  let notes
+  try {
+    notes = check(output) ?? ''
+  } catch (error) {
+    throw Object.assign(error, { log })
+  }
+  if (useCache) {
+    mkdirSync(cacheDir, { recursive: true })
+    const temporary = `${cached}.${process.pid}`
+    writeFileSync(temporary, JSON.stringify({ output, notes, trace: trace ? readFileSync(trace, 'utf8') : undefined }))
+    renameSync(temporary, cached)
+  }
+  return `${log}${notes}`
+}
+
+async function runAll() {
+  let verifying = Promise.resolve()
+  let next = 0
+  let failed
+  const lane = async () => {
+    while (next < jobs.length && !failed) {
+      const job = jobs[next++]
+      // One Apalache at a time; simulations keep the other lanes busy meanwhile.
+      const run = job.args[0] === 'verify' ? (verifying = verifying.then(() => runJob(job))) : runJob(job)
+      try {
+        console.log(await run)
+      } catch (error) {
+        failed ??= error
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(parallel, jobs.length) }, lane))
+  if (failed) {
+    if (failed.log) console.log(failed.log)
+    throw failed
+  }
 }
 
 function simulate(file, step, invariant, output, violation = false, randomized = false, options = {}) {
   const path = join(generated, output)
-  rmSync(path, { force: true })
-  const report = quint(['run', `specs/${file}.qnt`, '--step', step, '--invariant', invariant,
+  quint(['run', `specs/${file}.qnt`, '--step', step, '--invariant', invariant,
     '--backend', backend, '--n-threads', '2', '--seed', seed, '--max-samples', String(options.samples ?? (randomized ? samples : 1)),
     '--max-steps', String(options.steps ?? (randomized ? steps : 80)), '--verbosity', '1',
     ...(options.main ? ['--main', options.main] : []), ...(options.init ? ['--init', options.init] : []),
-    '--out-itf', path, '--mbt', ...(options.witnesses ? ['--witnesses', ...options.witnesses] : randomized ? ['--witnesses', 'reachedAgreement'] : [])], { violation })
-  for (const witness of options.witnesses ?? []) {
-    if (!new RegExp(`${witness} was witnessed in [1-9][0-9]* trace`).test(report)) {
-      throw new Error(`Missing completed agent schedule: ${witness}`)
-    }
-  }
-  if (options.requireCompletion && !report.includes(`reachedAgreement was witnessed in ${options.samples} trace(s) out of ${options.samples}`)) {
-    throw new Error('A corrected agent schedule stopped before completing its drain')
-  }
-  const trace = JSON.parse(readFileSync(path, 'utf8'))
-  if (!Array.isArray(trace.states) || trace.states.length < 2) throw new Error(`No usable trace in ${path}`)
-  if (file.startsWith('agent-') && !violation && !randomized) {
-    const last = trace.states.at(-1)
-    const state = Object.entries(last).find(([key]) => key === 's' || key.endsWith('::s'))?.[1]
-    if (state?.label !== 'finished') throw new Error(`Agent schedule did not finish its drain: ${step}`)
-  }
-  console.log(`${violation ? 'Expected counterexample' : 'Example trace'}: specs/traces/${output}`)
+    '--out-itf', path, '--mbt', ...(options.witnesses ? ['--witnesses', ...options.witnesses] : randomized ? ['--witnesses', 'reachedAgreement'] : [])], {
+    violation,
+    trace: path,
+    check: report => {
+      for (const witness of options.witnesses ?? []) {
+        if (!new RegExp(`${witness} was witnessed in [1-9][0-9]* trace`).test(report)) {
+          throw new Error(`Missing completed agent schedule: ${witness}`)
+        }
+      }
+      if (options.requireCompletion && !report.includes(`reachedAgreement was witnessed in ${options.samples} trace(s) out of ${options.samples}`)) {
+        throw new Error('A corrected agent schedule stopped before completing its drain')
+      }
+      const trace = JSON.parse(readFileSync(path, 'utf8'))
+      if (!Array.isArray(trace.states) || trace.states.length < 2) throw new Error(`No usable trace in ${path}`)
+      if (file.startsWith('agent-') && !violation && !randomized) {
+        const last = trace.states.at(-1)
+        const state = Object.entries(last).find(([key]) => key === 's' || key.endsWith('::s'))?.[1]
+        if (state?.label !== 'finished') throw new Error(`Agent schedule did not finish its drain: ${step}`)
+      }
+      return `${violation ? 'Expected counterexample' : 'Example trace'}: specs/traces/${output}`
+    },
+  })
 }
 
 // Quint's RPC serialization keeps analysis metadata from every imported module.
@@ -89,7 +194,7 @@ if (process.argv[2] === '--verify-agent') {
   const commands = require(join(dirname(pkg), 'dist/src/cliCommands.js'))
   const { parseServerEndpoint } = require(join(dirname(pkg), 'dist/src/apalache.js'))
   const args = JSON.parse(process.argv[3])
-  args.serverEndpoint = parseServerEndpoint('localhost:8822').value
+  args.serverEndpoint = parseServerEndpoint(`localhost:${args.port}`).value
   let result = await commands.load(args)
   for (const command of ['parse', 'typecheck', 'compile']) {
     if (result.isLeft()) break
@@ -315,4 +420,5 @@ if (!tracesOnly) {
     console.log('Bounded safety and races use the documented depths. Temporal liveness is typechecked only.')
   }
 }
+await runAll()
 console.log(`Spec check runtime: ${((Date.now() - startedAt) / 1000).toFixed(1)} seconds (excludes machine-lock wait).`)
