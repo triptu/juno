@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { connect, createServer } from 'node:net'
-import { homedir, setPriority, tmpdir } from 'node:os'
+import { homedir, tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { actionCases, recoveryCases, replayCases } from './agent-checks.mjs'
@@ -26,9 +26,8 @@ const apalacheVersion = '0.62.1' // Quint 0.33.0's default distribution.
 const generated = join(root, 'specs/traces')
 mkdirSync(generated, { recursive: true })
 
-// Jobs are collected first, then run a few at a time (SPECS_JOBS, default 3):
-// one lane for Apalache, which starts a JVM per run on its own port, and the
-// rest for simulations.
+// Jobs are collected first. Typechecks and simulations run SPECS_JOBS at a time
+// (default 3), then the Apalache checks run one at a time on one server.
 // A passing job is cached under a hash of its arguments, what is checked on its
 // output, its spec file and the Quint and Apalache versions, so an unchanged
 // check is not run again. Bump cacheVersion when the checks on a result or the
@@ -111,8 +110,6 @@ function spawnQuint(args, timeout, port) {
   return new Promise(resolve => {
     // Keep Apalache's generated directory inside the ignored trace directory.
     const child = spawn(process.execPath, command, { cwd: verify ? generated : root, detached: process.platform !== 'win32' })
-    // Simulations yield to Apalache, which runs one check at a time and sets the run's length.
-    if (!verify && child.pid) try { setPriority(child.pid, 10) } catch { /* Exited already. */ }
     let stdout = ''
     let stderr = ''
     child.stdout.on('data', chunk => { stdout += chunk })
@@ -169,8 +166,9 @@ async function runJob(job) {
 }
 
 async function runAll() {
-  // Apalache jobs are the slowest and run one at a time, so they get their own
-  // lane from the start; the simulations share the other lanes.
+  // Simulations first, SPECS_JOBS at a time. Then the Apalache checks, one at a
+  // time and alone: a JVM warming up next to simulations on a loaded machine
+  // misses the 60-second deadline.
   const queues = [jobs.filter(job => job.args[0] === 'verify'), jobs.filter(job => job.args[0] !== 'verify')]
   let failed
   const lane = async queue => {
@@ -184,7 +182,8 @@ async function runAll() {
       }
     }
   }
-  await Promise.all([lane(queues[0]), ...Array.from({ length: Math.max(1, parallel - 1) }, () => lane(queues[1]))])
+  await Promise.all(Array.from({ length: parallel }, () => lane(queues[1])))
+  await lane(queues[0])
   if (apalache) (await apalache.catch(() => ({ stop: () => {} }))).stop()
   if (failed) {
     if (failed.log) console.log(failed.log)
