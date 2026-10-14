@@ -25,30 +25,74 @@ import TopicHeader from './TopicHeader.fixtures'
 import TopicRow from './TopicRow.fixtures'
 import TopicView from './TopicView.fixtures'
 import Workspace from './Workspace.fixtures'
+import ChatCard, { budgetCard, changeCard, connectCard, proposedScheduleCard, proposedTaskCard, providerCard, questionCard, removeCard, resolveCard, scheduleCard, sendMessageCard, taskCard, topicsCardSet, unknownCardSet } from './juno-chat/cards/ChatCard.fixtures'
+import EmptyChat from './juno-chat/EmptyChat.fixtures'
+import JunoChatList from './juno-chat/JunoChatList.fixtures'
+import JunoComposer from './juno-chat/JunoComposer.fixtures'
+import JunoHeader from './juno-chat/JunoHeader.fixtures'
+import OwnerBubble from './juno-chat/OwnerBubble.fixtures'
+import RemoveSheet from './juno-chat/RemoveSheet.fixtures'
+import StatusBubble from './juno-chat/StatusBubble.fixtures'
+import ActivityPage from './juno-pages/ActivityPage.fixtures'
+import ConnectionsPage from './juno-pages/ConnectionsPage.fixtures'
+import JunoSettingsPage from './juno-pages/JunoSettingsPage.fixtures'
+import MemoryPage from './juno-pages/MemoryPage.fixtures'
+import RemembersPage from './juno-pages/RemembersPage.fixtures'
+import ReviewPage from './juno-pages/ReviewPage.fixtures'
+import ScheduledPage from './juno-pages/ScheduledPage.fixtures'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   AccountMenu,
+  ActivityPage,
   ActiveThreads,
   AppearanceSettings,
   AppInfoView,
   ChannelIconPicker,
+  BudgetCard: budgetCard,
+  ChangeCard: changeCard,
+  ChatCard,
   ComposerSlot,
+  ConnectCard: connectCard,
+  ConnectionsPage,
   EngineNotice: engineNoticeFixtures,
+  EmptyChat,
   EngineStatusView,
   HoverToolbar,
+  JunoChatList,
+  JunoComposer,
+  JunoHeader,
+  JunoSettingsPage,
+  MemoryPage,
   Message,
   MessageList,
   NewDivider,
   NewMessagesPill,
+  OwnerBubble,
+  ProposedScheduleCard: proposedScheduleCard,
+  ProposedTaskCard: proposedTaskCard,
+  ProviderCard: providerCard,
+  QuestionCard: questionCard,
   Reactions,
+  RemembersPage,
+  RemoveCard: removeCard,
+  RemoveSheet,
+  ResolveCard: resolveCard,
+  ReviewPage,
+  ScheduleCard: scheduleCard,
+  ScheduledPage,
+  SendMessageCard: sendMessageCard,
   SessionView,
   Shell,
   Sidebar,
   SignInView,
+  StatusBubble,
+  TaskCard: taskCard,
   ThreadLink,
+  TopicsCard: topicsCardSet,
   TopicHeader,
   TopicRow,
   TopicView,
+  UnknownCard: unknownCardSet,
   Workspace,
 }

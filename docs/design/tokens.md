@@ -89,6 +89,7 @@ The accent is a user setting (`AppearanceSettings`, persisted in `launch.json` l
 | `--hl-fg` | Text on the fill | #FFFFFF | #2A0D06 |
 | `--hl-text` | Accent text and icons on paper or a tint: the "new" label, the selected nav item | #B4351F | #FF9C87 |
 | `--hl-soft` | `color-mix(in oklch, var(--hl) <mix>, var(--background))`: mention-row tint, my reaction, the @ tag | 10% | 14% |
+| `--hl-bubble` | `color-mix(in oklch, var(--hl) <mix>, var(--background))`: the owner's bubble in the Juno chat (option B, `docs/design/juno-chat/README.md`), with `--foreground-default` text. Ink mixes 12% and 14% | 16% | 22% |
 | `--hl-nav` | `color-mix(in oklch, var(--hl) <mix>, var(--background-subtle))`: the selected nav item's fill | 9% | 16% |
 | `--hl-rule`, `--hl-ring` | `--hl` at 30% and 45% alpha: the new divider's rule, the mine-reaction ring | | |
 | `--focus-ring` | The accent text colour, so the ring meets 4.5:1 on the page (3:1 is the minimum) | #B4351F | #FF9C87 |
@@ -381,6 +382,10 @@ All [proto] measured at 1280×800 with Inter unless marked.
 ### Icons
 
 Phosphor (`@phosphor-icons/react`, imported per icon). Weight by size: `bold` at 12–14, `regular` at 15–20. `fill` marks active and selected states. `duotone` only for the Juno nav item, the Juno mark and illustrations. Sizes (`--icon-12` … `--icon-20`): 12 (badges, chip close), 13 (row meta, tags, tab close), 14 (pills, cards, thread link, catch-up sparkle), 15 (tab icon), 16 (nav, menu items, buttons, title sparkle), 18 (icon buttons, hover toolbar, palette rows, send), 20 (attach, palette search). Tab icons sit at 0.75 opacity. There is no stroke token; Phosphor is filled paths and the weight is the variant. The mapping from the Lucide names the prototype used is in `friendly-layer.md` §2.3.
+
+### Juno chat
+
+The `chat` group (`tokens.stylex.ts`). `--owner-bubble-bg` and `--owner-bubble-fg` are the owner bubble's fill and text, set to option B (`--hl-bubble` / `--foreground-default`); the other options are listed beside the group, and switching is a change to those two lines. `--bubble-max-width` 76%, `--bubble-tail` 4px (the last bubble of a group), `--card-max-width` 560px. The status bubble: `--status-dot` 6px, `--status-min-width` 52px, `--status-loop` 1200ms, `--status-pulse-scale` 1.35 (1 under reduced motion), `--status-dot-opacity` 1 (0.6 under reduced motion). `--delay-queued` 500ms is how long a steer waits before "Queued" shows.
 
 ### Illustrations and the mark
 

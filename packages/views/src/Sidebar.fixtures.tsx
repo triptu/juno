@@ -107,6 +107,9 @@ export default defineFixtures(
       'all-topics-active': scene(() => full({ activeNav: 'all-topics' })),
       'for-you-active': scene(() => full({ activeNav: 'for-you', forYouCount: 0 })),
       'juno-active': scene(() => full({ activeNav: 'juno' })),
+      'juno-unread': scene(() => full({ junoUnread: 3 })),
+      // A job runs: the sparkle is duotone, with the count beside it.
+      'juno-busy': scene(() => full({ junoUnread: 1, junoBusy: true })),
       'no-dots': scene(() => full({ dots: { channels: false, dms: false } })),
     },
     'Account menu': {
