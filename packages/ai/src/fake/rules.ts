@@ -30,11 +30,9 @@ export function fakeSettledScore(input: SettledScoreInput): unknown {
 }
 
 export function fakeUrgencyGate(input: UrgencyGateInput): unknown {
-  if (CHATTER.test(input.text)) return { urgent: 0.05, chatter: 0.9 }
-  if (URGENT.test(input.text)) return { urgent: 0.9, chatter: 0.05 }
-  if (input.mentionsMe && /\?/.test(input.text)) return { urgent: 0.7, chatter: 0.1 }
-  if (input.channelKind === 'im') return { urgent: 0.5, chatter: 0.2 }
-  return { urgent: 0.2, chatter: 0.3 }
+  if (CHATTER.test(input.text)) return { notify: false, reason: 'Social chatter' }
+  const notify = URGENT.test(input.text) || (input.mentionsMe && /\?/.test(input.text)) || input.channelKind === 'im'
+  return { notify, reason: notify ? 'Needs your attention' : 'An update with no action needed' }
 }
 
 const LET_KNOW = /^(?:let|tell|remind)\s+(\w+)\s+(?:know\s+)?(?:that\s+)?(.+)$/i

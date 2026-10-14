@@ -26,7 +26,7 @@ describe('cache keys', () => {
     expect(cacheKeyOf(tasks.urgencyGate, { messageTs: '1.0', channel: '#eng', channelKind: 'public', sender: 's', text: 't', mentionsMe: false, now: '2026-10-13T09:00:00.000Z' })).toEqual({
       task: 'urgencyGate',
       key: '1.0',
-      inputHash: '15fa3d4b49101f27',
+      inputHash: '2ca5187db7496d0f',
     })
   })
 

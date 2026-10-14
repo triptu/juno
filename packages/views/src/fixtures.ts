@@ -8,11 +8,13 @@ import ActiveThreads from './ActiveThreads.fixtures'
 import AppearanceSettings from './AppearanceSettings.fixtures'
 import AppInfoView from './AppInfoView.fixtures'
 import ChannelIconPicker from './ChannelIconPicker.fixtures'
+import Composer from './Composer.fixtures'
 import ComposerSlot from './ComposerSlot.fixtures'
 import EngineStatusView, { engineNoticeFixtures } from './EngineStatusView.fixtures'
 import HoverToolbar from './HoverToolbar.fixtures'
 import Message from './Message.fixtures'
 import MessageList from './MessageList.fixtures'
+import NewChat from './NewChat.fixtures'
 import NewDivider from './NewDivider.fixtures'
 import NewMessagesPill from './NewMessagesPill.fixtures'
 import PeekKeySetting from './PeekKeySetting.fixtures'
@@ -56,6 +58,7 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   BudgetCard: budgetCard,
   ChangeCard: changeCard,
   ChatCard,
+  Composer,
   ComposerSlot,
   ConnectCard: connectCard,
   ConnectionsPage,
@@ -70,6 +73,7 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   MemoryPage,
   Message,
   MessageList,
+  NewChat,
   NewDivider,
   NewMessagesPill,
   PeekKeySetting,

@@ -39,9 +39,9 @@ describe('FakeAiProvider decisions', () => {
   it('gates an outage as urgent and a joke as chatter', async () => {
     const base = { channel: '#incidents', channelKind: 'public' as const, mentionsMe: false, now: NOW }
     const outage = decided(await run((p) => p.decide(tasks.urgencyGate, { ...base, messageTs: '1', sender: 'Jonas Weber', text: 'Checkout is down for 20% of requests, production incident.' })))
-    expect(outage.urgent).toBeGreaterThan(0.8)
+    expect(outage.notify).toBe(true)
     const joke = decided(await run((p) => p.decide(tasks.urgencyGate, { ...base, messageTs: '2', sender: 'Priya Raman', text: 'haha the cake was great' })))
-    expect(joke.chatter).toBeGreaterThan(0.8)
+    expect(joke.notify).toBe(false)
   })
 
   it('parses "let maya know …" as a send and a bare search word as no command', async () => {

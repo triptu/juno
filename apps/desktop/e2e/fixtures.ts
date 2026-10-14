@@ -16,6 +16,7 @@ export interface JunoTestHooks {
   readonly agentState: () => string
   /** The host name from the agent's `host.hello`, once it reached the engine. */
   readonly agentHost: () => string | undefined
+  readonly agentPid: () => number | undefined
 }
 
 export interface RunningApp {

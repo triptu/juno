@@ -220,7 +220,7 @@ Activity / mentions (`boot-async`, `fetchActivityFeed` thunk; fetcher `activityF
 - Mentions for Juno are more simply derived from `client.counts` (`mention_count`) and message text.
 
 Prefs
-- `users.prefs.get` (all prefs), `users.prefs.set` `{ prefs: JSON }` (persisted), `users.prefs.setNotifications`. Notification-relevant prefs read in the notification code: `mute_sounds`, `show_typing`, per-channel `channel_notification_settings`/`muted_channels`, `desktop_notification_actions`, `enable_unread_view`, `enable_threads_view`.
+- `users.prefs.get` (all prefs), `users.prefs.set` `{ prefs: JSON }` (persisted), `users.prefs.setNotifications`. The DND schedule prefs and their setter are in section 7, "Slack's notification schedule". Notification-relevant prefs read in the notification code: `mute_sounds`, `show_typing`, per-channel `channel_notification_settings`/`muted_channels`, `desktop_notification_actions`, `enable_unread_view`, `enable_threads_view`.
 
 Internal/undocumented methods used: `client.userBoot`, `client.channels`, `client.counts`, `client.dms`, `client.init`, `client.extras`, `client.gantryBoot`, `client.shouldReload`, `client.getWebSocketURL`, `api.getFlannelHttpUrl`, `conversations.view`, `conversations.genericInfo`, `conversations.historyChanges`, `conversations.dms.mark`, `subscriptions.thread.*`, `search.modules.*`, `activity.*`, `drafts.*`, `experiments.getByUser`, the whole edge `users/list`-style API.
 
@@ -339,6 +339,50 @@ Inferred
 Unknown
 
 - Whether `desktop_notification` is sent when the client's notification prefs are "nothing" (the client-side gate suggests the server still sends and the client filters).
+
+### Slack's notification schedule (DND)
+
+Researched 2026-10-15 for the M10 backlog item. Sources: static reading of the bundles in section 0, plus one read-only live check against the same account with the cached dev session (`users.prefs.get` and `dnd.info` only, formats printed, values never printed or kept). No setter was called.
+
+Observed
+
+- **The schedule is a set of ordinary user prefs.** It has no endpoint of its own. The settings page component `DndPreferences` (`boot-async`, around module `SN+s`, which holds the key and value constants) reads these prefs and writes them with `setMultiplePrefsByApi`:
+  - `dnd_enabled` (boolean): the schedule is on.
+  - `dnd_days`: `every_day | weekdays | custom`.
+  - `dnd_start_hour`, `dnd_end_hour`: notifications pause at `dnd_start_hour` and resume at `dnd_end_hour`, so the paused span crosses midnight. The page reads them backwards: "Allow notifications: [`dnd_end_hour`] to [`dnd_start_hour`]" (`JiU7` `BaseDndTimeSelect`). These two apply when `dnd_days` is `every_day` or `weekdays`. With `weekdays` the page says "You won't receive notifications on Saturday or Sunday."
+  - Per day, used when `dnd_days` is `custom`, for `<day>` in `monday` to `sunday`: `dnd_before_<day>` (notifications start), `dnd_after_<day>` (notifications stop), and `dnd_enabled_<day>`: `all_day | disabled | partial`. `all_day` means no notifications that day: the page offers it as "None" for the start time, and only while fewer than 6 days are already `all_day`. `disabled` is drawn as allowed from 00:00 to 23:59 (inferred: no pause that day). Picking a time sets the day to `partial`.
+  - `dnd_weekdays_off_allday` (boolean). Present in the constants and live, but the page code read does not use it.
+  - Times are `"HH:mm"` strings in 30-minute steps from the client's picker (`qn32`), with `"23:59"` standing for midnight.
+- **Live, `users.prefs.get`** with `prefs=<comma-separated names>` returned all 28 names asked for under `prefs`. `dnd_enabled`, `dnd_weekdays_off_allday` and `priority_dnd_override` are booleans. `dnd_days` and every `dnd_enabled_<day>` hold one of the enum values above. Hours came back in both forms: some `"H:MM"` without the leading zero, some `"HH:MM"`. The client pads to five characters before comparing (`kKOK`, `JiU7`), so a reader must accept both. Without arguments, `users.prefs.get` returned 729 prefs. The ones whose names mention dnd, VIP or priority are the keys above plus `dnd_custom_new_badge_seen`, `dnd_notification_schedule_new_badge_seen`, `mega_dnd_expiration`, `priority_dnd_override`, `priority_sidebar_section`, `scheduled_dnd_status`, `today_priority_channels` and `vip_users`.
+- **The same keys are in `client.userBoot`** under `prefs`, so Juno can read the schedule at boot without another call. They are also under `team.prefs` and `workspaces[].prefs`, which are presumably the workspace's default schedule for new members (recorded fixture `client.userBoot.json`).
+- **The boot `dnd` object** is `{ dnd_enabled, next_dnd_start_ts, next_dnd_end_ts, snooze_enabled }`, and `dnd.info` returns the same four fields plus `ok`. It holds the next pause, already worked out by the server in Unix seconds, not the schedule itself. `dnd.info` with `{ user }` adds `snooze_endtime` and `dnd_profile_status` when they apply (`shared` `fetchUserDndInfo`). `dnd.teamInfo` with `{ users: "<ids,>" }` returns `{ users: { <id>: { next_dnd_start_ts, next_dnd_end_ts, dnd_profile_status? } } }` (`fetchUsersDndInfo`).
+- **`dnd_updated` and `dnd_updated_user`.** The handlers (`boot-async`, `dndUpdated` and `dndUpdatedUser`) read only `user` from the frame and refetch that person's DND with `dnd.teamInfo`. The `dnd_status` field in section 4 is never read. `dnd_invalidated` carries a list of `{ user }` and does the same. No `dnd_updated` frame was seen live, so its payload shape is still from the bundle only.
+- **The setter.** It is `users.prefs.set` with a JSON object of prefs. Call chain: `DndPreferences.setDndPrefs(changes)`, then `setMultiplePrefsByApi({ ...changes, dnd_enabled: true })` (`shared` `N0Kh`, export `Hj`), which updates local prefs first and rolls them back on failure. That calls `setMultipleUserPrefsFetcher` (`shared` `Nu4c`, export `TZ`), then `apiCall` with:
+  - method `users.prefs.set`
+  - form fields `token`, `prefs` = `JSON.stringify({ <pref>: <value>, ... })`
+  - `_x_reason=prefs-api/setMultipleUserPrefsByApi`
+
+  After success the client fires a local `pref_change` for each key. The one-pref form is `users.prefs.set` with `{ name, value }` (`setUserPrefFetcher`). Every write from this page also sets `dnd_enabled: true`, and the page has no path that turns `dnd_enabled` off. Examples of what the page sends:
+  - Every day, paused 18:00 to 09:00: `prefs={"dnd_days":"every_day","dnd_start_hour":"18:00","dnd_end_hour":"09:00","dnd_enabled":true}` (the page sends one key per change; sending several at once is the same call).
+  - Custom Saturday, no notifications all day: `prefs={"dnd_enabled_saturday":"all_day","dnd_enabled":true}`.
+  - Custom Monday, notifications 09:00 to 18:00: `prefs={"dnd_before_monday":"09:00","dnd_after_monday":"18:00","dnd_enabled_monday":"partial","dnd_enabled":true}`. When a new start is not before the stop, the page also moves the stop to the next half hour.
+- **Snooze is separate from the schedule:** `dnd.setSnooze` `{ num_minutes }` (`shared` `Glrq`), `dnd.endSnooze`, `dnd.endDnd` (ends a scheduled pause now).
+- **No channel can get through a pause.** The only DND exception in the bundle is for people. `shouldOverrideDndForMessage` (`shared`, near the `priority` store) lets a message through only when the pref `priority_dnd_override` is true, the sender (or a bot's `bot_profile.user_id`) is in the VIP list, and the message mentions someone or something or is in a DM. The VIP list comes from the `vip_users` pref, the `vip_users_updated` socket event and `users.priority.list`. The snooze dialog writes `priority_dnd_override` ("Everyone except VIPs"). The per-channel notification prefs (`all_notifications_prefs`, and `users.prefs.setNotifications` names `desktop`, `mobile`, `muted`, `suppress_at_channel`, `desktop_sound`) have no DND exception. The `dnd_override` socket event `{ channel, timestamp }` re-shows one message with `_ignore_dnd`. It fits the sender's "notify anyway" for a person in DND (a DM context-bar banner) and is not a setting. `silentSidebar.dndOverrideChannelIds` is local focus-mode state that is not synced. `today_priority_channels` is a JSON list for the Today view and is not used by the DND check.
+- `scheduled_dnd_status` is the "After hours" profile status option on the Availability page (`{ show, cleared_ts }`), not the schedule.
+
+Inferred
+
+- To make the phone match Juno's notification hours, Juno writes `dnd_days: "every_day"`, `dnd_end_hour: <hours start>`, `dnd_start_hour: <hours end>` and `dnd_enabled: true` in one `users.prefs.set` call. If the hours differ by weekday, it writes `dnd_days: "custom"` with the per-day keys instead. Times are rounded to the half hour, because the official page cannot show other values, although it inserts an unknown value as an extra option.
+- Pauses for mobile push are applied by Slack's server from these prefs, and `next_dnd_*_ts` show the server works out the times. Juno's desktop notifications are its own and do not depend on them.
+
+Unknown
+
+- Which time zone the server applies the hours in. Probably the profile `tz`; not checked.
+- Whether the server stores values exactly as sent. Some live values come back without the leading zero, so either an older client wrote them or the server normalises them.
+- Whether `users.prefs.set` returns the stored values, and whether the server sends `pref_change` and `dnd_updated` to the other clients after the write. Expected, but not seen.
+- What `dnd_weekdays_off_allday` controls, and how `weekdays` applies the weekend (whole weekend paused, going by the page text).
+- How `disabled` gets set for a day. The page code read never writes it.
+- How Enterprise Grid org policy, or the workspace default under `team.prefs`, interacts with a user's own values.
 
 ## 8. Recommended minimal API surface for Juno v1
 

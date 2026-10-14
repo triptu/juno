@@ -3,7 +3,7 @@
 import { startFakeSlack, topic300Seed } from '@juno/fake-slack'
 import { contentHoldsStill, happened, landsAndStays, neverBlank, noFlicker, noLayoutShift, noLongFrames, scrollsOneWay, staysAtBottom } from './checks'
 import { expect, test as base } from './feel'
-import { count, paneRegions, sidebarReorder, topicProbes } from './pane'
+import { count, paneRegions, rect, SCROLLER, sidebarReorder, topicProbes } from './pane'
 
 const test = base.extend({
   // oxlint-disable-next-line no-empty-pattern
@@ -15,6 +15,8 @@ const test = base.extend({
 })
 
 const THREAD = 'Review the rollout checklist 1.'
+/** The list runs under the 68 px header band; the divider opens 80 px below it (inventory 5). */
+const DIVIDER_OFFSET = 148
 /** Images answer this late, well after the rows paint. */
 const FILE_DELAY_MS = 1_200
 
@@ -58,11 +60,17 @@ test('a long thread with late images', async ({ juno, slack, win, feel }) => {
   await feel.run(
     {
       name: 'open-long-at-divider',
-      title: 'Reopen it with 40 new replies: it lands with the "40 new" divider 80 px from the top and stays there while images arrive',
-      probes: topicProbes,
+      title: 'Reopen it with 40 new replies: it lands with the "40 new" divider 80 px below the header band (148 px from the list top) and stays there while images arrive',
+      probes: [...topicProbes, { kind: 'rect', name: 'list', selector: SCROLLER }],
       regions: paneRegions,
       settleMs: 1_500,
       checks: [
+        happened('the divider first shows 148 px from the list top, 80 px below the header band', (r) => {
+          const first = r.frames.find((f) => rect(f.values, 'divider') !== undefined)
+          const divider = first === undefined ? undefined : rect(first.values, 'divider')
+          const list = first === undefined ? undefined : rect(first.values, 'list')
+          return divider !== undefined && list !== undefined && Math.abs(divider.y - list.y - DIVIDER_OFFSET) <= 2
+        }),
         landsAndStays('divider', 'the "40 new" divider', { from: 'press' }),
         contentHoldsStill('top', { from: 'press' }),
         noLayoutShift({ from: 'press' }),

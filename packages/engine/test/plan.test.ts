@@ -1,7 +1,8 @@
 // Every live query statement has an index (performance 6): the plan may not
 // scan messages, topic_index, reactions or topic_overlay. The sidebar's
 // statements, and the topic view's: the Main and thread windows, their
-// reactions and thread titles, and a channel's active threads.
+// reactions and thread titles, a channel's active threads, and the New chat
+// pickers.
 import { assert, describe, it } from '@effect/vitest'
 import { Effect, Layer } from 'effect'
 import * as fs from 'node:fs/promises'
@@ -9,6 +10,7 @@ import * as os from 'node:os'
 import * as path from 'node:path'
 import { Store, StoreReader, workspacePathsFromDir, type StoreError } from '@juno/store'
 import { reactionsStatement, threadsStatements, threadTitlesStatement, windowStatements, type WindowTarget } from '../src/messages/window'
+import { pickerStatements } from '../src/newchat/query'
 import { countsStatement, listStatements, type ListFilter } from '../src/topics/query'
 
 const tempDir = Effect.acquireRelease(
@@ -99,6 +101,20 @@ describe('query plans', () => {
         const lines = yield* plan(statement.sql, statement.params)
         assert.deepStrictEqual(scans(lines), [], lines.join('\n'))
         assert.isTrue(lines.some((line) => line.includes('topic_index_channel_activity')), lines.join('\n'))
+      }
+    }).pipe(Effect.provide(freshStore)),
+  )
+
+  it.effect('the New chat pickers read topic_index through an index', () =>
+    Effect.gen(function* () {
+      for (const channel of [undefined, 'C0ENG']) {
+        for (const match of [undefined, 'cutover*']) {
+          const { recent, threads } = pickerStatements('1700000000.000000', channel, match)
+          for (const statement of [recent, threads]) {
+            const lines = yield* plan(statement.sql, statement.params)
+            assert.deepStrictEqual(scans(lines), [], `${channel ?? 'everywhere'} ${match ?? ''}\n${lines.join('\n')}`)
+          }
+        }
       }
     }).pipe(Effect.provide(freshStore)),
   )

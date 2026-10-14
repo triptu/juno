@@ -1,19 +1,41 @@
 import { startTransition, useState } from 'react'
 import type { KindFilter } from '@juno/contract'
-import { accentAtom, persistAccent, persistTheme, sidebarDotAtom, sidebarFilterAtom, sidebarListAtom, signedInAtom, themeAtom, type Accent, type Theme } from '@juno/state'
+import {
+  accentAtom,
+  activeTab,
+  currentPlace,
+  persistAccent,
+  persistTheme,
+  sidebarDotAtom,
+  sidebarFilterAtom,
+  sidebarListAtom,
+  signedInAtom,
+  tabsAtom,
+  themeAtom,
+  type Accent,
+  type Tabs,
+  type Theme,
+} from '@juno/state'
 import { useAtom, useAtomValue } from '@juno/state/react'
-import { AccountMenu, AppearanceSettings, hueFor, initials, Sidebar as SidebarView, type SidebarNavTarget } from '@juno/views'
+import { AccountMenu, AppearanceSettings, hueFor, initials, Sidebar as SidebarView, type ActivateEvent, type SidebarNavTarget } from '@juno/views'
 import { AppInfo } from './AppInfo'
 import { EngineStatus, SyncNotice } from './EngineStatus'
 import { markFilterChange } from './filterMark'
+import { openHome, openNewTab } from './navigation'
 import { PeekKeyPreference } from './Peek'
 import { Session } from './Session'
 import { TitlebarNav } from './TitlebarNav'
 import { TopicList } from './TopicList'
 
-function navigate(target: SidebarNavTarget): void {
+function navigate(target: SidebarNavTarget, event: ActivateEvent): void {
+  if (target === 'home') return openHome({ newTab: event.metaKey })
   // TODO(M5/M9/M11): open the All topics or Juno page in a tab.
-  void target
+}
+
+/** The nav item of the active tab's page. Home also reads as selected with no tab open. */
+function activeNavOf(tabs: Tabs): SidebarNavTarget | undefined {
+  const tab = activeTab(tabs)
+  return tab === undefined || currentPlace(tab).kind === 'home' ? 'home' : undefined
 }
 
 /**
@@ -31,6 +53,7 @@ export function Sidebar() {
   const channelsDot = useAtomValue(sidebarDotAtom('channels'))
   const dmsDot = useAtomValue(sidebarDotAtom('dms'))
   const user = useAtomValue(signedInAtom)
+  const activeNav = useAtomValue(tabsAtom, activeNavOf)
   const [menuOpen, setMenuOpen] = useState(false)
   // The scope chip names the channel the list is narrowed to; its rows' refs carry it.
   const scopeChannel = useAtomValue(sidebarListAtom, (list) => (filter.scope === undefined ? undefined : list.refs.channels.get(filter.scope)))
@@ -97,6 +120,8 @@ export function Sidebar() {
       onSearch={() => {
         // TODO(M9): open the ⌘K palette.
       }}
+      {...(activeNav === undefined ? {} : { activeNav })}
+      onNewChat={openNewTab}
       onNavigate={navigate}
       onFilterKind={changeKind}
       onToggleUnread={toggleUnread}

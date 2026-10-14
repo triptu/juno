@@ -30,7 +30,7 @@ const schemaOnlyEffect = new Set(['@juno/domain', '@juno/richtext', '@juno/agent
 // (@juno/views is covered by the `views` directory rule below.)
 const noEffect = new Set(['@juno/ui', '@juno/tokens', '@juno/domain', '@juno/richtext', '@juno/agent-memory', '@juno/agent-cards'])
 // Packages whose src must not import @juno/state.
-const noState = new Set(['@juno/ui'])
+const noState = new Set(['@juno/ui', '@juno/notifications'])
 // The only package allowed to import electron.
 const electronOwner = '@juno/desktop'
 
@@ -126,7 +126,10 @@ const unstable = [
   {
     label: 'effect/rpc',
     spec: /^effect\/rpc(?:\/|$)/,
-    allow: ['packages/contract/src/', 'packages/engine/src/protocol/', 'packages/state/src/', 'packages/agent-contract/src/host/', 'packages/agent-contract/src/rpc/', 'packages/agent/src/host/'],
+    allow: [
+      'packages/contract/src/', 'packages/engine/src/protocol/', 'packages/state/src/', 'packages/agent-contract/src/host/', 'packages/agent-contract/src/rpc/', 'packages/agent/src/host/',
+      'packages/engine/test/agent-host.test.ts',
+    ],
   },
   {
     label: 'effect/workers',

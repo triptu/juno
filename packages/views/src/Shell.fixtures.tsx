@@ -40,6 +40,7 @@ export function SignedIn({ width, hidden = false, peek }: { readonly width?: num
           accountMenuOpen={false}
           onAccountMenu={noop}
           onSearch={noop}
+          onNewChat={noop}
           onNavigate={noop}
           onFilterKind={noop}
           onToggleUnread={noop}

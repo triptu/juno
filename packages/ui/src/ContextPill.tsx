@@ -1,11 +1,12 @@
 import * as stylex from '@stylexjs/stylex'
-import { radii, sizes, spacing, tints, weights } from '@juno/tokens/tokens.stylex'
+import { radii, sizes, spacing, text, tints, weights } from '@juno/tokens/tokens.stylex'
 import { Icon, type IconSize, type PhosphorIcon } from './Icon'
+import { interactive } from './internal/interactive'
 import { variants as typeVariants } from './internal/type'
 
 /** The three context tints from the tokens: neutral, amber and blue. */
 export type ContextTint = 'public' | 'private' | 'dm'
-export type ContextPillSize = 22 | 26 | 28
+export type ContextPillSize = 22 | 24 | 26 | 28
 
 export interface ContextPillProps {
   readonly tint: ContextTint
@@ -15,19 +16,17 @@ export interface ContextPillProps {
   readonly name: string
   /** The kind, appended after a dot at regular weight ("Public channel"). Also the tooltip. */
   readonly kindLabel?: string
-  /**
-   * Append `kindLabel` to the visible text. `roomy` keeps it only while the
-   * nearest size container (the owner declares one) is wider than 480px,
-   * so a narrow header drops the kind before it squeezes the name.
-   */
-  readonly showKind?: boolean | 'roomy'
+  /** Append `kindLabel` to the visible text. */
+  readonly showKind?: boolean
+  /** 22 on cards, 24 in a page header, 26 by default, 28 in the To field. */
   readonly size?: ContextPillSize
+  /** Makes the pill a button (the page header's: narrow the sidebar to the channel). */
+  readonly onClick?: () => void
+  /** The button's accessible name, which carries the kind when it is not shown ("eng, public channel. Show in sidebar."). */
+  readonly label?: string
 }
 
-const iconBySize: Record<ContextPillSize, IconSize> = { 22: 12, 26: 14, 28: 14 }
-
-// Container queries cannot read tokens, so the breakpoint is a constant.
-const CRAMPED = '@container (max-width: 480px)'
+const iconBySize: Record<ContextPillSize, IconSize> = { 22: 12, 24: 13, 26: 14, 28: 14 }
 
 /**
  * The tinted pill that says where a topic lives. The owner maps the
@@ -35,17 +34,35 @@ const CRAMPED = '@container (max-width: 480px)'
  * `@juno/domain`); the pill only draws them. It shrinks with its row: the
  * name takes an ellipsis, the icon and the kind keep their size.
  */
-export function ContextPill({ tint, icon, name, kindLabel, showKind = false, size = 26 }: ContextPillProps) {
-  return (
-    <span title={kindLabel} {...stylex.props(styles.base, typeVariants.pill, sizeStyles[size], tintStyles[tint])}>
+export function ContextPill({ tint, icon, name, kindLabel, showKind = false, size = 26, onClick, label }: ContextPillProps) {
+  const content = (
+    <>
       <Icon icon={icon} size={iconBySize[size]} />
       <span {...stylex.props(styles.name)}>{name}</span>
-      {showKind !== false && kindLabel ? (
-        <span {...stylex.props(styles.kind, showKind === 'roomy' && styles.kindRoomy)}>
+      {showKind && kindLabel ? (
+        <span {...stylex.props(styles.kind)}>
           <span aria-hidden>{' · '}</span>
           {kindLabel}
         </span>
       ) : null}
+    </>
+  )
+  if (onClick !== undefined) {
+    return (
+      <button
+        type="button"
+        title={kindLabel}
+        aria-label={label}
+        onClick={onClick}
+        {...stylex.props(interactive.reset, interactive.feedback, interactive.press, interactive.focusRing, styles.base, typeVariants.pill, sizeStyles[size], tintStyles[tint])}
+      >
+        {content}
+      </button>
+    )
+  }
+  return (
+    <span title={kindLabel} {...stylex.props(styles.base, typeVariants.pill, sizeStyles[size], tintStyles[tint])}>
+      {content}
     </span>
   )
 }
@@ -73,13 +90,11 @@ const styles = stylex.create({
     fontWeight: weights['--weight-regular'],
     flexShrink: 0,
   },
-  kindRoomy: {
-    display: { default: 'inline', [CRAMPED]: 'none' },
-  },
 })
 
 const sizeStyles = stylex.create({
   22: { height: sizes['--control-22'], paddingInline: spacing['--space-2'], gap: spacing['--space-1'] },
+  24: { height: sizes['--control-24'], paddingInline: spacing['--space-2'], gap: spacing['--space-1-5'], fontSize: text['--text-meta-size'], lineHeight: sizes['--control-24'] },
   26: { height: sizes['--control-26'] },
   28: { height: sizes['--control-28'] },
 })

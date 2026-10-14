@@ -2,6 +2,7 @@ import * as stylex from '@stylexjs/stylex'
 import { Bell } from '@phosphor-icons/react/dist/icons/Bell'
 import { Gear } from '@phosphor-icons/react/dist/icons/Gear'
 import { Hash } from '@phosphor-icons/react/dist/icons/Hash'
+import { House } from '@phosphor-icons/react/dist/icons/House'
 import { ListBullets } from '@phosphor-icons/react/dist/icons/ListBullets'
 import { Lock } from '@phosphor-icons/react/dist/icons/Lock'
 import { NotePencil } from '@phosphor-icons/react/dist/icons/NotePencil'
@@ -14,7 +15,7 @@ import { colors } from '@juno/tokens/tokens.stylex'
 import { EmptyState, IconButton, Tab, TabStrip, type ActivateEvent, type PhosphorIcon } from '@juno/ui'
 
 /** The icon a tab shows: the channel kind for a topic, the page's own icon otherwise. */
-export type WorkspaceTabIcon = 'hash' | 'lock' | 'user' | 'users' | 'new-chat' | 'all-topics' | 'juno' | 'notifications' | 'preferences'
+export type WorkspaceTabIcon = 'hash' | 'lock' | 'user' | 'users' | 'new-chat' | 'home' | 'all-topics' | 'juno' | 'notifications' | 'preferences'
 
 export interface WorkspaceTab {
   readonly id: string
@@ -44,8 +45,10 @@ export interface WorkspaceProps {
   readonly leading?: ReactNode
   /** The open pages, the hidden ones included. Nothing here shows the empty state. */
   readonly children?: ReactNode
-  /** Shows the empty state over hidden pages: the active tab has no page yet (a New chat until it is built). */
+  /** Shows the empty state over hidden pages: no tab is open, or the active tab has no page yet. */
   readonly nothingShown?: boolean
+  /** What shows with no page: Home's content. Default the empty state. */
+  readonly empty?: ReactNode
 }
 
 const icons: Record<WorkspaceTabIcon, PhosphorIcon> = {
@@ -54,6 +57,7 @@ const icons: Record<WorkspaceTabIcon, PhosphorIcon> = {
   user: User,
   users: Users,
   'new-chat': NotePencil,
+  home: House,
   'all-topics': ListBullets,
   juno: Sparkle,
   notifications: Bell,
@@ -86,7 +90,7 @@ function stepIndex(key: string, index: number, count: number): number | undefine
  * holds its controls. The strip is an APG tablist: the active tab is the one Tab stop, the arrow
  * keys select its neighbours, Delete closes it.
  */
-export function Workspace({ tabs = [], activeId, onSelectTab, onCloseTab, onNewTab, onTabContextMenu, leading, children, nothingShown = false }: WorkspaceProps) {
+export function Workspace({ tabs = [], activeId, onSelectTab, onCloseTab, onNewTab, onTabContextMenu, leading, children, nothingShown = false, empty }: WorkspaceProps) {
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (onSelectTab === undefined || !(event.target instanceof HTMLElement) || event.target.getAttribute('role') !== 'tab') return
     const next = stepIndex(event.key, tabs.findIndex((tab) => tab.id === activeId), tabs.length)
@@ -115,13 +119,18 @@ export function Workspace({ tabs = [], activeId, onSelectTab, onCloseTab, onNewT
       </TabStrip>
       <main {...stylex.props(styles.page)}>
         {children}
-        {children == null || nothingShown ? (
-          <div {...stylex.props(styles.empty)}>
-            <EmptyState variant="workspace" illustration="nothing-open" title="Nothing open yet" body="Pick a topic on the left." padding="page" />
-          </div>
-        ) : null}
+        {children == null || nothingShown ? (empty ?? <WorkspaceEmpty />) : null}
       </main>
     </section>
+  )
+}
+
+/** The empty workspace: what shows with no tab open, until Home has its own page. */
+export function WorkspaceEmpty() {
+  return (
+    <div data-workspace-empty="" {...stylex.props(styles.empty)}>
+      <EmptyState variant="workspace" illustration="nothing-open" title="Nothing open yet" body="Pick a topic on the left." padding="page" />
+    </div>
   )
 }
 

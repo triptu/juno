@@ -1,5 +1,5 @@
 export { startAgent, HostProtocolMismatch, type AgentHandle, type AgentTurns } from './start'
-export type { HostConnection, HostPort } from './host/port'
+export { hostProtocol, type HostConnection, type HostPort } from './host/port'
 export {
   AGENT_DATABASE_FILE, CoreOpenFailed, CRASH_ENV, CRASH_POINTS, crashPoint, DurableCore, openCore, OwnerLockHeld, OWNER_LOCK_FILE, ROTATION_AGE_MS,
   type Core, type CoreOptions, type CrashPoint, type CrashPointSpec, type Extension, type JournalModels, type JournalSettings, type UpdateNeeded,
