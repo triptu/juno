@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-14 14:45 · Orchestrator · M4 fix C merged: cut-off text shows its full text on hover (`tooltipWhenTruncated`, now on the header title too), a calm hover fill, the toolbar keeps clear of the name and first line on header rows, code blocks no longer trap the wheel, blank-line messages collapse. The New message page and Track replies are removed (the `tracked` column stays, unused, since migrations are append-only). The feel suite's long-thread wobble (one pixel, one frame) is older list behaviour that the code-block trap used to hide; it goes with the list scroll work.
 - 10-14 14:05 · Tushar · Open in Slack sits next to Copy Slack link in the topic menu and the message's More menu (M5).
 - 10-14 14:05 · Tushar · Keyboard edit and delete: ↑ from an empty composer selects the newest message, ↑ ↓ move, E edits your own message, Delete or Backspace deletes it after one inline confirm (M6). The owner uses few shortcuts; this is the one that matters.
 - 10-14 14:05 · Tushar · Peek: hold a key over a sidebar row to see the topic in a popover to the right, without opening it or marking it read (M5). The key defaults to ⌥ Option because it works while typing; Space is the alternative in Preferences. Fn is not offered because macOS does not report it to apps reliably.
