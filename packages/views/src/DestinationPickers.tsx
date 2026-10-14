@@ -309,7 +309,7 @@ function NoMatch() {
 function ConversationMark({ conversation }: { readonly conversation: PickConversation }) {
   const person = conversation.person
   if (person === undefined) return <Icon icon={kindIcons[conversation.kind]} size={15} />
-  return <Avatar size={20} label={initials(person.name)} name={person.name} hue={hueFor(person.color, person.id)} {...(person.avatarUrl === undefined ? {} : { src: person.avatarUrl })} />
+  return <Avatar size={20} label={initials(person.name)} hue={hueFor(person.color, person.id)} {...(person.avatarUrl === undefined ? {} : { src: person.avatarUrl })} />
 }
 
 /** The longest a thread title runs in its button before the ellipsis. */

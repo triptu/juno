@@ -37,36 +37,38 @@ export function Composer({ value, onChange, onSend, placeholder, sending = false
   return (
     <div data-composer="" {...stylex.props(styles.outer)}>
       {above !== undefined ? <div {...stylex.props(styles.above)}>{above}</div> : null}
-      <Surface kind="field" sx={styles.box}>
-        <span aria-hidden {...stylex.props(styles.mark, styles.attach)}>
-          <Icon icon={Plus} size={18} />
-        </span>
-        <Textarea
-          ref={inputRef}
-          variant="inline"
-          maxHeight="composer"
-          label={placeholder}
-          placeholder={placeholder}
-          value={value}
-          onChange={(event) => onChange(event.currentTarget.value)}
-          onKeyDown={onKeyDown}
-          dir="auto"
-        />
-        <span {...stylex.props(styles.send)}>
-          <IconButton
-            icon={ArrowUp}
-            label="Send"
-            size={28}
-            iconSize={16}
-            iconWeight="bold"
-            radius="full"
-            variant="primary"
-            dimmed={empty || sending}
-            onClick={() => {
-              if (!sending) onSend()
-            }}
+      <Surface kind="field" data-composer-field="" sx={styles.box}>
+        <div {...stylex.props(styles.row)}>
+          <span aria-hidden {...stylex.props(styles.mark, styles.attach)}>
+            <Icon icon={Plus} size={18} />
+          </span>
+          <Textarea
+            ref={inputRef}
+            variant="inline"
+            maxHeight="composer"
+            label={placeholder}
+            placeholder={placeholder}
+            value={value}
+            onChange={(event) => onChange(event.currentTarget.value)}
+            onKeyDown={onKeyDown}
+            dir="auto"
           />
-        </span>
+          <span {...stylex.props(styles.send)}>
+            <IconButton
+              icon={ArrowUp}
+              label="Send"
+              size={28}
+              iconSize={16}
+              iconWeight="bold"
+              radius="full"
+              variant="primary"
+              dimmed={empty || sending}
+              onClick={() => {
+                if (!sending) onSend()
+              }}
+            />
+          </span>
+        </div>
       </Surface>
     </div>
   )
@@ -90,14 +92,21 @@ const styles = stylex.create({
   },
   box: {
     display: 'flex',
-    alignItems: 'flex-end',
-    gap: spacing['--space-1'],
     width: '100%',
     maxWidth: layout['--composer-width'],
-    minHeight: sizes['--control-40'],
     marginInline: 'auto',
     paddingInline: spacing['--space-1-5'],
     boxSizing: 'border-box',
+  },
+  // The row is 40px at one line (the textarea's 9 + 22 + 9). It reaches into the field's 1px border,
+  // so the field is 40px tall too, like the ComposerSlot it replaces.
+  row: {
+    display: 'flex',
+    alignItems: 'flex-end',
+    flexGrow: 1,
+    minWidth: 0,
+    gap: spacing['--space-1'],
+    marginBlock: '-1px',
   },
   mark: {
     display: 'inline-flex',

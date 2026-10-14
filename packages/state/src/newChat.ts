@@ -7,6 +7,7 @@
  * switch to another tab. The destination is a conversation and, inside it,
  * a thread or Main (no thread).
  */
+import * as AsyncResult from 'effect/reactivity/AsyncResult'
 import * as Atom from 'effect/reactivity/Atom'
 import { messagesSend, newChatConversations, newChatThreads, type PickConversation, type PickThread, type SendTarget } from '@juno/contract'
 import { liveQuery, runCommand } from './atoms'
@@ -52,11 +53,15 @@ export function sendTarget(chat: NewChat): SendTarget | undefined {
 const conversationsFamily = liveQuery(newChatConversations)
 const threadsFamily = liveQuery(newChatThreads)
 
-/** The conversation picker's sections for a query. */
-export const pickConversationsAtom = (query: string) => conversationsFamily({ query })
+/** What a picker reads while its list is closed: nothing, and no subscription. */
+const closed = Atom.make(AsyncResult.initial<never, never>())
 
-/** The thread picker's rows: a conversation's threads, or recent ones everywhere. */
-export const pickThreadsAtom = (channel: string | undefined, query: string) => threadsFamily({ ...(channel === undefined ? {} : { channel }), query })
+/** The conversation picker's sections for a query, while its list is open. */
+export const pickConversationsAtom = (query: string | undefined) => (query === undefined ? closed : conversationsFamily({ query }))
+
+/** The thread picker's rows, while its list is open: a channel's threads, or recent ones everywhere. */
+export const pickThreadsAtom = (open: { readonly channel?: string | undefined; readonly query: string } | undefined) =>
+  open === undefined ? closed : threadsFamily({ ...(open.channel === undefined ? {} : { channel: open.channel }), query: open.query })
 
 /** Sends the draft. Resolves with the `Exit`; on success, the topic the message landed in. */
 export const sendMessage = (registry: Registry, to: SendTarget, text: string) => runCommand(registry, messagesSend, { to, text, clientMsgId: crypto.randomUUID() })
