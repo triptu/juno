@@ -6,6 +6,7 @@
 import { Effect, Layer, Ref, Stream } from 'effect'
 import type { EnginePhase, SessionStatus } from '@juno/contract'
 import type { SyncPhase } from '@juno/sync'
+import { NotificationControl } from './notificationRuntime'
 import { AiProviderLive } from './ai'
 import { ArtHandlers } from './art/handlers'
 import { ArtJob } from './art/job'
@@ -56,8 +57,9 @@ const EnginePhases = Layer.effectDiscard(
 /** Everything the route handlers need. Requires the host seams (`HostLink`, `HttpTransport`) and `EngineConfig`. */
 export const Services = Layer.mergeAll(EnginePhases, ArtJob).pipe(
   Layer.provideMerge(MarkWorker.layer),
-  Layer.provideMerge(AiProviderLive),
   Layer.provideMerge(SyncRunner.layer),
+  Layer.provideMerge(AiProviderLive),
+  Layer.provideMerge(NotificationControl.layer),
   Layer.provideMerge(SyncLink.layer),
   Layer.provideMerge(Outbox.layer),
   Layer.provideMerge(SessionClientLive),

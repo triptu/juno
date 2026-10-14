@@ -21,7 +21,7 @@ import {
   type Registry,
   type TopicListFilter,
 } from '@juno/state'
-import { memoryHost, startEngine, type EngineHandle } from '../src/index'
+import { memoryHost, startEngine, type EngineHandle, type EngineHostOptions } from '../src/index'
 import { memoryTransport, type MessagePortLike } from '../src/protocol/transport'
 
 /**
@@ -146,6 +146,7 @@ export interface RunningEngine {
 }
 
 export interface EngineOptions {
+  readonly notifications?: EngineHostOptions['notifications']
   /** A session main already holds, as after a relaunch. */
   readonly initial?: (fake: FakeSlack) => Credentials
   readonly enterpriseId?: string
@@ -170,6 +171,7 @@ export async function startTestEngine(options: EngineOptions = {}): Promise<Runn
   let cycles = 0
   let pendingCycles = 0
   const handle = await startEngine(transport, { userData, e2e: true, dev: false, fakeSlackUrl: fake.url, ai: 'fake' }, {
+    ...(options.notifications === undefined ? {} : { notifications: options.notifications }),
     host: main.host,
     httpTransport: main.httpTransport,
     sync: {

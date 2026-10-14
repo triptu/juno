@@ -23,7 +23,8 @@
     "@juno/store": "workspace:*",
     "@juno/sync": "workspace:*",
     "@juno/topic-art": "workspace:*",
-    "effect": "4.0.3"
+    "effect": "4.0.3",
+    "@juno/notifications": "workspace:*"
   },
   "devDependencies": {
     "@effect/vitest": "4.0.3",
@@ -44,7 +45,8 @@
       "@juno/slack",
       "@juno/store",
       "@juno/sync",
-      "@juno/topic-art"
+      "@juno/topic-art",
+      "@juno/notifications"
     ],
     "testDeps": [
       "@juno/fake-slack",

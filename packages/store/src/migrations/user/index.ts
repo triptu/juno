@@ -4,6 +4,7 @@ import initial from './202610121200_initial'
 import overlayPinned from './202610131000_overlay_pinned'
 import search from './202610140100_search'
 import readMirror from './202610141200_read_mirror'
+import notifications from './202610151000_notifications'
 import topicArt from './202610141300_topic_art'
 
 /**
@@ -17,4 +18,5 @@ export const userMigrations: Record<string, Effect.Effect<void, unknown, SqlClie
   '202610140100_search': search,
   '202610141200_read_mirror': readMirror,
   '202610141300_topic_art': topicArt,
+  '202610151000_notifications': notifications,
 }
