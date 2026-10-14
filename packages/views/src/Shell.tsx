@@ -143,10 +143,8 @@ const styles = stylex.create({
     backgroundColor: colors['--background'],
     color: colors['--foreground-default'],
   },
-  // The peek in the sidebar's slot fits the room beside the sidebar by this box's width (`cqw`).
   panes: {
     flexDirection: 'row',
-    containerType: 'inline-size',
   },
   // Holds the sidebar at the width set on it, and the edge.
   sidebarSlot: {

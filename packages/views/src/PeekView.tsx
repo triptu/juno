@@ -49,8 +49,8 @@ export function PeekView({ title, where, art, children }: PeekViewProps) {
 
 const styles = stylex.create({
   // Beside the sidebar's slot (its containing block), over the workspace.
-  // The width gives way when the shell (the query container) has less room
-  // right of the sidebar than the token.
+  // The width gives way when the window has less room right of the sidebar
+  // than the token. The shell fills the window, so `100vw` is its width.
   place: {
     position: 'absolute',
     top: layout['--titlebar-height'],
@@ -59,7 +59,7 @@ const styles = stylex.create({
     zIndex: z['--z-menu'],
     display: 'flex',
     width: layout['--peek-width'],
-    maxWidth: `calc(100cqw - 100% - 2 * ${spacing['--space-2']})`,
+    maxWidth: `calc(100vw - 100% - 2 * ${spacing['--space-2']})`,
   },
   panel: {
     display: 'flex',
