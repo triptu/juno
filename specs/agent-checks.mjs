@@ -48,6 +48,7 @@ export const actionCases = [
   ['raiseClick', 'oneRaisePerClick'],
   ['overReportCap', 'noAdmissionOverCap'],
   ['capReached', 'noAdmissionOverCap'],
+  ['menuSchedule', 'scheduleFromOwnerAuthority'],
 ]
 
 export const recoveryCases = [

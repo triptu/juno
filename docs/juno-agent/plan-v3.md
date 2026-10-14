@@ -347,6 +347,7 @@ Fakes for all three servers (WP10) mirror the shapes above. Real adapters are bu
 ### 11.1 Schedules
 - `schedule_create({ at | every | wallClock (time, time zone, weekdays), reason, prompt, deliver: now | digest | silent, source_op })` works with no click only in a clean owner run. `source_op` must be an owner input from that run, and the call mints the schedule's grant. In a tainted owner run it returns a `proposedSchedule` card instead. Start on that card is the owner's click; its op becomes `source_op` and mints the grant (§6.4, G6). Wake and report runs get neither path.
 - From wake and report runs, only `schedule_pause` and `schedule_delete` on the schedule that woke them are available.
+- A **reply watch** is a schedule with `unlessReply`; the scheduler settles it without a wake when a reply arrives. From a message's menu the owner's click creates it in code, as a third owner authority beside a clean run and a `proposedSchedule` click (§19.2).
 - No count or interval limits (O5): the daily spend cap bounds what wakes cost.
 - Wakes are admitted once per `(schedule_id, schedule_rev, due_at)` through the inbox, revalidating the revision and the grant first.
 - A missed wake is coalesced and admitted once at the next launch. A wake run with nothing worth saying marks no bubble, so the chat shows nothing; Activity records that it ran.
@@ -368,17 +369,18 @@ Fakes for all three servers (WP10) mirror the shapes above. Real adapters are bu
 | `sendMessage` | `messages[1..5]: { target pill, text (editable), result }`, `because?` | Send (all), Dismiss | A result per row: "Sent · Open" or "Not sent · Try again"; the card's status derives from the rows (`sendMessageStatus`) |
 | `resolve` | topics[] | Resolve, Dismiss | "Resolved 3 · Undo" |
 | `topics` | links | open | none |
-| `proposedTask` | kind, title, where | Start, Dismiss | "Started" |
-| `task` | job, title, where, phase (`running`, `needsYou`, `quiet`, `lostSight`, `stopping`, then `done`, `failed` or `stopped`; a recorded `unknown` shows as `failed`), live state. No `status`: `phase` is its only machine. `lostSight` reads "Sign in to T3 Code to keep watching" and Open becomes Sign in | Open, Stop | "Done · Open PR 412", "Failed · Show in Activity" or "Stopped" |
+| `proposedTask` | kind, title, where, and for T3 the project and base branch (§19.6) | Start, Dismiss | "Started" |
+| `task` | job, title, where (for T3 the project and branch, §19.6), phase (`running`, `needsYou`, `quiet`, `lostSight`, `stopping`, then `done`, `failed` or `stopped`; a recorded `unknown` shows as `failed`), live state. No `status`: `phase` is its only machine. `lostSight` reads "Sign in to T3 Code to keep watching" and Open becomes Sign in | Open, Stop | "Done · Open PR 412", "Failed · Show in Activity" or "Stopped" |
 | `question` | source header ("T3 Code asks", "Juno asks"), prompt, 2–4 options, free text | option, Reply | "You chose …" or "You replied" |
 | `proposedSchedule` | what, when, deliver, and `prompt`, the instruction each wake will run, all **rendered from the stored payload** (G6) | Start, Dismiss | "Started" |
 | `schedule` | what, when, deliver | Keep, Pause, Delete | "Kept", "Paused" or "Deleted" |
 | `connect` | server, scopes, what leaves the machine | Connect, Skip | "Connected" |
-| `change` | server, target, a field preview **rendered from the payload**, model caption | Apply, Dismiss | "Applied · Open" |
+| `change` | server, target, a field preview **rendered from the payload**, model caption | Apply, Dismiss | "Applied · Open", or "Applied · Undo" for a local change (§19.4) |
 | `remove` | messages, only for a removal Juno proposes; the owner's Remove is the local sheet (§4.5) | Remove, Keep | "Removed 2 messages" |
 | `budget` | spend today, cap | Allow $1 more today, Wait until tomorrow | "Allowed until midnight" |
 | `provider` | "Choose a model provider": OpenRouter key or Codex, with the fixed disclosure | Set up | "Using Claude Sonnet 5.5" |
 
+- A dismissal or expiry is recorded and reaches the model's next request as a no (§19.5).
 - The model cannot invent a kind. Cards expire after 7 days, or when the source changes ("Expired · Ask again"). An unknown kind renders "This card needs a newer Juno".
 - **The view summarizes; the record keeps the evidence** (W12). `agent-cards` keeps every attempt per child (`ChildEvidence`), including an `unknown` attempt after a later attempt succeeded, and both `cancel-requested` and `cancelled`. The card shows one result per row and one status per card: a row is `sending` while any attempt is unsettled (including `cancel-requested`), `sent` once any attempt has a receipt, and `failed` otherwise, whether every attempt was rejected or cancelled or one may have landed (O2). Activity lists every attempt with its evidence. Why: the owner decides from the row, and two cancellation states or an attempt history would not change what they can do there.
 - **Approval identities travel beside the view** (W13). The chat contract (`agent-contract/src/chat`) carries no revisions, digests or action ids. The renderer RPCs (`agent-contract/src/rpc`) send a `CardBinding` (card revision and digest, plus each child's action id, revision and digest) with each card, and a click returns it. Editing a send's text stores a new proposal with a new revision. Scheduled and Remembers snapshots carry revisions the same way. Why: views take props and return ids; the binding is checked by the agent, so no view can compose or alter it.
@@ -490,7 +492,7 @@ The property names and meanings below follow `review/astra-v2.md`. Where this pl
 **WP3 `specs/agent-actions.qnt`, safety:**
 
 - Astra's 21: `intentBeforeDispatch`, `approvalExact`, `approvalCurrentAtAuthorization`, `approvalConsumption`, `noHiddenRetry`, `retryRequiresAuthority` (now `noRepeatAuthorization`, O2), `unknownPreserved`, `dedupeIdentityStable`, `dedupedEffectOnce`, `receiptMatchesAction`, `scopedNoClickGrant`, `untrustedCannotGrant`, `tier4NeverDispatched`, `allWritesGated`, `currentOwnerAuthorizes`, `pauseBlocksAuthorization`, `scheduleGrantValid`, `occurrenceAdmissionOnce`, `cancelWinsBeforeAdmission`, `batchEffectsIndependent`, `outcomeEvidenceStable`.
-- Changed: `quietHoursHoldAuthorization` is replaced by `quietHoursHoldNotifications`: no OS notification in quiet hours unless the schedule is `now` (H4). `scheduleFromCleanOwnerRun` becomes `scheduleFromOwnerAuthority`: every schedule has a source from a clean owner run or an owner click on a current `proposedSchedule` card (G6). `currentOwnerAuthorizes` is the local check only (G7).
+- Changed: `quietHoursHoldAuthorization` is replaced by `quietHoursHoldNotifications`: no OS notification in quiet hours unless the schedule is `now` (H4). `scheduleFromCleanOwnerRun` becomes `scheduleFromOwnerAuthority`: every schedule has a source from a clean owner run, an owner click on a current `proposedSchedule` card (G6), or the owner's Tell me if nobody replies click while the owner may authorize (§19.2). `currentOwnerAuthorizes` is the local check only (G7).
 - Added: `cleanRunForNoClick`: a no-click Tier 2 start happens only in a clean owner run (R8). `capHard`: reserved plus actual spend never exceeds the cap plus the owner's raises, with compaction inside it (R15, G5). `scheduleFromOwnerAuthority` (B2, G6) is above.
 - `authorizeDispatch`, `transportSend`, `destinationAccept` and `recordReceipt` are separate actions.
 
@@ -533,6 +535,7 @@ The property names and meanings below follow `review/astra-v2.md`. Where this pl
 | 29 | Release, checkpoint, publish, then a crash and reopen of the old Mac (G10) | recovery |
 | 30 | A fresh Mac restores from a folder whose newest generation predates the last removal (G13) | recovery (kept as a counterexample, plus the strict-phrase correction) |
 | 31 | A crash between raising the keychain deletion record and the redaction commit (G13) | recovery |
+| 32 | Juno is paused, then the owner clicks Tell me if nobody replies (§19.2) | actions |
 
 The due-against-push check (t = 0…20,000) is a TypeScript property test in WP5.
 
@@ -625,10 +628,85 @@ S4 (how to reach T3) is resolved by the owner and replaced by S8.
 | **M6 Codex** | WP20 | Sol via Codex in the picker. ChatGPT sign-in if feasible |
 | **M7 Ownership** | WP21, flow 14 | |
 
-Each UI milestone ends with the design and performance reviews. WP23 runs from M2 onward. `m1-review.md` sets M2's launch order. It splits WP13 into a host side (`agent-juno`, `engine/src/agent-host`, the outbox mode, the desktop process wiring), which needs only the WP6 contracts and starts with WP8, and a wire-up (`state/src/agent`, removing `chat` from `ai`, the protocol-2 switch), which needs WP11.
+The ideas adopted on 10-14 16:40 add work to WP7, WP11, WP12, WP13, WP14, WP15, WP18, WP19 and WP23, and to M10 notifications; §19 lists it per idea. Each UI milestone ends with the design and performance reviews. WP23 runs from M2 onward. `m1-review.md` sets M2's launch order. It splits WP13 into a host side (`agent-juno`, `engine/src/agent-host`, the outbox mode, the desktop process wiring), which needs only the WP6 contracts and starts with WP8, and a wire-up (`state/src/agent`, removing `chat` from `ai`, the protocol-2 switch), which needs WP11.
 
 ## 18. Open questions for the owner
 
 Answered by the owner on 10-14 (see §1): T3 sessions run with full access in a new worktree; the backup is a local folder; Sign in with ChatGPT is not planned; T3 over the network needs the switch, off by default.
 
 The five questions listed here on 10-14 were answered the same day (O3, O4): the owner bubble is B; Juno says "I"; every T3 Code start is a one-tap card, which replaces the clean-run narrowing for starts; a restore while the old Mac still runs is an accepted v1 limit (G7, `staleOwnerCannotAuthorize` stays a documented counterexample); and "Rotate recovery phrase after removals" stays off by default (G13, `staleFolderCannotRestoreRemoved` stays a documented counterexample). No question is open now.
+
+## 19. Ideas adopted from the product research (10-14 16:40)
+
+The owner adopted six ideas from `docs/research/agent-native-chat-products.md` (decision log, 10-14 16:40). SPEC states the behaviour; this section says who builds each one and what it changes. Length, timing and wording stay the model's judgement (O5). The only hard rules are the existing safety ones: one click per outward action, no automatic repeat, the spend cap, untrusted content and the speed budgets. No idea adds a settings page.
+
+### 19.1 Sources on every Slack claim (SPEC 13.1)
+
+**Belongs to** WP11 (parse and check), WP7 (contract), WP12 (view), WP14 (open), WP23 (eval).
+
+- **Output.** Every message in a Slack read result (`slack_search`, `slack_history`, `slack_replies`, `slack_topics`) gets a short handle (`m3`) that the run maps to `{ channelId, ts }`. Inside a `<say>` block the model wraps the words of a claim in `<src m="m3">words</src>`. Handles keep the prompt small, and an invented id cannot resolve.
+- **Check.** The router resolves each handle against the handle table of the current run only. An unknown handle renders as plain text. Nothing calls Slack at render time.
+- **Contract (WP7).** `JunoInline` gains `source { text, channelId, ts, label }`, where `label` is the place and time for the tooltip ("#eng · 14:02"). `OpenTarget` gains `message { channelId, ts }`.
+- **View (WP12).** `JunoBubble`'s inline renders `source` as the citation `TextButton` (`data-source`), with the label as its tooltip.
+- **Open (WP14).** `message` opens the topic that holds the message (its thread, or Main) at that message, in the current tab or a new one with ⌘, and flashes it. It reuses the open-topic path with a target `ts`.
+- **Prompt and eval.** The prompt says that claims about Slack carry a source. The eval adds the share of Slack claims with a source, and checks that no unresolved handle renders as a link.
+- **Hours-start summary** (decided 10-14 23:25). The engine's `hoursStartSummary` (M10) also hands its list to the agent through the host port (WP13). The agent appends one Juno message with origin `summary` and one `source` inline per message, with no run and no model call, so it costs no spend. Clicking the OS notification opens the Juno tab at that message. Contract (WP7): `Origin` gains `summary { at }`, labelled "Summary". With AI assist off there is no chat, and the click opens the first message.
+- **Specs.** None.
+
+### 19.2 Reply watches and the nudge draft (SPEC 13.6, principle 5)
+
+**Belongs to** WP19 (scheduler), WP13 (host port), WP7 (contract), WP14 (menu wiring), WP11 (prompt). Milestone M5.
+
+- **A watch is a schedule.** `schedule_create` takes an optional `unlessReply: { channelId, ts, threadTs?, from: 'others' | userIds[] }` together with `at` (the deadline). `others` means anyone but the owner. The rules of §11.1 apply unchanged: no click in a clean owner run, otherwise a `proposedSchedule` card. The model picks `from` and `at` from the owner's words, or by its own judgement.
+- **The menu path** (decided 10-14 23:25). "Tell me if nobody replies" creates the watch in code, with no run and no model call. The click is an owner op through the inbox (WP14 to WP13), and it is the authority: it mints the schedule's grant the way a `proposedSchedule` click does, so taint does not matter and nothing depends on the prompt. Defaults, a short rule in code chosen over a model call because it is free, instant and the same every time: `from: 'others'`, and `at` is the same time on the owner's next notification day, moved to the start of notification hours when that time is outside them (the hours of SPEC 14). The fixed `prompt` tells the wake to check the thread and draft a nudge. The scheduler then posts a `schedule` card into the chat with no bubble, and the renderer shows a toast with Undo, which deletes the watch. The item is disabled while `mayAuthorize` is false (paused, AI off, another Mac). To change the time or who must reply, the owner replies to the card or says so; Juno replaces the watch in that clean owner run.
+- **The reply check is code, not the model.** The scheduler settles a watch as replied when the local store has a message in the thread of `ts` (or after `ts` in Main when there is no thread), newer than `ts`, from `from`. It checks on each new message in that conversation (a host port event, WP13) and once at the deadline, after the host refreshes that conversation. A settled watch never wakes, so it costs nothing.
+- **When it runs out.** The wake runs like any other and is tainted, since it reads the thread. Juno may propose a `sendMessage` card with the nudge text: Tier 3, one click, as always. The card's source is the watched conversation, so a reply arriving while it is open expires it under the existing rule (§12). Delivery follows the schedule's `deliver`, `now` by default.
+- **One shot.** The watch is deleted after its wake. A wake run may only pause or delete the schedule that woke it (§11.1), so Juno cannot set the watch again. A new watch needs the owner.
+- **Contract (WP7).** `chat.send`'s `context` (a `Place` today) becomes a union of `place` (today's), `person` and `channel` (19.3). The menu path is a new RPC, `schedule.watchReply { channelId, ts, threadTs? }`, which returns the watch's `at` for the toast. The Schedule card and the Scheduled page are unchanged: a watch reads "Tell you if nobody replies to Sam" with "Until Thu 17:00".
+- **Spec (`specs/agent-actions.qnt`).** No protocol change. A reply that settles a watch is the existing `deleteSchedule` transition, taken by the scheduler: it bumps `scheduleRev` and drops the schedule's grant, so `cancelWinsBeforeAdmission` already covers a reply that lands after the wake is queued or admitted but before it starts. A reply after the wake starts is seen by the run itself. The nudge is an ordinary Tier 3 intent and already needs an approval in any run (`allWritesGated`). The chat path is a clean owner run whose source is in the run, which `scheduleFromOwnerAuthority` already accepted. The menu path is a third authority, modelled as `scheduleFromMenu`: it needs `mayAuthorize` and nothing about the run, sets `scheduleAuthority: "menu"` and mints the grant. `scheduleFromOwnerAuthority` and `untrustedCannotGrant` accept it only when the owner could authorize at the click. The directed pair `menuSchedule` (pause, then the menu click) shows the broken guard violating `scheduleFromOwnerAuthority`, and the witness `menuScheduleWitnessStep` shows a menu click creating the watch after a report tainted the run.
+
+### 19.3 Ask Juno about a person or channel (SPEC 5, 7)
+
+**Belongs to** the app's menus (channel menu, new person menu; inventory §15.2 and §15.6), WP14 (wiring and the About chip container), WP12 (the chip and the About line), WP7 (contract), WP11 (turn state).
+
+- **Contract (WP7).** The `person { userId, name }` and `channel` (a `Place`) variants of the send context (19.2). The About line renders all three.
+- **Request (WP11).** A person or channel context adds one line to turn state naming it, in place of the topic and the messages on screen. A name and an id are not untrusted content, so the run stays clean until Juno reads.
+- **Reads.** No new tool: `slack_search` with `from:` and mention queries covers a person, and `slack_topics` and `slack_history` cover a channel, within the read lane budget.
+- **Speed.** Opening the panel with the chip keeps the panel's one-frame budget.
+- **Specs.** None.
+
+### 19.4 Corrections teach (SPEC 14, 13.9)
+
+**Belongs to** M10 notifications (the notification settings tool in the backlog, and the gate reading What matters), WP15 (policy), WP7 and WP12 (the `change` card's Undo).
+
+- **Tool.** `notifications_get` and `notifications_set({ whatMatters?, levels?, hours? })`. `whatMatters` is always the whole new text, never an append, so the change can be shown and undone as one value.
+- **Policy (WP15).** In a clean owner run `notifications_set` is Tier 1, with "Notifications changed · Undo". In a tainted run (Tell Juno quotes the message) it returns a `change` card: server "Notifications", target "What matters to you", one `long` field with the old and new text. Apply makes the change.
+- **Contract (WP7).** The `change` card's applied state gains an optional `undo`, so it reads "Applied · Undo" for a local change. WP12 renders it.
+- **Prompt.** Whether a correction is a one-off or a pattern, and whether to ask first, is the model's judgement.
+- **Specs.** None. A clean-run Tier 1 change follows the rule `remember` follows, and the card path is an ordinary approval.
+
+### 19.5 Dismissals say no (SPEC 13.3)
+
+**Belongs to** WP15 (record) and WP11 (request). No view change.
+
+- **Record (WP15).** Dismiss, Skip, Keep on a `remove` card, and expiry write a card outcome to the archive: `{ cardId, kind, outcome: declined | expired, summary }`. It is Juno-internal state, so it does not taint a run.
+- **Request (WP11).** The next request carries it at its place in the chat, as `<card-outcome card="c7" outcome="declined">Send message to #eng</card-outcome>`. It starts no run; it waits for the next input. Compaction keeps it like a message, so a no is remembered.
+- **Eval (WP23).** After a dismissal, Juno does not propose the same card again unless the owner asks or its source changed.
+- **Specs.** None. To `agent-memory.qnt` the outcome is one more archive entry with an opaque payload.
+
+### 19.6 Coding hand-off (SPEC 13.4)
+
+**Belongs to** WP18 (T3 adapter), WP7 (contract), WP12 (Task card), WP15 (superseding a proposal), WP11 (prompt). Milestone M4.
+
+- **Project and branch.** `t3_start({ project, baseBranch, title, brief, planFirst })`. `proposedTask` shows the project and the branch it starts from ("juno · from main"); `task` shows the project and the session's branch, read from `t3_worktree_status` ("juno · fix-sidebar-flake"). Both are in the digest already, since they are arguments (§6.2).
+- **Contract (WP7).** `proposedTask` and `task` gain `project` and `branch`, optional for `kind: subagent`, which keeps `where` for its model.
+- **Correcting a guess (WP15).** A new `proposedTask` may name the card it `replaces`; that open card expires.
+- **Plan first.** `planFirst` is the model's choice. The adapter starts the session in T3's plan mode when the server offers it, or else adds "write a plan, then wait for approval" to the brief. The plan comes back as a pending request, which is already a `question` card headed "T3 Code asks" (Tier 3 `t3_respond`). No new card.
+- **The cause.** The watcher's done report carries the session's last message, cut like any tool result (§10.1), so Juno can say what the cause was. The Task card's after-line stays fixed copy.
+- **Specs.** None. `t3_start` is still always a card (O3).
+
+### 19.7 For the owner
+
+- The nudge draft is the one place Juno writes in the owner's voice. Principle 5 and SPEC 15 now say so.
+- Decided 10-14 23:25: the menu's watch is created in code with a default wait from a rule (one notification day), and asks no wait time; the hours-start summary is also a chat message, and its notification opens the chat there.
+- A correction that came through Tell Juno costs a click (a Change card), because the quoted message is Slack content. A correction typed without a quote needs none.
