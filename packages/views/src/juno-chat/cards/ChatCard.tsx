@@ -275,6 +275,8 @@ const styles = stylex.create({
     justifyContent: 'flex-end',
     gap: spacing['--space-1-5'],
     width: '100%',
+    // The task card prints its after-line here: the slot keeps the buttons' height either way.
+    minHeight: sizes['--control-30'],
     transitionProperty: 'opacity',
     transitionDuration: motion['--duration-fast'],
     transitionTimingFunction: motion['--ease-out'],

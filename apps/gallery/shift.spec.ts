@@ -38,7 +38,7 @@ const interactive = [
 const perState = 8
 
 /** The tests split the components between them so they run in parallel. */
-const shards = 6
+const shards = 8
 
 /** Deals components out, biggest first, to whichever part has the fewest states so far. */
 function partsOf(routes: ReadonlyArray<Route>): string[][] {
@@ -384,8 +384,9 @@ test.describe('Juno chat', () => {
       await expectNoLayoutShift(page, () => page.getByRole('button', { name: 'Next banner' }).click())
       expect(await title.boundingBox()).toEqual(titleBox)
       expect(await menu.boundingBox()).toEqual(menuBox)
-      const chip = await page.locator('[data-banner]').getAttribute('data-banner')
-      if (chip !== null) seen.add(chip)
+      for (const chip of await page.locator('[data-banner]').evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-banner')))) {
+        if (chip !== null) seen.add(chip)
+      }
     }
     expect([...seen].toSorted()).toEqual(['aiOff', 'offline', 'otherDevice', 'paused', 'recovery', 'updateNeeded'])
   })

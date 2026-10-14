@@ -68,7 +68,6 @@ export default defineFixtures(
       because: card(sendMessage('s9', open, [results.pending], { because: 'a message from #eng was in this reply' })),
       'may-have-happened': card(sendMessage('s10', mayHaveHappened)),
       dismissed: card(sendMessage('s11', dismissed)),
-      expired: card(sendMessage('s12', expired)),
     },
     Resolve: {
       open: card(resolve('r1')),
@@ -76,11 +75,11 @@ export default defineFixtures(
       working: card(resolve('r3', working)),
       resolved: card(resolve('r4', done('Resolved 2', { undo: true }))),
       expired: card(resolve('r5', expired)),
+      'may-have-happened': card(resolve('r6', mayHaveHappened)),
     },
     Topics: {
       links: card(topicsCard('t1')),
       'link-hover': card(topicsCard('t2'), { width: 600, padded: true, hover: '[data-topic-link]' }),
-      'link-focus': card(topicsCard('t3'), { width: 600, padded: true, focus: '[data-topic-link]' }),
     },
     Task: {
       running: card(task('k1', 'running', { state: 'Tests running, 2 of 5', open: thread })),
@@ -106,7 +105,6 @@ export default defineFixtures(
       'free-text': card(question('q3', 'juno', true)),
       chose: card(question('q4', 'juno', false, done('You chose Keep both'))),
       replied: card(question('q5', 't3', true, done('You replied'))),
-      expired: card(question('q6', 'juno', false, expired)),
     },
     Schedule: {
       open: card(schedule('h1')),
