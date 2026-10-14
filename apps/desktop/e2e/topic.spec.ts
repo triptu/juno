@@ -64,6 +64,20 @@ test('Main shows thread links; a link opens the thread in the tab, and Threads l
   threads = await juno.topic.openThreads()
   await threads.subscribe(CHECKOUT)
   await juno.sidebar.row(CHECKOUT).expectVisible()
+
+  // Escape with focus inside the list (on the bell just pressed) puts focus back on the Threads button.
+  await juno.win.keyboard.press('Escape')
+  await expect(threads.root).toHaveCount(0)
+  await expect(juno.topic.threadsButton).toBeFocused()
+
+  // From the keyboard: Tab reaches the rows, which are buttons named by their title; Escape returns to the Threads button.
+  threads = await juno.topic.openThreadsWithKeyboard()
+  await juno.win.keyboard.press('Tab')
+  await expect(threads.root.getByRole('button').first()).toBeFocused()
+  await expect(threads.row(CHECKOUT)).toBeVisible()
+  await juno.win.keyboard.press('Escape')
+  await expect(threads.root).toHaveCount(0)
+  await expect(juno.topic.threadsButton).toBeFocused()
 })
 
 test('a #channel chip scopes the sidebar to that channel', async ({ juno }) => {
@@ -132,4 +146,16 @@ test.describe('a long thread', () => {
     expect(await juno.topic.rowTop(anchor.ts)).toBeCloseTo(anchor.top, 0)
     expect(report.shifts).toEqual([])
   })
+})
+
+test('at the minimum window size the Threads list stays inside the workspace', async ({ juno, app, win }) => {
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.setSize(720, 480))
+  await juno.signIn()
+  await juno.waitForSync()
+  await juno.sidebar.row(ENG_MAIN).open()
+  const threads = await juno.topic.openThreads()
+  const pane = (await win.getByRole('region', { name: 'Workspace' }).boundingBox())!
+  const list = (await threads.root.boundingBox())!
+  expect(list.x).toBeGreaterThanOrEqual(pane.x)
+  expect(list.x + list.width).toBeLessThanOrEqual(pane.x + pane.width)
 })

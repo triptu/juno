@@ -1,0 +1,138 @@
+import * as stylex from '@stylexjs/stylex'
+import type { ReactNode, Ref } from 'react'
+import { chatCopy, type Banner, type ChatItem } from '@juno/agent-contract'
+import { layout, sizes, spacing } from '@juno/tokens/tokens.stylex'
+import { ScrollArea, Text } from '@juno/ui'
+import type { ChatActions } from './commands'
+import { DaySeparator } from './DaySeparator'
+import { EmptyChat } from './EmptyChat'
+import { GroupLabel } from './GroupLabel'
+import { JunoBubble } from './JunoBubble'
+import { Note } from './Note'
+import { OwnerBubble } from './OwnerBubble'
+import { StatusBubble } from './StatusBubble'
+import { NewDivider } from '../NewDivider'
+
+export interface JunoChatListProps {
+  readonly items: ReadonlyArray<ChatItem>
+  readonly banner: Banner
+  /** Items exist outside the window; the container fills the edge slots as the owner scrolls near them. */
+  readonly moreAbove: boolean
+  readonly moreBelow: boolean
+  /** Epoch milliseconds, for the times. */
+  readonly now: number
+  readonly actions: ChatActions
+  /** A suggestion pill in the empty state was clicked. */
+  readonly onSuggest: (text: string) => void
+  /** The scroll element, for the container's open position and stick-to-bottom. */
+  readonly scrollRef?: Ref<HTMLElement>
+  /** The "New" divider, for the container to open the chat at it. */
+  readonly anchorRef?: Ref<HTMLDivElement>
+  /** The edge slots, for the container's IntersectionObserver that asks for more items. */
+  readonly topEdgeRef?: Ref<HTMLDivElement>
+  readonly bottomEdgeRef?: Ref<HTMLDivElement>
+  /** Play the empty state's entrance. Pass false when it was visible less than a second ago. */
+  readonly enterEmpty?: boolean
+}
+
+/**
+ * The one long chat (SPEC 13.1): bubbles, cards, the status bubble while
+ * a run is active, and the separators, in the centred 720px column. Rows
+ * stay in flow with `content-visibility: auto`, as the message list does,
+ * so the browser's scroll anchoring handles prepends and nothing runs on
+ * scroll; the container owns the position through `scrollRef`. The edge
+ * slots above and below have a fixed height whether or not more items
+ * exist, so a page arriving never moves the rows.
+ */
+export function JunoChatList({ items, banner, moreAbove, moreBelow, now, actions, onSuggest, scrollRef, anchorRef, topEdgeRef, bottomEdgeRef, enterEmpty = true }: JunoChatListProps) {
+  const empty = items.length === 0
+  return (
+    <ScrollArea scrollbar="hover" ref={scrollRef} data-scroll="" sx={styles.scroller}>
+      <div role="list" aria-label="Juno chat" {...stylex.props(styles.column)}>
+        <div ref={topEdgeRef} data-chat-edge={moreAbove ? 'more' : 'end'} aria-hidden {...stylex.props(styles.edge)} />
+        {empty ? <EmptyChat onSuggest={onSuggest} enter={enterEmpty} /> : null}
+        {items.map((item) => (
+          <Row key={keyOf(item)} item={item} now={now} actions={actions} anchorRef={anchorRef} />
+        ))}
+        {banner._tag === 'aiOff' ? (
+          <div {...stylex.props(styles.aiOff)}>
+            <Text variant="preview" tone="muted">
+              {chatCopy.banner.aiOff.line}
+            </Text>
+          </div>
+        ) : null}
+        <div ref={bottomEdgeRef} data-chat-edge={moreBelow ? 'more' : 'end'} aria-hidden {...stylex.props(styles.edge)} />
+      </div>
+    </ScrollArea>
+  )
+}
+
+/** The row key: the op for an owner bubble (it exists before the archive row), the id otherwise. */
+function keyOf(item: ChatItem): string {
+  switch (item._tag) {
+    case 'owner':
+      return `o:${item.opId}`
+    case 'juno':
+      return `j:${item.id}`
+    case 'status':
+      return `s:${item.runId}`
+    case 'note':
+      return `n:${item.id}`
+    case 'groupLabel':
+      return `g:${item.id}`
+    case 'day':
+      return `d:${item.at}`
+    case 'newDivider':
+      return 'new'
+  }
+}
+
+function Row({ item, now, actions, anchorRef }: { readonly item: ChatItem; readonly now: number; readonly actions: ChatActions; readonly anchorRef: Ref<HTMLDivElement> | undefined }): ReactNode {
+  switch (item._tag) {
+    case 'owner':
+      return <OwnerBubble item={item} now={now} actions={actions} />
+    case 'juno':
+      return <JunoBubble item={item} now={now} actions={actions} />
+    case 'status':
+      return <StatusBubble item={item} actions={actions} />
+    case 'note':
+      return <Note item={item} actions={actions} />
+    case 'groupLabel':
+      return <GroupLabel item={item} actions={actions} />
+    case 'day':
+      return <DaySeparator at={item.at} now={now} />
+    case 'newDivider':
+      return <NewDivider ref={anchorRef} count={item.count} />
+  }
+}
+
+const styles = stylex.create({
+  scroller: {
+    flexGrow: 1,
+    width: '100%',
+  },
+  column: {
+    display: 'flex',
+    flexDirection: 'column',
+    width: '100%',
+    maxWidth: layout['--page-width'],
+    minHeight: '100%',
+    marginInline: 'auto',
+    paddingTop: spacing['--space-10'],
+    paddingInline: spacing['--space-8'],
+    paddingBottom: spacing['--space-6'],
+    boxSizing: 'border-box',
+  },
+  // A fixed slot at each end, so a page arriving never moves the rows.
+  edge: {
+    height: sizes['--control-18'],
+    flexShrink: 0,
+  },
+  aiOff: {
+    display: 'flex',
+    justifyContent: 'center',
+    paddingTop: spacing['--space-5'],
+    textAlign: 'center',
+    userSelect: 'none',
+  },
+})

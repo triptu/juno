@@ -871,6 +871,9 @@ importers:
 
   packages/views:
     dependencies:
+      '@juno/agent-contract':
+        specifier: workspace:*
+        version: link:../agent-contract
       '@juno/contract':
         specifier: workspace:*
         version: link:../contract

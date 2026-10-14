@@ -34,8 +34,9 @@ export function Reactions({ reactions, onToggle }: ReactionsProps) {
             <span>{reaction.count}</span>
           </>
         )
+        // The emoji is hidden and the title is not read reliably, so the item carries the words.
         return onToggle === undefined ? (
-          <span role="listitem" key={reaction.name}>
+          <span role="listitem" aria-label={label} key={reaction.name}>
             <Chip variant={reaction.me ? 'soft' : 'outline'} size={24} numeric title={label}>
               {content}
             </Chip>

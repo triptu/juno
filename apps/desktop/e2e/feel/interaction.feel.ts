@@ -1,6 +1,7 @@
 // Hover and press feedback, and popovers, on the default seed.
 import { expect } from '@playwright/test'
 import { feedbackInOneFrame, landsAndStays, noFlicker, noLayoutShift, opensAtAnchor, opensWhole, type Check } from './checks'
+import { pointAt } from '../driver/juno'
 import { test } from './feel'
 import { tag } from './pane'
 import type { Probe, ProbeFrame } from './recorder'
@@ -54,7 +55,7 @@ test('hover and press feedback', async ({ juno, win, feel }) => {
   })
 
   const theme = await tag(juno.sidebar.themeButton, 'press-button')
-  await juno.sidebar.themeButton.hover()
+  await pointAt(win, juno.sidebar.themeButton)
   await win.waitForTimeout(300)
   await feel.run({ name: 'press-button', title: 'Hold the mouse down on an icon button: the press state shows in the next frame', probes: look(theme), checks: feedback('pointerdown', 'button press') }, async (rec) => {
     await rec.mark('go')
@@ -72,7 +73,7 @@ test('hover and press feedback', async ({ juno, win, feel }) => {
   await win.mouse.move(900, 400)
   await feel.run({ name: 'hover-tab', title: 'Point at an inactive tab: its hover state shows in the next frame', probes: look(tab), checks: feedback('pointerover', 'tab hover') }, async (rec) => {
     await rec.mark('go')
-    await juno.tabs.tab(RINA).hover()
+    await juno.tabs.hover(RINA)
   })
 })
 

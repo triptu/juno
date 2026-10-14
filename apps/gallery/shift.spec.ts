@@ -38,7 +38,7 @@ const interactive = [
 const perState = 8
 
 /** The tests split the components between them so they run in parallel. */
-const shards = 6
+const shards = 12
 
 /** Deals components out, biggest first, to whichever part has the fewest states so far. */
 function partsOf(routes: ReadonlyArray<Route>): string[][] {
@@ -102,7 +102,8 @@ for (let shard = 0; shard < shards; shard++) {
   // The states come from the built gallery, so the list can only be read once
   // a page is open; each component is a step so the report groups by component.
   test(`no interaction shifts the layout, in any state of any component (part ${shard + 1} of ${shards})`, async ({ page }) => {
-    test.setTimeout(10 * 60_000)
+    // Each part walks about forty states, at up to eight elements and six touches each, with a wait per touch for the longest declared motion.
+    test.setTimeout(15 * 60_000)
     const routes = await readRoutes(page)
     const components = partsOf(routes)[shard] ?? []
     const failures: string[] = []
@@ -292,5 +293,102 @@ test.describe('the guard itself', () => {
     )
     const box = (await page.locator('.b').boundingBox())!
     await expect(expectNoLayoutShift(page, () => page.mouse.move(box.x + 10, box.y + 10))).rejects.toThrow('dy 30')
+  })
+})
+
+/**
+ * The Juno chat (SPEC 13): text streams into a bubble, cards settle, the
+ * status bubble comes and goes, and the header's chip changes. None of
+ * that may move what the owner is reading. Scenes with a button are also
+ * pressed by the generic guard above; a change that is meant to move the
+ * list's end (a new last row) is driven through `window.__fixtureControls`
+ * instead, and the test checks the rows above it.
+ */
+test.describe('Juno chat', () => {
+  const open = (page: Page, component: string, id: string) => openState(page, { component, id, route: `${component}/${id}`, group: '', groupId: '', state: '', frame: {} })
+  const step = (page: Page, name: string) => page.evaluate((control) => (window as unknown as { __fixtureControls?: Record<string, () => void> }).__fixtureControls?.[control]?.(), name)
+
+  test('a streaming token joins the bubble without moving anything', async ({ page }) => {
+    await open(page, 'JunoChatList', 'shift/streaming-token')
+    const bubble = page.locator('[data-streaming]')
+    const before = await bubble.textContent()
+    await expectNoLayoutShift(page, () => page.getByRole('button', { name: 'Next token' }).click())
+    expect((await bubble.textContent())?.length).toBeGreaterThan(before?.length ?? 0)
+    await expectNoLayoutShift(page, () => page.getByRole('button', { name: 'Next token' }).click())
+  })
+
+  test('the status bubble appears below the reply and leaves without moving the rows above', async ({ page }) => {
+    await open(page, 'JunoChatList', 'shift/status-between-tokens')
+    const rows = [page.locator('[data-chat-owner]'), page.locator('[data-streaming]'), page.locator('[data-chat-juno] svg')]
+    const before = await Promise.all(rows.map((row) => row.boundingBox()))
+    await step(page, 'status')
+    await expect(page.locator('[data-chat-status]')).toBeVisible()
+    expect(await Promise.all(rows.map((row) => row.boundingBox()))).toEqual(before)
+    await step(page, 'status')
+    await expect(page.locator('[data-chat-status]')).toHaveCount(0)
+    expect(await Promise.all(rows.map((row) => row.boundingBox()))).toEqual(before)
+  })
+
+  test("the status bubble's text changes in place", async ({ page }) => {
+    await open(page, 'JunoChatList', 'shift/status-text-changes')
+    const status = page.locator('[data-chat-status]')
+    const fixed = [page.locator('[data-chat-owner]'), status.locator('svg'), status.locator('i').first()]
+    const before = await Promise.all(fixed.map((el) => el.boundingBox()))
+    const height = (await status.boundingBox())?.height
+    for (let round = 0; round < 3; round++) {
+      await step(page, 'status-text')
+      await page.waitForTimeout(200)
+      expect(await Promise.all(fixed.map((el) => el.boundingBox()))).toEqual(before)
+      expect((await status.boundingBox())?.height).toBe(height)
+    }
+    await expect(status).toContainText('room booking')
+  })
+
+  test('turning AI off adds the line at the end and moves no bubble', async ({ page }) => {
+    await open(page, 'JunoChatList', 'shift/banner-ai-off')
+    const bubbles = page.locator('[data-chat-owner], [data-chat-juno], [data-chat-card]')
+    const before = await bubbles.evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().toJSON()))
+    await step(page, 'ai')
+    await expect(page.getByText('Juno is off. Turn on AI assist in Settings.')).toBeVisible()
+    expect(await bubbles.evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().toJSON()))).toEqual(before)
+  })
+
+  for (const [state, settled] of [
+    ['resolve-settles', 'Resolved 2'],
+    ['send-settles', 'Sent 2'],
+    ['send-fails', 'Not sent'],
+    ['task-state-changes', 'Done'],
+    ['question-settles', 'You chose Keep both'],
+  ] as const) {
+    test(`a ${state.replace(/-/g, ' ')} card keeps its height from the click to the outcome`, async ({ page }) => {
+      await open(page, 'ChatCard', `shift/${state}`)
+      const card = page.locator('[data-chat-card]')
+      const before = await card.boundingBox()
+      await expectNoLayoutShift(page, () => page.getByRole('button', { name: 'Next step' }).click())
+      expect(await card.boundingBox()).toEqual(before)
+      await expectNoLayoutShift(page, async () => {
+        await page.getByRole('button', { name: 'Next step' }).click()
+        await expect(card).toContainText(settled)
+      })
+      expect(await card.boundingBox()).toEqual(before)
+    })
+  }
+
+  test('the banner chip changes without moving the title or the menu', async ({ page }) => {
+    await open(page, 'JunoHeader', 'shift/banner-cycles')
+    const title = page.getByRole('heading', { name: 'Juno' })
+    const menu = page.getByRole('button', { name: 'More' })
+    const titleBox = await title.boundingBox()
+    const menuBox = await menu.boundingBox()
+    const seen = new Set<string>()
+    for (let round = 0; round < 7; round++) {
+      await expectNoLayoutShift(page, () => page.getByRole('button', { name: 'Next banner' }).click())
+      expect(await title.boundingBox()).toEqual(titleBox)
+      expect(await menu.boundingBox()).toEqual(menuBox)
+      for (const chip of await page.locator('[data-banner]').evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-banner')))) {
+        if (chip !== null) seen.add(chip)
+      }
+    }
+    expect([...seen].toSorted()).toEqual(['aiOff', 'offline', 'otherDevice', 'paused', 'recovery', 'updateNeeded'])
   })
 })

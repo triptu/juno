@@ -212,7 +212,7 @@ test('the list scrollbar shows only while the pointer is over the list, and noth
   expect(await thumb()).toBe('rgba(0, 0, 0, 0)')
   const gutterBefore = await width()
 
-  await expectNoLayoutShift(win, () => list.hover({ position: { x: 10, y: 10 } }), { root: 'aside' })
+  await expectNoLayoutShift(win, () => sidebar.hoverList(), { root: 'aside' })
   await expect.poll(thumb).not.toBe('rgba(0, 0, 0, 0)')
   expect(await width()).toBe(gutterBefore)
 

@@ -7,7 +7,7 @@ import { Hash } from '@phosphor-icons/react/dist/icons/Hash'
 import { Lock } from '@phosphor-icons/react/dist/icons/Lock'
 import { User } from '@phosphor-icons/react/dist/icons/User'
 import { Users } from '@phosphor-icons/react/dist/icons/Users'
-import { memo, useId, type FocusEvent, type MouseEvent, type PointerEvent } from 'react'
+import { memo, useId, type FocusEvent, type MouseEvent } from 'react'
 import type { TopicRow as TopicRowModel } from '@juno/contract'
 import { accent, colors, opacity, radii, sizes, spacing, tints } from '@juno/tokens/tokens.stylex'
 import {
@@ -59,17 +59,6 @@ const REOPENED_TITLE = 'New activity after it was resolved'
 const PRIVATE_TITLE = 'Private channel'
 
 /**
- * Hover on a one-line text: while it is cut off, its native tooltip shows
- * the full value; when it fits, there is none. One width read on pointer
- * enter, nothing on render, so a row costs nothing until it is hovered.
- */
-function titleWhenTruncated(event: PointerEvent<HTMLElement>) {
-  const node = event.currentTarget
-  if (node.scrollWidth > node.clientWidth) node.title = node.textContent ?? ''
-  else node.removeAttribute('title')
-}
-
-/**
  * One sidebar row, chat style: the channel icon or the person's photo, then
  * the title and time, a two-line "Sender: text" preview with the @ and count
  * tags, and the meta line with the channel, the people, the Main and
@@ -77,6 +66,10 @@ function titleWhenTruncated(event: PointerEvent<HTMLElement>) {
  * check sits in a slot that is always reserved and shows on hover or
  * keyboard focus, so nothing ever moves. The row activates on mouse down;
  * Resolve on click.
+ *
+ * The row is a focusable list item, not a button: a button's children are
+ * presentational, so the Resolve button inside it would be flattened away.
+ * Enter and Space open it, as on a button.
  */
 export const TopicRow = memo(function TopicRow({ row, time, selected = false, tabbable = true, onOpen, onResolve, onPrefetch, onContextMenu, newThreads = 0 }: TopicRowProps) {
   const titleId = useId()
@@ -107,9 +100,9 @@ export const TopicRow = memo(function TopicRow({ row, time, selected = false, ta
 
   return (
     <div
-      role="button"
+      role="listitem"
       tabIndex={tabbable ? 0 : -1}
-      aria-pressed={selected}
+      aria-current={selected || undefined}
       aria-labelledby={titleId}
       aria-describedby={state === undefined ? previewId : `${stateId} ${previewId}`}
       data-topic-row=""
@@ -137,7 +130,7 @@ export const TopicRow = memo(function TopicRow({ row, time, selected = false, ta
             truncate
             dir="auto"
             id={titleId}
-            onPointerEnter={titleWhenTruncated}
+            tooltipWhenTruncated
             sx={styles.title}
           >
             {row.title}
@@ -187,7 +180,7 @@ export const TopicRow = memo(function TopicRow({ row, time, selected = false, ta
             ) : (
               <Icon icon={whereIcon(row)} size={13} />
             )}
-            <Text variant="meta" tone="muted" truncate dir="auto" onPointerEnter={titleWhenTruncated}>
+            <Text variant="meta" tone="muted" truncate dir="auto" tooltipWhenTruncated>
               {row.channel.name}
             </Text>
           </span>

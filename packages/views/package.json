@@ -13,6 +13,7 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@juno/agent-contract": "workspace:*",
     "@juno/contract": "workspace:*",
     "@juno/tokens": "workspace:*",
     "@juno/ui": "workspace:*",

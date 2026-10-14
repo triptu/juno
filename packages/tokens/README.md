@@ -18,7 +18,8 @@ Import tokens through the subpath, never a barrel: `import { colors } from '@jun
 | Export | Prefix | Examples |
 | --- | --- | --- |
 | `colors` | `--background`, `--surface-*`, `--secondary-*`, `--border-*`, `--foreground-*`, `--accent-*`, `--input-border`, `--overlay`, status | the base palette |
-| `accent` | `--hl`, `--hl-fg`, `--hl-text`, `--hl-soft`, `--hl-nav`, `--hl-rule`, `--hl-ring`, `--focus-ring`, `--selection-background` | the accent and its derived mixes; the only accent variables components use |
+| `accent` | `--hl`, `--hl-fg`, `--hl-text`, `--hl-soft`, `--hl-bubble`, `--hl-nav`, `--hl-rule`, `--hl-ring`, `--focus-ring`, `--selection-background` | the accent and its derived mixes; the only accent variables components use |
+| `chat` | `--owner-bubble-bg` / `-fg`, `--bubble-*`, `--card-max-width`, `--status-*`, `--delay-queued` | the Juno chat: the owner bubble's colour (option B behind two lines) and the status bubble |
 | `accentSwatches` | `--swatch-<accent>` / `-fg` | the eight fills for the accent picker, with a dark override |
 | `tints` | `--tint-<context>-bg` / `-fg` | `public`, `private`, `dm`, `resolved`, `warning`, `mention` |
 | `hues` | `--hue-<name>` | the eight person colours for avatars |
