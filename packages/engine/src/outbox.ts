@@ -10,6 +10,12 @@
  * final failure) is a later milestone and replaces this module without
  * touching the commands' shape: local transaction, mirror, settle.
  *
+ * `sendOnce` is the single-attempt mode for the agent's sends (plan v3
+ * §6.3): one exchange on the `send` lane and no retry, so a call is
+ * submitted at most once. `Offline` then means the answer is unknown, since
+ * Slack may have run the call before the answer was lost; an answer that
+ * does not decode is unknown in the same way.
+ *
  * `exclusive(key)` runs commands on the same target one at a time, so their
  * outcomes never interleave on the same thread. `background(effect)` runs
  * work that outlives a command, such as asking Slack again after a lookup
@@ -34,6 +40,8 @@ export class Outbox extends Context.Service<
      * `send` lane. Fails with `NotSignedIn` when there is no session.
      */
     readonly send: <A>(call: (api: SlackApiShape) => Effect.Effect<A, SlackApiError>) => Effect.Effect<A, MirrorError>
+    /** Like `send`, but one exchange and no retry. `Offline` means Slack may have run it. */
+    readonly sendOnce: <A>(call: (api: SlackApiShape) => Effect.Effect<A, SlackApiError>) => Effect.Effect<A, MirrorError>
     /** Like `send`, on the `interactive` lane: an authoritative lookup after a change, such as a thread's root. */
     readonly lookup: <A>(call: (api: SlackApiShape) => Effect.Effect<A, SlackApiError>) => Effect.Effect<A, MirrorError>
     /** Runs `effect` after every earlier `exclusive` effect with the same key has finished. */
@@ -49,14 +57,17 @@ export class Outbox extends Context.Service<
     Effect.gen(function* () {
       const client = yield* SessionClient
       const onLane =
-        (lane: 'send' | 'interactive') =>
+        (lane: 'send' | 'interactive', singleAttempt = false) =>
         <A>(call: (api: SlackApiShape) => Effect.Effect<A, SlackApiError>) =>
           Effect.gen(function* () {
             const api = yield* client.api
-            const laned: SlackApiShape = { call: (method, args, options) => api.call(method, args, { ...options, lane }) }
-            return yield* call(laned).pipe(Effect.catch(mapSlackError))
+            const laned: SlackApiShape = { call: (method, args, options) => api.call(method, args, { ...options, lane, singleAttempt }) }
+            return yield* call(laned).pipe(
+              Effect.catch((error) => (singleAttempt && error._tag === 'SlackDecodeError' ? Effect.fail(new Offline()) : mapSlackError(error))),
+            )
           })
       const send = onLane('send')
+      const sendOnce = onLane('send', true)
       const lookup = onLane('interactive')
 
       // One permit per key. A key is dropped once nothing holds or waits for it.
@@ -86,7 +97,7 @@ export class Outbox extends Context.Service<
       const background = <A, E>(effect: Effect.Effect<A, E>): Effect.Effect<void> =>
         FiberSet.run(recoveries, Effect.ignore(effect).pipe(Effect.asVoid)).pipe(Effect.asVoid)
 
-      return Outbox.of({ send, lookup, exclusive, background, idle: FiberSet.awaitEmpty(recoveries) })
+      return Outbox.of({ send, sendOnce, lookup, exclusive, background, idle: FiberSet.awaitEmpty(recoveries) })
     }),
   )
 }
