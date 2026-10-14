@@ -94,7 +94,8 @@ export type JunoInline = typeof JunoInline.Type
  * variant adds one fixed line under the bubble from `chatCopy.ending`; the
  * model never writes it, because an aborted or failed run writes nothing.
  *
- * - `stopped`: the owner pressed Stop. "Stopped. Nothing after this was sent."
+ * - `stopped`: the owner pressed Stop. "Stopped. Juno won't start anything new for this reply."
+ *   Work handed off before Stop may still land; its card shows that.
  * - `interrupted`: the process died or the request was refused at the
  *   provider guard. `retry` is the owner op to resubmit, when the run had
  *   one; wake and report runs have none and show no Try again.

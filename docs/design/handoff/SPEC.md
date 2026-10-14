@@ -239,7 +239,7 @@ Juno is also the assistant's name. It is one long chat with one assistant that r
 - **Status text.** The dots stay alone until Juno has something specific to say. The first tool call gives the bubble a line that counts real things ("Reading 3 topics", "Looking back through March"), which changes at most every two seconds. "Thinking" and percentages never appear.
 - **The reply takes the bubble's place.** On the first token the status bubble becomes Juno's reply, in place, and the text streams in. If Juno then reads or calls something before writing more, the status bubble reappears below the reply, and the next token clears it again: the text joins the same bubble, so one reply is one bubble however many steps it took.
 - **One status bubble, for runs only.** It exists while Juno is answering you, a schedule or a job report, and clears when that run ends. Work that goes on in the background (a T3 Code session, a delegate) never shows as the typing bubble; it has a Task card (13.4) and the sparkle on the sidebar's Juno row.
-- **Stop.** Hovering or focusing the status bubble shows Stop. Esc with the composer empty does the same. Stop ends the current run only, never a background job. The reply ends with "Stopped. Nothing after this was sent."
+- **Stop.** Hovering or focusing the status bubble shows Stop. Esc with the composer empty does the same. Stop ends the current run only, never a background job. The reply ends with "Stopped. Juno won't start anything new for this reply." Anything Juno handed off before Stop may still finish, and its card says how it ended.
 - **A run that fails says so.** If the provider does not answer, the line under the reply says what happened and offers Try again: "Juno didn't answer. Give it a moment and try again." A run that ends before its first word shows only the line (13.7).
 
 ### 13.3 Cards
@@ -263,7 +263,7 @@ Anything that leaves Juno, or that Juno wants you to decide, is a card under its
 | Provider | "Choose a model provider": OpenRouter or Codex, with the fixed line that Juno sends its memory of the chat to the provider on every turn | Set up | "Using Claude Sonnet 5.5" |
 
 - **Because.** When Juno proposes a card for something it would otherwise have done quietly (because a message it read in Slack or a report from a job was in the conversation, 13.9), the card carries one line saying why.
-- **One click, one action.** A click authorizes exactly the payload shown, once. A retry is a new click. If Juno cannot tell whether a send landed, the row says so: "Juno can't tell whether this was sent. Check channel · Send again", and Send again says it may duplicate.
+- **One click, one action.** A click authorizes exactly the payload shown, once. A retry is a new click. If Juno cannot tell whether a send landed, the row says so: "Juno can't tell whether this was sent. Check channel · Send again". Every retry of something the destination cannot recognise as a repeat (Send again, Try again, Apply again) says "If the first try went through, this does it again." beside its button, whatever happened the first time.
 - **Expiry.** Cards expire after seven days or when what they refer to changes: "Expired · Ask again". Ask again sends Juno a message quoting the card's request, so a fresh card follows from a fresh read.
 - **Restored.** After a restore from backup (13.8), each pending card reads "This may already have happened." above its buttons until you decide it.
 - **Keyboard.** Every card button is reachable with Tab, and the first option of a question takes Enter.
@@ -308,7 +308,7 @@ Every state the chat can be in, and what it shows.
 | Waiting | "Waiting for network", "Waiting for Resume" or "Waiting for your review" under your bubble. The message is stored and runs when it can |
 | Not delivered | "Not delivered · Try again". Only when Juno could not store the message on this Mac. Try again resubmits the same message |
 | Too long | "That is too long to send as one message. Split it up and send the parts." The message stays in the chat, marked not sent |
-| Stopped | "Stopped. Nothing after this was sent." under the reply |
+| Stopped | "Stopped. Juno won't start anything new for this reply." under the reply |
 | Interrupted | "Juno was interrupted. Your message is kept. Try again". No Try again when a schedule or a job started the run |
 | Failed | One line and Try again: "Juno didn't answer. Give it a moment and try again.", "OpenRouter rejected the key. Check it in Settings.", "Codex is signed out on this Mac. Sign in to Codex and try again.", or "Juno lost the connection. Try again when you are back online." |
 | Blocked | "Juno can't fit this in one request. Removing a pin or starting a smaller task helps." No card |

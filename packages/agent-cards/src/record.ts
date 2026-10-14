@@ -30,11 +30,11 @@ export type CardEvent =
   | { readonly _tag: 'expire' }
   | { readonly _tag: 'result'; readonly status: Extract<P.CardStatus, { _tag: 'done' | 'failed' | 'unknown' }> }
 
-/** Clicks are UI state only. WP15 must validate revision, digest and authority before dispatch. */
+/** A retry of a status marked `mayDuplicate` needs a warned click (Quint `retryRequiresAuthority`). Clicks are UI state only. WP15 must validate revision, digest and authority before dispatch. */
 export function transitionCard(status: P.CardStatus, event: CardEvent): P.CardStatus {
   switch (event._tag) {
     case 'click':
-      return status._tag === 'open' || ((status._tag === 'failed' || status._tag === 'unknown') && event.duplicateWarning)
+      return status._tag === 'open' || ((status._tag === 'failed' || status._tag === 'unknown') && (event.duplicateWarning || status.mayDuplicate !== true))
         ? { _tag: 'working' } : status
     case 'dismiss': return status._tag === 'open' ? { _tag: 'dismissed' } : status
     case 'expire': return status._tag === 'open' ? { _tag: 'expired' } : status

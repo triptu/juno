@@ -24,8 +24,11 @@ import { JobRef, OpenTarget, Place, TopicLink } from './place'
  * `done`, `failed` and `unknown` carry the line the card shows afterwards
  * ("Resolved 3", "Not sent", "Juno can't tell whether this was sent"), so
  * the view prints it and never composes it. `unknown` is an action whose
- * outcome the agent cannot prove either way (plan v3 §6.3); its retry says
- * it may duplicate. An `open` card restored from a backup (plan v3 §14.3)
+ * outcome the agent cannot prove either way (plan v3 §6.3). A `failed` or
+ * `unknown` card whose destination does not deduplicate carries
+ * `mayDuplicate`, and every retry of it shows the duplicate warning,
+ * whatever happened the first time. Slack sends always carry it, so a
+ * Send message row's "Try again" and "Send again" always warn. An `open` card restored from a backup (plan v3 §14.3)
  * carries `mayHaveHappened`: the buttons stay and the card says "This may
  * already have happened." above them.
  */
@@ -46,11 +49,15 @@ export const CardStatus = Schema.Union([
     line: Schema.String,
     /** Offer "Try again". The retry is a new click and a new authorization. */
     retry: Schema.optionalKey(Schema.Literal(true)),
+    /** The destination cannot recognise a repeat: the retry button shows `chatCopy.card.mayDuplicate`. */
+    mayDuplicate: Schema.optionalKey(Schema.Literal(true)),
   }),
   Schema.TaggedStruct('unknown', {
     line: Schema.String,
     /** Where the owner can look: the channel for a send, the thread for T3. */
     check: Schema.optionalKey(OpenTarget),
+    /** As for `failed`. */
+    mayDuplicate: Schema.optionalKey(Schema.Literal(true)),
   }),
 ])
 export type CardStatus = typeof CardStatus.Type
@@ -106,7 +113,7 @@ export type SendMessageCard = typeof SendMessageCard.Type
  * The card status a Send message card takes after Send, from its rows.
  * `working` while any row is unresolved. Then `done` with a count when at
  * least one row was sent, `unknown` when none was and one may have been,
- * and `failed` with a retry when none was.
+ * and `failed` with a retry when none was. Both warn on retry.
  */
 export const sendMessageStatus = (messages: ReadonlyArray<ProposedMessage>): CardStatus => {
   const results = messages.map((m) => m.result._tag)
@@ -114,8 +121,8 @@ export const sendMessageStatus = (messages: ReadonlyArray<ProposedMessage>): Car
   const sent = results.filter((r) => r === 'sent').length
   if (sent === messages.length) return { _tag: 'done', line: sent === 1 ? 'Sent' : `Sent ${sent}` }
   if (sent > 0) return { _tag: 'done', line: `Sent ${sent} of ${messages.length}` }
-  if (results.includes('unknown')) return { _tag: 'unknown', line: "Juno can't tell whether this was sent." }
-  return { _tag: 'failed', line: 'Not sent', retry: true }
+  if (results.includes('unknown')) return { _tag: 'unknown', line: "Juno can't tell whether this was sent.", mayDuplicate: true }
+  return { _tag: 'failed', line: 'Not sent', retry: true, mayDuplicate: true }
 }
 
 export const ResolveCard = Schema.TaggedStruct('resolve', {

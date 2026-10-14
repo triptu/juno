@@ -45,10 +45,11 @@ describe('sendMessageStatus', () => {
     expect(sendMessageStatus([row('a', { _tag: 'notSent' }), row('b', { _tag: 'unknown', check: open })])).toEqual({
       _tag: 'unknown',
       line: "Juno can't tell whether this was sent.",
+      mayDuplicate: true,
     })
   })
 
-  it('fails with a retry when nothing was sent', () => {
-    expect(sendMessageStatus([row('a', { _tag: 'notSent' }), row('b', { _tag: 'notSent' })])).toEqual({ _tag: 'failed', line: 'Not sent', retry: true })
+  it('fails with a warned retry when nothing was sent', () => {
+    expect(sendMessageStatus([row('a', { _tag: 'notSent' }), row('b', { _tag: 'notSent' })])).toEqual({ _tag: 'failed', line: 'Not sent', retry: true, mayDuplicate: true })
   })
 })

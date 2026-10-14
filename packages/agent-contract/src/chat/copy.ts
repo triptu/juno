@@ -35,7 +35,7 @@ export const chatCopy = {
   },
   /** One line per `Ending` variant. `interrupted` and `failed` add "Try again" when the ending carries a retry op. */
   ending: {
-    stopped: 'Stopped. Nothing after this was sent.',
+    stopped: "Stopped. Juno won't start anything new for this reply.",
     interrupted: 'Juno was interrupted. Your message is kept.',
     blocked: {
       tooLarge: "Juno can't fit this in one request. Removing a pin or starting a smaller task helps.",
@@ -78,6 +78,8 @@ export const chatCopy = {
     unknownKind: 'This card needs a newer Juno',
     dismiss: 'Dismiss',
     may: 'This may already have happened.',
+    /** Beside every retry of an action whose destination does not deduplicate, whatever the first outcome (plan v3 §6.3). */
+    mayDuplicate: 'If the first try went through, this does it again.',
     sendMessage: { send: 'Send', sent: 'Sent', notSent: 'Not sent', open: 'Open', unknown: "Juno can't tell whether this was sent.", check: 'Check channel', sendAgain: 'Send again' },
     resolve: { resolve: 'Resolve' },
     task: {

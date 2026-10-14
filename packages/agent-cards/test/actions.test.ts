@@ -55,8 +55,8 @@ describe('child actions and card status', () => {
         if (!receipt && prior === 'submitted' && (event === 'cancel' || event === 'cancelled')) expect(state).toBe('unknown')
         if (prior === 'cancel-requested' && event === 'cancelled') expect(state).toBe('cancelled')
         if (state === 'unknown') {
-          expect(transitionCard({ _tag: 'unknown', line: 'Unknown' }, { _tag: 'click', duplicateWarning: false })._tag).toBe('unknown')
-          expect(transitionCard({ _tag: 'unknown', line: 'Unknown' }, { _tag: 'click', duplicateWarning: true })._tag).toBe('working')
+          expect(transitionCard({ _tag: 'unknown', line: 'Unknown', mayDuplicate: true }, { _tag: 'click', duplicateWarning: false })._tag).toBe('unknown')
+          expect(transitionCard({ _tag: 'unknown', line: 'Unknown', mayDuplicate: true }, { _tag: 'click', duplicateWarning: true })._tag).toBe('working')
         }
       }
       // attemptEvidence: a receipt for attempt 1 must not erase unknown attempt 2.
@@ -64,6 +64,21 @@ describe('child actions and card status', () => {
       expect(childOutcome(evidence)).toBe('sent')
       expect(evidence.attempts[1]?.outcome).toBe(state)
     }))
+  })
+
+  it('asks for a warned retry exactly when the destination cannot recognise a repeat', () => {
+    for (const tag of ['failed', 'unknown'] as const) {
+      expect(transitionCard({ _tag: tag, line: 'Not sent', mayDuplicate: true }, { _tag: 'click', duplicateWarning: false })._tag).toBe(tag)
+      expect(transitionCard({ _tag: tag, line: 'Not sent', mayDuplicate: true }, { _tag: 'click', duplicateWarning: true })._tag).toBe('working')
+      expect(transitionCard({ _tag: tag, line: 'Not resolved' }, { _tag: 'click', duplicateWarning: false })._tag).toBe('working')
+    }
+    const payload = send(['one'])
+    const [child] = expandChildActions(payload)
+    if (child === undefined) throw new Error('Expected a child')
+    const record = Schema.decodeUnknownSync(CardRecord)({ id: 'card', payload, createdAt: 0, sourceValid: true, status: { _tag: 'working' }, children: [evidenceFor(child, 'notSent')] })
+    const view = toCard(record, 1)
+    if (view._tag !== 'sendMessage') throw new Error('Expected send card')
+    expect(view.status).toEqual({ _tag: 'failed', line: 'Not sent', retry: true, mayDuplicate: true })
   })
 
   it('projects every kind and expires only unconsumed proposals', () => {

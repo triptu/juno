@@ -72,6 +72,11 @@ Each finding is accepted (A) and changed in the plan, or rejected (R) with a rea
 | G12 | WP3/WP4 spec gap 8: the export cursor update captures itself, so backup never settles | A. Capture attaches only to replicated tables. Backup bookkeeping is local and never captured | §14.4 |
 | G13 | WP3/WP4 spec gap 9: a fresh Mac has no trusted deletion record | A, partly as a stated limit. A trusted record comes from this Mac's keychain, the move code, or a rotated recovery phrase. Without one, Juno restores the newest generation in the folder and says that removed messages may come back if the folder is out of date. The record reaches the keychain before "Removed" shows | §14.3, §14.4, §18, SPEC §13.8 |
 | P1 | WP5 finding: the 64k minimum for the compaction model is below the §5.3 bound (67,584 tokens) | A. The compaction model needs a window of at least 131,072 tokens, matching the spec | §5.3, §7.1 |
+| W9 | WP6 difference 2: Quint needs a warned click for every repeat of a non-deduplicated action; the plan named only `unknown` | A. Every repeat authorization of a child without dedupe needs a new click with the duplicate warning, whatever the earlier outcome. `agent-cards` already does this; the copy gains `card.mayDuplicate` | §6.3, SPEC §13.3 |
+| W10 | WP6 difference 1: §6.4 used stale proposal names | A. §6.4 already names `proposedTask` and `proposedSchedule` (G6). The check found one more gap: no kind for steering from a tainted run. `t3_send` there is a `change` card; `t3_stop` is the Task card's Stop | §6.4 |
+| W11 | WP6 difference 4: "Stopped. Nothing after this was sent." promises more than §6.5 allows | A. The line becomes "Stopped. Juno won't start anything new for this reply." Work handed off before Stop may still land and shows on its own card | §6.5, §8, §13.2, SPEC §13.2, §13.7 |
+| W12 | WP6 difference 3: the chat shows one result per row and per card, while the record keeps each attempt and both cancellation states | A, as intended. The view summarizes and Activity shows the evidence. The projection rules are written down | §12 |
+| W13 | WP6 difference 5: the chat contract has no approval identities or edit revisions | A, as intended. RPC metadata (`CardBinding`) carries them beside the view models | §12 |
 
 ## 1. Owner decisions in force
 
@@ -225,6 +230,8 @@ intent ─(Tier 3: owner click on rev/digest)─▶ approved ─authorize(consum
 unknown ─reconcile─▶ done (positive evidence) | unknown (kept, shown) ; retry = new owner click "may duplicate"
 ```
 
+- **Every repeat needs a warned click** (W9). A second authorization of a child whose destination does not deduplicate needs a new owner click that carries the duplicate warning, whatever the earlier attempt's outcome: `unknown`, `failed` or `cancelled`. Why: "definite rejection" rests on reading a destination's error correctly, and the spec (`retryRequiresAuthority`) does not trust that. A deduplicated child (natural or local-id dedupe) retries under its key with a plain click. The card prints the warning beside the retry button (`chatCopy.card.mayDuplicate`).
+
 - **Transports never retry by themselves.** pi-mcp is called with no retry. Agent sends go through the engine outbox in **single-attempt** mode. pi-ai `maxRetries: 0` stays as it is.
 
 | Destination | Dedupe | Reconcile |
@@ -239,12 +246,12 @@ unknown ─reconcile─▶ done (positive evidence) | unknown (kept, shown) ; re
 - A run is **clean** while its request holds only owner inputs and Juno-internal state. It becomes **tainted** at the first untrusted content: any MCP or Slack read result, a `work` report, a wake, or a steered report.
 - **Grant creation.** A Tier 2 start (`t3_start`, `delegate.spawn`) or a `schedule_create` without a click is allowed only in a clean owner run. It **mints a grant** `{ id, op_class, target (project, job or schedule), bounds (one job; or a schedule's revision and purpose), source_op, revoked }`. The model never supplies a grant id. The application binds the grant to the call it made.
 - **In a tainted run,** or when the scope cannot be established, the same tool produces a card (`proposedTask` or `proposedSchedule`), and the owner's click mints the grant. **A click is owner authority** (G6): it enters through the inbox as an owner op, and that op is the grant's `source_op`. It mints the grant only if the card's stored revision and digest are still current, as in §6.2. Why: the click approves the exact stored payload, which no untrusted content can change after the card renders. The model wrote the payload in a tainted run, so the card must show all of it, including a schedule's prompt.
-- **Grant use.** `t3_send` and `t3_stop` need a live grant for that job. From a tainted or report run they are cards. Reports, tool output and steering cannot create, broaden or restore a grant.
+- **Grant use.** `t3_send` and `t3_stop` need a live grant for that job. From a tainted or report run, `t3_send` becomes a `change` card (server T3 Code, target the job, the stored message as its preview), and `t3_stop` produces no card: Juno points to the Task card, whose Stop is the owner's click (W10). Reports, tool output and steering cannot create, broaden or restore a grant.
 - Revocation happens through a job Stop, a schedule delete, a redaction, or Pause.
 
 ### 6.5 Startup, Pause and Stop (R12)
 - At startup, every `attempt` without a receipt becomes `unknown` before `resume()`. A reconcile fiber works through them in the background. Unrelated chat runs at once. Resumed runs see unresolved outcomes in turn state.
-- Pause, Stop and AI off **stop new authorizations** and ask jobs to cancel. Authorizations already consumed may still land. States distinguish `cancel-requested`, `cancelled`, `unknown` and `done`, and earlier evidence is never overwritten.
+- Pause, Stop and AI off **stop new authorizations** and ask jobs to cancel. Authorizations already consumed may still land. States distinguish `cancel-requested`, `cancelled`, `unknown` and `done`, and earlier evidence is never overwritten. Stop's fixed line therefore promises only that nothing new starts (W11); anything already handed off reports on its own card.
 
 ## 7. Providers and the model picker
 
@@ -274,7 +281,7 @@ unknown ─reconcile─▶ done (positive evidence) | unknown (kept, shown) ; re
 ## 8. Orchestration behind the status bubble (B1, B5, M7, M8, M11)
 
 - **The router** owns the current run, `H`, and the clean or tainted flag. An idle owner input: reset, then the input. A busy owner input: a steer, with "Queued" shown after 500 ms. A report or wake: a steer if a run is active, otherwise a new run. Several reports within 30 s are coalesced. A proactive run waits while Juno has an open question of its own, at most until the question expires or 24 hours pass; job reports never wait.
-- **The status bubble covers runs only.**. Dots only until the first token (the bubble becomes the reply in place) or the first tool call (text appears, specific and counting real things, changing at most every 2 s). It clears when the run settles. Esc with the composer empty, or its Stop, aborts **the run only**. After a Stop, a queued steer starts a fresh run, and the reply ends with the fixed line "Stopped. Nothing after this was sent." If the run then calls tools between tokens, the bubble reappears below the streaming reply, and the next token clears it: one run is one Juno bubble. A run whose provider call fails (pi-ai runs with `maxRetries: 0`) ends `failed` with a fixed line per cause, never a model-written one.
+- **The status bubble covers runs only.**. Dots only until the first token (the bubble becomes the reply in place) or the first tool call (text appears, specific and counting real things, changing at most every 2 s). It clears when the run settles. Esc with the composer empty, or its Stop, aborts **the run only**. After a Stop, a queued steer starts a fresh run, and the reply ends with the fixed line "Stopped. Juno won't start anything new for this reply." (W11). If the run then calls tools between tokens, the bubble reappears below the streaming reply, and the next token clears it: one run is one Juno bubble. A run whose provider call fails (pi-ai runs with `maxRetries: 0`) ends `failed` with a fixed line per cause, never a model-written one.
 - **Background jobs** (`jobs` table: subagents and T3 sessions) never use the bubble. Each job has a **Task card** under the message that started it, with a live state line ("T3 Code · tests running, 2 of 5"), Open and Stop. The sidebar's Juno row shows the duotone sparkle while any job runs. "How is it going?" is answered from turn state, which lists the jobs.
 - **Subagents** follow pi's background pattern behind a `delegate` tool, with depth 1 and a cheaper model. Their first message is pins + view + task. Reports post once each (`report:<task>:<seq>`).
 - **T3 jobs:** A watcher fiber loops `t3_thread_wait(10 min)` and `t3_thread_read`, updating the state line. It posts a `work` report only on a milestone: started, a question or pending approval, done (with the PR), failed, or quiet for 30 minutes after the last step change. The last one reads: "T3 Code has been quiet for 30 minutes. I'll keep watching, or you can stop it." A pending approval becomes a `question` card headed "T3 Code asks" (Tier 3). Juno never merges or pushes.
@@ -356,6 +363,8 @@ Fakes for all three servers (WP10) mirror the shapes above. Real adapters are bu
 | `provider` | "Choose a model provider": OpenRouter key or Codex, with the fixed disclosure | Set up | "Using Claude Sonnet 5.5" |
 
 - The model cannot invent a kind. Cards expire after 7 days, or when the source changes ("Expired · Ask again"). An unknown kind renders "This card needs a newer Juno".
+- **The view summarizes; the record keeps the evidence** (W12). `agent-cards` keeps every attempt per child (`ChildEvidence`), including an `unknown` attempt after a later attempt succeeded, and both `cancel-requested` and `cancelled`. The card shows one result per row and one status per card: a row is `sending` while any attempt is unsettled (including `cancel-requested`), `sent` once any attempt has a receipt, `unknown` if an attempt may have landed, and `notSent` when every attempt failed or was cancelled before transport. So "Sent" means at least one copy landed, not that no duplicate exists; the owner was warned at the retry click (§6.3). Activity lists every attempt with its evidence. Why: the owner decides from the row, and two cancellation states or an attempt history would not change what they can do there.
+- **Approval identities travel beside the view** (W13). The chat contract (`agent-contract/src/chat`) carries no revisions, digests or action ids. The renderer RPCs (`agent-contract/src/rpc`) send a `CardBinding` (card revision and digest, plus each child's action id, revision, digest and `duplicateWarning`) with each card, and a click returns it. Editing a send's text stores a new proposal with a new revision. Scheduled and Remembers snapshots carry revisions the same way. Why: views take props and return ids; the binding is checked by the agent, so no view can compose or alter it.
 
 ## 13. Chat UI (dumb views, friendly layer)
 
@@ -379,7 +388,7 @@ The chat has four item kinds: owner bubble, Juno bubble with cards, the status b
 | Queued | "Queued" under the last owner bubble, at 70% opacity, after 500 ms |
 | Waiting | "Waiting for network", "Waiting for Resume" or "Waiting for your review". The inbox write succeeded; the run starts when it can |
 | Not delivered | "Not delivered · Try again". Only when the inbox write failed. Retrying resubmits the same `op_id` text |
-| Stopped | "Stopped. Nothing after this was sent." |
+| Stopped | "Stopped. Juno won't start anything new for this reply." Work already handed off before Stop may still finish; its card shows the result (§6.5) |
 | Interrupted | "Juno was interrupted. Your message is kept. [Try again]". No Try again for wake and report runs |
 | Failed | "Juno didn't answer. Give it a moment and try again." (provider), "OpenRouter rejected the key. Check it in Settings.", "Codex is signed out on this Mac. Sign in to Codex and try again.", "Juno lost the connection. Try again when you are back online." |
 | Blocked (too large) | §5.2 copy, with no card |

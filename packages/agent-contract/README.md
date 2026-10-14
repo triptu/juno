@@ -57,11 +57,12 @@ Reads cover Slack search/history/replies/people and Juno topics. Presence stream
 
 ## Plan and spec differences found in WP6
 
-- Plan §6.4 calls tainted-run proposals `task` and `schedule`; §12 and WP7 correctly separate `proposedTask` and `proposedSchedule` from existing work.
-- Quint's `retryRequiresAuthority` requires a warning for **every** repeat of a non-deduplicated action. Plan §6.3 and WP7 describe a duplicate warning only for unknown outcomes. This catalogue follows Quint's stronger repeat rule; no chat schema was changed.
-- Quint retains unknown evidence per attempt, even after another attempt for that child succeeds. WP7 has one result per row and reports a partially successful batch as `done`, even with unknown rows. The record retains all attempts; projection follows WP7. Neither a `done` card nor a `sent` row means every attempt is settled.
-- Quint distinguishes cancellation requested, cancelled, unknown and done. WP7's generic `CardStatus` and `SendResult` do not expose both cancellation states. Unsettled cancellation projects as working/sending; known unsent cancellation as notSent. Evidence stays in the record. The fixed Stop copy also sounds stronger than §6.5, which permits an already-consumed authorization to land later.
-- WP7 deliberately omits approval identities and edit revisions. RPC snapshot metadata supplies them without changing `src/chat/**`.
-- Plan v3 has §2.1 and §2.2, but no §2.4. The transport reference used here is architecture §2.4 and ADR 0012.
+All five are settled in plan v3 (§0 rows W9 to W13):
+
+- Proposal names: §6.4 names `proposedTask` and `proposedSchedule`. Steering from a tainted run is a `change` card (W10).
+- Every repeat of a non-deduplicated action needs a warned click, as Quint's `retryRequiresAuthority` says. `CardStatus` `failed` and `unknown` carry `mayDuplicate`, the button shows `chatCopy.card.mayDuplicate`, and `transitionCard` refuses an unwarned retry of such a status (W9).
+- The chat shows one result per row and one status per card. The record keeps every attempt and both cancellation states; Activity shows them (W12).
+- Stop's line promises only that nothing new starts: "Stopped. Juno won't start anything new for this reply." (W11).
+- Approval identities and edit revisions travel in RPC metadata, not in `src/chat/**` (W13).
 
 Run `pnpm test:agent-contracts` from the root for the property tests and request/response JSON codec round trips for every RPC group. `pnpm typecheck` checks the test sources too.

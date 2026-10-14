@@ -72,10 +72,12 @@ export const CardStatus = Schema.Union([
   Schema.TaggedStruct('failed', {
     line: Schema.String,
     retry: Schema.optionalKey(Schema.Literal(true)),
+    mayDuplicate: Schema.optionalKey(Schema.Literal(true)),
   }),
   Schema.TaggedStruct('unknown', {
     line: Schema.String,
     check: Schema.optionalKey(OpenTarget),
+    mayDuplicate: Schema.optionalKey(Schema.Literal(true)),
   }),
 ])
 export type CardStatus = typeof CardStatus.Type
@@ -111,8 +113,8 @@ export const sendMessageStatus = (messages: ReadonlyArray<ProposedMessage>): Car
   const sent = results.filter((r) => r === 'sent').length
   if (sent === messages.length) return { _tag: 'done', line: sent === 1 ? 'Sent' : `Sent ${sent}` }
   if (sent > 0) return { _tag: 'done', line: `Sent ${sent} of ${messages.length}` }
-  if (results.includes('unknown')) return { _tag: 'unknown', line: "Juno can't tell whether this was sent." }
-  return { _tag: 'failed', line: 'Not sent', retry: true }
+  if (results.includes('unknown')) return { _tag: 'unknown', line: "Juno can't tell whether this was sent.", mayDuplicate: true }
+  return { _tag: 'failed', line: 'Not sent', retry: true, mayDuplicate: true }
 }
 export const ResolveCard = Schema.TaggedStruct('resolve', {
   ...base,
