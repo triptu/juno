@@ -89,7 +89,6 @@ export const chatCopy = {
       stopped: 'Stopped',
       lostSight: 'Sign in to T3 Code to keep watching',
       signIn: 'Sign in',
-      quiet: "T3 Code has been quiet for 30 minutes. I'll keep watching, or you can stop it.",
     },
     question: { junoAsks: 'Juno asks', t3Asks: 'T3 Code asks', reply: 'Reply', chose: 'You chose', replied: 'You replied' },
     schedule: { keep: 'Keep', start: 'Start', pause: 'Pause', delete: 'Delete', kept: 'Kept', started: 'Started', paused: 'Paused', deleted: 'Deleted' },

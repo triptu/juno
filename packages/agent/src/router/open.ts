@@ -89,8 +89,6 @@ export interface TurnsOptions {
   /** Other folders' migration sets. Spend, turns and jobs are always applied. */
   readonly migrations?: ReadonlyArray<MigrationSet>
   readonly now?: () => number
-  /** The quiet milestone of a job, 30 minutes by default. */
-  readonly quietMs?: number
   readonly onReport?: (error: unknown) => void
 }
 
@@ -214,7 +212,6 @@ async function start(
     store,
     drivers: subagentModel ? [subagentDriver({ store, guard, builder, model: subagentModel })] : [],
     accept: (input) => router.message(input),
-    ...(options.quietMs !== undefined ? { quietMs: options.quietMs } : {}),
     ...(options.onReport ? { onReport: options.onReport } : {}),
   })
   const memoryTools = [

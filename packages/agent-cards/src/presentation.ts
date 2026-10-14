@@ -127,7 +127,6 @@ export type ProposedTaskCard = typeof ProposedTaskCard.Type
 export const JobPhase = Schema.Literals([
   'running',
   'needsYou',
-  'quiet',
   'lostSight',
   'done',
   'failed',

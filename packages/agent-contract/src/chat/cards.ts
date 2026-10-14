@@ -149,8 +149,6 @@ export const JobPhase = Schema.Literals([
   'running',
   /** T3 asked something; a `question` card follows. */
   'needsYou',
-  /** No step change for 30 minutes. Still watched. */
-  'quiet',
   /** The T3 sign-in expired: "Sign in to T3 Code to keep watching". */
   'lostSight',
   'done',

@@ -98,7 +98,7 @@ export function toCard(record: CardRecord, now: number): P.Card {
   }
 }
 
-export type JobEvent = 'progress' | 'needsYou' | 'quiet' | 'lostSight' | 'stop' | 'cancelled' | 'done' | 'failed' | 'unknown'
+export type JobEvent = 'progress' | 'needsYou' | 'lostSight' | 'stop' | 'cancelled' | 'done' | 'failed' | 'unknown'
 export function transitionJob(phase: JobRecordPhase, event: JobEvent): JobRecordPhase {
   if (phase === 'done' || event === 'done') return 'done'
   if (phase === 'failed' || phase === 'stopped') return phase
@@ -106,7 +106,7 @@ export function transitionJob(phase: JobRecordPhase, event: JobEvent): JobRecord
     case 'progress': return phase === 'stopping' ? phase : 'running'
     case 'stop': return 'stopping'
     case 'cancelled': return 'stopped'
-    case 'needsYou': case 'quiet': case 'lostSight': return phase === 'stopping' ? phase : event
+    case 'needsYou': case 'lostSight': return phase === 'stopping' ? phase : event
     case 'failed': case 'unknown': return event
   }
 }

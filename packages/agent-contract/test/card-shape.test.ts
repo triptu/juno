@@ -40,7 +40,7 @@ const cards = {
   proposedTask: fc.record({ ...base, _tag: fc.constant('proposedTask'), kind: jobKind, title: text, where: text }),
   task: fc.record({
     id: text, because: optional(text), _tag: fc.constant('task'), jobId: text, kind: jobKind, title: text, where: text,
-    phase: fc.constantFrom('running', 'needsYou', 'quiet', 'lostSight', 'done', 'failed', 'stopping', 'stopped'),
+    phase: fc.constantFrom('running', 'needsYou', 'lostSight', 'done', 'failed', 'stopping', 'stopped'),
     state: optional(text), open: optional(target),
   }),
   question: fc.record({
