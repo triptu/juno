@@ -59,9 +59,9 @@ export async function turnsHarness(options: HarnessOptions = {}) {
   return {
     dir, fake, turns, events, reports,
     /** An owner send, maybe a reply. Returns its op id. */
-    send: (text: string, options: { readonly opId?: string; readonly replyTo?: ReplyTarget } = {}) => {
-      const opId = options.opId ?? `op-${++sent}`
-      const accepted = turns.accept({ opId, kind: 'send', text, ...(options.replyTo ? { replyTo: options.replyTo } : {}) })
+    send: (text: string, input: { readonly opId?: string; readonly replyTo?: ReplyTarget } = {}) => {
+      const opId = input.opId ?? `op-${++sent}`
+      const accepted = turns.accept({ opId, kind: 'send', text, ...(input.replyTo ? { replyTo: input.replyTo } : {}) })
       if (accepted._tag !== 'accepted') throw new Error(`send refused: ${accepted._tag === 'refused' ? accepted.reason : 'recorded'}`)
       return opId
     },
