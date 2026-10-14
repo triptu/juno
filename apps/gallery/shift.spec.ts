@@ -399,3 +399,28 @@ test.describe('Juno chat', () => {
     expect([...seen].toSorted()).toEqual(['aiOff', 'offline', 'otherDevice', 'paused', 'recovery', 'updateNeeded'])
   })
 })
+
+test('the peek floats beside the sidebar: the rows, the tab strip and the page sit where they do without it', async ({ page }) => {
+  // The peek fixtures draw the signed-in window of Shell's `signed-in` state with the peek in its slot.
+  const boxes = async () =>
+    page.evaluate(() =>
+      Array.from(document.querySelectorAll('[data-topic-row], [role="tablist"], main'), (node) => {
+        const box = node.getBoundingClientRect()
+        return [box.x, box.y, box.width, box.height].map(Math.round).join(' ')
+      }),
+    )
+  await openState(page, { component: 'Shell', id: 'window/signed-in', route: 'Shell/window/signed-in' } as Route)
+  const without = await boxes()
+  await openState(page, { component: 'PeekView', id: 'topic/thread', route: 'PeekView/topic/thread' } as Route)
+  const peek = page.locator('[role="dialog"][aria-roledescription="peek"]')
+  await expect(peek).toBeVisible()
+  expect(without.length).toBeGreaterThan(3)
+  expect(await boxes()).toEqual(without)
+  // It hangs off the sidebar's right edge and stays inside the window.
+  const sidebar = (await page.getByRole('complementary', { name: 'Sidebar' }).boundingBox())!
+  const panel = (await peek.boundingBox())!
+  const frame = (await page.locator('[data-fixture-frame="PeekView/topic/thread"]').boundingBox())!
+  expect(panel.x).toBeGreaterThan(sidebar.x + sidebar.width)
+  expect(panel.x + panel.width).toBeLessThanOrEqual(frame.x + frame.width)
+
+})
