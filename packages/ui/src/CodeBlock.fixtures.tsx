@@ -13,7 +13,6 @@ export default defineFixtures(
     Length: {
       prompt: fixture({ children: prompt, label: 'Prompt' }),
       long: fixture({ children: `${prompt}\n${prompt}\n${prompt}`, label: 'Prompt' }),
-      'long-scrolling': fixture({ children: `${prompt}\n${prompt}\n${prompt}`, label: 'Prompt', scroll: true }),
     },
   },
   { width: 520 },

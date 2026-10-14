@@ -23,7 +23,7 @@ export default defineFixtures(
         source: 'Staging bill doubled since August',
         title: 'Hand the preview-env reaper to a coding agent',
         body: 'Jonas offered to add a 48h TTL to preview environments. Here is a prompt you could paste into Claude Code or Cursor.',
-        children: <CodeBlock scroll>{prompt}</CodeBlock>,
+        children: <CodeBlock>{prompt}</CodeBlock>,
         actions: (
           <>
             <Button size="md" variant="secondary">

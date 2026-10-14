@@ -33,7 +33,7 @@ export default defineFixtures(
       'right-to-left': state({ items: rtl, main: false }),
       'emoji-only': state({ items: emojiOnly, main: false }),
       hostile: state({ items: hostile, main: false }),
-      // The block is laid out in full inside the scrolling list; the wheel over it moves the list.
+      // A long block inside the scrolling list: it scrolls inside its box and hands the wheel on at its edges.
       'long-code': state({ items: longCode, main: false }),
     },
     Files: {

@@ -95,10 +95,10 @@ test.describe('truncation tooltip', () => {
 })
 
 /**
- * A long code block in a message is part of the message, not a scroller of
- * its own: the wheel over it moves the list.
+ * A long code block in a message scrolls inside its box, and at its end the
+ * wheel goes on to the message list instead of stopping there.
  */
-test('the wheel over a long code block scrolls the message list', async ({ page }) => {
+test('the wheel over a long code block reaches the end of the block, then scrolls the message list', async ({ page }) => {
   await page.goto('/#/MessageList?__state=content/long-code')
   const scroller = page.locator('[data-fixture-frame] [data-scroll]')
   await expect(scroller).toBeVisible()
@@ -107,11 +107,14 @@ test('the wheel over a long code block scrolls the message list', async ({ page 
   })
   const block = page.locator('[data-fixture-frame] pre').first()
   await block.scrollIntoViewIfNeeded()
-  const before = await scroller.evaluate((node) => node.scrollTop)
+  const listBefore = await scroller.evaluate((node) => node.scrollTop)
   await block.hover()
-  await page.mouse.wheel(0, 400)
-  await expect.poll(() => scroller.evaluate((node) => node.scrollTop)).toBeGreaterThan(before)
-  expect(await block.evaluate((node) => node.scrollHeight > node.clientHeight)).toBe(false)
+  await page.mouse.wheel(0, 5000)
+  await expect.poll(() => block.evaluate((node) => node.scrollHeight - node.scrollTop - node.clientHeight)).toBeLessThan(1)
+  // A pause ends the wheel gesture, so the next one is not latched to the block.
+  await page.waitForTimeout(300)
+  await page.mouse.wheel(0, 300)
+  await expect.poll(() => scroller.evaluate((node) => node.scrollTop)).toBeGreaterThan(listBefore)
 })
 
 /**

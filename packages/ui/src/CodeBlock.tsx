@@ -6,18 +6,16 @@ import { Surface } from './Surface'
 export interface CodeBlockProps {
   readonly children: string
   readonly label?: string
-  /**
-   * Cap the height at `--code-block-max-height` and scroll inside. For a
-   * block in a card. A block in a message is laid out in full, so a reader
-   * scrolls past it like any other message and the wheel is never trapped.
-   */
-  readonly scroll?: boolean
 }
 
-/** A selectable mono block on the page background. */
-export function CodeBlock({ children, label, scroll = false }: CodeBlockProps) {
+/**
+ * A selectable mono block on the page background. A long one scrolls inside
+ * a capped box; at its edges the wheel goes on to the page, as it does for
+ * any inline content (contained overscroll is for overlays).
+ */
+export function CodeBlock({ children, label }: CodeBlockProps) {
   return (
-    <Surface kind="inset" as="pre" aria-label={label} sx={[styles.block, scroll && styles.scroll]}>
+    <Surface kind="inset" as="pre" aria-label={label} sx={styles.block}>
       <code {...stylex.props(typeVariants.code, styles.code)}>{children}</code>
     </Surface>
   )
@@ -28,16 +26,12 @@ const styles = stylex.create({
     margin: 0,
     paddingBlock: spacing['--space-2-5'],
     paddingInline: spacing['--space-3'],
+    maxHeight: layout['--code-block-max-height'],
+    overflowY: 'auto',
     whiteSpace: 'pre-wrap',
     overflowWrap: 'anywhere',
     userSelect: 'text',
     cursor: 'text',
-  },
-  // Inline content hands the wheel back at its edges; contained overscroll
-  // is for overlays.
-  scroll: {
-    maxHeight: layout['--code-block-max-height'],
-    overflowY: 'auto',
   },
   code: {
     display: 'block',
