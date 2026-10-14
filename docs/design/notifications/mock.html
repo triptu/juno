@@ -110,7 +110,7 @@ h1 { font: 400 26px/1.15 var(--font-serif); margin: 0 0 4px; }
 .av { width: 16px; height: 16px; border-radius: 50%; font-size: 8.5px; font-weight: 700; display: grid; place-items: center; background: color-mix(in oklch, #E89EB8 24%, var(--surface-default)); color: color-mix(in oklch, #E89EB8 62%, var(--foreground-default)); }
 .av.b { background: color-mix(in oklch, #008AB3 24%, var(--surface-default)); color: color-mix(in oklch, #008AB3 62%, var(--foreground-default)); }
 .tags { display: flex; flex-wrap: wrap; gap: 6px; flex: 1; justify-content: flex-end; }
-.lbl { width: 200px; flex: none; }
+.lbl { width: 260px; flex: none; }
 .lbl .t { font-size: 14px; font-weight: 500; }
 .lbl .s { font-size: 12px; color: var(--foreground-muted); }
 .hint { font-size: 12px; color: var(--foreground-muted); margin-top: 8px; }
@@ -252,18 +252,25 @@ h1 { font: 400 26px/1.15 var(--font-serif); margin: 0 0 4px; }
   <div class="pane"><div class="page">
     <div>
       <h2>Notifications</h2>
-      <p class="sub">During your working hours, Juno lets through what needs you and holds the rest. Everything is in Juno whenever you open it.</p>
+      <p class="sub">During your notification hours, Juno lets through what needs you and holds the rest. Everything is in Juno whenever you open it.</p>
     </div>
 
     <div>
-      <div class="sec-h">Working hours</div>
+      <div class="sec-h">Hours</div>
       <div class="group">
-        <div class="r" style="min-height:56px">
-          <span class="days"><span class="on">M</span><span class="on">T</span><span class="on">W</span><span class="on">T</span><span class="on">F</span><span>S</span><span>S</span></span>
+        <div class="r" style="min-height:60px">
+          <div class="lbl"><div class="t">Notifications</div><div class="s">When it starts, one notification sums up what needed you.</div></div>
           <span class="grow"></span>
-          <span class="select">9am<svg><use href="#i-down"/></svg></span><span class="muted" style="font-size:13px">to</span><span class="select">7pm<svg><use href="#i-down"/></svg></span>
+          <span class="days"><span class="on">M</span><span class="on">T</span><span class="on">W</span><span class="on">T</span><span class="on">F</span><span>S</span><span>S</span></span>
+          <span class="select">9am<svg><use href="#i-down"/></svg></span><span class="muted" style="font-size:13px">to</span><span class="select">6pm<svg><use href="#i-down"/></svg></span>
         </div>
-        <div class="note" style="border-top:1px solid var(--border-subtle)">Outside these hours you show as away in Slack and notifications pause. When your hours start, one notification sums up anything that needed you.<div style="font-size:12px;margin-top:6px">Juno switches your status while it's open. If it's closed when your hours start, you stay away until you open it.</div></div>
+        <div class="r" style="min-height:60px">
+          <div class="lbl"><div class="t">Active in Slack</div><div class="s">Outside these hours you show as away.</div></div>
+          <span class="grow"></span>
+          <span class="days"><span class="on">M</span><span class="on">T</span><span class="on">W</span><span class="on">T</span><span class="on">F</span><span>S</span><span>S</span></span>
+          <span class="select">9am<svg><use href="#i-down"/></svg></span><span class="muted" style="font-size:13px">to</span><span class="select">8pm<svg><use href="#i-down"/></svg></span>
+        </div>
+        <div class="note" style="max-width:none;border-top:1px solid var(--border-subtle);font-size:12px;padding:10px 14px 12px">Juno switches your status while it's open. If it's closed when your active hours start, you stay away until you open it.</div>
       </div>
     </div>
 
@@ -277,7 +284,7 @@ h1 { font: 400 26px/1.15 var(--font-serif); margin: 0 0 4px; }
       <div class="sec-h">People and channels</div>
       <div class="group">
         <div class="r" style="padding:10px 10px 10px 14px">
-          <div class="lbl"><div class="t">Every message</div><div class="s">Even outside working hours</div></div>
+          <div class="lbl"><div class="t">Every message</div><div class="s">Even outside notification hours</div></div>
           <div class="tags">
             <span class="tag"><svg class="k"><use href="#i-hash"/></svg>incidents<span class="x"><svg><use href="#i-x"/></svg></span></span>
             <span class="tag"><span class="av">MC</span>Maya Chen<span class="x"><svg><use href="#i-x"/></svg></span></span>
@@ -344,7 +351,7 @@ h1 { font: 400 26px/1.15 var(--font-serif); margin: 0 0 4px; }
           <div class="mi" style="height:32px"><svg><use href="#i-out"/></svg>Sign out</div>
         </div>
       </div>
-      <p class="cap">Away and active are one item. A change by hand lasts until the next switch in your working hours.</p>
+      <p class="cap">Away and active are one item. A change by hand lasts until the next switch in your active hours.</p>
     </div>
 
     <div style="width:500px">
@@ -382,7 +389,7 @@ h1 { font: 400 26px/1.15 var(--font-serif); margin: 0 0 4px; }
           <div class="bub j">Done. #design-review won't notify you, and Sam Okafor gets through any time.</div>
           <div class="cline">Notifications changed · <span class="act">Undo</span></div>
           <div class="bub o last" style="margin-top:14px">I'm off Friday.</div>
-          <div class="bub j">Friday is out of your working hours. You'll show as away all day.</div>
+          <div class="bub j">Friday is off. No notifications, and you'll show as away all day.</div>
           <div class="cline">Notifications changed · <span class="act">Undo</span></div>
         </div>
         <div class="colhead" style="margin-top:30px"><b>Today</b>after Show why</div>
@@ -398,10 +405,10 @@ h1 { font: 400 26px/1.15 var(--font-serif); margin: 0 0 4px; }
 
 <section class="sheet theme-light" data-key="compare-light">
   <h1>Notifications: current and proposed</h1>
-  <p class="lede">Left is the page in SPEC 14 and inventory 13. Right is the proposal: one schedule that sets both presence and notifications, a few words for Juno, two short lists, and a one-line Today.</p>
+  <p class="lede">Left is the page in SPEC 14 and inventory 13. Right is the applied design: notification hours and active hours as two rows, a few words for Juno, two short lists, and a one-line Today. The example has notifications until 6pm and active until 8pm; by default both are the same.</p>
   <div class="row">
     <div style="width:960px"><div class="colhead"><b>Current</b>SPEC 14 · inventory 13</div><div data-t="current"></div></div>
-    <div style="width:960px"><div class="colhead"><b>Proposed</b>this README</div><div data-t="proposed"></div></div>
+    <div style="width:960px"><div class="colhead"><b>Proposed</b>applied</div><div data-t="proposed"></div></div>
   </div>
 </section>
 
@@ -410,7 +417,7 @@ h1 { font: 400 26px/1.15 var(--font-serif); margin: 0 0 4px; }
   <p class="lede">Dark theme. Same content.</p>
   <div class="row">
     <div style="width:960px"><div class="colhead"><b>Current</b>SPEC 14 · inventory 13</div><div data-t="current"></div></div>
-    <div style="width:960px"><div class="colhead"><b>Proposed</b>this README</div><div data-t="proposed"></div></div>
+    <div style="width:960px"><div class="colhead"><b>Proposed</b>applied</div><div data-t="proposed"></div></div>
   </div>
 </section>
 
