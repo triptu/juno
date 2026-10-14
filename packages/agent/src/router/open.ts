@@ -275,7 +275,11 @@ async function start(
     if (model !== undefined) {
       compactor = createCompactor({
         store, spend: guard.spend, cutoff: () => router.cutoff(),
-        model: createCompactionProvider({ store, guard, model, system: JUNO_INSTRUCTIONS, tools: tools().map((t) => t.registration), sessionId: 'juno-compaction' }),
+        // Declared, never called: the same tool block as a turn, as plain data (the guard copies the context).
+        model: createCompactionProvider({
+          store, guard, model, system: JUNO_INSTRUCTIONS, sessionId: 'juno-compaction',
+          tools: tools().map(({ registration: { name, description, parameters } }) => ({ name, description, parameters })),
+        }),
         ...(options.onReport ? { onReport: options.onReport } : {}),
       })
     }
