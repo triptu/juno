@@ -120,8 +120,7 @@ export function TopicHeader({ detail, stealth = false, art, threadsOpen = false,
           ) : null}
           <IconButton
             icon={Bell}
-            label={detail.subscribed ? 'Subscribed. Click to unsubscribe.' : 'Unsubscribed. Click to subscribe.'}
-            title={detail.subscribed ? 'Unsubscribe' : 'Subscribe'}
+            label="Subscribe"
             size={32}
             pressed={detail.subscribed}
             onClick={() => (detail.subscribed ? onUnsubscribe(detail.id) : onSubscribe(detail.id))}
