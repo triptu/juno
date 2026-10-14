@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-14 20:35 · orchestrator · Merged remove-cuts: stealth (peek replaces it later), the Subscribe bells and Main's own Unsubscribe, the AI title sparkle and Use AI title, the Browse and Theme title bar buttons, For you, and the grouping and catch-up AI tasks are gone from the code. Old saved tabs with a stealth flag still load. `readstate.qnt` names the rule peek; the protocol is unchanged.
 - 10-14 19:25 · Tushar · Header direction B (Floating) for topics, the Juno tab and the Juno panel: the pill and title, and the actions, float as islands over the messages. No topic art in the header. The pill drops its visible kind text; the tint, icon, tooltip and screen-reader name keep the kind. Designs in `docs/design/header/`.
 - 10-14 18:45 · Tushar · Topic and Juno headers get a modern redesign; three directions from his reference shots go to a design pass first.
 - 10-14 18:45 · orchestrator · Merged spend-cap spec alignment, M4 fix B and WP12 to main. Steer-only merges after its agent resolves the action-spec conflicts with the spend-cap change. The Task card keeps its Stop: it stops a running coding task, not the chat.
