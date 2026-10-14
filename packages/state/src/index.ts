@@ -40,23 +40,58 @@ export {
 } from './messages'
 export {
   activateTab,
+  activeTab,
+  closeAllTabs,
+  closeOtherTabs,
   closeTab,
+  closeTabsToRight,
+  currentPlace,
   cycleTab,
   dividerIndex,
   endStealth,
+  goToEntry,
+  historyStateAtom,
+  historyTarget,
   mountedTabs,
-  openTab,
+  newChatPlace,
+  openPlace,
+  reopenClosedTab,
   scrollSnapshotAtom,
+  setPinned,
+  stepHistory,
+  tabByNumber,
   tabsAtom,
+  tabShowing,
   tabStripAtom,
+  tabTopic,
+  topicPlace,
   updateTabs,
+  type HistoryState,
   type OpenOptions,
+  type Place,
   type ScrollSnapshot,
+  type Tab,
   type Tabs,
   type TabSummary,
 } from './tabs'
 export { errorOf } from './result'
 export { acquireRendererPort, EngineFailed } from './port'
-export { accentAtom, appInfoAtom, onMenuCommand, openExternal, persistAccent, persistTheme, popupContextMenu, themeAtom, type Accent, type Theme } from './shell'
+export {
+  accentAtom,
+  appInfoAtom,
+  copyText,
+  onMenuCommand,
+  openExternal,
+  openInSlack,
+  persistAccent,
+  persistSidebar,
+  persistTheme,
+  popupContextMenu,
+  sidebarLayoutAtom,
+  themeAtom,
+  type Accent,
+  type Theme,
+} from './shell'
 export type { PortConnection, PortLike } from './transport'
 export { redrawTopic, topicArtAtom } from './art'
+export { slackLink } from './links'

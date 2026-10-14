@@ -42,6 +42,8 @@ export const SessionStatus = Schema.Union([
     userId: Schema.String,
     /** The user's handle from `auth.test`. */
     userName: Schema.String,
+    /** `https://<workspace>.slack.com/`, the base of Slack links (the fake's URL in tests). */
+    workspaceUrl: Schema.String,
     enterprise: Schema.optionalKey(Schema.Struct({ id: Schema.String, name: Schema.optionalKey(Schema.String) })),
   }),
   /** A session existed but Slack no longer accepts it. Local data stays. */

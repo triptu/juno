@@ -1,9 +1,10 @@
 import { Activity, useEffect } from 'react'
 import type { TopicDetail } from '@juno/contract'
-import { mountedTabs, onMenuCommand, tabsAtom, tabStripAtom, type TabSummary } from '@juno/state'
+import { currentPlace, mountedTabs, onMenuCommand, sidebarLayoutAtom, tabsAtom, tabStripAtom, type TabSummary } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import { TopicArt, Workspace as WorkspaceView, type ActivateEvent, type WorkspaceTab, type WorkspaceTabIcon } from '@juno/views'
-import { closeTopicTab, runMenuCommand, showTabMenu, switchToTab } from './navigation'
+import { closeTabById, openNewTab, runMenuCommand, showTabMenu, stepTabHistory, switchToTab } from './navigation'
+import { TitlebarNav } from './TitlebarNav'
 import { hasArt, TopicTab } from './TopicView'
 
 const kindIcons: Record<TopicDetail['channel']['kind'], WorkspaceTabIcon> = {
@@ -19,14 +20,18 @@ const tabs = new WeakMap<TabSummary, WorkspaceTab>()
 function stripTab(summary: TabSummary): WorkspaceTab {
   const held = tabs.get(summary)
   if (held !== undefined) return held
-  const { detail } = summary
-  const tab: WorkspaceTab = {
-    id: summary.id,
-    title: detail == null ? '' : detail.kind === 'main' ? detail.channel.name : detail.title,
-    icon: detail == null ? 'hash' : kindIcons[detail.channel.kind],
-    stealth: summary.stealth,
-    ...(detail != null && hasArt(detail) ? { art: <TopicArt topicId={detail.id} recipe={detail.art} size={16} /> } : {}),
-  }
+  const { detail, place } = summary
+  const base = { id: summary.id, pinned: summary.pinned, stealth: summary.stealth }
+  const tab: WorkspaceTab =
+    place.kind === 'newChat'
+      ? { ...base, title: 'New chat', icon: 'new-chat' }
+      : {
+          ...base,
+          title: detail == null ? '' : detail.kind === 'main' ? detail.channel.name : detail.title,
+          icon: detail == null ? 'hash' : kindIcons[detail.channel.kind],
+          unread: detail != null && detail.unreadCount > 0,
+          ...(detail != null && hasArt(detail) ? { art: <TopicArt topicId={detail.id} recipe={detail.art} size={16} /> } : {}),
+        }
   tabs.set(summary, tab)
   return tab
 }
@@ -39,31 +44,56 @@ function tabMenu(id: string): void {
   void showTabMenu(id)
 }
 
+/** The mouse's back and forward buttons. */
+function onMouseUp(event: MouseEvent): void {
+  if (event.button === 3) stepTabHistory(-1)
+  else if (event.button === 4) stepTabHistory(1)
+}
+
 /**
- * The tab strip and the open topics. The active tab and the 4 most
- * recently active stay mounted in `<Activity>` (performance 4.3), so a
- * switch is a display toggle; older tabs unmount and come back at their
- * scroll snapshot. With no tab open the page shows the empty workspace.
+ * The tab strip and the open tabs. The active tab and the 4 most recently
+ * active stay mounted in `<Activity>` (performance 4.3), so a switch is a
+ * display toggle; older tabs unmount and come back at their scroll
+ * snapshot. A tab's topic is keyed by its id, so Back and Forward mount the
+ * topic they bring back. A New chat tab, and no tab at all, show the empty
+ * workspace. While the sidebar is hidden the strip starts with its
+ * controls.
  */
 export function Workspace() {
   const state = useAtomValue(tabsAtom)
   const strip = useAtomValue(tabStripAtom)
+  const sidebarHidden = useAtomValue(sidebarLayoutAtom, (layout) => layout.collapsed)
   const mounted = mountedTabs(state)
 
   useEffect(() => onMenuCommand(runMenuCommand), [])
+  useEffect(() => {
+    window.addEventListener('mouseup', onMouseUp)
+    return () => window.removeEventListener('mouseup', onMouseUp)
+  }, [])
 
-  // TODO(M5/M9): Wire onNewTab to All topics in a new tab, then search once ⌘K exists.
+  const topics = state.tabs.flatMap((tab) => {
+    const place = currentPlace(tab)
+    return mounted.has(tab.id) && place.kind === 'topic' ? [{ tab, topicId: place.topicId }] : []
+  })
+
   return (
-    <WorkspaceView tabs={strip.map(stripTab)} {...(state.active === undefined ? {} : { activeId: state.active })} onSelectTab={selectTab} onCloseTab={closeTopicTab} onTabContextMenu={tabMenu}>
-      {state.active === undefined
+    <WorkspaceView
+      tabs={strip.map(stripTab)}
+      {...(state.active === undefined ? {} : { activeId: state.active })}
+      onSelectTab={selectTab}
+      onCloseTab={closeTabById}
+      onNewTab={openNewTab}
+      onTabContextMenu={tabMenu}
+      {...(sidebarHidden ? { leading: <TitlebarNav /> } : {})}
+      nothingShown={!topics.some(({ tab }) => tab.id === state.active)}
+    >
+      {topics.length === 0
         ? undefined
-        : state.tabs
-            .filter((tab) => mounted.has(tab.id))
-            .map((tab) => (
-              <Activity key={tab.id} mode={tab.id === state.active ? 'visible' : 'hidden'}>
-                <TopicTab id={tab.id} stealth={tab.stealth} />
-              </Activity>
-            ))}
+        : topics.map(({ tab, topicId }) => (
+            <Activity key={tab.id} mode={tab.id === state.active ? 'visible' : 'hidden'}>
+              <TopicTab key={topicId} tabId={tab.id} id={topicId} stealth={tab.stealth} />
+            </Activity>
+          ))}
     </WorkspaceView>
   )
 }

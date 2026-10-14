@@ -1,38 +1,59 @@
 /**
- * Opening, switching and closing topic tabs (spec section 6), for every
- * place that opens a topic: sidebar rows, thread links, Main's Threads
- * list, the tab strip, the app menu and the context menus. The rules are
- * `@juno/state`'s; this module adds the timing.
+ * Opening, switching and closing tabs, and moving through a tab's history
+ * (spec section 6), for every place that opens a topic: sidebar rows, thread
+ * links, Main's Threads list, the tab strip, the title bar, the app menu and
+ * the context menus. The rules are `@juno/state`'s; this module adds the
+ * timing.
  *
- * A topic that is not open yet becomes the tab only once its header and
- * its first window have arrived (a local query, a few milliseconds when
- * cached or prefetched), so the old tab stays on screen until the new one
- * can paint at its open position, never an empty page in between
- * (performance 4.4). Slack is asked only after that, by the tab itself.
+ * A topic that is not on screen yet becomes the tab's page only once its
+ * header and its first window have arrived (a local query, a few
+ * milliseconds when cached or prefetched), so the old page stays on screen
+ * until the new one can paint at its open position, never an empty page in
+ * between (performance 4.4). Slack is asked only after that, by the tab
+ * itself.
  */
 import { MESSAGE_WINDOW_DEFAULT, MESSAGE_WINDOW_MAX, type MenuCommand, type TopicDetail } from '@juno/contract'
 import {
   activateTab,
+  activeTab,
   bottomWindow,
+  closeAllTabs,
+  closeOtherTabs,
   closeTab,
+  closeTabsToRight,
+  copyText,
+  currentPlace,
   cycleTab,
+  goToEntry,
   messageListAtom,
   messageWindowSpecAtom,
   mountedTabs,
-  openTab,
+  newChatPlace,
+  openInSlack,
+  openPlace,
   popupContextMenu,
   prefetchTopic,
   registry,
+  reopenClosedTab,
   scrollSnapshotAtom,
   selectedTopicAtom,
+  setPinned,
+  signedInAtom,
+  slackLink,
+  tabByNumber,
   tabsAtom,
+  tabShowing,
+  tabTopic,
   topicAtom,
+  topicPlace,
   updateTabs,
   type MessageWindowSpec,
   type OpenOptions,
+  type Place,
   type Tabs,
 } from '@juno/state'
 import { afterPaint, measure } from '@juno/state/perf'
+import { toggleSidebar } from './layout'
 
 /** Longest an open waits for the first message window before it shows the tab anyway, with the list loading. It always waits for the header. */
 const READY_WAIT_MS = 150
@@ -56,10 +77,10 @@ export function openWindow(detail: TopicDetail): MessageWindowSpec {
   return wanted <= MESSAGE_WINDOW_DEFAULT ? bottomWindow : { limit: Math.min(MESSAGE_WINDOW_MAX, wanted) }
 }
 
-/** What the shown tab does just before another tab replaces it: record its scroll position. */
+/** What the shown topic does just before another page replaces it: record its scroll position. Keyed by topic id. */
 const leaving = new Map<string, () => void>()
 
-/** Registers what the tab `id` does as it is left, while it is shown. Returns the unregister. */
+/** Registers what the topic `id` does as it is left, while it is shown. Returns the unregister. */
 export function onLeaveTab(id: string, leave: () => void): () => void {
   leaving.set(id, leave)
   return () => {
@@ -67,11 +88,16 @@ export function onLeaveTab(id: string, leave: () => void): () => void {
   }
 }
 
+const activeTopic = (tabs: Tabs): string | undefined => {
+  const tab = activeTab(tabs)
+  return tab === undefined ? undefined : tabTopic(tab)
+}
+
 function apply(change: (tabs: Tabs) => Tabs): Tabs {
-  const active = registry.get(tabsAtom).active
-  if (active !== undefined) leaving.get(active)?.()
+  const before = activeTopic(registry.get(tabsAtom))
+  if (before !== undefined) leaving.get(before)?.()
   const next = updateTabs(registry, change)
-  registry.set(selectedTopicAtom, next.active)
+  registry.set(selectedTopicAtom, activeTopic(next))
   return next
 }
 
@@ -79,7 +105,7 @@ function apply(change: (tabs: Tabs) => Tabs): Tabs {
  * Resolves once the topic's header and first window are local, or, after
  * `READY_WAIT_MS`, once the header is. Showing the tab without its header
  * would paint an empty pane and an empty tab title. A fresh open also
- * picks the window (`openWindow`); a tab coming back keeps the one it had.
+ * picks the window (`openWindow`); a topic coming back keeps the one it had.
  */
 function whenReady(id: string, fresh: boolean): Promise<void> {
   return new Promise((resolve) => {
@@ -118,30 +144,64 @@ function whenReady(id: string, fresh: boolean): Promise<void> {
   })
 }
 
-/** Opens apply in the order they were asked for. */
+/** Changes apply in the order they were asked for. */
 let queue: Promise<void> = Promise.resolve()
-/** Bumped by each open in the current tab and each tab switch: an open in the current tab applies only if nothing replaced it since. */
+/** Bumped by each change of what the window shows: a change that waited applies only if nothing replaced it since. */
 let currentTicket = 0
 
-/** Opens a topic: in the current tab, a new tab with `newTab`, or its own tab when it is already open. */
-export function openTopic(id: string, options: OpenOptions = {}): void {
+/**
+ * Applies `change` once `topic` (the topic the change brings on screen) can
+ * paint, unless something newer replaced it meanwhile. With no topic to
+ * wait for, it applies now.
+ */
+function show(change: (tabs: Tabs) => Tabs, topic: { readonly id: string; readonly fresh: boolean; readonly name: 'juno.topic-open' | 'juno.tab-switch' } | undefined, replaceable = true): void {
   const at = performance.now()
-  registry.set(selectedTopicAtom, id)
-  if (registry.get(tabsAtom).tabs.some((tab) => tab.id === id)) {
-    switchToTab(id)
+  const ticket = replaceable ? ++currentTicket : currentTicket
+  if (topic === undefined) {
+    queue = queue.then(() => {
+      if (ticket === currentTicket) apply(change)
+    })
     return
   }
-  pending = { id, at, name: 'juno.topic-open' }
-  const replaces = options.newTab !== true
-  const ticket = replaces ? ++currentTicket : currentTicket
-  // A fresh open starts at the divider or the bottom, not where an earlier tab of it was.
-  registry.set(scrollSnapshotAtom(id), undefined)
-  const ready = whenReady(id, true)
+  registry.set(selectedTopicAtom, topic.id)
+  pending = { id: topic.id, at, name: topic.name }
+  const ready = whenReady(topic.id, topic.fresh)
   queue = queue
     .then(() => ready)
     .then(() => {
-      if (!replaces || ticket === currentTicket) apply((tabs) => openTab(tabs, id, options))
+      if (!replaceable || ticket === currentTicket) apply(change)
     })
+}
+
+/** Opens a topic: in the current tab, a new tab with `newTab`, or the tab that already shows it. */
+export function openTopic(id: string, options: OpenOptions = {}): void {
+  const showing = tabShowing(registry.get(tabsAtom), id)
+  if (showing !== undefined) {
+    switchToTab(showing.id)
+    return
+  }
+  // A fresh open starts at the divider or the bottom, not where it was left.
+  registry.set(scrollSnapshotAtom(id), undefined)
+  // A new tab does not replace the current one, so a later open in the current tab does not cancel it.
+  show((tabs) => openPlace(tabs, topicPlace(id), options), { id, fresh: true, name: 'juno.topic-open' }, options.newTab !== true)
+}
+
+/**
+ * ⌘T, ⌘N and "+": a new tab. New chat is not built yet (spec section 9), so
+ * the tab shows the empty workspace until a topic opens in it.
+ * TODO(New chat): render the New chat page for `newChatPlace`.
+ */
+export function openNewTab(): void {
+  show((tabs) => openPlace(tabs, newChatPlace, { newTab: true }), undefined)
+}
+
+/** The topic a tab change brings on screen, if it has to wait for one. */
+function arriving(tabs: Tabs, tabId: string, place: Place | undefined, fresh: boolean) {
+  if (place?.kind !== 'topic') return undefined
+  // A mounted tab that keeps its page shows in the next frame.
+  const tab = tabs.tabs.find((other) => other.id === tabId)
+  if (tab !== undefined && mountedTabs(tabs).has(tabId) && tabTopic(tab) === place.topicId) return undefined
+  return { id: place.topicId, fresh, name: 'juno.tab-switch' as const }
 }
 
 /**
@@ -149,40 +209,87 @@ export function openTopic(id: string, options: OpenOptions = {}): void {
  * unmounted waits, like an open, until its data is local, then comes back
  * at its scroll snapshot.
  */
-export function switchToTab(id: string): void {
+export function switchToTab(tabId: string): void {
   const at = performance.now()
-  const ticket = ++currentTicket
   const tabs = registry.get(tabsAtom)
-  if (tabs.active === id) return
-  registry.set(selectedTopicAtom, id)
-  if (mountedTabs(tabs).has(id)) {
-    apply((current) => activateTab(current, id))
-    afterPaint(() => measure('juno.tab-switch', at, { detail: { id, mounted: true } }))
+  if (tabs.active === tabId) return
+  const tab = tabs.tabs.find((other) => other.id === tabId)
+  if (tab === undefined) return
+  const topic = arriving(tabs, tabId, currentPlace(tab), false)
+  if (topic === undefined) {
+    ++currentTicket
+    apply((current) => activateTab(current, tabId))
+    afterPaint(() => measure('juno.tab-switch', at, { detail: { id: tabTopic(tab) ?? tabId, mounted: true } }))
     return
   }
-  pending = { id, at, name: 'juno.tab-switch' }
-  const ready = whenReady(id, false)
-  queue = queue
-    .then(() => ready)
-    .then(() => {
-      if (ticket === currentTicket) apply((current) => activateTab(current, id))
-    })
+  show((current) => activateTab(current, tabId), topic)
 }
 
-export function closeTopicTab(id: string): void {
-  apply((tabs) => closeTab(tabs, id))
-  registry.set(scrollSnapshotAtom(id), undefined)
+/** Back (-1) or Forward (1) in the active tab. The topic comes back where it was left. */
+export function stepTabHistory(step: 1 | -1): void {
+  const tabs = registry.get(tabsAtom)
+  const tab = activeTab(tabs)
+  if (tab === undefined) return
+  goToTabEntry(tab.history.index + step)
 }
 
-/** ⌘W, ⌘⇧] and ⌘⇧[ from the app menu. */
+/** Shows entry `index` of the active tab's history (Back, Forward and the history menu). */
+export function goToTabEntry(index: number): void {
+  const tabs = registry.get(tabsAtom)
+  const tab = activeTab(tabs)
+  const place = tab?.history.entries[index]
+  if (tab === undefined || place === undefined || index === tab.history.index) return
+  const topic = place.kind === 'topic' ? { id: place.topicId, fresh: false, name: 'juno.topic-open' as const } : undefined
+  show((current) => goToEntry(current, index), topic)
+}
+
+/** Brings the tab that is active after `change` on screen, waiting for its topic when it was not mounted. */
+function changeTabs(change: (tabs: Tabs) => Tabs): void {
+  const tabs = registry.get(tabsAtom)
+  const next = change(tabs)
+  if (next === tabs) return
+  const tab = activeTab(next)
+  const topic = tab === undefined || tab.id === tabs.active ? undefined : arriving(tabs, tab.id, currentPlace(tab), false)
+  if (topic === undefined) {
+    ++currentTicket
+    apply(change)
+    return
+  }
+  show(change, topic)
+}
+
+export function closeTabById(tabId: string): void {
+  changeTabs((tabs) => closeTab(tabs, tabId))
+}
+
+/** The app menu and the three-finger swipe. */
 export function runMenuCommand(command: MenuCommand): void {
   const tabs = registry.get(tabsAtom)
-  if (command === 'tab.close') {
-    if (tabs.active !== undefined) closeTopicTab(tabs.active)
-    return
+  switch (command) {
+    case 'tab.new':
+      return openNewTab()
+    case 'tab.close':
+      if (tabs.active !== undefined) closeTabById(tabs.active)
+      return
+    case 'tab.reopen':
+      return changeTabs(reopenClosedTab)
+    case 'tab.next':
+    case 'tab.previous': {
+      const next = cycleTab(tabs, command === 'tab.next' ? 1 : -1)
+      if (next.active !== undefined && next.active !== tabs.active) switchToTab(next.active)
+      return
+    }
+    case 'history.back':
+      return stepTabHistory(-1)
+    case 'history.forward':
+      return stepTabHistory(1)
+    case 'sidebar.toggle':
+      return toggleSidebar()
+    default: {
+      const tab = tabByNumber(tabs, Number(command.slice('tab.select.'.length)))
+      if (tab !== undefined) switchToTab(tab.id)
+    }
   }
-  const next = cycleTab(tabs, command === 'tab.next' ? 1 : -1)
-  if (next.active !== undefined && next.active !== tabs.active) switchToTab(next.active)
 }
 
 /** Pointer enter, focus or keyboard selection of something that opens a topic. */
@@ -200,8 +307,68 @@ export async function showTopicMenu(id: string): Promise<void> {
   else if (chosen === 'stealth') openTopic(id, { stealth: true })
 }
 
-/** The menu on a tab. */
-export async function showTabMenu(id: string): Promise<void> {
-  const chosen = await popupContextMenu([{ id: 'close', label: 'Close tab' }])
-  if (chosen === 'close') closeTopicTab(id)
+/** The tab menu (inventory 15.5). Copy Slack link and Open in Slack only on a topic tab whose header is local. */
+export async function showTabMenu(tabId: string): Promise<void> {
+  const tabs = registry.get(tabsAtom)
+  const at = tabs.tabs.findIndex((tab) => tab.id === tabId)
+  const tab = tabs.tabs[at]
+  if (tab === undefined) return
+  const topicId = tabTopic(tab)
+  const header = topicId === undefined ? undefined : registry.get(topicAtom(topicId))
+  const detail = header?._tag === 'Success' ? header.value : null
+  const chosen = await popupContextMenu([
+    { id: 'pin', label: tab.pinned ? 'Unpin tab' : 'Pin tab' },
+    { separator: true },
+    { id: 'close', label: 'Close tab', accelerator: 'CommandOrControl+W' },
+    { id: 'close-others', label: 'Close other tabs', enabled: tabs.tabs.some((other) => other.id !== tabId && !other.pinned) },
+    { id: 'close-right', label: 'Close tabs to the right', enabled: tabs.tabs.slice(at + 1).some((other) => !other.pinned) },
+    { id: 'close-all', label: 'Close all tabs', enabled: tabs.tabs.some((other) => !other.pinned) },
+    ...(detail === null
+      ? []
+      : [{ separator: true } as const, { id: 'copy-link', label: 'Copy Slack link' }, { id: 'open-in-slack', label: 'Open in Slack' }]),
+  ])
+  switch (chosen) {
+    case 'pin':
+      return void apply((current) => setPinned(current, tabId, !tab.pinned))
+    case 'close':
+      return closeTabById(tabId)
+    case 'close-others':
+      return changeTabs((current) => closeOtherTabs(current, tabId))
+    case 'close-right':
+      return changeTabs((current) => closeTabsToRight(current, tabId))
+    case 'close-all':
+      return changeTabs(closeAllTabs)
+    case 'copy-link': {
+      const session = registry.get(signedInAtom)
+      if (detail !== null && session !== undefined) copyText(slackLink(session.workspaceUrl, detail))
+      return
+    }
+    case 'open-in-slack': {
+      const session = registry.get(signedInAtom)
+      if (detail !== null && session !== undefined) openInSlack({ teamId: session.teamId, channelId: detail.channel.id })
+      return
+    }
+  }
+}
+
+/** What the history menu calls a place: the tab's title for it. */
+function placeLabel(place: Place): string {
+  if (place.kind === 'newChat') return 'New chat'
+  const result = registry.get(topicAtom(place.topicId))
+  const detail = result._tag === 'Success' ? result.value : null
+  if (detail === null) return 'Topic'
+  return detail.kind === 'main' ? detail.channel.label : detail.title
+}
+
+/** A long press on Back (-1) or Forward (1): the active tab's history that way, nearest first, as in Safari. */
+export async function showHistoryMenu(step: 1 | -1): Promise<void> {
+  const tab = activeTab(registry.get(tabsAtom))
+  if (tab === undefined) return
+  const items: Array<{ id: string; label: string }> = []
+  for (let index = tab.history.index + step; index >= 0 && index < tab.history.entries.length && items.length < 20; index += step) {
+    items.push({ id: String(index), label: placeLabel(tab.history.entries[index]!) })
+  }
+  if (items.length === 0) return
+  const chosen = await popupContextMenu(items)
+  if (chosen !== undefined && registry.get(tabsAtom).active === tab.id) goToTabEntry(Number(chosen))
 }

@@ -7,6 +7,7 @@ import { AppInfo } from './AppInfo'
 import { EngineStatus, SyncNotice } from './EngineStatus'
 import { markFilterChange } from './filterMark'
 import { Session } from './Session'
+import { TitlebarNav } from './TitlebarNav'
 import { TopicList } from './TopicList'
 
 function navigate(target: SidebarNavTarget): void {
@@ -65,6 +66,7 @@ export function Sidebar() {
 
   return (
     <SidebarView
+      titlebarLeading={<TitlebarNav />}
       account={account}
       theme={theme}
       forYouCount={0}

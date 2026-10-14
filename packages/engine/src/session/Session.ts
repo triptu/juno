@@ -149,6 +149,7 @@ export class Session extends Context.Service<
             teamName: auth.team,
             userId: auth.user_id,
             userName: auth.user,
+            workspaceUrl: auth.url,
             ...(enterpriseId === undefined ? {} : { enterprise: { id: enterpriseId, ...(secrets.enterprise?.name === undefined ? {} : { name: secrets.enterprise.name }) } }),
           })
         })
@@ -182,6 +183,7 @@ export class Session extends Context.Service<
           teamName: answer.secrets.teamName ?? answer.secrets.teamDomain ?? answer.secrets.teamId,
           userId: answer.secrets.userId,
           userName: answer.secrets.userId,
+          workspaceUrl: answer.secrets.workspaceUrl,
           ...(answer.secrets.enterprise === undefined ? {} : { enterprise: { id: answer.secrets.enterprise.id } }),
         })
       })

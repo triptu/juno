@@ -38,7 +38,7 @@ import {
   type OlderStatus,
 } from '@juno/views'
 import { markFilterChange } from './filterMark'
-import { closeTopicTab, onLeaveTab, openTopic, takeOpenStart } from './navigation'
+import { closeTabById, onLeaveTab, openTopic, takeOpenStart } from './navigation'
 
 /** Within this of the end counts as at the bottom (performance 3.3). */
 const BOTTOM_SLACK = 32
@@ -211,6 +211,9 @@ export function hasArt(detail: TopicDetail): boolean {
 }
 
 export interface TopicTabProps {
+  /** The tab that shows the topic. */
+  readonly tabId: string
+  /** The topic. */
   readonly id: string
   readonly stealth: boolean
 }
@@ -232,13 +235,13 @@ export interface TopicTabProps {
  * - Marks read by `shouldMarkRead`: on open and when shown, then at the
  *   bottom of a focused window. A stealth tab marks only from Mark read.
  */
-export const TopicTab = memo(function TopicTab({ id, stealth }: TopicTabProps) {
+export const TopicTab = memo(function TopicTab({ tabId, id, stealth }: TopicTabProps) {
   const result = useAtomValue(topicAtom(id))
   const detail = result._tag === 'Success' ? result.value : undefined
   // A topic the store does not know (a saved tab whose topic is gone) closes its tab.
   useEffect(() => {
-    if (detail === null) closeTopicTab(id)
-  }, [id, detail])
+    if (detail === null) closeTabById(tabId)
+  }, [tabId, detail])
   if (detail == null) return null
   return <Topic id={id} stealth={stealth} detail={detail} />
 })

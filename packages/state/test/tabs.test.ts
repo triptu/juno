@@ -1,69 +1,222 @@
 import { describe, expect, it } from 'vitest'
-import { closeTab, cycleTab, dividerIndex, endStealth, mountedTabs, noTabs, openTab, parseTabs, type Tabs } from '../src/tabs'
+import {
+  closeAllTabs,
+  closeOtherTabs,
+  closeTab,
+  closeTabsToRight,
+  cycleTab,
+  dividerIndex,
+  endStealth,
+  historyTarget,
+  mountedTabs,
+  newChatPlace,
+  noTabs,
+  openPlace,
+  parseTabs,
+  reopenClosedTab,
+  savedTabs,
+  setPinned,
+  stepHistory,
+  tabByNumber,
+  tabTopic,
+  topicPlace,
+  type OpenOptions,
+  type Tabs,
+} from '../src/tabs'
 
-const ids = (tabs: Tabs) => tabs.tabs.map((tab) => tab.id)
+const open = (tabs: Tabs, topicId: string, options?: OpenOptions) => openPlace(tabs, topicPlace(topicId), options)
+/** What each tab shows, left to right: a topic id, or "new" for a New chat. */
+const shown = (tabs: Tabs) => tabs.tabs.map((tab) => tabTopic(tab) ?? 'new')
+const activeShows = (tabs: Tabs) => {
+  const tab = tabs.tabs.find((other) => other.id === tabs.active)
+  return tab === undefined ? undefined : (tabTopic(tab) ?? 'new')
+}
+/** The topics of the mounted tabs, the active first. */
+const mounted = (tabs: Tabs) => [...mountedTabs(tabs)].map((id) => tabTopic(tabs.tabs.find((tab) => tab.id === id)!))
+const idOf = (tabs: Tabs, topicId: string) => tabs.tabs.find((tab) => tabTopic(tab) === topicId)!.id
 
 /** Tabs a, b, c with b active. */
-const three = openTab(openTab(openTab(openTab(noTabs, 'a'), 'b', { newTab: true }), 'c', { newTab: true }), 'b')
+const three = open(open(open(open(noTabs, 'a'), 'b', { newTab: true }), 'c', { newTab: true }), 'b')
 
 describe('opening', () => {
-  it('the first topic opens a tab; the next ones replace it', () => {
-    const one = openTab(noTabs, 'a')
-    expect(one).toEqual({ tabs: [{ id: 'a', stealth: false }], active: 'a', recent: ['a'] })
-    expect(openTab(one, 'b')).toEqual({ tabs: [{ id: 'b', stealth: false }], active: 'b', recent: ['b'] })
+  it('the first topic opens a tab; the next ones show in it', () => {
+    const one = open(noTabs, 'a')
+    expect(shown(one)).toEqual(['a'])
+    const two = open(one, 'b')
+    expect(shown(two)).toEqual(['b'])
+    expect(two.tabs[0]!.id).toBe(one.tabs[0]!.id)
   })
 
   it('a new tab goes right after the current one and becomes active', () => {
-    expect(ids(three)).toEqual(['a', 'b', 'c'])
-    const opened = openTab(three, 'd', { newTab: true })
-    expect(ids(opened)).toEqual(['a', 'b', 'd', 'c'])
-    expect(opened.active).toBe('d')
-    expect(opened.recent).toEqual(['d', 'b', 'c', 'a'])
+    expect(shown(three)).toEqual(['a', 'b', 'c'])
+    const opened = open(three, 'd', { newTab: true })
+    expect(shown(opened)).toEqual(['a', 'b', 'd', 'c'])
+    expect(activeShows(opened)).toBe('d')
+    expect(mountedTabs(opened).size).toBe(4)
   })
 
-  it('an open topic focuses its tab instead of opening another, in either mode', () => {
-    expect(openTab(three, 'c')).toEqual({ ...three, active: 'c', recent: ['c', 'b', 'a'] })
-    expect(openTab(three, 'a', { newTab: true })).toEqual({ ...three, active: 'a', recent: ['a', 'b', 'c'] })
+  it('a topic another tab shows focuses that tab instead of opening another, in either mode', () => {
+    expect(activeShows(open(three, 'c'))).toBe('c')
+    expect(shown(open(three, 'a', { newTab: true }))).toEqual(['a', 'b', 'c'])
   })
 
   it('stealth is kept on the tab, and ends with Mark read', () => {
-    const stealth = openTab(three, 'd', { stealth: true })
-    expect(stealth.tabs[1]).toEqual({ id: 'd', stealth: true })
-    expect(endStealth(stealth, 'd').tabs[1]).toEqual({ id: 'd', stealth: false })
+    const stealth = open(three, 'd', { stealth: true })
+    expect(stealth.tabs[1]!.stealth).toBe(true)
+    expect(endStealth(stealth, 'd').tabs[1]!.stealth).toBe(false)
     expect(endStealth(three, 'b')).toBe(three)
+  })
+
+  it('a New chat opens in a new tab, and the next open in that tab replaces it', () => {
+    const chat = openPlace(three, newChatPlace, { newTab: true })
+    expect(shown(chat)).toEqual(['a', 'b', 'new', 'c'])
+    const filled = open(chat, 'd')
+    expect(shown(filled)).toEqual(['a', 'b', 'd', 'c'])
+    expect(historyTarget(filled, -1)).toBeUndefined()
+  })
+})
+
+describe('history', () => {
+  it('Back and Forward move through what the tab showed', () => {
+    const tabs = open(open(open(noTabs, 'a'), 'b'), 'c')
+    expect(historyTarget(tabs, -1)).toEqual(topicPlace('b'))
+    expect(historyTarget(tabs, 1)).toBeUndefined()
+    const back = stepHistory(stepHistory(tabs, -1), -1)
+    expect(shown(back)).toEqual(['a'])
+    expect(stepHistory(back, -1)).toBe(back)
+    expect(shown(stepHistory(back, 1))).toEqual(['b'])
+  })
+
+  it('opening something after going back drops Forward', () => {
+    const back = stepHistory(open(open(noTabs, 'a'), 'b'), -1)
+    const branched = open(back, 'c')
+    expect(historyTarget(branched, 1)).toBeUndefined()
+    expect(historyTarget(branched, -1)).toEqual(topicPlace('a'))
+  })
+
+  it('each tab has its own history', () => {
+    const tabs = open(open(open(open(noTabs, 'a'), 'b'), 'x', { newTab: true }), 'y')
+    expect(historyTarget(tabs, -1)).toEqual(topicPlace('x'))
+    expect(historyTarget(cycleTab(tabs, 1), -1)).toEqual(topicPlace('a'))
+  })
+
+  it('keeps the last 50 entries', () => {
+    let tabs = open(noTabs, 't0')
+    for (let i = 1; i < 60; i++) tabs = open(tabs, `t${i}`)
+    expect(tabs.tabs[0]!.history.entries).toHaveLength(50)
+    expect(tabs.tabs[0]!.history.entries[0]).toEqual(topicPlace('t10'))
   })
 })
 
 describe('closing', () => {
   it('closing the active tab focuses its right neighbour, or the left one at the end', () => {
-    expect(closeTab(three, 'b')).toMatchObject({ active: 'c' })
-    expect(ids(closeTab(three, 'b'))).toEqual(['a', 'c'])
-    const last = openTab(three, 'c')
-    expect(closeTab(last, 'c')).toMatchObject({ active: 'b' })
+    expect(activeShows(closeTab(three, idOf(three, 'b')))).toBe('c')
+    expect(shown(closeTab(three, idOf(three, 'b')))).toEqual(['a', 'c'])
+    const last = open(three, 'c')
+    expect(activeShows(closeTab(last, idOf(last, 'c')))).toBe('b')
   })
 
   it('closing another tab keeps the active one', () => {
-    expect(closeTab(three, 'a')).toEqual({ tabs: three.tabs.slice(1), active: 'b', recent: ['b', 'c'] })
+    const closed = closeTab(three, idOf(three, 'a'))
+    expect(shown(closed)).toEqual(['b', 'c'])
+    expect(activeShows(closed)).toBe('b')
   })
 
   it('closing the last tab leaves none', () => {
-    expect(closeTab(openTab(noTabs, 'a'), 'a')).toEqual(noTabs)
+    const one = open(noTabs, 'a')
+    const none = closeTab(one, one.tabs[0]!.id)
+    expect(none.tabs).toEqual([])
+    expect(none.active).toBeUndefined()
+  })
+
+  it('close other, to the right and all leave pinned tabs open', () => {
+    const tabs = setPinned(open(three, 'd', { newTab: true }), idOf(three, 'c'), true)
+    expect(shown(tabs)).toEqual(['c', 'a', 'b', 'd'])
+    expect(shown(closeOtherTabs(tabs, idOf(tabs, 'b')))).toEqual(['c', 'b'])
+    expect(activeShows(closeOtherTabs(tabs, idOf(tabs, 'a')))).toBe('a')
+    expect(shown(closeTabsToRight(tabs, idOf(tabs, 'a')))).toEqual(['c', 'a'])
+    expect(shown(closeTabsToRight(tabs, idOf(tabs, 'c')))).toEqual(['c'])
+    expect(shown(closeAllTabs(tabs))).toEqual(['c'])
+    expect(shown(closeTab(tabs, idOf(tabs, 'c')))).toEqual(['a', 'b', 'd'])
+  })
+})
+
+describe('reopening closed tabs', () => {
+  it('brings back the last closed tab, then the one before, each at its place and with its history', () => {
+    const withHistory = open(three, 'b2')
+    const one = closeTab(withHistory, idOf(withHistory, 'b2'))
+    const two = closeTab(one, idOf(one, 'a'))
+    expect(shown(two)).toEqual(['c'])
+    const first = reopenClosedTab(two)
+    expect(shown(first)).toEqual(['a', 'c'])
+    expect(activeShows(first)).toBe('a')
+    const second = reopenClosedTab(first)
+    expect(shown(second)).toEqual(['a', 'b2', 'c'])
+    expect(activeShows(second)).toBe('b2')
+    expect(historyTarget(second, -1)).toEqual(topicPlace('b'))
+    expect(reopenClosedTab(reopenClosedTab(second))).toBe(reopenClosedTab(second))
+  })
+
+  it('after closing all, reopens them left to right', () => {
+    let tabs = closeAllTabs(three)
+    tabs = reopenClosedTab(reopenClosedTab(reopenClosedTab(tabs)))
+    expect(shown(tabs)).toEqual(['a', 'b', 'c'])
+  })
+
+  it('keeps the last 20', () => {
+    let tabs = noTabs
+    for (let i = 0; i < 25; i++) tabs = open(tabs, `t${i}`, { newTab: true })
+    tabs = closeAllTabs(tabs)
+    expect(tabs.closed).toHaveLength(20)
+  })
+
+  it('a new tab never reuses the id of a closed one', () => {
+    const closed = closeTab(three, idOf(three, 'c'))
+    const opened = open(closed, 'd', { newTab: true })
+    expect(new Set([...opened.tabs, ...opened.closed.map((entry) => entry.tab)].map((tab) => tab.id)).size).toBe(4)
+  })
+})
+
+describe('pinning', () => {
+  it('pins after the pinned tabs and unpins to the first unpinned place', () => {
+    let tabs = setPinned(three, idOf(three, 'c'), true)
+    expect(shown(tabs)).toEqual(['c', 'a', 'b'])
+    tabs = setPinned(tabs, idOf(tabs, 'b'), true)
+    expect(shown(tabs)).toEqual(['c', 'b', 'a'])
+    expect(tabs.tabs.map((tab) => tab.pinned)).toEqual([true, true, false])
+    tabs = setPinned(tabs, idOf(tabs, 'c'), false)
+    expect(shown(tabs)).toEqual(['b', 'c', 'a'])
+  })
+
+  it('a new tab opened from a pinned tab goes after the pinned ones', () => {
+    const tabs = setPinned(open(open(noTabs, 'a'), 'b', { newTab: true }), 'tab-1', true)
+    const from = cycleTab(tabs, -1)
+    expect(activeShows(from)).toBe('a')
+    expect(shown(open(from, 'c', { newTab: true }))).toEqual(['a', 'c', 'b'])
   })
 })
 
 describe('switching and mounting', () => {
   it('cycles through the strip and wraps', () => {
-    expect(cycleTab(three, 1).active).toBe('c')
-    expect(cycleTab(cycleTab(three, 1), 1).active).toBe('a')
-    expect(cycleTab(three, -1).active).toBe('a')
+    expect(activeShows(cycleTab(three, 1))).toBe('c')
+    expect(activeShows(cycleTab(cycleTab(three, 1), 1))).toBe('a')
+    expect(activeShows(cycleTab(three, -1))).toBe('a')
+  })
+
+  it('numbers the tabs from 1, with 9 the last', () => {
+    const tabs = open(three, 'd', { newTab: true })
+    expect(tabTopic(tabByNumber(tabs, 1)!)).toBe('a')
+    expect(tabTopic(tabByNumber(tabs, 3)!)).toBe('d')
+    expect(tabByNumber(tabs, 8)).toBeUndefined()
+    expect(tabTopic(tabByNumber(tabs, 9)!)).toBe('c')
   })
 
   it('keeps the active tab and the 4 most recent mounted', () => {
     let tabs = noTabs
-    for (const id of ['a', 'b', 'c', 'd', 'e', 'f', 'g']) tabs = openTab(tabs, id, { newTab: true })
-    expect([...mountedTabs(tabs)]).toEqual(['g', 'f', 'e', 'd', 'c'])
-    tabs = openTab(tabs, 'a')
-    expect([...mountedTabs(tabs)]).toEqual(['a', 'g', 'f', 'e', 'd'])
+    for (const id of ['a', 'b', 'c', 'd', 'e', 'f', 'g']) tabs = open(tabs, id, { newTab: true })
+    expect(mounted(tabs)).toEqual(['g', 'f', 'e', 'd', 'c'])
+    tabs = open(tabs, 'a')
+    expect(mounted(tabs)).toEqual(['a', 'g', 'f', 'e', 'd'])
   })
 })
 
@@ -77,14 +230,27 @@ describe('the divider', () => {
 })
 
 describe('saved tabs', () => {
-  it('read back as they were saved, stealth included', () => {
-    const saved = { tabs: [{ id: 'a', stealth: false }, { id: 'b', stealth: true }], active: 'b', recent: ['b', 'a'] }
-    expect(parseTabs(JSON.parse(JSON.stringify(saved)))).toEqual(saved)
+  it('read back as they were saved, pinned and stealth flags included, each showing its place', () => {
+    const tabs = setPinned(open(open(three, 'b2'), 'd', { newTab: true, stealth: true }), 'tab-3', true)
+    const restored = parseTabs(JSON.parse(JSON.stringify(savedTabs(tabs))))
+    expect(shown(restored)).toEqual(shown(tabs))
+    expect(restored.tabs.map((tab) => [tab.id, tab.pinned, tab.stealth])).toEqual(tabs.tabs.map((tab) => [tab.id, tab.pinned, tab.stealth]))
+    expect(restored.active).toBe(tabs.active)
+    expect(historyTarget(restored, -1)).toBeUndefined()
+  })
+
+  it('tabs saved before history read back as topic tabs', () => {
+    const restored = parseTabs({ tabs: [{ id: 'a', stealth: false }, { id: 'b', stealth: true }], active: 'b', recent: ['b', 'a'] })
+    expect(shown(restored)).toEqual(['a', 'b'])
+    expect(restored.tabs[1]!.stealth).toBe(true)
+    expect(activeShows(restored)).toBe('b')
   })
 
   it('anything unreadable is no tabs, and a lost active tab falls back to the first', () => {
     expect(parseTabs(null)).toEqual(noTabs)
     expect(parseTabs({ tabs: 'nope' })).toEqual(noTabs)
-    expect(parseTabs({ tabs: [{ id: 'a', stealth: false }], active: 'gone', recent: ['gone'] })).toEqual({ tabs: [{ id: 'a', stealth: false }], active: 'a', recent: ['a'] })
+    const lost = parseTabs({ tabs: [{ id: 'a', stealth: false }], active: 'gone', recent: ['gone'] })
+    expect(lost.active).toBe('a')
+    expect(lost.recent).toEqual(['a'])
   })
 })

@@ -1,20 +1,27 @@
 /**
- * Topic tabs (spec section 6, performance 4.3 and 4.5).
+ * Workspace tabs (spec section 6, inventory 4, performance 4.3 and 4.5).
  *
- * The rules are pure functions over `Tabs`:
- * - `openTab`: a topic opens in the current tab, or in a new one after the
- *   current tab when asked (⌘-click, ⌘-Enter, Open in new tab). A topic
- *   that is already open focuses its tab instead.
- * - `closeTab`: closing the active tab focuses its right neighbour, or its
- *   left one when it was the last. Closing the last tab leaves none.
- * - `activateTab`, `cycleTab` (⌘⇧] and ⌘⇧[), `endStealth` (Mark read).
+ * A tab shows one place, a topic or a New chat, and keeps its own history
+ * of the places it showed, like a browser tab. The rules are pure functions
+ * over `Tabs`:
+ * - `openPlace`: a place opens in the current tab (a new history entry), or
+ *   in a new tab after it when asked (⌘-click, ⌘-Enter, Open in new tab,
+ *   ⌘T). A topic that a tab already shows focuses that tab instead.
+ * - `stepHistory` (Back and Forward), `goToEntry` (the history menu).
+ * - `closeTab`, `closeOtherTabs`, `closeTabsToRight`, `closeAllTabs`: every
+ *   closed tab goes onto the reopen stack with its history; `reopenClosedTab`
+ *   (⌘⇧T) takes the last one back. The bulk closes leave pinned tabs open.
+ * - `setPinned`: pinned tabs sit first, in pin order.
+ * - `activateTab`, `cycleTab` (⌃Tab, ⌘⇧] and ⌘⇧[), `tabByNumber` (⌘1 to
+ *   ⌘9), `endStealth` (Mark read).
  * - `mountedTabs`: the active tab and the 4 most recently active stay
  *   mounted in `<Activity>`; the rest unmount and keep a `ScrollSnapshot`.
  *
  * `tabsAtom` holds the tabs of the signed-in workspace. They are saved to
  * the workspace preference `TABS_PREF` on every change and read back from
- * it after a restart, stealth flags included. `updateTabs` is the one way
- * to change them.
+ * it after a restart, with their pinned and stealth flags and the place
+ * each shows. History and the reopen stack are in memory only.
+ * `updateTabs` is the one way to change them.
  */
 import { Option, Schema } from 'effect'
 import * as AsyncResult from 'effect/reactivity/AsyncResult'
@@ -25,30 +32,78 @@ import type { Registry } from './client'
 import { topicAtom } from './messages'
 import { signedInAtom } from './session'
 
-/** One open topic. A topic is open in at most one tab, so its id is the tab's. */
-export interface TopicTab {
+/** What a tab shows. New chat is a placeholder until it is built (spec section 9). */
+export type Place = { readonly kind: 'topic'; readonly topicId: string } | { readonly kind: 'newChat' }
+
+export const newChatPlace: Place = { kind: 'newChat' }
+export const topicPlace = (topicId: string): Place => ({ kind: 'topic', topicId })
+
+/** The places a tab showed, oldest first, and the one it shows. */
+export interface TabHistory {
+  readonly entries: ReadonlyArray<Place>
+  readonly index: number
+}
+
+export interface Tab {
   readonly id: string
-  /** Opened in stealth: nothing marks it read until its Mark read. */
+  readonly pinned: boolean
+  /** Opened in stealth: nothing marks it read until its Mark read. Ends when the tab shows another place. */
   readonly stealth: boolean
+  readonly history: TabHistory
+}
+
+/** A closed tab and where it was in the strip. */
+export interface ClosedTab {
+  readonly tab: Tab
+  readonly index: number
 }
 
 export interface Tabs {
-  /** In strip order. */
-  readonly tabs: ReadonlyArray<TopicTab>
+  /** In strip order, pinned tabs first. */
+  readonly tabs: ReadonlyArray<Tab>
   readonly active: string | undefined
   /** Tab ids, the most recently active first. */
   readonly recent: ReadonlyArray<string>
+  /** Closed tabs, the last closed at the end. */
+  readonly closed: ReadonlyArray<ClosedTab>
 }
 
-export const noTabs: Tabs = { tabs: [], active: undefined, recent: [] }
+export const noTabs: Tabs = { tabs: [], active: undefined, recent: [], closed: [] }
 
 /** Tabs kept mounted: the active one and the 4 most recently active (performance 4.3). */
 export const MOUNTED_TABS = 5
+/** History entries a tab keeps (inventory 4). */
+export const HISTORY_LIMIT = 50
+/** Closed tabs ⌘⇧T can bring back. */
+export const CLOSED_LIMIT = 20
 
 export interface OpenOptions {
   /** A new tab after the current one, instead of the current tab. */
   readonly newTab?: boolean
   readonly stealth?: boolean
+}
+
+export const currentPlace = (tab: Tab): Place => tab.history.entries[tab.history.index]!
+/** The topic a tab shows, if it shows one. */
+export function tabTopic(tab: Tab): string | undefined {
+  const place = currentPlace(tab)
+  return place.kind === 'topic' ? place.topicId : undefined
+}
+const samePlace = (a: Place, b: Place) => (a.kind === 'topic' ? b.kind === 'topic' && a.topicId === b.topicId : a.kind === b.kind)
+
+export const activeTab = (tabs: Tabs): Tab | undefined => tabs.tabs.find((tab) => tab.id === tabs.active)
+/** The tab that shows `topicId`, if one does. */
+export const tabShowing = (tabs: Tabs, topicId: string): Tab | undefined => tabs.tabs.find((tab) => tabTopic(tab) === topicId)
+const pinnedCount = (tabs: ReadonlyArray<Tab>) => tabs.filter((tab) => tab.pinned).length
+
+/** A tab id no open or closed tab has. Ids are `tab-<n>`, so the next is one past the highest. */
+function nextTabId(tabs: Tabs): string {
+  let highest = 0
+  for (const tab of [...tabs.tabs, ...tabs.closed.map((closed) => closed.tab)]) {
+    const n = Number(tab.id.slice(4))
+    if (tab.id.startsWith('tab-') && Number.isInteger(n)) highest = Math.max(highest, n)
+  }
+  return `tab-${highest + 1}`
 }
 
 const touch = (recent: ReadonlyArray<string>, id: string): ReadonlyArray<string> => (recent[0] === id ? recent : [id, ...recent.filter((other) => other !== id)])
@@ -59,14 +114,51 @@ export function activateTab(tabs: Tabs, id: string): Tabs {
   return { ...tabs, active: id, recent: touch(tabs.recent, id) }
 }
 
-export function openTab(tabs: Tabs, id: string, { newTab = false, stealth = false }: OpenOptions = {}): Tabs {
-  if (tabs.tabs.some((tab) => tab.id === id)) return activateTab(tabs, id)
-  const tab: TopicTab = { id, stealth }
-  const at = tabs.tabs.findIndex((other) => other.id === tabs.active)
-  if (at < 0) return { tabs: [...tabs.tabs, tab], active: id, recent: touch(tabs.recent, id) }
-  if (newTab) return { tabs: tabs.tabs.toSpliced(at + 1, 0, tab), active: id, recent: touch(tabs.recent, id) }
-  const replaced = tabs.tabs[at]!.id
-  return { tabs: tabs.tabs.with(at, tab), active: id, recent: touch(tabs.recent.filter((other) => other !== replaced), id) }
+const freshTab = (id: string, place: Place, stealth: boolean): Tab => ({ id, pinned: false, stealth, history: { entries: [place], index: 0 } })
+
+/** `place` as the tab's next entry. Forward is dropped. An empty New chat is replaced, not kept. */
+function push(history: TabHistory, place: Place): TabHistory {
+  const kept = history.entries[history.index]!.kind === 'newChat' ? history.index : history.index + 1
+  const entries = [...history.entries.slice(0, kept), place].slice(-HISTORY_LIMIT)
+  return { entries, index: entries.length - 1 }
+}
+
+export function openPlace(tabs: Tabs, place: Place, { newTab = false, stealth = false }: OpenOptions = {}): Tabs {
+  if (place.kind === 'topic') {
+    const showing = tabShowing(tabs, place.topicId)
+    if (showing !== undefined) return activateTab(tabs, showing.id)
+  }
+  const at = tabs.tabs.findIndex((tab) => tab.id === tabs.active)
+  if (at < 0 || newTab) {
+    const tab = freshTab(nextTabId(tabs), place, stealth)
+    // A new tab never lands among the pinned ones.
+    const index = at < 0 ? tabs.tabs.length : Math.max(at + 1, pinnedCount(tabs.tabs))
+    return { ...tabs, tabs: tabs.tabs.toSpliced(index, 0, tab), active: tab.id, recent: touch(tabs.recent, tab.id) }
+  }
+  const current = tabs.tabs[at]!
+  if (samePlace(currentPlace(current), place)) return tabs
+  const tab: Tab = { ...current, stealth, history: push(current.history, place) }
+  return { ...tabs, tabs: tabs.tabs.with(at, tab), recent: touch(tabs.recent, tab.id) }
+}
+
+/** The place Back (-1) or Forward (1) would show in the active tab, if there is one. */
+export function historyTarget(tabs: Tabs, step: 1 | -1): Place | undefined {
+  const tab = activeTab(tabs)
+  return tab?.history.entries[tab.history.index + step]
+}
+
+/** Shows entry `index` of the active tab's history. */
+export function goToEntry(tabs: Tabs, index: number): Tabs {
+  const at = tabs.tabs.findIndex((tab) => tab.id === tabs.active)
+  const tab = tabs.tabs[at]
+  if (tab === undefined || index === tab.history.index || index < 0 || index >= tab.history.entries.length) return tabs
+  return { ...tabs, tabs: tabs.tabs.with(at, { ...tab, stealth: false, history: { ...tab.history, index } }) }
+}
+
+/** Back (-1) or Forward (1) in the active tab. */
+export function stepHistory(tabs: Tabs, step: 1 | -1): Tabs {
+  const tab = activeTab(tabs)
+  return tab === undefined ? tabs : goToEntry(tabs, tab.history.index + step)
 }
 
 export function closeTab(tabs: Tabs, id: string): Tabs {
@@ -74,9 +166,51 @@ export function closeTab(tabs: Tabs, id: string): Tabs {
   if (at < 0) return tabs
   const rest = tabs.tabs.toSpliced(at, 1)
   const recent = tabs.recent.filter((other) => other !== id)
-  if (tabs.active !== id) return { ...tabs, tabs: rest, recent }
+  const closed = [...tabs.closed, { tab: tabs.tabs[at]!, index: at }].slice(-CLOSED_LIMIT)
+  if (tabs.active !== id) return { ...tabs, tabs: rest, recent, closed }
   const neighbour = rest[Math.min(at, rest.length - 1)]
-  return { tabs: rest, active: neighbour?.id, recent: neighbour === undefined ? recent : touch(recent, neighbour.id) }
+  return { tabs: rest, active: neighbour?.id, recent: neighbour === undefined ? recent : touch(recent, neighbour.id), closed }
+}
+
+/** Closes `ids` from the right, so ⌘⇧T brings them back left to right, each at its old place. */
+function closeEach(tabs: Tabs, ids: ReadonlyArray<string>): Tabs {
+  return ids.toReversed().reduce(closeTab, tabs)
+}
+
+const unpinnedIds = (tabs: ReadonlyArray<Tab>) => tabs.filter((tab) => !tab.pinned).map((tab) => tab.id)
+
+/** Close other tabs: every unpinned tab but `id`, which becomes active. */
+export function closeOtherTabs(tabs: Tabs, id: string): Tabs {
+  return activateTab(closeEach(tabs, unpinnedIds(tabs.tabs).filter((other) => other !== id)), id)
+}
+
+/** Close tabs to the right: the unpinned tabs after `id`. */
+export function closeTabsToRight(tabs: Tabs, id: string): Tabs {
+  const at = tabs.tabs.findIndex((tab) => tab.id === id)
+  return at < 0 ? tabs : closeEach(tabs, unpinnedIds(tabs.tabs.slice(at + 1)))
+}
+
+/** Close all tabs: every unpinned tab. */
+export function closeAllTabs(tabs: Tabs): Tabs {
+  return closeEach(tabs, unpinnedIds(tabs.tabs))
+}
+
+/** ⌘⇧T: the last closed tab, back at its old index (within its pinned or unpinned group) with its history, and active. */
+export function reopenClosedTab(tabs: Tabs): Tabs {
+  const last = tabs.closed.at(-1)
+  if (last === undefined) return tabs
+  const pinned = pinnedCount(tabs.tabs)
+  const index = last.tab.pinned ? Math.min(last.index, pinned) : Math.min(Math.max(last.index, pinned), tabs.tabs.length)
+  return { tabs: tabs.tabs.toSpliced(index, 0, last.tab), active: last.tab.id, recent: touch(tabs.recent, last.tab.id), closed: tabs.closed.slice(0, -1) }
+}
+
+/** Pins a tab after the pinned ones, or unpins it to the first unpinned place. */
+export function setPinned(tabs: Tabs, id: string, pinned: boolean): Tabs {
+  const at = tabs.tabs.findIndex((tab) => tab.id === id)
+  const tab = tabs.tabs[at]
+  if (tab === undefined || tab.pinned === pinned) return tabs
+  const rest = tabs.tabs.toSpliced(at, 1)
+  return { ...tabs, tabs: rest.toSpliced(pinnedCount(rest), 0, { ...tab, pinned }) }
 }
 
 /** The next (1) or previous (-1) tab, wrapping around. */
@@ -87,10 +221,15 @@ export function cycleTab(tabs: Tabs, step: 1 | -1): Tabs {
   return activateTab(tabs, tabs.tabs[(at + step + count) % count]!.id)
 }
 
-export function endStealth(tabs: Tabs, id: string): Tabs {
-  const at = tabs.tabs.findIndex((tab) => tab.id === id)
-  if (at < 0 || !tabs.tabs[at]!.stealth) return tabs
-  return { ...tabs, tabs: tabs.tabs.with(at, { id, stealth: false }) }
+/** ⌘1 to ⌘8: the tab at that position, pinned tabs included. ⌘9: the last tab. */
+export function tabByNumber(tabs: Tabs, n: number): Tab | undefined {
+  return n === 9 ? tabs.tabs.at(-1) : tabs.tabs[n - 1]
+}
+
+export function endStealth(tabs: Tabs, topicId: string): Tabs {
+  const at = tabs.tabs.findIndex((tab) => tab.stealth && tabTopic(tab) === topicId)
+  if (at < 0) return tabs
+  return { ...tabs, tabs: tabs.tabs.with(at, { ...tabs.tabs[at]!, stealth: false }) }
 }
 
 /** The tabs that stay mounted. */
@@ -119,25 +258,42 @@ export function dividerIndex(order: ReadonlyArray<string>, lastReadTs: string | 
 /** The workspace preference that holds the tabs. */
 export const TABS_PREF = 'tabs'
 
+const PlaceJson = Schema.Union([Schema.Struct({ kind: Schema.Literal('topic'), topicId: Schema.String }), Schema.Struct({ kind: Schema.Literal('newChat') })])
+/** A saved tab, or one saved before history, when a tab's id was its topic's. */
+const TabJson = Schema.Union([
+  Schema.Struct({ id: Schema.String, pinned: Schema.Boolean, stealth: Schema.Boolean, place: PlaceJson }),
+  Schema.Struct({ id: Schema.String, stealth: Schema.Boolean }),
+])
 const TabsJson = Schema.Struct({
-  tabs: Schema.Array(Schema.Struct({ id: Schema.String, stealth: Schema.Boolean })),
+  tabs: Schema.Array(TabJson),
   active: Schema.NullOr(Schema.String),
   recent: Schema.Array(Schema.String),
 })
 const decodeTabs = Schema.decodeUnknownOption(TabsJson)
 
-/** Saved tabs as `Tabs`. Anything else, an older shape included, is no tabs. */
+/** Saved tabs as `Tabs`, each with a history of the one place it showed. Anything unreadable is no tabs. */
 export function parseTabs(value: unknown): Tabs {
   return Option.match(decodeTabs(value), {
     onNone: () => noTabs,
     onSome: (saved) => {
       const ids = new Set(saved.tabs.map((tab) => tab.id))
       if (ids.size !== saved.tabs.length) return noTabs
-      const active = saved.active !== null && ids.has(saved.active) ? saved.active : saved.tabs[0]?.id
+      const tabs = saved.tabs.map((tab): Tab => ('place' in tab ? { id: tab.id, pinned: tab.pinned, stealth: tab.stealth, history: { entries: [tab.place], index: 0 } } : freshTab(tab.id, topicPlace(tab.id), tab.stealth)))
+      const ordered = [...tabs.filter((tab) => tab.pinned), ...tabs.filter((tab) => !tab.pinned)]
+      const active = saved.active !== null && ids.has(saved.active) ? saved.active : ordered[0]?.id
       const recent = saved.recent.filter((id) => ids.has(id))
-      return { tabs: saved.tabs, active, recent: active === undefined ? recent : touch(recent, active) }
+      return { tabs: ordered, active, recent: active === undefined ? recent : touch(recent, active), closed: [] }
     },
   })
+}
+
+/** What `TABS_PREF` holds: each tab with the place it shows. */
+export function savedTabs(tabs: Tabs): unknown {
+  return {
+    tabs: tabs.tabs.map((tab) => ({ id: tab.id, pinned: tab.pinned, stealth: tab.stealth, place: currentPlace(tab) })),
+    active: tabs.active ?? null,
+    recent: tabs.recent,
+  }
 }
 
 const savedTabsAtom = liveQuery(prefsGet)({ key: TABS_PREF })
@@ -163,28 +319,52 @@ export function updateTabs(registry: Registry, change: (tabs: Tabs) => Tabs): Ta
   const next = change(current)
   if (next === current) return current
   registry.set(changedTabsAtom(teamId), next)
-  void runCommand(registry, prefsSet, { key: TABS_PREF, value: { tabs: next.tabs, active: next.active ?? null, recent: next.recent } })
+  void runCommand(registry, prefsSet, { key: TABS_PREF, value: savedTabs(next) })
   return next
 }
+
+/** Whether the active tab can go Back and Forward, for the title bar buttons. */
+export interface HistoryState {
+  readonly back: boolean
+  readonly forward: boolean
+}
+
+const noHistory: HistoryState = { back: false, forward: false }
+
+export const historyStateAtom = Atom.make((get): HistoryState => {
+  const tabs = get(tabsAtom)
+  const back = historyTarget(tabs, -1) !== undefined
+  const forward = historyTarget(tabs, 1) !== undefined
+  return back || forward ? { back, forward } : noHistory
+}).pipe(Atom.withEquality((a: HistoryState, b: HistoryState) => a.back === b.back && a.forward === b.forward))
 
 /** A tab as the strip draws it. */
 export interface TabSummary {
   readonly id: string
+  readonly pinned: boolean
   readonly stealth: boolean
-  /** The topic's header: undefined until it arrives, null for a topic the store does not know. */
+  readonly place: Place
+  /** A topic's header: undefined until it arrives (and for New chat), null for a topic the store does not know. */
   readonly detail: TopicDetail | null | undefined
 }
 
 const sameStrip = (a: ReadonlyArray<TabSummary>, b: ReadonlyArray<TabSummary>) => a.length === b.length && a.every((tab, i) => tab === b[i])
 
-/** The tabs with their headers, for the strip. A tab keeps its object while its flag and header hold. */
+/**
+ * The tabs with their headers, for the strip. The header carries the
+ * topic's unread count, so the unread dot costs no extra query. A tab keeps
+ * its object while its flags, place and header hold.
+ */
 export const tabStripAtom = Atom.make((get): ReadonlyArray<TabSummary> => {
   const previous = new Map(Option.getOrElse(get.self<ReadonlyArray<TabSummary>>(), () => []).map((tab) => [tab.id, tab]))
   return get(tabsAtom).tabs.map((tab) => {
-    const result = get(topicAtom(tab.id))
-    const detail = AsyncResult.isSuccess(result) ? result.value : undefined
+    const place = currentPlace(tab)
+    const result = place.kind === 'topic' ? get(topicAtom(place.topicId)) : undefined
+    const detail = result !== undefined && AsyncResult.isSuccess(result) ? result.value : undefined
     const held = previous.get(tab.id)
-    return held !== undefined && held.stealth === tab.stealth && held.detail === detail ? held : { ...tab, detail }
+    return held !== undefined && held.pinned === tab.pinned && held.stealth === tab.stealth && samePlace(held.place, place) && held.detail === detail
+      ? held
+      : { id: tab.id, pinned: tab.pinned, stealth: tab.stealth, place, detail }
   })
 }).pipe(Atom.withEquality(sameStrip))
 
@@ -194,5 +374,5 @@ export interface ScrollSnapshot {
   readonly offset: number
 }
 
-/** Each tab's last scroll position, kept while the app runs. */
-export const scrollSnapshotAtom = Atom.family((_tabId: string) => Atom.make<ScrollSnapshot | undefined>(undefined).pipe(Atom.keepAlive))
+/** Each topic's last scroll position, kept while the app runs, so Back and ⌘⇧T return to where it was left. */
+export const scrollSnapshotAtom = Atom.family((_topicId: string) => Atom.make<ScrollSnapshot | undefined>(undefined).pipe(Atom.keepAlive))
