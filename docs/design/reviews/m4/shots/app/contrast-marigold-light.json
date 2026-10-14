@@ -1,0 +1,272 @@
+[
+  {
+    "fg": "rgb(112, 110, 102)",
+    "bg": "rgb(250, 249, 245)",
+    "ratio": 4.85,
+    "size": "11px",
+    "weight": "400",
+    "sample": "⌘J",
+    "count": 1,
+    "opacity": 1
+  },
+  {
+    "fg": "rgb(112, 110, 102)",
+    "bg": "rgb(250, 249, 245)",
+    "ratio": 4.85,
+    "size": "13.5px",
+    "weight": "500",
+    "sample": "Channels",
+    "count": 3,
+    "opacity": 1
+  },
+  {
+    "fg": "rgb(112, 110, 102)",
+    "bg": "rgb(250, 249, 245)",
+    "ratio": 4.85,
+    "size": "12.5px",
+    "weight": "400",
+    "sample": "now",
+    "count": 8,
+    "opacity": 1
+  },
+  {
+    "fg": "rgb(112, 110, 102)",
+    "bg": "rgb(250, 249, 245)",
+    "ratio": 4.85,
+    "size": "13.5px",
+    "weight": "400",
+    "sample": "Leo",
+    "count": 9,
+    "opacity": 1
+  },
+  {
+    "fg": "rgb(112, 110, 102)",
+    "bg": "rgb(252, 251, 247)",
+    "ratio": 4.93,
+    "size": "12.5px",
+    "weight": "400",
+    "sample": "04:51",
+    "count": 6,
+    "opacity": 1
+  },
+  {
+    "fg": "rgb(112, 110, 102)",
+    "bg": "rgb(251, 251, 248)",
+    "ratio": 4.93,
+    "size": "14.5px",
+    "weight": "400",
+    "sample": "Reply",
+    "count": 1,
+    "opacity": 1
+  },
+  {
+    "fg": "rgb(96, 94, 82)",
+    "bg": "rgb(234, 230, 215)",
+    "ratio": 5.22,
+    "size": "11.5px",
+    "weight": "500",
+    "sample": "9",
+    "count": 2,
+    "opacity": 1
+  },
+  {
+    "fg": "rgb(96, 94, 82)",
+    "bg": "rgb(241, 238, 228)",
+    "ratio": 5.62,
+    "size": "12.5px",
+    "weight": "400",
+    "sample": "25m",
+    "count": 2,
+    "opacity": 1
+  },
+  {
+    "fg": "rgb(96, 94, 82)",
+    "bg": "rgb(241, 238, 228)",
+    "ratio": 5.62,
+    "size": "13.5px",
+    "weight": "400",
+    "sample": "Maya",
+    "count": 3,
+    "opacity": 1
+  },
+  {
+    "fg": "rgb(96, 94, 82)",
+    "bg": "rgb(241, 238, 228)",
+    "ratio": 5.62,
+    "size": "13px",
+    "weight": "600",
+    "sample": "product",
+    "count": 1,
+    "opacity": 1
+  },
+  {
+    "fg": "rgb(96, 94, 82)",
+    "bg": "rgb(241, 238, 228)",
+    "ratio": 5.62,
+    "size": "13px",
+    "weight": "400",
+    "sample": "·",
+    "count": 2,
+    "opacity": 1
+  },
+  {
+    "fg": "rgb(96, 94, 82)",
+    "bg": "rgb(241, 238, 228)",
+    "ratio": 5.62,
+    "size": "14.5px",
+    "weight": "500",
+    "sample": "#",
+    "count": 2,
+    "opacity": 1
+  },
+  {
+    "fg": "rgb(96, 94, 82)",
+    "bg": "rgb(250, 249, 245)",
+    "ratio": 6.19,
+    "size": "12.5px",
+    "weight": "400",
+    "sample": "3m",
+    "count": 2,
+    "opacity": 1
+  },
+  {
+    "fg": "rgb(96, 94, 82)",
+    "bg": "rgb(250, 249, 245)",
+    "ratio": 6.19,
+    "size": "13.5px",
+    "weight": "400",
+    "sample": "Grafana",
+    "count": 8,
+    "opacity": 1
+  },
+  {
+    "fg": "rgb(96, 94, 82)",
+    "bg": "rgb(251, 251, 248)",
+    "ratio": 6.29,
+    "size": "11.5px",
+    "weight": "500",
+    "sample": "Main",
+    "count": 3,
+    "opacity": 1
+  },
+  {
+    "fg": "rgb(96, 94, 82)",
+    "bg": "rgb(251, 251, 248)",
+    "ratio": 6.29,
+    "size": "12.5px",
+    "weight": "500",
+    "sample": "🙏",
+    "count": 2,
+    "opacity": 1
+  },
+  {
+    "fg": "rgb(43, 30, 0)",
+    "bg": "rgb(242, 169, 0)",
+    "ratio": 8.11,
+    "size": "14.5px",
+    "weight": "500",
+    "sample": "@",
+    "count": 2,
+    "opacity": 1
+  },
+  {
+    "fg": "rgb(35, 33, 26)",
+    "bg": "rgb(241, 238, 228)",
+    "ratio": 13.87,
+    "size": "13.5px",
+    "weight": "500",
+    "sample": "All",
+    "count": 1,
+    "opacity": 1
+  },
+  {
+    "fg": "rgb(35, 33, 26)",
+    "bg": "rgb(241, 238, 228)",
+    "ratio": 13.87,
+    "size": "15px",
+    "weight": "500",
+    "sample": "Proposal: cut offline mode and public…",
+    "count": 1,
+    "opacity": 1
+  },
+  {
+    "fg": "rgb(35, 33, 26)",
+    "bg": "rgb(250, 249, 245)",
+    "ratio": 15.29,
+    "size": "13.5px",
+    "weight": "500",
+    "sample": "All topics",
+    "count": 3,
+    "opacity": 1
+  },
+  {
+    "fg": "rgb(35, 33, 26)",
+    "bg": "rgb(250, 249, 245)",
+    "ratio": 15.29,
+    "size": "15px",
+    "weight": "500",
+    "sample": "#eng",
+    "count": 3,
+    "opacity": 1
+  },
+  {
+    "fg": "rgb(35, 33, 26)",
+    "bg": "rgb(250, 249, 245)",
+    "ratio": 15.29,
+    "size": "15px",
+    "weight": "600",
+    "sample": "#alerts-prod",
+    "count": 2,
+    "opacity": 1
+  },
+  {
+    "fg": "rgb(35, 33, 26)",
+    "bg": "rgb(250, 249, 245)",
+    "ratio": 15.29,
+    "size": "13.5px",
+    "weight": "400",
+    "sample": "eng",
+    "count": 1,
+    "opacity": 1
+  },
+  {
+    "fg": "rgb(35, 33, 26)",
+    "bg": "rgb(252, 251, 247)",
+    "ratio": 15.55,
+    "size": "13.5px",
+    "weight": "500",
+    "sample": "Proposal: cut offline mode and public…",
+    "count": 1,
+    "opacity": 1
+  },
+  {
+    "fg": "rgb(35, 33, 26)",
+    "bg": "rgb(252, 251, 247)",
+    "ratio": 15.55,
+    "size": "20px",
+    "weight": "600",
+    "sample": "Proposal: cut offline mode and public…",
+    "count": 1,
+    "opacity": 1
+  },
+  {
+    "fg": "rgb(35, 33, 26)",
+    "bg": "rgb(252, 251, 247)",
+    "ratio": 15.55,
+    "size": "14.5px",
+    "weight": "600",
+    "sample": "Maya",
+    "count": 6,
+    "opacity": 1
+  },
+  {
+    "fg": "rgb(35, 33, 26)",
+    "bg": "rgb(252, 251, 247)",
+    "ratio": 15.55,
+    "size": "14.5px",
+    "weight": "400",
+    "sample": "Proposal: cut offline mode and public AP",
+    "count": 8,
+    "opacity": 1
+  }
+]

@@ -1,0 +1,272 @@
+[
+  {
+    "fg": "rgb(112, 110, 102)",
+    "bg": "rgb(250, 249, 245)",
+    "ratio": 4.85,
+    "size": "11px",
+    "weight": "400",
+    "sample": "⌘J",
+    "count": 1,
+    "opacity": 1
+  },
+  {
+    "fg": "rgb(112, 110, 102)",
+    "bg": "rgb(250, 249, 245)",
+    "ratio": 4.85,
+    "size": "13.5px",
+    "weight": "500",
+    "sample": "Channels",
+    "count": 3,
+    "opacity": 1
+  },
+  {
+    "fg": "rgb(112, 110, 102)",
+    "bg": "rgb(250, 249, 245)",
+    "ratio": 4.85,
+    "size": "12.5px",
+    "weight": "400",
+    "sample": "hiring",
+    "count": 13,
+    "opacity": 1
+  },
+  {
+    "fg": "rgb(112, 110, 102)",
+    "bg": "rgb(250, 249, 245)",
+    "ratio": 4.85,
+    "size": "13.5px",
+    "weight": "400",
+    "sample": "Maya",
+    "count": 15,
+    "opacity": 1
+  },
+  {
+    "fg": "rgb(112, 110, 102)",
+    "bg": "rgb(252, 251, 247)",
+    "ratio": 4.93,
+    "size": "12.5px",
+    "weight": "400",
+    "sample": "Oct 6",
+    "count": 9,
+    "opacity": 1
+  },
+  {
+    "fg": "rgb(112, 110, 102)",
+    "bg": "rgb(251, 251, 248)",
+    "ratio": 4.93,
+    "size": "14.5px",
+    "weight": "400",
+    "sample": "Message #eng",
+    "count": 1,
+    "opacity": 1
+  },
+  {
+    "fg": "rgb(96, 94, 82)",
+    "bg": "rgb(234, 230, 215)",
+    "ratio": 5.22,
+    "size": "11.5px",
+    "weight": "500",
+    "sample": "1",
+    "count": 1,
+    "opacity": 1
+  },
+  {
+    "fg": "rgb(96, 94, 82)",
+    "bg": "rgb(241, 238, 228)",
+    "ratio": 5.62,
+    "size": "12.5px",
+    "weight": "400",
+    "sample": "55m",
+    "count": 2,
+    "opacity": 1
+  },
+  {
+    "fg": "rgb(96, 94, 82)",
+    "bg": "rgb(241, 238, 228)",
+    "ratio": 5.62,
+    "size": "13.5px",
+    "weight": "400",
+    "sample": "Dev",
+    "count": 3,
+    "opacity": 1
+  },
+  {
+    "fg": "rgb(96, 94, 82)",
+    "bg": "rgb(241, 238, 228)",
+    "ratio": 5.62,
+    "size": "13px",
+    "weight": "600",
+    "sample": "eng",
+    "count": 1,
+    "opacity": 1
+  },
+  {
+    "fg": "rgb(96, 94, 82)",
+    "bg": "rgb(241, 238, 228)",
+    "ratio": 5.62,
+    "size": "13px",
+    "weight": "400",
+    "sample": "·",
+    "count": 2,
+    "opacity": 1
+  },
+  {
+    "fg": "rgb(96, 94, 82)",
+    "bg": "rgb(243, 240, 231)",
+    "ratio": 5.73,
+    "size": "13.5px",
+    "weight": "500",
+    "sample": "Threads · 3",
+    "count": 1,
+    "opacity": 1
+  },
+  {
+    "fg": "rgb(180, 53, 31)",
+    "bg": "rgb(252, 251, 247)",
+    "ratio": 5.85,
+    "size": "11.5px",
+    "weight": "600",
+    "sample": "2 new",
+    "count": 1,
+    "opacity": 1
+  },
+  {
+    "fg": "rgb(96, 94, 82)",
+    "bg": "rgb(250, 249, 245)",
+    "ratio": 6.19,
+    "size": "12.5px",
+    "weight": "400",
+    "sample": "38m",
+    "count": 1,
+    "opacity": 1
+  },
+  {
+    "fg": "rgb(96, 94, 82)",
+    "bg": "rgb(250, 249, 245)",
+    "ratio": 6.19,
+    "size": "13.5px",
+    "weight": "400",
+    "sample": "Maya",
+    "count": 6,
+    "opacity": 1
+  },
+  {
+    "fg": "rgb(96, 94, 82)",
+    "bg": "rgb(251, 251, 248)",
+    "ratio": 6.29,
+    "size": "11.5px",
+    "weight": "500",
+    "sample": "Main",
+    "count": 3,
+    "opacity": 1
+  },
+  {
+    "fg": "rgb(96, 94, 82)",
+    "bg": "rgb(251, 251, 248)",
+    "ratio": 6.29,
+    "size": "12.5px",
+    "weight": "400",
+    "sample": "Lag alerts are firing on the…",
+    "count": 4,
+    "opacity": 1
+  },
+  {
+    "fg": "rgb(35, 33, 26)",
+    "bg": "rgb(241, 238, 228)",
+    "ratio": 13.87,
+    "size": "13.5px",
+    "weight": "500",
+    "sample": "All",
+    "count": 1,
+    "opacity": 1
+  },
+  {
+    "fg": "rgb(35, 33, 26)",
+    "bg": "rgb(241, 238, 228)",
+    "ratio": 13.87,
+    "size": "15px",
+    "weight": "500",
+    "sample": "#eng",
+    "count": 1,
+    "opacity": 1
+  },
+  {
+    "fg": "rgb(35, 33, 26)",
+    "bg": "rgb(250, 249, 245)",
+    "ratio": 15.29,
+    "size": "13.5px",
+    "weight": "500",
+    "sample": "All topics",
+    "count": 3,
+    "opacity": 1
+  },
+  {
+    "fg": "rgb(35, 33, 26)",
+    "bg": "rgb(250, 249, 245)",
+    "ratio": 15.29,
+    "size": "15px",
+    "weight": "500",
+    "sample": "Proposal: cut offline mode and public…",
+    "count": 6,
+    "opacity": 1
+  },
+  {
+    "fg": "rgb(35, 33, 26)",
+    "bg": "rgb(250, 249, 245)",
+    "ratio": 15.29,
+    "size": "15px",
+    "weight": "600",
+    "sample": "Can eng take the Wednesday afternoon…",
+    "count": 1,
+    "opacity": 1
+  },
+  {
+    "fg": "rgb(35, 33, 26)",
+    "bg": "rgb(251, 251, 248)",
+    "ratio": 15.53,
+    "size": "12.5px",
+    "weight": "600",
+    "sample": "1 reply",
+    "count": 4,
+    "opacity": 1
+  },
+  {
+    "fg": "rgb(35, 33, 26)",
+    "bg": "rgb(252, 251, 247)",
+    "ratio": 15.55,
+    "size": "13.5px",
+    "weight": "500",
+    "sample": "eng",
+    "count": 1,
+    "opacity": 1
+  },
+  {
+    "fg": "rgb(35, 33, 26)",
+    "bg": "rgb(252, 251, 247)",
+    "ratio": 15.55,
+    "size": "20px",
+    "weight": "600",
+    "sample": "#eng",
+    "count": 2,
+    "opacity": 1
+  },
+  {
+    "fg": "rgb(35, 33, 26)",
+    "bg": "rgb(252, 251, 247)",
+    "ratio": 15.55,
+    "size": "14.5px",
+    "weight": "600",
+    "sample": "Jonas",
+    "count": 9,
+    "opacity": 1
+  },
+  {
+    "fg": "rgb(35, 33, 26)",
+    "bg": "rgb(252, 251, 247)",
+    "ratio": 15.55,
+    "size": "14.5px",
+    "weight": "400",
+    "sample": "Lag alerts are firing on the billing con",
+    "count": 9,
+    "opacity": 1
+  }
+]

@@ -169,7 +169,7 @@ The bottom block is Juno Agent (section 10, ADR 0012). Some of its edges are all
 | `@juno/agent-contract` | the agent's wire | the AgentHost port (`AgentHostRpcs`) and the main↔agent messages, the agent's RPC groups for the renderer, chat view models | logic |
 | `@juno/agent` | a portable agent | the agent core (plan v3): runtime on pi-durable, store, inbox, requests and the provider guard, jobs, actions, MCP, scheduling, ownership and backup; `startAgent()` | import Electron, Slack, `store`, `sync`, `engine` or UI |
 | `@juno/agent-juno` | Juno as the agent's host | the AgentHost handlers the engine serves | call a model |
-| `@juno/agent-testing` | agent test doubles | the scripted model provider, fake MCP servers, later the crash harness and memory simulator | be imported by any `src` |
+| `@juno/agent-testing` | agent test doubles | the scripted model and compactor, the fake Codex binary, the fake Notion, Littlebird and T3 MCP servers, hostile Slack fixtures and the crash harness (`agent-memory` is a test-only dependency); later the memory simulator | be imported by any `src` |
 | `apps/gallery` | review | browser-only fixture gallery (one state at a time), its screenshot project and its behaviour project, including the layout-shift guard (`pnpm test:gallery`) | Electron |
 
 `testDeps` in a package.json names a devDependency that tests may import and src may not: `engine` uses `state` (the real client against the real server) and `slack` uses `fake-slack`.
@@ -486,7 +486,7 @@ Juno Agent is the assistant of the brief in `docs/juno-agent/BRIEF.md`, designed
 - **Its own process.** Main forks `out/main/agent.js` as a second utility process, without the Slack partition. Until the chat ships it starts only with `JUNO_AGENT=1`.
 - **The AgentHost port.** The agent reaches Juno only through `AgentHostRpcs`, which the engine serves with `@juno/agent-juno`'s handlers on ports main brokers (section 2.4). Today the group has `host.hello`; Slack reads, outbox sends, resolve, presence and the notification gate follow in WP13. The renderer gets its own port to the agent for the chat.
 - **Durability.** pi-durable runs over Juno's SQLite facade at `synchronous = FULL` with `fullfsync`, because macOS `fsync` alone does not survive power loss. Owner input enters an inbox in `agent.sqlite` before it is acknowledged (plan v3 §3).
-- **Tests.** `@juno/agent-testing` has the scripted provider and the fake MCP server. `apps/desktop/e2e/juno-agent/` holds the agent's e2e flows, starting with the hello round trip.
+- **Tests.** `@juno/agent-testing` has the fakes of plan v3 §16; its README says which to use when. `apps/desktop/e2e/juno-agent/` holds the agent's e2e flows, starting with the hello round trip.
 
 ## 11. Notifications
 

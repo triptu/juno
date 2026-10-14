@@ -9,9 +9,15 @@
     ".": "./src/index.ts"
   },
   "devDependencies": {
-    "typescript": "5.9.3"
+    "typescript": "5.9.3",
+    "fast-check": "4.3.0",
+    "vitest": "5.0.4"
   },
   "juno": {
     "allowedDeps": []
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "node ../../scripts/heavy.mjs vitest run"
   }
 }

@@ -14,7 +14,7 @@ import { asTs, Workspace, type Subscription } from './state.ts'
 export type { CallRecord, Session } from './server.ts'
 export type { ConversationRecord, PostInput, Subscription } from './state.ts'
 export { Workspace } from './state.ts'
-export { CONVERSATIONS, PEOPLE, SELF_ID, TEAM } from './fixtures.ts'
+export { CONVERSATIONS, PEOPLE, SELF_ID, TEAM, seedWorkspace } from './fixtures.ts'
 
 export interface FakeSlackOptions {
   /** 0 picks a free port. */
@@ -269,6 +269,11 @@ export class FakeSlack {
     this.server.loseResponse(input.method, input.times ?? 1)
   }
 
+  /** File downloads answer after `ms` milliseconds, so images arrive late. 0 turns it off. */
+  delayFiles(input: { ms: number }): void {
+    this.server.delayFiles(input.ms)
+  }
+
   /** Frames of these types wait for `releaseFrames`, so a test can deliver an event late or never. */
   holdFrames(input: { types: ReadonlyArray<string> }): void {
     this.server.holdFrames(input.types)
@@ -328,6 +333,7 @@ export class FakeSlack {
       heldCalls: (i) => this.heldCalls(i),
       loseResponse: (i) => this.loseResponse(i),
       holdFrames: (i) => this.holdFrames(i),
+      delayFiles: (i) => this.delayFiles(i),
       releaseFrames: (i) => this.releaseFrames(i),
       heldFrames: () => this.heldFrames(),
       expireSession: () => this.expireSession(),

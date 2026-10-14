@@ -2,20 +2,24 @@
   "name": "@juno/agent-contract",
   "version": "0.1.0",
   "private": true,
-  "description": "Juno Agent's wire: chat view models (src/chat), the agent's RPC groups (src/rpc), and the AgentHost port with the agent process messages (src/host). Schemas only, no logic.",
+  "description": "Juno Agent's wire: chat view models (src/chat), the agent's RPC groups (src/rpc), and the AgentHost port with the agent process messages (src/host). Schemas, plus two pure rules the chat shares.",
   "type": "module",
   "sideEffects": false,
   "exports": {
     ".": "./src/index.ts"
   },
   "scripts": {
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
   },
   "dependencies": {
-    "effect": "4.0.3"
+    "effect": "4.0.3",
+    "@juno/agent-cards": "workspace:*"
   },
   "devDependencies": {
-    "typescript": "5.9.3"
+    "typescript": "5.9.3",
+    "vitest": "5.0.4",
+    "fast-check": "4.3.0"
   },
   "juno": {
     "allowedDeps": [

@@ -54,16 +54,43 @@ Each finding is accepted (A) and changed in the plan, or rejected (R) with a rea
 | G2 | WP2 spec gap 2: compaction can move the view past a run's `H` | A. While a run is live, no compaction job starts on an interval that ends after its `H`, and publication rechecks it. The spec's empty-view fallback is removed | §4.2, §5.2 |
 | G3 | WP2 spec gap 3: pin edits need a revision check beyond `gen` | A. `memory_head` holds `pin_rev`, bumped by every pin change. Requests revalidate it with `gen`. A pin edit is a compare-and-swap on the pin version and its source lineage | §4.3, §4.4 |
 | G4 | WP2 spec gap 4: oversized children can block a parent compaction | A. A stored node is **at most 16 KB**. A leaf with no attempt under that copies its source. A parent keeps its shortest attempt cut to 16 KB. So a parent input is always ≤ 32 KB and every merge can start | §4.2, §5.3 |
+| W1 | WP7 review B1: run endings cannot represent failures | A. `Ending` gains `failed` (provider, key rejected, Codex signed out, offline) and `blocked.budget`; every variant has fixed copy, and a run that wrote nothing shows the line alone. After Stop the line is fixed too; Juno no longer "states what was kept" | §8, §13.2 |
+| W2 | WP7 review 1: offline sends cannot be Not delivered | A. The inbox is local, so a send is accepted offline, paused and in recovery, and **waits**. Not delivered means only that the inbox write failed | §13.2 |
+| W3 | WP7 review 3: Remove as a card fails when needed most | A. The owner's Remove is a local sheet that needs no run. The `remove` card stays for removals Juno proposes | §4.5, §12 |
+| W4 | WP7 review 4 and 9: recovery, transfer and the owner's later decisions were not in the plan | A. A Review page, an ownership block in Settings and an update-needed banner. T3 sessions run with full access in a new worktree. The LAN switch exists, off by default, and only an `https` address works over the network (spikes, finding 1). The backup folder is local by default | §1, §13.2, §13.3, §14.3, §18 |
+| W5 | WP7 review 5: a card with two machines | A. `proposedTask` and `proposedSchedule` are their own kinds with the click machine; `task` has only `phase`, which gains `unknown`; `schedule` has only `status` | §12 |
+| W6 | WP7 review 8 and 11: the clean-run rule read broader than decided, and the question hold was unbounded | A. The spec states the rule as §6.4 defines it ("has not read Slack, a connection or a session report in this reply"), and §19 records that the owner has not confirmed the narrowing. A proactive run waits for an open question at most until it expires or 24 hours, and job reports never wait | §8, §18 |
+| W7 | WP7 review 12: "Stop these" could kill a T3 session from a label | A. The label's action is "Pause schedule" or "Mute updates". Jobs stop only from their Task card (B5) | §13.1 |
+| W8 | WP7 review 17 and nits: pins from the context menu, `deliver: silent`, the budget card's kind | A. The context-menu pin is an owner action on the trusted side, with the selection or the whole message and the 280-byte limit. `deliver` is `now \| digest \| silent`. The cap shows a `budget` card | §4.4, §5.4, §11.1 |
+| G5 | WP3/WP4 spec gap 1: a full chat reservation plus the compaction allowance exceeds the cap | A. The compaction allowance is a **sub-budget inside** the cap (at most 25% of the day's cap and raises), not extra on top. At the cap, compaction stops too | §5.4 |
+| G6 | WP3/WP4 spec gap 2: a click after an untrusted report cannot create a schedule under the clean-run property | A. A click on a `proposedSchedule` card is owner authority, the same as a `proposedTask` click. The card renders the exact stored schedule, prompt included. The property becomes `scheduleFromOwnerAuthority` | §6.4, §11.1, §12 |
+| G7 | WP3/WP4 spec gap 3: an offline old owner still authorizes after a forced recovery | A, as a stated limit. No fix without a central authority. v1 guarantees one writer under a move, or under a restore whose attestation is true. An old Mac that is still running stops when it sees a newer owner's backup in a shared folder. The UI says both Macs can act until then | §14.1, SPEC §13.8 |
+| G8 | WP3/WP4 spec gap 4: a crash before projection leaves the journal ahead of the archive, which §3 called impossible | A. Journal ahead is normal: resume and project. Only a journal **behind** the cursor (a rolled-back file) rotates. The comparison is `next_seq - 1` against the last projected position | §3 |
+| G9 | WP3/WP4 spec gap 5: a collected SQLite lock handle lets a second writer in | A. The lock is the S5 SQLite exclusive lock, not `flock`. Its connection is held by a module-level reference for the process's life and closed only after owned I/O stops | §2.2, §14.1 |
+| G10 | WP3/WP4 spec gap 6: publishing release before a durable local release lets both Macs activate | A. The old Mac commits `released` first, then captures the final checkpoint (which therefore holds `released`), then publishes | §14.2 |
+| G11 | WP3/WP4 spec gap 7: a deletion during staging lets a stale install restore removed content | A. The install transaction rechecks the deletion record. An older candidate stays quarantined and waits for a sanitized generation | §14.4 |
+| G12 | WP3/WP4 spec gap 8: the export cursor update captures itself, so backup never settles | A. Capture attaches only to replicated tables. Backup bookkeeping is local and never captured | §14.4 |
+| G13 | WP3/WP4 spec gap 9: a fresh Mac has no trusted deletion record | A, partly as a stated limit. A trusted record comes from this Mac's keychain, the move code, or a rotated recovery phrase. Without one, Juno restores the newest generation in the folder and says that removed messages may come back if the folder is out of date. The record reaches the keychain before "Removed" shows | §14.3, §14.4, §18, SPEC §13.8 |
+| P1 | WP5 finding: the 64k minimum for the compaction model is below the §5.3 bound (67,584 tokens) | A. The compaction model needs a window of at least 131,072 tokens, matching the spec | §5.3, §7.1 |
+| W9 | WP6 difference 2: Quint needs a warned click for every repeat of a non-deduplicated action; the plan named only `unknown` | A. Every repeat authorization of a child without dedupe needs a new click with the duplicate warning, whatever the earlier outcome. `agent-cards` already does this; the copy gains `card.mayDuplicate` | §6.3, SPEC §13.3 |
+| W10 | WP6 difference 1: §6.4 used stale proposal names | A. §6.4 already names `proposedTask` and `proposedSchedule` (G6). The check found one more gap: no kind for steering from a tainted run. `t3_send` there is a `change` card; `t3_stop` is the Task card's Stop | §6.4 |
+| W11 | WP6 difference 4: "Stopped. Nothing after this was sent." promises more than §6.5 allows | A. The line becomes "Stopped. Juno won't start anything new for this reply." Work handed off before Stop may still land and shows on its own card | §6.5, §8, §13.2, SPEC §13.2, §13.7 |
+| W12 | WP6 difference 3: the chat shows one result per row and per card, while the record keeps each attempt and both cancellation states | A, as intended. The view summarizes and Activity shows the evidence. The projection rules are written down | §12 |
+| W13 | WP6 difference 5: the chat contract has no approval identities or edit revisions | A, as intended. RPC metadata (`CardBinding`) carries them beside the view models | §12 |
 
 ## 1. Owner decisions in force
 
 - **Providers:** OpenRouter and local Codex. Sign in with ChatGPT only if Juno can register. No Claude Code subscription.
 - **Chat model:** chosen in Settings from the latest Claude Sonnet, Claude Opus, Muse, GPT Sol and Grok (§7.1). The default is **Claude Sonnet 5.5**. **Compaction:** Haiku 5.5, editable. **Spend cap:** $2 a day, editable in Settings and never by the model.
 - **Proactive messages** only about things the owner set up.
-- **No click** for read lookups, OS notifications to the owner, self-scheduling, and starting T3 sessions he asked for. Everything else outward is a card and runs at most once after a click.
+- **No click** for read lookups, OS notifications to the owner, self-scheduling, and starting T3 sessions he asked for. Everything else outward is a card and runs at most once after a click. The plan applies this through the clean-run rule (§6.4), which is narrower than the words above; the spec records that in its open questions (W6).
 - **Sync in v1:** one writer, an encrypted backup, and a way to move ownership.
-- **MCP endpoints:** Littlebird: `https://mcp.littlebird.ai/mcp`, with OAuth. T3 Code: `http://192.168.1.22:3773/mcp`, no auth, plain HTTP on the LAN. Prefer loopback when T3 runs on the same machine. The URL is a setting. Never send it secrets.
-- **Still pending confirmation** (these defaults are used meanwhile): T3 sessions run in `auto-accept-edits` in a new worktree. The backup destination (proposal in §14.5). Coral owner bubbles, pending the mock review. Whether Juno can register for Sign in with ChatGPT.
+- **MCP endpoints:** Littlebird: `https://mcp.littlebird.ai/mcp`, with OAuth. T3 Code: `http://192.168.1.22:3773/mcp`; the spikes found it needs OAuth and that plain `http` works only on loopback. Prefer loopback when T3 runs on the same machine. The URL is a setting. Never send it secrets.
+- **T3 sessions** Juno starts run with full access, each in a new worktree.
+- **T3 over the network** needs the Settings switch "Allow T3 Code over the local network", off by default. With it on, only an `https` address works, because the sign-in refuses plain `http` off loopback (spikes, finding 1).
+- **Backup:** a local folder the owner chooses, under the app's data directory by default. The owner may point it at a synced drive later.
+- **Sign in with ChatGPT:** not planned. Codex local and OpenRouter cover it.
+- **Still pending:** the owner bubble colour, between options A to D in `docs/design/juno-chat/` (the mock's README recommends B).
 
 ## 2. Shape
 
@@ -107,7 +134,7 @@ Versions are pinned exactly: pi 1.2.0 and Codex SDK 0.162.1.
 | --- | --- | --- |
 | `agent.sqlite` | Juno-owned: inbox, archive, memory, pins, ledger, grants, schedules, jobs, connections, spend, backup progress | WAL, `synchronous=FULL` |
 | `pi-<incarnation>.sqlite` | pi-durable journal, opened through **Juno's SQLite facade** (pi's portable core accepts one) at `synchronous=FULL` | FULL. Verified in S1 |
-| `owner.lock` | `flock`, held until all owned I/O stops | local only |
+| `owner.lock` | An SQLite file held with `locking_mode = EXCLUSIVE` (S5), held until all owned I/O stops | local only |
 
 ## 3. Durable core: inbox, journal and projection (R6)
 
@@ -115,7 +142,7 @@ Versions are pinned exactly: pi 1.2.0 and Codex SDK 0.162.1.
 - **Bridge.** A single router fiber serializes: idle detection, then `reset`, then `submit(input, requestId = op_id)`, then a commit of `inbox.state = submitted` with `(incarnation, submission id)`. A reset is idempotent. A crash between the reset and the submit resubmits on recovery with the same `op_id`, which pi deduplicates.
 - **Incarnations.** Each journal file has an incarnation UUID. Projection cursors, task references and action origins are keyed by `(incarnation, commit position)` and are never reused.
 - **Projection.** The indexer tails pi's commits in order. It writes archive messages and advances the cursor in one transaction. Source bytes are always stored whole. Presentation clipping (the 30,000-character tool head and tail) applies only to what the model sees. Full tool results go to `attachments`.
-- **Recovery** at open, in order: (1) Take the lock. (2) Open `agent.sqlite`. (3) Open the current journal. (4) If the journal's head is behind the archive cursor for the same incarnation (journal-ahead is impossible, because projection runs after the journal commits), do not resume: mark the live runs interrupted, rotate to a new incarnation, and leave every `submitted` inbox op whose run did not finish in `interrupted`. The owner sees "Juno was interrupted". (5) Otherwise, classify ledger attempts (§6.5), then call `harness.resume()`. (6) An unsupported journal schema (after a pi upgrade) stops safely with "Juno needs to update its records" and never replays.
+- **Recovery** at open, in order: (1) Take the lock. (2) Open `agent.sqlite`. (3) Open the current journal. (4) Compare the journal's last committed position, `durable_metadata.next_seq - 1`, with the archive cursor (the last projected position) for the same incarnation. **Journal ahead** is normal after a crash between a journal commit and its projection: resume, and projection catches up. **Journal behind** means an older file was restored under a newer archive (G8): do not resume. Mark the live runs interrupted, rotate to a new incarnation, and leave every `submitted` inbox op whose run did not finish in `interrupted`. The owner sees "Juno was interrupted". Why: projection runs after the journal commits, so the journal can lead but never trail. A trailing journal can only be a rollback, and replaying it would repeat or lose work. WP8 tests the `next_seq` indexing on both sides, since `next_seq` is the next free position, not the last used one. (5) Otherwise, classify ledger attempts (§6.5), then call `harness.resume()`. (6) An unsupported journal schema (after a pi upgrade) stops safely with "Juno needs to update its records" and never replays.
 - **Rotation:** stop admitting, drain the projection, let tasks settle or abandon them with `abortReason` and record each as interrupted, then commit a new incarnation in `agent.sqlite`, open the new journal, and delete the old file. It runs monthly, and on a redaction deadline (§4.5).
 - **Tool replay.** pi restores tool arguments without rerunning `beforeTool`. So every authority check (approval, grant, epoch, pause, redaction generation, cap) runs inside the dispatcher on every path. Proposals are deduplicated on `(incarnation, tool task id)`.
 
@@ -144,6 +171,7 @@ Versions are pinned exactly: pi 1.2.0 and Codex SDK 0.162.1.
 - `remember(source_id, from, to)` is Tier 1. `source_id` must be a `user` message admitted in this run. The trusted side copies `text = bytes[from, to)` (at most 280 bytes) and records the source version.
 - An edit on "What Juno remembers" writes `kind: owner`, which supersedes the old pin and keeps its `source_id`, so a later redaction of that source still removes it. The 4 KB active budget is checked in the same transaction as the insert. Over budget, Juno asks in words which pin to drop.
 - **Revisions (G3).** Every pin insert, edit, deactivation and Undo bumps `memory_head.pin_rev` in the same transaction. An edit is a compare-and-swap: it names the pin version it replaces, and commits only if that version is still active and its source is not redacted. Otherwise the page reloads the pin and shows "This changed. Check it and save again."
+- **The context menu path.** "Remember this" on an owner message is an owner action on the trusted side, not the `remember` tool: the renderer sends the message id and the selected byte range (or none, for the whole message), and the agent writes the pin with the same 280-byte limit. The renderer disables the item when the message, or the selection, is longer than that.
 - A redaction deactivates pins sourced from that message in the redaction transaction. **Claim:** pins are attributed exact text from the owner's own messages. They do not make injection impossible. A pin shows "Remembered · Undo". The recall eval includes "remember …" requests, so the line is reliable.
 
 ### 4.5 Redaction (R4, L2)
@@ -154,9 +182,9 @@ Versions are pinned exactly: pi 1.2.0 and Codex SDK 0.162.1.
 
 **Steps:**
 
-1. **The redaction transaction** (the owner's click): Tombstone the messages and `gen += 1`, and bump `pin_rev` if a pin is deactivated. Compute the taint closure over `nodes.inputs`. Because context is raw messages (§4.2), the closure of a message `m` holds only nodes whose interval contains `m`, nodes that start within 16 KB of archive after `m`, and their ancestors: about two nodes per message in that 16 KB, plus two per tree level. Write `view_rev` with `masked` entries for tainted lines, and advance the head. Deactivate the pins. Mark tainted pending proposals `expired` and revoke grants from tainting runs. Enqueue rebuilds at `ver+1`, and enqueue `purge` jobs for old node versions and attachments. From this commit on, no request, zoom or publication can expose tainted text: the builder renders masked lines as `(being updated)`, zoom returns `removed`, and jobs with an older `gen` are discarded.
+1. **The redaction transaction** (the owner's click, after the keychain deletion record is raised, §14.4): Tombstone the messages and `gen += 1`, and bump `pin_rev` if a pin is deactivated. Compute the taint closure over `nodes.inputs`. Because context is raw messages (§4.2), the closure of a message `m` holds only nodes whose interval contains `m`, nodes that start within 16 KB of archive after `m`, and their ancestors: about two nodes per message in that 16 KB, plus two per tree level. Write `view_rev` with `masked` entries for tainted lines, and advance the head. Deactivate the pins. Mark tainted pending proposals `expired` and revoke grants from tainting runs. Enqueue rebuilds at `ver+1`, and enqueue `purge` jobs for old node versions and attachments. From this commit on, no request, zoom or publication can expose tainted text: the builder renders masked lines as `(being updated)`, zoom returns `removed`, and jobs with an older `gen` are discarded.
 2. **In-flight work:** the active run is aborted if its request included tainted content, and its queued steer starts a fresh run. Running subagents spawned in tainting runs are stopped, and their reports are quarantined.
-3. **Purge**, eventually: Delete old node versions and attachment pages. Delete the Codex session files. Rotate the journal within 24 hours. If a background job blocks rotation, Settings shows "Removal pending: 1 copy in a running job [Stop job]". Start a new backup generation (§14).
+3. **Purge**, eventually: Delete old node versions and attachment pages. Delete the Codex session files. Rotate the journal within 24 hours. If a background job blocks rotation, Settings shows "Removal pending · 1 copy in a running job · Stop job". Start a new backup generation (§14).
 4. The chat shows "Removed". "Memory of this chat" shows masked lines until they are rebuilt.
 
 ## 5. Requests, admission and spend (R3, R10, R15)
@@ -176,12 +204,12 @@ Versions are pinned exactly: pi 1.2.0 and Codex SDK 0.162.1.
 ### 5.3 The guard at the provider boundary
 - Every model path (chat, compaction, subagent, harness prompt) goes through `providers/guard.ts`. The guard checks the builder's stamp (the snapshot `rev` and `gen`, plus a hash of the messages) and the admission bound, and reserves spend.
 - A request without a valid stamp, such as pi's raw context after a hook error, is refused with a local error. The run fails visibly as interrupted.
-- Compaction requests are bounded the same way: fixed text, the local window (≤ 16 KB), the input (≤ 32 KB, either two nodes of at most 16 KB or one ≤ 16 KB chunk), and the 16k output reserve. No pins. The compaction model is offered only if its window fits that sum under the bound, about 70k tokens.
+- Compaction requests are bounded the same way: fixed text, the local window (≤ 16 KB), the input (≤ 32 KB, either two nodes of at most 16 KB or one ≤ 16 KB chunk), and the 16k output reserve. No pins. That sum is at most 67,584 tokens under the bound (2,048 of task text + 16,384 context + 32,768 input + 16,384 reserve), plus the system text and tools; `agent-memory` computes it as `requiredWindow(…, 'compaction')`. The compaction model is offered only if its window is at least **131,072 tokens** (§7.1, P1).
 
 ### 5.4 Spend (R15)
 - A `spend` ledger holds per-day `reserved`, `actual` and `unknown`. Before each billable call the guard reserves `upper(input) × price + maxOutput × price`. Actual usage reconciles it. A lost stream keeps its reservation as `unknown` spend.
-- The cap defaults to $2 a day. It is a hard cap over all OpenRouter paths. Compaction has a separate allowance of 25%.
-- At the cap: New runs are Blocked with a `question` card: "Juno has used today's budget. [Allow $1 more today] [Wait until tomorrow]". The click is the owner's, and it is a one-day raise. Compaction pauses at its allowance, and the tail placeholder covers the gap.
+- The cap defaults to $2 a day. It is a hard cap over all OpenRouter paths: `reserved + actual ≤ cap + raises`, whichever path reserves. **Compaction has a sub-budget inside the cap** (G5): its own reservations and actual spend may use at most 25% of `cap + raises`. Chat may use the whole cap. Why: an allowance on top of the cap would let a day reach 125% of it, and the owner set one number. The cost: once chat has used the cap, compaction also stops until midnight or a raise, and the tail placeholder (§5.2) covers the gap.
+- At the cap: New runs are Blocked with a `budget` card: "Juno has used today's budget. [Allow $1 more today] [Wait until tomorrow]". A run that reaches the cap mid-way, or inside a subagent, ends `blocked (budget)` with the same line and the same card. The click is the owner's, and it is a one-day raise. Compaction pauses at its allowance, and the tail placeholder covers the gap.
 - Codex turns are counted, not charged. Only Settings can change the cap. No tool exists for it.
 
 ## 6. Actions (R7, R8, R11, R12)
@@ -202,6 +230,8 @@ intent ─(Tier 3: owner click on rev/digest)─▶ approved ─authorize(consum
 unknown ─reconcile─▶ done (positive evidence) | unknown (kept, shown) ; retry = new owner click "may duplicate"
 ```
 
+- **Every repeat needs a warned click** (W9). A second authorization of a child whose destination does not deduplicate needs a new owner click that carries the duplicate warning, whatever the earlier attempt's outcome: `unknown`, `failed` or `cancelled`. Why: "definite rejection" rests on reading a destination's error correctly, and the spec (`retryRequiresAuthority`) does not trust that. A deduplicated child (natural or local-id dedupe) retries under its key with a plain click. The card prints the warning beside the retry button (`chatCopy.card.mayDuplicate`).
+
 - **Transports never retry by themselves.** pi-mcp is called with no retry. Agent sends go through the engine outbox in **single-attempt** mode. pi-ai `maxRetries: 0` stays as it is.
 
 | Destination | Dedupe | Reconcile |
@@ -215,13 +245,13 @@ unknown ─reconcile─▶ done (positive evidence) | unknown (kept, shown) ; re
 ### 6.4 Grants and the clean-run rule (R8, B2, H2)
 - A run is **clean** while its request holds only owner inputs and Juno-internal state. It becomes **tainted** at the first untrusted content: any MCP or Slack read result, a `work` report, a wake, or a steered report.
 - **Grant creation.** A Tier 2 start (`t3_start`, `delegate.spawn`) or a `schedule_create` without a click is allowed only in a clean owner run. It **mints a grant** `{ id, op_class, target (project, job or schedule), bounds (one job; or a schedule's revision and purpose), source_op, revoked }`. The model never supplies a grant id. The application binds the grant to the call it made.
-- **In a tainted run,** or when the scope cannot be established, the same tool produces a card (`task` or `schedule`), and the owner's click mints the grant.
-- **Grant use.** `t3_send` and `t3_stop` need a live grant for that job. From a tainted or report run they are cards. Reports, tool output and steering cannot create, broaden or restore a grant.
+- **In a tainted run,** or when the scope cannot be established, the same tool produces a card (`proposedTask` or `proposedSchedule`), and the owner's click mints the grant. **A click is owner authority** (G6): it enters through the inbox as an owner op, and that op is the grant's `source_op`. It mints the grant only if the card's stored revision and digest are still current, as in §6.2. Why: the click approves the exact stored payload, which no untrusted content can change after the card renders. The model wrote the payload in a tainted run, so the card must show all of it, including a schedule's prompt.
+- **Grant use.** `t3_send` and `t3_stop` need a live grant for that job. From a tainted or report run, `t3_send` becomes a `change` card (server T3 Code, target the job, the stored message as its preview), and `t3_stop` produces no card: Juno points to the Task card, whose Stop is the owner's click (W10). Reports, tool output and steering cannot create, broaden or restore a grant.
 - Revocation happens through a job Stop, a schedule delete, a redaction, or Pause.
 
 ### 6.5 Startup, Pause and Stop (R12)
 - At startup, every `attempt` without a receipt becomes `unknown` before `resume()`. A reconcile fiber works through them in the background. Unrelated chat runs at once. Resumed runs see unresolved outcomes in turn state.
-- Pause, Stop and AI off **stop new authorizations** and ask jobs to cancel. Authorizations already consumed may still land. States distinguish `cancel-requested`, `cancelled`, `unknown` and `done`, and earlier evidence is never overwritten.
+- Pause, Stop and AI off **stop new authorizations** and ask jobs to cancel. Authorizations already consumed may still land. States distinguish `cancel-requested`, `cancelled`, `unknown` and `done`, and earlier evidence is never overwritten. Stop's fixed line therefore promises only that nothing new starts (W11); anything already handed off reports on its own card.
 
 ## 7. Providers and the model picker
 
@@ -236,13 +266,13 @@ unknown ─reconcile─▶ done (positive evidence) | unknown (kept, shown) ; re
 | GPT Sol | `openai/gpt-<ver>-sol` | yes (`gpt-<ver>-sol`) |
 | Grok | `x-ai/grok-<ver>` | no |
 
-- **Resolution:** Fetch OpenRouter's public `GET /api/v1/models` at startup and daily, caching the last result in `agent.sqlite`. Keep models whose `supported_parameters` include `tools`. Exclude `:batch` (which does not stream), `~…-latest` aliases (a moving target breaks cache stability), `-pro` and `-contributor` variants, image models, and models below the compatibility window (§5.1). Pick the newest `created` per family. Join with pi-ai 1.2.0's catalogue for API kind and compat. pi-ai's chat catalogue holds only tool-calling models, and every chat API it uses streams. A slug missing there is sent as OpenAI-compatible, with the price taken from OpenRouter's `pricing` field.
+- **Resolution:** Fetch OpenRouter's public `GET /api/v1/models` at startup and daily, caching the last result in `agent.sqlite`. Keep models whose `supported_parameters` include `tools`. Exclude `:batch` (which does not stream), `~…-latest` aliases (a moving target breaks cache stability), `-pro`, `-contributor`, `-lite`, `-preview` and `-image` variants, non-numeric versions (Muse is the exception: `meta/muse-<word>[-<ver>]`, spikes finding 5), and models below the compatibility window (§5.1). Pick the newest `created` per family. Join with pi-ai 1.2.0's catalogue for API kind and compat. pi-ai's chat catalogue holds only tool-calling models, and every chat API it uses streams. A slug missing there is sent as OpenAI-compatible, with the price taken from OpenRouter's `pricing` field.
 - **Sol via Codex:** the list comes from Codex's own model listing (app-server, S3), falling back to pi-ai's `openai-codex` catalogue. Today that resolves to `gpt-6.1-sol` with a 272k window.
 - The row shows the family, the resolved model ("Claude Sonnet 5.5"), its provider (OpenRouter, or Codex for Sol), and a price hint.
 - The saved choice is `{ family, provider }`. The resolved slug is stored per day, so a newer release takes over only at the next daily refresh, and the change is logged in Activity.
 - **On 2026-10-14 this resolves to** `anthropic/claude-sonnet-5.5`, `anthropic/claude-opus-5.5`, `meta/muse-wonder`, `openai/gpt-6.1-sol` and `x-ai/grok-4.7`. These are examples only: the code holds patterns, not slugs.
 - A model change costs one cache miss and applies from the next run.
-- **Compaction model:** a second picker, defaulting to the latest `anthropic/claude-haiku-<ver>` (Haiku 5.5 today), with the latest `google/gemini-<ver>-flash` as the alternative. The same filters apply (tools are declared but never called, so the tool block matches turns), with the compaction window minimum (64k).
+- **Compaction model:** a second picker, defaulting to the latest `anthropic/claude-haiku-<ver>` (Haiku 5.5 today), with the latest `google/gemini-<ver>-flash` as the alternative. The same filters apply (tools are declared but never called, so the tool block matches turns), with a compaction window minimum of **131,072 tokens** (P1). Why: the largest compaction request is 67,584 tokens under the bound before system text and tools (§5.3), and up to 84,480 with the 1.25 multiplier. 131,072 covers both with room, and it is the window the Quint spec checks. Haiku 5.5 and the current Flash pass it easily.
 
 ### 7.2 Adapters
 - **Model providers** (OpenRouter now; Sign in with ChatGPT if feasible): pi-ai through the guard, a key from the keychain via main, `sessionId` affinity, cache marks (S2).
@@ -250,8 +280,8 @@ unknown ─reconcile─▶ done (positive evidence) | unknown (kept, shown) ; re
 
 ## 8. Orchestration behind the status bubble (B1, B5, M7, M8, M11)
 
-- **The router** owns the current run, `H`, and the clean or tainted flag. An idle owner input: reset, then the input. A busy owner input: a steer, with "Queued" shown after 500 ms. A report or wake: a steer if a run is active, otherwise a new run. Several reports within 30 s are coalesced. A proactive run waits while Juno has an open question of its own.
-- **The status bubble covers runs only.**. Dots only until the first token (the bubble becomes the reply in place) or the first tool call (text appears, specific and counting real things, changing at most every 2 s). It clears when the run settles. Esc with the composer empty, or its Stop, aborts **the run only**. After a Stop, a queued steer starts a fresh run, and Juno states what was kept.
+- **The router** owns the current run, `H`, and the clean or tainted flag. An idle owner input: reset, then the input. A busy owner input: a steer, with "Queued" shown after 500 ms. A report or wake: a steer if a run is active, otherwise a new run. Several reports within 30 s are coalesced. A proactive run waits while Juno has an open question of its own, at most until the question expires or 24 hours pass; job reports never wait.
+- **The status bubble covers runs only.**. Dots only until the first token (the bubble becomes the reply in place) or the first tool call (text appears, specific and counting real things, changing at most every 2 s). It clears when the run settles. Esc with the composer empty, or its Stop, aborts **the run only**. After a Stop, a queued steer starts a fresh run, and the reply ends with the fixed line "Stopped. Juno won't start anything new for this reply." (W11). If the run then calls tools between tokens, the bubble reappears below the streaming reply, and the next token clears it: one run is one Juno bubble. A run whose provider call fails (pi-ai runs with `maxRetries: 0`) ends `failed` with a fixed line per cause, never a model-written one.
 - **Background jobs** (`jobs` table: subagents and T3 sessions) never use the bubble. Each job has a **Task card** under the message that started it, with a live state line ("T3 Code · tests running, 2 of 5"), Open and Stop. The sidebar's Juno row shows the duotone sparkle while any job runs. "How is it going?" is answered from turn state, which lists the jobs.
 - **Subagents** follow pi's background pattern behind a `delegate` tool, with depth 1 and a cheaper model. Their first message is pins + view + task. Reports post once each (`report:<task>:<seq>`).
 - **T3 jobs:** A watcher fiber loops `t3_thread_wait(10 min)` and `t3_thread_read`, updating the state line. It posts a `work` report only on a milestone: started, a question or pending approval, done (with the PR), failed, or quiet for 30 minutes after the last step change. The last one reads: "T3 Code has been quiet for 30 minutes. I'll keep watching, or you can stop it." A pending approval becomes a `question` card headed "T3 Code asks" (Tier 3). Juno never merges or pushes.
@@ -275,14 +305,14 @@ unknown ─reconcile─▶ done (positive evidence) | unknown (kept, shown) ; re
 - **States:** `off → connecting → ready ⇄ degraded → needs-sign-in → error(backoff 1 s, 5 s, 30 s, 5 min)`.
 - **Tool lists are discovered at connect** (paginated `tools/list`) and on `list_changed`. Each tool's `schema_hash` is stored. A tool on the server's **default allowlist** and present at connect is Tier 0. A **new or unknown tool is Tier 3** until the owner moves it on Settings › Connections, which lists the discovered tools with their hints. A changed schema on an allowlisted tool drops it to Tier 3 until reviewed, and voids open approvals (§6.2). Annotations are shown as hints and never grant Tier 0 by themselves.
 - **The model sees two fixed tools,** `find_tools` and `call_tool`. Turn state lists the ready servers. Results longer than 20 KB become attachments, and the prompt requires Juno to say when a result was cut or a server is down.
-- **Secrets policy:** Every outgoing MCP argument passes a secret filter: an exact match against the keychain values Juno holds, plus token patterns. A hit blocks the call and tells the owner in words. For servers marked `noSecrets` (T3), auth headers, cookies and stored credentials are never attached, whatever the config says.
+- **Secrets policy:** Every outgoing MCP argument passes a secret filter: an exact match against the keychain values Juno holds, plus token patterns. A hit blocks the call and tells the owner in words. For servers marked `noSecrets` (T3), Juno sends only the server's own OAuth token, only to the origin that issued it (spikes, finding 1); no other header, cookie or stored credential is attached, whatever the config says.
 
 ### 10.2 Default servers
 | Server | Connection | Default Tier 0 allowlist | Notes |
 | --- | --- | --- | --- |
 | Notion | `https://mcp.notion.com/mcp`, OAuth (PKCE, DCR, refresh) through pi-mcp, tokens in the keychain | The search and fetch tools, matched by name at connect | Writes are Tier 3 with a `last_edited_time` precondition |
 | Littlebird | `https://mcp.littlebird.ai/mcp`, OAuth | The search and read tools, matched at connect against the read names Littlebird publishes (meetings, context search, routine reports, account). Anything else is Tier 3 | Adding material and creating or updating routines are writes, so Tier 3 |
-| T3 Code | Setting `t3.url`, default `http://192.168.1.22:3773/mcp`. No auth. `noSecrets: true`. See the connection rule below | `t3_thread_read`, `t3_thread_list`, `t3_thread_search`, `t3_thread_wait`, `t3_pending_request_list`, `t3_project_list`, `t3_worktree_list`, `t3_worktree_status` | Launch, send and interrupt are Tier 2 through the T3 adapter. Pending-request answers are Tier 3 |
+| T3 Code | Setting `t3.url`, default `http://192.168.1.22:3773/mcp`. OAuth (registration, PKCE, no refresh token, spikes finding 1). `noSecrets: true` for briefs and arguments; the OAuth token is the connection's own. See the connection rule below | `t3_thread_read`, `t3_thread_list`, `t3_thread_search`, `t3_thread_wait`, `t3_pending_request_list`, `t3_project_list`, `t3_worktree_list`, `t3_worktree_status` | Launch, send and interrupt are Tier 2 through the T3 adapter. Pending-request answers are Tier 3 |
 
 **T3 connection rule:**
 
@@ -298,7 +328,7 @@ Fakes for all three servers (WP10) mirror the shapes above. Real adapters are bu
 ## 11. Proactive scheduling and delivery (B2, H3, H4)
 
 ### 11.1 Schedules
-- `schedule_create({ at | every | cron, reason, prompt, deliver: now | digest, source_op })` works only in a clean owner run. `source_op` must be an owner input from that run, and the call mints the schedule's grant.
+- `schedule_create({ at | every | wallClock (time, time zone, weekdays), reason, prompt, deliver: now | digest | silent, source_op })` works with no click only in a clean owner run. `source_op` must be an owner input from that run, and the call mints the schedule's grant. In a tainted owner run it returns a `proposedSchedule` card instead. Start on that card is the owner's click; its op becomes `source_op` and mints the grant (§6.4, G6). Wake and report runs get neither path.
 - From wake and report runs, only `schedule_pause` and `schedule_delete` on the schedule that woke them are available.
 - Limits: 20 active schedules, intervals of at least 15 minutes, and one-shot wakes at most a year ahead. A schedule untouched for 30 days pauses itself and says so once.
 - Wakes are admitted once per `(schedule_id, schedule_rev, due_at)` through the inbox, revalidating the revision and the grant first.
@@ -318,31 +348,35 @@ Fakes for all three servers (WP10) mirror the shapes above. Real adapters are bu
 
 | Kind | Props | Actions | After |
 | --- | --- | --- | --- |
-| `sendMessage` | `messages[1..5]: { target pill, text (editable) }`, `because?` | Send (all), Dismiss | A status per row: "Sent · Open" or "Not sent · Try again" |
+| `sendMessage` | `messages[1..5]: { target pill, text (editable), result }`, `because?` | Send (all), Dismiss | A result per row: "Sent · Open" or "Not sent · Try again"; the card's status derives from the rows (`sendMessageStatus`) |
 | `resolve` | topics[] | Resolve, Dismiss | "Resolved 3 · Undo" |
 | `topics` | links | open | none |
-| `task` | job, title, where, live state | Open, Stop (and Start, when used as a card) | "Done · Open PR 412" |
-| `question` | source header ("T3 Code asks", "Juno asks"), prompt, 2–4 options, free text | option, Reply | "You chose …" |
-| `schedule` | what, when, deliver | Keep or Start, Pause, Delete | "Paused" |
-| `connect` | server, scopes, what leaves the machine | Connect, Not now | "Connected" |
+| `proposedTask` | kind, title, where | Start, Dismiss | "Started" |
+| `task` | job, title, where, phase (`running`, `needsYou`, `quiet`, `lostSight`, `stopping`, then `done`, `failed`, `stopped` or `unknown`), live state. No `status`: `phase` is its only machine. `lostSight` reads "Sign in to T3 Code to keep watching" and Open becomes Sign in | Open, Stop | "Done · Open PR 412", "Failed · Show in Activity", "Stopped", or the can't-tell line |
+| `question` | source header ("T3 Code asks", "Juno asks"), prompt, 2–4 options, free text | option, Reply | "You chose …" or "You replied" |
+| `proposedSchedule` | what, when, deliver, and `prompt`, the instruction each wake will run, all **rendered from the stored payload** (G6) | Start, Dismiss | "Started" |
+| `schedule` | what, when, deliver | Keep, Pause, Delete | "Kept", "Paused" or "Deleted" |
+| `connect` | server, scopes, what leaves the machine | Connect, Skip | "Connected" |
 | `change` | server, target, a field preview **rendered from the payload**, model caption | Apply, Dismiss | "Applied · Open" |
-| `remove` | messages | Remove, Keep | "Removed 2 messages" |
-| `budget` | spend today, cap | Allow $1 more today, Wait | "Allowed until midnight" |
-| `provider` | OpenRouter key or Codex | Set up | "Using Claude Sonnet 5.5" |
+| `remove` | messages, only for a removal Juno proposes; the owner's Remove is the local sheet (§4.5) | Remove, Keep | "Removed 2 messages" |
+| `budget` | spend today, cap | Allow $1 more today, Wait until tomorrow | "Allowed until midnight" |
+| `provider` | "Choose a model provider": OpenRouter key or Codex, with the fixed disclosure | Set up | "Using Claude Sonnet 5.5" |
 
 - The model cannot invent a kind. Cards expire after 7 days, or when the source changes ("Expired · Ask again"). An unknown kind renders "This card needs a newer Juno".
+- **The view summarizes; the record keeps the evidence** (W12). `agent-cards` keeps every attempt per child (`ChildEvidence`), including an `unknown` attempt after a later attempt succeeded, and both `cancel-requested` and `cancelled`. The card shows one result per row and one status per card: a row is `sending` while any attempt is unsettled (including `cancel-requested`), `sent` once any attempt has a receipt, `unknown` if an attempt may have landed, and `notSent` when every attempt failed or was cancelled before transport. So "Sent" means at least one copy landed, not that no duplicate exists; the owner was warned at the retry click (§6.3). Activity lists every attempt with its evidence. Why: the owner decides from the row, and two cancellation states or an attempt history would not change what they can do there.
+- **Approval identities travel beside the view** (W13). The chat contract (`agent-contract/src/chat`) carries no revisions, digests or action ids. The renderer RPCs (`agent-contract/src/rpc`) send a `CardBinding` (card revision and digest, plus each child's action id, revision, digest and `duplicateWarning`) with each card, and a click returns it. Editing a send's text stores a new proposal with a new revision. Scheduled and Remembers snapshots carry revisions the same way. Why: views take props and return ids; the binding is checked by the agent, so no view can compose or alter it.
 
 ## 13. Chat UI (dumb views, friendly layer)
 
 ### 13.1 Look
 The chat has four item kinds: owner bubble, Juno bubble with cards, the status bubble (only during a run), and separators.
 
-- **Owner bubbles** use `--hl` fill and `--hl-fg` text (coral, pending a mock review that includes a 200-message transcript and both themes). The fallback is `--secondary-default`. `--radius-bubble` 16, with the 4 px tail on the last bubble of a group. Max width 76%, 14 px text, padding 8×12.
+- **Owner bubbles**: the colour is pending the owner's choice between options A to D in `docs/design/juno-chat/README.md`, which recommends B (an accent tint, `--hl-bubble`, with `--foreground-default` text). `--radius-bubble` 16, with the 4 px tail on the last bubble of a group. Max width 76%, 14 px text, padding 8×12.
 - **Juno bubbles** use `--surface-hover`, with the 28 px mark beside the last bubble of a group. Plain text. Recall answers cite the day ("On 12 Mar you said …") with a link that scrolls to the message.
-- **Groups** are formed by sender within 2 minutes **and the same origin**. A proactive group carries an 11 px uppercase label ("SCHEDULED · DAILY CATCH-UP") with "Why this?" and "Stop these".
+- **Groups** are formed by sender within 2 minutes **and the same origin**. A proactive group carries an 11 px uppercase label ("SCHEDULED · DAILY CATCH-UP") with "Why this?" and one quiet action: "Pause schedule" or "Mute updates". Neither stops a job (B5).
 - **Cards:** Column width up to 560 px, `--radius-card` 20. Light theme: the wide soft shadow. Dark theme: the ring from `docs/design/dark-theme/`. Laid out at full height, with a `--duration-appear` fade.
 - **Status bubble:** three dots looping over `--duration-pop` (static under reduced motion), 13 px status text with a 150 ms cross-fade, and Stop on hover or focus.
-- **Inline lines:** "Remembered · Undo", "Removed".
+- **Inline lines:** "Remembered · Undo" (Undo until the next send or 60 s), "Removed", and the fixed secret-blocked line.
 - **Times** show on hover. **Day and gap separators** follow SPEC §17 wording. **Scroll:** the "New" divider, and a "New message" pill when scrolled up. The list uses `@tanstack/react-virtual`.
 
 ### 13.2 States (B4), with copy
@@ -352,25 +386,34 @@ The chat has four item kinds: owner bubble, Juno bubble with cards, the status b
 | Idle | Nothing extra |
 | Running | The status bubble |
 | Queued | "Queued" under the last owner bubble, at 70% opacity, after 500 ms |
-| Not delivered | "Not delivered · Try again". Retrying resubmits the same `op_id` text |
-| Interrupted | "Juno was interrupted. Your message is kept. [Try again]" |
+| Waiting | "Waiting for network", "Waiting for Resume" or "Waiting for your review". The inbox write succeeded; the run starts when it can |
+| Too long | "That is too long to send as one message. Split it up and send the parts." The message stays, marked not sent |
+| Not delivered | "Not delivered · Try again". Only when the inbox write failed. Retrying resubmits the same `op_id` text |
+| Stopped | "Stopped. Juno won't start anything new for this reply." Work already handed off before Stop may still finish; its card shows the result (§6.5) |
+| Interrupted | "Juno was interrupted. Your message is kept. [Try again]". No Try again for wake and report runs |
+| Failed | "Juno didn't answer. Give it a moment and try again." (provider), "OpenRouter rejected the key. Check it in Settings.", "Codex is signed out on this Mac. Sign in to Codex and try again.", "Juno lost the connection. Try again when you are back online." |
 | Blocked (too large) | §5.2 copy, with no card |
-| Offline | The composer works. A send that needs the network ends as "Not delivered". Wakes that fall due offline are admitted once when back |
-| No provider | A `provider` card: "Pick how Juno thinks", with OpenRouter and Codex. It says once that Juno sends its memory of the chat to the chosen provider each turn |
+| Blocked (budget) | "Juno has used today's budget." with the `budget` card |
+| Offline | A chip, "You're offline". The composer works and a send that needs the network waits. Wakes that fall due offline are admitted once when back |
+| No provider | A `provider` card: "Choose a model provider", with OpenRouter and Codex. Its fixed line says Juno sends its memory of the chat to the chosen provider each turn |
 | Budget reached | A `budget` card |
 | Paused | A header chip, "Juno is paused · Resume". The composer works, and messages queue until Resume |
 | AI off | One line, "Juno is off. Turn on AI assist in Settings." The composer is disabled and schedules show as paused |
 | Expired card | "Expired · Ask again" |
-| Recovery mode | "Juno restored from backup. It won't act until you check pending actions. [Review]" |
+| Recovery mode | A chip, "Juno restored from backup · Review". The composer works and sends wait for the review. Review opens the Review page (§13.3) |
+| Update needed | A chip, "Juno needs an update" (§3 step 6). The composer is disabled |
 | Another device owns | "Juno is working on your other Mac", with the chat read-only |
-| Removal pending | A Settings line (§4.5) |
+| Removal pending | A Settings line, "Removal pending · 1 copy in a running job · Stop job" (§4.5) |
+| Secret blocked | A note line, "Juno stopped a tool call that held a key or a token. Nothing was sent." |
+
+The banner chips are not exclusive conditions; the container shows one by precedence: another device, update needed, recovery, AI off, paused, offline. Every line in this table is fixed copy in `chatCopy`; the model writes none of them.
 
 ### 13.3 Pages
 Pages open from the Juno header menu:
 
 - **Scheduled:** next run, deliver, Pause, Edit and Delete. **What Juno remembers:** pins, editable. **Memory of this chat:** the view as a dated timeline, with masked lines shown as "being updated".
 - **Activity:** grouped by run: who asked, when, outcome. Under each run, one row per Tier 1–3 action with its decision, and one folded read line ("Read 3 topics, looked back 4 times"). Failures appear in plain words with "Copy details".
-- **Connections:** status, address in use, discovered tools with tiers. **Settings › Juno:** chat model picker, compaction model picker, spend today and the cap, Codex status, rules, Pause, and backup.
+- **Connections:** status, address in use, discovered tools with tiers; the T3 row holds the address and the local-network switch. **Settings › Juno:** chat model picker, compaction model picker, spend today and the cap, Codex status, the OpenRouter key (with a rejected state), rules, Pause, backup, and ownership (state, export recovery phrase, move, restore). **Review** (recovery only): the pending cards, each "may already have happened", and Activate.
 
 ### 13.4 Elsewhere (M4)
 - Ask Juno on the home and ⌘J open the Juno tab with the composer focused. Inside the chat, ⌘J focuses the composer. The nav item shows a grey count of unread Juno messages. The home's Ask Juno field shows a running job's state line, as a text swap with no reflow.
@@ -380,32 +423,39 @@ Budgets go in `docs/performance.md`: send to bubble under 16 ms, status bubble u
 ## 14. Ownership, backup and transfer (R1, R2, R13)
 
 ### 14.1 Ownership
-- `owner.lock` (`flock`) gives a single local writer. `ownership { device_id, epoch, state: active | released | recovery }` is kept in `agent.sqlite` and in the backup manifest. The dispatcher checks `state = active` locally.
-- **v1 claims nothing about fencing across machines.** `staleOwnerCannotAuthorize` stays a visible counterexample in `agent-recovery.qnt`.
+- `owner.lock` gives a single local writer (G9). It is the S5 lock: an SQLite connection with `locking_mode = EXCLUSIVE` after one write, busy timeout 0. The connection is held by a module-level reference in `ownership/` for the life of the process and closed only after owned I/O has stopped. Process death releases it. Why: Node has no `flock`, and a collected `DatabaseSync` closes and drops the lock while the process still writes (S5).
+- `ownership { device_id, epoch, state: active | released | recovery }` is kept in `agent.sqlite` and in the backup manifest. The dispatcher checks `state = active` locally.
+- **v1 claims nothing about fencing across machines** (G7). `staleOwnerCannotAuthorize` stays a visible counterexample in `agent-recovery.qnt`. What v1 guarantees: one writer after a move (§14.2), and after a restore whose attestation is true (§14.3). What it cannot guarantee: if the owner restores on a new Mac while the old one is still running Juno and believes it owns, both can authorize. The old Mac stops itself only if it sees the new owner's manifest: before each backup write it reads the newest manifest in its backup folder, and a manifest with a higher epoch from another device turns its ownership to `released` and shows "Juno is working on your other Mac". That needs both Macs to use one synced folder; with the default local folder it never happens. The restore sheet and SPEC §13.8 say this. Why: a fence needs an authority both Macs must ask before acting, and v1 has none. Detection in the folder costs one read and is the most v1 can do. The fence comes with the later always-on authority (R1).
 
 ### 14.2 Cooperative transfer, the only supported move
-1. The old device stops admissions and the scheduler, drains authorizations and attempts (any `unknown` remains as such), drains projection, and writes a **final checkpoint**: a full snapshot at commit position P.
-2. It publishes a manifest naming that checkpoint with `state: released, epoch e`, then goes read-only.
-3. The new device verifies the manifest's authentication and chain, installs the checkpoint into a fresh database, takes `epoch e+1, active`, and starts.
+1. The old device stops admissions and the scheduler, drains authorizations and attempts (any `unknown` remains as such), and drains projection.
+2. It **commits `ownership.state = released`** (epoch e) at FULL. From here it is read-only: it authorizes and admits nothing, also after a crash and restart. It may still write the checkpoint and backup files.
+3. It writes the **final checkpoint**: a full snapshot at commit position P, which therefore holds `released`.
+4. It publishes a manifest naming that checkpoint with `state: released, epoch e`, and shows the **move code**: 8 characters from the manifest's hash.
+5. The new device verifies the manifest's authentication and chain, shows the code of the manifest it found, and the owner confirms it matches the old Mac. It installs the checkpoint into a fresh database, takes `epoch e+1, active`, and starts.
+
+Why this order (G10): if the manifest were published first and the old Mac crashed before releasing, it would restart active while the new Mac also activated. Releasing first means any published release is already durable. Taking the checkpoint after the release means that opening the checkpoint can never bring back the old active record. The move code tells the new Mac that this manifest is the old Mac's last one, and not an older copy in the folder, so its deletion record is trusted (§14.3).
 
 ### 14.3 Restore from backup, and forced recovery
 - The owner must confirm the old Mac is off, erased, or has Juno removed. Juno cannot check this, and the UI says so.
 - The restored store opens in **recovery**: Dispatch is off. Every approval and unconsumed authorization is void. Pending intents are quarantined as `restored`. Every attempt without a receipt is `unknown`. A new journal incarnation and archive incarnation start.
-- The owner reviews pending actions and re-approves them with "may already have happened" wording, then activates. The recovery point is the last backup, at most 5 minutes old.
+- The owner reviews pending actions on the Review page and re-approves them with "may already have happened" wording, then presses Activate; cards still open are expired. The composer works in recovery and sends wait for the review. The recovery point is the last backup, at most 5 minutes old.
+- **The deletion record on a fresh Mac (G13).** Install needs a trusted deletion record: the latest backup generation that removed something. It comes from one of three places, in order: (1) this Mac's keychain, when Juno is restored on the Mac that wrote it; (2) the manifest of a move, confirmed by its move code (§14.2); (3) the recovery phrase, when "Rotate recovery phrase after removals" is on (§14.5), because generations from before the last removal were encrypted under an older backup key that the current phrase does not open. With none of these, Juno restores the **newest authenticated generation** in the folder, and the Review page says: "Juno can't check that this backup is the newest. If the folder is out of date, messages you removed may come back. You can remove them again." Why: on a new Mac the only other witness is the folder itself, and an older copy of the folder looks valid. Refusing to restore would lose the whole chat to protect removals that may not exist. A stated limit keeps the restore and leaves the choice with the owner, who can turn on the strict option to close it.
 
 ### 14.4 Backup format
-- **Layout:** a generation `g` with a fresh data key `K_g` per generation, a schema version, a snapshot at commit position P, and ordered delta segments `P..Q`. The capture method is decided in S6: the SQLite session extension if it is available in the utility-process runtime, otherwise an application change log from Juno's own write paths.
+- **Layout:** a generation `g` with a fresh data key `K_g` per generation, a schema version, a snapshot at commit position P, and ordered delta segments `P..Q`. The capture method is the SQLite session extension (S6). **Capture attaches only to replicated tables** (G12). Backup bookkeeping (`backup_progress` with the export cursor and nonce counter), the lock file, the model catalogue cache and other per-device rows are local and never captured. A restore starts them fresh. Why: if writing the export cursor were captured, each export would create a new change to export, and backup would never settle.
 - **Encryption:** AES-GCM with a fresh nonce per encryption. The associated data is `(g, position, prev_hash)`.
 - **Write order:** write the segment, then write and rename the manifest, which is an authenticated chain head. Persist the export cursor only after the manifest is renamed. On restore, a manifest whose segment is missing waits.
-- **Restore:** gap-free replay into a fresh database, then atomic install.
+- **Restore:** gap-free replay into a fresh database, then atomic install. **The install transaction rechecks the deletion record** (G11): if a removal committed while the candidate was staging and the candidate's generation is now older than the record, the install does not happen. The candidate stays quarantined and the restore waits for the sanitized generation. Why: checking only when staging starts leaves a window in which a removal lands and the old generation is installed anyway.
 - **Redaction:** start generation `g+1` from a sanitized snapshot with a fresh `K_{g+1}`, then delete generation `g`'s files and **destroy `K_g`** (crypto-shredding).
-- **Deletion record:** the latest redaction generation and a hash are stored in the keychain and the manifest. Restoring a generation older than that record keeps it quarantined.
+- **Deletion record:** the latest redaction generation and a hash are stored in the keychain and the manifest. Restoring a generation older than that record keeps it quarantined. **Order** (G13): the redaction raises the keychain record to `g+1` first, then commits the redaction transaction (§4.5), and only then does the chat show "Removed". The record only grows, so a crash between the two leaves it ahead of the data, which blocks older backups and never admits them. At startup, a record ahead of the newest generation starts generation `g+1` from the current data, so a restorable backup exists again; the owner sees no "Removed" and can remove again. Where a fresh Mac gets a trusted record is in §14.3.
 - **Keys:** data keys are wrapped by a backup key kept in the keychain. The owner exports a recovery phrase, which wraps the backup key. Destroying `K_g` means removing its wrapped copy from every manifest Juno writes.
 
-### 14.5 Backup destination (pending confirmation)
-- **Proposed default:** the folder `Juno Backup` in the owner's iCloud Drive, with per-generation keys.
+### 14.5 Backup destination
+- **Decided (W4):** a local folder the owner chooses, under the app's data directory by default. The owner may point it at a synced drive later, so the trade-off below is stated in Settings when the folder is on one.
+- **Earlier proposal, kept for the trade-off:** the folder `Juno Backup` in the owner's iCloud Drive, with per-generation keys.
 - **The trade-off, as Settings will state it:** iCloud keeps deleted files in Recently Deleted for 30 days, and those old manifests still hold the wrapped `K_g`. So someone with the recovery phrase could read a removed message from iCloud's trash for up to 30 days.
-- **The strict option:** Settings › Backup › "Rotate recovery phrase after removals". This rotates the backup key on each redaction and needs the owner to save a new phrase. An external disk or NAS folder is offered as the alternative destination.
+- **The strict option:** Settings › Backup › "Rotate recovery phrase after removals". This rotates the backup key on each redaction and needs the owner to save a new phrase. It also makes the phrase a trusted deletion record on a new Mac (§14.3, G13). An external disk or NAS folder is offered as the alternative destination.
 
 ## 15. Quint specs (content of WP2, WP3, WP4)
 
@@ -419,18 +469,19 @@ The property names and meanings below follow `review/astra-v2.md`. Where this pl
 
 - Astra's 24: `sourceIdentityStable`, `retainedSourceExact`, `redactionMonotone`, `nodeIdentityStable`, `nodeInputsCurrent`, `treeClosed`, `viewPartition`, `viewReferencesValid`, `viewCAS`, `restartPreservesHead`, `mergePreservesCoverage`, `mergeDueOrder`, `prefixBetweenBatches`, `pinAuthorityExact`, `pinBudget`, `redactionExcludesReads`, `retrievalSound`, `requestSnapshotConsistent`, `requestCoverageDeclared`, `requestProtocolValid`, `requestBounded`, `mandatoryPinsIncluded`, `compactorLimits`, `pendingWorkRecoverable`.
 - Changed: `nodeInputsCurrent` includes the local-window context messages, and nodes record no pins (G1). `requestSnapshotConsistent` revalidates `pin_rev` as well as `gen` (G3). The empty-view fallback for `covered > H` is removed (G2).
-- Added: `taintClosureExact`: masked entries are exactly the closure of a redaction over recorded inputs. `guardStampRequired`: no dispatch without a valid builder stamp. `taintLocal` (G1), `viewWithinCutoff` (G2), `pinEditCurrent` (G3), `nodeBounded` and `parentInputFits` (G4). Exact definitions are in `review/wp2-gaps.md`.
+- Added: `taintClosureExact`: masked entries are exactly the closure of a redaction over recorded inputs. `guardStampRequired`: no dispatch without a valid builder stamp. `taintLocal` (G1), `viewWithinCutoff` (G2), `pinEditCurrent` (G3), `nodeBounded` and `parentInputFits` (G4). Exact definitions are in `review/wp2-gaps.md`. The spec also checks `pinsSurviveCompaction`.
 
 **WP3 `specs/agent-actions.qnt`, safety:**
 
-- Astra's 22: `intentBeforeDispatch`, `approvalExact`, `approvalCurrentAtAuthorization`, `approvalConsumption`, `noHiddenRetry`, `retryRequiresAuthority`, `unknownPreserved`, `dedupeIdentityStable`, `dedupedEffectOnce`, `receiptMatchesAction`, `scopedNoClickGrant`, `untrustedCannotGrant`, `tier4NeverDispatched`, `allWritesGated`, `currentOwnerAuthorizes`, `pauseBlocksAuthorization`, `scheduleGrantValid`, `occurrenceAdmissionOnce`, `cancelWinsBeforeAdmission`, `batchEffectsIndependent`, `outcomeEvidenceStable`.
-- Changed: `quietHoursHoldAuthorization` is replaced by `quietHoursHoldNotifications`: no OS notification in quiet hours unless the schedule is `now` (H4).
-- Added: `scheduleFromCleanOwnerRun`: every model-created schedule has a `source_op` from a clean owner run (B2). `cleanRunForNoClick`: a no-click Tier 2 start happens only in a clean owner run (R8). `capHard`: reserved plus actual spend never exceeds the cap plus the owner's raises (R15).
+- Astra's 21: `intentBeforeDispatch`, `approvalExact`, `approvalCurrentAtAuthorization`, `approvalConsumption`, `noHiddenRetry`, `retryRequiresAuthority`, `unknownPreserved`, `dedupeIdentityStable`, `dedupedEffectOnce`, `receiptMatchesAction`, `scopedNoClickGrant`, `untrustedCannotGrant`, `tier4NeverDispatched`, `allWritesGated`, `currentOwnerAuthorizes`, `pauseBlocksAuthorization`, `scheduleGrantValid`, `occurrenceAdmissionOnce`, `cancelWinsBeforeAdmission`, `batchEffectsIndependent`, `outcomeEvidenceStable`.
+- Changed: `quietHoursHoldAuthorization` is replaced by `quietHoursHoldNotifications`: no OS notification in quiet hours unless the schedule is `now` (H4). `scheduleFromCleanOwnerRun` becomes `scheduleFromOwnerAuthority`: every schedule has a source from a clean owner run or an owner click on a current `proposedSchedule` card (G6). `currentOwnerAuthorizes` is the local check only (G7).
+- Added: `cleanRunForNoClick`: a no-click Tier 2 start happens only in a clean owner run (R8). `capHard`: reserved plus actual spend never exceeds the cap plus the owner's raises, with compaction inside it (R15, G5). `scheduleFromOwnerAuthority` (B2, G6) is above.
 - `authorizeDispatch`, `transportSend`, `destinationAccept` and `recordReceipt` are separate actions.
 
 **WP4 `specs/agent-recovery.qnt`, safety:**
 
 - Astra's 10: `singleLocalOwner`, `acknowledgedInputDurable`, `projectionPrefix`, `journalIdentityUnique`, `ordinaryCrashPreservesCommittedAuthority`, `transferCheckpointComplete`, `restoreDoesNotAuthorize`, `backupChainComplete`, `restoreRespectsDeletion`, and `staleOwnerCannotAuthorize` (expected to fail under folder-only recovery, and kept as a documented counterexample).
+- Added (G7–G13): `observedOwnerStops`, `checkpointHoldsRelease`, `exportNotCaptured`, `deletionRecordedBeforeRemoved`, and `staleFolderCannotRestoreRemoved` (expected to fail without a trusted deletion record, and kept as a documented counterexample like `staleOwnerCannotAuthorize`). Exact definitions are in `review/wp3-wp4-gaps.md`. The spec also checks `lockBeforeWrite`, `journalRollbackStopsResume`, `bridgeDedupe`, `exportAfterManifest`, `encryptionNonceFresh`, `backupSanitized`, `generationKeyAvailable`, `releaseBeforePublication` and `finiteDomains`.
 
 **Temporal properties,** typechecked, with drains:
 - `eventuallyProjected`, `eventuallySummarized`, `retryEventuallyRuns`, `redactionEventuallySettles`, and `batchEventuallyFinishes` (memory). `unknownEventuallyExplained`, `approvedEventuallyAttempted`, `missedWakeEventuallyAdmitted`, and `pauseEventuallyQuiescent` (actions). `transferEventuallyCompletes` and `backupEventuallyCatchesUp` (recovery).
@@ -461,6 +512,11 @@ The property names and meanings below follow `review/astra-v2.md`. Where this pl
 | 24 | A steer is compacted and published while its run is live (G2) | memory |
 | 25 | Two saves edit the same pin version (G3) | memory |
 | 26 | Every attempt for two children is oversized, then their parent is queued (G4) | memory |
+| 27 | A report taints the run, Juno proposes a schedule, the owner clicks Start, and the proposal changes before the schedule is created (G6) | actions |
+| 28 | B activates after a forced recovery and publishes; A, still running, reads B's manifest and then tries to authorize (G7) | recovery |
+| 29 | Release, checkpoint, publish, then a crash and reopen of the old Mac (G10) | recovery |
+| 30 | A fresh Mac restores from a folder whose newest generation predates the last removal (G13) | recovery (kept as a counterexample, plus the strict-phrase correction) |
+| 31 | A crash between raising the keychain deletion record and the redaction commit (G13) | recovery |
 
 The due-against-push check (t = 0…20,000) is a TypeScript property test in WP5.
 
@@ -553,12 +609,16 @@ S4 (how to reach T3) is resolved by the owner and replaced by S8.
 | **M6 Codex** | WP20 | Sol via Codex in the picker. ChatGPT sign-in if feasible |
 | **M7 Ownership** | WP21, flow 14 | |
 
-Each UI milestone ends with the design and performance reviews. WP23 runs from M2 onward.
+Each UI milestone ends with the design and performance reviews. WP23 runs from M2 onward. `m1-review.md` sets M2's launch order. It splits WP13 into a host side (`agent-juno`, `engine/src/agent-host`, the outbox mode, the desktop process wiring), which needs only the WP6 contracts and starts with WP8, and a wire-up (`state/src/agent`, removing `chat` from `ai`, the protocol-2 switch), which needs WP11.
 
 ## 18. Open questions for the owner
 
-1. **T3 runtime mode** for sessions Juno starts: `auto-accept-edits` in a new worktree (the current default)?
-2. **Backup:** the iCloud folder with a 30-day residue as stated, the strict rotate-on-removal option, or an external disk?
-3. **Coral owner bubbles** after the mock review, or the neutral fallback?
-4. **Sign in with ChatGPT:** can Juno register for it?
-5. **T3 on the LAN:** since anyone on the network can drive it, should Juno refuse the LAN address unless the owner turns on "Allow T3 over the local network"? The proposed default is yes, require that toggle.
+Answered by the owner on 10-14 (see §1): T3 sessions run with full access in a new worktree; the backup is a local folder; Sign in with ChatGPT is not planned; T3 over the network needs the switch, off by default.
+
+These five are open on 10-14. SPEC §19 lists the same five. None blocks M2: the bubble colour and the voice land in WP12 as tokens and copy, the narrowing is a policy in WP15, and the two limits are M7 behaviour.
+
+1. **Owner bubble colour:** A (accent fill), B (accent tint), C (neutral tint) or D (ink), from `docs/design/juno-chat/`. The mock's README recommends B. WP12 builds B behind one token until the owner decides.
+2. **Juno's voice:** does Juno say "I" in its own bubbles? The spec proposes yes, and the fixed copy already uses it in two places (the empty state, the 30-minute quiet line).
+3. **The clean-run narrowing (W6):** the owner said "no click to start T3 sessions I asked for". The rule as built needs no click only while Juno has not read Slack, a connection or a session report in the same reply. Confirm the narrowing, or say which reads should not count.
+4. **A restore while the old Mac still runs (G7):** v1 cannot stop an old Mac that is still on from acting after a restore elsewhere, unless both Macs share one synced backup folder. The restore sheet says this. This repeats R1 with the exact limit, and `staleOwnerCannotAuthorize` stays a documented counterexample. Confirm it is acceptable for v1.
+5. **Removals and a restore on a new Mac (G13):** without a trusted deletion record, a restore from an out-of-date backup folder can bring back messages the owner removed. Juno says so on the Review page, and `staleFolderCannotRestoreRemoved` stays a documented counterexample. Should "Rotate recovery phrase after removals" be on by default? On closes the gap but asks the owner to save a new phrase after every removal. The plan keeps it off.
