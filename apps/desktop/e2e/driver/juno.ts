@@ -368,6 +368,7 @@ export class Juno {
   readonly sidebar: Sidebar
   readonly accountMenu: AccountMenu
   readonly topic: TopicPane
+  readonly newChat: NewChatPane
   readonly tabs: TabStrip
   readonly nav: Navigation
   readonly frame: SidebarFrame
@@ -379,6 +380,7 @@ export class Juno {
     this.sidebar = new Sidebar(win)
     this.accountMenu = new AccountMenu(win, this.sidebar)
     this.topic = new TopicPane(win)
+    this.newChat = new NewChatPane(win)
     this.tabs = new TabStrip(app, win)
     this.nav = new Navigation(app, win)
     this.frame = new SidebarFrame(app, win)
@@ -579,6 +581,92 @@ async function chooseNextMenuItem(win: Page, id: string): Promise<void> {
 const BOTTOM_SLACK = 2
 
 /** The topic shown in the active tab. Hidden tabs stay in the page with `display: none`. */
+/** A New chat tab: the two pickers, the composer and the preview (spec section 9). */
+export class NewChatPane {
+  readonly root: Locator
+
+  constructor(readonly win: Page) {
+    this.root = win.locator('[data-new-chat]').filter({ visible: true })
+  }
+
+  get composer(): Locator {
+    return this.root.locator('[data-composer] textarea')
+  }
+
+  /** The composer's field, whose box must not move when the tab becomes the topic. */
+  get field(): Locator {
+    return this.win.locator('[data-composer-field]').filter({ visible: true })
+  }
+
+  get conversationButton(): Locator {
+    return this.root.getByRole('button', { name: /^Conversation: / })
+  }
+
+  get threadButton(): Locator {
+    return this.root.getByRole('button', { name: /^Thread: / })
+  }
+
+  /** The open picker's list. */
+  get list(): Locator {
+    return this.root.getByRole('listbox')
+  }
+
+  get search(): Locator {
+    return this.root.getByRole('dialog').getByRole('textbox')
+  }
+
+  /** The row in the open list named `name`, followed by its sub line ("Direct message"). */
+  option(name: string): Locator {
+    return this.list.getByRole('option', { name: new RegExp(`^${escapeRegExp(name)}(\\s|$)`) })
+  }
+
+  async write(text: string): Promise<void> {
+    await this.composer.fill(text)
+  }
+
+  /** Enter in the composer. */
+  async send(): Promise<void> {
+    await this.composer.press('Enter')
+  }
+
+  /** Opens the conversation list, searches it, and picks the row that starts with `name`. */
+  async pickConversation(query: string, name: string): Promise<void> {
+    if (!(await this.search.isVisible())) await this.conversationButton.click()
+    await this.search.fill(query)
+    await this.option(name).click()
+    await expect(this.list).toBeHidden()
+  }
+
+  /** Opens the thread list, searches it, and picks the row that starts with `title`. */
+  async pickThread(query: string, title: string): Promise<void> {
+    await this.threadButton.click()
+    await this.search.fill(query)
+    await this.option(title).click()
+    await expect(this.list).toBeHidden()
+  }
+
+  async expectEmpty(): Promise<void> {
+    await expect(this.root.getByText('Write your message, then pick where it goes.', { exact: true })).toBeVisible()
+  }
+
+  async expectConversation(name: string): Promise<void> {
+    await expect(this.conversationButton).toHaveAccessibleName(`Conversation: ${name}`)
+  }
+
+  async expectThread(name: string): Promise<void> {
+    await expect(this.threadButton).toHaveAccessibleName(`Thread: ${name}`)
+  }
+
+  /** A message in the preview. */
+  async expectPreview(text: string): Promise<void> {
+    await expect(this.root.locator('[data-message-row]').filter({ hasText: text }).first()).toBeVisible({ timeout: 15_000 })
+  }
+
+  async expectNote(text: string): Promise<void> {
+    await expect(this.root.getByText(text, { exact: true })).toBeVisible()
+  }
+}
+
 export class TopicPane {
   readonly root: Locator
 
