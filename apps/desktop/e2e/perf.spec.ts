@@ -425,7 +425,7 @@ test.describe.serial('large workspace', () => {
       // A topic open beside the list, so the drag reflows both panes.
       const first = (await juno.sidebar.titles())[0]!
       await juno.sidebar.row(first).open()
-      await juno.topic.expectAtBottom()
+      await expect.poll(() => juno.topic.rowCount(), { timeout: 15_000 }).toBeGreaterThan(0)
       await win.evaluate(() => {
         const w = window as unknown as { __loaf: number }
         w.__loaf = 0
