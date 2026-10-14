@@ -4,7 +4,8 @@ The Juno Agent core: a portable, durable personal assistant. A plain Node progra
 
 ## What it owns today
 
-- `startAgent(config, connection)`: connects to the host over the AgentHost port, calls `host.hello`, checks the protocol, and returns `{ host, stop }`. `connection.acquire()` gives the next host port; the client takes a new one after the host restarts.
+- `startAgent(config, connection, turns?)`: connects to the host over the AgentHost port, calls `host.hello`, checks the protocol, and, given `turns`, opens the turn engine on `config.agentDir`. Returns `{ host, turns, stop }`. `connection.acquire()` gives the next host port; the client takes a new one after the host restarts.
+- The turn engine (WP11): `openTurns(options)`, or the `TurnEngine` Effect service. See "Turns" below.
 - `src/host/`: the `AgentHost` service (an `effect/rpc` client of `AgentHostRpcs`) and its port protocol, the same shape as the renderer's engine client.
 - The durable core (WP8): `openCore(options)`, or the `DurableCore` Effect service with `DurableCore.layer(options)`. `options` names the agent directory and gives pi-ai's `models` and the chat model (WP9 supplies them), plus WP11's pi extensions. It returns the running core, or `updateNeeded` ("Juno needs to update its records") when a newer Juno wrote `agent.sqlite` or the journal.
 
@@ -84,5 +85,30 @@ Pass `migrations: [SPEND_MIGRATIONS]` to `openCore` or `DurableCore.layer`, alon
 Integration limits found during WP9:
 
 - WP8 requires models before opening the core, but the guard needs the core's store. The application must provide a deferred model facade, attach the guard after `openCore`, then start requests. WP11 must address startup ordering before resuming queued journal work; WP9 does not change WP8's automatic resume loop.
-- The hard-cap proof assumes reported usage does not exceed the reserved upper bound and quoted prices. If a provider violates that assumption, the ledger records its actual charge rather than hiding it; further admissions stop at the exhausted cap. The multiplier is a future-request response, not a way to undo a provider charge.
+- The hard cap holds while reported usage stays within the reserved upper bound and quoted prices. A provider that reports more is recorded as it reports: the ledger never records less than was charged, so one request can take the day over its cap. Once the day (or compaction's share) is at or over its limit, every new reservation is refused, whatever its amount, until midnight or a raise (decision log, 10-14 09:49; spec `overReportStep`). The 1.25 multiplier then applies to the provider's later requests; it does not undo the charge.
 - The actions spec conservatively keeps the original compaction allocation even after known settlement. The ledger releases the unused part of a known reservation, as §5.4 specifies, while enforcing the same 25% invariant. The spec has no daily reset or raise action; the implementation tests those as well. The spec also settles every reservation either as known or as lost; releasing a reservation the provider refused (key, rate limit) is a known settlement of zero. No specs were changed in WP9.
+
+## Turns (WP11)
+
+`openTurns({ agentDir, provider, model, compaction?, subagent?, host? })` opens the engine: the durable core's open sequence with the router in place of WP8's serial loop. `provider(store)` builds the guarded provider (`createOpenRouter`, or `createProviderGuard` in tests) on the opened store.
+
+**Startup order.** Lock, `agent.sqlite` and migrations (spend, turns, jobs and the caller's), recovery (open authorizations become `unknown`), then `provider(store)`, then pi on the journal with only the guard's models, then the router restores the live run, and only then does pi resume. So pi never reaches a model before the guard exists, and a resumed request is built and stamped like any other; no deferred model facade is needed. `router/open.ts` copies `openCore`'s open sequence because the router needs the journal for steering and the core does not expose it. Letting `openCore` take a router would remove the copy.
+
+| Folder | Does |
+| --- | --- |
+| `router/` | The router (one owner input, one run), the engine (`open.ts`), turn events, the Slack read tools over the host port, the `runs` tables |
+| `request/` | The request builder in pi's `beforeRequest`: one snapshot, `buildRequest`, then `guard.stamp`. The tool shape and Juno's system text |
+| `compactor/` | Background memory jobs on `runJob` and WP9's compaction provider: at most 8 at once, never past a live run's cutoff, paused while Juno is paused or compaction's share of the cap is used |
+| `jobs/` | Background jobs behind Task cards (subagents now, T3 in WP18), the `delegate` tool, milestone reports into the inbox |
+| `memory-tools/` | `remember` |
+| `pins/` | Pin changes on the trusted side, each bumping `pin_rev` in its transaction |
+
+**A run.** The router commits the run (its history cutoff `H` and origin) before the input reaches pi, then resets and submits through `inbox/bridge.ts`. Every request goes through the builder and the guard. Input that arrives while a run is live is held in the inbox and delivered at the next boundary (pi's `afterTools` or `onYield`), because pi withdraws queued input on abort and burns its op id; so after Stop a queued steer starts a fresh run. Stop waits up to 1 s for input already handed to pi to be placed, then aborts. The run ends with the chat contract's `Ending`: `stopped` after Stop; the builder's or guard's refusal (`blocked`, `interrupted`); a provider failure (`failed`, or `interrupted` when the stream had started and was lost); `complete` when pi answered every input. Owner runs carry `retry` on `interrupted` and `failed`. A steered report or wake, or a Slack read, marks the run as no longer clean (§6.4).
+
+**Events** (`subscribe`): `started` (the status bubble, dots), `text` (the run's text so far, across requests), `status` (a tool's line, at most every 2 s; the next `text` clears it), `queued`, `steered`, `remembered`, `ended`. `run()` gives the live run for a renderer that attaches mid-run.
+
+**Tools.** Each is a `defineTool` with a status line and a `replay` mode. A tool calls `current()` inside `execute()` to get the live run: its cutoff, whether it is clean, and the journal position read after pi committed the call's intent. A tool that authorizes an action (WP15) passes that `position` to `authorize` and keeps `replay: 'unsafe'`. No WP11 tool authorizes: `remember` writes a pin keyed by the call id, `delegate` starts a job keyed by the call id, and the Slack reads are Tier 0.
+
+**`remember`** takes exact words the owner wrote in this run. The trusted side finds them among the run's owner messages (`[H, cutoff)`) and copies the bytes; the model never names a message id or offsets. "Remember this" (`pins.pinMessage`), edits and Undo name the pin version they replace.
+
+**Testing.** `test/turns.test.ts` runs the engine in-process with `fakeProvider`; `test/turns-crash.test.ts` kills it mid-turn under the crash harness.

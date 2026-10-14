@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, it } from 'vitest'
+import { reply } from '@juno/agent-testing'
 import { dollars, type SpendLedger } from '../src/index'
-import { providerHarness } from './providers-harness'
+import { providerHarness, request } from './providers-harness'
 
 let h: Awaited<ReturnType<typeof providerHarness>>
 let ledger: SpendLedger
@@ -80,4 +81,28 @@ it('keeps compaction inside both limits, and applies each $1 click only once for
   h.nextDay()
   ledger.allowDollar('owner-click')
   expect(ledger.snapshot()).toMatchObject({ cap: dollars(2), raises: 0, reserved: 0 })
+})
+
+it('records a cost above its reservation as reported, and refuses new spend until the day is back under its cap or raised', async () => {
+  const guard = h.guard()
+  const { revision, context } = request()
+  // The provider counts far more input than the byte bound allowed: $2 at Sonnet's input price.
+  h.fake.script([reply('Done.', { usage: { input: 1_000_000, output: 10 } })])
+  const answered = await guard.models.completeSimple(h.model, guard.stamp(revision, h.model, context))
+  expect(answered.stopReason).toBe('stop')
+  const reported = dollars(answered.usage.cost.total)
+  const s = ledger.snapshot()
+  expect(s.actual).toBe(reported)
+  expect(s.actual).toBeGreaterThan(s.cap)
+  // At or over the cap nothing is reserved, not even a zero amount, on any path.
+  for (const path of ['chat', 'subagent', 'compaction'] as const) expect(ledger.reserve(path, 0)).toEqual({ kind: 'blocked', reason: 'budget' })
+  h.fake.script([reply('Not sent.')])
+  const blocked = await guard.models.completeSimple(h.model, guard.stamp(revision, h.model, request('again').context))
+  expect(blocked.errorMessage).toBe('JUNO:blocked:budget')
+  expect(h.fake.pending()).toBe(1)
+  // About $2.0001 was spent, so the owner's $1 raise leaves room again.
+  ledger.allowDollar('owner-click')
+  expect(ledger.reserve('chat', dollars(0.5)).kind).toBe('reserved')
+  h.nextDay()
+  expect(ledger.reserve('chat', dollars(1)).kind).toBe('reserved')
 })
