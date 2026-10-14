@@ -9,12 +9,13 @@ import { ChatCard } from './ChatCard'
 export interface ProviderCardProps {
   readonly card: ProviderCardModel
   readonly actions: ChatActions
+  readonly enter?: boolean
 }
 
 const HOVER = '@media (hover: hover)'
 
 /** "Choose a model provider": the options as 36px rows, the fixed disclosure, and Set up. Afterwards "Using Claude Sonnet 5.5". */
-export function ProviderCard({ card, actions }: ProviderCardProps) {
+export function ProviderCard({ card, actions, enter }: ProviderCardProps) {
   const copy = chatCopy.card.provider
   const [selected, setSelected] = useState(card.options[0]?.id)
   const open = card.status._tag === 'open'
@@ -23,6 +24,7 @@ export function ProviderCard({ card, actions }: ProviderCardProps) {
       id={card.id}
       kind="provider"
       actions={actions}
+      enter={enter}
       status={card.status}
       because={card.because}
       buttons={

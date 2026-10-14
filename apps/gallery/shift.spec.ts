@@ -38,7 +38,7 @@ const interactive = [
 const perState = 8
 
 /** The tests split the components between them so they run in parallel. */
-const shards = 8
+const shards = 12
 
 /** Deals components out, biggest first, to whichever part has the fewest states so far. */
 function partsOf(routes: ReadonlyArray<Route>): string[][] {

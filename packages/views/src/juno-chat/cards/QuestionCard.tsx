@@ -9,6 +9,7 @@ import { ChatCard } from './ChatCard'
 export interface QuestionCardProps {
   readonly card: QuestionCardModel
   readonly actions: ChatActions
+  readonly enter?: boolean
 }
 
 const HOVER = '@media (hover: hover)'
@@ -19,7 +20,7 @@ const HOVER = '@media (hover: hover)'
  * reply field. A typed reply when `freeText`. Afterwards "You chose …" or
  * "You replied" from the status line.
  */
-export function QuestionCard({ card, actions }: QuestionCardProps) {
+export function QuestionCard({ card, actions, enter }: QuestionCardProps) {
   const [reply, setReply] = useState('')
   const copy = chatCopy.card.question
   const open = card.status._tag === 'open'
@@ -34,6 +35,7 @@ export function QuestionCard({ card, actions }: QuestionCardProps) {
       id={card.id}
       kind="question"
       actions={actions}
+      enter={enter}
       label={card.asks._tag === 't3' ? copy.t3Asks : copy.junoAsks}
       source={card.asks._tag === 't3' ? <Chip variant="filled" size={20} title={card.asks.job.title}>{card.asks.job.title}</Chip> : undefined}
       status={card.status}

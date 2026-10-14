@@ -11,6 +11,7 @@ export interface RemoveCardProps {
   readonly card: RemoveCardModel
   readonly actions: ChatActions
   readonly now: number
+  readonly enter?: boolean
 }
 
 /**
@@ -18,7 +19,7 @@ export interface RemoveCardProps {
  * offered, and the line that copies already sent cannot be recalled.
  * Remove or Keep; afterwards "Removed 2 messages" from the status line.
  */
-export function RemoveCard({ card, actions, now }: RemoveCardProps) {
+export function RemoveCard({ card, actions, now, enter }: RemoveCardProps) {
   const [alsoReply, setAlsoReply] = useState(false)
   const copy = chatCopy.card.remove
   return (
@@ -26,6 +27,7 @@ export function RemoveCard({ card, actions, now }: RemoveCardProps) {
       id={card.id}
       kind="remove"
       actions={actions}
+      enter={enter}
       status={card.status}
       because={card.because}
       buttons={

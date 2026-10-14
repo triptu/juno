@@ -26,15 +26,17 @@ function ScheduleBody({ what, when, deliver }: { readonly what: string; readonly
 export interface ScheduleCardProps {
   readonly card: ScheduleCardModel
   readonly actions: ChatActions
+  readonly enter?: boolean
 }
 
 /** A schedule Juno created from a clean run: what, when, how it delivers. Keep, Pause or Delete; afterwards "Kept", "Paused" or "Deleted". */
-export function ScheduleCard({ card, actions }: ScheduleCardProps) {
+export function ScheduleCard({ card, actions, enter }: ScheduleCardProps) {
   return (
     <ChatCard
       id={card.id}
       kind="schedule"
       actions={actions}
+      enter={enter}
       status={card.status}
       because={card.because}
       buttons={
@@ -59,15 +61,17 @@ export function ScheduleCard({ card, actions }: ScheduleCardProps) {
 export interface ProposedScheduleCardProps {
   readonly card: ProposedScheduleCardModel
   readonly actions: ChatActions
+  readonly enter?: boolean
 }
 
 /** A schedule from a tainted run: the same body, then the prompt each wake runs, in full. Start creates it. */
-export function ProposedScheduleCard({ card, actions }: ProposedScheduleCardProps) {
+export function ProposedScheduleCard({ card, actions, enter }: ProposedScheduleCardProps) {
   return (
     <ChatCard
       id={card.id}
       kind="proposedSchedule"
       actions={actions}
+      enter={enter}
       status={card.status}
       because={card.because}
       dismiss

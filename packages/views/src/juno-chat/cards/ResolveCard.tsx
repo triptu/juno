@@ -8,16 +8,18 @@ import { ChatCard, placeIcon } from './ChatCard'
 export interface ResolveCardProps {
   readonly card: ResolveCardModel
   readonly actions: ChatActions
+  readonly enter?: boolean
 }
 
 /** The topics Juno proposes to resolve. Resolve or Dismiss; afterwards "Resolved 3 · Undo" from the status line. */
-export function ResolveCard({ card, actions }: ResolveCardProps) {
+export function ResolveCard({ card, actions, enter }: ResolveCardProps) {
   const copy = chatCopy.card.resolve
   return (
     <ChatCard
       id={card.id}
       kind="resolve"
       actions={actions}
+      enter={enter}
       status={card.status}
       because={card.because}
       dismiss

@@ -33,7 +33,7 @@ export function ReviewPage({ page, now, actions, onActivate }: ReviewPageProps) 
         <div role="list" aria-label="Pending actions" {...stylex.props(styles.cards)}>
           {page.pending.map((card) => (
             <div key={card.id} role="listitem" {...stylex.props(styles.card)}>
-              {renderCard(card, actions, now)}
+              {renderCard(card, actions, now, false)}
             </div>
           ))}
         </div>

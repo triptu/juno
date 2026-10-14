@@ -10,16 +10,18 @@ import { ChatCard } from './ChatCard'
 export interface ChangeCardProps {
   readonly card: ChangeCardModel
   readonly actions: ChatActions
+  readonly enter?: boolean
 }
 
 /** A write to a connection: the server and target, each field with its before and after, rendered from the payload. Apply or Dismiss. */
-export function ChangeCard({ card, actions }: ChangeCardProps) {
+export function ChangeCard({ card, actions, enter }: ChangeCardProps) {
   const copy = chatCopy.card.change
   return (
     <ChatCard
       id={card.id}
       kind="change"
       actions={actions}
+      enter={enter}
       source={
         <Text variant="meta" tone="muted" truncate>
           {card.server} · {card.target}

@@ -10,6 +10,7 @@ import { ChatCard, MayDuplicate, OpenButton, placeIconFor } from './ChatCard'
 export interface SendMessageCardProps {
   readonly card: SendMessageCardModel
   readonly actions: ChatActions
+  readonly enter?: boolean
 }
 
 /**
@@ -19,7 +20,7 @@ export interface SendMessageCardProps {
  * its geometry and each row's result line fills the slot under it, so the
  * card never changes height as rows settle.
  */
-export function SendMessageCard({ card, actions }: SendMessageCardProps) {
+export function SendMessageCard({ card, actions, enter }: SendMessageCardProps) {
   const [texts, setTexts] = useState<Readonly<Record<string, string>>>(() => Object.fromEntries(card.messages.map((m) => [m.id, m.text])))
   const editable = card.status._tag === 'open'
   const copy = chatCopy.card.sendMessage
@@ -31,6 +32,7 @@ export function SendMessageCard({ card, actions }: SendMessageCardProps) {
       id={card.id}
       kind="sendMessage"
       actions={actions}
+      enter={enter}
       source={source}
       status={card.status}
       because={card.because}
@@ -64,6 +66,7 @@ function Row({
   readonly onChange: (text: string) => void
   readonly onSendRow: (id: ProposedMessageId) => void
   readonly actions: ChatActions
+  readonly enter?: boolean
 }) {
   const copy = chatCopy.card.sendMessage
   const result = message.result

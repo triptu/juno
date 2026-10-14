@@ -8,14 +8,15 @@ import { ChatCard, placeIcon } from './ChatCard'
 export interface TopicsCardProps {
   readonly card: TopicsCardModel
   readonly actions: ChatActions
+  readonly enter?: boolean
 }
 
 const HOVER = '@media (hover: hover)'
 
 /** Links to topics: 36px rows that open on mouse down, in a new tab with ⌘. No buttons and no status change. */
-export function TopicsCard({ card, actions }: TopicsCardProps) {
+export function TopicsCard({ card, actions, enter }: TopicsCardProps) {
   return (
-    <ChatCard id={card.id} kind="topics" actions={actions} status={card.status} because={card.because} footer={false} padding="tight">
+    <ChatCard id={card.id} kind="topics" actions={actions} enter={enter} status={card.status} because={card.because} footer={false} padding="tight">
       <div role="list" {...stylex.props(styles.list)}>
         {card.links.map((link) => (
           <div key={link.topicId} role="listitem" tabIndex={0} data-topic-link={link.topicId} {...activateHandlers<HTMLDivElement>((event) => actions.onOpen({ _tag: 'topic', topicId: link.topicId }, event))} {...stylex.props(styles.row)}>

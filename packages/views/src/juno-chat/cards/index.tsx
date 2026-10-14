@@ -22,6 +22,8 @@ export interface CardViewProps<K extends CardKind = CardKind> {
   readonly card: Extract<Card, { readonly _tag: K }>
   readonly actions: ChatActions
   readonly now: number
+  /** Play the fade on mount. Default true. */
+  readonly enter?: boolean
 }
 
 type CardViews = { readonly [K in CardKind]: (props: CardViewProps<K>) => React.ReactNode }
@@ -43,9 +45,9 @@ const cardViews: CardViews = {
   unknown: UnknownCard,
 }
 
-export function renderCard(card: Card, actions: ChatActions, now: number): React.ReactNode {
+export function renderCard(card: Card, actions: ChatActions, now: number, enter = true): React.ReactNode {
   const View = cardViews[card._tag] as (props: CardViewProps) => React.ReactNode
-  return <View card={card} actions={actions} now={now} />
+  return <View card={card} actions={actions} now={now} enter={enter} />
 }
 
 export { ChatCard, type ChatCardProps } from './ChatCard'

@@ -9,6 +9,7 @@ import { ChatCard, DangerGhost, OpenButton } from './ChatCard'
 export interface TaskCardProps {
   readonly card: TaskCardModel
   readonly actions: ChatActions
+  readonly enter?: boolean
 }
 
 const copy = chatCopy.card.task
@@ -45,7 +46,7 @@ function stateLine(card: TaskCardModel): string {
  * ellipsis). It has no status; `phase` is its only machine. Stop is the
  * only way to end a job, so it stays until the job has settled.
  */
-export function TaskCard({ card, actions }: TaskCardProps) {
+export function TaskCard({ card, actions, enter }: TaskCardProps) {
   const line = stateLine(card)
   const open = card.open
   return (
@@ -53,6 +54,7 @@ export function TaskCard({ card, actions }: TaskCardProps) {
       id={card.id}
       kind="task"
       actions={actions}
+      enter={enter}
       because={card.because}
       buttons={
         active.has(card.phase) ? (
@@ -141,15 +143,17 @@ function Settled({ card, actions }: TaskCardProps) {
 export interface ProposedTaskCardProps {
   readonly card: ProposedTaskCardModel
   readonly actions: ChatActions
+  readonly enter?: boolean
 }
 
 /** A task Juno may not start on its own: the same title and where, then Start or Dismiss. Afterwards "Started". */
-export function ProposedTaskCard({ card, actions }: ProposedTaskCardProps) {
+export function ProposedTaskCard({ card, actions, enter }: ProposedTaskCardProps) {
   return (
     <ChatCard
       id={card.id}
       kind="proposedTask"
       actions={actions}
+      enter={enter}
       status={card.status}
       because={card.because}
       dismiss

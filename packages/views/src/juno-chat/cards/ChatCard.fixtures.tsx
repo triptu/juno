@@ -31,7 +31,7 @@ import { renderCard } from './index'
 
 /** One card through the registry, as the chat renders it. */
 function CardFixture({ card }: { readonly card: Card }) {
-  return renderCard(card, noopActions, NOW)
+  return renderCard(card, noopActions, NOW, false)
 }
 
 const card = (value: Card, frame?: FixtureFrame) => fixture<{ readonly card: Card }>({ card: value }, frame)

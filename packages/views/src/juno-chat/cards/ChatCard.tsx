@@ -30,6 +30,8 @@ export interface ChatCardProps {
   readonly footer?: boolean
   /** The card's padding: `normal` 14 16; `tight` 8, for the topics list. */
   readonly padding?: 'normal' | 'tight'
+  /** Play the fade on mount. Pass false for a card drawn in a settled state (the review page, the gallery). */
+  readonly enter?: boolean
   readonly children?: ReactNode
 }
 
@@ -41,11 +43,11 @@ export interface ChatCardProps {
  * click never moves what is under the card. A `working` card dims its
  * buttons; the view never composes an after-line, it prints `status.line`.
  */
-export function ChatCard({ id, kind, actions, label, source, status, because, dismiss = false, buttons, footer = true, padding = 'normal', children }: ChatCardProps) {
+export function ChatCard({ id, kind, actions, label, source, status, because, dismiss = false, buttons, footer = true, padding = 'normal', enter = true, children }: ChatCardProps) {
   const open = status === undefined || status._tag === 'open'
   const working = status?._tag === 'working'
   return (
-    <Surface kind="card" as="article" padding="none" data-chat-card={kind} data-card-status={status?._tag} aria-busy={working || undefined} sx={styles.card}>
+    <Surface kind="card" as="article" padding="none" data-chat-card={kind} data-card-status={status?._tag} aria-busy={working || undefined} sx={enter ? styles.cardEnter : styles.card}>
       <div {...stylex.props(styles.inner, padding === 'tight' && styles.innerTight)}>
       <div {...stylex.props(styles.header, padding === 'tight' && styles.headerTight)}>
         <Text variant="meta" weight="medium" tone="subtle" truncate>
@@ -223,7 +225,12 @@ const styles = stylex.create({
     width: '100%',
     maxWidth: chat['--card-max-width'],
     boxSizing: 'border-box',
-    // Laid out at full size and only fades in: the height never changes while entering.
+  },
+  // Laid out at full size and only fades in: the height never changes while entering.
+  cardEnter: {
+    width: '100%',
+    maxWidth: chat['--card-max-width'],
+    boxSizing: 'border-box',
     animationName: appear,
     animationDuration: motion['--duration-appear'],
     animationTimingFunction: motion['--ease-out'],

@@ -8,16 +8,18 @@ import { ChatCard } from './ChatCard'
 export interface ConnectCardProps {
   readonly card: ConnectCardModel
   readonly actions: ChatActions
+  readonly enter?: boolean
 }
 
 /** A server to connect: its name, the scopes as tags, and one line on what leaves the machine. Connect or Skip. */
-export function ConnectCard({ card, actions }: ConnectCardProps) {
+export function ConnectCard({ card, actions, enter }: ConnectCardProps) {
   const copy = chatCopy.card.connect
   return (
     <ChatCard
       id={card.id}
       kind="connect"
       actions={actions}
+      enter={enter}
       source={<Text variant="meta" tone="muted" truncate>{card.server}</Text>}
       status={card.status}
       because={card.because}

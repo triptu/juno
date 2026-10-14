@@ -6,16 +6,18 @@ import { ChatCard } from './ChatCard'
 export interface BudgetCardProps {
   readonly card: BudgetCardModel
   readonly actions: ChatActions
+  readonly enter?: boolean
 }
 
 /** Today's spend against the cap. Allow $1 more today, or wait; afterwards "Allowed until midnight". */
-export function BudgetCard({ card, actions }: BudgetCardProps) {
+export function BudgetCard({ card, actions, enter }: BudgetCardProps) {
   const copy = chatCopy.card.budget
   return (
     <ChatCard
       id={card.id}
       kind="budget"
       actions={actions}
+      enter={enter}
       status={card.status}
       because={card.because}
       buttons={
