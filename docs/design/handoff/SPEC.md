@@ -308,7 +308,7 @@ Juno hands long work to delegates: a T3 Code session for code, or a cheaper copy
 - **Updates are Juno's call.** Juno hears when a job needs a decision, finishes (with the PR) or fails, and decides what to tell you and when. A long job may get many short updates or one at the end.
 - **Questions from a session** become a Question card headed "T3 Code asks", so you know the answer goes to the session. Juno never merges or pushes.
 - **"How is it going?"** is answered from what Juno knows of its jobs, without a card.
-- **Telling a running session something** ("also fix the tests") needs no click for a session you started in this chat, while Juno has not read Slack, a connection or a session report in this reply (13.9); otherwise it is a card. After Pause and Resume it needs a card again. Stopping a session is the Task card's Stop, and nothing else stops it.
+- **Telling a running session something** ("also fix the tests") needs no click for a session you started in this chat, while Juno has not read Slack, a connection or a session report in this reply (13.9); otherwise it is a card. After Pause and Resume it needs a card again. Stopping a session is the Task card's Stop, and nothing else stops it. That Stop ends the running coding task; it is not a chat Stop, and the chat itself has none (13.2).
 - If the T3 Code sign-in lapses while a session runs, the session keeps running and the Task card says "Sign in to T3 Code to keep watching".
 
 ### 13.5 Steering and interruptions
