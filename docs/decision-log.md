@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-14 19:55 · Tushar · The topic header is direction B, Floating (`docs/design/header/`): no bar, two solid islands on a fading band, aligned to the reading column; the title opens the row's menu, and only Resolve (Threads on Main) and Juno stay visible. No topic art in the header; the context pill shows the name only, the kind in its tint, icon, tooltip and accessible name. The Juno tab and panel headers follow.
 - 10-14 18:45 · Tushar · Topic and Juno headers get a modern redesign; three directions from his reference shots go to a design pass first.
 - 10-14 18:45 · orchestrator · Merged spend-cap spec alignment, M4 fix B and WP12 to main. Steer-only merges after its agent resolves the action-spec conflicts with the spend-cap change. The Task card keeps its Stop: it stops a running coding task, not the chat.
 - 10-14 17:10 · Tushar · Confirmed: a channel's Main has no Subscribe of its own (it follows the channel's Notify me; Ignore or Resolve hide a noisy one); the Juno panel shows the whole Juno chat; ⌘J in a topic toggles the panel and opens the Juno tab elsewhere.
