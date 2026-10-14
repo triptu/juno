@@ -37,6 +37,7 @@ function SignedIn({ width, hidden = false }: { readonly width?: number; readonly
           accountMenuOpen={false}
           onAccountMenu={noop}
           onSearch={noop}
+          onNewChat={noop}
           onNavigate={noop}
           onFilterKind={noop}
           onToggleUnread={noop}

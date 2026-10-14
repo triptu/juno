@@ -7,6 +7,7 @@ import {
   cycleTab,
   dividerIndex,
   historyTarget,
+  homePlace,
   mountedTabs,
   newChatPlace,
   noTabs,
@@ -15,6 +16,7 @@ import {
   reopenClosedTab,
   savedTabs,
   setPinned,
+  settleNewChat,
   stepHistory,
   tabByNumber,
   tabTopic,
@@ -24,11 +26,12 @@ import {
 } from '../src/tabs'
 
 const open = (tabs: Tabs, topicId: string, options?: OpenOptions) => openPlace(tabs, topicPlace(topicId), options)
-/** What each tab shows, left to right: a topic id, or "new" for a New chat. */
-const shown = (tabs: Tabs) => tabs.tabs.map((tab) => tabTopic(tab) ?? 'new')
+/** What each tab shows, left to right: a topic id, "new" for a New chat or "home". */
+const placeName = (tab: Tabs['tabs'][number]) => tabTopic(tab) ?? (tab.history.entries[tab.history.index]!.kind === 'home' ? 'home' : 'new')
+const shown = (tabs: Tabs) => tabs.tabs.map(placeName)
 const activeShows = (tabs: Tabs) => {
   const tab = tabs.tabs.find((other) => other.id === tabs.active)
-  return tab === undefined ? undefined : (tabTopic(tab) ?? 'new')
+  return tab === undefined ? undefined : placeName(tab)
 }
 /** The topics of the mounted tabs, the active first. */
 const mounted = (tabs: Tabs) => [...mountedTabs(tabs)].map((id) => tabTopic(tabs.tabs.find((tab) => tab.id === id)!))
@@ -65,6 +68,45 @@ describe('opening', () => {
     const filled = open(chat, 'd')
     expect(shown(filled)).toEqual(['a', 'b', 'd', 'c'])
     expect(historyTarget(filled, -1)).toBeUndefined()
+  })
+})
+
+describe('Home', () => {
+  it('opens in the current tab, and a second open focuses the tab that shows it', () => {
+    const home = openPlace(three, homePlace)
+    expect(shown(home)).toEqual(['a', 'home', 'c'])
+    expect(historyTarget(home, -1)).toEqual(topicPlace('b'))
+    const elsewhere = open(home, 'd', { newTab: true })
+    const again = openPlace(elsewhere, homePlace, { newTab: true })
+    expect(shown(again)).toEqual(['a', 'home', 'd', 'c'])
+    expect(activeShows(again)).toBe('home')
+  })
+
+  it('with no tab open, opens a tab', () => {
+    expect(shown(openPlace(noTabs, homePlace))).toEqual(['home'])
+  })
+})
+
+describe('a New chat that sends', () => {
+  it('becomes the topic in place of its own entry, so Back goes to what the tab showed before', () => {
+    const chat = openPlace(open(noTabs, 'a'), newChatPlace)
+    expect(historyTarget(chat, -1)).toEqual(topicPlace('a'))
+    const sent = settleNewChat(chat, chat.active!, 'd')
+    expect(shown(sent)).toEqual(['d'])
+    expect(historyTarget(sent, -1)).toEqual(topicPlace('a'))
+    expect(historyTarget(stepHistory(sent, -1), 1)).toEqual(topicPlace('d'))
+  })
+
+  it('closes and focuses the tab that already shows the topic, leaving nothing to reopen', () => {
+    const chat = openPlace(three, newChatPlace, { newTab: true })
+    const sent = settleNewChat(chat, chat.active!, 'c')
+    expect(shown(sent)).toEqual(['a', 'b', 'c'])
+    expect(activeShows(sent)).toBe('c')
+    expect(sent.closed).toEqual(chat.closed)
+  })
+
+  it('changes nothing once the tab shows something else', () => {
+    expect(settleNewChat(three, three.active!, 'd')).toBe(three)
   })
 })
 
@@ -253,6 +295,8 @@ describe('saved tabs', () => {
   })
 
   it('anything unreadable is no tabs, and a lost active tab falls back to the first', () => {
+    const home = parseTabs(JSON.parse(JSON.stringify(savedTabs(openPlace(noTabs, homePlace)))))
+    expect(shown(home)).toEqual(['home'])
     expect(parseTabs(null)).toEqual(noTabs)
     expect(parseTabs({ tabs: 'nope' })).toEqual(noTabs)
     const lost = parseTabs({ tabs: [{ id: 'a' }], active: 'gone', recent: ['gone'] })

@@ -343,7 +343,7 @@ All [proto] measured at 1280×800 with Inter unless marked.
 | `--page-width` | 720px (Juno) |
 | `--page-width-settings` | 760px (Preferences), 880px (Notifications) |
 | `--palette-width` | 560px, max calc(100% − 48px), top offset 96px |
-| `--menu-width` | 236px context menu, 248px avatar menu, 280px mention popover, 340px New chat pickers |
+| `--menu-width` | 236px context menu; `--menu-width-account` 248px avatar menu, `--menu-width-browse` 300px, `--menu-width-mention` 280px mention popover, `--menu-width-picker` 340px New chat pickers |
 | `--toast-max-width` | 352px |
 | `--popover-max-height` | 400px, and never taller than the window below the title bar (`100vh − --titlebar-height − --space-5`), so the account menu fits at the minimum window size; the content scrolls inside. `--picker-max-height` 300px |
 | `--scrollbar` | 10px, thumb `--border-strong` with 3px transparent inset, radius 10. `ScrollArea scrollbar="hover"` keeps the thumb transparent until the area is hovered; the 10px gutter stays |

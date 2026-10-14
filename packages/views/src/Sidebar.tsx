@@ -1,8 +1,10 @@
 import * as stylex from '@stylexjs/stylex'
 import { Hash } from '@phosphor-icons/react/dist/icons/Hash'
+import { House } from '@phosphor-icons/react/dist/icons/House'
 import { ListBullets } from '@phosphor-icons/react/dist/icons/ListBullets'
 import { Lock } from '@phosphor-icons/react/dist/icons/Lock'
 import { MagnifyingGlass } from '@phosphor-icons/react/dist/icons/MagnifyingGlass'
+import { NotePencil } from '@phosphor-icons/react/dist/icons/NotePencil'
 import { Sparkle } from '@phosphor-icons/react/dist/icons/Sparkle'
 import { User } from '@phosphor-icons/react/dist/icons/User'
 import { Users } from '@phosphor-icons/react/dist/icons/Users'
@@ -12,7 +14,7 @@ import { accent, colors, layout, sizes, spacing } from '@juno/tokens/tokens.styl
 import { activateHandlers, AvatarButton, Button, Chip, Divider, IconButton, NavItem, Popover, type ActivateEvent, type HueName } from '@juno/ui'
 import { countLabel } from './look'
 
-export type SidebarNavTarget = 'all-topics' | 'juno'
+export type SidebarNavTarget = 'home' | 'all-topics' | 'juno'
 
 export interface SidebarAccount {
   readonly name: string
@@ -55,6 +57,8 @@ export interface SidebarProps {
   readonly accountMenu?: ReactNode
   readonly onAccountMenu: (open: boolean) => void
   readonly onSearch: () => void
+  /** The New chat button: a New chat in a new tab. */
+  readonly onNewChat: () => void
   /** Fires on mouse down; `event.metaKey` asks for a new tab. */
   readonly onNavigate: (target: SidebarNavTarget, event: ActivateEvent) => void
   readonly onFilterKind: (kind: KindFilter) => void
@@ -68,7 +72,7 @@ export interface SidebarProps {
 
 /**
  * The left pane (spec section 5): the title bar with the traffic-light
- * space, Search and the account button, the nav items, a hairline, the quick
+ * space, Search, New chat and the account button, the nav items, a hairline, the quick
  * filters with their dots and the Unread toggle, a status line when the
  * list may be behind Slack, the scope chip when scoped, and the list the
  * owner renders into it.
@@ -86,6 +90,7 @@ export function Sidebar({
   accountMenu,
   onAccountMenu,
   onSearch,
+  onNewChat,
   onNavigate,
   onFilterKind,
   onToggleUnread,
@@ -102,6 +107,7 @@ export function Sidebar({
         {titlebarLeading}
         <div {...stylex.props(styles.icons)}>
           <IconButton icon={MagnifyingGlass} label="Search ⌘K" size={30} onClick={onSearch} />
+          <IconButton icon={NotePencil} label="New chat ⌘N" size={30} onClick={onNewChat} />
           <span {...stylex.props(styles.account)}>
             <Popover
               open={accountMenuOpen}
@@ -128,6 +134,9 @@ export function Sidebar({
       </header>
 
       <nav aria-label="Pages" {...stylex.props(styles.nav)}>
+        <NavItem icon={House} active={activeNav === 'home'} onSelect={(event) => onNavigate('home', event)}>
+          Home
+        </NavItem>
         <NavItem icon={ListBullets} active={activeNav === 'all-topics'} onSelect={(event) => onNavigate('all-topics', event)}>
           All topics
         </NavItem>

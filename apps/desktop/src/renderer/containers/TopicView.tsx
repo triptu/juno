@@ -224,7 +224,36 @@ export const TopicTab = memo(function TopicTab({ tabId, id }: TopicTabProps) {
   return <Topic id={id} detail={detail} />
 })
 
-function Topic({ id, detail }: { readonly id: string; readonly detail: TopicDetail }) {
+/** Thread links in a preview open in a new tab, so the New chat and its draft stay. */
+function openThreadInNewTab(id: string): void {
+  openTopic(id, { newTab: true })
+}
+
+/**
+ * A topic's latest messages, read-only: New chat's preview (spec section 9),
+ * and the same for peek (section 5). The list alone, with no header or
+ * composer, in `readOnly` mode (see `TopicProps`).
+ */
+export const TopicPreview = memo(function TopicPreview({ id }: { readonly id: string }) {
+  const result = useAtomValue(topicAtom(id))
+  const detail = result._tag === 'Success' ? result.value : undefined
+  if (detail == null) return null
+  return <Topic key={id} id={id} detail={detail} readOnly />
+})
+
+interface TopicProps {
+  readonly id: string
+  readonly detail: TopicDetail
+  /**
+   * Read-only: the message list alone, opened at the bottom, with no "N new"
+   * divider; nothing is marked read, the tab's scroll snapshot is neither
+   * read nor written, and thread links open in a new tab. Otherwise the
+   * topic as a tab shows it, with its header and composer.
+   */
+  readonly readOnly?: boolean
+}
+
+function Topic({ id, detail, readOnly = false }: TopicProps) {
   const list = useAtomValue(messageListAtom(id))
   const now = useAtomValue(nowAtom, (time) => Math.floor(time / TIME_STEP) * TIME_STEP)
   const focused = useWindowFocused()
@@ -233,7 +262,7 @@ function Topic({ id, detail }: { readonly id: string; readonly detail: TopicDeta
 
   // The read pointer when this tab first showed the topic, for the divider.
   const [readAtOpen] = useState(() => ({ lastReadTs: detail.lastReadTs }))
-  const at = dividerIndex(list.order, readAtOpen.lastReadTs)
+  const at = readOnly ? -1 : dividerIndex(list.order, readAtOpen.lastReadTs)
   const dividerBefore = at > 0 ? list.order[at] : undefined
 
   const [positioned, setPositioned] = useState(false)
@@ -263,7 +292,7 @@ function Topic({ id, detail }: { readonly id: string; readonly detail: TopicDeta
   useLayoutEffect(() => {
     const scroller = scrollRef.current
     if (scroller === null || positioned || !list.ready || last === undefined) return
-    const snapshot = registry.get(scrollSnapshotAtom(id))
+    const snapshot = readOnly ? undefined : registry.get(scrollSnapshotAtom(id))
     const row = snapshot === undefined ? null : scroller.querySelector(rowSelector(snapshot.anchorKey))
     pin.current =
       snapshot !== undefined && row !== null
@@ -282,7 +311,7 @@ function Topic({ id, detail }: { readonly id: string; readonly detail: TopicDeta
     setFar(distance > scroller.clientHeight)
     setSeenTs(last)
     setPositioned(true)
-  }, [id, positioned, list.ready, last, atEnd])
+  }, [id, readOnly, positioned, list.ready, last, atEnd])
 
   // Rows added above the ones in view (the rest of the window after the first frame, an older page):
   // scroll anchoring keeps the rows in view still, except at offset 0, where Chromium does not anchor.
@@ -334,7 +363,9 @@ function Topic({ id, detail }: { readonly id: string; readonly detail: TopicDeta
     const letGo = () => {
       pin.current = undefined
     }
-    const record = () => registry.set(scrollSnapshotAtom(id), snapshotOf(scroller))
+    const record = () => {
+      if (!readOnly) registry.set(scrollSnapshotAtom(id), snapshotOf(scroller))
+    }
     const onScrollEnd = () => {
       if (pin.current?.kind === 'row' && Math.abs(scroller.scrollTop - pinnedTop.current) > 1) pin.current = undefined
       const distance = distanceFromBottom(scroller)
@@ -352,13 +383,13 @@ function Topic({ id, detail }: { readonly id: string; readonly detail: TopicDeta
     // After a jump (End, a scrollbar drag, a script) the rows it brought near the view reach their real
     // height frames after the scroll ended, and Chromium does not always anchor that; so the position is
     // also recorded as the tab is left, from what is on screen then.
-    const stopLeaving = onLeaveTab(id, record)
+    const stopLeaving = readOnly ? () => {} : onLeaveTab(id, record)
     return () => {
       for (const type of inputs) scroller.removeEventListener(type, letGo)
       scroller.removeEventListener('scrollend', onScrollEnd)
       stopLeaving()
     }
-  }, [id])
+  }, [id, readOnly])
 
   // Older pages. A thread whose root is in the window has nothing older.
   const [complete, setComplete] = useState(false)
@@ -415,15 +446,15 @@ function Topic({ id, detail }: { readonly id: string; readonly detail: TopicDeta
     return () => clearTimeout(timer)
   }, [fetchState])
 
-  // The read rule. Opening, and showing the tab again, marks the topic read.
+  // The read rule. Opening, and showing the tab again, marks the topic read. A preview never does.
   useEffect(() => {
-    if (shouldMarkRead('open', { active: true, focused: true, atBottom: false })) void markRead(id)
-  }, [id])
+    if (!readOnly && shouldMarkRead('open', { active: true, focused: true, atBottom: false })) void markRead(id)
+  }, [id, readOnly])
   const unread = detail.unreadCount
   useEffect(() => {
-    if (unread === 0 || !positioned) return
+    if (readOnly || unread === 0 || !positioned) return
     if (shouldMarkRead('bottom', { active: true, focused, atBottom })) void markRead(id)
-  }, [id, unread, positioned, focused, atBottom])
+  }, [id, readOnly, unread, positioned, focused, atBottom])
 
   const jumpToLatest = () => {
     const scroller = scrollRef.current
@@ -440,14 +471,14 @@ function Topic({ id, detail }: { readonly id: string; readonly detail: TopicDeta
   const channel = detail.channel.id
   // Main keeps its threads query live while shown, from after its first frame, so the Threads
   // popover opens with its rows in the first frame instead of "Loading threads".
-  useEffect(() => (main && drawnAll ? registry.mount(channelThreadsAtom(channel)) : undefined), [main, drawnAll, channel])
+  useEffect(() => (main && drawnAll && !readOnly ? registry.mount(channelThreadsAtom(channel)) : undefined), [main, drawnAll, readOnly, channel])
 
   const people = list.refs.people
   const hueOf = (personId: string) => hueFor(people.get(personId)?.color ?? '', personId)
 
   const items = itemsOf(list)
   const rows = firstRows()
-  const openAt = drawnAll ? list.order.length : openIndex(list, at, registry.get(scrollSnapshotAtom(id)))
+  const openAt = drawnAll ? list.order.length : openIndex(list, at, readOnly ? undefined : registry.get(scrollSnapshotAtom(id)))
   const from = drawnAll ? 0 : Math.max(0, openAt - rows)
   const shown = from === 0 ? items : items.slice(from)
   const eager = eagerRows(list.order, openAt, rows)
@@ -459,6 +490,26 @@ function Topic({ id, detail }: { readonly id: string; readonly detail: TopicDeta
   // An empty list says nothing until Slack has answered or 300 ms have passed.
   const status: MessageListStatus =
     list.order.length > 0 ? 'ready' : fetchState === 'offline' ? 'offline' : list.ready && fetchState === 'done' ? 'ready' : slow ? 'loading' : 'pending'
+
+  const messages = (
+    <MessageList
+      items={shown}
+      eager={eager}
+      notDrawnAbove={from}
+      main={main}
+      now={now}
+      status={status}
+      older={list.order.length === 0 ? 'none' : older}
+      {...(dividerBefore === undefined ? {} : { dividerBefore })}
+      scrollRef={scrollRef}
+      anchorRef={anchorRef}
+      hueOf={hueOf}
+      onOpenThread={readOnly ? openThreadInNewTab : openThread}
+      onChannel={scopeToChannel}
+      onLink={openExternal}
+    />
+  )
+  if (readOnly) return messages
 
   return (
     <TopicViewFrame
@@ -474,22 +525,7 @@ function Topic({ id, detail }: { readonly id: string; readonly detail: TopicDeta
       pill={showPill ? <NewMessagesPill count={newCount} onJump={jumpToLatest} /> : undefined}
       composer={<ComposerSlot placeholder={main ? `Message ${detail.channel.label}` : 'Reply'} />}
     >
-      <MessageList
-        items={shown}
-        eager={eager}
-        notDrawnAbove={from}
-        main={main}
-        now={now}
-        status={status}
-        older={list.order.length === 0 ? 'none' : older}
-        {...(dividerBefore === undefined ? {} : { dividerBefore })}
-        scrollRef={scrollRef}
-        anchorRef={anchorRef}
-        hueOf={hueOf}
-        onOpenThread={openThread}
-        onChannel={scopeToChannel}
-        onLink={openExternal}
-      />
+      {messages}
     </TopicViewFrame>
   )
 }

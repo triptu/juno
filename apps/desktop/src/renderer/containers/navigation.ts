@@ -25,10 +25,13 @@ import {
   currentPlace,
   cycleTab,
   goToEntry,
+  homePlace,
   messageListAtom,
   messageWindowSpecAtom,
   mountedTabs,
+  newChatAtom,
   newChatPlace,
+  emptyNewChat,
   openInSlack,
   openPlace,
   popupContextMenu,
@@ -38,6 +41,7 @@ import {
   scrollSnapshotAtom,
   selectedTopicAtom,
   setPinned,
+  settleNewChat,
   signedInAtom,
   slackLink,
   tabByNumber,
@@ -46,6 +50,7 @@ import {
   tabTopic,
   topicAtom,
   topicPlace,
+  untouched,
   updateTabs,
   type MessageWindowSpec,
   type OpenOptions,
@@ -187,12 +192,39 @@ export function openTopic(id: string, options: OpenOptions = {}): void {
 }
 
 /**
- * ⌘T, ⌘N and "+": a new tab. New chat is not built yet (spec section 9), so
- * the tab shows the empty workspace until a topic opens in it.
- * TODO(New chat): render the New chat page for `newChatPlace`.
+ * ⌘T, ⌘N, "+" and the sidebar's New chat button: a New chat in a new tab
+ * (spec section 9), or the New chat tab that is still untouched.
  */
 export function openNewTab(): void {
+  const blank = registry.get(tabsAtom).tabs.find((tab) => currentPlace(tab).kind === 'newChat' && untouched(registry.get(newChatAtom(tab.id))))
+  if (blank !== undefined) {
+    switchToTab(blank.id)
+    return
+  }
   show((tabs) => openPlace(tabs, newChatPlace, { newTab: true }), undefined)
+}
+
+/** The sidebar's Home item. Home is a singleton: the tab that shows it is focused. */
+export function openHome(options: OpenOptions = {}): void {
+  show((tabs) => openPlace(tabs, homePlace, options), undefined)
+}
+
+/**
+ * A New chat sent to `topicId`: its tab becomes the topic, in the frame the
+ * topic can paint, or closes when another tab shows it (`settleNewChat`).
+ * Never replaced by a later open, so the sent message always shows.
+ */
+export function settleSentChat(tabId: string, topicId: string): void {
+  registry.set(scrollSnapshotAtom(topicId), undefined)
+  show(
+    (tabs) => {
+      const next = settleNewChat(tabs, tabId, topicId)
+      if (next !== tabs) registry.set(newChatAtom(tabId), emptyNewChat)
+      return next
+    },
+    { id: topicId, fresh: true, name: 'juno.topic-open' },
+    false,
+  )
 }
 
 /** The topic a tab change brings on screen, if it has to wait for one. */
@@ -350,6 +382,7 @@ export async function showTabMenu(tabId: string): Promise<void> {
 /** What the history menu calls a place: the tab's title for it. */
 function placeLabel(place: Place): string {
   if (place.kind === 'newChat') return 'New chat'
+  if (place.kind === 'home') return 'Home'
   const result = registry.get(topicAtom(place.topicId))
   const detail = result._tag === 'Success' ? result.value : null
   if (detail === null) return 'Topic'

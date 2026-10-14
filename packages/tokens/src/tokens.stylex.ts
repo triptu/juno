@@ -689,6 +689,8 @@ export const layout = stylex.defineVars({
   '--menu-width-account': '248px',
   '--menu-width-browse': '300px',
   '--menu-width-mention': '280px',
+  // The New chat pickers' lists.
+  '--menu-width-picker': '340px',
   // Never taller than the window below a title-bar anchor, so a menu fits
   // at the minimum size and under zoom; the content scrolls inside.
   '--popover-max-height': 'min(400px, calc(100vh - var(--titlebar-height) - var(--space-5)))',
