@@ -53,6 +53,60 @@ test.describe('mouse-down activation', () => {
 })
 
 /**
+ * A one-line text that is cut off shows its full text as the tooltip when
+ * hovered; one that fits shows none. The browser draws the tooltip itself, so
+ * the check reads the `title` attribute the hover sets.
+ */
+test.describe('truncation tooltip', () => {
+  const hoverText = async (page: Page, text: string | RegExp) => {
+    const node = page.locator('[data-fixture-frame]').getByText(text).first()
+    await node.hover()
+    return node
+  }
+
+  test('a cut-off sender name shows the full name', async ({ page }) => {
+    await page.goto('/#/Message?__state=row/long-name')
+    const name = await hoverText(page, /^Maximilian-Alexander/)
+    await expect(name).toHaveAttribute('title', 'Maximilian-Alexander Fitzgerald-Montgomery-Rutherford of the platform team')
+  })
+
+  test('a name that fits has no tooltip', async ({ page }) => {
+    await page.goto('/#/Message?__state=row/group-start')
+    const name = await hoverText(page, 'Maya Chen')
+    await expect(name).not.toHaveAttribute('title')
+  })
+
+  test('a cut-off thread link title shows the full title; one that fits does not', async ({ page }) => {
+    await page.goto('/#/ThreadLink?__state=label/long-title')
+    const long = await hoverText(page, /^Rotate the staging secrets/)
+    await expect(long).toHaveAttribute('title', 'Rotate the staging secrets before the audit, and document where each one lives so nobody has to ask again')
+    await page.goto('/#/ThreadLink?__state=label/replies')
+    const short = await hoverText(page, 'Staging bill doubled since August')
+    await expect(short).not.toHaveAttribute('title')
+  })
+})
+
+/**
+ * A long code block in a message is part of the message, not a scroller of
+ * its own: the wheel over it moves the list.
+ */
+test('the wheel over a long code block scrolls the message list', async ({ page }) => {
+  await page.goto('/#/MessageList?__state=content/long-code')
+  const scroller = page.locator('[data-fixture-frame] [data-scroll]')
+  await expect(scroller).toBeVisible()
+  await scroller.evaluate((node) => {
+    node.scrollTop = 0
+  })
+  const block = page.locator('[data-fixture-frame] pre').first()
+  await block.scrollIntoViewIfNeeded()
+  const before = await scroller.evaluate((node) => node.scrollTop)
+  await block.hover()
+  await page.mouse.wheel(0, 400)
+  await expect.poll(() => scroller.evaluate((node) => node.scrollTop)).toBeGreaterThan(before)
+  expect(await block.evaluate((node) => node.scrollHeight > node.clientHeight)).toBe(false)
+})
+
+/**
  * SPEC section 16: the arrow cursor everywhere, the text cursor only over
  * editable or selectable text, never the pointer. Checked on every fixture
  * in the light theme: an element may compute `cursor: text` only when it

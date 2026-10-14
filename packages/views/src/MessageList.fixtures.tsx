@@ -1,5 +1,5 @@
 import { defineFixtures, fixture, type FixtureFrame } from '@juno/ui'
-import { emojiOnly, failedFile, hostile, main as mainStream, mainDividerBefore, manyReactions, mentions, pendingFile, rtl, thread, threadDividerBefore, withFiles } from './fixtures/messages'
+import { emojiOnly, failedFile, hostile, longCode, longFirstLine, main as mainStream, mainDividerBefore, manyReactions, mentions, pendingFile, rtl, thread, threadDividerBefore, withFiles } from './fixtures/messages'
 import { NOW } from './fixtures/topics'
 import { HoverToolbar } from './HoverToolbar'
 import { MessageList, type MessageListProps } from './MessageList'
@@ -33,6 +33,8 @@ export default defineFixtures(
       'right-to-left': state({ items: rtl, main: false }),
       'emoji-only': state({ items: emojiOnly, main: false }),
       hostile: state({ items: hostile, main: false }),
+      // The block is laid out in full inside the scrolling list; the wheel over it moves the list.
+      'long-code': state({ items: longCode, main: false }),
     },
     Files: {
       thumbnails: state({ items: withFiles, main: false }),
@@ -50,6 +52,7 @@ export default defineFixtures(
       'hover-grouped': state({ items: thread, main: false }, { hover: `${ROW}:nth-of-type(5)` }),
       'hover-toolbar': state({ items: thread, main: false, renderToolbar: toolbar(false) }, { hover: `${ROW}:nth-of-type(4)` }),
       'hover-toolbar-main': state({ items: mainStream, main: true, renderToolbar: toolbar(true) }, { hover: `${ROW}:nth-of-type(5)` }),
+      'hover-toolbar-long-line': state({ items: longFirstLine, main: true, renderToolbar: toolbar(true) }, { hover: `${ROW}:first-of-type` }),
       focus: state({ items: thread, main: false, renderToolbar: toolbar(false) }, { focus: `${ROW}:last-of-type` }),
       'hover-thread-link': state({ items: mainStream, main: true }, { hover: '[data-thread-link]' }),
       'focus-thread-link': state({ items: mainStream, main: true }, { focus: '[data-thread-link]' }),
