@@ -26,11 +26,13 @@ const apalacheVersion = '0.62.1' // Quint 0.33.0's default distribution.
 const generated = join(root, 'specs/traces')
 mkdirSync(generated, { recursive: true })
 
-// Jobs are collected first, then run a few at a time (SPECS_JOBS, default 3).
-// Apalache runs one at a time, each on its own port, since every run starts a JVM.
-// A passing job is cached under a hash of its arguments, its spec file, this
-// runner and the Quint and Apalache versions, so an unchanged check is not run
-// again. The cache is shared by every worktree. SPECS_CACHE=off or --no-cache runs everything.
+// Jobs are collected first, then run a few at a time (SPECS_JOBS, default 3):
+// one lane for Apalache, which starts a JVM per run on its own port, and the
+// rest for simulations.
+// A passing job is cached under a hash of its arguments, what is checked on its
+// output, its spec file and the Quint and Apalache versions, so an unchanged
+// check is not run again. Bump cacheVersion when the checks on a result or the
+// Apalache adapter below change. The cache is shared by every worktree. SPECS_CACHE=off or --no-cache runs everything.
 const jobs = []
 const cacheDir = join(tmpdir(), 'juno-cache', 'specs')
 const useCache = process.env.SPECS_CACHE !== 'off' && !process.argv.includes('--no-cache')
@@ -40,8 +42,8 @@ const sha = (...parts) => {
   for (const part of parts) hash.update(String(part)).update('\0')
   return hash.digest('hex')
 }
-const runnerHash = sha(readFileSync(fileURLToPath(import.meta.url)), readFileSync(join(root, 'specs/agent-checks.mjs')),
-  require('@informalsystems/quint/package.json').version, apalacheVersion, backend, seed)
+const cacheVersion = 1
+const runnerHash = sha(cacheVersion, require('@informalsystems/quint/package.json').version, apalacheVersion, backend, seed)
 function specHash(file, seen = new Set()) {
   if (seen.has(file)) return ''
   seen.add(file)
@@ -50,8 +52,8 @@ function specHash(file, seen = new Set()) {
   return sha(text, ...imports.map(name => specHash(name, seen)))
 }
 
-function quint(args, { violation = false, timeout = 60000, trace, check = () => {} } = {}) {
-  jobs.push({ args, violation, timeout, trace, check })
+function quint(args, { violation = false, timeout = 60000, trace, check = () => {}, checks = '' } = {}) {
+  jobs.push({ args, violation, timeout, trace, check, checks })
 }
 
 function freePort() {
@@ -97,9 +99,9 @@ function spawnQuint(args, timeout, port) {
 }
 
 async function runJob(job) {
-  const { args, violation, timeout, trace, check } = job
+  const { args, violation, timeout, trace, check, checks } = job
   const label = `quint ${args.join(' ')}`
-  const key = sha(runnerHash, JSON.stringify(args), violation, specHash(args[1]))
+  const key = sha(runnerHash, JSON.stringify(args), violation, checks, specHash(args[1]))
   const cached = join(cacheDir, `${key}.json`)
   if (useCache && existsSync(cached)) {
     const saved = JSON.parse(readFileSync(cached, 'utf8'))
@@ -133,22 +135,22 @@ async function runJob(job) {
 }
 
 async function runAll() {
-  let verifying = Promise.resolve()
-  let next = 0
+  // Apalache jobs are the slowest and run one at a time, so they get their own
+  // lane from the start; the simulations share the other lanes.
+  const queues = [jobs.filter(job => job.args[0] === 'verify'), jobs.filter(job => job.args[0] !== 'verify')]
   let failed
-  const lane = async () => {
-    while (next < jobs.length && !failed) {
-      const job = jobs[next++]
-      // One Apalache at a time; simulations keep the other lanes busy meanwhile.
-      const run = job.args[0] === 'verify' ? (verifying = verifying.then(() => runJob(job))) : runJob(job)
+  const lane = async queue => {
+    while (queue.length > 0 && !failed) {
+      const job = queue.shift()
+      const started = Date.now()
       try {
-        console.log(await run)
+        console.log(`${await runJob(job)}\n(${((Date.now() - started) / 1000).toFixed(1)} s)`)
       } catch (error) {
         failed ??= error
       }
     }
   }
-  await Promise.all(Array.from({ length: Math.min(parallel, jobs.length) }, lane))
+  await Promise.all([lane(queues[0]), ...Array.from({ length: Math.max(1, parallel - 1) }, () => lane(queues[1]))])
   if (failed) {
     if (failed.log) console.log(failed.log)
     throw failed
@@ -164,6 +166,7 @@ function simulate(file, step, invariant, output, violation = false, randomized =
     '--out-itf', path, '--mbt', ...(options.witnesses ? ['--witnesses', ...options.witnesses] : randomized ? ['--witnesses', 'reachedAgreement'] : [])], {
     violation,
     trace: path,
+    checks: JSON.stringify({ file, step, violation, randomized, options }),
     check: report => {
       for (const witness of options.witnesses ?? []) {
         if (!new RegExp(`${witness} was witnessed in [1-9][0-9]* trace`).test(report)) {
