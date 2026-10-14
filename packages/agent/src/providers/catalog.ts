@@ -37,16 +37,18 @@ export interface PickerModel {
   readonly label: string
   readonly path: 'chat' | 'compaction'
   readonly model: Model<Api>
-  readonly priceHint: string
+  /** Dollars per million tokens, for the row's price hint. None for Codex: its turns are counted, not charged. */
+  readonly price: { readonly input: number; readonly output: number } | undefined
 }
 export interface CatalogueOptions {
   readonly systemAndTools: readonly string[]
   readonly multiplier?: 1 | 1.25
   readonly piModels?: readonly Model<Api>[]
 }
+/** OpenRouter prices are dollars per token, as decimal text. Round away float noise: 0.0000001 is $0.10 per million. */
 const rate = (text: string): number | undefined => {
   if (text.trim() === '') return undefined
-  const n = Number(text) * 1_000_000
+  const n = Math.round(Number(text) * 1e12) / 1e6
   return Number.isFinite(n) && n >= 0 ? n : undefined
 }
 
@@ -83,7 +85,7 @@ export function resolveCatalogue(body: unknown, options: CatalogueOptions): read
       },
     }
     return [{ choice: { family: family.family, provider: 'openrouter' }, label: family.label, path: family.path,
-      model, priceHint: `$${input} in / $${output} out per million tokens` } satisfies PickerModel]
+      model, price: { input, output } } satisfies PickerModel]
   })
 }
 
@@ -92,7 +94,7 @@ export function resolveCodexModels(ids: readonly string[] | undefined, options: 
   const candidates = Object.values(OPENAI_CODEX_MODELS).filter(m => /^gpt-\d+(?:\.\d+)*-sol$/.test(m.id) &&
     (ids === undefined || ids.includes(m.id)) && m.contextWindow >= requiredWindow(options.systemAndTools, 'chat', options.multiplier))
   const model = candidates.toSorted((a, b) => b.id.localeCompare(a.id, undefined, { numeric: true }))[0]
-  return model ? { choice: { family: 'sol', provider: 'codex' }, label: 'GPT Sol', path: 'chat', model, priceHint: 'Uses your ChatGPT plan' } : undefined
+  return model ? { choice: { family: 'sol', provider: 'codex' }, label: 'GPT Sol', path: 'chat', model, price: undefined } : undefined
 }
 
 export interface ModelChange { readonly family: string; readonly previous: string; readonly current: string }
