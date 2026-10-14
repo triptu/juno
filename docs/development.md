@@ -412,7 +412,26 @@ Effect and StyleX pitfalls are in their skills: `.claude/skills/effect/SKILL.md`
 - **Build skip.** `test:e2e`, `perf`, `test:feel`, `test:gallery` and `gallery:shots` build through `scripts/build-cached.mjs`, which skips the build when no file git sees in the app or `packages/` changed since the last build and the output is untouched. `JUNO_REBUILD=1` forces a build. `pnpm build` and `pnpm dev` always build.
 - **Shift guard.** The guard waits only for transitions and animations that are running after a touch, and its twelve parts take components from one queue in the temp folder, so they finish together. `GALLERY_SHIFT_ONLY=Button,Chip pnpm test:gallery` checks a few components while you iterate.
 - **Changed tests only.** `pnpm test --changed main` runs only the vitest files affected by changes since `main` (vitest follows imports across packages). Run the full suite once before you report.
-- **Remote runs.** `pnpm remote <script>` takes no local slot (ADR 0013).
+- **Remote runs.** `pnpm remote <script>` takes no local slot. See "Remote runs" below.
+
+## Remote runs
+
+`pnpm remote <script> [args...]` runs a root script on a Namespace Linux machine (16 vCPU, 32 GB for `specs:*`, 8 vCPU, 16 GB for the rest; `--machine` overrides) and streams its output and exit code back. Each run gets its own machine, so agents never wait for each other; nothing takes the local heavy-job lock. Use it for `test`, `specs:check` and `test:agent*`. `perf` and `test:feel` are refused: they time the Mac.
+
+- **What is sent.** The files git sees in the worktree (tracked or new, not ignored), so uncommitted work is tested; `.env`, `node_modules`, build output and design images under `docs/` are not. The script stops if a file looks like a key or token file or holds what looks like a real Slack token.
+- **Where it runs.** In the image from `scripts/remote/Dockerfile` (Playwright's Ubuntu image with Node 26, pnpm, Java 21, the installed workspace and Quint's downloads). Its tag is a hash of the Dockerfile, `pnpm-lock.yaml` and `pnpm-workspace.yaml`; when the registry lacks it, the first run builds it with `nsc build` (about two minutes) while others on the same Mac wait. Inside, `scripts/remote/run.sh` links the workspace offline and runs the script under xvfb with more workers than the Mac uses.
+- **Results.** Output streams live; reports (spec traces, Playwright results) land in `.remote/<run>/`. The exit code is the script's own.
+- **Cost and cleanup.** The machine is destroyed when the run ends, on failure and on Ctrl-C, and expires after `--duration` (default `60m`) if the client dies. `--keep` leaves it up for `nsc ssh <id>`. `--machine linux/amd64:16x32` picks a bigger shape. An 8x16 machine costs about $0.008 a minute.
+- **Setup.** `brew install namespacelabs/namespace/nsc` and `nsc login` once on the Mac. No credentials live in the repo.
+- **Timings** (2026-10-15, current main). Local times are with a free slot, before any queue wait.
+
+  | Script | Local (Mac) | Remote, end to end | Remote, script only | Remote CPU busy |
+  | --- | --- | --- | --- | --- |
+  | `test` | 160 s | 145 to 223 s (8x16; 223 s included an image build) | about 100 s | not measured yet |
+  | `specs:check` | 629 s (614 to 645 s in other agents' logs) | 214 s (16x32) | 99.6 s | 87% of 16 cores |
+
+  About 20 s of each remote run is creating the machine and 45 s pulling the image.
+- **`--dry-run`** prints the steps without creating anything.
 
 ## Heavy jobs share one queue
 

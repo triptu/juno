@@ -31,7 +31,7 @@ const remoteScripts = ['test', 'specs:check', 'specs:traces', 'test:agent', 'tes
 const localOnly = { perf: 'timing', 'test:feel': 'timing' }
 
 function parse(argv) {
-  const options = { dryRun: false, keep: false, machine: 'linux/amd64:8x16', duration: '60m' }
+  const options = { dryRun: false, keep: false, machine: undefined, duration: '60m' }
   let index = 0
   for (; index < argv.length && argv[index].startsWith('--'); index++) {
     const flag = argv[index]
@@ -45,6 +45,8 @@ function parse(argv) {
   if (!script) throw new Error('usage: pnpm remote [--dry-run] [--machine linux/amd64:8x16] [--keep] <script> [args...]')
   if (localOnly[script]) throw new Error(`${script} measures ${localOnly[script]} and runs only on the Mac. Run pnpm ${script} locally.`)
   if (!remoteScripts.includes(script)) throw new Error(`${script} is not set up for remote runs. Remote scripts: ${remoteScripts.join(', ')}`)
+  // Spec checks fill 16 cores (Apalache lanes plus simulations); the rest fill 8.
+  options.machine ??= script.startsWith('specs:') ? 'linux/amd64:16x32' : 'linux/amd64:8x16'
   return { ...options, script, args }
 }
 
@@ -158,7 +160,7 @@ const reportDir = join(root, '.remote', runId)
 const exitMarker = `__juno_remote_exit_${runId}=`
 const scriptArgs = [options.script, ...options.args].map(quote).join(' ')
 const container = (image) =>
-  `mkdir -p /tmp/out && chmod 777 /tmp/out && docker run --rm -i --init --ipc=host -v /tmp/out:/out ${image} ` +
+  `mkdir -p /tmp/out && chmod 777 /tmp/out && s=$(date +%s) && docker pull -q ${image} >/dev/null && echo "remote: image pulled in $(( $(date +%s) - s )) s" >&2 && docker run --rm -i --init --ipc=host -v /tmp/out:/out ${image} ` +
   `bash -c 'tar -xzf - -C /work && exec bash scripts/remote/run.sh "$@"' _ ${scriptArgs}; echo "${exitMarker}$?"`
 const create = ['create', '--bare', '--machine_type', options.machine, '--duration', options.duration, '--label', 'juno-remote=1', '--purpose', `juno remote ${options.script}`]
 
@@ -179,8 +181,10 @@ const work = mkdtempSync(join(tmpdir(), 'juno-remote-'))
 let id
 const cleanup = () => {
   if (id && !options.keep) spawnSync('nsc', ['destroy', id, '--force'], { stdio: 'ignore' })
+  id = undefined
   rmSync(work, { recursive: true, force: true })
 }
+process.on('exit', cleanup)
 for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
   process.on(signal, () => {
     console.error(`remote: ${signal}, destroying the machine`)
@@ -201,19 +205,37 @@ try {
 
   const list = join(work, 'files')
   writeFileSync(list, files.join('\0'))
-  // COPYFILE_DISABLE stops macOS tar from adding ._ files for extended attributes.
-  const tar = spawn('tar', ['-czf', '-', '--no-xattrs', '--null', '-T', list], { cwd: root, stdio: ['ignore', 'pipe', 'inherit'], env: { ...process.env, COPYFILE_DISABLE: '1' } })
-  const ssh = spawn('nsc', ['ssh', '-T', id, container(image)], { stdio: ['pipe', 'pipe', 'inherit'] })
-  tar.stdout.pipe(ssh.stdin)
-  const closed = new Promise((resolvePromise) => ssh.on('close', resolvePromise))
+  // A dial that times out before the script starts is retried; once output has
+  // arrived the run is not repeated.
   let reported
-  for await (const line of createInterface({ input: ssh.stdout })) {
-    if (line.startsWith(exitMarker)) reported = Number(line.slice(exitMarker.length))
-    else console.log(line)
+  for (let tries = 1; reported === undefined; tries++) {
+    // COPYFILE_DISABLE stops macOS tar from adding ._ files for extended attributes.
+    const tar = spawn('tar', ['-czf', '-', '--no-xattrs', '--null', '-T', list], { cwd: root, stdio: ['ignore', 'pipe', 'ignore'], env: { ...process.env, COPYFILE_DISABLE: '1' } })
+    const ssh = spawn('nsc', ['ssh', '-T', id, container(image)], { stdio: ['pipe', 'pipe', 'pipe'] })
+    ssh.stdin.on('error', () => {})
+    tar.stdout.pipe(ssh.stdin)
+    let errors = ''
+    ssh.stderr.on('data', (chunk) => {
+      errors += chunk
+      process.stderr.write(chunk)
+    })
+    const closed = new Promise((resolvePromise) => ssh.on('close', resolvePromise))
+    let lines = 0
+    for await (const line of createInterface({ input: ssh.stdout })) {
+      lines++
+      if (line.startsWith(exitMarker)) reported = Number(line.slice(exitMarker.length))
+      else console.log(line)
+    }
+    await closed
+    tar.kill()
+    if (reported !== undefined) break
+    if (lines > 0 || !/dial tcp|i\/o timeout|connection refused/.test(errors) || tries === 3) {
+      // nsc ssh turns every failure into 1, so the script's own code comes back as a marker line.
+      throw new Error('lost the connection to the machine before the script finished')
+    }
+    console.error('remote: could not reach the machine, retrying')
+    await sleep(5000 * tries)
   }
-  await closed
-  // nsc ssh turns every failure into 1, so the script's own code comes back as a marker line.
-  if (reported === undefined) throw new Error('lost the connection to the machine before the script finished')
   code = reported
 
   const reports = spawnSync('nsc', ['ssh', '-T', id, 'cat /tmp/out/reports.tgz 2>/dev/null'], { maxBuffer: 1024 * 1024 * 1024 })

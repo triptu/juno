@@ -1,6 +1,6 @@
 # 0013. Run the Linux-safe test suites on Namespace machines
 
-Status: proposed, 2026-10-15. `pnpm remote` is built and has a dry run; nothing has run on Namespace yet (no account).
+Status: accepted, 2026-10-15. `test` and `specs:check` pass remotely on current main.
 
 ## Context
 

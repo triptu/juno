@@ -36,6 +36,7 @@ const jobs = []
 const cacheDir = join(tmpdir(), 'juno-cache', 'specs')
 const useCache = process.env.SPECS_CACHE !== 'off' && !process.argv.includes('--no-cache')
 const parallel = Math.max(1, Number(process.env.SPECS_JOBS ?? 3))
+const apalacheLanes = Math.max(1, Number(process.env.SPECS_APALACHE ?? 1))
 const sha = (...parts) => {
   const hash = createHash('sha256')
   for (const part of parts) hash.update(String(part)).update('\0')
@@ -75,9 +76,9 @@ function freePort() {
 // check. It starts on the first uncached Apalache check and has its own
 // two-minute deadline; each check still has 60 seconds. Without a downloaded
 // Apalache, each check lets Quint start (and download) its own on a free port.
-let apalache
-function apalacheServer() {
-  apalache ??= (async () => {
+const servers = []
+function apalacheServer(lane) {
+  servers[lane] ??= (async () => {
     const port = await freePort()
     const exe = join(process.env.QUINT_HOME ?? join(homedir(), '.quint'), `apalache-dist-${apalacheVersion}`, 'apalache/bin/apalache-mc')
     if (!existsSync(exe)) return { port, stop: () => {} }
@@ -101,7 +102,7 @@ function apalacheServer() {
     }
     return { port, stop }
   })()
-  return apalache
+  return servers[lane]
 }
 
 function spawnQuint(args, timeout, port) {
@@ -135,7 +136,7 @@ function spawnQuint(args, timeout, port) {
   })
 }
 
-async function runJob(job) {
+async function runJob(job, lane = 0) {
   const { args, violation, timeout, trace, check, checks } = job
   const label = `quint ${args.join(' ')}`
   const key = sha(runnerHash, JSON.stringify(args), violation, checks, specHash(args[1]))
@@ -149,7 +150,7 @@ async function runJob(job) {
   const budget = 720000 - (Date.now() - startedAt)
   if (budget <= 0) throw new Error('Spec check exceeded its twelve-minute execution budget')
   if (trace) rmSync(trace, { force: true })
-  const port = args[0] !== 'verify' ? undefined : existsSync(join(process.env.QUINT_HOME ?? join(homedir(), '.quint'), `apalache-dist-${apalacheVersion}`)) ? (await apalacheServer()).port : await freePort()
+  const port = args[0] !== 'verify' ? undefined : existsSync(join(process.env.QUINT_HOME ?? join(homedir(), '.quint'), `apalache-dist-${apalacheVersion}`)) ? (await apalacheServer(lane)).port : await freePort()
   const result = await spawnQuint(args, Math.min(timeout, Math.max(0, 720000 - (Date.now() - startedAt))), port)
   const output = result.stdout + result.stderr
   const log = `${label}\n${output}`
@@ -173,25 +174,32 @@ async function runJob(job) {
 }
 
 async function runAll() {
-  // Simulations first, SPECS_JOBS at a time. Then the Apalache checks, one at a
-  // time and alone: a JVM warming up next to simulations on a loaded machine
-  // can miss its deadline.
+  // On the Mac (SPECS_APALACHE=1): simulations first, SPECS_JOBS at a time, then
+  // the Apalache checks one at a time and alone, because a JVM warming up next
+  // to simulations on a loaded machine can miss its deadline. A machine of its
+  // own (pnpm remote) sets SPECS_APALACHE above 1: that many Apalache servers,
+  // each with its own lane, run alongside the simulations.
   const queues = [jobs.filter(job => job.args[0] === 'verify'), jobs.filter(job => job.args[0] !== 'verify')]
   let failed
-  const lane = async queue => {
+  const lane = async (queue, index = 0) => {
     while (queue.length > 0 && !failed) {
       const job = queue.shift()
       const started = Date.now()
       try {
-        console.log(`${await runJob(job)}\n(${((Date.now() - started) / 1000).toFixed(1)} s)`)
+        console.log(`${await runJob(job, index)}\n(${((Date.now() - started) / 1000).toFixed(1)} s)`)
       } catch (error) {
         failed ??= error
       }
     }
   }
-  await Promise.all(Array.from({ length: parallel }, () => lane(queues[1])))
-  await lane(queues[0])
-  if (apalache) (await apalache.catch(() => ({ stop: () => {} }))).stop()
+  const simulations = () => Promise.all(Array.from({ length: parallel }, () => lane(queues[1])))
+  const checks = () => Promise.all(Array.from({ length: apalacheLanes }, (_, index) => lane(queues[0], index)))
+  if (apalacheLanes > 1) await Promise.all([simulations(), checks()])
+  else {
+    await simulations()
+    await checks()
+  }
+  for (const server of servers) (await server.catch(() => ({ stop: () => {} }))).stop()
   if (failed) {
     if (failed.log) console.log(failed.log)
     throw failed
