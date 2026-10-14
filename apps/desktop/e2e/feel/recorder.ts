@@ -4,8 +4,9 @@
  * layout-shift and long-animation-frame entries and the input events. The
  * checks in `checks.ts` read the result; nothing here asserts.
  *
- * Probes run inside `requestAnimationFrame`, so they see each frame's state
- * just before it paints. Frames are counted, not timed, so a loaded machine
+ * Probes run once per frame after layout and the app's ResizeObserver
+ * callbacks, so they see what the frame paints, and each frame stamps its
+ * number into the image. Frames are counted, not timed, so a loaded machine
  * slows a recording down without changing what it shows.
  */
 import type { CDPSession, Page } from '@playwright/test'
@@ -22,6 +23,10 @@ export type Probe =
   | { readonly kind: 'count'; readonly name: string; readonly within: string; readonly selector: string }
   /** How many images inside the first visible `within` have their bytes. */
   | { readonly kind: 'images'; readonly name: string; readonly within: string }
+  /** The opacity the element is drawn with: its own times every ancestor's, animations included. */
+  | { readonly kind: 'opacity'; readonly name: string; readonly selector: string }
+  /** The offset of one row's top from the scroller's top; null when it is not in the list. */
+  | { readonly kind: 'row'; readonly name: string; readonly scroller: string; readonly rowKey: string; readonly key: string }
   /** Trimmed text, at most 120 characters. */
   | { readonly kind: 'text'; readonly name: string; readonly selector: string }
   /** The computed look (colours, shadow, transform, opacity) and whether a transition or animation is running. */
@@ -303,6 +308,17 @@ async function installProbes(page: Page, probes: ReadonlyArray<Probe>): Promise<
             const el = visible(probe.within)
             return el === null ? 0 : [...el.querySelectorAll('img')].filter((img) => img.complete && img.naturalWidth > 0).length
           }
+          case 'opacity': {
+            let opacity = 1
+            for (let el: Element | null = visible(probe.selector); el !== null; el = el.parentElement) opacity *= Number(getComputedStyle(el).opacity)
+            return visible(probe.selector) === null ? 0 : Math.round(opacity * 1000) / 1000
+          }
+          case 'row': {
+            const scroller = visible(probe.scroller)
+            const row = scroller?.querySelector(`[${probe.rowKey}="${CSS.escape(probe.key)}"]`)
+            if (scroller == null || row == null) return null
+            return Math.round((row.getBoundingClientRect().top - scroller.getBoundingClientRect().top) * 10) / 10
+          }
           case 'text': {
             const el = visible(probe.selector)
             return el === null ? null : (el.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 120)
@@ -333,7 +349,7 @@ async function installProbes(page: Page, probes: ReadonlyArray<Probe>): Promise<
       document.body.append(stamp)
 
       const state: PageRecorder = { frames: [], events: [], shifts: [], longFrames: [], marks: [], on: true, stop: () => undefined }
-      const tick = (t: number) => {
+      const sample = (t: number) => {
         if (!state.on) return
         const values: Record<string, ProbeValue> = {}
         for (const probe of list) values[probe.name] = read(probe)
@@ -341,6 +357,20 @@ async function installProbes(page: Page, probes: ReadonlyArray<Probe>): Promise<
         for (let bit = 0; bit < stampSpec.bits; bit++) cells[bit + 2]!.style.background = (index >> bit) & 1 ? '#000' : '#fff'
         state.frames.push({ index, t, values })
         requestAnimationFrame(tick)
+      }
+      // Reading in requestAnimationFrame sees the state before the frame's
+      // layout and the app's ResizeObserver callbacks, which may still move
+      // things (the topic view pins its scroll position there). A
+      // ResizeObserver made in this frame is delivered last, after layout and
+      // after the app's observers, just before paint: what it reads is what
+      // the frame shows.
+      const tick = (t: number) => {
+        if (!state.on) return
+        const observer = new ResizeObserver(() => {
+          observer.disconnect()
+          sample(t)
+        })
+        observer.observe(stamp)
       }
       requestAnimationFrame(tick)
 

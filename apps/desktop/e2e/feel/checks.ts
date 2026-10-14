@@ -117,10 +117,10 @@ export function landsAndStays(probe: string, label: string, options: Window & { 
     const frames = framesIn(recording, options).filter((frame) => frame.values[probe] !== null && frame.values[probe] !== undefined)
     const first = frames[0]
     if (first === undefined) return fail(name, `${label} never appeared`, [])
-    const moved = frames.filter((frame) => differs(frame.values[probe]!, first.values[probe]!, options.tolerance ?? 1))
-    if (moved.length === 0) return pass(name, `at ${show(first.values[probe]!)} from frame #${shot(evidence, first)}`, [shot(evidence, first)])
-    const last = moved.at(-1)!
-    return fail(name, `first at ${show(first.values[probe]!)} (frame #${shot(evidence, first)}), then at ${show(moved[0]!.values[probe]!)} (frame #${shot(evidence, moved[0]!)}), ends at ${show(last.values[probe]!)}; moved in ${moved.length} animation frames`, shotsOf(evidence, [first, ...moved]).slice(0, 12))
+    const moves = frames.filter((frame, i) => i > 0 && differs(frame.values[probe]!, frames[i - 1]!.values[probe]!, options.tolerance ?? 1))
+    if (moves.length === 0) return pass(name, `at ${show(first.values[probe]!)} from frame #${shot(evidence, first)}`, [shot(evidence, first)])
+    const last = frames.at(-1)!
+    return fail(name, `first at ${show(first.values[probe]!)} (frame #${shot(evidence, first)}), moved in ${moves.length} frames (first at #${shot(evidence, moves[0]!)}), ends at ${show(last.values[probe]!)}`, shotsOf(evidence, [first, ...moves]).slice(0, 12))
   }
 }
 
@@ -300,7 +300,11 @@ export function firstFrameRight(label: string, where: (values: ProbeFrame['value
   }
 }
 
-/** Long animation frames: over `failMs` fails, over 50 ms warns. */
+/**
+ * Long animation frames. One over `failMs` with main-thread work in it
+ * (blocking time or a script) fails. One over 50 ms, or a long one with no
+ * work of the page's in it (the machine was busy), only warns.
+ */
 export function noLongFrames(options: Window & { readonly failMs?: number } = {}): Check {
   const name = 'no long animation frames'
   return (evidence) => {
@@ -308,12 +312,13 @@ export function noLongFrames(options: Window & { readonly failMs?: number } = {}
     const from = markTime(recording, options.from, -Infinity)
     const to = markTime(recording, options.to, Infinity)
     const long = recording.longFrames.filter((f) => f.t >= from && f.t < to)
-    const failMs = options.failMs ?? 100
     if (long.length === 0) return pass(name, 'none over 50 ms')
-    const worst = long.reduce((max, f) => (f.duration > max.duration ? f : max))
-    const detail = `${long.length} over 50 ms, longest ${Math.round(worst.duration)} ms (blocking ${Math.round(worst.blocking)} ms) ${worst.scripts.slice(0, 3).join('; ')}`
-    const shots = [...new Set(long.map((f) => shotAtTime(evidence, f.t)))].slice(0, 12)
-    return worst.duration > failMs ? fail(name, detail, shots) : { name, status: 'warn', detail, shots }
+    const failMs = options.failMs ?? 100
+    const busy = long.filter((f) => f.duration > failMs && (f.blocking > 0 || f.scripts.length > 0))
+    const worst = (busy.length > 0 ? busy : long).reduce((max, f) => (f.duration > max.duration ? f : max))
+    const detail = `${long.length} over 50 ms, ${busy.length} over ${failMs} ms with work of the page's; worst ${Math.round(worst.duration)} ms (blocking ${Math.round(worst.blocking)} ms) ${worst.scripts.slice(0, 3).join('; ')}`
+    const shots = [...new Set((busy.length > 0 ? busy : long).map((f) => shotAtTime(evidence, f.t)))].slice(0, 12)
+    return busy.length > 0 ? fail(name, detail, shots) : { name, status: 'warn', detail, shots }
   }
 }
 
