@@ -13,3 +13,4 @@ export const LOCAL_TABLES: ReadonlyArray<string> = [...CORE_LOCAL_TABLES, ...PRO
 export { runJob, type CompactionModel, type MemoryView } from './store/memory'
 export { createSpend, Spend, dollars, DOLLAR, spendDay, SPEND_MIGRATIONS, PROVIDER_LOCAL_TABLES,
   type SpendLedger, type SpendSnapshot, type SpendPath, type Reservation } from './spend'
+export * from './providers'
