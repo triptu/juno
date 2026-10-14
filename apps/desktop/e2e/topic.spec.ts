@@ -127,7 +127,7 @@ test('Main’s menu has no Notify me of its own, and the header is reached pill,
     order.push(await win.evaluate(() => document.activeElement?.getAttribute('aria-label') ?? document.activeElement?.textContent ?? ''))
     await win.keyboard.press('Tab')
   }
-  expect(order).toEqual(['eng, public channel. Show in sidebar.', 'Main', 'Threads, 1', 'Juno ⌘J'])
+  expect(order).toEqual(['eng, public channel. Show in sidebar.', 'Main', 'Threads, 3', 'Juno ⌘J'])
 })
 
 test('the context pill scopes the sidebar to its channel', async ({ juno }) => {
