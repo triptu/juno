@@ -48,10 +48,8 @@ test('the topic header over a thread and a Main, light and dark', async ({ juno,
     await juno.sidebar.row('Rina finished the onsite.').open()
     await juno.topic.expectTitle('Rina finished the onsite.')
     await shoot(`topic-thread-${theme.toLowerCase()}`)
-    // Scrolled a little, so the text fades out under the band.
-    await juno.topic.scroller.evaluate((node) => node.scrollBy({ top: -120, behavior: 'instant' }))
-    await shoot(`topic-thread-scrolled-${theme.toLowerCase()}`)
     await juno.sidebar.row('#eng').open()
+    // Main opens at its end, so its older messages fade out under the band.
     await juno.topic.expectTitle('Main')
     await shoot(`topic-main-${theme.toLowerCase()}`)
   }
