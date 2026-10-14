@@ -163,6 +163,7 @@ Density also changes the message list (§6.1). The prototype's "airy" level is g
 - Click: open in the current tab. ⌘-click: new tab. If already open in a tab, that tab is focused.
 - Right-click / context-menu key: row context menu (§15.1).
 - Hover Resolve: resolves, marks read, hides the row, toast "Resolved · {title}" with Undo. Main rows resolve the same way (toast uses the channel label).
+- Peek (SPEC §5): hold the peek key over a row. [built M5] `PeekView`, 8px right of the sidebar, from under the title bar to 8px above the window's bottom, `--peek-width` 480px or the room the window has: a popover surface with a header (art 20, title 14/600, where 12 muted; a Main shows only its channel label) over the message list at its newest messages, with no actions (no toolbar, plain reaction labels, no thread links, no "new" divider). It appears and closes at once, with no animation, and moves nothing. A non-modal `dialog` named by the title; focus stays where it was. Moving to another row switches it; moving off the rows, releasing the key, another key (Escape included), a click or leaving the window closes it. The wheel over the rows scrolls the peek. ⌥ also peeks the row with keyboard focus; Space only peeks by pointer, since Space opens a focused row.
 
 ## 4. Tabs
 
@@ -491,7 +492,7 @@ Page max-width 760, padding `40 40 72`, gap 36. Title "Preferences" serif 34.
   - **Theme**: segmented control (padding 2, bg `--surface-hover`, radius 7; segments 26px, padding 0 10, 12.5/500, selected bg `--surface-raised` with `--shadow-sm`): System · Light · Dark. Default System. Changes apply in one frame (§18).
   - **Accent**: a row of 20px round swatches, gap 8, one per accent in tokens §1.3, each with a 2px ring in `--focus-ring` when selected and the accent's name as its accessible name and tooltip. Default Coral.
   - **Density**: segmented control: Comfortable · Compact. Default Comfortable (§3.3).
-- **Peek key** — one row: "Hold to peek" 14/500 · segmented control: ⌥ Option · Space. Default ⌥ Option.
+- **Peek key** — one row: "Hold to peek" 14/500 · segmented control: ⌥ Option · Space. Default ⌥ Option. [built M5] Saved as the workspace preference `peekKey`. Until Preferences exists it is a "Peek" section in the avatar menu, label over the control (`PeekKeySetting`).
 
 - **Ignored channels** — "Hidden from your topics, search and All topics, and they never notify you. Nothing changes in Slack." Group card: rows min-height 48, padding `8 10 8 14`: channel icon 15 muted · name 14/500 · "3 messages hidden" 12 muted · **Stop ignoring** 28px secondary 12.5/500. Empty row "Nothing ignored." 13 muted padding 14. Add row: "Ignore" 13 muted · select of non-ignored channels 32px · **Ignore** 32px secondary · right hint "You can also right-click a channel to ignore it" 12 muted. Ignoring shows the toast "Ignoring #deploys" with Undo. DMs cannot be ignored.
 - **Notifications** — "Your hours, and what Juno lets through." Button **Open notification settings** 34px, padding 0 12, 1px `--border-strong`, radius 8, bg surface, `bell` 14, 13/500.
