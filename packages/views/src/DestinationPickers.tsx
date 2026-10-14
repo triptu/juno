@@ -129,7 +129,7 @@ interface PickerButtonProps {
   readonly icon: PhosphorIcon
   /** A picked conversation's context tint. */
   readonly tint?: PickConversation['tint'] | undefined
-  /** Nothing picked: subtle text. */
+  /** Nothing picked: subtle text. Default: no tint. */
   readonly muted?: boolean
   /** The thread title may run longer before it takes an ellipsis. */
   readonly wide?: boolean
@@ -138,7 +138,8 @@ interface PickerButtonProps {
   readonly children: ReactNode
 }
 
-function PickerButton({ label, icon, tint, muted = tint === undefined, wide = false, expanded, onOpen, children }: PickerButtonProps) {
+function PickerButton({ label, icon, tint, muted, wide = false, expanded, onOpen, children }: PickerButtonProps) {
+  const subtle = muted ?? tint === undefined
   const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
     if (event.key !== 'ArrowDown' || expanded) return
     event.preventDefault()
@@ -152,7 +153,7 @@ function PickerButton({ label, icon, tint, muted = tint === undefined, wide = fa
       aria-expanded={expanded}
       onClick={onOpen}
       onKeyDown={onKeyDown}
-      {...stylex.props(styles.button, tint === undefined ? (muted ? styles.unset : styles.plain) : tintStyles[tint])}
+      {...stylex.props(styles.button, tint === undefined ? (subtle ? styles.unset : styles.plain) : tintStyles[tint])}
     >
       <Icon icon={icon} size={13} />
       <span {...stylex.props(styles.buttonLabel, wide && styles.buttonLabelWide)}>{children}</span>
