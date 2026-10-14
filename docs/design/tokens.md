@@ -328,8 +328,8 @@ All [proto] measured at 1280×800 with Inter unless marked.
 | `--sidebar-width` | 384px (fixed, not resizable in v1) |
 | `--titlebar-height` | 44px (sidebar top bar and tab strip; both are drag regions) |
 | `--tab-height` | 35px, bottom margin -1px so the active tab merges with the page |
-| `--tab-width` | flex 0 1 230px, min 72px |
-| `--topic-header-height` | 95px at one-line title (padding 14/24/14/32 + 26 pill row + 8 gap + 26 title) |
+| `--tab-width` | flex 0 1 230px; `--tab-min-width` 120px (the prototype's 72 fit only the icon and the close button). The strip scrolls sideways once the tabs reach the floor |
+| `--topic-header-height` | 100px at one-line title (padding 14 + 32 pill row + 8 gap + 32 title row + 14; the rows are the height of their 32px buttons). The prototype measured 95 with 26px rows |
 | `--reading-width` | 800px message column, centred; composer inner max 752px (800 − 2×24) |
 | `--page-width-narrow` | 680px (New message) |
 | `--page-width` | 720px (For you, Juno) |

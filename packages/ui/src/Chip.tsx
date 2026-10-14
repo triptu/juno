@@ -48,6 +48,8 @@ interface ChipBaseProps {
   readonly removeLabel?: string
   /** Tooltip. */
   readonly title?: string
+  /** Let the chip give way in a tight row: the label takes an ellipsis, the icon keeps its size. */
+  readonly shrink?: boolean
   readonly children?: ReactNode
 }
 
@@ -94,6 +96,7 @@ export function Chip(props: ChipProps) {
     onRemove,
     removeLabel = 'Remove',
     title,
+    shrink = false,
     children,
     ...rest
   } = props
@@ -116,6 +119,7 @@ export function Chip(props: ChipProps) {
     variant === 'person' && personHues[hue],
     numeric && styles.numeric,
     onRemove !== undefined && styles.removable,
+    shrink && styles.shrink,
   ]
   if (rest.interactive === true) {
     const { interactive: _interactive, pressed, pop: _pop, type = 'button', ...buttonProps } = rest
@@ -189,6 +193,10 @@ const styles = stylex.create({
   removable: {
     paddingInlineEnd: spacing['--space-1'],
     gap: spacing['--space-1-5'],
+  },
+  shrink: {
+    flexShrink: 1,
+    minWidth: 0,
   },
   button: {
     borderColor: {
