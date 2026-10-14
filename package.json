@@ -29,7 +29,8 @@
     "ai:eval": "pnpm --filter @juno/ai eval",
     "specs:check": "node scripts/heavy.mjs node specs/check.mjs",
     "specs:traces": "node scripts/heavy.mjs node specs/check.mjs --traces",
-    "test:agent-contracts": "node scripts/heavy.mjs pnpm --filter @juno/agent-cards --filter @juno/agent-contract test"
+    "test:agent-contracts": "node scripts/heavy.mjs pnpm --filter @juno/agent-cards --filter @juno/agent-contract test",
+    "test:agent-testing": "node scripts/heavy.mjs pnpm --filter @juno/agent-testing test"
   },
   "devDependencies": {
     "@informalsystems/quint": "0.33.0",

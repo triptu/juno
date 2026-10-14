@@ -2,7 +2,7 @@
   "name": "@juno/agent-testing",
   "version": "0.1.0",
   "private": true,
-  "description": "Test doubles for Juno Agent: a scripted model provider, fake MCP servers, and later the fake Codex, hostile Slack fixtures, the crash harness and the memory simulator. Imported only by tests.",
+  "description": "Test doubles for Juno Agent: a scripted model, a compactor model and a fake Codex binary, fake Notion, Littlebird and T3 MCP servers, hostile Slack fixtures and the crash harness. Imported only by tests.",
   "type": "module",
   "sideEffects": false,
   "exports": {
@@ -13,18 +13,25 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@earendil-works/pi-ai": "1.2.0"
+    "@earendil-works/pi-ai": "1.2.0",
+    "@earendil-works/pi-mcp": "1.2.0",
+    "@juno/agent-contract": "workspace:*",
+    "effect": "4.0.3"
   },
   "devDependencies": {
-    "@earendil-works/pi-mcp": "1.2.0",
     "@types/node": "24.19.2",
     "typescript": "5.9.3",
-    "vitest": "5.0.4"
+    "vitest": "5.0.4",
+    "@openai/codex-sdk": "0.162.1",
+    "@juno/agent-memory": "workspace:*"
   },
   "juno": {
     "allowedDeps": [
       "@juno/agent",
       "@juno/agent-contract"
+    ],
+    "testDeps": [
+      "@juno/agent-memory"
     ]
   }
 }
