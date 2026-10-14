@@ -87,6 +87,9 @@ These replace earlier rows where they disagree (B5's Esc, M7, W1's Stop line, W9
 | O1 | **No Stop.** The chat works like a text conversation. Its core has two inputs: queue a message, and listen to events. A message sent during a run joins it at its next step as a pi steer; to change course the owner sends another message ("stop" is just a message). No Stop button, no Esc, no `stopped` ending, no Queued label. Crash recovery, the guard and shutdown can still end a run (`interrupted`, `failed`, `blocked`). Jobs still stop from their Task card | §6.5, §8, §13 |
 | O2 | **Failed actions stay simple.** A card runs once and has no retry button. An action that was rejected, or whose result Juno cannot confirm, shows "Failed" on its card. The owner checks by hand or asks Juno for a new card. Underneath nothing changes: an unknown outcome stays `unknown` in the ledger, startup never re-runs it, and a child whose destination does not deduplicate is authorized at most once (spec `noRepeatAuthorization`, which replaces `retryRequiresAuthority`) | §6.3, §12 |
 | O3 | **Every T3 Code session start is a one-tap card**, whatever Juno has read. `t3_start` always produces a `proposedTask`; its Start click mints the job's grant. `delegate.spawn` keeps the clean-run rule | §6.4, §9 |
+| O5 | **Conversation is the model's judgement** (10-14, after `research/chat-style.md`). How many bubbles, how long, when to post a job update, whether to answer a reaction: a short prompt guides it, and no code or spec fixes it. Hard rules stay only for safety (one click per outward action, never auto-repeat an unsafe action, the spend cap and guard, untrusted content, memory trust) and for speed budgets. Removed: the 2 s status throttle, the 30-minute quiet milestone, the fixed milestone list, the Queued label, the 24-hour question hold, the 30 s report coalescing, the schedule count and interval limits and the 30-day auto-pause, and any bubble length or count limit | §8, §11, §13 |
+| O6 | **Bubbles and what the owner sees.** The chat is not a transcript: only text the model marks becomes a bubble, and each arrives whole, with typing dots between bubbles. The budget is the first bubble within 2.5 s (it was the first token within 1.5 s) | §8, §13 |
+| O7 | **Reactions and replies, both ways.** Any emoji. The owner's thumbs up is only recorded; any other reaction is queued to Juno like a message, and Juno may ignore it. Juno may react to an owner message instead of replying. The owner can reply to a Juno bubble or card, and the model gets the item in full; Juno can reply to an owner message. A reaction or a reply never approves an action and never pins a memory | §8, §13 |
 | O4 | The owner bubble is option B (accent tint, `--hl-bubble`). Juno says "I" in its own chat. "Rotate recovery phrase after removals" stays off by default. A restore while the old Mac still runs is an accepted v1 limit | §13.1, §14, §18 |
 
 ## 1. Owner decisions in force
@@ -292,11 +295,13 @@ unknown ─reconcile─▶ done (positive evidence) | unknown (kept; the card sh
 
 ## 8. Orchestration behind the status bubble (B1, B5, M7, M8, M11)
 
-- **The router** owns the current run, `H`, and the clean or tainted flag. The chat's only inputs are a queued message and the event stream (O1). An idle owner input: reset, then the input. A busy owner input is held in the inbox and handed to pi as a steer at the run's next boundary (after a tool round, or at an answer), where pi places it; pi places every steer queued at that boundary together (`steeringMode: "all"`). The owner's bubble shows no extra state, and Juno's reply acknowledges the message. Input is held rather than queued in pi at once because pi keeps a queued steer after a failed run until the next input; held input that no boundary took starts the next run. A report or wake: a steer if a run is active, otherwise a new run. Several reports within 30 s are coalesced. A proactive run waits while Juno has an open question of its own, at most until the question expires or 24 hours pass; job reports never wait.
-- **The status bubble covers runs only.**. Dots only until the first token (the bubble becomes the reply in place) or the first tool call (text appears, specific and counting real things, changing at most every 2 s). It clears when the run settles. It has no Stop (O1). If the run then calls tools between tokens, the bubble reappears below the streaming reply, and the next token clears it: one run is one Juno bubble. A run whose provider call fails (pi-ai runs with `maxRetries: 0`) ends `failed` with a fixed line per cause, never a model-written one.
+- **The router** owns the current run, `H`, and the clean or tainted flag. The chat's only inputs are a queued input (a message, maybe a reply, or a reaction) and the event stream (O1, O7). An idle owner input: reset, then the input. A busy owner input is held in the inbox and handed to pi as a steer at the run's next boundary (after a tool round, or at an answer), where pi places it; pi places every steer queued at that boundary together (`steeringMode: "all"`). The owner's bubble shows no extra state; the model decides how to acknowledge it. Input is held rather than queued in pi at once because pi keeps a queued steer after a failed run until the next input; held input that no boundary took starts the next run. A report or wake: a steer if a run is active, otherwise a new run.
+- **What the owner sees (O6).** The model marks bubbles in its text with a block format, `<say>…</say>` (with `reply-to="n12"` to answer one owner message), and its own reactions with `<react to="n12">emoji</react>`. The router parses the stream and publishes each block once it closes, so a bubble appears whole. Text outside the blocks never leaves the agent, and a run that marks nothing shows nothing. Why a block format and not a `say` tool: pi answers each tool call with a tool result and calls the model again, so a tool per bubble costs one more request per turn. The archive keeps the raw text, and parsing it gives the same bubbles (`packages/agent/README.md`, Turns).
+- **What the model reads (O7).** Owner input is wrapped with a handle (`<message id="n12">`, the inbox `seq`). A reply carries the quoted bubble, card or message in full; a reaction is `<reaction id="n13" emoji="…">` with the item it is on. The owner's thumbs up and removals are stored in `reactions` and never reach the model. Pins take only the owner's own words inside the wrapper.
+- **The status bubble covers runs only.** Typing dots while a run is live, between bubbles: each bubble takes its place and the dots show again below it until the run settles. A tool call gives it a line naming real things, until the next bubble. It has no Stop (O1). A run whose provider call fails (pi-ai runs with `maxRetries: 0`) ends `failed` with a fixed line per cause, never a model-written one.
 - **Background jobs** (`jobs` table: subagents and T3 sessions) never use the bubble. Each job has a **Task card** under the message that started it, with a live state line ("T3 Code · tests running, 2 of 5"), Open and Stop. The sidebar's Juno row shows the duotone sparkle while any job runs. "How is it going?" is answered from turn state, which lists the jobs.
 - **Subagents** follow pi's background pattern behind a `delegate` tool, with depth 1 and a cheaper model. Their first message is pins + view + task. Reports post once each (`report:<task>:<seq>`).
-- **T3 jobs:** A watcher fiber loops `t3_thread_wait(10 min)` and `t3_thread_read`, updating the state line. It posts a `work` report only on a milestone: started, a question or pending approval, done (with the PR), failed, or quiet for 30 minutes after the last step change. The last one reads: "T3 Code has been quiet for 30 minutes. I'll keep watching, or you can stop it." A pending approval becomes a `question` card headed "T3 Code asks" (Tier 3). Juno never merges or pushes.
+- **T3 jobs:** A watcher fiber loops `t3_thread_wait(10 min)` and `t3_thread_read`, updating the state line. It posts a `work` report when the job's phase moves (a question or pending approval, done with the PR, failed), and the model decides what, if anything, to tell the owner (O5). A pending approval becomes a `question` card headed "T3 Code asks" (Tier 3). Juno never merges or pushes.
 
 ## 9. Action tiers
 
@@ -342,15 +347,15 @@ Fakes for all three servers (WP10) mirror the shapes above. Real adapters are bu
 ### 11.1 Schedules
 - `schedule_create({ at | every | wallClock (time, time zone, weekdays), reason, prompt, deliver: now | digest | silent, source_op })` works with no click only in a clean owner run. `source_op` must be an owner input from that run, and the call mints the schedule's grant. In a tainted owner run it returns a `proposedSchedule` card instead. Start on that card is the owner's click; its op becomes `source_op` and mints the grant (§6.4, G6). Wake and report runs get neither path.
 - From wake and report runs, only `schedule_pause` and `schedule_delete` on the schedule that woke them are available.
-- Limits: 20 active schedules, intervals of at least 15 minutes, and one-shot wakes at most a year ahead. A schedule untouched for 30 days pauses itself and says so once.
+- No count or interval limits (O5): the daily spend cap bounds what wakes cost.
 - Wakes are admitted once per `(schedule_id, schedule_rev, due_at)` through the inbox, revalidating the revision and the grant first.
-- A missed wake is coalesced and admitted once at the next launch. A wake run that finds no change ends with `stay_quiet(reason)`, which appears only in Activity.
+- A missed wake is coalesced and admitted once at the next launch. A wake run with nothing worth saying marks no bubble, so the chat shows nothing; Activity records that it ran.
 
 ### 11.2 Delivery
 | Event | OS notification |
 | --- | --- |
 | Schedule message | its `deliver` field (set from the owner's words, editable on Scheduled) |
-| Job needs a decision, failed, or quiet for 30 minutes | Now |
+| Job needs a decision, or failed | Now |
 | Owner-started job done | Now |
 | Job started | Silent (the chat shows it) |
 
@@ -381,13 +386,14 @@ Fakes for all three servers (WP10) mirror the shapes above. Real adapters are bu
 ## 13. Chat UI (dumb views, friendly layer)
 
 ### 13.1 Look
-The chat has four item kinds: owner bubble, Juno bubble with cards, the status bubble (only during a run), and separators.
+The chat's rows: owner bubble, Juno bubble (one per marked block), card, ending line, the status bubble (only during a run), notes and separators.
 
 - **Owner bubbles**: option B from `docs/design/juno-chat/README.md` (O4): an accent tint, `--hl-bubble`, with `--foreground-default` text. `--radius-bubble` 16, with the 4 px tail on the last bubble of a group. Max width 76%, 14 px text, padding 8×12.
-- **Juno bubbles** use `--surface-hover`, with the 28 px mark beside the last bubble of a group. Plain text. Recall answers cite the day ("On 12 Mar you said …") with a link that scrolls to the message.
+- **Juno bubbles** use `--surface-hover`, with the 28 px mark beside the last bubble of a group. Plain text, any length; each arrives whole. Recall answers cite the day ("On 12 Mar you said …") with a link that scrolls to the message.
 - **Groups** are formed by sender within 2 minutes **and the same origin**. A proactive group carries an 11 px uppercase label ("SCHEDULED · DAILY CATCH-UP") with "Why this?" and one quiet action: "Pause schedule" or "Mute updates". Neither stops a job (B5).
 - **Cards:** Column width up to 560 px, `--radius-card` 20. Light theme: the wide soft shadow. Dark theme: the ring from `docs/design/dark-theme/`. Laid out at full height, with a `--duration-appear` fade.
 - **Status bubble:** three dots looping over `--duration-pop` (static under reduced motion), 13 px status text with a 150 ms cross-fade. No Stop (O1).
+- **Reactions** (O7): any emoji, shown on the bubble's or card's corner, at most one per side. The owner reacts from hover › React or the context menu; the picker offers any emoji. **Replies:** a one-line quote above the bubble; the composer shows the quote while writing. Both work on Juno's bubbles and cards; Juno reacts and replies to owner messages.
 - **Inline lines:** "Remembered · Undo" (Undo until the next send or 60 s), "Removed", and the fixed secret-blocked line.
 - **Times** show on hover. **Day and gap separators** follow SPEC §17 wording. **Scroll:** the "New" divider, and a "New message" pill when scrolled up. The list uses `@tanstack/react-virtual`.
 
@@ -428,7 +434,7 @@ Pages open from the Juno header menu:
 ### 13.4 Elsewhere (M4)
 - Ask Juno on the home and ⌘J open the Juno tab with the composer focused. Inside the chat, ⌘J focuses the composer. The nav item shows a grey count of unread Juno messages. The home's Ask Juno field shows a running job's state line, as a text swap with no reflow.
 
-Budgets go in `docs/performance.md`: send to bubble under 16 ms, status bubble under 100 ms, first text or token under 1.5 s, and opening a 5,000-message chat within the list budget.
+Budgets go in `docs/performance.md`: send to bubble under 16 ms, a reaction on its bubble under 16 ms, status bubble under 100 ms, first status text or first bubble under 2.5 s (O6), and opening a 5,000-message chat within the list budget.
 
 ## 14. Ownership, backup and transfer (R1, R2, R13)
 
