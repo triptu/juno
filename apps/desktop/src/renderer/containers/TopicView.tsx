@@ -456,6 +456,10 @@ function Topic({ id, stealth, detail }: { readonly id: string; readonly stealth:
 
   const [threadsOpen, setThreadsOpen] = useState(false)
   const main = detail.kind === 'main'
+  const channel = detail.channel.id
+  // Main keeps its threads query live while shown, from after its first frame, so the Threads
+  // popover opens with its rows in the first frame instead of "Loading threads".
+  useEffect(() => (main && drawnAll ? registry.mount(channelThreadsAtom(channel)) : undefined), [main, drawnAll, channel])
 
   // Mark read takes its own button away; focus moves on to the next header control, not to the body.
   const focusAfterMarkRead = useRef<HTMLElement | undefined>(undefined)
