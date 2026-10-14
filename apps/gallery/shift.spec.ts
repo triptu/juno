@@ -298,13 +298,17 @@ test.describe('the guard itself', () => {
 /**
  * The Juno chat (SPEC 13): text streams into a bubble, cards settle, the
  * status bubble comes and goes, and the header's chip changes. None of
- * that may move what the owner is reading. The generic guard above
- * presses these fixtures' buttons too; these tests also check that the
- * change happened, so a green run means the swap was exercised.
+ * that may move what the owner is reading. Scenes with a button are also
+ * pressed by the generic guard above; a change that is meant to move the
+ * list's end (a new last row) is driven through `window.__fixtureControls`
+ * instead, and the test checks the rows above it.
  */
 test.describe('Juno chat', () => {
+  const open = (page: Page, component: string, id: string) => openState(page, { component, id, route: `${component}/${id}`, group: '', groupId: '', state: '', frame: {} })
+  const step = (page: Page, name: string) => page.evaluate((control) => (window as unknown as { __fixtureControls?: Record<string, () => void> }).__fixtureControls?.[control]?.(), name)
+
   test('a streaming token joins the bubble without moving anything', async ({ page }) => {
-    await page.goto('/#/JunoChatList?__state=shift/streaming-token')
+    await open(page, 'JunoChatList', 'shift/streaming-token')
     const bubble = page.locator('[data-streaming]')
     const before = await bubble.textContent()
     await expectNoLayoutShift(page, () => page.getByRole('button', { name: 'Next token' }).click())
@@ -313,41 +317,39 @@ test.describe('Juno chat', () => {
   })
 
   test('the status bubble appears below the reply and leaves without moving the rows above', async ({ page }) => {
-    await page.goto('/#/JunoChatList?__state=shift/status-between-tokens')
-    const bubble = page.locator('[data-streaming]')
-    const before = await bubble.boundingBox()
-    await expectNoLayoutShift(page, async () => {
-      await page.getByRole('button', { name: 'Status arrives' }).click()
-      await expect(page.locator('[data-chat-status]')).toBeVisible()
-    })
-    expect(await bubble.boundingBox()).toEqual(before)
-    await expectNoLayoutShift(page, async () => {
-      await page.getByRole('button', { name: 'Status leaves' }).click()
-      await expect(page.locator('[data-chat-status]')).toHaveCount(0)
-    })
-    expect(await bubble.boundingBox()).toEqual(before)
+    await open(page, 'JunoChatList', 'shift/status-between-tokens')
+    const rows = [page.locator('[data-chat-owner]'), page.locator('[data-streaming]'), page.locator('[data-chat-juno] svg')]
+    const before = await Promise.all(rows.map((row) => row.boundingBox()))
+    await step(page, 'status')
+    await expect(page.locator('[data-chat-status]')).toBeVisible()
+    expect(await Promise.all(rows.map((row) => row.boundingBox()))).toEqual(before)
+    await step(page, 'status')
+    await expect(page.locator('[data-chat-status]')).toHaveCount(0)
+    expect(await Promise.all(rows.map((row) => row.boundingBox()))).toEqual(before)
   })
 
   test("the status bubble's text changes in place", async ({ page }) => {
-    await page.goto('/#/JunoChatList?__state=shift/status-text-changes')
-    const dots = page.locator('[data-chat-status] i').first()
-    const before = await dots.boundingBox()
-    for (let step = 0; step < 3; step++) {
-      await expectNoLayoutShift(page, () => page.getByRole('button', { name: 'Next status' }).click())
-      expect(await dots.boundingBox()).toEqual(before)
+    await open(page, 'JunoChatList', 'shift/status-text-changes')
+    const status = page.locator('[data-chat-status]')
+    const fixed = [page.locator('[data-chat-owner]'), status.locator('svg'), status.locator('i').first()]
+    const before = await Promise.all(fixed.map((el) => el.boundingBox()))
+    const height = (await status.boundingBox())?.height
+    for (let round = 0; round < 3; round++) {
+      await step(page, 'status-text')
+      await page.waitForTimeout(200)
+      expect(await Promise.all(fixed.map((el) => el.boundingBox()))).toEqual(before)
+      expect((await status.boundingBox())?.height).toBe(height)
     }
-    await expect(page.locator('[data-chat-status]')).toContainText('room booking')
+    await expect(status).toContainText('room booking')
   })
 
   test('turning AI off adds the line at the end and moves no bubble', async ({ page }) => {
-    await page.goto('/#/JunoChatList?__state=shift/banner-ai-off')
-    const first = page.locator('[data-chat-owner]').first()
-    const before = await first.boundingBox()
-    await expectNoLayoutShift(page, async () => {
-      await page.getByRole('button', { name: 'Turn AI off' }).click()
-      await expect(page.getByText('Juno is off. Turn on AI assist in Settings.')).toBeVisible()
-    })
-    expect(await first.boundingBox()).toEqual(before)
+    await open(page, 'JunoChatList', 'shift/banner-ai-off')
+    const bubbles = page.locator('[data-chat-owner], [data-chat-juno], [data-chat-card]')
+    const before = await bubbles.evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().toJSON()))
+    await step(page, 'ai')
+    await expect(page.getByText('Juno is off. Turn on AI assist in Settings.')).toBeVisible()
+    expect(await bubbles.evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().toJSON()))).toEqual(before)
   })
 
   for (const [state, settled] of [
@@ -358,13 +360,13 @@ test.describe('Juno chat', () => {
     ['question-settles', 'You chose Keep both'],
   ] as const) {
     test(`a ${state.replace(/-/g, ' ')} card keeps its height from the click to the outcome`, async ({ page }) => {
-      await page.goto(`/#/ChatCard?__state=shift/${state}`)
+      await open(page, 'ChatCard', `shift/${state}`)
       const card = page.locator('[data-chat-card]')
       const before = await card.boundingBox()
-      await expectNoLayoutShift(page, () => page.getByRole('button', { name: /Click lands|Outcome arrives/ }).click())
+      await expectNoLayoutShift(page, () => page.getByRole('button', { name: 'Next step' }).click())
       expect(await card.boundingBox()).toEqual(before)
       await expectNoLayoutShift(page, async () => {
-        await page.getByRole('button', { name: /Click lands|Outcome arrives/ }).click()
+        await page.getByRole('button', { name: 'Next step' }).click()
         await expect(card).toContainText(settled)
       })
       expect(await card.boundingBox()).toEqual(before)
@@ -372,13 +374,13 @@ test.describe('Juno chat', () => {
   }
 
   test('the banner chip changes without moving the title or the menu', async ({ page }) => {
-    await page.goto('/#/JunoHeader?__state=shift/banner-cycles')
+    await open(page, 'JunoHeader', 'shift/banner-cycles')
     const title = page.getByRole('heading', { name: 'Juno' })
     const menu = page.getByRole('button', { name: 'More' })
     const titleBox = await title.boundingBox()
     const menuBox = await menu.boundingBox()
     const seen = new Set<string>()
-    for (let step = 0; step < 7; step++) {
+    for (let round = 0; round < 7; round++) {
       await expectNoLayoutShift(page, () => page.getByRole('button', { name: 'Next banner' }).click())
       expect(await title.boundingBox()).toEqual(titleBox)
       expect(await menu.boundingBox()).toEqual(menuBox)

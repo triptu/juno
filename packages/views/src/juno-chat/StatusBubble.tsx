@@ -1,7 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import { memo } from 'react'
 import { chatCopy, type StatusItem } from '@juno/agent-contract'
-import { chat, colors, motion, radii, spacing } from '@juno/tokens/tokens.stylex'
+import { chat, colors, motion, radii, sizes, spacing } from '@juno/tokens/tokens.stylex'
 import { Button, Text } from '@juno/ui'
 import type { ChatActions } from './commands'
 import { JunoMark } from './JunoMark'
@@ -77,6 +77,8 @@ const styles = stylex.create({
     boxSizing: 'border-box',
     minWidth: chat['--status-min-width'],
     maxWidth: chat['--bubble-max-width'],
+    // The same height with dots alone and with text, so the first status line never grows the bubble.
+    minHeight: sizes['--control-40'],
     paddingBlock: spacing['--space-2-5'],
     paddingInline: spacing['--space-3-5'],
     borderRadius: radii['--radius-bubble'],
@@ -90,21 +92,28 @@ const styles = stylex.create({
     gap: spacing['--space-1'],
     flexShrink: 0,
   },
+  // The pulse lives on a pseudo-element: it only scales, so it is no layout and no declared motion on the row.
   dot: {
     display: 'block',
     width: chat['--status-dot'],
     height: chat['--status-dot'],
-    borderRadius: '50%',
-    backgroundColor: colors['--foreground-muted'],
-    opacity: chat['--status-dot-opacity'],
-    animationName: pulse,
-    animationDuration: chat['--status-loop'],
-    animationTimingFunction: motion['--ease-out'],
-    animationIterationCount: 'infinite',
+    '::before': {
+      content: '""',
+      display: 'block',
+      width: chat['--status-dot'],
+      height: chat['--status-dot'],
+      borderRadius: '50%',
+      backgroundColor: colors['--foreground-muted'],
+      opacity: chat['--status-dot-opacity'],
+      animationName: pulse,
+      animationDuration: chat['--status-loop'],
+      animationTimingFunction: motion['--ease-out'],
+      animationIterationCount: 'infinite',
+    },
   },
-  dot1: { animationDelay: '0ms' },
-  dot2: { animationDelay: `calc(${chat['--status-loop']} / 6)` },
-  dot3: { animationDelay: `calc(${chat['--status-loop']} / 3)` },
+  dot1: { '::before': { animationDelay: '0ms' } },
+  dot2: { '::before': { animationDelay: `calc(${chat['--status-loop']} / 6)` } },
+  dot3: { '::before': { animationDelay: `calc(${chat['--status-loop']} / 3)` } },
   text: {
     minWidth: 0,
     animationName: fade,

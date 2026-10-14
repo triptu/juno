@@ -73,7 +73,7 @@ function BannerChip({ banner, onResume, onOpenPage }: { readonly banner: Banner;
   if (banner._tag === 'none') return null
   const text = copy[banner._tag]
   return (
-    <Chip variant="filled" size={26} title={text.line} data-banner={banner._tag}>
+    <Chip key={banner._tag} variant="filled" size={26} title={text.line} data-banner={banner._tag}>
       {text.chip}
       {banner._tag === 'paused' ? (
         <>
@@ -110,10 +110,13 @@ const styles = stylex.create({
     color: colors['--foreground-default'],
     userSelect: 'none',
   },
+  // Fills the space between the title and the menu whether or not a chip is in it, so a chip coming or going changes no box.
   chip: {
-    display: 'inline-flex',
+    display: 'flex',
+    alignItems: 'center',
+    flexGrow: 1,
+    alignSelf: 'stretch',
     minWidth: 0,
-    flexShrink: 1,
   },
   menu: {
     display: 'inline-flex',

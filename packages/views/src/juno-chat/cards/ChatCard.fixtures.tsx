@@ -47,7 +47,7 @@ function Settles({ make }: { readonly make: (step: 0 | 1 | 2) => Card }) {
     <>
       <CardFixture card={make(step)} />
       <Button variant="secondary" size="sm" onClick={() => setStep((s) => (s === 2 ? 0 : ((s + 1) as 1 | 2)))}>
-        {step === 0 ? 'Click lands' : step === 1 ? 'Outcome arrives' : 'Reset'}
+        Next step
       </Button>
     </>
   )

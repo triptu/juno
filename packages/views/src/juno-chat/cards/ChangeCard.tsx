@@ -50,7 +50,7 @@ export function ChangeCard({ card, actions }: ChangeCardProps) {
 
 /**
  * One field. A `long` value shows six lines; "Show all" lets the same box
- * scroll instead of growing it, so the card keeps its height.
+ * scroll instead of growing it, so the card keeps its height. It toggles.
  */
 function Field({ field }: { readonly field: ChangeField }) {
   const [all, setAll] = useState(false)
@@ -63,7 +63,9 @@ function Field({ field }: { readonly field: ChangeField }) {
         </Text>
         {long ? (
           <Text variant="meta" tone="muted" sx={styles.showAll}>
-            {all ? null : <TextButton onClick={() => setAll(true)}>{chatCopy.card.change.showAll}</TextButton>}
+            <TextButton aria-pressed={all} onClick={() => setAll((value) => !value)}>
+              {chatCopy.card.change.showAll}
+            </TextButton>
           </Text>
         ) : null}
       </div>

@@ -1,7 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import { useState } from 'react'
 import { chatCopy, type ProposedMessage, type ProposedMessageId, type SendMessageCard as SendMessageCardModel } from '@juno/agent-contract'
-import { colors, radii, sizes, spacing } from '@juno/tokens/tokens.stylex'
+import { colors, radii, sizes, spacing, text } from '@juno/tokens/tokens.stylex'
 import { Button, ContextPill, Text, Textarea } from '@juno/ui'
 import type { ChatActions } from '../commands'
 import { TextButton } from '../TextButton'
@@ -80,9 +80,9 @@ function Row({
       {editable ? (
         <Textarea variant="card" label={`Message to ${message.target.name}`} value={text} onChange={(event) => onChange(event.currentTarget.value)} dir="auto" />
       ) : (
-        <Text variant="bodySmall" tone="subtle" selectable dir="auto" as="p" sx={styles.sentText}>
+        <p dir="auto" {...stylex.props(styles.sentText)}>
           {text}
-        </Text>
+        </p>
       )}
       <div {...stylex.props(styles.result)}>
         {result._tag === 'sent' ? (
@@ -130,10 +130,18 @@ const styles = stylex.create({
     minHeight: sizes['--control-22'],
     userSelect: 'none',
   },
-  // The same box as the card textarea (two rows, padding 8 10, a 1px edge), with the edge gone.
+  // The same box as the card textarea (its type setting, two rows, padding 8 10, a 1px edge), with the edge gone.
   sentText: {
     boxSizing: 'border-box',
-    minHeight: `calc(2 * 1.55em + 2 * ${spacing['--space-2']} + 2px)`,
+    margin: 0,
+    minHeight: `calc(2 * ${text['--text-body-size']} * ${text['--text-body-small-leading']} + 2 * ${spacing['--space-2']} + 2px)`,
+    fontFamily: text['--text-body-family'],
+    fontSize: text['--text-body-size'],
+    fontWeight: text['--text-body-weight'],
+    lineHeight: text['--text-body-small-leading'],
+    letterSpacing: text['--text-body-tracking'],
+    color: colors['--foreground-subtle'],
+    userSelect: 'text',
     paddingBlock: spacing['--space-2'],
     paddingInline: spacing['--space-2-5'],
     borderWidth: '1px',

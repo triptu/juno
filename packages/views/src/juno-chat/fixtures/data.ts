@@ -296,18 +296,17 @@ export const conversation: ReadonlyArray<ChatItem> = [
 const paragraph =
   'Here is the long version. The migration plan has three phases: a dual-write window where both schemas get every write, a backfill that runs in 200-row batches so the sync never blocks, and a cutover that flips the read path behind a flag. Maya wants a reviewer for the backfill, because the index rebuild takes about forty minutes on the large workspace and the plan has it running inside the dual-write window. The flake on the sidebar test is unrelated: the fake server sometimes answers the second page before the first, and the test asserts on the order. Leo has a fix in a branch but has not opened the PR. Nothing else needs you today.'
 
-/** A very long reply, a long owner message, a long status line and a long card. */
+/** A very long reply, a long owner message and a long card. */
 export const longText: ReadonlyArray<ChatItem> = [
   day(0),
   owner('m-10', `Can you give me the long version of what happened in #eng this week? I want every thread, who asked for what, what is blocked and what is just waiting, and anything I promised someone and have not done. Skip the alerts channel unless something paged. ${'Also include the hiring loop. '.repeat(6)}`, 'single', { _tag: 'sent' }, NOW - 20 * MINUTE),
   juno('m-11', `${paragraph}\n\n${paragraph}`, { at: NOW - 18 * MINUTE, cards: [sendMessage('c-10', open, [result.pending, result.pending, result.pending])] }),
-  status('m-12', 'Looking back through March, April and the first half of May for anything about the offsite room booking'),
 ]
 
 const rtlOwner = 'מה פספסתי ב-#eng הבוקר? ותזכיר לי מתי היום של הצוות'
 const rtlJuno = 'שני דברים ב-#eng: מאיה פרסמה את תוכנית המעבר ל-Postgres 16 וביקשה סוקר, והבדיקה הרעועה של הסרגל הצדדי חזרה. היום של הצוות הוא ב-23.'
 
-/** Right-to-left text in both bubbles, in a card and in the status line. */
+/** Right-to-left text in both bubbles and in a card. */
 export const rightToLeft: ReadonlyArray<ChatItem> = [
   day(0),
   owner('m-20', rtlOwner, 'single', { _tag: 'sent' }, NOW - 9 * MINUTE),
@@ -328,7 +327,6 @@ export const rightToLeft: ReadonlyArray<ChatItem> = [
       },
     ],
   }),
-  status('m-22', 'קורא 3 נושאים'),
 ]
 
 /** One Juno message carrying every card kind at once. */

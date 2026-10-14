@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { Banner, ChatItem, Ending } from '@juno/agent-contract'
 import { Button, defineFixtures, fixture, scene, type FixtureFrame } from '@juno/ui'
 import { noopActions } from './commands'
+import { useFixtureControl } from './fixtures/control'
 import { budget, conversation, day, failedSend, jobs, juno, longText, manyCards, messageId, NOW, owner, rightToLeft, scheduled, status, stoppedRun, withNewDivider } from './fixtures/data'
 import { JunoChatList, type JunoChatListProps } from './JunoChatList'
 
@@ -36,50 +37,37 @@ function Streaming() {
   )
 }
 
-/** The status bubble appears below the streaming bubble between tokens and leaves on the next one. */
+/**
+ * The status bubble appears below the streaming bubble between tokens and
+ * leaves on the next one. A new last row moves the list's end, so the
+ * test drives it through `window.__fixtureControls.status` and checks the
+ * rows above instead of pressing a button under the generic guard.
+ */
 function StatusBetweenTokens() {
   const [shown, setShown] = useState(false)
+  useFixtureControl('status', () => setShown((s) => !s))
   const items: ReadonlyArray<ChatItem> = [
     ...ask('m-t', 'What did I miss in #eng?', { _tag: 'sent' }),
     juno('m-t-reply', 'Two things in #eng this morning. Let me check the thread before I say more.', { streaming: true, at: NOW }),
     ...(shown ? [status('m-t-reply', 'Reading 3 topics')] : []),
   ]
-  return (
-    <>
-      <JunoChatList {...base} items={items} />
-      <Button variant="secondary" size="sm" onClick={() => setShown((s) => !s)}>
-        {shown ? 'Status leaves' : 'Status arrives'}
-      </Button>
-    </>
-  )
+  return <JunoChatList {...base} items={items} />
 }
 
-/** The status bubble's text changes: the dots stay put and the text fades. */
+/** The status bubble's text changes: the dots and the mark stay put and the bubble keeps its height. Driven as above. */
 function StatusTextChanges() {
   const [step, setStep] = useState(0)
   const texts = [undefined, 'Reading 3 topics', 'Looking back through March', 'Reading 3 topics and looking back through March for the room booking']
+  useFixtureControl('status-text', () => setStep((n) => (n + 1) % texts.length))
   const items: ReadonlyArray<ChatItem> = [...ask('m-u', 'Find the room booking', { _tag: 'sent' }), status('m-u', texts[step])]
-  return (
-    <>
-      <JunoChatList {...base} items={items} />
-      <Button variant="secondary" size="sm" onClick={() => setStep((n) => (n + 1) % texts.length)}>
-        Next status
-      </Button>
-    </>
-  )
+  return <JunoChatList {...base} items={items} />
 }
 
-/** The chat ends with the AI-off line only when the banner says so. */
+/** The chat ends with the AI-off line only when the banner says so. Driven as above. */
 function BannerToAiOff() {
   const [banner, setBanner] = useState<Banner>({ _tag: 'none' })
-  return (
-    <>
-      <JunoChatList {...base} items={conversation} banner={banner} />
-      <Button variant="secondary" size="sm" onClick={() => setBanner((b) => (b._tag === 'none' ? { _tag: 'aiOff' } : { _tag: 'none' }))}>
-        {banner._tag === 'none' ? 'Turn AI off' : 'Turn AI on'}
-      </Button>
-    </>
-  )
+  useFixtureControl('ai', () => setBanner((b) => (b._tag === 'none' ? { _tag: 'aiOff' } : { _tag: 'none' })))
+  return <JunoChatList {...base} items={conversation} banner={banner} />
 }
 
 const frame: FixtureFrame = { width: 816, height: 640, padded: false }
@@ -137,8 +125,6 @@ export default defineFixtures(
       'ai-off': list(conversation, { banner: { _tag: 'aiOff' } }),
       'citation-hover': list(conversation, {}, { ...frame, hover: '[data-cite]' }),
       'bubble-hover': list(conversation, {}, { ...frame, hover: '[data-chat-owner="op-m-2"] p' }),
-      'status-hover': list([...ask('m-h', 'Catch me up on today', { _tag: 'sent' }), status('m-h', 'Reading 3 topics')], {}, { ...frame, hover: '[data-chat-status]' }),
-      'status-focus': list([...ask('m-f', 'Catch me up on today', { _tag: 'sent' }), status('m-f', 'Reading 3 topics')], {}, { ...frame, focus: '[data-chat-status] button' }),
     },
     Shift: {
       'streaming-token': scene(() => <Streaming />),
