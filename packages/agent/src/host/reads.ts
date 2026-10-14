@@ -2,10 +2,14 @@
  * The host, bound for the turn engine: the Slack read tools' `HostReads`
  * over the AgentHost client, and the latest `host.presence`.
  *
- * Every read names the account it is for. The account is the one the
+ * Every Slack read names the account it is for. The account is the one the
  * latest presence names, so a read made after the owner switched accounts
  * fails with `stale` at the host instead of reading the other workspace.
- * With no account signed in, a read fails with `signedOut` here.
+ * With no account signed in, a read fails with `signedOut` here. The topic
+ * list names no account: it is Juno's own list for the open workspace.
+ *
+ * While the host port is closed (the engine restarts), presence reads as
+ * offline until the next port gives a fresh one.
  */
 import { Effect, Stream, SubscriptionRef } from 'effect'
 import { AgentHostError, HostChannelId, HostMessageTs, HostUserId, type HostPresence } from '@juno/agent-contract'
@@ -34,6 +38,13 @@ export const bindHost = Effect.gen(function* () {
   yield* client['host.presence']().pipe(
     Stream.runForEach((presence) => Effect.andThen(Effect.sync(() => (current = presence)), SubscriptionRef.set(latest, presence))),
     Effect.ignore,
+    Effect.andThen(
+      Effect.suspend(() => {
+        if (current === undefined || !current.online) return Effect.void
+        current = { ...current, online: false }
+        return SubscriptionRef.set(latest, current)
+      }),
+    ),
     Effect.andThen(Effect.sleep('1 second')),
     Effect.forever,
     Effect.forkScoped,

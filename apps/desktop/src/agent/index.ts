@@ -20,13 +20,17 @@ const decode = Schema.decodeUnknownSync(MainToAgent)
 const send = (message: AgentToMain) => parent.postMessage(message)
 
 function fromMessagePortMain(port: MessagePortMain): HostPort {
+  // A renderer port can close before the server attaches; a late listener still hears it.
+  let closed = false
+  port.on('close', () => (closed = true))
   const hostPort: HostPort = {
     postMessage: (message) => port.postMessage(message),
     onMessage: (f) => {
       port.on('message', (event) => f(event.data))
     },
     onClose: (f) => {
-      port.on('close', f)
+      if (closed) f()
+      else port.on('close', f)
     },
     close: () => port.close(),
   }

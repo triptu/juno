@@ -4,7 +4,7 @@ import { DEFAULT_CHAT_FAMILY, DEFAULT_COMPACTION_FAMILY, piFamilyModel } from '.
 import { createProviderGuard, type GuardOptions, type ProviderGuardApi } from './guard'
 import type { Store } from '../store/store'
 
-/** The key comes from main's keychain bridge and stays in memory. */
+/** The key comes from main (today from the environment; later its keychain) and stays in memory. */
 export function createOpenRouter(options: Omit<GuardOptions, 'transport'> & {
   readonly models: readonly Model<Api>[]
   readonly apiKey: () => Promise<string | undefined>

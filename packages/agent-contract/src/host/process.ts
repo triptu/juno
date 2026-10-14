@@ -18,7 +18,8 @@ export type AgentConfig = typeof AgentConfig.Type
  * main -> agent. A `hostPort` message carries a port to the host in
  * `ports[0]`; a new one follows every host restart. A `rendererPort` carries
  * a port to one renderer, for the agent's RPCs (`AgentRpcs`). `openRouterKey`
- * is the key from main's secrets, kept in memory; `null` when there is none.
+ * is the key main holds (from the environment until Settings › Juno stores
+ * one), kept in memory; `null` when there is none.
  */
 export const MainToAgent = Schema.Union([
   Schema.TaggedStruct('config', { config: AgentConfig }),

@@ -117,6 +117,11 @@ export class AgentSupervisor {
       // A renderer that asks again while waiting replaces its earlier request.
       this.pendingRendererPorts.get(target)?.close()
       this.pendingRendererPorts.set(target, port1)
+      target.once('destroyed', () => {
+        if (this.pendingRendererPorts.get(target) !== port1) return
+        port1.close()
+        this.pendingRendererPorts.delete(target)
+      })
     }
     target.postMessage(Events.agentPort, null, [port2])
     return 'sent'
