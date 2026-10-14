@@ -28,6 +28,37 @@ export interface PopoverProps {
   readonly children?: ReactNode
 }
 
+/** The gap kept between a clamped panel and the edge of its pane. */
+const EDGE_GAP = '--space-2'
+
+/** The nearest ancestor that clips its overflow (the pane), or undefined for the window. */
+function clipOf(node: HTMLElement): HTMLElement | undefined {
+  for (let el = node.parentElement; el !== null && el !== document.body; el = el.parentElement) {
+    if (getComputedStyle(el).overflowX !== 'visible') return el
+  }
+  return undefined
+}
+
+/**
+ * Keeps an open panel inside its pane: shifts it sideways when it would
+ * run past an edge, and narrows it when the pane is narrower than the
+ * panel. One read of the two boxes, then one write, before the first paint.
+ */
+function clamp(panel: HTMLElement): void {
+  const clip = clipOf(panel)
+  const bounds = clip?.getBoundingClientRect() ?? { left: 0, right: document.documentElement.clientWidth }
+  const box = panel.getBoundingClientRect()
+  const gap = Number.parseFloat(getComputedStyle(panel).getPropertyValue(EDGE_GAP)) || 0
+  const room = bounds.right - bounds.left - 2 * gap
+  const width = Math.min(box.width, room)
+  const left = Math.max(bounds.left + gap, Math.min(box.left, bounds.right - gap - width))
+  if (width < box.width) panel.style.maxWidth = `${width}px`
+  // A right-anchored panel that is narrowed keeps its right edge; account for that before shifting.
+  const narrowedLeft = width < box.width && getComputedStyle(panel).right !== 'auto' ? box.right - width : box.left
+  const shift = left - narrowedLeft
+  if (shift !== 0) panel.style.translate = `${shift}px 0`
+}
+
 /** What can take focus in the anchor. */
 const FOCUSABLE = 'button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])'
 
@@ -35,7 +66,8 @@ const FOCUSABLE = 'button:not(:disabled), [href], input:not(:disabled), select:n
  * Floats a popover Surface next to its anchor. Appears with a short fade
  * and scale from the anchor corner (--duration-appear); closing is instant,
  * since the panel is unmounted. Scrolling is contained so the page behind
- * never moves. Closing with Escape while focus is inside puts focus back on
+ * never moves. The panel stays inside its pane: one that would run past an
+ * edge moves in, and one wider than the pane narrows. Closing with Escape while focus is inside puts focus back on
  * the anchor, so the next Tab goes on from there instead of from the top.
  */
 export function Popover({
@@ -57,6 +89,10 @@ export function Popover({
   const panelRef = useRef<HTMLDivElement>(null)
   // Set when Escape closes the panel with focus in it; the anchor takes focus once the panel is gone.
   const restoreFocus = useRef(false)
+
+  useLayoutEffect(() => {
+    if (open && panelRef.current !== null) clamp(panelRef.current)
+  }, [open])
 
   useLayoutEffect(() => {
     if (open || !restoreFocus.current) return

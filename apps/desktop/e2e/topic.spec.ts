@@ -142,3 +142,15 @@ test.describe('a long thread', () => {
     expect(report.shifts).toEqual([])
   })
 })
+
+test('at the minimum window size the Threads list stays inside the workspace', async ({ juno, app, win }) => {
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.setSize(720, 480))
+  await juno.signIn()
+  await juno.waitForSync()
+  await juno.sidebar.row(ENG_MAIN).open()
+  const threads = await juno.topic.openThreads()
+  const pane = (await win.getByRole('region', { name: 'Workspace' }).boundingBox())!
+  const list = (await threads.root.boundingBox())!
+  expect(list.x).toBeGreaterThanOrEqual(pane.x)
+  expect(list.x + list.width).toBeLessThanOrEqual(pane.x + pane.width)
+})
