@@ -130,7 +130,7 @@ Centered, padding `48 16`, gap 8: title 14/500, body 13 muted lh 1.5, button 30p
            [line 3: ⌗ channel   ○○○   ▢ 7   ]              margin-top 3
 ```
 
-- Container: `role="button" tabindex="0"`, flex, gap 12, align start, padding `11 12`, radius 10, transparent. Hover `--surface-hover`. Selected (open in the active tab) `--secondary-default`.
+- Container: `role="listitem"` in a `role="list"`, `tabindex` (roving), named by the title (`aria-labelledby`), `aria-current` when selected; Enter and Space open it. Not a button: a button's children are presentational, which would hide the Resolve button inside. Flex, gap 12, align start, padding `11 12`, radius 10, transparent. Hover `--surface-hover`. Selected (open in the active tab) `--secondary-default`.
 - Tile (chat style only): 44×44 (36 compact). Channel: first letter uppercase, 14/600, bg `--secondary-default`, fg subtle, radius 10. DM: person avatar, round, person colours (tokens §1.6). Group DM: first initials of each member ("ML").
 - Line 1 (22px box, gap 6): title 14.5px (13.5 compact), weight 500 (600 unread), letter-spacing 0, single line ellipsis, `flex: 0 1 auto` so the icons stay visible. Then the optional unsubscribed `bell-off` 13 muted. Spacer. Then time 12px tabular, muted (subtle when unread).
 - Line 2 (gap 8): preview 13px lh 1.45, muted (subtle when unread), `-webkit-line-clamp` 1 or 2 (tweak `previewLines`, default 2), `text-wrap: pretty`. Text is "Sender: text" with "You:" for own messages and ">" quote lines stripped. Right column (gap 4, padding-top 1):
@@ -223,7 +223,7 @@ Row 1 (gap 8):
 - **Stealth pill** (only in stealth): 26px, radius 6, 1px dashed `--border-strongest`, padding `0 4 0 10`, fg subtle 12px, `eye-off` 13, text "Stealth. Not marking as read.", then button "Mark read" 20px, padding 0 8, radius 4, bg `--secondary-default`, 11.5/500.
 - Spacer.
 - **Pin** icon button 32×32 radius 8 (`pin` 16, subtle). Pinned: bg `--secondary-default`. Name "Pin" / "Unpin".
-- **Subscribe** icon button 32 (`bell` subscribed / `bell-off` unsubscribed). Name "Subscribed. Click to unsubscribe." / "Unsubscribed. Click to subscribe." Toggling shows an undo toast.
+- **Subscribe** icon button 32 (`bell` subscribed / `bell-off` unsubscribed). Name "Subscribe" with `aria-pressed` for the state; the tooltip repeats the name. A toggle keeps one name and changes its state, never its name. Toggling shows an undo toast. The bell on each `ActiveThreads` row is the same.
 - **Resolve / Reopen**: 32px, padding 0 12, margin-left 4, 1px `--border-strong`, radius 8, transparent, 13/500, icon 14 (`circle-check` / `rotate-ccw`), hover `--surface-hover`. Undo toast.
 - **More** icon button 32 (`ellipsis` 16). Opens the row context menu anchored under the button, right-aligned (+4px).
 
@@ -233,7 +233,7 @@ Row 2 (gap 8):
 - AI sparkle `sparkles` 14 muted after the title when the title is AI-generated and no manual title exists (title attribute "Title suggested by AI. Double-click to rename."). Hidden when AI assist is off.
 - Main header: title "#eng · Main" (DM: "Maya Chen · Main") followed by "Messages posted outside threads" 13 muted. No sparkle.
 - Rename input: 34px, margin `−3 0 −3 −8`, padding 0 8, 1px `--border-strongest`, radius 8, bg surface, 20/600 −0.01em; preselected. Enter saves, Esc cancels, blur saves. Saving an empty title, or the same text as the AI title, clears the manual title.
-- [built M4] `TopicHeader`. Row 2 starts with a fixed 32px icon slot (`art`) that shows the channel icon, or the DM partner's photo, until the topic art track fills it. Main shows a "Threads · 12" outline button (`chats-circle` 16) before the bell; it opens a 300px popover with `ActiveThreads` (title, "12 replies · 4m", the unread count and the Subscribe bell, 52px rows). The stealth pill is the dashed `Chip` and "Mark read" is a separate 22px secondary button beside it (pills never nest in pills). Pin, Resolve and More are not drawn until M5 wires them: a button that does nothing is worse than none. The context pill and stealth pill are pills (`--radius-pill`).
+- [built M4] `TopicHeader`. Row 2 starts with a fixed 32px icon slot (`art`) that shows the channel icon, or the DM partner's photo, until the topic art track fills it. Main shows a "Threads · 12" outline button (`chats-circle` 16) before the bell; it opens a 300px popover with `ActiveThreads` (title, "12 replies · 4m", the unread count and the Subscribe bell, 52px rows). The stealth pill is the dashed `Chip` and "Mark read" is a separate 22px secondary button beside it (pills never nest in pills). Mark read removes itself, so focus moves on to the next header control (Threads on Main, else the bell). The `ActiveThreads` rows are buttons named by the title and described by the counts and the reply line, each in a list item; Escape closes the popover and puts focus back on the Threads button. Pin, Resolve and More are not drawn until M5 wires them: a button that does nothing is worse than none. The context pill and stealth pill are pills (`--radius-pill`).
 
 ## 6. Message list
 
@@ -263,7 +263,7 @@ Lines starting with ">" render as one block: margin 2 0, padding 4 10, radius 6,
 
 ### 6.4 Reactions
 
-Under the body, flex-wrap, gap 4, margin-top 6. Chip 24px, padding 0 8, gap 5, radius 6, 12px, emoji + count 500. Border 1px `--border-default`; mine: border `color-mix(var(--hl) 45%, transparent)` and bg `--hl-soft`. Hover border `--border-strongest`. Click toggles mine; a chip with zero reactors disappears.
+Under the body, flex-wrap, gap 4, margin-top 6. Chip 24px, padding 0 8, gap 5, radius 6, 12px, emoji + count 500. Border 1px `--border-default`; mine: border `color-mix(var(--hl) 45%, transparent)` and bg `--hl-soft`. Hover border `--border-strongest`. Click toggles mine; a chip with zero reactors disappears. Each chip's accessible name says the count, the emoji and whether you reacted ("2 👍, including you"), since the emoji is hidden from assistive technology.
 
 ### 6.5 Hover toolbar
 
@@ -601,7 +601,7 @@ Exposed in the prototype's design panel (`data-props`). Store them as user prefe
 | ⌘Z | anywhere, unless focus is in a non-empty input | Undo last reversible action |
 | ⌘, | anywhere | Preferences (shown in the avatar menu; [proposed]) |
 | Esc | anywhere | Close palette, picker, menus, popovers; dismiss send check; cancel rename |
-| Enter / Space | any `role="button"` (rows, tabs, menu items, palette rows, Juno topic links) | Activate |
+| Enter / Space | any `role="button"` (tabs, menu items, palette rows, Juno topic links) and the sidebar rows | Activate |
 | ⌘ click / ⌘ Enter | rows, tabs, links, palette, cards' Open topic | Open in a new tab |
 | Enter / Shift Enter | composer, Juno input | Send / newline |
 | Enter / Esc | while a send check is shown | First option / back to editing |
