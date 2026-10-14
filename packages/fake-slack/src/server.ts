@@ -71,6 +71,7 @@ export class FakeServer {
   readonly #stalls = new Map<string, HoldRule>()
   readonly #lost = new Map<string, number>()
   #frameHold: ReadonlySet<string> | undefined
+  #fileDelayMs = 0
   readonly #heldFrames: RtmFrame[] = []
   readonly workspace: Workspace
   readonly #control: (name: string, input: Record<string, unknown>) => unknown
@@ -241,6 +242,11 @@ export class FakeServer {
   // Held frames
 
   /** From now on, frames of these types wait for `releaseFrames` instead of reaching the sockets. */
+  /** File downloads answer after `ms`, so images arrive late. 0 turns it off. */
+  delayFiles(ms: number): void {
+    this.#fileDelayMs = ms
+  }
+
   holdFrames(types: ReadonlyArray<string>): void {
     this.#frameHold = new Set(types)
   }
@@ -464,7 +470,8 @@ export class FakeServer {
     response.end('OK - ' + bytes.length)
   }
 
-  #file(fileId: string, response: ServerResponse): void {
+  async #file(fileId: string, response: ServerResponse): Promise<void> {
+    if (this.#fileDelayMs > 0) await new Promise((resolve) => setTimeout(resolve, this.#fileDelayMs))
     const stored = this.workspace.files.get(fileId)
     if (stored?.bytes === undefined) return json(response, 404, { ok: false, error: 'file_not_found' })
     response.writeHead(200, { 'content-type': stored.mimetype, 'content-length': stored.bytes.length })
