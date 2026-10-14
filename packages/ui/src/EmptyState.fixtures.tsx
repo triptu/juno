@@ -36,7 +36,7 @@ export default defineFixtures(
       }),
     },
     Page: {
-      workspace: fixture({ variant: 'workspace', illustration: 'nothing-open', title: 'Nothing open yet', body: 'Pick a topic on the left, or press ⌘K.', padding: 'page' }),
+      workspace: fixture({ variant: 'workspace', illustration: 'nothing-open', title: 'Nothing open yet', body: 'Pick a topic on the left.', padding: 'page' }),
       'for-you': fixture({
         illustration: 'caught-up',
         title: 'Nothing for you right now',

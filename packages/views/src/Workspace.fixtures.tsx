@@ -18,6 +18,13 @@ const tabs = {
   forYou: { id: 'page:for-you', title: 'For you', icon: 'for-you' } satisfies WorkspaceTab,
 } as const
 
+/** Thirty-seven topic tabs, the last one active, so the strip has to scroll to show it. */
+const thirtySeven: ReadonlyArray<WorkspaceTab> = Array.from({ length: 37 }, (_, index) => {
+  const sample = [tabs.postgres, tabs.hiring, tabs.density, tabs.maya][index % 4] ?? tabs.postgres
+  return { ...sample, id: `${sample.id}:${index}`, title: `${sample.title} ${index + 1}` }
+})
+const lastTab = thirtySeven[thirtySeven.length - 1]?.id
+
 const base: Omit<WorkspaceProps, 'children'> = { tabs: [tabs.postgres, tabs.density], activeId: tabs.postgres.id, onSelectTab: noop, onCloseTab: noop, onNewTab: noop, onTabContextMenu: noop }
 
 const postgresPage = (
@@ -52,6 +59,8 @@ export default defineFixtures(
       'stealth-tab': workspace({ tabs: [tabs.eng, tabs.density, tabs.hiring], activeId: tabs.hiring.id }, postgresPage),
       'many-tabs': workspace({ tabs: [tabs.postgres, tabs.hiring, tabs.eng, tabs.density, tabs.maya, tabs.forYou], activeId: tabs.eng.id }, engPage),
       'minimum-window': workspace({ tabs: [tabs.postgres, tabs.hiring, tabs.eng, tabs.density, tabs.maya], activeId: tabs.eng.id }, engPage, { width: 720, height: 480 }),
+      'thirty-seven-tabs': workspace({ tabs: thirtySeven, ...(lastTab === undefined ? {} : { activeId: lastTab }) }, postgresPage),
+      'thirty-seven-tabs-minimum-window': workspace({ tabs: thirtySeven, ...(lastTab === undefined ? {} : { activeId: lastTab }) }, postgresPage, { width: 720, height: 480 }),
     },
     Interaction: {
       'hover-tab': workspace({}, postgresPage, { hover: '[role="tab"]:nth-of-type(2)' }),

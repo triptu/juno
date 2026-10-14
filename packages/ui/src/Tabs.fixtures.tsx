@@ -13,6 +13,19 @@ import { Text } from './Text'
 
 const newTab = <IconButton icon={Plus} label="New message" size={28} iconSize={16} tone="muted" />
 
+const titles = ['Postgres 16 migration plan', 'Rina Sato · Staff backend', 'Q4 roadmap cuts', 'Staging bill doubled since August', 'Thread list density', 'Offsite: Wednesday afternoon slot', 'Can eng review the launch checklist']
+
+/** Thirty-seven tabs, the last one active: the strip scrolls and keeps it in view. */
+function ThirtySeven() {
+  return (
+    <TabStrip trailing={newTab}>
+      {Array.from({ length: 37 }, (_, index) => (
+        <Tab key={index} icon={index % 5 === 1 ? Lock : Hash} label={`${titles[index % titles.length]} ${index + 1}`} active={index === 36} onClose={() => {}} />
+      ))}
+    </TabStrip>
+  )
+}
+
 /** A strip over a page body, so the active tab is seen merging with the page. */
 function StripWithPage() {
   return (
@@ -62,6 +75,8 @@ export default defineFixtures(
         ),
         { width: 480 },
       ),
+      'thirty-seven': scene(() => <ThirtySeven />),
+      'thirty-seven-narrow': scene(() => <ThirtySeven />, { width: 336 }),
       stealth: scene(() => (
         <TabStrip trailing={newTab}>
           <Tab icon={Hash} label="eng" onClose={() => {}} />
@@ -78,6 +93,8 @@ export default defineFixtures(
     Interaction: {
       hover: scene(() => <StripWithPage />, { height: 160, hover: '[role="tab"]:nth-of-type(1)' }),
       'close-hover': scene(() => <StripWithPage />, { height: 160, hover: '[role="tab"]:nth-of-type(2) button' }),
+      'narrow-hover': scene(() => <ThirtySeven />, { hover: '[role="tab"]:nth-of-type(33)' }),
+      'narrow-focus-close': scene(() => <ThirtySeven />, { focus: '[role="tab"]:nth-of-type(34) button' }),
     },
   },
   { width: 720, padded: false },
