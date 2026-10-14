@@ -70,7 +70,7 @@ export class SyncRunner extends Context.Service<
             const onEvent = yield* startNotifications
             return yield* runSync({
               onEvent,
-              onCycle: (event) => Effect.sync(() => control.onCycle?.(event)),
+              onCycle: (event) => (event === 'finished' ? link.caughtUp : Effect.void).pipe(Effect.andThen(Effect.sync(() => control.onCycle?.(event)))),
               onPhase: (next) => SubscriptionRef.set(phase, next),
               // The topic view's fetches run in this sync's context while it lives.
               onFetcher: (fetcher) => link.setFetcher(fetcher),

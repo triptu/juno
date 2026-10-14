@@ -26,7 +26,7 @@
 import { Option, Schema } from 'effect'
 import * as AsyncResult from 'effect/reactivity/AsyncResult'
 import * as Atom from 'effect/reactivity/Atom'
-import { prefsGet, prefsSet, type TopicDetail } from '@juno/contract'
+import { isPendingRowId, prefsGet, prefsSet, type TopicDetail } from '@juno/contract'
 import { liveQuery, runCommand } from './atoms'
 import type { Registry } from './client'
 import { topicAtom } from './messages'
@@ -262,7 +262,8 @@ export function mountedTabs(tabs: Tabs): ReadonlySet<string> {
  */
 export function dividerIndex(order: ReadonlyArray<string>, lastReadTs: string | undefined): number {
   if (lastReadTs === undefined) return -1
-  return order.findIndex((ts) => ts > lastReadTs)
+  // A message still sending is the user's own, never unread.
+  return order.findIndex((ts) => !isPendingRowId(ts) && ts > lastReadTs)
 }
 
 // Persistence

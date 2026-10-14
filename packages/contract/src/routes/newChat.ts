@@ -1,6 +1,5 @@
 /**
- * New chat (spec section 9, inventory 8): the two destination pickers and
- * the send.
+ * New chat (spec section 9, inventory 8): the two destination pickers.
  *
  * Live queries, which never call Slack:
  * - `newChat.conversations`: the conversation picker's sections. With an
@@ -12,16 +11,11 @@
  *   threads by latest activity, followed or not; without one, recent
  *   threads from everywhere. Main is not a row: the renderer puts it first.
  *
- * The command:
- * - `messages.send`: posts a message (`chat.postMessage`) to a channel, a
- *   thread, or a person. A person with no DM yet gets one opened first
- *   (`conversations.open`). The sent message is stored before the command
- *   answers, so the topic it returns can open at once.
+ * Sending is `messages.send` in `send.ts`.
  */
 import { Schema } from 'effect'
-import { Rpc, RpcGroup } from 'effect/rpc'
+import { RpcGroup } from 'effect/rpc'
 import { ContextTint, ConversationKind } from '@juno/domain'
-import { NotFound, NotSignedIn, Offline, RateLimited, Rejected } from '../errors'
 import { liveValueRoute } from '../live'
 import { Person } from '../refs'
 
@@ -81,27 +75,4 @@ export const newChatThreads = liveValueRoute('newChat.threads', {
   value: Schema.Array(PickThread),
 })
 
-/** Where a message goes: a conversation (and a thread in it), or a person with no DM yet. */
-export const SendTarget = Schema.Union([
-  Schema.Struct({ kind: Schema.Literal('channel'), channelId: Schema.String, threadTs: Schema.optionalKey(Schema.String) }),
-  Schema.Struct({ kind: Schema.Literal('person'), userId: Schema.String }),
-])
-export type SendTarget = typeof SendTarget.Type
-
-export const SendResult = Schema.Struct({
-  /** The topic the message landed in: the thread, or the conversation's Main. */
-  topicId: Schema.String,
-})
-export type SendResult = typeof SendResult.Type
-
-export const SendError = Schema.Union([NotSignedIn, Offline, RateLimited, Rejected, NotFound])
-export type SendError = typeof SendError.Type
-
-/** `clientMsgId` is the renderer's, so a retry of the same send is matched to its echo (ADR 0011). */
-export const messagesSend = Rpc.make('messages.send', {
-  payload: { to: SendTarget, text: Schema.String, clientMsgId: Schema.String },
-  success: SendResult,
-  error: SendError,
-})
-
-export const NewChatRoutes = RpcGroup.make(newChatConversations, newChatThreads, messagesSend)
+export const NewChatRoutes = RpcGroup.make(newChatConversations, newChatThreads)

@@ -15,6 +15,8 @@ import { SearchHandlers } from './search/handlers'
 import { PrefsHandlers } from './prefs/handlers'
 import { MessagesHandlers } from './messages/handlers'
 import { NewChatHandlers } from './newchat/handlers'
+import { SendHandlers } from './send/handlers'
+import { PostWorker } from './send/worker'
 import { ReadsHandlers } from './reads/handlers'
 import { MarkWorker } from './reads/worker'
 import { Outbox } from './outbox'
@@ -59,6 +61,7 @@ const EnginePhases = Layer.effectDiscard(
 /** Everything the route handlers need. Requires the host seams (`HostLink`, `HttpTransport`) and `EngineConfig`. */
 export const Services = Layer.mergeAll(EnginePhases, ArtJob).pipe(
   Layer.provideMerge(MarkWorker.layer),
+  Layer.provideMerge(PostWorker.layer),
   Layer.provideMerge(SyncRunner.layer),
   Layer.provideMerge(AiProviderLive),
   Layer.provideMerge(NotificationControl.layer),
@@ -71,7 +74,7 @@ export const Services = Layer.mergeAll(EnginePhases, ArtJob).pipe(
 )
 
 /** One `toLayer` per feature, merged. Requires `Services`. */
-export const Handlers = Layer.mergeAll(StatusHandlers, SessionHandlers, TopicsHandlers, SearchHandlers, PrefsHandlers, MessagesHandlers, ReadsHandlers, ArtHandlers, NewChatHandlers)
+export const Handlers = Layer.mergeAll(StatusHandlers, SessionHandlers, TopicsHandlers, SearchHandlers, PrefsHandlers, MessagesHandlers, ReadsHandlers, ArtHandlers, NewChatHandlers, SendHandlers)
 
 /** The engine's side of the AgentHost port (ADR 0012): `JunoHost` over `Services`, with the engine phase from the status feature. */
 export const AgentHost = JunoHostLive.pipe(Layer.provide(Layer.effect(PhaseSource, Status.use((status) => Effect.succeed(status.phases)))))
