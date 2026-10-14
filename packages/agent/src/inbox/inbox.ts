@@ -40,7 +40,7 @@ export function accept(store: Store, input: { readonly opId: string; readonly ki
   const result = transaction(store.db, (): Accept => {
     const existing = find(store, input.opId)
     if (existing !== undefined) return { _tag: 'accepted', op: existing }
-    if (mode(store) === 'off' && input.kind !== 'click') return { _tag: 'refused', reason: 'off' }
+    if (mode(store) === 'off') return { _tag: 'refused', reason: 'off' }
     store.db
       .prepare("INSERT INTO inbox (op_id, kind, text, data, at, state) VALUES (?, ?, ?, ?, ?, 'accepted')")
       .run(input.opId, input.kind, input.text, input.data === undefined ? null : JSON.stringify(input.data), store.now())
