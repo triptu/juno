@@ -30,7 +30,7 @@ Warm paper. HSL values are the source of truth; hex is the sRGB result for desig
 | `--border-subtle` | `hsla(48, 30%, 92%, 1)` | #F1EEE4 | css | Topic header rule, list-style row rule, table row rule, card inner rules |
 | `--border-default` | `hsla(48, 30%, 91%, 1)` | #EFECE1 | css | Sidebar edge, tab strip edge, menu separators, card-style row border, reaction chips, option buttons |
 | `--border-strong` | `hsla(48, 30%, 88%, 1)` | #EAE6D7 | css | Outline buttons (Resolve), Main tag, kbd, scrollbar thumb, @ tag ring |
-| `--border-strongest` | `hsla(48, 30%, 82%, 1)` | #DFD9C3 | css | Rename input, stealth pill (dashed), outline button hover |
+| `--border-strongest` | `hsla(48, 30%, 82%, 1)` | #DFD9C3 | css | Rename input, outline button hover |
 | `--foreground-default` | `hsla(48, 15%, 12%, 1)` | #23211A | css | Body text, toast background |
 | `--foreground-subtle` | `hsla(48, 8%, 35%, 1)` | #605E52 | css | Icons, secondary text, unread preview, pill text |
 | `--foreground-muted` | `hsla(48, 5%, 42%, 1)` | #706E66 | **proto** (overrides css 52%) | Meta, time, placeholders, section labels. See 1.6 |
@@ -240,7 +240,7 @@ Sizes are the Figtree values; the prototype's Inter value is half a pixel smalle
 | Tag small | 12px | 500 / 400 | | 0 | | Row Resolve button, card footnotes, "Use", Mark read |
 | Meta | 12.5px | 400 | normal | 0 | muted | Row line 3, times, message timestamps, card headers, status chips (500), bubble name line, log reasons |
 | Pill | 13px | 600 (+400 kind) | 26px box | 0 | tint fg | Context pill, scope chip (500) |
-| Small button | 13px | 500 | 28px box | 0 | | Group into topic, Resolve (hint), Fix and send, Stop ignoring, Not yet |
+| Small button | 13px | 500 | 28px box | 0 | | Resolve (hint), Fix and send, Stop ignoring, Not yet |
 | Thread link | 13px | 400 (count 600) | 26px box | 0 | subtle | "2 replies · Title ›" |
 | UI default | 13.5px | 400 / 500 | 1.5 | 0 | default | Nav, menu items, filters, buttons, selects, inputs, toast, table "Where" |
 | Preview | 13.5px | 400 | 1.45 | 0 | muted (subtle if unread) | Row line 2, clamped to 1 or 2 lines |
@@ -309,7 +309,7 @@ Odd values the prototype uses once (3, 5, 9, 18) are component-local; keep them 
 | `--radius-palette` | 14 | ⌘K panel, user chat bubble (with 4px tail corner) |
 | `--radius-toast` | 14 | Toast |
 | `--radius-bubble` | 16 | Message bubbles (tail corner 4) |
-| `--radius-tag` | 999 | Tags, count badges, @ tag, status chips, decision chips, scope chip, digest chips, stealth pill, confidence badge, reaction chips, inline @person and #channel chips (padding 0 5), the row Resolve button (22) and the toast Undo button (26) |
+| `--radius-tag` | 999 | Tags, count badges, @ tag, status chips, decision chips, scope chip, confidence badge, reaction chips, inline @person and #channel chips (padding 0 5), the row Resolve button (22) and the toast Undo button (26) |
 | `--radius-pill` | 999 | Context pill (header, To field, send card); the 32px and taller buttons (header Resolve, Discard/Send, Sign in) |
 | `--radius-full` | 999 | Avatars, attach/send buttons, colour swatches |
 
@@ -356,7 +356,7 @@ All [proto] measured at 1280×800 with Inter unless marked.
 | `--control-xs` | 20px | Tab close, scope chip close, digest chip close |
 | `--control-sm` | 22px | Row Resolve button, status chips |
 | `--control-md-` | 24px | Reaction chip, segmented-control segment, summary chips |
-| `--control-md` | 26px | Context pill, stealth pill, thread link, toast Undo, rule remove |
+| `--control-md` | 26px | Context pill, thread link, toast Undo, rule remove |
 | `--control` | 28px | Quick filters, status chips (All topics), small buttons, attach/send, hover-toolbar buttons, To pill, digest chips |
 | `--control-lg-` | 30px | Titlebar icon buttons, selects (All topics), card actions, Quote button, empty-state button, context menu item |
 | `--control-lg` | 32px | Nav buttons, header icon buttons, Resolve (header), menu items, rule selects, Add |
