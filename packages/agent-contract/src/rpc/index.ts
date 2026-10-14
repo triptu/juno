@@ -1,0 +1,11 @@
+export * from './common'
+export * from './identity'
+export * from './chat'
+export * from './cards'
+export * from './pages'
+export * from './settings'
+import { ChatRpcs } from './chat'
+import { CardRpcs } from './cards'
+import { ActivityRpcs, ConnectionsRpcs, MemoryRpcs, RemembersRpcs, ReviewRpcs, ScheduledRpcs } from './pages'
+import { SettingsRpcs } from './settings'
+export const AgentRpcs = ChatRpcs.merge(CardRpcs, ScheduledRpcs, RemembersRpcs, MemoryRpcs, ActivityRpcs, ConnectionsRpcs, ReviewRpcs, SettingsRpcs)
