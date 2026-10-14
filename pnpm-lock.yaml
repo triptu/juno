@@ -613,6 +613,12 @@ importers:
       '@effect/vitest':
         specifier: 4.0.3
         version: 4.0.3(effect@4.0.3)(vitest@5.0.4(@types/node@24.19.2)(vite@7.3.7(@types/node@24.19.2)(jiti@2.7.0)(lightningcss@1.33.0)(yaml@2.9.1)))
+      '@juno/agent':
+        specifier: workspace:*
+        version: link:../agent
+      '@juno/agent-testing':
+        specifier: workspace:*
+        version: link:../agent-testing
       '@juno/fake-slack':
         specifier: workspace:*
         version: link:../fake-slack

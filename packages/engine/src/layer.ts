@@ -6,6 +6,7 @@
 import { Effect, Layer, Ref, Stream } from 'effect'
 import type { EnginePhase, SessionStatus } from '@juno/contract'
 import type { SyncPhase } from '@juno/sync'
+import { JunoHostLive, PhaseSource } from './agent-host/host'
 import { AiProviderLive } from './ai'
 import { ArtHandlers } from './art/handlers'
 import { ArtJob } from './art/job'
@@ -68,3 +69,6 @@ export const Services = Layer.mergeAll(EnginePhases, ArtJob).pipe(
 
 /** One `toLayer` per feature, merged. Requires `Services`. */
 export const Handlers = Layer.mergeAll(StatusHandlers, SessionHandlers, TopicsHandlers, SearchHandlers, PrefsHandlers, MessagesHandlers, ReadsHandlers, ArtHandlers)
+
+/** The engine's side of the AgentHost port (ADR 0012): `JunoHost` over `Services`, with the engine phase from the status feature. */
+export const AgentHost = JunoHostLive.pipe(Layer.provide(Layer.effect(PhaseSource, Status.use((status) => Effect.succeed(status.phases)))))
