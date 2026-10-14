@@ -142,9 +142,49 @@ export const Peek = memo(function Peek() {
     }
   }, [open])
 
-  if (peeking === undefined) return null
-  return <PeekTopic key={peeking.id} id={peeking.id} at={peeking.at} scrollRef={scrollRef} stick={stick} />
+  const shown = useWhenReady(peeking)
+  if (peeking === undefined || shown === undefined) return null
+  return <PeekTopic key={shown.id} id={shown.id} at={shown.at} scrollRef={scrollRef} stick={stick} />
 })
+
+/** The topic's header and first window are local (or it failed, or is unknown): a peek at it can paint. */
+function canPaint(id: string): boolean {
+  const header = registry.get(topicAtom(id))
+  if (header._tag === 'Failure') return true
+  return header._tag === 'Success' && (header.value === null || registry.get(messageListAtom(id)).ready)
+}
+
+/**
+ * The peek to draw: `peeking` once its topic can paint. Until then the
+ * previous one stays, so moving from row to row never flashes an empty
+ * popover. A topic the row's hover warmed can paint at once, before the
+ * first frame.
+ */
+function useWhenReady(peeking: Peeking | undefined): Peeking | undefined {
+  const [shown, setShown] = useState<Peeking | undefined>(undefined)
+  useLayoutEffect(() => {
+    if (peeking === undefined) {
+      setShown(undefined)
+      return
+    }
+    if (canPaint(peeking.id)) {
+      setShown(peeking)
+      return
+    }
+    const check = () => {
+      if (!canPaint(peeking.id)) return
+      for (const off of offs) off()
+      setShown(peeking)
+    }
+    const offs = [registry.subscribe(topicAtom(peeking.id), check, { immediate: false }), registry.subscribe(messageListAtom(peeking.id), check, { immediate: false })]
+    // It may have arrived between the first look and the subscriptions.
+    check()
+    return () => {
+      for (const off of offs) off()
+    }
+  }, [peeking])
+  return shown
+}
 
 const items = new WeakMap<MessageView, MessageListItem>()
 
