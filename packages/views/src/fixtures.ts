@@ -25,7 +25,7 @@ import TopicHeader from './TopicHeader.fixtures'
 import TopicRow from './TopicRow.fixtures'
 import TopicView from './TopicView.fixtures'
 import Workspace from './Workspace.fixtures'
-import ChatCard from './juno-chat/cards/ChatCard.fixtures'
+import ChatCard, { budgetCard, changeCard, connectCard, proposedScheduleCard, proposedTaskCard, providerCard, questionCard, removeCard, resolveCard, scheduleCard, sendMessageCard, taskCard, topicsCardSet, unknownCardSet } from './juno-chat/cards/ChatCard.fixtures'
 import EmptyChat from './juno-chat/EmptyChat.fixtures'
 import JunoChatList from './juno-chat/JunoChatList.fixtures'
 import JunoComposer from './juno-chat/JunoComposer.fixtures'
@@ -49,8 +49,11 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   AppearanceSettings,
   AppInfoView,
   ChannelIconPicker,
+  BudgetCard: budgetCard,
+  ChangeCard: changeCard,
   ChatCard,
   ComposerSlot,
+  ConnectCard: connectCard,
   ConnectionsPage,
   EngineNotice: engineNoticeFixtures,
   EmptyChat,
@@ -66,19 +69,30 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   NewDivider,
   NewMessagesPill,
   OwnerBubble,
+  ProposedScheduleCard: proposedScheduleCard,
+  ProposedTaskCard: proposedTaskCard,
+  ProviderCard: providerCard,
+  QuestionCard: questionCard,
   Reactions,
   RemembersPage,
+  RemoveCard: removeCard,
   RemoveSheet,
+  ResolveCard: resolveCard,
   ReviewPage,
+  ScheduleCard: scheduleCard,
   ScheduledPage,
+  SendMessageCard: sendMessageCard,
   SessionView,
   Shell,
   Sidebar,
   SignInView,
   StatusBubble,
+  TaskCard: taskCard,
   ThreadLink,
+  TopicsCard: topicsCardSet,
   TopicHeader,
   TopicRow,
   TopicView,
+  UnknownCard: unknownCardSet,
   Workspace,
 }

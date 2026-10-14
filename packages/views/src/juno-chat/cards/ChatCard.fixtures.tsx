@@ -29,7 +29,11 @@ import {
 } from '../fixtures/data'
 import { renderCard } from './index'
 
-/** One card through the registry, as the chat renders it. */
+/**
+ * One card through the registry, as the chat renders it. Each kind is its
+ * own fixture set, so the gallery lists them apart and the shift guard
+ * shares them between its parts.
+ */
 function CardFixture({ card }: { readonly card: Card }) {
   return renderCard(card, noopActions, NOW, false)
 }
@@ -53,7 +57,9 @@ function Settles({ make }: { readonly make: (step: 0 | 1 | 2) => Card }) {
   )
 }
 
-export default defineFixtures(
+const frame = { width: 600, padded: true } as const
+
+export const sendMessageCard = defineFixtures(
   CardFixture,
   {
     'Send message': {
@@ -69,7 +75,14 @@ export default defineFixtures(
       'may-have-happened': card(sendMessage('s10', mayHaveHappened)),
       dismissed: card(sendMessage('s11', dismissed)),
     },
-    Resolve: {
+  },
+  frame,
+)
+
+export const resolveCard = defineFixtures(
+  CardFixture,
+  {
+    'Resolve': {
       open: card(resolve('r1')),
       one: card(resolve('r2', open, 1)),
       working: card(resolve('r3', working)),
@@ -77,11 +90,25 @@ export default defineFixtures(
       expired: card(resolve('r5', expired)),
       'may-have-happened': card(resolve('r6', mayHaveHappened)),
     },
-    Topics: {
+  },
+  frame,
+)
+
+export const topicsCardSet = defineFixtures(
+  CardFixture,
+  {
+    'Topics': {
       links: card(topicsCard('t1')),
       'link-hover': card(topicsCard('t2'), { width: 600, padded: true, hover: '[data-topic-link]' }),
     },
-    Task: {
+  },
+  frame,
+)
+
+export const taskCard = defineFixtures(
+  CardFixture,
+  {
+    'Task': {
       running: card(task('k1', 'running', { state: 'Tests running, 2 of 5', open: thread })),
       'needs-you': card(task('k2', 'needsYou', { state: 'Waiting for your answer', open: thread })),
       quiet: card(task('k3', 'quiet', { open: thread })),
@@ -94,54 +121,131 @@ export default defineFixtures(
       subagent: card(task('k10', 'running', { kind: 'subagent', where: 'Claude Haiku 5.5', state: 'Reading 12 topics' })),
       because: card(task('k11', 'running', { state: 'Tests running', because: 'a report from T3 Code was in this reply' })),
     },
+  },
+  frame,
+)
+
+export const proposedTaskCard = defineFixtures(
+  CardFixture,
+  {
     'Proposed task': {
       open: card(proposedTask('p1')),
       started: card(proposedTask('p2', done('Started'))),
       failed: card(proposedTask('p3', failed('Could not start. T3 Code did not answer.'))),
     },
-    Question: {
+  },
+  frame,
+)
+
+export const questionCard = defineFixtures(
+  CardFixture,
+  {
+    'Question': {
       'juno-asks': card(question('q1', 'juno', false)),
       't3-asks': card(question('q2', 't3', true)),
       'free-text': card(question('q3', 'juno', true)),
       chose: card(question('q4', 'juno', false, done('You chose Keep both'))),
       replied: card(question('q5', 't3', true, done('You replied'))),
     },
-    Schedule: {
+  },
+  frame,
+)
+
+export const scheduleCard = defineFixtures(
+  CardFixture,
+  {
+    'Schedule': {
       open: card(schedule('h1')),
       kept: card(schedule('h2', done('Kept'))),
       paused: card(schedule('h3', done('Paused'))),
       deleted: card(schedule('h4', done('Deleted'))),
     },
+  },
+  frame,
+)
+
+export const proposedScheduleCard = defineFixtures(
+  CardFixture,
+  {
     'Proposed schedule': {
       open: card(proposedSchedule('g1')),
       started: card(proposedSchedule('g2', done('Started'))),
     },
-    Connect: {
+  },
+  frame,
+)
+
+export const connectCard = defineFixtures(
+  CardFixture,
+  {
+    'Connect': {
       open: card(connect('n1')),
       connected: card(connect('n2', done('Connected'))),
     },
-    Change: {
+  },
+  frame,
+)
+
+export const changeCard = defineFixtures(
+  CardFixture,
+  {
+    'Change': {
       open: card(change('c1')),
       'long-field': card(change('c2', open, true)),
       applied: card(change('c3', done('Applied', { open: { _tag: 'url', url: 'https://notion.example/offsite', label: 'Open' } }))),
       failed: card(change('c4', failed('Not applied. Notion did not answer.'))),
     },
-    Remove: {
+  },
+  frame,
+)
+
+export const removeCard = defineFixtures(
+  CardFixture,
+  {
+    'Remove': {
       open: card(remove('v1')),
       removed: card(remove('v2', done('Removed 2 messages'))),
     },
-    Budget: {
+  },
+  frame,
+)
+
+export const budgetCard = defineFixtures(
+  CardFixture,
+  {
+    'Budget': {
       open: card(budget('b1')),
       allowed: card(budget('b2', done('Allowed until midnight'))),
     },
-    Provider: {
+  },
+  frame,
+)
+
+export const providerCard = defineFixtures(
+  CardFixture,
+  {
+    'Provider': {
       open: card(provider('o1')),
       using: card(provider('o2', done('Using Claude Sonnet 5.5'))),
     },
-    Unknown: {
+  },
+  frame,
+)
+
+export const unknownCardSet = defineFixtures(
+  CardFixture,
+  {
+    'Unknown': {
       'newer-juno': card(unknownCard('u1')),
     },
-    Shift: {
+  },
+  frame,
+)
+
+export const chatCard = defineFixtures(
+  CardFixture,
+  {
+    'Shift': {
       'resolve-settles': scene(() => <Settles make={(step) => resolve('x1', step === 0 ? open : step === 1 ? working : done('Resolved 2', { undo: true }))} />),
       'send-settles': scene(() => <Settles make={(step) => sendMessage('x2', step === 0 ? open : step === 1 ? working : done('Sent 2'), step === 0 ? [results.pending, results.pending] : step === 1 ? [results.sending, results.sending] : [results.sent, results.sent])} />),
       'send-fails': scene(() => <Settles make={(step) => sendMessage('x3', step === 0 ? open : step === 1 ? working : failed('Not sent', true, true), step === 0 ? [results.pending] : step === 1 ? [results.sending] : [results.notSent])} />),
@@ -149,5 +253,7 @@ export default defineFixtures(
       'question-settles': scene(() => <Settles make={(step) => question('x5', 'juno', true, step === 0 ? open : step === 1 ? working : done('You chose Keep both'))} />),
     },
   },
-  { width: 600, padded: true },
+  frame,
 )
+
+export default chatCard
