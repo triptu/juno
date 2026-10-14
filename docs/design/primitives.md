@@ -76,7 +76,7 @@ Small inline label. Replaces tags, count badges, status chips, decision chips, s
 | Prop | Values | Notes |
 | --- | --- | --- |
 | `variant` | `outline` (Main), `filled` (Reopened, Open, Digest, #channel), `strong` (`--secondary-active`; unread count), `soft` (`--hl-soft` + inset ring; @), `accent` (`--hl`; Now, @ in Browse, @you), `success` (resolved tint), `quiet` (transparent, muted), `surface` (`--surface-hover`), `dashed` (stealth pill), `person` (the inline @mention: `hue` mixed 16% into the surface and 40% into the text, weight 600; `hue` as Avatar) | Every chip is a pill (`--radius-tag`) |
-| `size` | 18 (tag), 20 (badge), 22 (status), 24 (summary, reaction), 26 (scope), 28 (digest time), `inline` (follows the surrounding line; padding 0 5) | Text 11 / 11 / 12 / 12 / 12.5 / 13 / inherited |
+| `size` | 18 (tag), 20 (badge), 22 (status), 24 (summary, reaction), 26 (scope), 28 (notification setting tag), `inline` (follows the surrounding line; padding 0 5) | Text 11 / 11 / 12 / 12 / 12.5 / 13 / inherited |
 | `icon`, `iconSize` | 12–13, bold | sparkle in the confidence badge, eye-slash in the stealth pill |
 | `numeric` | boolean | tabular figures |
 | `onRemove`, `removeLabel` | | Adds a 20×20 close IconButton (12px bold X) |
