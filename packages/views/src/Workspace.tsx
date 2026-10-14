@@ -11,7 +11,7 @@ import { Plus } from '@phosphor-icons/react/dist/icons/Plus'
 import { Sparkle } from '@phosphor-icons/react/dist/icons/Sparkle'
 import { User } from '@phosphor-icons/react/dist/icons/User'
 import { Users } from '@phosphor-icons/react/dist/icons/Users'
-import type { MouseEvent, ReactNode } from 'react'
+import type { KeyboardEvent, MouseEvent, ReactNode } from 'react'
 import { colors } from '@juno/tokens/tokens.stylex'
 import { EmptyState, IconButton, Tab, TabStrip, type ActivateEvent, type PhosphorIcon } from '@juno/ui'
 
@@ -57,15 +57,43 @@ const icons: Record<WorkspaceTabIcon, PhosphorIcon> = {
   preferences: Gear,
 }
 
+const keyboard: ActivateEvent = { metaKey: false, shiftKey: false, altKey: false, source: 'keyboard' }
+
+/** The tab the arrow keys select from `index`: Left and Right wrap, Home and End go to the ends. */
+function stepIndex(key: string, index: number, count: number): number | undefined {
+  switch (key) {
+    case 'ArrowLeft':
+      return index <= 0 ? count - 1 : index - 1
+    case 'ArrowRight':
+      return index < 0 || index >= count - 1 ? 0 : index + 1
+    case 'Home':
+      return 0
+    case 'End':
+      return count - 1
+    default:
+      return undefined
+  }
+}
+
 /**
  * The right pane: the tab strip (a window drag region) over the page.
  * Tabs carry the kind icon or the topic's art in a fixed slot, the eye-off
- * in stealth, the title and a close button; "+" opens New message.
+ * in stealth, the title and a close button; "+" opens New message. The
+ * strip is an APG tablist: the active tab is the one Tab stop, the arrow
+ * keys select its neighbours, Delete closes it.
  */
 export function Workspace({ tabs = [], activeId, onSelectTab, onCloseTab, onNewTab, onTabContextMenu, children }: WorkspaceProps) {
+  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (onSelectTab === undefined || !(event.target instanceof HTMLElement) || event.target.getAttribute('role') !== 'tab') return
+    const next = stepIndex(event.key, tabs.findIndex((tab) => tab.id === activeId), tabs.length)
+    const target = next === undefined ? undefined : tabs[next]
+    if (target === undefined) return
+    event.preventDefault()
+    onSelectTab(target.id, keyboard)
+  }
   return (
     <section aria-label="Workspace" {...stylex.props(styles.root)}>
-      <TabStrip trailing={<IconButton icon={Plus} label="New message" size={28} iconSize={16} tone="muted" onClick={onNewTab} />}>
+      <TabStrip onKeyDown={onKeyDown} trailing={<IconButton icon={Plus} label="New message" size={28} iconSize={16} tone="muted" onClick={onNewTab} />}>
         {tabs.map((tab) => (
           <Tab
             key={tab.id}
@@ -83,7 +111,7 @@ export function Workspace({ tabs = [], activeId, onSelectTab, onCloseTab, onNewT
       <main {...stylex.props(styles.page)}>
         {children ?? (
           <div {...stylex.props(styles.empty)}>
-            <EmptyState variant="workspace" illustration="nothing-open" title="Nothing open yet" body="Pick a topic on the left, or press ⌘K." padding="page" />
+            <EmptyState variant="workspace" illustration="nothing-open" title="Nothing open yet" body="Pick a topic on the left." padding="page" />
           </div>
         )}
       </main>
