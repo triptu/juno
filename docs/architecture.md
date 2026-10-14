@@ -420,7 +420,7 @@ The local `search.query` live value reads FTS indexes for root and overlay title
 
 ## 8. UI layering and review (ADR 0005)
 
-`tokens → ui → views → containers → app shell`. Views take contract view models and callbacks; a view that needs time takes `now`. Containers read atoms, map to props, bind callbacks to commands and the undo stack, and request native context menus through `shell.contextMenu.popup(items)` with item lists from `domain`.
+`tokens → ui → views → containers → app shell`. Views take contract view models and callbacks; a view that needs time takes `now`. Containers read atoms, map to props, bind callbacks to commands and the undo stack, and request native context menus through `shell.contextMenu.popup(items, at?)` with item lists from `domain`, which `@juno/contract` re-exports (`contract/src/menus.ts`) because the renderer does not depend on `domain`. A menu can hold one level of submenu and checked items, and opens at the pointer or at `at` (the header's title opens the topic menu under its island).
 
 The theme is applied in one place: `applyTheme(theme, accent)` in `packages/ui/src/theme.ts`. It puts the dark and accent classes on `<html>` and pauses transitions for two frames. `@juno/views` re-exports it, so the desktop app (which does not depend on `ui`) reaches it as `import { applyTheme } from '@juno/views'`; the gallery imports it from `@juno/ui`. The theme and accent values (`Theme`, `Accent`) are owned by `@juno/contract`; both are saved in `launch.json` and passed to the page as `?theme=&accent=` so the first render is right.
 

@@ -1,6 +1,18 @@
 /// <reference lib="dom" />
 import { contextBridge, ipcRenderer } from 'electron'
-import { Channels, Events, PORT_HANDOFF_TAG, type JunoBridge, type MenuCommand } from '@juno/contract/channels'
+import { Channels, Events, PORT_HANDOFF_TAG, type ContextMenuLeaf, type JunoBridge, type MenuCommand } from '@juno/contract/channels'
+
+/** A menu item copied field by field, so nothing else the page put on it crosses to main. */
+function leaf(item: ContextMenuLeaf): ContextMenuLeaf {
+  if ('separator' in item) return { separator: true }
+  return {
+    id: item.id,
+    label: item.label,
+    ...(item.enabled === undefined ? {} : { enabled: item.enabled }),
+    ...(item.checked === undefined ? {} : { checked: item.checked }),
+    ...(item.accelerator === undefined ? {} : { accelerator: item.accelerator }),
+  }
+}
 
 // The whole bridge. Add one function per shell route; never expose
 // ipcRenderer or Node APIs. The renderer validates every answer.
@@ -18,13 +30,10 @@ const bridge: JunoBridge = {
     setSidebar: ({ width, collapsed }) => ipcRenderer.invoke(Channels.launchSetSidebar, { width, collapsed }),
   },
   contextMenu: {
-    popup: (items) =>
+    popup: (items, at) =>
       ipcRenderer.invoke(Channels.contextMenuPopup, {
-        items: items.map((item) =>
-          'separator' in item
-            ? { separator: true }
-            : { id: item.id, label: item.label, ...(item.enabled === undefined ? {} : { enabled: item.enabled }), ...(item.accelerator === undefined ? {} : { accelerator: item.accelerator }) },
-        ),
+        items: items.map((item) => ('submenu' in item ? { label: item.label, submenu: item.submenu.map(leaf) } : leaf(item))),
+        ...(at === undefined ? {} : { at: { x: at.x, y: at.y } }),
       }),
   },
   shell: {

@@ -7,7 +7,7 @@
  *   `ShellRoutes` (`shell.ts`).
  * - engine <-> main and the port handoff: `protocol.ts`.
  */
-export { Channels, Events, PORT_HANDOFF_TAG, SIDEBAR_WIDTH, type Channel, type ContextMenuItem, type JunoBridge, type MenuCommand } from './channels'
+export { Channels, Events, PORT_HANDOFF_TAG, SIDEBAR_WIDTH, type Channel, type ContextMenuAt, type ContextMenuItem, type ContextMenuLeaf, type JunoBridge, type MenuCommand } from './channels'
 export * from './errors'
 export * from './live'
 export * from './protocol'
@@ -20,6 +20,7 @@ export * from './body'
 export * from './refs'
 export { AllRoutes } from './routes/index'
 export * from './shell'
+export * from './menus'
 
 export * from './routes/search'
 export * from './routes/prefs'

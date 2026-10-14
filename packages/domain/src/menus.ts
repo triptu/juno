@@ -2,8 +2,9 @@
  * Context menu item lists (spec section 5, inventory section 15). The shell
  * turns these into native menus; the ids come back as actions.
  */
-import { channelLabel, isDm, type ChannelInfo } from './channel'
+import { channelLabel, isDm, type ChannelInfo, type ChannelNaming } from './channel'
 import type { TopicKind } from './ids'
+import type { NotifyLevel } from './notifications'
 
 export type TopicMenuAction =
   | 'open-new-tab'
@@ -15,20 +16,54 @@ export type TopicMenuAction =
   | 'resolve'
   | 'reopen'
   | 'copy-link'
+  | 'open-in-slack'
+  | NotifyAction
   | 'ignore-channel'
 
 export type ChannelMenuAction = 'show-topics' | 'open-main' | 'mark-channel-read' | 'mark-channel-unread' | 'ignore-channel'
 
 export type MenuItem<A extends string> =
-  | { readonly type: 'item'; readonly id: A; readonly label: string; readonly hint?: string }
+  | { readonly type: 'item'; readonly id: A; readonly label: string; readonly hint?: string; readonly checked?: boolean }
   | { readonly type: 'separator' }
+  | { readonly type: 'submenu'; readonly label: string; readonly hint?: string; readonly items: ReadonlyArray<MenuItem<A>> }
+
+/**
+ * Notify me (spec sections 5 and 14, inventory 15.3). On a thread the
+ * choice is also how you follow it: Every message and When it matters
+ * follow it in Slack, Never unfollows it.
+ */
+export type NotifyChoice = NotifyLevel | 'matters'
+export type NotifyAction = 'notify-every' | 'notify-matters' | 'notify-never'
+
+const notifyLabels: Record<NotifyChoice, string> = { every: 'Every message', matters: 'When it matters', never: 'Never' }
+
+/**
+ * A thread's Notify me choice from Slack's follow flag. Juno does not keep
+ * Every message apart yet, so a followed thread shows the default, When
+ * it matters; a thread you do not follow shows Never.
+ */
+export function threadNotifyChoice(subscribed: boolean): NotifyChoice {
+  return subscribed ? 'matters' : 'never'
+}
+
+/** The Notify me choice an action picks. */
+export function notifyChoiceOf(action: NotifyAction): NotifyChoice {
+  return action === 'notify-every' ? 'every' : action === 'notify-matters' ? 'matters' : 'never'
+}
+
+/** Whether a thread with this choice is followed in Slack. */
+export function followsThread(level: NotifyChoice): boolean {
+  return level !== 'never'
+}
 
 export interface TopicMenuState {
   readonly kind: TopicKind
-  readonly channel: ChannelInfo
+  readonly channel: ChannelNaming
   readonly unread: boolean
   readonly pinned: boolean
   readonly resolved: boolean
+  /** The thread's Notify me choice. Main has no item of its own. */
+  readonly notify: NotifyChoice
 }
 
 const separator = { type: 'separator' } as const
@@ -37,7 +72,12 @@ function item<A extends string>(id: A, label: string, hint?: string): MenuItem<A
   return hint === undefined ? { type: 'item', id, label } : { type: 'item', id, label, hint }
 }
 
-/** The menu for a topic row, a topic tab and the header More button. */
+function notifyMenu(current: NotifyChoice): MenuItem<TopicMenuAction> {
+  const choice = (level: NotifyChoice): MenuItem<TopicMenuAction> => ({ type: 'item', id: `notify-${level}`, label: notifyLabels[level], checked: level === current })
+  return { type: 'submenu', label: 'Notify me', hint: notifyLabels[current], items: [choice('every'), choice('matters'), choice('never')] }
+}
+
+/** The menu for a topic row and the page header's title (inventory 15.1). */
 export function topicMenuItems(state: TopicMenuState): ReadonlyArray<MenuItem<TopicMenuAction>> {
   const isMain = state.kind === 'main'
   const items: MenuItem<TopicMenuAction>[] = [item('open-new-tab', 'Open in new tab', '⌘ click'), separator]
@@ -45,7 +85,8 @@ export function topicMenuItems(state: TopicMenuState): ReadonlyArray<MenuItem<To
   items.push(state.unread ? item('mark-read', 'Mark as read') : item('mark-unread', 'Mark as unread'))
   items.push(state.pinned ? item('unpin', 'Unpin') : item('pin', 'Pin'))
   items.push(state.resolved ? item('reopen', 'Reopen') : item('resolve', 'Resolve'))
-  items.push(separator, item('copy-link', 'Copy Slack link'))
+  items.push(separator, item('copy-link', 'Copy Slack link'), item('open-in-slack', 'Open in Slack'))
+  if (!isMain) items.push(notifyMenu(state.notify))
   if (!isDm(state.channel.kind)) items.push(item('ignore-channel', `Ignore ${channelLabel(state.channel)}`))
   return items
 }
