@@ -30,3 +30,8 @@ minimumReleaseAgeExclude:
   - "@earendil-works/pi-durable@1.2.0"
   - "@earendil-works/pi-mcp@1.2.0"
   - "@earendil-works/pi-telemetry@1.2.0"
+
+# The agent's tests use @juno/agent-testing, which imports the agent's crash
+# points: a test-only cycle. check-deps leaves test-only edges out of its cycle
+# check and fails on any other cycle; this tells `pnpm -r` the same.
+ignoreWorkspaceCycles: true
