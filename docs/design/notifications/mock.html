@@ -1,0 +1,433 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Notifications · simplification pass</title>
+<style>
+@font-face { font-family: 'Figtree Variable'; font-weight: 300 900; font-display: block; src: url('../home/fonts/figtree-latin-wght-normal.woff2') format('woff2-variations'); }
+@font-face { font-family: 'Instrument Serif'; font-weight: 400; font-display: block; src: url('../home/fonts/instrument-serif-latin-400-normal.woff2') format('woff2'); }
+
+/* Tokens: packages/tokens/src/tokens.stylex.ts and themes.stylex.ts, Coral accent. */
+.theme-light {
+  --background: hsla(48, 50%, 98%, 1); --background-subtle: hsla(48, 35%, 97%, 1);
+  --surface-default: hsla(48, 30%, 98%, 1); --surface-hover: hsla(48, 30%, 94%, 1); --surface-raised: hsla(48, 30%, 98%, 1);
+  --secondary-default: hsla(48, 30%, 92%, 1); --secondary-hover: hsla(48, 30%, 90%, 1);
+  --border-subtle: hsla(48, 30%, 92%, 1); --border-default: hsla(48, 30%, 91%, 1); --border-strong: hsla(48, 30%, 88%, 1); --input-border: hsla(48, 14%, 82%, 1);
+  --foreground-default: hsla(48, 15%, 12%, 1); --foreground-subtle: hsla(48, 8%, 35%, 1); --foreground-muted: hsla(48, 5%, 42%, 1);
+  --success: #00674F;
+  --hl: #CC4628; --hl-fg: #FFFFFF; --hl-text: #B4351F; --hl-soft: color-mix(in oklch, #CC4628 10%, var(--background));
+  --bubble: color-mix(in oklch, #CC4628 16%, var(--background));
+  --shadow-sm: 0 1px 2px 0 rgba(27, 28, 21, 0.04);
+  --card-ring: 0 1px 2px 0 oklch(0 0 0 / .03), 0 6px 20px -4px oklch(0 0 0 / .07);
+  --pop-shadow: 0 2px 6px -1px oklch(0 0 0 / 0.05), 0 14px 36px -8px oklch(0 0 0 / 0.13);
+  --sheet: #EFEDE6;
+}
+.theme-dark {
+  --background: #1B1916; --background-subtle: #151411;
+  --surface-default: #252421; --surface-hover: #2D2B28; --surface-raised: #373532;
+  --secondary-default: #302F2C; --secondary-hover: #383633;
+  --border-subtle: #2B2A27; --border-default: #32302D; --border-strong: #3C3A37; --input-border: #464541;
+  --foreground-default: #EEEBE2; --foreground-subtle: #C6C4BE; --foreground-muted: #A09E9A;
+  --success: color-mix(in oklch, #00674F 52%, #EEEBE2);
+  --hl: #FF8A73; --hl-fg: #2A0D06; --hl-text: #FF9C87; --hl-soft: color-mix(in oklch, #FF8A73 14%, var(--background));
+  --bubble: color-mix(in oklch, #FF8A73 22%, var(--background));
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.30);
+  --card-ring: 0 1px 2px 0 oklch(0 0 0 / .3), 0 6px 20px -4px oklch(0 0 0 / .35);
+  --pop-shadow: 0 2px 6px -1px oklch(0 0 0 / 0.3), 0 14px 36px -8px oklch(0 0 0 / 0.5);
+  --sheet: #0F0E0C;
+}
+:root {
+  --font-sans: 'Figtree Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-serif: 'Instrument Serif', ui-serif, Georgia, serif;
+}
+
+* { box-sizing: border-box; cursor: default; }
+body { margin: 0; font-family: var(--font-sans); font-size: 14px; line-height: 1.5; letter-spacing: 0.01em; -webkit-font-smoothing: antialiased; background: #ddd; }
+svg { display: block; flex: none; }
+section.sheet { background: var(--sheet); color: var(--foreground-default); padding: 32px 36px 40px; }
+h1 { font: 400 26px/1.15 var(--font-serif); margin: 0 0 4px; }
+.lede { margin: 0 0 24px; color: var(--foreground-muted); font-size: 13px; max-width: 820px; }
+.row { display: flex; gap: 24px; align-items: flex-start; }
+.colhead { font: 500 11px/1 var(--font-sans); letter-spacing: .06em; text-transform: uppercase; color: var(--foreground-muted); margin: 0 0 10px; }
+.colhead b { font-weight: 600; color: var(--foreground-default); letter-spacing: 0; text-transform: none; font-size: 13px; margin-right: 8px; }
+
+/* A workspace pane holding a page. */
+.pane { background: var(--background); border-radius: 14px; box-shadow: var(--card-ring); overflow: hidden; }
+.page { padding: 40px 40px 56px; display: flex; flex-direction: column; gap: 36px; }
+.page h2 { font: 400 34px/1.1 var(--font-serif); margin: 0; }
+.page .sub { font-size: 14px; line-height: 1.6; color: var(--foreground-subtle); max-width: 620px; margin: 8px 0 0; }
+.sec-h { font-size: 15px; font-weight: 600; }
+.sec-s { font-size: 13px; color: var(--foreground-muted); margin-top: 2px; }
+.group { margin-top: 12px; background: var(--surface-default); border-radius: 10px; box-shadow: var(--card-ring); }
+.group > .r + .r { border-top: 1px solid var(--border-subtle); }
+.r { display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 8px 10px 8px 14px; font-size: 14px; }
+.r .grow { flex: 1; min-width: 0; }
+.muted { color: var(--foreground-muted); }
+.subtle { color: var(--foreground-subtle); }
+.small { font-size: 12px; }
+.ic { width: 15px; height: 15px; color: var(--foreground-muted); }
+
+/* Controls. */
+.select { height: 32px; border: 1px solid var(--input-border); border-radius: 7px; padding: 0 8px 0 10px; font-size: 13px; display: inline-flex; align-items: center; gap: 8px; background: var(--background); white-space: nowrap; }
+.select svg { width: 12px; height: 12px; color: var(--foreground-muted); }
+.btn { height: 32px; padding: 0 12px; border-radius: 8px; font-size: 13px; font-weight: 500; display: inline-flex; align-items: center; gap: 6px; background: var(--secondary-default); color: var(--foreground-default); white-space: nowrap; }
+.btn.ghost { background: transparent; color: var(--foreground-subtle); padding: 0 8px; }
+.btn.sm { height: 28px; font-size: 12.5px; }
+.x { width: 26px; height: 26px; border-radius: 6px; display: grid; place-items: center; color: var(--foreground-muted); }
+.x svg { width: 13px; height: 13px; }
+.seg { display: inline-flex; padding: 2px; gap: 2px; background: var(--surface-hover); border-radius: 7px; }
+.seg span { height: 24px; padding: 0 9px; border-radius: 5px; font-size: 12px; font-weight: 500; display: inline-flex; align-items: center; color: var(--foreground-muted); }
+.seg span.on { background: var(--surface-raised); color: var(--foreground-default); box-shadow: var(--shadow-sm); }
+.check { width: 15px; height: 15px; border-radius: 4px; background: var(--foreground-default); color: var(--background); display: grid; place-items: center; flex: none; }
+.check svg { width: 11px; height: 11px; }
+.chip { height: 24px; padding: 0 9px; border-radius: 6px; font-size: 12px; font-weight: 500; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.chip b { font-weight: 600; font-variant-numeric: tabular-nums; }
+.tchip { height: 28px; padding: 0 4px 0 10px; border-radius: 7px; background: var(--secondary-default); font-size: 13px; font-weight: 500; display: inline-flex; align-items: center; gap: 2px; }
+.tchip .x { width: 20px; height: 20px; }
+.slider { width: 200px; height: 14px; position: relative; }
+.slider::before { content: ''; position: absolute; left: 0; right: 0; top: 5px; height: 4px; border-radius: 2px; background: var(--border-strong); }
+.slider::after { content: ''; position: absolute; left: 0; width: 66%; top: 5px; height: 4px; border-radius: 2px; background: var(--foreground-default); }
+.slider i { position: absolute; left: calc(66% - 7px); top: 0; width: 14px; height: 14px; border-radius: 50%; background: var(--surface-raised); box-shadow: var(--card-ring), 0 0 0 1px var(--border-strong); z-index: 1; }
+.log { margin-top: 12px; }
+.log .lr { display: grid; grid-template-columns: 44px minmax(0,130px) minmax(0,1fr) 64px minmax(0,170px); gap: 14px; min-height: 44px; padding: 6px 4px; border-bottom: 1px solid var(--border-subtle); align-items: center; font-size: 13px; }
+.log .lr > * { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.log .where { display: flex; align-items: center; gap: 4px; color: var(--foreground-subtle); }
+.log .where svg { width: 12px; height: 12px; }
+.c-now { background: var(--hl); color: var(--hl-fg); }
+.c-dig { background: var(--secondary-default); color: var(--foreground-subtle); }
+.c-sil { color: var(--foreground-muted); }
+
+/* Proposal pieces. */
+.days { display: inline-flex; gap: 4px; }
+.days span { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 500; color: var(--foreground-muted); }
+.days span.on { background: var(--secondary-default); color: var(--foreground-default); }
+.note { font-size: 13px; color: var(--foreground-muted); line-height: 1.5; padding: 12px 14px 14px; }
+.note b { font-weight: 500; color: var(--foreground-subtle); }
+.words { margin-top: 12px; border: 1px solid var(--input-border); background: var(--background); border-radius: 8px; padding: 10px 12px; font-size: 14px; line-height: 1.55; min-height: 68px; cursor: text; max-width: 620px; }
+.tag { height: 28px; padding: 0 4px 0 8px; border-radius: 7px; background: var(--secondary-default); font-size: 13px; font-weight: 500; display: inline-flex; align-items: center; gap: 5px; }
+.tag svg.k { width: 13px; height: 13px; color: var(--foreground-muted); }
+.tag .x { width: 20px; height: 20px; }
+.av { width: 16px; height: 16px; border-radius: 50%; font-size: 8.5px; font-weight: 700; display: grid; place-items: center; background: color-mix(in oklch, #E89EB8 24%, var(--surface-default)); color: color-mix(in oklch, #E89EB8 62%, var(--foreground-default)); }
+.av.b { background: color-mix(in oklch, #008AB3 24%, var(--surface-default)); color: color-mix(in oklch, #008AB3 62%, var(--foreground-default)); }
+.tags { display: flex; flex-wrap: wrap; gap: 6px; flex: 1; justify-content: flex-end; }
+.lbl { width: 150px; flex: none; }
+.lbl .t { font-size: 14px; font-weight: 500; }
+.lbl .s { font-size: 12px; color: var(--foreground-muted); }
+.hint { font-size: 12px; color: var(--foreground-muted); margin-top: 8px; }
+.today { display: flex; align-items: center; gap: 10px; font-size: 14px; }
+.today .num { font-variant-numeric: tabular-nums; font-weight: 600; }
+
+/* Around the page: menus, popovers, chat. */
+.stage { background: var(--background); border-radius: 14px; box-shadow: var(--card-ring); padding: 24px; position: relative; }
+.menu { width: 236px; padding: 5px; border-radius: 13px; background: var(--surface-default); box-shadow: var(--pop-shadow), 0 0 0 1px var(--border-default); }
+.menu.wide { width: 248px; padding: 6px; }
+.mi { height: 30px; padding: 0 8px; border-radius: 6px; display: flex; align-items: center; gap: 10px; font-size: 13px; }
+.mi svg { width: 15px; height: 15px; color: var(--foreground-subtle); }
+.mi .hint2 { margin-left: auto; font-size: 11px; color: var(--foreground-muted); }
+.mi.sel { background: var(--surface-hover); }
+.mi .chev { width: 12px; height: 12px; margin-left: auto; color: var(--foreground-muted); }
+.mi .tick { width: 15px; color: var(--foreground-default); }
+.mi .tick svg { color: var(--foreground-default); width: 13px; height: 13px; }
+.sep { height: 1px; background: var(--border-default); margin: 4px 6px; }
+.mhead { display: flex; gap: 10px; align-items: center; padding: 8px 8px 10px; }
+.bigav { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 700; background: color-mix(in oklch, #92C2F9 24%, var(--surface-default)); color: color-mix(in oklch, #92C2F9 62%, var(--foreground-default)); position: relative; }
+.dot { position: absolute; right: -1px; bottom: -1px; width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--surface-default); }
+.dot.active { background: var(--success); }
+.dot.away { background: var(--surface-default); box-shadow: inset 0 0 0 1.5px var(--foreground-muted); }
+.sidebarrow { width: 330px; padding: 10px 12px; border-radius: 10px; background: var(--surface-hover); display: flex; gap: 10px; }
+.tile { width: 36px; height: 36px; border-radius: 50%; background: var(--secondary-default); flex: none; }
+.msg { display: flex; gap: 10px; padding: 8px 10px; border-radius: 8px; background: var(--surface-hover); width: 440px; }
+.msg .who { font-weight: 600; font-size: 14px; }
+.msg .time { font-size: 12px; color: var(--foreground-muted); margin-left: 6px; font-weight: 400; }
+.pop { width: 300px; padding: 14px 16px; border-radius: 13px; background: var(--surface-default); box-shadow: var(--pop-shadow), 0 0 0 1px var(--border-default); display: flex; flex-direction: column; gap: 6px; }
+.pop .t { font-size: 13px; font-weight: 600; }
+.pop .b { font-size: 13px; color: var(--foreground-subtle); line-height: 1.5; }
+.pop .f { display: flex; justify-content: flex-end; margin-top: 4px; }
+.chat { display: flex; flex-direction: column; gap: 2px; width: 420px; }
+.bub { max-width: 80%; padding: 8px 12px; border-radius: 16px; font-size: 14px; line-height: 1.55; }
+.bub.o { align-self: flex-end; background: var(--bubble); }
+.bub.o.last { border-bottom-right-radius: 4px; }
+.bub.j { align-self: flex-start; background: var(--surface-hover); border-bottom-left-radius: 4px; margin-top: 8px; }
+.cline { font-size: 12.5px; color: var(--foreground-muted); padding: 4px 0 0 2px; }
+.cline .act { color: var(--foreground-default); font-weight: 500; }
+.cap { font-size: 12.5px; color: var(--foreground-muted); margin-top: 14px; max-width: 440px; }
+.cap b { color: var(--foreground-subtle); font-weight: 500; }
+.lst .lr2 { display: grid; grid-template-columns: 44px 120px minmax(0,1fr); gap: 12px; padding: 8px 2px; border-bottom: 1px solid var(--border-subtle); font-size: 13px; align-items: baseline; }
+.lst .lr2:last-child { border-bottom: 0; }
+.lst .why { grid-column: 3; font-size: 12px; color: var(--foreground-muted); margin-top: -4px; }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <symbol id="i-hash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 9h16M4 15h16M10 3 8 21M16 3l-2 18"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></symbol>
+    <symbol id="i-user" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
+    <symbol id="i-at" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8"/></symbol>
+    <symbol id="i-text" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h10M4 18h7"/><circle cx="17" cy="16" r="3"/><path d="m21 20-1.8-1.8"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+    <symbol id="i-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m6 9 6 6 6-6"/></symbol>
+    <symbol id="i-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m9 6 6 6-6 6"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></symbol>
+    <symbol id="i-bell" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+    <symbol id="i-dot" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/></symbol>
+    <symbol id="i-gear" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1A1.7 1.7 0 0 0 9 19.4a1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10.7 5.1A10 10 0 0 1 22 12a14 14 0 0 1-2 2.7M6.6 6.6A14 14 0 0 0 2 12a10 10 0 0 0 13.4 5.4M2 2l20 20M9.9 9.9a3 3 0 0 0 4.2 4.2"/></symbol>
+    <symbol id="i-list" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M7 12h10M10 18h4"/></symbol>
+    <symbol id="i-msg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2Z"/></symbol>
+    <symbol id="i-checks" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 7 17l-5-5M22 10l-7.5 7.5L13 16"/></symbol>
+    <symbol id="i-ban" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="m5.7 5.7 12.6 12.6"/></symbol>
+    <symbol id="i-swap" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 3 4 7l4 4M4 7h16M16 21l4-4-4-4M20 17H4"/></symbol>
+    <symbol id="i-out" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></symbol>
+    <symbol id="i-help" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3M12 17h.01"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="8" y="8" width="13" height="13" rx="2"/><path d="M4 16V5a2 2 0 0 1 2-2h11"/></symbol>
+  </defs>
+</svg>
+
+<template id="current">
+  <div class="pane"><div class="page">
+    <div>
+      <h2>Notifications</h2>
+      <p class="sub">Everything is in Juno whenever you open it. This only decides when your Mac interrupts you: right away, in a digest, or not at all.</p>
+      <div style="display:flex;gap:6px;align-items:center;margin-top:8px;font-size:13px" class="subtle">Today so far
+        <span class="chip c-now"><b>4</b> interrupted you</span>
+        <span class="chip c-dig"><b>5</b> waited for a digest</span>
+        <span class="chip" style="background:var(--surface-hover);color:var(--foreground-muted)"><b>3</b> stayed silent</span>
+      </div>
+    </div>
+
+    <div>
+      <div class="sec-h">Your rules</div>
+      <div class="sec-s">Checked top to bottom. The first rule that matches wins.</div>
+      <div class="group">
+        <div class="r"><svg class="ic"><use href="#i-hash"/></svg><span class="grow">In <b>#incidents</b></span><span class="small muted">1 today</span><span class="seg"><span class="on">Now</span><span>Digest</span><span>Silent</span></span><span class="x"><svg><use href="#i-x"/></svg></span></div>
+        <div class="r"><svg class="ic"><use href="#i-user"/></svg><span class="grow">From <b>Maya Chen</b></span><span class="small muted">2 today</span><span class="seg"><span class="on">Now</span><span>Digest</span><span>Silent</span></span><span class="x"><svg><use href="#i-x"/></svg></span></div>
+        <div class="r"><svg class="ic"><use href="#i-at"/></svg><span class="grow">Mentions of me in <b>hiring</b></span><span class="small muted">1 today</span><span class="seg"><span class="on">Now</span><span>Digest</span><span>Silent</span></span><span class="x"><svg><use href="#i-x"/></svg></span></div>
+        <div class="r"><svg class="ic"><use href="#i-hash"/></svg><span class="grow">In <b>#design-review</b></span><span class="small muted">1 today</span><span class="seg"><span>Now</span><span class="on">Digest</span><span>Silent</span></span><span class="x"><svg><use href="#i-x"/></svg></span></div>
+        <div class="r"><svg class="ic"><use href="#i-text"/></svg><span class="grow">Contains <b>"lunch"</b></span><span class="small muted">1 today</span><span class="seg"><span>Now</span><span>Digest</span><span class="on">Silent</span></span><span class="x"><svg><use href="#i-x"/></svg></span></div>
+        <div class="r" style="padding:10px 10px 10px 14px;gap:8px"><span class="muted" style="font-size:13px">New rule</span>
+          <span class="select">From a person<svg><use href="#i-down"/></svg></span>
+          <span class="select">Maya Chen<svg><use href="#i-down"/></svg></span>
+          <span class="select">Notify now<svg><use href="#i-down"/></svg></span>
+          <span class="btn">Add</span></div>
+      </div>
+    </div>
+
+    <div>
+      <div class="sec-h">Everything else</div>
+      <div class="sec-s">When no rule matches.</div>
+      <div class="group">
+        <div class="r" style="align-items:flex-start;padding:14px"><span class="check" style="margin-top:3px"><svg><use href="#i-check"/></svg></span><div><div style="font-weight:500">Let Juno decide</div><div class="muted" style="font-size:13px">Each message gets a quick read on urgency. Off means everything waits for a digest.</div></div></div>
+        <div class="r"><span class="grow">Interrupt me only when Juno is at least <b>80%</b> sure it's urgent</span><span class="slider"><i></i></span></div>
+        <div class="r" style="flex-wrap:wrap"><span class="grow">Digest times</span>
+          <span class="tchip">10am<span class="x"><svg><use href="#i-x"/></svg></span></span>
+          <span class="tchip">1pm<span class="x"><svg><use href="#i-x"/></svg></span></span>
+          <span class="tchip">4:30pm<span class="x"><svg><use href="#i-x"/></svg></span></span>
+          <span class="select">Add a time<svg><use href="#i-down"/></svg></span></div>
+        <div class="r"><span class="grow">Quiet hours</span><span class="select">7pm<svg><use href="#i-down"/></svg></span><span class="muted" style="font-size:13px">to</span><span class="select">8am<svg><use href="#i-down"/></svg></span><span class="muted" style="font-size:12.5px">Rules set to Now still come through.</span></div>
+      </div>
+    </div>
+
+    <div>
+      <div class="sec-h">Today</div>
+      <div class="sec-s">How the messages that have arrived so far were handled. Change a rule above and this updates.</div>
+      <div class="log">
+        <div class="lr"><span class="muted">13:42</span><span class="where"><svg><use href="#i-hash"/></svg>eng</span><span><b>Dev</b> @Leo I think the preview build is…</span><span><span class="chip c-now">Now</span></span><span class="small muted">Juno · 89% urgent</span></div>
+        <div class="lr"><span class="muted">13:30</span><span class="where"><svg><use href="#i-hash"/></svg>incidents</span><span><b>Grafana</b> queue depth &gt; 5k on billing</span><span><span class="chip c-now">Now</span></span><span class="small muted">Rule: In #incidents</span></div>
+        <div class="lr"><span class="muted">13:12</span><span class="where"><svg><use href="#i-user"/></svg>Maya Chen</span><span><b>Maya</b> Draft is up. Cross-posting to…</span><span><span class="chip c-now">Now</span></span><span class="small muted">Rule: From Maya Chen</span></div>
+        <div class="lr"><span class="muted">12:58</span><span class="where"><svg><use href="#i-hash"/></svg>design-review</span><span><b>Ana</b> New spacing pass on the sidebar</span><span><span class="chip c-dig">1pm</span></span><span class="small muted">Rule: In #design-review</span></div>
+        <div class="lr"><span class="muted">12:40</span><span class="where"><svg><use href="#i-hash"/></svg>general</span><span><b>Priya</b> Anyone up for lunch at the new…</span><span><span class="chip c-sil">Silent</span></span><span class="small muted">Rule: Contains "lunch"</span></div>
+        <div class="lr"><span class="muted">12:21</span><span class="where"><svg><use href="#i-hash"/></svg>product</span><span><b>Sam</b> Q4 roadmap cuts are in the doc</span><span><span class="chip c-dig">1pm</span></span><span class="small muted">Juno · 14% urgent, can wait</span></div>
+        <div class="lr"><span class="muted">12:05</span><span class="where"><svg><use href="#i-hash"/></svg>random</span><span><b>Leo</b> this is the best gif I've seen all week</span><span><span class="chip c-sil">Silent</span></span><span class="small muted">Juno · 66% just chatter</span></div>
+        <div class="lr"><span class="muted">07:48</span><span class="where"><svg><use href="#i-lock"/></svg>hiring</span><span><b>Elena</b> @Alex she has a competing offer…</span><span><span class="chip c-dig">10am</span></span><span class="small muted">Quiet hours</span></div>
+      </div>
+    </div>
+  </div></div>
+</template>
+
+<template id="proposed">
+  <div class="pane"><div class="page">
+    <div>
+      <h2>Notifications</h2>
+      <p class="sub">During your working hours, Juno lets through what needs you and holds the rest. Everything is in Juno whenever you open it.</p>
+    </div>
+
+    <div>
+      <div class="sec-h">Working hours</div>
+      <div class="group">
+        <div class="r" style="min-height:56px">
+          <span class="days"><span class="on">M</span><span class="on">T</span><span class="on">W</span><span class="on">T</span><span class="on">F</span><span>S</span><span>S</span></span>
+          <span class="grow"></span>
+          <span class="select">9am<svg><use href="#i-down"/></svg></span><span class="muted" style="font-size:13px">to</span><span class="select">7pm<svg><use href="#i-down"/></svg></span>
+        </div>
+        <div class="note" style="border-top:1px solid var(--border-subtle)">Outside these hours, Slack shows you as away and your notifications pause, here and on your phone. When your hours start, one notification sums up anything that needed you.<br><span style="font-size:12px">Juno switches your status while it's open. If it's closed when your hours start, you show as away until you open it.</span></div>
+      </div>
+    </div>
+
+    <div>
+      <div class="sec-h">What matters to you</div>
+      <div class="sec-s">Juno reads this for every message. You can also just tell Juno.</div>
+      <div class="words">The launch and hiring. Anything from my reports that needs a decision today. Production incidents.</div>
+    </div>
+
+    <div>
+      <div class="sec-h">People and channels</div>
+      <div class="group">
+        <div class="r" style="padding:10px 10px 10px 14px">
+          <div class="lbl"><div class="t">Every message</div><div class="s">Even outside working hours</div></div>
+          <div class="tags">
+            <span class="tag"><svg class="k"><use href="#i-hash"/></svg>incidents<span class="x"><svg><use href="#i-x"/></svg></span></span>
+            <span class="tag"><span class="av">MC</span>Maya Chen<span class="x"><svg><use href="#i-x"/></svg></span></span>
+          </div>
+        </div>
+        <div class="r" style="padding:10px 10px 10px 14px">
+          <div class="lbl"><div class="t">Never</div><div class="s">Still in Juno, no alerts</div></div>
+          <div class="tags">
+            <span class="tag"><svg class="k"><use href="#i-hash"/></svg>design-review<span class="x"><svg><use href="#i-x"/></svg></span></span>
+            <span class="tag"><svg class="k"><use href="#i-hash"/></svg>random<span class="x"><svg><use href="#i-x"/></svg></span></span>
+          </div>
+        </div>
+      </div>
+      <div class="hint">Right-click a channel or person to change how it notifies you.</div>
+    </div>
+
+    <div>
+      <div class="sec-h">Today</div>
+      <div class="today" style="margin-top:8px"><span class="subtle"><span class="num">4</span> messages interrupted you. Juno held <span class="num">23</span>.</span><span class="btn ghost sm">Show why</span></div>
+    </div>
+  </div></div>
+</template>
+
+<template id="around">
+  <div class="row" style="gap:20px">
+    <div style="width:400px">
+      <div class="colhead"><b>Sidebar menu</b>Set it where it arises</div>
+      <div class="stage" style="height:470px">
+        <div class="sidebarrow"><span class="tile"></span><div style="flex:1;min-width:0"><div style="font-weight:600;font-size:14px">#design-review <span class="muted small" style="font-weight:400;float:right">12m</span></div><div class="subtle" style="font-size:13px">Ana: New spacing pass on the sidebar</div></div></div>
+        <div style="display:flex;gap:4px;margin:6px 0 0 60px;align-items:flex-start">
+          <div class="menu" style="width:210px">
+            <div class="mi"><svg><use href="#i-list"/></svg>Show its topics</div>
+            <div class="mi"><svg><use href="#i-msg"/></svg>Open Main</div>
+            <div class="mi"><svg><use href="#i-eye"/></svg>Open Main in stealth</div>
+            <div class="sep"></div>
+            <div class="mi"><svg><use href="#i-checks"/></svg>Mark channel as read</div>
+            <div class="mi"><svg><use href="#i-dot"/></svg>Mark channel as unread</div>
+            <div class="sep"></div>
+            <div class="mi sel"><svg><use href="#i-bell"/></svg>Notify me<svg class="chev"><use href="#i-right"/></svg></div>
+            <div class="mi"><svg><use href="#i-ban"/></svg>Ignore channel<span class="hint2">Hide in Juno</span></div>
+          </div>
+          <div class="menu" style="width:170px;margin-top:190px">
+            <div class="mi"><span class="tick"></span>Every message</div>
+            <div class="mi"><span class="tick"></span>When it matters</div>
+            <div class="mi sel"><span class="tick"><svg><use href="#i-check"/></svg></span>Never</div>
+          </div>
+        </div>
+      </div>
+      <p class="cap">Channels, DMs and people get one submenu with three choices. <b>When it matters</b> is the default and is not listed on the page.</p>
+    </div>
+
+    <div style="width:320px">
+      <div class="colhead"><b>Avatar menu</b>Away by hand</div>
+      <div class="stage" style="height:470px;display:flex;justify-content:flex-end">
+        <div class="menu wide">
+          <div class="mhead"><span class="bigav">T<span class="dot away"></span></span><div><div style="font-size:13px;font-weight:600">Tushar</div><div class="muted" style="font-size:12px">Away until 9am</div></div></div>
+          <div class="sep" style="margin:2px 6px 4px"></div>
+          <div class="mi sel" style="height:32px"><svg><use href="#i-sun"/></svg>Set yourself active</div>
+          <div class="mi" style="height:32px"><svg><use href="#i-dot"/></svg>Set status</div>
+          <div class="mi" style="height:32px"><svg><use href="#i-bell"/></svg>Notifications<span class="hint2">Paused until 9am</span></div>
+          <div class="mi" style="height:32px"><svg><use href="#i-gear"/></svg>Preferences<span class="hint2">⌘,</span></div>
+          <div class="sep"></div>
+          <div class="mi" style="height:32px"><svg><use href="#i-swap"/></svg>Switch workspace</div>
+          <div class="mi" style="height:32px"><svg><use href="#i-out"/></svg>Sign out</div>
+        </div>
+      </div>
+      <p class="cap">Away and active are one item. A change by hand lasts until the next switch in your working hours.</p>
+    </div>
+
+    <div style="width:500px">
+      <div class="colhead"><b>A message</b>Why, on demand</div>
+      <div class="stage" style="height:470px">
+        <div class="msg"><span class="tile" style="width:32px;height:32px"></span><div><div class="who">Ana Ruiz<span class="time">12:58</span></div><div style="font-size:14px">New spacing pass on the sidebar is up. Comments by Friday?</div></div></div>
+        <div style="display:flex;gap:6px;margin:6px 0 0 120px;align-items:flex-start">
+          <div class="menu" style="width:200px">
+            <div class="mi"><svg><use href="#i-copy"/></svg>Copy text</div>
+            <div class="mi"><svg><use href="#i-msg"/></svg>Reply in thread</div>
+            <div class="sep"></div>
+            <div class="mi sel"><svg><use href="#i-help"/></svg>Why no notification?</div>
+          </div>
+        </div>
+        <div class="pop" style="margin:12px 0 0 150px">
+          <div class="t">Didn't notify you</div>
+          <div class="b">#design-review is set to Never.</div>
+          <div class="f"><span class="btn sm">Change</span></div>
+        </div>
+        <div class="pop" style="margin:12px 0 0 0px">
+          <div class="t">Notified you at 13:42</div>
+          <div class="b">Juno: Dev asks you to approve the release before 2pm.</div>
+          <div class="f"><span class="btn sm">Tell Juno</span></div>
+        </div>
+      </div>
+      <p class="cap">The message menu says why it did or didn't notify. A setting reason offers <b>Change</b>; a Juno reason offers <b>Tell Juno</b>, which opens the chat quoting the message.</p>
+    </div>
+
+    <div style="width:440px">
+      <div class="colhead"><b>Juno chat</b>Say it in words</div>
+      <div class="stage" style="height:470px">
+        <div class="chat">
+          <div class="bub o">Stop pinging me about #design-review.</div>
+          <div class="bub o last">And Sam can always reach me, even at night.</div>
+          <div class="bub j">Done. #design-review won't notify you, and Sam Okafor gets through any time.</div>
+          <div class="cline">Notifications changed · <span class="act">Undo</span></div>
+          <div class="bub o last" style="margin-top:14px">I'm off Friday.</div>
+          <div class="bub j">Friday is out of your working hours. You'll show as away all day.</div>
+          <div class="cline">Notifications changed · <span class="act">Undo</span></div>
+        </div>
+        <div class="colhead" style="margin-top:30px"><b>Today</b>after Show why</div>
+        <div class="lst">
+          <div class="lr2"><span class="muted">13:42</span><span class="subtle">#eng</span><span><b>Dev</b> needs a release approval</span><span class="why">Juno: asks you to decide before 2pm</span></div>
+          <div class="lr2"><span class="muted">13:30</span><span class="subtle">#incidents</span><span><b>Grafana</b> queue depth &gt; 5k</span><span class="why">#incidents: every message</span></div>
+        </div>
+      </div>
+      <p class="cap">Changes from chat are local, take effect at once and have Undo. They are taken only from your own words, never from something Juno read.</p>
+    </div>
+  </div>
+</template>
+
+<section class="sheet theme-light" data-key="compare-light">
+  <h1>Notifications: current and proposed</h1>
+  <p class="lede">Left is the page in SPEC 14 and inventory 13. Right is the proposal: one schedule that sets both presence and notifications, a few words for Juno, two short lists, and a one-line Today.</p>
+  <div class="row">
+    <div style="width:960px"><div class="colhead"><b>Current</b>SPEC 14 · inventory 13</div><div data-t="current"></div></div>
+    <div style="width:960px"><div class="colhead"><b>Proposed</b>this README</div><div data-t="proposed"></div></div>
+  </div>
+</section>
+
+<section class="sheet theme-dark" data-key="compare-dark">
+  <h1>Notifications: current and proposed</h1>
+  <p class="lede">Dark theme. Same content.</p>
+  <div class="row">
+    <div style="width:960px"><div class="colhead"><b>Current</b>SPEC 14 · inventory 13</div><div data-t="current"></div></div>
+    <div style="width:960px"><div class="colhead"><b>Proposed</b>this README</div><div data-t="proposed"></div></div>
+  </div>
+</section>
+
+<section class="sheet theme-light" data-key="around-light">
+  <h1>What moves off the page</h1>
+  <p class="lede">Per-channel and per-person choices live in the menus where they arise. Away has a manual switch in the avatar menu. The reason for a notification is one click away on the message. Anything else is said to Juno.</p>
+  <div data-t="around"></div>
+</section>
+
+<section class="sheet theme-dark" data-key="around-dark">
+  <h1>What moves off the page</h1>
+  <p class="lede">Dark theme.</p>
+  <div data-t="around"></div>
+</section>
+
+<script>
+for (const slot of document.querySelectorAll('[data-t]')) slot.replaceWith(document.getElementById(slot.dataset.t).content.cloneNode(true))
+</script>
+</body>
+</html>
