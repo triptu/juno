@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-14 12:20 · Orchestrator · M4 fix A merged. The tab strip scrolls and keeps the active tab in view (floor 120px, keyboard tablist with roving focus); the topic header fits at the 336px minimum and lines up with the message column; the empty workspace no longer promises ⌘K before M9. After shots are in `docs/design/reviews/m4/after/`. The Threads popover clamp at 336px goes to fix B, and the header title tooltip to fix C.
 - 10-14 12:10 · Tushar · Codex credits are back. Spec work and well-defined code go to Codex again; UI and coupled tests stay on Claude.
 - 10-14 11:50 · Tushar · Juno Agent chat works like iMessage. There is no Stop button and no Esc to stop; to change course you send a message. The core has two inputs: queue a message and listen to events. A queued message joins the run at its next step (pi already works this way). SPEC 13 and the turn router are revised to match.
 - 10-14 11:50 · Tushar · An action whose result Juno can't confirm shows as failed on its card, with no special "can't tell" row and no retry warning. The owner checks by hand, or asks Juno again for a new card. Juno still never repeats an action by itself.
