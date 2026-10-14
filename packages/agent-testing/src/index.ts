@@ -5,4 +5,6 @@ export {
 export { compactorAnswer, type CompactorOptions } from './model/compactor'
 export { codexModels, startFakeCodex, type FakeCodex, type FakeCodexOptions } from './codex/fakeCodex'
 export type { CodexInvocation, CodexModel, CodexToolCall, CodexToolOutcome, CodexTurn } from './codex/types'
-export { startFakeMcpServer, type FakeMcpOptions, type FakeMcpServer, type FakeTool } from './fakeMcp'
+export { json, type FakeTool, type ToolCallRecord, type ToolResult } from './mcp/handler'
+export { startFakeMcpServer, type FakeMcpOptions, type FakeMcpServer } from './mcp/server'
+export type { FakeOAuth, OAuthOptions, OAuthStats } from './mcp/oauth'
