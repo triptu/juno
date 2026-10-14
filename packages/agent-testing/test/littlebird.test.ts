@@ -41,7 +41,11 @@ it('sends list_changed when a tool appears or its schema changes', async () => {
       resolve()
     })
   })
-  await new Promise((resolve) => setTimeout(resolve, 50))
+  // A change that changes nothing, repeated until the event stream is open.
+  const open = changed()
+  const repeat = setInterval(() => littlebird!.removeTool('no_such_tool'), 20)
+  await open.finally(() => clearInterval(repeat))
+  changes = 0
 
   let next = changed()
   littlebird.addTool(unknownTool('delete_workspace'))

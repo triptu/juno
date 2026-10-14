@@ -35,11 +35,10 @@ it('pages tools/list and tells connected clients when the list changes', async (
     const c = client()
     await c.connect(transport)
     expect((await c.listTools()).map((t) => t.name)).toEqual(['a', 'b', 'c', 'd', 'e'])
+    // Change the list until the notification arrives: the HTTP event stream opens after connect.
     const changed = new Promise<void>((resolve) => c.onNotification('notifications/tools/list_changed', () => resolve()))
-    // Let the HTTP event stream open before the change.
-    await new Promise((resolve) => setTimeout(resolve, 50))
-    server.setTools(tools.slice(0, 1))
-    await changed
+    const repeat = setInterval(() => server!.setTools(tools.slice(0, 1)), 20)
+    await changed.finally(() => clearInterval(repeat))
     expect((await c.listTools()).map((t) => t.name)).toEqual(['a'])
     server.setTools(tools)
     await c.close()
