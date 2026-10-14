@@ -23,11 +23,12 @@ export interface MessageProps {
   readonly main: boolean
   /**
    * Show the name and avatar even when the message continues its sender's
-   * run: the first message of the window and the one after the "N new"
-   * divider. The row's top margin follows the same rule.
+   * run: the one after the "N new" divider. Otherwise `message.groupStart`
+   * decides, which the engine works out from the message before, even when
+   * that one is outside the window.
    */
   readonly startsGroup: boolean
-  /** No top margin: the first row, or the row right after the divider. */
+  /** No top margin: the topic's first message, or the row right after the divider. */
   readonly flush?: boolean
   /** Laid out in full even off screen, never at the size estimate. */
   readonly eager?: boolean
