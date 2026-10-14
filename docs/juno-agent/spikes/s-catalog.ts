@@ -20,8 +20,8 @@ const families = [
   { family: 'Muse', re: /^meta\/muse-[a-z]+(?:-\d+(?:\.\d+)*)?$/ },
   { family: 'GPT Sol', re: /^openai\/gpt-\d+(?:\.\d+)*-sol$/ },
   { family: 'Grok', re: /^x-ai\/grok-\d+(?:\.\d+)*$/ },
-  { family: 'Compaction: Claude Haiku', re: /^anthropic\/claude-haiku-\d+(?:\.\d+)*$/, minWindow: 64_000 },
-  { family: 'Compaction: Gemini Flash', re: /^google\/gemini-\d+(?:\.\d+)*-flash$/, minWindow: 64_000 },
+  { family: 'Compaction: Claude Haiku', re: /^anthropic\/claude-haiku-\d+(?:\.\d+)*$/, minWindow: 131_072 },
+  { family: 'Compaction: Gemini Flash', re: /^google\/gemini-\d+(?:\.\d+)*-flash$/, minWindow: 131_072 },
 ]
 const CHAT_MIN_WINDOW = 250_000
 

@@ -71,6 +71,7 @@ Each finding is accepted (A) and changed in the plan, or rejected (R) with a rea
 | G11 | WP3/WP4 spec gap 7: a deletion during staging lets a stale install restore removed content | A. The install transaction rechecks the deletion record. An older candidate stays quarantined and waits for a sanitized generation | §14.4 |
 | G12 | WP3/WP4 spec gap 8: the export cursor update captures itself, so backup never settles | A. Capture attaches only to replicated tables. Backup bookkeeping is local and never captured | §14.4 |
 | G13 | WP3/WP4 spec gap 9: a fresh Mac has no trusted deletion record | A, partly as a stated limit. A trusted record comes from this Mac's keychain, the move code, or a rotated recovery phrase. Without one, Juno restores the newest generation in the folder and says that removed messages may come back if the folder is out of date. The record reaches the keychain before "Removed" shows | §14.3, §14.4, §18, SPEC §13.8 |
+| P1 | WP5 finding: the 64k minimum for the compaction model is below the §5.3 bound (67,584 tokens) | A. The compaction model needs a window of at least 131,072 tokens, matching the spec | §5.3, §7.1 |
 
 ## 1. Owner decisions in force
 
@@ -198,7 +199,7 @@ Versions are pinned exactly: pi 1.2.0 and Codex SDK 0.162.1.
 ### 5.3 The guard at the provider boundary
 - Every model path (chat, compaction, subagent, harness prompt) goes through `providers/guard.ts`. The guard checks the builder's stamp (the snapshot `rev` and `gen`, plus a hash of the messages) and the admission bound, and reserves spend.
 - A request without a valid stamp, such as pi's raw context after a hook error, is refused with a local error. The run fails visibly as interrupted.
-- Compaction requests are bounded the same way: fixed text, the local window (≤ 16 KB), the input (≤ 32 KB, either two nodes of at most 16 KB or one ≤ 16 KB chunk), and the 16k output reserve. No pins. The compaction model is offered only if its window fits that sum under the bound, about 70k tokens.
+- Compaction requests are bounded the same way: fixed text, the local window (≤ 16 KB), the input (≤ 32 KB, either two nodes of at most 16 KB or one ≤ 16 KB chunk), and the 16k output reserve. No pins. That sum is at most 67,584 tokens under the bound (2,048 of task text + 16,384 context + 32,768 input + 16,384 reserve), plus the system text and tools; `agent-memory` computes it as `requiredWindow(…, 'compaction')`. The compaction model is offered only if its window is at least **131,072 tokens** (§7.1, P1).
 
 ### 5.4 Spend (R15)
 - A `spend` ledger holds per-day `reserved`, `actual` and `unknown`. Before each billable call the guard reserves `upper(input) × price + maxOutput × price`. Actual usage reconciles it. A lost stream keeps its reservation as `unknown` spend.
@@ -264,7 +265,7 @@ unknown ─reconcile─▶ done (positive evidence) | unknown (kept, shown) ; re
 - The saved choice is `{ family, provider }`. The resolved slug is stored per day, so a newer release takes over only at the next daily refresh, and the change is logged in Activity.
 - **On 2026-10-14 this resolves to** `anthropic/claude-sonnet-5.5`, `anthropic/claude-opus-5.5`, `meta/muse-wonder`, `openai/gpt-6.1-sol` and `x-ai/grok-4.7`. These are examples only: the code holds patterns, not slugs.
 - A model change costs one cache miss and applies from the next run.
-- **Compaction model:** a second picker, defaulting to the latest `anthropic/claude-haiku-<ver>` (Haiku 5.5 today), with the latest `google/gemini-<ver>-flash` as the alternative. The same filters apply (tools are declared but never called, so the tool block matches turns), with the compaction window minimum (64k).
+- **Compaction model:** a second picker, defaulting to the latest `anthropic/claude-haiku-<ver>` (Haiku 5.5 today), with the latest `google/gemini-<ver>-flash` as the alternative. The same filters apply (tools are declared but never called, so the tool block matches turns), with a compaction window minimum of **131,072 tokens** (P1). Why: the largest compaction request is 67,584 tokens under the bound before system text and tools (§5.3), and up to 84,480 with the 1.25 multiplier. 131,072 covers both with room, and it is the window the Quint spec checks. Haiku 5.5 and the current Flash pass it easily.
 
 ### 7.2 Adapters
 - **Model providers** (OpenRouter now; Sign in with ChatGPT if feasible): pi-ai through the guard, a key from the keychain via main, `sessionId` affinity, cache marks (S2).
