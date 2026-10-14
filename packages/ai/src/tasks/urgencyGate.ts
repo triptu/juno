@@ -2,9 +2,11 @@ import type { ConversationKind } from '@juno/domain'
 import { Type } from '../schema'
 import { defineStructuredTask } from '../task'
 import { messagesState, oneLine, renderMessages, type AiMessage } from './shared'
-import { chatterCriteria, classifierInstructions, prompt, urgentCriteria } from './urgencyGate.prompt'
+import { classifierInstructions, prompt, notificationReasons, notificationCriteria } from './urgencyGate.prompt'
 
 export interface UrgencyGateInput {
+  /** The owner's notification preferences in their own words. */
+  readonly matters?: string
   /** The message's Slack ts, the cache entity. */
   readonly messageTs: string
   readonly channel: string
@@ -17,28 +19,24 @@ export interface UrgencyGateInput {
   readonly before?: ReadonlyArray<AiMessage>
 }
 
-/** Mirrors `UrgencyScore` in @juno/domain, which the notification decision consumes. */
+/** The decision and its explanation are stored with the notification. */
 export const UrgencyGateOutput = Type.Object({
-  urgent: Type.Number({ minimum: 0, maximum: 1 }),
-  chatter: Type.Number({ minimum: 0, maximum: 1 }),
+  notify: Type.Boolean(),
+  reason: Type.String({ minLength: 1 }),
 })
 
-/**
- * Decision. Runs per candidate after the user's rules did not match (spec
- * section 14). A notification may arrive 2 s late; past that it goes to the
- * digest. Covers the classifier's 0.9 s p95 with room for one retry.
- */
 export const urgencyGate = defineStructuredTask<UrgencyGateInput, typeof UrgencyGateOutput>({
   name: 'urgencyGate',
-  version: 1,
+  version: 2,
   tier: 'decision',
   timeoutMillis: 2000,
   prompt,
-  tool: { name: 'gate', description: 'Report how urgent the message is and how much it is chatter.' },
+  tool: { name: 'gate', description: 'Decide whether to notify the owner and explain why.' },
   output: UrgencyGateOutput,
   classify: {
     ask: (input) => ({
       state: {
+        matters: input.matters ?? '',
         where: input.channel,
         kind: input.channelKind,
         now: input.now,
@@ -46,19 +44,19 @@ export const urgencyGate = defineStructuredTask<UrgencyGateInput, typeof Urgency
         message: { sender: input.sender, mentionsMe: input.mentionsMe, text: input.text },
       },
       questions: {
-        urgent: { type: 'bool', instructions: classifierInstructions, criteria: urgentCriteria },
-        chatter: { type: 'bool', instructions: 'Is this message chatter: social or low-value content?', criteria: chatterCriteria },
+        decision: { type: 'choice', instructions: classifierInstructions, criteria: notificationCriteria },
       },
     }),
     read: (answers) => {
-      const u = answers.urgent
-      const c = answers.chatter
-      return u?.type === 'bool' && c?.type === 'bool' ? { urgent: u.probability, chatter: c.probability } : undefined
+      const answer = answers.decision
+      if (answer?.type !== 'choice') return undefined
+      return Object.entries(notificationReasons).find(([key]) => key === answer.choice)?.[1]
     },
   },
   render: (input) =>
     [
       `Where: ${input.channel} (${input.channelKind})`,
+      `What matters to you: ${input.matters ?? ''}`,
       `Now: ${input.now}`,
       input.before && input.before.length > 0 ? `Before:\n${renderMessages(input.before)}\n` : '',
       `Message from ${input.sender}${input.mentionsMe ? ', mentioning me' : ''}: ${oneLine(input.text)}`,

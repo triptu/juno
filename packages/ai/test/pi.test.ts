@@ -162,14 +162,14 @@ describe('PiAiProvider decisions on a decision model', () => {
     expect(chat.callCount).toBe(0)
   })
 
-  it('maps the main choice to no topic, and two bools to the gate probabilities', async () => {
+  it('maps the main choice to no topic, and a reason choice to the notification decision', async () => {
     const { provider } = scriptedWithClassifier(
       [],
-      [() => ({ replyTo: { type: 'choice', choice: 'main', probabilities: { main: 0.7 }, confidence: 0.7 } }), () => ({ urgent: { type: 'bool', probability: 0.9 }, chatter: { type: 'bool', probability: 0.05 } })],
+      [() => ({ replyTo: { type: 'choice', choice: 'main', probabilities: { main: 0.7 }, confidence: 0.7 } }), () => ({ decision: { type: 'choice', choice: 'incident', probabilities: { incident: 0.9 }, confidence: 0.9 } })],
     )
     expect(await Effect.runPromise(provider.decide(tasks.routeCheck, routeInput))).toMatchObject({ _tag: 'Decided', value: { replyTo: null, confidence: 0.7 } })
     const gate = { messageTs: '1', channel: '#eng', channelKind: 'public' as const, sender: 'Jonas', text: 'Checkout is down', mentionsMe: false, now: NOW }
-    expect(await Effect.runPromise(provider.decide(tasks.urgencyGate, gate))).toMatchObject({ _tag: 'Decided', value: { urgent: 0.9, chatter: 0.05 } })
+    expect(await Effect.runPromise(provider.decide(tasks.urgencyGate, gate))).toMatchObject({ _tag: 'Decided', value: { notify: true, reason: 'An incident or customer problem needs you now' } })
   })
 
   it('gives no decision when the classifier answers a topic that is not in the input, after one retry', async () => {
