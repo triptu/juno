@@ -2,7 +2,7 @@ import { Schema } from 'effect'
 import { Rpc, RpcGroup } from 'effect/rpc'
 import { Revision } from '@juno/agent-cards'
 import { CardBinding } from './identity'
-import { ChatMessageId, OpId, RunId } from '../chat/ids'
+import { ChatMessageId, OpId } from '../chat/ids'
 import { ChatPage, ChatSummary } from '../chat/page'
 import { Place } from '../chat/place'
 import { Accepted, AgentCommandError, PageLimit, operation } from './common'
@@ -24,11 +24,10 @@ export const ChatPageSnapshot = Schema.Struct({
 })
 export const chatPage = Rpc.make('agent.chat.page', { payload: { window: ChatWindow }, success: ChatPageSnapshot, stream: true, error: AgentCommandError })
 export const chatSummary = Rpc.make('agent.chat.summary', { success: ChatSummary, stream: true })
+/** The one way to talk to Juno. While a run is live the message joins it at its next step; otherwise it starts one. */
 export const chatSend = Rpc.make('agent.chat.send', {
   payload: { ...operation, text: Schema.String, context: Schema.optionalKey(Place) }, success: Accepted, error: AgentCommandError,
 })
-/** Esc stops only this run. A queued steer is retained and starts a fresh run. */
-export const chatStop = Rpc.make('agent.chat.stop', { payload: { ...operation, runId: RunId }, success: Accepted, error: AgentCommandError })
 export const chatRetry = Rpc.make('agent.chat.retry', {
   payload: { ...operation, interruptedOpId: OpId }, success: Accepted, error: AgentCommandError,
 })
@@ -36,4 +35,4 @@ export const chatRead = Rpc.make('agent.chat.read', { payload: { through: ChatMe
 export const chatRemove = Rpc.make('agent.chat.remove', {
   payload: { ...operation, messageId: ChatMessageId, alsoRemoveReply: Schema.Boolean }, success: Accepted, error: AgentCommandError,
 })
-export const ChatRpcs = RpcGroup.make(chatPage, chatSummary, chatSend, chatStop, chatRetry, chatRead, chatRemove)
+export const ChatRpcs = RpcGroup.make(chatPage, chatSummary, chatSend, chatRetry, chatRead, chatRemove)

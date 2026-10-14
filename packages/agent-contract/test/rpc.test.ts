@@ -18,7 +18,6 @@ const cases: Record<string, readonly [unknown, unknown]> = {
   'agent.chat.page': [{ window: { _tag: 'around', anchor: '1', before: 5, limit: 20 } }, { page: { items: [], banner: { _tag: 'none' }, moreAbove: true, moreBelow: true, composerEnabled: true }, cards: [], messages: [] }],
   'agent.chat.summary': [null, { unread: 1, busy: false }],
   'agent.chat.send': [{ ...op, text: 'Example' }, accepted],
-  'agent.chat.stop': [{ ...op, runId: 'run' }, accepted],
   'agent.chat.retry': [{ ...op, interruptedOpId: 'previous' }, accepted],
   'agent.chat.read': [{ through: '1' }, undefined],
   'agent.chat.remove': [{ ...op, messageId: '1', alsoRemoveReply: true }, accepted],

@@ -41,22 +41,21 @@ export type Origin = typeof Origin.Type
 /**
  * An owner send's delivery, as the line under the bubble:
  *
- *   sending ─▶ sent | queued ─▶ sent | waiting ─▶ sent
+ *   sending ─▶ sent | waiting ─▶ sent
  *   sending ─▶ failed
  *
  * `sending` lasts until the inbox commit (plan v3 §3), so it is rarely
  * seen. The inbox is local, so a send is accepted offline, while paused and
  * in recovery; it then `waits`, and runs once the network, Resume or the
- * review lets it. `queued` is a steer into a busy run; the view shows
- * "Queued" only after 500 ms so a steer read within a tool round never
- * flickers. `failed` has two causes with different copy: the inbox write
+ * review lets it. A send while Juno is working is `sent` like any other:
+ * it joins the run at its next step and Juno's reply acknowledges it, as in
+ * a text chat, so the bubble shows no extra state. `failed` has two causes with different copy: the inbox write
  * failed ("Not delivered · Try again", which resubmits the same op), or the
  * text was over 64 KB and was refused locally.
  */
 export const Delivery = Schema.Union([
   Schema.TaggedStruct('sending', {}),
   Schema.TaggedStruct('sent', {}),
-  Schema.TaggedStruct('queued', { since: Schema.Number }),
   Schema.TaggedStruct('waiting', { for: Schema.Literals(['network', 'resume', 'review']) }),
   Schema.TaggedStruct('failed', { reason: Schema.Literals(['notDelivered', 'tooLong']) }),
 ])
@@ -94,8 +93,6 @@ export type JunoInline = typeof JunoInline.Type
  * variant adds one fixed line under the bubble from `chatCopy.ending`; the
  * model never writes it, because an aborted or failed run writes nothing.
  *
- * - `stopped`: the owner pressed Stop. "Stopped. Juno won't start anything new for this reply."
- *   Work handed off before Stop may still land; its card shows that.
  * - `interrupted`: the process died or the request was refused at the
  *   provider guard. `retry` is the owner op to resubmit, when the run had
  *   one; wake and report runs have none and show no Try again.
@@ -109,7 +106,6 @@ export type JunoInline = typeof JunoInline.Type
  */
 export const Ending = Schema.Union([
   Schema.TaggedStruct('complete', {}),
-  Schema.TaggedStruct('stopped', {}),
   Schema.TaggedStruct('interrupted', { retry: Schema.optionalKey(OpId) }),
   Schema.TaggedStruct('blocked', { reason: Schema.Literals(['tooLarge', 'budget']) }),
   Schema.TaggedStruct('failed', {
@@ -147,7 +143,7 @@ export type JunoMessageItem = typeof JunoMessageItem.Type
  * bubble. If the run then calls tools, the status bubble reappears below
  * that bubble, and the next token clears it again: the text joins the same
  * bubble, so a run has one Juno bubble however many tool rounds it makes.
- * Stop aborts the run only, never a background job.
+ * It has no Stop: to change course the owner sends another message.
  */
 export const StatusItem = Schema.TaggedStruct('status', {
   runId: RunId,

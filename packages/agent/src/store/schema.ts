@@ -76,7 +76,7 @@ const core1 = [
   //   submitted   in the journal of `incarnation` as `submission_id` (spec `submitted`)
   //   done        its run answered
   //   interrupted its run will not finish: a rollback or rotation, or pi gave up (spec `interrupted`)
-  //   stopped     the owner pressed Stop
+  //   stopped     never written now (there is no Stop); the CHECK keeps it because steps are append-only
   //   failed      refused before a run (for example AI off)
   `CREATE TABLE inbox (
     seq INTEGER PRIMARY KEY,
@@ -193,7 +193,7 @@ const core1 = [
   // receipts are evidence and are never overwritten. outcome:
   //   consumed          authorized, not yet handed to transport
   //   sent              an attempt is with the transport
-  //   cancel-requested  Pause, Stop or AI off asked it to stop
+  //   cancel-requested  Pause or AI off asked it to stop
   //   cancelled         stopped before any attempt
   //   unknown           no receipt and no definite rejection; reconcile works on it
   //   done | failed     evidence decided it

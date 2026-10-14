@@ -107,8 +107,6 @@ export interface Turns {
   readonly accept: (input: { readonly opId: string; readonly kind: InboxKind; readonly text: string; readonly data?: unknown }) => Accept
   /** "Try again" on an interrupted or failed send. */
   readonly retry: (input: { readonly opId: string; readonly interruptedOpId: string }) => Retry
-  /** Stops run `runId` only. Its held input starts the next run. */
-  readonly stop: (runId: string) => Promise<void>
   readonly mode: () => Mode
   readonly setMode: (next: Mode) => void
   /** The live run, or undefined. */
@@ -193,11 +191,9 @@ async function start(
   let projection: ReturnType<typeof projector> | undefined
   let unsubscribe: () => void = noop
   let compactor: Compactor | undefined
-  const commitWaiters: Array<() => void> = []
   const session = {
     journal: () => journal!,
     catchUp: () => projection!.catchUp(),
-    nextCommit: () => new Promise<void>((resolve) => commitWaiters.push(resolve)),
   }
 
   const tools = () => [...memoryTools, ...jobTools, ...slackTools]
@@ -249,7 +245,6 @@ async function start(
     journal = next
     projection = projector(store, next)
     unsubscribe = next.onCommit(() => {
-      for (const resolve of commitWaiters.splice(0)) resolve()
       void projection!.catchUp().then(() => compactor?.poke(), options.onReport)
     })
   }
@@ -300,7 +295,6 @@ async function start(
     position: async () => ({ incarnation: journal!.incarnation, seq: await journal!.lastCommitted() }),
     accept: router.accept,
     retry: router.retry,
-    stop: router.stop,
     mode: router.mode,
     setMode: (next) => {
       router.setMode(next)

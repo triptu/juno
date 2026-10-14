@@ -23,7 +23,6 @@ export const chatCopy = {
     newDivider: 'New',
   },
   delivery: {
-    queued: 'Queued',
     waiting: {
       network: 'Waiting for network',
       resume: 'Waiting for Resume',
@@ -35,7 +34,6 @@ export const chatCopy = {
   },
   /** One line per `Ending` variant. `interrupted` and `failed` add "Try again" when the ending carries a retry op. */
   ending: {
-    stopped: "Stopped. Juno won't start anything new for this reply.",
     interrupted: 'Juno was interrupted. Your message is kept.',
     blocked: {
       tooLarge: "Juno can't fit this in one request. Removing a pin or starting a smaller task helps.",
@@ -48,9 +46,6 @@ export const chatCopy = {
       offline: 'Juno lost the connection. Try again when you are back online.',
     },
     tryAgain: 'Try again',
-  },
-  status: {
-    stop: 'Stop',
   },
   note: {
     remembered: 'Remembered',
@@ -121,7 +116,7 @@ export const chatCopy = {
   },
   pages: {
     activity: {
-      outcome: { replied: 'Replied', stopped: 'Stopped', interrupted: 'Interrupted', blocked: 'Blocked', failed: 'Failed', stayedQuiet: 'Stayed quiet' },
+      outcome: { replied: 'Replied', interrupted: 'Interrupted', blocked: 'Blocked', failed: 'Failed', stayedQuiet: 'Stayed quiet' },
       copyDetails: 'Copy details',
     },
     memory: { beingUpdated: 'being updated' },

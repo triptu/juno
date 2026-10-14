@@ -3,26 +3,32 @@
  * bridge). It owns the live run: its history cutoff `H`, its clean flag, its
  * inputs, its text and status, and how it ends.
  *
+ * The chat has two inputs and nothing else: queue a message (`accept`) and
+ * listen to events (`subscribe`). Nothing the owner does stops a run. To
+ * change course they send another message, and Juno reads it at its next
+ * step.
+ *
  * One input, one run:
  *
  *   idle ─▶ begin: commit the run (H, origin) ─▶ deliver: reset, submit ─▶ live
  *   live ─▶ every request is built by the request builder (pi's beforeRequest)
- *   live ─▶ input that arrives is held, and joins at the next boundary:
- *           after a tool round (afterTools) or at an answer (onYield)
- *   live ─▶ Stop: nothing new is authorized, the run is aborted; held input stays
+ *   live ─▶ input that arrives is held, and joins at the next boundary as a
+ *           pi steer: after a tool round (afterTools) or at an answer (onYield)
  *   live ─▶ settled: the ending is committed, then each input op is settled
  *
- * Why input is held, not submitted to pi at once: pi withdraws queued input
- * when a run is aborted, and it keeps the op's request id, so a steer queued
- * in pi could never run after Stop (M7). Held input is still in the inbox
- * after Stop and starts the next run. Submitted at a boundary, pi places it
- * before the next request, exactly as a pi steer.
+ * Why input is held until a boundary rather than submitted to pi at once:
+ * pi places a steer only at a boundary of a working run. When a run fails,
+ * pi keeps a queued steer until the next input places it, so a message
+ * queued in pi during a failed run would wait for another message. Handed
+ * over at the boundary, pi places it right there, exactly as a steer
+ * submitted earlier would be. Held input that no boundary took starts the
+ * next run.
  *
- * Endings (agent-contract `Ending`): `stopped` after Stop; the builder's
- * refusal (`blocked`, `interrupted`) or the guard's failure code from the
- * failed response (`failed`, `blocked`, `interrupted`); `complete` when pi
- * answered every input; `interrupted` otherwise. Owner runs carry the op to
- * retry on `interrupted` and `failed`.
+ * Endings (agent-contract `Ending`): the builder's refusal (`blocked`,
+ * `interrupted`) or the guard's failure code from the failed response
+ * (`failed`, `blocked`, `interrupted`); `complete` when pi answered every
+ * input; `interrupted` otherwise. Owner runs carry the op to retry on
+ * `interrupted` and `failed`.
  *
  * A crash anywhere resumes: the run row is committed before the input is
  * delivered, and an input op is settled only after the run's ending is
@@ -36,7 +42,7 @@ import type { ChatModel, RequestBuilder, WireMessage } from '../request/builder'
 import type { JunoTool, ToolRun } from '../request/tool'
 import type { Journal, Settled } from '../runtime/journal'
 import { transaction } from '../store/database'
-import { cancelRun, mode, setMode, type Mode } from '../store/ledger'
+import { mode, setMode, type Mode } from '../store/ledger'
 import { uuidv7, type Store } from '../store/store'
 import type { Origin, RunState, TurnEvent } from './events'
 
@@ -47,12 +53,7 @@ export interface Session {
   readonly journal: () => Journal
   /** Projects every journal commit into the archive. */
   readonly catchUp: () => Promise<void>
-  /** Resolves at the journal's next commit. */
-  readonly nextCommit: () => Promise<void>
 }
-
-/** How long Stop waits for input handed to pi at the last boundary to join the run. */
-const PLACE_MS = 1_000
 
 export interface RouterOptions {
   readonly store: Store
@@ -75,8 +76,6 @@ interface Live {
   clean: boolean
   /** Inbox op → its pi submission, once delivered. */
   readonly inputs: Map<string, string | undefined>
-  readonly steers: Set<string>
-  stopping: boolean
   failure: Ending | undefined
   /** Text of the run's finished requests, and of the one streaming now. */
   done: string
@@ -93,17 +92,17 @@ interface Live {
 
 const originOf = (kind: InboxKind): Origin => (kind === 'send' || kind === 'steer' || kind === 'retry' ? 'owner' : kind)
 const join = (...parts: ReadonlyArray<string>) => parts.filter((part) => part !== '').join('\n\n')
-const settledStates = new Set(['done', 'interrupted', 'stopped', 'failed'])
+const settledStates = new Set(['done', 'interrupted', 'failed'])
 
 const live = (row: { id: string; op_id: string; origin: Origin; h: number; clean: number }): Live => ({
   runId: row.id, opId: row.op_id, origin: row.origin, h: row.h, clean: row.clean === 1,
-  inputs: new Map(), steers: new Set(), stopping: false, failure: undefined,
+  inputs: new Map(), failure: undefined,
   done: '', partial: '', streamed: false, status: {}, statusAt: 0, nextStatus: undefined, statusTimer: undefined,
   calls: new Map(), flushing: Promise.resolve(),
 })
 /** The inbox state an op settles in for a run's ending. */
-const stateFor = (ending: Ending): 'done' | 'interrupted' | 'stopped' | 'failed' =>
-  ending._tag === 'complete' ? 'done' : ending._tag === 'stopped' ? 'stopped' : ending._tag === 'interrupted' ? 'interrupted' : 'failed'
+const stateFor = (ending: Ending): 'done' | 'interrupted' | 'failed' =>
+  ending._tag === 'complete' ? 'done' : ending._tag === 'interrupted' ? 'interrupted' : 'failed'
 const reasonFor = (ending: Ending) => ('reason' in ending ? `${ending._tag}:${ending.reason}` : ending._tag)
 
 export type Retry =
@@ -145,25 +144,17 @@ export function createRouter(options: RouterOptions) {
 
   const endingOf = (run: Live, results: ReadonlyMap<string, Settled | InboxOp['state']>): Ending => {
     const retry = run.origin === 'owner' ? { retry: run.opId as OpId } : {}
-    if (run.stopping) return { _tag: 'stopped' }
     if (run.failure !== undefined) {
       return run.failure._tag === 'interrupted' || run.failure._tag === 'failed' ? { ...run.failure, ...retry } : run.failure
     }
     const answered = [...results.values()].every((result) => (typeof result === 'string' ? result === 'done' : result.status === 'done'))
     return answered ? { _tag: 'complete' } : { _tag: 'interrupted', ...retry }
   }
-  /** A steer pi withdrew on Stop before placing it: it never reached the archive. */
-  const withdrawn = (run: Live, opId: string) =>
-    run.stopping && run.steers.has(opId) && store.db.prepare('SELECT 1 FROM messages WHERE origin_op = ?').get(opId) === undefined
-
   const finish = (run: Live, ending: Ending) => {
     transaction(store.db, () => {
       store.db.prepare('UPDATE runs SET ended_at = ?, ending = ? WHERE id = ? AND ended_at IS NULL').run(store.now(), JSON.stringify(ending), run.runId)
     })
-    for (const opId of run.inputs.keys()) {
-      if (withdrawn(run, opId)) settle(store, opId, 'interrupted', 'withdrawn')
-      else settle(store, opId, stateFor(ending), reasonFor(ending))
-    }
+    for (const opId of run.inputs.keys()) settle(store, opId, stateFor(ending), reasonFor(ending))
     if (run.statusTimer !== undefined) clearTimeout(run.statusTimer)
     if (current === run) current = undefined
     emit({ _tag: 'ended', runId: run.runId, opId: run.opId, ending })
@@ -204,18 +195,14 @@ export function createRouter(options: RouterOptions) {
       row = { id, op_id: first.opId, origin: originOf(first.kind), h: at.id ?? archiveLength(), clean: 0 }
     }
     const run = live(row)
-    const inputs = store.db.prepare('SELECT op_id AS opId, steer FROM run_inputs WHERE run_id = ?').all(run.runId) as Array<{ opId: string; steer: number }>
-    for (const input of inputs) {
-      run.inputs.set(input.opId, find(store, input.opId)?.submissionId ?? undefined)
-      if (input.steer === 1) run.steers.add(input.opId)
-    }
+    const inputs = store.db.prepare('SELECT op_id AS opId FROM run_inputs WHERE run_id = ?').all(run.runId) as Array<{ opId: string }>
+    for (const input of inputs) run.inputs.set(input.opId, find(store, input.opId)?.submissionId ?? undefined)
     for (const op of open) {
       if (run.inputs.has(op.opId)) continue
       transaction(store.db, () => {
         store.db.prepare('INSERT OR IGNORE INTO run_inputs (op_id, run_id, steer) VALUES (?, ?, 1)').run(op.opId, run.runId)
       })
       run.inputs.set(op.opId, op.submissionId ?? undefined)
-      run.steers.add(op.opId)
     }
     current = run
   }
@@ -243,11 +230,7 @@ export function createRouter(options: RouterOptions) {
     const journal = session.journal()
     const input = find(store, run.opId)
     if (input === undefined) throw new Error(`run ${run.runId} has no input`)
-    if (input.state === 'accepted') {
-      if (run.stopping) return finish(run, { _tag: 'stopped' })
-      run.inputs.set(input.opId, await deliver(store, journal, input, { steer: false }))
-      if (run.stopping) await journal.abort()
-    }
+    if (input.state === 'accepted') run.inputs.set(input.opId, await deliver(store, journal, input, { steer: false }))
     const results = new Map<string, Settled | InboxOp['state']>()
     for (;;) {
       const pending = [...run.inputs].filter(([opId]) => !results.has(opId))
@@ -315,17 +298,16 @@ export function createRouter(options: RouterOptions) {
   /** Delivers held input into the live run at a boundary, oldest first. */
   const flush = async () => {
     const run = current
-    if (run === undefined || run.stopping || mode(store) !== 'on') return
+    if (run === undefined || mode(store) !== 'on') return
     const work = (async () => {
       for (;;) {
         const op = nextAccepted(store)
-        if (op === undefined || run.stopping || run.inputs.has(op.opId) || run !== current) return
+        if (op === undefined || run.inputs.has(op.opId) || run !== current) return
         // §6.4: a steered report or wake is untrusted content.
         if (originOf(op.kind) === 'report' || originOf(op.kind) === 'wake') taint(run)
         transaction(store.db, () => {
           store.db.prepare('INSERT OR IGNORE INTO run_inputs (op_id, run_id, steer) VALUES (?, ?, 1)').run(op.opId, run.runId)
         })
-        run.steers.add(op.opId)
         run.inputs.set(op.opId, await deliver(store, session.journal(), op, { steer: true }))
         emit({ _tag: 'steered', runId: run.runId, opId: op.opId })
       }
@@ -342,7 +324,7 @@ export function createRouter(options: RouterOptions) {
         api: { readonly models: { readonly getModel: (provider: string, id: string) => ChatModel | undefined } },
       ) => {
         const run = current
-        if (run === undefined || run.stopping) throw new Error('no live run')
+        if (run === undefined) throw new Error('no live run')
         await session.catchUp()
         run.streamed = false
         const model = api.models.getModel(options.model.provider, options.model.modelId)
@@ -384,24 +366,6 @@ export function createRouter(options: RouterOptions) {
     },
   }
 
-  /**
-   * Waits, at most `PLACE_MS`, until every steer handed to pi is in the
-   * archive. pi places input at the boundary right after the hook that
-   * submitted it; an abort before that withdraws it, and its op id cannot be
-   * submitted again.
-   */
-  const placed = async (run: Live) => {
-    const deadline = Date.now() + PLACE_MS
-    const inArchive = store.db.prepare('SELECT 1 FROM messages WHERE origin_op = ?')
-    for (;;) {
-      await session.catchUp()
-      if (run !== current || [...run.steers].every((opId) => run.inputs.get(opId) === undefined || inArchive.get(opId) !== undefined)) return
-      const left = deadline - Date.now()
-      if (left <= 0) return
-      await Promise.race([session.nextCommit(), new Promise((resolve) => setTimeout(resolve, left))])
-    }
-  }
-
   // ---- The loop
 
   const loop = async () => {
@@ -441,12 +405,9 @@ export function createRouter(options: RouterOptions) {
         if (!closing) options.onReport?.(error)
       })
     },
+    /** Queues input: it joins the live run at its next step, or starts a run. */
     accept: (input: { readonly opId: string; readonly kind: InboxKind; readonly text: string; readonly data?: unknown }): Accept => {
       const result = accept(store, input)
-      const run = current
-      if (result._tag === 'accepted' && result.op.state === 'accepted' && run !== undefined && !run.inputs.has(input.opId)) {
-        emit({ _tag: 'queued', runId: run.runId, opId: input.opId })
-      }
       signal()
       return result
     },
@@ -460,17 +421,6 @@ export function createRouter(options: RouterOptions) {
       signal()
       return result
     },
-    /** Esc or the bubble's Stop: this run only (§8, B5). Held input stays and starts the next run. */
-    stop: async (runId: string) => {
-      const run = current
-      if (run === undefined || run.runId !== runId || run.stopping) return
-      run.stopping = true
-      for (const opId of run.inputs.keys()) cancelRun(store, opId)
-      await run.flushing
-      if (run.inputs.get(run.opId) === undefined) return signal()
-      await placed(run)
-      await session.journal().abort()
-    },
     mode: (): Mode => mode(store),
     setMode: (next: Mode) => {
       setMode(store, next)
@@ -479,10 +429,7 @@ export function createRouter(options: RouterOptions) {
     state: (): RunState | undefined => {
       const run = current
       if (run === undefined) return undefined
-      const queued = (store.db.prepare("SELECT op_id AS opId FROM inbox WHERE state = 'accepted' ORDER BY seq").all() as Array<{ opId: string }>)
-        .map((row) => row.opId)
-        .filter((opId) => !run.inputs.has(opId))
-      return { runId: run.runId, opId: run.opId, origin: run.origin, text: text(run), status: run.status, queued }
+      return { runId: run.runId, opId: run.opId, origin: run.origin, text: text(run), status: run.status }
     },
     /** The live run's cutoff, for the compactor's ceiling (G2). */
     cutoff: (): number | undefined => current?.h,

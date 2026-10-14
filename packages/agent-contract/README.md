@@ -18,7 +18,7 @@ View-shaped types for the Juno chat (SPEC "Juno Agent", plan v3 §12 and §13). 
 | --- | --- |
 | `ids.ts` | Branded ids the views hand back: `ChatMessageId`, `OpId`, `CardId`, `ProposedMessageId`, `QuestionOptionId`, `JobId`, `ScheduleId`, `RunId`, `PinId`, `ConnectionId` |
 | `place.ts` | `Place` (a Slack place for a context pill), `TopicLink`, `JobRef`, `OpenTarget` (what "Open" opens; a `url` is `https:` anywhere or `http:` on loopback, checked by `isOpenableUrl` at decode time), `JunoPage` |
-| `items.ts` | `ChatItem`: one row of the list. `owner` bubbles keyed by `opId` (the archive `id` arrives later), `juno` bubbles with `GroupPosition`, the one `status` bubble, `note` lines, `groupLabel` over a proactive group, `day` and `newDivider` separators. `Delivery` (sending, sent, queued, waiting, failed) and `Ending` (complete, stopped, interrupted, blocked, failed) are the per-message state machines; `Origin` says what started a run. `RemoveSheet` is the owner's local Remove |
+| `items.ts` | `ChatItem`: one row of the list. `owner` bubbles keyed by `opId` (the archive `id` arrives later), `juno` bubbles with `GroupPosition`, the one `status` bubble, `note` lines, `groupLabel` over a proactive group, `day` and `newDivider` separators. `Delivery` (sending, sent, waiting, failed) and `Ending` (complete, interrupted, blocked, failed) are the per-message state machines; `Origin` says what started a run. `RemoveSheet` is the owner's local Remove |
 | `cards.ts` | `Card`: the catalogue (`sendMessage`, `resolve`, `topics`, `proposedTask`, `task`, `question`, `proposedSchedule`, `schedule`, `connect`, `change`, `remove`, `budget`, `provider`, plus `unknown` for a kind this build lacks). `CardStatus` is the one status machine every kind but `task` shares: open, working, done, dismissed, expired, failed, unknown, with the after-line carried as text. `task` has `JobPhase` instead. `sendMessageStatus` derives a Send card's status from its rows |
 | `page.ts` | `ChatPage` (items, `moreAbove` and `moreBelow`, the `Banner` picked by precedence: otherDevice, updateNeeded, recovery, aiOff, paused, offline) and `ChatSummary` (unread count, busy while a job runs, the job line the sidebar and home show) |
 | `pages.ts` | The header-menu pages: `ScheduledPage`, `RemembersPage`, `MemoryPage`, `ActivityPage`, `ConnectionsPage` (with the T3 address settings), `ReviewPage` (recovery), `JunoSettingsPage` (with `Ownership`) |
@@ -43,7 +43,7 @@ Rules of the shape:
 
 `AgentRpcs` merges `ChatRpcs`, `CardRpcs`, `ScheduledRpcs`, `RemembersRpcs`, `MemoryRpcs`, `ActivityRpcs`, `ConnectionsRpcs`, `ReviewRpcs` and `SettingsRpcs`. Each route is also exported. Live pages use streamed snapshots; chat windows are bounded to 200 rows and can open at latest, unread, around an anchor, above or below it. `ChatPageSnapshot.page` is exactly WP7's `ChatPage`, including `moreAbove` and `moreBelow`.
 
-Every durable mutation carries an `OpId`. `Accepted` means the FULL inbox commit succeeded, not that a run or external action succeeded. Failed delivery retries reuse the same op id. Stop names a run; stopping a background job is a separate command. The local Remove command needs no model run.
+Every durable mutation carries an `OpId`. `Accepted` means the FULL inbox commit succeeded, not that a run or external action succeeded. Failed delivery retries reuse the same op id. There is no command to stop a run: `chat.send` while Juno is working joins the run at its next step. Stopping a background job is the Task card's command. The local Remove command needs no model run.
 
 Approval identities and source revisions travel beside the view models. A card click binds the card revision/digest and ordered child revision/digests, including the duplicate warning. `prepare` stores choice arguments (for example a question answer) before `approve`; approval never accepts replacement executable arguments. Editing send text creates a new stored proposal. `dismiss` serves every button that only declines (Dismiss, Skip, Keep on Remove, Wait until tomorrow). `askAgain` takes an expired card; the agent writes the owner message that quotes it. The handler must reject stale bindings and already-consumed approvals.
 
@@ -62,7 +62,7 @@ All five are settled in plan v3 (§0 rows W9 to W13):
 - Proposal names: §6.4 names `proposedTask` and `proposedSchedule`. Steering from a tainted run is a `change` card (W10).
 - Every repeat of a non-deduplicated action needs a warned click, as Quint's `retryRequiresAuthority` says. `CardStatus` `failed` and `unknown` carry `mayDuplicate`, the button shows `chatCopy.card.mayDuplicate`, and `transitionCard` refuses an unwarned retry of such a status (W9).
 - The chat shows one result per row and one status per card. The record keeps every attempt and both cancellation states; Activity shows them (W12).
-- Stop's line promises only that nothing new starts: "Stopped. Juno won't start anything new for this reply." (W11).
+- W11 (Stop's line) no longer applies: the chat has no Stop (decision log, 10-14 11:50).
 - Approval identities and edit revisions travel in RPC metadata, not in `src/chat/**` (W13).
 
 Run `pnpm test:agent-contracts` from the root for the property tests and request/response JSON codec round trips for every RPC group. `pnpm typecheck` checks the test sources too.

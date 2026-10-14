@@ -19,7 +19,7 @@ import { projector } from '../projection/projector'
 import { commitRotation, currentIncarnation, deleteRetiredJournals } from '../recovery/incarnations'
 import { recover } from '../recovery/recover'
 import { openDatabase, StoreTooNew, type Database } from '../store/database'
-import { cancelRun, mode, setMode, type JournalPosition, type Mode } from '../store/ledger'
+import { mode, setMode, type JournalPosition, type Mode } from '../store/ledger'
 import type { MigrationSet } from '../store/schema'
 import { initialize, type Store } from '../store/store'
 import { crashPoint } from './crash'
@@ -56,8 +56,6 @@ export interface Core {
   readonly mode: () => Mode
   /** Pause, AI off and Resume (§6.5). Sends wait while paused; nothing new is authorized. */
   readonly setMode: (next: Mode) => void
-  /** Stops the run of `opId`. Nothing new starts for it; work already handed off may still land. */
-  readonly stop: (opId: string) => Promise<void>
   /** Rotates the journal once the current run settles (§3 Rotation). */
   readonly rotate: () => Promise<void>
   /** Resolves when no op is accepted or running (while `on`). */
@@ -106,7 +104,6 @@ function running(store: Store, first: Journal, options: CoreOptions, opened: 're
   let closing = false
   let rotateRequested: Array<() => void> = []
   let current: string | undefined
-  const stopped = new Set<string>()
   let wake: (() => void) | undefined
   const signal = () => wake?.()
   const idleWaiters: Array<() => void> = []
@@ -122,8 +119,7 @@ function running(store: Store, first: Journal, options: CoreOptions, opened: 're
     current = opId
     const settled = await journal.wait(submissionId)
     await projection.catchUp()
-    if (stopped.has(opId)) settle(store, opId, 'stopped')
-    else if (settled.status === 'done') settle(store, opId, 'done')
+    if (settled.status === 'done') settle(store, opId, 'done')
     else settle(store, opId, 'interrupted', settled.reason)
     current = undefined
   }
@@ -198,15 +194,6 @@ function running(store: Store, first: Journal, options: CoreOptions, opened: 're
     setMode: (next) => {
       setMode(store, next)
       signal()
-    },
-    stop: async (opId) => {
-      cancelRun(store, opId)
-      if (current !== opId) {
-        settle(store, opId, 'stopped')
-        return
-      }
-      stopped.add(opId)
-      await journal.abort()
     },
     rotate: () =>
       new Promise<void>((resolve) => {

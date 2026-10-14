@@ -13,7 +13,7 @@ import { mode } from '../store/ledger'
 import type { Store } from '../store/store'
 
 export type InboxKind = 'send' | 'steer' | 'retry' | 'wake' | 'report' | 'click'
-export type InboxState = 'accepted' | 'submitted' | 'done' | 'interrupted' | 'stopped' | 'failed'
+export type InboxState = 'accepted' | 'submitted' | 'done' | 'interrupted' | 'failed'
 
 export interface InboxOp {
   readonly seq: number
@@ -80,7 +80,7 @@ export function markSubmitted(store: Store, opId: string, incarnation: string, s
 }
 
 /** The op's run ended. A settled op never changes again. */
-export function settle(store: Store, opId: string, state: 'done' | 'interrupted' | 'stopped' | 'failed', reason?: string): void {
+export function settle(store: Store, opId: string, state: 'done' | 'interrupted' | 'failed', reason?: string): void {
   transaction(store.db, () => {
     store.db
       .prepare("UPDATE inbox SET state = ?, reason = ?, ended_at = ? WHERE op_id = ? AND state IN ('accepted', 'submitted')")

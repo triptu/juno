@@ -114,8 +114,12 @@ export async function openJournalFile(agentDir: string, incarnation: string): Pr
   }
 }
 
-/** Run policy (spikes S1, finding 2). Compaction is Juno's own; retries are the router's. */
+/**
+ * Run policy (spikes S1, finding 2). Compaction is Juno's own; retries are the router's.
+ * Every steer queued at a boundary joins at once, so several quick messages are read together.
+ */
 const SETTINGS = {
+  steeringMode: 'all',
   compaction: { enabled: false, backgroundTokens: 0 },
   retry: { maxRetries: 0 },
   progress: { partialIntervalMs: 250, outputIntervalMs: 250 },

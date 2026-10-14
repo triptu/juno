@@ -86,6 +86,15 @@ export function answer(text: string) {
   } as never
 }
 
+/** An answer that calls one tool, for a reply factory. */
+export function toolCall(name: string, args: Record<string, unknown>) {
+  return () => ({
+    role: 'assistant', content: [{ type: 'toolCall', id: `call-${name}`, name, arguments: args }], api: 'faux', provider: 'openrouter', model: SONNET.modelId,
+    usage: { input: 10, output: 5, cacheRead: 0, cacheWrite: 0, totalTokens: 15, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
+    stopReason: 'toolUse', timestamp: Date.now(),
+  }) as never
+}
+
 export function deferred<T = void>() {
   let resolve!: (value: T) => void
   const promise = new Promise<T>((r) => (resolve = r))

@@ -79,7 +79,7 @@ export const ActivityAction = Schema.Struct({
 export type ActivityAction = typeof ActivityAction.Type
 
 /** How a run ended, printed from `chatCopy.pages.activity.outcome`. */
-export const RunOutcome = Schema.Literals(['replied', 'stopped', 'interrupted', 'blocked', 'failed', 'stayedQuiet'])
+export const RunOutcome = Schema.Literals(['replied', 'interrupted', 'blocked', 'failed', 'stayedQuiet'])
 export type RunOutcome = typeof RunOutcome.Type
 
 export const ActivityRun = Schema.Struct({
