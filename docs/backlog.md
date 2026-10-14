@@ -44,13 +44,13 @@ Small items noticed during work that are not yet assigned to a milestone. Remove
 - Notifications (M10): `urgencyGate` answers `{ notify, reason }` and reads the owner's "What matters" text, in place of `{ urgent, chatter }`. Re-run the gate eval and keep the p50 near 516 ms. On timeout the pipeline falls back to the AI-off rule.
 - Notifications (M10): the hours-start summary notification (`hoursStartSummary`), the why popover on the message menu, and a Juno Agent tool to read and change notification settings and hours (Local tier, Undo, only from the owner's own words).
 - Notifications: `docs/design/handoff/screenshots/12-ui.png` shows the old page; replace it with a shot of the built page in M10.
-- Juno Agent ideas adopted 10-14 from `docs/research/agent-native-chat-products.md`, to fold into SPEC 13 and plan v3 after the simplification pass merges:
-  - Every Slack claim Juno makes (chat, catch-ups, the summary when notification hours start) links to the messages it came from.
-  - "Tell me if nobody replies": set in chat or from your own message's menu; Juno watches the thread and speaks only if the deadline passes with no reply. When it fires, Juno offers a ready-to-send nudge draft in your voice, one click to send (an owner-approved exception to "AI manages, you write").
-  - "Ask Juno" in a person's or channel's menu opens the Juno sidebar scoped to it.
-  - A correction to a notify or hold call: Juno asks once whether it applies more widely, then updates "What matters to you" with Undo (M10).
-  - A dismissed card tells the model plainly that the owner said no, so silence never reads as success (engine only).
-  - Coding hand-offs: the Task card shows the project and branch Juno picked, Juno sends a plan first when it judges the work needs one, and the Done message says what the cause was (with the T3 Code work).
+- Juno Agent ideas adopted 10-14 from `docs/research/agent-native-chat-products.md`: specced in SPEC (principle 5, sections 5, 7, 13.1, 13.3, 13.4, 13.6, 13.9, 14, 15), inventory §12, §12.1, §15.2, §15.4 and §15.6, and plan v3 §19, which names the work package for each. Still to build:
+  - Sources on every Slack claim (WP7, WP11, WP12, WP14).
+  - Reply watches with a nudge draft, from chat and your own message's menu (WP19, WP13, M5).
+  - Ask Juno in the person and channel menus (WP14, app menus).
+  - Corrections that update "What matters to you" with Undo (M10, WP15).
+  - Dismissals that reach the model as a no (WP15, WP11).
+  - Coding hand-offs: project and branch on the Task card, a plan first when needed, the cause when done (WP18, M4).
 - Specs (with the M5 cuts): `specs/readstate.qnt` models stealth (`stealth`, `stealthNeverMarks`, `stealthThenMarkStep`, `stealthBugStep`). Stealth is removed; peek and the New chat preview are the reads that never mark. Rename the action and property to peek and update `specs/README.md` and `specs/check.mjs`; the protocol does not change. `follow.qnt` needs no change: Notify me on a thread runs the same Subscribe and Unsubscribe commands.
 - Screenshots: `docs/design/handoff/screenshots/01-ui.png` (catch-up card, Browse and Theme icons, For you), `04-ui.png` (grouping card), `10-ui.png` (For you) and `14-ui.png` (stealth) show removed things. Replace them with shots of the built app once M5 lands.
 - Home: the follow-up and tidy-up items need an engine source now that `for_you_cards` is unused (a `home_items` table or a live query over settled scores and the assistant's follow-ups). Decide in M11.

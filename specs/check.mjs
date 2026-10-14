@@ -210,6 +210,8 @@ if (!boundedOnly && !memoryOnly && !recoveryOnly) {
   simulate('agent-actions', 'clickedGrantStep', 'invariants', 'actions-clicked-grant.itf.json', false, false, options)
   simulate('agent-actions', 'clickedScheduleWitnessStep', 'invariants', 'actions-clicked-schedule.itf.json', false, true,
     { ...options, samples: 1, witnesses: ['reachedAgreement', 'clickedScheduleCreated'], requireCompletion: true })
+  simulate('agent-actions', 'menuScheduleWitnessStep', 'invariants', 'actions-menu-schedule.itf.json', false, true,
+    { ...options, samples: 1, witnesses: ['reachedAgreement', 'menuScheduleCreated'], requireCompletion: true })
   for (const [schedule, invariant] of actionCases) {
     simulate('agent-actions', `${schedule}BugStep`, invariant, `actions-${schedule}-bug.itf.json`, true, false, options)
   }
