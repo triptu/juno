@@ -38,7 +38,7 @@ import {
   type OlderStatus,
 } from '@juno/views'
 import { markFilterChange } from './filterMark'
-import { closeTopicTab, openTopic, takeOpenStart } from './navigation'
+import { closeTopicTab, onLeaveTab, openTopic, takeOpenStart } from './navigation'
 
 /** Within this of the end counts as at the bottom (performance 3.3). */
 const BOTTOM_SLACK = 32
@@ -342,6 +342,7 @@ function Topic({ id, stealth, detail }: { readonly id: string; readonly stealth:
     const letGo = () => {
       pin.current = undefined
     }
+    const record = () => registry.set(scrollSnapshotAtom(id), snapshotOf(scroller))
     const onScrollEnd = () => {
       if (pin.current?.kind === 'row' && Math.abs(scroller.scrollTop - pinnedTop.current) > 1) pin.current = undefined
       const distance = distanceFromBottom(scroller)
@@ -351,14 +352,19 @@ function Topic({ id, stealth, detail }: { readonly id: string; readonly stealth:
       setAtBottom(bottom)
       setFar(distance > scroller.clientHeight)
       if (bottom) setSeenTs(lastRef.current)
-      registry.set(scrollSnapshotAtom(id), snapshotOf(scroller))
+      record()
     }
     const inputs = ['wheel', 'touchstart', 'pointerdown', 'keydown'] as const
     for (const type of inputs) scroller.addEventListener(type, letGo, { passive: true })
     scroller.addEventListener('scrollend', onScrollEnd)
+    // After a jump (End, a scrollbar drag, a script) the rows it brought near the view reach their real
+    // height frames after the scroll ended, and Chromium does not always anchor that; so the position is
+    // also recorded as the tab is left, from what is on screen then.
+    const stopLeaving = onLeaveTab(id, record)
     return () => {
       for (const type of inputs) scroller.removeEventListener(type, letGo)
       scroller.removeEventListener('scrollend', onScrollEnd)
+      stopLeaving()
     }
   }, [id])
 

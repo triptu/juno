@@ -56,7 +56,20 @@ export function openWindow(detail: TopicDetail): MessageWindowSpec {
   return wanted <= MESSAGE_WINDOW_DEFAULT ? bottomWindow : { limit: Math.min(MESSAGE_WINDOW_MAX, wanted) }
 }
 
+/** What the shown tab does just before another tab replaces it: record its scroll position. */
+const leaving = new Map<string, () => void>()
+
+/** Registers what the tab `id` does as it is left, while it is shown. Returns the unregister. */
+export function onLeaveTab(id: string, leave: () => void): () => void {
+  leaving.set(id, leave)
+  return () => {
+    if (leaving.get(id) === leave) leaving.delete(id)
+  }
+}
+
 function apply(change: (tabs: Tabs) => Tabs): Tabs {
+  const active = registry.get(tabsAtom).active
+  if (active !== undefined) leaving.get(active)?.()
   const next = updateTabs(registry, change)
   registry.set(selectedTopicAtom, next.active)
   return next
