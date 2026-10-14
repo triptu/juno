@@ -64,6 +64,15 @@ test('Main shows thread links; a link opens the thread in the tab, and Threads l
   threads = await juno.topic.openThreads()
   await threads.subscribe(CHECKOUT)
   await juno.sidebar.row(CHECKOUT).expectVisible()
+
+  // From the keyboard: Tab reaches the rows, which are buttons named by their title; Escape returns to the Threads button.
+  threads = await juno.topic.openThreadsWithKeyboard()
+  await juno.win.keyboard.press('Tab')
+  await expect(threads.root.getByRole('button').first()).toBeFocused()
+  await expect(threads.row(CHECKOUT)).toBeVisible()
+  await juno.win.keyboard.press('Escape')
+  await expect(threads.root).toHaveCount(0)
+  await expect(juno.topic.threadsButton).toBeFocused()
 })
 
 test('a #channel chip scopes the sidebar to that channel', async ({ juno }) => {

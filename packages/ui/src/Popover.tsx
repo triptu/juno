@@ -1,5 +1,5 @@
 import * as stylex from '@stylexjs/stylex'
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, type ReactNode } from 'react'
 import { layout, motion, spacing, z } from '@juno/tokens/tokens.stylex'
 import { Surface, type SurfacePadding, type SurfaceRadius } from './Surface'
 
@@ -28,11 +28,15 @@ export interface PopoverProps {
   readonly children?: ReactNode
 }
 
+/** What can take focus in the anchor. */
+const FOCUSABLE = 'button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])'
+
 /**
  * Floats a popover Surface next to its anchor. Appears with a short fade
  * and scale from the anchor corner (--duration-appear); closing is instant,
  * since the panel is unmounted. Scrolling is contained so the page behind
- * never moves.
+ * never moves. Closing with Escape while focus is inside puts focus back on
+ * the anchor, so the next Tab goes on from there instead of from the top.
  */
 export function Popover({
   open,
@@ -50,12 +54,25 @@ export function Popover({
   children,
 }: PopoverProps) {
   const rootRef = useRef<HTMLDivElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
+  // Set when Escape closes the panel with focus in it; the anchor takes focus once the panel is gone.
+  const restoreFocus = useRef(false)
+
+  useLayoutEffect(() => {
+    if (open || !restoreFocus.current) return
+    restoreFocus.current = false
+    rootRef.current?.querySelector<HTMLElement>(FOCUSABLE)?.focus()
+  }, [open])
 
   useEffect(() => {
     if (!open) return
+    // An owner that stayed open after Escape is not closing; forget it.
+    restoreFocus.current = false
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.stopPropagation()
+        const panel = panelRef.current
+        restoreFocus.current = panel !== null && panel.contains(document.activeElement)
         onClose()
       }
     }
@@ -82,7 +99,7 @@ export function Popover({
     <div ref={rootRef} {...stylex.props(styles.root)}>
       {anchor}
       {open ? (
-        <div {...stylex.props(styles.panel, placements[placement], widths[width], layers[layer])}>
+        <div ref={panelRef} {...stylex.props(styles.panel, placements[placement], widths[width], layers[layer])}>
           <Surface
             kind="popover"
             radius={radius}

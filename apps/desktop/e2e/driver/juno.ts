@@ -700,6 +700,17 @@ export class TopicPane {
     await this.header.getByRole('button', { name: 'Mark read', exact: true }).click()
   }
 
+  /** Mark read from the keyboard: focus it and press Enter. */
+  async markReadWithKeyboard(): Promise<void> {
+    await this.header.getByRole('button', { name: 'Mark read', exact: true }).focus()
+    await this.win.keyboard.press('Enter')
+  }
+
+  /** The header's Subscribe bell, a toggle (`aria-pressed`). */
+  get bell() {
+    return this.header.getByRole('button', { name: /subscribe/i })
+  }
+
   /** A "2 replies · Title" link under a Main message, by its label or title. */
   threadLink(text: string | RegExp): ThreadLinkDriver {
     return new ThreadLinkDriver(this.win, this.list.getByRole('button', { name: text }))
@@ -717,6 +728,15 @@ export class TopicPane {
 
   async openThreads(): Promise<ThreadsPopover> {
     await this.threadsButton.click()
+    const popover = new ThreadsPopover(this.win)
+    await expect(popover.root).toBeVisible()
+    return popover
+  }
+
+  /** Focuses the Threads button and opens its popover with Enter. */
+  async openThreadsWithKeyboard(): Promise<ThreadsPopover> {
+    await this.threadsButton.focus()
+    await this.win.keyboard.press('Enter')
     const popover = new ThreadsPopover(this.win)
     await expect(popover.root).toBeVisible()
     return popover
@@ -852,6 +872,21 @@ export class TabStrip {
   async close(title: string): Promise<void> {
     await this.tab(title).hover()
     await this.tab(title).getByRole('button', { name: 'Close tab' }).click()
+  }
+
+  /** Focuses a tab's close button and presses Enter. */
+  async closeWithKeyboard(title: string): Promise<void> {
+    await this.tab(title).getByRole('button', { name: 'Close tab' }).focus()
+    await this.win.keyboard.press('Enter')
+  }
+
+  async expectFocused(title: string): Promise<void> {
+    await expect(this.tab(title)).toBeFocused()
+  }
+
+  /** The "+" after the last tab. */
+  get newMessageButton() {
+    return this.win.getByRole('button', { name: 'New message', exact: true })
   }
 
   /** An item of the app menu, as ⌘W, ⌘⇧] or ⌘⇧[ would choose it. */
