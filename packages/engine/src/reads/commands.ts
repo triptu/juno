@@ -26,7 +26,7 @@ import { mirrorSetting } from './setting'
 /** How long a new mark waits before it is sent, so marks in quick succession make one call. */
 export const MARK_DELAY_MILLIS = 400
 
-type Topic = Exclude<ParsedTopicId, { readonly kind: 'group' }>
+type Topic = ParsedTopicId
 
 /** What a command did: its undo, and whether a mark now waits for the worker. */
 interface Marked {
@@ -78,7 +78,7 @@ const command = (id: string, change: Change): Effect.Effect<Marked, ReadError, W
     const open = yield* workspace.current
     if (open === undefined) return yield* new NotSignedIn()
     const parsed = parseTopicId(id)
-    if (parsed === undefined || parsed.kind === 'group') return yield* new NotFound({ kind: 'topic', id })
+    if (parsed === undefined) return yield* new NotFound({ kind: 'topic', id })
     const topic = parsed
     const now = yield* Clock.currentTimeMillis
     const outcome = yield* transaction(

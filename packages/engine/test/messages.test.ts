@@ -325,15 +325,15 @@ describe('files', () => {
 })
 
 describe("Main's active threads", () => {
-  it('lists the threads of the quiet window, newest first, with the follow flag', async () => {
+  it('lists the threads of the quiet window, newest first, with their reply counts', async () => {
     const engine = await bootedEngine()
     const threads = watchList(engine, channelThreadsAtom('C0ENG'))
     const window = await threads.until((w) => w.order.length >= 3, 'the threads')
     const rows: ReadonlyArray<ThreadSummary> = rowsOf(window)
     expect(rows.map((row) => row.lastActivityAt)).toEqual(rows.map((row) => row.lastActivityAt).toSorted((a, b) => b - a))
     const checkout = rows.find((row) => row.title.startsWith('checkout.spec'))!
-    expect(checkout).toMatchObject({ replyCount: 5, subscribed: false })
-    expect(rows.find((row) => row.title.startsWith('Draft plan'))).toMatchObject({ replyCount: 6, subscribed: true })
+    expect(checkout).toMatchObject({ replyCount: 5 })
+    expect(rows.find((row) => row.title.startsWith('Draft plan'))).toMatchObject({ replyCount: 6 })
     // The Kafka thread from eight days ago is outside the window.
     expect(rows.some((row) => row.title.startsWith('Lag alerts'))).toBe(false)
     expect(window.meta.total).toBe(rows.length)

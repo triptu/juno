@@ -48,7 +48,6 @@ export {
   currentPlace,
   cycleTab,
   dividerIndex,
-  endStealth,
   goToEntry,
   historyStateAtom,
   historyTarget,

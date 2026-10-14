@@ -39,8 +39,8 @@ interface Conversation {
   readonly ignored?: boolean
 }
 
-type Overlay = 'none' | 'unsubscribed' | 'resolved' | 'reopened' | 'pinned' | 'pinned-resolved' | 'pinned-unsubscribed'
-const OVERLAYS: ReadonlyArray<Overlay> = ['none', 'unsubscribed', 'resolved', 'reopened', 'pinned', 'pinned-resolved', 'pinned-unsubscribed']
+type Overlay = 'none' | 'resolved' | 'reopened' | 'pinned' | 'pinned-resolved'
+const OVERLAYS: ReadonlyArray<Overlay> = ['none', 'resolved', 'reopened', 'pinned', 'pinned-resolved']
 
 interface Case {
   readonly id: string
@@ -116,7 +116,6 @@ function topicOf(c: Case, channelActivity: string | undefined): Topic {
     overlay: {
       ...(resolvedAt === undefined ? {} : { resolvedAt, resolvedActivityTs: resolvedActivityTs as Topic['activity']['lastActivityTs'] }),
       ...(c.overlay.startsWith('pinned') ? { pinnedAt: NOW - 3 * DAY } : {}),
-      ...(c.overlay === 'unsubscribed' || c.overlay === 'pinned-unsubscribed' ? { unsubscribedAt: NOW - 3 * DAY } : {}),
     },
     ...(c.kind === 'thread' && c.subscribed !== null && c.subscribed !== undefined ? { slackSubscribed: c.subscribed === 1 } : {}),
   }
@@ -139,7 +138,7 @@ const seed = (conversations: ReadonlyArray<Conversation>, cases: ReadonlyArray<C
         yield* sql`INSERT INTO thread_subs (channel, thread_ts, subscribed) VALUES (${c.channel.id}, ${ts}, ${c.subscribed})`
       if (c.overlay !== 'none') {
         const topic = topicOf(c, undefined)
-        yield* sql`INSERT INTO topic_overlay (topic_id, resolved_at, resolved_activity_ts, pinned_at, unsubscribed_at) VALUES (${c.id}, ${topic.overlay.resolvedAt === undefined ? null : String(topic.overlay.resolvedAt)}, ${topic.overlay.resolvedActivityTs ?? null}, ${topic.overlay.pinnedAt === undefined ? null : String(topic.overlay.pinnedAt)}, ${topic.overlay.unsubscribedAt === undefined ? null : String(topic.overlay.unsubscribedAt)})`
+        yield* sql`INSERT INTO topic_overlay (topic_id, resolved_at, resolved_activity_ts, pinned_at) VALUES (${c.id}, ${topic.overlay.resolvedAt === undefined ? null : String(topic.overlay.resolvedAt)}, ${topic.overlay.resolvedActivityTs ?? null}, ${topic.overlay.pinnedAt === undefined ? null : String(topic.overlay.pinnedAt)})`
       }
     }
   })

@@ -15,7 +15,7 @@ export default defineFixtures(Button, {
     raised: fixture({ variant: 'raised', size: 'sm', kbd: '↵', children: 'Fix and send' }),
   },
   'In context': {
-    'small-action': fixture({ variant: 'secondary', size: 'sm', children: 'Group into topic' }),
+    'small-action': fixture({ variant: 'secondary', size: 'sm', children: 'Not yet' }),
     'row-resolve': fixture({ variant: 'outline', size: 'xs', iconStart: Check, children: 'Resolve', title: 'Resolve and hide until there is new activity' }),
     // The check has landed: filled, as in the resolve toast.
     'resolved-fill': fixture({ variant: 'outline', size: 'lg', iconStart: CheckCircle, iconWeight: 'fill', children: 'Resolved' }),
@@ -82,7 +82,7 @@ export default defineFixtures(Button, {
         <Button size="xs" variant="outline" iconStart={Check}>
           Resolve
         </Button>
-        <Button size="sm">Group into topic</Button>
+        <Button size="sm">Not yet</Button>
         <Button size="md">Open topic</Button>
         <Button size="lg" variant="outline" iconStart={CheckCircle}>
           Resolve

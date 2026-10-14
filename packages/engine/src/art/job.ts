@@ -56,7 +56,6 @@ export const candidatesStatement = (cutoff: string, limit: number): { readonly s
     WHERE (i.kind = 'main' OR i.last_activity_ts >= ? OR i.unread_count > 0 OR o.pinned_at IS NOT NULL) AND c.is_member = 1 AND c.is_archived = 0 AND ig.channel IS NULL
       AND NOT (i.kind = 'main' AND c.kind IN ('im', 'mpim'))
       AND (i.kind <> 'thread' OR s.subscribed = 1 OR (s.subscribed IS NULL AND i.mentions_me = 1 AND i.unread_count > 0))
-      AND o.unsubscribed_at IS NULL
       AND (a.topic_id IS NULL OR (a.source = 'ai' AND a.title_source = 'fallback' AND o.ai_title IS NOT NULL))
     ORDER BY i.last_activity_ts DESC LIMIT ?`,
   params: [cutoff, limit],

@@ -30,7 +30,7 @@ export interface NavItemProps {
 }
 
 /**
- * A sidebar navigation item (All topics, For you, Juno): 32px, full width,
+ * A sidebar navigation item (All topics, Juno): 32px, full width,
  * icon then label, ghost until hovered. The open page gets the accent's nav
  * tint, accent text, 600 and a filled icon. Navigates on mouse down like
  * rows and tabs, and never animates.

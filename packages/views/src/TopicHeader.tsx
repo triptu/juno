@@ -1,22 +1,17 @@
 import * as stylex from '@stylexjs/stylex'
-import { Bell } from '@phosphor-icons/react/dist/icons/Bell'
 import { ChatsCircle } from '@phosphor-icons/react/dist/icons/ChatsCircle'
-import { EyeSlash } from '@phosphor-icons/react/dist/icons/EyeSlash'
 import { Hash } from '@phosphor-icons/react/dist/icons/Hash'
 import { Lock } from '@phosphor-icons/react/dist/icons/Lock'
-import { Sparkle } from '@phosphor-icons/react/dist/icons/Sparkle'
 import { User } from '@phosphor-icons/react/dist/icons/User'
 import { Users } from '@phosphor-icons/react/dist/icons/Users'
 import { useState, type KeyboardEvent, type ReactNode } from 'react'
 import type { TopicDetail } from '@juno/contract'
 import { colors, layout, radii, sizes, spacing, text } from '@juno/tokens/tokens.stylex'
-import { Avatar, Button, ChannelIcon, Chip, ContextPill, Icon, IconButton, Popover, Text, type ContextTint, type PhosphorIcon } from '@juno/ui'
+import { Avatar, Button, ChannelIcon, ContextPill, Popover, Text, type ContextTint, type PhosphorIcon } from '@juno/ui'
 import { channelIconFor, groupInitials, hueFor, initials } from './look'
 
 export interface TopicHeaderProps {
   readonly detail: TopicDetail
-  /** The tab is in stealth: the pill and Mark read show. */
-  readonly stealth?: boolean
   /**
    * Fills the icon slot next to the title with the topic's art, at the
    * slot's size. Without it the slot shows the channel's icon or the DM
@@ -29,9 +24,6 @@ export interface TopicHeaderProps {
   readonly onThreads?: (open: boolean) => void
   /** Main only: the popover's content, an `ActiveThreads`. */
   readonly threads?: ReactNode
-  readonly onSubscribe: (id: string) => void
-  readonly onUnsubscribe: (id: string) => void
-  readonly onMarkRead: (id: string) => void
   /** Double-click to rename (not on Main). An empty title clears the manual one. */
   readonly onRename?: (id: string, title: string) => void
 }
@@ -57,20 +49,17 @@ const tints: Record<TopicDetail['channel']['kind'], ContextTint> = {
   mpim: 'dm',
 }
 
-const AI_TITLE = 'Title suggested by AI. Double-click to rename.'
-
 /**
- * The topic header (inventory 5): the context pill, the stealth pill, the
- * actions, then the title with its icon slot. Main reads "#eng · Main" with
- * the "Threads" button; a thread shows the AI sparkle when its title came
- * from AI, and renames on double-click. Pin, Resolve and More arrive in M5,
+ * The topic header (inventory 5): the context pill, the actions, then the
+ * title with its icon slot. Main reads "#eng · Main" with the "Threads"
+ * button; a thread renames on double-click. Pin, Resolve and More arrive in M5,
  * which is why the right side is quiet. The background and rule run the
  * full width; the content shares the message column's width and padding,
  * so pill, title, messages and composer keep one left edge on a wide
- * window. In a narrow one the pill drops its kind, then the pill and the
- * stealth chip shrink; the actions never do.
+ * window. In a narrow one the pill drops its kind, then shrinks; the
+ * actions never do.
  */
-export function TopicHeader({ detail, stealth = false, art, threadsOpen = false, onThreads, threads, onSubscribe, onUnsubscribe, onMarkRead, onRename }: TopicHeaderProps) {
+export function TopicHeader({ detail, art, threadsOpen = false, onThreads, threads, onRename }: TopicHeaderProps) {
   const { channel } = detail
   const main = detail.kind === 'main'
   const [draft, setDraft] = useState<string | undefined>(undefined)
@@ -102,29 +91,12 @@ export function TopicHeader({ detail, stealth = false, art, threadsOpen = false,
       <div {...stylex.props(styles.content)}>
         <div {...stylex.props(styles.row)}>
           <ContextPill tint={tints[channel.kind]} icon={kindIcons[channel.kind]} name={channel.name} kindLabel={kindLabels[channel.kind]} showKind="roomy" />
-          {stealth ? (
-            <span {...stylex.props(styles.stealth)}>
-              <Chip variant="dashed" size={26} icon={EyeSlash} shrink>
-                Stealth. Not marking as read.
-              </Chip>
-              <Button variant="secondary" size="xs" onClick={() => onMarkRead(detail.id)}>
-                Mark read
-              </Button>
-            </span>
-          ) : null}
           <span {...stylex.props(styles.spacer)} />
           {main && onThreads !== undefined ? (
             <Popover open={threadsOpen} onClose={() => onThreads(false)} anchor={threadsButton} placement="bottom-end" width="browse" padding="none" label="Threads">
               {threads}
             </Popover>
           ) : null}
-          <IconButton
-            icon={Bell}
-            label="Subscribe"
-            size={32}
-            pressed={detail.subscribed}
-            onClick={() => (detail.subscribed ? onUnsubscribe(detail.id) : onSubscribe(detail.id))}
-          />
         </div>
         <div {...stylex.props(styles.row, styles.titleRow)}>
           <span {...stylex.props(styles.art)}>{art ?? <TopicIcon detail={detail} />}</span>
@@ -147,24 +119,17 @@ export function TopicHeader({ detail, stealth = false, art, threadsOpen = false,
               </Text>
             </>
           ) : (
-            <>
-              <Text
-                variant="topicTitle"
-                tone="default"
-                truncate
-                tooltipWhenTruncated
-                dir="auto"
-                onDoubleClick={onRename === undefined ? undefined : () => setDraft(detail.title)}
-                sx={styles.title}
-              >
-                {detail.title}
-              </Text>
-              {detail.titleSource === 'ai' ? (
-                <span {...stylex.props(styles.sparkle)} title={AI_TITLE}>
-                  <Icon icon={Sparkle} size={16} weight="duotone" label="Title suggested by AI" />
-                </span>
-              ) : null}
-            </>
+            <Text
+              variant="topicTitle"
+              tone="default"
+              truncate
+              tooltipWhenTruncated
+              dir="auto"
+              onDoubleClick={onRename === undefined ? undefined : () => setDraft(detail.title)}
+              sx={styles.title}
+            >
+              {detail.title}
+            </Text>
           )}
         </div>
       </div>
@@ -223,15 +188,6 @@ const styles = stylex.create({
   titleRow: {
     gap: spacing['--space-2-5'],
   },
-  // Gives way four times faster than the pill, so the channel name outlasts
-  // "Stealth. Not marking as read." in a narrow header.
-  stealth: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: spacing['--space-1-5'],
-    flexShrink: 4,
-    minWidth: 0,
-  },
   spacer: {
     flexGrow: 1,
   },
@@ -249,11 +205,6 @@ const styles = stylex.create({
   title: {
     flexShrink: 1,
     minWidth: 0,
-  },
-  sparkle: {
-    display: 'inline-flex',
-    flexShrink: 0,
-    color: colors['--foreground-muted'],
   },
   // The rename input (inventory 5): the title's own type, pulled in by its
   // padding so the text does not move when it appears.

@@ -1,6 +1,6 @@
 // Tabs: opening uses the current tab, ⌘-click opens a new one, an open
 // topic focuses its tab, closing focuses the neighbour, the app menu's tab
-// items, and tabs with their stealth flags survive a restart.
+// items, the row menu's Open in new tab, and tabs survive a restart.
 import { expectNoLayoutShift } from '@juno/testing/layout-shift'
 import { expect, launchApp, test } from './fixtures'
 import { Juno } from './driver/juno'
@@ -66,7 +66,7 @@ test('closing a tab from the keyboard leaves focus in the strip', async ({ juno 
   await tabs.expectFocused(POSTGRES)
   await tabs.closeWithKeyboard(POSTGRES)
   await tabs.expectCount(0)
-  await expect(tabs.newMessageButton).toBeFocused()
+  await expect(tabs.newTabButton).toBeFocused()
 })
 
 test('the app menu closes the tab and moves between tabs', async ({ juno }) => {
@@ -89,16 +89,15 @@ test('the app menu closes the tab and moves between tabs', async ({ juno }) => {
   await tabs.expectActive(ROADMAP)
 })
 
-test('tabs and their stealth flags survive a restart', async ({ juno, running, userData, fake, slackApp }) => {
+test('tabs survive a restart', async ({ juno, running, userData, fake, slackApp }) => {
   await juno.signIn()
   await juno.waitForSync()
   const { sidebar, tabs } = juno
   await sidebar.row(POSTGRES).open()
   await sidebar.row(RINA).openInNewTab()
   await sidebar.row(ROADMAP).openInNewTab()
-  await sidebar.row(OFFSITE).openInStealth()
+  await sidebar.row(OFFSITE).openInNewTabFromMenu()
   await tabs.expectActive(OFFSITE)
-  await tabs.expectStealth(OFFSITE)
   // Let the save reach the engine.
   await juno.win.waitForTimeout(500)
   await running.close()
@@ -106,11 +105,9 @@ test('tabs and their stealth flags survive a restart', async ({ juno, running, u
   const again = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword })
   try {
     const restarted = new Juno(again.app, again.win)
-    await restarted.tabs.expectCount(3)
-    expect(await restarted.tabs.titles()).toEqual([expect.stringMatching(/^Draft plan/), expect.stringMatching(/^Rina/), expect.stringMatching(/^Can eng/)])
+    await restarted.tabs.expectCount(4)
+    expect(await restarted.tabs.titles()).toEqual([expect.stringMatching(/^Draft plan/), expect.stringMatching(/^Rina/), expect.stringMatching(/^Proposal/), expect.stringMatching(/^Can eng/)])
     await restarted.tabs.expectActive(OFFSITE)
-    await restarted.tabs.expectStealth(OFFSITE)
-    await restarted.topic.expectStealth()
     await restarted.sidebar.row(OFFSITE).expectVisible()
   } finally {
     await again.close()

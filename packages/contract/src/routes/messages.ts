@@ -185,7 +185,7 @@ export const TopicDetail = Schema.Struct({
   titleSource: TitleSource,
   channel: RowChannel,
   status: TopicStatus,
-  /** Slack's follow flag for a thread, the client-only flag for Main (as on `TopicRow`). */
+  /** Slack's follow flag for a thread, false for Main (as on `TopicRow`). */
   subscribed: Schema.Boolean,
   pinned: Schema.Boolean,
   resolved: Schema.Boolean,
@@ -214,7 +214,7 @@ export const topicsGet = liveValueRoute('topics.get', { payload: { id: Schema.St
 
 // Active threads of a channel
 
-/** One entry of Main's "Threads" list: title, reply count, time, unread count and the Subscribe bell. */
+/** One entry of Main's "Threads" list: title, reply count, time and unread count. */
 export const ThreadSummary = Schema.Struct({
   /** The thread's topic id. */
   ...RowFields,
@@ -228,8 +228,6 @@ export const ThreadSummary = Schema.Struct({
   unreadCount: Schema.Int,
   unreadExact: Schema.Boolean,
   mentionsMe: Schema.Boolean,
-  /** Slack's follow flag; the bell toggles it with `topics.subscribe` and `topics.unsubscribe`. */
-  subscribed: Schema.Boolean,
   /** Most recent first, at most three, as `Person`s in `refs`. */
   participantIds: Schema.Array(Schema.String),
 })

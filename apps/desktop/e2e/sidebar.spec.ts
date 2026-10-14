@@ -292,7 +292,7 @@ test('the sidebar renders in dark mode', async ({ juno, win }) => {
   const lightSidebar = await resolveColorVar(win, '--background-subtle')
   await expect(sidebar.root).toHaveCSS('background-color', lightSidebar)
 
-  await sidebar.themeButton.click()
+  await juno.setTheme('Dark')
   const darkSidebar = await resolveColorVar(win, '--background-subtle')
   expect(brightness(darkSidebar)).toBeLessThan(brightness(lightSidebar))
   await expect(sidebar.root).toHaveCSS('background-color', darkSidebar)
@@ -300,9 +300,8 @@ test('the sidebar renders in dark mode', async ({ juno, win }) => {
   // The title is still readable: its colour is lighter than the row behind it.
   const title = sidebar.row(POSTGRES).titleText
   expect(brightness(await title.evaluate((node) => getComputedStyle(node).color))).toBeGreaterThan(brightness(darkSidebar))
-  await expect(sidebar.themeButton).toHaveAccessibleName('Toggle theme')
 
-  await sidebar.themeButton.click()
+  await juno.setTheme('Light')
   await expect(sidebar.root).toHaveCSS('background-color', lightSidebar)
 })
 

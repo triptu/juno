@@ -46,7 +46,7 @@ function resolve(id: string): void {
   void id
 }
 
-/** Right-click on a row: Open in new tab, Open in stealth. */
+/** Right-click on a row: Open in new tab. */
 function rowMenu(id: string): void {
   void showTopicMenu(id)
 }

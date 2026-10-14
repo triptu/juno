@@ -52,7 +52,7 @@ test('Main shows thread links; a link opens the thread in the tab, and Threads l
   await juno.topic.expectTitle(POSTGRES)
   await juno.tabs.expectCount(1)
 
-  // The Threads list: opening an unfollowed thread does not add it to the sidebar; subscribing does.
+  // The Threads list: opening an unfollowed thread does not add it to the sidebar.
   await main.open()
   let threads = await juno.topic.openThreads()
   await threads.open(CHECKOUT)
@@ -60,17 +60,8 @@ test('Main shows thread links; a link opens the thread in the tab, and Threads l
   await juno.tabs.expectCount(1)
   await juno.sidebar.row(CHECKOUT).expectAbsent()
 
-  await main.open()
-  threads = await juno.topic.openThreads()
-  await threads.subscribe(CHECKOUT)
-  await juno.sidebar.row(CHECKOUT).expectVisible()
-
-  // Escape with focus inside the list (on the bell just pressed) puts focus back on the Threads button.
-  await juno.win.keyboard.press('Escape')
-  await expect(threads.root).toHaveCount(0)
-  await expect(juno.topic.threadsButton).toBeFocused()
-
   // From the keyboard: Tab reaches the rows, which are buttons named by their title; Escape returns to the Threads button.
+  await main.open()
   threads = await juno.topic.openThreadsWithKeyboard()
   await juno.win.keyboard.press('Tab')
   await expect(threads.root.getByRole('button').first()).toBeFocused()

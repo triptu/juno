@@ -1,21 +1,18 @@
 import * as stylex from '@stylexjs/stylex'
 import { Hash } from '@phosphor-icons/react/dist/icons/Hash'
-import { Lightbulb } from '@phosphor-icons/react/dist/icons/Lightbulb'
 import { ListBullets } from '@phosphor-icons/react/dist/icons/ListBullets'
 import { Lock } from '@phosphor-icons/react/dist/icons/Lock'
 import { MagnifyingGlass } from '@phosphor-icons/react/dist/icons/MagnifyingGlass'
-import { Moon } from '@phosphor-icons/react/dist/icons/Moon'
 import { Sparkle } from '@phosphor-icons/react/dist/icons/Sparkle'
-import { Sun } from '@phosphor-icons/react/dist/icons/Sun'
 import { User } from '@phosphor-icons/react/dist/icons/User'
 import { Users } from '@phosphor-icons/react/dist/icons/Users'
 import type { ReactNode } from 'react'
 import type { ConversationKind, KindFilter } from '@juno/contract'
 import { accent, colors, layout, sizes, spacing } from '@juno/tokens/tokens.stylex'
-import { activateHandlers, AvatarButton, Button, Chip, Divider, IconButton, NavItem, Popover, type ActivateEvent, type HueName, type ThemeName } from '@juno/ui'
+import { activateHandlers, AvatarButton, Button, Chip, Divider, IconButton, NavItem, Popover, type ActivateEvent, type HueName } from '@juno/ui'
 import { countLabel } from './look'
 
-export type SidebarNavTarget = 'all-topics' | 'for-you' | 'juno'
+export type SidebarNavTarget = 'all-topics' | 'juno'
 
 export interface SidebarAccount {
   readonly name: string
@@ -45,8 +42,6 @@ export interface SidebarProps {
   /** After the traffic lights: Hide sidebar, Back and Forward (`TitlebarNav`). */
   readonly titlebarLeading?: ReactNode
   readonly account: SidebarAccount
-  readonly theme: ThemeName
-  readonly forYouCount: number
   /** Unread Juno messages: the soft grey count on the Juno item, never an accent badge. */
   readonly junoUnread?: number
   /** A background job is running: the Juno item's sparkle turns duotone. A run alone does not light it (SPEC 13.2). */
@@ -60,8 +55,6 @@ export interface SidebarProps {
   readonly accountMenu?: ReactNode
   readonly onAccountMenu: (open: boolean) => void
   readonly onSearch: () => void
-  readonly onBrowse: () => void
-  readonly onToggleTheme: () => void
   /** Fires on mouse down; `event.metaKey` asks for a new tab. */
   readonly onNavigate: (target: SidebarNavTarget, event: ActivateEvent) => void
   readonly onFilterKind: (kind: KindFilter) => void
@@ -75,7 +68,7 @@ export interface SidebarProps {
 
 /**
  * The left pane (spec section 5): the title bar with the traffic-light
- * space and the four icons, the three nav items, a hairline, the quick
+ * space, Search and the account button, the nav items, a hairline, the quick
  * filters with their dots and the Unread toggle, a status line when the
  * list may be behind Slack, the scope chip when scoped, and the list the
  * owner renders into it.
@@ -83,8 +76,6 @@ export interface SidebarProps {
 export function Sidebar({
   titlebarLeading,
   account,
-  theme,
-  forYouCount,
   junoUnread = 0,
   junoBusy = false,
   activeNav,
@@ -95,8 +86,6 @@ export function Sidebar({
   accountMenu,
   onAccountMenu,
   onSearch,
-  onBrowse,
-  onToggleTheme,
   onNavigate,
   onFilterKind,
   onToggleUnread,
@@ -113,8 +102,6 @@ export function Sidebar({
         {titlebarLeading}
         <div {...stylex.props(styles.icons)}>
           <IconButton icon={MagnifyingGlass} label="Search ⌘K" size={30} onClick={onSearch} />
-          <IconButton icon={Hash} label="Browse channels and people" size={30} onClick={onBrowse} />
-          <IconButton icon={theme === 'dark' ? Sun : Moon} label="Toggle theme" size={30} onClick={onToggleTheme} />
           <span {...stylex.props(styles.account)}>
             <Popover
               open={accountMenuOpen}
@@ -143,20 +130,6 @@ export function Sidebar({
       <nav aria-label="Pages" {...stylex.props(styles.nav)}>
         <NavItem icon={ListBullets} active={activeNav === 'all-topics'} onSelect={(event) => onNavigate('all-topics', event)}>
           All topics
-        </NavItem>
-        <NavItem
-          icon={Lightbulb}
-          active={activeNav === 'for-you'}
-          onSelect={(event) => onNavigate('for-you', event)}
-          trailing={
-            forYouCount > 0 ? (
-              <Chip variant="strong" numeric title={`${forYouCount} for you`}>
-                {countLabel(forYouCount)}
-              </Chip>
-            ) : undefined
-          }
-        >
-          For you
         </NavItem>
         <NavItem
           icon={Sparkle}

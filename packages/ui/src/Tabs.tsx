@@ -70,8 +70,6 @@ export interface TabProps {
    */
   readonly leading?: ReactNode
   readonly label: string
-  /** Read after the label by assistive technology, for a state the icon shows ("Stealth"). */
-  readonly description?: string
   readonly active?: boolean
   /** A pinned tab: 40px, the icon alone, the label as its name and tooltip. Give it no `onClose`. */
   readonly pinned?: boolean
@@ -108,7 +106,7 @@ function focusTarget(tab: HTMLElement): HTMLElement | undefined {
  * active: tab switches do not animate and a filled set is too heavy in a
  * strip.
  */
-export function Tab({ icon, leading, label, description, active = false, pinned = false, unread = false, onSelect, onClose, onContextMenu, closeLabel = 'Close tab' }: TabProps) {
+export function Tab({ icon, leading, label, active = false, pinned = false, unread = false, onSelect, onClose, onContextMenu, closeLabel = 'Close tab' }: TabProps) {
   const ref = useRef<HTMLDivElement>(null)
 
   useLayoutEffect(() => {
@@ -136,7 +134,6 @@ export function Tab({ icon, leading, label, description, active = false, pinned 
   }
 
   const dot = unread && !active
-  const describedAs = [description, dot ? 'Unread' : undefined].filter((part) => part !== undefined).join(', ')
 
   return (
     <div
@@ -144,7 +141,7 @@ export function Tab({ icon, leading, label, description, active = false, pinned 
       role="tab"
       tabIndex={active ? 0 : -1}
       aria-selected={active}
-      aria-description={describedAs === '' ? undefined : describedAs}
+      aria-description={dot ? 'Unread' : undefined}
       aria-label={pinned ? label : undefined}
       data-pinned={pinned ? '' : undefined}
       data-unread={dot ? '' : undefined}

@@ -106,9 +106,9 @@ export class SidebarRow {
     await this.win.keyboard.up('Meta')
   }
 
-  /** Right-click, then Open in stealth. */
-  async openInStealth(): Promise<void> {
-    await chooseNextMenuItem(this.win, 'stealth')
+  /** Right-click, then Open in new tab. */
+  async openInNewTabFromMenu(): Promise<void> {
+    await chooseNextMenuItem(this.win, 'new-tab')
     await this.root.click({ button: 'right', position: { x: 40, y: 20 } })
   }
 
@@ -309,8 +309,8 @@ export class Sidebar {
     await expect(this.list.getByText(title, { exact: true })).toBeVisible({ timeout: 15_000 })
   }
 
-  get themeButton() {
-    return this.root.getByRole('button', { name: 'Toggle theme' })
+  get searchButton() {
+    return this.root.getByRole('button', { name: 'Search ⌘K' })
   }
 
   get accountButton() {
@@ -729,31 +729,6 @@ export class TopicPane {
     await this.pill.click()
   }
 
-  /** The stealth pill in the header. */
-  get stealthPill() {
-    return this.header.getByText('Stealth. Not marking as read.')
-  }
-
-  async expectStealth(stealth = true): Promise<void> {
-    await expect(this.stealthPill).toHaveCount(stealth ? 1 : 0)
-  }
-
-  /** The stealth pill's Mark read. */
-  async markRead(): Promise<void> {
-    await this.header.getByRole('button', { name: 'Mark read', exact: true }).click()
-  }
-
-  /** Mark read from the keyboard: focus it and press Enter. */
-  async markReadWithKeyboard(): Promise<void> {
-    await this.header.getByRole('button', { name: 'Mark read', exact: true }).focus()
-    await this.win.keyboard.press('Enter')
-  }
-
-  /** The header's Subscribe bell, a toggle (`aria-pressed`). */
-  get bell() {
-    return this.header.getByRole('button', { name: /subscribe/i })
-  }
-
   /** A "2 replies · Title" link under a Main message, by its label or title. */
   threadLink(text: string | RegExp): ThreadLinkDriver {
     return new ThreadLinkDriver(this.win, this.list.getByRole('button', { name: text }))
@@ -844,7 +819,7 @@ export class ThreadsPopover {
     this.root = win.getByRole('dialog', { name: 'Threads' })
   }
 
-  /** A thread's list item: its row button and its Subscribe bell. */
+  /** A thread's list item, holding its row button. */
   entry(title: string): Locator {
     return this.root.getByRole('listitem').filter({ hasText: title })
   }
@@ -860,13 +835,6 @@ export class ThreadsPopover {
     if (!box) throw new Error(`No thread "${title}" in the list`)
     await this.win.mouse.move(box.x + 24, box.y + box.height / 2)
     await press(this.win)
-  }
-
-  async subscribe(title: string): Promise<void> {
-    const bell = this.entry(title).getByRole('button', { name: 'Subscribe', exact: true })
-    await expect(bell).toHaveAttribute('aria-pressed', 'false')
-    await bell.click()
-    await expect(bell).toHaveAttribute('aria-pressed', 'true')
   }
 }
 
@@ -903,11 +871,6 @@ export class TabStrip {
     await expect(this.tab(title)).toHaveAttribute('aria-selected', 'true', { timeout: 15_000 })
   }
 
-  async expectStealth(title: string, stealth = true): Promise<void> {
-    if (stealth) await expect(this.tab(title)).toHaveAttribute('aria-description', /^Stealth/)
-    else await expect(this.tab(title)).not.toHaveAttribute('aria-description', /^Stealth/)
-  }
-
   /** Mouse down on a tab. */
   async select(title: string): Promise<void> {
     const box = await this.tab(title).boundingBox()
@@ -933,7 +896,7 @@ export class TabStrip {
   }
 
   /** The "+" after the last tab. */
-  get newMessageButton() {
+  get newTabButton() {
     return this.win.getByRole('region', { name: 'Workspace' }).getByRole('button', { name: 'New chat ⌘T', exact: true })
   }
 

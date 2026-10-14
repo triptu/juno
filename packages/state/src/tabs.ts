@@ -12,15 +12,13 @@
  *   closed tab goes onto the reopen stack with its history; `reopenClosedTab`
  *   (⌘⇧T) takes the last one back. The bulk closes leave pinned tabs open.
  * - `setPinned`: pinned tabs sit first, in pin order.
- * - `activateTab`, `cycleTab` (⌃Tab, ⌘⇧] and ⌘⇧[), `tabByNumber` (⌘1 to
- *   ⌘9), `endStealth` (Mark read).
+ * - `activateTab`, `cycleTab` (⌃Tab, ⌘⇧] and ⌘⇧[), `tabByNumber` (⌘1 to ⌘9).
  * - `mountedTabs`: the active tab and the 4 most recently active stay
  *   mounted in `<Activity>`; the rest unmount and keep a `ScrollSnapshot`.
  *
  * `tabsAtom` holds the tabs of the signed-in workspace. They are saved to
  * the workspace preference `TABS_PREF` on every change and read back from
- * it after a restart, with their pinned and stealth flags and the place
- * each shows. History and the reopen stack are in memory only.
+ * it after a restart, with their pinned flags and the place each shows. History and the reopen stack are in memory only.
  * `updateTabs` is the one way to change them.
  */
 import { Option, Schema } from 'effect'
@@ -47,8 +45,6 @@ export interface TabHistory {
 export interface Tab {
   readonly id: string
   readonly pinned: boolean
-  /** Opened in stealth: nothing marks it read until its Mark read. Ends when the tab shows another place. */
-  readonly stealth: boolean
   readonly history: TabHistory
 }
 
@@ -80,7 +76,6 @@ export const CLOSED_LIMIT = 20
 export interface OpenOptions {
   /** A new tab after the current one, instead of the current tab. */
   readonly newTab?: boolean
-  readonly stealth?: boolean
 }
 
 export const currentPlace = (tab: Tab): Place => tab.history.entries[tab.history.index]!
@@ -114,7 +109,7 @@ export function activateTab(tabs: Tabs, id: string): Tabs {
   return { ...tabs, active: id, recent: touch(tabs.recent, id) }
 }
 
-const freshTab = (id: string, place: Place, stealth: boolean): Tab => ({ id, pinned: false, stealth, history: { entries: [place], index: 0 } })
+const freshTab = (id: string, place: Place): Tab => ({ id, pinned: false, history: { entries: [place], index: 0 } })
 
 /** `place` as the tab's next entry. Forward is dropped. An empty New chat is replaced, not kept. */
 function push(history: TabHistory, place: Place): TabHistory {
@@ -123,21 +118,21 @@ function push(history: TabHistory, place: Place): TabHistory {
   return { entries, index: entries.length - 1 }
 }
 
-export function openPlace(tabs: Tabs, place: Place, { newTab = false, stealth = false }: OpenOptions = {}): Tabs {
+export function openPlace(tabs: Tabs, place: Place, { newTab = false }: OpenOptions = {}): Tabs {
   if (place.kind === 'topic') {
     const showing = tabShowing(tabs, place.topicId)
     if (showing !== undefined) return activateTab(tabs, showing.id)
   }
   const at = tabs.tabs.findIndex((tab) => tab.id === tabs.active)
   if (at < 0 || newTab) {
-    const tab = freshTab(nextTabId(tabs), place, stealth)
+    const tab = freshTab(nextTabId(tabs), place)
     // A new tab never lands among the pinned ones.
     const index = at < 0 ? tabs.tabs.length : Math.max(at + 1, pinnedCount(tabs.tabs))
     return { ...tabs, tabs: tabs.tabs.toSpliced(index, 0, tab), active: tab.id, recent: touch(tabs.recent, tab.id) }
   }
   const current = tabs.tabs[at]!
   if (samePlace(currentPlace(current), place)) return tabs
-  const tab: Tab = { ...current, stealth, history: push(current.history, place) }
+  const tab: Tab = { ...current, history: push(current.history, place) }
   return { ...tabs, tabs: tabs.tabs.with(at, tab), recent: touch(tabs.recent, tab.id) }
 }
 
@@ -152,7 +147,7 @@ export function goToEntry(tabs: Tabs, index: number): Tabs {
   const at = tabs.tabs.findIndex((tab) => tab.id === tabs.active)
   const tab = tabs.tabs[at]
   if (tab === undefined || index === tab.history.index || index < 0 || index >= tab.history.entries.length) return tabs
-  return { ...tabs, tabs: tabs.tabs.with(at, { ...tab, stealth: false, history: { ...tab.history, index } }) }
+  return { ...tabs, tabs: tabs.tabs.with(at, { ...tab, history: { ...tab.history, index } }) }
 }
 
 /** Back (-1) or Forward (1) in the active tab. */
@@ -226,12 +221,6 @@ export function tabByNumber(tabs: Tabs, n: number): Tab | undefined {
   return n === 9 ? tabs.tabs.at(-1) : tabs.tabs[n - 1]
 }
 
-export function endStealth(tabs: Tabs, topicId: string): Tabs {
-  const at = tabs.tabs.findIndex((tab) => tab.stealth && tabTopic(tab) === topicId)
-  if (at < 0) return tabs
-  return { ...tabs, tabs: tabs.tabs.with(at, { ...tabs.tabs[at]!, stealth: false }) }
-}
-
 /** The tabs that stay mounted. */
 export function mountedTabs(tabs: Tabs): ReadonlySet<string> {
   const mounted = new Set<string>()
@@ -259,11 +248,12 @@ export function dividerIndex(order: ReadonlyArray<string>, lastReadTs: string | 
 export const TABS_PREF = 'tabs'
 
 const PlaceJson = Schema.Union([Schema.Struct({ kind: Schema.Literal('topic'), topicId: Schema.String }), Schema.Struct({ kind: Schema.Literal('newChat') })])
-/** A saved tab, or one saved before history, when a tab's id was its topic's. */
-const TabJson = Schema.Union([
-  Schema.Struct({ id: Schema.String, pinned: Schema.Boolean, stealth: Schema.Boolean, place: PlaceJson }),
-  Schema.Struct({ id: Schema.String, stealth: Schema.Boolean }),
-])
+/**
+ * A saved tab, or one saved before history, when a tab's id was its
+ * topic's. Tabs saved with the old `stealth` flag still read back; the flag
+ * is dropped.
+ */
+const TabJson = Schema.Union([Schema.Struct({ id: Schema.String, pinned: Schema.Boolean, place: PlaceJson }), Schema.Struct({ id: Schema.String })])
 const TabsJson = Schema.Struct({
   tabs: Schema.Array(TabJson),
   active: Schema.NullOr(Schema.String),
@@ -278,7 +268,7 @@ export function parseTabs(value: unknown): Tabs {
     onSome: (saved) => {
       const ids = new Set(saved.tabs.map((tab) => tab.id))
       if (ids.size !== saved.tabs.length) return noTabs
-      const tabs = saved.tabs.map((tab): Tab => ('place' in tab ? { id: tab.id, pinned: tab.pinned, stealth: tab.stealth, history: { entries: [tab.place], index: 0 } } : freshTab(tab.id, topicPlace(tab.id), tab.stealth)))
+      const tabs = saved.tabs.map((tab): Tab => ('place' in tab ? { id: tab.id, pinned: tab.pinned, history: { entries: [tab.place], index: 0 } } : freshTab(tab.id, topicPlace(tab.id))))
       const ordered = [...tabs.filter((tab) => tab.pinned), ...tabs.filter((tab) => !tab.pinned)]
       const active = saved.active !== null && ids.has(saved.active) ? saved.active : ordered[0]?.id
       const recent = saved.recent.filter((id) => ids.has(id))
@@ -290,7 +280,7 @@ export function parseTabs(value: unknown): Tabs {
 /** What `TABS_PREF` holds: each tab with the place it shows. */
 export function savedTabs(tabs: Tabs): unknown {
   return {
-    tabs: tabs.tabs.map((tab) => ({ id: tab.id, pinned: tab.pinned, stealth: tab.stealth, place: currentPlace(tab) })),
+    tabs: tabs.tabs.map((tab) => ({ id: tab.id, pinned: tab.pinned, place: currentPlace(tab) })),
     active: tabs.active ?? null,
     recent: tabs.recent,
   }
@@ -342,7 +332,6 @@ export const historyStateAtom = Atom.make((get): HistoryState => {
 export interface TabSummary {
   readonly id: string
   readonly pinned: boolean
-  readonly stealth: boolean
   readonly place: Place
   /** A topic's header: undefined until it arrives (and for New chat), null for a topic the store does not know. */
   readonly detail: TopicDetail | null | undefined
@@ -362,9 +351,9 @@ export const tabStripAtom = Atom.make((get): ReadonlyArray<TabSummary> => {
     const result = place.kind === 'topic' ? get(topicAtom(place.topicId)) : undefined
     const detail = result !== undefined && AsyncResult.isSuccess(result) ? result.value : undefined
     const held = previous.get(tab.id)
-    return held !== undefined && held.pinned === tab.pinned && held.stealth === tab.stealth && samePlace(held.place, place) && held.detail === detail
+    return held !== undefined && held.pinned === tab.pinned && samePlace(held.place, place) && held.detail === detail
       ? held
-      : { id: tab.id, pinned: tab.pinned, stealth: tab.stealth, place, detail }
+      : { id: tab.id, pinned: tab.pinned, place, detail }
   })
 }).pipe(Atom.withEquality(sameStrip))
 

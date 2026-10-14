@@ -16,7 +16,7 @@ const sample: ReadonlyArray<[TextVariant, string]> = [
   ['ui', 'All topics'],
   ['preview', 'Maya: Draft is up. Cross-posting to #leadership once @Tushar has looked.'],
   ['pill', 'eng · Public channel'],
-  ['buttonSmall', 'Group into topic'],
+  ['buttonSmall', 'Not yet'],
   ['meta', 'Yesterday'],
   ['tagSmall', 'Resolve'],
   ['tag', 'Main'],
@@ -30,7 +30,7 @@ const sample: ReadonlyArray<[TextVariant, string]> = [
 export default defineFixtures(Text, {
   Roles: {
     body: fixture({ variant: 'body', tone: 'default', selectable: true, children: 'We keep the old primary warm for 48h. Flip DNS back and replay from the WAL position we logged.' }),
-    'page-title': fixture({ variant: 'pageTitle', tone: 'default', children: 'For you' }),
+    'page-title': fixture({ variant: 'pageTitle', tone: 'default', children: 'Notifications' }),
     'row-title-unread': fixture({ variant: 'rowTitle', tone: 'default', weight: 'semibold', truncate: true, children: 'Rina Sato · Staff backend' }),
     'preview-clamped': fixture(
       { variant: 'preview', tone: 'muted', clamp: 2, children: 'Elena: @Tushar she has a competing offer with a Friday deadline. Can you do a 30 min close call tomorrow? She was positive on systems design.' },

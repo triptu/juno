@@ -83,7 +83,7 @@ Juno's pointer (`topic_reads.last_read_ts`) is the state the sidebar shows. The 
 | A page (counts, a `getView` row, a root, a lookup) applies only when requested after `observed_at` and when Slack's pointer differs from `slack_read_ts`, so a mark Slack never saw (mirroring off) survives an unchanged Slack. | `observeServerRead` | `finishFetch` (`newer`, `changed`); `latePageStep` |
 | A page too old to apply that disagrees with the pointer asks Slack. | `boot.ts`, `pages.ts`, `sync.ts` queue the lookup | `finishFetch` (`stale`) |
 | A reconnect reads counts and `getView` again. | `catchUp` | `reconnect`, `scan`; `quietAgreement` |
-| Nothing marks by itself: opening, live queries and the sync never do. Stealth is the renderer not calling the command. | `shouldMarkRead` in `@juno/state` | `stealth`; `stealthNeverMarks` |
+| Nothing marks by itself: opening, live queries and the sync never do. Peek will be the renderer not calling the command. | `shouldMarkRead` in `@juno/state` | `peek`; `peekNeverMarks` |
 
 Known limits: thread marks made elsewhere while the socket was down reach Juno at the next window pass when the thread had no new reply. A clock that runs backwards past stored stamps makes pages look old until it catches up; each then costs a lookup, spaced by the background lane.
 

@@ -9,23 +9,17 @@ const base: TopicMenuState = {
   channel: eng,
   unread: false,
   pinned: false,
-  subscribed: true,
   resolved: false,
-  hasManualTitle: false,
-  hasAiTitle: true,
-  aiAssist: true,
 }
 
 describe('topic row menu', () => {
   it('lists the actions from spec section 5 in order', () => {
     expect(labels(topicMenuItems(base))).toEqual([
       'Open in new tab',
-      'Open in stealth',
       '—',
       'Rename',
       'Mark as unread',
       'Pin',
-      'Unsubscribe',
       'Resolve',
       '—',
       'Copy Slack link',
@@ -34,14 +28,12 @@ describe('topic row menu', () => {
   })
 
   it('flips the toggles by state', () => {
-    expect(labels(topicMenuItems({ ...base, unread: true, pinned: true, subscribed: false, resolved: true }))).toEqual([
+    expect(labels(topicMenuItems({ ...base, unread: true, pinned: true, resolved: true }))).toEqual([
       'Open in new tab',
-      'Open in stealth',
       '—',
       'Rename',
       'Mark as read',
       'Unpin',
-      'Subscribe',
       'Reopen',
       '—',
       'Copy Slack link',
@@ -49,16 +41,9 @@ describe('topic row menu', () => {
     ])
   })
 
-  it('offers "Use AI title" only when a manual title hides an AI title and AI assist is on', () => {
-    expect(labels(topicMenuItems({ ...base, hasManualTitle: true }))).toContain('Use AI title')
-    expect(labels(topicMenuItems({ ...base, hasManualTitle: true, aiAssist: false }))).not.toContain('Use AI title')
-    expect(labels(topicMenuItems({ ...base, hasManualTitle: true, hasAiTitle: false }))).not.toContain('Use AI title')
-  })
-
-  it('has no Rename or Use AI title for Main, and no Ignore for DMs', () => {
-    const main = labels(topicMenuItems({ ...base, kind: 'main', hasManualTitle: true }))
+  it('has no Rename for Main, and no Ignore for DMs', () => {
+    const main = labels(topicMenuItems({ ...base, kind: 'main' }))
     expect(main).not.toContain('Rename')
-    expect(main).not.toContain('Use AI title')
     expect(labels(topicMenuItems({ ...base, channel: maya }))).not.toContain('Ignore Maya Chen')
     expect(labels(topicMenuItems({ ...base, channel: group })).at(-1)).toBe('Copy Slack link')
   })
@@ -66,7 +51,6 @@ describe('topic row menu', () => {
   it('carries the hints and ids the shell needs', () => {
     const items = topicMenuItems(base)
     expect(items[0]).toEqual({ type: 'item', id: 'open-new-tab', label: 'Open in new tab', hint: '⌘ click' })
-    expect(items[1]).toEqual({ type: 'item', id: 'open-stealth', label: 'Open in stealth', hint: 'Stays unread' })
   })
 })
 
@@ -75,14 +59,13 @@ describe('channel menu', () => {
     expect(labels(channelMenuItems({ channel: eng, hasMain: true }))).toEqual([
       'Show its topics',
       'Open Main',
-      'Open Main in stealth',
       '—',
       'Mark channel as read',
       'Mark channel as unread',
       '—',
       'Ignore channel',
     ])
-    expect(labels(channelMenuItems({ channel: maya, hasMain: true }))).toEqual(['Show its topics', 'Open Main', 'Open Main in stealth', '—', 'Mark channel as read', 'Mark channel as unread'])
+    expect(labels(channelMenuItems({ channel: maya, hasMain: true }))).toEqual(['Show its topics', 'Open Main', '—', 'Mark channel as read', 'Mark channel as unread'])
     expect(labels(channelMenuItems({ channel: eng, hasMain: false }))).not.toContain('Open Main')
   })
 })

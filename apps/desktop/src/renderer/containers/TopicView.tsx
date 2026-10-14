@@ -1,10 +1,9 @@
 import { memo, startTransition, useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
-import { MESSAGE_WINDOW_MAX, readsMarkRead, topicsSubscribe, topicsUnsubscribe, type MessageView, type TopicDetail } from '@juno/contract'
+import { MESSAGE_WINDOW_MAX, readsMarkRead, type MessageView, type TopicDetail } from '@juno/contract'
 import {
   bottomWindow,
   channelThreadsAtom,
   dividerIndex,
-  endStealth,
   loadOlderMessages,
   messageListAtom,
   messageWindowSpecAtom,
@@ -17,7 +16,6 @@ import {
   shouldMarkRead,
   sidebarFilterAtom,
   topicAtom,
-  updateTabs,
   type MessageWindow,
   type ScrollSnapshot,
 } from '@juno/state'
@@ -79,25 +77,6 @@ function scopeToChannel(channel: string): void {
 }
 
 const markRead = (id: string) => runCommand(registry, readsMarkRead, { id })
-const subscribe = (id: string) => void runCommand(registry, topicsSubscribe, { id })
-const unsubscribe = (id: string) => void runCommand(registry, topicsUnsubscribe, { id })
-
-/** The stealth pill's Mark read: marks the topic and ends stealth. */
-function markReadAndEndStealth(id: string): void {
-  void markRead(id)
-  updateTabs(registry, (tabs) => endStealth(tabs, id))
-}
-
-const FOCUSABLE = 'button:not(:disabled), [href], input:not(:disabled), [tabindex]:not([tabindex="-1"])'
-
-/** The header control after the focused one, which takes focus when the focused one goes away. */
-function nextInHeader(): HTMLElement | undefined {
-  const focused = document.activeElement
-  const header = focused?.closest('[data-topic-header]')
-  if (focused == null || header == null) return undefined
-  const controls = [...header.querySelectorAll<HTMLElement>(FOCUSABLE)]
-  return controls[controls.indexOf(focused as HTMLElement) + 1]
-}
 
 const items = new WeakMap<MessageView, MessageListItem>()
 
@@ -202,7 +181,7 @@ function MainThreads({ channel, onClose }: { readonly channel: string; readonly 
     onClose()
     openTopic(id, { newTab: event.metaKey })
   }
-  return <ActiveThreads threads={threads} now={now} status={window === undefined ? 'loading' : 'ready'} onOpen={open} onSubscribe={subscribe} onUnsubscribe={unsubscribe} />
+  return <ActiveThreads threads={threads} now={now} status={window === undefined ? 'loading' : 'ready'} onOpen={open} />
 }
 
 /** Every topic draws its art (or the Tide placeholder) except a DM's Main, which keeps the person, as the sidebar tile does. */
@@ -215,7 +194,6 @@ export interface TopicTabProps {
   readonly tabId: string
   /** The topic. */
   readonly id: string
-  readonly stealth: boolean
 }
 
 /**
@@ -233,9 +211,9 @@ export interface TopicTabProps {
  * - Near the top, the next older page is fetched, one request at a time,
  *   and the window widens; scroll anchoring keeps the rows in view still.
  * - Marks read by `shouldMarkRead`: on open and when shown, then at the
- *   bottom of a focused window. A stealth tab marks only from Mark read.
+ *   bottom of a focused window.
  */
-export const TopicTab = memo(function TopicTab({ tabId, id, stealth }: TopicTabProps) {
+export const TopicTab = memo(function TopicTab({ tabId, id }: TopicTabProps) {
   const result = useAtomValue(topicAtom(id))
   const detail = result._tag === 'Success' ? result.value : undefined
   // A topic the store does not know (a saved tab whose topic is gone) closes its tab.
@@ -243,10 +221,10 @@ export const TopicTab = memo(function TopicTab({ tabId, id, stealth }: TopicTabP
     if (detail === null) closeTabById(tabId)
   }, [tabId, detail])
   if (detail == null) return null
-  return <Topic id={id} stealth={stealth} detail={detail} />
+  return <Topic id={id} detail={detail} />
 })
 
-function Topic({ id, stealth, detail }: { readonly id: string; readonly stealth: boolean; readonly detail: TopicDetail }) {
+function Topic({ id, detail }: { readonly id: string; readonly detail: TopicDetail }) {
   const list = useAtomValue(messageListAtom(id))
   const now = useAtomValue(nowAtom, (time) => Math.floor(time / TIME_STEP) * TIME_STEP)
   const focused = useWindowFocused()
@@ -439,13 +417,13 @@ function Topic({ id, stealth, detail }: { readonly id: string; readonly stealth:
 
   // The read rule. Opening, and showing the tab again, marks the topic read.
   useEffect(() => {
-    if (shouldMarkRead('open', { stealth, active: true, focused: true, atBottom: false })) void markRead(id)
-  }, [id, stealth])
+    if (shouldMarkRead('open', { active: true, focused: true, atBottom: false })) void markRead(id)
+  }, [id])
   const unread = detail.unreadCount
   useEffect(() => {
     if (unread === 0 || !positioned) return
-    if (shouldMarkRead('bottom', { stealth, active: true, focused, atBottom })) void markRead(id)
-  }, [id, unread, positioned, stealth, focused, atBottom])
+    if (shouldMarkRead('bottom', { active: true, focused, atBottom })) void markRead(id)
+  }, [id, unread, positioned, focused, atBottom])
 
   const jumpToLatest = () => {
     const scroller = scrollRef.current
@@ -464,17 +442,6 @@ function Topic({ id, stealth, detail }: { readonly id: string; readonly stealth:
   // popover opens with its rows in the first frame instead of "Loading threads".
   useEffect(() => (main && drawnAll ? registry.mount(channelThreadsAtom(channel)) : undefined), [main, drawnAll, channel])
 
-  // Mark read takes its own button away; focus moves on to the next header control, not to the body.
-  const focusAfterMarkRead = useRef<HTMLElement | undefined>(undefined)
-  const onMarkRead = (topicId: string) => {
-    focusAfterMarkRead.current = nextInHeader()
-    markReadAndEndStealth(topicId)
-  }
-  useLayoutEffect(() => {
-    const next = focusAfterMarkRead.current
-    focusAfterMarkRead.current = undefined
-    if (!stealth && next?.isConnected && (document.activeElement === null || document.activeElement === document.body)) next.focus()
-  }, [stealth])
   const people = list.refs.people
   const hueOf = (personId: string) => hueFor(people.get(personId)?.color ?? '', personId)
 
@@ -498,14 +465,10 @@ function Topic({ id, stealth, detail }: { readonly id: string; readonly stealth:
       header={
         <TopicHeader
           detail={detail}
-          stealth={stealth}
           {...(hasArt(detail) ? { art: <TopicArt topicId={detail.id} recipe={detail.art} size={20} /> } : {})}
           threadsOpen={threadsOpen}
           onThreads={main ? setThreadsOpen : undefined}
           threads={threadsOpen ? <MainThreads channel={detail.channel.id} onClose={() => setThreadsOpen(false)} /> : null}
-          onSubscribe={subscribe}
-          onUnsubscribe={unsubscribe}
-          onMarkRead={onMarkRead}
         />
       }
       pill={showPill ? <NewMessagesPill count={newCount} onJump={jumpToLatest} /> : undefined}

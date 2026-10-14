@@ -6,7 +6,6 @@ import {
   closeTabsToRight,
   cycleTab,
   dividerIndex,
-  endStealth,
   historyTarget,
   mountedTabs,
   newChatPlace,
@@ -58,13 +57,6 @@ describe('opening', () => {
   it('a topic another tab shows focuses that tab instead of opening another, in either mode', () => {
     expect(activeShows(open(three, 'c'))).toBe('c')
     expect(shown(open(three, 'a', { newTab: true }))).toEqual(['a', 'b', 'c'])
-  })
-
-  it('stealth is kept on the tab, and ends with Mark read', () => {
-    const stealth = open(three, 'd', { stealth: true })
-    expect(stealth.tabs[1]!.stealth).toBe(true)
-    expect(endStealth(stealth, 'd').tabs[1]!.stealth).toBe(false)
-    expect(endStealth(three, 'b')).toBe(three)
   })
 
   it('a New chat opens in a new tab, and the next open in that tab replaces it', () => {
@@ -230,26 +222,40 @@ describe('the divider', () => {
 })
 
 describe('saved tabs', () => {
-  it('read back as they were saved, pinned and stealth flags included, each showing its place', () => {
-    const tabs = setPinned(open(open(three, 'b2'), 'd', { newTab: true, stealth: true }), 'tab-3', true)
+  it('read back as they were saved, pinned flags included, each showing its place', () => {
+    const tabs = setPinned(open(open(three, 'b2'), 'd', { newTab: true }), 'tab-3', true)
     const restored = parseTabs(JSON.parse(JSON.stringify(savedTabs(tabs))))
     expect(shown(restored)).toEqual(shown(tabs))
-    expect(restored.tabs.map((tab) => [tab.id, tab.pinned, tab.stealth])).toEqual(tabs.tabs.map((tab) => [tab.id, tab.pinned, tab.stealth]))
+    expect(restored.tabs.map((tab) => [tab.id, tab.pinned])).toEqual(tabs.tabs.map((tab) => [tab.id, tab.pinned]))
     expect(restored.active).toBe(tabs.active)
     expect(historyTarget(restored, -1)).toBeUndefined()
   })
 
-  it('tabs saved before history read back as topic tabs', () => {
-    const restored = parseTabs({ tabs: [{ id: 'a', stealth: false }, { id: 'b', stealth: true }], active: 'b', recent: ['b', 'a'] })
-    expect(shown(restored)).toEqual(['a', 'b'])
-    expect(restored.tabs[1]!.stealth).toBe(true)
-    expect(activeShows(restored)).toBe('b')
+  it('tabs saved before history read back as topic tabs, with or without the old stealth flag', () => {
+    for (const saved of [
+      { tabs: [{ id: 'a' }, { id: 'b' }], active: 'b', recent: ['b', 'a'] },
+      { tabs: [{ id: 'a', stealth: false }, { id: 'b', stealth: true }], active: 'b', recent: ['b', 'a'] },
+    ]) {
+      const restored = parseTabs(saved)
+      expect(shown(restored)).toEqual(['a', 'b'])
+      expect(restored.tabs.map((tab) => Object.keys(tab).toSorted())).toEqual([
+        ['history', 'id', 'pinned'],
+        ['history', 'id', 'pinned'],
+      ])
+      expect(activeShows(restored)).toBe('b')
+    }
+  })
+
+  it('a tab saved with the old stealth flag and a place still reads back', () => {
+    const restored = parseTabs({ tabs: [{ id: 'tab-1', pinned: true, stealth: true, place: { kind: 'topic', topicId: 'a' } }], active: 'tab-1', recent: [] })
+    expect(shown(restored)).toEqual(['a'])
+    expect(restored.tabs[0]!.pinned).toBe(true)
   })
 
   it('anything unreadable is no tabs, and a lost active tab falls back to the first', () => {
     expect(parseTabs(null)).toEqual(noTabs)
     expect(parseTabs({ tabs: 'nope' })).toEqual(noTabs)
-    const lost = parseTabs({ tabs: [{ id: 'a', stealth: false }], active: 'gone', recent: ['gone'] })
+    const lost = parseTabs({ tabs: [{ id: 'a' }], active: 'gone', recent: ['gone'] })
     expect(lost.active).toBe('a')
     expect(lost.recent).toEqual(['a'])
   })

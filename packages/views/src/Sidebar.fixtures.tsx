@@ -16,15 +16,11 @@ const account = { name: 'Tushar', initials: 'T', hue: 'cyan' } as const
 const chrome: Omit<SidebarProps, 'children'> = {
   titlebarLeading: <TitlebarNav sidebarHidden={false} canGoBack canGoForward={false} onToggleSidebar={noop} onBack={noop} onForward={noop} />,
   account,
-  theme: 'light',
-  forYouCount: 5,
   filter: { kind: 'all', unreadOnly: false },
   dots: { channels: true, dms: true },
   accountMenuOpen: false,
   onAccountMenu: noop,
   onSearch: noop,
-  onBrowse: noop,
-  onToggleTheme: noop,
   onNavigate: noop,
   onFilterKind: noop,
   onToggleUnread: noop,
@@ -107,7 +103,6 @@ export default defineFixtures(
     },
     Nav: {
       'all-topics-active': scene(() => full({ activeNav: 'all-topics' })),
-      'for-you-active': scene(() => full({ activeNav: 'for-you', forYouCount: 0 })),
       'juno-active': scene(() => full({ activeNav: 'juno' })),
       'juno-unread': scene(() => full({ junoUnread: 3 })),
       // A job runs: the sparkle is duotone, with the count beside it.

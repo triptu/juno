@@ -90,7 +90,7 @@ export function topicsOfMessages(rows: Iterable<Pick<MessageRow, 'channel' | 'ts
 const reindexOne = (id: string, options: ReindexOptions): Effect.Effect<boolean, SqlError, StoreWriter | Invalidation> =>
   Effect.gen(function* () {
     const parsed = parseTopicId(id)
-    if (parsed === undefined || parsed.kind === 'group') return false
+    if (parsed === undefined) return false
     const sql = yield* StoreWriter
     const channel = parsed.channel
 

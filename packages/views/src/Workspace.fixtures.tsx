@@ -14,9 +14,8 @@ const tabs = {
   eng: { id: 'C0ENG:main', title: 'eng', icon: 'hash' } satisfies WorkspaceTab,
   postgres: { id: 'C0ENG:1760000000.000100', title: 'Postgres 16 migration plan', icon: 'hash' } satisfies WorkspaceTab,
   density: { id: 'C0DESIGNREV:1759900000.000900', title: 'Thread list density', icon: 'hash' } satisfies WorkspaceTab,
-  hiring: { id: 'C0HIRING:1760000000.000300', title: 'Rina Sato · Staff backend', icon: 'lock', stealth: true } satisfies WorkspaceTab,
+  hiring: { id: 'C0HIRING:1760000000.000300', title: 'Rina Sato · Staff backend', icon: 'lock' } satisfies WorkspaceTab,
   maya: { id: 'D0MAYA:1759990000.000500', title: 'Offsite: Wednesday afternoon slot', icon: 'user' } satisfies WorkspaceTab,
-  forYou: { id: 'page:for-you', title: 'For you', icon: 'for-you' } satisfies WorkspaceTab,
   pinnedEng: { id: 'tab-pinned-eng', title: 'eng', icon: 'hash', pinned: true } satisfies WorkspaceTab,
   pinnedMaya: { id: 'tab-pinned-maya', title: 'Offsite: Wednesday afternoon slot', icon: 'user', pinned: true, unread: true } satisfies WorkspaceTab,
   densityUnread: { id: 'tab-density-unread', title: 'Thread list density', icon: 'hash', unread: true } satisfies WorkspaceTab,
@@ -36,13 +35,13 @@ const lastTab = thirtySeven[thirtySeven.length - 1]?.id
 const base: Omit<WorkspaceProps, 'children'> = { tabs: [tabs.postgres, tabs.density], activeId: tabs.postgres.id, onSelectTab: noop, onCloseTab: noop, onNewTab: noop, onTabContextMenu: noop }
 
 const postgresPage = (
-  <TopicView header={<TopicHeader detail={details.postgres} onSubscribe={noop} onUnsubscribe={noop} onMarkRead={noop} onRename={noop} />} composer={<ComposerSlot placeholder="Reply" />}>
+  <TopicView header={<TopicHeader detail={details.postgres} onRename={noop} />} composer={<ComposerSlot placeholder="Reply" />}>
     <MessageList items={thread} main={false} now={NOW} onOpenThread={noop} onChannel={noop} onLink={noop} />
   </TopicView>
 )
 
 const engPage = (
-  <TopicView header={<TopicHeader detail={details.engMain} onThreads={noop} onSubscribe={noop} onUnsubscribe={noop} onMarkRead={noop} />} composer={<ComposerSlot placeholder="Message #eng" />}>
+  <TopicView header={<TopicHeader detail={details.engMain} onThreads={noop} />} composer={<ComposerSlot placeholder="Message #eng" />}>
     <MessageList items={main} main now={NOW} dividerBefore={mainDividerBefore} onOpenThread={noop} onChannel={noop} onLink={noop} />
   </TopicView>
 )
@@ -64,8 +63,7 @@ export default defineFixtures(
       'nothing-open': workspace({ tabs: [] }),
       'topic-open': workspace({}, postgresPage),
       'main-open': workspace({ tabs: [tabs.eng, tabs.density], activeId: tabs.eng.id }, engPage),
-      'stealth-tab': workspace({ tabs: [tabs.eng, tabs.density, tabs.hiring], activeId: tabs.hiring.id }, postgresPage),
-      'many-tabs': workspace({ tabs: [tabs.postgres, tabs.hiring, tabs.eng, tabs.density, tabs.maya, tabs.forYou], activeId: tabs.eng.id }, engPage),
+      'many-tabs': workspace({ tabs: [tabs.postgres, tabs.hiring, tabs.eng, tabs.density, tabs.maya], activeId: tabs.eng.id }, engPage),
       'minimum-window': workspace({ tabs: [tabs.postgres, tabs.hiring, tabs.eng, tabs.density, tabs.maya], activeId: tabs.eng.id }, engPage, { width: 720, height: 480 }),
       'pinned-and-unread': workspace({ tabs: browserTabs, activeId: tabs.postgres.id }, postgresPage),
       'pinned-active': workspace({ tabs: browserTabs, activeId: tabs.pinnedEng.id }, engPage),

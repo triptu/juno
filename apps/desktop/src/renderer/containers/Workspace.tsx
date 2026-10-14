@@ -21,7 +21,7 @@ function stripTab(summary: TabSummary): WorkspaceTab {
   const held = tabs.get(summary)
   if (held !== undefined) return held
   const { detail, place } = summary
-  const base = { id: summary.id, pinned: summary.pinned, stealth: summary.stealth }
+  const base = { id: summary.id, pinned: summary.pinned }
   const tab: WorkspaceTab =
     place.kind === 'newChat'
       ? { ...base, title: 'New chat', icon: 'new-chat' }
@@ -91,7 +91,7 @@ export function Workspace() {
         ? undefined
         : topics.map(({ tab, topicId }) => (
             <Activity key={tab.id} mode={tab.id === state.active ? 'visible' : 'hidden'}>
-              <TopicTab key={topicId} tabId={tab.id} id={topicId} stealth={tab.stealth} />
+              <TopicTab key={topicId} tabId={tab.id} id={topicId} />
             </Activity>
           ))}
     </WorkspaceView>

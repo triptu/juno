@@ -86,9 +86,9 @@ describe('cold boot', () => {
     expect(postgres?.participants[0]?.avatarUrl).toContain('/avatars/U0DEV.svg')
 
     // Main rows carry the channel label as title and the Main tag; counts come from the read pointer.
-    // Main is "subscribed" until the user unsubscribes it (a client-only flag).
+    // Main has no follow.
     const eng = byTitle('#eng')
-    expect(eng).toMatchObject({ kind: 'main', tags: ['main'], unreadCount: 2, unreadExact: true, mentionsMe: false, subscribed: true })
+    expect(eng).toMatchObject({ kind: 'main', tags: ['main'], unreadCount: 2, unreadExact: true, mentionsMe: false, subscribed: false })
     expect(eng?.preview).toEqual({ sender: 'Dev', text: '@Leo I think the preview environments never shut down. Will check.' })
     expect(eng?.channel.icon).toBeTruthy()
     expect(eng?.channel.color).toBeTruthy()
@@ -437,20 +437,17 @@ describe('subscriptions (spec section 5, "Subscribe works on any thread")', () =
     await engine.rowsUntil((list) => list.some((r) => r.id === id), 'the thread after the retry')
   })
 
-  it('unsubscribing a Main hides it with no Slack call, and the undo shows it again', async () => {
+  it('a Main has no follow: subscribing or unsubscribing it is NotFound and keeps its row', async () => {
     const engine = await bootedEngine()
     const before = await engine.rowsUntil((rows) => rows.length >= 20, 'rows')
     const id = 'm:C0DEPLOYS'
-    expect(before.find((r) => r.id === id)).toMatchObject({ kind: 'main', subscribed: true })
+    expect(before.find((r) => r.id === id)).toMatchObject({ kind: 'main', subscribed: false })
     engine.fake.resetCalls()
 
-    const result = valueOf(await unsubscribe(engine, id))
-    expect(result).toEqual({ undo: { _tag: 'topics.subscribe', id } })
-    await engine.rowsUntil((rows) => !rows.some((r) => r.id === id), 'the Main gone')
-    expect(valueOf(await replay(engine, result.undo!))).toEqual({ undo: { _tag: 'topics.unsubscribe', id } })
-    const back = await engine.rowsUntil((rows) => rows.some((r) => r.id === id), 'the Main back')
-    expect(back.find((r) => r.id === id)).toMatchObject({ subscribed: true, tags: ['main'] })
-    expect(apiCalls(engine).filter((c) => c.method.startsWith('subscriptions.thread.'))).toHaveLength(0)
+    expect(errorOf(await unsubscribe(engine, id))).toMatchObject({ _tag: 'NotFound' })
+    expect(errorOf(await subscribe(engine, id))).toMatchObject({ _tag: 'NotFound' })
+    expect((await engine.rowsUntil((rows) => rows.length >= 20, 'rows')).some((r) => r.id === id)).toBe(true)
+    expect(apiCalls(engine)).toHaveLength(0)
   })
 
   it('an unknown topic is NotFound and nothing is called', async () => {

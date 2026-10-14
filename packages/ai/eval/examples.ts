@@ -135,76 +135,6 @@ export const examples: ReadonlyArray<Example> = [
     (o) => o.score >= 0.7,
   ),
 
-  ex(
-    tasks.groupRun,
-    'a question and its answers among noise',
-    {
-      channelId: C('C0ENG'),
-      channel: '#eng',
-      messages: [
-        { ...m('Deploy Bot', 'api v2.41.0 deployed to production', 40), ts: '1728811200.000100' },
-        { ...m('Sam Okafor', 'Is anyone else seeing slow queries on the reports page since the deploy?', 35), ts: '1728811500.000200' },
-        { ...m('Dev Patel', 'Yes, reports page is slow for me too. p95 went from 300ms to 2s.', 33), ts: '1728811620.000300' },
-        { ...m('Priya Raman', 'Lunch at 12:30?', 32), ts: '1728811680.000400' },
-        { ...m('Leo Park', 'The deploy dropped an index on reports.created_at. Re-adding it now.', 30), ts: '1728811800.000500' },
-        { ...m('Sam Okafor', 'Reports page is fast again, thanks Leo.', 20), ts: '1728812400.000600' },
-      ],
-    },
-    (o) => {
-      if (o.group === null) return false
-      const ts = new Set(o.group.messageTs)
-      return ['1728811500.000200', '1728811620.000300', '1728811800.000500'].every((t) => ts.has(t)) && !ts.has('1728811680.000400') && !ts.has('1728811200.000100')
-    },
-  ),
-  ex(
-    tasks.groupRun,
-    'unrelated messages',
-    {
-      channelId: C('C0SOCIAL'),
-      channel: '#social',
-      messages: [
-        { ...m('Priya Raman', 'Lunch at 12:30?', 50), ts: '1728810600.000100' },
-        { ...m('Elena Ruiz', 'New coffee beans in the kitchen', 45), ts: '1728810900.000200' },
-        { ...m('Jonas Weber', 'Anyone going to the meetup on Thursday?', 40), ts: '1728811200.000300' },
-      ],
-    },
-    (o) => o.group === null,
-  ),
-  ex(
-    tasks.groupRun,
-    'a back and forth with a bot post in the middle',
-    {
-      channelId: C('C0HIRING'),
-      channel: '#hiring',
-      messages: [
-        { ...m('Maya Chen', 'The backend candidate from Tuesday: do we move to the onsite loop?', 60), ts: '1728810000.000100' },
-        { ...m('Leo Park', 'Yes from me. Strong on systems, a bit quiet on product questions.', 55), ts: '1728810300.000200' },
-        { ...m('Greenhouse', 'New application: Senior Backend Engineer', 52), ts: '1728810480.000300' },
-        { ...m('Sam Okafor', 'Yes from me too. I can do the systems interview Thursday.', 50), ts: '1728810600.000400' },
-        { ...m('Maya Chen', 'Great, I will schedule the loop for Thursday.', 48), ts: '1728810720.000500' },
-      ],
-    },
-    (o) => {
-      if (o.group === null) return false
-      const ts = new Set(o.group.messageTs)
-      return ts.size >= 3 && ts.has('1728810000.000100') && ts.has('1728810300.000200') && !ts.has('1728810480.000300')
-    },
-  ),
-  ex(
-    tasks.groupRun,
-    'two exchanges, each too short to group',
-    {
-      channelId: C('C0ENG'),
-      channel: '#eng',
-      messages: [
-        { ...m('Dev Patel', 'Is the staging deploy done?', 30), ts: '1728811800.000100' },
-        { ...m('Jonas Weber', 'Yes, ten minutes ago.', 28), ts: '1728811920.000200' },
-        { ...m('Elena Ruiz', 'Who owns the design tokens package now?', 20), ts: '1728812400.000300' },
-        { ...m('Priya Raman', 'Leo, since September.', 18), ts: '1728812520.000400' },
-      ],
-    },
-    (o) => o.group === null,
-  ),
 
   ex(
     tasks.urgencyGate,
@@ -274,44 +204,6 @@ export const examples: ReadonlyArray<Example> = [
   ex(tasks.parseCommand, 'ask for a catch-up', { text: 'what did I miss in eng this morning', people, channels, topics: topicList }, (o) => o.command?.kind === 'ask'),
   ex(tasks.parseCommand, 'resolve with no matching topic', { text: 'close the hiring thread', people, channels, topics: topicList }, (o) => o.command === null),
 
-  ex(
-    tasks.forYou,
-    'a morning of topics',
-    {
-      me: 'Tushar',
-      now: NOW,
-      topics: [
-        { id: postgres.id, title: postgres.title, channel: '#eng', unread: 1, messages: postgres.recent },
-        {
-          id: stagingBill.id,
-          title: stagingBill.title,
-          channel: '#eng',
-          unread: 0,
-          messages: [...stagingBill.recent, m('Jonas Weber', 'Alert added. Scaled down too.', 60), m('Leo Park', 'Perfect, thanks!', 55)],
-        },
-        {
-          id: T('t:D0MAYA:1728500000.000400'),
-          title: 'Offsite dates',
-          channel: 'Maya Chen',
-          unread: 0,
-          messages: [m('Maya Chen', 'Can you send the offsite dates to the team today?', 700), m('Tushar', 'Yes, I will send them this afternoon.', 690, true)],
-        },
-        {
-          id: T('t:C0PLATFORM:1728400000.000500'),
-          title: 'Flaky e2e on CI',
-          channel: '#platform',
-          unread: 3,
-          messages: [
-            m('Dev Patel', 'The sign-in e2e fails about one run in five on CI, always on the cookie step.', 200),
-            m('Sam Okafor', 'Looks like a race between the fake server start and the first request. A retry on connect would fix it.', 190),
-            m('Dev Patel', 'Agreed, want to pair on it?', 185),
-          ],
-        },
-      ],
-    },
-    (o) => o.cards.length > 0 && o.cards.some((c) => c.topicId === 't:D0MAYA:1728500000.000400' && (c.type === 'follow_up' || c.type === 'waiting_on_you')),
-  ),
-
   text(tasks.titleTopic, 'new thread', {
     topicId: T('t:C0ENG:1728900000.000100'),
     channel: '#eng',
@@ -358,13 +250,6 @@ export const examples: ReadonlyArray<Example> = [
     channel: '#social',
     first: 'hmm',
     last: 'yeah',
-  }),
-  text(tasks.catchUp, 'three new messages', {
-    topicId: stagingBill.id,
-    title: stagingBill.title,
-    channel: '#eng',
-    before: stagingBill.recent.slice(0, 1),
-    unread: [...stagingBill.recent.slice(1), m('Jonas Weber', 'Alert added at 80% of last month. Scaled down too.', 60)],
   }),
 ]
 
