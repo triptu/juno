@@ -172,6 +172,27 @@ describe('rich_text blocks', () => {
     })
   })
 
+  it('tidies blank lines: spaces are a blank line, runs collapse to one, and none at the edges', () => {
+    const body = messageBody({ blocks: richText([{ type: 'rich_text_section', elements: [{ type: 'text', text: '\n \n\n  \nmany blank lines above\n\n\n\nand between\n   ' }] }]) }, lookups)
+    expect(body.blocks).toEqual<MessageBody['blocks']>([
+      {
+        kind: 'paragraph',
+        children: [
+          { kind: 'text', text: 'many blank lines above' },
+          { kind: 'break' },
+          { kind: 'break' },
+          { kind: 'text', text: 'and between' },
+        ],
+      },
+    ])
+  })
+
+  it('keeps a space between two inlines on one line, and drops a message of only whitespace', () => {
+    const spaced = messageBody({ blocks: richText([{ type: 'rich_text_section', elements: [{ type: 'emoji', name: 'tada', unicode: '1f389' }, { type: 'text', text: ' ' }, { type: 'text', text: 'nice' }] }]) }, lookups)
+    expect(spaced.blocks[0]).toEqual({ kind: 'paragraph', children: [{ kind: 'emoji', name: 'tada', unicode: '🎉' }, { kind: 'text', text: ' nice' }] })
+    expect(bodyFromMrkdwn(' \n\n   \n', lookups).blocks).toEqual([])
+  })
+
   it('renders quote, preformatted, list, header and divider elements', () => {
     const body = messageBody(
       {

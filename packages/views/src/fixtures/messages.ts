@@ -240,6 +240,28 @@ export const hostile = window([
   { ago: 25, from: people.leo, blocks: [list('bullet', ['Top level']), list('bullet', ['Nested once'], 1), list('bullet', ['Nested twice'], 2), list('ordered', ['First', 'Second'])] },
 ])
 
+/** A sender whose name is longer than a message header, and messages whose first line fills the row. */
+export const longName: Person = { id: 'U0LONGNAME', name: 'Maximilian-Alexander Fitzgerald-Montgomery-Rutherford of the platform team', color: 'jordy' }
+
+export const longFirstLine = window([
+  {
+    ago: 30,
+    from: longName,
+    text: 'WAL position on the replica is 40 minutes behind primary and still falling back, so the read-only cutover window we promised for tonight is not safe unless someone finds the slow query first.',
+  },
+  { ago: 29, from: longName, text: 'Second line of the same run, a continuation row with a long first line that also reaches the end of the column before it wraps onto the next.' },
+  { ago: 20, from: people.maya, text: 'Looking now.' },
+])
+
+/** A sixty-line code block, then enough replies that the list is taller than its frame. */
+export const longCode = window([
+  { ago: 60, from: people.maya, text: 'Here is the whole migration log, for the record.' },
+  { ago: 59, from: people.jonas, blocks: [p('Pasting it in full:'), code(Array.from({ length: 60 }, (_, index) => `line ${index + 1}: ${'='.repeat(40)}`).join('\n'))] },
+  { ago: 50, from: people.leo, text: 'Thanks. The failure is on line 41.' },
+  { ago: 49, from: people.maya, text: 'Agreed, fixing.' },
+  ...Array.from({ length: 12 }, (_, index) => ({ ago: 48 - index, from: index % 2 === 0 ? people.leo : people.maya, text: `Follow-up ${index + 1} on the migration log.` })),
+])
+
 /** Fifty reaction kinds on one message, and a few on another. */
 export const manyReactions = window([
   { ago: 30, from: people.maya, text: 'Reply ideas shipped. Thank you all.', reactions: Array.from({ length: 50 }, (_, index) => reaction(`emoji-${index}`, String.fromCodePoint(0x1f600 + index), 1 + (index % 7), index % 9 === 0)) },

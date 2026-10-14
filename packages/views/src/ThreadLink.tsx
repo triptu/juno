@@ -3,7 +3,7 @@ import { CaretRight } from '@phosphor-icons/react/dist/icons/CaretRight'
 import { ChatsCircle } from '@phosphor-icons/react/dist/icons/ChatsCircle'
 import type { ThreadLink as ThreadLinkModel } from '@juno/contract'
 import { accent, colors, radii, sizes, spacing, text, weights } from '@juno/tokens/tokens.stylex'
-import { activateHandlers, Icon, type ActivateEvent } from '@juno/ui'
+import { activateHandlers, Icon, Text, type ActivateEvent } from '@juno/ui'
 
 export interface ThreadLinkProps {
   readonly link: ThreadLinkModel
@@ -30,9 +30,9 @@ export function ThreadLink({ link, onOpen, tabIndex = 0 }: ThreadLinkProps) {
     >
       <Icon icon={ChatsCircle} size={13} />
       <span {...stylex.props(styles.count)}>{link.label}</span>
-      <span {...stylex.props(styles.title)} dir="auto">
+      <Text variant="meta" tone="inherit" truncate tooltipWhenTruncated dir="auto" as="span" sx={styles.title}>
         {link.title}
-      </span>
+      </Text>
       <span {...stylex.props(styles.caret)}>
         <Icon icon={CaretRight} size={12} />
       </span>
@@ -78,10 +78,7 @@ const styles = stylex.create({
     color: colors['--foreground-default'],
   },
   title: {
-    minWidth: 0,
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap',
+    lineHeight: 1,
   },
   caret: {
     display: 'inline-flex',
