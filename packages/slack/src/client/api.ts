@@ -22,7 +22,8 @@
  * bucket in `RequestQueue` for `Retry-After` and the next attempt waits on it
  * (the interactive lane fails instead of waiting long). 5xx, timeouts and
  * connection failures back off exponentially with jitter. Fatal auth errors,
- * other `ok:false` errors and decode failures are never retried.
+ * other `ok:false` errors and decode failures are never retried. A call with
+ * `singleAttempt` is never retried at all.
  */
 import { Clock, Context, Effect, Layer, Result, Schema as S } from 'effect'
 import { Methods, type MethodArgs, type MethodName, type MethodOk } from '@juno/slack-schema'
@@ -48,6 +49,12 @@ export interface CallOptions {
   readonly lane?: Lane
   /** Sent as `_x_reason`, like the official client's `fetch-client-data`. Short, no user data. */
   readonly reason?: string
+  /**
+   * One HTTP exchange and no retry, whatever the error. For writes whose
+   * caller must never submit twice (the agent's sends, plan v3 §6.3): a
+   * timeout or 5xx then fails at once and the caller treats it as unknown.
+   */
+  readonly singleAttempt?: boolean
 }
 
 export interface SlackApiShape {
@@ -92,7 +99,8 @@ export class SlackApi extends Context.Service<SlackApi, SlackApiShape>()('juno/s
         Effect.gen(function* () {
           const lane = options.lane ?? 'interactive'
           const fields = encodeFields(method, args, session.token, options.reason)
-          return yield* withRetries(queue, config, lane, method, (attempt) => once(method, fields, attempt))
+          const attempts = options.singleAttempt === true ? { ...config, maxAttempts: 1 } : config
+          return yield* withRetries(queue, attempts, lane, method, (attempt) => once(method, fields, attempt))
         }).pipe(Effect.withSpan('SlackApi.call', { attributes: { method, lane: options.lane ?? 'interactive' } }))
 
       return SlackApi.of({ call })
