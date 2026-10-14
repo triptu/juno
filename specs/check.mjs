@@ -213,8 +213,8 @@ if (!boundedOnly && !memoryOnly && !recoveryOnly) {
   for (const [schedule, invariant] of actionCases) {
     simulate('agent-actions', `${schedule}BugStep`, invariant, `actions-${schedule}-bug.itf.json`, true, false, options)
   }
-  // An open WP9 gap, not a corrected schedule: a reported cost above its reservation passes the cap.
-  simulate('agent-actions', 'overReportStep', 'capHard', 'actions-overReport-gap.itf.json', true, false, options)
+  // The rule before the over-report decision: a reported cost above its reservation passes a strict cap.
+  simulate('agent-actions', 'overReportStep', 'strictCap', 'actions-overReport-strictCap.itf.json', true, false, options)
 }
 
 if (!boundedOnly && !memoryOnly && !actionsOnly) {
