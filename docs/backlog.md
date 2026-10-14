@@ -44,3 +44,10 @@ Small items noticed during work that are not yet assigned to a milestone. Remove
 - Notifications (M10): `urgencyGate` answers `{ notify, reason }` and reads the owner's "What matters" text, in place of `{ urgent, chatter }`. Re-run the gate eval and keep the p50 near 516 ms. On timeout the pipeline falls back to the AI-off rule.
 - Notifications (M10): the hours-start summary notification (`hoursStartSummary`), the why popover on the message menu, and a Juno Agent tool to read and change notification settings and hours (Local tier, Undo, only from the owner's own words).
 - Notifications: `docs/design/handoff/screenshots/12-ui.png` shows the old page; replace it with a shot of the built page in M10.
+- Juno Agent ideas adopted 10-14 from `docs/research/agent-native-chat-products.md`, to fold into SPEC 13 and plan v3 after the simplification pass merges:
+  - Every Slack claim Juno makes (chat, catch-ups, the summary when notification hours start) links to the messages it came from.
+  - "Tell me if nobody replies": set in chat or from your own message's menu; Juno watches the thread and speaks only if the deadline passes with no reply. When it fires, Juno offers a ready-to-send nudge draft in your voice, one click to send (an owner-approved exception to "AI manages, you write").
+  - "Ask Juno" in a person's or channel's menu opens the Juno sidebar scoped to it.
+  - A correction to a notify or hold call: Juno asks once whether it applies more widely, then updates "What matters to you" with Undo (M10).
+  - A dismissed card tells the model plainly that the owner said no, so silence never reads as success (engine only).
+  - Coding hand-offs: the Task card shows the project and branch Juno picked, Juno sends a plan first when it judges the work needs one, and the Done message says what the cause was (with the T3 Code work).

@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-14 16:40 · Tushar · From the product research (`docs/research/agent-native-chat-products.md`), Juno adopts: sources linked on every Slack claim, "Tell me if nobody replies" (chat and message menu) with a ready-to-send nudge draft when it fires, "Ask Juno" in person and channel menus, corrections that update "What matters to you" with Undo, dismissals that tell the model it was a no, and clearer coding hand-offs (project and branch on the Task card, a plan first when needed, the cause in Done). The nudge draft is a deliberate exception to "AI manages, you write".
 - 10-14 16:10 · Tushar · Browser-like navigation: back and forward in the sidebar header (per-tab history), a resizable and collapsible sidebar, a native tab menu (Pin, Close, Close others, Close to the right, Close all), the usual browser shortcuts including ⌘⇧T to reopen a closed tab, and an unread dot on tabs. Specced in the simplification pass; built after fix B.
 - 10-14 15:30 · Tushar · Keep the interface dead simple: anything Juno can do from the owner's words happens in chat, per-item choices live in that item's menu, and settings stay few.
 - 10-14 15:30 · Tushar · For you folds into Home and the Juno chat; Home needs a visible way in. All topics stays: it is the guarantee that everything in Slack is findable with filters and recency, which lets the sidebar stay small.
