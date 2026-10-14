@@ -77,7 +77,7 @@ export default defineFixtures(IconButton, {
         <IconButton icon={Moon} label="Toggle theme" size={30} />
         <IconButton icon={Bell} label="Subscribed. Click to unsubscribe." size={32} />
         <IconButton icon={DotsThree} label="More" size={32} iconWeight="bold" />
-        <IconButton icon={NotePencil} label="New message" size={36} />
+        <IconButton icon={NotePencil} label="Edit note" size={36} />
       </Row>
     )),
     'all-variants': scene(() => (

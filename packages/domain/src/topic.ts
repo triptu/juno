@@ -15,8 +15,6 @@ export interface TopicOverlay {
   readonly reopenedAt?: number
   readonly pinnedAt?: number
   readonly unsubscribedAt?: number
-  /** Set by "Track replies as a topic". */
-  readonly tracked?: boolean
 }
 
 export interface TopicActivity {

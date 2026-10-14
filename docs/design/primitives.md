@@ -121,7 +121,7 @@ Menus are not a separate primitive: an in-app menu (the account menu) is an `Opt
 
 `TextField`: 1px `--input-border`, surface background, focus shown on the container (`--focus-ring` border and 1px ring). `size` 30, 32, 34, 36, 44 (radius 7 / 7 / 8 / 8 / 10). `leadingIcon` (search), `leading` slot (the "To" label and a ContextPill), `trailing`, `width` (`full` | `search` 260 | `keyword` 160), `text`, `label` (required without a visible label), `invalid` (danger border, `aria-invalid`).
 
-`Textarea`: `variant` `plain` (bordered, 6 rows, resize vertical), `inline` (composer: no border, 22px line height, grows with `field-sizing: content` to `maxHeight` `composer` 194 or `assistant` 160 then scrolls; no layout is read on a keystroke), `card` (send card, `--background`, 2 rows).
+`Textarea`: `variant` `inline` (composer: no border, 22px line height, grows with `field-sizing: content` to `maxHeight` `composer` 194 or `assistant` 160 then scrolls; no layout is read on a keystroke), `card` (send card, `--background`, 2 rows).
 
 `Select`: native `<select>` styled like a 30 or 32px field with a muted chevron; `options[]`.
 
@@ -153,7 +153,7 @@ Centered `illustration` (optional; an `IllustrationName`, 96 wide in `list`, 120
 
 ## 16. Page, PageHeader, Section
 
-`Page`: scrolling page with a centred column, `width` `narrow` 680 | `default` 720 | `settings` 760 | `wide` 880, `padding` `page` (40 32 72) | `form` (56 32 64). `PageHeader`: serif `title` (`size` `compact` for the 32px All topics title), `subtitle`, `trailing` slot. `Section`: 15/600 `heading` + 13 muted `sub` + children (usually a `Surface group`).
+`Page`: scrolling page with a centred column, `width` `narrow` 680 | `default` 720 | `settings` 760 | `wide` 880, padding 40 32 72. `PageHeader`: serif `title` (`size` `compact` for the 32px All topics title), `subtitle`, `trailing` slot. `Section`: 15/600 `heading` + 13 muted `sub` + children (usually a `Surface group`).
 
 ## 17. CodeBlock
 

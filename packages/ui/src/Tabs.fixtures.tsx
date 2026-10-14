@@ -11,7 +11,7 @@ import { IconButton } from './IconButton'
 import { Tab, TabStrip } from './Tabs'
 import { Text } from './Text'
 
-const newTab = <IconButton icon={Plus} label="New message" size={28} iconSize={16} tone="muted" />
+const newTab = <IconButton icon={Plus} label="New tab" size={28} iconSize={16} tone="muted" />
 
 const titles = ['Postgres 16 migration plan', 'Rina Sato · Staff backend', 'Q4 roadmap cuts', 'Staging bill doubled since August', 'Thread list density', 'Offsite: Wednesday afternoon slot', 'Can eng review the launch checklist']
 

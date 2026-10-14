@@ -6,8 +6,8 @@ export default defineFixtures(
   {
     Value: {
       unchecked: fixture({
-        label: 'Track replies as a topic',
-        description: 'Slack posts this to Main either way. Replies to it are collected here as their own topic.',
+        label: 'Include muted channels',
+        description: 'Show muted channels in search results.',
         defaultChecked: false,
       }),
       checked: fixture({
@@ -16,10 +16,10 @@ export default defineFixtures(
         size: 'lg',
         defaultChecked: true,
       }),
-      'no-description': fixture({ label: 'Track replies as a topic', defaultChecked: false }),
+      'no-description': fixture({ label: 'Include muted channels', defaultChecked: false }),
     },
     Interaction: {
-      hover: fixture({ label: 'Track replies as a topic', defaultChecked: false }, { hover: 'input' }),
+      hover: fixture({ label: 'Include muted channels', defaultChecked: false }, { hover: 'input' }),
     },
     Availability: {
       disabled: fixture({

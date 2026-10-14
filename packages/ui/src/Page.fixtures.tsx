@@ -1,6 +1,5 @@
 import { Hash } from '@phosphor-icons/react/dist/icons/Hash'
 import { MagnifyingGlass } from '@phosphor-icons/react/dist/icons/MagnifyingGlass'
-import { Button } from './Button'
 import { defineFixtures, scene } from './fixtures/define'
 import { Icon } from './Icon'
 import { ListRow } from './ListRow'
@@ -44,22 +43,6 @@ export default defineFixtures(
           </Page>
         ),
         { width: 960, height: 560, padded: false },
-      ),
-      'new-message': scene(
-        () => (
-          <Page width="narrow" padding="form">
-            <PageHeader title="New message" />
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-              <Button size="2xl" variant="secondary">
-                Discard
-              </Button>
-              <Button size="2xl" variant="primary" dimmed>
-                Send
-              </Button>
-            </div>
-          </Page>
-        ),
-        { width: 760, height: 260, padded: false },
       ),
     },
     'Header widths': {

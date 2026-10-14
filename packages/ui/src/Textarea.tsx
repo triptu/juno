@@ -2,11 +2,10 @@ import * as stylex from '@stylexjs/stylex'
 import type { TextareaHTMLAttributes } from 'react'
 import { accent, colors, layout, radii, spacing, text } from '@juno/tokens/tokens.stylex'
 
-export type TextareaVariant = 'plain' | 'inline' | 'card'
+export type TextareaVariant = 'inline' | 'card'
 
 export interface TextareaProps extends Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'style' | 'className'> {
   /**
-   * `plain`: bordered block that resizes vertically (New message).
    * `inline`: no border of its own, grows with its content to a maximum and
    * then scrolls (composer). `card`: a bordered block on the page background
    * inside a card (send card).
@@ -21,11 +20,11 @@ export interface TextareaProps extends Omit<TextareaHTMLAttributes<HTMLTextAreaE
  * A multi-line input. The inline variant grows with its content through
  * `field-sizing: content`, so no layout is read on a keystroke.
  */
-export function Textarea({ variant = 'plain', maxHeight = 'composer', label, rows, ...rest }: TextareaProps) {
+export function Textarea({ variant = 'inline', maxHeight = 'composer', label, rows, ...rest }: TextareaProps) {
   return (
     <textarea
       aria-label={label}
-      rows={rows ?? (variant === 'inline' ? 1 : variant === 'card' ? 2 : 6)}
+      rows={rows ?? (variant === 'inline' ? 1 : 2)}
       {...rest}
       {...stylex.props(styles.base, variants[variant], variant === 'inline' && maxHeights[maxHeight])}
     />
@@ -51,26 +50,6 @@ const styles = stylex.create({
 })
 
 const variants = stylex.create({
-  plain: {
-    paddingBlock: spacing['--space-3'],
-    paddingInline: spacing['--space-3-5'],
-    borderWidth: '1px',
-    borderStyle: 'solid',
-    borderColor: {
-      default: colors['--input-border'],
-      ':focus': accent['--focus-ring'],
-    },
-    boxShadow: {
-      default: 'none',
-      ':focus': `0 0 0 1px ${accent['--focus-ring']}`,
-    },
-    borderRadius: radii['--radius-xl'],
-    fontFamily: text['--text-body-family'],
-    fontSize: text['--text-body-size'],
-    lineHeight: text['--text-body-leading'],
-    letterSpacing: text['--text-body-tracking'],
-    resize: 'vertical',
-  },
   inline: {
     // 9 + 22 + 9 = the 40px single-line composer.
     paddingBlock: layout['--composer-padding-block'],

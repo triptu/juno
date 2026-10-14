@@ -65,7 +65,7 @@ export default defineFixtures(
     Interaction: {
       'hover-tab': workspace({}, postgresPage, { hover: '[role="tab"]:nth-of-type(2)' }),
       'hover-close': workspace({}, postgresPage, { hover: '[role="tab"]:nth-of-type(1) button' }),
-      'hover-new-tab': workspace({}, postgresPage, { hover: '[aria-label="New message"]' }),
+      'hover-new-tab': workspace({}, postgresPage, { hover: '[aria-label="New tab"]' }),
       'focus-tab': workspace({}, postgresPage, { focus: '[role="tab"]:nth-of-type(2)' }),
     },
   },

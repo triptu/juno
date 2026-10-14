@@ -6,7 +6,6 @@ import { Hash } from '@phosphor-icons/react/dist/icons/Hash'
 import { Lightbulb } from '@phosphor-icons/react/dist/icons/Lightbulb'
 import { ListBullets } from '@phosphor-icons/react/dist/icons/ListBullets'
 import { Lock } from '@phosphor-icons/react/dist/icons/Lock'
-import { NotePencil } from '@phosphor-icons/react/dist/icons/NotePencil'
 import { Plus } from '@phosphor-icons/react/dist/icons/Plus'
 import { Sparkle } from '@phosphor-icons/react/dist/icons/Sparkle'
 import { User } from '@phosphor-icons/react/dist/icons/User'
@@ -16,7 +15,7 @@ import { colors } from '@juno/tokens/tokens.stylex'
 import { EmptyState, IconButton, Tab, TabStrip, type ActivateEvent, type PhosphorIcon } from '@juno/ui'
 
 /** The icon a tab shows: the channel kind for a topic, the page's own icon otherwise. */
-export type WorkspaceTabIcon = 'hash' | 'lock' | 'user' | 'users' | 'all-topics' | 'for-you' | 'juno' | 'new-message' | 'notifications' | 'preferences'
+export type WorkspaceTabIcon = 'hash' | 'lock' | 'user' | 'users' | 'all-topics' | 'for-you' | 'juno' | 'notifications' | 'preferences'
 
 export interface WorkspaceTab {
   readonly id: string
@@ -36,7 +35,7 @@ export interface WorkspaceProps {
   /** Fires on mouse down; `event.metaKey` asks for a new tab. */
   readonly onSelectTab?: (id: string, event: ActivateEvent) => void
   readonly onCloseTab?: (id: string) => void
-  /** The "+" after the last tab: New message. */
+  /** The "New tab" button opens search, or All topics until M9. */
   readonly onNewTab?: () => void
   /** Right-click on a topic tab: the row context menu. Page tabs have none. */
   readonly onTabContextMenu?: (id: string, event: MouseEvent<HTMLDivElement>) => void
@@ -52,7 +51,6 @@ const icons: Record<WorkspaceTabIcon, PhosphorIcon> = {
   'all-topics': ListBullets,
   'for-you': Lightbulb,
   juno: Sparkle,
-  'new-message': NotePencil,
   notifications: Bell,
   preferences: Gear,
 }
@@ -78,7 +76,7 @@ function stepIndex(key: string, index: number, count: number): number | undefine
 /**
  * The right pane: the tab strip (a window drag region) over the page.
  * Tabs carry the kind icon or the topic's art in a fixed slot, the eye-off
- * in stealth, the title and a close button; "+" opens New message. The
+ * in stealth, the title and a close button; "+" opens search (All topics until M9). The
  * strip is an APG tablist: the active tab is the one Tab stop, the arrow
  * keys select its neighbours, Delete closes it.
  */
@@ -93,7 +91,7 @@ export function Workspace({ tabs = [], activeId, onSelectTab, onCloseTab, onNewT
   }
   return (
     <section aria-label="Workspace" {...stylex.props(styles.root)}>
-      <TabStrip onKeyDown={onKeyDown} trailing={<IconButton icon={Plus} label="New message" size={28} iconSize={16} tone="muted" onClick={onNewTab} />}>
+      <TabStrip onKeyDown={onKeyDown} trailing={<IconButton icon={Plus} label="New tab" size={28} iconSize={16} tone="muted" onClick={onNewTab} />}>
         {tabs.map((tab) => (
           <Tab
             key={tab.id}

@@ -43,7 +43,6 @@ Right-aligned group, gap 2px, inside the 44px bar.
 | Search | `search` 16 | 30×30, radius 8 | "Search ⌘K" | Opens ⌘K palette |
 | Browse | `hash` 16 | 30×30 | "Browse channels and people" | Toggles the Browse popover; background `--secondary-default` while open |
 | Theme | `moon` / `sun` 16 | 30×30 | "Toggle theme" | Switches light/dark in one frame |
-| New | `square-pen` 16 | 30×30 | "New message" **[spec]** (prototype says "New topic") | Opens the New message page |
 | Me | avatar 24 | 30×30 round, margin-left 4 | "Account and preferences" | Toggles the avatar menu |
 
 Style: transparent, colour `--foreground-subtle`, hover `--surface-hover`, press scale .96.
@@ -187,18 +186,18 @@ Density also changes the message list (§6.1).
 
 ## 4. Tabs
 
-**Shows:** S01 (two tabs), S08 (three tabs with page tab), S14 (stealth tab), shot 23-tab-context-menu.
+**Shows:** S01 (two tabs), S14 (stealth tab), shot 23-tab-context-menu.
 
 - Strip: 44px, align-items flex-end, padding 0 10, gap 2. [built M4] The tabs sit in a horizontal scroller with no visible scrollbar (`scroll-snap-type: x proximity`); the active tab scrolls into view when it changes, so it is never hidden. The "+" button sits outside the scroller and never leaves the screen. The prototype clipped the strip with `overflow: hidden`.
 - Tab: `flex: 0 1 230px`, min-width 120 (`--tab-min-width`; the prototype's 72 lost the label), height 35, margin-bottom −1, padding `0 6 0 12`, radius `8 8 0 0`, 1px border, 13px, gap 8.
   - Active: bg `--background`, border `--border-default` with bottom border in `--background` so it merges into the page; fg default; weight 500.
   - Inactive: transparent, border transparent, fg subtle, weight 400; hover fg default.
-  - Icon 14 at 0.75 opacity: channel kind icon for topics (`hash`/`lock`/`user`/`users`), `eye-off` when stealth, `layout-list` All topics, `lightbulb` For you, `sparkles` Juno, `square-pen` New message, `bell` Notifications, `settings` Preferences.
+  - Icon 14 at 0.75 opacity: channel kind icon for topics (`hash`/`lock`/`user`/`users`), `eye-off` when stealth, `layout-list` All topics, `lightbulb` For you, `sparkles` Juno, `bell` Notifications, `settings` Preferences.
   - Label: topic title, channel name for Main (no "#"), or the page name. Ellipsis.
   - Label: `dir="auto"`, so a right-to-left title shows its start, as the row and header do.
   - Close: 20×20, radius 4, `x` 12 muted, hover bg `--secondary-default`, accessible name "Close tab". Always visible on the active tab and on inactive tabs wider than 140px. [built M4] On a narrower inactive tab the label takes the button's space and the button appears over the label's end on hover or focus (Safari does the same), so nothing moves.
-- New tab button after the last tab: 28×28, radius 8, `plus` 15 muted, margin `0 0 4 4`, opens New message (prototype title "New topic"; use "New message").
-- Behaviour: everything opens in the current tab; ⌘-click or "Open in new tab" adds one. Pages (All topics, For you, Juno, Notifications, Preferences, New message) are singletons: opening again focuses the existing tab. Closing a tab focuses the tab now at the same index (the right neighbour), else the last one. With no tabs the workspace shows the empty state (§17).
+- New tab button after the last tab: 28×28, radius 8, `plus` 15 muted, margin `0 0 4 4`, label "New tab"; opens search (⌘K) from M9, or All topics in a new tab until then. The desktop handler waits for the All topics page (M5); neither destination exists in the current shell.
+- Behaviour: everything opens in the current tab; ⌘-click or "Open in new tab" adds one. Pages (All topics, For you, Juno, Notifications, Preferences) are singletons: opening again focuses the existing tab. Closing a tab focuses the tab now at the same index (the right neighbour), else the last one. With no tabs the workspace shows the empty state (§17).
 - Stealth tab: opened via "Open in stealth"; icon `eye-off`; unread stays; header shows the stealth pill (§5). Sending a reply or "Mark read" ends stealth.
 - Right-click on a topic tab: the row context menu for that topic. Page tabs have no menu.
 - Keyboard: [built M4] the strip is an APG `tablist` with roving tabindex: only the active tab is in the Tab order; ArrowLeft and ArrowRight select the neighbour (wrapping), Home and End the first and last; Delete or Backspace on a tab closes it, and Enter or Space on its close button does too. Focus moves to the tab that takes the closed tab's place, or to "+" when none is left. ⌘W closes the active tab, ⌘⇧[ / ⌘⇧] switch tabs (app menu). The prototype had `role="button" tabindex="0"` on every tab, two Tab stops per tab.
@@ -346,19 +345,9 @@ Buttons: primary 28px, padding 0 10, radius 6, bg surface, `--shadow-sm`, 12.5/5
 
 Quote (toolbar) inserts the whole message as "> " lines; selection Quote inserts only the selection. Inserted at the end of the draft on its own lines, caret after, composer focused.
 
-## 8. New message page
+## 8. Removed
 
-**Shows:** S08 (tracking on), shot 46 (empty To), shot 46c (To picker).
-
-Scrolling page, inner max-width 680, padding `56 32`, gap 16.
-
-- Title "New message" serif 34 lh 1.15, margin-bottom 8.
-- **To** field: min-height 44, padding 0 12, 1px `--input-border`, radius 10, bg surface, gap 10, text cursor. Label "To" 13 muted. When a target is set: pill 28px, radius 6, padding 0 10, 13/600 with 400 kind, tinted like the header pill ("eng · Public channel"). Input 14px, placeholder "Channel or person" (empty) or "Change" (set). Prefilled with the channel of the topic you were viewing, or the current scope.
-- Picker (on focus/click): below the field +4px, full width, max-height 300, padding 6, radius 13, `--pop-shadow`, z 10. Rows 34px, radius 6, 13.5px: avatar 20 or icon 15, name, right kind 12 muted ("Public channel", "Private channel", "Direct message", "Group DM"). Sorted by latest activity, filtered by the typed text. Empty: "No channel or person matches." Esc closes; mouse-down picks.
-- Message textarea: 6 rows, padding 12 14, radius 10, 1px `--input-border`, 14px lh 1.6, resize vertical, placeholder "Write a message".
-- Track box: padding 12 14, radius 10, 1px `--border-default`, gap 10. Checkbox 15px (`accent-color: var(--foreground-default)`), off by default, label "Track replies as a topic" 13.5/500, description "Slack posts this to Main either way. Replies to it are collected here as their own topic." 12.5 muted lh 1.45. When on: title input 36px, margin-left 25, padding 0 12, radius 8, 1px `--input-border`, 13.5, placeholder "Title (optional, only in your client). AI names it if empty."
-- Footer, right-aligned, gap 8: **Discard** 36px padding 0 14 radius 8 `--secondary-default` 13/500 (closes the tab) · **Send** 36px padding 0 16 bg `--hl` fg `--hl-fg`, opacity .4 until there is text and a target.
-- Send posts to Main; with tracking on it also creates the topic (with the thread link under the Main message) and the tab becomes that topic; otherwise the tab becomes the Main thread, scrolled to the bottom.
+Removed on 10-14: posting uses Main; a separate page is redundant and reply tracking is unreliable.
 
 ## 9. ⌘K palette
 

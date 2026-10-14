@@ -74,7 +74,7 @@ Eight items need fixing before views are built on top of these primitives. The r
 
 - `Popover/account-menu`: the 640x640 frame cuts the menu after "Sign out"; the bottom padding and radius are not visible. Make the frame tall enough (about 340px content plus anchor).
 - `Chip/all-variants` does not include the `strong` unread-count variant on a `--secondary-default` row, the `dashed` stealth pill, or the `success` chip next to each other on the same surface; add them so the contrast rule in item 5 is covered by a fixture.
-- `TextField/title` is 420px wide and the placeholder is cut ("...if empt"). Use `width="full"` in a 640px frame, as in the New message page (S08).
+- `TextField/title` is 420px wide and the placeholder is cut ("...if empt"). Use `width="full"` in a 640px frame.
 - Also add the missing states that views will need, all in light and dark: hover (forced with a class), pressed (`scale .96`), disabled for IconButton, Segmented, Select, Checkbox and Slider, invalid text field. Right now only Button has `disabled`, `dimmed` and `pressed`.
 - Evidence: `Popover/account-menu-light.png`, `TextField/title-light.png`.
 

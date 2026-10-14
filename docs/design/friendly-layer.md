@@ -74,7 +74,6 @@ Every Lucide import in `packages/ui`, `packages/views` and `apps` today, plus th
 | `User` | `User` | |
 | `Users` | `Users` | |
 | `Search` | `MagnifyingGlass` | |
-| `SquarePen` | `NotePencil` | New message |
 | `Moon` / `Sun` | `Moon` / `Sun` | |
 | `LayoutList` | `ListBullets` | fill when All topics is active |
 | `Lightbulb` | `Lightbulb` | fill when For you is active; duotone on the Reply ideas card |
