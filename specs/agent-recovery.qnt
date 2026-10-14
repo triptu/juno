@@ -21,7 +21,7 @@ module recoveryProtocol {
     recovery: bool, quarantined: bool, reviewed: bool, restoredPending: bool,
     position: int, gen: int, segments: Set[Segment], encryptions: List[int], nextNonce: int,
     manifest: Manifest, exportCursor: int, snapshotApproval: Set[int], snapshotConsumed: Set[int],
-    snapshotReceipt: Set[int], snapshotInc: int, deletion: int,
+    snapshotReceipt: Set[int], snapshotInc: int, deletion: int, deletionKnown: bool,
     restoring: bool, candidate: Manifest, staged: int, stagedHash: int, fresh: bool,
     removed: Set[int], backupSources: Set[int], destroyedKeys: Set[int],
     installed: bool, installedGen: int, installedPosition: int,
@@ -33,6 +33,8 @@ module recoveryProtocol {
   var scenario: int
   var remaining: int
   pure def listSet(xs) = xs.foldl(Set(), (acc, x) => acc.union(Set(x)))
+  pure val generations = 1.to(16)
+  pure val positions = 0.to(32)
   pure val emptyManifest: Manifest = { gen: 1, schema: 1, snapshot: 0, head: 0, hash: 0, authenticated: true, deletion: 0 }
   pure val initial: State = {
     lock: 0, referenced: true, writers: Set(0), io: Set(), inbox: Set(), ack: Set(), volatile: Set(),
@@ -45,12 +47,13 @@ module recoveryProtocol {
     released: false, releasePublished: false, successor: false, oldOff: false, attested: false,
     recovery: false, quarantined: false, reviewed: false, restoredPending: false,
     position: 0, gen: 1, segments: Set(), encryptions: List(), nextNonce: 1, manifest: emptyManifest,
-    exportCursor: 0, snapshotApproval: Set(), snapshotConsumed: Set(), snapshotReceipt: Set(), snapshotInc: 1, deletion: 0,
+    exportCursor: 0, snapshotApproval: Set(), snapshotConsumed: Set(), snapshotReceipt: Set(), snapshotInc: 1, deletion: 0, deletionKnown: true,
     restoring: false, candidate: emptyManifest, staged: 0, stagedHash: 0, fresh: true,
     removed: Set(), backupSources: Set(), destroyedKeys: Set(),
     installed: false, installedGen: 0, installedPosition: 0, sealed: false, label: "init"
   }
   action init = all { s' = initial, before' = initial, pc' = 0, scenario' = 0, remaining' = drainLimit }
+  val localReady = s.referenced and s.writers == Set(s.lock) and s.lock != -1
   action idle = s' = { ...s, label: "blocked" }
   action acquire(p: int): bool =
     if (s.lock != -1) idle else s' = { ...s, lock: p, referenced: true, writers: s.writers.union(Set(p)), label: "acquire" }
@@ -69,40 +72,40 @@ module recoveryProtocol {
   action acknowledge(op: int, guard: bool): bool =
     if (guard and not(s.inbox.contains(op))) idle else s' = { ...s, ack: s.ack.union(Set(op)), label: "ack" }
   action resetBridge = s' = { ...s, bridgeReset: true, label: "reset" }
-  action submit(op: int, dedupe: bool): bool =
+  action submit(op: int, dedupe: bool): bool = if (not(localReady)) idle else
     if (not(s.bridgeReset) or not(s.inbox.contains(op)) or s.stopped) idle else
     if (dedupe and s.journal.listSet().exists(e => e.inc == s.incarnation and e.op == op)) idle else
     s' = { ...s, journal: s.journal.append({ inc: s.incarnation, pos: s.nextSeq, op: op }),
       nextSeq: s.nextSeq + 1, label: "submit" }
-  action markSubmitted(op: int): bool =
+  action markSubmitted(op: int): bool = if (not(localReady)) idle else
     if (s.journal.listSet().exists(e => e.op == op and e.inc == s.incarnation))
       s' = { ...s, submitted: s.submitted.union(Set(op)), label: "submitted" } else idle
-  action project(atomic: bool): bool = {
-    val next = s.journal.select(e => e.inc == s.incarnation and e.pos == s.cursor.get(s.incarnation) + 1)
-    if (next.length() == 0) idle else {
-      val e = next.head()
+  action project(atomic: bool): bool = if (not(localReady)) idle else {
+    val available = s.journal.select(e => e.inc == s.incarnation and e.pos == s.cursor.get(s.incarnation) + 1)
+    if (available.length() == 0) idle else {
+      val e = available.head()
       s' = { ...s, archive: s.archive.append(e), cursor: if (atomic) s.cursor.set(e.inc, e.pos) else s.cursor,
         position: s.position + 1, label: "project" }
     }
   }
-  action approve = if (s.approvals.contains(1)) idle else s' = { ...s, approvals: s.approvals.union(Set(1)), position: s.position + 1, label: "approve" }
-  action consume =
+  action approve = if (not(localReady)) idle else if (s.approvals.contains(1)) idle else s' = { ...s, approvals: s.approvals.union(Set(1)), position: s.position + 1, label: "approve" }
+  action consume = if (not(localReady)) idle else
     if (s.approvals.contains(1) and not(s.consumed.contains(1)) and not(s.recovery or s.quarantined))
       s' = { ...s, consumed: s.consumed.union(Set(1)), position: s.position + 1, label: "consume" } else idle
-  action receipt = if (s.consumed.subseteq(s.receipts)) idle else s' = { ...s, receipts: s.receipts.union(s.consumed), position: s.position + 1, label: "receipt" }
+  action receipt = if (not(localReady)) idle else if (s.consumed.subseteq(s.receipts)) idle else s' = { ...s, receipts: s.receipts.union(s.consumed), position: s.position + 1, label: "receipt" }
   action crash(guard: bool): bool = s' = { ...s, lock: -1, referenced: false, writers: Set(), io: Set(),
     volatile: Set(), bridgeReset: false, resumed: false,
     consumed: if (guard) s.consumed else Set(), label: "crash" }
   // A copied older pi file is valid to pi. The Juno cursor survives. next_seq
   // is the next available position; last committed is next_seq - 1.
   action rollbackJournal = s' = { ...s, journal: List(), nextSeq: 1, rollback: true, resumed: false, label: "rollback" }
-  action rotate(guard: bool): bool = {
+  action rotate(guard: bool): bool = if (not(localReady)) idle else {
     val inc = if (guard) s.nextInc else s.incarnation
     s' = { ...s, incarnation: inc, nextInc: s.nextInc + 1, identities: s.identities.union(Set(inc)),
       journal: List(), nextSeq: 1, rollback: false, resumed: false, stopped: false,
       interrupted: s.interrupted.union(s.submitted), label: "rotate" }
   }
-  action openJournal(guard: bool): bool =
+  action openJournal(guard: bool): bool = if (not(localReady)) idle else
     if (not(s.supported)) s' = { ...s, stopped: true, resumed: false, label: "unsupported" } else
     if (guard and s.nextSeq - 1 < s.cursor.get(s.incarnation)) rotate(true) else
     s' = { ...s, resumed: true, unknown: s.unknown.union(s.consumed.exclude(s.receipts)), label: "resume" }
@@ -110,22 +113,24 @@ module recoveryProtocol {
     if (s.active.contains(device) and not(device == 0 and (s.oldOff or not(s.admissions))))
       s' = { ...s, authorizations: s.authorizations.union(Set({ id: s.nextAuth, device: device, epoch: s.epoch.get(device) })),
         nextAuth: s.nextAuth + 1, label: "authorize" } else idle
-  action beginTransfer = s' = { ...s, admissions: false, transfer: true, label: "transfer" }
+  action beginTransfer = if (not(localReady)) idle else s' = { ...s, admissions: false, transfer: true, label: "transfer" }
   action drain =
     if (s.cursor.get(s.incarnation) != s.nextSeq - 1) project(true) else
     s' = { ...s, io: Set(), unknown: s.unknown.union(s.consumed.exclude(s.receipts)), drained: true, label: "drain" }
-  action checkpoint(guard: bool): bool =
+  action checkpoint(guard: bool): bool = if (not(localReady)) idle else
     if (guard and (s.admissions or not(s.drained) or s.io != Set() or s.cursor.get(s.incarnation) != s.nextSeq - 1)) idle else
     s' = { ...s, checkpoint: s.position,
       checkpointComplete: not(s.admissions) and s.drained and s.io == Set() and s.cursor.get(s.incarnation) == s.nextSeq - 1,
       label: "checkpoint" }
   // Release is durable BEFORE publishing the checkpoint's released manifest.
-  action releaseOwner =
-    if (s.checkpoint < 0) idle else s' = { ...s, released: true, active: s.active.exclude(Set(0)), label: "releaseOwner" }
-  action publishRelease(guard: bool): bool =
+  action releaseOwner = if (not(localReady)) idle else
+    if (s.checkpoint < 0) idle else s' = { ...s, released: true, admissions: false, active: s.active.exclude(Set(0)), label: "releaseOwner" }
+  action publishRelease(guard: bool): bool = if (not(localReady)) idle else
     if (guard and not(s.released)) idle else s' = { ...s, releasePublished: true, label: "publishRelease" }
+  // The successor sees the released manifest and its checkpoint, not the
+  // predecessor's current local ownership record or live commit position.
   action installSuccessor(guard: bool): bool =
-    if (not(s.releasePublished) or (guard and (not(s.checkpointComplete) or not(s.released) or s.checkpoint != s.position))) idle else
+    if (not(s.releasePublished) or (guard and not(s.checkpointComplete))) idle else
     s' = { ...s, successor: true, active: s.active.union(Set(1)), epoch: s.epoch.set(1, s.epoch.get(0) + 1),
       actualOwner: 1, label: "successor" }
   action rebootOld =
@@ -133,12 +138,12 @@ module recoveryProtocol {
 
   // Capture and export are separate durable file operations. A restore may
   // observe a renamed manifest before folder sync delivers its segments.
-  action snapshotWith(guard: bool): bool = s' = { ...s, manifest: { ...s.manifest, gen: s.gen, snapshot: s.position,
+  action snapshotWith(guard: bool): bool = if (not(localReady)) idle else s' = { ...s, manifest: { ...s.manifest, gen: s.gen, snapshot: s.position,
       head: s.position, hash: s.position, deletion: s.deletion, authenticated: true }, exportCursor: s.position,
     snapshotApproval: s.approvals, snapshotConsumed: s.consumed, snapshotReceipt: s.receipts,
     snapshotInc: s.incarnation, backupSources: if (guard) s.inbox.exclude(s.removed) else s.inbox, label: "snapshot" }
   action snapshot = snapshotWith(true)
-  action encrypt(guard: bool): bool = {
+  action encrypt(guard: bool): bool = if (not(localReady)) idle else {
     val from = s.manifest.head
     val nonce = if (guard) s.nextNonce else 1
     if (from >= s.position) idle else s' = { ...s,
@@ -146,37 +151,38 @@ module recoveryProtocol {
         prev: s.manifest.hash, hash: from + 1, nonce: nonce })),
       encryptions: s.encryptions.append(nonce), nextNonce: s.nextNonce + 1, label: "encrypt" }
   }
-  action publishManifest(guard: bool): bool = {
-    val next = s.segments.filter(x => x.gen == s.gen and x.from == s.manifest.head and x.prev == s.manifest.hash)
-    if (next == Set()) {
+  action publishManifest(guard: bool): bool = if (not(localReady)) idle else {
+    val available = s.segments.filter(x => x.gen == s.gen and x.from == s.manifest.head and x.prev == s.manifest.hash)
+    if (available == Set()) {
       if (guard) idle else s' = { ...s, manifest: { ...s.manifest, head: s.manifest.head + 1, hash: s.manifest.head + 1 }, label: "manifest" }
     } else {
-      nondet seg = next.oneOf()
+      nondet seg = available.oneOf()
       s' = { ...s, manifest: { ...s.manifest, head: seg.to, hash: seg.hash }, label: "manifest" }
     }
   }
-  action persistExport(guard: bool): bool = s' = { ...s,
+  action persistExport(guard: bool): bool = if (not(localReady)) idle else s' = { ...s,
     exportCursor: if (guard) s.manifest.head else s.position, label: "export" }
-  action beginRestore(guard: bool): bool =
+  action persistExportFeedback = if (not(localReady)) idle else s' = { ...s, exportCursor: s.manifest.head, position: s.position + 1, label: "export" }
+  action beginRestore(guard: bool): bool = if (not(localReady)) idle else
     if (guard and (not(s.manifest.authenticated) or s.manifest.schema != 1)) idle else
     s' = { ...s, candidate: s.manifest, restoring: true, staged: s.manifest.snapshot,
       stagedHash: s.manifest.snapshot, fresh: true, label: "beginRestore" }
-  action replay(guard: bool): bool = {
-    val next = s.segments.filter(x => x.gen == s.candidate.gen and x.from == s.staged and x.prev == s.stagedHash)
+  action replay(guard: bool): bool = if (not(localReady)) idle else {
+    val available = s.segments.filter(x => x.gen == s.candidate.gen and x.from == s.staged and x.prev == s.stagedHash)
     if (s.staged >= s.candidate.head) idle else
-    if (next == Set()) {
+    if (available == Set()) {
       if (guard) idle else s' = { ...s, staged: s.candidate.head, stagedHash: s.candidate.hash, label: "skipGap" }
     } else {
-      nondet seg = next.oneOf()
+      nondet seg = available.oneOf()
       s' = { ...s, staged: seg.to, stagedHash: seg.hash, label: "replay" }
     }
   }
   val candidateValid = s.restoring and s.fresh and s.candidate.authenticated and s.candidate.schema == 1 and
     s.staged == s.candidate.head and s.stagedHash == s.candidate.hash
-  action install(guard: bool): bool =
+  action install(guard: bool): bool = if (not(localReady)) idle else
     if (not(s.restoring) or s.staged != s.candidate.head or
-      (guard and (not(candidateValid) or s.candidate.gen < s.deletion))) idle else
-    s' = { ...s, installed: true, installedGen: s.candidate.gen, installedPosition: s.staged,
+      (guard and (not(candidateValid) or not(s.deletionKnown) or s.candidate.gen < s.deletion))) idle else
+    s' = { ...s, installed: true, installedGen: s.candidate.gen, installedPosition: s.staged, position: s.staged,
       recovery: true, quarantined: true, restoredPending: true, active: Set(),
       approvals: Set(), consumed: s.snapshotConsumed, receipts: s.snapshotReceipt,
       unknown: s.snapshotConsumed.exclude(s.snapshotReceipt),
@@ -186,30 +192,39 @@ module recoveryProtocol {
     if (guard) install(true) else s' = { ...s, installed: true, recovery: false, quarantined: false,
       approvals: s.snapshotApproval, consumed: s.snapshotConsumed, receipts: s.snapshotReceipt,
       active: Set(1), actualOwner: 1, label: "install" }
-  action redact = s' = { ...s, gen: s.gen + 1, deletion: s.gen + 1, removed: s.removed.union(s.inbox), position: s.position + 1, label: "redact" }
-  action shred(guard: bool): bool =
+  action redact = if (not(localReady)) idle else s' = { ...s, gen: s.gen + 1, deletion: s.gen + 1, removed: s.removed.union(s.inbox), position: s.position + 1, label: "redact" }
+  action shred(guard: bool): bool = if (not(localReady)) idle else
     if (guard and (s.manifest.gen != s.gen or s.backupSources.intersect(s.removed) != Set())) idle else
-    s' = { ...s, destroyedKeys: s.destroyedKeys.union(1.to(s.gen - 1)), label: "shred" }
+    s' = { ...s, destroyedKeys: s.destroyedKeys.union(generations.filter(g => g < s.gen)), label: "shred" }
   // Attestation is an owner statement, NOT a network fence. Only the corrected
   // schedule also shuts the old device down. Both paths use the same recovery.
   action attest = s' = { ...s, attested: true, label: "attest" }
   action turnOffOld = s' = { ...s, oldOff: true, active: s.active.exclude(Set(0)), label: "oldOff" }
-  action forcedRecovery = s' = { ...s, recovery: true, quarantined: true, reviewed: false,
+  action forcedRecovery = if (not(localReady)) idle else s' = { ...s, recovery: true, quarantined: true, reviewed: false, restoredPending: true,
+    incarnation: s.nextInc, nextInc: s.nextInc + 1, identities: s.identities.union(Set(s.nextInc)),
+    journal: List(), nextSeq: 1, resumed: false,
     approvals: Set(), unknown: s.consumed.exclude(s.receipts), label: "forcedRecovery" }
-  action review = s' = { ...s, reviewed: true, approvals: Set(), restoredPending: false, label: "review" }
-  action activate =
-    if (not(s.reviewed and s.attested)) idle else
+  action review = if (not(localReady)) idle else s' = { ...s, reviewed: true, approvals: Set(), restoredPending: false, label: "review" }
+  action activateWith(guard: bool): bool = if (not(localReady)) idle else
+    if (not(s.reviewed and s.attested) or (guard and (not(s.deletionKnown) or
+      (s.restoring and (not(s.installed) or s.installedGen < s.deletion))))) idle else
     s' = { ...s, recovery: false, quarantined: false, active: s.active.union(Set(1)),
       epoch: s.epoch.set(1, s.epoch.get(0) + 1), actualOwner: 1, label: "activate" }
 
+  action activate = activateWith(true)
+
   val singleLocalOwner = s.writers.union(s.io).size() <= 1 and
     (s.writers.union(s.io) == Set() or (s.referenced and s.writers.union(s.io) == Set(s.lock)))
+  val lockBeforeWrite = not(Set("inbox", "submit", "submitted", "project", "approve", "consume", "receipt",
+    "rotate", "resume", "transfer", "checkpoint", "releaseOwner", "snapshot", "export", "install",
+    "publishRelease", "encrypt", "manifest", "beginRestore", "replay", "redact", "shred", "forcedRecovery", "review", "activate").contains(s.label)) or
+    (before.referenced and before.lock != -1 and before.writers == Set(before.lock))
   val acknowledgedInputDurable = s.ack.subseteq(s.inbox)
   val projectionPrefix = s.archive.listSet().forall(e =>
     s.archive.select(x => x.inc == e.inc and x.pos == e.pos).length() == 1 and
     s.archive.select(x => x.inc == e.inc and x.pos <= e.pos).length() == e.pos) and
     1.to(16).forall(i => s.archive.select(e => e.inc == i).length() == s.cursor.get(i))
-  val journalIdentityUnique = (s.label == "rotate" or s.label == "install") implies
+  val journalIdentityUnique = (s.label == "rotate" or s.label == "install" or s.label == "forcedRecovery") implies
     (not(before.identities.contains(s.incarnation)) and s.identities.contains(s.incarnation))
   val ordinaryCrashPreservesCommittedAuthority = s.label == "crash" implies
     (s.inbox == before.inbox and s.approvals == before.approvals and s.consumed == before.consumed and
@@ -219,9 +234,11 @@ module recoveryProtocol {
   val restoreDoesNotAuthorize = s.label == "install" implies (s.recovery and s.quarantined and
     s.approvals == Set() and s.active == Set() and s.snapshotConsumed.exclude(s.snapshotReceipt).subseteq(s.unknown))
   val backupChainComplete = s.label != "install" or (s.fresh and s.candidate.authenticated and s.candidate.schema == 1 and
-    s.installedPosition == s.candidate.head and s.candidate.snapshot.to(s.candidate.head - 1).forall(p =>
+    s.installedPosition == s.candidate.head and positions.filter(p => p >= s.candidate.snapshot and p < s.candidate.head).forall(p =>
       s.segments.exists(x => x.gen == s.candidate.gen and x.from == p and x.to == p + 1 and x.prev == p and x.hash == p + 1)))
-  val restoreRespectsDeletion = s.label != "install" or s.installedGen >= s.deletion
+  val restoreRespectsDeletion = (s.label != "install" or (s.deletionKnown and s.installedGen >= s.deletion)) and
+    (s.label != "activate" or (before.deletionKnown and (not(before.restoring) or
+      (before.installed and before.installedGen >= before.deletion))))
   val staleOwnerCannotAuthorize = s.authorizations.exclude(before.authorizations).forall(a => a.device == before.actualOwner and a.epoch == before.epoch.get(before.actualOwner))
   val journalRollbackStopsResume = s.label != "resume" or (s.nextSeq - 1 >= s.cursor.get(s.incarnation) and s.supported)
   val bridgeDedupe = s.journal.listSet().forall(e => s.journal.select(x => x.inc == e.inc and x.op == e.op).length() == 1)
@@ -232,19 +249,24 @@ module recoveryProtocol {
   val releaseBeforePublication = not(s.releasePublished) or s.released
   // staleOwnerCannotAuthorize is checked separately: folder-only forced
   // recovery cannot satisfy it. Safety never quietly assumes an external fence.
-  val safety = singleLocalOwner and acknowledgedInputDurable and projectionPrefix and journalIdentityUnique and
+  val finiteDomains = generations.contains(s.gen) and generations.contains(s.incarnation) and
+    positions.contains(s.position) and positions.contains(s.manifest.snapshot) and positions.contains(s.manifest.head) and
+    positions.contains(s.candidate.snapshot) and positions.contains(s.candidate.head) and positions.contains(s.staged)
+  val safety = finiteDomains and singleLocalOwner and lockBeforeWrite and acknowledgedInputDurable and projectionPrefix and journalIdentityUnique and
     ordinaryCrashPreservesCommittedAuthority and transferCheckpointComplete and restoreDoesNotAuthorize and
     backupChainComplete and restoreRespectsDeletion and journalRollbackStopsResume and bridgeDedupe and
     exportAfterManifest and encryptionNonceFresh and releaseBeforePublication and backupSanitized and generationKeyAvailable
   val backupCaughtUp = s.manifest.gen == s.gen and s.manifest.head == s.position and s.exportCursor == s.position
   val transferDone = not(s.transfer) or s.successor
-  val settled = backupCaughtUp and transferDone
+  val keysRetired = generations.filter(g => g < s.gen).subseteq(s.destroyedKeys)
+  val settled = backupCaughtUp and transferDone and keysRetired
   val reachedAgreement = s.sealed and s.label == "finished" and settled
   val drainBound = remaining > 0 or reachedAgreement
   val invariants = safety and drainBound
   val cooperativeSafety = invariants and staleOwnerCannotAuthorize
   action seal = s' = { ...s, sealed: true, label: "seal" }
   action progress =
+    if (s.writers == Set()) acquire(0) else
     if (s.transfer and not(s.successor)) {
       if (not(s.drained)) drain else if (s.checkpoint < 0) checkpoint(true) else
       if (not(s.released)) releaseOwner else if (not(s.releasePublished)) publishRelease(true) else installSuccessor(true)
@@ -252,7 +274,7 @@ module recoveryProtocol {
     if (s.manifest.head < s.position) {
       if (s.segments.exists(x => x.gen == s.gen and x.from == s.manifest.head and x.prev == s.manifest.hash)) publishManifest(true)
       else encrypt(true)
-    } else if (s.exportCursor != s.manifest.head) persistExport(true) else s' = { ...s, label: "finished" }
+    } else if (s.exportCursor != s.manifest.head) persistExport(true) else if (not(keysRetired)) shred(true) else s' = { ...s, label: "finished" }
   action tick(a: bool): bool = all { a, before' = s, pc' = pc + 1, scenario' = scenario,
     remaining' = if (s.sealed and not(reachedAgreement)) remaining - 1 else remaining }
   action input = {
@@ -266,8 +288,8 @@ module recoveryProtocol {
   // checkpoint is final; backup-file progress does not change its position.
   action simulationStep = all { not(reachedAgreement), tick(if (s.sealed) progress else
     if (s.transfer) any { seal, progress } else input) }
-  temporal transferEventuallyCompletes = progress.weakFair(s).implies(eventually(always(s.sealed and s.transfer)).implies(eventually(s.successor)))
-  temporal backupEventuallyCatchesUp = progress.weakFair(s).implies(eventually(always(s.sealed)).implies(eventually(backupCaughtUp)))
+  temporal transferEventuallyCompletes = progress.weakFair(s).implies(eventually(always(s.sealed and s.transfer)).implies(eventually(always(s.successor))))
+  temporal backupEventuallyCatchesUp = progress.weakFair(s).implies(eventually(always(s.sealed)).implies(eventually(always(backupCaughtUp))))
 
   type Command = { op: str, k: int }
   pure def c(op: str, k: int): Command = { op: op, k: k }
@@ -307,13 +329,15 @@ module recoveryProtocol {
       hash: s.candidate.hash, nonce: 99 })), label: "deliver" } else
     if (op == "tamper") s' = { ...s, manifest: { ...s.manifest, authenticated: false }, label: "tamper" } else
     if (op == "force") forcedRecovery else if (op == "attest") attest else if (op == "review") review else
-    if (op == "activate") activate else if (op == "oldOff") {
+    if (op == "missingDeletion") s' = { ...s, deletionKnown: false, label: "missingDeletion" } else
+    if (op == "activate") activateWith(bug != "deletionAuthority") else if (op == "oldOff") {
       if (bug == "stale") idle else turnOffOld
     } else idle
   }
   action script(commands: List[Command], bug: str): bool = all { not(reachedAgreement),
     tick(if (pc < commands.length()) execute(commands.nth(pc), bug) else if (not(s.sealed)) seal else
-      if (bug == "drain") s' = { ...s, label: "idle" } else progress) }
+      if (bug == "drain") s' = { ...s, label: "idle" } else
+      if (bug == "feedback" and s.manifest.head == s.position and s.exportCursor != s.manifest.head) persistExportFeedback else progress) }
   pure val lockHandle = List(c("collect", 1), c("acquire", 1))
   action lockHandleStep = script(lockHandle, "")
   action lockHandleBugStep = script(lockHandle, "lockGC")
@@ -383,38 +407,49 @@ module recoveryProtocol {
   pure val backupDrain = List(c("inbox", 1))
   action backupDrainStep = script(backupDrain, "")
   action backupDrainBugStep = script(backupDrain, "drain")
-  action suiteInit = { nondet which = 0.to(22).oneOf(); all { s' = initial, before' = initial, pc' = 0, remaining' = drainLimit, scenario' = which } }
-  val suiteCommands = List(lockHandle, lockLifetime, inboxPowerLoss, bridgeReplay, projectionCommit, journalRollback, rotationIdentity, authorityCrash, incompleteCheckpoint, releaseCrash, restoreApproval, restoreAttempt, manifestBeforeSegment, redactionDuringRestore, unauthenticatedManifest, exportCrash, nonceAfterCrash, sanitizedGeneration, shredBeforeSnapshot, partitionedOwner, epochReadRace, transferDrain, backupDrain).nth(scenario)
+  pure val exportFeedback = List(c("inbox", 1))
+  action exportFeedbackStep = script(exportFeedback, "")
+  action exportFeedbackBugStep = script(exportFeedback, "feedback")
+  pure val missingDeletion = List(c("snapshot", 1), c("missingDeletion", 1), c("beginRestore", 1), c("install", 1),
+    c("attest", 1), c("review", 1), c("activate", 1))
+  action missingDeletionStep = script(missingDeletion, "")
+  action missingDeletionBugStep = script(missingDeletion, "deletionAuthority")
+  action suiteInit = { nondet which = 0.to(24).oneOf(); all { s' = initial, before' = initial, pc' = 0, remaining' = drainLimit, scenario' = which } }
+  val suiteCommands = List(lockHandle, lockLifetime, inboxPowerLoss, bridgeReplay, projectionCommit, journalRollback, rotationIdentity, authorityCrash, incompleteCheckpoint, releaseCrash, restoreApproval, restoreAttempt, manifestBeforeSegment, redactionDuringRestore, unauthenticatedManifest, exportCrash, nonceAfterCrash, sanitizedGeneration, shredBeforeSnapshot, partitionedOwner, epochReadRace, transferDrain, backupDrain, exportFeedback, missingDeletion).nth(scenario)
   action suiteStep = script(suiteCommands, "")
-  val case0 = scenario == 0 and reachedAgreement
-  val case1 = scenario == 1 and reachedAgreement
-  val case2 = scenario == 2 and reachedAgreement
-  val case3 = scenario == 3 and reachedAgreement
-  val case4 = scenario == 4 and reachedAgreement
-  val case5 = scenario == 5 and reachedAgreement
-  val case6 = scenario == 6 and reachedAgreement
-  val case7 = scenario == 7 and reachedAgreement
-  val case8 = scenario == 8 and reachedAgreement
-  val case9 = scenario == 9 and reachedAgreement
-  val case10 = scenario == 10 and reachedAgreement
-  val case11 = scenario == 11 and reachedAgreement
-  val case12 = scenario == 12 and reachedAgreement
-  val case13 = scenario == 13 and reachedAgreement
-  val case14 = scenario == 14 and reachedAgreement
-  val case15 = scenario == 15 and reachedAgreement
-  val case16 = scenario == 16 and reachedAgreement
-  val case17 = scenario == 17 and reachedAgreement
-  val case18 = scenario == 18 and reachedAgreement
-  val case19 = scenario == 19 and reachedAgreement
-  val case20 = scenario == 20 and reachedAgreement
-  val case21 = scenario == 21 and reachedAgreement
-  val case22 = scenario == 22 and reachedAgreement
+  val case0 = scenario == 0 and reachedAgreement and (s.writers == Set(0) and s.referenced)
+  val case1 = scenario == 1 and reachedAgreement and (s.io == Set(0))
+  val case2 = scenario == 2 and reachedAgreement and (s.ack == Set(1) and s.inbox == Set(1))
+  val case3 = scenario == 3 and reachedAgreement and (s.journal.length() == 1)
+  val case4 = scenario == 4 and reachedAgreement and (s.archive.length() == 1)
+  val case5 = scenario == 5 and reachedAgreement and (s.incarnation == 2 and s.interrupted == Set(1) and not(s.resumed))
+  val case6 = scenario == 6 and reachedAgreement and (s.incarnation == 2)
+  val case7 = scenario == 7 and reachedAgreement and (s.consumed == Set(1))
+  val case8 = scenario == 8 and reachedAgreement and (s.successor and s.archive.length() == 1)
+  val case9 = scenario == 9 and reachedAgreement and (s.successor and s.released)
+  val case10 = scenario == 10 and reachedAgreement and (s.installed and s.recovery and s.approvals == Set())
+  val case11 = scenario == 11 and reachedAgreement and (s.installed and s.unknown == Set(1))
+  val case12 = scenario == 12 and reachedAgreement and (s.installed and s.installedPosition == 1)
+  val case13 = scenario == 13 and reachedAgreement and (not(s.installed) and s.manifest.gen == 2)
+  val case14 = scenario == 14 and reachedAgreement and (not(s.installed))
+  val case15 = scenario == 15 and reachedAgreement and (s.exportCursor == 1)
+  val case16 = scenario == 16 and reachedAgreement and (s.encryptions.listSet().size() == 2)
+  val case17 = scenario == 17 and reachedAgreement and (s.backupSources == Set())
+  val case18 = scenario == 18 and reachedAgreement and (s.destroyedKeys == Set(1) and s.manifest.gen == 2)
+  val case19 = scenario == 19 and reachedAgreement and (s.oldOff and s.actualOwner == 1)
+  val case20 = scenario == 20 and reachedAgreement and (s.oldOff and s.actualOwner == 1)
+  val case21 = scenario == 21 and reachedAgreement and (s.successor)
+  val case22 = scenario == 22 and reachedAgreement and (s.manifest.head == 1)
+  val case23 = scenario == 23 and reachedAgreement and s.manifest.head == 1
+  val case24 = scenario == 24 and reachedAgreement and not(s.installed) and not(s.active.contains(1))
   // Positive crash witnesses beyond the broken/corrected pairs.
   action journalAheadStep = script(List(c("inbox", 1), c("reset", 1), c("submit", 1),
     c("crash", 1), c("acquire", 0), c("open", 1), c("project", 1)), "")
   action unsupportedSchemaStep = script(List(c("unsupported", 1), c("open", 1)), "")
   action cooperativeTransferStep = script(List(c("inbox", 1), c("reset", 1), c("submit", 1),
     c("transfer", 1)), "")
+  action reviewedRestoreStep = script(List(c("approve", 1), c("snapshot", 1), c("beginRestore", 1), c("install", 1),
+    c("attest", 1), c("oldOff", 1), c("review", 1), c("activate", 1), c("authorize", 1)), "")
   action boundedStep = tick(any {
     acceptInput(1, true), acknowledge(1, true), crash(true), acquire(0), acquire(1), collect(true)
   })
