@@ -10,7 +10,7 @@ echo "remote: workspace linked in ${SECONDS} s" >&2
 
 # One job per machine, so it can use all of it.
 export GALLERY_BROWSER=chromium JUNO_HEAVY_SLOTS=1 JUNO_TEST_FILE_PARALLEL=1
-export JUNO_E2E_WORKERS=${JUNO_E2E_WORKERS:-$(( $(nproc) / 3 ))} GALLERY_WORKERS=${GALLERY_WORKERS:-$(( $(nproc) / 2 ))} SPECS_JOBS=${SPECS_JOBS:-$(( $(nproc) / 2 ))} SPECS_APALACHE=${SPECS_APALACHE:-$(( $(nproc) / 4 ))}
+export JUNO_E2E_WORKERS=${JUNO_E2E_WORKERS:-$(( $(nproc) / 3 ))} GALLERY_WORKERS=${GALLERY_WORKERS:-$(( $(nproc) * 2 ))} GALLERY_SHIFT_PARTS=${GALLERY_SHIFT_PARTS:-$(( $(nproc) * 2 ))} SPECS_JOBS=${SPECS_JOBS:-$(( $(nproc) / 2 ))} SPECS_APALACHE=${SPECS_APALACHE:-$(( $(nproc) / 4 ))}
 # Samples how busy the machine is every 2 s, to size the workers above.
 ( prev=($(head -1 /proc/stat)); while sleep 2; do
     now=($(head -1 /proc/stat)); idle=$(( now[4] + now[5] - prev[4] - prev[5] )); total=0
