@@ -725,11 +725,6 @@ export class TopicPane {
     await this.pill.click()
   }
 
-  /** The header's Subscribe bell, a toggle (`aria-pressed`). */
-  get bell() {
-    return this.header.getByRole('button', { name: /subscribe/i })
-  }
-
   /** A "2 replies · Title" link under a Main message, by its label or title. */
   threadLink(text: string | RegExp): ThreadLinkDriver {
     return new ThreadLinkDriver(this.win, this.list.getByRole('button', { name: text }))
@@ -820,7 +815,7 @@ export class ThreadsPopover {
     this.root = win.getByRole('dialog', { name: 'Threads' })
   }
 
-  /** A thread's list item: its row button and its Subscribe bell. */
+  /** A thread's list item, holding its row button. */
   entry(title: string): Locator {
     return this.root.getByRole('listitem').filter({ hasText: title })
   }
@@ -836,13 +831,6 @@ export class ThreadsPopover {
     if (!box) throw new Error(`No thread "${title}" in the list`)
     await this.win.mouse.move(box.x + 24, box.y + box.height / 2)
     await press(this.win)
-  }
-
-  async subscribe(title: string): Promise<void> {
-    const bell = this.entry(title).getByRole('button', { name: 'Subscribe', exact: true })
-    await expect(bell).toHaveAttribute('aria-pressed', 'false')
-    await bell.click()
-    await expect(bell).toHaveAttribute('aria-pressed', 'true')
   }
 }
 

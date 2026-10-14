@@ -26,7 +26,7 @@ const topic = ({ detail, items, header, list, pill }: Scene, frame?: FixtureFram
   scene<TopicViewProps>(
     () => (
       <TopicView
-        header={<TopicHeader detail={detail} onSubscribe={noop} onUnsubscribe={noop} onRename={noop} {...(detail.kind === 'main' ? { onThreads: noop } : {})} {...header} />}
+        header={<TopicHeader detail={detail} onRename={noop} {...(detail.kind === 'main' ? { onThreads: noop } : {})} {...header} />}
         pill={pill === undefined ? undefined : <NewMessagesPill count={pill} onJump={noop} />}
         composer={<ComposerSlot placeholder={placeholder(detail)} />}
       >
@@ -36,7 +36,7 @@ const topic = ({ detail, items, header, list, pill }: Scene, frame?: FixtureFram
     frame,
   )
 
-const threads = <ActiveThreads threads={engThreads} now={NOW} onOpen={noop} onSubscribe={noop} onUnsubscribe={noop} />
+const threads = <ActiveThreads threads={engThreads} now={NOW} onOpen={noop} />
 
 export default defineFixtures(
   TopicView,

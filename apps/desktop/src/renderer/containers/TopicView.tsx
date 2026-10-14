@@ -1,5 +1,5 @@
 import { memo, startTransition, useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
-import { MESSAGE_WINDOW_MAX, readsMarkRead, topicsSubscribe, topicsUnsubscribe, type MessageView, type TopicDetail } from '@juno/contract'
+import { MESSAGE_WINDOW_MAX, readsMarkRead, type MessageView, type TopicDetail } from '@juno/contract'
 import {
   bottomWindow,
   channelThreadsAtom,
@@ -77,8 +77,6 @@ function scopeToChannel(channel: string): void {
 }
 
 const markRead = (id: string) => runCommand(registry, readsMarkRead, { id })
-const subscribe = (id: string) => void runCommand(registry, topicsSubscribe, { id })
-const unsubscribe = (id: string) => void runCommand(registry, topicsUnsubscribe, { id })
 
 const items = new WeakMap<MessageView, MessageListItem>()
 
@@ -183,7 +181,7 @@ function MainThreads({ channel, onClose }: { readonly channel: string; readonly 
     onClose()
     openTopic(id, { newTab: event.metaKey })
   }
-  return <ActiveThreads threads={threads} now={now} status={window === undefined ? 'loading' : 'ready'} onOpen={open} onSubscribe={subscribe} onUnsubscribe={unsubscribe} />
+  return <ActiveThreads threads={threads} now={now} status={window === undefined ? 'loading' : 'ready'} onOpen={open} />
 }
 
 /** Every topic draws its art (or the Tide placeholder) except a DM's Main, which keeps the person, as the sidebar tile does. */
@@ -468,8 +466,6 @@ function Topic({ id, detail }: { readonly id: string; readonly detail: TopicDeta
           threadsOpen={threadsOpen}
           onThreads={main ? setThreadsOpen : undefined}
           threads={threadsOpen ? <MainThreads channel={detail.channel.id} onClose={() => setThreadsOpen(false)} /> : null}
-          onSubscribe={subscribe}
-          onUnsubscribe={unsubscribe}
         />
       }
       pill={showPill ? <NewMessagesPill count={newCount} onJump={jumpToLatest} /> : undefined}

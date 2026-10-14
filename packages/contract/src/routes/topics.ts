@@ -72,9 +72,9 @@ const TopicRowFields = {
   resolved: Schema.Boolean,
   canResolveOnHover: Schema.Boolean,
   /**
-   * What Subscribe and Unsubscribe toggle: Slack's follow flag for a thread
-   * (true means Slack lists it as followed), the client-only flag for Main
-   * (true unless the user unsubscribed it). The menu offers Unsubscribe when true.
+   * Slack's follow flag for a thread (true means Slack lists it as followed),
+   * which `topics.subscribe` and `topics.unsubscribe` change. Always false for
+   * Main, which has no follow.
    */
   subscribed: Schema.Boolean,
   /** Main rows: threads started in the channel since Main was last read ("2 new threads"). 0 for a thread, and for a Main never read. */
@@ -166,8 +166,9 @@ export type CommandResult = typeof CommandResult.Type
  * Why a subscribe or unsubscribe may not have stuck. When one of these
  * arrives the thread shows what Slack said when asked afterwards; if Slack
  * could not be asked, it keeps the change until Slack answers, since the call
- * may have reached Slack. `NotFound` is a topic id the store does not know;
- * the others are Slack's answer to the mirror call of a thread.
+ * may have reached Slack. `NotFound` is a topic id the store does not know,
+ * or a Main, which has no follow. The others are Slack's answer to the
+ * mirror call.
  */
 export const SubscribeError = Schema.Union([NotSignedIn, NotFound, Rejected, RateLimited, Offline])
 export type SubscribeError = typeof SubscribeError.Type
@@ -176,11 +177,11 @@ const topicPayload = { id: Schema.String }
 
 /**
  * Follows a thread in Slack ("Get notified about new replies") and shows it
- * in the sidebar, or un-hides a Main. Returns an undo when something changed.
+ * in the sidebar. Returns an undo when something changed. A Main is `NotFound`.
  */
 export const topicsSubscribe = Rpc.make('topics.subscribe', { payload: topicPayload, success: CommandResult, error: SubscribeError })
 
-/** Unfollows a thread in Slack, or hides a Main (client-only). Returns an undo that subscribes again. */
+/** Unfollows a thread in Slack. Returns an undo that subscribes again. A Main is `NotFound`. */
 export const topicsUnsubscribe = Rpc.make('topics.unsubscribe', { payload: topicPayload, success: CommandResult, error: SubscribeError })
 
 export const TopicsRoutes = RpcGroup.make(topicsList, topicsCounts, topicsSubscribe, topicsUnsubscribe)

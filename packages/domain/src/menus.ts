@@ -13,8 +13,6 @@ export type TopicMenuAction =
   | 'mark-unread'
   | 'pin'
   | 'unpin'
-  | 'subscribe'
-  | 'unsubscribe'
   | 'resolve'
   | 'reopen'
   | 'copy-link'
@@ -31,7 +29,6 @@ export interface TopicMenuState {
   readonly channel: ChannelInfo
   readonly unread: boolean
   readonly pinned: boolean
-  readonly subscribed: boolean
   readonly resolved: boolean
   readonly hasManualTitle: boolean
   readonly hasAiTitle: boolean
@@ -52,7 +49,6 @@ export function topicMenuItems(state: TopicMenuState): ReadonlyArray<MenuItem<To
   if (!isMain && state.hasManualTitle && state.hasAiTitle && state.aiAssist) items.push(item('use-ai-title', 'Use AI title'))
   items.push(state.unread ? item('mark-read', 'Mark as read') : item('mark-unread', 'Mark as unread'))
   items.push(state.pinned ? item('unpin', 'Unpin') : item('pin', 'Pin'))
-  items.push(state.subscribed ? item('unsubscribe', 'Unsubscribe') : item('subscribe', 'Subscribe'))
   items.push(state.resolved ? item('reopen', 'Reopen') : item('resolve', 'Resolve'))
   items.push(separator, item('copy-link', 'Copy Slack link'))
   if (!isDm(state.channel.kind)) items.push(item('ignore-channel', `Ignore ${channelLabel(state.channel)}`))

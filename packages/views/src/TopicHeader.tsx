@@ -1,5 +1,4 @@
 import * as stylex from '@stylexjs/stylex'
-import { Bell } from '@phosphor-icons/react/dist/icons/Bell'
 import { ChatsCircle } from '@phosphor-icons/react/dist/icons/ChatsCircle'
 import { Hash } from '@phosphor-icons/react/dist/icons/Hash'
 import { Lock } from '@phosphor-icons/react/dist/icons/Lock'
@@ -9,7 +8,7 @@ import { Users } from '@phosphor-icons/react/dist/icons/Users'
 import { useState, type KeyboardEvent, type ReactNode } from 'react'
 import type { TopicDetail } from '@juno/contract'
 import { colors, layout, radii, sizes, spacing, text } from '@juno/tokens/tokens.stylex'
-import { Avatar, Button, ChannelIcon, ContextPill, Icon, IconButton, Popover, Text, type ContextTint, type PhosphorIcon } from '@juno/ui'
+import { Avatar, Button, ChannelIcon, ContextPill, Icon, Popover, Text, type ContextTint, type PhosphorIcon } from '@juno/ui'
 import { channelIconFor, groupInitials, hueFor, initials } from './look'
 
 export interface TopicHeaderProps {
@@ -26,8 +25,6 @@ export interface TopicHeaderProps {
   readonly onThreads?: (open: boolean) => void
   /** Main only: the popover's content, an `ActiveThreads`. */
   readonly threads?: ReactNode
-  readonly onSubscribe: (id: string) => void
-  readonly onUnsubscribe: (id: string) => void
   /** Double-click to rename (not on Main). An empty title clears the manual one. */
   readonly onRename?: (id: string, title: string) => void
 }
@@ -65,7 +62,7 @@ const AI_TITLE = 'Title suggested by AI. Double-click to rename.'
  * window. In a narrow one the pill drops its kind, then shrinks; the
  * actions never do.
  */
-export function TopicHeader({ detail, art, threadsOpen = false, onThreads, threads, onSubscribe, onUnsubscribe, onRename }: TopicHeaderProps) {
+export function TopicHeader({ detail, art, threadsOpen = false, onThreads, threads, onRename }: TopicHeaderProps) {
   const { channel } = detail
   const main = detail.kind === 'main'
   const [draft, setDraft] = useState<string | undefined>(undefined)
@@ -103,13 +100,6 @@ export function TopicHeader({ detail, art, threadsOpen = false, onThreads, threa
               {threads}
             </Popover>
           ) : null}
-          <IconButton
-            icon={Bell}
-            label="Subscribe"
-            size={32}
-            pressed={detail.subscribed}
-            onClick={() => (detail.subscribed ? onUnsubscribe(detail.id) : onSubscribe(detail.id))}
-          />
         </div>
         <div {...stylex.props(styles.row, styles.titleRow)}>
           <span {...stylex.props(styles.art)}>{art ?? <TopicIcon detail={detail} />}</span>

@@ -1,15 +1,15 @@
 /**
- * `topics.subscribe` and `topics.unsubscribe` (spec section 5 "Subscribe
- * works on any thread"; architecture 4.4 and 5.7; ADR 0010).
+ * `topics.subscribe` and `topics.unsubscribe`: follow and unfollow a thread
+ * (spec section 5 "Notify me on a thread"; architecture 4.4 and 5.7; ADR
+ * 0010). Main has no follow; a Main id is `NotFound`.
  *
  * One command is three steps:
  * 1. one writer transaction that reads the state before the change, writes
  *    the new state and fires the keys the sidebar query listens to, so the
  *    row appears or leaves at once;
- * 2. for a thread, the mirror call to Slack through the `Outbox` seam
+ * 2. the mirror call to Slack through the `Outbox` seam
  *    (`subscriptions.thread.add` or `.remove` with `channel`, `thread_ts`
- *    and `last_read`, research section 3). Main has no Slack subscription:
- *    its flag is client-only and the command ends after step 1;
+ *    and `last_read`, research section 3);
  * 3. the outcome, refreshed from Slack where Slack may know better. While
  *    the call is in flight the thread has a pending `follow` outbox row:
  *    socket events and pages about the thread do not change the flag (the
@@ -32,9 +32,8 @@
  * The undo is computed from the state before the change: a change returns
  * the opposite command, no change returns nothing.
  *
- * Thread state is Slack's follow flag in `thread_subs`; Main state is
- * `topic_overlay.unsubscribed_at`. The pure rules in `@juno/domain` read
- * both (`isSubscribed`, `sidebarPlacement`).
+ * The state is Slack's follow flag in `thread_subs`. The pure rules in
+ * `@juno/domain` read it (`isFollowed`, `sidebarPlacement`).
  */
 import { Clock, Effect, Schedule } from 'effect'
 import { NotFound, NotSignedIn, type CommandResult, type SubscribeError } from '@juno/contract'
@@ -47,7 +46,6 @@ import {
   readMessage,
   readState,
   setThreadSub,
-  syncKeys,
   threadSub,
   type ThreadSubRow,
 } from '@juno/sync'
@@ -63,16 +61,10 @@ export const setSubscribed = (id: string, subscribed: boolean): Effect.Effect<Co
     const open = yield* workspace.current
     if (open === undefined) return yield* new NotSignedIn()
     const parsed = parseTopicId(id)
-    if (parsed === undefined || parsed.kind === 'group') return yield* new NotFound({ kind: 'topic', id })
+    if (parsed === undefined || parsed.kind !== 'thread') return yield* new NotFound({ kind: 'topic', id })
     // A store failure is a bug, not a state the user can act on (architecture 2.6).
     const local = <A>(effect: Effect.Effect<A, SqlError, StoreServices>): Effect.Effect<A> => effect.pipe(Effect.provide(open.context), Effect.orDie)
     const undo: CommandResult = { undo: { _tag: subscribed ? 'topics.unsubscribe' : 'topics.subscribe', id } }
-
-    if (parsed.kind === 'main') {
-      const changed = yield* local(transaction(setMainSubscribed(parsed.channel, id, subscribed)))
-      if (changed === 'missing') return yield* new NotFound({ kind: 'topic', id })
-      return changed ? undo : {}
-    }
 
     const { channel, threadTs } = parsed
     const outbox = yield* Outbox
@@ -172,20 +164,4 @@ const applyLookup = (
     if (current?.observedAt !== undefined && compareTs(current.observedAt, requestedAt) >= 0) return
     if (!subscribed && forget) return yield* clearThreadSub(channel, threadTs)
     yield* setThreadSub(channel, threadTs, subscribed, subscribed ? lastRead : undefined, { kind: 'page', requestedAt })
-  })
-
-/** Main's client-only flag. Returns whether anything changed, or `missing` for a conversation the store does not know. */
-const setMainSubscribed = (channel: string, topicId: string, subscribed: boolean): Effect.Effect<boolean | 'missing', SqlError, StoreWriter | Invalidation> =>
-  Effect.gen(function* () {
-    const sql = yield* StoreWriter
-    const known = yield* sql<{ id: string }>`SELECT id FROM conversations WHERE id = ${channel}`
-    if (known.length === 0) return 'missing'
-    const rows = yield* sql<{ unsubscribed_at: string | null }>`SELECT unsubscribed_at FROM topic_overlay WHERE topic_id = ${topicId}`
-    const current = rows[0]?.unsubscribed_at ?? null
-    if ((current === null) === subscribed) return false
-    const value = subscribed ? null : String(yield* Clock.currentTimeMillis)
-    yield* sql`INSERT INTO topic_overlay (topic_id, unsubscribed_at) VALUES (${topicId}, ${value})
-      ON CONFLICT (topic_id) DO UPDATE SET unsubscribed_at = excluded.unsubscribed_at`
-    yield* Invalidation.use((i) => i.invalidate(syncKeys.overlay(topicId)))
-    return true
   })

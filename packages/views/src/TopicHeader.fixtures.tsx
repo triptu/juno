@@ -6,11 +6,11 @@ import { TopicHeader, type TopicHeaderProps } from './TopicHeader'
 
 const noop = () => {}
 
-const base: Pick<TopicHeaderProps, 'onSubscribe' | 'onUnsubscribe' | 'onRename'> = { onSubscribe: noop, onUnsubscribe: noop, onRename: noop }
+const base: Pick<TopicHeaderProps, 'onRename'> = { onRename: noop }
 
 const state = (props: Partial<TopicHeaderProps> & Pick<TopicHeaderProps, 'detail'>, frame?: FixtureFrame) => fixture<TopicHeaderProps>({ ...base, ...props }, frame)
 
-const threads = <ActiveThreads threads={engThreads} now={NOW} onOpen={noop} onSubscribe={noop} onUnsubscribe={noop} />
+const threads = <ActiveThreads threads={engThreads} now={NOW} onOpen={noop} />
 
 export default defineFixtures(
   TopicHeader,
@@ -20,7 +20,6 @@ export default defineFixtures(
       'manual-title': state({ detail: details.offsite }),
       private: state({ detail: details.hiring }),
       'direct-message': state({ detail: details.offsite }),
-      unsubscribed: state({ detail: details.flags }),
     },
     Main: {
       'channel-main': state({ detail: details.engMain, onThreads: noop }),
@@ -41,8 +40,6 @@ export default defineFixtures(
       'threads-open-336': state({ detail: details.engMain, onThreads: noop, threadsOpen: true, threads }, { width: 336, height: 520 }),
     },
     Interaction: {
-      'hover-subscribe': state({ detail: details.postgres }, { hover: 'button[aria-pressed]' }),
-      'focus-subscribe': state({ detail: details.postgres }, { focus: 'button[aria-pressed]' }),
       'hover-threads': state({ detail: details.engMain, onThreads: noop }, { hover: 'button[aria-expanded]' }),
     },
   },

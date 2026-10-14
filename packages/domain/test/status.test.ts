@@ -3,7 +3,6 @@ import {
   allTopicsList,
   canResolveOnHover,
   filterDots,
-  isSubscribed,
   rowTags,
   showsReopenedTag,
   showsResolvedCheck,
@@ -26,8 +25,7 @@ describe('topic status', () => {
     ['8 days old but pinned', topic({ ago: 8 * DAY, overlay: { pinnedAt: NOW } }), 'open'],
     ['resolved with no new activity', topic({ ago: HOUR, overlay: { resolvedAt: NOW - 1, resolvedActivityTs: ts(NOW - HOUR) } }), 'resolved'],
     ['resolved, then a new message', topic({ ago: HOUR, overlay: { resolvedAt: NOW - DAY, resolvedActivityTs: ts(NOW - DAY) } }), 'open'],
-    ['unsubscribed', topic({ ago: HOUR, overlay: { unsubscribedAt: NOW } }), 'unsubscribed'],
-    ['unsubscribed and resolved', topic({ overlay: { unsubscribedAt: NOW, resolvedAt: NOW, resolvedActivityTs: ts(NOW - HOUR) } }), 'unsubscribed'],
+    ['unfollowed and resolved', topic({ subscribed: false, overlay: { resolvedAt: NOW, resolvedActivityTs: ts(NOW - HOUR) } }), 'unsubscribed'],
     ['unfollowed in Slack', topic({ ago: HOUR, subscribed: false }), 'unsubscribed'],
     ['not followed, Slack said nothing', topic({ ago: HOUR, subscribed: null }), 'open'],
     ['in an ignored channel', topic({ channel: alerts, unread: 3 }), 'ignored'],
@@ -58,7 +56,7 @@ describe('reopened tag', () => {
   })
 
   it('is listed after Main in the row tags', () => {
-    expect(rowTags(topic({ kind: 'main', overlay: { reopenedAt: NOW, unsubscribedAt: NOW } }))).toEqual(['main', 'reopened', 'unsubscribed'])
+    expect(rowTags(topic({ kind: 'main', overlay: { reopenedAt: NOW } }))).toEqual(['main', 'reopened'])
     expect(rowTags(topic({ subscribed: false }))).toEqual(['unsubscribed'])
     expect(rowTags(topic())).toEqual([])
   })
@@ -87,23 +85,11 @@ describe('what shows up (spec section 5)', () => {
     ['a Main with no message for 10 days but a thread reply today', topic({ kind: 'main', ago: 10 * DAY, channelAgo: HOUR }), 'recent'],
     ['a Main with no activity of any kind for 8 days', topic({ kind: 'main', ago: 10 * DAY, channelAgo: 8 * DAY }), 'hidden'],
     ['a Main with no activity for 8 days but unread', topic({ kind: 'main', ago: 8 * DAY, unread: 1 }), 'recent'],
-    ['an unsubscribed Main', topic({ kind: 'main', ago: HOUR, overlay: { unsubscribedAt: NOW } }), 'hidden'],
     // "Ignored channels are hidden everywhere in Juno."
     ['a followed thread in an ignored channel', topic({ channel: alerts, subscribed: true, unread: 1, mentionsMe: true }), 'hidden'],
     ['a Main in an ignored channel', topic({ channel: alerts, kind: 'main', ago: HOUR }), 'hidden'],
   ] as const)('%s → %s', (_name, t, expected) => {
     expect(sidebarPlacement(t, ctx)).toBe(expected)
-  })
-
-  // "Subscribe works on any thread": the menu toggles Slack's follow flag for a thread and the client-only flag for Main.
-  it.each([
-    ['a followed thread', topic({ subscribed: true }), true],
-    ['a thread you do not follow', topic({ subscribed: null }), false],
-    ['a thread you unfollowed', topic({ subscribed: false }), false],
-    ['a Main', topic({ kind: 'main' }), true],
-    ['an unsubscribed Main', topic({ kind: 'main', overlay: { unsubscribedAt: NOW } }), false],
-  ] as const)('isSubscribed: %s → %s', (_name, t, expected) => {
-    expect(isSubscribed(t)).toBe(expected)
   })
 })
 
@@ -115,7 +101,7 @@ describe('sidebar placement', () => {
   it('hides quiet, resolved and unsubscribed topics', () => {
     expect(sidebarPlacement(topic({ ago: 9 * DAY }), ctx)).toBe('hidden')
     expect(sidebarPlacement(topic({ overlay: { resolvedAt: NOW, resolvedActivityTs: ts(NOW - HOUR) } }), ctx)).toBe('hidden')
-    expect(sidebarPlacement(topic({ overlay: { unsubscribedAt: NOW } }), ctx)).toBe('hidden')
+    expect(sidebarPlacement(topic({ subscribed: false }), ctx)).toBe('hidden')
   })
 
   it('brings a quiet topic back when it is marked unread', () => {
@@ -194,7 +180,7 @@ describe('All topics', () => {
   const open = topic({ ago: HOUR, messages: 3, firstMessageText: 'Postgres 16 migration plan' })
   const resolved = topic({ ago: 2 * HOUR, messages: 9, channel: hiring, overlay: { resolvedAt: NOW, resolvedActivityTs: ts(NOW - 2 * HOUR) } })
   const quiet = topic({ ago: 20 * DAY, messages: 1, channel: maya, kind: 'main' })
-  const unsubscribed = topic({ ago: 3 * HOUR, messages: 30, overlay: { unsubscribedAt: NOW, aiTitle: 'Pricing page copy' } })
+  const unsubscribed = topic({ ago: 3 * HOUR, messages: 30, subscribed: false, overlay: { aiTitle: 'Pricing page copy' } })
   const ignored = topic({ channel: alerts })
   const all = [open, resolved, quiet, unsubscribed, ignored]
 

@@ -14,7 +14,6 @@ export interface TopicOverlay {
   readonly resolvedActivityTs?: Ts
   readonly reopenedAt?: number
   readonly pinnedAt?: number
-  readonly unsubscribedAt?: number
 }
 
 export interface TopicActivity {
@@ -51,7 +50,7 @@ export interface Topic {
    * Slack's follow flag ("Get notified about new replies"), threads only.
    * `true` when Slack lists the thread as followed, `false` when the user
    * unfollowed it, absent when Slack has said nothing (not followed). Decides
-   * whether a thread is in the sidebar; Main has only `overlay.unsubscribedAt`.
+   * whether a thread is in the sidebar. Main has no follow.
    */
   readonly slackSubscribed?: boolean
   /** First message of a thread, for the fallback title. */

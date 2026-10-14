@@ -332,18 +332,17 @@ const summary = (input: Partial<ThreadSummary> & Pick<ThreadSummary, 'id' | 'tit
     unreadCount: 0,
     unreadExact: true,
     mentionsMe: false,
-    subscribed: false,
     participantIds: [people.leo.id, people.dev.id],
     ...rest,
   }
 }
 
 export const engThreads: ReadonlyArray<ThreadSummary> = [
-  summary({ id: 'C0ENG:1760000000.000100', title: 'Postgres 16 migration plan', replyCount: 14, ago: 4, subscribed: true, unreadCount: 4, mentionsMe: true }),
+  summary({ id: 'C0ENG:1760000000.000100', title: 'Postgres 16 migration plan', replyCount: 14, ago: 4, unreadCount: 4, mentionsMe: true }),
   summary({ id: 'C0ENG:1759999280.000100', title: 'Anyone else seeing slow CI on the main branch?', replyCount: 1, ago: 9, titleSource: 'fallback' }),
   summary({ id: 'C0ENG:1759993200.000100', title: 'Staging bill doubled since August', replyCount: 2, ago: 50, unreadCount: 2 }),
-  summary({ id: 'C0ENG:1759900000.001000', title: 'Replica sizing', replyCount: 6, ago: 7 * 60, titleSource: 'manual', subscribed: true }),
+  summary({ id: 'C0ENG:1759900000.001000', title: 'Replica sizing', replyCount: 6, ago: 7 * 60, titleSource: 'manual' }),
   summary({ id: 'C0ENG:1759800000.001000', title: 'Rotate the staging secrets before the audit, and document where each one lives', replyCount: 23, ago: 26 * 60, unreadCount: 60, unreadExact: false }),
   summary({ id: 'C0ENG:1759700000.001000', title: 'Flaky e2e on reconnect', replyCount: 3, ago: 3 * 24 * 60 }),
-  summary({ id: 'C0ENG:1759600000.001000', title: 'Welcome Priya', replyCount: 31, ago: 5 * 24 * 60, subscribed: true }),
+  summary({ id: 'C0ENG:1759600000.001000', title: 'Welcome Priya', replyCount: 31, ago: 5 * 24 * 60 }),
 ]

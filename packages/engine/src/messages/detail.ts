@@ -5,8 +5,8 @@
  */
 import {
   hashId,
+  isFollowed,
   isResolved,
-  isSubscribed,
   quietDaysOf,
   resolveTitle,
   topicStatus,
@@ -75,7 +75,7 @@ const bareRow = (sql: SqlClient.SqlClient, id: string, target: WindowTarget) =>
       SELECT ${id} AS topic_id, c.id AS channel, ${target.kind} AS kind, NULL AS last_activity_ts, 0 AS message_count,
         '[]' AS participants_json, ${rootTs} AS root_ts, 0 AS unread_count, 1 AS unread_exact, 0 AS mentions_me, NULL AS preview_json, 0 AS rev,
         c.kind AS c_kind, c.name AS c_name, c.user_id AS c_user_id, c.member_ids_json AS c_members,
-        o.manual_title, o.ai_title, o.resolved_at, o.resolved_activity_ts, o.reopened_at, o.pinned_at, o.unsubscribed_at,
+        o.manual_title, o.ai_title, o.resolved_at, o.resolved_activity_ts, o.reopened_at, o.pinned_at,
         s.subscribed AS subscribed, a.recipe AS art_recipe, a.status AS art_status, NULL AS channel_activity_ts
       FROM conversations c
       LEFT JOIN topic_art a ON a.topic_id = ${id}
@@ -123,7 +123,7 @@ export const topicDetail = (id: string, target: WindowTarget, now: number): Effe
       titleSource: title.source,
       channel: partnerId === undefined ? channel : { ...channel, partner: personFrom(partnerId, users.get(partnerId)) },
       status: status === 'ignored' ? 'open' : status,
-      subscribed: isSubscribed(topic),
+      subscribed: isFollowed(topic),
       pinned: topic.overlay.pinnedAt !== undefined,
       resolved: isResolved(topic),
       messageCount: topic.activity.messageCount,
@@ -151,7 +151,6 @@ interface ThreadRow {
   readonly rev: number
   readonly manual_title: string | null
   readonly ai_title: string | null
-  readonly subscribed: 0 | 1 | null
 }
 
 const THREAD_PARTICIPANTS = 3
@@ -190,7 +189,6 @@ export const channelThreads = (channel: string, limit: number, now: number): Eff
           ...(row.manual_title === null ? {} : { manualTitle: row.manual_title }),
           ...(row.ai_title === null ? {} : { aiTitle: row.ai_title }),
         },
-        ...(row.subscribed === null ? {} : { slackSubscribed: row.subscribed === 1 }),
         ...(rootText === undefined ? {} : { firstMessageText: rootText }),
       }
       const title = resolveTitle(topic)
@@ -205,7 +203,6 @@ export const channelThreads = (channel: string, limit: number, now: number): Eff
         unreadCount: row.unread_count,
         unreadExact: row.unread_exact === 1,
         mentionsMe: row.mentions_me === 1,
-        subscribed: isSubscribed(topic),
         participantIds: participants.get(row.topic_id) ?? [],
       }
       return { ...fields, rev: hashId(JSON.stringify(fields)) }

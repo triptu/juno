@@ -9,7 +9,6 @@ const base: TopicMenuState = {
   channel: eng,
   unread: false,
   pinned: false,
-  subscribed: true,
   resolved: false,
   hasManualTitle: false,
   hasAiTitle: true,
@@ -24,7 +23,6 @@ describe('topic row menu', () => {
       'Rename',
       'Mark as unread',
       'Pin',
-      'Unsubscribe',
       'Resolve',
       '—',
       'Copy Slack link',
@@ -33,13 +31,12 @@ describe('topic row menu', () => {
   })
 
   it('flips the toggles by state', () => {
-    expect(labels(topicMenuItems({ ...base, unread: true, pinned: true, subscribed: false, resolved: true }))).toEqual([
+    expect(labels(topicMenuItems({ ...base, unread: true, pinned: true, resolved: true }))).toEqual([
       'Open in new tab',
       '—',
       'Rename',
       'Mark as read',
       'Unpin',
-      'Subscribe',
       'Reopen',
       '—',
       'Copy Slack link',

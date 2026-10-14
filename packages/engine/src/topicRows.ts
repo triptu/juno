@@ -34,7 +34,6 @@ export interface JoinedRow extends TopicIndexRow {
   readonly resolved_activity_ts: string | null
   readonly reopened_at: string | null
   readonly pinned_at: string | null
-  readonly unsubscribed_at: string | null
   readonly subscribed: 0 | 1 | null
   /** The stored drawing (`topic_art`): the recipe and whether it is shown (`ok`), or null when the topic was never drawn. */
   readonly art_recipe: string | null
@@ -46,7 +45,7 @@ export interface JoinedRow extends TopicIndexRow {
 /** The columns of a `JoinedRow`, without `channel_activity_ts`. */
 export const TOPIC_COLUMNS = `
   SELECT i.*, c.kind AS c_kind, c.name AS c_name, c.user_id AS c_user_id, c.member_ids_json AS c_members,
-    o.manual_title, o.ai_title, o.resolved_at, o.resolved_activity_ts, o.reopened_at, o.pinned_at, o.unsubscribed_at,
+    o.manual_title, o.ai_title, o.resolved_at, o.resolved_activity_ts, o.reopened_at, o.pinned_at,
     s.subscribed AS subscribed, a.recipe AS art_recipe, a.status AS art_status`
 
 /** `topic_index` as `i` with its conversation `c`, overlay `o`, ignored flag `ig`, Slack follow flag `s` and drawing `a`. */
@@ -195,7 +194,6 @@ export function topicFrom(row: JoinedRow, columns: ParsedColumns, channel: Chann
       ...(row.resolved_activity_ts === null ? {} : { resolvedActivityTs: row.resolved_activity_ts as Ts }),
       ...(millis(row.reopened_at) === undefined ? {} : { reopenedAt: millis(row.reopened_at)! }),
       ...(millis(row.pinned_at) === undefined ? {} : { pinnedAt: millis(row.pinned_at)! }),
-      ...(millis(row.unsubscribed_at) === undefined ? {} : { unsubscribedAt: millis(row.unsubscribed_at)! }),
     },
     ...(row.subscribed === null ? {} : { slackSubscribed: row.subscribed === 1 }),
     ...(preview.rootText === undefined ? {} : { firstMessageText: preview.rootText }),
