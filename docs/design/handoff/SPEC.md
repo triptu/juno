@@ -60,7 +60,7 @@ Titles resolve in this order. A title you set by renaming (stored in Juno only) 
 ### Top to bottom
 
 1. **Title bar icons**: Search (⌘K), New chat (⌘N, section 9), and your avatar. The avatar menu holds Set yourself away or active, status, Notifications, Preferences, AI assist, switch workspace and sign out. There is no footer and no name label.
-2. **Navigation**: Home, All topics and Juno (⌘J). None carries a count. A properly spaced hairline separates these from the list.
+2. **Navigation**: Home, All topics and Juno (⌘J). Only Juno shows a count: its unread messages, as a soft grey tag. A properly spaced hairline separates these from the list.
 3. **Quick filters** on one row: All · Channels · DMs on the left and an Unread toggle on the right. DMs include group DMs. There are no counters or dots on Unread. A small dot appears next to Channels or DMs when that group has unread topics you are not viewing.
 4. **Scope chip**, shown only when narrowed to one channel: "#eng ×". Narrowing is rare. It happens from ⌘K (a channel's "Show its topics" result), by clicking a #channel chip in a message, or by clicking a topic's context pill.
 5. **The topic list**: Pinned first, then Recent, sorted by latest activity.
@@ -182,7 +182,7 @@ Pressing Enter runs fast checks before anything goes out. If they find nothing, 
 
 A blank conversation where you write first and choose where it goes, with the destination's messages shown above as soon as you pick it. Design: `docs/design/new-chat/`.
 
-- **Opening.** The New chat icon in the sidebar title bar, the tab strip's "+" and ⌘N each open a New chat in a new tab, titled "New chat", with the composer focused. If an untouched New chat tab already exists, it is focused instead.
+- **Opening.** The New chat icon in the sidebar title bar, the tab strip's "+" and ⌘N each open a New chat in a new tab with the composer focused. The tab is titled "New chat" until you pick a destination, then takes the destination's name, keeping the New chat icon until you send. If an untouched New chat tab already exists, it is focused instead.
 - **Empty state.** Nothing above the composer but one muted line in the middle: "Write your message, then pick where it goes." The two pickers sit on one row directly above the composer.
 - **Two pickers.** The first chooses the conversation: a channel, a person or a group DM. The second chooses the thread inside it, with Main as the default. Each is a button that opens a small searchable list; typing filters, ↑ ↓ move, Enter picks and Esc closes. Shift Tab from the composer reaches the thread picker, then the conversation picker; Space, Enter or ↓ opens the focused one.
   - **Conversation list.** Recent conversations first, then every channel you are in and everyone in the workspace, including people you have never messaged ("No messages yet"). Ignored channels are left out.

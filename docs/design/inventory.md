@@ -23,16 +23,18 @@ Conventions that apply everywhere (SPEC §16):
 
 **Shows:** S01.
 
-- Two panes: sidebar 384px fixed left; workspace fills the rest. Root is `display: flex; height: 100%; overflow: hidden`.
+- Two panes: sidebar on the left, 384px by default (`--sidebar-width`), resizable and collapsible (below); workspace fills the rest. Root is `display: flex; height: 100%; overflow: hidden`.
 - Root text: 14px, line-height 1.5, letter-spacing 0.01em, `--font-sans`, colour `--foreground-default`, background `--background`.
 - Sidebar top bar: 44px, padding `0 10px 0 16px`, background `--background-subtle`. Traffic lights live here (Electron `titleBarStyle: 'hiddenInset'`; the prototype fakes them as 12px circles with 6px gaps). The bar is a drag region (`-webkit-app-region: drag`), buttons inside are `no-drag`.
 - Workspace top bar: the tab strip, 44px, also a drag region. Border-bottom 1px `--border-default`, background `--background-subtle`.
-- Sidebar right edge: 1px `--border-default`.
+- Sidebar top bar, left to right: traffic lights · **Collapse sidebar** (`sidebar-simple` 16) · **Back** (`caret-left` 16) · **Forward** (`caret-right` 16), each 30×30 radius 8, the same style as the title bar icons (§2.1), starting 78px from the window edge so the traffic lights keep their space; then the right-aligned group (§2.1). Back and Forward are disabled (opacity `--opacity-disabled`, no hover) when the active tab has nowhere to go. Names "Back ⌘[", "Forward ⌘]", "Hide sidebar ⌃⌘S". A long press on Back or Forward lists that tab's history as a native menu, as in Safari.
+- Sidebar right edge: 1px `--border-default`. **Resize**: a 6px hit area centred on the edge (no visible handle; `col-resize` cursor over it, the one place a non-arrow cursor shows besides text). Drag between `--sidebar-min-width` 280 and `--sidebar-max-width` 480; double-click resets to 384. While dragging, only a CSS variable on the shell changes (set from a pointer-move handler, written once per frame); rows are fluid, so nothing re-renders, and the width is saved to prefs on pointer up. The tab strip and topic column take the rest and re-centre.
+- **Collapse**: ⌃⌘S, the collapse button, or View › Hide Sidebar hide the sidebar in one frame (no slide; under reduced motion it would be the same). Collapsed, the tab strip starts with the traffic lights' 78px, then Show sidebar, Back and Forward (the same 30px buttons), then the tabs. The state is saved. Dragging the edge below 200px also collapses it.
 - Scrollbars: 10px, transparent track, thumb `--border-strong` with 3px transparent inset and radius 10 (`::-webkit-scrollbar`). Scroll containers use `overscroll-behavior: contain` so menus, popovers and the palette never scroll the page behind.
 
 ## 2. Sidebar
 
-**Shows:** S01 (whole sidebar), S02 (row context menu), shot 30-avatar-menu, shot 31-browse-channels, shot 33-scope-chip.
+**Shows:** S01 (whole sidebar; its Browse and Theme icons and For you item are removed), S02 (row context menu), shot 30-avatar-menu, shot 33-scope-chip.
 
 ### 2.1 Title bar icons
 
@@ -41,8 +43,7 @@ Right-aligned group, gap 2px, inside the 44px bar.
 | Button | Icon | Size | Accessible name | Action |
 | --- | --- | --- | --- | --- |
 | Search | `search` 16 | 30×30, radius 8 | "Search ⌘K" | Opens ⌘K palette |
-| Browse | `hash` 16 | 30×30 | "Browse channels and people" | Toggles the Browse popover; background `--secondary-default` while open |
-| Theme | `moon` / `sun` 16 | 30×30 | "Toggle theme" | Switches light/dark in one frame |
+| New chat | `note-pencil` 16 | 30×30 | "New chat ⌘N" | Opens a New chat in a new tab (§8) |
 | Me | avatar 24 | 30×30 round, margin-left 4 | "Account and preferences" | Toggles the avatar menu |
 
 Style: transparent, colour `--foreground-subtle`, hover `--surface-hover`, press scale .96.
@@ -62,24 +63,14 @@ Style: transparent, colour `--foreground-subtle`, hover `--surface-hover`, press
   - Sign out (`log-out`)
 - Closes on Esc, outside click, or picking an item.
 
-**Browse popover** (300px, top 36 right 0, z 20, radius 13, `--pop-shadow`, overflow hidden):
-
-- Search header: `search` 14 muted + input 13px, placeholder "Find a channel or person"; padding `10 12`; border-bottom 1px `--border-default`. Autofocused on open. Enter picks the first match.
-- List: max-height 400, padding 6, contained scroll. Rows 32px, radius 6, padding 0 8, gap 10, 13px:
-  - First row "All topics" with `inbox` icon and total unread count tag; selected (background `--secondary-default`) when not scoped.
-  - Channels and DMs sorted by latest activity; ignored channels excluded. Leading `hash`/`lock` icon 15 muted, or 18px avatar for DMs (group DMs show two initials). Name 13, weight 600 when it has unread. Meta 11 muted: "private" or "quiet" (no activity in the quiet window). Trailing count tag 18px (unread count; or "@" with `--hl` background and `--hl-fg` text when a topic there mentions you). Selected row = current scope.
-  - Empty: "No match." 13 muted, padding 14 8.
-- Footer: "Right-click a channel to mark it read or unread", 11 muted, padding 8 14, border-top 1px `--border-subtle`.
-- Click a row → scope the sidebar to that channel (chip appears), popover closes. Right-click → channel context menu (§15.2).
-
 ### 2.2 Navigation
 
-Container padding `4 10 0`, gap 2. Three full-width buttons, 32px, radius 7, padding 0 10, gap 10, 13/500, icon 15 `--foreground-subtle`:
+Container padding `4 10 0`, gap 2. Three full-width buttons, none with a count, 32px, radius 7, padding 0 10, gap 10, 13/500, icon 15 `--foreground-subtle`:
 
 | Label | Icon | Trailing | Active when |
 | --- | --- | --- | --- |
-| All topics | `layout-list` | none | All topics tab is active (background `--secondary-default`) |
-| For you | `lightbulb` | count tag: 18px, min-width 18, radius 6, 11/500, bg `--secondary-active`, fg subtle, tabular; hidden at zero | For you tab active |
+| Home | `house` | none | Home tab is active, or no tab is open (background `--secondary-default`) |
+| All topics | `layout-list` | none | All topics tab active |
 | Juno | `sparkles` | "⌘J" mono 11 muted | Juno tab active |
 
 Hover `--surface-hover`. ⌘-click opens in a new tab.
@@ -90,12 +81,12 @@ Hairline below: 1px `--border-default`, margin `12 16 10`.
 
 Row padding `0 10 10`, gap 2. Buttons 28px, radius 7, padding 0 10, 13px.
 
-- Left: **All · Channels · DMs** (segmented by state, not a visible control). Selected: weight 600, bg `--secondary-default`, fg default. Unselected: weight 500, transparent, fg muted; hover fg default. A 5px dot in `--hl` after "Channels" or "DMs" when that group has unread subscribed topics and the group is not selected. DMs include group DMs. Picking Channels/DMs clears a scope of the other kind.
+- Left: **All · Channels · DMs** (segmented by state, not a visible control). Selected: weight 600, bg `--secondary-default`, fg default. Unselected: weight 500, transparent, fg muted; hover fg default. A 5px dot in `--hl` after "Channels" or "DMs" when that group has unread topics in the sidebar and the group is not selected. DMs include group DMs. Picking Channels/DMs clears a scope of the other kind.
 - Right: **Unread** toggle, weight 500. On: bg `--secondary-default`, fg default. No count, no dot. Accessible name "Show unread only".
 
 ### 2.4 Scope chip
 
-Only when scoped to one channel. Row padding `0 16 8`. Chip 26px, radius 6, bg `--secondary-default`, padding `0 4 0 9`, gap 6, 12.5/500: channel icon 12 muted, name without "#", then a 20×20 close button (`x` 11, radius 4, hover `--secondary-hover`), accessible name "Show everything". Scoping sources: Browse row, "Show its topics" in a channel menu, clicking a #channel chip in a message, ⌘K "show its topics" result.
+Only when scoped to one channel. Row padding `0 16 8`. Chip 26px, radius 6, bg `--secondary-default`, padding `0 4 0 9`, gap 6, 12.5/500: channel icon 12 muted, name without "#", then a 20×20 close button (`x` 11, radius 4, hover `--secondary-hover`), accessible name "Show everything". Scoping sources: clicking a topic's context pill (§5), "Show its topics" in a channel menu, clicking a #channel chip in a message, ⌘K "show its topics" result.
 
 ### 2.5 Topic list
 
@@ -103,9 +94,8 @@ Scroll container, padding `0 8 16`, contained scroll.
 
 - Sections: **Pinned** then **Recent**. Section label 10.5/500 uppercase 0.06em muted, padding `14 12 6`. "Recent" label only shows when a Pinned section exists.
 - Sort: latest activity first within each section.
-- **Group by channel (tweak `grouping: channel`)**: Pinned stays first; the rest is split into one section per channel in order of latest activity, labelled with the channel label ("#eng", "Maya Chen", "#alerts-prod"), same label style. Only applies when not scoped. Shot 55-group-by-channel.
-- Row gap: chat 2px, list 0, cards 6px.
-- Visibility rules (SPEC §5): hide when quiet (no activity for `quietDays`, default 7, and no unread), resolved, unsubscribed (unless it mentions you), or in an ignored channel. Pinned rows are always shown. Mark-as-unread brings a quiet row back.
+- Row gap 2px.
+- Visibility rules (SPEC §5): hide when quiet (no activity in 7 days and no unread), resolved, a thread set to Never (unless it mentions you), or in an ignored channel. Pinned rows are always shown. Mark-as-unread brings a quiet row back.
 - Prototype difference: a pinned row that is resolved stays visible with a green `circle-check` 14 before its title and no hover Resolve button. **[spec]** says resolving hides the row; decision needed (see summary).
 
 ### 2.6 Sidebar empty state
@@ -120,9 +110,9 @@ Centered, padding `48 16`, gap 8: title 14/500, body 13 muted lh 1.5, button 30p
 
 ## 3. Topic row
 
-**Shows:** S01 (unread, mention, Main tag, selected), S02 (context menu), S14 (selected + mention), shot 02-row-hover-resolve, shot 20-rename-row, shots 50–54 (styles, densities, no avatars).
+**Shows:** S01 (unread, mention, Main tag, selected), S02 (context menu), S14 (selected + mention), shot 02-row-hover-resolve, shot 20-rename-row, shots 52–53 (densities).
 
-### 3.1 Anatomy (chat style, balanced density, default)
+### 3.1 Anatomy (comfortable density, the default)
 
 ```
 [tile 44]  [line 1: title ........................ time | Resolve]  height 22
@@ -131,12 +121,12 @@ Centered, padding `48 16`, gap 8: title 14/500, body 13 muted lh 1.5, button 30p
 ```
 
 - Container: `role="button" tabindex="0"`, flex, gap 12, align start, padding `11 12`, radius 10, transparent. Hover `--surface-hover`. Selected (open in the active tab) `--secondary-default`.
-- Tile (chat style only): 44×44 (36 compact). Channel: first letter uppercase, 14/600, bg `--secondary-default`, fg subtle, radius 10. DM: person avatar, round, person colours (tokens §1.6). Group DM: first initials of each member ("ML").
-- Line 1 (22px box, gap 6): title 14.5px (13.5 compact), weight 500 (600 unread), letter-spacing 0, single line ellipsis, `flex: 0 1 auto` so the icons stay visible. Then the optional unsubscribed `bell-off` 13 muted. Spacer. Then time 12px tabular, muted (subtle when unread).
-- Line 2 (gap 8): preview 13px lh 1.45, muted (subtle when unread), `-webkit-line-clamp` 1 or 2 (tweak `previewLines`, default 2), `text-wrap: pretty`. Text is "Sender: text" with "You:" for own messages and ">" quote lines stripped. Right column (gap 4, padding-top 1):
+- Tile: 44×44 (36 compact). Channel: first letter uppercase, 14/600, bg `--secondary-default`, fg subtle, radius 10. DM: person avatar, round, person colours (tokens §1.6). Group DM: first initials of each member ("ML").
+- Line 1 (22px box, gap 6): title 14.5px (13.5 compact), weight 500 (600 unread), letter-spacing 0, single line ellipsis, `flex: 0 1 auto` so the icons stay visible. Then `bell-slash` 13 muted on a thread set to Never that shows because it mentions you. Spacer. Then time 12px tabular, muted (subtle when unread).
+- Line 2 (gap 8): preview 13px lh 1.45, muted (subtle when unread), `-webkit-line-clamp` 2, `text-wrap: pretty`. Text is "Sender: text" with "You:" for own messages and ">" quote lines stripped. Right column (gap 4, padding-top 1):
   - **@ tag** when the latest unread run mentions you: 18px, min-width 18, radius 6, bg `--hl-soft`, inset 1px ring `--border-strong`, "@" 11/500 subtle, title "Mentions you".
   - **count tag** = unread count: 18px, min-width 18, padding 0 5, radius 6, 11/500 tabular; unread row bg `--secondary-active` fg subtle; otherwise `--secondary-default` fg muted. Hidden at 0.
-- Line 3 (12px muted, gap 12, margin-top 3): channel icon 12 + name (no "#"), on Main rows too (the prototype's "Messages outside threads" label is gone). Then the avatar stack (18px circles, −4 overlap, 1.5px `--background-subtle` ring, initials 7.5/600, up to 4 participants) — in the prototype it shows only in list and cards styles and only when `showAvatars` is on; **[spec]** lists it as part of every row. Then optional tags in order (gap 6):
+- Line 3 (12px muted, gap 12, margin-top 3): channel icon 12 + name (no "#"), on Main rows too (the prototype's "Messages outside threads" label is gone). Then the avatar stack (18px circles, −4 overlap, 1.5px `--background-subtle` ring, initials 7.5/600, up to 4 participants), on every row. Then optional tags in order (gap 6):
   - Main tag: 18px, padding 0 6, radius 6, 1px `--border-strong`, 11/500 subtle.
   - Reopened tag: same but filled `--secondary-default`, no border, title "New activity after it was resolved".
   - Then, on Main rows only, `chats-circle` 13 + the number of threads started since Main was last read (tabular, title "3 new threads"). Hidden at 0. No message count on any row.
@@ -155,31 +145,20 @@ Centered, padding `48 16`, gap 8: title 14/500, body 13 muted lh 1.5, button 30p
 | Selected | bg `--secondary-default`; stays while hovered |
 | Main | Main tag after the title; title is the channel label |
 | Reopened | Reopened tag; row is back after a resolve |
-| Unsubscribed (shown because it mentions you) | opacity .6, `bell-off` icon |
+| Thread set to Never (shown because it mentions you) | opacity .6, `bell-slash` icon |
 | Resolved (pinned only) | green `circle-check` 14 before the title, no Resolve on hover |
 | Renaming | Title replaced by input: 24px, margin −2 0, padding 0 6, 1px `--border-strongest`, radius 6, bg surface, 14/600; text preselected; Enter saves, Esc cancels, blur saves. Row click disabled |
 
-### 3.3 Row style tweak (`rowStyle`)
-
-| Style | Tile | Padding | Radius | Border | Background | Gap |
-| --- | --- | --- | --- | --- | --- | --- |
-| chat (default) | yes | 11 12 | 10 | none | transparent | 2 |
-| list | no | 11 12 | 0 | bottom 1px `--border-subtle` | transparent | 0 |
-| cards | no | 13 14 | 10 | 1px `--border-default` all round | `--surface-default` | 6 |
-
-List and cards show the avatar stack in line 3 instead of the tile. Shots 50, 51.
-
-### 3.4 Density tweak (`density`)
+### 3.3 Density (Preferences › Appearance)
 
 | Density | Vertical padding | Line gap | Title | Tile | Row height (1 / 2 preview lines) |
 | --- | --- | --- | --- | --- | --- |
-| compact | 8 | 1 | 13.5 | 36 | 80 / 99 |
-| balanced | 11 | 3 | 14.5 | 44 | 90 / 109 |
-| airy | 15 | 5 | 14.5 | 44 | 102 / 121 |
+| Comfortable (default; the prototype's "balanced") | 11 | 3 | 14.5 | 44 | 90 / 109 |
+| Compact | 8 | 1 | 13.5 | 36 | 80 / 99 |
 
-Density also changes the message list (§6.1).
+Density also changes the message list (§6.1). The prototype's "airy" level is gone.
 
-### 3.5 Interactions
+### 3.4 Interactions
 
 - Click: open in the current tab. ⌘-click: new tab. If already open in a tab, that tab is focused.
 - Right-click / context-menu key: row context menu (§15.1).
@@ -187,26 +166,29 @@ Density also changes the message list (§6.1).
 
 ## 4. Tabs
 
-**Shows:** S01 (two tabs), S14 (stealth tab), shot 23-tab-context-menu.
+**Shows:** S01 (two tabs), `docs/design/new-chat/` (the strip with a pinned tab, an unread dot and the tab menu).
 
 - Strip: 44px, align-items flex-end, padding 0 10, gap 2. [built M4] The tabs sit in a horizontal scroller with no visible scrollbar (`scroll-snap-type: x proximity`); the active tab scrolls into view when it changes, so it is never hidden. The "+" button sits outside the scroller and never leaves the screen. The prototype clipped the strip with `overflow: hidden`.
 - Tab: `flex: 0 1 230px`, min-width 120 (`--tab-min-width`; the prototype's 72 lost the label), height 35, margin-bottom −1, padding `0 6 0 12`, radius `8 8 0 0`, 1px border, 13px, gap 8.
   - Active: bg `--background`, border `--border-default` with bottom border in `--background` so it merges into the page; fg default; weight 500.
   - Inactive: transparent, border transparent, fg subtle, weight 400; hover fg default.
-  - Icon 14 at 0.75 opacity: channel kind icon for topics (`hash`/`lock`/`user`/`users`), `eye-off` when stealth, `layout-list` All topics, `lightbulb` For you, `sparkles` Juno, `bell` Notifications, `settings` Preferences.
+  - Icon 14 at 0.75 opacity: channel kind icon for topics (`hash`/`lock`/`user`/`users`), `note-pencil` New chat, `house` Home, `layout-list` All topics, `sparkles` Juno, `bell` Notifications, `settings` Preferences.
   - Label: topic title, channel name for Main (no "#"), or the page name. Ellipsis.
   - Label: `dir="auto"`, so a right-to-left title shows its start, as the row and header do.
   - Close: 20×20, radius 4, `x` 12 muted, hover bg `--secondary-default`, accessible name "Close tab". Always visible on the active tab and on inactive tabs wider than 140px. [built M4] On a narrower inactive tab the label takes the button's space and the button appears over the label's end on hover or focus (Safari does the same), so nothing moves.
-- New tab button after the last tab: 28×28, radius 8, `plus` 15 muted, margin `0 0 4 4`, label "New tab"; opens search (⌘K) from M9, or All topics in a new tab until then. The desktop handler waits for the All topics page (M5); neither destination exists in the current shell.
-- Behaviour: everything opens in the current tab; ⌘-click or "Open in new tab" adds one. Pages (All topics, For you, Juno, Notifications, Preferences) are singletons: opening again focuses the existing tab. Closing a tab focuses the tab now at the same index (the right neighbour), else the last one. With no tabs the workspace shows the empty state (§17).
-- Stealth tab: opened via "Open in stealth"; icon `eye-off`; unread stays; header shows the stealth pill (§5). Sending a reply or "Mark read" ends stealth.
-- Right-click on a topic tab: the row context menu for that topic. Page tabs have no menu.
-- Keyboard: [built M4] the strip is an APG `tablist` with roving tabindex: only the active tab is in the Tab order; ArrowLeft and ArrowRight select the neighbour (wrapping), Home and End the first and last; Delete or Backspace on a tab closes it, and Enter or Space on its close button does too. Focus moves to the tab that takes the closed tab's place, or to "+" when none is left. ⌘W closes the active tab, ⌘⇧[ / ⌘⇧] switch tabs (app menu). The prototype had `role="button" tabindex="0"` on every tab, two Tab stops per tab.
-- [built M4] `Workspace` in `@juno/views` draws the strip from `WorkspaceTab`s. The 16px icon slot is fixed in size and takes the topic's art (`art`, drawn at 16) in place of the kind icon (drawn at 15), so art drops in with no shift; stealth replaces either with `eye-off`. Tab radius is 8 (`--radius-lg`).
+  - **Unread dot**: on an inactive topic tab whose topic has unread messages, a 6px round dot in `--foreground-muted` sits right after the label (before the close button), the same soft grey as unread counts. One style for everything; a mention does not change it. Never on the active tab (opening marks read) and never on pages.
+- **Pinned tabs** sit first, in pin order, as compact icon-only tabs: 40px wide, the same height and radius, the 16px icon centred, no label and no close button; the title is the tooltip. A pinned tab's unread dot sits at the icon's top-right corner with a 1.5px ring in the strip background. Pinned tabs are saved with the other tabs.
+- New chat button after the last tab: 28×28, radius 8, `plus` 15 muted, margin `0 0 4 4`, name "New chat ⌘T"; opens a New chat in a new tab (§8).
+- Behaviour: everything opens in the current tab; ⌘-click or "Open in new tab" adds one. Pages (Home, All topics, Juno, Notifications, Preferences) are singletons: opening again focuses the existing tab. Closing a tab focuses the tab now at the same index (the right neighbour), else the last one. With no tabs the workspace shows the empty state (§17).
+- **History.** Each tab keeps its own back and forward list, like a browser tab. An entry is one thing opened in that tab: a topic or a page. Opening something else in the tab pushes an entry and clears Forward. Scroll positions, peeks, popovers and the Juno panel are not entries; going back to a topic restores where you were in it from its saved scroll snapshot. A New chat that sends replaces its own entry with the topic, so Back never returns to an empty New chat. At most 50 entries per tab, in memory only. Back and Forward open the entry as an ordinary open (it marks read by the usual rule). Inputs: the buttons (§1), ⌘[ and ⌘], the mouse's back and forward buttons (`mouseup` buttons 3 and 4 in the renderer), and the three-finger swipe (`BrowserWindow` `swipe` event on macOS; two-finger swipe is not exposed to Electron apps).
+- **Tab menu** (right-click any tab, native): Pin tab / Unpin tab · separator · Close tab (⌘W) · Close other tabs · Close tabs to the right · Close all tabs · and on topic tabs, separator · Copy Slack link · Open in Slack. "Close other", "to the right" and "all" leave pinned tabs open, as browsers do; ⌘W or Close tab on a pinned tab closes it. Every close goes onto the reopen stack.
+- **Reopen closed tab** (⌘⇧T): a stack of the last 20 closed tabs, in memory, each with its history. Reopening puts the tab back at its old index (or the end) and focuses it. A closed New chat with a draft also has the "Draft closed · Undo" toast; either path restores the draft.
+- Keyboard: [built M4] the strip is an APG `tablist` with roving tabindex: only the active tab is in the Tab order; ArrowLeft and ArrowRight select the neighbour (wrapping), Home and End the first and last; Delete or Backspace on a tab closes it, and Enter or Space on its close button does too. Focus moves to the tab that takes the closed tab's place, or to "+" when none is left. Browser shortcuts from the app menu: ⌘T new tab (a New chat), ⌘W close tab, ⌘⇧T reopen the last closed tab, ⌘1 to ⌘8 go to that tab (pinned tabs count), ⌘9 the last tab, ⌃Tab / ⌃⇧Tab and ⌘⇧] / ⌘⇧[ next and previous tab (wrapping). The prototype had `role="button" tabindex="0"` on every tab, two Tab stops per tab.
+- [built M4] `Workspace` in `@juno/views` draws the strip from `WorkspaceTab`s. The 16px icon slot is fixed in size and takes the topic's art (`art`, drawn at 16) in place of the kind icon (drawn at 15), so art drops in with no shift. Tab radius is 8 (`--radius-lg`).
 
 ## 5. Topic header
 
-**Shows:** S01 (public, AI sparkle), S04 (Main header), S14 (private + stealth), shot 21-rename-header, shot 22-header-more-menu, S15 (dark, pinned state on Pin button).
+**Shows:** S01 (public; its sparkle is removed), S04 (Main header), S14 (private; its stealth pill is removed), shot 21-rename-header, shot 22-header-more-menu, S15 (dark, pinned state on Pin button), `docs/design/juno-panel/` (the Juno button and the panel).
 
 Container: padding `14 24`, border-bottom 1px `--border-subtle`, two rows with gap 8. Height 100px (`--topic-header-height`; each row is the height of its 32px buttons). [built M4] The background and the rule run the full width; the content is capped at `--reading-width` (800px) with the message column's 24px inline padding and centred, so on a wide window the pill, the title, the actions, the messages and the composer share one left edge. The prototype's `14 24 14 32` padding and 95px height are gone.
 
@@ -221,36 +203,37 @@ Row 1 (gap 8):
   | Direct message | `user` | "Maya Chen · Direct message" | `--tint-dm` (blue) |
   | Group DM | `users` | "Maya, Leo · Group DM" | `--tint-dm` |
 
-- **Stealth pill** (only in stealth): 26px, radius 6, 1px dashed `--border-strongest`, padding `0 4 0 10`, fg subtle 12px, `eye-off` 13, text "Stealth. Not marking as read.", then button "Mark read" 20px, padding 0 8, radius 4, bg `--secondary-default`, 11.5/500. [built M4] The stealth chip shrinks (ellipsis) after the context pill; Mark read keeps its size.
+- The context pill is a button: click narrows the sidebar to that channel (§2.4), right-click opens the channel menu (§15.2). Press scale as every button; no hover change beyond the arrow cursor, so it stays a calm label.
 - Spacer.
 - **Pin** icon button 32×32 radius 8 (`pin` 16, subtle). Pinned: bg `--secondary-default`. Name "Pin" / "Unpin".
-- **Subscribe** icon button 32 (`bell` subscribed / `bell-off` unsubscribed). Name "Subscribe" with `aria-pressed` for the state; the tooltip repeats the name. (The prototype renamed the button "Subscribed. Click to unsubscribe." / "Unsubscribed. Click to subscribe."; a toggle keeps one name and changes its state.) Toggling shows an undo toast.
+- **Notify me** icon button 32, a menu button (`aria-haspopup="menu"`) that opens the §15.3 choices for this topic, anchored under it. The icon shows the current choice: `bell` When it matters, `bell-ringing` Every message, `bell-slash` Never. Name "Notify me: When it matters" (the current choice). On Main it sets the channel's or DM's choice. Choosing shows the toast with Undo.
 - **Resolve / Reopen**: 32px, padding 0 12, margin-left 4, 1px `--border-strong`, radius 8, transparent, 13/500, icon 14 (`circle-check` / `rotate-ccw`), hover `--surface-hover`. Undo toast.
+- **Juno** icon button 32 (the Juno mark, `sparkle` 16 duotone), a toggle (`aria-pressed`) for the Juno panel (§12.1). Name "Juno ⌘J". Pressed: bg `--secondary-default`. Hidden when AI assist is off.
 - **More** icon button 32 (`ellipsis` 16). Opens the row context menu anchored under the button, right-aligned (+4px).
 
 Row 2 (gap 8):
 
 - Title 20/600, letter-spacing −0.01em, lh 1.3, single line ellipsis. Double-click to rename (not on Main). [built M4] The title attribute shows the full title only when it is truncated, never the rename hint; the rename affordance moves to the context menu's Rename item in M5.
-- AI sparkle `sparkles` 14 muted after the title when the title is AI-generated and no manual title exists (title attribute "Title suggested by AI. Double-click to rename."). Hidden when AI assist is off.
-- Main header: title "#eng · Main" (DM: "Maya Chen · Main") followed by "Messages posted outside threads" 13 muted. No sparkle.
+- No marker on AI titles.
+- Main header: title "#eng · Main" (DM: "Maya Chen · Main") followed by "Messages posted outside threads" 13 muted.
 - Rename input: 34px, margin `−3 0 −3 −8`, padding 0 8, 1px `--border-strongest`, radius 8, bg surface, 20/600 −0.01em; preselected. Enter saves, Esc cancels, blur saves. Saving an empty title, or the same text as the AI title, clears the manual title.
-- [built M4] `TopicHeader`. Row 2 starts with a fixed 32px icon slot (`art`) that shows the channel icon, or the DM partner's photo, until the topic art track fills it. Main shows a "Threads · 12" outline button (`chats-circle` 16) before the bell; it opens a 300px popover with `ActiveThreads` (title, "12 replies · 4m", the unread count and the Subscribe bell, 52px rows). The stealth pill is the dashed `Chip` and "Mark read" is a separate 22px secondary button beside it (pills never nest in pills). Pin, Resolve and More are not drawn until M5 wires them: a button that does nothing is worse than none. The context pill and stealth pill are pills (`--radius-pill`).
+- [built M4] `TopicHeader`. Row 2 starts with a fixed 32px icon slot (`art`) that shows the channel icon, or the DM partner's photo, until the topic art track fills it. Main shows a "Threads · 12" outline button (`chats-circle` 16) before the bell; it opens a 300px popover with `ActiveThreads` (title, "12 replies · 4m" and the unread count, 52px rows; its per-thread bell is removed, since Notify me lives on each thread). Pin, Resolve and More are not drawn until M5 wires them: a button that does nothing is worse than none. The context pill is a pill (`--radius-pill`).
 
 ## 6. Message list
 
-**Shows:** S01 (flat, grouping, new divider, catch-up, quote, mentions, reaction), S04 (grouping suggestion, thread link), S14 (mention tint), S15 (dark), shot 07, 08 (hover toolbar, picker), shot 15 (selection quote), shot 19 (settled hint), shot 56/56b (bubbles).
+**Shows:** S01 (flat, new divider, quote, mentions, reaction; its catch-up card is removed), S04 (thread link; its grouping card is removed), S14 (mention tint), S15 (dark), shot 07, 08 (hover toolbar, picker), shot 15 (selection quote), shot 19 (settled hint).
 
 Scroll container `[data-scroll]` with contained scroll; inner column max-width 800, centered, padding `20 24 16`.
 
-### 6.1 Flat messages (default)
+### 6.1 Flat messages
 
-- Message: flex, gap 12 (0 when avatars off), padding by density (compact `2 8`, balanced `4 8`, airy `6 10`), radius 8, `tabindex="0"`. Hover bg `--surface-hover` (the same token as every other hovered row; the prototype's `--background-subtle` is 1.02:1 against the page and invisible). Mentions you: bg `--hl-soft` permanently.
-- Grouping: consecutive messages by the same sender share one header. First of a group has margin-top 6/12/18 (density) unless it is the first message or sits right after the "new" divider. A quoted message always starts a new header.
-- Avatar column 32px (0 when off). Avatar 32 round, margin-top 2, initials 12/600, shown on the first message of a group.
+- Message: flex, gap 12, padding by density (Compact `2 8`, Comfortable `4 8`), radius 8, `tabindex="0"`. Hover bg `--surface-hover` (the same token as every other hovered row; the prototype's `--background-subtle` is 1.02:1 against the page and invisible). Mentions you: bg `--hl-soft` permanently.
+- Grouping: consecutive messages by the same sender share one header. First of a group has margin-top 6/12 (Compact/Comfortable) unless it is the first message or sits right after the "new" divider. A quoted message always starts a new header.
+- Avatar column 32px. Avatar 32 round, margin-top 2, initials 12/600, shown on the first message of a group.
 - Header: name 14/600, time 12 muted, gap 8, baseline aligned.
-- Body: 13.5/14/14.5 by density, lh 1.6, `overflow-wrap: anywhere`, `white-space: pre-wrap`, `text-wrap: pretty`; blocks stacked with gap 2. Selectable.
+- Body: 14 Compact, 14.5 Comfortable, lh 1.6, `overflow-wrap: anywhere`, `white-space: pre-wrap`, `text-wrap: pretty`; blocks stacked with gap 2. Selectable.
 - Timestamps: "9:12" (same day), "Yesterday", weekday "Sat", "Oct 3".
-- [built M4] `MessageList` and `Message`: balanced density only (padding `4 8`, radius 14, body 14.5/1.6). Hover bg is `--surface-hover`, the same fill as every other hovered row (the prototype's `--background-subtle` is 1.02:1 against the page, invisible). A cut-off sender name shows the full name as its tooltip on hover (`Text tooltipWhenTruncated`). A long code block scrolls inside its 150px box, and at its edges the wheel goes on to the list (no contained overscroll; a full-height block was tried and moved the list by a pixel on scroll, see `docs/design/reviews/m4/after/wp-c/README.md`). Blank lines in a message are tidied by `@juno/richtext`: a line of only spaces is a blank line, more than one blank line collapses to one, and none at the start or end. A continuation shows its time in the avatar column on hover or focus (tag size, muted). "edited" is a muted tag under the body; a broadcast reply says "also sent to the channel" after the time. A deleted message reads "This message was deleted." in muted italic; an unloaded root reads "Loading message". An emoji-only message (one to three emoji) is drawn at 1.75× the body size. Rows carry `content-visibility: auto` with `--row-message-estimate` (56px) and `contain: content`. Custom emoji are 1.25em images on the line; a `date` element is formatted in the reader's time zone ("Thursday at 14:00").
+- [built M4] `MessageList` and `Message`: Comfortable density only (padding `4 8`, radius 14, body 14.5/1.6). Hover bg is `--surface-hover`, the same fill as every other hovered row (the prototype's `--background-subtle` is 1.02:1 against the page, invisible). A cut-off sender name shows the full name as its tooltip on hover (`Text tooltipWhenTruncated`). A long code block scrolls inside its 150px box, and at its edges the wheel goes on to the list (no contained overscroll; a full-height block was tried and moved the list by a pixel on scroll, see `docs/design/reviews/m4/after/wp-c/README.md`). Blank lines in a message are tidied by `@juno/richtext`: a line of only spaces is a blank line, more than one blank line collapses to one, and none at the start or end. A continuation shows its time in the avatar column on hover or focus (tag size, muted). "edited" is a muted tag under the body; a broadcast reply says "also sent to the channel" after the time. A deleted message reads "This message was deleted." in muted italic; an unloaded root reads "Loading message". An emoji-only message (one to three emoji) is drawn at 1.75× the body size. Rows carry `content-visibility: auto` with `--row-message-estimate` (56px) and `contain: content`. Custom emoji are 1.25em images on the line; a `date` element is formatted in the reader's time zone ("Thursday at 14:00").
 
 ### 6.2 Inline chips
 
@@ -284,31 +267,13 @@ Selecting text inside a message (`[data-msg-text]`) shows a floating **Quote** b
 
 Under a Main message that has a thread: button 26px, margin-top 6, padding `0 8 0 6`, gap 6, 1px `--border-default`, radius 6, bg surface, fg subtle, 12.5px, max-width 100%: `messages-square` 13 · "2 replies" 600 default ("1 reply", "Thread" when only the root) · title ellipsis · `chevron-right` 12. Hover border `--border-strongest`. Click opens the topic (⌘-click new tab). [built M4] A cut-off title shows the full title as its tooltip on hover.
 
-### 6.8 New divider and catch-up card
+### 6.8 New divider
 
 - Divider at the first unread message (never before the first message): margin `14 0 6`, gap 10, "3 NEW" 11/600 uppercase 0.06em in `--hl`, then a 1px rule `color-mix(var(--hl) 30%, transparent)`. The list opens scrolled so the divider sits 80px from the top; otherwise it opens at the bottom.
 - [built M4] `NewDivider` (a `LabelledRule`) goes before `dividerBefore`; the message after it starts a group with no top margin. `NewMessagesPill` is a raised 28px button ("2 new messages", "Jump to latest", `arrow-down`) that `TopicView` floats 12px above the list's bottom edge. Image thumbnails: a box of the final size (from `thumb`'s dimensions, capped at `--thumb-max-width` × `--thumb-max-height`, radius 12, `--secondary-default` behind) with the image fading in; a failed image keeps the box and shows an `image` glyph. Other files are 360px `Surface inset` cards (radius 12) with a kind icon, the name and "PDF · 1.2 MB"; a deleted file reads "File no longer available".
-- Catch-up card, right after the divider when 2+ messages are new, AI assist on and a summary exists: margin `2 0 10`, padding `12 14`, radius 10, bg surface, `--card-ring`, gap 4. Header `sparkles` 13 + "Catch up" 12/500 muted. Body 13.5 lh 1.6 subtle.
-
-### 6.9 Grouping suggestion (Main only)
-
-Card above the first message when AI proposes a group: margin `4 0 14`, padding `12 14`, radius 10, `--card-ring`, gap 8.
-
-- Header 12/500 muted with `sparkles` 13: "4 messages below look like one conversation".
-- Row: suggested title 14/600 (flex 1) · **Group into topic** 28px radius 6 `--secondary-default` 12.5/500 · **Dismiss** ghost 28px muted.
-- Footnote 11.5 muted: "Only your client stores this. Slack still shows these as channel messages."
-- Group moves the first N messages into a new topic titled by AI (sparkle), and the card disappears. Dismiss hides it for that Main.
-
-### 6.10 Settled hint (threads)
+### 6.9 Settled hint (threads)
 
 Card at the top of a thread when AI thinks it is settled: margin-bottom 16, padding `10 10 10 14`, radius 10, `--card-ring`, 13px, gap 10: `sparkles` 14 muted · "Looks settled. Priya is shipping two-line previews as the default." subtle · **Resolve** 28px secondary 12.5/500 · **Not yet** ghost. Hidden once dismissed, resolved, or AI assist is off. Shot 19.
-
-### 6.11 Bubble style (tweak `messageStyle: bubbles`)
-
-- Each message: column, align start (others) or end (me), padding 2 0, margin-top as flat.
-- Others: name line "Leo Park 9:12" 12px (name 600 subtle, time muted), margin `0 0 3 40` (4 when avatars off), shown on the first of a group. Row: avatar 28 (visible only on the last of a group, otherwise reserved) + bubble, max-width 76%.
-- Bubble: padding 8 12, 14px (density), lh 1.55. Others bg `--surface-hover`, radius 16 with 4px bottom-left corner on the last of a group. Mentions you: bg `--hl-soft`. Me: bg `--hl`, fg `--hl-fg`, radius 16 with 4px bottom-right corner, time 11 right-aligned inside, margin-top 2.
-- Hover toolbar sits inline beside the bubble (centered vertically), not above. Thread link and reactions sit under the bubble with margin-left 36 for others.
 
 ## 7. Composer
 
@@ -320,7 +285,7 @@ Card at the top of a thread when AI thinks it is settled: margin-bottom 16, padd
 - Placeholder: "Reply" in threads, "Message #eng" / "Message Maya Chen" in Main. No helper text anywhere.
 - [built M4] `ComposerSlot` holds the place at the single-line height (40px field in the 752px column, padding `8 24 20`): the attach and send marks are drawn inert and the placeholder is muted body text. M6 swaps the composer in with no shift.
 - Drafts are kept per topic and survive tab switches.
-- Keys: Enter sends; Shift+Enter newline. Sending clears the draft, ends stealth, marks the topic read, and reopens it if it was resolved.
+- Keys: Enter sends; Shift+Enter newline. Sending clears the draft, marks the topic read, and reopens it if it was resolved.
 
 ### 7.1 @ and # suggestions
 
@@ -346,9 +311,26 @@ Buttons: primary 28px, padding 0 10, radius 6, bg surface, `--shadow-sm`, 12.5/5
 
 Quote (toolbar) inserts the whole message as "> " lines; selection Quote inserts only the selection. Inserted at the end of the draft on its own lines, caret after, composer focused.
 
-## 8. Removed
+## 8. New chat
 
-Removed on 10-14: posting uses Main; a separate page is redundant and reply tracking is unreliable.
+**Shows:** `docs/design/new-chat/` (`new-chat-light.png`, `new-chat-dark.png`). SPEC §9 decides behaviour.
+
+A tab with the message list's area on top and the composer at the bottom, like a topic without its header.
+
+- **Tab**: icon `note-pencil`; label "New chat" until a destination is picked, then the destination's label (the thread title, or "eng" / "Maya Chen" for Main), still with `note-pencil`. After the first send it is an ordinary topic tab.
+- **Empty state** (no destination): the list area holds one line, centred vertically, 14 muted, "Write your message, then pick where it goes." No illustration, no buttons.
+- **Picker row**: directly above the composer box, inside its 752px column, margin-bottom 8, gap 6, left-aligned. Two buttons, each 28px, `--radius-pill`, padding `0 8 0 10`, gap 6, 12.5/600, a trailing `caret-down` 12 muted:
+  - **Conversation**: unset, bg `--secondary-default`, fg subtle, `at` 13 + "Pick a conversation". Set, it is the context pill (§5) for that conversation, with the same tint, icon and "{name} · {kind}" text, plus the caret.
+  - **Thread**: bg `--secondary-default`, fg default; `message-square` 13 + "Main" (default once a conversation is set), or `chats-circle` 13 + the thread's title (ellipsis, max-width 260). With no conversation: "Any thread", fg subtle.
+  - Names "Conversation: {value}" and "Thread: {value}". In the Tab order before the composer; Space, Enter or ↓ opens.
+- **Picker popover**: opens above its button (`bottom: calc(100% + 6px)`), 340px, radius 13, `--pop-shadow`, overflow hidden. Search header as ⌘K's at small size (padding `10 12`, `magnifying-glass` 14 muted, input 13px, border-bottom 1px `--border-default`), autofocused. List padding 6, max-height 360, contained scroll; headings 10.5/500 uppercase muted, padding `8 10 4`.
+  - Conversation rows 36px, radius 8, padding 0 10, gap 10: kind icon 15 muted or avatar 20 · name 13.5 · sub 12 muted at the right ("Private channel", "Group DM", "No messages yet" for a person never messaged). Sections: **Recent** (8, by activity), then with a query **Channels** and **People**. Ignored channels are left out.
+  - Thread rows 44px, radius 8, padding `4 10`: title 13.5/500 ellipsis over "#eng · 12 replies · 4m" 12 muted. First row **Main** (`message-square`, sub "Messages outside threads") when a conversation is set. With no conversation: **Recent threads** across everything, each sub naming its conversation; picking one also sets the conversation.
+  - Active row bg `--surface-hover`; ↑ ↓ move, Enter picks, Esc closes and returns focus to the button, typing filters. Empty: "No match." 13 muted, padding 14 10.
+- **Preview**: the message list (§6) for the destination, opened at the bottom, read-only: no hover toolbar, no selection Quote, reactions shown but not clickable, no "new" divider, nothing marked read. A person never messaged: centred 14 muted "This is the start of your conversation with Jonas Weber." Switching destination swaps the list in one frame from the local cache; a destination not yet cached shows the list's loading rows.
+- **Composer**: §7, placeholder "Message" until a destination is set, then the destination's own placeholder. Send checks run against the destination (§7.3). Enter with no destination opens the conversation picker with the draft kept.
+- **After send**: the picker row is removed and the topic header (§5) appears in the same frame the sent message appears; the tab becomes the topic. Nothing else moves: the composer keeps its place.
+- **Closing with a draft**: toast "Draft closed" with Undo (reopens the tab with the draft and destination).
 
 ## 9. ⌘K palette
 
@@ -372,7 +354,7 @@ Removed on 10-14: posting uses Main; a separate page is redundant and reply trac
   | "post/send/say in #eng …" | Post in #eng | "…" | `send` | ↵ Send |
   | "summarize …", "catch me up", "tl;dr", "what did I miss" | Ask Juno to summarize … / catch you up | Opens Juno with this request | `sparkles` | ↵ |
   | "resolve pricing" | Resolve Pricing page copy | #product · hides it until there is new activity | `circle-check` | ↵ Resolve |
-  | no DM exists | No DM with Jonas Weber yet | (prototype limitation; see open questions) | `user` | |
+  | no DM exists | Message Jonas Weber | Starts a conversation | `user` | ↵ (opens a New chat addressed to them, §8) |
 
   A send command posts straight into that Main with the toast "Posted in Maya Chen · Main" and Undo (⌘Z). Search results still follow below the command (up to 6).
 - Keys: ⌘K toggles (also closes). ArrowUp/Down move; Enter runs the active row; ⌘Enter opens a topic result in a new tab (hint "⌘ Enter for new tab"); Esc closes. Input is autofocused.
@@ -381,38 +363,24 @@ Removed on 10-14: posting uses Main; a separate page is redundant and reply trac
 
 **Shows:** S09, shot 40b (Resolved filter), shot 40c (empty), shot 64 (dark).
 
-- Header: padding `32 40 16`, gap 18, border-bottom 1px `--border-subtle`. Title "All topics" serif 32 lh 1.1; sub "Everything you're part of, including quiet, resolved and unsubscribed topics." 13 muted. Right: search field 260×34, radius 8, 1px `--input-border`, `search` 14 muted, placeholder "Filter by title or message", 13px. Wraps under the title on narrow windows.
-- Filter row (gap 2, wraps): status chips 28px radius 7 padding 0 10 13/500 with the count in 400 muted: **All 21 · Open 15 · Resolved 1 · Quiet 4 · Unsubscribed 1**. Selected bg `--secondary-default` fg default; others transparent muted. Right: three selects 30px, radius 7, 1px `--input-border`, bg surface, 13px: "Channels and DMs | Channels | DMs", "Anywhere | #eng | … | Maya Chen", "Most recent | Oldest first | Most messages". [proposed] native `<select>` is fine on macOS.
+- Header: padding `32 40 16`, gap 18, border-bottom 1px `--border-subtle`. Title "All topics" serif 32 lh 1.1; sub "Everything you're part of, including quiet, resolved and unfollowed topics." 13 muted. Right: search field 260×34, radius 8, 1px `--input-border`, `search` 14 muted, placeholder "Filter by title or message", 13px. Wraps under the title on narrow windows.
+- Filter row (gap 2, wraps): status chips 28px radius 7 padding 0 10 13/500 with the count in 400 muted: **All 21 · Open 15 · Resolved 1 · Quiet 4 · Unfollowed 1**. Selected bg `--secondary-default` fg default; others transparent muted. Right: three selects 30px, radius 7, 1px `--input-border`, bg surface, 13px: "Channels and DMs | Channels | DMs", "Anywhere | #eng | … | Maya Chen", "Most recent | Oldest first | Most messages". [proposed] native `<select>` is fine on macOS.
 - Table: padding `4 28 40`, horizontal scroll on narrow windows. Grid `minmax(200px,1fr) minmax(0,150px) 104px 44px 84px`, gap 16. Header row 11/500 uppercase 0.06em muted, padding 10 12: TOPIC · WHERE · STATUS · MSGS (right) · UPDATED (right).
 - Row: `role="button"`, min-height 52, padding 8 12, radius 8, border-bottom 1px `--border-subtle`, hover `--surface-hover`, gap 1 between lines.
   - Topic: title 14 (600 unread, else 500) ellipsis + Main tag + `pin` 12 muted if pinned; preview "Sender: text" 12.5 muted ellipsis.
   - Where: channel icon 13 + name, 13 subtle.
-  - Status chip 22px, padding 0 8, radius 6, 12/500: Open (`--secondary-default` / subtle), Resolved (success tint), Quiet and Unsubscribed (transparent, muted).
+  - Status chip 22px, padding 0 8, radius 6, 12/500: Open (`--secondary-default` / subtle), Resolved (success tint), Quiet and Unfollowed (transparent, muted).
   - Msgs 13 subtle tabular right; Updated 13 muted tabular right ("3m", "1h", "Yesterday").
-- Click opens (⌘-click new tab); right-click gives the row context menu, so Reopen and Subscribe happen here. Empty: "No topics match these filters." centered 13 muted, padding 48.
-- Status definition: resolved → Resolved; unsubscribed → Unsubscribed; older than the quiet window and not pinned/unread → Quiet; else Open. Ignored channels are excluded.
+- Click opens (⌘-click new tab); right-click gives the row context menu, so Reopen and Notify me (following again) happen here. Empty: "No topics match these filters." centered 13 muted, padding 48.
+- Status definition: resolved → Resolved; a thread set to Never (not followed in Slack) → Unfollowed; older than the quiet window and not pinned/unread → Quiet; else Open. Ignored channels are excluded.
 
-## 11. For you page
+## 11. Home
 
-**Shows:** S10 (Coding agent, Waiting on you), shot 41c (Reply ideas, Follow-up, Tidy up).
+**Shows:** `docs/design/home/` (layout A; `home-variants-*.png`, `in-context-*.png`). SPEC §12 decides behaviour; the home README has the copy, scene rules, ranking and sizes.
 
-Page max-width 720, padding `40 32 64`, gap 12. Title "For you" serif 34; sub "Things Juno noticed across your topics. Take one to Juno, open the topic, or dismiss it." 14 lh 1.6 subtle; header margin-bottom 12.
-
-Card: padding 14 16, radius 10, bg surface, `--card-ring`, gap 10.
-
-- Header 12 muted, gap 8: type icon 13 · type name 500 subtle · "·" · source icon 11 + topic title (ellipsis) · spacer · dismiss 22×22 radius 5 `x` 12 (name "Dismiss").
-- Title 15/600 lh 1.35. Body 13.5 lh 1.55 subtle.
-- Actions row (wrap, gap 6): buttons 30px, padding 0 12, radius 7, 13px. Primary: bg `--secondary-default`, 500. Others: ghost, fg subtle, 400. Hover `--secondary-hover`.
-
-| Type | Icon | Extra block | Actions |
-| --- | --- | --- | --- |
-| Coding agent | `terminal` | Prompt block: mono 12.5 lh 1.6, padding 10 12, radius 8, 1px `--border-default`, bg `--background`, max-height 150, scrolls, pre-wrap, selectable | **Copy prompt** (toast "Prompt copied", no Undo) · Refine with Juno · Open topic |
-| Waiting on you | `reply` | Reply starters: buttons min-height 36, padding `6 10 6 12`, 1px `--border-default`, radius 8, 13.5 lh 1.45, left-aligned text + "Use" 11.5 muted at right; hover bg `--surface-hover` border `--border-strong`; title "Open the topic with this in the reply box" | Ask Juno · Open topic |
-| Reply ideas | `lightbulb` | Same option list ("Three directions. Pick one to start from.") | Open topic |
-| Follow-up | `calendar-check` | none | **Mark done** (toast "Follow-up done") · Open topic |
-| Tidy up | `circle-check` | none; source shows nothing (several topics) | **Resolve both** (undo toasts per topic) · Review |
-
-"Use" opens the topic with the text in the composer and focuses it. "Ask Juno" / "Refine with Juno" switches to the Juno tab and sends a prepared question. Dismiss removes the card; cards whose topic is resolved disappear by themselves. Empty: "Nothing right now." centered 13 muted, padding 48 0. The For you nav count = number of live cards.
+- Opens from the sidebar's Home item as a singleton tab (`house`), and shows without a tab when no tab is open. Layout A: scene 120×83, greeting (serif line and sans line), up to three item rows (52px each, fixed-width column), the Ask Juno field.
+- Item kinds: Waiting on you, Pick up where you left off, Moved a lot, Follow-up and Tidy up (the last two with AI assist on). The two that came from For you carry one trailing button, 26px ghost 12.5/500, shown on hover and focus in a reserved slot so nothing shifts: **Mark done** (Follow-up; toast "Follow-up done", no Undo) and **Resolve all** (Tidy up; toast "Resolved 3 topics" with Undo). Tidy up's title line reads "3 topics look settled" and its meta line lists their titles (ellipsis); the row itself does not open anything.
+- Everything else from the For you page is gone: the page, its nav count, the Coding agent prompt block, reply starters and reply ideas, and Dismiss.
 
 ## 12. Juno chat
 
@@ -445,7 +413,22 @@ One long list, no "new chat". Scroll container; column max-width `--page-width` 
 - **Header** (Juno tab): the tab strip plus a 44px bar: "Juno" 15/600 · banner chip when `banner` is not `none` (see below) · spacer · a More menu (`DotsThree` 18) with Scheduled, What Juno remembers, Memory of this chat, Activity, Connections, Settings › Juno. Banner chips are 26px, `--radius-pill`, 12.5/500, `--secondary-default`, text from `chatCopy.banner[kind].chip` with `line` as the title: "Juno is paused · Resume" (Resume as a text button), "You're offline", "Juno restored from backup · Review", "Juno needs an update", "Juno is off", "Juno is on your other Mac". One chip at a time, by the precedence in `Banner`. AI off also ends the list with one line "Juno is off. Turn on AI assist in Settings." 13 muted centered, and the composer is disabled.
 - **Composer**: outer padding `8 24 20`; box max-width 672, bg surface, 1px `--input-border`, `--radius-composer` 20; textarea padding `9 0 9 14`, 14 lh 22, max-height `--assistant-input-max-height` 160; send button 28 round `ArrowUp` 18 bold, margin 6, bg `--hl` fg `--hl-fg`, `--opacity-disabled` when empty. Placeholder 'Ask Juno, like "what did I miss in #eng?"'. Enter sends, Shift Enter newline; sending while a run is active queues (no disabled state). Disabled only for AI off, Update needed and Another device. The "New message" pill uses `chatCopy.list.newMessage`.
 - **Context menu on a message** (native): Copy · Remember this (owner messages only; disabled over 280 bytes without a selection) · Remove. Remove opens the **Remove sheet** (`RemoveSheet`): a native-style sheet with the title "Remove from Juno", the body line, the rows as on the Remove card, the "Also remove Juno's reply" checkbox when offered, the cannot-recall line, and Keep · Remove (danger). It needs no run, so it works paused, offline, in recovery and with AI off.
-- **Elsewhere**: the sidebar's Juno nav item shows the unread count as the soft grey tag and the duotone sparkle while `busy`; the home's Ask Juno field shows `jobLine` in place of its placeholder as a text swap. ⌘J opens the tab and focuses the composer. Juno pages (Scheduled, What Juno remembers, Memory of this chat, Activity, Connections, and Review in recovery) use the §11 page shell: max-width 720, title serif 34, group cards `--radius-card` with rows divided by `--border-subtle`, rows min-height 48. Activity run outcomes print `chatCopy.pages.activity.outcome`; a failure row has "Copy details". Memory's masked lines read "being updated". A pin that changed under an edit reads "This changed. Check it and save again." Review lists the pending cards with "This may already have happened." and ends with "Activate Juno". Settings › Juno adds the ownership group (state, "Export recovery phrase", "Move to another Mac", "Restore from backup" with the attestation line), the rejected-key line, and "Removal pending · 1 copy in a running job · Stop job". The Connections T3 row adds the address field and the "Allow T3 Code over the local network" switch with its https note.
+- **Elsewhere**: the sidebar's Juno nav item shows the unread count as the soft grey tag and the duotone sparkle while `busy`; the home's Ask Juno field shows `jobLine` in place of its placeholder as a text swap. ⌘J opens the tab and focuses the composer, except in a topic tab, where it toggles the panel (§12.1). Juno pages (Scheduled, What Juno remembers, Memory of this chat, Activity, Connections, and Review in recovery) use the §11 page shell: max-width 720, title serif 34, group cards `--radius-card` with rows divided by `--border-subtle`, rows min-height 48. Activity run outcomes print `chatCopy.pages.activity.outcome`; a failure row has "Copy details". Memory's masked lines read "being updated". A pin that changed under an edit reads "This changed. Check it and save again." Review lists the pending cards with "This may already have happened." and ends with "Activate Juno". Settings › Juno adds the ownership group (state, "Export recovery phrase", "Move to another Mac", "Restore from backup" with the attestation line), the rejected-key line, and "Removal pending · 1 copy in a running job · Stop job". The Connections T3 row adds the address field and the "Allow T3 Code over the local network" switch with its https note.
+
+### 12.1 Juno panel
+
+**Shows:** `docs/design/juno-panel/` (`panel-light.png`, `panel-dark.png`). SPEC §7 "Juno panel" decides behaviour.
+
+- **Place**: the right side of a topic tab, below the tab strip, full height, `--juno-panel-width` 360. Background `--background`, left edge 1px `--border-default`. The topic (header, list, composer) takes the rest; its reading column re-centres in it. Under 480px left for the topic, the panel covers the workspace below the tab strip instead (same look, full width). No slide: it appears in one frame, so the topic reflows once.
+- **Header**: 52px, padding `0 8 0 16`, border-bottom 1px `--border-subtle`: Juno mark 20 · "Juno" 14/600 · banner chip when the chat has one (§12) · spacer · **Open Juno tab** icon button 28 (`arrows-out-simple` 15, name "Open in a tab") · **Close** icon button 28 (`x` 15, name "Close Juno ⌘J").
+- **List**: the same chat (§12) in a narrower column: padding `16 16 12`, bubbles max-width 85%, cards full column width. Opens at the bottom. Everything else (grouping, status bubble, cards, notes, separators) is unchanged.
+- **About line**: above the first bubble of each owner group sent from the panel, right-aligned, 11.5 muted, margin-bottom 3, single line ellipsis: "About Postgres 16 migration plan" (Main: "About #eng · Main"). Shown in the Juno tab too. Clicking it opens the topic (⌘-click in a new tab).
+- **Context above the composer**, stacked, gap 6, padding `0 12 6`:
+  - **Selection**: when text is selected in the topic, a quote block (§6.3 look) of up to 3 lines with the sender's name 12/600, and a 20px `x` (name "Remove quote"). It follows the selection until you send or remove it.
+  - **Catch me up** pill: 28px, `--radius-pill`, padding 0 12, bg `--secondary-default`, 12.5/500, shown when the topic opened at a "new" divider and nothing has been sent from the panel about it since. Click sends "Catch me up".
+- **Composer**: the Juno composer (§12) with outer padding `0 12 12` and placeholder "Ask about this topic".
+- **Keys**: ⌘J and the header's Juno button toggle the panel and focus its composer; Esc in an empty panel composer closes it and returns focus to the topic composer. Tab order: topic header → topic list → topic composer → panel header → panel list → panel composer.
+- **Saved**: whether the panel is open (one pref for all topic tabs).
 
 ## 13. Notifications page
 
@@ -489,9 +472,15 @@ Page max-width 880, padding `40 40 56`, gap 36.
 
 Page max-width 760, padding `40 40 72`, gap 36. Title "Preferences" serif 34.
 
+- **Appearance** (first on the page, no sub). One group card, three rows, min-height 52, padding `8 10 8 14`, label 14/500 left, control right:
+  - **Theme**: segmented control (padding 2, bg `--surface-hover`, radius 7; segments 26px, padding 0 10, 12.5/500, selected bg `--surface-raised` with `--shadow-sm`): System · Light · Dark. Default System. Changes apply in one frame (§18).
+  - **Accent**: a row of 20px round swatches, gap 8, one per accent in tokens §1.3, each with a 2px ring in `--focus-ring` when selected and the accent's name as its accessible name and tooltip. Default Coral.
+  - **Density**: segmented control: Comfortable · Compact. Default Comfortable (§3.3).
+- **Peek key** — one row: "Hold to peek" 14/500 · segmented control: ⌥ Option · Space. Default ⌥ Option.
+
 - **Ignored channels** — "Hidden from your topics, search and All topics, and they never notify you. Nothing changes in Slack." Group card: rows min-height 48, padding `8 10 8 14`: channel icon 15 muted · name 14/500 · "3 messages hidden" 12 muted · **Stop ignoring** 28px secondary 12.5/500. Empty row "Nothing ignored." 13 muted padding 14. Add row: "Ignore" 13 muted · select of non-ignored channels 32px · **Ignore** 32px secondary · right hint "You can also right-click a channel to ignore it" 12 muted. Ignoring shows the toast "Ignoring #deploys" with Undo. DMs cannot be ignored.
 - **Notifications** — "Your hours, and what Juno lets through." Button **Open notification settings** 34px, padding 0 12, 1px `--border-strong`, radius 8, bg surface, `bell` 14, 13/500.
-- [proposed] The tweaks in §19 that are user preferences (row style, density, preview lines, avatars, grouping, quiet window, message style, accent, theme, AI assist) also live on this page as a "Appearance" group; the prototype only exposes them through the design-tool panel.
+- Nothing else from the prototype's design panel is a preference: row style, preview lines, avatars, grouping by channel, the quiet window and message style are gone for good. AI assist is the switch in the avatar menu (§2.1).
 
 ## 15. Context menus
 
@@ -499,32 +488,28 @@ Native menus **[spec]**. Prototype rendering for reference: 236px, padding 5, ra
 
 **Shows:** S02, shot 22 (header More), shot 23 (tab), shot 32 (channel), shot 61 (dark).
 
-### 15.1 Topic row / tab / header More
+### 15.1 Topic row / header More
 
 | Item | Icon | Hint | Shown when | Effect |
 | --- | --- | --- | --- | --- |
 | Open in new tab | `square-arrow-out-up-right` | ⌘ click | always | |
-| Open in stealth | `eye-off` | Stays unread | always | |
 | — | | | | |
 | Rename | `pencil` | | not Main | inline rename in the row (or header when opened from More) |
-| Use AI title | `sparkles` | | manual title exists, AI title exists, AI assist on | clears the manual title |
 | Mark as read / Mark as unread | `check-check` / `circle-dot` | | by state | unread sets count to at least 1 |
 | Pin / Unpin | `pin` / `pin-off` | | by state | |
-| Unsubscribe / Subscribe | `bell-off` / `bell` | | by state | undo toast |
 | Resolve / Reopen | `circle-check` / `rotate-ccw` | | by state | undo toast; resolve clears unread and mention |
 | — | | | | |
 | Copy Slack link | `link` | | always | |
 | Open in Slack | `arrow-square-out` | | always | opens the Slack app at the topic (`slack://` deep link, falling back to the web permalink) |
-| Notify me | `bell` | current level | always | submenu §15.3 for the topic's channel or DM |
+| Notify me | `bell` | current level | always | submenu §15.3: for a thread, the thread's own choice (Every message and When it matters follow it in Slack, Never unfollows it; SPEC §5); for Main, the channel's or DM's |
 | Ignore #product | `ban` | | channel is not a DM | toast "Ignoring #product" with Undo |
 
-### 15.2 Channel menu (Browse popover rows)
+### 15.2 Channel menu (context pill, #channel chip, ⌘K channel result)
 
 | Item | Icon | Hint | Shown when |
 | --- | --- | --- | --- |
 | Show its topics | `list-filter` | | always |
 | Open Main | `message-square` | | Main exists |
-| Open Main in stealth | `eye-off` | | Main exists |
 | — | | | |
 | Mark channel as read | `check-check` | | always (clears unread on every topic in it) |
 | Mark channel as unread | `circle-dot` | | always (marks the latest topic unread) |
@@ -534,13 +519,17 @@ Native menus **[spec]**. Prototype rendering for reference: 236px, padding 5, ra
 
 ### 15.3 Notify me submenu
 
-Shown from 15.1, 15.2 and from a person (a sender's name or avatar in a message, a DM row). Three items with a checkmark (13, `--foreground-default`) on the current one: **Every message**, **When it matters** (default), **Never**. For a person the parent reads "Notify me about Maya". Choosing one applies at once with the toast "#design-review: Never" and Undo.
+Shown from 15.1, 15.2, the header's Notify me button (§5) and from a person (a sender's name or avatar in a message, a DM row). Three items with a checkmark (13, `--foreground-default`) on the current one: **Every message**, **When it matters** (default), **Never**. For a person the parent reads "Notify me about Maya". Choosing one applies at once with the toast "#design-review: Never" and Undo.
 
 ### 15.4 Message menu
 
 Right-click on a message, and the message's More menu (the why item is new; the others wait for M6): Copy text (`copy`), Reply in thread (`message-square-reply`, Main only), separator, **Why did this notify?** / **Why no notification?** (`circle-help`, by what happened; hidden for your own messages).
 
 The why popover anchors under the item: 300px, padding `14 16`, radius 13, bg surface, `--pop-shadow`, gap 6. Title 13/600 ("Notified you at 13:42", "Didn't notify you", "In the 9am summary") · reason 13 subtle lh 1.5 (the decision's reason) · one button right-aligned, 28px secondary: **Change** when the reason is a setting (opens §15.3 for that channel or person, or the Notifications page for hours), **Tell Juno** when it was Juno's call (opens the Juno chat with the message quoted in the composer). Esc or outside click closes.
+
+### 15.5 Tab menu
+
+Right-click any tab (§4). Pin tab / Unpin tab (`push-pin`) · — · Close tab (⌘W) · Close other tabs · Close tabs to the right (disabled on the last tab) · Close all tabs · — · Copy Slack link · Open in Slack (topic tabs only). The close items leave pinned tabs open, except Close tab on a pinned tab itself.
 
 ## 16. Toasts
 
@@ -549,80 +538,83 @@ The why popover anchors under the item: 300px, padding `14 16`, radius 13, bg su
 - Position: bottom-left, left 16, bottom 16, z 45, max-width 352. Padding `8 8 8 14`, radius 10, bg `--foreground-default`, text `--background`, `--shadow-lg`, 13px, gap 12. Text ellipsis on one line.
 - Undo button (reversible actions only): 26px, padding 0 8, radius 6, bg `color-mix(var(--background) 16%, transparent)`, "Undo" 12.5/600 + "⌘Z" mono 11 at .75 opacity.
 - One toast at a time; a new one replaces the old. Auto-dismiss 5s (with Undo) or 4s (info). No enter/exit animation in the prototype; [proposed] 150ms fade is acceptable.
-- Undo stack holds 20 actions; ⌘Z pops the last one (resolve, reopen, subscribe, unsubscribe, ignore, routed post, command send) when focus is not in a non-empty input.
+- Undo stack holds 20 actions; ⌘Z pops the last one (resolve, reopen, Notify me change, ignore, routed post, command send, Resolve all on Home) when focus is not in a non-empty input.
 
 | Copy | Undo |
 | --- | --- |
 | Resolved · Postgres 16 migration plan | yes |
 | Resolved · #eng (Main rows use the channel label) | yes |
-| Reopened · … / Unsubscribed · … / Subscribed · … | yes |
+| Reopened · … / "{topic or channel}: Never" (and the other Notify me choices) | yes |
 | Ignoring #deploys | yes |
 | Posted in Staging bill doubled since August · Posted in #eng · Main | yes |
-| Prompt copied | no |
+| Resolved 3 topics (Home's Tidy up) | yes |
+| Draft closed (a New chat closed with a draft) | yes |
 | Follow-up done | no |
 
 ## 17. Empty states
 
 | Where | Copy | Style | Shows |
 | --- | --- | --- | --- |
-| Workspace, no tabs | "Nothing open" / "Pick a topic, or press ⌘K to find one." | centered; serif 30 subtle; 13 muted; gap 8 | shot 47 |
+| Workspace, no tabs | Home (§11) | | `docs/design/home/` |
+| New chat, no destination | "Write your message, then pick where it goes." | 14 muted, centred | §8 |
 | Sidebar list | see §2.6 | | shot 48 |
 | All topics table | "No topics match these filters." | 13 muted, padding 48 | shot 40c |
-| For you | "Nothing right now." | 13 muted, padding 48 0 | |
 | Juno | "What do you need?" + suggestions | §12 | S11 |
 | ⌘K | "No matches." | 13 muted, padding 20 10 | |
-| Browse | "No match." | 13 muted | |
-| To picker | "No channel or person matches." | 13 muted | |
+| New chat pickers | "No match." | 13 muted | |
 | Ignored list | "Nothing ignored." | 13 muted | |
 | Thread with no replies (thread link) | "Thread" instead of "N replies" | | |
 
-[spec] Empty states say why and offer one next step; All topics, For you, ⌘K and Browse empties in the prototype have no action. [proposed] add "Clear filters" to the All topics empty state.
+[spec] Empty states say why and offer one next step; All topics and ⌘K empties in the prototype have no action. [proposed] add "Clear filters" to the All topics empty state.
 
 ## 18. Dark mode
 
 **Shows:** S15, shots 60–65.
 
-- Trigger: Theme button in the sidebar bar (or OS setting; [proposed] default "follow system", with the button overriding). Root gets `data-theme="dark"` and the dark token block (tokens §1.2) applies; nothing else changes.
+- Trigger: Theme in Preferences › Appearance (§14): System (the default, follows macOS), Light or Dark. There is no title bar button. Root gets `data-theme="dark"` and the dark token block (tokens §1.2) applies; nothing else changes.
 - During the switch the root carries `data-theme-switching` for two frames so every transition is disabled and colours change at once.
 - Dark-only values: the dark base palette (tokens §1.2), the dark shadows, `--tint-resolved-fg` at 52%, the avatar mixes 32% / 46%; the other tints and `--hl-soft` recompute from the dark base. Every accent has its own dark values (tokens §1.3): ink flips to light (#EDEADE) with near-black text, Coral goes from #CC4628 to #FF8A73.
 - Everything else (sizes, weights, icons) is identical. Check: resolved chip text in dark is 5.94:1; cyan takes near-black text on its fill (tokens §1.3).
 
-## 19. Tweaks and defaults
+## 19. Preferences that change the look
 
-Exposed in the prototype's design panel (`data-props`). Store them as user preferences.
+Stored as user preferences. Nothing else from the prototype's design panel (`data-props`) survives: `rowStyle`, `previewLines`, `showAvatars`, `grouping`, `quietDays` and `messageStyle` are removed, with their variants.
 
-| Tweak | Options | Default | Affects |
+| Preference | Options | Default | Affects |
 | --- | --- | --- | --- |
-| rowStyle | chat, list, cards | chat | §3.3 |
-| density | compact, balanced, airy | balanced | §3.4, §6.1 message padding/size/spacing |
-| previewLines | 1, 2 | 2 | §3.1 line 2 clamp |
-| showAvatars | on, off | on | Row tile (chat) / avatar stack (list, cards); message avatars and bubble indent |
-| grouping | flat, channel | flat | §2.5 sections |
-| quietDays | 1–30 | 7 | Hide window; copy in empty state, Browse "quiet" meta, All topics Quiet status |
-| messageStyle | flat, bubbles | flat | §6.1 vs §6.11 |
-| aiAssist | on, off | on | Hides: AI sparkle on titles, catch-up card, grouping card, settled hint, send checks, audience warning, "Use AI title" item; ⌘K still searches. [spec] also turns off notification gating, For you and Juno |
-| accent | #1B1C15 ink, #2E1F64 midnight blue, #00674F dark emerald, #7F1734 claret, #008AB3 cyan | ink | `--hl`, `--hl-fg`, `--hl-soft` |
-| dark | on, off | off | §18 |
+| theme | system, light, dark | system | §18 |
+| accent | the accents in tokens §1.3 | coral | `--hl` and its group |
+| density | comfortable, compact | comfortable | §3.3, §6.1 |
+| aiAssist (avatar menu) | on, off | on | Hides: settled hint, send checks, audience warning, Home's follow-up and tidy-up items and AI title lines, the Juno panel and its button, topic art; ⌘K still searches. [spec] also turns off notification gating and Juno |
+| sidebarWidth, sidebarCollapsed | 280–480px; on, off | 384, off | §1 |
+| junoPanelOpen | on, off | off | §12.1 |
 
 ## 20. Keyboard map
 
 | Keys | Where | Action |
 | --- | --- | --- |
 | ⌘K | anywhere | Toggle palette |
-| ⌘J | anywhere | Open Juno tab and focus its input |
+| ⌘J | topic tab | Toggle the Juno panel and focus its composer |
+| ⌘J | elsewhere | Open Juno tab and focus its input |
+| ⌘N, ⌘T | anywhere | New chat in a new tab |
+| ⌘W / ⌘⇧T | anywhere | Close tab / reopen the last closed tab |
+| ⌘1–⌘8, ⌘9 | anywhere | Go to that tab / the last tab |
+| ⌃Tab, ⌃⇧Tab, ⌘⇧], ⌘⇧[ | anywhere | Next / previous tab |
+| ⌘[ / ⌘] | anywhere (not while a text field has a selection to indent; none do in v1) | Back / forward in the tab's history |
+| ⌃⌘S | anywhere | Hide or show the sidebar |
 | ⌘Z | anywhere, unless focus is in a non-empty input | Undo last reversible action |
 | ⌘, | anywhere | Preferences (shown in the avatar menu; [proposed]) |
-| Esc | anywhere | Close palette, picker, menus, popovers; dismiss send check; cancel rename |
+| Esc | anywhere | Close palette, picker, menus, popovers; dismiss send check; cancel rename; close the Juno panel from its empty composer |
 | Enter / Space | any `role="button"` (rows, tabs, menu items, palette rows, Juno topic links) | Activate |
 | ⌘ click / ⌘ Enter | rows, tabs, links, palette, cards' Open topic | Open in a new tab |
 | Enter / Shift Enter | composer, Juno input | Send / newline |
 | Enter / Esc | while a send check is shown | First option / back to editing |
 | ↑ ↓, Enter or Tab, Esc | @ and # suggestions | Move, insert, close |
 | ↑ ↓, Enter, ⌘Enter, Esc | palette | Move, open, open in new tab, close |
-| Enter | Browse search | Pick the first match |
+| ↑ ↓, Enter, Esc | New chat pickers | Move, pick, close |
 | Enter / Esc / blur | rename | Save / cancel / save |
-| Context-menu key, right-click | rows, tabs, Browse rows, All topics rows | Menu |
-| Tab order | sidebar bar → nav → filters → rows → tab strip → header → messages → composer | Hover-only actions (row Resolve, message toolbar) appear on focus |
+| Context-menu key, right-click | rows, tabs, context pill, All topics rows | Menu |
+| Tab order | sidebar bar (collapse, back, forward, search, new chat, avatar) → nav → filters → rows → tab strip → header → messages → composer → Juno panel | Hover-only actions (row Resolve, message toolbar) appear on focus |
 
 ## 21. Shared copy
 
