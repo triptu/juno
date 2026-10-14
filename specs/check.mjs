@@ -224,6 +224,10 @@ if (!boundedOnly && !memoryOnly && !actionsOnly) {
     simulate('agent-recovery', `${schedule}BugStep`, invariant, `recovery-${schedule}-bug.itf.json`, true, false,
       { ...options, steps: 100 })
   }
+  for (const [schedule, witness] of [['deletionAhead', 'deletionAheadRecovered'], ['moveCodeRestore', 'moveCodeRestored']]) {
+    simulate('agent-recovery', `${schedule}Step`, 'cooperativeSafety', `recovery-${schedule}.itf.json`, false, true,
+      { ...options, samples: 1, witnesses: ['reachedAgreement', witness], requireCompletion: true })
+  }
   for (const schedule of ['journalAhead', 'unsupportedSchema', 'cooperativeTransfer', 'reviewedRestore']) {
     simulate('agent-recovery', `${schedule}Step`, 'cooperativeSafety', `recovery-${schedule}.itf.json`, false, false, options)
   }
