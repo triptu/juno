@@ -1,13 +1,79 @@
 # @juno/agent-testing
 
-Test doubles for Juno Agent. Imported only by tests (declare it in `juno.testDeps`).
+Test doubles for Juno Agent (plan v3 §16). Imported only by tests (declare it in `juno.testDeps`). Each fake is driven through the same library or protocol the agent uses for the real thing: pi-ai's `Models`, the Codex SDK, pi-mcp's client and OAuth flow, the AgentHost message schema, and a real OS process for crashes.
 
-- `fakeProvider(catalogue?)`: a scripted model on pi-ai's faux provider, registered as provider `openrouter` with today's resolved slugs and their real context windows (`fakeCatalogue`). `script(steps)` sets the responses; `calls()` and `pending()` count them.
-- `startFakeMcpServer({ tools, bearer? })`: an MCP server over Streamable HTTP on loopback (initialize, `tools/list`, `tools/call`), with an optional bearer token. `calls` records every tool call. The test runs it against pi-mcp's real client.
+pi packages and the Codex SDK may be imported anywhere in this package (`check-deps`), because the fakes stand in for them.
 
-WP10 adds the rest of plan v3 §16: lost streams and usage reports, the deterministic compactor model, the fake Codex binary, the Notion, Littlebird and T3 servers (OAuth, `list_changed`, schema changes, lost writes, a missing tool, loopback against LAN), hostile Slack fixtures, the crash harness and the memory simulator.
+`pnpm test:agent-testing` runs this package's tests behind the machine-wide lock.
 
-pi packages may be imported anywhere in this package (`check-deps`), because the fakes stand in for them.
+## Which fake to use
+
+| You are testing | Use |
+| --- | --- |
+| A chat run, the guard, spend, a provider failure line | `fakeProvider()` with a script |
+| Compaction jobs and node text | `fakeProvider()`; requests to Haiku or Flash go to the compactor |
+| The Codex harness (WP20) | `startFakeCodex()` as `codexPathOverride` |
+| MCP manager logic without HTTP | any fake's `connectInMemory()` |
+| Connect, sign-in, token expiry, `list_changed`, schema hashes | `startFakeNotion()`, `startFakeLittlebird()`, `startFakeT3()` over HTTP |
+| Juno's own loopback MCP server's client, or a one-off server | `startFakeMcpServer()` |
+| Taint, the secret filter, Slack reconcile | `hostileMessages`, `forgedSendReceipt()` |
+| Recovery after a kill or power loss (WP8, WP15, WP21, WP22) | `crashAt()`, `snapshotFiles()` |
+
+## Model: `fakeProvider(options?)`
+
+A provider registered as `openrouter` with today's resolved slugs, their real context windows and the spike's prices (`fakeCatalogue`, including both compaction models). `models` is a pi-ai `Models`; `model(slug)` resolves a model.
+
+- `script(steps)` sets the chat responses, one per request. Steps:
+  - `reply(content, { usage? })`: text, thinking or tool calls (`fauxToolCall`). With `usage`, the final message reports exactly that, priced with the model's rates; without, pi-ai's faux estimate.
+  - `lostStream(content, { afterChars })`: HTTP 200, `start`, some deltas, then an `error` event with `errorMessage: 'terminated'` and zero usage.
+  - `serverError(500 | 502 | 503)`, `rejectedKey()` (401), `rateLimited()` (429), `httpError(status, message)`: one `error` event before any `start`, with `errorMessage` `"<status>: <body JSON>"` as pi-ai formats OpenAI-compatible errors.
+- Requests to a model in `compactionModels` (default Haiku 5.5 and Gemini 3.8 Flash) never use the script. The compactor answers `Summary of messages a–b: <input>` cut to 512 bytes, from the `<input>` block of `@juno/agent-memory`'s compaction task. `compactor: { oversizedAnswers: n }` makes the first `n` answers too long.
+- `requests` lists every request (model, context, options). `pending()` counts unused steps. A chat request with no step left fails with "No more faux responses queued".
+
+## Codex: `startFakeCodex(options?)`
+
+A `codex` executable that speaks `exec --experimental-json`, `app-server` (`initialize`, `model/list`), `login`, `login status` and `logout`.
+
+- `script(turns)`: each `exec` takes the next turn. A turn has `toolCalls` (made for real over Streamable HTTP to `mcp_servers.<server>.url`, with the token from `bearer_token_env_var`), `reply` (`{{result}}` is the last tool result), `fail`, `delayMs` and `usage` (default 20,000 in and 110 out, as S3 measured).
+- Approval mode: with `approval_policy = "never"`, a tool call fails with "MCP tool call requires approval" unless the server sets `default_tools_approval_mode = "approve"` (S3).
+- Signed out: sign-in is `$CODEX_HOME/auth.json`, as with the real CLI. `signIn(home?)` and `signOut(home?)` change it. A turn in a signed-out home exits 1 with "Not logged in", which the SDK reports as a thrown error.
+- `invocations()` records each run: command, config, model, sandbox, cwd, prompt, home and tool outcomes. `close()` deletes its directory.
+
+## MCP servers
+
+All are a JSON-RPC handler (`initialize`, `ping`, paginated `tools/list`, `tools/call`, `notifications/tools/list_changed`) served over loopback Streamable HTTP and over pi-mcp's in-memory transport (`connectInMemory()`, no auth). HTTP has a GET event stream for `list_changed`. Every fake has `calls`, `rejected()` (401 count) and `close()`.
+
+OAuth servers do discovery, dynamic registration, the authorization code grant with PKCE S256, and refresh with rotation where the real server offers it. GET on the authorization endpoint approves at once and redirects, standing in for the owner, so a built app's OAuth window completes on its own. In-process tests call `oauth.approve(url)` for the callback URL. `oauth.expireAccessTokens()` makes the next request get a 401 with a `WWW-Authenticate: Bearer` challenge. `oauth.revokeRefreshTokens()` makes a refresh fail with `invalid_grant`. Codes are single use.
+
+- `startFakeMcpServer({ tools, bearer?, oauth?, pageSize? })`: the generic server. `setTools()` sends `list_changed`. `loseNextCall(tool, { applied })` closes the connection without an answer, after running the tool or before.
+- `startFakeNotion({ pages? })`: OAuth with refresh. `notion-search` and `notion-fetch` read; `notion-create-pages` and `notion-update-page` write. `editElsewhere(id, content)` moves `last_edited_time`, for precondition conflicts. `loseNextWrite({ applied })` loses a write's answer. `pages()` shows the store.
+- `startFakeLittlebird({ extraTools?, pageSize? })`: OAuth with the scopes S8 found and refresh. Three tools per page. `addTool`, `removeTool` and `changeSchema` send `list_changed`; `unknownTool()` is a tool on no allowlist that claims to be read-only. The tool names are invented (S8 did not see the list).
+- `startFakeT3({ loopback?, lan?, lanHost?, omitTools? })`: the real T3 tool names and argument names. OAuth as S8 found it: `/oauth/mcp/*`, scopes `orchestration:read orchestration:operate`, no refresh, and a 401 `invalid_mcp_credential` that needs a new sign-in. It serves `loopbackUrl` and `lanUrl` on one port. When `lanHost` is not this machine's address (the default 192.168.1.22), pass `fetch` to pi-mcp; it routes the LAN origin to the fake, and pi-mcp still refuses the code exchange over plain http as it does for real. Threads are scripted with `advance(threadId, { status, reply })` and `ask(threadId, prompt)`, answered through `t3_pending_request_respond` and listed by `answers()`. `t3_thread_wait` really waits until a terminal status or its timeout.
+
+## Hostile Slack fixtures
+
+`hostileMessages` is a list of `{ name, why, message }`, each message a `HostMessage` decoded through the AgentHost contract. They cover injections, fake system tags, fake approvals, impersonation of Juno, a schedule request, a secret in a brief (`FAKE_SECRET`, shaped like an OpenRouter key), a misleading link, hidden control characters, a lone surrogate, content shaped like a tool call, a message over 30,000 characters and a hostile thread reply. `hostile(name)` gets one, `hostilePage()` returns all as one history page, `forgedSendReceipt(actionId)` is someone else's message with Juno's `client_msg_id`, and `hostilePerson` copies Juno's name. All content is invented.
+
+## Crash harness
+
+`CRASH_POINTS` names each point after the two spec transitions it sits between (the `label` the Quint state carries), with the spec scenarios to replay and what recovery must do:
+
+| Point | Spec | After | Before | Scenarios |
+| --- | --- | --- | --- | --- |
+| `inbox.committed` | recovery | `inbox` | `ack` | `inboxPowerLoss` |
+| `bridge.reset` | recovery | `reset` | `submit` | `bridgeReplay` |
+| `bridge.submitted` | recovery | `submit` | `submitted` | `bridgeReplay`, `journalAheadStep` |
+| `authorization.consumed` | actions | `authorize` | `send` | `startupAttempt`, recovery `authorityCrash` |
+| `attempt.beforeReceipt` | actions | `accept` | `receipt` | `negativeLookup`, `unknownRetry` |
+| `rotation.drained` | recovery | `project` | `rotate` | `rotationIdentity` |
+| `rotation.committed` | recovery | `rotate` | `resume` | `rotationIdentity` |
+| `backup.segmentWritten` | recovery | `encrypt` | `manifest` | `nonceAfterCrash`, `manifestBeforeSegment` |
+| `backup.manifestRenamed` | recovery | `manifest` | `export` | `exportCrash` |
+
+The contract with the agent: at each point, the agent checks `JUNO_AGENT_CRASH_AT` (`point` or `point:n` for the nth hit) and, if it names this point, kills itself with SIGKILL. `crashPoint(point)` is that check for test programs; the agent's runtime carries its own copy, because `src` may not import this package.
+
+- `runAgent({ args, env?, crashAt? })` runs a program and returns its exit, signal and output. `crashAt(point, options)` also requires the SIGKILL, and otherwise fails with the spec transition the point stands for.
+- `snapshotFiles(dir)` copies the agent directory. Taken right after a crash at a point, it is the state at that commit boundary. `restore(only?)` puts it back over a later state and deletes matching files written since: power loss, or with `journalFiles` a journal restored behind the archive (spec `rollback`). `agentDatabaseFiles` selects `agent.sqlite` and its siblings.
 
 ## Must not
 
