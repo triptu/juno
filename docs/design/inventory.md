@@ -188,36 +188,46 @@ Density also changes the message list (§6.1). The prototype's "airy" level is g
 
 ## 5. Topic header
 
-**Shows:** S01 (public; its sparkle is removed), S04 (Main header), S14 (private; its stealth pill is removed), shot 21-rename-header, shot 22-header-more-menu, S15 (dark, pinned state on Pin button), `docs/design/juno-panel/` (the Juno button and the panel).
+**Shows:** `docs/design/header/` (`b-light.png`, `b-dark.png`, `b-family-*.png`, `b-detail-*.png`), shot 22-header-more-menu (the menu the title now opens), `docs/design/juno-panel/` (the panel itself). SPEC §7 "Header" decides behaviour.
 
-Container: padding `14 24`, border-bottom 1px `--border-subtle`, two rows with gap 8. Height 100px (`--topic-header-height`; each row is the height of its 32px buttons). [built M4] The background and the rule run the full width; the content is capped at `--reading-width` (800px) with the message column's 24px inline padding and centred, so on a wide window the pill, the title, the actions, the messages and the composer share one left edge. The prototype's `14 24 14 32` padding and 95px height are gone.
+No bar and no rule. Two islands float over the top of the topic area (below the tab strip); the message list fills the whole area and scrolls under them.
 
-Row 1 (gap 8):
+- **Islands row**: absolute, top `--header-island-top` 8, height `--header-island-height` 36, capped at `--reading-width` (800) and centred, padding-inline 24 (the column's), `justify-content: space-between`, gap 8. The row has `pointer-events: none`; the islands have `auto`. On every width the islands' outer edges line up with the composer's.
+- **Island**: `Surface kind="island"`: height 36, `--radius-pill`, bg `--surface-default`, 1px transparent border, `--card-ring` (light: the soft shadow; dark: the darker shadow on a surface one step above the page), padding 3, gap 2. Solid. No blur and no coloured border (tokens §5).
+- **Band**: absolute, top 0, the full width of the topic area, height `--header-band` 68, `pointer-events: none`, `aria-hidden`. `linear-gradient(--background 0 to --header-band-solid 44, transparent at 68)`: solid behind the islands, then a 24px fade under them, so text never shows through or around an island. Static: no animation, no blur.
 
-- **Context pill**: 26px, radius 6, padding 0 10, gap 6, 12.5/600; icon 13; text "{channel} · {kind}" where the kind is 400 weight. Title attribute = kind. [built M4] The pill shrinks with the row: under 480px of header width the kind is dropped first, then the name takes an ellipsis. The actions never shrink. The workspace at the minimum window (720 by 480) is 336px wide and every header variant fits.
+Left island (`flex: 0 1 auto`, `min-width: 0`, padding `3 3 3 5`):
+
+- **Context pill**: `ContextPill size={24}`: `--radius-pill`, padding 0 9, gap 5, 12.5/600, icon 13, the channel name only. The kind is the tint, the icon, the tooltip and the accessible name ("eng, public channel"). Click narrows the sidebar to the channel (§2.4); right-click opens the channel menu (§15.2). Never hidden.
 
   | Kind | Icon | Text | Colours |
   | --- | --- | --- | --- |
-  | Public channel | `hash` | "eng · Public channel" | `--tint-public` |
-  | Private channel | `lock` | "hiring · Private channel" | `--tint-private` (amber) |
-  | Direct message | `user` | "Maya Chen · Direct message" | `--tint-dm` (blue) |
-  | Group DM | `users` | "Maya, Leo · Group DM" | `--tint-dm` |
+  | Public channel | `hash` | "eng" | `--tint-public` |
+  | Private channel | `lock` | "hiring" | `--tint-private` (amber) |
+  | Direct message | `user` | "Maya Chen" | `--tint-dm` (blue) |
+  | Group DM | `users` | "Maya, Leo" | `--tint-dm` |
 
-- The context pill is a button: click narrows the sidebar to that channel (§2.4), right-click opens the channel menu (§15.2). Press scale as every button; no hover change beyond the arrow cursor, so it stays a calm label.
-- Spacer.
-- **Pin** icon button 32×32 radius 8 (`pin` 16, subtle). Pinned: bg `--secondary-default`. Name "Pin" / "Unpin".
-- **Notify me** icon button 32, a menu button (`aria-haspopup="menu"`) that opens the §15.3 choices for this topic, anchored under it. The icon shows the current choice: `bell` When it matters, `bell-ringing` Every message, `bell-slash` Never. Name "Notify me: When it matters" (the current choice). On Main it sets the channel's or DM's choice. Choosing shows the toast with Undo.
-- **Resolve / Reopen**: 32px, padding 0 12, margin-left 4, 1px `--border-strong`, radius 8, transparent, 13/500, icon 14 (`circle-check` / `rotate-ccw`), hover `--surface-hover`. Undo toast.
-- **Juno** icon button 32 (the Juno mark, `sparkle` 16 duotone), a toggle (`aria-pressed`) for the Juno panel (§12.1). Name "Juno ⌘J". Pressed: bg `--secondary-default`. Hidden when AI assist is off.
-- **More** icon button 32 (`ellipsis` 16). Opens the row context menu anchored under the button, right-aligned (+4px).
+- **Title button**: 28px, `--radius-pill`, padding 0 8, gap 6: title 14/600 single line ellipsis, `dir="auto"`, then `caret-down` 12 muted. Hover `--surface-hover`; open `--secondary-default`. A menu button (`aria-haspopup="menu"`, `aria-expanded`) inside the page's `h1`. Click, Enter, Space or ↓ opens the topic menu (§15.1, the row's menu) anchored under the island, left-aligned, 6px below. The context-menu key and right-click open it too. Main's title is "Main".
+- **Rename** (from the menu): the title button becomes an input in place: 28px, padding 0 8, 14/600, 1px `--border-strongest`, `--radius-pill`, bg `--surface-default`, preselected. Enter saves, Esc cancels, blur saves. Saving an empty title, or the same text as the AI title, clears the manual title. There is no double-click rename in the header.
 
-Row 2 (gap 8):
+Right island (`flex: none`, padding 3):
 
-- Title 20/600, letter-spacing −0.01em, lh 1.3, single line ellipsis. Double-click to rename (not on Main). [built M4] The title attribute shows the full title only when it is truncated, never the rename hint; the rename affordance moves to the context menu's Rename item in M5.
-- No marker on AI titles.
-- Main header: title "#eng · Main" (DM: "Maya Chen · Main") followed by "Messages posted outside threads" 13 muted.
-- Rename input: 34px, margin `−3 0 −3 −8`, padding 0 8, 1px `--border-strongest`, radius 8, bg surface, 20/600 −0.01em; preselected. Enter saves, Esc cancels, blur saves. Saving an empty title, or the same text as the AI title, clears the manual title.
-- [built M4] `TopicHeader`. Row 2 starts with a fixed 32px icon slot (`art`) that shows the channel icon, or the DM partner's photo, until the topic art track fills it. Main shows a "Threads · 12" outline button (`chats-circle` 16) before the bell; it opens a 300px popover with `ActiveThreads` (title, "12 replies · 4m" and the unread count, 52px rows; its per-thread bell is removed, since Notify me lives on each thread). The `ActiveThreads` rows are buttons named by the title and described by the counts and the reply line, each in a list item; Escape closes the popover and puts focus back on the Threads button. Pin, Resolve and More are not drawn until M5 wires them: a button that does nothing is worse than none. The context pill is a pill (`--radius-pill`).
+- **Resolve / Reopen**: 28px, `--radius-pill`, padding 0 10, gap 6, 12.5/500 `--foreground-default`, icon 14 subtle (`circle-check` / `rotate-ccw`), hover `--surface-hover`. Undo toast. Not on Main.
+- **Threads** (Main only, in Resolve's place): the same button, `chats-circle` 14, "Threads · 12". Opens the 300px `ActiveThreads` popover, anchored under it, right-aligned (§2 behaviour unchanged: rows are buttons named by the title and described by the counts; Escape closes and puts focus back on Threads).
+- **Juno**: 28 round icon button (`sparkle` 16 duotone), a toggle (`aria-pressed`) for the panel (§12.1). Name "Juno ⌘J". Pressed: `--secondary-default`. Hidden when AI assist is off.
+- Pin, Notify me and More are not in the header. They are in the topic menu, which is the row's menu.
+
+Narrow (a container query on the topic area): under 480px, Resolve is a 28px icon button (name still "Resolve" / "Reopen") and Threads shows `chats-circle` and the count only ("12", name "Threads, 12"). The title gives up width first, down to 48px, then the pill's name takes an ellipsis; the pill's icon and tint always show. At the minimum window (720 by 480, sidebar shown) the topic is 336px and every variant fits.
+
+The message list under the header (`MessageList`, `TopicView`):
+
+- The scroller starts at the top of the topic area, under the band. Its content has `padding-top: --header-inset` 56 before the column's own 16, so at scroll top the first message starts at 72, below the band's end at 68.
+- `scroll-padding-top: --header-band` (68), so keyboard focus moves, `scrollIntoView` and find-in-page stop below the islands.
+- The scrollbar track starts below the band: `::-webkit-scrollbar-track { margin-top: --header-band }` on the message list's scroller only. The thumb never goes under an island.
+- Open position: the "N new" divider lands `--header-band` + 80 (148px) from the scroller's top, which is 80px below the band, as before. The bottom pin, prepends, the window cap and scroll anchoring are unchanged (performance.md 3.3 and 5.2): the band and islands are out of flow and never change, so a rename, the menu or Juno pressed moves nothing in the list.
+- No script reads or writes on scroll. The band is drawn the same at scroll top and scrolled: at scroll top it only covers the empty inset.
+
+Keyboard order inside the header: context pill → title button → Resolve or Threads → Juno. Then the message list and the composer, as before (the Tab order row in the accessibility table).
 
 ## 6. Message list
 
@@ -386,7 +396,7 @@ A tab with the message list's area on top and the composer at the bottom, like a
 
 **Shows:** S11 (empty), `docs/design/juno-chat/mock.html` (bubbles, status bubble, cards, states; renders `mock-light.png`, `mock-dark.png`). SPEC §13 decides behaviour; the view models are `@juno/agent-contract` `src/chat/`.
 
-One long list, no "new chat". Scroll container; column max-width `--page-width` 720, padding `40 32 24`. The list is virtualised (`@tanstack/react-virtual`); it opens at the "New" divider when there are unread Juno messages, otherwise at the bottom, and shows the "New message" pill (§6) when scrolled up and something arrives. Row kinds are the `ChatItem` union: owner bubble, Juno bubble, status bubble, note, group label, day separator, New divider.
+One long list, no "new chat". Scroll container under the header islands (§5); column max-width `--page-width` 720, padding `40 32 24` below the `--header-inset`. The list is virtualised (`@tanstack/react-virtual`); it opens at the "New" divider when there are unread Juno messages, otherwise at the bottom, and shows the "New message" pill (§6) when scrolled up and something arrives. Row kinds are the `ChatItem` union: owner bubble, Juno bubble, status bubble, note, group label, day separator, New divider.
 
 - **Empty state** (padding-top 40, gap 18): `juno` illustration 40 (`--illustration-figure`) · "What do you need?" `--text-display` serif 38 · body 14 lh 1.6 subtle max-width 520: "Ask me to find, summarize, catch you up or tidy up. I can read your topics and propose messages, but nothing is sent until you press Send." · four suggestion pills (wrap, gap 8): 34px, padding 0 12, 1px `--border-strong`, `--radius-pill`, bg surface, 13px: "Catch me up on today", "Summarize this topic", "Draft a reply in this topic", "Anything settled I can resolve?" (`chatCopy.empty.suggestions`). Clicking sends the text. Staggered entrance per friendly-layer §5.
 - **Spacing**: 2px between bubbles of one group, 8px between groups plus the 18px line slot under each group's last bubble (where a delivery or ending line goes, reserved so a line arriving or leaving moves nothing), 20px around a day separator or a group label.
@@ -410,7 +420,7 @@ One long list, no "new chat". Scroll container; column max-width `--page-width` 
 - **Note**: centered row, 12.5 muted: "Remembered · Undo" (Undo as a text button while `undo`), "Removed", and the secret-blocked line. Padding 2 0.
 - **Group label**: `--text-section-label` 11 uppercase muted, margin-bottom 4, over the group's first bubble, gap 8: "Scheduled · Daily catch-up", "T3 Code · Fix the sidebar flake" or "T3 Code · 2 jobs" · "Why this?" · "Pause schedule" or "Mute updates" by origin, the last two as 11px text buttons subtle. "Why this?" opens a popover with the schedule or job and who set it up. Neither button stops a job.
 - **Day separator** and **New divider**: as the topic view (§6): the day label `--text-divider` centered; the New divider with the count.
-- **Header** (Juno tab): the tab strip plus a 44px bar: "Juno" 15/600 · banner chip when `banner` is not `none` (see below) · spacer · a More menu (`DotsThree` 18) with Scheduled, What Juno remembers, Memory of this chat, Activity, Connections, Settings › Juno. Banner chips are 26px, `--radius-pill`, 12.5/500, `--secondary-default`, text from `chatCopy.banner[kind].chip` with `line` as the title: "Juno is paused · Resume" (Resume as a text button), "You're offline", "Juno restored from backup · Review", "Juno needs an update", "Juno is off", "Juno is on your other Mac". One chip at a time, by the precedence in `Banner`. AI off also ends the list with one line "Juno is off. Turn on AI assist in Settings." 13 muted centered, and the composer is disabled.
+- **Header** (Juno tab): the topic header's islands and band (§5) over the chat, with the row capped at `--page-width` 720 and padding-inline 32 so the islands line up with the chat column. Left island: a title button (§5 look) with the Juno mark 18, "Juno" 14/600 and `caret-down` 12 muted, a menu button that opens Scheduled, What Juno remembers, Memory of this chat, Activity, Connections, Settings › Juno. There is no More button. Right island, only when `banner` is not `none`: the banner chip. Banner chips are 28px, `--radius-pill`, 12.5/500, `--secondary-default`, text from `chatCopy.banner[kind].chip` with `line` as the title: "Juno is paused · Resume" (Resume as a text button), "You're offline", "Juno restored from backup · Review", "Juno needs an update", "Juno is off", "Juno is on your other Mac". One chip at a time, by the precedence in `Banner`. AI off also ends the list with one line "Juno is off. Turn on AI assist in Settings." 13 muted centered, and the composer is disabled. The list's top inset, scroll padding and scrollbar track follow §5.
 - **Composer**: outer padding `8 24 20`; box max-width 672, bg surface, 1px `--input-border`, `--radius-composer` 20; textarea padding `9 0 9 14`, 14 lh 22, max-height `--assistant-input-max-height` 160; send button 28 round `ArrowUp` 18 bold, margin 6, bg `--hl` fg `--hl-fg`, `--opacity-disabled` when empty. Placeholder 'Ask Juno, like "what did I miss in #eng?"'. Enter sends, Shift Enter newline; sending while a run is active queues (no disabled state). Disabled only for AI off, Update needed and Another device. The "New message" pill uses `chatCopy.list.newMessage`.
 - **Context menu on a message** (native): Copy · Remember this (owner messages only; disabled over 280 bytes without a selection) · Remove. Remove opens the **Remove sheet** (`RemoveSheet`): a native-style sheet with the title "Remove from Juno", the body line, the rows as on the Remove card, the "Also remove Juno's reply" checkbox when offered, the cannot-recall line, and Keep · Remove (danger). It needs no run, so it works paused, offline, in recovery and with AI off.
 - **Elsewhere**: the sidebar's Juno nav item shows the unread count as the soft grey tag and the duotone sparkle while `busy`; the home's Ask Juno field shows `jobLine` in place of its placeholder as a text swap. ⌘J opens the tab and focuses the composer, except in a topic tab, where it toggles the panel (§12.1). Juno pages (Scheduled, What Juno remembers, Memory of this chat, Activity, Connections, and Review in recovery) use the §11 page shell: max-width 720, title serif 34, group cards `--radius-card` with rows divided by `--border-subtle`, rows min-height 48. Activity run outcomes print `chatCopy.pages.activity.outcome`; a failure row has "Copy details". Memory's masked lines read "being updated". A pin that changed under an edit reads "This changed. Check it and save again." Review lists the pending cards with "This may already have happened." and ends with "Activate Juno". Settings › Juno adds the ownership group (state, "Export recovery phrase", "Move to another Mac", "Restore from backup" with the attestation line), the rejected-key line, and "Removal pending · 1 copy in a running job · Stop job". The Connections T3 row adds the address field and the "Allow T3 Code over the local network" switch with its https note.
@@ -420,14 +430,14 @@ One long list, no "new chat". Scroll container; column max-width `--page-width` 
 **Shows:** `docs/design/juno-panel/` (`panel-light.png`, `panel-dark.png`). SPEC §7 "Juno panel" decides behaviour.
 
 - **Place**: the right side of a topic tab, below the tab strip, full height, `--juno-panel-width` 360. Background `--background`, left edge 1px `--border-default`. The topic (header, list, composer) takes the rest; its reading column re-centres in it. Under 480px left for the topic, the panel covers the workspace below the tab strip instead (same look, full width). No slide: it appears in one frame, so the topic reflows once.
-- **Header**: 52px, padding `0 8 0 16`, border-bottom 1px `--border-subtle`: Juno mark 20 · "Juno" 14/600 · banner chip when the chat has one (§12) · spacer · **Open Juno tab** icon button 28 (`arrows-out-simple` 15, name "Open in a tab") · **Close** icon button 28 (`x` 15, name "Close Juno ⌘J").
-- **List**: the same chat (§12) in a narrower column: padding `16 16 12`, bubbles max-width 85%, cards full column width. Opens at the bottom. Everything else (grouping, status bubble, cards, notes, separators) is unchanged.
+- **Header**: the islands and band of §5 at the panel's width (row padding-inline 12, no width cap), on the same line as the topic's islands. Left island: the Juno title button (mark 18, "Juno" 14/600, `caret-down`), which opens the Juno menu (§12). Right island: **Open Juno tab** 28 round (`arrows-out-simple` 15, name "Open in a tab") · **Close** 28 round (`x` 15, name "Close Juno ⌘J"). A banner chip, when the chat has one, goes in the right island before these. No border-bottom. When the panel covers the topic, the topic's islands are hidden with it.
+- **List**: the same chat (§12) in a narrower column, under the panel's islands: padding `16 16 12` below the `--header-inset`, bubbles max-width 85%, cards full column width. Opens at the bottom. Everything else (grouping, status bubble, cards, notes, separators) is unchanged.
 - **About line**: above the first bubble of each owner group sent from the panel, right-aligned, 11.5 muted, margin-bottom 3, single line ellipsis: "About Postgres 16 migration plan" (Main: "About #eng · Main"). Shown in the Juno tab too. Clicking it opens the topic (⌘-click in a new tab).
 - **Context above the composer**, stacked, gap 6, padding `0 12 6`:
   - **Selection**: when text is selected in the topic, a quote block (§6.3 look) of up to 3 lines with the sender's name 12/600, and a 20px `x` (name "Remove quote"). It follows the selection until you send or remove it.
   - **Catch me up** pill: 28px, `--radius-pill`, padding 0 12, bg `--secondary-default`, 12.5/500, shown when the topic opened at a "new" divider and nothing has been sent from the panel about it since. Click sends "Catch me up".
 - **Composer**: the Juno composer (§12) with outer padding `0 12 12` and placeholder "Ask about this topic".
-- **Keys**: ⌘J and the header's Juno button toggle the panel and focus its composer; Esc in an empty panel composer closes it and returns focus to the topic composer. Tab order: topic header → topic list → topic composer → panel header → panel list → panel composer.
+- **Keys**: ⌘J and the header's Juno button toggle the panel and focus its composer; Esc in an empty panel composer closes it and returns focus to the topic composer. Tab order: topic header → topic list → topic composer → panel header (Juno menu, Open in a tab, Close) → panel list → panel composer.
 - **Saved**: whether the panel is open (one pref for all topic tabs).
 
 ## 13. Notifications page
@@ -484,17 +494,17 @@ Page max-width 760, padding `40 40 72`, gap 36. Title "Preferences" serif 34.
 
 ## 15. Context menus
 
-Native menus **[spec]**. Prototype rendering for reference: 236px, padding 5, radius 13, `--pop-shadow`, z 40, positioned at the pointer and clamped 8px inside the window (246px from the right edge, 340px from the bottom); from the header More button it is right-aligned 4px below the button. Items 30px, radius 6, padding 0 8, gap 10, 13px, icon 15 subtle, right hint 11 muted; separators 1px `--border-default` margin 4 6. Esc or outside click closes. Every item closes the menu.
+Native menus **[spec]**. Prototype rendering for reference: 236px, padding 5, radius 13, `--pop-shadow`, z 40, positioned at the pointer and clamped 8px inside the window (246px from the right edge, 340px from the bottom); from the header's title button it is left-aligned 6px below the left island (§5). Items 30px, radius 6, padding 0 8, gap 10, 13px, icon 15 subtle, right hint 11 muted; separators 1px `--border-default` margin 4 6. Esc or outside click closes. Every item closes the menu.
 
-**Shows:** S02, shot 22 (header More), shot 23 (tab), shot 32 (channel), shot 61 (dark).
+**Shows:** S02, shot 22 (now opened from the header's title), shot 23 (tab), shot 32 (channel), shot 61 (dark).
 
-### 15.1 Topic row / header More
+### 15.1 Topic row / header title
 
 | Item | Icon | Hint | Shown when | Effect |
 | --- | --- | --- | --- | --- |
 | Open in new tab | `square-arrow-out-up-right` | ⌘ click | always | |
 | — | | | | |
-| Rename | `pencil` | | not Main | inline rename in the row (or header when opened from More) |
+| Rename | `pencil` | | not Main | inline rename in the row (or in the header's title island when opened from there) |
 | Mark as read / Mark as unread | `check-check` / `circle-dot` | | by state | unread sets count to at least 1 |
 | Pin / Unpin | `pin` / `pin-off` | | by state | |
 | Resolve / Reopen | `circle-check` / `rotate-ccw` | | by state | undo toast; resolve clears unread and mention |
@@ -519,7 +529,7 @@ Native menus **[spec]**. Prototype rendering for reference: 236px, padding 5, ra
 
 ### 15.3 Notify me submenu
 
-Shown from 15.1, 15.2, the header's Notify me button (§5) and from a person (a sender's name or avatar in a message, a DM row). Three items with a checkmark (13, `--foreground-default`) on the current one: **Every message**, **When it matters** (default), **Never**. For a person the parent reads "Notify me about Maya". Choosing one applies at once with the toast "#design-review: Never" and Undo.
+Shown from 15.1 (also opened from the header's title, §5), 15.2 and from a person (a sender's name or avatar in a message, a DM row). Three items with a checkmark (13, `--foreground-default`) on the current one: **Every message**, **When it matters** (default), **Never**. For a person the parent reads "Notify me about Maya". Choosing one applies at once with the toast "#design-review: Never" and Undo.
 
 ### 15.4 Message menu
 
@@ -614,7 +624,7 @@ Stored as user preferences. Nothing else from the prototype's design panel (`dat
 | ↑ ↓, Enter, Esc | New chat pickers | Move, pick, close |
 | Enter / Esc / blur | rename | Save / cancel / save |
 | Context-menu key, right-click | rows, tabs, context pill, All topics rows | Menu |
-| Tab order | sidebar bar (collapse, back, forward, search, new chat, avatar) → nav → filters → rows → tab strip → header → messages → composer → Juno panel | Hover-only actions (row Resolve, message toolbar) appear on focus |
+| Tab order | sidebar bar (collapse, back, forward, search, new chat, avatar) → nav → filters → rows → tab strip → header (context pill, title, Resolve or Threads, Juno) → messages → composer → Juno panel | Hover-only actions (row Resolve, message toolbar) appear on focus |
 
 ## 21. Shared copy
 
