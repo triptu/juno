@@ -34,7 +34,7 @@ import {
 } from '@juno/state'
 import { afterPaint, measure } from '@juno/state/perf'
 
-/** Longest an open waits for local data before it shows the tab anyway, with the list loading. */
+/** Longest an open waits for the first message window before it shows the tab anyway, with the list loading. It always waits for the header. */
 const READY_WAIT_MS = 150
 /** Messages above the first unread one when a topic opens at its divider. */
 const CONTEXT_ABOVE = 50
@@ -76,15 +76,17 @@ function apply(change: (tabs: Tabs) => Tabs): Tabs {
 }
 
 /**
- * Resolves once the topic's header and first window are local, or after
- * `READY_WAIT_MS`. A fresh open also picks the window (`openWindow`); a
- * tab coming back keeps the one it had.
+ * Resolves once the topic's header and first window are local, or, after
+ * `READY_WAIT_MS`, once the header is. Showing the tab without its header
+ * would paint an empty pane and an empty tab title. A fresh open also
+ * picks the window (`openWindow`); a tab coming back keeps the one it had.
  */
 function whenReady(id: string, fresh: boolean): Promise<void> {
   return new Promise((resolve) => {
     const releases: Array<() => void> = []
     let done = false
     let specSet = false
+    let waited = false
     const finish = () => {
       if (done) return
       done = true
@@ -93,10 +95,14 @@ function whenReady(id: string, fresh: boolean): Promise<void> {
       // The tab reads the same atoms; let it mount before letting go of these.
       afterPaint(() => releases.forEach((release) => release()))
     }
-    const timer = setTimeout(finish, READY_WAIT_MS)
+    const timer = setTimeout(() => {
+      waited = true
+      check()
+    }, READY_WAIT_MS)
     const check = () => {
       if (done) return
       const result = registry.get(topicAtom(id))
+      if (result._tag === 'Failure') return finish()
       if (result._tag !== 'Success') return
       const detail = result.value
       if (detail === null) return finish()
@@ -105,7 +111,7 @@ function whenReady(id: string, fresh: boolean): Promise<void> {
         if (fresh) registry.set(messageWindowSpecAtom(id), openWindow(detail))
         releases.push(registry.subscribe(messageListAtom(id), check, { immediate: false }))
       }
-      if (registry.get(messageListAtom(id)).ready) finish()
+      if (waited || registry.get(messageListAtom(id)).ready) finish()
     }
     releases.push(registry.subscribe(topicAtom(id), check, { immediate: false }))
     check()
