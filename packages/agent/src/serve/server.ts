@@ -24,6 +24,7 @@ import {
   type Banner,
   type ChatItem,
   type ChatPage,
+  type OpId,
 } from '@juno/agent-contract'
 import { Revision } from '@juno/agent-cards'
 import type { Presence } from '../host/reads'
@@ -48,19 +49,17 @@ const dayOf = (at: number) => new Date(at).setHours(0, 0, 0, 0)
 const readAt = (store: Turns['store']) =>
   (store.db.prepare('SELECT through_at AS at FROM chat_read WHERE singleton = 1').get() as { at: number } | undefined)?.at ?? 0
 
-/** The chat server's state over one engine: the change signal and the times live bubbles were first seen. */
+/** The chat server's state over one engine: the change signal, and when each bubble was first shown. */
 function chatState(host: ChatHost) {
   const turns = host.turns?._tag === 'running' ? host.turns : undefined
   const listeners = new Set<() => void>()
   const changed = () => {
     for (const listener of listeners) listener()
   }
-  const seen = new Map<string, number>()
+  const shown = (id: string, at: number) =>
+    turns?.store.db.prepare('INSERT INTO chat_bubbles (id, at) VALUES (?, ?) ON CONFLICT (id) DO NOTHING').run(id, at)
   const unsubscribe = turns?.subscribe((event) => {
-    if (event._tag === 'bubble') seen.set(event.id, Date.now())
-    if (event._tag === 'ended') {
-      for (const id of seen.keys()) if (id.startsWith(`${event.runId}:`)) seen.delete(id)
-    }
+    if (event._tag === 'bubble') shown(event.id, Date.now())
     changed()
   })
 
@@ -87,10 +86,11 @@ function chatState(host: ChatHost) {
     return chatItems({
       store: turns.store,
       live: turns.run(),
-      seen: (id) => {
-        const at = seen.get(id) ?? Date.now()
-        seen.set(id, at)
-        return at
+      seen: (id, fallback) => {
+        const known = turns.store.db.prepare('SELECT at FROM chat_bubbles WHERE id = ?').get(id) as { at: number } | undefined
+        if (known !== undefined) return known.at
+        shown(id, fallback)
+        return fallback
       },
       jobs: turns.jobs.list(),
       readAt: readAt(turns.store),
@@ -192,7 +192,16 @@ export function agentHandlers(host: ChatHost) {
         'agent.chat.react': ({ opId, target, emoji }) =>
           Effect.flatMap(engine(state, host), (turns) => changed(answer(opId, () => turns.accept({ opId, kind: 'react', target, emoji })))),
         'agent.chat.retry': ({ opId, interruptedOpId }) =>
-          Effect.flatMap(engine(state, host), (turns) => changed(answer(opId, () => turns.retry({ opId, interruptedOpId })))),
+          Effect.flatMap(engine(state, host), (turns) => {
+            // One Try again per failure: a second click names the retry already queued or running.
+            const queued = turns.store.db
+              .prepare(
+                "SELECT op_id AS opId FROM inbox WHERE kind = 'retry' AND json_extract(data, '$.retryOf') = ? AND state NOT IN ('interrupted', 'failed') LIMIT 1",
+              )
+              .get(interruptedOpId) as { opId: OpId } | undefined
+            if (queued !== undefined && queued.opId !== opId) return Effect.succeed({ opId: queued.opId })
+            return changed(answer(opId, () => turns.retry({ opId, interruptedOpId })))
+          }),
         'agent.chat.read': ({ through }) =>
           Effect.sync(() => {
             const turns = state.turns

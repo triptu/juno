@@ -8,9 +8,10 @@
  * - An owner message is an inbox `send` or `steer`. A `retry` is the same
  *   message sent again, so it is not a second bubble: a reply or reaction
  *   that names the retry points at the original.
- * - A bubble's time is the time its archive row was written. A live run's
- *   bubbles are not archived yet; the caller passes when each was first
- *   seen, so the order does not move when the archive catches up.
+ * - A bubble's time is when it was first shown (`chat_bubbles`): when the
+ *   model closed it in a live run, or its archive row's time for a bubble
+ *   the server never saw live. It never changes, so neither the order nor
+ *   the read state moves when the run ends and the archive catches up.
  * - Bubbles group by sender within two minutes and the same origin; a day
  *   separator, an ending or a group label ends a group.
  * - A Juno bubble is unread when it is newer than the read mark.
@@ -46,8 +47,8 @@ const PREVIEW_CHARS = 120
 export interface ChatSource {
   readonly store: Store
   readonly live: RunState | undefined
-  /** When each live bubble was first seen, by id. */
-  readonly seen: (bubbleId: string) => number
+  /** When a bubble was first shown; `fallback` is stored for a bubble not seen before. */
+  readonly seen: (bubbleId: string, fallback: number) => number
   readonly jobs: ReadonlyArray<Job>
   /** Juno items at or before this time are read. */
   readonly readAt: number
@@ -172,9 +173,9 @@ export function chatItems(source: ChatSource): ReadonlyArray<ChatItem> {
     const originKey = origin._tag === 'job' ? `job:${origin.jobs.map((j) => j.jobId).join(',')}` : origin._tag
     let bubbles: ReadonlyArray<{ id: string; text: string; replyTo?: string; at: number }>
     if (live !== undefined) {
-      bubbles = live.bubbles.map((b) => ({ ...b, at: source.seen(b.id) }))
+      bubbles = live.bubbles.map((b) => ({ ...b, at: source.seen(b.id, Date.now()) }))
     } else {
-      bubbles = archivedBubbles(store, run.id, archived.get(run.id) ?? [], run.startedAt)
+      bubbles = archivedBubbles(store, run.id, archived.get(run.id) ?? [], run.startedAt).map((b) => ({ ...b, at: source.seen(b.id, b.at) }))
     }
     if (bubbles.length > 0 && origin._tag !== 'owner') {
       junoEntries.push({ by: 'line', at: bubbles[0]!.at, item: { _tag: 'groupLabel', id: `label:${run.id}`, origin, text: labelOf(origin, source.jobs) } })

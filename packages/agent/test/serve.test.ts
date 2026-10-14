@@ -10,7 +10,7 @@ import { Digest, Revision } from '@juno/agent-cards'
 import { AgentRpcs, type CardId, type ChatItem, type ChatPage, type HostPresence, type OpId } from '@juno/agent-contract'
 import { CHAT_MIGRATIONS, hostProtocol, rendererPorts, type HostPort } from '../src/index'
 import { rendererServer } from '../src/serve/server'
-import { say, turnsHarness } from './turns-harness'
+import { deferred, say, turnsHarness } from './turns-harness'
 
 type Client = RpcClient.RpcClient<RpcGroup.Rpcs<typeof AgentRpcs>, RpcClientError.RpcClientError>
 type Presence = typeof HostPresence.Type
@@ -153,6 +153,9 @@ it('a failed run shows its ending line, and Try again sends the same message wit
 
   const retried = await run(client['agent.chat.retry']({ opId: 'op-2' as OpId, interruptedOpId: 'op-1' as OpId }))
   expect(retried).toMatchObject({ _tag: 'Success', success: { opId: 'op-2' } })
+  // A second click on Try again names the same retry; the message is not sent twice.
+  const twice = await run(client['agent.chat.retry']({ opId: 'op-2b' as OpId, interruptedOpId: 'op-1' as OpId }))
+  expect(twice).toMatchObject({ _tag: 'Success', success: { opId: 'op-2' } })
   const answered = await pageWhere((p) => of(p, 'juno').length === 1 && of(p, 'status').length === 0, 'the answer')
   expect(of(answered, 'owner').map((item) => item.text)).toEqual(['summarise #eng'])
   expect(answered.items.map((item) => item._tag)).toEqual(['day', 'owner', 'ending', 'newDivider', 'juno'])
@@ -204,4 +207,39 @@ it('answers unavailable for cards, which come with the actions', async () => {
   const { client } = await chat()
   const identity = { cardId: 'c1' as CardId, revision: Revision.make(1), digest: Digest.make('0'.repeat(64)) }
   expect(await run(client['agent.cards.dismiss']({ opId: 'op-1' as OpId, identity }))).toMatchObject({ _tag: 'Failure', failure: { reason: 'unavailable' } })
+})
+
+it('a bubble read while its run is live stays read, and in place, when the run ends', async () => {
+  const { h, client, pageWhere } = await chat()
+  const release = deferred()
+  const usage = { input: 10, output: 5, cacheRead: 0, cacheWrite: 0, totalTokens: 15, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } }
+  h.fake.script([
+    // A bubble, then a tool round, so the run goes on after it.
+    reply(() => ({
+      role: 'assistant', api: 'faux', provider: 'openrouter', model: 'anthropic/claude-sonnet-5.5', usage, stopReason: 'toolUse', timestamp: Date.now(),
+      content: [{ type: 'text', text: say('Looking now.') }, { type: 'toolCall', id: 'call-1', name: 'remember', arguments: { text: 'nothing' } }],
+    }) as never),
+    reply(async () => {
+      await release.promise
+      return { role: 'assistant', api: 'faux', provider: 'openrouter', model: 'anthropic/claude-sonnet-5.5', usage, stopReason: 'stop', timestamp: Date.now(),
+        content: [{ type: 'text', text: say('Done.') }] } as never
+    }),
+  ])
+  await run(client['agent.chat.send']({ opId: 'op-1' as OpId, text: 'check the deploy' }))
+  const live = await pageWhere((p) => of(p, 'juno').length === 1 && of(p, 'status').length === 1, 'the first bubble in a live run')
+  const first = of(live, 'juno')[0]!
+  await run(client['agent.chat.send']({ opId: 'op-2' as OpId, text: 'and staging' }))
+  await run(client['agent.chat.read']({ through: first.id }))
+  await pageWhere((p) => of(p, 'juno')[0]?.unread === false, 'the first bubble read')
+
+  release.resolve()
+  await h.ended('op-1')
+  const ended = await pageWhere((p) => of(p, 'juno').length === 2 && of(p, 'status').length === 0, 'the run ended')
+  expect(of(ended, 'juno').map((item) => [item.body[0]!.text, item.unread])).toEqual([['Looking now.', false], ['Done.', true]])
+  expect(ended.items.filter((item) => item._tag === 'owner' || item._tag === 'juno').map((item) => (item._tag === 'owner' ? item.text : item.body[0]!.text))).toEqual([
+    'check the deploy',
+    'Looking now.',
+    'and staging',
+    'Done.',
+  ])
 })
