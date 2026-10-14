@@ -80,6 +80,7 @@ export const ShellRoutes = {
   [Channels.shellOpenExternal]: { input: Schema.Struct({ url: Schema.String }), output: Schema.Void },
   [Channels.shellOpenInSlack]: { input: SlackTarget, output: Schema.Void },
   [Channels.clipboardWriteText]: { input: Schema.Struct({ text: Schema.String.check(Schema.isMaxLength(2048)) }), output: Schema.Void },
+  [Channels.shellEditUndo]: { input: Schema.Void, output: Schema.Void },
 } as const
 
 export type ShellRoutes = typeof ShellRoutes

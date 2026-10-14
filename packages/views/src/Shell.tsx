@@ -16,6 +16,8 @@ export interface ShellProps {
   readonly onSidebarResetWidth?: () => void
   /** A drag on the edge ended far enough left to hide the sidebar. */
   readonly onSidebarCollapse?: () => void
+  /** The toast (bottom-left of the window), over both panes. */
+  readonly toast?: ReactNode
   readonly children?: ReactNode
 }
 
@@ -29,7 +31,7 @@ const COLLAPSE_BELOW = 200
  * waits on the engine renders its own waiting state inside. Nothing above
  * the panes may change on a tick (performance 4.3).
  */
-export function Shell({ sidebar, sidebarWidth = SIDEBAR_WIDTH.default, sidebarHidden = false, onSidebarResize, onSidebarResetWidth, onSidebarCollapse, children }: ShellProps) {
+export function Shell({ sidebar, sidebarWidth = SIDEBAR_WIDTH.default, sidebarHidden = false, onSidebarResize, onSidebarResetWidth, onSidebarCollapse, toast, children }: ShellProps) {
   const slot = useRef<HTMLDivElement>(null)
   // The width is set on the sidebar's own box, here and by a drag, never
   // through React state, so a drag re-renders nothing. It is a plain width,
@@ -46,6 +48,7 @@ export function Shell({ sidebar, sidebarWidth = SIDEBAR_WIDTH.default, sidebarHi
           <SidebarEdge width={sidebarWidth} onResize={onSidebarResize} onReset={onSidebarResetWidth} onCollapse={onSidebarCollapse} />
         </div>
         {children}
+        {toast}
       </div>
     )
   }
@@ -133,6 +136,8 @@ function SidebarEdge({ width, onResize, onReset, onCollapse }: SidebarEdgeProps)
 
 const styles = stylex.create({
   shell: {
+    // The toast region is placed against the window.
+    position: 'relative',
     display: 'flex',
     width: '100%',
     height: '100%',

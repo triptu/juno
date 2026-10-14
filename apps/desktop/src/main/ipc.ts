@@ -145,6 +145,10 @@ export function registerIpc({ supervisor, setTheme, setAccent, setSidebar }: Ipc
   handle(Channels.clipboardWriteText, ({ text }) => {
     clipboard.writeText(text)
   })
+
+  handle(Channels.shellEditUndo, (_input, event) => {
+    event.sender.undo()
+  })
 }
 
 /** Links from messages open in the browser only when they are http or https. */

@@ -29,6 +29,8 @@ export const Channels = {
   shellOpenInSlack: 'shell.openInSlack',
   /** Puts text on the clipboard. */
   clipboardWriteText: 'clipboard.writeText',
+  /** Undo in the focused text field (`webContents.undo()`), for ⌘Z while one has text. */
+  shellEditUndo: 'shell.editUndo',
 } as const
 
 export type Channel = (typeof Channels)[keyof typeof Channels]
@@ -43,8 +45,9 @@ export const Events = {
 
 /**
  * The app-menu items main hands to the renderer (architecture, shortcuts):
- * the tab keys, Back and Forward (also the three-finger swipe), and Hide
- * Sidebar.
+ * the tab keys, Back and Forward (also the three-finger swipe), Hide
+ * Sidebar, and Edit › Undo, which undoes typing in a text field or else
+ * Juno's last action.
  */
 export type MenuCommand =
   | 'tab.new'
@@ -56,6 +59,7 @@ export type MenuCommand =
   | 'history.back'
   | 'history.forward'
   | 'sidebar.toggle'
+  | 'edit.undo'
 
 /** One item of a context menu the renderer asks for, or a separator. */
 export type ContextMenuLeaf =
@@ -118,6 +122,8 @@ export interface JunoBridge {
     /** Only http and https links open; main ignores anything else. */
     readonly openExternal: (url: string) => Promise<unknown>
     readonly openInSlack: (target: SlackTarget) => Promise<unknown>
+    /** Undo in the focused text field. */
+    readonly editUndo: () => Promise<unknown>
   }
   readonly clipboard: {
     readonly writeText: (text: string) => Promise<unknown>

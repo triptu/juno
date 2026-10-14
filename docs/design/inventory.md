@@ -208,13 +208,13 @@ Left island (`flex: 0 1 auto`, `min-width: 0`, padding `3 3 3 5`):
   | Group DM | `users` | "Maya, Leo" | `--tint-dm` |
 
 - **Title button**: 28px, `--radius-pill`, padding 0 8, gap 6: title 14/600 single line ellipsis, `dir="auto"`, then `caret-down` 12 muted. At least 72px wide; it shortens before the pill does. Hover `--surface-hover`; open `--secondary-default`. A menu button (`aria-haspopup="menu"`, `aria-expanded`) inside the page's `h1`. Click, Enter, Space or ↓ opens the topic menu (§15.1, the row's menu) anchored under the island, left-aligned, 6px below. The context-menu key and right-click open it too. Main's title is "Main".
-- **Rename** (from the menu; [not built] the item shows disabled until the rename command lands in M5): the title button becomes an input in place: 28px, padding 0 8, 14/600, 1px `--border-strongest`, `--radius-pill`, bg `--surface-default`, preselected. Enter saves, Esc cancels, blur saves. Saving an empty title, or the same text as the AI title, clears the manual title. There is no double-click rename in the header.
+- **Rename** (from the menu): the title button becomes an input in place: 28px, padding 0 8, 14/600, 1px `--border-strongest`, `--radius-pill`, bg `--surface-default`, preselected. [built M5] `RenameField size="header"` sizes to its text (`field-sizing: content`) from the title's 72px floor up to the island's room. Enter saves, Esc cancels, blur saves. Saving an empty title, or the same text as the AI title, clears the manual title. There is no double-click rename in the header.
 
 Right island (`flex: none`, padding 3):
 
-- **Resolve / Reopen**: 28px, `--radius-pill`, padding 0 10, gap 6, 12.5/500 `--foreground-default`, icon 14 subtle (`circle-check` / `rotate-ccw`), hover `--surface-hover`. Undo toast. Not on Main. [not built] It shares the row check's resolve call, which waits for the resolve command (M5).
+- **Resolve / Reopen**: 28px, `--radius-pill`, padding 0 10, gap 6, 12.5/500 `--foreground-default`, icon 14 subtle (`circle-check` / `rotate-ccw`), hover `--surface-hover`. Undo toast. Not on Main. [built M5] It runs the row check's resolve call, and Reopen runs `topics.reopen`.
 - **Threads** (Main only, in Resolve's place): the same button, `chats-circle` 14, "Threads · 12". Opens the 300px `ActiveThreads` popover, anchored under it, right-aligned (§2 behaviour unchanged: rows are buttons named by the title and described by the counts; Escape closes and puts focus back on Threads).
-- **Juno**: 28 round icon button (`sparkle` 16 duotone), a toggle (`aria-pressed`) for the panel (§12.1). Name "Juno ⌘J". Pressed: `--secondary-default`. Hidden when AI assist is off. [not built] Shown, but it opens nothing until the panel is built.
+- **Juno**: 28 round icon button (`sparkle` 16 duotone), a toggle (`aria-pressed`) for the panel (§12.1). Name "Juno ⌘J". Pressed: `--secondary-default`. Hidden when AI assist is off. [not built] Hidden until the Juno panel is built, since a button that does nothing is worse than none.
 - Pin, Notify me and More are not in the header. They are in the topic menu, which is the row's menu.
 
 Narrow (a container query on the topic area): under 480px, Resolve is a 28px icon button (name still "Resolve" / "Reopen") and Threads shows `chats-circle` and the count only ("12", name "Threads, 12"). The pill shows its full name up to 160px, then takes an ellipsis; the title takes the rest and shortens first. The pill's icon and tint always show. At the minimum window (720 by 480, sidebar shown) the topic is 336px and every variant fits.
@@ -341,7 +341,7 @@ A tab with the message list's area on top and the composer at the bottom, like a
 - **Composer**: §7, placeholder "Message" until a destination is set, then the destination's own placeholder. Send checks run against the destination (§7.3). Enter with no destination opens the conversation picker with the draft kept.
 - **After send**: the picker row is removed and the topic header (§5) appears in the same frame the sent message appears; the tab becomes the topic. Nothing else moves: the composer keeps its place.
 - **Closing with a draft**: toast "Draft closed" with Undo (reopens the tab with the draft and destination).
-- [built] The composer is a plain text field (Enter sends, Shift Enter adds a line); attachments, @ and # suggestions and drafts that outlive the app are M6, and the send checks are M8, so a New chat sends without them for now. The message is posted before it shows: the tab becomes the topic once Slack has accepted it and the store holds it, with no pending row, and a failed send keeps the draft. ⌘⇧T on a New chat brings back its draft and destination from memory; the "Draft closed" toast waits for toasts (M5).
+- [built] The composer is a plain text field (Enter sends, Shift Enter adds a line); attachments, @ and # suggestions and drafts that outlive the app are M6, and the send checks are M8, so a New chat sends without them for now. The message is posted before it shows: the tab becomes the topic once Slack has accepted it and the store holds it, with no pending row, and a failed send keeps the draft. ⌘⇧T on a New chat brings back its draft and destination from memory; the "Draft closed" toast is not wired yet.
 
 ## 9. ⌘K palette
 
@@ -520,7 +520,7 @@ Native menus **[spec]**. Prototype rendering for reference: 236px, padding 5, ra
 | Notify me | `bell` | current level | always | submenu §15.3: for a thread, the thread's own choice (Every message and When it matters follow it in Slack, Never unfollows it; SPEC §5); for Main, the channel's or DM's. [built] Threads only, through `topics.subscribe` and `topics.unsubscribe`: a followed thread shows When it matters, since the Every message level is not stored yet; Main has no item until channel levels are |
 | Ignore #product | `ban` | | channel is not a DM | toast "Ignoring #product" with Undo |
 
-[built] The row and the header's title show this menu. Rename, Pin, Resolve and Ignore show disabled until their commands land (M5); the hints are not drawn, since a native menu has only a shortcut column.
+[built] The row and the header's title show this menu, and every item works (M5). Rename from the row edits the row's title (§3.2), from the header the header's title (§5). Each action shows its toast with Undo (§16). The hints are not drawn, since a native menu has only a shortcut column.
 
 ### 15.2 Channel menu (context pill, #channel chip, ⌘K channel result)
 
@@ -545,6 +545,8 @@ Shown from 15.1 (also opened from the header's title, §5), 15.2 and 15.6. Three
 
 Right-click on a message, and the message's More menu (the why item is new; the others wait for M6): Copy text (`copy`), Reply in thread (`message-square-reply`, Main only), separator, **Why did this notify?** / **Why no notification?** (`circle-help`, by what happened; hidden for your own messages), **Tell me if nobody replies** (`alarm`, your own messages only, AI assist on). The last one creates the reply watch at once, with no Juno run: a reply from anyone but you counts, and the wait ends at the same time on your next notification day, or at the start of notification hours if that time is outside them. It shows the toast "Watching for a reply until Thu 9:00 · Undo" (Undo deletes the watch) and adds a Schedule card to the Juno chat; nothing opens. Disabled while Juno is paused or on another Mac (SPEC 13.6).
 
+[built M5] Right-click (or the context-menu key on a focused message) shows Copy Slack link and Open in Slack. A reply's link carries `?thread_ts=&cid=`, as Slack's own links do; Open in Slack opens the channel, as on the tab menu. The other items come with their features.
+
 The why popover anchors under the item: 300px, padding `14 16`, radius 13, bg surface, `--pop-shadow`, gap 6. Title 13/600 ("Notified you at 13:42", "Didn't notify you", "In the 9am summary") · reason 13 subtle lh 1.5 (the decision's reason) · one button right-aligned, 28px secondary: **Change** when the reason is a setting (opens §15.3 for that channel or person, or the Notifications page for hours), **Tell Juno** when it was Juno's call (opens the Juno chat with the message quoted in the composer). Esc or outside click closes.
 
 ### 15.5 Tab menu
@@ -562,7 +564,8 @@ Right-click a sender's name or avatar in a message, or an @person chip. Notify m
 - Position: bottom-left, left 16, bottom 16, z 45, max-width 352. Padding `8 8 8 14`, radius 10, bg `--foreground-default`, text `--background`, `--shadow-lg`, 13px, gap 12. Text ellipsis on one line.
 - Undo button (reversible actions only): 26px, padding 0 8, radius 6, bg `color-mix(var(--background) 16%, transparent)`, "Undo" 12.5/600 + "⌘Z" mono 11 at .75 opacity.
 - One toast at a time; a new one replaces the old. Auto-dismiss 5s (with Undo) or 4s (info). No enter/exit animation in the prototype; [proposed] 150ms fade is acceptable.
-- Undo stack holds 20 actions; ⌘Z pops the last one (resolve, reopen, Notify me change, ignore, routed post, command send, Resolve all on Home) when focus is not in a non-empty input.
+- Undo stack holds 20 actions; ⌘Z pops the last one (resolve, reopen, pin, unpin, rename, mark read or unread, Notify me change, ignore, routed post, command send, Resolve all on Home) when focus is not in a non-empty input.
+- [built M5] `ActionToast` in `@juno/views`, mounted once by the shell over both panes, with the `Toast` rise. The undo stack and the toast are `undoStackAtom` and `toastAtom` in `@juno/state`; an action that changed nothing shows no toast. No exit fade yet.
 
 | Copy | Undo |
 | --- | --- |
@@ -570,6 +573,9 @@ Right-click a sender's name or avatar in a message, or an @person chip. Notify m
 | Resolved · #eng (Main rows use the channel label) | yes |
 | Reopened · … / "{topic or channel}: Never" (and the other Notify me choices) | yes |
 | Ignoring #deploys | yes |
+| Pinned · … / Unpinned · … | yes |
+| Marked as read · … / Marked as unread · … | yes |
+| Renamed · {new title} / Title cleared | yes |
 | Posted in Staging bill doubled since August · Posted in #eng · Main | yes |
 | Resolved 3 topics (Home's Tidy up) | yes |
 | Draft closed (a New chat closed with a draft) | yes |
