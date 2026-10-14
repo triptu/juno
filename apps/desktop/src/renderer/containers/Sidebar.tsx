@@ -17,8 +17,8 @@ function navigate(target: SidebarNavTarget): void {
 /**
  * Wires the sidebar chrome: the filters and scope (local UI state), the
  * filter dots (booleans from the counts live value, so a count that changes
- * without a dot changing re-renders nothing), the sync status line, the
- * theme toggle, and the account menu, which holds the appearance settings
+ * without a dot changing re-renders nothing), the sync status line, and
+ * the account menu, which holds the appearance settings
  * and the M1 diagnostics until Preferences exists. The list is a memoized
  * child with no props, so a render here does not reach the rows.
  */
@@ -66,7 +66,6 @@ export function Sidebar() {
   return (
     <SidebarView
       account={account}
-      theme={theme}
       forYouCount={0}
       filter={{ kind: filter.kind, unreadOnly: filter.unreadOnly }}
       dots={dots}
@@ -95,10 +94,6 @@ export function Sidebar() {
       onSearch={() => {
         // TODO(M9): open the ⌘K palette.
       }}
-      onBrowse={() => {
-        // TODO(M3 Browse): open the Browse channels and people popover.
-      }}
-      onToggleTheme={() => changeTheme(theme === 'dark' ? 'light' : 'dark')}
       onNavigate={navigate}
       onFilterKind={changeKind}
       onToggleUnread={toggleUnread}

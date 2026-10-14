@@ -309,8 +309,8 @@ export class Sidebar {
     await expect(this.list.getByText(title, { exact: true })).toBeVisible({ timeout: 15_000 })
   }
 
-  get themeButton() {
-    return this.root.getByRole('button', { name: 'Toggle theme' })
+  get searchButton() {
+    return this.root.getByRole('button', { name: 'Search ⌘K' })
   }
 
   get accountButton() {

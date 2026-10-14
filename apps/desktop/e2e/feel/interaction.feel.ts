@@ -54,14 +54,14 @@ test('hover and press feedback', async ({ juno, win, feel }) => {
     await juno.topic.expectTitle(RINA)
   })
 
-  const theme = await tag(juno.sidebar.themeButton, 'press-button')
-  await pointAt(win, juno.sidebar.themeButton)
+  const search = await tag(juno.sidebar.searchButton, 'press-button')
+  await pointAt(win, juno.sidebar.searchButton)
   await win.waitForTimeout(300)
-  await feel.run({ name: 'press-button', title: 'Hold the mouse down on an icon button: the press state shows in the next frame', probes: look(theme), checks: feedback('pointerdown', 'button press') }, async (rec) => {
+  await feel.run({ name: 'press-button', title: 'Hold the mouse down on an icon button: the press state shows in the next frame', probes: look(search), checks: feedback('pointerdown', 'button press') }, async (rec) => {
     await rec.mark('go')
     await win.mouse.down()
     await win.waitForTimeout(300)
-    // Leave before releasing, so the theme does not change.
+    // Leave before releasing, so nothing is clicked.
     await win.mouse.move(900, 400)
     await win.mouse.up()
   })
