@@ -26,6 +26,8 @@ export {
 } from './Sidebar'
 export { ThreadLink, type ThreadLinkProps } from './ThreadLink'
 export { TopicHeader, type TopicHeaderProps } from './TopicHeader'
+export { HeaderIslands, type HeaderColumn, type HeaderIslandsProps } from './header/HeaderIslands'
+export { HeaderTitleButton, IslandButton, JunoToggle, type HeaderTitleButtonProps, type IslandButtonProps, type JunoToggleProps, type MenuAnchor } from './header/HeaderControls'
 export { TopicList, type TopicListEmpty, type TopicListProps, type TopicListSection, type TopicListSectionId } from './TopicList'
 export { TopicRow, type TopicRowProps } from './TopicRow'
 export { TopicView, type TopicViewProps } from './TopicView'
