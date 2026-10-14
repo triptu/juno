@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { Context as EffectContext, Effect, Layer } from 'effect'
-import { limits, upper, type Request } from '@juno/agent-memory'
+import { limits, upper } from '@juno/agent-memory'
 import type { Ending } from '@juno/agent-contract'
 import {
   createAssistantMessageEventStream, createModels, createProvider, normalizeContext,
@@ -9,28 +9,53 @@ import {
 import { createSpend, dollars, type SpendLedger, type SpendPath } from '../spend'
 import type { Store } from '../store/store'
 
-export type Revision = { readonly rev: number; readonly gen: number; readonly pinRev: number }
+/** What a request was built against. An admitted `Request` is one. */
+export type Revision = { readonly gen: number; readonly pinRev: number }
 export type ProviderFailure = { readonly ending: Ending; readonly rateLimited: boolean }
 export class AdmissionError extends Error {
-  constructor(readonly ending: Ending) { super(`JUNO:${ending._tag}${'reason' in ending ? `:${ending.reason}` : ''}`) }
+  constructor(readonly ending: Ending) { super(code(ending)) }
 }
+type Reason = Exclude<Ending, { _tag: 'complete' | 'stopped' }>
+/** The guard's failures travel through pi as `errorMessage`. Only this fixed code is kept, never a provider's error body. */
+const code = (ending: Ending, rateLimited = false) => `JUNO:${ending._tag}${'reason' in ending ? `:${ending.reason}` : ''}${rateLimited ? ':429' : ''}`
+const CODE = /^JUNO:(interrupted|blocked:(?:tooLarge|budget)|failed:(?:provider|keyRejected|codexSignedOut|offline))(:429)?$/
+function decode(match: string): Reason {
+  const [tag, reason] = match.split(':')
+  if (tag === 'interrupted') return { _tag: 'interrupted' }
+  if (tag === 'blocked') return { _tag: 'blocked', reason: reason === 'budget' ? 'budget' : 'tooLarge' }
+  return { _tag: 'failed', reason: reason === 'keyRejected' || reason === 'codexSignedOut' || reason === 'offline' ? reason : 'provider' }
+}
+/** SDK errors start with the status ("401 …", "429: {…}"); pi's prefixed form is "Provider (503): …". */
+const httpStatus = (text: string): number | undefined => {
+  const found = /^([1-5]\d\d)\b/.exec(text) ?? /^[^\n(]*\(([1-5]\d\d)\):/.exec(text)
+  return found ? Number(found[1]) : undefined
+}
+const failed = (reason: Extract<Ending, { _tag: 'failed' }>['reason'], rateLimited = false): ProviderFailure =>
+  ({ ending: { _tag: 'failed', reason }, rateLimited })
+
+/** Maps a guard, provider or Codex error, or a failed message's `errorMessage`, to the chat ending. */
 export function providerFailure(error: unknown): ProviderFailure {
   if (error instanceof AdmissionError) return { ending: error.ending, rateLimited: false }
   const text = error instanceof Error ? error.message : String(error)
-  if (text.includes('JUNO:interrupted')) return { ending: { _tag: 'interrupted' }, rateLimited: false }
-  if (text.includes('JUNO:blocked:budget')) return { ending: { _tag: 'blocked', reason: 'budget' }, rateLimited: false }
-  if (text.includes('JUNO:blocked:tooLarge')) return { ending: { _tag: 'blocked', reason: 'tooLarge' }, rateLimited: false }
-  const status = /(?:^|\s)([45]\d\d)(?::|\s)/.exec(text)?.[1]
-  const reason = /not logged in|signed out|JUNO:failed:codexSignedOut/i.test(text) ? 'codexSignedOut'
-    : /\b(401|403)\b|no api key|missing.*key|API key auth (?:check )?failed|JUNO:failed:keyRejected/i.test(text) ? 'keyRejected'
-    : status ? 'provider' : /terminated|fetch failed|network|ENOTFOUND|EAI_AGAIN|ECONNRESET|ECONNREFUSED|offline|socket|timed? ?out/i.test(text) ? 'offline' : 'provider'
-  return { ending: { _tag: 'failed', reason }, rateLimited: /\b429\b|rate limit/i.test(text) }
+  const own = CODE.exec(text)
+  if (own) return { ending: decode(own[1]!), rateLimited: own[2] !== undefined }
+  const status = httpStatus(text)
+  if (status === 429 || /rate.?limit/i.test(text)) return failed('provider', true)
+  if (/not logged in|signed out/i.test(text)) return failed('codexSignedOut')
+  if (status === 401 || status === 403 || /no api key|missing .*key|api key auth (?:check )?failed/i.test(text)) return failed('keyRejected')
+  if (status !== undefined) return failed('provider')
+  if (/terminated|fetch failed|network|ENOTFOUND|EAI_AGAIN|ECONNRESET|ECONNREFUSED|offline|socket|timed? ?out/i.test(text)) return failed('offline')
+  return failed('provider')
 }
+/** The provider refused the request before doing any work, so it billed nothing. */
+const refused = (failure: ProviderFailure) => failure.rateLimited ||
+  (failure.ending._tag === 'failed' && failure.ending.reason === 'keyRejected')
 export function readRevision(store: Store): Revision {
-  const row = store.db.prepare('SELECT rev, gen, pin_rev FROM memory_head WHERE singleton = 1').get()!
-  return { rev: Number(row.rev), gen: Number(row.gen), pinRev: Number(row.pin_rev) }
+  const row = store.db.prepare('SELECT gen, pin_rev FROM memory_head WHERE singleton = 1').get()!
+  return { gen: Number(row.gen), pinRev: Number(row.pin_rev) }
 }
-const sameRevision = (a: Revision, b: Revision) => a.rev === b.rev && a.gen === b.gen && a.pinRev === b.pinRev
+// Spec `dispatchWith`: a redaction (gen) or a pin change makes a built request stale. A newer view (rev) does not.
+const sameRevision = (a: Revision, b: Revision) => a.gen === b.gen && a.pinRev === b.pinRev
 const hash = (model: Model<Api>, context: Context) => createHash('sha256').update(JSON.stringify([model.provider, model.id, normalizeContext(context).messages])).digest('hex')
 const rendered = (context: Context) => normalizeContext(context).messages.map(message => JSON.stringify(message))
 
@@ -41,14 +66,12 @@ function reservationCost(model: Model<Api>, input: number): number {
   const outputRate = Math.max(...rates.map(rate => rate.output))
   return dollars((input * inputRate + limits.reserve * outputRate) / 1_000_000)
 }
-function failedMessage(model: Model<Api>, error: unknown, partial?: AssistantMessage): AssistantMessage {
-  const failure = providerFailure(error)
-  const ending = failure.ending
+function failedMessage(model: Model<Api>, failure: ProviderFailure, partial?: AssistantMessage): AssistantMessage {
   return {
     role: 'assistant', content: partial?.content ?? [], api: model.api, provider: model.provider, model: model.id,
     usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
     stopReason: 'error', timestamp: Date.now(),
-    errorMessage: `JUNO:${ending._tag}${'reason' in ending ? `:${ending.reason}` : ''}${failure.rateLimited ? ':429' : ''}`,
+    errorMessage: code(failure.ending, failure.rateLimited),
   }
 }
 export interface GuardOptions {
@@ -86,6 +109,7 @@ export function createProviderGuard(options: GuardOptions) {
     void (async () => {
       let reservation: string | undefined
       let partial: AssistantMessage | undefined
+      let started = false
       let bound = 0
       let localFailure: AdmissionError | undefined
       let wirePassed = false
@@ -138,13 +162,16 @@ export function createProviderGuard(options: GuardOptions) {
             return
           }
           partial = event.partial
+          started = true
           outer.push(event)
         }
         throw new Error('terminated')
       } catch (error) {
-        if (reservation) spend.settle(reservation, localFailure && definitelyNotSent ? 0 : undefined)
         const failure = providerFailure(error)
-        const message = failedMessage(requested, error, partial)
+        // Anything else may have been billed: keep the whole reservation.
+        const unbilled = (localFailure && definitelyNotSent) || (!started && refused(failure))
+        if (reservation) spend.settle(reservation, unbilled ? 0 : undefined)
+        const message = failedMessage(requested, failure, partial)
         outer.push({ type: 'error', reason: 'error', error: message })
         outer.end(message)
         options.onFailure?.(failure)
@@ -162,22 +189,23 @@ export function createProviderGuard(options: GuardOptions) {
   return {
     models: publicModels,
     spend,
-    /** Called only by the trusted builder hook, after persisting any emergency merge. One use. */
-    stamp: (request: Request, model: Model<Api>, context?: Context, path: SpendPath = 'chat'): Context => {
-      if (request.kind === 'blocked') throw new AdmissionError(request.reason === 'protocol' ? { _tag: 'interrupted' } : { _tag: 'blocked', reason: 'tooLarge' })
-      const copy = structuredClone(context ?? { messages: request.messages.map(content => ({ role: 'user' as const, content, timestamp: 0 })) })
-      check(model, copy, request)
+    /**
+     * Called only by the trusted builder hook, after persisting any emergency
+     * merge. Pass the admitted `Request` (it is a `Revision`) and the context
+     * built from it. One use.
+     */
+    stamp: (revision: Revision, model: Model<Api>, context: Context, path: SpendPath = 'chat'): Context => {
+      const copy = structuredClone(context)
+      check(model, copy, revision)
       const key = hash(model, copy)
       const pending = stamps.get(key) ?? []
-      pending.push({ revision: { rev: request.rev, gen: request.gen, pinRev: request.pinRev }, path })
+      pending.push({ revision: { gen: revision.gen, pinRev: revision.pinRev }, path })
       stamps.set(key, pending)
       return copy
     },
-    /** The harness uses the same memory admission, but its turns are not billable. */
-    admitHarness: (request: Request, model: Model<Api>): string => {
-      if (request.kind !== 'admitted') throw new AdmissionError({ _tag: 'blocked', reason: 'tooLarge' })
-      const prompt = request.messages.join('\n\n')
-      check(model, { messages: [{ role: 'user', content: prompt, timestamp: 0 }] }, request)
+    /** The Codex harness gets the same memory admission. Its turns are counted, not charged. */
+    admitHarness: (revision: Revision, model: Model<Api>, prompt: string): string => {
+      check(model, { messages: [{ role: 'user', content: prompt, timestamp: 0 }] }, revision)
       return prompt
     },
   }

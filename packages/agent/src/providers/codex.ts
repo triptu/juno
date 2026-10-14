@@ -7,8 +7,7 @@ import { promisify } from 'node:util'
 import { Schema } from 'effect'
 import { Codex } from '@openai/codex-sdk'
 import type { Api, Model } from '@earendil-works/pi-ai'
-import type { Request } from '@juno/agent-memory'
-import { AdmissionError, providerFailure, type ProviderFailure, type ProviderGuardApi } from './guard'
+import { AdmissionError, providerFailure, type ProviderFailure, type ProviderGuardApi, type Revision } from './guard'
 
 const exec = promisify(execFile)
 const Listing = Schema.Struct({ id: Schema.Number, result: Schema.optionalKey(Schema.Unknown) })
@@ -55,13 +54,13 @@ export function createCodexAdapter(options: CodexOptions) {
         let finished = false
         const ids: string[] = []
         const cursors = new Set<string>()
-        const finish = (ids?: readonly string[]) => {
+        const finish = (listed?: readonly string[]) => {
           if (finished) return
           finished = true
           clearTimeout(timer)
           lines.close()
           child.kill()
-          resolveModels(ids)
+          resolveModels(listed)
         }
         const timer = setTimeout(() => finish(), 10_000)
         child.on('error', () => finish())
@@ -90,7 +89,9 @@ export function createCodexAdapter(options: CodexOptions) {
       })
     },
     turn: async (input: {
-      readonly request: Request
+      /** What the builder built the prompt against, such as the admitted `Request`. */
+      readonly revision: Revision
+      readonly prompt: string
       readonly model: Model<Api>
       readonly mcp: { readonly url: string; readonly token: string }
       readonly signal?: AbortSignal
@@ -112,7 +113,7 @@ export function createCodexAdapter(options: CodexOptions) {
         } })
         const thread = codex.startThread({ model: input.model.id, workingDirectory: cwd, skipGitRepoCheck: true,
           sandboxMode: 'read-only', approvalPolicy: 'never', networkAccessEnabled: false, webSearchMode: 'disabled' })
-        const prompt = options.guard.admitHarness(input.request, input.model)
+        const prompt = options.guard.admitHarness(input.revision, input.model, input.prompt)
         input.signal?.throwIfAborted()
         const turnId = options.guard.spend.countCodex(home)
         const stream = await thread.runStreamed(prompt, { signal: input.signal })

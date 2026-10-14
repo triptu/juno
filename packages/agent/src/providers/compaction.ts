@@ -1,4 +1,4 @@
-import { buildRequest, requiredWindow, upper, utf8Bytes, limits } from '@juno/agent-memory'
+import { requiredWindow, upper, utf8Bytes, limits } from '@juno/agent-memory'
 import type { Api, Model, Tool } from '@earendil-works/pi-ai'
 import type { CompactionModel } from '../store/memory'
 import type { Store } from '../store/store'
@@ -29,11 +29,7 @@ export function createCompactionProvider(options: {
         upper(task) + limits.reserve > requiredWindow([], 'compaction')) {
         throw new AdmissionError({ _tag: 'blocked', reason: 'tooLarge' })
       }
-      const revision = readRevision(options.store)
-      const request = buildRequest({ ...revision, pins: { revision: revision.pinRev, active: [] },
-        lines: [], covered: 0, h: 0, cutoff: 0, tail: [], active: [], parents: [],
-        systemAndTools: [...fixed, ...task], contextWindow: model.contextWindow })
-      const context = guard.stamp(request, model, {
+      const context = guard.stamp(readRevision(options.store), model, {
         systemPrompt: options.system, tools: [...options.tools],
         messages: task.map(content => ({ role: 'user', content, timestamp: 0 })),
       }, 'compaction')
