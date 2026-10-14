@@ -223,4 +223,11 @@ const core1 = [
   ) STRICT`,
 ]
 
-export const CORE_MIGRATIONS: MigrationSet = { name: 'core', steps: [core1] }
+const core2 = [
+  // The highest journal position at which an action of this incarnation was authorized. Recovery
+  // never resumes a journal file behind it, so a resumed file always holds the authorized tool
+  // call's execute intent, and pi does not run that call again (spec `authorizedOnce`).
+  'ALTER TABLE incarnations ADD COLUMN authorized_seq INTEGER NOT NULL DEFAULT 0 CHECK (authorized_seq >= 0)',
+]
+
+export const CORE_MIGRATIONS: MigrationSet = { name: 'core', steps: [core1, core2] }

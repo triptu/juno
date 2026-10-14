@@ -25,7 +25,7 @@ What each folder does, and the spec transitions it implements (`specs/agent-reco
 | `store/` | `schema.ts`: the tables, as named migration sets. `database.ts`: open, pragmas, migrate. `ledger.ts`: Pause, AI off, Stop, authorization, attempt, receipt, startup classification. `memory.ts`: memory queue, jobs, publication and the compaction seam | `startup`, `pause`, `cancel`, `authorize`; memory `project`, `start`, `complete`, `publish`, `extend`, `merge`, `failJob` |
 | `inbox/` | `inbox.ts`: owner input, durable before it is acknowledged. `bridge.ts`: reset, submit with `requestId = op_id`, then `submitted` | `acceptInput`, `acknowledge`, `resetBridge`, `submit`, `markSubmitted` |
 | `projection/` | One transaction per pi commit: archive messages (chunks of at most 16 KB), their memory keys, the cursor | `project` |
-| `recovery/` | Incarnations and rotation; the open sequence: journal at or ahead of the archive resumes, behind rotates, newer schema stops | `openJournal`, `rollbackJournal`, `rotate` |
+| `recovery/` | Incarnations and rotation; the open sequence: a journal at or ahead of both the archive cursor and the latest authorized position resumes, behind either rotates, newer schema stops | `openJournal`, `rollbackJournal`, `rotate`; `agent-recovery-replay.qnt` |
 | `runtime/` | The only pi-durable importer: the journal facade, the owner lock, the crash points, the core and its run loop, the Effect service | `acquire`, `collect`, `releaseLock` |
 
 Notes for the work packages that build on it:
@@ -34,6 +34,7 @@ Notes for the work packages that build on it:
 - **The run loop** in `runtime/core.ts` is the simplest router: one op at a time, follow-up order, no steering. WP11's router replaces it and keeps `inbox/bridge.ts`. Never reset while a run is live: pi ends a run when a reset is placed during a tool round.
 - **Compaction.** `runJob(store, key, model, h)` runs one job with a `CompactionModel` (`summarize(task)`); `readyKeys` says which keys may start. WP11's compactor schedules them (8 at once, waking at `due_at`) and calls the model through WP9's providers.
 - **Actions.** `store/ledger.ts` has the parts of the ledger that startup and Pause need. WP15 builds the dispatcher on `authorize`, `recordAttempt` and `recordReceipt` and adds intents, approvals and grants in its own migration set.
+- **Authorizations and replay.** `authorize` takes `position`: read it with `Core.position()` inside the tool's `execute()`, after pi has committed the call's execute intent. It raises the incarnation's `authorized_seq`, and recovery never resumes a journal behind it. So an older copy of the journal that lost the intent rotates instead of running the call, and its effect, again. A tool with an effect keeps pi's default `replay: "unsafe"`; pi then settles a call interrupted after its intent as interrupted, and never runs it twice.
 - **pi internals read.** `durable_metadata.next_seq`, `durable_schema.version` and `entries.commit_seq` are pi-internal. Juno adds its own `juno_incarnation` table and an index on `entries (conversation_id, commit_seq)` to the journal file. The crash tests fail if pi renames them.
 
 ## Crash points

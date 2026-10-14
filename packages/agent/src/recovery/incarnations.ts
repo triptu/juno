@@ -59,6 +59,15 @@ export function deleteRetiredJournals(agentDir: string, current: string): void {
   }
 }
 
+/**
+ * The lowest last commit a journal of this incarnation may have and resume:
+ * the archive cursor, or the position of its latest authorization if higher.
+ */
+export function resumeFloor(store: Store, incarnation: string): number {
+  const row = store.db.prepare('SELECT max(cursor, authorized_seq) AS floor FROM incarnations WHERE id = ?').get(incarnation) as { floor: number } | undefined
+  return row?.floor ?? 0
+}
+
 export function incarnations(store: Store): ReadonlyArray<{ readonly id: string; readonly cursor: number; readonly retiredReason: RetireReason | null }> {
   return store.db.prepare('SELECT id, cursor, retired_reason AS retiredReason FROM incarnations ORDER BY rowid').all() as Array<{
     id: string

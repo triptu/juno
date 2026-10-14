@@ -1,15 +1,18 @@
 // The agent's durable core as a process for the crash tests. Opens the core
 // on a directory (recovery runs), runs the commands, prints its state as JSON
 // and closes. The model is the scripted fake; every chat request is answered
-// "Reply <n>." unless `hang` makes it wait forever.
+// "Reply <n>." unless `hang` makes it wait forever, or `tool` makes the first
+// answer a call to the tool `act`. `act` authorizes one action, sends it and
+// records a receipt; `killBeforeTool` kills the process before pi commits the
+// call's execute intent.
 //
 //   node --import scripts/ts-resolve-hooks.mjs program.ts <dir> [command...]
 //
-// Commands: send:<op>:<text>  idle  pause  resume  off  rotate  hang
+// Commands: send:<op>:<text>  idle  pause  resume  off  rotate  hang  tool  killBeforeTool
 //           authorize:<intent>  attempt  compact  killWhenRunning:<op>  hold
-import { fakeProvider, reply } from '@juno/agent-testing'
-import { openCore } from '../../src/runtime/core'
-import { authorize, outcomes, recordAttempt } from '../../src/store/ledger'
+import { fakeProvider, reply, testTool } from '@juno/agent-testing'
+import { openCore, type Core } from '../../src/runtime/core'
+import { authorize, outcomes, recordAttempt, recordReceipt } from '../../src/store/ledger'
 import { ops } from '../../src/inbox/inbox'
 import { incarnations } from '../../src/recovery/incarnations'
 import { readyKeys, runJob, view } from '../../src/store/memory'
@@ -20,11 +23,12 @@ if (dir === undefined) throw new Error('usage: program.ts <dir> [command...]')
 const fake = fakeProvider()
 let hang = commands.includes('hang')
 let replies = 0
-fake.script(
-  Array.from({ length: 64 }, () =>
+fake.script([
+  ...(commands.includes('tool') ? [reply({ type: 'toolCall', id: 'call-1', name: 'act', arguments: {} })] : []),
+  ...Array.from({ length: 64 }, () =>
     reply(() => (hang ? new Promise<never>(() => {}) : Promise.resolve(answer(`Reply ${++replies}.`)))),
   ),
-)
+])
 // The fake's `reply` builds the message itself for a plain string; a factory must return one.
 function answer(text: string) {
   return { role: 'assistant', content: [{ type: 'text', text }], api: 'faux', provider: 'openrouter', model: 'anthropic/claude-sonnet-5.5',
@@ -32,16 +36,38 @@ function answer(text: string) {
     stopReason: 'stop', timestamp: Date.now() } as never
 }
 
+// pi may run a resumed tool call before openCore returns.
+let ready: (core: Core) => void
+const opened = new Promise<Core>((resolve) => (ready = resolve))
+let toolRuns = 0
+const act = testTool({
+  name: 'act',
+  beforeTool: () => {
+    if (commands.includes('killBeforeTool')) process.kill(process.pid, 'SIGKILL')
+  },
+  execute: async () => {
+    toolRuns += 1
+    const core = await opened
+    const result = authorize(core.store, { intentId: 'act', approvalId: 'approval-1', position: await core.position() })
+    if (result._tag !== 'authorized') return `Refused: ${result.reason}.`
+    const attempt = recordAttempt(core.store, result.id)
+    if (attempt !== undefined) recordReceipt(core.store, attempt, { ok: true })
+    return 'Done.'
+  },
+})
+
 const core = await openCore({
   agentDir: dir,
   models: fake.models,
   model: { provider: 'openrouter', modelId: 'anthropic/claude-sonnet-5.5' },
+  extensions: [act],
 })
 if (core._tag === 'updateNeeded') {
   console.log(JSON.stringify({ state: 'updateNeeded' }))
   await core.close()
   process.exit(0)
 }
+ready!(core)
 
 let lastAuthorization: string | undefined
 const results: unknown[] = []
@@ -59,8 +85,9 @@ for (const command of commands) {
     case 'off': core.setMode('off'); break
     case 'rotate': await core.rotate(); break
     case 'hang': hang = true; break
+    case 'tool': case 'killBeforeTool': break
     case 'authorize': {
-      const result = authorize(core.store, { intentId: rest[0]!, approvalId: 'approval-1' })
+      const result = authorize(core.store, { intentId: rest[0]!, approvalId: 'approval-1', position: await core.position() })
       if (result._tag === 'authorized') lastAuthorization = result.id
       results.push(result._tag === 'authorized' ? 'authorized' : result.reason)
       break
@@ -118,6 +145,7 @@ const summary = {
   inbox: ops(core.store).map((op) => ({ opId: op.opId, state: op.state, ...(op.reason ? { reason: op.reason } : {}) })),
   messages: core.store.db.prepare('SELECT id, kind, text, origin_op AS origin, incarnation FROM messages ORDER BY id').all(),
   authorizations: outcomes(core.store).map((row) => row.outcome),
+  toolRuns,
   memory: { rev: memory.rev, covered: memory.covered, lines: memory.lines.length, queued: (core.store.db.prepare('SELECT count(*) AS n FROM queue').get() as { n: number }).n },
   chatRequests: fake.requests.filter((r) => r.model === 'anthropic/claude-sonnet-5.5').length,
   compactionRequests: fake.requests.filter((r) => r.model === 'anthropic/claude-haiku-5.5').length,
