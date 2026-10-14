@@ -6,6 +6,7 @@ import { Hash } from '@phosphor-icons/react/dist/icons/Hash'
 import { Lightbulb } from '@phosphor-icons/react/dist/icons/Lightbulb'
 import { ListBullets } from '@phosphor-icons/react/dist/icons/ListBullets'
 import { Lock } from '@phosphor-icons/react/dist/icons/Lock'
+import { NotePencil } from '@phosphor-icons/react/dist/icons/NotePencil'
 import { Plus } from '@phosphor-icons/react/dist/icons/Plus'
 import { Sparkle } from '@phosphor-icons/react/dist/icons/Sparkle'
 import { User } from '@phosphor-icons/react/dist/icons/User'
@@ -15,7 +16,7 @@ import { colors } from '@juno/tokens/tokens.stylex'
 import { EmptyState, IconButton, Tab, TabStrip, type ActivateEvent, type PhosphorIcon } from '@juno/ui'
 
 /** The icon a tab shows: the channel kind for a topic, the page's own icon otherwise. */
-export type WorkspaceTabIcon = 'hash' | 'lock' | 'user' | 'users' | 'all-topics' | 'for-you' | 'juno' | 'notifications' | 'preferences'
+export type WorkspaceTabIcon = 'hash' | 'lock' | 'user' | 'users' | 'new-chat' | 'all-topics' | 'for-you' | 'juno' | 'notifications' | 'preferences'
 
 export interface WorkspaceTab {
   readonly id: string
@@ -26,6 +27,10 @@ export interface WorkspaceTab {
   readonly stealth?: boolean
   /** The topic's art, drawn in the 15px icon slot instead of the icon. */
   readonly art?: ReactNode
+  /** Pinned: first in the strip, icon only, no close button. */
+  readonly pinned?: boolean
+  /** The topic has unread messages: the soft grey dot, on inactive tabs only. */
+  readonly unread?: boolean
 }
 
 export interface WorkspaceProps {
@@ -35,12 +40,16 @@ export interface WorkspaceProps {
   /** Fires on mouse down; `event.metaKey` asks for a new tab. */
   readonly onSelectTab?: (id: string, event: ActivateEvent) => void
   readonly onCloseTab?: (id: string) => void
-  /** The "New tab" button opens search, or All topics until M9. */
+  /** The "+" button: a New chat in a new tab. */
   readonly onNewTab?: () => void
-  /** Right-click on a topic tab: the row context menu. Page tabs have none. */
+  /** Right-click on a tab: the tab menu. */
   readonly onTabContextMenu?: (id: string, event: MouseEvent<HTMLDivElement>) => void
-  /** The active tab's page. Nothing open shows the empty state. */
+  /** Before the tabs while the sidebar is hidden: Show sidebar, Back and Forward. */
+  readonly leading?: ReactNode
+  /** The open pages, the hidden ones included. Nothing here shows the empty state. */
   readonly children?: ReactNode
+  /** Shows the empty state over hidden pages: the active tab has no page yet (a New chat until it is built). */
+  readonly nothingShown?: boolean
 }
 
 const icons: Record<WorkspaceTabIcon, PhosphorIcon> = {
@@ -48,6 +57,7 @@ const icons: Record<WorkspaceTabIcon, PhosphorIcon> = {
   lock: Lock,
   user: User,
   users: Users,
+  'new-chat': NotePencil,
   'all-topics': ListBullets,
   'for-you': Lightbulb,
   juno: Sparkle,
@@ -76,11 +86,13 @@ function stepIndex(key: string, index: number, count: number): number | undefine
 /**
  * The right pane: the tab strip (a window drag region) over the page.
  * Tabs carry the kind icon or the topic's art in a fixed slot, the eye-off
- * in stealth, the title and a close button; "+" opens search (All topics until M9). The
+ * in stealth, the title, the unread dot and a close button; pinned tabs
+ * come first as icons. "+" opens a New chat in a new tab. While the
+ * sidebar is hidden, `leading` holds its controls. The
  * strip is an APG tablist: the active tab is the one Tab stop, the arrow
  * keys select its neighbours, Delete closes it.
  */
-export function Workspace({ tabs = [], activeId, onSelectTab, onCloseTab, onNewTab, onTabContextMenu, children }: WorkspaceProps) {
+export function Workspace({ tabs = [], activeId, onSelectTab, onCloseTab, onNewTab, onTabContextMenu, leading, children, nothingShown = false }: WorkspaceProps) {
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (onSelectTab === undefined || !(event.target instanceof HTMLElement) || event.target.getAttribute('role') !== 'tab') return
     const next = stepIndex(event.key, tabs.findIndex((tab) => tab.id === activeId), tabs.length)
@@ -91,7 +103,7 @@ export function Workspace({ tabs = [], activeId, onSelectTab, onCloseTab, onNewT
   }
   return (
     <section aria-label="Workspace" {...stylex.props(styles.root)}>
-      <TabStrip onKeyDown={onKeyDown} trailing={<IconButton icon={Plus} label="New tab" size={28} iconSize={16} tone="muted" onClick={onNewTab} />}>
+      <TabStrip onKeyDown={onKeyDown} leading={leading} trailing={<IconButton icon={Plus} label="New chat ⌘T" size={28} iconSize={16} tone="muted" onClick={onNewTab} />}>
         {tabs.map((tab) => (
           <Tab
             key={tab.id}
@@ -100,18 +112,21 @@ export function Workspace({ tabs = [], activeId, onSelectTab, onCloseTab, onNewT
             label={tab.title}
             {...(tab.stealth ? { description: 'Stealth' } : {})}
             active={tab.id === activeId}
+            pinned={tab.pinned === true}
+            unread={tab.unread === true}
             onSelect={onSelectTab === undefined ? undefined : (event) => onSelectTab(tab.id, event)}
-            onClose={onCloseTab === undefined ? undefined : () => onCloseTab(tab.id)}
+            onClose={onCloseTab === undefined || tab.pinned === true ? undefined : () => onCloseTab(tab.id)}
             onContextMenu={onTabContextMenu === undefined ? undefined : (event) => onTabContextMenu(tab.id, event)}
           />
         ))}
       </TabStrip>
       <main {...stylex.props(styles.page)}>
-        {children ?? (
+        {children}
+        {children == null || nothingShown ? (
           <div {...stylex.props(styles.empty)}>
             <EmptyState variant="workspace" illustration="nothing-open" title="Nothing open yet" body="Pick a topic on the left." padding="page" />
           </div>
-        )}
+        ) : null}
       </main>
     </section>
   )

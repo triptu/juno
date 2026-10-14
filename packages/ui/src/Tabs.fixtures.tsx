@@ -1,6 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import { EyeSlash } from '@phosphor-icons/react/dist/icons/EyeSlash'
 import { Hash } from '@phosphor-icons/react/dist/icons/Hash'
+import { House } from '@phosphor-icons/react/dist/icons/House'
 import { Lightbulb } from '@phosphor-icons/react/dist/icons/Lightbulb'
 import { ListBullets } from '@phosphor-icons/react/dist/icons/ListBullets'
 import { Lock } from '@phosphor-icons/react/dist/icons/Lock'
@@ -77,6 +78,26 @@ export default defineFixtures(
       ),
       'thirty-seven': scene(() => <ThirtySeven />),
       'thirty-seven-narrow': scene(() => <ThirtySeven />, { width: 336 }),
+      'pinned-and-unread': scene(() => (
+        <TabStrip trailing={newTab}>
+          <Tab icon={House} label="Home" pinned />
+          <Tab icon={Hash} label="Rina Sato · Staff backend" pinned unread />
+          <Tab icon={Hash} label="Postgres 16 migration plan" active onClose={() => {}} />
+          <Tab icon={Hash} label="design-review" unread onClose={() => {}} />
+          <Tab icon={ListBullets} label="All topics" onClose={() => {}} />
+        </TabStrip>
+      )),
+      'unread-narrow': scene(
+        () => (
+          <TabStrip trailing={newTab}>
+            <Tab icon={Hash} label="Postgres 16 migration plan" unread onClose={() => {}} />
+            <Tab icon={Lock} label="Rina Sato · Staff backend" unread onClose={() => {}} />
+            <Tab icon={Hash} label="Q4 roadmap cuts" active unread onClose={() => {}} />
+            <Tab icon={Hash} label="Staging bill doubled since August" onClose={() => {}} />
+          </TabStrip>
+        ),
+        { width: 480 },
+      ),
       stealth: scene(() => (
         <TabStrip trailing={newTab}>
           <Tab icon={Hash} label="eng" onClose={() => {}} />
@@ -93,6 +114,15 @@ export default defineFixtures(
     Interaction: {
       hover: scene(() => <StripWithPage />, { height: 160, hover: '[role="tab"]:nth-of-type(1)' }),
       'close-hover': scene(() => <StripWithPage />, { height: 160, hover: '[role="tab"]:nth-of-type(2) button' }),
+      'pinned-hover': scene(
+        () => (
+          <TabStrip trailing={newTab}>
+            <Tab icon={House} label="Home" pinned />
+            <Tab icon={Hash} label="Postgres 16 migration plan" active onClose={() => {}} />
+          </TabStrip>
+        ),
+        { hover: '[role="tab"]:nth-of-type(1)' },
+      ),
       'narrow-hover': scene(() => <ThirtySeven />, { hover: '[role="tab"]:nth-of-type(33)' }),
       'narrow-focus-close': scene(() => <ThirtySeven />, { focus: '[role="tab"]:nth-of-type(34) button' }),
     },

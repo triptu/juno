@@ -42,6 +42,8 @@ export interface SidebarScope {
 }
 
 export interface SidebarProps {
+  /** After the traffic lights: Hide sidebar, Back and Forward (`TitlebarNav`). */
+  readonly titlebarLeading?: ReactNode
   readonly account: SidebarAccount
   readonly theme: ThemeName
   readonly forYouCount: number
@@ -79,6 +81,7 @@ export interface SidebarProps {
  * owner renders into it.
  */
 export function Sidebar({
+  titlebarLeading,
   account,
   theme,
   forYouCount,
@@ -107,6 +110,7 @@ export function Sidebar({
   return (
     <aside aria-label="Sidebar" {...stylex.props(styles.root)}>
       <header aria-label="Sidebar title bar" {...stylex.props(styles.titlebar)}>
+        {titlebarLeading}
         <div {...stylex.props(styles.icons)}>
           <IconButton icon={MagnifyingGlass} label="Search ⌘K" size={30} onClick={onSearch} />
           <IconButton icon={Hash} label="Browse channels and people" size={30} onClick={onBrowse} />
@@ -249,21 +253,23 @@ const styles = stylex.create({
     color: colors['--foreground-default'],
     userSelect: 'none',
   },
-  // The traffic lights sit at the left of this strip (main positions them);
-  // the strip drags the window and the buttons inside opt out.
+  // The traffic lights sit at the left of this strip (main positions them),
+  // then the leading controls; the strip drags the window and the buttons
+  // inside opt out.
   titlebar: {
     display: 'flex',
     alignItems: 'center',
-    justifyContent: 'flex-end',
+    justifyContent: 'space-between',
     flexShrink: 0,
     height: layout['--titlebar-height'],
-    paddingInlineStart: spacing['--space-4'],
+    paddingInlineStart: layout['--titlebar-lights-inset'],
     paddingInlineEnd: spacing['--space-2-5'],
     WebkitAppRegion: 'drag',
   },
   icons: {
     display: 'flex',
     alignItems: 'center',
+    marginInlineStart: 'auto',
     gap: spacing['--space-0-5'],
   },
   account: {

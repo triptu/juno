@@ -21,6 +21,7 @@ import SignInView from './SignInView.fixtures'
 import Shell from './Shell.fixtures'
 import Sidebar from './Sidebar.fixtures'
 import ThreadLink from './ThreadLink.fixtures'
+import TitlebarNav from './TitlebarNav.fixtures'
 import TopicHeader from './TopicHeader.fixtures'
 import TopicRow from './TopicRow.fixtures'
 import TopicView from './TopicView.fixtures'
@@ -89,6 +90,7 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   StatusBubble,
   TaskCard: taskCard,
   ThreadLink,
+  TitlebarNav,
   TopicsCard: topicsCardSet,
   TopicHeader,
   TopicRow,

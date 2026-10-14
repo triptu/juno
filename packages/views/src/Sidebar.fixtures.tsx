@@ -5,6 +5,7 @@ import { EngineNotice } from './EngineStatusView'
 import { hostileIds, newThreadsById, NOW, pinnedIds, recentIds, rows, rowsById } from './fixtures/topics'
 import { Sidebar, type SidebarProps } from './Sidebar'
 import { relativeTime } from './time'
+import { TitlebarNav } from './TitlebarNav'
 import { TopicList, type TopicListProps } from './TopicList'
 import { TopicRow } from './TopicRow'
 
@@ -13,6 +14,7 @@ const noop = () => {}
 const account = { name: 'Tushar', initials: 'T', hue: 'cyan' } as const
 
 const chrome: Omit<SidebarProps, 'children'> = {
+  titlebarLeading: <TitlebarNav sidebarHidden={false} canGoBack canGoForward={false} onToggleSidebar={noop} onBack={noop} onForward={noop} />,
   account,
   theme: 'light',
   forYouCount: 5,

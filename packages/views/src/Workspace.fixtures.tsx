@@ -4,6 +4,7 @@ import { details, main, mainDividerBefore, thread } from './fixtures/messages'
 import { NOW } from './fixtures/topics'
 import { MessageList } from './MessageList'
 import { TopicHeader } from './TopicHeader'
+import { TitlebarNav } from './TitlebarNav'
 import { TopicView } from './TopicView'
 import { Workspace, type WorkspaceProps, type WorkspaceTab } from './Workspace'
 
@@ -16,7 +17,14 @@ const tabs = {
   hiring: { id: 'C0HIRING:1760000000.000300', title: 'Rina Sato · Staff backend', icon: 'lock', stealth: true } satisfies WorkspaceTab,
   maya: { id: 'D0MAYA:1759990000.000500', title: 'Offsite: Wednesday afternoon slot', icon: 'user' } satisfies WorkspaceTab,
   forYou: { id: 'page:for-you', title: 'For you', icon: 'for-you' } satisfies WorkspaceTab,
+  pinnedEng: { id: 'tab-pinned-eng', title: 'eng', icon: 'hash', pinned: true } satisfies WorkspaceTab,
+  pinnedMaya: { id: 'tab-pinned-maya', title: 'Offsite: Wednesday afternoon slot', icon: 'user', pinned: true, unread: true } satisfies WorkspaceTab,
+  densityUnread: { id: 'tab-density-unread', title: 'Thread list density', icon: 'hash', unread: true } satisfies WorkspaceTab,
+  newChat: { id: 'tab-new-chat', title: 'New chat', icon: 'new-chat' } satisfies WorkspaceTab,
 } as const
+
+const browserTabs = [tabs.pinnedEng, tabs.pinnedMaya, tabs.postgres, tabs.densityUnread, tabs.hiring]
+const sidebarControls = <TitlebarNav sidebarHidden canGoBack canGoForward={false} onToggleSidebar={noop} onBack={noop} onForward={noop} />
 
 /** Thirty-seven topic tabs, the last one active, so the strip has to scroll to show it. */
 const thirtySeven: ReadonlyArray<WorkspaceTab> = Array.from({ length: 37 }, (_, index) => {
@@ -59,13 +67,18 @@ export default defineFixtures(
       'stealth-tab': workspace({ tabs: [tabs.eng, tabs.density, tabs.hiring], activeId: tabs.hiring.id }, postgresPage),
       'many-tabs': workspace({ tabs: [tabs.postgres, tabs.hiring, tabs.eng, tabs.density, tabs.maya, tabs.forYou], activeId: tabs.eng.id }, engPage),
       'minimum-window': workspace({ tabs: [tabs.postgres, tabs.hiring, tabs.eng, tabs.density, tabs.maya], activeId: tabs.eng.id }, engPage, { width: 720, height: 480 }),
+      'pinned-and-unread': workspace({ tabs: browserTabs, activeId: tabs.postgres.id }, postgresPage),
+      'pinned-active': workspace({ tabs: browserTabs, activeId: tabs.pinnedEng.id }, engPage),
+      'new-chat-tab': workspace({ tabs: [tabs.postgres, tabs.newChat], activeId: tabs.newChat.id }),
+      'sidebar-hidden': workspace({ tabs: browserTabs, activeId: tabs.postgres.id, leading: sidebarControls }, postgresPage),
+      'sidebar-hidden-minimum-window': workspace({ tabs: browserTabs, activeId: tabs.postgres.id, leading: sidebarControls }, postgresPage, { width: 720, height: 480 }),
       'thirty-seven-tabs': workspace({ tabs: thirtySeven, ...(lastTab === undefined ? {} : { activeId: lastTab }) }, postgresPage),
       'thirty-seven-tabs-minimum-window': workspace({ tabs: thirtySeven, ...(lastTab === undefined ? {} : { activeId: lastTab }) }, postgresPage, { width: 720, height: 480 }),
     },
     Interaction: {
       'hover-tab': workspace({}, postgresPage, { hover: '[role="tab"]:nth-of-type(2)' }),
       'hover-close': workspace({}, postgresPage, { hover: '[role="tab"]:nth-of-type(1) button' }),
-      'hover-new-tab': workspace({}, postgresPage, { hover: '[aria-label="New tab"]' }),
+      'hover-new-tab': workspace({}, postgresPage, { hover: '[aria-label="New chat ⌘T"]' }),
       'focus-tab': workspace({}, postgresPage, { focus: '[role="tab"]:nth-of-type(2)' }),
     },
   },

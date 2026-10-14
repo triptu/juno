@@ -17,8 +17,18 @@ const HOVER = '@media (hover: hover)'
 // the breakpoint is a constant here.
 const NARROW_TAB = '@container tab (max-width: 140px)'
 
+// The pinned tab's unread dot sits over the icon's top-right corner with a
+// 1.5px ring in the strip's colour (inventory 4). One-off sizes.
+const PINNED_DOT_RING = '1.5px'
+const PINNED_DOT_OFFSET = '-2px'
+
 export interface TabStripProps {
   readonly label?: string
+  /**
+   * Controls before the tabs, after the traffic lights' space: Show
+   * sidebar, Back and Forward while the sidebar is hidden.
+   */
+  readonly leading?: ReactNode
   /** The new-tab button, after the scroller, so it never leaves the screen. */
   readonly trailing?: ReactNode
   /**
@@ -35,9 +45,10 @@ export interface TabStripProps {
  * a horizontal scroller with no visible scrollbar; the active tab scrolls
  * itself into view when it changes, like browser tabs.
  */
-export function TabStrip({ label = 'Tabs', trailing, onKeyDown, children }: TabStripProps) {
+export function TabStrip({ label = 'Tabs', leading, trailing, onKeyDown, children }: TabStripProps) {
   return (
-    <div data-tab-strip="" {...stylex.props(styles.strip)}>
+    <div data-tab-strip="" {...stylex.props(styles.strip, leading !== undefined && styles.stripLeading)}>
+      {leading !== undefined ? <span {...stylex.props(styles.leading)}>{leading}</span> : null}
       <div role="tablist" aria-label={label} onKeyDown={onKeyDown} {...stylex.props(styles.scroller)}>
         {children}
       </div>
@@ -62,6 +73,14 @@ export interface TabProps {
   /** Read after the label by assistive technology, for a state the icon shows ("Stealth"). */
   readonly description?: string
   readonly active?: boolean
+  /** A pinned tab: 40px, the icon alone, the label as its name and tooltip. Give it no `onClose`. */
+  readonly pinned?: boolean
+  /**
+   * The topic has unread messages: a soft grey dot after the label, or at
+   * the icon's corner on a pinned tab. Never shown on the active tab, which
+   * marks read when it opens.
+   */
+  readonly unread?: boolean
   /** Fires on mouse down (see internal/activate.ts); `metaKey` for ⌘-click. */
   readonly onSelect?: (event: ActivateEvent) => void
   readonly onClose?: () => void
@@ -89,7 +108,7 @@ function focusTarget(tab: HTMLElement): HTMLElement | undefined {
  * active: tab switches do not animate and a filled set is too heavy in a
  * strip.
  */
-export function Tab({ icon, leading, label, description, active = false, onSelect, onClose, onContextMenu, closeLabel = 'Close tab' }: TabProps) {
+export function Tab({ icon, leading, label, description, active = false, pinned = false, unread = false, onSelect, onClose, onContextMenu, closeLabel = 'Close tab' }: TabProps) {
   const ref = useRef<HTMLDivElement>(null)
 
   useLayoutEffect(() => {
@@ -116,24 +135,39 @@ export function Tab({ icon, leading, label, description, active = false, onSelec
     activate.onKeyDown(event)
   }
 
+  const dot = unread && !active
+  const describedAs = [description, dot ? 'Unread' : undefined].filter((part) => part !== undefined).join(', ')
+
   return (
     <div
       ref={ref}
       role="tab"
       tabIndex={active ? 0 : -1}
       aria-selected={active}
-      aria-description={description}
+      aria-description={describedAs === '' ? undefined : describedAs}
+      aria-label={pinned ? label : undefined}
+      data-pinned={pinned ? '' : undefined}
+      data-unread={dot ? '' : undefined}
       title={label}
       onContextMenu={onContextMenu}
       onPointerDown={activate.onPointerDown}
       onClick={activate.onClick}
       onKeyDown={onKeyDown}
-      {...stylex.props(interactive.focusRingInset, styles.tab, typeVariants.ui, active ? styles.tabActive : styles.tabInactive)}
+      {...stylex.props(interactive.focusRingInset, styles.tab, typeVariants.ui, active ? styles.tabActive : styles.tabInactive, pinned && styles.tabPinned)}
     >
-      <span {...stylex.props(styles.iconSlot)}>{leading ?? <Icon icon={icon} size={15} dim />}</span>
-      <span dir="auto" {...stylex.props(styles.label)}>
-        {label}
+      <span {...stylex.props(styles.iconSlot, pinned && styles.iconSlotPinned)}>
+        {leading ?? <Icon icon={icon} size={15} dim />}
+        {pinned ? <span aria-hidden {...stylex.props(styles.pinnedDot, dot && styles.dotShown)} /> : null}
       </span>
+      {pinned ? null : (
+        <>
+          <span dir="auto" {...stylex.props(styles.label)}>
+            {label}
+          </span>
+          {/* The dot's slot is always kept, so a dot that comes or goes never moves the label's end. */}
+          <span aria-hidden {...stylex.props(styles.dot, dot && styles.dotShown)} />
+        </>
+      )}
       {onClose ? (
         <span {...stylex.props(styles.close, !active && styles.closeInactive)}>
           <IconButton
@@ -171,6 +205,19 @@ const styles = stylex.create({
     borderBottomColor: colors['--border-default'],
     userSelect: 'none',
     WebkitAppRegion: 'drag',
+  },
+  // With the sidebar hidden the strip starts after the traffic lights.
+  stripLeading: {
+    paddingInlineStart: layout['--titlebar-lights-inset'],
+  },
+  leading: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: spacing['--space-0-5'],
+    flexShrink: 0,
+    alignSelf: 'center',
+    marginInlineEnd: spacing['--space-2'],
+    WebkitAppRegion: 'no-drag',
   },
   // The tabs scroll sideways inside the strip. The scroller hangs 1px over
   // the strip's bottom border so the active tab can paint across it.
@@ -243,7 +290,17 @@ const styles = stylex.create({
       ':focus-within': '1',
     },
   },
+  // Icon only, centred, at a fixed width that never shrinks.
+  tabPinned: {
+    flexBasis: layout['--tab-pinned-width'],
+    flexShrink: 0,
+    minWidth: layout['--tab-pinned-width'],
+    width: layout['--tab-pinned-width'],
+    justifyContent: 'center',
+    paddingInline: 0,
+  },
   iconSlot: {
+    position: 'relative',
     display: 'inline-flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -251,6 +308,32 @@ const styles = stylex.create({
     width: sizes['--icon-16'],
     height: sizes['--icon-16'],
     overflow: 'hidden',
+  },
+  iconSlotPinned: {
+    overflow: 'visible',
+  },
+  dot: {
+    flexShrink: 0,
+    width: sizes['--tab-unread-dot'],
+    height: sizes['--tab-unread-dot'],
+    borderRadius: radii['--radius-full'],
+    backgroundColor: colors['--foreground-muted'],
+    opacity: 0,
+  },
+  // At the icon's top-right corner, ringed in the strip's colour so it reads apart from the icon.
+  pinnedDot: {
+    position: 'absolute',
+    top: PINNED_DOT_OFFSET,
+    right: PINNED_DOT_OFFSET,
+    width: sizes['--tab-unread-dot'],
+    height: sizes['--tab-unread-dot'],
+    borderRadius: radii['--radius-full'],
+    backgroundColor: colors['--foreground-muted'],
+    boxShadow: `0 0 0 ${PINNED_DOT_RING} ${colors['--background-subtle']}`,
+    opacity: 0,
+  },
+  dotShown: {
+    opacity: 1,
   },
   label: {
     flexGrow: 1,
