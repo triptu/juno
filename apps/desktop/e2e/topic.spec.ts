@@ -65,6 +65,11 @@ test('Main shows thread links; a link opens the thread in the tab, and Threads l
   await threads.subscribe(CHECKOUT)
   await juno.sidebar.row(CHECKOUT).expectVisible()
 
+  // Escape with focus inside the list (on the bell just pressed) puts focus back on the Threads button.
+  await juno.win.keyboard.press('Escape')
+  await expect(threads.root).toHaveCount(0)
+  await expect(juno.topic.threadsButton).toBeFocused()
+
   // From the keyboard: Tab reaches the rows, which are buttons named by their title; Escape returns to the Threads button.
   threads = await juno.topic.openThreadsWithKeyboard()
   await juno.win.keyboard.press('Tab')

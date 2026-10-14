@@ -930,7 +930,7 @@ export class TabStrip {
 
   /** The "+" after the last tab. */
   get newMessageButton() {
-    return this.win.getByRole('button', { name: 'New message', exact: true })
+    return this.win.getByRole('region', { name: 'Workspace' }).getByRole('button', { name: 'New message', exact: true })
   }
 
   /** An item of the app menu, as ⌘W, ⌘⇧] or ⌘⇧[ would choose it. */
