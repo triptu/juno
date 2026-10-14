@@ -317,7 +317,6 @@ const THREAD_LABEL_MAX = '260px'
 /** The open list's height before it scrolls. */
 const LIST_MAX_HEIGHT = '360px'
 
-const HOVER = '@media (hover: hover)'
 
 const styles = stylex.create({
   row: {
@@ -348,9 +347,8 @@ const styles = stylex.create({
     outlineOffset: sizes['--focus-ring-offset'],
     outlineColor: accent['--focus-ring'],
     transform: { default: 'none', ':active': `scale(${motion['--press-scale']})` },
-    transitionProperty: 'transform, filter',
+    transitionProperty: 'transform',
     transitionDuration: { default: motion['--duration-fast'], '@media (prefers-reduced-motion: reduce)': '0ms' },
-    filter: { default: 'none', ':hover': { default: null, [HOVER]: 'brightness(0.97)' } },
   },
   unset: {
     color: colors['--foreground-subtle'],
