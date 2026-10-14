@@ -80,6 +80,12 @@ function raw() {
   }
 }
 
+function setCursor(value: number): void {
+  const agent = open('agent.sqlite')
+  agent.prepare('UPDATE incarnations SET cursor = ? WHERE retired_at IS NULL').run(value)
+  agent.close()
+}
+
 const userMessages = (state: State, op: string) => state.messages.filter((m) => m.kind === 'user' && m.origin === op)
 
 it('inbox.committed: the op is durable before it is acknowledged, and runs once after a restart', async () => {
@@ -217,11 +223,6 @@ it('rollback: a journal behind the archive is never resumed; a new incarnation s
 
 it('next_seq: a journal whose last commit equals the cursor resumes; one position behind rotates', async () => {
   await run('send:op-1:hello', 'idle')
-  const setCursor = (value: number) => {
-    const agent = open('agent.sqlite')
-    agent.prepare('UPDATE incarnations SET cursor = ? WHERE retired_at IS NULL').run(value)
-    agent.close()
-  }
   // The last committed position is next_seq - 1, so equal is not behind.
   setCursor(raw().journal!.lastCommitted)
   expect((await run()).opened).toBe('resumed')
