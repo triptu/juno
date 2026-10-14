@@ -50,6 +50,25 @@ test('opening, ⌘-click, focusing an open topic and closing to the neighbour', 
   await juno.expectNothingOpen()
 })
 
+test('closing a tab from the keyboard leaves focus in the strip', async ({ juno }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  const { sidebar, tabs } = juno
+  await sidebar.row(POSTGRES).open()
+  await sidebar.row(RINA).openInNewTab()
+  await sidebar.row(ROADMAP).openInNewTab()
+
+  // The tab that slides into the closed one's place takes focus, so the next Tab goes on from the strip.
+  await tabs.closeWithKeyboard(RINA)
+  await tabs.expectCount(2)
+  await tabs.expectFocused(ROADMAP)
+  await tabs.closeWithKeyboard(ROADMAP)
+  await tabs.expectFocused(POSTGRES)
+  await tabs.closeWithKeyboard(POSTGRES)
+  await tabs.expectCount(0)
+  await expect(tabs.newMessageButton).toBeFocused()
+})
+
 test('the app menu closes the tab and moves between tabs', async ({ juno }) => {
   await juno.signIn()
   await juno.waitForSync()

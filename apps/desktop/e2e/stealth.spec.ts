@@ -1,6 +1,6 @@
 // Stealth: a topic opened from the row menu's "Open in stealth" is never
 // marked read, here or in Slack, until its Mark read.
-import { test } from './fixtures'
+import { expect, test } from './fixtures'
 
 test.describe.configure({ timeout: 90_000 })
 
@@ -23,7 +23,9 @@ test('a stealth tab keeps the topic unread and sends no mark; Mark read ends ste
   await rina.expectUnread(3)
   await slack.expectNoMarks()
 
-  await juno.topic.markRead()
+  // From the keyboard: the button goes away, and focus moves on to the bell rather than the top of the window.
+  await juno.topic.markReadWithKeyboard()
+  await expect(juno.topic.bell).toBeFocused()
   await rina.expectRead()
   await juno.tabs.expectStealth(RINA, false)
   await juno.topic.expectStealth(false)

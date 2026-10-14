@@ -21,6 +21,40 @@ export async function press(win: Page): Promise<void> {
   await win.mouse.up()
 }
 
+/** Mouse moves per pointing gesture, so the pointer travels as a hand moves it rather than jumping. */
+const POINT_STEPS = 4
+
+/**
+ * Points at an element: real stepped mouse moves, then waits until the
+ * element matches `:hover`. If hover did not land, or was taken back,
+ * it moves again, up to three times, then fails with what is hovered.
+ * `position` is relative to the element's box, default its centre.
+ */
+export async function pointAt(win: Page, target: Locator, position?: { readonly x: number; readonly y: number }): Promise<void> {
+  await target.scrollIntoViewIfNeeded()
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const box = await target.boundingBox()
+    if (!box) throw new Error('Nothing on screen to point at')
+    const x = box.x + (position?.x ?? box.width / 2)
+    const y = box.y + (position?.y ?? box.height / 2)
+    await win.mouse.move(x, y, { steps: POINT_STEPS })
+    const hovered = () => target.evaluate((node) => node.matches(':hover'))
+    try {
+      await expect.poll(hovered, { timeout: 1_000, intervals: [16, 32, 64] }).toBe(true)
+      // Two frames later it must still be hovered.
+      await target.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
+      if (await hovered()) return
+    } catch {
+      // Move again.
+    }
+  }
+  const deepest = await target.evaluate(() => {
+    const node = [...document.querySelectorAll(':hover')].at(-1)
+    return node === undefined ? 'nothing' : node.outerHTML.slice(0, 120)
+  })
+  throw new Error(`Pointing did not hover the element; hovered: ${deepest}`)
+}
+
 export type SidebarSectionName = 'Pinned' | 'Recent'
 export type SidebarFilterName = 'All' | 'Channels' | 'DMs'
 
@@ -34,17 +68,17 @@ export class SidebarRow {
     readonly win: Page,
     readonly title: string,
   ) {
-    // Rows are named by their title; "Resolve {title}" is the button inside,
-    // so the name must start with the title.
-    this.root = win.getByRole('button', { name: new RegExp(`^${escapeRegExp(title)}`) })
+    // Rows are focusable list items named by their title (a button would
+    // flatten the Resolve button inside it).
+    this.root = win.getByRole('listitem', { name: new RegExp(`^${escapeRegExp(title)}`) })
   }
 
   get resolveButton() {
     return this.root.getByRole('button', { name: new RegExp(`^Resolve ${escapeRegExp(this.title)}`) })
   }
 
-  hover() {
-    return this.root.hover()
+  hover(): Promise<void> {
+    return pointAt(this.win, this.root)
   }
 
   focus() {
@@ -88,7 +122,8 @@ export class SidebarRow {
   }
 
   async expectSelected(selected = true): Promise<void> {
-    await expect(this.root).toHaveAttribute('aria-pressed', String(selected))
+    if (selected) await expect(this.root).toHaveAttribute('aria-current', 'true')
+    else await expect(this.root).not.toHaveAttribute('aria-current')
   }
 
   async expectFocused(): Promise<void> {
@@ -149,6 +184,11 @@ export class Sidebar {
 
   get list() {
     return this.root.getByRole('group', { name: 'Topics' })
+  }
+
+  /** Points at the list near its top-left corner, away from any row's controls. */
+  hoverList(): Promise<void> {
+    return pointAt(this.win, this.list, { x: 10, y: 10 })
   }
 
   get rows() {
@@ -699,6 +739,17 @@ export class TopicPane {
     await this.header.getByRole('button', { name: 'Mark read', exact: true }).click()
   }
 
+  /** Mark read from the keyboard: focus it and press Enter. */
+  async markReadWithKeyboard(): Promise<void> {
+    await this.header.getByRole('button', { name: 'Mark read', exact: true }).focus()
+    await this.win.keyboard.press('Enter')
+  }
+
+  /** The header's Subscribe bell, a toggle (`aria-pressed`). */
+  get bell() {
+    return this.header.getByRole('button', { name: /subscribe/i })
+  }
+
   /** A "2 replies · Title" link under a Main message, by its label or title. */
   threadLink(text: string | RegExp): ThreadLinkDriver {
     return new ThreadLinkDriver(this.win, this.list.getByRole('button', { name: text }))
@@ -716,6 +767,15 @@ export class TopicPane {
 
   async openThreads(): Promise<ThreadsPopover> {
     await this.threadsButton.click()
+    const popover = new ThreadsPopover(this.win)
+    await expect(popover.root).toBeVisible()
+    return popover
+  }
+
+  /** Focuses the Threads button and opens its popover with Enter. */
+  async openThreadsWithKeyboard(): Promise<ThreadsPopover> {
+    await this.threadsButton.focus()
+    await this.win.keyboard.press('Enter')
     const popover = new ThreadsPopover(this.win)
     await expect(popover.root).toBeVisible()
     return popover
@@ -780,8 +840,14 @@ export class ThreadsPopover {
     this.root = win.getByRole('dialog', { name: 'Threads' })
   }
 
+  /** A thread's list item: its row button and its Subscribe bell. */
   entry(title: string): Locator {
     return this.root.getByRole('listitem').filter({ hasText: title })
+  }
+
+  /** The row button that opens a thread, named by its title. */
+  row(title: string): Locator {
+    return this.root.getByRole('button', { name: new RegExp(`^${escapeRegExp(title)}`) })
   }
 
   async open(title: string): Promise<void> {
@@ -793,9 +859,10 @@ export class ThreadsPopover {
   }
 
   async subscribe(title: string): Promise<void> {
-    const bell = this.entry(title).getByRole('button', { name: /^Unsubscribed/ })
+    const bell = this.entry(title).getByRole('button', { name: 'Subscribe', exact: true })
+    await expect(bell).toHaveAttribute('aria-pressed', 'false')
     await bell.click()
-    await expect(this.entry(title).getByRole('button', { name: /^Subscribed/ })).toBeVisible()
+    await expect(bell).toHaveAttribute('aria-pressed', 'true')
   }
 }
 
@@ -812,6 +879,11 @@ export class TabStrip {
 
   tab(title: string): Locator {
     return this.root.getByRole('tab', { name: new RegExp(`^${escapeRegExp(title)}`) })
+  }
+
+  /** Points at a tab. */
+  hover(title: string): Promise<void> {
+    return pointAt(this.win, this.tab(title))
   }
 
   /** Tab titles, left to right. */
@@ -844,6 +916,21 @@ export class TabStrip {
   async close(title: string): Promise<void> {
     await this.tab(title).hover()
     await this.tab(title).getByRole('button', { name: 'Close tab' }).click()
+  }
+
+  /** Focuses a tab's close button and presses Enter. */
+  async closeWithKeyboard(title: string): Promise<void> {
+    await this.tab(title).getByRole('button', { name: 'Close tab' }).focus()
+    await this.win.keyboard.press('Enter')
+  }
+
+  async expectFocused(title: string): Promise<void> {
+    await expect(this.tab(title)).toBeFocused()
+  }
+
+  /** The "+" after the last tab. */
+  get newMessageButton() {
+    return this.win.getByRole('region', { name: 'Workspace' }).getByRole('button', { name: 'New message', exact: true })
   }
 
   /** An item of the app menu, as ⌘W, ⌘⇧] or ⌘⇧[ would choose it. */

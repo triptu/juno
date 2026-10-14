@@ -33,7 +33,7 @@ export default defineFixtures(IconButton, {
     // Toggles: outline when off, filled when on.
     'header-pressed': fixture({ icon: PushPin, label: 'Unpin', size: 32, pressed: true }),
     subscribe: fixture({ icon: Bell, label: 'Subscribe', size: 32, pressed: false }),
-    subscribed: fixture({ icon: Bell, label: 'Subscribed. Click to unsubscribe.', size: 32, pressed: true }),
+    subscribed: fixture({ icon: Bell, label: 'Subscribe', size: 32, pressed: true }),
   },
   Composer: {
     send: fixture({ icon: ArrowUp, label: 'Send', size: 28, radius: 'full', variant: 'primary', iconWeight: 'bold' }),
@@ -58,7 +58,7 @@ export default defineFixtures(IconButton, {
     hover: scene(() => <AllVariants />, { hover: 'button' }),
     'hover-secondary': fixture({ icon: Quotes, label: 'Quote', variant: 'secondary' }, { hover: 'button' }),
     'hover-raised': fixture({ icon: Quotes, label: 'Quote', variant: 'raised' }, { hover: 'button' }),
-    'hover-toggle-on': fixture({ icon: Bell, label: 'Subscribed. Click to unsubscribe.', size: 32, pressed: true }, { hover: 'button' }),
+    'hover-toggle-on': fixture({ icon: Bell, label: 'Subscribe', size: 32, pressed: true }, { hover: 'button' }),
   },
   Press: {
     'active-press': fixture({ icon: PushPin, label: 'Pin', size: 32 }, { press: 'button' }),
@@ -75,7 +75,7 @@ export default defineFixtures(IconButton, {
         <IconButton icon={X} label="Remove rule" size={26} iconSize={13} tone="muted" />
         <IconButton icon={Smiley} label="More reactions" size={28} />
         <IconButton icon={Moon} label="Toggle theme" size={30} />
-        <IconButton icon={Bell} label="Subscribed. Click to unsubscribe." size={32} />
+        <IconButton icon={Bell} label="Subscribe" size={32} />
         <IconButton icon={DotsThree} label="More" size={32} iconWeight="bold" />
         <IconButton icon={NotePencil} label="Edit note" size={36} />
       </Row>

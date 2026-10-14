@@ -48,11 +48,12 @@ export function ListRow({
   const isButton = onSelect !== undefined
   return (
     <div
+      {...rest}
+      // After `rest`, so an owner cannot undo the row's semantics by accident.
       role={isButton ? 'button' : undefined}
       tabIndex={isButton ? 0 : undefined}
       aria-pressed={isButton && selected ? true : undefined}
       {...activateHandlers<HTMLDivElement>(onSelect)}
-      {...rest}
       {...stylex.props(
         styles.row,
         heights[minHeight],

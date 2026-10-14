@@ -67,7 +67,9 @@ export function TopicList({ sections, renderRow, empty, quietDays = 7, enterEmpt
                 </Text>
               </div>
             ) : null}
-            <div {...stylex.props(styles.rows)}>{section.ids.map(renderRow)}</div>
+            <div role="list" {...stylex.props(styles.rows)}>
+              {section.ids.map(renderRow)}
+            </div>
           </section>
         ))
       )}

@@ -15,6 +15,12 @@ export interface MessageBodyProps {
   readonly onChannel?: (id: string) => void
   /** A link was clicked: open it in the browser. */
   readonly onLink?: (url: string) => void
+  /**
+   * The message row is the list's tabbable one (roving tabindex). The
+   * #channel chips and links follow it, so Tab does not stop at every chip
+   * in every message. Default false.
+   */
+  readonly tabbable?: boolean
 }
 
 // An emoji-only message (one to three emoji and nothing else) is drawn
@@ -41,12 +47,13 @@ export function isEmojiOnly(body: MessageBodyModel): boolean {
  * Files are not drawn here; the message draws them from its `files`. Text
  * is selectable and follows its own direction.
  */
-export function MessageBody({ body, now, hueOf, onChannel, onLink }: MessageBodyProps) {
+export function MessageBody({ body, now, hueOf, onChannel, onLink, tabbable = false }: MessageBodyProps) {
   const jumbo = isEmojiOnly(body)
+  const tabIndex = tabbable ? 0 : -1
   return (
     <div data-msg-text="" {...stylex.props(styles.body, jumbo && styles.jumbo)}>
       {body.blocks.map((block, index) => (
-        <Block key={index} block={block} now={now} hueOf={hueOf} onChannel={onChannel} onLink={onLink} />
+        <Block key={index} block={block} now={now} hueOf={hueOf} onChannel={onChannel} onLink={onLink} tabIndex={tabIndex} />
       ))}
     </div>
   )
@@ -58,20 +65,21 @@ interface BlockProps {
   readonly hueOf: (id: string) => HueName
   readonly onChannel: ((id: string) => void) | undefined
   readonly onLink: ((url: string) => void) | undefined
+  readonly tabIndex: 0 | -1
 }
 
-function Block({ block, now, hueOf, onChannel, onLink }: BlockProps) {
+function Block({ block, now, hueOf, onChannel, onLink, tabIndex }: BlockProps) {
   switch (block.kind) {
     case 'paragraph':
       return (
         <p dir="auto" {...stylex.props(styles.paragraph)}>
-          <Inlines inlines={block.children} now={now} hueOf={hueOf} onChannel={onChannel} onLink={onLink} />
+          <Inlines inlines={block.children} now={now} hueOf={hueOf} onChannel={onChannel} onLink={onLink} tabIndex={tabIndex} />
         </p>
       )
     case 'quote':
       return (
         <blockquote dir="auto" {...stylex.props(styles.quote)}>
-          <Inlines inlines={block.children} now={now} hueOf={hueOf} onChannel={onChannel} onLink={onLink} />
+          <Inlines inlines={block.children} now={now} hueOf={hueOf} onChannel={onChannel} onLink={onLink} tabIndex={tabIndex} />
         </blockquote>
       )
     case 'code':
@@ -94,7 +102,7 @@ function Block({ block, now, hueOf, onChannel, onLink }: BlockProps) {
                 </span>
               ) : null}
               <span {...stylex.props(checklist && block.style === 'checked' && styles.done)}>
-                <Inlines inlines={item} now={now} hueOf={hueOf} onChannel={onChannel} onLink={onLink} />
+                <Inlines inlines={item} now={now} hueOf={hueOf} onChannel={onChannel} onLink={onLink} tabIndex={tabIndex} />
               </span>
             </li>
           ))}
@@ -104,7 +112,7 @@ function Block({ block, now, hueOf, onChannel, onLink }: BlockProps) {
     case 'heading':
       return (
         <Text variant="heading" tone="default" as="p" dir="auto" selectable sx={styles.heading}>
-          <Inlines inlines={block.children} now={now} hueOf={hueOf} onChannel={onChannel} onLink={onLink} />
+          <Inlines inlines={block.children} now={now} hueOf={hueOf} onChannel={onChannel} onLink={onLink} tabIndex={tabIndex} />
         </Text>
       )
     case 'divider':
@@ -125,10 +133,11 @@ interface InlinesProps {
   readonly hueOf: (id: string) => HueName
   readonly onChannel: ((id: string) => void) | undefined
   readonly onLink: ((url: string) => void) | undefined
+  readonly tabIndex: 0 | -1
 }
 
-function Inlines({ inlines, now, hueOf, onChannel, onLink }: InlinesProps) {
-  return inlines.map((inline, index) => <Inline key={index} inline={inline} now={now} hueOf={hueOf} onChannel={onChannel} onLink={onLink} />)
+function Inlines({ inlines, now, hueOf, onChannel, onLink, tabIndex }: InlinesProps) {
+  return inlines.map((inline, index) => <Inline key={index} inline={inline} now={now} hueOf={hueOf} onChannel={onChannel} onLink={onLink} tabIndex={tabIndex} />)
 }
 
 interface InlineProps {
@@ -137,9 +146,10 @@ interface InlineProps {
   readonly hueOf: (id: string) => HueName
   readonly onChannel: ((id: string) => void) | undefined
   readonly onLink: ((url: string) => void) | undefined
+  readonly tabIndex: 0 | -1
 }
 
-function Inline({ inline, now, hueOf, onChannel, onLink }: InlineProps) {
+function Inline({ inline, now, hueOf, onChannel, onLink, tabIndex }: InlineProps) {
   switch (inline.kind) {
     case 'text':
       return styled(inline.text, inline.style)
@@ -149,7 +159,7 @@ function Inline({ inline, now, hueOf, onChannel, onLink }: InlineProps) {
         onLink?.(inline.url)
       }
       return (
-        <a href={inline.url} onClick={open} draggable={false} {...stylex.props(styles.link)}>
+        <a href={inline.url} onClick={open} draggable={false} tabIndex={tabIndex} {...stylex.props(styles.link)}>
           {styled(inline.text, inline.style)}
         </a>
       )
@@ -175,6 +185,7 @@ function Inline({ inline, now, hueOf, onChannel, onLink }: InlineProps) {
             onChannel?.(inline.id)
           }}
           title={`Show only #${inline.name}`}
+          tabIndex={tabIndex}
           {...stylex.props(styles.channelButton)}
         >
           <Chip variant="filled" size="inline">
@@ -210,7 +221,7 @@ function Inline({ inline, now, hueOf, onChannel, onLink }: InlineProps) {
         onLink?.(inline.url ?? '')
       }
       return (
-        <a href={inline.url} onClick={open} draggable={false} {...stylex.props(styles.link)}>
+        <a href={inline.url} onClick={open} draggable={false} tabIndex={tabIndex} {...stylex.props(styles.link)}>
           {time}
         </a>
       )

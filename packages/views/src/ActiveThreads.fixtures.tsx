@@ -18,9 +18,9 @@ export default defineFixtures(
       loading: state({ threads: [], status: 'loading' }),
     },
     Interaction: {
-      'hover-row': state({}, { hover: '[role="listitem"]' }),
+      'hover-row': state({}, { hover: '[role="listitem"] > [role="button"]' }),
       'hover-bell': state({}, { hover: '[role="listitem"] button' }),
-      'focus-row': state({}, { focus: '[role="listitem"]' }),
+      'focus-row': state({}, { focus: '[role="listitem"] > [role="button"]' }),
     },
     Overview: {
       'in-a-popover-width': scene(() => <ActiveThreads threads={engThreads} now={NOW} onOpen={noop} onSubscribe={noop} onUnsubscribe={noop} />, { width: 300, padded: false, surface: 'surface' }),
