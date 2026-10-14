@@ -538,7 +538,7 @@ Shown from 15.1, 15.2 and from a person (a sender's name or avatar in a message,
 
 ### 15.4 Message menu
 
-Right-click on a message (new; items before this pass wait for M6): Copy text (`copy`), Reply in thread (`message-square-reply`, Main only), separator, **Why did this notify?** / **Why no notification?** (`circle-help`, by what happened; hidden for your own messages).
+Right-click on a message, and the message's More menu (the why item is new; the others wait for M6): Copy text (`copy`), Reply in thread (`message-square-reply`, Main only), separator, **Why did this notify?** / **Why no notification?** (`circle-help`, by what happened; hidden for your own messages).
 
 The why popover anchors under the item: 300px, padding `14 16`, radius 13, bg surface, `--pop-shadow`, gap 6. Title 13/600 ("Notified you at 13:42", "Didn't notify you", "In the 9am summary") · reason 13 subtle lh 1.5 (the decision's reason) · one button right-aligned, 28px secondary: **Change** when the reason is a setting (opens §15.3 for that channel or person, or the Notifications page for hours), **Tell Juno** when it was Juno's call (opens the Juno chat with the message quoted in the composer). Esc or outside click closes.
 
