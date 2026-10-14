@@ -81,6 +81,7 @@ export const Methods = {
   'subscriptions.thread.mark': method(ThreadMarkArgs, ThreadMarkFields),
   'subscriptions.thread.add': method(ThreadSubscribeArgs, ThreadSubscribeFields),
   'subscriptions.thread.remove': method(ThreadSubscribeArgs, ThreadSubscribeFields),
+  'presence.set': method(S.Struct({ presence: S.Literals(['auto', 'away']) }), {}),
   'chat.postMessage': method(ChatPostMessageArgs, ChatPostMessageFields),
   'chat.update': method(ChatUpdateArgs, ChatUpdateFields),
   'chat.delete': method(ChatDeleteArgs, ChatDeleteFields),

@@ -1,12 +1,14 @@
 /**
  * Workspace tabs (spec section 6, inventory 4, performance 4.3 and 4.5).
  *
- * A tab shows one place, a topic or a New chat, and keeps its own history
- * of the places it showed, like a browser tab. The rules are pure functions
- * over `Tabs`:
+ * A tab shows one place, a topic, a New chat or Home, and keeps its own
+ * history of the places it showed, like a browser tab. The rules are pure
+ * functions over `Tabs`:
  * - `openPlace`: a place opens in the current tab (a new history entry), or
  *   in a new tab after it when asked (⌘-click, ⌘-Enter, Open in new tab,
- *   ⌘T). A topic that a tab already shows focuses that tab instead.
+ *   ⌘T). A topic or page that a tab already shows focuses that tab instead.
+ * - `settleNewChat`: a New chat that sent becomes the topic it sent to, in
+ *   place of its own entry, or closes when another tab shows that topic.
  * - `stepHistory` (Back and Forward), `goToEntry` (the history menu).
  * - `closeTab`, `closeOtherTabs`, `closeTabsToRight`, `closeAllTabs`: every
  *   closed tab goes onto the reopen stack with its history; `reopenClosedTab`
@@ -28,12 +30,14 @@ import { prefsGet, prefsSet, type TopicDetail } from '@juno/contract'
 import { liveQuery, runCommand } from './atoms'
 import type { Registry } from './client'
 import { topicAtom } from './messages'
+import { newChatAtom, newChatTitle } from './newChat'
 import { signedInAtom } from './session'
 
-/** What a tab shows. New chat is a placeholder until it is built (spec section 9). */
-export type Place = { readonly kind: 'topic'; readonly topicId: string } | { readonly kind: 'newChat' }
+/** What a tab shows: a topic, a New chat (spec section 9) or Home, a page (section 12). */
+export type Place = { readonly kind: 'topic'; readonly topicId: string } | { readonly kind: 'newChat' } | { readonly kind: 'home' }
 
 export const newChatPlace: Place = { kind: 'newChat' }
+export const homePlace: Place = { kind: 'home' }
 export const topicPlace = (topicId: string): Place => ({ kind: 'topic', topicId })
 
 /** The places a tab showed, oldest first, and the one it shows. */
@@ -89,6 +93,8 @@ const samePlace = (a: Place, b: Place) => (a.kind === 'topic' ? b.kind === 'topi
 export const activeTab = (tabs: Tabs): Tab | undefined => tabs.tabs.find((tab) => tab.id === tabs.active)
 /** The tab that shows `topicId`, if one does. */
 export const tabShowing = (tabs: Tabs, topicId: string): Tab | undefined => tabs.tabs.find((tab) => tabTopic(tab) === topicId)
+/** The tab that shows Home, if one does. Home is a singleton. */
+export const homeTab = (tabs: Tabs): Tab | undefined => tabs.tabs.find((tab) => currentPlace(tab).kind === 'home')
 const pinnedCount = (tabs: ReadonlyArray<Tab>) => tabs.filter((tab) => tab.pinned).length
 
 /** A tab id no open or closed tab has. Ids are `tab-<n>`, so the next is one past the highest. */
@@ -119,10 +125,8 @@ function push(history: TabHistory, place: Place): TabHistory {
 }
 
 export function openPlace(tabs: Tabs, place: Place, { newTab = false }: OpenOptions = {}): Tabs {
-  if (place.kind === 'topic') {
-    const showing = tabShowing(tabs, place.topicId)
-    if (showing !== undefined) return activateTab(tabs, showing.id)
-  }
+  const showing = place.kind === 'topic' ? tabShowing(tabs, place.topicId) : place.kind === 'home' ? homeTab(tabs) : undefined
+  if (showing !== undefined) return activateTab(tabs, showing.id)
   const at = tabs.tabs.findIndex((tab) => tab.id === tabs.active)
   if (at < 0 || newTab) {
     const tab = freshTab(nextTabId(tabs), place)
@@ -134,6 +138,25 @@ export function openPlace(tabs: Tabs, place: Place, { newTab = false }: OpenOpti
   if (samePlace(currentPlace(current), place)) return tabs
   const tab: Tab = { ...current, history: push(current.history, place) }
   return { ...tabs, tabs: tabs.tabs.with(at, tab), recent: touch(tabs.recent, tab.id) }
+}
+
+/**
+ * After a New chat in tab `tabId` sent to `topicId`: the tab shows the topic
+ * in place of the New chat's entry, so Back goes to what the tab showed
+ * before. If another tab already shows the topic, that tab is focused and
+ * the New chat tab closes; it does not go onto the reopen stack.
+ */
+export function settleNewChat(tabs: Tabs, tabId: string, topicId: string): Tabs {
+  const at = tabs.tabs.findIndex((tab) => tab.id === tabId)
+  const tab = tabs.tabs[at]
+  if (tab === undefined || currentPlace(tab).kind !== 'newChat') return tabs
+  const showing = tabShowing(tabs, topicId)
+  if (showing !== undefined) {
+    const closed = closeTab(tabs, tabId)
+    return activateTab({ ...closed, closed: tabs.closed }, showing.id)
+  }
+  const entries = [...tab.history.entries.slice(0, tab.history.index), topicPlace(topicId)]
+  return { ...tabs, tabs: tabs.tabs.with(at, { ...tab, history: { entries, index: entries.length - 1 } }) }
 }
 
 /** The place Back (-1) or Forward (1) would show in the active tab, if there is one. */
@@ -247,7 +270,10 @@ export function dividerIndex(order: ReadonlyArray<string>, lastReadTs: string | 
 /** The workspace preference that holds the tabs. */
 export const TABS_PREF = 'tabs'
 
-const PlaceJson = Schema.Union([Schema.Struct({ kind: Schema.Literal('topic'), topicId: Schema.String }), Schema.Struct({ kind: Schema.Literal('newChat') })])
+const PlaceJson = Schema.Union([
+  Schema.Struct({ kind: Schema.Literal('topic'), topicId: Schema.String }),
+  Schema.Struct({ kind: Schema.Literals(['newChat', 'home']) }),
+])
 /**
  * A saved tab, or one saved before history, when a tab's id was its
  * topic's. Tabs saved with the old `stealth` flag still read back; the flag
@@ -333,8 +359,10 @@ export interface TabSummary {
   readonly id: string
   readonly pinned: boolean
   readonly place: Place
-  /** A topic's header: undefined until it arrives (and for New chat), null for a topic the store does not know. */
+  /** A topic's header: undefined until it arrives (and for a page), null for a topic the store does not know. */
   readonly detail: TopicDetail | null | undefined
+  /** A New chat's title: "New chat", then its destination's name. */
+  readonly chatTitle?: string
 }
 
 const sameStrip = (a: ReadonlyArray<TabSummary>, b: ReadonlyArray<TabSummary>) => a.length === b.length && a.every((tab, i) => tab === b[i])
@@ -350,10 +378,11 @@ export const tabStripAtom = Atom.make((get): ReadonlyArray<TabSummary> => {
     const place = currentPlace(tab)
     const result = place.kind === 'topic' ? get(topicAtom(place.topicId)) : undefined
     const detail = result !== undefined && AsyncResult.isSuccess(result) ? result.value : undefined
+    const chatTitle = place.kind === 'newChat' ? newChatTitle(get(newChatAtom(tab.id))) : undefined
     const held = previous.get(tab.id)
-    return held !== undefined && held.pinned === tab.pinned && samePlace(held.place, place) && held.detail === detail
+    return held !== undefined && held.pinned === tab.pinned && samePlace(held.place, place) && held.detail === detail && held.chatTitle === chatTitle
       ? held
-      : { id: tab.id, pinned: tab.pinned, place, detail }
+      : { id: tab.id, pinned: tab.pinned, place, detail, ...(chatTitle === undefined ? {} : { chatTitle }) }
   })
 }).pipe(Atom.withEquality(sameStrip))
 

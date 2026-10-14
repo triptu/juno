@@ -21,8 +21,8 @@ import {
   type Registry,
   type TopicListFilter,
 } from '@juno/state'
-import { memoryHost, startEngine, type EngineHandle } from '../src/index'
-import { memoryTransport, type MessagePortLike } from '../src/protocol/transport'
+import { memoryHost, startEngine, type EngineHandle, type EngineHostOptions } from '../src/index'
+import { memoryTransport, type MessagePortLike, type Transport } from '../src/protocol/transport'
 
 /**
  * How long a harness wait allows by default: half the test timeout
@@ -146,12 +146,15 @@ export interface RunningEngine {
 }
 
 export interface EngineOptions {
+  readonly notifications?: EngineHostOptions['notifications']
   /** A session main already holds, as after a relaunch. */
   readonly initial?: (fake: FakeSlack) => Credentials
   readonly enterpriseId?: string
   readonly fakeOptions?: FakeSlackOptions
   /** Reuse a user-data directory (a warm boot) and a fake. */
   readonly reuse?: { readonly userData: string; readonly fake: FakeSlack; readonly credentials: Credentials }
+  /** Serve the AgentHost group on these ports, as for the agent process (ADR 0012). */
+  readonly agent?: { readonly transport: Transport; readonly writes?: 'enabled' | 'disabled' }
 }
 
 /** Starts a fake (unless reused) and the engine on it, with the atoms a test reads. */
@@ -170,8 +173,10 @@ export async function startTestEngine(options: EngineOptions = {}): Promise<Runn
   let cycles = 0
   let pendingCycles = 0
   const handle = await startEngine(transport, { userData, e2e: true, dev: false, fakeSlackUrl: fake.url, ai: 'fake' }, {
+    ...(options.notifications === undefined ? {} : { notifications: options.notifications }),
     host: main.host,
     httpTransport: main.httpTransport,
+    ...(options.agent === undefined ? {} : { agentTransport: options.agent.transport, agentWrites: options.agent.writes ?? 'disabled' }),
     sync: {
       config: { sweepIntervalMillis: 0 },
       onCycle: (event) => {

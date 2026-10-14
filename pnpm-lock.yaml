@@ -591,6 +591,9 @@ importers:
       '@juno/domain':
         specifier: workspace:*
         version: link:../domain
+      '@juno/notifications':
+        specifier: workspace:*
+        version: link:../notifications
       '@juno/richtext':
         specifier: workspace:*
         version: link:../richtext
@@ -613,6 +616,12 @@ importers:
       '@effect/vitest':
         specifier: 4.0.3
         version: 4.0.3(effect@4.0.3)(vitest@5.0.4(@types/node@24.19.2)(vite@7.3.7(@types/node@24.19.2)(jiti@2.7.0)(lightningcss@1.33.0)(yaml@2.9.1)))
+      '@juno/agent':
+        specifier: workspace:*
+        version: link:../agent
+      '@juno/agent-testing':
+        specifier: workspace:*
+        version: link:../agent-testing
       '@juno/fake-slack':
         specifier: workspace:*
         version: link:../fake-slack
@@ -656,6 +665,28 @@ importers:
       vitest:
         specifier: 5.0.4
         version: 5.0.4(@types/node@24.19.2)(vite@7.3.7(@types/node@24.19.2)(jiti@2.7.0)(lightningcss@1.33.0)(yaml@2.9.1))
+
+  packages/notifications:
+    dependencies:
+      '@juno/ai':
+        specifier: workspace:*
+        version: link:../ai
+      '@juno/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@juno/store':
+        specifier: workspace:*
+        version: link:../store
+      effect:
+        specifier: 4.0.3
+        version: 4.0.3
+    devDependencies:
+      '@types/node':
+        specifier: 24.19.2
+        version: 24.19.2
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
 
   packages/richtext:
     dependencies:

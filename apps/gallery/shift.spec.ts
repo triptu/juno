@@ -2,7 +2,7 @@ import { mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { expect, test, type Locator, type Page, type Route as NetworkRoute } from '@playwright/test'
-import { expectNoLayoutShift } from '@juno/testing/layout-shift'
+import { expectNoLayoutShift, measureLayoutShift } from '@juno/testing/layout-shift'
 import { openState, readRoutes, type Route } from './support'
 
 /**
@@ -391,21 +391,108 @@ test.describe('Juno chat', () => {
     })
   }
 
-  test('the banner chip changes without moving the title or the menu', async ({ page }) => {
+  test('the banner chip changes without moving the title', async ({ page }) => {
     await open(page, 'JunoHeader', 'shift/banner-cycles')
     const title = page.getByRole('heading', { name: 'Juno' })
-    const menu = page.getByRole('button', { name: 'More' })
     const titleBox = await title.boundingBox()
-    const menuBox = await menu.boundingBox()
     const seen = new Set<string>()
     for (let round = 0; round < 7; round++) {
-      await expectNoLayoutShift(page, () => page.getByRole('button', { name: 'Next banner' }).click())
+      // The right island is as wide as its chip, so only the left island must hold still.
+      await expectRootHolds(page, () => page.getByRole('button', { name: 'Next banner' }).click(), '[data-island="left"]')
       expect(await title.boundingBox()).toEqual(titleBox)
-      expect(await menu.boundingBox()).toEqual(menuBox)
       for (const chip of await page.locator('[data-banner]').evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-banner')))) {
         if (chip !== null) seen.add(chip)
       }
     }
     expect([...seen].toSorted()).toEqual(['aiOff', 'offline', 'otherDevice', 'paused', 'recovery', 'updateNeeded'])
+  })
+})
+
+/**
+ * No element under `root` changed its box. The browser's own `layout-shift`
+ * entries are left out on purpose: an island grows with its title or chip,
+ * which is the design, and those entries cannot be scoped to a region.
+ */
+async function expectRootHolds(page: Page, action: () => Promise<unknown>, root: string): Promise<void> {
+  const report = await measureLayoutShift(page, action, { root })
+  expect(report.moved).toEqual([])
+}
+
+/**
+ * The topic header floats over the list (SPEC 7, inventory 5): the menu
+ * opening, Juno pressed, a rename, resolving and a long title happen in an
+ * absolute layer, so none of them may move a message or the scroll position.
+ */
+test.describe('Topic header', () => {
+  const open = (page: Page, component: string, id: string) => openState(page, { component, id, route: `${component}/${id}`, group: '', groupId: '', state: '', frame: {} })
+
+  test('no change in the header moves the list under it', async ({ page }) => {
+    await open(page, 'TopicView', 'shift/header-cycles')
+    const scroller = page.locator('[data-scroll]')
+    const rows = page.locator('[data-message-row]')
+    const boxes = () => rows.evaluateAll((nodes) => nodes.slice(0, 12).map((node) => node.getBoundingClientRect().toJSON()))
+    const before = { scrollTop: await scroller.evaluate((node) => node.scrollTop), rows: await boxes() }
+    expect(before.scrollTop).toBeGreaterThan(0)
+    const titles = new Set<string>()
+    for (let round = 0; round < 6; round++) {
+      // The islands are as wide as their content; the list under them must not move.
+      await expectRootHolds(page, () => page.getByRole('button', { name: 'Next header' }).click(), '[data-scroll]')
+      expect(await scroller.evaluate((node) => node.scrollTop)).toBe(before.scrollTop)
+      expect(await boxes()).toEqual(before.rows)
+      titles.add((await page.locator('[data-topic-header] h1').textContent()) ?? '')
+    }
+    expect(titles.size).toBeGreaterThan(2)
+  })
+
+  test('the list starts below the band at the top, and its scrollbar track starts below the band', async ({ page }) => {
+    await open(page, 'TopicView', 'header/thread-at-top')
+    const scroller = page.locator('[data-scroll]')
+    const geometry = await scroller.evaluate((node) => {
+      const box = node.getBoundingClientRect()
+      const band = document.querySelector('[data-header-band]')!.getBoundingClientRect()
+      const first = node.querySelector('[data-message-row]')!.getBoundingClientRect()
+      const style = getComputedStyle(node)
+      return {
+        bandTop: band.top - box.top,
+        bandHeight: band.height,
+        firstRow: first.top - box.top,
+        scrollPadding: style.scrollPaddingTop,
+        trackMargin: getComputedStyle(node, '::-webkit-scrollbar-track').marginTop,
+      }
+    })
+    expect(geometry.bandTop).toBe(0)
+    expect(geometry.bandHeight).toBe(68)
+    expect(geometry.firstRow).toBeGreaterThanOrEqual(68)
+    expect(geometry.scrollPadding).toBe('68px')
+    expect(geometry.trackMargin).toBe('68px')
+  })
+
+  test('the islands line up with the composer, and the band lets the pointer through', async ({ page }) => {
+    await open(page, 'TopicView', 'header/thread-scrolled')
+    const left = (await page.locator('[data-island="left"]').boundingBox())!
+    const right = (await page.locator('[data-island="right"]').boundingBox())!
+    const composer = (await page.locator('[data-composer-slot] > *').first().boundingBox())!
+    // The reading column's 24px padding puts the islands' outer edges on the composer's.
+    expect(Math.round(left.x)).toBe(Math.round(composer.x))
+    expect(Math.round(right.x + right.width)).toBe(Math.round(composer.x + composer.width))
+    expect(Math.round(left.y)).toBe(Math.round((await page.locator('[data-topic-view]').boundingBox())!.y + 8))
+    const under = await page.evaluate(() => {
+      const band = document.querySelector('[data-header-band]')!.getBoundingClientRect()
+      const hit = document.elementFromPoint(band.left + 4, band.bottom - 4)
+      return hit?.closest('[data-header-band]') === null
+    })
+    expect(under).toBe(true)
+  })
+
+  test('under 480px Resolve keeps its name as an icon and Threads keeps its count', async ({ page }) => {
+    await open(page, 'TopicHeader', 'narrow/thread-336')
+    const resolve = page.getByRole('button', { name: 'Resolve', exact: true })
+    await expect(resolve).toBeVisible()
+    expect(Math.round((await resolve.boundingBox())!.width)).toBe(28)
+    await open(page, 'TopicHeader', 'narrow/main-336')
+    const threads = page.getByRole('button', { name: 'Threads, 12' })
+    await expect(threads).toHaveText('12', { useInnerText: true })
+    await open(page, 'TopicHeader', 'narrow/thread-480')
+    await expect(page.getByRole('button', { name: 'Resolve', exact: true })).toHaveText('Resolve', { useInnerText: true })
   })
 })

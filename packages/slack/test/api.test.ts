@@ -67,6 +67,27 @@ describe('SlackApi.call', () => {
     }),
   )
 
+  it.live('a lost answer is retried, so a post can land twice; a single attempt posts once', () =>
+    Effect.gen(function* () {
+      const fake = yield* fakeSlack
+      const layer = clientLayer(fake)
+      const post = (clientMsgId: string, singleAttempt: boolean) =>
+        SlackApi.use((api) =>
+          api.call('chat.postMessage', { channel: CHANNEL, text: clientMsgId, client_msg_id: clientMsgId }, { lane: 'send', singleAttempt }),
+        ).pipe(Effect.provide(layer), Effect.result)
+      const posted = (clientMsgId: string) => fake.messages(CHANNEL).filter((m) => m.client_msg_id === clientMsgId).length
+
+      fake.loseResponse({ method: 'chat.postMessage' })
+      yield* post('3f0c8a51-0000-4000-8000-000000000001', false)
+      assert.strictEqual(posted('3f0c8a51-0000-4000-8000-000000000001'), 2)
+
+      fake.loseResponse({ method: 'chat.postMessage' })
+      const once = yield* post('3f0c8a51-0000-4000-8000-000000000002', true)
+      assert.isTrue(once._tag === 'Failure' && once.failure._tag === 'SlackTransportError')
+      assert.strictEqual(posted('3f0c8a51-0000-4000-8000-000000000002'), 1)
+    }),
+  )
+
   it.live('a paused method does not hold the interactive lane: it fails fast with SlackRateLimited', () =>
     Effect.gen(function* () {
       const fake = yield* fakeSlack

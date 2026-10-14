@@ -313,6 +313,10 @@ export const handlers: Handlers = {
     return { subscription: ws.subscriptionObject(ws.unsubscribe(args.channel, args.thread_ts, args.last_read)) }
   },
 
+  'presence.set': (ctx, args) => {
+    ctx.workspace.emit({ type: 'manual_presence_change', presence: args.presence === 'auto' ? 'active' : 'away', user: ctx.workspace.selfId })
+    return {}
+  },
   'chat.postMessage': (ctx, args) => {
     const ws = ctx.workspace
     const conversation = requireConversation(ctx, args.channel, true)

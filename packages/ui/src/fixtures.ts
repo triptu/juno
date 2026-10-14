@@ -17,6 +17,7 @@ import ContextPill from './ContextPill.fixtures'
 import Divider from './Divider.fixtures'
 import EmojiButton from './EmojiButton.fixtures'
 import EmptyState from './EmptyState.fixtures'
+import HeaderBand from './HeaderBand.fixtures'
 import Icon from './Icon.fixtures'
 import IconButton from './IconButton.fixtures'
 import Illustration from './illustrations/Illustration.fixtures'
@@ -55,6 +56,7 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   Divider,
   EmojiButton,
   EmptyState,
+  HeaderBand,
   Icon,
   IconButton,
   Illustration,

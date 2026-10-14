@@ -52,11 +52,14 @@ export {
   historyStateAtom,
   historyTarget,
   mountedTabs,
+  homePlace,
+  homeTab,
   newChatPlace,
   openPlace,
   reopenClosedTab,
   scrollSnapshotAtom,
   setPinned,
+  settleNewChat,
   stepHistory,
   tabByNumber,
   tabsAtom,
@@ -73,6 +76,20 @@ export {
   type Tabs,
   type TabSummary,
 } from './tabs'
+export {
+  emptyNewChat,
+  newChatAtom,
+  newChatTitle,
+  pickConversation,
+  pickConversationsAtom,
+  pickThread,
+  pickThreadsAtom,
+  previewTopic,
+  sendMessage,
+  sendTarget,
+  untouched,
+  type NewChat,
+} from './newChat'
 export { errorOf } from './result'
 export { acquireRendererPort, EngineFailed } from './port'
 export {

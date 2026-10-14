@@ -6,12 +6,15 @@
 import { Effect, Layer, Ref, Stream } from 'effect'
 import type { EnginePhase, SessionStatus } from '@juno/contract'
 import type { SyncPhase } from '@juno/sync'
+import { NotificationControl } from './notificationRuntime'
+import { JunoHostLive, PhaseSource } from './agent-host/host'
 import { AiProviderLive } from './ai'
 import { ArtHandlers } from './art/handlers'
 import { ArtJob } from './art/job'
 import { SearchHandlers } from './search/handlers'
 import { PrefsHandlers } from './prefs/handlers'
 import { MessagesHandlers } from './messages/handlers'
+import { NewChatHandlers } from './newchat/handlers'
 import { ReadsHandlers } from './reads/handlers'
 import { MarkWorker } from './reads/worker'
 import { Outbox } from './outbox'
@@ -56,8 +59,9 @@ const EnginePhases = Layer.effectDiscard(
 /** Everything the route handlers need. Requires the host seams (`HostLink`, `HttpTransport`) and `EngineConfig`. */
 export const Services = Layer.mergeAll(EnginePhases, ArtJob).pipe(
   Layer.provideMerge(MarkWorker.layer),
-  Layer.provideMerge(AiProviderLive),
   Layer.provideMerge(SyncRunner.layer),
+  Layer.provideMerge(AiProviderLive),
+  Layer.provideMerge(NotificationControl.layer),
   Layer.provideMerge(SyncLink.layer),
   Layer.provideMerge(Outbox.layer),
   Layer.provideMerge(SessionClientLive),
@@ -67,4 +71,7 @@ export const Services = Layer.mergeAll(EnginePhases, ArtJob).pipe(
 )
 
 /** One `toLayer` per feature, merged. Requires `Services`. */
-export const Handlers = Layer.mergeAll(StatusHandlers, SessionHandlers, TopicsHandlers, SearchHandlers, PrefsHandlers, MessagesHandlers, ReadsHandlers, ArtHandlers)
+export const Handlers = Layer.mergeAll(StatusHandlers, SessionHandlers, TopicsHandlers, SearchHandlers, PrefsHandlers, MessagesHandlers, ReadsHandlers, ArtHandlers, NewChatHandlers)
+
+/** The engine's side of the AgentHost port (ADR 0012): `JunoHost` over `Services`, with the engine phase from the status feature. */
+export const AgentHost = JunoHostLive.pipe(Layer.provide(Layer.effect(PhaseSource, Status.use((status) => Effect.succeed(status.phases)))))

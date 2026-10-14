@@ -659,7 +659,16 @@ export const layout = stylex.defineVars({
   '--tab-width': '230px',
   '--tab-min-width': '120px',
   '--tab-pinned-width': '40px',
-  '--topic-header-height': '100px',
+  // The page header (a topic, the Juno tab, the Juno panel): two islands
+  // over the list, on a band of the page colour that is solid to the
+  // islands' bottom edge and fades out by --header-band. The list under
+  // it starts --header-inset down, so at scroll top its first row is clear
+  // of the band.
+  '--header-island-top': '8px',
+  '--header-island-height': '36px',
+  '--header-band-solid': '44px',
+  '--header-band': '68px',
+  '--header-inset': '56px',
   '--reading-width': '800px',
   '--composer-width': '752px',
   '--composer-max-height': '194px',
@@ -689,6 +698,8 @@ export const layout = stylex.defineVars({
   '--menu-width-account': '248px',
   '--menu-width-browse': '300px',
   '--menu-width-mention': '280px',
+  // The New chat pickers' lists.
+  '--menu-width-picker': '340px',
   // Never taller than the window below a title-bar anchor, so a menu fits
   // at the minimum size and under zoom; the content scrolls inside.
   '--popover-max-height': 'min(400px, calc(100vh - var(--titlebar-height) - var(--space-5)))',
@@ -777,6 +788,7 @@ export const sizes = stylex.defineVars({
 
 export const z = stylex.defineVars({
   '--z-toolbar': '2',
+  '--z-header': '3',
   '--z-mention': '5',
   '--z-picker': '10',
   '--z-menu': '20',

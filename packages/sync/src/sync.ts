@@ -20,14 +20,14 @@
  */
 import { mainTopicId, millisToTs, type ChannelId, type Ts } from '@juno/domain'
 import { SlackApi, SlackAuthRequired, SlackEdge, SlackSession, SlackSocket, type SocketEvent } from '@juno/slack'
-import { Invalidation, StoreReader, StoreWriter, transaction } from '@juno/store'
+import { Invalidation, StoreReader, StoreWriter, transaction, type SqlError } from '@juno/store'
 import { Clock, Effect, FiberSet, Queue, Scope, Semaphore } from 'effect'
 import { Stream } from 'effect'
 import { bootState, catchUp, coldBoot, followPass, warmBoot, type BootState, type Phase } from './boot'
 import { syncEmoji } from './emoji'
 import { SyncConfig } from './config'
 import { reindexOptions, type RootFetch, type SyncContext } from './context'
-import { applyFrame } from './events'
+import { applyFrame, applySent } from './events'
 import { fetchOlder, fetchTopic, type FetchLane, type FetchReport, type OpenError } from './open'
 import { applyPage } from './pages'
 import { reindexTopics } from './reindex'
@@ -41,6 +41,8 @@ export type SyncPhase =
   | { readonly _tag: 'offline' }
 
 export interface RunSyncOptions {
+  /** Observer after event application. Must enqueue work without blocking the socket. */
+  readonly onEvent?: (event: SocketEvent, me: import('@juno/domain').Me) => Effect.Effect<void>
   /** Brackets each boot, reboot or reconciliation, including its background follow pass. */
   readonly onCycle?: (event: 'started' | 'finished') => Effect.Effect<void>
   /** Called on every phase change. */
@@ -61,6 +63,8 @@ export interface RunSyncOptions {
 export interface TopicFetcher {
   readonly open: (topicId: string) => Effect.Effect<FetchReport, OpenError>
   readonly older: (topicId: string, before: string) => Effect.Effect<FetchReport, OpenError>
+  /** Stores what Juno's own send got back, in the sync's context (`applySent`). */
+  readonly sent: (sent: Parameters<typeof applySent>[1]) => Effect.Effect<void, SqlError>
 }
 
 export type SyncServices = SlackApi | SlackEdge | SlackSocket | SlackSession | StoreWriter | StoreReader | Invalidation
@@ -126,6 +130,7 @@ export const runSync = (options: RunSyncOptions): Effect.Effect<never, SlackAuth
     const fetcher: TopicFetcher = {
       open: (topicId) => fetched((lane) => fetchTopic(ctx, topicId, lane), 'open'),
       older: (topicId, before) => fetched((lane) => fetchOlder(ctx, topicId, before, lane), 'older page'),
+      sent: (sent) => applySent(ctx, sent).pipe(Effect.provide(services)),
     }
     if (options.onFetcher !== undefined) yield* options.onFetcher(fetcher)
 
@@ -194,7 +199,7 @@ export const runSync = (options: RunSyncOptions): Effect.Effect<never, SlackAuth
       }
     }
 
-    const consumer = Stream.runForEach(events, handle)
+    const consumer = Stream.runForEach(events, (event) => handle(event).pipe(Effect.andThen(options.onEvent?.(event, ctx.me) ?? Effect.void)))
 
     const bootOnce = Effect.gen(function* () {
       const startedAt = yield* Clock.currentTimeMillis

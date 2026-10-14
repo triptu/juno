@@ -20,6 +20,9 @@ const tabs = {
   pinnedMaya: { id: 'tab-pinned-maya', title: 'Offsite: Wednesday afternoon slot', icon: 'user', pinned: true, unread: true } satisfies WorkspaceTab,
   densityUnread: { id: 'tab-density-unread', title: 'Thread list density', icon: 'hash', unread: true } satisfies WorkspaceTab,
   newChat: { id: 'tab-new-chat', title: 'New chat', icon: 'new-chat' } satisfies WorkspaceTab,
+  // A New chat with a destination picked keeps its icon and takes the destination's name.
+  newChatPicked: { id: 'tab-new-chat', title: 'Postgres 16 cutover window', icon: 'new-chat' } satisfies WorkspaceTab,
+  home: { id: 'tab-home', title: 'Home', icon: 'home' } satisfies WorkspaceTab,
 } as const
 
 const browserTabs = [tabs.pinnedEng, tabs.pinnedMaya, tabs.postgres, tabs.densityUnread, tabs.hiring]
@@ -35,13 +38,13 @@ const lastTab = thirtySeven[thirtySeven.length - 1]?.id
 const base: Omit<WorkspaceProps, 'children'> = { tabs: [tabs.postgres, tabs.density], activeId: tabs.postgres.id, onSelectTab: noop, onCloseTab: noop, onNewTab: noop, onTabContextMenu: noop }
 
 const postgresPage = (
-  <TopicView header={<TopicHeader detail={details.postgres} onRename={noop} />} composer={<ComposerSlot placeholder="Reply" />}>
+  <TopicView header={<TopicHeader detail={details.postgres} onMenu={noop} onPill={noop} onResolve={noop} juno={{ open: false, onToggle: noop }} />} composer={<ComposerSlot placeholder="Reply" />}>
     <MessageList items={thread} main={false} now={NOW} onOpenThread={noop} onChannel={noop} onLink={noop} />
   </TopicView>
 )
 
 const engPage = (
-  <TopicView header={<TopicHeader detail={details.engMain} onThreads={noop} />} composer={<ComposerSlot placeholder="Message #eng" />}>
+  <TopicView header={<TopicHeader detail={details.engMain} onMenu={noop} onPill={noop} onThreads={noop} juno={{ open: false, onToggle: noop }} />} composer={<ComposerSlot placeholder="Message #eng" />}>
     <MessageList items={main} main now={NOW} dividerBefore={mainDividerBefore} onOpenThread={noop} onChannel={noop} onLink={noop} />
   </TopicView>
 )
@@ -68,6 +71,9 @@ export default defineFixtures(
       'pinned-and-unread': workspace({ tabs: browserTabs, activeId: tabs.postgres.id }, postgresPage),
       'pinned-active': workspace({ tabs: browserTabs, activeId: tabs.pinnedEng.id }, engPage),
       'new-chat-tab': workspace({ tabs: [tabs.postgres, tabs.newChat], activeId: tabs.newChat.id }),
+      'new-chat-picked': workspace({ tabs: [tabs.postgres, tabs.newChatPicked], activeId: tabs.newChatPicked.id }),
+      // Home's content is the empty workspace until the Home page is built.
+      'home-tab': workspace({ tabs: [tabs.home, tabs.postgres], activeId: tabs.home.id }),
       'sidebar-hidden': workspace({ tabs: browserTabs, activeId: tabs.postgres.id, leading: sidebarControls }, postgresPage),
       'sidebar-hidden-minimum-window': workspace({ tabs: browserTabs, activeId: tabs.postgres.id, leading: sidebarControls }, postgresPage, { width: 720, height: 480 }),
       'thirty-seven-tabs': workspace({ tabs: thirtySeven, ...(lastTab === undefined ? {} : { activeId: lastTab }) }, postgresPage),
