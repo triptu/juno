@@ -11,6 +11,11 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { gzipSync } from 'node:zlib'
 
+if (process.env.JUNO_UNMINIFIED === '1') {
+  console.log('bundle size: not checked, the build is unminified (JUNO_UNMINIFIED=1)')
+  process.exit(0)
+}
+
 const JS_BUDGET = 1_000_000
 const CSS_BUDGET = 150_000
 

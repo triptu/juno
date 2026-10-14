@@ -1,4 +1,4 @@
-import { memo, useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
+import { memo, startTransition, useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
 import { MESSAGE_WINDOW_MAX, readsMarkRead, topicsSubscribe, topicsUnsubscribe, type MessageView, type TopicDetail } from '@juno/contract'
 import {
   bottomWindow,
@@ -38,7 +38,7 @@ import {
   type OlderStatus,
 } from '@juno/views'
 import { markFilterChange } from './filterMark'
-import { closeTopicTab, openTopic, takeOpenStart } from './navigation'
+import { closeTopicTab, onLeaveTab, openTopic, takeOpenStart } from './navigation'
 
 /** Within this of the end counts as at the bottom (performance 3.3). */
 const BOTTOM_SLACK = 32
@@ -52,6 +52,17 @@ const OLDER_MARGIN = '1000px 0px 0px 0px'
 const LOADING_DELAY_MS = 300
 /** Message times change at most at a day boundary; re-render the rows for it this often, not every minute. */
 const TIME_STEP = 10 * 60_000
+/** The shortest a message row can be: the 32px avatar slot and its padding. */
+const MIN_ROW_HEIGHT = 40
+
+/**
+ * Rows above the open position that the first frame draws: enough to fill
+ * the window however short the rows are. The rest of the window is drawn
+ * after that frame. `innerHeight` does not force a layout.
+ */
+function firstRows(): number {
+  return Math.ceil(window.innerHeight / MIN_ROW_HEIGHT) + 2
+}
 
 const ROW = '[data-message-row]'
 
@@ -109,11 +120,12 @@ function snapshotOf(scroller: HTMLElement): ScrollSnapshot | undefined {
 }
 
 /**
- * What the list holds still while its rows reach their real height. Rows
- * are `content-visibility: auto`, so a row is laid out at its estimate
- * until it comes into view and grows in that frame. `bottom` keeps the end
- * in view; `row` keeps an element at an offset from the top (the divider
- * on open, a snapshot's row on restore) until the user scrolls.
+ * The position the list goes back to whenever it changes under the user:
+ * rows added above or below, the window resized. `bottom` keeps the end in
+ * view; `row` keeps an element at an offset from the top (the divider on
+ * open, a snapshot's row on restore, the row in view during a prepend)
+ * until the user scrolls. It is applied in layout effects and the resize
+ * event, before paint, and only ever writes `scrollTop`.
  */
 type Pin = { readonly kind: 'bottom' } | { readonly kind: 'row'; readonly element: Element; readonly offset: number }
 
@@ -128,6 +140,26 @@ function hold(scroller: HTMLElement, pin: RefObject<Pin | undefined>, pinnedTop:
   if (held.kind === 'bottom') scroller.scrollTop = scroller.scrollHeight
   else scroller.scrollTop += held.element.getBoundingClientRect().top - scroller.getBoundingClientRect().top - held.offset
   pinnedTop.current = scroller.scrollTop
+}
+
+/**
+ * The rows laid out in full rather than at their size estimate, so the
+ * position set before the first paint is where they end up: a window's
+ * worth around the open position, and the last window's worth, where new
+ * messages arrive and the bottom is held. Everywhere else the browser's
+ * scroll anchoring absorbs rows growing as they come into view.
+ */
+function eagerRows(order: ReadonlyArray<string>, openAt: number, rows: number): ReadonlySet<string> {
+  const eager = new Set<string>()
+  for (let i = Math.max(0, openAt - rows); i < Math.min(order.length, openAt + rows); i++) eager.add(order[i]!)
+  for (let i = Math.max(0, order.length - rows); i < order.length; i++) eager.add(order[i]!)
+  return eager
+}
+
+/** The row the open position shows at the top: the snapshot's row, the first unread one, or the end. */
+function openIndex(list: MessageWindow, divider: number, snapshot: ScrollSnapshot | undefined): number {
+  const restored = snapshot === undefined ? -1 : list.order.indexOf(snapshot.anchorKey)
+  return restored >= 0 ? restored : divider > 0 ? divider : list.order.length
 }
 
 function distanceFromBottom(scroller: HTMLElement): number {
@@ -213,13 +245,17 @@ function Topic({ id, stealth, detail }: { readonly id: string; readonly stealth:
   const dividerBefore = at > 0 ? list.order[at] : undefined
 
   const [positioned, setPositioned] = useState(false)
+  // Until the first frame is presented, only the rows from `firstRows()` above the open position down are drawn.
+  const [drawnAll, setDrawnAll] = useState(false)
   const [atBottom, setAtBottom] = useState(true)
   const [far, setFar] = useState(false)
   // The newest message the user has seen at the bottom; the pill counts those after it.
   const [seenTs, setSeenTs] = useState<string | undefined>(undefined)
-  // What the position holds to while rows reach their real height, and the scrollTop it last set.
+  // The position to hold (`Pin`), and the scrollTop it last set.
   const pin = useRef<Pin | undefined>(undefined)
   const pinnedTop = useRef(0)
+  // The last message and window size the bottom was held for.
+  const heldFor = useRef<string | undefined>(undefined)
   const last = list.order.at(-1)
   const first = list.order[0]
   // The window holds the newest message: no anchor.
@@ -246,22 +282,32 @@ function Topic({ id, stealth, detail }: { readonly id: string; readonly stealth:
     hold(scroller, pin, pinnedTop)
     const distance = distanceFromBottom(scroller)
     const bottom = atEnd && distance <= BOTTOM_SLACK
-    if (bottom) pin.current = { kind: 'bottom' }
+    if (bottom) {
+      pin.current = { kind: 'bottom' }
+      heldFor.current = `${last} ${window.innerWidth}x${window.innerHeight}`
+    }
     setAtBottom(bottom)
     setFar(distance > scroller.clientHeight)
     setSeenTs(last)
     setPositioned(true)
   }, [id, positioned, list.ready, last, atEnd])
 
-  // Rows are drawn at their estimate until they come into view, then grow in the same frame; this
-  // puts the pinned row or the bottom back before that frame is painted (the one ResizeObserver that writes).
+  // Rows added above the ones in view (the rest of the window after the first frame, an older page):
+  // scroll anchoring keeps the rows in view still, except at offset 0, where Chromium does not anchor.
   useLayoutEffect(() => {
     const scroller = scrollRef.current
-    const column = scroller?.firstElementChild
-    if (scroller == null || column == null) return
-    const observer = new ResizeObserver(() => hold(scroller, pin, pinnedTop))
-    observer.observe(column)
-    return () => observer.disconnect()
+    if (scroller !== null && positioned) hold(scroller, pin, pinnedTop)
+  }, [positioned, first, drawnAll])
+
+  // A wider or narrower window reflows the rows; at the bottom, stay there. Resize runs before the frame's paint.
+  useEffect(() => {
+    const scroller = scrollRef.current
+    if (scroller === null) return
+    const onResize = () => {
+      if (pin.current?.kind === 'bottom') hold(scroller, pin, pinnedTop)
+    }
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
   }, [])
 
   // `juno.topic-open` (or `juno.tab-switch` back to an unmounted tab): to the first frame with the header and the list in place.
@@ -271,10 +317,20 @@ function Topic({ id, stealth, detail }: { readonly id: string; readonly stealth:
     if (started !== undefined) afterPaint(() => measure(started.name, started.at, { detail: { id, rows: list.order.length } }))
   }, [id, list.ready, list.order.length, positioned])
 
+  // The rows above the first frame's, once it is on screen; scroll anchoring keeps the rows in view still.
+  useEffect(() => {
+    if (positioned && !drawnAll) afterPaint(() => startTransition(() => setDrawnAll(true)))
+  }, [positioned, drawnAll])
+
   // Stick to the bottom: a message that arrives while at the bottom is scrolled into view before paint.
+  // A tab shown again with no new message and the same window size is still at the bottom (Chromium
+  // keeps a hidden scroller's offset), so it skips the layout that reading the position would force.
   useLayoutEffect(() => {
     const scroller = scrollRef.current
     if (scroller === null || !positioned || pin.current?.kind !== 'bottom' || !atEnd) return
+    const key = `${last} ${window.innerWidth}x${window.innerHeight}`
+    if (heldFor.current === key) return
+    heldFor.current = key
     hold(scroller, pin, pinnedTop)
     setSeenTs(last)
   }, [positioned, last, atEnd])
@@ -286,6 +342,7 @@ function Topic({ id, stealth, detail }: { readonly id: string; readonly stealth:
     const letGo = () => {
       pin.current = undefined
     }
+    const record = () => registry.set(scrollSnapshotAtom(id), snapshotOf(scroller))
     const onScrollEnd = () => {
       if (pin.current?.kind === 'row' && Math.abs(scroller.scrollTop - pinnedTop.current) > 1) pin.current = undefined
       const distance = distanceFromBottom(scroller)
@@ -295,14 +352,19 @@ function Topic({ id, stealth, detail }: { readonly id: string; readonly stealth:
       setAtBottom(bottom)
       setFar(distance > scroller.clientHeight)
       if (bottom) setSeenTs(lastRef.current)
-      registry.set(scrollSnapshotAtom(id), snapshotOf(scroller))
+      record()
     }
     const inputs = ['wheel', 'touchstart', 'pointerdown', 'keydown'] as const
     for (const type of inputs) scroller.addEventListener(type, letGo, { passive: true })
     scroller.addEventListener('scrollend', onScrollEnd)
+    // After a jump (End, a scrollbar drag, a script) the rows it brought near the view reach their real
+    // height frames after the scroll ended, and Chromium does not always anchor that; so the position is
+    // also recorded as the tab is left, from what is on screen then.
+    const stopLeaving = onLeaveTab(id, record)
     return () => {
       for (const type of inputs) scroller.removeEventListener(type, letGo)
       scroller.removeEventListener('scrollend', onScrollEnd)
+      stopLeaving()
     }
   }, [id])
 
@@ -314,7 +376,7 @@ function Topic({ id, stealth, detail }: { readonly id: string; readonly stealth:
   const older: OlderStatus = loadingOlder ? 'loading' : rootShown || (complete && !windowFull) ? 'none' : 'more'
   useEffect(() => {
     const scroller = scrollRef.current
-    if (scroller === null || !positioned || older !== 'more' || first === undefined) return
+    if (scroller === null || !drawnAll || older !== 'more' || first === undefined) return
     const row = scroller.querySelector(rowSelector(first))
     if (row === null) return
     const observer = new IntersectionObserver(
@@ -344,7 +406,7 @@ function Topic({ id, stealth, detail }: { readonly id: string; readonly stealth:
     )
     observer.observe(row)
     return () => observer.disconnect()
-  }, [id, positioned, older, first])
+  }, [id, drawnAll, older, first])
 
   // What Slack has that the store lacks, once per mount; a hidden tab coming back does not ask again.
   const [fetchState, setFetchState] = useState<'pending' | 'done' | 'offline'>('pending')
@@ -386,6 +448,13 @@ function Topic({ id, stealth, detail }: { readonly id: string; readonly stealth:
   const people = list.refs.people
   const hueOf = (personId: string) => hueFor(people.get(personId)?.color ?? '', personId)
 
+  const items = itemsOf(list)
+  const rows = firstRows()
+  const openAt = drawnAll ? list.order.length : openIndex(list, at, registry.get(scrollSnapshotAtom(id)))
+  const from = drawnAll ? 0 : Math.max(0, openAt - rows)
+  const shown = from === 0 ? items : items.slice(from)
+  const eager = eagerRows(list.order, openAt, rows)
+
   const seenAt = seenTs === undefined ? -1 : list.order.indexOf(seenTs)
   const newCount = seenAt < 0 ? 0 : list.order.length - seenAt - 1
   const showPill = positioned && !atBottom && (newCount > 0 || far || !atEnd)
@@ -413,7 +482,9 @@ function Topic({ id, stealth, detail }: { readonly id: string; readonly stealth:
       composer={<ComposerSlot placeholder={main ? `Message ${detail.channel.label}` : 'Reply'} />}
     >
       <MessageList
-        items={itemsOf(list)}
+        items={shown}
+        eager={eager}
+        notDrawnAbove={from}
         main={main}
         now={now}
         status={status}

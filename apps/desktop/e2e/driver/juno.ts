@@ -6,6 +6,21 @@
  */
 import { expect, type ElectronApplication, type Locator, type Page } from '@playwright/test'
 
+/**
+ * How long a click holds the button, as a real one does. A pointerup in the
+ * frame right after the pointerdown makes Chromium defer the page's tasks
+ * past the next frame, which would end the app's input-to-paint measures a
+ * frame late.
+ */
+const PRESS_MS = 60
+
+/** Presses and releases the primary button where the mouse is. */
+export async function press(win: Page): Promise<void> {
+  await win.mouse.down()
+  await win.waitForTimeout(PRESS_MS)
+  await win.mouse.up()
+}
+
 export type SidebarSectionName = 'Pinned' | 'Recent'
 export type SidebarFilterName = 'All' | 'Channels' | 'DMs'
 
@@ -42,8 +57,7 @@ export class SidebarRow {
     const box = await this.root.boundingBox()
     if (!box) throw new Error(`Row "${this.title}" is not on screen`)
     await this.win.mouse.move(box.x + 40, box.y + box.height / 2)
-    await this.win.mouse.down()
-    await this.win.mouse.up()
+    await press(this.win)
   }
 
   /** Opens the topic in the current tab. */
@@ -598,6 +612,31 @@ export class TopicPane {
     return this.scroller.evaluate((scroller) => scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight)
   }
 
+  /**
+   * Reads the shown list's distance from the bottom on every frame until the
+   * returned function is called, which answers with one value per frame
+   * that had message rows, so a test can check the first painted frame.
+   */
+  async watchBottom(): Promise<() => Promise<number[]>> {
+    await this.win.evaluate(() => {
+      const w = window as unknown as { __bottomFrames?: { distances: number[]; on: boolean } }
+      const state = { distances: [] as number[], on: true }
+      w.__bottomFrames = state
+      const tick = () => {
+        const scroller = [...document.querySelectorAll<HTMLElement>('[data-topic-view] [data-scroll]')].find((node) => node.offsetParent !== null)
+        if (scroller !== undefined && scroller.querySelector('[data-message-row]') !== null) state.distances.push(scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight)
+        if (state.on) requestAnimationFrame(tick)
+      }
+      requestAnimationFrame(tick)
+    })
+    return () =>
+      this.win.evaluate(() => {
+        const state = (window as unknown as { __bottomFrames: { distances: number[]; on: boolean } }).__bottomFrames
+        state.on = false
+        return state.distances
+      })
+  }
+
   async expectAtBottom(): Promise<void> {
     await expect.poll(() => this.distanceFromBottom(), { timeout: 5_000 }).toBeLessThanOrEqual(BOTTOM_SLACK)
   }
@@ -728,8 +767,7 @@ export class ThreadLinkDriver {
     if (!box) throw new Error('Thread link is not on screen')
     if (options.newTab) await this.win.keyboard.down('Meta')
     await this.win.mouse.move(box.x + 8, box.y + box.height / 2)
-    await this.win.mouse.down()
-    await this.win.mouse.up()
+    await press(this.win)
     if (options.newTab) await this.win.keyboard.up('Meta')
   }
 }
@@ -751,8 +789,7 @@ export class ThreadsPopover {
     const box = await this.entry(title).boundingBox()
     if (!box) throw new Error(`No thread "${title}" in the list`)
     await this.win.mouse.move(box.x + 24, box.y + box.height / 2)
-    await this.win.mouse.down()
-    await this.win.mouse.up()
+    await press(this.win)
   }
 
   async subscribe(title: string): Promise<void> {
@@ -800,8 +837,7 @@ export class TabStrip {
     const box = await this.tab(title).boundingBox()
     if (!box) throw new Error(`No tab "${title}"`)
     await this.win.mouse.move(box.x + 24, box.y + box.height / 2)
-    await this.win.mouse.down()
-    await this.win.mouse.up()
+    await press(this.win)
   }
 
   /** The close button on a tab. */

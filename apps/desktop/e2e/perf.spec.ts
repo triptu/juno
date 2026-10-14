@@ -1,15 +1,19 @@
-// The sidebar's numbers against docs/performance.md section 1, measured on
-// the built app. Not part of the suite: the numbers depend on the machine
-// and the budgets are checked by hand until the perf harness exists
-// (performance.md 7.3). Each scenario prints its samples and the load
-// average; the filter scenario also fails on a frame with no rows.
+// Juno's numbers against docs/performance.md section 1, measured on the
+// built app. Not part of `test:e2e`: the numbers depend on the machine, so
+// the scenarios run on their own through the heavy-job lock. Each one prints
+// its samples and the load average and fails when a p95 (or a p50 where the
+// budget says so) is over its budget.
 //
-//   JUNO_PERF=1 pnpm --filter @juno/desktop exec playwright test e2e/perf.spec.ts
-import { rm } from 'node:fs/promises'
+//   pnpm perf                  every scenario
+//   pnpm perf -g "topic view"  some of them
+//   JUNO_PERF_TRACE=<dir>      also write traces and CPU profiles (scripts/perf-trace.mjs)
+import { mkdir, rm, writeFile } from 'node:fs/promises'
 import { loadavg } from 'node:os'
+import { join } from 'node:path'
+import type { Page } from '@playwright/test'
 import { largeSeed, startFakeSlack, topic300Seed, TOPIC300_MAIN_CHANNEL, TOPIC300_THREAD_CHANNEL, type FakeSlack } from '@juno/fake-slack'
 import { expect, launchApp, tempUserData, test, writeSlackApp, type RunningApp, type SlackAppFixture } from './fixtures'
-import { Juno, type SidebarFilterName } from './driver/juno'
+import { Juno, press, type SidebarFilterName } from './driver/juno'
 
 test.skip(process.env['JUNO_PERF'] !== '1', 'set JUNO_PERF=1 to measure')
 
@@ -17,13 +21,161 @@ const POSTGRES = 'Draft plan is in the doc'
 
 function stats(name: string, samples: ReadonlyArray<number>): { readonly median: number; readonly p95: number } {
   const sorted = samples.toSorted((a, b) => a - b)
-  const at = (q: number) => sorted[Math.min(sorted.length - 1, Math.floor(q * sorted.length))] ?? 0
+  // Nearest rank: the p95 of 20 samples is the 19th, not the largest.
+  const at = (q: number) => sorted[Math.max(0, Math.ceil(q * sorted.length) - 1)] ?? 0
   const median = at(0.5)
   const p95 = at(0.95)
   const load = loadavg()[0]!.toFixed(1)
-  console.log(`${name}: median ${median.toFixed(1)} ms, p95 ${p95.toFixed(1)} ms, n=${samples.length}, load ${load}, samples ${sorted.map((s) => s.toFixed(1)).join(' ')}`)
+  const shown = sorted.length <= 60 ? `, samples ${sorted.map((s) => s.toFixed(1)).join(' ')}` : ''
+  console.log(`${name}: median ${median.toFixed(1)} ms, p95 ${p95.toFixed(1)} ms, n=${samples.length}, load ${load}${shown}`)
   return { median, p95 }
 }
+
+/** Fails the scenario when `value` is over its budget from docs/performance.md section 1. */
+function within(name: string, value: number, budget: number): void {
+  expect(value, `${name}: ${value.toFixed(1)} ms against a budget of ${budget.toFixed(1)} ms`).toBeLessThanOrEqual(budget)
+}
+
+/** The display's refresh interval: the median of 30 animation frame intervals. */
+async function refreshInterval(win: Page): Promise<number> {
+  return win.evaluate(
+    () =>
+      new Promise<number>((resolve) => {
+        const times: number[] = []
+        const tick = (now: number) => {
+          times.push(now)
+          if (times.length <= 30) requestAnimationFrame(tick)
+          else resolve(times.slice(1).map((t, i) => t - times[i]!).toSorted((a, b) => a - b)[15]!)
+        }
+        requestAnimationFrame(tick)
+      }),
+  )
+}
+
+/**
+ * The budget for "one frame" interactions (tab switch, prefetched open,
+ * hover): 16 ms on the 120 Hz reference display. Measured from the input
+ * to the frame presented, it includes the wait for the next refresh, which
+ * at 60 Hz alone reaches 16.4 ms at p95 with no work at all (the frame
+ * floor scenario). On a slower display it is one refresh interval plus the
+ * 8 ms of work a 120 Hz frame allows, as proposed in performance.md 8.
+ */
+function oneFrameBudget(interval: number): number {
+  return interval < 10 ? 16 : interval + 8
+}
+
+/** Main-thread work per frame, in milliseconds: what the scroll budget is about. */
+interface FrameWork {
+  readonly work: ReadonlyArray<number>
+}
+
+const TRACE_DIR = process.env['JUNO_PERF_TRACE']
+
+/**
+ * Records a Chrome trace of the renderer while `run` runs and answers with
+ * the main thread's work per frame: every task from the start of one
+ * frame's task to the next. With JUNO_PERF_TRACE set to a directory it
+ * records every category and a CPU profile too, and writes them as
+ * `<name>.trace.json` and `<name>.cpuprofile` for scripts/perf-trace.mjs.
+ */
+async function traced(win: Page, name: string, run: () => Promise<void>): Promise<FrameWork> {
+  const cdp = await win.context().newCDPSession(win)
+  const categories =
+    TRACE_DIR === undefined
+      ? ['disabled-by-default-devtools.timeline', 'benchmark']
+      : ['devtools.timeline', 'disabled-by-default-devtools.timeline', 'disabled-by-default-devtools.timeline.frame', 'blink.user_timing', 'v8.execute', 'blink', 'cc', 'benchmark', 'gpu', 'viz']
+  await cdp.send('Tracing.start', { traceConfig: { includedCategories: categories }, transferMode: 'ReturnAsStream' })
+  let trace = ''
+  if (TRACE_DIR !== undefined) {
+    await cdp.send('Profiler.enable')
+    await cdp.send('Profiler.setSamplingInterval', { interval: 100 })
+    await cdp.send('Profiler.start')
+  }
+  // Starting a trace stops the renderer for a garbage collection: a 50-60 ms frame that is not the scenario's.
+  await win.waitForTimeout(500)
+  try {
+    await run()
+  } finally {
+    const profile = TRACE_DIR === undefined ? undefined : (await cdp.send('Profiler.stop')).profile
+    const done = new Promise<string>((resolve) => cdp.once('Tracing.tracingComplete', (event) => resolve(event.stream!)))
+    await cdp.send('Tracing.end')
+    const handle = await done
+    const chunks: string[] = []
+    for (;;) {
+      const chunk = await cdp.send('IO.read', { handle })
+      chunks.push(chunk.base64Encoded === true ? Buffer.from(chunk.data, 'base64').toString() : chunk.data)
+      if (chunk.eof) break
+    }
+    await cdp.send('IO.close', { handle })
+    await cdp.detach()
+    trace = chunks.join('')
+    if (TRACE_DIR !== undefined) {
+      await mkdir(TRACE_DIR, { recursive: true })
+      await writeFile(join(TRACE_DIR, `${name}.trace.json`), trace)
+      await writeFile(join(TRACE_DIR, `${name}.cpuprofile`), JSON.stringify(profile))
+    }
+  }
+  return { work: frameWork(trace) }
+}
+
+interface TraceEvent {
+  readonly name: string
+  readonly ph: string
+  readonly pid: number
+  readonly tid: number
+  readonly ts: number
+  readonly dur?: number
+  readonly args?: { readonly name?: string }
+}
+
+/** Sums the renderer main thread's top-level tasks between the starts of consecutive frame tasks. */
+function frameWork(json: string): number[] {
+  const parsed = JSON.parse(json) as { readonly traceEvents: ReadonlyArray<TraceEvent> } | ReadonlyArray<TraceEvent>
+  const events = 'traceEvents' in parsed ? parsed.traceEvents : parsed
+  const mains = new Set(events.filter((e) => e.ph === 'M' && e.name === 'thread_name' && e.args?.name === 'CrRendererMain').map((e) => `${e.pid}:${e.tid}`))
+  const frameCounts = new Map<string, number>()
+  for (const e of events) if (e.ph === 'X' && e.name === 'ProxyMain::BeginMainFrame' && mains.has(`${e.pid}:${e.tid}`)) frameCounts.set(`${e.pid}:${e.tid}`, (frameCounts.get(`${e.pid}:${e.tid}`) ?? 0) + 1)
+  // The window's renderer is the one drawing frames.
+  const main = [...frameCounts].toSorted((a, b) => b[1] - a[1])[0]?.[0]
+  const on = (e: TraceEvent) => `${e.pid}:${e.tid}` === main && e.ph === 'X'
+  const tasks = events.filter((e) => on(e) && e.name === 'RunTask').toSorted((a, b) => a.ts - b.ts)
+  const frameStarts = events
+    .filter((e) => on(e) && e.name === 'ProxyMain::BeginMainFrame')
+    .map((frame) => tasks.find((task) => task.ts <= frame.ts && frame.ts < task.ts + (task.dur ?? 0))?.ts ?? frame.ts)
+    .toSorted((a, b) => a - b)
+  const work: number[] = []
+  let next = 0
+  for (let i = 0; i + 1 < frameStarts.length; i++) {
+    while (next < tasks.length && tasks[next]!.ts < frameStarts[i]!) next++
+    let sum = 0
+    for (let k = next; k < tasks.length && tasks[k]!.ts < frameStarts[i + 1]!; k++) sum += tasks[k]!.dur ?? 0
+    work.push(sum / 1000)
+  }
+  return work
+}
+
+// The floor under every input-to-paint measure: a pointerdown that does no
+// work, to the first moment after the next presented frame, timed the way
+// `afterPaint` times the app's measures. On a 60 Hz display it spreads over
+// one 16.7 ms frame however fast the app is.
+test('frame floor: input with no work to the next frame', async ({ juno, win }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  await win.evaluate(() => {
+    const w = window as unknown as { __floor: number[] }
+    w.__floor = []
+    window.addEventListener('pointerdown', () => {
+      const start = performance.now()
+      requestAnimationFrame(() => setTimeout(() => w.__floor.push(performance.now() - start), 0))
+    })
+  })
+  for (let i = 0; i < 30; i++) {
+    await win.mouse.move(900, 300 + i)
+    await press(win)
+    await win.waitForTimeout(37 + (i % 7) * 3)
+  }
+  stats('frame floor, pointerdown with no work to next frame presented', await win.evaluate(() => (window as unknown as { __floor: number[] }).__floor))
+})
 
 test('row hover to paint', async ({ juno, win }) => {
   test.setTimeout(120_000)
@@ -55,7 +207,8 @@ test('row hover to paint', async ({ juno, win }) => {
     await win.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
     samples.push(await win.evaluate(() => (window as unknown as { __hoverSample: Promise<number> }).__hoverSample))
   }
-  stats('row hover (pointerover event) to next frame presented', samples)
+  const hover = stats('row hover (pointerover event) to next frame presented', samples)
+  within('row hover, p95', hover.p95, oneFrameBudget(await refreshInterval(win)))
 })
 
 test('live update: a reply from another client to pixels', async ({ juno, fake }) => {
@@ -76,7 +229,8 @@ test('live update: a reply from another client to pixels', async ({ juno, fake }
     await juno.win.waitForTimeout(300)
   }
   // The engine stamps the commit; the renderer ends the measure after the paint.
-  stats('live update, engine commit to pixels (juno.live-update)', measured)
+  const live = stats('live update, engine commit to pixels (juno.live-update)', measured)
+  within('live update, p95', live.p95, 50)
   // Includes the fake's socket frame, the engine's merge, and Playwright's own polling.
   stats('live update, inject call to new preview seen by Playwright', wall)
 })
@@ -132,7 +286,8 @@ test.describe.serial('large workspace', () => {
     }
     console.log(`rows in the window: ${runs.map((run) => run.rows).join(' ')}`)
     stats('warm start, main process created to shell painted', runs.map((run) => run.mainToShell))
-    stats('warm start, main process created to sidebar rows painted', runs.map((run) => run.mainToRows))
+    const rows = stats('warm start, main process created to sidebar rows painted', runs.map((run) => run.mainToRows))
+    within('warm start to sidebar rows, median', rows.median, 500)
     stats('warm start, sidebar snapshot to rows painted (juno.sidebar-paint)', runs.map((run) => run.snapshotToRows))
     stats('warm start, longest animation frame up to 1 s after the rows', runs.map((run) => run.longestFrame))
     stats('warm start, blocking time of that frame', runs.map((run) => run.longestBlocking))
@@ -164,8 +319,9 @@ test.describe.serial('large workspace', () => {
       const frames = await stop()
       const durations = await juno.measures('juno.filter')
       console.log(`filter frames: ${frames.frames}, with no rows: ${frames.blank}, fewest rows in a frame: ${frames.fewest}`)
-      stats('filter change, press to new list painted (juno.filter)', durations)
+      const filter = stats('filter change, press to new list painted (juno.filter)', durations)
       expect(frames.blank).toBe(0)
+      within('filter change, p95', filter.p95, 50)
     } finally {
       await running.close()
     }
@@ -197,45 +353,50 @@ test.describe.serial('large workspace', () => {
           }
         }).observe({ type: 'long-animation-frame', buffered: false })
       })
+      const interval = await refreshInterval(win)
       const sweep = async (label: string) => {
-        await win.evaluate(() => {
-          const w = window as unknown as { __frames: number[]; __sampling: boolean }
-          w.__frames = []
-          w.__sampling = true
-          let last = performance.now()
-          const tick = (now: number) => {
-            w.__frames.push(now - last)
-            last = now
-            if (w.__sampling) requestAnimationFrame(tick)
-          }
-          requestAnimationFrame(tick)
-        })
+        let frames: number[] = []
+        let loaf: string[] = []
         // About 2 000 px/s for 3 s, down then up.
-        for (let i = 0; i < 30; i++) {
-          await win.mouse.wheel(0, 200)
-          await win.waitForTimeout(100)
-        }
-        for (let i = 0; i < 30; i++) {
-          await win.mouse.wheel(0, -200)
-          await win.waitForTimeout(100)
-        }
-        const frames = await win.evaluate(() => {
-          const w = window as unknown as { __frames: number[]; __sampling: boolean }
-          w.__sampling = false
-          return w.__frames.slice(1)
-        })
-        const loaf = await win.evaluate(() => {
-          const w = window as unknown as { __loaf: string[] }
-          const out = w.__loaf
-          w.__loaf = []
-          return out
+        const { work } = await traced(win, `scroll-sidebar-${label.replace(' ', '-')}`, async () => {
+          await win.evaluate(() => {
+            const w = window as unknown as { __frames: number[]; __sampling: boolean; __loaf: string[] }
+            w.__frames = []
+            w.__loaf = []
+            w.__sampling = true
+            let last = performance.now()
+            const tick = (now: number) => {
+              w.__frames.push(now - last)
+              last = now
+              if (w.__sampling) requestAnimationFrame(tick)
+            }
+            requestAnimationFrame(tick)
+          })
+          for (let i = 0; i < 30; i++) {
+            await win.mouse.wheel(0, 200)
+            await win.waitForTimeout(100)
+          }
+          for (let i = 0; i < 30; i++) {
+            await win.mouse.wheel(0, -200)
+            await win.waitForTimeout(100)
+          }
+          // Read before the trace ends: collecting it stalls the renderer too.
+          ;({ frames, loaf } = await win.evaluate(() => {
+            const w = window as unknown as { __frames: number[]; __sampling: boolean; __loaf: string[] }
+            w.__sampling = false
+            return { frames: w.__frames.slice(1), loaf: w.__loaf }
+          }))
         })
         const sorted = frames.toSorted((a, b) => a - b)
         const p95 = sorted[Math.floor(0.95 * sorted.length)] ?? 0
         const max = sorted[sorted.length - 1] ?? 0
-        const over = frames.filter((f) => f > 16.7 * 1.5).length
-        console.log(`scroll ${label}: ${frames.length} frames, p95 ${p95.toFixed(1)} ms, max ${max.toFixed(1)} ms, frames over 25 ms ${over}, long animation frames ${loaf.length}, load ${loadavg()[0]!.toFixed(1)}`)
+        const over = frames.filter((f) => f > interval * 1.5).length
+        console.log(`scroll ${label}: ${frames.length} frames, p95 ${p95.toFixed(1)} ms, max ${max.toFixed(1)} ms, frames over 1.5 intervals ${over}, long animation frames ${loaf.length}, load ${loadavg()[0]!.toFixed(1)}`)
         for (const line of loaf) console.log(`  loaf ${line}`)
+        const perFrame = stats(`scroll sidebar ${label}, main-thread work per frame`, work)
+        within(`scroll sidebar ${label}, main-thread work per frame, p95`, perFrame.p95, 8.3)
+        expect(loaf).toEqual([])
+        expect(over / frames.length).toBeLessThan(0.01)
       }
       // The first pass lays out rows the window has never shown; the second is the steady state.
       await sweep('first pass')
@@ -282,7 +443,8 @@ test('topic open, uncached: a thread whose replies were never fetched, to the he
       await rm(appDir, { recursive: true, force: true })
     }
   }
-  stats('topic open, uncached, press to header and stored rows painted (juno.topic-open)', samples)
+  const open = stats('topic open, uncached, press to header and stored rows painted (juno.topic-open)', samples)
+  within('topic open uncached, p95', open.p95, 50)
 })
 
 // The M4 gate (performance 3.4) on the topic300 seed: a 300-message thread
@@ -314,8 +476,7 @@ test.describe.serial('topic view', () => {
   async function pressRow(juno: Juno, title: string): Promise<void> {
     const box = (await juno.sidebar.row(title).root.boundingBox())!
     await juno.win.mouse.move(box.x + 40, box.y + box.height / 2, { steps: 1 })
-    await juno.win.mouse.down()
-    await juno.win.mouse.up()
+    await press(juno.win)
   }
 
   async function nextMeasure(juno: Juno, name: string, before: number): Promise<number> {
@@ -370,29 +531,45 @@ test.describe.serial('topic view', () => {
           await juno.topic.expectAtBottom()
         }
       }
-      for (let i = 0; i < 10; i++) {
-        for (const title of [THREAD, MAIN]) {
-          await juno.sidebar.row(title).hover()
-          await running.win.waitForTimeout(300)
-          const before = (await juno.measures('juno.topic-open')).length
-          await juno.sidebar.row(title).open()
-          prefetched.push(await nextMeasure(juno, 'juno.topic-open', before))
+      await traced(running.win, 'topic-open-prefetched', async () => {
+        for (let i = 0; i < 10; i++) {
+          for (const title of [THREAD, MAIN]) {
+            await juno.sidebar.row(title).hover()
+            await running.win.waitForTimeout(300)
+            const before = (await juno.measures('juno.topic-open')).length
+            await juno.sidebar.row(title).open()
+            prefetched.push(await nextMeasure(juno, 'juno.topic-open', before))
+          }
         }
+      })
+      // Untimed: every frame of an open is painted at the bottom, with no correction after the first one.
+      for (const title of [THREAD, MAIN, THREAD, MAIN]) {
+        const stop = await juno.topic.watchBottom()
+        const before = (await juno.measures('juno.topic-open')).length
+        await pressRow(juno, title)
+        await nextMeasure(juno, 'juno.topic-open', before)
+        await running.win.waitForTimeout(300)
+        const distances = await stop()
+        expect(distances.length).toBeGreaterThan(5)
+        expect(Math.max(...distances)).toBeLessThanOrEqual(2)
       }
-      stats('topic open, cached 300 rows, press to rows painted at position (juno.topic-open)', cached)
-      stats('topic open, prefetched (juno.topic-open)', prefetched)
+      const oneFrame = oneFrameBudget(await refreshInterval(running.win))
+      within('topic open cached, p95', stats('topic open, cached 300 rows, press to rows painted at position (juno.topic-open)', cached).p95, 50)
+      within('topic open prefetched, p95', stats('topic open, prefetched (juno.topic-open)', prefetched).p95, oneFrame)
 
       // Tab switch: two mounted tabs.
       await juno.sidebar.row(THREAD).openInNewTab()
       await juno.tabs.expectCount(2)
       const mounted: number[] = []
-      for (let i = 0; i < 20; i++) {
-        const title = i % 2 === 0 ? 'perf-main' : THREAD
-        const before = (await juno.measures('juno.tab-switch')).length
-        await juno.tabs.select(title)
-        mounted.push(await nextMeasure(juno, 'juno.tab-switch', before))
-      }
-      stats('tab switch, mounted (juno.tab-switch)', mounted)
+      await traced(running.win, 'tab-switch-mounted', async () => {
+        for (let i = 0; i < 20; i++) {
+          const title = i % 2 === 0 ? 'perf-main' : THREAD
+          const before = (await juno.measures('juno.tab-switch')).length
+          await juno.tabs.select(title)
+          mounted.push(await nextMeasure(juno, 'juno.tab-switch', before))
+        }
+      })
+      within('tab switch mounted, p95', stats('tab switch, mounted (juno.tab-switch)', mounted).p95, oneFrame)
     } finally {
       await running.close()
     }
@@ -420,41 +597,50 @@ test.describe.serial('topic view', () => {
 
       const box = (await juno.topic.scroller.boundingBox())!
       await win.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
-      await win.evaluate(() => {
-        const w = window as unknown as { __frames: number[]; __sampling: boolean; __loaf: number }
-        w.__frames = []
-        w.__loaf = 0
-        w.__sampling = true
-        new PerformanceObserver((entries) => {
-          w.__loaf += entries.getEntries().length
-        }).observe({ type: 'long-animation-frame', buffered: false })
-        let last = performance.now()
-        const tick = (now: number) => {
-          w.__frames.push(now - last)
-          last = now
-          if (w.__sampling) requestAnimationFrame(tick)
-        }
-        requestAnimationFrame(tick)
-      })
+      const interval = await refreshInterval(win)
+      let result = { frames: [] as number[], loaf: 0 }
       // About 2 000 px/s for 3 s, down then up, twice.
-      for (let pass = 0; pass < 2; pass++) {
-        for (let i = 0; i < 30; i++) {
-          await win.mouse.wheel(0, 200)
-          await win.waitForTimeout(100)
+      const { work } = await traced(win, 'scroll-messages', async () => {
+        await win.evaluate(() => {
+          const w = window as unknown as { __frames: number[]; __sampling: boolean; __loaf: number }
+          w.__frames = []
+          w.__loaf = 0
+          w.__sampling = true
+          new PerformanceObserver((entries) => {
+            w.__loaf += entries.getEntries().length
+          }).observe({ type: 'long-animation-frame', buffered: false })
+          let last = performance.now()
+          const tick = (now: number) => {
+            w.__frames.push(now - last)
+            last = now
+            if (w.__sampling) requestAnimationFrame(tick)
+          }
+          requestAnimationFrame(tick)
+        })
+        for (let pass = 0; pass < 2; pass++) {
+          for (let i = 0; i < 30; i++) {
+            await win.mouse.wheel(0, 200)
+            await win.waitForTimeout(100)
+          }
+          for (let i = 0; i < 30; i++) {
+            await win.mouse.wheel(0, -200)
+            await win.waitForTimeout(100)
+          }
         }
-        for (let i = 0; i < 30; i++) {
-          await win.mouse.wheel(0, -200)
-          await win.waitForTimeout(100)
-        }
-      }
-      const result = await win.evaluate(() => {
-        const w = window as unknown as { __frames: number[]; __sampling: boolean; __loaf: number }
-        w.__sampling = false
-        return { frames: w.__frames.slice(1), loaf: w.__loaf }
+        // Read before the trace ends: collecting it stalls the renderer too.
+        result = await win.evaluate(() => {
+          const w = window as unknown as { __frames: number[]; __sampling: boolean; __loaf: number }
+          w.__sampling = false
+          return { frames: w.__frames.slice(1), loaf: w.__loaf }
+        })
       })
-      const over = result.frames.filter((frame) => frame > 16.7 * 1.5).length
+      const over = result.frames.filter((frame) => frame > interval * 1.5).length
       stats('scroll messages, frame interval', result.frames)
-      console.log(`scroll messages: ${result.frames.length} frames, dropped (over 25 ms) ${over} = ${((100 * over) / result.frames.length).toFixed(2)} %, long animation frames ${result.loaf}`)
+      const perFrame = stats('scroll messages, main-thread work per frame', work)
+      console.log(`scroll messages: ${result.frames.length} frames, dropped (over 1.5 intervals) ${over} = ${((100 * over) / result.frames.length).toFixed(2)} %, long animation frames ${result.loaf}`)
+      within('scroll messages, main-thread work per frame, p95', perFrame.p95, 8.3)
+      expect(result.loaf).toBe(0)
+      expect(over / result.frames.length).toBeLessThan(0.01)
     } finally {
       await running.close()
     }
@@ -466,7 +652,15 @@ test.describe.serial('topic view', () => {
     try {
       await juno.sidebar.row(THREAD).open()
       await juno.topic.expectAtBottom()
-      await juno.topic.scrollUp(2_000)
+      // By wheel, as a user scrolls: rows reach their real height during the gesture, before the scroll ends.
+      // A single 2,000px jump ends its scroll before the rows it shows are laid out.
+      const box = (await juno.topic.scroller.boundingBox())!
+      await running.win.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+      for (let i = 0; i < 10; i++) {
+        await running.win.mouse.wheel(0, -200)
+        await running.win.waitForTimeout(50)
+      }
+      await running.win.waitForTimeout(500)
       const anchor = await juno.topic.firstVisibleRow()
       // Five more tabs push the thread's tab out of the mounted set: five small threads that mention the user.
       const extra = [1, 2, 3, 4, 5].map((k) => `Side topic ${k} ${Date.now()}`)
@@ -489,7 +683,7 @@ test.describe.serial('topic view', () => {
           samples.push(await nextMeasure(juno, 'juno.tab-switch', before))
         }
       }
-      stats('tab switch, unmounted with scroll restore (juno.tab-switch)', samples)
+      within('tab switch unmounted, p95', stats('tab switch, unmounted with scroll restore (juno.tab-switch)', samples).p95, 50)
     } finally {
       await running.close()
     }
@@ -503,6 +697,7 @@ test.describe.serial('topic view', () => {
       await juno.topic.expectAtBottom()
       const root = fake.messages(TOPIC300_THREAD_CHANNEL)[0]!
       // Every juno.live-update of the message list, before the next update of any route replaces it.
+      const live = () => running.win.evaluate(() => (window as unknown as { __live: number[] }).__live.length)
       await running.win.evaluate(() => {
         const w = window as unknown as { __live: number[] }
         w.__live = []
@@ -512,15 +707,20 @@ test.describe.serial('topic view', () => {
           }
         }).observe({ type: 'measure' })
       })
-      for (let i = 0; i < 9; i++) {
-        const text = `Perf sample ${i} ${Date.now()}`
-        fake.injectMessage({ channel: TOPIC300_THREAD_CHANNEL, threadTs: root.ts, user: 'U0PERFLEO', text })
-        await juno.topic.expectMessage(text)
-        await juno.topic.expectAtBottom()
-        await running.win.waitForTimeout(300)
-      }
+      await traced(running.win, 'live-update', async () => {
+        for (let i = 0; i < 9; i++) {
+          const text = `Perf sample ${i} ${Date.now()}`
+          const before = await live()
+          fake.injectMessage({ channel: TOPIC300_THREAD_CHANNEL, threadTs: root.ts, user: 'U0PERFLEO', text })
+          // Polling a locator over 300 rows while the update is on its way runs on the renderer's main thread and would be measured with it.
+          await expect.poll(live, { timeout: 15_000 }).toBeGreaterThan(before)
+          await juno.topic.expectMessage(text)
+          await juno.topic.expectAtBottom()
+          await running.win.waitForTimeout(300)
+        }
+      })
       const measured = await running.win.evaluate(() => (window as unknown as { __live: number[] }).__live)
-      stats('live update in the topic, engine commit to pixels (juno.live-update, messages.list)', measured)
+      within('live update in the topic, p95', stats('live update in the topic, engine commit to pixels (juno.live-update, messages.list)', measured).p95, 50)
     } finally {
       await running.close()
     }
