@@ -468,7 +468,8 @@ module actionsProtocol {
   pure val consumeBeforeSend = List(c("propose", 0), c("click", 0), c("authorize", 0), c("send", 0))
   action consumeBeforeSendStep = script(consumeBeforeSend, "")
   action consumeBeforeSendBugStep = script(consumeBeforeSend, "consume")
-  pure val approvalReuse = List(c("propose", 0), c("click", 0), c("authorize", 0), c("authorize", 0))
+  // A second authorization needs a deduplicating destination; only then can a used approval be reused.
+  pure val approvalReuse = List(c("deduped", 0), c("click", 0), c("authorize", 0), c("authorize", 0))
   action approvalReuseStep = script(approvalReuse, "")
   action approvalReuseBugStep = script(approvalReuse, "reuse")
   pure val startupAttempt = List(c("propose", 0), c("click", 0), c("authorize", 0), c("crash", 0), c("startup", 0))
