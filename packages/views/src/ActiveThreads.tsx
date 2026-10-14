@@ -88,7 +88,7 @@ function ThreadEntry({ thread, now, divider, onOpen, onSubscribe, onUnsubscribe 
       >
         <span {...stylex.props(styles.body)}>
           <span {...stylex.props(styles.line)}>
-            <Text variant="ui" weight={unread ? 'semibold' : 'medium'} tone="default" truncate dir="auto" id={titleId} sx={styles.title}>
+            <Text variant="ui" weight={unread ? 'semibold' : 'medium'} tone="default" truncate tooltipWhenTruncated dir="auto" id={titleId} sx={styles.title}>
               {thread.title}
             </Text>
             {thread.mentionsMe ? (

@@ -7,7 +7,7 @@ import { Hash } from '@phosphor-icons/react/dist/icons/Hash'
 import { Lock } from '@phosphor-icons/react/dist/icons/Lock'
 import { User } from '@phosphor-icons/react/dist/icons/User'
 import { Users } from '@phosphor-icons/react/dist/icons/Users'
-import { memo, useId, type FocusEvent, type MouseEvent, type PointerEvent } from 'react'
+import { memo, useId, type FocusEvent, type MouseEvent } from 'react'
 import type { TopicRow as TopicRowModel } from '@juno/contract'
 import { accent, colors, opacity, radii, sizes, spacing, tints } from '@juno/tokens/tokens.stylex'
 import {
@@ -57,17 +57,6 @@ const ROW_PADDING_BLOCK = '11px'
 
 const REOPENED_TITLE = 'New activity after it was resolved'
 const PRIVATE_TITLE = 'Private channel'
-
-/**
- * Hover on a one-line text: while it is cut off, its native tooltip shows
- * the full value; when it fits, there is none. One width read on pointer
- * enter, nothing on render, so a row costs nothing until it is hovered.
- */
-function titleWhenTruncated(event: PointerEvent<HTMLElement>) {
-  const node = event.currentTarget
-  if (node.scrollWidth > node.clientWidth) node.title = node.textContent ?? ''
-  else node.removeAttribute('title')
-}
 
 /**
  * One sidebar row, chat style: the channel icon or the person's photo, then
@@ -141,7 +130,7 @@ export const TopicRow = memo(function TopicRow({ row, time, selected = false, ta
             truncate
             dir="auto"
             id={titleId}
-            onPointerEnter={titleWhenTruncated}
+            tooltipWhenTruncated
             sx={styles.title}
           >
             {row.title}
@@ -191,7 +180,7 @@ export const TopicRow = memo(function TopicRow({ row, time, selected = false, ta
             ) : (
               <Icon icon={whereIcon(row)} size={13} />
             )}
-            <Text variant="meta" tone="muted" truncate dir="auto" onPointerEnter={titleWhenTruncated}>
+            <Text variant="meta" tone="muted" truncate dir="auto" tooltipWhenTruncated>
               {row.channel.name}
             </Text>
           </span>
