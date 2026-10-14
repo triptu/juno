@@ -9,9 +9,20 @@
     ".": "./src/index.ts"
   },
   "devDependencies": {
-    "typescript": "5.9.3"
+    "typescript": "5.9.3",
+    "vitest": "5.0.4",
+    "fast-check": "4.3.0"
   },
   "juno": {
     "allowedDeps": []
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "effect": "4.0.3",
+    "@noble/hashes": "2.4.0",
+    "typebox": "1.3.27"
   }
 }
