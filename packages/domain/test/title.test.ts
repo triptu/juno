@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { canUseAiTitle, channelKindLabel, channelLabel, contextPillText, contextTint, firstWords, mainLabel, manualTitleAfterRename, resolveTitle, showsAiSparkle } from '../src/index'
+import { channelKindLabel, channelLabel, contextPillText, contextTint, firstWords, mainLabel, manualTitleAfterRename, resolveTitle } from '../src/index'
 import { eng, group, hiring, maya, topic } from './fixtures'
 
 describe('title resolution', () => {
@@ -20,19 +20,6 @@ describe('title resolution', () => {
     expect(resolveTitle(topic({ channel: hiring }))).toEqual({ text: '#hiring', source: 'channel' })
   })
 
-  it('shows the sparkle only for AI titles while AI assist is on', () => {
-    const ai = topic({ overlay: { aiTitle: 'A title' } })
-    expect(showsAiSparkle(ai, true)).toBe(true)
-    expect(showsAiSparkle(ai, false)).toBe(false)
-    expect(showsAiSparkle(topic({ overlay: { aiTitle: 'A title', manualTitle: 'Mine' } }), true)).toBe(false)
-  })
-
-  it('offers "Use AI title" only when a manual title hides an AI title', () => {
-    expect(canUseAiTitle(topic({ overlay: { aiTitle: 'A', manualTitle: 'B' } }), true)).toBe(true)
-    expect(canUseAiTitle(topic({ overlay: { aiTitle: 'A', manualTitle: 'B' } }), false)).toBe(false)
-    expect(canUseAiTitle(topic({ overlay: { manualTitle: 'B' } }), true)).toBe(false)
-    expect(canUseAiTitle(topic({ kind: 'main', overlay: { aiTitle: 'A', manualTitle: 'B' } }), true)).toBe(false)
-  })
 })
 
 describe('first words', () => {

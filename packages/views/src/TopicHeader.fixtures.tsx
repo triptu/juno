@@ -16,8 +16,7 @@ export default defineFixtures(
   TopicHeader,
   {
     Thread: {
-      'public-ai-title': state({ detail: details.postgres }),
-      'manual-title': state({ detail: details.offsite }),
+      public: state({ detail: details.postgres }),
       private: state({ detail: details.hiring }),
       'direct-message': state({ detail: details.offsite }),
     },

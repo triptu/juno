@@ -10,9 +10,6 @@ const base: TopicMenuState = {
   unread: false,
   pinned: false,
   resolved: false,
-  hasManualTitle: false,
-  hasAiTitle: true,
-  aiAssist: true,
 }
 
 describe('topic row menu', () => {
@@ -44,16 +41,9 @@ describe('topic row menu', () => {
     ])
   })
 
-  it('offers "Use AI title" only when a manual title hides an AI title and AI assist is on', () => {
-    expect(labels(topicMenuItems({ ...base, hasManualTitle: true }))).toContain('Use AI title')
-    expect(labels(topicMenuItems({ ...base, hasManualTitle: true, aiAssist: false }))).not.toContain('Use AI title')
-    expect(labels(topicMenuItems({ ...base, hasManualTitle: true, hasAiTitle: false }))).not.toContain('Use AI title')
-  })
-
-  it('has no Rename or Use AI title for Main, and no Ignore for DMs', () => {
-    const main = labels(topicMenuItems({ ...base, kind: 'main', hasManualTitle: true }))
+  it('has no Rename for Main, and no Ignore for DMs', () => {
+    const main = labels(topicMenuItems({ ...base, kind: 'main' }))
     expect(main).not.toContain('Rename')
-    expect(main).not.toContain('Use AI title')
     expect(labels(topicMenuItems({ ...base, channel: maya }))).not.toContain('Ignore Maya Chen')
     expect(labels(topicMenuItems({ ...base, channel: group })).at(-1)).toBe('Copy Slack link')
   })

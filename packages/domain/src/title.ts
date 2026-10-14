@@ -52,11 +52,6 @@ export function resolveTitle(topic: Topic): ResolvedTitle {
   return { text: channelLabel(topic.channel), source: 'channel' }
 }
 
-/** A sparkle shows beside AI titles while no manual title exists and AI assist is on. */
-export function showsAiSparkle(topic: Topic, aiAssist: boolean): boolean {
-  return aiAssist && resolveTitle(topic).source === 'ai'
-}
-
 /**
  * The manual title to store after a rename. Empty input, or the same text
  * as the AI title, clears the manual title so the AI title shows again.
@@ -66,9 +61,4 @@ export function manualTitleAfterRename(input: string, aiTitle: string | undefine
   if (text.length === 0) return undefined
   if (aiTitle !== undefined && text === aiTitle.trim()) return undefined
   return text
-}
-
-/** "Use AI title" is offered when a manual title hides an AI title and AI assist is on. */
-export function canUseAiTitle(topic: Topic, aiAssist: boolean): boolean {
-  return aiAssist && topic.kind !== 'main' && Boolean(topic.overlay.manualTitle?.trim()) && Boolean(topic.overlay.aiTitle?.trim())
 }

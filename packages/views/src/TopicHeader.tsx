@@ -2,13 +2,12 @@ import * as stylex from '@stylexjs/stylex'
 import { ChatsCircle } from '@phosphor-icons/react/dist/icons/ChatsCircle'
 import { Hash } from '@phosphor-icons/react/dist/icons/Hash'
 import { Lock } from '@phosphor-icons/react/dist/icons/Lock'
-import { Sparkle } from '@phosphor-icons/react/dist/icons/Sparkle'
 import { User } from '@phosphor-icons/react/dist/icons/User'
 import { Users } from '@phosphor-icons/react/dist/icons/Users'
 import { useState, type KeyboardEvent, type ReactNode } from 'react'
 import type { TopicDetail } from '@juno/contract'
 import { colors, layout, radii, sizes, spacing, text } from '@juno/tokens/tokens.stylex'
-import { Avatar, Button, ChannelIcon, ContextPill, Icon, Popover, Text, type ContextTint, type PhosphorIcon } from '@juno/ui'
+import { Avatar, Button, ChannelIcon, ContextPill, Popover, Text, type ContextTint, type PhosphorIcon } from '@juno/ui'
 import { channelIconFor, groupInitials, hueFor, initials } from './look'
 
 export interface TopicHeaderProps {
@@ -50,12 +49,10 @@ const tints: Record<TopicDetail['channel']['kind'], ContextTint> = {
   mpim: 'dm',
 }
 
-const AI_TITLE = 'Title suggested by AI. Double-click to rename.'
-
 /**
- * The topic header (inventory 5): the context pill, the actions, then the title with its icon slot. Main reads "#eng · Main" with
- * the "Threads" button; a thread shows the AI sparkle when its title came
- * from AI, and renames on double-click. Pin, Resolve and More arrive in M5,
+ * The topic header (inventory 5): the context pill, the actions, then the
+ * title with its icon slot. Main reads "#eng · Main" with the "Threads"
+ * button; a thread renames on double-click. Pin, Resolve and More arrive in M5,
  * which is why the right side is quiet. The background and rule run the
  * full width; the content shares the message column's width and padding,
  * so pill, title, messages and composer keep one left edge on a wide
@@ -122,24 +119,17 @@ export function TopicHeader({ detail, art, threadsOpen = false, onThreads, threa
               </Text>
             </>
           ) : (
-            <>
-              <Text
-                variant="topicTitle"
-                tone="default"
-                truncate
-                tooltipWhenTruncated
-                dir="auto"
-                onDoubleClick={onRename === undefined ? undefined : () => setDraft(detail.title)}
-                sx={styles.title}
-              >
-                {detail.title}
-              </Text>
-              {detail.titleSource === 'ai' ? (
-                <span {...stylex.props(styles.sparkle)} title={AI_TITLE}>
-                  <Icon icon={Sparkle} size={16} weight="duotone" label="Title suggested by AI" />
-                </span>
-              ) : null}
-            </>
+            <Text
+              variant="topicTitle"
+              tone="default"
+              truncate
+              tooltipWhenTruncated
+              dir="auto"
+              onDoubleClick={onRename === undefined ? undefined : () => setDraft(detail.title)}
+              sx={styles.title}
+            >
+              {detail.title}
+            </Text>
           )}
         </div>
       </div>
@@ -215,11 +205,6 @@ const styles = stylex.create({
   title: {
     flexShrink: 1,
     minWidth: 0,
-  },
-  sparkle: {
-    display: 'inline-flex',
-    flexShrink: 0,
-    color: colors['--foreground-muted'],
   },
   // The rename input (inventory 5): the title's own type, pulled in by its
   // padding so the text does not move when it appears.
