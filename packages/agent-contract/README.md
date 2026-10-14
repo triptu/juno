@@ -1,11 +1,11 @@
 # @juno/agent-contract
 
-Juno Agent's wire. Schemas, plus two pure rules the chat shares (`isOpenableUrl`, `sendMessageStatus`). Nothing else is logic.
+Juno Agent's wire. Schemas, the two chat rules (`isOpenableUrl`, `sendMessageStatus`), and the typed `projectCard` bridge to the pure catalogue. No services or I/O.
 
 | Folder | Owner | Holds |
 | --- | --- | --- |
 | `src/host/` | WP6 (Astra), seeded by WP1 | The AgentHost port: what the host app serves the agent (`AgentHostRpcs`, today only `host.hello`), and the parentPort messages between main and the agent process (`MainToAgent`, `AgentToMain`) |
-| `src/rpc/` | WP6 (Astra) | The RPC groups the agent serves to the renderer |
+| `src/rpc/` | WP6 (Astra) | The RPC groups the agent serves to the renderer, with approval metadata beside the view models |
 | `src/chat/` | WP7 (Fable) | The chat as the renderer draws it: items, delivery and ending states, card view models, the page and its banner, the header-menu pages, the recovery review, and the fixed copy |
 
 The agent is the client of `AgentHostRpcs` and the host serves it, over a port main brokers between the two utility processes (ADR 0012). `AGENT_HOST_PROTOCOL` goes up when a change breaks an older agent or host; the agent checks it on `host.hello`.
@@ -38,3 +38,30 @@ Rules of the shape:
 ## Must not
 
 - Hold logic. Import Electron or any Slack package.
+
+## Renderer RPCs
+
+`AgentRpcs` merges `ChatRpcs`, `CardRpcs`, `ScheduledRpcs`, `RemembersRpcs`, `MemoryRpcs`, `ActivityRpcs`, `ConnectionsRpcs`, `ReviewRpcs` and `SettingsRpcs`. Each route is also exported. Live pages use streamed snapshots; chat windows are bounded to 200 rows and can open at latest, unread, around an anchor, above or below it. `ChatPageSnapshot.page` is exactly WP7's `ChatPage`, including `moreAbove` and `moreBelow`.
+
+Every durable mutation carries an `OpId`. `Accepted` means the FULL inbox commit succeeded, not that a run or external action succeeded. Failed delivery retries reuse the same op id. Stop names a run; stopping a background job is a separate command. The local Remove command needs no model run.
+
+Approval identities and source revisions travel beside the view models. A card click binds the card revision/digest and ordered child revision/digests, including the duplicate warning. `prepare` stores choice arguments (for example a question answer) before `approve`; approval never accepts replacement executable arguments. Editing send text creates a new stored proposal. The handler must reject stale bindings and already-consumed approvals.
+
+Scheduled and Remembers snapshots also carry revisions, because their WP7 rows do not. Credentials use main's setup flow and never put secret values into the inbox. Settings changes and ownership operations are renderer-only commands, not model tools.
+
+## Host contracts for WP13
+
+`AgentHostRpcs` remains the working protocol-1 hello scaffold. `AgentHostFullRpcs` is the complete protocol-2 contract, merging it with `HostReadRpcs`, `HostActionRpcs`, `HostPresenceRpcs` and `HostNotificationRpcs`. WP13 switches the served group and hello protocol together when it supplies the handlers; this package adds no placeholder implementations.
+
+Reads cover Slack search/history/replies/people and Juno topics. Presence streams the current account, online and AI state, quiet hours and the current “this” topic. Dispatch carries the exact executable identity, digest and already-consumed authorization/attempt ids, with `mode: single-attempt`. Duplicate submissions of the same authorization must return its stored attempt. A transport loss remains unknown. A negative send lookup cannot prove failure. Notification delivery has an id and respects the notification gate independently of action admission.
+
+## Plan and spec differences found in WP6
+
+- Plan §6.4 calls tainted-run proposals `task` and `schedule`; §12 and WP7 correctly separate `proposedTask` and `proposedSchedule` from existing work.
+- Quint's `retryRequiresAuthority` requires a warning for **every** repeat of a non-deduplicated action. Plan §6.3 and WP7 describe a duplicate warning only for unknown outcomes. This catalogue follows Quint's stronger repeat rule; no chat schema was changed.
+- Quint retains unknown evidence per attempt, even after another attempt for that child succeeds. WP7 has one result per row and reports a partially successful batch as `done`, even with unknown rows. The record retains all attempts; projection follows WP7. Neither a `done` card nor a `sent` row means every attempt is settled.
+- Quint distinguishes cancellation requested, cancelled, unknown and done. WP7's generic `CardStatus` and `SendResult` do not expose both cancellation states. Unsettled cancellation projects as working/sending; known unsent cancellation as notSent. Evidence stays in the record. The fixed Stop copy also sounds stronger than §6.5, which permits an already-consumed authorization to land later.
+- WP7 deliberately omits approval identities and edit revisions. RPC snapshot metadata supplies them without changing `src/chat/**`.
+- Plan v3 has §2.1 and §2.2, but no §2.4. The transport reference used here is architecture §2.4 and ADR 0012.
+
+Run `pnpm test:agent-contracts` from the root for the property tests and request/response JSON codec round trips for every RPC group. `pnpm typecheck` checks the test sources too.

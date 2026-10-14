@@ -52,7 +52,7 @@ Juno wrappers (`scripts/check-deps.mjs` fails `pnpm lint` on an import from anyw
 | `effect/reactivity` (`Atom`, `AtomRegistry`, `AtomRpc`, `AsyncResult`) | `liveQuery(route)` and `command(route)` in `@juno/state`; `packages/state/src` only |
 | `@effect/atom-react` | `@juno/state/react` (`useAtomValue`, `useAtom`, `useAtomSet`, `useAtomRefresh`, `RegistryContext`); containers import the hooks from there |
 | `effect/reactivity/Reactivity` | `Invalidation` in `packages/store/src/invalidation.ts` |
-| `effect/rpc` | route declarations in `packages/contract/src` and `packages/agent-contract/src`, the servers in `packages/engine/src/protocol` (the renderer routes and the AgentHost group), the clients in `packages/state/src` and `packages/agent/src/host` |
+| `effect/rpc` | route declarations in `packages/contract/src` and `packages/agent-contract/src/{rpc,host}` (renderer groups and the WP13 host contracts), the servers in `packages/engine/src/protocol` (the renderer routes and the AgentHost group), the clients in `packages/state/src` and `packages/agent/src/host` |
 | `effect/workers` | the port transports: `packages/state/src/transport.ts`, `packages/engine/src/protocol/runner.ts`, `packages/agent/src/host/port.ts` (the agent's client side of the AgentHost port, ADR 0012) |
 | `effect/sql`, `@effect/sql-sqlite-node` | `@juno/store` only. See below. |
 | everything else listed above | nowhere yet. Add a wrapper module and an entry in `check-deps.mjs` first. |
