@@ -189,29 +189,30 @@ Density also changes the message list (§6.1).
 
 **Shows:** S01 (two tabs), S08 (three tabs with page tab), S14 (stealth tab), shot 23-tab-context-menu.
 
-- Strip: 44px, align-items flex-end, padding 0 10, gap 2, overflow hidden.
-- Tab: `flex: 0 1 230px`, min-width 72, height 35, margin-bottom −1, padding `0 6 0 12`, radius `8 8 0 0`, 1px border, 13px, gap 8.
+- Strip: 44px, align-items flex-end, padding 0 10, gap 2. [built M4] The tabs sit in a horizontal scroller with no visible scrollbar (`scroll-snap-type: x proximity`); the active tab scrolls into view when it changes, so it is never hidden. The "+" button sits outside the scroller and never leaves the screen. The prototype clipped the strip with `overflow: hidden`.
+- Tab: `flex: 0 1 230px`, min-width 120 (`--tab-min-width`; the prototype's 72 lost the label), height 35, margin-bottom −1, padding `0 6 0 12`, radius `8 8 0 0`, 1px border, 13px, gap 8.
   - Active: bg `--background`, border `--border-default` with bottom border in `--background` so it merges into the page; fg default; weight 500.
   - Inactive: transparent, border transparent, fg subtle, weight 400; hover fg default.
   - Icon 14 at 0.75 opacity: channel kind icon for topics (`hash`/`lock`/`user`/`users`), `eye-off` when stealth, `layout-list` All topics, `lightbulb` For you, `sparkles` Juno, `square-pen` New message, `bell` Notifications, `settings` Preferences.
   - Label: topic title, channel name for Main (no "#"), or the page name. Ellipsis.
-  - Close: 20×20, radius 4, `x` 12 muted, hover bg `--secondary-default`, accessible name "Close tab". Always visible (prototype); [proposed] keep always visible, it is the macOS Safari pattern too.
+  - Label: `dir="auto"`, so a right-to-left title shows its start, as the row and header do.
+  - Close: 20×20, radius 4, `x` 12 muted, hover bg `--secondary-default`, accessible name "Close tab". Always visible on the active tab and on inactive tabs wider than 140px. [built M4] On a narrower inactive tab the label takes the button's space and the button appears over the label's end on hover or focus (Safari does the same), so nothing moves.
 - New tab button after the last tab: 28×28, radius 8, `plus` 15 muted, margin `0 0 4 4`, opens New message (prototype title "New topic"; use "New message").
 - Behaviour: everything opens in the current tab; ⌘-click or "Open in new tab" adds one. Pages (All topics, For you, Juno, Notifications, Preferences, New message) are singletons: opening again focuses the existing tab. Closing a tab focuses the tab now at the same index (the right neighbour), else the last one. With no tabs the workspace shows the empty state (§17).
 - Stealth tab: opened via "Open in stealth"; icon `eye-off`; unread stays; header shows the stealth pill (§5). Sending a reply or "Mark read" ends stealth.
 - Right-click on a topic tab: the row context menu for that topic. Page tabs have no menu.
-- Keyboard: tabs are `role="button" tabindex="0"`; Enter/Space activates. [proposed] ⌘W closes the active tab, ⌘⇧[ / ⌘⇧] switch tabs (not in prototype).
-- [built M4] `Workspace` in `@juno/views` draws the strip from `WorkspaceTab`s. The 15px icon slot is fixed in size and takes the topic's art (`art`) in place of the kind icon, so art drops in with no shift; stealth replaces either with `eye-off`. Tab radius is 8 (`--radius-lg`).
+- Keyboard: [built M4] the strip is an APG `tablist` with roving tabindex: only the active tab is in the Tab order; ArrowLeft and ArrowRight select the neighbour (wrapping), Home and End the first and last; Delete or Backspace on a tab closes it, and Enter or Space on its close button does too. Focus moves to the tab that takes the closed tab's place, or to "+" when none is left. ⌘W closes the active tab, ⌘⇧[ / ⌘⇧] switch tabs (app menu). The prototype had `role="button" tabindex="0"` on every tab, two Tab stops per tab.
+- [built M4] `Workspace` in `@juno/views` draws the strip from `WorkspaceTab`s. The 16px icon slot is fixed in size and takes the topic's art (`art`, drawn at 16) in place of the kind icon (drawn at 15), so art drops in with no shift; stealth replaces either with `eye-off`. Tab radius is 8 (`--radius-lg`).
 
 ## 5. Topic header
 
 **Shows:** S01 (public, AI sparkle), S04 (Main header), S14 (private + stealth), shot 21-rename-header, shot 22-header-more-menu, S15 (dark, pinned state on Pin button).
 
-Container: padding `14 24 14 32`, border-bottom 1px `--border-subtle`, two rows with gap 8. Height 95px.
+Container: padding `14 24`, border-bottom 1px `--border-subtle`, two rows with gap 8. Height 100px (`--topic-header-height`; each row is the height of its 32px buttons). [built M4] The background and the rule run the full width; the content is capped at `--reading-width` (800px) with the message column's 24px inline padding and centred, so on a wide window the pill, the title, the actions, the messages and the composer share one left edge. The prototype's `14 24 14 32` padding and 95px height are gone.
 
 Row 1 (gap 8):
 
-- **Context pill**: 26px, radius 6, padding 0 10, gap 6, 12.5/600; icon 13; text "{channel} · {kind}" where the kind is 400 weight. Title attribute = kind.
+- **Context pill**: 26px, radius 6, padding 0 10, gap 6, 12.5/600; icon 13; text "{channel} · {kind}" where the kind is 400 weight. Title attribute = kind. [built M4] The pill shrinks with the row: under 480px of header width the kind is dropped first, then the name takes an ellipsis. The actions never shrink. The workspace at the minimum window (720 by 480) is 336px wide and every header variant fits.
 
   | Kind | Icon | Text | Colours |
   | --- | --- | --- | --- |
@@ -220,16 +221,16 @@ Row 1 (gap 8):
   | Direct message | `user` | "Maya Chen · Direct message" | `--tint-dm` (blue) |
   | Group DM | `users` | "Maya, Leo · Group DM" | `--tint-dm` |
 
-- **Stealth pill** (only in stealth): 26px, radius 6, 1px dashed `--border-strongest`, padding `0 4 0 10`, fg subtle 12px, `eye-off` 13, text "Stealth. Not marking as read.", then button "Mark read" 20px, padding 0 8, radius 4, bg `--secondary-default`, 11.5/500.
+- **Stealth pill** (only in stealth): 26px, radius 6, 1px dashed `--border-strongest`, padding `0 4 0 10`, fg subtle 12px, `eye-off` 13, text "Stealth. Not marking as read.", then button "Mark read" 20px, padding 0 8, radius 4, bg `--secondary-default`, 11.5/500. [built M4] The stealth chip shrinks (ellipsis) after the context pill; Mark read keeps its size.
 - Spacer.
 - **Pin** icon button 32×32 radius 8 (`pin` 16, subtle). Pinned: bg `--secondary-default`. Name "Pin" / "Unpin".
-- **Subscribe** icon button 32 (`bell` subscribed / `bell-off` unsubscribed). Name "Subscribe" with `aria-pressed` for the state; the tooltip repeats the name. A toggle keeps one name and changes its state, never its name. Toggling shows an undo toast. The bell on each `ActiveThreads` row is the same.
+- **Subscribe** icon button 32 (`bell` subscribed / `bell-off` unsubscribed). Name "Subscribe" with `aria-pressed` for the state; the tooltip repeats the name. (The prototype renamed the button "Subscribed. Click to unsubscribe." / "Unsubscribed. Click to subscribe."; a toggle keeps one name and changes its state.) Toggling shows an undo toast. The bell on each `ActiveThreads` row is the same.
 - **Resolve / Reopen**: 32px, padding 0 12, margin-left 4, 1px `--border-strong`, radius 8, transparent, 13/500, icon 14 (`circle-check` / `rotate-ccw`), hover `--surface-hover`. Undo toast.
 - **More** icon button 32 (`ellipsis` 16). Opens the row context menu anchored under the button, right-aligned (+4px).
 
 Row 2 (gap 8):
 
-- Title 20/600, letter-spacing −0.01em, lh 1.3, single line ellipsis. Double-click to rename (title attribute "Double-click to rename"; not on Main).
+- Title 20/600, letter-spacing −0.01em, lh 1.3, single line ellipsis. Double-click to rename (not on Main). [built M4] The title attribute shows the full title only when it is truncated, never the rename hint; the rename affordance moves to the context menu's Rename item in M5.
 - AI sparkle `sparkles` 14 muted after the title when the title is AI-generated and no manual title exists (title attribute "Title suggested by AI. Double-click to rename."). Hidden when AI assist is off.
 - Main header: title "#eng · Main" (DM: "Maya Chen · Main") followed by "Messages posted outside threads" 13 muted. No sparkle.
 - Rename input: 34px, margin `−3 0 −3 −8`, padding 0 8, 1px `--border-strongest`, radius 8, bg surface, 20/600 −0.01em; preselected. Enter saves, Esc cancels, blur saves. Saving an empty title, or the same text as the AI title, clears the manual title.
@@ -243,7 +244,7 @@ Scroll container `[data-scroll]` with contained scroll; inner column max-width 8
 
 ### 6.1 Flat messages (default)
 
-- Message: flex, gap 12 (0 when avatars off), padding by density (compact `2 8`, balanced `4 8`, airy `6 10`), radius 8, `tabindex="0"`. Hover bg `--background-subtle`. Mentions you: bg `--hl-soft` permanently.
+- Message: flex, gap 12 (0 when avatars off), padding by density (compact `2 8`, balanced `4 8`, airy `6 10`), radius 8, `tabindex="0"`. Hover bg `--surface-hover` (the same token as every other hovered row; the prototype's `--background-subtle` is 1.02:1 against the page and invisible). Mentions you: bg `--hl-soft` permanently.
 - Grouping: consecutive messages by the same sender share one header. First of a group has margin-top 6/12/18 (density) unless it is the first message or sits right after the "new" divider. A quoted message always starts a new header.
 - Avatar column 32px (0 when off). Avatar 32 round, margin-top 2, initials 12/600, shown on the first message of a group.
 - Header: name 14/600, time 12 muted, gap 8, baseline aligned.
@@ -273,7 +274,7 @@ Contents: three quick reactions 👍 ✅ 👀 (28×28, radius 6, emoji 15px, nam
 
 Picker: clicking More replaces the toolbar contents with 12 emoji (👍 ❤️ 😂 🎉 👀 ✅ 🙏 🔥 💯 😮 😢 🚀), 28×28 each, width 364. Esc or leaving the message closes it. [proposed] v1 ships this fixed set; a full emoji picker is a later addition.
 
-[built M4] `HoverToolbar` is the shell: `Surface toolbar` (radius 16, `--pop-shadow`, padding 4), 28px buttons with radius 12 (`EmojiButton` for the three reactions, `IconButton` for `smiley`, `quotes` and `arrow-bend-up-left`), a 1px vertical rule between. It sits inside the message's box at top 4, right 8 (not at −14: rows have paint containment, so anything outside the box is clipped), hidden with opacity until the row is hovered or has keyboard focus, so showing it moves nothing. The picker and every action wait for M6; the app does not mount the toolbar until then.
+[built M4] `HoverToolbar` is the shell: `Surface toolbar` (radius 16, `--pop-shadow`, padding 4), 28px buttons with radius 12 (`EmojiButton` for the three reactions, `IconButton` for `smiley`, `quotes` and `arrow-bend-up-left`), a 1px vertical rule between. It sits inside the message's box at top 4, right 8 (not at −14: rows have paint containment, so anything outside the box is clipped), hidden with opacity until the row is hovered or has keyboard focus, so showing it moves nothing. The header line of a row with a toolbar reserves the toolbar's width at its end (`--toolbar-reserve`, about 190px: five 28px buttons and their gaps), so the name, the time and the first body line never run under it. The picker and every action wait for M6; the app does not mount the toolbar until then.
 
 ### 6.6 Selection quote
 

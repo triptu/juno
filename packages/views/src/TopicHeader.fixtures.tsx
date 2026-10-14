@@ -32,6 +32,14 @@ export default defineFixtures(
       'right-to-left': state({ detail: details.mohammed }),
       'emoji-title': state({ detail: details.unicorn }),
       narrow: state({ detail: details.hiring, stealth: true }, { width: 720 }),
+      wide: state({ detail: details.engMain, onThreads: noop }, { width: 1600 }),
+    },
+    // The workspace at the minimum window size (720 by 480) is 336px wide.
+    'Minimum width': {
+      'main-336': state({ detail: details.engMain, onThreads: noop }, { width: 336 }),
+      'stealth-336': state({ detail: details.hiring, stealth: true }, { width: 336 }),
+      'thread-336': state({ detail: details.long }, { width: 336 }),
+      'threads-open-336': state({ detail: details.engMain, onThreads: noop, threadsOpen: true, threads }, { width: 336, height: 520 }),
     },
     Interaction: {
       'hover-subscribe': state({ detail: details.postgres }, { hover: 'button[aria-pressed]' }),

@@ -15,25 +15,33 @@ export interface ContextPillProps {
   readonly name: string
   /** The kind, appended after a dot at regular weight ("Public channel"). Also the tooltip. */
   readonly kindLabel?: string
-  /** Append `kindLabel` to the visible text. */
-  readonly showKind?: boolean
+  /**
+   * Append `kindLabel` to the visible text. `roomy` keeps it only while the
+   * nearest size container (the owner declares one) is wider than 480px,
+   * so a narrow header drops the kind before it squeezes the name.
+   */
+  readonly showKind?: boolean | 'roomy'
   readonly size?: ContextPillSize
 }
 
 const iconBySize: Record<ContextPillSize, IconSize> = { 22: 12, 26: 14, 28: 14 }
 
+// Container queries cannot read tokens, so the breakpoint is a constant.
+const CRAMPED = '@container (max-width: 480px)'
+
 /**
  * The tinted pill that says where a topic lives. The owner maps the
  * conversation kind to a tint, an icon and a label (that rule lives in
- * `@juno/domain`); the pill only draws them.
+ * `@juno/domain`); the pill only draws them. It shrinks with its row: the
+ * name takes an ellipsis, the icon and the kind keep their size.
  */
 export function ContextPill({ tint, icon, name, kindLabel, showKind = false, size = 26 }: ContextPillProps) {
   return (
     <span title={kindLabel} {...stylex.props(styles.base, typeVariants.pill, sizeStyles[size], tintStyles[tint])}>
       <Icon icon={icon} size={iconBySize[size]} />
       <span {...stylex.props(styles.name)}>{name}</span>
-      {showKind && kindLabel ? (
-        <span {...stylex.props(styles.kind)}>
+      {showKind !== false && kindLabel ? (
+        <span {...stylex.props(styles.kind, showKind === 'roomy' && styles.kindRoomy)}>
           <span aria-hidden>{' · '}</span>
           {kindLabel}
         </span>
@@ -46,7 +54,7 @@ const styles = stylex.create({
   base: {
     display: 'inline-flex',
     alignItems: 'center',
-    flexShrink: 0,
+    flexShrink: 1,
     gap: spacing['--space-1-5'],
     paddingInline: spacing['--space-2-5'],
     borderRadius: radii['--radius-pill'],
@@ -64,6 +72,9 @@ const styles = stylex.create({
   kind: {
     fontWeight: weights['--weight-regular'],
     flexShrink: 0,
+  },
+  kindRoomy: {
+    display: { default: 'inline', [CRAMPED]: 'none' },
   },
 })
 

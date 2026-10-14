@@ -245,7 +245,7 @@ Keep SPEC §17: sentence case, verb-first buttons, no emoji in chrome, undo over
 | Sidebar empty, unread filter | No unread topics / Your filters are hiding everything. Older and resolved topics are in All topics. | You're all caught up / Nothing unread right now. Older and resolved topics live in All topics. |
 | Sidebar empty, filtered | No recent topics here / Your filters are hiding everything. | Nothing here with these filters / Older and resolved topics live in All topics. |
 | Sidebar empty, nothing recent | No recent topics here / Topics with activity in the last 7 days show up here. | It's quiet / Topics with activity in the last 7 days show up here. |
-| Workspace empty | Nothing open / Pick a topic, or press ⌘K to find one. | Nothing open yet / Pick a topic on the left, or press ⌘K. |
+| Workspace empty | Nothing open / Pick a topic, or press ⌘K to find one. | Nothing open yet / Pick a topic on the left. (", or press ⌘K" returns when ⌘K ships in M9; until then the line must not promise a shortcut that does nothing.) |
 | For you empty | Nothing right now. | Nothing for you right now / Juno adds a card here when something needs you. |
 | All topics empty | No topics match these filters. | No topics match / Try fewer filters. [button: Clear filters] |
 | ⌘K empty | No matches. | No matches for "staging" / Try a word from the message, or a person. |

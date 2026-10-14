@@ -1,0 +1,345 @@
+/**
+ * Opens the turn engine on an agent directory: WP8's durable core with
+ * WP11's router in place of its serial loop (plan v3 §3, §8).
+ *
+ * The order is the startup order the providers need (backlog, WP9):
+ *
+ *   1. the owner lock, `agent.sqlite` and its migrations, recovery
+ *      (classifying open actions before anything resumes);
+ *   2. the guarded provider, built on the opened store by `provider`;
+ *   3. pi on the journal, with only the guard's models and Juno's
+ *      extension (the request builder, the tools, the hooks);
+ *   4. the router rebuilds the live run, and only then does pi resume, so
+ *      a request pi resumes is built and stamped like any other;
+ *   5. jobs resume, the loop starts, and the compactor runs.
+ *
+ * So no deferred model facade is needed: pi never sees models before the
+ * guard exists. Shutdown follows G9: jobs and the compactor stop, the loop
+ * stops, pi closes, the projection finishes, `agent.sqlite` closes, and the
+ * owner lock is released last.
+ *
+ * The open sequence mirrors `runtime/core.ts`'s `openCore`, which keeps the
+ * serial loop for its crash tests. Steering needs the journal, which the
+ * core does not expose, so the router owns this copy until the core takes a
+ * router (see the README).
+ */
+import { join } from 'node:path'
+import { createCompactionProvider, type ProviderGuardApi } from '../providers'
+import { projector } from '../projection/projector'
+import { commitRotation, currentIncarnation, deleteRetiredJournals } from '../recovery/incarnations'
+import { recover } from '../recovery/recover'
+import { AGENT_DATABASE_FILE, ROTATION_AGE_MS, type UpdateNeeded } from '../runtime/core'
+import { crashPoint } from '../runtime/crash'
+import { openJournalFile, type Extension, type Journal, type JournalSettings } from '../runtime/journal'
+import { acquireOwnerLock } from '../runtime/lock'
+import { SPEND_MIGRATIONS } from '../spend'
+import { openDatabase, StoreTooNew, type Database } from '../store/database'
+import type { MigrationSet } from '../store/schema'
+import { initialize, type Store } from '../store/store'
+import { createCompactor, type Compactor, type CompactorState } from '../compactor/scheduler'
+import { delegateTool } from '../jobs/delegate'
+import { createJobs, type Job } from '../jobs/jobs'
+import { JOBS_MIGRATIONS } from '../jobs/schema'
+import { subagentDriver } from '../jobs/subagent'
+import { rememberTool } from '../memory-tools/remember'
+import { activePins, editPin, pinMessage, undoPin, type PinResult } from '../pins/pins'
+import { createRequestBuilder } from '../request/builder'
+import { instructions, JUNO_INSTRUCTIONS } from '../request/prompt'
+import { declaration } from '../request/tool'
+import { uuidv7 } from '../store/store'
+import type { Pins } from '@juno/agent-memory'
+import type { RunState, TurnEvent } from './events'
+import { hostTools, type HostReads } from './host-tools'
+import { createRouter, type Retry } from './router'
+import { TURNS_MIGRATIONS } from './schema'
+import { find, type Accept, type InboxKind, type InboxState } from '../inbox/inbox'
+import { view, type MemoryView } from '../store/memory'
+import type { JournalPosition, Mode } from '../store/ledger'
+
+/** One archive message (§4.1). `opId` is the inbox op whose run wrote it. */
+export interface ArchiveMessage {
+  readonly id: number
+  readonly kind: 'user' | 'juno' | 'tool' | 'echo' | 'work' | 'wake' | 'card' | 'note'
+  readonly text: string
+  readonly at: number
+  readonly opId: string | null
+}
+
+export interface ModelRef {
+  readonly provider: string
+  readonly modelId: string
+}
+
+export interface TurnsOptions {
+  readonly agentDir: string
+  /**
+   * Builds the guarded provider on the opened store (`createOpenRouter`, or
+   * `createProviderGuard` in tests). Called after recovery and before pi
+   * starts. Only its models reach pi.
+   */
+  readonly provider: (store: Store) => ProviderGuardApi
+  /** The chat model. A change applies when the engine next opens. */
+  readonly model: ModelRef
+  /** The compaction model. No compaction runs without one. */
+  readonly compaction?: ModelRef
+  /** The subagents' cheaper model. Default: the compaction model; no `delegate` tool without either. */
+  readonly subagent?: ModelRef
+  /** Slack reads through the AgentHost port. No Slack tools without it. */
+  readonly host?: HostReads
+  /** Other folders' migration sets. Spend, turns and jobs are always applied. */
+  readonly migrations?: ReadonlyArray<MigrationSet>
+  readonly now?: () => number
+  /** The quiet milestone of a job, 30 minutes by default. */
+  readonly quietMs?: number
+  readonly onReport?: (error: unknown) => void
+}
+
+export interface Turns {
+  readonly _tag: 'running'
+  readonly store: Store
+  readonly guard: ProviderGuardApi
+  /** How the journal was found at open. */
+  readonly opened: 'resumed' | 'rotated'
+  readonly incarnation: () => string
+  /** The journal's last commit now. A tool reads it inside its `execute()` and passes it to `authorize` (WP15). */
+  readonly position: () => Promise<JournalPosition>
+  /** Owner input, a report, a wake or a click. Durable before it returns; the same op again is a no-op. */
+  readonly accept: (input: { readonly opId: string; readonly kind: InboxKind; readonly text: string; readonly data?: unknown }) => Accept
+  /** "Try again" on an interrupted or failed send. */
+  readonly retry: (input: { readonly opId: string; readonly interruptedOpId: string }) => Retry
+  /** Stops run `runId` only. Its held input starts the next run. */
+  readonly stop: (runId: string) => Promise<void>
+  readonly mode: () => Mode
+  readonly setMode: (next: Mode) => void
+  /** The live run, or undefined. */
+  readonly run: () => RunState | undefined
+  /** An inbox op's state: the owner bubble's delivery line and a run's settled inputs. */
+  readonly op: (opId: string) => { readonly state: InboxState; readonly reason: string | null } | undefined
+  /** Archive messages from id `from`, oldest first, at most `limit`. */
+  readonly messages: (from?: number, limit?: number) => ReadonlyArray<ArchiveMessage>
+  /** The published memory view (§4.2). */
+  readonly memory: () => MemoryView
+  readonly subscribe: (listener: (event: TurnEvent) => void) => () => void
+  /** Resolves when no run is live and no input waits (while on). */
+  readonly idle: () => Promise<void>
+  readonly rotate: () => Promise<void>
+  readonly pins: {
+    readonly active: () => Pins
+    /** "Remember this" on an owner message. */
+    readonly pinMessage: (input: { readonly messageId: number; readonly from?: number; readonly to?: number }) => PinResult
+    readonly edit: (expected: { readonly id: string; readonly version: number }, text: string) => PinResult
+    readonly undo: (expected: { readonly id: string; readonly version: number }) => PinResult
+  }
+  readonly jobs: {
+    readonly list: () => ReadonlyArray<Job>
+    readonly active: () => ReadonlyArray<Job>
+    /** The Task card's Stop. */
+    readonly stop: (jobId: string) => Promise<void>
+    readonly idle: () => Promise<void>
+  }
+  readonly compaction: {
+    readonly state: () => CompactorState
+    /** Resolves when no compaction job runs and none is ready. */
+    readonly idle: () => Promise<void>
+  }
+  readonly close: () => Promise<void>
+}
+
+export async function openTurns(options: TurnsOptions): Promise<Turns | UpdateNeeded> {
+  const now = options.now ?? Date.now
+  const lock = acquireOwnerLock(options.agentDir)
+  let db: Database | undefined
+  try {
+    try {
+      db = openDatabase(join(options.agentDir, AGENT_DATABASE_FILE), [SPEND_MIGRATIONS, TURNS_MIGRATIONS, JOBS_MIGRATIONS, ...(options.migrations ?? [])], now)
+    } catch (error) {
+      if (error instanceof StoreTooNew) return updateNeeded(lock.release)
+      throw error
+    }
+    const store: Store = { db, now }
+    initialize(store)
+    const recovery = await recover(store, options.agentDir)
+    if (recovery._tag === 'updateNeeded') {
+      db.close()
+      return updateNeeded(lock.release)
+    }
+    const guard = options.provider(store)
+    return await start(store, guard, recovery.file, recovery._tag === 'resume' ? 'resumed' : 'rotated', options, () => {
+      store.db.close()
+      lock.release()
+    })
+  } catch (error) {
+    if (db?.isOpen) db.close()
+    lock.release()
+    throw error
+  }
+}
+
+const noop = () => {}
+
+function updateNeeded(release: () => void): UpdateNeeded {
+  return { _tag: 'updateNeeded', close: async () => release() }
+}
+
+async function start(
+  store: Store,
+  guard: ProviderGuardApi,
+  file: { readonly start: (settings: JournalSettings) => Promise<Journal> },
+  opened: 'resumed' | 'rotated',
+  options: TurnsOptions,
+  release: () => void,
+): Promise<Turns> {
+  let journal: Journal | undefined
+  let projection: ReturnType<typeof projector> | undefined
+  let unsubscribe: () => void = noop
+  let compactor: Compactor | undefined
+  const commitWaiters: Array<() => void> = []
+  const session = {
+    journal: () => journal!,
+    catchUp: () => projection!.catchUp(),
+    nextCommit: () => new Promise<void>((resolve) => commitWaiters.push(resolve)),
+  }
+
+  const tools = () => [...memoryTools, ...jobTools, ...slackTools]
+  const section = () => instructions(jobs.active().map((job) => ({ title: job.title, line: job.state ?? job.phase })))
+  const builder = createRequestBuilder({ store, guard, systemAndTools: () => [`<juno>\n${section()}\n</juno>`, ...tools().map((t) => declaration(t.registration))] })
+  const router = createRouter({
+    store, session, builder, model: options.model, tools,
+    rotate: () => rotateNow(),
+    rotationDue: () => {
+      const row = store.db.prepare('SELECT created_at AS at FROM incarnations WHERE id = ?').get(journal!.incarnation) as { at: number }
+      return store.now() - row.at >= ROTATION_AGE_MS
+    },
+    onRunEnded: () => compactor?.poke(),
+    ...(options.onReport ? { onReport: options.onReport } : {}),
+  })
+  const subagentModel = options.subagent ?? options.compaction
+  const jobs = createJobs({
+    store,
+    drivers: subagentModel ? [subagentDriver({ store, guard, builder, model: subagentModel })] : [],
+    accept: (input) => router.accept(input),
+    ...(options.quietMs !== undefined ? { quietMs: options.quietMs } : {}),
+    ...(options.onReport ? { onReport: options.onReport } : {}),
+  })
+  const memoryTools = [
+    rememberTool({
+      store,
+      current: () => router.toolRun(),
+      remembered: (runId, pin) => router.emit({ _tag: 'remembered', runId, pinId: pin.id, version: pin.version, text: pin.text }),
+    }),
+  ]
+  const jobTools = subagentModel ? [delegateTool({ jobs, current: () => router.toolRun(), place: subagentModel.modelId })] : []
+  const slackTools = options.host ? hostTools(options.host) : []
+
+  const extension = {
+    name: 'juno',
+    tools: tools().map((tool) => tool.registration),
+    sections: [{ key: 'juno', render: section }],
+    hooks: [
+      { task: 'pi.generation', handlers: router.hooks.generation },
+      { task: 'pi.tool', handlers: router.hooks.tool },
+    ],
+  } as Extension
+  const settings: JournalSettings = {
+    models: guard.models, model: options.model, extensions: [extension],
+    ...(options.onReport ? { onReport: options.onReport } : {}),
+  }
+
+  const attach = (next: Journal) => {
+    journal = next
+    projection = projector(store, next)
+    unsubscribe = next.onCommit(() => {
+      for (const resolve of commitWaiters.splice(0)) resolve()
+      void projection!.catchUp().then(() => compactor?.poke(), options.onReport)
+    })
+  }
+
+  const rotateNow = async () => {
+    // Called by the loop between runs: no run is live. Drain the projection.
+    await projection!.catchUp()
+    crashPoint('rotation.drained')
+    const old = journal!
+    const incarnation = commitRotation(store, 'rotation')
+    unsubscribe()
+    await old.close()
+    deleteRetiredJournals(options.agentDir, incarnation)
+    const next = await openJournalFile(options.agentDir, incarnation)
+    if (next._tag !== 'opened') throw new Error(`a new journal could not be opened (${next._tag})`)
+    attach(await next.file.start(settings))
+    journal!.resume()
+  }
+
+  attach(await file.start(settings))
+  if (options.compaction) {
+    const model = guard.models.getModel(options.compaction.provider, options.compaction.modelId)
+    if (model !== undefined) {
+      compactor = createCompactor({
+        store, spend: guard.spend, cutoff: () => router.cutoff(),
+        // Declared, never called: the same tool block as a turn, as plain data (the guard copies the context).
+        model: createCompactionProvider({
+          store, guard, model, system: JUNO_INSTRUCTIONS, sessionId: 'juno-compaction',
+          tools: tools().map(({ registration: { name, description, parameters } }) => ({ name, description, parameters })),
+        }),
+        ...(options.onReport ? { onReport: options.onReport } : {}),
+      })
+    }
+  }
+  router.restore()
+  journal!.resume()
+  jobs.resume()
+  router.start()
+  compactor?.poke()
+
+  let closed: Promise<void> | undefined
+  return {
+    _tag: 'running',
+    store,
+    guard,
+    opened,
+    incarnation: () => currentIncarnation(store)!,
+    position: async () => ({ incarnation: journal!.incarnation, seq: await journal!.lastCommitted() }),
+    accept: router.accept,
+    retry: router.retry,
+    stop: router.stop,
+    mode: router.mode,
+    setMode: (next) => {
+      router.setMode(next)
+      compactor?.poke()
+    },
+    run: router.state,
+    op: (opId) => {
+      const op = find(store, opId)
+      return op === undefined ? undefined : { state: op.state, reason: op.reason }
+    },
+    messages: (from = 0, limit = 200) =>
+      store.db
+        .prepare('SELECT id, kind, text, at, origin_op AS opId FROM messages WHERE id >= ? ORDER BY id LIMIT ?')
+        .all(from, limit) as unknown as ReadonlyArray<ArchiveMessage>,
+    memory: () => view(store),
+    subscribe: router.subscribe,
+    idle: router.idle,
+    rotate: router.rotate,
+    pins: {
+      active: () => activePins(store),
+      pinMessage: (input) => pinMessage(store, { id: uuidv7(store.now()), ...input }),
+      edit: (expected, text) => editPin(store, expected, text),
+      undo: (expected) => undoPin(store, expected),
+    },
+    jobs: { list: jobs.list, active: jobs.active, stop: jobs.stop, idle: jobs.idle },
+    compaction: {
+      state: () => compactor?.state() ?? 'idle',
+      idle: () => compactor?.idle() ?? Promise.resolve(),
+    },
+    close: () =>
+      (closed ??= (async () => {
+        await jobs.close()
+        await compactor?.close()
+        const stopped = router.close()
+        unsubscribe()
+        await projection!.catchUp()
+        await journal!.close()
+        await stopped
+        release()
+      })()),
+  }
+}

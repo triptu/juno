@@ -179,11 +179,12 @@ module memoryProtocol {
     s' = { ...s, jobs: s.jobs.exclude(Set(j)), due: s.due.set(key(j.node.ref), s.clock + 2), label: "failJob" } }
   action clockTick = s' = { ...s, clock: s.clock + 1, label: "clock" }
 
-  // Validate digest/generation AND head CAS in the publication transaction.
-  // A failed CAS discards the candidate and leaves durable work queued.
+  // Validate inputs/generation and read the current head in this transaction.
+  // Job.rev is only a witness for the old start-time rule and its bug schedules.
+  // Unrelated publications do not stale a job; redaction and changed inputs do.
   action publishWith(j: Job, validate: bool, cas: bool, insert: bool): bool = {
     val k = key(j.node.ref)
-    val valid = (not(validate) or (fresh(j) and withinCutoff(k))) and (not(cas) or j.rev == s.head.rev)
+    val valid = (not(validate) or (fresh(j) and withinCutoff(k)))
     val replace = s.head.lines.lineSet().exists(l => key(l.ref) == k and l.masked)
     val extend = k.w == 1 and k.a == s.head.covered
     val lines = if (replace) s.head.lines.mapLines(l => if (key(l.ref) == k) { ref: j.node.ref, masked: false } else l)
@@ -193,7 +194,7 @@ module memoryProtocol {
       s' = if (valid) { ...s,
         nodes: if (insert) s.nodes.union(Set(j.node)) else s.nodes,
         jobs: s.jobs.exclude(Set(j)), queue: s.queue.exclude(Set(k)),
-        head: if (changed) { rev: s.head.rev + 1, gen: s.gen,
+        head: if (changed) { rev: (if (cas) s.head.rev else j.rev) + 1, gen: s.gen,
           covered: s.head.covered + (if (extend) 1 else 0), lines: lines } else s.head,
         batch: s.batch or (changed and viewBytes + j.node.bytes > high),
         target: k, label: "publish" }
@@ -375,7 +376,11 @@ module memoryProtocol {
   val viewReferencesValid = s.head.gen == s.gen and s.head.lines.lineSet().forall(l =>
     l.masked or stored(l.ref).exists(n => clean(n)))
   val viewCAS = s.label != "publish" or s.head == before.head or
-    before.jobs.exists(j => key(j.node.ref) == s.target and j.rev == before.head.rev and j.node.gen == before.gen)
+    (s.head.rev == before.head.rev + 1 and s.head.gen == before.gen and
+      before.jobs.exists(j => key(j.node.ref) == s.target and j.node.gen == before.gen))
+  // A ready, fresh job cannot be discarded just because another leaf published.
+  val freshPublicationKept = s.label != "discard" or before.jobs.exclude(s.jobs).forall(j =>
+    not(j.ready and fresh(j) and withinCutoff(key(j.node.ref))))
   val restartPreservesHead = s.label != "crash" or s.head == before.head
   val mergePreservesCoverage = s.label != "merge" or
     (s.head.covered == before.head.covered and s.head.lines.length() + 1 == before.head.lines.length() and
@@ -442,7 +447,7 @@ module memoryProtocol {
   }
   val guardStampRequired = s.stampUsed
   val safety = sourceIdentityStable and retainedSourceExact and redactionMonotone and nodeIdentityStable and
-    nodeInputsCurrent and treeClosed and viewPartition and viewReferencesValid and viewCAS and restartPreservesHead and
+    nodeInputsCurrent and treeClosed and viewPartition and viewReferencesValid and viewCAS and freshPublicationKept and restartPreservesHead and
     mergePreservesCoverage and mergeDueOrder and prefixBetweenBatches and pinAuthorityExact and pinBudget and
     pinsSurviveCompaction and redactionExcludesReads and retrievalSound and requestSnapshotConsistent and
     requestCoverageDeclared and requestProtocolValid and requestBounded and mandatoryPinsIncluded and
@@ -523,7 +528,9 @@ module memoryProtocol {
     if (op == "huge") { nondet j = s.jobs.filter(j => key(j.node.ref) == k).oneOf(); completeWith(j, 20000, j.node.read, bug != "noCap") } else
     if (op == "oversize") { nondet j = s.jobs.filter(j => key(j.node.ref) == k).oneOf(); complete(j, 2048, j.node.read.union(Set(-1))) } else
     if (op == "publish") { nondet j = s.jobs.filter(j => key(j.node.ref) == k).oneOf();
-      publishWith(j, bug != "stalePublish" and bug != "pastCutoff", bug != "staleCAS" and bug != "stalePublish", bug != "missingParent") } else
+      if (bug == "startRevision" and j.rev != s.head.rev)
+        s' = { ...s, jobs: s.jobs.exclude(Set(j)), label: "discard", target: k }
+      else publishWith(j, bug != "stalePublish" and bug != "pastCutoff", bug != "staleCAS" and bug != "stalePublish", bug != "missingParent") } else
     if (op == "failJob") { nondet j = s.jobs.filter(j => key(j.node.ref) == k).oneOf(); failJob(j) } else
     if (op == "redact") redactWith(cmd.a, bug != "ancestry", bug != "queueAll") else
     if (op == "begin") beginRun else
@@ -611,11 +618,17 @@ module memoryProtocol {
   pure val oversizeParent = one.concat(hugeBuild(0, 1)).concat(one).concat(hugeBuild(1, 1)).concat(hugeBuild(0, 2))
   action oversizeParentStep = script(oversizeParent, "")
   action oversizeParentBugStep = script(oversizeParent, "noCap")
-  // Two workers read the same head. The later one may not overwrite it.
+  // Two workers start at one revision. Both publish against the transaction head.
   pure val casRace = two.concat(List(c("start", 0, 1), c("start", 1, 1), c("complete", 0, 1), c("complete", 1, 1),
     c("publish", 0, 1), c("publish", 1, 1)))
   action casRaceStep = script(casRace, "")
   action casRaceBugStep = script(casRace, "staleCAS")
+  action parallelLeavesStep = script(casRace, "")
+  action parallelLeavesBugStep = script(casRace, "startRevision")
+  pure val parallelRedaction = two.concat(List(c("start", 0, 1), c("start", 1, 1),
+    c("complete", 0, 1), c("complete", 1, 1), c("publish", 0, 1), c("redact", 0, 1), c("publish", 1, 1)))
+  action parallelRedactionStep = script(parallelRedaction, "")
+  action parallelRedactionBugStep = script(parallelRedaction, "stalePublish")
   pure val atomicPublish = one.concat(build(0, 1)).concat(List(c("crash", 0, 1)))
   action atomicPublishStep = script(atomicPublish, "")
   action atomicPublishBugStep = script(atomicPublish, "missingParent")
@@ -686,7 +699,7 @@ module memoryProtocol {
   // One simulator startup covers every corrected schedule. The runner requires
   // a completed witness for each case, so sampling cannot silently omit one.
   action suiteInit = {
-    nondet which = 0.to(27).oneOf()
+    nondet which = 0.to(29).oneOf()
     val state = if (which == 21) dueState else if (which == 22) siblingState else
       if (which == 23) pinnedState else initial
     all { s' = state, before' = state, pc' = 0, scenario' = which, remaining' = drainLimit }
@@ -716,7 +729,7 @@ module memoryProtocol {
     List(c("merge", 0, 1)),
     List(c("nonSiblings", 0, 1)),
     List(c("merge", 0, 1)),
-    queueCurrent, localTaint, doubleEdit, oversizeParent).nth(scenario)
+    queueCurrent, localTaint, doubleEdit, oversizeParent, casRace, parallelRedaction).nth(scenario)
   action suiteStep = script(suiteCommands, "")
   val case0 = scenario == 0 and reachedAgreement
   val case1 = scenario == 1 and reachedAgreement
@@ -747,6 +760,8 @@ module memoryProtocol {
   val case25 = scenario == 25 and reachedAgreement
   val case26 = scenario == 26 and reachedAgreement
   val case27 = scenario == 27 and reachedAgreement
+  val case28 = scenario == 28 and reachedAgreement
+  val case29 = scenario == 29 and reachedAgreement
 
   // Archive and removal exploration is deliberately separate from the longer
   // job race. These are the same transactions, with no symbolic script decoder.

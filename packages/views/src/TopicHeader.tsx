@@ -58,14 +58,17 @@ const tints: Record<TopicDetail['channel']['kind'], ContextTint> = {
 }
 
 const AI_TITLE = 'Title suggested by AI. Double-click to rename.'
-const RENAME_TITLE = 'Double-click to rename'
 
 /**
  * The topic header (inventory 5): the context pill, the stealth pill, the
  * actions, then the title with its icon slot. Main reads "#eng · Main" with
  * the "Threads" button; a thread shows the AI sparkle when its title came
  * from AI, and renames on double-click. Pin, Resolve and More arrive in M5,
- * which is why the right side is quiet.
+ * which is why the right side is quiet. The background and rule run the
+ * full width; the content shares the message column's width and padding,
+ * so pill, title, messages and composer keep one left edge on a wide
+ * window. In a narrow one the pill drops its kind, then the pill and the
+ * stealth chip shrink; the actions never do.
  */
 export function TopicHeader({ detail, stealth = false, art, threadsOpen = false, onThreads, threads, onSubscribe, onUnsubscribe, onMarkRead, onRename }: TopicHeaderProps) {
   const { channel } = detail
@@ -96,73 +99,74 @@ export function TopicHeader({ detail, stealth = false, art, threadsOpen = false,
 
   return (
     <header data-topic-header="" {...stylex.props(styles.header)}>
-      <div {...stylex.props(styles.row)}>
-        <ContextPill tint={tints[channel.kind]} icon={kindIcons[channel.kind]} name={channel.name} kindLabel={kindLabels[channel.kind]} showKind />
-        {stealth ? (
-          <span {...stylex.props(styles.stealth)}>
-            <Chip variant="dashed" size={26} icon={EyeSlash}>
-              Stealth. Not marking as read.
-            </Chip>
-            <Button variant="secondary" size="xs" onClick={() => onMarkRead(detail.id)}>
-              Mark read
-            </Button>
-          </span>
-        ) : null}
-        <span {...stylex.props(styles.spacer)} />
-        {main && onThreads !== undefined ? (
-          <Popover open={threadsOpen} onClose={() => onThreads(false)} anchor={threadsButton} placement="bottom-end" width="browse" padding="none" label="Threads">
-            {threads}
-          </Popover>
-        ) : null}
-        <IconButton
-          icon={Bell}
-          label={detail.subscribed ? 'Subscribed. Click to unsubscribe.' : 'Unsubscribed. Click to subscribe.'}
-          title={detail.subscribed ? 'Unsubscribe' : 'Subscribe'}
-          size={32}
-          pressed={detail.subscribed}
-          onClick={() => (detail.subscribed ? onUnsubscribe(detail.id) : onSubscribe(detail.id))}
-        />
-      </div>
-      <div {...stylex.props(styles.row, styles.titleRow)}>
-        <span {...stylex.props(styles.art)}>{art ?? <TopicIcon detail={detail} />}</span>
-        {renaming ? (
-          <input
-            type="text"
-            aria-label="Topic title"
-            value={draft}
-            autoFocus
-            onChange={(event) => setDraft(event.currentTarget.value)}
-            onFocus={(event) => event.currentTarget.select()}
-            onBlur={commit}
-            onKeyDown={onKeyDown}
-            {...stylex.props(styles.input)}
+      <div {...stylex.props(styles.content)}>
+        <div {...stylex.props(styles.row)}>
+          <ContextPill tint={tints[channel.kind]} icon={kindIcons[channel.kind]} name={channel.name} kindLabel={kindLabels[channel.kind]} showKind="roomy" />
+          {stealth ? (
+            <span {...stylex.props(styles.stealth)}>
+              <Chip variant="dashed" size={26} icon={EyeSlash} shrink>
+                Stealth. Not marking as read.
+              </Chip>
+              <Button variant="secondary" size="xs" onClick={() => onMarkRead(detail.id)}>
+                Mark read
+              </Button>
+            </span>
+          ) : null}
+          <span {...stylex.props(styles.spacer)} />
+          {main && onThreads !== undefined ? (
+            <Popover open={threadsOpen} onClose={() => onThreads(false)} anchor={threadsButton} placement="bottom-end" width="browse" padding="none" label="Threads">
+              {threads}
+            </Popover>
+          ) : null}
+          <IconButton
+            icon={Bell}
+            label={detail.subscribed ? 'Subscribed. Click to unsubscribe.' : 'Unsubscribed. Click to subscribe.'}
+            title={detail.subscribed ? 'Unsubscribe' : 'Subscribe'}
+            size={32}
+            pressed={detail.subscribed}
+            onClick={() => (detail.subscribed ? onUnsubscribe(detail.id) : onSubscribe(detail.id))}
           />
-        ) : main ? (
-          <>
-            <Text variant="topicTitle" tone="default" truncate dir="auto" sx={styles.title}>
-              {channel.label} · Main
-            </Text>
-          </>
-        ) : (
-          <>
-            <Text
-              variant="topicTitle"
-              tone="default"
-              truncate
-              dir="auto"
-              title={onRename === undefined ? undefined : RENAME_TITLE}
-              onDoubleClick={onRename === undefined ? undefined : () => setDraft(detail.title)}
-              sx={styles.title}
-            >
-              {detail.title}
-            </Text>
-            {detail.titleSource === 'ai' ? (
-              <span {...stylex.props(styles.sparkle)} title={AI_TITLE}>
-                <Icon icon={Sparkle} size={16} weight="duotone" label="Title suggested by AI" />
-              </span>
-            ) : null}
-          </>
-        )}
+        </div>
+        <div {...stylex.props(styles.row, styles.titleRow)}>
+          <span {...stylex.props(styles.art)}>{art ?? <TopicIcon detail={detail} />}</span>
+          {renaming ? (
+            <input
+              type="text"
+              aria-label="Topic title"
+              value={draft}
+              autoFocus
+              onChange={(event) => setDraft(event.currentTarget.value)}
+              onFocus={(event) => event.currentTarget.select()}
+              onBlur={commit}
+              onKeyDown={onKeyDown}
+              {...stylex.props(styles.input)}
+            />
+          ) : main ? (
+            <>
+              <Text variant="topicTitle" tone="default" truncate dir="auto" sx={styles.title}>
+                {channel.label} · Main
+              </Text>
+            </>
+          ) : (
+            <>
+              <Text
+                variant="topicTitle"
+                tone="default"
+                truncate
+                dir="auto"
+                onDoubleClick={onRename === undefined ? undefined : () => setDraft(detail.title)}
+                sx={styles.title}
+              >
+                {detail.title}
+              </Text>
+              {detail.titleSource === 'ai' ? (
+                <span {...stylex.props(styles.sparkle)} title={AI_TITLE}>
+                  <Icon icon={Sparkle} size={16} weight="duotone" label="Title suggested by AI" />
+                </span>
+              ) : null}
+            </>
+          )}
+        </div>
       </div>
     </header>
   )
@@ -185,22 +189,29 @@ function TopicIcon({ detail }: { readonly detail: TopicDetail }) {
 
 const styles = stylex.create({
   header: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: spacing['--space-2'],
     flexShrink: 0,
     width: '100%',
     minHeight: layout['--topic-header-height'],
-    paddingTop: spacing['--space-3-5'],
-    paddingInlineEnd: spacing['--space-6'],
-    paddingBottom: spacing['--space-3-5'],
-    paddingInlineStart: spacing['--space-8'],
+    paddingBlock: spacing['--space-3-5'],
     boxSizing: 'border-box',
     borderBottomWidth: '1px',
     borderBottomStyle: 'solid',
     borderBottomColor: colors['--border-subtle'],
     backgroundColor: colors['--background'],
     userSelect: 'none',
+  },
+  // The message column's width and padding (MessageList `column`). A size
+  // container, so the pill can drop its kind by the header's width.
+  content: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: spacing['--space-2'],
+    width: '100%',
+    maxWidth: layout['--reading-width'],
+    marginInline: 'auto',
+    paddingInline: spacing['--space-6'],
+    boxSizing: 'border-box',
+    containerType: 'inline-size',
   },
   row: {
     display: 'flex',
@@ -212,10 +223,13 @@ const styles = stylex.create({
   titleRow: {
     gap: spacing['--space-2-5'],
   },
+  // Gives way four times faster than the pill, so the channel name outlasts
+  // "Stealth. Not marking as read." in a narrow header.
   stealth: {
     display: 'inline-flex',
     alignItems: 'center',
     gap: spacing['--space-1-5'],
+    flexShrink: 4,
     minWidth: 0,
   },
   spacer: {
