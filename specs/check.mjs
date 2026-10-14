@@ -51,7 +51,11 @@ function specHash(file, seen = new Set()) {
   return sha(text, ...imports.map(name => specHash(name, seen)))
 }
 
-function quint(args, { violation = false, timeout = 60000, trace, check = () => {}, checks = '' } = {}) {
+// Deadlines per Quint process, about four times the slowest run measured on a
+// loaded machine (docs/development.md, "Faster test runs"). A timeout is a failure.
+const deadlines = { verify: 180000, other: 60000 }
+
+function quint(args, { violation = false, timeout = args[0] === 'verify' ? deadlines.verify : deadlines.other, trace, check = () => {}, checks = '' } = {}) {
   jobs.push({ args, violation, timeout, trace, check, checks })
 }
 
@@ -168,7 +172,7 @@ async function runJob(job) {
 async function runAll() {
   // Simulations first, SPECS_JOBS at a time. Then the Apalache checks, one at a
   // time and alone: a JVM warming up next to simulations on a loaded machine
-  // misses the 60-second deadline.
+  // can miss its deadline.
   const queues = [jobs.filter(job => job.args[0] === 'verify'), jobs.filter(job => job.args[0] !== 'verify')]
   let failed
   const lane = async queue => {
