@@ -78,6 +78,28 @@ export const chatCopy = {
     otherDevice: { chip: 'Juno is on your other Mac', line: 'Juno is working on your other Mac.' },
   },
   card: {
+    /** The header's kind label, by card `_tag`. A `question` card's header is its asker instead. */
+    kind: {
+      sendMessage: 'Send message',
+      resolve: 'Resolve',
+      topics: 'Topics',
+      proposedTask: 'Proposed task',
+      task: 'Task',
+      question: 'Question',
+      proposedSchedule: 'Proposed schedule',
+      schedule: 'Schedule',
+      connect: 'Connect',
+      change: 'Change',
+      remove: 'Remove',
+      budget: 'Budget',
+      provider: 'Provider',
+      unknown: 'Card',
+    },
+    /** The source beside a task's kind: where the job runs. */
+    jobKind: { t3: 'T3 Code', subagent: 'Juno' },
+    /** Prefix of the "Because" line. */
+    because: 'Because ',
+    dismissed: 'Dismissed',
     expired: 'Expired',
     askAgain: 'Ask again',
     unknownKind: 'This card needs a newer Juno',

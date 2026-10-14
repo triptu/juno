@@ -1,5 +1,5 @@
 import * as stylex from '@stylexjs/stylex'
-import type { TextareaHTMLAttributes } from 'react'
+import type { Ref, TextareaHTMLAttributes } from 'react'
 import { accent, colors, layout, radii, spacing, text } from '@juno/tokens/tokens.stylex'
 
 export type TextareaVariant = 'plain' | 'inline' | 'card'
@@ -15,6 +15,8 @@ export interface TextareaProps extends Omit<TextareaHTMLAttributes<HTMLTextAreaE
   /** For `inline`: the growth limit. */
   readonly maxHeight?: 'composer' | 'assistant'
   readonly label?: string
+  /** The element, for an owner that focuses it (⌘J on the Juno composer). */
+  readonly ref?: Ref<HTMLTextAreaElement>
 }
 
 /**
