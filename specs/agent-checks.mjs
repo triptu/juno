@@ -1,258 +1,73 @@
 // Directed pairs; corrected schedules also check every invariant.
 export const actionCases = [
-  [
-    "negativeLookup",
-    "unknownPreserved"
-  ],
-  [
-    "unknownRetry",
-    "retryRequiresAuthority"
-  ],
-  [
-    "hiddenRetry",
-    "noHiddenRetry"
-  ],
-  [
-    "approvalEdit",
-    "approvalExact"
-  ],
-  [
-    "schemaRace",
-    "approvalCurrentAtAuthorization"
-  ],
-  [
-    "accountRace",
-    "approvalCurrentAtAuthorization"
-  ],
-  [
-    "connectionRace",
-    "approvalCurrentAtAuthorization"
-  ],
-  [
-    "preconditionRace",
-    "approvalCurrentAtAuthorization"
-  ],
-  [
-    "expireRace",
-    "approvalCurrentAtAuthorization"
-  ],
-  [
-    "redactRace",
-    "approvalCurrentAtAuthorization"
-  ],
-  [
-    "consumeBeforeSend",
-    "approvalConsumption"
-  ],
-  [
-    "approvalReuse",
-    "approvalConsumption"
-  ],
-  [
-    "startupAttempt",
-    "unknownPreserved"
-  ],
-  [
-    "payloadBinding",
-    "allWritesGated"
-  ],
-  [
-    "receiptBinding",
-    "receiptMatchesAction"
-  ],
-  [
-    "scopedGrant",
-    "scopedNoClickGrant"
-  ],
-  [
-    "reportGrant",
-    "untrustedCannotGrant"
-  ],
-  [
-    "reportLaunch",
-    "cleanRunForNoClick"
-  ],
-  [
-    "reportSchedule",
-    "scheduleFromCleanOwnerRun"
-  ],
-  [
-    "wakeSchedule",
-    "scheduleFromCleanOwnerRun"
-  ],
-  [
-    "destructive",
-    "tier4NeverDispatched"
-  ],
-  [
-    "ownerRace",
-    "currentOwnerAuthorizes"
-  ],
-  [
-    "pauseRace",
-    "pauseBlocksAuthorization"
-  ],
-  [
-    "stopRace",
-    "pauseBlocksAuthorization"
-  ],
-  [
-    "offRace",
-    "pauseBlocksAuthorization"
-  ],
-  [
-    "quietNotification",
-    "quietHoursHoldNotifications"
-  ],
-  [
-    "cancelWake",
-    "cancelWinsBeforeAdmission"
-  ],
-  [
-    "cancelQueuedWake",
-    "cancelWinsBeforeAdmission"
-  ],
-  [
-    "duplicateWake",
-    "occurrenceAdmissionOnce"
-  ],
-  [
-    "lateCancel",
-    "outcomeEvidenceStable"
-  ],
-  [
-    "partialBatch",
-    "batchEffectsIndependent"
-  ],
-  [
-    "dedupeKey",
-    "dedupeIdentityStable"
-  ],
-  [
-    "dedupeAccept",
-    "dedupedEffectOnce"
-  ],
-  [
-    "parallelBudget",
-    "capHard"
-  ],
-  [
-    "unknownSpend",
-    "capHard"
-  ],
-  [
-    "compactionBudget",
-    "capHard"
-  ],
-  [
-    "unknownDrain",
-    "drainBound"
-  ],
-  [
-    "approvedDrain",
-    "drainBound"
-  ],
-  [
-    "wakeDrain",
-    "drainBound"
-  ],
-  [
-    "pauseDrain",
-    "drainBound"
-  ]
+  ['negativeLookup', 'unknownPreserved'],
+  ['unknownRetry', 'retryRequiresAuthority'],
+  ['hiddenRetry', 'noHiddenRetry'],
+  ['approvalEdit', 'approvalExact'],
+  ['schemaRace', 'approvalCurrentAtAuthorization'],
+  ['accountRace', 'approvalCurrentAtAuthorization'],
+  ['connectionRace', 'approvalCurrentAtAuthorization'],
+  ['preconditionRace', 'approvalCurrentAtAuthorization'],
+  ['expireRace', 'approvalCurrentAtAuthorization'],
+  ['redactRace', 'approvalCurrentAtAuthorization'],
+  ['consumeBeforeSend', 'approvalConsumption'],
+  ['approvalReuse', 'approvalConsumption'],
+  ['startupAttempt', 'unknownPreserved'],
+  ['payloadBinding', 'allWritesGated'],
+  ['receiptBinding', 'receiptMatchesAction'],
+  ['scopedGrant', 'scopedNoClickGrant'],
+  ['reportGrant', 'untrustedCannotGrant'],
+  ['reportLaunch', 'cleanRunForNoClick'],
+  ['reportSchedule', 'scheduleFromCleanOwnerRun'],
+  ['wakeSchedule', 'scheduleFromCleanOwnerRun'],
+  ['destructive', 'tier4NeverDispatched'],
+  ['ownerRace', 'currentOwnerAuthorizes'],
+  ['pauseRace', 'pauseBlocksAuthorization'],
+  ['stopRace', 'pauseBlocksAuthorization'],
+  ['offRace', 'pauseBlocksAuthorization'],
+  ['quietNotification', 'quietHoursHoldNotifications'],
+  ['cancelWake', 'cancelWinsBeforeAdmission'],
+  ['cancelQueuedWake', 'cancelWinsBeforeAdmission'],
+  ['duplicateWake', 'occurrenceAdmissionOnce'],
+  ['lateCancel', 'outcomeEvidenceStable'],
+  ['partialBatch', 'batchEffectsIndependent'],
+  ['dedupeKey', 'dedupeIdentityStable'],
+  ['dedupeAccept', 'dedupedEffectOnce'],
+  ['parallelBudget', 'capHard'],
+  ['unknownSpend', 'capHard'],
+  ['compactionBudget', 'capHard'],
+  ['unknownDrain', 'drainBound'],
+  ['approvedDrain', 'drainBound'],
+  ['wakeDrain', 'drainBound'],
+  ['pauseDrain', 'drainBound'],
+  ['attemptEvidence', 'unknownPreserved'],
+  ['batchOrderRace', 'approvalExact'],
 ]
 
 export const recoveryCases = [
-  [
-    "lockHandle",
-    "singleLocalOwner"
-  ],
-  [
-    "lockLifetime",
-    "singleLocalOwner"
-  ],
-  [
-    "inboxPowerLoss",
-    "acknowledgedInputDurable"
-  ],
-  [
-    "bridgeReplay",
-    "bridgeDedupe"
-  ],
-  [
-    "projectionCommit",
-    "projectionPrefix"
-  ],
-  [
-    "journalRollback",
-    "journalRollbackStopsResume"
-  ],
-  [
-    "rotationIdentity",
-    "journalIdentityUnique"
-  ],
-  [
-    "authorityCrash",
-    "ordinaryCrashPreservesCommittedAuthority"
-  ],
-  [
-    "incompleteCheckpoint",
-    "transferCheckpointComplete"
-  ],
-  [
-    "releaseCrash",
-    "releaseBeforePublication"
-  ],
-  [
-    "restoreApproval",
-    "restoreDoesNotAuthorize"
-  ],
-  [
-    "restoreAttempt",
-    "restoreDoesNotAuthorize"
-  ],
-  [
-    "manifestBeforeSegment",
-    "backupChainComplete"
-  ],
-  [
-    "redactionDuringRestore",
-    "restoreRespectsDeletion"
-  ],
-  [
-    "unauthenticatedManifest",
-    "backupChainComplete"
-  ],
-  [
-    "exportCrash",
-    "exportAfterManifest"
-  ],
-  [
-    "nonceAfterCrash",
-    "encryptionNonceFresh"
-  ],
-  [
-    "sanitizedGeneration",
-    "backupSanitized"
-  ],
-  [
-    "shredBeforeSnapshot",
-    "generationKeyAvailable"
-  ],
-  [
-    "partitionedOwner",
-    "staleOwnerCannotAuthorize"
-  ],
-  [
-    "epochReadRace",
-    "staleOwnerCannotAuthorize"
-  ],
-  [
-    "transferDrain",
-    "drainBound"
-  ],
-  [
-    "backupDrain",
-    "drainBound"
-  ]
+  ['lockHandle', 'singleLocalOwner'],
+  ['lockLifetime', 'singleLocalOwner'],
+  ['inboxPowerLoss', 'acknowledgedInputDurable'],
+  ['bridgeReplay', 'bridgeDedupe'],
+  ['projectionCommit', 'projectionPrefix'],
+  ['journalRollback', 'journalRollbackStopsResume'],
+  ['rotationIdentity', 'journalIdentityUnique'],
+  ['authorityCrash', 'ordinaryCrashPreservesCommittedAuthority'],
+  ['incompleteCheckpoint', 'transferCheckpointComplete'],
+  ['releaseCrash', 'transferCheckpointComplete'],
+  ['restoreApproval', 'restoreDoesNotAuthorize'],
+  ['restoreAttempt', 'restoreDoesNotAuthorize'],
+  ['manifestBeforeSegment', 'backupChainComplete'],
+  ['redactionDuringRestore', 'restoreRespectsDeletion'],
+  ['unauthenticatedManifest', 'backupChainComplete'],
+  ['exportCrash', 'exportAfterManifest'],
+  ['nonceAfterCrash', 'encryptionNonceFresh'],
+  ['sanitizedGeneration', 'backupSanitized'],
+  ['shredBeforeSnapshot', 'generationKeyAvailable'],
+  ['partitionedOwner', 'staleOwnerCannotAuthorize'],
+  ['epochReadRace', 'staleOwnerCannotAuthorize'],
+  ['transferDrain', 'drainBound'],
+  ['backupDrain', 'drainBound'],
+  ['exportFeedback', 'drainBound'],
+  ['missingDeletion', 'restoreRespectsDeletion'],
 ]

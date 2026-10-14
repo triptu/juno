@@ -24,8 +24,8 @@ const generated = join(root, 'specs/traces')
 mkdirSync(generated, { recursive: true })
 
 function quint(args, { violation = false, timeout = 60000 } = {}) {
-  const budget = 540000 - (Date.now() - startedAt)
-  if (budget <= 0) throw new Error('Spec check exceeded its nine-minute execution budget')
+  const budget = 720000 - (Date.now() - startedAt)
+  if (budget <= 0) throw new Error('Spec check exceeded its twelve-minute execution budget')
   console.log(`quint ${args.join(' ')}`)
   // Keep Apalache's generated directory inside the ignored trace directory.
   const verify = args[0] === 'verify'
@@ -131,7 +131,8 @@ const regressions = [
   ['readstate', 'pendingMark', 'quietAgreement', 'pending-read-event'],
 ]
 
-for (const file of readdirSync(join(root, 'specs')).filter(name => name.endsWith('.qnt')).toSorted()) {
+const selectedSpec = actionsOnly ? 'agent-actions.qnt' : recoveryOnly ? 'agent-recovery.qnt' : memoryOnly ? 'agent-memory.qnt' : undefined
+for (const file of readdirSync(join(root, 'specs')).filter(name => name.endsWith('.qnt') && (!selectedSpec || name === selectedSpec)).toSorted()) {
   quint(['typecheck', `specs/${file}`])
 }
 
@@ -218,7 +219,7 @@ if (!boundedOnly && !memoryOnly && !actionsOnly) {
     simulate('agent-recovery', `${schedule}BugStep`, invariant, `recovery-${schedule}-bug.itf.json`, true, false,
       { ...options, steps: 100 })
   }
-  for (const schedule of ['journalAhead', 'unsupportedSchema', 'cooperativeTransfer']) {
+  for (const schedule of ['journalAhead', 'unsupportedSchema', 'cooperativeTransfer', 'reviewedRestore']) {
     simulate('agent-recovery', `${schedule}Step`, 'cooperativeSafety', `recovery-${schedule}.itf.json`, false, false, options)
   }
 }
@@ -241,7 +242,7 @@ if (!tracesOnly) {
   // Quint downloads Apalache on the first `verify` when it is missing.
   if (!javaPath) {
     console.log('Mode: randomized simulator only (Java unavailable).')
-    console.log(`Seed ${seed}; memory: 1000 random samples and all 25 corrected witnesses (unless --bounded).`)
+    console.log(`Seed ${seed}; selected agent protocols: 1000 random samples and all corrected witnesses (unless --bounded).`)
     console.log('Temporal formulas are typechecked only. Drain bounds: follow 64, read 48, memory 64, actions 32, recovery 64.')
   } else {
     if (!memoryOnly && !actionsOnly && !recoveryOnly) {
@@ -288,7 +289,7 @@ if (!tracesOnly) {
       }
     }
     console.log(`Mode: ${boundedOnly ? 'bounded Apalache' : 'simulator and bounded Apalache'}${memoryOnly ? ' (memory only)' : actionsOnly ? ' (actions only)' : recoveryOnly ? ' (recovery only)' : ''}.`)
-    console.log('Memory bounds: 4 archive transitions; 6 publication-race transitions. Temporal liveness is typechecked only.')
+    console.log('Bounded safety and races use the documented depths. Temporal liveness is typechecked only.')
   }
 }
 console.log(`Spec check runtime: ${((Date.now() - startedAt) / 1000).toFixed(1)} seconds (excludes machine-lock wait).`)
