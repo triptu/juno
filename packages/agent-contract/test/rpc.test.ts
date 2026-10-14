@@ -25,6 +25,7 @@ const cases: Record<string, readonly [unknown, unknown]> = {
   'agent.cards.prepare': [{ ...op, identity, choice: { _tag: 'send' } }, { card, identity, children: [child] }],
   'agent.cards.approve': [{ ...op, identity, children: [child] }, accepted],
   'agent.cards.dismiss': [{ ...op, identity }, accepted],
+  'agent.cards.askAgain': [{ ...op, identity }, accepted],
   'agent.cards.editMessage': [{ ...op, identity, messageId: 'message', text: 'Changed' }, { card, identity }],
   'agent.cards.undo': [{ ...op, identity }, accepted],
   'agent.jobs.stop': [{ ...op, jobId: 'job' }, accepted],

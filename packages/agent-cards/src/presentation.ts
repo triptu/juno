@@ -178,7 +178,7 @@ const scheduleFields = {
   when: Schema.String,
   deliver: Deliver,
 }
-export const ProposedScheduleCard = Schema.TaggedStruct('proposedSchedule', { ...base, ...scheduleFields })
+export const ProposedScheduleCard = Schema.TaggedStruct('proposedSchedule', { ...base, ...scheduleFields, prompt: Schema.String })
 export type ProposedScheduleCard = typeof ProposedScheduleCard.Type
 export const ScheduleCard = Schema.TaggedStruct('schedule', { ...base, ...scheduleFields, scheduleId: ScheduleId })
 export type ScheduleCard = typeof ScheduleCard.Type

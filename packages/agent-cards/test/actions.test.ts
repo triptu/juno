@@ -88,6 +88,7 @@ describe('child actions and card status', () => {
       expect(view._tag).toBe(payload._tag)
       if (view._tag !== 'task' && view._tag !== 'unknown') expect(view.status._tag).toBe(payload._tag === 'topics' || now < 604800000 ? 'open' : 'expired')
       if (view._tag === 'change') expect(view.fields).toEqual([{ name: 'text', after: '"Example"' }])
+      if (view._tag === 'proposedSchedule') expect(view.prompt).toBe('Summarize #test since the last run.')
     }))
   })
 })

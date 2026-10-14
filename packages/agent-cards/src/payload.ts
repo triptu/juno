@@ -38,7 +38,8 @@ export const QuestionPayload = Schema.TaggedStruct('question', {
   options: Schema.Array(P.QuestionOption).check(Schema.isMinLength(2), Schema.isMaxLength(4)), freeText: Schema.Boolean,
 })
 const schedule = { what: Schema.String, when: Schema.String, deliver: P.Deliver }
-export const ProposedSchedulePayload = Schema.TaggedStruct('proposedSchedule', { ...action, ...schedule })
+/** `prompt` is the exact instruction each wake runs. The card renders it in full (G6). */
+export const ProposedSchedulePayload = Schema.TaggedStruct('proposedSchedule', { ...action, ...schedule, prompt: Schema.String })
 export const SchedulePayload = Schema.TaggedStruct('schedule', { ...action, ...schedule, scheduleId: P.ScheduleId })
 export const ConnectPayload = Schema.TaggedStruct('connect', {
   ...action, server: Schema.String, scopes: Schema.Array(Schema.String), leaves: Schema.String,

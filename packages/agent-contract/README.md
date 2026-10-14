@@ -45,7 +45,7 @@ Rules of the shape:
 
 Every durable mutation carries an `OpId`. `Accepted` means the FULL inbox commit succeeded, not that a run or external action succeeded. Failed delivery retries reuse the same op id. Stop names a run; stopping a background job is a separate command. The local Remove command needs no model run.
 
-Approval identities and source revisions travel beside the view models. A card click binds the card revision/digest and ordered child revision/digests, including the duplicate warning. `prepare` stores choice arguments (for example a question answer) before `approve`; approval never accepts replacement executable arguments. Editing send text creates a new stored proposal. The handler must reject stale bindings and already-consumed approvals.
+Approval identities and source revisions travel beside the view models. A card click binds the card revision/digest and ordered child revision/digests, including the duplicate warning. `prepare` stores choice arguments (for example a question answer) before `approve`; approval never accepts replacement executable arguments. Editing send text creates a new stored proposal. `dismiss` serves every button that only declines (Dismiss, Skip, Keep on Remove, Wait until tomorrow). `askAgain` takes an expired card; the agent writes the owner message that quotes it. The handler must reject stale bindings and already-consumed approvals.
 
 Scheduled and Remembers snapshots also carry revisions, because their WP7 rows do not. Credentials use main's setup flow and never put secret values into the inbox. Settings changes and ownership operations are renderer-only commands, not model tools.
 

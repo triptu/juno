@@ -251,7 +251,7 @@ Anything that leaves Juno, or that Juno wants you to decide, is a card under its
 | Send message | One to five messages, each with a context pill for where it goes, "in {topic}" when it replies inside a thread, and editable text | Send (all), Dismiss | Per row: "Sent · Open" or "Not sent · Try again". The card itself says "Sent 3", "Sent 1 of 3" or "Not sent · Try again" once every row has settled, and stays working until then |
 | Resolve | The topics | Resolve, Dismiss | "Resolved 3 · Undo" |
 | Topics | Links to topics; click opens, ⌘ click opens a tab | none | none |
-| Task | A job: its title, where it runs, a live state line ("Tests running, 2 of 5") | Open, Stop | "Done · Open PR 412", "Failed · Show in Activity", "Stopped", or "Juno can't tell whether this is running · Open" |
+| Task | A job: its title, where it runs, a live state line ("Tests running, 2 of 5") | Open, Stop | "Done · Open PR 412", "Failed · Show in Activity", "Stopped", or "Juno can't tell whether this is running. Open" |
 | Proposed task | The same, for work Juno may not start on its own (13.9) | Start, Dismiss | "Started", then a Task card under Juno's next message |
 | Question | Who asks ("Juno asks", "T3 Code asks" with the job's pill), the question, two to four options, and a reply field | An option, Reply | "You chose …" or "You replied" |
 | Schedule | What, when, how it delivers | Keep, Pause, Delete | "Kept", "Paused" or "Deleted" |
@@ -263,7 +263,7 @@ Anything that leaves Juno, or that Juno wants you to decide, is a card under its
 | Provider | "Choose a model provider": OpenRouter or Codex, with the fixed line that Juno sends its memory of the chat to the provider on every turn | Set up | "Using Claude Sonnet 5.5" |
 
 - **Because.** When Juno proposes a card for something it would otherwise have done quietly (because a message it read in Slack or a report from a job was in the conversation, 13.9), the card carries one line saying why.
-- **One click, one action.** A click authorizes exactly the payload shown, once. A retry is a new click. If Juno cannot tell whether a send landed, the row says so: "Juno can't tell whether this was sent. Check channel · Send again". Every retry of something the destination cannot recognise as a repeat (Send again, Try again, Apply again) says "If the first try went through, this does it again." beside its button, whatever happened the first time.
+- **One click, one action.** A click authorizes exactly the payload shown, once. A retry is a new click. If Juno cannot tell whether a send landed, the row says so: "Juno can't tell whether this was sent. Check channel · Send again". Every retry of something the destination cannot recognise as a repeat (Send again, Try again) says "If the first try went through, this does it again." beside its button, whatever happened the first time.
 - **Expiry.** Cards expire after seven days or when what they refer to changes: "Expired · Ask again". Ask again sends Juno a message quoting the card's request, so a fresh card follows from a fresh read.
 - **Restored.** After a restore from backup (13.8), each pending card reads "This may already have happened." above its buttons until you decide it.
 - **Keyboard.** Every card button is reachable with Tab, and the first option of a question takes Enter.

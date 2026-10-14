@@ -26,7 +26,12 @@ export const cardsPrepare = Rpc.make('agent.cards.prepare', {
 export const cardsApprove = Rpc.make('agent.cards.approve', {
   payload: { ...operation, identity: CardIdentity, children: Schema.NonEmptyArray(ChildApproval) }, success: Accepted, error: AgentCommandError,
 })
+/** Dismiss, and every button that only declines: Skip on Connect, Keep on Remove, Wait until tomorrow on Budget. */
 export const cardsDismiss = Rpc.make('agent.cards.dismiss', {
+  payload: { ...operation, identity: CardIdentity }, success: Accepted, error: AgentCommandError,
+})
+/** "Ask again" on an expired card. The agent writes the owner message that quotes the card's request; the renderer sends only the card. */
+export const cardsAskAgain = Rpc.make('agent.cards.askAgain', {
   payload: { ...operation, identity: CardIdentity }, success: Accepted, error: AgentCommandError,
 })
 export const cardsEditMessage = Rpc.make('agent.cards.editMessage', {
@@ -35,4 +40,4 @@ export const cardsEditMessage = Rpc.make('agent.cards.editMessage', {
 })
 export const cardsUndo = Rpc.make('agent.cards.undo', { payload: { ...operation, identity: CardIdentity }, success: Accepted, error: AgentCommandError })
 export const jobStop = Rpc.make('agent.jobs.stop', { payload: { ...operation, jobId: JobId }, success: Accepted, error: AgentCommandError })
-export const CardRpcs = RpcGroup.make(cardsPrepare, cardsApprove, cardsDismiss, cardsEditMessage, cardsUndo, jobStop)
+export const CardRpcs = RpcGroup.make(cardsPrepare, cardsApprove, cardsDismiss, cardsAskAgain, cardsEditMessage, cardsUndo, jobStop)

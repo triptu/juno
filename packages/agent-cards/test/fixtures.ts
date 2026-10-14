@@ -18,7 +18,7 @@ export const payloads = [
   { _tag: 'proposedTask', action, kind: 't3', title: 'Example', where: 'test' },
   { _tag: 'task', jobId: 'job', kind: 't3', title: 'Example', where: 'test' },
   { _tag: 'question', action, asks: { _tag: 'juno' }, prompt: 'Example?', options: [{ id: 'one', label: 'One' }, { id: 'two', label: 'Two' }], freeText: true },
-  { _tag: 'proposedSchedule', action, what: 'Example', when: 'Tomorrow', deliver: 'digest' },
+  { _tag: 'proposedSchedule', action, what: 'Example', when: 'Tomorrow', deliver: 'digest', prompt: 'Summarize #test since the last run.' },
   { _tag: 'schedule', action, scheduleId: 'schedule', what: 'Example', when: 'Tomorrow', deliver: 'now' },
   { _tag: 'connect', action, server: 'Example', scopes: ['read'], leaves: 'Query text' },
   { _tag: 'change', action, server: 'Example', target: 'Example' },

@@ -74,7 +74,7 @@ export function toCard(record: CardRecord, now: number): P.Card {
     case 'topics': return { ...base, _tag: p._tag, links: p.links, status: { _tag: 'open' } }
     case 'proposedTask': return { ...base, _tag: p._tag, kind: p.kind, title: p.title, where: p.where }
     case 'question': return { ...base, _tag: p._tag, asks: p.asks, prompt: p.prompt, options: p.options, freeText: p.freeText }
-    case 'proposedSchedule': return { ...base, _tag: p._tag, what: p.what, when: p.when, deliver: p.deliver }
+    case 'proposedSchedule': return { ...base, _tag: p._tag, what: p.what, when: p.when, deliver: p.deliver, prompt: p.prompt }
     case 'schedule': return { ...base, _tag: p._tag, what: p.what, when: p.when, deliver: p.deliver, scheduleId: p.scheduleId }
     case 'connect': return { ...base, _tag: p._tag, server: p.server, scopes: p.scopes, leaves: p.leaves }
     case 'change': {

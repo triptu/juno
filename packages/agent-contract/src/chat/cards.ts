@@ -232,8 +232,13 @@ const scheduleFields = {
   deliver: Deliver,
 }
 
-/** A schedule proposed from a tainted run. Start creates it; `status` is that click. */
-export const ProposedScheduleCard = Schema.TaggedStruct('proposedSchedule', { ...base, ...scheduleFields })
+/**
+ * A schedule proposed from a tainted run. Start creates it; `status` is that
+ * click. `prompt` is the instruction each wake will run, word for word from
+ * the stored payload: the click approves it, so the card shows all of it
+ * (plan v3 §6.4, G6).
+ */
+export const ProposedScheduleCard = Schema.TaggedStruct('proposedSchedule', { ...base, ...scheduleFields, prompt: Schema.String })
 export type ProposedScheduleCard = typeof ProposedScheduleCard.Type
 
 /**
