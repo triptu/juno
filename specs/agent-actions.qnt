@@ -201,6 +201,14 @@ module actionsProtocol {
     if (guard and not(s.scheduleProposal > 0 and s.scheduleApproved == s.scheduleProposal and mayAuthorize)) idle else
     s' = { ...s, schedule: true, scheduleAuthority: "click", scheduleApproved: 0,
       grants: s.grants.union(Set({ target: 1, opClass: 1, source: s.gen, rev: s.scheduleRev })), label: "scheduleClick" }
+  // "Tell me if nobody replies" in a message's menu (SPEC 13.6). The owner's
+  // click enters through the inbox and creates the watch with no run, so what
+  // the chat has read does not matter. The item is disabled while Juno is
+  // paused, off or owned by another Mac, so no watch is created then.
+  action scheduleFromMenu(guard: bool): bool =
+    if (guard and not(mayAuthorize)) idle else
+    s' = { ...s, schedule: true, scheduleAuthority: "menu",
+      grants: s.grants.union(Set({ target: 1, opClass: 1, source: s.gen, rev: s.scheduleRev })), label: "scheduleMenu" }
   val scheduleValid = s.schedule and s.grants.exists(g => g.target == 1 and g.opClass == 1 and
     g.rev == s.scheduleRev and g.source == s.gen)
   action queueWake = s' = { ...s, queued: true, wake: { schedule: 1, rev: s.scheduleRev, due: 1 }, label: "queue" }
@@ -317,7 +325,8 @@ module actionsProtocol {
     (before.ownerRun and before.clean and before.sourceInRun) or
     (s.label == "grantClick" and before.approvals.exists(p => p.child == s.target and
       before.intents.exists(i => i.id == p.child and i.rev == p.rev and i.payload == p.digest))) or
-    (s.label == "scheduleClick" and before.scheduleProposal > 0 and before.scheduleApproved == before.scheduleProposal)
+    (s.label == "scheduleClick" and before.scheduleProposal > 0 and before.scheduleApproved == before.scheduleProposal) or
+    (s.label == "scheduleMenu" and beforeMayAuthorize)
   val tier4NeverDispatched = s.auths.forall(a => a.intent.tier < 4)
   val allWritesGated = s.attempts.listSet().forall(t => s.auths.exists(a => a.id == t.auth and a.consumed and a.intent.payload == t.payload))
   // This is the local ownership authority only. WP4 deliberately disproves
@@ -332,9 +341,11 @@ module actionsProtocol {
       g.opClass == 1 and g.rev == before.scheduleRev and g.source == before.gen))
   val batchEffectsIndependent = newAuths.forall(a => not(before.receipts.exists(r => r.child == a.intent.id)))
   val outcomeEvidenceStable = before.receipts.subseteq(s.receipts) and before.auths.subseteq(s.auths)
+  val beforeMayAuthorize = before.active and before.epoch == before.localEpoch and not(before.paused or before.off or before.crashed)
   val scheduleFromOwnerAuthority = not(s.schedule) or s.scheduleAuthority == "clean" or
     (s.scheduleAuthority == "click" and (s.label != "scheduleClick" or
-      (before.scheduleProposal > 0 and before.scheduleApproved == before.scheduleProposal)))
+      (before.scheduleProposal > 0 and before.scheduleApproved == before.scheduleProposal))) or
+    (s.scheduleAuthority == "menu" and (s.label != "scheduleMenu" or beforeMayAuthorize))
   val cleanRunForNoClick = newAuths.forall(a => not(a.grant) or (before.ownerRun and before.clean))
   // Per day: what the ledger holds stays within the cap and the owner's raises,
   // compaction within a quarter of it, and no reservation records less than
@@ -393,7 +404,7 @@ module actionsProtocol {
       all { currentIntent(k) != Set(), s.nextApproval < 5, click(k) },
       authorizeDispatch(k), transportSend(k), destinationAccept(k), recordReceipt(k), lose(k), reject(k), reconcile(k, true, true),
       crash, startup(true), pause("pause"), cancel(true), taint(true), grantWith(k, true),
-      proposeSchedule, clickSchedule, scheduleFromClick(true), scheduleWith(true), queueWake, deleteSchedule, admitWake(""), startWake(true),
+      proposeSchedule, clickSchedule, scheduleFromClick(true), scheduleWith(true), scheduleFromMenu(true), queueWake, deleteSchedule, admitWake(""), startWake(true),
       invalidate("redact"), invalidate("schema"), seal,
       all { s.nextSpend < 8, reserve(false, 2, true, "") }, all { s.nextSpend < 8, reserve(true, 2, true, "") },
       all { s.nextSpend < 8, reserve(false, 0, true, "") },
@@ -438,6 +449,7 @@ module actionsProtocol {
     if (op == "clickSchedule") clickSchedule else
     if (op == "scheduleClick") scheduleFromClick(bug != "scheduleClick") else
     if (op == "schedule") scheduleWith(bug != "schedule") else
+    if (op == "scheduleMenu") scheduleFromMenu(bug != "scheduleMenu") else
     if (op == "queue") queueWake else
     if (op == "delete") deleteSchedule else
     if (op == "admit") admitWake(bug) else
@@ -625,9 +637,13 @@ module actionsProtocol {
     c("proposeSchedule", 0), c("scheduleClick", 0))
   action clickedScheduleStep = script(clickedSchedule, "")
   action clickedScheduleBugStep = script(clickedSchedule, "scheduleClick")
-  action suiteInit = { nondet which = 0.to(47).oneOf(); all { s' = initial, before' = initial, pc' = 0, remaining' = drainLimit, scenario' = which } }
+  // A menu click while paused creates no watch.
+  pure val menuSchedule = List(c("pause", 0), c("scheduleMenu", 0))
+  action menuScheduleStep = script(menuSchedule, "")
+  action menuScheduleBugStep = script(menuSchedule, "scheduleMenu")
+  action suiteInit = { nondet which = 0.to(48).oneOf(); all { s' = initial, before' = initial, pc' = 0, remaining' = drainLimit, scenario' = which } }
   val suiteCommands = List(negativeLookup, unknownRetry, hiddenRetry, approvalEdit, schemaRace, accountRace, connectionRace, preconditionRace, expireRace, redactRace, consumeBeforeSend, approvalReuse, startupAttempt, payloadBinding, receiptBinding, scopedGrant, reportGrant, reportLaunch, reportSchedule, wakeSchedule, destructive, ownerRace, pauseRace, offRace, quietNotification, cancelWake, cancelQueuedWake, duplicateWake, lateCancel, partialBatch, dedupeKey, dedupeAccept, parallelBudget, unknownSpend, compactionBudget, unknownDrain, approvedDrain, wakeDrain, pauseDrain, attemptEvidence, batchOrderRace, clickedSchedule,
-    compactionSettle, refusedSpend, dailyReset, raiseClick, overReportCap, capReached).nth(scenario)
+    compactionSettle, refusedSpend, dailyReset, raiseClick, overReportCap, capReached, menuSchedule).nth(scenario)
   action suiteStep = script(suiteCommands, "")
   val case0 = scenario == 0 and reachedAgreement and (s.unknown == Set(1) and s.explained == Set(1))
   val case1 = scenario == 1 and reachedAgreement and (s.auths.size() == 1)
@@ -679,6 +695,10 @@ module actionsProtocol {
   val case45 = scenario == 45 and reachedAgreement and s.spends.size() == 6 and s.raiseLog.length() == 1 and reservedOn(0) == 12
   val case46 = scenario == 46 and reachedAgreement and s.spends.size() == 4 and totalOn(0) == 9 and overReportOn(0, false) == 1
   val case47 = scenario == 47 and reachedAgreement and s.spends.size() == 4 and totalOn(0) == 8
+  val case48 = scenario == 48 and reachedAgreement and not(s.schedule)
+  // A menu click creates the watch even after the run read Slack.
+  action menuScheduleWitnessStep = script(List(c("report", 0), c("scheduleMenu", 0)), "")
+  val menuScheduleCreated = reachedAgreement and s.schedule and s.scheduleAuthority == "menu"
   action clickedScheduleWitnessStep = script(List(c("report", 0), c("proposeSchedule", 0),
     c("clickSchedule", 0), c("scheduleClick", 0)), "")
   val clickedScheduleCreated = reachedAgreement and s.schedule and s.scheduleAuthority == "click"
