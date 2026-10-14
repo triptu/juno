@@ -1,134 +1,140 @@
 import { describe, expect, it } from 'vitest'
 import {
   decideNotification,
-  decisionChip,
   defaultNotificationSettings,
-  inQuietHours,
-  nextDigestLabel,
-  nextDigestSlot,
-  ruleLabel,
-  ruleMatches,
+  hoursStartSummary,
+  inHours,
+  nextSwitch,
+  scheduledPresence,
+  slackPresence,
+  untilLabel,
+  type DecisionContext,
+  type Hours,
+  type LocalTime,
   type NotificationCandidate,
-  type NotificationRule,
   type NotificationSettings,
-  type RuleNames,
 } from '../src/index'
 import { alerts, eng, hiring, leoId, maya, mayaId } from './fixtures'
 
-const names: RuleNames = {
-  user: (id) => ({ U0MAYA: 'Maya Chen', U0LEO: 'Leo Park' })[id],
-  channel: (id) => [eng, hiring, maya, alerts].find((c) => c.id === id),
+const at = (weekday: LocalTime['weekday'], hour: number, minute = 0): LocalTime => ({ weekday, minutes: hour * 60 + minute })
+const MON = 1
+const SAT = 6
+
+// Notifications stop at 6pm; Slack shows the owner active until 8pm (the owner's example).
+const settings: NotificationSettings = {
+  ...defaultNotificationSettings,
+  notificationHours: { days: [1, 2, 3, 4, 5], from: 9 * 60, to: 18 * 60 },
+  presenceHours: { days: [1, 2, 3, 4, 5], from: 9 * 60, to: 20 * 60 },
+  channels: { C0INCIDENTS: 'every', [eng.id]: 'never' },
+  people: { [mayaId]: 'every', U0SAM: 'never' },
 }
-
-const rules: NotificationRule[] = [
-  { id: 'r1', kind: 'channel', value: 'C0INCIDENTS', action: 'now' },
-  { id: 'r2', kind: 'person', value: mayaId, action: 'now' },
-  { id: 'r3', kind: 'mention', value: hiring.id, action: 'now' },
-  { id: 'r4', kind: 'keyword', value: 'lunch', action: 'silent' },
-  { id: 'r5', kind: 'channel', value: eng.id, action: 'digest' },
-]
-
-const noon = 12 * 60
-const nineAtNight = 21 * 60
+const incidents = { id: 'C0INCIDENTS', kind: 'public', name: 'incidents' } as const
+const ai: DecisionContext = { aiAssist: true, userName: (id) => ({ U0MAYA: 'Maya Chen', U0SAM: 'Sam Okafor' })[id] }
+const aiOff: DecisionContext = { ...ai, aiAssist: false }
 
 function candidate(overrides: Partial<NotificationCandidate> = {}): NotificationCandidate {
-  return { channel: hiring, senderId: leoId, mentionsMe: false, text: 'hello there', localMinutes: noon, ...overrides }
+  return { channel: hiring, senderId: leoId, mentionsMe: false, at: at(MON, 12), ...overrides }
 }
 
-const settings: NotificationSettings = { ...defaultNotificationSettings, threshold: 80 }
+describe('notification decision', () => {
+  const urgent = { notify: true, reason: 'asks you to approve the release before 2pm' }
+  const routine = { notify: false, reason: 'an update with nothing for you to do' }
 
-describe('rules', () => {
-  it('labels rules the way the Notifications page prints them', () => {
-    expect(ruleLabel(rules[0]!, { ...names, channel: () => ({ id: 'C0INCIDENTS', kind: 'public', name: 'incidents' }) as never })).toBe('In #incidents')
-    expect(ruleLabel(rules[1]!, names)).toBe('From Maya Chen')
-    expect(ruleLabel(rules[2]!, names)).toBe('Mentions of me in hiring')
-    expect(ruleLabel(rules[3]!, names)).toBe('Contains "lunch"')
-    expect(ruleLabel({ id: 'x', kind: 'person', value: 'U0UNKNOWN', action: 'now' })).toBe('From U0UNKNOWN')
+  it.each([
+    ['an ignored channel holds before anything else', candidate({ channel: alerts, senderId: mayaId }), ai, undefined, { outcome: 'hold', reason: '#alerts-prod is ignored' }],
+    ['a channel set to Every message notifies', candidate({ channel: incidents as never }), ai, undefined, { outcome: 'now', reason: '#incidents is set to Every message' }],
+    ['a person set to Every message notifies', candidate({ senderId: mayaId }), ai, undefined, { outcome: 'now', reason: 'Maya Chen is set to Every message' }],
+    ['Every message on the person wins over Never on the channel', candidate({ channel: eng, senderId: mayaId }), ai, undefined, { outcome: 'now', reason: 'Maya Chen is set to Every message' }],
+    ['Every message on the channel wins over Never on the person', candidate({ channel: incidents as never, senderId: 'U0SAM' as never }), ai, undefined, { outcome: 'now', reason: '#incidents is set to Every message' }],
+    ['a channel set to Never holds', candidate({ channel: eng }), ai, urgent, { outcome: 'hold', reason: '#eng is set to Never' }],
+    ['a person set to Never holds', candidate({ senderId: 'U0SAM' as never }), ai, urgent, { outcome: 'hold', reason: 'Sam Okafor is set to Never' }],
+    ['Every message comes through outside notification hours', candidate({ senderId: mayaId, at: at(MON, 22) }), ai, undefined, { outcome: 'now', reason: 'Maya Chen is set to Every message' }],
+    ['inside hours, Juno says it needs you', candidate(), ai, urgent, { outcome: 'now', reason: 'Juno: asks you to approve the release before 2pm' }],
+    ['inside hours, Juno says it can wait', candidate(), ai, routine, { outcome: 'hold', reason: 'Juno: an update with nothing for you to do' }],
+    ['outside hours, what would have notified goes into the summary', candidate({ at: at(MON, 19) }), ai, urgent, { outcome: 'summary', reason: 'Outside your notification hours. Juno: asks you to approve the release before 2pm' }],
+    ['outside hours, what can wait is held', candidate({ at: at(SAT, 12) }), ai, routine, { outcome: 'hold', reason: 'Juno: an update with nothing for you to do' }],
+    ['AI assist off: a DM notifies', candidate({ channel: maya }), aiOff, undefined, { outcome: 'now', reason: 'AI assist is off, and DMs and mentions notify you' }],
+    ['AI assist off: a mention notifies', candidate({ mentionsMe: true }), aiOff, undefined, { outcome: 'now', reason: 'AI assist is off, and DMs and mentions notify you' }],
+    ['AI assist off: anything else holds', candidate(), aiOff, undefined, { outcome: 'hold', reason: 'AI assist is off, so only DMs and mentions notify you' }],
+    ['AI assist off: a DM outside hours goes into the summary', candidate({ channel: maya, at: at(MON, 7) }), aiOff, undefined, { outcome: 'summary', reason: 'Outside your notification hours. AI assist is off, and DMs and mentions notify you' }],
+  ] as const)('%s', (_name, message, context, judgement, expected) => {
+    expect(decideNotification(message, settings, context, judgement)).toEqual(expected)
   })
 
-  it('matches a person, a channel or DM, mentions of me in a channel, or a keyword', () => {
-    expect(ruleMatches(rules[1]!, candidate({ senderId: mayaId }))).toBe(true)
-    expect(ruleMatches(rules[1]!, candidate({ senderId: leoId }))).toBe(false)
-    expect(ruleMatches({ id: 'dm', kind: 'channel', value: maya.id, action: 'now' }, candidate({ channel: maya }))).toBe(true)
-    expect(ruleMatches(rules[2]!, candidate({ channel: hiring, mentionsMe: true }))).toBe(true)
-    expect(ruleMatches(rules[2]!, candidate({ channel: hiring, mentionsMe: false }))).toBe(false)
-    expect(ruleMatches(rules[2]!, candidate({ channel: eng, mentionsMe: true }))).toBe(false)
-    expect(ruleMatches(rules[3]!, candidate({ text: 'Who wants Lunch?' }))).toBe(true)
-    expect(ruleMatches(rules[3]!, candidate({ text: 'launch day' }))).toBe(false)
-  })
-})
-
-describe('decision order', () => {
-  it('ignored channels are silent before anything else', () => {
-    expect(decideNotification(candidate({ channel: alerts, senderId: mayaId }), rules, settings, names)).toEqual({ outcome: 'silent', reason: 'Ignored channel' })
-  })
-
-  it('the first matching rule wins, top to bottom', () => {
-    // Maya posts "lunch" in #eng: the person rule (r2) is above the keyword and channel rules.
-    expect(decideNotification(candidate({ channel: eng, senderId: mayaId, text: 'lunch?' }), rules, settings, names)).toEqual({
-      outcome: 'now',
-      reason: 'Rule: From Maya Chen',
-      ruleId: 'r2',
-    })
-    // Leo posts "lunch" in #eng: keyword (r4, silent) is above the channel rule (r5, digest).
-    expect(decideNotification(candidate({ channel: eng, text: 'lunch?' }), rules, settings, names)).toMatchObject({ outcome: 'silent', ruleId: 'r4' })
-  })
-
-  it('quiet hours send to digest, unless a rule said Now', () => {
-    expect(decideNotification(candidate({ localMinutes: nineAtNight }), rules, settings, names)).toEqual({ outcome: 'digest', reason: 'Quiet hours' })
-    expect(decideNotification(candidate({ localMinutes: nineAtNight, senderId: mayaId }), rules, settings, names)).toMatchObject({ outcome: 'now', ruleId: 'r2' })
-    // A rule set to Digest or Silent in quiet hours keeps its own outcome.
-    expect(decideNotification(candidate({ localMinutes: nineAtNight, channel: eng }), rules, settings, names)).toMatchObject({ outcome: 'digest', ruleId: 'r5' })
-  })
-
-  it('with Juno off, everything else waits for a digest', () => {
-    expect(decideNotification(candidate(), rules, { ...settings, aiGate: false }, names)).toEqual({ outcome: 'digest', reason: 'Juno off, waiting for digest' })
-  })
-
-  it('asks for a score only when the rules and settings did not decide', () => {
-    expect(decideNotification(candidate(), rules, settings, names)).toEqual({ needsScore: true })
-    expect(decideNotification(candidate({ senderId: mayaId }), rules, settings, names)).not.toEqual({ needsScore: true })
-  })
-
-  it('compares the score with the threshold, then chatter, then digest', () => {
-    expect(decideNotification(candidate(), rules, settings, names, { urgent: 0.89, chatter: 0.1 })).toEqual({ outcome: 'now', reason: 'Juno · 89% urgent' })
-    expect(decideNotification(candidate(), rules, settings, names, { urgent: 0.8, chatter: 0.1 })).toEqual({ outcome: 'now', reason: 'Juno · 80% urgent' })
-    expect(decideNotification(candidate(), rules, settings, names, { urgent: 0.14, chatter: 0.66 })).toEqual({ outcome: 'silent', reason: 'Juno · 66% just chatter' })
-    expect(decideNotification(candidate(), rules, settings, names, { urgent: 0.14, chatter: 0.2 })).toEqual({ outcome: 'digest', reason: 'Juno · 14% urgent, can wait' })
-  })
-
-  it('follows the threshold slider', () => {
-    const score = { urgent: 0.6, chatter: 0.1 }
-    expect(decideNotification(candidate(), rules, { ...settings, threshold: 50 }, names, score)).toMatchObject({ outcome: 'now' })
-    expect(decideNotification(candidate(), rules, { ...settings, threshold: 95 }, names, score)).toMatchObject({ outcome: 'digest' })
+  it('asks for Juno only when the settings did not decide', () => {
+    expect(decideNotification(candidate(), settings, ai)).toEqual({ needsJudgement: true })
+    expect(decideNotification(candidate({ at: at(SAT, 12) }), settings, ai)).toEqual({ needsJudgement: true })
+    expect(decideNotification(candidate({ channel: eng }), settings, ai)).not.toEqual({ needsJudgement: true })
   })
 })
 
-describe('quiet hours and digest slots', () => {
-  it('handles a window that crosses midnight', () => {
-    const quiet = { from: 19 * 60, to: 8 * 60 }
-    expect(inQuietHours(21 * 60, quiet)).toBe(true)
-    expect(inQuietHours(2 * 60, quiet)).toBe(true)
-    expect(inQuietHours(8 * 60, quiet)).toBe(false)
-    expect(inQuietHours(noon, quiet)).toBe(false)
-    expect(inQuietHours(noon, { from: 9 * 60, to: 17 * 60 })).toBe(true)
-    expect(inQuietHours(noon, { from: 9 * 60, to: 9 * 60 })).toBe(false)
-    expect(inQuietHours(noon, undefined)).toBe(false)
+describe('the summary when notification hours start', () => {
+  const summary = { outcome: 'summary', reason: '' } as const
+  const hold = { outcome: 'hold', reason: '' } as const
+
+  it('counts only messages kept for it, and names where they are', () => {
+    expect(hoursStartSummary([{ decision: summary, where: '#eng' }, { decision: hold, where: '#random' }])).toEqual({ title: '1 message needs you', body: 'In #eng' })
+    expect(
+      hoursStartSummary([
+        { decision: summary, where: '#eng' },
+        { decision: summary, where: 'Maya Chen' },
+        { decision: summary, where: '#eng' },
+        { decision: summary, where: '#hiring' },
+      ]),
+    ).toEqual({ title: '4 messages need you', body: 'In #eng, Maya Chen and #hiring' })
+    expect(hoursStartSummary(['#a', '#b', '#c', '#d', '#e'].map((where) => ({ decision: summary, where })))).toEqual({ title: '5 messages need you', body: 'In #a, #b, #c and 2 more' })
   })
 
-  it('finds the next digest, wrapping to tomorrow', () => {
-    const times = defaultNotificationSettings.digestTimes
-    expect(nextDigestSlot(9 * 60, times)).toEqual({ minutes: 10 * 60, tomorrow: false })
-    expect(nextDigestSlot(13 * 60, times)).toEqual({ minutes: 16 * 60 + 30, tomorrow: false })
-    expect(nextDigestSlot(17 * 60, times)).toEqual({ minutes: 10 * 60, tomorrow: true })
-    expect(nextDigestSlot(noon, [])).toBeUndefined()
-    expect(nextDigestLabel(14 * 60, times)).toBe('Next digest 4:30pm')
-    expect(nextDigestLabel(17 * 60, times)).toBe('Next digest tomorrow 10am')
+  it('sends nothing when nothing needed the owner', () => {
+    expect(hoursStartSummary([{ decision: hold, where: '#random' }])).toBeUndefined()
+    expect(hoursStartSummary([])).toBeUndefined()
+  })
+})
+
+describe('hours', () => {
+  const work: Hours = { days: [1, 2, 3, 4, 5], from: 9 * 60, to: 19 * 60 }
+  const nights: Hours = { days: [5], from: 22 * 60, to: 2 * 60 }
+
+  it('holds on the chosen days between from and to', () => {
+    expect(inHours(at(MON, 9), work)).toBe(true)
+    expect(inHours(at(MON, 18, 59), work)).toBe(true)
+    expect(inHours(at(MON, 19), work)).toBe(false)
+    expect(inHours(at(SAT, 12), work)).toBe(false)
+    expect(inHours(at(MON, 12), { ...work, to: work.from })).toBe(false)
   })
 
-  it('prints the decision chip', () => {
-    expect(decisionChip({ outcome: 'now', reason: '' })).toBe('Now')
-    expect(decisionChip({ outcome: 'silent', reason: '' })).toBe('Silent')
-    expect(decisionChip({ outcome: 'digest', reason: '' }, 13 * 60)).toBe('1pm')
+  it('a span that crosses midnight belongs to the day it starts', () => {
+    expect(inHours(at(5, 23), nights)).toBe(true)
+    expect(inHours(at(SAT, 1), nights)).toBe(true)
+    expect(inHours(at(SAT, 23), nights)).toBe(false)
+    expect(inHours(at(5, 1), nights)).toBe(false)
+  })
+
+  it('finds the next switch and says until when', () => {
+    expect(nextSwitch(at(MON, 12), work)).toMatchObject({ starts: false, inMinutes: 7 * 60 })
+    expect(untilLabel(at(MON, 12), work)).toBe('until 7pm')
+    expect(untilLabel(at(MON, 20), work)).toBe('until tomorrow 9am')
+    expect(untilLabel(at(5, 20), work)).toBe('until Mon 9am')
+    expect(untilLabel(at(MON, 7, 30), work)).toBe('until 9am')
+    expect(untilLabel(at(MON, 12), { days: [], from: 0, to: 60 })).toBeUndefined()
+  })
+})
+
+describe('presence', () => {
+  it('is active inside presence hours and away outside, apart from notification hours', () => {
+    // 7pm on a Monday: notifications have stopped, Slack still shows the owner active.
+    expect(inHours(at(MON, 19), settings.notificationHours)).toBe(false)
+    expect(scheduledPresence(at(MON, 19), settings.presenceHours)).toBe('active')
+    expect(scheduledPresence(at(MON, 20), settings.presenceHours)).toBe('away')
+    expect(scheduledPresence(at(SAT, 12), settings.presenceHours)).toBe('away')
+  })
+
+  it('sets Slack to auto when active, so an idle owner still shows away', () => {
+    expect(slackPresence('active')).toBe('auto')
+    expect(slackPresence('away')).toBe('away')
+  })
+
+  it('uses the same hours for both by default', () => {
+    expect(defaultNotificationSettings.presenceHours).toEqual(defaultNotificationSettings.notificationHours)
   })
 })
