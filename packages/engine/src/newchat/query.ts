@@ -1,11 +1,13 @@
 /**
  * The New chat pickers' queries (spec section 9). Local only: they read the
- * conversations, people and topics the sync stored.
+ * conversations, people and topics the sync stored. The statements that
+ * read `topic_index` are in `pickerStatements`, so the plan test can check
+ * that each one reads it through an index (performance 6).
  */
 import { PICK_LIMIT, RECENT_CONVERSATIONS, type PickConversation, type PickConversations, type PickThread } from '@juno/contract'
 import { channelLabelBare, contextTint, firstWords, mainTopicId, tsToMillis, type ChannelId, type ConversationKind, type Ts } from '@juno/domain'
 import { ftsQuery, StoreReader, type SqlClient } from '@juno/store'
-import { Effect } from 'effect'
+import { Clock, Effect } from 'effect'
 import { parseIds, personFrom, userName, type UserRow } from '../topicRows'
 
 /** A conversation row with whether Juno holds any of its messages. */
@@ -20,6 +22,63 @@ interface ConversationRow {
 
 const CONVERSATION_COLUMNS = `c.id, c.kind, c.name, c.user_id, c.member_ids_json,
   EXISTS (SELECT 1 FROM topic_index t WHERE t.channel = c.id) AS has_topics`
+
+/** How far back Recent and the threads from everywhere look. */
+const RECENT_DAYS = 30
+const DAY = 24 * 60 * 60 * 1000
+
+/** Seconds as a Slack ts, for comparing with `last_activity_ts`. */
+const cutoffTs = (now: number) => `${Math.floor((now - RECENT_DAYS * DAY) / 1000)}.000000`
+
+interface Statement {
+  readonly sql: string
+  readonly params: ReadonlyArray<string | number>
+}
+
+/**
+ * The statements that read `topic_index`: the recent conversations, and the
+ * threads of a channel or from everywhere, matching `match` (an FTS query)
+ * when there is one.
+ */
+export function pickerStatements(cutoff: string, channel: string | undefined, match: string | undefined): { readonly recent: Statement; readonly threads: Statement } {
+  // Grouped by channel, the planner would walk the whole channel index; the activity index reads only the last RECENT_DAYS.
+  const recent = {
+    sql: `SELECT ${CONVERSATION_COLUMNS} FROM conversations c
+      JOIN (SELECT channel, MAX(last_activity_ts) AS activity FROM topic_index INDEXED BY topic_index_activity WHERE last_activity_ts > ? GROUP BY channel) a ON a.channel = c.id
+      LEFT JOIN ignored_channels g ON g.channel = c.id
+      WHERE c.is_member = 1 AND g.channel IS NULL
+      ORDER BY a.activity DESC, c.id LIMIT ?`,
+    params: [cutoff, RECENT_CONVERSATIONS],
+  }
+  const where = ["i.kind = 'thread'", 'c.is_member = 1', 'g.channel IS NULL']
+  const params: Array<string | number> = []
+  if (channel !== undefined) {
+    where.push('i.channel = ?')
+    params.push(channel)
+  } else if (match === undefined) {
+    where.push('i.last_activity_ts > ?')
+    params.push(cutoff)
+  }
+  if (match !== undefined) {
+    where.push(`i.topic_id IN (
+      SELECT t.topic_id FROM topic_titles_fts f JOIN topic_index t ON t.rowid = f.rowid WHERE topic_titles_fts MATCH ?
+      UNION SELECT o.topic_id FROM overlay_titles_fts f JOIN topic_overlay o ON o.rowid = f.rowid WHERE overlay_titles_fts MATCH ?)`)
+    params.push(match, match)
+  }
+  params.push(PICK_LIMIT)
+  const threads = {
+    sql: `SELECT ${CONVERSATION_COLUMNS}, i.topic_id, i.root_ts, i.last_activity_ts, i.message_count,
+        COALESCE(NULLIF(trim(o.manual_title), ''), NULLIF(trim(o.ai_title), '')) AS named_title,
+        COALESCE(json_extract(i.preview_json, '$.rootText'), '') AS root_text
+      FROM topic_index i JOIN conversations c ON c.id = i.channel
+      LEFT JOIN topic_overlay o ON o.topic_id = i.topic_id
+      LEFT JOIN ignored_channels g ON g.channel = i.channel
+      WHERE ${where.join(' AND ')}
+      ORDER BY i.last_activity_ts DESC, i.topic_id LIMIT ?`,
+    params,
+  }
+  return { recent, threads }
+}
 
 const readUsers = (sql: SqlClient.SqlClient, ids: ReadonlySet<string>) =>
   Effect.gen(function* () {
@@ -78,14 +137,8 @@ export const queryConversations = Effect.fn('newChat.conversations')(function* (
   const selfId = yield* selfIdOf(sql)
   const terms = ftsQuery(text.trim())
   if (terms === '') {
-    const rows = yield* sql.unsafe<ConversationRow>(
-      `SELECT ${CONVERSATION_COLUMNS} FROM conversations c
-        JOIN (SELECT channel, MAX(last_activity_ts) AS activity FROM topic_index GROUP BY channel) a ON a.channel = c.id
-        LEFT JOIN ignored_channels g ON g.channel = c.id
-        WHERE c.is_member = 1 AND g.channel IS NULL
-        ORDER BY a.activity DESC, c.id LIMIT ?`,
-      [RECENT_CONVERSATIONS],
-    )
+    const { recent } = pickerStatements(cutoffTs(yield* Clock.currentTimeMillis), undefined, undefined)
+    const rows = yield* sql.unsafe<ConversationRow>(recent.sql, recent.params)
     const users = yield* readUsers(sql, peopleOf(rows))
     return { recent: rows.map((row) => pickOf(row, users, selfId)), people: [], channels: [] } satisfies PickConversations
   }
@@ -134,31 +187,8 @@ export const queryThreads = Effect.fn('newChat.threads')(function* (channel: str
   const sql = yield* StoreReader
   const selfId = yield* selfIdOf(sql)
   const terms = ftsQuery(text.trim())
-  const where = ["i.kind = 'thread'", 'c.is_member = 1', 'g.channel IS NULL']
-  const params: Array<string | number> = []
-  if (channel !== undefined) {
-    where.push('i.channel = ?')
-    params.push(channel)
-  }
-  if (terms !== '') {
-    const query = `${terms}*`
-    where.push(`i.topic_id IN (
-      SELECT t.topic_id FROM topic_titles_fts f JOIN topic_index t ON t.rowid = f.rowid WHERE topic_titles_fts MATCH ?
-      UNION SELECT o.topic_id FROM overlay_titles_fts f JOIN topic_overlay o ON o.rowid = f.rowid WHERE overlay_titles_fts MATCH ?)`)
-    params.push(query, query)
-  }
-  params.push(PICK_LIMIT)
-  const rows = yield* sql.unsafe<ThreadRow>(
-    `SELECT ${CONVERSATION_COLUMNS}, i.topic_id, i.root_ts, i.last_activity_ts, i.message_count,
-        COALESCE(NULLIF(trim(o.manual_title), ''), NULLIF(trim(o.ai_title), '')) AS named_title,
-        COALESCE(json_extract(i.preview_json, '$.rootText'), '') AS root_text
-      FROM topic_index i JOIN conversations c ON c.id = i.channel
-      LEFT JOIN topic_overlay o ON o.topic_id = i.topic_id
-      LEFT JOIN ignored_channels g ON g.channel = i.channel
-      WHERE ${where.join(' AND ')}
-      ORDER BY i.last_activity_ts DESC, i.topic_id LIMIT ?`,
-    params,
-  )
+  const { threads } = pickerStatements(cutoffTs(yield* Clock.currentTimeMillis), channel, terms === '' ? undefined : `${terms}*`)
+  const rows = yield* sql.unsafe<ThreadRow>(threads.sql, threads.params)
   const users = yield* readUsers(sql, peopleOf(rows))
   return rows.map(
     (row): PickThread => ({
