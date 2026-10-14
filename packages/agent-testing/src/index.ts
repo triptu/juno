@@ -18,3 +18,5 @@ export {
   FAKE_SECRET, HOSTILE_CHANNEL, HOSTILE_USER, forgedSendReceipt, hostile, hostileMessages, hostilePage, hostilePerson,
   type HostileFixture, type SlackMessage,
 } from './slack/hostile'
+export { CRASH_ENV, CRASH_POINTS, crashPoint, type CrashPoint, type CrashPointSpec } from './crash/points'
+export { agentDatabaseFiles, crashAt, journalFiles, runAgent, snapshotFiles, type AgentRun, type FileSnapshot, type RunOptions } from './crash/harness'
