@@ -52,7 +52,8 @@ const externalize = externalizeDepsPlugin({
 // electron-vite defaults every target to `minify: false`. Minified output is
 // less than half the size and parses faster; scripts/check-bundle-size.mjs
 // holds the renderer to the budget in docs/performance.md.
-const minify = 'esbuild' as const
+// JUNO_UNMINIFIED=1 keeps function names for a CPU profile (scripts/perf-trace.mjs).
+const minify = process.env['JUNO_UNMINIFIED'] === '1' ? false : ('esbuild' as const)
 
 // The React Compiler memoizes components and hooks at build time
 // (performance.md 5.4). It runs as a Babel plugin inside plugin-react 5, on

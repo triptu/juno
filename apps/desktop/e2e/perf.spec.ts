@@ -5,8 +5,10 @@
 // average; the filter scenario also fails on a frame with no rows.
 //
 //   JUNO_PERF=1 pnpm --filter @juno/desktop exec playwright test e2e/perf.spec.ts
-import { rm } from 'node:fs/promises'
+import { mkdir, rm, writeFile } from 'node:fs/promises'
 import { loadavg } from 'node:os'
+import { join } from 'node:path'
+import type { Page } from '@playwright/test'
 import { largeSeed, startFakeSlack, topic300Seed, TOPIC300_MAIN_CHANNEL, TOPIC300_THREAD_CHANNEL, type FakeSlack } from '@juno/fake-slack'
 import { expect, launchApp, tempUserData, test, writeSlackApp, type RunningApp, type SlackAppFixture } from './fixtures'
 import { Juno, type SidebarFilterName } from './driver/juno'
@@ -23,6 +25,42 @@ function stats(name: string, samples: ReadonlyArray<number>): { readonly median:
   const load = loadavg()[0]!.toFixed(1)
   console.log(`${name}: median ${median.toFixed(1)} ms, p95 ${p95.toFixed(1)} ms, n=${samples.length}, load ${load}, samples ${sorted.map((s) => s.toFixed(1)).join(' ')}`)
   return { median, p95 }
+}
+
+const TRACE_DIR = process.env['JUNO_PERF_TRACE']
+
+/**
+ * With JUNO_PERF_TRACE set to a directory, records a Chrome trace and a CPU
+ * profile of the renderer while `run` runs, as `<name>.trace.json` and
+ * `<name>.cpuprofile`, so a slow scenario can be explained. Otherwise just runs it.
+ */
+async function profiled<T>(win: Page, name: string, run: () => Promise<T>): Promise<T> {
+  if (TRACE_DIR === undefined) return run()
+  const cdp = await win.context().newCDPSession(win)
+  const categories = ['devtools.timeline', 'disabled-by-default-devtools.timeline', 'disabled-by-default-devtools.timeline.frame', 'blink.user_timing', 'v8.execute', 'blink', 'cc', 'gpu', 'viz']
+  await cdp.send('Tracing.start', { traceConfig: { includedCategories: categories }, transferMode: 'ReturnAsStream' })
+  await cdp.send('Profiler.enable')
+  await cdp.send('Profiler.setSamplingInterval', { interval: 100 })
+  await cdp.send('Profiler.start')
+  try {
+    return await run()
+  } finally {
+    const { profile } = await cdp.send('Profiler.stop')
+    const done = new Promise<string>((resolve) => cdp.once('Tracing.tracingComplete', (event) => resolve(event.stream!)))
+    await cdp.send('Tracing.end')
+    const handle = await done
+    const chunks: string[] = []
+    for (;;) {
+      const chunk = await cdp.send('IO.read', { handle })
+      chunks.push(chunk.base64Encoded === true ? Buffer.from(chunk.data, 'base64').toString() : chunk.data)
+      if (chunk.eof) break
+    }
+    await cdp.send('IO.close', { handle })
+    await mkdir(TRACE_DIR, { recursive: true })
+    await writeFile(join(TRACE_DIR, `${name}.trace.json`), chunks.join(''))
+    await writeFile(join(TRACE_DIR, `${name}.cpuprofile`), JSON.stringify(profile))
+    await cdp.detach()
+  }
 }
 
 test('row hover to paint', async ({ juno, win }) => {
@@ -370,15 +408,17 @@ test.describe.serial('topic view', () => {
           await juno.topic.expectAtBottom()
         }
       }
-      for (let i = 0; i < 10; i++) {
-        for (const title of [THREAD, MAIN]) {
-          await juno.sidebar.row(title).hover()
-          await running.win.waitForTimeout(300)
-          const before = (await juno.measures('juno.topic-open')).length
-          await juno.sidebar.row(title).open()
-          prefetched.push(await nextMeasure(juno, 'juno.topic-open', before))
+      await profiled(running.win, 'topic-open-prefetched', async () => {
+        for (let i = 0; i < 10; i++) {
+          for (const title of [THREAD, MAIN]) {
+            await juno.sidebar.row(title).hover()
+            await running.win.waitForTimeout(300)
+            const before = (await juno.measures('juno.topic-open')).length
+            await juno.sidebar.row(title).open()
+            prefetched.push(await nextMeasure(juno, 'juno.topic-open', before))
+          }
         }
-      }
+      })
       stats('topic open, cached 300 rows, press to rows painted at position (juno.topic-open)', cached)
       stats('topic open, prefetched (juno.topic-open)', prefetched)
 
@@ -386,12 +426,14 @@ test.describe.serial('topic view', () => {
       await juno.sidebar.row(THREAD).openInNewTab()
       await juno.tabs.expectCount(2)
       const mounted: number[] = []
-      for (let i = 0; i < 20; i++) {
-        const title = i % 2 === 0 ? 'perf-main' : THREAD
-        const before = (await juno.measures('juno.tab-switch')).length
-        await juno.tabs.select(title)
-        mounted.push(await nextMeasure(juno, 'juno.tab-switch', before))
-      }
+      await profiled(running.win, 'tab-switch-mounted', async () => {
+        for (let i = 0; i < 20; i++) {
+          const title = i % 2 === 0 ? 'perf-main' : THREAD
+          const before = (await juno.measures('juno.tab-switch')).length
+          await juno.tabs.select(title)
+          mounted.push(await nextMeasure(juno, 'juno.tab-switch', before))
+        }
+      })
       stats('tab switch, mounted (juno.tab-switch)', mounted)
     } finally {
       await running.close()
@@ -437,16 +479,18 @@ test.describe.serial('topic view', () => {
         requestAnimationFrame(tick)
       })
       // About 2 000 px/s for 3 s, down then up, twice.
-      for (let pass = 0; pass < 2; pass++) {
-        for (let i = 0; i < 30; i++) {
-          await win.mouse.wheel(0, 200)
-          await win.waitForTimeout(100)
+      await profiled(win, 'scroll-messages', async () => {
+        for (let pass = 0; pass < 2; pass++) {
+          for (let i = 0; i < 30; i++) {
+            await win.mouse.wheel(0, 200)
+            await win.waitForTimeout(100)
+          }
+          for (let i = 0; i < 30; i++) {
+            await win.mouse.wheel(0, -200)
+            await win.waitForTimeout(100)
+          }
         }
-        for (let i = 0; i < 30; i++) {
-          await win.mouse.wheel(0, -200)
-          await win.waitForTimeout(100)
-        }
-      }
+      })
       const result = await win.evaluate(() => {
         const w = window as unknown as { __frames: number[]; __sampling: boolean; __loaf: number }
         w.__sampling = false
@@ -512,13 +556,15 @@ test.describe.serial('topic view', () => {
           }
         }).observe({ type: 'measure' })
       })
-      for (let i = 0; i < 9; i++) {
-        const text = `Perf sample ${i} ${Date.now()}`
-        fake.injectMessage({ channel: TOPIC300_THREAD_CHANNEL, threadTs: root.ts, user: 'U0PERFLEO', text })
-        await juno.topic.expectMessage(text)
-        await juno.topic.expectAtBottom()
-        await running.win.waitForTimeout(300)
-      }
+      await profiled(running.win, 'live-update', async () => {
+        for (let i = 0; i < 9; i++) {
+          const text = `Perf sample ${i} ${Date.now()}`
+          fake.injectMessage({ channel: TOPIC300_THREAD_CHANNEL, threadTs: root.ts, user: 'U0PERFLEO', text })
+          await juno.topic.expectMessage(text)
+          await juno.topic.expectAtBottom()
+          await running.win.waitForTimeout(300)
+        }
+      })
       const measured = await running.win.evaluate(() => (window as unknown as { __live: number[] }).__live)
       stats('live update in the topic, engine commit to pixels (juno.live-update, messages.list)', measured)
     } finally {
