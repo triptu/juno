@@ -111,8 +111,12 @@ test('the wheel over a long code block reaches the end of the block, then scroll
   await block.hover()
   await page.mouse.wheel(0, 5000)
   await expect.poll(() => block.evaluate((node) => node.scrollHeight - node.scrollTop - node.clientHeight)).toBeLessThan(1)
-  // A pause ends the wheel gesture, so the next one is not latched to the block.
-  await page.waitForTimeout(300)
+  // Land exactly on the end (a fraction of a pixel left would take one more notch), and let the
+  // wheel gesture end, so the next one starts on a block that cannot scroll and goes on to the list.
+  await block.evaluate((node) => {
+    node.scrollTop = node.scrollHeight
+  })
+  await page.waitForTimeout(500)
   await page.mouse.wheel(0, 300)
   await expect.poll(() => scroller.evaluate((node) => node.scrollTop)).toBeGreaterThan(listBefore)
 })

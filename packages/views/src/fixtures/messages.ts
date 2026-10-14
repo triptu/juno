@@ -253,12 +253,13 @@ export const longFirstLine = window([
   { ago: 20, from: people.maya, text: 'Looking now.' },
 ])
 
-/** A sixty-line code block between ordinary messages, so the list is taller than its frame. */
+/** A sixty-line code block, then enough replies that the list is taller than its frame. */
 export const longCode = window([
   { ago: 60, from: people.maya, text: 'Here is the whole migration log, for the record.' },
   { ago: 59, from: people.jonas, blocks: [p('Pasting it in full:'), code(Array.from({ length: 60 }, (_, index) => `line ${index + 1}: ${'='.repeat(40)}`).join('\n'))] },
   { ago: 50, from: people.leo, text: 'Thanks. The failure is on line 41.' },
   { ago: 49, from: people.maya, text: 'Agreed, fixing.' },
+  ...Array.from({ length: 12 }, (_, index) => ({ ago: 48 - index, from: index % 2 === 0 ? people.leo : people.maya, text: `Follow-up ${index + 1} on the migration log.` })),
 ])
 
 /** Fifty reaction kinds on one message, and a few on another. */
