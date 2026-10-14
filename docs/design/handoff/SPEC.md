@@ -251,35 +251,39 @@ Juno is also the assistant's name. It is one long chat with one assistant that r
 ### 13.1 The chat
 
 - **One thread.** There is no "new chat". Everything you and Juno have said is in one scrolling list, with day separators and the "New" divider before the first message you have not seen. Opening the chat lands at the divider, otherwise at the bottom. A "New message" pill appears when you are scrolled up and something arrives.
-- **Four kinds of thing on screen:** your bubbles, Juno's bubbles with their cards underneath, one status bubble while Juno is working, and separators. Quiet one-line notes ("Remembered · Undo", "Removed") sit between bubbles.
-- **Bubbles.** Yours are right-aligned in the owner fill, whose colour is still the owner's choice (section 19). Juno's are left-aligned on the hover surface, with the 28px mark beside the last bubble of a group. Consecutive messages from the same sender within two minutes group, and the last bubble of a group has the small tail. A message with a different origin (your reply, a schedule, a job) always starts a new group. Times show on hover. Text is selectable.
-- **Plain text.** Juno writes short plain text with no markdown and no emoji. A recall answer cites the day ("On 12 Mar you said …") and the citation scrolls the chat to that message.
+- **What is on screen:** your bubbles, Juno's bubbles and cards, one status bubble while Juno is working, and separators. Quiet one-line notes ("Remembered · Undo", "Removed") sit between bubbles.
+- **Not a transcript.** You see only what Juno chose to say to you. Its working (what it read, how it reasoned, an input it decided to let pass) never shows.
+- **Bubbles.** Yours are right-aligned in an accent tint (option B in `docs/design/juno-chat/`), with text in the default ink. Juno's are left-aligned on the hover surface, with the 28px mark beside the last bubble of a group. Consecutive messages from the same sender within two minutes group, and the last bubble of a group has the small tail. A message with a different origin (your reply, a schedule, a job) always starts a new group. Times show on hover. Text is selectable.
+- **Plain text.** Juno's bubbles are plain text; the chat does not render markdown. How many bubbles and how long each one is are Juno's judgement: a long answer can be one big bubble, and a long job can post many updates. A recall answer cites the day ("On 12 Mar you said …") and the citation scrolls the chat to that message.
+- **Reactions.** You can react to any Juno bubble or card with any emoji: hover › React, or right-click › React. One reaction per person per item; picking another replaces it, picking the same one removes it. A thumbs up is only recorded: Juno does not run for it. Any other reaction goes to Juno like a message, at its next step if it is working, and Juno answers only if the reaction calls for it; often you see nothing more. Juno can also react to your messages with any emoji, with or instead of words. A reaction shows as the emoji on the bubble's corner.
+- **Replies.** You can reply to a Juno bubble or card (hover › Reply, or right-click › Reply). The composer shows the quote above the field, and your bubble shows a one-line quote above it; a click scrolls to the original. Juno gets the quoted item in full. Juno can reply to one of your messages when it helps, with the same quote. A reply sent while Juno is working joins the work like any message.
+- **A reaction or a reply is never a click.** A thumbs up under a Send message card does not send, and "send it" as a reply to a card does not send either; only the card's button does (13.3). Neither pins anything (13.8).
 - **"This"** means the topic you were last viewing.
 - **Empty state.** "What do you need?" with the seated-j illustration, one line on what Juno can do, and four suggestion pills. Clicking one sends it.
-- **Composer.** Enter sends, Shift Enter adds a line. Sending while Juno is working is allowed: the message queues and Juno reads it mid-task (13.5).
-- **Context menu on a message:** Copy, Remember this (on your own messages), Remove. Remember this pins the selected text when there is a selection inside the message, otherwise the whole message; it is disabled when that is longer than a sentence (280 bytes). Remove opens a local sheet (13.8) that works in every state, including paused, offline and AI off.
-- **Read.** A Juno message counts as read once its bubble has been fully on screen in the focused chat for one second. Opening the chat does not read what is below the fold.
+- **Composer.** Enter sends, Shift Enter adds a line. The chat works like a text conversation: you can send while Juno is working, and Juno reads the message at its next step (13.5).
+- **Context menu on a message:** Copy, React, Reply (on Juno's), Remember this (on your own messages), Remove. Remember this pins the selected text when there is a selection inside the message, otherwise the whole message; it is disabled when that is longer than a sentence (280 bytes). Remove opens a local sheet (13.8) that works in every state, including paused, offline and AI off.
+- **Read.** A Juno bubble counts as read once it has been fully on screen in the focused chat for one second. Opening the chat does not read what is below the fold.
 
 ### 13.2 Working
 
 - **Acknowledge at once.** Your bubble appears before the send is stored. The status bubble appears within a tenth of a second: three looping dots, like someone typing.
-- **Status text.** The dots stay alone until Juno has something specific to say. The first tool call gives the bubble a line that counts real things ("Reading 3 topics", "Looking back through March"), which changes at most every two seconds. "Thinking" and percentages never appear.
-- **The reply takes the bubble's place.** On the first token the status bubble becomes Juno's reply, in place, and the text streams in. If Juno then reads or calls something before writing more, the status bubble reappears below the reply, and the next token clears it again: the text joins the same bubble, so one reply is one bubble however many steps it took.
+- **Status text.** A tool call gives the status bubble a line that names real things ("Reading 3 topics", "Looking back through March"). "Thinking" and percentages never appear.
+- **Bubbles arrive whole.** Each Juno bubble appears complete, as a text does, never word by word. It takes the status bubble's place, and the dots show again below it while Juno is still working, until the run ends.
 - **One status bubble, for runs only.** It exists while Juno is answering you, a schedule or a job report, and clears when that run ends. Work that goes on in the background (a T3 Code session, a delegate) never shows as the typing bubble; it has a Task card (13.4) and the sparkle on the sidebar's Juno row.
-- **Stop.** Hovering or focusing the status bubble shows Stop. Esc with the composer empty does the same. Stop ends the current run only, never a background job. The reply ends with "Stopped. Juno won't start anything new for this reply." Anything Juno handed off before Stop may still finish, and its card says how it ended.
-- **A run that fails says so.** If the provider does not answer, the line under the reply says what happened and offers Try again: "Juno didn't answer. Give it a moment and try again." A run that ends before its first word shows only the line (13.7).
+- **No Stop.** There is no Stop button and no key that stops Juno. To change course, send another message ("stop", "do X instead"); Juno reads it at its next step and answers it. A background job stops only from its Task card (13.4).
+- **A run that fails says so.** If the provider does not answer, a line says what happened and offers Try again: "Juno didn't answer. Give it a moment and try again." (13.7).
 
 ### 13.3 Cards
 
-Anything that leaves Juno, or that Juno wants you to decide, is a card under its bubble. The card shows exactly what will happen and runs once, after a click. Typing "yes" is not a click. The set is fixed; the model cannot invent a card.
+Anything that leaves Juno, or that Juno wants you to decide, is a card under its bubble. The card shows exactly what will happen and runs once, after a click. Typing "yes" is not a click, and neither is a reaction or a reply to the card. The set is fixed; the model cannot invent a card.
 
 | Card | Shows | Buttons | Afterwards |
 | --- | --- | --- | --- |
-| Send message | One to five messages, each with a context pill for where it goes, "in {topic}" when it replies inside a thread, and editable text | Send (all), Dismiss | Per row: "Sent · Open" or "Not sent · Try again". The card itself says "Sent 3", "Sent 1 of 3" or "Not sent · Try again" once every row has settled, and stays working until then |
+| Send message | One to five messages, each with a context pill for where it goes, "in {topic}" when it replies inside a thread, and editable text | Send (all), Dismiss | Per row: "Sent · Open" or "Failed". The card itself says "Sent 3", "Sent 1 of 3" or "Failed" once every row has settled, and stays working until then |
 | Resolve | The topics | Resolve, Dismiss | "Resolved 3 · Undo" |
 | Topics | Links to topics; click opens, ⌘ click opens a tab | none | none |
-| Task | A job: its title, where it runs, a live state line ("Tests running, 2 of 5") | Open, Stop | "Done · Open PR 412", "Failed · Show in Activity", "Stopped", or "Juno can't tell whether this is running. Open" |
-| Proposed task | The same, for work Juno may not start on its own (13.9) | Start, Dismiss | "Started", then a Task card under Juno's next message |
+| Task | A job: its title, where it runs, a live state line ("Tests running, 2 of 5") | Open, Stop | "Done · Open PR 412", "Failed · Show in Activity" or "Stopped" |
+| Proposed task | The same, for work that needs your tap to start: every T3 Code session, and a delegate Juno may not start on its own (13.9) | Start, Dismiss | "Started", then a Task card under Juno's next message |
 | Question | Who asks ("Juno asks", "T3 Code asks" with the job's pill), the question, two to four options, and a reply field | An option, Reply | "You chose …" or "You replied" |
 | Schedule | What, when, how it delivers | Keep, Pause, Delete | "Kept", "Paused" or "Deleted" |
 | Proposed schedule | The same, plus the instruction Juno will follow at each run, word for word, for a schedule Juno may not create on its own (13.9) | Start, Dismiss | "Started" |
@@ -290,7 +294,7 @@ Anything that leaves Juno, or that Juno wants you to decide, is a card under its
 | Provider | "Choose a model provider": OpenRouter or Codex, with the fixed line that Juno sends its memory of the chat to the provider on every turn | Set up | "Using Claude Sonnet 5.5" |
 
 - **Because.** When Juno proposes a card for something it would otherwise have done quietly (because a message it read in Slack or a report from a job was in the conversation, 13.9), the card carries one line saying why.
-- **One click, one action.** A click authorizes exactly the payload shown, once. A retry is a new click. If Juno cannot tell whether a send landed, the row says so: "Juno can't tell whether this was sent. Check channel · Send again". Every retry of something the destination cannot recognise as a repeat (Send again, Try again) says "If the first try went through, this does it again." beside its button, whatever happened the first time.
+- **One click, one action.** A click authorizes exactly the payload shown, once. A card runs once and has no retry button. If an action is rejected, or Juno cannot confirm it went through (the connection dropped), the card says "Failed", and the same for a Task card whose session Juno cannot tell started. Juno never tries it again on its own, after a crash or otherwise. To try again, check by hand, or ask Juno and it proposes a new card.
 - **Expiry.** Cards expire after seven days or when what they refer to changes: "Expired · Ask again". Ask again sends Juno a message quoting the card's request, so a fresh card follows from a fresh read.
 - **Restored.** After a restore from backup (13.8), each pending card reads "This may already have happened." above its buttons until you decide it.
 - **Keyboard.** Every card button is reachable with Tab, and the first option of a question takes Enter.
@@ -300,26 +304,24 @@ Anything that leaves Juno, or that Juno wants you to decide, is a card under its
 
 Juno hands long work to delegates: a T3 Code session for code, or a cheaper copy of itself for a side task. Juno speaks for them; you never talk to a delegate directly.
 
-- **Starting** a session you asked for needs no click while Juno has not read Slack, a connection or a session report in this reply (13.9); otherwise Juno proposes it as a card with Start. Sessions run with full access, each in a new worktree. The Task card appears under Juno's message with the live state line, Open and Stop. The sidebar's Juno row shows the duotone sparkle while any job runs, and the home's Ask Juno field reads the job's state line in place of its placeholder.
-- **Milestones as messages.** Juno posts once each when a job starts, needs a decision, finishes (with the PR), fails, or has been quiet for 30 minutes ("T3 Code has been quiet for 30 minutes. I'll keep watching, or you can stop it."). Reports that arrive together are one message.
+- **Starting** a T3 Code session always takes one tap: Juno proposes it as a Proposed task card with Start, whatever it has read. Sessions run with full access, each in a new worktree. The Task card appears under Juno's message with the live state line, Open and Stop. The sidebar's Juno row shows the duotone sparkle while any job runs, and the home's Ask Juno field reads the job's state line in place of its placeholder.
+- **Updates are Juno's call.** Juno hears when a job needs a decision, finishes (with the PR) or fails, and decides what to tell you and when. A long job may get many short updates or one at the end.
 - **Questions from a session** become a Question card headed "T3 Code asks", so you know the answer goes to the session. Juno never merges or pushes.
 - **"How is it going?"** is answered from what Juno knows of its jobs, without a card.
-- **Telling a running session something** ("also fix the tests") needs no click under the same rule, for a session you started in this chat. After Pause and Resume it needs a card again. Stopping a session is the Task card's Stop, and nothing else stops it.
+- **Telling a running session something** ("also fix the tests") needs no click for a session you started in this chat, while Juno has not read Slack, a connection or a session report in this reply (13.9); otherwise it is a card. After Pause and Resume it needs a card again. Stopping a session is the Task card's Stop, and nothing else stops it. That Stop ends the running coding task; it is not a chat Stop, and the chat itself has none (13.2).
 - If the T3 Code sign-in lapses while a session runs, the session keeps running and the Task card says "Sign in to T3 Code to keep watching".
 
 ### 13.5 Steering and interruptions
 
-- **Typing sends.** A message sent while Juno is working shows "Queued" under it after half a second and Juno reads it at its next step, inside the same run. Juno acknowledges it in its reply.
-- **Stop with a queued message** ends the run; the queued message then starts a fresh run on its own. Queued never becomes Not delivered.
-- **Juno never speaks over its own question.** While a Question card of Juno's is open, scheduled messages wait, until the question is answered, expires, or 24 hours pass. Reports from jobs do not wait.
+- **Typing sends.** A message, reply or reaction sent while Juno is working joins the work at Juno's next step, inside the same run: after the tool call it is waiting on, or before it writes more. Your bubble shows nothing extra; Juno takes it in, and acknowledges it in words or with a reaction if it judges that helps. Things sent close together are read together. If the run fails before its next step, the input starts a run of its own.
 
 ### 13.6 Proactive
 
 Juno speaks on its own only about things you set up: schedules you asked for, progress of work you started, and things you told it to watch. Never observations.
 
-- **Schedules.** "Catch me up on #eng every weekday at 9" creates a schedule only from a clean conversation with you, and the Scheduled page lists them with the next run, how each delivers, Pause, Edit and Delete. Limits: 20 active, at least 15 minutes apart, one-shot at most a year ahead. A schedule nothing has touched for 30 days pauses itself and says so once.
-- **The label.** A proactive group carries a small uppercase label ("Scheduled · Daily catch-up", "T3 Code · Fix the sidebar flake") with "Why this?" and one quiet action: "Pause schedule" on a schedule's group, "Mute updates" on a job's group. Mute updates stops the milestone messages; the job runs on and stops only from its Task card. Reports from several jobs that arrive together are one message, labelled "T3 Code · 2 jobs".
-- **Monitors speak only on change.** A wake that finds nothing new says nothing in the chat; Activity records that it ran.
+- **Schedules.** "Catch me up on #eng every weekday at 9" creates a schedule only from a clean conversation with you, and the Scheduled page lists them with the next run, how each delivers, Pause, Edit and Delete. The daily spend cap (13.10) bounds what they cost; there are no other limits.
+- **The label.** A proactive group carries a small uppercase label ("Scheduled · Daily catch-up", "T3 Code · Fix the sidebar flake") with "Why this?" and one quiet action: "Pause schedule" on a schedule's group, "Mute updates" on a job's group. Mute updates stops Juno's updates about that job; the job runs on and stops only from its Task card.
+- **Nothing to say, nothing shown.** A wake that finds nothing worth saying shows nothing in the chat; Activity records that it ran.
 - **Delivery.** The chat always gets the message. Whether your Mac notifies follows section 14. A schedule either notifies or doesn't; there is no digest.
 
 ### 13.7 States
@@ -331,11 +333,9 @@ Every state the chat can be in, and what it shows.
 | Empty | "What do you need?" with the illustration and four suggestion pills |
 | Idle | Nothing extra |
 | Running | The status bubble |
-| Queued | "Queued" under your last bubble, after half a second |
 | Waiting | "Waiting for network", "Waiting for Resume" or "Waiting for your review" under your bubble. The message is stored and runs when it can |
 | Not delivered | "Not delivered · Try again". Only when Juno could not store the message on this Mac. Try again resubmits the same message |
 | Too long | "That is too long to send as one message. Split it up and send the parts." The message stays in the chat, marked not sent |
-| Stopped | "Stopped. Juno won't start anything new for this reply." under the reply |
 | Interrupted | "Juno was interrupted. Your message is kept. Try again". No Try again when a schedule or a job started the run |
 | Failed | One line and Try again: "Juno didn't answer. Give it a moment and try again.", "OpenRouter rejected the key. Check it in Settings.", "Codex is signed out on this Mac. Sign in to Codex and try again.", or "Juno lost the connection. Try again when you are back online." |
 | Blocked | "Juno can't fit this in one request. Removing a pin or starting a smaller task helps." No card |
@@ -361,7 +361,7 @@ Failures follow one rule: say what failed, what is kept safe, and one action. Ev
 Juno remembers the whole chat. Older parts are kept as a summary that grows denser with age, and the full text stays on disk, so Juno can look back at any day and quote it.
 
 - **Recall** answers cite the day and scroll to the message.
-- **Remember this** (on your own message, or "remember that …") pins the exact words, up to a sentence, and shows "Remembered · Undo". Undo stays until your next message or for a minute, whichever is first. Pins come only from your own messages; from the context menu, the pin is the selection or the whole message (13.1). **What Juno remembers** lists them for editing; an edit replaces the pin with your words.
+- **Remember this** (on your own message, or "remember that …") pins the exact words, up to a sentence, and shows "Remembered · Undo". Undo stays until your next message or for a minute, whichever is first. Pins come only from your own words, never from a reaction or a quote in a reply; from the context menu, the pin is the selection or the whole message (13.1). **What Juno remembers** lists them for editing; an edit replaces the pin with your words.
 - **Forget** as a correction is a message ("forget the Wednesday slot"); Juno confirms in words. **Remove**, from a message's context menu, opens a local sheet that works in every state: it deletes the message, everything Juno derived from it, and pending actions that saw it. The chat shows "Removed" where it was. Juno's later replies that quote it stay unless you also remove them. Copies already sent to the model provider cannot be recalled, and the sheet says so. A removal Juno proposes is a Remove card with the same text.
 - **Memory of this chat** shows Juno's summary as a dated timeline. Lines being rebuilt after a removal read "being updated".
 - **One Mac at a time.** Juno's state lives on this Mac with an encrypted backup in a folder you choose (under the app's data folder by default). Moving to another Mac is a handover from the old one. A restore from backup opens in recovery (13.7) until you review what was pending.
@@ -374,13 +374,14 @@ Juno remembers the whole chat. Older parts are kept as a summary that grows dens
 | --- | --- | --- |
 | Read | Reading topics and channels, lookups in Notion, Littlebird and T3 Code, looking back in memory | No click. Folded into one line on Activity |
 | Local | Remember, schedules from a conversation with you, notifications to you, notification settings and hours from your own words | No click. Undo where one applies |
-| Work you asked for | Starting, steering or stopping a T3 Code session or a delegate | No click while Juno has not read Slack, a connection or a session report in this reply. Otherwise a card |
+| Work you asked for | Starting a T3 Code session | Always a card with Start, one tap, whatever Juno has read |
+| | Starting a delegate; steering or stopping a session or a delegate | No click while Juno has not read Slack, a connection or a session report in this reply. Otherwise a card |
 | Outward | Sending to Slack, resolving, writing to Notion or Littlebird, answering a session's approval request, any connection tool not on its read list | Always a card, every time, once per click |
 | Destructive | Deleting, merging, force-pushing, buying | Not offered at all |
 
 - **Untrusted content.** Anything Juno reads from Slack, a connection or a delegate can contain instructions. Once such content is in the conversation, the no-click rules for the Work tier stop for that run and Juno proposes cards instead, with a Because line. Only you can move a connection tool between Read and Outward, in Settings › Connections.
 - **Secrets.** Juno never puts a key or token into a tool call or a brief. A match is blocked and a fixed line says so (13.7).
-- **Four ways to stop.** Stop (this reply), Pause Juno, a connection's own switch, and the global AI assist switch (section 15), which turns the chat off entirely. Pause stops the current reply, asks every running session and delegate to stop, and starts nothing new; the composer still works and messages wait for Resume. After Resume, telling a session something needs a card again, because Pause revokes what the conversation had allowed.
+- **Three switches.** Pause Juno, a connection's own switch, and the global AI assist switch (section 15), which turns the chat off entirely. None of them is a Stop for a reply. Pause lets the current reply finish without acting (no card runs and no action is authorized), asks every running session and delegate to stop, and starts nothing new; the composer still works and messages wait for Resume. After Resume, telling a session something needs a card again, because Pause revokes what the conversation had allowed.
 - **Activity** lists every run: who asked, when, the outcome, each action from the Local tier up with the decision made, and one folded read line. Failures are in plain words with "Copy details".
 - **Settings are yours.** Models, the spend cap, rules, tiers and connections change only in Settings. No conversation can change them. Notification settings and hours (section 14) are the exception: Juno changes them from your own words in a clean conversation, like a schedule, never from something it read, and the change shows "Notifications changed · Undo".
 
@@ -390,11 +391,11 @@ The Juno header menu opens Scheduled, What Juno remembers, Memory of this chat, 
 
 ### 13.11 Writing
 
-Section 17 applies. Juno says "I" only in its own bubbles (proposed; section 19); the app around it has no voice. Status lines are present tense and name real things. Card buttons start with a verb. Juno never apologizes, exclaims or jokes.
+Section 17 applies to the app's own copy. Juno says "I" in its own bubbles; the app around it has no voice. Status lines are present tense and name real things. Card buttons start with a verb. How Juno writes is the model's judgement, guided by a short prompt, not by fixed rules.
 
 ### 13.12 Performance
 
-Your bubble within a frame of Enter. The status bubble within 100ms. First status text or first token within 1.5s on OpenRouter (a Codex turn is slower and shows the dots meanwhile). A 5,000-message chat opens within the list budget in `docs/performance.md`.
+Your bubble within a frame of Enter. A reaction on its bubble within a frame of the click. The status bubble within 100ms. First status text or first bubble within 2.5s on OpenRouter (a Codex turn can be slower and shows the dots meanwhile). A 5,000-message chat opens within the list budget in `docs/performance.md`.
 
 ### 13.13 Not in v1
 
@@ -500,7 +501,7 @@ Use the Littlebird design system's tokens.
 - **Case.** Sentence case everywhere.
 - **Buttons** are short and start with a verb: Resolve, Send, Post in thread, Fix and send.
 - **Relative time:** 4m, 2h, Yesterday, 3d.
-- **Emoji.** None in chrome. Users' messages are their own.
+- **Emoji.** None in chrome. Users' messages are their own, and so are reactions in the Juno chat: a reaction is content, not chrome.
 - **Undo over confirm.** Prefer undo to confirmation for reversible actions. Toasts read "Resolved · Postgres 16 migration plan · Undo".
 - **Main thread labels** always say whose Main it is: "#eng · Main".
 - **The "#" prefix.** Don't repeat the channel # in text when a hash icon is already beside it.
@@ -522,18 +523,14 @@ Use the Littlebird design system's tokens.
 | ↑ in an empty composer, then ↑ ↓ | Select a message. E edits and Delete or Backspace deletes your own selected message |
 | Hold ⌥ (or Space) over a sidebar row | Peek at the topic without opening it or marking it read |
 | Enter / Shift Enter | Send / new line. During a send check, Enter takes the first option. |
-| Esc | Close a menu or palette, or dismiss a send check. In the Juno panel with an empty composer, close the panel. In the Juno chat with an empty composer, stop Juno's current reply (never a background job) |
+| Esc | Close a menu or palette, or dismiss a send check. In the Juno panel with an empty composer, close the panel |
 
 ## 19. Not in v1, and open questions
 
 - **Not designed yet:** calls and huddles, canvases, workflows, the app directory and Slack Connect specifics. For Juno Agent: a mobile surface, several people in one chat, and live sync between running Macs (section 13.13).
 - **Slack's notification schedule.** Notification hours should also set Slack's own schedule so the phone goes quiet. Which pref or endpoint holds it is not yet verified (`docs/backlog.md`); until then only the Mac follows the hours, and Slack may not let a channel set to Every message through at night.
 - **Syncing client-only data.** Should client-only data (titles, resolution, notification settings) sync across devices? Juno's own state is answered: one Mac writes, an encrypted backup follows, and moving is a handover (section 13.8). Live sync between two running Macs is later.
-- **Your bubble colour.** Pending: the owner chooses between options A (accent fill), B (accent tint), C (neutral tint) and D (ink) from the mock in `docs/design/juno-chat/`. The mock's README recommends B.
-- **Juno's voice.** Juno saying "I" in its own bubbles (13.11) is a proposal awaiting the owner.
-- **Starting work without a click.** The owner's decision is "no click to start a T3 Code session I asked for". The rule written in 13.4 and 13.9 is narrower: no click only while Juno has not read Slack, a connection or a session report in the same reply, because anything read there can carry instructions. The owner has not yet confirmed the narrowing.
-- **A restore while the old Mac still runs.** Without a central service, Juno cannot stop an old Mac that is still on from acting after a restore elsewhere, unless both Macs share one backup folder (13.8). The restore sheet says so. The owner has not yet confirmed this limit for v1.
-- **Removed messages and an out-of-date backup.** A restore on a new Mac without a move code, from a folder that missed the newest backup, can bring back removed messages (13.8). "Rotate recovery phrase after removals" closes this but asks for a new phrase after every removal; it is off by default. The owner has not yet chosen the default.
+- **Settled for Juno Agent on 10-14** and written into section 13: your bubble is an accent tint (13.1); Juno says "I" in its own chat (13.11); every T3 Code session start is a one-tap card (13.4, 13.9); "Rotate recovery phrase after removals" is off by default, so a restore from an out-of-date folder can bring back removed messages (13.8); and a restore while the old Mac still runs is an accepted v1 limit, which the restore sheet states (13.8).
 - **Re-titling.** Should AI re-title a topic when it drifts, or only suggest a branch?
 - **Mobile.** Is there a mobile companion?
 

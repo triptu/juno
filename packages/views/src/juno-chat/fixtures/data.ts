@@ -4,6 +4,7 @@
  * workspace. Times are relative to `NOW` so the labels never drift.
  */
 import type {
+  BubbleId,
   Card,
   CardId,
   CardStatus,
@@ -14,7 +15,6 @@ import type {
   GroupPosition,
   JobId,
   JunoInline,
-  JunoMessageItem,
   OpId,
   OpenTarget,
   Origin,
@@ -22,6 +22,8 @@ import type {
   Place,
   ProposedMessageId,
   QuestionOptionId,
+  Quote,
+  Reaction,
   RunId,
   ScheduleId,
   SendResult,
@@ -59,15 +61,32 @@ export const topics = {
 
 /* Items ------------------------------------------------------------------- */
 
-export const owner = (id: string, text: string, group: GroupPosition = 'single', delivery: Delivery = { _tag: 'sent' }, at = NOW - 4 * MINUTE): OwnerMessageItem => ({
+export const bubbleId = (id: string) => id as BubbleId
+
+export const owner = (
+  id: string,
+  text: string,
+  group: GroupPosition = 'single',
+  delivery: Delivery = { _tag: 'sent' },
+  at = NOW - 4 * MINUTE,
+  extra: { readonly replyTo?: Quote; readonly reactions?: ReadonlyArray<Reaction> } = {},
+): OwnerMessageItem => ({
   _tag: 'owner',
   opId: opId(`op-${id}`),
   id: messageId(id),
   text,
   at,
   delivery,
+  ...(extra.replyTo === undefined ? {} : { replyTo: extra.replyTo }),
+  reactions: extra.reactions ?? [],
   group,
 })
+
+/** A reaction by one side. */
+export const reacted = (by: Reaction['by'], emoji: string): Reaction => ({ by, emoji })
+
+/** A reply's quote: of a Juno bubble or card (by the owner), or of an owner message (by Juno). */
+export const quoteOf = (target: Quote['target'], preview: string, removed = false): Quote => ({ target, preview, ...(removed ? { removed: true as const } : {}) })
 
 export const text = (value: string): JunoInline => ({ _tag: 'text', text: value })
 export const cite = (value: string, id: string): JunoInline => ({ _tag: 'cite', text: value, messageId: messageId(id) })
@@ -77,24 +96,44 @@ export interface JunoOptions {
   readonly cards?: ReadonlyArray<Card>
   readonly ending?: Ending
   readonly origin?: Origin
-  readonly streaming?: boolean
   readonly unread?: boolean
   readonly at?: number
+  readonly replyTo?: Quote
+  readonly reactions?: ReadonlyArray<Reaction>
+  /** Reactions on the cards, by card id. */
+  readonly cardReactions?: Readonly<Record<string, ReadonlyArray<Reaction>>>
 }
 
-export const juno = (id: string, body: ReadonlyArray<JunoInline> | string, options: JunoOptions = {}): JunoMessageItem => ({
-  _tag: 'juno',
-  id: messageId(id),
-  runId: runId(`run-${id}`),
-  body: typeof body === 'string' ? (body.length === 0 ? [] : [text(body)]) : body,
-  at: options.at ?? NOW - 3 * MINUTE,
-  origin: options.origin ?? { _tag: 'owner' },
-  streaming: options.streaming ?? false,
-  ending: options.ending ?? { _tag: 'complete' },
-  cards: options.cards ?? [],
-  group: options.group ?? 'single',
-  unread: options.unread ?? false,
-})
+/**
+ * The rows one Juno bubble makes: the bubble (none for an empty body), a
+ * row per card, and the ending line when the run did not end `complete`.
+ * Spread it into a transcript.
+ */
+export const juno = (id: string, body: ReadonlyArray<JunoInline> | string, options: JunoOptions = {}): ReadonlyArray<ChatItem> => {
+  const inlines = typeof body === 'string' ? (body.length === 0 ? [] : [text(body)]) : body
+  const run = runId(`run-${id}`)
+  const ending = options.ending ?? { _tag: 'complete' }
+  return [
+    ...(inlines.length === 0
+      ? []
+      : [
+          {
+            _tag: 'juno' as const,
+            id: bubbleId(id),
+            runId: run,
+            body: inlines,
+            at: options.at ?? NOW - 3 * MINUTE,
+            origin: options.origin ?? { _tag: 'owner' },
+            ...(options.replyTo === undefined ? {} : { replyTo: options.replyTo }),
+            reactions: options.reactions ?? [],
+            group: options.group ?? 'single',
+            unread: options.unread ?? false,
+          },
+        ]),
+    ...(options.cards ?? []).map((card) => ({ _tag: 'card' as const, runId: run, card, reactions: options.cardReactions?.[card.id] ?? [], unread: options.unread ?? false })),
+    ...(ending._tag === 'complete' ? [] : [{ _tag: 'ending' as const, runId: run, ending }]),
+  ]
+}
 
 export const status = (id: string, statusText?: string): ChatItem => ({ _tag: 'status', runId: runId(`run-${id}`), ...(statusText === undefined ? {} : { text: statusText }) })
 
@@ -118,7 +157,7 @@ export const mayHaveHappened: CardStatus = { _tag: 'open', mayHaveHappened: true
 export const dismissed: CardStatus = { _tag: 'dismissed' }
 export const expired: CardStatus = { _tag: 'expired' }
 export const done = (line: string, extra: { readonly undo?: true; readonly open?: OpenTarget } = {}): CardStatus => ({ _tag: 'done', line, ...extra })
-export const failed = (line: string, retry = true, mayDuplicate?: true): CardStatus => ({ _tag: 'failed', line, ...(retry ? { retry: true as const } : {}), ...(mayDuplicate ? { mayDuplicate } : {}) })
+export const failed = (line: string): CardStatus => ({ _tag: 'failed', line })
 
 /* Cards ------------------------------------------------------------------- */
 
@@ -126,8 +165,7 @@ const result = {
   pending: { _tag: 'pending' } satisfies SendResult,
   sending: { _tag: 'sending' } satisfies SendResult,
   sent: { _tag: 'sent', open: { _tag: 'topic', topicId: topics.postgres.topicId } } satisfies SendResult,
-  notSent: { _tag: 'notSent' } satisfies SendResult,
-  unknown: { _tag: 'unknown', check: { _tag: 'topic', topicId: topics.postgres.topicId } } satisfies SendResult,
+  failed: { _tag: 'failed' } satisfies SendResult,
 } as const
 
 const proposed = (id: string, target: Place, textValue: string, r: SendResult = result.pending, inTopic?: TopicLink) => ({
@@ -278,7 +316,7 @@ export const conversation: ReadonlyArray<ChatItem> = [
   day(0),
   owner('m-1', 'What did I miss in #eng this morning?', 'first', { _tag: 'sent' }, NOW - 12 * MINUTE),
   owner('m-2', 'And remind me when the offsite is', 'last', { _tag: 'sent' }, NOW - 11 * MINUTE),
-  juno(
+  ...juno(
     'm-3',
     [
       text('Two things in #eng: Maya posted the Postgres 16 migration plan and asked for a reviewer, and the CI flake on the sidebar test is back. The offsite is on the 23rd. '),
@@ -287,10 +325,10 @@ export const conversation: ReadonlyArray<ChatItem> = [
     ],
     { group: 'first', at: NOW - 10 * MINUTE },
   ),
-  juno('m-4', 'I can tell Maya you will review the plan. Here is what I would send.', { group: 'last', at: NOW - 10 * MINUTE, cards: [sendMessage('c-1')] }),
+  ...juno('m-4', 'I can tell Maya you will review the plan. Here is what I would send.', { group: 'last', at: NOW - 10 * MINUTE, cards: [sendMessage('c-1')] }),
   { _tag: 'note', id: messageId('m-5'), kind: 'remembered', text: 'The offsite is on the 23rd', undo: true },
   owner('m-6', 'Start a session to fix the flake', 'single', { _tag: 'sent' }, NOW - 6 * MINUTE),
-  juno('m-7', 'Started T3 Code on juno. I will say when it needs you or when there is a PR.', { at: NOW - 5 * MINUTE, cards: [task('c-2', 'running', { state: 'Tests running, 2 of 5', open: { _tag: 'url', url: 'https://t3.example/thread/1', label: 'Open' } })] }),
+  ...juno('m-7', 'Started T3 Code on juno. I will say when it needs you or when there is a PR.', { at: NOW - 5 * MINUTE, cards: [task('c-2', 'running', { state: 'Tests running, 2 of 5', open: { _tag: 'url', url: 'https://t3.example/thread/1', label: 'Open' } })] }),
 ]
 
 const paragraph =
@@ -300,7 +338,7 @@ const paragraph =
 export const longText: ReadonlyArray<ChatItem> = [
   day(0),
   owner('m-10', `Can you give me the long version of what happened in #eng this week? I want every thread, who asked for what, what is blocked and what is just waiting, and anything I promised someone and have not done. Skip the alerts channel unless something paged. ${'Also include the hiring loop. '.repeat(6)}`, 'single', { _tag: 'sent' }, NOW - 20 * MINUTE),
-  juno('m-11', `${paragraph}\n\n${paragraph}`, { at: NOW - 18 * MINUTE, cards: [sendMessage('c-10', open, [result.pending, result.pending, result.pending])] }),
+  ...juno('m-11', `${paragraph}\n\n${paragraph}`, { at: NOW - 18 * MINUTE, cards: [sendMessage('c-10', open, [result.pending, result.pending, result.pending])] }),
 ]
 
 const rtlOwner = 'מה פספסתי ב-#eng הבוקר? ותזכיר לי מתי היום של הצוות'
@@ -310,7 +348,7 @@ const rtlJuno = 'שני דברים ב-#eng: מאיה פרסמה את תוכני�
 export const rightToLeft: ReadonlyArray<ChatItem> = [
   day(0),
   owner('m-20', rtlOwner, 'single', { _tag: 'sent' }, NOW - 9 * MINUTE),
-  juno('m-21', rtlJuno, {
+  ...juno('m-21', rtlJuno, {
     at: NOW - 8 * MINUTE,
     cards: [
       {
@@ -333,7 +371,7 @@ export const rightToLeft: ReadonlyArray<ChatItem> = [
 export const manyCards: ReadonlyArray<ChatItem> = [
   day(0),
   owner('m-30', 'Do everything at once', 'single', { _tag: 'sent' }, NOW - 9 * MINUTE),
-  juno('m-31', 'Here is everything, one card each.', {
+  ...juno('m-31', 'Here is everything, one card each.', {
     at: NOW - 8 * MINUTE,
     cards: [
       sendMessage('c-30', open, [result.pending, result.pending, result.pending]),
@@ -354,24 +392,13 @@ export const manyCards: ReadonlyArray<ChatItem> = [
   }),
 ]
 
-/** A Send message card where one row failed and one may have landed. */
+/** A Send message card where two rows failed: one rejected, one Juno could not confirm. Both read "Failed". */
 export const failedSend: ReadonlyArray<ChatItem> = [
   day(0),
   owner('m-50', 'Send the three replies', 'single', { _tag: 'sent' }, NOW - 9 * MINUTE),
-  juno('m-52', 'Sent one. The DM did not go through, and I cannot tell about #hiring.', {
+  ...juno('m-52', 'Sent one. The DM and the #hiring reply failed. Want me to try them again?', {
     at: NOW - 8 * MINUTE,
-    cards: [sendMessage('c-50', done('Sent 1 of 3'), [result.sent, result.notSent, result.unknown])],
-  }),
-]
-
-/** A run the owner stopped while a job it started runs on. */
-export const stoppedRun: ReadonlyArray<ChatItem> = [
-  day(0),
-  owner('m-60', 'Fix the flake and then tidy up the old threads', 'single', { _tag: 'sent' }, NOW - 9 * MINUTE),
-  juno('m-61', 'Started T3 Code on juno. Now looking at the threads from last', {
-    at: NOW - 8 * MINUTE,
-    ending: { _tag: 'stopped' },
-    cards: [task('c-60', 'running', { state: 'Reading the test', open: { _tag: 'url', url: 'https://t3.example/thread/1', label: 'Open' } })],
+    cards: [sendMessage('c-50', done('Sent 1 of 3'), [result.sent, result.failed, result.failed])],
   }),
 ]
 
@@ -379,14 +406,14 @@ export const stoppedRun: ReadonlyArray<ChatItem> = [
 export const scheduled: ReadonlyArray<ChatItem> = [
   day(0),
   { _tag: 'groupLabel', id: 'g-1', origin: scheduleOrigin, text: 'Scheduled · Daily catch-up' },
-  juno('m-70', 'Quiet night in #eng. One thing: the Postgres 16 plan got two more comments, both about the index rebuild window.', { origin: scheduleOrigin, at: NOW - 30 * MINUTE, unread: true, cards: [topicsCard('c-70')] }),
+  ...juno('m-70', 'Quiet night in #eng. One thing: the Postgres 16 plan got two more comments, both about the index rebuild window.', { origin: scheduleOrigin, at: NOW - 30 * MINUTE, unread: true, cards: [topicsCard('c-70')] }),
 ]
 
 /** A proactive group from two jobs that reported together. */
 export const jobs: ReadonlyArray<ChatItem> = [
   day(0),
   { _tag: 'groupLabel', id: 'g-2', origin: twoJobsOrigin, text: 'T3 Code · 2 jobs' },
-  juno('m-80', 'Two updates. The flake fix has a PR. The Electron bump failed on the native module build.', {
+  ...juno('m-80', 'Two updates. The flake fix has a PR. The Electron bump failed on the native module build.', {
     origin: twoJobsOrigin,
     at: NOW - 15 * MINUTE,
     unread: true,
@@ -398,9 +425,71 @@ export const jobs: ReadonlyArray<ChatItem> = [
 export const withNewDivider: ReadonlyArray<ChatItem> = [
   day(1),
   owner('m-90', 'Summarize the pricing thread', 'single', { _tag: 'sent' }, NOW - DAY - 3 * HOUR),
-  juno('m-91', 'Three people want the monthly price on the page, one wants the annual only. No decision yet.', { at: NOW - DAY - 3 * HOUR + MINUTE }),
+  ...juno('m-91', 'Three people want the monthly price on the page, one wants the annual only. No decision yet.', { at: NOW - DAY - 3 * HOUR + MINUTE }),
   { _tag: 'newDivider', count: 1 },
   day(0),
   { _tag: 'groupLabel', id: 'g-3', origin: scheduleOrigin, text: 'Scheduled · Daily catch-up' },
-  juno('m-92', 'The pricing thread settled on monthly, with the annual price under it. Leo owns the copy.', { origin: scheduleOrigin, at: NOW - 30 * MINUTE, unread: true }),
+  ...juno('m-92', 'The pricing thread settled on monthly, with the annual price under it. Leo owns the copy.', { origin: scheduleOrigin, at: NOW - 30 * MINUTE, unread: true }),
+]
+
+/* Bubbles, reactions and replies ------------------------------------------ */
+
+/** One run that posted three bubbles, the typing dots under the newest while it works on. */
+export const bubbles: ReadonlyArray<ChatItem> = [
+  day(0),
+  owner('m-100', 'Catch me up on #eng and the offsite', 'single', { _tag: 'sent' }, NOW - 3 * MINUTE),
+  ...juno('m-101', 'Two things in #eng this morning.', { group: 'first', at: NOW - 2 * MINUTE }),
+  ...juno('m-102', 'Maya posted the Postgres 16 migration plan and asked for a reviewer before Thursday.', { group: 'middle', at: NOW - 2 * MINUTE }),
+  ...juno('m-103', 'And the CI flake on the sidebar test is back.', { group: 'last', at: NOW - MINUTE }),
+  status('m-101', 'Looking back through March'),
+]
+
+/** Reactions both ways: the owner's on a bubble and a card, Juno's on the owner's message instead of a reply. */
+export const reactions: ReadonlyArray<ChatItem> = [
+  day(0),
+  owner('m-110', 'What did I miss in #eng?', 'single', { _tag: 'sent' }, NOW - 6 * MINUTE),
+  ...juno('m-111', 'Maya posted the Postgres 16 plan and asked for a reviewer. Here is a reply you could send.', {
+    at: NOW - 5 * MINUTE,
+    reactions: [reacted('owner', '🎉')],
+    cards: [sendMessage('c-111')],
+    cardReactions: { 'c-111': [reacted('owner', '❤️')] },
+  }),
+  owner('m-112', 'thanks!', 'single', { _tag: 'sent' }, NOW - MINUTE, { reactions: [reacted('juno', '👍')] }),
+]
+
+/** Emoji that are one grapheme but several code points: a flag, a skin tone, a ZWJ sequence, a keycap. */
+export const unusualReactions: ReadonlyArray<ChatItem> = [
+  day(0),
+  owner('m-120', 'Who is on call?', 'single', { _tag: 'sent' }, NOW - 4 * MINUTE, { reactions: [reacted('juno', '👩‍💻')] }),
+  ...juno('m-121', 'Leo until 6, then Priya.', { group: 'first', at: NOW - 3 * MINUTE, reactions: [reacted('owner', '🇮🇳')] }),
+  ...juno('m-122', 'Priya is in Bangalore this week.', { group: 'middle', at: NOW - 3 * MINUTE, reactions: [reacted('owner', '👍🏽')] }),
+  ...juno('m-123', 'Both have the pager app.', { group: 'last', at: NOW - 3 * MINUTE, reactions: [reacted('owner', '1️⃣')] }),
+]
+
+const firstBubble = bubbleId('m-130')
+
+/** The owner replies to a Juno bubble, to a card, and to a bubble that was removed since. */
+export const ownerReplies: ReadonlyArray<ChatItem> = [
+  day(0),
+  ...juno('m-130', 'The deploy is green on staging. Production goes at 4.', { at: NOW - 8 * MINUTE, cards: [sendMessage('c-130')] }),
+  owner('m-131', 'which deploy?', 'single', { _tag: 'sent' }, NOW - 6 * MINUTE, { replyTo: quoteOf({ _tag: 'bubble', id: firstBubble }, 'The deploy is green on staging. Production goes at 4.') }),
+  owner('m-132', 'make this shorter', 'single', { _tag: 'sent' }, NOW - 4 * MINUTE, { replyTo: quoteOf({ _tag: 'card', id: cardId('c-130') }, 'Send message · #eng') }),
+  owner('m-133', 'and this one?', 'single', { _tag: 'sent' }, NOW - 2 * MINUTE, { replyTo: quoteOf({ _tag: 'bubble', id: bubbleId('m-gone') }, '', true) }),
+]
+
+/** Three owner messages arrived together; Juno answers the older one by quoting it. */
+export const junoReplies: ReadonlyArray<ChatItem> = [
+  day(0),
+  owner('m-140', 'Is the offsite on the 23rd?', 'first', { _tag: 'sent' }, NOW - 5 * MINUTE),
+  owner('m-141', 'Also, who booked the room?', 'middle', { _tag: 'sent' }, NOW - 5 * MINUTE),
+  owner('m-142', 'And did Leo reply?', 'last', { _tag: 'sent' }, NOW - 5 * MINUTE),
+  ...juno('m-143', 'Yes, the 23rd.', { group: 'first', at: NOW - 4 * MINUTE, replyTo: quoteOf({ _tag: 'owner', opId: opId('op-m-140') }, 'Is the offsite on the 23rd?') }),
+  ...juno('m-144', 'Maya booked it on 2 Oct. Leo has not replied yet.', { group: 'last', at: NOW - 4 * MINUTE }),
+]
+
+/** One long essay as a single bubble: Juno decides the length. */
+export const essay: ReadonlyArray<ChatItem> = [
+  day(0),
+  owner('m-150', 'Write up the migration plan for the doc', 'single', { _tag: 'sent' }, NOW - 9 * MINUTE),
+  ...juno('m-151', `${paragraph}\n\n${paragraph}\n\n${paragraph}`, { at: NOW - 6 * MINUTE }),
 ]

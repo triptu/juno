@@ -1,5 +1,7 @@
 # Juno Agent: how the chat talks and feels
 
+> **Superseded in part (owner, 10-14).** The owner's decisions after reading this proposal replace its limits and its fixed reaction set: no length, count or splitting limits on bubbles and no post-check that splits or strips them (the model decides); any emoji as a reaction, both ways, instead of the six Tapbacks; the owner's thumbs up is only recorded and any other reaction goes to Juno, which may ignore it; Juno may use any emoji; no 350 ms spacing; and bubbles are marked with `<say>` blocks rather than blank lines and `⟦ ⟧` directives. The rest (whole bubbles with dots between, replies both ways, a reply or reaction is never a click) is in SPEC §13 and plan v3 O5 to O7. Read this file as background.
+
 A proposal, not a decision. It covers how Juno shapes its replies (short bubbles), reactions both ways, and replies to a specific message. It builds on the owner's decisions of 10-14 (`docs/decision-log.md`): the chat works like iMessage, there is no Stop, the core has two inputs (queue a message, listen to events), the owner bubble is option B, Juno says "I", and action cards take one click.
 
 Sources: OpenInstinct at commit `0c2a7c6` (read only, not run), SPEC §13 and §17, plan v3 §4, §5, §8 and §13, `packages/agent-contract/src/chat/`, `packages/agent/README.md` (Turns), `packages/agent/src/request/prompt.ts`, and `docs/design/juno-chat/`.

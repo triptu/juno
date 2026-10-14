@@ -29,4 +29,20 @@ const turns1 = [
   'CREATE INDEX run_inputs_by_run ON run_inputs (run_id)',
 ]
 
-export const TURNS_MIGRATIONS: MigrationSet = { name: 'turns', steps: [turns1] }
+const turns2 = [
+  // Reactions on chat items, by either side; the latest row per (target, by) is the state, and a null
+  // emoji removes it. Targets: a Juno bubble (<runId>:<n>), a card, or an owner message (its op).
+  // A reaction is never a click and never a pin.
+  `CREATE TABLE reactions (
+    seq INTEGER PRIMARY KEY,
+    op_id TEXT NOT NULL UNIQUE,
+    target_kind TEXT NOT NULL CHECK (target_kind IN ('bubble', 'card', 'owner')),
+    target_id TEXT NOT NULL,
+    by TEXT NOT NULL CHECK (by IN ('owner', 'juno')),
+    emoji TEXT,
+    at INTEGER NOT NULL
+  ) STRICT`,
+  'CREATE INDEX reactions_by_target ON reactions (target_kind, target_id, by, seq)',
+]
+
+export const TURNS_MIGRATIONS: MigrationSet = { name: 'turns', steps: [turns1, turns2] }

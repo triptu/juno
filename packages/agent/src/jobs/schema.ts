@@ -7,8 +7,8 @@ import type { MigrationSet } from '../store/schema'
 const jobs1 = [
   // One job and its Task card. `origin_op` is the message the card sits under; `call_id` is the
   // pi tool call that started it, so a replayed call finds its job. `phase` is agent-cards'
-  // JobPhase; `state` is the live line under the title. `step_at` is the last step change, for
-  // the 30-minute quiet milestone. `reports` counts the reports posted (`report:<job>:<seq>:<event>`).
+  // JobPhase; `state` is the live line under the title. `step_at` is the last step change
+  // or phase move. `quiet` in the CHECK is no longer written (there is no quiet milestone). `reports` counts the reports posted (`report:<job>:<seq>:<event>`).
   `CREATE TABLE jobs (
     id TEXT PRIMARY KEY,
     kind TEXT NOT NULL CHECK (kind IN ('subagent', 't3')),

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { defineFixtures, fixture, scene, type FixtureFrame } from '@juno/ui'
+import { bubbleId, cardId, quoteOf } from './fixtures/data'
 import { JunoComposer, type JunoComposerProps } from './JunoComposer'
 
 const noop = () => {}
@@ -30,6 +31,9 @@ export default defineFixtures(
       'job-line': composer({ placeholder: 'T3 Code · tests running, 2 of 5' }),
       disabled: composer({ enabled: false }),
       'right-to-left': composer({ value: 'מה פספסתי ב-#eng הבוקר?' }),
+      'quote-bubble': composer({ value: 'which deploy?', quote: quoteOf({ _tag: 'bubble', id: bubbleId('b1') }, 'The deploy is green on staging. Production goes at 4.'), onClearQuote: noop }),
+      'quote-card': composer({ quote: quoteOf({ _tag: 'card', id: cardId('c1') }, 'Send message · #eng'), onClearQuote: noop }),
+      'quote-removed': composer({ quote: quoteOf({ _tag: 'bubble', id: bubbleId('b2') }, '', true), onClearQuote: noop }),
     },
     Interaction: {
       focus: composer({}, { ...frame, focus: 'textarea' }),

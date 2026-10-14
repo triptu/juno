@@ -15,7 +15,7 @@ export interface TaskCardProps {
 const copy = chatCopy.card.task
 
 /** The phases whose footer still has buttons. The rest print an after-line. */
-const active: ReadonlySet<JobPhase> = new Set(['running', 'needsYou', 'quiet', 'lostSight', 'stopping'])
+const active: ReadonlySet<JobPhase> = new Set(['running', 'needsYou', 'lostSight', 'stopping'])
 
 /** The state line's text by phase: the agent's live line while it runs, fixed copy otherwise. */
 function stateLine(card: TaskCardModel): string {
@@ -25,8 +25,6 @@ function stateLine(card: TaskCardModel): string {
       return card.state ?? ''
     case 'stopping':
       return card.state ?? copy.stopping
-    case 'quiet':
-      return card.state ?? copy.quiet
     case 'lostSight':
       return copy.lostSight
     case 'done':
@@ -35,16 +33,15 @@ function stateLine(card: TaskCardModel): string {
       return copy.failed
     case 'stopped':
       return copy.stopped
-    case 'unknown':
-      return card.state ?? ''
   }
 }
 
 /**
  * A running or settled job (SPEC 13.4): its title, where it runs, and a
  * live state line that swaps text with a fade and never reflows (one line,
- * ellipsis). It has no status; `phase` is its only machine. Stop is the
- * only way to end a job, so it stays until the job has settled.
+ * ellipsis). It has no status; `phase` is its only machine. Stop ends the
+ * running job: it is the Task card's own control, not a chat Stop, and it
+ * stays until the job has settled.
  */
 export function TaskCard({ card, actions, enter }: TaskCardProps) {
   const line = stateLine(card)
@@ -99,7 +96,7 @@ export function TaskCard({ card, actions, enter }: TaskCardProps) {
   )
 }
 
-/** "Done · Open PR 412", "Failed · Show in Activity", "Stopped", or the can't-tell line with Open. */
+/** "Done · Open PR 412", "Failed · Show in Activity" or "Stopped". */
 function Settled({ card, actions }: TaskCardProps) {
   const open = card.open
   switch (card.phase) {
@@ -123,18 +120,6 @@ function Settled({ card, actions }: TaskCardProps) {
       )
     case 'stopped':
       return copy.stopped
-    case 'unknown':
-      return (
-        <>
-          {copy.unknown}
-          {open !== undefined ? (
-            <>
-              {' '}
-              <OpenButton target={open} actions={actions} />
-            </>
-          ) : null}
-        </>
-      )
     default:
       return null
   }

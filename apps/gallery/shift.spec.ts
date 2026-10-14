@@ -297,8 +297,8 @@ test.describe('the guard itself', () => {
 })
 
 /**
- * The Juno chat (SPEC 13): text streams into a bubble, cards settle, the
- * status bubble comes and goes, and the header's chip changes. None of
+ * The Juno chat (SPEC 13): bubbles arrive whole, reactions land, cards
+ * settle, the status bubble comes and goes, and the header's chip changes. None of
  * that may move what the owner is reading. Scenes with a button are also
  * pressed by the generic guard above; a change that is meant to move the
  * list's end (a new last row) is driven through `window.__fixtureControls`
@@ -308,25 +308,32 @@ test.describe('Juno chat', () => {
   const open = (page: Page, component: string, id: string) => openState(page, { component, id, route: `${component}/${id}`, group: '', groupId: '', state: '', frame: {} })
   const step = (page: Page, name: string) => page.evaluate((control) => (window as unknown as { __fixtureControls?: Record<string, () => void> }).__fixtureControls?.[control]?.(), name)
 
-  test('a streaming token joins the bubble without moving anything', async ({ page }) => {
-    await open(page, 'JunoChatList', 'shift/streaming-token')
-    const bubble = page.locator('[data-streaming]')
-    const before = await bubble.textContent()
-    await expectNoLayoutShift(page, () => page.getByRole('button', { name: 'Next token' }).click())
-    expect((await bubble.textContent())?.length).toBeGreaterThan(before?.length ?? 0)
-    await expectNoLayoutShift(page, () => page.getByRole('button', { name: 'Next token' }).click())
+  test('a bubble arrives whole above the dots and moves nothing above it', async ({ page }) => {
+    await open(page, 'JunoChatList', 'shift/bubble-arrives')
+    // The visible bubbles. A bubble that stops being the last of its group gives up the empty slot under it, which shows nothing.
+    const rows = [page.locator('[data-chat-owner] p'), page.locator('[data-chat-juno] p').first()]
+    const before = await Promise.all(rows.map((row) => row.boundingBox()))
+    for (const count of [2, 3]) {
+      await step(page, 'bubble')
+      await expect(page.locator('[data-chat-juno]')).toHaveCount(count)
+      await expect(page.locator('[data-chat-status]')).toHaveCount(1)
+      expect(await Promise.all(rows.map((row) => row.boundingBox()))).toEqual(before)
+    }
+    // The dots stay the last row, under the newest bubble.
+    const last = await page.locator('[data-chat-juno]').last().boundingBox()
+    expect((await page.locator('[data-chat-status]').boundingBox())!.y).toBeGreaterThan(last!.y)
   })
 
-  test('the status bubble appears below the reply and leaves without moving the rows above', async ({ page }) => {
-    await open(page, 'JunoChatList', 'shift/status-between-tokens')
-    const rows = [page.locator('[data-chat-owner]'), page.locator('[data-streaming]'), page.locator('[data-chat-juno] svg')]
-    const before = await Promise.all(rows.map((row) => row.boundingBox()))
-    await step(page, 'status')
-    await expect(page.locator('[data-chat-status]')).toBeVisible()
-    expect(await Promise.all(rows.map((row) => row.boundingBox()))).toEqual(before)
-    await step(page, 'status')
-    await expect(page.locator('[data-chat-status]')).toHaveCount(0)
-    expect(await Promise.all(rows.map((row) => row.boundingBox()))).toEqual(before)
+  test('a reaction lands on its bubble and leaves without moving anything', async ({ page }) => {
+    await open(page, 'JunoChatList', 'shift/reaction-arrives')
+    const bubbles = page.locator('[data-chat-owner], [data-chat-juno]')
+    const before = await bubbles.evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().toJSON()))
+    await step(page, 'reaction')
+    await expect(page.locator('[data-reactions]')).toHaveCount(2)
+    expect(await bubbles.evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().toJSON()))).toEqual(before)
+    await step(page, 'reaction')
+    await expect(page.locator('[data-reactions]')).toHaveCount(0)
+    expect(await bubbles.evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().toJSON()))).toEqual(before)
   })
 
   test("the status bubble's text changes in place", async ({ page }) => {
@@ -356,7 +363,7 @@ test.describe('Juno chat', () => {
   for (const [state, settled] of [
     ['resolve-settles', 'Resolved 2'],
     ['send-settles', 'Sent 2'],
-    ['send-fails', 'Not sent'],
+    ['send-fails', 'Failed'],
     ['task-state-changes', 'Done'],
     ['question-settles', 'You chose Keep both'],
   ] as const) {

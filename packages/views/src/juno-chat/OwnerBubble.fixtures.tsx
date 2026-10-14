@@ -2,7 +2,7 @@ import * as stylex from '@stylexjs/stylex'
 import { accent, colors, spacing } from '@juno/tokens/tokens.stylex'
 import { defineFixtures, fixture, scene, Text } from '@juno/ui'
 import { noopActions } from './commands'
-import { NOW, owner } from './fixtures/data'
+import { bubbleId, NOW, owner, quoteOf, reacted } from './fixtures/data'
 import { OwnerBubble, type OwnerBubbleProps } from './OwnerBubble'
 
 const MINUTE = 60_000
@@ -49,7 +49,7 @@ function Compare() {
           </Text>
           <OwnerBubble item={owner(`m-${option}-1`, 'What did I miss in #eng this morning?', 'first', { _tag: 'sent' }, at)} now={NOW} actions={noopActions} />
           <OwnerBubble item={owner(`m-${option}-2`, 'And remind me when the offsite is', 'last', { _tag: 'sent' }, at)} now={NOW} actions={noopActions} />
-          <OwnerBubble item={owner(`m-${option}-3`, 'Start a session to fix the flake, then tidy up anything settled in #eng', 'single', { _tag: 'queued', since: at }, at)} now={NOW} actions={noopActions} />
+          <OwnerBubble item={owner(`m-${option}-3`, 'Start a session to fix the flake, then tidy up anything settled in #eng', 'single', { _tag: 'sent' }, at, { reactions: [reacted('juno', '👍')] })} now={NOW} actions={noopActions} />
         </div>
       ))}
     </div>
@@ -71,12 +71,18 @@ export default defineFixtures(
     },
     Delivery: {
       sent: bubble(),
-      queued: bubble([undefined, undefined, undefined, { _tag: 'queued', since: at }]),
       'waiting-network': bubble([undefined, undefined, undefined, { _tag: 'waiting', for: 'network' }]),
       'waiting-resume': bubble([undefined, undefined, undefined, { _tag: 'waiting', for: 'resume' }]),
       'waiting-review': bubble([undefined, undefined, undefined, { _tag: 'waiting', for: 'review' }]),
       'not-delivered': bubble([undefined, undefined, undefined, { _tag: 'failed', reason: 'notDelivered' }]),
       'too-long': bubble([undefined, undefined, undefined, { _tag: 'failed', reason: 'tooLong' }]),
+    },
+    Reply: {
+      'to-bubble': fixture<OwnerBubbleProps>({ item: owner('m-r1', 'which deploy?', 'single', { _tag: 'sent' }, at, { replyTo: quoteOf({ _tag: 'bubble', id: bubbleId('b1') }, 'The deploy is green on staging. Production goes at 4.') }), now: NOW, actions: noopActions }),
+      removed: fixture<OwnerBubbleProps>({ item: owner('m-r2', 'and this one?', 'single', { _tag: 'sent' }, at, { replyTo: quoteOf({ _tag: 'bubble', id: bubbleId('b2') }, '', true) }), now: NOW, actions: noopActions }),
+    },
+    Reactions: {
+      'juno-reacted': fixture<OwnerBubbleProps>({ item: owner('m-x1', 'thanks!', 'single', { _tag: 'sent' }, at, { reactions: [reacted('juno', '👍')] }), now: NOW, actions: noopActions }),
     },
     Content: {
       'long-text': bubble([undefined, 'Can you give me the long version of what happened in #eng this week? I want every thread, who asked for what, what is blocked and what is just waiting, and anything I promised someone and have not done.']),

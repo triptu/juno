@@ -35,16 +35,9 @@ export function setMode(store: Store, next: Mode): void {
   })
 }
 
-/** Stop (§6.5): nothing new starts for this reply. Only the authorizations its run made are touched. */
-export function cancelRun(store: Store, originOp: string): void {
-  transaction(store.db, () => cancelOpen(store, originOp))
-}
-
-function cancelOpen(store: Store, originOp?: string): void {
-  const scope = originOp === undefined ? '' : ' AND origin_op = ?'
-  const args = originOp === undefined ? [] : [originOp]
-  store.db.prepare(`UPDATE authorizations SET outcome = 'cancelled' WHERE outcome = 'consumed'${scope}`).run(...args)
-  store.db.prepare(`UPDATE authorizations SET outcome = 'cancel-requested' WHERE outcome = 'sent'${scope}`).run(...args)
+function cancelOpen(store: Store): void {
+  store.db.prepare("UPDATE authorizations SET outcome = 'cancelled' WHERE outcome = 'consumed'").run()
+  store.db.prepare("UPDATE authorizations SET outcome = 'cancel-requested' WHERE outcome = 'sent'").run()
 }
 
 export type Authorize =

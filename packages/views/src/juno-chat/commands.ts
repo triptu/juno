@@ -5,22 +5,19 @@
  * tomorrow) are `dismiss`, as the M1 review documents.
  */
 import type { MouseEvent } from 'react'
-import type { CardId, ChatMessageId, OpId, OpenTarget, ProposedMessageId, QuestionOptionId, RunId } from '@juno/agent-contract'
+import type { BubbleId, CardId, ChatMessageId, OpId, OpenTarget, ProposedMessageId, QuestionOptionId, ReplyTarget } from '@juno/agent-contract'
 import type { ActivateEvent } from '@juno/ui'
 
 export type CardCommand =
   /** Send every row; `texts` carries the edited text of each. */
   | { readonly _tag: 'send'; readonly texts: ReadonlyArray<{ readonly id: ProposedMessageId; readonly text: string }> }
-  /** One row's Try again (after Not sent) or Send again (after can't-tell). A new click, a new authorization. */
-  | { readonly _tag: 'sendRow'; readonly messageId: ProposedMessageId }
   | { readonly _tag: 'dismiss' }
   | { readonly _tag: 'resolve' }
   | { readonly _tag: 'undo' }
-  /** The card's own Try again, offered by a `failed` status. */
-  | { readonly _tag: 'retry' }
   /** On an expired card: Juno is sent a message quoting the request. */
   | { readonly _tag: 'askAgain' }
   | { readonly _tag: 'start' }
+  /** The Task card's Stop: ends a running job. It is not a chat Stop; the chat has none. */
   | { readonly _tag: 'stop' }
   /** The task card's Sign in, when the T3 sign-in lapsed. */
   | { readonly _tag: 'signIn' }
@@ -35,8 +32,14 @@ export type CardCommand =
   | { readonly _tag: 'allow' }
   | { readonly _tag: 'setUp'; readonly provider: 'openrouter' | 'codex' }
 
-/** The message a context menu was opened on. An owner bubble is keyed by its op until it is stored. */
-export type ChatMenuTarget = { readonly kind: 'owner'; readonly opId: OpId; readonly id?: ChatMessageId } | { readonly kind: 'juno'; readonly id: ChatMessageId }
+/** What the owner can react to: a Juno bubble or a card. */
+export type ReactionTarget = Extract<ReplyTarget, { _tag: 'bubble' | 'card' }>
+
+/** The item a context menu was opened on. An owner bubble is keyed by its op until it is stored. */
+export type ChatMenuTarget =
+  | { readonly kind: 'owner'; readonly opId: OpId; readonly id?: ChatMessageId }
+  | { readonly kind: 'juno'; readonly id: BubbleId }
+  | { readonly kind: 'card'; readonly id: CardId }
 
 export type GroupLabelAction = 'why' | 'pauseSchedule' | 'muteUpdates'
 
@@ -47,8 +50,12 @@ export interface ChatActions {
   readonly onOpen: (target: OpenTarget, event: ActivateEvent) => void
   /** "Try again" under an owner bubble or an ending line: resubmit the same op. */
   readonly onRetry: (opId: OpId) => void
-  /** Stop on the status bubble. Ends the run only, never a background job. */
-  readonly onStop: (runId: RunId) => void
+  /** React on a Juno bubble or card: the container opens the reaction picker at `event`'s target. */
+  readonly onReactions: (target: ReactionTarget, event: MouseEvent<HTMLElement>) => void
+  /** Reply on a Juno bubble or card: the composer shows the quote. Not a click on the card. */
+  readonly onReply: (target: ReactionTarget) => void
+  /** A reply's quote was clicked: scroll to the original and flash it. */
+  readonly onQuote: (target: ReplyTarget) => void
   /** Undo on a "Remembered" note. */
   readonly onUndoNote: (id: ChatMessageId) => void
   readonly onGroupLabel: (id: string, action: GroupLabelAction) => void
@@ -60,7 +67,9 @@ export const noopActions: ChatActions = {
   onCard: () => {},
   onOpen: () => {},
   onRetry: () => {},
-  onStop: () => {},
+  onReactions: () => {},
+  onReply: () => {},
+  onQuote: () => {},
   onUndoNote: () => {},
   onGroupLabel: () => {},
 }

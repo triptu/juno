@@ -78,12 +78,27 @@ Each finding is accepted (A) and changed in the plan, or rejected (R) with a rea
 | W12 | WP6 difference 3: the chat shows one result per row and per card, while the record keeps each attempt and both cancellation states | A, as intended. The view summarizes and Activity shows the evidence. The projection rules are written down | §12 |
 | W13 | WP6 difference 5: the chat contract has no approval identities or edit revisions | A, as intended. RPC metadata (`CardBinding`) carries them beside the view models | §12 |
 
+### Owner decisions of 10-14 11:50
+
+These replace earlier rows where they disagree (B5's Esc, M7, W1's Stop line, W9, W11, and R7's warned retry).
+
+| ID | Decision | Where |
+| --- | --- | --- |
+| O1 | **No Stop.** The chat works like a text conversation. Its core has two inputs: queue a message, and listen to events. A message sent during a run joins it at its next step as a pi steer; to change course the owner sends another message ("stop" is just a message). No Stop button, no Esc, no `stopped` ending, no Queued label. Crash recovery, the guard and shutdown can still end a run (`interrupted`, `failed`, `blocked`). Jobs still stop from their Task card | §6.5, §8, §13 |
+| O2 | **Failed actions stay simple.** A card runs once and has no retry button. An action that was rejected, or whose result Juno cannot confirm, shows "Failed" on its card. The owner checks by hand or asks Juno for a new card. Underneath nothing changes: an unknown outcome stays `unknown` in the ledger, startup never re-runs it, and a child whose destination does not deduplicate is authorized at most once (spec `noRepeatAuthorization`, which replaces `retryRequiresAuthority`) | §6.3, §12 |
+| O3 | **Every T3 Code session start is a one-tap card**, whatever Juno has read. `t3_start` always produces a `proposedTask`; its Start click mints the job's grant. `delegate.spawn` keeps the clean-run rule | §6.4, §9 |
+| O5 | **Conversation is the model's judgement** (10-14, after `research/chat-style.md`). How many bubbles, how long, when to post a job update, whether to answer a reaction: a short prompt guides it, and no code or spec fixes it. Hard rules stay only for safety (one click per outward action, never auto-repeat an unsafe action, the spend cap and guard, untrusted content, memory trust) and for speed budgets. Removed: the 2 s status throttle, the 30-minute quiet milestone, the fixed milestone list, the Queued label, the 24-hour question hold, the 30 s report coalescing, the schedule count and interval limits and the 30-day auto-pause, and any bubble length or count limit | §8, §11, §13 |
+| O6 | **Bubbles and what the owner sees.** The chat is not a transcript: only text the model marks becomes a bubble, and each arrives whole, with typing dots between bubbles. The budget is the first bubble within 2.5 s (it was the first token within 1.5 s) | §8, §13 |
+| O7 | **Reactions and replies, both ways.** Any emoji. The owner's thumbs up is only recorded; any other reaction is queued to Juno like a message, and Juno may ignore it. Juno may react to an owner message instead of replying. The owner can reply to a Juno bubble or card, and the model gets the item in full; Juno can reply to an owner message. A reaction or a reply never approves an action and never pins a memory | §8, §13 |
+| O4 | The owner bubble is option B (accent tint, `--hl-bubble`). Juno says "I" in its own chat. "Rotate recovery phrase after removals" stays off by default. A restore while the old Mac still runs is an accepted v1 limit | §13.1, §14, §18 |
+
 ## 1. Owner decisions in force
 
 - **Providers:** OpenRouter and local Codex. Sign in with ChatGPT only if Juno can register. No Claude Code subscription.
 - **Chat model:** chosen in Settings from the latest Claude Sonnet, Claude Opus, Muse, GPT Sol and Grok (§7.1). The default is **Claude Sonnet 5.5**. **Compaction:** Haiku 5.5, editable. **Spend cap:** $2 a day, editable in Settings and never by the model.
 - **Proactive messages** only about things the owner set up.
-- **No click** for read lookups, OS notifications to the owner, self-scheduling, and starting T3 sessions he asked for. Everything else outward is a card and runs at most once after a click. The plan applies this through the clean-run rule (§6.4), which is narrower than the words above; the spec records that in its open questions (W6).
+- **No click** for read lookups, OS notifications to the owner, and self-scheduling. Starting a T3 Code session is always a one-tap Start card (O3). Everything else outward is a card and runs at most once after a click. The plan applies the no-click rules through the clean-run rule (§6.4).
+- **The chat has no Stop** (O1), and a failed or unconfirmed action shows "Failed" on its card with no retry (O2).
 - **Sync in v1:** one writer, an encrypted backup, and a way to move ownership.
 - **MCP endpoints:** Littlebird: `https://mcp.littlebird.ai/mcp`, with OAuth. T3 Code: `http://192.168.1.22:3773/mcp`; the spikes found it needs OAuth and that plain `http` works only on loopback. Prefer loopback when T3 runs on the same machine. The URL is a setting. Never send it secrets.
 - **T3 sessions** Juno starts run with full access, each in a new worktree.
@@ -227,16 +242,16 @@ Versions are pinned exactly: pi 1.2.0 and Codex SDK 0.162.1.
 intent ─(Tier 3: owner click on rev/digest)─▶ approved ─authorize(consume)─▶ attempt ─▶ receipt: done
                                                                     │                 └▶ definite rejection: failed
                                                                     └ crash or timeout after consume ─▶ unknown
-unknown ─reconcile─▶ done (positive evidence) | unknown (kept, shown) ; retry = new owner click "may duplicate"
+unknown ─reconcile─▶ done (positive evidence) | unknown (kept; the card shows "Failed")
 ```
 
-- **Every repeat needs a warned click** (W9). A second authorization of a child whose destination does not deduplicate needs a new owner click that carries the duplicate warning, whatever the earlier attempt's outcome: `unknown`, `failed` or `cancelled`. Why: "definite rejection" rests on reading a destination's error correctly, and the spec (`retryRequiresAuthority`) does not trust that. A deduplicated child (natural or local-id dedupe) retries under its key with a plain click. The card prints the warning beside the retry button (`chatCopy.card.mayDuplicate`).
+- **No repeat** (O2, replacing W9). A child whose destination does not deduplicate is authorized at most once, whatever the first attempt's outcome: `unknown`, `failed` or `cancelled`. The card has no retry button; it shows "Failed" and the owner asks Juno for a new card, which is a new intent with new action ids. Why: "definite rejection" rests on reading a destination's error correctly, and the spec (`noRepeatAuthorization`) does not trust that. The spec still allows a second authorization of a deduplicated child under its key; no v1 card offers one.
 
 - **Transports never retry by themselves.** pi-mcp is called with no retry. Agent sends go through the engine outbox in **single-attempt** mode. pi-ai `maxRetries: 0` stays as it is.
 
 | Destination | Dedupe | Reconcile |
 | --- | --- | --- |
-| Slack send | none proven server-side | A history lookup for `client_msg_id`. A positive result proves success. A negative result keeps `unknown`: "Juno can't tell whether this was sent. [Check channel] [Send again]" |
+| Slack send | none proven server-side | A history lookup for `client_msg_id`. A positive result proves success. A negative result keeps `unknown`; the row shows "Failed" |
 | Resolve (local) | natural | Re-apply |
 | T3 launch, send, respond | none | `t3_thread_search` for the tag `juno:<action id>` in the first message. Positive proves it. Negative keeps `unknown` |
 | Notion, Littlebird writes | none known | Read back. Positive identification of the exact change proves it. Otherwise `unknown` |
@@ -244,14 +259,14 @@ unknown ─reconcile─▶ done (positive evidence) | unknown (kept, shown) ; re
 
 ### 6.4 Grants and the clean-run rule (R8, B2, H2)
 - A run is **clean** while its request holds only owner inputs and Juno-internal state. It becomes **tainted** at the first untrusted content: any MCP or Slack read result, a `work` report, a wake, or a steered report.
-- **Grant creation.** A Tier 2 start (`t3_start`, `delegate.spawn`) or a `schedule_create` without a click is allowed only in a clean owner run. It **mints a grant** `{ id, op_class, target (project, job or schedule), bounds (one job; or a schedule's revision and purpose), source_op, revoked }`. The model never supplies a grant id. The application binds the grant to the call it made.
+- **Grant creation.** `t3_start` never runs without a click (O3): it always returns a `proposedTask` card, and the Start click mints the grant. A `delegate.spawn` or a `schedule_create` without a click is allowed only in a clean owner run. It **mints a grant** `{ id, op_class, target (project, job or schedule), bounds (one job; or a schedule's revision and purpose), source_op, revoked }`. The model never supplies a grant id. The application binds the grant to the call it made.
 - **In a tainted run,** or when the scope cannot be established, the same tool produces a card (`proposedTask` or `proposedSchedule`), and the owner's click mints the grant. **A click is owner authority** (G6): it enters through the inbox as an owner op, and that op is the grant's `source_op`. It mints the grant only if the card's stored revision and digest are still current, as in §6.2. Why: the click approves the exact stored payload, which no untrusted content can change after the card renders. The model wrote the payload in a tainted run, so the card must show all of it, including a schedule's prompt.
 - **Grant use.** `t3_send` and `t3_stop` need a live grant for that job. From a tainted or report run, `t3_send` becomes a `change` card (server T3 Code, target the job, the stored message as its preview), and `t3_stop` produces no card: Juno points to the Task card, whose Stop is the owner's click (W10). Reports, tool output and steering cannot create, broaden or restore a grant.
 - Revocation happens through a job Stop, a schedule delete, a redaction, or Pause.
 
-### 6.5 Startup, Pause and Stop (R12)
+### 6.5 Startup and Pause (R12)
 - At startup, every `attempt` without a receipt becomes `unknown` before `resume()`. A reconcile fiber works through them in the background. Unrelated chat runs at once. Resumed runs see unresolved outcomes in turn state.
-- Pause, Stop and AI off **stop new authorizations** and ask jobs to cancel. Authorizations already consumed may still land. States distinguish `cancel-requested`, `cancelled`, `unknown` and `done`, and earlier evidence is never overwritten. Stop's fixed line therefore promises only that nothing new starts (W11); anything already handed off reports on its own card.
+- Pause and AI off **stop new authorizations** and ask jobs to cancel. Authorizations already consumed may still land. States distinguish `cancel-requested`, `cancelled`, `unknown` and `done`, and earlier evidence is never overwritten. Pause does not end the current run: it finishes without acting. There is no Stop (O1).
 
 ## 7. Providers and the model picker
 
@@ -280,11 +295,13 @@ unknown ─reconcile─▶ done (positive evidence) | unknown (kept, shown) ; re
 
 ## 8. Orchestration behind the status bubble (B1, B5, M7, M8, M11)
 
-- **The router** owns the current run, `H`, and the clean or tainted flag. An idle owner input: reset, then the input. A busy owner input: a steer, with "Queued" shown after 500 ms. A report or wake: a steer if a run is active, otherwise a new run. Several reports within 30 s are coalesced. A proactive run waits while Juno has an open question of its own, at most until the question expires or 24 hours pass; job reports never wait.
-- **The status bubble covers runs only.**. Dots only until the first token (the bubble becomes the reply in place) or the first tool call (text appears, specific and counting real things, changing at most every 2 s). It clears when the run settles. Esc with the composer empty, or its Stop, aborts **the run only**. After a Stop, a queued steer starts a fresh run, and the reply ends with the fixed line "Stopped. Juno won't start anything new for this reply." (W11). If the run then calls tools between tokens, the bubble reappears below the streaming reply, and the next token clears it: one run is one Juno bubble. A run whose provider call fails (pi-ai runs with `maxRetries: 0`) ends `failed` with a fixed line per cause, never a model-written one.
+- **The router** owns the current run, `H`, and the clean or tainted flag. The chat's only inputs are a queued input (a message, maybe a reply, or a reaction) and the event stream (O1, O7). An idle owner input: reset, then the input. A busy owner input is held in the inbox and handed to pi as a steer at the run's next boundary (after a tool round, or at an answer), where pi places it; pi places every steer queued at that boundary together (`steeringMode: "all"`). The owner's bubble shows no extra state; the model decides how to acknowledge it. Input is held rather than queued in pi at once because pi keeps a queued steer after a failed run until the next input; held input that no boundary took starts the next run. A report or wake: a steer if a run is active, otherwise a new run.
+- **What the owner sees (O6).** The model marks bubbles in its text with a block format, `<say>…</say>` (with `reply-to="n12"` to answer one owner message), and its own reactions with `<react to="n12">emoji</react>`. The router parses the stream and publishes each block once it closes, so a bubble appears whole. Text outside the blocks never leaves the agent, and a run that marks nothing shows nothing. Why a block format and not a `say` tool: pi answers each tool call with a tool result and calls the model again, so a tool per bubble costs one more request per turn. The archive keeps the raw text, and parsing it gives the same bubbles (`packages/agent/README.md`, Turns).
+- **What the model reads (O7).** Owner input is wrapped with a handle (`<message id="n12">`, the inbox `seq`). A reply carries the quoted bubble, card or message in full; a reaction is `<reaction id="n13" emoji="…">` with the item it is on. The owner's thumbs up and removals are stored in `reactions` and never reach the model. Pins take only the owner's own words inside the wrapper.
+- **The status bubble covers runs only.** Typing dots while a run is live, between bubbles: each bubble takes its place and the dots show again below it until the run settles. A tool call gives it a line naming real things, until the next bubble. It has no Stop (O1). A run whose provider call fails (pi-ai runs with `maxRetries: 0`) ends `failed` with a fixed line per cause, never a model-written one.
 - **Background jobs** (`jobs` table: subagents and T3 sessions) never use the bubble. Each job has a **Task card** under the message that started it, with a live state line ("T3 Code · tests running, 2 of 5"), Open and Stop. The sidebar's Juno row shows the duotone sparkle while any job runs. "How is it going?" is answered from turn state, which lists the jobs.
 - **Subagents** follow pi's background pattern behind a `delegate` tool, with depth 1 and a cheaper model. Their first message is pins + view + task. Reports post once each (`report:<task>:<seq>`).
-- **T3 jobs:** A watcher fiber loops `t3_thread_wait(10 min)` and `t3_thread_read`, updating the state line. It posts a `work` report only on a milestone: started, a question or pending approval, done (with the PR), failed, or quiet for 30 minutes after the last step change. The last one reads: "T3 Code has been quiet for 30 minutes. I'll keep watching, or you can stop it." A pending approval becomes a `question` card headed "T3 Code asks" (Tier 3). Juno never merges or pushes.
+- **T3 jobs:** A watcher fiber loops `t3_thread_wait(10 min)` and `t3_thread_read`, updating the state line. It posts a `work` report when the job's phase moves (a question or pending approval, done with the PR, failed), and the model decides what, if anything, to tell the owner (O5). A pending approval becomes a `question` card headed "T3 Code asks" (Tier 3). Juno never merges or pushes.
 
 ## 9. Action tiers
 
@@ -292,7 +309,7 @@ unknown ─reconcile─▶ done (positive evidence) | unknown (kept, shown) ; re
 | --- | --- | --- |
 | 0 Read | Slack and topic reads, allowlisted MCP reads (§10.1), zoom, date, T3 status | No click. Folded into Activity |
 | 1 Local | Exactly: `remember`, `schedule_create` (clean owner run only), pause and delete of the schedule that woke the run, `notify` | No click. Undo line where one applies |
-| 2 Owner-asked work | `t3_start`, `t3_send`, `t3_stop`, `delegate.spawn`, `delegate.message`, `delegate.stop` | No click in a clean owner run (start) or under a live grant (send and stop). Otherwise a card |
+| 2 Owner-asked work | `t3_start`, `t3_send`, `t3_stop`, `delegate.spawn`, `delegate.message`, `delegate.stop` | `t3_start`: always a `proposedTask` card (O3). `delegate.spawn`: no click in a clean owner run. Send and stop: no click under a live grant. Otherwise a card |
 | 3 Outward | Slack send, resolve (a card because SPEC §13 says so), Notion and Littlebird writes, T3 approval answers, every MCP tool not on an allowlist | A card for the exact payload, every time, at most once per authorization |
 | 4 Destructive | delete, merge, force push, purchase | Not offered. No card kind. Generic MCP tools on a denylist are refused |
 
@@ -330,15 +347,15 @@ Fakes for all three servers (WP10) mirror the shapes above. Real adapters are bu
 ### 11.1 Schedules
 - `schedule_create({ at | every | wallClock (time, time zone, weekdays), reason, prompt, deliver: now | digest | silent, source_op })` works with no click only in a clean owner run. `source_op` must be an owner input from that run, and the call mints the schedule's grant. In a tainted owner run it returns a `proposedSchedule` card instead. Start on that card is the owner's click; its op becomes `source_op` and mints the grant (§6.4, G6). Wake and report runs get neither path.
 - From wake and report runs, only `schedule_pause` and `schedule_delete` on the schedule that woke them are available.
-- Limits: 20 active schedules, intervals of at least 15 minutes, and one-shot wakes at most a year ahead. A schedule untouched for 30 days pauses itself and says so once.
+- No count or interval limits (O5): the daily spend cap bounds what wakes cost.
 - Wakes are admitted once per `(schedule_id, schedule_rev, due_at)` through the inbox, revalidating the revision and the grant first.
-- A missed wake is coalesced and admitted once at the next launch. A wake run that finds no change ends with `stay_quiet(reason)`, which appears only in Activity.
+- A missed wake is coalesced and admitted once at the next launch. A wake run with nothing worth saying marks no bubble, so the chat shows nothing; Activity records that it ran.
 
 ### 11.2 Delivery
 | Event | OS notification |
 | --- | --- |
 | Schedule message | its `deliver` field (set from the owner's words, editable on Scheduled) |
-| Job needs a decision, failed, or quiet for 30 minutes | Now |
+| Job needs a decision, or failed | Now |
 | Owner-started job done | Now |
 | Job started | Silent (the chat shows it) |
 
@@ -352,7 +369,7 @@ Fakes for all three servers (WP10) mirror the shapes above. Real adapters are bu
 | `resolve` | topics[] | Resolve, Dismiss | "Resolved 3 · Undo" |
 | `topics` | links | open | none |
 | `proposedTask` | kind, title, where | Start, Dismiss | "Started" |
-| `task` | job, title, where, phase (`running`, `needsYou`, `quiet`, `lostSight`, `stopping`, then `done`, `failed`, `stopped` or `unknown`), live state. No `status`: `phase` is its only machine. `lostSight` reads "Sign in to T3 Code to keep watching" and Open becomes Sign in | Open, Stop | "Done · Open PR 412", "Failed · Show in Activity", "Stopped", or the can't-tell line |
+| `task` | job, title, where, phase (`running`, `needsYou`, `quiet`, `lostSight`, `stopping`, then `done`, `failed` or `stopped`; a recorded `unknown` shows as `failed`), live state. No `status`: `phase` is its only machine. `lostSight` reads "Sign in to T3 Code to keep watching" and Open becomes Sign in | Open, Stop | "Done · Open PR 412", "Failed · Show in Activity" or "Stopped" |
 | `question` | source header ("T3 Code asks", "Juno asks"), prompt, 2–4 options, free text | option, Reply | "You chose …" or "You replied" |
 | `proposedSchedule` | what, when, deliver, and `prompt`, the instruction each wake will run, all **rendered from the stored payload** (G6) | Start, Dismiss | "Started" |
 | `schedule` | what, when, deliver | Keep, Pause, Delete | "Kept", "Paused" or "Deleted" |
@@ -363,19 +380,20 @@ Fakes for all three servers (WP10) mirror the shapes above. Real adapters are bu
 | `provider` | "Choose a model provider": OpenRouter key or Codex, with the fixed disclosure | Set up | "Using Claude Sonnet 5.5" |
 
 - The model cannot invent a kind. Cards expire after 7 days, or when the source changes ("Expired · Ask again"). An unknown kind renders "This card needs a newer Juno".
-- **The view summarizes; the record keeps the evidence** (W12). `agent-cards` keeps every attempt per child (`ChildEvidence`), including an `unknown` attempt after a later attempt succeeded, and both `cancel-requested` and `cancelled`. The card shows one result per row and one status per card: a row is `sending` while any attempt is unsettled (including `cancel-requested`), `sent` once any attempt has a receipt, `unknown` if an attempt may have landed, and `notSent` when every attempt failed or was cancelled before transport. So "Sent" means at least one copy landed, not that no duplicate exists; the owner was warned at the retry click (§6.3). Activity lists every attempt with its evidence. Why: the owner decides from the row, and two cancellation states or an attempt history would not change what they can do there.
-- **Approval identities travel beside the view** (W13). The chat contract (`agent-contract/src/chat`) carries no revisions, digests or action ids. The renderer RPCs (`agent-contract/src/rpc`) send a `CardBinding` (card revision and digest, plus each child's action id, revision, digest and `duplicateWarning`) with each card, and a click returns it. Editing a send's text stores a new proposal with a new revision. Scheduled and Remembers snapshots carry revisions the same way. Why: views take props and return ids; the binding is checked by the agent, so no view can compose or alter it.
+- **The view summarizes; the record keeps the evidence** (W12). `agent-cards` keeps every attempt per child (`ChildEvidence`), including an `unknown` attempt after a later attempt succeeded, and both `cancel-requested` and `cancelled`. The card shows one result per row and one status per card: a row is `sending` while any attempt is unsettled (including `cancel-requested`), `sent` once any attempt has a receipt, and `failed` otherwise, whether every attempt was rejected or cancelled or one may have landed (O2). Activity lists every attempt with its evidence. Why: the owner decides from the row, and two cancellation states or an attempt history would not change what they can do there.
+- **Approval identities travel beside the view** (W13). The chat contract (`agent-contract/src/chat`) carries no revisions, digests or action ids. The renderer RPCs (`agent-contract/src/rpc`) send a `CardBinding` (card revision and digest, plus each child's action id, revision and digest) with each card, and a click returns it. Editing a send's text stores a new proposal with a new revision. Scheduled and Remembers snapshots carry revisions the same way. Why: views take props and return ids; the binding is checked by the agent, so no view can compose or alter it.
 
 ## 13. Chat UI (dumb views, friendly layer)
 
 ### 13.1 Look
-The chat has four item kinds: owner bubble, Juno bubble with cards, the status bubble (only during a run), and separators.
+The chat's rows: owner bubble, Juno bubble (one per marked block), card, ending line, the status bubble (only during a run), notes and separators.
 
-- **Owner bubbles**: the colour is pending the owner's choice between options A to D in `docs/design/juno-chat/README.md`, which recommends B (an accent tint, `--hl-bubble`, with `--foreground-default` text). `--radius-bubble` 16, with the 4 px tail on the last bubble of a group. Max width 76%, 14 px text, padding 8×12.
-- **Juno bubbles** use `--surface-hover`, with the 28 px mark beside the last bubble of a group. Plain text. Recall answers cite the day ("On 12 Mar you said …") with a link that scrolls to the message.
+- **Owner bubbles**: option B from `docs/design/juno-chat/README.md` (O4): an accent tint, `--hl-bubble`, with `--foreground-default` text. `--radius-bubble` 16, with the 4 px tail on the last bubble of a group. Max width 76%, 14 px text, padding 8×12.
+- **Juno bubbles** use `--surface-hover`, with the 28 px mark beside the last bubble of a group. Plain text, any length; each arrives whole. Recall answers cite the day ("On 12 Mar you said …") with a link that scrolls to the message.
 - **Groups** are formed by sender within 2 minutes **and the same origin**. A proactive group carries an 11 px uppercase label ("SCHEDULED · DAILY CATCH-UP") with "Why this?" and one quiet action: "Pause schedule" or "Mute updates". Neither stops a job (B5).
 - **Cards:** Column width up to 560 px, `--radius-card` 20. Light theme: the wide soft shadow. Dark theme: the ring from `docs/design/dark-theme/`. Laid out at full height, with a `--duration-appear` fade.
-- **Status bubble:** three dots looping over `--duration-pop` (static under reduced motion), 13 px status text with a 150 ms cross-fade, and Stop on hover or focus.
+- **Status bubble:** three dots looping over `--duration-pop` (static under reduced motion), 13 px status text with a 150 ms cross-fade. No Stop (O1).
+- **Reactions** (O7): any emoji, shown on the bubble's or card's corner, at most one per side. The owner reacts from hover › React or the context menu; the picker offers any emoji. **Replies:** a one-line quote above the bubble; the composer shows the quote while writing. Both work on Juno's bubbles and cards; Juno reacts and replies to owner messages.
 - **Inline lines:** "Remembered · Undo" (Undo until the next send or 60 s), "Removed", and the fixed secret-blocked line.
 - **Times** show on hover. **Day and gap separators** follow SPEC §17 wording. **Scroll:** the "New" divider, and a "New message" pill when scrolled up. The list uses `@tanstack/react-virtual`.
 
@@ -385,11 +403,9 @@ The chat has four item kinds: owner bubble, Juno bubble with cards, the status b
 | Empty | "What do you need?" with the illustration and four suggestion pills |
 | Idle | Nothing extra |
 | Running | The status bubble |
-| Queued | "Queued" under the last owner bubble, at 70% opacity, after 500 ms |
 | Waiting | "Waiting for network", "Waiting for Resume" or "Waiting for your review". The inbox write succeeded; the run starts when it can |
 | Too long | "That is too long to send as one message. Split it up and send the parts." The message stays, marked not sent |
 | Not delivered | "Not delivered · Try again". Only when the inbox write failed. Retrying resubmits the same `op_id` text |
-| Stopped | "Stopped. Juno won't start anything new for this reply." Work already handed off before Stop may still finish; its card shows the result (§6.5) |
 | Interrupted | "Juno was interrupted. Your message is kept. [Try again]". No Try again for wake and report runs |
 | Failed | "Juno didn't answer. Give it a moment and try again." (provider), "OpenRouter rejected the key. Check it in Settings.", "Codex is signed out on this Mac. Sign in to Codex and try again.", "Juno lost the connection. Try again when you are back online." |
 | Blocked (too large) | §5.2 copy, with no card |
@@ -418,7 +434,7 @@ Pages open from the Juno header menu:
 ### 13.4 Elsewhere (M4)
 - Ask Juno on the home and ⌘J open the Juno tab with the composer focused. Inside the chat, ⌘J focuses the composer. The nav item shows a grey count of unread Juno messages. The home's Ask Juno field shows a running job's state line, as a text swap with no reflow.
 
-Budgets go in `docs/performance.md`: send to bubble under 16 ms, status bubble under 100 ms, first text or token under 1.5 s, and opening a 5,000-message chat within the list budget.
+Budgets go in `docs/performance.md`: send to bubble under 16 ms, a reaction on its bubble under 16 ms, status bubble under 100 ms, first status text or first bubble under 2.5 s (O6), and opening a 5,000-message chat within the list budget.
 
 ## 14. Ownership, backup and transfer (R1, R2, R13)
 
@@ -473,7 +489,7 @@ The property names and meanings below follow `review/astra-v2.md`. Where this pl
 
 **WP3 `specs/agent-actions.qnt`, safety:**
 
-- Astra's 21: `intentBeforeDispatch`, `approvalExact`, `approvalCurrentAtAuthorization`, `approvalConsumption`, `noHiddenRetry`, `retryRequiresAuthority`, `unknownPreserved`, `dedupeIdentityStable`, `dedupedEffectOnce`, `receiptMatchesAction`, `scopedNoClickGrant`, `untrustedCannotGrant`, `tier4NeverDispatched`, `allWritesGated`, `currentOwnerAuthorizes`, `pauseBlocksAuthorization`, `scheduleGrantValid`, `occurrenceAdmissionOnce`, `cancelWinsBeforeAdmission`, `batchEffectsIndependent`, `outcomeEvidenceStable`.
+- Astra's 21: `intentBeforeDispatch`, `approvalExact`, `approvalCurrentAtAuthorization`, `approvalConsumption`, `noHiddenRetry`, `retryRequiresAuthority` (now `noRepeatAuthorization`, O2), `unknownPreserved`, `dedupeIdentityStable`, `dedupedEffectOnce`, `receiptMatchesAction`, `scopedNoClickGrant`, `untrustedCannotGrant`, `tier4NeverDispatched`, `allWritesGated`, `currentOwnerAuthorizes`, `pauseBlocksAuthorization`, `scheduleGrantValid`, `occurrenceAdmissionOnce`, `cancelWinsBeforeAdmission`, `batchEffectsIndependent`, `outcomeEvidenceStable`.
 - Changed: `quietHoursHoldAuthorization` is replaced by `quietHoursHoldNotifications`: no OS notification in quiet hours unless the schedule is `now` (H4). `scheduleFromCleanOwnerRun` becomes `scheduleFromOwnerAuthority`: every schedule has a source from a clean owner run or an owner click on a current `proposedSchedule` card (G6). `currentOwnerAuthorizes` is the local check only (G7).
 - Added: `cleanRunForNoClick`: a no-click Tier 2 start happens only in a clean owner run (R8). `capHard`: reserved plus actual spend never exceeds the cap plus the owner's raises, with compaction inside it (R15, G5). `scheduleFromOwnerAuthority` (B2, G6) is above.
 - `authorizeDispatch`, `transportSend`, `destinationAccept` and `recordReceipt` are separate actions.
@@ -530,10 +546,10 @@ The due-against-push check (t = 0…20,000) is a TypeScript property test in WP5
 
 **E2E** (Playwright driver, one spec per flow):
 1. Send, then the bubble, then the reply in place.
-2. Steer while busy: Queued, then read. Stop with a queued steer: the steer starts a fresh run.
-3. A multi-send card: Send, one child fails, retry only that one. Kill after authorization: shows unknown, then "Send again" with a warning.
-4. "Fix the sidebar flake": a T3 start with no click, a Task card with live state, the sparkle, a "T3 Code asks" card, done with a notification.
-5. A hostile Slack message: the run is tainted, `t3_start` becomes a card, and there is a "Because" line.
+2. Send while busy: the message joins at the next step and the reply acknowledges it. "stop" is read as a message.
+3. A multi-send card: Send, one child fails: "Sent 1 of 2", the failed row says "Failed" with no button. Kill after authorization: the row shows "Failed" and nothing is sent again after restart.
+4. "Fix the sidebar flake": a one-tap Start card, a Task card with live state, the sparkle, a "T3 Code asks" card, done with a notification.
+5. A hostile Slack message: the run is tainted, `t3_send` becomes a card, and there is a "Because" line.
 6. A schedule from a clean run: quit, advance the clock, relaunch: one wake. Quiet hours hold the notification only.
 7. Connect Notion, then Littlebird with an unknown tool: the tool is Tier 3 until moved on Connections.
 8. T3 on loopback is preferred over the LAN URL. A secret in a brief is blocked.
@@ -615,10 +631,4 @@ Each UI milestone ends with the design and performance reviews. WP23 runs from M
 
 Answered by the owner on 10-14 (see §1): T3 sessions run with full access in a new worktree; the backup is a local folder; Sign in with ChatGPT is not planned; T3 over the network needs the switch, off by default.
 
-These five are open on 10-14. SPEC §19 lists the same five. None blocks M2: the bubble colour and the voice land in WP12 as tokens and copy, the narrowing is a policy in WP15, and the two limits are M7 behaviour.
-
-1. **Owner bubble colour:** A (accent fill), B (accent tint), C (neutral tint) or D (ink), from `docs/design/juno-chat/`. The mock's README recommends B. WP12 builds B behind one token until the owner decides.
-2. **Juno's voice:** does Juno say "I" in its own bubbles? The spec proposes yes, and the fixed copy already uses it in two places (the empty state, the 30-minute quiet line).
-3. **The clean-run narrowing (W6):** the owner said "no click to start T3 sessions I asked for". The rule as built needs no click only while Juno has not read Slack, a connection or a session report in the same reply. Confirm the narrowing, or say which reads should not count.
-4. **A restore while the old Mac still runs (G7):** v1 cannot stop an old Mac that is still on from acting after a restore elsewhere, unless both Macs share one synced backup folder. The restore sheet says this. This repeats R1 with the exact limit, and `staleOwnerCannotAuthorize` stays a documented counterexample. Confirm it is acceptable for v1.
-5. **Removals and a restore on a new Mac (G13):** without a trusted deletion record, a restore from an out-of-date backup folder can bring back messages the owner removed. Juno says so on the Review page, and `staleFolderCannotRestoreRemoved` stays a documented counterexample. Should "Rotate recovery phrase after removals" be on by default? On closes the gap but asks the owner to save a new phrase after every removal. The plan keeps it off.
+The five questions listed here on 10-14 were answered the same day (O3, O4): the owner bubble is B; Juno says "I"; every T3 Code start is a one-tap card, which replaces the clean-run narrowing for starts; a restore while the old Mac still runs is an accepted v1 limit (G7, `staleOwnerCannotAuthorize` stays a documented counterexample); and "Rotate recovery phrase after removals" stays off by default (G13, `staleFolderCannotRestoreRemoved` stays a documented counterexample). No question is open now.

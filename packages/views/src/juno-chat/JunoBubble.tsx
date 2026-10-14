@@ -1,68 +1,63 @@
 import * as stylex from '@stylexjs/stylex'
-import { memo, type ReactNode } from 'react'
-import { chatCopy, type Ending, type JunoInline, type JunoMessageItem, type OpId } from '@juno/agent-contract'
-import { colors, sizes, spacing } from '@juno/tokens/tokens.stylex'
+import { memo } from 'react'
+import type { JunoBubbleItem, JunoInline } from '@juno/agent-contract'
+import { colors, motion, sizes, spacing } from '@juno/tokens/tokens.stylex'
 import { Text } from '@juno/ui'
-import { renderCard } from './cards'
 import type { ChatActions } from './commands'
 import { JunoMark } from './JunoMark'
+import { QuoteStub } from './QuoteStub'
+import { ReactionBadge } from './ReactionBadge'
 import { groupGap, isGroupEnd, rowStyles } from './rows'
+import { RowActions } from './RowActions'
 import { TextButton } from './TextButton'
 import { fullTime, messageTime } from '../time'
 
 export interface JunoBubbleProps {
-  readonly item: JunoMessageItem
+  readonly item: JunoBubbleItem
   readonly now: number
   readonly actions: ChatActions
+  /** Fade in on mount: a bubble arrives whole. Pass false for a bubble drawn in a settled list. */
+  readonly enter?: boolean
 }
 
 /**
- * Juno's bubble (inventory 12): the mark beside the last bubble of a group,
- * plain text with recall citations, the cards under it at column width,
- * and the ending line in the fixed slot under the group's last bubble.
- * While `streaming` the text grows in place with no cursor. A message whose
- * run ended before its first token has an empty body and shows the ending
- * line alone.
+ * One Juno bubble (inventory 12). It arrives whole, never streamed, and
+ * fades in at full size. The mark sits beside the last bubble of a group;
+ * a reply shows its quote above; reactions sit on the top corner out of
+ * flow; React and Reply wait beside it. The slot under a group's last
+ * bubble is kept, as the owner's is, so the spacing matches.
  */
-export const JunoBubble = memo(function JunoBubble({ item, now, actions }: JunoBubbleProps) {
+export const JunoBubble = memo(function JunoBubble({ item, now, actions, enter = true }: JunoBubbleProps) {
   const end = isGroupEnd(item.group)
-  const hasBubble = item.body.length > 0 || item.streaming
   const menu = actions.onContextMenu
+  const target = { _tag: 'bubble', id: item.id } as const
+  const replyTo = item.replyTo
   return (
-    <div data-chat-juno={item.id} data-unread={item.unread || undefined} {...stylex.props(groupGap[item.group], styles.root)}>
-      {hasBubble ? (
-        <div {...stylex.props(rowStyles.row, rowStyles.contained)}>
-          <span {...stylex.props(styles.gutter)}>{end ? <JunoMark /> : null}</span>
-          <div
-            data-streaming={item.streaming || undefined}
-            onContextMenu={menu === undefined ? undefined : (event) => menu({ kind: 'juno', id: item.id }, event)}
-            {...stylex.props(rowStyles.bubble, styles.bubble, end && rowStyles.tailStart)}
-          >
-            <Text variant="bodySmall" tone="default" selectable dir="auto" as="p" sx={rowStyles.bubbleText}>
-              {item.body.map((inline, index) => (
-                <Inline key={index} inline={inline} actions={actions} />
-              ))}
-            </Text>
-          </div>
-          <Text variant="tag" tone="muted" numeric as="time" title={fullTime(item.at)} sx={rowStyles.time}>
-            {messageTime(item.at, now)}
+    <div data-chat-juno={item.id} data-unread={item.unread || undefined} {...stylex.props(groupGap[item.group], styles.root, enter && styles.enter)}>
+      {replyTo !== undefined ? (
+        <div {...stylex.props(styles.quote)}>
+          <QuoteStub quote={replyTo} onOpen={() => actions.onQuote(replyTo.target)} />
+        </div>
+      ) : null}
+      <div {...stylex.props(rowStyles.row, rowStyles.contained)}>
+        <span {...stylex.props(styles.gutter)}>{end ? <JunoMark /> : null}</span>
+        <div
+          onContextMenu={menu === undefined ? undefined : (event) => menu({ kind: 'juno', id: item.id }, event)}
+          {...stylex.props(rowStyles.bubble, rowStyles.anchor, styles.bubble, end && rowStyles.tailStart)}
+        >
+          <Text variant="bodySmall" tone="default" selectable dir="auto" as="p" sx={rowStyles.bubbleText}>
+            {item.body.map((inline, index) => (
+              <Inline key={index} inline={inline} actions={actions} />
+            ))}
           </Text>
+          <ReactionBadge reactions={item.reactions} corner="end" />
         </div>
-      ) : null}
-      {item.cards.length > 0 ? (
-        <div {...stylex.props(styles.cards)}>
-          {item.cards.map((card) => (
-            <div key={card.id} {...stylex.props(styles.card)}>
-              {renderCard(card, actions, now)}
-            </div>
-          ))}
-        </div>
-      ) : null}
-      {end ? (
-        <div {...stylex.props(rowStyles.lineSlot, styles.lineSlot)}>
-          <EndingLine ending={item.ending} onRetry={actions.onRetry} />
-        </div>
-      ) : null}
+        <Text variant="tag" tone="muted" numeric as="time" title={fullTime(item.at)} sx={rowStyles.time}>
+          {messageTime(item.at, now)}
+        </Text>
+        <RowActions target={target} actions={actions} />
+      </div>
+      {end ? <div aria-hidden {...stylex.props(rowStyles.lineSlot)} /> : null}
     </div>
   )
 })
@@ -76,38 +71,10 @@ function Inline({ inline, actions }: { readonly inline: JunoInline; readonly act
   )
 }
 
-function EndingLine({ ending, onRetry }: { readonly ending: Ending; readonly onRetry: (opId: OpId) => void }) {
-  const copy = chatCopy.ending
-  const retry = (opId: OpId | undefined) => (opId === undefined ? null : <TextButton onClick={() => onRetry(opId)}>{copy.tryAgain}</TextButton>)
-  switch (ending._tag) {
-    case 'complete':
-      return null
-    case 'stopped':
-      return <Line kind="stopped">{copy.stopped}</Line>
-    case 'interrupted':
-      return (
-        <Line kind="interrupted">
-          {copy.interrupted} {retry(ending.retry)}
-        </Line>
-      )
-    case 'blocked':
-      return <Line kind="blocked">{copy.blocked[ending.reason]}</Line>
-    case 'failed':
-      return (
-        <Line kind="failed">
-          {copy.failed[ending.reason]} {retry(ending.retry)}
-        </Line>
-      )
-  }
-}
-
-function Line({ kind, children }: { readonly kind: string; readonly children: ReactNode }) {
-  return (
-    <Text variant="meta" tone="muted" data-ending={kind} sx={rowStyles.lineText}>
-      {children}
-    </Text>
-  )
-}
+const appear = stylex.keyframes({
+  from: { opacity: 0 },
+  to: { opacity: 1 },
+})
 
 const styles = stylex.create({
   root: {
@@ -115,6 +82,13 @@ const styles = stylex.create({
     flexDirection: 'column',
     alignItems: 'flex-start',
     minWidth: 0,
+  },
+  // Laid out at full size and only fades in: a bubble arriving never grows.
+  enter: {
+    animationName: appear,
+    animationDuration: motion['--duration-appear'],
+    animationTimingFunction: motion['--ease-out'],
+    animationFillMode: 'both',
   },
   gutter: {
     display: 'inline-flex',
@@ -127,22 +101,12 @@ const styles = stylex.create({
     backgroundColor: colors['--surface-hover'],
     color: colors['--foreground-default'],
   },
-  // Under the bubble, past the mark's column: 28px mark plus the 10px gap.
-  cards: {
+  // Above the bubble, past the mark's column: 28px mark plus the 10px gap.
+  quote: {
     display: 'flex',
-    flexDirection: 'column',
-    gap: spacing['--space-2'],
-    width: '100%',
+    maxWidth: '100%',
     boxSizing: 'border-box',
-    marginTop: spacing['--space-2'],
     paddingInlineStart: `calc(${spacing['--space-7']} + ${spacing['--space-2-5']})`,
-  },
-  card: {
-    display: 'flex',
-    width: '100%',
-    minWidth: 0,
-  },
-  lineSlot: {
-    paddingInlineStart: `calc(${spacing['--space-7']} + ${spacing['--space-2-5']} + ${spacing['--space-0-5']})`,
+    marginBottom: spacing['--space-0-5'],
   },
 })

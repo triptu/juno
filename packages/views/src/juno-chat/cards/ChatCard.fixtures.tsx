@@ -42,7 +42,6 @@ const card = (value: Card, frame?: FixtureFrame) => fixture<{ readonly card: Car
 
 const pr = { _tag: 'url', url: 'https://github.com/example/juno/pull/412', label: 'Open PR 412' } as const
 const thread = { _tag: 'url', url: 'https://t3.example/thread/1', label: 'Open' } as const
-const topic = { _tag: 'topic', topicId: 't:C0ENG:1' } as const
 
 /** Open, then working, then done: the footer keeps its height through every step. */
 function Settles({ make }: { readonly make: (step: 0 | 1 | 2) => Card }) {
@@ -68,9 +67,8 @@ export const sendMessageCard = defineFixtures(
       sending: card(sendMessage('s3', working, [results.sending, results.sending])),
       sent: card(sendMessage('s4', done('Sent'), [results.sent])),
       'sent-three': card(sendMessage('s5', done('Sent 3'), [results.sent, results.sent, results.sent])),
-      'sent-one-of-three': card(sendMessage('s6', done('Sent 1 of 3'), [results.sent, results.notSent, results.unknown])),
-      'not-sent': card(sendMessage('s7', failed('Not sent', true, true), [results.notSent])),
-      'cannot-tell': card(sendMessage('s8', { _tag: 'unknown', line: "Juno can't tell whether this was sent.", check: topic, mayDuplicate: true }, [results.unknown])),
+      'sent-one-of-three': card(sendMessage('s6', done('Sent 1 of 3'), [results.sent, results.failed, results.failed])),
+      failed: card(sendMessage('s7', failed('Failed'), [results.failed])),
       because: card(sendMessage('s9', open, [results.pending], { because: 'a message from #eng was in this reply' })),
       'may-have-happened': card(sendMessage('s10', mayHaveHappened)),
       dismissed: card(sendMessage('s11', dismissed)),
@@ -111,13 +109,11 @@ export const taskCard = defineFixtures(
     'Task': {
       running: card(task('k1', 'running', { state: 'Tests running, 2 of 5', open: thread })),
       'needs-you': card(task('k2', 'needsYou', { state: 'Waiting for your answer', open: thread })),
-      quiet: card(task('k3', 'quiet', { open: thread })),
       'lost-sight': card(task('k4', 'lostSight', { open: thread })),
       stopping: card(task('k5', 'stopping', { open: thread })),
       done: card(task('k6', 'done', { open: pr })),
       failed: card(task('k7', 'failed')),
       stopped: card(task('k8', 'stopped')),
-      unknown: card(task('k9', 'unknown', { open: thread })),
       subagent: card(task('k10', 'running', { kind: 'subagent', where: 'Claude Haiku 5.5', state: 'Reading 12 topics' })),
       because: card(task('k11', 'running', { state: 'Tests running', because: 'a report from T3 Code was in this reply' })),
     },
@@ -131,7 +127,7 @@ export const proposedTaskCard = defineFixtures(
     'Proposed task': {
       open: card(proposedTask('p1')),
       started: card(proposedTask('p2', done('Started'))),
-      failed: card(proposedTask('p3', failed('Could not start. T3 Code did not answer.'))),
+      failed: card(proposedTask('p3', failed('Failed'))),
     },
   },
   frame,
@@ -193,7 +189,7 @@ export const changeCard = defineFixtures(
       open: card(change('c1')),
       'long-field': card(change('c2', open, true)),
       applied: card(change('c3', done('Applied', { open: { _tag: 'url', url: 'https://notion.example/offsite', label: 'Open' } }))),
-      failed: card(change('c4', failed('Not applied. Notion did not answer.'))),
+      failed: card(change('c4', failed('Failed'))),
     },
   },
   frame,
@@ -248,7 +244,7 @@ export const chatCard = defineFixtures(
     'Shift': {
       'resolve-settles': scene(() => <Settles make={(step) => resolve('x1', step === 0 ? open : step === 1 ? working : done('Resolved 2', { undo: true }))} />),
       'send-settles': scene(() => <Settles make={(step) => sendMessage('x2', step === 0 ? open : step === 1 ? working : done('Sent 2'), step === 0 ? [results.pending, results.pending] : step === 1 ? [results.sending, results.sending] : [results.sent, results.sent])} />),
-      'send-fails': scene(() => <Settles make={(step) => sendMessage('x3', step === 0 ? open : step === 1 ? working : failed('Not sent', true, true), step === 0 ? [results.pending] : step === 1 ? [results.sending] : [results.notSent])} />),
+      'send-fails': scene(() => <Settles make={(step) => sendMessage('x3', step === 0 ? open : step === 1 ? working : failed('Failed'), step === 0 ? [results.pending] : step === 1 ? [results.sending] : [results.failed])} />),
       'task-state-changes': scene(() => <Settles make={(step) => task('x4', step === 2 ? 'done' : 'running', step === 2 ? { open: pr } : { state: step === 0 ? 'Tests running, 2 of 5' : 'Opening the pull request', open: thread })} />),
       'question-settles': scene(() => <Settles make={(step) => question('x5', 'juno', true, step === 0 ? open : step === 1 ? working : done('You chose Keep both'))} />),
     },

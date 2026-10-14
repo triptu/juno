@@ -6,7 +6,7 @@ module actionsProtocol {
   type Payload = { connection: int, account: int, destination: int, tool: int,
     schema: int, args: int, precondition: int, ops: List[int] }
   type Intent = { id: int, rev: int, payload: Payload, tier: int, deduped: bool, source: int }
-  type Approval = { id: int, child: int, rev: int, digest: Payload, warning: bool, batch: int }
+  type Approval = { id: int, child: int, rev: int, digest: Payload, batch: int }
   type Authorization = { id: int, intent: Intent, approval: int, consumed: bool, epoch: int, grant: bool }
   type Attempt = { id: int, auth: int, child: int, payload: Payload, key: int }
   type Receipt = { attempt: int, child: int, payload: Payload }
@@ -23,7 +23,7 @@ module actionsProtocol {
     unknown: Set[int], failed: Set[int], explained: Set[int], cancelled: Set[int], cancelRequested: bool,
     nextAuth: int, nextApproval: int, schema: int, account: int, connection: int, precondition: int,
     invalid: bool, expired: bool, gen: int, epoch: int, localEpoch: int, active: bool,
-    paused: bool, off: bool, stopped: bool, crashed: bool, resumed: bool,
+    paused: bool, off: bool, crashed: bool, resumed: bool,
     ownerRun: bool, clean: bool, sourceInRun: bool, grants: Set[Grant],
     schedule: bool, scheduleRev: int, scheduleAuthority: str, scheduleProposal: int, scheduleApproved: int, wake: Occurrence,
     queued: bool, admissions: List[Occurrence], starts: List[Occurrence],
@@ -48,7 +48,7 @@ module actionsProtocol {
     failed: Set(), explained: Set(), cancelled: Set(), cancelRequested: false,
     nextAuth: 1, nextApproval: 1, schema: 1, account: 1, connection: 1, precondition: 1,
     invalid: false, expired: false, gen: 0, epoch: 1, localEpoch: 1, active: true,
-    paused: false, off: false, stopped: false, crashed: false, resumed: false,
+    paused: false, off: false, crashed: false, resumed: false,
     ownerRun: true, clean: true, sourceInRun: true, grants: Set(),
     schedule: false, scheduleRev: 1, scheduleAuthority: "none", scheduleProposal: 0, scheduleApproved: 0,
     wake: { schedule: 1, rev: 1, due: 1 }, queued: false, admissions: List(), starts: List(),
@@ -66,7 +66,7 @@ module actionsProtocol {
   def valid(i: Intent): bool = i.rev == s.current.get(i.id) and not(s.invalid) and not(s.expired) and
     i.source == s.gen and i.payload.schema == s.schema and i.payload.account == s.account and
     i.payload.connection == s.connection and i.payload.precondition == s.precondition
-  val mayAuthorize = s.active and s.epoch == s.localEpoch and not(s.paused or s.off or s.stopped or s.crashed)
+  val mayAuthorize = s.active and s.epoch == s.localEpoch and not(s.paused or s.off or s.crashed)
   def liveGrant(k: int): bool = s.grants.exists(g => g.target == k and g.opClass == 2 and g.source == s.gen)
   action idle = s' = { ...s, label: "blocked" }
   action propose(k: int, tier: int, deduped: bool): bool = {
@@ -78,10 +78,13 @@ module actionsProtocol {
   }
   // A click identifies one immutable child. A batch click is the ordered
   // expansion into these child clicks, never a reusable batch transport token.
-  action click(k: int, warning: bool): bool = {
+  // A card runs once and has no retry button, so a click on a child that was
+  // already authorized is never honoured unless its destination deduplicates
+  // (`noRepeatAuthorization`). The owner asks Juno for a new card instead.
+  action click(k: int): bool = {
     nondet i = currentIntent(k).oneOf()
     s' = { ...s, approvals: s.approvals.union(Set({ id: s.nextApproval, child: k,
-      rev: i.rev, digest: i.payload, warning: warning, batch: 0 })), nextApproval: s.nextApproval + 1,
+      rev: i.rev, digest: i.payload, batch: 0 })), nextApproval: s.nextApproval + 1,
       label: "click", target: k }
   }
   action clickBatch = {
@@ -89,8 +92,8 @@ module actionsProtocol {
     nondet second = currentIntent(1).oneOf()
     if (s.batchId != 0) idle else s' = { ...s, batchId: s.nextApproval, batchOrder: List(first, second),
       approvals: s.approvals.union(Set(
-        { id: s.nextApproval, child: 0, rev: first.rev, digest: first.payload, warning: false, batch: s.nextApproval },
-        { id: s.nextApproval + 1, child: 1, rev: second.rev, digest: second.payload, warning: false, batch: s.nextApproval })),
+        { id: s.nextApproval, child: 0, rev: first.rev, digest: first.payload, batch: s.nextApproval },
+        { id: s.nextApproval + 1, child: 1, rev: second.rev, digest: second.payload, batch: s.nextApproval })),
       nextApproval: s.nextApproval + 2, label: "clickBatch" }
   }
   action expandBatch = s' = { ...s, expanded: s.batchOrder, label: "expandBatch" }
@@ -102,7 +105,7 @@ module actionsProtocol {
       (a.batch == 0 or bug == "batchOrder" or s.expanded == s.batchOrder) and
       (bug == "edit" or (a.rev == i.rev and a.digest == i.payload)) and
       (bug == "reuse" or not(used.contains(a.id))) and
-      (bug == "retry" or not(s.auths.exists(a => a.intent.id == k)) or a.warning or i.deduped))
+      (bug == "retry" or not(s.auths.exists(a => a.intent.id == k)) or i.deduped))
     val grant = i.tier == 2 and s.ownerRun and s.clean and liveGrant(k)
     val allowed = (mayAuthorize or bug == "owner" or bug == "pause") and
       (valid(i) or bug == "current") and
@@ -172,7 +175,7 @@ module actionsProtocol {
     unknown: s.unknown.union(s.auths.filter(a => not(done(a.intent.id)) and
       not(s.cancelled.contains(a.id)) and not(s.failed.contains(a.id))).map(a => a.id)), label: "startup" }
   action pause(kind: str): bool = s' = { ...s, paused: kind == "pause" or s.paused,
-    off: kind == "off" or s.off, stopped: kind == "stop" or s.stopped,
+    off: kind == "off" or s.off,
     grants: Set(), schedule: false, cancelRequested: true, label: "pause" }
   action cancel(guard: bool): bool = s' = { ...s,
     cancelled: s.cancelled.union(s.auths.filter(a => not(sent(a.id))).map(a => a.id)),
@@ -296,9 +299,10 @@ module actionsProtocol {
   val approvalConsumption = s.auths.forall(a => a.consumed) and s.auths.forall(a => a.approval == 0 or
     s.auths.filter(b => b.approval == a.approval).size() <= 1) and before.auths.subseteq(s.auths)
   val noHiddenRetry = s.auths.forall(a => s.attempts.select(t => t.auth == a.id).length() <= 1)
-  val retryRequiresAuthority = newAuths.forall(a => a.intent.deduped or
-    not(before.auths.exists(b => b.intent.id == a.intent.id)) or
-    before.approvals.exists(p => p.id == a.approval and p.warning and not(before.auths.exists(b => b.approval == p.id))))
+  // A child whose destination does not deduplicate is authorized at most once,
+  // whatever happened to the first attempt: rejected, cancelled or unknown.
+  val noRepeatAuthorization = newAuths.forall(a => a.intent.deduped or
+    not(before.auths.exists(b => b.intent.id == a.intent.id)))
   val unknownPreserved = (s.label == "negative" implies before.unknown.subseteq(s.unknown)) and
     (s.label == "startup" implies s.auths.forall(a => evidenced(a.id) or s.failed.contains(a.id) or s.cancelled.contains(a.id) or s.unknown.contains(a.id)))
   val dedupeIdentityStable = s.attempts.listSet().forall(t => s.auths.exists(a => a.id == t.auth and
@@ -319,7 +323,7 @@ module actionsProtocol {
   // This is the local ownership authority only. WP4 deliberately disproves
   // the stronger cross-device interpretation without an external fence.
   val currentOwnerAuthorizes = newAuths.forall(a => before.active and a.epoch == before.epoch)
-  val pauseBlocksAuthorization = newAuths.isEmpty() or not(before.paused or before.off or before.stopped)
+  val pauseBlocksAuthorization = newAuths.isEmpty() or not(before.paused or before.off)
   val quietHoursHoldNotifications = s.notifications == before.notifications or (not(before.off) and (not(before.quiet) or before.deliverNow))
   val scheduleGrantValid = not(s.schedule) or scheduleValid
   val occurrenceAdmissionOnce = s.admissions.listSet().forall(w => s.admissions.select(v => v == w).length() == 1)
@@ -350,7 +354,7 @@ module actionsProtocol {
   val oneRaisePerClick = s.raiseLog.indices().forall(i => s.raiseLog.indices().forall(j =>
     i == j or s.raiseLog.nth(i).click != s.raiseLog.nth(j).click))
   val safety = intentBeforeDispatch and approvalExact and approvalCurrentAtAuthorization and approvalConsumption and
-    noHiddenRetry and retryRequiresAuthority and unknownPreserved and dedupeIdentityStable and dedupedEffectOnce and
+    noHiddenRetry and noRepeatAuthorization and unknownPreserved and dedupeIdentityStable and dedupedEffectOnce and
     receiptMatchesAction and scopedNoClickGrant and untrustedCannotGrant and tier4NeverDispatched and allWritesGated and
     currentOwnerAuthorizes and pauseBlocksAuthorization and quietHoursHoldNotifications and scheduleGrantValid and
     occurrenceAdmissionOnce and cancelWinsBeforeAdmission and batchEffectsIndependent and outcomeEvidenceStable and
@@ -358,7 +362,7 @@ module actionsProtocol {
 
   val pendingApproved = ids.filter(k => not(done(k)) and currentIntent(k).exists(i => valid(i) and
     s.approvals.exists(p => p.child == k and p.rev == i.rev and p.digest == i.payload and
-      (p.batch == 0 or s.expanded == s.batchOrder) and not(s.auths.exists(a => a.approval == p.id)) and (not(s.auths.exists(a => a.intent.id == k)) or p.warning or i.deduped))))
+      (p.batch == 0 or s.expanded == s.batchOrder) and not(s.auths.exists(a => a.approval == p.id)) and (not(s.auths.exists(a => a.intent.id == k)) or i.deduped))))
   val unsettled = s.auths.filter(a => not(evidenced(a.id)) and not(s.unknown.contains(a.id)) and not(s.cancelled.contains(a.id)) and not(s.failed.contains(a.id)))
   val wakeDue = s.queued and scheduleValid and s.wake.rev == s.scheduleRev and not(s.admissions.listSet().contains(s.wake))
   val settled = not(s.crashed) and unsettled.isEmpty() and s.unknown.subseteq(s.explained) and
@@ -386,7 +390,7 @@ module actionsProtocol {
   action input = {
     nondet k = ids.oneOf()
     any { all { s.current.get(k) == 0, propose(k, 3, false) },
-      all { currentIntent(k) != Set(), s.nextApproval < 5, click(k, true) },
+      all { currentIntent(k) != Set(), s.nextApproval < 5, click(k) },
       authorizeDispatch(k), transportSend(k), destinationAccept(k), recordReceipt(k), lose(k), reject(k), reconcile(k, true, true),
       crash, startup(true), pause("pause"), cancel(true), taint(true), grantWith(k, true),
       proposeSchedule, clickSchedule, scheduleFromClick(true), scheduleWith(true), queueWake, deleteSchedule, admitWake(""), startWake(true),
@@ -415,8 +419,7 @@ module actionsProtocol {
     if (op == "clickBatch") clickBatch else
     if (op == "expandBatch") expandBatch else
     if (op == "reorderBatch") reorderBatch else
-    if (op == "click") click(k, false) else
-    if (op == "retryClick") click(k, true) else
+    if (op == "click") click(k) else
     if (op == "authorize") authorizeWith(k, bug) else
     if (op == "send") sendWith(k, bug) else
     if (op == "accept") acceptWith(k, bug != "dedupe") else
@@ -425,7 +428,7 @@ module actionsProtocol {
     if (op == "negative") reconcile(k, false, bug != "negative") else
     if (op == "crash") crash else
     if (op == "startup") { if (bug == "childEvidence") startupByChild else startup(bug != "startup") } else
-    if (op == "pause" or op == "off" or op == "stop") pause(op) else
+    if (op == "pause" or op == "off") pause(op) else
     if (op == "cancel") cancel(bug != "evidence") else
     if (op == "report") taint(true) else
     if (op == "wakeRun") taint(false) else
@@ -490,7 +493,8 @@ module actionsProtocol {
   pure val consumeBeforeSend = List(c("propose", 0), c("click", 0), c("authorize", 0), c("send", 0))
   action consumeBeforeSendStep = script(consumeBeforeSend, "")
   action consumeBeforeSendBugStep = script(consumeBeforeSend, "consume")
-  pure val approvalReuse = List(c("propose", 0), c("retryClick", 0), c("authorize", 0), c("authorize", 0))
+  // A second authorization needs a deduplicating destination; only then can a used approval be reused.
+  pure val approvalReuse = List(c("deduped", 0), c("click", 0), c("authorize", 0), c("authorize", 0))
   action approvalReuseStep = script(approvalReuse, "")
   action approvalReuseBugStep = script(approvalReuse, "reuse")
   pure val startupAttempt = List(c("propose", 0), c("click", 0), c("authorize", 0), c("crash", 0), c("startup", 0))
@@ -526,9 +530,6 @@ module actionsProtocol {
   pure val pauseRace = List(c("propose", 0), c("click", 0), c("pause", 0), c("authorize", 0))
   action pauseRaceStep = script(pauseRace, "")
   action pauseRaceBugStep = script(pauseRace, "pause")
-  pure val stopRace = List(c("propose", 0), c("click", 0), c("stop", 0), c("authorize", 0))
-  action stopRaceStep = script(stopRace, "")
-  action stopRaceBugStep = script(stopRace, "pause")
   pure val offRace = List(c("propose", 0), c("click", 0), c("off", 0), c("authorize", 0))
   action offRaceStep = script(offRace, "")
   action offRaceBugStep = script(offRace, "pause")
@@ -552,10 +553,10 @@ module actionsProtocol {
     c("authorize", 1), c("send", 1), c("accept", 1), c("receipt", 1), c("authorize", 0))
   action partialBatchStep = script(partialBatch, "")
   action partialBatchBugStep = script(partialBatch, "batch")
-  pure val dedupeKey = List(c("deduped", 0), c("click", 0), c("authorize", 0), c("send", 0), c("accept", 0), c("lose", 0), c("retryClick", 0), c("authorize", 0), c("send", 0), c("accept", 0))
+  pure val dedupeKey = List(c("deduped", 0), c("click", 0), c("authorize", 0), c("send", 0), c("accept", 0), c("lose", 0), c("click", 0), c("authorize", 0), c("send", 0), c("accept", 0))
   action dedupeKeyStep = script(dedupeKey, "")
   action dedupeKeyBugStep = script(dedupeKey, "key")
-  pure val dedupeAccept = List(c("deduped", 0), c("click", 0), c("authorize", 0), c("send", 0), c("accept", 0), c("lose", 0), c("retryClick", 0), c("authorize", 0), c("send", 0), c("accept", 0))
+  pure val dedupeAccept = List(c("deduped", 0), c("click", 0), c("authorize", 0), c("send", 0), c("accept", 0), c("lose", 0), c("click", 0), c("authorize", 0), c("send", 0), c("accept", 0))
   action dedupeAcceptStep = script(dedupeAccept, "")
   action dedupeAcceptBugStep = script(dedupeAccept, "dedupe")
   pure val parallelBudget = List(c("reserve", 0), c("reserve", 0), c("reserve", 0), c("reserve", 0), c("reserve", 1))
@@ -612,8 +613,9 @@ module actionsProtocol {
   pure val pauseDrain = List(c("propose", 0), c("click", 0), c("authorize", 0), c("pause", 0))
   action pauseDrainStep = script(pauseDrain, "")
   action pauseDrainBugStep = script(pauseDrain, "drain")
-  pure val attemptEvidence = List(c("propose", 0), c("click", 0), c("authorize", 0), c("send", 0), c("accept", 0),
-    c("lose", 0), c("retryClick", 0), c("authorize", 0), c("send", 0), c("receipt", 0), c("crash", 0), c("startup", 0))
+  // Two attempts of one child need a destination that deduplicates; any other child is authorized once.
+  pure val attemptEvidence = List(c("deduped", 0), c("click", 0), c("authorize", 0), c("send", 0), c("accept", 0),
+    c("lose", 0), c("click", 0), c("authorize", 0), c("send", 0), c("receipt", 0), c("crash", 0), c("startup", 0))
   action attemptEvidenceStep = script(attemptEvidence, "")
   action attemptEvidenceBugStep = script(attemptEvidence, "childEvidence")
   pure val batchOrderRace = List(c("propose", 0), c("propose", 1), c("clickBatch", 0), c("expandBatch", 0), c("reorderBatch", 0), c("authorize", 0))
@@ -623,8 +625,8 @@ module actionsProtocol {
     c("proposeSchedule", 0), c("scheduleClick", 0))
   action clickedScheduleStep = script(clickedSchedule, "")
   action clickedScheduleBugStep = script(clickedSchedule, "scheduleClick")
-  action suiteInit = { nondet which = 0.to(48).oneOf(); all { s' = initial, before' = initial, pc' = 0, remaining' = drainLimit, scenario' = which } }
-  val suiteCommands = List(negativeLookup, unknownRetry, hiddenRetry, approvalEdit, schemaRace, accountRace, connectionRace, preconditionRace, expireRace, redactRace, consumeBeforeSend, approvalReuse, startupAttempt, payloadBinding, receiptBinding, scopedGrant, reportGrant, reportLaunch, reportSchedule, wakeSchedule, destructive, ownerRace, pauseRace, stopRace, offRace, quietNotification, cancelWake, cancelQueuedWake, duplicateWake, lateCancel, partialBatch, dedupeKey, dedupeAccept, parallelBudget, unknownSpend, compactionBudget, unknownDrain, approvedDrain, wakeDrain, pauseDrain, attemptEvidence, batchOrderRace, clickedSchedule,
+  action suiteInit = { nondet which = 0.to(47).oneOf(); all { s' = initial, before' = initial, pc' = 0, remaining' = drainLimit, scenario' = which } }
+  val suiteCommands = List(negativeLookup, unknownRetry, hiddenRetry, approvalEdit, schemaRace, accountRace, connectionRace, preconditionRace, expireRace, redactRace, consumeBeforeSend, approvalReuse, startupAttempt, payloadBinding, receiptBinding, scopedGrant, reportGrant, reportLaunch, reportSchedule, wakeSchedule, destructive, ownerRace, pauseRace, offRace, quietNotification, cancelWake, cancelQueuedWake, duplicateWake, lateCancel, partialBatch, dedupeKey, dedupeAccept, parallelBudget, unknownSpend, compactionBudget, unknownDrain, approvedDrain, wakeDrain, pauseDrain, attemptEvidence, batchOrderRace, clickedSchedule,
     compactionSettle, refusedSpend, dailyReset, raiseClick, overReportCap, capReached).nth(scenario)
   action suiteStep = script(suiteCommands, "")
   val case0 = scenario == 0 and reachedAgreement and (s.unknown == Set(1) and s.explained == Set(1))
@@ -652,32 +654,31 @@ module actionsProtocol {
   val case22 = scenario == 22 and reachedAgreement
   val case23 = scenario == 23 and reachedAgreement
   val case24 = scenario == 24 and reachedAgreement
-  val case25 = scenario == 25 and reachedAgreement
-  val case26 = scenario == 26 and reachedAgreement and (s.admissions.length() == 0)
-  val case27 = scenario == 27 and reachedAgreement and (s.starts.length() == 0)
-  val case28 = scenario == 28 and reachedAgreement and (s.admissions.length() == 1)
-  val case29 = scenario == 29 and reachedAgreement and (s.receipts.size() == 1)
-  val case30 = scenario == 30 and reachedAgreement and (s.effects.get(0) == 1 and s.effects.get(1) == 1)
+  val case25 = scenario == 25 and reachedAgreement and (s.admissions.length() == 0)
+  val case26 = scenario == 26 and reachedAgreement and (s.starts.length() == 0)
+  val case27 = scenario == 27 and reachedAgreement and (s.admissions.length() == 1)
+  val case28 = scenario == 28 and reachedAgreement and (s.receipts.size() == 1)
+  val case29 = scenario == 29 and reachedAgreement and (s.effects.get(0) == 1 and s.effects.get(1) == 1)
+  val case30 = scenario == 30 and reachedAgreement and (s.effects.get(0) == 1 and s.attempts.length() == 2)
   val case31 = scenario == 31 and reachedAgreement and (s.effects.get(0) == 1 and s.attempts.length() == 2)
-  val case32 = scenario == 32 and reachedAgreement and (s.effects.get(0) == 1 and s.attempts.length() == 2)
+  val case32 = scenario == 32 and reachedAgreement
   val case33 = scenario == 33 and reachedAgreement
   val case34 = scenario == 34 and reachedAgreement
-  val case35 = scenario == 35 and reachedAgreement
-  val case36 = scenario == 36 and reachedAgreement and (s.unknown.subseteq(s.explained))
-  val case37 = scenario == 37 and reachedAgreement and (s.attempts.length() == 1)
-  val case38 = scenario == 38 and reachedAgreement and (s.admissions.length() == 1)
-  val case39 = scenario == 39 and reachedAgreement and (s.cancelled == Set(1))
-  val case40 = scenario == 40 and reachedAgreement and s.unknown == Set(2) and s.receipts.size() == 1
-  val case41 = scenario == 41 and reachedAgreement and s.auths == Set()
-  val case42 = scenario == 42 and reachedAgreement and not(s.schedule)
-  val case43 = scenario == 43 and reachedAgreement and s.spends.size() == 1 and compactionOn(0, "") == 1 and actualOn(0) == 1
-  val case44 = scenario == 44 and reachedAgreement and s.spends.size() == 5 and reservedOn(0) == 8 and
+  val case35 = scenario == 35 and reachedAgreement and (s.unknown.subseteq(s.explained))
+  val case36 = scenario == 36 and reachedAgreement and (s.attempts.length() == 1)
+  val case37 = scenario == 37 and reachedAgreement and (s.admissions.length() == 1)
+  val case38 = scenario == 38 and reachedAgreement and (s.cancelled == Set(1))
+  val case39 = scenario == 39 and reachedAgreement and s.unknown == Set(2) and s.receipts.size() == 1
+  val case40 = scenario == 40 and reachedAgreement and s.auths == Set()
+  val case41 = scenario == 41 and reachedAgreement and not(s.schedule)
+  val case42 = scenario == 42 and reachedAgreement and s.spends.size() == 1 and compactionOn(0, "") == 1 and actualOn(0) == 1
+  val case43 = scenario == 43 and reachedAgreement and s.spends.size() == 5 and reservedOn(0) == 8 and
     s.spends.exists(r => r.id == 1 and r.state == "settled" and r.actual == 0) and s.spends.exists(r => r.id == 2 and r.state == "unknown")
-  val case45 = scenario == 45 and reachedAgreement and reservedOn(1) == 8 and reservedOn(0) == 6 and actualOn(0) == 1 and
+  val case44 = scenario == 44 and reachedAgreement and reservedOn(1) == 8 and reservedOn(0) == 6 and actualOn(0) == 1 and
     s.spends.exists(r => r.id == 1 and r.state == "unknown" and r.day == 0)
-  val case46 = scenario == 46 and reachedAgreement and s.spends.size() == 6 and s.raiseLog.length() == 1 and reservedOn(0) == 12
-  val case47 = scenario == 47 and reachedAgreement and s.spends.size() == 4 and totalOn(0) == 9 and overReportOn(0, false) == 1
-  val case48 = scenario == 48 and reachedAgreement and s.spends.size() == 4 and totalOn(0) == 8
+  val case45 = scenario == 45 and reachedAgreement and s.spends.size() == 6 and s.raiseLog.length() == 1 and reservedOn(0) == 12
+  val case46 = scenario == 46 and reachedAgreement and s.spends.size() == 4 and totalOn(0) == 9 and overReportOn(0, false) == 1
+  val case47 = scenario == 47 and reachedAgreement and s.spends.size() == 4 and totalOn(0) == 8
   action clickedScheduleWitnessStep = script(List(c("report", 0), c("proposeSchedule", 0),
     c("clickSchedule", 0), c("scheduleClick", 0)), "")
   val clickedScheduleCreated = reachedAgreement and s.schedule and s.scheduleAuthority == "click"
@@ -685,13 +686,13 @@ module actionsProtocol {
     c("grantClick", 0), c("authorize", 0), c("send", 0), c("accept", 0), c("receipt", 0)), "")
   action boundedStep = tick(any {
     all { s.current.get(0) == 0, propose(0, 3, false) },
-    all { currentIntent(0) != Set(), s.nextApproval < 3, click(0, false) },
+    all { currentIntent(0) != Set(), s.nextApproval < 3, click(0) },
     authorizeDispatch(0), transportSend(0), crash, startup(true), pause("pause")
   })
   val boundedSafety = intentBeforeDispatch and approvalExact and approvalConsumption and
     noHiddenRetry and allWritesGated and pauseBlocksAuthorization and unknownPreserved
   action boundedRace(guard: bool): bool = tick(
-    if (pc == 0) propose(0, 3, false) else if (pc == 1) click(0, false) else
+    if (pc == 0) propose(0, 3, false) else if (pc == 1) click(0) else
     if (pc == 2) pause("pause") else if (pc == 3) authorizeWith(0, if (guard) "" else "pause") else idle)
   action boundedRaceStep = boundedRace(true)
   action boundedRaceBugStep = boundedRace(false)

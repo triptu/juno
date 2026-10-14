@@ -21,7 +21,7 @@ export interface Rendered {
 /** A chunk is at most 16 KB (§4.1): the memory's source limit. */
 export const CHUNK_BYTES = 16_384
 
-const inputKinds: Record<InboxKind, MessageKind> = { send: 'user', steer: 'user', retry: 'user', click: 'card', wake: 'wake', report: 'work' }
+const inputKinds: Record<InboxKind, MessageKind> = { send: 'user', steer: 'user', retry: 'user', react: 'user', click: 'card', wake: 'wake', report: 'work' }
 
 type Part = { readonly type?: string; readonly text?: string; readonly name?: string; readonly arguments?: unknown; readonly toolName?: string }
 type Message = { readonly role?: string; readonly content?: string | ReadonlyArray<Part>; readonly toolName?: string; readonly timestamp?: number }

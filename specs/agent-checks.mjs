@@ -1,7 +1,7 @@
 // Directed pairs; corrected schedules also check every invariant.
 export const actionCases = [
   ['negativeLookup', 'unknownPreserved'],
-  ['unknownRetry', 'retryRequiresAuthority'],
+  ['unknownRetry', 'noRepeatAuthorization'],
   ['hiddenRetry', 'noHiddenRetry'],
   ['approvalEdit', 'approvalExact'],
   ['schemaRace', 'approvalCurrentAtAuthorization'],
@@ -23,7 +23,6 @@ export const actionCases = [
   ['destructive', 'tier4NeverDispatched'],
   ['ownerRace', 'currentOwnerAuthorizes'],
   ['pauseRace', 'pauseBlocksAuthorization'],
-  ['stopRace', 'pauseBlocksAuthorization'],
   ['offRace', 'pauseBlocksAuthorization'],
   ['quietNotification', 'quietHoursHoldNotifications'],
   ['cancelWake', 'cancelWinsBeforeAdmission'],

@@ -1,7 +1,7 @@
 /**
  * The inbox (plan v3 §3; spec `acceptInput`, `acknowledge`, `markSubmitted`).
  *
- * An owner send, steer, retry, card click, wake or report is written here
+ * An owner send, steer, retry, reaction, card click, wake or report is written here
  * at FULL before it is acknowledged, so the renderer clears its pending
  * state only for input that survives power loss. "Not delivered" means this
  * write failed. Each op carries a stable `op_id` (UUIDv7, minted by the
@@ -12,14 +12,16 @@ import { transaction } from '../store/database'
 import { mode } from '../store/ledger'
 import type { Store } from '../store/store'
 
-export type InboxKind = 'send' | 'steer' | 'retry' | 'wake' | 'report' | 'click'
-export type InboxState = 'accepted' | 'submitted' | 'done' | 'interrupted' | 'stopped' | 'failed'
+export type InboxKind = 'send' | 'steer' | 'retry' | 'react' | 'wake' | 'report' | 'click'
+export type InboxState = 'accepted' | 'submitted' | 'done' | 'interrupted' | 'failed'
 
 export interface InboxOp {
   readonly seq: number
   readonly opId: string
   readonly kind: InboxKind
   readonly text: string
+  /** JSON: a reply's target, or a reaction's target and emoji. */
+  readonly data: string | null
   readonly at: number
   readonly state: InboxState
   readonly incarnation: string | null
@@ -50,7 +52,7 @@ export function accept(store: Store, input: { readonly opId: string; readonly ki
   return result
 }
 
-const columns = 'seq, op_id AS opId, kind, text, at, state, incarnation, submission_id AS submissionId, reason'
+const columns = 'seq, op_id AS opId, kind, text, data, at, state, incarnation, submission_id AS submissionId, reason'
 
 export function find(store: Store, opId: string): InboxOp | undefined {
   return store.db.prepare(`SELECT ${columns} FROM inbox WHERE op_id = ?`).get(opId) as InboxOp | undefined
@@ -80,7 +82,7 @@ export function markSubmitted(store: Store, opId: string, incarnation: string, s
 }
 
 /** The op's run ended. A settled op never changes again. */
-export function settle(store: Store, opId: string, state: 'done' | 'interrupted' | 'stopped' | 'failed', reason?: string): void {
+export function settle(store: Store, opId: string, state: 'done' | 'interrupted' | 'failed', reason?: string): void {
   transaction(store.db, () => {
     store.db
       .prepare("UPDATE inbox SET state = ?, reason = ?, ended_at = ? WHERE op_id = ? AND state IN ('accepted', 'submitted')")

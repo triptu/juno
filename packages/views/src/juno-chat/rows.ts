@@ -54,6 +54,10 @@ export const rowStyles = stylex.create({
     paddingInline: spacing['--space-3'],
     borderRadius: radii['--radius-bubble'],
   },
+  // A bubble or card that a reaction badge sits on.
+  anchor: {
+    position: 'relative',
+  },
   bubbleText: {
     whiteSpace: 'pre-wrap',
     overflowWrap: 'anywhere',

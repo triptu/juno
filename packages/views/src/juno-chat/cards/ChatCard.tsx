@@ -134,31 +134,8 @@ function AfterLine({ id, status, actions }: { readonly id: CardId; readonly stat
         </After>
       )
     case 'failed':
-      return (
-        <After>
-          {status.line}
-          {status.retry ? (
-            <>
-              {' · '}
-              <TextButton onClick={() => actions.onCard(id, { _tag: 'retry' })}>{chatCopy.ending.tryAgain}</TextButton>
-            </>
-          ) : null}
-          {status.mayDuplicate && status.retry ? <MayDuplicate /> : null}
-        </After>
-      )
-    case 'unknown':
-      return (
-        <After>
-          {status.line}
-          {status.check !== undefined ? (
-            <>
-              {' '}
-              <OpenButton target={status.check} actions={actions} label={copy.sendMessage.check} />
-            </>
-          ) : null}
-          {status.mayDuplicate ? <MayDuplicate /> : null}
-        </After>
-      )
+      // The card runs once: no retry and no "can't tell" row (SPEC 13.3).
+      return <After>{status.line}</After>
   }
 }
 
@@ -167,18 +144,6 @@ function After({ children }: { readonly children: ReactNode }) {
     <Text variant="meta" tone="muted" as="p" sx={styles.after}>
       {children}
     </Text>
-  )
-}
-
-/** "If the first try went through, this does it again." beside every retry of a non-deduplicated action. */
-export function MayDuplicate() {
-  return (
-    <>
-      {' '}
-      <Text variant="meta" tone="muted" as="span">
-        {chatCopy.card.mayDuplicate}
-      </Text>
-    </>
   )
 }
 

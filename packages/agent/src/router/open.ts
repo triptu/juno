@@ -50,9 +50,9 @@ import { uuidv7 } from '../store/store'
 import type { Pins } from '@juno/agent-memory'
 import type { RunState, TurnEvent } from './events'
 import { hostTools, type HostReads } from './host-tools'
-import { createRouter, type Retry } from './router'
+import { createRouter, type Input, type Queued, type Retry } from './router'
 import { TURNS_MIGRATIONS } from './schema'
-import { find, type Accept, type InboxKind, type InboxState } from '../inbox/inbox'
+import { find, type InboxState } from '../inbox/inbox'
 import { view, type MemoryView } from '../store/memory'
 import type { JournalPosition, Mode } from '../store/ledger'
 
@@ -89,8 +89,6 @@ export interface TurnsOptions {
   /** Other folders' migration sets. Spend, turns and jobs are always applied. */
   readonly migrations?: ReadonlyArray<MigrationSet>
   readonly now?: () => number
-  /** The quiet milestone of a job, 30 minutes by default. */
-  readonly quietMs?: number
   readonly onReport?: (error: unknown) => void
 }
 
@@ -103,12 +101,10 @@ export interface Turns {
   readonly incarnation: () => string
   /** The journal's last commit now. A tool reads it inside its `execute()` and passes it to `authorize` (WP15). */
   readonly position: () => Promise<JournalPosition>
-  /** Owner input, a report, a wake or a click. Durable before it returns; the same op again is a no-op. */
-  readonly accept: (input: { readonly opId: string; readonly kind: InboxKind; readonly text: string; readonly data?: unknown }) => Accept
+  /** A message (maybe a reply), a reaction, a report, a wake or a click. Durable before it returns; the same op again is a no-op. */
+  readonly accept: (input: Input) => Queued
   /** "Try again" on an interrupted or failed send. */
   readonly retry: (input: { readonly opId: string; readonly interruptedOpId: string }) => Retry
-  /** Stops run `runId` only. Its held input starts the next run. */
-  readonly stop: (runId: string) => Promise<void>
   readonly mode: () => Mode
   readonly setMode: (next: Mode) => void
   /** The live run, or undefined. */
@@ -193,11 +189,9 @@ async function start(
   let projection: ReturnType<typeof projector> | undefined
   let unsubscribe: () => void = noop
   let compactor: Compactor | undefined
-  const commitWaiters: Array<() => void> = []
   const session = {
     journal: () => journal!,
     catchUp: () => projection!.catchUp(),
-    nextCommit: () => new Promise<void>((resolve) => commitWaiters.push(resolve)),
   }
 
   const tools = () => [...memoryTools, ...jobTools, ...slackTools]
@@ -217,8 +211,7 @@ async function start(
   const jobs = createJobs({
     store,
     drivers: subagentModel ? [subagentDriver({ store, guard, builder, model: subagentModel })] : [],
-    accept: (input) => router.accept(input),
-    ...(options.quietMs !== undefined ? { quietMs: options.quietMs } : {}),
+    accept: (input) => router.message(input),
     ...(options.onReport ? { onReport: options.onReport } : {}),
   })
   const memoryTools = [
@@ -249,7 +242,6 @@ async function start(
     journal = next
     projection = projector(store, next)
     unsubscribe = next.onCommit(() => {
-      for (const resolve of commitWaiters.splice(0)) resolve()
       void projection!.catchUp().then(() => compactor?.poke(), options.onReport)
     })
   }
@@ -300,7 +292,6 @@ async function start(
     position: async () => ({ incarnation: journal!.incarnation, seq: await journal!.lastCommitted() }),
     accept: router.accept,
     retry: router.retry,
-    stop: router.stop,
     mode: router.mode,
     setMode: (next) => {
       router.setMode(next)

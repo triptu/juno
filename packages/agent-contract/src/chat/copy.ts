@@ -28,7 +28,6 @@ export const chatCopy = {
     newDivider: 'New',
   },
   delivery: {
-    queued: 'Queued',
     waiting: {
       network: 'Waiting for network',
       resume: 'Waiting for Resume',
@@ -40,7 +39,6 @@ export const chatCopy = {
   },
   /** One line per `Ending` variant. `interrupted` and `failed` add "Try again" when the ending carries a retry op. */
   ending: {
-    stopped: "Stopped. Juno won't start anything new for this reply.",
     interrupted: 'Juno was interrupted. Your message is kept.',
     blocked: {
       tooLarge: "Juno can't fit this in one request. Removing a pin or starting a smaller task helps.",
@@ -53,9 +51,6 @@ export const chatCopy = {
       offline: 'Juno lost the connection. Try again when you are back online.',
     },
     tryAgain: 'Try again',
-  },
-  status: {
-    stop: 'Stop',
   },
   note: {
     remembered: 'Remembered',
@@ -105,8 +100,8 @@ export const chatCopy = {
     unknownKind: 'This card needs a newer Juno',
     dismiss: 'Dismiss',
     may: 'This may already have happened.',
-    /** Beside every retry of an action whose destination does not deduplicate, whatever the first outcome (plan v3 §6.3). */
-    mayDuplicate: 'If the first try went through, this does it again.',
+    /** A row, or a whole card, that was rejected or that Juno could not confirm. No button follows it. */
+    failed: 'Failed',
     sendMessage: {
       send: 'Send',
       sent: 'Sent',
@@ -114,11 +109,7 @@ export const chatCopy = {
       sentCount: (sent: number) => (sent === 1 ? 'Sent' : `Sent ${sent}`),
       /** "Sent 1 of 3". */
       sentOf: (sent: number, of: number) => `Sent ${sent} of ${of}`,
-      notSent: 'Not sent',
       open: 'Open',
-      unknown: "Juno can't tell whether this was sent.",
-      check: 'Check channel',
-      sendAgain: 'Send again',
       /** "in {topic title}" beside a reply inside a thread. */
       inTopic: (title: string) => `in ${title}`,
     },
@@ -141,10 +132,8 @@ export const chatCopy = {
       showInActivity: 'Show in Activity',
       stopping: 'Stopping',
       stopped: 'Stopped',
-      unknown: "Juno can't tell whether this is running.",
       lostSight: 'Sign in to T3 Code to keep watching',
       signIn: 'Sign in',
-      quiet: "T3 Code has been quiet for 30 minutes. I'll keep watching, or you can stop it.",
     },
     question: {
       junoAsks: 'Juno asks',
@@ -201,6 +190,23 @@ export const chatCopy = {
     remove: 'Remove',
     keep: 'Keep',
   },
+  /** Reactions and replies. The emoji itself is content; these are the labels around it. */
+  react: {
+    react: 'React',
+    reply: 'Reply',
+    /** The sender beside a quote of a Juno bubble or card, and of one of yours. */
+    juno: 'Juno',
+    you: 'You',
+    /** The reaction picker's name and its field for any emoji (the system picker works there too). */
+    picker: 'Reactions',
+    anyEmoji: 'Any emoji',
+    /** A reaction's accessible name: "Reacted 🎉". */
+    reacted: (emoji: string) => `Reacted ${emoji}`,
+    /** The composer's close button on a quote. */
+    clearQuote: 'Remove quote',
+    /** A quote whose target was removed. */
+    removed: 'Removed',
+  },
   contextMenu: {
     copy: 'Copy',
     remember: 'Remember this',
@@ -208,7 +214,7 @@ export const chatCopy = {
   },
   pages: {
     activity: {
-      outcome: { replied: 'Replied', stopped: 'Stopped', interrupted: 'Interrupted', blocked: 'Blocked', failed: 'Failed', stayedQuiet: 'Stayed quiet' },
+      outcome: { replied: 'Replied', interrupted: 'Interrupted', blocked: 'Blocked', failed: 'Failed', stayedQuiet: 'Stayed quiet' },
       copyDetails: 'Copy details',
     },
     memory: { beingUpdated: 'being updated' },

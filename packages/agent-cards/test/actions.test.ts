@@ -1,7 +1,7 @@
 import { Schema } from 'effect'
 import { describe, expect, it } from 'vitest'
 import fc from 'fast-check'
-import { CardPayload, CardRecord, ChildEvidence, actionDigest, childOutcome, expandChildActions, retryChildren, toCard, transitionAttempt, transitionCard } from '@juno/agent-cards'
+import { CardPayload, CardRecord, ChildEvidence, actionDigest, childOutcome, expandChildActions, toCard, transitionAttempt, transitionCard, transitionJob } from '@juno/agent-cards'
 import { message, payloads } from './fixtures'
 
 const outcomes = fc.constantFrom('pending', 'sending', 'sent', 'notSent', 'unknown')
@@ -11,7 +11,7 @@ const evidenceFor = (child: ReturnType<typeof expandChildActions>[number], outco
 })
 
 describe('child actions and card status', () => {
-  it('expands the exact ordered immutable batch and retries only children without receipts', () => {
+  it('expands the exact ordered immutable batch and shows one result per row', () => {
     fc.assert(fc.property(fc.array(fc.tuple(fc.string(), outcomes), { minLength: 1, maxLength: 5 }), (rows) => {
       const payload = send(rows.map(([text]) => text))
       const children = expandChildActions(payload)
@@ -27,22 +27,20 @@ describe('child actions and card status', () => {
         expect(child.payload.preconditions).toEqual(message.preconditions)
       })
       expect(expandChildActions(Schema.decodeUnknownSync(CardPayload)(JSON.parse(JSON.stringify(payload))))).toEqual(children)
-      const retries = retryChildren(payload, evidence)
-      expect(retries.map((child) => child.id)).toEqual(rows.flatMap(([, outcome], i) => outcome === 'sent' ? [] : [`action-${i}`]))
-      retries.forEach((child) => expect(child.digest).toBe(actionDigest(child.payload)))
       const record = Schema.decodeUnknownSync(CardRecord)({ id: 'card', payload, createdAt: 0, sourceValid: true,
         status: { _tag: 'working' }, children: evidence })
       const view = toCard(record, 1)
       if (view._tag !== 'sendMessage') throw new Error('Expected send card')
-      const tags = rows.map(([, outcome]) => outcome)
+      // A rejection and an outcome Juno cannot confirm look the same on the card.
+      const tags = rows.map(([, outcome]) => outcome === 'notSent' || outcome === 'unknown' ? 'failed' : outcome)
       const sent = tags.filter((tag) => tag === 'sent').length
-      const expected = tags.includes('pending') || tags.includes('sending') ? 'working' : sent > 0 ? 'done' : tags.includes('unknown') ? 'unknown' : 'failed'
+      const expected = tags.includes('pending') || tags.includes('sending') ? 'working' : sent > 0 ? 'done' : 'failed'
       expect(view.status._tag).toBe(expected)
       expect(view.messages.map((m) => m.result._tag)).toEqual(tags)
     }))
   })
 
-  it('preserves receipts, uncertainty and repeat-click authority under arbitrary events', () => {
+  it('preserves receipts and uncertainty under arbitrary events', () => {
     fc.assert(fc.property(fc.array(fc.constantFrom('submit', 'receipt', 'reject', 'lost', 'negative', 'cancel', 'cancelled')), (events) => {
       let state: Parameters<typeof transitionAttempt>[0] = 'consumed'
       let receipt = false
@@ -54,10 +52,6 @@ describe('child actions and card status', () => {
         if (event === 'negative') expect(state).toBe(prior)
         if (!receipt && prior === 'submitted' && (event === 'cancel' || event === 'cancelled')) expect(state).toBe('unknown')
         if (prior === 'cancel-requested' && event === 'cancelled') expect(state).toBe('cancelled')
-        if (state === 'unknown') {
-          expect(transitionCard({ _tag: 'unknown', line: 'Unknown', mayDuplicate: true }, { _tag: 'click', duplicateWarning: false })._tag).toBe('unknown')
-          expect(transitionCard({ _tag: 'unknown', line: 'Unknown', mayDuplicate: true }, { _tag: 'click', duplicateWarning: true })._tag).toBe('working')
-        }
       }
       // attemptEvidence: a receipt for attempt 1 must not erase unknown attempt 2.
       const evidence = Schema.decodeUnknownSync(ChildEvidence)({ id: 'action', rev: 1, digest: '0'.repeat(64), attempts: [{ id: 'one', outcome: 'done' }, { id: 'two', outcome: state }] })
@@ -66,19 +60,27 @@ describe('child actions and card status', () => {
     }))
   })
 
-  it('asks for a warned retry exactly when the destination cannot recognise a repeat', () => {
-    for (const tag of ['failed', 'unknown'] as const) {
-      expect(transitionCard({ _tag: tag, line: 'Not sent', mayDuplicate: true }, { _tag: 'click', duplicateWarning: false })._tag).toBe(tag)
-      expect(transitionCard({ _tag: tag, line: 'Not sent', mayDuplicate: true }, { _tag: 'click', duplicateWarning: true })._tag).toBe('working')
-      expect(transitionCard({ _tag: tag, line: 'Not resolved' }, { _tag: 'click', duplicateWarning: false })._tag).toBe('working')
-    }
+  it('shows a send Juno cannot confirm as Failed, offers nothing to click, and turns Sent on later proof', () => {
     const payload = send(['one'])
     const [child] = expandChildActions(payload)
     if (child === undefined) throw new Error('Expected a child')
-    const record = Schema.decodeUnknownSync(CardRecord)({ id: 'card', payload, createdAt: 0, sourceValid: true, status: { _tag: 'working' }, children: [evidenceFor(child, 'notSent')] })
+    const record = Schema.decodeUnknownSync(CardRecord)({ id: 'card', payload, createdAt: 0, sourceValid: true, status: { _tag: 'working' }, children: [evidenceFor(child, 'unknown')] })
     const view = toCard(record, 1)
     if (view._tag !== 'sendMessage') throw new Error('Expected send card')
-    expect(view.status).toEqual({ _tag: 'failed', line: 'Not sent', retry: true, mayDuplicate: true })
+    expect(view.messages.map((m) => m.result)).toEqual([{ _tag: 'failed' }])
+    expect(view.status).toEqual({ _tag: 'failed', line: 'Failed' })
+    // The card runs once: a click on a settled card changes nothing, so it can never send again.
+    expect(transitionCard(view.status, { _tag: 'click' })).toEqual({ _tag: 'failed', line: 'Failed' })
+    expect(transitionCard({ _tag: 'open' }, { _tag: 'click' })).toEqual({ _tag: 'working' })
+    expect(transitionCard(view.status, { _tag: 'result', status: { _tag: 'done', line: 'Sent' } })).toEqual({ _tag: 'done', line: 'Sent' })
+  })
+
+  it('shows a job Juno cannot tell is running as failed, and running again on later proof', () => {
+    const payload = payloads.find((p) => p._tag === 'task')
+    if (payload === undefined) throw new Error('Expected a task payload')
+    const record = Schema.decodeUnknownSync(CardRecord)({ id: 'card', payload, createdAt: 0, sourceValid: true, job: { phase: transitionJob('running', 'unknown') } })
+    expect(toCard(record, 1)).toMatchObject({ _tag: 'task', phase: 'failed' })
+    expect(transitionJob('unknown', 'progress')).toBe('running')
   })
 
   it('projects every kind and expires only unconsumed proposals', () => {

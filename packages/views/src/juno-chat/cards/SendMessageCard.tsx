@@ -1,11 +1,10 @@
 import * as stylex from '@stylexjs/stylex'
 import { useState } from 'react'
-import { chatCopy, type ProposedMessage, type ProposedMessageId, type SendMessageCard as SendMessageCardModel } from '@juno/agent-contract'
+import { chatCopy, type ProposedMessage, type SendMessageCard as SendMessageCardModel } from '@juno/agent-contract'
 import { colors, radii, sizes, spacing, text } from '@juno/tokens/tokens.stylex'
 import { Button, ContextPill, Text, Textarea } from '@juno/ui'
 import type { ChatActions } from '../commands'
-import { TextButton } from '../TextButton'
-import { ChatCard, MayDuplicate, OpenButton, placeIconFor } from './ChatCard'
+import { ChatCard, OpenButton, placeIconFor } from './ChatCard'
 
 export interface SendMessageCardProps {
   readonly card: SendMessageCardModel
@@ -18,7 +17,9 @@ export interface SendMessageCardProps {
  * context pill for where it goes, "in {topic}" for a reply inside a
  * thread, and the text, editable until Send. After Send the text box keeps
  * its geometry and each row's result line fills the slot under it, so the
- * card never changes height as rows settle.
+ * card never changes height as rows settle. A row that failed, or that
+ * Juno could not confirm, says "Failed" and offers nothing: the card runs
+ * once, and the owner asks Juno for a new one.
  */
 export function SendMessageCard({ card, actions, enter }: SendMessageCardProps) {
   const [texts, setTexts] = useState<Readonly<Record<string, string>>>(() => Object.fromEntries(card.messages.map((m) => [m.id, m.text])))
@@ -47,7 +48,7 @@ export function SendMessageCard({ card, actions, enter }: SendMessageCardProps) 
     >
       <div role="list" {...stylex.props(styles.rows)}>
         {card.messages.map((message) => (
-          <Row key={message.id} message={message} text={texts[message.id] ?? message.text} editable={editable} inBox={inBox} onChange={(text) => setTexts((prev) => ({ ...prev, [message.id]: text }))} onSendRow={(id) => actions.onCard(card.id, { _tag: 'sendRow', messageId: id })} actions={actions} />
+          <Row key={message.id} message={message} text={texts[message.id] ?? message.text} editable={editable} inBox={inBox} onChange={(text) => setTexts((prev) => ({ ...prev, [message.id]: text }))} actions={actions} />
         ))}
       </div>
     </ChatCard>
@@ -60,7 +61,6 @@ function Row({
   editable,
   inBox,
   onChange,
-  onSendRow,
   actions,
 }: {
   readonly message: ProposedMessage
@@ -68,7 +68,6 @@ function Row({
   readonly editable: boolean
   readonly inBox: boolean
   readonly onChange: (text: string) => void
-  readonly onSendRow: (id: ProposedMessageId) => void
   readonly actions: ChatActions
   readonly enter?: boolean
 }) {
@@ -96,15 +95,9 @@ function Row({
           <Text variant="meta" tone="muted">
             {copy.sent} · <OpenButton target={result.open} actions={actions} />
           </Text>
-        ) : result._tag === 'notSent' ? (
+        ) : result._tag === 'failed' ? (
           <Text variant="meta" tone="muted">
-            {copy.notSent} · <TextButton onClick={() => onSendRow(message.id)}>{chatCopy.delivery.tryAgain}</TextButton>
-            <MayDuplicate />
-          </Text>
-        ) : result._tag === 'unknown' ? (
-          <Text variant="meta" tone="muted">
-            {copy.unknown} <OpenButton target={result.check} actions={actions} label={copy.check} /> · <TextButton onClick={() => onSendRow(message.id)}>{copy.sendAgain}</TextButton>
-            <MayDuplicate />
+            {chatCopy.card.failed}
           </Text>
         ) : null}
       </div>

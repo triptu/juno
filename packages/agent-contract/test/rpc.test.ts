@@ -5,7 +5,7 @@ import * as C from '@juno/agent-contract'
 const op = { opId: 'operation' }
 const accepted = op
 const identity = { cardId: 'card', revision: 1, digest: '0'.repeat(64) }
-const child = { actionId: 'action', revision: 1, digest: '0'.repeat(64), duplicateWarning: false }
+const child = { actionId: 'action', revision: 1, digest: '0'.repeat(64) }
 const card = { _tag: 'unknown', id: 'card', kind: 'future' }
 const window = { limit: 20 }
 const executable = { connection_id: 'connection', account_id: 'account', destination_ids: ['channel'], tool: 'slack.send', schema_hash: '0'.repeat(64), args: { text: 'Example' }, preconditions: {}, ops: [] }
@@ -18,7 +18,7 @@ const cases: Record<string, readonly [unknown, unknown]> = {
   'agent.chat.page': [{ window: { _tag: 'around', anchor: '1', before: 5, limit: 20 } }, { page: { items: [], banner: { _tag: 'none' }, moreAbove: true, moreBelow: true, composerEnabled: true }, cards: [], messages: [] }],
   'agent.chat.summary': [null, { unread: 1, busy: false }],
   'agent.chat.send': [{ ...op, text: 'Example' }, accepted],
-  'agent.chat.stop': [{ ...op, runId: 'run' }, accepted],
+  'agent.chat.react': [{ ...op, target: { _tag: 'bubble', id: 'run:0' }, emoji: '🎉' }, accepted],
   'agent.chat.retry': [{ ...op, interruptedOpId: 'previous' }, accepted],
   'agent.chat.read': [{ through: '1' }, undefined],
   'agent.chat.remove': [{ ...op, messageId: '1', alsoRemoveReply: true }, accepted],

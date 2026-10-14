@@ -69,16 +69,7 @@ export const CardStatus = Schema.Union([
   }),
   Schema.TaggedStruct('dismissed', {}),
   Schema.TaggedStruct('expired', {}),
-  Schema.TaggedStruct('failed', {
-    line: Schema.String,
-    retry: Schema.optionalKey(Schema.Literal(true)),
-    mayDuplicate: Schema.optionalKey(Schema.Literal(true)),
-  }),
-  Schema.TaggedStruct('unknown', {
-    line: Schema.String,
-    check: Schema.optionalKey(OpenTarget),
-    mayDuplicate: Schema.optionalKey(Schema.Literal(true)),
-  }),
+  Schema.TaggedStruct('failed', { line: Schema.String }),
 ])
 export type CardStatus = typeof CardStatus.Type
 const base = {
@@ -90,8 +81,7 @@ export const SendResult = Schema.Union([
   Schema.TaggedStruct('pending', {}),
   Schema.TaggedStruct('sending', {}),
   Schema.TaggedStruct('sent', { open: OpenTarget }),
-  Schema.TaggedStruct('notSent', {}),
-  Schema.TaggedStruct('unknown', { check: OpenTarget }),
+  Schema.TaggedStruct('failed', {}),
 ])
 export type SendResult = typeof SendResult.Type
 export const ProposedMessage = Schema.Struct({
@@ -113,8 +103,7 @@ export const sendMessageStatus = (messages: ReadonlyArray<ProposedMessage>): Car
   const sent = results.filter((r) => r === 'sent').length
   if (sent === messages.length) return { _tag: 'done', line: sent === 1 ? 'Sent' : `Sent ${sent}` }
   if (sent > 0) return { _tag: 'done', line: `Sent ${sent} of ${messages.length}` }
-  if (results.includes('unknown')) return { _tag: 'unknown', line: "Juno can't tell whether this was sent.", mayDuplicate: true }
-  return { _tag: 'failed', line: 'Not sent', retry: true, mayDuplicate: true }
+  return { _tag: 'failed', line: 'Failed' }
 }
 export const ResolveCard = Schema.TaggedStruct('resolve', {
   ...base,
@@ -138,13 +127,11 @@ export type ProposedTaskCard = typeof ProposedTaskCard.Type
 export const JobPhase = Schema.Literals([
   'running',
   'needsYou',
-  'quiet',
   'lostSight',
   'done',
   'failed',
   'stopping',
   'stopped',
-  'unknown',
 ])
 export type JobPhase = typeof JobPhase.Type
 export const TaskCard = Schema.TaggedStruct('task', {

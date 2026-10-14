@@ -1,6 +1,6 @@
 import { Schema } from 'effect'
 import { describe, expect, it } from 'vitest'
-import { OpenTarget, sendMessageStatus, type ProposedMessage } from '../src/index'
+import { Emoji, OpenTarget, sendMessageStatus, type ProposedMessage } from '../src/index'
 
 const decodeOpen = Schema.decodeUnknownSync(OpenTarget)
 
@@ -15,6 +15,16 @@ describe('OpenTarget url', () => {
     for (const url of ['file:///etc/passwd', 'javascript:alert(1)', 'x-juno://open', 'http://192.168.1.22:3773/mcp', 'http://localhost.evil.com/', 'https://', 'notaurl']) {
       expect(() => decodeOpen({ _tag: 'url', url, label: 'Open' })).toThrow()
     }
+  })
+})
+
+describe('Emoji', () => {
+  it('takes any single emoji, including sequences, flags and skin tones', () => {
+    for (const emoji of ['👍', '🎉', '❤️', '👍🏽', '👩‍💻', '🇮🇳', '1️⃣']) expect(Schema.decodeUnknownSync(Emoji)(emoji)).toBe(emoji)
+  })
+
+  it('refuses text, two emoji and the empty string', () => {
+    for (const text of ['', 'ok', '👍👍', '👍 ', 'a👍']) expect(() => Schema.decodeUnknownSync(Emoji)(text)).toThrow()
   })
 })
 
@@ -35,21 +45,13 @@ describe('sendMessageStatus', () => {
   it('counts what was sent', () => {
     expect(sendMessageStatus([row('a', { _tag: 'sent', open })])).toEqual({ _tag: 'done', line: 'Sent' })
     expect(sendMessageStatus([row('a', { _tag: 'sent', open }), row('b', { _tag: 'sent', open })])).toEqual({ _tag: 'done', line: 'Sent 2' })
-    expect(sendMessageStatus([row('a', { _tag: 'sent', open }), row('b', { _tag: 'notSent' }), row('c', { _tag: 'unknown', check: open })])).toEqual({
+    expect(sendMessageStatus([row('a', { _tag: 'sent', open }), row('b', { _tag: 'failed' }), row('c', { _tag: 'failed' })])).toEqual({
       _tag: 'done',
       line: 'Sent 1 of 3',
     })
   })
 
-  it('is unknown when nothing was proven sent and one may have been', () => {
-    expect(sendMessageStatus([row('a', { _tag: 'notSent' }), row('b', { _tag: 'unknown', check: open })])).toEqual({
-      _tag: 'unknown',
-      line: "Juno can't tell whether this was sent.",
-      mayDuplicate: true,
-    })
-  })
-
-  it('fails with a warned retry when nothing was sent', () => {
-    expect(sendMessageStatus([row('a', { _tag: 'notSent' }), row('b', { _tag: 'notSent' })])).toEqual({ _tag: 'failed', line: 'Not sent', retry: true, mayDuplicate: true })
+  it('says Failed, with nothing to click, when no row was sent', () => {
+    expect(sendMessageStatus([row('a', { _tag: 'failed' }), row('b', { _tag: 'failed' })])).toEqual({ _tag: 'failed', line: 'Failed' })
   })
 })

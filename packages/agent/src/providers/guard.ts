@@ -26,7 +26,7 @@ export class AdmissionError extends Error {
     this.ending = ending
   }
 }
-type Reason = Exclude<Ending, { _tag: 'complete' | 'stopped' }>
+type Reason = Exclude<Ending, { _tag: 'complete' }>
 /** The guard's failures travel through pi as `errorMessage`. Only this fixed code is kept, never a provider's error body. */
 const code = (ending: Ending, rateLimited = false) => `JUNO:${ending._tag}${'reason' in ending ? `:${ending.reason}` : ''}${rateLimited ? ':429' : ''}`
 const CODE = /^JUNO:(interrupted|blocked:(?:tooLarge|budget)|failed:(?:provider|keyRejected|codexSignedOut|offline))(:429)?$/

@@ -1,24 +1,22 @@
 import * as stylex from '@stylexjs/stylex'
 import { memo } from 'react'
-import { chatCopy, type StatusItem } from '@juno/agent-contract'
+import type { StatusItem } from '@juno/agent-contract'
 import { chat, colors, motion, radii, sizes, spacing } from '@juno/tokens/tokens.stylex'
-import { Button, Text } from '@juno/ui'
-import type { ChatActions } from './commands'
+import { Text } from '@juno/ui'
 import { JunoMark } from './JunoMark'
 import { groupGap, rowStyles } from './rows'
 
 export interface StatusBubbleProps {
   readonly item: StatusItem
-  readonly actions: ChatActions
 }
 
 /**
  * The one status bubble (SPEC 13.2): three looping dots in Juno's bubble
- * shape, with the status text beside them once the run has something
- * specific to say. Stop sits to the right and shows on hover or focus; its
- * space is always reserved. Always the last row while a run is active.
+ * shape, like someone typing, with a tool's line beside them. It sits under
+ * the newest bubble while a run is active, always the last row. It has no
+ * Stop: to change course the owner sends another message.
  */
-export const StatusBubble = memo(function StatusBubble({ item, actions }: StatusBubbleProps) {
+export const StatusBubble = memo(function StatusBubble({ item }: StatusBubbleProps) {
   return (
     <div data-chat-status={item.runId} role="status" aria-label={item.text ?? 'Juno is working'} {...stylex.props(groupGap.single, rowStyles.row, styles.row)}>
       <span {...stylex.props(styles.gutter)}>
@@ -39,11 +37,6 @@ export const StatusBubble = memo(function StatusBubble({ item, actions }: Status
           </span>
         ) : null}
       </div>
-      <span {...stylex.props(styles.stop)}>
-        <Button variant="ghost" size="xs" tone="subtle" onClick={() => actions.onStop(item.runId)}>
-          {chatCopy.status.stop}
-        </Button>
-      </span>
     </div>
   )
 })
@@ -120,11 +113,5 @@ const styles = stylex.create({
     animationDuration: motion['--duration-fast'],
     animationTimingFunction: motion['--ease-out'],
     animationFillMode: 'both',
-  },
-  // Reserved beside the bubble; only opacity changes on hover or focus.
-  stop: {
-    display: 'inline-flex',
-    flexShrink: 0,
-    opacity: 'var(--row-action-opacity)',
   },
 })

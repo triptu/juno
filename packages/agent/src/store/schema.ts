@@ -76,7 +76,7 @@ const core1 = [
   //   submitted   in the journal of `incarnation` as `submission_id` (spec `submitted`)
   //   done        its run answered
   //   interrupted its run will not finish: a rollback or rotation, or pi gave up (spec `interrupted`)
-  //   stopped     the owner pressed Stop
+  //   (core3 rebuilds this table: kind `react` joins, `stopped` goes)
   //   failed      refused before a run (for example AI off)
   `CREATE TABLE inbox (
     seq INTEGER PRIMARY KEY,
@@ -193,7 +193,7 @@ const core1 = [
   // receipts are evidence and are never overwritten. outcome:
   //   consumed          authorized, not yet handed to transport
   //   sent              an attempt is with the transport
-  //   cancel-requested  Pause, Stop or AI off asked it to stop
+  //   cancel-requested  Pause or AI off asked it to stop
   //   cancelled         stopped before any attempt
   //   unknown           no receipt and no definite rejection; reconcile works on it
   //   done | failed     evidence decided it
@@ -230,4 +230,29 @@ const core2 = [
   'ALTER TABLE incarnations ADD COLUMN authorized_seq INTEGER NOT NULL DEFAULT 0 CHECK (authorized_seq >= 0)',
 ]
 
-export const CORE_MIGRATIONS: MigrationSet = { name: 'core', steps: [core1, core2] }
+const core3 = [
+  // The owner's reactions enter the inbox as `react` (any emoji but a thumbs up). There is no Stop, so
+  // no op settles `stopped` again; an old one reads as `interrupted`. SQLite cannot alter a CHECK, so
+  // the table is rebuilt.
+  `CREATE TABLE inbox_next (
+    seq INTEGER PRIMARY KEY,
+    op_id TEXT NOT NULL UNIQUE,
+    kind TEXT NOT NULL CHECK (kind IN ('send', 'steer', 'retry', 'react', 'wake', 'report', 'click')),
+    text TEXT NOT NULL,
+    data TEXT CHECK (data IS NULL OR json_valid(data)),
+    at INTEGER NOT NULL,
+    state TEXT NOT NULL CHECK (state IN ('accepted', 'submitted', 'done', 'interrupted', 'failed')),
+    incarnation TEXT REFERENCES incarnations (id),
+    submission_id TEXT,
+    ended_at INTEGER,
+    reason TEXT,
+    CHECK (state != 'submitted' OR (incarnation IS NOT NULL AND submission_id IS NOT NULL))
+  ) STRICT`,
+  `INSERT INTO inbox_next SELECT seq, op_id, kind, text, data, at,
+     CASE state WHEN 'stopped' THEN 'interrupted' ELSE state END, incarnation, submission_id, ended_at, reason FROM inbox`,
+  'DROP TABLE inbox',
+  'ALTER TABLE inbox_next RENAME TO inbox',
+  'CREATE INDEX inbox_by_state ON inbox (state, seq)',
+]
+
+export const CORE_MIGRATIONS: MigrationSet = { name: 'core', steps: [core1, core2, core3] }

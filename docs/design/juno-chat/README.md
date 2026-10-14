@@ -35,5 +35,5 @@ Built (WP12): `--hl-bubble` is in every accent theme (16% light, 22% dark; Ink 1
 ## Also seen in the mock
 
 - The citation underline in `--foreground-muted` is enough to read as a link inside a bubble; a blue link would fight the bubble.
-- The status bubble with text beside the dots, and Stop to its right, reads as one row. The streaming bubble's thin caret is a mock detail; the view shows no cursor.
+- The status bubble with text beside the dots reads as one row. (The mock also shows Stop to its right; the chat no longer has Stop, decision log 10-14 11:50.) The streaming bubble's thin caret is a mock detail; the view shows no cursor.
 - Cards at full column width under a 76% bubble look right in light. In dark the ring separates the card from the page; the light shadow would vanish there, as the review said.

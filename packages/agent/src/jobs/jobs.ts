@@ -5,9 +5,11 @@
  * and only the card's Stop ends it (B5).
  *
  * A driver runs one kind of job and reports updates. The runner keeps the
- * phase machine and posts a report into the inbox on each milestone: a
- * question, done, failed, or quiet for 30 minutes after the last step
- * change. The router makes it a steer of the live run, or a new run.
+ * phase machine and posts an update's report into the inbox when the phase
+ * moves (a question, done, failed). The router makes it a steer of the live
+ * run, or a new run, and the model decides whether the owner hears about
+ * it: an update can pass without a bubble. There is no fixed schedule of
+ * milestone messages.
  *
  * A report is accepted into the inbox before the job's phase moves, as
  * `report:<job>:<seq>:<event>`. A crash in between leaves the job in its old
@@ -17,14 +19,10 @@
  * At startup, a job that was running starts again if its driver can resume
  * it, and is `unknown` otherwise (§6.5).
  */
-import { transitionJob, type JobEvent } from '@juno/agent-cards'
-import type { JobPhase } from '@juno/agent-contract'
+import { transitionJob, type JobEvent, type JobRecordPhase as JobPhase } from '@juno/agent-cards'
 import type { Accept } from '../inbox/inbox'
 import { transaction } from '../store/database'
 import { uuidv7, type Store } from '../store/store'
-
-/** §8: a job with no step change for this long posts the quiet milestone once. */
-export const QUIET_MS = 30 * 60 * 1000
 
 export type JobKind = 'subagent' | 't3'
 
@@ -55,8 +53,6 @@ export interface JobDriver {
   readonly run: (job: Job, signal: AbortSignal, update: (update: JobUpdate) => void) => Promise<JobUpdate>
   /** Whether a job left running by the last process can run again. */
   readonly resumable: boolean
-  /** The quiet milestone's report. */
-  readonly quiet?: (job: Job) => string
 }
 
 export interface JobsOptions {
@@ -64,7 +60,6 @@ export interface JobsOptions {
   readonly drivers: ReadonlyArray<JobDriver>
   /** The router's accept: a report is inbox input. */
   readonly accept: (input: { readonly opId: string; readonly kind: 'report'; readonly text: string }) => Accept
-  readonly quietMs?: number
   readonly onReport?: (error: unknown) => void
   readonly onChange?: (job: Job) => void
 }
@@ -78,8 +73,7 @@ const settled = (phase: JobPhase) => phase === 'done' || phase === 'failed' || p
 
 export function createJobs(options: JobsOptions) {
   const { store } = options
-  const quietMs = options.quietMs ?? QUIET_MS
-  const running = new Map<string, { readonly controller: AbortController; readonly done: Promise<void>; quietTimer?: ReturnType<typeof setTimeout> }>()
+  const running = new Map<string, { readonly controller: AbortController; readonly done: Promise<void> }>()
   let closed = false
 
   const get = (id: string) => {
@@ -104,18 +98,6 @@ export function createJobs(options: JobsOptions) {
     })
     const after = get(id)!
     options.onChange?.(after)
-    watchQuiet(after)
-  }
-
-  const watchQuiet = (job: Job) => {
-    const entry = running.get(job.id)
-    if (entry === undefined) return
-    if (entry.quietTimer !== undefined) clearTimeout(entry.quietTimer)
-    entry.quietTimer = undefined
-    if (job.phase !== 'running') return
-    const driver = options.drivers.find((d) => d.kind === job.kind)
-    if (driver?.quiet === undefined) return
-    entry.quietTimer = setTimeout(() => apply(job.id, { event: 'quiet', report: driver.quiet!(get(job.id)!) }), Math.max(0, job.stepAt + quietMs - store.now()))
   }
 
   const launch = (job: Job) => {
@@ -135,13 +117,8 @@ export function createJobs(options: JobsOptions) {
           apply(job.id, controller.signal.aborted ? { event: 'cancelled' } : { event: 'failed', report: `${job.title} failed.` })
         },
       )
-      .finally(() => {
-        const entry = running.get(job.id)
-        if (entry?.quietTimer !== undefined) clearTimeout(entry.quietTimer)
-        running.delete(job.id)
-      })
+      .finally(() => running.delete(job.id))
     running.set(job.id, { controller, done })
-    watchQuiet(job)
   }
 
   return {
@@ -195,10 +172,7 @@ export function createJobs(options: JobsOptions) {
     },
     close: async () => {
       closed = true
-      for (const entry of running.values()) {
-        if (entry.quietTimer !== undefined) clearTimeout(entry.quietTimer)
-        entry.controller.abort()
-      }
+      for (const entry of running.values()) entry.controller.abort()
       await Promise.all([...running.values()].map((entry) => entry.done))
     },
   }

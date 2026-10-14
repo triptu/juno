@@ -23,7 +23,7 @@ What each folder does, and the spec transitions it implements (`specs/agent-reco
 
 | Folder | Does | Spec |
 | --- | --- | --- |
-| `store/` | `schema.ts`: the tables, as named migration sets. `database.ts`: open, pragmas, migrate. `ledger.ts`: Pause, AI off, Stop, authorization, attempt, receipt, startup classification. `memory.ts`: memory queue, jobs, publication and the compaction seam | `startup`, `pause`, `cancel`, `authorize`; memory `project`, `start`, `complete`, `publish`, `extend`, `merge`, `failJob` |
+| `store/` | `schema.ts`: the tables, as named migration sets. `database.ts`: open, pragmas, migrate. `ledger.ts`: Pause, AI off, authorization, attempt, receipt, startup classification. `memory.ts`: memory queue, jobs, publication and the compaction seam | `startup`, `pause`, `cancel`, `authorize`; memory `project`, `start`, `complete`, `publish`, `extend`, `merge`, `failJob` |
 | `inbox/` | `inbox.ts`: owner input, durable before it is acknowledged. `bridge.ts`: reset, submit with `requestId = op_id`, then `submitted` | `acceptInput`, `acknowledge`, `resetBridge`, `submit`, `markSubmitted` |
 | `projection/` | One transaction per pi commit: archive messages (chunks of at most 16 KB), their memory keys, the cursor | `project` |
 | `recovery/` | Incarnations and rotation; the open sequence: a journal at or ahead of both the archive cursor and the latest authorized position resumes, behind either rotates, newer schema stops | `openJournal`, `rollbackJournal`, `rotate`; `agent-recovery-replay.qnt` |
@@ -92,7 +92,7 @@ Integration limits found during WP9:
 
 `openTurns({ agentDir, provider, model, compaction?, subagent?, host? })` opens the engine: the durable core's open sequence with the router in place of WP8's serial loop. `provider(store)` builds the guarded provider (`createOpenRouter`, or `createProviderGuard` in tests) on the opened store.
 
-**Startup order.** Lock, `agent.sqlite` and migrations (spend, turns, jobs and the caller's), recovery (open authorizations become `unknown`), then `provider(store)`, then pi on the journal with only the guard's models, then the router restores the live run, and only then does pi resume. So pi never reaches a model before the guard exists, and a resumed request is built and stamped like any other; no deferred model facade is needed. `router/open.ts` copies `openCore`'s open sequence because the router needs the journal for steering and the core does not expose it. Letting `openCore` take a router would remove the copy.
+**Startup order.** Lock, `agent.sqlite` and migrations (spend, turns, jobs and the caller's), recovery (open authorizations become `unknown`), then `provider(store)`, then pi on the journal with only the guard's models, then the router restores the live run, and only then does pi resume. So pi never reaches a model before the guard exists, and a resumed request is built and stamped like any other; no deferred model facade is needed. `router/open.ts` copies `openCore`'s open sequence because the router needs the journal and its hooks for steering and the core does not expose them. Letting `openCore` take a router would remove the copy.
 
 | Folder | Does |
 | --- | --- |
@@ -103,9 +103,25 @@ Integration limits found during WP9:
 | `memory-tools/` | `remember` |
 | `pins/` | Pin changes on the trusted side, each bumping `pin_rev` in its transaction |
 
-**A run.** The router commits the run (its history cutoff `H` and origin) before the input reaches pi, then resets and submits through `inbox/bridge.ts`. Every request goes through the builder and the guard. Input that arrives while a run is live is held in the inbox and delivered at the next boundary (pi's `afterTools` or `onYield`), because pi withdraws queued input on abort and burns its op id; so after Stop a queued steer starts a fresh run. Stop waits up to 1 s for input already handed to pi to be placed, then aborts. The run ends with the chat contract's `Ending`: `stopped` after Stop; the builder's or guard's refusal (`blocked`, `interrupted`); a provider failure (`failed`, or `interrupted` when the stream had started and was lost); `complete` when pi answered every input. Owner runs carry `retry` on `interrupted` and `failed`. A steered report or wake, or a Slack read, marks the run as no longer clean (§6.4).
+**The chat's surface** is two calls: `accept` queues an input (a message, maybe a reply; a reaction; a report, wake or click), and `subscribe` listens to events. Nothing stops a run from outside: to change course the owner sends another message, and "stop" is a message like any other. Only recovery, the guard and shutdown end a run early. How Juno talks (how many bubbles, how long, whether to answer a reaction) is the model's judgement, guided by the short prompt in `request/prompt.ts`; the code keeps hard rules only for safety and cost.
 
-**Events** (`subscribe`): `started` (the status bubble, dots), `text` (the run's text so far, across requests), `status` (a tool's line, at most every 2 s; the next `text` clears it), `queued`, `steered`, `remembered`, `ended`. `run()` gives the live run for a renderer that attaches mid-run.
+**What the owner sees** (`router/output.ts`). The chat is not a transcript. Only text the model marks becomes visible:
+
+```text
+<say>One bubble.</say>
+<say reply-to="n12">A bubble that answers owner message n12.</say>
+<react to="n12">👍</react>
+```
+
+The router parses the stream and publishes each block once it closes: a bubble appears whole (`bubble` event, id `<runId>:<n>`), never streamed. Text outside the blocks never leaves the agent; if the model marks nothing, nothing shows. Why blocks and not a `say` tool: pi answers every tool call with a tool result and calls the model again, so a tool per bubble costs one more request per turn. The archive keeps the raw text, so parsing it gives the same bubbles (`input.ts` `archivedBubble`), and a restored run carries on numbering where it was.
+
+**What the model reads** (`router/input.ts`). Owner input is wrapped with a handle the model can reply or react to: `<message id="n12">…</message>`, where `n12` is the inbox `seq`. A reply carries the quoted bubble, card or message in full (`<quote from="juno">…</quote>`). A reaction is `<reaction id="n13" emoji="🎉"><quote …>…</quote></reaction>`. Nothing is escaped, so the owner's words stay byte for byte and a pin points only at them (`ownerWords`), never at a quote or a reaction.
+
+**Reactions** (`reactions` table). Any one emoji, both ways, at most one per side per item; a null emoji removes it. The owner's thumbs up and removals are only recorded: no run, and the model never sees them. Any other owner reaction is also an inbox op (`react`): it joins a live run at its next step or starts one, and the model may ignore it, in which case the owner sees nothing. Juno's reactions come from `<react>` blocks on owner messages. A reaction is never a click and never a pin.
+
+**A run.** The router commits the run (its history cutoff `H` and origin) before the input reaches pi, then resets and submits through `inbox/bridge.ts`. Every request goes through the builder and the guard. Input that arrives while a run is live is held in the inbox and handed to pi as a steer at the next boundary (pi's `afterTools` or `onYield`); pi places it right there, and with `steeringMode: 'all'` every message held at that boundary joins together. It is held until the boundary, not queued in pi at once, because pi keeps a queued steer after a failed run until the next input; held input that no boundary took starts the next run. The run ends with the chat contract's `Ending`: the builder's or guard's refusal (`blocked`, `interrupted`); a provider failure (`failed`, or `interrupted` when the stream had started and was lost); `complete` when pi answered every input. Owner runs carry `retry` on `interrupted` and `failed`. A steered report or wake, or a Slack read, marks the run as no longer clean (§6.4).
+
+**Events** (`subscribe`): `started` (the status bubble, dots), `bubble` (one whole bubble; the dots go back below it while the run goes on), `status` (a tool's line, until the next bubble), `reaction` (either side, set or removed), `steered` (a held message was handed to pi), `remembered`, `ended`. `run()` gives the live run (its bubbles and status) for a renderer that attaches mid-run.
 
 **Tools.** Each is a `defineTool` with a status line and a `replay` mode. A tool calls `current()` inside `execute()` to get the live run: its cutoff, whether it is clean, and the journal position read after pi committed the call's intent. A tool that authorizes an action (WP15) passes that `position` to `authorize` and keeps `replay: 'unsafe'`. No WP11 tool authorizes: `remember` writes a pin keyed by the call id, `delegate` starts a job keyed by the call id, and the Slack reads are Tier 0.
 

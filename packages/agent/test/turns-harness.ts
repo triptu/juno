@@ -4,6 +4,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fakeProvider, type FakeProviderOptions } from '@juno/agent-testing'
+import type { BubbleId, ReplyTarget } from '@juno/agent-contract'
 import { createProviderGuard, openTurns, type HostReads, type ModelRef, type TurnEvent, type Turns } from '../src/index'
 
 export const SONNET: ModelRef = { provider: 'openrouter', modelId: 'anthropic/claude-sonnet-5.5' }
@@ -57,12 +58,20 @@ export async function turnsHarness(options: HarnessOptions = {}) {
 
   return {
     dir, fake, turns, events, reports,
-    /** An owner send. Returns its op id. */
-    send: (text: string, opId = `op-${++sent}`) => {
-      const accepted = turns.accept({ opId, kind: 'send', text })
-      if (accepted._tag !== 'accepted') throw new Error(`send refused: ${accepted.reason}`)
+    /** An owner send, maybe a reply. Returns its op id. */
+    send: (text: string, input: { readonly opId?: string; readonly replyTo?: ReplyTarget } = {}) => {
+      const opId = input.opId ?? `op-${++sent}`
+      const accepted = turns.accept({ opId, kind: 'send', text, ...(input.replyTo ? { replyTo: input.replyTo } : {}) })
+      if (accepted._tag !== 'accepted') throw new Error(`send refused: ${accepted._tag === 'refused' ? accepted.reason : 'recorded'}`)
       return opId
     },
+    /** The owner's reaction on a Juno bubble. Returns its op id. */
+    react: (bubbleId: string, emoji: string | null, opId = `op-${++sent}`) => {
+      turns.accept({ opId, kind: 'react', target: { _tag: 'bubble', id: bubbleId as BubbleId }, emoji })
+      return opId
+    },
+    /** The bubbles the owner has seen, in order: text and the owner op each replies to. */
+    bubbles: () => events.flatMap((e) => (e._tag === 'bubble' ? [e.replyTo ? [e.text, e.replyTo] : [e.text]] : [])),
     next,
     started: (opId: string) => next((e): e is Extract<TurnEvent, { _tag: 'started' }> => e._tag === 'started' && e.opId === opId),
     /** The run that `opId` started has ended. */
@@ -77,6 +86,9 @@ export async function turnsHarness(options: HarnessOptions = {}) {
   }
 }
 
+/** One bubble in the model's output. */
+export const say = (text: string) => `<say>${text}</say>`
+
 /** A complete answer, for a reply factory (the fake builds it itself only for plain content). */
 export function answer(text: string) {
   return {
@@ -84,6 +96,15 @@ export function answer(text: string) {
     usage: { input: 10, output: 5, cacheRead: 0, cacheWrite: 0, totalTokens: 15, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
     stopReason: 'stop', timestamp: Date.now(),
   } as never
+}
+
+/** An answer that calls one tool, for a reply factory. */
+export function toolCall(name: string, args: Record<string, unknown>) {
+  return () => ({
+    role: 'assistant', content: [{ type: 'toolCall', id: `call-${name}`, name, arguments: args }], api: 'faux', provider: 'openrouter', model: SONNET.modelId,
+    usage: { input: 10, output: 5, cacheRead: 0, cacheWrite: 0, totalTokens: 15, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
+    stopReason: 'toolUse', timestamp: Date.now(),
+  }) as never
 }
 
 export function deferred<T = void>() {
