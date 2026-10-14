@@ -17,7 +17,8 @@ import { afterPaint, mark, measure } from '@juno/state/perf'
 import { useAtomValue } from '@juno/state/react'
 import { relativeTime, TopicList as TopicListView, TopicRow as TopicRowView, type ActivateEvent, type TopicListEmpty } from '@juno/views'
 import { markFilterChange, takeFilterMark } from './filterMark'
-import { openTopic, showTopicMenu, warmTopic } from './navigation'
+import { openTopic, showRowMenu, warmTopic } from './navigation'
+import { resolveTopic } from './topicCommands'
 
 /**
  * Rows in the first commit of a new list. The rest mount in a transition
@@ -39,17 +40,6 @@ function open(id: string, event: ActivateEvent): void {
   openTopic(id, { newTab: event.metaKey })
 }
 
-/** The Resolve check. */
-function resolve(id: string): void {
-  // TODO(M5): run the topic resolve command once the engine has one
-  // (resolve, mark read, hide the row, toast with Undo). Nothing to call yet.
-  void id
-}
-
-/** Right-click on a row: Open in new tab. */
-function rowMenu(id: string): void {
-  void showTopicMenu(id)
-}
 
 /** A row got focus: Tab comes back to it, and reaches its Resolve button next. */
 function focusRow(id: string): void {
@@ -76,7 +66,7 @@ const Row = memo(function Row({ id }: { readonly id: string }) {
   // The minute tick re-renders a row only when its label changes.
   const time = useAtomValue(nowAtom, (now) => relativeTime(at, now))
   if (row === undefined) return null
-  return <TopicRowView row={row} time={time} selected={selected} tabbable={tabbable} newThreads={row.newThreads} onOpen={open} onResolve={resolve} onPrefetch={warmTopic} onContextMenu={rowMenu} />
+  return <TopicRowView row={row} time={time} selected={selected} tabbable={tabbable} newThreads={row.newThreads} onOpen={open} onResolve={resolveTopic} onPrefetch={warmTopic} onContextMenu={showRowMenu} />
 })
 
 const renderRow = (id: string) => <Row key={id} id={id} />

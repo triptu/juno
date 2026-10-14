@@ -27,21 +27,31 @@ import {
   hueFor,
   MessageList,
   NewMessagesPill,
-  TopicArt,
   TopicHeader,
   TopicView as TopicViewFrame,
   type ActivateEvent,
+  type MenuAnchor,
   type MessageListItem,
   type MessageListStatus,
   type OlderStatus,
 } from '@juno/views'
 import { markFilterChange } from './filterMark'
-import { closeTabById, onLeaveTab, openTopic, takeOpenStart } from './navigation'
+import { closeTabById, onLeaveTab, openTopic, showTopicMenu, takeOpenStart } from './navigation'
+import { resolveTopic, toggleJunoPanel } from './topicCommands'
+
+/**
+ * The divider's offset from the scroller's top on open: 80px below the
+ * header band, which the list runs under (inventory 5). The band's height
+ * is the scroller's `scroll-padding-top`, so the token stays the one source.
+ */
+function dividerTop(scroller: HTMLElement): number {
+  return (Number.parseFloat(getComputedStyle(scroller).scrollPaddingTop) || 0) + DIVIDER_GAP
+}
 
 /** Within this of the end counts as at the bottom (performance 3.3). */
 const BOTTOM_SLACK = 32
-/** The "N new" divider's distance from the top of the list when a topic opens at it. */
-const DIVIDER_TOP = 80
+/** How far below the header band the "N new" divider lands when a topic opens at it. */
+const DIVIDER_GAP = 80
 /** Rows each older page adds to the window. */
 const OLDER_PAGE = 100
 /** The next page is asked for when the first row comes this close to the top. */
@@ -201,7 +211,7 @@ export interface TopicTabProps {
  * lives in an `<Activity>`: while hidden its effects are gone, so it marks
  * nothing and asks for nothing, and its DOM keeps the scroll position.
  *
- * - Opens at the "N new" divider, 80px from the top, or at the bottom, in
+ * - Opens at the "N new" divider, 80px below the header band, or at the bottom, in
  *   the layout effect of the first frame that has rows. A tab that was
  *   unmounted comes back at its `ScrollSnapshot` instead.
  * - The divider sits where the read pointer was when the tab first showed
@@ -269,7 +279,7 @@ function Topic({ id, detail }: { readonly id: string; readonly detail: TopicDeta
       snapshot !== undefined && row !== null
         ? { kind: 'row', element: row, offset: snapshot.offset }
         : anchorRef.current !== null
-          ? { kind: 'row', element: anchorRef.current, offset: DIVIDER_TOP }
+          ? { kind: 'row', element: anchorRef.current, offset: dividerTop(scroller) }
           : { kind: 'bottom' }
     hold(scroller, pin, pinnedTop)
     const distance = distanceFromBottom(scroller)
@@ -437,6 +447,12 @@ function Topic({ id, detail }: { readonly id: string; readonly detail: TopicDeta
 
   const [threadsOpen, setThreadsOpen] = useState(false)
   const main = detail.kind === 'main'
+  // The title's native menu: the title shows it open until the menu closes.
+  const [menuOpen, setMenuOpen] = useState(false)
+  const openMenu = (at: MenuAnchor) => {
+    setMenuOpen(true)
+    void showTopicMenu(detail, at).finally(() => setMenuOpen(false))
+  }
   const channel = detail.channel.id
   // Main keeps its threads query live while shown, from after its first frame, so the Threads
   // popover opens with its rows in the first frame instead of "Loading threads".
@@ -465,10 +481,14 @@ function Topic({ id, detail }: { readonly id: string; readonly detail: TopicDeta
       header={
         <TopicHeader
           detail={detail}
-          {...(hasArt(detail) ? { art: <TopicArt topicId={detail.id} recipe={detail.art} size={20} /> } : {})}
+          menuOpen={menuOpen}
+          onMenu={openMenu}
+          onPill={() => scopeToChannel(detail.channel.id)}
+          {...(main ? {} : { onResolve: () => resolveTopic(detail.id) })}
           threadsOpen={threadsOpen}
-          onThreads={main ? setThreadsOpen : undefined}
+          {...(main ? { onThreads: setThreadsOpen } : {})}
           threads={threadsOpen ? <MainThreads channel={detail.channel.id} onClose={() => setThreadsOpen(false)} /> : null}
+          juno={{ open: false, onToggle: toggleJunoPanel }}
         />
       }
       pill={showPill ? <NewMessagesPill count={newCount} onJump={jumpToLatest} /> : undefined}
