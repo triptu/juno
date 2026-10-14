@@ -780,8 +780,14 @@ export class ThreadsPopover {
     this.root = win.getByRole('dialog', { name: 'Threads' })
   }
 
+  /** A thread's list item: its row button and its Subscribe bell. */
   entry(title: string): Locator {
     return this.root.getByRole('listitem').filter({ hasText: title })
+  }
+
+  /** The row button that opens a thread, named by its title. */
+  row(title: string): Locator {
+    return this.root.getByRole('button', { name: new RegExp(`^${escapeRegExp(title)}`) })
   }
 
   async open(title: string): Promise<void> {
@@ -793,9 +799,10 @@ export class ThreadsPopover {
   }
 
   async subscribe(title: string): Promise<void> {
-    const bell = this.entry(title).getByRole('button', { name: /^Unsubscribed/ })
+    const bell = this.entry(title).getByRole('button', { name: 'Subscribe', exact: true })
+    await expect(bell).toHaveAttribute('aria-pressed', 'false')
     await bell.click()
-    await expect(this.entry(title).getByRole('button', { name: /^Subscribed/ })).toBeVisible()
+    await expect(bell).toHaveAttribute('aria-pressed', 'true')
   }
 }
 
