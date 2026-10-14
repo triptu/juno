@@ -2,7 +2,7 @@
 
 These specs describe the protocols and their limits. They do not certify the application code. Only the model checks are tests here.
 
-`follow.qnt` models the current follow command seam, two threads inside the quiet window, and one older thread. It includes Slack writes, socket delivery, HTTP pages, boot and hourly window passes, shorter reconnect reads, and activity lookups. Its `followProtocol` module takes constants; `follow` supplies the full simulator instance. `readstate.qnt` models read state as implemented in M4: Main and one followed thread that mirror, and one unfollowed thread that stays local. Its `readProtocol` module takes constants; `readstate` supplies the full simulator instance and `readstate-bounded.qnt` a small one. Like follow, it keeps Slack's event clock and Juno's observation clock apart.
+`follow.qnt` models the current follow command seam, two threads inside the quiet window, and one older thread. It includes Slack writes, socket delivery, HTTP pages, boot and hourly window passes, shorter reconnect reads, and activity lookups. Its `followProtocol` module takes constants; `follow` supplies the full simulator instance. `readstate.qnt` models read state as implemented in M4: Main and one followed thread that mirror, and one unfollowed thread that stays local. Its `readProtocol` module takes constants; `readstate` supplies the full simulator instance and `readstate-bounded.qnt` a small one. Like follow, it keeps Slack's event clock and Juno's observation clock apart. `outbox.qnt` models message sends, ambiguous failures, restart recovery and reconciliation. Its `outboxProtocol` module takes constants; `outbox` supplies two draft IDs.
 
 ## Follow rules and assumptions
 
@@ -32,7 +32,7 @@ The four reported differences are intentional protocol changes: separate clocks,
 | `acceptedMarkKept`, `acceptedUnreadProtected` | While Slack's latest write is Juno's accepted mark and the user has not marked since, Juno shows that mark (with the unread flag for Mark unread). Older events and pages cannot undo it. |
 | `peekNeverMarks` | A peek changes neither pointers, pending marks, nor mark traffic counters. |
 | `coalesced` | Five marks before the worker sends, and one more while it is in flight, make at most two calls (`coalesceStep`). |
-| `drainBound` | After input and failures stop, follow reaches scoped agreement within 64 transitions; read state within 48. |
+| `drainBound` | After input and failures stop, follow reaches scoped agreement within 64 transitions; read state and outbox within 48. |
 | `eventualAgreement` | Under fair recovery and permanent quiet, permanent scoped agreement follows. Typechecked only; no unbounded liveness proof is claimed. |
 | `reachedAgreement` | A coverage witness that a trace actually reached quiet agreement. |
 | `invariants` | Passing safety and drain properties for that protocol. Follow includes `acceptedUnfollow`. |
@@ -49,6 +49,62 @@ The follow drain covers three pending calls and their refreshes, eight events, t
 - `disconnect` drops queued events; `reconnect` refreshes every mirrored topic (`scan`). Thread marks made elsewhere during a drop on a thread with no new reply wait for the next window pass in the code; the model assumes the reconnect refresh covers them.
 - `seal` stops input and failures. Queued work completes.
 
+## Outbox rules and assumptions
+
+- `send` creates one durable `queued` row per draft, keyed by `client_msg_id`. Each ID is new and belongs to Juno. The model tracks row states `queued`, `sending`, `unknown`, `failed` and `gone`. Gone means no pending row. Slack stores a count per ID; the local mirror stores a set. The model gives Slack no deduplication guard. Each `accept` increases the count, so a repeated post is observable.
+- `claim` persists `sending` before one HTTP request leaves. These are one model action with a crash boundary after persistence. A crash before the call leaves is the dropped branch of `crash`. There is no HTTP retry. `accept` decides the request and may queue an echo. `refuse` decides a permanent refusal, 429 or signed-out response without posting. `refused` makes a permanent refusal `failed`; 429 and signed-out responses return the row to `queued`, due later.
+- `lost` models a timeout, lost answer or undecodable answer. **Assumption:** Slack has accepted or dropped the request by the time Juno observes the failure. The request is no longer in transit. A lost refusal answer is also ambiguous to Juno and uses the same lookup. Retrying after an incomplete or stale negative lookup has no safety guarantee.
+- `crash` models an engine restart at any time. It retains local storage, changes every `sending` row to `unknown`, and loses all HTTP answers, including page and lookup answers. Previously accepted messages remain on Slack. For requests still in transit, it chooses accepted or dropped before recovery starts. This extends the failure assumption to restart recovery: the old request cannot be accepted after a complete negative recovery lookup. Without that assumption, lookup before retry cannot guarantee at-most-once sending. A restart alone does not disconnect the socket in this model; `disconnect` represents that separately.
+- `lookup` starts only for a due `unknown` row and returns a complete recent-history snapshot for its ID. Found stores the message and deletes the row. Absent returns a still-unknown row to `queued`. A concurrent reconciliation can already have deleted the row; an absent lookup never recreates it. `failLookup` leaves the row unknown. `wake` abstracts backoff ending. The model assumes history is complete for these recent draft IDs, and messages are not deleted or edited remotely.
+- `writeMessage` stores the message and deletes its pending row in one transaction. The answer, `echo`, and positive history, replies or lookup results all use it. It is safe when the row is already gone. `page` captures Slack's snapshot when requested and can finish later. An absent page changes nothing. Two response slots bound pages and lookups together. Echoes can be absent, delayed or reordered across the two IDs. `disconnect` drops queued echoes; HTTP snapshots survive a socket disconnect. Repeated positive writes are idempotent.
+- `retry` and `discard` apply only to `failed` rows. Discard records the user's choice and deletes the draft. These are the only user actions after `send`; pending edits, dependencies, attachments and other outbox kinds are outside this model.
+- Socket connectivity and HTTP availability are separate. `goOffline` also disconnects the socket; `goOnline` restores HTTP access. `reconnect` starts catch-up pages for the created IDs. `catchUp` ends that pass and makes every remaining `queued` or `unknown` row due. This models the catch-up's outbox flush. It does not infer absence from a catch-up page.
+- `seal` stops new drafts, user actions, failures, crashes and disconnects. Already decided refusals and dropped calls still finish. Connectivity recovers, backoff ends, and workers and deliveries run. New requests succeed after sealing. With two drafts and two response slots, this drain has a 48-transition budget. The bound counts productive model transitions, not wall-clock time or idle scheduler steps.
+
+### Outbox properties
+
+| Quint name | Plain meaning |
+| --- | --- |
+| `atMostOnce` | Slack holds at most one message per `client_msg_id`. |
+| `noDoubleShow` | A stored message never has a pending row with the same ID. |
+| `noSilentLoss` | Every created draft whose row is gone is stored locally or was discarded by the user. |
+| `quietAgreement` | After sealing and draining, every undiscarded draft is stored locally and on Slack exactly once, or remains failed with no Slack message. |
+| `drainBound` | After sealing, recovery and delivery finish within 48 transitions. |
+| `reachedAgreement` | A trace reached sealed, drained agreement. The runner requires this witness for every corrected directed schedule and at least one random trace. |
+| `invariants` | All five safety and finite-drain properties above. |
+
+### Outbox bug schedules
+
+Each `<name>Step` checks `invariants` and must finish its drain. Each `<name>BugStep` must violate the named property. Syntax, runtime and checker failures never count as counterexamples.
+
+| Schedule | Ordering and guard | Broken property |
+| --- | --- | --- |
+| `blindRetry` | Accept without an echo, lose the answer, then look up the ID. The bug returns directly to queued and posts again. | `atMostOnce` |
+| `crashResend` | Accept without an echo, crash before the answer, then look up the ID. The bug recovers sending as queued and posts again. | `atMostOnce` |
+| `echoKeepsRow` | Deliver the echo before the answer. The bug stores the echo without deleting the pending row. | `noDoubleShow` |
+| `answerAfterEcho` | Deliver the echo, then the answer. The bug writes the worker's old sending row back after reconciliation. The guarded answer leaves a deleted row gone. | `noDoubleShow` |
+
+The corrected `echoKeepsRow` and `answerAfterEcho` schedules cover echo before answer. Corrected `blindRetry` covers a lost answer followed by a found lookup. Three additional corrected schedules cover `answerBeforeEcho`, `lostLookupAbsent` and `reconnectPage`. The absent case drops the first call, loses its answer, confirms absence, and posts once. `reconnectPage` accepts, loses the answer, disconnects, then reconnects and holds a lookup answer. A catch-up page reconciles first, the catch-up flushes, and the lookup answer safely writes the message again. These seven corrected runs cover all five delivery and recovery orderings.
+
+### Outbox actions and engine mapping
+
+| Quint action or helper | Engine or fake Slack event |
+| --- | --- |
+| `send` | `messages.send` inserts the pending row. |
+| `claim`, `accept` | `PostWorker` persists sending and calls `chat.postMessage` once with `client_msg_id` through `Outbox.sendOnce`; fake `holdNext {method, before}` holds before acceptance and `release` lets it proceed. |
+| `answer`, `refuse`, `refused` | Release the success answer, or use `forceError` for a permanent refusal, 429 or signed-out answer. |
+| `drop`, `lost` | Drop the request before acceptance, or use `loseResponse` after Slack decides it; the worker records unknown. |
+| `crash` | Stop and restart the engine; persisted sending rows recover as unknown. |
+| `lookup`, `failLookup`, `finishFetch` | `PostWorker` asks recent history for the ID; `holdNext {method, before}`, `release`, `forceError` and `goOffline` control the lookup. |
+| `echo`, `page`, `finishFetch`, `writeMessage` | `holdFrames` and `releaseFrames` delay socket echoes; hold and release history or replies requests for page races. `writeMessage` in `@juno/sync` stores the message and deletes the pending row with the same `client_msg_id`. |
+| `retry`, `discard`, `wake` | Retry or Delete draft on a failed row; the worker's backoff makes work due. |
+| `disconnect`, `reconnect`, `goOffline`, `goOnline`, `catchUp` | Socket recovery and fake `goOffline` or `goOnline`; the catch-up's end flushes the outbox. |
+| `seal` | Stop injected input and failures, restore delivery, and wait for the worker to drain. |
+
+`pnpm specs:check --outbox` selects only this model, its 10,000 random traces and seven corrected schedules plus four broken variants. `--traces` reduces random sampling to 100. The normal root check includes them too. No new Apalache run is added: the existing 19 bounded checks remain, and the twelve-minute total execution budget and 60-second child deadline are unchanged. This is sampled safety and a finite drain check, not an exhaustive or unbounded liveness proof.
+
+Validation on 2026-10-15: the full root `pnpm specs:check` passed in **636.2 seconds (10m 36s)**, excluding the machine-lock wait. It ran the 10,000 outbox samples, all seven corrected outbox schedules, all four expected outbox counterexamples, the existing protocol suites and all 19 bounded checks. Every outbox sample reached agreement. This run held both heavy-job slots with `pnpm exec node scripts/heavy.mjs --exclusive pnpm specs:check`. An earlier shared-slot run hit the same twelve-minute deadline during a bounded follow check. The execution budget and child deadlines are unchanged.
+
 ## Accepted Unsubscribe: three races and their guards
 
 Each race is a directed schedule with a fixed mode (`<name>Step`, must satisfy `invariants`) and a bug mode (`<name>BugStep`, must violate `acceptedUnfollow`). The bug modes are the rules Juno had before the guards.
@@ -63,7 +119,7 @@ The stale-page regression (`stale-follow-page`) is the older race: a page reques
 
 ## Run the checks and bounds
 
-From the worktree root, run `pnpm specs:check`. This is the only verification entry point used here; it queues behind `scripts/heavy.mjs`. Quint is pinned to `@informalsystems/quint@0.33.0`. The script typechecks every `.qnt`, samples both full protocols 10,000 times with at most 160 transitions and two simulator threads, and uses seed `20261013`. Completed simulations stop at agreement. Directed schedules run once for at most 80 transitions, with guarded and bug modes for stale follow pages, the three accepted-Unsubscribe races, missing stored follows, a follow beyond the first window page, reordered follow events, rollback after a newer event, stale read observations, lost pending read observations, and peek. Additional schedules cover Unknown, observations retained through pending commands, ambiguous command failure, fallback, and old threads with and without activity. Read has guarded and bug modes for a late official mark (`lateMark`), a page from before a mark (`latePage`), a page requested while a mark was pending (`pendingPage`), an official mark during a pending one (`pendingMark`) and peek, plus `coalesceStep`, `retryAfterAcceptStep` and `peekThenMarkStep`. Generated ITF JSON and Apalache output in `specs/traces/` are ignored by git.
+From the worktree root, run `pnpm specs:check`. This is the only verification entry point used here; it queues behind `scripts/heavy.mjs`. Quint is pinned to `@informalsystems/quint@0.33.0`. The script typechecks every `.qnt`, samples all three full sync protocols 10,000 times with at most 160 transitions and two simulator threads, and uses seed `20261013`. Completed simulations stop at agreement. Directed schedules run once for at most 80 transitions, with guarded and bug modes for stale follow pages, the three accepted-Unsubscribe races, missing stored follows, a follow beyond the first window page, reordered follow events, rollback after a newer event, stale read observations, lost pending read observations, and peek. Additional schedules cover Unknown, observations retained through pending commands, ambiguous command failure, fallback, and old threads with and without activity. Read has guarded and bug modes for a late official mark (`lateMark`), a page from before a mark (`latePage`), a page requested while a mark was pending (`pendingPage`), an official mark during a pending one (`pendingMark`) and peek, plus `coalesceStep`, `retryAfterAcceptStep` and `peekThenMarkStep`. Outbox adds the four bug pairs and three additional corrected schedules listed above. Generated ITF JSON and Apalache output in `specs/traces/` are ignored by git.
 
 With Java, the bounded Apalache 0.62.1 checks use these small instances:
 
@@ -73,13 +129,13 @@ With Java, the bounded Apalache 0.62.1 checks use these small instances:
 | `readstate-bounded.qnt` | One mirrored Main topic; one queued event; one HTTP response | 4 transitions (`boundedStep`), `boundedSafety`: pending intent, pending unread, accepted mark and accepted unread |
 | Follow races: stale page, late event, pending page, failed lookup | Same small follow instance | 5 transitions each, `acceptedUnfollow`; each bug mode must produce an actual counterexample and each fixed mode must pass |
 
-The small instances import the same protocol actions; they do not replace them with proof-only transitions. The read instance selects marks, acceptance, answers, retries, refusals, events, pages and lookups for one Main topic; the reconnect refresh, peek and the local-only thread are covered by the full simulator. The four-transition check is a shallow safety check, not a convergence or exhaustive protocol proof. Long recovery and read bug traces are checked by simulation, not thirty-step symbolic exploration. The whole script has a twelve-minute execution budget, excluding the machine-lock wait. Each Quint process has a 60-second deadline, including each of the eleven Apalache runs; a timeout is a failure and its process group is killed. The script reports total execution time excluding the machine-lock wait. The completed check took 215.9 seconds on a loaded machine, including both full simulations, every regression and all eleven Apalache runs, excluding the machine-lock wait. This bounds normal verification to within the execution budget; it avoids the previous twelve-step full-state and thirty-step regression checks. Without Java the script clearly reports simulator-only mode. A checker, runtime or syntax error never counts as an expected violation.
+The small instances import the same protocol actions; they do not replace them with proof-only transitions. The read instance selects marks, acceptance, answers, retries, refusals, events, pages and lookups for one Main topic; the reconnect refresh, peek and the local-only thread are covered by the full simulator. The four-transition check is a shallow safety check, not a convergence or exhaustive protocol proof. Long recovery and read bug traces are checked by simulation, not thirty-step symbolic exploration. The whole script has a twelve-minute execution budget, excluding the machine-lock wait. Each Quint process has a 60-second deadline, including each of the 19 Apalache runs; a timeout is a failure and its process group is killed. The script reports total execution time excluding the machine-lock wait. The earlier sync-only check took 215.9 seconds on a loaded machine, including both full simulations, every regression and all eleven Apalache runs, excluding the machine-lock wait. Later validation timings appear with the protocol additions below. The shallow bounds avoid the previous twelve-step full-state and thirty-step regression checks. Without Java the script clearly reports simulator-only mode. A checker, runtime or syntax error never counts as an expected violation.
 
 `QUINT_SIMULATOR=typescript pnpm specs:check` selects the TypeScript evaluator when Rust is unavailable. The temporal formula is typechecked but not executed. See the [Quint CLI reference](https://quint.sh/docs/quint) and [model checker guide](https://quint.sh/docs/model-checkers).
 
 ## Read and map a trace
 
-ITF `states[0]` is initial. In each state find the variable ending in `::s`, then read `label`, `target`, `local`, `server`, `observedAt` and `updatedEvent`. `#bigint`, `#map` and `#set` encode integers, maps and sets. `--mbt` records selected actions and arguments. All identifiers and stamps are invented.
+ITF `states[0]` is initial. In each state find the variable ending in `::s`, then read `label`, `target`, `local`, `server`, `observedAt` and `updatedEvent`. `#bigint`, `#map` and `#set` encode integers, maps and sets. `--mbt` records selected actions and arguments. For outbox, read `row`, `stored`, `server`, `request`, `due` and `fetches`. `server` counts accepted messages per ID. All identifiers and stamps are invented.
 
 | Follow action | Engine or fake Slack event |
 | --- | --- |
@@ -270,7 +326,7 @@ The 31 main recovery pairs and their failure properties are listed in `agent-che
 
 The simulator uses two operation IDs, two local processes, two devices, up to eight incarnations during random exploration (16 cursor slots), one approval and one consumed attempt, and one coalesced backup chain. Random input positions are bounded; backup positions and hashes use unit segments. Positions are explicitly bounded by 32 and generations by 16; `finiteDomains` rejects overflow. The symbolic backend needs constant ranges, so state-dependent intervals filter these finite domains. It samples 1,000 traces of at most 140 transitions, or 100 with `--traces`. The 31 corrected main recovery schedules share 1,024 samples, at most 100 transitions, with mandatory completion witnesses for all cases. The finite drain is 64 transitions. Under permanent quiet and recovered storage delivery, it uses real projection, checkpoint, release, encryption, manifest and export steps to complete transfer and catch backup up. The temporal formulas `transferEventuallyCompletes` and `backupEventuallyCatchesUp` require eventual permanent completion and are typechecked only.
 
-Apalache explores one operation ID and both competing local processes for four transitions. The shared lock-handle race is checked in broken and corrected modes for two transitions. These are shallow checks, not exhaustive proofs of full backup or ownership recovery. `pnpm specs:check --recovery` selects WP4; the normal root command includes WP2, WP3, WP4 and both existing sync protocols. All checks retain the machine lock, 60-second child deadline and twelve-minute total execution budget.
+Apalache explores one operation ID and both competing local processes for four transitions. The shared lock-handle race is checked in broken and corrected modes for two transitions. These are shallow checks, not exhaustive proofs of full backup or ownership recovery. `pnpm specs:check --recovery` selects WP4; the normal root command includes WP2, WP3, WP4 and all three sync protocols. All checks retain the machine lock, 60-second child deadline and twelve-minute total execution budget.
 
 ### Plan gaps closed: recovery
 
