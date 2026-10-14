@@ -34,9 +34,9 @@ export class SidebarRow {
     readonly win: Page,
     readonly title: string,
   ) {
-    // Rows are named by their title; "Resolve {title}" is the button inside,
-    // so the name must start with the title.
-    this.root = win.getByRole('button', { name: new RegExp(`^${escapeRegExp(title)}`) })
+    // Rows are focusable list items named by their title (a button would
+    // flatten the Resolve button inside it).
+    this.root = win.getByRole('listitem', { name: new RegExp(`^${escapeRegExp(title)}`) })
   }
 
   get resolveButton() {
@@ -88,7 +88,8 @@ export class SidebarRow {
   }
 
   async expectSelected(selected = true): Promise<void> {
-    await expect(this.root).toHaveAttribute('aria-pressed', String(selected))
+    if (selected) await expect(this.root).toHaveAttribute('aria-current', 'true')
+    else await expect(this.root).not.toHaveAttribute('aria-current')
   }
 
   async expectFocused(): Promise<void> {

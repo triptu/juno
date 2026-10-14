@@ -77,6 +77,10 @@ function titleWhenTruncated(event: PointerEvent<HTMLElement>) {
  * check sits in a slot that is always reserved and shows on hover or
  * keyboard focus, so nothing ever moves. The row activates on mouse down;
  * Resolve on click.
+ *
+ * The row is a focusable list item, not a button: a button's children are
+ * presentational, so the Resolve button inside it would be flattened away.
+ * Enter and Space open it, as on a button.
  */
 export const TopicRow = memo(function TopicRow({ row, time, selected = false, tabbable = true, onOpen, onResolve, onPrefetch, onContextMenu, newThreads = 0 }: TopicRowProps) {
   const titleId = useId()
@@ -107,9 +111,9 @@ export const TopicRow = memo(function TopicRow({ row, time, selected = false, ta
 
   return (
     <div
-      role="button"
+      role="listitem"
       tabIndex={tabbable ? 0 : -1}
-      aria-pressed={selected}
+      aria-current={selected || undefined}
       aria-labelledby={titleId}
       aria-describedby={state === undefined ? previewId : `${stateId} ${previewId}`}
       data-topic-row=""
