@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page, type Route as NetworkRoute } from '@playwright/test'
-import { expectNoLayoutShift } from '@juno/testing/layout-shift'
+import { expectNoLayoutShift, measureLayoutShift } from '@juno/testing/layout-shift'
 import { openState, readRoutes, type Route } from './support'
 
 /**
@@ -387,7 +387,8 @@ test.describe('Juno chat', () => {
     const titleBox = await title.boundingBox()
     const seen = new Set<string>()
     for (let round = 0; round < 7; round++) {
-      await expectNoLayoutShift(page, () => page.getByRole('button', { name: 'Next banner' }).click())
+      // The right island is as wide as its chip, so only the left island must hold still.
+      await expectRootHolds(page, () => page.getByRole('button', { name: 'Next banner' }).click(), '[data-island="left"]')
       expect(await title.boundingBox()).toEqual(titleBox)
       for (const chip of await page.locator('[data-banner]').evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-banner')))) {
         if (chip !== null) seen.add(chip)
@@ -396,6 +397,16 @@ test.describe('Juno chat', () => {
     expect([...seen].toSorted()).toEqual(['aiOff', 'offline', 'otherDevice', 'paused', 'recovery', 'updateNeeded'])
   })
 })
+
+/**
+ * No element under `root` changed its box. The browser's own `layout-shift`
+ * entries are left out on purpose: an island grows with its title or chip,
+ * which is the design, and those entries cannot be scoped to a region.
+ */
+async function expectRootHolds(page: Page, action: () => Promise<unknown>, root: string): Promise<void> {
+  const report = await measureLayoutShift(page, action, { root })
+  expect(report.moved).toEqual([])
+}
 
 /**
  * The topic header floats over the list (SPEC 7, inventory 5): the menu
@@ -414,7 +425,8 @@ test.describe('Topic header', () => {
     expect(before.scrollTop).toBeGreaterThan(0)
     const titles = new Set<string>()
     for (let round = 0; round < 6; round++) {
-      await expectNoLayoutShift(page, () => page.getByRole('button', { name: 'Next header' }).click())
+      // The islands are as wide as their content; the list under them must not move.
+      await expectRootHolds(page, () => page.getByRole('button', { name: 'Next header' }).click(), '[data-scroll]')
       expect(await scroller.evaluate((node) => node.scrollTop)).toBe(before.scrollTop)
       expect(await boxes()).toEqual(before.rows)
       titles.add((await page.locator('[data-topic-header] h1').textContent()) ?? '')
@@ -445,14 +457,14 @@ test.describe('Topic header', () => {
     expect(geometry.trackMargin).toBe('68px')
   })
 
-  test('the islands line up with the reading column, and the band lets the pointer through', async ({ page }) => {
+  test('the islands line up with the composer, and the band lets the pointer through', async ({ page }) => {
     await open(page, 'TopicView', 'header/thread-scrolled')
     const left = (await page.locator('[data-island="left"]').boundingBox())!
     const right = (await page.locator('[data-island="right"]').boundingBox())!
-    const column = (await page.getByRole('list', { name: 'Messages' }).boundingBox())!
-    // The column's 24px padding is the islands' inset from its edges, as it is the composer's.
-    expect(Math.round(left.x - column.x)).toBe(24)
-    expect(Math.round(column.x + column.width - (right.x + right.width))).toBe(24)
+    const composer = (await page.locator('[data-composer-slot] > *').first().boundingBox())!
+    // The reading column's 24px padding puts the islands' outer edges on the composer's.
+    expect(Math.round(left.x)).toBe(Math.round(composer.x))
+    expect(Math.round(right.x + right.width)).toBe(Math.round(composer.x + composer.width))
     expect(Math.round(left.y)).toBe(Math.round((await page.locator('[data-topic-view]').boundingBox())!.y + 8))
     const under = await page.evaluate(() => {
       const band = document.querySelector('[data-header-band]')!.getBoundingClientRect()
@@ -469,8 +481,8 @@ test.describe('Topic header', () => {
     expect(Math.round((await resolve.boundingBox())!.width)).toBe(28)
     await open(page, 'TopicHeader', 'narrow/main-336')
     const threads = page.getByRole('button', { name: 'Threads, 12' })
-    await expect(threads).toHaveText('12')
+    await expect(threads).toHaveText('12', { useInnerText: true })
     await open(page, 'TopicHeader', 'narrow/thread-480')
-    await expect(page.getByRole('button', { name: 'Resolve', exact: true })).toHaveText('Resolve')
+    await expect(page.getByRole('button', { name: 'Resolve', exact: true })).toHaveText('Resolve', { useInnerText: true })
   })
 })
