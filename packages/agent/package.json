@@ -6,10 +6,12 @@
   "type": "module",
   "sideEffects": false,
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./crash": "./src/runtime/crash.ts"
   },
   "scripts": {
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
   },
   "dependencies": {
     "@earendil-works/chord": "1.2.0",
@@ -17,18 +19,24 @@
     "@earendil-works/pi-durable": "1.2.0",
     "@earendil-works/pi-mcp": "1.2.0",
     "@juno/agent-contract": "workspace:*",
+    "@juno/agent-memory": "workspace:*",
     "@openai/codex-sdk": "0.162.1",
     "effect": "4.0.3"
   },
   "devDependencies": {
+    "@juno/agent-testing": "workspace:*",
     "@types/node": "24.19.2",
-    "typescript": "5.9.3"
+    "typescript": "5.9.3",
+    "vitest": "5.0.4"
   },
   "juno": {
     "allowedDeps": [
       "@juno/agent-cards",
       "@juno/agent-contract",
       "@juno/agent-memory"
+    ],
+    "testDeps": [
+      "@juno/agent-testing"
     ]
   }
 }
