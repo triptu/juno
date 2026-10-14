@@ -193,12 +193,18 @@ describe('older messages', () => {
     const wider = await watchList(engine, messagesAtom(id, { anchor: first, before: 100, limit: 106 })).until((window) => window.order.length === 106, 'the wider window')
     expect(wider.order.slice(100)).toEqual(bottom.order)
     expect(textOf(wider.rows.get(wider.order[0]!)!)).toBe('old deploy 50')
+    // The old first row continues the bot's run, so it has no header, in this window and in the one that starts with it.
+    expect(wider.rows.get(first)!.groupStart).toBe(false)
+    const recent = await watchList(engine, messagesAtom(id, { limit: 6 })).until((window) => window.order.length === 6, 'the recent deploys again')
+    expect(recent.rows.get(first)!.groupStart).toBe(false)
 
     // Asking again for the same page needs no call; the last 50 make one more, which reaches the start.
     engine.fake.resetCalls()
     expect(valueOf(await loadOlderMessages(engine.registry, id, wider.order[0]!))).toEqual({ outcome: 'fetched', complete: true })
     expect(valueOf(await loadOlderMessages(engine.registry, id, wider.order[0]!))).toEqual({ outcome: 'cached', complete: true })
     expect(conversationCalls(engine)).toHaveLength(1)
+    // Now 'old deploy 49' is stored, just before the window: 'old deploy 50' continues its run and loses its header.
+    await watchList(engine, messagesAtom(id, { anchor: first, before: 100, limit: 106 })).until((window) => window.rows.get(window.order[0]!)!.groupStart === false, 'the first row without a header')
   })
 })
 
