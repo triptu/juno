@@ -97,6 +97,8 @@ for (const command of commands) {
       }
     }
     case 'hold': {
+      // A pending promise alone does not keep Node running; a timer does.
+      setInterval(() => {}, 1000)
       console.log('HOLDING')
       await new Promise(() => {})
       break

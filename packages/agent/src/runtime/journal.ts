@@ -181,8 +181,8 @@ async function startJournal(db: NodeSqliteDatabase, incarnation: string, setting
       return String(submission.id)
     },
     submissionFor: async (opId) => {
-      const row = await db.get<{ id: number }>('SELECT id FROM submissions WHERE conversation_id = ? AND request_id = ?', ROOT_CONVERSATION_ID, opId)
-      return row === undefined ? undefined : String(row.id)
+      const record = await storage.submissionByRequest(ROOT_CONVERSATION_ID, opId, ctx)
+      return record === undefined ? undefined : String(record.id)
     },
     wait: async (submissionId) => {
       const submission = await harness.submission(Number(submissionId) as never, ctx)
