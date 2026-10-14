@@ -4,54 +4,43 @@ Status: accepted, 2026-10-15. `test` and `specs:check` pass remotely on current 
 
 ## Context
 
-Six or more agents work in parallel on one 8-core, 8 GB Mac. Every heavy suite takes one of two slots in `scripts/heavy.mjs`, and `perf` and `test:feel` take the whole machine. Agents spend more time waiting for a slot than running tests. Most suites do not need the Mac: unit tests, Quint specs and the agent tests are plain Node, Java and Rust programs. Only the timing suites (`perf`, `test:feel`) and the screenshots (`gallery:shots`) depend on this machine.
+Six or more agents work in parallel on one 8-core, 8 GB Mac. Every heavy suite takes one of two slots in `scripts/heavy.mjs`, and `perf` and `test:feel` take the whole machine. Agents spent more time waiting for a slot than running tests, the Mac swapped (11 GB of 12 GB swap in use), and checks with deadlines failed under the load. Most suites do not need the Mac: unit tests, Quint specs and the agent tests are plain Node, Java and Rust programs. Only the timing suites (`perf`, `test:feel`) depend on this machine.
 
-[Namespace](https://namespace.so/docs) rents Linux and macOS machines by the minute through the `nsc` CLI. A machine starts in seconds, can be created for one run with a maximum duration, and can mount a cache volume that survives between machines.
+[Namespace](https://namespace.so/docs) rents Linux machines by the minute through the `nsc` CLI. A machine starts in about 5 seconds, can be created for one run with a maximum duration, and pulls from a registry in the workspace.
 
 ## Decision
 
-- `pnpm remote <script> [args...]` (`scripts/remote.mjs`) runs one root script on a fresh Linux machine and streams its output. Each run creates its own machine, so there is no shared lock between agents; the limit is the account's machine quota.
-- What is sent: the files git sees in the worktree (`git ls-files --cached --others --exclude-standard`), so uncommitted work is tested and ignored files (`.env`, `node_modules`, `out/`, test output) are not. Non-Markdown files under `docs/` are left out (design images, about 93 MB). The script refuses to send a file that looks like a key or token file, or whose contents look like a real Slack token or `d` cookie. The repo already holds no secrets or Slack data by rule; this is a second check.
-- On the machine, `scripts/remote/setup.sh` installs Java, xvfb, Node and pnpm, then `pnpm install --frozen-lockfile`. Downloads, the pnpm store and Playwright's Chromium live on the `juno-toolchain` cache volume, so later machines skip them. `scripts/remote/run.sh` runs the script as a normal user under xvfb, with `GALLERY_BROWSER=chromium` and `CI=1`.
-- Reports (`specs/traces`, Playwright `test-results` and `playwright-report`) are copied back into `.remote/<run>/` (ignored by git). The machine is destroyed after the run, also on failure; `--duration 45m` ends a machine whose client died.
-- Allowed scripts: `test`, `specs:check`, `specs:traces`, `test:agent`, `test:agent-contracts`, `test:agent-testing`, `test:gallery`, `test:e2e`. `perf`, `test:feel` and `gallery:shots` are refused: they measure or show the Mac.
+- `pnpm remote <script> [args...]` (`scripts/remote.mjs`) runs one root script on a fresh Linux machine and streams its output and exit code. Each run creates its own machine (`nsc create --bare --duration 60m`), so there is no shared lock between agents; the limit is the workspace's machine quota.
+- Namespace's base image is Wolfi, without apt. The toolchain lives in our own image, `scripts/remote/Dockerfile`: Playwright's Ubuntu image (Chromium, its system libraries, xvfb) plus Node 26, pnpm 12, Java 21, the installed workspace (including Electron) and Quint's Rust evaluator and Apalache. Its tag is a hash of the Dockerfile, `pnpm-lock.yaml` and `pnpm-workspace.yaml`. When the registry lacks it, `pnpm remote` builds it with `nsc build --push` (about two minutes), one build per Mac at a time.
+- What is sent: the files git sees in the worktree (`git ls-files --cached --others --exclude-standard`), so uncommitted work is tested and ignored files (`.env`, `node_modules`, `out/`, test output) are not. Non-Markdown files under `docs/` are left out (design images, about 93 MB). The script refuses to send a file that looks like a key or token file, or whose contents look like a real Slack token or `d` cookie. The tar is streamed into the container over `nsc ssh`; macOS extended attributes are left out (they arrived as `._` test files).
+- Inside, `scripts/remote/run.sh` links the workspace offline, runs the script under xvfb as a normal user with workers sized to the machine, samples CPU use, and packs reports. `nsc ssh` reports every failure as exit code 1, so the script's own code comes back as a marker line.
+- The machine is destroyed when the run ends, on failure, on Ctrl-C and when the client exits; `--duration` ends a machine whose client died. A dial timeout before the script starts is retried.
+- `perf` and `test:feel` are refused: they time the Mac.
+- `specs:check` gets a 16x32 machine (Apalache servers next to the simulations fill it); the rest get 8x16.
 
 ### Which suites match the Mac on Linux
 
-| Suite | Expected on Linux | Why |
+| Suite | On Linux | Notes |
 | --- | --- | --- |
-| `test`, `test:agent*` | Same results | Node and SQLite only. The engine suite runs its files one at a time because the Mac is overloaded; on a dedicated machine that could be relaxed. |
-| `specs:check` | Same results | Quint's Rust simulator and Apalache on Java, with a fixed seed. |
-| `test:gallery` (behaviour and shift guard) | Same results expected, to confirm on the first run | The shift guard compares the page with itself before and after each touch, never with a Mac image. Linux text metrics differ slightly (the fonts are bundled, the rasteriser is not), so a layout that wraps differently could change which states are exercised. Run it on both once and compare. |
-| `test:e2e` (Electron) | Likely, to confirm on the first run | The app already handles non-Mac platforms (no traffic lights or app menu, `app.quit` on last window). Tests use no Cmd shortcuts. `app.spec.ts` reads `process.platform`, so it adapts. Electron needs xvfb and a non-root user. |
-| `gallery:shots` | No | The screenshots are for reviewing the Mac look. |
+| `test`, `test:agent*` | Same results (verified) | Node and SQLite only. |
+| `specs:check` | Same results (verified) | Quint's Rust simulator and Apalache, fixed seed. |
+| `test:gallery`, `gallery:shots` | To verify | The shift guard compares a page with itself, never with a Mac image. Fonts are bundled, so text uses the same faces; the rasteriser differs. |
+| `test:e2e` (Electron) | To verify | The app already handles non-Mac platforms, and the tests use no Cmd shortcuts. |
 | `perf`, `test:feel` | No | They time frames on the Mac. |
 
 ## Cost
 
-Prices from <https://namespace.so/pricing>, October 2026. Linux `8x16` (8 vCPU, 16 GB) is $0.008 a minute prepaid ($0.012 overage), billed by the minute with a one-minute minimum. A cold run adds about two minutes of setup; with a warm cache volume, about one. A `specs:check` or `test` run is then 3 to 6 minutes, so about $0.03 to $0.05. Six agents running twenty remote jobs a day each is about 600 machine minutes, about $5 a day. Cache volumes cost $0.002 per GB-hour while attached, which is negligible at 30 GB for a few minutes.
-
-Plan limits on concurrent Linux machines: Developer (free, pay as you go) 32 vCPU, so four `8x16` machines at once; Team ($100 a month, 100,000 unit minutes included) 64 vCPU, eight at once. Team is the right size for six to eight agents.
-
-## What the owner sets up
-
-1. A Namespace account and workspace (Team plan for eight concurrent machines).
-2. `brew install namespacelabs/namespace/nsc`, then `nsc login` once on the Mac.
-3. A token for scripts, stored outside the repo (the docs show this grant; whether `nsc ssh` needs more actions is unconfirmed):
-   `nsc token create --name juno-remote --grant '{"resource_type":"instance","resource_id":"*","actions":["create","get","list","destroy"]}' --expires_in 365d --token_file ~/.config/juno/nsc-token.json`
-   and `export NSC_TOKEN_FILE=~/.config/juno/nsc-token.json` in the shell profile the agents use. `pnpm remote` refuses a token file inside the repo.
-4. A first run of each suite with both `pnpm <script>` and `pnpm remote <script>`, to confirm the Linux results match before agents switch.
-
-Still unconfirmed, to check on the first run: that `nsc ssh -T` forwards stdin (the upload and report copy pipe a tar stream through it), the base image of `nsc create --bare` (setup.sh assumes Ubuntu with apt and root), and the token grants `ssh` needs.
+Prices from <https://namespace.so/pricing>, October 2026: Linux 8x16 is $0.008 a minute prepaid, 16x32 about twice that, billed by the minute. A `specs:check` run on 16x32 takes about 3.5 minutes end to end, so about $0.06. Six agents running twenty remote jobs a day each is about 120 runs and well under $10 a day.
 
 ## Alternatives
 
-- **Namespace GitHub Actions runners.** Good for CI later, but an agent would have to push a branch, wait for a workflow to be queued and read logs through the API. The direct machine streams output and tests uncommitted work.
-- **A long-lived devbox per agent.** Keeps `node_modules` warm, but is billed while idle and gives back a shared-state problem the per-run machine avoids.
-- **A bigger Mac.** Helps the timing suites, which must stay on a Mac, but does not scale with the number of agents.
+- **Install the toolchain on each machine.** Wolfi has no apt, and installing Java, Node and Electron's libraries on every run costs minutes. The image does it once per lockfile.
+- **Namespace GitHub Actions runners.** Good for scheduled runs later, but an agent would have to push a branch and read logs through the API. The direct machine streams output and tests uncommitted work.
+- **A long-lived devbox per agent.** Keeps state warm, but is billed while idle and brings back shared state.
+- **Cache volumes for the toolchain.** A volume is saved only when the instance's main process exits cleanly; machines we destroy did not save it in a test. The image does not depend on that.
 
 ## Consequences
 
-- The heavy-job lock now guards only Mac-bound work when agents use `pnpm remote` for the rest.
+- The heavy-job lock guards only Mac-bound work once agents use `pnpm remote` for the rest.
 - A remote failure that does not reproduce on the Mac is a platform difference to fix or record, not a reason to skip the suite.
 - Reports land in `.remote/`; clean it up from time to time.
