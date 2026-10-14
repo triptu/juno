@@ -20,6 +20,7 @@
     "health:size": "node scripts/health-size.mjs",
     "test": "node scripts/heavy.mjs pnpm -r --workspace-concurrency=2 --if-present test",
     "test:e2e": "node scripts/heavy.mjs sh -c \"pnpm --filter @juno/desktop test:e2e && pnpm --filter @juno/gallery test:e2e\"",
+    "test:feel": "node scripts/heavy.mjs pnpm --filter @juno/desktop test:feel",
     "test:gallery": "node scripts/heavy.mjs pnpm --filter @juno/gallery test:e2e",
     "package": "pnpm --filter @juno/desktop package",
     "gallery": "pnpm --filter @juno/gallery dev",

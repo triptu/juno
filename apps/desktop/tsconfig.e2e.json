@@ -4,5 +4,5 @@
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "types": ["node"]
   },
-  "include": ["e2e", "playwright.config.ts", "src/renderer/juno.d.ts"]
+  "include": ["e2e", "playwright.config.ts", "playwright.feel.config.ts", "src/renderer/juno.d.ts"]
 }
