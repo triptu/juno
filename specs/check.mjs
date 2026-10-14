@@ -2,8 +2,8 @@ import { spawn, spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
-import { createServer } from 'node:net'
-import { tmpdir } from 'node:os'
+import { connect, createServer } from 'node:net'
+import { homedir, tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { actionCases, recoveryCases, replayCases } from './agent-checks.mjs'
@@ -67,6 +67,37 @@ function freePort() {
   })
 }
 
+// One Apalache server for the whole run. Starting its JVM takes from a few
+// seconds to over a minute on a loaded machine; Quint would start one per
+// check. It starts on the first uncached Apalache check and has its own
+// two-minute deadline; each check still has 60 seconds. Without a downloaded
+// Apalache, each check lets Quint start (and download) its own on a free port.
+let apalache
+function apalacheServer() {
+  apalache ??= (async () => {
+    const port = await freePort()
+    const exe = join(process.env.QUINT_HOME ?? join(homedir(), '.quint'), `apalache-dist-${apalacheVersion}`, 'apalache/bin/apalache-mc')
+    if (!existsSync(exe)) return { port, stop: () => {} }
+    const child = spawn(exe, ['server', `--port=${port}`], { cwd: generated, stdio: 'ignore', detached: process.platform !== 'win32' })
+    const stop = () => { try { process.kill(process.platform === 'win32' ? child.pid : -child.pid, 'SIGKILL') } catch { /* Already exited. */ } }
+    process.on('exit', stop)
+    const ready = () => new Promise(resolve => {
+      const socket = connect(port, '127.0.0.1', () => { socket.destroy(); resolve(true) })
+      socket.on('error', () => resolve(false))
+    })
+    const deadline = Date.now() + 120000
+    while (!(await ready())) {
+      if (child.exitCode !== null || Date.now() > deadline) {
+        stop()
+        throw new Error(`The Apalache server did not start on port ${port}`)
+      }
+      await new Promise(resolve => setTimeout(resolve, 500))
+    }
+    return { port, stop }
+  })()
+  return apalache
+}
+
 function spawnQuint(args, timeout, port) {
   const verify = args[0] === 'verify'
   const commandArgs = verify ? [args[0], join(root, args[1]), ...args.slice(2), '--server-endpoint', `localhost:${port}`] : args
@@ -112,7 +143,8 @@ async function runJob(job) {
   const budget = 720000 - (Date.now() - startedAt)
   if (budget <= 0) throw new Error('Spec check exceeded its twelve-minute execution budget')
   if (trace) rmSync(trace, { force: true })
-  const result = await spawnQuint(args, Math.min(timeout, budget), args[0] === 'verify' ? await freePort() : undefined)
+  const port = args[0] !== 'verify' ? undefined : existsSync(join(process.env.QUINT_HOME ?? join(homedir(), '.quint'), `apalache-dist-${apalacheVersion}`)) ? (await apalacheServer()).port : await freePort()
+  const result = await spawnQuint(args, Math.min(timeout, Math.max(0, 720000 - (Date.now() - startedAt))), port)
   const output = result.stdout + result.stderr
   const log = `${label}\n${output}`
   // A syntax, runtime, download, or tool failure is never an expected counterexample.
@@ -151,6 +183,7 @@ async function runAll() {
     }
   }
   await Promise.all([lane(queues[0]), ...Array.from({ length: Math.max(1, parallel - 1) }, () => lane(queues[1]))])
+  if (apalache) (await apalache.catch(() => ({ stop: () => {} }))).stop()
   if (failed) {
     if (failed.log) console.log(failed.log)
     throw failed
