@@ -648,11 +648,19 @@ export const motion = stylex.defineVars({
 
 /** Layout. Fixed widths and heights of the shell. */
 export const layout = stylex.defineVars({
+  // The default; the live width is this variable set on the shell.
   '--sidebar-width': '384px',
+  '--sidebar-min-width': '280px',
+  '--sidebar-max-width': '480px',
+  '--sidebar-resize-hit': '6px',
   '--titlebar-height': '44px',
+  // Kept free for the traffic lights at the start of the sidebar bar, or of
+  // the tab strip while the sidebar is hidden.
+  '--titlebar-lights-inset': '78px',
   '--tab-height': '35px',
   '--tab-width': '230px',
   '--tab-min-width': '120px',
+  '--tab-pinned-width': '40px',
   '--topic-header-height': '100px',
   '--reading-width': '800px',
   '--composer-width': '752px',
@@ -760,6 +768,7 @@ export const sizes = stylex.defineVars({
   '--slider-thumb': '14px',
   '--slider-width': '200px',
   '--unread-dot': '5px',
+  '--tab-unread-dot': '6px',
   '--focus-ring-width': '2px',
   '--focus-ring-offset': '2px',
 })
