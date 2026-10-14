@@ -399,9 +399,12 @@ test.describe.serial('large workspace', () => {
         expect(over / frames.length).toBeLessThan(0.01)
       }
       // The first pass lays out rows the window has never shown; the second is the steady state.
+      const warmed = await juno.lastMark('juno.prefetch')
       await sweep('first pass')
       await win.waitForTimeout(1000)
       await sweep('second pass')
+      // Rows that scroll under the still pointer are not warmed (performance.md 3.2).
+      expect(await juno.lastMark('juno.prefetch')).toBe(warmed)
       console.log(`scrollTop after the run: ${await list.evaluate((node) => node.scrollTop)}`)
 
       // Memory per process (working set, MB) and the renderer's JS heap and DOM size.

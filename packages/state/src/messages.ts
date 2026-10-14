@@ -39,6 +39,7 @@ import {
 import { liveQuery, prefetch, runCommand } from './atoms'
 import type { Registry } from './client'
 import { emptyWindow, sameOrder, type ListWindow } from './list'
+import { mark } from './perf'
 
 /** Which messages a tab wants. See `messages.list` in the contract. */
 export interface MessageWindowSpec {
@@ -160,5 +161,6 @@ export const loadOlderMessages = (registry: Registry, id: string, before: string
  * Local queries only.
  */
 export function prefetchTopic(registry: Registry, id: string): void {
+  mark('juno.prefetch', undefined, { replace: true })
   prefetch(registry, [messagesAtom(id, registry.get(messageWindowSpecAtom(id))), topicAtom(id)])
 }

@@ -497,6 +497,11 @@ export class Juno {
     }, name)
   }
 
+  /** When one of the app's marks (`@juno/state/perf`) was last recorded, on the page's clock; undefined if never. */
+  async lastMark(name: string): Promise<number | undefined> {
+    return this.win.evaluate((markName) => performance.getEntriesByName(markName, 'mark').at(-1)?.startTime, name)
+  }
+
   /** Every recorded duration of one measure, oldest first. */
   async measures(name: string): Promise<number[]> {
     return this.win.evaluate((measureName) => performance.getEntriesByName(measureName, 'measure').map((entry) => entry.duration), name)
