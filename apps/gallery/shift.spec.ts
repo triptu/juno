@@ -310,7 +310,8 @@ test.describe('Juno chat', () => {
 
   test('a bubble arrives whole above the dots and moves nothing above it', async ({ page }) => {
     await open(page, 'JunoChatList', 'shift/bubble-arrives')
-    const rows = [page.locator('[data-chat-owner]'), page.locator('[data-chat-juno]').first()]
+    // The visible bubbles. A bubble that stops being the last of its group gives up the empty slot under it, which shows nothing.
+    const rows = [page.locator('[data-chat-owner] p'), page.locator('[data-chat-juno] p').first()]
     const before = await Promise.all(rows.map((row) => row.boundingBox()))
     for (const count of [2, 3]) {
       await step(page, 'bubble')
