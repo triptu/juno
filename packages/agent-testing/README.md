@@ -70,7 +70,7 @@ OAuth servers do discovery, dynamic registration, the authorization code grant w
 | `backup.segmentWritten` | recovery | `encrypt` | `manifest` | `nonceAfterCrash`, `manifestBeforeSegment` |
 | `backup.manifestRenamed` | recovery | `manifest` | `export` | `exportCrash` |
 
-The contract with the agent: at each point, the agent checks `JUNO_AGENT_CRASH_AT` (`point` or `point:n` for the nth hit) and, if it names this point, kills itself with SIGKILL. `crashPoint(point)` is that check for test programs; the agent's runtime carries its own copy, because `src` may not import this package.
+The contract with the agent: at each point, the agent checks `JUNO_AGENT_CRASH_AT` (`point` or `point:n` for the nth hit) and, if it names this point, kills itself with SIGKILL. The points and `crashPoint(point)` belong to the agent (`@juno/agent/crash`, in `packages/agent/src/runtime/crash.ts`); this package re-exports them for test programs.
 
 - `runAgent({ args, env?, crashAt? })` runs a program and returns its exit, signal and output. `crashAt(point, options)` also requires the SIGKILL, and otherwise fails with the spec transition the point stands for.
 - `snapshotFiles(dir)` copies the agent directory. Taken right after a crash at a point, it is the state at that commit boundary. `restore(only?)` puts it back over a later state and deletes matching files written since: power loss, or with `journalFiles` a journal restored behind the archive (spec `rollback`). `agentDatabaseFiles` selects `agent.sqlite` and its siblings.

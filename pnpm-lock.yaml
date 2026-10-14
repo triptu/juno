@@ -385,6 +385,9 @@ importers:
       '@juno/agent-contract':
         specifier: workspace:*
         version: link:../agent-contract
+      '@juno/agent-memory':
+        specifier: workspace:*
+        version: link:../agent-memory
       '@openai/codex-sdk':
         specifier: 0.162.1
         version: 0.162.1
@@ -392,12 +395,18 @@ importers:
         specifier: 4.0.3
         version: 4.0.3
     devDependencies:
+      '@juno/agent-testing':
+        specifier: workspace:*
+        version: link:../agent-testing
       '@types/node':
         specifier: 24.19.2
         version: 24.19.2
       typescript:
         specifier: 5.9.3
         version: 5.9.3
+      vitest:
+        specifier: 5.0.4
+        version: 5.0.4(@types/node@24.19.2)(vite@7.3.7(@types/node@24.19.2)(jiti@2.7.0)(lightningcss@1.33.0)(yaml@2.9.1))
 
   packages/agent-cards:
     dependencies:
@@ -473,6 +482,9 @@ importers:
       '@earendil-works/pi-mcp':
         specifier: 1.2.0
         version: 1.2.0
+      '@juno/agent':
+        specifier: workspace:*
+        version: link:../agent
       '@juno/agent-contract':
         specifier: workspace:*
         version: link:../agent-contract
