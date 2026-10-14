@@ -230,10 +230,9 @@ function openThreadInNewTab(id: string): void {
 }
 
 /**
- * A topic's latest messages, read-only, for New chat's preview (spec
- * section 9): opened at the bottom, no "N new" divider, and nothing is
- * marked read, as with peek. It never reads or writes the topic's scroll
- * snapshot, which belongs to the topic's tab.
+ * A topic's latest messages, read-only: New chat's preview (spec section 9),
+ * and the same for peek (section 5). The list alone, with no header or
+ * composer, in `readOnly` mode (see `TopicProps`).
  */
 export const TopicPreview = memo(function TopicPreview({ id }: { readonly id: string }) {
   const result = useAtomValue(topicAtom(id))
@@ -242,7 +241,19 @@ export const TopicPreview = memo(function TopicPreview({ id }: { readonly id: st
   return <Topic key={id} id={id} detail={detail} readOnly />
 })
 
-function Topic({ id, detail, readOnly = false }: { readonly id: string; readonly detail: TopicDetail; readonly readOnly?: boolean }) {
+interface TopicProps {
+  readonly id: string
+  readonly detail: TopicDetail
+  /**
+   * Read-only: the message list alone, opened at the bottom, with no "N new"
+   * divider; nothing is marked read, the tab's scroll snapshot is neither
+   * read nor written, and thread links open in a new tab. Otherwise the
+   * topic as a tab shows it, with its header and composer.
+   */
+  readonly readOnly?: boolean
+}
+
+function Topic({ id, detail, readOnly = false }: TopicProps) {
   const list = useAtomValue(messageListAtom(id))
   const now = useAtomValue(nowAtom, (time) => Math.floor(time / TIME_STEP) * TIME_STEP)
   const focused = useWindowFocused()
