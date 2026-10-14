@@ -184,7 +184,7 @@ Versions are pinned exactly: pi 1.2.0 and Codex SDK 0.162.1.
 
 1. **The redaction transaction** (the owner's click, after the keychain deletion record is raised, §14.4): Tombstone the messages and `gen += 1`, and bump `pin_rev` if a pin is deactivated. Compute the taint closure over `nodes.inputs`. Because context is raw messages (§4.2), the closure of a message `m` holds only nodes whose interval contains `m`, nodes that start within 16 KB of archive after `m`, and their ancestors: about two nodes per message in that 16 KB, plus two per tree level. Write `view_rev` with `masked` entries for tainted lines, and advance the head. Deactivate the pins. Mark tainted pending proposals `expired` and revoke grants from tainting runs. Enqueue rebuilds at `ver+1`, and enqueue `purge` jobs for old node versions and attachments. From this commit on, no request, zoom or publication can expose tainted text: the builder renders masked lines as `(being updated)`, zoom returns `removed`, and jobs with an older `gen` are discarded.
 2. **In-flight work:** the active run is aborted if its request included tainted content, and its queued steer starts a fresh run. Running subagents spawned in tainting runs are stopped, and their reports are quarantined.
-3. **Purge**, eventually: Delete old node versions and attachment pages. Delete the Codex session files. Rotate the journal within 24 hours. If a background job blocks rotation, Settings shows "Removal pending: 1 copy in a running job [Stop job]". Start a new backup generation (§14).
+3. **Purge**, eventually: Delete old node versions and attachment pages. Delete the Codex session files. Rotate the journal within 24 hours. If a background job blocks rotation, Settings shows "Removal pending · 1 copy in a running job · Stop job". Start a new backup generation (§14).
 4. The chat shows "Removed". "Memory of this chat" shows masked lines until they are rebuilt.
 
 ## 5. Requests, admission and spend (R3, R10, R15)
@@ -266,7 +266,7 @@ unknown ─reconcile─▶ done (positive evidence) | unknown (kept, shown) ; re
 | GPT Sol | `openai/gpt-<ver>-sol` | yes (`gpt-<ver>-sol`) |
 | Grok | `x-ai/grok-<ver>` | no |
 
-- **Resolution:** Fetch OpenRouter's public `GET /api/v1/models` at startup and daily, caching the last result in `agent.sqlite`. Keep models whose `supported_parameters` include `tools`. Exclude `:batch` (which does not stream), `~…-latest` aliases (a moving target breaks cache stability), `-pro` and `-contributor` variants, image models, and models below the compatibility window (§5.1). Pick the newest `created` per family. Join with pi-ai 1.2.0's catalogue for API kind and compat. pi-ai's chat catalogue holds only tool-calling models, and every chat API it uses streams. A slug missing there is sent as OpenAI-compatible, with the price taken from OpenRouter's `pricing` field.
+- **Resolution:** Fetch OpenRouter's public `GET /api/v1/models` at startup and daily, caching the last result in `agent.sqlite`. Keep models whose `supported_parameters` include `tools`. Exclude `:batch` (which does not stream), `~…-latest` aliases (a moving target breaks cache stability), `-pro`, `-contributor`, `-lite`, `-preview` and `-image` variants, non-numeric versions (Muse is the exception: `meta/muse-<word>[-<ver>]`, spikes finding 5), and models below the compatibility window (§5.1). Pick the newest `created` per family. Join with pi-ai 1.2.0's catalogue for API kind and compat. pi-ai's chat catalogue holds only tool-calling models, and every chat API it uses streams. A slug missing there is sent as OpenAI-compatible, with the price taken from OpenRouter's `pricing` field.
 - **Sol via Codex:** the list comes from Codex's own model listing (app-server, S3), falling back to pi-ai's `openai-codex` catalogue. Today that resolves to `gpt-6.1-sol` with a 272k window.
 - The row shows the family, the resolved model ("Claude Sonnet 5.5"), its provider (OpenRouter, or Codex for Sol), and a price hint.
 - The saved choice is `{ family, provider }`. The resolved slug is stored per day, so a newer release takes over only at the next daily refresh, and the change is logged in Activity.
@@ -305,14 +305,14 @@ unknown ─reconcile─▶ done (positive evidence) | unknown (kept, shown) ; re
 - **States:** `off → connecting → ready ⇄ degraded → needs-sign-in → error(backoff 1 s, 5 s, 30 s, 5 min)`.
 - **Tool lists are discovered at connect** (paginated `tools/list`) and on `list_changed`. Each tool's `schema_hash` is stored. A tool on the server's **default allowlist** and present at connect is Tier 0. A **new or unknown tool is Tier 3** until the owner moves it on Settings › Connections, which lists the discovered tools with their hints. A changed schema on an allowlisted tool drops it to Tier 3 until reviewed, and voids open approvals (§6.2). Annotations are shown as hints and never grant Tier 0 by themselves.
 - **The model sees two fixed tools,** `find_tools` and `call_tool`. Turn state lists the ready servers. Results longer than 20 KB become attachments, and the prompt requires Juno to say when a result was cut or a server is down.
-- **Secrets policy:** Every outgoing MCP argument passes a secret filter: an exact match against the keychain values Juno holds, plus token patterns. A hit blocks the call and tells the owner in words. For servers marked `noSecrets` (T3), auth headers, cookies and stored credentials are never attached, whatever the config says.
+- **Secrets policy:** Every outgoing MCP argument passes a secret filter: an exact match against the keychain values Juno holds, plus token patterns. A hit blocks the call and tells the owner in words. For servers marked `noSecrets` (T3), Juno sends only the server's own OAuth token, only to the origin that issued it (spikes, finding 1); no other header, cookie or stored credential is attached, whatever the config says.
 
 ### 10.2 Default servers
 | Server | Connection | Default Tier 0 allowlist | Notes |
 | --- | --- | --- | --- |
 | Notion | `https://mcp.notion.com/mcp`, OAuth (PKCE, DCR, refresh) through pi-mcp, tokens in the keychain | The search and fetch tools, matched by name at connect | Writes are Tier 3 with a `last_edited_time` precondition |
 | Littlebird | `https://mcp.littlebird.ai/mcp`, OAuth | The search and read tools, matched at connect against the read names Littlebird publishes (meetings, context search, routine reports, account). Anything else is Tier 3 | Adding material and creating or updating routines are writes, so Tier 3 |
-| T3 Code | Setting `t3.url`, default `http://192.168.1.22:3773/mcp`. No auth. `noSecrets: true`. See the connection rule below | `t3_thread_read`, `t3_thread_list`, `t3_thread_search`, `t3_thread_wait`, `t3_pending_request_list`, `t3_project_list`, `t3_worktree_list`, `t3_worktree_status` | Launch, send and interrupt are Tier 2 through the T3 adapter. Pending-request answers are Tier 3 |
+| T3 Code | Setting `t3.url`, default `http://192.168.1.22:3773/mcp`. OAuth (registration, PKCE, no refresh token, spikes finding 1). `noSecrets: true` for briefs and arguments; the OAuth token is the connection's own. See the connection rule below | `t3_thread_read`, `t3_thread_list`, `t3_thread_search`, `t3_thread_wait`, `t3_pending_request_list`, `t3_project_list`, `t3_worktree_list`, `t3_worktree_status` | Launch, send and interrupt are Tier 2 through the T3 adapter. Pending-request answers are Tier 3 |
 
 **T3 connection rule:**
 
@@ -328,7 +328,7 @@ Fakes for all three servers (WP10) mirror the shapes above. Real adapters are bu
 ## 11. Proactive scheduling and delivery (B2, H3, H4)
 
 ### 11.1 Schedules
-- `schedule_create({ at | every | cron, reason, prompt, deliver: now | digest | silent, source_op })` works with no click only in a clean owner run. `source_op` must be an owner input from that run, and the call mints the schedule's grant. In a tainted owner run it returns a `proposedSchedule` card instead. Start on that card is the owner's click; its op becomes `source_op` and mints the grant (§6.4, G6). Wake and report runs get neither path.
+- `schedule_create({ at | every | wallClock (time, time zone, weekdays), reason, prompt, deliver: now | digest | silent, source_op })` works with no click only in a clean owner run. `source_op` must be an owner input from that run, and the call mints the schedule's grant. In a tainted owner run it returns a `proposedSchedule` card instead. Start on that card is the owner's click; its op becomes `source_op` and mints the grant (§6.4, G6). Wake and report runs get neither path.
 - From wake and report runs, only `schedule_pause` and `schedule_delete` on the schedule that woke them are available.
 - Limits: 20 active schedules, intervals of at least 15 minutes, and one-shot wakes at most a year ahead. A schedule untouched for 30 days pauses itself and says so once.
 - Wakes are admitted once per `(schedule_id, schedule_rev, due_at)` through the inbox, revalidating the revision and the grant first.
@@ -352,14 +352,14 @@ Fakes for all three servers (WP10) mirror the shapes above. Real adapters are bu
 | `resolve` | topics[] | Resolve, Dismiss | "Resolved 3 · Undo" |
 | `topics` | links | open | none |
 | `proposedTask` | kind, title, where | Start, Dismiss | "Started" |
-| `task` | job, title, where, phase, live state. No `status`: `phase` is its only machine | Open, Stop | "Done · Open PR 412", "Failed · Show in Activity", "Stopped", or the can't-tell line |
-| `question` | source header ("T3 Code asks", "Juno asks"), prompt, 2–4 options, free text | option, Reply | "You chose …" |
-| `proposedSchedule` | what, when, deliver, and the prompt each wake will run, all **rendered from the stored payload** (G6) | Start, Dismiss | "Started" |
+| `task` | job, title, where, phase (`running`, `needsYou`, `quiet`, `lostSight`, `stopping`, then `done`, `failed`, `stopped` or `unknown`), live state. No `status`: `phase` is its only machine. `lostSight` reads "Sign in to T3 Code to keep watching" and Open becomes Sign in | Open, Stop | "Done · Open PR 412", "Failed · Show in Activity", "Stopped", or the can't-tell line |
+| `question` | source header ("T3 Code asks", "Juno asks"), prompt, 2–4 options, free text | option, Reply | "You chose …" or "You replied" |
+| `proposedSchedule` | what, when, deliver, and `prompt`, the instruction each wake will run, all **rendered from the stored payload** (G6) | Start, Dismiss | "Started" |
 | `schedule` | what, when, deliver | Keep, Pause, Delete | "Kept", "Paused" or "Deleted" |
 | `connect` | server, scopes, what leaves the machine | Connect, Skip | "Connected" |
 | `change` | server, target, a field preview **rendered from the payload**, model caption | Apply, Dismiss | "Applied · Open" |
 | `remove` | messages, only for a removal Juno proposes; the owner's Remove is the local sheet (§4.5) | Remove, Keep | "Removed 2 messages" |
-| `budget` | spend today, cap | Allow $1 more today, Wait | "Allowed until midnight" |
+| `budget` | spend today, cap | Allow $1 more today, Wait until tomorrow | "Allowed until midnight" |
 | `provider` | "Choose a model provider": OpenRouter key or Codex, with the fixed disclosure | Set up | "Using Claude Sonnet 5.5" |
 
 - The model cannot invent a kind. Cards expire after 7 days, or when the source changes ("Expired · Ask again"). An unknown kind renders "This card needs a newer Juno".
@@ -387,6 +387,7 @@ The chat has four item kinds: owner bubble, Juno bubble with cards, the status b
 | Running | The status bubble |
 | Queued | "Queued" under the last owner bubble, at 70% opacity, after 500 ms |
 | Waiting | "Waiting for network", "Waiting for Resume" or "Waiting for your review". The inbox write succeeded; the run starts when it can |
+| Too long | "That is too long to send as one message. Split it up and send the parts." The message stays, marked not sent |
 | Not delivered | "Not delivered · Try again". Only when the inbox write failed. Retrying resubmits the same `op_id` text |
 | Stopped | "Stopped. Juno won't start anything new for this reply." Work already handed off before Stop may still finish; its card shows the result (§6.5) |
 | Interrupted | "Juno was interrupted. Your message is kept. [Try again]". No Try again for wake and report runs |
@@ -468,19 +469,19 @@ The property names and meanings below follow `review/astra-v2.md`. Where this pl
 
 - Astra's 24: `sourceIdentityStable`, `retainedSourceExact`, `redactionMonotone`, `nodeIdentityStable`, `nodeInputsCurrent`, `treeClosed`, `viewPartition`, `viewReferencesValid`, `viewCAS`, `restartPreservesHead`, `mergePreservesCoverage`, `mergeDueOrder`, `prefixBetweenBatches`, `pinAuthorityExact`, `pinBudget`, `redactionExcludesReads`, `retrievalSound`, `requestSnapshotConsistent`, `requestCoverageDeclared`, `requestProtocolValid`, `requestBounded`, `mandatoryPinsIncluded`, `compactorLimits`, `pendingWorkRecoverable`.
 - Changed: `nodeInputsCurrent` includes the local-window context messages, and nodes record no pins (G1). `requestSnapshotConsistent` revalidates `pin_rev` as well as `gen` (G3). The empty-view fallback for `covered > H` is removed (G2).
-- Added: `taintClosureExact`: masked entries are exactly the closure of a redaction over recorded inputs. `guardStampRequired`: no dispatch without a valid builder stamp. `taintLocal` (G1), `viewWithinCutoff` (G2), `pinEditCurrent` (G3), `nodeBounded` and `parentInputFits` (G4). Exact definitions are in `review/wp2-gaps.md`.
+- Added: `taintClosureExact`: masked entries are exactly the closure of a redaction over recorded inputs. `guardStampRequired`: no dispatch without a valid builder stamp. `taintLocal` (G1), `viewWithinCutoff` (G2), `pinEditCurrent` (G3), `nodeBounded` and `parentInputFits` (G4). Exact definitions are in `review/wp2-gaps.md`. The spec also checks `pinsSurviveCompaction`.
 
 **WP3 `specs/agent-actions.qnt`, safety:**
 
-- Astra's 22: `intentBeforeDispatch`, `approvalExact`, `approvalCurrentAtAuthorization`, `approvalConsumption`, `noHiddenRetry`, `retryRequiresAuthority`, `unknownPreserved`, `dedupeIdentityStable`, `dedupedEffectOnce`, `receiptMatchesAction`, `scopedNoClickGrant`, `untrustedCannotGrant`, `tier4NeverDispatched`, `allWritesGated`, `currentOwnerAuthorizes`, `pauseBlocksAuthorization`, `scheduleGrantValid`, `occurrenceAdmissionOnce`, `cancelWinsBeforeAdmission`, `batchEffectsIndependent`, `outcomeEvidenceStable`.
-- Changed: `quietHoursHoldAuthorization` is replaced by `quietHoursHoldNotifications`: no OS notification in quiet hours unless the schedule is `now` (H4). `scheduleFromCleanOwnerRun` becomes `scheduleFromOwnerAuthority`: every schedule has a source from a clean owner run or an owner click on a current `proposedSchedule` card (G6). `capHard` bounds compaction inside the cap, at 25% of `cap + raises` (G5). `currentOwnerAuthorizes` is the local check only (G7).
-- Added: `scheduleFromCleanOwnerRun`: every model-created schedule has a `source_op` from a clean owner run (B2). `cleanRunForNoClick`: a no-click Tier 2 start happens only in a clean owner run (R8). `capHard`: reserved plus actual spend never exceeds the cap plus the owner's raises (R15).
+- Astra's 21: `intentBeforeDispatch`, `approvalExact`, `approvalCurrentAtAuthorization`, `approvalConsumption`, `noHiddenRetry`, `retryRequiresAuthority`, `unknownPreserved`, `dedupeIdentityStable`, `dedupedEffectOnce`, `receiptMatchesAction`, `scopedNoClickGrant`, `untrustedCannotGrant`, `tier4NeverDispatched`, `allWritesGated`, `currentOwnerAuthorizes`, `pauseBlocksAuthorization`, `scheduleGrantValid`, `occurrenceAdmissionOnce`, `cancelWinsBeforeAdmission`, `batchEffectsIndependent`, `outcomeEvidenceStable`.
+- Changed: `quietHoursHoldAuthorization` is replaced by `quietHoursHoldNotifications`: no OS notification in quiet hours unless the schedule is `now` (H4). `scheduleFromCleanOwnerRun` becomes `scheduleFromOwnerAuthority`: every schedule has a source from a clean owner run or an owner click on a current `proposedSchedule` card (G6). `currentOwnerAuthorizes` is the local check only (G7).
+- Added: `cleanRunForNoClick`: a no-click Tier 2 start happens only in a clean owner run (R8). `capHard`: reserved plus actual spend never exceeds the cap plus the owner's raises, with compaction inside it (R15, G5). `scheduleFromOwnerAuthority` (B2, G6) is above.
 - `authorizeDispatch`, `transportSend`, `destinationAccept` and `recordReceipt` are separate actions.
 
 **WP4 `specs/agent-recovery.qnt`, safety:**
 
 - Astra's 10: `singleLocalOwner`, `acknowledgedInputDurable`, `projectionPrefix`, `journalIdentityUnique`, `ordinaryCrashPreservesCommittedAuthority`, `transferCheckpointComplete`, `restoreDoesNotAuthorize`, `backupChainComplete`, `restoreRespectsDeletion`, and `staleOwnerCannotAuthorize` (expected to fail under folder-only recovery, and kept as a documented counterexample).
-- Added (G7–G13): `observedOwnerStops`, `checkpointHoldsRelease`, `exportNotCaptured`, `deletionRecordedBeforeRemoved`, and `staleFolderCannotRestoreRemoved` (expected to fail without a trusted deletion record, and kept as a documented counterexample like `staleOwnerCannotAuthorize`). Exact definitions are in `review/wp3-wp4-gaps.md`.
+- Added (G7–G13): `observedOwnerStops`, `checkpointHoldsRelease`, `exportNotCaptured`, `deletionRecordedBeforeRemoved`, and `staleFolderCannotRestoreRemoved` (expected to fail without a trusted deletion record, and kept as a documented counterexample like `staleOwnerCannotAuthorize`). Exact definitions are in `review/wp3-wp4-gaps.md`. The spec also checks `lockBeforeWrite`, `journalRollbackStopsResume`, `bridgeDedupe`, `exportAfterManifest`, `encryptionNonceFresh`, `backupSanitized`, `generationKeyAvailable`, `releaseBeforePublication` and `finiteDomains`.
 
 **Temporal properties,** typechecked, with drains:
 - `eventuallyProjected`, `eventuallySummarized`, `retryEventuallyRuns`, `redactionEventuallySettles`, and `batchEventuallyFinishes` (memory). `unknownEventuallyExplained`, `approvedEventuallyAttempted`, `missedWakeEventuallyAdmitted`, and `pauseEventuallyQuiescent` (actions). `transferEventuallyCompletes` and `backupEventuallyCatchesUp` (recovery).
