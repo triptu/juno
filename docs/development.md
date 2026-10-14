@@ -33,7 +33,8 @@ Run these from the repo root.
 | `pnpm test:feel` | Builds, then records the feel suite against the fake Slack: slow-motion videos, filmstrips and frame checks in `apps/desktop/feel-report/`. See "The feel suite". |
 | `pnpm gallery` | Starts the fixture gallery at http://localhost:4174 (browser only, no Electron). |
 | `pnpm gallery:shots` | Builds the gallery and screenshots every state in light and dark into `apps/gallery/shots/<Component>/<group>/<state>-<theme>.png`. |
-| `pnpm specs:check` | Checks every Quint spec in `specs/`, including the broken and corrected pairs for Juno Agent. About ten minutes. `--memory`, `--actions` or `--recovery` selects one agent spec. See `specs/README.md`. |
+| `pnpm specs:check` | Checks every Quint spec in `specs/`, including the broken and corrected pairs for Juno Agent. Runs three Quint processes at a time and skips checks that passed before with the same inputs (see "Faster test runs"). `--memory`, `--actions` or `--recovery` selects one agent spec. See `specs/README.md`. |
+| `pnpm remote <script>` | Runs a Linux-safe root script (`test`, `specs:check`, `test:agent*`, `test:gallery`, `test:e2e`) on a fresh Namespace machine and streams the output. `--dry-run` shows what would be sent and run. See ADR 0013. |
 | `pnpm test:agent-contracts` | Runs the `agent-cards` and `agent-contract` property tests: card identities, digests, retries, the RPC codecs and the chat projection. |
 | `pnpm --filter @juno/agent-memory test` | Runs the pure memory rules' property tests. Its script takes the heavy-job lock itself. |
 | `pnpm --filter @juno/engine test` | Runs one package's suite (here the engine's: the port protocol over an in-memory MessageChannel, live query serving). |
@@ -404,6 +405,14 @@ At the end of each UI milestone, run these reviews in parallel and turn the find
 
 Effect and StyleX pitfalls are in their skills: `.claude/skills/effect/SKILL.md` ("Pitfalls") and
 `.claude/skills/stylex/SKILL.md`.
+
+## Faster test runs
+
+- **Spec cache.** `pnpm specs:check` stores each passing Quint run in the system temp folder (`juno-cache/specs`), keyed by its arguments, what is checked on its output, the spec file and what it imports, and the Quint and Apalache versions. Every worktree shares it. A run whose key matches is not repeated: its saved output goes through the same checks and its trace is written back to `specs/traces/`. A changed spec reruns only its own checks. `SPECS_CACHE=off pnpm specs:check` or `--no-cache` runs everything; `SPECS_JOBS=<n>` sets how many Quint processes run at once (default 3: one lane for Apalache, two for simulations). Bump `cacheVersion` in `specs/check.mjs` when you change how a result is checked.
+- **Build skip.** `test:e2e`, `perf`, `test:feel`, `test:gallery` and `gallery:shots` build through `scripts/build-cached.mjs`, which skips the build when no file git sees in the app or `packages/` changed since the last build and the output is untouched. `JUNO_REBUILD=1` forces a build. `pnpm build` and `pnpm dev` always build.
+- **Shift guard.** The guard waits only for transitions and animations that are running after a touch, and its twelve parts take components from one queue in the temp folder, so they finish together. `GALLERY_SHIFT_ONLY=Button,Chip pnpm test:gallery` checks a few components while you iterate.
+- **Changed tests only.** `pnpm test --changed main` runs only the vitest files affected by changes since `main` (vitest follows imports across packages). Run the full suite once before you report.
+- **Remote runs.** `pnpm remote <script>` takes no local slot (ADR 0013).
 
 ## Heavy jobs share one queue
 
