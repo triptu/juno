@@ -250,22 +250,38 @@ section.sheet { width: 1400px; }
 .hA .fade { height: 20px; }
 .hA .art { width: 22px; height: 22px; margin-right: -2px; }
 
-/* B: floating islands over the list. */
-.hB { position: absolute; z-index: 2; top: 10px; left: 12px; right: 12px; height: 36px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; pointer-events: none; }
-.hB.narrow { grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
-.hB.narrow .isl.t { justify-self: start; max-width: 100%; }
-.isl { pointer-events: auto; height: 36px; border-radius: 999px; background: var(--surface-raised); box-shadow: 0 1px 2px 0 oklch(0 0 0 / .05), 0 6px 16px -6px oklch(0 0 0 / .14), 0 0 0 1px var(--border-default); display: flex; align-items: center; gap: 2px; padding: 4px; min-width: 0; }
-.isl.t { grid-column: 2; padding: 4px 10px 4px 6px; gap: 8px; max-width: 560px; }
-.hB.narrow .isl.t { grid-column: 1; }
-.isl.r { grid-column: 3; justify-self: end; }
-.hB.narrow .isl.r { grid-column: 2; }
+/* B: floating islands on a band. The list runs under both. */
+.stage.b .list { padding-top: 56px; }
+.bandB { position: absolute; z-index: 1; left: 0; right: 0; top: 0; height: 68px; pointer-events: none; background: linear-gradient(var(--background) 44px, color-mix(in oklch, var(--background) 0%, transparent) 68px); }
+.hB { position: absolute; z-index: 2; top: 8px; left: 0; right: 0; height: 36px; max-width: 800px; margin: 0 auto; padding: 0 24px; display: flex; align-items: center; justify-content: space-between; gap: 8px; pointer-events: none; }
+.hB.center { max-width: none; display: grid; grid-template-columns: 1fr auto 1fr; padding: 0 12px; }
+.hB.center .isl.t { grid-column: 2; }
+.hB.center .isl.r { grid-column: 3; justify-self: end; }
+.hB.panelh { max-width: none; padding: 0 12px; }
+.isl { pointer-events: auto; height: 36px; border-radius: 999px; background: var(--surface-default); border: 1px solid transparent; box-shadow: var(--card-ring); display: flex; align-items: center; gap: 2px; padding: 3px; min-width: 0; position: relative; }
+.isl.t { flex: 0 1 auto; padding: 3px 3px 3px 5px; }
+.isl.r { flex: none; }
+.tbtn { height: 28px; padding: 0 8px; border-radius: 999px; display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+.tbtn.open { background: var(--secondary-default); }
+.tbtn b { font-size: 14px; font-weight: 600; }
+.tbtn .mark { width: 18px; height: 18px; }
 .isl .ttl2 { font-size: 14px; }
+.isl .cp { flex: none; max-width: 160px; }
+.isl .tbtn { flex: 0 1 auto; min-width: 72px; }
 .isl .dn { width: 12px; height: 12px; color: var(--foreground-muted); flex: none; }
 .isl .a { border-radius: 999px; }
-.isl .tb { height: 28px; padding: 0 10px; border-radius: 999px; display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 500; color: var(--foreground-subtle); white-space: nowrap; }
-.isl .tb svg { width: 14px; height: 14px; }
-.fadeB { position: absolute; z-index: 1; left: 0; right: 0; top: 0; height: 72px; pointer-events: none; background: linear-gradient(var(--background) 30%, color-mix(in oklch, var(--background) 0%, transparent)); }
-.stage.b .list { padding-top: 56px; }
+.isl .tb { height: 28px; padding: 0 10px; border-radius: 999px; display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 500; color: var(--foreground-default); white-space: nowrap; }
+.isl .tb svg { width: 14px; height: 14px; color: var(--foreground-subtle); }
+.isl .tb.ic { width: 28px; padding: 0; justify-content: center; }
+.isl .tb.ic svg { width: 16px; height: 16px; }
+.chipb { height: 28px; padding: 0 10px; border-radius: 999px; background: var(--secondary-default); font-size: 12.5px; font-weight: 500; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.chipb u { text-decoration: none; font-weight: 600; }
+.thumb { position: absolute; z-index: 0; right: 3px; width: 4px; border-radius: 4px; background: var(--border-strong); }
+.guide { position: absolute; z-index: 6; left: 0; right: 0; border-top: 1px dashed var(--hl-text); pointer-events: none; }
+.guide span { position: absolute; left: 8px; top: 1px; font: 600 10.5px/1 var(--font-sans); color: var(--hl-text); background: var(--background); padding: 2px 4px; border-radius: 3px; }
+.isl .menu { top: 42px; left: 0; }
+.mi svg { width: 15px; height: 15px; color: var(--foreground-subtle); }
+.panel.cover { width: auto; flex: 1; border-left: 0; }
 
 /* C: identity block. 64px, art 36, context line under the title, bordered buttons. */
 .hC { height: 64px; flex: none; position: relative; z-index: 2; background: var(--background); }
@@ -289,7 +305,7 @@ section.sheet { width: 1400px; }
 .ph2 b, .hA b.jn { font-size: 15px; font-weight: 600; }
 .plist { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; padding: 0 16px 12px; gap: 2px; }
 .plist > * { flex: none; }
-.jcol { max-width: 800px; width: 100%; margin: 0 auto; padding: 0 24px 8px; display: flex; flex-direction: column; gap: 2px; }
+.jcol { max-width: 720px; width: 100%; margin: 0 auto; padding: 0 32px 8px; display: flex; flex-direction: column; gap: 2px; }
 .jcol > * { flex: none; }
 .bm { display: flex; align-items: flex-end; gap: 10px; }
 .bm.own { justify-content: flex-end; }
@@ -345,18 +361,26 @@ section.sheet { width: 1400px; }
   </defs>
 </svg>
 <svg width="0" height="0" style="position:absolute"><defs>
+  <symbol id="i-link" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></symbol>
+  <symbol id="i-out" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></symbol>
+  <symbol id="i-ban" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="m5.7 5.7 12.6 12.6"/></symbol>
+  <symbol id="i-dot" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.5" fill="currentColor"/></symbol>
   <symbol id="i-expand" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M20 4l-7 7M10 20H4v-6M4 20l7-7"/></symbol>
   <symbol id="i-juno" viewBox="0 0 64 64"><circle cx="40" cy="10" r="7" fill="currentColor"/><path d="M47.5 25 C47.5 35.5 46 42.5 40.5 46.5 C37.5 48.6 34.5 48.6 31 48.6" fill="none" stroke="currentColor" stroke-width="8.5" stroke-linecap="round"/><circle cx="20" cy="48.6" r="5" fill="currentColor"/><circle cx="10.5" cy="36.5" r="4.5" fill="currentColor"/></symbol>
 </defs></svg>
 
 <section class="sheet theme-light" data-key="a-light" data-dir="A"><h1>A · One line</h1><p class="lede">One 52px row under the tab strip: the context pill, the title, then the actions. No rule; the messages fade out under it. 96px of chrome above the first message, down from 144.</p><div data-overview></div></section>
 <section class="sheet theme-dark" data-key="a-dark" data-dir="A"><h1>A · One line</h1><p class="lede">Dark theme.</p><div data-overview></div></section>
-<section class="sheet theme-light" data-key="b-light" data-dir="B"><h1>B · Floating</h1><p class="lede">No bar. Two raised islands float over the messages: the pill and title in the centre, with a chevron that opens the topic menu, and the few actions on the right. Messages scroll under both behind a tall fade.</p><div data-overview></div></section>
+<section class="sheet theme-light" data-key="b-light" data-dir="B"><h1>B · Floating</h1><p class="lede">The chosen direction. No bar: two solid islands float on a band of the page colour, aligned to the reading column. Left: the context pill and the title, whose chevron opens the topic menu. Right: Resolve (Threads on Main) and Juno. Messages scroll under the band and fade out below the islands.</p><div data-overview></div></section>
 <section class="sheet theme-dark" data-key="b-dark" data-dir="B"><h1>B · Floating</h1><p class="lede">Dark theme.</p><div data-overview></div></section>
+<section class="sheet theme-light" data-key="b-family-light" data-dir="B"><h1>B · One family</h1><p class="lede">The topic, the Juno panel and the Juno tab share the islands, the band and the chevron menu. The topic's and the panel's islands sit on one line, 8px under the tab strip.</p><div data-familyb></div></section>
+<section class="sheet theme-dark" data-key="b-family-dark" data-dir="B"><h1>B · One family</h1><p class="lede">Dark theme.</p><div data-familyb></div></section>
+<section class="sheet theme-light" data-key="b-detail-light" data-dir="B"><h1>B · Details</h1><p class="lede">Alignment, the topic menu, the list's top inset and the narrow window.</p><div data-detailb></div></section>
+<section class="sheet theme-dark" data-key="b-detail-dark" data-dir="B"><h1>B · Details</h1><p class="lede">Dark theme.</p><div data-detailb></div></section>
 <section class="sheet theme-light" data-key="c-light" data-dir="C"><h1>C · Identity</h1><p class="lede">A 64px block led by the topic art at 36px, the title with the context under it like a breadcrumb, and small bordered buttons on the right. No rule; a short fade.</p><div data-overview></div></section>
 <section class="sheet theme-dark" data-key="c-dark" data-dir="C"><h1>C · Identity</h1><p class="lede">Dark theme.</p><div data-overview></div></section>
-<section class="sheet theme-light" data-key="family-light" data-dir="A"><h1>One family: A everywhere</h1><p class="lede">The recommended direction applied to the topic, the Juno panel and the Juno tab. Every header is a 52px line with no rule and the same fade, so the topic header and the panel header read as one bar.</p><div data-family></div></section>
-<section class="sheet theme-dark" data-key="family-dark" data-dir="A"><h1>One family: A everywhere</h1><p class="lede">Dark theme.</p><div data-family></div></section>
+<section class="sheet theme-light" data-key="a-family-light" data-dir="A"><h1>One family: A everywhere</h1><p class="lede">The recommended direction applied to the topic, the Juno panel and the Juno tab. Every header is a 52px line with no rule and the same fade, so the topic header and the panel header read as one bar.</p><div data-family></div></section>
+<section class="sheet theme-dark" data-key="a-family-dark" data-dir="A"><h1>One family: A everywhere</h1><p class="lede">Dark theme.</p><div data-family></div></section>
 
 <script>
 const I = (id, cls = '') => `<svg class="${cls}"><use href="#i-${id}"/></svg>`
@@ -412,12 +436,25 @@ function headA(t, o) {
   else acts = `${a('pin', f(2))}${a('bell', f(3))}<span class="gap8"></span><span class="ta2"${F(f(4))}>${I('circ')}Resolve</span><span class="gap8"></span>${a('spark', f(5), o.panel)}${a('dots', f(6))}`
   return `<div class="hA"><div class="in">${pill(t, '', f(1))}<span class="ttl2">${t.title}</span><span class="spacer"></span><div class="acts">${acts}</div></div><div class="fade${o.top ? ' off' : ''}"></div></div>`
 }
+const MENU = (t) => `<div class="menu">
+  <div class="mi">${I('out')}Open in new tab<span class="hk">⌘ click</span></div><div class="sep"></div>
+  <div class="mi sel">${I('pencil')}Rename</div>
+  <div class="mi">${I('dot')}Mark as unread</div>
+  <div class="mi">${I('pin')}Pin</div>
+  <div class="mi">${I('circ')}Resolve</div><div class="sep"></div>
+  <div class="mi">${I('link')}Copy Slack link</div>
+  <div class="mi">${I('out')}Open in Slack</div>
+  <div class="mi">${I('bell')}Notify me<span class="hk">When it matters ›</span></div>
+  <div class="mi">${I('ban')}Ignore #${t.ch}</div></div>`
+const BAND = '<div class="bandB"></div>'
+const guides = (marks) => marks.map(([y, label, x = 8, up]) => `<div class="guide" style="top:${y}px"><span style="left:${x}px;${up ? 'top:-15px' : ''}">${label}</span></div>`).join('')
 function headB(t, o) {
-  let r
-  if (o.narrow) r = a('spark', 0, o.panel)
-  else if (t.main) r = `<span class="tb">${I('chats')}Threads · ${t.threads}</span>${a('bell')}${a('spark', 0, o.panel)}`
-  else r = `<span class="tb">${I('circ')}Resolve</span>${a('bell')}${a('spark', 0, o.panel)}`
-  return `<div class="fadeB"></div><div class="hB${o.narrow ? ' narrow' : ''}"><div class="isl t">${pill(t)}<span class="ttl2">${t.title}</span>${I('down', 'dn')}</div><div class="isl r">${r}</div></div>`
+  const f = o.focus ? (n) => n : () => 0
+  const lead = t.main
+    ? `<span class="tb${o.tight ? '' : ''}"${F(f(3))}>${I('chats')}${o.tight ? t.threads : 'Threads · ' + t.threads}</span>`
+    : o.tight ? `<span class="tb ic"${F(f(3))} title="Resolve">${I('circ')}</span>` : `<span class="tb"${F(f(3))}>${I('circ')}Resolve</span>`
+  const left = `<div class="isl t">${pill(t, '', f(1))}<span class="tbtn${o.menu ? ' open' : ''}"${F(f(2))}><span class="ttl2">${t.title}</span>${I('down', 'dn')}</span>${o.menu ? MENU(t) : ''}</div>`
+  return `${BAND}<div class="hB${o.center ? ' center' : ''}">${left}<div class="isl r">${lead}${a('spark', f(4), o.panel)}</div></div>`
 }
 function headC(t, o) {
   const icon = t.dm ? `<span class="av a" style="width:36px;height:36px;margin:0;font-size:13px">${t.dm}</span>` : t.main ? `<span class="art" style="width:36px;height:36px;border-radius:10px;display:grid;place-items:center;background:var(--secondary-default);color:var(--foreground-subtle)">${I(t.icon)}</span>` : blob(t.art, 36)
@@ -463,9 +500,52 @@ const PANEL = `<div class="panel"><div class="ph2">${JM(20)}<b>Juno</b><span cla
   </div>
   <div class="pcomp"><div class="pbox"><div class="ta">Ask about this topic</div><span class="snd">${I('up')}</span></div></div></div>`
 
-function win({ dir, t, w, h, sb, panel, top, junoTab, focus }) {
+const PANEL_B = (cover) => `<div class="panel${cover ? ' cover' : ''}"><div class="stage b">${BAND}<div class="hB panelh"><div class="isl t"><span class="tbtn">${JM(18)}<b>Juno</b>${I('down', 'dn')}</span></div><div class="isl r">${a('expand')}${a('x')}</div></div>
+  <div class="plist" style="padding-top:56px">
+    <div class="dsep">Yesterday</div>
+    <div class="about">About Hiring loop for the platform role</div>
+    <div class="bm own"><div class="bub">Who still owes a scorecard?</div></div><div class="g"></div>
+    <div class="bm jn">${JM(28)}<div class="bub">Only Leo. Elena and Sam sent theirs on Monday.</div></div>
+    <div class="dsep">Today</div>
+    <div class="about">About Postgres 16 cutover window</div>
+    <div class="bm own"><div class="bub">Catch me up</div></div><div class="g"></div>
+    <div class="bm jn">${JM(28)}<div class="bub">Dev wants one more day of replica checks, so Thursday night. Leo says billing closes Thursday at 2am and needs a heads-up. Maya needs your call.</div></div>
+  </div></div>
+  <div class="pcomp"><div class="pbox"><div class="ta">Ask about this topic</div><span class="snd">${I('up')}</span></div></div></div>`
+const JUNO_LIST = `<div class="list"><div class="jcol">
+        <div class="dsep">Yesterday</div>
+        <div class="bm own"><div class="bub">Remind me to send the offsite budget on Friday</div></div><div class="g"></div>
+        <div class="bm jn">${JM(28)}<div class="bub">Done. I'll remind you on Friday at 9.</div></div>
+        <div class="dsep">Today</div>
+        <div class="about">About Postgres 16 cutover window</div>
+        <div class="bm own"><div class="bub">Catch me up</div></div><div class="g"></div>
+        <div class="bm jn">${JM(28)}<div class="bub">Dev wants one more day of replica checks, so Thursday night. Leo says billing closes Thursday at 2am and needs a heads-up. Maya needs your call.</div></div>
+        <div class="g"></div>
+        <div class="bm own"><div class="bub">Anything else waiting on me?</div></div><div class="g"></div>
+        <div class="bm jn">${JM(28)}<div class="bub">Elena asked in #hiring for a call about Rina's offer before Friday.</div></div>
+      </div></div>`
+function win({ dir, t, w, h, sb, panel, top, junoTab, focus, menu, center, marks, thumb, banner }) {
+  const topicW = w - (sb ? 384 : 0) - (panel ? 360 : 0)
+  const cover = dir === 'B' && panel && topicW < 480
+  if (dir === 'B') {
+    const o = { tight: topicW < 480, panel, focus, menu, center }
+    let body
+    if (junoTab) {
+      body = `<div class="topic"><div class="stage b">${BAND}<div class="hB" style="max-width:720px;padding:0 32px"><div class="isl t"><span class="tbtn">${JM(18)}<b>Juno</b>${I('down', 'dn')}</span></div>${banner ? `<div class="isl r"><span class="chipb">Juno is paused · <u>Resume</u></span></div>` : ''}</div>${JUNO_LIST}</div>
+      <div class="comp"><div class="compin"><div class="pbox"><div class="ta">Message Juno</div><span class="snd">${I('up')}</span></div></div></div></div>`
+    } else if (cover) {
+      body = ''
+    } else {
+      const msgs = top ? t.msgs.slice(0, 3) : t.msgs
+      const list = `<div class="list${top ? ' top' : ''}"><div class="col">${msgs.join('')}</div></div>`
+      const th = thumb ? `<span class="thumb" style="top:${thumb[0]}px;height:${thumb[1]}px"></span>` : ''
+      body = `<div class="topic"><div class="stage b">${headB(t, o)}${list}${th}${marks ? guides(marks) : ''}</div>${composer(t.ph)}</div>`
+    }
+    const sideHtml = sb ? side(t === T.priv ? 1 : 0) : ''
+    return `<div class="win" style="width:${w}px;height:${h}px">${sideHtml}<div class="work">${strip(t, sb, junoTab)}<div style="display:flex;flex:1;min-height:0">${body}${panel ? PANEL_B(cover) : ''}</div></div></div>`
+  }
   const narrow = (w - (sb ? 384 : 0) - (panel ? 360 : 0)) < 480
-  const o = { narrow: dir === 'B' ? (w - (sb ? 384 : 0)) < 640 : narrow, panel, top, focus }
+  const o = { narrow, panel, top, focus }
   let body
   if (junoTab) {
     body = `<div class="topic"><div class="hA"><div class="in">${JM(20)}<b class="jn">Juno</b><span class="spacer"></span>${a('dots')}</div><div class="fade"></div></div>
@@ -496,10 +576,10 @@ function win({ dir, t, w, h, sb, panel, top, junoTab, focus }) {
 
 const ch = (dir, b) => `<span class="chrome">${b}</span>`
 function overview(dir) {
-  const hgt = { A: '44 + 52 = 96px of chrome', B: '44px of chrome, the islands sit over the messages', C: '44 + 64 = 108px of chrome' }[dir]
+  const hgt = { A: '44 + 52 = 96px of chrome', B: 'islands 36px, band 68px, the list runs under it', C: '44 + 64 = 108px of chrome' }[dir]
   const narrowCap = {
     A: 'At 720px with the sidebar shown, the topic is 336px. Under 480px of header width, Pin, Notify me and Resolve fold into More (they are already in it). The pill keeps its tint and icon; its name and the title take the ellipsis.',
-    B: 'Narrow: the title island moves to the left and truncates; the right island keeps only Juno. Everything else is behind the chevron.',
+    B: 'At 336px the islands keep their places. Resolve becomes an icon button that keeps its name, "Resolve". The title takes the ellipsis first, then the channel name; the pill\'s tint and icon always show. Juno stays.',
     C: 'Narrow: the kind text after the pill goes first, then Pin, Notify me and Resolve fold into More. The 36px art keeps its room.',
   }[dir]
   return `<div class="colhead"><b>Thread topic</b>#eng, sidebar shown ${ch(dir, hgt)}</div>
@@ -526,6 +606,43 @@ function family() {
       <p class="spec"><b>Sizes.</b> Row 52px, content capped at 800px and centred, padding 0 20 0 24, gap 10. Pill 24px, padding 0 9, gap 5, 12.5/600, icon 13. Title 15/600. Icon buttons 28px, radius 8, icon 16, gap 2. Resolve 28px, padding 0 10, 12.5/500, inset ring <code>--border-strong</code>, 6px either side. Fade 20px, <code>--background</code> to transparent, under the row. The panel header uses the same row, padding 0 12 0 16.</p>
     </div>`
 }
+function familyB() {
+  return `<div class="colhead"><b>Topic with the Juno panel</b>one line of islands across both ${ch('B', 'tab order shown')}</div>
+    ${win({ dir: 'B', t: T.thread, w: 1320, h: 560, panel: true, focus: true })}
+    <p class="cap">Numbers are the Tab order in the topic header: the pill, the title (a menu button), Resolve, Juno. The pill comes first, so the channel is the first thing seen and reached. Juno shows pressed while the panel is open. The panel's islands hold its menu, Open in a tab and Close; the panel follows the topic composer in the Tab order.</p>
+    <div class="colhead" style="margin-top:28px"><b>Juno tab</b>the same left island, a state chip on the right</div>
+    ${win({ dir: 'B', t: T.thread, w: 1000, h: 440, junoTab: true, banner: true })}
+    <p class="cap">The left island is the mark, "Juno" and the chevron, which opens the Juno menu (Scheduled, What Juno remembers, Memory of this chat, Activity, Connections, Settings › Juno). It replaces the More button. A banner chip, when there is one, is the right island. The islands align to the chat's 720px column.</p>
+    <div class="colhead" style="margin-top:28px"><b>Panel beside a 520px topic</b>both keep their islands</div>
+    ${win({ dir: 'B', t: T.thread, w: 1264, h: 400, sb: true, panel: true })}
+    <div class="colhead" style="margin-top:28px"><b>Panel over a 336px topic</b>under 480px the panel covers the topic</div>
+    ${win({ dir: 'B', t: T.thread, w: 1080, h: 400, sb: true, panel: true })}
+    <p class="cap">SPEC 7: when the topic would be under 480px, the panel covers it. The topic's islands are hidden with it; the panel's own islands take the line.</p>`
+}
+function detailB() {
+  return `<div class="colhead"><b>Centred</b>considered</div>
+    ${win({ dir: 'B', t: T.thread, w: 1100, h: 300, center: true })}
+    <div class="colhead" style="margin-top:20px"><b>On the reading column</b>chosen</div>
+    ${win({ dir: 'B', t: T.thread, w: 1100, h: 300 })}
+    <p class="cap">Centred islands sit off the column's left edge, so the eye jumps from the title to the messages, and they need a second layout for narrow windows. On the column, the islands' outer edges line up with the composer's edges (the column's 24px padding), the title reads first as everywhere else in Juno, and one layout works from 336px to any width.</p>
+    <div class="colhead" style="margin-top:28px"><b>The topic menu</b>the title opens the row's menu</div>
+    ${win({ dir: 'B', t: T.thread, w: 1100, h: 500, menu: true })}
+    <p class="cap">Click the title, or Enter, Space or ↓ on it, and the topic's context menu opens under the island: the same items and order as the sidebar row. Rename is in it, so double-click to rename goes. Visible on the right: Resolve (Threads on Main) and Juno. Pin, Notify me, Rename and the rest live in the menu; there is no separate More button.</p>
+    <div class="row2" style="margin-top:28px">
+      <div><div class="colhead"><b>At scroll top</b>the inset keeps the first message clear</div>${win({ dir: 'B', t: T.thread, w: 620, h: 360, top: true, thumb: [68, 70], marks: [[8, 'islands 8 to 44', 250, true], [44, 'band solid to 44', 250], [68, 'band ends at 68 · scrollbar track starts', 330, true], [72, 'first message at 72', 330]] })}</div>
+      <div><div class="colhead"><b>Scrolled</b>text fades out between 44 and 68</div>${win({ dir: 'B', t: T.thread, w: 620, h: 360, thumb: [150, 70] })}</div>
+    </div>
+    <div class="row2" style="margin-top:28px">
+      <div><div class="colhead"><b>Narrow</b>a 336px topic</div>${win({ dir: 'B', t: T.priv, w: 720, h: 400, sb: true })}</div>
+      <p class="cap" style="max-width:520px;margin-top:30px">Under 480px Resolve is an icon button named "Resolve". The title shortens first, then the channel name; the pill's tint and icon always show.</p>
+    </div>
+    <div class="row2" style="margin-top:28px">
+      <div><div class="colhead"><b>Narrow Main</b>Threads keeps its count</div>${win({ dir: 'B', t: T.main, w: 720, h: 400, sb: true })}</div>
+      <p class="cap" style="max-width:520px;margin-top:30px">Threads shows its icon and count, named "Threads, 12". "#design-review" shortens before "Main" would drop under 72px.</p>
+    </div>`
+}
+for (const s of document.querySelectorAll('[data-familyb]')) s.outerHTML = familyB()
+for (const s of document.querySelectorAll('[data-detailb]')) s.outerHTML = detailB()
 for (const s of document.querySelectorAll('[data-overview]')) s.outerHTML = overview(s.closest('section').dataset.dir)
 for (const s of document.querySelectorAll('[data-family]')) s.outerHTML = family()
 
