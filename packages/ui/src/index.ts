@@ -58,6 +58,7 @@ export { Toast, ToastRegion, type ToastAction, type ToastProps, type ToastRegion
 export { TopicArt, type TopicArtProps, type TopicArtSize } from './TopicArt'
 export { accentLabels, accentNames, applyTheme, defaultAccent, isAccentName, isThemeName, themeNames, type AccentName, type ThemeName } from './theme'
 export { firstGrapheme } from './internal/grapheme'
+export { pointerMoved } from './internal/pointer'
 export { activateHandlers, type ActivateEvent, type ActivateHandler, type ActivateHandlers, type ActivateOptions } from './internal/activate'
 export type { LayoutStyles } from './internal/sx'
 export {
