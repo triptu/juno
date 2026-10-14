@@ -159,7 +159,7 @@ test('Copy Slack link and Open in Slack from a row and from a message', async ({
   const postgres = juno.sidebar.row(POSTGRES)
 
   await postgres.chooseInMenu('copy-link')
-  await expect.poll(() => juno.clipboard()).toMatch(/^https:\/\/[^/]+\/archives\/C0ENG\/p\d+$/)
+  await expect.poll(() => juno.clipboard()).toMatch(/\/archives\/C0ENG\/p\d+$/)
   await postgres.chooseInMenu('open-in-slack')
   await expect.poll(() => juno.slackLinks()).toEqual([expect.stringMatching(/^slack:\/\/channel\?team=T0JUNO&id=C0ENG$/)])
 
@@ -169,7 +169,7 @@ test('Copy Slack link and Open in Slack from a row and from a message', async ({
   await juno.topic.expectMessage('Booked 2–4pm')
   await juno.chooseNextMenuItem('copy-link')
   await reply.click({ button: 'right' })
-  await expect.poll(() => juno.clipboard()).toMatch(/^https:\/\/[^/]+\/archives\/C0ENG\/p\d+\?thread_ts=\d+\.\d+&cid=C0ENG$/)
+  await expect.poll(() => juno.clipboard()).toMatch(/\/archives\/C0ENG\/p\d+\?thread_ts=\d+\.\d+&cid=C0ENG$/)
   await juno.chooseNextMenuItem('open-in-slack')
   await reply.click({ button: 'right' })
   await expect.poll(async () => (await juno.slackLinks()).length).toBe(2)

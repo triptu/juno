@@ -4,6 +4,11 @@
  */
 import type { TopicDetail } from '@juno/contract'
 
+/** A thread's root ts from its topic id (`t:<channel>:<thread_ts>`, architecture 4.4); undefined for Main. */
+export function threadRootTs(topicId: string): string | undefined {
+  return topicId.startsWith('t:') ? topicId.slice(topicId.lastIndexOf(':') + 1) : undefined
+}
+
 export function slackLink(workspaceUrl: string, topic: Pick<TopicDetail, 'channel' | 'rootTs'>): string {
   const base = new URL(`archives/${topic.channel.id}`, workspaceUrl.endsWith('/') ? workspaceUrl : `${workspaceUrl}/`).toString()
   return topic.rootTs === undefined ? base : `${base}/p${topic.rootTs.replace('.', '')}`

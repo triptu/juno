@@ -43,6 +43,7 @@ import {
   sidebarRowAtom,
   signedInAtom,
   slackLink,
+  threadRootTs,
   topicAtom,
   undoLast,
   type ToastContent,
@@ -54,11 +55,12 @@ export type ActionTopic = Pick<TopicDetail, 'id' | 'kind' | 'title' | 'channel' 
   readonly rootTs?: string | undefined
 }
 
-/** The header's detail when it is loaded, else the sidebar row. */
+/** The header's detail when it is loaded, else the sidebar row with its thread's root from the id. */
 function topicOf(id: string): ActionTopic | undefined {
   const header = registry.get(topicAtom(id))
   if (header._tag === 'Success' && header.value !== null) return header.value
-  return registry.get(sidebarRowAtom(id))
+  const row = registry.get(sidebarRowAtom(id))
+  return row === undefined ? undefined : { ...row, rootTs: threadRootTs(id) }
 }
 
 /** How a toast names a topic: its title, or the channel label for Main ("#eng"). */
