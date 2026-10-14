@@ -1,0 +1,506 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>New chat and window chrome</title>
+<style>
+@font-face { font-family: 'Figtree Variable'; font-weight: 300 900; font-display: block; src: url('../home/fonts/figtree-latin-wght-normal.woff2') format('woff2-variations'); }
+@font-face { font-family: 'Instrument Serif'; font-weight: 400; font-display: block; src: url('../home/fonts/instrument-serif-latin-400-normal.woff2') format('woff2'); }
+
+/* Tokens: packages/tokens/src/tokens.stylex.ts and themes.stylex.ts, Coral accent. */
+.theme-light {
+  --background: hsla(48, 50%, 98%, 1); --background-subtle: hsla(48, 35%, 97%, 1);
+  --surface-default: hsla(48, 30%, 98%, 1); --surface-hover: hsla(48, 30%, 94%, 1); --surface-raised: hsla(48, 30%, 98%, 1);
+  --secondary-default: hsla(48, 30%, 92%, 1); --secondary-hover: hsla(48, 30%, 90%, 1); --secondary-active: hsla(48, 30%, 88%, 1);
+  --border-subtle: hsla(48, 30%, 92%, 1); --border-default: hsla(48, 30%, 91%, 1); --border-strong: hsla(48, 30%, 88%, 1); --input-border: hsla(48, 14%, 82%, 1);
+  --foreground-default: hsla(48, 15%, 12%, 1); --foreground-subtle: hsla(48, 8%, 35%, 1); --foreground-muted: hsla(48, 5%, 42%, 1);
+  --hl: #CC4628; --hl-fg: #FFFFFF; --hl-text: #B4351F; --hl-soft: color-mix(in oklch, #CC4628 10%, var(--background));
+  --warning: #E0A500; --info: #008AB3;
+  --shadow-sm: 0 1px 2px 0 rgba(27, 28, 21, 0.04);
+  --card-ring: 0 1px 2px 0 oklch(0 0 0 / .03), 0 6px 20px -4px oklch(0 0 0 / .07);
+  --pop-shadow: 0 2px 6px -1px oklch(0 0 0 / 0.05), 0 14px 36px -8px oklch(0 0 0 / 0.13);
+  --sheet: #EFEDE6; --lights: #E1DFD6;
+}
+.theme-dark {
+  --background: #1B1916; --background-subtle: #151411;
+  --surface-default: #252421; --surface-hover: #2D2B28; --surface-raised: #373532;
+  --secondary-default: #302F2C; --secondary-hover: #383633; --secondary-active: #403E3A;
+  --border-subtle: #2B2A27; --border-default: #32302D; --border-strong: #3C3A37; --input-border: #464541;
+  --foreground-default: #EEEBE2; --foreground-subtle: #C6C4BE; --foreground-muted: #A09E9A;
+  --hl: #FF8A73; --hl-fg: #2A0D06; --hl-text: #FF9C87; --hl-soft: color-mix(in oklch, #FF8A73 14%, var(--background));
+  --warning: #E0A500; --info: #008AB3;
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.30);
+  --card-ring: 0 1px 2px 0 oklch(0 0 0 / .3), 0 6px 20px -4px oklch(0 0 0 / .35);
+  --pop-shadow: 0 2px 6px -1px oklch(0 0 0 / 0.3), 0 14px 36px -8px oklch(0 0 0 / 0.5);
+  --sheet: #0F0E0C; --lights: #3A3834;
+}
+.theme-light, .theme-dark {
+  --tint-public-bg: var(--secondary-default); --tint-public-fg: var(--foreground-subtle);
+  --tint-private-bg: color-mix(in oklch, var(--warning) 15%, var(--background)); --tint-private-fg: color-mix(in oklch, var(--warning) 42%, var(--foreground-default));
+  --tint-dm-bg: color-mix(in oklch, var(--info) 12%, var(--background)); --tint-dm-fg: color-mix(in oklch, var(--info) 55%, var(--foreground-default));
+}
+:root {
+  --font-sans: 'Figtree Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-serif: 'Instrument Serif', ui-serif, Georgia, serif;
+}
+
+* { box-sizing: border-box; cursor: default; }
+body { margin: 0; font-family: var(--font-sans); font-size: 14px; line-height: 1.5; letter-spacing: 0.01em; -webkit-font-smoothing: antialiased; background: #ddd; }
+svg { display: block; flex: none; }
+section.sheet { background: var(--sheet); color: var(--foreground-default); padding: 32px 36px 40px; width: max-content; }
+h1 { font: 400 26px/1.15 var(--font-serif); margin: 0 0 4px; }
+.lede { margin: 0 0 24px; color: var(--foreground-muted); font-size: 13px; max-width: 900px; }
+.grid { display: grid; grid-template-columns: repeat(2, 820px); gap: 28px 24px; }
+.cap { font-size: 12.5px; color: var(--foreground-muted); margin: 10px 2px 0; max-width: 800px; line-height: 1.5; }
+.cap b { color: var(--foreground-default); font-weight: 600; }
+.colhead { font: 500 11px/1 var(--font-sans); letter-spacing: .06em; text-transform: uppercase; color: var(--foreground-muted); margin: 0 0 10px; }
+.colhead b { font-weight: 600; color: var(--foreground-default); letter-spacing: 0; text-transform: none; font-size: 13px; margin-right: 8px; }
+.muted { color: var(--foreground-muted); } .subtle { color: var(--foreground-subtle); }
+
+/* Window frame. */
+.win { display: flex; border-radius: 12px; overflow: hidden; box-shadow: var(--card-ring), 0 0 0 1px var(--border-default); background: var(--background); position: relative; }
+.work { flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--background); }
+.side { width: 384px; flex: none; background: var(--background-subtle); border-right: 1px solid var(--border-default); display: flex; flex-direction: column; }
+.bar { height: 44px; flex: none; display: flex; align-items: center; gap: 2px; padding: 0 10px 0 0; }
+.lights { width: 78px; flex: none; display: flex; gap: 8px; padding-left: 16px; }
+.lights i { width: 12px; height: 12px; border-radius: 50%; background: var(--lights); }
+.ib { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; color: var(--foreground-subtle); flex: none; }
+.ib svg { width: 16px; height: 16px; }
+.ib.off { opacity: .4; }
+.ib.on { background: var(--secondary-default); }
+.spacer { flex: 1; }
+.me { width: 24px; height: 24px; border-radius: 50%; margin-left: 4px; display: grid; place-items: center; font-size: 10px; font-weight: 700; background: color-mix(in oklch, #92C2F9 24%, var(--surface-default)); color: color-mix(in oklch, #92C2F9 62%, var(--foreground-default)); }
+.nav { padding: 4px 10px 0; display: flex; flex-direction: column; gap: 2px; }
+.ni { height: 32px; border-radius: 7px; padding: 0 10px; display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 500; }
+.ni svg { width: 15px; height: 15px; color: var(--foreground-subtle); }
+.ni.on { background: var(--secondary-default); }
+.ni .cnt { margin-left: auto; height: 18px; min-width: 18px; padding: 0 5px; border-radius: 999px; background: var(--secondary-active); color: var(--foreground-subtle); font-size: 11px; font-weight: 500; display: grid; place-items: center; }
+.hair { height: 1px; background: var(--border-default); margin: 12px 16px 10px; }
+.filters { display: flex; gap: 2px; padding: 0 10px 10px; }
+.filters span { height: 28px; padding: 0 10px; border-radius: 7px; font-size: 13px; font-weight: 500; color: var(--foreground-muted); display: inline-flex; align-items: center; }
+.filters span.on { background: var(--secondary-default); color: var(--foreground-default); font-weight: 600; }
+.rows { padding: 0 8px; display: flex; flex-direction: column; gap: 2px; }
+.trow { display: flex; gap: 12px; padding: 11px 12px; border-radius: 10px; }
+.trow.sel { background: var(--secondary-default); }
+.pebble { width: 44px; height: 44px; flex: none; border-radius: 46% 54% 40% 60% / 55% 42% 58% 45%; }
+.tcol { flex: 1; min-width: 0; }
+.l1 { display: flex; align-items: center; gap: 6px; height: 22px; }
+.l1 .t { font-size: 14.5px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.l1 .t.u { font-weight: 600; }
+.l1 .tm { margin-left: auto; font-size: 12px; color: var(--foreground-muted); font-variant-numeric: tabular-nums; }
+.l2 { display: flex; gap: 8px; font-size: 13px; line-height: 1.45; color: var(--foreground-muted); }
+.l2 .p { flex: 1; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.l2 .p.u { color: var(--foreground-subtle); }
+.count { height: 18px; min-width: 18px; padding: 0 5px; border-radius: 999px; background: var(--secondary-active); color: var(--foreground-subtle); font-size: 11px; font-weight: 500; display: grid; place-items: center; }
+.l3 { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--foreground-muted); margin-top: 3px; }
+.l3 svg { width: 12px; height: 12px; }
+.tagm { height: 18px; padding: 0 6px; border-radius: 999px; box-shadow: inset 0 0 0 1px var(--border-strong); font-size: 11px; font-weight: 500; color: var(--foreground-subtle); display: inline-flex; align-items: center; }
+
+/* Tab strip. */
+.strip { height: 44px; flex: none; display: flex; align-items: flex-end; gap: 2px; padding: 0 10px; background: var(--background-subtle); border-bottom: 1px solid var(--border-default); }
+.strip.lead { padding-left: 0; }
+.strip .lights { align-self: center; }
+.strip .ctl { align-self: center; display: flex; gap: 2px; margin-right: 6px; }
+.tab { flex: 0 1 230px; min-width: 120px; height: 35px; margin-bottom: -1px; padding: 0 6px 0 12px; border-radius: 8px 8px 0 0; border: 1px solid transparent; display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--foreground-subtle); position: relative; }
+.tab.on { background: var(--background); border-color: var(--border-default); border-bottom-color: var(--background); color: var(--foreground-default); font-weight: 500; }
+.tab svg.k { width: 14px; height: 14px; opacity: .75; }
+.tab .lab { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tab .udot { width: 6px; height: 6px; border-radius: 50%; background: var(--foreground-muted); flex: none; }
+.tab .cl { width: 20px; height: 20px; border-radius: 4px; display: grid; place-items: center; color: var(--foreground-muted); flex: none; }
+.tab .cl svg { width: 12px; height: 12px; }
+.tab.pin { flex: none; min-width: 0; width: 40px; padding: 0; justify-content: center; }
+.tab.pin svg.k { width: 16px; height: 16px; }
+.tab.pin .udot { position: absolute; top: 8px; right: 9px; width: 6px; height: 6px; box-shadow: 0 0 0 1.5px var(--background-subtle); }
+.tab .tart { width: 16px; height: 16px; border-radius: 46% 54% 40% 60% / 55% 42% 58% 45%; flex: none; }
+.plus { width: 28px; height: 28px; border-radius: 8px; margin: 0 0 4px 4px; display: grid; place-items: center; color: var(--foreground-muted); flex: none; }
+.plus svg { width: 15px; height: 15px; }
+
+/* Topic header. */
+.thead { height: 100px; flex: none; border-bottom: 1px solid var(--border-subtle); padding: 14px 24px; display: flex; flex-direction: column; gap: 8px; }
+.thead .r1, .thead .r2 { display: flex; align-items: center; gap: 8px; height: 32px; }
+.pill { height: 26px; padding: 0 10px; border-radius: 999px; display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; white-space: nowrap; }
+.pill svg { width: 13px; height: 13px; }
+.pill .k { font-weight: 400; }
+.pill.public { background: var(--tint-public-bg); color: var(--tint-public-fg); }
+.pill.private { background: var(--tint-private-bg); color: var(--tint-private-fg); }
+.pill.dm { background: var(--tint-dm-bg); color: var(--tint-dm-fg); }
+.hb { width: 32px; height: 32px; border-radius: 8px; display: grid; place-items: center; color: var(--foreground-subtle); }
+.hb svg { width: 16px; height: 16px; }
+.hb.on { background: var(--secondary-default); }
+.resolve { height: 32px; padding: 0 12px; border-radius: 8px; box-shadow: inset 0 0 0 1px var(--border-strong); display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; margin-left: 4px; }
+.resolve svg { width: 14px; height: 14px; }
+.ttl { font-size: 20px; font-weight: 600; letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Messages. */
+.list { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; }
+.col { width: 100%; max-width: 800px; margin: 0 auto; padding: 16px 24px 8px; }
+.m { display: flex; gap: 12px; padding: 4px 8px; }
+.m + .m.first { margin-top: 12px; }
+.av { width: 32px; height: 32px; border-radius: 50%; flex: none; display: grid; place-items: center; font-size: 12px; font-weight: 600; margin-top: 2px; }
+.av.a { background: color-mix(in oklch, #E89EB8 24%, var(--surface-default)); color: color-mix(in oklch, #E89EB8 62%, var(--foreground-default)); }
+.av.b { background: color-mix(in oklch, #008AB3 24%, var(--surface-default)); color: color-mix(in oklch, #008AB3 62%, var(--foreground-default)); }
+.av.c { background: color-mix(in oklch, #9BC27A 24%, var(--surface-default)); color: color-mix(in oklch, #9BC27A 62%, var(--foreground-default)); }
+.av.me2 { background: color-mix(in oklch, #92C2F9 24%, var(--surface-default)); color: color-mix(in oklch, #92C2F9 62%, var(--foreground-default)); }
+.av.blank { visibility: hidden; height: 0; }
+.mb { flex: 1; min-width: 0; }
+.mh { display: flex; gap: 8px; align-items: baseline; }
+.mh b { font-size: 14px; font-weight: 600; }
+.mh span { font-size: 12px; color: var(--foreground-muted); }
+.mt { font-size: 14.5px; line-height: 1.6; }
+.chip { font-weight: 600; padding: 0 3px; border-radius: 4px; background: var(--hl-soft); }
+.reacts { display: flex; gap: 4px; margin-top: 6px; }
+.reacts span { height: 24px; padding: 0 8px; border-radius: 999px; box-shadow: inset 0 0 0 1px var(--border-default); font-size: 12px; display: inline-flex; gap: 5px; align-items: center; }
+.tlink { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 8px 0 6px; border-radius: 999px; box-shadow: inset 0 0 0 1px var(--border-default); background: var(--surface-default); font-size: 12.5px; color: var(--foreground-subtle); margin-top: 6px; }
+.tlink svg { width: 13px; height: 13px; }
+.tlink b { color: var(--foreground-default); font-weight: 600; }
+.daysep { display: flex; align-items: center; gap: 10px; margin: 6px 0 10px; font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--foreground-muted); }
+.daysep::before, .daysep::after { content: ''; flex: 1; height: 1px; background: var(--border-subtle); }
+
+/* Composer and the picker row. */
+.comp { flex: none; padding: 8px 24px 20px; }
+.compin { max-width: 752px; margin: 0 auto; position: relative; }
+.box { background: var(--surface-default); border: 1px solid var(--input-border); border-radius: 12px; display: flex; align-items: flex-end; gap: 4px; }
+.box .att { width: 28px; height: 28px; border-radius: 50%; margin: 6px 0 6px 6px; display: grid; place-items: center; color: var(--foreground-subtle); }
+.box .att svg { width: 18px; height: 18px; }
+.box .ta { flex: 1; padding: 9px 0 9px 4px; font-size: 14px; line-height: 22px; min-height: 40px; cursor: text; }
+.box .ta.ph { color: var(--foreground-muted); }
+.box .snd { width: 28px; height: 28px; border-radius: 50%; margin: 6px 6px 6px 0; background: var(--hl); color: var(--hl-fg); display: grid; place-items: center; }
+.box .snd.dim { opacity: .4; }
+.box .snd svg { width: 16px; height: 16px; }
+.caret { display: inline-block; width: 1.5px; height: 17px; vertical-align: -3px; background: var(--foreground-default); margin-left: 1px; }
+.pickrow { display: flex; gap: 6px; margin-bottom: 8px; }
+.pk { height: 28px; padding: 0 8px 0 10px; border-radius: 999px; display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; white-space: nowrap; background: var(--secondary-default); color: var(--foreground-default); max-width: 320px; }
+.pk .v { overflow: hidden; text-overflow: ellipsis; }
+.pk svg { width: 13px; height: 13px; }
+.pk svg.dn { width: 12px; height: 12px; color: var(--foreground-muted); }
+.pk.unset { color: var(--foreground-subtle); }
+.pk .k { font-weight: 400; }
+.pk.private { background: var(--tint-private-bg); color: var(--tint-private-fg); }
+.pk.dm { background: var(--tint-dm-bg); color: var(--tint-dm-fg); }
+.pk.public { background: var(--tint-public-bg); color: var(--tint-public-fg); }
+.pk.open { box-shadow: 0 0 0 2px var(--hl-text); }
+.empty { flex: 1; display: grid; place-items: center; font-size: 14px; color: var(--foreground-muted); }
+
+/* Popover lists. */
+.pop { position: absolute; width: 340px; border-radius: 13px; background: var(--surface-default); box-shadow: var(--pop-shadow), 0 0 0 1px var(--border-default); overflow: hidden; z-index: 5; }
+.pop .srch { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--border-default); font-size: 13px; }
+.pop .srch svg { width: 14px; height: 14px; color: var(--foreground-muted); }
+.pop .lst { padding: 6px; }
+.pop .h { font-size: 10.5px; font-weight: 500; letter-spacing: .06em; text-transform: uppercase; color: var(--foreground-muted); padding: 8px 10px 4px; }
+.pop .o { height: 36px; border-radius: 8px; padding: 0 10px; display: flex; align-items: center; gap: 10px; font-size: 13.5px; }
+.pop .o svg { width: 15px; height: 15px; color: var(--foreground-muted); }
+.pop .o .s { margin-left: auto; font-size: 12px; color: var(--foreground-muted); }
+.pop .o.act { background: var(--surface-hover); }
+.pop .o .mini { width: 20px; height: 20px; font-size: 9px; margin: 0; }
+.pop .th { border-radius: 8px; padding: 5px 10px; }
+.pop .th .a { font-size: 13.5px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pop .th .b { font-size: 12px; color: var(--foreground-muted); }
+.pop .th.act { background: var(--surface-hover); }
+
+/* Menus (native in the app; drawn here for reference). */
+.menu { position: absolute; width: 236px; padding: 5px; border-radius: 13px; background: var(--surface-default); box-shadow: var(--pop-shadow), 0 0 0 1px var(--border-default); z-index: 6; }
+.mi { height: 30px; padding: 0 8px; border-radius: 6px; display: flex; align-items: center; gap: 10px; font-size: 13px; white-space: nowrap; }
+.mi .hk { margin-left: auto; font-size: 11px; color: var(--foreground-muted); }
+.mi.sel { background: var(--surface-hover); }
+.mi.dis { color: var(--foreground-muted); }
+.sep { height: 1px; background: var(--border-default); margin: 4px 6px; }
+.resize { position: absolute; top: 0; bottom: 0; width: 6px; margin-left: -3px; }
+.resize::after { content: ''; position: absolute; left: 2px; top: 0; bottom: 0; width: 2px; background: var(--hl-text); opacity: .7; }
+.note { position: absolute; font-size: 11.5px; color: var(--hl-text); font-weight: 600; white-space: nowrap; }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <symbol id="i-hash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 9h16M4 15h16M10 3 8 21M16 3l-2 18"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></symbol>
+    <symbol id="i-user" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
+    <symbol id="i-at" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+    <symbol id="i-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></symbol>
+    <symbol id="i-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 5-7 7 7 7"/></symbol>
+    <symbol id="i-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 5 7 7-7 7"/></symbol>
+    <symbol id="i-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m9 6 6 6-6 6"/></symbol>
+    <symbol id="i-side" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></symbol>
+    <symbol id="i-pencil" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6"/><path d="M18.5 2.5a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4Z"/></symbol>
+    <symbol id="i-house" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6h-4v6H5a1 1 0 0 1-1-1Z"/></symbol>
+    <symbol id="i-list" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/></symbol>
+    <symbol id="i-spark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 3c.6 4.6 2.4 6.4 7 7-4.6.6-6.4 2.4-7 7-.6-4.6-2.4-6.4-7-7 4.6-.6 6.4-2.4 7-7Z" fill="currentColor" fill-opacity=".2"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></symbol>
+    <symbol id="i-msg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2Z"/></symbol>
+    <symbol id="i-chats" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M17 9h2a2 2 0 0 1 2 2v9l-3-3h-7a2 2 0 0 1-2-2v-1"/><path d="M15 3H5a2 2 0 0 0-2 2v9l3-3h9a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2Z"/></symbol>
+    <symbol id="i-bell" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0"/></symbol>
+    <symbol id="i-pin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5M9 10.8V4h6v6.8l3 3.2v2H6v-2Z"/></symbol>
+    <symbol id="i-circ" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m8.5 12 2.5 2.5 4.5-5"/></symbol>
+    <symbol id="i-dots" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></symbol>
+  </defs>
+</svg>
+
+<!-- Picker row, used in several states. -->
+<template id="t-empty">
+  <div class="win" style="height:520px">
+    <div class="work">
+      <div class="strip">
+        <div class="tab"><svg class="k"><use href="#i-hash"/></svg><span class="lab">Postgres 16 migration plan</span><span class="udot"></span></div>
+        <div class="tab on"><svg class="k"><use href="#i-pencil"/></svg><span class="lab">New chat</span><span class="cl"><svg><use href="#i-x"/></svg></span></div>
+        <div class="plus"><svg><use href="#i-plus"/></svg></div>
+      </div>
+      <div class="empty">Write your message, then pick where it goes.</div>
+      <div class="comp"><div class="compin">
+        <div class="pickrow">
+          <span class="pk unset"><svg><use href="#i-at"/></svg><span class="v">Pick a conversation</span><svg class="dn"><use href="#i-down"/></svg></span>
+          <span class="pk unset"><svg><use href="#i-chats"/></svg><span class="v">Any thread</span><svg class="dn"><use href="#i-down"/></svg></span>
+        </div>
+        <div class="box"><span class="att"><svg><use href="#i-plus"/></svg></span><div class="ta">Can we move the cutover to Thursday night? Dev needs one more day on the replica check.<span class="caret"></span></div><span class="snd"><svg><use href="#i-up"/></svg></span></div>
+      </div></div>
+    </div>
+  </div>
+</template>
+
+<template id="t-thread-first">
+  <div class="win" style="height:520px">
+    <div class="work">
+      <div class="strip">
+        <div class="tab"><svg class="k"><use href="#i-hash"/></svg><span class="lab">Postgres 16 migration plan</span><span class="udot"></span></div>
+        <div class="tab on"><svg class="k"><use href="#i-pencil"/></svg><span class="lab">New chat</span><span class="cl"><svg><use href="#i-x"/></svg></span></div>
+        <div class="plus"><svg><use href="#i-plus"/></svg></div>
+      </div>
+      <div class="empty">Write your message, then pick where it goes.</div>
+      <div class="comp"><div class="compin">
+        <div class="pop" style="left:150px; bottom:92px">
+          <div class="srch"><svg><use href="#i-search"/></svg><span>cutover</span><span class="caret"></span></div>
+          <div class="lst">
+            <div class="h">Recent threads</div>
+            <div class="th act"><div class="a">Postgres 16 cutover window</div><div class="b">#eng · 14 replies · 2h</div></div>
+            <div class="th"><div class="a">Cutover checklist for billing</div><div class="b">#billing-ops · 6 replies · Yesterday</div></div>
+            <div class="th"><div class="a">Who owns the cutover comms?</div><div class="b">Maya Chen · 3 replies · 3d</div></div>
+          </div>
+        </div>
+        <div class="pickrow">
+          <span class="pk unset"><svg><use href="#i-at"/></svg><span class="v">Pick a conversation</span><svg class="dn"><use href="#i-down"/></svg></span>
+          <span class="pk unset open"><svg><use href="#i-chats"/></svg><span class="v">Any thread</span><svg class="dn"><use href="#i-down"/></svg></span>
+        </div>
+        <div class="box"><span class="att"><svg><use href="#i-plus"/></svg></span><div class="ta">Can we move the cutover to Thursday night? Dev needs one more day on the replica check.</div><span class="snd"><svg><use href="#i-up"/></svg></span></div>
+      </div></div>
+    </div>
+  </div>
+</template>
+
+<template id="t-preview">
+  <div class="win" style="height:520px">
+    <div class="work">
+      <div class="strip">
+        <div class="tab"><svg class="k"><use href="#i-hash"/></svg><span class="lab">Postgres 16 migration plan</span><span class="udot"></span></div>
+        <div class="tab on"><svg class="k"><use href="#i-pencil"/></svg><span class="lab">Postgres 16 cutover window</span><span class="cl"><svg><use href="#i-x"/></svg></span></div>
+        <div class="plus"><svg><use href="#i-plus"/></svg></div>
+      </div>
+      <div class="list"><div class="col">
+        <div class="daysep">Today</div>
+        <div class="m first"><div class="av b">D</div><div class="mb"><div class="mh"><b>Dev Patel</b><span>9:40</span></div><div class="mt">Replica lag is under a second now. I'd still like one full day of checks before we flip.</div></div></div>
+        <div class="m first"><div class="av a">MC</div><div class="mb"><div class="mh"><b>Maya Chen</b><span>10:02</span></div><div class="mt">Wednesday night is the only window support signed off on. <span class="chip">@Tushar</span> can you decide?</div><div class="reacts"><span>👀 2</span></div></div></div>
+      </div></div>
+      <div class="comp"><div class="compin">
+        <div class="pickrow">
+          <span class="pk public"><svg><use href="#i-hash"/></svg><span class="v">eng <span class="k">· Public channel</span></span><svg class="dn"><use href="#i-down"/></svg></span>
+          <span class="pk"><svg><use href="#i-chats"/></svg><span class="v">Postgres 16 cutover window</span><svg class="dn"><use href="#i-down"/></svg></span>
+        </div>
+        <div class="box"><span class="att"><svg><use href="#i-plus"/></svg></span><div class="ta">Can we move the cutover to Thursday night? Dev needs one more day on the replica check.<span class="caret"></span></div><span class="snd"><svg><use href="#i-up"/></svg></span></div>
+      </div></div>
+    </div>
+  </div>
+</template>
+
+<template id="t-person">
+  <div class="win" style="height:520px">
+    <div class="work">
+      <div class="strip">
+        <div class="tab"><svg class="k"><use href="#i-hash"/></svg><span class="lab">Postgres 16 migration plan</span></div>
+        <div class="tab on"><svg class="k"><use href="#i-pencil"/></svg><span class="lab">Jonas Weber</span><span class="cl"><svg><use href="#i-x"/></svg></span></div>
+        <div class="plus"><svg><use href="#i-plus"/></svg></div>
+      </div>
+      <div class="empty">This is the start of your conversation with Jonas Weber.</div>
+      <div class="comp"><div class="compin">
+        <div class="pop" style="left:0; bottom:92px">
+          <div class="srch"><svg><use href="#i-search"/></svg><span>jon</span><span class="caret"></span></div>
+          <div class="lst">
+            <div class="h">People</div>
+            <div class="o act"><span class="av c mini">JW</span>Jonas Weber<span class="s">No messages yet</span></div>
+            <div class="o"><span class="av b mini">JO</span>Jo Okafor<span class="s">Direct message</span></div>
+            <div class="h">Channels</div>
+            <div class="o"><svg><use href="#i-lock"/></svg>jonas-onboarding<span class="s">Private channel</span></div>
+          </div>
+        </div>
+        <div class="pickrow">
+          <span class="pk dm open"><svg><use href="#i-user"/></svg><span class="v">Jonas Weber <span class="k">· Direct message</span></span><svg class="dn"><use href="#i-down"/></svg></span>
+          <span class="pk"><svg><use href="#i-msg"/></svg><span class="v">Main</span><svg class="dn"><use href="#i-down"/></svg></span>
+        </div>
+        <div class="box"><span class="att"><svg><use href="#i-plus"/></svg></span><div class="ta">Welcome aboard. Your laptop arrives Monday; ping me if anything is blocked.</div><span class="snd"><svg><use href="#i-up"/></svg></span></div>
+      </div></div>
+    </div>
+  </div>
+</template>
+
+<template id="t-sent">
+  <div class="win" style="height:520px">
+    <div class="work">
+      <div class="strip">
+        <div class="tab"><svg class="k"><use href="#i-hash"/></svg><span class="lab">Postgres 16 migration plan</span><span class="udot"></span></div>
+        <div class="tab on"><span class="tart" style="background:color-mix(in oklch,#7FB6A4 45%,var(--background))"></span><span class="lab">Postgres 16 cutover window</span><span class="cl"><svg><use href="#i-x"/></svg></span></div>
+        <div class="plus"><svg><use href="#i-plus"/></svg></div>
+      </div>
+      <div class="thead">
+        <div class="r1"><span class="pill public"><svg><use href="#i-hash"/></svg>eng <span class="k">· Public channel</span></span><span class="spacer"></span><span class="hb"><svg><use href="#i-pin"/></svg></span><span class="hb"><svg><use href="#i-bell"/></svg></span><span class="resolve"><svg><use href="#i-circ"/></svg>Resolve</span><span class="hb"><svg><use href="#i-spark"/></svg></span><span class="hb"><svg><use href="#i-dots"/></svg></span></div>
+        <div class="r2"><span class="ttl">Postgres 16 cutover window</span></div>
+      </div>
+      <div class="list"><div class="col">
+        <div class="m first"><div class="av a">MC</div><div class="mb"><div class="mh"><b>Maya Chen</b><span>10:02</span></div><div class="mt">Wednesday night is the only window support signed off on. <span class="chip">@Tushar</span> can you decide?</div></div></div>
+        <div class="m first"><div class="av me2">T</div><div class="mb"><div class="mh"><b>Tushar</b><span>10:14</span></div><div class="mt">Can we move the cutover to Thursday night? Dev needs one more day on the replica check.</div></div></div>
+      </div></div>
+      <div class="comp"><div class="compin">
+        <div class="box"><span class="att"><svg><use href="#i-plus"/></svg></span><div class="ta ph">Reply</div><span class="snd dim"><svg><use href="#i-up"/></svg></span></div>
+      </div></div>
+    </div>
+  </div>
+</template>
+
+<!-- The whole window: sidebar bar with collapse, back and forward; tabs with a pinned tab and unread dots; the tab menu. -->
+<template id="t-chrome">
+  <div class="win" style="width:1300px; height:560px">
+    <div class="side">
+      <div class="bar">
+        <div class="lights"><i></i><i></i><i></i></div>
+        <span class="ib"><svg><use href="#i-side"/></svg></span>
+        <span class="ib"><svg><use href="#i-left"/></svg></span>
+        <span class="ib off"><svg><use href="#i-right"/></svg></span>
+        <span class="spacer"></span>
+        <span class="ib"><svg><use href="#i-search"/></svg></span>
+        <span class="ib"><svg><use href="#i-pencil"/></svg></span>
+        <span class="me">T</span>
+      </div>
+      <div class="nav">
+        <div class="ni"><svg><use href="#i-house"/></svg>Home</div>
+        <div class="ni"><svg><use href="#i-list"/></svg>All topics</div>
+        <div class="ni"><svg><use href="#i-spark"/></svg>Juno<span class="cnt">2</span></div>
+      </div>
+      <div class="hair"></div>
+      <div class="filters"><span class="on">All</span><span>Channels</span><span>DMs</span><span style="margin-left:auto">Unread</span></div>
+      <div class="rows">
+        <div class="trow sel"><span class="pebble" style="background:color-mix(in oklch,#7FB6A4 45%,var(--background))"></span><div class="tcol"><div class="l1"><span class="t">Postgres 16 cutover window</span><span class="tm">4m</span></div><div class="l2"><span class="p">You: Can we move the cutover to Thursday night? Dev needs one more day on the replica check.</span></div><div class="l3"><svg><use href="#i-hash"/></svg>eng</div></div></div>
+        <div class="trow"><span class="pebble" style="background:color-mix(in oklch,#E0A35F 45%,var(--background))"></span><div class="tcol"><div class="l1"><span class="t u">Rina's competing offer</span><span class="tm">12m</span></div><div class="l2"><span class="p u">Elena: She has until Friday. Can we get a call on the calendar before then?</span><span class="count">3</span></div><div class="l3"><svg><use href="#i-lock"/></svg>hiring</div></div></div>
+        <div class="trow"><span class="pebble" style="background:color-mix(in oklch,#9AA7E0 45%,var(--background))"></span><div class="tcol"><div class="l1"><span class="t">#design-review</span><span class="tm">1h</span></div><div class="l2"><span class="p">Priya: Two-line previews ship as the default this week.</span></div><div class="l3"><svg><use href="#i-hash"/></svg>design-review <span class="tagm">Main</span></div></div></div>
+      </div>
+    </div>
+    <div class="resize" style="left:384px"></div>
+    <div class="work">
+      <div class="strip">
+        <div class="tab pin"><svg class="k"><use href="#i-house"/></svg></div>
+        <div class="tab pin"><span class="tart" style="background:color-mix(in oklch,#E0A35F 45%,var(--background))"></span><span class="udot"></span></div>
+        <div class="tab on"><span class="tart" style="background:color-mix(in oklch,#7FB6A4 45%,var(--background))"></span><span class="lab">Postgres 16 cutover window</span><span class="cl"><svg><use href="#i-x"/></svg></span></div>
+        <div class="tab"><span class="tart" style="background:color-mix(in oklch,#9AA7E0 45%,var(--background))"></span><span class="lab">design-review</span><span class="udot"></span></div>
+        <div class="tab"><svg class="k"><use href="#i-list"/></svg><span class="lab">All topics</span></div>
+        <div class="plus"><svg><use href="#i-plus"/></svg></div>
+      </div>
+      <div class="thead">
+        <div class="r1"><span class="pill public"><svg><use href="#i-hash"/></svg>eng <span class="k">· Public channel</span></span><span class="spacer"></span><span class="hb"><svg><use href="#i-pin"/></svg></span><span class="hb"><svg><use href="#i-bell"/></svg></span><span class="resolve"><svg><use href="#i-circ"/></svg>Resolve</span><span class="hb"><svg><use href="#i-spark"/></svg></span><span class="hb"><svg><use href="#i-dots"/></svg></span></div>
+        <div class="r2"><span class="ttl">Postgres 16 cutover window</span></div>
+      </div>
+      <div class="list"><div class="col">
+        <div class="m first"><div class="av a">MC</div><div class="mb"><div class="mh"><b>Maya Chen</b><span>10:02</span></div><div class="mt">Wednesday night is the only window support signed off on. <span class="chip">@Tushar</span> can you decide?</div></div></div>
+        <div class="m first"><div class="av me2">T</div><div class="mb"><div class="mh"><b>Tushar</b><span>10:14</span></div><div class="mt">Can we move the cutover to Thursday night? Dev needs one more day on the replica check.</div></div></div>
+      </div></div>
+      <div class="comp"><div class="compin"><div class="box"><span class="att"><svg><use href="#i-plus"/></svg></span><div class="ta ph">Reply</div><span class="snd dim"><svg><use href="#i-up"/></svg></span></div></div></div>
+    </div>
+    <div class="menu" style="left:735px; top:40px">
+      <div class="mi">Pin tab</div>
+      <div class="sep"></div>
+      <div class="mi">Close tab<span class="hk">⌘W</span></div>
+      <div class="mi sel">Close other tabs</div>
+      <div class="mi">Close tabs to the right</div>
+      <div class="mi">Close all tabs</div>
+      <div class="sep"></div>
+      <div class="mi">Copy Slack link</div>
+      <div class="mi">Open in Slack</div>
+    </div>
+  </div>
+</template>
+
+<template id="t-collapsed">
+  <div class="win" style="width:1300px; height:300px">
+    <div class="work">
+      <div class="strip lead">
+        <div class="lights"><i></i><i></i><i></i></div>
+        <div class="ctl"><span class="ib on"><svg><use href="#i-side"/></svg></span><span class="ib"><svg><use href="#i-left"/></svg></span><span class="ib off"><svg><use href="#i-right"/></svg></span></div>
+        <div class="tab pin"><svg class="k"><use href="#i-house"/></svg></div>
+        <div class="tab pin"><span class="tart" style="background:color-mix(in oklch,#E0A35F 45%,var(--background))"></span><span class="udot"></span></div>
+        <div class="tab on"><span class="tart" style="background:color-mix(in oklch,#7FB6A4 45%,var(--background))"></span><span class="lab">Postgres 16 cutover window</span><span class="cl"><svg><use href="#i-x"/></svg></span></div>
+        <div class="tab"><span class="tart" style="background:color-mix(in oklch,#9AA7E0 45%,var(--background))"></span><span class="lab">design-review</span><span class="udot"></span></div>
+        <div class="tab"><svg class="k"><use href="#i-list"/></svg><span class="lab">All topics</span></div>
+        <div class="plus"><svg><use href="#i-plus"/></svg></div>
+      </div>
+      <div class="thead">
+        <div class="r1"><span class="pill public"><svg><use href="#i-hash"/></svg>eng <span class="k">· Public channel</span></span><span class="spacer"></span><span class="hb"><svg><use href="#i-pin"/></svg></span><span class="hb"><svg><use href="#i-bell"/></svg></span><span class="resolve"><svg><use href="#i-circ"/></svg>Resolve</span><span class="hb"><svg><use href="#i-spark"/></svg></span><span class="hb"><svg><use href="#i-dots"/></svg></span></div>
+        <div class="r2"><span class="ttl">Postgres 16 cutover window</span></div>
+      </div>
+      <div class="list"><div class="col">
+        <div class="m first"><div class="av me2">T</div><div class="mb"><div class="mh"><b>Tushar</b><span>10:14</span></div><div class="mt">Can we move the cutover to Thursday night? Dev needs one more day on the replica check.</div></div></div>
+      </div></div>
+    </div>
+  </div>
+</template>
+
+<template id="t-states">
+  <div class="grid">
+    <div><div class="colhead"><b>1 · Write first</b>⌘N, ⌘T, the "+" or the title bar icon</div><div data-t="t-empty"></div>
+      <p class="cap">The composer has focus. Nothing above it but one line. Both pickers are unset; Enter now would open the conversation picker and keep the draft.</p></div>
+    <div><div class="colhead"><b>2 · Thread first</b>the second picker works alone</div><div data-t="t-thread-first"></div>
+      <p class="cap">With no conversation chosen, the thread picker searches recent threads everywhere. Picking one also fills in the conversation.</p></div>
+    <div><div class="colhead"><b>3 · Destination set</b>preview above, draft kept</div><div data-t="t-preview"></div>
+      <p class="cap">The conversation picker has become the context pill. The thread's latest messages show above, read-only and not marked read. The tab takes the thread's name and keeps the New chat icon until you send.</p></div>
+    <div><div class="colhead"><b>4 · Sent</b>the pickers go, the topic stays</div><div data-t="t-sent"></div>
+      <p class="cap">After the first send the tab is that topic: its header, its messages, the composer back to "Reply". Back from here goes to whatever the tab showed before the New chat.</p></div>
+    <div><div class="colhead"><b>A person never messaged</b>conversations.open on send</div><div data-t="t-person"></div>
+      <p class="cap">Everyone in the workspace is in the conversation picker. Picking someone new shows the start of the conversation; the DM opens when you send.</p></div>
+  </div>
+</template>
+
+<template id="t-window">
+  <div class="colhead"><b>Window</b>back and forward, hide sidebar, pinned tabs, unread dots, the tab menu</div>
+  <div data-t="t-chrome"></div>
+  <p class="cap">The sidebar bar starts with the traffic lights, then Hide sidebar (⌃⌘S), Back (⌘[) and Forward (⌘], disabled here). Two pinned tabs sit first as icons; the second has unread. Inactive tabs with unread show the soft grey dot after the title. Right-clicking design-review opened the tab menu (native in the app). The coral line marks the resize edge: drag between 280 and 480px, double-click to reset.</p>
+  <div class="colhead" style="margin-top:24px"><b>Sidebar hidden</b>the controls move to the tab strip</div>
+  <div data-t="t-collapsed"></div>
+</template>
+
+<section class="sheet theme-light" data-key="new-chat-light">
+  <h1>New chat</h1>
+  <p class="lede">Write first, then choose where it goes. Two pickers above the composer: the conversation, then the thread (Main by default). The destination's messages appear above as soon as it is picked; after the first send the pickers go and the tab becomes the topic.</p>
+  <div data-t="t-states"></div>
+</section>
+
+<section class="sheet theme-dark" data-key="new-chat-dark">
+  <h1>New chat</h1>
+  <p class="lede">Dark theme. Same states.</p>
+  <div data-t="t-states"></div>
+</section>
+
+<section class="sheet theme-light" data-key="window-light">
+  <h1>Window controls</h1>
+  <p class="lede">Browser habits, kept native and quiet: per-tab Back and Forward, a sidebar that resizes and hides, pinned tabs, a tab menu, and a soft dot for unread.</p>
+  <div data-t="t-window"></div>
+</section>
+
+<section class="sheet theme-dark" data-key="window-dark">
+  <h1>Window controls</h1>
+  <p class="lede">Dark theme.</p>
+  <div data-t="t-window"></div>
+</section>
+
+<script>
+let slot
+while ((slot = document.querySelector('[data-t]'))) slot.replaceWith(document.getElementById(slot.dataset.t).content.cloneNode(true))
+</script>
+</body>
+</html>

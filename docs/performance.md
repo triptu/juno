@@ -154,7 +154,7 @@ Navigation (sidebar rows, tabs, nav items, filter chips, ⌘K rows, Browse rows,
 - `messagesAtom` has a 30 s idle TTL so a hidden tab's query is not torn down and rebuilt during a quick switch away and back.
 - Tabs beyond the 5 are unmounted and keep a `ScrollSnapshot { anchorKey, offset }` (`scrollSnapshotAtom(tabId)` in `@juno/state`, recorded on each `scrollend`). Switching back waits until the topic's header and window are local, as an open does, and the container restores the snapshot in `useLayoutEffect` before paint.
 - Every component under a tab must clean up its effects correctly; hidden means "as if unmounted". StrictMode in dev double-invokes mounts to catch this.
-- Page tabs (All topics, For you, Juno, Notifications, Preferences) are singletons and follow the same rule.
+- Page tabs (Home, All topics, Juno, Notifications, Preferences) are singletons and follow the same rule.
 
 ### 4.4 Feedback timing
 
