@@ -26,7 +26,6 @@ function SignedIn() {
           onSearch={noop}
           onBrowse={noop}
           onToggleTheme={noop}
-          onNewMessage={noop}
           onNavigate={noop}
           onFilterKind={noop}
           onToggleUnread={noop}

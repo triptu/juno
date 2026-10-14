@@ -3,10 +3,15 @@
  * place, so the views, the gallery fixtures and the e2e driver print the
  * same strings. Juno's own replies are not here; they come from the model.
  * Every line a failure or an ending prints is here, so the model never
- * writes one.
+ * writes one. Lines with a number or a name in them are functions
+ * ("Resolved 3", "Using Claude Sonnet 5.5"), so a count is never pasted
+ * into a string by a view.
  *
  * SPEC §17 applies: sentence case, verb-first buttons, no emoji.
  */
+
+/** "$2.00", "$0.35". Two decimals, always. */
+const usd = (amount: number): string => `$${amount.toFixed(2)}`
 
 export const chatCopy = {
   empty: {
@@ -68,6 +73,28 @@ export const chatCopy = {
     otherDevice: { chip: 'Juno is on your other Mac', line: 'Juno is working on your other Mac.' },
   },
   card: {
+    /** The header's kind label, by card `_tag`. A `question` card's header is its asker instead. */
+    kind: {
+      sendMessage: 'Send message',
+      resolve: 'Resolve',
+      topics: 'Topics',
+      proposedTask: 'Proposed task',
+      task: 'Task',
+      question: 'Question',
+      proposedSchedule: 'Proposed schedule',
+      schedule: 'Schedule',
+      connect: 'Connect',
+      change: 'Change',
+      remove: 'Remove',
+      budget: 'Budget',
+      provider: 'Provider',
+      unknown: 'Card',
+    },
+    /** The source beside a task's kind: where the job runs. */
+    jobKind: { t3: 'T3 Code', subagent: 'Juno' },
+    /** Prefix of the "Because" line. */
+    because: 'Because ',
+    dismissed: 'Dismissed',
     expired: 'Expired',
     askAgain: 'Ask again',
     unknownKind: 'This card needs a newer Juno',
@@ -75,14 +102,32 @@ export const chatCopy = {
     may: 'This may already have happened.',
     /** A row, or a whole card, that was rejected or that Juno could not confirm. No button follows it. */
     failed: 'Failed',
-    sendMessage: { send: 'Send', sent: 'Sent', open: 'Open' },
-    resolve: { resolve: 'Resolve' },
+    sendMessage: {
+      send: 'Send',
+      sent: 'Sent',
+      /** The card's own line: "Sent", "Sent 3". */
+      sentCount: (sent: number) => (sent === 1 ? 'Sent' : `Sent ${sent}`),
+      /** "Sent 1 of 3". */
+      sentOf: (sent: number, of: number) => `Sent ${sent} of ${of}`,
+      open: 'Open',
+      /** "in {topic title}" beside a reply inside a thread. */
+      inTopic: (title: string) => `in ${title}`,
+    },
+    resolve: {
+      resolve: 'Resolve',
+      /** "Resolve 2 topics". */
+      title: (count: number) => (count === 1 ? 'Resolve 1 topic' : `Resolve ${count} topics`),
+      /** "Resolved 3". */
+      resolved: (count: number) => `Resolved ${count}`,
+    },
     task: {
       open: 'Open',
       stop: 'Stop',
       start: 'Start',
       started: 'Started',
       done: 'Done',
+      /** "Open PR 412". */
+      openPr: (number: number) => `Open PR ${number}`,
       failed: 'Failed',
       showInActivity: 'Show in Activity',
       stopping: 'Stopping',
@@ -90,13 +135,51 @@ export const chatCopy = {
       lostSight: 'Sign in to T3 Code to keep watching',
       signIn: 'Sign in',
     },
-    question: { junoAsks: 'Juno asks', t3Asks: 'T3 Code asks', reply: 'Reply', chose: 'You chose', replied: 'You replied' },
-    schedule: { keep: 'Keep', start: 'Start', pause: 'Pause', delete: 'Delete', kept: 'Kept', started: 'Started', paused: 'Paused', deleted: 'Deleted' },
+    question: {
+      junoAsks: 'Juno asks',
+      t3Asks: 'T3 Code asks',
+      reply: 'Reply',
+      /** "You chose Keep both". */
+      chose: (label: string) => `You chose ${label}`,
+      replied: 'You replied',
+    },
+    schedule: {
+      keep: 'Keep',
+      start: 'Start',
+      pause: 'Pause',
+      delete: 'Delete',
+      kept: 'Kept',
+      started: 'Started',
+      paused: 'Paused',
+      deleted: 'Deleted',
+      /** "Delivers: Now", "Delivers: Digest", "Delivers: Silent". */
+      delivers: { now: 'Delivers: Now', digest: 'Delivers: Digest', silent: 'Delivers: Silent' },
+    },
     connect: { connect: 'Connect', skip: 'Skip', connected: 'Connected' },
     change: { apply: 'Apply', applied: 'Applied', showAll: 'Show all' },
-    remove: { remove: 'Remove', keep: 'Keep', alsoReply: "Also remove Juno's reply", cannotRecall: 'Copies already sent to the model provider cannot be recalled.' },
-    budget: { title: "Juno has used today's budget.", allow: 'Allow $1 more today', wait: 'Wait until tomorrow', allowed: 'Allowed until midnight' },
-    provider: { title: 'Choose a model provider', setUp: 'Set up', disclosure: 'Juno sends its memory of this chat to the provider you choose, on every turn.' },
+    remove: {
+      remove: 'Remove',
+      keep: 'Keep',
+      alsoReply: "Also remove Juno's reply",
+      cannotRecall: 'Copies already sent to the model provider cannot be recalled.',
+      /** "Removed 2 messages". */
+      removed: (count: number) => (count === 1 ? 'Removed 1 message' : `Removed ${count} messages`),
+    },
+    budget: {
+      title: "Juno has used today's budget.",
+      /** "$2.00 of $2.00 today". */
+      spent: (spentUsd: number, capUsd: number) => `${usd(spentUsd)} of ${usd(capUsd)} today`,
+      allow: 'Allow $1 more today',
+      wait: 'Wait until tomorrow',
+      allowed: 'Allowed until midnight',
+    },
+    provider: {
+      title: 'Choose a model provider',
+      setUp: 'Set up',
+      disclosure: 'Juno sends its memory of this chat to the provider you choose, on every turn.',
+      /** "Using Claude Sonnet 5.5". */
+      using: (model: string) => `Using ${model}`,
+    },
   },
   /** The local Remove sheet from a message's context menu. */
   removeSheet: {
@@ -134,7 +217,8 @@ export const chatCopy = {
       activate: 'Activate Juno',
     },
     settings: {
-      removalPending: 'Removal pending',
+      /** "Removal pending · 1 copy in a running job". */
+      removalPending: (copies: number) => `Removal pending · ${copies === 1 ? '1 copy' : `${copies} copies`} in a running job`,
       stopJob: 'Stop job',
       keyRejected: 'OpenRouter rejected this key',
       exportPhrase: 'Export recovery phrase',

@@ -30,7 +30,7 @@ Juno's bubbles are `--surface-hover` in every option, with the seated j beside t
 
 If the owner wants a bolder chat, A is the answer and the mock shows it is workable; the cost is the rhythm sheet.
 
-What B needs in code: one accent token, `--hl-bubble`, mixed like `--hl-soft` but stronger (16% light, 22% dark), added per accent in `themes.stylex.ts` by WP12 alongside the status bubble tokens. The bubble view then uses `--hl-bubble` and `--foreground-default`; nothing else changes.
+Built (WP12): `--hl-bubble` is in every accent theme (16% light, 22% dark; Ink 12% and 14%), and the `chat` token group's `--owner-bubble-bg` / `--owner-bubble-fg` point at option B. Switching options is a change to those two lines in `packages/tokens/src/tokens.stylex.ts`. The gallery's `OwnerBubble` "compare-a-to-d" state renders all four options through the real component, in light and dark.
 
 ## Also seen in the mock
 

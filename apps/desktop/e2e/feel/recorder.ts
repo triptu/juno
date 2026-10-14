@@ -74,6 +74,8 @@ export interface InputEvent {
   readonly t: number
   /** The probe frame that came next: the first frame that could show the event. */
   readonly nextFrame: number
+  /** The probes whose element holds the event's target, so a check can pick the event on its element. */
+  readonly within: ReadonlyArray<string>
 }
 
 export interface ShiftSource {
@@ -374,7 +376,11 @@ async function installProbes(page: Page, probes: ReadonlyArray<Probe>): Promise<
       }
       requestAnimationFrame(tick)
 
-      const onEvent = (event: Event) => state.events.push({ type: event.type, t: event.timeStamp, nextFrame: state.frames.length })
+      const onEvent = (event: Event) => {
+        const target = event.target instanceof Node ? event.target : null
+        const within = list.filter((probe) => 'selector' in probe && target !== null && document.querySelector(probe.selector)?.contains(target) === true).map((probe) => probe.name)
+        state.events.push({ type: event.type, t: event.timeStamp, nextFrame: state.frames.length, within })
+      }
       const types = ['pointerover', 'pointerdown', 'pointerup', 'keydown', 'wheel']
       for (const type of types) window.addEventListener(type, onEvent, { capture: true, passive: true })
 

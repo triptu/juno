@@ -78,7 +78,7 @@ export function channelMenuItems(state: ChannelMenuState): ReadonlyArray<MenuIte
   return items
 }
 
-export type TabKind = 'topic' | 'all-topics' | 'for-you' | 'juno' | 'new-message' | 'notifications' | 'preferences'
+export type TabKind = 'topic' | 'all-topics' | 'for-you' | 'juno' | 'notifications' | 'preferences'
 
 /** Topic tabs get the topic menu; page tabs have none. */
 export function tabMenuItems(tab: { readonly kind: TabKind; readonly topic?: TopicMenuState }): ReadonlyArray<MenuItem<TopicMenuAction>> {

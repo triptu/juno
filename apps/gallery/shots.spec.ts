@@ -6,6 +6,9 @@ import { openState, readRoutes, type Route } from './support'
 const shotsDir = join(import.meta.dirname, 'shots')
 const themes = ['light', 'dark'] as const
 
+/** To shoot a few components: GALLERY_SHOTS_ONLY=Message,MessageList pnpm gallery:shots. Keeps the other shots. */
+const only = process.env.GALLERY_SHOTS_ONLY?.split(',').map((name) => name.trim())
+
 /** Puts the state into the look its frame asks for; returns the cleanup. */
 async function arrange(page: Page, route: Route): Promise<() => Promise<void>> {
   const frame = page.locator('[data-fixture-frame]')
@@ -46,10 +49,16 @@ test('screenshots every state in light and dark', async ({ page }) => {
   // One test walks every state twice, a navigation each: a few minutes for
   // the whole gallery, past the default timeout.
   test.setTimeout(10 * 60_000)
-  const routes = await readRoutes(page)
+  const routes = (await readRoutes(page)).filter((route) => !only || only.includes(route.component))
   await page.evaluate(() => document.fonts.ready)
 
-  await rm(shotsDir, { recursive: true, force: true })
+  if (only) {
+    for (const component of new Set(routes.map((route) => route.component))) {
+      await rm(join(shotsDir, component), { recursive: true, force: true })
+    }
+  } else {
+    await rm(shotsDir, { recursive: true, force: true })
+  }
 
   for (const route of routes) {
     for (const theme of themes) {

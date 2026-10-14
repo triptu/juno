@@ -45,6 +45,10 @@ const radiusBySize: Record<IconButtonSize, IconButtonRadius> = {
   36: 'lg',
 }
 
+// Buttons under 24px get an invisible hit area of 24px around the glyph
+// (WCAG 2.5.8): the tab close button and the row Resolve check.
+const smallSizes: ReadonlySet<IconButtonSize> = new Set([20, 22])
+
 // One step up from the Lucide sizes: Phosphor glyphs fill less of their box.
 const iconBySize: Record<IconButtonSize, IconSize> = {
   20: 12,
@@ -95,6 +99,7 @@ export function IconButton({
         interactive.focusRing,
         styles.base,
         sizeStyles[size],
+        smallSizes.has(size) && styles.hitArea,
         radiusStyles[radius ?? radiusBySize[size]],
         variants[variant],
         variant === 'ghost' && tones[tone],
@@ -127,6 +132,18 @@ const styles = stylex.create({
     justifyContent: 'center',
     flexShrink: 0,
     verticalAlign: 'middle',
+  },
+  // Centred on the button, so it reaches past each edge by the same amount.
+  hitArea: {
+    position: 'relative',
+    '::before': {
+      content: '""',
+      position: 'absolute',
+      top: `calc((100% - ${sizes['--control-24']}) / 2)`,
+      right: `calc((100% - ${sizes['--control-24']}) / 2)`,
+      bottom: `calc((100% - ${sizes['--control-24']}) / 2)`,
+      left: `calc((100% - ${sizes['--control-24']}) / 2)`,
+    },
   },
   pair: {
     display: 'grid',

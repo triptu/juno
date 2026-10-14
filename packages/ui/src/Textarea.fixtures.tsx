@@ -32,10 +32,6 @@ function Composer({ value, dimmed }: { readonly value?: string; readonly dimmed?
 export default defineFixtures(
   Textarea,
   {
-    Plain: {
-      plain: fixture({ variant: 'plain', placeholder: 'Write a message', label: 'Message' }),
-      'plain-filled': fixture({ variant: 'plain', defaultValue: 'Kicking off the Q1 planning cycle. Drafts due Friday.', label: 'Message' }),
-    },
     Card: {
       card: fixture({ variant: 'card', defaultValue: 'The Wednesday slot works for eng.', label: 'Message' }),
     },
@@ -47,7 +43,7 @@ export default defineFixtures(
       'composer-focused': scene(() => <Composer dimmed />, { focus: 'textarea' }),
     },
     Availability: {
-      'plain-disabled': fixture({ variant: 'plain', defaultValue: 'Kicking off the Q1 planning cycle.', label: 'Message', disabled: true }),
+      'card-disabled': fixture({ variant: 'card', defaultValue: 'Kicking off the Q1 planning cycle.', label: 'Message', disabled: true }),
     },
   },
   { width: 560 },

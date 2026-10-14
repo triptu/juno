@@ -1,6 +1,6 @@
 # The living home
 
-What the workspace shows when no tab is open. It replaces the "Nothing open yet" empty state with a small scene of Juno's mascot, a greeting, up to three things computed from the user's data, and an Ask Juno field. The scene changes with the time of day, the weekday, the season and whether anything is waiting.
+What the workspace shows when no tab is open, and the Home page that the sidebar's Home item opens as a tab (SPEC §12). Home also took over the For you page's Follow-up and Tidy up items (decision log 10-14 15:30). It replaces the "Nothing open yet" empty state with a small scene of Juno's mascot, a greeting, up to three things computed from the user's data, and an Ask Juno field. The scene changes with the time of day, the weekday, the season and whether anything is waiting.
 
 Files:
 
@@ -60,7 +60,8 @@ Each item has a title line (13.5px, medium) and a meta line (12.5px, muted): the
 | Waiting on you | A message in a followed thread or DM that mentions you and ends in a question mark, with no reply from you after it | `<Name> asked you something` | `Elena wants a call on Rina's competing offer by Friday` |
 | Pick up where you left off | The last topic you had open for more than a minute, if it has new messages since | `Pick up where you left off` | `Pick up where you left off: Dev wants the Postgres 16 cutover window` |
 | Moved a lot | A followed topic with the most new messages since you last opened it, at least 8 | `Moved a lot since you looked` | `Maya's proposal grew 14 replies, leaning toward cutting offline mode` |
-| Follow-up (AI on only) | Something you said you would do, from the For you follow-up cards | not shown | `You said you'd send Rina the scorecard` |
+| Follow-up (AI on only) | Something you said you would do, found by the assistant in your own messages; Mark done clears it | not shown | `You said you'd send Rina the scorecard` |
+| Tidy up (AI on only) | Topics the settled decision scored high, at least two | not shown | `3 topics look settled`, with Resolve all |
 
 AI never adds an item the rules did not find; it only rewrites the title line of an item that is already there, and only when its confidence is high. If the rewrite is missing, late or low confidence, the AI-off title shows. The meta line never changes, so the row's second line is identical with and without AI and nothing shifts when a rewrite arrives.
 
@@ -80,9 +81,9 @@ The eight scenes in `scenes.png`: morning, midday, evening, late night, Friday, 
 ## Items: how they are chosen and capped
 
 - Candidates come from the local cache only: followed topics, read state, the last-opened log and mentions. No network call, no AI call, before first paint.
-- Rank: waiting on you first, then pick up where you left off, then moved a lot, then follow-ups. At most one of each kind.
+- Rank: waiting on you first, then pick up where you left off, then moved a lot, then follow-ups, then tidy up. At most one of each kind; tidy up is one row for several topics.
 - Cap at three. If the window is shorter than 600px, cap at two.
-- Each item is one topic. A topic appears once; if it qualifies for two kinds, the higher kind wins.
+- Each item is one topic, except tidy up. A topic appears once; if it qualifies for two kinds, the higher kind wins.
 - Opening an item opens the topic in the current tab like any row, with ⌘-click for a new tab. Opening it marks it read under the normal rule, so it leaves the list on the next visit.
 - Resolved, unfollowed and muted topics never appear.
 - Items do not refresh while the home is on screen. They are computed at mount, and recomputed on the next mount, so a row never disappears under the pointer.

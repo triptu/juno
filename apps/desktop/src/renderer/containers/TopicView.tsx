@@ -88,6 +88,17 @@ function markReadAndEndStealth(id: string): void {
   updateTabs(registry, (tabs) => endStealth(tabs, id))
 }
 
+const FOCUSABLE = 'button:not(:disabled), [href], input:not(:disabled), [tabindex]:not([tabindex="-1"])'
+
+/** The header control after the focused one, which takes focus when the focused one goes away. */
+function nextInHeader(): HTMLElement | undefined {
+  const focused = document.activeElement
+  const header = focused?.closest('[data-topic-header]')
+  if (focused == null || header == null) return undefined
+  const controls = [...header.querySelectorAll<HTMLElement>(FOCUSABLE)]
+  return controls[controls.indexOf(focused as HTMLElement) + 1]
+}
+
 const items = new WeakMap<MessageView, MessageListItem>()
 
 /** The window's rows with their senders. A row keeps its object while its message and sender do, so `Message` stays memoized. */
@@ -445,6 +456,22 @@ function Topic({ id, stealth, detail }: { readonly id: string; readonly stealth:
 
   const [threadsOpen, setThreadsOpen] = useState(false)
   const main = detail.kind === 'main'
+  const channel = detail.channel.id
+  // Main keeps its threads query live while shown, from after its first frame, so the Threads
+  // popover opens with its rows in the first frame instead of "Loading threads".
+  useEffect(() => (main && drawnAll ? registry.mount(channelThreadsAtom(channel)) : undefined), [main, drawnAll, channel])
+
+  // Mark read takes its own button away; focus moves on to the next header control, not to the body.
+  const focusAfterMarkRead = useRef<HTMLElement | undefined>(undefined)
+  const onMarkRead = (topicId: string) => {
+    focusAfterMarkRead.current = nextInHeader()
+    markReadAndEndStealth(topicId)
+  }
+  useLayoutEffect(() => {
+    const next = focusAfterMarkRead.current
+    focusAfterMarkRead.current = undefined
+    if (!stealth && next?.isConnected && (document.activeElement === null || document.activeElement === document.body)) next.focus()
+  }, [stealth])
   const people = list.refs.people
   const hueOf = (personId: string) => hueFor(people.get(personId)?.color ?? '', personId)
 
@@ -475,7 +502,7 @@ function Topic({ id, stealth, detail }: { readonly id: string; readonly stealth:
           threads={threadsOpen ? <MainThreads channel={detail.channel.id} onClose={() => setThreadsOpen(false)} /> : null}
           onSubscribe={subscribe}
           onUnsubscribe={unsubscribe}
-          onMarkRead={markReadAndEndStealth}
+          onMarkRead={onMarkRead}
         />
       }
       pill={showPill ? <NewMessagesPill count={newCount} onJump={jumpToLatest} /> : undefined}

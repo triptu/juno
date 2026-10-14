@@ -46,6 +46,8 @@ export const actionCases = [
   ['refusedSpend', 'capHard'],
   ['dailyReset', 'capHard'],
   ['raiseClick', 'oneRaisePerClick'],
+  ['overReportCap', 'noAdmissionOverCap'],
+  ['capReached', 'noAdmissionOverCap'],
 ]
 
 export const recoveryCases = [

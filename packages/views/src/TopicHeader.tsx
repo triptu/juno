@@ -120,8 +120,7 @@ export function TopicHeader({ detail, stealth = false, art, threadsOpen = false,
           ) : null}
           <IconButton
             icon={Bell}
-            label={detail.subscribed ? 'Subscribed. Click to unsubscribe.' : 'Unsubscribed. Click to subscribe.'}
-            title={detail.subscribed ? 'Unsubscribe' : 'Subscribe'}
+            label="Subscribe"
             size={32}
             pressed={detail.subscribed}
             onClick={() => (detail.subscribed ? onUnsubscribe(detail.id) : onSubscribe(detail.id))}
@@ -143,7 +142,7 @@ export function TopicHeader({ detail, stealth = false, art, threadsOpen = false,
             />
           ) : main ? (
             <>
-              <Text variant="topicTitle" tone="default" truncate dir="auto" sx={styles.title}>
+              <Text variant="topicTitle" tone="default" truncate tooltipWhenTruncated dir="auto" sx={styles.title}>
                 {channel.label} · Main
               </Text>
             </>
@@ -153,6 +152,7 @@ export function TopicHeader({ detail, stealth = false, art, threadsOpen = false,
                 variant="topicTitle"
                 tone="default"
                 truncate
+                tooltipWhenTruncated
                 dir="auto"
                 onDoubleClick={onRename === undefined ? undefined : () => setDraft(detail.title)}
                 sx={styles.title}

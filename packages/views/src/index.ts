@@ -30,8 +30,10 @@ export { TopicList, type TopicListEmpty, type TopicListProps, type TopicListSect
 export { TopicRow, type TopicRowProps } from './TopicRow'
 export { TopicView, type TopicViewProps } from './TopicView'
 export { Workspace, type WorkspaceProps, type WorkspaceTab, type WorkspaceTabIcon } from './Workspace'
+export * from './juno-chat'
+export * from './juno-pages'
 export { hueFor, initials } from './look'
-export { fullTime, messageTime, relativeTime, slackDate } from './time'
+export { dayLabel, fullTime, messageTime, relativeTime, slackDate } from './time'
 // The theme entry point for apps, so the shell reaches ui through views.
 export { accentNames, applyTheme, defaultAccent, type AccentName, type ActivateEvent, type ThemeName } from '@juno/ui'
 // The topic tile, for the header and tab containers in the desktop app, which does not depend on ui.

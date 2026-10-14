@@ -12,6 +12,7 @@
  * line.
  */
 import { Schema } from 'effect'
+import { chatCopy } from './copy'
 import { CardId, ChatMessageId, JobId, ProposedMessageId, QuestionOptionId, ScheduleId } from './ids'
 import { JobRef, OpenTarget, Place, TopicLink } from './place'
 
@@ -101,9 +102,10 @@ export const sendMessageStatus = (messages: ReadonlyArray<ProposedMessage>): Car
   const results = messages.map((m) => m.result._tag)
   if (results.some((r) => r === 'pending' || r === 'sending')) return { _tag: 'working' }
   const sent = results.filter((r) => r === 'sent').length
-  if (sent === messages.length) return { _tag: 'done', line: sent === 1 ? 'Sent' : `Sent ${sent}` }
-  if (sent > 0) return { _tag: 'done', line: `Sent ${sent} of ${messages.length}` }
-  return { _tag: 'failed', line: 'Failed' }
+  const copy = chatCopy.card.sendMessage
+  if (sent === messages.length) return { _tag: 'done', line: copy.sentCount(sent) }
+  if (sent > 0) return { _tag: 'done', line: copy.sentOf(sent, messages.length) }
+  return { _tag: 'failed', line: chatCopy.card.failed }
 }
 
 export const ResolveCard = Schema.TaggedStruct('resolve', {

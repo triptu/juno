@@ -26,11 +26,11 @@ Warm paper. HSL values are the source of truth; hex is the sRGB result for desig
 | `--surface-raised` | `hsla(48, 30%, 98%, 1)` | #FBFBF8 | proposed | Selected segment of a segmented control; must read as raised over `--surface-hover` in both themes |
 | `--secondary-default` | `hsla(48, 30%, 92%, 1)` | #F1EEE4 | css | Secondary buttons, selected row, selected filter, chips, public context pill, channel tile |
 | `--secondary-hover` | `hsla(48, 30%, 90%, 1)` | #EDEADE | css | Secondary button hover |
-| `--secondary-active` | `hsla(48, 30%, 88%, 1)` | #EAE6D7 | css | Unread count tag, For you count, pressed state |
+| `--secondary-active` | `hsla(48, 30%, 88%, 1)` | #EAE6D7 | css | Unread count tag, Juno nav count, pressed state |
 | `--border-subtle` | `hsla(48, 30%, 92%, 1)` | #F1EEE4 | css | Topic header rule, list-style row rule, table row rule, card inner rules |
 | `--border-default` | `hsla(48, 30%, 91%, 1)` | #EFECE1 | css | Sidebar edge, tab strip edge, menu separators, card-style row border, reaction chips, option buttons |
 | `--border-strong` | `hsla(48, 30%, 88%, 1)` | #EAE6D7 | css | Outline buttons (Resolve), Main tag, kbd, scrollbar thumb, @ tag ring |
-| `--border-strongest` | `hsla(48, 30%, 82%, 1)` | #DFD9C3 | css | Rename input, stealth pill (dashed), outline button hover |
+| `--border-strongest` | `hsla(48, 30%, 82%, 1)` | #DFD9C3 | css | Rename input, outline button hover |
 | `--foreground-default` | `hsla(48, 15%, 12%, 1)` | #23211A | css | Body text, toast background |
 | `--foreground-subtle` | `hsla(48, 8%, 35%, 1)` | #605E52 | css | Icons, secondary text, unread preview, pill text |
 | `--foreground-muted` | `hsla(48, 5%, 42%, 1)` | #706E66 | **proto** (overrides css 52%) | Meta, time, placeholders, section labels. See 1.6 |
@@ -87,8 +87,9 @@ The accent is a user setting (`AppearanceSettings`, persisted in `launch.json` l
 | --- | --- | --- | --- |
 | `--hl` | The fill: primary button, send, @you chip, Now chip, own bubbles | #CC4628 | #FF8A73 |
 | `--hl-fg` | Text on the fill | #FFFFFF | #2A0D06 |
-| `--hl-text` | Accent text and icons on paper or a tint: the "new" label, the selected nav item, the subscribed bell | #B4351F | #FF9C87 |
+| `--hl-text` | Accent text and icons on paper or a tint: the "new" label, the selected nav item | #B4351F | #FF9C87 |
 | `--hl-soft` | `color-mix(in oklch, var(--hl) <mix>, var(--background))`: mention-row tint, my reaction, the @ tag | 10% | 14% |
+| `--hl-bubble` | `color-mix(in oklch, var(--hl) <mix>, var(--background))`: the owner's bubble in the Juno chat (option B, `docs/design/juno-chat/README.md`), with `--foreground-default` text. Ink mixes 12% and 14% | 16% | 22% |
 | `--hl-nav` | `color-mix(in oklch, var(--hl) <mix>, var(--background-subtle))`: the selected nav item's fill | 9% | 16% |
 | `--hl-rule`, `--hl-ring` | `--hl` at 30% and 45% alpha: the new divider's rule, the mine-reaction ring | | |
 | `--focus-ring` | The accent text colour, so the ring meets 4.5:1 on the page (3:1 is the minimum) | #B4351F | #FF9C87 |
@@ -96,7 +97,7 @@ The accent is a user setting (`AppearanceSettings`, persisted in `launch.json` l
 
 Ink keeps the old grey states: `--hl-nav` is `--secondary-default`, its tint mixes are 9% and 18%, and its focus ring stays the info blue (#008AB3 light, 3.8:1 on paper; `hsla(200, 80%, 65%)` dark).
 
-**What the accent does not touch.** Unread counts, the For you count and the quiet "@" tag on rows stay the soft grey tags (SPEC: "unread counts are soft grey, not black badges"); the "@" tag's background is `--hl-soft`, its text `--foreground-subtle`. Coral is for the primary button, the selected nav item, the user's own @mention chip, the focus ring and text selection.
+**What the accent does not touch.** Unread counts, the Juno nav count, the tab unread dot and the quiet "@" tag on rows stay the soft grey tags (SPEC: "unread counts are soft grey, not black badges"); the "@" tag's background is `--hl-soft`, its text `--foreground-subtle`. Coral is for the primary button, the selected nav item, the user's own @mention chip, the focus ring and text selection.
 
 **Values and measured contrast.** Measured in Chromium from the built gallery (WCAG 2, sRGB; `color-mix()` resolved by the browser). Targets: 4.5:1 for text on the fill, accent text on the page, on the selected nav and on the soft tint, and for body text on the selection; the focus ring is the accent text so it meets the same bar. The fill against the page is information only: Marigold in light is 1.94:1, so a marigold button is identified by its label, never by colour alone. The dark column was measured against the dark palette in 1.2.
 
@@ -131,7 +132,7 @@ Always derived from the base palette so they follow dark mode. Formulas from the
 
 Token names [proposed]: `--tint-public-bg/fg`, `--tint-private-bg/fg`, `--tint-dm-bg/fg`.
 
-Used by: topic header context pill, New message To pill, Juno send-card pill. Icons: `hash` (public), `lock` (private), `user` (DM), `users` (group DM).
+Used by: topic header context pill, Juno send-card pill. Icons: `hash` (public), `lock` (private), `user` (DM), `users` (group DM).
 
 ### 1.5 Status and semantic colours
 
@@ -240,22 +241,22 @@ Sizes are the Figtree values; the prototype's Inter value is half a pixel smalle
 | Tag small | 12px | 500 / 400 | | 0 | | Row Resolve button, card footnotes, "Use", Mark read |
 | Meta | 12.5px | 400 | normal | 0 | muted | Row line 3, times, message timestamps, card headers, status chips (500), bubble name line, log reasons |
 | Pill | 13px | 600 (+400 kind) | 26px box | 0 | tint fg | Context pill, scope chip (500) |
-| Small button | 13px | 500 | 28px box | 0 | | Group into topic, Resolve (hint), Fix and send, Stop ignoring, Not yet |
+| Small button | 13px | 500 | 28px box | 0 | | Resolve (hint), Fix and send, Stop ignoring, Not yet |
 | Thread link | 13px | 400 (count 600) | 26px box | 0 | subtle | "2 replies · Title ›" |
 | UI default | 13.5px | 400 / 500 | 1.5 | 0 | default | Nav, menu items, filters, buttons, selects, inputs, toast, table "Where" |
 | Preview | 13.5px | 400 | 1.45 | 0 | muted (subtle if unread) | Row line 2, clamped to 1 or 2 lines |
-| Body small | 14px | 400 | 1.55–1.6 | 0 | subtle | Catch-up text, For you card body, reply options, picker rows, compact-density message body |
-| Body | 14.5px | 400 | 1.6 | 0 | default | Message body (balanced), composer (lh 22px), rule rows, palette labels, textareas |
+| Body small | 14px | 400 | 1.55–1.6 | 0 | subtle | Home item titles, picker rows, Compact message body |
+| Body | 14.5px | 400 | 1.6 | 0 | default | Message body (Comfortable), composer (lh 22px), rule rows, palette labels, textareas |
 | Row title | 15px (14 compact) | 500, 600 unread | 22px box | 0 | default | Sidebar row line 1; All topics title is 14.5px |
 | Message name | 14.5px | 600 | | 0 | default | Flat message header |
-| Body large | 15px | 400 | 1.6 | 0 | | Airy-density message body |
-| Heading | 15.5px | 600 | 1.35 | 0 | default | Settings section titles, For you card titles (lh 1.35), palette input (400) |
+| Body large | 15px | 400 | 1.6 | 0 | | Unused since the airy density was removed |
+| Heading | 15.5px | 600 | 1.35 | 0 | default | Settings section titles, palette input (400) |
 | Topic title | 20px | 600 | 1.3 | -0.01em | default | Topic header, rename input |
-| Page title | serif 34px (32 All topics) | 400 | 1.1–1.15 | 0 | default | New message, For you, Notifications, Preferences, All topics |
+| Page title | serif 34px (32 All topics) | 400 | 1.1–1.15 | 0 | default | Notifications, Preferences, All topics |
 | Display | serif 38px | 400 | 1.1 | 0 | default | "What do you need?" |
 | Empty title | serif 30px | 400 | | | subtle | "Nothing open" |
 | Kbd / confidence | mono 10–11px | 400 | | | subtle / muted | esc, ⌘J, ⌘Z, ↵, "95%" |
-| Prompt block | mono 12.5px | 400 | 1.6 | | default | For you coding-agent prompt |
+| Prompt block | mono 12.5px | 400 | 1.6 | | default | Code in Juno cards |
 | Avatar initials | 7.5 / 8.5 / 9 / 9.5 / 11 / 12 / 14px | 600 | | | derived | By tile size (18 / 18 / 20 / 24 / 28 / 32 / 44) |
 
 [proposed] Token names: `--text-10-5, --text-11, --text-11-5, --text-12, --text-12-5, --text-13, --text-13-5, --text-14, --text-14-5, --text-15, --text-20, --display-30, --display-32, --display-34, --display-38`. The half-pixel sizes are deliberate in the prototype; keep them rather than rounding, they are what makes the hierarchy quiet.
@@ -283,8 +284,8 @@ Line-height tokens: `--leading-title 1.3`, `--leading-card 1.35`, `--leading-pre
 | `--space-9` | 36 | Settings section gap |
 | `--space-10` | 40 | Page padding top |
 | `--space-12` | 48 | Empty-state padding |
-| `--space-14` | 56 | New message page top |
-| `--space-16` | 64 | For you page bottom |
+| `--space-14` | 56 | Large page spacing |
+| `--space-16` | 64 | Page bottom padding |
 | `--space-18` | 72 | Settings page bottom |
 
 Odd values the prototype uses once (3, 5, 9, 18) are component-local; keep them in the component, not the scale.
@@ -298,18 +299,18 @@ Odd values the prototype uses once (3, 5, 9, 18) are component-local; keep them 
 | `--radius-xs` | 4 | Kbd, tiny close buttons, Mark read |
 | `--radius-sm` | 5 | Dismiss buttons, segmented-control segment, 18–20px channel tiles |
 | `--radius-md` | 6 | Menu items, small buttons (28), quote block, thread link, 24px channel tiles |
-| `--radius-md-plus` | 7 | Selects, the segmented track, For you action buttons, topic-list items in Juno cards, 28px channel tiles |
+| `--radius-md-plus` | 7 | Selects, the segmented track, topic-list items in Juno cards, 28px channel tiles |
 | `--radius-lg` | 8 | 28px buttons, icon buttons (30–32), tabs (top corners), palette items, inputs, send-check bar, option buttons, 28px channel tiles |
-| `--radius-xl` | 12 | Nav items, filter buttons, 30px buttons, hover-toolbar buttons (28), To field, New message textarea, 32–36px channel tiles |
+| `--radius-xl` | 12 | Nav items, filter buttons, 30px buttons, hover-toolbar buttons (28), 32–36px channel tiles |
 | `--radius-2xl` | 14 | Flat message hover row |
 | `--radius-3xl` | 16 | Sidebar and list rows (and the selected row), 44px channel tile, hover toolbar |
-| `--radius-card` | 20 | Cards (catch-up, grouping, For you, Juno cards) and settings groups |
+| `--radius-card` | 20 | Cards (settled hint, Juno cards) and settings groups |
 | `--radius-composer` | 20 | The composer frame: a pill at its 40px single-line height, and the same corner once it has grown, so a tall draft is not a capsule |
-| `--radius-menu` | 13 | Context menu, avatar menu, Browse menu, mention popover, To picker |
+| `--radius-menu` | 13 | Context menu, avatar menu, mention popover, New chat pickers |
 | `--radius-palette` | 14 | ⌘K panel, user chat bubble (with 4px tail corner) |
 | `--radius-toast` | 14 | Toast |
 | `--radius-bubble` | 16 | Message bubbles (tail corner 4) |
-| `--radius-tag` | 999 | Tags, count badges, @ tag, status chips, decision chips, scope chip, digest chips, stealth pill, confidence badge, reaction chips, inline @person and #channel chips (padding 0 5), the row Resolve button (22) and the toast Undo button (26) |
+| `--radius-tag` | 999 | Tags, count badges, @ tag, status chips, decision chips, scope chip, confidence badge, reaction chips, inline @person and #channel chips (padding 0 5), the row Resolve button (22) and the toast Undo button (26) |
 | `--radius-pill` | 999 | Context pill (header, To field, send card); the 32px and taller buttons (header Resolve, Discard/Send, Sign in) |
 | `--radius-full` | 999 | Avatars, attach/send buttons, colour swatches |
 
@@ -325,22 +326,27 @@ All [proto] measured at 1280×800 with Inter unless marked.
 
 | Token | Value |
 | --- | --- |
-| `--sidebar-width` | 384px (fixed, not resizable in v1) |
+| `--sidebar-width` | 384px default; the owner drags it between `--sidebar-min-width` 280px and `--sidebar-max-width` 480px. The live width is a CSS variable on the shell set during the drag, not a token value |
+| `--sidebar-resize-hit` | 6px hit area centred on the sidebar edge |
+| `--titlebar-lights-inset` | 78px kept free for the traffic lights, in the sidebar bar or, with the sidebar hidden, at the start of the tab strip |
+| `--juno-panel-width` | 360px; the topic beside it keeps at least `--juno-panel-topic-min` 480px, else the panel covers the topic |
 | `--titlebar-height` | 44px (sidebar top bar and tab strip; both are drag regions) |
 | `--tab-height` | 35px, bottom margin -1px so the active tab merges with the page |
-| `--tab-width` | flex 0 1 230px; `--tab-min-width` 120px (the prototype's 72 fit only the icon and the close button). The strip scrolls sideways once the tabs reach the floor |
+| `--tab-width` | flex 0 1 230px; `--tab-min-width` 120px (the prototype's 72 fit only the icon and the close button). The strip scrolls sideways once the tabs reach the floor. `--tab-pinned-width` 40px (icon only) |
+| `--tab-unread-dot` | 6px round, `--foreground-muted` |
 | `--topic-header-height` | 100px at one-line title (padding 14 + 32 pill row + 8 gap + 32 title row + 14; the rows are the height of their 32px buttons). The prototype measured 95 with 26px rows |
 | `--reading-width` | 800px message column, centred; composer inner max 752px (800 − 2×24) |
-| `--page-width-narrow` | 680px (New message) |
-| `--page-width` | 720px (For you, Juno) |
+| `--page-width-narrow` | 680px |
+| `--page-width` | 720px (Juno) |
 | `--page-width-settings` | 760px (Preferences), 880px (Notifications) |
 | `--palette-width` | 560px, max calc(100% − 48px), top offset 96px |
-| `--menu-width` | 236px context menu, 248px avatar menu, 300px Browse, 280px mention popover |
+| `--menu-width` | 236px context menu, 248px avatar menu, 280px mention popover, 340px New chat pickers |
 | `--toast-max-width` | 352px |
 | `--popover-max-height` | 400px, and never taller than the window below the title bar (`100vh − --titlebar-height − --space-5`), so the account menu fits at the minimum window size; the content scrolls inside. `--picker-max-height` 300px |
 | `--scrollbar` | 10px, thumb `--border-strong` with 3px transparent inset, radius 10. `ScrollArea scrollbar="hover"` keeps the thumb transparent until the area is hovered; the 10px gutter stays |
 | `--search-field-width` | 260px filter search; `--keyword-field-width` 160px keyword rule input |
-| `--code-block-max-height` | 150px, then the prompt block scrolls inside |
+| `--code-block-max-height` | 150px, then the block scrolls inside; the wheel goes on to the page at its edges |
+| `--toolbar-height` / `--toolbar-reserve` | 36px / 213px. The message hover toolbar's height, and the width a message header keeps free at its end so the name, the time and the first body line never run under it (inventory 6.5). The Main toolbar measures 193px, plus a 20px gap |
 | `--thumb-max-width` / `--thumb-max-height` | 360px / 280px. An image thumbnail in a message is scaled by its own aspect ratio inside this box, and the box is sized before the bytes arrive (performance.md 3.3). File cards are `--thumb-max-width` wide |
 
 ### Controls
@@ -349,17 +355,17 @@ All [proto] measured at 1280×800 with Inter unless marked.
 | --- | --- | --- |
 | `--control-18` | 18px | Tags and count badges (implemented as `--control-<px>`; the names below map to `--control-20` … `--control-44`) |
 | `--control-xs` | 20px | Tab close, scope chip close, digest chip close |
-| `--control-sm` | 22px | Row Resolve button, status chips, dismiss (For you), decision chips |
+| `--control-sm` | 22px | Row Resolve button, status chips |
 | `--control-md-` | 24px | Reaction chip, segmented-control segment, summary chips |
-| `--control-md` | 26px | Context pill, stealth pill, thread link, toast Undo, rule remove |
+| `--control-md` | 26px | Context pill, thread link, toast Undo, rule remove |
 | `--control` | 28px | Quick filters, status chips (All topics), small buttons, attach/send, hover-toolbar buttons, To pill, digest chips |
 | `--control-lg-` | 30px | Titlebar icon buttons, selects (All topics), card actions, Quote button, empty-state button, context menu item |
 | `--control-lg` | 32px | Nav buttons, header icon buttons, Resolve (header), menu items, rule selects, Add |
 | `--control-xl-` | 34px | Rename input (header), filter search, suggestion chips, Open notification settings, To-picker rows |
-| `--control-xl` | 36px | Discard/Send (New message), topic-list items in Juno cards, reply options (min), title input |
+| `--control-xl` | 36px | topic-list items in Juno cards, reply options (min), title input |
 | `--field-min` | 40px | Composer textarea single line (`--composer-padding-block` 9 + `--composer-line-height` 22 + 9), To field 44 |
 | `--row-44` / `--row-48` / `--row-52` | 44, 48, 52px | Today log row, notification rule row, All topics table row (ListRow `minHeight`) |
-| `--row-topic-estimate` | 85px | The `contain-intrinsic-size` estimate for sidebar rows off screen (performance.md 3.2). It sizes the content box, so it is the measured row (chat, balanced, two preview lines: 107px) minus the 22px of block padding |
+| `--row-topic-estimate` | 85px | The `contain-intrinsic-size` estimate for sidebar rows off screen (performance.md 3.2). It sizes the content box, so it is the measured row (Comfortable, two preview lines: 107px) minus the 22px of block padding |
 | `--row-message-estimate` | 56px | The same estimate for message rows off screen (performance.md 3.3): a name line and one body line, without the row's block padding |
 
 ### Tiles and avatars
@@ -371,11 +377,15 @@ All [proto] measured at 1280×800 with Inter unless marked.
 | `--avatar-sm` | 28px | Bubble avatar, Juno assistant mark; initials 11 |
 | `--avatar-xs` | 24px | Titlebar me avatar; initials 9.5 |
 | `--avatar-2xs` | 20px | Mention and To-picker rows; initials 9 |
-| `--avatar-3xs` | 18px | Browse rows (8.5), avatar stack (one initial at 8.5, overlap −4, 1.5px ring in the colour of the surface the stack sits on) |
+| `--avatar-3xs` | 18px | Avatar stack (one initial at 8.5, overlap −4, 1.5px ring in the colour of the surface the stack sits on) |
 
 ### Icons
 
-Phosphor (`@phosphor-icons/react`, imported per icon). Weight by size: `bold` at 12–14, `regular` at 15–20. `fill` marks active and selected states. `duotone` only for the Juno nav item, AI sparkles, For you card kinds and illustrations. Sizes (`--icon-12` … `--icon-20`): 12 (badges, chip close), 13 (row meta, tags, tab close), 14 (pills, cards, thread link, catch-up sparkle), 15 (tab icon), 16 (nav, menu items, buttons, title sparkle), 18 (icon buttons, hover toolbar, palette rows, send), 20 (attach, palette search). Tab icons sit at 0.75 opacity. There is no stroke token; Phosphor is filled paths and the weight is the variant. The mapping from the Lucide names the prototype used is in `friendly-layer.md` §2.3.
+Phosphor (`@phosphor-icons/react`, imported per icon). Weight by size: `bold` at 12–14, `regular` at 15–20. `fill` marks active and selected states. `duotone` only for the Juno nav item, the Juno mark and illustrations. Sizes (`--icon-12` … `--icon-20`): 12 (badges, chip close), 13 (row meta, tags, tab close), 14 (pills, cards, thread link, catch-up sparkle), 15 (tab icon), 16 (nav, menu items, buttons, title sparkle), 18 (icon buttons, hover toolbar, palette rows, send), 20 (attach, palette search). Tab icons sit at 0.75 opacity. There is no stroke token; Phosphor is filled paths and the weight is the variant. The mapping from the Lucide names the prototype used is in `friendly-layer.md` §2.3.
+
+### Juno chat
+
+The `chat` group (`tokens.stylex.ts`). `--owner-bubble-bg` and `--owner-bubble-fg` are the owner bubble's fill and text, set to option B (`--hl-bubble` / `--foreground-default`); the other options are listed beside the group, and switching is a change to those two lines. `--bubble-max-width` 76%, `--bubble-tail` 4px (the last bubble of a group), `--card-max-width` 560px. The status bubble: `--status-dot` 6px, `--status-min-width` 52px, `--status-loop` 1200ms, `--status-pulse-scale` 1.35 (1 under reduced motion), `--status-dot-opacity` 1 (0.6 under reduced motion). `--delay-queued` 500ms is how long a steer waits before "Queued" shows.
 
 ### Illustrations and the mark
 
@@ -383,15 +393,14 @@ Phosphor (`@phosphor-icons/react`, imported per icon). Weight by size: `bold` at
 
 ### Rows
 
-Sidebar row heights per density × style × preview lines (chat rows include the tile; measured with Inter, 2-line titles do not occur). The two values are 1-line / 2-line previews.
+Sidebar row heights per density (Preferences › Appearance; rows include the tile; measured with Inter, 2-line titles do not occur). The two values are 1-line / 2-line previews. The prototype's list and cards styles and its airy density are removed.
 
-| Density | chat | list | cards | Vertical padding | Line gap | Title size |
-| --- | --- | --- | --- | --- | --- | --- |
-| compact | 80 / 99 | 81 / 100 | 86 / 105 | 8px (cards 10) | 1px | 13.5px |
-| balanced (default) | 90 / 109 | 91 / 110 | 96 / 115 | 11px (cards 13) | 3px | 14.5px |
-| airy | 102 / 121 | 103 / 122 | 108 / 127 | 15px (cards 17) | 5px | 14.5px |
+| Density | Row | Vertical padding | Line gap | Title size |
+| --- | --- | --- | --- | --- |
+| Comfortable (default) | 90 / 109 | 11px | 3px | 14.5px |
+| Compact | 80 / 99 | 8px | 1px | 13.5px |
 
-Gap between rows: chat 2px, list 0 (1px rule), cards 6px. All topics table row: min 52px. Notification rule row: min 48px. Today log row: min 44px. Palette result: 55px. Menu item: 30px (context) / 32px (other menus). Message group spacing (margin above a new sender): compact 6px, balanced 12px, airy 18px. Message padding: 2 8 / 4 8 / 6 10.
+Gap between rows: 2px. All topics table row: min 52px. Notification rule row: min 48px. Today log row: min 44px. Palette result: 55px. Menu item: 30px (context) / 32px (other menus). Message group spacing (margin above a new sender): Compact 6px, Comfortable 12px. Message padding: 2 8 / 4 8.
 
 ### Composer
 
@@ -405,7 +414,7 @@ Single line 40px; grows to `max-height` then scrolls inside. Prototype max is 18
 | `--shadow-md` | `0 2px 6px 0 rgba(27,28,21,.06)` | `0 2px 6px 0 rgba(0,0,0,.40)` | css | Floating Quote button |
 | `--shadow-card` | `0 0 12px 0 rgba(27,28,21,.12)` | `0 0 12px 0 rgba(0,0,0,.45)` | css | Unused in prototype; prefer `--card-ring` |
 | `--shadow-lg` | `0 8px 24px 0 rgba(27,28,21,.10)` | `0 8px 24px 0 rgba(0,0,0,.50)` | css | Toast |
-| `--card-ring` | `0 1px 2px 0 oklch(0 0 0 / .03), 0 6px 20px -4px oklch(0 0 0 / .07)` | `0 1px 2px 0 oklch(0 0 0 / .3), 0 6px 20px -4px oklch(0 0 0 / .35)` | options D1 | Cards: catch-up, grouping, settled hint, For you, Juno cards, settings groups. The name is historical; there is no ring any more |
+| `--card-ring` | `0 1px 2px 0 oklch(0 0 0 / .03), 0 6px 20px -4px oklch(0 0 0 / .07)` | `0 1px 2px 0 oklch(0 0 0 / .3), 0 6px 20px -4px oklch(0 0 0 / .35)` | options D1 | Cards: settled hint, Juno cards, settings groups. The name is historical; there is no ring any more |
 | `--pop-shadow` | `0 2px 6px -1px oklch(0 0 0 / .05), 0 14px 36px -8px oklch(0 0 0 / .13)` | `0 2px 6px -1px oklch(0 0 0 / .3), 0 14px 36px -8px oklch(0 0 0 / .5)` | options D1 | Menus, popovers, palette, hover toolbar |
 
 Floating surfaces have `border: 1px solid transparent` plus the shadow, never a coloured border. Inputs keep a real 1px `--input-border`. The raised button (`Button variant="raised"`) is a control, not a floating surface: it keeps a 1px `--border-default` edge plus `--shadow-sm`. In dark the shadows alone do not separate a popover from the page, so popovers and the hover toolbar sit on `--surface-raised` (1.2).
@@ -416,8 +425,8 @@ Floating surfaces have `border: 1px solid transparent` plus the shadow, never a 
 | --- | --- | --- |
 | `--z-toolbar` | 2 | Message hover toolbar (relative to message) |
 | `--z-mention` | 5 | @/# suggestion popover above composer |
-| `--z-picker` | 10 | New message To picker |
-| `--z-menu` | 20 | Avatar menu, Browse menu |
+| `--z-picker` | 10 | Picker overlay |
+| `--z-menu` | 20 | Avatar menu, New chat pickers |
 | `--z-palette` | 30 | ⌘K overlay and panel |
 | `--z-selection` | 35 | Floating Quote button |
 | `--z-context` | 40 | Context menus |
@@ -457,7 +466,7 @@ Entrances are 240ms, exits 150ms, pops 220ms; rows, tabs and typing never animat
 
 | Token | Value | Use |
 | --- | --- | --- |
-| `--opacity-disabled` | 0.4 | Send and Ask buttons with an empty draft, Send on New message |
+| `--opacity-disabled` | 0.4 | Send and Ask buttons with an empty draft |
 | `--opacity-dim` | 0.6 | The decorative tile of a resolved or unsubscribed row. Never on text: at 0.6 muted text drops to 2.3:1 |
 | `--opacity-tab-icon` | 0.75 | Tab icon |
 | `--opacity-kbd` | 0.75 | ⌘Z inside the toast Undo button |

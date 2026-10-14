@@ -34,11 +34,11 @@ One component for every clickable control with a label. Radius, text size and ic
 | `dimmed` | boolean | opacity .4, still focusable, `aria-disabled` (Send with empty draft) |
 | `disabled` | boolean | Same look as dimmed; no press scale |
 
-Covers: quick filters, status chips, Resolve (row and header), Group into topic, Dismiss, Not yet, Discard/Send, card actions, suggestion chips, Stop ignoring, Add, Ignore, Mark read, Undo. Sidebar nav items are `NavItem`.
+Covers: quick filters, status chips, Resolve (row and header), Not yet, Discard/Send, card actions, suggestion chips, Stop ignoring, Add, Ignore, Mark read, Undo. Sidebar nav items are `NavItem`.
 
 ## 2a. NavItem
 
-The sidebar navigation item (All topics, For you, Juno): 32px, full width, radius 12, 16px `icon` then the label, ghost until hovered; when `active` (sets `aria-current="page"`) it takes the accent's nav tint `--hl-nav`, accent text `--hl-text`, weight 600 and a filled icon (the ink accent keeps the plain `--secondary-default`). `iconWeight` overrides the outline/fill pair; the Juno item passes `duotone` so it stays marked as the one AI surface whether or not it is open. `trailing` takes the count Chip, `kbd` the "⌘J" hint. Navigates on mouse down through `onSelect` like rows and tabs; `onContextMenu` for the right button. Never animates.
+The sidebar navigation item (Home, All topics, Juno): 32px, full width, radius 12, 16px `icon` then the label, ghost until hovered; when `active` (sets `aria-current="page"`) it takes the accent's nav tint `--hl-nav`, accent text `--hl-text`, weight 600 and a filled icon (the ink accent keeps the plain `--secondary-default`). `iconWeight` overrides the outline/fill pair; the Juno item passes `duotone` so it stays marked as the one AI surface whether or not it is open. `trailing` takes the count Chip, `kbd` the "⌘J" hint. Navigates on mouse down through `onSelect` like rows and tabs; `onContextMenu` for the right button. Never animates.
 
 ## 3. IconButton
 
@@ -71,13 +71,13 @@ Channels are `ChannelIcon` (section 4a).
 
 ## 5. Chip
 
-Small inline label. Replaces tags, count badges, status chips, decision chips, summary chips, confidence badge, scope chip, digest chips, the stealth pill.
+Small inline label. Replaces tags, count badges, status chips, decision chips, summary chips, confidence badge, scope chip.
 
 | Prop | Values | Notes |
 | --- | --- | --- |
 | `variant` | `outline` (Main), `filled` (Reopened, Open, Digest, #channel), `strong` (`--secondary-active`; unread count), `soft` (`--hl-soft` + inset ring; @), `accent` (`--hl`; Now, @ in Browse, @you), `success` (resolved tint), `quiet` (transparent, muted), `surface` (`--surface-hover`), `dashed` (stealth pill), `person` (the inline @mention: `hue` mixed 16% into the surface and 40% into the text, weight 600; `hue` as Avatar) | Every chip is a pill (`--radius-tag`) |
-| `size` | 18 (tag), 20 (badge), 22 (status), 24 (summary, reaction), 26 (scope), 28 (digest time), `inline` (follows the surrounding line; padding 0 5) | Text 11 / 11 / 12 / 12 / 12.5 / 13 / inherited |
-| `icon`, `iconSize` | 12–13, bold | sparkle in the confidence badge, eye-slash in the stealth pill |
+| `size` | 18 (tag), 20 (badge), 22 (status), 24 (summary, reaction), 26 (scope), 28 (notification setting tag), `inline` (follows the surrounding line; padding 0 5) | Text 11 / 11 / 12 / 12 / 12.5 / 13 / inherited |
+| `icon`, `iconSize` | 12–13, bold | sparkle in the confidence badge |
 | `numeric` | boolean | tabular figures |
 | `onRemove`, `removeLabel` | | Adds a 20×20 close IconButton (12px bold X) |
 | `interactive`, `pressed`, `pop` | | Renders a toggle `button` (reaction chips: 1px `--border-default`, pressed = `--hl-soft` + `--hl-ring` border and the count in `--foreground-default`). `pop` plays the spring once (1 → 1.12 → 1 over `--duration-pop`); set it only when the toggle was the user's own action |
@@ -121,7 +121,7 @@ Menus are not a separate primitive: an in-app menu (the account menu) is an `Opt
 
 `TextField`: 1px `--input-border`, surface background, focus shown on the container (`--focus-ring` border and 1px ring). `size` 30, 32, 34, 36, 44 (radius 7 / 7 / 8 / 8 / 10). `leadingIcon` (search), `leading` slot (the "To" label and a ContextPill), `trailing`, `width` (`full` | `search` 260 | `keyword` 160), `text`, `label` (required without a visible label), `invalid` (danger border, `aria-invalid`).
 
-`Textarea`: `variant` `plain` (bordered, 6 rows, resize vertical), `inline` (composer: no border, 22px line height, grows with `field-sizing: content` to `maxHeight` `composer` 194 or `assistant` 160 then scrolls; no layout is read on a keystroke), `card` (send card, `--background`, 2 rows).
+`Textarea`: `variant` `inline` (composer: no border, 22px line height, grows with `field-sizing: content` to `maxHeight` `composer` 194 or `assistant` 160 then scrolls; no layout is read on a keystroke), `card` (send card, `--background`, 2 rows).
 
 `Select`: native `<select>` styled like a 30 or 32px field with a muted chevron; `options[]`.
 
@@ -147,21 +147,21 @@ Centered `illustration` (optional; an `IllustrationName`, 96 wide in `list`, 120
 
 ## 15a. Illustration and Logo
 
-`Illustration` `name`: `caught-up` (the seated j with a tablet on its lap and a check; Unread filter with nothing unread, For you with no cards), `nothing-here` (a tray with two faded rows; a filter hides everything, All topics and Browse with no match), `nothing-open` (a blank tablet with two reply dots; no tabs), `no-results` (a magnifying glass over two rows; ⌘K), `juno` (the seated j alone on a warm disc; the Juno chat empty state). `size` `list` 96 | `workspace` 120 | `figure` 40. One colour (`--foreground-subtle` through `currentColor`), stroke 4 on a 104 by 72 grid, round caps, filled dots, one `--warm-soft` layer. Decorative; the title says what it means.
+`Illustration` `name`: `caught-up` (the seated j with a tablet on its lap and a check; Unread filter with nothing unread), `nothing-here` (a tray with two faded rows; a filter hides everything, All topics and Browse with no match), `nothing-open` (a blank tablet with two reply dots; no tabs), `no-results` (a magnifying glass over two rows; ⌘K), `juno` (the seated j alone on a warm disc; the Juno chat empty state). `size` `list` 96 | `workspace` 120 | `figure` 40. One colour (`--foreground-subtle` through `currentColor`), stroke 4 on a 104 by 72 grid, round caps, filled dots, one `--warm-soft` layer. Decorative; the title says what it means.
 
 `Logo`: the laptop-two mark in `currentColor`. `size` 16 | 18 | 20 | 24 | 28 | 32 | 40 | 44; `label` ("Juno") when it is not decorative. The sign-in page shows it at 40; the assistant's avatar is 28.
 
 ## 16. Page, PageHeader, Section
 
-`Page`: scrolling page with a centred column, `width` `narrow` 680 | `default` 720 | `settings` 760 | `wide` 880, `padding` `page` (40 32 72) | `form` (56 32 64). `PageHeader`: serif `title` (`size` `compact` for the 32px All topics title), `subtitle`, `trailing` slot. `Section`: 15/600 `heading` + 13 muted `sub` + children (usually a `Surface group`).
+`Page`: scrolling page with a centred column, `width` `narrow` 680 | `default` 720 | `settings` 760 | `wide` 880, padding 40 32 72. `PageHeader`: serif `title` (`size` `compact` for the 32px All topics title), `subtitle`, `trailing` slot. `Section`: 15/600 `heading` + 13 muted `sub` + children (usually a `Surface group`).
 
 ## 17. CodeBlock
 
-Mono 12.5 lh 1.6 inside a `Surface inset`, pre-wrap, max-height 150 with contained scroll, selectable. For you prompt only.
+Mono 12.5 lh 1.6 inside a `Surface inset`, pre-wrap, max-height 150 with contained scroll, selectable. Code in Juno cards.
 
 ## 18. Card
 
-`Surface card` with a meta header (`kindIcon` + `kind`, `·`, `sourceIcon` + `source`, `onDismiss` 22px IconButton), `title` (15/600), `body` (13.5 subtle), `children` (prompt block, reply options) and `actions` (wrapping Button row). Used by For you cards and assistant cards; message-level cards (catch-up, grouping, settled) use `Surface card` directly.
+`Surface card` with a meta header (`kindIcon` + `kind`, `·`, `sourceIcon` + `source`, `onDismiss` 22px IconButton), `title` (15/600), `body` (13.5 subtle), `children` (prompt block, reply options) and `actions` (wrapping Button row). Used by assistant cards (For you, its first user, is removed); the settled hint uses `Surface card` directly.
 
 ---
 

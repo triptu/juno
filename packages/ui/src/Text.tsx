@@ -1,5 +1,5 @@
 import * as stylex from '@stylexjs/stylex'
-import type { ElementType, HTMLAttributes, ReactNode } from 'react'
+import type { ElementType, HTMLAttributes, PointerEvent, ReactNode } from 'react'
 import { accent, colors } from '@juno/tokens/tokens.stylex'
 import type { LayoutStyles } from './internal/sx'
 import { numeric as numericStyles, variants as typeVariants, weight as weightStyles, type TextVariant, type Weight } from './internal/type'
@@ -18,6 +18,13 @@ export interface TextProps extends Omit<HTMLAttributes<HTMLElement>, 'style' | '
   readonly truncate?: boolean
   /** Clamp to this many lines with an ellipsis. */
   readonly clamp?: 1 | 2 | 3
+  /**
+   * With `truncate` or `clamp`: while the text is cut off, hovering it shows
+   * the full text as the native tooltip; when it fits, there is none. One
+   * size read on pointer enter, nothing on render, so a row costs nothing
+   * until it is hovered. Do not combine with `title`.
+   */
+  readonly tooltipWhenTruncated?: boolean
   /** Tabular figures; use for times, counts and table numbers. */
   readonly numeric?: boolean
   /** Chrome text is not selectable; message text and similar opt in. */
@@ -27,6 +34,12 @@ export interface TextProps extends Omit<HTMLAttributes<HTMLElement>, 'style' | '
   /** Extra StyleX styles from the owner (layout only). */
   readonly sx?: LayoutStyles
   readonly children?: ReactNode
+}
+
+function titleWhenTruncated(event: PointerEvent<HTMLElement>) {
+  const node = event.currentTarget
+  if (node.scrollWidth > node.clientWidth || node.scrollHeight > node.clientHeight) node.title = node.textContent ?? ''
+  else node.removeAttribute('title')
 }
 
 const blockTags: Partial<Record<TextVariant, ElementType>> = {
@@ -53,6 +66,7 @@ export function Text({
   weight,
   truncate = false,
   clamp,
+  tooltipWhenTruncated = false,
   numeric = false,
   selectable = false,
   as,
@@ -61,9 +75,16 @@ export function Text({
   ...rest
 }: TextProps) {
   const Tag = as ?? blockTags[variant] ?? 'span'
+  const enter = tooltipWhenTruncated
+    ? (event: PointerEvent<HTMLElement>) => {
+        titleWhenTruncated(event)
+        rest.onPointerEnter?.(event)
+      }
+    : rest.onPointerEnter
   return (
     <Tag
       {...rest}
+      onPointerEnter={enter}
       {...stylex.props(
         styles.base,
         typeVariants[variant],

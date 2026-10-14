@@ -98,3 +98,13 @@ export function slackDate(timestamp: number, format: string, now: number): strin
     }
   })
 }
+
+/** The day separator's label (inventory 12): "Today", "Yesterday", the weekday inside the week, then "Oct 3". */
+export function dayLabel(at: number, now: number): string {
+  const today = startOfDay(now)
+  const day = startOfDay(at)
+  if (day === today) return 'Today'
+  if (day === today - DAY) return 'Yesterday'
+  if (day > today - 7 * DAY && day < today) return weekday.format(at)
+  return new Date(at).getFullYear() === new Date(now).getFullYear() ? monthDay.format(at) : monthDayYear.format(at)
+}

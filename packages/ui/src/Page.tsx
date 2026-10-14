@@ -8,16 +8,14 @@ export type PageWidth = 'narrow' | 'default' | 'settings' | 'wide'
 export interface PageProps {
   /** narrow 680, default 720, settings 760, wide 880. */
   readonly width?: PageWidth
-  /** `page` pads 40 32; `form` pads 56 32 (New message). */
-  readonly padding?: 'page' | 'form'
   readonly children?: ReactNode
 }
 
 /** A scrolling page with a centred column of a fixed maximum width. */
-export function Page({ width = 'default', padding = 'page', children }: PageProps) {
+export function Page({ width = 'default', children }: PageProps) {
   return (
     <div {...stylex.props(styles.scroll)}>
-      <div {...stylex.props(styles.column, widths[width], padding === 'form' ? styles.form : styles.page)}>{children}</div>
+      <div {...stylex.props(styles.column, widths[width], styles.page)}>{children}</div>
     </div>
   )
 }
@@ -93,11 +91,6 @@ const styles = stylex.create({
   page: {
     paddingBlock: `${spacing['--space-10']} ${spacing['--space-18']}`,
     paddingInline: spacing['--space-8'],
-  },
-  form: {
-    paddingBlock: `${spacing['--space-14']} ${spacing['--space-16']}`,
-    paddingInline: spacing['--space-8'],
-    gap: spacing['--space-4'],
   },
   header: {
     display: 'flex',

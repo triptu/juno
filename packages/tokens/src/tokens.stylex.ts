@@ -91,6 +91,8 @@ export const colors = stylex.defineVars({
  * - --hl-text: accent-coloured text and icons on paper or on a tint (the
  *   "new" label, the selected nav item, the subscribed bell)
  * - --hl-soft: the tint behind a message that mentions you, my reaction
+ * - --hl-bubble: the owner's bubble in the Juno chat, a stronger tint than
+ *   --hl-soft (16% light, 22% dark) with --foreground-default text
  * - --hl-nav: the selected nav item's fill, over the sidebar
  * - --hl-rule, --hl-ring: the new divider's rule and the mine-reaction ring
  * - --focus-ring: the accent text colour, so it meets 4.5:1 on the page
@@ -103,6 +105,7 @@ export const accent = stylex.defineVars({
   '--hl-fg': '#FFFFFF',
   '--hl-text': '#B4351F',
   '--hl-soft': `color-mix(in oklch, #CC4628 10%, ${colors['--background']})`,
+  '--hl-bubble': `color-mix(in oklch, #CC4628 16%, ${colors['--background']})`,
   '--hl-nav': `color-mix(in oklch, #CC4628 9%, ${colors['--background-subtle']})`,
   '--hl-rule': 'color-mix(in oklch, #CC4628 30%, transparent)',
   '--hl-ring': 'color-mix(in oklch, #CC4628 45%, transparent)',
@@ -132,6 +135,44 @@ export const accentSwatches = stylex.defineVars({
   '--swatch-claret-fg': '#FFFAEB',
   '--swatch-cyan': '#008AB3',
   '--swatch-cyan-fg': 'hsla(48, 10%, 2%, 1)',
+})
+
+/**
+ * The Juno chat (SPEC section 13, inventory section 12). The owner bubble's
+ * colour is still the owner's choice between options A to D
+ * (docs/design/juno-chat/README.md): this is option B, the accent tint.
+ * Switching options changes the two owner-bubble lines and nothing else:
+ *
+ *   A  accent['--hl']              / accent['--hl-fg']
+ *   B  accent['--hl-bubble']       / colors['--foreground-default']
+ *   C  colors['--secondary-default'] / colors['--foreground-default']
+ *   D  colors['--accent-default']  / colors['--accent-foreground']
+ *
+ * The status bubble's three dots loop over --status-loop; under reduced
+ * motion the pulse scale is 1 and the dots rest at --status-dot-opacity,
+ * so the animation runs but nothing moves.
+ */
+export const chat = stylex.defineVars({
+  '--owner-bubble-bg': accent['--hl-bubble'],
+  '--owner-bubble-fg': colors['--foreground-default'],
+  '--bubble-max-width': '76%',
+  '--bubble-tail': '4px',
+  '--card-max-width': '560px',
+  '--status-dot': '6px',
+  '--status-min-width': '52px',
+  '--status-loop': '1200ms',
+  '--status-pulse-scale': {
+    default: '1.35',
+    [REDUCED_MOTION]: '1',
+  },
+  '--status-dot-opacity': {
+    default: '1',
+    [REDUCED_MOTION]: '0.6',
+  },
+  // "Queued" shows under a steer only after this long, so a steer read
+  // within one tool round never flickers. Not collapsed by reduced motion:
+  // it is a delay, not a movement.
+  '--delay-queued': '500ms',
 })
 
 /**
@@ -494,7 +535,7 @@ export const text = stylex.defineVars({
   '--text-topic-title-leading': '1.3',
   '--text-topic-title-tracking': '-0.01em',
 
-  // Page titles: New message, For you, Notifications, Preferences.
+  // Page titles: For you, Notifications, Preferences.
   '--text-page-title-family': fonts['--font-serif'],
   '--text-page-title-size': '34px',
   '--text-page-title-weight': '400',
@@ -620,6 +661,12 @@ export const layout = stylex.defineVars({
   '--composer-padding-block': '9px',
   '--assistant-input-max-height': '160px',
   '--code-block-max-height': '150px',
+  // The message hover toolbar: its height, and the width a message header
+  // keeps free at its end so the name and time never run under it. The Main
+  // toolbar is 193px (six 28px buttons, 2px gaps, a 5px rule, 4px padding)
+  // plus a 20px gap.
+  '--toolbar-height': '36px',
+  '--toolbar-reserve': '213px',
   // Image thumbnails in a message: never wider or taller than this, scaled
   // by their own aspect ratio. File cards share the width.
   '--thumb-max-width': '360px',

@@ -45,9 +45,6 @@ a:hover{color:var(--foreground-subtle)}
         <button onClick="{{toggleDark}}" title="Toggle theme" aria-label="Toggle theme" style="width:30px;height:30px;flex:none;padding:0;border:none;border-radius:8px;background:transparent;color:var(--foreground-subtle);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:scale 150ms ease-out,background-color 150ms ease-out,color 150ms ease-out,box-shadow 150ms ease-out" style-active="scale:0.96" style-hover="background:var(--surface-hover)">
           <span style="display:block;width:16px;height:16px;background:currentColor;mask:{{themeMask}}"></span>
         </button>
-        <button onClick="{{newTopic}}" title="New topic" aria-label="New topic" style="width:30px;height:30px;flex:none;padding:0;border:none;border-radius:8px;background:transparent;color:var(--foreground-subtle);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:scale 150ms ease-out,background-color 150ms ease-out,color 150ms ease-out,box-shadow 150ms ease-out" style-active="scale:0.96" style-hover="background:var(--surface-hover)">
-          <span style="display:block;width:16px;height:16px;background:currentColor;mask:url(//unpkg.com/lucide-static@0.454.0/icons/square-pen.svg) center / contain no-repeat"></span>
-        </button>
         <button onClick="{{toggleMeMenu}}" title="Account and preferences" style="width:30px;height:30px;flex:none;margin-left:4px;padding:0;border:none;border-radius:999px;background:transparent;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:scale 150ms ease-out,background-color 150ms ease-out,color 150ms ease-out,box-shadow 150ms ease-out" style-active="scale:0.96" style-hover="background:var(--surface-hover)">
           <span style="width:24px;height:24px;border-radius:999px;display:flex;align-items:center;justify-content:center;font-size:9.5px;font-weight:600;background:{{me.bg}};color:{{me.fg}}">{{me.ini}}</span>
         </button>
@@ -241,7 +238,7 @@ a:hover{color:var(--foreground-subtle)}
           </button>
         </div>
       </sc-for>
-      <button onClick="{{newTopic}}" title="New topic" aria-label="New topic" style="width:28px;height:28px;flex:none;margin:0 0 4px 4px;border:none;border-radius:8px;background:transparent;color:var(--foreground-muted);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:scale 150ms ease-out,background-color 150ms ease-out,color 150ms ease-out,box-shadow 150ms ease-out" style-active="scale:0.96" style-hover="background:var(--surface-hover)">
+      <button onClick="{{openPalette}}" title="New tab" aria-label="New tab" style="width:28px;height:28px;flex:none;margin:0 0 4px 4px;border:none;border-radius:8px;background:transparent;color:var(--foreground-muted);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:scale 150ms ease-out,background-color 150ms ease-out,color 150ms ease-out,box-shadow 150ms ease-out" style-active="scale:0.96" style-hover="background:var(--surface-hover)">
         <span style="display:block;width:15px;height:15px;background:currentColor;mask:url(//unpkg.com/lucide-static@0.454.0/icons/plus.svg) center / contain no-repeat"></span>
       </button>
     </div>
@@ -455,58 +452,6 @@ a:hover{color:var(--foreground-subtle)}
                   <span style="display:block;width:16px;height:16px;background:currentColor;mask:url(//unpkg.com/lucide-static@0.454.0/icons/arrow-up.svg) center / contain no-repeat"></span>
                 </button>
               </div>
-            </div>
-          </div>
-        </div>
-      </sc-if>
-
-      <sc-if value="{{showNew}}">
-        <div style="flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain">
-          <div style="max-width:680px;margin:0 auto;padding:56px 32px;display:flex;flex-direction:column;gap:16px">
-            <div style="font-family:var(--font-serif);font-size:34px;line-height:1.15;margin-bottom:8px">New message</div>
-            <div onClick="{{stop}}" style="position:relative">
-              <div onClick="{{ndOpenTo}}" style="display:flex;align-items:center;gap:10px;min-height:44px;padding:0 12px;border:1px solid var(--input-border);border-radius:10px;background:var(--surface-default);cursor:text">
-                <span style="flex:none;font-size:13px;color:var(--foreground-muted)">To</span>
-                <sc-if value="{{ndHasTo}}">
-                  <span style="flex:none;height:28px;display:flex;align-items:center;gap:6px;padding:0 10px;border-radius:6px;background:{{ndv.tintBg}};color:{{ndv.tintFg}};font-size:13px;font-weight:600">
-                    <span style="display:block;width:12px;height:12px;flex:none;background:currentColor;mask:{{ndv.mask}}"></span>
-                    {{ndv.name}}
-                    <span style="font-weight:400">· {{ndv.kind}}</span>
-                  </span>
-                </sc-if>
-                <input data-to-input="1" value="{{nd.toQ}}" onChange="{{ndToQ}}" onFocus="{{ndOpenTo}}" onKeyDown="{{ndToKey}}" placeholder="{{toPlaceholder}}" style="flex:1;min-width:0;height:40px;border:none;outline:none;background:transparent;font-size:14px">
-              </div>
-              <sc-if value="{{ndToOpen}}">
-                <div style="position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:10;max-height:300px;overflow-y:auto;overscroll-behavior:contain;padding:6px;background:var(--surface-default);border:1px solid transparent;border-radius:13px;box-shadow:var(--pop-shadow)">
-                  <sc-for list="{{toItems}}" as="c" hint-placeholder-count="5">
-                    <div onMouseDown="{{c.pick}}" style="display:flex;align-items:center;gap:10px;height:34px;padding:0 8px;border-radius:6px;background:{{c.bg}};font-size:13.5px;cursor:pointer" style-hover="background:var(--surface-hover)">
-                      <sc-if value="{{c.isDm}}"><span style="width:20px;height:20px;border-radius:999px;flex:none;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:600;background:{{c.av.bg}};color:{{c.av.fg}}">{{c.av.ini}}</span></sc-if>
-                      <sc-if value="{{c.notDm}}"><span style="display:block;width:15px;height:15px;margin:0 2px;flex:none;color:var(--foreground-muted);background:currentColor;mask:{{c.mask}}"></span></sc-if>
-                      <span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{c.name}}</span>
-                      <span style="font-size:12px;color:var(--foreground-muted)">{{c.kind}}</span>
-                    </div>
-                  </sc-for>
-                  <sc-if value="{{toEmpty}}"><div style="padding:12px 8px;font-size:13px;color:var(--foreground-muted)">No channel or person matches.</div></sc-if>
-                </div>
-              </sc-if>
-            </div>
-            <textarea value="{{nd.text}}" onChange="{{ndText}}" rows="6" placeholder="Write a message" style="width:100%;resize:vertical;padding:12px 14px;border-radius:10px;border:1px solid var(--input-border);background:var(--surface-default);font-size:14px;line-height:1.6;outline:none"></textarea>
-            <div style="display:flex;flex-direction:column;gap:10px;padding:12px 14px;border-radius:10px;border:1px solid var(--border-default)">
-              <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer">
-                <input type="checkbox" checked="{{nd.asTopic}}" onChange="{{ndAsTopic}}" style="width:15px;height:15px;margin:2px 0 0;flex:none;accent-color:var(--foreground-default)">
-                <span style="display:flex;flex-direction:column;gap:2px">
-                  <span style="font-size:13.5px;font-weight:500">Track replies as a topic</span>
-                  <span style="font-size:12.5px;line-height:1.45;color:var(--foreground-muted)">Slack posts this to Main either way. Replies to it are collected here as their own topic.</span>
-                </span>
-              </label>
-              <sc-if value="{{ndIsTopic}}">
-                <input value="{{nd.title}}" onChange="{{ndTitle}}" placeholder="Title (optional, only in your client). AI names it if empty." style="height:36px;margin-left:25px;padding:0 12px;border-radius:8px;border:1px solid var(--input-border);background:var(--surface-default);font-size:13.5px;outline:none">
-              </sc-if>
-            </div>
-
-            <div style="display:flex;align-items:center;justify-content:flex-end;gap:8px">
-              <button onClick="{{discardNew}}" style="height:36px;padding:0 14px;border:none;border-radius:8px;background:var(--secondary-default);font-size:13px;font-weight:500;cursor:pointer;transition:scale 150ms ease-out,background-color 150ms ease-out,color 150ms ease-out,box-shadow 150ms ease-out" style-active="scale:0.96" style-hover="background:var(--secondary-hover)">Discard</button>
-              <button onClick="{{postNew}}" style="height:36px;padding:0 16px;border:none;border-radius:8px;background:var(--hl, var(--accent-default));color:var(--hl-fg, var(--accent-foreground));opacity:{{postOpacity}};font-size:13px;font-weight:500;cursor:pointer;transition:scale 150ms ease-out,background-color 150ms ease-out,color 150ms ease-out,box-shadow 150ms ease-out" style-active="scale:0.96">{{ndSendLabel}}</button>
             </div>
           </div>
         </div>
@@ -1110,7 +1055,7 @@ class Component extends DCLogic {
     tabs: [{ key: 'k1', topic: 't1', stealth: false, since: 4 }, { key: 'k2', topic: 't6', stealth: false, since: 4 }],
     activeTab: 'k1', scope: 'all', kind: 'all', filter: 'all', showHidden: false, darkO: null,
     pal: false, q: '', pi: 0, hover: null, picker: null, quote: null, drafts: {},
-    nd: { ch: null, title: '', text: '', asTopic: false, toQ: '', toOpen: false }, scopeMenu: false, scopeQ: '',
+    scopeMenu: false, scopeQ: '',
     ctx: null, selQ: null, toast: null, check: null, ideasOff: [], ignored: ['deploys'], prefAdd: 'alerts-prod',
     notif: { juno: true, th: 80, digests: [600, 780, 990], qFrom: 19 * 60, qTo: 8 * 60, rules: [
       { id: 'r1', type: 'channel', value: 'incidents', action: 'now' },
@@ -1235,16 +1180,6 @@ class Component extends DCLogic {
     this.setState(s => ({ tabs: s.tabs.map(x => x.key === tb.key ? Object.assign({}, x, { stealth: false }) : x), topics: s.topics.map(t => t.id === tb.topic ? Object.assign({}, t, { unread: 0, mention: false }) : t) }));
   }
   setScope(id) { this.setState({ scope: id, scopeMenu: false, scopeQ: '', ctx: null, pal: false }); }
-  newTopic() {
-    this.setState(s => {
-      const ex = s.tabs.find(t => t.topic === 'new');
-      const cur = this.activeTabObj(s); const curT = cur && s.topics.find(t => t.id === cur.topic);
-      const nd = Object.assign({}, s.nd, { ch: s.scope !== 'all' ? s.scope : (curT ? curT.ch : s.nd.ch), toQ: '', toOpen: false });
-      if (ex) return { activeTab: ex.key, nd, scopeMenu: false };
-      const key = 'k' + (++this.seq);
-      return { tabs: [...s.tabs, { key, topic: 'new', stealth: false, since: 0 }], activeTab: key, nd, scopeMenu: false };
-    });
-  }
   react(tid, mid, e) {
     this.setState(s => ({
       picker: null,
@@ -1324,23 +1259,6 @@ class Component extends DCLogic {
       tabs: s.tabs.map(x => x.key === tb.key ? Object.assign({}, x, { stealth: false, since: x.since }) : x),
       drafts: Object.assign({}, s.drafts, { [id]: '' }), quote: null, mq: null, check: null,
     });
-  }
-  postNew() {
-    const s = this.state; const { ch, title, text, asTopic } = s.nd;
-    if (!text.trim() || !ch) return;
-    const stamp = Date.now();
-    const base = { from: 'me', t: nowStr(), text: text.trim(), reactions: [], quote: null };
-    let topics = s.topics;
-    let main = topics.find(t => t.ch === ch && t.kind === 'main');
-    if (!main) { main = { id: 'm-' + ch + stamp, ch, kind: 'main', ago: 0, unread: 0, mention: false, needsYou: false, pinned: false, subscribed: true, resolved: false, reopened: false, msgs: [] }; topics = [...topics, main]; }
-    const mainMsgId = main.id + '-' + stamp;
-    let openId = main.id;
-    let threadId;
-    if (asTopic) { threadId = 'n' + stamp; openId = threadId; }
-    topics = topics.map(t => t.id === main.id ? Object.assign({}, t, { ago: 0, msgs: [...t.msgs, Object.assign({ id: mainMsgId, threadId }, base)] }) : t);
-    if (asTopic) topics = [...topics, TH({ id: threadId, ch, manualTitle: title.trim() || undefined, ago: 0, msgs: [Object.assign({ id: threadId + '-0' }, base)] })];
-    const tabs = s.tabs.map(x => x.topic === 'new' ? { key: x.key, topic: openId, stealth: false, since: 999 } : x);
-    this.setState({ topics, tabs, nd: { ch, title: '', text: '', asTopic, toQ: '', toOpen: false } });
   }
   openBrowse(newTab, page = 'browse') {
     this.setState(s => {
@@ -1569,7 +1487,7 @@ class Component extends DCLogic {
     return out.filter(b => b.lines.join('').trim() !== '' || b.q).map(b => ({ isQuote: b.q, isText: !b.q, qfg: onMe ? 'inherit' : 'var(--foreground-subtle)', segs: this.segs(b.lines.join('\n').replace(/^\n+|\n+$/g, ''), onMe) }));
   }
   insertQuote(text) {
-    const tb = this.activeTabObj(); if (!tb || tb.topic === 'new') return;
+    const tb = this.activeTabObj(); if (!tb) return;
     const q = text.trim().split('\n').map(l => '> ' + l).join('\n') + '\n';
     this.setState(st => { const v = st.drafts[tb.topic] || ''; return { drafts: Object.assign({}, st.drafts, { [tb.topic]: v ? v.replace(/\n*$/, '\n') + q : q }), selQ: null, hover: null }; });
     setTimeout(() => { const el = this.q('[data-composer]'); if (el) { el.focus(); const n = el.value.length; el.setSelectionRange(n, n); } }, 30);
@@ -1814,8 +1732,8 @@ class Component extends DCLogic {
       const on = s.activeTab === x.key;
       const t = topics.find(y => y.id === x.topic);
       const c = t ? chOf(t.ch) : null;
-      const label = x.topic === 'foryou' ? 'For you' : x.topic === 'prefs' ? 'Preferences' : x.topic === 'notify' ? 'Notifications' : x.topic === 'ai' ? 'Juno' : x.topic === 'browse' ? 'All topics' : x.topic === 'new' ? 'New message' : t ? (t.kind === 'main' ? chName(c) : titleOf(t)) : '';
-      const mask = x.topic === 'foryou' ? ICON('lightbulb') : x.topic === 'prefs' ? ICON('settings') : x.topic === 'notify' ? ICON('bell') : x.topic === 'ai' ? ICON('sparkles') : x.topic === 'browse' ? ICON('layout-list') : x.topic === 'new' ? ICON('square-pen') : x.stealth ? ICON('eye-off') : c ? chMask(c) : ICON('hash');
+      const label = x.topic === 'foryou' ? 'For you' : x.topic === 'prefs' ? 'Preferences' : x.topic === 'notify' ? 'Notifications' : x.topic === 'ai' ? 'Juno' : x.topic === 'browse' ? 'All topics' : t ? (t.kind === 'main' ? chName(c) : titleOf(t)) : '';
+      const mask = x.topic === 'foryou' ? ICON('lightbulb') : x.topic === 'prefs' ? ICON('settings') : x.topic === 'notify' ? ICON('bell') : x.topic === 'ai' ? ICON('sparkles') : x.topic === 'browse' ? ICON('layout-list') : x.stealth ? ICON('eye-off') : c ? chMask(c) : ICON('hash');
       return {
         label, mask, bg: on ? 'var(--background)' : 'transparent', border: on ? 'var(--border-default)' : 'transparent', bottom: on ? 'var(--background)' : 'transparent',
         color: on ? 'var(--foreground-default)' : 'var(--foreground-subtle)', weight: on ? 500 : 400,
@@ -1905,8 +1823,6 @@ class Component extends DCLogic {
     const guard = ai && at && chOf(at.ch).kind === 'public' && GUARD_RE.test(draft);
     const mqList = this.mqItems().map((it, i) => Object.assign(it, { bg: s.mq && i === s.mq.i ? 'var(--surface-hover)' : 'transparent', pick: e => { e.preventDefault(); this.insertMention(it); } }));
     const pal = this.palItems().map((p, i) => Object.assign(p, { active: i === s.pi, bg: i === s.pi ? 'var(--surface-hover)' : 'transparent', hover: () => this.setState({ pi: i }) }));
-    const ndC = chOf(s.nd.ch) || CH[0], ndT = tint(ndC);
-    const lastActNd = null;
 
     return {
       rootRef: this.rootRef,
@@ -1921,7 +1837,7 @@ class Component extends DCLogic {
           emptyAction: () => filtered ? this.setState({ filter: 'all', kind: 'all', scope: 'all' }) : this.openBrowse(false),
         };
       })(),
-      rootClick: () => { if (s.ctx || s.scopeMenu || s.filterMenu || s.meMenu || s.nd.toOpen) this.setState(st => ({ ctx: null, scopeMenu: false, filterMenu: false, meMenu: false, nd: Object.assign({}, st.nd, { toOpen: false }) })); },
+      rootClick: () => { if (s.ctx || s.scopeMenu || s.filterMenu || s.meMenu) this.setState({ ctx: null, scopeMenu: false, filterMenu: false, meMenu: false }); },
       meMenu: !!s.meMenu, toggleMeMenu: e => { e.stopPropagation(); this.setState(st => ({ meMenu: !st.meMenu, scopeMenu: false, ctx: null })); },
       filterMenu: !!s.filterMenu, filterActive: s.kind !== 'all' || s.filter === 'unread', filterBtnBg: s.filterMenu ? 'var(--secondary-default)' : 'transparent',
       toggleFilterMenu: e => { e.stopPropagation(); this.setState(st => ({ filterMenu: !st.filterMenu, scopeMenu: false, ctx: null })); },
@@ -1943,7 +1859,6 @@ class Component extends DCLogic {
       onScopeQ: e => this.setState({ scopeQ: e.target.value }),
       onScopeKey: e => { if (e.key === 'Enter' && scopeItems[0]) scopeItems[0].onClick(); },
       toggleScopeMenu: e => { e.stopPropagation(); const opening = !s.scopeMenu; this.setState(st => ({ scopeMenu: !st.scopeMenu, scopeQ: '', ctx: null, filterMenu: false, meMenu: false })); if (opening) this.focusLater('[data-scope-input]'); },
-      newTopic: e => { if (e) e.stopPropagation(); this.newTopic(); },
       kinds: [['all', 'All', 'inbox'], ['channels', 'Channels', 'hash'], ['dms', 'DMs', 'users']].map(([id, label, ic]) => {
         const on = s.kind === id;
         const dot = id !== 'all' && topics.some(t => t.subscribed && t.unread > 0 && !s.ignored.includes(t.ch) && (id === 'dms' ? chOf(t.ch).kind === 'dm' : chOf(t.ch).kind !== 'dm'));
@@ -2015,7 +1930,7 @@ class Component extends DCLogic {
       prefAdd: s.prefAdd, onPrefAdd: e => this.setState({ prefAdd: e.target.value }),
       prefAddOpts: CH.filter(c => c.kind !== 'dm' && !s.ignored.includes(c.id)).map(c => ({ id: c.id, label: chLabel(c) })),
       prefIgnore: () => { const opts = CH.filter(c => c.kind !== 'dm' && !s.ignored.includes(c.id)); const id = opts.some(c => c.id === s.prefAdd) ? s.prefAdd : (opts[0] && opts[0].id); if (id) { this.ignoreChannel(id); const rest = opts.filter(c => c.id !== id); this.setState({ prefAdd: rest[0] ? rest[0].id : '' }); } },
-      showTopic: !!at, showNew: !!(tb && tb.topic === 'new'), showEmpty: !tb,
+      showTopic: !!at, showEmpty: !tb,
       atv, msgs, flatMsgs: !bubbles, bubbleMsgs: bubbles,
       groupTitle, groupCount: String(groupCount),
       groupIt: () => at && this.groupMain(at),
@@ -2051,23 +1966,6 @@ class Component extends DCLogic {
         if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); this.send(); }
       },
       send: () => this.send(),
-      ndHasTo: !!s.nd.ch, ndToOpen: !!s.nd.toOpen, ndIsTopic: !!s.nd.asTopic,
-      ndAsTopic: e => { const v = e.target.checked; this.setState(st => ({ nd: Object.assign({}, st.nd, { asTopic: v }) })); },
-      toPlaceholder: s.nd.ch ? 'Change' : 'Channel or person',
-      toItems: (() => { const q = (s.nd.toQ || '').trim().toLowerCase(); return [...CH].sort((a, b) => lastAct(a.id) - lastAct(b.id)).filter(c => !q || c.name.toLowerCase().includes(q)).map(c => { const a = c.kind === 'dm' ? av(c.people[0]) : null; if (a && c.people.length > 1) a.ini = c.people.map(p => P[p].first[0]).join(''); return { isDm: !!a, notDm: !a, av: a || {}, mask: chMask(c), name: chName(c), kind: kindLabel(c), bg: s.nd.ch === c.id ? 'var(--secondary-default)' : 'transparent', pick: e => { e.preventDefault(); this.setState(st => ({ nd: Object.assign({}, st.nd, { ch: c.id, toQ: '', toOpen: false }) })); } }; }); })(),
-      ndOpenTo: e => { if (e && e.stopPropagation) e.stopPropagation(); if (!s.nd.toOpen) this.setState(st => ({ nd: Object.assign({}, st.nd, { toOpen: true }) })); this.focusLater('[data-to-input]'); },
-      ndToQ: e => { const v = e.target.value; this.setState(st => ({ nd: Object.assign({}, st.nd, { toQ: v, toOpen: true }) })); },
-      ndToKey: e => { if (e.key === 'Escape') { e.stopPropagation(); this.setState(st => ({ nd: Object.assign({}, st.nd, { toOpen: false }) })); } },
-      modes: [['topic', 'New topic', 'Starts its own thread so replies stay together.'], ['main', 'Message in Main', 'A regular message in the channel or DM, not in a thread.']].map(([id, label, desc]) => { const on = s.nd.mode === id; return { label, desc, border: on ? 'var(--foreground-default)' : 'var(--border-strong)', bg: on ? 'var(--surface-default)' : 'transparent', ring: on ? 'var(--foreground-default)' : 'var(--border-strongest)', dot: on ? 'var(--foreground-default)' : 'transparent', onClick: () => this.setState(st => ({ nd: Object.assign({}, st.nd, { mode: id }) })) }; }),
-      ndSendLabel: 'Send',
-      nd: s.nd, ndv: { name: chName(ndC), kind: kindLabel(ndC), mask: chMask(ndC), tintBg: ndT.bg, tintFg: ndT.fg },
-      chOptions: CH.map(c => ({ id: c.id, label: chLabel(c) + ' · ' + kindLabel(c) })),
-      ndCh: e => { const v = e.target.value; this.setState(st => ({ nd: Object.assign({}, st.nd, { ch: v }) })); },
-      ndTitle: e => { const v = e.target.value; this.setState(st => ({ nd: Object.assign({}, st.nd, { title: v }) })); },
-      ndText: e => { const v = e.target.value; this.setState(st => ({ nd: Object.assign({}, st.nd, { text: v }) })); },
-      ndMain: e => { const v = e.target.checked; this.setState(st => ({ nd: Object.assign({}, st.nd, { toMain: v }) })); },
-      postNew: () => this.postNew(), postOpacity: s.nd.text.trim() && s.nd.ch ? 1 : 0.4,
-      discardNew: () => tb && this.closeTab(tb.key),
       selOpen: !!s.selQ, selX: s.selQ ? s.selQ.x + 'px' : '0px', selY: s.selQ ? s.selQ.y + 'px' : '0px',
       onSelDown: () => { if (s.selQ) this.setState({ selQ: null }); },
       onSelUp: () => setTimeout(() => {
