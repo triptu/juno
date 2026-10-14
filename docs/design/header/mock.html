@@ -1,0 +1,667 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Topic header</title>
+<style>
+@font-face { font-family: 'Figtree Variable'; font-weight: 300 900; font-display: block; src: url('../home/fonts/figtree-latin-wght-normal.woff2') format('woff2-variations'); }
+@font-face { font-family: 'Instrument Serif'; font-weight: 400; font-display: block; src: url('../home/fonts/instrument-serif-latin-400-normal.woff2') format('woff2'); }
+
+/* Tokens: packages/tokens/src/tokens.stylex.ts and themes.stylex.ts, Coral accent. */
+.theme-light {
+  --background: hsla(48, 50%, 98%, 1); --background-subtle: hsla(48, 35%, 97%, 1);
+  --surface-default: hsla(48, 30%, 98%, 1); --surface-hover: hsla(48, 30%, 94%, 1); --surface-raised: hsla(48, 30%, 98%, 1);
+  --secondary-default: hsla(48, 30%, 92%, 1); --secondary-hover: hsla(48, 30%, 90%, 1); --secondary-active: hsla(48, 30%, 88%, 1);
+  --border-subtle: hsla(48, 30%, 92%, 1); --border-default: hsla(48, 30%, 91%, 1); --border-strong: hsla(48, 30%, 88%, 1); --input-border: hsla(48, 14%, 82%, 1);
+  --foreground-default: hsla(48, 15%, 12%, 1); --foreground-subtle: hsla(48, 8%, 35%, 1); --foreground-muted: hsla(48, 5%, 42%, 1);
+  --hl: #CC4628; --hl-fg: #FFFFFF; --hl-text: #B4351F; --hl-soft: color-mix(in oklch, #CC4628 10%, var(--background));
+  --warning: #E0A500; --info: #008AB3;
+  --shadow-sm: 0 1px 2px 0 rgba(27, 28, 21, 0.04);
+  --card-ring: 0 1px 2px 0 oklch(0 0 0 / .03), 0 6px 20px -4px oklch(0 0 0 / .07);
+  --pop-shadow: 0 2px 6px -1px oklch(0 0 0 / 0.05), 0 14px 36px -8px oklch(0 0 0 / 0.13);
+  --sheet: #EFEDE6; --lights: #E1DFD6;
+}
+.theme-dark {
+  --background: #1B1916; --background-subtle: #151411;
+  --surface-default: #252421; --surface-hover: #2D2B28; --surface-raised: #373532;
+  --secondary-default: #302F2C; --secondary-hover: #383633; --secondary-active: #403E3A;
+  --border-subtle: #2B2A27; --border-default: #32302D; --border-strong: #3C3A37; --input-border: #464541;
+  --foreground-default: #EEEBE2; --foreground-subtle: #C6C4BE; --foreground-muted: #A09E9A;
+  --hl: #FF8A73; --hl-fg: #2A0D06; --hl-text: #FF9C87; --hl-soft: color-mix(in oklch, #FF8A73 14%, var(--background));
+  --warning: #E0A500; --info: #008AB3;
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.30);
+  --card-ring: 0 1px 2px 0 oklch(0 0 0 / .3), 0 6px 20px -4px oklch(0 0 0 / .35);
+  --pop-shadow: 0 2px 6px -1px oklch(0 0 0 / 0.3), 0 14px 36px -8px oklch(0 0 0 / 0.5);
+  --sheet: #0F0E0C; --lights: #3A3834;
+}
+.theme-light, .theme-dark {
+  --tint-public-bg: var(--secondary-default); --tint-public-fg: var(--foreground-subtle);
+  --tint-private-bg: color-mix(in oklch, var(--warning) 15%, var(--background)); --tint-private-fg: color-mix(in oklch, var(--warning) 42%, var(--foreground-default));
+  --tint-dm-bg: color-mix(in oklch, var(--info) 12%, var(--background)); --tint-dm-fg: color-mix(in oklch, var(--info) 55%, var(--foreground-default));
+}
+:root {
+  --font-sans: 'Figtree Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-serif: 'Instrument Serif', ui-serif, Georgia, serif;
+}
+
+* { box-sizing: border-box; cursor: default; }
+body { margin: 0; font-family: var(--font-sans); font-size: 14px; line-height: 1.5; letter-spacing: 0.01em; -webkit-font-smoothing: antialiased; background: #ddd; }
+svg { display: block; flex: none; }
+section.sheet { background: var(--sheet); color: var(--foreground-default); padding: 32px 36px 40px; width: max-content; }
+h1 { font: 400 26px/1.15 var(--font-serif); margin: 0 0 4px; }
+.lede { margin: 0 0 24px; color: var(--foreground-muted); font-size: 13px; max-width: 900px; }
+.grid { display: grid; grid-template-columns: repeat(2, 820px); gap: 28px 24px; }
+.cap { font-size: 12.5px; color: var(--foreground-muted); margin: 10px 2px 0; max-width: 800px; line-height: 1.5; }
+.cap b { color: var(--foreground-default); font-weight: 600; }
+.colhead { font: 500 11px/1 var(--font-sans); letter-spacing: .06em; text-transform: uppercase; color: var(--foreground-muted); margin: 0 0 10px; }
+.colhead b { font-weight: 600; color: var(--foreground-default); letter-spacing: 0; text-transform: none; font-size: 13px; margin-right: 8px; }
+.muted { color: var(--foreground-muted); } .subtle { color: var(--foreground-subtle); }
+
+/* Window frame. */
+.win { display: flex; border-radius: 12px; overflow: hidden; box-shadow: var(--card-ring), 0 0 0 1px var(--border-default); background: var(--background); position: relative; }
+.work { flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--background); }
+.side { width: 384px; flex: none; background: var(--background-subtle); border-right: 1px solid var(--border-default); display: flex; flex-direction: column; }
+.bar { height: 44px; flex: none; display: flex; align-items: center; gap: 2px; padding: 0 10px 0 0; }
+.lights { width: 78px; flex: none; display: flex; gap: 8px; padding-left: 16px; }
+.lights i { width: 12px; height: 12px; border-radius: 50%; background: var(--lights); }
+.ib { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; color: var(--foreground-subtle); flex: none; }
+.ib svg { width: 16px; height: 16px; }
+.ib.off { opacity: .4; }
+.ib.on { background: var(--secondary-default); }
+.spacer { flex: 1; }
+.me { width: 24px; height: 24px; border-radius: 50%; margin-left: 4px; display: grid; place-items: center; font-size: 10px; font-weight: 700; background: color-mix(in oklch, #92C2F9 24%, var(--surface-default)); color: color-mix(in oklch, #92C2F9 62%, var(--foreground-default)); }
+.nav { padding: 4px 10px 0; display: flex; flex-direction: column; gap: 2px; }
+.ni { height: 32px; border-radius: 7px; padding: 0 10px; display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 500; }
+.ni svg { width: 15px; height: 15px; color: var(--foreground-subtle); }
+.ni.on { background: var(--secondary-default); }
+.ni .cnt { margin-left: auto; height: 18px; min-width: 18px; padding: 0 5px; border-radius: 999px; background: var(--secondary-active); color: var(--foreground-subtle); font-size: 11px; font-weight: 500; display: grid; place-items: center; }
+.hair { height: 1px; background: var(--border-default); margin: 12px 16px 10px; }
+.filters { display: flex; gap: 2px; padding: 0 10px 10px; }
+.filters span { height: 28px; padding: 0 10px; border-radius: 7px; font-size: 13px; font-weight: 500; color: var(--foreground-muted); display: inline-flex; align-items: center; }
+.filters span.on { background: var(--secondary-default); color: var(--foreground-default); font-weight: 600; }
+.rows { padding: 0 8px; display: flex; flex-direction: column; gap: 2px; }
+.trow { display: flex; gap: 12px; padding: 11px 12px; border-radius: 10px; }
+.trow.sel { background: var(--secondary-default); }
+.pebble { width: 44px; height: 44px; flex: none; border-radius: 46% 54% 40% 60% / 55% 42% 58% 45%; }
+.tcol { flex: 1; min-width: 0; }
+.l1 { display: flex; align-items: center; gap: 6px; height: 22px; }
+.l1 .t { font-size: 14.5px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.l1 .t.u { font-weight: 600; }
+.l1 .tm { margin-left: auto; font-size: 12px; color: var(--foreground-muted); font-variant-numeric: tabular-nums; }
+.l2 { display: flex; gap: 8px; font-size: 13px; line-height: 1.45; color: var(--foreground-muted); }
+.l2 .p { flex: 1; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.l2 .p.u { color: var(--foreground-subtle); }
+.count { height: 18px; min-width: 18px; padding: 0 5px; border-radius: 999px; background: var(--secondary-active); color: var(--foreground-subtle); font-size: 11px; font-weight: 500; display: grid; place-items: center; }
+.l3 { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--foreground-muted); margin-top: 3px; }
+.l3 svg { width: 12px; height: 12px; }
+.tagm { height: 18px; padding: 0 6px; border-radius: 999px; box-shadow: inset 0 0 0 1px var(--border-strong); font-size: 11px; font-weight: 500; color: var(--foreground-subtle); display: inline-flex; align-items: center; }
+
+/* Tab strip. */
+.strip { height: 44px; flex: none; display: flex; align-items: flex-end; gap: 2px; padding: 0 10px; background: var(--background-subtle); border-bottom: 1px solid var(--border-default); }
+.strip.lead { padding-left: 0; }
+.strip .lights { align-self: center; }
+.strip .ctl { align-self: center; display: flex; gap: 2px; margin-right: 6px; }
+.tab { flex: 0 1 230px; min-width: 120px; height: 35px; margin-bottom: -1px; padding: 0 6px 0 12px; border-radius: 8px 8px 0 0; border: 1px solid transparent; display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--foreground-subtle); position: relative; }
+.tab.on { background: var(--background); border-color: var(--border-default); border-bottom-color: var(--background); color: var(--foreground-default); font-weight: 500; }
+.tab svg.k { width: 14px; height: 14px; opacity: .75; }
+.tab .lab { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tab .udot { width: 6px; height: 6px; border-radius: 50%; background: var(--foreground-muted); flex: none; }
+.tab .cl { width: 20px; height: 20px; border-radius: 4px; display: grid; place-items: center; color: var(--foreground-muted); flex: none; }
+.tab .cl svg { width: 12px; height: 12px; }
+.tab.pin { flex: none; min-width: 0; width: 40px; padding: 0; justify-content: center; }
+.tab.pin svg.k { width: 16px; height: 16px; }
+.tab.pin .udot { position: absolute; top: 8px; right: 9px; width: 6px; height: 6px; box-shadow: 0 0 0 1.5px var(--background-subtle); }
+.tab .tart { width: 16px; height: 16px; border-radius: 46% 54% 40% 60% / 55% 42% 58% 45%; flex: none; }
+.plus { width: 28px; height: 28px; border-radius: 8px; margin: 0 0 4px 4px; display: grid; place-items: center; color: var(--foreground-muted); flex: none; }
+.plus svg { width: 15px; height: 15px; }
+
+/* Topic header. */
+.thead { height: 100px; flex: none; border-bottom: 1px solid var(--border-subtle); padding: 14px 24px; display: flex; flex-direction: column; gap: 8px; }
+.thead .r1, .thead .r2 { display: flex; align-items: center; gap: 8px; height: 32px; }
+.pill { height: 26px; padding: 0 10px; border-radius: 999px; display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; white-space: nowrap; }
+.pill svg { width: 13px; height: 13px; }
+.pill .k { font-weight: 400; }
+.pill.public { background: var(--tint-public-bg); color: var(--tint-public-fg); }
+.pill.private { background: var(--tint-private-bg); color: var(--tint-private-fg); }
+.pill.dm { background: var(--tint-dm-bg); color: var(--tint-dm-fg); }
+.hb { width: 32px; height: 32px; border-radius: 8px; display: grid; place-items: center; color: var(--foreground-subtle); }
+.hb svg { width: 16px; height: 16px; }
+.hb.on { background: var(--secondary-default); }
+.resolve { height: 32px; padding: 0 12px; border-radius: 8px; box-shadow: inset 0 0 0 1px var(--border-strong); display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; margin-left: 4px; }
+.resolve svg { width: 14px; height: 14px; }
+.ttl { font-size: 20px; font-weight: 600; letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Messages. */
+.list { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; }
+.col { width: 100%; max-width: 800px; margin: 0 auto; padding: 16px 24px 8px; }
+.m { display: flex; gap: 12px; padding: 4px 8px; }
+.m + .m.first { margin-top: 12px; }
+.av { width: 32px; height: 32px; border-radius: 50%; flex: none; display: grid; place-items: center; font-size: 12px; font-weight: 600; margin-top: 2px; }
+.av.a { background: color-mix(in oklch, #E89EB8 24%, var(--surface-default)); color: color-mix(in oklch, #E89EB8 62%, var(--foreground-default)); }
+.av.b { background: color-mix(in oklch, #008AB3 24%, var(--surface-default)); color: color-mix(in oklch, #008AB3 62%, var(--foreground-default)); }
+.av.c { background: color-mix(in oklch, #9BC27A 24%, var(--surface-default)); color: color-mix(in oklch, #9BC27A 62%, var(--foreground-default)); }
+.av.me2 { background: color-mix(in oklch, #92C2F9 24%, var(--surface-default)); color: color-mix(in oklch, #92C2F9 62%, var(--foreground-default)); }
+.av.blank { visibility: hidden; height: 0; }
+.mb { flex: 1; min-width: 0; }
+.mh { display: flex; gap: 8px; align-items: baseline; }
+.mh b { font-size: 14px; font-weight: 600; }
+.mh span { font-size: 12px; color: var(--foreground-muted); }
+.mt { font-size: 14.5px; line-height: 1.6; }
+.chip { font-weight: 600; padding: 0 3px; border-radius: 4px; background: var(--hl-soft); }
+.reacts { display: flex; gap: 4px; margin-top: 6px; }
+.reacts span { height: 24px; padding: 0 8px; border-radius: 999px; box-shadow: inset 0 0 0 1px var(--border-default); font-size: 12px; display: inline-flex; gap: 5px; align-items: center; }
+.tlink { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 8px 0 6px; border-radius: 999px; box-shadow: inset 0 0 0 1px var(--border-default); background: var(--surface-default); font-size: 12.5px; color: var(--foreground-subtle); margin-top: 6px; }
+.tlink svg { width: 13px; height: 13px; }
+.tlink b { color: var(--foreground-default); font-weight: 600; }
+.daysep { display: flex; align-items: center; gap: 10px; margin: 6px 0 10px; font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--foreground-muted); }
+.daysep::before, .daysep::after { content: ''; flex: 1; height: 1px; background: var(--border-subtle); }
+
+/* Composer and the picker row. */
+.comp { flex: none; padding: 8px 24px 20px; }
+.compin { max-width: 752px; margin: 0 auto; position: relative; }
+.box { background: var(--surface-default); border: 1px solid var(--input-border); border-radius: 12px; display: flex; align-items: flex-end; gap: 4px; }
+.box .att { width: 28px; height: 28px; border-radius: 50%; margin: 6px 0 6px 6px; display: grid; place-items: center; color: var(--foreground-subtle); }
+.box .att svg { width: 18px; height: 18px; }
+.box .ta { flex: 1; padding: 9px 0 9px 4px; font-size: 14px; line-height: 22px; min-height: 40px; cursor: text; }
+.box .ta.ph { color: var(--foreground-muted); }
+.box .snd { width: 28px; height: 28px; border-radius: 50%; margin: 6px 6px 6px 0; background: var(--hl); color: var(--hl-fg); display: grid; place-items: center; }
+.box .snd.dim { opacity: .4; }
+.box .snd svg { width: 16px; height: 16px; }
+.caret { display: inline-block; width: 1.5px; height: 17px; vertical-align: -3px; background: var(--foreground-default); margin-left: 1px; }
+.pickrow { display: flex; gap: 6px; margin-bottom: 8px; }
+.pk { height: 28px; padding: 0 8px 0 10px; border-radius: 999px; display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; white-space: nowrap; background: var(--secondary-default); color: var(--foreground-default); max-width: 320px; }
+.pk .v { overflow: hidden; text-overflow: ellipsis; }
+.pk svg { width: 13px; height: 13px; }
+.pk svg.dn { width: 12px; height: 12px; color: var(--foreground-muted); }
+.pk.unset { color: var(--foreground-subtle); }
+.pk .k { font-weight: 400; }
+.pk.private { background: var(--tint-private-bg); color: var(--tint-private-fg); }
+.pk.dm { background: var(--tint-dm-bg); color: var(--tint-dm-fg); }
+.pk.public { background: var(--tint-public-bg); color: var(--tint-public-fg); }
+.pk.open { box-shadow: 0 0 0 2px var(--hl-text); }
+.empty { flex: 1; display: grid; place-items: center; font-size: 14px; color: var(--foreground-muted); }
+
+/* Popover lists. */
+.pop { position: absolute; width: 340px; border-radius: 13px; background: var(--surface-default); box-shadow: var(--pop-shadow), 0 0 0 1px var(--border-default); overflow: hidden; z-index: 5; }
+.pop .srch { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--border-default); font-size: 13px; }
+.pop .srch svg { width: 14px; height: 14px; color: var(--foreground-muted); }
+.pop .lst { padding: 6px; }
+.pop .h { font-size: 10.5px; font-weight: 500; letter-spacing: .06em; text-transform: uppercase; color: var(--foreground-muted); padding: 8px 10px 4px; }
+.pop .o { height: 36px; border-radius: 8px; padding: 0 10px; display: flex; align-items: center; gap: 10px; font-size: 13.5px; }
+.pop .o svg { width: 15px; height: 15px; color: var(--foreground-muted); }
+.pop .o .s { margin-left: auto; font-size: 12px; color: var(--foreground-muted); }
+.pop .o.act { background: var(--surface-hover); }
+.pop .o .mini { width: 20px; height: 20px; font-size: 9px; margin: 0; }
+.pop .th { border-radius: 8px; padding: 5px 10px; }
+.pop .th .a { font-size: 13.5px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pop .th .b { font-size: 12px; color: var(--foreground-muted); }
+.pop .th.act { background: var(--surface-hover); }
+
+/* Menus (native in the app; drawn here for reference). */
+.menu { position: absolute; width: 236px; padding: 5px; border-radius: 13px; background: var(--surface-default); box-shadow: var(--pop-shadow), 0 0 0 1px var(--border-default); z-index: 6; }
+.mi { height: 30px; padding: 0 8px; border-radius: 6px; display: flex; align-items: center; gap: 10px; font-size: 13px; white-space: nowrap; }
+.mi .hk { margin-left: auto; font-size: 11px; color: var(--foreground-muted); }
+.mi.sel { background: var(--surface-hover); }
+.mi.dis { color: var(--foreground-muted); }
+.sep { height: 1px; background: var(--border-default); margin: 4px 6px; }
+.resize { position: absolute; top: 0; bottom: 0; width: 6px; margin-left: -3px; }
+.resize::after { content: ''; position: absolute; left: 2px; top: 0; bottom: 0; width: 2px; background: var(--hl-text); opacity: .7; }
+.note { position: absolute; font-size: 11.5px; color: var(--hl-text); font-weight: 600; white-space: nowrap; }
+</style>
+<style>
+.theme-light { --bubble: color-mix(in oklch, #CC4628 16%, var(--background)); }
+.theme-dark { --bubble: color-mix(in oklch, #FF8A73 22%, var(--background)); }
+section.sheet { width: 1400px; }
+.row2 { display: flex; gap: 24px; align-items: flex-start; }
+.row2 > div { flex: none; }
+.chrome { font: 500 11px/1 var(--font-sans); letter-spacing: .06em; text-transform: uppercase; color: var(--hl-text); margin-left: 8px; }
+
+/* The topic area. The list fills it; each direction places its header. */
+.topic { flex: 1; min-width: 0; display: flex; flex-direction: column; position: relative; }
+.stage { flex: 1; min-height: 0; position: relative; display: flex; flex-direction: column; }
+.list { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; }
+.list.top { justify-content: flex-start; }
+.art { flex: none; border-radius: 46% 54% 40% 60% / 55% 42% 58% 45%; }
+.mark { color: var(--foreground-subtle); flex: none; }
+.ai { width: 14px; height: 14px; color: var(--foreground-muted); flex: none; }
+.ttl2 { font-size: 15px; font-weight: 600; letter-spacing: -0.005em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.ttl2 .k { font-weight: 400; color: var(--foreground-muted); }
+.cp { height: 24px; padding: 0 9px; border-radius: 999px; display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; font-weight: 600; white-space: nowrap; flex: none; max-width: 40%; }
+.cp svg { width: 13px; height: 13px; }
+.cp span { overflow: hidden; text-overflow: ellipsis; }
+.cp.public { background: var(--tint-public-bg); color: var(--tint-public-fg); }
+.cp.private { background: var(--tint-private-bg); color: var(--tint-private-fg); }
+.cp.dm { background: var(--tint-dm-bg); color: var(--tint-dm-fg); }
+.cp.sm { height: 20px; padding: 0 7px; font-size: 11.5px; gap: 4px; }
+.cp.sm svg { width: 11px; height: 11px; }
+.acts { display: flex; align-items: center; gap: 2px; flex: none; }
+.a { width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; color: var(--foreground-subtle); flex: none; }
+.a svg { width: 16px; height: 16px; }
+.a.on { background: var(--secondary-default); color: var(--foreground-default); }
+.ta2 { height: 28px; padding: 0 10px; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 500; color: var(--foreground-default); box-shadow: inset 0 0 0 1px var(--border-strong); flex: none; white-space: nowrap; }
+.ta2 svg { width: 14px; height: 14px; color: var(--foreground-subtle); }
+.gap8 { width: 6px; flex: none; }
+.fade { position: absolute; left: 0; right: 0; top: 100%; pointer-events: none; background: linear-gradient(var(--background), color-mix(in oklch, var(--background) 0%, transparent)); }
+.fade.off { opacity: 0; }
+
+/* A: one line. 52px, opaque, a 20px fade below. */
+.hA { height: 52px; flex: none; position: relative; z-index: 2; background: var(--background); }
+.hA .in { height: 100%; max-width: 800px; margin: 0 auto; padding: 0 20px 0 24px; display: flex; align-items: center; gap: 10px; }
+.hA .fade { height: 20px; }
+.hA .art { width: 22px; height: 22px; margin-right: -2px; }
+
+/* B: floating islands on a band. The list runs under both. */
+.stage.b .list { padding-top: 56px; }
+.bandB { position: absolute; z-index: 1; left: 0; right: 0; top: 0; height: 68px; pointer-events: none; background: linear-gradient(var(--background) 44px, color-mix(in oklch, var(--background) 0%, transparent) 68px); }
+.hB { position: absolute; z-index: 2; top: 8px; left: 0; right: 0; height: 36px; max-width: 800px; margin: 0 auto; padding: 0 24px; display: flex; align-items: center; justify-content: space-between; gap: 8px; pointer-events: none; }
+.hB.center { max-width: none; display: grid; grid-template-columns: 1fr auto 1fr; padding: 0 12px; }
+.hB.center .isl.t { grid-column: 2; }
+.hB.center .isl.r { grid-column: 3; justify-self: end; }
+.hB.panelh { max-width: none; padding: 0 12px; }
+.isl { pointer-events: auto; height: 36px; border-radius: 999px; background: var(--surface-default); border: 1px solid transparent; box-shadow: var(--card-ring); display: flex; align-items: center; gap: 2px; padding: 3px; min-width: 0; position: relative; }
+.isl.t { flex: 0 1 auto; padding: 3px 3px 3px 5px; }
+.isl.r { flex: none; }
+.tbtn { height: 28px; padding: 0 8px; border-radius: 999px; display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+.tbtn.open { background: var(--secondary-default); }
+.tbtn b { font-size: 14px; font-weight: 600; }
+.tbtn .mark { width: 18px; height: 18px; }
+.isl .ttl2 { font-size: 14px; }
+.isl .cp { flex: none; max-width: 160px; }
+.isl .tbtn { flex: 0 1 auto; min-width: 72px; }
+.isl .dn { width: 12px; height: 12px; color: var(--foreground-muted); flex: none; }
+.isl .a { border-radius: 999px; }
+.isl .tb { height: 28px; padding: 0 10px; border-radius: 999px; display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 500; color: var(--foreground-default); white-space: nowrap; }
+.isl .tb svg { width: 14px; height: 14px; color: var(--foreground-subtle); }
+.isl .tb.ic { width: 28px; padding: 0; justify-content: center; }
+.isl .tb.ic svg { width: 16px; height: 16px; }
+.chipb { height: 28px; padding: 0 10px; border-radius: 999px; background: var(--secondary-default); font-size: 12.5px; font-weight: 500; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.chipb u { text-decoration: none; font-weight: 600; }
+.thumb { position: absolute; z-index: 0; right: 3px; width: 4px; border-radius: 4px; background: var(--border-strong); }
+.guide { position: absolute; z-index: 6; left: 0; right: 0; border-top: 1px dashed var(--hl-text); pointer-events: none; }
+.guide span { position: absolute; left: 8px; top: 1px; font: 600 10.5px/1 var(--font-sans); color: var(--hl-text); background: var(--background); padding: 2px 4px; border-radius: 3px; }
+.isl .menu { top: 42px; left: 0; }
+.mi svg { width: 15px; height: 15px; color: var(--foreground-subtle); }
+.panel.cover { width: auto; flex: 1; border-left: 0; }
+
+/* C: identity block. 64px, art 36, context line under the title, bordered buttons. */
+.hC { height: 64px; flex: none; position: relative; z-index: 2; background: var(--background); }
+.hC .in { height: 100%; max-width: 800px; margin: 0 auto; padding: 0 20px 0 24px; display: flex; align-items: center; gap: 12px; }
+.hC .art { width: 36px; height: 36px; }
+.hC .art svg { width: 18px; height: 18px; }
+.hC .who { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.hC .ctxl { overflow: hidden; display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 12.5px; color: var(--foreground-muted); white-space: nowrap; }
+.hC .ctxl .cp { max-width: none; }
+.hC .ctxl svg.sep { width: 11px; height: 11px; color: var(--foreground-muted); }
+.hC .fade { height: 16px; }
+.hC .acts { gap: 6px; }
+.bb { height: 30px; min-width: 30px; padding: 0 8px; border-radius: 8px; box-shadow: inset 0 0 0 1px var(--border-strong); display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-size: 12.5px; font-weight: 500; color: var(--foreground-subtle); flex: none; white-space: nowrap; }
+.bb svg { width: 15px; height: 15px; }
+.bb.on { background: var(--secondary-default); box-shadow: none; color: var(--foreground-default); }
+
+/* Juno panel and Juno tab. */
+.panel { width: 360px; flex: none; border-left: 1px solid var(--border-default); display: flex; flex-direction: column; background: var(--background); position: relative; }
+.ph2 { height: 52px; flex: none; display: flex; align-items: center; gap: 8px; padding: 0 12px 0 16px; position: relative; z-index: 2; background: var(--background); }
+.ph2 .fade { height: 20px; }
+.ph2 b, .hA b.jn { font-size: 15px; font-weight: 600; }
+.plist { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; padding: 0 16px 12px; gap: 2px; }
+.plist > * { flex: none; }
+.jcol { max-width: 720px; width: 100%; margin: 0 auto; padding: 0 32px 8px; display: flex; flex-direction: column; gap: 2px; }
+.jcol > * { flex: none; }
+.bm { display: flex; align-items: flex-end; gap: 10px; }
+.bm.own { justify-content: flex-end; }
+.bub { max-width: 75%; padding: 8px 12px; border-radius: 16px; font-size: 14px; line-height: 1.55; }
+.own .bub { background: var(--bubble); border-bottom-right-radius: 4px; }
+.jn .bub { background: var(--surface-hover); border-bottom-left-radius: 4px; }
+.bm .mark { width: 28px; height: 28px; }
+.about { align-self: flex-end; font-size: 11.5px; color: var(--foreground-muted); margin: 10px 0 3px; }
+.g { height: 10px; }
+.dsep { align-self: center; font: 600 11px/1 var(--font-sans); letter-spacing: .06em; text-transform: uppercase; color: var(--foreground-muted); padding: 10px 0; }
+.pcomp { padding: 0 12px 12px; }
+.pbox { background: var(--surface-default); border: 1px solid var(--input-border); border-radius: 20px; display: flex; align-items: flex-end; }
+.pbox .ta { flex: 1; padding: 9px 0 9px 14px; font-size: 14px; line-height: 22px; color: var(--foreground-muted); }
+.pbox .snd { width: 28px; height: 28px; border-radius: 50%; margin: 6px; background: var(--hl); color: var(--hl-fg); display: grid; place-items: center; opacity: .4; }
+.pbox .snd svg { width: 16px; height: 16px; }
+.newdiv { display: flex; align-items: center; gap: 10px; margin: 14px 0 6px; font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--hl-text); }
+.newdiv::after { content: ''; flex: 1; height: 1px; background: color-mix(in oklch, var(--hl) 30%, transparent); }
+.tab .tmk { width: 14px; height: 14px; color: var(--foreground-subtle); flex: none; }
+
+/* Annotations. */
+.focusn { position: absolute; z-index: 9; width: 18px; height: 18px; border-radius: 50%; background: var(--hl); color: var(--hl-fg); font: 700 10.5px/18px var(--font-sans); text-align: center; }
+.ring { box-shadow: 0 0 0 2px #3B82F6 !important; }
+.spec { font-size: 12.5px; line-height: 1.6; color: var(--foreground-subtle); max-width: 560px; }
+.spec b { color: var(--foreground-default); font-weight: 600; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <symbol id="i-hash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 9h16M4 15h16M10 3 8 21M16 3l-2 18"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></symbol>
+    <symbol id="i-user" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
+    <symbol id="i-at" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+    <symbol id="i-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></symbol>
+    <symbol id="i-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 5-7 7 7 7"/></symbol>
+    <symbol id="i-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 5 7 7-7 7"/></symbol>
+    <symbol id="i-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m9 6 6 6-6 6"/></symbol>
+    <symbol id="i-side" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></symbol>
+    <symbol id="i-pencil" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6"/><path d="M18.5 2.5a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4Z"/></symbol>
+    <symbol id="i-house" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6h-4v6H5a1 1 0 0 1-1-1Z"/></symbol>
+    <symbol id="i-list" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/></symbol>
+    <symbol id="i-spark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 3c.6 4.6 2.4 6.4 7 7-4.6.6-6.4 2.4-7 7-.6-4.6-2.4-6.4-7-7 4.6-.6 6.4-2.4 7-7Z" fill="currentColor" fill-opacity=".2"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></symbol>
+    <symbol id="i-msg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2Z"/></symbol>
+    <symbol id="i-chats" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M17 9h2a2 2 0 0 1 2 2v9l-3-3h-7a2 2 0 0 1-2-2v-1"/><path d="M15 3H5a2 2 0 0 0-2 2v9l3-3h9a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2Z"/></symbol>
+    <symbol id="i-bell" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0"/></symbol>
+    <symbol id="i-pin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5M9 10.8V4h6v6.8l3 3.2v2H6v-2Z"/></symbol>
+    <symbol id="i-circ" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m8.5 12 2.5 2.5 4.5-5"/></symbol>
+    <symbol id="i-dots" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></symbol>
+  </defs>
+</svg>
+<svg width="0" height="0" style="position:absolute"><defs>
+  <symbol id="i-link" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></symbol>
+  <symbol id="i-out" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></symbol>
+  <symbol id="i-ban" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="m5.7 5.7 12.6 12.6"/></symbol>
+  <symbol id="i-dot" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.5" fill="currentColor"/></symbol>
+  <symbol id="i-expand" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M20 4l-7 7M10 20H4v-6M4 20l7-7"/></symbol>
+  <symbol id="i-juno" viewBox="0 0 64 64"><circle cx="40" cy="10" r="7" fill="currentColor"/><path d="M47.5 25 C47.5 35.5 46 42.5 40.5 46.5 C37.5 48.6 34.5 48.6 31 48.6" fill="none" stroke="currentColor" stroke-width="8.5" stroke-linecap="round"/><circle cx="20" cy="48.6" r="5" fill="currentColor"/><circle cx="10.5" cy="36.5" r="4.5" fill="currentColor"/></symbol>
+</defs></svg>
+
+<section class="sheet theme-light" data-key="a-light" data-dir="A"><h1>A · One line</h1><p class="lede">One 52px row under the tab strip: the context pill, the title, then the actions. No rule; the messages fade out under it. 96px of chrome above the first message, down from 144.</p><div data-overview></div></section>
+<section class="sheet theme-dark" data-key="a-dark" data-dir="A"><h1>A · One line</h1><p class="lede">Dark theme.</p><div data-overview></div></section>
+<section class="sheet theme-light" data-key="b-light" data-dir="B"><h1>B · Floating</h1><p class="lede">The chosen direction. No bar: two solid islands float on a band of the page colour, aligned to the reading column. Left: the context pill and the title, whose chevron opens the topic menu. Right: Resolve (Threads on Main) and Juno. Messages scroll under the band and fade out below the islands.</p><div data-overview></div></section>
+<section class="sheet theme-dark" data-key="b-dark" data-dir="B"><h1>B · Floating</h1><p class="lede">Dark theme.</p><div data-overview></div></section>
+<section class="sheet theme-light" data-key="b-family-light" data-dir="B"><h1>B · One family</h1><p class="lede">The topic, the Juno panel and the Juno tab share the islands, the band and the chevron menu. The topic's and the panel's islands sit on one line, 8px under the tab strip.</p><div data-familyb></div></section>
+<section class="sheet theme-dark" data-key="b-family-dark" data-dir="B"><h1>B · One family</h1><p class="lede">Dark theme.</p><div data-familyb></div></section>
+<section class="sheet theme-light" data-key="b-detail-light" data-dir="B"><h1>B · Details</h1><p class="lede">Alignment, the topic menu, the list's top inset and the narrow window.</p><div data-detailb></div></section>
+<section class="sheet theme-dark" data-key="b-detail-dark" data-dir="B"><h1>B · Details</h1><p class="lede">Dark theme.</p><div data-detailb></div></section>
+<section class="sheet theme-light" data-key="c-light" data-dir="C"><h1>C · Identity</h1><p class="lede">A 64px block led by the topic art at 36px, the title with the context under it like a breadcrumb, and small bordered buttons on the right. No rule; a short fade.</p><div data-overview></div></section>
+<section class="sheet theme-dark" data-key="c-dark" data-dir="C"><h1>C · Identity</h1><p class="lede">Dark theme.</p><div data-overview></div></section>
+<section class="sheet theme-light" data-key="a-family-light" data-dir="A"><h1>One family: A everywhere</h1><p class="lede">The recommended direction applied to the topic, the Juno panel and the Juno tab. Every header is a 52px line with no rule and the same fade, so the topic header and the panel header read as one bar.</p><div data-family></div></section>
+<section class="sheet theme-dark" data-key="a-family-dark" data-dir="A"><h1>One family: A everywhere</h1><p class="lede">Dark theme.</p><div data-family></div></section>
+
+<script>
+const I = (id, cls = '') => `<svg class="${cls}"><use href="#i-${id}"/></svg>`
+const JM = (s, cls = 'mark') => `<svg class="${cls}" style="width:${s}px;height:${s}px" viewBox="0 0 64 64"><use href="#i-juno"/></svg>`
+const blob = (c, s, extra = '') => `<span class="art" style="width:${s}px;height:${s}px;background:color-mix(in oklch,${c} 45%,var(--background))${extra}"></span>`
+const F = (n) => (n ? ` data-f="${n}"` : '')
+
+const msg = (av, ini, name, time, text, extra = '') => `<div class="m first"><div class="av ${av}">${ini}</div><div class="mb"><div class="mh"><b>${name}</b><span>${time}</span></div><div class="mt">${text}</div>${extra}</div></div>`
+const M = {
+  cutover: [
+    msg('c', 'LP', 'Leo Park', 'Mon 16:20', 'Can we get the cutover on the calendar this week? Billing wants a date before their close.'),
+    msg('b', 'D', 'Dev Patel', 'Mon 16:42', 'Draft runbook is in the doc. Two open questions: who watches the error rate, and do we pause the queue workers or drain them.'),
+    msg('a', 'MC', 'Maya Chen', 'Mon 17:05', 'Support can staff Wednesday night. Thursday is harder but possible with a day of notice.'),
+    msg('b', 'D', 'Dev Patel', '9:12', 'Plan for the cutover: freeze writes at 11pm, promote the replica, flip DNS, unfreeze. About 20 minutes.'),
+    '<div class="newdiv">3 new</div>',
+    msg('b', 'D', 'Dev Patel', '9:40', "Replica lag is under a second now. I'd still like one full day of checks before we flip."),
+    msg('c', 'LP', 'Leo Park', '9:51', 'Billing runs its monthly close Thursday at 2am, so Thursday night needs a heads-up to them.'),
+    msg('a', 'MC', 'Maya Chen', '10:02', 'Wednesday night is the only window support signed off on. <span class="chip">@Tushar</span> can you decide?'),
+  ],
+  main: [
+    msg('c', 'SK', 'Sam Kim', '11:02', 'Reminder: crit is at 3 today. Bring one screen you are unsure about.'),
+    msg('a', 'PR', 'Priya Rao', '11:30', 'Two-line previews ship as the default this week.', '<span class="tlink">' + I('chats') + '<b>2 replies</b> · Two-line previews ›</span>'),
+    msg('b', 'EL', 'Elena Lund', '12:14', 'The empty state copy for All topics is ready for review.', '<span class="tlink">' + I('chats') + '<b>5 replies</b> · Empty states ›</span>'),
+    msg('c', 'SK', 'Sam Kim', '12:40', 'Moving crit to the small room, the big one is booked.'),
+  ],
+  dm: [
+    msg('a', 'MC', 'Maya Chen', 'Tue 18:10', 'I narrowed the offsite to three places. All have a room for 30 and are near a station.'),
+    msg('me2', 'T', 'Tushar', 'Tue 18:22', 'Nice. Which one has the best outdoor space?'),
+    msg('a', 'MC', 'Maya Chen', '9:05', 'The farm one, by a lot. It is also the cheapest, but the rooms are shared.'),
+    msg('a', 'MC', 'Maya Chen', '9:06', 'I can hold it until Friday if you want to look.'),
+  ],
+  priv: [
+    msg('b', 'EL', 'Elena Lund', '10:20', 'Rina has a competing offer with a higher base. She prefers us but needs an answer.'),
+    msg('c', 'SK', 'Sam Kim', '10:31', 'We can move on equity, not on base.'),
+    msg('b', 'EL', 'Elena Lund', '10:44', 'She has until Friday. Can we get a call on the calendar before then?'),
+  ],
+}
+const T = {
+  thread: { tint: 'public', icon: 'hash', ch: 'eng', kind: 'Public channel', title: 'Postgres 16 cutover window', tab: 'Postgres 16 cutover window', art: '#7FB6A4', msgs: M.cutover, ph: 'Reply' },
+  main: { tint: 'public', icon: 'hash', ch: 'design-review', kind: 'Public channel', title: 'Main', main: true, threads: 12, tab: 'design-review', art: '#9AA7E0', msgs: M.main, ph: 'Message #design-review' },
+  dm: { tint: 'dm', icon: 'user', ch: 'Maya Chen', kind: 'Direct message', title: 'Offsite venue shortlist', tab: 'Offsite venue shortlist', art: '#E8B48A', dm: 'MC', msgs: M.dm, ph: 'Reply' },
+  priv: { tint: 'private', icon: 'lock', ch: 'hiring', kind: 'Private channel', title: "Rina's competing offer", tab: "Rina's competing offer", art: '#E6B8C8', msgs: M.priv, ph: 'Reply' },
+}
+
+const a = (icon, f, on) => `<span class="a${on ? ' on' : ''}"${F(f)}>${I(icon)}</span>`
+const pill = (t, cls = '', f) => `<span class="cp ${t.tint} ${cls}"${F(f)} title="${t.kind}">${I(t.icon)}<span>${t.ch}</span></span>`
+
+function headA(t, o) {
+  const f = o.focus ? (n) => n : () => 0
+  let acts
+  if (o.narrow) acts = a('spark', f(2), o.panel) + a('dots', f(3))
+  else if (t.main) acts = `<span class="ta2"${F(f(2))}>${I('chats')}Threads · ${t.threads}</span><span class="gap8"></span>${a('bell', f(3))}${a('spark', f(4), o.panel)}${a('dots', f(5))}`
+  else acts = `${a('pin', f(2))}${a('bell', f(3))}<span class="gap8"></span><span class="ta2"${F(f(4))}>${I('circ')}Resolve</span><span class="gap8"></span>${a('spark', f(5), o.panel)}${a('dots', f(6))}`
+  return `<div class="hA"><div class="in">${pill(t, '', f(1))}<span class="ttl2">${t.title}</span><span class="spacer"></span><div class="acts">${acts}</div></div><div class="fade${o.top ? ' off' : ''}"></div></div>`
+}
+const MENU = (t) => `<div class="menu">
+  <div class="mi">${I('out')}Open in new tab<span class="hk">⌘ click</span></div><div class="sep"></div>
+  <div class="mi sel">${I('pencil')}Rename</div>
+  <div class="mi">${I('dot')}Mark as unread</div>
+  <div class="mi">${I('pin')}Pin</div>
+  <div class="mi">${I('circ')}Resolve</div><div class="sep"></div>
+  <div class="mi">${I('link')}Copy Slack link</div>
+  <div class="mi">${I('out')}Open in Slack</div>
+  <div class="mi">${I('bell')}Notify me<span class="hk">When it matters ›</span></div>
+  <div class="mi">${I('ban')}Ignore #${t.ch}</div></div>`
+const BAND = '<div class="bandB"></div>'
+const guides = (marks) => marks.map(([y, label, x = 8, up]) => `<div class="guide" style="top:${y}px"><span style="left:${x}px;${up ? 'top:-15px' : ''}">${label}</span></div>`).join('')
+function headB(t, o) {
+  const f = o.focus ? (n) => n : () => 0
+  const lead = t.main
+    ? `<span class="tb${o.tight ? '' : ''}"${F(f(3))}>${I('chats')}${o.tight ? t.threads : 'Threads · ' + t.threads}</span>`
+    : o.tight ? `<span class="tb ic"${F(f(3))} title="Resolve">${I('circ')}</span>` : `<span class="tb"${F(f(3))}>${I('circ')}Resolve</span>`
+  const left = `<div class="isl t">${pill(t, '', f(1))}<span class="tbtn${o.menu ? ' open' : ''}"${F(f(2))}><span class="ttl2">${t.title}</span>${I('down', 'dn')}</span>${o.menu ? MENU(t) : ''}</div>`
+  return `${BAND}<div class="hB${o.center ? ' center' : ''}">${left}<div class="isl r">${lead}${a('spark', f(4), o.panel)}</div></div>`
+}
+function headC(t, o) {
+  const icon = t.dm ? `<span class="av a" style="width:36px;height:36px;margin:0;font-size:13px">${t.dm}</span>` : t.main ? `<span class="art" style="width:36px;height:36px;border-radius:10px;display:grid;place-items:center;background:var(--secondary-default);color:var(--foreground-subtle)">${I(t.icon)}</span>` : blob(t.art, 36)
+  const b = (icon, label, on) => `<span class="bb${on ? ' on' : ''}">${I(icon)}${label ?? ''}</span>`
+  let acts
+  if (o.narrow) acts = b('spark', '', o.panel) + b('dots')
+  else if (t.main) acts = b('chats', 'Threads · ' + t.threads) + b('bell') + b('spark', '', o.panel) + b('dots')
+  else acts = b('pin') + b('bell') + b('circ', 'Resolve') + b('spark', '', o.panel) + b('dots')
+  const sub = t.main ? 'Messages outside threads' : o.narrow ? '' : t.kind
+  return `<div class="hC"><div class="in">${icon}<div class="who"><span class="ttl2">${t.title}</span><div class="ctxl">${pill(t, 'sm')}${sub ? `<span>${sub}</span>` : ''}</div></div><div class="acts">${acts}</div></div><div class="fade${o.top ? ' off' : ''}"></div></div>`
+}
+
+const SIDE = `<div class="side">
+  <div class="bar"><div class="lights"><i></i><i></i><i></i></div><span class="ib">${I('side')}</span><span class="ib">${I('left')}</span><span class="ib off">${I('right')}</span><span class="spacer"></span><span class="ib">${I('search')}</span><span class="ib">${I('pencil')}</span><span class="me">T</span></div>
+  <div class="nav"><div class="ni">${I('house')}Home</div><div class="ni">${I('list')}All topics</div><div class="ni">${I('spark')}Juno<span class="cnt">2</span></div></div>
+  <div class="hair"></div>
+  <div class="filters"><span class="on">All</span><span>Channels</span><span>DMs</span><span style="margin-left:auto">Unread</span></div>
+  <div class="rows">
+    <div class="trow SEL0">${blob('#7FB6A4', 44).replace('art', 'pebble')}<div class="tcol"><div class="l1"><span class="t">Postgres 16 cutover window</span><span class="tm">4m</span></div><div class="l2"><span class="p">Maya: Wednesday night is the only window support signed off on. @Tushar can you decide?</span></div><div class="l3">${I('hash')}eng</div></div></div>
+    <div class="trow SEL1">${blob('#E6B8C8', 44).replace('art', 'pebble')}<div class="tcol"><div class="l1"><span class="t u">Rina's competing offer</span><span class="tm">12m</span></div><div class="l2"><span class="p u">Elena: She has until Friday. Can we get a call on the calendar before then?</span><span class="count">3</span></div><div class="l3">${I('lock')}hiring</div></div></div>
+    <div class="trow">${blob('#9AA7E0', 44).replace('art', 'pebble')}<div class="tcol"><div class="l1"><span class="t">#design-review</span><span class="tm">1h</span></div><div class="l2"><span class="p">Sam: Moving crit to the small room, the big one is booked.</span></div><div class="l3">${I('hash')}design-review <span class="tagm">Main</span></div></div></div>
+  </div></div>`
+const side = (sel) => SIDE.replace('SEL' + sel, 'sel').replace(/SEL\d/g, '')
+
+function strip(t, sb, juno) {
+  const lead = sb ? '' : `<div class="lights"><i></i><i></i><i></i></div><div class="ctl"><span class="ib">${I('side')}</span><span class="ib">${I('left')}</span><span class="ib off">${I('right')}</span></div>`
+  const active = juno ? `<div class="tab on">${JM(14, 'tmk')}<span class="lab">Juno</span></div>` : `<div class="tab on">${t.main ? I(t.icon, 'k') : blob(t.art, 16).replace('art', 'tart')}<span class="lab">${t.tab}</span><span class="cl">${I('x')}</span></div>`
+  const other = t === T.main && !juno ? `<div class="tab">${blob('#7FB6A4', 16).replace('art', 'tart')}<span class="lab">Postgres 16 cutover window</span></div>` : `<div class="tab">${I('hash', 'k')}<span class="lab">design-review</span><span class="udot"></span></div>`
+  return `<div class="strip${sb ? '' : ' lead'}">${lead}<div class="tab pin">${I('house', 'k')}</div>${active}${other}<div class="plus">${I('plus')}</div></div>`
+}
+const composer = (ph) => `<div class="comp"><div class="compin"><div class="box"><span class="att">${I('plus')}</span><div class="ta ph">${ph}</div><span class="snd dim">${I('up')}</span></div></div></div>`
+
+const PANEL = `<div class="panel"><div class="ph2">${JM(20)}<b>Juno</b><span class="spacer"></span>${a('expand')}${a('x')}<div class="fade"></div></div>
+  <div class="plist">
+    <div class="dsep">Yesterday</div>
+    <div class="about">About Hiring loop for the platform role</div>
+    <div class="bm own"><div class="bub">Who still owes a scorecard?</div></div><div class="g"></div>
+    <div class="bm jn">${JM(28)}<div class="bub">Only Leo. Elena and Sam sent theirs on Monday.</div></div>
+    <div class="dsep">Today</div>
+    <div class="about">About Postgres 16 cutover window</div>
+    <div class="bm own"><div class="bub">Catch me up</div></div><div class="g"></div>
+    <div class="bm jn">${JM(28)}<div class="bub">Dev wants one more day of replica checks, so Thursday night. Leo says billing closes Thursday at 2am and needs a heads-up. Maya needs your call.</div></div>
+  </div>
+  <div class="pcomp"><div class="pbox"><div class="ta">Ask about this topic</div><span class="snd">${I('up')}</span></div></div></div>`
+
+const PANEL_B = (cover) => `<div class="panel${cover ? ' cover' : ''}"><div class="stage b">${BAND}<div class="hB panelh"><div class="isl t"><span class="tbtn">${JM(18)}<b>Juno</b>${I('down', 'dn')}</span></div><div class="isl r">${a('expand')}${a('x')}</div></div>
+  <div class="plist" style="padding-top:56px">
+    <div class="dsep">Yesterday</div>
+    <div class="about">About Hiring loop for the platform role</div>
+    <div class="bm own"><div class="bub">Who still owes a scorecard?</div></div><div class="g"></div>
+    <div class="bm jn">${JM(28)}<div class="bub">Only Leo. Elena and Sam sent theirs on Monday.</div></div>
+    <div class="dsep">Today</div>
+    <div class="about">About Postgres 16 cutover window</div>
+    <div class="bm own"><div class="bub">Catch me up</div></div><div class="g"></div>
+    <div class="bm jn">${JM(28)}<div class="bub">Dev wants one more day of replica checks, so Thursday night. Leo says billing closes Thursday at 2am and needs a heads-up. Maya needs your call.</div></div>
+  </div></div>
+  <div class="pcomp"><div class="pbox"><div class="ta">Ask about this topic</div><span class="snd">${I('up')}</span></div></div></div>`
+const JUNO_LIST = `<div class="list"><div class="jcol">
+        <div class="dsep">Yesterday</div>
+        <div class="bm own"><div class="bub">Remind me to send the offsite budget on Friday</div></div><div class="g"></div>
+        <div class="bm jn">${JM(28)}<div class="bub">Done. I'll remind you on Friday at 9.</div></div>
+        <div class="dsep">Today</div>
+        <div class="about">About Postgres 16 cutover window</div>
+        <div class="bm own"><div class="bub">Catch me up</div></div><div class="g"></div>
+        <div class="bm jn">${JM(28)}<div class="bub">Dev wants one more day of replica checks, so Thursday night. Leo says billing closes Thursday at 2am and needs a heads-up. Maya needs your call.</div></div>
+        <div class="g"></div>
+        <div class="bm own"><div class="bub">Anything else waiting on me?</div></div><div class="g"></div>
+        <div class="bm jn">${JM(28)}<div class="bub">Elena asked in #hiring for a call about Rina's offer before Friday.</div></div>
+      </div></div>`
+function win({ dir, t, w, h, sb, panel, top, junoTab, focus, menu, center, marks, thumb, banner }) {
+  const topicW = w - (sb ? 384 : 0) - (panel ? 360 : 0)
+  const cover = dir === 'B' && panel && topicW < 480
+  if (dir === 'B') {
+    const o = { tight: topicW < 480, panel, focus, menu, center }
+    let body
+    if (junoTab) {
+      body = `<div class="topic"><div class="stage b">${BAND}<div class="hB" style="max-width:720px;padding:0 32px"><div class="isl t"><span class="tbtn">${JM(18)}<b>Juno</b>${I('down', 'dn')}</span></div>${banner ? `<div class="isl r"><span class="chipb">Juno is paused · <u>Resume</u></span></div>` : ''}</div>${JUNO_LIST}</div>
+      <div class="comp"><div class="compin"><div class="pbox"><div class="ta">Message Juno</div><span class="snd">${I('up')}</span></div></div></div></div>`
+    } else if (cover) {
+      body = ''
+    } else {
+      const msgs = top ? t.msgs.slice(0, 3) : t.msgs
+      const list = `<div class="list${top ? ' top' : ''}"><div class="col">${msgs.join('')}</div></div>`
+      const th = thumb ? `<span class="thumb" style="top:${thumb[0]}px;height:${thumb[1]}px"></span>` : ''
+      body = `<div class="topic"><div class="stage b">${headB(t, o)}${list}${th}${marks ? guides(marks) : ''}</div>${composer(t.ph)}</div>`
+    }
+    const sideHtml = sb ? side(t === T.priv ? 1 : 0) : ''
+    return `<div class="win" style="width:${w}px;height:${h}px">${sideHtml}<div class="work">${strip(t, sb, junoTab)}<div style="display:flex;flex:1;min-height:0">${body}${panel ? PANEL_B(cover) : ''}</div></div></div>`
+  }
+  const narrow = (w - (sb ? 384 : 0) - (panel ? 360 : 0)) < 480
+  const o = { narrow, panel, top, focus }
+  let body
+  if (junoTab) {
+    body = `<div class="topic"><div class="hA"><div class="in">${JM(20)}<b class="jn">Juno</b><span class="spacer"></span>${a('dots')}</div><div class="fade"></div></div>
+      <div class="list"><div class="jcol">
+        <div class="dsep">Yesterday</div>
+        <div class="bm own"><div class="bub">Remind me to send the offsite budget on Friday</div></div><div class="g"></div>
+        <div class="bm jn">${JM(28)}<div class="bub">Done. I'll remind you on Friday at 9.</div></div>
+        <div class="dsep">Today</div>
+        <div class="about">About Postgres 16 cutover window</div>
+        <div class="bm own"><div class="bub">Catch me up</div></div><div class="g"></div>
+        <div class="bm jn">${JM(28)}<div class="bub">Dev wants one more day of replica checks, so Thursday night. Leo says billing closes Thursday at 2am and needs a heads-up. Maya needs your call.</div></div>
+        <div class="g"></div>
+        <div class="bm own"><div class="bub">Anything else waiting on me?</div></div><div class="g"></div>
+        <div class="bm jn">${JM(28)}<div class="bub">Elena asked in #hiring for a call about Rina's offer before Friday.</div></div>
+      </div></div>
+      <div class="comp"><div class="compin"><div class="pbox"><div class="ta">Message Juno</div><span class="snd">${I('up')}</span></div></div></div></div>`
+  } else {
+    const head = dir === 'A' ? headA(t, o) : dir === 'B' ? headB(t, o) : headC(t, o)
+    const msgs = top ? t.msgs.slice(0, 3) : t.msgs
+    const list = `<div class="list${top ? ' top' : ''}"><div class="col">${msgs.join('')}</div></div>`
+    body = dir === 'B'
+      ? `<div class="topic"><div class="stage b">${head}${list}</div>${composer(t.ph)}</div>`
+      : `<div class="topic">${head}${list}${composer(t.ph)}</div>`
+  }
+  const sideHtml = sb ? side(t === T.priv ? 1 : 0) : ''
+  return `<div class="win" style="width:${w}px;height:${h}px">${sideHtml}<div class="work">${strip(t, sb, junoTab)}<div style="display:flex;flex:1;min-height:0">${body}${panel ? PANEL : ''}</div></div></div>`
+}
+
+const ch = (dir, b) => `<span class="chrome">${b}</span>`
+function overview(dir) {
+  const hgt = { A: '44 + 52 = 96px of chrome', B: 'islands 36px, band 68px, the list runs under it', C: '44 + 64 = 108px of chrome' }[dir]
+  const narrowCap = {
+    A: 'At 720px with the sidebar shown, the topic is 336px. Under 480px of header width, Pin, Notify me and Resolve fold into More (they are already in it). The pill keeps its tint and icon; its name and the title take the ellipsis.',
+    B: 'At 336px the islands keep their places. Resolve becomes an icon button that keeps its name, "Resolve". The title takes the ellipsis first, then the channel name; the pill\'s tint and icon always show. Juno stays.',
+    C: 'Narrow: the kind text after the pill goes first, then Pin, Notify me and Resolve fold into More. The 36px art keeps its room.',
+  }[dir]
+  return `<div class="colhead"><b>Thread topic</b>#eng, sidebar shown ${ch(dir, hgt)}</div>
+    ${win({ dir, t: T.thread, w: 1320, h: 570, sb: true })}
+    <div class="row2" style="margin-top:28px">
+      <div><div class="colhead"><b>Main</b>the channel's stream, with Threads</div>${win({ dir, t: T.main, w: 800, h: 420 })}</div>
+      <div><div class="colhead"><b>DM</b>a thread with Maya Chen</div>${win({ dir, t: T.dm, w: 500, h: 420 })}</div>
+    </div>
+    <div class="row2" style="margin-top:28px">
+      <div><div class="colhead"><b>Narrow</b>720px window, private channel</div>${win({ dir, t: T.priv, w: 720, h: 420, sb: true })}</div>
+      <p class="cap" style="max-width:520px;margin-top:30px">${narrowCap}</p>
+    </div>`
+}
+function family() {
+  return `<div class="colhead"><b>Topic with the Juno panel</b>one 52px line across both ${ch('A', 'tab order shown')}</div>
+    ${win({ dir: 'A', t: T.thread, w: 1320, h: 560, panel: true, focus: true })}
+    <p class="cap">Numbers are the Tab order inside the topic header. The pill comes first, so a keyboard user meets the channel before any action; the title is the page heading, not a Tab stop. The panel header follows the topic composer in the order. The Juno button shows pressed while the panel is open, and the two headers share one 52px line.</p>
+    <div class="row2" style="margin-top:28px">
+      <div><div class="colhead"><b>Juno tab</b>the same row: mark, name, More</div>${win({ dir: 'A', t: T.thread, w: 860, h: 460, junoTab: true })}</div>
+      <div><div class="colhead"><b>At scroll top</b>nothing above, no fade</div>${win({ dir: 'A', t: T.thread, w: 440, h: 300, top: true })}
+        <div class="colhead" style="margin-top:20px"><b>Scrolled</b>the fade fades in over 24px</div>${win({ dir: 'A', t: T.thread, w: 440, h: 300 })}</div>
+    </div>
+    <div class="row2" style="margin-top:28px">
+      <p class="spec"><b>Sizes.</b> Row 52px, content capped at 800px and centred, padding 0 20 0 24, gap 10. Pill 24px, padding 0 9, gap 5, 12.5/600, icon 13. Title 15/600. Icon buttons 28px, radius 8, icon 16, gap 2. Resolve 28px, padding 0 10, 12.5/500, inset ring <code>--border-strong</code>, 6px either side. Fade 20px, <code>--background</code> to transparent, under the row. The panel header uses the same row, padding 0 12 0 16.</p>
+    </div>`
+}
+function familyB() {
+  return `<div class="colhead"><b>Topic with the Juno panel</b>one line of islands across both ${ch('B', 'tab order shown')}</div>
+    ${win({ dir: 'B', t: T.thread, w: 1320, h: 560, panel: true, focus: true })}
+    <p class="cap">Numbers are the Tab order in the topic header: the pill, the title (a menu button), Resolve, Juno. The pill comes first, so the channel is the first thing seen and reached. Juno shows pressed while the panel is open. The panel's islands hold its menu, Open in a tab and Close; the panel follows the topic composer in the Tab order.</p>
+    <div class="colhead" style="margin-top:28px"><b>Juno tab</b>the same left island, a state chip on the right</div>
+    ${win({ dir: 'B', t: T.thread, w: 1000, h: 440, junoTab: true, banner: true })}
+    <p class="cap">The left island is the mark, "Juno" and the chevron, which opens the Juno menu (Scheduled, What Juno remembers, Memory of this chat, Activity, Connections, Settings › Juno). It replaces the More button. A banner chip, when there is one, is the right island. The islands align to the chat's 720px column.</p>
+    <div class="colhead" style="margin-top:28px"><b>Panel beside a 520px topic</b>both keep their islands</div>
+    ${win({ dir: 'B', t: T.thread, w: 1264, h: 400, sb: true, panel: true })}
+    <div class="colhead" style="margin-top:28px"><b>Panel over a 336px topic</b>under 480px the panel covers the topic</div>
+    ${win({ dir: 'B', t: T.thread, w: 1080, h: 400, sb: true, panel: true })}
+    <p class="cap">SPEC 7: when the topic would be under 480px, the panel covers it. The topic's islands are hidden with it; the panel's own islands take the line.</p>`
+}
+function detailB() {
+  return `<div class="colhead"><b>Centred</b>considered</div>
+    ${win({ dir: 'B', t: T.thread, w: 1100, h: 300, center: true })}
+    <div class="colhead" style="margin-top:20px"><b>On the reading column</b>chosen</div>
+    ${win({ dir: 'B', t: T.thread, w: 1100, h: 300 })}
+    <p class="cap">Centred islands sit off the column's left edge, so the eye jumps from the title to the messages, and they need a second layout for narrow windows. On the column, the islands' outer edges line up with the composer's edges (the column's 24px padding), the title reads first as everywhere else in Juno, and one layout works from 336px to any width.</p>
+    <div class="colhead" style="margin-top:28px"><b>The topic menu</b>the title opens the row's menu</div>
+    ${win({ dir: 'B', t: T.thread, w: 1100, h: 500, menu: true })}
+    <p class="cap">Click the title, or Enter, Space or ↓ on it, and the topic's context menu opens under the island: the same items and order as the sidebar row. Rename is in it, so double-click to rename goes. Visible on the right: Resolve (Threads on Main) and Juno. Pin, Notify me, Rename and the rest live in the menu; there is no separate More button.</p>
+    <div class="row2" style="margin-top:28px">
+      <div><div class="colhead"><b>At scroll top</b>the inset keeps the first message clear</div>${win({ dir: 'B', t: T.thread, w: 620, h: 360, top: true, thumb: [68, 70], marks: [[8, 'islands 8 to 44', 250, true], [44, 'band solid to 44', 250], [68, 'band ends at 68 · scrollbar track starts', 330, true], [72, 'first message at 72', 330]] })}</div>
+      <div><div class="colhead"><b>Scrolled</b>text fades out between 44 and 68</div>${win({ dir: 'B', t: T.thread, w: 620, h: 360, thumb: [150, 70] })}</div>
+    </div>
+    <div class="row2" style="margin-top:28px">
+      <div><div class="colhead"><b>Narrow</b>a 336px topic</div>${win({ dir: 'B', t: T.priv, w: 720, h: 400, sb: true })}</div>
+      <p class="cap" style="max-width:520px;margin-top:30px">Under 480px Resolve is an icon button named "Resolve". The title shortens first, then the channel name; the pill's tint and icon always show.</p>
+    </div>
+    <div class="row2" style="margin-top:28px">
+      <div><div class="colhead"><b>Narrow Main</b>Threads keeps its count</div>${win({ dir: 'B', t: T.main, w: 720, h: 400, sb: true })}</div>
+      <p class="cap" style="max-width:520px;margin-top:30px">Threads shows its icon and count, named "Threads, 12". "#design-review" shortens before "Main" would drop under 72px.</p>
+    </div>`
+}
+for (const s of document.querySelectorAll('[data-familyb]')) s.outerHTML = familyB()
+for (const s of document.querySelectorAll('[data-detailb]')) s.outerHTML = detailB()
+for (const s of document.querySelectorAll('[data-overview]')) s.outerHTML = overview(s.closest('section').dataset.dir)
+for (const s of document.querySelectorAll('[data-family]')) s.outerHTML = family()
+
+// Tab-order badges, placed after the fonts load.
+document.fonts.ready.then(() => {
+for (const sec of document.querySelectorAll('section')) {
+  sec.style.position = 'relative'
+  const base = sec.getBoundingClientRect()
+  for (const el of sec.querySelectorAll('[data-f]')) {
+    const r = el.getBoundingClientRect()
+    const b = document.createElement('span')
+    b.className = 'focusn'
+    b.textContent = el.dataset.f
+    b.style.left = r.left - base.left + r.width - 10 + 'px'
+    b.style.top = r.top - base.top - 10 + 'px'
+    sec.appendChild(b)
+  }
+}
+})
+</script>
+</body>
+</html>

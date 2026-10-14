@@ -121,12 +121,17 @@ Each row is a tile followed by three lines. The tile is the topic's art: a small
 
 ### Header
 
-- A **context pill** shows the channel and its type:  This is the main defence against posting in the wrong place, so it is always visible. People and message counts are deliberately left out. Clicking it narrows the sidebar to that channel; right-clicking it opens the channel menu.
-  - **Public channel:** neutral.
-  - **Private channel:** warm amber.
-  - **Direct message or group DM:** soft blue.
-- The title. Double-click to rename.
-- Actions on the right: Pin, Notify me (a bell that opens the three choices and shows the current one), Resolve or Reopen, Juno (opens the Juno panel, below), and More (the same menu as the row).
+The header has no bar. Two islands float over the top of the message list, 8px under the tab strip, aligned to the reading column. Design: `docs/design/header/`.
+
+- **Left island:** the context pill, then the title with a chevron.
+  - The **context pill** shows the channel name, with its type in its tint, its icon and its tooltip. This is the main defence against posting in the wrong place, so it is always visible, at every width. People and message counts are deliberately left out. Clicking it narrows the sidebar to that channel; right-clicking it opens the channel menu.
+    - **Public channel:** neutral.
+    - **Private channel:** warm amber.
+    - **Direct message or group DM:** soft blue.
+  - **The title** opens the topic's menu, the same menu as its sidebar row: Rename, Pin, Notify me, Resolve, Copy Slack link, Open in Slack and the rest. Rename turns the title into a field in place.
+- **Right island:** Resolve or Reopen, and Juno (opens the Juno panel, below). Main shows Threads in place of Resolve.
+- **Under the islands** the list scrolls on: the page colour is solid behind the islands and fades out just below them, so text never shows through or around them. The first message sits below the islands when scrolled to the top.
+- **Narrow windows.** The islands keep their places at every width. Under 480px, Resolve shows as an icon and Threads as its count; the title shortens first, then the channel name, and the pill's tint and icon always show.
 
 ### Messages
 
@@ -146,7 +151,7 @@ Each row is a tile followed by three lines. The tile is the topic's art: a small
 
 ### Main thread
 
-Main is the unthreaded stream of a channel or DM. It reads "#eng · Main" in the header.
+Main is the unthreaded stream of a channel or DM. Its header reads "#eng" in the pill and "Main" as the title.
 
 ![Main thread with a thread link](screenshots/04-ui.png)
 
@@ -158,7 +163,7 @@ Juno can sit beside any topic, so you can talk about what you are looking at wit
 
 - **Open and close.** The Juno button in the header, or ⌘J while a topic tab is active, opens the panel and focuses its composer. The same button, ⌘J again, or Esc in its empty composer closes it, and focus goes back to the topic's composer. Once open, the panel stays open beside every topic tab you switch to, until you close it. It never shows on Home, All topics or other pages.
 - **Size.** The panel is 360px wide on the right of the workspace, below the tab strip, with a hairline between it and the topic. The topic keeps its header, list and composer, and its reading column re-centres in the space left. When that space would be under 480px, the panel covers the topic instead of sitting beside it.
-- **One Juno.** The panel is the same single chat as the Juno tab (13.1), shown narrower and opened at the bottom. A message you send from the panel carries the topic it was sent from: a small "About {topic}" line above your bubble, in the chat and in the Juno tab alike. There is no second conversation and no per-topic history. The panel's header shows "Juno" and a button that opens the Juno tab.
+- **One Juno.** The panel is the same single chat as the Juno tab (13.1), shown narrower and opened at the bottom. A message you send from the panel carries the topic it was sent from: a small "About {topic}" line above your bubble, in the chat and in the Juno tab alike. There is no second conversation and no per-topic history. The panel's header is the same pair of islands as the topic's: "Juno" with the Juno menu on the left; Open in a tab and Close on the right.
 - **What Juno knows.** With each message sent from the panel, Juno gets the topic (its id, title, channel and kind), the messages on screen, the "new" divider's position, and your text selection in the topic if there is one. A selection shows as a removable quote above the panel's composer before you send. "This" means that topic.
 - **Catch me up.** When the topic opened at a "new" divider, one suggestion pill above the composer reads "Catch me up". Clicking it sends it. This replaces the catch-up card that used to sit at the divider. What Juno answers, and how long, is up to the model.
 - **Trust.** Anything Juno reads from the topic, the selection included, is Slack content. A message sent from the panel therefore counts as having read Slack in that run, and the untrusted-content rule (13.9) applies: work that would need no click proposes a card instead, with a Because line.
@@ -250,6 +255,7 @@ Juno is also the assistant's name. It is one long chat with one assistant that r
 
 ### 13.1 The chat
 
+- **Header.** The same islands as a topic's (section 7): "Juno" with a chevron for the Juno menu (13.10) on the left, and the banner chip (13.7), when there is one, on the right.
 - **One thread.** There is no "new chat". Everything you and Juno have said is in one scrolling list, with day separators and the "New" divider before the first message you have not seen. Opening the chat lands at the divider, otherwise at the bottom. A "New message" pill appears when you are scrolled up and something arrives.
 - **What is on screen:** your bubbles, Juno's bubbles and cards, one status bubble while Juno is working, and separators. Quiet one-line notes ("Remembered · Undo", "Removed") sit between bubbles.
 - **Not a transcript.** You see only what Juno chose to say to you. Its working (what it read, how it reasoned, an input it decided to let pass) never shows.
@@ -387,7 +393,7 @@ Juno remembers the whole chat. Older parts are kept as a summary that grows dens
 
 ### 13.10 Settings and pages
 
-The Juno header menu opens Scheduled, What Juno remembers, Memory of this chat, Activity, Connections and Settings › Juno. **Settings › Juno** holds the chat model (the newest of Claude Sonnet, Claude Opus, Muse, GPT Sol or Grok, resolved from the provider's catalogue; Sonnet by default), the compaction model, today's spend and the daily cap ($2 by default), the OpenRouter key (with a line when the provider rejected it) and Codex status, your rules, Pause, the backup folder with "Rotate recovery phrase after removals" (off by default), and who owns Juno's state with Export recovery phrase, Move to another Mac and Restore from backup (13.8). **Connections** shows each server's state, the address in use, and the tools it offers with their tier. The T3 Code row also holds its address and the switch "Allow T3 Code over the local network", off by default; over the network only an https address works, so with the switch off Juno uses T3 Code on this Mac only.
+The Juno header menu (the chevron beside "Juno" in the Juno tab and the panel) opens Scheduled, What Juno remembers, Memory of this chat, Activity, Connections and Settings › Juno. **Settings › Juno** holds the chat model (the newest of Claude Sonnet, Claude Opus, Muse, GPT Sol or Grok, resolved from the provider's catalogue; Sonnet by default), the compaction model, today's spend and the daily cap ($2 by default), the OpenRouter key (with a line when the provider rejected it) and Codex status, your rules, Pause, the backup folder with "Rotate recovery phrase after removals" (off by default), and who owns Juno's state with Export recovery phrase, Move to another Mac and Restore from backup (13.8). **Connections** shows each server's state, the address in use, and the tools it offers with their tier. The T3 Code row also holds its address and the switch "Allow T3 Code over the local network", off by default; over the network only an https address works, so with the switch off Juno uses T3 Code on this Mac only.
 
 ### 13.11 Writing
 
@@ -410,7 +416,7 @@ Everything is always visible when you open Juno. Notification settings only deci
   - **Active hours.** Inside them Slack shows you as active, outside as away. Juno sets presence at each switch, on launch and on wake. It can only do so while it runs: if it is closed when your active hours start, you stay away until you open it. The page says so in one line.
 - **Juno decides** each message inside notification hours: notify now, or hold. Held means no notification; the message is in Juno as always. There is no threshold to set.
 - **What matters to you** is a short text you write ("The launch and hiring. Anything from my reports that needs a decision today."). Juno reads it with every message.
-- **People, channels and threads** have three settings, chosen from their context menu (Notify me; for a thread also the header bell, and what each choice does to following is in section 5): **Every message** (notifies, even outside notification hours), **When it matters** (the default: Juno decides) and **Never** (no notifications, still in Juno). There is no order: if a person and a channel disagree, Every message wins, so nothing important is silently lost.
+- **People, channels and threads** have three settings, chosen from their context menu (Notify me; for a thread also the header's topic menu, and what each choice does to following is in section 5): **Every message** (notifies, even outside notification hours), **When it matters** (the default: Juno decides) and **Never** (no notifications, still in Juno). There is no order: if a person and a channel disagree, Every message wins, so nothing important is silently lost.
 - **Away by hand.** The avatar menu's Set yourself away or Set yourself active changes presence until the next switch in your active hours.
 - **Why.** A message's context menu has "Why did this notify?" or "Why no notification?", with the reason in words ("#design-review is set to Never", "Juno: asks you to approve the release before 2pm"). A setting reason offers Change; a Juno reason offers Tell Juno, which opens the chat quoting the message. The page has one line for today ("4 messages interrupted you. Juno held 23.") with Show why, listing the messages that interrupted you.
 - **Say it to Juno.** "Stop pinging me about #design-review", "I'm off Friday", "Sam can always reach me" change these settings from the chat, with Undo (13.9). Extra digests are Juno schedules ("summarise what you held at 1pm on weekdays").
@@ -468,6 +474,7 @@ Use the Littlebird design system's tokens.
 - **Icons.** Lucide outline icons, tinted with the surrounding text colour.
 - **Radii.** 6–10px. Inner and outer radii nest, so the outer radius equals the inner radius plus the padding.
 - **Surfaces.** Popovers, menus and toolbars float on a layered shadow ring, not a hard border. Cards use a 1px shadow ring. Inputs keep a soft border.
+- **Page headers** (a topic, the Juno tab, the Juno panel) have no bar and no rule. Their controls sit in solid pill-shaped islands over the content, which scrolls under them and fades out below them. No blur.
 - **Bubbles** (the Juno chat, section 13.1). Yours take the owner fill, pending the owner's choice between the four options in `docs/design/juno-chat/` (section 19); Juno's take the hover surface. Radius 16 with a 4px tail corner on the last bubble of a group, text at 14px, at most three quarters of the column wide. Cards under a bubble take the card radius, the soft shadow in light and the ring in dark.
 - **Context tints** for channel types: neutral for public, amber for private, blue for DMs.
 - **Dark mode** uses the cool near-black system palette. Theme is chosen in Preferences › Appearance and follows the system by default. Switching theme suppresses transitions so colours change in one frame.

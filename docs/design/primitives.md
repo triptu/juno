@@ -85,7 +85,7 @@ Small inline label. Replaces tags, count badges, status chips, decision chips, s
 
 ## 6. ContextPill
 
-The tinted "where" pill, fully round (`--radius-pill`). It draws what it is given and knows nothing about conversation kinds: `tint` `public` | `private` | `dm` (the three tints in the tokens; group DMs use `dm`), `icon` (`Hash`, `Lock`, `User`, `Users`, bold at 12 / 14 / 14), `name` without "#", `kindLabel` ("Public channel", also the tooltip) shown after a dot at 400 when `showKind` is set; `size` 22 (card), 26 (header), 28 (To field). The kind → tint, icon and label mapping is a `@juno/domain` rule applied by the view.
+The tinted "where" pill, fully round (`--radius-pill`). It draws what it is given and knows nothing about conversation kinds: `tint` `public` | `private` | `dm` (the three tints in the tokens; group DMs use `dm`), `icon` (`Hash`, `Lock`, `User`, `Users`, bold at 12 / 14 / 14), `name` without "#", `kindLabel` ("Public channel", also the tooltip) shown after a dot at 400 when `showKind` is set (the To field and cards; the header shows the name only, with the kind in the tooltip and the accessible name); `size` 22 (card), 24 (header), 28 (To field). The kind → tint, icon and label mapping is a `@juno/domain` rule applied by the view.
 
 ## 7. Kbd
 
@@ -97,9 +97,11 @@ Typography. `variant` maps to the five variables of a type role in tokens: `sect
 
 ## 9. Surface, Divider, LabelledRule
 
-`Surface` `kind`: `card` (surface + `--card-ring`, radius 20, padding 14), `popover` (`--pop-shadow`, radius 13, padding 6), `toolbar` (`--pop-shadow`, radius 16), `group` (card with no padding, clips children), `inset` (`--background` + 1px `--border-default`, radius 8), `field` (the composer frame: surface + 1px `--input-border`, focus colour and 1px ring on `:focus-within`, radius 20, a pill at its single-line height), `toast` (ink on paper, `--shadow-lg`, radius 14). `--card-ring` and `--pop-shadow` are wide soft shadows with no ring. `padding` `none` | `xs` 4 | `sm` 6 | `md` 12 | `lg` 14 and `radius` override the defaults. Floating kinds carry a transparent 1px border so a ring never changes layout.
+`Surface` `kind`: `card` (surface + `--card-ring`, radius 20, padding 14), `popover` (`--pop-shadow`, radius 13, padding 6), `toolbar` (`--pop-shadow`, radius 16), `group` (card with no padding, clips children), `inset` (`--background` + 1px `--border-default`, radius 8), `field` (the composer frame: surface + 1px `--input-border`, focus colour and 1px ring on `:focus-within`, radius 20, a pill at its single-line height), `toast` (ink on paper, `--shadow-lg`, radius 14), `island` (the page header's islands: `--surface-default`, `--card-ring`, `--radius-pill`, padding 3, height `--header-island-height`; inventory §5). `--card-ring` and `--pop-shadow` are wide soft shadows with no ring. `padding` `none` | `xs` 4 | `sm` 6 | `md` 12 | `lg` 14 and `radius` override the defaults. Floating kinds carry a transparent 1px border so a ring never changes layout.
 
 `Divider`: 1px, `tone` `default` | `subtle`, `vertical`, `inset`. `LabelledRule`: the "3 NEW" divider, `label` + rule in `--hl` / `--hl-rule` (or `muted`); fills its row.
+
+`HeaderBand`: the static band behind a page header's islands (`--header-band` tall, solid to `--header-band-solid`, then a fade), `aria-hidden`, no pointer events. Used by the topic header, the Juno tab and the Juno panel.
 
 ## 10. Popover and OptionList
 
@@ -111,7 +113,7 @@ Menus are not a separate primitive: an in-app menu (the account menu) is an `Opt
 
 ## 10a. ScrollArea
 
-`ScrollArea`: a vertical scroll container (`overflow-y: auto`, contained overscroll) with `scrollbar` (`always` | `hover`), `as`, a `ref` to the scroll element (the message list's container reads and sets the position through it) and a layout-only `sx`. The scrollbar is the 10px classic bar from `global.css` in both modes, so the gutter never changes size. `hover` sets a `--scrollbar-thumb` variable to transparent and to `--border-strong` under `:hover` (hover-capable pointers only); the `::-webkit-scrollbar-thumb` reads it. The track is transparent always. Keyboard and trackpad scrolling are the browser's. The sidebar topic list and the message list are `ScrollArea scrollbar="hover"`; `Page`, `Popover` and `CodeBlock` keep the always-on bar for now.
+`ScrollArea`: a vertical scroll container (`overflow-y: auto`, contained overscroll) with `scrollbar` (`always` | `hover`), `as`, a `ref` to the scroll element (the message list's container reads and sets the position through it) and a layout-only `sx`. The scrollbar is the 10px classic bar from `global.css` in both modes, so the gutter never changes size. `hover` sets a `--scrollbar-thumb` variable to transparent and to `--border-strong` under `:hover` (hover-capable pointers only); the `::-webkit-scrollbar-thumb` reads it. The track is transparent always. Keyboard and trackpad scrolling are the browser's. `underHeader` is for a list that runs under a page header's islands: it adds the `--header-inset` top padding, `scroll-padding-top: --header-band` and a `--header-band` top margin on the scrollbar track, all in CSS. The sidebar topic list and the message list are `ScrollArea scrollbar="hover"`; `Page`, `Popover` and `CodeBlock` keep the always-on bar for now.
 
 ## 11. Tabs
 
@@ -171,6 +173,6 @@ Feature components that compose the above and hold app logic: `Sidebar`, `TopicR
 
 ## Count
 
-23 primitives: Icon, Button, NavItem, IconButton, Avatar (+AvatarStack, AvatarButton), ChannelIcon (+Swatch), Chip, ContextPill, Kbd, Text, Surface (+Divider, LabelledRule), Popover/OptionList, ScrollArea, Tabs, Fields (TextField, Textarea, Select, Checkbox, Slider, Segmented), ListRow, Toast, EmptyState, Illustration, Logo, Page/PageHeader/Section, CodeBlock, Card.
+23 primitives (Surface gains the `island` kind and `HeaderBand`): Icon, Button, NavItem, IconButton, Avatar (+AvatarStack, AvatarButton), ChannelIcon (+Swatch), Chip, ContextPill, Kbd, Text, Surface (+Divider, LabelledRule), Popover/OptionList, ScrollArea, Tabs, Fields (TextField, Textarea, Select, Checkbox, Slider, Segmented), ListRow, Toast, EmptyState, Illustration, Logo, Page/PageHeader/Section, CodeBlock, Card.
 
 Differences from the first proposal: Button's accent variant is called `primary`; Tile and Avatar are one component; Menu/MenuItem were folded into OptionList (same row anatomy, one keyboard model); PageHeader got a `Page` container for the width and padding instead of setting them itself; `Icon` takes a component rather than a name.

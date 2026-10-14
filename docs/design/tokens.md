@@ -334,7 +334,10 @@ All [proto] measured at 1280×800 with Inter unless marked.
 | `--tab-height` | 35px, bottom margin -1px so the active tab merges with the page |
 | `--tab-width` | flex 0 1 230px; `--tab-min-width` 120px (the prototype's 72 fit only the icon and the close button). The strip scrolls sideways once the tabs reach the floor. `--tab-pinned-width` 40px (icon only) |
 | `--tab-unread-dot` | 6px round, `--foreground-muted` |
-| `--topic-header-height` | 100px at one-line title (padding 14 + 32 pill row + 8 gap + 32 title row + 14; the rows are the height of their 32px buttons). The prototype measured 95 with 26px rows |
+| `--header-island-top` | 8px from the top of the topic area (or Juno tab, or panel) to the header islands |
+| `--header-island-height` | 36px: a 28px control plus 3px padding and the 1px transparent border |
+| `--header-band` | 68px: the band behind the islands, solid `--background` to `--header-band-solid` 44px (the islands' bottom), then fading to transparent. Also the list's `scroll-padding-top` and the scrollbar track's top margin |
+| `--header-inset` | 56px top padding of a list that runs under the header; with the column's 16px the first message starts at 72, below the band. Replaces `--topic-header-height` (100px), which goes |
 | `--reading-width` | 800px message column, centred; composer inner max 752px (800 − 2×24) |
 | `--page-width-narrow` | 680px |
 | `--page-width` | 720px (Juno) |
@@ -417,7 +420,7 @@ Single line 40px; grows to `max-height` then scrolls inside. Prototype max is 18
 | `--card-ring` | `0 1px 2px 0 oklch(0 0 0 / .03), 0 6px 20px -4px oklch(0 0 0 / .07)` | `0 1px 2px 0 oklch(0 0 0 / .3), 0 6px 20px -4px oklch(0 0 0 / .35)` | options D1 | Cards: settled hint, Juno cards, settings groups. The name is historical; there is no ring any more |
 | `--pop-shadow` | `0 2px 6px -1px oklch(0 0 0 / .05), 0 14px 36px -8px oklch(0 0 0 / .13)` | `0 2px 6px -1px oklch(0 0 0 / .3), 0 14px 36px -8px oklch(0 0 0 / .5)` | options D1 | Menus, popovers, palette, hover toolbar |
 
-Floating surfaces have `border: 1px solid transparent` plus the shadow, never a coloured border. Inputs keep a real 1px `--input-border`. The raised button (`Button variant="raised"`) is a control, not a floating surface: it keeps a 1px `--border-default` edge plus `--shadow-sm`. In dark the shadows alone do not separate a popover from the page, so popovers and the hover toolbar sit on `--surface-raised` (1.2).
+Floating surfaces have `border: 1px solid transparent` plus the shadow, never a coloured border. Inputs keep a real 1px `--input-border`. The raised button (`Button variant="raised"`) is a control, not a floating surface: it keeps a 1px `--border-default` edge plus `--shadow-sm`. In dark the shadows alone do not separate a popover from the page, so popovers and the hover toolbar sit on `--surface-raised` (1.2). The header islands are the calm exception: `--surface-default` with `--card-ring` in both themes, because they are always on screen and sit on the page, not over another surface.
 
 ## 7. Z-index layers
 
