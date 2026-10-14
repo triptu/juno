@@ -345,6 +345,7 @@ All [proto] measured at 1280×800 with Inter unless marked.
 | `--palette-width` | 560px, max calc(100% − 48px), top offset 96px |
 | `--menu-width` | 236px context menu, 248px avatar menu, 280px mention popover, 340px New chat pickers |
 | `--toast-max-width` | 352px |
+| `--peek-width` | 480px peek popover, 8px right of the sidebar, from under the title bar to 8px above the window's bottom; never wider than the window has room for |
 | `--popover-max-height` | 400px, and never taller than the window below the title bar (`100vh − --titlebar-height − --space-5`), so the account menu fits at the minimum window size; the content scrolls inside. `--picker-max-height` 300px |
 | `--scrollbar` | 10px, thumb `--border-strong` with 3px transparent inset, radius 10. `ScrollArea scrollbar="hover"` keeps the thumb transparent until the area is hovered; the 10px gutter stays |
 | `--search-field-width` | 260px filter search; `--keyword-field-width` 160px keyword rule input |

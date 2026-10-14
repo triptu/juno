@@ -16,6 +16,8 @@ export interface ShellProps {
   readonly onSidebarResetWidth?: () => void
   /** A drag on the edge ended far enough left to hide the sidebar. */
   readonly onSidebarCollapse?: () => void
+  /** The peek popover (`PeekView`), while one is open. It hangs off the sidebar's right edge. */
+  readonly peek?: ReactNode
   readonly children?: ReactNode
 }
 
@@ -29,7 +31,7 @@ const COLLAPSE_BELOW = 200
  * waits on the engine renders its own waiting state inside. Nothing above
  * the panes may change on a tick (performance 4.3).
  */
-export function Shell({ sidebar, sidebarWidth = SIDEBAR_WIDTH.default, sidebarHidden = false, onSidebarResize, onSidebarResetWidth, onSidebarCollapse, children }: ShellProps) {
+export function Shell({ sidebar, sidebarWidth = SIDEBAR_WIDTH.default, sidebarHidden = false, onSidebarResize, onSidebarResetWidth, onSidebarCollapse, peek, children }: ShellProps) {
   const slot = useRef<HTMLDivElement>(null)
   // The width is set on the sidebar's own box, here and by a drag, never
   // through React state, so a drag re-renders nothing. It is a plain width,
@@ -44,6 +46,7 @@ export function Shell({ sidebar, sidebarWidth = SIDEBAR_WIDTH.default, sidebarHi
         <div ref={slot} {...stylex.props(styles.sidebarSlot, sidebarHidden && styles.hidden)}>
           {sidebar}
           <SidebarEdge width={sidebarWidth} onResize={onSidebarResize} onReset={onSidebarResetWidth} onCollapse={onSidebarCollapse} />
+          {peek}
         </div>
         {children}
       </div>
@@ -140,8 +143,10 @@ const styles = stylex.create({
     backgroundColor: colors['--background'],
     color: colors['--foreground-default'],
   },
+  // The peek in the sidebar's slot fits the room beside the sidebar by this box's width (`cqw`).
   panes: {
     flexDirection: 'row',
+    containerType: 'inline-size',
   },
   // Holds the sidebar at the width set on it, and the edge.
   sidebarSlot: {

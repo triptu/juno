@@ -689,6 +689,8 @@ export const layout = stylex.defineVars({
   '--menu-width-account': '248px',
   '--menu-width-browse': '300px',
   '--menu-width-mention': '280px',
+  // The peek popover beside the sidebar; never wider than the room left of the window.
+  '--peek-width': '480px',
   // Never taller than the window below a title-bar anchor, so a menu fits
   // at the minimum size and under zoom; the content scrolls inside.
   '--popover-max-height': 'min(400px, calc(100vh - var(--titlebar-height) - var(--space-5)))',
