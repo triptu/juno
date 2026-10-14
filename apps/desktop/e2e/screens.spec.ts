@@ -30,3 +30,29 @@ test('the sidebar, light and dark', async ({ juno, win }) => {
   await win.waitForTimeout(300)
   await win.screenshot({ path: resolve(screens, 'sidebar-dark.png') })
 })
+
+test('the topic header over a thread and a Main, light and dark', async ({ juno, win }) => {
+  test.setTimeout(120_000)
+  await juno.signIn()
+  await juno.waitForSync()
+  const shoot = async (name: string) => {
+    // The pointer rests on the sidebar's empty end, so nothing in the topic is hovered.
+    await win.mouse.move(20, 760)
+    await win.evaluate(() => document.fonts.ready)
+    await expect(win.locator('html')).not.toHaveAttribute('data-theme-switching', /.*/)
+    await win.waitForTimeout(300)
+    await win.screenshot({ path: resolve(screens, `${name}.png`) })
+  }
+  for (const theme of ['Light', 'Dark'] as const) {
+    if (theme === 'Dark') await juno.setTheme('Dark')
+    await juno.sidebar.row('Rina finished the onsite.').open()
+    await juno.topic.expectTitle('Rina finished the onsite.')
+    await shoot(`topic-thread-${theme.toLowerCase()}`)
+    // Scrolled a little, so the text fades out under the band.
+    await juno.topic.scroller.evaluate((node) => node.scrollBy({ top: -120, behavior: 'instant' }))
+    await shoot(`topic-thread-scrolled-${theme.toLowerCase()}`)
+    await juno.sidebar.row('#eng').open()
+    await juno.topic.expectTitle('Main')
+    await shoot(`topic-main-${theme.toLowerCase()}`)
+  }
+})
