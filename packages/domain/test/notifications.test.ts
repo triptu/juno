@@ -5,6 +5,8 @@ import {
   hoursStartSummary,
   inHours,
   nextSwitch,
+  nextHoursStart,
+  localTime,
   scheduledPresence,
   slackPresence,
   untilLabel,
@@ -59,6 +61,14 @@ describe('notification decision', () => {
     ['AI assist off: a DM outside hours goes into the summary', candidate({ channel: maya, at: at(MON, 7) }), aiOff, undefined, { outcome: 'summary', reason: 'Outside your notification hours. AI assist is off, and DMs and mentions notify you' }],
   ] as const)('%s', (_name, message, context, judgement, expected) => {
     expect(decideNotification(message, settings, context, judgement)).toEqual(expected)
+  })
+
+  it('applies thread overrides, with Every message winning over Never anywhere', () => {
+    const topicId = 't:C0HIRING:1.000001'
+    const message = candidate({ topicId })
+    expect(decideNotification(message, { ...settings, threads: { [topicId]: 'every' }, channels: { [message.channel.id]: 'never' } }, ai)).toMatchObject({ outcome: 'now' })
+    expect(decideNotification(message, { ...settings, threads: { [topicId]: 'never' } }, ai)).toMatchObject({ outcome: 'hold' })
+    expect(decideNotification({ ...message, senderId: mayaId }, { ...settings, threads: { [topicId]: 'never' } }, ai)).toMatchObject({ outcome: 'now' })
   })
 
   it('asks for Juno only when the settings did not decide', () => {
@@ -136,5 +146,21 @@ describe('presence', () => {
 
   it('uses the same hours for both by default', () => {
     expect(defaultNotificationSettings.presenceHours).toEqual(defaultNotificationSettings.notificationHours)
+  })
+})
+
+
+describe('calendar notification starts', () => {
+  const monday = new Date(2026, 9, 12, 8, 30)
+  const hours: Hours = { days: [1], from: 540, to: 1140 }
+  it('keeps local times and skips a start that has already happened', () => {
+    expect(localTime(monday.getTime())).toEqual({ weekday: 1, minutes: 510 })
+    expect(nextHoursStart(monday.getTime(), hours)).toBe(new Date(2026, 9, 12, 9).getTime())
+    expect(nextHoursStart(new Date(2026, 9, 12, 9).getTime(), hours)).toBe(new Date(2026, 9, 19, 9).getTime())
+    expect(nextHoursStart(monday.getTime(), { ...hours, days: [] })).toBeUndefined()
+    expect(nextHoursStart(monday.getTime(), { ...hours, to: 540 })).toBeUndefined()
+  })
+  it('uses the day on which an overnight window starts', () => {
+    expect(nextHoursStart(monday.getTime(), { days: [1], from: 1320, to: 120 })).toBe(new Date(2026, 9, 12, 22).getTime())
   })
 })

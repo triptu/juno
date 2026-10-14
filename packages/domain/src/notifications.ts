@@ -45,6 +45,8 @@ export interface NotificationSettings {
   readonly channels: Readonly<Record<string, NotifyLevel>>
   /** By user id. */
   readonly people: Readonly<Record<string, NotifyLevel>>
+  /** By thread topic id. Missing means no thread overrides. */
+  readonly threads?: Readonly<Record<string, NotifyLevel>>
 }
 
 const weekdays: ReadonlyArray<Weekday> = [1, 2, 3, 4, 5]
@@ -58,6 +60,7 @@ export const defaultNotificationSettings: NotificationSettings = {
 }
 
 export interface NotificationCandidate {
+  readonly topicId?: string
   readonly channel: ChannelInfo
   readonly senderId: UserId
   readonly mentionsMe: boolean
@@ -178,11 +181,14 @@ export function decideNotification(
   const where = channelLabel(channel)
   if (channel.ignored) return { outcome: 'hold', reason: `${where} is ignored` }
 
+  const threadLevel = candidate.topicId?.startsWith('t:') ? settings.threads?.[candidate.topicId] : undefined
   const channelLevel = settings.channels[channel.id]
   const personLevel = settings.people[senderId]
   const person = context.userName?.(senderId) ?? senderId
+  if (threadLevel === 'every') return { outcome: 'now', reason: 'This thread is set to Every message' }
   if (channelLevel === 'every') return { outcome: 'now', reason: `${where} is set to Every message` }
   if (personLevel === 'every') return { outcome: 'now', reason: `${person} is set to Every message` }
+  if (threadLevel === 'never') return { outcome: 'hold', reason: 'This thread is set to Never' }
   if (channelLevel === 'never') return { outcome: 'hold', reason: `${where} is set to Never` }
   if (personLevel === 'never') return { outcome: 'hold', reason: `${person} is set to Never` }
 
@@ -215,4 +221,22 @@ export function hoursStartSummary(
   const list = rest > 0 ? `${shown.join(', ')} and ${rest} more` : shown.length > 1 ? `${shown.slice(0, -1).join(', ')} and ${shown.at(-1)}` : shown[0]
   const title = kept.length === 1 ? '1 message needs you' : `${kept.length} messages need you`
   return { title, body: `In ${list}` }
+}
+
+const calendarWeekdays: ReadonlyArray<Weekday> = [0, 1, 2, 3, 4, 5, 6]
+export function localTime(at: number): LocalTime {
+  const date = new Date(at)
+  return { weekday: calendarWeekdays[date.getDay()] ?? 0, minutes: date.getHours() * 60 + date.getMinutes() }
+}
+
+/** Calendar arithmetic preserves local hour boundaries across daylight saving changes. */
+export function nextHoursStart(at: number, hours: Hours): number | undefined {
+  if (hours.from === hours.to) return undefined
+  for (let offset = 0; offset <= 7; offset++) {
+    const date = new Date(at)
+    date.setDate(date.getDate() + offset)
+    date.setHours(Math.floor(hours.from / 60), hours.from % 60, 0, 0)
+    if (date.getTime() > at && hours.days.includes(localTime(date.getTime()).weekday)) return date.getTime()
+  }
+  return undefined
 }
