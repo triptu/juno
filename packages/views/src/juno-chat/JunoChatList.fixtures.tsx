@@ -129,7 +129,7 @@ export default defineFixtures(
     Hostile: {
       'long-text': list(longText),
       'right-to-left': list(rightToLeft),
-      'many-cards': list(manyCards, {}, { ...frame, height: 1400 }),
+      'many-cards': list(manyCards, {}, { ...frame, height: 880 }),
       'failed-send': list(failedSend),
       'stopped-run': list(stoppedRun),
     },

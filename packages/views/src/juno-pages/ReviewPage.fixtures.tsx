@@ -15,5 +15,5 @@ export default defineFixtures(
       'nothing-pending': page({ page: { backupAt: NOW - DAY, pending: [] } }),
     },
   },
-  { width: 960, height: 1000, padded: false },
+  { width: 960, height: 880, padded: false },
 )

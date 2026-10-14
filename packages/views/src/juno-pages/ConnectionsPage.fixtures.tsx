@@ -13,5 +13,5 @@ export default defineFixtures(
       empty: page({ page: { connections: [] } }),
     },
   },
-  { width: 960, height: 1100, padded: false },
+  { width: 960, height: 880, padded: false },
 )

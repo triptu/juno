@@ -100,6 +100,7 @@ const styles = stylex.create({
     alignItems: 'center',
     gap: spacing['--space-3'],
     flexShrink: 0,
+    width: '100%',
     height: layout['--titlebar-height'],
     paddingInline: spacing['--space-5'],
     boxSizing: 'border-box',

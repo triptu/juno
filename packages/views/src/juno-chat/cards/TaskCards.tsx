@@ -53,7 +53,6 @@ export function TaskCard({ card, actions }: TaskCardProps) {
       id={card.id}
       kind="task"
       actions={actions}
-      source={<Text variant="meta" tone="muted">{chatCopy.card.jobKind[card.kind]}</Text>}
       because={card.because}
       buttons={
         active.has(card.phase) ? (
@@ -151,7 +150,6 @@ export function ProposedTaskCard({ card, actions }: ProposedTaskCardProps) {
       id={card.id}
       kind="proposedTask"
       actions={actions}
-      source={<Text variant="meta" tone="muted">{chatCopy.card.jobKind[card.kind]}</Text>}
       status={card.status}
       because={card.because}
       dismiss

@@ -34,5 +34,5 @@ export default defineFixtures(
       released: page({ page: settingsReleased }),
     },
   },
-  { width: 960, height: 1300, padded: false },
+  { width: 960, height: 880, padded: false },
 )
