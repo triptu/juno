@@ -122,6 +122,26 @@ test('the wheel over a long code block reaches the end of the block, then scroll
 })
 
 /**
+ * Message rows are a whole number of pixels tall (performance 3.3). A row
+ * laid out for the first time above the view grows from its estimate, and
+ * scroll anchoring moves the list by the difference; a fractional difference
+ * leaves the rows in view a part of a pixel off, and their text jumps.
+ */
+test('every message row is a whole number of pixels tall', async ({ page }) => {
+  const routes = (await readRoutes(page)).filter((route) => route.component === 'MessageList' || route.component === 'Message')
+  expect(routes.length).toBeGreaterThan(0)
+  const fractional: string[] = []
+  for (const route of routes) {
+    await openState(page, route)
+    const heights = await page
+      .locator('[data-fixture-frame] [data-message-row]')
+      .evaluateAll((rows) => rows.map((row) => ({ ts: (row as HTMLElement).dataset['messageRow'] ?? '', height: row.getBoundingClientRect().height })))
+    for (const { ts, height } of heights) if (Math.abs(height - Math.round(height)) > 0.001) fractional.push(`${route.route} ${ts}: ${height}px`)
+  }
+  expect(fractional).toEqual([])
+})
+
+/**
  * SPEC section 16: the arrow cursor everywhere, the text cursor only over
  * editable or selectable text, never the pointer. Checked on every fixture
  * in the light theme: an element may compute `cursor: text` only when it
