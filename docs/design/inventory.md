@@ -479,7 +479,7 @@ Page max-width 880, padding `40 40 56`, gap 36.
 
 **Decision** (`@juno/domain` `decideNotification`): ignored channel → Every message (channel or person) → Never → outside notification hours (into the summary if it would have notified) → AI assist off (DMs and mentions) → Juno's judgement. Reasons are the strings the why popover shows: "#incidents is set to Every message", "Maya Chen is set to Never", "Outside your notification hours. Juno: …", "AI assist is off, and DMs and mentions notify you", "Juno: asks you to approve the release before 2pm".
 
-**Summary when notification hours start** (`hoursStartSummary`): one OS notification, "3 messages need you" / "In #eng, Maya Chen and #hiring" (three places, then "and N more"). None when nothing was kept for it.
+**Summary when notification hours start** (`hoursStartSummary`): one OS notification, "3 messages need you" / "In #eng, Maya Chen and #hiring" (three places, then "and N more"). None when nothing was kept for it. The same summary is a Juno message in the chat under the group label "Summary", one line per message ("Maya Chen in #eng: needs your approval before 2pm", the name and place as the source link); clicking the notification opens the Juno tab scrolled to it. With AI assist off, the click opens the first message.
 
 ## 14. Preferences
 
@@ -540,7 +540,7 @@ Shown from 15.1 (also opened from the header's title, §5), 15.2 and 15.6. Three
 
 ### 15.4 Message menu
 
-Right-click on a message, and the message's More menu (the why item is new; the others wait for M6): Copy text (`copy`), Reply in thread (`message-square-reply`, Main only), separator, **Why did this notify?** / **Why no notification?** (`circle-help`, by what happened; hidden for your own messages), **Tell me if nobody replies** (`alarm`, your own messages only, AI assist on). The last one sends "Tell me if nobody replies" to Juno with a link to the message, and opens the Juno panel (or the Juno tab outside a topic tab) without moving focus; Juno answers with a Schedule card (SPEC 13.6).
+Right-click on a message, and the message's More menu (the why item is new; the others wait for M6): Copy text (`copy`), Reply in thread (`message-square-reply`, Main only), separator, **Why did this notify?** / **Why no notification?** (`circle-help`, by what happened; hidden for your own messages), **Tell me if nobody replies** (`alarm`, your own messages only, AI assist on). The last one creates the reply watch at once, with no Juno run: a reply from anyone but you counts, and the wait ends at the same time on your next notification day, or at the start of notification hours if that time is outside them. It shows the toast "Watching for a reply until Thu 9:00 · Undo" (Undo deletes the watch) and adds a Schedule card to the Juno chat; nothing opens. Disabled while Juno is paused or on another Mac (SPEC 13.6).
 
 The why popover anchors under the item: 300px, padding `14 16`, radius 13, bg surface, `--pop-shadow`, gap 6. Title 13/600 ("Notified you at 13:42", "Didn't notify you", "In the 9am summary") · reason 13 subtle lh 1.5 (the decision's reason) · one button right-aligned, 28px secondary: **Change** when the reason is a setting (opens §15.3 for that channel or person, or the Notifications page for hours), **Tell Juno** when it was Juno's call (opens the Juno chat with the message quoted in the composer). Esc or outside click closes.
 
