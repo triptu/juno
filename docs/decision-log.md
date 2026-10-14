@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-14 13:35 · Tushar · New feature Slack lacks: a schedule for presence (away or active by time of day), beside the manual switch. Juno sets it with `presence.set` while running and applies the current state on launch or wake. Designed together with the notification timing in the notifications pass.
 - 10-14 13:20 · Tushar · The New message page, its sidebar icon and "Track replies as a topic" are removed. To post, open a conversation's Main from the sidebar or search and type there. Tracking replies as a topic can't be done reliably and was scope creep. The tab strip's "+" becomes New tab: it opens search once ⌘K exists (M9), All topics until then.
 - 10-14 12:50 · Tushar · Juno Agent conversation is the model's judgement, not hard-coded rules. No limits on bubble length or count, no fixed pacing or milestone rules. Hard rules stay only for safety (one click per outward action, no automatic repeat, spend cap, untrusted content, memory trust) and perf budgets. SPEC 13 and plan-v3 get a simplification pass.
 - 10-14 12:50 · Tushar · Juno's bubbles appear whole with typing dots between; the target is the first bubble within 2.5 s. Only text the model marks for the owner becomes a bubble (a block format in its output, not a tool call per bubble, which would cost an extra model request); the chat is not a literal transcript.
