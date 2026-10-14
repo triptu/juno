@@ -29,6 +29,8 @@ export interface MessageProps {
   readonly startsGroup: boolean
   /** No top margin: the first row, or the row right after the divider. */
   readonly flush?: boolean
+  /** Laid out in full even off screen, never at the size estimate. */
+  readonly eager?: boolean
   /** Roving tabindex: the one row that Tab reaches. */
   readonly tabbable?: boolean
   readonly hueOf: (id: string) => HueName
@@ -59,6 +61,7 @@ export const Message = memo(function Message({
   main,
   startsGroup,
   flush = false,
+  eager = false,
   tabbable = false,
   hueOf,
   toolbar,
@@ -82,7 +85,7 @@ export const Message = memo(function Message({
       tabIndex={tabbable ? 0 : -1}
       data-message-row={message.ts}
       onFocus={focus}
-      {...stylex.props(styles.row, header && !flush && styles.rowGroupStart, message.mentionsMe && styles.rowMention)}
+      {...stylex.props(styles.row, eager && styles.rowEager, header && !flush && styles.rowGroupStart, message.mentionsMe && styles.rowMention)}
     >
       <span {...stylex.props(styles.gutter)}>
         {header ? (
@@ -167,6 +170,9 @@ const styles = stylex.create({
       ':focus-visible': '1',
       ':has(:focus-visible)': '1',
     },
+  },
+  rowEager: {
+    contentVisibility: 'visible',
   },
   rowGroupStart: {
     marginTop: spacing['--space-3'],
