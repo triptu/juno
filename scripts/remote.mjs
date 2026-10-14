@@ -94,15 +94,15 @@ function nsc(args) {
   return result.stdout
 }
 
-/** nsc sometimes fails to dial for a moment; retry calls that are safe to repeat. */
+/** About one dial in four to Namespace's gateway times out from the office network; retry calls that are safe to repeat. */
 async function retry(what, attempt) {
   for (let tries = 1; ; tries++) {
     try {
       return attempt()
     } catch (error) {
-      if (tries === 3) throw error
+      if (tries === 6) throw error
       console.error(`remote: ${what} failed, retrying (${error.message.split('\n').find((line) => line.startsWith('Failed')) ?? error.message.split('\n')[0]})`)
-      await sleep(3000 * tries)
+      await sleep(2000 * tries)
     }
   }
 }
@@ -229,12 +229,12 @@ try {
     await closed
     tar.kill()
     if (reported !== undefined) break
-    if (lines > 0 || !/dial tcp|i\/o timeout|connection refused/.test(errors) || tries === 3) {
+    if (lines > 0 || !/dial tcp|i\/o timeout|connection refused/.test(errors) || tries === 6) {
       // nsc ssh turns every failure into 1, so the script's own code comes back as a marker line.
       throw new Error('lost the connection to the machine before the script finished')
     }
     console.error('remote: could not reach the machine, retrying')
-    await sleep(5000 * tries)
+    await sleep(2000 * tries)
   }
   code = reported
 
