@@ -104,7 +104,7 @@ export const Message = memo(function Message({
             <Text variant="messageName" tone="default" truncate tooltipWhenTruncated dir="auto" as="span" sx={styles.name}>
               {name}
             </Text>
-            <Text variant="meta" tone="muted" numeric as="time" title={fullTime(message.at)}>
+            <Text variant="meta" tone="muted" numeric as="time" title={fullTime(message.at)} sx={styles.time}>
               {time}
             </Text>
             {message.broadcast ? (
@@ -226,6 +226,10 @@ const styles = stylex.create({
   name: {
     flexShrink: 1,
     minWidth: 0,
+  },
+  // A long name gives way; the time never does.
+  time: {
+    flexShrink: 0,
   },
   placeholder: {
     fontStyle: 'italic',
