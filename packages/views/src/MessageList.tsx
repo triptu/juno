@@ -30,6 +30,17 @@ export interface MessageListProps {
   /** Epoch milliseconds, for the times. */
   readonly now: number
   readonly status?: MessageListStatus
+  /**
+   * Rows laid out in full on their first frame instead of at the size
+   * estimate, so a scroll position the container sets before paint holds.
+   */
+  readonly eager?: ReadonlySet<string>
+  /**
+   * Rows of the window above `items` that are not drawn yet. Their place is
+   * kept at the row estimate, so the scroll height and the position do not
+   * change when they arrive.
+   */
+  readonly notDrawnAbove?: number
   /** The `ts` of the first unread message: the "N new" divider goes before it. */
   readonly dividerBefore?: string
   readonly older?: OlderStatus
@@ -76,6 +87,8 @@ export function MessageList({
   main,
   now,
   status = 'ready',
+  eager,
+  notDrawnAbove = 0,
   dividerBefore,
   older = 'none',
   scrollRef,
@@ -105,6 +118,7 @@ export function MessageList({
             ) : null}
           </div>
         ) : null}
+        {notDrawnAbove > 0 ? <div aria-hidden {...stylex.props(styles.notDrawn(notDrawnAbove))} /> : null}
         {items.length === 0 ? <Empty main={main} status={status} /> : null}
         {items.map((item, index) => {
           const atDivider = index === dividerIndex && index > 0
@@ -117,6 +131,7 @@ export function MessageList({
                 now={now}
                 main={main}
                 startsGroup={index === 0 || atDivider}
+                eager={eager?.has(item.message.ts) ?? false}
                 flush={index === 0 || atDivider}
                 tabbable={item.message.ts === tabbable}
                 hueOf={hueOf}
@@ -194,6 +209,10 @@ const styles = stylex.create({
     flexShrink: 0,
     userSelect: 'none',
   },
+  notDrawn: (rows: number) => ({
+    flexShrink: 0,
+    height: `calc(${sizes['--row-message-estimate']} * ${rows})`,
+  }),
   quiet: {
     display: 'flex',
     alignItems: 'center',
