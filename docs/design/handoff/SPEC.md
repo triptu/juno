@@ -493,6 +493,8 @@ Use the Littlebird design system's tokens.
 - **Your bubble colour.** Pending: the owner chooses between options A (accent fill), B (accent tint), C (neutral tint) and D (ink) from the mock in `docs/design/juno-chat/`. The mock's README recommends B.
 - **Juno's voice.** Juno saying "I" in its own bubbles (13.11) is a proposal awaiting the owner.
 - **Starting work without a click.** The owner's decision is "no click to start a T3 Code session I asked for". The rule written in 13.4 and 13.9 is narrower: no click only while Juno has not read Slack, a connection or a session report in the same reply, because anything read there can carry instructions. The owner has not yet confirmed the narrowing.
+- **A restore while the old Mac still runs.** Without a central service, Juno cannot stop an old Mac that is still on from acting after a restore elsewhere, unless both Macs share one backup folder (13.8). The restore sheet says so. The owner has not yet confirmed this limit for v1.
+- **Removed messages and an out-of-date backup.** A restore on a new Mac without a move code, from a folder that missed the newest backup, can bring back removed messages (13.8). "Rotate recovery phrase after removals" closes this but asks for a new phrase after every removal; it is off by default. The owner has not yet chosen the default.
 - **Re-titling.** Should AI re-title a topic when it drifts, or only suggest a branch?
 - **Mobile.** Is there a mobile companion?
 

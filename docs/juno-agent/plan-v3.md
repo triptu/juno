@@ -614,8 +614,10 @@ Each UI milestone ends with the design and performance reviews. WP23 runs from M
 
 Answered by the owner on 10-14 (see §1): T3 sessions run with full access in a new worktree; the backup is a local folder; Sign in with ChatGPT is not planned; T3 over the network needs the switch, off by default.
 
-1. **Owner bubble colour:** A (accent fill), B (accent tint), C (neutral tint) or D (ink), from `docs/design/juno-chat/`. The mock's README recommends B.
-2. **The clean-run narrowing (W6):** the owner said "no click to start T3 sessions I asked for". The rule as built needs no click only while Juno has not read Slack, a connection or a session report in the same reply. Confirm the narrowing, or say which reads should not count.
-3. **Juno's voice:** does Juno say "I" in its own bubbles? The spec proposes yes.
-4. **Removals and a restore on a new Mac (G13):** without a trusted deletion record, a restore from an out-of-date backup folder can bring back messages the owner removed. Juno says so on the Review page. Should "Rotate recovery phrase after removals" be on by default, which closes this but asks the owner to save a new phrase after every removal? The plan keeps it off.
-5. **A restore while the old Mac still runs (G7):** v1 cannot stop an old Mac that is still on from acting after a restore elsewhere, unless both Macs share one synced backup folder. The restore sheet says this. This repeats R1 with the exact limit; confirm it is acceptable for v1.
+These five are open on 10-14. SPEC §19 lists the same five. None blocks M2: the bubble colour and the voice land in WP12 as tokens and copy, the narrowing is a policy in WP15, and the two limits are M7 behaviour.
+
+1. **Owner bubble colour:** A (accent fill), B (accent tint), C (neutral tint) or D (ink), from `docs/design/juno-chat/`. The mock's README recommends B. WP12 builds B behind one token until the owner decides.
+2. **Juno's voice:** does Juno say "I" in its own bubbles? The spec proposes yes, and the fixed copy already uses it in two places (the empty state, the 30-minute quiet line).
+3. **The clean-run narrowing (W6):** the owner said "no click to start T3 sessions I asked for". The rule as built needs no click only while Juno has not read Slack, a connection or a session report in the same reply. Confirm the narrowing, or say which reads should not count.
+4. **A restore while the old Mac still runs (G7):** v1 cannot stop an old Mac that is still on from acting after a restore elsewhere, unless both Macs share one synced backup folder. The restore sheet says this. This repeats R1 with the exact limit, and `staleOwnerCannotAuthorize` stays a documented counterexample. Confirm it is acceptable for v1.
+5. **Removals and a restore on a new Mac (G13):** without a trusted deletion record, a restore from an out-of-date backup folder can bring back messages the owner removed. Juno says so on the Review page, and `staleFolderCannotRestoreRemoved` stays a documented counterexample. Should "Rotate recovery phrase after removals" be on by default? On closes the gap but asks the owner to save a new phrase after every removal. The plan keeps it off.
