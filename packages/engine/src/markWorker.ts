@@ -27,10 +27,10 @@ import { Clock, Context, Effect, Layer, Queue, Schedule, Stream } from 'effect'
 import { millisToTs, parseTopicId, type ParsedTopicId, type Ts } from '@juno/domain'
 import { transaction, type SqlError } from '@juno/store'
 import { deferMark, dropMark, endMark, observeRead, pendingMark, pendingMarks, rejectMark, reindexTopics, storedMe } from '@juno/sync'
-import { EngineConfig } from '../config'
-import { Outbox } from '../outbox'
-import { Workspace, type OpenWorkspace, type StoreServices } from '../workspace'
-import { mirrorSetting } from './setting'
+import { EngineConfig } from './config'
+import { Outbox } from './outbox'
+import { Workspace, type OpenWorkspace, type StoreServices } from './workspace'
+import { mirrorSetting } from './readSetting'
 
 /** Longest wait between two tries of a mark that keeps failing. */
 const MAX_BACKOFF_MILLIS = 5 * 60_000
@@ -49,7 +49,7 @@ export class MarkWorker extends Context.Service<
     /** Look at the pending marks now: a command queued one, or the setting changed. */
     readonly wake: Effect.Effect<void>
   }
->()('juno/engine/reads/MarkWorker') {
+>()('juno/engine/MarkWorker') {
   static readonly layer: Layer.Layer<MarkWorker, never, Workspace | Outbox | EngineConfig> = Layer.effect(
     MarkWorker,
     Effect.gen(function* () {

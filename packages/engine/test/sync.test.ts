@@ -56,7 +56,11 @@ const activeMains = memberConversations.filter((c) => c.messages.some((m) => m.a
 const threadId = (engine: RunningEngine, channel: string, prefix: string) => threadIdIn(engine.fake, channel, prefix)
 
 /** Replays an undo the way the renderer's undo stack does: the command its tag names. */
-const replay = (engine: RunningEngine, undo: UndoCommand) => (undo._tag === 'topics.subscribe' ? subscribe(engine, undo.id) : unsubscribe(engine, undo.id))
+const replay = (engine: RunningEngine, undo: UndoCommand) => {
+  if (undo._tag === 'topics.subscribe') return subscribe(engine, undo.id)
+  if (undo._tag === 'topics.unsubscribe') return unsubscribe(engine, undo.id)
+  throw new Error(`not a follow undo: ${undo._tag}`)
+}
 
 describe('cold boot', () => {
   it('discovers the fixture workspace: titles, previews, counts, tags and order', async () => {

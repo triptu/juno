@@ -10,9 +10,9 @@ import { keys, liveQuery } from '@juno/store'
 import { EngineConfig } from '../config'
 import { retryFirstRun, serveLiveValue, timed } from '../protocol/live'
 import { Workspace } from '../workspace'
-import { markRead, markUnread } from './commands'
-import { readMirrorSetting } from './setting'
-import { MarkWorker } from './worker'
+import { markRead, markUnread } from '../marks'
+import { readMirrorSetting } from '../readSetting'
+import { MarkWorker } from '../markWorker'
 
 export const ReadsHandlers = ReadsRoutes.toLayer(
   Effect.gen(function* () {
