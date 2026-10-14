@@ -18,6 +18,7 @@ Every budget is a p95 over the runs of the scenario in section 8 unless marked p
 | Topic open, cached (rows already in `cache.db`) | 50 ms | `pointerdown` on a row → messages painted at the right scroll position. 16 ms when the topic was prefetched (section 4.2). |
 | Topic open, uncached (never synced) | 50 ms to header and empty body; no spinner before 300 ms | Messages arrive whenever Slack answers; the list must not shift when they do. |
 | Tab switch | 16 ms | One frame. Recently used tabs stay mounted (section 4.3). Unmounted tabs: 50 ms including scroll restore. |
+| Sidebar resize drag | p95 frame ≤ 8.3 ms main-thread work; zero long animation frames | Only the `--sidebar-width` variable on the shell changes, at most once per frame; nothing re-renders until the drag ends. Asserted by `sidebar drag` in `perf.spec.ts` on the large workspace with a topic open. |
 | Sidebar filter or scope change | 50 ms | Query, delta, render. The old list stays on screen until the new one is ready. |
 | ⌘K open | 50 ms | Input focused and recent rows painted. |
 | ⌘K keystroke → results painted | 100 ms, typing never blocked | Local FTS only. The AI command parse arrives later and never delays results. |
@@ -40,7 +41,7 @@ Where these numbers come from: 100 ms is the limit under which a response feels 
 
 Order of work at launch, in parallel where the arrows allow:
 
-1. Main: `app.enableSandbox()`, set `userData`, read a tiny `launch.json` (theme, window bounds) synchronously. Build the application menu before `ready` ([Electron performance tutorial](https://www.electronjs.org/docs/latest/tutorial/performance)).
+1. Main: `app.enableSandbox()`, set `userData`, read a tiny `launch.json` (theme, accent, sidebar width and hidden state, window bounds) synchronously. Build the application menu before `ready` ([Electron performance tutorial](https://www.electronjs.org/docs/latest/tutorial/performance)).
 2. Main: fork the engine (`utilityProcess.fork` with `serviceName: 'juno-engine'` so it is named in metrics) and create the window in the same tick. Do not wait for one to start the other.
 3. Window: `show: false`, `backgroundColor` set to the token background of the saved theme (dark users must never see a light flash), `show()` on `ready-to-show` ([BrowserWindow](https://www.electronjs.org/docs/latest/api/browser-window)). `ready-to-show` fires after the first paint, so the shell must paint with no data: the `App` renders the sidebar bar, filters, tab strip and an empty list before any atom resolves.
 4. Renderer: request the port, subscribe `topics.list` for the default filter. The engine opens the databases and answers from `cache.db` before it opens the socket or calls Slack. Boot network work starts after the first sidebar snapshot has been sent.
@@ -152,7 +153,7 @@ Navigation (sidebar rows, tabs, nav items, filter chips, ⌘K rows, Browse rows,
 
 - The active tab and the 4 most recently active topic tabs render inside `<Activity mode="visible" | "hidden">` ([React Activity](https://react.dev/reference/react/Activity), stable in React 19.2; this repo has 19.3). Hidden tabs keep their DOM, scroll position and composer text; React destroys their effects, so their live subscriptions end and the engine stops working for them. Switching is a `display` toggle: one frame.
 - `messagesAtom` has a 30 s idle TTL so a hidden tab's query is not torn down and rebuilt during a quick switch away and back.
-- Tabs beyond the 5 are unmounted and keep a `ScrollSnapshot { anchorKey, offset }` (`scrollSnapshotAtom(tabId)` in `@juno/state`, recorded on each `scrollend`). Switching back waits until the topic's header and window are local, as an open does, and the container restores the snapshot in `useLayoutEffect` before paint.
+- Tabs beyond the 5 are unmounted and keep a `ScrollSnapshot { anchorKey, offset }` (`scrollSnapshotAtom(topicId)` in `@juno/state`, recorded on each `scrollend`; kept per topic, so Back and ⌘⇧T come back to where the topic was left). Switching back waits until the topic's header and window are local, as an open does, and the container restores the snapshot in `useLayoutEffect` before paint.
 - Every component under a tab must clean up its effects correctly; hidden means "as if unmounted". StrictMode in dev double-invokes mounts to catch this.
 - Page tabs (Home, All topics, Juno, Notifications, Preferences) are singletons and follow the same rule.
 
