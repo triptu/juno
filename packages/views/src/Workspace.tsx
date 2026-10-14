@@ -1,6 +1,5 @@
 import * as stylex from '@stylexjs/stylex'
 import { Bell } from '@phosphor-icons/react/dist/icons/Bell'
-import { EyeSlash } from '@phosphor-icons/react/dist/icons/EyeSlash'
 import { Gear } from '@phosphor-icons/react/dist/icons/Gear'
 import { Hash } from '@phosphor-icons/react/dist/icons/Hash'
 import { Lightbulb } from '@phosphor-icons/react/dist/icons/Lightbulb'
@@ -22,8 +21,6 @@ export interface WorkspaceTab {
   /** The topic title, the channel name for Main (no "#"), or the page name. */
   readonly title: string
   readonly icon: WorkspaceTabIcon
-  /** Opened in stealth: the eye-off icon replaces the kind icon. */
-  readonly stealth?: boolean
   /** The topic's art, drawn in the 15px icon slot instead of the icon. */
   readonly art?: ReactNode
 }
@@ -75,8 +72,8 @@ function stepIndex(key: string, index: number, count: number): number | undefine
 
 /**
  * The right pane: the tab strip (a window drag region) over the page.
- * Tabs carry the kind icon or the topic's art in a fixed slot, the eye-off
- * in stealth, the title and a close button; "+" opens search (All topics until M9). The
+ * Tabs carry the kind icon or the topic's art in a fixed slot, the title
+ * and a close button; "+" opens search (All topics until M9). The
  * strip is an APG tablist: the active tab is the one Tab stop, the arrow
  * keys select its neighbours, Delete closes it.
  */
@@ -95,10 +92,9 @@ export function Workspace({ tabs = [], activeId, onSelectTab, onCloseTab, onNewT
         {tabs.map((tab) => (
           <Tab
             key={tab.id}
-            icon={tab.stealth ? EyeSlash : icons[tab.icon]}
-            leading={tab.stealth ? undefined : tab.art}
+            icon={icons[tab.icon]}
+            leading={tab.art}
             label={tab.title}
-            {...(tab.stealth ? { description: 'Stealth' } : {})}
             active={tab.id === activeId}
             onSelect={onSelectTab === undefined ? undefined : (event) => onSelectTab(tab.id, event)}
             onClose={onCloseTab === undefined ? undefined : () => onCloseTab(tab.id)}

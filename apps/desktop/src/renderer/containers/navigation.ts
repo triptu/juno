@@ -192,12 +192,8 @@ export function warmTopic(id: string): void {
 
 /** The menu on a sidebar row or a thread entry (M5 adds the rest). */
 export async function showTopicMenu(id: string): Promise<void> {
-  const chosen = await popupContextMenu([
-    { id: 'new-tab', label: 'Open in new tab' },
-    { id: 'stealth', label: 'Open in stealth' },
-  ])
+  const chosen = await popupContextMenu([{ id: 'new-tab', label: 'Open in new tab' }])
   if (chosen === 'new-tab') openTopic(id, { newTab: true })
-  else if (chosen === 'stealth') openTopic(id, { stealth: true })
 }
 
 /** The menu on a tab. */

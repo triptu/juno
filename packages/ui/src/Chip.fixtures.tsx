@@ -1,9 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
-import { EyeSlash } from '@phosphor-icons/react/dist/icons/EyeSlash'
 import { Sparkle } from '@phosphor-icons/react/dist/icons/Sparkle'
 import { colors, radii, spacing } from '@juno/tokens/tokens.stylex'
 import { hueNames } from './Avatar'
-import { Button } from './Button'
 import { Chip } from './Chip'
 import { defineFixtures, fixture, scene } from './fixtures/define'
 import { Row, Stack } from './fixtures/layout'
@@ -64,14 +62,6 @@ export default defineFixtures(Chip, {
       ),
       { width: 420 },
     ),
-    stealth: scene(() => (
-      <Chip variant="dashed" size={26} icon={EyeSlash}>
-        Stealth. Not marking as read.
-        <Button size="xs" variant="secondary">
-          Mark read
-        </Button>
-      </Chip>
-    )),
     summary: scene(() => (
       <Row gap="sm">
         <Chip variant="accent" size={24} numeric>
@@ -96,9 +86,6 @@ export default defineFixtures(Chip, {
         <Chip variant="soft">@</Chip>
         <Chip variant="success" size={22}>
           Resolved
-        </Chip>
-        <Chip variant="dashed" size={26} icon={EyeSlash}>
-          Stealth
         </Chip>
       </div>
     )),
@@ -148,9 +135,6 @@ export default defineFixtures(Chip, {
           </Chip>
           <Chip variant="quiet" size={22}>
             Silent
-          </Chip>
-          <Chip variant="dashed" size={22} icon={EyeSlash}>
-            Stealth
           </Chip>
         </Row>
         <Row gap="sm">

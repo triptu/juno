@@ -24,7 +24,6 @@ export type ChipVariant =
   | 'success'
   | 'quiet'
   | 'surface'
-  | 'dashed'
   | 'person'
 /**
  * Height in px. 18 tag, 20 badge, 22 status, 24 summary and reaction, 26
@@ -261,12 +260,6 @@ const variants = stylex.create({
   surface: {
     color: colors['--foreground-muted'],
     backgroundColor: colors['--surface-hover'],
-  },
-  dashed: {
-    color: colors['--foreground-subtle'],
-    backgroundColor: 'transparent',
-    borderStyle: 'dashed',
-    borderColor: colors['--border-strongest'],
   },
   person: {
     fontWeight: weights['--weight-semibold'],

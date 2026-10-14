@@ -144,12 +144,12 @@ if (!memoryOnly && !actionsOnly && !recoveryOnly && !boundedOnly) {
     simulate(file, `${schedule}Step`, guardedInvariant, `${name}.itf.json`)
     simulate(file, `${schedule}BugStep`, invariant, `${name}-bug.itf.json`, true)
   }
-  simulate('readstate', 'stealthBugStep', 'stealthNeverMarks', 'stealth-bug.itf.json', true)
+  simulate('readstate', 'peekBugStep', 'peekNeverMarks', 'peek-bug.itf.json', true)
   for (const schedule of ['ambiguousFailure', 'pendingObservation', 'failedFirstSubscribe', 'unknownRoot', 'oldFollowActivity', 'oldFollowQuiet']) {
     simulate('follow', `${schedule}Step`, 'invariants', `${schedule}.itf.json`)
   }
   simulate('readstate', 'coalesceStep', 'coalescingSafety', 'read-coalesce.itf.json')
-  for (const schedule of ['retryAfterAccept', 'stealthThenMark']) {
+  for (const schedule of ['retryAfterAccept', 'peekThenMark']) {
     simulate('readstate', `${schedule}Step`, 'invariants', `read-${schedule}.itf.json`)
   }
 }

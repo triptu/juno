@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { closeTab, cycleTab, dividerIndex, endStealth, mountedTabs, noTabs, openTab, parseTabs, type Tabs } from '../src/tabs'
+import { closeTab, cycleTab, dividerIndex, mountedTabs, noTabs, openTab, parseTabs, type Tabs } from '../src/tabs'
 
 const ids = (tabs: Tabs) => tabs.tabs.map((tab) => tab.id)
 
@@ -9,8 +9,8 @@ const three = openTab(openTab(openTab(openTab(noTabs, 'a'), 'b', { newTab: true 
 describe('opening', () => {
   it('the first topic opens a tab; the next ones replace it', () => {
     const one = openTab(noTabs, 'a')
-    expect(one).toEqual({ tabs: [{ id: 'a', stealth: false }], active: 'a', recent: ['a'] })
-    expect(openTab(one, 'b')).toEqual({ tabs: [{ id: 'b', stealth: false }], active: 'b', recent: ['b'] })
+    expect(one).toEqual({ tabs: [{ id: 'a' }], active: 'a', recent: ['a'] })
+    expect(openTab(one, 'b')).toEqual({ tabs: [{ id: 'b' }], active: 'b', recent: ['b'] })
   })
 
   it('a new tab goes right after the current one and becomes active', () => {
@@ -26,12 +26,6 @@ describe('opening', () => {
     expect(openTab(three, 'a', { newTab: true })).toEqual({ ...three, active: 'a', recent: ['a', 'b', 'c'] })
   })
 
-  it('stealth is kept on the tab, and ends with Mark read', () => {
-    const stealth = openTab(three, 'd', { stealth: true })
-    expect(stealth.tabs[1]).toEqual({ id: 'd', stealth: true })
-    expect(endStealth(stealth, 'd').tabs[1]).toEqual({ id: 'd', stealth: false })
-    expect(endStealth(three, 'b')).toBe(three)
-  })
 })
 
 describe('closing', () => {
@@ -77,14 +71,19 @@ describe('the divider', () => {
 })
 
 describe('saved tabs', () => {
-  it('read back as they were saved, stealth included', () => {
-    const saved = { tabs: [{ id: 'a', stealth: false }, { id: 'b', stealth: true }], active: 'b', recent: ['b', 'a'] }
+  it('read back as they were saved', () => {
+    const saved = { tabs: [{ id: 'a' }, { id: 'b' }], active: 'b', recent: ['b', 'a'] }
     expect(parseTabs(JSON.parse(JSON.stringify(saved)))).toEqual(saved)
+  })
+
+  it('tabs saved with the old stealth flag still read back, without it', () => {
+    const saved = { tabs: [{ id: 'a', stealth: false }, { id: 'b', stealth: true }], active: 'b', recent: ['b', 'a'] }
+    expect(parseTabs(saved)).toEqual({ tabs: [{ id: 'a' }, { id: 'b' }], active: 'b', recent: ['b', 'a'] })
   })
 
   it('anything unreadable is no tabs, and a lost active tab falls back to the first', () => {
     expect(parseTabs(null)).toEqual(noTabs)
     expect(parseTabs({ tabs: 'nope' })).toEqual(noTabs)
-    expect(parseTabs({ tabs: [{ id: 'a', stealth: false }], active: 'gone', recent: ['gone'] })).toEqual({ tabs: [{ id: 'a', stealth: false }], active: 'a', recent: ['a'] })
+    expect(parseTabs({ tabs: [{ id: 'a' }], active: 'gone', recent: ['gone'] })).toEqual({ tabs: [{ id: 'a' }], active: 'a', recent: ['a'] })
   })
 })

@@ -20,7 +20,6 @@ describe('topic row menu', () => {
   it('lists the actions from spec section 5 in order', () => {
     expect(labels(topicMenuItems(base))).toEqual([
       'Open in new tab',
-      'Open in stealth',
       '—',
       'Rename',
       'Mark as unread',
@@ -36,7 +35,6 @@ describe('topic row menu', () => {
   it('flips the toggles by state', () => {
     expect(labels(topicMenuItems({ ...base, unread: true, pinned: true, subscribed: false, resolved: true }))).toEqual([
       'Open in new tab',
-      'Open in stealth',
       '—',
       'Rename',
       'Mark as read',
@@ -66,7 +64,6 @@ describe('topic row menu', () => {
   it('carries the hints and ids the shell needs', () => {
     const items = topicMenuItems(base)
     expect(items[0]).toEqual({ type: 'item', id: 'open-new-tab', label: 'Open in new tab', hint: '⌘ click' })
-    expect(items[1]).toEqual({ type: 'item', id: 'open-stealth', label: 'Open in stealth', hint: 'Stays unread' })
   })
 })
 
@@ -75,14 +72,13 @@ describe('channel menu', () => {
     expect(labels(channelMenuItems({ channel: eng, hasMain: true }))).toEqual([
       'Show its topics',
       'Open Main',
-      'Open Main in stealth',
       '—',
       'Mark channel as read',
       'Mark channel as unread',
       '—',
       'Ignore channel',
     ])
-    expect(labels(channelMenuItems({ channel: maya, hasMain: true }))).toEqual(['Show its topics', 'Open Main', 'Open Main in stealth', '—', 'Mark channel as read', 'Mark channel as unread'])
+    expect(labels(channelMenuItems({ channel: maya, hasMain: true }))).toEqual(['Show its topics', 'Open Main', '—', 'Mark channel as read', 'Mark channel as unread'])
     expect(labels(channelMenuItems({ channel: eng, hasMain: false }))).not.toContain('Open Main')
   })
 })

@@ -43,7 +43,6 @@ export {
   closeTab,
   cycleTab,
   dividerIndex,
-  endStealth,
   mountedTabs,
   openTab,
   scrollSnapshotAtom,

@@ -106,9 +106,9 @@ export class SidebarRow {
     await this.win.keyboard.up('Meta')
   }
 
-  /** Right-click, then Open in stealth. */
-  async openInStealth(): Promise<void> {
-    await chooseNextMenuItem(this.win, 'stealth')
+  /** Right-click, then Open in new tab. */
+  async openInNewTabFromMenu(): Promise<void> {
+    await chooseNextMenuItem(this.win, 'new-tab')
     await this.root.click({ button: 'right', position: { x: 40, y: 20 } })
   }
 
@@ -725,26 +725,6 @@ export class TopicPane {
     await this.pill.click()
   }
 
-  /** The stealth pill in the header. */
-  get stealthPill() {
-    return this.header.getByText('Stealth. Not marking as read.')
-  }
-
-  async expectStealth(stealth = true): Promise<void> {
-    await expect(this.stealthPill).toHaveCount(stealth ? 1 : 0)
-  }
-
-  /** The stealth pill's Mark read. */
-  async markRead(): Promise<void> {
-    await this.header.getByRole('button', { name: 'Mark read', exact: true }).click()
-  }
-
-  /** Mark read from the keyboard: focus it and press Enter. */
-  async markReadWithKeyboard(): Promise<void> {
-    await this.header.getByRole('button', { name: 'Mark read', exact: true }).focus()
-    await this.win.keyboard.press('Enter')
-  }
-
   /** The header's Subscribe bell, a toggle (`aria-pressed`). */
   get bell() {
     return this.header.getByRole('button', { name: /subscribe/i })
@@ -897,11 +877,6 @@ export class TabStrip {
 
   async expectActive(title: string): Promise<void> {
     await expect(this.tab(title)).toHaveAttribute('aria-selected', 'true', { timeout: 15_000 })
-  }
-
-  async expectStealth(title: string, stealth = true): Promise<void> {
-    if (stealth) await expect(this.tab(title)).toHaveAttribute('aria-description', 'Stealth')
-    else await expect(this.tab(title)).not.toHaveAttribute('aria-description', 'Stealth')
   }
 
   /** Mouse down on a tab. */

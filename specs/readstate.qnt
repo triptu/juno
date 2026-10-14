@@ -44,7 +44,7 @@ module readProtocol {
     connected: bool, catchup: bool, scan: Set[int], sealed: bool,
     label: str, target: int, marksQueued: int, marksSent: int
   }
-  // The previous state's read view, for `stealthNeverMarks`.
+  // The previous state's read view, for `peekNeverMarks`.
   var before: { local: int -> int, unread: int -> bool, pending: Set[int], marksQueued: int, marksSent: int }
   var remaining: int
 
@@ -89,9 +89,9 @@ module readProtocol {
   action markRead(k: int, upTo: int): bool = localChange(k, if (upTo > s.local.get(k)) upTo else s.local.get(k), false)
   action markUnread(k: int, value: int): bool = localChange(k, value, true)
 
-  // Opening or keeping a topic in stealth changes nothing.
-  action stealth(k: int): bool = all {
-    not(s.sealed), s' = { ...s, label: "stealth", target: k }
+  // Peeking at a topic changes nothing.
+  action peek(k: int): bool = all {
+    not(s.sealed), s' = { ...s, label: "peek", target: k }
   }
 
   // The worker sends the row's current intent and Slack accepts it. Real Slack
@@ -253,12 +253,12 @@ module readProtocol {
   val acceptedUnreadProtected = mirrored.forall(k => (not(s.pending.contains(k)) and s.markAt.get(k) > 0 and
     s.serverAt.get(k) == s.markAt.get(k) and s.gen.get(k) == s.markGen.get(k) and s.markUnread.get(k)) implies
     (s.local.get(k) == s.markValue.get(k) and s.unread.get(k)))
-  val stealthNeverMarks = s.label == "stealth" implies (s.local == before.local and s.unread == before.unread and
+  val peekNeverMarks = s.label == "peek" implies (s.local == before.local and s.unread == before.unread and
     s.pending == before.pending and s.marksQueued == before.marksQueued and s.marksSent == before.marksSent)
   val reachedAgreement = s.sealed and quiet and agreed
   val drainBound = remaining > 0 or reachedAgreement
   val invariants = pendingIntentWins and localUnreadProtected and acceptedMarkKept and acceptedUnreadProtected and
-    quietAgreement and stealthNeverMarks and drainBound
+    quietAgreement and peekNeverMarks and drainBound
 
   action work(fetchGuard: bool, eventGuard: bool): bool = any {
     reconnect, finishCatchup,
@@ -275,7 +275,7 @@ module readProtocol {
     nondet k = topics.oneOf()
     nondet value = Set(0, 1, 2).oneOf()
     any {
-      markRead(k, value), markUnread(k, if (value == 2) 1 else value), officialMark(k, value), stealth(k),
+      markRead(k, value), markUnread(k, if (value == 2) 1 else value), officialMark(k, value), peek(k),
       retry(k), reject(k), disconnect, seal,
       startFetch(k, "page")
     }
@@ -327,23 +327,23 @@ module readProtocol {
     finish
   )
 
-  // Another client marks Main unread; a stealth open shows it and marks
-  // nothing; the stealth pill's Mark read then marks as usual.
-  action stealthThenMarkStep = tick(
+  // Another client marks Main unread; a peek shows it and marks nothing;
+  // opening the topic afterwards marks as usual.
+  action peekThenMarkStep = tick(
     if (s.sealed) progress(true, true) else
     if (s.label == "init") officialMark(1, 0) else
     if (s.label == "officialMark") { nondet e = s.events.oneOf(); deliver(e) } else
-    if (s.label == "deliver" and s.marksQueued == 0) stealth(1) else
-    if (s.label == "stealth") markRead(1, 2) else
+    if (s.label == "deliver" and s.marksQueued == 0) peek(1) else
+    if (s.label == "peek") markRead(1, 2) else
     if (s.label == "localChange") accept(1, true) else
     if (s.label == "accept") respond(1) else
     finish
   )
 
-  // Old rule: opening in stealth queued the ordinary open-and-mark.
-  action stealthBugStep = tick(all {
+  // Bug: a peek that queued the ordinary open-and-mark.
+  action peekBugStep = tick(all {
     s.label == "init",
-    s' = { ...s, local: s.local.set(1, 2), pending: Set(1), marksQueued: s.marksQueued + 1, label: "stealth", target: 1 }
+    s' = { ...s, local: s.local.set(1, 2), pending: Set(1), marksQueued: s.marksQueued + 1, label: "peek", target: 1 }
   })
 
   // An official mark from before Juno's mark arrives after Juno's answer. It

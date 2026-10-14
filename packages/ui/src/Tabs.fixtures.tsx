@@ -1,5 +1,4 @@
 import * as stylex from '@stylexjs/stylex'
-import { EyeSlash } from '@phosphor-icons/react/dist/icons/EyeSlash'
 import { Hash } from '@phosphor-icons/react/dist/icons/Hash'
 import { Lightbulb } from '@phosphor-icons/react/dist/icons/Lightbulb'
 import { ListBullets } from '@phosphor-icons/react/dist/icons/ListBullets'
@@ -77,13 +76,6 @@ export default defineFixtures(
       ),
       'thirty-seven': scene(() => <ThirtySeven />),
       'thirty-seven-narrow': scene(() => <ThirtySeven />, { width: 336 }),
-      stealth: scene(() => (
-        <TabStrip trailing={newTab}>
-          <Tab icon={Hash} label="eng" onClose={() => {}} />
-          <Tab icon={EyeSlash} label="Rina Sato · Staff backend" active onClose={() => {}} />
-          <Tab icon={Lightbulb} label="For you" onClose={() => {}} />
-        </TabStrip>
-      )),
     },
     'With page': {
       'with-page': scene(() => <StripWithPage />, { height: 160 }),
