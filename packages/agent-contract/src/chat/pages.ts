@@ -1,10 +1,10 @@
 /**
  * The pages behind the Juno header menu (plan v3 §13.3): Scheduled, What
  * Juno remembers, Memory of this chat, Activity, Connections and Settings ›
- * Juno. Rows only; the containers wire the edits.
+ * Juno, plus the recovery review. Rows only; the containers wire the edits.
  */
 import { Schema } from 'effect'
-import { Deliver } from './cards'
+import { Card, Deliver } from './cards'
 import { ChatMessageId, ConnectionId, JobId, PinId, RunId, ScheduleId } from './ids'
 
 /* Scheduled ---------------------------------------------------------------- */
@@ -34,6 +34,8 @@ export const PinRow = Schema.Struct({
   /** A pin from the owner's own words points at the message it came from. An edited pin has no source. */
   source: Schema.optionalKey(Schema.Struct({ messageId: ChatMessageId, at: Schema.Number })),
   at: Schema.Number,
+  /** The pin changed under an open edit: "This changed. Check it and save again." */
+  changed: Schema.optionalKey(Schema.Literal(true)),
 })
 export type PinRow = typeof PinRow.Type
 
@@ -76,13 +78,16 @@ export const ActivityAction = Schema.Struct({
 })
 export type ActivityAction = typeof ActivityAction.Type
 
+/** How a run ended, printed from `chatCopy.pages.activity.outcome`. */
+export const RunOutcome = Schema.Literals(['replied', 'stopped', 'interrupted', 'blocked', 'failed', 'stayedQuiet'])
+export type RunOutcome = typeof RunOutcome.Type
+
 export const ActivityRun = Schema.Struct({
   id: RunId,
   /** Who asked: "You", a schedule's name, a job's title. */
   who: Schema.String,
   at: Schema.Number,
-  /** "Replied", "Stopped", "Interrupted", "Stayed quiet", "Blocked". */
-  outcome: Schema.String,
+  outcome: RunOutcome,
   actions: Schema.Array(ActivityAction),
   /** The folded read line: "Read 3 topics, looked back 4 times". */
   reads: Schema.optionalKey(Schema.String),
@@ -112,6 +117,18 @@ export const DiscoveredTool = Schema.Struct({
 })
 export type DiscoveredTool = typeof DiscoveredTool.Type
 
+/**
+ * The T3 Code address settings (plan v3 §10.2). Only the T3 row carries
+ * them. `allowNetwork` is off by default; a non-loopback address is used
+ * only when it is on and the address is `https:`, because the sign-in
+ * refuses plain `http:` off loopback (spikes, finding 1).
+ */
+export const T3Address = Schema.Struct({
+  url: Schema.String,
+  allowNetwork: Schema.Boolean,
+})
+export type T3Address = typeof T3Address.Type
+
 export const ConnectionRow = Schema.Struct({
   id: ConnectionId,
   label: Schema.String,
@@ -120,6 +137,8 @@ export const ConnectionRow = Schema.Struct({
   detail: Schema.optionalKey(Schema.String),
   /** The address in use, shown for T3 Code. */
   address: Schema.optionalKey(Schema.String),
+  /** Editable address settings; T3 Code only. */
+  t3: Schema.optionalKey(T3Address),
   tools: Schema.Array(DiscoveredTool),
   enabled: Schema.Boolean,
 })
@@ -127,6 +146,20 @@ export type ConnectionRow = typeof ConnectionRow.Type
 
 export const ConnectionsPage = Schema.Struct({ connections: Schema.Array(ConnectionRow) })
 export type ConnectionsPage = typeof ConnectionsPage.Type
+
+/* Review (recovery) --------------------------------------------------------- */
+
+/**
+ * The page behind the recovery banner's Review (plan v3 §14.3). Every
+ * pending card is `open` with `mayHaveHappened`. Activate ends recovery;
+ * cards still open are then expired.
+ */
+export const ReviewPage = Schema.Struct({
+  /** When the backup Juno restored from was taken. */
+  backupAt: Schema.Number,
+  pending: Schema.Array(Card),
+})
+export type ReviewPage = typeof ReviewPage.Type
 
 /* Settings › Juno ---------------------------------------------------------- */
 
@@ -142,6 +175,18 @@ export const ModelChoice = Schema.Struct({
 })
 export type ModelChoice = typeof ModelChoice.Type
 
+/**
+ * Who owns Juno's state (plan v3 §14.1). `active` is this Mac. `released`
+ * is after "Move to another Mac": this Mac is read-only until the other one
+ * takes over. `recovery` is after a restore, until Activate.
+ */
+export const Ownership = Schema.Union([
+  Schema.TaggedStruct('active', { epoch: Schema.Int }),
+  Schema.TaggedStruct('released', { epoch: Schema.Int }),
+  Schema.TaggedStruct('recovery', { pending: Schema.Int }),
+])
+export type Ownership = typeof Ownership.Type
+
 export const JunoSettingsPage = Schema.Struct({
   chatModels: Schema.Array(ModelChoice),
   compactionModels: Schema.Array(ModelChoice),
@@ -153,12 +198,16 @@ export const JunoSettingsPage = Schema.Struct({
     Schema.TaggedStruct('signedOut', {}),
     Schema.TaggedStruct('ready', { version: Schema.String }),
   ]),
-  openRouterKey: Schema.Literals(['missing', 'set']),
+  /** `rejected`: the provider refused the key on the last call. */
+  openRouterKey: Schema.Literals(['missing', 'set', 'rejected']),
   /** The owner's rules, one line each. They can only tighten tiers. */
   rules: Schema.Array(Schema.Struct({ id: Schema.String, text: Schema.String })),
   paused: Schema.Boolean,
   backupFolder: Schema.String,
   lastBackupAt: Schema.optionalKey(Schema.Number),
+  ownership: Ownership,
+  /** When the recovery phrase was last exported. Absent until the owner exports it. */
+  recoveryPhraseExportedAt: Schema.optionalKey(Schema.Number),
   /** "Removal pending: 1 copy in a running job", with the job to stop. */
   removalPending: Schema.optionalKey(Schema.Struct({ copies: Schema.Int, jobId: JobId })),
 })

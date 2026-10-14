@@ -1,12 +1,12 @@
 # @juno/agent-contract
 
-Juno Agent's wire. Schemas only, no logic.
+Juno Agent's wire. Schemas, plus two pure rules the chat shares (`isOpenableUrl`, `sendMessageStatus`). Nothing else is logic.
 
 | Folder | Owner | Holds |
 | --- | --- | --- |
 | `src/host/` | WP6 (Astra), seeded by WP1 | The AgentHost port: what the host app serves the agent (`AgentHostRpcs`, today only `host.hello`), and the parentPort messages between main and the agent process (`MainToAgent`, `AgentToMain`) |
 | `src/rpc/` | WP6 (Astra) | The RPC groups the agent serves to the renderer |
-| `src/chat/` | WP7 (Fable) | The chat as the renderer draws it: items, delivery and ending states, card view models, the page and its banner, the header-menu pages, and the fixed copy |
+| `src/chat/` | WP7 (Fable) | The chat as the renderer draws it: items, delivery and ending states, card view models, the page and its banner, the header-menu pages, the recovery review, and the fixed copy |
 
 The agent is the client of `AgentHostRpcs` and the host serves it, over a port main brokers between the two utility processes (ADR 0012). `AGENT_HOST_PROTOCOL` goes up when a change breaks an older agent or host; the agent checks it on `host.hello`.
 
@@ -16,20 +16,22 @@ View-shaped types for the Juno chat (SPEC "Juno Agent", plan v3 §12 and §13). 
 
 | File | Holds |
 | --- | --- |
-| `ids.ts` | Branded ids the views hand back: `ChatMessageId`, `OpId`, `CardId`, `JobId`, `ScheduleId`, `RunId`, `PinId`, `ConnectionId` |
-| `place.ts` | `Place` (a Slack place for a context pill), `TopicLink`, `OpenTarget` (what "Open" opens) |
-| `items.ts` | `ChatItem`: one row of the list. `owner` and `juno` bubbles with `GroupPosition`, the one `status` bubble, `note` lines, `groupLabel` over a proactive group, `day` and `newDivider` separators. `Delivery` (sending, sent, queued, failed) and `Ending` (complete, stopped, interrupted, blocked) are the per-message state machines; `Origin` says what started a run |
-| `cards.ts` | `Card`: the catalogue (`sendMessage`, `resolve`, `topics`, `task`, `question`, `schedule`, `connect`, `change`, `remove`, `budget`, `provider`, plus `unknown` for a kind this build lacks). `CardStatus` is the one status machine every kind shares: open, working, done, dismissed, expired, failed, unknown, with the after-line carried as text |
-| `page.ts` | `ChatPage` (items, the exclusive `Banner`: none, paused, aiOff, offline, recovery, otherDevice) and `ChatSummary` (unread count, busy, the job line the sidebar and home show) |
-| `pages.ts` | The header-menu pages: `ScheduledPage`, `RemembersPage`, `MemoryPage`, `ActivityPage`, `ConnectionsPage`, `JunoSettingsPage` |
-| `copy.ts` | `chatCopy`: the fixed strings of plan v3 §13.2 and the card buttons, so views, fixtures and the e2e driver print the same words |
+| `ids.ts` | Branded ids the views hand back: `ChatMessageId`, `OpId`, `CardId`, `ProposedMessageId`, `QuestionOptionId`, `JobId`, `ScheduleId`, `RunId`, `PinId`, `ConnectionId` |
+| `place.ts` | `Place` (a Slack place for a context pill), `TopicLink`, `JobRef`, `OpenTarget` (what "Open" opens; a `url` is `https:` anywhere or `http:` on loopback, checked by `isOpenableUrl` at decode time), `JunoPage` |
+| `items.ts` | `ChatItem`: one row of the list. `owner` bubbles keyed by `opId` (the archive `id` arrives later), `juno` bubbles with `GroupPosition`, the one `status` bubble, `note` lines, `groupLabel` over a proactive group, `day` and `newDivider` separators. `Delivery` (sending, sent, queued, waiting, failed) and `Ending` (complete, stopped, interrupted, blocked, failed) are the per-message state machines; `Origin` says what started a run. `RemoveSheet` is the owner's local Remove |
+| `cards.ts` | `Card`: the catalogue (`sendMessage`, `resolve`, `topics`, `proposedTask`, `task`, `question`, `proposedSchedule`, `schedule`, `connect`, `change`, `remove`, `budget`, `provider`, plus `unknown` for a kind this build lacks). `CardStatus` is the one status machine every kind but `task` shares: open, working, done, dismissed, expired, failed, unknown, with the after-line carried as text. `task` has `JobPhase` instead. `sendMessageStatus` derives a Send card's status from its rows |
+| `page.ts` | `ChatPage` (items, `moreAbove` and `moreBelow`, the `Banner` picked by precedence: otherDevice, updateNeeded, recovery, aiOff, paused, offline) and `ChatSummary` (unread count, busy while a job runs, the job line the sidebar and home show) |
+| `pages.ts` | The header-menu pages: `ScheduledPage`, `RemembersPage`, `MemoryPage`, `ActivityPage`, `ConnectionsPage` (with the T3 address settings), `ReviewPage` (recovery), `JunoSettingsPage` (with `Ownership`) |
+| `copy.ts` | `chatCopy`: every fixed string the chat prints: plan v3 §13.2 states, ending and failure lines, banner chips and lines, card buttons and after-lines, the Remove sheet, the pages. The model never writes any of them |
 
 Rules of the shape:
 
-- Lines the owner reads after an action ("Resolved 3", "Not sent") travel as text in the status. Views print; they never compose outcome copy.
-- Exclusive states are unions, not booleans: `Banner`, `Delivery`, `Ending`, `CardStatus`, `JobPhase`.
+- Lines the owner reads after an action ("Resolved 3", "Not sent") travel as text in the status. Views print; they never compose outcome copy. Failure and ending lines are fixed copy, so a run that wrote nothing still ends with a line.
+- Exclusive states are unions, not booleans: `Banner`, `Delivery`, `Ending`, `CardStatus`, `JobPhase`, `Asker`, `Ownership`.
+- A proposal and the thing it becomes are different kinds (`proposedTask` and `task`, `proposedSchedule` and `schedule`), so one card never carries two machines.
 - Group position is precomputed per item so a virtualised row renders without its neighbours.
 - A `change` card's field preview is rendered from the stored payload by the agent, never by the model.
+- `test/chat.test.ts` covers the two rules through the package's public API.
 
 `effect/rpc` may be imported here (`scripts/check-deps.mjs`, the effect skill).
 

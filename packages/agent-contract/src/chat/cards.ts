@@ -6,13 +6,14 @@
  * a `change` card's field preview from the stored payload before it reaches
  * the renderer, so a model-written summary can never stand in for it.
  *
- * Every card has one `status`. The kinds differ only in what they show and
- * which buttons they offer. The model cannot invent a kind: an id the
- * renderer does not know arrives as `unknown` and renders one line.
+ * Every card but `task` has one `status`. The kinds differ only in what
+ * they show and which buttons they offer. The model cannot invent a kind:
+ * an id the renderer does not know arrives as `unknown` and renders one
+ * line.
  */
 import { Schema } from 'effect'
-import { CardId, ChatMessageId, JobId, ScheduleId } from './ids'
-import { OpenTarget, Place, TopicLink } from './place'
+import { CardId, ChatMessageId, JobId, ProposedMessageId, QuestionOptionId, ScheduleId } from './ids'
+import { JobRef, OpenTarget, Place, TopicLink } from './place'
 
 /**
  * Where a card is in its life. One machine for every kind:
@@ -24,10 +25,12 @@ import { OpenTarget, Place, TopicLink } from './place'
  * ("Resolved 3", "Not sent", "Juno can't tell whether this was sent"), so
  * the view prints it and never composes it. `unknown` is an action whose
  * outcome the agent cannot prove either way (plan v3 §6.3); its retry says
- * it may duplicate.
+ * it may duplicate. An `open` card restored from a backup (plan v3 §14.3)
+ * carries `mayHaveHappened`: the buttons stay and the card says "This may
+ * already have happened." above them.
  */
 export const CardStatus = Schema.Union([
-  Schema.TaggedStruct('open', {}),
+  Schema.TaggedStruct('open', { mayHaveHappened: Schema.optionalKey(Schema.Literal(true)) }),
   /** The click landed; buttons are disabled until the outcome arrives. */
   Schema.TaggedStruct('working', {}),
   Schema.TaggedStruct('done', {
@@ -64,31 +67,56 @@ const base = {
   because: Schema.optionalKey(Schema.String),
 }
 
+/**
+ * One row's outcome on a Send message card. Every row starts `pending`;
+ * Send moves them all to `sending`, and each settles on its own.
+ */
+export const SendResult = Schema.Union([
+  Schema.TaggedStruct('pending', {}),
+  Schema.TaggedStruct('sending', {}),
+  Schema.TaggedStruct('sent', { open: OpenTarget }),
+  Schema.TaggedStruct('notSent', {}),
+  /** The send may have landed. "Check channel" or "Send again". */
+  Schema.TaggedStruct('unknown', { check: OpenTarget }),
+])
+export type SendResult = typeof SendResult.Type
+
 /** One proposed Slack message. The text is editable until Send. */
 export const ProposedMessage = Schema.Struct({
-  id: Schema.String,
+  id: ProposedMessageId,
   target: Place,
   /** Set when the message replies inside a thread: "in {topic title}". */
   inTopic: Schema.optionalKey(TopicLink),
   text: Schema.String,
-  /** Per row, after Send. Rows without one are still pending. */
-  result: Schema.optionalKey(
-    Schema.Union([
-      Schema.TaggedStruct('sent', { open: OpenTarget }),
-      Schema.TaggedStruct('notSent', {}),
-      /** The send may have landed. "Check channel" or "Send again". */
-      Schema.TaggedStruct('unknown', { check: OpenTarget }),
-    ]),
-  ),
+  result: SendResult,
 })
 export type ProposedMessage = typeof ProposedMessage.Type
 
 export const SendMessageCard = Schema.TaggedStruct('sendMessage', {
   ...base,
-  /** One to five messages. One Send sends them all; results are per row. */
+  /**
+   * One to five messages. One Send sends them all; results are per row, and
+   * the card's `status` after Send follows them (`sendMessageStatus`).
+   */
   messages: Schema.Array(ProposedMessage).check(Schema.isMinLength(1), Schema.isMaxLength(5)),
 })
 export type SendMessageCard = typeof SendMessageCard.Type
+
+/**
+ * The card status a Send message card takes after Send, from its rows.
+ * `working` while any row is unresolved. Then `done` with a count when at
+ * least one row was sent, `unknown` when none was and one may have been,
+ * and `failed` with a retry when none was.
+ */
+export const sendMessageStatus = (messages: ReadonlyArray<ProposedMessage>): CardStatus => {
+  const results = messages.map((m) => m.result._tag)
+  if (results.some((r) => r === 'pending' || r === 'sending')) return { _tag: 'working' }
+  const sent = results.filter((r) => r === 'sent').length
+  if (sent === messages.length) return { _tag: 'done', line: sent === 1 ? 'Sent' : `Sent ${sent}` }
+  if (sent > 0) return { _tag: 'done', line: `Sent ${sent} of ${messages.length}` }
+  if (results.includes('unknown')) return { _tag: 'unknown', line: "Juno can't tell whether this was sent." }
+  return { _tag: 'failed', line: 'Not sent', retry: true }
+}
 
 export const ResolveCard = Schema.TaggedStruct('resolve', {
   ...base,
@@ -108,13 +136,28 @@ export const JobKind = Schema.Literals(['t3', 'subagent'])
 export type JobKind = typeof JobKind.Type
 
 /**
- * A job's phase, for the card's state line and buttons. The line itself is
- * written by the agent ("Tests running, 2 of 5") and changes at most every
- * 2 s.
+ * A job proposed from a tainted run (plan v3 §6.4). It has no job yet: the
+ * owner's Start click mints the grant and starts it, and the card's
+ * `status` is that click's machine ("Started", or a failure). Once the job
+ * exists a `task` card follows under Juno's next message.
+ */
+export const ProposedTaskCard = Schema.TaggedStruct('proposedTask', {
+  ...base,
+  kind: JobKind,
+  /** The task in the owner's words: "Fix the sidebar flake". */
+  title: Schema.String,
+  /** Where it would run: a project or worktree name, or the subagent's model. */
+  where: Schema.String,
+})
+export type ProposedTaskCard = typeof ProposedTaskCard.Type
+
+/**
+ * A job's phase, for the card's state line and buttons. The live line
+ * itself is written by the agent ("Tests running, 2 of 5") and changes at
+ * most every 2 s; the settled phases print fixed copy from
+ * `chatCopy.card.task`.
  */
 export const JobPhase = Schema.Literals([
-  /** Proposed from a tainted run: the card offers Start. */
-  'proposed',
   'running',
   /** T3 asked something; a `question` card follows. */
   'needsYou',
@@ -126,11 +169,19 @@ export const JobPhase = Schema.Literals([
   'failed',
   'stopping',
   'stopped',
+  /** Juno cannot tell whether the job started or still runs (plan v3 §6.5). */
+  'unknown',
 ])
 export type JobPhase = typeof JobPhase.Type
 
+/**
+ * A running or settled job. It is the one card without `status`: a job is
+ * not a click waiting for an outcome, and `phase` is its only machine.
+ * Stop is the only way to end a job (plan v3 B5).
+ */
 export const TaskCard = Schema.TaggedStruct('task', {
-  ...base,
+  id: CardId,
+  because: Schema.optionalKey(Schema.String),
   jobId: JobId,
   kind: JobKind,
   /** The task in the owner's words: "Fix the sidebar flake". */
@@ -138,22 +189,23 @@ export const TaskCard = Schema.TaggedStruct('task', {
   /** Where it runs: a project or worktree name, or the subagent's model. */
   where: Schema.String,
   phase: JobPhase,
-  /** The live state line under the title. */
-  state: Schema.String,
-  /** Open the thread or the PR. */
+  /** The live state line under the title, while `running`, `needsYou` or `stopping`. */
+  state: Schema.optionalKey(Schema.String),
+  /** Open the thread, or the PR once there is one. */
   open: Schema.optionalKey(OpenTarget),
 })
 export type TaskCard = typeof TaskCard.Type
 
-export const QuestionOption = Schema.Struct({ id: Schema.String, label: Schema.String })
+export const QuestionOption = Schema.Struct({ id: QuestionOptionId, label: Schema.String })
 export type QuestionOption = typeof QuestionOption.Type
+
+/** Who asks, as the header reads: "Juno asks", or "T3 Code asks" with the job's pill. */
+export const Asker = Schema.Union([Schema.TaggedStruct('juno', {}), Schema.TaggedStruct('t3', { job: JobRef })])
+export type Asker = typeof Asker.Type
 
 export const QuestionCard = Schema.TaggedStruct('question', {
   ...base,
-  /** Who asks, as the header reads: "Juno asks", "T3 Code asks". */
-  source: Schema.Literals(['juno', 't3']),
-  /** The job's title in a pill when `source` is `t3`. */
-  job: Schema.optionalKey(Schema.Struct({ jobId: JobId, title: Schema.String })),
+  asks: Asker,
   prompt: Schema.String,
   options: Schema.Array(QuestionOption).check(Schema.isMinLength(2), Schema.isMaxLength(4)),
   /** Also take a typed reply. */
@@ -165,17 +217,23 @@ export type QuestionCard = typeof QuestionCard.Type
 export const Deliver = Schema.Literals(['now', 'digest', 'silent'])
 export type Deliver = typeof Deliver.Type
 
-export const ScheduleCard = Schema.TaggedStruct('schedule', {
-  ...base,
-  scheduleId: ScheduleId,
+const scheduleFields = {
   /** What Juno will do, in its words: "Catch you up on #eng". */
   what: Schema.String,
   /** When, in words: "Weekdays at 9:00", "Once, 3 Nov at 14:00". */
   when: Schema.String,
   deliver: Deliver,
-  /** `proposed` from a tainted run offers Start; `active` offers Keep. */
-  state: Schema.Literals(['proposed', 'active', 'paused']),
-})
+}
+
+/** A schedule proposed from a tainted run. Start creates it; `status` is that click. */
+export const ProposedScheduleCard = Schema.TaggedStruct('proposedSchedule', { ...base, ...scheduleFields })
+export type ProposedScheduleCard = typeof ProposedScheduleCard.Type
+
+/**
+ * A schedule Juno created from a clean run. Keep, Pause and Delete each
+ * settle `status` with a fixed line ("Kept", "Paused", "Deleted").
+ */
+export const ScheduleCard = Schema.TaggedStruct('schedule', { ...base, ...scheduleFields, scheduleId: ScheduleId })
 export type ScheduleCard = typeof ScheduleCard.Type
 
 export const ConnectCard = Schema.TaggedStruct('connect', {
@@ -209,6 +267,10 @@ export const ChangeCard = Schema.TaggedStruct('change', {
 })
 export type ChangeCard = typeof ChangeCard.Type
 
+/**
+ * A removal Juno proposes ("forget what I said about the offsite"). The
+ * owner's own Remove is the local sheet (`RemoveSheet`), never a card.
+ */
 export const RemoveCard = Schema.TaggedStruct('remove', {
   ...base,
   messages: Schema.Array(
@@ -231,6 +293,7 @@ export const BudgetCard = Schema.TaggedStruct('budget', {
 })
 export type BudgetCard = typeof BudgetCard.Type
 
+/** The provider disclosure is fixed copy (`chatCopy.card.provider.disclosure`), shown on every provider card. */
 export const ProviderCard = Schema.TaggedStruct('provider', {
   ...base,
   options: Schema.Array(
@@ -241,8 +304,6 @@ export const ProviderCard = Schema.TaggedStruct('provider', {
       note: Schema.String,
     }),
   ),
-  /** Shown once: Juno sends its memory of the chat to the chosen provider each turn. */
-  disclosure: Schema.optionalKey(Schema.String),
 })
 export type ProviderCard = typeof ProviderCard.Type
 
@@ -254,8 +315,10 @@ export const Card = Schema.Union([
   SendMessageCard,
   ResolveCard,
   TopicsCard,
+  ProposedTaskCard,
   TaskCard,
   QuestionCard,
+  ProposedScheduleCard,
   ScheduleCard,
   ConnectCard,
   ChangeCard,

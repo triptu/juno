@@ -5,18 +5,25 @@ import { Schema } from 'effect'
 import { ChatItem } from './items'
 
 /**
- * The one thing the chat header can say about Juno as a whole. These are
- * exclusive, so one union and not five booleans. Each has fixed copy in
- * `chatCopy.banner`. `none` is the common case.
+ * The one thing the chat header can say about Juno as a whole. The
+ * conditions are not exclusive (paused and offline can both hold), so the
+ * container picks one by precedence, highest first:
  *
- * - `paused`: the owner paused Juno. The composer works and sends queue
- *   until Resume.
- * - `aiOff`: AI assist is off in Settings. The composer is disabled.
- * - `offline`: no network. The composer works; a send that needs the
- *   network ends as Not delivered.
- * - `recovery`: restored from backup. Juno will not act until pending
- *   actions are reviewed.
+ *   otherDevice > updateNeeded > recovery > aiOff > paused > offline > none
+ *
+ * Each has `chip` and `line` copy in `chatCopy.banner`. `none` is the
+ * common case.
+ *
  * - `otherDevice`: another Mac owns Juno. The chat is read-only.
+ * - `updateNeeded`: the journal is newer than this build (plan v3 §3 step
+ *   6). Nothing runs until Juno is updated; the composer is disabled.
+ * - `recovery`: restored from backup. The composer works and sends wait
+ *   for the review; Review opens the `review` page.
+ * - `aiOff`: AI assist is off in Settings. The composer is disabled.
+ * - `paused`: the owner paused Juno. The composer works and sends wait
+ *   until Resume.
+ * - `offline`: no network. The composer works; a send that needs the
+ *   network waits.
  */
 export const Banner = Schema.Union([
   Schema.TaggedStruct('none', {}),
@@ -24,6 +31,7 @@ export const Banner = Schema.Union([
   Schema.TaggedStruct('aiOff', {}),
   Schema.TaggedStruct('offline', {}),
   Schema.TaggedStruct('recovery', { pending: Schema.Int }),
+  Schema.TaggedStruct('updateNeeded', {}),
   Schema.TaggedStruct('otherDevice', { deviceName: Schema.String }),
 ])
 export type Banner = typeof Banner.Type
@@ -32,10 +40,12 @@ export const ChatPage = Schema.Struct({
   items: Schema.Array(ChatItem),
   banner: Banner,
   /**
-   * There are more items above the window. The list asks for them when the
-   * owner scrolls up; a 5,000-message chat is never sent whole.
+   * There are more items outside the window. The list asks for them when
+   * the owner scrolls towards an edge; a 5,000-message chat is never sent
+   * whole, and a window opened at the "New" divider has items on both sides.
    */
   moreAbove: Schema.Boolean,
+  moreBelow: Schema.Boolean,
   /** The composer's draft is the renderer's. This is only whether it takes input. */
   composerEnabled: Schema.Boolean,
 })
@@ -48,7 +58,7 @@ export type ChatPage = typeof ChatPage.Type
 export const ChatSummary = Schema.Struct({
   /** Unread Juno messages. A soft grey count, never an accent badge. */
   unread: Schema.Int,
-  /** A run or a background job is active: the duotone sparkle. */
+  /** A background job is running: the duotone sparkle. A run alone does not light it (SPEC §13.2). */
   busy: Schema.Boolean,
   /**
    * The newest running job's state line ("T3 Code · tests running, 2 of 5").
