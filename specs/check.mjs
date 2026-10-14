@@ -164,8 +164,8 @@ if (!boundedOnly) {
     ['lateRequest', 'redactionExcludesReads'],
     ['overflow', 'requestBounded'],
     ['overlap', 'requestCoverageDeclared'],
-    ['fastCompactor', 'requestCoverageDeclared'],
-    ['editedJob', 'nodeInputsCurrent'],
+    ['fastCompactor', 'viewWithinCutoff'],
+    ['editedRequest', 'mandatoryPinsIncluded'],
     ['casRace', 'viewCAS'],
     ['atomicPublish', 'viewReferencesValid'],
     ['restart', 'restartPreservesHead'],
@@ -181,6 +181,9 @@ if (!boundedOnly) {
     ['siblings', 'viewPartition', 'siblingInit'],
     ['compactionPins', 'pinsSurviveCompaction', 'pinnedInit'],
     ['queueCurrent', 'pendingWorkRecoverable'],
+    ['localTaint', 'taintLocal'],
+    ['doubleEdit', 'pinEditCurrent'],
+    ['oversizeParent', 'nodeBounded'],
   ]
   simulate('agent-memory', 'suiteStep', 'invariants', 'memory-corrected.itf.json', false, true,
     { ...memoryOptions, init: 'suiteInit', samples: 512, steps: 80,
@@ -209,7 +212,7 @@ if (!tracesOnly) {
   // Quint downloads Apalache on the first `verify` when it is missing.
   if (!javaPath) {
     console.log('Mode: randomized simulator only (Java unavailable).')
-    console.log(`Seed ${seed}; memory: 1000 random samples and all 25 corrected witnesses (unless --bounded).`)
+    console.log(`Seed ${seed}; memory: 1000 random samples and all 28 corrected witnesses (unless --bounded).`)
     console.log('Temporal formulas are typechecked only. Drain bounds: follow 64, read 48, memory 64.')
   } else {
     if (!memoryOnly) {

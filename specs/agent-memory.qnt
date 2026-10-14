@@ -12,12 +12,12 @@ module memoryProtocol {
   type Key = { a: int, w: int }
   type Ref = { a: int, w: int, v: int }
   type Pin = { id: int, v: int, source: int, from: int, to: int, text: int, owner: bool }
-  type Node = { ref: Ref, sources: Set[int], inputs: Set[Ref], pins: Set[Pin],
-    deps: Set[int], read: Set[int], words: Set[int], bytes: int, gen: int }
+  type Node = { ref: Ref, sources: Set[int], inputs: Set[Ref], context: Set[int],
+    deps: Set[int], read: Set[int], words: Set[int], bytes: int, cut: bool, gen: int }
   type Line = { ref: Ref, masked: bool }
   type Head = { rev: int, gen: int, covered: int, lines: List[Line] }
-  type Job = { node: Node, rev: int, pinRev: int, ready: bool, attempts: int, shortest: int,
-    context: Set[Ref], contextBytes: int, inputBytes: int }
+  type Job = { node: Node, rev: int, ready: bool, attempts: int, shortest: int,
+    context: Set[int], contextBytes: int, inputBytes: int }
   type Item = { id: int, text: int, kind: int, pair: int, meta: int }
   type Request = { head: Head, pins: Set[Pin], pinRev: int, cutoff: int, h: int,
     tail: Set[int], active: Set[int], omitted: Set[int], items: List[Item],
@@ -100,64 +100,79 @@ module memoryProtocol {
     s' = { ...s, n: s.n + 1, log: s.log.set(s.n, original(s.n)),
       queue: s.queue.union(nodeKeys.filter(k => k.a + k.w == s.n + 1)), label: "project" } }
 
-  // Nearest clean lines before the interval, newest first. Stop before a line
-  // that does not fit; do not skip it to pick a more distant line.
-  def context(k: Key): Set[Ref] = {
+  // Raw archive sources only, newest first, including tail framing.
+  def context(k: Key): Set[int] = {
+    val selected = 0.range(capacity).select(i => i < k.a).foldl(List(), (acc, i) => List(i).concat(acc))
+      .foldl({ refs: Set(), size: 0, full: false }, (acc, i) =>
+        if (s.removed.contains(i) or acc.full) acc else
+        if (acc.size + s.sizes.get(i) + 64 > 16384) { ...acc, full: true } else
+        { refs: acc.refs.union(Set(i)), size: acc.size + s.sizes.get(i) + 64, full: false })
+    selected.refs
+  }
+  // Deliberately broken old design: a bounded window of summaries chains reads.
+  def summaryContext(k: Key): Set[int] = {
     val selected = s.head.lines.reverseLines().foldl({ refs: Set(), size: 0, full: false }, (acc, l) =>
       if (l.masked or l.ref.a + l.ref.w > k.a or acc.full) acc else
       if (acc.size + bytes(Set(l.ref)) > 16384) { ...acc, full: true } else
       { refs: acc.refs.union(Set(l.ref)), size: acc.size + bytes(Set(l.ref)), full: false })
-    selected.refs
+    deps(selected.refs)
   }
-  def fresh(j: Job): bool = j.node.gen == s.gen and j.pinRev == s.pinRev and
+  def fresh(j: Job): bool = j.node.gen == s.gen and j.node.context.intersect(s.removed) == Set() and
     j.node.sources.intersect(s.removed) == Set() and
     j.node.inputs.forall(r => stored(r).exists(n => clean(n))) and
     current(key(j.node.ref)) == Set()
 
-  action startWith(k: Key, recordContext: bool): bool = {
+  def withinCutoff(k: Key): bool = not(s.running) or k.a + k.w <= s.h
+  action startWith(k: Key, recordContext: bool, raw: bool, ceiling: bool): bool = {
     val child = children(k)
-    val ctx = context(k)
+    val ctx = if (raw) context(k) else summaryContext(k)
     val source = if (k.w == 1) Set(k.a).exclude(s.removed) else Set()
     val input = if (k.w == 1) (if (source == Set()) 0 else s.sizes.get(k.a)) else bytes(child)
-    val allDeps = source.union(deps(child.union(ctx))).union(s.pins.map(p => p.source))
-    val recorded = child.union(if (recordContext) ctx else Set())
+    val allDeps = source.union(deps(child)).union(ctx)
+    val recorded = if (recordContext) ctx else Set()
     val version = s.gen + 1
-    val node: Node = { ref: { a: k.a, w: k.w, v: version }, sources: source, inputs: recorded,
-      pins: s.pins, deps: source.union(deps(recorded)).union(s.pins.map(p => p.source)),
-      read: allDeps, words: Set(), bytes: 0, gen: s.gen }
-    val job: Job = { node: node, rev: s.head.rev, pinRev: s.pinRev, ready: false,
-      attempts: 0, shortest: 1000000, context: ctx, contextBytes: bytes(ctx), inputBytes: input }
+    val node: Node = { ref: { a: k.a, w: k.w, v: version }, sources: source, inputs: child,
+      context: recorded, deps: source.union(deps(child)).union(recorded),
+      read: allDeps, words: Set(), bytes: 0, cut: false, gen: s.gen }
+    val job: Job = { node: node, rev: s.head.rev, ready: false,
+      attempts: 0, shortest: 1000000, context: ctx, contextBytes: if (raw) ctx.fold(0, (v, i) => v + s.sizes.get(i) + 64) else 16384, inputBytes: input }
     all {
       s.queue.contains(k), available(k), current(k) == Set(),
+      not(ceiling) or withinCutoff(k),
       not(s.jobs.exists(j => key(j.node.ref) == k)), s.jobs.size() < workers,
       s.clock >= s.due.get(k), input <= 32768,
       k.w > 1 or needed.filter(x => x.w == 1 and x.a < k.a).size() < workers,
-      // Fixed text/framing + pins + window + input + output reserve.
-      2048 + 16384 + pinBytes(s.pins) + bytes(ctx) + input <= 65536,
+      // Fixed text/framing + raw context + input + output reserve.
+      2048 + 16384 + job.contextBytes + input <= 131072,
       s' = { ...s, jobs: s.jobs.union(Set(job)), sent: s.sent + 1,
-        sentCost: 2048 + 16384 + pinBytes(s.pins) + bytes(ctx) + input,
-        sentWindow: 65536, stampUsed: true, target: k, label: "start" }
+        sentCost: 2048 + 16384 + job.contextBytes + input,
+        sentWindow: 131072, stampUsed: true, target: k, label: "start" }
     }
   }
-  action start(k: Key): bool = startWith(k, true)
+  action start(k: Key): bool = startWith(k, true, true, true)
 
   // An LLM can omit every fact, copy any read source, invent (-1), return an
   // oversized answer, or failJob. No invariant assumes semantic fidelity.
-  action complete(j: Job, answerSize: int, output: Set[int]): bool = all {
+  action completeWith(j: Job, answerSize: int, output: Set[int], cap: bool): bool = all {
     s.jobs.contains(j), not(j.ready), j.attempts == 0 or fresh(j), output.subseteq(j.node.read.union(Set(-1))),
     val shortest = if (answerSize < j.shortest) answerSize else j.shortest
     val answer = if (answerSize < j.shortest) output else j.node.words
+    val ready = shortest <= 512 or j.attempts == 4
+    val oversized = ready and shortest > 16384 and cap
+    val leaf = j.node.ref.w == 1
     s' = { ...s,
       // A shortening attempt reuses the bounded original input, not an
       // accumulated transcript. Revalidate before each additional call.
       sent: s.sent + (if (j.attempts > 0) 1 else 0),
-      sentCost: if (j.attempts > 0) 2048 + 16384 + pinBytes(j.node.pins) + j.contextBytes + j.inputBytes else s.sentCost,
-      sentWindow: if (j.attempts > 0) 65536 else s.sentWindow,
+      sentCost: if (j.attempts > 0) 2048 + 16384 + j.contextBytes + j.inputBytes else s.sentCost,
+      sentWindow: if (j.attempts > 0) 131072 else s.sentWindow,
       stampUsed: if (j.attempts > 0) fresh(j) else s.stampUsed,
       jobs: s.jobs.exclude(Set(j)).union(Set({ ...j,
-      ready: shortest <= 512 or j.attempts == 4, attempts: j.attempts + 1, shortest: shortest,
-      node: { ...j.node, bytes: shortest, words: answer } })), label: "complete" }
+      ready: ready, attempts: j.attempts + 1, shortest: shortest,
+      node: { ...j.node, bytes: if (oversized) (if (leaf) j.inputBytes else 16384) else shortest,
+        words: if (oversized and leaf) j.node.sources else answer, cut: oversized and not(leaf) } })), label: "complete" }
   }
+  action complete(j: Job, answerSize: int, output: Set[int]): bool = completeWith(j, answerSize, output, true)
   action abandonStale(j: Job): bool = all { s.jobs.contains(j), not(fresh(j)),
     s' = { ...s, jobs: s.jobs.exclude(Set(j)), label: "discard", target: key(j.node.ref) } }
   action failJob(j: Job): bool = all { s.jobs.contains(j), not(s.sealed),
@@ -168,7 +183,7 @@ module memoryProtocol {
   // A failed CAS discards the candidate and leaves durable work queued.
   action publishWith(j: Job, validate: bool, cas: bool, insert: bool): bool = {
     val k = key(j.node.ref)
-    val valid = (not(validate) or fresh(j)) and (not(cas) or j.rev == s.head.rev)
+    val valid = (not(validate) or (fresh(j) and withinCutoff(k))) and (not(cas) or j.rev == s.head.rev)
     val replace = s.head.lines.lineSet().exists(l => key(l.ref) == k and l.masked)
     val extend = k.w == 1 and k.a == s.head.covered
     val lines = if (replace) s.head.lines.mapLines(l => if (key(l.ref) == k) { ref: j.node.ref, masked: false } else l)
@@ -189,7 +204,7 @@ module memoryProtocol {
   // A completed out-of-order leaf becomes visible only when the prefix reaches it.
   action extend = {
     nondet n = current({ a: s.head.covered, w: 1 }).oneOf()
-    all { s.head.covered < s.n,
+    all { s.head.covered < s.n, not(s.running) or s.head.covered < s.h,
       s' = { ...s, head: { ...s.head, rev: s.head.rev + 1, covered: s.head.covered + 1,
         lines: s.head.lines.append({ ref: n.ref, masked: false }) },
         batch: s.batch or viewBytes + n.bytes > high, label: "extend" } }
@@ -245,7 +260,7 @@ module memoryProtocol {
       s' = { ...s, removed: removed, gen: s.gen + 1, log: s.log.set(i, -1),
         head: { ...s.head, rev: s.head.rev + 1, gen: s.gen + 1,
           lines: s.head.lines.mapLines(l => { ...l, masked: l.masked or tainted.contains(l.ref) }) },
-        pins: s.pins.filter(p => p.source != i), pinRev: s.pinRev + 1,
+        pins: s.pins.filter(p => p.source != i), pinRev: s.pinRev + (if (s.pins.exists(p => p.source == i)) 1 else 0),
         queue: s.queue.union(if (queueCurrent) rebuild else dirty), requestReady: false, admitted: false,
         visibleReport: if (s.visibleReport.contains(i)) Set() else s.visibleReport, readIds: Set(), readItems: List(), opened: Set(),
         label: "redact" } }
@@ -260,11 +275,9 @@ module memoryProtocol {
     s' = { ...s, running: true, h: s.n, label: "beginRun" } }
   action endRun = s' = { ...s, running: false, requestReady: false, admitted: false, label: "endRun" }
 
-  // Freeze the run's historical view at H. If compaction has passed H, render
-  // a conservative empty prefix and an explicit tail range instead. This is
-  // a chosen refinement: the plan does not specify splitting a straddling node.
+  // The live head cannot pass the run cutoff.
   action prepareWith(overlap: bool, mixed: bool, window: int): bool = {
-    val snapHead = if (overlap or s.head.covered <= s.h) s.head else { ...s.head, covered: 0, lines: List() }
+    val snapHead = s.head
     val refs = snapHead.lines.select(l => not(l.masked)).lineSet().map(l => l.ref)
     val tailIds = ids.filter(i => i >= snapHead.covered and i < (if (overlap) s.n else s.h))
     val active = ids.filter(i => i >= s.h and i < s.n)
@@ -293,17 +306,17 @@ module memoryProtocol {
     r.items.indices().forall(i => r.items.indices().forall(j => i >= j or r.items.nth(i).id < r.items.nth(j).id))
   // The guard also authenticates the rendered payload, model window, rev/gen,
   // and pin revision. `stamp` abstracts a trusted digest, not a model boolean.
-  action dispatchWith(bound: bool, generation: bool, stamp: bool): bool = {
+  action dispatchWith(bound: bool, generation: bool, stamp: bool, pinRevision: bool): bool = {
     val r = s.request
     val ok = (not(bound) or (r.cost <= r.window and protocol(r))) and
-      (not(generation) or (r.head.gen == s.gen and r.pinRev == s.pinRev and r.deps.intersect(s.removed) == Set())) and
+      (not(generation) or (r.head.gen == s.gen and (not(pinRevision) or r.pinRev == s.pinRev) and r.deps.intersect(s.removed) == Set())) and
       (not(stamp) or (r.stamp and r == s.signed)) and r.active.fold(0, (v, i) => v + s.sizes.get(i)) <= 65536
     all { s.requestReady or r.stamp,
       s' = if (ok) { ...s, requestReady: false, admitted: true, blocked: false,
         sent: s.sent + 1, sentCost: r.cost, sentWindow: r.window, stampUsed: r.stamp and r == s.signed, label: "dispatch" }
       else { ...s, requestReady: false, admitted: false, blocked: true, label: "blocked" } }
   }
-  action dispatch = dispatchWith(true, true, true)
+  action dispatch = dispatchWith(true, true, true, true)
   action rawHook = s' = { ...s, request: { ...s.request, stamp: false }, requestReady: true, label: "rawHook" }
   action breakPair = {
     val malformed = { ...s.request, items: s.request.items.mapItems(x => if (x.id == 3) { ...x, pair: 99 } else x) }
@@ -343,10 +356,12 @@ module memoryProtocol {
   val redactionMonotone = before.removed.subseteq(s.removed) and before.gen <= s.gen
   val nodeIdentityStable = s.nodes.forall(n => before.nodes.forall(old =>
     old.ref != n.ref or old == n))
-  val nodeInputsCurrent = s.label != "publish" or s.nodes.exclude(before.nodes).forall(n =>
+  val nodeInputsCurrent = (s.label != "start" or s.jobs.exclude(before.jobs).forall(j =>
+    j.context == context(key(j.node.ref)) and j.node.context == j.context)) and
+    (s.label != "publish" or s.nodes.exclude(before.nodes).forall(n =>
     n.gen == before.gen and n.deps == n.read and n.deps.intersect(before.removed) == Set() and
-    before.jobs.exists(j => j.node == n and j.pinRev == before.pinRev and j.context.subseteq(n.inputs) and
-      j.node.inputs.forall(r => before.nodes.exists(c => c.ref == r and c.deps.intersect(before.removed) == Set()))))
+    before.jobs.exists(j => j.node == n and j.context == n.context and
+      j.node.inputs.forall(r => before.nodes.exists(c => c.ref == r and c.deps.intersect(before.removed) == Set())))))
   val treeClosed = s.nodes.filter(n => clean(n)).forall(n => n.ref.w == 1 or
     Set(left(key(n.ref)), right(key(n.ref))).forall(k =>
       n.inputs.exists(r => key(r) == k and stored(r).exists(c => clean(c)))))
@@ -391,8 +406,8 @@ module memoryProtocol {
   val requestSnapshotConsistent =
     (s.label != "prepare" or (s.request.pins == before.pins and s.request.pinRev == before.pinRev and
       s.request.head.rev == before.head.rev and s.request.head.gen == before.gen and s.request.cutoff == before.n and
-      s.request.head == (if (before.head.covered <= before.h) before.head else { ...before.head, covered: 0, lines: List() }))) and
-    (s.label != "dispatch" or s.request.head.gen == s.gen)
+      s.request.head == before.head)) and
+    (s.label != "dispatch" or (s.request.head.gen == s.gen and s.request.pinRev == s.pinRev))
   val requestCoverageDeclared = not(s.requestReady or s.admitted) or {
     val r = s.request
     val v = r.head.lines.lineSet().map(l => span(key(l.ref))).flatten()
@@ -411,17 +426,32 @@ module memoryProtocol {
   val taintClosureExact = s.label != "redact" or s.head.lines.lineSet().forall(l =>
     l.masked == (before.head.lines.lineSet().exists(old => key(old.ref) == key(l.ref) and old.masked) or
       before.nodes.exists(n => n.ref == l.ref and n.deps.intersect(s.removed) != Set())))
+  val viewWithinCutoff = not(s.running) or s.head.covered <= s.h
+  val nodeBounded = s.nodes.forall(n => n.bytes <= 16384)
+  val parentInputFits = nodeKeys.filter(k => k.w > 1 and available(k)).forall(k => bytes(children(k)) <= 32768)
+  val pinEditCurrent = s.label != "editPin" or s.pins.exclude(before.pins).forall(p =>
+    before.pins.exists(old => old.id == p.id and old.v + 1 == p.v and old.source == p.source) and
+    not(s.removed.contains(p.source)) and s.pins.filter(q => q.id == p.id).size() == 1) and
+    (s.label != "editPin" or s.pins != before.pins)
+  // Test only nodes affected by this removal, not previously queued work.
+  val taintLocal = s.label != "redact" or {
+    val removedNow = s.removed.exclude(before.removed)
+    before.nodes.filter(n => n.deps.intersect(removedNow) != Set()).forall(n => removedNow.forall(m =>
+      not(n.deps.contains(m)) or span(key(n.ref)).contains(m) or
+      (n.ref.a > m and m.to(n.ref.a - 1).exclude(before.removed).fold(0, (v, i) => v + before.sizes.get(i)) <= 16384)))
+  }
   val guardStampRequired = s.stampUsed
   val safety = sourceIdentityStable and retainedSourceExact and redactionMonotone and nodeIdentityStable and
     nodeInputsCurrent and treeClosed and viewPartition and viewReferencesValid and viewCAS and restartPreservesHead and
     mergePreservesCoverage and mergeDueOrder and prefixBetweenBatches and pinAuthorityExact and pinBudget and
     pinsSurviveCompaction and redactionExcludesReads and retrievalSound and requestSnapshotConsistent and
     requestCoverageDeclared and requestProtocolValid and requestBounded and mandatoryPinsIncluded and
-    compactorLimits and pendingWorkRecoverable and taintClosureExact and guardStampRequired
+    compactorLimits and pendingWorkRecoverable and taintClosureExact and guardStampRequired and taintLocal and viewWithinCutoff and
+    pinEditCurrent and nodeBounded and parentInputFits
 
   val settled = s.n == s.accepted and needed == Set() and s.jobs == Set() and
     s.head.covered == s.n and masked == Set() and s.nodes.forall(n => clean(n))
-  // A batch can be irreducible (popcount, oversized nodes, unavailable parents).
+  // A batch can be irreducible (popcount, unavailable parents).
   // Progress promises finishing only when the required low partition is feasible.
   val batchFeasible = s.head.covered == s.n and s.n == 4 and
     current({ a: 0, w: 4 }).exists(n => n.bytes <= low)
@@ -448,7 +478,7 @@ module memoryProtocol {
   action input = any {
     all { s.accepted < 4, accept }, project, beginRun, endRun, crash, seal, clockTick, extend, merge, finishBatch, purge,
     { nondet k = nodeKeys.oneOf(); any { start(k), zoom(k) } },
-    { nondet j = s.jobs.oneOf(); nondet answerSize = Set(512, 2048, 8192).oneOf();
+    { nondet j = s.jobs.oneOf(); nondet answerSize = Set(512, 2048, 8192, 20000).oneOf();
       nondet output = j.node.read.union(Set(-1)).powerset().oneOf(); any { complete(j, answerSize, output), publish(j), failJob(j), abandonStale(j) } },
     { nondet i = live.oneOf(); any { pin(i), redact(i) } },
     { nondet p = s.pins.oneOf(); editPin(p, true) },
@@ -476,13 +506,24 @@ module memoryProtocol {
   action execute(cmd: Command, bug: str): bool = {
     val k = { a: cmd.a, w: cmd.w }
     val op = cmd.op
+    if (op == "ceilingStart") {
+      if (bug == "pastCutoff") startWith(k, true, true, false) else
+      all { not(withinCutoff(k)), s' = { ...s, label: "cutoffRefused" } }
+    } else
+    if (op == "ceilingComplete" or op == "ceilingPublish") {
+      if (bug != "pastCutoff") s' = { ...s, label: "cutoffRefused" } else {
+        nondet j = s.jobs.oneOf()
+        if (op == "ceilingComplete") complete(j, 512, j.node.read) else publishWith(j, false, true, true)
+      }
+    } else
     if (op == "accept") accept else
     if (op == "project") project else
-    if (op == "start") startWith(k, bug != "unrecordedContext") else
+    if (op == "start") startWith(k, bug != "unrecordedContext", bug != "summaryContext", bug != "pastCutoff") else
     if (op == "complete") { nondet j = s.jobs.filter(j => key(j.node.ref) == k).oneOf(); complete(j, 512, j.node.read) } else
+    if (op == "huge") { nondet j = s.jobs.filter(j => key(j.node.ref) == k).oneOf(); completeWith(j, 20000, j.node.read, bug != "noCap") } else
     if (op == "oversize") { nondet j = s.jobs.filter(j => key(j.node.ref) == k).oneOf(); complete(j, 2048, j.node.read.union(Set(-1))) } else
     if (op == "publish") { nondet j = s.jobs.filter(j => key(j.node.ref) == k).oneOf();
-      publishWith(j, bug != "stalePublish", bug != "staleCAS" and bug != "stalePublish", bug != "missingParent") } else
+      publishWith(j, bug != "stalePublish" and bug != "pastCutoff", bug != "staleCAS" and bug != "stalePublish", bug != "missingParent") } else
     if (op == "failJob") { nondet j = s.jobs.filter(j => key(j.node.ref) == k).oneOf(); failJob(j) } else
     if (op == "redact") redactWith(cmd.a, bug != "ancestry", bug != "queueAll") else
     if (op == "begin") beginRun else
@@ -491,7 +532,7 @@ module memoryProtocol {
     if (op == "edit") { nondet p = s.pins.oneOf(); editPin(p, true) } else
     if (op == "lateEdit") { nondet p = before.pins.oneOf(); editPin(p, bug != "stalePin") } else
     if (op == "prepare") prepareWith(bug == "overlap", bug == "mixed", cmd.a) else
-    if (op == "dispatch") dispatchWith(bug != "unbounded" and bug != "toolPair", bug != "staleRequest", bug != "rawHook" and bug != "hash") else
+    if (op == "dispatch") dispatchWith(bug != "unbounded" and bug != "toolPair", bug != "staleRequest", bug != "rawHook" and bug != "hash", bug != "genOnly") else
     if (op == "crash") crashWith(bug != "lostQueue", bug != "restartView") else
     if (op == "raw") rawHook else
     if (op == "pair") breakPair else
@@ -520,7 +561,7 @@ module memoryProtocol {
   pure val redactionRace = one.concat(List(c("start", 0, 1), c("complete", 0, 1), c("redact", 0, 1), c("publish", 0, 1)))
   action redactionRaceStep = script(redactionRace, "")
   action redactionRaceBugStep = script(redactionRace, "stalePublish")
-  // Plan #7: node 1 reads node 0 despite not being its ancestor.
+  // Plan #7: node 1 reads source 0 despite not containing its interval.
   pure val contextRace = twoBuilt.concat(List(c("redact", 0, 1)))
   action contextRaceStep = script(contextRace, "")
   action contextRaceBugStep = script(contextRace, "ancestry")
@@ -541,23 +582,35 @@ module memoryProtocol {
 
   // Plan #9: five shortening attempts still leave a node above target; pins
   // plus that view exceed the final fallback on a small model.
-  pure val overflow = List(c("begin", 0, 1)).concat(one).concat(List(c("pin", 0, 1), c("start", 0, 1),
+  pure val overflow = List(c("begin", 0, 1)).concat(one).concat(List(c("pin", 0, 1), c("end", 0, 1), c("start", 0, 1),
     c("oversize", 0, 1), c("oversize", 0, 1), c("oversize", 0, 1), c("oversize", 0, 1), c("oversize", 0, 1),
     c("publish", 0, 1), c("end", 0, 1), c("begin", 0, 1), c("prepare", 20000, 1), c("dispatch", 0, 1)))
   action overflowStep = script(overflow, "")
   action overflowBugStep = script(overflow, "unbounded")
-  // Plan #10: projection and even compaction can pass a long-running run's H.
+  // Plan #10: the tail must stop at the run cutoff.
   pure val overlap = List(c("begin", 0, 1)).concat(one).concat(List(c("prepare", 300000, 1), c("dispatch", 0, 1)))
   action overlapStep = script(overlap, "")
   action overlapBugStep = script(overlap, "overlap")
-  pure val fastCompactor = List(c("begin", 0, 1)).concat(one).concat(build(0, 1)).concat(List(c("prepare", 300000, 1)))
+  // A refused start is observed explicitly; the corrected schedule resumes after endRun.
+  pure val fastCompactor = List(c("begin", 0, 1)).concat(one).concat(List(c("ceilingStart", 0, 1), c("ceilingComplete", 0, 1), c("ceilingPublish", 0, 1), c("end", 0, 1)))
   action fastCompactorStep = script(fastCompactor, "")
-  action fastCompactorBugStep = script(fastCompactor, "overlap")
-  // Stale job after an owner edit, without any redaction-generation change.
-  pure val editedJob = List(c("begin", 0, 1)).concat(one).concat(List(c("pin", 0, 1), c("start", 0, 1),
-    c("complete", 0, 1), c("edit", 0, 1), c("publish", 0, 1)))
-  action editedJobStep = script(editedJob, "")
-  action editedJobBugStep = script(editedJob, "stalePublish")
+  action fastCompactorBugStep = script(fastCompactor, "pastCutoff")
+  pure val editedRequest = List(c("begin", 0, 1)).concat(one).concat(List(c("pin", 0, 1),
+    c("prepare", 300000, 1), c("edit", 0, 1), c("dispatch", 0, 1)))
+  action editedRequestStep = script(editedRequest, "")
+  action editedRequestBugStep = script(editedRequest, "genOnly")
+  pure val doubleEdit = List(c("begin", 0, 1)).concat(one).concat(List(c("pin", 0, 1),
+    c("snapshot", 0, 1), c("lateEdit", 0, 1), c("lateEdit", 0, 1)))
+  action doubleEditStep = script(doubleEdit, "")
+  action doubleEditBugStep = script(doubleEdit, "stalePin")
+  pure val localTaint = fourBuilt.concat(one).concat(build(4, 1)).concat(one).concat(build(5, 1)).concat(List(c("redact", 0, 1)))
+  action localTaintStep = script(localTaint, "")
+  action localTaintBugStep = script(localTaint, "summaryContext")
+  pure def hugeBuild(a: int, w: int): List[Command] = List(c("start", a, w)).concat(
+    0.range(5).foldl(List(), (acc, _) => acc.append(c("huge", a, w)))).append(c("publish", a, w))
+  pure val oversizeParent = one.concat(hugeBuild(0, 1)).concat(one).concat(hugeBuild(1, 1)).concat(hugeBuild(0, 2))
+  action oversizeParentStep = script(oversizeParent, "")
+  action oversizeParentBugStep = script(oversizeParent, "noCap")
   // Two workers read the same head. The later one may not overwrite it.
   pure val casRace = two.concat(List(c("start", 0, 1), c("start", 1, 1), c("complete", 0, 1), c("complete", 1, 1),
     c("publish", 0, 1), c("publish", 1, 1)))
@@ -606,7 +659,10 @@ module memoryProtocol {
     ref: { a: k.a, w: k.w, v: 1 },
     sources: if (k.w == 1) span(k) else Set(),
     inputs: if (k.w == 1) Set() else Set({ a: k.a, w: k.w / 2, v: 1 }, { a: k.a + k.w / 2, w: k.w / 2, v: 1 }),
-    pins: Set(), deps: span(k), read: span(k), words: span(k), bytes: 512, gen: 0 })
+    context: if (k.a == 0) Set() else Set(k.a - 1),
+    deps: span(k).union(if (k.a == 0) Set() else Set(k.a - 1)),
+    read: span(k).union(if (k.a == 0) Set() else Set(k.a - 1)),
+    words: span(k), bytes: 512, cut: false, gen: 0 })
   pure def fixture(lines: List[Line], n: int): State = { ...initial, n: n, accepted: n,
     log: ids.mapBy(i => if (i < n) original(i) else -1),
     nodes: fixtureNodes.filter(x => x.ref.a + x.ref.w <= n),
@@ -630,7 +686,7 @@ module memoryProtocol {
   // One simulator startup covers every corrected schedule. The runner requires
   // a completed witness for each case, so sampling cannot silently omit one.
   action suiteInit = {
-    nondet which = 0.to(24).oneOf()
+    nondet which = 0.to(27).oneOf()
     val state = if (which == 21) dueState else if (which == 22) siblingState else
       if (which == 23) pinnedState else initial
     all { s' = state, before' = state, pc' = 0, scenario' = which, remaining' = drainLimit }
@@ -645,7 +701,7 @@ module memoryProtocol {
     overflow,
     overlap,
     fastCompactor,
-    editedJob,
+    editedRequest,
     casRace,
     atomicPublish,
     atomicPublish,
@@ -660,7 +716,7 @@ module memoryProtocol {
     List(c("merge", 0, 1)),
     List(c("nonSiblings", 0, 1)),
     List(c("merge", 0, 1)),
-    queueCurrent).nth(scenario)
+    queueCurrent, localTaint, doubleEdit, oversizeParent).nth(scenario)
   action suiteStep = script(suiteCommands, "")
   val case0 = scenario == 0 and reachedAgreement
   val case1 = scenario == 1 and reachedAgreement
@@ -687,6 +743,10 @@ module memoryProtocol {
   val case22 = scenario == 22 and reachedAgreement
   val case23 = scenario == 23 and reachedAgreement
   val case24 = scenario == 24 and reachedAgreement
+
+  val case25 = scenario == 25 and reachedAgreement
+  val case26 = scenario == 26 and reachedAgreement
+  val case27 = scenario == 27 and reachedAgreement
 
   // Archive and removal exploration is deliberately separate from the longer
   // job race. These are the same transactions, with no symbolic script decoder.
