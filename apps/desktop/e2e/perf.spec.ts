@@ -614,6 +614,32 @@ test.describe.serial('topic view', () => {
     }
   })
 
+  // Peek reads the query the row's hover warmed, so it is a prefetched open: one frame.
+  test('peek: the peek key over a hovered row to the peeked messages painted', async () => {
+    test.setTimeout(300_000)
+    const { running, juno } = await ready()
+    try {
+      const samples: number[] = []
+      await traced(running.win, 'peek-open', async () => {
+        for (let i = 0; i < 10; i++) {
+          for (const title of [THREAD, MAIN]) {
+            await juno.sidebar.row(title).hover()
+            await running.win.waitForTimeout(300)
+            const before = (await juno.measures('juno.peek-open')).length
+            await running.win.keyboard.down('Alt')
+            samples.push(await nextMeasure(juno, 'juno.peek-open', before))
+            await juno.peek.expectShowing(title)
+            await juno.peek.release()
+            await juno.peek.expectClosed()
+          }
+        }
+      })
+      within('peek open, p95', stats('peek open, key down to the peeked rows painted (juno.peek-open)', samples).p95, oneFrameBudget(await refreshInterval(running.win)))
+    } finally {
+      await running.close()
+    }
+  })
+
   test('scroll the 300-message thread, and prepend older pages with zero shift', async () => {
     test.setTimeout(300_000)
     const { running, juno } = await ready()
