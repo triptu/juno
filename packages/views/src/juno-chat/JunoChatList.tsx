@@ -3,9 +3,11 @@ import type { ReactNode, Ref } from 'react'
 import { chatCopy, type Banner, type ChatItem } from '@juno/agent-contract'
 import { layout, sizes, spacing } from '@juno/tokens/tokens.stylex'
 import { ScrollArea, Text } from '@juno/ui'
+import { CardRow } from './CardRow'
 import type { ChatActions } from './commands'
 import { DaySeparator } from './DaySeparator'
 import { EmptyChat } from './EmptyChat'
+import { EndingLine } from './EndingLine'
 import { GroupLabel } from './GroupLabel'
 import { JunoBubble } from './JunoBubble'
 import { Note } from './Note'
@@ -36,8 +38,10 @@ export interface JunoChatListProps {
 }
 
 /**
- * The one long chat (SPEC 13.1): bubbles, cards, the status bubble while
- * a run is active, and the separators, in the centred 720px column. Rows
+ * The one long chat (SPEC 13.1): bubbles, cards, ending lines, the status
+ * bubble under the newest bubble while a run is active, and the
+ * separators, in the centred 720px column. Juno's bubbles arrive one at a
+ * time, whole; each is a new row and moves nothing above it. Rows
  * stay in flow with `content-visibility: auto`, as the message list does,
  * so the browser's scroll anchoring handles prepends and nothing runs on
  * scroll; the container owns the position through `scrollRef`. The edge
@@ -74,6 +78,10 @@ function keyOf(item: ChatItem): string {
       return `o:${item.opId}`
     case 'juno':
       return `j:${item.id}`
+    case 'card':
+      return `c:${item.card.id}`
+    case 'ending':
+      return `e:${item.runId}`
     case 'status':
       return `s:${item.runId}`
     case 'note':
@@ -93,8 +101,12 @@ function Row({ item, now, actions, anchorRef }: { readonly item: ChatItem; reado
       return <OwnerBubble item={item} now={now} actions={actions} />
     case 'juno':
       return <JunoBubble item={item} now={now} actions={actions} />
+    case 'card':
+      return <CardRow item={item} now={now} actions={actions} />
+    case 'ending':
+      return <EndingLine item={item} actions={actions} />
     case 'status':
-      return <StatusBubble item={item} actions={actions} />
+      return <StatusBubble item={item} />
     case 'note':
       return <Note item={item} actions={actions} />
     case 'groupLabel':

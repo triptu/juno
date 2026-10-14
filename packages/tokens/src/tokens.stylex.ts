@@ -169,10 +169,8 @@ export const chat = stylex.defineVars({
     default: '1',
     [REDUCED_MOTION]: '0.6',
   },
-  // "Queued" shows under a steer only after this long, so a steer read
-  // within one tool round never flickers. Not collapsed by reduced motion:
-  // it is a delay, not a movement.
-  '--delay-queued': '500ms',
+  // How far a reaction badge sits out over its bubble's top corner.
+  '--reaction-offset': '10px',
 })
 
 /**

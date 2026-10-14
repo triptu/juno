@@ -1,9 +1,8 @@
 import { defineFixtures, fixture } from '@juno/ui'
-import { noopActions } from './commands'
 import { runId } from './fixtures/data'
 import { StatusBubble, type StatusBubbleProps } from './StatusBubble'
 
-const bubble = (text?: string) => fixture<StatusBubbleProps>({ item: { _tag: 'status', runId: runId('r1'), ...(text === undefined ? {} : { text }) }, actions: noopActions })
+const bubble = (text?: string) => fixture<StatusBubbleProps>({ item: { _tag: 'status', runId: runId('r1'), ...(text === undefined ? {} : { text }) } })
 
 export default defineFixtures(
   StatusBubble,
@@ -16,7 +15,6 @@ export default defineFixtures(
     },
     Interaction: {
       hover: { ...bubble('Reading 3 topics'), frame: { width: 640, padded: true, hover: '[data-chat-status]' } },
-      'stop-focus': { ...bubble('Reading 3 topics'), frame: { width: 640, padded: true, focus: '[data-chat-status] button' } },
     },
   },
   { width: 640, padded: true },

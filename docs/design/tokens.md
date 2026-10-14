@@ -385,7 +385,7 @@ Phosphor (`@phosphor-icons/react`, imported per icon). Weight by size: `bold` at
 
 ### Juno chat
 
-The `chat` group (`tokens.stylex.ts`). `--owner-bubble-bg` and `--owner-bubble-fg` are the owner bubble's fill and text, set to option B (`--hl-bubble` / `--foreground-default`); the other options are listed beside the group, and switching is a change to those two lines. `--bubble-max-width` 76%, `--bubble-tail` 4px (the last bubble of a group), `--card-max-width` 560px. The status bubble: `--status-dot` 6px, `--status-min-width` 52px, `--status-loop` 1200ms, `--status-pulse-scale` 1.35 (1 under reduced motion), `--status-dot-opacity` 1 (0.6 under reduced motion). `--delay-queued` 500ms is how long a steer waits before "Queued" shows.
+The `chat` group (`tokens.stylex.ts`). `--owner-bubble-bg` and `--owner-bubble-fg` are the owner bubble's fill and text, set to option B (`--hl-bubble` / `--foreground-default`); the other options are listed beside the group, and switching is a change to those two lines. `--bubble-max-width` 76%, `--bubble-tail` 4px (the last bubble of a group), `--card-max-width` 560px. The status bubble: `--status-dot` 6px, `--status-min-width` 52px, `--status-loop` 1200ms, `--status-pulse-scale` 1.35 (1 under reduced motion), `--status-dot-opacity` 1 (0.6 under reduced motion). `--reaction-offset` 10px is how far a reaction badge sits out over its bubble's top corner.
 
 ### Illustrations and the mark
 
