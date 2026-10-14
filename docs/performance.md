@@ -18,7 +18,7 @@ Every budget is a p95 over the runs of the scenario in section 8 unless marked p
 | Topic open, cached (rows already in `cache.db`) | 50 ms | `pointerdown` on a row → messages painted at the right scroll position. 16 ms when the topic was prefetched (section 4.2). |
 | Topic open, uncached (never synced) | 50 ms to header and empty body; no spinner before 300 ms | Messages arrive whenever Slack answers; the list must not shift when they do. |
 | Tab switch | 16 ms | One frame. Recently used tabs stay mounted (section 4.3). Unmounted tabs: 50 ms including scroll restore. |
-| Sidebar resize drag | p95 frame ≤ 8.3 ms main-thread work; zero long animation frames | Only the `--sidebar-width` variable on the shell changes, at most once per frame; nothing re-renders until the drag ends. Asserted by `sidebar drag` in `perf.spec.ts` on the large workspace with a topic open. |
+| Sidebar resize drag | p95 frame ≤ 8.3 ms main-thread work; zero long animation frames | Only the sidebar box's inline `width` changes, at most once per frame; nothing re-renders until the drag ends. A custom property on the shell cost 4.7 ms of style recalculation per frame, because every element under it inherits it. Asserted by `sidebar drag` in `perf.spec.ts` on the large workspace with a topic open. |
 | Sidebar filter or scope change | 50 ms | Query, delta, render. The old list stays on screen until the new one is ready. |
 | ⌘K open | 50 ms | Input focused and recent rows painted. |
 | ⌘K keystroke → results painted | 100 ms, typing never blocked | Local FTS only. The AI command parse arrives later and never delays results. |

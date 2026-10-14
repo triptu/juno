@@ -27,7 +27,7 @@ The owner asked for back and forward, a resizable and collapsible sidebar, brows
 
 - **Back and Forward** sit after the traffic lights, per tab like a browser. An entry is a topic or page opened in that tab; scroll is restored, not recorded. ⌘[ and ⌘], the mouse's side buttons and a three-finger swipe (Electron's `swipe` event; the two-finger swipe is not exposed to apps) do the same. Holding a button lists the history.
 - **Hide sidebar** is ⌃⌘S, the macOS standard (Mail, Notes, Reminders and SwiftUI's sidebar command), rather than Finder's ⌥⌘S or editors' ⌘\. Hidden, the traffic lights and the three buttons move to the start of the tab strip.
-- **Resize** by dragging the edge, 280 to 480px, double-click to reset. During a drag only a CSS variable changes, once per frame, and the width is saved on release, so the list never re-renders per pixel.
+- **Resize** by dragging the edge, 280 to 480px, double-click to reset. During a drag only the sidebar's width changes, once per frame, and the width is saved on release, so the list never re-renders per pixel.
 - **Pinned tabs** are the calmest browser form: 40px, icon only, first in the strip, no close button. Close others, to the right and all leave them.
 - **Unread dot**: one 6px soft grey dot after the title, the same grey as unread counts. Not on the active tab (opening marks read), not coloured for mentions: the sidebar already carries the "@".
 - **Shortcuts**: ⌘T, ⌘W, ⌘⇧T (a stack of 20 closed tabs), ⌘1 to ⌘8 and ⌘9, ⌃Tab and ⌃⇧Tab, ⌘⇧] and ⌘⇧[. None clashes with ⌘K, ⌘J, ⌘N, ⌘, or ⌘Z.

@@ -215,7 +215,10 @@ const styles = stylex.create({
   root: {
     display: 'flex',
     flexDirection: 'column',
-    flexShrink: 0,
+    // The default width; inside the shell it fills the box the shell sizes.
+    flexGrow: 1,
+    flexShrink: 1,
+    minWidth: 0,
     width: layout['--sidebar-width'],
     height: '100%',
     minHeight: 0,

@@ -326,7 +326,7 @@ All [proto] measured at 1280×800 with Inter unless marked.
 
 | Token | Value |
 | --- | --- |
-| `--sidebar-width` | 384px default; the owner drags it between `--sidebar-min-width` 280px and `--sidebar-max-width` 480px. The live width is a CSS variable on the shell set during the drag, not a token value |
+| `--sidebar-width` | 384px default; the owner drags it between `--sidebar-min-width` 280px and `--sidebar-max-width` 480px. The live width is an inline `width` on the shell's sidebar box, set during the drag, not a token value |
 | `--sidebar-resize-hit` | 6px hit area centred on the sidebar edge |
 | `--titlebar-lights-inset` | 78px kept free for the traffic lights, in the sidebar bar or, with the sidebar hidden, at the start of the tab strip |
 | `--juno-panel-width` | 360px; the topic beside it keeps at least `--juno-panel-topic-min` 480px, else the panel covers the topic |

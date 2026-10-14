@@ -30,19 +30,21 @@ const COLLAPSE_BELOW = 200
  * the panes may change on a tick (performance 4.3).
  */
 export function Shell({ sidebar, sidebarWidth = SIDEBAR_WIDTH.default, sidebarHidden = false, onSidebarResize, onSidebarResetWidth, onSidebarCollapse, children }: ShellProps) {
-  const shell = useRef<HTMLDivElement>(null)
-  // The width is a CSS variable on the shell, set here and by a drag, never
-  // through React state, so a drag re-renders nothing.
+  const slot = useRef<HTMLDivElement>(null)
+  // The width is set on the sidebar's own box, here and by a drag, never
+  // through React state, so a drag re-renders nothing. It is a plain width,
+  // not an inherited custom property, so a change restyles one element and
+  // not every element below it.
   useLayoutEffect(() => {
-    shell.current?.style.setProperty('--sidebar-width', `${sidebarWidth}px`)
+    if (slot.current !== null) slot.current.style.width = `${sidebarWidth}px`
   }, [sidebarWidth])
   if (sidebar !== undefined) {
     return (
-      <div ref={shell} {...stylex.props(styles.shell, styles.panes)}>
-        <div {...stylex.props(styles.sidebarSlot, sidebarHidden && styles.hidden)}>{sidebar}</div>
-        {sidebarHidden ? null : (
-          <SidebarEdge shell={shell} width={sidebarWidth} onResize={onSidebarResize} onReset={onSidebarResetWidth} onCollapse={onSidebarCollapse} />
-        )}
+      <div {...stylex.props(styles.shell, styles.panes)}>
+        <div ref={slot} {...stylex.props(styles.sidebarSlot, sidebarHidden && styles.hidden)}>
+          {sidebar}
+          <SidebarEdge slot={slot} width={sidebarWidth} onResize={onSidebarResize} onReset={onSidebarResetWidth} onCollapse={onSidebarCollapse} />
+        </div>
         {children}
       </div>
     )
@@ -56,7 +58,7 @@ export function Shell({ sidebar, sidebarWidth = SIDEBAR_WIDTH.default, sidebarHi
 }
 
 interface SidebarEdgeProps {
-  readonly shell: RefObject<HTMLDivElement | null>
+  readonly slot: RefObject<HTMLDivElement | null>
   readonly width: number
   readonly onResize: ((width: number) => void) | undefined
   readonly onReset: (() => void) | undefined
@@ -67,13 +69,15 @@ const clamp = (width: number) => Math.round(Math.min(SIDEBAR_WIDTH.max, Math.max
 
 /**
  * The sidebar's resize edge: a 6px hit area centred on its border. A drag
- * writes the width to the shell's variable at most once per frame and
+ * writes the sidebar's width at most once per frame and
  * reports it when it ends; a double-click asks for the default.
  */
-function SidebarEdge({ shell, width, onResize, onReset, onCollapse }: SidebarEdgeProps) {
+function SidebarEdge({ slot, width, onResize, onReset, onCollapse }: SidebarEdgeProps) {
   const drag = useRef<{ readonly startX: number; raw: number; frame: number | undefined } | undefined>(undefined)
 
-  const write = (value: number) => shell.current?.style.setProperty('--sidebar-width', `${value}px`)
+  const write = (value: number) => {
+    if (slot.current !== null) slot.current.style.width = `${value}px`
+  }
 
   const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) return
@@ -136,12 +140,14 @@ const styles = stylex.create({
     color: colors['--foreground-default'],
   },
   panes: {
-    position: 'relative',
     flexDirection: 'row',
   },
+  // Holds the sidebar at the width set on it, and the edge.
   sidebarSlot: {
+    position: 'relative',
     display: 'flex',
     flexShrink: 0,
+    width: layout['--sidebar-width'],
     height: '100%',
   },
   hidden: {
@@ -152,7 +158,7 @@ const styles = stylex.create({
     position: 'absolute',
     top: 0,
     bottom: 0,
-    left: `calc(${layout['--sidebar-width']} - ${layout['--sidebar-resize-hit']} / 2)`,
+    right: `calc(${layout['--sidebar-resize-hit']} / -2)`,
     width: layout['--sidebar-resize-hit'],
     zIndex: 1,
     cursor: 'col-resize',
