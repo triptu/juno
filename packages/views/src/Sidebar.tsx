@@ -46,6 +46,10 @@ export interface SidebarProps {
   readonly account: SidebarAccount
   readonly theme: ThemeName
   readonly forYouCount: number
+  /** Unread Juno messages: the soft grey count on the Juno item, never an accent badge. */
+  readonly junoUnread?: number
+  /** A background job is running: the Juno item's sparkle turns duotone. A run alone does not light it (SPEC 13.2). */
+  readonly junoBusy?: boolean
   readonly activeNav?: SidebarNavTarget
   readonly filter: SidebarFilter
   readonly dots: SidebarDots
@@ -80,6 +84,8 @@ export function Sidebar({
   account,
   theme,
   forYouCount,
+  junoUnread = 0,
+  junoBusy = false,
   activeNav,
   filter,
   dots,
@@ -152,7 +158,20 @@ export function Sidebar({
         >
           For you
         </NavItem>
-        <NavItem icon={Sparkle} iconWeight="duotone" active={activeNav === 'juno'} kbd="⌘J" onSelect={(event) => onNavigate('juno', event)}>
+        <NavItem
+          icon={Sparkle}
+          iconWeight={junoBusy ? 'duotone' : undefined}
+          active={activeNav === 'juno'}
+          kbd="⌘J"
+          onSelect={(event) => onNavigate('juno', event)}
+          trailing={
+            junoUnread > 0 ? (
+              <Chip variant="filled" numeric title={`${junoUnread} unread from Juno`}>
+                {countLabel(junoUnread)}
+              </Chip>
+            ) : undefined
+          }
+        >
           Juno
         </NavItem>
       </nav>
