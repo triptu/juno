@@ -77,10 +77,14 @@ export function createSpend(store: Store, cap: () => number = () => 2 * DOLLAR) 
       db.prepare('UPDATE spend_reservations SET amount = ? WHERE id = ?').run(amount, id)
       return true
     }),
-    /** Unknown is still reserved, including after restart. Settlement is idempotent. */
+    /**
+     * Known usage releases the rest of the reservation. Unknown usage keeps all
+     * of it for that day, including after a restart, and is final (spec
+     * `settleSpend`). Only the first settlement counts.
+     */
     settle: (id: string, actual: number | undefined): void => {
       if (actual !== undefined) money(actual)
-      db.prepare(`UPDATE spend_reservations SET state = ?, actual = ? WHERE id = ? AND state != 'settled'`)
+      db.prepare(`UPDATE spend_reservations SET state = ?, actual = ? WHERE id = ? AND state = 'reserved'`)
         .run(actual === undefined ? 'unknown' : 'settled', actual ?? null, id)
     },
     /** A trusted owner click, keyed by its durable operation id. Never expose this as a model tool. */
