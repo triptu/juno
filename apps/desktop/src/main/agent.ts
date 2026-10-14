@@ -1,23 +1,32 @@
 /**
- * Supervises the agent utility process (ADR 0012) and brokers its port to the
- * engine. The agent is forked without the Slack partition: it never sees
- * Slack cookies. Whenever both are up (the engine reports ready, or the
- * agent spawns while the engine is ready), main makes a new channel and
- * gives one end to the engine (`agentPort`) and the other to the agent
- * (`hostPort`), so each follows the other's restarts.
+ * Supervises the agent utility process (ADR 0012) and brokers its ports. The
+ * agent is forked without the Slack partition: it never sees Slack cookies.
+ *
+ * - The engine: whenever both are up (the engine reports ready, or the agent
+ *   spawns while the engine is ready), main makes a new channel and gives
+ *   one end to the engine (`agentPort`) and the other to the agent
+ *   (`hostPort`), so each follows the other's restarts.
+ * - The renderer: on request (`agent.requestPort`), main makes a channel and
+ *   gives one end to the renderer and the other to the agent
+ *   (`rendererPort`), at once or when the agent next spawns. When the agent
+ *   dies the renderer's port closes and the renderer asks again.
  *
  * The agent restarts on exit like the engine (architecture 2.5): exponential
  * backoff from 1 s to 30 s, and it gives up after 5 exits in two minutes.
  * A send the agent had in flight when it died is still answered by the host
  * (`@juno/agent-juno`, single-attempt dispatch).
  *
- * Off unless JUNO_AGENT=1 until the chat ships (M2). WP13b adds the renderer
- * port; the keychain and OAuth requests come with the providers that use them.
+ * Off unless JUNO_AGENT=1 until the chat ships (M2); a renderer that asks
+ * for a port is told `failed`. The OpenRouter key comes from the environment
+ * for now, as the engine's does (ADR 0006); the keychain and OAuth requests
+ * come with Settings › Juno.
  */
-import { app, MessageChannelMain, utilityProcess, type MessagePortMain, type UtilityProcess } from 'electron'
+import { app, MessageChannelMain, utilityProcess, type MessagePortMain, type UtilityProcess, type WebContents } from 'electron'
 import { join } from 'node:path'
 import { Schema } from 'effect'
 import { AgentToMain, type AgentConfig, type HostHello, type MainToAgent } from '@juno/agent-contract'
+import { Events } from '@juno/contract/channels'
+import type { PortRequestResult } from '@juno/contract'
 
 const BACKOFF_BASE_MS = 1_000
 const BACKOFF_CAP_MS = 30_000
@@ -36,6 +45,8 @@ export class AgentSupervisor {
   private readonly exits: Array<number> = []
   private attempt = 0
   private restartTimer: NodeJS.Timeout | undefined
+  /** Renderer ports asked for while the agent was not spawned, by renderer. */
+  private readonly pendingRendererPorts = new Map<WebContents, MessagePortMain>()
 
   constructor(
     private readonly config: AgentConfig,
@@ -43,6 +54,7 @@ export class AgentSupervisor {
     private readonly sendToEngine: (port: MessagePortMain) => void,
     /** Whether the engine is ready to take a port now. */
     private readonly engineReady: () => boolean,
+    private readonly openRouterKey: string | undefined,
   ) {}
 
   get currentState(): AgentState {
@@ -65,7 +77,10 @@ export class AgentSupervisor {
     child.on('spawn', () => {
       this.spawned = true
       this.send({ _tag: 'config', config: this.config })
+      this.send({ _tag: 'openRouterKey', key: this.openRouterKey ?? null })
       if (this.engineReady()) this.linkHost()
+      for (const port of this.pendingRendererPorts.values()) this.send({ _tag: 'rendererPort' }, [port])
+      this.pendingRendererPorts.clear()
     })
     child.on('message', (data: unknown) => {
       let message: AgentToMain
@@ -92,12 +107,34 @@ export class AgentSupervisor {
     this.send({ _tag: 'hostPort' }, [port2])
   }
 
+  /** A new channel between a renderer and the agent's RPCs. `failed` when no agent will run. */
+  connect(target: WebContents): PortRequestResult {
+    if (this.state === 'failed' || this.state === 'stopped') return 'failed'
+    const { port1, port2 } = new MessageChannelMain()
+    if (this.child && this.spawned) {
+      this.send({ _tag: 'rendererPort' }, [port1])
+    } else {
+      // A renderer that asks again while waiting replaces its earlier request.
+      this.pendingRendererPorts.get(target)?.close()
+      this.pendingRendererPorts.set(target, port1)
+    }
+    target.postMessage(Events.agentPort, null, [port2])
+    return 'sent'
+  }
+
   stop(): void {
     this.state = 'stopped'
+    this.dropPendingRendererPorts()
     if (this.restartTimer) clearTimeout(this.restartTimer)
     this.restartTimer = undefined
     this.child?.kill()
     this.child = undefined
+  }
+
+  /** Closing the waiting ends makes each renderer ask again, and hear `failed`. */
+  private dropPendingRendererPorts(): void {
+    for (const port of this.pendingRendererPorts.values()) port.close()
+    this.pendingRendererPorts.clear()
   }
 
   private send(message: MainToAgent, ports?: Array<MessagePortMain>): void {
@@ -115,6 +152,7 @@ export class AgentSupervisor {
     if (this.exits.length >= CRASH_LIMIT) {
       console.error(`main: agent exited ${CRASH_LIMIT} times in two minutes (last code ${code}); giving up`)
       this.state = 'failed'
+      this.dropPendingRendererPorts()
       return
     }
     this.state = 'restarting'
@@ -129,5 +167,11 @@ export class AgentSupervisor {
 }
 
 export function createAgentSupervisor(sendToEngine: (port: MessagePortMain) => void, engineReady: () => boolean): AgentSupervisor {
-  return new AgentSupervisor({ agentDir: join(app.getPath('userData'), 'agent'), e2e: process.env.JUNO_E2E === '1' }, sendToEngine, engineReady)
+  const e2e = process.env.JUNO_E2E === '1'
+  return new AgentSupervisor(
+    { agentDir: join(app.getPath('userData'), 'agent'), e2e },
+    sendToEngine,
+    engineReady,
+    e2e ? undefined : process.env.OPENROUTER_API_KEY,
+  )
 }

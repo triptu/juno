@@ -2,6 +2,7 @@ import '@juno/tokens/fonts.css'
 import './global.css'
 
 import { acquireRendererPort, configureConnection, registry } from '@juno/state'
+import { acquireAgentPort, configureAgentConnection } from '@juno/state/agent'
 import { afterPaint, mark, measure, observeFrames } from '@juno/state/perf'
 import { RegistryContext } from '@juno/state/react'
 import { StrictMode } from 'react'
@@ -12,6 +13,8 @@ mark('juno.start')
 
 // The engine port comes from main through the preload; reconnects reuse this.
 configureConnection(registry, { acquire: acquireRendererPort })
+// The Juno Agent's port, the same way. Nothing asks for it until a Juno atom is read.
+configureAgentConnection(registry, { acquire: acquireAgentPort })
 
 // Frame and input observers run always; tests and DevTools read the counters.
 Object.assign(window, { __juno: { perf: observeFrames() } })

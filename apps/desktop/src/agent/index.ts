@@ -1,13 +1,16 @@
 /**
  * Entry of the agent utility process (ADR 0012). Main forks this file (built
- * to out/main/agent.js) without the Slack partition, sends the config over
- * parentPort, and hands over a port to the engine's AgentHost server, again
- * after every engine restart. Everything else is `@juno/agent`, which never
- * imports Electron.
+ * to out/main/agent.js) without the Slack partition, sends the config and the
+ * OpenRouter key over parentPort, hands over a port to the engine's AgentHost
+ * server (again after every engine restart), and a port per renderer for the
+ * chat. Everything else is `@juno/agent`, which never imports Electron.
+ *
+ * The agent opens the turn engine on OpenRouter with the default models
+ * (`openRouterTurns`) and serves the renderer's RPCs on the renderer ports.
  */
 import { Schema } from 'effect'
 import { MainToAgent, type AgentToMain } from '@juno/agent-contract'
-import { startAgent, type HostPort } from '@juno/agent'
+import { openRouterTurns, rendererPorts, startAgent, type HostPort } from '@juno/agent'
 import type { MessagePortMain } from 'electron'
 
 const parent = process.parentPort
@@ -41,6 +44,16 @@ const nextPort = () =>
     else waiting.push(resolve)
   })
 
+const renderers = rendererPorts()
+// The key arrives right after the config; a request waits for it, so the first send does not race it.
+let openRouterKey: string | null | undefined
+const keyWaiters: Array<(key: string | undefined) => void> = []
+const apiKey = () =>
+  new Promise<string | undefined>((resolve) => {
+    if (openRouterKey !== undefined) resolve(openRouterKey ?? undefined)
+    else keyWaiters.push(resolve)
+  })
+
 let started = false
 parent.on('message', (event) => {
   let message: MainToAgent
@@ -54,13 +67,23 @@ parent.on('message', (event) => {
     case 'config': {
       if (started) return
       started = true
-      startAgent(message.config, { acquire: nextPort }).then(
+      startAgent(message.config, { acquire: nextPort }, { turns: openRouterTurns(apiKey), renderer: renderers }).then(
         (agent) => send({ _tag: 'ready', host: agent.host }),
         (cause: unknown) => {
           console.error('agent: failed to start', cause)
           process.exit(1)
         },
       )
+      return
+    }
+    case 'openRouterKey': {
+      openRouterKey = message.key
+      for (const resolve of keyWaiters.splice(0)) resolve(message.key ?? undefined)
+      return
+    }
+    case 'rendererPort': {
+      const raw = event.ports[0]
+      if (raw) renderers.add(fromMessagePortMain(raw))
       return
     }
     case 'hostPort': {
