@@ -19,7 +19,8 @@ export default defineConfig({
   timeout: 120_000,
   // Tests are independent pages against a static server. The shift guard
   // splits itself into parts to use the workers.
-  workers: process.env.CI ? 2 : 3,
+  // GALLERY_WORKERS lets a machine of its own (pnpm remote) run more.
+  workers: Number(process.env.GALLERY_WORKERS ?? (process.env.CI ? 2 : 3)),
   fullyParallel: true,
   reporter: process.env.CI ? 'github' : 'list',
   use: {
