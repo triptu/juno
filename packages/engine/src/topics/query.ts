@@ -44,8 +44,8 @@ import {
   channelLabel,
   hashId,
   isDm,
+  isFollowed,
   isResolved,
-  isSubscribed,
   quietDaysOf,
   resolveTitle,
   rowTags,
@@ -203,7 +203,7 @@ const kindClause = (kind: ListFilter['kind']): string =>
  * (quiet cannot apply inside the window), so the window's row count says
  * whether the older statements can still add a row.
  */
-const OPEN_RULE = ` AND o.unsubscribed_at IS NULL AND (o.resolved_at IS NULL OR (o.resolved_activity_ts IS NOT NULL AND i.last_activity_ts > o.resolved_activity_ts))`
+const OPEN_RULE = ` AND (o.resolved_at IS NULL OR (o.resolved_activity_ts IS NOT NULL AND i.last_activity_ts > o.resolved_activity_ts))`
 
 /**
  * The four statements, as SQL text with positional parameters, so the plan
@@ -443,7 +443,6 @@ function shape(entry: CacheEntry, section: TopicListRow['section'], status: Topi
     row.resolved_activity_ts,
     row.reopened_at,
     row.pinned_at,
-    row.unsubscribed_at,
     row.subscribed,
     row.new_threads,
     row.c_name,
@@ -476,7 +475,7 @@ function shape(entry: CacheEntry, section: TopicListRow['section'], status: Topi
     pinned: topic.overlay.pinnedAt !== undefined,
     resolved: isResolved(topic),
     canResolveOnHover: canResolveOnHover(topic),
-    subscribed: isSubscribed(topic),
+    subscribed: isFollowed(topic),
     newThreads: row.new_threads,
     lastActivityTs: topic.activity.lastActivityTs,
     lastActivityAt: tsToMillis(topic.activity.lastActivityTs),

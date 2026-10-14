@@ -11,7 +11,7 @@
  *
  * Nothing else marks: opening a topic, a live query and the sync never do.
  * The renderer calls `reads.markRead` by the read rule (`shouldMarkRead` in
- * `@juno/state`), so a stealth tab marks only from its Mark read button.
+ * `@juno/state`).
  *
  * `reads.mirror` is the setting that lets marks reach Slack, as it applies
  * to the open workspace. It is the workspace preference `MIRROR_READS_PREF`,

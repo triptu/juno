@@ -1,7 +1,5 @@
 import * as stylex from '@stylexjs/stylex'
-import { EyeSlash } from '@phosphor-icons/react/dist/icons/EyeSlash'
 import { Hash } from '@phosphor-icons/react/dist/icons/Hash'
-import { Lightbulb } from '@phosphor-icons/react/dist/icons/Lightbulb'
 import { ListBullets } from '@phosphor-icons/react/dist/icons/ListBullets'
 import { Lock } from '@phosphor-icons/react/dist/icons/Lock'
 import { Plus } from '@phosphor-icons/react/dist/icons/Plus'
@@ -60,7 +58,6 @@ export default defineFixtures(
           <Tab icon={Lock} label="Rina Sato · Staff backend" onClose={() => {}} />
           <Tab icon={Hash} label="Q4 roadmap cuts" active onClose={() => {}} />
           <Tab icon={Hash} label="Staging bill doubled since August" onClose={() => {}} />
-          <Tab icon={Lightbulb} label="For you" onClose={() => {}} />
         </TabStrip>
       )),
       'many-narrow': scene(
@@ -70,20 +67,12 @@ export default defineFixtures(
             <Tab icon={Lock} label="Rina Sato · Staff backend" onClose={() => {}} />
             <Tab icon={Hash} label="Q4 roadmap cuts" active onClose={() => {}} />
             <Tab icon={Hash} label="Staging bill doubled since August" onClose={() => {}} />
-            <Tab icon={Lightbulb} label="For you" onClose={() => {}} />
-          </TabStrip>
+            </TabStrip>
         ),
         { width: 480 },
       ),
       'thirty-seven': scene(() => <ThirtySeven />),
       'thirty-seven-narrow': scene(() => <ThirtySeven />, { width: 336 }),
-      stealth: scene(() => (
-        <TabStrip trailing={newTab}>
-          <Tab icon={Hash} label="eng" onClose={() => {}} />
-          <Tab icon={EyeSlash} label="Rina Sato · Staff backend" active onClose={() => {}} />
-          <Tab icon={Lightbulb} label="For you" onClose={() => {}} />
-        </TabStrip>
-      )),
     },
     'With page': {
       'with-page': scene(() => <StripWithPage />, { height: 160 }),

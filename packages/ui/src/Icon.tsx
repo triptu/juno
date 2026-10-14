@@ -8,7 +8,7 @@ export type { PhosphorIcon }
  * `regular` for chrome at 15px and up, `bold` at 14px and below (regular
  * drops under 1px there and goes faint next to 11–12px text), `fill` for
  * active and selected states only, `duotone` for the few deliberate friendly
- * spots: the Juno nav item, AI sparkles, For you card kinds, illustrations.
+ * spots: the Juno nav item, AI sparkles, illustrations.
  */
 export type IconWeight = 'regular' | 'bold' | 'fill' | 'duotone'
 export type IconSize = 12 | 13 | 14 | 15 | 16 | 18 | 20

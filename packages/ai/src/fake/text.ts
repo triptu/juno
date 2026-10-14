@@ -44,4 +44,3 @@ export function firstName(name: string): string {
 export const CLOSING = /\b(thanks|thank you|thx|done|merged|shipped|resolved|fixed|sounds good|lgtm|closing|all good|works now)\b|👍|✅/i
 export const URGENT = /\b(urgent|asap|down|outage|incident|blocked|blocker|prod|production|p0|p1|sev\d|deadline|broken|failing|errors?|5\d\ds?|not working|customers?|right now|immediately)\b/i
 export const CHATTER = /\b(lol|haha|lunch|coffee|congrats|happy (birthday|friday)|weekend|cheers|nice one)\b|^\s*(\p{Extended_Pictographic}|\s)+$/iu
-export const PROMISE = /\b(i'll|i will|will do|let me|on it|i can take)\b/i

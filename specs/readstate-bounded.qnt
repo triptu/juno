@@ -1,6 +1,6 @@
 // Small instance for exhaustive bounded checking: one mirrored Main topic,
 // one queued event and one HTTP response, with the real read rules. The
-// reconnect refresh, stealth and the local-only thread are covered by the
+// reconnect refresh, peek and the local-only thread are covered by the
 // simulator.
 module readstate_bounded {
   import readProtocol(topics = Set(1), mirrored = Set(1), eventLimit = 1, fetchLimit = 1, drainLimit = 48).* from "./readstate"

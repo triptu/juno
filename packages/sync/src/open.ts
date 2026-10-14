@@ -55,7 +55,7 @@ const nowTs = Effect.map(Clock.currentTimeMillis, (now) => millisToTs(now))
 /** A topic id the open fetch understands: a thread or a Main. Groups are local and fetch nothing. */
 export const fetchableTopic = (topicId: string): { readonly kind: 'thread'; readonly channel: string; readonly threadTs: string } | { readonly kind: 'main'; readonly channel: string } | undefined => {
   const parsed = parseTopicId(topicId)
-  if (parsed === undefined || parsed.kind === 'group') return undefined
+  if (parsed === undefined) return undefined
   return parsed.kind === 'thread' ? { kind: 'thread', channel: parsed.channel, threadTs: parsed.threadTs } : { kind: 'main', channel: parsed.channel }
 }
 

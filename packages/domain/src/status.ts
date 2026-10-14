@@ -42,12 +42,10 @@ export function isFollowed(topic: Topic): boolean {
 }
 
 /**
- * The user unsubscribed the topic: Juno's client-only flag (any kind), or
- * an explicit unfollow in Slack for a thread. A thread Slack has said
- * nothing about is not unsubscribed, only not followed.
+ * The user unfollowed the thread in Slack. A thread Slack has said nothing
+ * about is not unsubscribed, only not followed. Main is never unsubscribed.
  */
 export function isUnsubscribed(topic: Topic): boolean {
-  if (topic.overlay.unsubscribedAt !== undefined) return true
   return topic.kind === 'thread' && topic.slackSubscribed === false
 }
 
@@ -136,15 +134,6 @@ export function rowTags(topic: Topic): ReadonlyArray<RowTag> {
   if (showsReopenedTag(topic)) tags.push('reopened')
   if (isUnsubscribed(topic)) tags.push('unsubscribed')
   return tags
-}
-
-/**
- * What Subscribe and Unsubscribe toggle: Slack's follow flag for a thread,
- * the client-only flag for Main (architecture 4.4). The row's menu offers
- * Unsubscribe when this is true.
- */
-export function isSubscribed(topic: Topic): boolean {
-  return topic.kind === 'thread' ? isFollowed(topic) : topic.overlay.unsubscribedAt === undefined
 }
 
 /** Whether a topic appears on All topics: everything except ignored channels. */

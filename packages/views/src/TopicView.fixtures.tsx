@@ -26,7 +26,7 @@ const topic = ({ detail, items, header, list, pill }: Scene, frame?: FixtureFram
   scene<TopicViewProps>(
     () => (
       <TopicView
-        header={<TopicHeader detail={detail} onSubscribe={noop} onUnsubscribe={noop} onMarkRead={noop} onRename={noop} {...(detail.kind === 'main' ? { onThreads: noop } : {})} {...header} />}
+        header={<TopicHeader detail={detail} onRename={noop} {...(detail.kind === 'main' ? { onThreads: noop } : {})} {...header} />}
         pill={pill === undefined ? undefined : <NewMessagesPill count={pill} onJump={noop} />}
         composer={<ComposerSlot placeholder={placeholder(detail)} />}
       >
@@ -36,7 +36,7 @@ const topic = ({ detail, items, header, list, pill }: Scene, frame?: FixtureFram
     frame,
   )
 
-const threads = <ActiveThreads threads={engThreads} now={NOW} onOpen={noop} onSubscribe={noop} onUnsubscribe={noop} />
+const threads = <ActiveThreads threads={engThreads} now={NOW} onOpen={noop} />
 
 export default defineFixtures(
   TopicView,
@@ -46,7 +46,6 @@ export default defineFixtures(
       // The window starts near the divider, as the container opens it, so the divider is in the frame.
       'new-divider': topic({ detail: details.postgres, items: thread.slice(6), list: { dividerBefore: threadDividerBefore } }),
       'mentions-you': topic({ detail: details.hiring, items: mentions }),
-      stealth: topic({ detail: details.hiring, items: mentions, header: { stealth: true }, list: { dividerBefore: mentions[2]?.message.ts ?? '' } }),
       'scrolled-up': topic({ detail: details.postgres, items: thread, pill: 2 }),
       'jump-to-latest': topic({ detail: details.postgres, items: thread, pill: 0 }),
     },

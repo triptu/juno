@@ -24,7 +24,6 @@ function stripTab(summary: TabSummary): WorkspaceTab {
     id: summary.id,
     title: detail == null ? '' : detail.kind === 'main' ? detail.channel.name : detail.title,
     icon: detail == null ? 'hash' : kindIcons[detail.channel.kind],
-    stealth: summary.stealth,
     ...(detail != null && hasArt(detail) ? { art: <TopicArt topicId={detail.id} recipe={detail.art} size={16} /> } : {}),
   }
   tabs.set(summary, tab)
@@ -61,7 +60,7 @@ export function Workspace() {
             .filter((tab) => mounted.has(tab.id))
             .map((tab) => (
               <Activity key={tab.id} mode={tab.id === state.active ? 'visible' : 'hidden'}>
-                <TopicTab id={tab.id} stealth={tab.stealth} />
+                <TopicTab id={tab.id} />
               </Activity>
             ))}
     </WorkspaceView>

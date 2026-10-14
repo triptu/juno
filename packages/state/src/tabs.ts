@@ -7,14 +7,13 @@
  *   that is already open focuses its tab instead.
  * - `closeTab`: closing the active tab focuses its right neighbour, or its
  *   left one when it was the last. Closing the last tab leaves none.
- * - `activateTab`, `cycleTab` (⌘⇧] and ⌘⇧[), `endStealth` (Mark read).
+ * - `activateTab`, `cycleTab` (⌘⇧] and ⌘⇧[).
  * - `mountedTabs`: the active tab and the 4 most recently active stay
  *   mounted in `<Activity>`; the rest unmount and keep a `ScrollSnapshot`.
  *
  * `tabsAtom` holds the tabs of the signed-in workspace. They are saved to
  * the workspace preference `TABS_PREF` on every change and read back from
- * it after a restart, stealth flags included. `updateTabs` is the one way
- * to change them.
+ * it after a restart. `updateTabs` is the one way to change them.
  */
 import { Option, Schema } from 'effect'
 import * as AsyncResult from 'effect/reactivity/AsyncResult'
@@ -28,8 +27,6 @@ import { signedInAtom } from './session'
 /** One open topic. A topic is open in at most one tab, so its id is the tab's. */
 export interface TopicTab {
   readonly id: string
-  /** Opened in stealth: nothing marks it read until its Mark read. */
-  readonly stealth: boolean
 }
 
 export interface Tabs {
@@ -48,7 +45,6 @@ export const MOUNTED_TABS = 5
 export interface OpenOptions {
   /** A new tab after the current one, instead of the current tab. */
   readonly newTab?: boolean
-  readonly stealth?: boolean
 }
 
 const touch = (recent: ReadonlyArray<string>, id: string): ReadonlyArray<string> => (recent[0] === id ? recent : [id, ...recent.filter((other) => other !== id)])
@@ -59,9 +55,9 @@ export function activateTab(tabs: Tabs, id: string): Tabs {
   return { ...tabs, active: id, recent: touch(tabs.recent, id) }
 }
 
-export function openTab(tabs: Tabs, id: string, { newTab = false, stealth = false }: OpenOptions = {}): Tabs {
+export function openTab(tabs: Tabs, id: string, { newTab = false }: OpenOptions = {}): Tabs {
   if (tabs.tabs.some((tab) => tab.id === id)) return activateTab(tabs, id)
-  const tab: TopicTab = { id, stealth }
+  const tab: TopicTab = { id }
   const at = tabs.tabs.findIndex((other) => other.id === tabs.active)
   if (at < 0) return { tabs: [...tabs.tabs, tab], active: id, recent: touch(tabs.recent, id) }
   if (newTab) return { tabs: tabs.tabs.toSpliced(at + 1, 0, tab), active: id, recent: touch(tabs.recent, id) }
@@ -85,12 +81,6 @@ export function cycleTab(tabs: Tabs, step: 1 | -1): Tabs {
   if (count < 2) return tabs
   const at = Math.max(0, tabs.tabs.findIndex((tab) => tab.id === tabs.active))
   return activateTab(tabs, tabs.tabs[(at + step + count) % count]!.id)
-}
-
-export function endStealth(tabs: Tabs, id: string): Tabs {
-  const at = tabs.tabs.findIndex((tab) => tab.id === id)
-  if (at < 0 || !tabs.tabs[at]!.stealth) return tabs
-  return { ...tabs, tabs: tabs.tabs.with(at, { id, stealth: false }) }
 }
 
 /** The tabs that stay mounted. */
@@ -120,7 +110,7 @@ export function dividerIndex(order: ReadonlyArray<string>, lastReadTs: string | 
 export const TABS_PREF = 'tabs'
 
 const TabsJson = Schema.Struct({
-  tabs: Schema.Array(Schema.Struct({ id: Schema.String, stealth: Schema.Boolean })),
+  tabs: Schema.Array(Schema.Struct({ id: Schema.String })),
   active: Schema.NullOr(Schema.String),
   recent: Schema.Array(Schema.String),
 })
@@ -170,21 +160,20 @@ export function updateTabs(registry: Registry, change: (tabs: Tabs) => Tabs): Ta
 /** A tab as the strip draws it. */
 export interface TabSummary {
   readonly id: string
-  readonly stealth: boolean
   /** The topic's header: undefined until it arrives, null for a topic the store does not know. */
   readonly detail: TopicDetail | null | undefined
 }
 
 const sameStrip = (a: ReadonlyArray<TabSummary>, b: ReadonlyArray<TabSummary>) => a.length === b.length && a.every((tab, i) => tab === b[i])
 
-/** The tabs with their headers, for the strip. A tab keeps its object while its flag and header hold. */
+/** The tabs with their headers, for the strip. A tab keeps its object while its header holds. */
 export const tabStripAtom = Atom.make((get): ReadonlyArray<TabSummary> => {
   const previous = new Map(Option.getOrElse(get.self<ReadonlyArray<TabSummary>>(), () => []).map((tab) => [tab.id, tab]))
   return get(tabsAtom).tabs.map((tab) => {
     const result = get(topicAtom(tab.id))
     const detail = AsyncResult.isSuccess(result) ? result.value : undefined
     const held = previous.get(tab.id)
-    return held !== undefined && held.stealth === tab.stealth && held.detail === detail ? held : { ...tab, detail }
+    return held !== undefined && held.detail === detail ? held : { ...tab, detail }
   })
 }).pipe(Atom.withEquality(sameStrip))
 

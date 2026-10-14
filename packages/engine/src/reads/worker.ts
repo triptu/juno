@@ -41,7 +41,7 @@ const PASS_RETRY_MILLIS = 5_000
 /** Lookups that cannot reach Slack are tried again this many times, about a minute in all. */
 const LOOKUP_RETRIES = 6
 
-type Topic = Exclude<ParsedTopicId, { readonly kind: 'group' }>
+type Topic = ParsedTopicId
 
 export class MarkWorker extends Context.Service<
   MarkWorker,
@@ -95,7 +95,7 @@ export class MarkWorker extends Context.Service<
             const now = yield* Clock.currentTimeMillis
             if (mark === undefined || mark.nextAt > now) return
             const parsed = parseTopicId(topicId)
-            if (parsed === undefined || parsed.kind === 'group' || !(yield* local(mirrorSetting(config))).on) {
+            if (parsed === undefined || !(yield* local(mirrorSetting(config))).on) {
               return yield* local(transaction(dropMark(topicId)))
             }
             const topic = parsed

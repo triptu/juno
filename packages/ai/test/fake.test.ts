@@ -2,7 +2,7 @@
 import { Effect, Stream } from 'effect'
 import { describe, expect, it } from 'vitest'
 import { AiProvider, FakeAiProvider, chatTools, tasks, type ChatEvent, type Decision } from '../src/index'
-import { C, NOW, T, channels, msg, people, postgres, stagingBill } from './fixtures'
+import { NOW, T, channels, msg, people, postgres, stagingBill } from './fixtures'
 
 const run = <A>(f: (p: typeof AiProvider.Service) => Effect.Effect<A>) =>
   Effect.runPromise(Effect.gen(function* () {
@@ -35,26 +35,6 @@ describe('FakeAiProvider decisions', () => {
     expect(open.score).toBeLessThan(0.3)
   })
 
-  it('groups three related Main messages and skips the unrelated one', async () => {
-    const out = decided(
-      await run((p) =>
-        p.decide(tasks.groupRun, {
-          channelId: C('C0ENG'),
-          channel: '#eng',
-          messages: [
-            { ...msg('Sam Okafor', 'Anyone seeing slow queries on the reports page since the deploy?', 35), ts: '1.000100' },
-            { ...msg('Dev Patel', 'Reports page is slow for me too, queries take two seconds.', 33), ts: '1.000200' },
-            { ...msg('Priya Raman', 'Lunch at 12:30?', 32), ts: '1.000300' },
-            { ...msg('Leo Park', 'The deploy dropped an index, reports queries should be fast again now.', 30), ts: '1.000400' },
-          ],
-        }),
-      ),
-    )
-    expect(out.group).not.toBeNull()
-    expect(out.group!.messageTs).toEqual(['1.000100', '1.000200', '1.000400'])
-    expect(out.group!.title.length).toBeGreaterThan(0)
-    expect(out.group!.title.length).toBeLessThanOrEqual(60)
-  })
 
   it('gates an outage as urgent and a joke as chatter', async () => {
     const base = { channel: '#incidents', channelKind: 'public' as const, mentionsMe: false, now: NOW }
@@ -74,20 +54,6 @@ describe('FakeAiProvider decisions', () => {
     expect(search.command).toBeNull()
   })
 
-  it('builds a waiting-on-you card for an unanswered question and points it at the topic', async () => {
-    const out = decided(
-      await run((p) =>
-        p.decide(tasks.forYou, {
-          me: 'Tushar',
-          now: NOW,
-          topics: [{ id: postgres.id, title: postgres.title, channel: '#eng', unread: 1, messages: [...postgres.recent, msg('Sam Okafor', 'Can you be on call Saturday?', 5)] }],
-        }),
-      ),
-    )
-    expect(out.cards).toHaveLength(1)
-    expect(out.cards[0]).toMatchObject({ type: 'waiting_on_you', topicId: postgres.id })
-    expect(out.cards[0]!.options!.length).toBeGreaterThan(0)
-  })
 })
 
 describe('FakeAiProvider generation', () => {
@@ -137,10 +103,6 @@ describe('FakeAiProvider generation', () => {
     expect(decision).toMatchObject({ _tag: 'NoDecision', reason: 'invalid-output', detail: 'element <text> is not allowed' })
   })
 
-  it('writes a catch-up that names the senders and the last message', async () => {
-    const text = decided(await run((p) => p.generate(tasks.catchUp, { topicId: stagingBill.id, title: stagingBill.title, channel: '#eng', before: [], unread: stagingBill.recent })))
-    expect(text).toBe('2 new from Leo and Jonas. Jonas: We left the perf cluster running after the load test.')
-  })
 })
 
 const collect = (events: Stream.Stream<ChatEvent>) => Stream.runCollect(events)

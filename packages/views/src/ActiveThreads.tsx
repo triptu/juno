@@ -1,9 +1,8 @@
 import * as stylex from '@stylexjs/stylex'
-import { Bell } from '@phosphor-icons/react/dist/icons/Bell'
 import { useId } from 'react'
 import type { ThreadSummary } from '@juno/contract'
 import { spacing } from '@juno/tokens/tokens.stylex'
-import { Chip, EmptyState, IconButton, ListRow, Text, type ActivateEvent } from '@juno/ui'
+import { Chip, EmptyState, ListRow, Text, type ActivateEvent } from '@juno/ui'
 import { countLabel } from './look'
 import { relativeTime } from './time'
 
@@ -14,16 +13,14 @@ export interface ActiveThreadsProps {
   readonly status?: 'ready' | 'loading'
   /** Fires on mouse down; `event.metaKey` asks for a new tab. */
   readonly onOpen: (id: string, event: ActivateEvent) => void
-  readonly onSubscribe: (id: string) => void
-  readonly onUnsubscribe: (id: string) => void
 }
 
 /**
  * The channel's threads with recent activity, behind Main's "Threads"
- * button: title, reply count and time, the unread count and the Subscribe
- * bell. Opening one uses the current tab; subscribing adds it to the sidebar.
+ * button: title, reply count and time, and the unread count. Opening one
+ * uses the current tab.
  */
-export function ActiveThreads({ threads, now, status = 'ready', onOpen, onSubscribe, onUnsubscribe }: ActiveThreadsProps) {
+export function ActiveThreads({ threads, now, status = 'ready', onOpen }: ActiveThreadsProps) {
   if (threads.length === 0) {
     return status === 'loading' ? (
       <div {...stylex.props(styles.quiet)}>
@@ -38,7 +35,7 @@ export function ActiveThreads({ threads, now, status = 'ready', onOpen, onSubscr
   return (
     <div role="list" aria-label="Threads" {...stylex.props(styles.list)}>
       {threads.map((thread, index) => (
-        <ThreadEntry key={thread.id} thread={thread} now={now} divider={index < threads.length - 1} onOpen={onOpen} onSubscribe={onSubscribe} onUnsubscribe={onUnsubscribe} />
+        <ThreadEntry key={thread.id} thread={thread} now={now} divider={index < threads.length - 1} onOpen={onOpen} />
       ))}
     </div>
   )
@@ -49,15 +46,13 @@ interface ThreadEntryProps {
   readonly now: number
   readonly divider: boolean
   readonly onOpen: (id: string, event: ActivateEvent) => void
-  readonly onSubscribe: (id: string) => void
-  readonly onUnsubscribe: (id: string) => void
 }
 
 /**
  * One thread: a list item holding a button named by the title, described by
  * the counts and the reply line, as a sidebar row is.
  */
-function ThreadEntry({ thread, now, divider, onOpen, onSubscribe, onUnsubscribe }: ThreadEntryProps) {
+function ThreadEntry({ thread, now, divider, onOpen }: ThreadEntryProps) {
   const titleId = useId()
   const metaId = useId()
   const stateId = useId()
@@ -75,16 +70,6 @@ function ThreadEntry({ thread, now, divider, onOpen, onSubscribe, onUnsubscribe 
         aria-labelledby={titleId}
         aria-describedby={state === '' ? metaId : `${stateId} ${metaId}`}
         data-thread-id={thread.id}
-        trailing={
-          <IconButton
-            icon={Bell}
-            label="Subscribe"
-            size={28}
-            iconSize={16}
-            pressed={thread.subscribed}
-            onClick={() => (thread.subscribed ? onUnsubscribe(thread.id) : onSubscribe(thread.id))}
-          />
-        }
       >
         <span {...stylex.props(styles.body)}>
           <span {...stylex.props(styles.line)}>

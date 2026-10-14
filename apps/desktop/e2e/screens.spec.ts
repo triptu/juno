@@ -24,7 +24,7 @@ test('the sidebar, light and dark', async ({ juno, win }) => {
   await win.waitForTimeout(300)
   await win.screenshot({ path: resolve(screens, 'sidebar-light.png') })
 
-  await sidebar.themeButton.click()
+  await juno.setTheme('Dark')
   await win.mouse.move(900, 400)
   await expect(win.locator('html')).not.toHaveAttribute('data-theme-switching', /.*/)
   await win.waitForTimeout(300)
