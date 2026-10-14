@@ -609,7 +609,7 @@ S4 (how to reach T3) is resolved by the owner and replaced by S8.
 | **M6 Codex** | WP20 | Sol via Codex in the picker. ChatGPT sign-in if feasible |
 | **M7 Ownership** | WP21, flow 14 | |
 
-Each UI milestone ends with the design and performance reviews. WP23 runs from M2 onward.
+Each UI milestone ends with the design and performance reviews. WP23 runs from M2 onward. `m1-review.md` sets M2's launch order. It splits WP13 into a host side (`agent-juno`, `engine/src/agent-host`, the outbox mode, the desktop process wiring), which needs only the WP6 contracts and starts with WP8, and a wire-up (`state/src/agent`, removing `chat` from `ai`, the protocol-2 switch), which needs WP11.
 
 ## 18. Open questions for the owner
 
