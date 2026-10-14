@@ -251,7 +251,7 @@ function Topic({ id, stealth, detail }: { readonly id: string; readonly stealth:
   const [far, setFar] = useState(false)
   // The newest message the user has seen at the bottom; the pill counts those after it.
   const [seenTs, setSeenTs] = useState<string | undefined>(undefined)
-  // What the position holds to while rows reach their real height, and the scrollTop it last set.
+  // The position to hold (`Pin`), and the scrollTop it last set.
   const pin = useRef<Pin | undefined>(undefined)
   const pinnedTop = useRef(0)
   // The last message and window size the bottom was held for.
