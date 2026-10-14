@@ -43,7 +43,7 @@ export function QuestionCard({ card, actions, enter }: QuestionCardProps) {
       buttons={
         card.freeText ? (
           <div {...stylex.props(styles.replyRow)}>
-            <TextField size={30} label={copy.reply} value={reply} onChange={(event) => setReply(event.currentTarget.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); submit() } }} disabled={!open} dir="auto" />
+            <TextField size={30} label={copy.reply} value={reply} onChange={(event) => setReply(event.currentTarget.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); submit() } }} readOnly={!open} aria-disabled={!open || undefined} dir="auto" />
             <Button variant="secondary" size="md" onClick={submit} dimmed={reply.trim().length === 0}>
               {copy.reply}
             </Button>
@@ -56,7 +56,7 @@ export function QuestionCard({ card, actions, enter }: QuestionCardProps) {
       </Text>
       <div role="group" aria-label={copy.junoAsks} {...stylex.props(styles.options)}>
         {card.options.map((option) => (
-          <button key={option.id} type="button" disabled={!open} dir="auto" onClick={() => actions.onCard(card.id, { _tag: 'choose', optionId: option.id })} {...stylex.props(styles.option)}>
+          <button key={option.id} type="button" aria-disabled={!open || undefined} dir="auto" onClick={() => open && actions.onCard(card.id, { _tag: 'choose', optionId: option.id })} {...stylex.props(styles.option, !open && styles.optionSettled)}>
             {option.label}
           </button>
         ))}
@@ -122,6 +122,10 @@ const styles = stylex.create({
     outlineWidth: sizes['--focus-ring-width'],
     outlineOffset: sizes['--focus-ring-offset'],
     outlineColor: accent['--focus-ring'],
+  },
+  // Settled: the options stay for the record, with no hover, press or pointer.
+  optionSettled: {
+    pointerEvents: 'none',
   },
   replyRow: {
     display: 'flex',

@@ -41,7 +41,9 @@ export interface ChatCardProps {
  * which holds the buttons while the card is open and the after-line once
  * it has settled. The footer keeps its height through that change, so a
  * click never moves what is under the card. A `working` card dims its
- * buttons; the view never composes an after-line, it prints `status.line`.
+ * buttons and keeps every control in place (dimmed, not removed) until the
+ * outcome arrives; the view never composes an after-line, it prints
+ * `status.line`.
  */
 export function ChatCard({ id, kind, actions, label, source, status, because, dismiss = false, buttons, footer = true, padding = 'normal', enter = true, children }: ChatCardProps) {
   const open = status === undefined || status._tag === 'open'
@@ -59,8 +61,8 @@ export function ChatCard({ id, kind, actions, label, source, status, because, di
             {source}
           </>
         ) : null}
-        {dismiss && open ? (
-          <span {...stylex.props(styles.dismiss)}>
+        {dismiss && (open || working) ? (
+          <span {...stylex.props(styles.dismiss, working && styles.working)}>
             <IconButton icon={X} label={chatCopy.card.dismiss} size={22} radius="sm" iconSize={12} tone="muted" onClick={() => actions.onCard(id, { _tag: 'dismiss' })} />
           </span>
         ) : null}

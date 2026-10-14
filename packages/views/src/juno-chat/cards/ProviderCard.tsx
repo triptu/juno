@@ -38,7 +38,7 @@ export function ProviderCard({ card, actions, enter }: ProviderCardProps) {
       </Text>
       <div role="radiogroup" aria-label={copy.title} {...stylex.props(styles.options)}>
         {card.options.map((option) => (
-          <button key={option.id} type="button" role="radio" aria-checked={option.id === selected} disabled={!open} onClick={() => setSelected(option.id)} {...stylex.props(styles.option, option.id === selected && styles.optionSelected)}>
+          <button key={option.id} type="button" role="radio" aria-checked={option.id === selected} aria-disabled={!open || undefined} onClick={() => open && setSelected(option.id)} {...stylex.props(styles.option, option.id === selected && styles.optionSelected, !open && styles.optionSettled)}>
             <Text variant="preview" weight="medium" tone="default" truncate>
               {option.label}
             </Text>
@@ -100,6 +100,9 @@ const styles = stylex.create({
     outlineWidth: sizes['--focus-ring-width'],
     outlineOffset: `calc(-1 * ${sizes['--focus-ring-width']})`,
     outlineColor: accent['--focus-ring'],
+  },
+  optionSettled: {
+    pointerEvents: 'none',
   },
   optionSelected: {
     borderColor: colors['--border-strong'],

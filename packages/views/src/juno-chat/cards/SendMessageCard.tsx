@@ -23,6 +23,8 @@ export interface SendMessageCardProps {
 export function SendMessageCard({ card, actions, enter }: SendMessageCardProps) {
   const [texts, setTexts] = useState<Readonly<Record<string, string>>>(() => Object.fromEntries(card.messages.map((m) => [m.id, m.text])))
   const editable = card.status._tag === 'open'
+  // The text stays in its box while the send is in flight, read-only; the static text takes over once every row has settled.
+  const inBox = editable || card.status._tag === 'working'
   const copy = chatCopy.card.sendMessage
   const first = card.messages[0]
   const source = first === undefined ? undefined : <ContextPill tint={first.target.tint} icon={placeIconFor(first.target)} name={first.target.name} kindLabel={first.target.kindLabel} size={22} />
@@ -45,7 +47,7 @@ export function SendMessageCard({ card, actions, enter }: SendMessageCardProps) 
     >
       <div role="list" {...stylex.props(styles.rows)}>
         {card.messages.map((message) => (
-          <Row key={message.id} message={message} text={texts[message.id] ?? message.text} editable={editable} onChange={(text) => setTexts((prev) => ({ ...prev, [message.id]: text }))} onSendRow={(id) => actions.onCard(card.id, { _tag: 'sendRow', messageId: id })} actions={actions} />
+          <Row key={message.id} message={message} text={texts[message.id] ?? message.text} editable={editable} inBox={inBox} onChange={(text) => setTexts((prev) => ({ ...prev, [message.id]: text }))} onSendRow={(id) => actions.onCard(card.id, { _tag: 'sendRow', messageId: id })} actions={actions} />
         ))}
       </div>
     </ChatCard>
@@ -56,6 +58,7 @@ function Row({
   message,
   text,
   editable,
+  inBox,
   onChange,
   onSendRow,
   actions,
@@ -63,6 +66,7 @@ function Row({
   readonly message: ProposedMessage
   readonly text: string
   readonly editable: boolean
+  readonly inBox: boolean
   readonly onChange: (text: string) => void
   readonly onSendRow: (id: ProposedMessageId) => void
   readonly actions: ChatActions
@@ -80,8 +84,8 @@ function Row({
           </Text>
         ) : null}
       </div>
-      {editable ? (
-        <Textarea variant="card" label={`Message to ${message.target.name}`} value={text} onChange={(event) => onChange(event.currentTarget.value)} dir="auto" />
+      {inBox ? (
+        <Textarea variant="card" label={`Message to ${message.target.name}`} value={text} readOnly={!editable} onChange={(event) => onChange(event.currentTarget.value)} dir="auto" />
       ) : (
         <p dir="auto" {...stylex.props(styles.sentText)}>
           {text}
