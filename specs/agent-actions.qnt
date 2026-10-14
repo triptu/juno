@@ -12,6 +12,10 @@ module actionsProtocol {
   type Receipt = { attempt: int, child: int, payload: Payload }
   type Grant = { target: int, opClass: int, source: int, rev: int }
   type Occurrence = { schedule: int, rev: int, due: int }
+  // One spend reservation (WP9 `spend_reservations`). `actual` counts once
+  // settled. `charged` is a ghost: what the provider really billed.
+  type Spend = { id: int, day: int, compact: bool, amount: int, state: str, actual: int, charged: int }
+  type Raise = { click: int, day: int }
   type State = {
     batchId: int, batchOrder: List[Intent], expanded: List[Intent],
     intents: Set[Intent], current: int -> int, approvals: Set[Approval], auths: Set[Authorization],
@@ -23,8 +27,8 @@ module actionsProtocol {
     ownerRun: bool, clean: bool, sourceInRun: bool, grants: Set[Grant],
     schedule: bool, scheduleRev: int, scheduleAuthority: str, scheduleProposal: int, scheduleApproved: int, wake: Occurrence,
     queued: bool, admissions: List[Occurrence], starts: List[Occurrence],
-    quiet: bool, deliverNow: bool, notifications: int, cap: int, raises: int,
-    reserved: int, actual: int, unknownSpend: int, compaction: int,
+    quiet: bool, deliverNow: bool, notifications: int,
+    spends: Set[Spend], nextSpend: int, day: int, caps: int -> int, raiseLog: List[Raise],
     sealed: bool, label: str, target: int
   }
   var s: State
@@ -48,9 +52,12 @@ module actionsProtocol {
     ownerRun: true, clean: true, sourceInRun: true, grants: Set(),
     schedule: false, scheduleRev: 1, scheduleAuthority: "none", scheduleProposal: 0, scheduleApproved: 0,
     wake: { schedule: 1, rev: 1, due: 1 }, queued: false, admissions: List(), starts: List(),
-    quiet: false, deliverNow: false, notifications: 0, cap: 8, raises: 0,
-    reserved: 0, actual: 0, unknownSpend: 0, compaction: 0, sealed: false, label: "init", target: 0
+    quiet: false, deliverNow: false, notifications: 0,
+    spends: Set(), nextSpend: 1, day: 0, caps: days.mapBy(_ => 8), raiseLog: List(), sealed: false, label: "init", target: 0
   }
+  pure val days = 0.to(2)
+  // A dollar is 4 units; the default cap is $2.
+  pure val dollar = 4
   action init = all { s' = initial, before' = initial, pc' = 0, remaining' = drainLimit, scenario' = 0 }
   def currentIntent(k: int): Set[Intent] = s.intents.filter(i => i.id == k and i.rev == s.current.get(k))
   def done(k: int): bool = s.receipts.exists(r => r.child == k)
@@ -207,15 +214,53 @@ module actionsProtocol {
   action notify(guard: bool): bool =
     if (s.off or (guard and s.quiet and not(s.deliverNow))) idle else
     s' = { ...s, notifications: s.notifications + 1, label: "notify" }
-  // All model paths share one reservation transaction. Unknown usage keeps
-  // its reservation; a second sub-budget never expands the owner's total cap.
-  action reserve(compact: bool, guard: bool): bool =
-    if (guard and (s.reserved + s.actual + 2 > s.cap + s.raises or (compact and s.compaction + 2 > (s.cap + s.raises) / 4))) idle else
-    s' = { ...s, reserved: s.reserved + 2, compaction: s.compaction + (if (compact) 2 else 0), label: "reserve" }
-  action settleSpend(lost: bool, guard: bool): bool =
-    if (s.reserved - s.unknownSpend < 2) idle else s' = { ...s,
-      reserved: s.reserved - (if (lost and guard) 0 else 2), actual: s.actual + (if (lost) 0 else 1),
-      unknownSpend: s.unknownSpend + (if (lost) 2 else 0), label: "spend" }
+  // WP9's spend ledger (packages/agent/src/spend). All model paths share one
+  // reservation transaction, per local day. Open and unknown reservations
+  // count their full amount; a settled one counts only its actual cost,
+  // compaction included. Unknown usage keeps its reservation on its day for
+  // good. A second sub-budget never expands the owner's total cap.
+  def sumOn(d: int, f: Spend => int): int = s.spends.filter(r => r.day == d).fold(0, (acc, r) => acc + f(r))
+  def reservedOn(d: int): int = sumOn(d, r => if (r.state != "settled") r.amount else 0)
+  def actualOn(d: int): int = sumOn(d, r => if (r.state == "settled") r.actual else 0)
+  // `compactionReleased` is the bug that forgets a settled compaction's actual cost.
+  def compactionOn(d: int, bug: str): int = sumOn(d, r =>
+    if (not(r.compact)) 0 else if (r.state != "settled") r.amount else if (bug == "compactionReleased") 0 else r.actual)
+  // The limit the ledger sees: each recorded raise adds a dollar.
+  def limitOn(d: int): int = s.caps.get(d) + dollar * s.raiseLog.select(x => x.day == d).length()
+  // The limit the owner granted: one dollar per distinct click.
+  def grantedOn(d: int): int = s.caps.get(d) + dollar * s.raiseLog.select(x => x.day == d).foldl(Set(), (acc, x) => acc.union(Set(x.click))).size()
+  def fits(compact: bool, amount: int, bug: str): bool =
+    reservedOn(s.day) + actualOn(s.day) + amount <= limitOn(s.day) and
+    (not(compact) or compactionOn(s.day, bug) + amount <= limitOn(s.day) / 4)
+  action reserve(compact: bool, guard: bool, bug: str): bool =
+    if (guard and not(fits(compact, 2, bug))) s' = { ...s, label: "budgetBlocked" } else
+    s' = { ...s, spends: s.spends.union(Set({ id: s.nextSpend, day: s.day, compact: compact, amount: 2, state: "reserved", actual: 0, charged: 0 })),
+      nextSpend: s.nextSpend + 1, label: "reserve" }
+  // Settles the oldest open reservation on its own day. `outcome` is what the
+  // guard saw: "done" (reported cost `cost`), "refused" (refused before any
+  // output: a known zero) or "lost" (anything else: unknown, kept in full).
+  val oldestOpen: Set[Spend] = s.spends.filter(r => r.state == "reserved" and
+    s.spends.forall(o => o.state != "reserved" or o.id >= r.id))
+  action settle(outcome: str, cost: int, charge: int, bug: str): bool =
+    if (oldestOpen == Set()) idle else {
+      nondet r = oldestOpen.oneOf()
+      val known = outcome != "lost" or bug == "spend"
+      val settled = { ...r, state: if (known) "settled" else "unknown", actual: if (outcome == "done") cost else 0, charged: charge,
+        day: if (bug == "settleToday") s.day else r.day }
+      s' = { ...s, spends: s.spends.exclude(Set(r)).union(Set(settled)), label: "spend" }
+    }
+  // "Allow $1 more today": a trusted click, keyed by its operation id.
+  action allowDollar(click: int, guard: bool): bool =
+    if (guard and s.raiseLog.select(x => x.click == click).length() > 0) s' = { ...s, label: "raise" } else
+    s' = { ...s, raiseLog: s.raiseLog.append({ click: click, day: s.day }), label: "raise" }
+  // The local date changes. The new day starts at the default cap.
+  action newDay = if (s.day >= 2) idle else s' = { ...s, day: s.day + 1, label: "newDay" }
+  // Settings may lower today's cap only as far as today's obligations.
+  action setCap(amount: int): bool = {
+    val limit = amount + limitOn(s.day) - s.caps.get(s.day)
+    if (reservedOn(s.day) + actualOn(s.day) > limit or compactionOn(s.day, "") > limit / 4) idle else
+    s' = { ...s, caps: s.caps.set(s.day, amount), label: "setCap" }
+  }
   action invalidate(kind: str): bool = s' = { ...s,
     schema: s.schema + (if (kind == "schema") 1 else 0), account: s.account + (if (kind == "account") 1 else 0),
     connection: s.connection + (if (kind == "connection") 1 else 0),
@@ -274,13 +319,19 @@ module actionsProtocol {
     (s.scheduleAuthority == "click" and (s.label != "scheduleClick" or
       (before.scheduleProposal > 0 and before.scheduleApproved == before.scheduleProposal)))
   val cleanRunForNoClick = newAuths.forall(a => not(a.grant) or (before.ownerRun and before.clean))
-  val capHard = s.reserved + s.actual <= s.cap + s.raises and s.unknownSpend <= s.reserved and s.compaction <= (s.cap + s.raises) / 4
+  // Per day: what the ledger holds stays within the cap and the owner's raises,
+  // compaction within a quarter of it, and no reservation records less than
+  // the provider charged.
+  val capHard = days.forall(d => reservedOn(d) + actualOn(d) <= grantedOn(d) and compactionOn(d, "") <= grantedOn(d) / 4) and
+    s.spends.forall(r => r.charged <= (if (r.state == "settled") r.actual else r.amount))
+  val oneRaisePerClick = s.raiseLog.indices().forall(i => s.raiseLog.indices().forall(j =>
+    i == j or s.raiseLog.nth(i).click != s.raiseLog.nth(j).click))
   val safety = intentBeforeDispatch and approvalExact and approvalCurrentAtAuthorization and approvalConsumption and
     noHiddenRetry and retryRequiresAuthority and unknownPreserved and dedupeIdentityStable and dedupedEffectOnce and
     receiptMatchesAction and scopedNoClickGrant and untrustedCannotGrant and tier4NeverDispatched and allWritesGated and
     currentOwnerAuthorizes and pauseBlocksAuthorization and quietHoursHoldNotifications and scheduleGrantValid and
     occurrenceAdmissionOnce and cancelWinsBeforeAdmission and batchEffectsIndependent and outcomeEvidenceStable and
-    scheduleFromOwnerAuthority and cleanRunForNoClick and capHard
+    scheduleFromOwnerAuthority and cleanRunForNoClick and capHard and oneRaisePerClick
 
   val pendingApproved = ids.filter(k => not(done(k)) and currentIntent(k).exists(i => valid(i) and
     s.approvals.exists(p => p.child == k and p.rev == i.rev and p.digest == i.payload and
@@ -316,7 +367,11 @@ module actionsProtocol {
       authorizeDispatch(k), transportSend(k), destinationAccept(k), recordReceipt(k), lose(k), reject(k), reconcile(k, true, true),
       crash, startup(true), pause("pause"), cancel(true), taint(true), grantWith(k, true),
       proposeSchedule, clickSchedule, scheduleFromClick(true), scheduleWith(true), queueWake, deleteSchedule, admitWake(""), startWake(true),
-      invalidate("redact"), invalidate("schema"), reserve(false, true), reserve(true, true), settleSpend(true, true), settleSpend(false, true), seal }
+      invalidate("redact"), invalidate("schema"), seal,
+      all { s.nextSpend < 8, reserve(false, true, "") }, all { s.nextSpend < 8, reserve(true, true, "") },
+      { nondet cost = 0.to(2).oneOf(); settle("done", cost, cost, "") }, settle("refused", 0, 0, ""),
+      { nondet charge = 0.to(2).oneOf(); settle("lost", 0, charge, "") },
+      { nondet click = 1.to(2).oneOf(); allowDollar(click, true) }, newDay, setCap(4) }
   }
   action simulationStep = all { not(reachedAgreement), tick(if (s.sealed) progress else input) }
   temporal unknownEventuallyExplained = progress.weakFair(s).implies(eventually(always(s.sealed)).implies(eventually(always(s.unknown.subseteq(s.explained)))))
@@ -362,8 +417,15 @@ module actionsProtocol {
     if (op == "startWake") startWake(bug != "startWake") else
     if (op == "quiet") s' = { ...s, quiet: true, label: "quiet" } else
     if (op == "notify") notify(bug != "notify") else
-    if (op == "reserve") reserve(k == 1, bug != "cap") else
-    if (op == "spend") settleSpend(true, bug != "spend") else
+    if (op == "reserve") reserve(k == 1, bug != "cap", bug) else
+    if (op == "spend") settle("lost", 0, 1, bug) else
+    // A stream that failed after output is lost; `lostAsRefused` settles it as a refusal.
+    if (op == "failAfterOutput") settle(if (bug == "lostAsRefused") "refused" else "lost", 0, 1, bug) else
+    if (op == "refused") settle("refused", 0, 0, bug) else
+    if (op == "settle") settle("done", k, k, bug) else
+    if (op == "overReport") settle("done", 3, 3, bug) else
+    if (op == "raise") allowDollar(k, bug != "raiseTwice") else
+    if (op == "newDay") newDay else
     if (op == "owner") s' = { ...s, active: false, epoch: 2, label: "owner" } else
     invalidate(op)
   }
@@ -480,6 +542,30 @@ module actionsProtocol {
   pure val compactionBudget = List(c("reserve", 1), c("reserve", 1))
   action compactionBudgetStep = script(compactionBudget, "")
   action compactionBudgetBugStep = script(compactionBudget, "cap")
+  // WP9: a settled compaction counts its actual cost, not its reservation.
+  pure val compactionSettle = List(c("reserve", 1), c("settle", 1), c("reserve", 1))
+  action compactionSettleStep = script(compactionSettle, "")
+  action compactionSettleBugStep = script(compactionSettle, "compactionReleased")
+  // WP9: a request refused before any output settles as a known zero and frees
+  // its reservation. A failure after output may have been billed.
+  pure val refusedSpend = List(c("reserve", 0), c("reserve", 0), c("reserve", 0), c("reserve", 0),
+    c("refused", 0), c("failAfterOutput", 0), c("reserve", 0))
+  action refusedSpendStep = script(refusedSpend, "")
+  action refusedSpendBugStep = script(refusedSpend, "lostAsRefused")
+  // WP9: a new day starts a new budget; yesterday's unknown stays on yesterday,
+  // and a late settlement stays on its reservation's day.
+  pure val dailyReset = List(c("reserve", 0), c("reserve", 0), c("reserve", 0), c("reserve", 0), c("spend", 0),
+    c("newDay", 0), c("reserve", 0), c("reserve", 0), c("reserve", 0), c("reserve", 0), c("settle", 1))
+  action dailyResetStep = script(dailyReset, "")
+  action dailyResetBugStep = script(dailyReset, "settleToday")
+  // WP9: "Allow $1 more today" counts once per click, however often it is delivered.
+  pure val raiseClick = List(c("reserve", 0), c("reserve", 0), c("reserve", 0), c("reserve", 0),
+    c("raise", 1), c("raise", 1), c("reserve", 0), c("reserve", 0), c("reserve", 0))
+  action raiseClickStep = script(raiseClick, "")
+  action raiseClickBugStep = script(raiseClick, "raiseTwice")
+  // Open gap in WP9: a reported cost above the reservation is recorded as is.
+  // It is not a corrected schedule; check.mjs expects this counterexample.
+  action overReportStep = script(List(c("reserve", 0), c("reserve", 0), c("reserve", 0), c("reserve", 0), c("overReport", 0)), "")
   pure val unknownDrain = List(c("propose", 0), c("click", 0), c("authorize", 0), c("send", 0), c("accept", 0), c("lose", 0))
   action unknownDrainStep = script(unknownDrain, "")
   action unknownDrainBugStep = script(unknownDrain, "drain")
@@ -503,8 +589,9 @@ module actionsProtocol {
     c("proposeSchedule", 0), c("scheduleClick", 0))
   action clickedScheduleStep = script(clickedSchedule, "")
   action clickedScheduleBugStep = script(clickedSchedule, "scheduleClick")
-  action suiteInit = { nondet which = 0.to(42).oneOf(); all { s' = initial, before' = initial, pc' = 0, remaining' = drainLimit, scenario' = which } }
-  val suiteCommands = List(negativeLookup, unknownRetry, hiddenRetry, approvalEdit, schemaRace, accountRace, connectionRace, preconditionRace, expireRace, redactRace, consumeBeforeSend, approvalReuse, startupAttempt, payloadBinding, receiptBinding, scopedGrant, reportGrant, reportLaunch, reportSchedule, wakeSchedule, destructive, ownerRace, pauseRace, stopRace, offRace, quietNotification, cancelWake, cancelQueuedWake, duplicateWake, lateCancel, partialBatch, dedupeKey, dedupeAccept, parallelBudget, unknownSpend, compactionBudget, unknownDrain, approvedDrain, wakeDrain, pauseDrain, attemptEvidence, batchOrderRace, clickedSchedule).nth(scenario)
+  action suiteInit = { nondet which = 0.to(46).oneOf(); all { s' = initial, before' = initial, pc' = 0, remaining' = drainLimit, scenario' = which } }
+  val suiteCommands = List(negativeLookup, unknownRetry, hiddenRetry, approvalEdit, schemaRace, accountRace, connectionRace, preconditionRace, expireRace, redactRace, consumeBeforeSend, approvalReuse, startupAttempt, payloadBinding, receiptBinding, scopedGrant, reportGrant, reportLaunch, reportSchedule, wakeSchedule, destructive, ownerRace, pauseRace, stopRace, offRace, quietNotification, cancelWake, cancelQueuedWake, duplicateWake, lateCancel, partialBatch, dedupeKey, dedupeAccept, parallelBudget, unknownSpend, compactionBudget, unknownDrain, approvedDrain, wakeDrain, pauseDrain, attemptEvidence, batchOrderRace, clickedSchedule,
+    compactionSettle, refusedSpend, dailyReset, raiseClick).nth(scenario)
   action suiteStep = script(suiteCommands, "")
   val case0 = scenario == 0 and reachedAgreement and (s.unknown == Set(1) and s.explained == Set(1))
   val case1 = scenario == 1 and reachedAgreement and (s.auths.size() == 1)
@@ -549,6 +636,12 @@ module actionsProtocol {
   val case40 = scenario == 40 and reachedAgreement and s.unknown == Set(2) and s.receipts.size() == 1
   val case41 = scenario == 41 and reachedAgreement and s.auths == Set()
   val case42 = scenario == 42 and reachedAgreement and not(s.schedule)
+  val case43 = scenario == 43 and reachedAgreement and s.spends.size() == 1 and compactionOn(0, "") == 1 and actualOn(0) == 1
+  val case44 = scenario == 44 and reachedAgreement and s.spends.size() == 5 and reservedOn(0) == 8 and
+    s.spends.exists(r => r.id == 1 and r.state == "settled" and r.actual == 0) and s.spends.exists(r => r.id == 2 and r.state == "unknown")
+  val case45 = scenario == 45 and reachedAgreement and reservedOn(1) == 8 and reservedOn(0) == 6 and actualOn(0) == 1 and
+    s.spends.exists(r => r.id == 1 and r.state == "unknown" and r.day == 0)
+  val case46 = scenario == 46 and reachedAgreement and s.spends.size() == 6 and s.raiseLog.length() == 1 and reservedOn(0) == 12
   action clickedScheduleWitnessStep = script(List(c("report", 0), c("proposeSchedule", 0),
     c("clickSchedule", 0), c("scheduleClick", 0)), "")
   val clickedScheduleCreated = reachedAgreement and s.schedule and s.scheduleAuthority == "click"

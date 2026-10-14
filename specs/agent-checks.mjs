@@ -43,6 +43,10 @@ export const actionCases = [
   ['attemptEvidence', 'unknownPreserved'],
   ['batchOrderRace', 'approvalExact'],
   ['clickedSchedule', 'scheduleFromOwnerAuthority'],
+  ['compactionSettle', 'capHard'],
+  ['refusedSpend', 'capHard'],
+  ['dailyReset', 'capHard'],
+  ['raiseClick', 'oneRaisePerClick'],
 ]
 
 export const recoveryCases = [
