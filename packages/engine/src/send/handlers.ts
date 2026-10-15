@@ -1,16 +1,18 @@
 /**
  * Handlers for the send routes (`contract/src/routes/send.ts`). The commands
  * write locally and wake `PostWorker` and `ActionWorker`; `drafts.get` follows the open
- * workspace and never calls Slack.
+ * workspace and never calls Slack. `messages.check` asks the AI provider (`checks.ts`).
  */
 import { NotSignedIn, SendRoutes } from '@juno/contract'
 import { liveQuery, transaction } from '@juno/store'
+import { AiProvider } from '@juno/ai'
 import { Effect, Stream } from 'effect'
 import { Outbox } from '../outbox'
 import { retryFirstRun, serveLiveValue, timed } from '../protocol/live'
 import { Workspace } from '../workspace'
 import { ActionWorker } from './actionWorker'
 import { deleteMessage, editMessage, reactToMessage } from './actions'
+import { checkMessage, dailyBudget, ROUTE_DAILY_BUDGET } from './checks'
 import { discardMessage, retryMessage, sendMessage } from './commands'
 import { draftKeys, readDraft, writeDraft } from './drafts'
 import { PostWorker } from './worker'
@@ -21,6 +23,8 @@ export const SendHandlers = SendRoutes.toLayer(
     const outbox = yield* Outbox
     const worker = yield* PostWorker
     const actions = yield* ActionWorker
+    const ai = yield* AiProvider
+    const routeBudget = dailyBudget(ROUTE_DAILY_BUDGET)
     const provide = <A, E>(effect: Effect.Effect<A, E, Workspace | Outbox>) =>
       effect.pipe(Effect.provideService(Workspace, workspace), Effect.provideService(Outbox, outbox), Effect.tap(() => Effect.andThen(worker.wake, actions.wake)))
     return {
@@ -30,6 +34,7 @@ export const SendHandlers = SendRoutes.toLayer(
       'messages.edit': ({ message, text }) => provide(editMessage(message, text)),
       'messages.delete': ({ message }) => provide(deleteMessage(message)),
       'messages.react': ({ message, name, on }) => provide(reactToMessage(message, name, on)),
+      'messages.check': (payload) => checkMessage(payload, routeBudget).pipe(Effect.provideService(Workspace, workspace), Effect.provideService(AiProvider, ai)),
       'drafts.get': ({ topicId }) =>
         serveLiveValue(
           workspace.changes.pipe(
