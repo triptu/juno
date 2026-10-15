@@ -778,6 +778,13 @@ test.describe.serial('topic view', () => {
         expect(distances.length).toBeGreaterThan(5)
         expect(Math.max(...distances)).toBeLessThanOrEqual(2)
       }
+      // Every row renders its hover toolbar, hidden until hover: its share of what an open builds.
+      const dom = await running.win.evaluate(() => {
+        const view = [...document.querySelectorAll<HTMLElement>('[data-topic-view]')].find((node) => node.offsetParent !== null)
+        const toolbars = [...(view?.querySelectorAll('[role="toolbar"][aria-label="Message actions"]') ?? [])]
+        return { rows: view?.querySelectorAll('[data-message-row]').length ?? 0, elements: view?.getElementsByTagName('*').length ?? 0, toolbars: toolbars.length, inToolbars: toolbars.reduce((sum, bar) => sum + bar.getElementsByTagName('*').length + 1, 0) }
+      })
+      console.log(`topic open DOM: ${dom.rows} rows, ${dom.elements} elements, ${dom.toolbars} hover toolbars with ${dom.inToolbars} elements (${((100 * dom.inToolbars) / Math.max(1, dom.elements)).toFixed(0)} %)`)
       const oneFrame = oneFrameBudget(await refreshInterval(running.win))
       within('topic open cached, p95', stats('topic open, cached 300 rows, press to rows painted at position (juno.topic-open)', cached).p95, 50)
       within('topic open prefetched, p95', stats('topic open, prefetched (juno.topic-open)', prefetched).p95, oneFrame)
