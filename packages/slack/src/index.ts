@@ -28,6 +28,7 @@ export {
   SlackTransportError,
   type SlackApiError,
 } from './client/errors.ts'
+export { searchMessages, type MessageMatch } from './client/search.ts'
 export { RequestQueue, type Lane, type RequestQueueShape } from './client/queue.ts'
 export { apiBaseFromWorkspace, SlackSession, slackRoute, type SlackSessionShape } from './client/session.ts'
 export { SlackSocket, SocketHandshake, type SlackSocketShape, type SocketEvent, type SocketHandshakeShape } from './client/socket.ts'
