@@ -231,6 +231,10 @@ export function decideNotification(
   return 'needsJudgement' in result ? result : result.decision
 }
 
+function level(kind: NotifyTarget['kind'], id: string, outcome: NotificationOutcome, reason: string): CausedDecision {
+  return { decision: { outcome, reason }, cause: { kind: 'level', target: { kind, id } } }
+}
+
 /** `decideNotification`, with what decided it. */
 export function decideWithCause(
   candidate: NotificationCandidate,
@@ -247,10 +251,6 @@ export function decideWithCause(
   const channelLevel = settings.channels[channel.id]
   const personLevel = settings.people[senderId]
   const person = context.userName?.(senderId) ?? senderId
-  const level = (kind: NotifyTarget['kind'], id: string, outcome: NotificationOutcome, reason: string): CausedDecision => ({
-    decision: { outcome, reason },
-    cause: { kind: 'level', target: { kind, id } },
-  })
   if (thread !== undefined && threadLevel === 'every') return level('thread', thread, 'now', 'This thread is set to Every message')
   if (channelLevel === 'every') return level('channel', channel.id, 'now', `${where} is set to Every message`)
   if (personLevel === 'every') return level('person', senderId, 'now', `${person} is set to Every message`)

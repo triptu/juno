@@ -48,7 +48,7 @@ import { liveQuery, prefs, StoreReader, transaction, type InvalidationKeys, type
 import { NotificationControl } from '../notificationRuntime'
 import { Outbox } from '../outbox'
 import { retryFirstRun, serveLiveValue, timed, type Run } from '../protocol/live'
-import { setSubscribed } from '../topics/commands'
+import { setSubscribed } from '../follow'
 import { Workspace, type StoreServices } from '../workspace'
 
 const SETTINGS_KEYS: InvalidationKeys = ['prefs']
@@ -212,6 +212,39 @@ const whyUnseen = (topicId: string, channel: string, ts: string, settings: Notif
     } satisfies Why
   })
 
+/** A thread topic id's channel and root, or undefined for anything else. */
+const thread = (id: string) => {
+  const parsed = parseTopicId(id)
+  return parsed?.kind === 'thread' ? parsed : undefined
+}
+
+/** The settings with one Notify me choice applied. When it matters is no entry; a thread's Never is its follow flag, not an entry. */
+const withLevel = (settings: NotificationSettings, target: NotifyTargetView, choice: NotifyChoice): NotificationSettings => {
+  const set = (map: Readonly<Record<string, 'every' | 'never'>> | undefined, allowNever: boolean) => {
+    const { [target.id]: _, ...rest } = map ?? {}
+    return choice === 'every' || (choice === 'never' && allowNever) ? { ...rest, [target.id]: choice } : rest
+  }
+  switch (target.kind) {
+    case 'channel':
+      return { ...settings, channels: set(settings.channels, true) }
+    case 'person':
+      return { ...settings, people: set(settings.people, true) }
+    case 'thread':
+      // A thread's Never is its follow flag, not a stored level.
+      return { ...settings, threads: set(settings.threads, false) }
+  }
+}
+
+/** A thread's choice from its follow flag and level. */
+const threadChoice = (id: string, settings: NotificationSettings) =>
+  Effect.gen(function* () {
+    const parsed = thread(id)
+    if (parsed === undefined) return 'never' as NotifyChoice
+    const sql = yield* StoreReader
+    const rows = yield* sql<{ subscribed: number }>`SELECT subscribed FROM thread_subs WHERE channel = ${parsed.channel} AND thread_ts = ${parsed.threadTs}`
+    return threadNotifyChoice(rows[0]?.subscribed === 1, settings.threads?.[id])
+  })
+
 export const NotificationsHandlers = NotificationsRoutes.toLayer(
   Effect.gen(function* () {
     const workspace = yield* Workspace
@@ -258,37 +291,6 @@ export const NotificationsHandlers = NotificationsRoutes.toLayer(
       const paused = pausedLabel(now, settings.notificationHours)
       return { presence, presenceLabel: presenceLabel(now, shown, settings.presenceHours), ...(paused === undefined ? {} : { paused }) } satisfies NotificationStatus
     })
-
-    const thread = (id: string) => {
-      const parsed = parseTopicId(id)
-      return parsed?.kind === 'thread' ? parsed : undefined
-    }
-
-    /** A thread's choice from its follow flag and level. */
-    const threadChoice = (id: string, settings: NotificationSettings) =>
-      Effect.gen(function* () {
-        const parsed = thread(id)
-        if (parsed === undefined) return 'never' as NotifyChoice
-        const sql = yield* StoreReader
-        const rows = yield* sql<{ subscribed: number }>`SELECT subscribed FROM thread_subs WHERE channel = ${parsed.channel} AND thread_ts = ${parsed.threadTs}`
-        return threadNotifyChoice(rows[0]?.subscribed === 1, settings.threads?.[id])
-      })
-
-    const withLevel = (settings: NotificationSettings, target: NotifyTargetView, choice: NotifyChoice): NotificationSettings => {
-      const set = (map: Readonly<Record<string, 'every' | 'never'>> | undefined, allowNever: boolean) => {
-        const { [target.id]: _, ...rest } = map ?? {}
-        return choice === 'every' || (choice === 'never' && allowNever) ? { ...rest, [target.id]: choice } : rest
-      }
-      switch (target.kind) {
-        case 'channel':
-          return { ...settings, channels: set(settings.channels, true) }
-        case 'person':
-          return { ...settings, people: set(settings.people, true) }
-        case 'thread':
-          // A thread's Never is its follow flag, not a stored level.
-          return { ...settings, threads: set(settings.threads, false) }
-      }
-    }
 
     const setLevel = (target: NotifyTargetView, choice: NotifyChoice) =>
       Effect.gen(function* () {
