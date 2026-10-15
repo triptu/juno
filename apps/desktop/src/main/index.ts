@@ -1,4 +1,5 @@
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, Notification, powerMonitor } from 'electron'
+import { Events, type NotificationTarget } from '@juno/contract'
 import { join } from 'node:path'
 import { createAgentSupervisor } from './agent'
 import { createSupervisor } from './engine'
@@ -7,7 +8,8 @@ import { readLaunch, writeLaunch, type Launch } from './launch'
 import { registerAppScheme, serveAppScheme } from './scheme'
 import { SecretsStore } from './secrets'
 import { SessionHost } from './session'
-import { createMainWindow, setSidebarHidden } from './window'
+import { Notifier, type ShownNotification } from './notifier'
+import { appWindow, createMainWindow, setSidebarHidden } from './window'
 
 // Every renderer runs in the Chromium sandbox. Must be called before ready.
 app.enableSandbox()
@@ -40,9 +42,41 @@ const keychainPassword = e2e ? process.env.JUNO_SLACK_SAFE_STORAGE_PASSWORD : un
 const supervisor = createSupervisor({
   ...(fakeSlackUrl === undefined ? {} : { fakeSlackUrl }),
   onMessage: (message) => {
-    if (!sessionHost.handle(message)) console.warn(`main: unhandled engine message ${message._tag}`)
+    if (!notifier.handle(message) && !sessionHost.handle(message)) console.warn(`main: unhandled engine message ${message._tag}`)
   },
 })
+
+/** Under JUNO_E2E notifications are recorded, not shown; a test clicks them through `junoTest`. */
+const notificationsForTests: Array<{ readonly title: string; readonly body: string; click: () => void }> = []
+let badgeForTests = ''
+
+/** A clicked notification: the app window comes forward, or opens, and the renderer opens the target. */
+function openTarget(target: NotificationTarget): void {
+  const window = appWindow() ?? openWindow()
+  if (window.isMinimized()) window.restore()
+  window.show()
+  window.focus()
+  window.webContents.send(Events.notificationOpen, target)
+}
+
+const notifier = new Notifier({
+  create: (options): ShownNotification => {
+    if (e2e) {
+      let listener = () => {}
+      notificationsForTests.push({ ...options, click: () => listener() })
+      return { show: () => {}, close: () => {}, onClick: (f) => { listener = f } }
+    }
+    const shown = new Notification({ title: options.title, body: options.body })
+    return { show: () => shown.show(), close: () => shown.close(), onClick: (f) => shown.on('click', f) }
+  },
+  setBadge: (text) => {
+    badgeForTests = text
+    if (!e2e) app.dock?.setBadge(text)
+  },
+  open: openTarget,
+  send: (message) => supervisor.send(message),
+})
+supervisor.onReady(() => notifier.engineReady())
 
 // The agent process starts only on request until the chat ships (ADR 0012, M2).
 const agent =
@@ -69,8 +103,10 @@ app.whenReady().then(() => {
   // A packaged app gets its icon from the bundle. In dev the Dock would show Electron's.
   if (process.platform === 'darwin' && !app.isPackaged) app.dock?.setIcon(join(__dirname, '../../build/icon.png'))
   serveAppScheme(join(__dirname, '../renderer'), fakeSlackUrl === undefined ? undefined : new URL(fakeSlackUrl).origin)
+  powerMonitor.on('resume', () => notifier.wake())
   registerIpc({
     supervisor,
+    setViewing: (topicId) => notifier.setViewing(topicId),
     setTheme: (theme) => updateLaunch({ theme }),
     setAccent: (accent) => updateLaunch({ accent }),
     setSidebar: (sidebar) => {
@@ -89,9 +125,10 @@ app.whenReady().then(() => {
   })
 })
 
-function openWindow(): void {
+function openWindow(): BrowserWindow {
   const window = createMainWindow(launch)
   window.on('close', () => updateLaunch({ bounds: window.getNormalBounds() }))
+  return window
 }
 
 app.on('window-all-closed', () => {
@@ -116,6 +153,10 @@ if (e2e) {
       agentState: () => agent?.currentState ?? 'stopped',
       agentHost: () => agent?.host?.host,
       agentPid: () => agent?.pid,
+      notifications: () => notificationsForTests.map(({ title, body }) => ({ title, body })),
+      clickNotification: (index: number) => notificationsForTests[index]?.click(),
+      dockBadge: () => badgeForTests,
+      wake: () => notifier.wake(),
     },
   })
 }

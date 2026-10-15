@@ -53,6 +53,16 @@ const bridge: JunoBridge = {
       }
     },
   },
+  notifications: {
+    setViewing: (topicId) => ipcRenderer.invoke(Channels.notificationsViewing, { topicId }),
+    onOpen: (listener) => {
+      const forward = (_event: unknown, target: unknown) => listener(target)
+      ipcRenderer.on(Events.notificationOpen, forward)
+      return () => {
+        ipcRenderer.off(Events.notificationOpen, forward)
+      }
+    },
+  },
 }
 
 contextBridge.exposeInMainWorld('juno', bridge)

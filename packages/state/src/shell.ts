@@ -1,7 +1,7 @@
 /** Atoms backed by main through the bridge, not the engine. */
 import { Effect, Schema } from 'effect'
 import * as Atom from 'effect/reactivity/Atom'
-import { AccentSchema, AppInfo, DEFAULT_ACCENT, DEFAULT_SIDEBAR, SIDEBAR_WIDTH, ThemeSchema, type Accent, type SidebarLayout, type SlackTarget, type Theme } from '@juno/contract'
+import { AccentSchema, AppInfo, DEFAULT_ACCENT, DEFAULT_SIDEBAR, NotificationTarget, SIDEBAR_WIDTH, ThemeSchema, type Accent, type SidebarLayout, type SlackTarget, type Theme } from '@juno/contract'
 import type { ContextMenuAt, ContextMenuItem, JunoBridge, MenuCommand } from '@juno/contract/channels'
 
 export type { Accent, Theme } from '@juno/contract'
@@ -109,4 +109,19 @@ export function openExternal(url: string): void {
 /** Calls `listener` for each app-menu command (the tab keys, Back and Forward, Hide Sidebar). Returns the unsubscribe. */
 export function onMenuCommand(listener: (command: MenuCommand) => void): () => void {
   return window.juno.menu.onCommand(listener)
+}
+
+/** Tells main which topic the window shows, or null. Main adds the window's focus; a notification for it is not shown. */
+export function setViewing(topicId: string | null): void {
+  window.juno.notifications.setViewing(topicId).catch(() => {})
+}
+
+const decodeTarget = Schema.decodeUnknownOption(NotificationTarget)
+
+/** Calls `listener` with what a clicked notification opens. Returns the unsubscribe. */
+export function onNotificationOpen(listener: (target: NotificationTarget) => void): () => void {
+  return window.juno.notifications.onOpen((raw) => {
+    const target = decodeTarget(raw)
+    if (target._tag === 'Some') listener(target.value)
+  })
 }

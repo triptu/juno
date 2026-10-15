@@ -62,6 +62,11 @@ export function createWindow(options: BrowserWindowConstructorOptions = {}): Bro
 /** Windows that show the app page, which take the tab commands. Others (sign-in) just close on ⌘W. */
 const mainWindows = new WeakSet<BaseWindow>()
 
+/** The window that shows the app page, if one is open. */
+export function appWindow(): BrowserWindow | undefined {
+  return BrowserWindow.getAllWindows().find((window) => mainWindows.has(window) && !window.isDestroyed())
+}
+
 export function createMainWindow(launch: Launch): BrowserWindow {
   const window = createWindow({
     title: 'Juno',

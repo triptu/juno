@@ -65,9 +65,11 @@ export interface IpcDeps {
   readonly setTheme: (theme: Launch['theme']) => void
   readonly setAccent: (accent: NonNullable<Launch['accent']>) => void
   readonly setSidebar: (sidebar: NonNullable<Launch['sidebar']>) => void
+  /** The topic the window shows, or null while it shows none or is not focused. */
+  readonly setViewing: (topicId: string | null) => void
 }
 
-export function registerIpc({ supervisor, setTheme, setAccent, setSidebar }: IpcDeps): void {
+export function registerIpc({ supervisor, setTheme, setAccent, setSidebar, setViewing }: IpcDeps): void {
   handle(Channels.appGetInfo, () => ({
     name: app.getName(),
     version: app.getVersion(),
@@ -148,6 +150,10 @@ export function registerIpc({ supervisor, setTheme, setAccent, setSidebar }: Ipc
 
   handle(Channels.shellEditUndo, (_input, event) => {
     event.sender.undo()
+  })
+
+  handle(Channels.notificationsViewing, ({ topicId }) => {
+    setViewing(topicId)
   })
 }
 
