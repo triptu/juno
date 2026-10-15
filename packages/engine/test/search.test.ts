@@ -94,6 +94,23 @@ describe('local search through the engine', () => {
   })
 })
 
+describe('palette text from Slack', () => {
+  it('names the people a title or snippet mentions and decodes Slack escaping', async () => {
+    engine = await startTestEngine({ initial: (fake) => fake.signIn(), fakeOptions: { seed: (workspace) => {
+      workspace.addUser({ id: workspace.selfId, name: 'self' })
+      workspace.addUser({ id: 'U0MAYA', name: 'maya', profile: { display_name: 'Maya Chen' } })
+      workspace.addConversation({ id: 'C0SEARCH', name: 'rollout', kind: 'public', members: new Set([workspace.selfId, 'U0MAYA']), created: workspace.clock.now(), topic: '', purpose: '', isOpen: true, archived: false })
+      // Stored as Slack stores it: `<@U0MAYA> canary -&gt; prod`.
+      const root = workspace.post({ channel: 'C0SEARCH', user: 'U0MAYA', text: '<@U0MAYA> canary -> prod', at: workspace.clock.now() - 60_000, silent: true })
+      workspace.post({ channel: 'C0SEARCH', user: 'U0MAYA', text: 'Done', threadTs: root.ts, at: workspace.clock.now() - 5_000, silent: true })
+    } } })
+    await engine.phase('live')
+    const results = await search(engine, 'canary')
+    expect(results).toContainEqual(expect.objectContaining({ kind: 'topic', title: '@Maya Chen canary -> prod' }))
+    expect(results).toContainEqual(expect.objectContaining({ kind: 'message', title: '@Maya Chen canary -> prod', text: '@Maya Chen canary -> prod' }))
+  })
+})
+
 describe("Slack's search through the engine", () => {
   it('finds a message the store lacks in its thread, and drops channels the user is not in or ignores', async () => {
     const e = await boot()

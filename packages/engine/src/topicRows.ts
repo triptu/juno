@@ -13,6 +13,7 @@ import {
   contextTint,
   defaultChannelStyle,
   defaultPersonColor,
+  mentionedUserIds,
   type ChannelId,
   type ChannelInfo,
   type Topic,
@@ -120,10 +121,8 @@ export function userIdsOf(row: JoinedRow, columns: ParsedColumns, into: Set<stri
   for (const id of columns.members) into.add(id)
   if (row.c_user_id !== null) into.add(row.c_user_id)
   if (columns.preview.senderId !== undefined) into.add(columns.preview.senderId)
-  for (const match of columns.preview.rootText?.matchAll(MENTION) ?? []) into.add(match[1]!)
+  for (const id of mentionedUserIds(columns.preview.rootText)) into.add(id)
 }
-
-const MENTION = /<@([UW][A-Z0-9]+)(?:\|[^>]*)?>/g
 
 export function channelInfoOf(
   row: Pick<JoinedRow, 'channel' | 'c_kind' | 'c_name' | 'c_user_id'>,

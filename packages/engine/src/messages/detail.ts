@@ -8,6 +8,7 @@ import {
   isFollowed,
   isResolved,
   quietDaysOf,
+  mentionedUserIds,
   resolveTitle,
   topicStatus,
   tsToMillis,
@@ -167,13 +168,11 @@ export const channelThreads = (channel: string, limit: number, now: number): Eff
     const conversation = (yield* sql<{ kind: Topic['channel']['kind']; name: string | null }>`SELECT kind, name FROM conversations WHERE id = ${channel}`)[0]
     const participants = new Map<string, ReadonlyArray<string>>()
     const ids = new Set<string>()
+    const rootTexts = new Map<string, string | undefined>()
     for (const row of rows) {
       const list = parseIds(row.participants_json).slice(0, THREAD_PARTICIPANTS)
       participants.set(row.topic_id, list)
       for (const id of list) ids.add(id)
-    }
-    const users = yield* readUsers(sql, ids)
-    const summaries: Array<ThreadSummary> = rows.map((row) => {
       const rootText = (() => {
         try {
           return row.preview_json === null ? undefined : (JSON.parse(row.preview_json) as { rootText?: string }).rootText
@@ -181,6 +180,13 @@ export const channelThreads = (channel: string, limit: number, now: number): Eff
           return undefined
         }
       })()
+      rootTexts.set(row.topic_id, rootText)
+      // The people a fallback title mentions, so it reads "@Maya …".
+      for (const id of mentionedUserIds(rootText)) ids.add(id)
+    }
+    const users = yield* readUsers(sql, ids)
+    const summaries: Array<ThreadSummary> = rows.map((row) => {
+      const rootText = rootTexts.get(row.topic_id)
       const topic: Topic = {
         id: row.topic_id as Topic['id'],
         kind: 'thread',
@@ -192,7 +198,7 @@ export const channelThreads = (channel: string, limit: number, now: number): Eff
         },
         ...(rootText === undefined ? {} : { firstMessageText: rootText }),
       }
-      const title = resolveTitle(topic)
+      const title = resolveTitle(topic, { user: (id) => userName(id, users.get(id)) })
       const fields: Omit<ThreadSummary, 'rev'> = {
         id: row.topic_id,
         rootTs: row.root_ts,

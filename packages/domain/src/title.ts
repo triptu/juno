@@ -25,6 +25,11 @@ export function slackLine(text: string, lookups: Lookups = {}): string {
   return previewText(bodyFromMrkdwn(text, lookups))
 }
 
+/** The users Slack's `text` mentions (`<@U…>`), so a caller can load their names before a title or line is made. */
+export function mentionedUserIds(text: string | undefined): ReadonlyArray<string> {
+  return text === undefined ? [] : [...text.matchAll(/<@([UW][A-Z0-9]+)(?:\|[^>]*)?>/g)].map((match) => match[1]!)
+}
+
 /**
  * The first `count` words of a message's Slack text, with an ellipsis when it was cut.
  * A cut that lands on the end of a sentence keeps the sentence and adds no
