@@ -65,7 +65,7 @@ export function checkSource(source, file = 'component.tsx') {
       return
     }
     if (ts.isNumericLiteral(node) && lengthProperty.test(property)) {
-      const number = Number(node.text)
+      const number = Number(node.text) * (ts.isPrefixUnaryExpression(node.parent) && node.parent.operator === ts.SyntaxKind.MinusToken ? -1 : 1)
       if (number !== 0 && !(number === 1 && hairline.test(property))) report(node, property)
       return
     }

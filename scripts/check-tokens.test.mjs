@@ -23,3 +23,9 @@ test('supports named aliases and ignores unrelated code, keys and comments', () 
     css({ red: { '@media (min-width: 20px)': { width: '2px' } } });`
   assert.equal(checkSource(code).length, 1)
 })
+
+test('hairline allowance does not cover negative widths or rounded corners', () => {
+  for (const declaration of ["borderRadius: '1px'", 'borderWidth: -1', "borderWidth: '-1px'", 'backgroundSize: 12']) {
+    assert.equal(checkSource(source(declaration)).length, 1, declaration)
+  }
+})
