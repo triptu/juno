@@ -7,6 +7,7 @@ directories:
 files:
   - out/**
   - package.json
+  - "!**/*.map"
 asar: true
 mac:
   category: public.app-category.productivity
@@ -30,8 +31,5 @@ electronFuses:
   enableEmbeddedAsarIntegrityValidation: true
   onlyLoadAppFromAsar: true
   enableCookieEncryption: true
-publish:
-  provider: github
-  owner: triptu
-  repo: juno
-  releaseType: draft
+# No inferred GitHub repository. A configured public feed is supplied by package.cjs.
+publish: null

@@ -211,61 +211,52 @@ importers:
 
   apps/desktop:
     dependencies:
+      electron-updater:
+        specifier: 6.8.3
+        version: 6.8.3(supports-color@7.2.0)
+    devDependencies:
+      '@electron/fuses':
+        specifier: 1.8.0
+        version: 1.8.0
       '@juno/agent':
         specifier: workspace:*
         version: link:../../packages/agent
       '@juno/agent-contract':
         specifier: workspace:*
         version: link:../../packages/agent-contract
+      '@juno/agent-testing':
+        specifier: workspace:*
+        version: link:../../packages/agent-testing
       '@juno/contract':
         specifier: workspace:*
         version: link:../../packages/contract
       '@juno/engine':
         specifier: workspace:*
         version: link:../../packages/engine
+      '@juno/fake-slack':
+        specifier: workspace:*
+        version: link:../../packages/fake-slack
       '@juno/slack':
         specifier: workspace:*
         version: link:../../packages/slack
       '@juno/state':
         specifier: workspace:*
         version: link:../../packages/state
+      '@juno/testing':
+        specifier: workspace:*
+        version: link:../../packages/testing
       '@juno/tokens':
         specifier: workspace:*
         version: link:../../packages/tokens
       '@juno/views':
         specifier: workspace:*
         version: link:../../packages/views
-      '@stylexjs/stylex':
-        specifier: 0.19.1
-        version: 0.19.1
-      effect:
-        specifier: 4.0.3
-        version: 4.0.3
-      electron-updater:
-        specifier: 6.8.3
-        version: 6.8.3(supports-color@7.2.0)
-      react:
-        specifier: 19.3.0
-        version: 19.3.0
-      react-dom:
-        specifier: 19.3.0
-        version: 19.3.0(react@19.3.0)
-    devDependencies:
-      '@electron/fuses':
-        specifier: 1.8.0
-        version: 1.8.0
-      '@juno/agent-testing':
-        specifier: workspace:*
-        version: link:../../packages/agent-testing
-      '@juno/fake-slack':
-        specifier: workspace:*
-        version: link:../../packages/fake-slack
-      '@juno/testing':
-        specifier: workspace:*
-        version: link:../../packages/testing
       '@playwright/test':
         specifier: 1.64.0
         version: 1.64.0
+      '@stylexjs/stylex':
+        specifier: 0.19.1
+        version: 0.19.1
       '@stylexjs/unplugin':
         specifier: 0.19.1
         version: 0.19.1(supports-color@7.2.0)(unplugin@2.3.11)
@@ -284,6 +275,9 @@ importers:
       babel-plugin-react-compiler:
         specifier: 1.0.0
         version: 1.0.0
+      effect:
+        specifier: 4.0.3
+        version: 4.0.3
       electron:
         specifier: 44.7.0
         version: 44.7.0(supports-color@7.2.0)
@@ -293,6 +287,12 @@ importers:
       electron-vite:
         specifier: 5.0.0
         version: 5.0.0(supports-color@7.2.0)(vite@7.3.7(@types/node@24.19.2)(jiti@2.7.0)(lightningcss@1.33.0)(yaml@2.9.1))
+      react:
+        specifier: 19.3.0
+        version: 19.3.0
+      react-dom:
+        specifier: 19.3.0
+        version: 19.3.0(react@19.3.0)
       typescript:
         specifier: 7.0.2
         version: 7.0.2

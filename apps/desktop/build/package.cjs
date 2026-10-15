@@ -1,7 +1,14 @@
 const { build } = require('electron-builder')
+const { rmSync } = require('node:fs')
+const { resolve } = require('node:path')
 
-const repository = process.env.JUNO_RELEASE_REPOSITORY
-if (repository && !/^[\w.-]+\/[\w.-]+$/.test(repository)) throw new Error('JUNO_RELEASE_REPOSITORY must be owner/repo')
+const feed = process.env.JUNO_UPDATE_FEED_URL
+if (feed) {
+  const url = new URL(feed)
+  if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash) {
+    throw new Error('JUNO_UPDATE_FEED_URL must be a public HTTPS base URL without credentials, query or fragment')
+  }
+}
 const release = process.env.JUNO_RELEASE === '1'
 const appleId = ['APPLE_ID', 'APPLE_APP_SPECIFIC_PASSWORD', 'APPLE_TEAM_ID']
 const apiKey = ['APPLE_API_KEY', 'APPLE_API_KEY_ID', 'APPLE_API_ISSUER']
@@ -20,11 +27,14 @@ if (release && process.env.CSC_LINK && !process.env.CSC_KEY_PASSWORD) {
 if (!release) console.log('Packaging unsigned; Developer ID signing and notarization are off (JUNO_RELEASE is unset).')
 if (!release) process.env.CSC_IDENTITY_AUTO_DISCOVERY = 'false'
 
+// A previous build may have enabled updates; never leave its checksums behind.
+rmSync(resolve(__dirname, '../release/latest-mac.yml'), { force: true })
+
 build({
   config: {
     extends: './electron-builder.yml',
     forceCodeSigning: release,
-    ...(repository ? { publish: { provider: 'github', owner: repository.split('/')[0], repo: repository.split('/')[1], releaseType: 'draft' } } : {}),
+    publish: feed ? { provider: 'generic', url: feed } : null,
     mac: { notarize: release, ...(!release ? { identity: null } : {}) },
     // ARM64 macOS requires a valid local signature after the fuse bytes change.
     electronFuses: { resetAdHocDarwinSignature: !release },

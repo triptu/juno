@@ -2,9 +2,12 @@ import { app, BrowserWindow } from 'electron'
 import { Events, type UpdateState } from '@juno/contract'
 import type { AppUpdater, UpdateCheckResult } from 'electron-updater'
 
+// Replaced by electron-vite. No runtime environment override or app token.
+declare const __JUNO_UPDATE_FEED_URL__: string
+
 /** Shell-only updater. Nothing loads or contacts GitHub until the owner opts in. */
 export function createUpdates(initial: boolean, save: (enabled: boolean) => void) {
-  const available = app.isPackaged && process.env.JUNO_E2E !== '1'
+  const available = app.isPackaged && process.env.JUNO_E2E !== '1' && __JUNO_UPDATE_FEED_URL__ !== ''
   let enabled = available && initial
   let state: UpdateState = available ? { kind: enabled ? 'idle' : 'disabled' } : { kind: 'unavailable' }
   let updater: AppUpdater | undefined
@@ -23,6 +26,7 @@ export function createUpdates(initial: boolean, save: (enabled: boolean) => void
         const module = await import('electron-updater')
         if (!enabled) return
         updater = module.autoUpdater
+        updater.setFeedURL({ provider: 'generic', url: __JUNO_UPDATE_FEED_URL__ })
         updater.autoDownload = false
         updater.autoInstallOnAppQuit = false
         updater.logger = null
