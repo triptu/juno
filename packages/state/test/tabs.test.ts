@@ -6,12 +6,14 @@ import {
   closeTabsToRight,
   cycleTab,
   dividerIndex,
+  ensureTab,
   historyTarget,
   homePlace,
   junoPagePlace,
   junoPlace,
   mountedTabs,
   newChatPlace,
+  newTabPlace,
   noTabs,
   openPlace,
   parseTabs,
@@ -63,9 +65,24 @@ describe('opening', () => {
     expect(mountedTabs(opened).size).toBe(4)
   })
 
-  it('a topic another tab shows focuses that tab instead of opening another, in either mode', () => {
-    expect(activeShows(open(three, 'c'))).toBe('c')
-    expect(shown(open(three, 'a', { newTab: true }))).toEqual(['a', 'b', 'c'])
+  it('a plain open of a topic another tab shows focuses that tab', () => {
+    const focused = open(three, 'c')
+    expect(shown(focused)).toEqual(['a', 'b', 'c'])
+    expect(activeShows(focused)).toBe('c')
+  })
+
+  it('a new tab always opens, so one topic can show in several tabs', () => {
+    const twice = open(three, 'a', { newTab: true })
+    expect(shown(twice)).toEqual(['a', 'b', 'a', 'c'])
+    expect(twice.active).not.toBe(idOf(three, 'a'))
+  })
+
+  it('a plain open focuses the tab that shows the topic and was active last', () => {
+    // Two tabs show a: the one opened second was active more recently.
+    const twice = open(three, 'a', { newTab: true })
+    const second = twice.active!
+    const back = open(open(twice, 'c'), 'a')
+    expect(back.active).toBe(second)
   })
 
   it('a New chat opens in a new tab, and the next open in that tab replaces it', () => {
@@ -78,14 +95,15 @@ describe('opening', () => {
 })
 
 describe('Home', () => {
-  it('opens in the current tab, and a second open focuses the tab that shows it', () => {
+  it('opens in the current tab, a plain open again focuses that tab, and a new tab shows a second Home', () => {
     const home = openPlace(three, homePlace)
     expect(shown(home)).toEqual(['a', 'home', 'c'])
     expect(historyTarget(home, -1)).toEqual(topicPlace('b'))
     const elsewhere = open(home, 'd', { newTab: true })
-    const again = openPlace(elsewhere, homePlace, { newTab: true })
+    const again = openPlace(elsewhere, homePlace)
     expect(shown(again)).toEqual(['a', 'home', 'd', 'c'])
     expect(activeShows(again)).toBe('home')
+    expect(shown(openPlace(elsewhere, homePlace, { newTab: true }))).toEqual(['a', 'home', 'd', 'home', 'c'])
   })
 
   it('with no tab open, opens a tab', () => {
@@ -94,22 +112,24 @@ describe('Home', () => {
 })
 
 describe('Juno', () => {
-  it('is one tab: a second open focuses it, and it reads back after a restart', () => {
+  it('a plain open focuses its tab, a new tab shows it twice, and both read back after a restart', () => {
     const juno = openPlace(three, junoPlace, { newTab: true })
     expect(shown(juno)).toEqual(['a', 'b', 'juno', 'c'])
-    const again = openPlace(open(juno, 'd', { newTab: true }), junoPlace, { newTab: true })
+    const again = openPlace(open(juno, 'd', { newTab: true }), junoPlace)
     expect(shown(again)).toEqual(['a', 'b', 'juno', 'd', 'c'])
     expect(activeShows(again)).toBe('juno')
-    expect(shown(parseTabs(JSON.parse(JSON.stringify(savedTabs(again)))))).toEqual(['a', 'b', 'juno', 'd', 'c'])
+    const twice = openPlace(again, junoPlace, { newTab: true })
+    expect(shown(twice)).toEqual(['a', 'b', 'juno', 'juno', 'd', 'c'])
+    expect(shown(parseTabs(JSON.parse(JSON.stringify(savedTabs(twice)))))).toEqual(['a', 'b', 'juno', 'juno', 'd', 'c'])
   })
 })
 
 describe('Juno pages', () => {
-  it('each opens in one tab, and reads back after a restart', () => {
+  it('a plain open focuses the tab that shows the page, and the pages read back after a restart', () => {
     const settings = openPlace(three, junoPagePlace('settings'), { newTab: true })
     const both = openPlace(settings, junoPagePlace('activity'), { newTab: true })
     expect(shown(both)).toEqual(['a', 'b', 'settings', 'activity', 'c'])
-    const again = openPlace(both, junoPagePlace('settings'), { newTab: true })
+    const again = openPlace(both, junoPagePlace('settings'))
     expect(activeShows(again)).toBe('settings')
     expect(shown(again)).toEqual(['a', 'b', 'settings', 'activity', 'c'])
     expect(shown(parseTabs(JSON.parse(JSON.stringify(savedTabs(again)))))).toEqual(['a', 'b', 'settings', 'activity', 'c'])
@@ -185,11 +205,17 @@ describe('closing', () => {
     expect(activeShows(closed)).toBe('b')
   })
 
-  it('closing the last tab leaves none', () => {
+  it('closing the last tab leaves one that shows what a new tab opens, and ⌘⇧T can still bring the closed one back', () => {
     const one = open(noTabs, 'a')
     const none = closeTab(one, one.tabs[0]!.id)
     expect(none.tabs).toEqual([])
-    expect(none.active).toBeUndefined()
+    const chat = ensureTab(none, newTabPlace('newChat'))
+    expect(shown(chat)).toEqual(['new'])
+    expect(chat.active).toBe(chat.tabs[0]!.id)
+    expect(chat.active).not.toBe(one.tabs[0]!.id)
+    expect(shown(ensureTab(none, newTabPlace('home')))).toEqual(['home'])
+    expect(shown(reopenClosedTab(chat))).toEqual(['a', 'new'])
+    expect(ensureTab(three, newTabPlace('home'))).toBe(three)
   })
 
   it('close other, to the right and all leave pinned tabs open', () => {
