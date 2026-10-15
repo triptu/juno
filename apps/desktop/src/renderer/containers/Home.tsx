@@ -26,10 +26,9 @@ function askJuno(): void {
  * Home (SPEC section 12): the Home tab, and what the workspace shows with
  * no tab open. It shows the items `home.view` had when Home appeared
  * (`showHome`, before the first paint, again each time Home comes back
- * from a hidden tab, and once more when the first value and the first
- * finished sync arrive); later values change only a row's title line
- * (`freezeHome`). Until there is a value the page is blank, never a
- * spinner, so it paints whole.
+ * from a hidden tab, and once more when the first value arrives); later
+ * values change only a row's title line (`freezeHome`). Until there is a
+ * value the page is blank, never a spinner, so it paints whole.
  */
 export function HomePage() {
   const key = useId()
@@ -43,12 +42,10 @@ export function HomePage() {
   const junoOn = useAtomValue(junoAvailableAtom)
 
   const ready = latest !== undefined
-  // Before the first sync is done Home shows its greeting with a line saying so; the items enter once it is.
-  const syncing = result._tag === 'Success' && !result.value.ready
   useLayoutEffect(() => {
     showHome(registry, key, { windowHeight: window.innerHeight, enter: ready && !appeared.current })
     if (ready) appeared.current = true
-  }, [key, ready, syncing])
+  }, [key, ready])
 
   if (shown === undefined) return <div data-home="" data-home-waiting="" />
   const view = latest === undefined ? shown.view : freezeHome(shown.view, latest)
