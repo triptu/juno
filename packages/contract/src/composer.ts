@@ -14,4 +14,5 @@ export {
   removeTokenBefore,
   type MentionPick,
   type MentionQuery,
+  type MentionToken,
 } from '@juno/domain'

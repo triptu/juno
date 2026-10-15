@@ -58,6 +58,17 @@ export interface ComposerProps {
   readonly onCaret?: (caret: number) => void
 }
 
+/** The field's side of the @ and # suggestions: chips, the caret, the list's anchor and its ARIA wiring. */
+function mentionProps(marks: ComposerProps['marks'], mention: ComposerMention | undefined, onCaret: ComposerProps['onCaret']) {
+  return {
+    ...(onCaret === undefined ? {} : { onSelect: (event: SyntheticEvent<HTMLTextAreaElement>) => onCaret(event.currentTarget.selectionStart) }),
+    ...(marks === undefined ? {} : { marks, 'aria-autocomplete': 'list' as const }),
+    ...(mention === undefined
+      ? {}
+      : { anchorAt: mention.anchorAt, onBlur: mention.onDismiss, 'aria-controls': mention.listId, 'aria-activedescendant': mention.activeId, 'aria-expanded': mention.list !== null && mention.list !== undefined }),
+  }
+}
+
 /** A drag that carries files from Finder, not text or a link. */
 const carriesFiles = (event: DragEvent<HTMLElement>) => event.dataTransfer.types.includes('Files')
 
@@ -122,12 +133,7 @@ export function Composer({ value, onChange, onSend, placeholder, sending = false
             value={value}
             onChange={(event) => onChange(event.currentTarget.value, event.currentTarget.selectionStart)}
             onKeyDown={onKeyDown}
-            {...(onCaret === undefined ? {} : { onSelect: (event: SyntheticEvent<HTMLTextAreaElement>) => onCaret(event.currentTarget.selectionStart) })}
-            {...(marks === undefined ? {} : { marks })}
-            {...(mention === undefined
-              ? {}
-              : { anchorAt: mention.anchorAt, onBlur: mention.onDismiss, 'aria-controls': mention.listId, 'aria-activedescendant': mention.activeId, 'aria-expanded': mention.list !== null && mention.list !== undefined })}
-            aria-autocomplete={marks === undefined ? undefined : 'list'}
+            {...mentionProps(marks, mention, onCaret)}
             onPaste={onFiles === undefined ? undefined : onPaste}
             dir="auto"
           />

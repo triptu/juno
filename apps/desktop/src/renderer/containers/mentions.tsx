@@ -10,6 +10,7 @@ import {
   type MentionPerson,
   type MentionPick,
   type MentionQuery,
+  type MentionToken,
 } from '@juno/contract'
 import { mentionChannelsAtom, mentionPeopleAtom, onFirstMentionAnswer, type MentionPlace } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
@@ -52,37 +53,10 @@ export function useMentions({ text, picks, onPicks, onChange, field, place }: Me
   const tokens = mentionTokens(text, picks)
   const typed = mentionQueryAt(text, Math.min(caret, text.length), tokens)
   const query = typed !== undefined && typed.start !== dismissed ? typed : undefined
-
-  const people = useAtomValue(mentionPeopleAtom(query?.trigger === '@' ? query.text : undefined, place))
-  const channels = useAtomValue(mentionChannelsAtom(query?.trigger === '#' ? query.text : undefined))
-  // The last answer, narrowed while the next one is on its way. Kept as state: a new answer replaces it during render.
-  const [last, setLast] = useState<Rows | undefined>(undefined)
-  const kind = query?.trigger === '@' ? 'person' : 'channel'
-  const answer = query === undefined ? undefined : kind === 'person' ? people : channels
-  const fresh: Rows | undefined =
-    answer?._tag !== 'Success'
-      ? undefined
-      : kind === 'person'
-        ? { kind, rows: answer.value as ReadonlyArray<MentionPerson> }
-        : { kind, rows: answer.value as ReadonlyArray<MentionChannel> }
-  if (fresh !== undefined && fresh.rows !== last?.rows) setLast(fresh)
-  let rows: Rows | undefined = fresh
-  if (query !== undefined && rows === undefined) {
-    if (last?.kind === 'person' && kind === 'person') rows = { kind, rows: rankSuggestions(last.rows, query.text) }
-    else if (last?.kind === 'channel' && kind === 'channel') rows = { kind, rows: rankSuggestions(last.rows, query.text) }
-  }
+  const { rows, answered } = useMentionRows(query, place)
   const ids = rows === undefined ? [] : rows.rows.map((row) => mentionRowId(listId, row.id))
   const activeId = chosen !== undefined && ids.includes(chosen) ? chosen : ids[0]
   const open = query !== undefined && rows !== undefined && rows.rows.length > 0
-
-  /** Replaces `from`..`to` in the field the way typing would, so it can be undone. */
-  const edit = (from: number, to: number, insert: string) => {
-    const element = field.current
-    if (element === null) return
-    element.setSelectionRange(from, to)
-    if (insert === '') document.execCommand('delete')
-    else document.execCommand('insertText', false, insert)
-  }
 
   /** Puts `row` in place of the query `at`, and keeps it with the picks. */
   const insertPick = (at: MentionQuery, row: MentionPerson | MentionChannel) => {
@@ -90,100 +64,157 @@ export function useMentions({ text, picks, onPicks, onChange, field, place }: Me
     if (!picks.some((p) => p.kind === picked.kind && p.id === picked.id && p.name === picked.name)) onPicks([...picks, picked])
     const after = insertMention(text, at, picked)
     // Only what changes is typed: the name, and the space when there is none yet.
-    edit(at.start, at.end, after.text.slice(at.start, after.caret))
+    editField(field.current, at.start, at.end, after.text.slice(at.start, after.caret))
   }
-
   const pick = (rowId: string) => {
     const row = rows?.rows[ids.indexOf(rowId)]
     if (query === undefined || row === undefined) return
     insertPick(query, row)
     setChosen(undefined)
   }
-
-  // Enter or Tab before the engine answered a query the narrowed list had nothing for: the first
-  // row of the answer goes in when it lands, so "#pla" and a quick Enter never sends "#pla".
-  const held = useRef<(() => void) | undefined>(undefined)
-  const hold = (at: MentionQuery) => {
-    held.current?.()
-    held.current = onFirstMentionAnswer(at.trigger, at.text, place, (answer) => {
-      held.current = undefined
-      const first = answer[0]
-      // Typing went on meanwhile: that text decides, not this answer.
-      if (first !== undefined && field.current?.value === text) insertPick(at, first)
-    })
-  }
+  const held = useHeldEnter(place, (at, first) => {
+    // Typing went on meanwhile: that text decides, not this answer.
+    if (field.current?.value === text) insertPick(at, first)
+  })
 
   const onFieldKey = (event: KeyboardEvent<HTMLTextAreaElement>): boolean => {
     if (event.nativeEvent.isComposing || event.metaKey || event.ctrlKey || event.altKey) return false
     if (open && activeId !== undefined) {
-      const index = ids.indexOf(activeId)
-      switch (event.key) {
-        case 'ArrowDown':
-        case 'ArrowUp': {
-          event.preventDefault()
-          const step = event.key === 'ArrowDown' ? 1 : -1
-          setChosen(ids[(index + step + ids.length) % ids.length])
-          return true
-        }
-        case 'Enter':
-        case 'Tab':
-          if (event.shiftKey) return false
-          event.preventDefault()
-          pick(activeId)
-          return true
-        case 'Escape':
-          event.preventDefault()
-          setDismissed(query?.start)
-          return true
-      }
+      const handled = listKey(event, ids, activeId, { move: setChosen, pick, close: () => setDismissed(query?.start) })
+      if (handled) return true
     }
-    if ((event.key === 'Enter' || event.key === 'Tab') && !event.shiftKey && query !== undefined && fresh === undefined) {
+    if ((event.key === 'Enter' || event.key === 'Tab') && !event.shiftKey && query !== undefined && !answered) {
       event.preventDefault()
-      hold(query)
+      held.hold(query)
       return true
     }
-    if (event.key === 'Backspace' && !event.shiftKey) {
-      const element = event.currentTarget
-      if (element.selectionStart !== element.selectionEnd) return false
-      const removed = removeTokenBefore(text, element.selectionStart, tokens)
-      if (removed === undefined) return false
-      event.preventDefault()
-      const token = tokens.find((t) => t.start === removed.caret)
-      if (token !== undefined) edit(token.start, token.end, '')
-      return true
-    }
-    return false
+    if (event.key !== 'Backspace' || event.shiftKey) return false
+    const element = event.currentTarget
+    const removed = element.selectionStart === element.selectionEnd ? removeTokenBefore(text, element.selectionStart, tokens) : undefined
+    if (removed === undefined) return false
+    event.preventDefault()
+    const token = tokens.find((t) => t.start === removed.caret)
+    if (token !== undefined) editField(element, token.start, token.end, '')
+    return true
   }
-
-  const mention: ComposerMention | undefined =
-    typed === undefined
-      ? undefined
-      : {
-          anchorAt: typed.start,
-          listId,
-          activeId: open ? activeId : undefined,
-          list: open && rows !== undefined ? <MentionSuggestions {...rows} id={listId} activeId={activeId} onActivate={setChosen} onPick={pick} /> : null,
-          onDismiss: () => setDismissed(typed.start),
-        }
 
   return {
     onChange: (value: string, at: number) => {
       setCaret(at)
-      // Typing goes on: a held Enter is dropped.
-      held.current?.()
-      held.current = undefined
+      held.drop()
       // A new query, or none: Esc's choice was for the one before.
       if (dismissed !== undefined && mentionQueryAt(value, at, mentionTokens(value, picks))?.start !== dismissed) setDismissed(undefined)
       onChange(value)
     },
     onCaret: setCaret,
     onFieldKey,
-    marks: tokens.map((token) => ({
-      start: token.start,
-      end: token.end,
-      look: token.pick.kind,
-      ...(token.pick.kind === 'person' ? { hue: hueFor(defaultPersonColor(token.pick.id), token.pick.id) } : {}),
-    })),
-    ...(mention === undefined ? {} : { mention }),
+    marks: marksOf(tokens),
+    ...(typed === undefined
+      ? {}
+      : {
+          mention: {
+            anchorAt: typed.start,
+            listId,
+            activeId: open ? activeId : undefined,
+            list: open && rows !== undefined ? <MentionSuggestions {...rows} id={listId} activeId={activeId} onActivate={setChosen} onPick={pick} /> : null,
+            onDismiss: () => setDismissed(typed.start),
+          } satisfies ComposerMention,
+        }),
   }
 }
+
+/**
+ * The rows for `query`: the engine's answer once it is here, and until then
+ * the last answer narrowed to the query. `answered` is false while the
+ * answer for this query is on its way.
+ */
+function useMentionRows(query: MentionQuery | undefined, place: MentionPlace): { readonly rows: Rows | undefined; readonly answered: boolean } {
+  const people = useAtomValue(mentionPeopleAtom(query?.trigger === '@' ? query.text : undefined, place))
+  const channels = useAtomValue(mentionChannelsAtom(query?.trigger === '#' ? query.text : undefined))
+  // Kept as state: a new answer replaces it during render.
+  const [last, setLast] = useState<Rows | undefined>(undefined)
+  if (query === undefined) return { rows: undefined, answered: false }
+  const fresh: Rows | undefined =
+    query.trigger === '@'
+      ? people._tag === 'Success'
+        ? { kind: 'person', rows: people.value }
+        : undefined
+      : channels._tag === 'Success'
+        ? { kind: 'channel', rows: channels.value }
+        : undefined
+  if (fresh !== undefined) {
+    if (fresh.rows !== last?.rows) setLast(fresh)
+    return { rows: fresh, answered: true }
+  }
+  if (last?.kind === 'person' && query.trigger === '@') return { rows: { kind: 'person', rows: rankSuggestions(last.rows, query.text) }, answered: false }
+  if (last?.kind === 'channel' && query.trigger === '#') return { rows: { kind: 'channel', rows: rankSuggestions(last.rows, query.text) }, answered: false }
+  return { rows: undefined, answered: false }
+}
+
+/**
+ * Enter or Tab before the engine answered a query the narrowed list had
+ * nothing for: the first row of the answer goes in when it lands, so
+ * "#pla" and a quick Enter never sends "#pla". Typing on drops it.
+ */
+function useHeldEnter(place: MentionPlace, insert: (at: MentionQuery, first: MentionPerson | MentionChannel) => void) {
+  const held = useRef<(() => void) | undefined>(undefined)
+  const drop = () => {
+    held.current?.()
+    held.current = undefined
+  }
+  const hold = (at: MentionQuery) => {
+    drop()
+    held.current = onFirstMentionAnswer(at.trigger, at.text, place, (answer) => {
+      held.current = undefined
+      const first = answer[0]
+      if (first !== undefined) insert(at, first)
+    })
+  }
+  return { hold, drop }
+}
+
+/** The open list's keys: ↑ ↓ move, Enter or Tab picks, Esc closes. True when the key was taken. */
+function listKey(
+  event: KeyboardEvent<HTMLTextAreaElement>,
+  ids: ReadonlyArray<string>,
+  activeId: string,
+  on: { readonly move: (id: string) => void; readonly pick: (id: string) => void; readonly close: () => void },
+): boolean {
+  const index = ids.indexOf(activeId)
+  switch (event.key) {
+    case 'ArrowDown':
+    case 'ArrowUp':
+      event.preventDefault()
+      on.move(ids[(index + (event.key === 'ArrowDown' ? 1 : -1) + ids.length) % ids.length]!)
+      return true
+    case 'Enter':
+    case 'Tab':
+      if (event.shiftKey) return false
+      event.preventDefault()
+      on.pick(activeId)
+      return true
+    case 'Escape':
+      event.preventDefault()
+      on.close()
+      return true
+    default:
+      return false
+  }
+}
+
+/** Replaces `from`..`to` in the field the way typing would, so ⌘Z undoes it. */
+function editField(element: HTMLTextAreaElement | null, from: number, to: number, insert: string): void {
+  if (element === null) return
+  element.setSelectionRange(from, to)
+  if (insert === '') document.execCommand('delete')
+  else document.execCommand('insertText', false, insert)
+}
+
+/** The picked names as the field draws them: a person in their hue, a channel as its chip. */
+const marksOf = (tokens: ReadonlyArray<MentionToken>) =>
+  tokens.map((token) => ({
+    start: token.start,
+    end: token.end,
+    look: token.pick.kind,
+    ...(token.pick.kind === 'person' ? { hue: hueFor(defaultPersonColor(token.pick.id), token.pick.id) } : {}),
+  }))
