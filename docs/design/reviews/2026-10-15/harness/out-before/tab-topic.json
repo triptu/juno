@@ -1,0 +1,132 @@
+[
+  {
+    "tag": "button",
+    "role": null,
+    "name": "Draft plan is in the doc",
+    "ring": "solid 2px rgb(180, 53, 31) +2px",
+    "shadow": "none",
+    "rect": [
+      580,
+      56,
+      177,
+      28
+    ]
+  },
+  {
+    "tag": "button",
+    "role": null,
+    "name": "Resolve",
+    "ring": "solid 2px rgb(180, 53, 31) +2px",
+    "shadow": "none",
+    "rect": [
+      1150,
+      56,
+      84,
+      28
+    ]
+  },
+  {
+    "tag": "button",
+    "role": null,
+    "name": "Juno ⌘J",
+    "ring": "solid 2px rgb(180, 53, 31) +2px",
+    "shadow": "none",
+    "rect": [
+      1236,
+      56,
+      28,
+      28
+    ]
+  },
+  {
+    "tag": "div",
+    "role": "listitem",
+    "name": "DDev14:12Booked 2–4pm. Will post results here.👍✅\ud83d",
+    "ring": "solid 2px rgb(180, 53, 31) +-2px",
+    "shadow": "none",
+    "rect": [
+      516,
+      660,
+      752,
+      68
+    ]
+  },
+  {
+    "tag": "button",
+    "role": null,
+    "name": "React 👍",
+    "ring": "solid 2px rgb(180, 53, 31) +2px",
+    "shadow": "none",
+    "rect": [
+      1070,
+      667,
+      28,
+      28
+    ]
+  },
+  {
+    "tag": "button",
+    "role": null,
+    "name": "React ✅",
+    "ring": "solid 2px rgb(180, 53, 31) +2px",
+    "shadow": "none",
+    "rect": [
+      1100,
+      667,
+      28,
+      28
+    ]
+  },
+  {
+    "tag": "button",
+    "role": null,
+    "name": "React 👀",
+    "ring": "solid 2px rgb(180, 53, 31) +2px",
+    "shadow": "none",
+    "rect": [
+      1130,
+      667,
+      28,
+      28
+    ]
+  },
+  {
+    "tag": "button",
+    "role": null,
+    "name": "More reactions",
+    "ring": "solid 2px rgb(180, 53, 31) +2px",
+    "shadow": "none",
+    "rect": [
+      1167,
+      667,
+      28,
+      28
+    ]
+  },
+  {
+    "tag": "button",
+    "role": null,
+    "name": "Quote",
+    "ring": "solid 2px rgb(180, 53, 31) +2px",
+    "shadow": "none",
+    "rect": [
+      1197,
+      667,
+      28,
+      28
+    ]
+  },
+  {
+    "tag": "button",
+    "role": null,
+    "name": "More",
+    "ring": "solid 2px rgb(180, 53, 31) +2px",
+    "shadow": "none",
+    "rect": [
+      1227,
+      667,
+      28,
+      28
+    ]
+  }
+]
