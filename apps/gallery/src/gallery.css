@@ -21,9 +21,11 @@
   box-sizing: border-box;
 }
 
-/* Links keep the arrow, like the app (the browser default is the hand). */
-.g-chrome a,
-.g-chrome select {
+/* Links keep the arrow, like the app (the browser default is the hand).
+   :where() keeps this weaker than a component's own class, so a message
+   link that opens outside Juno still shows the hand in a fixture. */
+:where(.g-chrome) a,
+:where(.g-chrome) select {
   cursor: default;
 }
 
