@@ -395,8 +395,11 @@ test.describe('large workspace', () => {
           const metrics = app.getAppMetrics()
           return [metrics.find((metric) => metric.type === 'Browser')?.creationTime ?? 0, metrics.find((metric) => metric.type === 'Tab')?.creationTime ?? Number.NaN] as const
         })
-        const page = await running.win.evaluate(() => ({ origin: performance.timeOrigin, start: performance.getEntriesByName('juno.start', 'mark')[0]?.startTime ?? Number.NaN }))
-        if (i > 0) console.log(`warm start ${i}: main to renderer process ${(renderer - created).toFixed(0)} ms, to navigation ${(page.origin - created).toFixed(0)} ms, bundle run at +${page.start.toFixed(0)}, shell at +${(created + times.mainToShell - page.origin).toFixed(0)}, rows at +${(created + times.mainToRows - page.origin).toFixed(0)}`)
+        const page = await running.win.evaluate(() => {
+          const first = (name: string) => performance.getEntriesByName(name, 'mark')[0]?.startTime ?? Number.NaN
+          return { origin: performance.timeOrigin, start: first('juno.start'), snapshot: first('juno.sidebar-snapshot') }
+        })
+        if (i > 0) console.log(`warm start ${i}: main to renderer process ${(renderer - created).toFixed(0)} ms, to navigation ${(page.origin - created).toFixed(0)} ms, bundle run at +${page.start.toFixed(0)}, sidebar snapshot at +${page.snapshot.toFixed(0)}, shell at +${(created + times.mainToShell - page.origin).toFixed(0)}, rows at +${(created + times.mainToRows - page.origin).toFixed(0)}`)
       } finally {
         await running.close()
       }
