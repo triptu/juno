@@ -34,7 +34,7 @@ What each folder does, and the spec transitions it implements (`specs/agent-reco
 
 Notes for the work packages that build on it:
 
-- **Migrations.** Add a `MigrationSet` in your own folder (for example `spend/schema.ts`) and pass it in `CoreOptions.migrations`. Steps are append-only. `LOCAL_TABLES` lists tables a backup must not capture; add yours.
+- **Migrations.** Add a `MigrationSet` in your own folder (for example `spend/schema.ts`) and pass it in `CoreOptions.migrations`. Steps are append-only. `LOCAL_TABLES` lists tables a backup must not capture; add yours to the list in `backup/schema.ts`. Every other table must have a primary key: the session extension captures nothing from a table without one, and backup refuses to start.
 - **The run loop** in `runtime/core.ts` is the simplest router: one op at a time, follow-up order, no steering. WP11's router replaces it and keeps `inbox/bridge.ts`. Never reset while a run is live: pi ends a run when a reset is placed during a tool round.
 - **Compaction.** `runJob(store, key, model, h)` runs one job with a `CompactionModel` (`summarize(task)`); `readyKeys` says which keys may start. WP11's compactor schedules them (8 at once, waking at `due_at`) and calls the model through WP9's providers.
 - **Actions.** `store/ledger.ts` has the parts of the ledger that startup and Pause need. WP15 builds the dispatcher on `authorize`, `recordAttempt` and `recordReceipt` and adds intents, approvals and grants in its own migration set.
@@ -59,7 +59,7 @@ Each folder has one owner (plan v3 §17). Only that folder imports its library (
 | `src/mcp/` | WP17 | the only importer of `@earendil-works/pi-mcp` |
 | `src/t3/`, `src/littlebird/` | WP18 | |
 | `src/schedule/` | WP19 | |
-| `src/ownership/`, `src/backup/` | WP21 | |
+| `src/ownership/`, `src/backup/` | WP21 (built; see "Ownership and backup") | |
 
 Versions are pinned exactly: pi 1.2.0 and the Codex SDK 0.162.1.
 
@@ -190,7 +190,8 @@ startup: open authorizations ─▶ unknown (recovery) ─▶ reconcile once ─
 - **The key.** A run that ends `failed: keyRejected` marks the active provider's key (`openRouterKey: 'rejected'` or `customKeyRejected`), and a change from main clears the mark. Whether each key is set is main's `ProviderState`.
 - **Pause** sets the run mode and asks every running job to stop. It is refused while the mode is `off`. Settings change with AI assist off too.
 - **Rules** are the owner's lines (`actions/rules.ts`, the `owner_rules` table): replaced as one list, each one line of at most 280 bytes, at most 20. The model reads them with Juno's instructions. They can only make Juno ask more; tiers and cards are enforced in code.
-- **Not served yet**: Codex status (shown `missing`), the backup folder (the default `agentDir/backup`, with no backup taken; WP21) and ownership changes (WP21).
+- **Backup and This Mac** (WP21): the backup folder (`agentDir/backup` by default), the last backup's time, when the recovery phrase was exported, and who owns Juno's state (`active`, `released` with the move code or the other Mac's name, or `recovery` with the pending count). `{ _tag: 'backupFolder' }` takes an absolute path and starts a generation there. Move, restore and Activate are `agent.settings.ownership` and `agent.review.activate`.
+- **Not served yet**: Codex status (shown `missing`).
 
 ## The chat server (WP13b)
 
@@ -231,3 +232,25 @@ together.
 Undo records. It uses WP15's policy and Change cards, and binds the AgentHost
 view routes at startup. See [the tool README](src/view-tools/README.md).
 `slack_channels` finds all cached channels by name glob without reading messages.
+
+## Ownership and backup (WP21)
+
+`src/ownership/` and `src/backup/` implement plan v3 §14 and the `agent-recovery.qnt` transitions named below. `openTurns` builds both when `TurnsOptions.backup` gives main's keychain (`BackupKeychain`) and this Mac's name; without it Juno keeps no backup and cannot move. `Turns.ownership` and `Turns.backup` expose them.
+
+**Ownership** (`ownership/`). The core `ownership` row (`device_id`, `epoch`, `state`) is local; the backup manifest carries it instead. The dispatcher authorizes only while `state = active`, and the router starts or steers a run only then (`RouterOptions.admits`).
+
+- **Move** (`ownership.move()`, spec `beginTransfer`, `drain`, `releaseOwner`, `checkpoint`, `publishRelease`): admission stops, the live run, dispatch and projection finish, `released` commits, then the final checkpoint (a new generation) is published with `state: released` and the move code (8 characters of the manifest's hash). A crash after the release reopens released and `resume` publishes again (`ownership.released`).
+- **Restore** (`ownership.restore(folder)`, spec `beginRestore`, `replay`, `install`): stages the newest manifest the key authenticates into `restore.sqlite` and calls `restart`. The next open installs it before `agent.sqlite` opens, rechecking the deletion record (G11), then `enterRecovery`: a new incarnation, this Mac's device id with the backup's epoch in `recovery`, and every click not yet authorized deleted, so it never runs without a new click. Authorizations without a receipt become `unknown` at recovery as usual.
+- **Review and Activate** (spec `review`, `activate`): in recovery every open card shows `mayHaveHappened` (`ownership.restored`), sends wait (`waiting: review`), and a click waits. `activate({ backupAt })` names the restore the owner reviewed; it expires the cards still open, takes `epoch + 1`, and calls `actions.kick()` and the router's kick, so reviewed clicks and waiting sends run once.
+- **A stale owner** (G7, spec `observeOwner`): before each write the backup reads the newest manifest in the folder. Another Mac at this epoch or later turns this Mac `released` (`deviceName` set; the chat banner is `otherDevice` and every command is refused `readOnly`). Before that read both Macs can act: `staleOwnerCannotAuthorize` stays a counterexample.
+
+**Backup** (`backup/`). One generation at a time in `<folder>/g000007/`: `snapshot.bin`, `segment-<n>.bin`, `manifest.json`.
+
+- **Capture** (S6): a snapshot is `VACUUM INTO` with local rows deleted; a segment is one **patchset** per replicated table. Patchsets, not changesets: a changeset holds old row values, so a segment cut after a removal would carry the removed text. Sessions attach only to replicated tables (G12). A replicated table must have a primary key.
+- **Keys**: the backup key (keychain) wraps a fresh data key per generation and authenticates manifests (HMAC). Segments are AES-256-GCM with a counter nonce reserved in `backup_progress` before use, and associated data binding generation, position and the previous segment's hash. Export recovery phrase makes a phrase, gives it to the keychain (`recoveryPhrase`) for main to show, and every later manifest carries the backup key wrapped by it (scrypt).
+- **When a generation starts**: none yet, the last close was not clean (changes before a crash were never captured), the deletion record is ahead of the generation (G13), the schema or the set of tables changed (a patchset holds no schema, so a migration starts a generation instead of a schema segment), the folder changed, or an export failed after its cut. Otherwise an export cuts a segment, renames the manifest, then moves the export cursor (spec `exportAfterManifest`). A new generation's manifest is renamed before older generations are deleted (spec `shred`).
+- **Removal** (WP16's `RemovalBackup` is `backup.removal`): `raiseDeletion(gen)` raises the keychain record before the removal commits; `regenerate(gen)` starts a generation from a snapshot at that memory generation or later and deletes the older ones. A generation's `label` is max(memory generation, record) at its snapshot; a restore with a trusted record (this Mac's keychain, or a move's manifest) refuses a generation whose label is below it. Without one it restores and the Review page shows `unchecked` (`staleFolderCannotRestoreRemoved` stays a counterexample; the strict phrase option is off by default and not built).
+- **A folder this key cannot verify** holds another Juno's backup (a new Mac pointed at the old Mac's folder before restoring). Juno never writes there (`ForeignBackup`), so it cannot delete the backup the owner is about to restore.
+- Exports run every minute when something changed, and at close.
+
+Tests: `test/backup.test.ts` (two Macs in-process: round trips, segments, a move, a voided click, a stale owner, a removal and regeneration, a record ahead, the folder rules) and `test/backup-crash.test.ts` (kills at `backup.segmentWritten`, `backup.manifestRenamed`, `ownership.released`, `restore.staged`, `restore.swapped`).
