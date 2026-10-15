@@ -6,7 +6,7 @@
  *   long: if the method is paused for longer than `interactiveMaxWaitMillis`
  *   the call fails at once with `SlackRateLimited`, so the route can answer
  *   from the cache and the engine can show `rate-limited`.
- * - `background`: backfill and sweeps. Concurrency 2, independent method tiers (research section 6).
+ * - `background`: backfill and sweeps. Concurrency 2, each method spaced 1,500 ms apart on its own (research section 6).
  *   A 429 doubles that method's interval for the session, up to 60 s.
  * - `send`: one in flight, like the official client's message queue.
  *
@@ -51,8 +51,9 @@ export class RequestQueue extends Context.Service<RequestQueue, RequestQueueShap
       const bucketOf = (method: string) => {
         let bucket = buckets.get(method)
         if (bucket === undefined) {
-          const tier = method === 'conversations.history' || method === 'conversations.replies' ? 1_200 : 1_500
-          bucket = { next: 0, interval: config.lanes.backgroundMinIntervalMillis ?? tier }
+          // 40 per minute per method: the rate measured safe live. The token is shared with the
+          // official client, so Juno stays below the published 50 per minute to leave it room.
+          bucket = { next: 0, interval: config.lanes.backgroundMinIntervalMillis ?? 1_500 }
           buckets.set(method, bucket)
         }
         return bucket

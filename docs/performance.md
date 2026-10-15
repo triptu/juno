@@ -503,7 +503,7 @@ capacity limit. The Mac runs above provide the complete five-pair series.
 
 The production-paced large fake cold boot (`pnpm remote bench:sync`, one
 4-vCPU machine per run) reached `live` in 579.264 s before and 459.310 s
-after, a 119.954 s reduction. Sidebar setup reached catch-up in 25.749 s
+after, a 119.954 s reduction. That run spaced history and replies 1,200 ms apart; they were later set back to 1,500 ms per method to leave room for the official client on the shared token, so part of this gain (about 78 s by the earlier projection) does not apply. Sidebar setup reached catch-up in 25.749 s
 and 16.537 s respectively. Both runs made 471 Web API calls: 300 history,
 113 getView, 50 replies, three discovery search calls and five setup calls;
 they stored the same 6,179 messages, 1,525 roots, 3,478 replies, 300 ranges
