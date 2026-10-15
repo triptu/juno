@@ -45,6 +45,40 @@ test('During the first sync Home greets and says it is syncing, and the sidebar 
   await expect(progress).toHaveCount(0)
 })
 
+test('Home shows rows before the first sync ends', async ({ juno, slack, win }) => {
+  const method = 'conversations.history'
+  slack.fake.holdNext({ method })
+  await juno.signIn()
+  // A launch opens a New chat tab; Home is one click away.
+  await juno.home.navItem.click()
+  const syncing = win.locator('[data-home][data-home-loading]')
+  const rows = win.locator('[data-home] [data-home-item]')
+  // History lands a page at a time; Home shows what waits before the sync is done.
+  await expect
+    .poll(
+      async () => {
+        if ((await syncing.locator('[data-home-item]').count()) > 0) return true
+        if (slack.fake.heldCount({ method }) > 0) {
+          slack.fake.release({ method })
+          slack.fake.holdNext({ method })
+        }
+        return false
+      },
+      { timeout: 30_000 },
+    )
+    .toBe(true)
+  await expect(syncing.getByText('Syncing with Slack.')).toBeVisible()
+  await expect(juno.sidebar.root.getByRole('status', { name: 'Sync status' })).toHaveText(/^Syncing \d+ of \d+$/)
+  const early = await juno.home.kinds()
+
+  // The sync ends: the rows shown stay first, in their order, and the count line replaces the syncing one.
+  slack.fake.release({ method })
+  await expect(syncing).toHaveCount(0, { timeout: 30_000 })
+  expect((await juno.home.kinds()).slice(0, early.length)).toEqual(early)
+  await expect(win.locator('[data-home]').getByText(/wants? you\.$/)).toBeVisible()
+  await expect(rows.first().getByRole('link')).toBeVisible()
+})
+
 test('Home shows what waits from the sidebar, and each row opens its topic', async ({ juno, slack, win }) => {
   await juno.signIn()
   await juno.waitForSync()

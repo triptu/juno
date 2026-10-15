@@ -39,8 +39,10 @@ export interface HomeProps {
   readonly askLine?: string
   /** "Browse all topics". Fires on mouse down; `event.metaKey` asks for a new tab. */
   readonly onBrowseAll?: (event: ActivateEvent) => void
-  /** The first sync is still running: `line` says so and there are no items yet. */
+  /** The first sync is still running: `line` says so and items fill in as they land. */
   readonly loading?: boolean
+  /** Rows the list keeps room for, so a row that lands later moves nothing (the first sync). */
+  readonly slots?: number
 }
 
 /**
@@ -49,7 +51,7 @@ export interface HomeProps {
  * Every size is fixed before data arrives, so nothing moves when a title
  * line is rewritten: a title is one ellipsised line in a 52px row.
  */
-export function Home({ scene, title, line, items, done, now, caughtUp, enter = true, onOpen, onMarkDone, onResolveAll, onSort, onItemMenu, onAsk, askLine, onBrowseAll, loading = false }: HomeProps) {
+export function Home({ scene, title, line, items, done, now, caughtUp, enter = true, onOpen, onMarkDone, onResolveAll, onSort, onItemMenu, onAsk, askLine, onBrowseAll, loading = false, slots = 0 }: HomeProps) {
   const headingId = useId()
   let step = 0
   const part = () => (enter ? [styles.rise, styles.delay(step++)] : [])
@@ -67,8 +69,8 @@ export function Home({ scene, title, line, items, done, now, caughtUp, enter = t
             {line}
           </Text>
         </div>
-        {items.length === 0 ? null : (
-          <ul aria-labelledby={headingId} {...stylex.props(styles.items, ...part())}>
+        {items.length === 0 && slots === 0 ? null : (
+          <ul aria-labelledby={headingId} data-home-slots={slots > 0 ? slots : undefined} {...stylex.props(styles.items, slots > 0 && styles.slots(slots, slots - 1), ...part())}>
             {items.map((item) => (
               <HomeRow
                 key={item.id}
@@ -265,6 +267,10 @@ const styles = stylex.create({
     padding: 0,
     listStyle: 'none',
   },
+  // Room for `rows` rows and the `gaps` between them.
+  slots: (rows: number, gaps: number) => ({
+    minHeight: `calc(${rows} * ${sizes['--row-52']} + ${gaps} * ${spacing['--space-0-5']})`,
+  }),
   // The row is the hover and focus surface; its link and its button sit side by side inside it.
   row: {
     display: 'flex',

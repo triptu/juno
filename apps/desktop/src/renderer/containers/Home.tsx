@@ -1,6 +1,6 @@
 import { useId, useLayoutEffect, useRef } from 'react'
 import { viewsSortChannel } from '@juno/contract'
-import { freezeHome, homeGreeting, homeShownAtom, homeViewAtom, junoAvailableAtom, markFollowUpDone, markHomeItemUsed, registry, resolveAllTopics, runAction, showHome } from '@juno/state'
+import { fillHome, freezeHome, homeGreeting, homeShownAtom, homeViewAtom, junoAvailableAtom, markFollowUpDone, markHomeItemUsed, registry, resolveAllTopics, runAction, showHome } from '@juno/state'
 import { junoNavAtom } from '@juno/state/agent'
 import { useAtomValue } from '@juno/state/react'
 import { Home, type ActivateEvent } from '@juno/views'
@@ -22,6 +22,19 @@ function askJuno(): void {
   openJunoTab()
 }
 
+/** Takes Home at each stage (`showHome`), and while the first sync runs adds the items each new value brings (`fillHome`). */
+function useShowHome(key: string, stage: 0 | 1 | 2, value: unknown): void {
+  const appeared = useRef(false)
+  useLayoutEffect(() => {
+    // The entrance plays once, when Home first has something to show; the items arriving later just appear.
+    showHome(registry, key, { windowHeight: window.innerHeight, enter: stage > 0 && !appeared.current })
+    if (stage > 0) appeared.current = true
+  }, [key, stage])
+  useLayoutEffect(() => {
+    if (stage === 1) fillHome(registry, key)
+  }, [key, stage, value])
+}
+
 /**
  * Home (SPEC section 12): the Home tab, and what the workspace shows with
  * no tab open. It shows the items `home.view` had when Home appeared
@@ -29,7 +42,7 @@ function askJuno(): void {
  * from a hidden tab, and once more when the first value arrives); later
  * values change only a row's title line (`freezeHome`). Until the first
  * sync is done it shows the scene and the greeting with "Syncing with
- * Slack." and no items. Until there is any value (a few milliseconds) the
+ * Slack.", and rows fill reserved slots as they land (`fillHome`). Until there is any value (a few milliseconds) the
  * page is blank, never a spinner, so it paints whole.
  */
 export function HomePage() {
@@ -38,22 +51,16 @@ export function HomePage() {
   const value = result._tag === 'Success' ? result.value : undefined
   const latest = value?.ready === true ? value : undefined
   const shown = useAtomValue(homeShownAtom(key))
-  const appeared = useRef(false)
   // The newest running job's state line replaces the field's placeholder (SPEC 13.4).
   const jobLine = useAtomValue(junoNavAtom, (nav) => nav.jobLine)
   // With AI assist off Home has no Ask Juno field (inventory 11).
   const junoOn = useAtomValue(junoAvailableAtom)
 
   // Nothing yet, the first sync running, or ready: Home is taken again at each step.
-  const stage = latest !== undefined ? 2 : value !== undefined ? 1 : 0
-  useLayoutEffect(() => {
-    // The entrance plays once, when Home first has something to show; the items arriving after the sync just appear.
-    showHome(registry, key, { windowHeight: window.innerHeight, enter: stage > 0 && !appeared.current })
-    if (stage > 0) appeared.current = true
-  }, [key, stage])
+  useShowHome(key, latest !== undefined ? 2 : value !== undefined ? 1 : 0, value)
 
   if (shown === undefined) return <div data-home="" data-home-waiting="" />
-  const view = latest === undefined ? shown.view : freezeHome(shown.view, latest)
+  const view = value === undefined ? shown.view : freezeHome(shown.view, value)
 
   const itemOf = (itemId: string) => view.items.find((candidate) => candidate.id === itemId)
   const markDone = (itemId: string) => {
@@ -94,6 +101,7 @@ export function HomePage() {
       title={shown.loading && value !== undefined ? homeGreeting({ now: new Date(shown.now), firstName: value.firstName, items: 0, caughtUp: false }).title : shown.title}
       line={shown.line}
       items={view.items}
+      slots={shown.slots}
       done={shown.used}
       now={shown.now}
       caughtUp={shown.caughtUp}

@@ -302,7 +302,7 @@ Home is a calm resting page: a small scene with Juno's mascot that changes with 
   - **Follow-up** (AI on). Something you said you would do, with Mark done.
   - **Automated.** A channel neither the rules nor Juno could place (5, "Automated"): "Move #releases?", with "To Automated" on the line below, quiet Keep in All then raised Move, each with Undo. Right-clicking it opens the channel's menu.
   - **Tidy up** (AI on). Topics that look settled, listed in the meta line, with Resolve all and Undo.
-  Clicking a row opens its topic. Items are computed when Home appears and do not change under the pointer. With AI on, a row's title line may be rewritten to say what it is about; the meta line never changes.
+  Clicking a row opens its topic. Items are computed when Home appears and do not change under the pointer. During the first sync Home says "Syncing with Slack." and rows fill reserved slots from the top as conversations land; a row shown never moves. With AI on, a row's title line may be rewritten to say what it is about; the meta line never changes.
 - **Ask Juno** opens the Juno chat. Anything else that used to be a suggestion card (a coding prompt from a discussion, reply ideas) is something you ask Juno for, here or in the Juno panel beside the topic.
 
 ## 13. Juno Agent
