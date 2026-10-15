@@ -126,7 +126,7 @@ function ensureReaper() {
     let pid
     try { pid = Number(readFileSync(pidFile, 'utf8')) } catch { /* No watcher yet. */ }
     const version = existsSync(versionFile) ? Number(readFileSync(versionFile, 'utf8')) : 1
-    if (alive(pid) && version >= 6) return
+    if (alive(pid) && version >= 7) return
     // Upgrade housekeeping only. Machine/job owners are untouched.
     if (alive(pid)) {
       const command = spawnSync('ps', ['-p', String(pid), '-o', 'args='], { encoding: 'utf8', timeout: 1000 }).stdout ?? ''
@@ -135,7 +135,7 @@ function ensureReaper() {
     }
     const child = spawn(process.execPath, [fileURLToPath(import.meta.url), '--watch'], { detached: true, stdio: 'ignore', env: { ...process.env, JUNO_REMOTE_IDLE_MINUTES: '1' } })
     writeFileSync(pidFile, String(child.pid))
-    writeFileSync(versionFile, '6')
+    writeFileSync(versionFile, '7')
     child.unref()
   } finally { unlock('watcher-start') }
 }
@@ -169,14 +169,24 @@ export function keep(id) {
   ensureReaper()
 }
 
-function reconcile() {
-  const snapshot = list()
-  const { instances } = snapshot
-  const states = machines().map((state) => {
+function machineStates() {
+  return machines().map((state) => {
     const pid = lockOwner(state.id)
     const publishing = pid === undefined && lockIsNew(state.id)
     return { ...state, live: alive(pid) || publishing, abandoned: existsSync(lockPath(state.id)) && !alive(pid) && !publishing }
   })
+}
+
+/** Per-machine locks protect idle cleanup while inventory admission is busy. */
+export function reapIdle() {
+  const targets = machinesToDestroy({ instances: [], states: machineStates(), pending: [], owner, now: Date.now(), idleMs, lifetimeMs })
+  for (const id of targets) destroy(id)
+}
+
+function reconcile() {
+  const snapshot = list()
+  const { instances } = snapshot
+  const states = machineStates()
   const pending = entries().filter((entry) => entry.pending).map((entry) => ({ ...entry, live: alive(entry.pid) }))
   const targets = machinesToDestroy({ instances, states, pending, owner, now: Date.now(), idleMs, lifetimeMs })
   for (const id of targets) destroy(id)
@@ -295,6 +305,7 @@ export async function reap() {
   try {
     for (;;) {
       await sleep(30_000)
+      try { reapIdle() } catch (error) { console.error(`remote: idle cleanup failed: ${error.message}`) }
       if (!takeLock('decide')) continue
       try {
         const instances = reconcile()
