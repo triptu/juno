@@ -1,6 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import type { ElementType, HTMLAttributes, PointerEvent, ReactNode } from 'react'
 import { accent, colors } from '@juno/tokens/tokens.stylex'
+import { pointerMoved } from './internal/pointer'
 import type { LayoutStyles } from './internal/sx'
 import { numeric as numericStyles, variants as typeVariants, weight as weightStyles, type TextVariant, type Weight } from './internal/type'
 
@@ -38,6 +39,13 @@ export interface TextProps extends Omit<HTMLAttributes<HTMLElement>, 'style' | '
 
 function titleWhenTruncated(event: PointerEvent<HTMLElement>) {
   const node = event.currentTarget
+  // Text scrolled under a still pointer is read after the frame, when layout
+  // is clean, instead of forcing one in the middle of a scroll.
+  if (pointerMoved(event)) setTitle(node)
+  else requestAnimationFrame(() => setTimeout(() => setTitle(node)))
+}
+
+function setTitle(node: HTMLElement) {
   if (node.scrollWidth > node.clientWidth || node.scrollHeight > node.clientHeight) node.title = node.textContent ?? ''
   else node.removeAttribute('title')
 }

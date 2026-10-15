@@ -22,6 +22,7 @@ import { AppInfo } from './AppInfo'
 import { EngineStatus, SyncNotice } from './EngineStatus'
 import { markFilterChange } from './filterMark'
 import { openAllTopics, openHome, openNewTab } from './navigation'
+import { PeekKeyPreference } from './Peek'
 import { Session } from './Session'
 import { TitlebarNav } from './TitlebarNav'
 import { TopicList } from './TopicList'
@@ -105,6 +106,7 @@ export function Sidebar() {
           workspace={user?.teamName ?? ''}
           sections={[
             { title: 'Appearance', content: <AppearanceSettings theme={theme} accent={accent} layout="stack" onThemeChange={changeTheme} onAccentChange={changeAccent} /> },
+            { title: 'Peek', content: <PeekKeyPreference /> },
             { title: 'Session', content: <Session /> },
             {
               title: 'Diagnostics',

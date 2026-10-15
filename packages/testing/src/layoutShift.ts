@@ -25,8 +25,9 @@ import type { Page } from '@playwright/test'
  *
  * After the action it waits two animation frames, then until every
  * transition or animation running under the root has finished (one iteration
- * for an endless one), then `settleMs`, then reads both. Motion that is
- * declared but not running cannot move anything, so it is not waited for.
+ * of an endless one the action started), then `settleMs`, then reads both.
+ * Motion that is declared but not running, or endless and running before the
+ * action, was not started by it, so it is not waited for.
  */
 export interface LayoutShiftOptions {
   /** CSS selector of the region to snapshot. Default: the gallery's `[data-fixture-frame]`, else `body`. */
@@ -149,9 +150,10 @@ export async function measureLayoutShift(page: Page, action: () => Promise<unkno
         })
       }
 
+      const earlier = new Set(rootEl.getAnimations({ subtree: true }))
       // How long until the motion running under the root ends: what is left of
-      // each finite transition or animation, and one iteration of an endless one
-      // when `endless` is set.
+      // each finite transition or animation, and, when `endless` is set, one
+      // iteration of an endless one the action started.
       const runningMs = (endless: boolean): number => {
         let longest = 0
         for (const animation of rootEl.getAnimations({ subtree: true })) {
@@ -159,7 +161,7 @@ export async function measureLayoutShift(page: Page, action: () => Promise<unkno
           const timing = animation.effect?.getComputedTiming()
           if (!timing) continue
           const end = Number(timing.endTime)
-          if (!Number.isFinite(end) && !endless) continue
+          if (!Number.isFinite(end) && (!endless || earlier.has(animation))) continue
           const left = Number.isFinite(end) ? end - Number(timing.localTime ?? 0) : Number(timing.delay ?? 0) + Number(timing.duration ?? 0)
           longest = Math.max(longest, left / Math.abs(animation.playbackRate || 1))
         }

@@ -21,7 +21,7 @@ export const MAIN_CONDITION = `(thread_ts IS NULL OR thread_ts = ts OR subtype =
 
 /** The columns a message row needs. */
 export const MESSAGE_COLUMNS = `channel, ts, thread_ts, user_id, subtype, text, blocks_json, files_json, attachments_json,
-  edited_ts, deleted, reply_count, latest_reply, version, last_event_ts`
+  edited_ts, deleted, client_msg_id, reply_count, latest_reply, version, last_event_ts`
 
 export type WindowMessage = Pick<
   MessageRow,
@@ -36,6 +36,7 @@ export type WindowMessage = Pick<
   | 'attachments_json'
   | 'edited_ts'
   | 'deleted'
+  | 'client_msg_id'
   | 'reply_count'
   | 'latest_reply'
   | 'version'
@@ -59,17 +60,30 @@ const scope = (target: WindowTarget): Statement =>
  * one: up to `before` rows older than the anchor, then the anchor and newer
  * rows up to `limit` in all. Rows come newest first from the first
  * statement and oldest first from the second; the caller orders them.
+ *
+ * The first statement reads one row more than the window holds: the message
+ * just before the window, when there is one. It is not shown; it only says
+ * whether the window's first row starts a sender group, so that row keeps
+ * its header (and its height) when an older page arrives above it.
  */
 export function windowStatements(target: WindowTarget, range: { readonly anchor?: string | undefined; readonly before: number; readonly limit: number }): ReadonlyArray<Statement> {
   const where = scope(target)
   if (range.anchor === undefined) {
-    return [{ sql: `SELECT ${MESSAGE_COLUMNS} FROM messages WHERE ${where.sql} ORDER BY ts DESC LIMIT ?`, params: [...where.params, range.limit] }]
+    return [{ sql: `SELECT ${MESSAGE_COLUMNS} FROM messages WHERE ${where.sql} ORDER BY ts DESC LIMIT ?`, params: [...where.params, range.limit + 1] }]
   }
   const before = Math.min(range.before, range.limit)
   return [
-    { sql: `SELECT ${MESSAGE_COLUMNS} FROM messages WHERE ${where.sql} AND ts < ? ORDER BY ts DESC LIMIT ?`, params: [...where.params, range.anchor, before] },
+    { sql: `SELECT ${MESSAGE_COLUMNS} FROM messages WHERE ${where.sql} AND ts < ? ORDER BY ts DESC LIMIT ?`, params: [...where.params, range.anchor, before + 1] },
     { sql: `SELECT ${MESSAGE_COLUMNS} FROM messages WHERE ${where.sql} AND ts >= ? ORDER BY ts ASC LIMIT ?`, params: [...where.params, range.anchor, range.limit] },
   ]
+}
+
+/** The topic's pending messages (architecture 5.7), oldest first, through `pending_messages_channel (channel, thread_ts)`. */
+export function pendingStatement(target: WindowTarget): Statement {
+  const columns = 'client_msg_id, channel, thread_ts, text, blocks_json, created_at, state'
+  return target.kind === 'main'
+    ? { sql: `SELECT ${columns} FROM pending_messages WHERE channel = ? AND thread_ts IS NULL ORDER BY created_at, client_msg_id`, params: [target.channel] }
+    : { sql: `SELECT ${columns} FROM pending_messages WHERE channel = ? AND thread_ts = ? ORDER BY created_at, client_msg_id`, params: [target.channel, target.threadTs] }
 }
 
 /** Reactions of the window's messages, by primary key. */

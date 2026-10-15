@@ -1,6 +1,6 @@
 /**
  * The AgentHost handlers Juno's engine serves to the agent (ADR 0012): the
- * whole protocol-2 group, `AgentHostFullRpcs`, over `JunoHost`.
+ * whole group, `AgentHostRpcs`, over `JunoHost`.
  *
  * - Every request names the account it was made for. A request for another
  *   account than the signed-in one fails with `stale`; none open, `signedOut`.
@@ -11,12 +11,11 @@
  * - Resolve and OS notification delivery fail with `unsupported`: Juno has
  *   no resolve command or notifier yet (M3 and M10 add them).
  *
- * `host.hello` answers the protocol the agent asked for when the host
- * serves it (1 or 2), so an agent still on protocol 1 keeps working while
- * WP13b switches the client.
+ * `host.hello` answers the one protocol the host serves; the agent refuses
+ * a host whose protocol differs from its own.
  */
 import { Effect } from 'effect'
-import { AGENT_HOST_FULL_PROTOCOL, AGENT_HOST_PROTOCOL, AgentHostError, AgentHostFullRpcs } from '@juno/agent-contract'
+import { AGENT_HOST_PROTOCOL, AgentHostError, AgentHostRpcs } from '@juno/agent-contract'
 import { makeDispatcher, parseSend } from './dispatch'
 import { JunoHost, type Account, type AccountId } from './host'
 
@@ -25,12 +24,10 @@ export interface HandlerOptions {
   readonly writes: 'enabled' | 'disabled'
 }
 
-const SERVED = new Set([AGENT_HOST_PROTOCOL, AGENT_HOST_FULL_PROTOCOL])
-
 const unsupported = (message: string) => Effect.fail(new AgentHostError({ reason: 'unsupported', message }))
 
 export const agentHostHandlers = (options: HandlerOptions) =>
-  AgentHostFullRpcs.toLayer(
+  AgentHostRpcs.toLayer(
     Effect.gen(function* () {
       const host = yield* JunoHost
       const dispatcher = yield* makeDispatcher
@@ -44,8 +41,8 @@ export const agentHostHandlers = (options: HandlerOptions) =>
         )
       const asAccount = <A>(accountId: AccountId, read: Effect.Effect<A, AgentHostError>) => Effect.andThen(accountFor(accountId), read)
 
-      return AgentHostFullRpcs.of({
-        'host.hello': ({ protocol }) => Effect.succeed({ host: 'juno', protocol: SERVED.has(protocol) ? protocol : AGENT_HOST_FULL_PROTOCOL }),
+      return AgentHostRpcs.of({
+        'host.hello': () => Effect.succeed({ host: 'juno', protocol: AGENT_HOST_PROTOCOL }),
 
         'host.slack.search': ({ accountId, query, cursor, limit }) => asAccount(accountId, host.search(query, cursor, limit)),
         'host.slack.history': ({ accountId, channelId, cursor, limit }) => asAccount(accountId, host.history(channelId, cursor, limit)),

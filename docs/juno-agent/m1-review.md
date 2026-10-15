@@ -70,7 +70,7 @@ This review compared card kinds, state machines, copy and property names across 
 
 1. **One source for the card view shapes** (Astra, small, before WP13 projects cards). `agent-cards/src/presentation.ts` copies `chat/cards.ts` and `place.ts` so the pure package has no workspace dependency. Only the `projectCard` type assignment catches drift, and the `mayDuplicate` change had to be made twice. Add a test in `agent-contract` that the two `Card` schemas encode identically, and have `sendMessageStatus` take its strings from one place.
 2. **After-line templates in `chatCopy`** (Fable, in WP12). "Resolved {n}", "Removed {n} messages", "Using {model}", "Open PR {n}", "Sent {n}", "Sent {n} of {m}" are fixed copy with a number in them, but `chatCopy` holds no template for them yet. WP12 adds them before the views print them; item 1's test then checks `agent-cards` against them.
-3. **Protocol 2 for the host.** `AgentHostFullRpcs` exists, but the served group is still protocol 1. WP13 switches both together when it supplies handlers.
+3. **Protocol 2 for the host.** Done in WP13: the host serves the whole group and the agent asks for protocol 2. Protocol 1 is gone, and the group is `AgentHostRpcs` again.
 
 ## M2 launch plan
 
@@ -87,7 +87,7 @@ M2's done-when: the chat runs in the app on OpenRouter with the model picker; Sl
 | A | WP13a Host side | Opus | `packages/agent-juno/**`, `packages/engine/src/agent-host/**`, outbox single-attempt mode, `apps/desktop/src/{agent,main/agent}/**` | now |
 | B | WP9 Providers and guard | Astra | `packages/agent/src/providers/{guard,openrouter,catalog,compaction,index}.ts`, `packages/agent/src/spend/**` | WP8's store schema and migrations merged |
 | C | WP11 Turns | Opus | `packages/agent/src/{request,compactor,router,jobs,memory-tools,pins}/**` | WP8 and WP9 merged |
-| C | WP13b Wire-up | Opus | `packages/state/src/agent/**`, removing `chat` from `packages/ai/src/**`, protocol 2 switch | WP11's run loop merged |
+| C | WP13b Wire-up | Opus | `packages/state/src/agent/**`, `packages/agent/src/{host,serve}/**` (the chat server), removing `chat` from `packages/ai/src/**`, protocol 2 switch | WP11's run loop merged |
 | D | WP14 Containers | Fable | `apps/desktop/src/renderer/containers/juno/**`, home Ask Juno, Settings › Juno container, `docs/performance.md` budgets | WP12 and WP13b merged |
 | D | WP22 flows 1, 2, 9, 12, 13, 15 | Opus | `apps/desktop/e2e/juno-agent/**`, `apps/desktop/e2e/driver/juno.ts` | Driver and flow 15 (gallery) after WP12; app flows after WP14 |
 | from C | WP23 Evals | Opus | `packages/agent/eval/**` | WP11 merged |

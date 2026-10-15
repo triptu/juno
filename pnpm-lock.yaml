@@ -245,6 +245,9 @@ importers:
         specifier: 19.3.0
         version: 19.3.0(react@19.3.0)
     devDependencies:
+      '@juno/agent-testing':
+        specifier: workspace:*
+        version: link:../../packages/agent-testing
       '@juno/fake-slack':
         specifier: workspace:*
         version: link:../../packages/fake-slack
@@ -290,6 +293,9 @@ importers:
       vite:
         specifier: 7.3.7
         version: 7.3.7(@types/node@24.19.2)(jiti@2.7.0)(lightningcss@1.33.0)(yaml@2.9.1)
+      vitest:
+        specifier: 5.0.4
+        version: 5.0.4(@types/node@24.19.2)(vite@7.3.7(@types/node@24.19.2)(jiti@2.7.0)(lightningcss@1.33.0)(yaml@2.9.1))
 
   apps/gallery:
     dependencies:
@@ -759,6 +765,9 @@ importers:
       '@effect/atom-react':
         specifier: 4.0.3
         version: 4.0.3(effect@4.0.3)(react@19.3.0)(scheduler@0.28.0)
+      '@juno/agent-contract':
+        specifier: workspace:*
+        version: link:../agent-contract
       '@juno/contract':
         specifier: workspace:*
         version: link:../contract
@@ -766,6 +775,12 @@ importers:
         specifier: 4.0.3
         version: 4.0.3
     devDependencies:
+      '@juno/agent':
+        specifier: workspace:*
+        version: link:../agent
+      '@juno/agent-testing':
+        specifier: workspace:*
+        version: link:../agent-testing
       '@types/node':
         specifier: 24.19.2
         version: 24.19.2

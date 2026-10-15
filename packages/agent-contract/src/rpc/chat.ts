@@ -10,12 +10,14 @@ import { Accepted, AgentCommandError, PageLimit, operation } from './common'
 
 /** First subscription opens the newest window or the first unread row. Anchored windows
  * can page in either direction; every emitted ChatPage carries both edge flags. */
+/** What a window is anchored on: any row's own id. An owner bubble has its op id before its archive id. */
+export const ChatAnchor = Schema.Union([ChatMessageId, BubbleId, CardId, OpId])
 export const ChatWindow = Schema.Union([
   Schema.TaggedStruct('latest', { limit: PageLimit }),
   Schema.TaggedStruct('unread', { limit: PageLimit }),
-  Schema.TaggedStruct('around', { anchor: ChatMessageId, before: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)), limit: PageLimit }),
-  Schema.TaggedStruct('above', { anchor: ChatMessageId, limit: PageLimit }),
-  Schema.TaggedStruct('below', { anchor: ChatMessageId, limit: PageLimit }),
+  Schema.TaggedStruct('around', { anchor: ChatAnchor, before: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)), limit: PageLimit }),
+  Schema.TaggedStruct('above', { anchor: ChatAnchor, limit: PageLimit }),
+  Schema.TaggedStruct('below', { anchor: ChatAnchor, limit: PageLimit }),
 ])
 /** View data stays WP7-shaped. Approval identities and edit versions travel beside it. */
 export const ChatPageSnapshot = Schema.Struct({
@@ -48,7 +50,8 @@ export const chatReact = Rpc.make('agent.chat.react', {
 export const chatRetry = Rpc.make('agent.chat.retry', {
   payload: { ...operation, interruptedOpId: OpId }, success: Accepted, error: AgentCommandError,
 })
-export const chatRead = Rpc.make('agent.chat.read', { payload: { through: ChatMessageId }, success: Schema.Void })
+/** Marks Juno's items read through `through`: a Juno bubble, or an archive message. */
+export const chatRead = Rpc.make('agent.chat.read', { payload: { through: Schema.Union([ChatMessageId, BubbleId]) }, success: Schema.Void })
 export const chatRemove = Rpc.make('agent.chat.remove', {
   payload: { ...operation, messageId: ChatMessageId, alsoRemoveReply: Schema.Boolean }, success: Accepted, error: AgentCommandError,
 })

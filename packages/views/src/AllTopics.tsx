@@ -6,7 +6,7 @@ import { PushPin } from '@phosphor-icons/react/dist/icons/PushPin'
 import { User } from '@phosphor-icons/react/dist/icons/User'
 import { Users } from '@phosphor-icons/react/dist/icons/Users'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import { memo, useLayoutEffect, useRef, useState, type FocusEvent, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
+import { memo, useLayoutEffect, useRef, useState, type FocusEvent, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode } from 'react'
 import type { AllTopicsChip, AllTopicsCounts, AllTopicsSort, ChannelRef, KindFilter, TopicRow } from '@juno/contract'
 import { accent, colors, layout, radii, sizes, spacing } from '@juno/tokens/tokens.stylex'
 import {
@@ -17,6 +17,7 @@ import {
   EmptyState,
   Icon,
   PageHeader,
+  pointerMoved,
   Select,
   Text,
   TextField,
@@ -74,7 +75,7 @@ export interface AllTopicsRowProps {
   readonly onOpen: (id: string, event: ActivateEvent) => void
   /** Right-click, or the context-menu key (which the platform sends as a context menu event). */
   readonly onContextMenu: (id: string) => void
-  /** Pointer enter or keyboard focus: warm the topic's query. */
+  /** Pointer enter (a real move, not content scrolling under a still pointer) or keyboard focus: warm the topic's query. */
   readonly onPrefetch?: (id: string) => void
   /** The title is a field for Rename: the row does not open until it ends. */
   readonly renaming?: boolean
@@ -115,7 +116,7 @@ export const AllTopicsRow = memo(function AllTopicsRow({
       tabIndex={tabbable ? 0 : -1}
       data-all-topics-row=""
       data-topic-id={row.id}
-      onPointerEnter={onPrefetch === undefined ? undefined : () => onPrefetch(row.id)}
+      onPointerEnter={onPrefetch === undefined ? undefined : (event: PointerEvent<HTMLDivElement>) => pointerMoved(event) && onPrefetch(row.id)}
       onFocus={onFocus}
       onContextMenu={(event: MouseEvent<HTMLDivElement>) => {
         event.preventDefault()

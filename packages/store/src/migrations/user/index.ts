@@ -7,6 +7,7 @@ import readMirror from './202610141200_read_mirror'
 import notifications from './202610151000_notifications'
 import topicArt from './202610141300_topic_art'
 import agentAttempts from './202610151200_agent_attempts'
+import postOutbox from './202610151500_post_outbox'
 
 /**
  * Migrations for `user.db`, keyed `<timestamp>_<name>`. Add a file per change
@@ -21,4 +22,5 @@ export const userMigrations: Record<string, Effect.Effect<void, unknown, SqlClie
   '202610141300_topic_art': topicArt,
   '202610151000_notifications': notifications,
   '202610151200_agent_attempts': agentAttempts,
+  '202610151500_post_outbox': postOutbox,
 }

@@ -18,6 +18,8 @@ import MessageList from './MessageList.fixtures'
 import NewChat from './NewChat.fixtures'
 import NewDivider from './NewDivider.fixtures'
 import NewMessagesPill from './NewMessagesPill.fixtures'
+import PeekKeySetting from './PeekKeySetting.fixtures'
+import PeekView from './PeekView.fixtures'
 import Reactions from './Reactions.fixtures'
 import SessionView from './SessionView.fixtures'
 import SignInView from './SignInView.fixtures'
@@ -76,6 +78,8 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   NewChat,
   NewDivider,
   NewMessagesPill,
+  PeekKeySetting,
+  PeekView,
   OwnerBubble,
   ProposedScheduleCard: proposedScheduleCard,
   ProposedTaskCard: proposedTaskCard,

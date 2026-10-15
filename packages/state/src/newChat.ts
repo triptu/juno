@@ -1,6 +1,6 @@
 /**
  * New chat (spec section 9): what each New chat tab holds, the pickers'
- * live queries and the send.
+ * live queries. Sending is `send.ts`.
  *
  * A New chat tab keeps its draft and its destination in `newChatAtom(tabId)`
  * while the app runs, so they survive every change of destination and a
@@ -9,9 +9,8 @@
  */
 import * as AsyncResult from 'effect/reactivity/AsyncResult'
 import * as Atom from 'effect/reactivity/Atom'
-import { messagesSend, newChatConversations, newChatThreads, type PickConversation, type PickThread, type SendTarget } from '@juno/contract'
-import { liveQuery, runCommand } from './atoms'
-import type { Registry } from './client'
+import { newChatConversations, newChatThreads, type PickConversation, type PickThread, type SendTarget } from '@juno/contract'
+import { liveQuery } from './atoms'
 
 export interface NewChat {
   readonly draft: string
@@ -62,6 +61,3 @@ export const pickConversationsAtom = (query: string | undefined) => (query === u
 /** The thread picker's rows, while its list is open: a channel's threads, or recent ones everywhere. */
 export const pickThreadsAtom = (open: { readonly channel?: string | undefined; readonly query: string } | undefined) =>
   open === undefined ? closed : threadsFamily({ ...(open.channel === undefined ? {} : { channel: open.channel }), query: open.query })
-
-/** Sends the draft. Resolves with the `Exit`; on success, the topic the message landed in. */
-export const sendMessage = (registry: Registry, to: SendTarget, text: string) => runCommand(registry, messagesSend, { to, text, clientMsgId: crypto.randomUUID() })

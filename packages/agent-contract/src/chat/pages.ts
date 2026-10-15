@@ -152,11 +152,11 @@ export type ConnectionsPage = typeof ConnectionsPage.Type
 /**
  * The page behind the recovery banner's Review (plan v3 §14.3). Every
  * pending card is `open` with `mayHaveHappened`. Activate ends recovery;
- * cards still open are then expired.
+ * cards still open are then expired. Outside recovery the page is empty.
  */
 export const ReviewPage = Schema.Struct({
-  /** When the backup Juno restored from was taken. */
-  backupAt: Schema.Number,
+  /** When the backup Juno restored from was taken. Absent outside recovery. */
+  backupAt: Schema.optionalKey(Schema.Number),
   pending: Schema.Array(Card),
 })
 export type ReviewPage = typeof ReviewPage.Type

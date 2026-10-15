@@ -31,6 +31,27 @@ test('the sidebar, light and dark', async ({ juno, win }) => {
   await win.screenshot({ path: resolve(screens, 'sidebar-dark.png') })
 })
 
+test('peek, light and dark', async ({ juno, win }) => {
+  test.setTimeout(120_000)
+  await juno.signIn()
+  await juno.waitForSync()
+  await juno.sidebar.row('Draft plan is in the doc').open()
+  const rina = juno.sidebar.row('Rina finished the onsite.')
+  for (const theme of ['light', 'dark'] as const) {
+    if (theme === 'dark') {
+      await juno.setTheme('Dark')
+      await expect(win.locator('html')).not.toHaveAttribute('data-theme-switching', /.*/)
+    }
+    await rina.peek()
+    await juno.peek.expectMessage('Strong systems design')
+    await win.evaluate(() => document.fonts.ready)
+    await win.waitForTimeout(300)
+    await win.screenshot({ path: resolve(screens, `peek-${theme}.png`) })
+    await juno.peek.release()
+    await juno.peek.expectClosed()
+  }
+})
+
 test('New chat with a destination and the thread list open, light and dark', async ({ juno, win }) => {
   test.setTimeout(120_000)
   await juno.signIn()
@@ -78,6 +99,33 @@ test('the topic header over a thread and a Main, light and dark', async ({ juno,
     await juno.topic.expectTitle('Main')
     await shoot(`topic-main-${theme.toLowerCase()}`)
   }
+})
+
+test('sending in a Main: a failed send, a send on its way and a draft, light and dark', async ({ juno, win, fake }) => {
+  test.setTimeout(120_000)
+  await juno.signIn()
+  await juno.waitForSync()
+  const { topic } = juno
+  await juno.sidebar.row('#eng').open()
+  await topic.expectTitle('Main')
+  // The first send is refused; the second waits for Slack's answer, so it stays on its way.
+  fake.forceError({ method: 'chat.postMessage', error: 'restricted_action' })
+  await topic.send('Can someone look at the staging bill before Friday?')
+  await expect(topic.failed('Can someone look at the staging bill').row).toBeVisible()
+  fake.holdNext({ method: 'chat.postMessage', before: true })
+  await topic.send('Moving the cutover to Thursday night.')
+  await expect(topic.message('Moving the cutover to Thursday night.')).toHaveAttribute('data-pending', 'sending')
+  await topic.composer.fill('Two things for the checklist:\nreplica lag under a second, and support signed off')
+  for (const theme of ['Light', 'Dark'] as const) {
+    if (theme === 'Dark') await juno.setTheme('Dark')
+    await win.mouse.move(20, 760)
+    await win.evaluate(() => document.fonts.ready)
+    await expect(win.locator('html')).not.toHaveAttribute('data-theme-switching', /.*/)
+    // Past --delay-pending, so the row on its way has dimmed.
+    await win.waitForTimeout(1200)
+    await win.screenshot({ path: resolve(screens, `send-${theme.toLowerCase()}.png`) })
+  }
+  fake.release()
 })
 
 test('All topics, light and dark', async ({ juno, win }) => {

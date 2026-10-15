@@ -36,8 +36,8 @@ export interface NewChatTabProps {
  * being hidden. The pickers' lists are live queries only while open. The
  * preview is the destination's topic, read-only (`TopicPreview`). Enter
  * with no destination opens the conversation picker; Enter after picking
- * sends, and once Slack has the message the tab becomes its topic
- * (`settleSentChat`). The tab lives in an `<Activity>`: each time it shows,
+ * sends: the message is queued and the tab becomes its topic at once,
+ * with the message pending in it (`settleSentChat`). The tab lives in an `<Activity>`: each time it shows,
  * the composer takes focus.
  */
 export const NewChatTab = memo(function NewChatTab({ tabId }: NewChatTabProps) {
