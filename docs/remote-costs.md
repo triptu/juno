@@ -35,7 +35,9 @@ The CI records identify repository `littlebirdai/littlebird`. Within the macOS
 subtotal, 138 `[MB] iOS Build and test` jobs account for about $94.50 prepaid,
 five `[MB] Native performance on phones` jobs for $25.55, eighteen
 `[MB] Native Maestro flows` jobs for $9.52, and three TestFlight release jobs
-for $0.95. These sum to the macOS subtotal; they are not additional charges.
+for $0.95. Together the first two workflows are $120.05, about 57% of the $208.96
+prepaid estimate. All Littlebird CI is $150.01, about 72%. These sum into
+the account totals; they are not additional charges.
 The largest Linux CI workflow is Android native tests: 118 jobs, about $14.65.
 
 Juno builds its test image only when the Dockerfile, lockfile or workspace-file
@@ -69,7 +71,10 @@ proven leaks. The remaining Juno total still mixes active runs, image loading an
 warm idle time; the retained logs cannot split those completely.
 
 An unused 8-core machine retained for five minutes costs 40 vCPU-minutes.
-The one-minute default reduces that to 8, plus the reaper's 30-second poll delay.
+The one-minute default reduces that to 8, plus polling and destroy latency.
+Known idle cleanup runs under the decision lock before the inventory call.
+A failed listing does not prevent that cleanup attempt once the lock is acquired;
+orphan discovery still needs a successful listing.
 `JUNO_REMOTE_IDLE_MINUTES=0` destroys a released machine immediately. Keep the
 one-minute default until fresh-start measurements justify removing reuse entirely.
 Live owners and pending creates remain protected at every idle setting.
@@ -151,16 +156,16 @@ benchmark. CPU busy is the existing two-second Linux sampler.
 | Unit baseline | 4x8 | 156 s | 43% | 10.4 |
 | Unit final | 2x4 | 262 s | 67% | 8.7 |
 | Desktop baseline | 8x16, four workers | 277 s | 56% | 36.9 |
-| Desktop final | two 4x8, three workers each | 272 / 210 s | 42% / 72% | 32.1 combined |
+| Desktop two-shard pilot | two 4x8, three workers each | 272 / 210 s | 42% / 72% | 32.1 combined |
 
 The two-core unit run passed the full suite, including the unchanged agent timing
-checks in a separate final phase. It saves about 16% of script compute but misses
-the requested two-minute ceiling. A serial-package experiment took 309 seconds
+checks in a separate final phase. It uses about 16% less script compute in this
+pilot but takes longer. A serial-package experiment took 309 seconds
 and was rejected. Four Vitest workers with two packages at a time took 262 seconds.
 The baseline was 246 seconds end to end; the final unit run was 303 seconds,
 including a fresh cached machine with an 18.4-second startup.
 
-The final desktop shards passed 238 tests with 32 skipped and merged both blob
+The two-shard desktop pilot passed 238 tests with 32 skipped and merged both blob
 reports into one HTML report. The baseline passed 233 with 32 skipped before
 five tests arrived on main. Final script compute was about 13% lower. The longest
 shard took 272 seconds versus the baseline's 277; these pilots do not establish
@@ -206,3 +211,126 @@ three-machine pilot also had one hit at 11.2 seconds and two misses at 60.2 and
 118.0 seconds. Hits can reach the ten-second target, but the measured hit rate did
 not establish a reliable saving. Keep this cache opt-in to avoid adding storage
 charges by default. The one-minute idle setting remains the default.
+
+
+## Shapes before and after
+
+A shape is vCPU × GB RAM. Busy percentages cover the script, excluding pool
+waits, image loading and warm idle time. Values below are diagnostic pilots;
+source changes and host variation prevent treating them as repeated benchmarks.
+“Not recorded” is missing evidence, not zero utilization.
+
+| Work | Before shape / busy | Final shape / busy | Measured script time and decision |
+| --- | --- | --- | --- |
+| Unit tests | 4x8 / 43% | 2x4 / 67% | 156 → 262 s; lower script compute, with a longer runtime |
+| Desktop | 8x16 / 56% | four 4x8 / 37–66% | 83, 187, 112 and 82 s; longest about 3.1 min |
+| Full gallery | 8x16 in affected / 78–87% | 8x16 / 78–87% | 132–146 s; the 4x8 trial took 215 s at 73% busy |
+| `specs:check`, uncached | 8x16 / about 90% | 8x16 / about 90% | inherited 126 s pilot; 4x8 took 214 s |
+| `specs:traces`, uncached | proposed 4x8 / 98% | 8x16 / 97% | 132 s with eight jobs; 4x8 took 333 s at 98%; 2x4 took 529 s at 74% |
+| Selected gallery components | 4x8 / not recorded | 4x8 / not recorded | unchanged; full-gallery timing does not describe a selection |
+| Typecheck, lint, agent suites | 2x4 / not recorded as a group | 2x4 / agent-contracts 68–78% | agent-contracts pilots took 3–8 s; this busy range does not describe typecheck or lint |
+
+The four-shard validation on 16 October passed 261 tests, skipped 34 and
+merged all four blob reports. In shard order, busy averages were 58%, 37%,
+44% and 66%. Script allocation totaled 30.9 core-minutes; machine-held time,
+including startup and reports, totaled 48.2. The earlier two-shard pilot used
+32.1 script and 48.0 machine-held core-minutes. The four-shard run included
+25 more test cases, so this is not a matched-source speedup claim. The first
+three machines were acquired at 327–337 seconds; the fourth at 501 seconds.
+The slowest child completed after 645 seconds including its queue, startup
+and reports. Contention prevented measuring a fully parallel end-to-end run.
+
+The combined `test:e2e` uses the desktop and full-gallery rows. Its parent has
+no separate machine or meaningful CPU-busy percentage. End-to-end time still
+includes Namespace queue, image loading and report transfer; these shapes do
+not promise a three-minute command completion under contention.
+
+## Final scheduling and recovery changes
+
+Desktop is four 4x8 shards by default, including `pnpm affected`. Its internal
+`JUNO_REMOTE_SHARDED` marker prevents recursion, not opt-in behavior. A single
+desktop machine also defaults to 4x8; request 8x16 explicitly for comparison.
+The combined `test:e2e` command uses these shards plus the 8x16 gallery,
+requesting at most 24 cores in total. The full gallery stays on eight cores:
+the inherited four-core pilot passed in 215 seconds at 73% busy, missing three
+minutes, while eight-core pilots passed in 132–146 seconds at 78–87% busy.
+Selected-component gallery runs use four cores. Explicit machine and shard
+overrides remain available.
+
+The inherited full uncached `specs:check` pilot took 126 seconds on 8x16 at
+about 90% busy, versus 214 seconds on four cores. The whole check overlaps
+Quint processes with Apalache server lanes; it is not limited to one core.
+A separate bounded-only diagnostic on 4x8 passed in 180 seconds at 36% busy,
+or 1.44 occupied cores on average across the script. It includes Quint startup
+and Java work, so it does not isolate the CPU use of an individual Apalache JVM.
+This narrower workload does not replace the full-check sizing measurements.
+
+Trace-only runs skip Apalache. The inherited 2x4 / one-job run passed in
+529 seconds at 74% busy. The takeover's uncached 4x8 / four-job run passed in
+333 seconds at 98% busy (3.92 occupied cores on average), excluding startup.
+It took 444 seconds end to end. Ten process snapshots during the simulator
+phase reported a combined 361–382% lifetime CPU for Node processes; these are
+samples of `ps` lifetime averages, not interval measurements or a full-run
+profile. Individual Rust phases frequently took 0.2–0.4 seconds while their
+Quint commands took 5–8 seconds. Node startup and typechecking dominate these
+short directed simulations. Four cores are busy, but miss the three-minute
+target. The 8x16 / eight-job follow-up passed in 132 seconds at 97% busy
+(7.76 occupied cores on average). It is the smallest tested standard shape
+that meets three minutes. These are single diagnostic pilots, not a repeated
+benchmark or a guaranteed runtime. The same image tag, source specs and
+`--no-cache` were used; report transfer is excluded from script time.
+Measured machine-held compute was 27.9 core-minutes on four cores and 33.9 on
+eight, including startup and reports. The eight-core report download retried;
+its total wall time was 448 seconds, including the pool wait. The faster script
+did not reduce total measured compute in these cold-start pilots.
+
+For known unchanged cached specs, an explicit `--machine linux/amd64:2x4`
+avoids allocating a larger machine merely to return cached results.
+
+Inventory calls have a 90-second timeout and up to three attempts for transient
+errors, including ETIMEDOUT and Unavailable. Exhausted transient inventory calls
+pause acquisition before trying again, without handing out capacity. The CLI
+returns `null` for an empty workspace; this is accepted as an empty array.
+Other non-array responses still fail. A shared five-second inventory cache
+reduces repeated polling across processes. Create and destroy attempts invalidate
+it before and after the mutation. A revision prevents an in-flight list from
+publishing an obsolete cache. Newer tracked machines remain reserved even when
+absent from the snapshot, and reconciliation retains records newer than the
+read. Expired or invalid cache entries never replace a failed API response.
+The pool retries transient creates twice with short backoffs. A returned partial
+ID is destroyed first; ambiguous attempts retain a reservation and label until reconciliation observes and destroys the instance,
+or the five-minute orphan grace expires. Late tagged arrivals are still reclaimed.
+The background reaper is upgraded to retain these failed-attempt reservations.
+Only infrastructure failures are retried; test executions are not repeated.
+
+The unfinished incremental-loading experiment was dropped. The runner retains
+its existing Docker pull, workspace streaming and report download path.
+
+
+## Verification
+
+The final targeted pool suite passed 18 tests, with the Linux-only host queue
+check skipped on the Mac. It covers empty `null` inventory, transient listing
+and create failures, failed partial-instance cleanup, cross-process cache reuse
+and invalidation, capacity reservations, idle cleanup, and default shard shapes.
+`pnpm lint` passed, including the repository health checks.
+The final `pnpm remote test:agent-contracts` smoke passed on 2x4: four seconds
+of script time, 72% busy over two sampled seconds, and 69 seconds end to end.
+No Namespace timeout caused a final check failure.
+
+Earlier validation passed `JUNO_REMOTE_MACHINE=linux/amd64:2x4 pnpm affected`:
+273 items reused successful cache entries; lint, health, pool tests and cached
+spec checks passed. The full no-cache sweep was canceled to free shared capacity.
+Final validation uses targeted checks only.
+
+The trace pilots can be reproduced with these commands when capacity is available:
+
+```sh
+pnpm remote --machine linux/amd64:4x8 specs:traces --no-cache
+pnpm remote --machine linux/amd64:8x16 specs:traces --no-cache
+pnpm remote test:desktop
+```
+
+The Windows laptop instructions are in
+[Setup prompt for the laptop](self-hosted-runner.md#setup-prompt-for-the-laptop).
+The prompt covers WSL2, Docker, Tailscale, SSH, startup, image preload and host checks.
