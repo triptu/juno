@@ -62,7 +62,7 @@ import { assignHandles, type SourceRef } from './sources'
 import { find, type InboxState } from '../inbox/inbox'
 import { view, type CompactionModel, type MemoryView } from '../store/memory'
 import type { JournalPosition, Mode } from '../store/ledger'
-import { ACTIONS_MIGRATIONS, budgetCard, createActions, proposedTask, sendMessageTool, type Actions, type ActionsOptions } from '../actions'
+import { ACTIONS_MIGRATIONS, budgetCard, createActions, proposedTask, resolveTool, sendMessageTool, type Actions, type ActionsOptions } from '../actions'
 import { mintGrant } from '../grants/grants'
 import { createBackup, type Backup, type BackupKeychain } from '../backup/backup'
 import { adoptRestoredKeys, clearStagedRestore, installStaged } from '../backup/restore'
@@ -423,7 +423,7 @@ async function start(
   const slackTools = options.host ? hostTools(options.host, handles) : []
   const actionHost = options.actions?.host
   const extraTools = options.tools?.({ store, actions, jobs, current: () => router.toolRun() }) ?? []
-  const actionTools = actionHost ? [sendMessageTool({ store, current: () => router.toolRun(), propose: actions.propose, host: actionHost })] : []
+  const actionTools = actionHost ? [resolveTool({ store, current: () => router.toolRun(), propose: actions.propose, host: actionHost }), sendMessageTool({ store, current: () => router.toolRun(), propose: actions.propose, host: actionHost })] : []
   // §5.4: a run the daily cap blocked brings the Budget card, one per day and raise.
   router.subscribe((event) => {
     if (event._tag !== 'ended' || event.ending._tag !== 'blocked' || event.ending.reason !== 'budget') return
