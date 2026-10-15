@@ -590,7 +590,7 @@ Files are disjoint across packages that run concurrently. A later package extend
 | WP10 Fakes | Opus | `packages/agent-testing/**` | WP6 |
 | WP11 Turns | Opus | `packages/agent/src/{request,compactor,router,jobs,memory-tools,pins}/**` | WP8, WP9 |
 | WP12 Views | Fable | `packages/views/src/juno-chat/**`, `packages/views/src/juno-pages/**`, Sidebar busy and unread props, gallery registry, status bubble tokens | WP7 |
-| WP13 Juno host | Opus | `packages/agent-juno/**`, `packages/engine/src/agent-host/**`, outbox single-attempt mode, `packages/state/src/agent/**`, `apps/desktop/src/{agent,main/agent}/**`, removing `chat` from `packages/ai/src/**` | WP11 |
+| WP13 Juno host | Opus | `packages/agent-juno/**`, `packages/engine/src/agent-host/**`, outbox single-attempt mode, `packages/state/src/agent/**`, `apps/desktop/src/{agent,main/agent}/**`, `packages/agent/src/{host,serve}/**` (the host client and the chat server the renderer reads), removing `chat` from `packages/ai/src/**` | WP11 |
 | WP14 Containers | Fable | `apps/desktop/src/renderer/containers/juno/**`, home Ask Juno wiring, Settings › Juno container, `docs/performance.md` budgets | WP12, WP13 |
 | WP15 Actions | Opus | `packages/agent/src/{actions,grants,policy}/**` | WP3, WP11 |
 | WP16 Redaction | Opus | `packages/agent/src/redaction/**`, and the purge hooks it calls in store, providers and backup (through interfaces their owners export) | WP15 |

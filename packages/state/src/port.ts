@@ -44,10 +44,20 @@ export function requestEngineRestart(): Promise<void> {
 
 export function acquireRendererPort(): Promise<PortLike> {
   const win = globalThis as unknown as WindowLike
+  return acquirePort(() => win.juno.engine.requestPort(), PORT_HANDOFF_TAG, () => new EngineFailed(), 'engine')
+}
+
+/**
+ * Asks main for a port with `request`, then waits for the preload to forward
+ * it as a window message tagged `tag`. `failed` is the error for main's
+ * answer that no port will come.
+ */
+export function acquirePort(request: () => Promise<unknown>, tag: string, failed: () => Error, name: string): Promise<PortLike> {
+  const win = globalThis as unknown as WindowLike
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
       win.removeEventListener('message', onMessage)
-      reject(new Error('main did not send an engine port in time'))
+      reject(new Error(`main did not send an ${name} port in time`))
     }, PORT_TIMEOUT_MS)
     const fail = (cause: unknown) => {
       clearTimeout(timer)
@@ -57,7 +67,7 @@ export function acquireRendererPort(): Promise<PortLike> {
     const onMessage = (event: HandoffEvent) => {
       if (event.source !== win) return
       const data = event.data as { _tag?: unknown } | null
-      if (!data || data._tag !== PORT_HANDOFF_TAG) return
+      if (!data || data._tag !== tag) return
       const port = event.ports[0]
       if (!port) return
       clearTimeout(timer)
@@ -65,8 +75,8 @@ export function acquireRendererPort(): Promise<PortLike> {
       resolve(port)
     }
     win.addEventListener('message', onMessage)
-    win.juno.engine.requestPort().then((answer) => {
-      if (decodeResult(answer) === 'failed') fail(new EngineFailed())
+    request().then((answer) => {
+      if (decodeResult(answer) === 'failed') fail(failed())
     }, fail)
   })
 }

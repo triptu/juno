@@ -11,7 +11,6 @@
  */
 import {
   hasApi,
-  validateToolCall,
   type Api,
   type AssistantMessage,
   type Context as PiContext,
@@ -21,11 +20,10 @@ import {
   type Tool,
   type TSchema,
 } from '@earendil-works/pi-ai'
-import { Effect, Layer, Option, Queue, Stream } from 'effect'
+import { Effect, Layer, Option } from 'effect'
 import { classifierFor, modelFor, type AiConfig } from '../config'
-import { AiProvider, type AiCallMeta, type AiProviderShape, type ChatContext, type ChatEvent, type ChatTool, type ChatToolCall, type Decision, type NoDecisionReason } from '../provider'
+import { AiProvider, type AiCallMeta, type AiProviderShape, type Decision, type NoDecisionReason } from '../provider'
 import { cleanText, validateOutput, type StructuredTask, type TextTask } from '../task'
-import { chat as chatTask } from '../tasks/chat'
 import { OPENROUTER, openRouterModels, resolveClassifier, resolveModel, type PiModels } from './models'
 
 export { OPENROUTER, openRouterModels, resolveClassifier, resolveModel, type PiModels } from './models'
@@ -193,67 +191,7 @@ export function makePiAiProvider(readConfig: Effect.Effect<AiConfig>, models: Pi
       return yield* run<string>({ modelId: model.id, priced, timeoutMillis: task.timeoutMillis, started, attempt: chatAttempt(request, config.apiKey) })
     })
 
-  const chat: AiProviderShape['chat'] = (context, tools) =>
-    Stream.callback<ChatEvent>((queue) =>
-      Effect.gen(function* () {
-        const started = Date.now()
-        const config = yield* readConfig
-        const { model, priced } = resolveModel(models, modelFor(chatTask.tier, config))
-        const meta = (extra: Partial<AiCallMeta> = {}): AiCallMeta => ({ model: model.id, latencyMillis: Date.now() - started, attempts: 1, ...extra })
-        if (!config.apiKey) {
-          Queue.offerUnsafe(queue, { type: 'failed', reason: 'missing-key', meta: meta({ attempts: 0 }) })
-          Queue.endUnsafe(queue)
-          return
-        }
-        const apiKey = config.apiKey
-        const piTools = tools.map(toPiTool)
-        const piContext: PiContext = {
-          systemPrompt: `${chatTask.prompt}\n\n${chatTask.render(context)}`,
-          messages: context.messages.map((m) => toPiMessage(m, model)),
-          tools: piTools,
-        }
-        const consume = Effect.tryPromise(async (signal) => {
-          const events = models.stream(model, piContext, { apiKey, signal, maxTokens: GENERATION_MAX_TOKENS })
-          let text = ''
-          const calls: ChatToolCall[] = []
-          for await (const event of events) {
-            if (event.type === 'text_delta') {
-              text += event.delta
-              Queue.offerUnsafe(queue, { type: 'text', delta: event.delta })
-            } else if (event.type === 'toolcall_end') {
-              const call: ChatToolCall = { id: event.toolCall.id, name: event.toolCall.name, arguments: event.toolCall.arguments }
-              try {
-                validateToolCall(piTools, event.toolCall)
-              } catch (error) {
-                Queue.offerUnsafe(queue, { type: 'failed', reason: 'invalid-output', detail: error instanceof Error ? error.message : String(error), meta: meta() })
-                return
-              }
-              calls.push(call)
-              Queue.offerUnsafe(queue, { type: 'toolCall', call })
-            } else if (event.type === 'error') {
-              const reason: NoDecisionReason = event.reason === 'aborted' ? 'timeout' : 'provider-error'
-              Queue.offerUnsafe(queue, { type: 'failed', reason, detail: event.error.errorMessage, meta: meta() })
-              return
-            } else if (event.type === 'done') {
-              const cost = event.message.usage.cost.total
-              Queue.offerUnsafe(queue, { type: 'done', text, toolCalls: calls, meta: meta(priced ? { costUsd: cost } : {}) })
-            }
-          }
-        })
-        const timed = Effect.gen(function* () {
-          const result = yield* Effect.result(Effect.timeoutOption(consume, chatTask.timeoutMillis))
-          if (result._tag === 'Failure') {
-            Queue.offerUnsafe(queue, { type: 'failed', reason: 'provider-error', detail: String(result.failure.cause), meta: meta() })
-          } else if (Option.isNone(result.success)) {
-            Queue.offerUnsafe(queue, { type: 'failed', reason: 'timeout', meta: meta() })
-          }
-          Queue.endUnsafe(queue)
-        })
-        yield* Effect.forkScoped(timed)
-      }),
-    )
-
-  return { decide, generate, chat }
+  return { decide, generate }
 }
 
 /** Two attempts at most, inside the task's timeout. */
@@ -318,39 +256,4 @@ function textOf(message: AssistantMessage): string {
     .filter((c) => c.type === 'text')
     .map((c) => c.text)
     .join('')
-}
-
-function toPiTool(tool: ChatTool): Tool {
-  return { name: tool.name, description: tool.description, parameters: tool.parameters }
-}
-
-function toPiMessage(message: ChatContext['messages'][number], model: Model<Api>): PiMessage {
-  const timestamp = Date.now()
-  switch (message.role) {
-    case 'user':
-      return { role: 'user', content: message.text, timestamp }
-    case 'assistant':
-      return {
-        role: 'assistant',
-        content: [
-          ...(message.text ? [{ type: 'text' as const, text: message.text }] : []),
-          ...message.toolCalls.map((call) => ({ type: 'toolCall' as const, id: call.id, name: call.name, arguments: call.arguments as never })),
-        ],
-        api: model.api,
-        provider: OPENROUTER,
-        model: model.id,
-        usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
-        stopReason: message.toolCalls.length > 0 ? 'toolUse' : 'stop',
-        timestamp,
-      }
-    case 'tool':
-      return {
-        role: 'toolResult',
-        toolCallId: message.callId,
-        toolName: message.name,
-        content: [{ type: 'text', text: message.result }],
-        isError: message.isError ?? false,
-        timestamp,
-      }
-  }
 }

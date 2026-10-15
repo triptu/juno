@@ -8,15 +8,16 @@
  *   `chat.postMessage` with `client_msg_id` set to the action id, no retry.
  * - `sent` asks Slack, not the store, for the reconcile lookup.
  * - Presence follows the engine phase, the AI assist pref, the clock against
- *   the notification and active hours, and the topic last shown.
+ *   the notification and active hours the notifications engine reads
+ *   (`@juno/notifications` settings), and the topic last shown.
  */
 import { Clock, Context, Effect, Layer, Result, Stream, SubscriptionRef } from 'effect'
 import { AgentHostError, type Place } from '@juno/agent-contract'
 import { JunoHost, type Account, type AccountId, type Attempt, type Message, type PostOutcome, type Presence } from '@juno/agent-juno'
 import type { EnginePhase } from '@juno/contract'
-import { defaultNotificationSettings, inHours, type Ts } from '@juno/domain'
+import { defaultNotificationSettings, inHours, type NotificationSettings, type Ts } from '@juno/domain'
+import { readSettings } from '@juno/notifications'
 import { liveQuery, StoreReader, type SqlError } from '@juno/store'
-import { aiAssistOn } from '../ai'
 import { Outbox, type MirrorError } from '../outbox'
 import { SyncLink } from '../syncLink'
 import { Workspace, type StoreServices } from '../workspace'
@@ -62,13 +63,15 @@ const readAccount = Effect.gen(function* () {
   return team === undefined || team.self_user_id === null ? undefined : { id: `${team.id}:${team.self_user_id}` as AccountId, userId: team.self_user_id }
 })
 
-/** Whether `at` is outside notification hours, and inside active hours. Juno has no hours setting yet, so the defaults apply. */
-const hoursAt = (millis: number) => {
+type Hours = Pick<NotificationSettings, 'notificationHours' | 'presenceHours'>
+
+/** Whether `millis` is outside notification hours, and inside active hours, in local time. */
+const hoursAt = (millis: number, hours: Hours) => {
   const date = new Date(millis)
   const at = { weekday: date.getDay() as 0, minutes: date.getHours() * 60 + date.getMinutes() }
   return {
-    quietHours: !inHours(at, defaultNotificationSettings.notificationHours),
-    ownerActive: inHours(at, defaultNotificationSettings.presenceHours),
+    quietHours: !inHours(at, hours.notificationHours),
+    ownerActive: inHours(at, hours.presenceHours),
   }
 }
 
@@ -139,11 +142,12 @@ export const JunoHostLive: Layer.Layer<JunoHost, never, Workspace | Outbox | Syn
         ) satisfies Effect.Effect<ReadonlyArray<Message>, AgentHostError>
 
     const online = phases.pipe(Stream.map((phase) => ONLINE.has(phase._tag)))
+    const signedOutSettings = { aiEnabled: true, accountId: null, hours: defaultNotificationSettings as Hours }
     const settings = workspace.changes.pipe(
       Stream.switchMap((open) => {
-        if (open === undefined) return Stream.make({ aiEnabled: true, accountId: null })
-        const read = Effect.all({ aiEnabled: aiAssistOn, account: readAccount }).pipe(
-          Effect.map(({ aiEnabled, account: signedIn }) => ({ aiEnabled, accountId: signedIn?.id ?? null })),
+        if (open === undefined) return Stream.make(signedOutSettings)
+        const read = Effect.all({ prefs: readSettings, account: readAccount }).pipe(
+          Effect.map(({ prefs, account: signedIn }) => ({ aiEnabled: prefs.aiAssist, accountId: signedIn?.id ?? null, hours: prefs.settings as Hours })),
         )
         return liveQuery(['prefs', 'team'], read).pipe(
           Stream.filterMap((result) => (Result.isSuccess(result) ? Result.succeed(result.success) : Result.failVoid)),
@@ -151,10 +155,7 @@ export const JunoHostLive: Layer.Layer<JunoHost, never, Workspace | Outbox | Syn
         )
       }),
     )
-    const hours = Stream.tick('1 minute').pipe(
-      Stream.mapEffect(() => Clock.currentTimeMillis),
-      Stream.map(hoursAt),
-    )
+    const clock = Stream.tick('1 minute').pipe(Stream.mapEffect(() => Clock.currentTimeMillis))
     // "This" is the topic last viewed (SPEC 7): the most recently shown one, kept after it closes.
     const lastViewed = yield* SubscriptionRef.make<string | undefined>(undefined)
     yield* link.shownChanges.pipe(
@@ -172,10 +173,10 @@ export const JunoHostLive: Layer.Layer<JunoHost, never, Workspace | Outbox | Syn
             ),
       ),
     )
-    const presence = Stream.zipLatestAll(online, settings, hours, thisTopic).pipe(
+    const presence = Stream.zipLatestAll(online, settings, clock, thisTopic).pipe(
       Stream.map(
-        ([isOnline, current, clock, topic]): Presence =>
-          ({ online: isOnline, ...current, ...clock, thisTopic: topic }) as Presence,
+        ([isOnline, { hours, ...current }, now, topic]): Presence =>
+          ({ online: isOnline, ...current, ...hoursAt(now, hours), thisTopic: topic }) as Presence,
       ),
       Stream.changesWith((a, b) => JSON.stringify(a) === JSON.stringify(b)),
     )
