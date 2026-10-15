@@ -73,3 +73,10 @@ WP19 adds `agent.schedule.watchReply { opId, channelId, ts, threadTs? }` to
 The owner click is the authority; the server verifies the message's author and
 uses saved notification hours. Undo deletes the returned schedule through
 `agent.scheduled.action`, using its current revision from the page.
+
+Reply watches use `host.schedule.check` (cached metadata or a complete Slack
+refresh), `host.schedule.hours` (saved notification hours and local timezone),
+and `host.schedule.changes` (message-store invalidations). The check includes
+the owner's identity and verifies the source author for the menu command.
+No message text crosses these routes. Account checks surround refreshes, and
+incomplete or limited Slack history fails rather than reporting no reply.

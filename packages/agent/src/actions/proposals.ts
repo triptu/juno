@@ -188,7 +188,7 @@ export function sendMessageTool(context: ProposeContext & { readonly host: Actio
     name: 'send_message',
     description:
       'Propose messages to send to Slack as the owner. The owner sees a card with each message and sends it with one click; nothing is sent until then. ' +
-      'Use only when the owner asked you to send or reply. Each message names its topic: m:<channel id> posts to a channel or DM, t:<channel id>:<thread ts> replies in a thread.',
+      'Use when the owner asked you to send or reply, or to draft a nudge for an expired reply watch. Each message names its topic: m:<channel id> posts to a channel or DM, t:<channel id>:<thread ts> replies in a thread.',
     parameters: {
       type: 'object',
       properties: {

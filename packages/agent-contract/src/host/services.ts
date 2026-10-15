@@ -33,6 +33,16 @@ export const hostPerson = Rpc.make('host.slack.person', { payload: { accountId: 
   success: Schema.Struct({ id: HostUserId, name: Schema.String, displayName: Schema.String }), error: AgentHostError })
 export const HostReadRpcs = RpcGroup.make(hostSearch, hostHistory, hostReplies, hostTopics, hostTopic, hostPerson)
 
+/** Metadata only: reply watches never send message content to a model to check replies. */
+export const WatchConversation = Schema.Struct({ channelId: Schema.String, ts: Schema.String, threadTs: Schema.optionalKey(Schema.String) })
+export const WatchReply = Schema.Struct({ channelId: Schema.String, ts: Schema.String, threadTs: Schema.optionalKey(Schema.String), userId: Schema.String })
+export const WatchSnapshot = Schema.Struct({ owner: Schema.String, ownMessage: Schema.Boolean, messages: Schema.Array(WatchReply) })
+export const WatchHours = Schema.Struct({ timeZone: Schema.String, weekdays: Schema.Array(Schema.Int), start: Schema.Int, end: Schema.Int })
+export const hostWatchCheck = Rpc.make('host.schedule.check', { payload: { accountId: AccountId, conversation: WatchConversation, refresh: Schema.Boolean }, success: WatchSnapshot, error: AgentHostError })
+export const hostWatchHours = Rpc.make('host.schedule.hours', { payload: { accountId: AccountId }, success: WatchHours, error: AgentHostError })
+export const hostWatchChanges = Rpc.make('host.schedule.changes', { success: Schema.Void, stream: true })
+export const HostScheduleRpcs = RpcGroup.make(hostWatchCheck, hostWatchHours, hostWatchChanges)
+
 /** An already-consumed authorization is the unit of deduplication at the host boundary.
  * Repeating an RPC must return the recorded attempt, never submit it again. */
 export const HostDispatch = Schema.Struct({
@@ -75,4 +85,4 @@ export const hostNotify = Rpc.make('host.notification.deliver', {
 export const HostNotificationRpcs = RpcGroup.make(hostNotify)
 
 /** The whole AgentHost group, protocol `AGENT_HOST_PROTOCOL` (2). */
-export const AgentHostRpcs = HostHelloRpcs.merge(HostReadRpcs, HostActionRpcs, HostPresenceRpcs, HostNotificationRpcs)
+export const AgentHostRpcs = HostHelloRpcs.merge(HostReadRpcs, HostActionRpcs, HostPresenceRpcs, HostNotificationRpcs, HostScheduleRpcs)
