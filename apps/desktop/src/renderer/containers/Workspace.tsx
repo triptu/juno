@@ -22,9 +22,7 @@ import { useAtomValue } from '@juno/state/react'
 import { TopicArt, Workspace as WorkspaceView, type ActivateEvent, type WorkspaceTab, type WorkspaceTabIcon } from '@juno/views'
 import { HomePage } from './Home'
 import { runJunoShortcut } from './juno/actions'
-import { JunoPageTab } from './juno/JunoPages'
-import { JunoPanel } from './juno/JunoPanel'
-import { JunoTab } from './juno/JunoTab'
+import { JunoPageTab, JunoPanel, JunoTab, loadJuno } from './juno/lazy'
 import { NotificationsPage } from './Notifications'
 import { useNotificationBridge, WhyLayer } from './notificationBridge'
 import { PreferencesPage } from './Preferences'
@@ -89,9 +87,17 @@ function Page({ tab }: { readonly tab: Tab }) {
     case 'home':
       return <HomePage key="home" />
     case 'juno':
-      return <JunoTab key="juno" />
+      return (
+        <Suspense key="juno" fallback={null}>
+          <JunoTab />
+        </Suspense>
+      )
     case 'junoPage':
-      return <JunoPageTab key={place.page} page={place.page} />
+      return (
+        <Suspense key={place.page} fallback={null}>
+          <JunoPageTab page={place.page} />
+        </Suspense>
+      )
     case 'notifications':
       return <NotificationsPage key="notifications" />
     case 'preferences':
@@ -151,7 +157,13 @@ export function Workspace() {
   // "Pick up where you left off" on Home: the topic that stayed on screen for a minute.
   useEffect(() => startVisitLog(registry), [])
   useEffect(() => {
-    const idle = requestIdleCallback(() => void loadAllTopicsPage(), { timeout: 5_000 })
+    const idle = requestIdleCallback(
+      () => {
+        void loadAllTopicsPage()
+        if (registry.get(junoAgentOnAtom)) void loadJuno()
+      },
+      { timeout: 5_000 },
+    )
     return () => cancelIdleCallback(idle)
   }, [])
   useEffect(() => {
@@ -173,7 +185,13 @@ export function Workspace() {
       {...(sidebarHidden ? { leading: <TitlebarNav /> } : {})}
       nothingShown={state.active === undefined}
       empty={<HomePage />}
-      side={agentOn && panelOpen && panelTopic !== undefined ? <JunoPanel topicId={panelTopic} /> : undefined}
+      side={
+        agentOn && panelOpen && panelTopic !== undefined ? (
+          <Suspense fallback={null}>
+            <JunoPanel topicId={panelTopic} />
+          </Suspense>
+        ) : undefined
+      }
     >
       {pages.length === 0
         ? undefined
