@@ -8,13 +8,13 @@
 
 The desktop agent (`apps/desktop/src/agent/index.ts`) supplies `credentialBridge` (`bridge.ts`): each `Credentials` call is a `credential` request to main over `parentPort` (`CredentialRequest`: `load`, `save`, `clear`, `open`), answered by `credentialReply`. Main (`apps/desktop/src/main/mcpCredentials.ts`) keeps each connection's OAuth state in the login keychain, in base64 chunks under the service `juno-mcp`, writes one connection at a time, refuses ids that are not Juno's, and opens only https or loopback sign-in pages with `shell.openExternal`. Under `JUNO_E2E` it keeps them in memory and fetches the sign-in page instead, which the fake authorization server approves. The held secrets for the argument filter are the states this agent process loaded or saved. No connection uses a bearer secret yet.
 
-The presets are Notion, Littlebird (`https://mcp.littlebird.ai/mcp`, OAuth) and T3 Code (`http://localhost:3773/mcp`, OAuth with no refresh, `noSecrets`), all off at first and never removable. Littlebird's read list starts empty until the owner reviews discovered names and schema hashes; WP18 removed the unconfirmed names. See `../littlebird/README.md`. `address(url, allowNetwork)` changes T3 Code's address: without the network switch only loopback is accepted, and with it only https off this Mac. `add(label, url)` adds another server with no auth and no read list; `remove(id)` deletes one the owner added, with its credentials.
+The presets are Notion, Littlebird (`https://mcp.littlebird.ai/mcp`, OAuth) and T3 Code (`http://localhost:3773/mcp`, OAuth with no refresh, `noSecrets`), all off at first and never removable. Littlebird's read list starts empty until the owner reviews discovered names and schema hashes; WP18 removed the unconfirmed names. See `../littlebird/README.md`. `address(url, allowNetwork)` changes T3 Code's address: without the network switch only loopback is accepted, with it private IPv4 hosts may use HTTP and other hosts require HTTPS. `add(label, url)` adds another server with no auth and no read list; `remove(id)` deletes one the owner added, with its credentials.
 
 Connect (`authorize`) first connects with stored credentials, which opens no browser. Only when the server then asks for a sign-in does it run the OAuth flow; a server added without auth that answers 401 is switched to OAuth first. A new sign-in changes the connection identity.
 
 WP14 uses each discovered row's `schemaHash` in `agent.connections.tier`. It is optional in the shared row schema for older fixtures; manager rows always carry it. A row's hint is the server's description and its read-only claim, shown and never trusted. Connect signs in only when needed; Disconnect clears credentials and changes the connection identity; Disable retains credentials. Enable reconnects without opening a browser. Refresh discovers the tools again. Remove deletes an added server.
 
-`configure` is an owner-only API for connection config. There is no model tool for configuration or tier edits. Changing configuration revokes old credentials and cards. HTTP is permitted only on loopback; HTTPS is required elsewhere. A `noSecrets` connection refuses bearer configuration. Its OAuth token is sent only to the configured endpoint; MCP HTTP redirects are refused.
+`configure` is an owner-only API for connection config. There is no model tool for configuration or tier edits. Changing configuration revokes old credentials and cards. HTTP is permitted on loopback, and for T3 on private IPv4 hosts with the network switch; HTTPS is required elsewhere. A `noSecrets` connection refuses bearer configuration. Its OAuth token is sent only to the selected endpoint; MCP HTTP redirects are refused.
 
 ## Discovery and execution
 
@@ -35,3 +35,9 @@ An update captures the fetched page id, `last_edited_time`, original content and
 Tests use `agent-testing`'s Notion and Littlebird HTTP servers, the real pi-mcp OAuth/client path and the real turn engine. Their page update arguments are simplified, as the fake documents. The hosted server's current schema is always discovered, never assumed. The versioned update adapter deliberately refuses a response without a page id, content and `last_edited_time`, or an update outside its supported replace/append shape. Do not claim hosted writes are verified from these tests.
 
 For a live check, the owner starts Juno, opens Connections, clicks Connect for Notion, sign in and choose the intended workspace. First check discovery and a search/fetch of an owner-selected test page. Compare the actual fetch/update schemas with the adapter before allowing a write; if they differ, extend the fake and adapter together. Then approve one Change card on that test page and read back the result. No live workspace was accessed in WP17.
+
+T3 tries the configured port on loopback first and shows the selected address.
+The selected endpoint is saved; switching endpoints clears credentials and
+changes the connection epoch before any tool call. Network fallback requires
+the owner switch. Public hosts require HTTPS; private and link-local IPv4
+hosts may use HTTP, though OAuth may require HTTPS there.

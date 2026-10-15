@@ -8,11 +8,12 @@ import { catalogue, discover, json, parseObject, validateArguments } from './cat
 import { clientFor, connectionAuth, signIn } from './auth'
 import { ConnectionConfig, McpError, PRESETS, T3, denied, destructiveArguments, endpoint, hasSecret, type Credentials } from './types'
 
-const Stored = Schema.Struct({ config: Schema.String, epoch: Schema.String, discovered: Schema.Number })
+const Stored = Schema.Struct({ config: Schema.String, epoch: Schema.String, discovered: Schema.Number, active_url: Schema.NullOr(Schema.String) })
 interface Session {
   state: ConnectionState
   client?: McpClient
   auth?: AuthProvider
+  address?: string
   pending?: Promise<void>
   abort: AbortController
   retry?: ReturnType<typeof setTimeout>
@@ -30,7 +31,7 @@ export function createMcpManager({ store, credentials, defaults = PRESETS }: Man
   let closed = false
   const changed = () => { for (const listener of listeners) listener() }
   const stored = (id: string) => {
-    const raw = store.db.prepare('SELECT config, epoch, discovered FROM mcp_connections WHERE id = ?').get(id)
+    const raw = store.db.prepare('SELECT config, epoch, discovered, active_url FROM mcp_connections WHERE id = ?').get(id)
     if (!raw) throw new McpError({ reason: 'invalid', message: 'Unknown connection.' })
     const row = Schema.decodeUnknownSync(Stored)(raw)
     return { ...row, config: Schema.decodeUnknownSync(ConnectionConfig)(JSON.parse(row.config)) }
@@ -46,7 +47,7 @@ export function createMcpManager({ store, credentials, defaults = PRESETS }: Man
   }
   const save = (config: ConnectionConfig) => store.db.prepare('UPDATE mcp_connections SET config = ? WHERE id = ?').run(JSON.stringify(config), config.id)
   for (const config of defaults) {
-    endpoint(config.url, config.allowNetwork)
+    endpoint(config.url, config.allowNetwork, config.id === 't3')
     if (config.noSecrets && config.auth.kind === 'bearer') throw new McpError({ reason: 'invalid', message: 'This connection requires its own OAuth sign-in.' })
     store.db.prepare('INSERT OR IGNORE INTO mcp_connections (id,config,epoch) VALUES (?,?,?)').run(config.id, JSON.stringify(config), uuidv7())
     // A preset's read list belongs to the code, not the stored row: an older build's guess must not
@@ -101,9 +102,31 @@ export function createMcpManager({ store, credentials, defaults = PRESETS }: Man
       delete s.client
       await old?.close()
       const config = stored(id).config
-      endpoint(config.url, config.allowNetwork)
-      const auth = await connectionAuth(config, credentials)
-      const client = await clientFor(config, auth)
+      endpoint(config.url, config.allowNetwork, config.id === 't3')
+      let selected = config
+      if (id === 't3') {
+        const local = new URL(config.url)
+        local.protocol = 'http:'
+        local.hostname = '127.0.0.1'
+        local.pathname = '/mcp'
+        const candidate = { ...config, url: local.href }
+        try {
+          // Probe without credentials. A sign-in challenge still identifies the local endpoint.
+          const probe = await clientFor(candidate, undefined)
+          await probe.close()
+          selected = candidate
+        } catch (error) {
+          if (error instanceof McpOAuthAuthorizationRequiredError || error instanceof McpAuthRequiredError) selected = candidate
+        }
+      }
+      if (selected.url !== (stored(id).active_url ?? config.url)) {
+        await credentials.clear(id)
+        store.db.prepare('UPDATE mcp_connections SET epoch = ? WHERE id = ?').run(uuidv7(), id)
+      }
+      store.db.prepare('UPDATE mcp_connections SET active_url = ? WHERE id = ?').run(selected.url, id)
+      s.address = selected.url
+      const auth = await connectionAuth(selected, credentials)
+      const client = await clientFor(selected, auth)
       if (signal.aborted) { await client.close(); return }
       if (auth) s.auth = auth
       s.client = client
@@ -148,7 +171,7 @@ export function createMcpManager({ store, credentials, defaults = PRESETS }: Man
       s.abort = new AbortController()
       s.state = 'connecting'
       changed()
-      await signIn(config, credentials, s.abort.signal)
+      await signIn({ ...config, url: s.address ?? config.url }, credentials, s.abort.signal)
       if (s.abort.signal.aborted) return
       store.db.prepare('UPDATE mcp_connections SET epoch = ? WHERE id = ?').run(uuidv7(), id)
       await connect(id)
@@ -184,7 +207,7 @@ export function createMcpManager({ store, credentials, defaults = PRESETS }: Man
     if (s.state !== 'ready' || !s.client) throw new McpError({ reason: 'unavailable', message: 'The connection is not ready.' })
     let client = s.client
     try {
-      if (write) client = await clientFor(stored(id).config, s.auth, true)
+      if (write) client = await clientFor({ ...stored(id).config, url: s.address ?? stored(id).config.url }, s.auth, true)
       if (s.abort.signal.aborted || stored(id).epoch !== epoch || tool(id, name).hash !== initial.hash) throw new Error('Connection changed')
       return await client.callTool(name, parsed)
     } catch (error) {
@@ -195,10 +218,10 @@ export function createMcpManager({ store, credentials, defaults = PRESETS }: Man
   /** Owner-only configuration. Replacing an endpoint revokes credentials and old cards. */
   const configure = async (input: ConnectionConfig) => {
     const config = Schema.decodeUnknownSync(ConnectionConfig)(input)
-    endpoint(config.url, config.allowNetwork)
+    endpoint(config.url, config.allowNetwork, config.id === 't3')
     if (config.noSecrets && config.auth.kind === 'bearer') throw new McpError({ reason: 'invalid', message: 'Use this server’s own OAuth sign-in.' })
     if (configs().some((row) => row.id === config.id)) await disconnect(config.id)
-    store.db.prepare('INSERT INTO mcp_connections (id,config,epoch) VALUES (?,?,?) ON CONFLICT(id) DO UPDATE SET config=excluded.config, epoch=excluded.epoch, discovered=0').run(config.id, JSON.stringify(config), uuidv7())
+    store.db.prepare('INSERT INTO mcp_connections (id,config,epoch) VALUES (?,?,?) ON CONFLICT(id) DO UPDATE SET config=excluded.config, epoch=excluded.epoch, discovered=0, active_url=NULL').run(config.id, JSON.stringify(config), uuidv7())
     store.db.prepare('DELETE FROM mcp_tools WHERE connection_id = ?').run(config.id)
     changed()
   }
@@ -224,7 +247,7 @@ export function createMcpManager({ store, credentials, defaults = PRESETS }: Man
     /** T3 Code's address. A new address is a new connection: it signs in again. */
     address: async (url: string, allowNetwork: boolean) => {
       const config = stored(T3.id).config
-      const href = endpoint(url.trim(), allowNetwork)
+      const href = endpoint(url.trim(), allowNetwork, true)
       if (href === config.url && allowNetwork === (config.allowNetwork ?? false)) return
       await configure({ ...config, url: href, allowNetwork, enabled: false })
     },
@@ -237,7 +260,7 @@ export function createMcpManager({ store, credentials, defaults = PRESETS }: Man
     definitions: (id: string) => catalogue(store, id).filter((row) => row.present === 1 && !denied(row.name)).map((row) => ({ ...row, definition: json(JSON.parse(row.definition)) })),
     page: (): ConnectionsPage => ({ connections: configs().map((config) => ({
       id: ConnectionId.make(config.id), label: config.label, enabled: config.enabled,
-      state: session(config.id).state, address: config.url,
+      state: session(config.id).state, address: session(config.id).address ?? config.url,
       ...(config.id === T3.id ? { t3: { url: config.url, allowNetwork: config.allowNetwork ?? false } } : {}),
       ...(presets.has(config.id) ? {} : { removable: true as const }),
       ...(session(config.id).state === 'error' || session(config.id).state === 'degraded' ? { detail: 'The connection is unavailable. Juno will reconnect.' } : {}),

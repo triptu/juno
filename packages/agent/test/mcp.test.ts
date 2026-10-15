@@ -269,10 +269,11 @@ it('offers Notion, Littlebird and T3 Code, and adds a server by address that sig
   await expect(manager.remove('notion')).rejects.toMatchObject({ reason: 'invalid' })
 })
 
-it('keeps T3 Code on this Mac unless the local network is allowed, and then only over https', async () => {
+it('keeps T3 Code on this Mac unless the local network is allowed, allows private network addresses with the owner switch', async () => {
   const manager = await bareManager((url) => url)
   await expect(manager.address('http://192.168.1.22:3773/mcp', false)).rejects.toMatchObject({ reason: 'invalid' })
-  await expect(manager.address('http://192.168.1.22:3773/mcp', true)).rejects.toMatchObject({ reason: 'invalid' })
+  await manager.address('http://192.168.1.22:3773/mcp', true)
+  await expect(manager.address('http://example.com:3773/mcp', true)).rejects.toMatchObject({ reason: 'invalid' })
   await expect(manager.address('https://t3.local:3773/mcp', false)).rejects.toMatchObject({ reason: 'invalid' })
   await manager.address('https://t3.local:3773/mcp', true)
   expect(manager.page().connections.find((row) => row.id === T3.id)).toMatchObject({ address: 'https://t3.local:3773/mcp', t3: { url: 'https://t3.local:3773/mcp', allowNetwork: true } })
