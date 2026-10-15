@@ -83,6 +83,24 @@ const bytes = (value: unknown) => new TextEncoder().encode(JSON.stringify(value)
 
 const conversationCalls = (engine: RunningEngine) => apiCalls(engine).filter((call) => call.method.startsWith('conversations.'))
 
+it('shows each bot message name and icon without changing other bot senders', async () => {
+  const engine = await boot(engines)
+  const list = watchList(engine, messagesAtom('m:C0ENG'))
+  const messages = [
+    { ts: `${Math.floor(engine.fake.now() / 1000)}.900001`, username: 'Release helper', bot_profile: { id: 'B0TEST', name: 'Build helper', icons: { image_72: 'https://example.test/build.png' } } },
+    { ts: `${Math.floor(engine.fake.now() / 1000)}.900002`, bot_profile: { id: 'B0TEST', name: 'Build helper', icons: { image_48: 'https://example.test/other.png' } } },
+  ]
+  for (const message of messages) engine.fake.emitFrame({ type: 'message', channel: 'C0ENG', subtype: 'bot_message', bot_id: 'B0TEST', text: 'Synthetic build status', ...message })
+  const window = await list.until((value) => messages.every((message) => value.rows.has(message.ts)), 'bot messages')
+  const senders = messages.map((message) => window.refs.people.get(window.rows.get(message.ts)!.senderId!))
+  expect(senders[0]).toMatchObject({ name: 'Release helper', avatarUrl: 'https://example.test/build.png' })
+  expect(senders[1]).toMatchObject({ name: 'Build helper', avatarUrl: 'https://example.test/other.png' })
+  const stored = readDb(engine, 'cache.db', (db) => db.prepare('SELECT bot_name, bot_icon FROM messages WHERE ts = ?').get(messages[0]!.ts))
+  expect(stored).toEqual({ bot_name: 'Release helper', bot_icon: 'https://example.test/build.png' })
+  const topics = await engine.rowsUntil((rows) => rows.find((row) => row.id === 'm:C0ENG')?.preview.sender === 'Build helper', 'bot preview')
+  expect(topics.find((row) => row.id === 'm:C0ENG')?.preview.sender).toBe('Build helper')
+})
+
 it('tints mentions of stored user groups and leaves other groups plain', async () => {
   const engine = await boot(engines, { initial: (fake) => {
     fake.setSelfUsergroups({ ids: ['S0PLATFORM'] })
@@ -150,7 +168,7 @@ describe('opening a topic', () => {
     const id = 'm:C0DEPLOYS'
     const list = watchList(engine, messagesAtom(id))
     const before = await list.until((window) => window.order.length === 6, 'the six deploys')
-    expect(rowsOf(before).every((row) => row.senderId === 'U0DEPLOYBOT')).toBe(true)
+    expect(rowsOf(before).every((row) => before.refs.people.get(row.senderId!)?.name === 'Deploy Bot')).toBe(true)
     // Grouped under one header: one sender, no quotes.
     expect(rowsOf(before).map((row) => row.groupStart)).toEqual([true, false, false, false, false, false])
 

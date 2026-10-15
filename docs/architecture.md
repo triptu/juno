@@ -217,7 +217,7 @@ team            (id PK, name, domain, self_user_id, enterprise_id, prefs_json, b
 users           (id PK, name, display_name, real_name, avatar_url, tz, is_bot, deleted, updated)
 conversations   (id PK, kind 'public'|'private'|'im'|'mpim', name, user_id, member_ids_json,
                  is_member, is_archived, topic, purpose, created, updated)
-messages        (channel, ts, PK(channel, ts), thread_ts, user_id, subtype, text, blocks_json,
+messages        (channel, ts, PK(channel, ts), thread_ts, user_id, bot_name, bot_icon, subtype, text, blocks_json,
                  files_json, attachments_json, edited_ts, deleted, client_msg_id,
                  reply_count, latest_reply, reply_users_json, last_event_ts, version)
 messages_fts    (fts5: text, content=messages)        -- external content; triggers on messages keep it in step in the same transaction
@@ -233,6 +233,8 @@ topic_index     (topic_id PK, channel, kind, last_activity_ts, message_count, pa
 sync_state      (key PK, value_json)
 ai_cache        (task, key, PK, input_hash, output_json, model, cost_usd, created_at)
 ```
+
+Bot messages keep their display name and icon in `messages.bot_name` and `bot_icon`. The message window emits a separate sender ref per bot message, so overrides on one message do not rename another. These fields follow message content merge ordering.
 
 ### 4.3 Durable tables (`user.db`)
 

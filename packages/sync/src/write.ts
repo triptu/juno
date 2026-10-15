@@ -43,7 +43,7 @@ export const writeMessage = (row: MessageRow): Writer =>
     const sql = yield* StoreWriter
     yield* sql`INSERT INTO messages ${sql.insert(row as unknown as Record<string, unknown>)}
       ON CONFLICT (channel, ts) DO UPDATE SET
-        thread_ts = excluded.thread_ts, user_id = excluded.user_id, subtype = excluded.subtype, text = excluded.text,
+        thread_ts = excluded.thread_ts, user_id = excluded.user_id, bot_name = excluded.bot_name, bot_icon = excluded.bot_icon, subtype = excluded.subtype, text = excluded.text,
         blocks_json = excluded.blocks_json, files_json = excluded.files_json, attachments_json = excluded.attachments_json,
         edited_ts = excluded.edited_ts, deleted = excluded.deleted, client_msg_id = excluded.client_msg_id,
         reply_count = excluded.reply_count, latest_reply = excluded.latest_reply, reply_users_json = excluded.reply_users_json,
