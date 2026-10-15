@@ -16,7 +16,9 @@ before a card or launch. Native plan mode is preferred; its absence adds
 approved brief. Replacing an open T3 proposal uses WP15's expiry path.
 
 The Start click records one attempt, invokes `t3_thread_launch` once, records
-the returned thread in the job, and mints its grant. Lost responses stay
+the returned thread in the job, and mints its grant. A session T3 Code
+confirmed always gets its job and Task card; the grant needs the card's memory
+generation and the connection's account to still hold. Lost responses stay
 unknown. A launch carries `[juno:<action id>]`; reconciliation reads candidate
 threads and requires the same project and exact original message. A negative
 search never permits another launch. A reconciled receipt does not restore a

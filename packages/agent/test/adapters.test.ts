@@ -368,6 +368,19 @@ it('says a T3 question needs an answer in T3 Code when Juno cannot show it', asy
   expect(turns.actions.views().some((v) => v.card._tag === 'question')).toBe(false)
 })
 
+it('shows a session T3 Code started even when the account changed during the launch, without a grant', async () => {
+  let changeAccount = () => {}
+  const tools: FakeTool[] = [{ ...launch, call: () => { changeAccount(); return json({ threadId: 'thread-test' }) } }, ...t3Tools.slice(1)]
+  const { turns, call, click } = await fixture('t3', tools)
+  changeAccount = () => { turns.store.db.prepare("UPDATE mcp_connections SET epoch = 'account-test' WHERE id = 't3'").run() }
+  await call('t3_start', start)
+  await click()
+  expect(turns.actions.views()[0]?.card).toMatchObject({ _tag: 'proposedTask', status: { _tag: 'done' } })
+  expect(turns.jobs.list()).toHaveLength(1)
+  expect(turns.store.db.prepare('SELECT id FROM grants').all()).toHaveLength(0)
+  await expect.poll(() => turns.jobs.list()[0]?.phase).toBe('unknown')
+})
+
 it('settles a lost grant-backed send like a click: Activity detail and the card outcome', async () => {
   const { server, manager, turns, call, click } = await fixture('t3', t3Tools)
   await call('t3_start', start)
