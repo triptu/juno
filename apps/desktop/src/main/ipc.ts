@@ -1,6 +1,6 @@
 import { app, BrowserWindow, clipboard, ipcMain, Menu, shell, type IpcMainInvokeEvent, type MenuItemConstructorOptions } from 'electron'
 import { Schema } from 'effect'
-import { Channels, ShellRoutes, type ContextMenuLeaf, type ShellInput, type ShellOutput } from '@juno/contract'
+import { Channels, ShellRoutes, type ContextMenuLeaf, type DownloadResult, type ShellInput, type ShellOutput } from '@juno/contract'
 import type { AgentSupervisor } from './agent'
 import type { EngineSupervisor } from './engine'
 import type { ProviderStore } from './providers'
@@ -73,9 +73,11 @@ export interface IpcDeps {
   readonly setSidebar: (sidebar: NonNullable<Launch['sidebar']>) => void
   /** The topic the window shows, or null while it shows none or is not focused. */
   readonly setViewing: (topicId: string | null) => void
+  /** Download (files.ts), with the hosts it may fetch from already bound. */
+  readonly downloadFile: (file: { readonly url: string; readonly name: string }) => Promise<DownloadResult>
 }
 
-export function registerIpc({ supervisor, agent, providers, setTheme, setAccent, setDensity, setSidebar, setViewing }: IpcDeps): void {
+export function registerIpc({ supervisor, agent, providers, setTheme, setAccent, setDensity, setSidebar, setViewing, downloadFile }: IpcDeps): void {
   handle(Channels.appGetInfo, () => ({
     name: app.getName(),
     version: app.getVersion(),
@@ -162,6 +164,8 @@ export function registerIpc({ supervisor, agent, providers, setTheme, setAccent,
     if (e2e) slackLinksForTests.push(url.toString())
     else void shell.openExternal(url.toString())
   })
+
+  handle(Channels.shellDownloadFile, (file) => downloadFile(file))
 
   handle(Channels.clipboardWriteText, ({ text }) => {
     clipboard.writeText(text)

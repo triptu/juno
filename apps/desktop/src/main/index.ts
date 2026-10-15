@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { createAgentSupervisor } from './agent'
 import { appMcpCredentials } from './mcpCredentials'
 import { createSupervisor } from './engine'
+import { downloadFile, downloadsForTests } from './files'
 import { contextMenuForTests, registerIpc, slackLinksForTests } from './ipc'
 import { CUSTOM_ITEM, macKeychain, memoryKeychain, OPENROUTER_ITEM } from './keychain'
 import { ProviderStore } from './providers'
@@ -123,8 +124,10 @@ app.whenReady().then(() => {
   if (process.platform === 'darwin' && !app.isPackaged && !e2e) app.dock?.setIcon(join(__dirname, '../../build/icon.png'))
   serveAppScheme(join(__dirname, '../renderer'), fakeSlackUrl === undefined ? undefined : new URL(fakeSlackUrl).origin)
   powerMonitor.on('resume', () => notifier.wake())
+  const fakeSlackOrigin = fakeSlackUrl === undefined ? undefined : new URL(fakeSlackUrl).origin
   registerIpc({
     supervisor,
+    downloadFile: (file) => downloadFile(file, fakeSlackOrigin, e2e),
     setViewing: (topicId) => notifier.setViewing(topicId),
     agent,
     providers,
@@ -181,6 +184,7 @@ if (e2e) {
       failEngine: () => supervisor.giveUp(),
       contextMenu: contextMenuForTests,
       slackLinks: slackLinksForTests,
+      downloads: downloadsForTests,
       agentState: () => agent.currentState,
       agentHost: () => agent.host?.host,
       agentPid: () => agent.pid,
