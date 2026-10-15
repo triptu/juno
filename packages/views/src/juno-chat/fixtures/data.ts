@@ -156,7 +156,6 @@ export const status = (id: string, statusText?: string): ChatItem => ({ _tag: 's
 export const day = (daysAgo: number): ChatItem => ({ _tag: 'day', at: NOW - daysAgo * DAY - (NOW % DAY) })
 
 export const scheduleOrigin: Origin = { _tag: 'schedule', scheduleId: scheduleId('s1'), name: 'Daily catch-up' }
-export const jobOrigin: Origin = { _tag: 'job', jobs: [{ jobId: jobId('j1'), title: 'Fix the sidebar flake' }] }
 export const twoJobsOrigin: Origin = {
   _tag: 'job',
   jobs: [

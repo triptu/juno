@@ -4,10 +4,8 @@
  * the renderer reaches them here, as it reaches the domain's schemas.
  */
 export {
-  addToViewMenu,
   channelMenuItems,
   dropViewOrder,
-  followsThread,
   isViewMenuAction,
   moveViewOrder,
   notifyChoice,
@@ -20,15 +18,11 @@ export {
   viewPillMenuItems,
   whyLabel,
   type ChannelMenuAction,
-  type ChannelMenuState,
   type ViewChoice,
   type ViewMenuAction,
   type ViewPillAction,
   type MenuItem,
   type NotifyAction,
   type NotifyChoice,
-  type PersonMenuAction,
-  type PersonMenuState,
   type TopicMenuAction,
-  type TopicMenuState,
 } from '@juno/domain'

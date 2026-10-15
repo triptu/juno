@@ -575,5 +575,3 @@ export function createRouter(options: RouterOptions) {
     stopped: () => done,
   }
 }
-
-export type Router = ReturnType<typeof createRouter>

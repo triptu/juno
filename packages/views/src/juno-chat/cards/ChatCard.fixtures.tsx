@@ -238,7 +238,7 @@ export const unknownCardSet = defineFixtures(
   frame,
 )
 
-export const chatCard = defineFixtures(
+const chatCard = defineFixtures(
   CardFixture,
   {
     'Shift': {

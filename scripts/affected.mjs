@@ -273,6 +273,7 @@ if (specs.length > 0) {
   })
 }
 
+if (everythingChanged.length || changed.some((file) => file.startsWith('scripts/health'))) plan.push({ script: 'test:health', args: [], local: true, items: [], why: 'health ratchet rules' })
 if (everythingChanged.length || changed.includes('scripts/flake.mjs')) plan.push({ script: 'test:remote-pool', args: [], local: true, items: [], why: 'remote pool lifecycle decisions' })
 
 const renderer = changed.some((file) => file.startsWith('apps/desktop/src/renderer/') || file.startsWith('packages/views/src/') || file.startsWith('packages/ui/src/') || file.startsWith('packages/tokens/'))

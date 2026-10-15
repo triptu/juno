@@ -34,7 +34,6 @@
     "@juno/tokens": "workspace:*",
     "@juno/views": "workspace:*",
     "@playwright/test": "1.64.0",
-    "@stylexjs/stylex": "0.19.1",
     "@stylexjs/unplugin": "0.19.1",
     "@types/node": "24.19.2",
     "@types/react": "19.3.0",

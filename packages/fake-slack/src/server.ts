@@ -63,8 +63,6 @@ interface HoldRule {
   readonly waiting: Array<{ readonly resume: () => void; readonly args: Record<string, unknown> }>
 }
 
-export type ControlHandler = (input: Record<string, unknown>) => unknown
-
 export class FakeServer {
   readonly sessions = new Map<string, Session>()
   readonly calls: CallRecord[] = []

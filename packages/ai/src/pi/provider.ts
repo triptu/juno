@@ -26,7 +26,7 @@ import { AiProvider, type AiCallMeta, type AiProviderShape, type Decision, type 
 import { cleanText, validateOutput, type StructuredTask, type TextTask } from '../task'
 import { OPENROUTER, openRouterModels, resolveClassifier, resolveModel, type PiModels } from './models'
 
-export { OPENROUTER, openRouterModels, resolveClassifier, resolveModel, type PiModels } from './models'
+export { OPENROUTER, openRouterModels, type PiModels } from './models'
 
 const DECISION_MAX_TOKENS = 1024
 const GENERATION_MAX_TOKENS = 2048

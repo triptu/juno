@@ -178,9 +178,6 @@ export type ThreadRoot = typeof ThreadRoot.Type
 export const Message = S.Struct({ ...MessageFields, root: opt(ThreadRoot) })
 export type Message = typeof Message.Type
 
-/** Subtypes with a message body that Juno shows in a topic. Everything else is a system or structural message. */
-export const BodySubtypes = ['thread_broadcast', 'bot_message', 'me_message', 'file_share'] as const
-
 /** Subtypes that change another message instead of being one. They arrive only on the socket. */
 export const StructuralSubtypes = ['message_changed', 'message_deleted', 'message_replied'] as const
 

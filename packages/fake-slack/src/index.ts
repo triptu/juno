@@ -12,9 +12,9 @@ import { FakeServer, type CallRecord, type Session } from './server.ts'
 import { asTs, Workspace, type Subscription } from './state.ts'
 
 export type { CallRecord, Session } from './server.ts'
-export type { ConversationRecord, PostInput, Subscription } from './state.ts'
+export type { Subscription } from './state.ts'
 export { Workspace } from './state.ts'
-export { CONVERSATIONS, EARLY_ACCESS_PNG, PEOPLE, Q4_PLAN_PDF, SELF_ID, TEAM, seedWorkspace, type SeedFile } from './fixtures.ts'
+export { CONVERSATIONS, SELF_ID, TEAM, seedWorkspace } from './fixtures.ts'
 export { samplePdf, samplePng } from './samples.ts'
 
 export interface FakeSlackOptions {
@@ -397,7 +397,7 @@ export class FakeSlack {
 export function startFakeSlack(options?: FakeSlackOptions): Promise<FakeSlack> {
   return FakeSlack.start(options)
 }
-export { localConfigJson, writeSlackAppFixture, type SlackAppFixtureOptions, type SlackAppFixtureTeam } from './slackApp.ts'
-export { largeSeed, LARGE_SEED_DEFAULTS, type LargeSeedOptions, type LargeSeedSummary } from './seeds/large.ts'
+export { writeSlackAppFixture } from './slackApp.ts'
+export { largeSeed, LARGE_SEED_DEFAULTS } from './seeds/large.ts'
 
-export { topic300Seed, TOPIC300_MAIN_CHANNEL, TOPIC300_THREAD_CHANNEL, type Topic300Summary } from './seeds/topic300.ts'
+export { topic300Seed, TOPIC300_MAIN_CHANNEL, TOPIC300_THREAD_CHANNEL } from './seeds/topic300.ts'

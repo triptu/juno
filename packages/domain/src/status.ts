@@ -146,16 +146,3 @@ export function allTopicsStatus(topic: Topic, ctx: RuleContext): AllTopicsStatus
   const status = topicStatus(topic, ctx)
   return status === 'ignored' ? 'open' : status
 }
-
-export function statusLabel(status: AllTopicsStatus): string {
-  switch (status) {
-    case 'open':
-      return 'Open'
-    case 'resolved':
-      return 'Resolved'
-    case 'quiet':
-      return 'Quiet'
-    case 'unsubscribed':
-      return 'Unfollowed'
-  }
-}

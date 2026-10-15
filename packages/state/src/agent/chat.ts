@@ -86,9 +86,6 @@ const pageFamily = Atom.family((key: string) =>
   ),
 )
 
-/** The agent's page for `window`, live. Equal windows share one subscription. */
-export const chatPageAtom = (window: Window) => pageFamily(JSON.stringify(window))
-
 export const chatSummaryAtom = AgentClient.runtime
   .atom(live<ChatSummary, never>('agent.chat.summary', undefined))
   .pipe(Atom.keepAlive)
@@ -307,8 +304,6 @@ export function chatActions(registry: Registry) {
     onCard: (id: CardId, command: CardCommand): Promise<CardOutcome> => cardCommand(registry, id, command),
   }
 }
-
-export type ChatCommands = ReturnType<typeof chatActions>
 
 const ok = (exit: CommandResult<unknown>): CardOutcome => (Exit.isSuccess(exit) ? 'sent' : 'failed')
 

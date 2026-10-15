@@ -1,7 +1,6 @@
-import { Schema, SchemaRepresentation } from 'effect'
+import { Schema } from 'effect'
 import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
-import { Card as ProjectedCard, sendMessageStatus as projectedSendMessageStatus } from '@juno/agent-cards'
 import { Card, SendMessageCard, chatCopy, sendMessageStatus } from '@juno/agent-contract'
 
 const text = fc.string()
@@ -63,46 +62,17 @@ const cards = {
   budget: fc.record({ ...base, _tag: fc.constant('budget'), spentTodayUsd: fc.double({ noNaN: true, noDefaultInfinity: true }), capUsd: fc.double({ noNaN: true, noDefaultInfinity: true }) }),
   provider: fc.record({ ...base, _tag: fc.constant('provider'), options: fc.array(fc.record({ id: fc.constantFrom('openrouter', 'codex'), label: text, note: text })) }),
   unknown: fc.record({ _tag: fc.constant('unknown'), id: text, kind: text }),
-} satisfies Record<Card['_tag'] | ProjectedCard['_tag'], fc.Arbitrary<unknown>>
+} satisfies Record<Card['_tag'], fc.Arbitrary<unknown>>
 
 // JSON omits absent optional keys, just as the wire does.
 const wireCard = (value: unknown): unknown => JSON.parse(JSON.stringify(value))
 
-// Custom URL predicates are opaque functions; the property below checks their behaviour.
-const shape = (schema: Schema.Top): unknown => JSON.parse(JSON.stringify(
-  SchemaRepresentation.toRepresentation(schema.ast),
-  (_key, value: unknown) => typeof value === 'function' ? '[predicate]' : value,
-))
-
-describe('card schema parity', () => {
-  it('has the same encoded AST shape, including nested fields and constraints', () => {
-    expect(shape(ProjectedCard)).toEqual(shape(Card))
-  })
-
-  it('agrees on URL validation inside nested card targets', () => {
-    const urls = fc.oneof(text, fc.constantFrom('t3-thread://v1/thread-1', 't3-thread://v1/../other'), fc.tuple(
-      fc.constantFrom('https://', 'http://', 'file://', 'javascript:', ''),
-      fc.constantFrom('localhost', 'localhost.evil.com', '127.0.0.1', '[::1]', 'example.com', ''),
-      text,
-    ).map((parts) => parts.join('')))
-    fc.assert(fc.property(urls, (url) => {
-      const input = { _tag: 'task', id: 'card', jobId: 'job', kind: 't3', title: '', where: '', phase: 'done', open: { _tag: 'url', url, label: '' } }
-      expect(Schema.is(ProjectedCard)(input)).toBe(Schema.is(Card)(input))
-    }), { numRuns: 500 })
-  })
-
+describe('card wire formats', () => {
   for (const [kind, arbitrary] of Object.entries(cards)) {
-    it(`encodes ${kind} identically in both directions`, () => {
+    it(`round-trips ${kind} without changing the wire data`, () => {
       fc.assert(fc.property(arbitrary.map(wireCard), (input) => {
-        const projected = Schema.decodeUnknownSync(ProjectedCard)(input)
-        const chat = Schema.decodeUnknownSync(Card)(input)
-        const projectedWire = Schema.encodeSync(ProjectedCard)(projected)
-        const chatWire = Schema.encodeSync(Card)(chat)
-        expect(projectedWire).toEqual(input)
-        expect(chatWire).toEqual(input)
-        expect(projectedWire).toEqual(chatWire)
-        expect(Schema.encodeSync(Card)(Schema.decodeUnknownSync(Card)(projectedWire))).toEqual(projectedWire)
-        expect(Schema.encodeSync(ProjectedCard)(Schema.decodeUnknownSync(ProjectedCard)(chatWire))).toEqual(chatWire)
+        const card = Schema.decodeUnknownSync(Card)(input)
+        expect(Schema.encodeSync(Card)(card)).toEqual(input)
       }), { numRuns: 100 })
     })
   }
@@ -111,7 +81,7 @@ describe('card schema parity', () => {
 // WP12: add count-template cases here once chatCopy has Sent {n} and Sent {n} of {m}.
 // Keep this check at the package boundary so the pure catalogue cannot drift.
 describe('send status copy', () => {
-  it('matches the fixed chat copy in both status derivations', () => {
+  it('matches the fixed chat copy', () => {
     for (const [tag, line] of [
       ['sent', chatCopy.card.sendMessage.sent],
       ['failed', chatCopy.card.failed],
@@ -121,9 +91,7 @@ describe('send status copy', () => {
         messages: [{ id: 'row', target: { channelId: 'C_TEST', name: 'test', kindLabel: 'Public channel', tint: 'public' }, text: '',
           result: { _tag: tag, open: { _tag: 'topic', topicId: 'topic' } } }],
       }).messages
-      for (const derive of [projectedSendMessageStatus, sendMessageStatus]) {
-        expect(derive(messages)).toMatchObject({ line })
-      }
+      expect(sendMessageStatus(messages)).toMatchObject({ line })
     }
   })
 })

@@ -120,8 +120,6 @@ export function junoPageActions(registry: Registry) {
   }
 }
 
-export type JunoPageActions = ReturnType<typeof junoPageActions>
-
 /** The owner's menu click sets a watch without starting a model run. */
 export async function watchReply(registry: Registry, message: { readonly channelId: string; readonly ts: string; readonly threadTs?: string }): Promise<void> {
   const result = await call<{ readonly id: ScheduleId; readonly at: number }>(registry, 'agent.schedule.watchReply', { opId: uuidv7(), ...message })
