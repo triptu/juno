@@ -167,6 +167,7 @@ export {
   JUNO_PANEL_PREF,
   junoAboutAtom,
   junoAvailableAtom,
+  junoChatTargetAtom,
   junoFocusAtom,
   junoPanelOpenAtom,
   junoQuoteAtom,
@@ -174,6 +175,7 @@ export {
   openedAtNewAtom,
   quoteInJuno,
   setJunoPanelOpen,
+  showInJunoChat,
   type JunoFocusRequest,
   type JunoQuoteRequest,
 } from './junoPanel'

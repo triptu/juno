@@ -20,7 +20,7 @@ With AI assist on, `Notifier.summary` receives the full source list and the summ
 
 Delivery is claimed in SQLite before the OS call, to prevent a duplicate interruption. A crash between the claim and the OS call can lose that interruption. Reasons and message content remain in the log. The agent summary callback runs before the delivery claim.
 
-The agent host on this branch has no summary append method yet. The callback is the M10 engine handoff for WP13 and plan v3 section 19.1. In the app, `hostNotificationHost` in the engine sends notifications to main (`apps/desktop/src/main/notifier.ts`), which shows them and reports the focused topic; until the chat can take the summary, its click opens the first source.
+Each summary source carries the place as the owner sees it (`#eng`, `Maya Chen`) and the sender when the place does not name them, so the chat can say "Maya Chen in #eng" without message text. In the app, `hostNotificationHost` in the engine sends notifications to main (`apps/desktop/src/main/notifier.ts`), which shows them and reports the focused topic. Its `summary` offers the summary to the agent over `host.notification.summaries` until the agent says it appended it (`host.notification.summaryTaken`), and returns the summary id; the chat keys the message by it (`summaryBubbleId`), so the click opens the Juno tab at it. The offer is held in memory: a summary the agent has not taken when the engine stops misses the chat, though its OS notification was shown.
 
 ## Tests
 
