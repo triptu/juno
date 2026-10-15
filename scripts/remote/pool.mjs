@@ -82,7 +82,8 @@ function list() {
     if (result.status === 0) break
   }
   if (result.status !== 0) throw new Error(`nsc list failed: ${result.error?.message ?? result.stderr.trim()}`)
-  const instances = JSON.parse(result.stdout)
+  // nsc prints `null`, not `[]`, when no instance exists.
+  const instances = JSON.parse(result.stdout) ?? []
   if (!Array.isArray(instances)) throw new Error('nsc list did not return an array')
   return instances
 }
