@@ -2,14 +2,15 @@ import * as stylex from '@stylexjs/stylex'
 import { chatCopy, type JobId, type JunoSettingsPage as JunoSettingsPageModel, type ModelChoice } from '@juno/agent-contract'
 import { Button, Checkbox, Chip, ListRow, Page, PageHeader, Section, Select, Surface, Text, TextField } from '@juno/ui'
 import type { ReactNode } from 'react'
+import { BackupSection, ThisMacSection } from './BackupSections'
 import { cell } from './cell'
-import { fullTime, messageTime } from '../time'
 
 /**
  * A section whose work is not built yet is left out by leaving out its
  * callbacks: Codex (`onSignInCodex`), Rules (`onRuleChange`, `onRuleRemove`,
  * `onRuleAdd`), Backup (`onBackupFolder`, `onExportPhrase`) and This Mac
- * (`onMove`, `onRestore`, `onStopJob`).
+ * (`onMove`, `onRestore`). Without `onStopJob` a removal pending in a job
+ * is not shown.
  */
 export interface JunoSettingsPageProps {
   /** The agent's page. Absent while no provider is set up, as no agent runs: the page shows the provider alone. */
@@ -35,6 +36,10 @@ export interface JunoSettingsPageProps {
   readonly onMove?: () => void
   readonly onRestore?: () => void
   readonly onStopJob?: (jobId: JobId) => void
+  /** A folder change or an export in flight: its button waits. */
+  readonly backupBusy?: 'folder' | 'phrase'
+  /** Why the last folder change or export failed, under its row. */
+  readonly backupError?: { readonly row: 'folder' | 'phrase'; readonly message: string }
 }
 
 function commitCap(text: string, current: number, onCap: (usd: number) => void): void {
@@ -87,8 +92,9 @@ export function JunoSettingsPage({
   onMove,
   onRestore,
   onStopJob,
+  backupBusy,
+  backupError,
 }: JunoSettingsPageProps) {
-  const copy = chatCopy.pages.settings
   if (page === undefined) {
     return (
       <Page width="settings">
@@ -286,95 +292,17 @@ export function JunoSettingsPage({
       </Section>
 
       {onBackupFolder === undefined || onExportPhrase === undefined ? null : (
-        <Section heading="Backup" sub="An encrypted copy of Juno's state, in a folder you choose.">
-          <Surface kind="group">
-            <ListRow
-              trailing={
-                <Button variant="ghost" size="xs" tone="subtle" onClick={onBackupFolder}>
-                  Choose folder
-                </Button>
-              }
-            >
-              <span {...stylex.props(cell.lines)}>
-                <Text variant="body" truncate>
-                  {page.backupFolder}
-                </Text>
-                <Text variant="meta" tone="muted">
-                  {page.lastBackupAt === undefined ? 'No backup yet' : (
-                    <>
-                      Last backup <time title={fullTime(page.lastBackupAt)}>{messageTime(page.lastBackupAt, now)}</time>
-                    </>
+        <BackupSection
+          page={page}
+          now={now}
+          onBackupFolder={onBackupFolder}
+          onExportPhrase={onExportPhrase}
+          {...(backupBusy === undefined ? {} : { backupBusy })}
+          {...(backupError === undefined ? {} : { backupError })}
+        />
       )}
-              </Text>
-            </span>
-          </ListRow>
-          <ListRow divider={false} trailing={<Button variant="ghost" size="xs" tone="subtle" onClick={onExportPhrase}>{copy.exportPhrase}</Button>}>
-            <span {...stylex.props(cell.lines)}>
-              <Text variant="body">Recovery phrase</Text>
-              <Text variant="meta" tone="muted">
-                {page.recoveryPhraseExportedAt === undefined ? 'Not exported yet. Without it a backup cannot be read on another Mac.' : (
-                  <>
-                    Exported <time title={fullTime(page.recoveryPhraseExportedAt)}>{messageTime(page.recoveryPhraseExportedAt, now)}</time>
-                  </>
-                )}
-              </Text>
-            </span>
-          </ListRow>
-        </Surface>
-      </Section>
-
-      )}
-      {onMove === undefined || onRestore === undefined || onStopJob === undefined ? null : (
-        <Section heading="This Mac" sub="Juno runs on one Mac at a time.">
-          <Surface kind="group" data-ownership={page.ownership._tag}>
-            <ListRow
-              trailing={
-                <Chip variant={page.ownership._tag === 'active' ? 'filled' : 'outline'} size={20}>
-                  {page.ownership._tag === 'active' ? 'Active here' : page.ownership._tag === 'released' ? 'Moving' : 'Recovery'}
-                </Chip>
-              }
-            >
-              <span {...stylex.props(cell.lines)}>
-                <Text variant="body">
-                  {page.ownership._tag === 'active'
-                    ? 'This Mac owns Juno’s state.'
-                    : page.ownership._tag === 'released'
-                      ? 'This Mac is read-only until the other Mac takes over.'
-                      : `Restored from a backup. ${page.ownership.pending === 1 ? '1 action was' : `${page.ownership.pending} actions were`} pending.`}
-                </Text>
-              </span>
-            </ListRow>
-            {page.removalPending !== undefined ? (
-              <ListRow
-                data-removal-pending=""
-                trailing={
-                  <Button variant="ghost" size="xs" tone="subtle" onClick={() => page.removalPending !== undefined && onStopJob(page.removalPending.jobId)}>
-                    {copy.stopJob}
-                  </Button>
-                }
-              >
-                <Text variant="body">{copy.removalPending(page.removalPending.copies)}</Text>
-              </ListRow>
-            ) : null}
-            <ListRow
-              divider={false}
-              trailing={
-                <span {...stylex.props(cell.controls)}>
-                  <Button variant="ghost" size="xs" tone="subtle" onClick={onMove} disabled={page.ownership._tag !== 'active'}>
-                    {copy.move}
-                  </Button>
-                  <Button variant="ghost" size="xs" tone="subtle" onClick={onRestore}>
-                    {copy.restore}
-                  </Button>
-                </span>
-              }
-            >
-              <Text variant="meta" tone="muted" sx={cell.wrap}>
-                {copy.attest}
-              </Text>
-            </ListRow>
-          </Surface>
-        </Section>
+      {onMove === undefined || onRestore === undefined ? null : (
+        <ThisMacSection page={page} onMove={onMove} onRestore={onRestore} {...(onStopJob === undefined ? {} : { onStopJob })} />
       )}
     </Page>
   )
