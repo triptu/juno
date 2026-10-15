@@ -1,5 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import { Bell } from '@phosphor-icons/react/dist/icons/Bell'
+import { Eye } from '@phosphor-icons/react/dist/icons/Eye'
+import { EyeSlash } from '@phosphor-icons/react/dist/icons/EyeSlash'
 import { Gear } from '@phosphor-icons/react/dist/icons/Gear'
 import { Moon } from '@phosphor-icons/react/dist/icons/Moon'
 import { Sun } from '@phosphor-icons/react/dist/icons/Sun'
@@ -12,7 +14,7 @@ export interface AccountMenuSection {
   readonly content: ReactNode
 }
 
-export type AccountMenuAction = 'presence' | 'notifications' | 'preferences'
+export type AccountMenuAction = 'presence' | 'privacy' | 'notifications' | 'preferences'
 
 export interface AccountMenuProps {
   readonly name: string
@@ -25,6 +27,8 @@ export interface AccountMenuProps {
   readonly presence?: { readonly active: boolean; readonly label: string }
   /** "Paused until 9am" outside notification hours, beside Notifications. */
   readonly paused?: string
+  /** Privacy mode is on: the item offers Show message text instead of Hide (SPEC section 5). */
+  readonly privacy?: boolean
   readonly onAction?: (action: AccountMenuAction) => void
   /** Titled blocks under the items, separated by hairlines. */
   readonly sections: ReadonlyArray<AccountMenuSection>
@@ -39,15 +43,17 @@ interface Item {
 
 /**
  * What the avatar button opens (inventory 2.1): who is signed in and
- * whether Slack shows them active, Set yourself away or active, the
- * Notifications and Preferences pages, then the blocks the owner passes.
+ * whether Slack shows them active, Set yourself away or active, Hide or
+ * Show message text (privacy mode), the Notifications and Preferences
+ * pages, then the blocks the owner passes.
  */
-export function AccountMenu({ name, initials, hue, avatarUrl, workspace, presence, paused, onAction, sections }: AccountMenuProps) {
+export function AccountMenu({ name, initials, hue, avatarUrl, workspace, presence, paused, privacy = false, onAction, sections }: AccountMenuProps) {
   const items: ReadonlyArray<Item> =
     onAction === undefined
       ? []
       : [
           presence?.active === false ? { id: 'presence', icon: Sun, label: 'Set yourself active' } : { id: 'presence', icon: Moon, label: 'Set yourself away' },
+          privacy ? { id: 'privacy', icon: Eye, label: 'Show message text', hint: '⌃⌘H' } : { id: 'privacy', icon: EyeSlash, label: 'Hide message text', hint: '⌃⌘H' },
           { id: 'notifications', icon: Bell, label: 'Notifications', ...(paused === undefined ? {} : { hint: paused }) },
           { id: 'preferences', icon: Gear, label: 'Preferences', hint: '⌘,' },
         ]

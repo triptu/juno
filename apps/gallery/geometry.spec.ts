@@ -63,6 +63,26 @@ test.describe('sidebar inset', () => {
     })
   }
 
+  test('privacy/on: the footer widget sits at the inset on the left, right and bottom, with Show 4px from its edges', async ({ page }) => {
+    await open(page, 'Sidebar', 'privacy/on')
+    const at = await page.evaluate(() => {
+      const aside = document.querySelector('aside[aria-label="Sidebar"]')!
+      const box = aside.getBoundingClientRect()
+      const right = box.right - parseFloat(getComputedStyle(aside).borderRightWidth)
+      const widget = aside.querySelector('[data-privacy-footer]')!.getBoundingClientRect()
+      const show = aside.querySelector('[data-privacy-footer] button')!.getBoundingClientRect()
+      const row = aside.querySelector('[data-topic-row]')!.getBoundingClientRect()
+      return {
+        widget: { left: widget.left - box.left, right: right - widget.right, bottom: box.bottom - widget.bottom },
+        show: { top: show.top - widget.top, right: widget.right - show.right, bottom: widget.bottom - show.bottom },
+        row: { left: row.left - box.left, right: right - row.right },
+      }
+    })
+    expect(at.widget).toEqual({ left: 10, right: 10, bottom: 10 })
+    expect(at.row).toEqual({ left: 10, right: 10 })
+    expect(at.show).toEqual({ top: 4, right: 4, bottom: 4 })
+  })
+
   test('views do not make the filter row taller or move the list', async ({ page }) => {
     const measure = () =>
       page.evaluate(() => {

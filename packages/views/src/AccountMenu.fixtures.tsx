@@ -28,6 +28,9 @@ export default defineFixtures(
       'active-by-hand': fixture({ ...base, presence: { active: true, label: 'Active until 8pm' } }),
       unknown: fixture({ ...base }),
     },
+    Privacy: {
+      on: fixture({ ...base, presence: { active: true, label: 'Active' }, privacy: true }),
+    },
     Sections: {
       'with-session': fixture({ ...base, presence: { active: true, label: 'Active' }, sections: [session] }),
     },
