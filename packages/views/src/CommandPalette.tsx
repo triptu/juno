@@ -238,20 +238,31 @@ function PaletteRow({ item, active, now, onSelect, onActivate, onMenu }: Palette
       id={rowDomId(item.id)}
       size={55}
       active={active}
-      leading={<Icon icon={icons[item.icon]} size={16} />}
+      leading={
+        <>
+          <Icon icon={icons[item.icon]} size={16} />
+          {/* Laid over the row's end: moving the active row must not reflow any row's text. */}
+          {active && item.badge === undefined ? (
+            <span {...stylex.props(styles.hintOver)}>
+              <Kbd>{hint}</Kbd>
+            </span>
+          ) : null}
+        </>
+      }
       label={item.label}
       {...(sub === undefined ? {} : { sub, subPlacement: 'below' as const })}
       trailing={
-        item.badge !== undefined || active ? (
+        // A command keeps its hint's place in flow, hidden while another row is active.
+        item.badge === undefined ? undefined : (
           <>
-            {item.badge === undefined ? null : (
-              <Chip variant="filled" size={20} icon={Sparkle} iconSize={12} title="Juno's read of what you typed" numeric>
-                {item.badge}
-              </Chip>
-            )}
-            {active ? <Kbd>{hint}</Kbd> : null}
+            <Chip variant="filled" size={20} icon={Sparkle} iconSize={12} title="Juno's read of what you typed" numeric>
+              {item.badge}
+            </Chip>
+            <span {...stylex.props(!active && styles.hintHidden)}>
+              <Kbd>{hint}</Kbd>
+            </span>
           </>
-        ) : undefined
+        )
       }
       onSelect={(event) => onSelect(event.metaKey && item.opensTab === true)}
       onActivate={onActivate}
@@ -323,6 +334,19 @@ const styles = stylex.create({
     overflowY: 'auto',
     overscrollBehavior: 'contain',
     padding: spacing['--space-1-5'],
+  },
+  hintHidden: {
+    visibility: 'hidden',
+  },
+  // Over the end of the active row (its `contain` makes it the containing block), on its background, with a soft edge over any text it covers.
+  hintOver: {
+    position: 'absolute',
+    insetInlineEnd: spacing['--space-2-5'],
+    top: '50%',
+    transform: 'translateY(-50%)',
+    paddingInlineStart: spacing['--space-2'],
+    backgroundColor: colors['--surface-hover'],
+    boxShadow: `calc(-1 * ${spacing['--space-2']}) 0 ${spacing['--space-2']} ${colors['--surface-hover']}`,
   },
   empty: {
     paddingBlock: spacing['--space-5'],
