@@ -37,8 +37,10 @@ export interface WorkspaceProps {
   /** Fires on mouse down; `event.metaKey` asks for a new tab. */
   readonly onSelectTab?: (id: string, event: ActivateEvent) => void
   readonly onCloseTab?: (id: string) => void
-  /** The "+" button: a New chat in a new tab. */
+  /** The "+" button: a new tab, with a New chat or Home (Settings › General). */
   readonly onNewTab?: () => void
+  /** The "+" button's name, after what a new tab opens. Default "New chat". */
+  readonly newTabLabel?: string
   /** Right-click on a tab: the tab menu. */
   readonly onTabContextMenu?: (id: string, event: MouseEvent<HTMLDivElement>) => void
   /** Before the tabs while the sidebar is hidden: Show sidebar, Back and Forward. */
@@ -47,7 +49,7 @@ export interface WorkspaceProps {
   readonly children?: ReactNode
   /** Shows the empty state over hidden pages: no tab is open, or the active tab has no page yet. */
   readonly nothingShown?: boolean
-  /** What shows with no page: Home's content. Default the empty state. */
+  /** What shows with no page, null for nothing. Default the empty state. */
   readonly empty?: ReactNode
   /**
    * The Juno panel, on the right of the page below the strip, 360px with a
@@ -95,11 +97,11 @@ function stepIndex(key: string, index: number, count: number): number | undefine
  * The right pane: the tab strip (a window drag region) over the page.
  * Tabs carry the kind icon or the topic's art in a fixed slot, the title,
  * the unread dot and a close button; pinned tabs come first as icons. "+"
- * opens a New chat in a new tab. While the sidebar is hidden, `leading`
+ * sits right after the last tab and opens a new tab. While the sidebar is hidden, `leading`
  * holds its controls. The strip is an APG tablist: the active tab is the one Tab stop, the arrow
  * keys select its neighbours, Delete closes it.
  */
-export function Workspace({ tabs = [], activeId, onSelectTab, onCloseTab, onNewTab, onTabContextMenu, leading, children, nothingShown = false, empty, side }: WorkspaceProps) {
+export function Workspace({ tabs = [], activeId, onSelectTab, onCloseTab, onNewTab, newTabLabel = 'New chat', onTabContextMenu, leading, children, nothingShown = false, empty, side }: WorkspaceProps) {
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (onSelectTab === undefined || !(event.target instanceof HTMLElement) || event.target.getAttribute('role') !== 'tab') return
     const next = stepIndex(event.key, tabs.findIndex((tab) => tab.id === activeId), tabs.length)
@@ -110,7 +112,7 @@ export function Workspace({ tabs = [], activeId, onSelectTab, onCloseTab, onNewT
   }
   return (
     <section aria-label="Workspace" {...stylex.props(styles.root)}>
-      <TabStrip onKeyDown={onKeyDown} leading={leading} trailing={<IconButton icon={Plus} label="New chat ⌘T" size={28} iconSize={16} tone="muted" onClick={onNewTab} />}>
+      <TabStrip onKeyDown={onKeyDown} leading={leading} trailing={<IconButton icon={Plus} label={`${newTabLabel} ⌘T`} size={28} iconSize={16} tone="muted" onClick={onNewTab} />}>
         {tabs.map((tab) => (
           <Tab
             key={tab.id}
@@ -129,7 +131,7 @@ export function Workspace({ tabs = [], activeId, onSelectTab, onCloseTab, onNewT
       <div {...stylex.props(styles.body)}>
         <main {...stylex.props(styles.page)}>
           {children}
-          {children == null || nothingShown ? (empty ?? <WorkspaceEmpty />) : null}
+          {children == null || nothingShown ? (empty === undefined ? <WorkspaceEmpty /> : empty) : null}
         </main>
         {side == null ? null : (
           <aside aria-label="Juno" data-juno-panel="" {...stylex.props(styles.side)}>

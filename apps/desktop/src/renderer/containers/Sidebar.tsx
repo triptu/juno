@@ -3,6 +3,7 @@ import {
   activeTab,
   currentPlace,
   notificationStatusAtom,
+  popupContextMenu,
   privacyAtom,
   registry,
   setPresence,
@@ -22,7 +23,7 @@ import { AppInfo } from './AppInfo'
 import { EngineStatus, SyncNotice } from './EngineStatus'
 import { markFilterChange } from './filterMark'
 import { openJunoTab } from './juno/actions'
-import { openAllTopics, openHome, openNewTab, openNotifications, openPreferences } from './navigation'
+import { openAllTopics, openHome, openNewChat, openNotifications, openPreferences } from './navigation'
 import { openPalette } from './paletteActions'
 import { setPrivacy } from './privacy'
 import { Session } from './Session'
@@ -37,10 +38,16 @@ function navigate(target: SidebarNavTarget, event: ActivateEvent): void {
   if (target === 'juno') return openJunoTab({ newTab: event.metaKey })
 }
 
-/** The nav item of the active tab's page. Home also reads as selected with no tab open. */
+/** A page item's menu: Open in new tab, as ⌘-click does. */
+async function navigateMenu(target: SidebarNavTarget): Promise<void> {
+  const chosen = await popupContextMenu([{ id: 'open-new-tab', label: 'Open in new tab' }])
+  if (chosen === 'open-new-tab') navigate(target, { metaKey: true, shiftKey: false, altKey: false, source: 'pointer' })
+}
+
+/** The nav item of the active tab's page. */
 function activeNavOf(tabs: Tabs): SidebarNavTarget | undefined {
   const tab = activeTab(tabs)
-  if (tab === undefined) return 'home'
+  if (tab === undefined) return undefined
   const place = currentPlace(tab)
   switch (place.kind) {
     case 'home':
@@ -139,8 +146,9 @@ export function Sidebar() {
       {...(activeNav === undefined ? {} : { activeNav })}
       junoUnread={junoUnread}
       junoBusy={junoBusy}
-      onNewChat={openNewTab}
+      onNewChat={openNewChat}
       onNavigate={navigate}
+      onNavigateMenu={(target) => void navigateMenu(target)}
       onFilterKind={selectKind}
       views={views}
       onFilterView={selectView}

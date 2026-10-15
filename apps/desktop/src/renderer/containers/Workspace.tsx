@@ -7,6 +7,7 @@ import {
   junoAvailableAtom,
   junoPanelOpenAtom,
   mountedTabs,
+  newTabPageAtom,
   onMenuCommand,
   registry,
   sidebarLayoutAtom,
@@ -146,8 +147,9 @@ function onMouseUp(event: MouseEvent): void {
  * display toggle; older tabs unmount and come back at their scroll
  * snapshot. A tab's topic is keyed by its id, so Back and Forward mount the
  * topic they bring back, and a New chat that sends becomes its topic in one
- * commit. With no tab open the workspace shows Home. While the sidebar is
- * hidden the strip starts with its controls.
+ * commit. There is always a tab (`ensureTab`); until the saved tabs have
+ * been read the page is blank. While the sidebar is hidden the strip
+ * starts with its controls.
  */
 export function Workspace() {
   const state = useAtomValue(tabsAtom)
@@ -158,6 +160,7 @@ export function Workspace() {
   const agentOn = useAtomValue(junoAvailableAtom)
   const panelOpen = useAtomValue(junoPanelOpenAtom)
   const panelTopic = useAtomValue(tabsAtom, activeTopicOf)
+  const newTabPage = useAtomValue(newTabPageAtom)
 
   useNotificationBridge()
   useEffect(() => onMenuCommand(runMenuCommand), [])
@@ -193,7 +196,8 @@ export function Workspace() {
       onTabContextMenu={tabMenu}
       {...(sidebarHidden ? { leading: <TitlebarNav /> } : {})}
       nothingShown={state.active === undefined}
-      empty={<HomePage />}
+      empty={null}
+      newTabLabel={newTabPage === 'home' ? 'New tab' : 'New chat'}
       side={
         agentOn && panelOpen && panelTopic !== undefined ? (
           <Suspense fallback={null}>

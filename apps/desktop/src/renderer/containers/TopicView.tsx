@@ -23,6 +23,7 @@ import {
   scrollSnapshotAtom,
   shouldMarkRead,
   topicAtom,
+  topicView,
   type MessageWindow,
   type ScrollSnapshot,
   uploadProgressAtom,
@@ -264,7 +265,7 @@ export const TopicTab = memo(function TopicTab({ tabId, id }: TopicTabProps) {
     if (detail === null) closeTabById(tabId)
   }, [tabId, detail])
   if (detail == null) return null
-  return <Topic id={id} detail={detail} />
+  return <Topic id={id} view={topicView(id, tabId)} detail={detail} />
 })
 
 /** Thread links in a preview open in a new tab, so the New chat and its draft stay. */
@@ -281,11 +282,16 @@ export const TopicPreview = memo(function TopicPreview({ id, underHeader = true 
   const result = useAtomValue(topicAtom(id))
   const detail = result._tag === 'Success' ? result.value : undefined
   if (detail == null) return null
-  return <Topic key={id} id={id} detail={detail} readOnly underHeader={underHeader} />
+  return <Topic key={id} id={id} view={id} detail={detail} readOnly underHeader={underHeader} />
 })
 
 interface TopicProps {
   readonly id: string
+  /**
+   * Whose window and scroll position these are: `topicView(id, tabId)` in a
+   * tab, so two tabs on one topic keep their own; the topic id in a preview.
+   */
+  readonly view: string
   readonly detail: TopicDetail
   /**
    * Read-only: the message list alone, opened at the bottom, with no "N new"
@@ -298,8 +304,8 @@ interface TopicProps {
   readonly underHeader?: boolean
 }
 
-function Topic({ id, detail, readOnly = false, underHeader = true }: TopicProps) {
-  const list = useAtomValue(messageListAtom(id))
+function Topic({ id, view, detail, readOnly = false, underHeader = true }: TopicProps) {
+  const list = useAtomValue(messageListAtom(view))
   const now = useAtomValue(nowAtom, (time) => Math.floor(time / TIME_STEP) * TIME_STEP)
   const focused = useWindowFocused()
   const scrollRef = useRef<HTMLElement>(null)
@@ -351,7 +357,7 @@ function Topic({ id, detail, readOnly = false, underHeader = true }: TopicProps)
   useLayoutEffect(() => {
     const scroller = scrollRef.current
     if (scroller === null || positioned || !list.ready || last === undefined) return
-    const snapshot = readOnly ? undefined : registry.get(scrollSnapshotAtom(id))
+    const snapshot = readOnly ? undefined : registry.get(scrollSnapshotAtom(view))
     const row = snapshot === undefined ? null : scroller.querySelector(rowSelector(snapshot.anchorKey))
     pin.current =
       snapshot !== undefined && row !== null
@@ -370,7 +376,7 @@ function Topic({ id, detail, readOnly = false, underHeader = true }: TopicProps)
     setFar(distance > scroller.clientHeight)
     setSeenTs(last)
     setPositioned(true)
-  }, [id, readOnly, positioned, list.ready, list.rows, last, atEnd])
+  }, [view, readOnly, positioned, list.ready, list.rows, last, atEnd])
 
   // A Juno source link or a notification asked for a message: once the topic is positioned and the row is in its
   // window, it is scrolled into view if it is not, and flashes. Each request is taken once, so showing a hidden tab
@@ -456,7 +462,7 @@ function Topic({ id, detail, readOnly = false, underHeader = true }: TopicProps)
       pin.current = undefined
     }
     const record = () => {
-      if (!readOnly) registry.set(scrollSnapshotAtom(id), snapshotOf(scroller))
+      if (!readOnly) registry.set(scrollSnapshotAtom(view), snapshotOf(scroller))
     }
     const onScrollEnd = () => {
       if (pin.current?.kind === 'row' && Math.abs(scroller.scrollTop - pinnedTop.current) > 1) pin.current = undefined
@@ -475,13 +481,13 @@ function Topic({ id, detail, readOnly = false, underHeader = true }: TopicProps)
     // After a jump (End, a scrollbar drag, a script) the rows it brought near the view reach their real
     // height frames after the scroll ended, and Chromium does not always anchor that; so the position is
     // also recorded as the tab is left, from what is on screen then.
-    const stopLeaving = readOnly ? () => {} : onLeaveTab(id, record)
+    const stopLeaving = readOnly ? () => {} : onLeaveTab(view, record)
     return () => {
       for (const type of inputs) scroller.removeEventListener(type, letGo)
       scroller.removeEventListener('scrollend', onScrollEnd)
       stopLeaving()
     }
-  }, [id, readOnly])
+  }, [view, readOnly])
 
   // Older pages. A thread whose root is in the window has nothing older.
   const [complete, setComplete] = useState(false)
@@ -503,7 +509,7 @@ function Topic({ id, detail, readOnly = false, underHeader = true }: TopicProps)
         setLoadingOlder(true)
         void loadOlderMessages(registry, id, first).then((exit) => {
           if (exit._tag === 'Success' && exit.value.complete) setComplete(true)
-          const spec = registry.get(messageWindowSpecAtom(id))
+          const spec = registry.get(messageWindowSpecAtom(view))
           // Up to the cap the window grows at the top; past it, it holds the 500 rows from the new page down.
           const next =
             spec.anchor === undefined && spec.limit + OLDER_PAGE <= MESSAGE_WINDOW_MAX
@@ -516,7 +522,7 @@ function Topic({ id, detail, readOnly = false, underHeader = true }: TopicProps)
             pinnedTop.current = scroller.scrollTop
             setHeldAt(inView.anchorKey)
           }
-          registry.set(messageWindowSpecAtom(id), next)
+          registry.set(messageWindowSpecAtom(view), next)
           setLoadingOlder(false)
         })
       },
@@ -524,7 +530,7 @@ function Topic({ id, detail, readOnly = false, underHeader = true }: TopicProps)
     )
     observer.observe(row)
     return () => observer.disconnect()
-  }, [id, drawnAll, older, first])
+  }, [id, view, drawnAll, older, first])
 
   // What Slack has that the store lacks, once per mount; a hidden tab coming back does not ask again.
   const [fetchState, setFetchState] = useState<'pending' | 'done' | 'offline'>('pending')
@@ -556,7 +562,7 @@ function Topic({ id, detail, readOnly = false, underHeader = true }: TopicProps)
     pin.current = { kind: 'bottom' }
     setAtBottom(true)
     setFar(false)
-    if (!atEnd) registry.set(messageWindowSpecAtom(id), bottomWindow)
+    if (!atEnd) registry.set(messageWindowSpecAtom(view), bottomWindow)
     if (scroller !== null) hold(scroller, pin, pinnedTop)
     setSeenTs(last)
   }
@@ -583,7 +589,7 @@ function Topic({ id, detail, readOnly = false, underHeader = true }: TopicProps)
 
   const items = itemsOf(list)
   const rows = firstRows()
-  const openAt = drawnAll ? list.order.length : openIndex(list, at, readOnly ? undefined : registry.get(scrollSnapshotAtom(id)))
+  const openAt = drawnAll ? list.order.length : openIndex(list, at, readOnly ? undefined : registry.get(scrollSnapshotAtom(view)))
   const from = drawnAll ? 0 : Math.max(0, openAt - rows)
   const shown = from === 0 ? items : items.slice(from)
   const eager = eagerRows(list.order, openAt, heldAt === undefined ? -1 : list.order.indexOf(heldAt), rows)

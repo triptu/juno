@@ -80,7 +80,10 @@ export const Events = {
  * Juno's last action, and Settings (⌘,), which opens Preferences.
  */
 export type MenuCommand =
+  /** ⌘T: a new tab with what Settings › General chooses. */
   | 'tab.new'
+  /** ⌘N: a New chat in a new tab. */
+  | 'chat.new'
   | 'tab.close'
   | 'tab.reopen'
   | 'tab.next'

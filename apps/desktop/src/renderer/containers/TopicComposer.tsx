@@ -71,10 +71,19 @@ export function TopicComposer({ detail, onSent, handle, onArrowUpEmpty, dropping
   const stored = useAtomValue(draftAtom(detail.id))
   const placeholder = detail.kind === 'main' ? `Message ${detail.channel.label}` : 'Reply'
   if (stored._tag !== 'Success') return <ComposerSlot placeholder={placeholder} />
-  return <LoadedComposer detail={detail} initial={stored.value} placeholder={placeholder} onSent={onSent} handle={handle} onArrowUpEmpty={onArrowUpEmpty} dropping={dropping} />
+  return <LoadedComposer detail={detail} initial={stored.value} latest={stored.value} placeholder={placeholder} onSent={onSent} handle={handle} onArrowUpEmpty={onArrowUpEmpty} dropping={dropping} />
 }
 
-function LoadedComposer({ detail, initial, placeholder, onSent, handle, onArrowUpEmpty, dropping = false }: TopicComposerProps & { readonly initial: string; readonly placeholder: string }) {
+function LoadedComposer({
+  detail,
+  initial,
+  latest,
+  placeholder,
+  onSent,
+  handle,
+  onArrowUpEmpty,
+  dropping = false,
+}: TopicComposerProps & { readonly initial: string; readonly latest: string; readonly placeholder: string }) {
   const id = detail.id
   const files = useAttachments(id)
   const aiAssist = useAtomValue(aiAssistOnAtom)
@@ -117,6 +126,18 @@ function LoadedComposer({ detail, initial, placeholder, onSent, handle, onArrowU
   })
   // The tab hid or closed: write what is typed now.
   useEffect(() => () => flushRef.current(), [])
+  // The draft is the topic's, one for every tab that shows it. Another tab on the topic changed it: take its
+  // text when this tab shows again, unless this field has typing of its own or has focus.
+  useEffect(() => {
+    if (unsaved.current !== undefined || document.activeElement === field.current || latest === encoded(text)) return
+    const next = decodeMentions(latest)
+    picked.current = next.picks
+    setPicks(next.picks)
+    setText(next.text)
+    setPaused(next.text)
+    // Only a change of the stored draft is taken, not this field's own edits.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [latest])
   // A saved Main draft is asked about once, as if typing had just paused.
   useEffect(() => {
     preloadBar()
