@@ -66,7 +66,7 @@ export interface LaunchOptions {
 }
 
 /**
- * Launches the built app (run `pnpm build` first) on the given user-data
+ * Launches the built app (prepared by Playwright setup) on the given user-data
  * directory and waits for its first window. Launch the same directory twice
  * to test what survives a relaunch.
  */
