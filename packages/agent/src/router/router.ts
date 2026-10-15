@@ -87,6 +87,12 @@ interface Live {
   readonly origin: Origin
   readonly h: number
   clean: boolean
+  /**
+   * `clean` when the current request was built: what the model had read when
+   * it wrote this response's tool calls. A call in the response that taints the
+   * run (a connection read) does not change what the model wrote beside it.
+   */
+  cleanAtRequest: boolean
   /** Inbox op → its pi submission, once delivered. */
   readonly inputs: Map<string, string | undefined>
   failure: Ending | undefined
@@ -112,7 +118,7 @@ const join = (...parts: ReadonlyArray<string>) => parts.filter((part) => part !=
 const settledStates = new Set(['done', 'interrupted', 'failed'])
 
 const live = (row: { id: string; op_id: string; origin: Origin; h: number; clean: number }, retryable: boolean): Live => ({
-  runId: row.id, opId: row.op_id, origin: row.origin, h: row.h, clean: row.clean === 1,
+  runId: row.id, opId: row.op_id, origin: row.origin, h: row.h, clean: row.clean === 1, cleanAtRequest: row.clean === 1,
   inputs: new Map(), failure: undefined,
   done: '', partial: '', streamed: false, bubbles: [], reactions: 0, status: {}, retryable,
   calls: new Map(), flushing: Promise.resolve(),
@@ -409,6 +415,7 @@ export function createRouter(options: RouterOptions) {
         if (run === undefined) throw new Error('no live run')
         await session.catchUp()
         run.streamed = false
+        run.cleanAtRequest = run.clean
         const ref = options.model()
         const model = api.models.getModel(ref.provider, ref.modelId)
         if (model === undefined) {
@@ -548,7 +555,7 @@ export function createRouter(options: RouterOptions) {
       const journal = session.journal()
       const position = { incarnation: journal.incarnation, seq: await journal.lastCommitted() }
       await session.catchUp()
-      return { runId: run.runId, opId: run.opId, h: run.h, origin: run.origin, cutoff: archiveLength(), clean: run.clean, position }
+      return { runId: run.runId, opId: run.opId, h: run.h, origin: run.origin, cutoff: archiveLength(), clean: run.clean, cleanAtRequest: run.cleanAtRequest, position }
     },
     emit,
     subscribe: (listener: (event: TurnEvent) => void) => {

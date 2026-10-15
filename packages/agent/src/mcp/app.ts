@@ -6,17 +6,19 @@ import { createMcpManager, type McpManagerApi } from './manager'
 import { MCP_MIGRATIONS } from './schema'
 import { mcpTools } from './tools'
 import type { Credentials } from './types'
+import type { ReviewModel } from '../review/review'
 
 type Wrapped = Pick<TurnsOptions, 'provider' | 'migrations' | 'actions' | 'tools' | 'jobDrivers' | 'stopExternalJob'>
 
 /**
  * Adds the MCP connections to the turn engine's options: the migrations, the
  * manager on the opened store (made where the engine builds its provider),
- * the write executors and the two model tools. `manager()` is the manager once
+ * the write executors and the two model tools, whose calls `review` checks
+ * (none: every call that needs a review asks). `manager()` is the manager once
  * the engine opened its store. The caller starts it after the engine opens,
  * kicks waiting approvals on each change and closes it before the engine.
  */
-export function withMcp<T extends Wrapped>(turns: T, credentials: Credentials): { readonly turns: T; readonly manager: () => McpManagerApi | undefined } {
+export function withMcp<T extends Wrapped>(turns: T, credentials: Credentials, review?: ReviewModel): { readonly turns: T; readonly manager: () => McpManagerApi | undefined } {
   let manager: McpManagerApi | undefined
   let t3: ReturnType<typeof createT3Adapter> | undefined
   const executors = (): ReadonlyArray<Executor> => {
@@ -38,7 +40,7 @@ export function withMcp<T extends Wrapped>(turns: T, credentials: Credentials): 
       tools: (context) => [
         ...(turns.tools?.(context) ?? []),
         ...(t3?.tools(context) ?? []),
-        ...(manager ? mcpTools(manager, { current: context.current, propose: context.actions.propose }) : []),
+        ...(manager ? mcpTools(manager, { current: context.current, actions: context.actions, ...(review ? { review } : {}) }) : []),
       ],
     },
     manager: () => manager,

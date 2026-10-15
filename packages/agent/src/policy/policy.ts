@@ -14,7 +14,10 @@
  *   untrusted content in the run turns a no-click call into a card.
  * - `mayMintGrant` is `grantWith`, `grantClick`, `scheduleFromClick` and
  *   `scheduleFromMenu`: the three owner authorities (`untrustedCannotGrant`).
+ * - `needsReview` and `reviewDecision` are `reviewAllows`: the auto-review of
+ *   a connection call (`reviewGated`, `untrustedNeverAuthorizes`).
  */
+import type { ReviewIntent, ReviewRisk, ReviewRule } from '@juno/agent-cards/presentation'
 
 export type Mode = 'on' | 'paused' | 'off'
 export type OwnerState = 'active' | 'released' | 'recovery'
@@ -45,6 +48,8 @@ export interface AuthorizeInput {
   readonly approval?: { readonly rev: number; readonly digest: string; readonly used: boolean; readonly batchOrdered: boolean }
   /** A live grant for this target exists and the run asking is a clean owner run. */
   readonly grant: boolean
+  /** A connection call (Tier 3) the owner's rule and the review let run with no click (`reviewDecision`). */
+  readonly review?: boolean
   /** Digests of every earlier authorization of this child, whatever their outcome. */
   readonly prior: ReadonlyArray<string>
   /** A receipt already proves the child happened. */
@@ -56,7 +61,7 @@ export type Refusal =
   | { readonly _tag: 'refused'; readonly reason: 'invalid'; readonly invalid: Invalid }
   | { readonly _tag: 'refused'; readonly reason: 'destructive' | 'done' | 'alreadyAuthorized' | 'payloadChanged' | 'noApproval' }
 
-export type AuthorizeDecision = { readonly _tag: 'authorize'; readonly via: 'approval' | 'grant' } | Refusal
+export type AuthorizeDecision = { readonly _tag: 'authorize'; readonly via: 'approval' | 'grant' | 'review' } | Refusal
 
 export function authorizeDecision(input: AuthorizeInput): AuthorizeDecision {
   const { authority, intent } = input
@@ -74,7 +79,52 @@ export function authorizeDecision(input: AuthorizeInput): AuthorizeDecision {
     return { _tag: 'authorize', via: 'approval' }
   }
   if (input.grant && intent.tier === 2) return { _tag: 'authorize', via: 'grant' }
+  if (input.review === true && intent.tier === 3) return { _tag: 'authorize', via: 'review' }
   return { _tag: 'refused', reason: 'noApproval' }
+}
+
+/**
+ * The auto-review's answers about one connection call (SPEC 13.9). `skipped`:
+ * no review ran. `failed`: the decision-model call failed, timed out or found
+ * no budget.
+ */
+export type Review =
+  | { readonly _tag: 'answered'; readonly intent: ReviewIntent; readonly risk: ReviewRisk }
+  | { readonly _tag: 'failed' }
+  | { readonly _tag: 'skipped' }
+
+/** A call that looks like a delete in its own terms is never reversible, whatever the review said. */
+export function floorRisk(review: Review, destructive: boolean): Review {
+  return review._tag === 'answered' && destructive && review.risk === 'reversible' ? { ...review, risk: 'delete' } : review
+}
+
+/** Whether a call under this rule needs the review: Always ask needs none, and Never ask needs none in a clean run. */
+export const needsReview = (rule: ReviewRule, clean: boolean): boolean => rule === 'auto' || (rule === 'never' && !clean)
+
+/** Which fixed line says why (agent-contract `chatCopy.card.change.review`). */
+export type ReviewLine = 'always' | 'failed' | 'notAsked' | 'untrusted' | 'implied' | 'delete' | 'send' | 'write' | 'ranExplicit' | 'ranNever'
+
+/**
+ * Run a connection call with no click, or show its card (spec `reviewAllows`):
+ *
+ * - Always ask: a card.
+ * - Never ask: runs in a clean run; in a run that read untrusted content it
+ *   runs only if the owner's words at least implied it. Untrusted text alone
+ *   never authorizes, under any rule.
+ * - Auto: runs only when the owner asked for exactly this and it can be undone.
+ * - A failed review asks.
+ */
+export function reviewDecision(rule: ReviewRule, clean: boolean, review: Review): { readonly _tag: 'run' | 'card'; readonly line: ReviewLine } {
+  if (rule === 'always') return { _tag: 'card', line: 'always' }
+  if (rule === 'never') {
+    if (clean) return { _tag: 'run', line: 'ranNever' }
+    if (review._tag !== 'answered') return { _tag: 'card', line: 'failed' }
+    return review.intent === 'notAsked' ? { _tag: 'card', line: 'untrusted' } : { _tag: 'run', line: 'ranNever' }
+  }
+  if (review._tag !== 'answered') return { _tag: 'card', line: 'failed' }
+  if (review.intent === 'explicit' && review.risk === 'reversible') return { _tag: 'run', line: 'ranExplicit' }
+  if (review.intent === 'notAsked') return { _tag: 'card', line: 'notAsked' }
+  return { _tag: 'card', line: review.risk === 'reversible' ? 'implied' : review.risk }
 }
 
 /** Who started the run, and whether it has read untrusted content yet (§6.4). */
