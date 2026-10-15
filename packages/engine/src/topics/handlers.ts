@@ -19,7 +19,7 @@
  * first value has nothing to re-emit, so the subscription starts again with
  * backoff and the renderer keeps what it shows until a run succeeds.
  *
- * The follow commands (`commands.ts`) write the current store and mirror
+ * The follow commands (`../follow.ts`, shared with notifications) write the current store and mirror
  * to Slack through the `Outbox` seam. The topic actions (`actions.ts`) are
  * local; a resolve that queued a read mark wakes `MarkWorker`.
  */
@@ -33,7 +33,7 @@ import { retryFirstRun, serveLiveList, serveLiveValue, timed, type Run } from '.
 import { Workspace, type StoreServices } from '../workspace'
 import { renameTopic, reopenTopic, resolveTopic, restoreTopic, setChannelIgnored, setPinned } from './actions'
 import { listAllTopics, matchQuery, summarizeAllTopics } from './allTopics'
-import { setSubscribed } from './commands'
+import { setSubscribed } from '../follow'
 import { countTopics, forgetUsers, listTopics, makeRowCache } from './query'
 
 const LIST_KEYS: InvalidationKeys = ['topics', 'topic_overlay', 'topic_reads', 'conversations', 'users', 'ignored_channels', 'thread_subs', 'prefs', 'topic_art']

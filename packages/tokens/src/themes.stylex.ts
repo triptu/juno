@@ -11,7 +11,7 @@
  * and the app can switch back to it.
  */
 import * as stylex from '@stylexjs/stylex'
-import { accent, accentSwatches, art, colors, hues, shadows, tints } from './tokens.stylex'
+import { accent, accentSwatches, art, colors, density, hues, shadows, tints } from './tokens.stylex'
 
 export const darkColors = stylex.createTheme(colors, {
   // A warm-neutral near-black (OKLCH hue 85, chroma 0.006), so dark is the
@@ -413,3 +413,13 @@ export const accents: Readonly<Record<AccentName, { readonly light: stylex.Theme
   claret: { light: accentClaretLight, dark: accentClaretDark },
   cyan: { light: accentCyanLight, dark: accentCyanDark },
 }
+
+/** Compact density (inventory 3.3): less padding, a 36px tile, tighter message groups. */
+export const compact = stylex.createTheme(density, {
+  '--density-row-padding-block': '8px',
+  '--density-row-line-gap': '0px',
+  '--density-row-tile-zoom': '0.8182',
+  '--density-row-estimate': '83px',
+  '--density-message-padding-block': '2px',
+  '--density-message-group-gap': '6px',
+})

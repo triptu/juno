@@ -62,6 +62,7 @@ Style: transparent, colour `--foreground-subtle`, hover `--surface-hover`, press
   - Switch workspace (`arrow-left-right`)
   - Sign out (`log-out`)
 - Closes on Esc, outside click, or picking an item.
+- [built M10] Header, Set yourself away or active, Notifications (with "Paused until 9am") and Preferences ("⌘,", also Juno › Settings… in the app menu). Set status, AI assist, Switch workspace and Sign out as an item are not built; the Session block (with Sign out) and the diagnostics stay under the items until they are. The line under the name is the workspace until presence is known. The away dot's ring is 1px.
 
 ### 2.2 Navigation
 
@@ -157,6 +158,8 @@ Centered, padding `48 16`, gap 8: title 14/500, body 13 muted lh 1.5, button 30p
 | Compact | 8 | 1 | 13.5 | 36 | 80 / 99 |
 
 Density also changes the message list (§6.1). The prototype's "airy" level is gone.
+
+[built M10] The `density` token group (`tokens.md`) holds the row padding, line three's gap, the tile zoom and the off-screen estimate, and the message padding and group gap; `compact` in `themes.stylex.ts` overrides them on `<html>`. Compact keeps the comfortable title size and line three's gap is 0 (comfortable keeps its 2px); the tile is the 44px tile drawn at 36px with CSS `zoom`. The message body stays 14.5.
 
 ### 3.4 Interactions
 
@@ -394,7 +397,7 @@ A tab with the message list's area on top and the composer at the bottom, like a
 
 **Shows:** `docs/design/home/` (layout A; `home-variants-*.png`, `in-context-*.png`). SPEC §12 decides behaviour; the home README has the copy, scene rules, ranking and sizes.
 
-- Opens from the sidebar's Home item as a singleton tab (`house`), and shows without a tab when no tab is open. [built] Layout A (`Home` and `HomeScene` in `@juno/views`, `containers/Home.tsx`): scene 120×83, greeting (serif 36 line and sans line), up to three item rows (52px each, in the 480px `--home-width` column; two on a window shorter than 600px), the Ask Juno field (a 40px pill button with ⌘J). A row is the topic's art (40), a title line (13.5/500, one line, ellipsis) and a meta line (12.5 muted: topic title · place · time, or "N new" for Moved a lot); the caret shows on hover and keyboard focus. Until the first sync has finished, Home is blank rather than "All caught up". Ask Juno and "Browse all topics" (caught up) wait for the Juno tab and the All topics page: the button is there and does nothing yet, the link is hidden.
+- Opens from the sidebar's Home item as a singleton tab (`house`), and shows without a tab when no tab is open. [built] Layout A (`Home` and `HomeScene` in `@juno/views`, `containers/Home.tsx`): scene 120×83, greeting (serif 36 line and sans line), up to three item rows (52px each, in the 480px `--home-width` column; two on a window shorter than 600px), the Ask Juno field (a 40px pill button with ⌘J). A row is the topic's art (40), a title line (13.5/500, one line, ellipsis) and a meta line (12.5 muted: topic title · place · time, or "N new" for Moved a lot); the caret shows on hover and keyboard focus. Until the first sync has finished, Home is blank rather than "All caught up". "Browse all topics" (caught up only) opens the All topics tab on mouse down, ⌘ for a new tab. Ask Juno waits for the Juno tab: the button is there and does nothing yet.
 - Item kinds: Waiting on you, Pick up where you left off, Moved a lot, Follow-up and Tidy up (the last two with AI assist on). The two that came from For you carry one trailing button, 26px ghost 12.5/500, shown on hover and focus in a reserved slot so nothing shifts: **Mark done** (Follow-up; toast "Follow-up done", no Undo) and **Resolve all** (Tidy up; toast "Resolved 3 topics" with Undo). Tidy up's title line reads "3 topics look settled" and its meta line lists their titles (ellipsis); the row itself does not open anything.
 - Everything else from the For you page is gone: the page, its nav count, the Coding agent prompt block, reply starters and reply ideas, and Dismiss.
 
@@ -483,6 +486,8 @@ Page max-width 880, padding `40 40 56`, gap 36.
 - One line, margin-top 8, 14 subtle: "**4** messages interrupted you. Juno held **23**." (counts 600 tabular) · ghost button **Show why** 28px. Zero: "Nothing has interrupted you today."
 - Show why expands a list under the line (rows padding `8 2`, divided by 1px `--border-subtle`, 13px): time 44px muted tabular · place 120px subtle · "**Sender** text" ellipsis; the reason on a second line, 12 muted. Only messages that notified are listed, newest first. The button becomes **Hide**.
 
+[built M10] `NotificationsPage` in `@juno/views`, the Notifications tab (`bell`), opened from the avatar menu or Preferences. Hours selects are named "Notifications from", "Active in Slack to" and so on, and the day toggles are `DayToggles` in `@juno/ui` (Monday first). A change to the hours saves at once; What matters to you saves on blur. Removing a tag shows "#incidents: When it matters" with Undo. Show why opens a popover above the button (340px) with at most 50 messages, each as the time and place, the sender and text, and the reason, rather than expanding a list under the line: no interaction may move the page (the gallery's shift test), and the button keeps its label. Notification hours are not written to Slack's own schedule yet (docs/backlog.md), so the Notifications sub does not mention the phone.
+
 **Decision** (`@juno/domain` `decideNotification`): ignored channel → Every message (channel or person) → Never → outside notification hours (into the summary if it would have notified) → AI assist off (DMs and mentions) → Juno's judgement. Reasons are the strings the why popover shows: "#incidents is set to Every message", "Maya Chen is set to Never", "Outside your notification hours. Juno: …", "AI assist is off, and DMs and mentions notify you", "Juno: asks you to approve the release before 2pm".
 
 **Summary when notification hours start** (`hoursStartSummary`): one OS notification, "3 messages need you" / "In #eng, Maya Chen and #hiring" (three places, then "and N more"). None when nothing was kept for it. The same summary is a Juno message in the chat under the group label "Summary", one line per message ("Maya Chen in #eng: needs your approval before 2pm", the name and place as the source link); clicking the notification opens the Juno tab scrolled to it. With AI assist off, the click opens the first message.
@@ -501,6 +506,7 @@ Page max-width 760, padding `40 40 72`, gap 36. Title "Preferences" serif 34.
 
 - **Ignored channels** — "Hidden from your topics, search and All topics, and they never notify you. Nothing changes in Slack." Group card: rows min-height 48, padding `8 10 8 14`: channel icon 15 muted · name 14/500 · "3 messages hidden" 12 muted · **Stop ignoring** 28px secondary 12.5/500. Empty row "Nothing ignored." 13 muted padding 14. Add row: "Ignore" 13 muted · select of non-ignored channels 32px · **Ignore** 32px secondary · right hint "You can also right-click a channel to ignore it" 12 muted. Ignoring shows the toast "Ignoring #deploys" with Undo. DMs cannot be ignored.
 - **Notifications** — "Your hours, and what Juno lets through." Button **Open notification settings** 34px, padding 0 12, 1px `--border-strong`, radius 8, bg surface, `bell` 14, 13/500.
+- [built M10] `PreferencesPage` in `@juno/views`: Appearance (Theme System · Light · Dark, Accent, Density) as one group card, Peek (Hold to peek: ⌥ Option or Space), and Notifications with its button. The ignore list is not on the page yet. Theme, accent and density are saved in main's `launch.json`, so the first frame of the next launch has them; System follows macOS and the window paints in the matching background.
 - Nothing else from the prototype's design panel is a preference: row style, preview lines, avatars, grouping by channel, the quiet window and message style are gone for good. AI assist is the switch in the avatar menu (§2.1).
 
 ## 15. Context menus
@@ -522,7 +528,7 @@ Native menus **[spec]**. Prototype rendering for reference: 236px, padding 5, ra
 | — | | | | |
 | Copy Slack link | `link` | | always | |
 | Open in Slack | `arrow-square-out` | | always | opens the Slack app at the topic (`slack://` deep link, falling back to the web permalink) |
-| Notify me | `bell` | current level | always | submenu §15.3: for a thread, the thread's own choice (Every message and When it matters follow it in Slack, Never unfollows it; SPEC §5); for Main, the channel's or DM's. [built] Threads only, through `topics.subscribe` and `topics.unsubscribe`: a followed thread shows When it matters, since the Every message level is not stored yet; Main has no item until channel levels are |
+| Notify me | `bell` | current level | always | submenu §15.3: for a thread, the thread's own choice (Every message and When it matters follow it in Slack, Never unfollows it; SPEC §5); for Main, the channel's or DM's. [built M10] Through `notifications.setLevel`: on a thread the engine follows or unfollows it and keeps Every message as its level; on Main it sets the channel's or DM's level |
 | Ignore #product | `ban` | | channel is not a DM | toast "Ignoring #product" with Undo |
 
 [built] The row and the header's title show this menu, and every item works (M5). Rename from the row edits the row's title (§3.2), from the header the header's title (§5). Each action shows its toast with Undo (§16). The hints are not drawn, since a native menu has only a shortcut column.
@@ -554,6 +560,8 @@ Right-click on a message, and the message's More menu (the why item is new; the 
 
 The why popover anchors under the item: 300px, padding `14 16`, radius 13, bg surface, `--pop-shadow`, gap 6. Title 13/600 ("Notified you at 13:42", "Didn't notify you", "In the 9am summary") · reason 13 subtle lh 1.5 (the decision's reason) · one button right-aligned, 28px secondary: **Change** when the reason is a setting (opens §15.3 for that channel or person, or the Notifications page for hours), **Tell Juno** when it was Juno's call (opens the Juno chat with the message quoted in the composer). Esc or outside click closes.
 
+[built M10] The why item follows Open in Slack after a separator, on others' messages; its label comes from the engine's answer (`notifications.why`), asked before the menu opens. The popover (`WhyPopover`) opens where the menu did. Change opens the three choices as a native menu at the same place (no Notify me parent), or the Notifications page for the hours. Tell Juno is not shown until the Juno chat exists. A message the engine never decided (not a DM, a mention or an Every message place) reads "Didn't notify you" with "Juno checks DMs, mentions of you, and places set to Every message. This was none of them." and Change for its channel, unless a Never level or an ignored channel explains it.
+
 ### 15.5 Tab menu
 
 Right-click any tab (§4). Pin tab / Unpin tab (`push-pin`) · — · Close tab (⌘W) · Close other tabs · Close tabs to the right (disabled on the last tab) · Close all tabs · — · Copy Slack link · Open in Slack (topic tabs only). The close items leave pinned tabs open, except Close tab on a pinned tab itself.
@@ -561,6 +569,8 @@ Right-click any tab (§4). Pin tab / Unpin tab (`push-pin`) · — · Close tab 
 ### 15.6 Person menu
 
 Right-click a sender's name or avatar in a message, or an @person chip. Notify me about Maya (`bell`, submenu §15.3) · — · Ask Juno (`sparkle`, AI assist on; opens the Juno panel with an "About Maya Chen" chip, §12.1).
+
+[built M10] On a sender's name or avatar (`data-sender` in `Message`), not on your own: Notify me about Maya only. The @person chip and Ask Juno come later.
 
 ## 16. Toasts
 

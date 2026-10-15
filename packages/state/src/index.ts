@@ -69,6 +69,8 @@ export {
   allTopicsTab,
   homePlace,
   homeTab,
+  notificationsPlace,
+  preferencesPlace,
   newChatPlace,
   openPlace,
   reopenClosedTab,
@@ -106,22 +108,42 @@ export {
 } from './newChat'
 export { discardMessage, draftAtom, retryMessage, saveDraft, sendMessage } from './send'
 export { errorOf } from './result'
+export {
+  currentNotificationSettings,
+  loadNotificationSettings,
+  loadWhy,
+  notificationSettingsAtom,
+  notificationsPageAtom,
+  notificationStatusAtom,
+  setHours,
+  setMatters,
+  setPresence,
+  whyPopoverAtom,
+  type WhyPopover,
+} from './notifications'
 export { acquireRendererPort, EngineFailed } from './port'
 export {
   accentAtom,
   appInfoAtom,
   copyText,
+  densityAtom,
   editUndo,
   onMenuCommand,
+  onNotificationOpen,
   openExternal,
   openInSlack,
   persistAccent,
+  persistDensity,
   persistSidebar,
   persistTheme,
   popupContextMenu,
+  resolvedThemeAtom,
+  setViewing,
   sidebarLayoutAtom,
   themeAtom,
   type Accent,
+  type Density,
+  type ResolvedTheme,
   type Theme,
 } from './shell'
 export type { PortConnection, PortLike } from './transport'

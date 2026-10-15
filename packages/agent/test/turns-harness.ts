@@ -4,7 +4,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fakeProvider, type FakeProviderOptions } from '@juno/agent-testing'
-import type { BubbleId, ReplyTarget } from '@juno/agent-contract'
+import type { BubbleId, ReplyTarget, SendContext } from '@juno/agent-contract'
 import { createProviderGuard, openTurns, type ActionsOptions, type HostReads, type MigrationSet, type ModelRef, type TurnEvent, type Turns } from '../src/index'
 
 export const SONNET: ModelRef = { provider: 'openrouter', modelId: 'anthropic/claude-sonnet-5.5' }
@@ -66,9 +66,9 @@ export async function turnsHarness(options: HarnessOptions = {}) {
   return {
     dir, fake, turns, events, reports,
     /** An owner send, maybe a reply. Returns its op id. */
-    send: (text: string, input: { readonly opId?: string; readonly replyTo?: ReplyTarget } = {}) => {
+    send: (text: string, input: { readonly opId?: string; readonly replyTo?: ReplyTarget; readonly context?: SendContext } = {}) => {
       const opId = input.opId ?? `op-${++sent}`
-      const accepted = turns.accept({ opId, kind: 'send', text, ...(input.replyTo ? { replyTo: input.replyTo } : {}) })
+      const accepted = turns.accept({ opId, kind: 'send', text, ...(input.replyTo ? { replyTo: input.replyTo } : {}), ...(input.context ? { data: { context: input.context } } : {}) })
       if (accepted._tag !== 'accepted') throw new Error(`send refused: ${accepted._tag === 'refused' ? accepted.reason : 'recorded'}`)
       return opId
     },

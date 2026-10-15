@@ -45,4 +45,19 @@ const turns2 = [
   'CREATE INDEX reactions_by_target ON reactions (target_kind, target_id, by, seq)',
 ]
 
-export const TURNS_MIGRATIONS: MigrationSet = { name: 'turns', steps: [turns1, turns2] }
+const turns3 = [
+  // The run's handle table (plan v3 §19.1): each Slack message a read returned in the run gets the
+  // next handle, m1, m2, …, once. A `<src m="m3">` in the run's bubbles resolves here, and only here.
+  // `place` is the channel's name as the owner sees it ("#eng"), when the host gave one.
+  `CREATE TABLE sources (
+    run_id TEXT NOT NULL REFERENCES runs (id),
+    handle TEXT NOT NULL,
+    channel_id TEXT NOT NULL,
+    ts TEXT NOT NULL,
+    place TEXT,
+    PRIMARY KEY (run_id, handle),
+    UNIQUE (run_id, channel_id, ts)
+  ) STRICT`,
+]
+
+export const TURNS_MIGRATIONS: MigrationSet = { name: 'turns', steps: [turns1, turns2, turns3] }

@@ -17,6 +17,12 @@ export interface JunoTestHooks {
   /** The host name from the agent's `host.hello`, once it reached the engine. */
   readonly agentHost: () => string | undefined
   readonly agentPid: () => number | undefined
+  /** The OS notifications main showed, recorded instead of shown. */
+  readonly notifications: () => Array<{ readonly title: string; readonly body: string }>
+  readonly clickNotification: (index?: number) => void
+  readonly dockBadge: () => string
+  /** As if the Mac woke from sleep. */
+  readonly wake: () => void
 }
 
 export interface RunningApp {

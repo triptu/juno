@@ -9,32 +9,30 @@
  */
 import {
   channelsIgnore,
-  followsThread,
   notifyChoiceOf,
   readsMarkRead,
   readsMarkUnread,
-  threadNotifyChoice,
   topicMenuItems,
   topicsPin,
   topicsRename,
   topicsReopen,
   topicsResolve,
-  topicsSubscribe,
   topicsUnpin,
-  topicsUnsubscribe,
+  whyLabel,
   type ContextMenuAt,
   type ContextMenuItem,
-  type ContextMenuLeaf,
   type MenuCommand,
-  type MenuItem,
-  type NotifyChoice,
+  type NotifyTargetView,
   type TopicDetail,
   type TopicMenuAction,
 } from '@juno/contract'
 import {
   allTopicsRowAtom,
   copyText,
+  currentNotificationSettings,
   editUndo,
+  loadNotificationSettings,
+  loadWhy,
   messageLink,
   openInSlack,
   popupContextMenu,
@@ -51,6 +49,7 @@ import {
   type ToastContent,
 } from '@juno/state'
 import { openTopic } from './navigation'
+import { choiceFor, nativeMenu, setNotifyLevel, showPersonMenu, showWhy } from './notifyActions'
 
 /** What the actions read from a sidebar row or the header's detail. Copy Slack link and Open in Slack need the detail's root. */
 export type ActionTopic = Pick<TopicDetail, 'id' | 'kind' | 'title' | 'channel' | 'unreadCount' | 'pinned' | 'resolved' | 'subscribed'> & {
@@ -103,18 +102,24 @@ export function cancelRename(): void {
   registry.set(renamingAtom, undefined)
 }
 
-const notifyToast: Record<NotifyChoice, string> = { every: 'Every message', matters: 'When it matters', never: 'Never' }
+/** What Notify me applies to: the thread itself, or on Main the channel or DM. */
+function notifyTarget(topic: ActionTopic): { readonly target: NotifyTargetView; readonly label: string } {
+  return topic.kind === 'main' ? { target: { kind: 'channel', id: topic.channel.id }, label: topic.channel.label } : { target: { kind: 'thread', id: topic.id }, label: topic.title }
+}
 
 /**
  * The topic menu (inventory 15.1), on a sidebar row and the header's title,
  * at the pointer or at `at`. `from` says which title Rename edits. Notify me
  * on a thread is how it is followed: Every message and When it matters
- * follow it in Slack, Never unfollows it (SPEC 5).
+ * follow it in Slack, Never unfollows it (SPEC 5). On Main it is the
+ * channel's or DM's choice.
  */
 export async function showTopicMenu(topic: ActionTopic, from: RenameTarget['where'], at?: ContextMenuAt): Promise<void> {
-  const state = { kind: topic.kind, channel: topic.channel, unread: topic.unreadCount > 0, pinned: topic.pinned, resolved: topic.resolved, notify: threadNotifyChoice(topic.subscribed) }
+  const settings = currentNotificationSettings(registry) ?? (await loadNotificationSettings(registry))
+  const notify = notifyTarget(topic)
+  const state = { kind: topic.kind, channel: topic.channel, unread: topic.unreadCount > 0, pinned: topic.pinned, resolved: topic.resolved, notify: choiceFor(settings, notify.target, topic.subscribed) }
   const linkable = topic.kind === 'main' || topic.rootTs !== undefined
-  const chosen = (await popupContextMenu(topicMenuItems(state).map((item) => nativeItem(item, linkable)), at)) as TopicMenuAction | undefined
+  const chosen = (await popupContextMenu(nativeMenu(topicMenuItems(state), (id) => linkable || (id !== 'copy-link' && id !== 'open-in-slack')), at)) as TopicMenuAction | undefined
   const { id } = topic
   switch (chosen) {
     case 'open-new-tab':
@@ -142,27 +147,10 @@ export async function showTopicMenu(topic: ActionTopic, from: RenameTarget['wher
       return openTopicInSlack(topic)
     case 'notify-every':
     case 'notify-matters':
-    case 'notify-never': {
-      const choice = notifyChoiceOf(chosen)
-      const follow = followsThread(choice)
-      if (follow !== topic.subscribed) void runAction(registry, follow ? topicsSubscribe : topicsUnsubscribe, { id }, { text: `${labelOf(topic)}: ${notifyToast[choice]}` })
-      return
-    }
+    case 'notify-never':
+      return setNotifyLevel(notify.target, notifyChoiceOf(chosen), notify.label)
     case 'ignore-channel':
       return void runAction(registry, channelsIgnore, { channel: topic.channel.id }, { text: `Ignoring ${topic.channel.label}` })
-  }
-}
-
-function nativeItem(item: MenuItem<TopicMenuAction>, linkable: boolean): ContextMenuItem {
-  switch (item.type) {
-    case 'separator':
-      return { separator: true }
-    case 'submenu':
-      return { label: item.label, submenu: item.items.map((sub) => nativeItem(sub, linkable) as ContextMenuLeaf) }
-    case 'item': {
-      const enabled = linkable || (item.id !== 'copy-link' && item.id !== 'open-in-slack')
-      return { id: item.id, label: item.label, ...(enabled ? {} : { enabled: false }), ...(item.checked === undefined ? {} : { checked: item.checked }) }
-    }
   }
 }
 
@@ -184,17 +172,25 @@ function openTopicInSlack(topic: ActionTopic): void {
 }
 
 /**
- * The message menu (SPEC 7, inventory 15.4): Copy Slack link and Open in
- * Slack. A reply's link carries its thread. The other items come with
- * their features (M6).
+ * The message menu (SPEC 7, inventory 15.4): Copy Slack link, Open in
+ * Slack, and, on someone else's message, why it did or did not notify. A
+ * reply's link carries its thread. On the sender's name or avatar it is
+ * the person menu (inventory 15.6). The other items come with their
+ * features (M6).
  */
-export async function showMessageMenu(topic: ActionTopic, ts: string): Promise<void> {
-  const chosen = await popupContextMenu([
+export async function showMessageMenu(topic: ActionTopic, ts: string, at: ContextMenuAt, sender: { readonly id: string; readonly name: string } | undefined, onSender: boolean): Promise<void> {
+  const session = registry.get(signedInAtom)
+  const own = sender !== undefined && sender.id === session?.userId
+  if (onSender && sender !== undefined && !own) return showPersonMenu(sender, at)
+  const why = own ? undefined : await loadWhy(registry, topic.id, ts)
+  const items: ContextMenuItem[] = [
     { id: 'copy-link', label: 'Copy Slack link' },
     { id: 'open-in-slack', label: 'Open in Slack' },
-  ])
+    ...(why === undefined ? [] : [{ separator: true } as const, { id: 'why', label: whyLabel(why.notified) }]),
+  ]
+  const chosen = await popupContextMenu(items, at)
   if (chosen === 'open-in-slack') return openTopicInSlack(topic)
-  const session = registry.get(signedInAtom)
+  if (chosen === 'why' && why !== undefined) return showWhy(topic.id, ts, why, at)
   if (chosen === 'copy-link' && session !== undefined) copyText(messageLink(session.workspaceUrl, topic.channel.id, ts, topic.kind === 'thread' ? topic.rootTs : undefined))
 }
 

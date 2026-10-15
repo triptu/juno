@@ -804,6 +804,24 @@ export const sizes = stylex.defineVars({
 /* Layers and opacity                                                         */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Density (Preferences › Appearance, inventory 3.3 and 6.1). These are the
+ * Comfortable values; `compact` in themes.stylex.ts overrides them on
+ * <html>. Only the sidebar row and the message row read them.
+ */
+export const density = stylex.defineVars({
+  '--density-row-padding-block': '11px',
+  // Line three's gap above it.
+  '--density-row-line-gap': '2px',
+  // The 44px tile drawn at 36px in Compact.
+  '--density-row-tile-zoom': '1',
+  // The row's content-box estimate for off-screen rows.
+  '--density-row-estimate': sizes['--row-topic-estimate'],
+  '--density-message-padding-block': '4px',
+  // Above the first message of a sender group.
+  '--density-message-group-gap': '12px',
+})
+
 export const z = stylex.defineVars({
   '--z-toolbar': '2',
   '--z-header': '3',

@@ -53,6 +53,7 @@ import type { RunState, TurnEvent } from './events'
 import { hostTools, type HostReads } from './host-tools'
 import { createRouter, type Input, type Queued, type Retry } from './router'
 import { TURNS_MIGRATIONS } from './schema'
+import { assignHandles, type SourceRef } from './sources'
 import { find, type InboxState } from '../inbox/inbox'
 import { view, type CompactionModel, type MemoryView } from '../store/memory'
 import type { JournalPosition, Mode } from '../store/ledger'
@@ -287,7 +288,11 @@ async function start(
         }),
       ]
     : []
-  const slackTools = options.host ? hostTools(options.host) : []
+  const handles = async (refs: ReadonlyArray<SourceRef>) => {
+    const runId = router.state()?.runId
+    return runId === undefined ? [] : assignHandles(store, runId, refs)
+  }
+  const slackTools = options.host ? hostTools(options.host, handles) : []
   const actionHost = options.actions?.host
   const actionTools = actionHost ? [sendMessageTool({ store, current: () => router.toolRun(), propose: actions.propose, host: actionHost })] : []
   // §5.4: a run the daily cap blocked brings the Budget card, one per day and raise.

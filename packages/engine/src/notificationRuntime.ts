@@ -3,28 +3,44 @@ import { ChannelId, UserId, isDm, messageMentionsMe, type Me, type Presence } fr
 import { makeNotifications, readSettings, type Notifier, type Notifications } from '@juno/notifications'
 import { messageBody, plainText } from '@juno/richtext'
 import { SlackApi, SlackSession, type SocketEvent } from '@juno/slack'
+import type { NotificationSource, NotificationTarget } from '@juno/contract'
 import { liveQuery, StoreReader, type ConversationRow } from '@juno/store'
-import { Clock, Context, Effect, Layer, Queue, Stream } from 'effect'
+import { Clock, Context, Effect, Layer, Queue, Ref, Stream, SubscriptionRef } from 'effect'
+import { HostLink } from './protocol/host'
 
 const safe = <A, E, R>(effect: Effect.Effect<A, E, R>) => effect.pipe(Effect.catch(() => Effect.logWarning('notifications: operation failed')))
 const run = (effect: Effect.Effect<void, unknown> | undefined) => effect === undefined ? Effect.void : safe(effect)
 
 export interface NotificationHost {
   readonly notifier: Notifier
+  /** Whether any topic has an unread mention, on every change. Main shows the dock badge. */
+  readonly badge?: (mentions: boolean) => Effect.Effect<void>
 }
 export class NotificationControl extends Context.Service<NotificationControl, {
   readonly attach: (notifications: Notifications | undefined) => Effect.Effect<void>
   readonly wake: Effect.Effect<void>
   readonly setPresence: (presence: Presence) => Effect.Effect<void>
   readonly currentPresence: Effect.Effect<Presence | undefined>
+  /** What Slack shows for the signed-in session, once known, then every change. */
+  readonly presence: Stream.Stream<Presence | undefined>
 }>()('juno/engine/NotificationControl') {
-  static readonly layer = Layer.effect(NotificationControl, Effect.sync(() => {
-    let active: Notifications | undefined
+  static readonly layer = Layer.effect(NotificationControl, Effect.gen(function* () {
+    const active = yield* SubscriptionRef.make<Notifications | undefined>(undefined)
+    const current = SubscriptionRef.get(active)
+    const wake = Effect.flatMap(current, (notifications) => run(notifications?.wake))
+    // Main says when the Mac wakes: apply the presence schedule again.
+    const link = yield* HostLink
+    const fromMain = yield* link.messages
+    yield* Effect.forkScoped(Stream.runForEach(fromMain, (message) => message._tag === 'wake' ? wake : Effect.void))
     return NotificationControl.of({
-      attach: (next) => Effect.sync(() => { active = next }),
-      wake: Effect.suspend(() => run(active?.wake)),
-      setPresence: (value) => Effect.suspend(() => run(active?.setPresence(value))),
-      currentPresence: Effect.suspend(() => active?.currentPresence ?? Effect.succeed(undefined)),
+      attach: (next) => SubscriptionRef.set(active, next),
+      wake,
+      setPresence: (value) => Effect.flatMap(current, (notifications) => run(notifications?.setPresence(value))),
+      currentPresence: Effect.flatMap(current, (notifications) => notifications?.currentPresence ?? Effect.succeed(undefined)),
+      presence: SubscriptionRef.changes(active).pipe(
+        Stream.switchMap((notifications) => notifications === undefined ? Stream.make(undefined) : notifications.presenceChanges),
+        Stream.changes,
+      ),
     })
   }))
 }
@@ -37,6 +53,44 @@ export const NotificationHost = Context.Reference<NotificationHost>('juno/engine
     viewing: () => Effect.succeed(false),
   } }),
 })
+
+/**
+ * The host for the Electron engine: notifications go to main over the host
+ * link, and main says which topic is on screen in a focused window. The
+ * Juno chat cannot take the hours-start summary yet (WP14), so the summary
+ * keeps its first message for the click, and its id stands in for the chat
+ * message.
+ */
+export const hostNotificationHost = Layer.effect(NotificationHost, Effect.gen(function* () {
+  const link = yield* HostLink
+  const viewing = yield* Ref.make<string | null>(null)
+  const firstOf = new Map<string, NotificationSource>()
+  const messages = yield* link.messages
+  yield* Effect.forkScoped(Stream.runForEach(messages, (message) => message._tag === 'viewing' ? Ref.set(viewing, message.topicId) : Effect.void))
+  const host: NotificationHost = {
+    notifier: {
+      show: ({ id, title, body, target }) => Effect.gen(function* () {
+        let to: NotificationTarget
+        if (target.kind === 'message') to = { _tag: 'message', source: target.source }
+        else {
+          const first = firstOf.get(target.id)
+          if (first === undefined) return
+          firstOf.delete(target.id)
+          to = { _tag: 'summary', id: target.id, first }
+        }
+        yield* link.send({ _tag: 'notify', notification: { id, title, body, target: to } })
+      }),
+      summary: ({ id, sources }) => Effect.sync(() => {
+        const first = sources[0]
+        if (first !== undefined) firstOf.set(id, first)
+        return id
+      }),
+      viewing: (topicId) => Effect.map(Ref.get(viewing), (shown) => shown === topicId),
+    },
+    badge: (mentions) => link.send({ _tag: 'badge', mentions }),
+  }
+  return host
+}))
 
 type Frame = Extract<SocketEvent, { readonly _tag: 'Frame' }>['frame']
 
@@ -100,6 +154,21 @@ export const startNotifications = Effect.gen(function* () {
     last = result.success
     return safe(notifications.settingsChanged)
   }))
+  // The dock badge: any unread topic that mentions you, outside ignored channels. The partial unread index bounds the read.
+  const badge = host.badge
+  if (badge !== undefined) {
+    let shown: boolean | undefined
+    yield* Effect.forkScoped(Stream.runForEach(liveQuery(['topics', 'ignored_channels'], Effect.gen(function* () {
+      const rows = yield* sql<{ id: string }>`SELECT topic_id AS id FROM topic_index INDEXED BY topic_index_unread
+        WHERE unread_count > 0 AND mentions_me = 1 AND channel NOT IN (SELECT channel FROM ignored_channels) LIMIT 1`
+      return rows.length > 0
+    })), (result) => {
+      if (result._tag === 'Failure' || result.success === shown) return Effect.void
+      shown = result.success
+      return badge(result.success)
+    }))
+    yield* Effect.addFinalizer(() => shown === true ? badge(false) : Effect.void)
+  }
   yield* Effect.forkScoped(Effect.gen(function* () {
     yield* safe(notifications.tick)
     while (true) {

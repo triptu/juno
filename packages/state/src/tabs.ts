@@ -33,12 +33,20 @@ import { topicAtom } from './messages'
 import { newChatAtom, newChatTitle } from './newChat'
 import { signedInAtom } from './session'
 
-/** What a tab shows: a topic, a New chat (spec section 9), or a page: Home (section 12) or All topics (section 11). */
-export type Place = { readonly kind: 'topic'; readonly topicId: string } | { readonly kind: 'newChat' } | { readonly kind: 'home' } | { readonly kind: 'allTopics' }
+/** What a tab shows: a topic, a New chat (spec section 9), or a page: Home (section 12), All topics (section 11), Notifications or Preferences (section 14). */
+export type Place =
+  | { readonly kind: 'topic'; readonly topicId: string }
+  | { readonly kind: 'newChat' }
+  | { readonly kind: 'home' }
+  | { readonly kind: 'allTopics' }
+  | { readonly kind: 'notifications' }
+  | { readonly kind: 'preferences' }
 
 export const newChatPlace: Place = { kind: 'newChat' }
 export const homePlace: Place = { kind: 'home' }
 export const allTopicsPlace: Place = { kind: 'allTopics' }
+export const notificationsPlace: Place = { kind: 'notifications' }
+export const preferencesPlace: Place = { kind: 'preferences' }
 export const topicPlace = (topicId: string): Place => ({ kind: 'topic', topicId })
 
 /** The places a tab showed, oldest first, and the one it shows. */
@@ -95,9 +103,11 @@ export const activeTab = (tabs: Tabs): Tab | undefined => tabs.tabs.find((tab) =
 /** The tab that shows `topicId`, if one does. */
 export const tabShowing = (tabs: Tabs, topicId: string): Tab | undefined => tabs.tabs.find((tab) => tabTopic(tab) === topicId)
 /** The tab that shows Home, if one does. Home is a singleton. */
-export const homeTab = (tabs: Tabs): Tab | undefined => tabs.tabs.find((tab) => currentPlace(tab).kind === 'home')
+export const homeTab = (tabs: Tabs): Tab | undefined => pageTab(tabs, 'home')
+/** The tab that shows a page. Pages are singletons. */
+const pageTab = (tabs: Tabs, kind: Place['kind']): Tab | undefined => tabs.tabs.find((tab) => currentPlace(tab).kind === kind)
 /** The tab that shows All topics, if one does. All topics is a singleton. */
-export const allTopicsTab = (tabs: Tabs): Tab | undefined => tabs.tabs.find((tab) => currentPlace(tab).kind === 'allTopics')
+export const allTopicsTab = (tabs: Tabs): Tab | undefined => pageTab(tabs, 'allTopics')
 const pinnedCount = (tabs: ReadonlyArray<Tab>) => tabs.filter((tab) => tab.pinned).length
 
 /** A tab id no open or closed tab has. Ids are `tab-<n>`, so the next is one past the highest. */
@@ -128,7 +138,7 @@ function push(history: TabHistory, place: Place): TabHistory {
 }
 
 export function openPlace(tabs: Tabs, place: Place, { newTab = false }: OpenOptions = {}): Tabs {
-  const showing = place.kind === 'topic' ? tabShowing(tabs, place.topicId) : place.kind === 'home' ? homeTab(tabs) : place.kind === 'allTopics' ? allTopicsTab(tabs) : undefined
+  const showing = place.kind === 'topic' ? tabShowing(tabs, place.topicId) : place.kind === 'newChat' ? undefined : pageTab(tabs, place.kind)
   if (showing !== undefined) return activateTab(tabs, showing.id)
   const at = tabs.tabs.findIndex((tab) => tab.id === tabs.active)
   if (at < 0 || newTab) {
@@ -276,7 +286,7 @@ export const TABS_PREF = 'tabs'
 
 const PlaceJson = Schema.Union([
   Schema.Struct({ kind: Schema.Literal('topic'), topicId: Schema.String }),
-  Schema.Struct({ kind: Schema.Literals(['newChat', 'home', 'allTopics']) }),
+  Schema.Struct({ kind: Schema.Literals(['newChat', 'home', 'allTopics', 'notifications', 'preferences']) }),
 ])
 /**
  * A saved tab, or one saved before history, when a tab's id was its
