@@ -15,7 +15,7 @@ import {
 } from '@juno/slack-schema'
 import { Invalidation, StoreWriter, transaction, type MessageRow, type SqlError } from '@juno/store'
 import { Clock, Effect, Queue } from 'effect'
-import { observeMetadata, patchMetadata } from './metadata'
+import { observeMetadata, patchMetadata, type MetadataFence } from './metadata'
 import { reindexOptions, wantUsers, type SyncContext } from './context'
 import { mergeRootCounters, mergeTombstone, type MergeSource } from './merge'
 import { mainTopicOf, mergeOne, threadTopicOf } from './pages'
@@ -23,7 +23,6 @@ import { reindexTopics, topicsOfMessages } from './reindex'
 import {
   changeReaction,
   observeRead,
-  patchConversation,
   readMessage,
   reopenIfResolved,
   setChannelReads,
@@ -33,7 +32,6 @@ import {
   threadSub,
   toConversationRow,
   topicOfMessage,
-  upsertConversations,
   upsertUsers,
   writeMessage,
   type ThreadSubSource,
@@ -143,7 +141,7 @@ export const applyFrame = (ctx: SyncContext, frame: RtmFrame): Effect.Effect<voi
         return yield* transaction(
           Effect.gen(function* () {
             const id = typeof frame.channel === 'string' ? frame.channel : frame.channel.id
-            if (typeof frame.channel !== 'string') yield* observeMetadata(ctx.metadata, toConversationRow(frame.channel))
+            if (typeof frame.channel !== 'string') yield* observeMetadata(ctx.metadata, frame.channel)
             switch (frame.type) {
               case 'channel_joined':
               case 'group_joined':
@@ -175,7 +173,7 @@ export const applyFrame = (ctx: SyncContext, frame: RtmFrame): Effect.Effect<voi
             const id = typeof frame.channel === 'string' ? frame.channel : frame.channel.id
             if (typeof frame.channel !== 'string') {
               const row = toConversationRow(frame.channel)
-              yield* observeMetadata(ctx.metadata, row)
+              yield* observeMetadata(ctx.metadata, frame.channel)
               // The other side of a new DM, or the members of a group DM, before its row shows.
               wantUsers(ctx, [...(row.user_id === null ? [] : [row.user_id]), ...(row.member_ids_json === null ? [] : (JSON.parse(row.member_ids_json) as Array<string>))])
             }
@@ -185,7 +183,7 @@ export const applyFrame = (ctx: SyncContext, frame: RtmFrame): Effect.Effect<voi
       case 'im_close':
       case 'mpim_close':
         if (typeof frame.channel === 'string') return
-        return yield* transaction(observeMetadata(ctx.metadata, toConversationRow(frame.channel)))
+        return yield* transaction(observeMetadata(ctx.metadata, frame.channel))
       case 'member_joined_channel':
       case 'member_left_channel':
         if (frame.user !== ctx.me.userId) return
@@ -222,8 +220,7 @@ export const applySent = (ctx: SyncContext, sent: { readonly opened?: Channel | 
     yield* transaction(
       Effect.gen(function* () {
         if (sent.opened !== undefined) {
-          yield* upsertConversations([toConversationRow(sent.opened)])
-          yield* patchConversation(sent.opened.id, { is_member: 1 })
+          yield* applyOpened(ctx.metadata, sent.opened)
         }
         yield* writePosted(ctx, sent.channel, sent.message, sent.message.ts, now)
       }),
@@ -231,11 +228,11 @@ export const applySent = (ctx: SyncContext, sent: { readonly opened?: Channel | 
   })
 
 /** A DM Juno opened for a send (`conversations.open`), stored as the socket's `im_created` would store it. */
-export const applyOpened = (channel: Channel): Effect.Effect<void, SqlError, StoreWriter | Invalidation> =>
+export const applyOpened = (fence: MetadataFence, channel: Channel): Effect.Effect<void, SqlError, StoreWriter | Invalidation> =>
   transaction(
     Effect.gen(function* () {
-      yield* upsertConversations([toConversationRow(channel)])
-      yield* patchConversation(channel.id, { is_member: 1 })
+      yield* observeMetadata(fence, channel)
+      yield* patchMetadata(fence, channel.id, { is_member: 1 })
     }),
   )
 

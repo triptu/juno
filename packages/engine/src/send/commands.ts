@@ -20,9 +20,10 @@ import { MAX_FILES_PER_MESSAGE, NotFound, NotSignedIn, Rejected, type SendError,
 import { mainTopicId, threadTopicId, type ChannelId, type Ts } from '@juno/domain'
 import { composeOutgoing } from '@juno/richtext'
 import { transaction } from '@juno/store'
-import { applyOpened, discardPost, queuePost, readPost, retryPost } from '@juno/sync'
+import { discardPost, queuePost, readPost, retryPost } from '@juno/sync'
 import { Staging } from '../staging'
 import { Outbox } from '../outbox'
+import { SyncLink } from '../syncLink'
 import { Workspace } from '../workspace'
 import { clearDraft } from './drafts'
 
@@ -36,7 +37,7 @@ export interface SendInput {
   readonly files?: ReadonlyArray<string> | undefined
 }
 
-export const sendMessage = (input: SendInput): Effect.Effect<SendResult, SendError, Outbox | Workspace | Staging> =>
+export const sendMessage = (input: SendInput): Effect.Effect<SendResult, SendError, Outbox | Workspace | Staging | SyncLink> =>
   Effect.gen(function* () {
     const outbox = yield* Outbox
     const workspace = yield* Workspace
@@ -49,9 +50,11 @@ export const sendMessage = (input: SendInput): Effect.Effect<SendResult, SendErr
     if (open === undefined) return yield* new NotSignedIn()
     let channel: string
     if (to.kind === 'person') {
+      const fetcher = yield* (yield* SyncLink).fetcher
+      if (fetcher === undefined) return yield* new NotSignedIn()
       const opened = (yield* outbox.send((api) => api.call('conversations.open', { users: to.userId, return_im: true }))).channel
       // A store failure is a bug, not a state the user can act on (architecture 2.6).
-      yield* applyOpened(opened).pipe(Effect.provide(open.context), Effect.orDie)
+      yield* fetcher.opened(opened).pipe(Effect.orDie)
       channel = opened.id
     } else {
       channel = to.channelId

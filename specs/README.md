@@ -153,11 +153,11 @@ The random simulation (10,000 traces of at most 160 transitions) found two forms
 
 ## Conversation metadata
 
-`metadata.qnt` models name, membership and archive fields, socket observations during a snapshot, and full refresh after a gap. `staleRename`, `staleMembership` and `staleArchive` each disable the observation fence in their broken mode and violate `eventWins`. `missedRename` disables the gap refresh and violates `quietAgreement`. Every corrected schedule must reach `reachedAgreement`. The runner also samples 10,000 random traces of at most 160 transitions; after input stops, recovery has a 16-transition drain bound.
+`metadata.qnt` models name, membership, archive, topic and purpose fields, socket observations during a snapshot, and full refresh after a gap. `staleRename`, `staleMembership` and `staleArchive` each disable the observation fence in their broken mode and violate `eventWins`. `missedRename` disables the gap refresh and violates `quietAgreement`. `ownDm` checks a DM-open answer against a held counts snapshot without a socket echo; `partial` checks an event omitting topic and purpose. Both broken modes violate `quietAgreement`. Every corrected schedule must reach `reachedAgreement`. The runner also samples 10,000 random traces of at most 160 transitions; after input stops, recovery has a 16-transition drain bound.
 
 The model serializes snapshot reads, matching the sync work permit. As with M7's older-page guard, an older read must finish before a later refresh can start. Events update the store and record the affected fields atomically. The implementation retains per-read patches until success, failure or interruption; it compares no Slack timestamp with a local timestamp. Membership snapshots cover absent members as well as listed ones. A rename leaves unrelated snapshot fields eligible to refresh.
 
-Assumptions: a successful full snapshot covers the relevant conversations, events are applied in socket order, and connectivity and reads eventually recover. Event creation and delivery are collapsed into one action; delayed or reordered events and local commands are outside this model. HTTP snapshots can survive a socket gap. This is simulation and directed regression coverage, not an unbounded proof.
+Assumptions: a successful full snapshot covers the relevant conversations, events are applied in socket order, and connectivity and reads eventually recover. Event creation and delivery are collapsed into one action; delayed or reordered events and local commands other than DM-open answers are outside this model. HTTP snapshots can survive a socket gap. This is simulation and directed regression coverage, not an unbounded proof.
 
 ## Accepted Unsubscribe: three races and their guards
 
