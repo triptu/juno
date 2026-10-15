@@ -1,3 +1,4 @@
+import { expectStableAnchor } from './shiftProbe'
 // The sidebar against the fake Slack: what shows after sign-in, the quick
 // filters, a live update from another client, hover and keyboard, and dark
 // mode. The rows asserted on are threads the self user follows (started,
@@ -188,13 +189,24 @@ test('during the first sync the list says Juno is getting the topics, not that i
   await expect(juno.win.getByRole('status', { name: 'Sync status' })).toHaveText('Syncing')
   await expect(sidebar.list.getByText("It's quiet")).toHaveCount(0)
 
-  fake.release({ method: 'client.userBoot' })
-  await expect.poll(() => fake.heldCount({ method: 'conversations.history' })).toBe(1)
-  await expect(juno.win.getByRole('status', { name: 'Sync status' })).toHaveText(/^Syncing \d+ of \d+$/)
-  await sidebar.expectEmpty('Getting your topics')
-  fake.release({ method: 'conversations.history' })
-  await juno.waitForSync()
-  await sidebar.row(POSTGRES).expectVisible()
+  await juno.allTopics.open()
+  const header = sidebar.root.locator('header[aria-label="Sidebar title bar"]')
+  const headerBox = await header.boundingBox()
+  const barBox = await header.getByRole('progressbar').boundingBox()
+  expect(headerBox).not.toBeNull()
+  expect(barBox).not.toBeNull()
+  expect(barBox!.height).toBe(2)
+  expect(barBox!.y + barBox!.height).toBe(headerBox!.y + headerBox!.height)
+  await expectStableAnchor(juno.win, 'nav[aria-label="Pages"]', async () => {
+    fake.release({ method: 'client.userBoot' })
+    await expect.poll(() => fake.heldCount({ method: 'conversations.history' })).toBe(1)
+    await expect(juno.win.getByRole('status', { name: 'Sync status' })).toHaveText(/^Syncing \d+ of \d+$/)
+    await sidebar.expectEmpty('Getting your topics')
+    fake.release({ method: 'conversations.history' })
+    await juno.waitForSync()
+    await sidebar.row(POSTGRES).expectVisible()
+  })
+  expect(await header.boundingBox()).toEqual(headerBox)
 })
 
 test('a reply from another client updates its row in place and moves it to the top', async ({ juno, fake }) => {

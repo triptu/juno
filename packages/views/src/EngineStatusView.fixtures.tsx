@@ -30,7 +30,7 @@ export default defineFixtures(EngineStatusView, {
 
 const onRestart = () => {}
 
-// The line under the sidebar's filters, as the Sidebar container draws it.
+// The fixed secondary line in the sidebar header, as the Sidebar container draws it.
 export const engineNoticeFixtures = defineFixtures(
   EngineNotice,
   {

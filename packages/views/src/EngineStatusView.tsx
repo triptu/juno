@@ -2,7 +2,7 @@ import * as stylex from '@stylexjs/stylex'
 import { HourglassMedium } from '@phosphor-icons/react/dist/icons/HourglassMedium'
 import { WarningCircle } from '@phosphor-icons/react/dist/icons/WarningCircle'
 import { WifiSlash } from '@phosphor-icons/react/dist/icons/WifiSlash'
-import { colors, motion, radii, spacing } from '@juno/tokens/tokens.stylex'
+import { colors, motion, spacing, text } from '@juno/tokens/tokens.stylex'
 import { Button, Icon, Text, type PhosphorIcon } from '@juno/ui'
 
 export interface EngineStatusViewProps {
@@ -50,37 +50,32 @@ const notices: Record<EngineNoticeKind, { readonly icon: PhosphorIcon; readonly 
 }
 
 /**
- * A quiet line under the sidebar's filters when what it shows may be
+ * A quiet line in the sidebar header when what it shows may be
  * behind Slack (friendly-layer 7): what happened, what is kept, and one
  * action when the user has to act.
  */
 export function EngineNotice({ kind, onRestart }: EngineNoticeProps) {
   const notice = notices[kind]
   return (
-    <section aria-label="Sync" {...stylex.props(styles.notice)}>
+    <section aria-label="Sync" title={notice.body} {...stylex.props(styles.notice)}>
       <span {...stylex.props(styles.noticeIcon)}>
         <Icon icon={notice.icon} size={16} />
       </span>
       <span role="status" aria-label="Sync status" {...stylex.props(styles.noticeText)}>
-        <Text variant="meta" weight="semibold" tone="default">
+        <Text variant="meta" tone="muted" truncate sx={styles.statusLine}>
           {notice.title}
-        </Text>
-        <Text variant="meta" tone="muted">
-          {notice.body}
         </Text>
       </span>
       {kind === 'stopped' && onRestart !== undefined ? (
-        <Button variant="secondary" size="sm" onClick={onRestart}>
+        <button type="button" {...stylex.props(styles.restart)} onClick={onRestart}>
           Restart
-        </Button>
+        </button>
       ) : null}
     </section>
   )
 }
 
 export interface SyncProgressProps {
-  /** Sit above the held empty list without moving it when sync finishes. */
-  readonly overlay?: boolean
   /** Conversations read so far, out of `total`. Both absent while the sync is still listing them. */
   readonly done?: number
   readonly total?: number
@@ -88,15 +83,15 @@ export interface SyncProgressProps {
 
 /**
  * The first sync's progress, in the same place as the notices: a thin line
- * that fills as conversations land and "Syncing 30 of 143" under it. Shown
+ * along the header’s bottom edge and "Syncing 30 of 143" in its fixed text slot. Shown
  * only until the first sync is done; later catch-ups are silent.
  */
-export function SyncProgress({ done, total, overlay = false }: SyncProgressProps) {
+export function SyncProgress({ done, total }: SyncProgressProps) {
   const counted = done !== undefined && total !== undefined && total > 0
   const fraction = counted ? Math.min(1, done / total) : 0
   const label = counted ? `Syncing ${done} of ${total}` : 'Syncing'
-  const progress = (
-    <section aria-label="Sync" data-sync-progress="" {...stylex.props(styles.progress, overlay && styles.progressOverlay)}>
+  return (
+    <section aria-label="Sync" data-sync-progress="" {...stylex.props(styles.progress)}>
       <div
         role="progressbar"
         aria-label="Sync progress"
@@ -107,27 +102,25 @@ export function SyncProgress({ done, total, overlay = false }: SyncProgressProps
       >
         <div {...stylex.props(styles.fill, styles.fraction(fraction))} />
       </div>
-      <Text variant="meta" tone="muted" numeric role="status" aria-label="Sync status">
+      <Text variant="meta" tone="muted" numeric role="status" aria-label="Sync status" sx={styles.statusLine}>
         {label}
       </Text>
     </section>
   )
-  return overlay ? <div {...stylex.props(styles.progressAnchor)}>{progress}</div> : progress
 }
 
 const styles = stylex.create({
-  progressAnchor: { position: 'relative', flexShrink: 0 },
-  progressOverlay: { position: 'absolute', insetInline: 0, top: 0 },
+  statusLine: { lineHeight: spacing['--space-4'] },
   progress: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: spacing['--space-1'],
+    position: 'relative',
+    height: '100%',
     paddingInline: spacing['--space-4'],
-    paddingBottom: spacing['--space-2-5'],
   },
   track: {
+    position: 'absolute',
+    insetInline: 0,
+    bottom: 0,
     height: spacing['--space-0-5'],
-    borderRadius: radii['--radius-full'],
     backgroundColor: colors['--border-subtle'],
     overflow: 'hidden',
   },
@@ -142,22 +135,30 @@ const styles = stylex.create({
   fraction: (value: number) => ({ transform: `scaleX(${value})` }),
   notice: {
     display: 'flex',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     gap: spacing['--space-2'],
     paddingInline: spacing['--space-4'],
-    paddingBottom: spacing['--space-2-5'],
+    height: '100%',
   },
   noticeIcon: {
     display: 'inline-flex',
     flexShrink: 0,
-    paddingTop: spacing['--space-pixel'],
     color: colors['--foreground-muted'],
   },
   noticeText: {
     display: 'flex',
-    flexDirection: 'column',
     flexGrow: 1,
     minWidth: 0,
+  },
+  restart: {
+    borderWidth: 0,
+    padding: 0,
+    backgroundColor: 'transparent',
+    color: colors['--foreground-default'],
+    fontFamily: text['--text-meta-family'],
+    fontSize: text['--text-meta-size'],
+    lineHeight: 'inherit',
+    textDecoration: 'underline',
   },
   section: {
     display: 'flex',
