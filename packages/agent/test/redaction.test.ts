@@ -32,12 +32,12 @@ function leaks(turns: Turns): ReadonlyArray<string> {
   )
 }
 
-/** Files under the agent directory, other than agent.sqlite, whose bytes hold the marker. */
+/** Files under the agent directory, agent.sqlite and its WAL included, whose bytes hold the marker. */
 async function fileLeaks(dir: string): Promise<ReadonlyArray<string>> {
   const entries = await readdir(dir, { recursive: true, withFileTypes: true })
   const found: string[] = []
   for (const entry of entries) {
-    if (!entry.isFile() || entry.name.startsWith('agent.sqlite')) continue
+    if (!entry.isFile()) continue
     const path = join(entry.parentPath, entry.name)
     if ((await readFile(path)).includes(SECRET)) found.push(path)
   }
@@ -187,6 +187,7 @@ it('quotes of a removed message in later replies and reactions become the Remove
   await h.turns.compaction.idle()
   await h.turns.redaction.idle()
   expect(leaks(h.turns)).toEqual([])
+  expect(await fileLeaks(h.dir)).toEqual([])
   expect(h.turns.memory().lines.every((line) => line.kind === 'node')).toBe(true)
   // A reply to the removed message sent afterwards quotes the placeholder too, and the model never reads the words.
   h.fake.script([reply(say('Noted.'))])

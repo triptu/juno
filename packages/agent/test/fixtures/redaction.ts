@@ -81,7 +81,7 @@ for (const command of commands) {
 }
 
 const files = readdirSync(dir, { recursive: true, withFileTypes: true })
-  .filter((entry) => entry.isFile() && !entry.name.startsWith('agent.sqlite') && entry.name !== 'backup.json')
+  .filter((entry) => entry.isFile() && entry.name !== 'backup.json')
   .filter((entry) => readFileSync(join(entry.parentPath, entry.name)).includes(SECRET))
   .map((entry) => entry.name)
 const summary = {

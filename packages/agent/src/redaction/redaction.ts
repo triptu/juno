@@ -22,7 +22,8 @@
  * 3. **In-flight work**: jobs started in runs that saw the messages are
  *    stopped.
  * 4. **Purge**, each step durable and idempotent, retried until done: node
- *    versions that depend on a removed message, Codex thread files, the pi
+ *    versions that depend on a removed message, then a truncating
+ *    checkpoint (`secure_delete` zeroed the freed content), Codex thread files, the pi
  *    journal (rotation), then a sanitized backup generation.
  *
  * Removals run one at a time. The same op again is the same removal.
@@ -33,7 +34,7 @@ import { memoryGen } from '../actions/cards'
 import { revokeExposedGrants } from '../grants/grants'
 import { purgeCodexThreads } from '../providers/codex-purge'
 import { crashPoint } from '../runtime/crash'
-import { transaction } from '../store/database'
+import { checkpointTruncate, transaction } from '../store/database'
 import { purgeNodes, redactMemory } from '../store/memory'
 import type { Store } from '../store/store'
 import { clearQuotes, movePins, removedBubbles } from './quotes'
@@ -232,6 +233,8 @@ export function createRedaction(options: RedactionOptions) {
     switch (step) {
       case 'nodes':
         purgeNodes(store)
+        // secure_delete zeroed what the removal and this purge freed; the checkpoint puts those pages in the main file.
+        checkpointTruncate(store.db)
         return
       case 'codex':
         await purgeCodexThreads(store)
