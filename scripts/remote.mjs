@@ -27,6 +27,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join, relative, resolve } from 'node:path'
 import { createInterface } from 'node:readline'
 import { fileURLToPath } from 'node:url'
+import { forwardSignals } from './remote/children.mjs'
 import { acquire, destroy, forget, reap, release, status } from './remote/pool.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -196,9 +197,13 @@ const shardsAt = process.argv.indexOf('--shards')
 if (shardsAt > 1 && process.argv.slice(2, shardsAt).every((arg) => arg.startsWith('--'))) {
   const total = Number(process.argv[shardsAt + 1])
   const rest = process.argv.slice(2).filter((_, index) => index !== shardsAt - 2 && index !== shardsAt - 1)
+  const children = new Set()
+  forwardSignals(children)
   const runs = Array.from({ length: total }, (_, index) =>
     new Promise((resolvePromise) => {
       const child = spawn(process.execPath, [self, '--env', `JUNO_SHARD=${index}/${total}`, ...rest], { stdio: ['ignore', 'pipe', 'pipe'] })
+      children.add(child)
+      child.on('close', () => children.delete(child))
       for (const stream of [child.stdout, child.stderr]) createInterface({ input: stream }).on('line', (line) => console.log(`[${index + 1}/${total}] ${line}`))
       child.on('close', (code) => resolvePromise(code ?? 1))
     }),

@@ -31,6 +31,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, normalize, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { forwardSignals } from './remote/children.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const argv = process.argv.slice(2)
@@ -282,6 +283,8 @@ if (renderer) console.log('  (UI changed: run pnpm test:feel and pnpm perf on th
 if (flag('--plan') || plan.length === 0) process.exit(0)
 
 // Each step runs at once: on its own Namespace machine, or one after another locally.
+const children = new Set()
+forwardSignals(children)
 const localAll = flag('--local')
 const run = (step) =>
   new Promise((resolvePromise) => {
@@ -290,6 +293,8 @@ const run = (step) =>
     const machine = step.machine && !process.env.JUNO_REMOTE_MACHINE ? ['--machine', step.machine] : []
     const command = local ? ['pnpm', [step.script, ...step.args]] : ['node', [join(root, 'scripts/remote.mjs'), ...machine, ...env, step.script, ...step.args]]
     const child = spawn(command[0], command[1], { cwd: root, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, ...(local ? step.env : {}) } })
+    children.add(child)
+    child.on('close', () => children.delete(child))
     const prefix = `[${step.script}] `
     for (const stream of [child.stdout, child.stderr]) {
       let rest = ''
