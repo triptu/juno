@@ -213,7 +213,8 @@ export function useMessageActions({ detail, list, scrollRef, composer }: Message
       const sender = message.senderId === undefined ? undefined : { id: message.senderId, name: people.get(message.senderId)?.name ?? message.senderId }
       const chosen = await showMessageMenu(latest.current.detail, message, isOwnEditable(message), at, sender, onSender)
       // The message may have been edited or deleted while the menu was open: act on it as it is now.
-      const now = latest.current.list.rows.get(message.ts)
+      const rows = latest.current.list.rows
+      const now = rows.get(message.ts) ?? rows.get(landedTs(rows, message.ts) ?? '')
       if (now === undefined) return
       if (chosen === 'edit' && isOwnEditable(now)) startEdit(now)
       else if (chosen === 'delete' && isOwnEditable(now)) askDelete(now)
