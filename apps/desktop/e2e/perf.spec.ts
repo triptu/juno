@@ -327,46 +327,53 @@ test('send: Enter to the pending row painted', async ({ juno }) => {
   within('send, p95', send.p95, 50)
 })
 
-// Typing "@ma " quickly in a reply, ten times over: each input to its
+// Typing "@ma " or ":smi " in a reply, ten times over: each input to its
 // character presented, measured like the keystroke controls (`perfTyping.ts`,
 // performance.md 7.1). Every "@" opens the suggestions and each letter
 // narrows them; the field draws its text through the chip layer. Soft
 // against the budget, as the plain composer control is: the presentation
 // measure misses it on a bare input too (performance.md 7.1).
-test('mention typing: each keystroke of "@ma" to its character presented', async ({ juno, win }) => {
-  test.setTimeout(120_000)
-  await juno.signIn()
-  await juno.waitForSync()
-  await juno.sidebar.row(POSTGRES).open()
-  await juno.topic.expectTitle(POSTGRES)
-  const hidden = await countHidden(win)
-  const interval = await refreshInterval(win)
-  // The same keys in a bare input first: the floor the composer is held to.
-  const control = stats('mention typing, bare input (control) input timestamp to character presented', (await nativeControl(win, 'typing-mention-control', async (field) => {
-    for (let round = 0; round < 10; round++) {
-      await field.pressSequentially('@ma ')
-      await win.waitForTimeout(150)
+for (const { kind, query } of [{ kind: 'mention', query: '@ma' }, { kind: 'emoji', query: ':smi' }]) {
+  test(`${kind} typing: each keystroke of "${query}" to its character presented`, async ({ juno, win }) => {
+    test.setTimeout(120_000)
+    await juno.signIn()
+    await juno.waitForSync()
+    await juno.sidebar.row(POSTGRES).open()
+    await juno.topic.expectTitle(POSTGRES)
+    const hidden = await countHidden(win)
+    const interval = await refreshInterval(win)
+    // The same keys in a bare input first: the floor the composer is held to.
+    const control = stats(`${kind} typing, bare input (control) input timestamp to character presented`, (await nativeControl(win, `typing-${kind}-control`, async (field) => {
+      for (let round = 0; round < 10; round++) {
+        await field.pressSequentially(`${query} `)
+        await win.waitForTimeout(150)
+      }
+    })).presented)
+    const budget = characterBudget(control.p95, interval)
+    const input = juno.topic.composer
+    await input.fill('')
+    await input.focus()
+    const result = await typingReading(win, input, `typing-${kind}`, async () => {
+      for (let round = 0; round < 10; round++) {
+        await input.pressSequentially(`${query} `)
+        await win.waitForTimeout(150)
+      }
+    })
+    expect(result.count).toBe((query.length + 1) * 10)
+    await expect(input).toHaveValue(`${query} `.repeat(10))
+    // Check rows outside timing: the driver's visibility assertion forces layout.
+    if (kind === 'emoji') {
+      await input.pressSequentially(query)
+      await expect(juno.topic.suggestions).toBeVisible()
     }
-  })).presented)
-  const budget = characterBudget(control.p95, interval)
-  const input = juno.topic.composer
-  await input.fill('')
-  await input.focus()
-  const result = await typingReading(win, input, 'typing-mention', async () => {
-    for (let round = 0; round < 10; round++) {
-      await input.pressSequentially('@ma ')
-      await win.waitForTimeout(150)
-    }
+    expect(await hidden(), 'the window was hidden or covered while measuring, so its frames were not drawn').toBe(0)
+    stats(`${kind} typing, Event Timing keydown/keypress >=16 ms (diagnostic)`, result.events)
+    const presented = stats(`${kind} typing, input timestamp to character presented`, result.presented)
+    stats(`${kind} typing, input to animation frame callback`, result.frame)
+    stats(`${kind} typing, animation frame callback to presentation`, result.afterFrame)
+    expect.soft(presented.p95, `${kind} typing: input to character presented, within one frame of the bare input`).toBeLessThanOrEqual(budget)
   })
-  expect(result.count).toBe(40)
-  await expect(input).toHaveValue('@ma '.repeat(10))
-  expect(await hidden(), 'the window was hidden or covered while measuring, so its frames were not drawn').toBe(0)
-  stats('mention typing, Event Timing keydown/keypress >=16 ms (diagnostic)', result.events)
-  const presented = stats('mention typing, input timestamp to character presented', result.presented)
-  stats('mention typing, input to animation frame callback', result.frame)
-  stats('mention typing, animation frame callback to presentation', result.afterFrame)
-  expect.soft(presented.p95, 'mention typing: input to character presented, within one frame of the bare input').toBeLessThanOrEqual(budget)
-})
+}
 
 test('send in Main: Enter through the checks on send to the pending row painted, with a slow model', async ({ juno, fake, slackApp, userData, running }) => {
   test.setTimeout(180_000)

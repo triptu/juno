@@ -61,5 +61,6 @@ export function onFirstMentionAnswer(
   return end
 }
 
-/** One local subscription per workspace, independent of the typed query. */
-export const composerEmojiAtom = liveQuery(mentionsEmoji)(undefined)
+/** Read workspace emoji only while a colon query needs them. */
+const emojiFamily = liveQuery(mentionsEmoji)
+export const composerEmojiAtom = (open: boolean) => open ? emojiFamily(undefined) : closed

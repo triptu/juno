@@ -12,22 +12,29 @@ interface Options {
 }
 
 const queryAt = (text: string, caret: number) => {
-  const match = /(?:^|[^\p{L}\p{N}_:])(:([a-zA-Z0-9_+-]{2,}))$/u.exec(text.slice(0, caret))
+  if (!text.includes(':')) return undefined
+  const match = /(?:^|[^\p{L}\p{N}_:])(:([a-zA-Z0-9_+-]{1,}))$/u.exec(text.slice(0, caret))
   return match?.[1] === undefined ? undefined : { start: caret - match[1].length, end: caret, text: match[2]!.toLowerCase() }
 }
 
-function useEmojiRows() {
-  const custom = useAtomValue(composerEmojiAtom)
-  const [standard, setStandard] = useState<ReadonlyArray<EmojiSuggestion>>([])
+const EMPTY_ROWS: ReadonlyArray<EmojiSuggestion> = []
+
+function useEmojiRows(open: boolean) {
+  const custom = useAtomValue(composerEmojiAtom(open))
+  const [standard, setStandard] = useState(EMPTY_ROWS)
+  const [answer, setAnswer] = useState(custom)
+  if (custom._tag === 'Success' && (answer._tag !== 'Success' || custom.value !== answer.value)) setAnswer(custom)
   useEffect(() => {
+    if (!open || standard.length > 0) return
     let live = true
-    const idle = requestIdleCallback(() => { void import('./emojiMatches').then((data) => { if (live) setStandard(data.standardEmoji) }) })
-    return () => { live = false; cancelIdleCallback(idle) }
-  }, [])
-  return useMemo(() => {
-    if (custom._tag !== 'Success') return standard
-    const byName = new Map(custom.value.map((emoji) => [emoji.name, emoji]))
-    const rows = custom.value.flatMap((emoji) => {
+    void import('./emojiMatches').then((data) => { if (live) setStandard(data.standardEmoji) })
+    return () => { live = false }
+  }, [open, standard])
+  // The workspace answer alone owns alias resolution and sorting, never a standard-catalog update.
+  const workspace = useMemo(() => {
+    if (answer._tag !== 'Success' || answer.value.length === 0) return EMPTY_ROWS
+    const byName = new Map(answer.value.map((emoji) => [emoji.name, emoji]))
+    return answer.value.flatMap((emoji) => {
       let target: typeof emoji | undefined = emoji
       const seen = new Set<string>()
       while (target?.url == null && target?.alias_for != null && !seen.has(target.name)) {
@@ -35,10 +42,22 @@ function useEmojiRows() {
         target = byName.get(target.alias_for)
       }
       return target?.url == null ? [] : [{ id: emoji.name, name: emoji.name, insert: `:${emoji.name}:`, url: target.url }]
-    })
-    const names = new Set(rows.map((row) => row.name))
-    return [...rows, ...standard.filter((row) => !names.has(row.name))].toSorted((a, b) => a.name.localeCompare(b.name))
-  }, [custom, standard])
+    }).toSorted((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0)
+  }, [answer])
+  return useMemo(() => mergeRows(standard, workspace), [standard, workspace])
+}
+
+/** Both inputs are sorted; custom names replace standard names without sorting the catalog again. */
+function mergeRows(standard: ReadonlyArray<EmojiSuggestion>, custom: ReadonlyArray<EmojiSuggestion>) {
+  if (custom.length === 0) return standard
+  const rows: EmojiSuggestion[] = []
+  let at = 0
+  for (const emoji of standard) {
+    while (at < custom.length && custom[at]!.name < emoji.name) rows.push(custom[at++]!)
+    if (custom[at]?.name === emoji.name) rows.push(custom[at++]!)
+    else rows.push(emoji)
+  }
+  return [...rows, ...custom.slice(at)]
 }
 
 function matching(rows: ReadonlyArray<EmojiSuggestion>, query: string) {
@@ -51,13 +70,14 @@ function matching(rows: ReadonlyArray<EmojiSuggestion>, query: string) {
 
 /** Local colon suggestions share the mention list's anchor, rows, and keyboard handling. */
 export function useEmojiSuggestions({ text, onChange, field }: Options) {
-  const catalog = useEmojiRows()
   const listId = useId()
   const [caret, setCaret] = useState(text.length)
   const [dismissed, setDismissed] = useState<number | undefined>(undefined)
   const [chosen, setChosen] = useState<string | undefined>(undefined)
   const typed = queryAt(text, Math.min(caret, text.length))
-  const query = typed?.start === dismissed ? undefined : typed
+  const loading = typed !== undefined && (/^[a-z]/.test(typed.text) || typed.text.length >= 2)
+  const catalog = useEmojiRows(loading && typed.start !== dismissed)
+  const query = typed === undefined || typed.start === dismissed || typed.text.length < 2 ? undefined : typed
   const rows = query === undefined ? [] : matching(catalog, query.text)
   const ids = rows.map((row) => mentionRowId(listId, row.id))
   const activeId = chosen !== undefined && ids.includes(chosen) ? chosen : ids[0]
@@ -69,6 +89,7 @@ export function useEmojiSuggestions({ text, onChange, field }: Options) {
     setChosen(undefined)
   }
   const onFieldKey = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (typed === undefined) return false
     if (event.nativeEvent.isComposing || event.metaKey || event.ctrlKey || event.altKey) return false
     if (event.key === ':' && typed !== undefined && event.currentTarget.selectionStart === event.currentTarget.selectionEnd) {
       const exact = catalog.find((row) => row.name === typed.text)
@@ -84,11 +105,12 @@ export function useEmojiSuggestions({ text, onChange, field }: Options) {
   }
   return {
     onChange: (value: string, at: number) => {
-      setCaret(at)
-      if (queryAt(value, at)?.start !== dismissed) setDismissed(undefined)
+      const next = queryAt(value, at)
+      if (next !== undefined || typed !== undefined) setCaret(at)
+      if (dismissed !== undefined && next?.start !== dismissed) setDismissed(undefined)
       onChange(value)
     },
-    onCaret: setCaret,
+    onCaret: (at: number) => { if (text.includes(':')) setCaret(at) },
     onFieldKey,
     marks: [],
     mention: query === undefined ? undefined : {
