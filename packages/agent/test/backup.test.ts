@@ -55,9 +55,11 @@ async function restart(mac: Mac): Promise<Mac> {
   return startMac(mac.name, mac.keychain, { dir: mac.h.dir, slack: mac.slack })
 }
 
+let said = 0
+/** Op ids are global across restores, so each Mac's sends get their own. */
 async function converse(mac: Mac, text: string, answer: string) {
   mac.h.fake.script([reply(say(answer))])
-  await mac.h.ended(mac.h.send(text))
+  await mac.h.ended(mac.h.send(text, { opId: `${mac.name}-${++said}` }))
 }
 
 const texts = (turns: Turns) => turns.messages().map((m) => m.text)
@@ -344,4 +346,66 @@ it('a new backup folder starts a generation there and removes this Mac’s gener
   expect(generations(second)).toEqual([2])
   expect(generations(first)).toEqual([])
   expect(a.h.turns.backup!.folder()).toBe(second)
+})
+
+it('a new Mac that already backed up restores with the phrase, takes the backup key, and its next generations open with the same phrase', async () => {
+  const folder = tempDir()
+  const a = await startMac('Studio', fakeKeychain())
+  await a.h.turns.backup!.setFolder(folder)
+  await a.h.turns.backup!.exportPhrase()
+  await converse(a, 'the launch is on Friday', 'Noted.')
+  await a.h.turns.backup!.flush()
+
+  // The new Mac ran for a while: it has its own key and a backup in its own folder.
+  const keychain = fakeKeychain({ recoveryPhrase: a.keychain.values().recoveryPhrase! })
+  const fresh = await startMac('Laptop', keychain)
+  await fresh.h.turns.backup!.flush()
+  const ownKey = keychain.values().backupKey
+  expect(ownKey).toBeDefined()
+  const staged = await fresh.h.turns.ownership.restore(folder)
+  if (staged._tag !== 'staged') throw new Error(staged.message)
+  const b = await restart(fresh)
+  expect(keychain.values().backupKey).toBe(a.keychain.values().backupKey)
+
+  b.h.turns.ownership.activate({ backupAt: staged.backupAt })
+  await converse(b, 'and the demo on Monday', 'Noted.')
+  await b.h.turns.backup!.flush()
+  expect(generations(folder)).toEqual([2])
+  // The old Mac reads the new owner's manifest, and a third Mac opens it with the phrase the owner has.
+  await a.h.turns.backup!.flush()
+  expect(a.h.turns.ownership.owner()).toMatchObject({ state: 'released', deviceName: 'Laptop' })
+  const { mac: c } = await restoreOnNewMac('Spare', a, folder)
+  expect(texts(c.h.turns).join('\n')).toContain('demo on Monday')
+})
+
+it('a removal record from the store a new Mac had before does not block restoring another Mac’s backup', async () => {
+  const folder = tempDir()
+  const a = await startMac('Studio', fakeKeychain())
+  await a.h.turns.backup!.setFolder(folder)
+  await a.h.turns.backup!.exportPhrase()
+  await converse(a, 'hello', 'Hi.')
+  await a.h.turns.backup!.flush()
+
+  const keychain = fakeKeychain({ recoveryPhrase: a.keychain.values().recoveryPhrase!, deletionRecord: '3' })
+  const fresh = await startMac('Laptop', keychain)
+  const staged = await fresh.h.turns.ownership.restore(folder)
+  expect(staged).toMatchObject({ _tag: 'staged' })
+  const b = await restart(fresh)
+  expect(b.h.turns.ownership.owner()).toMatchObject({ state: 'recovery', trusted: false })
+  // The record is the restored store's now.
+  expect(keychain.values().deletionRecord).toBe('0')
+})
+
+it('a folder change whose first backup fails still clears the old folder once a later backup lands', async () => {
+  const first = tempDir()
+  const second = tempDir()
+  const a = await startMac('Studio', fakeKeychain())
+  await a.h.turns.backup!.setFolder(first)
+  expect(generations(first)).toEqual([1])
+  // A folder Juno cannot create: the export fails after the setting changed.
+  await expect(a.h.turns.backup!.setFolder('/dev/null/backup')).rejects.toThrow()
+  expect(generations(first)).toEqual([1])
+  await a.h.turns.backup!.setFolder(second)
+  expect(generations(second)).toHaveLength(1)
+  expect(generations(first)).toEqual([])
 })
