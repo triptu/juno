@@ -63,33 +63,67 @@ export interface Core {
   readonly close: () => Promise<void>
 }
 
-export async function openCore(options: CoreOptions): Promise<Core | UpdateNeeded> {
+type OpenStorage = Pick<CoreOptions, 'agentDir' | 'migrations' | 'now'>
+
+/** Startup hooks run under the owner lock. The router starts pi only after recovery. */
+interface CoreRouter<Running> {
+  readonly beforeOpen?: () => Promise<void>
+  readonly beforeRecovery?: (store: Store) => Promise<void>
+  /** Stops hook resources when recovery refuses or startup fails. */
+  readonly stop?: () => void
+  /** The running router releases the database and owner lock last on close. */
+  readonly start: (context: {
+    readonly store: Store
+    readonly file: { readonly start: (settings: JournalSettings) => Promise<Journal> }
+    readonly opened: 'resumed' | 'rotated'
+    readonly release: () => void
+  }) => Promise<Running>
+}
+
+type RoutedOptions<Running> = OpenStorage & { readonly router: CoreRouter<Running> }
+
+export function openCore(options: CoreOptions): Promise<Core | UpdateNeeded>
+export function openCore<Running>(options: RoutedOptions<Running>): Promise<Running | UpdateNeeded>
+export async function openCore<Running>(options: CoreOptions | RoutedOptions<Running>): Promise<Core | Running | UpdateNeeded> {
   const now = options.now ?? Date.now
   const lock = acquireOwnerLock(options.agentDir)
+  const router = 'router' in options ? options.router : serialRouter(options)
   let db: Database | undefined
   try {
+    if (router.beforeOpen !== undefined) await router.beforeOpen()
     try {
       db = openDatabase(join(options.agentDir, AGENT_DATABASE_FILE), options.migrations ?? [], now)
     } catch (error) {
-      if (error instanceof StoreTooNew) return updateNeeded(lock.release)
+      if (error instanceof StoreTooNew) {
+        router.stop?.()
+        return updateNeeded(lock.release)
+      }
       throw error
     }
     const store: Store = { db, now }
     initialize(store)
+    if (router.beforeRecovery !== undefined) await router.beforeRecovery(store)
     const recovery = await recover(store, options.agentDir)
     if (recovery._tag === 'updateNeeded') {
+      router.stop?.()
       db.close()
       return updateNeeded(lock.release)
     }
-    const journal = await recovery.file.start(options)
-    return running(store, journal, options, recovery._tag === 'resume' ? 'resumed' : 'rotated', () => {
-      store.db.close()
-      lock.release()
+    return await router.start({
+      store, file: recovery.file, opened: recovery._tag === 'resume' ? 'resumed' : 'rotated',
+      release: () => { store.db.close(); lock.release() },
     })
   } catch (error) {
+    router.stop?.()
     if (db?.isOpen) db.close()
     lock.release()
     throw error
+  }
+}
+
+function serialRouter(options: CoreOptions): CoreRouter<Core> {
+  return {
+    start: async ({ store, file, opened, release }) => running(store, await file.start(options), options, opened, release),
   }
 }
 
