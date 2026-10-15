@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Menu, screen, shell, type BaseWindow, type BrowserWindowConstructorOptions, type MenuItemConstructorOptions } from 'electron'
+import { app, BrowserWindow, Menu, screen, shell, type BaseWindow, type BrowserWindowConstructorOptions, type MenuItemConstructorOptions, type Rectangle } from 'electron'
 import { join } from 'node:path'
 import { DEFAULT_ACCENT, DEFAULT_DENSITY, DEFAULT_SIDEBAR, Events, type MenuCommand } from '@juno/contract'
 import { BACKGROUND, backgroundFor, type Launch } from './launch'
@@ -81,7 +81,7 @@ export function createMainWindow(currentLaunch: () => Launch): BrowserWindow {
     title: 'Juno',
     width: 1200,
     height: 800,
-    ...launch.bounds,
+    ...onScreen(launch.bounds),
     minWidth: MIN_WIDTH,
     minHeight: MIN_HEIGHT,
     backgroundColor: backgroundFor(launch.theme),
@@ -122,6 +122,24 @@ function reload(window: BaseWindow | undefined, ignoringCache: boolean): void {
   if (launch !== undefined) void window.loadURL(appPageUrl(launch()), ignoringCache ? { extraHeaders: 'pragma: no-cache\n' } : {})
   else if (ignoringCache) window.webContents.reloadIgnoringCache()
   else window.webContents.reload()
+}
+
+/**
+ * The saved bounds, when they still show on a display. A window saved on a
+ * display that is gone opens centred on the main one, at its saved size
+ * within that display.
+ */
+function onScreen(bounds: Launch['bounds']): Partial<Rectangle> {
+  if (bounds === undefined) return {}
+  const visible = screen.getAllDisplays().some(({ workArea }) => {
+    const width = Math.min(bounds.x + bounds.width, workArea.x + workArea.width) - Math.max(bounds.x, workArea.x)
+    const height = Math.min(bounds.y + bounds.height, workArea.y + workArea.height) - Math.max(bounds.y, workArea.y)
+    // Enough of the window, including its title strip, to grab and move it.
+    return width >= 100 && height >= TITLEBAR_HEIGHT && bounds.y >= workArea.y - TITLEBAR_HEIGHT / 2
+  })
+  if (visible) return bounds
+  const { workArea } = screen.getPrimaryDisplay()
+  return { width: Math.min(bounds.width, workArea.width), height: Math.min(bounds.height, workArea.height) }
 }
 
 /**

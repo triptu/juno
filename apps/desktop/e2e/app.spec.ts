@@ -1,5 +1,7 @@
 import type { Page } from '@playwright/test'
-import { expect, test } from './fixtures'
+import { writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
+import { expect, launchApp, test } from './fixtures'
 
 /** Resolves a CSS custom property to the colour Chromium computes for it. */
 async function resolveColorVar(win: Page, name: string): Promise<string> {
@@ -107,4 +109,22 @@ test('exposes only the bridge to the page', async ({ win }) => {
     menu: ['onCommand'],
     notifications: ['setViewing', 'onOpen'],
   })
+})
+
+test('a window saved on a display that is gone opens on screen', async ({ running, userData }) => {
+  await running.close()
+  await writeFile(join(userData, 'launch.json'), JSON.stringify({ theme: 'light', bounds: { x: -6000, y: -6000, width: 1100, height: 760 } }))
+  const again = await launchApp(userData)
+  try {
+    const placed = await again.app.evaluate(({ BrowserWindow, screen }) => {
+      const bounds = BrowserWindow.getAllWindows()[0]!.getBounds()
+      const { workArea } = screen.getPrimaryDisplay()
+      return { bounds, inside: bounds.x >= workArea.x && bounds.y >= workArea.y && bounds.x + bounds.width <= workArea.x + workArea.width && bounds.y + bounds.height <= workArea.y + workArea.height }
+    })
+    expect(placed.inside).toBe(true)
+    expect(placed.bounds.width).toBe(1100)
+    expect(placed.bounds.height).toBe(760)
+  } finally {
+    await again.close()
+  }
 })
