@@ -67,5 +67,5 @@ export function SyncNotice() {
   const progress = useAtomValue(syncProgressAtom)
   if (kind !== undefined) return <EngineNotice kind={kind} onRestart={restart} />
   if (progress === undefined) return null
-  return <SyncProgress {...progress} />
+  return <SyncProgress {...progress} overlay />
 }

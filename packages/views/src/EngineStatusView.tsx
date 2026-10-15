@@ -79,6 +79,8 @@ export function EngineNotice({ kind, onRestart }: EngineNoticeProps) {
 }
 
 export interface SyncProgressProps {
+  /** Sit above the held empty list without moving it when sync finishes. */
+  readonly overlay?: boolean
   /** Conversations read so far, out of `total`. Both absent while the sync is still listing them. */
   readonly done?: number
   readonly total?: number
@@ -89,12 +91,12 @@ export interface SyncProgressProps {
  * that fills as conversations land and "Syncing 30 of 143" under it. Shown
  * only until the first sync is done; later catch-ups are silent.
  */
-export function SyncProgress({ done, total }: SyncProgressProps) {
+export function SyncProgress({ done, total, overlay = false }: SyncProgressProps) {
   const counted = done !== undefined && total !== undefined && total > 0
   const fraction = counted ? Math.min(1, done / total) : 0
   const label = counted ? `Syncing ${done} of ${total}` : 'Syncing'
-  return (
-    <section aria-label="Sync" data-sync-progress="" {...stylex.props(styles.progress)}>
+  const progress = (
+    <section aria-label="Sync" data-sync-progress="" {...stylex.props(styles.progress, overlay && styles.progressOverlay)}>
       <div
         role="progressbar"
         aria-label="Sync progress"
@@ -110,9 +112,12 @@ export function SyncProgress({ done, total }: SyncProgressProps) {
       </Text>
     </section>
   )
+  return overlay ? <div {...stylex.props(styles.progressAnchor)}>{progress}</div> : progress
 }
 
 const styles = stylex.create({
+  progressAnchor: { position: 'relative', flexShrink: 0 },
+  progressOverlay: { position: 'absolute', insetInline: 0, top: 0 },
   progress: {
     display: 'flex',
     flexDirection: 'column',

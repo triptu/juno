@@ -180,12 +180,19 @@ test('the empty state offers to clear the filters, and shows at once when it was
 test('during the first sync the list says Juno is getting the topics, not that it is quiet', async ({ juno, fake }) => {
   // Hold the first boot call, so nothing has arrived when the window opens.
   fake.holdNext({ method: 'client.userBoot', before: true })
+  fake.holdNext({ method: 'conversations.history', before: true })
   await juno.signIn()
   const { sidebar } = juno
   await sidebar.expectEmpty('Getting your topics')
+  await expect(juno.win.getByRole('progressbar', { name: 'Sync progress' })).toBeVisible()
+  await expect(juno.win.getByRole('status', { name: 'Sync status' })).toHaveText('Syncing')
   await expect(sidebar.list.getByText("It's quiet")).toHaveCount(0)
 
   fake.release({ method: 'client.userBoot' })
+  await expect.poll(() => fake.heldCount({ method: 'conversations.history' })).toBe(1)
+  await expect(juno.win.getByRole('status', { name: 'Sync status' })).toHaveText(/^Syncing \d+ of \d+$/)
+  await sidebar.expectEmpty('Getting your topics')
+  fake.release({ method: 'conversations.history' })
   await juno.waitForSync()
   await sidebar.row(POSTGRES).expectVisible()
 })

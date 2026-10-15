@@ -41,7 +41,7 @@ const BEFORE_LIVE = new Set(['first-run', 'booting', 'catching-up'])
 
 /** Why the list is empty, or undefined while its first window has not arrived. */
 function emptyKind(ready: boolean, filter: TopicListFilter, syncing: boolean, emptyView: boolean): TopicListEmpty | undefined {
-  if (!ready) return undefined
+  if (!ready) return syncing ? 'syncing' : undefined
   if (filter.unreadOnly) return 'caught-up'
   if (filter.scope === undefined && emptyView) return 'empty-view'
   if (filter.kind !== 'all' || filter.scope !== undefined) return 'filtered'
