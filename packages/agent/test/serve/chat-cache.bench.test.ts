@@ -3,13 +3,14 @@ import { writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { Schema } from 'effect'
 import { expect, it } from 'vitest'
+import type { BenchmarkMode } from './chat-cache-bench'
 
 const Measurement = Schema.Struct({
   p50: Schema.Number, p95: Schema.Number, queryP95: Schema.Number, structuralP95: Schema.Number, warmHeap: Schema.Number,
   retainedHeap: Schema.Number, rss: Schema.Number, peakRss: Schema.Number, bytes: Schema.Number, events: Schema.Number,
 })
 
-const measure = (mode: 'full' | 'cached') => {
+const measure = (mode: BenchmarkMode) => {
   const result = spawnSync(process.execPath, [
     '--expose-gc', '--import', fileURLToPath(new URL('../../../../scripts/ts-resolve-hooks.mjs', import.meta.url)),
     fileURLToPath(new URL('./chat-cache-bench.ts', import.meta.url)), mode,

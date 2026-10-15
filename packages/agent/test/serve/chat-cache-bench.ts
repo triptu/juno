@@ -7,6 +7,8 @@ import { createChatCache, windowOf } from '../../src/serve/chat'
 import { chatItems } from './full-rebuild'
 import { chatFixture } from './cache-fixture'
 
+export type BenchmarkMode = 'full' | 'cached'
+
 const percentile = (values: number[], p: number) => values.toSorted((a, b) => a - b)[Math.floor(values.length * p)]!
 
 const fixture = chatFixture(5000)
@@ -50,7 +52,7 @@ try {
       source.store.db.prepare('INSERT INTO chat_bubbles VALUES (?, ?)').run(id, source.store.now() + 3_000_000 + n)
       source = { ...source, live: { ...source.live, bubbles: [...source.live.bubbles, { id, text: `Bubble ${n}`, body: [{ text: `Bubble ${n}` }] }] } }
     } else {
-      source = { ...source, readAt: source.store.now() + n * 1000 }
+      source = { ...source, readAt: source.store.now() + 3_000_000 + n }
       source.store.db.prepare('INSERT INTO chat_read VALUES (1, ?) ON CONFLICT (singleton) DO UPDATE SET through_at = excluded.through_at').run(source.readAt)
     }
 
@@ -69,7 +71,7 @@ try {
     } else if (kind === 1) assert(encoded.includes(`Working ${n}`))
     else if (kind === 2) assert(encoded.includes(`Task ${n}`))
     else if (kind === 3) assert(encoded.includes(`Bubble ${n}`))
-    else assert(page.items.some((item) => item._tag === 'juno' && item.unread))
+    else assert(page.items.filter((item) => item._tag === 'juno').every((item) => !item.unread))
     if (n >= 10) {
       eventMs.push(end - start)
       if (kind < 3) queryMs.push(queryEnd - queryStart)
