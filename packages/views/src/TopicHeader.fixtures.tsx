@@ -62,10 +62,21 @@ export default defineFixtures(
       // Just above the switch: the full labels.
       'thread-480': state({ detail: details.hiring }, { width: 480, height: 68 }),
     },
+    // Every control in the islands has the same hover, keyboard focus and press.
     Interaction: {
       'hover-title': state({ detail: details.postgres }, { hover: 'button[aria-haspopup="menu"]' }),
       'hover-threads': state({ detail: details.engMain, onThreads: noop }, { hover: '[data-island="right"] button' }),
+      'hover-resolve': state({ detail: details.postgres }, { hover: 'button[aria-label="Resolve"]' }),
+      'hover-reopen': state({ detail: { ...details.postgres, resolved: true, status: 'resolved' } }, { hover: 'button[aria-label="Reopen"]' }),
+      'hover-resolve-336': state({ detail: details.hiring }, { ...narrow, hover: 'button[aria-label="Resolve"]' }),
+      'hover-juno': state({ detail: details.postgres }, { hover: 'button[aria-label="Juno ⌘J"]' }),
+      'hover-pill': state({ detail: details.postgres }, { hover: '[data-island="left"] button' }),
+      'press-resolve': state({ detail: details.postgres }, { press: 'button[aria-label="Resolve"]' }),
+      'press-title': state({ detail: details.postgres }, { press: 'button[aria-haspopup="menu"]' }),
       'focus-pill': state({ detail: details.hiring }, { focus: '[data-island="left"] button' }),
+      'focus-title': state({ detail: details.postgres }, { focus: 'button[aria-haspopup="menu"]' }),
+      'focus-resolve': state({ detail: details.postgres }, { focus: 'button[aria-label="Resolve"]' }),
+      'focus-juno': state({ detail: details.postgres }, { focus: 'button[aria-label="Juno ⌘J"]' }),
     },
   },
   { width: 816, height: 68, padded: false },

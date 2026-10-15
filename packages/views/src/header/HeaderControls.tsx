@@ -123,7 +123,7 @@ export interface JunoToggleProps {
 
 /** The right island's Juno button: opens and closes the Juno panel (⌘J does the same). */
 export function JunoToggle({ pressed, onToggle }: JunoToggleProps) {
-  return <IconButton icon={Sparkle} label="Juno ⌘J" size={28} iconSize={16} iconWeight="duotone" radius="full" tone="default" pressed={pressed} onClick={onToggle} />
+  return <IconButton icon={Sparkle} label="Juno ⌘J" size={28} iconSize={16} iconWeight="duotone" radius="full" variant="island" pressed={pressed} onClick={onToggle} />
 }
 
 const styles = stylex.create({
@@ -170,15 +170,16 @@ const styles = stylex.create({
     fontSize: text['--text-body-small-size'],
     fontWeight: weights['--weight-semibold'],
     lineHeight: sizes['--control-28'],
+    // The island controls' fills (IconButton's `island` variant): hover, then open or pressed, one step darker each.
     backgroundColor: {
       default: 'transparent',
-      ':hover': { default: null, [HOVER]: colors['--surface-hover'] },
+      ':hover': { default: null, [HOVER]: colors['--secondary-default'] },
     },
   },
   titleOpen: {
     backgroundColor: {
-      default: colors['--secondary-default'],
-      ':hover': { default: null, [HOVER]: colors['--secondary-default'] },
+      default: colors['--secondary-hover'],
+      ':hover': { default: null, [HOVER]: colors['--secondary-active'] },
     },
   },
   titleText: {
@@ -210,7 +211,7 @@ const styles = stylex.create({
     fontVariantNumeric: 'tabular-nums',
     backgroundColor: {
       default: 'transparent',
-      ':hover': { default: null, [HOVER]: colors['--surface-hover'] },
+      ':hover': { default: null, [HOVER]: colors['--secondary-default'] },
     },
   },
   iconOnlyWhenNarrow: {
@@ -218,8 +219,8 @@ const styles = stylex.create({
   },
   islandDown: {
     backgroundColor: {
-      default: colors['--secondary-default'],
-      ':hover': { default: null, [HOVER]: colors['--secondary-default'] },
+      default: colors['--secondary-hover'],
+      ':hover': { default: null, [HOVER]: colors['--secondary-active'] },
     },
   },
   islandIcon: {
