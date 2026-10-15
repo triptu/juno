@@ -40,7 +40,7 @@ export function BackupSection({ page, now, onBackupFolder, onExportPhrase, backu
             <Text variant="body" truncate title={page.backupFolder} data-backup-folder="">
               {page.backupFolder}
             </Text>
-            <Text variant="meta" tone="muted" data-last-backup="">
+            <Text variant="meta" tone="muted" data-last-backup={page.lastBackupAt ?? ''}>
               {page.lastBackupAt === undefined ? (
                 'No backup yet'
               ) : (

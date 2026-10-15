@@ -28,9 +28,9 @@ export function SheetLayer({ onClose, children }: { readonly onClose: () => void
   return <div {...stylex.props(styles.layer)}>{children}</div>
 }
 
-function Sheet({ label, data, children }: { readonly label: string; readonly data: string; readonly children: ReactNode }) {
+function Sheet({ label, kind, children }: { readonly label: string; readonly kind: 'phrase' | 'restore' | 'move'; readonly children: ReactNode }) {
   return (
-    <Surface kind="popover" as="section" role="dialog" aria-label={label} aria-modal padding="none" sx={styles.sheet} {...{ [`data-${data}`]: '' }}>
+    <Surface kind="popover" as="section" role="dialog" aria-label={label} aria-modal padding="none" sx={styles.sheet} data-sheet={kind}>
       <div {...stylex.props(styles.inner)}>{children}</div>
     </Surface>
   )
@@ -75,7 +75,7 @@ export function RecoveryPhraseSheet({ phrase, copied, onCopy, onDone }: Recovery
   const copy = chatCopy.pages.settings.phraseSheet
   const groups = phrase.split(/[\s-]+/).filter((group) => group !== '')
   return (
-    <Sheet label={copy.title} data="phrase-sheet">
+    <Sheet label={copy.title} kind="phrase">
       <Head title={copy.title} body={copy.body} />
       <Surface kind="inset" padding="none" sx={styles.phraseBox}>
         <span {...stylex.props(styles.phrase)} data-recovery-phrase="" aria-label={copy.title}>
@@ -118,7 +118,7 @@ export interface RestoreSheetProps {
 export function RestoreSheet({ folder, phrase, attested, busy, error, onChooseFolder, onPhrase, onAttest, onRestore, onCancel }: RestoreSheetProps) {
   const copy = chatCopy.pages.settings.restoreSheet
   return (
-    <Sheet label={copy.title} data="restore-sheet">
+    <Sheet label={copy.title} kind="restore">
       <Head title={copy.title} body={copy.body} />
       <Surface kind="group">
         <div {...stylex.props(styles.field)}>
@@ -175,7 +175,7 @@ export interface MoveSheetProps {
 export function MoveSheet({ busy, error, onMove, onCancel }: MoveSheetProps) {
   const copy = chatCopy.pages.settings.moveSheet
   return (
-    <Sheet label={copy.title} data="move-sheet">
+    <Sheet label={copy.title} kind="move">
       <Head title={copy.title} body={copy.body} />
       <ErrorLine message={error} />
       <Buttons>
