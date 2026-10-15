@@ -70,3 +70,4 @@ export {
   type MessageRef,
   type PendingAction,
 } from './actions'
+export { checkCopyDelete } from './sent'

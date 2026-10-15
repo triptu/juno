@@ -24,15 +24,19 @@
  *   with backoff, also after a restart.
  *
  * Sync also writes rows: the delete of a second copy of one of Juno's
- * posts (`@juno/sync` `sent.ts`), which wakes this worker.
+ * posts (`@juno/sync` `sent.ts`), which wakes this worker. Just before
+ * that delete goes out, one transaction checks again that it loses
+ * nothing (`checkCopyDelete`) and cancels it otherwise. After the socket
+ * drops, a copy's delete waits for the catch-up, so a delete of the kept
+ * message made meanwhile on another device is stored before the check.
  *
  * Nothing is sent while no sync runs or its socket is down. The end of
  * each boot or catch-up makes every row due (architecture 5.8).
  */
-import { Clock, Context, Effect, Layer, Queue, Stream } from 'effect'
+import { Clock, Context, Effect, Layer, Queue, Ref, Stream } from 'effect'
 import { millisToTs, type Ts } from '@juno/domain'
 import { liveQuery, transaction } from '@juno/store'
-import { actionDone, deferAction, dropAction, flushActions, pendingActions, placeOf, settleOnFailedPost, storedMe, type Acted, type PendingAction, type TopicFetcher } from '@juno/sync'
+import { actionDone, checkCopyDelete, deferAction, dropAction, flushActions, pendingActions, placeOf, settleOnFailedPost, storedMe, type Acted, type PendingAction, type TopicFetcher } from '@juno/sync'
 import { Outbox, type MirrorError } from '../outbox'
 import { SyncLink } from '../syncLink'
 import { Workspace, type OpenWorkspace } from '../workspace'
@@ -68,6 +72,8 @@ export class ActionWorker extends Context.Service<
       const outbox = yield* Outbox
       const link = yield* SyncLink
       const signal = yield* Queue.sliding<void>(1)
+      // False from a socket drop until the next catch-up: the store may not know what changed meanwhile.
+      const inStep = yield* Ref.make(false)
       const wake = Effect.asVoid(Queue.offer(signal, undefined))
 
       /** The call for a row whose message has `ts`, and what Slack's acceptance stores. Undefined when there is nothing to send. */
@@ -123,6 +129,7 @@ export class ActionWorker extends Context.Service<
             yield* local(transaction(dropAction(action)))
             return false
           }
+          if (action.kind === 'delete' && !(yield* local(transaction(checkCopyDelete(action, place.ts))))) return false
           const selfId = (yield* local(storedMe))?.userId ?? ''
           const result = yield* Effect.result(callFor(action, place.ts, selfId))
           const now = yield* Clock.currentTimeMillis
@@ -169,10 +176,13 @@ export class ActionWorker extends Context.Service<
           const now = yield* Clock.currentTimeMillis
           const held = new Set<string>()
           const waiting = new Set<number>()
+          const caughtUp = yield* Ref.get(inStep)
           for (const action of yield* local(pendingActions)) {
             if (held.has(action.channel)) continue
             held.add(action.channel)
             if (action.nextAt > now) continue
+            // A copy's delete (it names the copy by ts alone) waits for the catch-up; `flush` wakes the worker then.
+            if (!caughtUp && action.kind === 'delete' && action.dependsOn === null && action.payload.clientMsgId === null) continue
             if (yield* run(open, fetcher, action)) waiting.add(action.id)
           }
           const rest = (yield* local(pendingActions)).filter((action) => !waiting.has(action.id))
@@ -191,6 +201,7 @@ export class ActionWorker extends Context.Service<
       })
 
       const flush = Effect.gen(function* () {
+        yield* Ref.set(inStep, true)
         const open = yield* workspace.current
         if (open !== undefined) yield* inStore(open)(transaction(flushActions(yield* Clock.currentTimeMillis)))
         yield* wake
@@ -203,7 +214,7 @@ export class ActionWorker extends Context.Service<
       )
       yield* Effect.forkScoped(Stream.runForEach(queuedBySync, () => wake))
       yield* Effect.forkScoped(Stream.runForEach(link.caughtUps, () => flush))
-      yield* Effect.forkScoped(Stream.runForEach(Stream.filter(link.onlineChanges, (online) => online), () => wake))
+      yield* Effect.forkScoped(Stream.runForEach(link.onlineChanges, (online) => (online ? wake : Ref.set(inStep, false))))
       yield* Effect.forkScoped(loop)
       return ActionWorker.of({ wake })
     }),
