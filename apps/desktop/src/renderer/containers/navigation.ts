@@ -441,23 +441,44 @@ export function goToTabEntry(index: number): void {
   show((current) => goToEntry(current, index), topic)
 }
 
+/**
+ * The last tab change still waiting for its topic. A tab change that comes
+ * before it applies (⌘W held down, ⌘⇧T twice) builds on it rather than
+ * replacing it, so each press counts.
+ */
+let waitingTabChange: { readonly ticket: number; readonly change: (tabs: Tabs) => Tabs } | undefined
+
 /** Brings the tab that is active after `change` on screen, waiting for its topic when it was not mounted. */
 function changeTabs(change: (tabs: Tabs) => Tabs): void {
+  const waiting = waitingTabChange?.ticket === currentTicket ? waitingTabChange.change : undefined
+  waitingTabChange = undefined
   const tabs = registry.get(tabsAtom)
-  const next = change(tabs)
-  if (next === tabs) return
+  const base = waiting === undefined ? tabs : waiting(tabs)
+  if (change(base) === base && waiting === undefined) return
+  const both = waiting === undefined ? change : (current: Tabs) => change(waiting(current))
+  const next = both(tabs)
   const tab = activeTab(next)
   const topic = tab === undefined || tab.id === tabs.active ? undefined : arriving(tabs, tab.id, currentPlace(tab), false)
   if (topic === undefined) {
     ++currentTicket
-    apply(change)
+    apply(both)
     return
   }
-  show(change, topic)
+  const applying = (current: Tabs) => {
+    if (waitingTabChange?.change === applying) waitingTabChange = undefined
+    return both(current)
+  }
+  show(applying, topic)
+  waitingTabChange = { ticket: currentTicket, change: applying }
 }
 
 export function closeTabById(tabId: string): void {
   changeTabs((tabs) => closeTab(tabs, tabId))
+}
+
+/** ⌘W: closes whichever tab is active once the changes before it apply. */
+function closeActiveTab(): void {
+  changeTabs((tabs) => (tabs.active === undefined ? tabs : closeTab(tabs, tabs.active)))
 }
 
 /** The app menu and the three-finger swipe. */
@@ -467,8 +488,7 @@ export function runMenuCommand(command: MenuCommand): void {
     case 'tab.new':
       return openNewTab()
     case 'tab.close':
-      if (tabs.active !== undefined) closeTabById(tabs.active)
-      return
+      return closeActiveTab()
     case 'tab.reopen':
       return changeTabs(reopenClosedTab)
     case 'tab.next':
