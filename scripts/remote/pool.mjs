@@ -74,8 +74,27 @@ function takeLock(id) {
   }
   return lock(id)
 }
-function list() {
+const inventoryPath = join(dir, 'inventory-cache')
+const revisionPath = join(dir, 'inventory-revision')
+const inventoryRevision = () => {
+  try { return readFileSync(revisionPath, 'utf8') } catch { return '' }
+}
+export function invalidateInventory() {
+  const temporary = `${revisionPath}.${process.pid}.tmp`
+  writeFileSync(temporary, randomUUID())
+  renameSync(temporary, revisionPath)
+  rmSync(inventoryPath, { force: true })
+}
+
+export function list() {
+  try {
+    const cached = JSON.parse(readFileSync(inventoryPath, 'utf8'))
+    const age = Date.now() - cached.completedAt
+    if (Array.isArray(cached.instances) && age >= 0 && age < 5000 && cached.revision === inventoryRevision()) return cached
+  } catch { /* A missing or incomplete cache requires a fresh inventory. */ }
   for (let attempt = 1; attempt <= 3; attempt++) {
+    const startedAt = Date.now()
+    const revision = inventoryRevision()
     const result = spawnSync('nsc', ['list', '-o', 'json'], { encoding: 'utf8', timeout: 90_000 })
     if (result.status !== 0) {
       const error = new Error(`nsc list failed: ${result.error?.message ?? result.stderr.trim()}`)
@@ -85,7 +104,14 @@ function list() {
     // nsc prints null when no instance exists.
     const instances = JSON.parse(result.stdout) ?? []
     if (!Array.isArray(instances)) throw new Error('nsc list did not return an array')
-    return instances
+    const snapshot = { instances, startedAt, completedAt: Date.now(), revision }
+    // A mutation during this call must not publish an inventory for later readers.
+    if (revision === inventoryRevision()) {
+      const temporary = `${inventoryPath}.${process.pid}.tmp`
+      writeFileSync(temporary, JSON.stringify(snapshot))
+      renameSync(temporary, inventoryPath)
+    }
+    return snapshot
   }
 }
 function forget(id) {
@@ -100,7 +126,7 @@ function ensureReaper() {
     let pid
     try { pid = Number(readFileSync(pidFile, 'utf8')) } catch { /* No watcher yet. */ }
     const version = existsSync(versionFile) ? Number(readFileSync(versionFile, 'utf8')) : 1
-    if (alive(pid) && version >= 5) return
+    if (alive(pid) && version >= 6) return
     // Upgrade housekeeping only. Machine/job owners are untouched.
     if (alive(pid)) {
       const command = spawnSync('ps', ['-p', String(pid), '-o', 'args='], { encoding: 'utf8', timeout: 1000 }).stdout ?? ''
@@ -109,7 +135,7 @@ function ensureReaper() {
     }
     const child = spawn(process.execPath, [fileURLToPath(import.meta.url), '--watch'], { detached: true, stdio: 'ignore', env: { ...process.env, JUNO_REMOTE_IDLE_MINUTES: '1' } })
     writeFileSync(pidFile, String(child.pid))
-    writeFileSync(versionFile, '5')
+    writeFileSync(versionFile, '6')
     child.unref()
   } finally { unlock('watcher-start') }
 }
@@ -119,10 +145,12 @@ export function destroy(id) {
   if (alive(lockOwner(id)) && lockOwner(id) !== process.pid) return false
   if (lockOwner(id) !== process.pid && !takeLock(id)) return false
   write({ ...read(id), id, destroying: true })
+  invalidateInventory()
   const result = spawnSync('nsc', ['destroy', id, '--force'], { encoding: 'utf8', timeout: 30_000 })
+  invalidateInventory()
   let gone = result.status === 0
   if (!gone) {
-    try { gone = !list().some((instance) => instance.cluster_id === id) } catch { /* Retain state when the workspace cannot be read. */ }
+    try { gone = !list().instances.some((instance) => instance.cluster_id === id) } catch { /* Retain state when the workspace cannot be read. */ }
   }
   if (gone) forget(id)
   else {
@@ -142,7 +170,8 @@ export function keep(id) {
 }
 
 function reconcile() {
-  const instances = list()
+  const snapshot = list()
+  const { instances } = snapshot
   const states = machines().map((state) => {
     const pid = lockOwner(state.id)
     const publishing = pid === undefined && lockIsNew(state.id)
@@ -151,9 +180,10 @@ function reconcile() {
   const pending = entries().filter((entry) => entry.pending).map((entry) => ({ ...entry, live: alive(entry.pid) }))
   const targets = machinesToDestroy({ instances, states, pending, owner, now: Date.now(), idleMs, lifetimeMs })
   for (const id of targets) destroy(id)
-  const remaining = targets.length ? list() : instances
+  const remainingSnapshot = targets.length ? list() : snapshot
+  const remaining = remainingSnapshot.instances
   const present = new Set(remaining.map((instance) => instance.cluster_id))
-  for (const state of states) if (!present.has(state.id) && !state.live) forget(state.id)
+  for (const state of states) if (!present.has(state.id) && !state.live && state.created < remainingSnapshot.startedAt) forget(state.id)
   for (const entry of pending) if (!entry.live) {
     const observed = instances.some((instance) => instance.labels?.['juno-create'] === entry.token)
     const gone = !remaining.some((instance) => instance.labels?.['juno-create'] === entry.token)
@@ -163,6 +193,7 @@ function reconcile() {
 }
 
 async function provision(machine, pending, create) {
+  invalidateInventory()
   try {
     const id = await create('3h', { 'juno-pool': owner, 'juno-create': pending.token })
     lock(id)
@@ -173,7 +204,7 @@ async function provision(machine, pending, create) {
     write({ ...pending, pid: undefined, failed: true })
     if (error.instanceId && destroy(error.instanceId)) rmSync(statePath(pending.id), { force: true })
     throw error
-  }
+  } finally { invalidateInventory() }
 }
 
 export async function acquire(machine, create, log, { fresh = false } = {}) {

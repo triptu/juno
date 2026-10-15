@@ -140,7 +140,7 @@ import { mkdirSync, writeFileSync, readFileSync, readdirSync } from 'node:fs';
 import { acquire, destroy } from ${JSON.stringify(new URL('./pool.mjs', import.meta.url).href)};
 mkdirSync(${JSON.stringify(poolDir)}, { recursive: true });
 writeFileSync(${JSON.stringify(join(poolDir, 'watcher.pid'))}, String(process.pid));
-writeFileSync(${JSON.stringify(join(poolDir, 'watcher.version'))}, '5');
+writeFileSync(${JSON.stringify(join(poolDir, 'watcher.version'))}, '6');
 let attempts = 0;
 const logs = [];
 const request = acquire('linux/amd64:2x4', async (_, labels) => {
@@ -168,4 +168,54 @@ assert(!readdirSync(${JSON.stringify(poolDir)}).some(x => x.startsWith('pending-
       assert.equal(result.status, 0, result.stderr || result.error?.message)
     } finally { rmSync(dir, { recursive: true, force: true }) }
   }
+})
+
+test('inventory is shared briefly across processes and mutations invalidate it', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'juno-inventory-'))
+  const counter = join(dir, 'calls')
+  const source = join(dir, 'instances')
+  writeFileSync(source, 'null')
+  writeFileSync(join(dir, 'nsc'), `#!/usr/bin/env node
+const fs = require('node:fs');
+fs.appendFileSync(process.env.TEST_CALLS, 'list\\n');
+if (process.env.TEST_INVALIDATE) fs.writeFileSync(process.env.TEST_REVISION, require('node:crypto').randomUUID());
+console.log(fs.readFileSync(process.env.TEST_INSTANCES, 'utf8'));
+`)
+  chmodSync(join(dir, 'nsc'), 0o755)
+  const invoke = (body) => spawnSync(process.execPath, ['--input-type=module', '-e', `
+import { list, invalidateInventory, acquire } from ${JSON.stringify(new URL('./pool.mjs', import.meta.url).href)};
+${body}
+`], { env: { ...process.env, TMPDIR: dir, TMP: dir, TEMP: dir, PATH: `${dir}:${process.env.PATH}`, TEST_CALLS: counter, TEST_INSTANCES: source, TEST_REVISION: join(dir, 'juno-remote-pool', 'inventory-revision') }, encoding: 'utf8', timeout: 10_000 })
+  try {
+    assert.equal(invoke('console.log(JSON.stringify(list().instances))').stdout.trim(), '[]')
+    assert.equal(invoke('console.log(JSON.stringify(list().instances))').stdout.trim(), '[]')
+    assert.equal(readFileSync(counter, 'utf8').trim().split('\n').length, 1)
+    const reused = invoke(`
+import { writeFileSync } from 'node:fs';
+const poolDir = ${JSON.stringify(join(dir, 'juno-remote-pool'))};
+writeFileSync(poolDir + '/watcher.pid', String(process.pid));
+writeFileSync(poolDir + '/watcher.version', '6');
+writeFileSync(poolDir + '/new.json', JSON.stringify({ id: 'new', machine: 'linux/amd64:4x8', created: list().startedAt + 1, lastUsed: Date.now() }));
+const result = await acquire('linux/amd64:4x8', () => { throw new Error('must reuse the newly recorded machine') }, () => {});
+if (!result.warm || result.id !== 'new') throw new Error('lost a machine newer than the cached inventory');
+`)
+    assert.equal(reused.status, 0, reused.stderr)
+    writeFileSync(source, '[{"cluster_id":"new","shape":{"virtual_cpu":4}}]')
+    const refreshed = invoke('invalidateInventory(); console.log(JSON.stringify(list().instances))')
+    assert.equal(refreshed.status, 0, refreshed.stderr)
+    assert.equal(JSON.parse(refreshed.stdout)[0].cluster_id, 'new')
+    assert.equal(readFileSync(counter, 'utf8').trim().split('\n').length, 2)
+    const cachePath = join(dir, 'juno-remote-pool', 'inventory-cache')
+    const cached = JSON.parse(readFileSync(cachePath, 'utf8'))
+    writeFileSync(cachePath, JSON.stringify({ ...cached, completedAt: Date.now() - 6000 }))
+    writeFileSync(source, '{}')
+    const invalid = invoke('list()')
+    assert.notEqual(invalid.status, 0)
+    assert.match(invalid.stderr, /nsc list did not return an array/)
+    assert.equal(readFileSync(counter, 'utf8').trim().split('\n').length, 3)
+    writeFileSync(source, '[]')
+    assert.equal(invoke("invalidateInventory(); process.env.TEST_INVALIDATE = '1'; list()").status, 0)
+    assert.equal(invoke('list()').status, 0)
+    assert.equal(readFileSync(counter, 'utf8').trim().split('\n').length, 5)
+  } finally { rmSync(dir, { recursive: true, force: true }) }
 })
