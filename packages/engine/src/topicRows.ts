@@ -121,7 +121,12 @@ export function userIdsOf(row: JoinedRow, columns: ParsedColumns, into: Set<stri
   if (columns.preview.senderId !== undefined) into.add(columns.preview.senderId)
 }
 
-export function channelInfoOf(row: JoinedRow, columns: ParsedColumns, selfId: string | undefined, nameOf: (id: string) => string): ChannelInfo {
+export function channelInfoOf(
+  row: Pick<JoinedRow, 'channel' | 'c_kind' | 'c_name' | 'c_user_id'>,
+  columns: Pick<ParsedColumns, 'members'>,
+  selfId: string | undefined,
+  nameOf: (id: string) => string,
+): ChannelInfo {
   const id = row.channel as ChannelId
   switch (row.c_kind) {
     case 'im':
