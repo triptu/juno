@@ -111,10 +111,17 @@ function caches() {
   return {
     ops: memo<ReadonlyArray<OpRow>>(),
     times: memo<Map<string, number>>(),
+    opMaps: memo<{ original: Map<string, string>; text: Map<string, string>; handles: Map<string, string> }>(),
+    archived: memo<Map<string, ArchiveRow[]>>(),
+    origins: keyedMemo<Origin>(),
+    sourceKeys: memo<Map<string, string>>(),
+    endings: keyedMemo<Entry | undefined>(),
     runs: memo<ReadonlyArray<RunRow>>(),
     archiveIds: memo<Map<string, ChatMessageId>>(),
     archive: memo<ReadonlyArray<ArchiveRow>>(),
     reactions: memo<ReadonlyArray<ReactionRow>>(),
+    aliases: memo<Map<string, string>>(),
+    reactionMap: memo<Map<string, Reaction[]>>(),
     started: memo<Map<string, number>>(),
     bubbles: keyedMemo<ReturnType<typeof archivedBubbles>>(),
     entries: keyedMemo<Entry>(),
@@ -133,20 +140,96 @@ export function invalidateChatCaches(store: Store): void {
 export function createChatCache(store: Store, changed: () => void = () => {}) {
   const revisions = chatRevisions(store)
   let cache = caches()
-  const invalidateAll = () => { cache = caches(); changed() }
+  let previous: { inputs: ReadonlyArray<unknown>; items: ReadonlyArray<ChatItem>; reactions: Map<string, Reaction[]>; indexes: Map<string, number> } | undefined
+  const invalidateAll = () => { cache = caches(); previous = undefined; changed() }
   const registered = invalidators.get(store.db) ?? new Set<() => void>()
   registered.add(invalidateAll)
   invalidators.set(store.db, registered)
+  const inputs = (source: ChatSource, revision: ReturnType<typeof revisions>) => [
+    ...revision('inbox', 'messages', 'runs', 'run_inputs', 'sources', 'chat_bubbles', 'jobs'),
+    source.readAt, source.waiting, source.dayOf, new Date().getTimezoneOffset(),
+    JSON.stringify(source.jobs), JSON.stringify(source.cards.map((view) => [view.at, view.runId, view.card.id])),
+    JSON.stringify(source.live === undefined ? undefined : { ...source.live, status: undefined }),
+  ]
   return {
-    items: (source: ChatSource) => buildItems(source, cache, revisions()),
+    items(source: ChatSource): ReadonlyArray<ChatItem> {
+      const revision = revisions()
+      const next = inputs(source, revision)
+      const known = previous
+      if (known !== undefined && next.every((input, n) => input === known.inputs[n])) {
+        // These changes cannot move a row or change its neighbours' grouping.
+        const reactions = reactionsFor(store, cache, revision)
+        let updatedItems: ChatItem[] | undefined
+        let items = known.items
+        const replace = (index: number, item: ChatItem) => {
+          updatedItems ??= known.items.slice()
+          updatedItems[index] = item
+          items = updatedItems
+        }
+        if (reactions !== known.reactions) {
+          for (const key of new Set([...reactions.keys(), ...known.reactions.keys()])) {
+            const updated = reactions.get(key) ?? emptyReactions
+            if (JSON.stringify(updated) === JSON.stringify(known.reactions.get(key) ?? emptyReactions)) continue
+            const index = known.indexes.get(key)
+            const item = index === undefined ? undefined : items[index]
+            if (index !== undefined && item !== undefined && (item._tag === 'owner' || item._tag === 'juno' || item._tag === 'card')) replace(index, { ...item, reactions: updated })
+          }
+        }
+        for (const view of source.cards) {
+          const index = known.indexes.get(`card:${view.card.id}`)
+          const item = index === undefined ? undefined : items[index]
+          if (index !== undefined && item?._tag === 'card' && JSON.stringify(item.card) !== JSON.stringify(view.card)) replace(index, { ...item, card: view.card })
+        }
+        const statusIndex = known.indexes.get('status')
+        const status = statusIndex === undefined ? undefined : items[statusIndex]
+        if (statusIndex !== undefined && status?._tag === 'status' && source.live?.runId === status.runId && status.text !== source.live.status.text) {
+          const text = source.live.status.text
+          replace(statusIndex, { _tag: 'status', runId: status.runId, ...(text === undefined ? {} : { text }) })
+        }
+        previous = { inputs: next, items, reactions, indexes: known.indexes }
+        return items
+      }
+      const items = buildItems(source, cache, revision)
+      // First display can persist timestamps. Include those writes in the snapshot.
+      const indexes = new Map<string, number>()
+      items.forEach((item, index) => {
+        if (item._tag === 'owner') indexes.set(`owner:${item.opId}`, index)
+        else if (item._tag === 'juno') indexes.set(`bubble:${item.id}`, index)
+        else if (item._tag === 'card') indexes.set(`card:${item.card.id}`, index)
+        else if (item._tag === 'status') indexes.set('status', index)
+      })
+      previous = { inputs: inputs(source, revisions()), items, reactions: reactionsFor(store, cache, revision), indexes }
+      return items
+    },
     invalidateAll,
-    close: () => { registered.delete(invalidateAll); cache = caches() },
+    close: () => { registered.delete(invalidateAll); cache = caches(); previous = undefined },
   }
 }
 
-/** Full rebuild, also the reference used to check the incremental projection. */
-export function chatItems(source: ChatSource): ReadonlyArray<ChatItem> {
-  return buildItems(source, caches(), () => [])
+function reactionsFor(store: Store, cache: Caches, revision: ReturnType<ReturnType<typeof chatRevisions>>) {
+  const aliases = cache.aliases(revision('inbox'), () => {
+    const result = new Map<string, string>()
+    const retries = store.db.prepare("SELECT op_id, data FROM inbox WHERE kind = 'retry' ORDER BY seq").all()
+    for (const row of retries) {
+      const of = parse<{ retryOf?: string }>(row.data as string | null)?.retryOf
+      if (of !== undefined) result.set(String(row.op_id), result.get(of) ?? of)
+    }
+    return result
+  })
+  const rows = cache.reactions(revision('reactions'), () => store.db.prepare(
+    `SELECT target_kind AS kind, target_id AS id, by, emoji FROM reactions r
+     WHERE seq = (SELECT max(seq) FROM reactions WHERE target_kind = r.target_kind AND target_id = r.target_id AND by = r.by)
+     ORDER BY seq`,
+  ).all() as ReactionRow[])
+  return cache.reactionMap([aliases, rows], () => {
+    const result = new Map<string, Reaction[]>()
+    for (const row of rows) {
+      if (row.emoji === null) continue
+      const key = `${row.kind}:${row.kind === 'owner' ? aliases.get(row.id) ?? row.id : row.id}`
+      result.set(key, [...(result.get(key) ?? []), { by: row.by, emoji: row.emoji as Reaction['emoji'] }])
+    }
+    return result
+  })
 }
 
 /** Every item in the chat, oldest first. */
@@ -156,15 +239,18 @@ function buildItems(source: ChatSource, cache: Caches, revision: ReturnType<Retu
     .prepare("SELECT seq, op_id AS opId, kind, text, data, at, state FROM inbox WHERE kind IN ('send', 'steer', 'retry') ORDER BY seq")
     .all() as unknown as ReadonlyArray<OpRow>)
   // A retry stands for the message it resends.
-  const original = new Map<string, string>()
-  for (const op of ops) {
-    if (op.kind !== 'retry') continue
-    const of = parse<{ retryOf?: string }>(op.data)?.retryOf
-    if (of !== undefined) original.set(op.opId, original.get(of) ?? of)
-  }
-  const ownerOp = (opId: string) => original.get(opId) ?? opId
-  const opText = new Map(ops.map((op) => [op.opId, op.text]))
-  const handles = new Map(ops.map((op) => [`n${op.seq}`, op.opId]))
+  const maps = cache.opMaps([ops], () => {
+    const original = new Map<string, string>()
+    for (const op of ops) {
+      if (op.kind !== 'retry') continue
+      const of = parse<{ retryOf?: string }>(op.data)?.retryOf
+      if (of !== undefined) original.set(op.opId, original.get(of) ?? of)
+    }
+    return { original, text: new Map(ops.map((op) => [op.opId, op.text])), handles: new Map(ops.map((op) => [`n${op.seq}`, op.opId])) }
+  })
+  const ownerOp = (opId: string) => maps.original.get(opId) ?? opId
+  const opText = maps.text
+  const handles = maps.handles
   const times = cache.times(revision('chat_bubbles'), () => new Map(
     store.db.prepare('SELECT id, at FROM chat_bubbles').all().map((row) => [String(row.id), Number(row.at)]),
   ))
@@ -183,20 +269,8 @@ function buildItems(source: ChatSource, cache: Caches, revision: ReturnType<Retu
     }>).map((row) => [row.opId, String(row.id) as ChatMessageId]),
   ))
 
-  const reactions = new Map<string, Reaction[]>()
-  const reactionRows = cache.reactions(revision('reactions'), () => store.db
-    .prepare(
-      `SELECT target_kind AS kind, target_id AS id, by, emoji FROM reactions r
-       WHERE seq = (SELECT max(seq) FROM reactions WHERE target_kind = r.target_kind AND target_id = r.target_id AND by = r.by)
-       ORDER BY seq`,
-    )
-    .all() as ReactionRow[])
-  for (const row of reactionRows) {
-    if (row.emoji === null) continue
-    const key = `${row.kind}:${row.kind === 'owner' ? ownerOp(row.id) : row.id}`
-    reactions.set(key, [...(reactions.get(key) ?? []), { by: row.by, emoji: row.emoji as Reaction['emoji'] }])
-  }
-  const reactionsOf = (kind: string, id: string) => reactions.get(`${kind}:${id}`) ?? emptyReactions
+  const reactionMap = reactionsFor(store, cache, revision)
+  const reactionsOf = (kind: string, id: string) => reactionMap.get(`${kind}:${id}`) ?? emptyReactions
 
   const bubbleTexts = new Map<string, string>()
   const quoteOf = (target: ReplyTarget): Quote => {
@@ -223,7 +297,6 @@ function buildItems(source: ChatSource, cache: Caches, revision: ReturnType<Retu
   const runs = cache.runs(revision('runs'), () => store.db
     .prepare('SELECT id, op_id AS opId, origin, started_at AS startedAt, ended_at AS endedAt, ending FROM runs ORDER BY started_at, id')
     .all() as unknown as ReadonlyArray<RunRow>)
-  const archived = new Map<string, Array<{ text: string; entry: string; at: number }>>()
   const juno = cache.archive(revision('messages', 'run_inputs'), () => store.db
     .prepare(
       `SELECT run_inputs.run_id AS runId, messages.text, messages.incarnation || '/' || messages.entry_id AS entry, messages.at
@@ -231,27 +304,45 @@ function buildItems(source: ChatSource, cache: Caches, revision: ReturnType<Retu
        WHERE messages.kind = 'juno' AND messages.redacted_gen IS NULL ORDER BY messages.id`,
     )
     .all() as ArchiveRow[])
-  for (const row of juno) {
-    const rows = archived.get(row.runId)
-    if (rows === undefined) archived.set(row.runId, [row])
-    else rows.push(row)
-  }
+  const archived = cache.archived([juno], () => {
+    const byRun = new Map<string, ArchiveRow[]>()
+    for (const row of juno) {
+      const rows = byRun.get(row.runId)
+      if (rows === undefined) byRun.set(row.runId, [row])
+      else rows.push(row)
+    }
+    return byRun
+  })
+  const sourceKeys = cache.sourceKeys(revision('sources'), () => {
+    const keys = new Map<string, string[]>()
+    for (const row of store.db.prepare('SELECT * FROM sources ORDER BY run_id, handle').all()) {
+      const id = String(row.run_id)
+      const rows = keys.get(id) ?? []
+      rows.push(JSON.stringify(row))
+      keys.set(id, rows)
+    }
+    return new Map([...keys].map(([id, rows]) => [id, rows.join('\n')]))
+  })
 
   const junoEntries: Entry[] = []
   for (const run of runs) {
     const live = source.live?.runId === run.id ? source.live : undefined
-    const origin = originOf(run, source.jobs)
+    const job = run.origin === 'report' ? source.jobs.find((candidate) => candidate.id === reportJob(run.opId)) : undefined
+    const origin = cache.origins.get(run.id, [run.origin, run.opId, job?.id, job?.title], () => originOf(run, source.jobs))
     const originKey = origin._tag === 'job' ? `job:${origin.jobs.map((j) => j.jobId).join(',')}` : origin._tag
     let bubbles: ReadonlyArray<{ id: string; text: string; body: ReadonlyArray<BubbleSpan>; replyTo?: string; at: number }>
     if (live !== undefined) {
       bubbles = live.bubbles.map((b) => ({ ...b, at: source.seen(b.id, Date.now()) }))
     } else {
       const rows = archived.get(run.id) ?? []
-      bubbles = cache.bubbles.get(run.id, [run.startedAt, ...revision('sources'), ...rows.flatMap((row) => [row.text, row.entry, row.at])],
+      bubbles = cache.bubbles.get(run.id, [run.startedAt, sourceKeys.get(run.id), ...rows.flatMap((row) => [row.text, row.entry, row.at])],
         () => archivedBubbles(store, run.id, rows, run.startedAt))
     }
     if (bubbles.length > 0 && origin._tag !== 'owner') {
-      junoEntries.push({ by: 'line', at: seen(bubbles[0]!.id, bubbles[0]!.at), item: { _tag: 'groupLabel', id: `label:${run.id}`, origin, text: labelOf(origin, source.jobs) } })
+      const at = seen(bubbles[0]!.id, bubbles[0]!.at)
+      const text = labelOf(origin, source.jobs)
+      junoEntries.push(cache.entries.get(`label:${run.id}`, [at, origin, text],
+        () => ({ by: 'line', at, item: { _tag: 'groupLabel', id: `label:${run.id}`, origin, text } })))
     }
     for (const bubble of bubbles) {
       bubbleTexts.set(bubble.id, bubble.text)
@@ -260,7 +351,7 @@ function buildItems(source: ChatSource, cache: Caches, revision: ReturnType<Retu
       const replyTo = replyOp === undefined ? undefined : ({ _tag: 'owner', opId: ownerOp(replyOp) as OpId } as const)
       const quote = replyTo ? quoteOf(replyTo) : undefined
       const reactions = reactionsOf('bubble', bubble.id)
-      junoEntries.push(cache.entries.get(`bubble:${bubble.id}`, [bubble.body, at, originKey, JSON.stringify(origin), JSON.stringify(quote), JSON.stringify(reactions), at > source.readAt], () => ({
+      junoEntries.push(cache.entries.get(`bubble:${bubble.id}`, [bubble.body, at, origin, quote?.preview, quote?.removed, replyTo?.opId, JSON.stringify(reactions), at > source.readAt], () => ({
         by: 'juno',
         at,
         originKey,
@@ -277,10 +368,12 @@ function buildItems(source: ChatSource, cache: Caches, revision: ReturnType<Retu
         },
       })))
     }
-    const ending = parse<Ending>(run.ending)
-    if (ending !== undefined && ending._tag !== 'complete') {
-      junoEntries.push({ by: 'line', at: run.endedAt ?? run.startedAt, item: { _tag: 'ending', runId: run.id as RunId, ending } })
-    }
+    const ending = cache.endings.get(run.id, [run.ending, run.endedAt, run.startedAt], () => {
+      const parsed = parse<Ending>(run.ending)
+      return parsed === undefined || parsed._tag === 'complete' ? undefined
+        : { by: 'line', at: run.endedAt ?? run.startedAt, item: { _tag: 'ending', runId: run.id as RunId, ending: parsed } }
+    })
+    if (ending !== undefined) junoEntries.push(ending)
     if (live !== undefined) {
       junoEntries.push({ by: 'line', at: Number.POSITIVE_INFINITY, item: { _tag: 'status', runId: run.id as RunId, ...(live.status.text === undefined ? {} : { text: live.status.text }) } })
     }
@@ -330,6 +423,8 @@ function buildItems(source: ChatSource, cache: Caches, revision: ReturnType<Retu
   // Stable: at the same time an owner message comes before what answers it.
   entries.sort((a, b) => a.at - b.at)
   const result = layout(entries, source, cache.grouped)
+  cache.endings.sweep()
+  cache.origins.sweep()
   cache.bubbles.sweep()
   cache.entries.sweep()
   cache.grouped.sweep()

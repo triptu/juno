@@ -51,6 +51,5 @@ export function keyedMemo<A>() {
       for (const key of entries.keys()) if (!used.has(key)) entries.delete(key)
       used = new Set()
     },
-    clear() { entries.clear(); used.clear() },
   }
 }

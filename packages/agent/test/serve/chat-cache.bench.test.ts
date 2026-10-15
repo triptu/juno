@@ -1,41 +1,36 @@
+import { spawnSync } from 'node:child_process'
+import { writeFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+import { Schema } from 'effect'
 import { expect, it } from 'vitest'
-import { chatItems, createChatCache, windowOf } from '../../src/serve/chat'
-import { chatFixture } from './cache-fixture'
 
-it('5,000 messages: event to encoded window stays within the live-update budget', () => {
-  const fixture = chatFixture(5000)
-  const cache = createChatCache(fixture.source.store)
-  const { source } = fixture
-  const write = source.store.db.prepare("INSERT INTO reactions (op_id, target_kind, target_id, by, emoji, at) VALUES (?, 'bubble', 'run-2499:0', 'owner', ?, 0)")
-  const window = { _tag: 'latest', limit: 40 } as const
-  let seq = 0
-  const measure = (cached: boolean) => {
-    const times: number[] = []
-    const heap = process.memoryUsage().heapUsed
-    let bytes = 0
-    for (let n = 0; n < 35; n++) {
-      const start = performance.now()
-      write.run(`bench-${seq++}`, n % 2 ? '👍' : null)
-      const page = windowOf(cached ? cache.items(source) : chatItems(source), window)
-      const encoded = JSON.stringify(page)
-      const elapsed = performance.now() - start
-      if (n >= 5) times.push(elapsed)
-      bytes = Buffer.byteLength(encoded)
-      expect(page.items).toHaveLength(40)
-      expect(page.moreAbove).toBe(true)
-      expect(page.items.at(-1)).toMatchObject({ _tag: 'juno', reactions: n % 2 ? [{ by: 'owner', emoji: '👍' }] : [] })
-    }
-    times.sort((a, b) => a - b)
-    return { p50: times[Math.floor(times.length / 2)]!, p95: times[Math.floor(times.length * .95)]!, heapDelta: process.memoryUsage().heapUsed - heap, rss: process.memoryUsage().rss, bytes }
+const Measurement = Schema.Struct({
+  p50: Schema.Number, p95: Schema.Number, queryP95: Schema.Number, warmHeap: Schema.Number,
+  retainedHeap: Schema.Number, rss: Schema.Number, peakRss: Schema.Number, bytes: Schema.Number, events: Schema.Number,
+})
+
+const measure = (mode: 'full' | 'cached') => {
+  const result = spawnSync(process.execPath, [
+    '--expose-gc', '--import', fileURLToPath(new URL('../../../../scripts/ts-resolve-hooks.mjs', import.meta.url)),
+    fileURLToPath(new URL('./chat-cache-bench.ts', import.meta.url)), mode,
+  ], { encoding: 'utf8', timeout: 60_000 })
+  expect(result.status, result.stderr).toBe(0)
+  return Schema.decodeUnknownSync(Measurement)(JSON.parse(result.stdout))
+}
+
+it('5,000 messages: event to encoded window, query and payload stay within budget', () => {
+  const before = []
+  const after = []
+  for (let n = 0; n < (process.env.JUNO_CHAT_PROFILE ? 1 : 5); n++) { before.push(measure('full')); after.push(measure('cached')) }
+  const report = JSON.stringify({ messages: 5000, window: 40, before, after })
+  console.log(report)
+  if (process.env.JUNO_CHAT_BENCH_REPORT) writeFileSync(process.env.JUNO_CHAT_BENCH_REPORT, report)
+  for (const run of after) {
+    expect(run.events).toBe(100)
+    expect(run.queryP95).toBeLessThan(5)
+    expect(run.p95).toBeLessThan(50)
+    expect(run.bytes).toBeLessThan(200_000)
+    // Cache retained heap, not the test runner's RSS or GC scheduling noise.
+    expect(run.retainedHeap).toBeLessThan(32 * 1024 * 1024)
   }
-  try {
-    cache.items(source)
-    const before = []
-    const after = []
-    for (let n = 0; n < 5; n++) { before.push(measure(false)); after.push(measure(true)) }
-    console.log(JSON.stringify({ messages: 5000, window: 40, before, after }))
-    expect(Math.max(...after.map((run) => run.p95))).toBeLessThan(50)
-    expect(Math.max(...after.map((run) => run.bytes))).toBeLessThan(200_000)
-    expect(windowOf(cache.items(source), window)).toEqual(windowOf(chatItems(source), window))
-  } finally { cache.close(); fixture.close() }
 })

@@ -26,6 +26,11 @@ export function chatFixture(count: number) {
       seen.run(`run-${n}:0`, at + 1)
     }
   })
-  const source: ChatSource = { store, live: undefined, seen: (id, fallback) => Number(db.prepare('SELECT at FROM chat_bubbles WHERE id = ?').get(id)?.at ?? fallback), jobs: [], cards: [], readAt: 0, waiting: undefined, dayOf: (at) => Math.floor(at / 86_400_000) * 86_400_000 }
+  const source: ChatSource = { store, live: undefined, seen: (id, fallback) => {
+    const known = db.prepare('SELECT at FROM chat_bubbles WHERE id = ?').get(id)
+    if (known !== undefined) return Number(known.at)
+    db.prepare('INSERT INTO chat_bubbles VALUES (?, ?)').run(id, fallback)
+    return fallback
+  }, jobs: [], cards: [], readAt: 0, waiting: undefined, dayOf: (at) => Math.floor(at / 86_400_000) * 86_400_000 }
   return { source, close: () => db.close() }
 }
