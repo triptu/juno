@@ -62,6 +62,8 @@ const bridge: JunoBridge = {
     setOpenRouterKey: (key) => ipcRenderer.invoke(Channels.agentSetOpenRouterKey, { key }),
     provider: () => ipcRenderer.invoke(Channels.agentProvider),
     setProvider: (change) => ipcRenderer.invoke(Channels.agentSetProvider, change),
+    codex: () => ipcRenderer.invoke(Channels.agentCodex),
+    codexSignIn: () => ipcRenderer.invoke(Channels.agentCodexSignIn),
     onProvider: (listener) => {
       const forward = (_event: unknown, state: unknown) => listener(state)
       ipcRenderer.on(Events.agentProviderChanged, forward)

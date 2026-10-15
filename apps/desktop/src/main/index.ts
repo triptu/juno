@@ -3,6 +3,7 @@ import { Events, type NotificationTarget } from '@juno/contract'
 import { join } from 'node:path'
 import { createAgentSupervisor } from './agent'
 import { appBackupSecrets } from './backupSecrets'
+import { codexHome } from './codex'
 import { appMcpCredentials } from './mcpCredentials'
 import { createSupervisor } from './engine'
 import { downloadFile, downloadsForTests } from './files'
@@ -144,6 +145,7 @@ app.whenReady().then(() => {
     setViewing: (topicId) => notifier.setViewing(topicId),
     agent,
     providers,
+    codex: codexHome(agent.agentDir, e2e),
     backupSecrets,
     setTheme: (theme) => updateLaunch({ theme }),
     setAccent: (accent) => updateLaunch({ accent }),
