@@ -389,7 +389,7 @@ A tab with the message list's area on top and the composer at the bottom, like a
 - **Composer**: §7, placeholder "Message" until a destination is set, then the destination's own placeholder. Send checks run against the destination (§7.3). Enter with no destination opens the conversation picker with the draft kept.
 - **After send**: the picker row is removed and the topic header (§5) appears in the same frame the sent message appears; the tab becomes the topic. Nothing else moves: the composer keeps its place.
 - **Closing with a draft**: toast "Draft closed" with Undo (reopens the tab with the draft and destination).
-- [built] The composer is a plain text field (Enter sends, Shift Enter adds a line); attachments are built; @ and # suggestions and drafts that outlive the app remain, and the send checks are M8, so a New chat sends without them for now. The message is posted before it shows: the tab becomes the topic once Slack has accepted it and the store holds it, with no pending row, and a failed send keeps the draft. ⌘⇧T on a New chat brings back its draft and destination from memory; the "Draft closed" toast is not wired yet.
+- [built] The composer is a plain text field (Enter sends, Shift Enter adds a line) with attachments (§7). Text and attachments stay through destination changes and tab switches, in memory. @ and # suggestions, drafts that outlive the app, and New chat send checks remain to be built. Sending queues the message and turns the tab into its topic at once, with the pending row visible; a failure to queue keeps the draft. ⌘⇧T on a New chat brings back its draft and destination from memory; the "Draft closed" toast is not wired yet.
 
 ## 9. ⌘K palette
 
