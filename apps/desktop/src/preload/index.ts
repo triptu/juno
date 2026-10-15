@@ -40,6 +40,16 @@ function requestEnginePort(): Promise<unknown> {
 // The whole bridge. Add one function per shell route; never expose
 // ipcRenderer or Node APIs. The renderer validates every answer.
 const bridge: JunoBridge = {
+  updates: {
+    get: () => ipcRenderer.invoke(Channels.updatesGet),
+    set: (enabled) => ipcRenderer.invoke(Channels.updatesSet, { enabled }),
+    restart: () => ipcRenderer.invoke(Channels.updatesRestart),
+    onChange: (listener) => {
+      const forward = (_event: unknown, state: unknown) => listener(state)
+      ipcRenderer.on(Events.updatesChanged, forward)
+      return () => { ipcRenderer.off(Events.updatesChanged, forward) }
+    },
+  },
   app: {
     getInfo: () => ipcRenderer.invoke(Channels.appGetInfo),
   },

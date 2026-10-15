@@ -80,6 +80,7 @@ test('exposes only the bridge to the page', async ({ win }) => {
       require: typeof globals['require'],
       process: typeof globals['process'],
       juno: Object.keys(window.juno),
+      updates: Object.keys(window.juno.updates),
       app: Object.keys(window.juno.app),
       engine: Object.keys(window.juno.engine),
       agent: Object.keys(window.juno.agent),
@@ -94,7 +95,8 @@ test('exposes only the bridge to the page', async ({ win }) => {
   expect(exposed).toEqual({
     require: 'undefined',
     process: 'undefined',
-    juno: ['app', 'engine', 'agent', 'launch', 'contextMenu', 'shell', 'clipboard', 'menu', 'notifications'],
+    juno: ['updates', 'app', 'engine', 'agent', 'launch', 'contextMenu', 'shell', 'clipboard', 'menu', 'notifications'],
+    updates: ['get', 'set', 'restart', 'onChange'],
     app: ['getInfo'],
     engine: ['requestPort', 'restart'],
     agent: ['requestPort', 'setOpenRouterKey', 'provider', 'setProvider', 'onProvider', 'chooseFolder', 'recoveryPhrase', 'typeRecoveryPhrase'],

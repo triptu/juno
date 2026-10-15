@@ -22,6 +22,7 @@ import NewChat from './NewChat.fixtures'
 import NewDivider from './NewDivider.fixtures'
 import NewMessagesPill from './NewMessagesPill.fixtures'
 import NotificationsPage from './NotificationsPage.fixtures'
+import UpdateSettings from './UpdateSettings.fixtures'
 import PreferencesPage from './PreferencesPage.fixtures'
 import PeekKeySetting from './PeekKeySetting.fixtures'
 import PeekView from './PeekView.fixtures'
@@ -103,6 +104,7 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   PeekView,
   OwnerBubble,
   PreferencesPage,
+  UpdateSettings,
   ProposedScheduleCard: proposedScheduleCard,
   ProposedTaskCard: proposedTaskCard,
   ProviderCard: providerCard,
