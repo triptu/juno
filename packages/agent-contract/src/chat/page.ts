@@ -56,6 +56,7 @@ export type ChatPage = typeof ChatPage.Type
  * nav count and the home's Ask Juno field. One live query feeds all three.
  */
 export const ChatSummary = Schema.Struct({
+  mayAuthorize: Schema.optionalKey(Schema.Boolean),
   /** Unread Juno messages. A soft grey count, never an accent badge. */
   unread: Schema.Int,
   /** A background job is running: the duotone sparkle. A run alone does not light it (SPEC §13.2). */

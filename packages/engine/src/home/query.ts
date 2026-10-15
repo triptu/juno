@@ -301,7 +301,7 @@ export const readHome = (): Effect.Effect<HomeRun, SqlError, StoreReader> =>
           : base.kind === 'tidyUp'
             ? `${rows.length} topics look settled`
             : channel !== undefined
-              ? `Move ${channel.label} to Automated?`
+              ? `Move ${channel.label}?`
               : base.title
       const cached = rewrites.find((entry) => entry.key === base.id)
       const aiTitle = cached !== undefined && rows[0] !== undefined && freshFor(cached.created_at, rows[0]) ? parseTitle(cached.output_json) : undefined

@@ -27,6 +27,8 @@ export default defineFixtures(
       // A first start: nothing written yet and no phrase.
       'no-backup-yet': inPage({ page: settingsTrouble }),
       'on-a-shared-drive': inPage({ page: { ...settings, backupFolder: '/Users/maya/Library/CloudStorage/Dropbox/Juno backup', lastBackupAt: NOW - 60_000 } }),
+      'long-path': inPage({ page: { ...settings, backupFolder: '/Users/maya/Library/CloudStorage/Dropbox/Workspace archives/Shared folders/Desktop clients/Juno backup' } }),
+      exporting: inPage({ backupBusy: 'phrase' }),
       choosing: inPage({ backupBusy: 'folder' }),
       'folder-refused': inPage({ backupError: { row: 'folder', message: "Juno can't write to that folder. Choose another one." } }),
       'export-failed': inPage({ backupError: { row: 'phrase', message: 'Juno could not reach the keychain. Try again.' } }),

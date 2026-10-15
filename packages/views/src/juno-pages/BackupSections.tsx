@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { chatCopy, type JobId, type JunoSettingsPage as JunoSettingsPageModel, type Ownership } from '@juno/agent-contract'
 import { Button, Chip, ListRow, Section, Surface, Text } from '@juno/ui'
 import { cell } from './cell'
+import { BackupPath } from './BackupPath'
 import { fullTime, messageTime } from '../time'
 
 /**
@@ -37,9 +38,7 @@ export function BackupSection({ page, now, onBackupFolder, onExportPhrase, backu
           }
         >
           <span {...stylex.props(cell.lines)}>
-            <Text variant="body" truncate title={page.backupFolder} data-backup-folder="">
-              {page.backupFolder}
-            </Text>
+            <BackupPath path={page.backupFolder} />
             <Text variant="meta" tone="muted" data-last-backup={page.lastBackupAt ?? ''}>
               {page.lastBackupAt === undefined ? (
                 'No backup yet'
@@ -55,7 +54,7 @@ export function BackupSection({ page, now, onBackupFolder, onExportPhrase, backu
         <ListRow
           divider={false}
           trailing={
-            <Button variant="ghost" size="xs" tone="subtle" onClick={onExportPhrase} disabled={backupBusy === 'phrase'}>
+            <Button variant="ghost" size="xs" tone="subtle" onClick={() => backupBusy !== 'phrase' && onExportPhrase()} aria-disabled={backupBusy === 'phrase'} aria-busy={backupBusy === 'phrase'}>
               {copy.exportPhrase}
             </Button>
           }

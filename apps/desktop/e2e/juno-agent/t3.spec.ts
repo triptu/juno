@@ -110,15 +110,11 @@ test('a one-tap Start card starts a T3 Code session, and its Task card follows i
   expect(t3.calls.filter((call) => call.name === 't3_thread_launch')).toHaveLength(1)
 })
 
-test.fixme('Stop on the Task card interrupts the session', async ({ juno, t3 }) => {
+test('Stop on the Task card interrupts the session', async ({ juno, t3 }) => {
   await ready(juno)
   await connectT3(juno, t3.loopbackUrl)
   const { task } = await startTask(juno, t3)
 
-  // packages/agent/src/serve/chat.ts creates task:<jobId> without an approval binding.
-  // packages/state/src/agent/chat.ts rememberCards therefore omits it; cardCommand returns
-  // unknownCard before its stop branch can call agent.jobs.stop. The first assertion below
-  // fails: fake T3 stays running and receives no t3_thread_interrupt.
   await task.getByRole('button', { name: 'Stop' }).click()
   await expect.poll(() => t3.threads()[0]?.status, { timeout: POLL }).toBe('interrupted')
   await expect(task.locator('[data-task-phase]')).toHaveAttribute('data-task-phase', 'stopped', { timeout: POLL })
@@ -126,10 +122,7 @@ test.fixme('Stop on the Task card interrupts the session', async ({ juno, t3 }) 
   expect(t3.calls.filter((call) => call.name === 't3_thread_interrupt')).toHaveLength(1)
 })
 
-test.fixme('T3 Code asks a question on a card and the chosen answer reaches T3 Code', async ({ juno, t3 }) => {
-  // packages/agent/src/t3/questions.ts:66 reads `requestIds` (and `questions` from the read), but the
-  // fake T3's t3_pending_request_list and _read (packages/agent-testing/src/mcp/t3.ts:209,213) answer
-  // `requests` and `prompt`/`options`, so the watcher loses sight instead of showing a card.
+test('T3 Code asks a question on a card and the chosen answer reaches T3 Code', async ({ juno, t3 }) => {
   await ready(juno)
   await connectT3(juno, t3.loopbackUrl)
   const { pane, task, threadId } = await startTask(juno, t3)
@@ -146,15 +139,12 @@ test.fixme('T3 Code asks a question on a card and the chosen answer reaches T3 C
   await expect(task.locator('[data-task-phase]')).toHaveAttribute('data-task-phase', 'running', { timeout: POLL })
 })
 
-test.fixme('the Task card opens the session, and Done links the pull request', async ({ juno, t3 }) => {
-  // packages/agent/src/serve/chat.ts:428 builds the Task card with no `open` target (T3 Code has no
-  // link the contract accepts, packages/agent/src/t3/README.md "Session Open"), so neither Open nor
-  // "Open PR …" is shown.
+test('the Task card opens the session, and Done links the pull request', async ({ juno, t3 }) => {
   await ready(juno)
   await connectT3(juno, t3.loopbackUrl)
   const { task, threadId } = await startTask(juno, t3)
   await expect(task.getByRole('button', { name: 'Open' })).toBeVisible()
-  t3.advance(threadId, { status: 'completed', reply: 'Opened PR 412.' })
+  t3.advance(threadId, { status: 'completed', reply: 'Opened PR 412.', pullRequest: { number: 412, url: 'https://github.com/example/juno/pull/412' } })
   await expect(task).toContainText('Done · Open PR 412', { timeout: POLL })
 })
 
@@ -182,9 +172,7 @@ test('a key in a brief is blocked: no card, and nothing reaches T3 Code', async 
   expect(t3.calls.map((call) => call.name)).not.toContain('t3_thread_launch')
 })
 
-test.fixme('a key in a brief shows the fixed blocked line in the chat', async ({ juno, t3 }) => {
-  // Nothing in the agent emits the `secretBlocked` note (packages/agent-contract/src/chat/items.ts:221);
-  // t3_start only returns the error to the model (packages/agent/src/t3/proposal.ts:50).
+test('a key in a brief shows the fixed blocked line in the chat', async ({ juno, t3 }) => {
   await ready(juno)
   await connectT3(juno, t3.loopbackUrl)
   const pane = await openChat(juno)
@@ -192,14 +180,12 @@ test.fixme('a key in a brief shows the fixed blocked line in the chat', async ({
   await expect(pane.root.getByText('Juno stopped a tool call that held a key or a token. Nothing was sent.')).toBeVisible({ timeout: 15_000 })
 })
 
-test.fixme('T3 Code on loopback is used before the LAN address', async ({ juno, t3 }) => {
-  // The manager connects only to the configured address (packages/agent/src/mcp/manager.ts:104) and
-  // never tries http://127.0.0.1:<port>/mcp first (plan v3 §10.2); a plain-http LAN address is also
-  // refused before that (packages/agent/src/mcp/types.ts:64).
+test('T3 Code on loopback is used before the LAN address', async ({ juno, t3 }) => {
   await ready(juno)
   const page = await openPage(juno, 'Connections')
   const row = page.locator('[data-connection-id="t3"]')
-  await row.getByLabel('Allow T3 Code over the local network').check()
+  await row.getByLabel('Allow T3 Code over the local network').click()
+  await expect(row.getByLabel('Allow T3 Code over the local network')).toBeChecked()
   await connectT3(juno, t3.lanUrl)
   // The row shows the address in use.
   await expect(row).toContainText(t3.loopbackUrl)
@@ -208,8 +194,7 @@ test.fixme('T3 Code on loopback is used before the LAN address', async ({ juno, 
 })
 
 
-test.fixme('hostile Slack makes instructions to a running T3 job a card with a Because line', async ({ juno, t3, fake, slack }) => {
-  // t3/work.ts proposes the Change card without the taint explanation.
+test('hostile Slack makes instructions to a running T3 job a card with a Because line', async ({ juno, t3, fake, slack }) => {
   await ready(juno)
   await connectT3(juno, t3.loopbackUrl)
   const { pane } = await startTask(juno, t3)

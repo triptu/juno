@@ -86,7 +86,7 @@ describe('the Automated view', () => {
     const engine = await bootedEngine(engines, withReleases)
     const home = await homeUntil(engine, (view) => view.items.some((item) => item.kind === 'automated'), 'the question on Home')
     const question = home.items.find((item) => item.kind === 'automated')!
-    expect(question).toMatchObject({ id: `automated:${RELEASES}`, title: 'Move #releases to Automated?', channel: { id: RELEASES, label: '#releases' }, fromApps: { apps: 3, of: 6 } })
+    expect(question).toMatchObject({ id: `automated:${RELEASES}`, title: 'Move #releases?', channel: { id: RELEASES, label: '#releases' }, fromApps: { apps: 3, of: 6 } })
 
     const moved = valueOf(await runCommand(engine.registry, viewsSortChannel, { channel: RELEASES, to: 'automated' }))
     expect(moved.undo).toEqual({ _tag: 'views.sortChannel', channel: RELEASES, to: 'ask' })

@@ -10,8 +10,8 @@ import { Effect, Exit, Layer, Scope, Stream } from 'effect'
 import { CHAT_MIGRATIONS, createProviderGuard, openTurns, rendererPorts, rendererServer, type HostPort, type Turns } from '@juno/agent'
 import { fakeProvider, reply } from '@juno/agent-testing'
 import type { ChatPage, HostPresence } from '@juno/agent-contract'
-import { makeRegistry, type PortLike, type Registry } from '../src/index'
-import { chatActions, chatItemsAtom, chatSummaryAtom, configureAgentConnection, MAX_SEND_BYTES } from '../src/agent'
+import { makeRegistry, toastAtom, undoLast, type PortLike, type Registry } from '../src/index'
+import { chatActions, chatItemsAtom, chatSummaryAtom, configureAgentConnection, MAX_SEND_BYTES, watchReply } from '../src/agent'
 
 const cleanups: Array<() => Promise<void>> = []
 afterEach(async () => {
@@ -49,7 +49,7 @@ async function agentChat() {
   const transport = rendererPorts()
   const scope = Effect.runSync(Scope.make())
   cleanups.push(() => Effect.runPromise(Scope.close(scope, Exit.void)))
-  await Effect.runPromise(Layer.buildWithScope(rendererServer(transport, { turns, presence: () => ONLINE, presenceChanges: Stream.make(ONLINE) }), scope))
+  await Effect.runPromise(Layer.buildWithScope(rendererServer(transport, { turns, presence: () => ONLINE, presenceChanges: Stream.make(ONLINE), schedule: { scheduler: turns.scheduler, host: { ownMessage: async () => true, hours: async () => ({ timeZone: 'UTC', weekdays: [1, 2, 3, 4, 5], start: 540, end: 1020 }) } } }), scope))
 
   const registry: Registry = makeRegistry()
   cleanups.push(async () => registry.dispose())
@@ -130,4 +130,14 @@ it('a message over 64 KB fails locally and never reaches the agent', async () =>
   const opId = chatActions(registry).send('x'.repeat(MAX_SEND_BYTES + 1))
   expect(pageOf(registry)?.items).toContainEqual(expect.objectContaining({ _tag: 'owner', opId, delivery: { _tag: 'failed', reason: 'tooLong' } }))
   expect(turns.op(opId)).toBeUndefined()
+})
+
+it('the menu reply watch toast undoes the schedule without a model run', async () => {
+  const { fake, turns, registry } = await agentChat()
+  await watchReply(registry, { channelId: 'C_TEST', ts: '100', threadTs: '100' })
+  expect(turns.scheduler.list()).toHaveLength(1)
+  expect(registry.get(toastAtom)?.text).toContain('Watching for a reply until')
+  expect(await undoLast(registry)).toBe(true)
+  expect(turns.scheduler.list()).toHaveLength(0)
+  expect(fake.requests).toHaveLength(0)
 })

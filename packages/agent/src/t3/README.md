@@ -3,8 +3,9 @@
 `createT3Adapter(manager)` uses WP17's manager only. `withMcp` registers its
 fixed tools, executors and resumable job driver. The router adds three narrow
 hooks: job drivers, access to jobs when registering tools, and an external
-job's Stop. No contract or Task view changes are needed: `where` already
-carries the project and branch, and `because` shows the approved brief.
+job's Stop. `where` carries the project and branch, and `because` shows the approved brief.
+Task Open uses the fixed `t3-thread://v1/<threadId>` link. A completed task
+uses `thread.linkedPullRequest` for Open PR; message text never creates a PR link.
 
 `t3_start({ project, baseBranch, title, brief, planFirst, replaces? })` always
 stores a Proposed task card. Project is the discovered project id. The digest
@@ -92,9 +93,7 @@ After signing in on the owner's loopback connection, check:
 - Sign-in expiry and return to the same account. WP17 changes the connection
   epoch on sign-in and supplies no stable account identity. Resuming old jobs
   after that requires a verified identity from WP17, not relaxing the check.
-- Session Open: the contract currently permits HTTPS/loopback URLs, not
-  `t3-thread://` links. The thread id is retained in the job and completion
-  report; adding the T3 deep link needs shell/contract work outside WP18.
+- Session Open: check that T3 Code handles its thread deep link on this Mac.
 
 Plan gaps: the watcher polls thread reads every ten seconds because S8's `t3_thread_wait` only
 wakes on terminal state, not questions. A server notification or a wait that
@@ -104,3 +103,7 @@ insertion. It does not mint a grant again and never relaunches.
 
 `test/adapters.test.ts` uses real loopback MCP, the manager, scripted provider,
 turn engine and dispatcher, with synthetic schemas and content.
+
+A blocked brief records only its call id, run id and time in `tool_blocks`.
+The chat renders the fixed Secret blocked note, including after a restart.
+No brief or credential is stored in that record.
