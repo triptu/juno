@@ -1,5 +1,5 @@
 import { memo, useState } from 'react'
-import { chatCopy, type JunoPage, type JunoSettingsPage as JunoSettingsPageModel, type PinId } from '@juno/agent-contract'
+import { chatCopy, type ConnectionId, type JunoPage, type JunoSettingsPage as JunoSettingsPageModel, type PinId } from '@juno/agent-contract'
 import type { ProviderChange, ProviderKind } from '@juno/contract'
 import { copyText, nowAtom, registry } from '@juno/state'
 import {
@@ -282,19 +282,30 @@ function Scheduled() {
 
 function Connections() {
   const result = useAtomValue(connectionsPageAtom)
+  const [error, setError] = useState<{ readonly id: ConnectionId | 'new'; readonly message: string } | undefined>(undefined)
   if (result._tag !== 'Success') return null
   const page = result.value
+  const copy = chatCopy.pages.connections
+  // An address the agent refused says so; anything else is one plain line.
+  const report = (id: ConnectionId | 'new') => (outcome: string) =>
+    setError(outcome === 'ok' ? undefined : { id, message: outcome === 'invalid' && (id === 'new' || page.connections.some((row) => row.id === id && row.t3 !== undefined)) ? copy.invalidAddress : copy.failed })
   // A tier change binds the tool's current schema; a tool listed without one cannot be moved yet.
   const schemaOf = (id: string, tool: string) => page.connections.find((row) => row.id === id)?.tools.find((entry) => entry.name === tool)?.schemaHash
   return (
     <ConnectionsPage
       page={page}
-      onEnabled={(id, enabled) => void actions.connection(id, enabled ? 'enable' : 'disable')}
-      onT3Address={(_id, address) => void actions.t3Address(address)}
+      {...(error === undefined ? {} : { error })}
+      onEnabled={(id, enabled) => void actions.connection(id, enabled ? 'enable' : 'disable').then(report(id))}
+      onAction={(id, action) => {
+        setError(undefined)
+        void actions.connection(id, action).then(report(id))
+      }}
+      onT3Address={(id, address) => void actions.t3Address(address).then(report(id))}
       onTier={(id, tool, tier) => {
         const schemaHash = schemaOf(id, tool)
-        if (schemaHash !== undefined) void actions.tier(id, tool, schemaHash, tier)
+        if (schemaHash !== undefined) void actions.tier(id, tool, schemaHash, tier).then(report(id))
       }}
+      onAdd={(label, url) => void actions.addConnection(label, url).then(report('new'))}
     />
   )
 }
