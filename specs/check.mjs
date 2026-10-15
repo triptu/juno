@@ -221,7 +221,8 @@ async function runAll() {
     await simulations()
     await checks()
   }
-  for (const server of servers) (await server.catch(() => ({ stop: () => {} }))).stop()
+  // A lane whose checks were all cached never started a server, so the array can have holes.
+  for (const server of servers) if (server !== undefined) (await server.catch(() => ({ stop: () => {} }))).stop()
   if (failed) {
     if (failed.log) console.log(failed.log)
     throw failed
