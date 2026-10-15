@@ -177,6 +177,19 @@ test('the empty state offers to clear the filters, and shows at once when it was
   await sidebar.row(POSTGRES).expectVisible()
 })
 
+test('during the first sync the list says Juno is getting the topics, not that it is quiet', async ({ juno, fake }) => {
+  // Hold the first boot call, so nothing has arrived when the window opens.
+  fake.holdNext({ method: 'client.userBoot', before: true })
+  await juno.signIn()
+  const { sidebar } = juno
+  await sidebar.expectEmpty('Getting your topics')
+  await expect(sidebar.list.getByText("It's quiet")).toHaveCount(0)
+
+  fake.release({ method: 'client.userBoot' })
+  await juno.waitForSync()
+  await sidebar.row(POSTGRES).expectVisible()
+})
+
 test('a reply from another client updates its row in place and moves it to the top', async ({ juno, fake }) => {
   await juno.signIn()
   await juno.waitForSync()

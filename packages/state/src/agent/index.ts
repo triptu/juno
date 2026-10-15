@@ -14,5 +14,5 @@ export {
   type JunoSettingsChange,
 } from './pages'
 export { chooseFolder, takeRecoveryPhrase, typeRecoveryPhrase } from './backup'
-export { agentProviderAtom, setAgentProvider } from './provider'
+export { agentProviderAtom, codexSetup, setAgentProvider } from './provider'
 export { messageActions } from './messages'

@@ -154,6 +154,9 @@ export default defineFixtures(
       'caught-up': scene(() => full({ filter: { kind: 'all', unreadOnly: true }, dots: { channels: false, dms: false } }, { sections: [], empty: 'caught-up', onClearFilters: noop })),
       filtered: scene(() => full({ filter: { kind: 'dms', unreadOnly: false }, dots: { channels: true, dms: false } }, { sections: [], empty: 'filtered', onClearFilters: noop, onViewAll: noop })),
       quiet: scene(() => full({ dots: { channels: false, dms: false } }, { sections: [], empty: 'quiet', onViewAll: noop })),
+      // The first sync has not brought a topic yet.
+      syncing: scene(() => full({ dots: { channels: false, dms: false } }, { sections: [], empty: 'syncing' })),
+      'empty-view': scene(() => full({ dots: { channels: false, dms: false } }, { sections: [], empty: 'empty-view', onEditView: noop })),
       // Nothing has arrived from the engine yet: the chrome paints, the list stays blank.
       loading: scene(() => full({ dots: { channels: false, dms: false } }, { sections: [] })),
     },

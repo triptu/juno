@@ -1,10 +1,11 @@
 import { useLayoutEffect } from 'react'
-import { accentAtom, densityAtom, persistAccent, persistTheme, privacyAtom, resolvedThemeAtom, signedInAtom, themeAtom, type Accent, type Density, type ResolvedTheme, type Theme } from '@juno/state'
+import { accentAtom, densityAtom, junoSetupPendingAtom, persistAccent, persistTheme, privacyAtom, resolvedThemeAtom, signedInAtom, themeAtom, type Accent, type Density, type ResolvedTheme, type Theme } from '@juno/state'
 import { useAtom, useAtomValue } from '@juno/state/react'
 import { AppearanceSettings, applyPrivacy, applyTheme, Shell, type AccentName, type DensityName, type ThemeName, type ThemePreference } from '@juno/views'
 import { Frame } from './containers/Frame'
 import { Peek } from './containers/Peek'
 import { Session } from './containers/Session'
+import { SetUpJuno } from './containers/SetUpJuno'
 import { Sidebar } from './containers/Sidebar'
 import { Workspace } from './containers/Workspace'
 
@@ -34,6 +35,7 @@ export function App() {
   const [accent, setAccent] = useAtom(accentAtom)
   const density = useAtomValue(densityAtom)
   const signedIn = useAtomValue(signedInAtom)
+  const setUpPending = useAtomValue(junoSetupPendingAtom)
 
   useLayoutEffect(() => applyTheme(resolved, accent, density), [resolved, accent, density])
 
@@ -48,8 +50,16 @@ export function App() {
   }
 
   // Signed in: the sidebar and the workspace; Settings holds the
-  // appearance settings. Otherwise the sign-in page is the whole page, with
-  // the appearance block under it.
+  // appearance settings. Right after a first sign-in with no model set up,
+  // "Set up Juno" on the same page first. Otherwise the sign-in page is the
+  // whole page, with the appearance block under it.
+  if (signedIn !== undefined && setUpPending) {
+    return (
+      <Shell>
+        <SetUpJuno />
+      </Shell>
+    )
+  }
   if (signedIn !== undefined) {
     return (
       <>

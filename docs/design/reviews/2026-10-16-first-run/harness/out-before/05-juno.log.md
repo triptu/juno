@@ -1,0 +1,16 @@
+- shot 20-juno-needs-a-model
+- shot 21-panel-needs-a-model
+- shot 22-settings-provider
+- shot 22b-settings-key-error
+- shot 23-after-save-0
+- shot 23-after-save-500
+- shot 23b-settings-with-model
+- shot 23c-settings-scrolled
+- shot 24-juno-empty-chat
+- shot 25-activity-empty
+- shot 25b-scheduled-empty
+- shot 25c-remembers-empty
+- shot 25d-memory-empty
+- shot 25e-connections
+- shot 26-first-chat-sent
+- shot 26b-first-chat-answer

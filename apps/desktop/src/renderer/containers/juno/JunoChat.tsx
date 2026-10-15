@@ -1,7 +1,7 @@
 import { useEmojiSuggestions } from '../emojiSuggestions'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode, type RefObject } from 'react'
 import { chatCopy, type MessageMenu, type BubbleId, type ChatItem, type ChatPage, type ChatWindow, type OpId, type Quote, type ReplyTarget, type SendContext } from '@juno/agent-contract'
-import { copyText, registry, junoChatTargetAtom, junoFocusAtom, nowAtom, openExternal, popupContextMenu } from '@juno/state'
+import { copyText, registry, junoAvailableAtom, junoChatTargetAtom, junoFocusAtom, nowAtom, openExternal, popupContextMenu } from '@juno/state'
 import { messageActions, agentConnectionStateAtom, chatItemsAtom } from '@juno/state/agent'
 import { afterPaint, measure } from '@juno/state/perf'
 import { useAtomValue } from '@juno/state/react'
@@ -47,6 +47,18 @@ const latest: Window = { _tag: 'latest', limit: WINDOW }
 const empty: ChatPage = { items: [], banner: { _tag: 'none' }, moreAbove: false, moreBelow: false, composerEnabled: true }
 /** The agent is off: the chat says so and takes no input. */
 const off: ChatPage = { ...empty, banner: { _tag: 'aiOff' }, composerEnabled: false }
+
+/**
+ * The agent's connection, read as off while AI assist is off and no agent
+ * answers: with no provider nothing runs to say so, and the chat would wait
+ * on an empty page with its composer on. A running agent sends its own
+ * AI-off page, with the history.
+ */
+function useAgentState() {
+  const state = useAtomValue(agentConnectionStateAtom)
+  const aiOn = useAtomValue(junoAvailableAtom)
+  return aiOn || state === 'connected' ? state : ('off' as const)
+}
 
 /** A row's id the agent can anchor a window on. Separators and the status bubble have none. */
 function nextAnchor(items: ReadonlyArray<ChatItem>, index: number): string | undefined {
@@ -129,7 +141,7 @@ export interface JunoChatProps {
  * - Sends show at once (`chatItemsAtom` holds them as `sending`).
  */
 export function JunoChat({ column, header, contextOf, composerContext, onSent, onEscape, sendRef }: JunoChatProps) {
-  const agent = useAtomValue(agentConnectionStateAtom)
+  const agent = useAgentState()
   // The panel opens in one frame (performance 1), so it mounts a screenful and pages up from there.
   const [window, setWindow] = useState<Window>(() => (column === 'page' ? { _tag: 'unread', limit: WINDOW } : { _tag: 'latest', limit: PANEL_WINDOW }))
   const result = useAtomValue(chatItemsAtom(window))

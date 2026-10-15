@@ -1,6 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
-import { colors, layout, spacing } from '@juno/tokens/tokens.stylex'
-import { Button, Logo, Text } from '@juno/ui'
+import { spacing } from '@juno/tokens/tokens.stylex'
+import { Button, Text } from '@juno/ui'
+import { SignInPage } from './SignInPage'
 
 export interface SignInViewProps {
   /** `first-run` has never signed in; `expired` had a session Slack no longer accepts. */
@@ -22,21 +23,18 @@ export interface SignInViewProps {
 export function SignInView({ mode, busy, error, onSignIn, onImport }: SignInViewProps) {
   const waiting = busy !== undefined
   const expired = mode === 'expired'
+  const status = waiting
+    ? { text: busy === 'window' ? 'Waiting for the sign-in window' : 'Reading the Slack app’s session', tone: 'muted' as const }
+    : error === undefined
+      ? undefined
+      : { text: error, tone: 'danger' as const }
   return (
-    <section {...stylex.props(styles.root)} aria-labelledby="sign-in-title">
-      <div {...stylex.props(styles.text)}>
-        <span {...stylex.props(styles.mark)}>
-          <Logo size={40} />
-        </span>
-        <Text variant="pageTitle" tone="default" id="sign-in-title">
-          {expired ? 'Slack signed you out' : "Hi, I'm Juno"}
-        </Text>
-        <Text variant="body" tone="subtle" as="p">
-          {expired
-            ? 'Sign in again to pick up where you left off. Your topics and settings are kept.'
-            : "Sign in to Slack and I'll sort your conversations into topics. Nothing is sent without you."}
-        </Text>
-      </div>
+    <SignInPage
+      titleId="sign-in-title"
+      title={expired ? 'Slack signed you out' : "Hi, I'm Juno"}
+      body={expired ? 'Sign in again to pick up where you left off. Your topics and settings are kept.' : "Sign in to Slack and I'll sort your conversations into topics. Nothing is sent without you."}
+      {...(status === undefined ? {} : { status })}
+    >
       <div {...stylex.props(styles.actions)}>
         <Button variant="primary" size="2xl" onClick={onSignIn} disabled={waiting}>
           Sign in to Slack
@@ -50,42 +48,11 @@ export function SignInView({ mode, busy, error, onSignIn, onImport }: SignInView
           </Text>
         </div>
       </div>
-      <div {...stylex.props(styles.status)} role="status" aria-live="polite">
-        {waiting ? (
-          <Text variant="ui" tone="muted" as="p">
-            {busy === 'window' ? 'Waiting for the sign-in window' : 'Reading the Slack app’s session'}
-          </Text>
-        ) : error !== undefined ? (
-          <Text variant="ui" tone="danger" as="p">
-            {error}
-          </Text>
-        ) : null}
-      </div>
-    </section>
+    </SignInPage>
   )
 }
 
 const styles = stylex.create({
-  root: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: spacing['--space-8'],
-    width: '100%',
-    maxWidth: layout['--page-width-narrow'],
-    alignSelf: 'center',
-    marginBlock: 'auto',
-    paddingBlock: spacing['--space-12'],
-  },
-  text: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: spacing['--space-3'],
-  },
-  mark: {
-    display: 'inline-flex',
-    color: colors['--foreground-default'],
-    marginBottom: spacing['--space-2'],
-  },
   actions: {
     display: 'flex',
     flexDirection: 'column',
@@ -97,9 +64,5 @@ const styles = stylex.create({
     flexDirection: 'column',
     alignItems: 'flex-start',
     gap: spacing['--space-2'],
-  },
-  status: {
-    // Reserve a line so a message appearing never moves the buttons.
-    minHeight: spacing['--space-6'],
   },
 })

@@ -166,6 +166,16 @@ export class AgentSupervisor {
     this.start()
   }
 
+  /** Juno's own Codex home, where a Codex sign-in starts the agent with no API provider (`codex.ts`). */
+  get agentDir(): string {
+    return this.config.agentDir
+  }
+
+  /** Codex was just signed in: starts the agent if it was off for want of a provider. */
+  codexSignedIn(): void {
+    this.setProvider(this.provider)
+  }
+
   /** A new channel between the engine's AgentHost server and the agent. Call when the engine is ready. */
   linkHost(): void {
     if (!this.child || !this.spawned) return

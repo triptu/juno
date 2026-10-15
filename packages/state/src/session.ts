@@ -49,3 +49,12 @@ const heldSessionAtom = Atom.make((get): HeldSession => {
 
 /** The session the shell is built around, or undefined when the sign-in page should show. */
 export const signedInAtom = Atom.make((get): ReadySession | undefined => get(heldSessionAtom).session)
+
+/**
+ * The "Set up Juno" step (SPEC section 13.10, "Set up Juno"): true from a
+ * first sign-in started in this run until the owner sets up a model or
+ * skips. The step shows only once signed in, and only while no provider is
+ * active. Not kept across a relaunch: after one, "Juno needs a model" in the
+ * Juno tab is the way back.
+ */
+export const junoSetupPendingAtom = Atom.make(false).pipe(Atom.keepAlive)

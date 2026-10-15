@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { SignInFailed } from '@juno/contract'
-import { errorOf, importFromSlackAppCommand, sessionStatusAtom, signInCommand, signOutCommand } from '@juno/state'
+import { errorOf, importFromSlackAppCommand, junoSetupPendingAtom, registry, sessionStatusAtom, signInCommand, signOutCommand } from '@juno/state'
+import { agentProviderAtom } from '@juno/state/agent'
 import { useAtomSet, useAtomValue } from '@juno/state/react'
 import { SessionView, SignInView } from '@juno/views'
 
@@ -33,6 +34,8 @@ export function Session() {
   const signIn = useAtomSet(signInCommand)
   const importSession = useAtomSet(importFromSlackAppCommand)
   const signOut = useAtomSet(signOutCommand)
+  // Read now, so it is known by the time the owner presses a sign-in button.
+  const noProvider = useAtomValue(agentProviderAtom, (state) => state?.active === null)
   // Which action ran last decides whose failure is shown.
   const [last, setLast] = useState<'window' | 'import' | undefined>(undefined)
   const result = last === 'import' ? importResult : last === 'window' ? signInResult : undefined
@@ -55,17 +58,22 @@ export function Session() {
     )
   }
 
+  const mode = value._tag === 'authRequired' ? 'expired' : 'first-run'
+  // A first sign-in with no model set up is followed by "Set up Juno" (SPEC 13.10).
+  const setUpAfter = () => registry.set(junoSetupPendingAtom, mode === 'first-run' && noProvider)
   return (
     <SignInView
-      mode={value._tag === 'authRequired' ? 'expired' : 'first-run'}
+      mode={mode}
       {...(value._tag === 'signingIn' ? { busy: value.method } : {})}
       {...(error === undefined ? {} : { error })}
       onSignIn={() => {
         setLast('window')
+        setUpAfter()
         signIn(undefined)
       }}
       onImport={() => {
         setLast('import')
+        setUpAfter()
         importSession(undefined)
       }}
     />

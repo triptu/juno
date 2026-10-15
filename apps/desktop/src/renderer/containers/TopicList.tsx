@@ -3,6 +3,7 @@ import { SIDEBAR_WINDOW, type KindFilter } from '@juno/contract'
 import {
   currentRowAtom,
   defaultTopicListFilter,
+  engineStatusAtom,
   focusedTopicAtom,
   nowAtom,
   registry,
@@ -13,6 +14,7 @@ import {
   topicListAtom,
   topicSelectedAtom,
   type TopicListFilter,
+  viewsAtom,
 } from '@juno/state'
 import { afterPaint, mark, measure } from '@juno/state/perf'
 import { useAtomValue } from '@juno/state/react'
@@ -20,6 +22,7 @@ import { relativeTime, TopicList as TopicListView, TopicRow as TopicRowView, typ
 import { markFilterChange, takeFilterMark } from './filterMark'
 import { openAllTopics, openTopic, warmTopic } from './navigation'
 import { cancelRename, renameTopic, resolveTopic, showRowMenu } from './topicActions'
+import { editSelectedView } from './viewActions'
 
 /**
  * Rows in the first commit of a new list. The rest mount in a transition
@@ -32,6 +35,18 @@ const FIRST_ROWS = 24
 const EMPTY_REPLAY_MS = 1_000
 
 const KINDS: ReadonlyArray<KindFilter> = ['all', 'channels', 'dms']
+
+/** Phases before the engine has caught up once: an empty list may only mean nothing has arrived yet. */
+const BEFORE_LIVE = new Set(['first-run', 'booting', 'catching-up'])
+
+/** Why the list is empty, or undefined while its first window has not arrived. */
+function emptyKind(ready: boolean, filter: TopicListFilter, syncing: boolean, emptyView: boolean): TopicListEmpty | undefined {
+  if (!ready) return undefined
+  if (filter.unreadOnly) return 'caught-up'
+  if (filter.scope === undefined && emptyView) return 'empty-view'
+  if (filter.kind !== 'all' || filter.scope !== undefined) return 'filtered'
+  return syncing ? 'syncing' : 'quiet'
+}
 
 // Row callbacks are created once and take the id, so no row ever receives
 // a new function (performance.md 5.1).
@@ -199,7 +214,9 @@ export const TopicList = memo(function TopicList() {
 
   useWarmFilters(ready, filter)
 
-  const empty: TopicListEmpty | undefined = !ready ? undefined : filter.unreadOnly ? 'caught-up' : filter.kind !== 'all' || filter.scope !== undefined ? 'filtered' : 'quiet'
+  const syncing = useAtomValue(engineStatusAtom, (status) => status._tag === 'Success' && BEFORE_LIVE.has(status.value.phase._tag))
+  const emptyView = useAtomValue(viewsAtom, (views) => filter.view !== undefined && views.find((view) => view.id === filter.view)?.channels.length === 0)
+  const empty = emptyKind(ready, filter, syncing, emptyView)
   const enterEmpty = useEmptyEntrance(ready && count === 0)
 
   return (
@@ -214,6 +231,7 @@ export const TopicList = memo(function TopicList() {
       truncated={full && count >= SIDEBAR_WINDOW}
       onClearFilters={clearFilters}
       onViewAll={viewAllTopics}
+      onEditView={editSelectedView}
       onRowFocus={focusRow}
     />
   )

@@ -4,8 +4,11 @@ The picker discovers the installed `codex` executable and checks sign-in in
 `<agentDir>/codex`, Juno's isolated `CODEX_HOME`. It lists Sol only when signed
 in, resolving the model through the shared daily catalogue. It never reads
 credentials, configuration, skills or MCP servers from the owner's Codex home.
-To set up that home, the owner runs `CODEX_HOME="<agentDir>/codex" codex login`
-in Terminal, then restarts Juno. That auth file lets main start local discovery
+To set up that home, the owner presses Sign in to Codex in "Set up Juno" after
+the first sign-in, which has main run `codex login` with that home
+(`apps/desktop/src/main/codex.ts`) and start the agent when it succeeds. Running
+`CODEX_HOME="<agentDir>/codex" codex login` in Terminal and restarting Juno does
+the same. That auth file lets main start local discovery
 even without an API key; the agent still verifies sign-in and CLI availability. There is no separate ChatGPT OAuth provider.
 
 The price line says “Uses your ChatGPT plan” and shows today's number of

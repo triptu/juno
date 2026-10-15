@@ -1,0 +1,12 @@
+- shot 10-home
+- shot 10b-home-720
+- shot 11-all-topics
+- shot 11b-all-topics-no-match
+- shot 12-first-topic
+- shot 13-palette-first
+- shot 13b-palette-no-matches
+- shot 14-unread-only
+- shot 15-empty-view
+- shot 16-notifications
+- shot 17-preferences
+- shot 17b-preferences-ignored

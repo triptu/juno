@@ -41,7 +41,8 @@ function commitModel(text: string, current: string, onChatModel: (id: string) =>
 
 const usd = (amount: number): string => `$${amount.toFixed(2)}`
 
-function modelOptions(models: ReadonlyArray<ModelChoice>) {
+/** The model select's rows: the resolved name, Codex, and the price, as Settings › Juno and Set up Juno show them. */
+export function modelOptions(models: ReadonlyArray<ModelChoice>) {
   return models.map((model) => ({
     value: modelChoiceKey(model),
     // A custom endpoint's row is a model id, its own name.
@@ -76,7 +77,8 @@ export function JunoSettingsPage({
   if (page === undefined) {
     return (
       <Page width="settings">
-        <PageHeader title="Juno" subtitle={chatCopy.providers.noneBody} />
+        {/* One line, as on the full page, so nothing moves when the agent's part arrives after a key is saved. */}
+        <PageHeader title="Juno" subtitle="Models, spend and the provider. Only you can change these." />
         {providers}
       </Page>
     )

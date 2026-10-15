@@ -1,0 +1,142 @@
+[
+  {
+    "tag": "section",
+    "label": "Set up JunoI run on a model you choose. Keys stay in your ke",
+    "rect": [
+      360,
+      200,
+      680,
+      476
+    ],
+    "padding": "48px 0px",
+    "margin": "140.359px 0px 140.352px",
+    "font": "14.5px/21.75px 400",
+    "color": "rgb(35, 33, 26)"
+  },
+  {
+    "tag": "h1",
+    "label": "Set up Juno",
+    "rect": [
+      360,
+      308,
+      680,
+      39
+    ],
+    "padding": "0px",
+    "margin": "0px",
+    "font": "34px/39.1px 400",
+    "color": "rgb(35, 33, 26)"
+  },
+  {
+    "tag": "p",
+    "label": "I run on a model you choose. Keys stay in your keychain, and",
+    "rect": [
+      360,
+      359,
+      680,
+      23
+    ],
+    "padding": "0px",
+    "margin": "0px",
+    "font": "14.5px/23.2px 400",
+    "color": "rgb(96, 94, 82)"
+  },
+  {
+    "tag": "div",
+    "label": "Provider",
+    "rect": [
+      360,
+      415,
+      223,
+      28
+    ],
+    "padding": "2px",
+    "margin": "0px",
+    "font": "14.5px/21.75px 400",
+    "color": "rgb(35, 33, 26)"
+  },
+  {
+    "tag": "button",
+    "label": "OpenRouter",
+    "rect": [
+      362,
+      417,
+      87,
+      24
+    ],
+    "padding": "0px 9px",
+    "margin": "0px",
+    "font": "12.5px/normal 500",
+    "color": "rgb(35, 33, 26)"
+  },
+  {
+    "tag": "button",
+    "label": "OpenAI-compatible",
+    "rect": [
+      451,
+      417,
+      130,
+      24
+    ],
+    "padding": "0px 9px",
+    "margin": "0px",
+    "font": "12.5px/normal 500",
+    "color": "rgb(112, 110, 102)"
+  },
+  {
+    "tag": "p",
+    "label": "API key",
+    "rect": [
+      375,
+      468,
+      48,
+      23
+    ],
+    "padding": "0px",
+    "margin": "0px",
+    "font": "14.5px/23.2px 400",
+    "color": "rgb(35, 33, 26)"
+  },
+  {
+    "tag": "input",
+    "label": "API key",
+    "rect": [
+      876,
+      466,
+      138,
+      28
+    ],
+    "padding": "0px",
+    "margin": "0px",
+    "font": "13.5px/20.25px 400",
+    "color": "rgb(35, 33, 26)"
+  },
+  {
+    "tag": "button",
+    "label": "Continue",
+    "rect": [
+      360,
+      537,
+      86,
+      36
+    ],
+    "padding": "0px 14px",
+    "margin": "0px",
+    "font": "13.5px/20.25px 500",
+    "color": "rgb(255, 255, 255)"
+  },
+  {
+    "tag": "button",
+    "label": "Skip for now",
+    "rect": [
+      458,
+      537,
+      106,
+      36
+    ],
+    "padding": "0px 14px",
+    "margin": "0px",
+    "font": "13.5px/20.25px 500",
+    "color": "rgb(96, 94, 82)"
+  }
+]

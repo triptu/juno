@@ -26,6 +26,10 @@ export const Channels = {
   agentProvider: 'agent.provider',
   /** Sets up, removes or switches the agent's provider; keys go to the keychain. */
   agentSetProvider: 'agent.setProvider',
+  /** Local Codex in Juno's own Codex home: missing, signed out or signed in. */
+  agentCodex: 'agent.codex',
+  /** Signs in to Codex in Juno's own Codex home (Codex opens the browser); the status after. */
+  agentCodexSignIn: 'agent.codexSignIn',
   /** A folder picker for the backup folder or a backup to restore from; the chosen path, or null. */
   agentChooseFolder: 'agent.chooseFolder',
   /** The recovery phrase from the last export, once; null after that. */
@@ -178,6 +182,10 @@ export interface JunoBridge {
     readonly provider: () => Promise<unknown>
     /** Applies a `ProviderChange`; resolves with a `ProviderResult`. The agent starts or stops to match. */
     readonly setProvider: (change: ProviderChange) => Promise<unknown>
+    /** Local Codex (`CodexSetup`): `missing` when the CLI is not installed, else signed in or out in Juno's own Codex home. */
+    readonly codex: () => Promise<unknown>
+    /** Runs Codex's sign-in in Juno's own Codex home, which opens the browser; resolves with the `CodexSetup` after. A signed-in Codex starts the agent. */
+    readonly codexSignIn: () => Promise<unknown>
     /** Calls `listener` with each new `ProviderState`, undecoded. Returns the unsubscribe. */
     readonly onProvider: (listener: (state: unknown) => void) => () => void
     /** Shows the folder picker; resolves with the chosen absolute path, or null when cancelled. */

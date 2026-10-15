@@ -101,7 +101,7 @@ test('exposes only the bridge to the page', async ({ win }) => {
     updates: ['get', 'set', 'restart', 'onChange'],
     app: ['getInfo'],
     engine: ['requestPort', 'restart'],
-    agent: ['requestPort', 'setOpenRouterKey', 'provider', 'setProvider', 'onProvider', 'chooseFolder', 'recoveryPhrase', 'typeRecoveryPhrase'],
+    agent: ['requestPort', 'setOpenRouterKey', 'provider', 'setProvider', 'codex', 'codexSignIn', 'onProvider', 'chooseFolder', 'recoveryPhrase', 'typeRecoveryPhrase'],
     launch: ['setTheme', 'setAccent', 'setDensity', 'setPrivacy', 'setSidebar'],
     contextMenu: ['popup'],
     shell: ['openExternal', 'openInSlack', 'editUndo', 'downloadFile'],

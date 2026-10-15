@@ -4,6 +4,7 @@ import { Schema } from 'effect'
 import { Channels, ShellRoutes, type ContextMenuLeaf, type DownloadResult, type ShellInput, type ShellOutput } from '@juno/contract'
 import type { AgentSupervisor } from './agent'
 import type { BackupSecrets } from './backupSecrets'
+import type { CodexHome } from './codex'
 import type { EngineSupervisor } from './engine'
 import type { ProviderStore } from './providers'
 import type { Updates } from './updates'
@@ -83,6 +84,8 @@ export interface IpcDeps {
   /** The agent's supervisor; absent while the agent is off. */
   readonly agent: AgentSupervisor
   readonly providers: ProviderStore
+  /** Local Codex in Juno's own Codex home, for the "Set up Juno" step. */
+  readonly codex: CodexHome
   /** The backup's secrets: the phrase shown once after an export, and one typed for a restore. */
   readonly backupSecrets: BackupSecrets
   readonly setTheme: (theme: Launch['theme']) => void
@@ -96,7 +99,7 @@ export interface IpcDeps {
   readonly downloadFile: (file: { readonly url: string; readonly name: string }) => Promise<DownloadResult>
 }
 
-export function registerIpc({ updates, supervisor, agent, providers, backupSecrets, setTheme, setAccent, setDensity, setPrivacy, setSidebar, setViewing, downloadFile }: IpcDeps): void {
+export function registerIpc({ updates, supervisor, agent, providers, codex, backupSecrets, setTheme, setAccent, setDensity, setPrivacy, setSidebar, setViewing, downloadFile }: IpcDeps): void {
   handle(Channels.updatesGet, () => updates.get())
   handle(Channels.updatesSet, ({ enabled }) => updates.set(enabled))
   handle(Channels.updatesRestart, () => updates.restart())
@@ -120,6 +123,13 @@ export function registerIpc({ updates, supervisor, agent, providers, backupSecre
     return providers.state
   })
   handle(Channels.agentSetProvider, (change) => providers.set(change))
+  // Local Codex in Juno's own Codex home; a sign-in that worked starts the agent.
+  handle(Channels.agentCodex, () => codex.status())
+  handle(Channels.agentCodexSignIn, async () => {
+    const after = await codex.signIn()
+    if (after === 'signedIn') agent.codexSignedIn()
+    return after
+  })
   // The backup folder, or a backup to restore from (SPEC 13.8). The agent checks the path again.
   handle(Channels.agentChooseFolder, async ({ purpose }, event) => {
     if (e2e && folderForTests.next !== undefined) {

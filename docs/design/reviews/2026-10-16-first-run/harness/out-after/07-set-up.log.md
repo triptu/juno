@@ -1,0 +1,7 @@
+- shot 40-set-up
+- shot 40b-set-up-720
+- shot 41-set-up-custom
+- shot 42-set-up-bad-key
+- shot 43-set-up-saving
+- shot 44-set-up-model
+- shot 45-after-set-up
