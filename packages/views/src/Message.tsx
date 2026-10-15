@@ -60,6 +60,7 @@ export interface MessageProps {
   /** The hover toolbar's actions. With them the row has a toolbar and reserves its place, so nothing moves when it shows. */
   readonly actions?: MessageActions
   /** The toolbar asks to confirm a delete and stays shown. */
+  readonly active?: boolean
   readonly confirmingDelete?: boolean
   /** The inline edit field, in place of the body while the message is edited. */
   readonly editor?: ReactNode
@@ -146,6 +147,7 @@ export const Message = memo(function Message({
   tabbable = false,
   hueOf,
   actions,
+  active = false,
   confirmingDelete = false,
   editor,
   onOpenThread,
@@ -190,6 +192,7 @@ export const Message = memo(function Message({
       tabIndex={tabbable ? 0 : -1}
       data-message-row={message.ts}
       data-pending={pending}
+      data-popover-active={active ? '' : undefined}
       onFocus={focus}
       onPointerEnter={actions === undefined ? undefined : (event) => placeToolbar(event.currentTarget)}
       data-editing={editor === undefined ? undefined : ''}
@@ -197,8 +200,8 @@ export const Message = memo(function Message({
         styles.row,
         eager && styles.rowEager,
         header && !flush && styles.rowGroupStart,
+        (active || confirmingDelete || editor !== undefined) && styles.rowHeld,
         message.mentionsMe && styles.rowMention,
-        (confirmingDelete || editor !== undefined) && styles.rowHeld,
       )}
     >
       <span data-sender={header ? '' : undefined} {...stylex.props(styles.gutter)}>

@@ -112,8 +112,12 @@ test('Edit and Delete from the toolbar’s More menu and from a right-click', as
 
   const row = topic.message('Retro at 3')
   await row.hover()
-  await juno.chooseNextMenuItem('edit')
+  await juno.chooseNextMenuItem('edit', { hold: true })
   await row.getByRole('button', { name: 'More', exact: true }).click()
+  await juno.win.mouse.move(0, 0)
+  await expect(row).toHaveAttribute('data-popover-active', '')
+  await expect(row.getByRole('toolbar')).toBeVisible()
+  await juno.releaseMenu()
   const editing = topic.list.locator('[data-editing]')
   const field = editing.getByRole('textbox', { name: 'Edit message' })
   await field.fill('Retro at 4')
@@ -188,10 +192,10 @@ test('an edit made while the message is still sending reaches Slack once it has 
 test('reactions: a quick reaction, its chip toggled off, and one from the full picker', async ({ juno, fake }) => {
   await openMain(juno)
   const { topic } = juno
-  fake.injectMessage({ channel: 'C0ENG', user: 'U0MAYA', text: 'Staging is green again' })
+  fake.injectMessage({ channel: 'C0ENG', user: 'U0MAYA', text: `Staging is green again <@${fake.selfId}>` })
   const row = topic.message('Staging is green again')
   await expect(row).toBeVisible()
-  const ts = fake.messages('C0ENG').find((m) => m.text === 'Staging is green again')!.ts
+  const ts = fake.messages('C0ENG').find((m) => m.text?.startsWith('Staging is green again'))!.ts
   const reactionsOf = () => fake.messages('C0ENG').find((m) => m.ts === ts)?.reactions ?? []
 
   await row.hover()
@@ -216,13 +220,19 @@ test('reactions: a quick reaction, its chip toggled off, and one from the full p
   await expect.poll(() => reactionsOf().some((r) => r.name === '+1')).toBe(false)
 
   await row.hover()
+  const activeBackground = await row.evaluate((element) => getComputedStyle(element).backgroundColor)
   await row.getByRole('button', { name: 'More reactions' }).click()
   const picker = juno.win.locator('[data-floating="picker"]')
+  await picker.hover()
+  await expect(row).toHaveCSS('background-color', activeBackground)
+  await expect(row).toHaveAttribute('data-popover-active', '')
+  await expect(row.getByRole('toolbar')).toBeVisible()
   const search = picker.getByRole('textbox', { name: 'Search emoji' })
   await expect(search).toBeFocused()
   await search.fill('rocket')
   await search.press('Enter')
   await expect(picker).toHaveCount(0)
+  await expect(row).not.toHaveAttribute('data-popover-active')
   await expect(row.getByRole('button', { name: '1 🚀, including you' })).toBeVisible()
   await expect.poll(() => reactionsOf().some((r) => r.name === 'rocket')).toBe(true)
 })
