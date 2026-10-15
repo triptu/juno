@@ -129,4 +129,8 @@ Each has a recommendation. They are left open because each changes what a surfac
 
 ## Verification
 
-See the report at the end of the branch's work.
+- `pnpm --filter <package> typecheck` for views, state and desktop after each change. `pnpm build` stays under budget (JS 953.4 KB, CSS 117.3 KB).
+- Locally under the heavy lock: `home.spec.ts`, `views.spec.ts`, `sidebar.spec.ts`, `juno-agent/providers-ui.spec.ts` and `juno-agent/states.spec.ts` passed, including the new tests for the first sync, the empty view and AI assist off.
+- `pnpm affected` after merging origin/main: typecheck, lint, `pnpm test`, `test:gallery` and `test:desktop` (235 passed, 32 skipped) all passed.
+- The harness ran before (clean `520f9429`) and after (this branch). The after run covers sign-in, the pages, Juno setup and AI assist off. The import and the long cold boot have no change, so they were not run again.
+- Not run: `pnpm test:feel`. The lock was held by perf runs for most of this review. These changes add empty-state copy and one opacity, and touch no list, scroll path or animation.
