@@ -18,7 +18,8 @@
     "@juno/tokens": "workspace:*",
     "@juno/ui": "workspace:*",
     "@phosphor-icons/react": "2.1.10",
-    "@stylexjs/stylex": "0.19.1"
+    "@stylexjs/stylex": "0.19.1",
+    "@tanstack/react-virtual": "3.14.19"
   },
   "peerDependencies": {
     "react": "^19.0.0"
