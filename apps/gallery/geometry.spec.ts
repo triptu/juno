@@ -380,10 +380,10 @@ test('Home Automated keeps its two lines aligned and its actions evenly inset', 
     const title = node.querySelector('[data-home-title]')!.getBoundingClientRect()
     const meta = node.querySelector('[data-home-meta]')!.getBoundingClientRect()
     const buttons = [...node.querySelectorAll('button')].map((button) => button.getBoundingClientRect())
-    const slot = node.lastElementChild!.getBoundingClientRect()
+    const slot = node.getBoundingClientRect()
     return { title: title.left, meta: meta.left, buttons: buttons.map((box) => ({ top: box.top - slot.top, bottom: slot.bottom - box.bottom })), gap: buttons[1]!.left - buttons[0]!.right }
   })
   expect(at.title).toBe(at.meta)
-  for (const button of at.buttons) expect(button.top).toBe(button.bottom)
+  for (const button of at.buttons) expect(button).toEqual({ top: 12, bottom: 12 })
   expect(at.gap).toBeGreaterThan(0)
 })
