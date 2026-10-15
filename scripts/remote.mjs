@@ -50,11 +50,11 @@ const remoteShapes = {
   'test:agent': '2x4',
   'test:agent-contracts': '2x4',
   'test:agent-testing': '2x4',
-  'test:gallery': '4x8',
+  'test:gallery': '8x16',
   'test:desktop': '4x8',
   'test:e2e': '4x8',
   'specs:check': '8x16',
-  'specs:traces': '4x8',
+  'specs:traces': '8x16',
 }
 const localOnly = { perf: 'timing', 'test:feel': 'timing', 'gallery:shots': 'the Mac look' }
 
@@ -74,7 +74,9 @@ function parse(argv) {
   if (!script) throw new Error('usage: pnpm remote [--dry-run] [--machine linux/amd64:8x16] [--keep] <script> [args...]')
   if (localOnly[script]) throw new Error(`${script} measures ${localOnly[script]} and runs only on the Mac. Run pnpm ${script} locally.`)
   if (!remoteScripts.includes(script)) throw new Error(`${script} is not set up for remote runs. Remote scripts: ${remoteScripts.join(', ')}`)
-  options.machine ??= process.env.JUNO_REMOTE_MACHINE ?? `linux/amd64:${remoteShapes[script] ?? '4x8'}`
+  const gallerySelection = options.env.findLast((pair) => pair.startsWith('GALLERY_SHIFT_ONLY='))?.slice('GALLERY_SHIFT_ONLY='.length)
+  const partialGallery = script === 'test:gallery' && gallerySelection
+  options.machine ??= process.env.JUNO_REMOTE_MACHINE ?? `linux/amd64:${partialGallery ? '4x8' : remoteShapes[script] ?? '4x8'}`
   return { ...options, script, args }
 }
 
@@ -139,7 +141,7 @@ if (shardsAt > 1) {
 
 if (!process.env.JUNO_REMOTE_SHARDED) {
   const parsed = parse(process.argv.slice(2))
-  const count = Number(process.env.JUNO_REMOTE_DESKTOP_SHARDS ?? 2)
+  const count = Number(process.env.JUNO_REMOTE_DESKTOP_SHARDS ?? 4)
   if (parsed.script === 'test:desktop' && !process.argv.includes('--machine') && !process.env.JUNO_REMOTE_MACHINE && !parsed.args.some((arg) => arg.startsWith('--repeat-each')) && count !== 1) {
     process.exit(await runShards({ total: count, rest: process.argv.slice(2), self, root, desktop: true, dryRun: parsed.dryRun }))
   }

@@ -246,7 +246,7 @@ if (components.length > 0 || behaviour.length > 0) {
     script: 'test:gallery',
     args: [],
     // A name no component has keeps the shift guard idle when only the behaviour tests need a run.
-    // Keep the default 4-core gallery shape to leave room for other agents.
+    // Partial gallery runs use four cores; the full suite needs eight.
     env: all ? undefined : { GALLERY_SHIFT_ONLY: components.length > 0 ? components.map((item) => item.id).join(',') : 'none' },
     items: [...components, ...behaviour],
     why: all ? 'every component' : `${components.length} component(s)${components.length ? `: ${components.map((item) => item.id).join(', ')}` : ''}${behaviour.length ? ' and the behaviour tests' : ''}`,

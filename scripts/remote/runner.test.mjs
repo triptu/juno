@@ -170,6 +170,25 @@ assert(!readdirSync(${JSON.stringify(poolDir)}).some(x => x.startsWith('pending-
   }
 })
 
+test('default e2e splits desktop and sizes full and partial galleries separately', () => {
+  const env = { ...process.env }
+  for (const key of ['JUNO_REMOTE_MACHINE', 'JUNO_REMOTE_DESKTOP_SHARDS', 'JUNO_REMOTE_SHARDED', 'JUNO_RUNNER_HOST', 'GALLERY_SHIFT_ONLY']) delete env[key]
+  const dryRun = (args) => {
+    const result = spawnSync(process.execPath, ['scripts/remote.mjs', '--dry-run', ...args], { env, encoding: 'utf8', timeout: 30_000 })
+    assert.equal(result.status, 0, result.stderr || result.error?.message)
+    return result.stdout
+  }
+  const combined = dryRun(['test:e2e'])
+  assert.equal(combined.match(/a warm linux\/amd64:4x8/g)?.length, 4)
+  assert.equal(combined.match(/a warm linux\/amd64:8x16/g)?.length, 1)
+  for (let shard = 1; shard <= 4; shard++) assert(combined.includes(`--shard=${shard}/4`))
+  const single = dryRun(['--machine', 'linux/amd64:4x8', 'test:desktop'])
+  assert.doesNotMatch(single, /--shard=/)
+  const partial = dryRun(['--env', 'GALLERY_SHIFT_ONLY=Sidebar', 'test:gallery'])
+  assert.match(partial, /a warm linux\/amd64:4x8/)
+  assert.match(dryRun(['--env', 'GALLERY_SHIFT_ONLY=', 'test:gallery']), /a warm linux\/amd64:8x16/)
+})
+
 test('inventory is shared briefly across processes and mutations invalidate it', () => {
   const dir = mkdtempSync(join(tmpdir(), 'juno-inventory-'))
   const counter = join(dir, 'calls')
