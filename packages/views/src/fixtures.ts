@@ -11,6 +11,7 @@ import AppInfoView from './AppInfoView.fixtures'
 import ChannelIconPicker from './ChannelIconPicker.fixtures'
 import Composer from './Composer.fixtures'
 import ComposerSlot from './ComposerSlot.fixtures'
+import EmojiPicker from './EmojiPicker.fixtures'
 import EngineStatusView, { engineNoticeFixtures } from './EngineStatusView.fixtures'
 import Home from './Home.fixtures'
 import HoverToolbar from './HoverToolbar.fixtures'
@@ -70,6 +71,7 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   ComposerSlot,
   ConnectCard: connectCard,
   ConnectionsPage,
+  EmojiPicker,
   EngineNotice: engineNoticeFixtures,
   EmptyChat,
   NoProvider,

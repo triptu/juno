@@ -54,7 +54,7 @@ export function mintGrant(
   store: Store,
   input: { readonly opClass: GrantClass; readonly target: string; readonly bounds?: unknown; readonly authority: GrantAuthority; readonly sourceOp: string },
 ): Mint {
-  return transaction(store.db, (): Mint => {
+  return joined(store, (): Mint => {
     if (!mayMintGrant(input.authority, authorityOf(store))) return { _tag: 'refused' }
     const revoked = store.db
       .prepare('SELECT 1 FROM grants WHERE op_class = ? AND target = ? AND source_op = ? AND revoked_at IS NOT NULL')

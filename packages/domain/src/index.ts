@@ -18,3 +18,6 @@ export * from './channel-style'
 
 export { startsGroup, threadLinkLabel, type GroupMessage } from './messages'
 export * from './home'
+
+// The standard emoji, for the renderer's picker through @juno/contract.
+export { emojiCatalog, type EmojiCategory } from '@juno/richtext'

@@ -4,6 +4,7 @@
  * Juno, plus the recovery review. Rows only; the containers wire the edits.
  */
 import { Schema } from 'effect'
+import { Digest } from '@juno/agent-cards'
 import { Card, Deliver } from './cards'
 import { ChatMessageId, ConnectionId, JobId, PinId, RunId, ScheduleId } from './ids'
 
@@ -106,6 +107,8 @@ export type ConnectionState = typeof ConnectionState.Type
 
 export const DiscoveredTool = Schema.Struct({
   name: Schema.String,
+  /** Current schema to bind an owner tier change. */
+  schemaHash: Schema.optionalKey(Digest),
   /** Tier 0 reads need no click; Tier 3 is a card every time. */
   tier: Schema.Literals([0, 3]),
   /** The server's hint, shown and never trusted. */

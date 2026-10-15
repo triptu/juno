@@ -1,11 +1,14 @@
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Button, defineFixtures, scene, type FixtureFrame } from '@juno/ui'
 import type { TopicDetail } from '@juno/contract'
 import { ActiveThreads } from './ActiveThreads'
 import { ComposerSlot } from './ComposerSlot'
 import { details, emojiOnly, engThreads, hostile, main, mainDividerBefore, mentions, rtl, thread, threadDividerBefore, withFiles } from './fixtures/messages'
 import { NOW } from './fixtures/topics'
-import { HoverToolbar } from './HoverToolbar'
+import type { EmojiCategory } from '@juno/contract'
+import { EmojiPicker } from './EmojiPicker'
+import { noopActions } from './fixtures/actions'
+import { Floating, SelectionQuote } from './Floating'
 import { MessageList, type MessageListProps } from './MessageList'
 import { NewMessagesPill } from './NewMessagesPill'
 import { TopicHeader, type TopicHeaderProps } from './TopicHeader'
@@ -21,11 +24,12 @@ interface Scene {
   readonly pill?: number
   /** Scroll the list this far down before the first paint, as a restored position would. */
   readonly scrollTop?: number
+  readonly floating?: TopicViewProps['floating']
 }
 
 const placeholder = (detail: TopicDetail) => (detail.kind === 'main' ? `Message ${detail.channel.label}` : 'Reply')
 
-function Topic({ detail, items, header, list, pill, scrollTop }: Scene) {
+function Topic({ detail, items, header, list, pill, scrollTop, floating }: Scene) {
   const scrollRef = useRef<HTMLElement>(null)
   useLayoutEffect(() => {
     if (scrollTop !== undefined && scrollRef.current !== null) scrollRef.current.scrollTop = scrollTop
@@ -44,6 +48,7 @@ function Topic({ detail, items, header, list, pill, scrollTop }: Scene) {
       }
       pill={pill === undefined ? undefined : <NewMessagesPill count={pill} onJump={noop} />}
       composer={<ComposerSlot placeholder={placeholder(detail)} />}
+      floating={floating}
     >
       <MessageList items={items} main={detail.kind === 'main'} now={NOW} scrollRef={scrollRef} onOpenThread={noop} onChannel={noop} onLink={noop} {...list} />
     </TopicView>
@@ -81,6 +86,71 @@ function HeaderCycles() {
 const topic = (props: Scene, frame?: FixtureFrame) => scene<TopicViewProps>(() => <Topic {...props} />, frame)
 
 const threads = <ActiveThreads threads={engThreads} now={NOW} onOpen={noop} />
+
+/** A few emoji, so the picker reads like the real one without the whole catalog. */
+const pickerCatalog: ReadonlyArray<EmojiCategory> = [
+  {
+    name: 'Smileys & emotion',
+    emoji: ['😀 grinning', '😃 smiley', '😄 smile', '😁 grin', '😆 laughing', '😅 sweat_smile', '🤣 rolling_on_the_floor_laughing', '😂 joy', '🙂 slightly_smiling_face', '😉 wink', '😊 blush', '😇 innocent'].map((pair) => {
+      const [unicode, name] = pair.split(' ') as [string, string]
+      return { name, unicode }
+    }),
+  },
+  {
+    name: 'People & body',
+    emoji: ['👍 +1', '👎 -1', '👏 clap', '🙌 raised_hands', '🙏 pray', '💪 muscle', '👀 eyes', '🧠 brain', '👋 wave'].map((pair) => {
+      const [unicode, name] = pair.split(' ') as [string, string]
+      return { name, unicode }
+    }),
+  },
+]
+
+/**
+ * Text selected in a message shows the floating Quote button centred over
+ * the selection. The scene selects a message's text the way a drag would
+ * and places the button from the selection's box, as the container does.
+ */
+function SelectionScene() {
+  const [at, setAt] = useState<{ x: number; y: number } | undefined>(undefined)
+  useEffect(() => {
+    // Once the fonts are in and the list has drawn, as a drag would end on a settled list.
+    let frame = 0
+    let live = true
+    void document.fonts.ready.then(() => {
+      if (live) frame = requestAnimationFrame(select)
+    })
+    const select = () => {
+      const text = document.querySelectorAll('[data-message-row] [data-msg-text] p')[2]
+      const middle = text?.closest('[data-topic-middle]')
+      if (text == null || middle == null || text.firstChild === null) return
+      const range = document.createRange()
+      range.setStart(text.firstChild, 0)
+      range.setEnd(text.firstChild, Math.min(40, text.firstChild.textContent?.length ?? 0))
+      const selection = window.getSelection()
+      selection?.removeAllRanges()
+      selection?.addRange(range)
+      const box = range.getBoundingClientRect()
+      const origin = middle.getBoundingClientRect()
+      setAt({ x: box.left + box.width / 2 - origin.left, y: box.top - origin.top })
+    }
+    return () => {
+      live = false
+      cancelAnimationFrame(frame)
+    }
+  }, [])
+  return (
+    <Topic
+      detail={details.postgres}
+      items={thread}
+      list={{ actions: noopActions }}
+      floating={at === undefined ? undefined : (
+        <Floating x={at.x} y={at.y} placement="above-center" layer="selection">
+          <SelectionQuote onQuote={noop} />
+        </Floating>
+      )}
+    />
+  )
+}
 
 export default defineFixtures(
   TopicView,
@@ -122,7 +192,19 @@ export default defineFixtures(
       offline: topic({ detail: details.flags, items: [], list: { status: 'offline' } }),
     },
     Interaction: {
-      'hover-message': topic({ detail: details.postgres, items: thread, list: { renderToolbar: () => <HoverToolbar /> } }, { hover: '[data-message-row]:nth-of-type(3)' }),
+      'hover-message': topic({ detail: details.postgres, items: thread, list: { actions: noopActions } }, { hover: '[data-message-row]:nth-of-type(3)' }),
+      'selection-quote': scene(() => <SelectionScene />),
+      // More reactions opens the picker under the toolbar, floated over the list so the row's paint containment does not clip it.
+      'emoji-picker': topic({
+        detail: details.postgres,
+        items: thread,
+        list: { actions: noopActions },
+        floating: (
+          <Floating x={820} y={180} placement="below-end" layer="picker">
+            <EmojiPicker catalog={pickerCatalog} recent={['+1', 'white_check_mark', 'eyes']} onPick={noop} onClose={noop} />
+          </Floating>
+        ),
+      }),
       'minimum-window': topic({ detail: details.engMain, items: main, list: { dividerBefore: mainDividerBefore } }, { width: 720, height: 480 }),
     },
   },

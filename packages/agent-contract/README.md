@@ -67,3 +67,16 @@ All five are settled in plan v3 (§0 rows W9 to W13):
 - Approval identities and edit revisions travel in RPC metadata, not in `src/chat/**` (W13).
 
 Run `pnpm test:agent-contracts` from the root for the property tests and request/response JSON codec round trips for every RPC group. `pnpm typecheck` checks the test sources too.
+
+WP19 adds `agent.schedule.watchReply { opId, channelId, ts, threadTs? }` to
+`ScheduledRpcs`. It returns `{ opId, id, at }` after the menu watch is persisted.
+The owner click is the authority; the server verifies the message's author and
+uses saved notification hours. Undo deletes the returned schedule through
+`agent.scheduled.action`, using its current revision from the page.
+
+Reply watches use `host.schedule.check` (cached metadata or a complete Slack
+refresh), `host.schedule.hours` (saved notification hours and local timezone),
+and `host.schedule.changes` (message-store invalidations). The check includes
+the owner's identity and verifies the source author for the menu command.
+No message text crosses these routes. Account checks surround refreshes, and
+incomplete or limited Slack history fails rather than reporting no reply.

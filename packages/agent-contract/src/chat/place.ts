@@ -130,6 +130,8 @@ export const OpenTarget = Schema.Union([
   Schema.TaggedStruct('topic', { topicId: Schema.String }),
   /** Scroll the chat to one of its own messages (a recall citation). */
   Schema.TaggedStruct('chatMessage', { messageId: ChatMessageId }),
+  /** A Slack message (a source): the topic that holds it, its thread or Main, opened at the message, which flashes. */
+  Schema.TaggedStruct('message', { channelId: Schema.String, ts: Schema.String }),
   /** A PR, a Notion page, a T3 Code thread: opened outside Juno. */
   Schema.TaggedStruct('url', { url: OpenableUrl, label: Schema.String }),
   Schema.TaggedStruct('page', { page: JunoPage }),

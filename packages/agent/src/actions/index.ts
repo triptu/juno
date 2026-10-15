@@ -31,13 +31,14 @@ export interface ActionsOptions {
   /** The host's action RPCs. No Slack send or resolve without it. */
   readonly host?: ActionHost
   /** Executors other folders own (MCP writes, T3, schedules, removal). */
-  readonly executors?: ReadonlyArray<Executor>
+  readonly executors?: ReadonlyArray<Executor> | (() => ReadonlyArray<Executor>)
 }
 
 type Identity = typeof CardBinding.Type['identity']
 
 export function createActions(options: ActionsOptions & {
   readonly store: Store
+  readonly onProposed?: (id: string, proposal: Proposal) => void
   readonly position: () => Promise<JournalPosition>
   readonly jobs: Jobs | undefined
   readonly spend: SpendLedger
@@ -50,16 +51,16 @@ export function createActions(options: ActionsOptions & {
   const changed = () => {
     for (const listener of listeners) listener()
   }
-  const executors: ReadonlyArray<Executor> = [
+  const executors = (): ReadonlyArray<Executor> => [
     ...(options.host ? hostExecutors(options.host) : []),
     ...localExecutors({
       store, jobs: options.jobs, spend: options.spend, place: options.place, accept: options.accept,
       cardRun: (cardId) => cardRow(store, cardId)!.run_id,
     }),
-    ...(options.executors ?? []),
+    ...(typeof options.executors === 'function' ? options.executors() : options.executors ?? []),
   ]
   const dispatcher = createDispatcher({
-    store, executors: () => executors, position: options.position, onChange: changed,
+    store, executors, position: options.position, onChange: changed,
     ...(options.onReport ? { onReport: options.onReport } : {}),
   })
   let starting: Promise<void> = Promise.resolve()
@@ -69,10 +70,11 @@ export function createActions(options: ActionsOptions & {
   }
 
   return {
-    executors,
+    get executors() { return executors() },
+    changed,
     /** Stores a proposal. The same call id is the same card. */
     propose: (proposal: Proposal): string => {
-      const id = proposeCard(store, proposal)
+      const id = proposeCard(store, proposal, options.onProposed)
       changed()
       return id
     },

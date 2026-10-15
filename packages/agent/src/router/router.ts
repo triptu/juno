@@ -72,6 +72,7 @@ export interface RouterOptions {
   readonly rotationDue: () => boolean
   /** Called with no run live, before the next one begins: a model change applies here. */
   readonly beforeRun?: () => Promise<void>
+  readonly startWake?: (opId: string, persist: () => void) => boolean
   readonly onRunEnded?: () => void
   /** Card outcomes the model has not read, and a reply's quote of a card (WP15). */
   readonly cards?: CardText
@@ -93,7 +94,7 @@ interface Live {
   /** The current request's response has started. */
   streamed: boolean
   /** Bubbles and reactions already published, by index in the run's parsed text. */
-  readonly bubbles: Array<{ readonly id: string; readonly text: string; readonly replyTo?: string }>
+  readonly bubbles: Array<RunState['bubbles'][number]>
   reactions: number
   /** The status bubble: dots, or a tool's line. */
   status: { text?: string }
@@ -234,7 +235,8 @@ export function createRouter(options: RouterOptions) {
     // What the run already wrote, so bubble numbers carry on where they were.
     run.done = runText(store, run.runId)
     const published = parseOutput(run.done)
-    run.bubbles.push(...published.bubbles.map((bubble, n) => ({ id: `${run.runId}:${n}`, text: bubble.text })))
+    const sources = sourceTable(store, run.runId)
+    run.bubbles.push(...published.bubbles.map((bubble, n) => ({ id: `${run.runId}:${n}`, text: bubble.text, body: resolveSpans(bubble.spans, sources) })))
     run.reactions = published.reactions.length
     const inputs = store.db.prepare('SELECT op_id AS opId FROM run_inputs WHERE run_id = ?').all(run.runId) as Array<{ opId: string }>
     for (const input of inputs) run.inputs.set(input.opId, find(store, input.opId)?.submissionId ?? undefined)
@@ -250,17 +252,26 @@ export function createRouter(options: RouterOptions) {
 
   // ---- A run
 
-  const begin = async (op: InboxOp): Promise<Live> => {
+  const persistInput = (op: InboxOp, persist: () => void): boolean => {
+    if (op.kind === 'wake' && options.startWake !== undefined) {
+      if (options.startWake(op.opId, persist)) return true
+      settle(store, op.opId, 'interrupted', 'schedule cancelled')
+      return false
+    }
+    transaction(store.db, persist)
+    return true
+  }
+  const begin = async (op: InboxOp): Promise<Live | undefined> => {
     await session.catchUp()
     const origin = originOf(op.kind)
     // A message sent beside a topic carries Slack content (SPEC 7): the run starts tainted.
     const row = { id: uuidv7(store.now()), op_id: op.opId, origin, h: archiveLength(), clean: origin === 'owner' && !readsTopic(op) ? 1 : 0 }
-    transaction(store.db, () => {
+    if (!persistInput(op, () => {
       store.db
         .prepare('INSERT INTO runs (id, op_id, origin, h, clean, started_at) VALUES (?, ?, ?, ?, ?, ?)')
         .run(row.id, row.op_id, row.origin, row.h, row.clean, store.now())
       store.db.prepare('INSERT INTO run_inputs (op_id, run_id, steer) VALUES (?, ?, 0)').run(op.opId, row.id)
-    })
+    })) return undefined
     const run = live(row, isMessage(op.kind))
     run.inputs.set(op.opId, undefined)
     current = run
@@ -273,6 +284,12 @@ export function createRouter(options: RouterOptions) {
     const input = find(store, run.opId)
     if (input === undefined) throw new Error(`run ${run.runId} has no input`)
     if (input.state === 'accepted') run.inputs.set(input.opId, await deliver(store, journal, input, { steer: false, text: () => inputText(input) }))
+    // A crash can leave a steered input recorded in run_inputs but not yet in pi.
+    for (const opId of run.inputs.keys()) {
+      if (opId === run.opId) continue
+      const queued = find(store, opId)
+      if (queued?.state === 'accepted') run.inputs.set(opId, await deliver(store, journal, queued, { steer: true, text: () => inputText(queued) }))
+    }
     const results = new Map<string, Settled | InboxOp['state']>()
     for (;;) {
       const pending = [...run.inputs].filter(([opId]) => !results.has(opId))
@@ -310,9 +327,9 @@ export function createRouter(options: RouterOptions) {
     for (const bubble of output.bubbles.slice(run.bubbles.length)) {
       const id = `${run.runId}:${run.bubbles.length}`
       const replyTo = bubble.replyTo === undefined ? undefined : ownerOpOf(store, bubble.replyTo)
-      run.bubbles.push({ id, text: bubble.text, ...(replyTo ? { replyTo } : {}) })
-      run.status = {}
       const body = resolveSpans(bubble.spans, sourceTable(store, run.runId))
+      run.bubbles.push({ id, text: bubble.text, body, ...(replyTo ? { replyTo } : {}) })
+      run.status = {}
       emit({ _tag: 'bubble', runId: run.runId, id, text: bubble.text, body, ...(replyTo ? { replyTo } : {}) })
     }
     for (const reaction of output.reactions.slice(run.reactions)) {
@@ -361,11 +378,13 @@ export function createRouter(options: RouterOptions) {
       for (;;) {
         const op = nextAccepted(store)
         if (op === undefined || run.inputs.has(op.opId) || run !== current) return
-        // §6.4: a steered report or wake is untrusted content, and so is a message sent beside a topic.
-        if (originOf(op.kind) === 'report' || originOf(op.kind) === 'wake' || readsTopic(op)) taint(run)
-        transaction(store.db, () => {
+        const untrusted = originOf(op.kind) === 'report' || originOf(op.kind) === 'wake' || readsTopic(op)
+        if (!persistInput(op, () => {
+          if (untrusted) store.db.prepare('UPDATE runs SET clean = 0 WHERE id = ?').run(run.runId)
           store.db.prepare('INSERT OR IGNORE INTO run_inputs (op_id, run_id, steer) VALUES (?, ?, 1)').run(op.opId, run.runId)
-        })
+        })) continue
+        // §6.4: a steered report or wake is untrusted content, and so is a message sent beside a topic.
+        if (untrusted) run.clean = false
         run.inputs.set(op.opId, await deliver(store, session.journal(), op, { steer: true, text: () => inputText(op) }))
         emit({ _tag: 'steered', runId: run.runId, opId: op.opId })
       }
@@ -480,6 +499,7 @@ export function createRouter(options: RouterOptions) {
   return {
     hooks,
     restore,
+    kick: signal,
     /** Starts the loop. Call after `restore` and pi's resume. */
     start: () => {
       done = loop().catch((error: unknown) => {
