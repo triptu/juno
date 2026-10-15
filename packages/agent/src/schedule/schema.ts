@@ -15,5 +15,8 @@ export const SCHEDULE_MIGRATIONS: MigrationSet = {
     'CREATE TABLE schedule_commands (op_id TEXT PRIMARY KEY, accepted INTEGER NOT NULL CHECK(accepted IN (0,1))) STRICT',
     'CREATE INDEX occurrence_queue ON schedule_occurrences(state, due_at)',
     'CREATE INDEX schedule_due ON schedules(state, due_at)',
+  ], [
+    'CREATE TABLE schedule_replies (schedule_id TEXT PRIMARY KEY REFERENCES schedules(id), at INTEGER NOT NULL) STRICT',
+    'CREATE TABLE schedule_nudges (card_id TEXT NOT NULL, schedule_id TEXT NOT NULL REFERENCES schedules(id), PRIMARY KEY(card_id, schedule_id)) STRICT',
   ]],
 }

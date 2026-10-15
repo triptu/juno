@@ -13,6 +13,8 @@
  */
 import { Effect, Stream, SubscriptionRef } from 'effect'
 import { AgentHostError, HostChannelId, HostMessageTs, HostUserId, type HostPresence } from '@juno/agent-contract'
+import type { SchedulerOptions } from '../schedule/scheduler'
+import type { WatchHost } from '../schedule/commands'
 import type { HostReads } from '../router/host-tools'
 import { AgentHost } from './client'
 
@@ -23,6 +25,8 @@ const READ_LIMIT = 50
 
 export interface BoundHost {
   readonly reads: HostReads
+  readonly schedule: Pick<SchedulerOptions, 'replies' | 'cachedReplies' | 'account' | 'enabled'> & WatchHost
+  readonly scheduleChanges: Stream.Stream<void, unknown>
   /** The latest presence, or undefined before the first one arrives. */
   readonly presence: () => Presence | undefined
   /** The current presence, then every change. */
@@ -71,8 +75,21 @@ export const bindHost = Effect.gen(function* () {
     topics: () => withAccount(() => client['host.topics.list']({ limit })),
     person: (userId) => withAccount((accountId) => client['host.slack.person']({ accountId, userId: HostUserId.make(userId) })),
   }
+  const check = (conversation: import('../schedule/rules').ReplyWatch, refresh: boolean) => {
+    if (conversation.accountId !== undefined && conversation.accountId !== current?.accountId) return Promise.reject(new AgentHostError({ reason: 'stale', message: 'Another Slack account is signed in.' }))
+    return withAccount((accountId) => client['host.schedule.check']({ accountId, conversation, refresh }))
+  }
   return {
     reads,
+    schedule: {
+      replies: (conversation) => check(conversation, true),
+      cachedReplies: (conversation) => check(conversation, false),
+      account: () => current?.accountId ?? undefined,
+      enabled: () => current?.aiEnabled === true && current.accountId !== null,
+      ownMessage: (conversation) => withAccount((accountId) => client['host.schedule.check']({ accountId, conversation, refresh: false })).then((snapshot) => snapshot.ownMessage),
+      hours: () => withAccount((accountId) => client['host.schedule.hours']({ accountId })),
+    },
+    scheduleChanges: client['host.schedule.changes'](),
     presence: () => current,
     presenceChanges: SubscriptionRef.changes(latest),
   } satisfies BoundHost

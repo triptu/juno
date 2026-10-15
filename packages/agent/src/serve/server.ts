@@ -46,6 +46,8 @@ import type { Presence } from '../host/reads'
 import type { Turns } from '../router/open'
 import type { PinResult } from '../pins/pins'
 import type { UpdateNeeded } from '../runtime/core'
+import { connectionHandlers } from '../mcp/pages'
+import type { McpManagerApi } from '../mcp/manager'
 import type { JunoSettings } from '../settings/settings'
 import { chatItems, chatSummary, readMarkOf, windowOf, type ChatWindow } from './chat'
 import { activityPage, emptyRemembers, memoryPage, remembersPage, reviewPage } from './pages'
@@ -58,6 +60,7 @@ export interface ChatHost {
   readonly presenceChanges: Stream.Stream<Presence | undefined>
   /** Settings › Juno, when the engine runs on a model picker. */
   readonly settings?: JunoSettings
+  readonly connections?: McpManagerApi
   readonly schedule?: { readonly scheduler: Scheduler; readonly host: WatchHost }
 }
 
@@ -377,9 +380,9 @@ export function agentHandlers(host: ChatHost) {
             : live(Stream.merge(state.changes, Stream.tick(MEMORY_RECHECK)), () => memoryPage(state.turns!.store, window)),
         'agent.activity.page': ({ window }) =>
           state.turns === undefined ? Stream.make({ runs: [], moreAbove: false }) : live(state.changes, () => activityPage(state.turns!.store, window)),
-        'agent.connections.page': () => Stream.make({ connections: [] }),
-        'agent.connections.action': notYet('Connections'),
-        'agent.connections.tier': notYet('Connections'),
+        'agent.connections.page': () => host.connections ? connectionHandlers(host.connections).page() : Stream.make({ connections: [] }),
+        'agent.connections.action': (input) => host.connections ? connectionHandlers(host.connections).action(input) : notYet('Connections')(),
+        'agent.connections.tier': (input) => host.connections ? connectionHandlers(host.connections).tier(input) : notYet('Connections')(),
         'agent.connections.address': notYet('Connections'),
         'agent.review.page': () => Stream.make(reviewPage()),
         'agent.review.activate': notYet('Review'),

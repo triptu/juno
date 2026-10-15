@@ -70,7 +70,8 @@ export const postTopic = (post: Pick<PendingPost, 'channel' | 'threadTs'>): stri
 
 const touch = (post: Pick<PendingPost, 'channel' | 'threadTs'>) => Invalidation.use((i) => i.invalidate(syncKeys.messages(postTopic(post))))
 
-const readPost = (clientMsgId: string): Effect.Effect<PendingPost | undefined, SqlError, StoreWriter> =>
+/** The pending post with this `client_msg_id`, if any. */
+export const readPost = (clientMsgId: string): Effect.Effect<PendingPost | undefined, SqlError, StoreWriter> =>
   Effect.gen(function* () {
     const sql = yield* StoreWriter
     const rows = yield* sql.unsafe<PostRow>(`SELECT ${COLUMNS} FROM pending_messages WHERE client_msg_id = ?`, [clientMsgId])

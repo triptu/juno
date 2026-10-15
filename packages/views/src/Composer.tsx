@@ -18,6 +18,8 @@ export interface ComposerProps {
   /** Above the field, inside its column: New chat's pickers. */
   readonly above?: ReactNode
   readonly inputRef?: Ref<HTMLTextAreaElement>
+  /** ↑ in an empty field: a topic selects its newest message (SPEC section 7, Keyboard). */
+  readonly onArrowUpEmpty?: () => void
 }
 
 /**
@@ -27,9 +29,14 @@ export interface ComposerProps {
  * `ComposerSlot`'s geometry, so one replaces the other with no shift.
  * Attachments come with M6: the attach mark is drawn, not a button.
  */
-export function Composer({ value, onChange, onSend, placeholder, sending = false, above, inputRef }: ComposerProps) {
+export function Composer({ value, onChange, onSend, placeholder, sending = false, above, inputRef, onArrowUpEmpty }: ComposerProps) {
   const empty = value.trim().length === 0
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === 'ArrowUp' && value === '' && onArrowUpEmpty !== undefined && !event.shiftKey && !event.metaKey && !event.altKey && !event.ctrlKey) {
+      event.preventDefault()
+      onArrowUpEmpty()
+      return
+    }
     if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) return
     event.preventDefault()
     if (!sending) onSend()

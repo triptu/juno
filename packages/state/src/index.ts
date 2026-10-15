@@ -106,7 +106,7 @@ export {
   untouched,
   type NewChat,
 } from './newChat'
-export { discardMessage, draftAtom, retryMessage, saveDraft, sendMessage } from './send'
+export { deleteMessage, discardMessage, draftAtom, editMessage, reactToMessage, retryMessage, saveDraft, sendMessage } from './send'
 export { errorOf } from './result'
 export {
   currentNotificationSettings,
