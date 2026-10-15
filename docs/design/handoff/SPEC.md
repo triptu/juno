@@ -53,8 +53,8 @@ Titles resolve in this order. A title you set by renaming (stored in Juno only) 
 - **Resizing the sidebar.** Drag its right edge to make it between 280 and 480px wide; double-click the edge to go back to 384. The width is remembered. The list does not re-render while you drag.
 - **Hiding the sidebar.** The sidebar button in its top bar, ⌃⌘S, or View › Hide Sidebar hides it; the same again shows it. ⌃⌘S is the macOS standard for Show and Hide Sidebar (Mail, Notes, Reminders and SwiftUI's default sidebar command use it). Dragging the edge far enough left also hides it. Hidden or shown is remembered. While hidden, the traffic lights, the sidebar button, Back and Forward move to the start of the tab strip, so nothing becomes unreachable.
 - **Title bar.** The macOS traffic lights sit in the sidebar's top bar, followed by the sidebar button, Back and Forward. The workspace's top bar is the tab strip. Both bars are window drag regions.
-- **Workspace tabs** work like browser tabs. The "+" button is labelled "New chat" and opens a New chat in a new tab (section 9): a new tab is a new chat. Every page opens in a tab: a topic, a New chat, Home, All topics, Juno, Notifications or Preferences.
-- **Home** (section 12) is what the workspace shows with no tab open, and the Home item in the sidebar opens it as a tab.
+- **Workspace tabs** work like browser tabs. The "+" button sits right after the last tab, as in Safari and Chrome, and stays at the strip's end when the tabs scroll. It opens a new tab (section 6). Every page opens in a tab: a topic, a New chat, Home, All topics, Juno, Notifications or Preferences.
+- **There is always a tab.** Closing the last tab opens a new one, and a first launch opens one; the workspace is never empty.
 - **Reading width.** Message columns are capped around 800px and centered, so long lines stay readable on wide windows.
 
 ## 5. Sidebar
@@ -144,8 +144,10 @@ Each row is a tile followed by three lines. The tile is the topic's art: a small
 
 ## 6. Opening things and tabs
 
-- Everything opens in the **current tab**. A new tab opens only on ⌘-click or "Open in new tab".
-- If the topic is already open in another tab, that tab is focused instead of opening a duplicate.
+- Everything opens in the **current tab**. A new tab opens only on ⌘-click, ⌘ Enter or "Open in new tab".
+- A plain open of a topic or page that another tab shows focuses that tab, the one active last if several do, so the sidebar's selection stays one place. ⌘-click and "Open in new tab" always open a new tab, so the same topic, Home, All topics or Juno can show in several tabs.
+- **One place in several tabs.** Each tab keeps its own scroll position, "N new" divider, composer focus and selection. Everything else is shared: the messages, the read state, the Juno chat and the draft of each topic. Two Juno tabs show the same chat, and a message sent in one shows in both. Two tabs on one topic can sit at different places in it.
+- **New tabs.** The "+" button and ⌘T open a new tab with a New chat (section 9), or Home when Settings › General says so ("New tabs open": New chat, the default, or Home). ⌘N and the sidebar's New chat button always open a New chat. Closing the last tab opens a new tab the same way, so there is never no tab.
 - Tabs carry the topic's art and title, or the channel name for a Main thread. Closing a tab focuses its neighbour.
 - **Unread dot.** A tab whose topic has unread messages shows a small soft grey dot after its title, the same grey as unread counts. One style for all unread, mentions included. The active tab never shows it, since opening marks read.
 - **Back and Forward.** Each tab has its own history, like a browser tab. An entry is a topic or page opened in that tab; scrolling, peeks, popovers and the Juno panel are not entries. Back returns to the previous topic where you left it in it. A New chat that sends replaces its own entry with the topic. Back and Forward are the buttons in the title bar, ⌘[ and ⌘], the mouse's back and forward buttons, and a three-finger swipe. Holding a button lists the tab's history.
@@ -238,7 +240,7 @@ The send-check bar shows the finding and two choices, without a confidence numbe
 
 A blank conversation where you write first and choose where it goes, with the destination's messages shown above as soon as you pick it. Design: `docs/design/new-chat/`.
 
-- **Opening.** The New chat icon in the sidebar title bar, the tab strip's "+" and ⌘N each open a New chat in a new tab with the composer focused. The tab is titled "New chat" until you pick a destination, then takes the destination's name, keeping the New chat icon until you send. If an untouched New chat tab already exists, it is focused instead.
+- **Opening.** The New chat icon in the sidebar title bar and ⌘N each open a New chat in a new tab with the composer focused, and so do the tab strip's "+" and ⌘T unless new tabs open Home (section 6). The tab is titled "New chat" until you pick a destination, then takes the destination's name, keeping the New chat icon until you send. If an untouched New chat tab already exists, it is focused instead.
 - **Empty state.** Nothing above the composer but one muted line in the middle: "Write your message, then pick where it goes." The two pickers sit on one row directly above the composer.
 - **Two pickers.** The first chooses the conversation: a channel, a person or a group DM. The second chooses the thread inside it, with Main as the default. Each is a button that opens a small searchable list; typing filters, ↑ ↓ move, Enter picks and Esc closes. Shift Tab from the composer reaches the thread picker, then the conversation picker; Space, Enter or ↓ opens the focused one.
   - **Conversation list.** Recent conversations first, then every channel you are in and everyone in the workspace, including people you have never messaged ("No messages yet"). Ignored channels are left out.
@@ -279,7 +281,7 @@ A full page in a tab, listing everything: quiet, resolved, unfollowed. It is the
 
 Home is a calm resting page: a small scene with Juno's mascot that changes with the time of day, a short greeting, at most three things that want you, an "Ask Juno…" field, and an all-caught-up scene when nothing needs you. Design: `docs/design/home/` (layout A).
 
-- **Getting there.** Home is the first item in the sidebar navigation. It opens in a tab like any page and is a singleton. With no tab open, the workspace shows Home without a tab, and the Home item reads as selected.
+- **Getting there.** Home is the first item in the sidebar navigation. It opens in a tab like any page: a plain click focuses a tab that shows it, and ⌘-click opens another (section 6). New tabs can open Home instead of a New chat (Settings › General).
 - **What wants you.** Each item is one row with a title line and a plain meta line. The kinds, ranked:
   - **Waiting on you.** A message that asks you something and has no reply from you.
   - **Pick up where you left off.** The last topic you had open, when it has new messages.
@@ -489,6 +491,8 @@ The order: ignored channel → Every message (thread, channel or person) → Nev
 | A job you started finished | Now inside notification hours, in the summary outside them |
 | A job started | None |
 
+**General**, first in Preferences (Settings › General once Settings is one page), has one choice: **New tabs open** a New chat (the default) or Home. It covers "+", ⌘T and the tab that replaces the last one closed (section 6).
+
 **Preferences** holds the **ignore list** for noisy channels such as alerts and deploys. Ignored channels are hidden from topics, search and All topics, and never notify. Nothing changes in Slack. You can also ignore a channel from any context menu, with undo.
 
 **Appearance**, also in Preferences, has three choices and nothing else:
@@ -576,7 +580,8 @@ Use the Littlebird design system's tokens.
 | Keys | Action |
 | --- | --- |
 | ⌘K | Search and commands |
-| ⌘N or ⌘T | New chat in a new tab (section 9) |
+| ⌘N | New chat in a new tab (section 9) |
+| ⌘T | New tab: a New chat, or Home if Settings › General says so (section 6) |
 | ⌘W / ⌘⇧T | Close the tab / reopen the last closed tab |
 | ⌘1 to ⌘8, ⌘9 | Go to that tab, or the last tab |
 | ⌃Tab / ⌃⇧Tab, ⌘⇧] / ⌘⇧[ | Next / previous tab |
