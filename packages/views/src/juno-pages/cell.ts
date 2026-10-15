@@ -1,4 +1,4 @@
-/** The layouts the Juno pages share: a two-line cell inside a ListRow, and a row of trailing controls. */
+/** The layouts the Juno pages share: a two-line cell inside a ListRow, a row of trailing controls, and a chip that ends a row. */
 import * as stylex from '@stylexjs/stylex'
 import { spacing } from '@juno/tokens/tokens.stylex'
 
@@ -33,5 +33,14 @@ export const cell = stylex.create({
   },
   wrap: {
     textWrap: 'pretty',
+  },
+  // A chip that ends a row, in a card whose other rows end with xs ghost
+  // buttons, ends where their text ends: their 8px padding and 1px border in from the
+  // row's 15px inset, 24px from the card's edge.
+  chip: {
+    display: 'inline-flex',
+  },
+  endChip: {
+    marginInlineEnd: `calc(${spacing['--space-2']} + 1px)`,
   },
 })

@@ -165,9 +165,11 @@ function OwnerRow({ ownership }: { readonly ownership: Ownership }) {
   return (
     <ListRow
       trailing={
-        <Chip variant={state === 'active' ? 'filled' : 'outline'} size={20}>
-          {copy[state].chip}
-        </Chip>
+        <span data-owner-chip="" {...stylex.props(cell.chip, cell.endChip)}>
+          <Chip variant={state === 'active' ? 'filled' : 'outline'} size={20}>
+            {copy[state].chip}
+          </Chip>
+        </span>
       }
     >
       <Text variant="body" sx={cell.wrap} data-owner-line="">

@@ -31,12 +31,13 @@ const styles = stylex.create({
     display: 'flex',
     alignItems: 'center',
     gap: spacing['--space-1-5'],
-    marginTop: spacing['--space-2'],
-    marginInline: spacing['--space-2'],
+    marginTop: spacing['--space-1-5'],
+    marginInline: spacing['--space-1-5'],
     paddingBlock: spacing['--space-1-5'],
     paddingInline: spacing['--space-2-5'],
-    // Concentric with the composer's 20px corners, 8px in.
-    borderRadius: radii['--radius-xl'],
+    // The composer's one inset (6px, as the chips and the attach and send
+    // buttons), and concentric with its 20px corners.
+    borderRadius: radii['--radius-2xl'],
     backgroundColor: tints['--tint-warning-bg'],
     color: tints['--tint-warning-fg'],
   },
