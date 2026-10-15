@@ -153,11 +153,11 @@ The random simulation (10,000 traces of at most 160 transitions) found two forms
 
 ## Conversation metadata
 
-`metadata.qnt` models name, membership and archive fields, socket observations during a snapshot, and full refresh after a gap. `staleRename`, `staleMembership` and `staleArchive` each disable the observation fence in their broken mode and violate `eventWins`. `missedRename` disables the gap refresh and violates `quietAgreement`. Every corrected schedule must reach `reachedAgreement`. The runner also samples 10,000 random traces of at most 160 transitions; after input stops, recovery has a 16-transition drain bound.
+`metadata.qnt` models name, membership, archive, topic and purpose fields, socket observations during a snapshot, and full refresh after a gap. `staleRename`, `staleMembership` and `staleArchive` each disable the observation fence in their broken mode and violate `eventWins`. `missedRename` disables the gap refresh and violates `quietAgreement`. `ownDm` checks a DM-open answer against a held counts snapshot without a socket echo; `partial` checks an event omitting topic and purpose. Both broken modes violate `quietAgreement`. Every corrected schedule must reach `reachedAgreement`. The runner also samples 10,000 random traces of at most 160 transitions; after input stops, recovery has a 16-transition drain bound.
 
 The model serializes snapshot reads, matching the sync work permit. As with M7's older-page guard, an older read must finish before a later refresh can start. Events update the store and record the affected fields atomically. The implementation retains per-read patches until success, failure or interruption; it compares no Slack timestamp with a local timestamp. Membership snapshots cover absent members as well as listed ones. A rename leaves unrelated snapshot fields eligible to refresh.
 
-Assumptions: a successful full snapshot covers the relevant conversations, events are applied in socket order, and connectivity and reads eventually recover. Event creation and delivery are collapsed into one action; delayed or reordered events and local commands are outside this model. HTTP snapshots can survive a socket gap. This is simulation and directed regression coverage, not an unbounded proof.
+Assumptions: a successful full snapshot covers the relevant conversations, events are applied in socket order, and connectivity and reads eventually recover. Event creation and delivery are collapsed into one action; delayed or reordered events and local commands other than DM-open answers are outside this model. HTTP snapshots can survive a socket gap. This is simulation and directed regression coverage, not an unbounded proof.
 
 ## Accepted Unsubscribe: three races and their guards
 
@@ -439,8 +439,8 @@ Validation on 2026-10-14 after the WP8 and WP9 alignment: the full root `pnpm sp
 
 `agent-actions.qnt` also contains `agent_resolve`: the corrected/broken pair checks that Undo retains the host receipt, so a repeated dispatch cannot resolve the topic again.
 
-## Background request pacing
+## Request pacing
 
-`requestqueue.qnt` models independent method clocks, admission after a lane wait, and Retry-After with a doubled method interval. Its time units abstract the production intervals. `invariants` checks that dispatch never crosses a pause and a tier never becomes faster after a 429. The simulation does not model HTTP latency, lane fairness or Slack's actual limits; fake-server tests check the dispatch timestamps. Existing follow/read/catch-up models already permit reordered HTTP responses and make no fixed-spacing assumption.
+`requestqueue.qnt` models the total background clock (1,500 ms), method clocks, the interactive bucket (20 tokens, 2/second), and unpaced sends. Each tick is 125 ms; four credits make one interactive token. Retry-After doubles a method interval once per pause window up to 60 s; five quiet minutes halve it down to base. Admission follows the lane wait. `invariants` checks pauses, background deadlines, token bounds and interval bounds. The simulation does not model HTTP latency, lane fairness or Slack's actual limits; fake-server tests check the dispatch timestamps. Existing follow/read/catch-up models already permit reordered HTTP responses and make no fixed-spacing assumption.
 
 `discovery.qnt` describes a partial search page with a root and reply, or a reply alone. Applying root metadata first avoids a lookup only in the first case. Search leaves reaction and follow state unchanged. The model abstracts the counters and lookup success; it does not prove search completeness or replace the merge tests.

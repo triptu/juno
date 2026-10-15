@@ -326,6 +326,8 @@ const regressions = [
   ['metadata', 'staleRename', 'eventWins', 'metadata-stale-rename'],
   ['metadata', 'staleMembership', 'eventWins', 'metadata-stale-membership'],
   ['metadata', 'staleArchive', 'eventWins', 'metadata-stale-archive'],
+  ['metadata', 'ownDm', 'quietAgreement', 'metadata-own-dm'],
+  ['metadata', 'partial', 'quietAgreement', 'metadata-partial'],
   ['metadata', 'missedRename', 'quietAgreement', 'metadata-missed-rename'],
 ]
 // Specs whose corrected runs must reach their drained agreement.

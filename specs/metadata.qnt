@@ -1,11 +1,12 @@
-// Conversation columns: 1 = name version, 2 = membership, 3 = archive flag.
+// Conversation columns: 1 = name version, 2 = membership, 3 = archive flag,
+// 4 = topic, 5 = purpose. Own DM answers use the same fence as socket events.
 // Socket application and its observation are atomic with the store write.
 // Reads are serialized by the sync work permit (the same ordering M7 needs
 // for older pages). HTTP snapshots survive socket drops. No server clock
 // is compared with a local clock: each read records the columns touched since
 // it began. Boot and counts are separate reads with the same rule.
 module metadata {
-  val columns = Set(1, 2, 3)
+  val columns = Set(1, 2, 3, 4, 5)
   var server: int -> int
   var local: int -> int
   var page: int -> int
@@ -87,6 +88,37 @@ module metadata {
   action staleMembershipBugStep = staleWith(2, false)
   action staleArchiveStep = staleWith(3, true)
   action staleArchiveBugStep = staleWith(3, false)
+  action ownDmWith(fence: bool): bool = all {
+    not(sealed), server' = server.set(2, 1), local' = local.set(2, 1),
+    observed' = if (inFlight and fence) observed.union(Set(2)) else observed,
+    eventValue' = eventValue.set(2, 1), page' = page, inFlight' = inFlight,
+    connected' = connected, due' = due, sealed' = sealed
+  }
+  action ownDmSchedule(fence: bool): bool = all {
+    not(reachedAgreement), tick(
+      if (turn == 0) request else if (turn == 1) ownDmWith(fence)
+      else if (turn == 2) finishWith(true) else seal
+    )
+  }
+  action ownDmStep = ownDmSchedule(true)
+  action ownDmBugStep = ownDmSchedule(false)
+  // A partial event carries the name only; omitted topic/purpose are not observations.
+  action partialWith(patch: bool): bool = all {
+    server' = server.set(1, 1),
+    local' = if (patch) local.set(1, 1) else local.set(1, 1).set(4, 0).set(5, 0),
+    observed' = if (patch) observed.union(Set(1)) else observed.union(Set(1, 4, 5)),
+    eventValue' = if (patch) eventValue.set(1, 1) else eventValue.set(1, 1).set(4, 0).set(5, 0),
+    page' = page, inFlight' = inFlight, connected' = connected, due' = due, sealed' = sealed
+  }
+  action partialSchedule(patch: bool): bool = all {
+    not(reachedAgreement), tick(
+      if (turn == 0) disconnect else if (turn == 1) change(4) else if (turn == 2) change(5)
+      else if (turn == 3) reconnectWith(true) else if (turn == 4) request
+      else if (turn == 5) partialWith(patch) else if (turn == 6) finishWith(true) else seal
+    )
+  }
+  action partialStep = partialSchedule(true)
+  action partialBugStep = partialSchedule(false)
   action missedRenameWith(refresh: bool): bool = all {
     not(reachedAgreement), tick(
       if (sealed) progress else

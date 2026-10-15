@@ -2,12 +2,12 @@
  * The three lanes of docs/architecture.md section 5.1 and the per-method
  * rate buckets.
  *
- * - `interactive`: what the user is waiting for. Concurrency 3. Never waits
- *   long: if the method is paused for longer than `interactiveMaxWaitMillis`
+ * - `interactive`: what the user is waiting for. Concurrency 3, burst 20,
+ *   refill 2/second. Token waits queue; if the method is paused for longer than `interactiveMaxWaitMillis`
  *   the call fails at once with `SlackRateLimited`, so the route can answer
  *   from the cache and the engine can show `rate-limited`.
- * - `background`: backfill and sweeps. Concurrency 2, each method spaced 1,500 ms apart on its own (research section 6).
- *   A 429 doubles that method's interval for the session, up to 60 s.
+ * - `background`: backfill and sweeps. Concurrency 2, starts spaced 1,500 ms apart in total and per method (research section 6).
+ *   A 429 doubles that method's interval, up to 60 s; five quiet minutes halve it.
  * - `send`: one in flight, like the official client's message queue.
  *
  * The lanes have separate permits, so a flood of background calls cannot
@@ -22,6 +22,7 @@
 import { Clock, Context, Effect, Layer, Ref, Semaphore, Stream, SubscriptionRef } from 'effect'
 import { SlackConfig } from './config.ts'
 import { SlackRateLimited } from './errors.ts'
+import { makePacing } from './pacing.ts'
 
 export type Lane = 'interactive' | 'background' | 'send'
 
@@ -47,17 +48,7 @@ export class RequestQueue extends Context.Service<RequestQueue, RequestQueueShap
         send: yield* Semaphore.make(config.lanes.sendConcurrency),
       }
       const paused = yield* Ref.make(new Map<string, number>())
-      const buckets = new Map<string, { next: number; interval: number }>()
-      const bucketOf = (method: string) => {
-        let bucket = buckets.get(method)
-        if (bucket === undefined) {
-          // 40 per minute per method: the rate measured safe live. The token is shared with the
-          // official client, so Juno stays below the published 50 per minute to leave it room.
-          bucket = { next: 0, interval: config.lanes.backgroundMinIntervalMillis ?? 1_500 }
-          buckets.set(method, bucket)
-        }
-        return bucket
-      }
+      const pacing = makePacing(config.lanes, yield* Clock.currentTimeMillis)
       const slowed = yield* SubscriptionRef.make<number | undefined>(undefined)
       const scope = yield* Effect.scope
 
@@ -78,9 +69,9 @@ export class RequestQueue extends Context.Service<RequestQueue, RequestQueueShap
 
       const pause = (method: string, retryAfterMillis: number) =>
         Effect.gen(function* () {
-          const bucket = bucketOf(method)
-          bucket.interval = Math.min(60_000, bucket.interval * 2)
           const now = yield* Clock.currentTimeMillis
+          const previousPause = (yield* Ref.get(paused)).get(method) ?? 0
+          pacing.limited(method, now, previousPause)
           const wait = Math.min(Math.max(retryAfterMillis, 0), config.maxRetryAfterMillis)
           const until = now + wait
           yield* Ref.update(paused, (map) => new Map(map).set(method, Math.max(until, map.get(method) ?? 0)))
@@ -99,19 +90,16 @@ export class RequestQueue extends Context.Service<RequestQueue, RequestQueueShap
             const result = yield* permits[lane].withPermit(Effect.gen(function* () {
               const now = yield* Clock.currentTimeMillis
               const pauseEnd = (yield* Ref.get(paused)).get(method) ?? 0
-              const bucket = lane === 'background' ? bucketOf(method) : undefined
-              const until = Math.max(pauseEnd, bucket?.next ?? 0)
-              // Do not reserve a future slot or hold a lane permit while sleeping.
-              // Another method can run, and a new pause is checked on every admission.
-              if (until > now) return { kind: 'wait', millis: until - now } as const
-              if (bucket !== undefined) bucket.next = now + bucket.interval
+              if (lane === 'interactive' && pauseEnd - now > config.interactiveMaxWaitMillis) {
+                return yield* new SlackRateLimited({ method, retryAfterMillis: pauseEnd - now })
+              }
+              // No future reservation or lane permit is held while sleeping.
+              const wait = pacing.admit(lane, method, now, pauseEnd)
+              if (wait > 0) return { kind: 'wait', millis: wait } as const
               const value = yield* effect
               return { kind: 'done', value } as const
             }))
             if (result.kind === 'done') return result.value
-            if (lane === 'interactive' && result.millis > config.interactiveMaxWaitMillis) {
-              return yield* new SlackRateLimited({ method, retryAfterMillis: result.millis })
-            }
             yield* Effect.sleep(result.millis)
           }
         })

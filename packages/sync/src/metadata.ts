@@ -1,8 +1,9 @@
 /** Conversation snapshots keep socket observations made while their reads are in flight. */
+import type { Channel } from '@juno/slack-schema'
 import type { ConversationRow } from '@juno/store'
 import { StoreWriter } from '@juno/store'
 import { Effect } from 'effect'
-import { patchConversation, setMembership, upsertConversations } from './write'
+import { patchConversation, setMembership, toConversationRow, upsertConversations } from './write'
 
 type Patch = Partial<Omit<ConversationRow, 'id'>>
 export type MetadataRead = Map<string, Patch>
@@ -28,10 +29,24 @@ const observe = (fence: MetadataFence, id: string, patch: Patch) => Effect.sync(
 export const patchMetadata = (fence: MetadataFence, id: string, patch: Patch) =>
   patchConversation(id, patch).pipe(Effect.andThen(observe(fence, id, patch)))
 
-export const observeMetadata = (fence: MetadataFence, row: ConversationRow) => {
-  const { id, is_member: _membership, ...patch } = row
-  return upsertConversations([row]).pipe(Effect.andThen(observe(fence, id, patch)))
-}
+export const observeMetadata = (fence: MetadataFence, channel: Channel) => Effect.gen(function* () {
+  const row = toConversationRow(channel)
+  const patch: Patch = {
+    ...(channel.name === undefined ? {} : { name: row.name }),
+    ...(channel.user === undefined ? {} : { user_id: row.user_id }),
+    ...(channel.members === undefined ? {} : { member_ids_json: row.member_ids_json }),
+    ...(channel.is_archived === undefined ? {} : { is_archived: row.is_archived }),
+    ...(channel.topic === undefined ? {} : { topic: row.topic }),
+    ...(channel.purpose === undefined ? {} : { purpose: row.purpose }),
+    ...(channel.created === undefined ? {} : { created: row.created }),
+    ...(channel.updated === undefined ? {} : { updated: row.updated }),
+    ...(channel.is_channel === undefined && channel.is_group === undefined && channel.is_private === undefined && channel.is_im === undefined && channel.is_mpim === undefined && channel.user === undefined ? {} : { kind: row.kind }),
+  }
+  const sql = yield* StoreWriter
+  const existing = yield* sql<{ id: string }>`SELECT id FROM conversations WHERE id = ${channel.id}`
+  if (existing.length === 0) yield* upsertConversations([row])
+  yield* patchMetadata(fence, channel.id, patch)
+})
 
 /** Apply only snapshot fields untouched since the request began. Also handles a previously unknown row. */
 export const storeMetadata = (read: MetadataRead, rows: ReadonlyArray<ConversationRow>) =>

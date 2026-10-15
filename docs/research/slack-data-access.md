@@ -340,13 +340,15 @@ Inferred
 
 - Slack applies Tier limits per method and per token; the client's 60 s default backoff on 429 is a good default for Juno.
 
-### Background pacing policy (2026-10-15)
+### Request pacing policy (2026-10-17)
 
 The published [history](https://docs.slack.dev/reference/methods/conversations.history/) and [replies](https://docs.slack.dev/reference/methods/conversations.replies/) methods have Tier 3 limits (50+ per minute) for Marketplace and internal customer-built apps. Those pages also document a separate 1/minute policy for affected commercially distributed non-Marketplace apps. Neither policy establishes the limit of the internal `xoxc` session Juno uses. The live runs above only establish that 40/minute caused no 429.
 
-Juno spaces background starts 1,500 ms apart per method (40 per minute), independently for each method. This is the rate the live runs measured as safe. It stays below the published 50 per minute because the session token is shared with the official Slack client, which needs room for its own calls. A 429 retains Retry-After and doubles that method's spacing for the session, capped at 60 s. No recovery ramp is assumed without more live evidence. Test overrides can disable spacing.
+Juno spaces all background starts 1,500 ms apart in total (40/minute), and retains a separate 1,500 ms minimum for each method. The 298-call live run measured about 40/minute across all methods, not per method. This is evidence for a conservative background budget, not a guarantee for the internal session token shared with the official client.
 
-The earlier live run made 147 history calls and 114 replies calls. The gain comes from admitting methods independently and from discovery metadata, not from a faster per-method rate.
+Interactive reads use a separate token bucket: capacity 20, refill one token every 500 ms (2/second). Reconnect refetches beyond that allowance queue; waits release lane permits and recheck the method pause before dispatch. The send lane remains one in flight. The interactive budget is a local policy for normal use and bounded bursts, not a measured Slack allowance. The fake can inject method or global 429s but does not enforce a measured throughput limit.
+
+A 429 retains Retry-After and doubles that method's background interval once per active pause window, capped at 60 s. Every 429 resets its quiet timer. After five minutes without another 429 the interval halves, then halves every further five quiet minutes down to 1,500 ms. Existing start deadlines are retained. Interactive calls fail fast only for a method pause longer than five seconds, not because their token bucket is empty. Test overrides can disable background spacing and interactive refill waits independently.
 
 `subscriptions.thread.getView` cannot be paged in parallel from the known API: `current_ts` is the last preceding page's `latest_reply`, not an offset or an independently obtainable cursor. Guessing timestamps risks gaps when activity is uneven or moves between requests. The existing sequential pass remains; increasing `limit` does not remove its 10-row cap.
 

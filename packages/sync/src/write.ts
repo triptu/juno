@@ -414,6 +414,7 @@ export const markRepliesComplete = (channel: string, threadTs: string, complete:
           WHEN thread_cursors.complete_from IS NULL THEN excluded.complete_from
           WHEN excluded.complete_from < thread_cursors.complete_from THEN excluded.complete_from
           ELSE thread_cursors.complete_from END`
+    yield* invalidate({ thread_cursors: [threadTopicId(channel as ChannelId, threadTs as Ts)] })
   })
 
 /**
@@ -424,11 +425,12 @@ export const markRepliesComplete = (channel: string, threadTs: string, complete:
  * was last in step and marks their coverage again from Slack's pointer, and
  * a followed thread with no activity since then missed nothing.
  */
-export const endEventCoverage: Effect.Effect<void, SqlError, StoreWriter> = Effect.gen(function* () {
+export const endEventCoverage: Writer = Effect.gen(function* () {
   const sql = yield* StoreWriter
   yield* sql`UPDATE thread_cursors SET complete_from = NULL
     WHERE complete_from IS NOT NULL AND NOT EXISTS (
       SELECT 1 FROM thread_subs s WHERE s.channel = thread_cursors.channel AND s.thread_ts = thread_cursors.thread_ts AND s.subscribed = 1)`
+  yield* invalidate(['thread_cursors'])
 })
 
 // Read state (architecture 5.6, specs/readstate.qnt). The rules are `@juno/domain`'s
