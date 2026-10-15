@@ -12,10 +12,14 @@ import { WhyPopover } from '@juno/views'
 import { openTopicAt } from './navigation'
 import { changeFromWhy, closeWhy } from './notifyActions'
 
-/** A clicked notification: the topic at its message. The summary opens its first message until the Juno chat can take it (WP14). */
+/**
+ * A clicked notification: the topic at its message, which flashes, also in a
+ * tab that already shows it. The hours-start summary opens its first message
+ * until the Juno chat can take it.
+ */
 function open(target: NotificationTarget): void {
   const source = target._tag === 'message' ? target.source : target.first
-  openTopicAt(source.topicId, source.ts)
+  openTopicAt(source.topicId, source.ts, { flash: true })
 }
 
 /**
