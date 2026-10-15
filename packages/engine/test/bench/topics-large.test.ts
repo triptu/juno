@@ -91,7 +91,7 @@ describe.skipIf(process.env['JUNO_BENCH'] !== '1')('topics.list on the large see
       // A command has committed when it returns.
       if (!Exit.isSuccess(bots) || !Exit.isSuccess(wide)) throw new Error('views.save failed')
       // The query alone, on a reader of its own: every row shaped (no cache), then a subscription's re-run (warm cache).
-      await engine.syncIdle()
+      await engine.handle.stop()
       const paths = workspacePathsFromDir(join(engine.userData, 'workspaces', engine.fake.teamId))
       const isolated = await Effect.runPromise(
         Effect.gen(function* () {
@@ -198,8 +198,8 @@ describe.skipIf(process.env['JUNO_BENCH'] !== '1')('allTopics.list on the large 
     try {
       await engine.status('ready')
       await engine.phase('live', 600_000)
-      // The store is opened a second time below; the engine must have stopped writing.
-      await engine.syncIdle()
+      // Freeze the boot snapshot before opening a separate store for isolated timings.
+      await engine.handle.stop()
       const paths = workspacePathsFromDir(join(engine.userData, 'workspaces', engine.fake.teamId))
       const report = await Effect.runPromise(
         Effect.gen(function* () {
