@@ -94,7 +94,7 @@ test('adds a server, signs in, lists and moves tools, uses a read in chat, propo
   for (const tool of ['search_meetings', 'get_account', 'add_material', 'update_routine']) await expect(row.locator(`[data-tool="${tool}"]`)).toHaveAttribute('data-tool-tier', '3')
   const search = row.locator('[data-tool="search_meetings"]')
   // The box follows the agent's answer, so it changes once the tier is saved.
-  await search.getByLabel('Needs no click').click()
+  await search.getByLabel('Runs without asking').click()
   await expect(search).toHaveAttribute('data-tool-tier', '0')
   await expect(search.getByText('Read', { exact: true })).toBeVisible()
 
