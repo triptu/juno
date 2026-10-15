@@ -192,7 +192,13 @@ With `JUNO_AGENT=1` (for example `JUNO_AGENT=1 pnpm dev`), main also forks the J
 Agent utility process (`src/main/agent.ts`, built from `src/agent/index.ts` to
 `out/main/agent.js`) without the Slack partition, and on every engine `ready` brokers
 a port between the agent and the engine's AgentHost server (ADR 0012). It stays off
-by default until the chat ships. The spike scripts behind the agent's design are in
+by default until the chat ships. The agent's OpenRouter key is the one saved in
+Settings › Juno, kept in the login keychain as the generic password
+`juno-openrouter-key`; `OPENROUTER_API_KEY` in the environment overrides it for
+development. Delete the item with `security delete-generic-password -s
+juno-openrouter-key` to start again with no key. Under `JUNO_E2E` the key is kept in
+memory, and `JUNO_FAKE_OPENROUTER_URL` points the agent at `startFakeOpenRouter()`
+from `@juno/agent-testing/openrouter`. The spike scripts behind the agent's design are in
 `docs/juno-agent/spikes/`, with their results in `docs/juno-agent/spikes.md`.
 
 ## Sign-in and the live smoke
