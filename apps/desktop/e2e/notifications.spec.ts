@@ -146,7 +146,7 @@ test('Set yourself away and active from the avatar menu sets Slack presence', as
   const startsActive = (await away.count()) > 0
   slack.resetCalls()
   await juno.accountMenu.item(startsActive ? 'Set yourself away' : 'Set yourself active').click()
-  await slack.expectPresenceSet(startsActive ? 'away' : 'auto')
+  await slack.expectPresenceSet(startsActive ? 'away' : 'active')
   await juno.accountMenu.open()
   await expect(juno.accountMenu.item(startsActive ? 'Set yourself active' : 'Set yourself away')).toBeVisible()
   await juno.accountMenu.expectPresence(startsActive ? /^Away/ : /^Active/)
@@ -154,7 +154,7 @@ test('Set yourself away and active from the avatar menu sets Slack presence', as
   // And back.
   slack.resetCalls()
   await juno.accountMenu.item(startsActive ? 'Set yourself active' : 'Set yourself away').click()
-  await slack.expectPresenceSet(startsActive ? 'auto' : 'away')
+  await slack.expectPresenceSet(startsActive ? 'active' : 'away')
 })
 
 test('Preferences lists an ignored channel, and Stop ignoring has Undo', async ({ juno }) => {

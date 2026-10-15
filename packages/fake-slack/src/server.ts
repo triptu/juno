@@ -351,7 +351,10 @@ export class FakeServer {
         ws.send(JSON.stringify(encodeRtmFrame({ type: 'pong', reply_to: frame['id'] })))
       } else if (frame['type'] === 'presence_sub' && Array.isArray(frame['ids'])) {
         const users = frame['ids'].filter((id): id is string => typeof id === 'string' && this.workspace.users.has(id))
-        if (users.length > 0) ws.send(JSON.stringify(encodeRtmFrame({ type: 'presence_change', presence: 'active', users })))
+        const self = users.filter((id) => id === this.workspace.selfId && this.workspace.manualPresence === 'away')
+        const others = users.filter((id) => !self.includes(id))
+        if (others.length > 0) ws.send(JSON.stringify(encodeRtmFrame({ type: 'presence_change', presence: 'active', users: others })))
+        if (self.length > 0) ws.send(JSON.stringify(encodeRtmFrame({ type: 'presence_change', presence: 'away', users: self })))
       }
     })
     ws.send(JSON.stringify(encodeRtmFrame({ type: 'hello', region: 'fake', host_id: 'fake-1', fast_reconnect: false, start: true })))
@@ -423,6 +426,8 @@ export class FakeServer {
 
   #run<M extends MethodName>(method: M, fields: FormFields): ApiError | { ok: true } {
     const definition = Methods[method]
+    // Slack's own error for a presence it does not take (`auto` is the public API's word, not this method's).
+    if (method === 'presence.set' && fields['presence'] !== 'active' && fields['presence'] !== 'away') return new ApiError('invalid_presence')
     let args: (typeof definition)['args']['Type']
     try {
       args = Schema.decodeUnknownSync(definition.args)(fields) as (typeof definition)['args']['Type']

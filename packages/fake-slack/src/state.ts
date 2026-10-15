@@ -93,6 +93,8 @@ export class Workspace {
   prefs: UserPrefs = {}
   /** The user groups self belongs to, as `client.userBoot.subteams.self` lists them. */
   selfUsergroups: Array<string> = []
+  /** The self user's `manual_presence`: `active` (Slack's automatic mode) or `away`. */
+  manualPresence: 'active' | 'away' = 'active'
   readonly clock: Clock
   readonly selfId: string
   readonly team: Team

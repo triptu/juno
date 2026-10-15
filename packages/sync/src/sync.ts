@@ -46,6 +46,8 @@ export interface RunSyncOptions {
   readonly onEvent?: (event: SocketEvent, me: import('@juno/domain').Me) => Effect.Effect<void>
   /** Brackets each boot, reboot or reconciliation, including its background follow pass. */
   readonly onCycle?: (event: 'started' | 'finished') => Effect.Effect<void>
+  /** Called with the user's own presence as `client.userBoot` reports it (`self.manual_presence`), at every workspace refresh. */
+  readonly onSelfPresence?: (presence: 'active' | 'away') => Effect.Effect<void>
   /** Called on every phase change. */
   readonly onPhase: (phase: SyncPhase) => Effect.Effect<void>
   /** Called when the socket says hello (true) and when it drops (false): whether Slack can be reached now. */
@@ -95,6 +97,7 @@ export const runSync = (options: RunSyncOptions): Effect.Effect<never, SlackAuth
       missingUsers: new Map(),
       usersWanted: yield* Queue.sliding<void>(1),
       usersOnBackground: false,
+      onSelfPresence: options.onSelfPresence ?? (() => Effect.void),
       unknownUsers: new Set(),
       lateReactions: new Map(),
       fetchesInFlight: new Set(),

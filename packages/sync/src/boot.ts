@@ -112,6 +112,8 @@ const loadWorkspace = (ctx: SyncContext, withPrefs: boolean): Effect.Effect<void
         yield* upsertConversations([...boot.channels.map((c) => toConversationRow(c)), ...boot.ims.map((im) => toConversationRow(im))])
       }),
     )
+    const presence = boot.self.manual_presence
+    if (presence === 'active' || presence === 'away') yield* ctx.onSelfPresence(presence)
   })
 
 /**

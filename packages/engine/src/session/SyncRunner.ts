@@ -88,9 +88,10 @@ export class SyncRunner extends Context.Service<
               return SubscriptionRef.set(syncing, cycles > 0)
             })
           const program = Effect.gen(function* () {
-            const onEvent = yield* startNotifications
+            const { onEvent, onSelfPresence } = yield* startNotifications
             return yield* runSync({
               onEvent,
+              onSelfPresence,
               onCycle: (event) =>
                 (event === 'finished' ? link.caughtUp : Effect.void).pipe(
                   Effect.andThen(countCycle(event)),

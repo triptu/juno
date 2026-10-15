@@ -202,5 +202,9 @@ export const startNotifications = Effect.gen(function* () {
       yield* safe(notifications.tick)
     }
   }))
-  return (event: SocketEvent, me: Me) => event._tag === 'Frame' ? Queue.offer(queue, { frame: event.frame, me }).pipe(Effect.asVoid) : Effect.void
+  return {
+    onEvent: (event: SocketEvent, me: Me) => event._tag === 'Frame' ? Queue.offer(queue, { frame: event.frame, me }).pipe(Effect.asVoid) : Effect.void,
+    /** Slack's presence for the user as the boot read it. */
+    onSelfPresence: (presence: Presence) => notifications.seedPresence(presence),
+  }
 })

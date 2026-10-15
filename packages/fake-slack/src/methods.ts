@@ -98,7 +98,7 @@ export const handlers: Handlers = {
     const ims = records.filter((c) => c.kind === 'im').map((c) => ws.imObject(c))
     const cacheTs = `${Math.floor(ws.clock.now() / 1000)}.000000`
     return {
-      self,
+      self: { ...self, manual_presence: ws.manualPresence },
       team: { ...ws.team, url: `${ctx.baseUrl}/` },
       prefs: ws.prefs,
       channels,
@@ -318,7 +318,8 @@ export const handlers: Handlers = {
   },
 
   'presence.set': (ctx, args) => {
-    ctx.workspace.emit({ type: 'manual_presence_change', presence: args.presence === 'auto' ? 'active' : 'away', user: ctx.workspace.selfId })
+    ctx.workspace.manualPresence = args.presence
+    ctx.workspace.emit({ type: 'manual_presence_change', presence: args.presence, user: ctx.workspace.selfId })
     return {}
   },
   'chat.postMessage': (ctx, args) => {
