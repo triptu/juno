@@ -89,8 +89,8 @@ function JunoMenu({ onOpenPage }: { readonly onOpenPage: (page: JunoPage) => voi
 export function JunoPanelActions({ onOpenInTab, onClose }: { readonly onOpenInTab: () => void; readonly onClose: () => void }) {
   return (
     <>
-      <IconButton icon={ArrowsOutSimple} label={chatCopy.panel.openInTab} size={28} iconSize={15} radius="full" tone="default" onClick={onOpenInTab} />
-      <IconButton icon={X} label={chatCopy.panel.close} size={28} iconSize={15} radius="full" tone="default" onClick={onClose} />
+      <IconButton icon={ArrowsOutSimple} label={chatCopy.panel.openInTab} size={28} iconSize={15} radius="full" variant="island" onClick={onOpenInTab} />
+      <IconButton icon={X} label={chatCopy.panel.close} size={28} iconSize={15} radius="full" variant="island" onClick={onClose} />
     </>
   )
 }

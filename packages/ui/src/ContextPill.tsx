@@ -4,6 +4,10 @@ import { Icon, type IconSize, type PhosphorIcon } from './Icon'
 import { interactive } from './internal/interactive'
 import { variants as typeVariants } from './internal/type'
 
+// Hover styles only apply on devices with a real pointer. Local because
+// StyleX cannot read constants from other modules.
+const HOVER = '@media (hover: hover)'
+
 /** The three context tints from the tokens: neutral, amber and blue. */
 export type ContextTint = 'public' | 'private' | 'dm'
 export type ContextPillSize = 22 | 24 | 26 | 28
@@ -54,7 +58,7 @@ export function ContextPill({ tint, icon, name, kindLabel, showKind = false, siz
         title={kindLabel}
         aria-label={label}
         onClick={onClick}
-        {...stylex.props(interactive.reset, interactive.feedback, interactive.press, interactive.focusRing, styles.base, typeVariants.pill, sizeStyles[size], tintStyles[tint])}
+        {...stylex.props(interactive.reset, interactive.feedback, interactive.press, interactive.focusRing, styles.base, typeVariants.pill, sizeStyles[size], tintStyles[tint], hoverStyles[tint])}
       >
         {content}
       </button>
@@ -97,6 +101,13 @@ const sizeStyles = stylex.create({
   24: { height: sizes['--control-24'], paddingInline: spacing['--space-2'], gap: spacing['--space-1-5'], fontSize: text['--text-meta-size'], lineHeight: sizes['--control-24'] },
   26: { height: sizes['--control-26'] },
   28: { height: sizes['--control-28'] },
+})
+
+// Only a pill that does something answers the pointer.
+const hoverStyles = stylex.create({
+  public: { backgroundColor: { default: tints['--tint-public-bg'], ':hover': { default: null, [HOVER]: tints['--tint-public-hover'] } } },
+  private: { backgroundColor: { default: tints['--tint-private-bg'], ':hover': { default: null, [HOVER]: tints['--tint-private-hover'] } } },
+  dm: { backgroundColor: { default: tints['--tint-dm-bg'], ':hover': { default: null, [HOVER]: tints['--tint-dm-hover'] } } },
 })
 
 const tintStyles = stylex.create({

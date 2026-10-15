@@ -5,14 +5,14 @@ import { ChatsCircle } from '@phosphor-icons/react/dist/icons/ChatsCircle'
 import { ChatText } from '@phosphor-icons/react/dist/icons/ChatText'
 import { Hash } from '@phosphor-icons/react/dist/icons/Hash'
 import { Lock } from '@phosphor-icons/react/dist/icons/Lock'
-import { MagnifyingGlass } from '@phosphor-icons/react/dist/icons/MagnifyingGlass'
 import { User } from '@phosphor-icons/react/dist/icons/User'
 import { Users } from '@phosphor-icons/react/dist/icons/Users'
 import { useState, type KeyboardEvent, type ReactNode } from 'react'
 import type { ConversationKind, PickConversation, PickConversations, PickThread } from '@juno/contract'
 import { accent, colors, motion, radii, sizes, spacing, text, tints } from '@juno/tokens/tokens.stylex'
-import { Avatar, Icon, OptionGroupLabel, OptionList, OptionRow, Popover, Text, useOptionListKeys, type PhosphorIcon } from '@juno/ui'
+import { Avatar, Icon, OptionGroupLabel, OptionList, OptionRow, Popover, useOptionListKeys, type PhosphorIcon } from '@juno/ui'
 import { hueFor, initials } from './look'
+import { PickerNoMatch, PickerSearch } from './PickerSearch'
 import { relativeTime } from './time'
 
 export type PickerName = 'conversation' | 'thread'
@@ -164,33 +164,6 @@ function PickerButton({ label, icon, tint, muted, wide = false, expanded, onOpen
   )
 }
 
-/** The search field at the top of an open list, and the keys that drive the list. */
-function SearchField({ query, onQuery, placeholder, onKeyDown, activeId }: {
-  readonly query: string
-  readonly onQuery: (query: string) => void
-  readonly placeholder: string
-  readonly onKeyDown: (event: KeyboardEvent<HTMLElement>) => void
-  readonly activeId: string | undefined
-}) {
-  return (
-    <label {...stylex.props(styles.search)}>
-      <span {...stylex.props(styles.searchIcon)}>
-        <Icon icon={MagnifyingGlass} size={14} />
-      </span>
-      <input
-        autoFocus
-        value={query}
-        placeholder={placeholder}
-        aria-label={placeholder}
-        aria-activedescendant={activeId}
-        onChange={(event) => onQuery(event.currentTarget.value)}
-        onKeyDown={onKeyDown}
-        {...stylex.props(styles.searchInput)}
-      />
-    </label>
-  )
-}
-
 /** The highlighted row: the one the pointer or the arrows chose, or the first. */
 function useActive(ids: ReadonlyArray<string>): readonly [string | undefined, (id: string) => void] {
   const [chosen, setChosen] = useState<string | undefined>(undefined)
@@ -216,7 +189,7 @@ function ConversationList({ query, onQuery, conversations, onPickConversation, o
   const onKeyDown = useOptionListKeys({ ids, activeId, onActiveChange: setActive, onSelect: pick, onClose: () => onOpen(undefined) })
   return (
     <>
-      <SearchField query={query} onQuery={onQuery} placeholder="Search people and channels" onKeyDown={onKeyDown} activeId={activeId} />
+      <PickerSearch query={query} onQuery={onQuery} placeholder="Search people and channels" onKeyDown={onKeyDown} activeId={activeId} />
       <div {...stylex.props(styles.scroll)}>
         <OptionList label="Conversations" {...(activeId === undefined ? {} : { activeId })}>
           {sections.map(([title, items]) =>
@@ -242,7 +215,7 @@ function ConversationList({ query, onQuery, conversations, onPickConversation, o
               </div>
             ),
           )}
-          {conversations !== undefined && rows.length === 0 ? <NoMatch /> : null}
+          {conversations !== undefined && rows.length === 0 ? <PickerNoMatch /> : null}
         </OptionList>
       </div>
     </>
@@ -258,7 +231,7 @@ function ThreadList({ query, onQuery, conversation, threads, now, onPickThread, 
   const onKeyDown = useOptionListKeys({ ids, activeId, onActiveChange: setActive, onSelect: pick, onClose: () => onOpen(undefined) })
   return (
     <>
-      <SearchField query={query} onQuery={onQuery} placeholder="Search threads" onKeyDown={onKeyDown} activeId={activeId} />
+      <PickerSearch query={query} onQuery={onQuery} placeholder="Search threads" onKeyDown={onKeyDown} activeId={activeId} />
       <div {...stylex.props(styles.scroll)}>
         <OptionList label="Threads" {...(activeId === undefined ? {} : { activeId })}>
           {conversation === undefined ? <OptionGroupLabel>Recent threads</OptionGroupLabel> : null}
@@ -291,18 +264,10 @@ function ThreadList({ query, onQuery, conversation, threads, now, onPickThread, 
               />
             )
           })}
-          {threads !== undefined && ids.length === 0 ? <NoMatch /> : null}
+          {threads !== undefined && ids.length === 0 ? <PickerNoMatch /> : null}
         </OptionList>
       </div>
     </>
-  )
-}
-
-function NoMatch() {
-  return (
-    <Text variant="ui" tone="muted" as="div" sx={styles.noMatch}>
-      No match.
-    </Text>
   )
 }
 
@@ -371,43 +336,11 @@ const styles = stylex.create({
     display: 'inline-flex',
     color: colors['--foreground-muted'],
   },
-  search: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: spacing['--space-2'],
-    paddingBlock: spacing['--space-2-5'],
-    paddingInline: spacing['--space-3'],
-    borderBottomWidth: '1px',
-    borderBottomStyle: 'solid',
-    borderBottomColor: colors['--border-default'],
-    cursor: 'text',
-  },
-  searchIcon: {
-    display: 'inline-flex',
-    color: colors['--foreground-muted'],
-  },
-  searchInput: {
-    flexGrow: 1,
-    minWidth: 0,
-    margin: 0,
-    padding: 0,
-    borderWidth: 0,
-    backgroundColor: 'transparent',
-    color: colors['--foreground-default'],
-    fontFamily: text['--text-ui-family'],
-    fontSize: text['--text-ui-size'],
-    outline: 'none',
-    '::placeholder': { color: colors['--foreground-muted'], opacity: 1 },
-  },
   scroll: {
     maxHeight: LIST_MAX_HEIGHT,
     overflowY: 'auto',
     overscrollBehavior: 'contain',
     padding: spacing['--space-1-5'],
-  },
-  noMatch: {
-    paddingBlock: spacing['--space-3-5'],
-    paddingInline: spacing['--space-2-5'],
   },
 })
 

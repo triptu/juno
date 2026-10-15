@@ -1,6 +1,6 @@
 import { memo, Suspense } from 'react'
 import { prefsGet, prefsSet, type SettingsSection } from '@juno/contract'
-import { liveQuery, runCommand, accentAtom, densityAtom, ignoredChannelsAtom, peekKeyAtom, stopIgnoring, persistAccent, persistDensity, persistTheme, registry, setPeekKey, themeAtom, type Accent, type Density, type Theme } from '@juno/state'
+import { liveQuery, runCommand, accentAtom, densityAtom, ignoredChannelsAtom, newTabPageAtom, peekKeyAtom, stopIgnoring, persistAccent, persistDensity, persistTheme, registry, setNewTabPage, setPeekKey, themeAtom, type Accent, type Density, type Theme } from '@juno/state'
 import { useAtom, useAtomValue } from '@juno/state/react'
 import { SettingsAbout, SettingsAppearance, SettingsGeneral, SettingsIgnored, SettingsPage } from '@juno/views'
 import { AppInfo } from './AppInfo'
@@ -52,7 +52,7 @@ function Section({ section }: { readonly section: SettingsSection }) {
   }
 }
 
-/** The peek key, and the fast classifier, saved in the `aiModels` preference as an empty classifier slug when off. */
+/** What a new tab opens, the peek key, and the fast classifier, saved in the `aiModels` preference as an empty classifier slug when off. */
 function General() {
   const models = useAtomValue(modelsAtom)
   const modelPrefs = models._tag === 'Success' && typeof models.value === 'object' && models.value !== null && !Array.isArray(models.value) ? models.value : {}
@@ -62,7 +62,8 @@ function General() {
     void runCommand(registry, prefsSet, { key: 'aiModels', value: enabled ? value : { ...value, classifier: '' } })
   }
   const peekKey = useAtomValue(peekKeyAtom)
-  return <SettingsGeneral peekKey={peekKey} onPeekKeyChange={(key) => setPeekKey(registry, key)} classifier={classifier} onClassifierChange={changeClassifier} />
+  const newTabPage = useAtomValue(newTabPageAtom)
+  return <SettingsGeneral newTabPage={newTabPage} onNewTabPageChange={(page) => setNewTabPage(registry, page)} peekKey={peekKey} onPeekKeyChange={(key) => setPeekKey(registry, key)} classifier={classifier} onClassifierChange={changeClassifier} />
 }
 
 /** Theme, accent and density, saved to main for the next launch's first frame. */

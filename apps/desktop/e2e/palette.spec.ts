@@ -222,7 +222,7 @@ test("Slack's search adds what the cache lacks under the local rows, and opening
 test('keyboard only: ⌘K, type, arrows, Enter and Esc', async ({ juno }) => {
   await juno.signIn()
   await juno.waitForSync()
-  const { palette, sidebar, tabs } = juno
+  const { palette, sidebar } = juno
 
   await palette.open()
   await palette.expectResults()
@@ -251,7 +251,7 @@ test('keyboard only: ⌘K, type, arrows, Enter and Esc', async ({ juno }) => {
   await palette.expectNoMatches()
   await palette.press('Escape')
   await palette.expectClosed()
-  await tabs.expectCount(0)
+  await juno.expectNothingOpen()
 })
 
 

@@ -6,7 +6,8 @@ import { interactive } from './internal/interactive'
 
 export type IconButtonSize = 20 | 22 | 26 | 28 | 30 | 32 | 36
 export type IconButtonRadius = 'xs' | 'sm' | 'md' | 'lg' | 'xl' | 'full'
-export type IconButtonVariant = 'ghost' | 'secondary' | 'primary' | 'raised'
+/** `island`: a control in a page header's island (inventory 5), with the island's own hover and pressed fills. */
+export type IconButtonVariant = 'ghost' | 'secondary' | 'primary' | 'raised' | 'island'
 export type IconButtonTone = 'default' | 'subtle' | 'muted'
 
 export interface IconButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'style' | 'className' | 'children'> {
@@ -25,6 +26,8 @@ export interface IconButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonEle
    * the fill pops in with the spring, toggling off just cross-fades.
    */
   readonly pressed?: boolean
+  /** A menu button whose menu is showing: `aria-expanded`, drawn as pressed. */
+  readonly expanded?: boolean
   readonly dimmed?: boolean
   /** Hides the native tooltip when the label would repeat visible text. */
   readonly noTooltip?: boolean
@@ -75,6 +78,7 @@ export function IconButton({
   variant = 'ghost',
   tone = 'subtle',
   pressed,
+  expanded,
   dimmed = false,
   noTooltip = false,
   type = 'button',
@@ -89,6 +93,7 @@ export function IconButton({
       aria-label={label}
       title={noTooltip ? undefined : label}
       aria-pressed={pressed}
+      aria-expanded={expanded}
       aria-disabled={dimmed || undefined}
       disabled={disabled}
       {...rest}
@@ -103,7 +108,7 @@ export function IconButton({
         radiusStyles[radius ?? radiusBySize[size]],
         variants[variant],
         variant === 'ghost' && tones[tone],
-        pressed && pressedStyles[variant],
+        (pressed === true || expanded === true) && pressedStyles[variant],
         (dimmed || disabled) && interactive.dimmed,
       )}
     >
@@ -200,6 +205,14 @@ const radiusStyles = stylex.create({
 })
 
 const variants = stylex.create({
+  // On the island's surface `--surface-hover` is too close to read, so the island's controls take the secondary fills.
+  island: {
+    color: colors['--foreground-default'],
+    backgroundColor: {
+      default: 'transparent',
+      ':hover': { default: null, [HOVER]: colors['--secondary-default'] },
+    },
+  },
   ghost: {
     backgroundColor: {
       default: 'transparent',
@@ -251,4 +264,10 @@ const pressedStyles = stylex.create({
   secondary: { backgroundColor: colors['--secondary-active'] },
   primary: {},
   raised: {},
+  island: {
+    backgroundColor: {
+      default: colors['--secondary-hover'],
+      ':hover': { default: null, [HOVER]: colors['--secondary-active'] },
+    },
+  },
 })

@@ -245,7 +245,7 @@ function setAppMenu(state: MenuState, rebuild = false): void {
   // ⌘N and ⌘T both open a new tab (a New chat, spec section 9). ⌘W closes
   // the tab, not the window; ⌘⇧W closes the window.
   const file: MenuItemConstructorOptions[] = [
-    command('new-chat', 'New Chat', 'CommandOrControl+N', 'tab.new'),
+    command('new-chat', 'New Chat', 'CommandOrControl+N', 'chat.new'),
     command('new-tab', 'New Tab', 'CommandOrControl+T', 'tab.new'),
     command('reopen-tab', 'Reopen Closed Tab', 'CommandOrControl+Shift+T', 'tab.reopen'),
     { type: 'separator' },

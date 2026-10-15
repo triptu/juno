@@ -109,22 +109,28 @@ export function threadTitlesStatement(topicIds: ReadonlyArray<string>): Statemen
   }
 }
 
+/** A thread resolved with no activity after the resolve, as All topics reads it. */
+const RESOLVED = `(o.resolved_at IS NOT NULL AND NOT (o.resolved_activity_ts IS NOT NULL AND i.last_activity_ts > o.resolved_activity_ts))`
+
 /**
  * A channel's threads with activity since `cutoff`, newest first, through
  * `topic_index_channel_activity (channel, last_activity_ts DESC)`, with
  * what a `ThreadSummary` shows. `count` is the number of such threads.
+ * With no `cutoff` (the header's topic switcher): every thread the store
+ * knows, open ones first, then the resolved ones, each newest first.
  */
-export function threadsStatements(channel: string, cutoff: string, limit: number): { readonly list: Statement; readonly count: Statement } {
-  const where = `i.channel = ? AND i.kind = 'thread' AND i.last_activity_ts >= ?`
+export function threadsStatements(channel: string, cutoff: string | undefined, limit: number): { readonly list: Statement; readonly count: Statement } {
+  const where = cutoff === undefined ? `i.channel = ? AND i.kind = 'thread'` : `i.channel = ? AND i.kind = 'thread' AND i.last_activity_ts >= ?`
+  const params = cutoff === undefined ? [channel] : [channel, cutoff]
   return {
     list: {
       sql: `SELECT i.topic_id, i.root_ts, i.last_activity_ts, i.message_count, i.unread_count, i.unread_exact, i.mentions_me,
-          i.participants_json, i.preview_json, i.rev, o.manual_title, o.ai_title
+          i.participants_json, i.preview_json, i.rev, o.manual_title, o.ai_title, ${RESOLVED} AS resolved
         FROM topic_index i
         LEFT JOIN topic_overlay o ON o.topic_id = i.topic_id
-        WHERE ${where} ORDER BY i.last_activity_ts DESC LIMIT ?`,
-      params: [channel, cutoff, limit],
+        WHERE ${where} ORDER BY ${cutoff === undefined ? 'resolved, ' : ''}i.last_activity_ts DESC LIMIT ?`,
+      params: [...params, limit],
     },
-    count: { sql: `SELECT count(*) AS n FROM topic_index i WHERE ${where}`, params: [channel, cutoff] },
+    count: { sql: `SELECT count(*) AS n FROM topic_index i WHERE ${where}`, params },
   }
 }

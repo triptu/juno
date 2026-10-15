@@ -5,6 +5,7 @@ import { spacing } from '@juno/tokens/tokens.stylex'
 import { Checkbox, Page, PageHeader, Section, Surface, Text } from '@juno/ui'
 import { AppearanceSettings, type AppearanceSettingsProps } from './AppearanceSettings'
 import { IgnoredChannels } from './IgnoredChannels'
+import { NewTabSetting, type NewTabPageName } from './NewTabSetting'
 import { PeekKeySetting, type PeekKeyName } from './PeekKeySetting'
 
 // The sections of Settings that are the app's own (SPEC 14). Notifications,
@@ -12,17 +13,25 @@ import { PeekKeySetting, type PeekKeyName } from './PeekKeySetting'
 // is a settings page with its title; `SettingsPage` puts the list beside it.
 
 export interface SettingsGeneralProps {
+  /** What a new tab opens: "+", ⌘T and the tab that replaces the last one closed. */
+  readonly newTabPage: NewTabPageName
+  readonly onNewTabPageChange: (page: NewTabPageName) => void
   readonly peekKey: PeekKeyName
   readonly onPeekKeyChange: (key: PeekKeyName) => void
   readonly classifier: boolean
   readonly onClassifierChange: (enabled: boolean) => void
 }
 
-/** General: the peek key and the fast classifier. */
-export function SettingsGeneral({ peekKey, onPeekKeyChange, classifier, onClassifierChange }: SettingsGeneralProps) {
+/** General: what a new tab opens, the peek key and the fast classifier. */
+export function SettingsGeneral({ newTabPage, onNewTabPageChange, peekKey, onPeekKeyChange, classifier, onClassifierChange }: SettingsGeneralProps) {
   return (
     <Page width="settings">
       <PageHeader title="General" />
+      <Section heading="Tabs" sub="What the + button, ⌘T and closing the last tab open.">
+        <Surface kind="group" padding="md">
+          <NewTabSetting value={newTabPage} onChange={onNewTabPageChange} />
+        </Surface>
+      </Section>
       <Section heading="Peek" sub="Hold the key over a topic in the sidebar to read it without marking it read.">
         <Surface kind="group" padding="md">
           <PeekKeySetting value={peekKey} onChange={onPeekKeyChange} />

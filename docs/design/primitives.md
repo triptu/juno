@@ -50,7 +50,7 @@ Button with only an icon. `label` is required and doubles as the tooltip (`noToo
 | `radius` | derived (4 for 20–22, 6 for 26, 12 for 28 (the hover-toolbar button), 8 for 30+), or `sm` (5, dismiss), `full` (attach, send) |
 
 `EmojiButton`: the 28px hover-toolbar button whose icon is an emoji (`emoji` as text, or `src` for a custom emoji's image, with `emoji` as the alt), radius 12, the same feedback as `IconButton`. Needs a `label` ("React 👍").
-| `variant` | `ghost` (default), `secondary`, `primary` (send), `raised` |
+| `variant` | `ghost` (default), `secondary`, `primary` (send), `raised`, `island` (a page header island's control: hover `--secondary-default`, pressed `--secondary-hover`) |
 | `tone` | `subtle` (default), `muted`, `default` for ghost |
 | `icon`, `iconSize`, `iconWeight`, `dimmed` | as Button. Icon 12 / 12 / 13 / 18 / 18 / 18 / 20 by size; the send arrow passes `iconWeight="bold"`, attach `iconSize={20}` |
 | `pressed` | Toggle state (subscribe, pin): `aria-pressed` and the filled icon. Both icons stay in the DOM; the fill scales 0.8 → 1 with the spring over `--duration-pop` and cross-fades in, off just cross-fades over `--duration-fast` |
@@ -119,7 +119,7 @@ Menus are not a separate primitive: an in-app menu (the account menu) is an `Opt
 
 ## 11. Tabs
 
-`TabStrip` (44px drag region, full width, bottom border, `trailing` slot for the new-tab IconButton) + `Tab` (`icon` at 0.75, or `leading` to fill the fixed 15px icon slot with a topic's art, `label`, `active`, `onSelect`, `onClose` with `closeLabel`, `onContextMenu`; 35px, radius 8 8 0 0, flex 0 1 230, min 72; the active tab's bottom border is the page colour so it merges).
+`TabStrip` (44px drag region, full width, bottom border; the scroller is only as wide as its tabs, so the `trailing` slot, a tab-high square for the new-tab IconButton, follows the last tab and stays at the strip's end once the tabs scroll) + `Tab` (`icon` at 0.75, or `leading` to fill the fixed 15px icon slot with a topic's art, `label`, `active`, `onSelect`, `onClose` with `closeLabel`, `onContextMenu`; 35px, radius 8 8 0 0, flex 0 1 230, min 72; the active tab's bottom border is the page colour so it merges).
 
 ## 12. Fields
 

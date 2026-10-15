@@ -1,6 +1,9 @@
-// Tabs: opening uses the current tab, ⌘-click opens a new one, an open
-// topic focuses its tab, closing focuses the neighbour, the app menu's tab
-// items, the row menu's Open in new tab, and tabs survive a restart.
+// Tabs: opening uses the current tab, ⌘-click opens a new one, a plain open
+// of an open topic focuses its tab, one topic in two tabs scrolls apart,
+// closing focuses the neighbour and never leaves no tab, what a new tab
+// opens, where "+" sits, the app menu's tab items, the row menu's Open in
+// new tab, and tabs survive a restart.
+import { startFakeSlack, topic300Seed } from '@juno/fake-slack'
 import { expectNoLayoutShift } from '@juno/testing/layout-shift'
 import { expect, launchApp, test } from './fixtures'
 import { Juno } from './driver/juno'
@@ -45,8 +48,8 @@ test('opening, ⌘-click, focusing an open topic and closing to the neighbour', 
   await tabs.expectActive(ROADMAP)
   await tabs.close(ROADMAP)
   await tabs.expectActive(RINA)
+  // Closing the last tab leaves a New chat, never no tab.
   await tabs.close(RINA)
-  await tabs.expectCount(0)
   await juno.expectNothingOpen()
 })
 
@@ -64,9 +67,10 @@ test('closing a tab from the keyboard leaves focus in the strip', async ({ juno 
   await tabs.expectFocused(ROADMAP)
   await tabs.closeWithKeyboard(ROADMAP)
   await tabs.expectFocused(POSTGRES)
+  // The last one gives way to a New chat, whose composer takes focus.
   await tabs.closeWithKeyboard(POSTGRES)
-  await tabs.expectCount(0)
-  await expect(tabs.newTabButton).toBeFocused()
+  await juno.expectNothingOpen()
+  await expect(juno.newChat.composer).toBeFocused()
 })
 
 test('the app menu closes the tab and moves between tabs', async ({ juno }) => {
@@ -135,4 +139,130 @@ test('tabs survive a restart', async ({ juno, running, userData, fake, slackApp 
   } finally {
     await again.close()
   }
+})
+
+test.describe('one topic in two tabs', () => {
+  const longTest = test.extend({
+    // oxlint-disable-next-line no-empty-pattern
+    fake: async ({}, use) => {
+      const fake = await startFakeSlack({ seed: (workspace, avatars) => void topic300Seed()(workspace, avatars) })
+      await use(fake)
+      await fake.close()
+    },
+  })
+  const THREAD = 'Review the rollout checklist 1.'
+
+  longTest('each tab keeps its own scroll position', async ({ juno }) => {
+    await juno.signIn()
+    await juno.waitForSync()
+    const { sidebar, tabs, topic } = juno
+    await sidebar.row(THREAD).open()
+    await topic.expectAtBottom()
+
+    // ⌘-click opens the topic again in a new tab, though a tab shows it.
+    await sidebar.row(THREAD).openInNewTab()
+    await expect(tabs.tab(THREAD)).toHaveCount(2)
+    await tabs.expectActiveAt(THREAD, 1)
+    await topic.expectAtBottom()
+    await topic.scrollUp(2400)
+    const up = await topic.firstVisibleRow()
+
+    // The first tab is still at the bottom; the second is where it was left.
+    await tabs.selectAt(THREAD, 0)
+    await tabs.expectActiveAt(THREAD, 0)
+    await topic.expectAtBottom()
+    await tabs.selectAt(THREAD, 1)
+    await tabs.expectActiveAt(THREAD, 1)
+    const back = await topic.firstVisibleRow()
+    expect(back.ts).toBe(up.ts)
+    expect(back.top).toBeCloseTo(up.top, 0)
+
+    // A plain open focuses the tab that was active last, without moving it.
+    await tabs.selectAt(THREAD, 0)
+    await sidebar.row(THREAD).open()
+    await tabs.expectActiveAt(THREAD, 0)
+    await topic.expectAtBottom()
+    await expect(tabs.tab(THREAD)).toHaveCount(2)
+  })
+})
+
+test('closing the last tab opens a new tab: a New chat, or Home once Settings says so; ⌘T and "+" follow it, ⌘N stays a New chat', async ({ juno }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  const { sidebar, tabs } = juno
+
+  await sidebar.row(POSTGRES).open()
+  await tabs.expectCount(1)
+  await tabs.close(POSTGRES)
+  await juno.expectNothingOpen()
+
+  await sidebar.row(POSTGRES).open()
+  await tabs.menu('new-tab')
+  await tabs.expectCount(2)
+  await tabs.expectActive('New chat')
+  await expect(juno.newChat.composer).toBeFocused()
+
+  // Settings › General: a new tab opens Home.
+  await juno.openSettings('General')
+  const home = juno.settings.root.getByRole('radiogroup', { name: 'New tabs open' }).getByRole('radio', { name: 'Home' })
+  await home.click()
+  await expect(home).toHaveAttribute('aria-checked', 'true')
+  await expect(tabs.newTabButton).toHaveAccessibleName('New tab ⌘T')
+
+  await tabs.menu('new-tab')
+  await tabs.expectActive('Home')
+  await juno.home.expectShown()
+  const homes = await tabs.tab('Home').count()
+  await tabs.newTabButton.click()
+  await expect(tabs.tab('Home')).toHaveCount(homes + 1)
+  await juno.home.expectShown()
+
+  // ⌘N is always a New chat (the untouched one is focused).
+  await tabs.menu('new-chat')
+  await tabs.expectActive('New chat')
+
+  // Closing every tab leaves one Home.
+  await tabs.contextMenu(POSTGRES, 'close-all')
+  await juno.expectNothingOpen('Home')
+})
+
+test('"+" sits one tab gap after the last tab, level with the tabs, and stays at the end of the strip when the tabs scroll', async ({ juno, app }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  const { sidebar, tabs } = juno
+
+  // `strip` is the tablist, the scroller the tabs sit in.
+  const place = async () => {
+    const last = (await tabs.root.getByRole('tab').last().boundingBox())!
+    const plus = (await tabs.newTabButton.boundingBox())!
+    const strip = (await tabs.root.boundingBox())!
+    return { last, plus, strip }
+  }
+  const expectAfterLastTab = async () => {
+    await expect
+      .poll(async () => {
+        const { last, plus } = await place()
+        // The 2px tab gap, then the button's even inset in its tab-high square: (35 - 28) / 2.
+        return { gap: Math.round((plus.x - (last.x + last.width)) * 2) / 2, level: Math.abs(plus.y + plus.height / 2 - (last.y + last.height / 2)) <= 0.5 }
+      })
+      .toEqual({ gap: 5.5, level: true })
+  }
+
+  await juno.expectNothingOpen()
+  await expectAfterLastTab()
+  await sidebar.row(POSTGRES).open()
+  await sidebar.row(RINA).openInNewTab()
+  await expectAfterLastTab()
+
+  // A narrow window: the tabs overflow and scroll, and "+" stays in view at the strip's end.
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.setSize(760, 600))
+  await sidebar.row(ROADMAP).openInNewTab()
+  await sidebar.row(OFFSITE).openInNewTab()
+  await expect.poll(() => tabs.root.evaluate((list) => list.scrollWidth > list.clientWidth)).toBe(true)
+  // The tabs fill the strip up to "+", which follows the scroller and ends inside the window.
+  const { plus, strip } = await place()
+  expect(plus.x).toBeGreaterThanOrEqual(strip.x + strip.width)
+  expect(plus.x - (strip.x + strip.width)).toBeLessThanOrEqual(5.5)
+  expect(plus.x + plus.width).toBeLessThanOrEqual(await juno.win.evaluate(() => window.innerWidth))
+  await expect(tabs.newTabButton).toBeInViewport()
 })

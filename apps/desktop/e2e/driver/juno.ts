@@ -696,9 +696,15 @@ export class Juno {
     return this.app.evaluate(() => [...(globalThis as unknown as { junoTest: { slackLinks: string[] } }).junoTest.slackLinks])
   }
 
-  /** Home, which the workspace shows when no tab is open. */
-  async expectNothingOpen(): Promise<void> {
-    await this.home.expectShown()
+  /**
+   * Nothing was opened: the one tab a fresh launch, or closing the last tab,
+   * leaves, with what a new tab opens. There is never no tab (SPEC 6).
+   */
+  async expectNothingOpen(page: 'New chat' | 'Home' = 'New chat'): Promise<void> {
+    await this.tabs.expectCount(1)
+    await this.tabs.expectActive(page)
+    if (page === 'Home') await this.home.expectShown()
+    else await expect(this.newChat.root).toBeVisible()
   }
 
   /**
@@ -1408,8 +1414,14 @@ export class TopicPane {
   }
 
   /** The title, a menu button inside the page's heading. */
+  /** The title: opens the topic switcher; a right-click opens the topic menu. */
   get titleButton() {
     return this.header.getByRole('heading').getByRole('button')
+  }
+
+  /** The right island's ⋯, which opens the topic menu. */
+  get moreButton() {
+    return this.header.getByRole('button', { name: 'More', exact: true })
   }
 
   /**
@@ -1417,9 +1429,17 @@ export class TopicPane {
    * labels ("-" a separator, "(label)" disabled, "label ✓" checked, "> "
    * before a submenu's items) and where it was asked to open.
    */
+  /** Opens the topic menu from ⋯ and picks `item`. */
   async chooseInMenu(item: TopicMenuItem): Promise<{ readonly labels: string[]; readonly at: { readonly x: number; readonly y: number } | null }> {
     await chooseNextMenuItem(this.win, item)
-    await this.titleButton.click()
+    await this.moreButton.click()
+    return lastMenu(this.win)
+  }
+
+  /** Opens the topic menu by right-clicking the title and picks `item`. */
+  async chooseInTitleMenu(item: TopicMenuItem): Promise<{ readonly labels: string[]; readonly at: { readonly x: number; readonly y: number } | null }> {
+    await chooseNextMenuItem(this.win, item)
+    await this.titleButton.click({ button: 'right' })
     return lastMenu(this.win)
   }
 
@@ -1570,24 +1590,21 @@ export class TopicPane {
   }
 
   /** Main's "Threads" button and its popover. */
-  get threadsButton() {
-    return this.header.getByRole('button', { name: /^Threads/ })
+  /** Opens the topic switcher from the title. */
+  async openSwitcher(): Promise<TopicSwitcherDriver> {
+    await this.titleButton.click()
+    const switcher = new TopicSwitcherDriver(this.win)
+    await expect(switcher.root).toBeVisible()
+    return switcher
   }
 
-  async openThreads(): Promise<ThreadsPopover> {
-    await this.threadsButton.click()
-    const popover = new ThreadsPopover(this.win)
-    await expect(popover.root).toBeVisible()
-    return popover
-  }
-
-  /** Focuses the Threads button and opens its popover with Enter. */
-  async openThreadsWithKeyboard(): Promise<ThreadsPopover> {
-    await this.threadsButton.focus()
+  /** Focuses the title and opens the switcher with Enter. */
+  async openSwitcherWithKeyboard(): Promise<TopicSwitcherDriver> {
+    await this.titleButton.focus()
     await this.win.keyboard.press('Enter')
-    const popover = new ThreadsPopover(this.win)
-    await expect(popover.root).toBeVisible()
-    return popover
+    const switcher = new TopicSwitcherDriver(this.win)
+    await expect(switcher.root).toBeVisible()
+    return switcher
   }
 
   /** The first message row in view and its top, for checking that nothing moved. */
@@ -1641,30 +1658,42 @@ export class ThreadLinkDriver {
   }
 }
 
-/** The list behind Main's "Threads" button. */
-export class ThreadsPopover {
+/** The title's topic switcher: a search field over the channel's Main and threads. */
+export class TopicSwitcherDriver {
   readonly root: Locator
 
   constructor(readonly win: Page) {
-    this.root = win.getByRole('dialog', { name: 'Threads' })
+    this.root = win.getByRole('dialog', { name: 'Topics in this channel' })
   }
 
-  /** A thread's list item, holding its row button. */
-  entry(title: string): Locator {
-    return this.root.getByRole('listitem').filter({ hasText: title })
+  get search(): Locator {
+    return this.root.getByRole('textbox', { name: 'Search this channel' })
   }
 
-  /** The row button that opens a thread, named by its title. */
+  /** A row, by the start of its title ("Main" for Main). */
   row(title: string): Locator {
-    return this.root.getByRole('button', { name: new RegExp(`^${escapeRegExp(title)}`) })
+    return this.root.getByRole('option', { name: new RegExp(`^${escapeRegExp(title)}`) })
   }
 
-  async open(title: string): Promise<void> {
-    await this.entry(title).scrollIntoViewIfNeeded()
-    const box = await this.entry(title).boundingBox()
-    if (!box) throw new Error(`No thread "${title}" in the list`)
+  /** Row titles, top to bottom. */
+  titles(): Promise<string[]> {
+    return this.root.getByRole('option').evaluateAll((rows) => rows.map((row) => (row.querySelector('span span')?.textContent ?? row.textContent ?? '').trim()))
+  }
+
+  /** Mouse down on a row; with `newTab`, ⌘ held. */
+  async open(title: string, options: { readonly newTab?: boolean } = {}): Promise<void> {
+    const row = this.row(title)
+    await row.scrollIntoViewIfNeeded()
+    const box = await row.boundingBox()
+    if (!box) throw new Error(`No topic "${title}" in the switcher`)
+    if (options.newTab) await this.win.keyboard.down('Meta')
     await this.win.mouse.move(box.x + 24, box.y + box.height / 2)
     await press(this.win)
+    if (options.newTab) await this.win.keyboard.up('Meta')
+  }
+
+  async type(text: string): Promise<void> {
+    await this.search.fill(text)
   }
 }
 
@@ -1681,6 +1710,31 @@ export class TabStrip {
 
   tab(title: string): Locator {
     return this.root.getByRole('tab', { name: new RegExp(`^${escapeRegExp(title)}`) })
+  }
+
+  /** The `index`th tab titled `title`, left to right, when several show the same place. */
+  nth(title: string, index: number): Locator {
+    return this.tab(title).nth(index)
+  }
+
+  /** The `index`th of the tabs titled `title` is the active one. */
+  async expectActiveAt(title: string, index: number): Promise<void> {
+    await expect(this.nth(title, index)).toHaveAttribute('aria-selected', 'true', { timeout: 15_000 })
+  }
+
+  /** Mouse down on the `index`th tab titled `title`. */
+  async selectAt(title: string, index: number): Promise<void> {
+    const box = await this.nth(title, index).boundingBox()
+    if (!box) throw new Error(`No tab "${title}" at ${index}`)
+    await this.win.mouse.move(box.x + 24, box.y + box.height / 2)
+    await press(this.win)
+  }
+
+  /** The close button on the `index`th tab titled `title`. */
+  async closeAt(title: string, index: number): Promise<void> {
+    const tab = this.nth(title, index)
+    await tab.hover()
+    await tab.getByRole('button', { name: 'Close tab' }).click()
   }
 
   /** Points at a tab. */
@@ -1725,9 +1779,9 @@ export class TabStrip {
     await expect(this.tab(title)).toBeFocused()
   }
 
-  /** The "+" after the last tab. */
+  /** The "+" after the last tab: "New chat ⌘T", or "New tab ⌘T" when a new tab opens Home. */
   get newTabButton() {
-    return this.win.getByRole('region', { name: 'Workspace' }).getByRole('button', { name: 'New chat ⌘T', exact: true })
+    return this.win.getByRole('region', { name: 'Workspace' }).getByRole('button', { name: /^New (chat|tab) ⌘T$/ })
   }
 
   /** An item of the app menu, as its shortcut would choose it. */

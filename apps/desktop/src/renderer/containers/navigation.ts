@@ -11,6 +11,10 @@
  * until the new one can paint at its open position, never an empty page in
  * between (performance 4.4). Slack is asked only after that, by the tab
  * itself.
+ *
+ * A topic's window and scroll position belong to the tab that shows it
+ * (`topicView`), so two tabs on one topic scroll apart. A fresh open waits
+ * on the topic's own view and hands its window to the tab it lands in.
  */
 import {
   MESSAGE_WINDOW_BEFORE,
@@ -47,6 +51,7 @@ import {
   mountedTabs,
   newChatAtom,
   newChatPlace,
+  newTabPageAtom,
   emptyNewChat,
   openInSlack,
   openPlace,
@@ -67,12 +72,15 @@ import {
   tabShowing,
   tabTopic,
   topicAtom,
+  topicOfView,
   topicPlace,
+  topicView,
   untouched,
   updateTabs,
   type MessageWindowSpec,
   type OpenOptions,
   type Place,
+  type ScrollSnapshot,
   type Tabs,
 } from '@juno/state'
 import { chatCopy, type JunoPage } from '@juno/agent-contract'
@@ -103,14 +111,14 @@ export function openWindow(detail: TopicDetail): MessageWindowSpec {
   return wanted <= MESSAGE_WINDOW_DEFAULT ? bottomWindow : { limit: Math.min(MESSAGE_WINDOW_MAX, wanted) }
 }
 
-/** What the shown topic does just before another page replaces it: record its scroll position. Keyed by topic id. */
+/** What the shown topic does just before another page replaces it: record its scroll position. Keyed by topic view. */
 const leaving = new Map<string, () => void>()
 
-/** Registers what the topic `id` does as it is left, while it is shown. Returns the unregister. */
-export function onLeaveTab(id: string, leave: () => void): () => void {
-  leaving.set(id, leave)
+/** Registers what the topic view `view` does as it is left, while it is shown. Returns the unregister. */
+export function onLeaveTab(view: string, leave: () => void): () => void {
+  leaving.set(view, leave)
   return () => {
-    if (leaving.get(id) === leave) leaving.delete(id)
+    if (leaving.get(view) === leave) leaving.delete(view)
   }
 }
 
@@ -119,12 +127,38 @@ const activeTopic = (tabs: Tabs): string | undefined => {
   return tab === undefined ? undefined : tabTopic(tab)
 }
 
+/** The topic view the active tab shows, if it shows a topic. */
+const activeView = (tabs: Tabs): string | undefined => {
+  const tab = activeTab(tabs)
+  const topic = tab === undefined ? undefined : tabTopic(tab)
+  return topic === undefined ? undefined : topicView(topic, tab!.id)
+}
+
 function apply(change: (tabs: Tabs) => Tabs): Tabs {
-  const before = activeTopic(registry.get(tabsAtom))
+  const before = activeView(registry.get(tabsAtom))
   if (before !== undefined) leaving.get(before)?.()
   const next = updateTabs(registry, change)
   registry.set(selectedTopicAtom, activeTopic(next))
   return next
+}
+
+/**
+ * A fresh open landed: the tab that now shows the topic takes the window
+ * the open waited for, and starts at `snapshot` (a message a link asked
+ * for) or else at the divider or the bottom. A tab that already showed the
+ * topic before the change keeps its own. The tab's window is its own
+ * subscription; if the topic's first fetch covers its history only after
+ * that subscription started, the tab asks for it again (`refreshMessages`
+ * in `TopicView`).
+ */
+function landFresh(before: Tabs, next: Tabs, topicId: string, snapshot: ScrollSnapshot | undefined): void {
+  const tab = activeTab(next)
+  if (tab === undefined || tabTopic(tab) !== topicId) return
+  const prior = before.tabs.find((other) => other.id === tab.id)
+  if (prior !== undefined && prior.history === tab.history) return
+  const view = topicView(topicId, tab.id)
+  registry.set(messageWindowSpecAtom(view), registry.get(messageWindowSpecAtom(topicId)))
+  registry.set(scrollSnapshotAtom(view), snapshot)
 }
 
 /**
@@ -135,12 +169,13 @@ function apply(change: (tabs: Tabs) => Tabs): Tabs {
  * A fresh open at `target`, a message older than that window, then takes
  * the window around the message instead.
  */
-function whenReady(id: string, fresh: boolean, target?: string): Promise<void> {
+function whenReady(view: string, fresh: boolean, target?: string): Promise<void> {
+  const id = topicOfView(view)
   return new Promise((resolve) => {
     // The messages are asked for with the header, not after it, so the two queries overlap. A topic
     // coming back keeps its window; a fresh open usually gets the bottom one (`openWindow`), and one
     // with more unread than that asks for its own window once the header says so.
-    const releases: Array<() => void> = [registry.mount(messagesAtom(id, fresh ? bottomWindow : registry.get(messageWindowSpecAtom(id))))]
+    const releases: Array<() => void> = [registry.mount(messagesAtom(id, fresh ? bottomWindow : registry.get(messageWindowSpecAtom(view))))]
     let done = false
     let specSet = false
     let anchored = false
@@ -166,15 +201,15 @@ function whenReady(id: string, fresh: boolean, target?: string): Promise<void> {
       if (detail === null) return finish()
       if (!specSet) {
         specSet = true
-        if (fresh) registry.set(messageWindowSpecAtom(id), openWindow(detail))
-        releases.push(registry.subscribe(messageListAtom(id), check, { immediate: false }))
+        if (fresh) registry.set(messageWindowSpecAtom(view), openWindow(detail))
+        releases.push(registry.subscribe(messageListAtom(view), check, { immediate: false }))
       }
-      const list = registry.get(messageListAtom(id))
+      const list = registry.get(messageListAtom(view))
       if (fresh && target !== undefined && !anchored && list.ready && !waited) {
         const first = list.order[0]
         if (first !== undefined && target < first && !list.order.includes(target)) {
           anchored = true
-          registry.set(messageWindowSpecAtom(id), { anchor: target, before: MESSAGE_WINDOW_BEFORE, limit: MESSAGE_WINDOW_DEFAULT })
+          registry.set(messageWindowSpecAtom(view), { anchor: target, before: MESSAGE_WINDOW_BEFORE, limit: MESSAGE_WINDOW_DEFAULT })
           return
         }
       }
@@ -190,17 +225,25 @@ let queue: Promise<void> = Promise.resolve()
 /** Bumped by each change of what the window shows: a change that waited applies only if nothing replaced it since. */
 let currentTicket = 0
 
+/** A topic a change brings on screen. A fresh open waits on the topic's own view; a tab coming back on its view. */
+interface Arriving {
+  readonly id: string
+  /** The view to wait on: `topicView(id, tabId)` for a tab coming back. Default the topic's own, as a fresh open has. */
+  readonly view?: string
+  readonly fresh: boolean
+  readonly name: 'juno.topic-open' | 'juno.tab-switch'
+  /** A fresh open at a message older than the first window: the window around it. */
+  readonly target?: string
+  /** A fresh open's starting position instead of the divider or the bottom. */
+  readonly snapshot?: ScrollSnapshot
+}
+
 /**
  * Applies `change` once `topic` (the topic the change brings on screen) can
  * paint, unless something newer replaced it meanwhile. With no topic to
  * wait for, it applies after the supplied readiness wait, or now.
  */
-function show(
-  change: (tabs: Tabs) => Tabs,
-  topic: { readonly id: string; readonly fresh: boolean; readonly name: 'juno.topic-open' | 'juno.tab-switch'; readonly target?: string } | undefined,
-  replaceable = true,
-  ready?: Promise<void>,
-): void {
+function show(change: (tabs: Tabs) => Tabs, topic: Arriving | undefined, replaceable = true, ready?: Promise<void>): void {
   const at = performance.now()
   const ticket = replaceable ? ++currentTicket : currentTicket
   if (topic === undefined) {
@@ -211,29 +254,42 @@ function show(
   }
   registry.set(selectedTopicAtom, topic.id)
   pending = { id: topic.id, at, name: topic.name }
-  const topicReady = whenReady(topic.id, topic.fresh, topic.target)
+  const topicReady = whenReady(topic.view ?? topic.id, topic.fresh, topic.target)
+  const landing = topic.fresh
+    ? (tabs: Tabs) => {
+        const next = change(tabs)
+        landFresh(tabs, next, topic.id, topic.snapshot)
+        return next
+      }
+    : change
   queue = queue
     .then(() => topicReady)
     .then(() => {
-      if (!replaceable || ticket === currentTicket) apply(change)
+      if (!replaceable || ticket === currentTicket) apply(landing)
     })
 }
 
-/** Opens a topic: in the current tab, a new tab with `newTab`, or the tab that already shows it. */
+/**
+ * Opens a topic: in the current tab, or the tab that already shows it; with
+ * `newTab`, in a new tab even when another tab shows it (SPEC 6).
+ */
 export function openTopic(id: string, options: OpenOptions = {}): void {
-  openTopicFresh(id, options, undefined)
+  openTopicFresh(id, options, undefined, undefined)
 }
 
-function openTopicFresh(id: string, options: OpenOptions, target: string | undefined): void {
-  const showing = tabShowing(registry.get(tabsAtom), id)
+function openTopicFresh(id: string, options: OpenOptions, target: string | undefined, snapshot: ScrollSnapshot | undefined): void {
+  const showing = options.newTab === true ? undefined : tabShowing(registry.get(tabsAtom), id)
   if (showing !== undefined) {
     switchToTab(showing.id)
     return
   }
-  // A fresh open starts at the divider or the bottom, not where it was left.
-  registry.set(scrollSnapshotAtom(id), undefined)
+  // A fresh open starts at the divider or the bottom (or `snapshot`), not where it was left: `landFresh`.
   // A new tab does not replace the current one, so a later open in the current tab does not cancel it.
-  show((tabs) => openHere(tabs, topicPlace(id), options), { id, fresh: true, name: 'juno.topic-open', ...(target === undefined ? {} : { target }) }, options.newTab !== true)
+  show(
+    (tabs) => openHere(tabs, topicPlace(id), options),
+    { id, fresh: true, name: 'juno.topic-open', ...(target === undefined ? {} : { target }), ...(snapshot === undefined ? {} : { snapshot }) },
+    options.newTab !== true,
+  )
 }
 
 /**
@@ -251,16 +307,35 @@ function keepsNewChat(tabs: Tabs): boolean {
 }
 
 /**
- * ⌘T, ⌘N, "+" and the sidebar's New chat button: a New chat in a new tab
- * (spec section 9), or the New chat tab that is still untouched.
+ * ⌘N and the sidebar's New chat button: a New chat in a new tab (spec
+ * section 9), or the New chat tab that is still untouched.
  */
-export function openNewTab(): void {
+export function openNewChat(): void {
   const blank = registry.get(tabsAtom).tabs.find((tab) => currentPlace(tab).kind === 'newChat' && untouched(registry.get(newChatAtom(tab.id))))
   if (blank !== undefined) {
     switchToTab(blank.id)
+    // Already on screen, its composer may have lost focus: ask for it again.
+    afterPaint(() => newChatFocus.forEach((focus) => focus(blank.id)))
     return
   }
   show((tabs) => openHere(tabs, newChatPlace, { newTab: true }), undefined)
+}
+
+/** New chat tabs listening for "focus your composer", by tab id. */
+const newChatFocus = new Set<(tabId: string) => void>()
+
+/** A New chat tab's composer takes focus when ⌘N, ⌘T or "+" lands on that tab. Returns the unsubscribe. */
+export function onNewChatFocus(focus: (tabId: string) => void): () => void {
+  newChatFocus.add(focus)
+  return () => {
+    newChatFocus.delete(focus)
+  }
+}
+
+/** ⌘T and the strip's "+": a new tab with what Settings › General chooses, a New chat (the default) or Home. */
+export function openNewTab(): void {
+  if (registry.get(newTabPageAtom) === 'home') openHome({ newTab: true })
+  else openNewChat()
 }
 
 /** A New chat addressed to `conversation`, as ⌘K's result for a person never messaged (spec section 10). */
@@ -299,12 +374,14 @@ export function openHome(options: OpenOptions = {}): void {
     const off = registry.subscribe(homeViewAtom, check, { immediate: false })
     check()
   })
-  show((tabs) => openHere(tabs, homePlace, options), undefined, true, ready)
+  // A new tab does not replace the current one, so a later open in the current tab does not cancel it.
+  show((tabs) => openHere(tabs, homePlace, options), undefined, options.newTab !== true, ready)
 }
 
 /**
- * A page behind the Juno menu (SPEC 13.10), each in one tab. Its Settings
- * and Connections are sections of Settings, so links to them open there.
+ * A page behind the Juno menu (SPEC 13.10). A plain open focuses a tab that
+ * shows it. Its Settings and Connections are sections of Settings, so links
+ * to them open there.
  */
 export function openJunoPage(page: JunoPage, options: OpenOptions = {}): void {
   if (page === 'settings') return openSettings('juno', options)
@@ -312,7 +389,7 @@ export function openJunoPage(page: JunoPage, options: OpenOptions = {}): void {
   show((tabs) => openHere(tabs, junoPagePlace(page), options), undefined)
 }
 
-/** The Juno tab (SPEC 13). One chat, so one tab: the tab that shows it is focused. */
+/** The Juno tab (SPEC 13). A plain open focuses a tab that shows it; each Juno tab shows the one chat. */
 export function openJuno(options: OpenOptions = {}): void {
   show((tabs) => openHere(tabs, junoPlace, options), undefined)
 }
@@ -339,13 +416,14 @@ const MESSAGE_TOP = 80
  */
 export function openTopicAt(id: string, ts: string, options: OpenOptions & { readonly flash?: boolean } = {}): void {
   if (options.flash === true) flashMessage(registry, id, ts)
-  if (tabShowing(registry.get(tabsAtom), id) !== undefined) {
-    const list = registry.get(messageListAtom(id))
-    if (list.ready && !list.order.includes(ts)) registry.set(messageWindowSpecAtom(id), { anchor: ts, before: MESSAGE_WINDOW_BEFORE, limit: MESSAGE_WINDOW_DEFAULT })
-    return openTopic(id)
+  const showing = options.newTab === true ? undefined : tabShowing(registry.get(tabsAtom), id)
+  if (showing !== undefined) {
+    const view = topicView(id, showing.id)
+    const list = registry.get(messageListAtom(view))
+    if (list.ready && !list.order.includes(ts)) registry.set(messageWindowSpecAtom(view), { anchor: ts, before: MESSAGE_WINDOW_BEFORE, limit: MESSAGE_WINDOW_DEFAULT })
+    return switchToTab(showing.id)
   }
-  openTopicFresh(id, options.newTab === true ? { newTab: true } : {}, ts)
-  registry.set(scrollSnapshotAtom(id), { anchorKey: ts, offset: MESSAGE_TOP })
+  openTopicFresh(id, options.newTab === true ? { newTab: true } : {}, ts, { anchorKey: ts, offset: MESSAGE_TOP })
 }
 
 /** A Juno source link (SPEC 13.1): the topic that holds the message, opened at it, and the message flashes. */
@@ -398,9 +476,9 @@ function whenAllTopicsReady(): Promise<void> {
   )
 }
 
-/** The sidebar's All topics item and the "View all topics" empty states. All topics is a singleton, like Home. */
+/** The sidebar's All topics item and the "View all topics" empty states. A plain open focuses a tab that shows it, as for Home. */
 export function openAllTopics(options: OpenOptions = {}): void {
-  if (allTopicsTab(registry.get(tabsAtom)) !== undefined) {
+  if (options.newTab !== true && allTopicsTab(registry.get(tabsAtom)) !== undefined) {
     show((tabs) => openHere(tabs, allTopicsPlace, options), undefined)
     return
   }
@@ -422,7 +500,6 @@ export function openAllTopics(options: OpenOptions = {}): void {
  * reopening it can never send the message again.
  */
 export function settleSentChat(tabId: string, topicId: string): void {
-  registry.set(scrollSnapshotAtom(topicId), undefined)
   show(
     (tabs) => {
       registry.set(newChatAtom(tabId), emptyNewChat)
@@ -439,7 +516,7 @@ function arriving(tabs: Tabs, tabId: string, place: Place | undefined, fresh: bo
   // A mounted tab that keeps its page shows in the next frame.
   const tab = tabs.tabs.find((other) => other.id === tabId)
   if (tab !== undefined && mountedTabs(tabs).has(tabId) && tabTopic(tab) === place.topicId) return undefined
-  return { id: place.topicId, fresh, name: 'juno.tab-switch' as const }
+  return { id: place.topicId, view: topicView(place.topicId, tabId), fresh, name: 'juno.tab-switch' as const }
 }
 
 /**
@@ -477,7 +554,7 @@ export function goToTabEntry(index: number): void {
   const tab = activeTab(tabs)
   const place = tab?.history.entries[index]
   if (tab === undefined || place === undefined || index === tab.history.index) return
-  const topic = place.kind === 'topic' ? { id: place.topicId, fresh: false, name: 'juno.topic-open' as const } : undefined
+  const topic = place.kind === 'topic' ? { id: place.topicId, view: topicView(place.topicId, tab.id), fresh: false, name: 'juno.topic-open' as const } : undefined
   show((current) => goToEntry(current, index), topic)
 }
 
@@ -527,6 +604,8 @@ export function runMenuCommand(command: MenuCommand): void {
   switch (command) {
     case 'tab.new':
       return openNewTab()
+    case 'chat.new':
+      return openNewChat()
     case 'tab.close':
       return closeActiveTab()
     case 'tab.reopen':

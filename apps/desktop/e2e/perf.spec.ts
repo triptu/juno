@@ -694,10 +694,10 @@ test('topic open, uncached: a thread whose replies were never fetched, to the he
       await juno.signIn()
       await juno.waitForSync()
       await juno.sidebar.row('#eng').open()
-      const threads = await juno.topic.openThreads()
+      const switcher = await juno.topic.openSwitcher()
       // Not followed, so the boot never fetched its replies.
       const before = (await juno.measures('juno.topic-open')).length
-      await threads.open('checkout.spec failed again')
+      await switcher.open('checkout.spec failed again')
       await expect.poll(async () => (await juno.measures('juno.topic-open')).length).toBeGreaterThan(before)
       samples.push((await juno.measures('juno.topic-open')).at(-1)!)
       await juno.topic.expectMessage('Can you add a wait')
@@ -725,14 +725,14 @@ test.describe('topic view', () => {
 
   const launch = (): Promise<RunningApp> => launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword })
 
-  /** Launches warm, waits for the sync, and closes any tab a previous launch left. */
+  /** Launches warm, waits for the sync, and closes any tab a previous launch left, which leaves one New chat. */
   async function ready(): Promise<{ readonly running: RunningApp; readonly juno: Juno }> {
     const running = await launch()
     const juno = new Juno(running.app, running.win)
     await juno.sidebar.expectRows()
     await juno.expectEngineLive(120_000)
-    for (let i = 0; i < 10 && (await juno.tabs.root.getByRole('tab').count()) > 0; i++) await juno.tabs.menu('close-tab')
-    await juno.tabs.expectCount(0)
+    for (let i = 0; i < 10 && !((await juno.tabs.root.getByRole('tab').count()) === 1 && (await juno.tabs.tab('New chat').count()) === 1); i++) await juno.tabs.menu('close-tab')
+    await juno.expectNothingOpen()
     await running.win.mouse.move(900, 400)
     return { running, juno }
   }

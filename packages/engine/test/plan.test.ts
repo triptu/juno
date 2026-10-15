@@ -135,8 +135,9 @@ describe('query plans', () => {
 
   it.effect("channel.threads reads a channel's threads through the channel index", () =>
     Effect.gen(function* () {
-      const statements = threadsStatements('C0ENG', '1700000000.000000', 100)
-      for (const statement of [statements.list, statements.count]) {
+      const recent = threadsStatements('C0ENG', '1700000000.000000', 100)
+      const all = threadsStatements('C0ENG', undefined, 100)
+      for (const statement of [recent.list, recent.count, all.list, all.count]) {
         const lines = yield* plan(statement.sql, statement.params)
         assert.deepStrictEqual(scans(lines), [], lines.join('\n'))
         assert.isTrue(lines.some((line) => line.includes('topic_index_channel_activity')), lines.join('\n'))

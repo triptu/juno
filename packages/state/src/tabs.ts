@@ -6,7 +6,10 @@
  * functions over `Tabs`:
  * - `openPlace`: a place opens in the current tab (a new history entry), or
  *   in a new tab after it when asked (⌘-click, ⌘-Enter, Open in new tab,
- *   ⌘T). A topic or page that a tab already shows focuses that tab instead.
+ *   ⌘T). A plain open of a topic or page that a tab already shows focuses
+ *   that tab; a new tab always opens, so one place can show in several tabs.
+ * - `ensureTab`: there is never no tab. Closing the last one, or a launch
+ *   with none saved, leaves one tab with what a new tab opens (`newTabPage.ts`).
  * - `openSettingsSection`: Settings at a section, in the tab that shows
  *   Settings if one does, where the section replaces the one it showed.
  * - `settleNewChat`: a New chat that sent becomes the topic it sent to, in
@@ -34,6 +37,7 @@ import { liveQuery, runCommand } from './atoms'
 import type { Registry } from './client'
 import { topicAtom } from './messages'
 import { newChatAtom, newChatTitle } from './newChat'
+import { newTabPageAtom, type NewTabPage } from './newTabPage'
 import { signedInAtom } from './session'
 
 /** The Juno menu's pages that have a tab of their own. Its Connections and Settings are sections of Settings. */
@@ -48,7 +52,7 @@ export type Place =
   /** One tab for Settings, whichever section it shows. */
   | { readonly kind: 'settings'; readonly section: SettingsSection }
   | { readonly kind: 'juno' }
-  /** A page behind the Juno menu (SPEC 13.10). One tab per page. */
+  /** A page behind the Juno menu (SPEC 13.10). */
   | { readonly kind: 'junoPage'; readonly page: JunoTabPage }
 
 export const newChatPlace: Place = { kind: 'newChat' }
@@ -116,12 +120,25 @@ const samePlace = (a: Place, b: Place) =>
   a.kind === 'topic' ? b.kind === 'topic' && a.topicId === b.topicId : a.kind === 'junoPage' ? b.kind === 'junoPage' && a.page === b.page : a.kind === b.kind
 
 export const activeTab = (tabs: Tabs): Tab | undefined => tabs.tabs.find((tab) => tab.id === tabs.active)
-/** The tab that shows `topicId`, if one does. */
-export const tabShowing = (tabs: Tabs, topicId: string): Tab | undefined => tabs.tabs.find((tab) => tabTopic(tab) === topicId)
-/** The tab that shows a page. Pages are singletons. */
-const pageTab = (tabs: Tabs, kind: Place['kind']): Tab | undefined => tabs.tabs.find((tab) => currentPlace(tab).kind === kind)
-/** The tab that shows All topics, if one does. All topics is a singleton. */
-export const allTopicsTab = (tabs: Tabs): Tab | undefined => pageTab(tabs, 'allTopics')
+/**
+ * The tab a plain open of `place` focuses: of the tabs that show it, the
+ * one active most recently. A New chat is never focused this way.
+ */
+export function tabShowingPlace(tabs: Tabs, place: Place): Tab | undefined {
+  if (place.kind === 'newChat') return undefined
+  const showing = tabs.tabs.filter((tab) => samePlace(currentPlace(tab), place))
+  if (showing.length < 2) return showing[0]
+  const rank = (tab: Tab) => {
+    if (tab.id === tabs.active) return -1
+    const at = tabs.recent.indexOf(tab.id)
+    return at < 0 ? tabs.recent.length : at
+  }
+  return showing.reduce((best, tab) => (rank(tab) < rank(best) ? tab : best))
+}
+/** The tab a plain open of `topicId` focuses, if a tab shows it. */
+export const tabShowing = (tabs: Tabs, topicId: string): Tab | undefined => tabShowingPlace(tabs, topicPlace(topicId))
+/** A tab that shows All topics, if one does. */
+export const allTopicsTab = (tabs: Tabs): Tab | undefined => tabShowingPlace(tabs, allTopicsPlace)
 const pinnedCount = (tabs: ReadonlyArray<Tab>) => tabs.filter((tab) => tab.pinned).length
 
 /** A tab id no open or closed tab has. Ids are `tab-<n>`, so the next is one past the highest. */
@@ -152,8 +169,8 @@ function push(history: TabHistory, place: Place, keepNewChat: boolean): TabHisto
 }
 
 export function openPlace(tabs: Tabs, place: Place, { newTab = false, keepNewChat = false }: OpenOptions = {}): Tabs {
-  // A topic and each page show in at most one tab (a Juno page per page): opening one again focuses it.
-  const showing = place.kind === 'newChat' ? undefined : tabs.tabs.find((tab) => samePlace(currentPlace(tab), place))
+  // A plain open of a place a tab shows focuses that tab. A new tab is always new, so a place can show in several.
+  const showing = newTab ? undefined : tabShowingPlace(tabs, place)
   if (showing !== undefined) return activateTab(tabs, showing.id)
   const at = tabs.tabs.findIndex((tab) => tab.id === tabs.active)
   if (at < 0 || newTab) {
@@ -167,6 +184,16 @@ export function openPlace(tabs: Tabs, place: Place, { newTab = false, keepNewCha
   const tab: Tab = { ...current, history: push(current.history, place, keepNewChat) }
   return { ...tabs, tabs: tabs.tabs.with(at, tab), recent: touch(tabs.recent, tab.id) }
 }
+
+/** With no tab left, one tab that shows `place`, active. Otherwise the tabs as they are. */
+export function ensureTab(tabs: Tabs, place: Place): Tabs {
+  if (tabs.tabs.length > 0) return tabs
+  const tab = freshTab(nextTabId(tabs), place)
+  return { ...tabs, tabs: [tab], active: tab.id, recent: [tab.id] }
+}
+
+/** What a new tab shows. */
+export const newTabPlace = (page: NewTabPage): Place => (page === 'home' ? homePlace : newChatPlace)
 
 /**
  * Settings at `section`. The tab that shows Settings is focused and shows
@@ -413,15 +440,16 @@ export const tabsAtom = Atom.make((get): Tabs => {
   const changed = get(changedTabsAtom(teamId))
   if (changed !== undefined) return changed
   const saved = get(savedTabsAtom)
-  return AsyncResult.isSuccess(saved) ? parseTabs(saved.value) : noTabs
+  return AsyncResult.isSuccess(saved) ? ensureTab(parseTabs(saved.value), newTabPlace(get(newTabPageAtom))) : noTabs
 }).pipe(Atom.withEquality((a: Tabs, b: Tabs) => a === b))
 
-/** Applies a rule to the tabs and saves the result. */
+/** Applies a rule to the tabs and saves the result. A change that leaves no tab leaves one with what a new tab opens. */
 export function updateTabs(registry: Registry, change: (tabs: Tabs) => Tabs): Tabs {
   const teamId = registry.get(signedInAtom)?.teamId
   const current = registry.get(tabsAtom)
   if (teamId === undefined) return current
-  const next = change(current)
+  const changed = change(current)
+  const next = changed === current ? current : ensureTab(changed, newTabPlace(registry.get(newTabPageAtom)))
   if (next === current) return current
   registry.set(changedTabsAtom(teamId), next)
   void runCommand(registry, prefsSet, { key: TABS_PREF, value: savedTabs(next) })
@@ -481,5 +509,9 @@ export interface ScrollSnapshot {
   readonly offset: number
 }
 
-/** Each topic's last scroll position, kept while the app runs, so Back and ⌘⇧T return to where it was left. */
-export const scrollSnapshotAtom = Atom.family((_topicId: string) => Atom.make<ScrollSnapshot | undefined>(undefined).pipe(Atom.keepAlive))
+/**
+ * Each topic view's last scroll position, kept while the app runs, so Back
+ * and ⌘⇧T return to where it was left. Keyed by `topicView(topicId, tabId)`,
+ * so two tabs on one topic keep their own.
+ */
+export const scrollSnapshotAtom = Atom.family((_view: string) => Atom.make<ScrollSnapshot | undefined>(undefined).pipe(Atom.keepAlive))

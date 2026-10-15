@@ -1,9 +1,9 @@
 import { lazy, memo, startTransition, Suspense, useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
-import { MESSAGE_WINDOW_MAX, readsMarkRead, type FileView, type MessageView, type TopicDetail } from '@juno/contract'
+import { mainTopicOf, MESSAGE_WINDOW_MAX, readsMarkRead, type FileView, type MessageView, type TopicDetail } from '@juno/contract'
 import {
   bottomWindow,
   catchUpDoneAtom,
-  channelThreadsAtom,
+  channelTopicsAtom,
   discardMessage,
   dividerIndex,
   headerRenamingAtom,
@@ -17,12 +17,14 @@ import {
   openExternal,
   openedAtNewAtom,
   openTopic as fetchTopic,
+  refreshMessages,
   registry,
   retryMessage,
   runCommand,
   scrollSnapshotAtom,
   shouldMarkRead,
   topicAtom,
+  topicView,
   type MessageWindow,
   type ScrollSnapshot,
   uploadProgressAtom,
@@ -31,12 +33,12 @@ import {
 import { afterPaint, mark, measure } from '@juno/state/perf'
 import { useAtomValue } from '@juno/state/react'
 import {
-  ActiveThreads,
   flashChatRow,
   hueFor,
   MessageList,
   NewMessagesPill,
   TopicHeader,
+  TopicSwitcher as TopicSwitcherView,
   TopicView as TopicViewFrame,
   type ActivateEvent,
   type MenuAnchor,
@@ -199,17 +201,27 @@ function useWindowFocused(): boolean {
   return focused
 }
 
-/** Main's "Threads" popover: the channel's active threads. Mounted only while open. */
-function MainThreads({ channel, onClose }: { readonly channel: string; readonly onClose: () => void }) {
-  const result = useAtomValue(channelThreadsAtom(channel))
+/**
+ * The title's topic switcher (SPEC 7): the channel's Main and threads, from
+ * local queries the topic keeps live while shown, so it opens with its rows
+ * in the first frame. Mounted only while open; the query text is its own.
+ */
+function Switcher({ detail, onClose }: { readonly detail: TopicDetail; readonly onClose: () => void }) {
+  const channel = detail.channel.id
+  const mainId = mainTopicOf(channel)
+  const result = useAtomValue(channelTopicsAtom(channel))
+  const mainUnread = useAtomValue(topicAtom(mainId), (header) => (header._tag === 'Success' ? (header.value?.unreadCount ?? 0) : 0))
   const now = useAtomValue(nowAtom)
+  const [query, setQuery] = useState('')
   const window = result._tag === 'Success' ? result.value : undefined
-  const threads = window === undefined ? [] : window.order.map((id) => window.rows.get(id)!)
-  const open = (id: string, event: ActivateEvent) => {
+  const threads = window === undefined ? undefined : window.order.map((id) => window.rows.get(id)!)
+  const open = (id: string, event: { readonly metaKey: boolean }) => {
     onClose()
-    openTopic(id, { newTab: event.metaKey })
+    if (id !== detail.id || event.metaKey) openTopic(id, { newTab: event.metaKey })
   }
-  return <ActiveThreads threads={threads} now={now} status={window === undefined ? 'loading' : 'ready'} onOpen={open} />
+  return (
+    <TopicSwitcherView mainId={mainId} mainUnread={mainUnread} currentId={detail.id} threads={threads} now={now} query={query} onQuery={setQuery} onOpen={open} />
+  )
 }
 
 /** Every topic draws its art (or the Tide placeholder) except a DM's Main, which keeps the person, as the sidebar tile does. */
@@ -264,7 +276,7 @@ export const TopicTab = memo(function TopicTab({ tabId, id }: TopicTabProps) {
     if (detail === null) closeTabById(tabId)
   }, [tabId, detail])
   if (detail == null) return null
-  return <Topic id={id} detail={detail} />
+  return <Topic id={id} view={topicView(id, tabId)} detail={detail} />
 })
 
 /** Thread links in a preview open in a new tab, so the New chat and its draft stay. */
@@ -281,11 +293,16 @@ export const TopicPreview = memo(function TopicPreview({ id, underHeader = true 
   const result = useAtomValue(topicAtom(id))
   const detail = result._tag === 'Success' ? result.value : undefined
   if (detail == null) return null
-  return <Topic key={id} id={id} detail={detail} readOnly underHeader={underHeader} />
+  return <Topic key={id} id={id} view={id} detail={detail} readOnly underHeader={underHeader} />
 })
 
 interface TopicProps {
   readonly id: string
+  /**
+   * Whose window and scroll position these are: `topicView(id, tabId)` in a
+   * tab, so two tabs on one topic keep their own; the topic id in a preview.
+   */
+  readonly view: string
   readonly detail: TopicDetail
   /**
    * Read-only: the message list alone, opened at the bottom, with no "N new"
@@ -298,8 +315,8 @@ interface TopicProps {
   readonly underHeader?: boolean
 }
 
-function Topic({ id, detail, readOnly = false, underHeader = true }: TopicProps) {
-  const list = useAtomValue(messageListAtom(id))
+function Topic({ id, view, detail, readOnly = false, underHeader = true }: TopicProps) {
+  const list = useAtomValue(messageListAtom(view))
   const now = useAtomValue(nowAtom, (time) => Math.floor(time / TIME_STEP) * TIME_STEP)
   const focused = useWindowFocused()
   const scrollRef = useRef<HTMLElement>(null)
@@ -325,8 +342,14 @@ function Topic({ id, detail, readOnly = false, underHeader = true }: TopicProps)
   useEffect(() => {
     if (fetched.current) return
     fetched.current = true
-    void fetchTopic(registry, id).then((exit) => setFetchState(exit._tag === 'Success' && (exit.value.outcome === 'fetched' || exit.value.outcome === 'cached') ? 'done' : 'offline'))
-  }, [id])
+    void fetchTopic(registry, id).then((exit) => {
+      const done = exit._tag === 'Success' && (exit.value.outcome === 'fetched' || exit.value.outcome === 'cached')
+      // This tab's window can have started while the fetch was writing the history it covers (a first send
+      // to someone never messaged) and missed that change; ask for it again, or it never shows its rows.
+      if (done && registry.get(messageListAtom(view)).meta.windowCovered !== true) refreshMessages(registry, view)
+      setFetchState(done ? 'done' : 'offline')
+    })
+  }, [id, view])
   const [slow, setSlow] = useState(false)
   useEffect(() => {
     if (fetchState !== 'pending') return
@@ -373,7 +396,7 @@ function Topic({ id, detail, readOnly = false, underHeader = true }: TopicProps)
   useLayoutEffect(() => {
     const scroller = scrollRef.current
     if (scroller === null || positioned || !showWindow || !list.ready || last === undefined) return
-    const snapshot = readOnly ? undefined : registry.get(scrollSnapshotAtom(id))
+    const snapshot = readOnly ? undefined : registry.get(scrollSnapshotAtom(view))
     const row = snapshot === undefined ? null : scroller.querySelector(rowSelector(snapshot.anchorKey))
     pin.current =
       snapshot !== undefined && row !== null
@@ -392,7 +415,7 @@ function Topic({ id, detail, readOnly = false, underHeader = true }: TopicProps)
     setFar(distance > scroller.clientHeight)
     setSeenTs(last)
     setPositioned(true)
-  }, [id, readOnly, positioned, showWindow, list.ready, list.rows, last, atEnd])
+  }, [view, readOnly, positioned, showWindow, list.ready, list.rows, last, atEnd])
 
   // A Juno source link or a notification asked for a message: once the topic is positioned and the row is in its
   // window, it is scrolled into view if it is not, and flashes. Each request is taken once, so showing a hidden tab
@@ -481,7 +504,7 @@ function Topic({ id, detail, readOnly = false, underHeader = true }: TopicProps)
       pin.current = undefined
     }
     const record = () => {
-      if (!readOnly) registry.set(scrollSnapshotAtom(id), snapshotOf(scroller))
+      if (!readOnly) registry.set(scrollSnapshotAtom(view), snapshotOf(scroller))
     }
     const onScrollEnd = () => {
       if (pin.current?.kind === 'row' && Math.abs(scroller.scrollTop - pinnedTop.current) > 1) pin.current = undefined
@@ -500,13 +523,13 @@ function Topic({ id, detail, readOnly = false, underHeader = true }: TopicProps)
     // After a jump (End, a scrollbar drag, a script) the rows it brought near the view reach their real
     // height frames after the scroll ended, and Chromium does not always anchor that; so the position is
     // also recorded as the tab is left, from what is on screen then.
-    const stopLeaving = readOnly ? () => {} : onLeaveTab(id, record)
+    const stopLeaving = readOnly ? () => {} : onLeaveTab(view, record)
     return () => {
       for (const type of inputs) scroller.removeEventListener(type, letGo)
       scroller.removeEventListener('scrollend', onScrollEnd)
       stopLeaving()
     }
-  }, [id, readOnly])
+  }, [view, readOnly])
 
   // Older pages. A thread whose root is in the window has nothing older.
   const [complete, setComplete] = useState(false)
@@ -526,7 +549,7 @@ function Topic({ id, detail, readOnly = false, underHeader = true }: TopicProps)
         setLoadingOlder(true)
         void loadOlderMessages(registry, id, first).then((exit) => {
           if (exit._tag === 'Success' && exit.value.complete) setComplete(true)
-          const spec = registry.get(messageWindowSpecAtom(id))
+          const spec = registry.get(messageWindowSpecAtom(view))
           // Up to the cap the window grows at the top; past it, it holds the 500 rows from the new page down.
           const next =
             spec.anchor === undefined && spec.limit + OLDER_PAGE <= MESSAGE_WINDOW_MAX
@@ -539,7 +562,7 @@ function Topic({ id, detail, readOnly = false, underHeader = true }: TopicProps)
             pinnedTop.current = scroller.scrollTop
             setHeldAt(inView.anchorKey)
           }
-          registry.set(messageWindowSpecAtom(id), next)
+          registry.set(messageWindowSpecAtom(view), next)
           setLoadingOlder(false)
         })
       },
@@ -547,7 +570,7 @@ function Topic({ id, detail, readOnly = false, underHeader = true }: TopicProps)
     )
     observer.observe(row)
     return () => observer.disconnect()
-  }, [id, drawnAll, older, first])
+  }, [id, view, drawnAll, older, first])
 
   // The read rule. Opening, and showing the tab again, marks the topic read. A preview never does.
   useEffect(() => {
@@ -564,14 +587,14 @@ function Topic({ id, detail, readOnly = false, underHeader = true }: TopicProps)
     pin.current = { kind: 'bottom' }
     setAtBottom(true)
     setFar(false)
-    if (!atEnd) registry.set(messageWindowSpecAtom(id), bottomWindow)
+    if (!atEnd) registry.set(messageWindowSpecAtom(view), bottomWindow)
     if (scroller !== null) hold(scroller, pin, pinnedTop)
     setSeenTs(last)
   }
 
-  const [threadsOpen, setThreadsOpen] = useState(false)
+  const [switcherOpen, setSwitcherOpen] = useState(false)
   const main = detail.kind === 'main'
-  // The title's native menu: the title shows it open until the menu closes.
+  // The topic's native menu, from ⋯ or a right-click on the title: ⋯ shows it open until the menu closes.
   const [menuOpen, setMenuOpen] = useState(false)
   const openMenu = (at: MenuAnchor) => {
     setMenuOpen(true)
@@ -579,9 +602,13 @@ function Topic({ id, detail, readOnly = false, underHeader = true }: TopicProps)
   }
   const renaming = useAtomValue(headerRenamingAtom(detail.id))
   const channel = detail.channel.id
-  // Main keeps its threads query live while shown, from after its first frame, so the Threads
-  // popover opens with its rows in the first frame instead of "Loading threads".
-  useEffect(() => (main && drawnAll && !readOnly ? registry.mount(channelThreadsAtom(channel)) : undefined), [main, drawnAll, readOnly, channel])
+  // The switcher's queries stay live while the topic is shown, from after its first frame, so the
+  // title opens the switcher with its rows in the first frame (performance 4.4).
+  useEffect(() => {
+    if (!drawnAll || readOnly) return undefined
+    const releases = [registry.mount(channelTopicsAtom(channel)), registry.mount(topicAtom(mainTopicOf(channel)))]
+    return () => releases.forEach((release) => release())
+  }, [drawnAll, readOnly, channel])
 
   const composer = useRef<ComposerHandle>(null)
   const messageActions = useMessageActions({ detail, list, scrollRef, composer })
@@ -591,7 +618,7 @@ function Topic({ id, detail, readOnly = false, underHeader = true }: TopicProps)
 
   const items = itemsOf(list)
   const rows = firstRows()
-  const openAt = openIndex(list, at, readOnly ? undefined : registry.get(scrollSnapshotAtom(id)))
+  const openAt = openIndex(list, at, readOnly ? undefined : registry.get(scrollSnapshotAtom(view)))
   const from = drawnAll ? 0 : Math.max(0, openAt - rows)
   const shown = from === 0 ? items : items.slice(from)
   const held = flash?.ts ?? heldAt
@@ -665,9 +692,7 @@ function Topic({ id, detail, readOnly = false, underHeader = true }: TopicProps)
           {...(agentOn ? { juno: { open: panelOpen, onToggle: toggleJunoPanel } } : {})}
           {...(renaming ? { rename: { onSave: (title: string) => renameTopic(detail.id, title), onCancel: cancelRename } } : {})}
           {...(main ? {} : { onResolve: () => toggleResolved(detail.id) })}
-          threadsOpen={threadsOpen}
-          {...(main ? { onThreads: setThreadsOpen } : {})}
-          threads={threadsOpen ? <MainThreads channel={detail.channel.id} onClose={() => setThreadsOpen(false)} /> : null}
+          switcher={{ open: switcherOpen, onOpen: setSwitcherOpen, content: switcherOpen ? <Switcher detail={detail} onClose={() => setSwitcherOpen(false)} /> : null }}
         />
       }
       pill={showPill ? <NewMessagesPill count={newCount} onJump={jumpToLatest} /> : undefined}

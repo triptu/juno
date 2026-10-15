@@ -91,6 +91,8 @@ export interface SidebarProps {
   readonly onNewChat: () => void
   /** Fires on mouse down; `event.metaKey` asks for a new tab. */
   readonly onNavigate: (target: SidebarNavTarget, event: ActivateEvent) => void
+  /** Right-click on a page item: its menu (Open in new tab). */
+  readonly onNavigateMenu?: (target: SidebarNavTarget) => void
   readonly onFilterKind: (kind: KindFilter) => void
   /** The views, in pill order, after DMs. */
   readonly views?: ReadonlyArray<SidebarViewPill>
@@ -141,6 +143,7 @@ export function Sidebar({
   onSearch,
   onNewChat,
   onNavigate,
+  onNavigateMenu,
   onFilterKind,
   views = [],
   onFilterView,
@@ -163,6 +166,13 @@ export function Sidebar({
   // A dot marks a group with unread topics that is not the one being viewed.
   const channelsDot = dots.channels && kind !== 'channels'
   const dmsDot = dots.dms && kind !== 'dms'
+  const navMenu = (target: SidebarNavTarget) =>
+    onNavigateMenu === undefined
+      ? undefined
+      : (event: MouseEvent<HTMLDivElement>) => {
+          event.preventDefault()
+          onNavigateMenu(target)
+        }
   return (
     <aside aria-label="Sidebar" aria-busy={syncing} {...stylex.props(styles.root)}>
       <header aria-label="Sidebar title bar" {...stylex.props(styles.header)}>
@@ -199,10 +209,10 @@ export function Sidebar({
       </header>
 
       <nav aria-label="Pages" {...stylex.props(styles.nav)}>
-        <NavItem icon={House} active={activeNav === 'home'} onSelect={(event) => onNavigate('home', event)}>
+        <NavItem icon={House} active={activeNav === 'home'} onSelect={(event) => onNavigate('home', event)} onContextMenu={navMenu('home')}>
           Home
         </NavItem>
-        <NavItem icon={ListBullets} active={activeNav === 'all-topics'} onSelect={(event) => onNavigate('all-topics', event)}>
+        <NavItem icon={ListBullets} active={activeNav === 'all-topics'} onSelect={(event) => onNavigate('all-topics', event)} onContextMenu={navMenu('all-topics')}>
           All topics
         </NavItem>
         <NavItem
@@ -211,6 +221,7 @@ export function Sidebar({
           active={activeNav === 'juno'}
           kbd="⌘J"
           onSelect={(event) => onNavigate('juno', event)}
+          onContextMenu={navMenu('juno')}
           trailing={
             junoUnread > 0 ? (
               <Chip variant="filled" numeric title={`${junoUnread} unread from Juno`}>

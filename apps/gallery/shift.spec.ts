@@ -670,14 +670,15 @@ test.describe('Topic header', () => {
     expect(under).toBe(true)
   })
 
-  test('under 480px Resolve keeps its name as an icon and Threads keeps its count', async ({ page }) => {
+  test('under 480px Resolve keeps its name as an icon, and ⋯ stays a 28px icon beside it', async ({ page }) => {
     await open(page, 'TopicHeader', 'narrow/thread-336')
     const resolve = page.getByRole('button', { name: 'Resolve', exact: true })
     await expect(resolve).toBeVisible()
     expect(Math.round((await resolve.boundingBox())!.width)).toBe(28)
     await open(page, 'TopicHeader', 'narrow/main-336')
-    const threads = page.getByRole('button', { name: 'Threads, 12' })
-    await expect(threads).toHaveText('12', { useInnerText: true })
+    const more = page.getByRole('button', { name: 'More', exact: true })
+    await expect(more).toBeVisible()
+    expect(Math.round((await more.boundingBox())!.width)).toBe(28)
     await open(page, 'TopicHeader', 'narrow/thread-480')
     await expect(page.getByRole('button', { name: 'Resolve', exact: true })).toHaveText('Resolve', { useInnerText: true })
   })

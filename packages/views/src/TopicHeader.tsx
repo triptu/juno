@@ -1,5 +1,4 @@
 import { ArrowCounterClockwise } from '@phosphor-icons/react/dist/icons/ArrowCounterClockwise'
-import { ChatsCircle } from '@phosphor-icons/react/dist/icons/ChatsCircle'
 import { CheckCircle } from '@phosphor-icons/react/dist/icons/CheckCircle'
 import { Hash } from '@phosphor-icons/react/dist/icons/Hash'
 import { Lock } from '@phosphor-icons/react/dist/icons/Lock'
@@ -9,16 +8,18 @@ import * as stylex from '@stylexjs/stylex'
 import type { ReactNode } from 'react'
 import type { TopicDetail } from '@juno/contract'
 import { ContextPill, Popover, type ContextTint, type PhosphorIcon } from '@juno/ui'
-import { HeaderTitleButton, IslandButton, JunoToggle, type MenuAnchor } from './header/HeaderControls'
+import { HeaderTitleButton, IslandButton, JunoToggle, MoreButton, type MenuAnchor } from './header/HeaderControls'
 import { HeaderIslands } from './header/HeaderIslands'
 import { RenameField } from './RenameField'
 
 export interface TopicHeaderProps {
   readonly detail: TopicDetail
-  /** The topic menu, opened from the title, is showing. */
+  /** The topic menu, from ⋯ or a right-click on the title, is showing. */
   readonly menuOpen?: boolean
-  /** The title asked for the topic menu (the row's menu, inventory 15.1), to open at `at`. */
+  /** ⋯ or a right-click on the title asked for the topic menu (the row's menu, inventory 15.1), to open at `at`. */
   readonly onMenu: (at: MenuAnchor) => void
+  /** The title's topic switcher: whether it is open, the title's toggle, and its list (a `TopicSwitcher`). Without it the title opens the menu. */
+  readonly switcher?: { readonly open: boolean; readonly onOpen: (open: boolean) => void; readonly content: ReactNode }
   /** The title is a field for Rename (from the topic menu). Threads only. */
   readonly rename?: { readonly onSave: (title: string) => void; readonly onCancel: () => void }
   /** The context pill: narrow the sidebar to the channel. */
@@ -27,12 +28,6 @@ export interface TopicHeaderProps {
   readonly onPillMenu?: () => void
   /** Threads: Resolve or Reopen. Without it the button is not shown. */
   readonly onResolve?: () => void
-  /** Main only: the "Threads" button is pressed and its popover is open. */
-  readonly threadsOpen?: boolean
-  /** Main only: the "Threads" button was pressed, or the popover asked to close. */
-  readonly onThreads?: (open: boolean) => void
-  /** Main only: the popover's content, an `ActiveThreads`. */
-  readonly threads?: ReactNode
   /** The Juno panel's toggle. Hidden when absent (AI assist off). */
   readonly juno?: { readonly open: boolean; readonly onToggle: () => void }
 }
@@ -65,41 +60,24 @@ const tints: Record<TopicDetail['channel']['kind'], ContextTint> = {
  * The topic header (SPEC 7, inventory 5): two islands over the top of the
  * topic, with no bar. Left: the context pill (the channel's name; its kind
  * is the tint, the icon, the tooltip and the accessible name) and the
- * title, which opens the topic's menu. Right: Resolve or Reopen (Threads on
- * Main) and Juno. Everything else is in the menu. The islands line up with
- * the reading column, and under 480px Resolve shows as an icon and Threads
- * as its count. Rename turns the title into a field in place.
+ * title, which opens the topic switcher, hung under the left island; a
+ * right-click on it opens the topic's menu. Right: Resolve or Reopen (not
+ * on Main), ⋯ (the topic's menu) and Juno. The islands line up with the
+ * reading column, and under 480px Resolve shows as an icon. Rename turns
+ * the title into a field in place.
  */
-export function TopicHeader({ detail, menuOpen = false, onMenu, rename, onPill, onPillMenu, onResolve, threadsOpen = false, onThreads, threads, juno }: TopicHeaderProps) {
+export function TopicHeader({ detail, menuOpen = false, onMenu, switcher, rename, onPill, onPillMenu, onResolve, juno }: TopicHeaderProps) {
   const { channel } = detail
   const main = detail.kind === 'main'
   const kind = kindLabels[channel.kind]
   const pillName = `${channel.name}, ${kind.toLowerCase()}`
 
-  const threadCount = detail.threadCount ?? 0
-  const threadsButton = (
-    <IslandButton
-      reserveCount
-      icon={ChatsCircle}
-      label={threadCount > 0 ? `Threads · ${threadCount}` : 'Threads'}
-      narrowLabel={threadCount > 0 ? String(threadCount) : 'Threads'}
-      name={threadCount > 0 ? `Threads, ${threadCount}` : 'Threads'}
-      expanded={threadsOpen}
-      onClick={() => onThreads?.(!threadsOpen)}
-    />
-  )
-
-  const resolve = main ? (
-    onThreads === undefined ? null : (
-      <Popover open={threadsOpen} onClose={() => onThreads(false)} anchor={threadsButton} placement="bottom-end" width="browse" padding="none" label="Threads">
-        {threads}
-      </Popover>
+  const resolve =
+    main || onResolve === undefined ? null : detail.resolved ? (
+      <IslandButton icon={ArrowCounterClockwise} label="Reopen" onClick={onResolve} />
+    ) : (
+      <IslandButton icon={CheckCircle} label="Resolve" onClick={onResolve} />
     )
-  ) : onResolve === undefined ? null : detail.resolved ? (
-    <IslandButton icon={ArrowCounterClockwise} label="Reopen" onClick={onResolve} />
-  ) : (
-    <IslandButton icon={CheckCircle} label="Resolve" onClick={onResolve} />
-  )
   const junoButton = juno === undefined ? null : <JunoToggle pressed={juno.open} onToggle={juno.onToggle} />
 
   return (
@@ -129,20 +107,32 @@ export function TopicHeader({ detail, menuOpen = false, onMenu, rename, onPill, 
             />
           </span>
           {rename === undefined || main ? (
-            <HeaderTitleButton title={main ? 'Main' : detail.title} expanded={menuOpen} onOpen={onMenu} />
+            switcher === undefined ? (
+              <HeaderTitleButton title={main ? 'Main' : detail.title} expanded={menuOpen} onOpen={onMenu} />
+            ) : (
+              <HeaderTitleButton title={main ? 'Main' : detail.title} popup="dialog" expanded={switcher.open} onOpen={() => switcher.onOpen(!switcher.open)} onMenu={onMenu} />
+            )
           ) : (
             <RenameField title={detail.title} size="header" onSave={rename.onSave} onCancel={rename.onCancel} />
           )}
         </>
       }
       right={
-        resolve === null && junoButton === null ? undefined : (
-          <>
-            {resolve}
-            {junoButton}
-          </>
-        )
+        <>
+          {resolve}
+          <MoreButton expanded={menuOpen} onOpen={onMenu} />
+          {junoButton}
+        </>
       }
+      {...(switcher === undefined
+        ? {}
+        : {
+            wrapLeft: (island: ReactNode) => (
+              <Popover open={switcher.open} onClose={() => switcher.onOpen(false)} anchor={island} placement="bottom-start" width="browse" padding="none" label="Topics in this channel" returnFocusTo='[aria-haspopup="dialog"]'>
+                {switcher.content}
+              </Popover>
+            ),
+          })}
     />
   )
 }

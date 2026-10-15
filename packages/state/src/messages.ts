@@ -7,10 +7,13 @@
  * - `channelThreadsAtom(channel)`: Main's active threads.
  *
  * What a topic tab reads, so the list never shows an empty frame when its
- * window moves (performance 5.3):
- * - `messageWindowSpecAtom(id)`: the window the tab wants. The container
+ * window moves (performance 5.3). Both are keyed by a view, `topicView(id,
+ * tabId)`, so two tabs on one topic each keep their own window; the topic
+ * id alone is the view outside tabs (peek, New chat's preview, and an open
+ * still waiting for its first window, which its tab then takes over).
+ * - `messageWindowSpecAtom(view)`: the window the tab wants. The container
  *   writes it (open at the divider, stick to the bottom, prepend).
- * - `messageListAtom(id)`: the window shown. After the spec changes it keeps
+ * - `messageListAtom(view)`: the window shown. After the spec changes it keeps
  *   the old window until the new one's first snapshot arrives, then swaps in
  *   one update; rows whose `rev` is unchanged keep their objects.
  *
@@ -32,7 +35,7 @@ import {
   topicsOpen,
   type MessageView,
 } from '@juno/contract'
-import { liveQuery, prefetch, runCommand } from './atoms'
+import { liveQuery, prefetch, refreshLive, runCommand } from './atoms'
 import type { Registry } from './client'
 import { emptyWindow, sameOrder, type ListWindow } from './list'
 import { mark } from './perf'
@@ -67,8 +70,23 @@ export const topicAtom = (id: string) => topicFamily({ id })
 /** A channel's threads with activity in the quiet window, newest first. `meta.total` is how many there are. */
 export const channelThreadsAtom = (channel: string, limit: number = THREADS_WINDOW_MAX) => threadsFamily({ channel, range: { limit } })
 
-/** The window a topic tab wants. Kept while the app runs, so a hidden tab comes back where it was. */
-export const messageWindowSpecAtom = Atom.family((_id: string) => Atom.make<MessageWindowSpec>(bottomWindow).pipe(Atom.keepAlive))
+/** Every thread the store knows in a channel, open ones first, then the resolved ones: the header's topic switcher. */
+export const channelTopicsAtom = (channel: string) => threadsFamily({ channel, all: true, range: { limit: THREADS_WINDOW_MAX } })
+
+/** Between a topic id and a tab id in a view key. Neither id can hold it. */
+const VIEW_SEPARATOR = '\u0000'
+
+/** A topic as one tab shows it, the key of its window and scroll position. Without a tab, the topic's own view. */
+export const topicView = (topicId: string, tabId?: string): string => (tabId === undefined ? topicId : `${topicId}${VIEW_SEPARATOR}${tabId}`)
+
+/** The topic a view shows. */
+export const topicOfView = (view: string): string => {
+  const at = view.indexOf(VIEW_SEPARATOR)
+  return at < 0 ? view : view.slice(0, at)
+}
+
+/** The window a topic view wants. Kept while the app runs, so a hidden tab comes back where it was. */
+export const messageWindowSpecAtom = Atom.family((_view: string) => Atom.make<MessageWindowSpec>(bottomWindow).pipe(Atom.keepAlive))
 
 /** The window a topic tab shows, and the spec it belongs to. */
 export interface MessageWindow extends ListWindow<MessageView> {
@@ -91,10 +109,10 @@ function carryOver(shown: MessageWindow | undefined, next: ListWindow<MessageVie
 }
 
 /** See the module comment. Reading it subscribes to the current spec's window. */
-export const messageListAtom = Atom.family((id: string) =>
+export const messageListAtom = Atom.family((view: string) =>
   Atom.make((get): MessageWindow => {
-    const spec = get(messageWindowSpecAtom(id))
-    const result = get(messagesAtom(id, spec))
+    const spec = get(messageWindowSpecAtom(view))
+    const result = get(messagesAtom(topicOfView(view), spec))
     const shown = Option.getOrUndefined(get.self<MessageWindow>())
     if (AsyncResult.isFailure(result)) return shown ?? { ...emptyWindow<MessageView>(), spec, ready: false, failed: true }
     if (!AsyncResult.isSuccess(result) || result.value.meta.seq === 0) return shown ?? { ...emptyWindow<MessageView>(), spec, ready: false, failed: false }
@@ -108,7 +126,16 @@ export const openTopic = (registry: Registry, id: string) => runCommand(registry
 /** The topic that holds a message (its thread, or Main), for a Juno source link. */
 export const locateMessage = (registry: Registry, channel: string, ts: string) => runCommand(registry, messagesLocate, { channel, ts })
 
-/** Makes sure the page before `before` is stored; then widen `messageWindowSpecAtom(id)`. */
+/**
+ * A view's window asked for again: its own subscription can start while the
+ * topic's first fetch is still writing history (a New chat's first send to
+ * someone never messaged) and miss the change that covers it.
+ */
+export function refreshMessages(registry: Registry, view: string): void {
+  refreshLive(registry, messagesAtom(topicOfView(view), registry.get(messageWindowSpecAtom(view))))
+}
+
+/** Makes sure the page before `before` is stored; then widen the view's `messageWindowSpecAtom`. */
 export const loadOlderMessages = (registry: Registry, id: string, before: string) => runCommand(registry, messagesLoadOlder, { id, before })
 
 /**

@@ -168,9 +168,9 @@ Navigation (sidebar rows, tabs, nav items, filter chips, ⌘K rows, Browse rows,
 
 - The active tab and the 4 most recently active topic tabs render inside `<Activity mode="visible" | "hidden">` ([React Activity](https://react.dev/reference/react/Activity), stable in React 19.2; this repo has 19.3). Hidden tabs keep their DOM, scroll position and composer text; React destroys their effects, so their live subscriptions end and the engine stops working for them. Switching is a `display` toggle: one frame.
 - `messagesAtom` has a 30 s idle TTL so a hidden tab's query is not torn down and rebuilt during a quick switch away and back.
-- Tabs beyond the 5 are unmounted and keep a `ScrollSnapshot { anchorKey, offset }` (`scrollSnapshotAtom(topicId)` in `@juno/state`, recorded on each `scrollend`; kept per topic, so Back and ⌘⇧T come back to where the topic was left). Switching back waits until the topic's header and window are local, as an open does, and the container restores the snapshot in `useLayoutEffect` before paint.
+- Tabs beyond the 5 are unmounted and keep a `ScrollSnapshot { anchorKey, offset }` (`scrollSnapshotAtom(topicView(topicId, tabId))` in `@juno/state`, recorded on each `scrollend`; kept per topic per tab, so Back and ⌘⇧T come back to where the topic was left in that tab, and two tabs on one topic keep their own). Switching back waits until the topic's header and window are local, as an open does, and the container restores the snapshot in `useLayoutEffect` before paint.
 - Every component under a tab must clean up its effects correctly; hidden means "as if unmounted". StrictMode in dev double-invokes mounts to catch this.
-- Page tabs (Home, All topics, Juno, each Juno page, Settings) are singletons and follow the same rule.
+- Page tabs (Home, All topics, Juno, each Juno page, Settings) follow the same rule. A place open in several tabs costs one mounted tree per mounted tab; the live queries under them are shared by payload (`liveQuery` memoizes per payload), so two tabs on one topic with the same window run one query, and two windows run two.
 
 ### 4.4 Feedback timing
 

@@ -58,7 +58,7 @@ const postgresPanelPage = (
 )
 
 const engPage = (
-  <TopicView header={<TopicHeader detail={details.engMain} onMenu={noop} onPill={noop} onThreads={noop} juno={{ open: false, onToggle: noop }} />} composer={<ComposerSlot placeholder="Message #eng" />}>
+  <TopicView header={<TopicHeader detail={details.engMain} onMenu={noop} onPill={noop} juno={{ open: false, onToggle: noop }} />} composer={<ComposerSlot placeholder="Message #eng" />}>
     <MessageList items={main} main now={NOW} dividerBefore={mainDividerBefore} onOpenThread={noop} onChannel={noop} onLink={noop} />
   </TopicView>
 )
@@ -104,7 +104,16 @@ const workspace = (props: Partial<WorkspaceProps> = {}, page?: React.ReactNode, 
 export default defineFixtures(
   Workspace,
   {
+    // The strip: "+" right after the last tab, and at the strip's end once the tabs scroll.
+    Strip: {
+      'one-tab': workspace({ tabs: [tabs.postgres], activeId: tabs.postgres.id }, postgresPage),
+      'many-tabs': workspace({ tabs: [tabs.pinnedEng, tabs.postgres, tabs.hiring, tabs.densityUnread], activeId: tabs.postgres.id }, postgresPage),
+      overflowing: workspace({ tabs: thirtySeven, ...(lastTab === undefined ? {} : { activeId: lastTab }) }, postgresPage, { width: 960, height: 480 }),
+      'one-topic-in-two-tabs': workspace({ tabs: [tabs.postgres, { ...tabs.postgres, id: 'tab-postgres-2' }, tabs.home, { ...tabs.home, id: 'tab-home-2' }], activeId: 'tab-postgres-2' }, postgresPage),
+      'new-tab-opens-home': workspace({ tabs: [tabs.postgres], activeId: tabs.postgres.id, newTabLabel: 'New tab' }, postgresPage, { hover: '[aria-label="New tab ⌘T"]' }),
+    },
     Page: {
+      // Only before the saved tabs have been read: there is otherwise always a tab.
       'nothing-open': workspace({ tabs: [] }),
       'topic-open': workspace({}, postgresPage),
       'main-open': workspace({ tabs: [tabs.eng, tabs.density], activeId: tabs.eng.id }, engPage),

@@ -84,14 +84,14 @@ test('popovers open from their anchor, whole', async ({ juno, win, feel }) => {
   await juno.sidebar.row('#eng').open()
   await juno.topic.expectTitle('Main')
   await win.waitForTimeout(300)
-  const threads = await tag(juno.topic.threadsButton, 'threads-button')
-  await feel.run({ name: 'threads-popover', title: 'Open the Threads list from a Main header', ...popover('[role="dialog"][aria-label="Threads"]', threads, 'the Threads list') }, async (rec) => {
+  const title = await tag(juno.topic.titleButton, 'title-button')
+  await feel.run({ name: 'topic-switcher', title: 'Open the topic switcher from a Main header', ...popover('[role="dialog"][aria-label="Topics in this channel"]', title, 'the topic switcher') }, async (rec) => {
     await rec.mark('press')
-    await juno.topic.threadsButton.click()
-    await expect(win.getByRole('dialog', { name: 'Threads' })).toBeVisible()
+    await juno.topic.titleButton.click()
+    await expect(win.getByRole('dialog', { name: 'Topics in this channel' })).toBeVisible()
   })
   await win.keyboard.press('Escape')
-  await expect(win.getByRole('dialog', { name: 'Threads' })).toHaveCount(0)
+  await expect(win.getByRole('dialog', { name: 'Topics in this channel' })).toHaveCount(0)
 
   const account = await tag(juno.sidebar.accountButton, 'account-button')
   await feel.run({ name: 'account-menu', title: 'Open the account menu from the avatar', ...popover('[role="dialog"][aria-label="Account"]', account, 'the account menu') }, async (rec) => {

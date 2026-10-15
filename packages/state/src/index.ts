@@ -15,6 +15,7 @@ export {
 } from './allTopics'
 export { mirrorReadsAtom, shouldMarkRead } from './reads'
 export { isPeekKey, peekKeyAtom, setPeekKey } from './peek'
+export { newTabPageAtom, setNewTabPage } from './newTabPage'
 export {
   currentRowAtom,
   focusedTopicAtom,
@@ -32,6 +33,7 @@ export { applyListDelta, emptyWindow, type ListWindow } from './list'
 export {
   bottomWindow,
   channelThreadsAtom,
+  channelTopicsAtom,
   loadOlderMessages,
   locateMessage,
   messageListAtom,
@@ -39,7 +41,10 @@ export {
   messageWindowSpecAtom,
   openTopic,
   prefetchTopic,
+  refreshMessages,
   topicAtom,
+  topicOfView,
+  topicView,
   type MessageWindow,
   type MessageWindowSpec,
 } from './messages'

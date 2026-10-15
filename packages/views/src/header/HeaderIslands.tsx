@@ -15,6 +15,8 @@ export interface HeaderIslandsProps {
   readonly left: ReactNode
   /** The right island's buttons. No right island when absent. */
   readonly right?: ReactNode
+  /** Wraps the left island, so a popover can hang off the island itself (the topic switcher). */
+  readonly wrapLeft?: (island: ReactNode) => ReactNode
   /** Extra attributes for tests and probes (`data-topic-header`). */
   readonly data?: Readonly<Record<`data-${string}`, string>>
 }
@@ -28,7 +30,7 @@ export interface HeaderIslandsProps {
  * container, so the buttons can switch to their narrow form by the area's
  * width alone.
  */
-export function HeaderIslands({ column, left, right, data }: HeaderIslandsProps) {
+export function HeaderIslands({ column, left, right, data, wrapLeft }: HeaderIslandsProps) {
   // The panel floats already, so its header is the islands' row with no
   // surfaces of its own: the controls sit on the panel, 4px in from its top
   // corners, on the same line as the topic's islands.
@@ -49,13 +51,16 @@ export function HeaderIslands({ column, left, right, data }: HeaderIslandsProps)
       </header>
     )
   }
+  const island = (
+    <Surface kind="island" data-island="left" sx={styles.left}>
+      {left}
+    </Surface>
+  )
   return (
     <header {...data} {...stylex.props(styles.root)}>
       <HeaderBand />
       <div {...stylex.props(styles.row, columns[column])}>
-        <Surface kind="island" data-island="left" sx={styles.left}>
-          {left}
-        </Surface>
+        {wrapLeft === undefined ? island : wrapLeft(island)}
         {right === undefined ? null : (
           <Surface kind="island" data-island="right" sx={styles.right}>
             {right}

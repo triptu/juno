@@ -55,6 +55,31 @@ test('the Juno tab sends a message at once and shows the answer, both ways a rea
   await expect.poll(() => model.inputs().at(-1)).toContain('<quote from="juno">You said: what is on today?</quote>which one?')
 })
 
+test('two Juno tabs show the one chat: a message sent in one shows in both', async ({ juno }) => {
+  await ready(juno)
+  await junoNav(juno).click()
+  await juno.tabs.expectActive('Juno')
+  // ⌘-click opens a second Juno tab; a plain click focuses the one active last.
+  await junoNav(juno).click({ modifiers: ['Meta'] })
+  await expect(juno.tabs.tab('Juno')).toHaveCount(2)
+  await juno.tabs.expectActiveAt('Juno', 1)
+
+  const chat = JunoChatPane.tab(juno.win)
+  await chat.send('sent from the second tab')
+  await chat.expectOwner('sent from the second tab')
+  await chat.expectJuno('You said: sent from the second tab')
+
+  await juno.tabs.selectAt('Juno', 0)
+  await juno.tabs.expectActiveAt('Juno', 0)
+  await chat.expectOwner('sent from the second tab')
+  await chat.expectJuno('You said: sent from the second tab')
+
+  await juno.tabs.selectAt('Juno', 1)
+  await junoNav(juno).click()
+  await juno.tabs.expectActiveAt('Juno', 1)
+  await expect(juno.tabs.tab('Juno')).toHaveCount(2)
+})
+
 test('⌘J opens the panel beside a topic with its composer focused, and Esc in the empty composer closes it', async ({ juno }) => {
   await ready(juno)
   await setWindowWidth(juno, 1400)

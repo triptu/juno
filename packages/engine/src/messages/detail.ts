@@ -153,16 +153,20 @@ interface ThreadRow {
   readonly rev: number
   readonly manual_title: string | null
   readonly ai_title: string | null
+  readonly resolved: 0 | 1
 }
 
 const THREAD_PARTICIPANTS = 3
 
-/** A channel's threads with activity inside the quiet window, newest first, with their participants as refs. */
-export const channelThreads = (channel: string, limit: number, now: number): Effect.Effect<ListRun<ThreadSummary>, SqlError, StoreReader> =>
+/**
+ * A channel's threads with activity inside the quiet window, newest first, with their participants as refs.
+ * With `all`, every thread the store knows, the resolved ones last (the header's topic switcher).
+ */
+export const channelThreads = (channel: string, limit: number, now: number, all = false): Effect.Effect<ListRun<ThreadSummary>, SqlError, StoreReader> =>
   Effect.gen(function* () {
     const sql = yield* StoreReader
     const { cutoff } = yield* settings(sql, now)
-    const statements = threadsStatements(channel, cutoff, limit)
+    const statements = threadsStatements(channel, all ? undefined : cutoff, limit)
     const rows = yield* sql.unsafe<ThreadRow>(statements.list.sql, statements.list.params)
     const total = rows.length < limit ? rows.length : ((yield* sql.unsafe<{ n: number }>(statements.count.sql, statements.count.params))[0]?.n ?? rows.length)
     const conversation = (yield* sql<{ kind: Topic['channel']['kind']; name: string | null }>`SELECT kind, name FROM conversations WHERE id = ${channel}`)[0]
@@ -211,6 +215,7 @@ export const channelThreads = (channel: string, limit: number, now: number): Eff
         unreadExact: row.unread_exact === 1,
         mentionsMe: row.mentions_me === 1,
         participantIds: participants.get(row.topic_id) ?? [],
+        ...(row.resolved === 1 ? { resolved: true } : {}),
       }
       return { ...fields, rev: hashId(JSON.stringify(fields)) }
     })

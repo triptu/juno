@@ -18,7 +18,7 @@ import { useAtom, useAtomValue } from '@juno/state/react'
 import { Composer, DestinationPickers, NewChat as NewChatView, startOfConversation, type PickerName } from '@juno/views'
 import { takeAttachments, useAttachments } from './attachments'
 import { useMentions } from './mentions'
-import { settleSentChat } from './navigation'
+import { onNewChatFocus, settleSentChat } from './navigation'
 import { useNewChatChecks } from './newChatChecks'
 import type { Destination } from './sendChecks'
 import { TopicPreview } from './TopicView'
@@ -62,6 +62,7 @@ export const NewChatTab = memo(function NewChatTab({ tabId }: NewChatTabProps) {
   useEffect(() => {
     inputRef.current?.focus()
   }, [])
+  useEffect(() => onNewChatFocus((id) => id === tabId && inputRef.current?.focus()), [tabId])
 
   const conversationList = useAtomValue(pickConversationsAtom(open === 'conversation' ? query : undefined))
   // A person never messaged has no threads: only Main.

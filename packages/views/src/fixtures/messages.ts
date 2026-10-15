@@ -381,3 +381,10 @@ export const engThreads: ReadonlyArray<ThreadSummary> = [
   summary({ id: 'C0ENG:1759700000.001000', title: 'Flaky e2e on reconnect', replyCount: 3, ago: 3 * 24 * 60 }),
   summary({ id: 'C0ENG:1759600000.001000', title: 'Welcome Priya', replyCount: 31, ago: 5 * 24 * 60 }),
 ]
+
+/** Every thread the store knows in #eng, for the header's topic switcher: the open ones, then the resolved ones. */
+export const engTopics: ReadonlyArray<ThreadSummary> = [
+  ...engThreads,
+  { ...summary({ id: 'C0ENG:1759500000.001000', title: 'Pin the Node version in CI', replyCount: 5, ago: 8 * 24 * 60 }), resolved: true },
+  { ...summary({ id: 'C0ENG:1759400000.001000', title: 'Postgres 15 point release', replyCount: 2, ago: 12 * 24 * 60 }), resolved: true },
+]

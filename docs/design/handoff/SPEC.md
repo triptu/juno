@@ -53,8 +53,8 @@ Titles resolve in this order. A title you set by renaming (stored in Juno only) 
 - **Resizing the sidebar.** Drag its right edge to make it between 280 and 480px wide; double-click the edge to go back to 384. The width is remembered. The list does not re-render while you drag.
 - **Hiding the sidebar.** The sidebar button in its top bar, ⌃⌘S, or View › Hide Sidebar hides it; the same again shows it. ⌃⌘S is the macOS standard for Show and Hide Sidebar (Mail, Notes, Reminders and SwiftUI's default sidebar command use it). Dragging the edge far enough left also hides it. Hidden or shown is remembered. While hidden, the traffic lights, the sidebar button, Back and Forward move to the start of the tab strip, so nothing becomes unreachable.
 - **Title bar.** The macOS traffic lights sit in the sidebar's top bar, followed by the sidebar button, Back and Forward. The workspace's top bar is the tab strip. Both bars are window drag regions.
-- **Workspace tabs** work like browser tabs. The "+" button is labelled "New chat" and opens a New chat in a new tab (section 9): a new tab is a new chat. Every page opens in a tab: a topic, a New chat, Home, All topics, Juno, a Juno page or Settings.
-- **Home** (section 12) is what the workspace shows with no tab open, and the Home item in the sidebar opens it as a tab.
+- **Workspace tabs** work like browser tabs. The "+" button sits right after the last tab, as in Safari and Chrome, and stays at the strip's end when the tabs scroll. It opens a new tab (section 6). Every page opens in a tab: a topic, a New chat, Home, All topics, Juno, a Juno page or Settings.
+- **There is always a tab.** Closing the last tab opens a new one, and a first launch opens one; the workspace is never empty.
 - **Reading width.** Message columns are capped around 800px and centered, so long lines stay readable on wide windows.
 
 ### Sign-in
@@ -129,7 +129,7 @@ Each row is a tile followed by three lines. The tile is the topic's art: a small
 ### Row actions
 
 - **Hover** (or keyboard focus) shows an icon-only **Resolve** button (a check) at the right end of the meta line. The time stays in place, and the button's slot is always reserved, so nothing shifts. Its tooltip and accessible name say "Resolve" (with the topic title for screen readers). Resolving hides the row, marks it read and shows a toast with Undo. ⌘Z also undoes. Main threads resolve the same way.
-- **Context menu** (right-click, or the context-menu key):
+- **Context menu** (right-click, or the context-menu key; in an open topic, ⋯ in the header or a right-click on its title):
   - Open in new tab (⌘-click)
   - Rename
   - Redraw (a new drawing for the topic's art, with Undo; only while AI assist is on, and not on a DM's Main)
@@ -149,8 +149,10 @@ Each row is a tile followed by three lines. The tile is the topic's art: a small
 
 ## 6. Opening things and tabs
 
-- Everything opens in the **current tab**. A new tab opens only on ⌘-click or "Open in new tab".
-- If the topic is already open in another tab, that tab is focused instead of opening a duplicate.
+- Everything opens in the **current tab**, the header's topic switcher included (section 7). A new tab opens only on ⌘-click, ⌘ Enter or "Open in new tab".
+- A plain open of a topic or page that another tab shows focuses that tab, the one active last if several do, so the sidebar's selection stays one place. ⌘-click and "Open in new tab" always open a new tab, so the same topic, Home, All topics or Juno can show in several tabs.
+- **One place in several tabs.** Each tab keeps its own scroll position, "N new" divider, composer focus and selection. Everything else is shared: the messages, the read state, the Juno chat and the draft of each topic. Two Juno tabs show the same chat, and a message sent in one shows in both. Two tabs on one topic can sit at different places in it.
+- **New tabs.** The "+" button and ⌘T open a new tab with a New chat (section 9), or Home when Settings › General says so ("New tabs open": New chat, the default, or Home). ⌘N and the sidebar's New chat button always open a New chat. Closing the last tab opens a new tab the same way, so there is never no tab.
 - Tabs carry the topic's art and title, or the channel name for a Main thread. Closing a tab focuses its neighbour.
 - **Unread dot.** A tab whose topic has unread messages shows a small soft grey dot after its title, the same grey as unread counts. One style for all unread, mentions included. The active tab never shows it, since opening marks read.
 - **Back and Forward.** Each tab has its own history, like a browser tab. An entry is a topic or page opened in that tab; scrolling, peeks, popovers and the Juno panel are not entries. Back returns to the previous topic where you left it in it. A New chat that sends replaces its own entry with the topic. Back and Forward are the buttons in the title bar, ⌘[ and ⌘], the mouse's back and forward buttons, and a three-finger swipe. Holding a button lists the tab's history.
@@ -171,10 +173,10 @@ The header has no bar. Two islands float over the top of the message list, 8px u
     - **Public channel:** neutral.
     - **Private channel:** warm amber.
     - **Direct message or group DM:** soft blue.
-  - **The title** opens the topic's menu, the same menu as its sidebar row: Rename, Pin, Notify me, Resolve, Copy Slack link, Open in Slack and the rest. Rename turns the title into a field in place.
-- **Right island:** Resolve or Reopen, and Juno (opens the Juno panel, below). Main shows Threads in place of Resolve.
+  - **The title** is a topic switcher. Clicking it (or Enter, Space or ↓ on it) opens a popover under the left island: a search field, then this channel's Main and its threads, newest activity first, with resolved threads last under "Resolved". Unread shows as in the sidebar (a bold title and a count, and @ for a mention), and the topic on screen is marked. Typing filters by title, ↑ ↓ move, Enter opens in the current tab, ⌘Enter or ⌘-click in a new tab, and Esc closes. Right-clicking the title opens the topic's menu. Rename turns the title into a field in place.
+- **Right island:** Resolve or Reopen (not on Main), ⋯ and Juno (opens the Juno panel, below). **⋯** opens the topic's menu, the same menu as its sidebar row: Open in new tab, Rename, Redraw, Mark as unread, Pin, Resolve, Copy Slack link, Open in Slack, Notify me and Ignore #channel. Main has no Threads button: its title's switcher lists the channel's threads.
 - **Under the islands** the list scrolls on: the page colour is solid behind the islands and fades out just below them, so text never shows through or around them. The first message sits below the islands when scrolled to the top.
-- **Narrow windows.** The islands keep their places at every width. Under 480px, Resolve shows as an icon and Threads as its count; the title shortens first, then the channel name, and the pill's tint and icon always show.
+- **Narrow windows.** The islands keep their places at every width. Under 480px, Resolve shows as an icon; the title shortens first, then the channel name, and the pill's tint and icon always show.
 
 ### Messages
 
@@ -249,7 +251,7 @@ The send-check bar shows the finding and two choices, without a confidence numbe
 
 A conversation where you write first and choose where it goes, with frequent destinations one press away. Design: `docs/design/new-chat/`.
 
-- **Opening.** The New chat icon in the sidebar title bar, the tab strip's "+" and ⌘N each open a New chat in a new tab with the composer focused. The tab is titled "New chat" until you pick a destination, then takes the destination's name, keeping the New chat icon until you send. If an untouched New chat tab already exists, it is focused instead.
+- **Opening.** The New chat icon in the sidebar title bar and ⌘N each open a New chat in a new tab with the composer focused, and so do the tab strip's "+" and ⌘T unless new tabs open Home (section 6). The tab is titled "New chat" until you pick a destination, then takes the destination's name, keeping the New chat icon until you send. If an untouched New chat tab already exists, it is focused instead.
 - **Frequent destinations.** A block centred as a whole in the space above the destination chips shows the section label "Frequent" and up to six compact standard list rows. All rows share the sidebar width, capped at the composer column. Their highlights align with the composer’s left edge; the label, leading glyphs and hint share the rows’ inner inset. A fixed leading slot aligns every name. DMs show the person’s avatar and name; group DMs use the group treatment; channels show # and their name, with a lock for private channels. The quiet hint "Write your message, then pick where it goes." sits below. With no destinations, only the centred hint shows. The two pickers stay directly above the composer.
   - Rank local own messages from the last 30 days by the sum of `0.5 ^ (age_in_days / 7)`, breaking ties by latest send. Fill remaining places with member conversations by latest activity, DMs before channels. Archived channels are excluded. Fetch on opening without delaying first paint; no Slack calls.
   - A primary mouse down, Return or Space chooses a row and focuses the composer. Every row is reachable with Tab. Picking changes the destination chip without sending or opening a conversation. The list stays visible and marks the chosen row.
@@ -294,7 +296,7 @@ Home is a calm resting page: a small scene with Juno's mascot that changes with 
 
 On a cold visit, the greeting says "Syncing with Slack." and reserves space for the possible rows and the Browse link. That space stays for the visit when sync finishes, so the greeting and Ask Juno field do not move. Later visits use the items available when Home opens.
 
-- **Getting there.** Home is the first item in the sidebar navigation. It opens in a tab like any page and is a singleton. With no tab open, the workspace shows Home without a tab, and the Home item reads as selected.
+- **Getting there.** Home is the first item in the sidebar navigation. It opens in a tab like any page: a plain click focuses a tab that shows it, and ⌘-click opens another (section 6). New tabs can open Home instead of a New chat (Settings › General).
 - **What wants you.** Each item is one row with a title line and a plain meta line. The kinds, ranked:
   - **Waiting on you.** A message that asks you something and has no reply from you.
   - **Pick up where you left off.** The last topic you had open, when it has new messages.
@@ -510,7 +512,7 @@ The order: ignored channel → Every message (thread, channel or person) → Nev
 
 **Settings** (⌘,) is the one place for everything you set, in the app and for Juno Agent. It opens in a tab like any page, and there is one Settings tab. A quiet list of sections runs down its left side, as in a Mac app's settings, and the open section shows beside it in the settings column:
 
-- **General**: the peek key (section 5) and Use fast classifier (section 15).
+- **General**: New tabs open, a New chat (the default) or Home, which covers "+", ⌘T and the tab that replaces the last one closed (section 6); the peek key (section 5); and Use fast classifier (section 15).
 - **Appearance**, **Notifications** (the settings above), **Ignored** and **About**, below.
 - **Juno**, **Connections**, and **Backup & This Mac** (section 13.10).
 
@@ -604,7 +606,8 @@ Use the Littlebird design system's tokens.
 | --- | --- |
 | ⌘K | Search and commands |
 | ⌘, | Settings (section 14) |
-| ⌘N or ⌘T | New chat in a new tab (section 9) |
+| ⌘N | New chat in a new tab (section 9) |
+| ⌘T | New tab: a New chat, or Home if Settings › General says so (section 6) |
 | ⌘W / ⌘⇧T | Close the tab / reopen the last closed tab |
 | ⌘1 to ⌘8, ⌘9 | Go to that tab, or the last tab |
 | ⌃Tab / ⌃⇧Tab, ⌘⇧] / ⌘⇧[ | Next / previous tab |

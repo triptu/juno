@@ -29,7 +29,11 @@ export interface TabStripProps {
    * sidebar, Back and Forward while the sidebar is hidden.
    */
   readonly leading?: ReactNode
-  /** The new-tab button, after the scroller, so it never leaves the screen. */
+  /**
+   * The new-tab button, right after the last tab as in Safari and Chrome.
+   * It sits outside the scroller, so when the tabs overflow it stays at the
+   * strip's end and never scrolls away.
+   */
   readonly trailing?: ReactNode
   /**
    * Keys pressed on a tab that the strip does not handle itself: the owner
@@ -42,8 +46,10 @@ export interface TabStripProps {
 
 /**
  * The 44px strip above the workspace. A window drag region. The tabs sit in
- * a horizontal scroller with no visible scrollbar; the active tab scrolls
- * itself into view when it changes, like browser tabs.
+ * a horizontal scroller with no visible scrollbar, as wide as the tabs need
+ * and no wider, so `trailing` follows the last tab and the rest of the
+ * strip is free to drag the window by. The active tab scrolls itself into
+ * view when it changes, like browser tabs.
  */
 export function TabStrip({ label = 'Tabs', leading, trailing, onKeyDown, children }: TabStripProps) {
   return (
@@ -217,12 +223,13 @@ const styles = stylex.create({
     WebkitAppRegion: 'no-drag',
   },
   // The tabs scroll sideways inside the strip. The scroller hangs 1px over
-  // the strip's bottom border so the active tab can paint across it.
+  // the strip's bottom border so the active tab can paint across it. It
+  // takes only the tabs' width, and shrinks to scroll once they overflow.
   scroller: {
     display: 'flex',
     alignItems: 'flex-end',
     gap: spacing['--space-0-5'],
-    flexGrow: 1,
+    flexGrow: 0,
     flexShrink: 1,
     minWidth: 0,
     height: '100%',
@@ -233,11 +240,19 @@ const styles = stylex.create({
     scrollSnapType: 'x proximity',
     overscrollBehaviorX: 'contain',
   },
+  // A square slot as tall as a tab and level with it, one tab gap after the
+  // last tab: the button inside is centred on the tabs' middle line and
+  // keeps an even inset on all four sides.
   trailing: {
     display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
     flexShrink: 0,
-    marginBottom: spacing['--space-1'],
-    marginInlineStart: spacing['--space-1'],
+    alignSelf: 'flex-end',
+    width: layout['--tab-height'],
+    height: layout['--tab-height'],
+    marginBottom: '-1px', // tokens-allow: Level with the tabs, which overlap the page border by one pixel.
+    marginInlineStart: spacing['--space-0-5'],
     WebkitAppRegion: 'no-drag',
   },
   tab: {
@@ -245,7 +260,9 @@ const styles = stylex.create({
     display: 'flex',
     alignItems: 'center',
     gap: spacing['--space-2'],
+    // The width too, not only the basis: the scroller sizes to its tabs' widths, which ignore the basis.
     flexBasis: layout['--tab-width'],
+    width: layout['--tab-width'],
     flexGrow: 0,
     flexShrink: 1,
     minWidth: layout['--tab-min-width'],

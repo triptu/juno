@@ -202,6 +202,10 @@ export const tints = stylex.defineVars({
   '--tint-warning-bg': `color-mix(in oklch, ${colors['--warning']} 14%, ${colors['--surface-default']})`,
   '--tint-warning-fg': `color-mix(in oklch, ${colors['--warning']} 45%, ${colors['--foreground-default']})`,
   '--tint-mention-bg': accent['--hl-soft'],
+  // A clickable context pill under the pointer: its tint with a little of the text colour mixed in.
+  '--tint-public-hover': colors['--secondary-hover'],
+  '--tint-private-hover': `color-mix(in oklch, ${colors['--warning']} 24%, ${colors['--background']})`,
+  '--tint-dm-hover': `color-mix(in oklch, ${colors['--info']} 20%, ${colors['--background']})`,
 })
 
 /**
