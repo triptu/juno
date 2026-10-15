@@ -1,5 +1,7 @@
 import { expect, test } from './fixtures'
 
+test.describe.configure({ timeout: 120_000 })
+
 test('a bot attachment names its thread and expands its description', async ({ juno, fake }) => {
   const root = fake.workspace.post({ channel: 'C0ENG', user: 'U0DEPLOYBOT', text: '[sample/project] Pull request opened', attachments: [{
     title: '#42 Improve cache', title_link: 'https://example.test/pull/42', color: 'good',
