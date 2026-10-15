@@ -1,0 +1,318 @@
+[
+  {
+    "tag": "div",
+    "label": "Account",
+    "rect": {
+      "x": 73,
+      "y": 41,
+      "w": 300,
+      "h": 377.3
+    },
+    "padding": "6px",
+    "gap": "normal",
+    "radius": "13px",
+    "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgb(251, 251, 248)",
+    "border": "1px solid rgba(0, 0, 0, 0)",
+    "shadow": "oklch(0 0 0 / 0.05) 0px 2px 6px -1px, oklch(0 0 0 / 0.13) 0px 14px 36px -8px",
+    "outline": "none 3px rgb(35, 33, 26) offset 0px",
+    "children": [
+      {
+        "tag": "div",
+        "label": "TtusharActiveSet yourself awayNotificati",
+        "rect": {
+          "x": 80,
+          "y": 48,
+          "w": 286,
+          "h": 363.3
+        },
+        "padding": "0px",
+        "gap": "normal",
+        "radius": "0px",
+        "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+        "color": "rgb(35, 33, 26)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(35, 33, 26)",
+        "shadow": "none",
+        "outline": "none 3px rgb(35, 33, 26) offset 0px"
+      }
+    ]
+  },
+  {
+    "tag": "div",
+    "label": "Set yourself away",
+    "rect": {
+      "x": 80,
+      "y": 110.3,
+      "w": 286,
+      "h": 32
+    },
+    "padding": "0px 8px",
+    "gap": "10px",
+    "radius": "6px",
+    "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "0px none rgb(35, 33, 26)",
+    "shadow": "none",
+    "outline": "none 3px rgb(35, 33, 26) offset 0px",
+    "children": [
+      {
+        "tag": "span",
+        "label": "",
+        "rect": {
+          "x": 88,
+          "y": 118.8,
+          "w": 15,
+          "h": 15
+        },
+        "padding": "0px",
+        "gap": "normal",
+        "radius": "0px",
+        "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+        "color": "rgb(96, 94, 82)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(96, 94, 82)",
+        "shadow": "none",
+        "outline": "none 3px rgb(96, 94, 82) offset 0px"
+      },
+      {
+        "tag": "span",
+        "label": "Set yourself away",
+        "rect": {
+          "x": 113,
+          "y": 116.1,
+          "w": 245,
+          "h": 20.3
+        },
+        "padding": "0px",
+        "gap": "6px",
+        "radius": "0px",
+        "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+        "color": "rgb(35, 33, 26)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(35, 33, 26)",
+        "shadow": "none",
+        "outline": "none 3px rgb(35, 33, 26) offset 0px"
+      }
+    ]
+  },
+  {
+    "tag": "div",
+    "label": "Notifications",
+    "rect": {
+      "x": 80,
+      "y": 142.3,
+      "w": 286,
+      "h": 32
+    },
+    "padding": "0px 8px",
+    "gap": "10px",
+    "radius": "6px",
+    "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "0px none rgb(35, 33, 26)",
+    "shadow": "none",
+    "outline": "none 3px rgb(35, 33, 26) offset 0px",
+    "children": [
+      {
+        "tag": "span",
+        "label": "",
+        "rect": {
+          "x": 88,
+          "y": 150.8,
+          "w": 15,
+          "h": 15
+        },
+        "padding": "0px",
+        "gap": "normal",
+        "radius": "0px",
+        "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+        "color": "rgb(96, 94, 82)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(96, 94, 82)",
+        "shadow": "none",
+        "outline": "none 3px rgb(96, 94, 82) offset 0px"
+      },
+      {
+        "tag": "span",
+        "label": "Notifications",
+        "rect": {
+          "x": 113,
+          "y": 148.1,
+          "w": 245,
+          "h": 20.3
+        },
+        "padding": "0px",
+        "gap": "6px",
+        "radius": "0px",
+        "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+        "color": "rgb(35, 33, 26)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(35, 33, 26)",
+        "shadow": "none",
+        "outline": "none 3px rgb(35, 33, 26) offset 0px"
+      }
+    ]
+  },
+  {
+    "tag": "div",
+    "label": "Preferences⌘,",
+    "rect": {
+      "x": 80,
+      "y": 174.3,
+      "w": 286,
+      "h": 32
+    },
+    "padding": "0px 8px",
+    "gap": "10px",
+    "radius": "6px",
+    "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "0px none rgb(35, 33, 26)",
+    "shadow": "none",
+    "outline": "none 3px rgb(35, 33, 26) offset 0px",
+    "children": [
+      {
+        "tag": "span",
+        "label": "",
+        "rect": {
+          "x": 88,
+          "y": 182.8,
+          "w": 15,
+          "h": 15
+        },
+        "padding": "0px",
+        "gap": "normal",
+        "radius": "0px",
+        "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+        "color": "rgb(96, 94, 82)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(96, 94, 82)",
+        "shadow": "none",
+        "outline": "none 3px rgb(96, 94, 82) offset 0px"
+      },
+      {
+        "tag": "span",
+        "label": "Preferences",
+        "rect": {
+          "x": 113,
+          "y": 180.1,
+          "w": 221.6,
+          "h": 20.3
+        },
+        "padding": "0px",
+        "gap": "6px",
+        "radius": "0px",
+        "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+        "color": "rgb(35, 33, 26)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(35, 33, 26)",
+        "shadow": "none",
+        "outline": "none 3px rgb(35, 33, 26) offset 0px"
+      },
+      {
+        "tag": "span",
+        "label": "⌘,",
+        "rect": {
+          "x": 344.6,
+          "y": 181.3,
+          "w": 13.4,
+          "h": 18
+        },
+        "padding": "0px",
+        "gap": "normal",
+        "radius": "0px",
+        "font": "11.5px/18px 500 \"Figtree Variable\"",
+        "color": "rgb(112, 110, 102)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(112, 110, 102)",
+        "shadow": "none",
+        "outline": "none 3px rgb(112, 110, 102) offset 0px"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "label": "Sign out",
+    "rect": {
+      "x": 276.1,
+      "y": 246.8,
+      "w": 71.1,
+      "h": 28
+    },
+    "padding": "0px 10px",
+    "gap": "6px",
+    "radius": "8px",
+    "font": "13px/normal 500 \"Figtree Variable\"",
+    "color": "rgb(112, 110, 102)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "1px solid rgba(0, 0, 0, 0)",
+    "shadow": "none",
+    "outline": "none 2px rgb(180, 53, 31) offset 2px",
+    "children": [
+      {
+        "tag": "span",
+        "label": "Sign out",
+        "rect": {
+          "x": 287.1,
+          "y": 252.8,
+          "w": 49.1,
+          "h": 16
+        },
+        "padding": "0px",
+        "gap": "normal",
+        "radius": "0px",
+        "font": "13px/normal 500 \"Figtree Variable\"",
+        "color": "rgb(112, 110, 102)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(112, 110, 102)",
+        "shadow": "none",
+        "outline": "none 3px rgb(112, 110, 102) offset 0px"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "label": "Ping engine",
+    "rect": {
+      "x": 88,
+      "y": 371.3,
+      "w": 97.2,
+      "h": 32
+    },
+    "padding": "0px 12px",
+    "gap": "8px",
+    "radius": "999px",
+    "font": "13.5px/20.25px 500 \"Figtree Variable\"",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgb(241, 238, 228)",
+    "border": "1px solid rgba(0, 0, 0, 0)",
+    "shadow": "none",
+    "outline": "none 2px rgb(180, 53, 31) offset 2px",
+    "children": [
+      {
+        "tag": "span",
+        "label": "Ping engine",
+        "rect": {
+          "x": 101,
+          "y": 377.1,
+          "w": 71.2,
+          "h": 20.3
+        },
+        "padding": "0px",
+        "gap": "normal",
+        "radius": "0px",
+        "font": "13.5px/20.25px 500 \"Figtree Variable\"",
+        "color": "rgb(35, 33, 26)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(35, 33, 26)",
+        "shadow": "none",
+        "outline": "none 3px rgb(35, 33, 26) offset 0px"
+      }
+    ]
+  }
+]

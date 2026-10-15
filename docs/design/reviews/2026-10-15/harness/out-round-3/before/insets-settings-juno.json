@@ -1,0 +1,51 @@
+[
+  {
+    "what": "div API keyKey set",
+    "left": 1,
+    "right": 1,
+    "width": 694,
+    "cardWidth": 696
+  },
+  {
+    "what": "label ",
+    "left": 525,
+    "right": 11,
+    "width": 160,
+    "cardWidth": 696
+  },
+  {
+    "what": "button Remove",
+    "left": 575,
+    "right": 59,
+    "width": 62,
+    "cardWidth": 696
+  },
+  {
+    "what": "button Save",
+    "left": 641,
+    "right": 11,
+    "width": 44,
+    "cardWidth": 696
+  },
+  {
+    "what": "label $",
+    "left": 525,
+    "right": 11,
+    "width": 160,
+    "cardWidth": 696
+  },
+  {
+    "what": "button Add a rule",
+    "left": 15,
+    "right": 600,
+    "width": 81,
+    "cardWidth": 696
+  },
+  {
+    "what": "label Juno is paused",
+    "left": 15,
+    "right": 559,
+    "width": 122,
+    "cardWidth": 696
+  }
+]

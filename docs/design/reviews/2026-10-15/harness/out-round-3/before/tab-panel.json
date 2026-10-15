@@ -1,0 +1,132 @@
+[
+  {
+    "tag": "button",
+    "role": null,
+    "name": "Send",
+    "ring": "solid 2px rgb(180, 53, 31) +2px",
+    "shadow": "none",
+    "rect": [
+      1353,
+      779,
+      28,
+      28
+    ]
+  },
+  {
+    "tag": "button",
+    "role": null,
+    "name": "Hide sidebar ⌃⌘S",
+    "ring": "solid 2px rgb(180, 53, 31) +2px",
+    "shadow": "none",
+    "rect": [
+      78,
+      7,
+      30,
+      30
+    ]
+  },
+  {
+    "tag": "button",
+    "role": null,
+    "name": "Back ⌘[",
+    "ring": "solid 2px rgb(180, 53, 31) +2px",
+    "shadow": "none",
+    "rect": [
+      110,
+      7,
+      30,
+      30
+    ]
+  },
+  {
+    "tag": "button",
+    "role": null,
+    "name": "Search ⌘K",
+    "ring": "solid 2px rgb(180, 53, 31) +2px",
+    "shadow": "none",
+    "rect": [
+      275,
+      7,
+      30,
+      30
+    ]
+  },
+  {
+    "tag": "button",
+    "role": null,
+    "name": "New chat ⌘N",
+    "ring": "solid 2px rgb(180, 53, 31) +2px",
+    "shadow": "none",
+    "rect": [
+      307,
+      7,
+      30,
+      30
+    ]
+  },
+  {
+    "tag": "button",
+    "role": null,
+    "name": "Account and preferences",
+    "ring": "solid 2px rgb(180, 53, 31) +2px",
+    "shadow": "none",
+    "rect": [
+      343,
+      7,
+      30,
+      30
+    ]
+  },
+  {
+    "tag": "div",
+    "role": "button",
+    "name": "Home",
+    "ring": "solid 2px rgb(180, 53, 31) +2px",
+    "shadow": "none",
+    "rect": [
+      10,
+      48,
+      363,
+      32
+    ]
+  },
+  {
+    "tag": "div",
+    "role": "button",
+    "name": "All topics",
+    "ring": "solid 2px rgb(180, 53, 31) +2px",
+    "shadow": "none",
+    "rect": [
+      10,
+      82,
+      363,
+      32
+    ]
+  },
+  {
+    "tag": "div",
+    "role": "button",
+    "name": "Juno⌘J",
+    "ring": "solid 2px rgb(180, 53, 31) +2px",
+    "shadow": "none",
+    "rect": [
+      10,
+      116,
+      363,
+      32
+    ]
+  },
+  {
+    "tag": "button",
+    "role": null,
+    "name": "All",
+    "ring": "solid 2px rgb(180, 53, 31) +2px",
+    "shadow": "none",
+    "rect": [
+      10,
+      171,
+      37,
+      28
+    ]
+  }
+]

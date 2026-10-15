@@ -1,0 +1,82 @@
+[
+  {
+    "tag": "h1",
+    "label": "Scheduled",
+    "rect": {
+      "x": 559,
+      "y": 84,
+      "w": 576.1,
+      "h": 39.1
+    },
+    "padding": "0px",
+    "gap": "normal",
+    "radius": "0px",
+    "font": "34px/39.1px 400 \"Instrument Serif\"",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "0px none rgb(35, 33, 26)",
+    "shadow": "none",
+    "outline": "none 3px rgb(35, 33, 26) offset 0px",
+    "children": []
+  },
+  {
+    "tag": "p",
+    "label": "What Juno does on its own, and when. Jun",
+    "rect": {
+      "x": 559,
+      "y": 131.1,
+      "w": 576.1,
+      "h": 46.4
+    },
+    "padding": "0px",
+    "gap": "normal",
+    "radius": "0px",
+    "font": "14.5px/23.2px 400 \"Figtree Variable\"",
+    "color": "rgb(96, 94, 82)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "0px none rgb(96, 94, 82)",
+    "shadow": "none",
+    "outline": "none 3px rgb(96, 94, 82) offset 0px",
+    "children": []
+  },
+  {
+    "tag": "h2",
+    "label": "Nothing scheduled",
+    "rect": {
+      "x": 824.9,
+      "y": 341.9,
+      "w": 124.2,
+      "h": 23.2
+    },
+    "padding": "0px",
+    "gap": "normal",
+    "radius": "0px",
+    "font": "14.5px/23.2px 500 \"Figtree Variable\"",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "0px none rgb(35, 33, 26)",
+    "shadow": "none",
+    "outline": "none 3px rgb(35, 33, 26) offset 0px",
+    "children": []
+  },
+  {
+    "tag": "p",
+    "label": "Ask for something on a schedule, like \"c",
+    "rect": {
+      "x": 731.3,
+      "y": 373.1,
+      "w": 311.4,
+      "h": 40.5
+    },
+    "padding": "0px",
+    "gap": "normal",
+    "radius": "0px",
+    "font": "13.5px/20.25px 400 \"Figtree Variable\"",
+    "color": "rgb(112, 110, 102)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "0px none rgb(112, 110, 102)",
+    "shadow": "none",
+    "outline": "none 3px rgb(112, 110, 102) offset 0px",
+    "children": []
+  }
+]
