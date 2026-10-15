@@ -231,7 +231,17 @@ function openTopicFresh(id: string, options: OpenOptions, target: string | undef
   // A fresh open starts at the divider or the bottom, not where it was left.
   registry.set(scrollSnapshotAtom(id), undefined)
   // A new tab does not replace the current one, so a later open in the current tab does not cancel it.
-  show((tabs) => openPlace(tabs, topicPlace(id), options), { id, fresh: true, name: 'juno.topic-open', ...(target === undefined ? {} : { target }) }, options.newTab !== true)
+  show((tabs) => openHere(tabs, topicPlace(id), options), { id, fresh: true, name: 'juno.topic-open', ...(target === undefined ? {} : { target }) }, options.newTab !== true)
+}
+
+/**
+ * Opens `place` (`openPlace`). A New chat with a draft or a destination in
+ * the current tab stays in its history, so Back returns to what was written.
+ */
+function openHere(tabs: Tabs, place: Place, options: OpenOptions = {}): Tabs {
+  const tab = tabs.tabs.find((each) => each.id === tabs.active)
+  const keepNewChat = tab !== undefined && currentPlace(tab).kind === 'newChat' && !untouched(registry.get(newChatAtom(tab.id)))
+  return openPlace(tabs, place, { ...options, keepNewChat })
 }
 
 /**
@@ -244,14 +254,14 @@ export function openNewTab(): void {
     switchToTab(blank.id)
     return
   }
-  show((tabs) => openPlace(tabs, newChatPlace, { newTab: true }), undefined)
+  show((tabs) => openHere(tabs, newChatPlace, { newTab: true }), undefined)
 }
 
 /** A New chat addressed to `conversation`, as ⌘K's result for a person never messaged (spec section 10). */
 export function openNewChatTo(conversation: PickConversation): void {
   show((tabs) => {
     const blank = tabs.tabs.find((tab) => currentPlace(tab).kind === 'newChat' && untouched(registry.get(newChatAtom(tab.id))))
-    const next = blank === undefined ? openPlace(tabs, newChatPlace, { newTab: true }) : activateTab(tabs, blank.id)
+    const next = blank === undefined ? openHere(tabs, newChatPlace, { newTab: true }) : activateTab(tabs, blank.id)
     if (next.active !== undefined) registry.set(newChatAtom(next.active), pickConversation(emptyNewChat, conversation))
     return next
   }, undefined)
@@ -259,27 +269,27 @@ export function openNewChatTo(conversation: PickConversation): void {
 
 /** The sidebar's Home item. Home is a singleton: the tab that shows it is focused. */
 export function openHome(options: OpenOptions = {}): void {
-  show((tabs) => openPlace(tabs, homePlace, options), undefined)
+  show((tabs) => openHere(tabs, homePlace, options), undefined)
 }
 
 /** A page behind the Juno menu, or Settings › Juno (SPEC 13.10). Each shows in one tab. */
 export function openJunoPage(page: JunoPage, options: OpenOptions = {}): void {
-  show((tabs) => openPlace(tabs, junoPagePlace(page), options), undefined)
+  show((tabs) => openHere(tabs, junoPagePlace(page), options), undefined)
 }
 
 /** The Juno tab (SPEC 13). One chat, so one tab: the tab that shows it is focused. */
 export function openJuno(options: OpenOptions = {}): void {
-  show((tabs) => openPlace(tabs, junoPlace, options), undefined)
+  show((tabs) => openHere(tabs, junoPlace, options), undefined)
 }
 
 /** The Notifications page (SPEC 14), a singleton like Home. */
 export function openNotifications(options: OpenOptions = {}): void {
-  show((tabs) => openPlace(tabs, notificationsPlace, options), undefined)
+  show((tabs) => openHere(tabs, notificationsPlace, options), undefined)
 }
 
 /** Preferences (SPEC 14), a singleton like Home. */
 export function openPreferences(options: OpenOptions = {}): void {
-  show((tabs) => openPlace(tabs, preferencesPlace, options), undefined)
+  show((tabs) => openHere(tabs, preferencesPlace, options), undefined)
 }
 
 /** Below the header band, where a message a notification opens lands. */
@@ -351,7 +361,7 @@ function whenAllTopicsReady(): Promise<void> {
 /** The sidebar's All topics item and the "View all topics" empty states. All topics is a singleton, like Home. */
 export function openAllTopics(options: OpenOptions = {}): void {
   if (allTopicsTab(registry.get(tabsAtom)) !== undefined) {
-    show((tabs) => openPlace(tabs, allTopicsPlace, options), undefined)
+    show((tabs) => openHere(tabs, allTopicsPlace, options), undefined)
     return
   }
   const ticket = ++currentTicket
@@ -360,7 +370,7 @@ export function openAllTopics(options: OpenOptions = {}): void {
   queue = queue
     .then(() => ready)
     .then(() => {
-      if (ticket === currentTicket) apply((tabs) => openPlace(tabs, allTopicsPlace, options))
+      if (ticket === currentTicket) apply((tabs) => openHere(tabs, allTopicsPlace, options))
     })
 }
 

@@ -116,6 +116,16 @@ describe('Juno pages', () => {
   })
 })
 
+describe('a New chat left for a topic', () => {
+  it('is replaced when empty, and kept for Back when it has a draft', () => {
+    const chat = openPlace(noTabs, newChatPlace)
+    expect(historyTarget(open(chat, 'a'), -1)).toBeUndefined()
+    const kept = openPlace(chat, topicPlace('a'), { keepNewChat: true })
+    expect(shown(kept)).toEqual(['a'])
+    expect(historyTarget(kept, -1)).toEqual(newChatPlace)
+  })
+})
+
 describe('a New chat that sends', () => {
   it('becomes the topic in place of its own entry, so Back goes to what the tab showed before', () => {
     const chat = openPlace(open(noTabs, 'a'), newChatPlace)

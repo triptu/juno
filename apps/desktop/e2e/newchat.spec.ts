@@ -139,6 +139,20 @@ test('a person never messaged: the start of the conversation, then conversations
   expect(fake.workspace.conversation(String(posted?.args['channel']))?.kind).toBe('im')
 })
 
+test('a New chat with a draft stays in the tab history when a topic opens over it', async ({ juno }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  const { tabs, newChat, topic, sidebar, nav } = juno
+
+  await tabs.newTabButton.click()
+  await newChat.write('A long thought I do not want to lose')
+  await sidebar.row('Draft plan is in the doc').open()
+  await topic.expectTitle('Draft plan is in the doc')
+  await tabs.expectCount(1)
+  await nav.back()
+  await expect(newChat.composer).toHaveValue('A long thought I do not want to lose')
+})
+
 test('a New chat closed while it sends comes back as the conversation, so Enter cannot send it again', async ({ juno, fake }) => {
   await juno.signIn()
   await juno.waitForSync()
