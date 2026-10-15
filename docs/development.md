@@ -256,6 +256,16 @@ prompt, because `security` itself created the item. `pnpm smoke:live --
 (`auth.test: SlackAuthRequired`) and cache again, or before handing the machine
 to someone else. The desktop app never reads this item.
 
+`JUNO_LIVE=1 pnpm probe:live` (`scripts/probe-live.ts`) answers questions the smoke does not:
+the cost of the M7 recheck, what `conversations.history` and `conversations.replies` return
+around threads, the search response, file objects and thumbnail auth, and the notification
+prefs. It reuses the cached session, refuses methods outside its own read-only allow-list, starts
+calls 1.5 s apart, and honours `Retry-After` once. It prints counts, key censuses and
+milliseconds only, and writes redacted shapes to `--out DIR` (a temporary directory by default);
+copy a shape into the recorded fixtures by hand and run `node scripts/check-fixtures-redacted.mjs`.
+`-- --only search` runs the search part alone (four calls). A full run is about 34 calls. The
+results are in research section 10, "Live probe".
+
 ## The live sync dry run
 
 `JUNO_LIVE=1 pnpm sync:live` (`scripts/sync-live-dry-run.ts`) runs the real `@juno/sync`
@@ -486,8 +496,9 @@ An import graph over `apps/` and `packages/` decides what each change reaches: r
 - **Where it runs.** In the image from `scripts/remote/Dockerfile` (Playwright's Ubuntu image with Node 26, pnpm, Java 21, the installed workspace and Quint's downloads). Its tag is a hash of the Dockerfile, `pnpm-lock.yaml` and `pnpm-workspace.yaml`; when the registry lacks it, the first run builds it with `nsc build` (about two minutes) while others on the same Mac wait. Inside, `scripts/remote/run.sh` links the workspace offline and runs the script under xvfb with more workers than the Mac uses.
 - **Results.** Output streams live; reports (spec traces, Playwright results) land in `.remote/<run>/`. The exit code is the script's own.
 - **Warm pool.** After a clean run the machine goes back to a pool kept in the system temp folder (`scripts/remote/pool.mjs`); the next run on this Mac claims it with the image already pulled, which takes a small suite from about 190 s to 19 s. A machine runs one job at a time. The pool keeps at most `JUNO_REMOTE_IDLE_PER_SHAPE` (default 2) idle machines of each shape; a detached reaper destroys one after `JUNO_REMOTE_IDLE_MINUTES` (default 5) idle minutes, every machine ends after 3 hours, and after a failure or Ctrl-C the machine is destroyed at once. `pnpm remote --status` lists the pool; `pnpm remote --drain` destroys the idle machines.
-- **Cap.** Machines in use and idle stay within `JUNO_REMOTE_MAX_VCPU` (default 64 vCPU, the Team plan's Linux limit: for example sixteen 4x8 machines, or about three typical `pnpm affected` runs at once). A run waits while the pool is full and says so. An idle machine of another shape is destroyed to make room.
-- **Cost.** Namespace bills vCPU-minutes (about $0.001 each on the Team plan), whatever the shape, so a machine costs its vCPU count times the minutes it is up, idle or not. The cap bounds the spend at about $1 an hour with every machine busy. `--keep` leaves a machine up outside the pool for `nsc ssh <id>`.
+- **Recovery.** Creation attempts are recorded before `nsc create`; machines carry pool-owner and attempt labels. A reaper starts before acquisition and reconciles the workspace every 30 seconds, as does each acquisition. Untracked pool machines get a five-minute grace period; live local owners and pending creates are protected. Machines labelled for another pool are left alone. Legacy `juno-remote=1` machines without an owner label are reconciled against this Mac's shared state. Failed destroys stay marked `destroying` and are retried. A failed workspace listing stops acquisition rather than treating usage as zero.
+- **Cap.** Machines in use and idle stay within `JUNO_REMOTE_MAX_VCPU` (default 64 vCPU, the Team plan's Linux limit: for example sixteen 4x8 machines, or about three typical `pnpm affected` runs at once). A run waits while the pool is full; after a minute it reports tracked and untracked workspace vCPU. An idle machine of another shape is destroyed to make room.
+- **Cost.** Namespace bills vCPU-minutes (about $0.001 each on the Team plan), whatever the shape, so a machine costs its vCPU count times the minutes it is up, idle or not. The cap bounds the spend at about $1 an hour with every machine busy. `--keep` leaves a machine available for `nsc ssh <id>` and tracked until its 3-hour expiry; it is neither reused nor drained.
 - **Setup.** `brew install namespacelabs/namespace/nsc` and `nsc login` once on the Mac. No credentials live in the repo.
 - **Timings** (2026-10-15, 16x32). Local times are with a free slot, before any queue wait. A new machine adds about 20 s to create and 45 s to pull the image; a warm one adds about 10 s.
 
