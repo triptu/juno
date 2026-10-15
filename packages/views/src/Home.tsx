@@ -33,8 +33,8 @@ export interface HomeProps {
   readonly onSort: (itemId: string, to: Exclude<AutomatedPlace, 'ask'>) => void
   /** Right-click on Automated's row: the conversation's menu, with Ignore. */
   readonly onItemMenu: (itemId: string) => void
-  /** Opens the Juno chat. */
-  readonly onAsk: () => void
+  /** Opens the Juno chat. Absent with AI assist off, which leaves the field out. */
+  readonly onAsk?: () => void
   /** A running job's state line, shown in the field in place of "Ask Juno…" (SPEC 13.4). */
   readonly askLine?: string
   /** "Browse all topics". Fires on mouse down; `event.metaKey` asks for a new tab. */
@@ -82,13 +82,15 @@ export function Home({ scene, title, line, items, done, now, caughtUp, enter = t
             ))}
           </ul>
         )}
-        <button type="button" aria-label="Ask Juno" aria-keyshortcuts="Meta+J" onClick={onAsk} {...stylex.props(styles.ask, ...part())}>
-          <Icon icon={Sparkle} size={16} weight="duotone" />
-          <span data-ask-line={askLine === undefined ? undefined : ''} {...stylex.props(styles.askText)}>
-            {askLine ?? 'Ask Juno…'}
-          </span>
-          <Kbd look="key">⌘J</Kbd>
-        </button>
+        {onAsk === undefined ? null : (
+          <button type="button" aria-label="Ask Juno" aria-keyshortcuts="Meta+J" onClick={onAsk} {...stylex.props(styles.ask, ...part())}>
+            <Icon icon={Sparkle} size={16} weight="duotone" />
+            <span data-ask-line={askLine === undefined ? undefined : ''} {...stylex.props(styles.askText)}>
+              {askLine ?? 'Ask Juno…'}
+            </span>
+            <Kbd look="key">⌘J</Kbd>
+          </button>
+        )}
         {caughtUp && onBrowseAll !== undefined ? (
           <button type="button" {...activateHandlers<HTMLButtonElement>(onBrowseAll)} {...stylex.props(styles.quietLink, ...part())}>
             Browse all topics

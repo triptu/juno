@@ -1,6 +1,6 @@
 import { useId, useLayoutEffect, useRef } from 'react'
 import { viewsSortChannel } from '@juno/contract'
-import { freezeHome, homeShownAtom, homeViewAtom, markFollowUpDone, markHomeItemUsed, registry, resolveAllTopics, runAction, showHome } from '@juno/state'
+import { freezeHome, homeShownAtom, homeViewAtom, junoAvailableAtom, markFollowUpDone, markHomeItemUsed, registry, resolveAllTopics, runAction, showHome } from '@juno/state'
 import { junoNavAtom } from '@juno/state/agent'
 import { useAtomValue } from '@juno/state/react'
 import { Home, type ActivateEvent } from '@juno/views'
@@ -39,6 +39,8 @@ export function HomePage() {
   const appeared = useRef(false)
   // The newest running job's state line replaces the field's placeholder (SPEC 13.4).
   const jobLine = useAtomValue(junoNavAtom, (nav) => nav.jobLine)
+  // With AI assist off Home has no Ask Juno field (inventory 11).
+  const junoOn = useAtomValue(junoAvailableAtom)
 
   const ready = latest !== undefined
   // Before the first sync is done Home shows its greeting with a line saying so; the items enter once it is.
@@ -97,7 +99,7 @@ export function HomePage() {
       onResolveAll={resolveAll}
       onSort={sort}
       onItemMenu={itemMenu}
-      onAsk={askJuno}
+      {...(junoOn ? { onAsk: askJuno } : {})}
       {...(jobLine === undefined ? {} : { askLine: jobLine })}
       onBrowseAll={browseAll}
     />
