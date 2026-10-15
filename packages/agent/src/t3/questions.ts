@@ -57,7 +57,9 @@ export function questionExecutor(manager: McpManagerApi): Executor {
 }
 
 /** Unknown question shapes remain in T3; never invent approval answers. */
-export async function proposeQuestions(manager: McpManagerApi, actions: Actions, job: Job, threadId: string) {
+export async function proposeQuestions(manager: McpManagerApi, actions: Actions, job: Job, threadId: string, signal: AbortSignal) {
+  const source = memoryGen(manager.store)
+  const epoch = manager.stored('t3').epoch
   const list = Schema.decodeUnknownSync(Schema.Struct({ requestIds: Schema.Array(Schema.String) }))(
     content(await manager.invoke('t3', 't3_pending_request_list', { threadId })),
   )
@@ -69,6 +71,7 @@ export async function proposeQuestions(manager: McpManagerApi, actions: Actions,
     if (request.requestId !== requestId || request.questions.length !== 1 || !q || q.multiSelect || q.options.length < 2 || q.options.length > 4) throw new Error('Unsupported T3 Code question. Answer it in T3 Code.')
     const tool = manager.tool('t3', RESPOND)
     const options = q.options.map((o, i) => ({ id: `option-${i}`, label: o.label, value: o.value ?? o.label }))
+    if (signal.aborted || source !== memoryGen(manager.store) || epoch !== manager.stored('t3').epoch) return
     actions.propose({ runId: job.runId, callId, payload: Schema.decodeUnknownSync(CardPayload)({
       _tag: 'question', asks: { _tag: 't3', job: { jobId: job.id, title: job.title } },
       prompt: q.question, options: options.map(({ id, label }) => ({ id, label })), freeText: q.allowCustomAnswer === true,

@@ -253,3 +253,37 @@ it('keeps a lost grant-backed send unknown without retrying', async () => {
   expect(server.calls.filter((c) => c.name === 't3_thread_send')).toHaveLength(1)
   expect(turns.store.db.prepare('SELECT outcome FROM authorizations WHERE grant_id IS NOT NULL').all()).toEqual([{ outcome: 'unknown' }])
 })
+
+it('fails clearly when the server goes down before the Start click', async () => {
+  const { server, manager, turns, call, click } = await fixture('t3', t3Tools)
+  await call('t3_start', start)
+  await server.close()
+  await manager.connect('t3')
+  await click()
+  expect(server.calls.filter((c) => c.name === launch.name)).toHaveLength(0)
+  expect(turns.actions.views()[0]?.card).toMatchObject({ status: { _tag: 'failed' } })
+  await call('t3_start', start)
+  expect(turns.actions.views()).toHaveLength(1)
+})
+
+it('reconciles a lost launch only from its exact message, without relaunching or minting a grant', async () => {
+  let message = ''
+  const tools: FakeTool[] = [
+    { ...launch, call: (args) => { message = String(args.message); return json({ threadId: 'thread-test' }) } },
+    { name: 't3_thread_search', inputSchema: { type: 'object', properties: { query: str }, required: ['query'] }, call: () => json({ matches: [{ threadId: 'thread-test' }] }) },
+    { name: 't3_thread_read', inputSchema: threadArgs, call: () => json({ thread: { threadId: 'thread-test', projectId: start.project, status: 'running' }, items: [{ text: message }] }) },
+    t3Tools[2]!,
+  ]
+  const { server, manager, turns, call, click } = await fixture('t3', tools)
+  await call('t3_start', start)
+  server.loseNextCall(launch.name)
+  await click()
+  expect(turns.jobs.list()).toHaveLength(0)
+  await manager.connect('t3')
+  await turns.actions.start()
+  await turns.actions.idle()
+  expect(server.calls.filter((c) => c.name === launch.name)).toHaveLength(1)
+  expect(turns.store.db.prepare('SELECT outcome FROM authorizations').all()).toEqual([{ outcome: 'done' }])
+  expect(turns.jobs.list()).toHaveLength(1)
+  expect(turns.store.db.prepare('SELECT id FROM grants').all()).toHaveLength(0)
+})

@@ -50,7 +50,7 @@ export async function startProposal(manager: McpManagerApi, input: Start, source
   await manager.checkSecrets(args)
   const payload = Schema.decodeUnknownSync(CardPayload)({
     _tag: 'proposedTask', kind: 't3', title: input.title, where: `${input.project} · from ${input.baseBranch}`,
-    because: args.message,
+    because: input.brief + (input.planFirst ? '\n\nWrite a plan, then wait for approval before changing files.' : ''),
     action: {
       id: actionId, rev: 1, tier: 2, deduped: false, source: memoryGen(manager.store),
       payload: {

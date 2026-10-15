@@ -74,7 +74,7 @@ After signing in on the owner's loopback connection, check:
   `t3-thread://` links. The thread id is retained in the job and completion
   report; adding the T3 deep link needs shell/contract work outside WP18.
 
-Plan gaps: the watcher polls thread reads because S8's `t3_thread_wait` only
+Plan gaps: the watcher polls thread reads every ten seconds because S8's `t3_thread_wait` only
 wakes on terminal state, not questions. A server notification or a wait that
 wakes on pending requests should replace polling. Positive launch recovery
 reconstructs a missing Task card after a crash between launch and local job

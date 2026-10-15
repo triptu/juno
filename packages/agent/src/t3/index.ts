@@ -1,6 +1,6 @@
 import { Schema } from 'effect'
 import type { Actions, Executor, ExecutorCall } from '../actions'
-import { cardRow } from '../actions/cards'
+import { cardRow, memoryGen } from '../actions/cards'
 import { mintGrant } from '../grants/grants'
 import type { Jobs } from '../jobs/jobs'
 import { defineTool, type ToolRun } from '../request/tool'
@@ -20,7 +20,7 @@ export function createT3Adapter(manager: McpManagerApi) {
   const attach = (call: ExecutorCall, threadId: string, grant: boolean) => {
     const args = Schema.decodeUnknownSync(Schema.Struct({ projectId: Schema.String, title: Schema.String }))(call.payload.args)
     const card = cardRow(manager.store, call.cardId)
-    if (!card || !bound) return undefined
+    if (!card || !bound || card.source_gen !== memoryGen(manager.store) || call.payload.account_id !== manager.stored('t3').epoch) return undefined
     const job = bound.jobs.start({
       kind: 't3', runId: card.run_id, originOp: call.opId, callId: call.actionId, title: args.title,
       place: `${args.projectId} · branch pending`,
@@ -60,7 +60,7 @@ export function createT3Adapter(manager: McpManagerApi) {
   return {
     executors: [executor, questionExecutor(manager)],
     stop: async (job: Parameters<typeof stopSession>[2]) => bound ? stopSession(manager, bound.actions, job) : false,
-    driver: t3Driver(manager, async (job, threadId) => { if (bound) await proposeQuestions(manager, bound.actions, job, threadId) }),
+    driver: t3Driver(manager, async (job, threadId, signal) => { if (bound) await proposeQuestions(manager, bound.actions, job, threadId, signal) }),
     tools: (context: { readonly actions: Actions; readonly jobs: Jobs; readonly current: () => Promise<ToolRun | undefined> }) => {
       bound = context
       return [...workTools(manager, context), defineTool<Start>({
