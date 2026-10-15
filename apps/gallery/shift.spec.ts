@@ -69,7 +69,8 @@ function claimNext(routes: ReadonlyArray<Route>, only: ReadonlyArray<string> | u
 }
 
 async function targets(page: Page, route: Route): Promise<Locator[]> {
-  const all = page.locator(`[data-fixture-frame="${route.route}"]`).locator(interactive)
+  // A disclosure that grows its content in place (Show more) moves what is under it on purpose.
+  const all = page.locator(`[data-fixture-frame="${route.route}"]`).locator(interactive).and(page.locator(':not([data-expands-in-place] *)'))
   const count = await all.count()
   const indexes = Array.from({ length: count }, (_, index) => index)
   const picked = count <= perState ? indexes : [...indexes.slice(0, perState - 3), ...indexes.slice(-3)]

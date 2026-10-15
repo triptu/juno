@@ -95,14 +95,14 @@ const styles = stylex.create({
     gap: spacing['--space-1-5'],
     minWidth: 0,
   },
-  // One 20px line, lined up with the field's text.
+  // One 20px line, lined up with the field's text: its 1px border, 14px inset and the textarea's own 4px.
   line: {
     display: 'flex',
     alignItems: 'center',
     gap: spacing['--space-1-5'],
     height: sizes['--control-20'],
     minWidth: 0,
-    paddingInline: spacing['--space-3-5'],
+    paddingInline: `calc(${spacing['--space-3-5']} + ${spacing['--space-1']} + 1px)`, // tokens-allow: the field's 1px border.
     color: colors['--foreground-muted'],
     fontFamily: text['--text-meta-family'],
     fontSize: text['--text-meta-size'],
