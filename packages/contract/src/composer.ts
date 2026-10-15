@@ -1,0 +1,21 @@
+/**
+ * The composer's @ and # rules (spec section 8): `@juno/domain` rules the
+ * renderer runs on each keystroke, reached here because the renderer does
+ * not import domain (as with `audience.ts`).
+ */
+export {
+  decodeMentions,
+  encodeMentions,
+  insertMention,
+  mentionQueryAt,
+  mentionText,
+  mentionTokens,
+  picksIn,
+  rankSuggestions,
+  removeTokenBefore,
+  SUGGESTION_LIMIT,
+  type MentionKind,
+  type MentionPick,
+  type MentionQuery,
+  type MentionToken,
+} from '@juno/domain'

@@ -14,6 +14,7 @@ import { homeStatements } from '../src/home/query'
 import { staleStatement } from '../src/home/job'
 import { automatedStatements } from '../src/automatedView'
 import { pickerStatements } from '../src/newchat/query'
+import { mentionStatements } from '../src/mentions/query'
 import { countsStatement as allTopicsCountsStatement, orderStatement, placesStatement } from '../src/topics/allTopics'
 import { countsStatement, listStatements, type ListFilter } from '../src/topics/query'
 
@@ -152,6 +153,21 @@ describe('query plans', () => {
             assert.deepStrictEqual(scans(lines), [], `${channel ?? 'everywhere'} ${match ?? ''}\n${lines.join('\n')}`)
           }
         }
+      }
+    }).pipe(Effect.provide(freshStore)),
+  )
+
+  it.effect('the @ and # suggestions read messages and topic_index through their indexes', () =>
+    Effect.gen(function* () {
+      const statements = [
+        mentionStatements.threadPosters('C0ENG', '1700000000.000100'),
+        mentionStatements.channelPosters('C0ENG'),
+        mentionStatements.recentContacts('1700000000.000000'),
+        mentionStatements.yourChannels('1700000000.000000'),
+      ]
+      for (const statement of statements) {
+        const lines = yield* plan(statement.sql, statement.params)
+        assert.deepStrictEqual(scans(lines), [], lines.join('\n'))
       }
     }).pipe(Effect.provide(freshStore)),
   )
