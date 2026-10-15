@@ -27,7 +27,7 @@ import { fileURLToPath } from 'node:url'
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
 /** Scripts that give the same result on Linux. feel and perf time the Mac and stay local. */
-const remoteScripts = ['test', 'specs:check', 'specs:traces', 'test:agent', 'test:agent-contracts', 'test:agent-testing', 'test:gallery', 'gallery:shots', 'test:e2e']
+const remoteScripts = ['test', 'specs:check', 'specs:traces', 'test:agent', 'test:agent-contracts', 'test:agent-testing', 'test:gallery', 'gallery:shots', 'test:desktop', 'test:e2e']
 const localOnly = { perf: 'timing', 'test:feel': 'timing' }
 
 function parse(argv) {
