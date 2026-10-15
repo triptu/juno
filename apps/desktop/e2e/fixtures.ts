@@ -57,6 +57,8 @@ export interface LaunchOptions {
   readonly agent?: boolean
   /** The fake OpenRouter the agent reads its catalogue from and sends chat requests to. */
   readonly fakeOpenRouterUrl?: string
+  /** How long the engine's fake AI takes to answer; past a task's timeout it gives no answer. */
+  readonly fakeAiDelayMillis?: number
 }
 
 /**
@@ -74,6 +76,7 @@ export async function launchApp(userData: string, options: LaunchOptions = {}): 
   if (options.fakeSlackUrl !== undefined) env.JUNO_FAKE_SLACK_URL = options.fakeSlackUrl
   if (options.slackAppDir !== undefined) env.JUNO_SLACK_APP_DIR = options.slackAppDir
   if (options.keychainPassword !== undefined) env.JUNO_SLACK_SAFE_STORAGE_PASSWORD = options.keychainPassword
+  if (options.fakeAiDelayMillis !== undefined) env.JUNO_FAKE_AI_DELAY_MS = String(options.fakeAiDelayMillis)
   const ownOpenRouter = options.agent === true && options.fakeOpenRouterUrl === undefined ? await startFakeOpenRouter() : undefined
   if (options.agent === true) env.JUNO_E2E_OPENROUTER_KEY = E2E_OPENROUTER_KEY
   const openRouterUrl = options.fakeOpenRouterUrl ?? ownOpenRouter?.origin

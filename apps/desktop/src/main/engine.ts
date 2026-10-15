@@ -161,6 +161,8 @@ export function createSupervisor(options: { readonly fakeSlackUrl?: string; read
   // without it every AI task answers "no decision" and the app runs as before.
   const ai = e2e || process.env.JUNO_AI === 'fake' ? 'fake' : 'live'
   const openRouterApiKey = e2e ? undefined : process.env.OPENROUTER_API_KEY
+  // An e2e run can make the fake AI slow, to watch a check give up at its timeout.
+  const fakeAiDelayMillis = e2e ? Number(process.env.JUNO_FAKE_AI_DELAY_MS) : Number.NaN
   return new EngineSupervisor(
     {
       userData: app.getPath('userData'),
@@ -169,6 +171,7 @@ export function createSupervisor(options: { readonly fakeSlackUrl?: string; read
       ...(options.fakeSlackUrl === undefined ? {} : { fakeSlackUrl: options.fakeSlackUrl }),
       ai,
       ...(openRouterApiKey ? { openRouterApiKey } : {}),
+      ...(Number.isFinite(fakeAiDelayMillis) ? { fakeAiDelayMillis } : {}),
     },
     options.onMessage,
   )
