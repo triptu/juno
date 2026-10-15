@@ -72,6 +72,14 @@ function textOf(scroller: HTMLElement | null, ts: string): string {
   return body?.innerText.trim() ?? ''
 }
 
+/** The ts a row that was `pending:<clientMsgId>` has now that Slack has the message, if it is in the window. */
+function landedTs(rows: ReadonlyMap<string, MessageView>, pendingTs: string): string | undefined {
+  if (!pendingTs.startsWith('pending:')) return undefined
+  const clientMsgId = pendingTs.slice('pending:'.length)
+  for (const message of rows.values()) if (message.clientMsgId === clientMsgId && message.pending === undefined) return message.ts
+  return undefined
+}
+
 export interface MessageActionsInput {
   readonly detail: TopicDetail
   readonly list: MessageWindow
@@ -119,6 +127,12 @@ export function useMessageActions({ detail, list, scrollRef, composer }: Message
   useLayoutEffect(() => {
     latest.current = { list, editing, confirming, detail }
   })
+
+  // A message still sending takes Slack's ts when it lands: an editor open on it moves with it, text and all.
+  const landed = editing === undefined || list.rows.has(editing.ts) ? undefined : landedTs(list.rows, editing.ts)
+  useLayoutEffect(() => {
+    if (landed !== undefined) setEditing((current) => (current === undefined ? current : { ...current, ts: landed }))
+  }, [landed])
 
   // A saved edit ends when the window shows the new text; a sent delete when the row has left.
   const editedRev = editing?.savedRev === undefined ? undefined : list.rows.get(editing.ts)?.rev
