@@ -37,4 +37,9 @@ describe('integration content', () => {
     expect(messageTitle({ text: '[sample/project] Pull request opened', attachments: [{ title: '#42 Improve cache' }] })).toBe('PR #42: Improve cache')
     expect(messageTitle(Schema.decodeUnknownSync(Message)({ ts: '1700000000.000000', blocks: [{ type: 'header', text: { type: 'plain_text', text: 'Latency alert' } }] }))).toBe('Latency alert')
   })
+  it('keeps a meaningful human message ahead of an unfurl title and strips nested quotes in previews', () => {
+    expect(messageTitle({ text: 'This issue needs a careful review', attachments: [{ title: 'Unrelated page title' }] })).toMatch(/^This issue needs a careful review/)
+    expect(previewText(parse({ attachments: [{ text: '> Quoted detail\nVisible detail' }] }))).toBe('Visible detail')
+  })
+
 })

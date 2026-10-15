@@ -239,474 +239,472 @@
   },
   {
     "subtype": "redacted",
-    "text": "redacted",
-    "username": "redacted",
-    "icons": {
-      "image_48": "redacted"
-    },
-    "attachments": [
-      {
-        "id": 0,
-        "color": "redacted",
-        "fallback": "redacted",
-        "text": "redacted",
-        "title": "redacted",
-        "mrkdwn_in": [
-          "redacted"
-        ]
-      }
-    ],
-    "type": "redacted",
-    "ts": "redacted",
     "bot_id": "redacted",
-    "app_id": "redacted",
-    "team": "redacted",
-    "bot_profile": {
-      "id": "redacted",
-      "deleted": false,
-      "name": "redacted",
-      "updated": 0,
-      "app_id": "redacted",
-      "user_id": "redacted",
-      "icons": {
-        "image_36": "redacted",
-        "image_48": "redacted",
-        "image_72": "redacted"
-      },
-      "team_id": "redacted"
-    },
-    "blocks": [
-      {
-        "type": "redacted",
-        "block_id": "redacted",
-        "elements": [
-          {
-            "type": "redacted",
-            "elements": [
-              {
-                "type": "redacted",
-                "text": "redacted",
-                "style": {
-                  "bold": true
-                }
-              },
-              {
-                "type": "redacted",
-                "text": "redacted"
-              },
-              {
-                "type": "redacted",
-                "text": "redacted",
-                "style": {
-                  "bold": true
-                }
-              }
-            ]
-          }
-        ]
-      }
-    ],
-    "reactions": [
-      {
-        "name": "redacted",
-        "users": [
-          "redacted"
-        ],
-        "count": 0
-      }
-    ]
-  },
-  {
-    "subtype": "redacted",
-    "text": "redacted",
-    "username": "redacted",
-    "icons": {
-      "image_48": "redacted"
-    },
-    "attachments": [
-      {
-        "id": 0,
-        "color": "redacted",
-        "fallback": "redacted",
-        "text": "redacted",
-        "title": "redacted",
-        "mrkdwn_in": [
-          "redacted"
-        ],
-        "media_type": "redacted"
-      },
-      {
-        "id": 0,
-        "color": "redacted",
-        "fallback": "redacted",
-        "text": "redacted",
-        "title": "redacted",
-        "mrkdwn_in": [
-          "redacted"
-        ],
-        "media_type": "redacted"
-      },
-      {
-        "id": 0,
-        "color": "redacted",
-        "fallback": "redacted",
-        "text": "redacted",
-        "title": "redacted",
-        "mrkdwn_in": [
-          "redacted"
-        ],
-        "media_type": "redacted"
-      }
-    ],
-    "type": "redacted",
-    "ts": "redacted",
-    "bot_id": "redacted",
-    "app_id": "redacted",
-    "team": "redacted",
-    "bot_profile": {
-      "id": "redacted",
-      "deleted": false,
-      "name": "redacted",
-      "updated": 0,
-      "app_id": "redacted",
-      "user_id": "redacted",
-      "icons": {
-        "image_36": "redacted",
-        "image_48": "redacted",
-        "image_72": "redacted"
-      },
-      "team_id": "redacted"
-    },
-    "blocks": [
-      {
-        "type": "redacted",
-        "block_id": "redacted",
-        "elements": [
-          {
-            "type": "redacted",
-            "elements": [
-              {
-                "type": "redacted",
-                "text": "redacted",
-                "style": {
-                  "bold": true
-                }
-              },
-              {
-                "type": "redacted",
-                "text": "redacted"
-              },
-              {
-                "type": "redacted",
-                "text": "redacted",
-                "style": {
-                  "bold": true
-                }
-              }
-            ]
-          }
-        ]
-      }
-    ],
-    "reactions": [
-      {
-        "name": "redacted",
-        "users": [
-          "redacted"
-        ],
-        "count": 0
-      }
-    ]
-  },
-  {
-    "subtype": "redacted",
-    "text": "redacted",
-    "username": "redacted",
-    "icons": {
-      "image_48": "redacted"
-    },
-    "attachments": [
-      {
-        "id": 0,
-        "color": "redacted",
-        "fallback": "redacted",
-        "text": "redacted",
-        "title": "redacted",
-        "mrkdwn_in": [
-          "redacted"
-        ],
-        "media_type": "redacted"
-      },
-      {
-        "id": 0,
-        "color": "redacted",
-        "fallback": "redacted",
-        "text": "redacted",
-        "title": "redacted",
-        "mrkdwn_in": [
-          "redacted"
-        ],
-        "media_type": "redacted"
-      }
-    ],
-    "type": "redacted",
-    "ts": "redacted",
-    "edited": {
+    "thread_ts": "redacted",
+    "root": {
       "user": "redacted",
-      "ts": "redacted"
-    },
-    "bot_id": "redacted",
-    "app_id": "redacted",
-    "team": "redacted",
-    "bot_profile": {
-      "id": "redacted",
-      "deleted": false,
-      "name": "redacted",
-      "updated": 0,
+      "type": "redacted",
+      "ts": "redacted",
+      "bot_id": "redacted",
       "app_id": "redacted",
-      "user_id": "redacted",
-      "icons": {
-        "image_36": "redacted",
-        "image_48": "redacted",
-        "image_72": "redacted"
+      "text": "redacted",
+      "team": "redacted",
+      "bot_profile": {
+        "id": "redacted",
+        "app_id": "redacted",
+        "user_id": "redacted",
+        "name": "redacted",
+        "icons": {
+          "image_36": "redacted",
+          "image_48": "redacted",
+          "image_72": "redacted"
+        },
+        "deleted": false,
+        "updated": 0,
+        "team_id": "redacted"
       },
-      "team_id": "redacted"
+      "thread_ts": "redacted",
+      "reply_count": 0,
+      "reply_users_count": 0,
+      "latest_reply": "redacted",
+      "reply_users": [
+        "redacted"
+      ],
+      "is_locked": false,
+      "subscribed": false,
+      "blocks": [
+        {
+          "type": "redacted",
+          "block_id": "redacted",
+          "text": {
+            "type": "redacted",
+            "text": "redacted",
+            "verbatim": false
+          }
+        },
+        {
+          "type": "redacted",
+          "block_id": "redacted",
+          "text": {
+            "type": "redacted",
+            "text": "redacted",
+            "verbatim": false
+          }
+        },
+        {
+          "type": "redacted",
+          "block_id": "redacted",
+          "elements": [
+            {
+              "type": "redacted",
+              "text": "redacted",
+              "verbatim": false
+            }
+          ]
+        },
+        {
+          "type": "redacted",
+          "block_id": "redacted",
+          "elements": [
+            {
+              "type": "redacted",
+              "action_id": "redacted",
+              "text": {
+                "type": "redacted",
+                "text": "redacted",
+                "emoji": true
+              },
+              "value": "redacted"
+            },
+            {
+              "type": "redacted",
+              "action_id": "redacted",
+              "text": {
+                "type": "redacted",
+                "text": "redacted",
+                "emoji": true
+              },
+              "value": "redacted"
+            },
+            {
+              "type": "redacted",
+              "action_id": "redacted",
+              "placeholder": {
+                "type": "redacted",
+                "text": "redacted",
+                "emoji": true
+              }
+            },
+            {
+              "type": "redacted",
+              "action_id": "redacted",
+              "text": {
+                "type": "redacted",
+                "text": "redacted",
+                "emoji": true
+              },
+              "style": "redacted",
+              "value": "redacted"
+            }
+          ]
+        },
+        {
+          "type": "redacted",
+          "block_id": "redacted",
+          "elements": [
+            {
+              "type": "redacted",
+              "text": "redacted",
+              "verbatim": false
+            }
+          ]
+        },
+        {
+          "type": "redacted",
+          "block_id": "redacted",
+          "elements": [
+            {
+              "type": "redacted",
+              "text": "redacted",
+              "verbatim": false
+            }
+          ]
+        }
+      ]
     },
+    "user": "redacted",
+    "type": "redacted",
+    "ts": "redacted",
+    "app_id": "redacted",
+    "text": "redacted",
     "blocks": [
+      {
+        "type": "redacted",
+        "block_id": "redacted",
+        "text": {
+          "type": "redacted",
+          "text": "redacted",
+          "verbatim": false
+        }
+      },
       {
         "type": "redacted",
         "block_id": "redacted",
         "elements": [
           {
             "type": "redacted",
-            "elements": [
-              {
-                "type": "redacted",
-                "text": "redacted",
-                "style": {
-                  "bold": true
-                }
-              },
-              {
-                "type": "redacted",
-                "text": "redacted"
-              },
-              {
-                "type": "redacted",
-                "text": "redacted",
-                "style": {
-                  "bold": true
-                }
-              }
-            ]
+            "text": "redacted",
+            "verbatim": false
           }
         ]
-      }
-    ],
-    "reactions": [
-      {
-        "name": "redacted",
-        "users": [
-          "redacted"
-        ],
-        "count": 0
-      }
-    ]
-  },
-  {
-    "subtype": "redacted",
-    "text": "redacted",
-    "username": "redacted",
-    "icons": {
-      "image_48": "redacted"
-    },
-    "attachments": [
-      {
-        "id": 0,
-        "color": "redacted",
-        "fallback": "redacted",
-        "text": "redacted",
-        "title": "redacted",
-        "mrkdwn_in": [
-          "redacted"
-        ],
-        "media_type": "redacted"
       },
-      {
-        "id": 0,
-        "color": "redacted",
-        "fallback": "redacted",
-        "text": "redacted",
-        "title": "redacted",
-        "mrkdwn_in": [
-          "redacted"
-        ],
-        "media_type": "redacted"
-      },
-      {
-        "id": 0,
-        "color": "redacted",
-        "fallback": "redacted",
-        "text": "redacted",
-        "title": "redacted",
-        "mrkdwn_in": [
-          "redacted"
-        ],
-        "media_type": "redacted"
-      }
-    ],
-    "type": "redacted",
-    "ts": "redacted",
-    "bot_id": "redacted",
-    "app_id": "redacted",
-    "team": "redacted",
-    "bot_profile": {
-      "id": "redacted",
-      "deleted": false,
-      "name": "redacted",
-      "updated": 0,
-      "app_id": "redacted",
-      "user_id": "redacted",
-      "icons": {
-        "image_36": "redacted",
-        "image_48": "redacted",
-        "image_72": "redacted"
-      },
-      "team_id": "redacted"
-    },
-    "blocks": [
       {
         "type": "redacted",
         "block_id": "redacted",
         "elements": [
           {
             "type": "redacted",
-            "elements": [
-              {
-                "type": "redacted",
-                "text": "redacted",
-                "style": {
-                  "bold": true
-                }
-              },
-              {
-                "type": "redacted",
-                "text": "redacted"
-              },
-              {
-                "type": "redacted",
-                "text": "redacted",
-                "style": {
-                  "bold": true
-                }
-              }
-            ]
+            "action_id": "redacted",
+            "text": {
+              "type": "redacted",
+              "text": "redacted",
+              "emoji": true
+            },
+            "value": "redacted"
+          },
+          {
+            "type": "redacted",
+            "action_id": "redacted",
+            "text": {
+              "type": "redacted",
+              "text": "redacted",
+              "emoji": true
+            },
+            "value": "redacted"
+          },
+          {
+            "type": "redacted",
+            "action_id": "redacted",
+            "placeholder": {
+              "type": "redacted",
+              "text": "redacted",
+              "emoji": true
+            }
+          },
+          {
+            "type": "redacted",
+            "action_id": "redacted",
+            "text": {
+              "type": "redacted",
+              "text": "redacted",
+              "emoji": true
+            },
+            "style": "redacted",
+            "value": "redacted"
           }
         ]
-      }
-    ],
-    "reactions": [
+      },
       {
-        "name": "redacted",
-        "users": [
-          "redacted"
-        ],
-        "count": 0
+        "type": "redacted",
+        "block_id": "redacted",
+        "elements": [
+          {
+            "type": "redacted",
+            "text": "redacted",
+            "verbatim": false
+          }
+        ]
+      },
+      {
+        "type": "redacted",
+        "block_id": "redacted",
+        "elements": [
+          {
+            "type": "redacted",
+            "text": "redacted",
+            "verbatim": false
+          }
+        ]
       }
     ]
   },
   {
     "subtype": "redacted",
-    "text": "redacted",
-    "username": "redacted",
-    "icons": {
-      "image_48": "redacted"
-    },
-    "attachments": [
-      {
-        "id": 0,
-        "color": "redacted",
-        "fallback": "redacted",
-        "text": "redacted",
-        "title": "redacted",
-        "mrkdwn_in": [
-          "redacted"
-        ],
-        "media_type": "redacted"
-      },
-      {
-        "id": 0,
-        "color": "redacted",
-        "fallback": "redacted",
-        "text": "redacted",
-        "title": "redacted",
-        "mrkdwn_in": [
-          "redacted"
-        ],
-        "media_type": "redacted"
-      }
-    ],
-    "type": "redacted",
-    "ts": "redacted",
-    "edited": {
+    "bot_id": "redacted",
+    "thread_ts": "redacted",
+    "root": {
       "user": "redacted",
-      "ts": "redacted"
-    },
-    "bot_id": "redacted",
-    "app_id": "redacted",
-    "team": "redacted",
-    "bot_profile": {
-      "id": "redacted",
-      "deleted": false,
-      "name": "redacted",
-      "updated": 0,
+      "type": "redacted",
+      "ts": "redacted",
+      "bot_id": "redacted",
       "app_id": "redacted",
-      "user_id": "redacted",
-      "icons": {
-        "image_36": "redacted",
-        "image_48": "redacted",
-        "image_72": "redacted"
+      "text": "redacted",
+      "team": "redacted",
+      "bot_profile": {
+        "id": "redacted",
+        "app_id": "redacted",
+        "user_id": "redacted",
+        "name": "redacted",
+        "icons": {
+          "image_36": "redacted",
+          "image_48": "redacted",
+          "image_72": "redacted"
+        },
+        "deleted": false,
+        "updated": 0,
+        "team_id": "redacted"
       },
-      "team_id": "redacted"
+      "thread_ts": "redacted",
+      "reply_count": 0,
+      "reply_users_count": 0,
+      "latest_reply": "redacted",
+      "reply_users": [
+        "redacted"
+      ],
+      "is_locked": false,
+      "subscribed": false,
+      "blocks": [
+        {
+          "type": "redacted",
+          "block_id": "redacted",
+          "text": {
+            "type": "redacted",
+            "text": "redacted",
+            "verbatim": false
+          }
+        },
+        {
+          "type": "redacted",
+          "block_id": "redacted",
+          "elements": [
+            {
+              "type": "redacted",
+              "text": "redacted",
+              "verbatim": false
+            }
+          ]
+        },
+        {
+          "type": "redacted",
+          "block_id": "redacted",
+          "text": {
+            "type": "redacted",
+            "text": "redacted",
+            "verbatim": false
+          }
+        },
+        {
+          "type": "redacted",
+          "block_id": "redacted",
+          "elements": [
+            {
+              "type": "redacted",
+              "text": "redacted",
+              "verbatim": false
+            }
+          ]
+        },
+        {
+          "type": "redacted",
+          "block_id": "redacted",
+          "elements": [
+            {
+              "type": "redacted",
+              "action_id": "redacted",
+              "text": {
+                "type": "redacted",
+                "text": "redacted",
+                "emoji": true
+              },
+              "value": "redacted"
+            },
+            {
+              "type": "redacted",
+              "action_id": "redacted",
+              "text": {
+                "type": "redacted",
+                "text": "redacted",
+                "emoji": true
+              },
+              "value": "redacted"
+            },
+            {
+              "type": "redacted",
+              "action_id": "redacted",
+              "placeholder": {
+                "type": "redacted",
+                "text": "redacted",
+                "emoji": true
+              }
+            },
+            {
+              "type": "redacted",
+              "action_id": "redacted",
+              "text": {
+                "type": "redacted",
+                "text": "redacted",
+                "emoji": true
+              },
+              "style": "redacted",
+              "value": "redacted"
+            }
+          ]
+        },
+        {
+          "type": "redacted",
+          "block_id": "redacted",
+          "elements": [
+            {
+              "type": "redacted",
+              "text": "redacted",
+              "verbatim": false
+            }
+          ]
+        }
+      ]
     },
+    "user": "redacted",
+    "type": "redacted",
+    "ts": "redacted",
+    "app_id": "redacted",
+    "text": "redacted",
     "blocks": [
+      {
+        "type": "redacted",
+        "block_id": "redacted",
+        "text": {
+          "type": "redacted",
+          "text": "redacted",
+          "verbatim": false
+        }
+      },
       {
         "type": "redacted",
         "block_id": "redacted",
         "elements": [
           {
             "type": "redacted",
-            "elements": [
-              {
-                "type": "redacted",
-                "text": "redacted",
-                "style": {
-                  "bold": true
-                }
-              },
-              {
-                "type": "redacted",
-                "text": "redacted"
-              },
-              {
-                "type": "redacted",
-                "text": "redacted",
-                "style": {
-                  "bold": true
-                }
-              }
-            ]
+            "text": "redacted",
+            "verbatim": false
           }
         ]
-      }
-    ],
-    "reactions": [
+      },
       {
-        "name": "redacted",
-        "users": [
-          "redacted"
-        ],
-        "count": 0
+        "type": "redacted",
+        "block_id": "redacted",
+        "text": {
+          "type": "redacted",
+          "text": "redacted",
+          "verbatim": false
+        }
+      },
+      {
+        "type": "redacted",
+        "block_id": "redacted",
+        "elements": [
+          {
+            "type": "redacted",
+            "text": "redacted",
+            "verbatim": false
+          }
+        ]
+      },
+      {
+        "type": "redacted",
+        "block_id": "redacted",
+        "elements": [
+          {
+            "type": "redacted",
+            "action_id": "redacted",
+            "text": {
+              "type": "redacted",
+              "text": "redacted",
+              "emoji": true
+            },
+            "value": "redacted"
+          },
+          {
+            "type": "redacted",
+            "action_id": "redacted",
+            "text": {
+              "type": "redacted",
+              "text": "redacted",
+              "emoji": true
+            },
+            "value": "redacted"
+          },
+          {
+            "type": "redacted",
+            "action_id": "redacted",
+            "placeholder": {
+              "type": "redacted",
+              "text": "redacted",
+              "emoji": true
+            }
+          },
+          {
+            "type": "redacted",
+            "action_id": "redacted",
+            "text": {
+              "type": "redacted",
+              "text": "redacted",
+              "emoji": true
+            },
+            "style": "redacted",
+            "value": "redacted"
+          }
+        ]
+      },
+      {
+        "type": "redacted",
+        "block_id": "redacted",
+        "elements": [
+          {
+            "type": "redacted",
+            "text": "redacted",
+            "verbatim": false
+          }
+        ]
       }
     ]
   },
@@ -714,48 +712,1035 @@
     "subtype": "redacted",
     "text": "redacted",
     "username": "redacted",
-    "icons": {
-      "image_48": "redacted"
-    },
-    "attachments": [
-      {
-        "id": 0,
-        "color": "redacted",
-        "fallback": "redacted",
-        "text": "redacted",
-        "title": "redacted",
-        "mrkdwn_in": [
-          "redacted"
-        ],
-        "media_type": "redacted"
-      },
-      {
-        "id": 0,
-        "color": "redacted",
-        "fallback": "redacted",
-        "text": "redacted",
-        "title": "redacted",
-        "mrkdwn_in": [
-          "redacted"
-        ],
-        "media_type": "redacted"
-      },
-      {
-        "id": 0,
-        "color": "redacted",
-        "fallback": "redacted",
-        "text": "redacted",
-        "title": "redacted",
-        "mrkdwn_in": [
-          "redacted"
-        ],
-        "media_type": "redacted"
-      }
-    ],
     "type": "redacted",
     "ts": "redacted",
     "bot_id": "redacted",
     "app_id": "redacted",
+    "metadata": {
+      "event_type": "redacted"
+    },
+    "blocks": [
+      {
+        "type": "redacted",
+        "block_id": "redacted",
+        "elements": [
+          {
+            "type": "redacted",
+            "elements": [
+              {
+                "type": "redacted",
+                "text": "redacted"
+              },
+              {
+                "type": "redacted",
+                "text": "redacted"
+              },
+              {
+                "type": "redacted",
+                "text": "redacted"
+              },
+              {
+                "type": "redacted",
+                "text": "redacted"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "redacted",
+        "block_id": "redacted",
+        "rows": [
+          [
+            {
+              "type": "redacted",
+              "block_id": "redacted",
+              "elements": [
+                {
+                  "type": "redacted",
+                  "elements": [
+                    {
+                      "type": "redacted",
+                      "text": "redacted"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "redacted",
+              "block_id": "redacted",
+              "elements": [
+                {
+                  "type": "redacted",
+                  "elements": [
+                    {
+                      "type": "redacted",
+                      "text": "redacted"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "redacted",
+              "block_id": "redacted",
+              "elements": [
+                {
+                  "type": "redacted",
+                  "elements": [
+                    {
+                      "type": "redacted",
+                      "text": "redacted"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "redacted",
+              "block_id": "redacted",
+              "elements": [
+                {
+                  "type": "redacted",
+                  "elements": [
+                    {
+                      "type": "redacted",
+                      "text": "redacted"
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          [
+            {
+              "type": "redacted",
+              "block_id": "redacted",
+              "elements": [
+                {
+                  "type": "redacted",
+                  "elements": [
+                    {
+                      "type": "redacted",
+                      "text": "redacted"
+                    },
+                    {
+                      "type": "redacted",
+                      "text": "redacted",
+                      "style": {
+                        "italic": true
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "redacted",
+              "block_id": "redacted",
+              "elements": [
+                {
+                  "type": "redacted",
+                  "elements": [
+                    {
+                      "type": "redacted",
+                      "text": "redacted"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "redacted",
+              "block_id": "redacted",
+              "elements": [
+                {
+                  "type": "redacted",
+                  "elements": [
+                    {
+                      "type": "redacted",
+                      "text": "redacted"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "redacted",
+              "block_id": "redacted",
+              "elements": [
+                {
+                  "type": "redacted",
+                  "elements": [
+                    {
+                      "type": "redacted",
+                      "text": "redacted"
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          [
+            {
+              "type": "redacted",
+              "block_id": "redacted",
+              "elements": [
+                {
+                  "type": "redacted",
+                  "elements": [
+                    {
+                      "type": "redacted",
+                      "text": "redacted"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "redacted",
+              "block_id": "redacted",
+              "elements": [
+                {
+                  "type": "redacted",
+                  "elements": [
+                    {
+                      "type": "redacted",
+                      "text": "redacted"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "redacted",
+              "block_id": "redacted",
+              "elements": [
+                {
+                  "type": "redacted",
+                  "elements": [
+                    {
+                      "type": "redacted",
+                      "text": "redacted"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "redacted",
+              "block_id": "redacted",
+              "elements": [
+                {
+                  "type": "redacted",
+                  "elements": [
+                    {
+                      "type": "redacted",
+                      "text": "redacted"
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          [
+            {
+              "type": "redacted",
+              "block_id": "redacted",
+              "elements": [
+                {
+                  "type": "redacted",
+                  "elements": [
+                    {
+                      "type": "redacted",
+                      "text": "redacted"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "redacted",
+              "block_id": "redacted",
+              "elements": [
+                {
+                  "type": "redacted",
+                  "elements": [
+                    {
+                      "type": "redacted",
+                      "text": "redacted"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "redacted",
+              "block_id": "redacted",
+              "elements": [
+                {
+                  "type": "redacted",
+                  "elements": [
+                    {
+                      "type": "redacted",
+                      "text": "redacted"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "redacted",
+              "block_id": "redacted",
+              "elements": [
+                {
+                  "type": "redacted",
+                  "elements": [
+                    {
+                      "type": "redacted",
+                      "text": "redacted"
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          [
+            {
+              "type": "redacted",
+              "block_id": "redacted",
+              "elements": [
+                {
+                  "type": "redacted",
+                  "elements": [
+                    {
+                      "type": "redacted",
+                      "text": "redacted"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "redacted",
+              "block_id": "redacted",
+              "elements": [
+                {
+                  "type": "redacted",
+                  "elements": [
+                    {
+                      "type": "redacted",
+                      "text": "redacted"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "redacted",
+              "block_id": "redacted",
+              "elements": [
+                {
+                  "type": "redacted",
+                  "elements": [
+                    {
+                      "type": "redacted",
+                      "text": "redacted"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "redacted",
+              "block_id": "redacted",
+              "elements": [
+                {
+                  "type": "redacted",
+                  "elements": [
+                    {
+                      "type": "redacted",
+                      "text": "redacted"
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          [
+            {
+              "type": "redacted",
+              "block_id": "redacted",
+              "elements": [
+                {
+                  "type": "redacted",
+                  "elements": [
+                    {
+                      "type": "redacted",
+                      "text": "redacted"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "redacted",
+              "block_id": "redacted",
+              "elements": [
+                {
+                  "type": "redacted",
+                  "elements": [
+                    {
+                      "type": "redacted",
+                      "text": "redacted"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "redacted",
+              "block_id": "redacted",
+              "elements": [
+                {
+                  "type": "redacted",
+                  "elements": [
+                    {
+                      "type": "redacted",
+                      "text": "redacted"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "redacted",
+              "block_id": "redacted",
+              "elements": [
+                {
+                  "type": "redacted",
+                  "elements": [
+                    {
+                      "type": "redacted",
+                      "text": "redacted"
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          [
+            {
+              "type": "redacted",
+              "block_id": "redacted",
+              "elements": [
+                {
+                  "type": "redacted",
+                  "elements": [
+                    {
+                      "type": "redacted",
+                      "text": "redacted"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "redacted",
+              "block_id": "redacted",
+              "elements": [
+                {
+                  "type": "redacted",
+                  "elements": [
+                    {
+                      "type": "redacted",
+                      "text": "redacted"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "redacted",
+              "block_id": "redacted",
+              "elements": [
+                {
+                  "type": "redacted",
+                  "elements": [
+                    {
+                      "type": "redacted",
+                      "text": "redacted"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "redacted",
+              "block_id": "redacted",
+              "elements": [
+                {
+                  "type": "redacted",
+                  "elements": [
+                    {
+                      "type": "redacted",
+                      "text": "redacted"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        ]
+      },
+      {
+        "type": "redacted",
+        "block_id": "redacted",
+        "elements": [
+          {
+            "type": "redacted",
+            "elements": [
+              {
+                "type": "redacted",
+                "text": "redacted"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "redacted",
+        "block_id": "redacted",
+        "elements": [
+          {
+            "type": "redacted",
+            "text": "redacted",
+            "verbatim": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "subtype": "redacted",
+    "text": "redacted",
+    "username": "redacted",
+    "type": "redacted",
+    "ts": "redacted",
+    "bot_id": "redacted",
+    "app_id": "redacted",
+    "thread_ts": "redacted",
+    "reply_count": 0,
+    "reply_users_count": 0,
+    "latest_reply": "redacted",
+    "reply_users": [
+      "redacted"
+    ],
+    "is_locked": false,
+    "subscribed": false,
+    "metadata": {
+      "event_type": "redacted"
+    },
+    "blocks": [
+      {
+        "type": "redacted",
+        "block_id": "redacted",
+        "elements": [
+          {
+            "type": "redacted",
+            "elements": [
+              {
+                "type": "redacted",
+                "text": "redacted"
+              },
+              {
+                "type": "redacted",
+                "text": "redacted"
+              },
+              {
+                "type": "redacted",
+                "text": "redacted"
+              },
+              {
+                "type": "redacted",
+                "text": "redacted"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "redacted",
+        "block_id": "redacted",
+        "rows": [
+          [
+            {
+              "type": "redacted",
+              "block_id": "redacted",
+              "elements": [
+                {
+                  "type": "redacted",
+                  "elements": [
+                    {
+                      "type": "redacted",
+                      "text": "redacted"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "redacted",
+              "block_id": "redacted",
+              "elements": [
+                {
+                  "type": "redacted",
+                  "elements": [
+                    {
+                      "type": "redacted",
+                      "text": "redacted"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "redacted",
+              "block_id": "redacted",
+              "elements": [
+                {
+                  "type": "redacted",
+                  "elements": [
+                    {
+                      "type": "redacted",
+                      "text": "redacted"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "redacted",
+              "block_id": "redacted",
+              "elements": [
+                {
+                  "type": "redacted",
+                  "elements": [
+                    {
+                      "type": "redacted",
+                      "text": "redacted"
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          [
+            {
+              "type": "redacted",
+              "block_id": "redacted",
+              "elements": [
+                {
+                  "type": "redacted",
+                  "elements": [
+                    {
+                      "type": "redacted",
+                      "text": "redacted"
+                    },
+                    {
+                      "type": "redacted",
+                      "text": "redacted",
+                      "style": {
+                        "italic": true
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "redacted",
+              "block_id": "redacted",
+              "elements": [
+                {
+                  "type": "redacted",
+                  "elements": [
+                    {
+                      "type": "redacted",
+                      "text": "redacted"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "redacted",
+              "block_id": "redacted",
+              "elements": [
+                {
+                  "type": "redacted",
+                  "elements": [
+                    {
+                      "type": "redacted",
+                      "text": "redacted"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "redacted",
+              "block_id": "redacted",
+              "elements": [
+                {
+                  "type": "redacted",
+                  "elements": [
+                    {
+                      "type": "redacted",
+                      "text": "redacted"
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          [
+            {
+              "type": "redacted",
+              "block_id": "redacted",
+              "elements": [
+                {
+                  "type": "redacted",
+                  "elements": [
+                    {
+                      "type": "redacted",
+                      "text": "redacted"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "redacted",
+              "block_id": "redacted",
+              "elements": [
+                {
+                  "type": "redacted",
+                  "elements": [
+                    {
+                      "type": "redacted",
+                      "text": "redacted"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "redacted",
+              "block_id": "redacted",
+              "elements": [
+                {
+                  "type": "redacted",
+                  "elements": [
+                    {
+                      "type": "redacted",
+                      "text": "redacted"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "redacted",
+              "block_id": "redacted",
+              "elements": [
+                {
+                  "type": "redacted",
+                  "elements": [
+                    {
+                      "type": "redacted",
+                      "text": "redacted"
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          [
+            {
+              "type": "redacted",
+              "block_id": "redacted",
+              "elements": [
+                {
+                  "type": "redacted",
+                  "elements": [
+                    {
+                      "type": "redacted",
+                      "text": "redacted"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "redacted",
+              "block_id": "redacted",
+              "elements": [
+                {
+                  "type": "redacted",
+                  "elements": [
+                    {
+                      "type": "redacted",
+                      "text": "redacted"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "redacted",
+              "block_id": "redacted",
+              "elements": [
+                {
+                  "type": "redacted",
+                  "elements": [
+                    {
+                      "type": "redacted",
+                      "text": "redacted"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "redacted",
+              "block_id": "redacted",
+              "elements": [
+                {
+                  "type": "redacted",
+                  "elements": [
+                    {
+                      "type": "redacted",
+                      "text": "redacted"
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          [
+            {
+              "type": "redacted",
+              "block_id": "redacted",
+              "elements": [
+                {
+                  "type": "redacted",
+                  "elements": [
+                    {
+                      "type": "redacted",
+                      "text": "redacted"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "redacted",
+              "block_id": "redacted",
+              "elements": [
+                {
+                  "type": "redacted",
+                  "elements": [
+                    {
+                      "type": "redacted",
+                      "text": "redacted"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "redacted",
+              "block_id": "redacted",
+              "elements": [
+                {
+                  "type": "redacted",
+                  "elements": [
+                    {
+                      "type": "redacted",
+                      "text": "redacted"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "redacted",
+              "block_id": "redacted",
+              "elements": [
+                {
+                  "type": "redacted",
+                  "elements": [
+                    {
+                      "type": "redacted",
+                      "text": "redacted"
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          [
+            {
+              "type": "redacted",
+              "block_id": "redacted",
+              "elements": [
+                {
+                  "type": "redacted",
+                  "elements": [
+                    {
+                      "type": "redacted",
+                      "text": "redacted"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "redacted",
+              "block_id": "redacted",
+              "elements": [
+                {
+                  "type": "redacted",
+                  "elements": [
+                    {
+                      "type": "redacted",
+                      "text": "redacted"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "redacted",
+              "block_id": "redacted",
+              "elements": [
+                {
+                  "type": "redacted",
+                  "elements": [
+                    {
+                      "type": "redacted",
+                      "text": "redacted"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "redacted",
+              "block_id": "redacted",
+              "elements": [
+                {
+                  "type": "redacted",
+                  "elements": [
+                    {
+                      "type": "redacted",
+                      "text": "redacted"
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          [
+            {
+              "type": "redacted",
+              "block_id": "redacted",
+              "elements": [
+                {
+                  "type": "redacted",
+                  "elements": [
+                    {
+                      "type": "redacted",
+                      "text": "redacted"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "redacted",
+              "block_id": "redacted",
+              "elements": [
+                {
+                  "type": "redacted",
+                  "elements": [
+                    {
+                      "type": "redacted",
+                      "text": "redacted"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "redacted",
+              "block_id": "redacted",
+              "elements": [
+                {
+                  "type": "redacted",
+                  "elements": [
+                    {
+                      "type": "redacted",
+                      "text": "redacted"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "redacted",
+              "block_id": "redacted",
+              "elements": [
+                {
+                  "type": "redacted",
+                  "elements": [
+                    {
+                      "type": "redacted",
+                      "text": "redacted"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        ]
+      },
+      {
+        "type": "redacted",
+        "block_id": "redacted",
+        "elements": [
+          {
+            "type": "redacted",
+            "elements": [
+              {
+                "type": "redacted",
+                "text": "redacted"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "user": "redacted",
+    "type": "redacted",
+    "ts": "redacted",
+    "bot_id": "redacted",
+    "app_id": "redacted",
+    "text": "redacted",
     "team": "redacted",
     "bot_profile": {
       "id": "redacted",
@@ -771,35 +1756,532 @@
       },
       "team_id": "redacted"
     },
+    "attachments": [
+      {
+        "from_url": "redacted",
+        "work_object_entity": {
+          "work_object_type": "redacted",
+          "external_url": "redacted",
+          "entity_id": "redacted",
+          "app_id": "redacted",
+          "app_name": "redacted",
+          "product_name": "redacted",
+          "display_type": "redacted",
+          "layouts": {
+            "expanded": {
+              "title": {
+                "text": "redacted"
+              },
+              "subtitle": {
+                "text": "redacted"
+              },
+              "header_title": {
+                "text": "redacted"
+              },
+              "hover_subtitle": {
+                "text": "redacted"
+              },
+              "product_icon": {
+                "type": "redacted",
+                "block_id": "redacted",
+                "image_url": "redacted",
+                "alt_text": "redacted",
+                "image_width": 0,
+                "image_height": 0,
+                "image_bytes": 0,
+                "fallback": "redacted",
+                "is_animated": true
+              },
+              "layout_type": "redacted",
+              "fields": {
+                "type": "redacted",
+                "elements": [
+                  {
+                    "type": "redacted",
+                    "label": "redacted",
+                    "field_type": "redacted",
+                    "rich_text": {
+                      "type": "redacted",
+                      "block_id": "redacted",
+                      "elements": [
+                        {
+                          "type": "redacted",
+                          "elements": [
+                            {
+                              "type": "redacted",
+                              "text": "redacted"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    "field_name": "redacted"
+                  },
+                  {
+                    "type": "redacted",
+                    "label": "redacted",
+                    "field_type": "redacted",
+                    "rich_text": {
+                      "type": "redacted",
+                      "block_id": "redacted",
+                      "elements": [
+                        {
+                          "type": "redacted",
+                          "elements": [
+                            {
+                              "type": "redacted",
+                              "user_id": "redacted"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    "field_name": "redacted"
+                  },
+                  {
+                    "type": "redacted",
+                    "label": "redacted",
+                    "field_type": "redacted",
+                    "rich_text": {
+                      "type": "redacted",
+                      "block_id": "redacted",
+                      "elements": [
+                        {
+                          "type": "redacted",
+                          "elements": [
+                            {
+                              "type": "redacted",
+                              "url": "redacted",
+                              "text": "redacted"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    "text": "redacted",
+                    "field_name": "redacted"
+                  }
+                ]
+              },
+              "actions": {
+                "primary_actions": [],
+                "overflow_actions": {
+                  "app_actions": [
+                    {
+                      "type": "redacted",
+                      "text": {
+                        "type": "redacted",
+                        "text": "redacted",
+                        "emoji": true
+                      },
+                      "action_id": "redacted",
+                      "block_id": "redacted",
+                      "value": "redacted"
+                    },
+                    {
+                      "type": "redacted",
+                      "text": {
+                        "type": "redacted",
+                        "text": "redacted",
+                        "emoji": true
+                      },
+                      "action_id": "redacted",
+                      "block_id": "redacted",
+                      "value": "redacted"
+                    },
+                    {
+                      "type": "redacted",
+                      "text": {
+                        "type": "redacted",
+                        "text": "redacted",
+                        "emoji": true
+                      },
+                      "action_id": "redacted",
+                      "block_id": "redacted",
+                      "value": "redacted"
+                    },
+                    {
+                      "type": "redacted",
+                      "text": {
+                        "type": "redacted",
+                        "text": "redacted",
+                        "emoji": true
+                      },
+                      "action_id": "redacted",
+                      "block_id": "redacted",
+                      "value": "redacted"
+                    },
+                    {
+                      "type": "redacted",
+                      "text": {
+                        "type": "redacted",
+                        "text": "redacted",
+                        "emoji": true
+                      },
+                      "action_id": "redacted",
+                      "block_id": "redacted",
+                      "value": "redacted"
+                    }
+                  ],
+                  "slack_actions": [
+                    {
+                      "type": "redacted"
+                    },
+                    {
+                      "type": "redacted"
+                    },
+                    {
+                      "type": "redacted"
+                    },
+                    {
+                      "type": "redacted"
+                    },
+                    {
+                      "type": "redacted"
+                    },
+                    {
+                      "type": "redacted"
+                    },
+                    {
+                      "type": "redacted",
+                      "style": "redacted"
+                    },
+                    {
+                      "type": "redacted"
+                    }
+                  ]
+                },
+                "block_payload": {
+                  "service_id": "redacted",
+                  "service_team_id": "redacted",
+                  "container": {
+                    "type": "redacted"
+                  }
+                }
+              }
+            }
+          },
+          "work_object_entity_type": "redacted",
+          "app_icons": {
+            "image_36": {
+              "type": "redacted",
+              "block_id": "redacted",
+              "image_url": "redacted",
+              "alt_text": "redacted",
+              "image_width": 0,
+              "image_height": 0,
+              "image_bytes": 0,
+              "fallback": "redacted",
+              "is_animated": true
+            },
+            "image_128": {
+              "type": "redacted",
+              "block_id": "redacted",
+              "image_url": "redacted",
+              "alt_text": "redacted",
+              "image_width": 0,
+              "image_height": 0,
+              "image_bytes": 0,
+              "fallback": "redacted",
+              "is_animated": true
+            }
+          }
+        },
+        "id": 0
+      }
+    ],
+    "metadata": {
+      "event_type": "redacted"
+    },
     "blocks": [
       {
         "type": "redacted",
         "block_id": "redacted",
-        "elements": [
-          {
-            "type": "redacted",
-            "elements": [
-              {
-                "type": "redacted",
-                "text": "redacted",
-                "style": {
-                  "bold": true
-                }
-              },
-              {
-                "type": "redacted",
+        "text": {
+          "type": "redacted",
+          "text": "redacted",
+          "verbatim": true
+        }
+      }
+    ]
+  },
+  {
+    "user": "redacted",
+    "type": "redacted",
+    "ts": "redacted",
+    "bot_id": "redacted",
+    "app_id": "redacted",
+    "text": "redacted",
+    "team": "redacted",
+    "bot_profile": {
+      "id": "redacted",
+      "deleted": false,
+      "name": "redacted",
+      "updated": 0,
+      "app_id": "redacted",
+      "user_id": "redacted",
+      "icons": {
+        "image_36": "redacted",
+        "image_48": "redacted",
+        "image_72": "redacted"
+      },
+      "team_id": "redacted"
+    },
+    "thread_ts": "redacted",
+    "reply_count": 0,
+    "reply_users_count": 0,
+    "latest_reply": "redacted",
+    "reply_users": [
+      "redacted"
+    ],
+    "is_locked": false,
+    "subscribed": false,
+    "attachments": [
+      {
+        "from_url": "redacted",
+        "work_object_entity": {
+          "work_object_type": "redacted",
+          "external_url": "redacted",
+          "entity_id": "redacted",
+          "app_id": "redacted",
+          "app_name": "redacted",
+          "product_name": "redacted",
+          "display_type": "redacted",
+          "layouts": {
+            "expanded": {
+              "title": {
                 "text": "redacted"
               },
-              {
+              "subtitle": {
+                "text": "redacted"
+              },
+              "header_title": {
+                "text": "redacted"
+              },
+              "hover_subtitle": {
+                "text": "redacted"
+              },
+              "product_icon": {
                 "type": "redacted",
-                "text": "redacted",
-                "style": {
-                  "bold": true
+                "block_id": "redacted",
+                "image_url": "redacted",
+                "alt_text": "redacted",
+                "image_width": 0,
+                "image_height": 0,
+                "image_bytes": 0,
+                "fallback": "redacted",
+                "is_animated": true
+              },
+              "layout_type": "redacted",
+              "fields": {
+                "type": "redacted",
+                "elements": [
+                  {
+                    "type": "redacted",
+                    "label": "redacted",
+                    "field_type": "redacted",
+                    "rich_text": {
+                      "type": "redacted",
+                      "block_id": "redacted",
+                      "elements": [
+                        {
+                          "type": "redacted",
+                          "elements": [
+                            {
+                              "type": "redacted",
+                              "text": "redacted"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    "field_name": "redacted"
+                  },
+                  {
+                    "type": "redacted",
+                    "label": "redacted",
+                    "field_type": "redacted",
+                    "rich_text": {
+                      "type": "redacted",
+                      "block_id": "redacted",
+                      "elements": [
+                        {
+                          "type": "redacted",
+                          "elements": [
+                            {
+                              "type": "redacted",
+                              "user_id": "redacted"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    "field_name": "redacted"
+                  },
+                  {
+                    "type": "redacted",
+                    "label": "redacted",
+                    "field_type": "redacted",
+                    "rich_text": {
+                      "type": "redacted",
+                      "block_id": "redacted",
+                      "elements": [
+                        {
+                          "type": "redacted",
+                          "elements": [
+                            {
+                              "type": "redacted",
+                              "url": "redacted",
+                              "text": "redacted"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    "text": "redacted",
+                    "field_name": "redacted"
+                  }
+                ]
+              },
+              "actions": {
+                "primary_actions": [],
+                "overflow_actions": {
+                  "app_actions": [
+                    {
+                      "type": "redacted",
+                      "text": {
+                        "type": "redacted",
+                        "text": "redacted",
+                        "emoji": true
+                      },
+                      "action_id": "redacted",
+                      "block_id": "redacted",
+                      "value": "redacted"
+                    },
+                    {
+                      "type": "redacted",
+                      "text": {
+                        "type": "redacted",
+                        "text": "redacted",
+                        "emoji": true
+                      },
+                      "action_id": "redacted",
+                      "block_id": "redacted",
+                      "value": "redacted"
+                    },
+                    {
+                      "type": "redacted",
+                      "text": {
+                        "type": "redacted",
+                        "text": "redacted",
+                        "emoji": true
+                      },
+                      "action_id": "redacted",
+                      "block_id": "redacted",
+                      "value": "redacted"
+                    },
+                    {
+                      "type": "redacted",
+                      "text": {
+                        "type": "redacted",
+                        "text": "redacted",
+                        "emoji": true
+                      },
+                      "action_id": "redacted",
+                      "block_id": "redacted",
+                      "value": "redacted"
+                    },
+                    {
+                      "type": "redacted",
+                      "text": {
+                        "type": "redacted",
+                        "text": "redacted",
+                        "emoji": true
+                      },
+                      "action_id": "redacted",
+                      "block_id": "redacted",
+                      "value": "redacted"
+                    }
+                  ],
+                  "slack_actions": [
+                    {
+                      "type": "redacted"
+                    },
+                    {
+                      "type": "redacted"
+                    },
+                    {
+                      "type": "redacted"
+                    },
+                    {
+                      "type": "redacted"
+                    },
+                    {
+                      "type": "redacted"
+                    },
+                    {
+                      "type": "redacted"
+                    },
+                    {
+                      "type": "redacted",
+                      "style": "redacted"
+                    },
+                    {
+                      "type": "redacted"
+                    }
+                  ]
+                },
+                "block_payload": {
+                  "service_id": "redacted",
+                  "service_team_id": "redacted",
+                  "container": {
+                    "type": "redacted"
+                  }
                 }
               }
-            ]
+            }
+          },
+          "work_object_entity_type": "redacted",
+          "app_icons": {
+            "image_36": {
+              "type": "redacted",
+              "block_id": "redacted",
+              "image_url": "redacted",
+              "alt_text": "redacted",
+              "image_width": 0,
+              "image_height": 0,
+              "image_bytes": 0,
+              "fallback": "redacted",
+              "is_animated": true
+            },
+            "image_128": {
+              "type": "redacted",
+              "block_id": "redacted",
+              "image_url": "redacted",
+              "alt_text": "redacted",
+              "image_width": 0,
+              "image_height": 0,
+              "image_bytes": 0,
+              "fallback": "redacted",
+              "is_animated": true
+            }
           }
-        ]
+        },
+        "id": 0
+      }
+    ],
+    "metadata": {
+      "event_type": "redacted"
+    },
+    "blocks": [
+      {
+        "type": "redacted",
+        "block_id": "redacted",
+        "text": {
+          "type": "redacted",
+          "text": "redacted",
+          "verbatim": true
+        }
       }
     ],
     "reactions": [

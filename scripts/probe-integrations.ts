@@ -31,7 +31,7 @@ export async function probeIntegrations(call: Call, out: string): Promise<void> 
   }
   console.log(JSON.stringify(report, null, 2))
   await writeFile(join(out, 'integration-counts.json'), JSON.stringify(report, null, 2) + '\n')
-  await writeFile(join(out, 'integration-shapes.json'), JSON.stringify(messages.slice(0, 8).map(shape), null, 2) + '\n')
+  await writeFile(join(out, 'integration-shapes.json'), JSON.stringify(selected.flatMap((page) => page.bots.slice(0, 2)).map(shape), null, 2) + '\n')
 }
 
 function shape(value: unknown): unknown {
