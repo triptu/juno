@@ -1,12 +1,14 @@
 import * as stylex from '@stylexjs/stylex'
 import { useState } from 'react'
-import { defineFixtures, fixture, scene } from '@juno/ui'
+import type { MentionChannel, MentionPerson } from '@juno/contract'
+import { defineFixtures, fixture, scene, type TextareaMark } from '@juno/ui'
 import { AttachButton } from './AttachButton'
 import { AttachmentChips } from './AttachmentChips'
 import { chips } from './AttachmentChips.fixtures'
 import { AudienceWarning } from './AudienceWarning'
 import { Composer } from './Composer'
 import { useFixtureControl } from './juno-chat/fixtures/control'
+import { MentionSuggestions, mentionRowId } from './MentionSuggestions'
 import { SendCheckBar, type SendCheckFinding } from './SendCheckBar'
 
 const noop = () => {}
@@ -71,6 +73,59 @@ function NoticesComeAndGo({ withChips = false }: { readonly withChips?: boolean 
     </div>
   )
 }
+
+const person = (id: string, name: string, realName: string, color: MentionPerson['color'], tier: number): MentionPerson => ({
+  id,
+  name,
+  realName,
+  color,
+  tier,
+  order: 0,
+  names: [name, realName],
+})
+
+const people: ReadonlyArray<MentionPerson> = [
+  person('U0MAYA', 'Maya', 'Maya Chen', 'claret', 0),
+  person('U0MARCO', 'Marco', 'Marco Silva', 'jordy', 0),
+  person('U0MALIK', 'Malik', 'Malik Osei', 'emerald', 1),
+  person('U0MARTA', 'Marta', 'Marta Nowak', 'plum', 2),
+]
+
+const channels: ReadonlyArray<MentionChannel> = [
+  { id: 'C0PLATFORM', name: 'platform', kind: 'public', tier: 0, order: 0, names: ['platform'] },
+  { id: 'C0PLANNING', name: 'planning', kind: 'private', tier: 0, order: 1, names: ['planning'] },
+  { id: 'C0PLAYBOOKS', name: 'playbooks', kind: 'public', tier: 1, order: 2, names: ['playbooks'] },
+]
+
+const LIST = 'mentions'
+
+/** The composer with the @ or # list open over `value`, its trigger at `at`. */
+function MentionsOpen({ value, at, kind }: { readonly value: string; readonly at: number; readonly kind: 'person' | 'channel' }) {
+  const rows = kind === 'person' ? { kind, rows: people } : { kind, rows: channels }
+  const activeId = mentionRowId(LIST, rows.rows[0]!.id)
+  return (
+    <div {...stylex.props(styles.column)}>
+      <Composer
+        {...base}
+        value={value}
+        placeholder="Reply"
+        marks={value.startsWith('Ask @Leo') ? [{ start: 4, end: 8, look: 'person', hue: 'midnight' }] : []}
+        mention={{
+          anchorAt: at,
+          listId: LIST,
+          activeId,
+          list: <MentionSuggestions {...rows} id={LIST} activeId={activeId} onActivate={noop} onPick={noop} />,
+          onDismiss: noop,
+        }}
+      />
+    </div>
+  )
+}
+
+const picked: ReadonlyArray<TextareaMark> = [
+  { start: 7, end: 12, look: 'person', hue: 'claret' },
+  { start: 32, end: 41, look: 'channel' },
+]
 
 export default defineFixtures(
   Composer,
@@ -147,6 +202,16 @@ export default defineFixtures(
         { width: 336 },
       ),
       'narrow-wrong-place': fixture({ ...base, value: 'the preview environments reaper should cut the staging bill', placeholder: 'Message #eng', notices: routeBar, onEscape: noop }, { width: 336 }),
+    },
+    // Inventory 7.1: @ and # suggestions, and the picked names as chips.
+    Mentions: {
+      chips: fixture({ ...base, value: 'Thanks @Maya for the notes, see #platform for the plan.', placeholder: 'Reply', marks: picked }),
+      'people-open': scene(() => <MentionsOpen value="Ask @Leo and @ma" at={13} kind="person" />, { height: 300 }),
+      'channels-open': scene(() => <MentionsOpen value="#pla" at={0} kind="channel" />, { height: 260 }),
+      // Far right in a wide field: the list stays inside the composer's width.
+      'open-at-the-end': scene(() => <MentionsOpen value={`${'The numbers for the quarter are in and they look good. '.repeat(1)}cc @ma`} at={58} kind="person" />, {
+        height: 300,
+      }),
     },
     Shift: {
       'notices-come-and-go': scene(() => <NoticesComeAndGo />, { height: 320 }),
