@@ -298,3 +298,18 @@ test.describe('state switcher', () => {
     await expect(avatar.locator('img')).toHaveCSS('opacity', '0')
   })
 })
+
+// Shift and screenshot checks assume the bundled faces on every platform
+// (Linux under pnpm remote too), never a system fallback.
+test('every font family comes from the bundle', async ({ page }) => {
+  await page.goto('/#/Button')
+  const families = await page.evaluate(async () => {
+    const loaded: Record<string, number> = {}
+    for (const family of ['Figtree Variable', 'Instrument Serif', 'JetBrains Mono']) {
+      // `load` resolves with the @font-face rules that match; a system font has none.
+      loaded[family] = (await document.fonts.load(`16px "${family}"`)).filter((face) => face.status === 'loaded').length
+    }
+    return loaded
+  })
+  expect(Object.entries(families).filter(([, faces]) => faces === 0)).toEqual([])
+})

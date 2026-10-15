@@ -97,6 +97,7 @@ export {
   accentAtom,
   appInfoAtom,
   copyText,
+  editUndo,
   onMenuCommand,
   openExternal,
   openInSlack,
@@ -111,4 +112,6 @@ export {
 } from './shell'
 export type { PortConnection, PortLike } from './transport'
 export { redrawTopic, topicArtAtom } from './art'
-export { slackLink } from './links'
+export { messageLink, slackLink, threadRootTs } from './links'
+export { headerRenamingAtom, renamingAtom, rowRenamingAtom, type RenameTarget } from './rename'
+export { dismissToast, runAction, showToast, TOAST_LIFE_MS, toastAtom, undoLast, undoStackAtom, UNDO_LIMIT, type Toast, type ToastContent } from './undo'

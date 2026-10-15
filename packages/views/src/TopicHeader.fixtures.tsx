@@ -29,6 +29,17 @@ export default defineFixtures(
       'threads-open': state({ detail: details.engMain, onThreads: noop, threadsOpen: true, threads }, { height: 520 }),
       'group-dm-main': state({ detail: details.lunch, onThreads: noop }),
     },
+    // Rename from the title menu: the title is a field in place, preselected, as wide as its text.
+    Rename: {
+      rename: state({ detail: details.postgres, rename: { onSave: noop, onCancel: noop } }),
+      'rename-long': state({ detail: details.long, rename: { onSave: noop, onCancel: noop } }),
+      'rename-336': state({ detail: details.hiring, rename: { onSave: noop, onCancel: noop } }, narrow),
+    },
+    // Resolve becomes Reopen once the topic is resolved. The app has no Juno button until the panel exists.
+    Resolve: {
+      'resolved-no-juno': fixture<TopicHeaderProps>({ detail: { ...details.postgres, resolved: true, status: 'resolved' }, onMenu: noop, onPill: noop, onResolve: noop }),
+      'resolved-336': state({ detail: { ...details.hiring, resolved: true, status: 'resolved' } }, narrow),
+    },
     // The title's menu is native; the title button shows it is open.
     Menu: {
       'menu-open': state({ detail: details.postgres, menuOpen: true }),

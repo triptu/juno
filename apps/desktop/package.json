@@ -10,9 +10,9 @@
     "build": "electron-vite build && node ../../scripts/check-bundle-size.mjs",
     "start": "node ../../scripts/without-run-as-node.mjs electron-vite preview",
     "typecheck": "tsc -p tsconfig.node.json && tsc -p tsconfig.web.json && tsc -p tsconfig.e2e.json",
-    "test:e2e": "pnpm build && node ../../scripts/without-run-as-node.mjs playwright test",
-    "perf": "pnpm build && JUNO_PERF=1 node ../../scripts/without-run-as-node.mjs playwright test e2e/perf.spec.ts",
-    "test:feel": "pnpm build && node ../../scripts/without-run-as-node.mjs playwright test -c playwright.feel.config.ts",
+    "test:e2e": "node ../../scripts/build-cached.mjs out pnpm build && node ../../scripts/without-run-as-node.mjs playwright test",
+    "perf": "node ../../scripts/build-cached.mjs out pnpm build && JUNO_PERF=1 node ../../scripts/without-run-as-node.mjs playwright test e2e/perf.spec.ts",
+    "test:feel": "node ../../scripts/build-cached.mjs out pnpm build && node ../../scripts/without-run-as-node.mjs playwright test -c playwright.feel.config.ts",
     "package": "pnpm build && electron-builder --config electron-builder.yml"
   },
   "dependencies": {

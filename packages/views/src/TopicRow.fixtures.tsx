@@ -39,6 +39,9 @@ export default defineFixtures(
       mention: state(rows.hiring),
       selected: state(rows.postgres, { selected: true }),
       'selected-unread': state(rows.roadmap, { selected: true }),
+      // Rename from the row's menu: the title is a field, preselected; no Resolve.
+      renaming: state(rows.postgres, { renaming: true, onRename: noop, onRenameCancel: noop }),
+      'renaming-selected': state(rows.roadmap, { renaming: true, selected: true, onRename: noop, onRenameCancel: noop }),
     },
     Tile: {
       art: state(rows.postgres),

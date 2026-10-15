@@ -6,6 +6,7 @@ import { TopicArt, Workspace as WorkspaceView, type ActivateEvent, type Workspac
 import { HomePage } from './Home'
 import { closeTabById, openNewTab, runMenuCommand, showTabMenu, stepTabHistory, switchToTab } from './navigation'
 import { NewChatTab } from './NewChat'
+import { runUndoCommand } from './topicActions'
 import { TitlebarNav } from './TitlebarNav'
 import { hasArt, TopicTab } from './TopicView'
 
@@ -83,6 +84,7 @@ export function Workspace() {
   const mounted = mountedTabs(state)
 
   useEffect(() => onMenuCommand(runMenuCommand), [])
+  useEffect(() => onMenuCommand(runUndoCommand), [])
   useEffect(() => {
     window.addEventListener('mouseup', onMouseUp)
     return () => window.removeEventListener('mouseup', onMouseUp)

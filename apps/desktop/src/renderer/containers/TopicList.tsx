@@ -6,6 +6,7 @@ import {
   focusedTopicAtom,
   nowAtom,
   registry,
+  rowRenamingAtom,
   sidebarFilterAtom,
   sidebarRowAtom,
   sidebarSectionsAtom,
@@ -17,8 +18,8 @@ import { afterPaint, mark, measure } from '@juno/state/perf'
 import { useAtomValue } from '@juno/state/react'
 import { relativeTime, TopicList as TopicListView, TopicRow as TopicRowView, type ActivateEvent, type TopicListEmpty } from '@juno/views'
 import { markFilterChange, takeFilterMark } from './filterMark'
-import { openTopic, showRowMenu, warmTopic } from './navigation'
-import { resolveTopic } from './topicCommands'
+import { openTopic, warmTopic } from './navigation'
+import { cancelRename, renameTopic, resolveTopic, showRowMenu } from './topicActions'
 
 /**
  * Rows in the first commit of a new list. The rest mount in a transition
@@ -62,11 +63,27 @@ const Row = memo(function Row({ id }: { readonly id: string }) {
   const row = useAtomValue(sidebarRowAtom(id))
   const selected = useAtomValue(topicSelectedAtom(id))
   const tabbable = useAtomValue(currentRowAtom(id))
+  const renaming = useAtomValue(rowRenamingAtom(id))
   const at = row?.lastActivityAt ?? 0
   // The minute tick re-renders a row only when its label changes.
   const time = useAtomValue(nowAtom, (now) => relativeTime(at, now))
   if (row === undefined) return null
-  return <TopicRowView row={row} time={time} selected={selected} tabbable={tabbable} newThreads={row.newThreads} onOpen={open} onResolve={resolveTopic} onPrefetch={warmTopic} onContextMenu={showRowMenu} />
+  return (
+    <TopicRowView
+      row={row}
+      time={time}
+      selected={selected}
+      tabbable={tabbable}
+      newThreads={row.newThreads}
+      onOpen={open}
+      onResolve={resolveTopic}
+      onPrefetch={warmTopic}
+      onContextMenu={showRowMenu}
+      renaming={renaming}
+      onRename={renameTopic}
+      onRenameCancel={cancelRename}
+    />
+  )
 })
 
 const renderRow = (id: string) => <Row key={id} id={id} />

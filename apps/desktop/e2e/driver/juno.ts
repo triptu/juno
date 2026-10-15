@@ -112,6 +112,21 @@ export class SidebarRow {
     await this.root.click({ button: 'right', position: { x: 40, y: 20 } })
   }
 
+  /**
+   * Right-click, then `item` in the topic menu. Returns the menu's labels
+   * (see `TopicPane.chooseInMenu`).
+   */
+  async chooseInMenu(item: TopicMenuItem): Promise<{ readonly labels: string[]; readonly at: { readonly x: number; readonly y: number } | null }> {
+    await chooseNextMenuItem(this.win, item)
+    await this.root.click({ button: 'right', position: { x: 40, y: 20 } })
+    return lastMenu(this.win)
+  }
+
+  /** A pinned resolved row: the check before the title. */
+  async expectResolvedCheck(shown = true): Promise<void> {
+    await expect(this.root.locator('[title="Resolved"]')).toHaveCount(shown ? 1 : 0)
+  }
+
   /** Main rows: "2 new threads" under the title. */
   async expectNewThreads(count: number): Promise<void> {
     await expect(this.root.getByTitle(count === 1 ? '1 new thread' : `${count} new threads`)).toHaveText(String(count))
@@ -433,6 +448,53 @@ export class Juno {
     this.peek = new PeekPopover(win)
   }
 
+  /** Makes the next native context menu pick `id` without showing it. */
+  chooseNextMenuItem(id: string): Promise<void> {
+    return chooseNextMenuItem(this.win, id)
+  }
+
+  /** The toast that says `text` (inventory 16). */
+  toast(text: string): Locator {
+    return this.win.getByRole('status').filter({ hasText: text })
+  }
+
+  async expectToast(text: string): Promise<void> {
+    await expect(this.toast(text)).toBeVisible({ timeout: 10_000 })
+  }
+
+  /** The Undo of the toast on screen. */
+  async undoFromToast(): Promise<void> {
+    await this.win.getByRole('status').getByRole('button', { name: /^Undo/ }).click()
+  }
+
+  /** Edit › Undo, as ⌘Z. */
+  async undo(): Promise<void> {
+    await clickAppMenu(this.app, 'undo')
+  }
+
+  /** The title field of a rename, in a row or the header. */
+  get renameField(): Locator {
+    return this.win.locator('[data-rename-field]').filter({ visible: true })
+  }
+
+  /** Types a new title into the open rename field and saves it with Enter. */
+  async rename(title: string): Promise<void> {
+    await expect(this.renameField).toBeFocused()
+    await this.renameField.fill(title)
+    await this.renameField.press('Enter')
+    await expect(this.renameField).toHaveCount(0)
+  }
+
+  /** The text the app last put on the clipboard. */
+  clipboard(): Promise<string> {
+    return this.app.evaluate(({ clipboard }) => clipboard.readText())
+  }
+
+  /** The `slack://` links Open in Slack opened, oldest first. */
+  slackLinks(): Promise<string[]> {
+    return this.app.evaluate(() => [...(globalThis as unknown as { junoTest: { slackLinks: string[] } }).junoTest.slackLinks])
+  }
+
   /** The empty workspace shown when no tab is open. */
   async expectNothingOpen(): Promise<void> {
     await expect(this.win.getByText('Nothing open yet', { exact: true })).toBeVisible()
@@ -640,7 +702,21 @@ const BOTTOM_SLACK = 2
 const DIVIDER_OFFSET = 148
 
 /** The ids of the topic menu's items (inventory 15.1). */
-export type TopicMenuItem = 'open-new-tab' | 'mark-read' | 'mark-unread' | 'copy-link' | 'open-in-slack' | 'notify-every' | 'notify-matters' | 'notify-never'
+export type TopicMenuItem =
+  | 'open-new-tab'
+  | 'rename'
+  | 'mark-read'
+  | 'mark-unread'
+  | 'pin'
+  | 'unpin'
+  | 'resolve'
+  | 'reopen'
+  | 'copy-link'
+  | 'open-in-slack'
+  | 'notify-every'
+  | 'notify-matters'
+  | 'notify-never'
+  | 'ignore-channel'
 
 /** The topic shown in the active tab. Hidden tabs stay in the page with `display: none`. */
 /** A New chat tab: the two pickers, the composer and the preview (spec section 9). */
@@ -1115,6 +1191,7 @@ export type AppMenuItem =
   | 'back'
   | 'forward'
   | 'toggle-sidebar'
+  | 'undo'
   | `tab-${1 | 2 | 3 | 4 | 5 | 6 | 7 | 8}`
   | 'tab-last'
 

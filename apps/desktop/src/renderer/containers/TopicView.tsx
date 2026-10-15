@@ -4,6 +4,7 @@ import {
   bottomWindow,
   channelThreadsAtom,
   dividerIndex,
+  headerRenamingAtom,
   loadOlderMessages,
   messageListAtom,
   messageWindowSpecAtom,
@@ -36,8 +37,8 @@ import {
   type OlderStatus,
 } from '@juno/views'
 import { markFilterChange } from './filterMark'
-import { closeTabById, onLeaveTab, openTopic, showTopicMenu, takeOpenStart } from './navigation'
-import { resolveTopic, toggleJunoPanel } from './topicCommands'
+import { closeTabById, onLeaveTab, openTopic, takeOpenStart } from './navigation'
+import { cancelRename, renameTopic, showMessageMenu, showTopicMenu, toggleResolved } from './topicActions'
 
 /**
  * The divider's offset from the scroller's top on open: 80px below the
@@ -484,8 +485,9 @@ function Topic({ id, detail, readOnly = false, underHeader = true }: TopicProps)
   const [menuOpen, setMenuOpen] = useState(false)
   const openMenu = (at: MenuAnchor) => {
     setMenuOpen(true)
-    void showTopicMenu(detail, at).finally(() => setMenuOpen(false))
+    void showTopicMenu(detail, 'header', at).finally(() => setMenuOpen(false))
   }
+  const renaming = useAtomValue(headerRenamingAtom(detail.id))
   const channel = detail.channel.id
   // Main keeps its threads query live while shown, from after its first frame, so the Threads
   // popover opens with its rows in the first frame instead of "Loading threads".
@@ -526,6 +528,7 @@ function Topic({ id, detail, readOnly = false, underHeader = true }: TopicProps)
       onOpenThread={readOnly ? openThreadInNewTab : openThread}
       onChannel={scopeToChannel}
       onLink={openExternal}
+      {...(readOnly ? {} : { onMessageMenu: (ts: string) => void showMessageMenu(detail, ts) })}
     />
   )
   if (readOnly) return messages
@@ -538,11 +541,11 @@ function Topic({ id, detail, readOnly = false, underHeader = true }: TopicProps)
           menuOpen={menuOpen}
           onMenu={openMenu}
           onPill={() => scopeToChannel(detail.channel.id)}
-          {...(main ? {} : { onResolve: () => resolveTopic(detail.id) })}
+          {...(renaming ? { rename: { onSave: (title: string) => renameTopic(detail.id, title), onCancel: cancelRename } } : {})}
+          {...(main ? {} : { onResolve: () => toggleResolved(detail.id) })}
           threadsOpen={threadsOpen}
           {...(main ? { onThreads: setThreadsOpen } : {})}
           threads={threadsOpen ? <MainThreads channel={detail.channel.id} onClose={() => setThreadsOpen(false)} /> : null}
-          juno={{ open: false, onToggle: toggleJunoPanel }}
         />
       }
       pill={showPill ? <NewMessagesPill count={newCount} onJump={jumpToLatest} /> : undefined}

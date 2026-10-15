@@ -96,6 +96,11 @@ export function openInSlack(target: SlackTarget): void {
   window.juno.shell.openInSlack(target).catch(() => {})
 }
 
+/** Undo in the focused text field. */
+export function editUndo(): void {
+  window.juno.shell.editUndo().catch(() => {})
+}
+
 /** Opens an http or https link in the browser. */
 export function openExternal(url: string): void {
   window.juno.shell.openExternal(url).catch(() => {})

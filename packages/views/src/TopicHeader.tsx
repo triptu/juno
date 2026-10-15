@@ -11,6 +11,7 @@ import type { TopicDetail } from '@juno/contract'
 import { ContextPill, Popover, type ContextTint, type PhosphorIcon } from '@juno/ui'
 import { HeaderTitleButton, IslandButton, JunoToggle, type MenuAnchor } from './header/HeaderControls'
 import { HeaderIslands } from './header/HeaderIslands'
+import { RenameField } from './RenameField'
 
 export interface TopicHeaderProps {
   readonly detail: TopicDetail
@@ -18,6 +19,8 @@ export interface TopicHeaderProps {
   readonly menuOpen?: boolean
   /** The title asked for the topic menu (the row's menu, inventory 15.1), to open at `at`. */
   readonly onMenu: (at: MenuAnchor) => void
+  /** The title is a field for Rename (from the topic menu). Threads only. */
+  readonly rename?: { readonly onSave: (title: string) => void; readonly onCancel: () => void }
   /** The context pill: narrow the sidebar to the channel. */
   readonly onPill?: () => void
   /** Threads: Resolve or Reopen. Without it the button is not shown. */
@@ -63,9 +66,9 @@ const tints: Record<TopicDetail['channel']['kind'], ContextTint> = {
  * title, which opens the topic's menu. Right: Resolve or Reopen (Threads on
  * Main) and Juno. Everything else is in the menu. The islands line up with
  * the reading column, and under 480px Resolve shows as an icon and Threads
- * as its count.
+ * as its count. Rename turns the title into a field in place.
  */
-export function TopicHeader({ detail, menuOpen = false, onMenu, onPill, onResolve, threadsOpen = false, onThreads, threads, juno }: TopicHeaderProps) {
+export function TopicHeader({ detail, menuOpen = false, onMenu, rename, onPill, onResolve, threadsOpen = false, onThreads, threads, juno }: TopicHeaderProps) {
   const { channel } = detail
   const main = detail.kind === 'main'
   const kind = kindLabels[channel.kind]
@@ -112,7 +115,11 @@ export function TopicHeader({ detail, menuOpen = false, onMenu, onPill, onResolv
               {...(onPill === undefined ? {} : { onClick: onPill, label: `${pillName}. Show in sidebar.` })}
             />
           </span>
-          <HeaderTitleButton title={main ? 'Main' : detail.title} expanded={menuOpen} onOpen={onMenu} />
+          {rename === undefined || main ? (
+            <HeaderTitleButton title={main ? 'Main' : detail.title} expanded={menuOpen} onOpen={onMenu} />
+          ) : (
+            <RenameField title={detail.title} size="header" onSave={rename.onSave} onCancel={rename.onCancel} />
+          )}
         </>
       }
       right={

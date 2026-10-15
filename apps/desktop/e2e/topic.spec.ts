@@ -85,10 +85,10 @@ test('the title opens the topic menu under the left island, and Notify me follow
   expect(never.labels).toEqual([
     'Open in new tab',
     '-',
-    '(Rename)',
+    'Rename',
     'Mark as unread',
-    '(Pin)',
-    '(Resolve)',
+    'Pin',
+    'Resolve',
     '-',
     'Copy Slack link',
     'Open in Slack',
@@ -96,7 +96,7 @@ test('the title opens the topic menu under the left island, and Notify me follow
     '> Every message',
     '> When it matters ✓',
     '> Never',
-    '(Ignore #hiring)',
+    'Ignore #hiring',
   ])
   const island = (await juno.topic.header.locator('[data-island="left"]').boundingBox())!
   expect(never.at).not.toBeNull()
@@ -112,22 +112,24 @@ test('the title opens the topic menu under the left island, and Notify me follow
   await expect.poll(() => slack.fake.calls.some((call) => call.method === 'subscriptions.thread.add'), { timeout: 10_000 }).toBe(true)
 })
 
-test('Main’s menu has no Notify me of its own, and the header is reached pill, title, Threads, Juno', async ({ juno, win }) => {
+test('Main’s menu has no Notify me of its own, and the header is reached pill, title, Threads', async ({ juno, win }) => {
   await juno.signIn()
   await juno.waitForSync()
   await juno.sidebar.row(ENG_MAIN).open()
   await juno.topic.expectTitle('Main')
   const { labels } = await juno.topic.chooseInMenu('copy-link')
   expect(labels).not.toContain('Notify me')
-  expect(labels).not.toContain('(Rename)')
+  expect(labels).not.toContain('Rename')
 
   await juno.topic.contextPill.focus()
   const order: string[] = []
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < 3; i++) {
     order.push(await win.evaluate(() => document.activeElement?.getAttribute('aria-label') ?? document.activeElement?.textContent ?? ''))
     await win.keyboard.press('Tab')
   }
-  expect(order).toEqual(['eng, public channel. Show in sidebar.', 'Main', 'Threads, 3', 'Juno ⌘J'])
+  expect(order).toEqual(['eng, public channel. Show in sidebar.', 'Main', 'Threads, 3'])
+  // No Juno button until the Juno panel exists.
+  await expect(juno.topic.header.getByRole('button', { name: 'Juno ⌘J' })).toHaveCount(0)
 })
 
 test('the context pill scopes the sidebar to its channel', async ({ juno }) => {

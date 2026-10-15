@@ -1,5 +1,5 @@
 import * as stylex from '@stylexjs/stylex'
-import { useState, type KeyboardEvent, type ReactNode, type Ref } from 'react'
+import { useState, type KeyboardEvent, type MouseEvent, type ReactNode, type Ref } from 'react'
 import type { MessageView, Person } from '@juno/contract'
 import { layout, sizes, spacing } from '@juno/tokens/tokens.stylex'
 import { EmptyState, hueForId, ScrollArea, Text, type ActivateEvent, type HueName } from '@juno/ui'
@@ -58,6 +58,8 @@ export interface MessageListProps {
   readonly onChannel?: (id: string) => void
   readonly onLink?: (url: string) => void
   readonly onToggleReaction?: (ts: string, name: string) => void
+  /** Right-click or the context-menu key on a message: its menu, at the pointer. */
+  readonly onMessageMenu?: (ts: string, event: MouseEvent) => void
 }
 
 const ROW = '[data-message-row]'
@@ -74,6 +76,16 @@ function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
   event.preventDefault()
   next.focus()
   next.scrollIntoView({ block: 'nearest', behavior: 'instant' })
+}
+
+/** One handler for every row: the row under the pointer, or the focused row for the context-menu key. A field keeps its own menu. */
+function messageMenu(event: MouseEvent, onMessageMenu: (ts: string, event: MouseEvent) => void) {
+  const target = event.target
+  if (!(target instanceof Element) || target.closest('input, textarea') !== null) return
+  const ts = target.closest<HTMLElement>(ROW)?.dataset.messageRow
+  if (ts === undefined) return
+  event.preventDefault()
+  onMessageMenu(ts, event)
 }
 
 /**
@@ -102,6 +114,7 @@ export function MessageList({
   onChannel,
   onLink,
   onToggleReaction,
+  onMessageMenu,
 }: MessageListProps) {
   const [focusedTs, setFocusedTs] = useState<string | undefined>(undefined)
   const last = items[items.length - 1]
@@ -111,7 +124,14 @@ export function MessageList({
 
   return (
     <ScrollArea scrollbar="hover" underHeader={underHeader} ref={scrollRef} data-scroll="" sx={styles.scroller}>
-      <div role="list" aria-label="Messages" aria-busy={status === 'loading' || status === 'pending'} onKeyDown={onKeyDown} {...stylex.props(styles.column)}>
+      <div
+        role="list"
+        aria-label="Messages"
+        aria-busy={status === 'loading' || status === 'pending'}
+        onKeyDown={onKeyDown}
+        onContextMenu={onMessageMenu === undefined ? undefined : (event) => messageMenu(event, onMessageMenu)}
+        {...stylex.props(styles.column)}
+      >
         {older !== 'none' ? (
           <div aria-live="polite" {...stylex.props(styles.olderLine)}>
             {older === 'loading' ? (
