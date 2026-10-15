@@ -5,9 +5,10 @@
  */
 
 /** Ranked in this order. */
-export type HomeKind = 'waiting' | 'resume' | 'moved' | 'followUp' | 'tidyUp' | 'automated'
+export type HomeKind = 'waiting' | 'resume' | 'moved' | 'followUp' | 'automated' | 'tidyUp'
 
-export const HOME_KINDS: ReadonlyArray<HomeKind> = ['waiting', 'resume', 'moved', 'followUp', 'tidyUp', 'automated']
+/** Automated's question comes before Tidy up: it is asked once, and an unanswered one keeps a channel in the wrong place. */
+export const HOME_KINDS: ReadonlyArray<HomeKind> = ['waiting', 'resume', 'moved', 'followUp', 'automated', 'tidyUp']
 
 /** Moved a lot: a followed topic with at least this many new messages. */
 export const MOVED_A_LOT_MIN = 8

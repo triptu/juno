@@ -1761,7 +1761,7 @@ export class SidebarFrame {
   }
 }
 
-export type HomeItemKind = 'waiting' | 'resume' | 'moved' | 'followUp' | 'tidyUp'
+export type HomeItemKind = 'waiting' | 'resume' | 'moved' | 'followUp' | 'automated' | 'tidyUp'
 
 /** Home (SPEC section 12): the greeting, the rows and the Ask Juno field, in the visible page. */
 export class HomePane {
@@ -1812,8 +1812,15 @@ export class HomePane {
     await this.item(kind).getByRole('link').click()
   }
 
-  button(kind: HomeItemKind, name: 'Mark done' | 'Resolve all'): Locator {
-    return this.item(kind).getByRole('button', { name })
+  button(kind: HomeItemKind, name: 'Mark done' | 'Resolve all' | 'Move' | 'Keep in All'): Locator {
+    return this.item(kind).getByRole('button', { name, exact: true })
+  }
+
+  /** Right-clicks a row and chooses `item` in its menu. Returns the menu's labels. */
+  async chooseInItemMenu(kind: HomeItemKind, item: string): Promise<string[]> {
+    await chooseNextMenuItem(this.win, item)
+    await this.item(kind).click({ button: 'right' })
+    return (await lastMenu(this.win)).labels
   }
 
   get ask(): Locator {

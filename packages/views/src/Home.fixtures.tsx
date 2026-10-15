@@ -40,7 +40,7 @@ export default defineFixtures(
       'ai-titles': state({ items: [rewritten.waiting, rewritten.resume, rewritten.moved] }),
       'follow-up-and-tidy-up': state({ scene: 'evening', title: 'Evening, Tushar.', items: [homeItems.waiting, homeItems.followUp, homeItems.tidyUp] }),
       'buttons-used': state({ scene: 'evening', title: 'Evening, Tushar.', items: [homeItems.waiting, homeItems.followUp, homeItems.tidyUp], done: new Set([homeItems.followUp.id, homeItems.tidyUp.id]) }),
-      // The Automated question last, under the others it ranks after.
+      // The Automated question, after the ones it ranks below.
       automated: state({ scene: 'midday', title: 'Hello, Tushar.', items: [homeItems.waiting, homeItems.resume, homeItems.automated] }),
       one: state({ scene: 'friday', title: 'Happy Friday, Tushar.', line: 'One thing wants you.', items: [homeItems.resume] }),
       // A running job's state line in place of "Ask Juno…" (SPEC 13.4); a long one takes an ellipsis.

@@ -16,7 +16,7 @@ import { liveValueRoute } from '../live'
 import { ChannelRef } from '../refs'
 
 /** Ranked in this order: at most one of each, and at most three in all. */
-export const HomeItemKind = Schema.Literals(['waiting', 'resume', 'moved', 'followUp', 'tidyUp', 'automated'])
+export const HomeItemKind = Schema.Literals(['waiting', 'resume', 'moved', 'followUp', 'automated', 'tidyUp'])
 export type HomeItemKind = typeof HomeItemKind.Type
 
 /** A topic as a Home row names it. */
