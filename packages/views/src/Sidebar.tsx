@@ -114,6 +114,8 @@ export interface SidebarProps {
   readonly onPrivacyOff?: () => void
   /** The topic list. */
   readonly children: ReactNode
+  /** The engine is not live yet or a sync cycle is running: the list may still change (`aria-busy` on the sidebar). */
+  readonly syncing?: boolean
 }
 
 /**
@@ -153,6 +155,7 @@ export function Sidebar({
   privacy = false,
   onPrivacyOff,
   children,
+  syncing = false,
 }: SidebarProps) {
   // The pill that is selected: a view, else the kind.
   const selected = filter.view !== undefined && views.some((view) => view.id === filter.view) ? filter.view : undefined
@@ -161,7 +164,7 @@ export function Sidebar({
   const channelsDot = dots.channels && kind !== 'channels'
   const dmsDot = dots.dms && kind !== 'dms'
   return (
-    <aside aria-label="Sidebar" {...stylex.props(styles.root)}>
+    <aside aria-label="Sidebar" aria-busy={syncing} {...stylex.props(styles.root)}>
       <header aria-label="Sidebar title bar" {...stylex.props(styles.titlebar)}>
         {titlebarLeading}
         <div {...stylex.props(styles.icons)}>
@@ -177,7 +180,7 @@ export function Sidebar({
               label="Account"
               anchor={
                 <AvatarButton
-                  label="Account and preferences"
+                  label="Account and settings"
                   initials={account.initials}
                   hue={account.hue}
                   open={accountMenuOpen}

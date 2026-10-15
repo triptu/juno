@@ -2,7 +2,7 @@ import { chatCopy, type Banner, type JunoPage } from '@juno/agent-contract'
 import type { ReactNode } from 'react'
 import { ArrowsOutSimple } from '@phosphor-icons/react/dist/icons/ArrowsOutSimple'
 import { X } from '@phosphor-icons/react/dist/icons/X'
-import { Chip, IconButton, OptionList, OptionRow, Popover } from '@juno/ui'
+import { Chip, IconButton, OptionList, OptionRow, Popover, useMenuActive } from '@juno/ui'
 import { HeaderTitleButton } from '../header/HeaderControls'
 import { HeaderIslands } from '../header/HeaderIslands'
 import { JunoMark } from './JunoMark'
@@ -50,19 +50,12 @@ export function JunoHeader({ banner, menuOpen, onMenu, onOpenPage, onResume, col
           label="Juno menu"
           anchor={<HeaderTitleButton title="Juno" leading={<JunoMark />} expanded={menuOpen} onOpen={() => onMenu(!menuOpen)} />}
         >
-          <OptionList role="menu" label="Juno pages" focusable>
-            {pages.map((entry) => (
-              <OptionRow
-                key={entry.page}
-                id={`juno-page-${entry.page}`}
-                label={entry.label}
-                onSelect={() => {
-                  onMenu(false)
-                  onOpenPage(entry.page)
-                }}
-              />
-            ))}
-          </OptionList>
+          <JunoMenu
+            onOpenPage={(page) => {
+              onMenu(false)
+              onOpenPage(page)
+            }}
+          />
         </Popover>
       }
       right={
@@ -74,6 +67,21 @@ export function JunoHeader({ banner, menuOpen, onMenu, onOpenPage, onResume, col
         )
       }
     />
+  )
+}
+
+/** The Juno menu's pages, with one active row for the pointer and the keyboard. */
+function JunoMenu({ onOpenPage }: { readonly onOpenPage: (page: JunoPage) => void }) {
+  const menu = useMenuActive(
+    pages.map((entry) => `juno-page-${entry.page}`),
+    (id) => onOpenPage(id.slice('juno-page-'.length) as JunoPage),
+  )
+  return (
+    <OptionList role="menu" label="Juno pages" {...menu.list}>
+      {pages.map((entry) => (
+        <OptionRow key={entry.page} {...menu.row(`juno-page-${entry.page}`)} label={entry.label} onSelect={() => onOpenPage(entry.page)} />
+      ))}
+    </OptionList>
   )
 }
 

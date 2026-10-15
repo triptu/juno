@@ -10,7 +10,7 @@ export interface AppearanceSettingsProps {
   /** With both, a Density row: Comfortable or Compact. */
   readonly density?: DensityName
   readonly onDensityChange?: (density: DensityName) => void
-  /** `row` puts the label beside the control (Preferences); `stack` puts it above (a narrow popover). Default `row`. */
+  /** `row` puts the label beside the control (Settings); `stack` puts it above (a narrow popover). Default `row`. */
   readonly layout?: 'row' | 'stack'
 }
 
@@ -26,7 +26,7 @@ const densityOptions: ReadonlyArray<{ readonly value: DensityName; readonly labe
 ]
 
 /**
- * The Appearance group of Preferences (SPEC 14, inventory 14): the theme
+ * The Appearance group of Settings (SPEC 14, inventory 14): the theme
  * (System follows macOS), the accent as a row of swatches, and the density.
  */
 export function AppearanceSettings({ theme, accent, onThemeChange, onAccentChange, density, onDensityChange, layout = 'row' }: AppearanceSettingsProps) {

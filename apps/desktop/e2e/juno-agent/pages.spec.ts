@@ -1,4 +1,5 @@
 // Settings › Juno and the Juno menu's pages in the app, against the agent's served pages.
+// The menu's Settings and Connections open those sections of Settings.
 import type { Juno } from '../driver/juno'
 import { hooks } from '../fixtures'
 import { expect, JunoChatPane, test } from './chat'
@@ -19,15 +20,21 @@ const ruleFields = (juno: Juno) => juno.win.locator('main').getByLabel('Rule', {
 async function openPage(juno: Juno, label: string): Promise<void> {
   await juno.win.locator('main [data-juno-header]').getByRole('button', { name: 'Juno' }).click()
   await juno.win.getByRole('menuitem', { name: label }).click()
-  await juno.tabs.expectActive(label)
+  await juno.tabs.expectActive(label === 'Settings' || label === 'Connections' ? 'Settings' : label)
 }
 
 test('Settings › Juno shows what is built, with the provider in use, and pauses Juno', async ({ juno }) => {
   await ready(juno)
-  await openPage(juno, 'Settings › Juno')
+  await openPage(juno, 'Settings')
   const page = juno.win.locator('main')
   await expect(page.getByRole('heading', { name: 'Juno', exact: true })).toBeVisible()
-  for (const heading of ['Provider', 'Model', 'Spend', 'Codex', 'Rules', 'Pause', 'Backup', 'This Mac']) await expect(page.getByRole('heading', { name: heading })).toBeVisible()
+  for (const heading of ['Provider', 'Model', 'Spend', 'Codex', 'Rules', 'Pause']) await expect(page.getByRole('heading', { name: heading })).toBeVisible()
+  // Backup and This Mac are their own section.
+  const sections = juno.win.getByRole('navigation', { name: 'Settings' })
+  await sections.getByRole('button', { name: 'Backup & This Mac' }).click()
+  for (const heading of ['Backup', 'This Mac']) await expect(page.getByRole('heading', { name: heading, exact: true })).toBeVisible()
+  await sections.getByRole('button', { name: 'Juno' }).click()
+  await expect(page.getByRole('heading', { name: 'Provider' })).toBeVisible()
   // The launch set OpenRouter up: its key is set and it is in use.
   await expect(page.locator('[data-provider-shown]')).toHaveAttribute('data-provider-shown', 'openRouter')
   await expect(page.locator('[data-provider-key]')).toHaveAttribute('data-provider-key', 'set')
@@ -48,7 +55,7 @@ test('Settings › Juno shows what is built, with the provider in use, and pause
   await expect(page.getByLabel('Rule', { exact: true })).toHaveCount(1)
   // What the agent kept: the page opened again shows only its served list.
   await juno.nav.back()
-  await openPage(juno, 'Settings › Juno')
+  await openPage(juno, 'Settings')
   await expect.poll(() => ruleFields(juno)).toEqual(['Never post in #general without asking'])
 
   // Pause shows in the chat's header, and its Resume undoes it.

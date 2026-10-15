@@ -1,6 +1,6 @@
 import { chatCopy, type ModelChoice } from '@juno/agent-contract'
 import { defineFixtures, fixture } from '@juno/ui'
-import { NOW, settings, settingsRecovery, settingsReleased, settingsTrouble } from './fixtures'
+import { settings, settingsTrouble } from './fixtures'
 import { JunoSettingsPage, type JunoSettingsPageProps } from './JunoSettingsPage'
 import { ProviderSection, type ProviderSectionProps } from './ProviderSection'
 
@@ -15,7 +15,7 @@ const provider = (props: Partial<ProviderSectionProps> = {}) => (
 const onCustom = (key: 'set' | 'missing' = 'missing') =>
   provider({ state: { ...none, active: 'custom', custom: { baseUrl: LOCAL, key } }, shown: 'custom', drafts: { ...emptyDrafts, baseUrl: LOCAL } })
 
-const callbacks = { now: NOW, onChatModel: noop, onCompactionModel: noop, onCap: noop, onPaused: noop }
+const callbacks = { onChatModel: noop, onCompactionModel: noop, onCap: noop, onPaused: noop }
 
 const page = (props: Pick<JunoSettingsPageProps, 'page'>) =>
   fixture<JunoSettingsPageProps>({
@@ -26,14 +26,9 @@ const page = (props: Pick<JunoSettingsPageProps, 'page'>) =>
     onRuleChange: noop,
     onRuleRemove: noop,
     onRuleAdd: noop,
-    onBackupFolder: noop,
-    onExportPhrase: noop,
-    onMove: noop,
-    onRestore: noop,
-    onStopJob: noop,
   })
 
-/** What the app wires today: the provider, the models, spend, the rules and Pause. Codex, Backup and This Mac wait for their work packages. */
+/** The provider, the models, spend, the rules and Pause, with Codex's sign-in not wired. */
 const today = (props: Partial<Pick<JunoSettingsPageProps, 'page' | 'providers' | 'rulesError'>> = {}) =>
   fixture<JunoSettingsPageProps>({
     page: settings,
@@ -53,10 +48,10 @@ export default defineFixtures(
   {
     Settings: {
       ready: page({ page: settings }),
-      // The key was rejected, Codex is signed out, Juno is paused, no backup yet, and a removal waits on a job.
+      // The key was rejected, Codex is signed out and Juno is paused.
       trouble: page({ page: settingsTrouble }),
-      recovery: page({ page: settingsRecovery }),
-      released: page({ page: settingsReleased }),
+      // From "Add a provider": the key field has focus.
+      'add-provider': fixture<JunoSettingsPageProps>({ ...callbacks, providers: provider({ state: none, focusFirst: true }) }),
     },
     Today: {
       'open-router': today(),

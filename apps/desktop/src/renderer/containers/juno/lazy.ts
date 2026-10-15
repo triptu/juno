@@ -9,3 +9,7 @@ export const loadJuno = (() => {
 export const JunoTab = lazy(() => loadJuno().then((chunk) => ({ default: chunk.JunoTab })))
 export const JunoPageTab = lazy(() => loadJuno().then((chunk) => ({ default: chunk.JunoPageTab })))
 export const JunoPanel = lazy(() => loadJuno().then((chunk) => ({ default: chunk.JunoPanel })))
+// Settings' Juno, Connections and Backup & This Mac sections.
+export const JunoSettings = lazy(() => loadJuno().then((chunk) => ({ default: chunk.JunoSettings })))
+export const JunoConnections = lazy(() => loadJuno().then((chunk) => ({ default: chunk.JunoConnections })))
+export const JunoBackup = lazy(() => loadJuno().then((chunk) => ({ default: chunk.JunoBackup })))

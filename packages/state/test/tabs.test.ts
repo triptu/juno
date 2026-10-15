@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  activateTab,
   closeAllTabs,
   closeOtherTabs,
   closeTab,
@@ -14,6 +15,7 @@ import {
   newChatPlace,
   noTabs,
   openPlace,
+  openSettingsSection,
   parseTabs,
   reopenClosedTab,
   savedTabs,
@@ -107,13 +109,51 @@ describe('Juno', () => {
 
 describe('Juno pages', () => {
   it('each opens in one tab, and reads back after a restart', () => {
-    const settings = openPlace(three, junoPagePlace('settings'), { newTab: true })
-    const both = openPlace(settings, junoPagePlace('activity'), { newTab: true })
-    expect(shown(both)).toEqual(['a', 'b', 'settings', 'activity', 'c'])
-    const again = openPlace(both, junoPagePlace('settings'), { newTab: true })
-    expect(activeShows(again)).toBe('settings')
-    expect(shown(again)).toEqual(['a', 'b', 'settings', 'activity', 'c'])
-    expect(shown(parseTabs(JSON.parse(JSON.stringify(savedTabs(again)))))).toEqual(['a', 'b', 'settings', 'activity', 'c'])
+    const scheduled = openPlace(three, junoPagePlace('scheduled'), { newTab: true })
+    const both = openPlace(scheduled, junoPagePlace('activity'), { newTab: true })
+    expect(shown(both)).toEqual(['a', 'b', 'scheduled', 'activity', 'c'])
+    const again = openPlace(both, junoPagePlace('scheduled'), { newTab: true })
+    expect(activeShows(again)).toBe('scheduled')
+    expect(shown(again)).toEqual(['a', 'b', 'scheduled', 'activity', 'c'])
+    expect(shown(parseTabs(JSON.parse(JSON.stringify(savedTabs(again)))))).toEqual(['a', 'b', 'scheduled', 'activity', 'c'])
+  })
+})
+
+describe('Settings', () => {
+  const sectionOf = (tabs: Tabs) => {
+    const place = tabs.tabs.find((tab) => tab.id === tabs.active)!.history.entries.at(-1)!
+    return place.kind === 'settings' ? place.section : undefined
+  }
+
+  it('has one tab: opening another section focuses it and shows that section, with nothing added to Back', () => {
+    const general = openSettingsSection(three, 'general', { newTab: true })
+    expect(shown(general)).toEqual(['a', 'b', 'settings', 'c'])
+    const away = activateTab(general, idOf(general, 'a'))
+    const juno = openSettingsSection(away, 'juno')
+    expect(shown(juno)).toEqual(['a', 'b', 'settings', 'c'])
+    expect(activeShows(juno)).toBe('settings')
+    expect(sectionOf(juno)).toBe('juno')
+    expect(historyTarget(juno, -1)).toBeUndefined()
+  })
+
+  it('reads back old Preferences, Notifications, Settings › Juno and Connections tabs as the one Settings tab at their section', () => {
+    const saved = {
+      tabs: [
+        { id: 'tab-1', pinned: false, place: { kind: 'topic', topicId: 'a' } },
+        { id: 'tab-2', pinned: false, place: { kind: 'junoPage', page: 'connections' } },
+        { id: 'tab-3', pinned: false, place: { kind: 'preferences' } },
+        { id: 'tab-4', pinned: false, place: { kind: 'notifications' } },
+        { id: 'tab-5', pinned: false, place: { kind: 'junoPage', page: 'activity' } },
+      ],
+      active: 'tab-4',
+      recent: ['tab-4', 'tab-2'],
+    }
+    const restored = parseTabs(saved)
+    expect(shown(restored)).toEqual(['a', 'settings', 'activity'])
+    expect(restored.active).toBe('tab-1')
+    expect(sectionOf(activateTab(restored, 'tab-2'))).toBe('connections')
+    expect(sectionOf(activateTab(parseTabs({ ...saved, tabs: [{ id: 'tab-9', pinned: false, place: { kind: 'junoPage', page: 'settings' } }], active: 'tab-9' }), 'tab-9'))).toBe('juno')
+    expect(sectionOf(activateTab(parseTabs({ ...saved, tabs: [saved.tabs[2]!], active: 'tab-3' }), 'tab-3'))).toBe('general')
   })
 })
 

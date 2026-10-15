@@ -1,5 +1,5 @@
 /**
- * The ignore list on Preferences (SPEC 14, inventory 14). Ignoring happens
+ * The ignore list on Settings › Ignored (SPEC 14, inventory 14). Ignoring happens
  * from a channel's menu; here the owner sees what is ignored and stops
  * ignoring it, with Undo.
  */

@@ -44,10 +44,12 @@ async function ready(juno: Juno): Promise<void> {
 
 const openChat = (juno: Juno) => juno.win.getByRole('navigation', { name: 'Pages' }).getByRole('button', { name: /^Juno/ }).click()
 
+/** Settings › Backup & This Mac, through the Juno menu's Settings. */
 async function openSettings(juno: Juno): Promise<void> {
   await juno.win.locator('main [data-juno-header]').getByRole('button', { name: 'Juno' }).click()
-  await juno.win.getByRole('menuitem', { name: 'Settings › Juno' }).click()
-  await juno.tabs.expectActive('Settings › Juno')
+  await juno.win.getByRole('menuitem', { name: 'Settings' }).click()
+  await juno.tabs.expectActive('Settings')
+  await juno.win.getByRole('navigation', { name: 'Settings' }).getByRole('button', { name: 'Backup & This Mac' }).click()
 }
 
 /** The native folder picker is out of reach: main picks this folder the next time it is asked. */
@@ -64,8 +66,8 @@ test('backup to a shared folder, export the phrase, restore on a second Mac, and
   await ready(juno)
   await openSettings(juno)
   const studio = juno.win.locator('main')
-  await expect(studio.getByRole('heading', { name: 'Backup' })).toBeVisible()
-  await expect(studio.getByRole('heading', { name: 'This Mac' })).toBeVisible()
+  await expect(studio.getByRole('heading', { name: 'Backup', exact: true })).toBeVisible()
+  await expect(studio.getByRole('heading', { name: 'This Mac', exact: true })).toBeVisible()
   await expect(studio.locator('[data-owner-line]')).toHaveText('This Mac owns Juno’s state.')
   await expect(studio.locator('[data-last-backup]')).toContainText('Last backup', { timeout: 15_000 })
   const before = await lastBackupAt(juno)

@@ -5,16 +5,16 @@ import { EyeSlash } from '@phosphor-icons/react/dist/icons/EyeSlash'
 import { Gear } from '@phosphor-icons/react/dist/icons/Gear'
 import { Moon } from '@phosphor-icons/react/dist/icons/Moon'
 import { Sun } from '@phosphor-icons/react/dist/icons/Sun'
-import { useState, type ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import { colors, radii, sizes, spacing } from '@juno/tokens/tokens.stylex'
-import { Avatar, Icon, OptionHeader, OptionList, OptionRow, OptionSeparator, Text, useOptionListKeys, type HueName, type PhosphorIcon } from '@juno/ui'
+import { Avatar, Icon, OptionHeader, OptionList, OptionRow, OptionSeparator, Text, useMenuActive, type HueName, type PhosphorIcon } from '@juno/ui'
 
 export interface AccountMenuSection {
   readonly title: string
   readonly content: ReactNode
 }
 
-export type AccountMenuAction = 'presence' | 'privacy' | 'notifications' | 'preferences'
+export type AccountMenuAction = 'presence' | 'privacy' | 'notifications' | 'settings'
 
 export interface AccountMenuProps {
   readonly name: string
@@ -44,8 +44,9 @@ interface Item {
 /**
  * What the avatar button opens (inventory 2.1): who is signed in and
  * whether Slack shows them active, Set yourself away or active, Hide or
- * Show message text (privacy mode), the Notifications and Preferences
- * pages, then the blocks the owner passes.
+ * Show message text (privacy mode), Notifications and Settings (both
+ * open Settings, at Notifications and at General), then the blocks the
+ * owner passes.
  */
 export function AccountMenu({ name, initials, hue, avatarUrl, workspace, presence, paused, privacy = false, onAction, sections }: AccountMenuProps) {
   const items: ReadonlyArray<Item> =
@@ -55,11 +56,12 @@ export function AccountMenu({ name, initials, hue, avatarUrl, workspace, presenc
           presence?.active === false ? { id: 'presence', icon: Sun, label: 'Set yourself active' } : { id: 'presence', icon: Moon, label: 'Set yourself away' },
           privacy ? { id: 'privacy', icon: Eye, label: 'Show message text', hint: '⌃⌘H' } : { id: 'privacy', icon: EyeSlash, label: 'Hide message text', hint: '⌃⌘H' },
           { id: 'notifications', icon: Bell, label: 'Notifications', ...(paused === undefined ? {} : { hint: paused }) },
-          { id: 'preferences', icon: Gear, label: 'Preferences', hint: '⌘,' },
+          { id: 'settings', icon: Gear, label: 'Settings', hint: '⌘,' },
         ]
-  const [active, setActive] = useState<string | undefined>(undefined)
-  const choose = (id: string) => onAction?.(id as AccountMenuAction)
-  const onKeyDown = useOptionListKeys({ ids: items.map((item) => `account-${item.id}`), activeId: active, onActiveChange: setActive, onSelect: (id) => choose(id.slice('account-'.length)) })
+  const menu = useMenuActive(
+    items.map((item) => `account-${item.id}`),
+    (id) => onAction?.(id.slice('account-'.length) as AccountMenuAction),
+  )
   const avatar = <Avatar label={initials} name={name} hue={hue} size={32} {...(avatarUrl === undefined ? {} : { src: avatarUrl })} />
   return (
     <div {...stylex.props(styles.root)}>
@@ -80,17 +82,15 @@ export function AccountMenu({ name, initials, hue, avatarUrl, workspace, presenc
       {items.length > 0 ? (
         <>
           <OptionSeparator />
-          <OptionList role="menu" label="Account" focusable activeId={active === undefined ? undefined : active} onKeyDown={onKeyDown}>
+          <OptionList role="menu" label="Account" {...menu.list}>
             {items.map((item) => (
               <OptionRow
                 key={item.id}
-                id={`account-${item.id}`}
-                active={active === `account-${item.id}`}
+                {...menu.row(`account-${item.id}`)}
                 leading={<Icon icon={item.icon} size={15} />}
                 label={item.label}
                 {...(item.hint === undefined ? {} : { sub: item.hint })}
-                onActivate={() => setActive(`account-${item.id}`)}
-                onSelect={() => choose(item.id)}
+                onSelect={() => onAction?.(item.id)}
               />
             ))}
           </OptionList>

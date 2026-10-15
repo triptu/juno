@@ -14,7 +14,7 @@ export {
   type AllTopicsLayout,
 } from './allTopics'
 export { mirrorReadsAtom, shouldMarkRead } from './reads'
-export { isPeekKey, peekKeyAtom, setPeekKey, type PeekKey } from './peek'
+export { isPeekKey, peekKeyAtom, setPeekKey } from './peek'
 export {
   currentRowAtom,
   focusedTopicAtom,
@@ -61,8 +61,7 @@ export {
   homePlace,
   junoPagePlace,
   junoPlace,
-  notificationsPlace,
-  preferencesPlace,
+  openSettingsSection,
   newChatPlace,
   openPlace,
   reopenClosedTab,
@@ -77,6 +76,7 @@ export {
   topicPlace,
   updateTabs,
   type OpenOptions,
+  type JunoTabPage,
   type Place,
   type ScrollSnapshot,
   type Tab,

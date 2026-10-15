@@ -40,7 +40,7 @@ export const chatCopy = {
     memory: 'Memory of this chat',
     activity: 'Activity',
     connections: 'Connections',
-    settings: 'Settings › Juno',
+    settings: 'Settings',
     review: 'Review',
   },
   /** The Juno panel (SPEC 7, inventory 12.1). */

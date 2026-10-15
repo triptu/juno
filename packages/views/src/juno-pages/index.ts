@@ -1,6 +1,6 @@
 export { ActivityPage } from './ActivityPage'
 export { ConnectionsPage } from './ConnectionsPage'
-export { JunoSettingsPage, type JunoSettingsPageProps } from './JunoSettingsPage'
+export { JunoBackupPage, JunoSettingsPage, type JunoBackupPageProps } from './JunoSettingsPage'
 export { MemoryPage } from './MemoryPage'
 export { ProviderSection, type ProviderDrafts } from './ProviderSection'
 export { RemembersPage } from './RemembersPage'

@@ -551,7 +551,7 @@ export const text = stylex.defineVars({
   '--text-topic-title-leading': '1.3',
   '--text-topic-title-tracking': '-0.01em',
 
-  // Page titles: Notifications, Preferences.
+  // Page titles: the sections of Settings, All topics.
   '--text-page-title-family': fonts['--font-serif'],
   '--text-page-title-size': '34px',
   '--text-page-title-weight': '400',
@@ -746,8 +746,10 @@ export const layout = stylex.defineVars({
   '--page-width-narrow': '680px',
   '--page-width': '720px',
   '--page-width-settings': '760px',
-  // The label column of Preferences' rows (Theme, Accent, Density, Hold to peek), so the controls share one edge.
+  // The label column of Settings' rows (Theme, Accent, Density, Hold to peek), so the controls share one edge.
   '--settings-label-width': '104px',
+  // Settings' list of sections, beside the section's page. Fits "Backup & This Mac" with the sidebar's insets.
+  '--settings-nav-width': '200px',
   '--palette-width': '560px',
   '--palette-top': '96px',
   '--palette-list-max-height': '400px',
@@ -862,7 +864,7 @@ export const sizes = stylex.defineVars({
 /* -------------------------------------------------------------------------- */
 
 /**
- * Density (Preferences › Appearance, inventory 3.3 and 6.1). These are the
+ * Density (Settings › Appearance, inventory 3.3 and 6.1). These are the
  * Comfortable values; `compact` in themes.stylex.ts overrides them on
  * <html>. Only the sidebar row and the message row read them.
  */

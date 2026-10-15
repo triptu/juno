@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react'
 import { agentProviderAtom, junoSettingsAtom } from '@juno/state/agent'
 import { useAtomValue } from '@juno/state/react'
 import { JunoChatFrame, JunoHeader, NoProvider } from '@juno/views'
+import { openSettings } from '../navigation'
 import { openJunoPage } from './actions'
 
 /**
@@ -17,7 +18,7 @@ export function useNoProvider(): boolean {
 /**
  * The Juno tab or panel with no model provider (SPEC 13.10): the same
  * header, "Juno needs a model" under it, and no composer. Add a provider
- * opens Settings › Juno.
+ * opens Settings at Juno, with focus in the key field.
  */
 export function NoProviderFrame({ column, actions }: { readonly column: 'page' | 'panel'; readonly actions?: ReactNode }) {
   const [menuOpen, setMenuOpen] = useState(false)
@@ -37,7 +38,7 @@ export function NoProviderFrame({ column, actions }: { readonly column: 'page' |
       }
       composer={null}
     >
-      <NoProvider column={column} onAddProvider={() => openJunoPage('settings')} />
+      <NoProvider column={column} onAddProvider={() => openSettings('juno')} />
     </JunoChatFrame>
   )
 }

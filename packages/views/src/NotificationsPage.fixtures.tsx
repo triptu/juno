@@ -5,7 +5,7 @@ const noop = () => {}
 const weekdays = [1, 2, 3, 4, 5] as const
 const at = (hour: number, minute: number) => new Date(2026, 9, 15, hour, minute).getTime()
 
-const base: NotificationsPageProps = {
+export const notificationsBase: NotificationsPageProps = {
   notificationHours: { days: weekdays, from: 9 * 60, to: 18 * 60 },
   presenceHours: { days: weekdays, from: 9 * 60, to: 20 * 60 },
   matters: 'The launch and hiring. Anything from my reports that needs a decision today. Production incidents.',
@@ -34,13 +34,13 @@ export default defineFixtures(
   NotificationsPage,
   {
     Page: {
-      default: fixture(base),
-      'show-why': fixture({ ...base, showWhy: true }),
-      'same-hours': fixture({ ...base, notificationHours: { days: weekdays, from: 540, to: 1140 }, presenceHours: { days: weekdays, from: 540, to: 1140 } }),
+      default: fixture(notificationsBase),
+      'show-why': fixture({ ...notificationsBase, showWhy: true }),
+      'same-hours': fixture({ ...notificationsBase, notificationHours: { days: weekdays, from: 540, to: 1140 }, presenceHours: { days: weekdays, from: 540, to: 1140 } }),
     },
     Empty: {
-      'nothing-set': fixture({ ...base, matters: '', every: [], never: [], interrupted: 0, held: 0, today: [] }),
-      'ai-off': fixture({ ...base, aiAssist: false }),
+      'nothing-set': fixture({ ...notificationsBase, matters: '', every: [], never: [], interrupted: 0, held: 0, today: [] }),
+      'ai-off': fixture({ ...notificationsBase, aiAssist: false }),
     },
   },
   { width: 1000, height: 900 },
