@@ -6,7 +6,7 @@ import { Users } from '@phosphor-icons/react/dist/icons/Users'
 import { useState, type ReactNode } from 'react'
 import type { Hours, NotifyTag, TodayRow } from '@juno/contract'
 import { colors, spacing } from '@juno/tokens/tokens.stylex'
-import { Avatar, Button, Chip, DayToggles, ListRow, Page, PageHeader, Section, Select, Surface, Text, Textarea, type PhosphorIcon } from '@juno/ui'
+import { Avatar, Button, Chip, DayToggles, ListRow, Page, PageHeader, Popover, Section, Select, Surface, Text, Textarea, type PhosphorIcon } from '@juno/ui'
 import { hueFor, initials } from './look'
 import { clockLabel, hourLabel } from './time'
 
@@ -191,68 +191,61 @@ function Tag({ tag, onRemove }: { readonly tag: NotifyTag; readonly onRemove: ()
 
 function Today({ interrupted, held, rows, initiallyOpen }: { readonly interrupted: number; readonly held: number; readonly rows: ReadonlyArray<TodayRow>; readonly initiallyOpen: boolean }) {
   const [open, setOpen] = useState(initiallyOpen)
+  const count = (n: number) => (
+    <Text variant="body" tone="inherit" weight="semibold" numeric as="span">
+      {n}
+    </Text>
+  )
+  const showWhy = (
+    <Button variant="ghost" size="sm" tone="subtle" aria-expanded={open} aria-haspopup="dialog" onClick={() => setOpen(!open)}>
+      Show why
+    </Button>
+  )
   return (
-    <div {...stylex.props(styles.today)}>
-      <div {...stylex.props(styles.todayLine)}>
+    <div {...stylex.props(styles.todayLine)}>
+      <Text variant="body" tone="subtle">
         {interrupted === 0 ? (
-          <Text variant="body" tone="subtle">
-            Nothing has interrupted you today.{held > 0 ? ` Juno held ${held}.` : ''}
-          </Text>
+          <>Nothing has interrupted you today.{held > 0 ? <> Juno held {count(held)}.</> : null}</>
         ) : (
-          <Text variant="body" tone="subtle">
-            <Text variant="body" tone="inherit" weight="semibold" numeric>
-              {interrupted}
-            </Text>
-            {interrupted === 1 ? ' message interrupted you.' : ' messages interrupted you.'} Juno held{' '}
-            <Text variant="body" tone="inherit" weight="semibold" numeric>
-              {held}
-            </Text>
-            .
-          </Text>
+          <>
+            {count(interrupted)}
+            {interrupted === 1 ? ' message interrupted you.' : ' messages interrupted you.'} Juno held {count(held)}.
+          </>
         )}
-        {rows.length > 0 ? (
-          <Button variant="ghost" size="sm" tone="subtle" aria-expanded={open} onClick={() => setOpen(!open)}>
-            {open ? 'Hide' : 'Show why'}
-          </Button>
-        ) : null}
-      </div>
-      {open ? (
-        <div role="list" aria-label="Messages that interrupted you" {...stylex.props(styles.log)}>
-          {rows.map((row) => (
-            <div key={row.id} role="listitem" {...stylex.props(styles.logRow)}>
-              <span {...stylex.props(styles.logLine)}>
-                <span {...stylex.props(styles.logTime)}>
-                  <Text variant="ui" tone="muted" numeric>
+      </Text>
+      {rows.length === 0 ? null : (
+        <Popover open={open} onClose={() => setOpen(false)} anchor={showWhy} placement="top-start" width="picker" maxHeight="picker" padding="sm" label="Messages that interrupted you">
+          <div role="list" aria-label="Messages that interrupted you" {...stylex.props(styles.log)}>
+            {rows.map((row) => (
+              <div key={row.id} role="listitem" {...stylex.props(styles.logRow)}>
+                <span {...stylex.props(styles.logLine)}>
+                  <Text variant="meta" tone="muted" numeric>
                     {clockLabel(row.at)}
                   </Text>
-                </span>
-                <span {...stylex.props(styles.logPlace)}>
-                  <Text variant="ui" tone="subtle" truncate>
+                  <Text variant="meta" tone="subtle" truncate>
                     {row.place}
                   </Text>
                 </span>
-                <Text variant="ui" truncate>
-                  {row.sender === '' ? null : <Text variant="ui" weight="semibold">{`${row.sender} `}</Text>}
+                <Text variant="ui" clamp={2}>
+                  {row.sender === '' ? null : (
+                    <Text variant="ui" weight="semibold" as="span">{`${row.sender} `}</Text>
+                  )}
                   {row.text}
                 </Text>
-              </span>
-              <Text variant="meta" tone="muted">
-                {row.reason}
-              </Text>
-            </div>
-          ))}
-        </div>
-      ) : null}
+                <Text variant="meta" tone="muted">
+                  {row.reason}
+                </Text>
+              </div>
+            ))}
+          </div>
+        </Popover>
+      )}
     </div>
   )
 }
 
 /** The label column of a row: 260px (inventory 13). */
 const LABEL_WIDTH = 260
-/** The time column of Show why: 44px. */
-const LOG_TIME_WIDTH = 44
-/** The place column of Show why: 120px. */
-const LOG_PLACE_WIDTH = 120
 /** What matters to you: at most 620px wide. */
 const MATTERS_WIDTH = 620
 
@@ -296,11 +289,6 @@ const styles = stylex.create({
     alignItems: 'center',
     gap: spacing['--space-1-5'],
   },
-  today: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: spacing['--space-2'],
-  },
   todayLine: {
     display: 'flex',
     alignItems: 'center',
@@ -315,7 +303,7 @@ const styles = stylex.create({
     flexDirection: 'column',
     gap: spacing['--space-0-5'],
     paddingBlock: spacing['--space-2'],
-    paddingInline: spacing['--space-0-5'],
+    paddingInline: spacing['--space-1-5'],
     borderBottomWidth: '1px',
     borderBottomStyle: 'solid',
     borderBottomColor: colors['--border-subtle'],
@@ -325,15 +313,5 @@ const styles = stylex.create({
     alignItems: 'baseline',
     gap: spacing['--space-2'],
     minWidth: 0,
-  },
-  logTime: {
-    width: LOG_TIME_WIDTH,
-    flexShrink: 0,
-  },
-  logPlace: {
-    width: LOG_PLACE_WIDTH,
-    flexShrink: 0,
-    minWidth: 0,
-    display: 'flex',
   },
 })

@@ -35,5 +35,5 @@ export default defineFixtures(
       'hover-item': fixture({ ...base, presence: { active: true, label: 'Active' } }, { hover: '[role="menuitem"]:nth-of-type(2)' }),
     },
   },
-  { width: 248, surface: 'surface' },
+  { width: 280, surface: 'surface' },
 )
