@@ -20,6 +20,7 @@ import HoverToolbar from './HoverToolbar.fixtures'
 import ImageViewer from './ImageViewer.fixtures'
 import Message from './Message.fixtures'
 import MessageList from './MessageList.fixtures'
+import CommandPalette from './CommandPalette.fixtures'
 import NewChat from './NewChat.fixtures'
 import NewDivider from './NewDivider.fixtures'
 import NewMessagesPill from './NewMessagesPill.fixtures'
@@ -98,6 +99,7 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   MemoryPage,
   Message,
   MessageList,
+  CommandPalette,
   MoveSheet: moveSheet,
   NewChat,
   NewDivider,

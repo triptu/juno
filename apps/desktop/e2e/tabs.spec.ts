@@ -106,7 +106,7 @@ test('tabs survive a restart', async ({ juno, running, userData, fake, slackApp 
   try {
     const restarted = new Juno(again.app, again.win)
     await restarted.tabs.expectCount(4)
-    expect(await restarted.tabs.titles()).toEqual([expect.stringMatching(/^Draft plan/), expect.stringMatching(/^Rina/), expect.stringMatching(/^Proposal/), expect.stringMatching(/^Can eng/)])
+    await expect.poll(() => restarted.tabs.titles()).toEqual([expect.stringMatching(/^Draft plan/), expect.stringMatching(/^Rina/), expect.stringMatching(/^Proposal/), expect.stringMatching(/^Can eng/)])
     await restarted.tabs.expectActive(OFFSITE)
     await restarted.sidebar.row(OFFSITE).expectVisible()
   } finally {

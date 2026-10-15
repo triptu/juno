@@ -461,6 +461,52 @@ test.describe('large workspace', () => {
     }
   })
 
+  test('palette: ⌘K to recent rows, each keystroke to its rows, and every keystroke inside a frame', async () => {
+    test.setTimeout(300_000)
+    const running = await launch()
+    try {
+      const juno = new Juno(running.app, running.win)
+      const { palette } = juno
+      const { win } = running
+      await juno.sidebar.expectRows()
+      await juno.expectEngineLive(120_000)
+      const interval = await refreshInterval(win)
+      // Event Timing: each keystroke from the key press to the frame that shows it, rounded to 8 ms by the browser.
+      await win.evaluate(() => {
+        const w = window as unknown as { __keys: number[] }
+        w.__keys = []
+        new PerformanceObserver((entries) => {
+          for (const entry of entries.getEntries()) if (entry.name === 'keydown' || entry.name === 'keypress') w.__keys.push(entry.duration)
+        }).observe({ type: 'event', durationThreshold: 16, buffered: false } as PerformanceObserverInit)
+      })
+      const words = ['deplo', 'rollou', 'staging bil', 'index missin']
+      for (let round = 0; round < 12; round++) {
+        const opened = (await juno.measures('juno.palette-open')).length
+        await palette.open()
+        await expect.poll(async () => (await juno.measures('juno.palette-open')).length).toBe(opened + 1)
+        const typed = (await juno.measures('juno.palette-results')).length
+        const text = words[round % words.length]!
+        await palette.type(text)
+        await expect(palette.input).toHaveValue(text)
+        // Each keystroke ends its measure once its rows are painted; deferred renders may fold a fast run of keys into one.
+        await expect.poll(async () => (await juno.measures('juno.palette-results')).length, { timeout: 10_000 }).toBeGreaterThan(typed)
+        await win.waitForTimeout(150)
+        await palette.press('Escape')
+        await palette.expectClosed()
+      }
+      const open = stats('palette open, ⌘K to recent rows painted (juno.palette-open)', (await juno.measures('juno.palette-open')).slice(2))
+      const results = stats('palette keystroke to its rows painted (juno.palette-results)', (await juno.measures('juno.palette-results')).slice(5))
+      const keys = await win.evaluate(() => (window as unknown as { __keys: number[] }).__keys)
+      const budget = oneFrameBudget(interval)
+      console.log(`keystrokes over 16 ms (Event Timing): ${keys.length}, ${keys.join(' ')}; frame budget ${budget.toFixed(1)} ms`)
+      within('palette open, p95', open.p95, 50)
+      within('palette keystroke to rows, p95', results.p95, 100)
+      expect(keys.filter((duration) => duration > budget)).toEqual([])
+    } finally {
+      await running.close()
+    }
+  })
+
   test('sidebar drag: main-thread work per frame while the edge moves', async () => {
     test.setTimeout(300_000)
     const running = await launch()
