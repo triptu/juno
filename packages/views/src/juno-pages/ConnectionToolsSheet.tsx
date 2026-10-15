@@ -2,7 +2,7 @@ import { useState } from 'react'
 import * as stylex from '@stylexjs/stylex'
 import { MagnifyingGlass } from '@phosphor-icons/react/dist/icons/MagnifyingGlass'
 import { chatCopy, type ConnectionId, type ConnectionRow, type DiscoveredTool, type ReviewRule, type T3Address } from '@juno/agent-contract'
-import { colors, layout, spacing } from '@juno/tokens/tokens.stylex'
+import { colors, layout, spacing, text } from '@juno/tokens/tokens.stylex'
 import { Button, Checkbox, Select, Surface, Text, TextField } from '@juno/ui'
 import { cell } from './cell'
 import { T3AddressRow } from './ConnectionsPage'
@@ -121,17 +121,17 @@ function Tool({ tool, t3, options, onTool }: {
   const fixed = tool.read ? copy.read : t3 ? copy.rules.always : undefined
   return (
     <div {...stylex.props(styles.row, styles.tool)} role="row" data-tool={tool.name} data-tool-enabled={tool.enabled} data-tool-review={fixed === undefined ? tool.review : tool.read ? 'read' : 'always'}>
-      <span {...stylex.props(cell.lines)} role="cell">
-        <Text variant="bodySmall" weight="medium" truncate>
+      <span {...stylex.props(cell.lines, styles.toolLines)} role="cell">
+        <Text variant="bodySmall" weight="medium" truncate sx={styles.toolName}>
           {tool.name}
         </Text>
         {tool.hint !== undefined ? (
-          <Text variant="meta" tone="muted" truncate dir="auto">
+          <Text variant="meta" tone="muted" truncate dir="auto" sx={styles.toolMeta}>
             {tool.hint}
           </Text>
         ) : null}
         {tool.changed ? (
-          <Text variant="meta" tone="muted">
+          <Text variant="meta" tone="muted" sx={styles.toolMeta}>
             {copy.changed}
           </Text>
         ) : null}
@@ -200,20 +200,34 @@ const styles = stylex.create({
     display: 'grid',
     gridColumn: '1 / -1',
     gridTemplateColumns: 'subgrid',
-    // A fixed height, so the sheet keeps its size while a search narrows the list.
-    height: layout['--palette-list-max-height'],
+    // A fixed height, so the sheet keeps its size while a search narrows the
+    // list: seven whole rows, so at rest the list ends on a row's edge.
+    height: `calc(7 * ${layout['--tool-row-height']})`,
     alignContent: 'start',
     overflowY: 'auto',
     overscrollBehavior: 'contain',
   },
+  // 56px rows on the 4px grid. The rule is above each row, after the
+  // header's, so none sits on the list's bottom edge over the sheet's padding.
   tool: {
+    boxSizing: 'border-box',
+    minHeight: layout['--tool-row-height'],
     paddingBlock: spacing['--space-2'],
-    borderBottomWidth: '1px',
-    borderBottomStyle: 'solid',
-    borderBottomColor: {
+    borderTopWidth: '1px',
+    borderTopStyle: 'solid',
+    borderTopColor: {
       default: colors['--border-subtle'],
-      ':last-child': 'transparent',
+      ':first-child': 'transparent',
     },
+  },
+  toolLines: {
+    gap: 0,
+  },
+  toolName: {
+    lineHeight: text['--text-option-title-leading'],
+  },
+  toolMeta: {
+    lineHeight: text['--text-option-meta-leading'],
   },
   center: {
     display: 'flex',

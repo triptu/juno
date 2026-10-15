@@ -112,3 +112,19 @@ test('the avatar menu’s Sign out starts on the account line’s edge', async (
   })
   expect(edges.signOut).toBe(edges.line)
 })
+
+test('Configure: tool rows are 56px, the list is seven of them, and no rule sits on its bottom edge', async ({ page }) => {
+  await open(page, 'ConnectionToolsSheet', 'configure/tools')
+  const at = await page.evaluate(() => {
+    const rows = [...document.querySelectorAll('[data-tool]')]
+    const list = rows[0]!.parentElement!
+    return {
+      heights: rows.map((row) => row.getBoundingClientRect().height),
+      list: list.clientHeight,
+      bottomRules: rows.map((row) => getComputedStyle(row).borderBottomWidth),
+    }
+  })
+  for (const height of at.heights) expect(height).toBe(56)
+  expect(at.list).toBe(7 * 56)
+  for (const rule of at.bottomRules) expect(rule).toBe('0px')
+})
