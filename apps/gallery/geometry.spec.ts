@@ -411,3 +411,18 @@ test('the topic switcher opens on the topic on screen: one row lit, not that one
     expect(rows.filter((row) => row.lit), id).toHaveLength(1)
   }
 })
+
+test('a card header reads as one meta line: the dot after the kind has the kind’s size and baseline', async ({ page }) => {
+  for (const [component, id] of [['ChangeCard', 'change/asked-delete'], ['ConnectCard', 'connect/open']] as const) {
+    await open(page, component, id)
+    const parts = await page.evaluate(() =>
+      [...document.querySelectorAll('[data-chat-card] *')]
+        .filter((el) => el.children.length === 0 && el.textContent!.trim() !== '')
+        .slice(0, 3)
+        .map((el) => ({ text: el.textContent!.trim(), size: getComputedStyle(el).fontSize, bottom: Math.round(el.getBoundingClientRect().bottom) })),
+    )
+    expect(parts[1]!.text, id).toBe('·')
+    expect(parts[1]!.size, id).toBe(parts[0]!.size)
+    expect(parts[1]!.bottom, id).toBe(parts[0]!.bottom)
+  }
+})

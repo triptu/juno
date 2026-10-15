@@ -52,15 +52,20 @@ export function ChatCard({ id, kind, actions, label, source, status, because, di
     <Surface kind="card" as="article" padding="none" data-chat-card={kind} data-card-status={status?._tag} aria-busy={working || undefined} sx={enter ? styles.cardEnter : styles.card}>
       <div {...stylex.props(styles.inner, padding === 'tight' && styles.innerTight)}>
       <div {...stylex.props(styles.header, padding === 'tight' && styles.headerTight)}>
-        <Text variant="meta" weight="medium" tone="subtle" truncate>
-          {label ?? chatCopy.card.kind[kind]}
-        </Text>
-        {source !== undefined ? (
-          <>
-            <span aria-hidden>·</span>
-            {source}
-          </>
-        ) : null}
+        <span {...stylex.props(styles.title)}>
+          <Text variant="meta" weight="medium" tone="subtle" truncate>
+            {label ?? chatCopy.card.kind[kind]}
+          </Text>
+          {source !== undefined ? (
+            <>
+              {/* In the meta type and spaced as the dots inside the source: "Change · Notion · Offsite agenda". */}
+              <Text variant="meta" tone="muted" aria-hidden sx={styles.dot}>
+                {' · '}
+              </Text>
+              {source}
+            </>
+          ) : null}
+        </span>
         {dismiss && (open || working) ? (
           <span {...stylex.props(styles.dismiss, working && styles.working)}>
             <IconButton icon={X} label={chatCopy.card.dismiss} size={22} radius="sm" iconSize={12} tone="muted" onClick={() => actions.onCard(id, { _tag: 'dismiss' })} />
@@ -223,6 +228,15 @@ const styles = stylex.create({
     minHeight: sizes['--control-22'],
     color: colors['--foreground-muted'],
     userSelect: 'none',
+  },
+  title: {
+    display: 'flex',
+    alignItems: 'baseline',
+    minWidth: 0,
+  },
+  dot: {
+    whiteSpace: 'pre',
+    flexShrink: 0,
   },
   headerTight: {
     paddingInline: spacing['--space-2-5'],
