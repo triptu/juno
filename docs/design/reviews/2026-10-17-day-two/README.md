@@ -47,7 +47,7 @@ The switcher opened with the keyboard highlight on Main and the selected fill on
 - Evidence: `before/02-switcher-thread-*`.
 - Source: `packages/views/src/TopicSwitcher.tsx`.
 
-**Fix.** The switcher opens with the highlight on the topic on screen, scrolled into view, as a Mac pop-up button opens on its current item. Typing a query moves it to the first match, as before, and a row the arrows reach scrolls into view. The pointer still never scrolls the list. `geometry.spec.ts` checks that one row is lit on a thread and on Main. `e2e/topic.spec.ts` checks the highlight on open and now uses Home before Enter to reach Main. The inventory is updated.
+**Fix.** The switcher opens with the highlight on the topic on screen, scrolled into view, as a Mac pop-up button opens on its current item. Typing a query moves it to the first match, as before, and a row the arrows reach scrolls into view. The pointer still never scrolls the list. `list-geometry.spec.ts` checks that one row is lit on a thread and on Main. `e2e/topic.spec.ts` checks the highlight on open and now uses Home before Enter to reach Main. The inventory is updated.
 
 - Compare: `compare/02-switcher-thread-*`.
 
@@ -55,13 +55,13 @@ The switcher opened with the keyboard highlight on Main and the selected fill on
 
 In light, the switcher's selected row printed "14 replies · 4m" at 4.4:1 on `--secondary-default`. `ListRow` already avoids this by pointing `--foreground-muted` at `--foreground-subtle` on a selected row (tokens.md 1.7), but `OptionRow` did not. The same applies to New chat's pickers.
 
-**Fix.** `OptionRow`'s selected style makes the same override. `geometry.spec.ts` checks that the selected row's second line uses the subtle colour. The contrast probe now finds nothing under 4.5:1 on the switcher in either theme.
+**Fix.** `OptionRow`'s selected style makes the same override. `list-geometry.spec.ts` checks that the selected row's second line uses the subtle colour. The contrast probe now finds nothing under 4.5:1 on the switcher in either theme.
 
 ### 4. The card header's dot was in body type. Low. Fixed.
 
 "Change · Notion · Offsite agenda". The first dot was a bare span in the card's 14.5px body type beside 12.5px meta text, so it sat 3px higher than the words. It also had 8px flex gaps on each side, while the dot inside the source used a space. The header affects every Juno card with a source: Change, Connect, Send message and T3 Code questions.
 
-**Fix.** The dot is meta text with a space on each side, on the label's baseline, and the label, dot and source read as one line. `geometry.spec.ts` checks the size and baseline on the Change and Connect cards.
+**Fix.** The dot is meta text with a space on each side, on the label's baseline, and the label, dot and source read as one line. `list-geometry.spec.ts` checks the size and baseline on the Change and Connect cards.
 
 - Compare: `compare/04-change-card-header-*`.
 
@@ -130,6 +130,6 @@ The Change card reads Apply (primary), then Dismiss. Every card puts its main ac
 
 ## Verification
 
-- Gallery behaviour tests for the changed components, against this branch's build: `settings.spec.ts` (7 passed, including the new inset check), the new `geometry.spec.ts` checks (switcher, card header, selected row colour), and `shift.spec.ts` with `GALLERY_SHIFT_ONLY=TopicHeader,TopicSwitcher,SettingsPage,ChangeCard,ConnectCard,QuestionCard,SendMessageCard`. All passed except the `batch-3` test drift noted in finding 13, which does not touch these components.
+- Gallery behaviour tests for the changed components, against this branch's build: `settings.spec.ts` (7 passed, including the new inset check), the new `list-geometry.spec.ts` checks (switcher, card header, selected row colour), and `shift.spec.ts` with `GALLERY_SHIFT_ONLY=TopicHeader,TopicSwitcher,SettingsPage,ChangeCard,ConnectCard,QuestionCard,SendMessageCard`. All passed except the `batch-3` test drift noted in finding 13, which does not touch these components.
 - `pnpm remote test:desktop e2e/topic.spec.ts`: 13 passed, including the switcher's new keyboard steps.
-- `pnpm affected`: see the report for this branch.
+- `pnpm affected` (before the last commit): typecheck, test, specs:check, test:health and test:remote-pool passed. Lint failed on two health regressions from this branch's tests (`geometry.spec.ts` over 400 lines, the Settings `describe` over 80 lines). The last commit moves the new checks to `list-geometry.spec.ts` and out of the `describe`, and `pnpm lint` now passes. test:gallery failed only on the test drift in finding 13. test:desktop failed nine tests that do not reach this branch's changes. They come from other batch-3 work: `sidebar.spec.ts` (participant stacks, the first-sync list), `layout-shift.spec.ts` (cold sync, and a `Threads` header button that the header no longer has), `juno-agent/set-up.spec.ts` (Home's Ask Juno) and `juno-agent/source-link.spec.ts`. They were not rerun on `batch-3` alone.
