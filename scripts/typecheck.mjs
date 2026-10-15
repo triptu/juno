@@ -2,6 +2,7 @@
 //
 //   pnpm typecheck                every project (unchanged ones are skipped)
 //   pnpm typecheck --no-cache     check them all
+//   node scripts/typecheck.mjs --pending   list the projects that would run
 //
 // The projects are each package's `tsc -p <config>` from its typecheck script,
 // plus scripts/tsconfig.json; the tsconfigs, and so the rules, are unchanged.
@@ -118,6 +119,11 @@ for (const project of projects) {
 
 const started = Date.now()
 const pending = projects.filter((project) => !(useCache && existsSync(join(cacheDir, project.key))))
+// --pending prints the projects that would run, as JSON, for pnpm affected.
+if (process.argv.includes('--pending')) {
+  console.log(JSON.stringify(pending.map((project) => project.label)))
+  process.exit(0)
+}
 console.log(`typecheck: ${projects.length} projects, ${projects.length - pending.length} unchanged since they last passed${pending.length ? `, checking ${pending.length}` : ''}`)
 
 /** Runs one project's tsc, through the Mac-wide typecheck queue unless this machine is ours alone. */
