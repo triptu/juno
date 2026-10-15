@@ -13,6 +13,7 @@ pi packages and the Codex SDK may be imported anywhere in this package (`check-d
 | A chat run, the guard, spend, a provider failure line | `fakeProvider()` with a script |
 | Compaction jobs and node text | `fakeProvider()`; requests to Haiku or Flash go to the compactor |
 | The app's agent end to end: the model picker, the OpenRouter key | `startFakeOpenRouter()` over HTTP |
+| The auto-review of connection calls, in-process | `fakeReviewer(answer?)`: the agent's `ReviewModel`, by default `fakeReview` |
 | A custom OpenAI-compatible endpoint (a local model server) | `startFakeOpenAi()` over HTTP |
 | The Codex harness (WP20) | `startFakeCodex()` as `codexPathOverride` |
 | MCP manager logic without HTTP | any fake's `connectInMemory()` |
@@ -39,6 +40,7 @@ A provider registered as `openrouter` with today's resolved slugs, their real co
 For the e2e tests, where the agent runs in its own process with the real OpenRouter provider. Import it from `@juno/agent-testing/openrouter`, which loads nothing else. Give the agent `origin` in place of `https://openrouter.ai` (main does so from `JUNO_FAKE_OPENROUTER_URL` under `JUNO_E2E`).
 
 - `GET /api/v1/models` answers `openRouterCatalogue()`: `fakeCatalogue` in OpenRouter's shape, with names such as "Anthropic: Claude Opus 5.5".
+- `POST /api/v1/systemone` is the decision model the auto-review asks (TypeSafe's System One protocol, as OpenRouter serves Jev). It answers with `options.review`, by default `fakeReview`: intent `explicit` when an owner message names the tool's action word (`update` for `notion-update-page`), `implied` for other owner words, `notAsked` with none; risk `delete` or `send` for tools named so, else `reversible`. `reviews` lists what it was asked.
 - `POST /api/v1/messages` (Claude, Anthropic Messages) and `POST /api/v1/chat/completions` (the rest) stream `answer`, by default one `<say>` bubble. `answer` may be a function of the request, to answer what was sent. It may return `{ toolCall: { name, arguments } }` instead of text; the request after the call carries the tool's result in `toolResult`. A request to a compaction model gets the compactor's answer instead, as with `fakeProvider()`.
 - `key`: a request carrying another key gets 401, as a rejected key does.
 - `requests` records each chat request's path, model, key, whether it was a compaction, and `input`, the last user message. `inputs()` lists the inputs of the chat requests that were not compactions. `catalogueReads()` counts list reads.
@@ -68,7 +70,7 @@ OAuth servers do discovery, dynamic registration, the authorization code grant w
 
 - `startFakeMcpServer({ tools, bearer?, oauth?, pageSize? })`: the generic server. `setTools()` sends `list_changed`. `loseNextCall(tool, { applied })` closes the connection without an answer, after running the tool or before.
 - `startFakeNotion({ pages? })`: OAuth with refresh. `notion-search` and `notion-fetch` read; `notion-create-pages` and `notion-update-page` write. `editElsewhere(id, content)` moves `last_edited_time`, for precondition conflicts. `loseNextWrite({ applied })` loses a write's answer. `pages()` shows the store.
-- `startFakeLittlebird({ extraTools?, pageSize? })`: OAuth with the scopes S8 found and refresh. Three tools per page. `addTool`, `removeTool` and `changeSchema` send `list_changed`; `unknownTool()` is a tool on no allowlist that claims to be read-only. The tool names are invented (S8 did not see the list).
+- `startFakeLittlebird({ extraTools?, pageSize? })`: OAuth with the scopes S8 found and refresh. Three tools per page. `addTool`, `removeTool` and `changeSchema` send `list_changed`; Its reads mark themselves read-only and its writes include `delete_material`. `unknownTool()` is a tool on no read list that claims to be read-only. The tool names are invented (S8 did not see the list).
 - `startFakeT3({ loopback?, lan?, lanHost?, omitTools? })`: the real T3 tool names and argument names. OAuth as S8 found it: `/oauth/mcp/*`, scopes `orchestration:read orchestration:operate`, no refresh, and a 401 `invalid_mcp_credential` that needs a new sign-in. It serves `loopbackUrl` and `lanUrl` on one port. When `lanHost` is not this machine's address (the default 192.168.1.22), pass `fetch` to pi-mcp; it routes the LAN origin to the fake, and pi-mcp still refuses the code exchange over plain http as it does for real. Threads are scripted with `advance(threadId, { status, reply })` and `ask(threadId, prompt)`, answered through `t3_pending_request_respond` and listed by `answers()`. `t3_thread_wait` really waits until a terminal status or its timeout.
 
 ## Hostile Slack fixtures

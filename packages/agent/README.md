@@ -57,6 +57,7 @@ Each folder has one owner (plan v3 §17). Only that folder imports its library (
 | `src/actions/`, `src/grants/`, `src/policy/` | WP15 (built; see "Actions") | |
 | `src/redaction/` | WP16 (built; see "Redaction") | |
 | `src/mcp/` | WP17 | the only importer of `@earendil-works/pi-mcp` |
+| `src/review/` | Auto-review (10-16) | |
 | `src/t3/`, `src/littlebird/` | WP18 | |
 | `src/schedule/` | WP19 | |
 | `src/ownership/`, `src/backup/` | WP21 (built; see "Ownership and backup") | |
@@ -160,6 +161,7 @@ startup: open authorizations ─▶ unknown (recovery) ─▶ reconcile once ─
 - **Executors** run one child by its tool (`Executor`): `slack_send` and `topics_resolve` through the host's single-attempt RPCs; `delegate` (a Proposed task's Start, which also mints the job's grant), `spend_raise` (Allow $1 more today) and `juno_answer` (a question's answer goes to the model as a `click` op). A host error means the host refused before recording anything: failed. A lost answer is unknown. Reconcile looks for positive evidence once per start and never makes a second attempt.
 - **Grants**: a `delegate` in a clean owner run mints the job's grant under `cleanRun`; a Start click under `click`; the menu's reply watch under `menu` (WP19 calls `mintGrant`). Pause and AI off revoke every grant before the mode changes; a job's Stop revokes its own; WP16's removal calls `revokeExposedGrants(store, runs, gen)` inside its transaction: it revokes the grants minted by runs that saw the removed messages (found through the grant's op: a run input, a clicked card's run, or the job's run; a menu grant read nothing and stays) and carries the rest into the new generation, so an unrelated schedule keeps waking. Resume restores none, and one authority op mints a target's grant once, so a replayed call cannot restore a revoked grant.
 - **Untrusted content forces a card.** `toolDecision` turns a no-click call into a card once the run has read Slack, a connection or a report; `delegate` then proposes a Proposed task with the Because line "Juno read Slack or a report in this reply". Sending to Slack is a card in every run.
+- **Connection calls are auto-reviewed** (decision of 10-16, SPEC 13.9, plan v3 §6.4a). See "Auto-review" below.
 - **What the model learns** (§19.5). A dismissal, an expiry and a settled click leave one outcome per card. The next input the model reads, of any kind, carries them first: `<card-outcome card="…" kind="sendMessage" outcome="declined|expired|done|failed">summary</card-outcome>`. It starts no run. The text is escaped, so it cannot close the tag, and a pin never covers it (`ownerWords`). A reply to a card quotes its summary.
 - **A batch** settles row by row: a row refused after another row ran reads Failed ("Sent 1 of 2"); a card whose click never ran because it expired reads Expired.
 - **Activity** lists a run's settled cards and no-click job starts (`activityActions`); an open card has no decision yet and is not listed.
@@ -173,11 +175,32 @@ startup: open authorizations ─▶ unknown (recovery) ─▶ reconcile once ─
 **For the next packages.**
 
 - WP16 (redaction, built): in the removal's transaction, bump `memory_head.gen` and call `revokeExposedGrants(store, runsThatSaw, gen)`, which revokes only the grants minted by runs that saw the removed messages (spec `redact`, pairs `redactExposed` and `redactUnrelated`); open cards proposed in the old generation expire and a waiting click is refused (`sourceChanged`). Register an executor for the `remove` card's child (the card's choice is in `args.choice.alsoRemoveReply`).
-- WP17 (MCP): register one `Executor` per write tool through `openTurns({ actions: { executors } })` with `deduped: false` unless the server keeps a key, a `check` for the schema hash and preconditions, and a `reconcile` that reads back. Propose `change` and `connect` cards with `actions.propose`; `toolDecision('outward', run)` is always a card, and `toolDecision('read', run)` never is. Use `policy.toolDecision` for the allowlist's Tier 0 versus Tier 3.
+- WP17 (MCP): register one `Executor` per write tool through `openTurns({ actions: { executors } })` with `deduped: false` unless the server keeps a key, a `check` for the schema hash and preconditions, and a `reconcile` that reads back. Propose `change` and `connect` cards with `actions.propose`. A read runs; any other call goes through the auto-review ("Auto-review" below).
 - WP18 (T3): register `t3_start` (deduped: false; reconcile by the tag `juno:<action id>`), mint the job's grant on Start with `mintGrant({ authority: { _tag: 'click', current: true } })`, and decide `t3_send` and `t3_stop` with `toolDecision('steer' | 'stopJob', run, { liveGrant })`.
 - WP19 (schedules): `toolDecision('scheduleCreate', run)` gives run or card; mint the schedule grant with `mintGrant({ opClass: 'schedule', authority })` for a clean run, a `proposedSchedule` click (register its executor) or the menu (`{ _tag: 'menu' }`), revoke it with `revokeGrant(store, 'schedule', id, 'delete')`, and register the `schedule` card's executor (its choice is `args.choice.action`).
 
 `test/policy.test.ts` checks the pure rules with properties; `test/actions.test.ts` runs every card kind on the engine (click, consume, send, receipt, unknown, dismiss); `test/actions-crash.test.ts` kills the agent at `approval.committed`, `authorization.consumed` and `attempt.beforeReceipt`.
+
+## Auto-review
+
+A connection (MCP) call that is not a read runs once with no click or shows its Change card, as the owner's rule and one review decide (`mcp/tools.ts` `call_tool`; spec `reviewAllows`, `reviewGated`, `untrustedNeverAuthorizes`).
+
+| Piece | Where |
+| --- | --- |
+| Reads: the code's read list, or read-only at first sight with an unchanged schema (`isRead`) | `mcp/catalogue.ts` |
+| Tool switches and rules: `mcp_tools.enabled`, `mcp_tools.review`, `mcp_connections.review`; `setTool`, `setRule`, `rule` | `mcp/schema.ts`, `mcp/manager.ts` |
+| The review: the owner's words in the run (`ownerWordsInRun`), the request, the spend reservation, the 3 s limit | `review/review.ts` |
+| The decision model: Jev on OpenRouter through pi-ai `classify`, no retry; none without an OpenRouter key | `providers/review.ts` (`reviewModel`) |
+| The rules: `needsReview`, `reviewDecision`, `floorRisk`; `authorizeDecision` with `review` | `policy/policy.ts` |
+| A call that runs: a quiet card, an `mcp_reviews` authority, authorize, attempt, `runWrite`, settle | `mcp/tools.ts`, `mcp/actions.ts` |
+
+- **The rule** is the tool's own unless it is Auto, else the connection's. Always ask: a card, no review. Never ask: no review when the run was clean when the model wrote the call (`ToolRun.cleanAtRequest`; a call's own taint at its start does not count), else a review that must find the intent at least implied. Auto: a review that must find it explicit and reversible. T3 Code's generic tools always ask (O3).
+- **The review** reads only `{ owner, call }`: the text of the run's `send`, `steer` and `retry` inputs (never quotes, reports, wakes or tool results), and the call's server label, tool name and arguments. It reserves on the `chat` path before the call and settles with the reported cost, or keeps the reservation. No model (another provider than OpenRouter), no budget, an error, a timeout or an answer outside the choices is `failed`, and the call asks. A permissive answer below 0.6 confidence counts as the next safer one. `floorRisk` makes a call named like a delete, with a destructive argument (`archived`, `in_trash`, a delete `command`), or marked `destructiveHint` never reversible.
+- **The card** carries the review in `ChangePayload.review` (`{ rule, intent?, risk?, failed?, line }`), and the view shows the line. The line is fixed copy (`chatCopy.card.change.review`), never the model's.
+- **A call that runs** is a card row with `quiet = 1`: the chat never lists it, it takes no click, and it leaves no card outcome (the model has the tool's result). Its single-use authority is an `mcp_reviews` row passed as `grantId`. It is authorized only if `authorizeDecision` allows it with `review: true` (mode, owner, validity, no earlier authorization), attempted once and settled as a click is; an unconfirmed result is `unknown` and never retried. If it cannot be authorized the quiet card is dismissed and the model is told nothing was done. Activity lists it as `noClick` with the review.
+- **Disabled tools** are left out of `definitions` (so `find_tools` never offers them and they get no executor) and refused by `tool`.
+
+`test/auto-review.test.ts` runs the flows on the engine with `fakeReviewer` (`@juno/agent-testing`); `test/policy.test.ts` checks the rules with properties.
 
 ## Redaction (WP16)
 

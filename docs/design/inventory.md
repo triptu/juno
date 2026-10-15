@@ -499,7 +499,7 @@ One long list, no "new chat". Scroll container under the header islands (§5); c
 
 ### Connections and Backup refinements (10-16)
 
-Connections tools each have one checkbox, "Runs without asking". There are no Read or Asks every time chips. "Default" is quiet text only when an allowlisted tool has been changed to ask. Connect and Sign in use secondary buttons; this page has no accent-filled action. Tool rows retain the card’s symmetric 15px insets.
+Connections lists each server as one compact row in one card: the name with its state chip, the address (and the detail or a refusal under it), then Remove for an added server, Connect, Sign in or Disconnect, and Configure, all secondary or ghost; this page has no accent-filled action. Configure opens a sheet (`ConnectionToolsSheet` in `SheetLayer`, 560px wide): the title "{Server} tools" with Done, the connection's "Auto-review for all tools" select with its note (T3 Code shows its address and network switch there instead), a search field that takes focus, and a table with Tool (name and one-line description), Enabled (a checkbox, on by default) and Auto-review (Auto, Always ask or Never ask; a read shows Read, T3 Code's other tools Always ask). The table's list keeps one height while a search narrows it and scrolls inside. A tool whose schema changed says "Changed since Juno first saw it". (Auto-review, 10-16; replaces the per-tool "Runs without asking" checkbox.)
 
 The Backup folder path is measured in its rendered font and cut in the middle to fit, keeping both ends. Its hover title and accessible name contain the full path. Export recovery phrase remains focusable while busy, announces its busy state and ignores another press. Closing the phrase sheet returns keyboard focus to it.
 

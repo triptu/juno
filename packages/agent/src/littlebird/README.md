@@ -8,13 +8,14 @@ schema. Reviewed reads run without a card; writes are exact Change cards,
 once per click. All results taint the run as untrusted connection content.
 
 There are no invented Littlebird tool aliases. The WP17 preset's guessed read
-names were removed. First connect starts with every tool Outward. The owner
-reviews the actual read tools in Connections and selects Read for their
-current schema hashes. Later schema changes drop those decisions to Outward.
-A read-only annotation is a hint, never authority. A preset's read list
-comes from the code at every start, not from the stored row, so an older
-build's guessed names are cleared, and a tool they made Read is Outward again
-until the owner reviews it.
+names were removed, and the code's read list is empty. Since the auto-review
+(10-16), a tool Littlebird marks read-only the first time Juno sees it is a
+read while its schema is unchanged; every other tool goes through the
+auto-review (`../../README.md`, "Auto-review"), which runs a call the owner
+asked for in so many words that can be undone and asks for anything else. A
+read-only mark that appears later grants nothing. A preset's read list comes
+from the code at every start, not from the stored row, so an older build's
+guessed names are cleared.
 
 The plan asks for a default read list matched to published names, but S8 did
 not authenticate and no published names were verified. Until the owner
@@ -24,7 +25,7 @@ annotations, names such as `get_*`, or a model's classification.
 
 Owner live check: sign in, inspect the complete discovered tool list, identify
 meeting/context/routine-report/account reads, review their input and output
-schemas, and mark the confirmed reads Read. Exercise one synthetic lookup
+schemas, and add the confirmed reads to the code's read list. Exercise one synthetic lookup
 and one approved write in owner-selected test material. Record the verified
 names and schema hashes before adding defaults. Confirm schema-change
 notifications, token refresh and write error behaviour. WP18 accessed no
