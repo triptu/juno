@@ -48,7 +48,7 @@ test('finds a topic by its title and opens it; ⌘Enter opens one in a new tab',
 
   await palette.open()
   await palette.type('draft pla')
-  await palette.expectActive(new RegExp(`^${POSTGRES}`))
+  await palette.expectActive(POSTGRES)
   await palette.choose(POSTGRES)
   await palette.expectClosed()
   await topic.expectMessage('4 minutes is fine for us')

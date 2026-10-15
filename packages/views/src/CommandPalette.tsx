@@ -241,7 +241,7 @@ function PaletteRow({ item, active, now, onSelect, onActivate, onMenu }: Palette
           <Icon icon={icons[item.icon]} size={16} />
           {/* Laid over the row's end: moving the active row must not reflow any row's text. */}
           {active && item.badge === undefined ? (
-            <span {...stylex.props(styles.hintOver)}>
+            <span aria-hidden="true" {...stylex.props(styles.hintOver)}>
               <Kbd>{hint}</Kbd>
             </span>
           ) : null}
@@ -256,7 +256,7 @@ function PaletteRow({ item, active, now, onSelect, onActivate, onMenu }: Palette
             <Chip variant="filled" size={20} icon={Sparkle} iconSize={12} title="Juno's read of what you typed" numeric>
               {item.badge}
             </Chip>
-            <span {...stylex.props(!active && styles.hintHidden)}>
+            <span aria-hidden="true" {...stylex.props(!active && styles.hintHidden)}>
               <Kbd>{hint}</Kbd>
             </span>
           </>
