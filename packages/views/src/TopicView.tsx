@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 import { colors, spacing, z } from '@juno/tokens/tokens.stylex'
 
 export interface TopicViewProps {
-  /** The `TopicHeader`. */
+  /** The `TopicHeader`, laid over the top of the list. */
   readonly header: ReactNode
   /** The `MessageList`, or whatever the container shows in its place. */
   readonly children: ReactNode
@@ -14,15 +14,17 @@ export interface TopicViewProps {
 }
 
 /**
- * One topic in a tab (SPEC section 7): the header, the list filling the
- * middle, and the composer at the bottom. The pill floats over the list's
- * bottom edge and never takes part in its layout.
+ * One topic in a tab (SPEC section 7): the list filling the area above the
+ * composer, with the header's islands floating over its top and the pill
+ * over its bottom edge. Neither takes part in the list's layout, so a header
+ * change never moves a message. The header comes first in the DOM, so it
+ * is first in the Tab order.
  */
 export function TopicView({ header, children, pill, composer }: TopicViewProps) {
   return (
     <div data-topic-view="" {...stylex.props(styles.root)}>
-      {header}
       <div {...stylex.props(styles.middle)}>
+        {header}
         {children}
         {pill !== undefined ? <div {...stylex.props(styles.pill)}>{pill}</div> : null}
       </div>

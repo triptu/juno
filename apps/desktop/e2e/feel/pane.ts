@@ -4,7 +4,7 @@ import { noLayoutShift } from './checks'
 import type { Probe, ProbeFrame } from './recorder'
 
 const VIEW = '[data-topic-view]'
-const SCROLLER = `${VIEW} [data-scroll]`
+export const SCROLLER = `${VIEW} [data-scroll]`
 
 /** The active topic: header text, scroll position, rows, the divider, the rows at the top and bottom edges, reactions and loaded images. */
 export const topicProbes: ReadonlyArray<Probe> = [
@@ -32,6 +32,14 @@ export const header = (values: ProbeFrame['values']): string => (typeof values['
 export const edgeKey = (values: ProbeFrame['values'], edge: 'top' | 'bottom'): string => {
   const value = values[edge]
   return typeof value === 'object' && value !== null && 'key' in value ? value.key : 'no rows'
+}
+
+/** A `rect` probe's box, or undefined when the element was not there. */
+export const rect = (values: ProbeFrame['values'], name: string): { readonly x: number; readonly y: number; readonly width: number; readonly height: number } | undefined => {
+  const value = values[name]
+  return typeof value === 'object' && value !== null && 'y' in value && 'height' in value && 'x' in value && 'width' in value
+    ? { x: Number(value.x), y: Number(value.y), width: Number(value.width), height: Number(value.height) }
+    : undefined
 }
 
 export const count = (values: ProbeFrame['values'], name: string): number => (typeof values[name] === 'number' ? values[name] : 0)

@@ -2,6 +2,8 @@ import { defineConfig } from '@playwright/test'
 
 // GALLERY_PORT lets two worktrees run the tests at the same time.
 const port = Number(process.env.GALLERY_PORT ?? 4174)
+// One id per run, set before the workers start, so the shift guard's parts share one queue.
+process.env.GALLERY_SHIFT_RUN ??= `${Date.now()}-${process.pid}`
 
 /**
  * Two projects against the built gallery. `shots` screenshots every state
@@ -17,7 +19,8 @@ export default defineConfig({
   timeout: 120_000,
   // Tests are independent pages against a static server. The shift guard
   // splits itself into parts to use the workers.
-  workers: process.env.CI ? 2 : 3,
+  // GALLERY_WORKERS lets a machine of its own (pnpm remote) run more.
+  workers: Number(process.env.GALLERY_WORKERS ?? (process.env.CI ? 2 : 3)),
   fullyParallel: true,
   reporter: process.env.CI ? 'github' : 'list',
   use: {

@@ -16,6 +16,7 @@ export interface JunoTestHooks {
   readonly agentState: () => string
   /** The host name from the agent's `host.hello`, once it reached the engine. */
   readonly agentHost: () => string | undefined
+  readonly agentPid: () => number | undefined
 }
 
 export interface RunningApp {
@@ -60,7 +61,9 @@ export async function launchApp(userData: string, options: LaunchOptions = {}): 
   // Launch the package directory (like `electron .`), not the script, so
   // Electron reads package.json for the app name and version.
   const app = await electron.launch({
-    args: [resolve(__dirname, '..')],
+    // Under xvfb (pnpm remote) Chromium may find no pointing device and match
+    // `(hover: none)`, which turns off every hover style. Say there is a mouse.
+    args: [...(process.platform === 'linux' ? ['--blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4'] : []), resolve(__dirname, '..')],
     env,
   })
   const win = await app.firstWindow()

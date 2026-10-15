@@ -1,0 +1,107 @@
+/**
+ * New chat (spec section 9, inventory 8): the two destination pickers and
+ * the send.
+ *
+ * Live queries, which never call Slack:
+ * - `newChat.conversations`: the conversation picker's sections. With an
+ *   empty query, the recent conversations; with a query, the matching
+ *   people (everyone in the workspace, including people never messaged)
+ *   and the matching channels and group DMs you are in. Ignored channels
+ *   are left out.
+ * - `newChat.threads`: the thread picker's rows. With a channel, its
+ *   threads by latest activity, followed or not; without one, recent
+ *   threads from everywhere. Main is not a row: the renderer puts it first.
+ *
+ * The command:
+ * - `messages.send`: posts a message (`chat.postMessage`) to a channel, a
+ *   thread, or a person. A person with no DM yet gets one opened first
+ *   (`conversations.open`). The sent message is stored before the command
+ *   answers, so the topic it returns can open at once.
+ */
+import { Schema } from 'effect'
+import { Rpc, RpcGroup } from 'effect/rpc'
+import { ContextTint, ConversationKind } from '@juno/domain'
+import { NotFound, NotSignedIn, Offline, RateLimited, Rejected } from '../errors'
+import { liveValueRoute } from '../live'
+import { Person } from '../refs'
+
+/** A conversation the picker offers: a channel, a group DM, a DM, or a person with no DM yet. */
+export const PickConversation = Schema.Struct({
+  /** The channel id, or `u:<user id>` for a person with no DM yet. */
+  key: Schema.String,
+  /** "eng", "Maya Chen", "Maya, Leo": without "#". */
+  name: Schema.String,
+  /** A person with no DM yet is `im`. */
+  kind: ConversationKind,
+  tint: ContextTint,
+  /** Absent for a person with no DM yet: sending opens one. */
+  channelId: Schema.optionalKey(Schema.String),
+  /** The conversation's Main topic id, with `channelId`. */
+  mainId: Schema.optionalKey(Schema.String),
+  /** The other person, for a DM or a person with no DM yet. */
+  person: Schema.optionalKey(Person),
+  /** Juno holds no message in it: "No messages yet" for a person. */
+  empty: Schema.Boolean,
+})
+export type PickConversation = typeof PickConversation.Type
+
+export const PickConversations = Schema.Struct({
+  /** By latest activity, at most `RECENT_CONVERSATIONS`. Empty when there is a query. */
+  recent: Schema.Array(PickConversation),
+  people: Schema.Array(PickConversation),
+  channels: Schema.Array(PickConversation),
+})
+export type PickConversations = typeof PickConversations.Type
+
+/** Rows in the conversation picker's Recent section. */
+export const RECENT_CONVERSATIONS = 8
+/** Rows in each of the conversation picker's People and Channels sections, and in the thread picker. */
+export const PICK_LIMIT = 20
+
+export const newChatConversations = liveValueRoute('newChat.conversations', {
+  payload: { query: Schema.String },
+  value: PickConversations,
+})
+
+/** A thread the picker offers, with the conversation it lives in. */
+export const PickThread = Schema.Struct({
+  /** The thread's topic id. */
+  id: Schema.String,
+  rootTs: Schema.String,
+  title: Schema.String,
+  replyCount: Schema.Int,
+  /** Epoch milliseconds of the latest activity. */
+  lastActivityAt: Schema.Number,
+  conversation: PickConversation,
+})
+export type PickThread = typeof PickThread.Type
+
+export const newChatThreads = liveValueRoute('newChat.threads', {
+  payload: { channel: Schema.optionalKey(Schema.String), query: Schema.String },
+  value: Schema.Array(PickThread),
+})
+
+/** Where a message goes: a conversation (and a thread in it), or a person with no DM yet. */
+export const SendTarget = Schema.Union([
+  Schema.Struct({ kind: Schema.Literal('channel'), channelId: Schema.String, threadTs: Schema.optionalKey(Schema.String) }),
+  Schema.Struct({ kind: Schema.Literal('person'), userId: Schema.String }),
+])
+export type SendTarget = typeof SendTarget.Type
+
+export const SendResult = Schema.Struct({
+  /** The topic the message landed in: the thread, or the conversation's Main. */
+  topicId: Schema.String,
+})
+export type SendResult = typeof SendResult.Type
+
+export const SendError = Schema.Union([NotSignedIn, Offline, RateLimited, Rejected, NotFound])
+export type SendError = typeof SendError.Type
+
+/** `clientMsgId` is the renderer's, so a retry of the same send is matched to its echo (ADR 0011). */
+export const messagesSend = Rpc.make('messages.send', {
+  payload: { to: SendTarget, text: Schema.String, clientMsgId: Schema.String },
+  success: SendResult,
+  error: SendError,
+})
+
+export const NewChatRoutes = RpcGroup.make(newChatConversations, newChatThreads, messagesSend)

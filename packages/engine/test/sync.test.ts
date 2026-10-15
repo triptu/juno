@@ -56,7 +56,11 @@ const activeMains = memberConversations.filter((c) => c.messages.some((m) => m.a
 const threadId = (engine: RunningEngine, channel: string, prefix: string) => threadIdIn(engine.fake, channel, prefix)
 
 /** Replays an undo the way the renderer's undo stack does: the command its tag names. */
-const replay = (engine: RunningEngine, undo: UndoCommand) => (undo._tag === 'topics.subscribe' ? subscribe(engine, undo.id) : unsubscribe(engine, undo.id))
+const replay = (engine: RunningEngine, undo: UndoCommand) => {
+  if (undo._tag === 'topics.subscribe') return subscribe(engine, undo.id)
+  if (undo._tag === 'topics.unsubscribe') return unsubscribe(engine, undo.id)
+  throw new Error(`not a follow undo: ${undo._tag}`)
+}
 
 describe('cold boot', () => {
   it('discovers the fixture workspace: titles, previews, counts, tags and order', async () => {
@@ -153,6 +157,7 @@ describe('cold boot', () => {
     const history = apiCalls(engine, 'conversations.history')
     expect(new Set(history.map((c) => c.args['channel'])).size).toBe(history.length)
     expect(callMap(engine)).toEqual({
+      'api:presence.set': 1,
       'api:auth.test': 1,
       'api:client.getWebSocketURL': 1,
       'api:api.getFlannelHttpUrl': 1,
@@ -273,6 +278,7 @@ describe('warm boot', () => {
     await quiet(second)
     expect(apiCalls(second, 'conversations.history').map((c) => c.args['channel'])).toEqual(['C0PRODUCT'])
     expect(callMap(second)).toEqual({
+      'api:presence.set': 1,
       'api:auth.test': 1,
       'api:api.getFlannelHttpUrl': 1,
       'edge:emojis/list': 1,
@@ -772,7 +778,7 @@ describe('subscriptions after a failure (review M3 finding 10)', () => {
     )
     valueOf(await subscribe(engine, id))
     expect(apiCalls(engine, 'subscriptions.thread.add').at(-1)!.args['last_read']).toBe(root.ts)
-    const rows = await engine.rowsUntil((list) => list.some((r) => r.id === id), 'the thread')
+    const rows = await engine.rowsUntil((list) => list.some((r) => r.id === id && r.unreadCount === 2), 'the thread after the read-cursor echo')
     expect(rows.find((r) => r.id === id)).toMatchObject({ unreadCount: 2 })
   })
 })

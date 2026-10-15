@@ -42,6 +42,8 @@ export default defineFixtures(
     Scrollbar: {
       always: fixture(area('always')),
       hover: fixture(area('hover')),
+      // The content starts below the header inset and the track below the band.
+      'under-header': fixture({ ...area('always'), underHeader: true }),
     },
     Interaction: {
       // The thumb appears; the gutter was already there, so nothing moves.

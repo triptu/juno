@@ -5,7 +5,7 @@ import { Surface, type SurfacePadding, type SurfaceRadius } from './Surface'
 
 export type PopoverPlacement = 'bottom-start' | 'bottom-end' | 'top-start' | 'top-end'
 export type PopoverLayer = 'mention' | 'picker' | 'menu' | 'context'
-export type PopoverWidth = 'menu' | 'account' | 'browse' | 'mention' | 'anchor'
+export type PopoverWidth = 'menu' | 'account' | 'browse' | 'mention' | 'picker' | 'anchor'
 
 export interface PopoverProps {
   readonly open: boolean
@@ -198,6 +198,7 @@ const widths = stylex.create({
   account: { width: layout['--menu-width-account'] },
   browse: { width: layout['--menu-width-browse'] },
   mention: { width: layout['--menu-width-mention'] },
+  picker: { width: layout['--menu-width-picker'] },
   anchor: { left: 0, right: 0 },
 })
 

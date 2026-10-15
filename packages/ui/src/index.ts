@@ -21,6 +21,7 @@ export { ContextPill, type ContextPillProps, type ContextPillSize, type ContextT
 export { Divider, LabelledRule, type DividerProps, type LabelledRuleProps } from './Divider'
 export { EmojiButton, type EmojiButtonProps } from './EmojiButton'
 export { EmptyState, type EmptyStateProps } from './EmptyState'
+export { HeaderBand } from './HeaderBand'
 export { Icon, defaultIconWeight, type IconProps, type IconSize, type IconWeight, type PhosphorIcon } from './Icon'
 export { IconButton, type IconButtonProps, type IconButtonRadius, type IconButtonSize, type IconButtonTone, type IconButtonVariant } from './IconButton'
 export { Illustration, type IllustrationName, type IllustrationProps, type IllustrationSize } from './illustrations/Illustration'

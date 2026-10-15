@@ -9,6 +9,7 @@ import {
   isMessageDeleted,
   isMessagePosted,
   isMessageReplied,
+  type Channel,
   type Message,
   type RtmFrame,
 } from '@juno/slack-schema'
@@ -200,20 +201,41 @@ export const applyFrame = (ctx: SyncContext, frame: RtmFrame): Effect.Effect<voi
     }
   })
 
+/** A new message, from its socket event or from Juno's own send. */
+const writePosted = (ctx: SyncContext, channel: string, message: Message, eventTs: string, now: number): Effect.Effect<void, SqlError, Services> =>
+  Effect.gen(function* () {
+    const rows = yield* mergeOne(ctx, channel, message, { kind: 'event', eventTs })
+    const topics = topicsOfMessages(rows)
+    // Activity after a resolve reopens the topic, except the user's own messages are activity too.
+    for (const row of rows) if (row.ts === message.ts) yield* reopenIfResolved(topicOfMessage(row), message.ts, now)
+    yield* followOnReply(ctx, channel, rows.find((row) => row.ts === message.ts), { kind: 'event', eventTs, observedAt: millisToTs(now) }, now)
+    yield* reindexTopics(topics, reindexOptions(ctx))
+  })
+
+/**
+ * What Juno's own send got back (`chat.postMessage`, and `conversations.open`
+ * when it opened a DM), stored as the socket's `im_created` and message
+ * echo would store it, so the topic can open before the echo arrives. The
+ * echo then changes nothing: it carries the same message and event ts.
+ */
+export const applySent = (ctx: SyncContext, sent: { readonly opened?: Channel | undefined; readonly channel: string; readonly message: Message }): Effect.Effect<void, SqlError, Services> =>
+  Effect.gen(function* () {
+    const now = yield* Clock.currentTimeMillis
+    yield* transaction(
+      Effect.gen(function* () {
+        if (sent.opened !== undefined) {
+          yield* upsertConversations([toConversationRow(sent.opened)])
+          yield* patchConversation(sent.opened.id, { is_member: 1 })
+        }
+        yield* writePosted(ctx, sent.channel, sent.message, sent.message.ts, now)
+      }),
+    )
+  })
+
 const applyMessageFrame = (ctx: SyncContext, frame: Extract<RtmFrame, { type: 'message' }>, now: number): Effect.Effect<void, SqlError, Services> => {
   if (isMessagePosted(frame)) {
     const { event_ts: _e, hidden: _h, suppress_notification: _s, ...message } = frame
-    return transaction(
-      Effect.gen(function* () {
-        const eventTs = eventTsOf(frame, now)
-        const rows = yield* mergeOne(ctx, frame.channel, message as Message, { kind: 'event', eventTs })
-        const topics = topicsOfMessages(rows)
-        // Activity after a resolve reopens the topic, except the user's own messages are activity too.
-        for (const row of rows) if (row.ts === frame.ts) yield* reopenIfResolved(topicOfMessage(row), frame.ts, now)
-        yield* followOnReply(ctx, frame.channel, rows.find((row) => row.ts === frame.ts), { kind: 'event', eventTs, observedAt: millisToTs(now) }, now)
-        yield* reindexTopics(topics, reindexOptions(ctx))
-      }),
-    )
+    return transaction(writePosted(ctx, frame.channel, message as Message, eventTsOf(frame, now), now))
   }
   if (isMessageChanged(frame)) {
     return transaction(

@@ -9,8 +9,8 @@
     "build": "vite build",
     "preview": "vite preview --port 4174 --strictPort",
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.shots.json",
-    "shots": "vite build && playwright test --project shots",
-    "test:e2e": "vite build && playwright test --project behaviour"
+    "shots": "node ../../scripts/build-cached.mjs dist vite build && playwright test --project shots",
+    "test:e2e": "node ../../scripts/build-cached.mjs dist vite build && playwright test --project behaviour"
   },
   "dependencies": {
     "@juno/tokens": "workspace:*",

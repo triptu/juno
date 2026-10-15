@@ -21,6 +21,7 @@ const chrome: Omit<SidebarProps, 'children'> = {
   accountMenuOpen: false,
   onAccountMenu: noop,
   onSearch: noop,
+  onNewChat: noop,
   onNavigate: noop,
   onFilterKind: noop,
   onToggleUnread: noop,
@@ -102,6 +103,8 @@ export default defineFixtures(
       stopped: scene(() => full({ status: <EngineNotice kind="stopped" onRestart={noop} /> })),
     },
     Nav: {
+      // Home tab active, or no tab open.
+      'home-active': scene(() => full({ activeNav: 'home' })),
       'all-topics-active': scene(() => full({ activeNav: 'all-topics' })),
       'juno-active': scene(() => full({ activeNav: 'juno' })),
       'juno-unread': scene(() => full({ junoUnread: 3 })),

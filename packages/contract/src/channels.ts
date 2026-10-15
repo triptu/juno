@@ -29,6 +29,8 @@ export const Channels = {
   shellOpenInSlack: 'shell.openInSlack',
   /** Puts text on the clipboard. */
   clipboardWriteText: 'clipboard.writeText',
+  /** Undo in the focused text field (`webContents.undo()`), for ⌘Z while one has text. */
+  shellEditUndo: 'shell.editUndo',
 } as const
 
 export type Channel = (typeof Channels)[keyof typeof Channels]
@@ -43,8 +45,9 @@ export const Events = {
 
 /**
  * The app-menu items main hands to the renderer (architecture, shortcuts):
- * the tab keys, Back and Forward (also the three-finger swipe), and Hide
- * Sidebar.
+ * the tab keys, Back and Forward (also the three-finger swipe), Hide
+ * Sidebar, and Edit › Undo, which undoes typing in a text field or else
+ * Juno's last action.
  */
 export type MenuCommand =
   | 'tab.new'
@@ -56,18 +59,30 @@ export type MenuCommand =
   | 'history.back'
   | 'history.forward'
   | 'sidebar.toggle'
+  | 'edit.undo'
 
 /** One item of a context menu the renderer asks for, or a separator. */
-export type ContextMenuItem =
+export type ContextMenuLeaf =
   | {
       readonly id: string
       readonly label: string
       /** Default true. */
       readonly enabled?: boolean
+      /** Draws a checkmark beside the item (the current Notify me choice). */
+      readonly checked?: boolean
       /** Shown in the shortcut column, in Electron's accelerator form ("CommandOrControl+W"). Display only. */
       readonly accelerator?: string
     }
   | { readonly separator: true }
+
+/** An item, a separator, or a submenu of items one level deep. */
+export type ContextMenuItem = ContextMenuLeaf | { readonly label: string; readonly submenu: ReadonlyArray<ContextMenuLeaf> }
+
+/** Where a menu opens, in CSS pixels from the window's top left. Without it, at the pointer. */
+export interface ContextMenuAt {
+  readonly x: number
+  readonly y: number
+}
 
 /** The sidebar's width range in CSS pixels, and the width a double-click on its edge resets to (spec section 4). */
 export const SIDEBAR_WIDTH = { min: 280, max: 480, default: 384 } as const
@@ -101,12 +116,14 @@ export interface JunoBridge {
   }
   readonly contextMenu: {
     /** Resolves with the chosen item's id, or null when the menu closed without a choice. */
-    readonly popup: (items: ReadonlyArray<ContextMenuItem>) => Promise<unknown>
+    readonly popup: (items: ReadonlyArray<ContextMenuItem>, at?: ContextMenuAt) => Promise<unknown>
   }
   readonly shell: {
     /** Only http and https links open; main ignores anything else. */
     readonly openExternal: (url: string) => Promise<unknown>
     readonly openInSlack: (target: SlackTarget) => Promise<unknown>
+    /** Undo in the focused text field. */
+    readonly editUndo: () => Promise<unknown>
   }
   readonly clipboard: {
     readonly writeText: (text: string) => Promise<unknown>

@@ -4,7 +4,8 @@ Slack into the store. Cold and warm boot, thread discovery, the merge rules, soc
 
 ## Public API
 
-- `runSync({ onPhase, onCycle?, onFetcher?, openTopics? })`: the whole sync for one session, until interrupted. Needs the Slack client (`SlackApi`, `SlackEdge`, `SlackSocket`, `SlackSession`) and the store (`StoreWriter`, `StoreReader`, `Invalidation`) in its context, plus a `Scope`. It opens the socket first, boots cold (empty cache) or warm (`sync_state.boot` present), then stays live: every event is one transaction, a reconnect runs the catch-up, a discovery sweep runs every ten minutes. It fails only with `SlackAuthRequired`; the engine then ends the session.
+- `runSync({ onPhase, onCycle?, onFetcher?, openTopics?, onEvent? })`: the whole sync for one session, until interrupted. Needs the Slack client (`SlackApi`, `SlackEdge`, `SlackSocket`, `SlackSession`) and the store (`StoreWriter`, `StoreReader`, `Invalidation`) in its context, plus a `Scope`. It opens the socket first, boots cold (empty cache) or warm (`sync_state.boot` present), then stays live: every event is one transaction, a reconnect runs the catch-up, a discovery sweep runs every ten minutes. It fails only with `SlackAuthRequired`; the engine then ends the session.
+- `onEvent(event, me)`: a nonblocking observer after socket event application. The notifications engine queues candidates here. This does not change merge, follow, or read-state rules.
 - `onCycle`: reports `started` and `finished` around boot, reboot and reconnect/sweep reconciliation, including the follow pass after `live`. It also finishes on failure or interruption; it does not drain socket events or command recovery. Tests use it to await completion rather than infer it from API traffic.
 - `SyncPhase`: `booting`, `catching-up { done, total }`, `live`, `offline`. `onPhase` is called on every change; the engine folds it into `engine.status`.
 - `SyncConfig` / `syncConfigLayer({ ... })`: the quiet window, page sizes, sweep interval, `discovery: 'search' | 'history'`. `sweepIntervalMillis: 0` disables the periodic timer; boot, reconnect and `force_reload` still run their passes.
@@ -72,7 +73,7 @@ Juno's pointer (`topic_reads.last_read_ts`) is the state the sidebar shows. The 
 
 | Rule | Code | Spec |
 | --- | --- | --- |
-| A mark moves the pointer and flag at once, stamps `observed_at` and re-indexes in one transaction. A mirrored mark (setting on; Main or a followed thread) sets `commanded` and writes or replaces the topic's one `mark` outbox row. | `engine/reads/commands.ts`, `writeLocalMark` | `localChange`; `pendingIntentWins` |
+| A mark moves the pointer and flag at once, stamps `observed_at` and re-indexes in one transaction. A mirrored mark (setting on; Main or a followed thread) sets `commanded` and writes or replaces the topic's one `mark` outbox row. | `engine/marks.ts`, `writeLocalMark` | `localChange`; `pendingIntentWins` |
 | A new row waits 400 ms; marks meanwhile, or while it is in flight, replace its intent (`gen`). | `writeLocalMark`, `MarkWorker` | `localChange` on a pending topic; `coalesceStep` |
 | Success ends the row unless the intent changed, records Slack's pointer (`slack_read_ts`) and stamps `observed_at`, so a page requested while the mark was pending cannot apply. A changed intent is sent again. | `endMark` | `respond`; `pendingPageStep` |
 | A transient error keeps the intent and retries with backoff, across restarts. | `deferMark` | `retry`; `retryAfterAcceptStep` |
@@ -93,7 +94,7 @@ Known limits: thread marks made elsewhere while the socket was down reach Juno a
 - A message first stored from a search match has no reaction state, files or blocks until a page or an event brings it.
 - A follow changed elsewhere during a drop, on a thread with no activity since the last sync, waits for the next window pass (at most an hour). A follow older than the window waits for its thread's next reply.
 - The sweep reads at most 150 matches per gap; a longer outage in a busy workspace misses older thread activity until the next sweep or open.
-- The persisted outbox for other kinds and send reconciliation are later milestones. Read marks have their own worker in the engine (`reads/worker.ts`).
+- The persisted outbox for other kinds and send reconciliation are later milestones. Read marks have their own worker in the engine (`markWorker.ts`).
 
 ## Must not
 

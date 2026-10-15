@@ -14,8 +14,9 @@ export default defineConfig({
     // tens of seconds, and boots in parallel files slow each other down, so the
     // files run one at a time and a test gets 90 s. The harness waits take at
     // most half of that, so a slow step fails with its own label, not a bare
-    // timeout. A real hang still fails.
-    fileParallelism: false,
+    // timeout. A real hang still fails. JUNO_TEST_FILE_PARALLEL=1 runs files
+    // in parallel on a machine of its own (pnpm remote).
+    fileParallelism: process.env.JUNO_TEST_FILE_PARALLEL === '1',
     testTimeout: 90_000,
     hookTimeout: 90_000,
   },

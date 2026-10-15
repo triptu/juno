@@ -17,7 +17,7 @@ export interface ComposerSlotProps {
 export function ComposerSlot({ placeholder }: ComposerSlotProps) {
   return (
     <div data-composer-slot="" {...stylex.props(styles.outer)}>
-      <Surface kind="field" aria-hidden sx={styles.box}>
+      <Surface kind="field" aria-hidden data-composer-field="" sx={styles.box}>
         <span {...stylex.props(styles.mark, styles.attach)}>
           <Icon icon={Plus} size={18} />
         </span>

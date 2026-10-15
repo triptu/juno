@@ -49,7 +49,8 @@ export function OptionList({ role = 'listbox', label, activeId, focusable = fals
   )
 }
 
-export type OptionRowSize = 30 | 32 | 34 | 55
+/** 44 and 55 are two-line rows: the label over `sub`. */
+export type OptionRowSize = 30 | 32 | 34 | 36 | 44 | 55
 
 export interface OptionRowProps {
   readonly id: string
@@ -91,7 +92,7 @@ export function OptionRow({
   onActivate,
   onContextMenu,
 }: OptionRowProps) {
-  const twoLine = size === 55
+  const twoLine = size === 44 || size === 55
   const listRole = useContext(ListRole)
   // The keyboard highlight is announced through aria-activedescendant on the
   // list; aria-selected is only the real selection, and only in a listbox.
@@ -108,6 +109,7 @@ export function OptionRow({
         styles.row,
         rowSizes[size],
         twoLine && styles.rowTwoLine,
+        size === 44 && styles.rowTwoLineCompact,
         active && styles.rowActive,
         selected && styles.rowSelected,
         disabled && styles.rowDisabled,
@@ -266,6 +268,10 @@ const styles = stylex.create({
     paddingInline: spacing['--space-2-5'],
     borderRadius: radii['--radius-lg'],
   },
+  rowTwoLineCompact: {
+    gap: spacing['--space-2-5'],
+    paddingBlock: spacing['--space-1'],
+  },
   rowActive: {
     backgroundColor: colors['--surface-hover'],
   },
@@ -345,5 +351,7 @@ const rowSizes = stylex.create({
   30: { minHeight: sizes['--control-30'] },
   32: { minHeight: sizes['--control-32'] },
   34: { minHeight: sizes['--control-34'] },
+  36: { minHeight: sizes['--control-36'] },
+  44: { minHeight: sizes['--control-44'] },
   55: { minHeight: 'auto' },
 })

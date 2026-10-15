@@ -108,8 +108,23 @@ export class SidebarRow {
 
   /** Right-click, then Open in new tab. */
   async openInNewTabFromMenu(): Promise<void> {
-    await chooseNextMenuItem(this.win, 'new-tab')
+    await chooseNextMenuItem(this.win, 'open-new-tab')
     await this.root.click({ button: 'right', position: { x: 40, y: 20 } })
+  }
+
+  /**
+   * Right-click, then `item` in the topic menu. Returns the menu's labels
+   * (see `TopicPane.chooseInMenu`).
+   */
+  async chooseInMenu(item: TopicMenuItem): Promise<{ readonly labels: string[]; readonly at: { readonly x: number; readonly y: number } | null }> {
+    await chooseNextMenuItem(this.win, item)
+    await this.root.click({ button: 'right', position: { x: 40, y: 20 } })
+    return lastMenu(this.win)
+  }
+
+  /** A pinned resolved row: the check before the title. */
+  async expectResolvedCheck(shown = true): Promise<void> {
+    await expect(this.root.locator('[title="Resolved"]')).toHaveCount(shown ? 1 : 0)
   }
 
   /** Main rows: "2 new threads" under the title. */
@@ -368,6 +383,7 @@ export class Juno {
   readonly sidebar: Sidebar
   readonly accountMenu: AccountMenu
   readonly topic: TopicPane
+  readonly newChat: NewChatPane
   readonly tabs: TabStrip
   readonly nav: Navigation
   readonly frame: SidebarFrame
@@ -379,9 +395,57 @@ export class Juno {
     this.sidebar = new Sidebar(win)
     this.accountMenu = new AccountMenu(win, this.sidebar)
     this.topic = new TopicPane(win)
+    this.newChat = new NewChatPane(win)
     this.tabs = new TabStrip(app, win)
     this.nav = new Navigation(app, win)
     this.frame = new SidebarFrame(app, win)
+  }
+
+  /** Makes the next native context menu pick `id` without showing it. */
+  chooseNextMenuItem(id: string): Promise<void> {
+    return chooseNextMenuItem(this.win, id)
+  }
+
+  /** The toast that says `text` (inventory 16). */
+  toast(text: string): Locator {
+    return this.win.getByRole('status').filter({ hasText: text })
+  }
+
+  async expectToast(text: string): Promise<void> {
+    await expect(this.toast(text)).toBeVisible({ timeout: 10_000 })
+  }
+
+  /** The Undo of the toast on screen. */
+  async undoFromToast(): Promise<void> {
+    await this.win.getByRole('status').getByRole('button', { name: /^Undo/ }).click()
+  }
+
+  /** Edit › Undo, as ⌘Z. */
+  async undo(): Promise<void> {
+    await clickAppMenu(this.app, 'undo')
+  }
+
+  /** The title field of a rename, in a row or the header. */
+  get renameField(): Locator {
+    return this.win.locator('[data-rename-field]').filter({ visible: true })
+  }
+
+  /** Types a new title into the open rename field and saves it with Enter. */
+  async rename(title: string): Promise<void> {
+    await expect(this.renameField).toBeFocused()
+    await this.renameField.fill(title)
+    await this.renameField.press('Enter')
+    await expect(this.renameField).toHaveCount(0)
+  }
+
+  /** The text the app last put on the clipboard. */
+  clipboard(): Promise<string> {
+    return this.app.evaluate(({ clipboard }) => clipboard.readText())
+  }
+
+  /** The `slack://` links Open in Slack opened, oldest first. */
+  slackLinks(): Promise<string[]> {
+    return this.app.evaluate(() => [...(globalThis as unknown as { junoTest: { slackLinks: string[] } }).junoTest.slackLinks])
   }
 
   /** The empty workspace shown when no tab is open. */
@@ -573,6 +637,16 @@ export interface StartupTimes {
 const appOf = new WeakMap<Page, ElectronApplication>()
 
 /** Makes the next native context menu pick `id` without showing (main's JUNO_E2E hook). */
+/** What the last native menu showed and where it was asked to open (see `contextMenuForTests` in main). */
+async function lastMenu(win: Page): Promise<{ readonly labels: string[]; readonly at: { readonly x: number; readonly y: number } | null }> {
+  const app = appOf.get(win)
+  if (app === undefined) throw new Error('lastMenu needs the app; use the Juno driver')
+  return app.evaluate(() => {
+    const menu = (globalThis as unknown as { junoTest: { contextMenu: { lastLabels: string[]; lastAt: { x: number; y: number } | null } } }).junoTest.contextMenu
+    return { labels: [...menu.lastLabels], at: menu.lastAt }
+  })
+}
+
 async function chooseNextMenuItem(win: Page, id: string): Promise<void> {
   const app = appOf.get(win)
   if (app === undefined) throw new Error('chooseNextMenuItem needs the app; use the Juno driver')
@@ -582,8 +656,113 @@ async function chooseNextMenuItem(win: Page, id: string): Promise<void> {
 }
 
 const BOTTOM_SLACK = 2
+/** The "N new" divider's offset from the list's top on open: the 68px header band, then 80px (inventory 5). */
+const DIVIDER_OFFSET = 148
+
+/** The ids of the topic menu's items (inventory 15.1). */
+export type TopicMenuItem =
+  | 'open-new-tab'
+  | 'rename'
+  | 'mark-read'
+  | 'mark-unread'
+  | 'pin'
+  | 'unpin'
+  | 'resolve'
+  | 'reopen'
+  | 'copy-link'
+  | 'open-in-slack'
+  | 'notify-every'
+  | 'notify-matters'
+  | 'notify-never'
+  | 'ignore-channel'
 
 /** The topic shown in the active tab. Hidden tabs stay in the page with `display: none`. */
+/** A New chat tab: the two pickers, the composer and the preview (spec section 9). */
+export class NewChatPane {
+  readonly root: Locator
+
+  constructor(readonly win: Page) {
+    this.root = win.locator('[data-new-chat]').filter({ visible: true })
+  }
+
+  get composer(): Locator {
+    return this.root.locator('[data-composer] textarea')
+  }
+
+  /** The composer's field, whose box must not move when the tab becomes the topic. */
+  get field(): Locator {
+    return this.win.locator('[data-composer-field]').filter({ visible: true })
+  }
+
+  get conversationButton(): Locator {
+    return this.root.getByRole('button', { name: /^Conversation: / })
+  }
+
+  get threadButton(): Locator {
+    return this.root.getByRole('button', { name: /^Thread: / })
+  }
+
+  /** The open picker's list. */
+  get list(): Locator {
+    return this.root.getByRole('listbox')
+  }
+
+  get search(): Locator {
+    return this.root.getByRole('dialog').getByRole('textbox')
+  }
+
+  /** The row in the open list named `name`, followed by its sub line ("Direct message"). */
+  option(name: string): Locator {
+    return this.list.getByRole('option', { name: new RegExp(`^${escapeRegExp(name)}(\\s|$)`) })
+  }
+
+  async write(text: string): Promise<void> {
+    await this.composer.fill(text)
+  }
+
+  /** Enter in the composer. */
+  async send(): Promise<void> {
+    await this.composer.press('Enter')
+  }
+
+  /** Opens the conversation list, searches it, and picks the row that starts with `name`. */
+  async pickConversation(query: string, name: string): Promise<void> {
+    if (!(await this.search.isVisible())) await this.conversationButton.click()
+    await this.search.fill(query)
+    await this.option(name).click()
+    await expect(this.list).toBeHidden()
+  }
+
+  /** Opens the thread list, searches it, and picks the row that starts with `title`. */
+  async pickThread(query: string, title: string): Promise<void> {
+    await this.threadButton.click()
+    await this.search.fill(query)
+    await this.option(title).click()
+    await expect(this.list).toBeHidden()
+  }
+
+  async expectEmpty(): Promise<void> {
+    await expect(this.root.getByText('Write your message, then pick where it goes.', { exact: true })).toBeVisible()
+  }
+
+  async expectConversation(name: string): Promise<void> {
+    await expect(this.conversationButton).toHaveAccessibleName(`Conversation: ${name}`)
+  }
+
+  async expectThread(name: string): Promise<void> {
+    await expect(this.threadButton).toHaveAccessibleName(`Thread: ${name}`)
+  }
+
+  /** A message in the preview. */
+  async expectPreview(text: string): Promise<void> {
+    await expect(this.root.locator('[data-message-row]').filter({ hasText: text }).first()).toBeVisible({ timeout: 15_000 })
+  }
+
+  async expectNote(text: string): Promise<void> {
+    await expect(this.root.getByText(text, { exact: true })).toBeVisible()
+  }
+}
+
 export class TopicPane {
   readonly root: Locator
 
@@ -620,10 +799,32 @@ export class TopicPane {
     await expect(this.message(text)).toBeVisible({ timeout: 15_000 })
   }
 
+  /** The context pill, a button named by the channel and its kind. */
+  get contextPill() {
+    return this.header.locator('[data-island="left"]').getByRole('button').first()
+  }
+
+  /** The title, a menu button inside the page's heading. */
+  get titleButton() {
+    return this.header.getByRole('heading').getByRole('button')
+  }
+
+  /**
+   * Clicks the title and picks `item` in the topic menu. Returns the menu's
+   * labels ("-" a separator, "(label)" disabled, "label ✓" checked, "> "
+   * before a submenu's items) and where it was asked to open.
+   */
+  async chooseInMenu(item: TopicMenuItem): Promise<{ readonly labels: string[]; readonly at: { readonly x: number; readonly y: number } | null }> {
+    await chooseNextMenuItem(this.win, item)
+    await this.titleButton.click()
+    return lastMenu(this.win)
+  }
+
   /**
    * The "N new" divider sits right before the message that starts with
-   * `text`, 80px from the top of the list, or as near as the list can
-   * scroll when the topic is short.
+   * `text`, 80px below the header band (148px from the top of the list,
+   * which runs under the band), or as near as the list can scroll when the
+   * topic is short.
    */
   async expectDividerBefore(text: string): Promise<void> {
     await expect(this.root.locator('[data-new-divider] + [data-message-row]')).toContainText(text, { timeout: 15_000 })
@@ -636,7 +837,7 @@ export class TopicPane {
         max: scroller.scrollHeight - scroller.clientHeight,
       }
     })
-    if (scrollTop > 0.5 && scrollTop < max - 0.5) expect(Math.abs(offset - 80)).toBeLessThanOrEqual(2)
+    if (scrollTop > 0.5 && scrollTop < max - 0.5) expect(Math.abs(offset - DIVIDER_OFFSET)).toBeLessThanOrEqual(2)
     else expect(offset).toBeGreaterThanOrEqual(0)
   }
 
@@ -948,6 +1149,7 @@ export type AppMenuItem =
   | 'back'
   | 'forward'
   | 'toggle-sidebar'
+  | 'undo'
   | `tab-${1 | 2 | 3 | 4 | 5 | 6 | 7 | 8}`
   | 'tab-last'
 

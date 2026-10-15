@@ -23,10 +23,13 @@
     "@juno/store": "workspace:*",
     "@juno/sync": "workspace:*",
     "@juno/topic-art": "workspace:*",
-    "effect": "4.0.3"
+    "effect": "4.0.3",
+    "@juno/notifications": "workspace:*"
   },
   "devDependencies": {
     "@effect/vitest": "4.0.3",
+    "@juno/agent": "workspace:*",
+    "@juno/agent-testing": "workspace:*",
     "@juno/fake-slack": "workspace:*",
     "@juno/state": "workspace:*",
     "@types/node": "24.19.2",
@@ -44,9 +47,12 @@
       "@juno/slack",
       "@juno/store",
       "@juno/sync",
-      "@juno/topic-art"
+      "@juno/topic-art",
+      "@juno/notifications"
     ],
     "testDeps": [
+      "@juno/agent",
+      "@juno/agent-testing",
       "@juno/fake-slack",
       "@juno/state"
     ]

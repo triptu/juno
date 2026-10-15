@@ -3,6 +3,7 @@ import { sidebarLayoutAtom } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import { Shell } from '@juno/views'
 import { collapseSidebar, resetSidebarWidth, resizeSidebar } from './layout'
+import { Toasts } from './Toasts'
 
 /**
  * The signed-in window: the shell with the sidebar at its saved width, or
@@ -19,6 +20,7 @@ export function Frame({ sidebar, children }: { readonly sidebar: ReactNode; read
       onSidebarResize={resizeSidebar}
       onSidebarResetWidth={resetSidebarWidth}
       onSidebarCollapse={collapseSidebar}
+      toast={<Toasts />}
     >
       {children}
     </Shell>

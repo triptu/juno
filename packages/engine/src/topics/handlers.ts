@@ -19,16 +19,19 @@
  * first value has nothing to re-emit, so the subscription starts again with
  * backoff and the renderer keeps what it shows until a run succeeds.
  *
- * The two commands (`commands.ts`) write the current store and mirror to
- * Slack through the `Outbox` seam.
+ * The follow commands (`commands.ts`) write the current store and mirror
+ * to Slack through the `Outbox` seam. The topic actions (`actions.ts`) are
+ * local; a resolve that queued a read mark wakes `MarkWorker`.
  */
 import { Clock, Effect, Schema, type Scope, Semaphore, Stream } from 'effect'
-import { SIDEBAR_WINDOW, TopicListRow, TopicsRoutes } from '@juno/contract'
+import { SIDEBAR_WINDOW, TopicListRow, TopicsRoutes, type CommandResult } from '@juno/contract'
 import { Invalidation, liveQuery, type InvalidationKeys, type SqlError } from '@juno/store'
 import { EngineConfig } from '../config'
+import { MarkWorker } from '../markWorker'
 import { Outbox } from '../outbox'
 import { retryFirstRun, serveLiveList, serveLiveValue, timed, type Run } from '../protocol/live'
 import { Workspace, type StoreServices } from '../workspace'
+import { renameTopic, reopenTopic, resolveTopic, restoreTopic, setChannelIgnored, setPinned } from './actions'
 import { setSubscribed } from './commands'
 import { countTopics, forgetUsers, listTopics, makeRowCache } from './query'
 
@@ -43,7 +46,17 @@ export const TopicsHandlers = TopicsRoutes.toLayer(
     const workspace = yield* Workspace
     const outbox = yield* Outbox
     const config = yield* EngineConfig
+    const worker = yield* MarkWorker
     const measure = config.e2e || config.dev
+
+    /** Runs a topic action in the open workspace and wakes the worker when it queued a mark. */
+    const act = <E>(effect: Effect.Effect<{ readonly result: CommandResult; readonly queued: boolean }, E, Workspace | EngineConfig>) =>
+      effect.pipe(
+        Effect.provideService(Workspace, workspace),
+        Effect.provideService(EngineConfig, config),
+        Effect.tap(({ queued }) => (queued ? worker.wake : Effect.void)),
+        Effect.map(({ result }) => result),
+      )
 
     /**
      * Query runs from the current store; nothing while no workspace is open.
@@ -97,6 +110,14 @@ export const TopicsHandlers = TopicsRoutes.toLayer(
         serveLiveValue(runs(COUNT_KEYS, Effect.succeed(countTopics(payload.scope)), false), { measure }).pipe(retryFirstRun('topics.counts'), Stream.orDie),
       'topics.subscribe': (payload) => setSubscribed(payload.id, true).pipe(Effect.provideService(Workspace, workspace), Effect.provideService(Outbox, outbox)),
       'topics.unsubscribe': (payload) => setSubscribed(payload.id, false).pipe(Effect.provideService(Workspace, workspace), Effect.provideService(Outbox, outbox)),
+      'topics.resolve': ({ id }) => act(resolveTopic(id)),
+      'topics.reopen': ({ id }) => act(reopenTopic(id)),
+      'topics.pin': ({ id }) => act(setPinned(id, true)),
+      'topics.unpin': ({ id }) => act(setPinned(id, false)),
+      'topics.rename': ({ id, title }) => act(renameTopic(id, title)),
+      'topics.restore': ({ id, overlay, unreadFrom }) => act(restoreTopic(id, overlay, unreadFrom)),
+      'channels.ignore': ({ channel }) => setChannelIgnored(channel, true).pipe(Effect.provideService(Workspace, workspace)),
+      'channels.unignore': ({ channel }) => setChannelIgnored(channel, false).pipe(Effect.provideService(Workspace, workspace)),
     }
   }),
 )
