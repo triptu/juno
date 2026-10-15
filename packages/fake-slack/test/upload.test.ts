@@ -151,7 +151,7 @@ describe('seeded files', () => {
     const files = fake.messages('C0PRODUCT').flatMap((message) => message.files ?? [])
     const image = files.find((file) => file.mimetype === 'image/png')!
     for (const url of [image.thumb_360!, image.url_private_download!]) {
-      for (const headers of [{}, { authorization: `Bearer ${fake.credentials().token}` }]) {
+      for (const headers of [new Headers(), new Headers({ authorization: `Bearer ${fake.credentials().token}` })]) {
         const response = await fetch(url, { headers, redirect: 'manual' })
         expect(response.status).toBe(302)
         expect(response.headers.get('location')).toBe('/signin')
