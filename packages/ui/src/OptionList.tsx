@@ -1,13 +1,11 @@
 import * as stylex from '@stylexjs/stylex'
-import { createContext, useCallback, useContext, type HTMLAttributes, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useState, type HTMLAttributes, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
 import { colors, radii, sizes, spacing, weights } from '@juno/tokens/tokens.stylex'
 import { Divider } from './Divider'
 import { activateHandlers, type ActivateEvent } from './internal/activate'
 import { interactive } from './internal/interactive'
 import { variants as typeVariants } from './internal/type'
 import { Text } from './Text'
-
-const HOVER = '@media (hover: hover)'
 
 export interface OptionListProps extends Omit<HTMLAttributes<HTMLDivElement>, 'style' | 'className' | 'role' | 'onKeyDown'> {
   /** `listbox` for pickers and suggestions, `menu` for action lists. */
@@ -29,7 +27,11 @@ const ListRole = createContext<'listbox' | 'menu'>('listbox')
 
 /**
  * The vertical list used by menus, pickers, suggestions and the palette.
- * Dumb: the owner tracks the active id and handles selection.
+ * Dumb: the owner tracks the active id and handles selection. The pointer
+ * and the keyboard share that one active row, as in a native menu: rows
+ * have no hover style of their own, and moving the pointer over a row
+ * makes it active (`onActivate`). The list opts out of the window's drag
+ * region, so a menu that hangs off the title bar still gets the pointer.
  */
 export function OptionList({ role = 'listbox', label, activeId, focusable = false, onKeyDown, children, ...rest }: OptionListProps) {
   return (
@@ -60,7 +62,7 @@ export interface OptionRowProps {
   readonly sub?: ReactNode
   readonly subPlacement?: 'inline' | 'below' | 'end'
   readonly trailing?: ReactNode
-  /** Highlighted by keyboard or hover. */
+  /** Highlighted by the keyboard or the pointer: the list's one active row. */
   readonly active?: boolean
   /** The current value (selected row background). */
   readonly selected?: boolean
@@ -68,7 +70,7 @@ export interface OptionRowProps {
   readonly size?: OptionRowSize
   /** Fires on mouse down (see internal/activate.ts); `metaKey` for ⌘-click. */
   readonly onSelect?: (event: ActivateEvent) => void
-  /** Called when the pointer moves over the row, so the owner can move `active`. */
+  /** Called when the pointer moves over the row, so the owner can move `active`. Rows without it show no pointer highlight. */
   readonly onActivate?: () => void
   readonly onContextMenu?: (event: MouseEvent<HTMLDivElement>) => void
 }
@@ -175,6 +177,21 @@ export function OptionHeader({ leading, title, sub }: OptionHeaderProps) {
   )
 }
 
+/**
+ * The active row of a menu that owns its list (the avatar menu, the Juno
+ * menu): the arrow keys and the pointer move the same row, and the pointer
+ * leaving the list clears it, as a native menu does. Spread `list` on the
+ * OptionList and `row(id)` on each OptionRow.
+ */
+export function useMenuActive(ids: ReadonlyArray<string>, onSelect: (id: string) => void) {
+  const [active, setActive] = useState<string | undefined>(undefined)
+  const onKeyDown = useOptionListKeys({ ids, activeId: active, onActiveChange: setActive, onSelect })
+  return {
+    list: { activeId: active, focusable: true, onKeyDown, onPointerLeave: () => setActive(undefined) },
+    row: (id: string) => ({ id, active: active === id, onActivate: () => setActive(id) }),
+  }
+}
+
 export interface OptionListKeysOptions {
   readonly ids: ReadonlyArray<string>
   readonly activeId: string | undefined
@@ -245,6 +262,7 @@ const styles = stylex.create({
     flexDirection: 'column',
     minWidth: 0,
     outlineOffset: `calc(-1 * ${sizes['--focus-ring-width']})`,
+    WebkitAppRegion: 'no-drag',
   },
   row: {
     display: 'flex',
@@ -257,10 +275,7 @@ const styles = stylex.create({
     minWidth: 0,
     flexShrink: 0,
     contain: 'content',
-    backgroundColor: {
-      default: 'transparent',
-      ':hover': { default: null, [HOVER]: colors['--surface-hover'] },
-    },
+    backgroundColor: 'transparent',
   },
   rowTwoLine: {
     gap: spacing['--space-3'],
