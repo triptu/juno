@@ -158,7 +158,12 @@ export const nameFirst = (ctx: SyncContext, messages: ReadonlyArray<Message>): E
 export const fillUsers = (ctx: SyncContext, lane: Lane = 'background'): Effect.Effect<void, SlackApiError | SqlError, UsersServices> =>
   Effect.gen(function* () {
     const ids = new Set(yield* unknownUserIds())
-    for (const id of ctx.missingUsers.keys()) ids.add(id)
+    // Every message that lands wants its people; most are stored already and only need their waiting topics re-indexed.
+    const wanted = [...ctx.missingUsers.keys()]
+    const missing = new Set(yield* unstored(wanted))
+    const stored = wanted.filter((id) => !missing.has(id))
+    if (stored.length > 0) yield* transaction(reindexTopics(takeWaiting(ctx, stored), reindexOptions(ctx)))
+    for (const id of missing) ids.add(id)
     for (const id of ctx.unknownUsers) ids.delete(id)
     if (lane === 'interactive') yield* fetchSoon(ctx, [...ids])
     else yield* fetchUsers(ctx, [...ids], lane)
