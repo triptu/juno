@@ -12,7 +12,7 @@ export default defineFixtures(
   {
     Configure: {
       tools: sheet({ row: notion! }),
-      search: sheet({ row: notion!, initialQuery: 'page' }),
+      search: sheet({ row: notion!, initialQuery: 'create' }),
       'no-match': sheet({ row: notion!, initialQuery: 'calendar' }),
       'never-ask': sheet({ row: docs! }),
       't3-code': sheet({ row: t3! }),

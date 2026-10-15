@@ -46,7 +46,7 @@ export function ConnectionToolsSheet({ row, error, onTool, onRule, onT3Address, 
           <Text variant="heading" tone="default" as="h2" truncate>
             {copy.tools(row.label)}
           </Text>
-          <Button variant="secondary" size="sm" onClick={onClose} autoFocus>
+          <Button variant="secondary" size="sm" onClick={onClose}>
             {copy.done}
           </Button>
         </span>
@@ -72,7 +72,16 @@ export function ConnectionToolsSheet({ row, error, onTool, onRule, onT3Address, 
             {error}
           </Text>
         ) : null}
-        <TextField size={32} leadingIcon={MagnifyingGlass} label={copy.search} placeholder={copy.search} type="search" value={query} onChange={(event) => setQuery(event.currentTarget.value)} />
+        {/* Like a macOS sheet with a list, typing goes straight to the search box. */}
+        <TextField
+          size={32}
+          leadingIcon={MagnifyingGlass}
+          label={copy.search}
+          placeholder={copy.search}
+          value={query}
+          autoFocus
+          onChange={(event) => setQuery(event.currentTarget.value)}
+        />
         <div {...stylex.props(styles.table)} role="table" aria-label={copy.tools(row.label)}>
           <div {...stylex.props(styles.row, styles.header)} role="row">
             <Text variant="meta" tone="muted" role="columnheader">
@@ -191,7 +200,9 @@ const styles = stylex.create({
     display: 'grid',
     gridColumn: '1 / -1',
     gridTemplateColumns: 'subgrid',
-    maxHeight: layout['--palette-list-max-height'],
+    // A fixed height, so the sheet keeps its size while a search narrows the list.
+    height: layout['--palette-list-max-height'],
+    alignContent: 'start',
     overflowY: 'auto',
     overscrollBehavior: 'contain',
   },

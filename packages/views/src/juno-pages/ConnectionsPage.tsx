@@ -132,7 +132,7 @@ function Connection({ row, last, error, onAction, onConfigure }: { readonly row:
   )
 }
 
-/** Keyed by the saved address, so a saved change resets the draft. */
+/** T3 Code's address and network switch, in its Configure sheet. Keyed by the saved address, so a saved change resets the draft. */
 export function T3AddressRow({ id, address, onT3Address }: { readonly id: ConnectionId; readonly address: T3Address; readonly onT3Address: (id: ConnectionId, address: T3Address) => void }) {
   const copy = chatCopy.pages
   const [url, setUrl] = useState(address.url)
@@ -140,7 +140,7 @@ export function T3AddressRow({ id, address, onT3Address }: { readonly id: Connec
     if (url.trim() !== address.url) onT3Address(id, { ...address, url: url.trim() })
   }
   return (
-    <ListRow data-t3-address="">
+    <ListRow data-t3-address="" divider={false}>
       <span {...stylex.props(cell.field)}>
         <TextField
           size={32}

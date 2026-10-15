@@ -50,13 +50,13 @@ test('Configure lists the tools, searches them, and turns one off', async ({ jun
   await expect(sheet.locator('[data-tool="get_meeting"]')).toHaveAttribute('data-tool-review', 'read')
   await expect(sheet.locator('[data-tool="delete_material"]')).toHaveAttribute('data-tool-review', 'auto')
 
-  await sheet.getByRole('searchbox', { name: 'Search tools' }).fill('routine')
+  await sheet.getByRole('textbox', { name: 'Search tools' }).fill('routine')
   await expect(sheet.locator('[data-tool]')).toHaveCount(3)
-  await sheet.getByRole('searchbox', { name: 'Search tools' }).fill('calendar')
+  await sheet.getByRole('textbox', { name: 'Search tools' }).fill('calendar')
   await expect(sheet.locator('[data-tool]')).toHaveCount(0)
   await expect(sheet.getByText('No tools match.')).toBeVisible()
 
-  await sheet.getByRole('searchbox', { name: 'Search tools' }).fill('material')
+  await sheet.getByRole('textbox', { name: 'Search tools' }).fill('material')
   const material = sheet.locator('[data-tool="delete_material"]')
   await material.getByRole('checkbox', { name: 'Enabled: delete_material' }).click()
   // The switch follows the agent's answer, so it holds once the agent kept it.
