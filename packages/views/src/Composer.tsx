@@ -20,6 +20,10 @@ export interface ComposerProps {
   readonly inputRef?: Ref<HTMLTextAreaElement>
   /** ↑ in an empty field: a topic selects its newest message (SPEC section 7, Keyboard). */
   readonly onArrowUpEmpty?: () => void
+  /** Inside the box, above the text: the audience warning and the send check bar (inventory 7). */
+  readonly notices?: ReactNode
+  /** Esc in the field, while there is something to close (the send check bar). */
+  readonly onEscape?: () => void
 }
 
 /**
@@ -28,13 +32,19 @@ export interface ComposerProps {
  * to send. Enter sends, Shift Enter adds a line. At one line it has the
  * `ComposerSlot`'s geometry, so one replaces the other with no shift.
  * Attachments come with M6: the attach mark is drawn, not a button.
+ * `notices` grow the box upwards; the text row stays where it is.
  */
-export function Composer({ value, onChange, onSend, placeholder, sending = false, above, inputRef, onArrowUpEmpty }: ComposerProps) {
+export function Composer({ value, onChange, onSend, placeholder, sending = false, above, inputRef, onArrowUpEmpty, notices, onEscape }: ComposerProps) {
   const empty = value.trim().length === 0
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === 'ArrowUp' && value === '' && onArrowUpEmpty !== undefined && !event.shiftKey && !event.metaKey && !event.altKey && !event.ctrlKey) {
       event.preventDefault()
       onArrowUpEmpty()
+      return
+    }
+    if (event.key === 'Escape' && onEscape !== undefined && !event.nativeEvent.isComposing) {
+      event.preventDefault()
+      onEscape()
       return
     }
     if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) return
@@ -45,6 +55,7 @@ export function Composer({ value, onChange, onSend, placeholder, sending = false
     <div data-composer="" {...stylex.props(styles.outer)}>
       {above !== undefined ? <div {...stylex.props(styles.above)}>{above}</div> : null}
       <Surface kind="field" data-composer-field="" sx={styles.box}>
+        {notices}
         <div {...stylex.props(styles.row)}>
           <span aria-hidden {...stylex.props(styles.mark, styles.attach)}>
             <Icon icon={Plus} size={18} />
@@ -99,10 +110,10 @@ const styles = stylex.create({
   },
   box: {
     display: 'flex',
+    flexDirection: 'column',
     width: '100%',
     maxWidth: layout['--composer-width'],
     marginInline: 'auto',
-    paddingInline: spacing['--space-1-5'],
     boxSizing: 'border-box',
   },
   // The row is 40px at one line (the textarea's 9 + 22 + 9). It reaches into the field's 1px border,
@@ -110,8 +121,8 @@ const styles = stylex.create({
   row: {
     display: 'flex',
     alignItems: 'flex-end',
-    flexGrow: 1,
     minWidth: 0,
+    paddingInline: spacing['--space-1-5'],
     gap: spacing['--space-1'],
     marginBlock: '-1px',
   },
