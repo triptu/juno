@@ -23,6 +23,8 @@ export interface TopicHeaderProps {
   readonly rename?: { readonly onSave: (title: string) => void; readonly onCancel: () => void }
   /** The context pill: narrow the sidebar to the channel. */
   readonly onPill?: () => void
+  /** Right-click on the context pill: the channel menu (inventory 15.2), at the pointer. */
+  readonly onPillMenu?: () => void
   /** Threads: Resolve or Reopen. Without it the button is not shown. */
   readonly onResolve?: () => void
   /** Main only: the "Threads" button is pressed and its popover is open. */
@@ -68,7 +70,7 @@ const tints: Record<TopicDetail['channel']['kind'], ContextTint> = {
  * the reading column, and under 480px Resolve shows as an icon and Threads
  * as its count. Rename turns the title into a field in place.
  */
-export function TopicHeader({ detail, menuOpen = false, onMenu, rename, onPill, onResolve, threadsOpen = false, onThreads, threads, juno }: TopicHeaderProps) {
+export function TopicHeader({ detail, menuOpen = false, onMenu, rename, onPill, onPillMenu, onResolve, threadsOpen = false, onThreads, threads, juno }: TopicHeaderProps) {
   const { channel } = detail
   const main = detail.kind === 'main'
   const kind = kindLabels[channel.kind]
@@ -105,7 +107,17 @@ export function TopicHeader({ detail, menuOpen = false, onMenu, rename, onPill, 
       data={{ 'data-topic-header': '' }}
       left={
         <>
-          <span {...stylex.props(styles.pill)}>
+          <span
+            onContextMenu={
+              onPillMenu === undefined
+                ? undefined
+                : (event) => {
+                    event.preventDefault()
+                    onPillMenu()
+                  }
+            }
+            {...stylex.props(styles.pill)}
+          >
             <ContextPill
               tint={tints[channel.kind]}
               icon={kindIcons[channel.kind]}

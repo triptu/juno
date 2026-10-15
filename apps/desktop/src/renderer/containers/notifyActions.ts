@@ -20,7 +20,8 @@ import {
   type NotifyTargetView,
   type Why,
 } from '@juno/contract'
-import { currentNotificationSettings, loadNotificationSettings, popupContextMenu, registry, runAction, whyPopoverAtom } from '@juno/state'
+import { currentNotificationSettings, junoAgentOnAtom, loadNotificationSettings, popupContextMenu, registry, runAction, whyPopoverAtom } from '@juno/state'
+import { askJunoAbout } from './juno/actions'
 import { openNotifications } from './navigation'
 
 /** Sets a Notify me choice: "#design-review: Never", with Undo. */
@@ -54,12 +55,14 @@ export function nativeMenu<A extends string>(items: ReadonlyArray<MenuItem<A>>, 
   })
 }
 
-/** The person menu (inventory 15.6): Notify me about them. */
+/** The person menu (inventory 15.6), on a sender and an @person chip: Notify me about them, then Ask Juno while the agent runs. */
 export async function showPersonMenu(person: { readonly id: string; readonly name: string }, at?: ContextMenuAt): Promise<void> {
   const settings = currentNotificationSettings(registry) ?? (await loadNotificationSettings(registry))
   const target: NotifyTargetView = { kind: 'person', id: person.id }
-  const chosen = (await popupContextMenu(nativeMenu(personMenuItems({ name: person.name, notify: choiceFor(settings, target) })), at)) as NotifyAction | undefined
-  if (chosen !== undefined) setNotifyLevel(target, notifyChoiceOf(chosen), person.name)
+  const items = personMenuItems({ name: person.name, notify: choiceFor(settings, target), askJuno: registry.get(junoAgentOnAtom) })
+  const chosen = (await popupContextMenu(nativeMenu(items), at)) as NotifyAction | 'ask-juno' | undefined
+  if (chosen === 'ask-juno') askJunoAbout({ _tag: 'person', userId: person.id, name: person.name })
+  else if (chosen !== undefined) setNotifyLevel(target, notifyChoiceOf(chosen), person.name)
 }
 
 /** Opens the why popover for a message, under where its menu opened. */

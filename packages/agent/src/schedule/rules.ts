@@ -2,7 +2,7 @@ import { Schema } from 'effect'
 import { ScheduleDefinition } from '@juno/agent-contract'
 
 export const ReplyWatch = Schema.Struct({
-  channelId: Schema.String, ts: Schema.String, threadTs: Schema.optionalKey(Schema.String),
+  accountId: Schema.optionalKey(Schema.String), channelId: Schema.String, ts: Schema.String, threadTs: Schema.optionalKey(Schema.String),
   from: Schema.Union([Schema.Literal('others'), Schema.Array(Schema.String)]),
 })
 export type ReplyWatch = typeof ReplyWatch.Type

@@ -14,7 +14,7 @@
  * `host.hello` answers the one protocol the host serves; the agent refuses
  * a host whose protocol differs from its own.
  */
-import { Effect } from 'effect'
+import { Effect, Stream } from 'effect'
 import { AGENT_HOST_PROTOCOL, AgentHostError, AgentHostRpcs } from '@juno/agent-contract'
 import { makeDispatcher, parseSend } from './dispatch'
 import { JunoHost, type Account, type AccountId } from './host'
@@ -69,6 +69,9 @@ export const agentHostHandlers = (options: HandlerOptions) =>
           Effect.flatMap(accountFor(accountId), (account) => dispatcher.reconcile(attemptId, channelId, actionId, account.userId)),
         'host.topics.resolve': () => unsupported('Juno cannot resolve a topic for the agent yet.'),
 
+        'host.schedule.check': ({ accountId, conversation, refresh }) => asAccount(accountId, host.schedule?.check(conversation, refresh) ?? unsupported('Reply watches are unavailable.')).pipe(Effect.tap(() => accountFor(accountId))),
+        'host.schedule.hours': ({ accountId }) => asAccount(accountId, host.schedule?.hours ?? unsupported('Notification hours are unavailable.')),
+        'host.schedule.changes': () => host.schedule?.changes ?? Stream.empty,
         'host.presence': () => host.presence,
         'host.notification.deliver': () => unsupported('Juno cannot show notifications for the agent yet.'),
       })

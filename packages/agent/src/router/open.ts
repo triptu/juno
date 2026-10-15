@@ -1,3 +1,5 @@
+import { createScheduler, SCHEDULE_MIGRATIONS, scheduleCreateTool, ownScheduleTool, scheduleExecutors, type Scheduler, type SchedulerOptions } from '../schedule'
+import { driveScheduler } from '../schedule/driver'
 /**
  * Opens the turn engine on an agent directory: WP8's durable core with
  * WP11's router in place of its serial loop (plan v3 §3, §8).
@@ -97,12 +99,15 @@ export interface TurnsOptions {
   readonly tools?: (context: { readonly store: Store; readonly actions: Actions; readonly current: () => Promise<ToolRun | undefined> }) => ReadonlyArray<JunoTool & { readonly taints?: boolean }>
   /** Other folders' migration sets. Spend, turns and jobs are always applied. */
   readonly migrations?: ReadonlyArray<MigrationSet>
+  readonly schedule?: Pick<SchedulerOptions, 'replies' | 'cachedReplies' | 'account' | 'enabled'>
   readonly now?: () => number
   readonly onReport?: (error: unknown) => void
 }
 
 export interface Turns {
   readonly _tag: 'running'
+  readonly scheduler: Scheduler
+  readonly checkSchedules: () => Promise<void>
   readonly store: Store
   readonly guard: ProviderGuardApi
   /** How the journal was found at open. */
@@ -168,7 +173,7 @@ export async function openTurns(options: TurnsOptions): Promise<Turns | UpdateNe
     try {
       db = openDatabase(
         join(options.agentDir, AGENT_DATABASE_FILE),
-        [SPEND_MIGRATIONS, TURNS_MIGRATIONS, JOBS_MIGRATIONS, SETTINGS_MIGRATIONS, ACTIONS_MIGRATIONS, ...(options.migrations ?? [])],
+        [SPEND_MIGRATIONS, TURNS_MIGRATIONS, JOBS_MIGRATIONS, SETTINGS_MIGRATIONS, ACTIONS_MIGRATIONS, SCHEDULE_MIGRATIONS, ...(options.migrations ?? []).filter((set) => set.name !== SCHEDULE_MIGRATIONS.name)],
         now,
       )
     } catch (error) {
@@ -227,7 +232,7 @@ async function start(
     catchUp: () => projection!.catchUp(),
   }
 
-  const tools = () => [...memoryTools, ...jobTools, ...slackTools, ...actionTools, ...extraTools]
+  const tools = () => [...memoryTools, ...jobTools, ...slackTools, ...actionTools, ...scheduleTools, ...extraTools]
   const section = () => {
     const base = instructions(jobs.active().map((job) => ({ title: job.title, line: job.state ?? job.phase })))
     const rules = rulesSection(ownerRules(store))
@@ -247,6 +252,7 @@ async function start(
     store, session, builder, model: () => running, tools,
     rotate: () => rotateNow(),
     beforeRun: applyModel,
+    startWake: (opId, persist) => scheduler.start(opId, persist),
     rotationDue: () => {
       const row = store.db.prepare('SELECT created_at AS at FROM incarnations WHERE id = ?').get(journal!.incarnation) as { at: number }
       return store.now() - row.at >= ROTATION_AGE_MS
@@ -270,12 +276,24 @@ async function start(
     }),
   ]
   const position = async (): Promise<JournalPosition> => ({ incarnation: journal!.incarnation, seq: await journal!.lastCommitted() })
+  const scheduler = createScheduler({
+    store,
+    ...options.schedule,
+    onError: options.onReport ?? noop,
+    replies: options.schedule?.replies ?? (async () => { throw new Error('Reply refresh is unavailable.') }),
+    ...(options.schedule?.cachedReplies ? { cachedReplies: options.schedule.cachedReplies } : {}),
+    changed: () => { router.kick(); actions.changed() },
+  })
   const actions = createActions({
     ...options.actions,
+    executors: () => [...(typeof options.actions?.executors === 'function' ? options.actions.executors() : options.actions?.executors ?? []), ...scheduleExecutors({ store, scheduler, propose: (proposal) => actions.propose(proposal) })],
+    onProposed: scheduler.bindNudge,
     store, position, jobs, spend: guard.spend, place: subagentModel?.modelId ?? '',
     accept: (input) => router.message(input),
     ...(options.onReport ? { onReport: options.onReport } : {}),
   })
+  const scheduleContext = { store, scheduler, current: () => router.toolRun(), propose: actions.propose }
+  const scheduleTools = [scheduleCreateTool(scheduleContext), ownScheduleTool(scheduleContext)]
   const jobTools = subagentModel
     ? [
         delegateTool({
@@ -378,10 +396,14 @@ async function start(
   router.start()
   actions.start()
   compactor?.poke()
+  const scheduleDriver = driveScheduler(scheduler, options.onReport ?? noop)
+  void scheduleDriver.tick()
 
   let closed: Promise<void> | undefined
   return {
     _tag: 'running',
+    scheduler,
+    checkSchedules: scheduleDriver.tick,
     store,
     guard,
     opened,
@@ -443,6 +465,7 @@ async function start(
     },
     close: () =>
       (closed ??= (async () => {
+        await scheduleDriver.close()
         await actions.close()
         await jobs.close()
         await compactor?.close()

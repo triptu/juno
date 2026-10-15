@@ -1,3 +1,4 @@
+import { chatCopy } from '@juno/agent-contract'
 import { defineFixtures, fixture } from '@juno/ui'
 import { NOW, settings, settingsRecovery, settingsReleased, settingsTrouble } from './fixtures'
 import { JunoSettingsPage, type JunoSettingsPageProps } from './JunoSettingsPage'
@@ -23,6 +24,24 @@ const page = (props: Pick<JunoSettingsPageProps, 'page'>) =>
     onStopJob: noop,
   })
 
+/** What the app wires today: the models, spend, OpenRouter, the rules and Pause. Codex, Backup and This Mac wait for their work packages. */
+const today = (props: Pick<JunoSettingsPageProps, 'page' | 'keyEntry' | 'rulesError'>) =>
+  fixture<JunoSettingsPageProps>({
+    ...props,
+    now: NOW,
+    onChatModel: noop,
+    onCompactionModel: noop,
+    onCap: noop,
+    onOpenRouterKey: noop,
+    onPaused: noop,
+    onRuleChange: noop,
+    onRuleRemove: noop,
+    onRuleAdd: noop,
+    onRulesCommit: noop,
+  })
+
+const entry = (draft: string, error?: string) => ({ draft, ...(error === undefined ? {} : { error }), onDraft: noop, onSave: noop, onCancel: noop })
+
 export default defineFixtures(
   JunoSettingsPage,
   {
@@ -32,6 +51,15 @@ export default defineFixtures(
       trouble: page({ page: settingsTrouble }),
       recovery: page({ page: settingsRecovery }),
       released: page({ page: settingsReleased }),
+    },
+    Today: {
+      'built-today': today({ page: settings }),
+      'no-key': today({ page: { ...settings, openRouterKey: 'missing' } }),
+      'key-entry': today({ page: { ...settings, openRouterKey: 'missing' }, keyEntry: entry('sk-or-v1-0123') }),
+      'key-invalid': today({ page: { ...settings, openRouterKey: 'missing' }, keyEntry: entry('not a key', chatCopy.pages.settings.keyInvalid) }),
+      'key-rejected': today({ page: { ...settings, openRouterKey: 'rejected' } }),
+      'no-rules': today({ page: { ...settings, rules: [] } }),
+      'rules-refused': today({ page: settings, rulesError: chatCopy.pages.settings.rulesInvalid }),
     },
   },
   { width: 960, height: 880, padded: false },

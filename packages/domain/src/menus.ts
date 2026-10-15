@@ -22,7 +22,8 @@ export type TopicMenuAction =
   | ViewMenuAction
   | 'ignore-channel'
 
-export type ChannelMenuAction = 'show-topics' | 'open-main' | 'mark-channel-read' | 'mark-channel-unread' | ViewMenuAction | 'ignore-channel'
+export type ChannelMenuAction = 'show-topics' | 'open-main' | 'mark-channel-read' | 'mark-channel-unread' | NotifyAction | ViewMenuAction | 'ignore-channel' | 'ask-juno'
+export type PersonMenuAction = 'ask-juno'
 
 /** Add to view (inventory 15.8): add to or remove from a view by id, or a new view with the conversation in it. */
 export type ViewMenuAction = `view-add:${string}` | `view-remove:${string}` | 'view-new'
@@ -155,24 +156,39 @@ export function topicMenuItems(state: TopicMenuState): ReadonlyArray<MenuItem<To
 export interface ChannelMenuState {
   readonly channel: ChannelInfo
   readonly hasMain: boolean
+  /** The channel's Notify me choice; the submenu shows when it is given. */
+  readonly notify?: NotifyChoice
+  /** The Juno Agent is on: Ask Juno shows (SPEC 7). */
+  readonly askJuno?: boolean
   /** The views, in pill order, for Add to view. Absent: no item. */
   readonly views?: ReadonlyArray<ViewChoice>
 }
 
-/** The menu for a channel row in Browse. */
+/** The channel menu (inventory 15.2): a channel row in Browse, the header's context pill, a #channel chip. */
 export function channelMenuItems(state: ChannelMenuState): ReadonlyArray<MenuItem<ChannelMenuAction>> {
   const items: MenuItem<ChannelMenuAction>[] = [item('show-topics', 'Show its topics')]
   if (state.hasMain) items.push(item('open-main', 'Open Main'))
   items.push(separator, item('mark-channel-read', 'Mark channel as read'), item('mark-channel-unread', 'Mark channel as unread'))
-  if (state.views !== undefined) items.push(separator, addToViewMenu<ChannelMenuAction>(state.views))
-  if (!isDm(state.channel.kind)) items.push(separator, item('ignore-channel', 'Ignore channel', 'Hide in Juno'))
+  if (state.notify !== undefined || state.views !== undefined || !isDm(state.channel.kind)) items.push(separator)
+  if (state.notify !== undefined) items.push(notifyMenu(state.notify))
+  if (state.views !== undefined) items.push(addToViewMenu<ChannelMenuAction>(state.views))
+  if (!isDm(state.channel.kind)) items.push(item('ignore-channel', 'Ignore channel', 'Hide in Juno'))
+  if (state.askJuno === true) items.push(separator, item('ask-juno', 'Ask Juno'))
   return items
 }
 
-/** The person menu (inventory 15.6): Notify me about them. Ask Juno comes with the Juno panel. */
-export function personMenuItems(person: { readonly name: string; readonly notify: NotifyChoice }): ReadonlyArray<MenuItem<NotifyAction>> {
+export interface PersonMenuState {
+  readonly name: string
+  readonly notify: NotifyChoice
+  /** The Juno Agent is on: Ask Juno shows (SPEC 7). */
+  readonly askJuno?: boolean
+}
+
+/** The person menu (inventory 15.6): Notify me about them, then Ask Juno while the agent runs. */
+export function personMenuItems(person: PersonMenuState): ReadonlyArray<MenuItem<NotifyAction | PersonMenuAction>> {
   const first = person.name.split(' ')[0] ?? person.name
-  return [notifyMenu(person.notify, `Notify me about ${first}`)]
+  const notify: MenuItem<NotifyAction | PersonMenuAction> = notifyMenu(person.notify, `Notify me about ${first}`)
+  return person.askJuno === true ? [notify, separator, item('ask-juno', 'Ask Juno')] : [notify]
 }
 
 /** The message menu's why item (inventory 15.4), by what happened to the message. */

@@ -164,6 +164,8 @@ function setAppMenu(sidebarHidden: boolean, rebuild = false): void {
   menuSidebarHidden = sidebarHidden
   const view: MenuItemConstructorOptions[] = [
     command('toggle-sidebar', sidebarHidden ? 'Show Sidebar' : 'Hide Sidebar', 'Control+Command+S', 'sidebar.toggle'),
+    // In a topic tab ⌘J opens or closes the Juno panel; elsewhere it opens the Juno tab.
+    ...(agentOn() ? [command('juno', 'Juno', 'CommandOrControl+J', 'juno.toggle')] : []),
     { type: 'separator' },
     { role: 'reload' },
     { role: 'forceReload' },
@@ -249,9 +251,16 @@ function setAppMenu(sidebarHidden: boolean, rebuild = false): void {
   )
 }
 
-/** The page reads `?theme=`, `?accent=` and `?sidebar=` so its first render matches the window background, the saved accent and the saved sidebar. */
+/** The Juno Agent runs only with JUNO_AGENT=1 until the chat ships (ADR 0012, M2). */
+const agentOn = () => process.env.JUNO_AGENT === '1'
+
+/**
+ * The page reads `?theme=`, `?accent=` and `?sidebar=` so its first render matches the window background, the saved accent and the
+ * saved sidebar, and `?agent=1` so the Juno button and Ask Juno show from the first frame when the agent runs.
+ */
 function pageUrl(base: string, launch: Launch): string {
   const url = new URL(base)
+  if (agentOn()) url.searchParams.set('agent', '1')
   url.searchParams.set('theme', launch.theme)
   url.searchParams.set('accent', launch.accent ?? DEFAULT_ACCENT)
   url.searchParams.set('density', launch.density ?? DEFAULT_DENSITY)

@@ -74,6 +74,10 @@ export interface MessageListProps {
   readonly onDiscard?: (clientMsgId: string) => void
   /** Right-click or the context-menu key on a message: its menu, at the pointer. `onSender` on the sender's name or avatar (the person menu). */
   readonly onMessageMenu?: (ts: string, event: MouseEvent, onSender: boolean) => void
+  /** Right-click on an @person chip: the person menu (inventory 15.6). */
+  readonly onPersonMenu?: (person: { readonly id: string; readonly name: string }, event: MouseEvent) => void
+  /** Right-click on a #channel chip: the channel menu (inventory 15.2). */
+  readonly onChannelMenu?: (channel: { readonly id: string; readonly name: string }, event: MouseEvent) => void
 }
 
 const ROW = '[data-message-row]'
@@ -96,10 +100,33 @@ function onKeyDown(event: KeyboardEvent<HTMLDivElement>, onRowKey: MessageListPr
   next.scrollIntoView({ block: 'nearest', behavior: 'instant' })
 }
 
-/** One handler for every row: the row under the pointer, or the focused row for the context-menu key. A field keeps its own menu. */
-function messageMenu(event: MouseEvent, onMessageMenu: (ts: string, event: MouseEvent, onSender: boolean) => void) {
+interface Menus {
+  readonly onMessageMenu: ((ts: string, event: MouseEvent, onSender: boolean) => void) | undefined
+  readonly onPersonMenu: ((person: { readonly id: string; readonly name: string }, event: MouseEvent) => void) | undefined
+  readonly onChannelMenu: ((channel: { readonly id: string; readonly name: string }, event: MouseEvent) => void) | undefined
+}
+
+/**
+ * One handler for every row: an @person or #channel chip under the pointer
+ * gets its own menu, otherwise the row under the pointer, or the focused row
+ * for the context-menu key. A field keeps its own menu.
+ */
+function messageMenu(event: MouseEvent, { onMessageMenu, onPersonMenu, onChannelMenu }: Menus) {
   const target = event.target
   if (!(target instanceof Element) || target.closest('input, textarea') !== null) return
+  const person = onPersonMenu === undefined ? null : target.closest<HTMLElement>('[data-person]')
+  if (person !== null && onPersonMenu !== undefined) {
+    event.preventDefault()
+    onPersonMenu({ id: person.dataset.person ?? '', name: person.dataset.personName ?? '' }, event)
+    return
+  }
+  const channel = onChannelMenu === undefined ? null : target.closest<HTMLElement>('[data-channel]')
+  if (channel !== null && onChannelMenu !== undefined) {
+    event.preventDefault()
+    onChannelMenu({ id: channel.dataset.channel ?? '', name: channel.dataset.channelName ?? '' }, event)
+    return
+  }
+  if (onMessageMenu === undefined) return
   const ts = target.closest<HTMLElement>(ROW)?.dataset.messageRow
   if (ts === undefined) return
   event.preventDefault()
@@ -138,6 +165,8 @@ export function MessageList({
   onRetry,
   onDiscard,
   onMessageMenu,
+  onPersonMenu,
+  onChannelMenu,
 }: MessageListProps) {
   const [focusedTs, setFocusedTs] = useState<string | undefined>(undefined)
   const last = items[items.length - 1]
@@ -152,7 +181,9 @@ export function MessageList({
         aria-label="Messages"
         aria-busy={status === 'loading' || status === 'pending'}
         onKeyDown={(event) => onKeyDown(event, onRowKey)}
-        onContextMenu={onMessageMenu === undefined ? undefined : (event) => messageMenu(event, onMessageMenu)}
+        onContextMenu={
+          onMessageMenu === undefined && onPersonMenu === undefined && onChannelMenu === undefined ? undefined : (event) => messageMenu(event, { onMessageMenu, onPersonMenu, onChannelMenu })
+        }
         {...stylex.props(styles.column)}
       >
         {older !== 'none' ? (

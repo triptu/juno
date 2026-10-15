@@ -398,12 +398,15 @@ export function agentHandlers(host: ChatHost) {
           return live(Stream.merge(state.changes, own), settings.page)
         },
         // Settings change with AI assist off too: only Pause needs the engine on.
+        // Pause shows in the chat's banner and waiting lines, so a change rebuilds the chat page too.
         'agent.settings.change': ({ opId, change }) =>
-          Effect.suspend(() => {
-            if (host.settings === undefined) return unavailable('Juno is not running.')
-            const result = host.settings.change(change)
-            return result._tag === 'done' ? Effect.succeed({ opId }) : Effect.fail(new AgentCommandError({ reason: result.reason, message: result.message }))
-          }),
+          changed(
+            Effect.suspend(() => {
+              if (host.settings === undefined) return unavailable('Juno is not running.')
+              const result = host.settings.change(change)
+              return result._tag === 'done' ? Effect.succeed({ opId }) : Effect.fail(new AgentCommandError({ reason: result.reason, message: result.message }))
+            }),
+          ),
         'agent.settings.credentials': notYet('Signing in to Codex'),
         'agent.settings.ownership': notYet('Moving Juno'),
       })

@@ -332,7 +332,7 @@ All [proto] measured at 1280×800 with Inter unless marked.
 | `--sidebar-width` | 384px default; the owner drags it between `--sidebar-min-width` 280px and `--sidebar-max-width` 480px. The live width is an inline `width` on the shell's sidebar box, set during the drag, not a token value |
 | `--sidebar-resize-hit` | 6px hit area centred on the sidebar edge |
 | `--titlebar-lights-inset` | 78px kept free for the traffic lights, in the sidebar bar or, with the sidebar hidden, at the start of the tab strip |
-| `--juno-panel-width` | 360px; the topic beside it keeps at least `--juno-panel-topic-min` 480px, else the panel covers the topic |
+| `--juno-panel-width` | 360px; the topic beside it keeps at least `--juno-panel-topic-min` 480px, else the panel covers the topic (the `Workspace` view's container query repeats the sum, 840px) |
 | `--titlebar-height` | 44px (sidebar top bar and tab strip; both are drag regions) |
 | `--tab-height` | 35px, bottom margin -1px so the active tab merges with the page |
 | `--tab-width` | flex 0 1 230px; `--tab-min-width` 120px (the prototype's 72 fit only the icon and the close button). The strip scrolls sideways once the tabs reach the floor. `--tab-pinned-width` 40px (icon only) |
@@ -381,6 +381,7 @@ All [proto] measured at 1280×800 with Inter unless marked.
 | `--row-44` / `--row-48` / `--row-52` | 44, 48, 52px | Today log row, notification rule row, All topics table row (ListRow `minHeight`) |
 | `--row-topic-estimate` | 66px | A sidebar row's content box (title, one-line preview, meta), rounded up to a whole pixel. The row's fixed height is this plus its block padding (88px Comfortable), and it is the exact `contain-intrinsic-size` for rows off screen (performance.md 3.2) |
 | `--row-message-estimate` | 56px | The same estimate for message rows off screen (performance.md 3.3): a name line and one body line, without the row's block padding |
+| `--row-bubble-estimate` | 38px | The estimate for a Juno chat bubble row off screen: one 22px line with 8px padding above and below |
 
 ### Tiles and avatars
 
@@ -399,7 +400,7 @@ Phosphor (`@phosphor-icons/react`, imported per icon). Weight by size: `bold` at
 
 ### Juno chat
 
-The `chat` group (`tokens.stylex.ts`). `--owner-bubble-bg` and `--owner-bubble-fg` are the owner bubble's fill and text, set to option B (`--hl-bubble` / `--foreground-default`); the other options are listed beside the group, and switching is a change to those two lines. `--bubble-max-width` 76%, `--bubble-tail` 4px (the last bubble of a group), `--card-max-width` 560px. The status bubble: `--status-dot` 6px, `--status-min-width` 52px, `--status-loop` 1200ms, `--status-pulse-scale` 1.35 (1 under reduced motion), `--status-dot-opacity` 1 (0.6 under reduced motion). `--reaction-offset` 10px is how far a reaction badge sits out over its bubble's top corner.
+The `chat` group (`tokens.stylex.ts`). `--owner-bubble-bg` and `--owner-bubble-fg` are the owner bubble's fill and text, set to option B (`--hl-bubble` / `--foreground-default`); the other options are listed beside the group, and switching is a change to those two lines. `--bubble-max-width` 76% (`--bubble-max-width-panel` 85% in the Juno panel), `--bubble-tail` 4px (the last bubble of a group), `--card-max-width` 560px. The status bubble: `--status-dot` 6px, `--status-min-width` 52px, `--status-loop` 1200ms, `--status-pulse-scale` 1.35 (1 under reduced motion), `--status-dot-opacity` 1 (0.6 under reduced motion). `--reaction-offset` 10px is how far a reaction badge sits out over its bubble's top corner.
 
 ### Illustrations and the mark
 
@@ -441,6 +442,7 @@ Floating surfaces have `border: 1px solid transparent` plus the shadow, never a 
 | --- | --- | --- |
 | `--z-toolbar` | 2 | Message hover toolbar (relative to message) |
 | `--z-header` | 3 | Page header band and islands, over the list that scrolls under them |
+| `--z-panel` | 4 | The Juno panel while it covers the topic, over the topic's header |
 | `--z-mention` | 5 | @/# suggestion popover above composer |
 | `--z-picker` | 10 | Picker overlay |
 | `--z-menu` | 20 | Avatar menu, New chat pickers |

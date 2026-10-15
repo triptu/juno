@@ -156,6 +156,8 @@ export const chat = stylex.defineVars({
   '--owner-bubble-bg': accent['--hl-bubble'],
   '--owner-bubble-fg': colors['--foreground-default'],
   '--bubble-max-width': '76%',
+  // In the Juno panel's narrow column.
+  '--bubble-max-width-panel': '85%',
   '--bubble-tail': '4px',
   '--card-max-width': '560px',
   '--status-dot': '6px',
@@ -682,6 +684,11 @@ export const layout = stylex.defineVars({
   '--header-band': '68px',
   '--header-inset': '56px',
   '--reading-width': '800px',
+  // The Juno panel beside a topic. The topic keeps at least
+  // --juno-panel-topic-min, else the panel covers it (views/Workspace.tsx
+  // repeats the sum in its container query, which cannot read a variable).
+  '--juno-panel-width': '360px',
+  '--juno-panel-topic-min': '480px',
   '--composer-width': '752px',
   '--composer-max-height': '194px',
   '--composer-line-height': '22px',
@@ -768,6 +775,8 @@ export const sizes = stylex.defineVars({
   // The same estimate for off-screen message rows: one line of body under a
   // name, without the row's block padding (performance.md 3.3).
   '--row-message-estimate': '56px',
+  // A one-line chat bubble off screen: 8px padding above and below a 22px line.
+  '--row-bubble-estimate': '38px',
 
   '--tile-44': '44px',
   '--tile-36': '36px',
@@ -838,6 +847,8 @@ export const density = stylex.defineVars({
 export const z = stylex.defineVars({
   '--z-toolbar': '2',
   '--z-header': '3',
+  // The Juno panel when it covers the topic: over the topic's header and toolbar.
+  '--z-panel': '4',
   '--z-mention': '5',
   '--z-picker': '10',
   '--z-menu': '20',

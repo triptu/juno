@@ -14,11 +14,13 @@ import {
   viewSheetAtom,
   type Tabs,
 } from '@juno/state'
+import { junoNavAtom } from '@juno/state/agent'
 import { useAtom, useAtomValue } from '@juno/state/react'
 import { AccountMenu, hueFor, initials, Sidebar as SidebarView, type AccountMenuAction, type ActivateEvent, type SidebarNavTarget } from '@juno/views'
 import { AppInfo } from './AppInfo'
 import { EngineStatus, SyncNotice } from './EngineStatus'
 import { markFilterChange } from './filterMark'
+import { openJunoTab } from './juno/actions'
 import { openAllTopics, openHome, openNewTab, openNotifications, openPreferences } from './navigation'
 import { Session } from './Session'
 import { TitlebarNav } from './TitlebarNav'
@@ -29,7 +31,7 @@ import { ViewSheet } from './ViewSheet'
 function navigate(target: SidebarNavTarget, event: ActivateEvent): void {
   if (target === 'home') return openHome({ newTab: event.metaKey })
   if (target === 'all-topics') return openAllTopics({ newTab: event.metaKey })
-  // TODO(M11): open the Juno page in a tab.
+  if (target === 'juno') return openJunoTab({ newTab: event.metaKey })
 }
 
 /** The nav item of the active tab's page. Home also reads as selected with no tab open. */
@@ -37,7 +39,17 @@ function activeNavOf(tabs: Tabs): SidebarNavTarget | undefined {
   const tab = activeTab(tabs)
   if (tab === undefined) return 'home'
   const place = currentPlace(tab)
-  return place.kind === 'home' ? 'home' : place.kind === 'allTopics' ? 'all-topics' : undefined
+  switch (place.kind) {
+    case 'home':
+      return 'home'
+    case 'allTopics':
+      return 'all-topics'
+    case 'juno':
+    case 'junoPage':
+      return 'juno'
+    default:
+      return undefined
+  }
 }
 
 /**
@@ -56,6 +68,8 @@ export function Sidebar() {
   const dmsDot = useAtomValue(sidebarDotAtom('dms'))
   const user = useAtomValue(signedInAtom)
   const activeNav = useAtomValue(tabsAtom, activeNavOf)
+  const junoUnread = useAtomValue(junoNavAtom, (nav) => nav.unread)
+  const junoBusy = useAtomValue(junoNavAtom, (nav) => nav.busy)
   const [menuOpen, setMenuOpen] = useState(false)
   const status = useAtomValue(notificationStatusAtom)
   // The scope chip names the channel the list is narrowed to; its rows' refs carry it.
@@ -119,6 +133,8 @@ export function Sidebar() {
         // TODO(M9): open the ⌘K palette.
       }}
       {...(activeNav === undefined ? {} : { activeNav })}
+      junoUnread={junoUnread}
+      junoBusy={junoBusy}
       onNewChat={openNewTab}
       onNavigate={navigate}
       onFilterKind={selectKind}

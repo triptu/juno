@@ -34,3 +34,10 @@ A send's payload is an `ExecutableIdentity` with `tool: 'slack_send'`, `args: { 
 
 - Call a model. The agent decides; the host only reads and writes Juno's data.
 - Import Electron or any Slack package. Slack access goes through the engine's `JunoHost`.
+
+Reply watches use `host.schedule.check` (cached metadata or a complete Slack
+refresh), `host.schedule.hours` (saved notification hours and local timezone),
+and `host.schedule.changes` (message-store invalidations). The check includes
+the owner's identity and verifies the source author for the menu command.
+No message text crosses these routes. Account checks surround refreshes, and
+incomplete or limited Slack history fails rather than reporting no reply.

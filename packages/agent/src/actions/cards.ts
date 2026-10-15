@@ -58,6 +58,7 @@ export interface CardRow {
   readonly source_gen: number
   readonly dismissed_at: number | null
   readonly replaced_by: string | null
+  readonly expired_at: number | null
 }
 
 export interface IntentRow {
@@ -94,7 +95,7 @@ export function bindingOf(card: Pick<CardRow, 'id' | 'revision'>, payload: CardP
 
 /** Why an open card can no longer be clicked, or undefined while it can. */
 export function expiry(store: Store, card: CardRow, now: number): 'expired' | undefined {
-  if (card.replaced_by !== null || now >= card.created_at + CARD_LIFETIME_MS || card.source_gen !== memoryGen(store)) return 'expired'
+  if (card.expired_at !== null || card.replaced_by !== null || now >= card.created_at + CARD_LIFETIME_MS || card.source_gen !== memoryGen(store)) return 'expired'
   return undefined
 }
 
@@ -128,7 +129,7 @@ export interface Proposal {
 }
 
 /** Stores a proposal and its intents. Returns the card's id: the existing one for a call seen before. */
-export function proposeCard(store: Store, proposal: Proposal): string {
+export function proposeCard(store: Store, proposal: Proposal, onProposed?: (id: string, proposal: Proposal) => void): string {
   return transaction(store.db, () => {
     const existing = store.db.prepare('SELECT id FROM cards WHERE call_id = ?').get(proposal.callId) as { id: string } | undefined
     if (existing !== undefined) return existing.id
@@ -137,6 +138,7 @@ export function proposeCard(store: Store, proposal: Proposal): string {
       .prepare('INSERT INTO cards (id, run_id, call_id, kind, revision, created_at, source_gen) VALUES (?, ?, ?, ?, 1, ?, ?)')
       .run(id, proposal.runId, proposal.callId, proposal.payload._tag, store.now(), memoryGen(store))
     insertRevision(store, { id, revision: 1 }, proposal.payload)
+    onProposed?.(id, proposal)
     if (proposal.replaces !== undefined) {
       store.db.prepare('UPDATE cards SET replaced_by = ? WHERE id = ? AND replaced_by IS NULL').run(id, proposal.replaces)
     }
@@ -432,7 +434,7 @@ export function viewOf(store: Store, card: CardRow, now: number): CardView {
   const approved = clicked(store, card.id) !== undefined
   const ran = intents.some((intent) => store.db.prepare('SELECT 1 FROM authorizations WHERE intent_id = ?').get(intent.id) !== undefined)
   const evidences = intents.map((intent) => evidence(store, intent, !ran))
-  const sourceValid = card.replaced_by === null && card.source_gen === memoryGen(store)
+  const sourceValid = card.expired_at === null && card.replaced_by === null && card.source_gen === memoryGen(store)
   const base = { id: card.id as CardId, createdAt: card.created_at, sourceValid }
   let record: CardRecord
   if (payload._tag === 'sendMessage') {

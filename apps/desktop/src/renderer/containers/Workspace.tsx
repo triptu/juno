@@ -1,9 +1,28 @@
 import { Activity, lazy, Suspense, useEffect } from 'react'
+import { chatCopy } from '@juno/agent-contract'
 import type { TopicDetail } from '@juno/contract'
-import { currentPlace, mountedTabs, onMenuCommand, registry, sidebarLayoutAtom, startVisitLog, tabsAtom, tabStripAtom, type Tab, type TabSummary } from '@juno/state'
+import {
+  activeTab,
+  currentPlace,
+  junoAgentOnAtom,
+  junoPanelOpenAtom,
+  mountedTabs,
+  onMenuCommand,
+  registry,
+  sidebarLayoutAtom,
+  startVisitLog,
+  tabsAtom,
+  tabStripAtom,
+  tabTopic,
+  type Tab,
+  type Tabs,
+  type TabSummary,
+} from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import { TopicArt, Workspace as WorkspaceView, type ActivateEvent, type WorkspaceTab, type WorkspaceTabIcon } from '@juno/views'
 import { HomePage } from './Home'
+import { runJunoShortcut } from './juno/actions'
+import { JunoPageTab, JunoPanel, JunoTab, loadJuno } from './juno/lazy'
 import { NotificationsPage } from './Notifications'
 import { useNotificationBridge, WhyLayer } from './notificationBridge'
 import { PreferencesPage } from './Preferences'
@@ -42,7 +61,11 @@ function stripTab(summary: TabSummary): WorkspaceTab {
             ? { ...base, title: 'Notifications', icon: 'notifications' }
             : place.kind === 'preferences'
               ? { ...base, title: 'Preferences', icon: 'preferences' }
-              : {
+              : place.kind === 'juno'
+                ? { ...base, title: 'Juno', icon: 'juno' }
+                : place.kind === 'junoPage'
+                  ? { ...base, title: chatCopy.pageTitles[place.page], icon: place.page === 'settings' ? 'preferences' : 'juno' }
+                  : {
           ...base,
           title: detail == null ? '' : detail.kind === 'main' ? detail.channel.name : detail.title,
           icon: detail == null ? 'hash' : kindIcons[detail.channel.kind],
@@ -63,6 +86,18 @@ function Page({ tab }: { readonly tab: Tab }) {
       return <NewChatTab key="new-chat" tabId={tab.id} />
     case 'home':
       return <HomePage key="home" />
+    case 'juno':
+      return (
+        <Suspense key="juno" fallback={null}>
+          <JunoTab />
+        </Suspense>
+      )
+    case 'junoPage':
+      return (
+        <Suspense key={place.page} fallback={null}>
+          <JunoPageTab page={place.page} />
+        </Suspense>
+      )
     case 'notifications':
       return <NotificationsPage key="notifications" />
     case 'preferences':
@@ -74,6 +109,12 @@ function Page({ tab }: { readonly tab: Tab }) {
         </Suspense>
       )
   }
+}
+
+/** The topic the active tab shows, for the Juno panel beside it. */
+const activeTopicOf = (state: Tabs): string | undefined => {
+  const tab = activeTab(state)
+  return tab === undefined ? undefined : tabTopic(tab)
 }
 
 function selectTab(id: string, _event: ActivateEvent): void {
@@ -104,14 +145,25 @@ export function Workspace() {
   const strip = useAtomValue(tabStripAtom)
   const sidebarHidden = useAtomValue(sidebarLayoutAtom, (layout) => layout.collapsed)
   const mounted = mountedTabs(state)
+  // The Juno panel shows beside a topic tab while it is open, and never on a page (SPEC 7).
+  const agentOn = useAtomValue(junoAgentOnAtom)
+  const panelOpen = useAtomValue(junoPanelOpenAtom)
+  const panelTopic = useAtomValue(tabsAtom, activeTopicOf)
 
   useNotificationBridge()
   useEffect(() => onMenuCommand(runMenuCommand), [])
   useEffect(() => onMenuCommand(runUndoCommand), [])
+  useEffect(() => onMenuCommand((command) => command === 'juno.toggle' && runJunoShortcut()), [])
   // "Pick up where you left off" on Home: the topic that stayed on screen for a minute.
   useEffect(() => startVisitLog(registry), [])
   useEffect(() => {
-    const idle = requestIdleCallback(() => void loadAllTopicsPage(), { timeout: 5_000 })
+    const idle = requestIdleCallback(
+      () => {
+        void loadAllTopicsPage()
+        if (registry.get(junoAgentOnAtom)) void loadJuno()
+      },
+      { timeout: 5_000 },
+    )
     return () => cancelIdleCallback(idle)
   }, [])
   useEffect(() => {
@@ -133,6 +185,13 @@ export function Workspace() {
       {...(sidebarHidden ? { leading: <TitlebarNav /> } : {})}
       nothingShown={state.active === undefined}
       empty={<HomePage />}
+      side={
+        agentOn && panelOpen && panelTopic !== undefined ? (
+          <Suspense fallback={null}>
+            <JunoPanel topicId={panelTopic} />
+          </Suspense>
+        ) : undefined
+      }
     >
       {pages.length === 0
         ? undefined
