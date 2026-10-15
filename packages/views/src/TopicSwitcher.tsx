@@ -1,9 +1,8 @@
 import * as stylex from '@stylexjs/stylex'
-import { ChatText } from '@phosphor-icons/react/dist/icons/ChatText'
 import { useLayoutEffect, useState, type KeyboardEvent } from 'react'
 import type { ThreadSummary } from '@juno/contract'
 import { spacing } from '@juno/tokens/tokens.stylex'
-import { Chip, Icon, OptionGroupLabel, OptionList, OptionRow, Text, useOptionListKeys, type ActivateEvent } from '@juno/ui'
+import { Chip, OptionGroupLabel, OptionList, OptionRow, Text, useOptionListKeys, type ActivateEvent } from '@juno/ui'
 import { countLabel } from './look'
 import { PickerNoMatch, PickerSearch } from './PickerSearch'
 import { relativeTime } from './time'
@@ -113,7 +112,7 @@ interface RowProps {
   readonly onActivate: (rowId: string) => void
 }
 
-/** Main: first, with the line New chat's thread picker gives it. */
+/** Main: first, with the line New chat's thread picker gives it, and no icon, so its title starts on the threads' edge. */
 function MainRow({ mainId, unread, active, current, onOpen, onActivate }: RowProps & { readonly mainId: string; readonly unread: number }) {
   const id = rowId(mainId)
   return (
@@ -122,7 +121,6 @@ function MainRow({ mainId, unread, active, current, onOpen, onActivate }: RowPro
       size={44}
       active={active}
       selected={current}
-      leading={<Icon icon={ChatText} size={15} />}
       label={
         <Text variant="body" weight={unread > 0 ? 'semibold' : 'medium'} tone="default" sx={styles.title}>
           Main

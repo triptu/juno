@@ -58,7 +58,7 @@ test('a selected option row prints its second line in the subtle colour, which k
   expect(colours.line).toBe(colours.subtle)
 })
 
-test('two-line picker rows are 44px', async ({ page }) => {
+test('two-line picker rows are 44px, and Main’s title starts on the threads’ edge', async ({ page }) => {
   for (const [component, id] of [['TopicHeader', 'switcher/switcher-thread'], ['NewChat', 'flow/thread-list']] as const) {
     await open(page, component, id)
     const rows = await page.evaluate(() =>
@@ -72,5 +72,6 @@ test('two-line picker rows are 44px', async ({ page }) => {
     )
     expect(rows.length, id).toBeGreaterThan(2)
     for (const row of rows) expect(row.height, id).toBe(44)
+    expect(new Set(rows.map((row) => row.titleStart)).size, id).toBe(1)
   }
 })
