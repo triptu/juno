@@ -40,12 +40,14 @@ import {
   type ChatPage,
   type OpId,
 } from '@juno/agent-contract'
+import { authorityOf } from '../grants/grants'
+import { mayAuthorize } from '../policy/policy'
 import { pinNotes } from './pin-notes'
 import { messageMenu } from './message-menu'
 import { Revision } from '@juno/agent-cards'
 import { watchReplyCommand, type WatchHost } from '../schedule/commands'
 import type { Scheduler } from '../schedule/scheduler'
-import type { Choice } from '../actions/cards'
+import { bindingOf, cardRow, payloadOf, type Choice } from '../actions/cards'
 import type { Presence } from '../host/reads'
 import type { Turns } from '../router/open'
 import type { PinResult } from '../pins/pins'
@@ -211,7 +213,15 @@ function chatState(host: ChatHost) {
       : (turns.store.db.prepare(`SELECT id, version FROM messages WHERE id IN (${ids.map(() => '?').join(',')})`).all(...ids) as Array<{ id: number; version: number }>)
     return {
       page: view,
-      cards: cards.flatMap((card) => (card.binding !== undefined && slice.items.some((item) => item._tag === 'card' && item.card.id === card.card.id) ? [card.binding] : [])),
+      cards: cards.flatMap((entry) => {
+        if (!slice.items.some((item) => item._tag === 'card' && item.card.id === entry.card.id)) return []
+        if (entry.binding) return [entry.binding]
+        if (turns && 'status' in entry.card && entry.card.status._tag === 'expired') {
+          const row = cardRow(turns.store, entry.card.id)
+          if (row) return [{ identity: bindingOf(row, payloadOf(turns.store, row)).identity, children: [] }]
+        }
+        return []
+      }),
       messages: versions.map((row) => ({ id: ChatMessageId.make(String(row.id)), revision: Revision.make(row.version) })),
     }
   }
@@ -297,7 +307,7 @@ export function agentHandlers(host: ChatHost) {
           ),
         'agent.chat.summary': () =>
           state.changes.pipe(
-            Stream.map(() => chatSummary(state.items(), state.turns?.jobs.active() ?? [])),
+            Stream.map(() => ({ ...chatSummary(state.items(), state.turns?.jobs.active() ?? []), mayAuthorize: state.turns !== undefined && host.presence()?.aiEnabled !== false && mayAuthorize(authorityOf(state.turns.store)) })),
             Stream.changesWith((a, b) => JSON.stringify(a) === JSON.stringify(b)),
           ),
         'agent.chat.send': ({ opId, text, context, replyTo }) =>

@@ -15,7 +15,7 @@ export const ConnectionConfig = Schema.Struct({
   noSecrets: Schema.Boolean,
   allowlist: Schema.Array(Schema.String),
   enabled: Schema.Boolean,
-  /** T3 Code only: false keeps it on this Mac; true allows an https address on the network. */
+  /** T3 Code only: false keeps it on this Mac; true allows a private HTTP or HTTPS address on the network. */
   allowNetwork: Schema.optionalKey(Schema.Boolean),
 })
 export type ConnectionConfig = typeof ConnectionConfig.Type
@@ -57,11 +57,16 @@ export const T3: ConnectionConfig = {
 
 export const PRESETS: ReadonlyArray<ConnectionConfig> = [NOTION, LITTLEBIRD, T3]
 
-export function endpoint(url: string, allowNetwork = true): string {
+export function endpoint(url: string, allowNetwork = true, localNetwork = false): string {
   let parsed: URL
   try { parsed = new URL(url) } catch { throw new McpError({ reason: 'invalid', message: 'Enter a full address, like https://mcp.example.com/mcp.' }) }
   const loopback = ['localhost', '127.0.0.1', '[::1]'].includes(parsed.hostname)
-  if ((parsed.protocol !== 'https:' && !(parsed.protocol === 'http:' && loopback)) || parsed.username || parsed.password || parsed.hash || parsed.search) {
+  const octets = parsed.hostname.split('.').map(Number)
+  const [first, second] = octets
+  const privateHost = octets.length === 4 && octets.every((octet) => Number.isInteger(octet) && octet >= 0 && octet <= 255) &&
+    (first === 10 || (first === 192 && second === 168) ||
+      (first === 172 && second !== undefined && second >= 16 && second <= 31) || (first === 169 && second === 254))
+  if ((parsed.protocol !== 'https:' && !(parsed.protocol === 'http:' && (loopback || (localNetwork && privateHost)))) || parsed.username || parsed.password || parsed.hash || parsed.search) {
     throw new McpError({ reason: 'invalid', message: 'Use HTTPS, or HTTP on this Mac, without credentials in the address.' })
   }
   if (!allowNetwork && !loopback) throw new McpError({ reason: 'invalid', message: 'Allow the local network to use an address on another machine.' })

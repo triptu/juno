@@ -75,9 +75,13 @@ it('runs a scripted thread: launch, a question, an answer, done', async () => {
   expect(launched.status).toBe('running')
 
   const requestId = t3.ask(launched.threadId, 'Run the full suite?')
-  expect(parse(await client.callTool('t3_pending_request_list', { threadId: launched.threadId })).requests).toEqual([{ requestId, prompt: 'Run the full suite?', options: ['Yes', 'No'] }])
-  await client.callTool('t3_pending_request_respond', { requestId, answers: { choice: 'Yes' } })
-  expect(t3.answers()).toEqual([{ requestId, answers: { choice: 'Yes' } }])
+  expect(parse(await client.callTool('t3_pending_request_list', { threadId: launched.threadId })).requestIds).toEqual([requestId])
+  expect(parse(await client.callTool('t3_pending_request_read', { requestId, threadId: launched.threadId })).questions).toEqual([{
+    id: 'question', header: 'T3 Code asks', question: 'Run the full suite?', allowCustomAnswer: true, multiSelect: false,
+    options: ['Yes', 'No'].map((label) => ({ label, description: '', value: label })),
+  }])
+  expect(parse(await client.callTool('t3_pending_request_respond', { requestId, answers: { question: 'Yes' } }))).toEqual({ sequence: 1 })
+  expect(t3.answers()).toEqual([{ requestId, answers: { question: 'Yes' } }])
 
   const waiting = client.callTool('t3_thread_wait', { threadId: launched.threadId, timeoutMs: 5_000 })
   t3.advance(launched.threadId, { reply: 'Done. PR #12.', status: 'completed' })

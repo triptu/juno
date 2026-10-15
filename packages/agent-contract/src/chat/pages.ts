@@ -123,8 +123,8 @@ export type DiscoveredTool = typeof DiscoveredTool.Type
 /**
  * The T3 Code address settings (plan v3 §10.2). Only the T3 row carries
  * them. `allowNetwork` is off by default; a non-loopback address is used
- * only when it is on and the address is `https:`, because the sign-in
- * refuses plain `http:` off loopback (spikes, finding 1).
+ * only when it is on. Public hosts require HTTPS; private IPv4 hosts may
+ * use HTTP, though their OAuth sign-in may require HTTPS.
  */
 export const T3Address = Schema.Struct({
   url: Schema.String,

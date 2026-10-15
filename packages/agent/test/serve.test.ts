@@ -29,13 +29,13 @@ it('a sent message shows as the owner bubble, then Juno answers it, and reading 
   expect(second).toMatchObject({ body: [{ _tag: 'text', text: 'Two meetings today.' }], group: 'last', unread: true })
 
   const summary = await Effect.runPromise(client['agent.chat.summary']().pipe(Stream.take(1), Stream.runCollect))
-  expect(summary).toEqual([{ unread: 2, busy: false }])
+  expect(summary).toEqual([{ unread: 2, busy: false, mayAuthorize: true }])
 
   await run(client['agent.chat.read']({ through: second!.id }))
   const read = await pageWhere((p) => of(p, 'juno').every((item) => !item.unread), 'every bubble read')
   expect(of(read, 'newDivider')).toEqual([])
   const after = await Effect.runPromise(client['agent.chat.summary']().pipe(Stream.take(1), Stream.runCollect))
-  expect(after).toEqual([{ unread: 0, busy: false }])
+  expect(after).toEqual([{ unread: 0, busy: false, mayAuthorize: true }])
 })
 
 it('words Juno took from a Slack message it read show as a source, and an unknown handle as plain words', async () => {

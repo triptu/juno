@@ -79,7 +79,7 @@ export interface FakeT3 {
   readonly rejected: () => number
   readonly threads: () => ReadonlyArray<T3Thread>
   /** Moves a thread on: an assistant message and a new status. Wakes `t3_thread_wait` on a terminal status. */
-  readonly advance: (threadId: string, update: { readonly status?: T3Status; readonly reply?: string }) => void
+  readonly advance: (threadId: string, update: { readonly status?: T3Status; readonly reply?: string; readonly pullRequest?: { readonly number: number; readonly url: string } }) => void
   /** T3 asks the owner something. The thread waits until it is answered. Returns the request id. */
   readonly ask: (threadId: string, prompt: string, options?: ReadonlyArray<string>) => string
   /** Answers given through `t3_pending_request_respond`. */
@@ -95,7 +95,7 @@ const schema = (properties: Record<string, unknown>, required: ReadonlyArray<str
 
 export async function startFakeT3(options: FakeT3Options = {}): Promise<FakeT3> {
   const projects = options.projects ?? [{ projectId: 'project-juno', title: 'juno', workspaceRoot: '/work/juno' }]
-  const threads = new Map<string, { threadId: string; projectId: string; title: string; status: T3Status; items: T3Item[]; pending: T3Request[] }>()
+  const threads = new Map<string, { threadId: string; projectId: string; title: string; status: T3Status; items: T3Item[]; pending: T3Request[]; linkedPullRequest?: { number: number; url: string } }>()
   const answers: Array<{ requestId: string; answers: Record<string, unknown> }> = []
   const sends = new Map<string, unknown>()
   const waiters = new Set<() => void>()
@@ -163,7 +163,7 @@ export async function startFakeT3(options: FakeT3Options = {}): Promise<FakeT3> 
         const thread = find(threadId)
         const after = Number(afterPosition ?? 0)
         const items = thread.items.filter((item) => item.position > after).slice(0, Number(limit ?? 50))
-        return json({ thread: summary(thread), items, nextPosition: items.at(-1)?.position ?? after, pendingRequests: thread.pending.length })
+        return json({ thread: { ...summary(thread), branch: 'fix-sidebar-flake', linkedPullRequest: thread.linkedPullRequest ?? null }, items, nextPosition: items.at(-1)?.position ?? after, pendingRequests: thread.pending.length })
       },
     },
     t3_thread_list: {
@@ -208,11 +208,17 @@ export async function startFakeT3(options: FakeT3Options = {}): Promise<FakeT3> 
     },
     t3_pending_request_list: {
       inputSchema: schema({ threadId: optStr }),
-      call: ({ threadId }) => json({ requests: find(threadId).pending }),
+      call: ({ threadId }) => json({ requestIds: find(threadId).pending.map((request) => request.requestId) }),
     },
     t3_pending_request_read: {
       inputSchema: schema({ requestId: str, threadId: optStr }, ['requestId']),
-      call: ({ requestId }) => json(findRequest(requestId).request),
+      call: ({ requestId }) => {
+        const request = findRequest(requestId).request
+        return json({ requestId: request.requestId, questions: [{
+          id: 'question', header: 'T3 Code asks', question: request.prompt, allowCustomAnswer: true, multiSelect: false,
+          options: request.options.map((label) => ({ label, description: '', value: label })),
+        }] })
+      },
     },
     t3_pending_request_respond: {
       inputSchema: schema({ requestId: str, answers: { type: 'object' }, threadId: optStr }, ['requestId', 'answers']),
@@ -221,7 +227,7 @@ export async function startFakeT3(options: FakeT3Options = {}): Promise<FakeT3> 
         thread.pending = thread.pending.filter((r) => r !== request)
         answers.push({ requestId: request.requestId, answers: given as Record<string, unknown> })
         if (thread.pending.length === 0 && thread.status === 'waiting') thread.status = 'running'
-        return json({ requestId: request.requestId, accepted: true })
+        return json({ sequence: answers.length })
       },
     },
     t3_worktree_list: {
@@ -283,6 +289,7 @@ export async function startFakeT3(options: FakeT3Options = {}): Promise<FakeT3> 
       const thread = find(threadId)
       if (update.reply !== undefined) append(thread, 'assistant', update.reply)
       if (update.status) thread.status = update.status
+      if (update.pullRequest) thread.linkedPullRequest = update.pullRequest
       wake()
     },
     ask: (threadId, prompt, choices = ['Yes', 'No']) => {

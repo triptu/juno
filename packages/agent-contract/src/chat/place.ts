@@ -7,7 +7,7 @@
  */
 import { Schema } from 'effect'
 import { Place, PlaceTint } from '@juno/agent-cards/presentation'
-export { Place, PlaceTint, JobRef, TopicLink, JunoPage, OpenTarget } from '@juno/agent-cards/presentation'
+export { Place, PlaceTint, JobRef, TopicLink, JunoPage, OpenTarget, OpenableUrl, isT3ThreadUrl } from '@juno/agent-cards/presentation'
 
 /** The owner's text selection in a topic, sent as a quote (SPEC §7, Juno panel). */
 export const MAX_SELECTION_CHARS = 4_000
