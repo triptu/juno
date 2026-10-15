@@ -102,18 +102,16 @@ export function CommandPalette({ query, onQuery, sections, settled, now, onSelec
   useEffect(() => {
     if (activeId !== undefined && chosen === undefined) warmFirst(activeId)
   }, [activeId, chosen])
-  // A row moved to by the keyboard comes into view; the list scrolls, never the page.
-  useEffect(() => {
-    if (activeId === undefined) return
-    document.getElementById(rowDomId(activeId))?.scrollIntoView({ block: 'nearest' })
-  }, [activeId])
 
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     const index = activeId === undefined ? -1 : ids.indexOf(activeId)
     const move = (to: number) => {
       event.preventDefault()
       const id = ids[(to + ids.length) % ids.length]
-      if (id !== undefined) activate(id)
+      if (id === undefined) return
+      activate(id)
+      // A row the arrows reach comes into view; the list scrolls, never the page. The pointer never scrolls it.
+      document.getElementById(rowDomId(id))?.scrollIntoView({ block: 'nearest' })
     }
     switch (event.key) {
       case 'ArrowDown':
