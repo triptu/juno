@@ -61,7 +61,7 @@ Titles resolve in this order. A title you set by renaming (stored in Juno only) 
 
 ### Top to bottom
 
-1. **Title bar**: on the left, after the traffic lights, the sidebar button, Back and Forward (section 6); on the right, Search (⌘K), New chat (⌘N, section 9), and your avatar. The avatar menu holds Set yourself away or active, status, Notifications, Preferences, AI assist, switch workspace and sign out. There is no footer and no name label.
+1. **Title bar**: on the left, after the traffic lights, the sidebar button, Back and Forward (section 6); on the right, Search (⌘K), New chat (⌘N, section 9), and your avatar. The avatar menu holds Set yourself away or active, status, Notifications, Preferences, AI assist, switch workspace and sign out. There is no name label, and no footer except the privacy footer while privacy mode is on (below).
 2. **Navigation**: Home, All topics and Juno (⌘J). Only Juno shows a count: its unread messages, as a soft grey tag. A properly spaced hairline separates these from the list.
 3. **Quick filters** on one row: a horizontally scrollable row of pills on the left and an Unread toggle on the right. The pills are All, Channels (a hash icon), DMs (a person icon), then your views (below), then a "+" pill that makes a new view. Channels and DMs are icon-only, with a tooltip and an accessible name. DMs include group DMs. The row never grows taller: when the pills overflow, the row scrolls sideways with the trackpad or the mouse wheel and the list does not move. Unread stays fixed at the right. There are no counters or dots on Unread. A small dot appears on Channels or DMs when that group has unread topics you are not viewing.
 4. **Scope chip**, shown only when narrowed to one channel: "#eng ×". Picking a view clears it. Narrowing is rare. It happens from ⌘K (a channel's "Show its topics" result), by clicking a #channel chip in a message, or by clicking a topic's context pill.
@@ -76,6 +76,22 @@ A view is a set of channels and DMs you pick. Its pill shows the Main and thread
 - **Making and editing.** The "+" pill opens a small sheet with four fields and nothing else: the name, an optional icon from the app's icon set, the conversations (a searchable picker), and the Keep these out of All setting. Save makes the view and selects it. Right-click a pill for Edit view, Move left, Move right and Delete view; dragging a pill also reorders. Delete has Undo.
 - **Adding a conversation.** A channel's or DM's menu (and a Main row's menu) has **Add to view ›**: your views with a check on the ones that hold it (choosing a checked one removes it), then New view…, which opens the sheet with the conversation already in it. Adding and removing show a toast with Undo.
 - **Juno can make one.** "Make a Bots view with every alerts channel" is a Juno settings task: the same command the sheet uses. (Not wired to Juno yet; the engine command is the seam.)
+
+### Privacy mode
+
+For screen sharing. **Hide message text** in the avatar menu (or ⌃⌘H, View › Hide Message Text) blurs message text that shows without you opening anything, so it cannot be read over a shared screen:
+
+- the sidebar row preview ("Sender: text"),
+- the All topics preview line,
+- a Home row's title when Juno wrote it (the plain titles, such as "Elena asked you something", stay).
+
+What you need to find your way stays readable: titles, channel and people names, times, counts and tags. A topic, the Juno chat and a peek are not blurred: you open them on purpose. Hovering or focusing a blurred line does not reveal it, and blurred text cannot be selected.
+
+While the mode is on, macOS notifications keep their title (who or where) and replace the message with "Message hidden", because they show over a shared screen too.
+
+While the mode is on, a small footer at the bottom of the sidebar says "Message text hidden" with a **Show** button, which turns it off in one click. The avatar menu item reads **Show message text**.
+
+The mode is remembered across a relaunch, and the first frame after a relaunch is already blurred: a restart in the middle of a call must never show text. Juno never turns it off by itself. (Turning it on by itself when sharing starts is researched in `docs/research/screen-share-detection.md`, not built.)
 
 ### Row anatomy
 
@@ -549,6 +565,7 @@ Use the Littlebird design system's tokens.
 | ⌃Tab / ⌃⇧Tab, ⌘⇧] / ⌘⇧[ | Next / previous tab |
 | ⌘[ / ⌘] | Back / forward in the tab's history |
 | ⌃⌘S | Hide or show the sidebar |
+| ⌃⌘H | Hide or show message text (privacy mode, section 5) |
 | ⌘J | In a topic, open or close the Juno panel. Elsewhere, open the Juno tab with the composer focused |
 | ⌘Z | Undo the last topic action: resolve, reopen, pin, rename, mark read or unread, Notify me change or ignore. Sends are final (ADR 0010) |
 | ⌘ click / ⌘ Enter | Open in a new tab |
