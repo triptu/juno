@@ -16,8 +16,9 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { largeSeed } from '@juno/fake-slack'
 import { Effect, Schema } from 'effect'
-import { ChannelRef, Person, TopicListRow } from '@juno/contract'
+import { ALL_TOPICS_WINDOW, ChannelRef, Person, TopicListRow } from '@juno/contract'
 import { Store, StoreReader, workspacePathsFromDir } from '@juno/store'
+import { listAllTopics, summarizeAllTopics } from '../../src/topics/allTopics'
 import { listTopics, makeRowCache } from '../../src/topics/query'
 import { sleep, startTestEngine } from '../harness'
 
@@ -155,6 +156,72 @@ describe.skipIf(process.env['JUNO_BENCH'] !== '1')('topics.list on the large see
       if (process.env['JUNO_BENCH_STRICT'] === '1') {
         expect(budgets.queryMsP95).toBe(true)
         expect(budgets.snapshotBytes).toBe(true)
+      }
+    } finally {
+      await engine.stop()
+    }
+  }, 900_000)
+})
+
+describe.skipIf(process.env['JUNO_BENCH'] !== '1')('allTopics.list on the large seed', () => {
+  it('runs a window, the counts and a text filter over every topic within budget', async () => {
+    const engine = await startTestEngine({ initial: (fake) => fake.signIn(), fakeOptions: { seed: largeSeed() } })
+    try {
+      await engine.status('ready')
+      await engine.phase('live', 600_000)
+      // The store is opened a second time below; the engine must have stopped writing.
+      await engine.syncIdle()
+      const paths = workspacePathsFromDir(join(engine.userData, 'workspaces', engine.fake.teamId))
+      const report = await Effect.runPromise(
+        Effect.gen(function* () {
+          const reader = yield* StoreReader
+          const time = (runs: number, query: Effect.Effect<unknown, unknown, StoreReader>) =>
+            Effect.gen(function* () {
+              yield* query
+              const out: Array<number> = []
+              for (let i = 0; i < runs; i++) {
+                const runStarted = performance.now()
+                yield* query
+                out.push(performance.now() - runStarted)
+              }
+              return out
+            }).pipe(Effect.provideService(StoreReader, reader))
+          const now = Date.now()
+          const all = { status: 'all', kind: 'all', sort: 'recent' } as const
+          const options = (offset: number) => ({ now, offset, limit: ALL_TOPICS_WINDOW })
+          const top = yield* listAllTopics(all, options(0), makeRowCache()).pipe(Effect.provideService(StoreReader, reader))
+          const first = yield* time(20, listAllTopics(all, options(0), makeRowCache()))
+          const cache = makeRowCache({ keepUsers: true })
+          const rerun = yield* time(20, listAllTopics(all, options(0), cache))
+          const middle = yield* time(20, listAllTopics({ ...all, sort: 'messages', status: 'quiet' }, options(1_000), makeRowCache()))
+          const text = yield* time(20, listAllTopics({ ...all, query: 'the' }, options(0), makeRowCache()))
+          const counts = yield* time(20, summarizeAllTopics({ kind: 'all' }, now))
+          const textCounts = yield* time(20, summarizeAllTopics({ kind: 'all', query: 'the' }, now))
+          return { top, first, rerun, middle, text, counts, textCounts }
+        }).pipe(Effect.provide(Store.layer(paths)), Effect.scoped),
+      )
+      const snapshotBytes = bytes(report.top.rows.map((row) => encodeRow(row)))
+      const result = {
+        load: loadavg().map((n) => Number(n.toFixed(1))),
+        total: report.top.total,
+        rows: report.top.rows.length,
+        firstMsMedian: median(report.first),
+        firstMsP95: p95(report.first),
+        rerunMsMedian: median(report.rerun),
+        rerunMsP95: p95(report.rerun),
+        deepWindowByMessagesMsP95: p95(report.middle),
+        textMsP95: p95(report.text),
+        countsMsP95: p95(report.counts),
+        textCountsMsP95: p95(report.textCounts),
+        snapshotBytes,
+      }
+      console.log(`allTopics.list large seed: ${JSON.stringify(result)}`)
+      expect(report.top.rows.length).toBe(ALL_TOPICS_WINDOW)
+      if (process.env['JUNO_BENCH_STRICT'] === '1') {
+        expect(result.firstMsP95).toBeLessThan(5)
+        expect(result.countsMsP95).toBeLessThan(5)
+        expect(result.textMsP95).toBeLessThan(20)
+        expect(snapshotBytes).toBeLessThan(200 * 1024)
       }
     } finally {
       await engine.stop()

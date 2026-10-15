@@ -204,12 +204,8 @@ describe('All topics', () => {
     expect(allTopicsList(all, { status: 'all', kind: 'all', sort: 'messages' }, ctx).rows.map((r) => r.topic.id)).toEqual([unsubscribed.id, resolved.id, open.id, quiet.id])
   })
 
-  it('filters by kind, channel and text; counts follow those filters', () => {
+  it('filters by kind and channel; counts follow those filters', () => {
     expect(allTopicsList(all, { status: 'all', kind: 'dms', sort: 'recent' }, ctx).rows.map((r) => r.topic.id)).toEqual([quiet.id])
-    expect(allTopicsList(all, { status: 'all', kind: 'all', scope: hiring.id, sort: 'recent' }, ctx).counts.all).toBe(1)
-    const byText = allTopicsList(all, { status: 'all', kind: 'all', sort: 'recent', query: 'pricing' }, ctx)
-    expect(byText.rows.map((r) => r.topic.id)).toEqual([unsubscribed.id])
-    expect(byText.counts).toEqual({ all: 1, open: 0, resolved: 0, quiet: 0, unsubscribed: 1 })
-    expect(allTopicsList(all, { status: 'all', kind: 'all', sort: 'recent', query: 'postgres' }, ctx).rows.map((r) => r.topic.id)).toEqual([open.id])
+    expect(allTopicsList(all, { status: 'all', kind: 'all', scope: hiring.id, sort: 'recent' }, ctx).counts).toEqual({ all: 1, open: 0, resolved: 1, quiet: 0, unsubscribed: 0 })
   })
 })

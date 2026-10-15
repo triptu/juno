@@ -21,6 +21,7 @@ import {
 import {
   activateTab,
   activeTab,
+  allTopicsLayoutAtom,
   bottomWindow,
   closeAllTabs,
   closeOtherTabs,
@@ -30,6 +31,8 @@ import {
   currentPlace,
   cycleTab,
   goToEntry,
+  allTopicsPlace,
+  allTopicsTab,
   homePlace,
   messageListAtom,
   messageWindowSpecAtom,
@@ -241,6 +244,66 @@ export function openTopicAt(id: string, ts: string): void {
   registry.set(scrollSnapshotAtom(id), { anchorKey: ts, offset: MESSAGE_TOP })
 }
 
+/** When the last All topics open started, for the page's first paint with rows to end its measure on. */
+let allTopicsOpenStart: number | undefined
+
+export function takeAllTopicsOpenStart(): number | undefined {
+  const start = allTopicsOpenStart
+  allTopicsOpenStart = undefined
+  return start
+}
+
+/** The All topics page's code, loaded once; the sidebar loads it on idle after its first paint. */
+export const loadAllTopicsPage = (() => {
+  let loading: Promise<typeof import('./AllTopics')> | undefined
+  return () => (loading ??= import('./AllTopics'))
+})()
+
+/**
+ * Resolves once the page's code is loaded and its first window is local,
+ * or after `READY_WAIT_MS` without the window, so the page does not paint
+ * an empty table when the engine answers within a frame or two.
+ */
+function whenAllTopicsReady(): Promise<void> {
+  return loadAllTopicsPage().then(
+    () =>
+      new Promise((resolve) => {
+        let done = false
+        const release = registry.mount(allTopicsLayoutAtom)
+        const finish = () => {
+          if (done) return
+          done = true
+          clearTimeout(timer)
+          off()
+          resolve()
+          afterPaint(release)
+        }
+        const check = () => {
+          if (registry.get(allTopicsLayoutAtom).ready) finish()
+        }
+        const timer = setTimeout(finish, READY_WAIT_MS)
+        const off = registry.subscribe(allTopicsLayoutAtom, check, { immediate: false })
+        check()
+      }),
+  )
+}
+
+/** The sidebar's All topics item and the "View all topics" empty states. All topics is a singleton, like Home. */
+export function openAllTopics(options: OpenOptions = {}): void {
+  if (allTopicsTab(registry.get(tabsAtom)) !== undefined) {
+    show((tabs) => openPlace(tabs, allTopicsPlace, options), undefined)
+    return
+  }
+  const ticket = ++currentTicket
+  allTopicsOpenStart = performance.now()
+  const ready = whenAllTopicsReady()
+  queue = queue
+    .then(() => ready)
+    .then(() => {
+      if (ticket === currentTicket) apply((tabs) => openPlace(tabs, allTopicsPlace, options))
+    })
+}
+
 /**
  * A New chat sent to `topicId`: its tab becomes the topic, in the frame the
  * topic can paint, or closes when another tab shows it (`settleNewChat`).
@@ -416,6 +479,7 @@ function placeLabel(place: Place): string {
   if (place.kind === 'home') return 'Home'
   if (place.kind === 'notifications') return 'Notifications'
   if (place.kind === 'preferences') return 'Preferences'
+  if (place.kind === 'allTopics') return 'All topics'
   const result = registry.get(topicAtom(place.topicId))
   const detail = result._tag === 'Success' ? result.value : null
   if (detail === null) return 'Topic'

@@ -1,7 +1,7 @@
 /**
  * Workspace tabs (spec section 6, inventory 4, performance 4.3 and 4.5).
  *
- * A tab shows one place, a topic, a New chat or Home, and keeps its own
+ * A tab shows one place, a topic, a New chat, Home or All topics, and keeps its own
  * history of the places it showed, like a browser tab. The rules are pure
  * functions over `Tabs`:
  * - `openPlace`: a place opens in the current tab (a new history entry), or
@@ -33,16 +33,18 @@ import { topicAtom } from './messages'
 import { newChatAtom, newChatTitle } from './newChat'
 import { signedInAtom } from './session'
 
-/** What a tab shows: a topic, a New chat (spec section 9), or a page: Home (section 12), Notifications or Preferences (section 14). */
+/** What a tab shows: a topic, a New chat (spec section 9), or a page: Home (section 12), All topics (section 11), Notifications or Preferences (section 14). */
 export type Place =
   | { readonly kind: 'topic'; readonly topicId: string }
   | { readonly kind: 'newChat' }
   | { readonly kind: 'home' }
+  | { readonly kind: 'allTopics' }
   | { readonly kind: 'notifications' }
   | { readonly kind: 'preferences' }
 
 export const newChatPlace: Place = { kind: 'newChat' }
 export const homePlace: Place = { kind: 'home' }
+export const allTopicsPlace: Place = { kind: 'allTopics' }
 export const notificationsPlace: Place = { kind: 'notifications' }
 export const preferencesPlace: Place = { kind: 'preferences' }
 export const topicPlace = (topicId: string): Place => ({ kind: 'topic', topicId })
@@ -104,6 +106,8 @@ export const tabShowing = (tabs: Tabs, topicId: string): Tab | undefined => tabs
 export const homeTab = (tabs: Tabs): Tab | undefined => pageTab(tabs, 'home')
 /** The tab that shows a page. Pages are singletons. */
 const pageTab = (tabs: Tabs, kind: Place['kind']): Tab | undefined => tabs.tabs.find((tab) => currentPlace(tab).kind === kind)
+/** The tab that shows All topics, if one does. All topics is a singleton. */
+export const allTopicsTab = (tabs: Tabs): Tab | undefined => pageTab(tabs, 'allTopics')
 const pinnedCount = (tabs: ReadonlyArray<Tab>) => tabs.filter((tab) => tab.pinned).length
 
 /** A tab id no open or closed tab has. Ids are `tab-<n>`, so the next is one past the highest. */
@@ -282,7 +286,7 @@ export const TABS_PREF = 'tabs'
 
 const PlaceJson = Schema.Union([
   Schema.Struct({ kind: Schema.Literal('topic'), topicId: Schema.String }),
-  Schema.Struct({ kind: Schema.Literals(['newChat', 'home', 'notifications', 'preferences']) }),
+  Schema.Struct({ kind: Schema.Literals(['newChat', 'home', 'allTopics', 'notifications', 'preferences']) }),
 ])
 /**
  * A saved tab, or one saved before history, when a tab's id was its

@@ -18,20 +18,23 @@ import { AccountMenu, hueFor, initials, Sidebar as SidebarView, type AccountMenu
 import { AppInfo } from './AppInfo'
 import { EngineStatus, SyncNotice } from './EngineStatus'
 import { markFilterChange } from './filterMark'
-import { openHome, openNewTab, openNotifications, openPreferences } from './navigation'
+import { openAllTopics, openHome, openNewTab, openNotifications, openPreferences } from './navigation'
 import { Session } from './Session'
 import { TitlebarNav } from './TitlebarNav'
 import { TopicList } from './TopicList'
 
 function navigate(target: SidebarNavTarget, event: ActivateEvent): void {
   if (target === 'home') return openHome({ newTab: event.metaKey })
-  // TODO(M5/M9/M11): open the All topics or Juno page in a tab.
+  if (target === 'all-topics') return openAllTopics({ newTab: event.metaKey })
+  // TODO(M11): open the Juno page in a tab.
 }
 
 /** The nav item of the active tab's page. Home also reads as selected with no tab open. */
 function activeNavOf(tabs: Tabs): SidebarNavTarget | undefined {
   const tab = activeTab(tabs)
-  return tab === undefined || currentPlace(tab).kind === 'home' ? 'home' : undefined
+  if (tab === undefined) return 'home'
+  const place = currentPlace(tab)
+  return place.kind === 'home' ? 'home' : place.kind === 'allTopics' ? 'all-topics' : undefined
 }
 
 /**

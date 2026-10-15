@@ -26,7 +26,6 @@ Small items noticed during work that are not yet assigned to a milestone. Remove
 - ui: `EmptyState.tsx` is skipped by the React Compiler (`step++` inside a closure); rewrite so it compiles.
 - ui: `activateHandlers` follow-ups and the `ScrollArea` gutter and hover rule from the M3 code review.
 - Sidebar times should use domain `relativeTime` (needs a `desktop → domain` edge decision).
-- "View all topics" does nothing until the All topics page lands (M5).
 - Main rows: engine field for "threads started since Main was last read" (contract + topics query), wired to the TopicRow `newThreads` prop. After M4 WP1 merges.
 - Topic art track: placeholder is a library of free-form Tide-style shapes picked per topic, no container (owner decision 10-13).
 - Topic view: the message's mention tint does not count the user's groups (`@group`), because the engine does not keep the groups from `client.userBoot` outside the sync. Keep them in `team` or hand them over through `SyncLink`.

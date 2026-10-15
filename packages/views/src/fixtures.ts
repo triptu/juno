@@ -4,6 +4,7 @@
  */
 import type { FixtureSet } from '@juno/ui'
 import AccountMenu from './AccountMenu.fixtures'
+import AllTopics from './AllTopics.fixtures'
 import ActiveThreads from './ActiveThreads.fixtures'
 import AppearanceSettings from './AppearanceSettings.fixtures'
 import AppInfoView from './AppInfoView.fixtures'
@@ -54,6 +55,7 @@ import ScheduledPage from './juno-pages/ScheduledPage.fixtures'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   AccountMenu,
+  AllTopics,
   ActivityPage,
   ActiveThreads,
   AppearanceSettings,

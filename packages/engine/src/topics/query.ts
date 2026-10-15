@@ -104,7 +104,7 @@ export interface RowCache {
   usersRead: Map<string, UserRow | null> | undefined
 }
 
-interface CacheEntry {
+export interface CacheEntry {
   readonly source: ListRow
   readonly parsed: ParsedColumns
   readonly topic: Topic
@@ -149,7 +149,7 @@ export interface QueryOptions {
 const DAY = 24 * 60 * 60 * 1000
 
 /** The quiet window from prefs (clamped by the domain rule), the AI assist switch and the signed-in user. */
-const settings = Effect.gen(function* () {
+export const settings = Effect.gen(function* () {
   const sql = yield* StoreReader
   const prefs = yield* sql<{ key: string; value_json: string }>`SELECT key, value_json FROM prefs WHERE key IN ('quietDays', 'aiAssist')`
   const team = yield* sql<{ self_user_id: string | null }>`SELECT self_user_id FROM team LIMIT 1`
@@ -175,15 +175,15 @@ const settings = Effect.gen(function* () {
 const NEW_THREADS = `CASE WHEN i.kind = 'main' THEN (SELECT count(*) FROM topic_index t
       WHERE t.channel = i.channel AND t.last_activity_ts > r.last_read_ts AND t.kind = 'thread' AND t.root_ts > r.last_read_ts) ELSE 0 END AS new_threads`
 
-const SELECT = `${TOPIC_COLUMNS}, ${NEW_THREADS},
+export const SELECT = `${TOPIC_COLUMNS}, ${NEW_THREADS},
     CASE WHEN i.kind = 'main' THEN (SELECT max(t.last_activity_ts) FROM topic_index t WHERE t.channel = i.channel) END AS channel_activity_ts`
 const SELECT_IN_WINDOW = `${TOPIC_COLUMNS}, ${NEW_THREADS}, NULL AS channel_activity_ts`
 
-const FROM = `${TOPIC_FROM}
+export const FROM = `${TOPIC_FROM}
   LEFT JOIN topic_reads r ON r.topic_id = i.topic_id`
 
 /** A sidebar row: the joined topic and its new-threads count. */
-interface ListRow extends JoinedRow {
+export interface ListRow extends JoinedRow {
   readonly new_threads: number
 }
 
@@ -194,7 +194,7 @@ interface ListRow extends JoinedRow {
  */
 const THREAD_RULE = ` AND (i.kind <> 'thread' OR s.subscribed = 1 OR (s.subscribed IS NULL AND i.mentions_me = 1 AND i.unread_count > 0))`
 
-const kindClause = (kind: ListFilter['kind']): string =>
+export const kindClause = (kind: ListFilter['kind']): string =>
   kind === 'channels' ? ` AND c.kind IN ('public', 'private')` : kind === 'dms' ? ` AND c.kind IN ('im', 'mpim')` : ''
 
 /**
@@ -273,8 +273,7 @@ export const listTopics = (filter: ListFilter, options: QueryOptions, cache: Row
     const sql = yield* StoreReader
     const { quietDays, aiAssist, selfId } = yield* settings
     const ctx = { now: options.now, ...(quietDays === undefined ? {} : { quietDays }) }
-    const cutoffMillis = options.now - quietDaysOf(ctx) * DAY
-    const cutoff = `${Math.floor(cutoffMillis / 1000)}.000000`
+    const cutoff = cutoffTs(options.now, quietDaysOf(ctx))
 
     const byId = new Map<string, ListRow>()
     const run = (statement: ReturnType<typeof listStatements>[number]) =>
@@ -288,6 +287,53 @@ export const listTopics = (filter: ListFilter, options: QueryOptions, cache: Row
     // A pinned row in the window sits in Pinned, not Recent. The rest fill Recent; the older statements only matter when they leave room.
     if (inWindow.filter((row) => row.pinned_at === null).length < options.limit) for (const statement of older) yield* run(statement)
 
+    const shaper = yield* shapeRows(byId.values(), { selfId, aiAssist }, cache)
+    // Let the pure rules place every topic.
+    const pinned: Array<CacheEntry> = []
+    const recent: Array<CacheEntry> = []
+    for (const entry of shaper.entries) {
+      const placement = sidebarPlacement(entry.topic, ctx)
+      if (placement === 'pinned') pinned.push(entry)
+      else if (placement === 'recent') recent.push(entry)
+    }
+    pinned.sort((a, b) => byLatestActivity(a.topic, b.topic))
+    recent.sort((a, b) => byLatestActivity(a.topic, b.topic))
+
+    for (const entry of pinned) shaper.place(entry, 'pinned', topicStatus(entry.topic, ctx))
+    for (const entry of recent.slice(0, Math.max(0, options.limit - pinned.length))) shaper.place(entry, 'recent', topicStatus(entry.topic, ctx))
+    return shaper.finish()
+  })
+
+/** The quiet window's start as a ts, to the millisecond, so `ts < cutoff` is exactly the domain's quiet rule. */
+export function cutoffTs(now: number, quietDays: number): string {
+  const millis = now - quietDays * DAY
+  return `${Math.floor(millis / 1000)}.${String(millis % 1000).padStart(3, '0')}000`
+}
+
+/** Builds the rows of one run, in the order `place` is called. */
+export interface Shaper {
+  /** The topic of every joined row with activity, in the order given. */
+  readonly entries: ReadonlyArray<CacheEntry>
+  /** Adds the entry's row to the run, shaped for this section and status. */
+  readonly place: (entry: CacheEntry, section: TopicListRow['section'], status: TopicStatus) => void
+  /** The run, with the channels, people and art its rows name. Commits the cache, so call it last. */
+  readonly finish: (total?: number) => ListRun<TopicListRow>
+}
+
+/**
+ * Turns joined index rows into domain topics, reusing the cache's topics
+ * and people where nothing changed and reading the users no earlier run
+ * has read. The sidebar and All topics share it; each decides which rows to
+ * place and with what section and status.
+ */
+export const shapeRows = (
+  source: Iterable<ListRow>,
+  options: { readonly selfId: string | undefined; readonly aiAssist: boolean },
+  cache: RowCache,
+): Effect.Effect<Shaper, SqlError, StoreReader> =>
+  Effect.gen(function* () {
+    const sql = yield* StoreReader
+    const { selfId, aiAssist } = options
     // A different signed-in user changes every group DM name; start over.
     if (cache.selfId !== selfId) {
       cache.selfId = selfId
@@ -295,11 +341,12 @@ export const listTopics = (filter: ListFilter, options: QueryOptions, cache: Row
       cache.people = new Map()
     }
     const previous = cache.entries
+    const joined = [...source]
 
     // Names and photos: participants, DM partners, group DM members and senders, in one lookup.
     const userIds = new Set<string>()
     const parsed = new Map<JoinedRow, ParsedColumns>()
-    for (const row of byId.values()) {
+    for (const row of joined) {
       const hit = previous.get(row.topic_id)
       const columns =
         hit !== undefined && hit.source.participants_json === row.participants_json && hit.source.preview_json === row.preview_json && hit.source.c_members === row.c_members
@@ -335,11 +382,10 @@ export const listTopics = (filter: ListFilter, options: QueryOptions, cache: Row
       return person
     }
 
-    // Build or reuse the domain topic of every row, then let the pure rules place it.
+    // Build or reuse the domain topic of every row.
     const next = new Map<string, CacheEntry>()
-    const pinned: Array<CacheEntry> = []
-    const recent: Array<CacheEntry> = []
-    for (const row of byId.values()) {
+    const entries: Array<CacheEntry> = []
+    for (const row of joined) {
       if (row.last_activity_ts === null) continue
       const hit = previous.get(row.topic_id)
       const columns = parsed.get(row)!
@@ -348,19 +394,14 @@ export const listTopics = (filter: ListFilter, options: QueryOptions, cache: Row
           ? hit
           : { ...entryOf(row, columns, selfId, personOf), source: row, parsed: columns }
       next.set(row.topic_id, entry)
-      const placement = sidebarPlacement(entry.topic, ctx)
-      if (placement === 'pinned') pinned.push(entry)
-      else if (placement === 'recent') recent.push(entry)
+      entries.push(entry)
     }
-    pinned.sort((a, b) => byLatestActivity(a.topic, b.topic))
-    recent.sort((a, b) => byLatestActivity(a.topic, b.topic))
 
     const rows: Array<TopicListRow> = []
     const channels = new Map<string, ChannelRef>()
     const named = new Map<string, Person>()
     const art: Array<TopicArt> = []
-    const place = (entry: CacheEntry, section: TopicListRow['section']) => {
-      const status = topicStatus(entry.topic, ctx)
+    const place = (entry: CacheEntry, section: TopicListRow['section'], status: TopicStatus) => {
       const shaped = entry.shaped !== undefined && entry.shaped.section === section && entry.shaped.status === status ? entry.shaped : { section, status, row: shape(entry, section, status) }
       if (shaped !== entry.shaped) next.set(entry.topic.id, { ...entry, shaped })
       rows.push(shaped.row)
@@ -370,16 +411,14 @@ export const listTopics = (filter: ListFilter, options: QueryOptions, cache: Row
       const drawing = artRefOf(entry.source, aiAssist)
       if (drawing !== undefined) art.push(drawing)
     }
-    for (const entry of pinned) place(entry, 'pinned')
-    for (const entry of recent) {
-      if (rows.length >= options.limit) break
-      place(entry, 'recent')
+    const finish = (total?: number): ListRun<TopicListRow> => {
+      // Committed together, at the end, so a run that fails halfway leaves the last good state.
+      cache.entries = next
+      cache.people = people
+      cache.usersRead = users
+      return { rows, total: total ?? rows.length, refs: { channels: [...channels.values()], people: [...named.values()], art } }
     }
-    // Committed together, at the end, so a run that fails halfway leaves the last good state.
-    cache.entries = next
-    cache.people = people
-    cache.usersRead = users
-    return { rows, total: rows.length, refs: { channels: [...channels.values()], people: [...named.values()], art } }
+    return { entries, place, finish }
   })
 
 /** Every column of the joined row equal: the topic built from it still holds. */
