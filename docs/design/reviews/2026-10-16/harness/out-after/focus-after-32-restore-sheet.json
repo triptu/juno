@@ -1,0 +1,13 @@
+{
+  "tag": "button",
+  "role": null,
+  "name": "Restore",
+  "inDialog": null,
+  "ring": "solid 2px rgb(180, 53, 31)",
+  "rect": [
+    1160,
+    811,
+    60,
+    22
+  ]
+}

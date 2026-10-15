@@ -1,0 +1,182 @@
+[
+  {
+    "tag": "section",
+    "label": "Restore from backup",
+    "rect": [
+      420,
+      214,
+      560,
+      405
+    ],
+    "padding": "0px",
+    "radius": "13px",
+    "font": "14.5px/21.75px 400",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgb(251, 251, 248)"
+  },
+  {
+    "tag": "h2",
+    "label": "Restore from backup",
+    "rect": [
+      441,
+      235,
+      518,
+      21
+    ],
+    "padding": "0px",
+    "radius": "0px",
+    "font": "15.5px/20.925px 600",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "tag": "p",
+    "label": "Juno replaces its state on this Mac with",
+    "rect": [
+      441,
+      260,
+      518,
+      43
+    ],
+    "padding": "0px",
+    "radius": "0px",
+    "font": "14px/21.7px 400",
+    "color": "rgb(96, 94, 82)",
+    "bg": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "tag": "p",
+    "label": "Backup folder",
+    "rect": [
+      441,
+      319,
+      518,
+      22
+    ],
+    "padding": "0px",
+    "radius": "0px",
+    "font": "14px/21.7px 500",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "tag": "button",
+    "label": "Choose folder",
+    "rect": [
+      860,
+      352,
+      94,
+      22
+    ],
+    "padding": "0px 8px",
+    "radius": "999px",
+    "font": "12px/normal 500",
+    "color": "rgb(96, 94, 82)",
+    "bg": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "tag": "p",
+    "label": "Recovery phrase",
+    "rect": [
+      441,
+      395,
+      518,
+      22
+    ],
+    "padding": "0px",
+    "radius": "0px",
+    "font": "14px/21.7px 500",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "tag": "label",
+    "label": "",
+    "rect": [
+      441,
+      423,
+      518,
+      32
+    ],
+    "padding": "0px 10px",
+    "radius": "7px",
+    "font": "14.5px/21.75px 400",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgb(251, 251, 248)"
+  },
+  {
+    "tag": "input",
+    "label": "Recovery phrase",
+    "rect": [
+      452,
+      424,
+      496,
+      30
+    ],
+    "padding": "0px",
+    "radius": "0px",
+    "font": "13.5px/20.25px 400",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "tag": "label",
+    "label": "The old Mac is off, erased, or has Juno ",
+    "rect": [
+      441,
+      492,
+      518,
+      60
+    ],
+    "padding": "0px",
+    "radius": "0px",
+    "font": "14.5px/21.75px 400",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "tag": "input",
+    "label": "",
+    "rect": [
+      441,
+      494,
+      15,
+      15
+    ],
+    "padding": "0px",
+    "radius": "0px",
+    "font": "13.3333px/normal 400",
+    "color": "rgb(0, 0, 0)",
+    "bg": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "tag": "button",
+    "label": "Cancel",
+    "rect": [
+      812,
+      568,
+      68,
+      30
+    ],
+    "padding": "0px 12px",
+    "radius": "12px",
+    "font": "13.5px/20.25px 500",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgb(241, 238, 228)"
+  },
+  {
+    "tag": "button",
+    "label": "Restore",
+    "rect": [
+      886,
+      568,
+      73,
+      30
+    ],
+    "padding": "0px 12px",
+    "radius": "12px",
+    "font": "13.5px/20.25px 500",
+    "color": "rgb(255, 255, 255)",
+    "bg": "rgb(204, 70, 40)"
+  }
+]

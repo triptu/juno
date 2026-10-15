@@ -1,0 +1,122 @@
+[
+  {
+    "tag": "label",
+    "label": "Enabled",
+    "rect": [
+      574,
+      255,
+      163,
+      23
+    ],
+    "padding": "0px",
+    "radius": "0px",
+    "font": "14.5px/21.75px 400",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "tag": "button",
+    "label": "Connect",
+    "rect": [
+      1135,
+      265,
+      65,
+      22
+    ],
+    "padding": "0px 8px",
+    "radius": "999px",
+    "font": "12px/normal 500",
+    "color": "rgb(255, 255, 255)",
+    "bg": "rgb(204, 70, 40)"
+  },
+  {
+    "tag": "label",
+    "label": "Enabled",
+    "rect": [
+      574,
+      384,
+      158,
+      23
+    ],
+    "padding": "0px",
+    "radius": "0px",
+    "font": "14.5px/21.75px 400",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "tag": "button",
+    "label": "Connect",
+    "rect": [
+      1135,
+      393,
+      65,
+      22
+    ],
+    "padding": "0px 8px",
+    "radius": "999px",
+    "font": "12px/normal 500",
+    "color": "rgb(255, 255, 255)",
+    "bg": "rgb(204, 70, 40)"
+  },
+  {
+    "tag": "label",
+    "label": "Enabled",
+    "rect": [
+      574,
+      512,
+      147,
+      23
+    ],
+    "padding": "0px",
+    "radius": "0px",
+    "font": "14.5px/21.75px 400",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "tag": "button",
+    "label": "Connect",
+    "rect": [
+      1135,
+      521,
+      65,
+      22
+    ],
+    "padding": "0px 8px",
+    "radius": "999px",
+    "font": "12px/normal 500",
+    "color": "rgb(255, 255, 255)",
+    "bg": "rgb(204, 70, 40)"
+  },
+  {
+    "tag": "label",
+    "label": "",
+    "rect": [
+      574,
+      577,
+      626,
+      32
+    ],
+    "padding": "0px 10px",
+    "radius": "7px",
+    "font": "14.5px/21.75px 400",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgb(251, 251, 248)"
+  },
+  {
+    "tag": "label",
+    "label": "Allow T3 Code over the local networkOnly",
+    "rect": [
+      574,
+      617,
+      626,
+      45
+    ],
+    "padding": "0px",
+    "radius": "0px",
+    "font": "14.5px/21.75px 400",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgba(0, 0, 0, 0)"
+  }
+]

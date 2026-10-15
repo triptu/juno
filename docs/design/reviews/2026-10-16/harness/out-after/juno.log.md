@@ -1,0 +1,7 @@
+- shot 30-settings-backup
+- shot 31-phrase-sheet
+- shot 32-restore-sheet
+- shot 33-move-sheet
+- shot 40-connections
+- shot 41-connections-bottom
+- shot 42-connections-720

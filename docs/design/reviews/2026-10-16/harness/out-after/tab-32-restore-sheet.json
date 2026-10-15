@@ -1,0 +1,106 @@
+[
+  {
+    "tag": "button",
+    "role": null,
+    "name": "Choose folder",
+    "inDialog": "Restore from backup",
+    "ring": "solid 2px rgb(180, 53, 31)",
+    "rect": [
+      860,
+      352,
+      94,
+      22
+    ]
+  },
+  {
+    "tag": "input",
+    "role": null,
+    "name": "Recovery phrase",
+    "inDialog": "Restore from backup",
+    "ring": "none 3px rgb(35, 33, 26)",
+    "rect": [
+      452,
+      424,
+      496,
+      30
+    ]
+  },
+  {
+    "tag": "input",
+    "role": null,
+    "name": "",
+    "inDialog": "Restore from backup",
+    "ring": "solid 2px rgb(180, 53, 31)",
+    "rect": [
+      441,
+      494,
+      15,
+      15
+    ]
+  },
+  {
+    "tag": "button",
+    "role": null,
+    "name": "Cancel",
+    "inDialog": "Restore from backup",
+    "ring": "solid 2px rgb(180, 53, 31)",
+    "rect": [
+      812,
+      568,
+      68,
+      30
+    ]
+  },
+  {
+    "tag": "button",
+    "role": null,
+    "name": "Choose folder",
+    "inDialog": "Restore from backup",
+    "ring": "solid 2px rgb(180, 53, 31)",
+    "rect": [
+      860,
+      352,
+      94,
+      22
+    ]
+  },
+  {
+    "tag": "input",
+    "role": null,
+    "name": "Recovery phrase",
+    "inDialog": "Restore from backup",
+    "ring": "none 3px rgb(35, 33, 26)",
+    "rect": [
+      452,
+      424,
+      496,
+      30
+    ]
+  },
+  {
+    "tag": "input",
+    "role": null,
+    "name": "",
+    "inDialog": "Restore from backup",
+    "ring": "solid 2px rgb(180, 53, 31)",
+    "rect": [
+      441,
+      494,
+      15,
+      15
+    ]
+  },
+  {
+    "tag": "button",
+    "role": null,
+    "name": "Cancel",
+    "inDialog": "Restore from backup",
+    "ring": "solid 2px rgb(180, 53, 31)",
+    "rect": [
+      812,
+      568,
+      68,
+      30
+    ]
+  }
+]

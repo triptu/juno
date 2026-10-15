@@ -344,7 +344,7 @@ export const chatCopy = {
       cancel: 'Cancel',
       disconnect: 'Disconnect',
       remove: 'Remove',
-      signingIn: 'Finish signing in in your browser.',
+      signingIn: 'Your browser is open to finish signing in.',
       add: 'Add a server',
       addSub: 'Any MCP server by its address. Juno signs in if the server asks.',
       name: 'Name',

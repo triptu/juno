@@ -24,6 +24,11 @@ test('opens with ⌘K and the Search button, shows recent topics, and closes wit
   // The first recent topic is active, and Enter opens it.
   const first = await palette.activeText()
   expect(first).not.toBe('')
+  // The field is the only stop: Tab never reaches the window under the dim.
+  await palette.press('Tab')
+  await expect(palette.input).toBeFocused()
+  await palette.press('Shift+Tab')
+  await expect(palette.input).toBeFocused()
   await palette.press('Escape')
   await palette.expectClosed()
 

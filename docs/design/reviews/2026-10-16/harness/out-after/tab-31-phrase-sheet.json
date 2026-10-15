@@ -1,0 +1,106 @@
+[
+  {
+    "tag": "button",
+    "role": null,
+    "name": "Copy",
+    "inDialog": "Your recovery phrase",
+    "ring": "solid 2px rgb(180, 53, 31)",
+    "rect": [
+      836,
+      496,
+      59,
+      30
+    ]
+  },
+  {
+    "tag": "button",
+    "role": null,
+    "name": "Done",
+    "inDialog": "Your recovery phrase",
+    "ring": "solid 2px rgb(180, 53, 31)",
+    "rect": [
+      901,
+      496,
+      58,
+      30
+    ]
+  },
+  {
+    "tag": "button",
+    "role": null,
+    "name": "Copy",
+    "inDialog": "Your recovery phrase",
+    "ring": "solid 2px rgb(180, 53, 31)",
+    "rect": [
+      836,
+      496,
+      59,
+      30
+    ]
+  },
+  {
+    "tag": "button",
+    "role": null,
+    "name": "Done",
+    "inDialog": "Your recovery phrase",
+    "ring": "solid 2px rgb(180, 53, 31)",
+    "rect": [
+      901,
+      496,
+      58,
+      30
+    ]
+  },
+  {
+    "tag": "button",
+    "role": null,
+    "name": "Copy",
+    "inDialog": "Your recovery phrase",
+    "ring": "solid 2px rgb(180, 53, 31)",
+    "rect": [
+      836,
+      496,
+      59,
+      30
+    ]
+  },
+  {
+    "tag": "button",
+    "role": null,
+    "name": "Done",
+    "inDialog": "Your recovery phrase",
+    "ring": "solid 2px rgb(180, 53, 31)",
+    "rect": [
+      901,
+      496,
+      58,
+      30
+    ]
+  },
+  {
+    "tag": "button",
+    "role": null,
+    "name": "Copy",
+    "inDialog": "Your recovery phrase",
+    "ring": "solid 2px rgb(180, 53, 31)",
+    "rect": [
+      836,
+      496,
+      59,
+      30
+    ]
+  },
+  {
+    "tag": "button",
+    "role": null,
+    "name": "Done",
+    "inDialog": "Your recovery phrase",
+    "ring": "solid 2px rgb(180, 53, 31)",
+    "rect": [
+      901,
+      496,
+      58,
+      30
+    ]
+  }
+]
