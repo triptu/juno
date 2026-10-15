@@ -1,9 +1,12 @@
 import * as stylex from '@stylexjs/stylex'
 import { ArrowBendUpLeft } from '@phosphor-icons/react/dist/icons/ArrowBendUpLeft'
+import { DotsThree } from '@phosphor-icons/react/dist/icons/DotsThree'
 import { Quotes } from '@phosphor-icons/react/dist/icons/Quotes'
 import { Smiley } from '@phosphor-icons/react/dist/icons/Smiley'
+import type { MouseEvent } from 'react'
 import { spacing } from '@juno/tokens/tokens.stylex'
-import { Divider, EmojiButton, IconButton, Surface } from '@juno/ui'
+import { Button, Divider, EmojiButton, IconButton, Surface, Text } from '@juno/ui'
+import type { MenuAnchor } from './header/HeaderControls'
 
 export interface QuickReaction {
   /** Slack's name, for example `+1`. */
@@ -23,19 +26,50 @@ export interface HoverToolbarProps {
   readonly main?: boolean
   readonly reactions?: ReadonlyArray<QuickReaction>
   readonly onReact?: (name: string) => void
-  readonly onMoreReactions?: () => void
+  /** Opens the emoji picker under the toolbar's bottom right corner. */
+  readonly onMoreReactions?: (at: MenuAnchor) => void
   readonly onQuote?: () => void
   readonly onReply?: () => void
+  /** More: the message menu, under the button. */
+  readonly onMore?: (at: MenuAnchor) => void
+  /**
+   * The inline delete confirm (ADR 0010): the toolbar asks "Delete this
+   * message?" with Delete and Cancel in place of its buttons. Enter and Esc
+   * are the row's keys; the container handles them.
+   */
+  readonly confirmDelete?: { readonly onConfirm: () => void; readonly onCancel: () => void }
   readonly tabIndex?: 0 | -1
+}
+
+/** Below the button, right-aligned with it: where a menu or the picker opens. */
+function below(event: MouseEvent<HTMLElement>): MenuAnchor {
+  const box = event.currentTarget.getBoundingClientRect()
+  return { x: box.right, y: box.bottom }
 }
 
 /**
  * The toolbar that appears over a hovered or focused message (inventory
- * 6.5): quick reactions, More reactions, Quote and, in Main, Reply in
- * thread. Icon only. The message reserves its place, so showing it moves
- * nothing. M4 shows it in the gallery; the app mounts it in M6.
+ * 6.5): quick reactions, More reactions (the emoji picker), Quote, in Main
+ * Reply in thread, and More (the message menu). Icon only. The message
+ * reserves its place, so showing it moves nothing. While a delete waits for
+ * its confirm, the toolbar holds the question instead.
  */
-export function HoverToolbar({ main = false, reactions = quickReactions, onReact, onMoreReactions, onQuote, onReply, tabIndex = 0 }: HoverToolbarProps) {
+export function HoverToolbar({ main = false, reactions = quickReactions, onReact, onMoreReactions, onQuote, onReply, onMore, confirmDelete, tabIndex = 0 }: HoverToolbarProps) {
+  if (confirmDelete !== undefined) {
+    return (
+      <Surface kind="toolbar" padding="xs" role="group" aria-label="Delete this message?" data-delete-confirm="" sx={[styles.toolbar, styles.confirm]}>
+        <Text variant="meta" tone="default" as="span" sx={styles.question}>
+          Delete this message?
+        </Text>
+        <Button variant="ghost" size="sm" tone="subtle" onClick={confirmDelete.onCancel}>
+          Cancel
+        </Button>
+        <Button variant="primary" size="sm" kbd="↵" onClick={confirmDelete.onConfirm}>
+          Delete
+        </Button>
+      </Surface>
+    )
+  }
   return (
     <Surface kind="toolbar" padding="xs" role="toolbar" aria-label="Message actions" sx={styles.toolbar}>
       {reactions.map((reaction) => (
@@ -44,9 +78,10 @@ export function HoverToolbar({ main = false, reactions = quickReactions, onReact
       <span {...stylex.props(styles.separator)}>
         <Divider vertical inset="none" />
       </span>
-      <IconButton icon={Smiley} label="More reactions" size={28} tabIndex={tabIndex} onClick={onMoreReactions} />
+      <IconButton icon={Smiley} label="More reactions" size={28} tabIndex={tabIndex} onClick={onMoreReactions === undefined ? undefined : (event) => onMoreReactions(below(event))} />
       <IconButton icon={Quotes} label="Quote" size={28} tabIndex={tabIndex} onClick={onQuote} />
       {main ? <IconButton icon={ArrowBendUpLeft} label="Reply in thread" size={28} tabIndex={tabIndex} onClick={onReply} /> : null}
+      {onMore !== undefined ? <IconButton icon={DotsThree} label="More" size={28} tabIndex={tabIndex} onClick={(event) => onMore(below(event))} /> : null}
     </Surface>
   )
 }
@@ -56,6 +91,14 @@ const styles = stylex.create({
     display: 'inline-flex',
     alignItems: 'center',
     gap: spacing['--space-0-5'],
+  },
+  confirm: {
+    gap: spacing['--space-1'],
+  },
+  question: {
+    paddingInline: spacing['--space-2'],
+    whiteSpace: 'nowrap',
+    userSelect: 'none',
   },
   separator: {
     display: 'inline-flex',

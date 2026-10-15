@@ -267,6 +267,83 @@ test.describe('Send', () => {
   })
 })
 
+/**
+ * Changes to one message (spec section 7): a reaction chip joining, its
+ * count going up and the chip leaving move nothing; the first chip of a
+ * message grows that message at its bottom only; the delete confirm takes
+ * the toolbar's place and the edit field the body's without moving any row
+ * above. Driven through `window.__fixtureControls`.
+ */
+test.describe('Message actions', () => {
+  const open = (page: Page, component: string, id: string) => openState(page, { component, id, route: `${component}/${id}`, group: '', groupId: '', state: '', frame: {} })
+  const step = (page: Page, name: string) => page.evaluate((control) => (window as unknown as { __fixtureControls?: Record<string, () => void> }).__fixtureControls?.[control]?.(), name)
+  const boxes = (page: Page) => page.locator('[data-message-row]').evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().toJSON() as DOMRect))
+
+  test('a chip joining, counting up and leaving a row of chips moves nothing', async ({ page }) => {
+    await open(page, 'MessageList', 'shift/reaction-changes')
+    const before = await boxes(page)
+    await step(page, 'chip-joins')
+    await expect(page.getByRole('button', { name: '1 👀, including you' })).toHaveCount(1)
+    expect(await boxes(page)).toEqual(before)
+    await step(page, 'count-up')
+    await expect(page.getByRole('button', { name: '2 👀, including you' })).toHaveCount(1)
+    expect(await boxes(page)).toEqual(before)
+    await step(page, 'chip-leaves')
+    await expect(page.getByRole('button', { name: /👀, including you/ })).toHaveCount(0)
+    expect(await boxes(page)).toEqual(before)
+  })
+
+  test('a message’s first chip grows it at its bottom and moves nothing above', async ({ page }) => {
+    await open(page, 'MessageList', 'shift/reaction-changes')
+    const before = await boxes(page)
+    await step(page, 'first-chip')
+    await expect(page.getByRole('button', { name: '1 👀, including you' })).toHaveCount(1)
+    const after = await boxes(page)
+    // Rows 0 and 1 are above the message (row 2): untouched. The message keeps its top; the rows under it move down together.
+    expect(after.slice(0, 2)).toEqual(before.slice(0, 2))
+    expect(after[2]!.y).toBe(before[2]!.y)
+    const grown = after[2]!.height - before[2]!.height
+    expect(grown).toBeGreaterThan(0)
+    for (let index = 3; index < before.length; index++) expect(after[index]!.y - before[index]!.y).toBe(grown)
+  })
+
+  test('the delete confirm takes the toolbar’s place and moves nothing', async ({ page }) => {
+    await open(page, 'MessageList', 'shift/own-row-changes')
+    const before = await boxes(page)
+    await step(page, 'confirm')
+    await expect(page.locator('[data-delete-confirm]')).toBeVisible()
+    expect(await boxes(page)).toEqual(before)
+    await step(page, 'done')
+    await expect(page.locator('[data-delete-confirm]')).toHaveCount(0)
+    expect(await boxes(page)).toEqual(before)
+  })
+
+  test('the edit field takes the body’s place and moves nothing above the message', async ({ page }) => {
+    await open(page, 'MessageList', 'shift/own-row-changes')
+    const before = await boxes(page)
+    await step(page, 'edit')
+    await expect(page.getByRole('textbox', { name: 'Edit message' })).toBeFocused()
+    const after = await boxes(page)
+    const edited = before.length - 1
+    expect(after.slice(0, edited)).toEqual(before.slice(0, edited))
+    expect(after[edited]!.y).toBe(before[edited]!.y)
+    await step(page, 'done')
+    expect(await boxes(page)).toEqual(before)
+  })
+
+  test('the selection’s Quote button floats over the list, outside the rows', async ({ page }) => {
+    await open(page, 'TopicView', 'interaction/selection-quote')
+    const button = page.locator('[data-selection-quote]')
+    await expect(button).toBeVisible()
+    await expect(page.locator('[data-message-row] [data-selection-quote]')).toHaveCount(0)
+    // Centred over the selection, above it.
+    const selection = await page.evaluate(() => window.getSelection()!.getRangeAt(0).getBoundingClientRect().toJSON() as DOMRect)
+    const box = (await button.boundingBox())!
+    expect(Math.abs(box.x + box.width / 2 - (selection.x + selection.width / 2)), JSON.stringify({ box, selection })).toBeLessThanOrEqual(1)
+    expect(box.y + box.height).toBeLessThan(selection.y)
+  })
+})
+
 test.describe('the guard itself', () => {
   const frame = (css: string, body: string) => `<style>${css}</style><div data-fixture-frame="guard">${body}</div>`
 
