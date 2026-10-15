@@ -54,6 +54,6 @@ Small items noticed during work that are not yet assigned to a milestone. Remove
 - Screenshots: `docs/design/handoff/screenshots/01-ui.png` (catch-up card, Browse and Theme icons, For you), `04-ui.png` (grouping card), `10-ui.png` (For you) and `14-ui.png` (stealth) show removed things. Replace them with shots of the built app once M5 lands.
 - New chat (built ahead of M6): the send has no pending row and no send checks, and a failed send says nothing (the draft stays). M6 moves `messages.send` onto the outbox with reconciliation, M8 adds the checks, and M5's toasts bring "Draft closed · Undo" and the send error.
 - New chat: group DMs only match by their Slack name (`mpdm-…`) in the conversation picker, not by member names.
-- Home: Ask Juno does nothing until the renderer has a Juno tab (`askJuno` in `containers/Home.tsx`; the Juno Agent wiring opens it there, and ⌘J); the field does not show `jobLine` yet. The caught-up state's "Browse all topics" link is hidden until the All topics page exists (pass `onBrowseAll`).
+- Home: Ask Juno does nothing until the renderer has a Juno tab (`askJuno` in `containers/Home.tsx`; the Juno Agent wiring opens it there, and ⌘J); the field does not show `jobLine` yet.
 - Home: "muted" in SPEC 12 is read as a thread set to Never (not followed); a DM whose Notify me is Never can still show. Use the notification levels once they are in the store.
 - Home: `for_you_cards` (user.db) is unused; drop it in a migration when the schema is next touched.
