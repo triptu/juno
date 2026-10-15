@@ -338,7 +338,9 @@ module actionsProtocol {
     t.child == r.child and t.payload == r.payload and s.accepted.contains(t.id)))
   val scopedNoClickGrant = newAuths.forall(a => not(a.grant) or
     (a.intent.tier == 2 and before.grants.exists(g => g.target == a.intent.id and g.opClass == 2 and g.source == before.gen)))
-  val untrustedCannotGrant = s.grants.exclude(before.grants).isEmpty() or
+  // Grants compared without their generation: a removal carries grants into the next one, and mints none.
+  pure def ungenerated(gs: Set[Grant]): Set[Grant] = gs.map(g => { ...g, source: 0 })
+  val untrustedCannotGrant = ungenerated(s.grants).exclude(ungenerated(before.grants)).isEmpty() or
     (before.ownerRun and before.clean and before.sourceInRun) or
     (s.label == "grantClick" and before.approvals.exists(p => p.child == s.target and
       before.intents.exists(i => i.id == p.child and i.rev == p.rev and i.payload == p.digest))) or
