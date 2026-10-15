@@ -36,11 +36,13 @@ export const ActivityRpcs = RpcGroup.make(activityPage)
 
 export const connectionsPage = Rpc.make('agent.connections.page', { success: C.ConnectionsPage, stream: true })
 export const connectionsAction = Rpc.make('agent.connections.action', { payload: { ...operation, id: C.ConnectionId,
-  action: Schema.Literals(['connect', 'disconnect', 'enable', 'disable', 'refresh']) }, success: Accepted, error: AgentCommandError })
+  action: Schema.Literals(['connect', 'disconnect', 'enable', 'disable', 'refresh', 'remove']) }, success: Accepted, error: AgentCommandError })
 export const connectionsTier = Rpc.make('agent.connections.tier', { payload: { ...operation, id: C.ConnectionId, tool: Schema.String,
   schemaHash: Digest, tier: Schema.Literals([0, 3]) }, success: Accepted, error: AgentCommandError })
 export const connectionsAddress = Rpc.make('agent.connections.address', { payload: { ...operation, address: C.T3Address }, success: Accepted, error: AgentCommandError })
-export const ConnectionsRpcs = RpcGroup.make(connectionsPage, connectionsAction, connectionsTier, connectionsAddress)
+/** Another MCP server, by its address. It starts off; Connect signs in if the server asks. */
+export const connectionsAdd = Rpc.make('agent.connections.add', { payload: { ...operation, label: Schema.String, url: Schema.String }, success: Accepted, error: AgentCommandError })
+export const ConnectionsRpcs = RpcGroup.make(connectionsPage, connectionsAction, connectionsTier, connectionsAddress, connectionsAdd)
 export const reviewPage = Rpc.make('agent.review.page', { success: Schema.Struct({ page: C.ReviewPage, cards: Schema.Array(CardBinding) }), stream: true })
 export const reviewActivate = Rpc.make('agent.review.activate', { payload: { ...operation, backupAt: Schema.Number,
   oldDeviceOffOrErased: Schema.Literal(true) }, success: Accepted, error: AgentCommandError })

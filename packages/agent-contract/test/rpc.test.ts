@@ -46,6 +46,7 @@ const cases: Record<string, readonly [unknown, unknown]> = {
   'agent.connections.action': [{ ...op, id: 'connection', action: 'connect' }, accepted],
   'agent.connections.tier': [{ ...op, id: 'connection', tool: 'read', schemaHash: '0'.repeat(64), tier: 0 }, accepted],
   'agent.connections.address': [{ ...op, address: { url: 'http://localhost:3773/mcp', allowNetwork: false } }, accepted],
+  'agent.connections.add': [{ ...op, label: 'Docs', url: 'https://mcp.example.com/mcp' }, accepted],
   'agent.review.page': [null, { page: { backupAt: 1234, pending: [] }, cards: [] }],
   'agent.review.activate': [{ ...op, backupAt: 1234, oldDeviceOffOrErased: true }, accepted],
   'agent.settings.page': [null, { chatModels: [], compactionModels: [], spentTodayUsd: 0, capUsd: 2, codex: { _tag: 'missing' }, openRouterKey: 'missing', rules: [], paused: false, backupFolder: 'backup', ownership: { _tag: 'active', epoch: 1 } }],
