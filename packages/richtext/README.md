@@ -26,5 +26,6 @@ Unknown inline elements (`file`, `canvas`, `message_mention`, future ones) decod
 Integration attachments retain titles and links, mrkdwn bodies, two-column fields,
 context, images, footer dates and URL actions. Fallback text is used only when
 there is no structured content. `messageTitle` uses a structured title for an
-empty root or an integration event summary. Unknown blocks retain text and URL
+empty root or an integration event summary. Otherwise it keeps the original
+mrkdwn so title readers can resolve mentions when names arrive. Unknown blocks retain text and URL
 buttons become links; Juno never invokes interactive callbacks.
