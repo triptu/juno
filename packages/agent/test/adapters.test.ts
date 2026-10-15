@@ -8,6 +8,8 @@ import { createMcpManager, MCP_MIGRATIONS, T3, LITTLEBIRD, mcpExecutors, mcpTool
 import { parseObject } from '../src/mcp/catalogue'
 import { createT3Adapter } from '../src/t3'
 import { SONNET } from './turns-harness'
+import { openDatabase } from '../src/store/database'
+import { initialize } from '../src/store/store'
 
 const cleanup: Array<() => Promise<void>> = []
 afterEach(async () => { for (const close of cleanup.splice(0).toReversed()) await close() })
@@ -287,4 +289,80 @@ it('reconciles a lost launch only from its exact message, without relaunching or
   expect(turns.store.db.prepare('SELECT outcome FROM authorizations').all()).toEqual([{ outcome: 'done' }])
   expect(turns.jobs.list()).toHaveLength(1)
   expect(turns.store.db.prepare('SELECT id FROM grants').all()).toHaveLength(0)
+})
+
+it('does not queue a T3 interrupt while paused, so Resume sends nothing', async () => {
+  const { server, turns, call, click } = await fixture('t3', t3Tools)
+  await call('t3_start', start)
+  await click()
+  const job = turns.jobs.list()[0]
+  if (!job) throw new Error('No job')
+  // Settings' Pause asks every active job to stop; that is not a click on an interrupt.
+  turns.setMode('paused')
+  await turns.jobs.stop(job.id)
+  turns.setMode('on')
+  await turns.actions.idle()
+  expect(server.calls.filter((c) => c.name === 't3_thread_interrupt')).toHaveLength(0)
+  expect(turns.store.db.prepare("SELECT 1 FROM approvals WHERE op_id LIKE 't3-stop:%'").all()).toHaveLength(0)
+  await turns.jobs.stop(job.id)
+  expect(server.calls.filter((c) => c.name === 't3_thread_interrupt')).toHaveLength(1)
+})
+
+it('keeps every T3 tool off the read list a card, even if the owner made it Read', async () => {
+  const fork: FakeTool = { name: 't3_thread_fork', inputSchema: threadArgs, call: () => json({ threadId: 'thread-fork' }) }
+  const { server, manager, turns, call } = await fixture('t3', [...t3Tools, fork])
+  manager.setTier('t3', fork.name, manager.tool('t3', fork.name).hash, 0)
+  await call('call_tool', { server: 't3', tool: fork.name, args: { threadId: 'thread-test' } })
+  expect(server.calls.filter((c) => c.name === fork.name)).toHaveLength(0)
+  expect(turns.actions.views().at(-1)?.card).toMatchObject({ _tag: 'change', status: { _tag: 'open' } })
+})
+
+it('drops read names a preset no longer lists, before and after discovery', async () => {
+  const lookup: FakeTool = { name: 'search_meetings', inputSchema: { type: 'object', properties: { term: str } }, call: () => json({ matches: [] }) }
+  const account: FakeTool = { name: 'get_account', inputSchema: { type: 'object', properties: {} }, call: () => json({}) }
+  const server = await startFakeMcpServer({ tools: [lookup, account] })
+  cleanup.push(server.close)
+  const dir = await mkdtemp(join(tmpdir(), 'juno-adapters-'))
+  cleanup.push(() => rm(dir, { recursive: true, force: true }))
+  const store = { db: openDatabase(join(dir, 'agent.sqlite'), [MCP_MIGRATIONS]), now: Date.now }
+  initialize(store)
+  cleanup.push(async () => { store.db.close() })
+  const credentials: Credentials = { oauth: () => ({ load: () => undefined, save: () => undefined }), bearer: async () => undefined, values: async () => [], clear: async () => undefined, openAuthorization: async () => undefined }
+  const preset = { ...LITTLEBIRD, url: server.url, auth: { kind: 'none' as const } }
+  // An older build stored guessed read names and discovered one of them.
+  const old = createMcpManager({ store, credentials, defaults: [{ ...preset, allowlist: ['search_meetings', 'get_account'] }] })
+  await old.connect('littlebird')
+  expect(old.tool('littlebird', 'search_meetings').tier).toBe(0)
+  await old.close()
+  // The current build lists no Littlebird reads.
+  const current = createMcpManager({ store, credentials, defaults: [preset] })
+  cleanup.push(() => current.close())
+  expect(current.stored('littlebird').config.allowlist).toEqual([])
+  expect(current.tool('littlebird', 'search_meetings').tier).toBe(3)
+  // A store that never discovered still holds the guess; first discovery must not use it.
+  const fresh = { db: openDatabase(join(dir, 'fresh.sqlite'), [MCP_MIGRATIONS]), now: Date.now }
+  initialize(fresh)
+  cleanup.push(async () => { fresh.db.close() })
+  await createMcpManager({ store: fresh, credentials, defaults: [{ ...preset, allowlist: ['get_account'] }] }).close()
+  const later = createMcpManager({ store: fresh, credentials, defaults: [preset] })
+  cleanup.push(() => later.close())
+  await later.connect('littlebird')
+  expect(later.tool('littlebird', 'get_account').tier).toBe(3)
+})
+
+it('says a T3 question needs an answer in T3 Code when Juno cannot show it', async () => {
+  const tools: FakeTool[] = [launch,
+    { name: 't3_thread_read', inputSchema: threadArgs, call: () => json({ thread: { status: 'waiting' } }) },
+    t3Tools[2]!,
+    { name: 't3_pending_request_list', inputSchema: threadArgs, call: () => json({ requestIds: ['request-test'] }) },
+    { name: 't3_pending_request_read', inputSchema: { type: 'object', properties: { threadId: str, requestId: str } }, call: () => json({ requestId: 'request-test', questions: [
+      { id: 'q1', question: 'First?', options: [{ label: 'A' }, { label: 'B' }] },
+      { id: 'q2', question: 'Second?', options: [{ label: 'C' }, { label: 'D' }] },
+    ] }) },
+  ]
+  const { turns, call, click } = await fixture('t3', tools)
+  await call('t3_start', start)
+  await click()
+  await expect.poll(() => turns.jobs.list()[0]?.state).toBe('T3 Code needs your answer in T3 Code')
+  expect(turns.actions.views().some((v) => v.card._tag === 'question')).toBe(false)
 })

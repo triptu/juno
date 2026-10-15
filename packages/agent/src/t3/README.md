@@ -21,15 +21,21 @@ unknown. A launch carries `[juno:<action id>]`; reconciliation reads candidate
 threads and requires the same project and exact original message. A negative
 search never permits another launch. A reconciled receipt does not restore a
 revoked grant. Generic `call_tool` cannot launch, even if launch was moved to
-Read in Connections.
+Read in Connections. Through `call_tool`, a T3 tool skips the card only when it
+is on the T3 preset's read list and still Read: T3 Code can also start, fork
+and steer sessions under other names, so moving those to Read does not remove
+the click.
 
 `t3_send` and `t3_stop` use an existing job, never a model-supplied grant. A
 clean owner run with the job's live grant records a Change intent and an
 attempt without a click. The settled Change card is the audit record. A
 send without that authority leaves the Change card open; a stop without it
 points to the Task card. Task Stop is already an owner click: it approves
-one stored interrupt through the dispatcher, with no second click. Failed
-stops remain visible on their Change card and do not claim the session stopped.
+one stored interrupt through the dispatcher, with no second click. While
+Juno is paused or off, Stop approves nothing and the job keeps running: Pause
+stops every job, and an interrupt queued then would reach T3 Code on Resume
+with no click. Failed stops remain visible on their Change card and do not
+claim the session stopped.
 Closing Juno only stops observation; it does not interrupt the external session.
 
 The watcher resumes from the recorded thread, never from the launch brief.
@@ -44,7 +50,8 @@ new account after sign-in.
 Single-choice pending user questions with two to four options become Question
 cards. Their exact selected value or free text reaches
 `t3_pending_request_respond` once. Unknown, multi-question and multi-select
-shapes stay in T3. The current API cannot answer permission approvals.
+shapes stay in T3, and the Task card says "T3 Code needs your answer in T3
+Code". The current API cannot answer permission approvals.
 
 ## Evidence and owner live checks
 

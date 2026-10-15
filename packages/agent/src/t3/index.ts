@@ -60,7 +60,7 @@ export function createT3Adapter(manager: McpManagerApi) {
   return {
     executors: [executor, questionExecutor(manager)],
     stop: async (job: Parameters<typeof stopSession>[2]) => bound ? stopSession(manager, bound.actions, job) : false,
-    driver: t3Driver(manager, async (job, threadId, signal) => { if (bound) await proposeQuestions(manager, bound.actions, job, threadId, signal) }),
+    driver: t3Driver(manager, async (job, threadId, signal) => bound ? proposeQuestions(manager, bound.actions, job, threadId, signal) : false),
     tools: (context: { readonly actions: Actions; readonly jobs: Jobs; readonly current: () => Promise<ToolRun | undefined> }) => {
       bound = context
       return [...workTools(manager, context), defineTool<Start>({

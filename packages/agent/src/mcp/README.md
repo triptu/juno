@@ -18,7 +18,7 @@ WP14 uses each discovered row's `schemaHash` in `agent.connections.tier`. It is 
 
 ## Discovery and execution
 
-Tool lists are paginated by pi-mcp and refreshed on `list_changed`. Only a default read name in the first discovery becomes Read. New tools are Outward regardless of annotations. A schema change demotes a tool until the owner reviews its current hash. A removed tool is unavailable. Schema translation rejects unsupported features, including untrusted regular expressions; arguments are validated before proposal and dispatch.
+Tool lists are paginated by pi-mcp and refreshed on `list_changed`. Only a default read name in the first discovery becomes Read. A preset's default read names come from the code at every start; a name the code drops is Outward again until the owner reviews it. New tools are Outward regardless of annotations. A schema change demotes a tool until the owner reviews its current hash. A removed tool is unavailable. Schema translation rejects unsupported features, including untrusted regular expressions; arguments are validated before proposal and dispatch.
 
 Every argument is filtered against held secrets and token patterns. Destructive tool names and destructive operations inside generic arguments are refused. The read path enforces Tier 0 again after asynchronous checks. Outward calls only propose a stored Change card; the dispatcher owns approval, consumption, attempt and receipt. Writes use a separate client without OAuth replay or SSE retries. An MCP error or lost response is unknown, never automatically repeated.
 

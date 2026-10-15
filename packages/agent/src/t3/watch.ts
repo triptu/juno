@@ -4,7 +4,7 @@ import type { McpManagerApi } from '../mcp/manager'
 import { content, sessionOf, sessionBranch, threadState } from './protocol'
 
 /** Resuming observes a recorded thread. It never launches or sends anything. */
-export function t3Driver(manager: McpManagerApi, questions: (job: Job, threadId: string, signal: AbortSignal) => Promise<void>): JobDriver {
+export function t3Driver(manager: McpManagerApi, questions: (job: Job, threadId: string, signal: AbortSignal) => Promise<boolean>): JobDriver {
   return {
     kind: 't3', resumable: true,
     run: async (job, signal, update) => {
@@ -26,8 +26,10 @@ export function t3Driver(manager: McpManagerApi, questions: (job: Job, threadId:
           if (status === 'completed') return { event: 'done', state: 'Done', report: `T3 Code finished ${job.title}. Open session ${session.threadId} for the result.` }
           if (['failed', 'rolled_back'].includes(status)) return { event: 'failed', state: 'Failed', report: `T3 Code reported that ${job.title} failed.` }
           if (['interrupted', 'cancelled'].includes(status)) return { event: 'cancelled', state: 'Stopped' }
-          if (status === 'waiting') await questions(job, session.threadId, signal)
-          update({ event: status === 'waiting' ? 'needsYou' : 'progress', state: status === 'waiting' ? 'T3 Code needs your answer' : 'T3 Code · running' })
+          if (status === 'waiting') {
+            const shown = await questions(job, session.threadId, signal)
+            update({ event: 'needsYou', state: shown ? 'T3 Code needs your answer' : 'T3 Code needs your answer in T3 Code' })
+          } else update({ event: 'progress', state: 'T3 Code · running' })
           // Short polling also observes questions; thread_wait only wakes on completion on S8's server.
           await setTimeout(10_000, undefined, { signal }).catch(() => undefined)
         } catch {

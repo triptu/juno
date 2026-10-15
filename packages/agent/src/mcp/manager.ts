@@ -2,6 +2,7 @@ import { Context, Effect, Layer, Schema } from 'effect'
 import { McpAuthRequiredError, type AuthProvider, type McpClient } from '@earendil-works/pi-mcp'
 import { McpOAuthAuthorizationRequiredError } from '@earendil-works/pi-mcp/oauth'
 import { ConnectionId, type ConnectionsPage, type ConnectionState } from '@juno/agent-contract'
+import { transaction } from '../store/database'
 import { uuidv7, type Store } from '../store/store'
 import { catalogue, discover, json, parseObject, validateArguments } from './catalogue'
 import { clientFor, connectionAuth, signIn } from './auth'
@@ -48,6 +49,16 @@ export function createMcpManager({ store, credentials, defaults = PRESETS }: Man
     endpoint(config.url, config.allowNetwork)
     if (config.noSecrets && config.auth.kind === 'bearer') throw new McpError({ reason: 'invalid', message: 'This connection requires its own OAuth sign-in.' })
     store.db.prepare('INSERT OR IGNORE INTO mcp_connections (id,config,epoch) VALUES (?,?,?)').run(config.id, JSON.stringify(config), uuidv7())
+    // A preset's read list belongs to the code, not the stored row: an older build's guess must not
+    // promote a tool at first discovery, and a name the code dropped goes back to Outward until reviewed.
+    const saved = stored(config.id).config
+    const dropped = saved.allowlist.filter((name) => !config.allowlist.includes(name))
+    if (dropped.length > 0 || config.allowlist.some((name) => !saved.allowlist.includes(name))) {
+      transaction(store.db, () => {
+        save({ ...saved, allowlist: config.allowlist })
+        for (const name of dropped) store.db.prepare('UPDATE mcp_tools SET tier = 3 WHERE connection_id = ? AND name = ?').run(config.id, name)
+      })
+    }
   }
   const refresh = async (id: string) => {
     const s = session(id)
