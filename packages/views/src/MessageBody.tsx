@@ -3,7 +3,7 @@ import type { MouseEvent, ReactNode } from 'react'
 import type { BodyBlock, BodyInline, MessageBody as MessageBodyModel } from '@juno/contract'
 import { accent, colors, radii, spacing, text, weights, sizes } from '@juno/tokens/tokens.stylex'
 import { Chip, CodeBlock, Divider, Text, type HueName } from '@juno/ui'
-import { AttachmentCard, AttachmentImage } from './AttachmentCard'
+import { AttachmentCard, AttachmentFields, AttachmentImage } from './AttachmentCard'
 import { slackDate } from './time'
 
 export interface MessageBodyProps {
@@ -80,7 +80,7 @@ function Block({ block, now, hueOf, onChannel, onLink, tabIndex }: BlockProps) {
     case 'image':
       return <AttachmentImage image={block} />
     case 'fields':
-      return <div {...stylex.props(styles.fields)}>{block.items.map((item, index) => <div key={index}><Inlines inlines={item} now={now} hueOf={hueOf} onChannel={onChannel} onLink={onLink} tabIndex={tabIndex} /></div>)}</div>
+      return <AttachmentFields items={block.items} render={(inlines) => <Inlines inlines={inlines} now={now} hueOf={hueOf} onChannel={onChannel} onLink={onLink} tabIndex={tabIndex} />} />
     case 'context':
       return <div {...stylex.props(styles.context)}><Inlines inlines={block.children} now={now} hueOf={hueOf} onChannel={onChannel} onLink={onLink} tabIndex={tabIndex} /></div>
     case 'paragraph':
@@ -255,7 +255,6 @@ function styled(value: string, style: { bold?: true; italic?: true; strike?: tru
 }
 
 const styles = stylex.create({
-  fields: { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: spacing['--space-3'], whiteSpace: 'pre-wrap' },
   context: { color: colors['--foreground-muted'], fontSize: text['--text-tag-small-size'] },
   body: {
     display: 'flex',
