@@ -1,8 +1,9 @@
 /** Entry points: a Slack message in, a `MessageBody` out, plus text views of a body. */
 import type { Message } from '@juno/slack-schema'
-import type { Lookups, MessageBody } from './model'
+import type { Block, Lookups, MessageBody } from './model'
 import { bodyFromBlocks } from './from-blocks'
 import { mrkdwnBlocks } from './from-mrkdwn'
+import { attachmentBlock } from './attachments'
 import { inlineText } from './inline'
 
 /**
@@ -16,11 +17,10 @@ export type MessageContent = Pick<Message, 'text' | 'blocks' | 'files' | 'attach
  * mrkdwn `text` is parsed. A message with neither gives an empty body.
  */
 export function messageBody(content: MessageContent, lookups: Lookups = {}): MessageBody {
-  const blocks = [...bodyFromBlocks(content.blocks ?? [], lookups).blocks]
+  const blocks: Block[] = [...bodyFromBlocks(content.blocks ?? [], lookups).blocks]
   if (blocks.length === 0 && content.text) blocks.push(...mrkdwnBlocks(content.text, lookups))
   for (const attachment of content.attachments ?? []) {
-    const text = attachment.fallback || [attachment.pretext, attachment.title, attachment.text, ...(attachment.fields ?? []).map((field) => [field.title, field.value].filter(Boolean).join(': '))].filter(Boolean).join('\n')
-    if (text) blocks.push(...mrkdwnBlocks(text, lookups))
+    blocks.push(attachmentBlock(attachment, lookups))
   }
   for (const file of content.files ?? []) {
     const width = file.original_w ?? file.thumb_360_w
@@ -44,6 +44,16 @@ export function plainText(body: MessageBody): string {
   const parts: string[] = []
   for (const block of body.blocks) {
     switch (block.kind) {
+      case 'attachment':
+        parts.push(inlineText(block.title), plainText({ blocks: block.blocks }), inlineText(block.footer))
+        break
+      case 'fields':
+        parts.push(...block.items.map((item) => inlineText(item)))
+        break
+      case 'image':
+        parts.push(block.alt)
+        break
+      case 'context':
       case 'paragraph':
       case 'heading':
         parts.push(inlineText(block.children))
@@ -69,7 +79,7 @@ export function plainText(body: MessageBody): string {
         break
     }
   }
-  return parts.join('\n')
+  return parts.filter(Boolean).join('\n')
 }
 
 /**
@@ -77,28 +87,7 @@ export function plainText(body: MessageBody): string {
  * to spaces, whitespace squeezed. Empty when the message was only a quote.
  */
 export function previewText(body: MessageBody): string {
-  const parts: string[] = []
-  for (const block of body.blocks) {
-    switch (block.kind) {
-      case 'paragraph':
-      case 'heading':
-        parts.push(inlineText(block.children, ' '))
-        break
-      case 'code':
-        parts.push(block.text)
-        break
-      case 'file':
-        parts.push(block.name)
-        break
-      case 'list':
-        parts.push(block.items.map((item) => inlineText(item, ' ')).join(' '))
-        break
-      case 'quote':
-      case 'divider':
-        break
-    }
-  }
-  return parts.join(' ').replace(/\s+/g, ' ').trim()
+  return plainText({ blocks: body.blocks.filter((block) => block.kind !== 'quote') }).replace(/\s+/g, ' ').trim()
 }
 
 /**

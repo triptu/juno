@@ -12,7 +12,7 @@ Pure text handling between Slack and the UI. See `docs/architecture.md` section 
 
 Unknown inline elements (`file`, `canvas`, `message_mention`, future ones) decode to `{ type: 'unknown', raw }` in the schema; richtext keeps their `text` or `fallback`.
 
-`date` inlines carry epoch seconds, the Slack format, readable fallback text and an optional link. Dates without fallback text use ISO text. `file` blocks carry `id`, `name`, `mimetype` and optional positive `width`/`height`, using original dimensions before thumbnail dimensions. Views reserve the image box from these fields and resolve the id through main. Legacy attachments append their fallback text once; without a fallback, their title, text and fields are read. File names appear in plain text and previews.
+`date` inlines carry epoch seconds, the Slack format, readable fallback text and an optional link. Dates without fallback text use ISO text. `file` blocks carry `id`, `name`, `mimetype` and optional positive `width`/`height`, using original dimensions before thumbnail dimensions. Views reserve the image box from these fields and resolve the id through main. Legacy attachments keep their title, text and fields; fallback text is read only when those are absent. File names appear in plain text and previews.
 
 ## Must not
 
@@ -22,3 +22,9 @@ Unknown inline elements (`file`, `canvas`, `message_mention`, future ones) decod
 ## Testing
 
 `pnpm --filter @juno/richtext test`. Table-driven tests with real payload shapes: `decode.test.ts` (a payload decoded with `Schema.decodeUnknownSync(Message)`, including an unknown element, then rendered), `rendering.test.ts`, `outgoing.test.ts`, `emoji.test.ts`, and `content.test.ts` (dates, files, attachment text and workspace emoji). Use redacted or invented text, never real message content.
+
+Integration attachments retain titles and links, mrkdwn bodies, two-column fields,
+context, images, footer dates and URL actions. Fallback text is used only when
+there is no structured content. `messageTitle` uses a structured title for an
+empty root or an integration event summary. Unknown blocks retain text and URL
+buttons become links; Juno never invokes interactive callbacks.

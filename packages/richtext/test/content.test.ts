@@ -36,9 +36,9 @@ describe('message content from Slack', () => {
   })
 
   it.each([
-    [{ fallback: 'Build passed', text: 'Duplicate details' }, 'Build passed'],
-    [{ title: 'Build', text: 'Passed', fields: [{ title: 'Revision', value: 'abc' }] }, 'Build\nPassed\nRevision: abc'],
-  ])('reads attachment fallback text once', (attachment, expected) => {
+    [{ fallback: 'Build passed', text: 'Duplicate details' }, 'Duplicate details'],
+    [{ title: 'Build', text: 'Passed', fields: [{ title: 'Revision', value: 'abc' }] }, 'Build\nPassed\nRevision\nabc'],
+  ])('prefers attachment content to fallback summaries', (attachment, expected) => {
     const body = render({ ts: '1700000000.000000', text: 'Status', attachments: [attachment] })
     expect(plainText(body)).toBe(`Status\n${expected}`)
   })
