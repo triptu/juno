@@ -170,7 +170,7 @@ test('a custom endpoint turns the agent on and answers through its model', async
 })
 
 test('local Codex starts without an API key and answers through the shared picker', async () => {
-  const { startFakeCodex } = await import('@juno/agent-testing')
+  const { startFakeCodex } = await import('@juno/agent-testing/codex')
   const { dirname, join } = await import('node:path')
   const codex = startFakeCodex()
   const openRouter = await startFakeOpenRouter()
