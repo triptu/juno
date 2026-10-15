@@ -1,14 +1,16 @@
 // The agent's renderer RPCs as the renderer reads them (plan v3 §12, §13): the real turn engine with
 // the scripted fake provider, served over a Node MessageChannel (the same structured-clone port main
-// brokers) and read through an RPC client of `AgentRpcs`. Settings › Juno runs on a model picker
-// that reads the fake OpenRouter catalogue.
+// brokers) and read through an RPC client of `AgentRpcs`. Settings › Juno runs on a model picker:
+// on OpenRouter it reads the fake catalogue, beside the scripted model; with `custom`, the engine runs
+// on the app's providers (`providerTurns`) against a fake OpenAI-compatible server over HTTP.
 import { MessageChannel, type MessagePort } from 'node:worker_threads'
 import { afterEach } from 'vitest'
 import { Effect, Exit, Layer, Scope, Stream, SubscriptionRef } from 'effect'
 import { RpcClient, type RpcClientError, type RpcGroup } from 'effect/rpc'
 import { openRouterCatalogue } from '@juno/agent-testing'
 import { AgentRpcs, type ChatPage, type HostPresence } from '@juno/agent-contract'
-import { CHAT_MIGRATIONS, hostProtocol, modelPicker, openRouterKey, rendererPorts, type HostPort } from '../src/index'
+import type { AgentProvider } from '@juno/agent-contract'
+import { CHAT_MIGRATIONS, hostProtocol, modelPicker, providerConnection, providerTurns, rendererPorts, type HostPort } from '../src/index'
 import { rendererServer } from '../src/serve/server'
 import { createJunoSettings } from '../src/settings/settings'
 import { turnsHarness, type HarnessOptions } from './turns-harness'
@@ -36,9 +38,30 @@ export const ONLINE: Presence = { online: true, aiEnabled: true, quietHours: fal
 
 export const run = <A, E>(effect: Effect.Effect<A, E>) => Effect.runPromise(Effect.result(effect))
 
+export const TEST_KEY = 'sk-or-v1-test'
+
 /** The engine with Settings › Juno, served to one renderer client. */
-export async function served(options: HarnessOptions = {}) {
-  const h = await turnsHarness({ compaction: false, ...options, migrations: [CHAT_MIGRATIONS, ...(options.migrations ?? [])] })
+export async function served(options: HarnessOptions & { readonly custom?: { readonly baseUrl: string; readonly key: string | null } } = {}) {
+  const connection = providerConnection()
+  const provider: AgentProvider = options.custom === undefined ? { _tag: 'openRouter', key: TEST_KEY } : { _tag: 'custom', ...options.custom }
+  connection.set(provider)
+  let catalogueReads = 0
+  const picker = modelPicker(
+    connection,
+    options.custom === undefined
+      ? {
+          fetch: async () => {
+            catalogueReads++
+            return Response.json(openRouterCatalogue())
+          },
+        }
+      : {
+          // The endpoint's list is real HTTP; OpenRouter's catalogue, after a switch, is the fake one.
+          fetch: async (url, init) => (String(url).endsWith('/api/v1/models') ? Response.json(openRouterCatalogue()) : fetch(url, init)),
+        },
+  )
+  const app = options.custom === undefined ? {} : { app: providerTurns(connection, picker) }
+  const h = await turnsHarness({ compaction: false, ...options, ...app, migrations: [CHAT_MIGRATIONS, ...(options.migrations ?? [])] })
   cleanups.push(h.close)
   const presence = await Effect.runPromise(SubscriptionRef.make<Presence | undefined>(ONLINE))
   let current: Presence | undefined = ONLINE
@@ -46,15 +69,7 @@ export async function served(options: HarnessOptions = {}) {
     current = next
     return Effect.runPromise(SubscriptionRef.set(presence, next))
   }
-  let catalogueReads = 0
-  const picker = modelPicker({
-    fetch: async () => {
-      catalogueReads++
-      return Response.json(openRouterCatalogue())
-    },
-  })
-  const key = openRouterKey()
-  const settings = createJunoSettings({ turns: h.turns, picker, key, agentDir: h.dir })
+  const settings = createJunoSettings({ turns: h.turns, picker, connection, agentDir: h.dir })
   cleanups.push(async () => settings.close())
   await settings.ready
   const transport = rendererPorts()
@@ -121,5 +136,5 @@ export async function served(options: HarnessOptions = {}) {
   /** The first chat page that passes `test`. */
   const pageWhere = (test: (page: ChatPage) => boolean, what: string) => chatPage.where(test, what)
 
-  return { h, client, follow, pageWhere, setPresence, key, picker, catalogueReads: () => catalogueReads }
+  return { h, client, follow, pageWhere, setPresence, connection, picker, catalogueReads: () => catalogueReads }
 }

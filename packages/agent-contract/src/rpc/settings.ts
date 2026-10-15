@@ -4,7 +4,12 @@ import { JunoSettingsPage } from '../chat'
 import { Accepted, AgentCommandError, operation } from './common'
 
 export const SettingsChange = Schema.Union([
-  Schema.TaggedStruct('model', { purpose: Schema.Literals(['chat', 'compaction']), provider: Schema.Literals(['openrouter', 'codex']), family: Schema.String }),
+  /** On a custom endpoint `family` is the model id, listed or typed; only `chat` applies there. */
+  Schema.TaggedStruct('model', {
+    purpose: Schema.Literals(['chat', 'compaction']),
+    provider: Schema.Literals(['openrouter', 'codex', 'custom']),
+    family: Schema.String.check(Schema.isMaxLength(256)),
+  }),
   Schema.TaggedStruct('cap', { usd: Schema.Number.check(Schema.isFinite(), Schema.isGreaterThanOrEqualTo(0)) }),
   Schema.TaggedStruct('paused', { value: Schema.Boolean }),
   Schema.TaggedStruct('rules', { rules: Schema.Array(Schema.Struct({ id: Schema.String.pipe(Schema.brand('AgentRuleId')), text: Schema.String })) }),

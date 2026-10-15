@@ -2,6 +2,7 @@ import { _electron as electron, test as base, type ElectronApplication, type Pag
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
+import { startFakeOpenRouter } from '@juno/agent-testing/openrouter'
 import { startFakeSlack, writeSlackAppFixture, type Credentials, type FakeSlack } from '@juno/fake-slack'
 import { Juno } from './driver/juno'
 import { Slack } from './driver/slack'
@@ -12,7 +13,7 @@ export interface JunoTestHooks {
   readonly engineState: () => string
   /** Makes the supervisor give up on the engine, as after too many crashes. */
   readonly failEngine: () => void
-  /** `stopped` unless the app was launched with `agent: true`. */
+  /** `stopped` until a provider is set up: launch with `agent: true`, or set one through `window.juno.agent`. */
   readonly agentState: () => string
   /** The host name from the agent's `host.hello`, once it reached the engine. */
   readonly agentHost: () => string | undefined
@@ -31,6 +32,9 @@ export interface RunningApp {
   readonly close: () => Promise<void>
 }
 
+/** The OpenRouter key an `agent: true` launch starts with. */
+export const E2E_OPENROUTER_KEY = 'sk-or-v1-e2e-launch-0123456789abcdef'
+
 /** A throwaway user-data directory. Delete it with `rm` when done. */
 export function tempUserData(): Promise<string> {
   return mkdtemp(join(tmpdir(), 'juno-e2e-'))
@@ -43,7 +47,12 @@ export interface LaunchOptions {
   readonly slackAppDir?: string
   /** The stand-in for the "Slack Safe Storage" keychain password. */
   readonly keychainPassword?: string
-  /** Start the Juno Agent utility process (JUNO_AGENT=1). */
+  /**
+   * Start with OpenRouter set up (a test key, `JUNO_E2E_OPENROUTER_KEY`), so
+   * the Juno Agent runs from launch. Without `fakeOpenRouterUrl`, a fake
+   * OpenRouter is started for the launch. With no provider the agent does
+   * not run.
+   */
   readonly agent?: boolean
   /** The fake OpenRouter the agent reads its catalogue from and sends chat requests to. */
   readonly fakeOpenRouterUrl?: string
@@ -64,8 +73,10 @@ export async function launchApp(userData: string, options: LaunchOptions = {}): 
   if (options.fakeSlackUrl !== undefined) env.JUNO_FAKE_SLACK_URL = options.fakeSlackUrl
   if (options.slackAppDir !== undefined) env.JUNO_SLACK_APP_DIR = options.slackAppDir
   if (options.keychainPassword !== undefined) env.JUNO_SLACK_SAFE_STORAGE_PASSWORD = options.keychainPassword
-  if (options.agent === true) env.JUNO_AGENT = '1'
-  if (options.fakeOpenRouterUrl !== undefined) env.JUNO_FAKE_OPENROUTER_URL = options.fakeOpenRouterUrl
+  const ownOpenRouter = options.agent === true && options.fakeOpenRouterUrl === undefined ? await startFakeOpenRouter() : undefined
+  if (options.agent === true) env.JUNO_E2E_OPENROUTER_KEY = E2E_OPENROUTER_KEY
+  const openRouterUrl = options.fakeOpenRouterUrl ?? ownOpenRouter?.origin
+  if (openRouterUrl !== undefined) env.JUNO_FAKE_OPENROUTER_URL = openRouterUrl
 
   // Launch the package directory (like `electron .`), not the script, so
   // Electron reads package.json for the app name and version.
@@ -77,7 +88,14 @@ export async function launchApp(userData: string, options: LaunchOptions = {}): 
   })
   const win = await app.firstWindow()
   await win.waitForLoadState('domcontentloaded')
-  return { app, win, close: () => app.close() }
+  return {
+    app,
+    win,
+    close: async () => {
+      await app.close()
+      await ownOpenRouter?.close()
+    },
+  }
 }
 
 /** The fixture Slack-app directory the app imports from, written with one of the fake's sessions. */

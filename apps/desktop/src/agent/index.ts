@@ -1,17 +1,19 @@
 /**
  * Entry of the agent utility process (ADR 0012). Main forks this file (built
  * to out/main/agent.js) without the Slack partition, sends the config and the
- * OpenRouter key over parentPort, hands over a port to the engine's AgentHost
+ * active model provider over parentPort, hands over a port to the engine's AgentHost
  * server (again after every engine restart), and a port per renderer for the
  * chat. Everything else is `@juno/agent`, which never imports Electron.
  *
- * The agent opens the turn engine on OpenRouter with the owner's models
- * from Settings › Juno (`openRouterTurns`) and serves the renderer's RPCs
- * on the renderer ports. The key stays in memory (`openRouterKey`).
+ * The agent opens the turn engine on that provider (OpenRouter or an
+ * OpenAI-compatible endpoint) with the owner's models from Settings › Juno
+ * (`providerTurns`), once main has sent the provider, and serves the
+ * renderer's RPCs on the renderer ports. Keys stay in memory.
+ * `providerConnection` follows every later provider change.
  */
 import { Schema } from 'effect'
 import { MainToAgent, type AgentToMain } from '@juno/agent-contract'
-import { modelPicker, openRouterKey, openRouterTurns, rendererPorts, startAgent, type HostPort } from '@juno/agent'
+import { modelPicker, providerConnection, providerTurns, rendererPorts, startAgent, type HostPort } from '@juno/agent'
 import type { MessagePortMain } from 'electron'
 
 const parent = process.parentPort
@@ -50,8 +52,8 @@ const nextPort = () =>
   })
 
 const renderers = rendererPorts()
-// The key arrives from main once it has read the keychain; a request waits for it.
-const key = openRouterKey()
+// The provider arrives from main at spawn and on every change.
+const connection = providerConnection()
 
 let started = false
 parent.on('message', (event) => {
@@ -66,8 +68,13 @@ parent.on('message', (event) => {
     case 'config': {
       if (started) return
       started = true
-      const picker = modelPicker(message.config.openRouterOrigin === undefined ? {} : { origin: message.config.openRouterOrigin })
-      startAgent(message.config, { acquire: nextPort }, { turns: openRouterTurns(key, picker), renderer: renderers }).then(
+      const config = message.config
+      const picker = modelPicker(connection, config.openRouterOrigin === undefined ? {} : { origin: config.openRouterOrigin })
+      // The engine opens on the saved model of the active provider, so it waits for main to name one.
+      void connection
+        .get()
+        .then(() => startAgent(config, { acquire: nextPort }, { turns: providerTurns(connection, picker), renderer: renderers }))
+        .then(
         (agent) => send({ _tag: 'ready', host: agent.host }),
         (cause: unknown) => {
           console.error('agent: failed to start', cause)
@@ -76,8 +83,8 @@ parent.on('message', (event) => {
       )
       return
     }
-    case 'openRouterKey': {
-      key.set(message.key)
+    case 'provider': {
+      connection.set(message.provider)
       return
     }
     case 'rendererPort': {

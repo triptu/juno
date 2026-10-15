@@ -231,6 +231,35 @@ export const chatCopy = {
     /** A quote whose target was removed. */
     removed: 'Removed',
   },
+  /**
+   * Model providers (SPEC 13.10): the Juno tab's and panel's state with none
+   * set up, and the provider section of Settings › Juno.
+   */
+  providers: {
+    noneTitle: 'Juno needs a model',
+    noneBody: 'Juno runs on a model provider you choose: OpenRouter, or a model on this Mac or another OpenAI-compatible service.',
+    add: 'Add a provider',
+    heading: 'Provider',
+    sub: 'Juno uses one at a time. Keys stay in your keychain.',
+    openRouter: 'OpenRouter',
+    custom: 'OpenAI-compatible',
+    customNote: 'A model server such as Ollama, LM Studio or vLLM, or another service.',
+    key: 'API key',
+    keyOptional: 'API key (optional)',
+    baseUrl: 'Base URL',
+    save: 'Save',
+    remove: 'Remove',
+    /** Under the fields of the provider in use: "OpenRouter is in use." */
+    inUse: (name: string) => `${name} is in use.`,
+    keySet: 'Key set',
+    invalidKey: 'That is not a key. Keys have no spaces.',
+    invalidUrl: 'Enter an http or https address.',
+    failed: 'The keychain did not save the key. Try again.',
+    customRejected: 'The endpoint rejected this key',
+    modelId: 'Model id',
+    modelTyped: 'This endpoint does not list its models. Type the id of the one to use.',
+    spendUntracked: 'This model reports no prices, so the cap cannot track what it costs.',
+  },
   contextMenu: {
     copy: 'Copy',
     remember: 'Remember this',
