@@ -37,8 +37,9 @@ import type {
   OwnerMessageItem,
   ReplyTarget,
   Card,
-  Place,
+  SendContext,
 } from '@juno/agent-contract'
+import { aboutOf } from '@juno/agent-contract'
 import type { Registry } from '../client'
 import { AgentClient } from './client'
 import { uuidv7 } from './ids'
@@ -91,7 +92,7 @@ export interface PendingSend {
   readonly opId: OpId
   readonly text: string
   readonly at: number
-  readonly context?: Place
+  readonly context?: SendContext
   readonly replyTo?: ReplyTarget
   readonly delivery: OwnerMessageItem['delivery']
 }
@@ -125,6 +126,7 @@ export function withPending(page: ChatPage, pending: ReadonlyArray<PendingSend>)
       at: send.at,
       delivery: send.delivery,
       ...(send.replyTo ? { replyTo: quoteIn(page.items, send.replyTo) } : {}),
+      ...(send.context ? { about: aboutOf(send.context) } : {}),
       reactions: [],
       group: 'single',
     }))
@@ -219,7 +221,7 @@ export function chatActions(registry: Registry) {
 
   return {
     /** The composer's send. Returns the new op id, the row's key from the first frame. */
-    send: (text: string, options: { readonly context?: Place; readonly replyTo?: ReplyTarget } = {}): OpId => {
+    send: (text: string, options: { readonly context?: SendContext; readonly replyTo?: ReplyTarget } = {}): OpId => {
       prune()
       const send: PendingSend = { opId: uuidv7() as OpId, text, at: Date.now(), ...options, delivery: { _tag: 'sending' } }
       if (byteLength(text) > MAX_SEND_BYTES) setPending(send.opId, { ...send, delivery: { _tag: 'failed', reason: 'tooLong' } })

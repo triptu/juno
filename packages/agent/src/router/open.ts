@@ -53,6 +53,7 @@ import type { RunState, TurnEvent } from './events'
 import { hostTools, type HostReads } from './host-tools'
 import { createRouter, type Input, type Queued, type Retry } from './router'
 import { TURNS_MIGRATIONS } from './schema'
+import { assignHandles, type SourceRef } from './sources'
 import { find, type InboxState } from '../inbox/inbox'
 import { view, type CompactionModel, type MemoryView } from '../store/memory'
 import type { JournalPosition, Mode } from '../store/ledger'
@@ -252,7 +253,11 @@ async function start(
     }),
   ]
   const jobTools = subagentModel ? [delegateTool({ jobs, current: () => router.toolRun(), place: subagentModel.modelId })] : []
-  const slackTools = options.host ? hostTools(options.host) : []
+  const handles = async (refs: ReadonlyArray<SourceRef>) => {
+    const runId = router.state()?.runId
+    return runId === undefined ? [] : assignHandles(store, runId, refs)
+  }
+  const slackTools = options.host ? hostTools(options.host, handles) : []
 
   const extension = {
     name: 'juno',

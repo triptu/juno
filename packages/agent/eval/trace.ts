@@ -6,7 +6,7 @@
  */
 import type { Ending } from '@juno/agent-contract'
 import type { SlackMessage } from '@juno/agent-testing'
-import { parseOutput, type ArchiveMessage } from '../src/index'
+import { parseOutput, type ArchiveMessage, type Output, type SourceRef } from '../src/index'
 
 /** A cited span inside a bubble: `<src m="m3">words</src>` (plan v3 §19.1). */
 export interface Source {
@@ -39,7 +39,7 @@ export interface StepTrace {
   readonly calls: ReadonlyArray<Call>
   /** Messages the host returned in this step, each once, in the order returned. */
   readonly read: ReadonlyArray<SlackMessage>
-  /** The handle table of this step's run: `m1` is the first message read. */
+  /** The handle table of this step's run, from the router: `m1` is the first message read. */
   readonly handles: ReadonlyMap<string, SlackMessage>
   readonly endings: ReadonlyArray<Ending>
   /** Pins written ("Remembered"). */
@@ -50,21 +50,21 @@ export interface Trace {
   readonly steps: ReadonlyArray<StepTrace>
 }
 
-const SRC = /<src\s+m="([^"]*)"\s*>([\s\S]*?)<\/src>/g
-
-export function bubble(raw: string, replyTo?: string): Bubble {
-  const sources = [...raw.matchAll(SRC)].map(([, handle, words]) => ({ handle: handle!, words: words! }))
-  return { raw, text: raw.replace(SRC, (_, __, words: string) => words), ...(replyTo ? { replyTo } : {}), sources }
+/** A bubble as the router parsed it, with `raw` rebuilt with its `<src>` tags. */
+export function bubble(parsed: Output['bubbles'][number]): Bubble {
+  const sources = parsed.spans.flatMap((span) => (span.source === undefined ? [] : [{ handle: span.source, words: span.text }]))
+  const raw = parsed.spans.map((span) => (span.source === undefined ? span.text : `<src m="${span.source}">${span.text}</src>`)).join('')
+  return { raw, text: parsed.text, ...(parsed.replyTo ? { replyTo: parsed.replyTo } : {}), sources }
 }
 
-/**
- * The handle table. The router does not give read results handles yet (plan
- * v3 §19.1, WP11): until it does, the eval numbers the messages of a run's
- * read results in the order they came back, which is how §19.1 describes
- * them. When the router exports its table, read it here instead.
- */
-export function handleTable(read: ReadonlyArray<SlackMessage>): ReadonlyMap<string, SlackMessage> {
-  return new Map(read.map((message, i) => [`m${i + 1}`, message]))
+/** The router's handle table for a step's runs (`sourceTable`), each handle with the message it names. */
+export function handleTable(tables: ReadonlyArray<ReadonlyMap<string, SourceRef>>, read: ReadonlyArray<SlackMessage>): ReadonlyMap<string, SlackMessage> {
+  const handles = new Map<string, SlackMessage>()
+  for (const [handle, ref] of tables.flatMap((table) => [...table])) {
+    const message = read.find((m) => m.channelId === ref.channelId && m.ts === ref.ts)
+    if (message !== undefined) handles.set(handle, message)
+  }
+  return handles
 }
 
 export function unique(read: ReadonlyArray<SlackMessage>): ReadonlyArray<SlackMessage> {
@@ -104,7 +104,7 @@ export function fromArchive(rows: ReadonlyArray<ArchiveMessage>): Pick<StepTrace
     }
   }
   const output = parseOutput(texts.join('\n\n'))
-  return { bubbles: output.bubbles.map((b) => bubble(b.text, b.replyTo)), reactions: output.reactions, calls }
+  return { bubbles: output.bubbles.map(bubble), reactions: output.reactions, calls }
 }
 
 function parseArgs(json: string): unknown {

@@ -14,10 +14,12 @@ export class AgentHostError extends Schema.TaggedError<AgentHostError>()('AgentH
   reason: Schema.Literals(['offline', 'signedOut', 'notFound', 'rateLimited', 'stale', 'unsupported', 'rejected']),
   message: Schema.String,
 }) {}
+/** `senderName` and `channelName` are what the owner sees in Juno ("Maya Chen", "#eng"), so Juno can say names, not ids. */
 export const HostMessage = Schema.Struct({
   channelId: HostChannelId, ts: HostMessageTs, threadTs: Schema.optionalKey(HostMessageTs),
   senderId: HostUserId, text: Schema.String, editedAt: Schema.optionalKey(HostMessageTs),
   clientMessageId: Schema.optionalKey(ActionId),
+  senderName: Schema.optionalKey(Schema.String), channelName: Schema.optionalKey(Schema.String),
 })
 export const HostMessagePage = Schema.Struct({ messages: Schema.Array(HostMessage), next: Schema.optionalKey(HostCursor) })
 export const hostSearch = Rpc.make('host.slack.search', { payload: { accountId: AccountId, query: Schema.String, cursor: Schema.optionalKey(HostCursor), limit }, success: HostMessagePage, error: AgentHostError })

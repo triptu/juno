@@ -34,7 +34,9 @@ import type {
   Reaction,
   ReplyTarget,
   RunId,
+  SendContext,
 } from '@juno/agent-contract'
+import { aboutOf } from '@juno/agent-contract'
 import type { Job } from '../jobs/jobs'
 import { ownerOpOf } from '../router/input'
 import type { RunState } from '../router/events'
@@ -211,7 +213,7 @@ export function chatItems(source: ChatSource): ReadonlyArray<ChatItem> {
 
   for (const op of ops) {
     if (op.kind === 'retry') continue
-    const data = parse<{ replyTo?: ReplyTarget }>(op.data)
+    const data = parse<{ replyTo?: ReplyTarget; context?: SendContext }>(op.data)
     const id = archiveIds.get(op.opId)
     entries.push({
       by: 'owner',
@@ -224,6 +226,7 @@ export function chatItems(source: ChatSource): ReadonlyArray<ChatItem> {
         at: op.at,
         delivery: op.state === 'accepted' && source.waiting !== undefined ? { _tag: 'waiting', for: source.waiting } : { _tag: 'sent' },
         ...(data?.replyTo === undefined ? {} : { replyTo: quoteOf(data.replyTo) }),
+        ...(data?.context === undefined ? {} : { about: aboutOf(data.context) }),
         reactions: reactionsOf('owner', op.opId),
       },
     })
