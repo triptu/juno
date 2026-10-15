@@ -32,6 +32,7 @@ import {
   type TopicMenuAction,
 } from '@juno/contract'
 import {
+  allTopicsRowAtom,
   copyText,
   editUndo,
   messageLink,
@@ -46,6 +47,7 @@ import {
   threadRootTs,
   topicAtom,
   undoLast,
+  type RenameTarget,
   type ToastContent,
 } from '@juno/state'
 import { openTopic } from './navigation'
@@ -55,11 +57,11 @@ export type ActionTopic = Pick<TopicDetail, 'id' | 'kind' | 'title' | 'channel' 
   readonly rootTs?: string | undefined
 }
 
-/** The header's detail when it is loaded, else the sidebar row with its thread's root from the id. */
+/** The header's detail when it is loaded, else the sidebar or All topics row, with its thread's root from the id. */
 function topicOf(id: string): ActionTopic | undefined {
   const header = registry.get(topicAtom(id))
   if (header._tag === 'Success' && header.value !== null) return header.value
-  const row = registry.get(sidebarRowAtom(id))
+  const row = registry.get(sidebarRowAtom(id)) ?? registry.get(allTopicsRowAtom(id))
   return row === undefined ? undefined : { ...row, rootTs: threadRootTs(id) }
 }
 
@@ -109,7 +111,7 @@ const notifyToast: Record<NotifyChoice, string> = { every: 'Every message', matt
  * on a thread is how it is followed: Every message and When it matters
  * follow it in Slack, Never unfollows it (SPEC 5).
  */
-export async function showTopicMenu(topic: ActionTopic, from: 'row' | 'header', at?: ContextMenuAt): Promise<void> {
+export async function showTopicMenu(topic: ActionTopic, from: RenameTarget['where'], at?: ContextMenuAt): Promise<void> {
   const state = { kind: topic.kind, channel: topic.channel, unread: topic.unreadCount > 0, pinned: topic.pinned, resolved: topic.resolved, notify: threadNotifyChoice(topic.subscribed) }
   const linkable = topic.kind === 'main' || topic.rootTs !== undefined
   const chosen = (await popupContextMenu(topicMenuItems(state).map((item) => nativeItem(item, linkable)), at)) as TopicMenuAction | undefined
@@ -168,6 +170,12 @@ function nativeItem(item: MenuItem<TopicMenuAction>, linkable: boolean): Context
 export function showRowMenu(id: string): void {
   const topic = topicOf(id)
   if (topic !== undefined) void showTopicMenu(topic, 'row')
+}
+
+/** An All topics row's menu: the same menu; Rename edits the table row. */
+export function showTableRowMenu(id: string): void {
+  const topic = topicOf(id)
+  if (topic !== undefined) void showTopicMenu(topic, 'table')
 }
 
 function openTopicInSlack(topic: ActionTopic): void {
