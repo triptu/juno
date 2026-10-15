@@ -48,7 +48,7 @@ Rules of the shape:
 
 Approval identities and source revisions travel beside the view models. A card click binds the card revision/digest and ordered child revision/digests. `prepare` stores choice arguments (for example a question answer) before `approve`; approval never accepts replacement executable arguments. Editing send text creates a new stored proposal. `dismiss` serves every button that only declines (Dismiss, Skip, Keep on Remove, Wait until tomorrow). `askAgain` takes an expired card; the agent writes the owner message that quotes it. The handler must reject stale bindings and already-consumed approvals.
 
-Scheduled and Remembers snapshots also carry revisions, because their WP7 rows do not. Credentials use main's setup flow and never put secret values into the inbox. Settings changes and ownership operations are renderer-only commands, not model tools.
+Scheduled and Remembers snapshots also carry revisions, because their WP7 rows do not. Credentials use main's setup flow and never put secret values into the inbox. Model, spend, rule and connection settings, and ownership operations, are renderer-only commands. Sidebar views have the local settings tool described below.
 
 ## Host contracts
 
@@ -80,3 +80,19 @@ and `host.schedule.changes` (message-store invalidations). The check includes
 the owner's identity and verifies the source author for the menu command.
 No message text crosses these routes. Account checks surround refreshes, and
 incomplete or limited Slack history fails rather than reporting no reply.
+
+
+## Sidebar view host routes
+
+`HostViewRpcs` adds `host.views.list`, `create`, `update`, `delete` and `undo`.
+Every request carries `accountId`. Create takes `view` (name, optional icon,
+conversation ids in `channels`, and `keepOutOfAll`); update also takes `id` and
+replaces the whole view. Mutations return `{ id, undo }`. Undo carries the exact
+expected state and the previous snapshot, including position. It refuses newer
+edits. These are local Juno settings and work with outward Slack writes disabled.
+The host validates icons against the app's set. Listing retains every stored
+conversation id, even if it has left the Slack cache.
+
+`host.slack.channels` adds a paginated directory read: account, name `pattern`
+(case-insensitive glob, `*` and `?`), cursor and limit; channel ids/names and the
+next cursor. It returns no messages, topics, descriptions or user profiles.

@@ -12,7 +12,7 @@
  * offline until the next port gives a fresh one.
  */
 import { Effect, Stream, SubscriptionRef } from 'effect'
-import { AgentHostError, HostChannelId, HostMessageTs, HostUserId, type HostPresence } from '@juno/agent-contract'
+import { AgentHostError, HostChannelId, HostCursor, type HostChannel, HostMessageTs, HostUserId, type HostPresence } from '@juno/agent-contract'
 import type { SchedulerOptions } from '../schedule/scheduler'
 import type { WatchHost } from '../schedule/commands'
 import type { HostReads } from '../router/host-tools'
@@ -66,6 +66,20 @@ export const bindHost = Effect.gen(function* () {
   const limit = READ_LIMIT
 
   const reads: HostReads = {
+    channels: async (pattern) => {
+      const account = current?.accountId
+      if (account == null) throw signedOut
+      const channels: Array<typeof HostChannel.Type> = []
+      let cursor: typeof HostCursor.Type | undefined
+      do {
+        const page = await withAccount((accountId) => accountId === account
+          ? client['host.slack.channels']({ accountId, pattern, limit: 200, ...(cursor === undefined ? {} : { cursor }) })
+          : Effect.fail(new AgentHostError({ reason: 'stale', message: 'The Slack account changed.' })))
+        channels.push(...page.channels)
+        cursor = page.next
+      } while (cursor !== undefined)
+      return channels
+    },
     search: (query) => withAccount((accountId) => client['host.slack.search']({ accountId, query, limit })),
     history: (channelId) => withAccount((accountId) => client['host.slack.history']({ accountId, channelId: HostChannelId.make(channelId), limit })),
     replies: (channelId, threadTs) =>

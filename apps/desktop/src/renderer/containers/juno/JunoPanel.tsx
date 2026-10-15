@@ -6,6 +6,7 @@ import { useAtomValue } from '@juno/state/react'
 import { JunoHeader, JunoPanelActions, JunoPanelContext } from '@juno/views'
 import { closeJunoPanel, moveJunoToTab, openJunoPage, resumeJuno } from './actions'
 import { JunoChat } from './JunoChat'
+import { NoProviderFrame, useNoProvider } from './NoProviderFrame'
 import { focusTopicComposer, useTopicSelection, visibleRange } from './topicContext'
 
 const kindLabels: Record<TopicDetail['channel']['kind'], string> = {
@@ -46,6 +47,10 @@ const titleOf = (detail: TopicDetail) => (detail.kind === 'main' ? `${detail.cha
  * at a "new" divider and nothing has been sent about it from here.
  */
 export function JunoPanel({ topicId }: { readonly topicId: string }) {
+  return useNoProvider() ? <NoProviderFrame column="panel" actions={<JunoPanelActions onOpenInTab={moveJunoToTab} onClose={close} />} /> : <PanelChat topicId={topicId} />
+}
+
+function PanelChat({ topicId }: { readonly topicId: string }) {
   const result = useAtomValue(topicAtom(topicId))
   const detail = result._tag === 'Success' ? (result.value ?? undefined) : undefined
   const about = useAtomValue(junoAboutAtom)

@@ -199,8 +199,8 @@ async function runAll() {
   // On the Mac (SPECS_APALACHE=1): simulations first, SPECS_JOBS at a time, then
   // the Apalache checks one at a time and alone, because a JVM warming up next
   // to simulations on a loaded machine can miss its deadline. A machine of its
-  // own (pnpm remote) sets SPECS_APALACHE above 1: that many Apalache servers,
-  // each with its own lane, run alongside the simulations.
+  // own (pnpm remote) sets SPECS_OVERLAP=1, and SPECS_APALACHE servers, each
+  // with its own lane, run alongside the simulations.
   const queues = [jobs.filter(job => job.args[0] === 'verify'), jobs.filter(job => job.args[0] !== 'verify')]
   let failed
   const lane = async (queue, index = 0) => {
@@ -216,7 +216,7 @@ async function runAll() {
   }
   const simulations = () => Promise.all(Array.from({ length: parallel }, () => lane(queues[1])))
   const checks = () => Promise.all(Array.from({ length: apalacheLanes }, (_, index) => lane(queues[0], index)))
-  if (apalacheLanes > 1) await Promise.all([simulations(), checks()])
+  if (apalacheLanes > 1 || process.env.SPECS_OVERLAP === '1') await Promise.all([simulations(), checks()])
   else {
     await simulations()
     await checks()

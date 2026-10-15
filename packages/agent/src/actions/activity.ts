@@ -51,7 +51,6 @@ function cardAction(store: Store, card: CardRow): ActivityAction | undefined {
   const approvals = store.db.prepare('SELECT refused FROM approvals WHERE card_id = ?').all(card.id) as Array<{ refused: string | null }>
   const base = { id: card.id, tier: tierOf(payload), label: labelOf(payload) }
   if (card.dismissed_at !== null) return { ...base, decision: 'dismissed', outcome: 'none' }
-  if (approvals.length === 0) return expiry(store, card, store.now()) === undefined ? undefined : { ...base, decision: 'expired', outcome: 'none' }
   const refused = approvals.find((a) => a.refused !== null)?.refused
   const auths = store.db
     .prepare(
@@ -59,16 +58,18 @@ function cardAction(store: Store, card: CardRow): ActivityAction | undefined {
        LEFT JOIN action_results ON action_results.authorization_id = authorizations.id WHERE intents.card_id = ? ORDER BY consumed_at`,
     )
     .all(card.id) as Array<{ outcome: Outcome; detail: string | null }>
+  if (approvals.length === 0 && auths.length === 0) return expiry(store, card, store.now()) === undefined ? undefined : { ...base, decision: 'expired', outcome: 'none' }
+  const decision = approvals.length === 0 ? 'noClick' : 'approved'
   if (auths.length === 0 && refused != null) {
     const expired = refused === 'expired' || refused === 'stale' || refused === 'sourceChanged'
     return expired ? { ...base, decision: 'expired', outcome: 'none' } : { ...base, decision: 'refused', outcome: 'none', failure: { text: FAILED, details: refused } }
   }
   const outcomes = auths.map((a) => a.outcome)
   const details = auths.flatMap((a) => (a.detail === null ? [] : [a.detail])).join('\n')
-  if (outcomes.length === 0 || outcomes.some((o) => o === 'consumed' || o === 'sent' || o === 'cancel-requested')) return { ...base, decision: 'approved', outcome: 'pending' }
-  if (outcomes.every((o) => o === 'done') && refused == null) return { ...base, decision: 'approved', outcome: 'done' }
-  if (outcomes.includes('unknown')) return { ...base, decision: 'approved', outcome: 'unknown', failure: { text: UNCONFIRMED, details } }
-  return { ...base, decision: 'approved', outcome: 'failed', failure: { text: FAILED, details: details || (refused ?? '') } }
+  if (outcomes.length === 0 || outcomes.some((o) => o === 'consumed' || o === 'sent' || o === 'cancel-requested')) return { ...base, decision, outcome: 'pending' }
+  if (outcomes.every((o) => o === 'done') && refused == null) return { ...base, decision, outcome: 'done' }
+  if (outcomes.includes('unknown')) return { ...base, decision, outcome: 'unknown', failure: { text: UNCONFIRMED, details } }
+  return { ...base, decision, outcome: 'failed', failure: { text: FAILED, details: details || (refused ?? '') } }
 }
 
 /** The run's actions, in the order they happened. */

@@ -47,7 +47,8 @@ for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => process.exi
 const suites = [
   { name: 'test', args: ['test'] },
   { name: 'specs:check', args: ['--env', 'SPECS_CACHE=off', 'specs:check'], env: { SPECS_CACHE: 'off' } },
-  { name: 'test:gallery', args: ['test:gallery'] },
+  // Every component: 8x16 keeps it near a minute and a half (docs/development.md, "Machine shapes").
+  { name: 'test:gallery', args: ['--machine', 'linux/amd64:8x16', 'test:gallery'] },
   { name: 'test:desktop', args: ['test:desktop'] },
 ]
 

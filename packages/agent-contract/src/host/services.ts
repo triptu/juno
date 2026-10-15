@@ -31,7 +31,11 @@ export const hostTopic = Rpc.make('host.topics.get', { payload: { topicId: HostT
   success: Schema.Struct({ topic: TopicLink, place: Place, accountId: AccountId, resolved: Schema.Boolean, messages: HostMessagePage }), error: AgentHostError })
 export const hostPerson = Rpc.make('host.slack.person', { payload: { accountId: AccountId, userId: HostUserId },
   success: Schema.Struct({ id: HostUserId, name: Schema.String, displayName: Schema.String }), error: AgentHostError })
-export const HostReadRpcs = RpcGroup.make(hostSearch, hostHistory, hostReplies, hostTopics, hostTopic, hostPerson)
+/** Channel directory metadata only; `pattern` is a case-insensitive glob (* and ?). */
+export const HostChannel = Schema.Struct({ id: HostChannelId, name: Schema.String })
+export const hostChannels = Rpc.make('host.slack.channels', { payload: { accountId: AccountId, pattern: Schema.String, cursor: Schema.optionalKey(HostCursor), limit },
+  success: Schema.Struct({ channels: Schema.Array(HostChannel), next: Schema.optionalKey(HostCursor) }), error: AgentHostError })
+export const HostReadRpcs = RpcGroup.make(hostSearch, hostHistory, hostReplies, hostTopics, hostTopic, hostPerson, hostChannels)
 
 /** Metadata only: reply watches never send message content to a model to check replies. */
 export const WatchConversation = Schema.Struct({ channelId: Schema.String, ts: Schema.String, threadTs: Schema.optionalKey(Schema.String) })
@@ -84,5 +88,18 @@ export const hostNotify = Rpc.make('host.notification.deliver', {
 })
 export const HostNotificationRpcs = RpcGroup.make(hostNotify)
 
+/** Local sidebar settings. Icons are validated by the host against the app's icon set. */
+export const HostViewDraft = Schema.Struct({ name: Schema.String, icon: Schema.optionalKey(Schema.String),
+  channels: Schema.Array(Schema.String), keepOutOfAll: Schema.Boolean })
+export const HostView = Schema.Struct({ ...HostViewDraft.fields, id: Schema.String, position: Schema.Int })
+export const HostViewUndo = Schema.Struct({ id: Schema.String, expected: Schema.NullOr(HostView), restore: Schema.NullOr(HostView) })
+export const HostViewChange = Schema.Struct({ id: Schema.String, undo: HostViewUndo })
+export const hostViewsList = Rpc.make('host.views.list', { payload: { accountId: AccountId }, success: Schema.Array(HostView), error: AgentHostError })
+export const hostViewsCreate = Rpc.make('host.views.create', { payload: { accountId: AccountId, view: HostViewDraft }, success: HostViewChange, error: AgentHostError })
+export const hostViewsUpdate = Rpc.make('host.views.update', { payload: { accountId: AccountId, id: Schema.String, view: HostViewDraft }, success: HostViewChange, error: AgentHostError })
+export const hostViewsDelete = Rpc.make('host.views.delete', { payload: { accountId: AccountId, id: Schema.String }, success: HostViewChange, error: AgentHostError })
+export const hostViewsUndo = Rpc.make('host.views.undo', { payload: { accountId: AccountId, undo: HostViewUndo }, success: Schema.Void, error: AgentHostError })
+export const HostViewRpcs = RpcGroup.make(hostViewsList, hostViewsCreate, hostViewsUpdate, hostViewsDelete, hostViewsUndo)
+
 /** The whole AgentHost group, protocol `AGENT_HOST_PROTOCOL` (2). */
-export const AgentHostRpcs = HostHelloRpcs.merge(HostReadRpcs, HostActionRpcs, HostPresenceRpcs, HostNotificationRpcs, HostScheduleRpcs)
+export const AgentHostRpcs = HostHelloRpcs.merge(HostReadRpcs, HostActionRpcs, HostPresenceRpcs, HostNotificationRpcs, HostScheduleRpcs, HostViewRpcs)

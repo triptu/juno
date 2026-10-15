@@ -14,7 +14,7 @@ async function ready(juno: Juno): Promise<void> {
   await openChat(juno)
 }
 
-const ruleFields = (juno: Juno) => juno.win.locator('main').getByLabel('Rule').evaluateAll((fields) => fields.map((field) => (field as HTMLInputElement).value))
+const ruleFields = (juno: Juno) => juno.win.locator('main').getByLabel('Rule', { exact: true }).evaluateAll((fields) => fields.map((field) => (field as HTMLInputElement).value))
 
 async function openPage(juno: Juno, label: string): Promise<void> {
   await juno.win.locator('main [data-juno-header]').getByRole('button', { name: 'Juno' }).click()
@@ -22,26 +22,18 @@ async function openPage(juno: Juno, label: string): Promise<void> {
   await juno.tabs.expectActive(label)
 }
 
-test('Settings › Juno shows what is built, takes a key, and pauses Juno', async ({ juno }) => {
+test('Settings › Juno shows what is built, with the provider in use, and pauses Juno', async ({ juno }) => {
   await ready(juno)
   await openPage(juno, 'Settings › Juno')
   const page = juno.win.locator('main')
   await expect(page.getByRole('heading', { name: 'Juno', exact: true })).toBeVisible()
-  for (const heading of ['Model', 'Spend', 'Providers', 'Rules', 'Pause']) await expect(page.getByRole('heading', { name: heading })).toBeVisible()
+  for (const heading of ['Provider', 'Model', 'Spend', 'Rules', 'Pause']) await expect(page.getByRole('heading', { name: heading })).toBeVisible()
   // Codex, Backup and This Mac wait for their work packages.
-  for (const heading of ['Backup', 'This Mac']) await expect(page.getByRole('heading', { name: heading })).toHaveCount(0)
-  await expect(page.locator('[data-codex]')).toHaveCount(0)
-  await expect(page.locator('[data-openrouter]')).toHaveAttribute('data-openrouter', 'set')
-
-  // A key goes to main: one that is not a key is refused in place.
-  await page.getByRole('button', { name: 'Change key' }).click()
-  await page.getByLabel('OpenRouter key').fill('not a key')
-  await page.getByRole('button', { name: 'Save' }).click()
-  await expect(page.locator('[data-key-error]')).toHaveText('That is not an OpenRouter key.')
-  await page.getByLabel('OpenRouter key').fill('sk-or-v1-e2efedcba9876543210fedcba9876543210')
-  await page.getByRole('button', { name: 'Save' }).click()
-  await expect(page.getByLabel('OpenRouter key')).toHaveCount(0)
-  await expect(page.locator('[data-openrouter]')).toHaveAttribute('data-openrouter', 'set')
+  for (const heading of ['Codex', 'Backup', 'This Mac']) await expect(page.getByRole('heading', { name: heading })).toHaveCount(0)
+  // The launch set OpenRouter up: its key is set and it is in use.
+  await expect(page.locator('[data-provider-shown]')).toHaveAttribute('data-provider-shown', 'openRouter')
+  await expect(page.locator('[data-provider-key]')).toHaveAttribute('data-provider-key', 'set')
+  await expect(page.getByText('OpenRouter is in use.')).toBeVisible()
 
   // The chat model is one of the picker's families; the page follows the change.
   await page.getByLabel('Chat model').selectOption('Claude Opus')
@@ -49,13 +41,13 @@ test('Settings › Juno shows what is built, takes a key, and pauses Juno', asyn
 
   // A rule is saved when its field loses focus, and a removed one goes at once.
   await page.getByRole('button', { name: 'Add a rule' }).click()
-  await page.getByLabel('Rule').fill('Ask me before anything goes to #hiring')
-  await page.getByLabel('Rule').press('Enter')
+  await page.getByLabel('Rule', { exact: true }).fill('Ask me before anything goes to #hiring')
+  await page.getByLabel('Rule', { exact: true }).press('Enter')
   await page.getByRole('button', { name: 'Add a rule' }).click()
-  await page.getByLabel('Rule').nth(1).fill('Never post in #general without asking')
+  await page.getByLabel('Rule', { exact: true }).nth(1).fill('Never post in #general without asking')
   await page.getByLabel('Juno is paused').focus()
-  await page.getByRole('button', { name: 'Remove' }).first().click()
-  await expect(page.getByLabel('Rule')).toHaveCount(1)
+  await page.getByRole('button', { name: 'Remove rule' }).first().click()
+  await expect(page.getByLabel('Rule', { exact: true })).toHaveCount(1)
   // What the agent kept: the page opened again shows only its served list.
   await juno.nav.back()
   await openPage(juno, 'Settings › Juno')

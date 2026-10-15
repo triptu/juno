@@ -32,12 +32,6 @@ test('the agent process restarts after a crash and reaches its host again', asyn
   }
 })
 
-test('the agent process stays off by default, and a renderer asking for its port hears failed', async ({ app, win }) => {
-  await expect.poll(() => hooks(app, 'engineState'), { timeout: 15_000 }).toBe('ready')
-  expect(await hooks(app, 'agentState')).toBe('stopped')
-  expect(await win.evaluate(() => window.juno.agent.requestPort())).toBe('failed')
-})
-
 // Main brokers a port between the renderer and the agent (ADR 0012), and the agent serves its
 // renderer RPCs on it: a first request for the chat summary answers.
 test("the renderer gets a port to the agent, and the agent's chat answers on it", async () => {

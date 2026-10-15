@@ -53,7 +53,8 @@ export interface Output {
 
 const BLOCK = /<say(?:\s+reply-to="([^"]*)")?\s*>([\s\S]*?)<\/say>|<react\s+to="([^"]*)"\s*>([\s\S]*?)<\/react>/g
 
-const SRC = /<src\s+m="([^"]*)"\s*>([\s\S]*?)<\/src>/g
+/** `<src m="m3">`, or the shorter `<src m3>` that models also write. */
+const SRC = /<src\s+(?:m="([^"]*)"|(m\d+))\s*>([\s\S]*?)<\/src>/g
 /** Markup that has no place inside a bubble: a `<src>` left open or closed alone, a nested `<say>` tag, a `<react>`. */
 const STRAY = /<react\b[^>]*>[\s\S]*?<\/react>|<\/?(?:src|say|react)\b[^>]*>/g
 
@@ -66,8 +67,8 @@ function spansOf(body: string): ReadonlyArray<Span> {
   let at = 0
   for (const match of body.matchAll(SRC)) {
     plain(body.slice(at, match.index))
-    const words = match[2]!.replace(STRAY, '')
-    if (words !== '') spans.push({ text: words, source: match[1]! })
+    const words = match[3]!.replace(STRAY, '')
+    if (words !== '') spans.push({ text: words, source: (match[1] ?? match[2])! })
     at = match.index + match[0].length
   }
   plain(body.slice(at))

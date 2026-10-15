@@ -50,12 +50,6 @@ function savedAccent(): Accent {
   return isAccent(accent) ? accent : DEFAULT_ACCENT
 }
 
-/**
- * The Juno Agent runs (`?agent=1`): the Juno button, ⌘J and Ask Juno show.
- * Fixed for the window's life; the agent starts only with JUNO_AGENT=1.
- */
-export const junoAgentOnAtom = Atom.make(launchParam('agent') === '1')
-
 /** The theme the owner picked. Starts as the saved one. */
 export const themeAtom = Atom.make<Theme>(savedTheme())
 
@@ -127,15 +121,6 @@ export async function popupContextMenu(items: ReadonlyArray<ContextMenuItem>, at
   const chosen = await window.juno.contextMenu.popup(items, at).catch(() => null)
   const ids = items.flatMap((item) => ('submenu' in item ? item.submenu : [item])).flatMap((item) => ('id' in item ? [item.id] : []))
   return typeof chosen === 'string' && ids.includes(chosen) ? chosen : undefined
-}
-
-/** What main did with an OpenRouter key from Settings › Juno. */
-export type OpenRouterKeyResult = 'saved' | 'removed' | 'invalid' | 'failed'
-
-/** Stores the OpenRouter key in the keychain through main, which hands it to the agent; `null` removes it. */
-export async function setOpenRouterKey(key: string | null): Promise<OpenRouterKeyResult> {
-  const result = await window.juno.agent.setOpenRouterKey(key).catch(() => 'failed')
-  return result === 'saved' || result === 'removed' || result === 'invalid' ? result : 'failed'
 }
 
 /** Puts text on the clipboard. */

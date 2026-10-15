@@ -13,6 +13,7 @@ pi packages and the Codex SDK may be imported anywhere in this package (`check-d
 | A chat run, the guard, spend, a provider failure line | `fakeProvider()` with a script |
 | Compaction jobs and node text | `fakeProvider()`; requests to Haiku or Flash go to the compactor |
 | The app's agent end to end: the model picker, the OpenRouter key | `startFakeOpenRouter()` over HTTP |
+| A custom OpenAI-compatible endpoint (a local model server) | `startFakeOpenAi()` over HTTP |
 | The Codex harness (WP20) | `startFakeCodex()` as `codexPathOverride` |
 | MCP manager logic without HTTP | any fake's `connectInMemory()` |
 | Connect, sign-in, token expiry, `list_changed`, schema hashes | `startFakeNotion()`, `startFakeLittlebird()`, `startFakeT3()` over HTTP |
@@ -40,6 +41,14 @@ For the e2e tests, where the agent runs in its own process with the real OpenRou
 - `POST /api/v1/messages` (Claude, Anthropic Messages) and `POST /api/v1/chat/completions` (the rest) stream `answer`, by default one `<say>` bubble. `answer` may be a function of the request, to answer what was sent. A request to a compaction model gets the compactor's answer instead, as with `fakeProvider()`.
 - `key`: a request carrying another key gets 401, as a rejected key does.
 - `requests` records each chat request's path, model, key, whether it was a compaction, and `input`, the last user message. `inputs()` lists the inputs of the chat requests that were not compactions. `catalogueReads()` counts list reads.
+
+## OpenAI-compatible endpoint over HTTP: `startFakeOpenAi(options?)`
+
+An endpoint as Ollama, LM Studio or vLLM serve one, at `baseUrl` (`<origin>/v1`). Import it from `@juno/agent-testing/openai`, which loads nothing else.
+
+- `GET /v1/models` lists `models` by id only, with no prices or window (default `qwen3:8b` and `llama3.3:70b`); `models: null` answers 404, as an endpoint that lists nothing.
+- `POST /v1/chat/completions` streams `answer`, by default one `<say>` bubble.
+- `key`: a request with another bearer token gets 401. `requests` records each chat request's model and key.
 
 ## Codex: `startFakeCodex(options?)`
 

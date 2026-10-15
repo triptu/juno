@@ -31,6 +31,8 @@ export interface ActionsOptions {
   /** The host's action RPCs. No Slack send or resolve without it. */
   readonly host?: ActionHost
   /** Executors other folders own (MCP writes, T3, schedules, removal). */
+  readonly decorateCard?: (view: CardView) => CardView
+  readonly undoCard?: (identity: Identity) => Promise<boolean>
   readonly executors?: ReadonlyArray<Executor> | (() => ReadonlyArray<Executor>)
 }
 
@@ -96,7 +98,8 @@ export function createActions(options: ActionsOptions & {
       return result
     },
     /** Every card as the chat shows it. */
-    views: (now = store.now()): ReadonlyArray<CardView> => cardViews(store, now),
+    views: (now = store.now()): ReadonlyArray<CardView> => cardViews(store, now).map((view) => options.decorateCard?.(view) ?? view),
+    undo: (identity: Identity) => options.undoCard?.(identity) ?? Promise.resolve(false),
     /** Outcomes the model has not read, as text for input `opId` (§19.5). */
     carry: (opId: string) => carryOutcomes(store, opId),
     /** A reply's quote of a card. */

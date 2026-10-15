@@ -4,6 +4,9 @@ import { defineConfig } from '@playwright/test'
 const port = Number(process.env.GALLERY_PORT ?? 4174)
 // One id per run, set before the workers start, so the shift guard's parts share one queue.
 process.env.GALLERY_SHIFT_RUN ??= `${Date.now()}-${process.pid}`
+// JUNO_SHARD=i/n (pnpm remote --shards n): shard 0 runs every test; the others
+// run only the shift guard's parts, which split the states between the shards.
+const shardIndex = Number(/^(\d+)\/\d+$/.exec(process.env.JUNO_SHARD ?? '')?.[1] ?? 0)
 
 /**
  * Two projects against the built gallery. `shots` screenshots every state
@@ -31,6 +34,7 @@ export default defineConfig({
     colorScheme: 'light',
     reducedMotion: 'reduce',
   },
+  ...(shardIndex > 0 ? { grep: /no interaction shifts the layout, in any state of any component/ } : {}),
   projects: [
     // Wide enough for the 240px switcher plus the widest frame (1400px).
     { name: 'shots', testMatch: 'shots.spec.ts', use: { viewport: { width: 1800, height: 1000 } } },

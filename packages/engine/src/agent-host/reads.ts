@@ -21,7 +21,7 @@ import {
 } from '@juno/domain'
 import { ftsQuery, StoreReader, type SqlClient } from '@juno/store'
 import { Effect } from 'effect'
-import { AgentHostError, type HostCursor, type HostUserId, type Place, type TopicLink } from '@juno/agent-contract'
+import { AgentHostError, HostChannelId, HostCursor, type HostUserId, type Place, type TopicLink } from '@juno/agent-contract'
 import type { Message, MessagePage, Topic } from '@juno/agent-juno'
 import { channelInfoOf, parseColumns, parseIds, TOPIC_COLUMNS, TOPIC_FROM, topicFrom, userName, type JoinedRow, type UserRow } from '../topicRows'
 
@@ -267,3 +267,14 @@ export const topic = (topicId: string) =>
     const messages = row.kind === 'thread' && row.root_ts !== null ? yield* replies(row.channel, row.root_ts, undefined, 50) : yield* history(row.channel, undefined, 50)
     return { topic: shaped.link, place: shaped.place, resolved: shaped.resolved, messages } satisfies Topic
   })
+
+/** Directory lookup: match channel names without reading any Slack message content. */
+export const channels = (pattern: string, cursor: string | undefined, limit: number) => Effect.gen(function* () {
+  const sql = yield* StoreReader
+  const glob = pattern.toLowerCase().replaceAll('[', '[[]')
+  const rows = yield* sql<{ id: string; name: string }>`SELECT id, name FROM conversations
+    WHERE kind IN ('public', 'private') AND lower(name) GLOB ${glob} AND id > ${cursor ?? ''}
+    ORDER BY id LIMIT ${limit + 1}`
+  return { channels: rows.slice(0, limit).map((row) => ({ ...row, id: HostChannelId.make(row.id) })),
+    ...(rows.length > limit ? { next: HostCursor.make(rows[limit - 1]!.id) } : {}) }
+})

@@ -41,3 +41,8 @@ and `host.schedule.changes` (message-store invalidations). The check includes
 the owner's identity and verifies the source author for the menu command.
 No message text crosses these routes. Account checks surround refreshes, and
 incomplete or limited Slack history fails rather than reporting no reply.
+
+The sidebar view routes (`host.views.*`) enforce the same account check and
+forward to the engine's shared sheet commands. They are local settings, so
+`writes: disabled` does not disable them. `host.slack.channels` reads only the
+cached channel directory, with a paginated name glob.

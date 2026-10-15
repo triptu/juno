@@ -32,3 +32,4 @@ export {
   type JunoSettingsChange,
   type PageOutcome,
 } from './pages'
+export { agentProviderAtom, setAgentProvider, whenProviderActive } from './provider'
