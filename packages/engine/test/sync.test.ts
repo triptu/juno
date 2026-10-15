@@ -7,10 +7,10 @@ import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
 import { Effect } from 'effect'
 import { afterEach, describe, expect, it } from 'vitest'
-import type { UndoCommand } from '@juno/contract'
+import { viewsDelete, type UndoCommand } from '@juno/contract'
 import { CONVERSATIONS, SELF_ID, startFakeSlack } from '@juno/fake-slack'
 import { prefs, Store, workspacePaths } from '@juno/store'
-import { topicCountsAtom } from '@juno/state'
+import { runCommand, topicCountsAtom } from '@juno/state'
 import { sleep, startTestEngine, waitFor, type RunningEngine } from './harness'
 import {
   apiCalls,
@@ -39,6 +39,18 @@ afterEach(async () => {
 
 const bootedEngine = (options: Parameters<typeof startTestEngine>[0] = {}) => boot(engines, options)
 
+/**
+ * A booted engine whose All list holds every conversation. These tests are
+ * about the sync, so the Automated view, which keeps #alerts-prod and
+ * #deploys out of All after the first sync, is deleted first.
+ */
+async function bootedWithAll(): Promise<RunningEngine> {
+  const engine = await bootedEngine()
+  valueOf(await runCommand(engine.registry, viewsDelete, { id: 'automated' }))
+  await engine.rowsUntil((rows) => ['m:C0ALERTSPROD', 'm:C0DEPLOYS'].every((id) => rows.some((row) => row.id === id)), 'the bot channels back in All')
+  return engine
+}
+
 /** The quiet window, in the fixture's unit (minutes before now). */
 const WINDOW = 7 * 24 * 60
 
@@ -64,7 +76,7 @@ const replay = (engine: RunningEngine, undo: UndoCommand) => {
 
 describe('cold boot', () => {
   it('discovers the fixture workspace: titles, previews, counts, tags and order', async () => {
-    const engine = await bootedEngine()
+    const engine = await bootedWithAll()
     const rows = await engine.rowsUntil((list) => list.length >= 20 && list.every((r) => r.preview.sender !== ''), 'all rows named')
 
     // Newest activity first; every row is from a conversation the user is in.
@@ -132,7 +144,7 @@ describe('cold boot', () => {
   })
 
   it('shows exactly the rows of spec section 5: active Main rows and followed threads, no unfollowed thread at first sign-in', async () => {
-    const engine = await bootedEngine()
+    const engine = await bootedWithAll()
     const rows = await engine.rowsUntil((list) => list.length >= 20, 'rows')
     const expected = new Set<string>()
     for (const c of memberConversations) {
@@ -209,7 +221,7 @@ describe('cold boot', () => {
 
 describe('membership', () => {
   it('comes from client.counts: channels the user is not in never reach the sidebar and cost no history call', async () => {
-    const engine = await bootedEngine()
+    const engine = await bootedWithAll()
     const rows = await engine.rowsUntil((list) => list.length >= 20, 'rows')
     // The fake's userBoot lists every channel, like the real one; the non-member ones have recent threads.
     expect(nonMemberChannels.length).toBeGreaterThan(0)
@@ -302,7 +314,7 @@ describe('warm boot', () => {
 
 describe('realtime', () => {
   it('a reply from the socket updates one row and leaves the others as they were', async () => {
-    const engine = await bootedEngine()
+    const engine = await bootedWithAll()
     const before = await engine.rowsUntil((rows) => rows.length >= 20, 'rows')
     const postgres = before.find((r) => r.title === 'Draft plan is in the doc')!
     const other = before.find((r) => r.title === '#deploys')!
@@ -445,7 +457,7 @@ describe('subscriptions (spec section 5, "Subscribe works on any thread")', () =
   })
 
   it('a Main has no follow: subscribing or unsubscribing it is NotFound and keeps its row', async () => {
-    const engine = await bootedEngine()
+    const engine = await bootedWithAll()
     const before = await engine.rowsUntil((rows) => rows.length >= 20, 'rows')
     const id = 'm:C0DEPLOYS'
     expect(before.find((r) => r.id === id)).toMatchObject({ kind: 'main', subscribed: false })
