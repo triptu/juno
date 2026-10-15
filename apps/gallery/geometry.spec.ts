@@ -193,6 +193,7 @@ test.describe('composer attachments', () => {
   for (const id of ['checks/narrow-audience-and-check', 'checks/narrow-wrong-place']) {
     test(`${id}: in a 336px field the choices move under the finding and keep the bar's insets`, async ({ page }) => {
       await open(page, 'Composer', id)
+      await expect(page.locator('[data-send-check]')).not.toContainText('%')
       const at = await page.evaluate(() => {
         const bar = document.querySelector('[data-send-check]')!
         const box = bar.getBoundingClientRect()
@@ -332,4 +333,57 @@ test.describe('settings forms', () => {
     expect(at.buttonEnd).toBe(at.buttonTop)
     expect(at.buttonTop).toBe(at.buttonBottom)
   })
+})
+
+
+test('Connections tools keep symmetric row insets with one tier checkbox', async ({ page }) => {
+  await open(page, 'ConnectionsPage', 'connections/servers')
+  const rows = page.locator('[data-tool]')
+  for (const row of await rows.all()) {
+    await expect(row.getByRole('checkbox', { name: 'Runs without asking' })).toHaveCount(1)
+    const insets = await row.evaluate((node) => {
+      const box = node.closest('[data-connection-id]')!.getBoundingClientRect()
+      const name = node.firstElementChild!.getBoundingClientRect()
+      const control = node.lastElementChild!.getBoundingClientRect()
+      return { start: name.left - box.left, end: box.right - control.right }
+    })
+    expect(insets).toEqual({ start: 15, end: 15 })
+  }
+})
+
+test('Backup cuts the path in the middle and keeps the row insets', async ({ page }) => {
+  await open(page, 'BackupSection', 'backup/long-path')
+  const path = page.locator('[data-backup-folder]')
+  await expect(path).toHaveAttribute('title', '/Users/maya/Library/CloudStorage/Dropbox/Workspace archives/Shared folders/Desktop clients/Juno backup')
+  await expect(path).toContainText('…')
+  await expect(path).toContainText('/Juno backup')
+  const at = await path.evaluate((node) => {
+    const card = node.closest('[data-backup]')!.getBoundingClientRect()
+    const row = node.closest('[data-backup]')!.firstElementChild!
+    const button = row.querySelector('button')!.getBoundingClientRect()
+    const box = node.getBoundingClientRect()
+    return { start: box.left - card.left, end: card.right - button.right, fits: node.scrollWidth <= node.clientWidth, gap: button.left - box.right }
+  })
+  expect(at.start).toBe(15)
+  expect(at.end).toBe(at.start)
+  expect(at.fits).toBe(true)
+  expect(at.gap).toBeGreaterThan(0)
+})
+
+test('Home Automated keeps its two lines aligned and its actions evenly inset', async ({ page }) => {
+  await open(page, 'Home', 'items/automated')
+  const row = page.locator('[data-home-item=automated]')
+  await row.hover()
+  await expect(row.locator('[data-home-title]')).toHaveText('Move #releases?')
+  await expect(row.locator('[data-home-meta]')).toHaveText('To Automated')
+  const at = await row.evaluate((node) => {
+    const title = node.querySelector('[data-home-title]')!.getBoundingClientRect()
+    const meta = node.querySelector('[data-home-meta]')!.getBoundingClientRect()
+    const buttons = [...node.querySelectorAll('button')].map((button) => button.getBoundingClientRect())
+    const slot = node.getBoundingClientRect()
+    return { title: title.left, meta: meta.left, buttons: buttons.map((box) => ({ top: box.top - slot.top, bottom: slot.bottom - box.bottom })), gap: buttons[1]!.left - buttons[0]!.right }
+  })
+  expect(at.title).toBe(at.meta)
+  for (const button of at.buttons) expect(button).toEqual({ top: 12, bottom: 12 })
+  expect(at.gap).toBeGreaterThan(0)
 })

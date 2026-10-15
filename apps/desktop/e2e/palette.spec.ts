@@ -20,7 +20,7 @@ test('opens with ⌘K and the Search button, shows recent topics, and closes wit
   await palette.expectResults()
   await expect(palette.section('Recent')).toBeVisible()
   await expect(palette.section('Recent').getByRole('option')).toHaveCount(6)
-  await expect(palette.input).toHaveAttribute('placeholder', 'Search, or tell Juno: message maya the slot works')
+  await expect(palette.input).toHaveAttribute('placeholder', 'Search, or ask Juno')
   // The first recent topic is active, and Enter opens it.
   const first = await palette.activeText()
   expect(first).not.toBe('')

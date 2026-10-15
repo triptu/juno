@@ -11,6 +11,8 @@ export default defineFixtures(
   {
     Connections: {
       servers: page({ page: connections }),
+      off: page({ page: { connections: connections.connections.map((row) => ({ ...row, state: 'off', enabled: false, tools: [] })) } }),
+      'needs-sign-in': page({ page: { connections: connections.connections.map((row) => ({ ...row, state: 'needsSignIn', enabled: false })) } }),
       signingIn: page({ page: signingIn }),
       badAddress: page({ page: connections, error: { id: 'new', message: 'Use an https address, or http on this Mac.' } }),
       empty: page({ page: { connections: [] } }),

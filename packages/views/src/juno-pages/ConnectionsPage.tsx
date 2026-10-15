@@ -83,7 +83,7 @@ function Connection({ row, error, onEnabled, onAction, onT3Address, onTier }: { 
                   {copy.remove}
                 </Button>
               ) : null}
-              <Button variant={primary.action === 'connect' ? 'primary' : 'secondary'} size="xs" onClick={() => onAction(row.id, primary.action)}>
+              <Button variant="secondary" size="xs" onClick={() => onAction(row.id, primary.action)}>
                 {primary.label}
               </Button>
             </span>
@@ -207,7 +207,7 @@ function Tool({ tool, last, onTier }: { readonly tool: DiscoveredTool; readonly 
       divider={!last}
       trailing={
         <span {...stylex.props(cell.controls)}>
-          <Checkbox label="Needs no click" checked={read} onChange={(event) => onTier(event.currentTarget.checked ? 0 : 3)} />
+          <Checkbox label="Runs without asking" checked={read} onChange={(event) => onTier(event.currentTarget.checked ? 0 : 3)} />
         </span>
       }
     >
@@ -216,13 +216,10 @@ function Tool({ tool, last, onTier }: { readonly tool: DiscoveredTool; readonly 
           <Text variant="body" truncate>
             {tool.name}
           </Text>
-          <Chip variant={read ? 'filled' : 'outline'} size={18}>
-            {read ? 'Read' : 'Asks every time'}
-          </Chip>
-          {tool.allowlisted ? (
-            <Chip variant="quiet" size={18}>
+          {tool.allowlisted && !read ? (
+            <Text variant="meta" tone="muted">
               Default
-            </Chip>
+            </Text>
           ) : null}
         </span>
         {tool.hint !== undefined ? (

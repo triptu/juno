@@ -40,6 +40,7 @@ export function useBackupSettings(): { readonly props: BackupProps; readonly she
   }
 
   const exportPhrase = async () => {
+    if (busy === 'phrase') return
     setError(undefined)
     setBusy('phrase')
     const answer = await actions.ownership({ _tag: 'exportPhrase' })

@@ -39,8 +39,8 @@ export function choose(bar: CheckBar, choice: 'primary' | 'secondary'): Outcome 
 }
 
 /** What the bar view draws. */
-export function findingOf(bar: CheckBar): { readonly finding: SendCheckFinding; readonly confidence: number } {
-  if (bar.kind === 'route') return { finding: { kind: 'route', title: bar.route.title }, confidence: bar.route.confidence }
-  const { fixes, note, confidence } = bar.clarity
-  return { finding: { kind: 'clarity', fixes, ...(note === undefined ? {} : { note }) }, confidence }
+export function findingOf(bar: CheckBar): { readonly finding: SendCheckFinding } {
+  if (bar.kind === 'route') return { finding: { kind: 'route', title: bar.route.title } }
+  const { fixes, note } = bar.clarity
+  return { finding: { kind: 'clarity', fixes, ...(note === undefined ? {} : { note }) } }
 }
