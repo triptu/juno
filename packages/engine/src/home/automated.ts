@@ -32,7 +32,7 @@ import { automatedViewState, candidates, classify, clearVerdict, moveToAutomated
 import { userName, type UserRow } from '../topicRows'
 import { Workspace, type StoreServices } from '../workspace'
 import { decideAndStore, HOME_DAILY_BUDGET, usedToday } from './assist'
-import { bodyFromMrkdwn, plainText } from '@juno/richtext'
+import { unescapeMrkdwn } from '@juno/richtext'
 
 const KEYS: InvalidationKeys = ['conversations', 'topics', 'sync_state', 'sidebar_views', 'automated_channels', 'ignored_channels', 'prefs', 'users']
 const WINDOW = '3 seconds'
@@ -127,7 +127,7 @@ const junoSample = (rows: ReadonlyArray<SampleRow>, selfId: string | undefined) 
         const sender = senderOf(row, selfId)
         return {
           sender: row.user_id === null ? 'An app' : userName(row.user_id, users.get(row.user_id)),
-          text: plainText(bodyFromMrkdwn(row.text)).slice(0, 300),
+          text: unescapeMrkdwn(row.text).slice(0, 300),
           at: new Date(Number(row.ts) * 1000).toISOString(),
           ...(sender === 'app' ? { fromApp: true } : {}),
           ...(sender === 'you' ? { fromMe: true } : {}),

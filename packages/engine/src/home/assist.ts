@@ -14,7 +14,7 @@ import { Invalidation, keys, StoreReader, StoreWriter, type SqlError } from '@ju
 import { Clock, Effect } from 'effect'
 import { userName, type JoinedRow, type UserRow } from '../topicRows'
 import { messagesAfter, NO_READ } from './query'
-import { bodyFromMrkdwn, plainText } from '@juno/richtext'
+import { unescapeMrkdwn } from '@juno/richtext'
 
 /** Home's calls per workspace per day, across its tasks. */
 export const HOME_DAILY_BUDGET = 300
@@ -69,8 +69,8 @@ export const recentMessages = (
       .map((m) => ({
         id: m.ts,
         sender: m.user_id === null ? 'Someone' : userName(m.user_id, users.get(m.user_id)),
-        // Slack's escaped mrkdwn as plain text, so a model never reads or echoes `&gt;`.
-        text: plainText(bodyFromMrkdwn(m.text)).slice(0, 600),
+        // Entities decoded, so a model never reads or echoes `&gt;`; mention tokens stay for the model to read.
+        text: unescapeMrkdwn(m.text).slice(0, 600),
         at: isoOf(m.ts),
         ...(m.user_id !== null && m.user_id === selfId ? { fromMe: true } : {}),
       }))
