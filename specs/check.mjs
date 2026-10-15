@@ -332,7 +332,7 @@ if (!memoryOnly && !actionsOnly && !recoveryOnly && !boundedOnly) {
       file === 'outbox' ? { samples: 1, witnesses: ['reachedAgreement'], requireCompletion: true } : {})
     simulate(file, `${schedule}BugStep`, invariant, `${name}-bug.itf.json`, true)
   }
-  for (const schedule of ['answerBeforeEcho', 'lostLookupAbsent', 'reconnectPage', 'dependentDelete', 'actionRetry']) {
+  for (const schedule of ['answerBeforeEcho', 'lostLookupAbsent', 'reconnectPage', 'dependentDelete', 'actionRetry', 'uploadRetry']) {
     simulate('outbox', `${schedule}Step`, 'invariants', `outbox-${schedule}.itf.json`, false, false,
       { samples: 1, witnesses: ['reachedAgreement'], requireCompletion: true })
   }
