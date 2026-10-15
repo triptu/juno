@@ -43,6 +43,21 @@ describe('composer text to outgoing message', () => {
     expect(out.text).toBe('<@U0MAYA> and <@U0MAYA2>, see <#C0ENGINFRA|eng-infra> not <#C0ENG|eng>')
   })
 
+  it('sends the people and channels the composer picked by id, with no targets needed', () => {
+    const out = composeOutgoing('ask <@U0MAYA|Maya> in <#C0ENG|eng> about <b>', {})
+    expect(out.blocks[0]?.elements[0]).toEqual({
+      type: 'rich_text_section',
+      elements: [
+        { type: 'text', text: 'ask ' },
+        { type: 'user', user_id: 'U0MAYA' },
+        { type: 'text', text: ' in ' },
+        { type: 'channel', channel_id: 'C0ENG' },
+        { type: 'text', text: ' about <b>' },
+      ],
+    })
+    expect(out.text).toBe('ask <@U0MAYA> in <#C0ENG|eng> about &lt;b&gt;')
+  })
+
   it('matches a first name only when it is unambiguous', () => {
     expect(composeOutgoing('thanks @Leo', targets).blocks[0]?.elements[0]).toEqual({
       type: 'rich_text_section',
