@@ -5,9 +5,9 @@
  */
 
 /** Ranked in this order. */
-export type HomeKind = 'waiting' | 'resume' | 'moved' | 'followUp' | 'tidyUp'
+export type HomeKind = 'waiting' | 'resume' | 'moved' | 'followUp' | 'tidyUp' | 'automated'
 
-export const HOME_KINDS: ReadonlyArray<HomeKind> = ['waiting', 'resume', 'moved', 'followUp', 'tidyUp']
+export const HOME_KINDS: ReadonlyArray<HomeKind> = ['waiting', 'resume', 'moved', 'followUp', 'tidyUp', 'automated']
 
 /** Moved a lot: a followed topic with at least this many new messages. */
 export const MOVED_A_LOT_MIN = 8

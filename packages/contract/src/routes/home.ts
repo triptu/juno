@@ -13,9 +13,10 @@ import { Schema } from 'effect'
 import { Rpc, RpcGroup } from 'effect/rpc'
 import { NotSignedIn } from '../errors'
 import { liveValueRoute } from '../live'
+import { ChannelRef } from '../refs'
 
 /** Ranked in this order: at most one of each, and at most three in all. */
-export const HomeItemKind = Schema.Literals(['waiting', 'resume', 'moved', 'followUp', 'tidyUp'])
+export const HomeItemKind = Schema.Literals(['waiting', 'resume', 'moved', 'followUp', 'tidyUp', 'automated'])
 export type HomeItemKind = typeof HomeItemKind.Type
 
 /** A topic as a Home row names it. */
@@ -31,10 +32,10 @@ export const HomeTopic = Schema.Struct({
 export type HomeTopic = typeof HomeTopic.Type
 
 export const HomeItem = Schema.Struct({
-  /** Stable for the same thing: `<kind>:<topic id>`, `followUp:<topic id>:<ts>`, `tidyUp`. */
+  /** Stable for the same thing: `<kind>:<topic id>`, `followUp:<topic id>:<ts>`, `tidyUp`, `automated:<channel id>`. */
   id: Schema.String,
   kind: HomeItemKind,
-  /** The title line with AI off: "Elena asked you something", "3 topics look settled". */
+  /** The title line with AI off: "Elena asked you something", "3 topics look settled", "Move #ci-builds to Automated?". */
   title: Schema.String,
   /** A sharper title line from the assistant, only when it was confident. Never changes the meta line. */
   aiTitle: Schema.optionalKey(Schema.String),
@@ -46,6 +47,10 @@ export const HomeItem = Schema.Struct({
   newCount: Schema.optionalKey(Schema.Int),
   /** Follow-up: the user's message the promise was found in, for Mark done. */
   messageTs: Schema.optionalKey(Schema.String),
+  /** Automated: the conversation asked about, for Move, Keep in All and its menu. Its Main is `topics[0]`. */
+  channel: Schema.optionalKey(ChannelRef),
+  /** Automated: how many of its latest messages came from apps, for the meta line. */
+  fromApps: Schema.optionalKey(Schema.Struct({ apps: Schema.Int, of: Schema.Int })),
 })
 export type HomeItem = typeof HomeItem.Type
 
