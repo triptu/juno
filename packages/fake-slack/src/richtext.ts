@@ -26,8 +26,9 @@ export function unescapeText(text: string): string {
   return text.replaceAll('&lt;', '<').replaceAll('&gt;', '>').replaceAll('&amp;', '&')
 }
 
+/** An `&` that already starts an entity stays: text a client escaped is stored as sent, raw text is escaped, as Slack does. */
 function escapeLiteral(text: string): string {
-  return text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
+  return text.replace(/&(?!(?:amp|lt|gt);)/g, '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
 }
 
 export function textToBlocks(text: string): Blocks {

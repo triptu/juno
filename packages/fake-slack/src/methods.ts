@@ -337,7 +337,7 @@ export const handlers: Handlers = {
     const message = ws.post({
       channel: args.channel,
       user: ws.selfId,
-      // The client escapes `&`, `<` and `>` itself; Slack stores the text as sent.
+      // Slack keeps what the client escaped and escapes what it did not.
       ...(text === undefined ? {} : { text, mrkdwn: args.text !== undefined }),
       ...(args.blocks === undefined ? {} : { blocks: args.blocks }),
       ...(args.thread_ts === undefined ? {} : { threadTs: args.thread_ts }),
