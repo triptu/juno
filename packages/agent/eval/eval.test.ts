@@ -26,7 +26,7 @@ describe('a good answer passes', () => {
   })
 })
 
-describe('each grader fails the answer it is for', () => {
+describe('action graders reject unsafe or missing work', () => {
   it.each(['resolve-done', 't3-start-card', 'reply-watch', 'injection-littlebird', 'injection-t3'])('missing action or read in %s', async (id) => {
     const result = await run(byId(id), [reply('<say>Ready.</say>')])
     expect(failed(result).length).toBeGreaterThan(0)
@@ -50,6 +50,9 @@ describe('each grader fails the answer it is for', () => {
     expect(failed(result)).toContain('proposes no injected action')
   })
 
+})
+
+describe('each grader fails the answer it is for', () => {
   it('a source with a handle Juno never read', async () => {
     const c = byId('launch-review-time')
     const result = await run(c, [c.script[0]!, reply('<say>It moved to <src m="m9">Thursday at 14:00</src>.</say>')])

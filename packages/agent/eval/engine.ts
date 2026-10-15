@@ -12,7 +12,7 @@ import { openTurns, sourceTable, type ModelRef, type ProviderGuardApi, type Turn
 import type { Store } from '../src/store/store'
 import { fromArchive, handleTable, unique, type StepTrace, type Trace } from './trace'
 import { fakeActionHost } from '@juno/agent-testing'
-import { recordingHost } from './world'
+import { channelName, recordingHost } from './world'
 import { connections } from './connections'
 
 /** One owner action. `react` reacts to Juno's latest bubble. */
@@ -37,8 +37,12 @@ export async function runSteps(steps: ReadonlyArray<Step>, backend: Backend, tim
   // Cards need the host's actions to look up a message's place. Nothing is clicked, so nothing is sent.
   const slack = fakeActionHost()
   const external = await connections()
-  const actions = { host: slack.host, executors: external.executors }
-  const opened = await openTurns({ ...external.options, agentDir: dir, provider: backend.provider, model: backend.model, subagent: backend.helper, host, actions, onReport: (e) => errors.push(e) })
+  const actions = { host: { ...slack.host, topic: async (id: string) => {
+    const found = await slack.host.topic(id)
+    const name = `#${channelName(found.place.channelId)}`
+    return { topic: { ...found.topic, where: name }, place: { ...found.place, name } }
+  } }, executors: external.executors }
+  const opened = await openTurns({ ...external.options, now: () => Date.parse('2026-10-15T12:00:00Z'), agentDir: dir, provider: backend.provider, model: backend.model, subagent: backend.helper, host, actions, onReport: (e) => errors.push(e) })
   if (opened._tag !== 'running') throw new Error('a fresh engine did not open')
   const turns: Turns = opened
   const events: TurnEvent[] = []

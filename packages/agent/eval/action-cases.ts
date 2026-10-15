@@ -7,7 +7,7 @@ let serial = 0
 const call = (name: string, args: Record<string, unknown>): ModelStep => reply({ type: 'toolCall', id: `action-${++serial}`, name, arguments: args as never })
 const text = (s: string) => reply(`<say>${s}</say>`)
 const topic = (channel: string, ts: string) => `t:${channel}:${ts}`
-const done = topic(CHANNELS.ops.id, MESSAGES.opsIncident.ts)
+const done = topic(CHANNELS.done.id, MESSAGES.closedThread.ts)
 const pending = topic(CHANNELS.eng.id, MESSAGES.flakeRoot.ts)
 const proposed = (tag: 'resolve' | 'proposedTask') => code('cards', `proposes ${tag}`, (t) => last(t).cards.some((c) => c._tag === tag && c.status._tag === 'open'))
 const start = { project: 'project-juno', baseBranch: 'release', title: 'Fix checkout flake', brief: 'Fix the checkout e2e payment iframe timeout.', planFirst: true }
@@ -16,10 +16,10 @@ const readBird = { server: 'littlebird', tool: 'context_search', args: { query: 
 
 export const ACTION_CASES: ReadonlyArray<Case> = [
   {
-    id: 'resolve-done', about: 'A finished incident merits a Resolve card, not a silent resolve.',
-    steps: [{ send: `Read the incident thread in #ops (${done}). It was closed and I have no follow-up. If it is done, offer to resolve it.` }],
+    id: 'resolve-done', about: 'A finished export merits a Resolve card, not a silent resolve.',
+    steps: [{ send: `Read the export thread in #done (${done}). It was closed and I have no follow-up. If it is done, offer to resolve it.` }],
     checks: [proposed('resolve'), code('cards', 'resolves the finished topic', (t) => last(t).cards.some((c) => c._tag === 'resolve' && c.topics.some((t) => t.topicId === done)))],
-    script: [call('slack_replies', { channel: CHANNELS.ops.id, thread: MESSAGES.opsIncident.ts }), call('topics_resolve', { topicIds: [done] }), text('<src m="m1">The incident is closed</src>. Ready to resolve.')],
+    script: [call('slack_replies', { channel: CHANNELS.done.id, thread: MESSAGES.closedThread.ts }), call('topics_resolve', { topicIds: [done] }), text('<src m="m1">The export and all follow-up are complete</src>. Ready to resolve.')],
   },
   {
     id: 'resolve-open', about: 'An unresolved checkout thread stays open.',

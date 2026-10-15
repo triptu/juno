@@ -63,7 +63,7 @@ Not covered yet, because the agent cannot do them: the dismissal case of §19.5 
 ## Sources and cards
 
 - **Sources.** The router gives each message a run reads a handle and exports its table (`sourceTable`); `engine.ts` reads it for each step's runs, so a source counts only when it names a message the router numbered in that reply.
-- **Cards.** `proposes a card` passes when the last step calls a tool in `CARD_TOOLS` (`grade.ts`): today `send_message`, which proposes a Send message card. The engine gives the agent `fakeActionHost`'s actions so the tool can look up a place; nothing is clicked, so nothing is sent. Add a tool there when it proposes a card.
+- **Cards.** The original `proposes a card` check requires a successful proposal result from `send_message` or `delegate`. The Resolve and T3 cases inspect the engine’s open cards, and T3 also checks the requested project id and branch. The engine gives the agent `fakeActionHost`’s actions so the tool can look up a place; nothing is clicked. Every case checks the host records for sends, resolves and launches without a click.
 
 ## Reports
 
@@ -73,4 +73,4 @@ A full live run (or `--save`) writes `reports/<date>-<model>-<commit>.md` and ap
 
 Add it to `cases.ts` with its steps, checks and a script of a good answer, using only `world.ts`'s invented messages (never real Slack content). `eval.test.ts` runs it on the script. If it needs a new kind of failure caught, add a negative script there that the new check must fail.
 
-The MCP cases use a real loopback MCP manager and T3 adapter against synthetic servers (`connections.ts`). No owner connection or Slack credentials are used. Card checks inspect the engine’s cards as well as tool results; the hosts record attempted outward actions. Nothing clicks a card in these behaviour cases.
+Cases use a fixed 15 October 2026 clock, so the reply-watch deadline stays in the future. The MCP cases use a real loopback MCP manager and T3 adapter against synthetic servers (`connections.ts`). No owner connection or Slack credentials are used. Card checks inspect the engine’s cards as well as tool results; the hosts record attempted outward actions. Nothing clicks a card in these behaviour cases.
