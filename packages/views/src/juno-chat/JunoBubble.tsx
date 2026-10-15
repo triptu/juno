@@ -7,9 +7,9 @@ import type { ChatActions } from './commands'
 import { JunoMark } from './JunoMark'
 import { QuoteStub } from './QuoteStub'
 import { ReactionBadge } from './ReactionBadge'
+import { InlineLink } from './InlineLink'
 import { groupGap, isGroupEnd, rowStyles } from './rows'
 import { RowActions } from './RowActions'
-import { TextButton } from './TextButton'
 import { fullTime, messageTime } from '../time'
 
 export interface JunoBubbleProps {
@@ -71,22 +71,19 @@ function Inline({ inline, now, actions }: { readonly inline: JunoInline; readonl
       return inline.text
     case 'cite':
       return (
-        <TextButton tone="subtle" data-cite={inline.messageId} onClick={() => actions.onOpen({ _tag: 'chatMessage', messageId: inline.messageId }, { metaKey: false, shiftKey: false, altKey: false, source: 'pointer' })}>
+        <InlineLink data-cite={inline.messageId} onOpen={(event) => actions.onOpen({ _tag: 'chatMessage', messageId: inline.messageId }, event)}>
           {inline.text}
-        </TextButton>
+        </InlineLink>
       )
     case 'source':
       return (
-        <TextButton
-          tone="subtle"
+        <InlineLink
           data-source={`${inline.channelId}/${inline.ts}`}
           title={`${inline.place} · ${messageTime(tsMillis(inline.ts), now)}`}
-          onClick={(event) =>
-            actions.onOpen({ _tag: 'message', channelId: inline.channelId, ts: inline.ts }, { metaKey: event.metaKey, shiftKey: event.shiftKey, altKey: event.altKey, source: 'pointer' })
-          }
+          onOpen={(event) => actions.onOpen({ _tag: 'message', channelId: inline.channelId, ts: inline.ts }, event)}
         >
           {inline.text}
-        </TextButton>
+        </InlineLink>
       )
   }
 }
