@@ -26,10 +26,11 @@ export const RouteCheckOutput = Type.Object({
 })
 
 /**
- * Decision. Runs on Enter in a Main thread (spec section 8), so the user is
- * waiting. Jev 1.13 answers in about 0.5 s (p95 0.9 s, plus about 0.3 s for a
- * cold connection); past 1.5 s the draft posts to Main unchecked. A chat model
- * in its place is slower than this budget.
+ * Decision. Runs while typing pauses in a Main thread (spec section 8), and
+ * Enter uses the answer only if it is already stored, so nobody waits on it.
+ * Jev 1.13 answers in about 0.5 s (p95 0.9 s, plus about 0.3 s for a cold
+ * connection); past 1.5 s there is no answer and the draft is unchecked. A
+ * chat model in its place is slower than this budget.
  */
 export const routeCheck = defineStructuredTask<RouteCheckInput, typeof RouteCheckOutput>({
   name: 'routeCheck',

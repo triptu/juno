@@ -51,12 +51,16 @@ export function createMcpManager({ store, credentials, defaults = PRESETS }: Man
     store.db.prepare('INSERT OR IGNORE INTO mcp_connections (id,config,epoch) VALUES (?,?,?)').run(config.id, JSON.stringify(config), uuidv7())
     // A preset's read list belongs to the code, not the stored row: an older build's guess must not
     // promote a tool at first discovery, and a name the code dropped goes back to Outward until reviewed.
+    // A name the code added is Read for a tool already discovered, as first discovery would have made it,
+    // unless its schema changed since it was first seen.
     const saved = stored(config.id).config
     const dropped = saved.allowlist.filter((name) => !config.allowlist.includes(name))
-    if (dropped.length > 0 || config.allowlist.some((name) => !saved.allowlist.includes(name))) {
+    const added = config.allowlist.filter((name) => !saved.allowlist.includes(name))
+    if (dropped.length > 0 || added.length > 0) {
       transaction(store.db, () => {
         save({ ...saved, allowlist: config.allowlist })
         for (const name of dropped) store.db.prepare('UPDATE mcp_tools SET tier = 3 WHERE connection_id = ? AND name = ?').run(config.id, name)
+        for (const name of added) store.db.prepare('UPDATE mcp_tools SET tier = 0 WHERE connection_id = ? AND name = ? AND changed = 0').run(config.id, name)
       })
     }
   }

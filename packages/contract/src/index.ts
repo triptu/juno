@@ -21,6 +21,7 @@ export * from './body'
 export * from './refs'
 export { AllRoutes } from './routes/index'
 export * from './shell'
+export * from './audience'
 export * from './menus'
 
 export * from './routes/search'

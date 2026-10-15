@@ -108,7 +108,12 @@ export interface TurnsOptions {
   readonly actions?: ActionsOptions
   /** Fixed tools supplied by a connection adapter; called before the journal resumes. */
   readonly tools?: (context: { readonly store: Store; readonly actions: Actions; readonly jobs: Jobs; readonly current: () => Promise<ToolRun | undefined> }) => ReadonlyArray<JunoTool & { readonly taints?: boolean }>
-  readonly stopExternalJob?: (job: Job) => Promise<boolean>
+  /**
+   * Stops a job whose work runs outside Juno (a T3 Code session). `click` is the Task
+   * card's Stop. Without one (a removal) it only proposes a Stop card the owner clicks.
+   * Resolves true once the work is confirmed stopped.
+   */
+  readonly stopExternalJob?: (job: Job, click: string | undefined) => Promise<boolean>
   readonly jobDrivers?: () => ReadonlyArray<JobDriver>
   /** Other folders' migration sets. Spend, turns and jobs are always applied. */
   readonly migrations?: ReadonlyArray<MigrationSet>
@@ -189,7 +194,7 @@ export interface Turns {
     readonly list: () => ReadonlyArray<Job>
     readonly active: () => ReadonlyArray<Job>
     /** The Task card's Stop. */
-    readonly stop: (jobId: string) => Promise<void>
+    readonly stop: (jobId: string, opId?: string) => Promise<void>
     readonly idle: () => Promise<void>
   }
   readonly compaction: {
@@ -377,7 +382,12 @@ async function start(
     rotate: () => router.rotate(),
     stopJob: async (jobId) => {
       actions.jobStopped(jobId)
-      await jobs.stop(jobId)
+      const job = jobs.get(jobId)
+      if (job?.kind !== 't3') return jobs.stop(jobId)
+      // A T3 Code session runs outside Juno. Juno stops watching it, so no report reaches the
+      // model, without claiming it stopped; the interrupt waits on a Stop card the owner clicks.
+      await jobs.release(jobId, 'Juno stopped watching after a removal. The session may still be running in T3 Code.')
+      await options.stopExternalJob?.(job, undefined)
     },
     changed: () => {
       actions.changed()
@@ -578,9 +588,9 @@ async function start(
     jobs: {
       list: jobs.list,
       active: jobs.active,
-      stop: async (jobId) => {
+      stop: async (jobId, opId) => {
         const job = jobs.get(jobId)
-        if (job?.kind === 't3' && !await options.stopExternalJob?.(job)) return
+        if (job?.kind === 't3' && !await options.stopExternalJob?.(job, opId ?? uuidv7(store.now()))) return
         actions.jobStopped(jobId)
         return jobs.stop(jobId)
       },

@@ -340,6 +340,8 @@ Typing `@` or `#` at a word start opens a popover above the composer: `bottom: c
 
 While typing in a **public** channel, if the draft matches hiring/people terms (offer, salary, comp, candidate, layoffs, performance review, headcount, fired, onsite), a line appears at the top of the box: margin `8 8 0`, padding 6 10, radius 6, bg warning-14% over surface, text warning-45% over fg, 12px, `sparkles` 13: "This reads like hiring or people detail. eng is a public channel." Disappears as soon as the draft stops matching. Not a block.
 
+[built M8] `AudienceWarning` in the topic composer's `notices`, from the domain's `audienceCheck` (reached through `@juno/contract`). It shows once typing pauses (400 ms, with the draft save) and goes at once when the draft stops matching; nothing with AI assist off. Its radius is 12, concentric with the composer's 20px corners 8px in; the text is the 12.5px `meta` type.
+
 ### 7.3 Send checks
 
 On Enter (AI assist on) the draft is checked, route first (Main only), then clarity. If nothing is found it sends. If something is found a bar appears inside the box above the input: margin `8 8 0`, padding `8 8 8 12`, radius 8, bg `--surface-hover`, 13px lh 1.45, gap 10. Esc returns to editing (bar closes, draft unchanged). Editing the draft also closes it. Enter takes the first option.
@@ -351,6 +353,8 @@ On Enter (AI assist on) the draft is checked, route first (Main only), then clar
 | Clarity (long only) | `spell-check` | "Reads a bit long. One sentence runs over 40 words." | "74%" | **Send ↵** | Keep editing |
 
 Buttons: primary 28px, padding 0 10, radius 6, bg surface, `--shadow-sm`, 12.5/500, with "↵" mono 10.5 muted; secondary ghost 28px, fg subtle, hover bg `--secondary-default`. "Post in thread" posts into that topic, clears the draft and shows the toast "Posted in {title}" with Undo. "Send to Main" sends skipping the route check (clarity still runs). Fixes are minimal (typo table, doubled words, lowercase "i", missing "?"), never rewrites. Checks compare against the last 3–4 open topics in the channel.
+
+[built M8] The model is asked the wrong-place question while typing pauses; Enter in a topic composer calls `messages.check` (architecture 10), which uses that answer only if it is already there, and sends at once when it finds nothing; New chat sends unchecked. `SendCheckBar` (raised `sm` primary with "↵", ghost `sm` secondary, radius 12 like the audience line) sits in the composer's `notices` above the text row, which does not move (`apps/gallery/shift.spec.ts`, "Composer notices"). A route bar is followed by the clarity bar when clarity found something too, for either place. Clicking a choice returns focus to the field. "Posted in {title}" has no Undo: a send has none (ADR 0010). The field waits at most 250 ms for the check, then sends. The confidence is shown as this table asks.
 
 ### 7.4 Quoting
 
