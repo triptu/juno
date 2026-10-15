@@ -535,3 +535,19 @@ reported budgets: sidebar event p95 was 17.80 ms and All topics warm p95
 10,000 backfill messages landed. The command was not in strict timing mode;
 its pass confirms the scenarios and assertions, not every timing budget.
 The log is `/tmp/juno-speed-engine-bench-final-2.log`.
+
+Final verification on the merged branch: the focused engine run passed 72
+tests in seven files; the engine benchmark passed five cases. `pnpm affected`
+passed typechecking, the 22 Slack tests, 34 schema tests, specs, 97 gallery
+tests and 261 desktop tests (34 Linux skips), plus health and pool checks.
+Its broad unit run stopped in the unchanged agent chat-cache benchmark:
+one of five p95 readings was 50.105 ms against the strict 50 ms limit
+(279 agent tests passed). It therefore did not finish the remaining unit
+packages. The focused engine run above covers this change separately.
+
+Lint initially passed, then one restart failed because Knip produced no
+report; a focused `pnpm lint` retry passed without code changes. The affected
+run is not fully green. Logs: `/tmp/juno-speed-affected-final-3.log`,
+`/tmp/juno-speed-focused-final.log`, and `/tmp/juno-speed-lint-final.log`.
+After queueing at the 24-vCPU cap, final remote checks used the supported
+`JUNO_REMOTE_MACHINE=linux/amd64:2x4` override. No pool limit was raised.
