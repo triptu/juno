@@ -5,6 +5,7 @@
  */
 export {
   decodeMentions,
+  defaultPersonColor,
   encodeMentions,
   insertMention,
   mentionQueryAt,

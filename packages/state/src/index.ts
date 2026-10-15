@@ -111,6 +111,7 @@ export {
   untouched,
   type NewChat,
 } from './newChat'
+export { mentionChannelsAtom, mentionPeopleAtom, onFirstMentionAnswer, type MentionPlace } from './mentions'
 export { checkMessage, deleteMessage, discardMessage, draftAtom, editMessage, precheckMessage, reactToMessage, retryMessage, saveDraft, SEND_CHECK_WAIT_MS, sendMessage } from './send'
 export { errorOf } from './result'
 export {
