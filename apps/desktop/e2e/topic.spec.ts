@@ -222,3 +222,37 @@ test('at the minimum window size the Threads list stays inside the workspace', a
   expect(list.x).toBeGreaterThanOrEqual(pane.x)
   expect(list.x + list.width).toBeLessThanOrEqual(pane.x + pane.width)
 })
+
+test('every control in the header answers hover and press', async ({ juno, win }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  await juno.sidebar.row(POSTGRES).open()
+  await juno.topic.expectTitle(POSTGRES)
+  const header = juno.topic.header
+  const controls = [
+    header.getByRole('button', { name: 'Resolve', exact: true }),
+    juno.topic.titleButton,
+    header.getByRole('button', { name: /Show in sidebar/ }),
+    header.getByRole('button', { name: 'Juno ⌘J' }),
+  ]
+  const look = (control: (typeof controls)[number]) =>
+    control.evaluate((element) => {
+      const style = getComputedStyle(element)
+      return { background: style.backgroundColor, scale: style.scale }
+    })
+  const away = () => win.mouse.move(5, 300)
+
+  for (const control of controls) {
+    if ((await control.count()) === 0) continue
+    const name = (await control.getAttribute('aria-label')) ?? (await control.textContent())
+    await away()
+    const rest = await look(control)
+    await control.hover()
+    await expect.poll(async () => (await look(control)).background, { message: `hover on ${name}` }).not.toBe(rest.background)
+    await win.mouse.down()
+    await expect.poll(async () => (await look(control)).scale, { message: `press on ${name}` }).not.toBe(rest.scale)
+    // Let go away from the control, so the press does nothing.
+    await away()
+    await win.mouse.up()
+  }
+})

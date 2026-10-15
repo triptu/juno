@@ -672,9 +672,15 @@ export class Juno {
     return this.app.evaluate(() => [...(globalThis as unknown as { junoTest: { slackLinks: string[] } }).junoTest.slackLinks])
   }
 
-  /** Home, which the workspace shows when no tab is open. */
-  async expectNothingOpen(): Promise<void> {
-    await this.home.expectShown()
+  /**
+   * Nothing was opened: the one tab a fresh launch, or closing the last tab,
+   * leaves, with what a new tab opens. There is never no tab (SPEC 6).
+   */
+  async expectNothingOpen(page: 'New chat' | 'Home' = 'New chat'): Promise<void> {
+    await this.tabs.expectCount(1)
+    await this.tabs.expectActive(page)
+    if (page === 'Home') await this.home.expectShown()
+    else await expect(this.newChat.root).toBeVisible()
   }
 
   /**
@@ -1628,6 +1634,31 @@ export class TabStrip {
     return this.root.getByRole('tab', { name: new RegExp(`^${escapeRegExp(title)}`) })
   }
 
+  /** The `index`th tab titled `title`, left to right, when several show the same place. */
+  nth(title: string, index: number): Locator {
+    return this.tab(title).nth(index)
+  }
+
+  /** The `index`th of the tabs titled `title` is the active one. */
+  async expectActiveAt(title: string, index: number): Promise<void> {
+    await expect(this.nth(title, index)).toHaveAttribute('aria-selected', 'true', { timeout: 15_000 })
+  }
+
+  /** Mouse down on the `index`th tab titled `title`. */
+  async selectAt(title: string, index: number): Promise<void> {
+    const box = await this.nth(title, index).boundingBox()
+    if (!box) throw new Error(`No tab "${title}" at ${index}`)
+    await this.win.mouse.move(box.x + 24, box.y + box.height / 2)
+    await press(this.win)
+  }
+
+  /** The close button on the `index`th tab titled `title`. */
+  async closeAt(title: string, index: number): Promise<void> {
+    const tab = this.nth(title, index)
+    await tab.hover()
+    await tab.getByRole('button', { name: 'Close tab' }).click()
+  }
+
   /** Points at a tab. */
   hover(title: string): Promise<void> {
     return pointAt(this.win, this.tab(title))
@@ -1670,9 +1701,9 @@ export class TabStrip {
     await expect(this.tab(title)).toBeFocused()
   }
 
-  /** The "+" after the last tab. */
+  /** The "+" after the last tab: "New chat ⌘T", or "New tab ⌘T" when a new tab opens Home. */
   get newTabButton() {
-    return this.win.getByRole('region', { name: 'Workspace' }).getByRole('button', { name: 'New chat ⌘T', exact: true })
+    return this.win.getByRole('region', { name: 'Workspace' }).getByRole('button', { name: /^New (chat|tab) ⌘T$/ })
   }
 
   /** An item of the app menu, as its shortcut would choose it. */

@@ -37,7 +37,7 @@ test('lists quiet, resolved and never-followed topics, and a row opens its topic
   await allTopics.row(ROADMAP).expectStatus('Resolved')
   await allTopics.row(POSTGRES).expectWhere('eng')
 
-  // The page is a singleton: the item again focuses the same tab.
+  // A plain open of the page again focuses the tab that shows it.
   await allTopics.open()
   await tabs.expectCount(1)
 

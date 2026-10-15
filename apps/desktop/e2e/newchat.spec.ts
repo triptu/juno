@@ -139,14 +139,15 @@ test('a person never messaged: the start of the conversation, then conversations
   expect(fake.workspace.conversation(String(posted?.args['channel']))?.kind).toBe('im')
 })
 
-test('Home opens from the sidebar as one tab, and reads as selected with no tab open', async ({ juno, win }) => {
+test('Home opens from the sidebar in the current tab; a plain open focuses its tab and ⌘-click opens another', async ({ juno, win }) => {
   await juno.signIn()
   await juno.waitForSync()
   const { tabs, sidebar, topic, nav } = juno
   const home = win.getByRole('navigation', { name: 'Pages' }).getByRole('button', { name: 'Home' })
 
-  await expect(home).toHaveAttribute('aria-current', 'page')
+  // A fresh launch shows one New chat tab; Home is not selected.
   await juno.expectNothingOpen()
+  await expect(home).not.toHaveAttribute('aria-current', 'page')
 
   await sidebar.row(POSTGRES).open()
   await topic.expectTitle(POSTGRES)
@@ -156,11 +157,11 @@ test('Home opens from the sidebar as one tab, and reads as selected with no tab 
   await tabs.expectActive('Home')
   await tabs.expectCount(1)
   await expect(home).toHaveAttribute('aria-current', 'page')
-  await juno.expectNothingOpen()
+  await juno.home.expectShown()
   await nav.back()
   await topic.expectTitle(POSTGRES)
 
-  // A singleton: opening it again focuses the tab that shows it.
+  // A plain open focuses the tab that shows Home.
   await sidebar.row(OFFSITE).openInNewTab()
   await tabs.select(POSTGRES)
   await home.click()
@@ -169,4 +170,11 @@ test('Home opens from the sidebar as one tab, and reads as selected with no tab 
   await home.click()
   await tabs.expectCount(2)
   await tabs.expectActive('Home')
+
+  // ⌘-click opens a second Home.
+  await home.click({ modifiers: ['Meta'] })
+  await tabs.expectCount(3)
+  await expect(tabs.tab('Home')).toHaveCount(2)
+  await tabs.expectActiveAt('Home', 1)
+  await juno.home.expectShown()
 })

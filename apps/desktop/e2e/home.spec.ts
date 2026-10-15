@@ -23,13 +23,13 @@ const POSTGRES = 'Draft plan is in the doc'
 const STAGING = 'Unrelated: has anyone looked at the'
 const OFFSITE = 'Can eng take the Wednesday afternoon'
 
-test('Home shows what waits with no tab open and from the sidebar, and each row opens its topic', async ({ juno, slack, win }) => {
+test('Home shows what waits from the sidebar, and each row opens its topic', async ({ juno, slack, win }) => {
   await juno.signIn()
   await juno.waitForSync()
   const { home, sidebar, topic, tabs } = juno
 
-  // No tab open: Home, with the question Elena asked.
-  await home.expectShown()
+  // Home from the sidebar, with the question Elena asked.
+  await home.open()
   await expect(home.greeting).toHaveText(/Tushar\.$/)
   await expect(home.meta('waiting')).toHaveText(/^Rina finished the onsite\. Panel notes… · hiring · \d+m$/)
   await expect(home.navItem).toHaveAttribute('aria-current', 'page')
@@ -111,7 +111,8 @@ test('with AI assist off, Home shows the rules alone, with their plain titles', 
   try {
     const { home } = new Juno(again.app, again.win)
     // The relaunch restores the session first.
-    await expect(home.greeting).toBeVisible({ timeout: 30_000 })
+    await expect(home.navItem).toBeVisible({ timeout: 30_000 })
+    await home.open()
     await expect(home.title('waiting')).toHaveText('Elena asked you something')
     expect(await home.kinds()).toEqual(['waiting'])
     // Nothing arrives later either.
@@ -147,6 +148,7 @@ quiet('caught up, Home offers Browse all topics, which opens the All topics tab'
   await juno.signIn()
   await juno.waitForSync()
   const { home, tabs, allTopics } = juno
+  await home.open()
   await expect(home.greeting).toHaveText('All caught up.')
   expect(await home.kinds()).toEqual([])
   const browse = home.root.getByRole('button', { name: 'Browse all topics' })

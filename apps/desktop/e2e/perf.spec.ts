@@ -718,14 +718,14 @@ test.describe('topic view', () => {
 
   const launch = (): Promise<RunningApp> => launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword })
 
-  /** Launches warm, waits for the sync, and closes any tab a previous launch left. */
+  /** Launches warm, waits for the sync, and closes any tab a previous launch left, which leaves one New chat. */
   async function ready(): Promise<{ readonly running: RunningApp; readonly juno: Juno }> {
     const running = await launch()
     const juno = new Juno(running.app, running.win)
     await juno.sidebar.expectRows()
     await juno.expectEngineLive(120_000)
-    for (let i = 0; i < 10 && (await juno.tabs.root.getByRole('tab').count()) > 0; i++) await juno.tabs.menu('close-tab')
-    await juno.tabs.expectCount(0)
+    for (let i = 0; i < 10 && !((await juno.tabs.root.getByRole('tab').count()) === 1 && (await juno.tabs.tab('New chat').count()) === 1); i++) await juno.tabs.menu('close-tab')
+    await juno.expectNothingOpen()
     await running.win.mouse.move(900, 400)
     return { running, juno }
   }

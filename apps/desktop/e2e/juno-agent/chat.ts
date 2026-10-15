@@ -48,7 +48,8 @@ export class JunoChatPane {
   ) {}
 
   static tab(win: Page): JunoChatPane {
-    return new JunoChatPane(win, win.locator('main [data-juno-chat]'))
+    // The Juno tab on screen: another Juno tab can be mounted, hidden.
+    return new JunoChatPane(win, win.locator('main [data-juno-chat]').filter({ visible: true }))
   }
 
   static panel(win: Page): JunoChatPane {
