@@ -9,7 +9,7 @@
     "unlistedDependencies": 0,
     "clonePairs": 7,
     "oversizedFiles": 47,
-    "oversizedFunctions": 146
+    "oversizedFunctions": 143
   },
   "clonedLines": 139,
   "oversizedFiles": [
@@ -68,12 +68,9 @@
     "apps/desktop/e2e/feel/studio.ts:Studio/analyse#1",
     "apps/desktop/e2e/feel/studio.ts:Studio/analyse/page.evaluate#1",
     "apps/desktop/e2e/juno-agent/backup.spec.ts:test('backup to a shared folder, export the phrase, restore on a second Mac, and the first Mac turns read-only')#1",
-    "apps/desktop/e2e/perf.spec.ts:test.describe('Juno chat')#1",
-    "apps/desktop/e2e/perf.spec.ts:test.describe('Juno chat')/test('send to your bubble and to the first answer, ⌘J to the panel, and scroll the chat')#1",
     "apps/desktop/e2e/perf.spec.ts:test.describe('large workspace')#1",
-    "apps/desktop/e2e/perf.spec.ts:test.describe('large workspace')/test('All topics: open, then scroll the whole list, moving its window')#1",
-    "apps/desktop/e2e/perf.spec.ts:test.describe('large workspace')/test('scroll frame times, and memory after scrolling')#1",
     "apps/desktop/e2e/perf.spec.ts:test.describe('topic view')#1",
+    "apps/desktop/e2e/perfScroll.ts:scrollReading#1",
     "apps/desktop/packaging/smoke.spec.ts:test('packaged app signs in and starts both utility processes @mac')#1",
     "apps/desktop/src/main/ipc.ts:registerIpc#1",
     "apps/desktop/src/main/window.ts:setAppMenu#1",
