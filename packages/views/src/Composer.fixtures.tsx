@@ -1,6 +1,9 @@
 import * as stylex from '@stylexjs/stylex'
 import { useState } from 'react'
 import { defineFixtures, fixture, scene } from '@juno/ui'
+import { AttachButton } from './AttachButton'
+import { AttachmentChips } from './AttachmentChips'
+import { chips } from './AttachmentChips.fixtures'
 import { AudienceWarning } from './AudienceWarning'
 import { Composer } from './Composer'
 import { useFixtureControl } from './juno-chat/fixtures/control'
@@ -9,6 +12,27 @@ import { SendCheckBar, type SendCheckFinding } from './SendCheckBar'
 const noop = () => {}
 
 const base = { onChange: noop, onSend: noop }
+
+const attach = { leading: <AttachButton onFiles={noop} />, onFiles: noop }
+
+/**
+ * Chips leave one by one on the test's command; the test checks that the text
+ * row stays put. The remove buttons do nothing here, so the generic shift
+ * guard can press them.
+ */
+function ChipRemoval() {
+  const [files, setFiles] = useState([chips.image, chips.pdf, chips.sheet])
+  useFixtureControl('remove', () => setFiles((current) => current.slice(1)))
+  return (
+    <Composer
+      {...base}
+      {...attach}
+      value="Numbers from last night"
+      placeholder="Reply"
+      attachments={<AttachmentChips files={files} onRemove={noop} />}
+    />
+  )
+}
 
 const route: SendCheckFinding = { kind: 'route', title: 'Staging bill doubled since August' }
 const fixes: SendCheckFinding = { kind: 'clarity', fixes: ['recieve → receive', 'the the → the', 'add ?'] }
@@ -22,7 +46,7 @@ const audience = <AudienceWarning message="This reads like hiring or people deta
  * through `window.__fixtureControls` and checks that the text row and the
  * field's bottom edge never move.
  */
-function NoticesComeAndGo() {
+function NoticesComeAndGo({ withChips = false }: { readonly withChips?: boolean }) {
   const [notices, setNotices] = useState<'none' | 'audience' | 'bar' | 'both'>('none')
   useFixtureControl('audience', () => setNotices('audience'))
   useFixtureControl('bar', () => setNotices('bar'))
@@ -34,6 +58,7 @@ function NoticesComeAndGo() {
         {...base}
         value="the preview environments reaper should cut the staging bill"
         placeholder="Message #eng"
+        {...(withChips ? { ...attach, attachments: <AttachmentChips files={[chips.image, chips.pdf]} onRemove={noop} /> } : {})}
         notices={
           notices === 'none' ? undefined : (
             <>
@@ -59,6 +84,35 @@ export default defineFixtures(
       'right-to-left': fixture({ ...base, value: 'مرحبا، هل يمكننا نقل الموعد إلى الخميس؟', placeholder: 'Message محمد' }),
       sending: fixture({ ...base, value: 'Thursday works for me.', placeholder: 'Reply', sending: true }),
     },
+    Attachments: {
+      'attach-button': fixture({ ...base, ...attach, value: '', placeholder: 'Reply' }),
+      'with-chips': fixture({
+        ...base,
+        ...attach,
+        value: 'Numbers from last night, with the runbook.',
+        placeholder: 'Reply',
+        attachments: <AttachmentChips files={[chips.image, { ...chips.pdf, state: 'staging' }]} onRemove={noop} />,
+      }),
+      dropping: fixture({ ...base, ...attach, value: '', placeholder: 'Message #eng', dropping: true }),
+      'dropping-with-chips': fixture({
+        ...base,
+        ...attach,
+        value: '',
+        placeholder: 'Message #eng',
+        dropping: true,
+        attachments: <AttachmentChips files={[chips.pdf]} onRemove={noop} />,
+      }),
+      'chip-removal': scene(() => <ChipRemoval />),
+      'check-bar-with-chips': fixture({
+        ...base,
+        ...attach,
+        value: 'the preview environments reaper should cut the staging bill',
+        placeholder: 'Message #eng',
+        notices: routeBar,
+        onEscape: noop,
+        attachments: <AttachmentChips files={[chips.image, chips.pdf]} onRemove={noop} />,
+      }),
+    },
     // Spec section 8: the check bar on Enter, and the audience line while typing.
     Checks: {
       'wrong-place': fixture({ ...base, value: 'the preview environments reaper should cut the staging bill', placeholder: 'Message #eng', notices: routeBar, onEscape: noop }),
@@ -79,6 +133,7 @@ export default defineFixtures(
     },
     Shift: {
       'notices-come-and-go': scene(() => <NoticesComeAndGo />, { height: 320 }),
+      'notices-over-chips': scene(() => <NoticesComeAndGo withChips />, { height: 400 }),
     },
   },
   { width: 816, padded: false },

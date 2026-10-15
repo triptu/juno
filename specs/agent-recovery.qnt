@@ -13,7 +13,7 @@ module recoveryProtocol {
     inbox: Set[int], ack: Set[int], volatile: Set[int], submitted: Set[int], interrupted: Set[int],
     bridgeReset: bool, toolRound: bool, resetEndedRun: bool, journalInc: int, entryHistory: List[Entry], journal: List[Entry], archive: List[Entry], cursor: int -> int, authorizedSeq: int,
     incarnation: int, nextInc: int, identities: Set[int], nextSeq: int, rollback: bool,
-    supported: bool, resumed: bool, stopped: bool,
+    online: bool, supported: bool, resumed: bool, stopped: bool,
     approvals: Set[int], consumed: Set[int], receipts: Set[int], unknown: Set[int],
     active: Set[int], epoch: int -> int, actualOwner: int, observedNewer: bool, cachedEpoch: int, authorizations: Set[Authority], nextAuth: int,
     admissions: bool, transfer: bool, drained: bool, checkpoint: int, checkpointComplete: bool, checkpointReleased: bool,
@@ -40,7 +40,7 @@ module recoveryProtocol {
     lock: 0, referenced: true, writers: Set(0), io: Set(), inbox: Set(), ack: Set(), volatile: Set(),
     submitted: Set(), interrupted: Set(), bridgeReset: false, toolRound: false, resetEndedRun: false, journalInc: 1, entryHistory: List(), journal: List(), archive: List(),
     cursor: 1.to(16).mapBy(_ => 0), authorizedSeq: 0, incarnation: 1, nextInc: 2, identities: Set(1), nextSeq: 1,
-    rollback: false, supported: true, resumed: false, stopped: false,
+    rollback: false, online: true, supported: true, resumed: false, stopped: false,
     approvals: Set(), consumed: Set(), receipts: Set(), unknown: Set(),
     active: Set(0), epoch: 0.to(1).mapBy(d => if (d == 0) 1 else 0), actualOwner: 0, observedNewer: false, cachedEpoch: 1, authorizations: Set(), nextAuth: 1,
     admissions: true, transfer: false, drained: false, checkpoint: -1, checkpointComplete: false, checkpointReleased: false,
@@ -82,7 +82,8 @@ module recoveryProtocol {
     s' = { ...s, nextSeq: s.nextSeq + 1, label: "stateCommit" }
   val unprojected = s.journal.select(e => e.inc == s.incarnation and e.pos > s.cursor.get(s.incarnation))
   val projectionDrained = unprojected.length() == 0
-  action submit(op: int, dedupe: bool): bool = if (not(localReady)) idle else
+  action submit(op: int, dedupe: bool): bool = submitWith(op, dedupe, true)
+  action submitWith(op: int, dedupe: bool, networkGuard: bool): bool = if (not(localReady) or (networkGuard and not(s.online))) idle else
     if (dedupe and hasOp(op)) idle else
     if (not(s.bridgeReset) or not(s.inbox.contains(op)) or s.stopped) idle else
     s' = { ...s, journal: s.journal.append({ inc: s.incarnation, pos: s.nextSeq, op: op }),
@@ -300,7 +301,8 @@ module recoveryProtocol {
   val reachedAgreement = s.sealed and s.label == "finished" and settled
   val drainBound = remaining > 0 or reachedAgreement
   val invariants = safety and drainBound
-  val cooperativeSafety = invariants and staleOwnerCannotAuthorize and staleFolderCannotRestoreRemoved
+  val networkAdmission = s.label == "submit" implies before.online
+  val cooperativeSafety = networkAdmission and invariants and staleOwnerCannotAuthorize and staleFolderCannotRestoreRemoved
   action seal = s' = { ...s, sealed: true, label: "seal" }
   action progress =
     if (s.writers == Set()) acquire(0) else
@@ -340,7 +342,9 @@ module recoveryProtocol {
     if (op == "state") stateCommit else
     if (op == "tool") s' = { ...s, toolRound: true, label: "tool" } else
     if (op == "foreign") s' = { ...s, journalInc: 0, label: "foreign" } else
-    if (op == "submit") submit(k, bug != "bridge") else
+    if (op == "offline") s' = { ...s, online: false, label: "offline" } else
+    if (op == "online") s' = { ...s, online: true, label: "online" } else
+    if (op == "submit") submitWith(k, bug != "bridge", bug != "network") else
     if (op == "submitted") markSubmitted(k) else
     if (op == "project") project(bug != "projection") else
     if (op == "approve") approve else if (op == "consume") consume else if (op == "receipt") receipt else
@@ -486,8 +490,11 @@ module recoveryProtocol {
     c("submitted", 1), c("project", 1), c("project", 1))
   action bridgeToolReplayStep = script(bridgeToolReplay, "")
   action bridgeToolReplayBugStep = script(bridgeToolReplay, "liveReset")
-  action suiteInit = { nondet which = 0.to(30).oneOf(); all { s' = initial, before' = initial, pc' = 0, remaining' = drainLimit, scenario' = which } }
-  val suiteCommands = List(lockHandle, lockLifetime, inboxPowerLoss, bridgeReplay, projectionCommit, journalRollback, rotationIdentity, authorityCrash, incompleteCheckpoint, releaseCrash, restoreApproval, restoreAttempt, manifestBeforeSegment, redactionDuringRestore, unauthenticatedManifest, exportCrash, nonceAfterCrash, sanitizedGeneration, shredBeforeSnapshot, partitionedOwner, epochReadRace, transferDrain, backupDrain, exportFeedback, strictStaleFolder, staleOwnerObserves, checkpointReopen, deletionOrder, cursorGaps, foreignJournal, bridgeToolReplay).nth(scenario)
+  pure val offlineInput = List(c("offline", 0), c("inbox", 1), c("ack", 1), c("reset", 1), c("submit", 1), c("online", 0), c("submit", 1), c("submit", 1))
+  action offlineInputStep = script(offlineInput, "")
+  action offlineInputBugStep = script(offlineInput, "network")
+  action suiteInit = { nondet which = 0.to(31).oneOf(); all { s' = initial, before' = initial, pc' = 0, remaining' = drainLimit, scenario' = which } }
+  val suiteCommands = List(lockHandle, lockLifetime, inboxPowerLoss, bridgeReplay, projectionCommit, journalRollback, rotationIdentity, authorityCrash, incompleteCheckpoint, releaseCrash, restoreApproval, restoreAttempt, manifestBeforeSegment, redactionDuringRestore, unauthenticatedManifest, exportCrash, nonceAfterCrash, sanitizedGeneration, shredBeforeSnapshot, partitionedOwner, epochReadRace, transferDrain, backupDrain, exportFeedback, strictStaleFolder, staleOwnerObserves, checkpointReopen, deletionOrder, cursorGaps, foreignJournal, bridgeToolReplay, offlineInput).nth(scenario)
   action suiteStep = script(suiteCommands, "")
   val case0 = scenario == 0 and reachedAgreement and (s.writers == Set(0) and s.referenced)
   val case1 = scenario == 1 and reachedAgreement and (s.io == Set(0))
@@ -519,6 +526,7 @@ module recoveryProtocol {
   val case27 = scenario == 27 and reachedAgreement and s.removed == Set() and s.gen == 1
   val case28 = scenario == 28 and reachedAgreement and s.successor and s.cursor.get(1) == 4 and s.nextSeq == 6 and s.archive.length() == 2
   val case29 = scenario == 29 and reachedAgreement and s.incarnation == 2 and not(s.resumed)
+  val case31 = scenario == 31 and reachedAgreement and s.journal.length() == 1
   val case30 = scenario == 30 and reachedAgreement and s.toolRound and s.submitted == Set(1) and s.journal.length() == 1 and s.archive.length() == 1
   action deletionAheadStep = script(List(c("inbox", 1), c("snapshot", 1), c("raiseDeletion", 1),
     c("crash", 1), c("acquire", 0)), "")

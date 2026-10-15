@@ -19,8 +19,8 @@
  * - Cards (WP15) sit at the time Juno proposed them, under their run; a
  *   Task card at the time its job started. A card is unread like a bubble.
  *
- * A removed owner message is a "Removed" note in its place. Other notes
- * come with the pin events; they are not listed yet.
+ * Removed messages leave a "Removed" note in their place. The server adds
+ * pin notes and their time-limited Undo after this cached projection.
  */
 import type {
   BubbleId,
@@ -414,6 +414,10 @@ function buildItems(source: ChatSource, cache: Caches, revision: ReturnType<Retu
     })))
   }
   entries.push(...junoEntries)
+  for (const id of removed.bubbles) {
+    const shown = store.db.prepare('SELECT at FROM chat_bubbles WHERE id = ?').get(id) as { at: number } | undefined
+    if (shown !== undefined) entries.push({ by: 'line', at: shown.at, item: { _tag: 'note', id: `removed:${id}` as ChatMessageId, kind: 'removed' } })
+  }
   for (const view of source.cards) {
     const reactions = reactionsOf('card', view.card.id)
     entries.push(cache.entries.get(`card:${view.card.id}`, [view.at, view.runId, JSON.stringify(view.card), JSON.stringify(reactions), view.at > source.readAt],

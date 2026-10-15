@@ -17,7 +17,7 @@ import { SlackSession } from './client/session.ts'
 import { SlackSocket, SocketHandshake } from './client/socket.ts'
 import { HttpTransport } from './client/transport.ts'
 
-export { SlackApi, type CallOptions, type SlackApiShape } from './client/api.ts'
+export { SlackApi, type CallOptions, type SlackApiShape, type UploadBody } from './client/api.ts'
 export { defaultSlackConfig, makeSlackConfig, SlackConfig, slackConfigLayer, type SlackConfigOverrides, type SlackConfigShape } from './client/config.ts'
 export { SlackEdge, type EdgeCallOptions, type SlackEdgeShape } from './client/edge.ts'
 export {

@@ -79,3 +79,46 @@ export function toMrkdwn(text: string): string {
     .map((line) => (line.startsWith('> ') ? `&gt; ${escapeText(line.slice(2))}` : escapeText(line)))
     .join('\n')
 }
+
+/**
+ * The mrkdwn source of rich_text blocks, for a message posted with blocks and
+ * no text. Sections become lines and quotes `> ` lines; `post` escapes it.
+ */
+export function blocksToText(blocks: Blocks): string {
+  const lines: string[] = []
+  for (const block of blocks) {
+    if (block.type !== 'rich_text') continue
+    for (const element of block.elements) {
+      if (element.type === 'rich_text_section') lines.push(inlineText(element.elements))
+      else if (element.type === 'rich_text_quote') lines.push(...inlineText(element.elements).split('\n').map((line) => `> ${line}`))
+      else if (element.type === 'rich_text_preformatted') lines.push(inlineText(element.elements))
+      else if (element.type === 'rich_text_list') for (const item of element.elements) lines.push(`• ${inlineText(item.elements)}`)
+    }
+  }
+  return lines.join('\n')
+}
+
+function inlineText(elements: ReadonlyArray<RichTextInline>): string {
+  return elements
+    .map((element) => {
+      switch (element.type) {
+        case 'text':
+          return element.text
+        case 'user':
+          return `<@${element.user_id}>`
+        case 'channel':
+          return `<#${element.channel_id}>`
+        case 'usergroup':
+          return `<!subteam^${element.usergroup_id}>`
+        case 'broadcast':
+          return `<!${element.range}>`
+        case 'link':
+          return element.text === undefined ? `<${element.url}>` : `<${element.url}|${element.text}>`
+        case 'emoji':
+          return `:${element.name}:`
+        default:
+          return ''
+      }
+    })
+    .join('')
+}

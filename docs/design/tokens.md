@@ -42,6 +42,7 @@ Warm paper. HSL values are the source of truth; hex is the sRGB result for desig
 | `--accent-foreground-muted` | `hsla(48, 20%, 70%, 1)` | #BDB8A3 | css | |
 | `--selection-background` | `hsla(200, 50%, 80%, 1)` | #B3D4E6 | css | `::selection`; prototype also uses it for the focus ring (see 1.7) |
 | `--input-border` | `hsla(48, 14%, 82%, 1)` | #D8D5CB | proto | Composer, text fields, selects, search fields, send-card textarea |
+| `--overlay-viewer` | `hsla(48, 50%, 98%, 0.94)` | | redesign | Behind the image viewer: the page at 94%, so only the picture reads |
 
 ### 1.2 Base palette, dark
 
@@ -74,6 +75,7 @@ A warm-neutral near-black: the same paper seen at night, not a cool system grey.
 | `--accent-foreground-muted` | `hsla(48, 10%, 10%, 1)` | | | css |
 | `--danger` | #F8767E | 0.72 | 6.6:1 page, 5.8:1 cards (the light red is 3.0:1 on ink) | redesign |
 | `--overlay` | `rgba(0, 0, 0, 0.5)` | | | redesign |
+| `--overlay-viewer` | `rgba(27, 25, 22, 0.94)` | | The page (#1B1916) at 94%, behind the image viewer | redesign |
 
 Dark-only overrides on other groups: `--tint-resolved-fg` takes 52% of the green instead of 70% (1.5); `--avatar-bg-mix` 32% and `--avatar-fg-mix` 46% instead of 24% / 62% (1.6); the shadows (6); the accent swatches (1.3). `BrowserWindow.backgroundColor` in `apps/desktop/src/main/launch.ts` repeats `--background` for both themes.
 
@@ -454,6 +456,7 @@ Floating surfaces have `border: 1px solid transparent` plus the shadow, never a 
 | `--z-picker` | 10 | Picker overlay |
 | `--z-menu` | 20 | Avatar menu, New chat pickers |
 | `--z-palette` | 30 | ⌘K overlay and panel |
+| `--z-viewer` | 30 | Image viewer, over the whole window (never open with the palette) |
 | `--z-selection` | 35 | Floating Quote button |
 | `--z-context` | 40 | Context menus |
 | `--z-toast` | 45 | Toast |

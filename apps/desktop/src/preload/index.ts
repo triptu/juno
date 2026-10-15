@@ -91,6 +91,7 @@ const bridge: JunoBridge = {
     openExternal: (url) => ipcRenderer.invoke(Channels.shellOpenExternal, { url }),
     openInSlack: ({ teamId, channelId }) => ipcRenderer.invoke(Channels.shellOpenInSlack, { teamId, channelId }),
     editUndo: () => ipcRenderer.invoke(Channels.shellEditUndo),
+    downloadFile: ({ url, name }) => ipcRenderer.invoke(Channels.shellDownloadFile, { url, name }),
   },
   clipboard: {
     writeText: (text) => ipcRenderer.invoke(Channels.clipboardWriteText, { text }),

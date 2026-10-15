@@ -6,17 +6,22 @@
  * earlier one is not settled, so messages reach Slack in the order they
  * were sent. A `failed` row does not hold the channel up.
  *
- * - `queued`: the row becomes `sending` in its own transaction, then one
- *   `chat.postMessage` with its `client_msg_id` goes out through
+ * - `queued`: a post with files first uploads the ones Slack does not have
+ *   yet (`upload`); a file Slack's upload host refuses makes the row
+ *   `failed`, and a lost connection makes it wait. Then the row becomes
+ *   `sending` in its own transaction, and one `chat.postMessage`, or
+ *   `files.share` for a post with files, with its `client_msg_id` goes out through
  *   `Outbox.sendOnce`, which never retries, because a retry after a lost
  *   answer posts twice. The answer is stored as the echo would store it,
  *   which ends the row. A refusal makes it `failed`; a rate limit or a lost
  *   session puts it back to `queued` for later; a lost answer, or an
  *   answer Slack gives when it may have run the call (`internal_error` and
- *   friends), makes it `unknown`.
+ *   friends), makes it `unknown`. `files.share` answers without the
+ *   message, so a shared post becomes `unknown` too and waits for the echo.
  * - `unknown`: after `SETTLE_MILLIS`, the worker reads the topic's recent
  *   messages from Slack. The message is there: it is stored, which ends the
- *   row. A complete read without it: the row is `queued` again. No answer:
+ *   row. A complete read without it: the row is `queued` again, except a
+ *   post Slack said it shared, which is asked about again later. No answer:
  *   it asks again with backoff.
  *
  * Any write of the message (the echo, a page, the answer, the lookup) ends
@@ -30,10 +35,14 @@
 import { Clock, Context, Effect, Layer, Queue, Stream } from 'effect'
 import { millisToTs, type Ts } from '@juno/domain'
 import { transaction, type SqlError } from '@juno/store'
+import { SlackRejected } from '@juno/slack'
 import {
   claimPost,
   deferLookup,
+  deferPost,
   failPost,
+  failUpload,
+  fileUploaded,
   flushPosts,
   pendingPosts,
   postUnknown,
@@ -42,6 +51,8 @@ import {
   type PendingPost,
   type TopicFetcher,
 } from '@juno/sync'
+import { UploadProgress } from '../uploadProgress'
+import { Staging } from '../staging'
 import { Outbox } from '../outbox'
 import { SyncLink } from '../syncLink'
 import { Workspace, type OpenWorkspace, type StoreServices } from '../workspace'
@@ -63,6 +74,8 @@ const LOOKUP_MARGIN_MILLIS = 5 * 60_000
 const LOOKUP_PAGES = 5
 /** Refusals that Slack may give after running the call: the answer is unknown, not a refusal. */
 const MAYBE_POSTED = new Set(['internal_error', 'fatal_error', 'request_timeout', 'service_unavailable'])
+/** `last_error` of a post Slack accepted without sending the message back (`files.share`). */
+const SHARED = 'shared'
 
 export class PostWorker extends Context.Service<
   PostWorker,
@@ -71,37 +84,122 @@ export class PostWorker extends Context.Service<
     readonly wake: Effect.Effect<void>
   }
 >()('juno/engine/send/PostWorker') {
-  static readonly layer: Layer.Layer<PostWorker, never, Workspace | Outbox | SyncLink> = Layer.effect(
+  static readonly layer: Layer.Layer<PostWorker, never, Workspace | Outbox | SyncLink | Staging | UploadProgress> = Layer.effect(
     PostWorker,
     Effect.gen(function* () {
       const workspace = yield* Workspace
       const outbox = yield* Outbox
       const link = yield* SyncLink
+      const staging = yield* Staging
+      const progress = yield* UploadProgress
       const signal = yield* Queue.sliding<void>(1)
       const wake = Effect.asVoid(Queue.offer(signal, undefined))
+
+      /**
+       * Uploads the files of a queued post that Slack does not have yet, one
+       * at a time, as the official client does when a file is attached:
+       * `files.getUploadURL`, the bytes, `files.completeUpload`. Each file's
+       * id is kept as soon as it is in Slack. Answers the post with every
+       * file id, or undefined when the post must wait or failed.
+       */
+      const upload = (open: OpenWorkspace, row: PendingPost) =>
+        Effect.gen(function* () {
+          const local = inStore(open)
+          const total = row.files.reduce((sum, file) => sum + Math.max(1, file.size), 0)
+          let done = row.files.reduce((sum, file) => sum + (file.fileId === undefined ? 0 : Math.max(1, file.size)), 0)
+          yield* progress.set(row.clientMsgId, done / total)
+          let files = row.files
+          for (const file of row.files) {
+            if (file.fileId !== undefined) continue
+            const result = yield* staging.read(open, file).pipe(
+              Effect.flatMap((bytes) =>
+                outbox.send((api) =>
+                  Effect.gen(function* () {
+                    const target = yield* api.call('files.getUploadURL', { filename: file.name, length: bytes.byteLength }, { reason: 'upload-queue' })
+                    yield* api.upload(target.upload_url, { name: file.name, mimetype: file.mimetype, bytes }).pipe(
+                      // Slack's upload host answered but did not take the bytes: a failure the user retries, not a lost connection.
+                      Effect.catchIf(
+                        (error) => error.status !== undefined,
+                        (error) => Effect.fail(new SlackRejected({ method: 'upload', error: `upload_failed_${error.status}` })),
+                      ),
+                    )
+                    yield* api.call('files.completeUpload', { files: [{ id: target.file, title: file.name }] }, { reason: 'upload-queue' })
+                    return target.file
+                  }),
+                ),
+              ),
+              Effect.result,
+            )
+            const now = yield* Clock.currentTimeMillis
+            if (result._tag === 'Failure') {
+              yield* progress.clear(row.clientMsgId)
+              const error = result.failure
+              switch (error._tag) {
+                case 'Rejected':
+                  yield* Effect.logWarning('send: a file was not uploaded', { code: error.code })
+                  yield* local(transaction(failUpload(row.clientMsgId, error.code)))
+                  return undefined
+                case 'RateLimited':
+                  yield* local(transaction(deferPost(row.clientMsgId, now + Math.max(error.retryAfterMillis, backoff(row.attempts)), error._tag)))
+                  return undefined
+                case 'NotSignedIn':
+                  yield* local(transaction(deferPost(row.clientMsgId, now + NO_SESSION_MILLIS, error._tag)))
+                  return undefined
+                case 'Offline':
+                  // Sends wait out a lost connection (spec section 8); the catch-up's flush makes the row due again.
+                  yield* local(transaction(deferPost(row.clientMsgId, now + backoff(row.attempts), error._tag)))
+                  return undefined
+              }
+            }
+            const fileId = result.success
+            if (!(yield* local(transaction(fileUploaded(row.clientMsgId, file.id, fileId))))) return undefined
+            files = files.map((each) => (each.id === file.id ? { ...each, fileId } : each))
+            done += Math.max(1, file.size)
+            yield* progress.set(row.clientMsgId, done / total)
+          }
+          return files.flatMap((file) => (file.fileId === undefined ? [] : [file.fileId]))
+        })
 
       const post = (open: OpenWorkspace, fetcher: TopicFetcher, row: PendingPost) =>
         Effect.gen(function* () {
           const local = inStore(open)
+          const fileIds = row.files.length === 0 ? [] : yield* upload(open, row)
+          if (fileIds === undefined) return
           if (!(yield* local(transaction(claimPost(row.clientMsgId))))) return
+          const blocks = row.blocksJson === null ? undefined : JSON.parse(row.blocksJson)
+          const threadTs = row.threadTs === undefined ? {} : { thread_ts: row.threadTs as Ts }
           const result = yield* outbox
             .sendOnce((api) =>
-              api.call('chat.postMessage', {
-                channel: row.channel,
-                text: row.text,
-                ...(row.blocksJson === null ? {} : { blocks: JSON.parse(row.blocksJson) }),
-                client_msg_id: row.clientMsgId,
-                ...(row.threadTs === undefined ? {} : { thread_ts: row.threadTs as Ts }),
-              }),
+              fileIds.length === 0
+                ? api.call('chat.postMessage', { channel: row.channel, text: row.text, ...(blocks === undefined ? {} : { blocks }), client_msg_id: row.clientMsgId, ...threadTs })
+                : // A message with files is shared, as the official composer does: the files and the text in one call.
+                  Effect.as(
+                    api.call(
+                      'files.share',
+                      {
+                        files: fileIds,
+                        channel: row.channel,
+                        ...(blocks === undefined ? (row.text === '' ? {} : { comment: row.text }) : { blocks }),
+                        client_msg_id: row.clientMsgId,
+                        resharing_aware: true,
+                        ...threadTs,
+                      },
+                      { reason: 'send_message_with_files' },
+                    ),
+                    undefined,
+                  ),
             )
             .pipe(
               Effect.result,
               // A bug after the request left may still have posted: unknown, never failed.
               Effect.catchDefect(() => Effect.succeed(undefined)),
             )
+          yield* progress.clear(row.clientMsgId)
           const now = yield* Clock.currentTimeMillis
           if (result === undefined) return yield* local(transaction(postUnknown(row.clientMsgId, now + SETTLE_MILLIS, 'defect')))
           if (result._tag === 'Success') {
+            // `files.share` answers without the message: the echo or a lookup stores it, and a lookup that misses it waits.
+            if (result.success === undefined) return yield* local(transaction(postUnknown(row.clientMsgId, now + SETTLE_MILLIS, SHARED)))
             // The answer may leave out the id; the stored message carries it, which ends the row.
             const message: Message = { ...result.success.message, client_msg_id: result.success.message.client_msg_id ?? row.clientMsgId }
             return yield* fetcher.sent({ channel: result.success.channel, message }).pipe(Effect.orDie)
@@ -141,6 +239,8 @@ export class PostWorker extends Context.Service<
             if (found !== undefined) return yield* fetcher.sent({ channel: row.channel, message: found }).pipe(Effect.orDie)
             cursor = answer.value.response_metadata?.next_cursor || undefined
             if (!answer.value.has_more || cursor === undefined) {
+              // Slack said it shared the files: the message is there even if the read does not show it yet.
+              if (row.lastError === SHARED) return yield* local(transaction(deferLookup(row.clientMsgId, now + backoff(row.attempts))))
               // Slack has decided the lost request by now (specs/outbox.qnt): it is not there, so it may go again.
               return yield* local(transaction(requeuePost(row.clientMsgId, now, 'lost')))
             }

@@ -177,7 +177,9 @@ const guardedApi: Layer.Layer<SlackApi, never, SlackApi> = Layer.effect(
         ),
       )
     }
-    return SlackApi.of({ call })
+    // Uploading writes to Slack: the dry run never does.
+    const upload: SlackApiShape['upload'] = () => Effect.die(new Error('sync-live: refusing to upload a file'))
+    return SlackApi.of({ call, upload })
   }),
 )
 

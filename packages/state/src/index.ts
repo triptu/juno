@@ -205,3 +205,14 @@ export {
   SLACK_DELAY_MS,
   SLACK_MIN_LENGTH,
 } from './palette'
+export { attachFiles, type FileLike } from './staging'
+export {
+  attachmentsAtom,
+  clearAttachments,
+  downloadFile,
+  readyFiles,
+  removeAttachment,
+  restoreAttachments,
+  uploadProgressAtom,
+  type Attachment,
+} from './attachments'

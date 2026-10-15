@@ -136,6 +136,8 @@ export function rememberQuote(store: Store, input: { readonly id: string; readon
 
 /** "Remember this" on an owner message: the selection `[from, to)`, or the whole message. */
 export function pinMessage(store: Store, input: { readonly id: string; readonly messageId: number; readonly from?: number; readonly to?: number }): PinResult {
+  const earlier = written(store, input.id)
+  if (earlier !== undefined) return { _tag: 'changed', pin: earlier, revision: activePins(store).revision }
   const found = source(store, input.messageId)
   if (found === undefined || found.removed || found.kind !== 'user') return { _tag: 'refused', reason: 'source' }
   // `from` and `to` count from the start of the owner's words, as the chat shows them.

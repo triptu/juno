@@ -1,6 +1,6 @@
 import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, shell, type IpcMainInvokeEvent, type MenuItemConstructorOptions } from 'electron'
 import { Schema } from 'effect'
-import { Channels, ShellRoutes, type ContextMenuLeaf, type ShellInput, type ShellOutput } from '@juno/contract'
+import { Channels, ShellRoutes, type ContextMenuLeaf, type DownloadResult, type ShellInput, type ShellOutput } from '@juno/contract'
 import type { AgentSupervisor } from './agent'
 import type { BackupSecrets } from './backupSecrets'
 import type { EngineSupervisor } from './engine'
@@ -82,9 +82,11 @@ export interface IpcDeps {
   readonly setSidebar: (sidebar: NonNullable<Launch['sidebar']>) => void
   /** The topic the window shows, or null while it shows none or is not focused. */
   readonly setViewing: (topicId: string | null) => void
+  /** Download (files.ts), with the hosts it may fetch from already bound. */
+  readonly downloadFile: (file: { readonly url: string; readonly name: string }) => Promise<DownloadResult>
 }
 
-export function registerIpc({ updates, supervisor, agent, providers, backupSecrets, setTheme, setAccent, setDensity, setPrivacy, setSidebar, setViewing }: IpcDeps): void {
+export function registerIpc({ updates, supervisor, agent, providers, backupSecrets, setTheme, setAccent, setDensity, setPrivacy, setSidebar, setViewing, downloadFile }: IpcDeps): void {
   handle(Channels.updatesGet, () => updates.get())
   handle(Channels.updatesSet, ({ enabled }) => updates.set(enabled))
   handle(Channels.updatesRestart, () => updates.restart())
@@ -197,6 +199,8 @@ export function registerIpc({ updates, supervisor, agent, providers, backupSecre
     if (e2e) slackLinksForTests.push(url.toString())
     else void shell.openExternal(url.toString())
   })
+
+  handle(Channels.shellDownloadFile, (file) => downloadFile(file))
 
   handle(Channels.clipboardWriteText, ({ text }) => {
     clipboard.writeText(text)

@@ -2,7 +2,8 @@
  * Sending (spec sections 8 and 9; architecture 5.7).
  *
  * Commands:
- * - `messages.send`: queues a message for a channel, a thread, or a person.
+ * - `messages.send`: queues a message, with any staged files, for a
+ *   channel, a thread, or a person.
  *   A person with no DM yet gets one opened first (`conversations.open`),
  *   which needs Slack; otherwise the command only writes locally: the
  *   message shows at once as a pending row in `messages.list` and the
@@ -53,9 +54,19 @@ export type SendResult = typeof SendResult.Type
 export const SendError = Schema.Union([NotSignedIn, Offline, RateLimited, Rejected, NotFound])
 export type SendError = typeof SendError.Type
 
-/** `clientMsgId` is the renderer's: the post carries it, so the echo and pages are matched to the pending row (ADR 0011). */
+/**
+ * `clientMsgId` is the renderer's: the post carries it, so the echo and pages are matched to the pending row (ADR 0011).
+ * `files` are staged files (`files.stage`) that go with the text, in order; the text may then be empty.
+ * `Rejected` `no_text` for nothing to send, `file_not_found` for a file that is not staged.
+ */
 export const messagesSend = Rpc.make('messages.send', {
-  payload: { to: SendTarget, text: Schema.String, clientMsgId: Schema.String, draftOf: Schema.optionalKey(Schema.String) },
+  payload: {
+    to: SendTarget,
+    text: Schema.String,
+    clientMsgId: Schema.String,
+    draftOf: Schema.optionalKey(Schema.String),
+    files: Schema.optionalKey(Schema.Array(Schema.String)),
+  },
   success: SendResult,
   error: SendError,
 })

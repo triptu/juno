@@ -1,5 +1,5 @@
 import * as stylex from '@stylexjs/stylex'
-import type { ReactNode } from 'react'
+import type { DragEvent, ReactNode } from 'react'
 import { colors, spacing, z } from '@juno/tokens/tokens.stylex'
 
 export interface TopicViewProps {
@@ -13,7 +13,14 @@ export interface TopicViewProps {
   readonly composer?: ReactNode
   /** Over the list, outside its rows: the emoji picker, the selection's Quote button (`Floating`). Positioned from the list area's top left. */
   readonly floating?: ReactNode
+  /** Files dropped anywhere on the topic go to its composer. */
+  readonly onFiles?: (files: ReadonlyArray<File>) => void
+  /** Files are being dragged over the topic, or no longer are: the composer shows it. */
+  readonly onDragFiles?: (over: boolean) => void
 }
+
+/** A drag that carries files from Finder, not text or a link. */
+const carriesFiles = (event: DragEvent<HTMLElement>) => event.dataTransfer.types.includes('Files')
 
 /**
  * One topic in a tab (SPEC section 7): the list filling the area above the
@@ -22,9 +29,35 @@ export interface TopicViewProps {
  * change never moves a message. The header comes first in the DOM, so it
  * is first in the Tab order.
  */
-export function TopicView({ header, children, pill, composer, floating }: TopicViewProps) {
+export function TopicView({ header, children, pill, composer, floating, onFiles, onDragFiles }: TopicViewProps) {
+  const drops =
+    onFiles === undefined
+      ? {}
+      : {
+          onDragEnter: (event: DragEvent<HTMLDivElement>) => {
+            if (carriesFiles(event)) onDragFiles?.(true)
+          },
+          onDragOver: (event: DragEvent<HTMLDivElement>) => {
+            if (!carriesFiles(event)) return
+            event.preventDefault()
+            event.dataTransfer.dropEffect = 'copy'
+          },
+          onDragLeave: (event: DragEvent<HTMLDivElement>) => {
+            // Leaving one row for the next fires too; only leaving the topic ends the drag.
+            if (!(event.relatedTarget instanceof Node) || !event.currentTarget.contains(event.relatedTarget)) onDragFiles?.(false)
+          },
+          onDrop: (event: DragEvent<HTMLDivElement>) => {
+            onDragFiles?.(false)
+            // The composer took a drop on itself already.
+            if (event.defaultPrevented) return
+            const files = Array.from(event.dataTransfer.files)
+            if (files.length === 0) return
+            event.preventDefault()
+            onFiles(files)
+          },
+        }
   return (
-    <div data-topic-view="" {...stylex.props(styles.root)}>
+    <div data-topic-view="" {...drops} {...stylex.props(styles.root)}>
       <div data-topic-middle="" {...stylex.props(styles.middle)}>
         {header}
         {children}

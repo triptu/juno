@@ -35,34 +35,50 @@ export function parseJson(body: Buffer): Record<string, unknown> {
 }
 
 function parseMultipart(contentType: string, body: Buffer): FormFields {
+  const fields: FormFields = {}
+  for (const part of parseMultipartParts(contentType, body)) fields[part.name] = part.data.toString('utf8')
+  return fields
+}
+
+export interface MultipartPart {
+  readonly name: string
+  readonly filename: string | undefined
+  readonly contentType: string | undefined
+  readonly data: Buffer
+}
+
+/** The parts of a multipart/form-data body, bytes untouched (file uploads are binary). */
+export function parseMultipartParts(contentType: string, body: Buffer): MultipartPart[] {
   const match = /boundary=(?:"([^"]+)"|([^;]+))/i.exec(contentType)
   const boundary = match?.[1] ?? match?.[2]
   if (boundary === undefined) throw new Error('multipart body without a boundary')
   const delimiter = Buffer.from(`--${boundary.trim()}`)
-  const fields: FormFields = {}
+  const parts: MultipartPart[] = []
   let position = body.indexOf(delimiter)
   while (position !== -1) {
     const start = position + delimiter.length
     // The closing delimiter is "--boundary--".
     if (body[start] === 0x2d && body[start + 1] === 0x2d) break
     const next = body.indexOf(delimiter, start)
-    const partEnd = next === -1 ? body.length : next
-    const part = body.subarray(start, partEnd)
+    const part = body.subarray(start, next === -1 ? body.length : next)
     const headerEnd = part.indexOf('\r\n\r\n')
     if (headerEnd !== -1) {
       const headers = part.subarray(0, headerEnd).toString('utf8')
-      const name = /name="([^"]*)"/i.exec(headers)?.[1]
+      const name = /[;\s]name="([^"]*)"/i.exec(headers)?.[1]
       if (name !== undefined) {
-        let value = part.subarray(headerEnd + 4)
-        if (value.length >= 2 && value[value.length - 2] === 0x0d && value[value.length - 1] === 0x0a) {
-          value = value.subarray(0, value.length - 2)
-        }
-        fields[name] = value.toString('utf8')
+        let data = part.subarray(headerEnd + 4)
+        if (data.length >= 2 && data[data.length - 2] === 0x0d && data[data.length - 1] === 0x0a) data = data.subarray(0, data.length - 2)
+        parts.push({
+          name,
+          filename: /filename="([^"]*)"/i.exec(headers)?.[1],
+          contentType: /^content-type:\s*(.+)$/im.exec(headers)?.[1]?.trim(),
+          data,
+        })
       }
     }
     position = next
   }
-  return fields
+  return parts
 }
 
 export function parseCookies(header: string | undefined): Record<string, string> {

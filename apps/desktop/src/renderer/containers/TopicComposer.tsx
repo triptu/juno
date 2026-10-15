@@ -3,6 +3,7 @@ import { audienceCheck, type SendTarget, type TopicDetail } from '@juno/contract
 import { aiAssistOnAtom, checkMessage, draftAtom, precheckMessage, registry, saveDraft, sendMessage, showToast } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import { AudienceWarning, Composer, ComposerSlot } from '@juno/views'
+import { takeAttachments, useAttachments } from './attachments'
 import type { ComposerHandle } from './messageActions'
 import { afterCheck, choose, type CheckBar, type Destination, type Outcome } from './sendChecks'
 import { cancelSendMark, markSend } from './sendMark'
@@ -28,6 +29,8 @@ export interface TopicComposerProps {
   readonly handle?: Ref<ComposerHandle>
   /** ↑ in the empty field: the topic selects its newest message. */
   readonly onArrowUpEmpty?: () => void
+  /** Files are being dragged over the topic. */
+  readonly dropping?: boolean
 }
 
 /** `text` as Slack quotes it: every line starts with "> ". */
@@ -60,15 +63,16 @@ export function withQuote(draft: string, text: string): string {
  * pauses in a public channel, the audience line warns about hiring and
  * people details.
  */
-export function TopicComposer({ detail, onSent, handle, onArrowUpEmpty }: TopicComposerProps) {
+export function TopicComposer({ detail, onSent, handle, onArrowUpEmpty, dropping }: TopicComposerProps) {
   const stored = useAtomValue(draftAtom(detail.id))
   const placeholder = detail.kind === 'main' ? `Message ${detail.channel.label}` : 'Reply'
   if (stored._tag !== 'Success') return <ComposerSlot placeholder={placeholder} />
-  return <LoadedComposer detail={detail} initial={stored.value} placeholder={placeholder} onSent={onSent} handle={handle} onArrowUpEmpty={onArrowUpEmpty} />
+  return <LoadedComposer detail={detail} initial={stored.value} placeholder={placeholder} onSent={onSent} handle={handle} onArrowUpEmpty={onArrowUpEmpty} dropping={dropping} />
 }
 
-function LoadedComposer({ detail, initial, placeholder, onSent, handle, onArrowUpEmpty }: TopicComposerProps & { readonly initial: string; readonly placeholder: string }) {
+function LoadedComposer({ detail, initial, placeholder, onSent, handle, onArrowUpEmpty, dropping = false }: TopicComposerProps & { readonly initial: string; readonly placeholder: string }) {
   const id = detail.id
+  const files = useAttachments(id)
   const aiAssist = useAtomValue(aiAssistOnAtom)
   const [text, setText] = useState(initial)
   // The draft as it was when typing last paused: the audience line reads it.
@@ -134,6 +138,8 @@ function LoadedComposer({ detail, initial, placeholder, onSent, handle, onArrowU
 
   const here = { channelId: detail.channel.id, ...(detail.kind === 'thread' && detail.rootTs !== undefined ? { threadTs: detail.rootTs } : {}) }
   const deliver = (body: string, to: Destination) => {
+    const attached = takeAttachments(id)
+    if (attached === undefined) return
     // The send clears the stored draft; a save still waiting must not write it back.
     clearTimeout(timer.current)
     unsaved.current = undefined
@@ -142,10 +148,11 @@ function LoadedComposer({ detail, initial, placeholder, onSent, handle, onArrowU
     setBar(undefined)
     onSent()
     const target: SendTarget = { kind: 'channel', ...(to.kind === 'here' ? here : { channelId: detail.channel.id, threadTs: to.threadTs }) }
-    void sendMessage(registry, target, body, id).then((exit) => {
+    void sendMessage(registry, target, body, id, attached.ids).then((exit) => {
       if (exit._tag === 'Failure') {
-        // Nothing was queued: the text comes back so it can be sent again.
+        // Nothing was queued: the text and the files come back so they can be sent again.
         setText((current) => (current === '' ? body : current))
+        attached.restore()
         console.warn('juno: send failed', exit.cause)
       } else if (to.kind === 'thread') {
         showToast(registry, { text: `Posted in ${to.title}` })
@@ -160,9 +167,12 @@ function LoadedComposer({ detail, initial, placeholder, onSent, handle, onArrowU
 
   const send = () => {
     if (bar !== undefined) return follow(choose(bar, 'primary'))
-    if (text.trim() === '' || checking.current !== undefined) return
+    if ((text.trim() === '' && files.files.length === 0) || checking.current !== undefined) return
+    // A file is still on its way to the engine: Enter waits for it.
+    if (files.files.some((file) => file.state === 'staging')) return
     markSend()
-    if (!aiAssist) return deliver(text, { kind: 'here' })
+    // Files with no text have nothing to check.
+    if (!aiAssist || text.trim() === '') return deliver(text, { kind: 'here' })
     const token = {}
     checking.current = token
     setWaiting(true)
@@ -213,6 +223,10 @@ function LoadedComposer({ detail, initial, placeholder, onSent, handle, onArrowU
       sending={waiting}
       notices={notices}
       {...(bar === undefined ? {} : { onEscape: () => setBar(undefined) })}
+      leading={files.leading}
+      attachments={files.chips}
+      onFiles={files.onFiles}
+      dropping={dropping}
       {...(onArrowUpEmpty === undefined ? {} : { onArrowUpEmpty })}
     />
   )

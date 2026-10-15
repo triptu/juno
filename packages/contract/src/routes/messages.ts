@@ -88,6 +88,10 @@ export const FileView = Schema.Struct({
   width: Schema.optionalKey(Schema.Int),
   height: Schema.optionalKey(Schema.Int),
   thumb: Schema.optionalKey(FileThumb),
+  /** An image at full size for the viewer, a `juno://files` url like `thumb.src`. */
+  full: Schema.optionalKey(Schema.String),
+  /** Slack's download url, which main fetches on the Slack session. Absent for a file still being sent. */
+  download: Schema.optionalKey(Schema.String),
 })
 export type FileView = typeof FileView.Type
 

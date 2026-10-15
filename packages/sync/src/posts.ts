@@ -21,12 +21,30 @@ import { syncKeys } from './keys'
 
 export type PostState = 'queued' | 'sending' | 'unknown' | 'failed'
 
+/**
+ * A file that goes with a post, staged under the workspace's `uploads/`
+ * folder as `stagedName`. `fileId` is Slack's id once the bytes are
+ * uploaded, so a retry or a restart never uploads a file twice.
+ */
+export interface PendingFile {
+  readonly id: string
+  readonly stagedName: string
+  readonly name: string
+  readonly mimetype: string
+  readonly size: number
+  readonly width?: number | undefined
+  readonly height?: number | undefined
+  readonly fileId?: string | undefined
+}
+
 export interface PendingPost {
   readonly clientMsgId: string
   readonly channel: string
   readonly threadTs: string | undefined
   readonly text: string
   readonly blocksJson: string | null
+  /** In the order they were attached. Empty for a post of text alone. */
+  readonly files: ReadonlyArray<PendingFile>
   /** Epoch millis. */
   readonly createdAt: number
   readonly state: PostState
@@ -42,6 +60,7 @@ interface PostRow {
   readonly thread_ts: string | null
   readonly text: string
   readonly blocks_json: string | null
+  readonly file_ids_json: string | null
   readonly created_at: string
   readonly state: PostState
   readonly attempts: number
@@ -49,7 +68,7 @@ interface PostRow {
   readonly last_error: string | null
 }
 
-const COLUMNS = 'client_msg_id, channel, thread_ts, text, blocks_json, created_at, state, attempts, next_at, last_error'
+const COLUMNS = 'client_msg_id, channel, thread_ts, text, blocks_json, file_ids_json, created_at, state, attempts, next_at, last_error'
 
 const toPost = (row: PostRow): PendingPost => ({
   clientMsgId: row.client_msg_id,
@@ -57,6 +76,7 @@ const toPost = (row: PostRow): PendingPost => ({
   threadTs: row.thread_ts ?? undefined,
   text: row.text,
   blocksJson: row.blocks_json,
+  files: row.file_ids_json === null ? [] : (JSON.parse(row.file_ids_json) as ReadonlyArray<PendingFile>),
   createdAt: Number(row.created_at),
   state: row.state,
   attempts: row.attempts,
@@ -85,12 +105,14 @@ export const queuePost = (post: {
   readonly threadTs: string | undefined
   readonly text: string
   readonly blocksJson: string | null
+  readonly files?: ReadonlyArray<PendingFile>
   readonly createdAt: number
 }): Effect.Effect<void, SqlError, StoreWriter | Invalidation> =>
   Effect.gen(function* () {
     const sql = yield* StoreWriter
-    yield* sql`INSERT INTO pending_messages (client_msg_id, channel, thread_ts, text, blocks_json, created_at, state, attempts, next_at)
-      VALUES (${post.clientMsgId}, ${post.channel}, ${post.threadTs ?? null}, ${post.text}, ${post.blocksJson}, ${String(post.createdAt)}, 'queued', 0, ${post.createdAt})
+    const files = post.files === undefined || post.files.length === 0 ? null : JSON.stringify(post.files)
+    yield* sql`INSERT INTO pending_messages (client_msg_id, channel, thread_ts, text, blocks_json, file_ids_json, created_at, state, attempts, next_at)
+      VALUES (${post.clientMsgId}, ${post.channel}, ${post.threadTs ?? null}, ${post.text}, ${post.blocksJson}, ${files}, ${String(post.createdAt)}, 'queued', 0, ${post.createdAt})
       ON CONFLICT (client_msg_id) DO NOTHING`
     yield* touch(post)
   })
@@ -139,6 +161,26 @@ export const requeuePost = (clientMsgId: string, nextAt: number, error: string |
 
 /** A lookup could not answer: ask again at `nextAt`. Counts as an attempt, so the backoff grows. */
 export const deferLookup = (clientMsgId: string, nextAt: number) => move(clientMsgId, ['unknown'], 'unknown', { nextAt, attempt: true })
+
+/**
+ * One of a queued post's files is in Slack: its id is kept, so the next
+ * try uploads only the files still missing. False when the row is gone.
+ */
+export const fileUploaded = (clientMsgId: string, stagedId: string, fileId: string): Effect.Effect<boolean, SqlError, StoreWriter> =>
+  Effect.gen(function* () {
+    const post = yield* readPost(clientMsgId)
+    if (post === undefined) return false
+    const files = post.files.map((file) => (file.id === stagedId ? { ...file, fileId } : file))
+    const sql = yield* StoreWriter
+    yield* sql`UPDATE pending_messages SET file_ids_json = ${JSON.stringify(files)} WHERE client_msg_id = ${clientMsgId}`
+    return true
+  })
+
+/** A queued post's uploads could not reach Slack (offline, rate limited, signed out): try again at `nextAt`. */
+export const deferPost = (clientMsgId: string, nextAt: number, error: string) => move(clientMsgId, ['queued'], 'queued', { nextAt, lastError: error, attempt: true })
+
+/** A file of a queued post could not be uploaded: nothing was posted, so it waits for Retry or Delete draft. */
+export const failUpload = (clientMsgId: string, error: string) => move(clientMsgId, ['queued'], 'failed', { lastError: error, attempt: true })
 
 /** Slack refused the post. It waits for Retry or Delete draft. */
 export const failPost = (clientMsgId: string, error: string) => move(clientMsgId, ['sending'], 'failed', { lastError: error })

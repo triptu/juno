@@ -48,6 +48,8 @@ export const Channels = {
   shellOpenExternal: 'shell.openExternal',
   /** Opens a conversation in the Slack app through its `slack://` link. */
   shellOpenInSlack: 'shell.openInSlack',
+  /** Saves a Slack file into ~/Downloads on the Slack session and shows it in Finder. */
+  shellDownloadFile: 'shell.downloadFile',
   /** Puts text on the clipboard. */
   clipboardWriteText: 'clipboard.writeText',
   /** Undo in the focused text field (`webContents.undo()`), for ⌘Z while one has text. */
@@ -204,6 +206,8 @@ export interface JunoBridge {
     readonly openInSlack: (target: SlackTarget) => Promise<unknown>
     /** Undo in the focused text field. */
     readonly editUndo: () => Promise<unknown>
+    /** Only Slack file urls download; main answers `saved` or `failed`. */
+    readonly downloadFile: (file: { readonly url: string; readonly name: string }) => Promise<unknown>
   }
   readonly clipboard: {
     readonly writeText: (text: string) => Promise<unknown>

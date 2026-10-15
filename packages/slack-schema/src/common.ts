@@ -39,6 +39,17 @@ export const FormBit = S.Literals(['1', '0', 'true', 'false']).pipe(
     encode: SchemaGetter.transform((b) => (b ? '1' : '0')),
   }),
 )
+/**
+ * A list of strings in one form field. The official client's form builder
+ * (`getFormData`) appends a plain string array as is, so `FormData` sends it
+ * comma-joined (`F1,F2`). Decoding also accepts a JSON array.
+ */
+export const FormList = S.String.pipe(
+  S.decodeTo(S.Array(S.String), {
+    decode: SchemaGetter.transform((s) => (s.trimStart().startsWith('[') ? (JSON.parse(s) as ReadonlyArray<string>) : s.split(',').filter((id) => id !== ''))),
+    encode: SchemaGetter.transform((list) => list.join(',')),
+  }),
+)
 /** A JSON document carried inside one form field (`blocks`, `cached_latest_updates`, `files`). */
 export const FormJson = <T extends S.Top>(schema: T) => S.fromJsonString(schema)
 
