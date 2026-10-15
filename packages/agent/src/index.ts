@@ -38,7 +38,7 @@ export {
 } from './actions'
 export { authorizeDecision, bindingMatches, mayAuthorize, mayMintGrant, toolDecision,
   type Authority, type AuthorizeDecision, type AuthorizeInput, type CardOutcome, type GrantAuthority, type Invalid, type OpClass, type RunFacts, type ToolDecision } from './policy/policy'
-export { liveGrant, mintGrant, revokeAllGrants, revokeGrant, type Grant, type GrantClass, type Mint } from './grants/grants'
+export { liveGrant, mintGrant, revokeAllGrants, revokeExposedGrants, revokeGrant, type Grant, type GrantClass, type Mint } from './grants/grants'
 
 export * from './mcp'
 export * from './schedule'

@@ -12,7 +12,8 @@
  *    moves (`redactMemory`), their attachments are deleted, the inbox ops'
  *    text is cleared, pins sourced from them are deactivated and cleared
  *    (bumping `pin_rev`), the previews of remove cards that name them are
- *    cleared, every grant is revoked, and reports waiting from jobs started
+ *    cleared, grants minted by runs that saw the messages are revoked (the
+ *    rest carry into the new generation), and reports waiting from jobs started
  *    in runs that saw them are quarantined. The moved `gen` expires every
  *    open card, refuses a waiting click (`sourceChanged`), refuses a request
  *    built before it at the guard, and discards a compaction job that read
@@ -28,7 +29,7 @@
 import { retryDelay } from '@juno/agent-memory'
 import { canonicalPayload, decodePayload } from '@juno/agent-cards'
 import { memoryGen } from '../actions/cards'
-import { revokeAllGrants } from '../grants/grants'
+import { revokeExposedGrants } from '../grants/grants'
 import { purgeCodexThreads } from '../providers/codex-purge'
 import { crashPoint } from '../runtime/crash'
 import { transaction } from '../store/database'
@@ -146,7 +147,7 @@ function commit(store: Store, input: RemoveInput, expected: number): Committed |
   db.prepare(`UPDATE pins SET text = '' WHERE source_id IN (${placeholders(ids.length)})`).run(...ids)
   if (Number(pins.changes) > 0) db.prepare('UPDATE memory_head SET pin_rev = pin_rev + 1 WHERE singleton = 1').run()
   clearRemovePreviews(store, new Set(ids.map(String)))
-  revokeAllGrants(store, 'redaction')
+  revokeExposedGrants(store, new Set(runs), memory.gen)
 
   // §4.5 step 2: jobs from runs that saw the messages stop, and their waiting reports never reach the model.
   const jobs = runs.length === 0 ? [] : (db

@@ -121,6 +121,33 @@ it('a removal reaches every place the words lived, and Juno never sees them agai
   expect(backup.calls).toHaveLength(2)
 })
 
+it('a removal revokes only the grants of runs that saw the message: earlier schedules and reply watches keep waking', async () => {
+  const h = await turnsHarness({ compaction: false })
+  harnesses.push(h)
+  const clean = { _tag: 'cleanRun', run: { origin: 'owner', clean: true }, sourceInRun: true } as const
+  const schedule = (key: string, sourceOp: string, authority: Parameters<Turns['scheduler']['create']>[0]['authority']) =>
+    h.turns.scheduler.create({ key, sourceOp, authority, definition: { what: key, prompt: 'Check the topic.', deliver: 'now', schedule: { _tag: 'once', at: h.turns.store.now() + 3_600_000 } } })!
+  h.fake.script([reply(say('Sure.'))])
+  const before = h.send('every morning, check the deploy')
+  await h.ended(before)
+  h.fake.script([reply(say('Noted.'))])
+  const said = h.send(`The gate code is ${SECRET}.`)
+  await h.ended(said)
+  h.fake.script([reply(say('Will do.'))])
+  const after = h.send('remind me about the gate tonight')
+  await h.ended(after)
+  const earlier = schedule('earlier', before, clean)
+  const later = schedule('later', after, clean)
+  const watch = schedule('watch', 'menu-op', { _tag: 'menu' })
+
+  await h.turns.redaction.remove({ opId: 'remove-1', messageIds: [ownerMessageId(h.turns, said)], alsoRemoveReply: false })
+  expect(liveGrant(h.turns.store, 'schedule', earlier.id)).toBeDefined()
+  expect(liveGrant(h.turns.store, 'schedule', watch.id)).toBeDefined()
+  expect(liveGrant(h.turns.store, 'schedule', later.id)).toBeUndefined()
+  const states = Object.fromEntries(h.turns.scheduler.page().page.schedules.map((row) => [row.what, row.state]))
+  expect(states).toEqual({ earlier: 'active', later: 'paused', watch: 'active' })
+})
+
 it('a compaction job that read the message before the removal is discarded, and the summary is rebuilt without it', async () => {
   const hold = deferred()
   let held = 0
