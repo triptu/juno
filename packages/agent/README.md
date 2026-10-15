@@ -250,7 +250,7 @@ The same op again is the same removal; a removal of messages already gone change
 
 `src/mcp/` owns HTTP connections, loopback OAuth sign-in, tool discovery and tier decisions, the two fixed model tools, Notion's version checks and read-back, and the per-turn MCP endpoint for WP20. See [the MCP hand-off](src/mcp/README.md) for bootstrap, credential bridge and WP14 wiring, tests and the owner-only live check.
 
-Contract additions: `ActionsOptions.executors` accepts a callback for discovered tools; `TurnsOptions.tools` registers fixed adapter tools before resume; `ChatHost.connections` serves the Connections routes; discovered rows carry an optional `schemaHash` (always present from the manager). The request builder pages MCP results over 20 KB using ordinary archive attachments. No action protocol changed.
+`startAgent` runs the manager when given `mcp: { credentials }`; main's keychain bridge supplies them in the app. Contract additions: `agent.connections.add`, the `remove` action and `ConnectionRow.removable`; `credential`/`credentialReply` between the agent and main; `ActionsOptions.executors` accepts a callback for discovered tools; `TurnsOptions.tools` registers fixed adapter tools before resume; `ChatHost.connections` serves the Connections routes; discovered rows carry an optional `schemaHash` (always present from the manager). The request builder pages MCP results over 20 KB using ordinary archive attachments. No action protocol changed.
 
 ## Scheduler (WP19)
 

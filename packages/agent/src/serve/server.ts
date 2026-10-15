@@ -402,7 +402,8 @@ export function agentHandlers(host: ChatHost) {
         'agent.connections.page': () => host.connections ? connectionHandlers(host.connections).page() : Stream.make({ connections: [] }),
         'agent.connections.action': (input) => host.connections ? connectionHandlers(host.connections).action(input) : notYet('Connections')(),
         'agent.connections.tier': (input) => host.connections ? connectionHandlers(host.connections).tier(input) : notYet('Connections')(),
-        'agent.connections.address': notYet('Connections'),
+        'agent.connections.address': (input) => host.connections ? connectionHandlers(host.connections).address(input) : notYet('Connections')(),
+        'agent.connections.add': (input) => host.connections ? connectionHandlers(host.connections).add(input) : notYet('Connections')(),
         'agent.review.page': () => Stream.make(reviewPage()),
         'agent.review.activate': notYet('Review'),
         'agent.settings.page': () => {
