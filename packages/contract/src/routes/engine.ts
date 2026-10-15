@@ -24,10 +24,12 @@ export const EngineStatus = Schema.Struct({
   phase: EnginePhase,
   /** Epoch milliseconds when the engine process started. Changes on restart. */
   startedAt: Schema.Number,
+  /** A sync cycle (a boot, catch-up or sweep, with its follow pass) is running. Slack calls and row changes may still come. */
+  syncing: Schema.Boolean,
 })
 export type EngineStatus = typeof EngineStatus.Type
 
-/** The engine's phase. Emits once at subscribe time and then on every phase change. */
+/** The engine's phase. Emits once at subscribe time and then on every change of the phase or of `syncing`. */
 export const engineStatus = liveValueRoute('engine.status', { value: EngineStatus })
 
 /**

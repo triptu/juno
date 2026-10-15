@@ -10,14 +10,16 @@ export interface EngineStatusViewProps {
   readonly line: string
   /** The last answer to a ping, if any. */
   readonly pong?: string
+  /** A sync cycle is running, so the line may change again soon. Read by assistive tech and tests, not shown. */
+  readonly busy?: boolean
   readonly onPing: () => void
 }
 
 /** The engine's phase as a status line, with a ping button for diagnostics. */
-export function EngineStatusView({ line, pong, onPing }: EngineStatusViewProps) {
+export function EngineStatusView({ line, pong, busy = false, onPing }: EngineStatusViewProps) {
   return (
     <section {...stylex.props(styles.section)} aria-label="Engine">
-      <Text variant="meta" tone="muted" numeric as="p" role="status" aria-label="Engine status">
+      <Text variant="meta" tone="muted" numeric as="p" role="status" aria-label="Engine status" aria-busy={busy}>
         {line}
       </Text>
       <div {...stylex.props(styles.row)}>
