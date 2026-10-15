@@ -12,7 +12,7 @@ echo "remote: workspace linked in ${SECONDS} s" >&2
 electron=$(node -e "console.log(require('./apps/desktop/node_modules/electron'))" 2>/dev/null) && "$electron" --version >/dev/null 2>&1
 
 # One job per machine, so it can use all of it.
-export GALLERY_BROWSER=chromium JUNO_HEAVY_SLOTS=1 JUNO_TEST_FILE_PARALLEL=1 JUNO_VITEST_WORKERS=${JUNO_VITEST_WORKERS:-$(( $(nproc) / 2 ))}
+export JUNO_TYPECHECK_JOBS=${JUNO_TYPECHECK_JOBS:-$(( $(nproc) / 2 ))} GALLERY_BROWSER=chromium JUNO_HEAVY_SLOTS=1 JUNO_TEST_FILE_PARALLEL=1 JUNO_VITEST_WORKERS=${JUNO_VITEST_WORKERS:-$(( $(nproc) / 2 ))}
 export JUNO_E2E_WORKERS=${JUNO_E2E_WORKERS:-$(( $(nproc) / 3 ))} GALLERY_WORKERS=${GALLERY_WORKERS:-$(( $(nproc) * 2 ))} GALLERY_SHIFT_PARTS=${GALLERY_SHIFT_PARTS:-$(( $(nproc) * 2 ))} SPECS_JOBS=${SPECS_JOBS:-$(( $(nproc) / 2 ))} SPECS_APALACHE=${SPECS_APALACHE:-$(( $(nproc) / 4 ))}
 # Samples how busy the machine is every 2 s, to size the workers above.
 ( prev=($(head -1 /proc/stat)); while sleep 2; do
@@ -34,5 +34,6 @@ for path in specs/traces apps/desktop/test-results apps/gallery/test-results app
 done
 # The spec cache pnpm remote brought along, with what this run added to it.
 [ -n "${SPECS_CACHE_DIR:-}" ] && [ -d "$SPECS_CACHE_DIR" ] && reports+=("${SPECS_CACHE_DIR#/work/}")
+[ -n "${JUNO_TYPECHECK_CACHE_DIR:-}" ] && [ -d "$JUNO_TYPECHECK_CACHE_DIR" ] && reports+=("${JUNO_TYPECHECK_CACHE_DIR#/work/}")
 [ ${#reports[@]} -gt 0 ] && tar -czf /out/reports.tgz "${reports[@]}"
 exit $code

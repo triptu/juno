@@ -22,7 +22,7 @@ Run these from the repo root.
 | `pnpm install` | Installs everything. Electron downloads its binary in a postinstall. |
 | `pnpm dev` | Starts electron-vite with HMR for the renderer and reload for main and preload. |
 | `pnpm build` | Builds main, preload and renderer into `apps/desktop/out/`, then checks the renderer bundle size. |
-| `pnpm typecheck` | Runs `tsc` in every package. |
+| `pnpm typecheck` | Typechecks every tsc project (each package's configs and `scripts/tsconfig.json`), skipping the ones whose inputs passed before; see "Typecheck". |
 | `pnpm lint` | Runs oxlint, the `cursor: pointer` check, then `check-deps`. |
 | `pnpm check-deps` | The package graph and the import rules in `docs/architecture.md` section 3. Part of `pnpm lint`; run it alone for a quicker loop. |
 | `pnpm health` | Reports unused code and dependencies, duplication, and large files and functions. Writes `.juno-status/health.json`. |
@@ -49,7 +49,7 @@ Run these from the repo root.
 
 The switcher, key and index tests use `GalleryTestComponent`, declared in `apps/gallery/src/testFixtures.tsx`. It is registered only when the page is opened as `/?test-fixtures#/...`, so it never shows in the normal gallery or the screenshots. Set `GALLERY_PORT` to run the tests while another worktree holds port 4174.
 
-Before calling work done: `pnpm typecheck`, `pnpm lint`, `pnpm test`, and `pnpm test:e2e` for anything the app or gallery shows.
+Before calling work done: `pnpm affected`, which covers typecheck, lint and the tests the change reaches (see "Affected tests").
 
 Copy `.env.example` to `.env` for local secrets. `.env` is ignored by git.
 
@@ -421,6 +421,28 @@ Effect and StyleX pitfalls are in their skills: `.claude/skills/effect/SKILL.md`
 - **Changed tests only.** `pnpm test --changed main` runs only the vitest files affected by changes since `main` (vitest follows imports across packages). Run the full suite once before you report.
 - **Remote runs.** `pnpm remote <script>` takes no local slot. See "Remote runs" below.
 
+## Typecheck
+
+Packages ship TypeScript source, so each package's `tsc -p` also checks the source of every workspace package it depends on, and 29 projects repeat much of the same work. `pnpm typecheck` (`scripts/typecheck.mjs`) runs the same projects with the same tsconfigs, so the rules are unchanged, but:
+
+- **Skips what passed.** A project's key is a hash of its package's files, the files of every workspace package it depends on (directly or not), its tsconfig chain, `tsconfig.base.json`, the lockfile and the TypeScript version. A passing key is recorded in the system temp folder (`juno-cache/typecheck`), shared by every worktree; `pnpm remote typecheck` brings its results back. An unchanged project costs nothing. `--no-cache` checks everything.
+- **Incremental.** A project that runs uses `tsc --incremental`, with its build info in the package's `node_modules/.cache/tsc/`, so only what changed is checked again.
+- **Queued.** At most `JUNO_TYPECHECK_JOBS` (default 2) tsc processes in one run, and at most two at once on the Mac across every worktree (a separate `typecheck` queue in `scripts/heavy.mjs`, apart from the test slots).
+
+Timings (2026-10-15):
+
+| Run | Old `pnpm -r typecheck` | `pnpm typecheck` |
+| --- | --- | --- |
+| Mac, quiet (load 3 to 5), nothing cached or built | 35.6 s | 36.6 s (same work, two tsc at once) |
+| Mac, quiet, incremental build info only (`--no-cache`) | 35.6 s | 15.4 s |
+| Mac, nothing changed | 35.6 s | 3.9 s |
+| Mac, one engine test file changed (5 projects) | 35.6 s | 8.2 s |
+| Mac, a dozen worktrees at once | over 30 minutes (reported) | at most two tsc on the Mac; the rest wait or are cached |
+| 16x32 remote, nothing cached | 34 s | 14.5 s |
+| 16x32 remote, all cached | | 0.0 s (about 30 s end to end, warm) |
+
+`pnpm lint` stays whole: oxlint, the cursor rule, `check-deps` and the fixture check take about 3 s together even on the loaded Mac, and `check-deps` needs the whole package graph to see a bad edge.
+
 ## Affected tests
 
 `pnpm affected` works out which tests the change can reach and runs only those, each suite on its own Namespace machine at the same time (`--local` runs them one after another through the local root scripts; `--plan` only prints the plan; `--files a,b` plans for given files). The change is every file that differs from the merge base with `main`, committed or not, plus new files. Agents use it while iterating and for their report; full suites run on a schedule against `main` and before a merge when asked.
@@ -436,6 +458,8 @@ An import graph over `apps/` and `packages/` decides what each change reaches: r
 | `apps/gallery/` (except `shots.spec.ts`), `packages/tokens/`, `packages/testing/` | `pnpm test:gallery` for every component |
 | A file the desktop app or the e2e support reaches (`apps/desktop/src`, `e2e/fixtures.ts`, `e2e/driver/`, the Playwright config) | `pnpm test:desktop` in full |
 | Only e2e spec files | `pnpm test:desktop <those files>` |
+| Any `.ts`, `.tsx` or config a tsc project reads | `pnpm typecheck` remotely, when a project's key has not passed; it checks only those projects |
+| Anything but Markdown | `pnpm lint`, on the Mac (about 3 s, less than a remote machine's overhead) |
 | Documentation only | nothing |
 
 **Results cache.** Each unit test file, gallery component (plus one item for the behaviour tests) and desktop e2e spec file is an item with a key: a hash of every file it reaches, its package and suite configs, and the lockfile. After a step passes, its items' keys are recorded in the system temp folder (`juno-cache/results`), shared by every worktree, whether the step ran here or remotely. An item whose key passed before is skipped and counted in the plan; `--no-cache` runs everything. `specs:check` keeps its own cache per Quint run. A failing step records nothing.

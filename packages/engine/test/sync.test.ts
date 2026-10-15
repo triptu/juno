@@ -810,17 +810,19 @@ describe('cold boot details (review M3 finding 10)', () => {
         fake.holdNext({ method: 'conversations.history' })
         return fake.signIn()
       },
+      // The failed boot is tried again after this; the app waits 30 s.
+      bootRetryMillis: 3_000,
     })
     engines.push(engine)
     await engine.status('ready')
     await waitFor(() => (engine.fake.heldCount({ method: 'conversations.history' }) === 1 ? true : undefined), 20_000, 'the first history page held')
-    // The first conversation's page lands; the second keeps failing (every retry), so the boot fails and waits 30 s.
+    // The first conversation's page lands; the second keeps failing (every retry), so the boot fails and waits to try again.
     engine.fake.forceError({ method: 'conversations.history', error: 'internal_error', times: 3 })
     engine.fake.release()
     await engine.phase('offline', 30_000)
     expect(apiCalls(engine, 'conversations.history').filter((c) => c.ok)).toHaveLength(1)
     engine.fake.resetCalls()
-    // A force_reload boots again at once, without the conversation it already has.
+    // The next boot, from the retry or the force_reload (which waits for the retry's cycle), skips the conversation it already has.
     engine.fake.emitFrame({ type: 'force_reload', event_ts: eventTs() })
     await engine.phase('live', 30_000)
     await quiet(engine)

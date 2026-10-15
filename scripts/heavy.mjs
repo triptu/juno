@@ -20,8 +20,12 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-const exclusive = process.argv[2] === '--exclusive'
-const args = process.argv.slice(exclusive ? 3 : 2)
+// `--queue <name>` uses a separate lock with its own two slots, for short jobs
+// that must not pile up but should not wait behind test runs (typecheck).
+const queueAt = process.argv[2] === '--queue' ? process.argv[3] : undefined
+const rest = process.argv.slice(queueAt ? 4 : 2)
+const exclusive = rest[0] === '--exclusive'
+const args = rest.slice(exclusive ? 1 : 0)
 if (args.length === 0) {
   console.error('usage: node scripts/heavy.mjs <command> [args...]')
   process.exit(2)
@@ -39,8 +43,8 @@ const run = () => {
 
 if (process.env.JUNO_HEAVY_HELD === '1') process.exit(await run())
 
-const root = join(tmpdir(), 'juno-heavy')
-const slots = Math.max(1, Number(process.env.JUNO_HEAVY_SLOTS ?? 2))
+const root = join(tmpdir(), queueAt ? `juno-heavy-${queueAt}` : 'juno-heavy')
+const slots = queueAt ? 2 : Math.max(1, Number(process.env.JUNO_HEAVY_SLOTS ?? 2))
 const label = `${args.join(' ')} (${process.cwd()})`
 mkdirSync(root, { recursive: true })
 
