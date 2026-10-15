@@ -70,7 +70,7 @@ export function Home({ scene, title, line, items, done, now, caughtUp, enter = t
           </Text>
         </div>
         {items.length === 0 && slots === 0 ? null : (
-          <ul aria-labelledby={headingId} data-home-slots={slots > 0 ? slots : undefined} {...stylex.props(styles.items, slots > 0 && styles.slots(slots), ...part())}>
+          <ul aria-labelledby={headingId} data-home-slots={slots > 0 ? slots : undefined} {...stylex.props(styles.items, slots > 0 && styles.slots(slots, slots - 1), ...part())}>
             {items.map((item) => (
               <HomeRow
                 key={item.id}
@@ -267,9 +267,9 @@ const styles = stylex.create({
     padding: 0,
     listStyle: 'none',
   },
-  // Room for `count` rows and the gaps between them.
-  slots: (count: number) => ({
-    minHeight: `calc(${count} * ${sizes['--row-52']} + ${count - 1} * ${spacing['--space-0-5']})`,
+  // Room for `rows` rows and the `gaps` between them.
+  slots: (rows: number, gaps: number) => ({
+    minHeight: `calc(${rows} * ${sizes['--row-52']} + ${gaps} * ${spacing['--space-0-5']})`,
   }),
   // The row is the hover and focus surface; its link and its button sit side by side inside it.
   row: {
