@@ -316,6 +316,8 @@ const regressions = [
   ['outbox', 'actionBeforeStore', 'actionNeedsMessage', 'outbox-action-before-store'],
   ['outbox', 'actionOnDiscarded', 'noActionOnDiscarded', 'outbox-action-on-discarded'],
   ['outbox', 'offlineSend', 'sendsWaitOffline', 'outbox-offline-send'],
+  ['outbox', 'networkCopy', 'shownOnce', 'outbox-network-copy'],
+  ['outbox', 'sameText', 'keepsRealSends', 'outbox-same-text'],
   ['catchup', 'newerThanPage', 'noFalseDelete', 'catchup-newer-than-page'],
   ['catchup', 'dropChanges', 'quietAgreement', 'catchup-drop-changes'],
   ['catchup', 'olderPage', 'quietAgreement', 'catchup-older-page'],
