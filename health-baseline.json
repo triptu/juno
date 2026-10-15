@@ -8,8 +8,8 @@
     "unusedDependencies": 0,
     "unlistedDependencies": 0,
     "clonePairs": 7,
-    "oversizedFiles": 47,
-    "oversizedFunctions": 143
+    "oversizedFiles": 46,
+    "oversizedFunctions": 141
   },
   "clonedLines": 139,
   "oversizedFiles": [
@@ -23,7 +23,6 @@
     "apps/gallery/shift.spec.ts",
     "packages/agent/src/actions/cards.ts",
     "packages/agent/src/backup/backup.ts",
-    "packages/agent/src/router/open.ts",
     "packages/agent/src/router/router.ts",
     "packages/agent/src/serve/chat.ts",
     "packages/agent/src/serve/server.ts",
@@ -103,8 +102,6 @@
     "packages/agent/src/providers/guard.ts:createProviderGuard#1",
     "packages/agent/src/providers/guard.ts:createProviderGuard/stream#1",
     "packages/agent/src/redaction/redaction.ts:createRedaction#1",
-    "packages/agent/src/router/open.ts:start#1",
-    "packages/agent/src/router/router.ts:createRouter#1",
     "packages/agent/src/runtime/core.ts:running#1",
     "packages/agent/src/schedule/scheduler.ts:createScheduler#1",
     "packages/agent/src/serve/chat.ts:buildItems#1",
