@@ -32,6 +32,7 @@ export * from './shell'
 export * from './audience'
 export * from './composer'
 export * from './menus'
+export * from './ids'
 
 export * from './routes/search'
 export * from './routes/prefs'

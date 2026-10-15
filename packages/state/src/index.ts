@@ -33,6 +33,7 @@ export { applyListDelta, emptyWindow, type ListWindow } from './list'
 export {
   bottomWindow,
   channelThreadsAtom,
+  channelTopicsAtom,
   loadOlderMessages,
   locateMessage,
   messageListAtom,

@@ -70,6 +70,9 @@ export const topicAtom = (id: string) => topicFamily({ id })
 /** A channel's threads with activity in the quiet window, newest first. `meta.total` is how many there are. */
 export const channelThreadsAtom = (channel: string, limit: number = THREADS_WINDOW_MAX) => threadsFamily({ channel, range: { limit } })
 
+/** Every thread the store knows in a channel, open ones first, then the resolved ones: the header's topic switcher. */
+export const channelTopicsAtom = (channel: string) => threadsFamily({ channel, all: true, range: { limit: THREADS_WINDOW_MAX } })
+
 /** Between a topic id and a tab id in a view key. Neither id can hold it. */
 const VIEW_SEPARATOR = '\u0000'
 

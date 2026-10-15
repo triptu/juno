@@ -262,15 +262,19 @@ export const ThreadSummary = Schema.Struct({
   mentionsMe: Schema.Boolean,
   /** Most recent first, at most three, as `Person`s in `refs`. */
   participantIds: Schema.Array(Schema.String),
+  /** Resolved with no activity since; only sent with `all`. */
+  resolved: Schema.optionalKey(Schema.Boolean),
 })
 export type ThreadSummary = typeof ThreadSummary.Type
 
 /**
  * A channel's threads with activity inside the quiet window, newest
  * activity first, at most `THREADS_WINDOW_MAX`. `range.anchor` is not used.
- * `meta.total` is the number of such threads.
+ * `meta.total` is the number of such threads. With `all` (the header's
+ * topic switcher), every thread the store knows, open ones first and the
+ * resolved ones after them, each newest first.
  */
-export const channelThreads = liveListRoute('channel.threads', { row: ThreadSummary, payload: { channel: Schema.String } })
+export const channelThreads = liveListRoute('channel.threads', { row: ThreadSummary, payload: { channel: Schema.String, all: Schema.optionalKey(Schema.Boolean) } })
 
 // Commands
 

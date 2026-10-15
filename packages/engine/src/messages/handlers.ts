@@ -141,7 +141,7 @@ export const MessagesHandlers = MessagesRoutes.toLayer(
       'channel.threads': (payload) => {
         const limit = Math.max(1, Math.min(THREADS_WINDOW_MAX, payload.range.limit))
         const keys: InvalidationKeys = ['topics', 'topic_overlay', 'users', 'prefs', 'conversations']
-        const setup = Effect.succeed(Effect.flatMap(now, (at) => channelThreads(payload.channel, limit, at)))
+        const setup = Effect.succeed(Effect.flatMap(now, (at) => channelThreads(payload.channel, limit, at, payload.all === true)))
         return serveLiveList(runs(keys, setup), { encodeRow: encodeThread, measure }).pipe(retryFirstRun('channel.threads'), Stream.orDie)
       },
       'topics.open': (payload) =>
