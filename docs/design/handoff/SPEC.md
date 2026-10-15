@@ -124,7 +124,7 @@ Each row is a tile followed by three lines. The tile is the topic's art: a small
 ### Row actions
 
 - **Hover** (or keyboard focus) shows an icon-only **Resolve** button (a check) at the right end of the meta line. The time stays in place, and the button's slot is always reserved, so nothing shifts. Its tooltip and accessible name say "Resolve" (with the topic title for screen readers). Resolving hides the row, marks it read and shows a toast with Undo. ⌘Z also undoes. Main threads resolve the same way.
-- **Context menu** (right-click, or the context-menu key):
+- **Context menu** (right-click, or the context-menu key; in an open topic, ⋯ in the header or a right-click on its title):
   - Open in new tab (⌘-click)
   - Rename
   - Redraw (a new drawing for the topic's art, with Undo; only while AI assist is on, and not on a DM's Main)
@@ -144,7 +144,7 @@ Each row is a tile followed by three lines. The tile is the topic's art: a small
 
 ## 6. Opening things and tabs
 
-- Everything opens in the **current tab**. A new tab opens only on ⌘-click, ⌘ Enter or "Open in new tab".
+- Everything opens in the **current tab**, the header's topic switcher included (section 7). A new tab opens only on ⌘-click, ⌘ Enter or "Open in new tab".
 - A plain open of a topic or page that another tab shows focuses that tab, the one active last if several do, so the sidebar's selection stays one place. ⌘-click and "Open in new tab" always open a new tab, so the same topic, Home, All topics or Juno can show in several tabs.
 - **One place in several tabs.** Each tab keeps its own scroll position, "N new" divider, composer focus and selection. Everything else is shared: the messages, the read state, the Juno chat and the draft of each topic. Two Juno tabs show the same chat, and a message sent in one shows in both. Two tabs on one topic can sit at different places in it.
 - **New tabs.** The "+" button and ⌘T open a new tab with a New chat (section 9), or Home when Settings › General says so ("New tabs open": New chat, the default, or Home). ⌘N and the sidebar's New chat button always open a New chat. Closing the last tab opens a new tab the same way, so there is never no tab.
@@ -168,10 +168,10 @@ The header has no bar. Two islands float over the top of the message list, 8px u
     - **Public channel:** neutral.
     - **Private channel:** warm amber.
     - **Direct message or group DM:** soft blue.
-  - **The title** opens the topic's menu, the same menu as its sidebar row: Rename, Pin, Notify me, Resolve, Copy Slack link, Open in Slack and the rest. Rename turns the title into a field in place.
-- **Right island:** Resolve or Reopen, and Juno (opens the Juno panel, below). Main shows Threads in place of Resolve.
+  - **The title** is a topic switcher. Clicking it (or Enter, Space or ↓ on it) opens a popover under the left island: a search field, then this channel's Main and its threads, newest activity first, with resolved threads last under "Resolved". Unread shows as in the sidebar (a bold title and a count, and @ for a mention), and the topic on screen is marked. Typing filters by title, ↑ ↓ move, Enter opens in the current tab, ⌘Enter or ⌘-click in a new tab, and Esc closes. Right-clicking the title opens the topic's menu. Rename turns the title into a field in place.
+- **Right island:** Resolve or Reopen (not on Main), ⋯ and Juno (opens the Juno panel, below). **⋯** opens the topic's menu, the same menu as its sidebar row: Open in new tab, Rename, Redraw, Mark as unread, Pin, Resolve, Copy Slack link, Open in Slack, Notify me and Ignore #channel. Main has no Threads button: its title's switcher lists the channel's threads.
 - **Under the islands** the list scrolls on: the page colour is solid behind the islands and fades out just below them, so text never shows through or around them. The first message sits below the islands when scrolled to the top.
-- **Narrow windows.** The islands keep their places at every width. Under 480px, Resolve shows as an icon and Threads as its count; the title shortens first, then the channel name, and the pill's tint and icon always show.
+- **Narrow windows.** The islands keep their places at every width. Under 480px, Resolve shows as an icon; the title shortens first, then the channel name, and the pill's tint and icon always show.
 
 ### Messages
 

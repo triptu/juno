@@ -238,18 +238,19 @@ Left island (`flex: 0 1 auto`, `min-width: 0`, padding `3 3 3 5`):
   | Direct message | `user` | "Maya Chen" | `--tint-dm` (blue) |
   | Group DM | `users` | "Maya, Leo" | `--tint-dm` |
 
-- **Title button**: 28px, `--radius-pill`, padding 0 8, gap 6: title 14/600 single line ellipsis, `dir="auto"`, then `caret-down` 12 muted. At least 72px wide; it shortens before the pill does. Hover `--secondary-default`; open `--secondary-hover` (`--secondary-active` under the pointer). A menu button (`aria-haspopup="menu"`, `aria-expanded`) inside the page's `h1`. Click, Enter, Space or ↓ opens the topic menu (§15.1, the row's menu) anchored under the island, left-aligned, 6px below. The context-menu key and right-click open it too. Main's title is "Main".
+- **Title button**: 28px, `--radius-pill`, padding 0 8, gap 6: title 14/600 single line ellipsis, `dir="auto"`, then `caret-down` 12 muted. At least 72px wide; it shortens before the pill does. Hover `--secondary-default`; open `--secondary-hover` (`--secondary-active` under the pointer). A popover button (`aria-haspopup="dialog"`, `aria-expanded`) inside the page's `h1`. Click, Enter, Space or ↓ opens the **topic switcher**; right-click or the context-menu key opens the topic menu (§15.1) anchored under the island, left-aligned, 6px below. Main's title is "Main".
+- **Topic switcher** (`TopicSwitcher` in `@juno/views`, mounted only while open): a `Popover` hung off the left island itself (bottom-start, 4px below the island like every popover, `--browse-width` 360), padding none. A search field ("Search this channel", the New chat picker's `PickerSearch`, focused on open), then an `OptionList` (listbox "Topics in this channel", max-height 360, scrolls): Main first (`chat-text` 15, "Messages outside threads"), the open threads newest activity first, then a "Resolved" group label and the resolved threads, their titles in `--foreground-subtle`. Rows are 44px two-line `OptionRow`s: title 14 (500, 600 while unread), "N replies · 4m" meta; at the end the sidebar's count chip (`strong`) and @ chip (`soft`). The topic on screen is the selected row (`aria-selected`). Typing filters by title (each query word starts a word of the title); "No match." when nothing does. ↑ ↓ move, Enter opens in the current tab, ⌘Enter or ⌘-click in a new tab, Esc closes and gives focus back to the title. Data: `channel.threads` with `all` (every thread the store knows, open ones first, at most 100), kept live while the topic is shown, and Main's header, so the popover paints its rows in its first frame.
 - **Rename** (from the menu): the title button becomes an input in place: 28px, padding 0 8, 14/600, 1px `--border-strongest`, `--radius-pill`, bg `--surface-default`, preselected. [built M5] `RenameField size="header"` sizes to its text (`field-sizing: content`) from the title's 72px floor up to the island's room. Enter saves, Esc cancels, blur saves. Saving an empty title, or the same text as the AI title, clears the manual title. There is no double-click rename in the header.
 
 Right island (`flex: none`, padding 3):
 
 - **Resolve / Reopen**: 28px, `--radius-pill`, padding 0 10, gap 6, 12.5/500 `--foreground-default`, icon 14 subtle (`circle-check` / `rotate-ccw`), hover `--secondary-default`. Undo toast. Not on Main. [built M5] It runs the row check's resolve call, and Reopen runs `topics.reopen`.
-- **Threads** (Main only, in Resolve's place): the same button, `chats-circle` 14, "Threads · 12". Opens the 300px `ActiveThreads` popover, anchored under it, right-aligned (§2 behaviour unchanged: rows are buttons named by the title and described by the counts; Escape closes and puts focus back on Threads).
+- **⋯** (`dots-three` 18 bold, `IconButton variant="island"`, 28 round, name "More", `aria-haspopup="menu"`): opens the topic menu (§15.1), the row's menu, at the button's left edge 6px under the island; shows pressed (`--secondary-hover`) while the menu is open. Between Resolve and Juno; on Main, first. Main has no Threads button: the title's switcher lists the channel's threads.
 - **Juno**: 28 round icon button (`sparkle` 16 duotone), a toggle (`aria-pressed`) for the panel (§12.1). Name "Juno ⌘J". `IconButton variant="island"`: hover `--secondary-default`; pressed `--secondary-hover` (`--secondary-active` under the pointer). Hidden when AI assist is off. [not built] Hidden until the Juno panel is built, since a button that does nothing is worse than none.
 - **States.** Every island control has the same three: hover a secondary fill (on the island's `--surface-default`, `--surface-hover` was too close to see), the press scale (`--press-scale`) and the keyboard focus ring. The context pill's hover is its tint one step deeper (`--tint-public-hover`, `--tint-private-hover`, `--tint-dm-hover`). The Juno panel's Open in a tab and Close use the same `island` variant. Gallery: `TopicHeader` › Interaction (hover, press and focus for each control).
 - Pin, Notify me and More are not in the header. They are in the topic menu, which is the row's menu.
 
-Narrow (a container query on the topic area): under 480px, Resolve is a 28px icon button (name still "Resolve" / "Reopen") and Threads shows `chats-circle` and the count only ("12", name "Threads, 12"). The pill shows its full name up to 160px, then takes an ellipsis; the title takes the rest and shortens first. The pill's icon and tint always show. At the minimum window (720 by 480, sidebar shown) the topic is 336px and every variant fits.
+Narrow (a container query on the topic area): under 480px, Resolve is a 28px icon button (name still "Resolve" / "Reopen"). The pill shows its full name up to 160px, then takes an ellipsis; the title takes the rest and shortens first. The pill's icon and tint always show. At the minimum window (720 by 480, sidebar shown) the topic is 336px and every variant fits.
 
 The message list under the header (`MessageList`, `TopicView`):
 
@@ -259,7 +260,7 @@ The message list under the header (`MessageList`, `TopicView`):
 - Open position: the "N new" divider lands `--header-band` + 80 (148px) from the scroller's top, which is 80px below the band, as before. The bottom pin, prepends, the window cap and scroll anchoring are unchanged (performance.md 3.3 and 5.2): the band and islands are out of flow and never change, so a rename, the menu or Juno pressed moves nothing in the list.
 - No script reads or writes on scroll. The band is drawn the same at scroll top and scrolled: at scroll top it only covers the empty inset.
 
-Keyboard order inside the header: context pill → title button → Resolve or Threads → Juno. Then the message list and the composer, as before (the Tab order row in the accessibility table).
+Keyboard order inside the header: context pill → title button → Resolve (threads) → ⋯ → Juno. Then the message list and the composer, as before (the Tab order row in the accessibility table).
 
 ## 6. Message list
 
@@ -585,7 +586,7 @@ Native menus **[spec]**. Prototype rendering for reference: 236px, padding 5, ra
 
 **Shows:** S02, shot 22 (now opened from the header's title), shot 23 (tab), shot 32 (channel), shot 61 (dark).
 
-### 15.1 Topic row / header title
+### 15.1 Topic row / header ⋯ (and a right-click on the header title)
 
 | Item | Icon | Hint | Shown when | Effect |
 | --- | --- | --- | --- | --- |
@@ -748,7 +749,7 @@ Stored as user preferences. Nothing else from the prototype's design panel (`dat
 | ↑ ↓, Enter, Esc | New chat pickers | Move, pick, close |
 | Enter / Esc / blur | rename | Save / cancel / save |
 | Context-menu key, right-click | rows, tabs, context pill, All topics rows | Menu |
-| Tab order | sidebar bar (collapse, back, forward, search, new chat, avatar) → nav → filters → rows → tab strip → header (context pill, title, Resolve or Threads, Juno) → messages → composer → Juno panel | Hover-only actions (row Resolve, message toolbar) appear on focus |
+| Tab order | sidebar bar (collapse, back, forward, search, new chat, avatar) → nav → filters → rows → tab strip → header (context pill, title, Resolve, ⋯, Juno) → messages → composer → Juno panel | Hover-only actions (row Resolve, message toolbar) appear on focus |
 
 ## 21. Shared copy
 
