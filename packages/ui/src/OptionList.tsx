@@ -1,4 +1,5 @@
 import * as stylex from '@stylexjs/stylex'
+import { flushSync } from 'react-dom'
 import { createContext, useCallback, useContext, useState, type HTMLAttributes, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
 import { colors, radii, sizes, spacing, weights } from '@juno/tokens/tokens.stylex'
 import { Divider } from './Divider'
@@ -105,7 +106,9 @@ export function OptionRow({
       aria-selected={listRole === 'menu' ? undefined : selected}
       aria-disabled={disabled || undefined}
       {...activateHandlers<HTMLDivElement>(onSelect, { keepFocus: true, disabled })}
-      onPointerMove={onActivate}
+      // Synchronous, so the highlight follows the pointer in the next frame as a hover style would;
+      // React would otherwise render a pointer-move update later. Nothing runs while the row is already active.
+      onPointerMove={onActivate === undefined || active ? undefined : () => flushSync(onActivate)}
       onContextMenu={onContextMenu}
       {...stylex.props(
         styles.row,
