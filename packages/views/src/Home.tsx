@@ -116,7 +116,7 @@ function metaOf(item: HomeItem, now: number): string {
   const topic = item.topics[0]
   const last = item.kind === 'moved' ? `${item.newCount ?? 0} new` : item.at === undefined ? undefined : relativeTime(item.at, now)
   // Automated: why it is asked, instead of the conversation's name the title already says.
-  const first = item.kind === 'automated' ? (item.fromApps === undefined ? undefined : `${item.fromApps.apps} of the last ${item.fromApps.of} messages from apps`) : topic?.title
+  const first = item.kind === 'automated' ? (item.fromApps === undefined ? undefined : `${item.fromApps.apps} of the last ${item.fromApps.of} from apps`) : topic?.title
   const place = item.kind === 'automated' ? undefined : topic?.place
   return [first, place, last].filter((part) => part !== undefined && part !== '').join(' · ')
 }
