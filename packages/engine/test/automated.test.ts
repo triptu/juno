@@ -72,6 +72,16 @@ describe('the Automated view', () => {
     expect([...inView].toSorted()).toEqual(['C0ALERTSPROD', 'C0DEPLOYS'])
   })
 
+  it('sorts a channel the user joins later, once its bot has written a few messages', async () => {
+    const engine = await bootedEngine(engines)
+    const now = engine.fake.now()
+    engine.fake.workspace.addConversation({ id: 'C0BUILDS', name: 'builds', kind: 'public', members: new Set(['U0DEPLOYBOT']), created: now, topic: '', purpose: '', isOpen: true, archived: false })
+    engine.fake.joinChannel({ channel: 'C0BUILDS' })
+    for (let n = 1; n <= 5; n++) engine.fake.injectMessage({ channel: 'C0BUILDS', user: 'U0DEPLOYBOT', text: `main #${n} passed` })
+    const views = await viewsUntil(engine, (list) => holds(list, 'C0BUILDS'), 'the new channel in Automated')
+    expect(automatedOf(views)!.addedByJuno).toContain('C0BUILDS')
+  })
+
   it('asks about an ambiguous channel on Home; Move and Keep in All stick, and each undoes', async () => {
     const engine = await bootedEngine(engines, withReleases)
     const home = await homeUntil(engine, (view) => view.items.some((item) => item.kind === 'automated'), 'the question on Home')
