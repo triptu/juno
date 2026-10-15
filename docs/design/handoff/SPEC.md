@@ -61,7 +61,7 @@ Titles resolve in this order. A title you set by renaming (stored in Juno only) 
 
 ### Top to bottom
 
-1. **Title bar**: on the left, after the traffic lights, the sidebar button, Back and Forward (section 6); on the right, Search (⌘K), New chat (⌘N, section 9), and your avatar. The avatar menu holds Set yourself away or active, status, Notifications, Preferences, AI assist, switch workspace and sign out. There is no footer and no name label.
+1. **Title bar**: on the left, after the traffic lights, the sidebar button, Back and Forward (section 6); on the right, Search (⌘K), New chat (⌘N, section 9), and your avatar. The avatar menu holds Set yourself away or active, status, Notifications, Preferences, AI assist, switch workspace and sign out. There is no name label, and no footer except the privacy footer while privacy mode is on (below).
 2. **Navigation**: Home, All topics and Juno (⌘J). Only Juno shows a count: its unread messages, as a soft grey tag. A properly spaced hairline separates these from the list.
 3. **Quick filters** on one row: a horizontally scrollable row of pills on the left and an Unread only toggle on the right, an icon pill like Channels and DMs (a box with a dot on its corner) with that tooltip and accessible name, shown pressed while it is on. The pills are All, Channels (a hash icon), DMs (a person icon), then your views (below), then a "+" pill that makes a new view. Channels and DMs are icon-only, with a tooltip and an accessible name. DMs include group DMs. The row never grows taller: when the pills overflow, the row scrolls sideways with the trackpad or the mouse wheel and the list does not move. Unread only stays fixed at the right. There are no counters or dots on it. A small dot appears on Channels or DMs when that group has unread topics you are not viewing.
 4. **Scope chip**, shown only when narrowed to one channel: "#eng ×". Picking a view clears it. Narrowing is rare. It happens from ⌘K (a channel's "Show its topics" result), by clicking a #channel chip in a message, or by clicking a topic's context pill.
@@ -77,9 +77,25 @@ A view is a set of channels and DMs you pick. Its pill shows the Main and thread
 - **Adding a conversation.** A channel's or DM's menu (and a Main row's menu) has **Add to view ›**: your views with a check on the ones that hold it (choosing a checked one removes it), then New view…, which opens the sheet with the conversation already in it. Adding and removing show a toast with Undo.
 - **Juno can make one.** "Make a Bots view with every alerts channel" is a Juno settings task: the same command the sheet uses. (Not wired to Juno yet; the engine command is the seam.)
 
+### Privacy mode
+
+For screen sharing. **Hide message text** in the avatar menu (or ⌃⌘H, View › Hide Message Text) blurs message text that shows without you opening anything, so it cannot be read over a shared screen:
+
+- the sidebar row preview ("Sender: text"),
+- the All topics preview line,
+- a Home row's title when Juno wrote it (the plain titles, such as "Elena asked you something", stay).
+
+What you need to find your way stays readable: titles, channel and people names, times, counts and tags. A topic, the Juno chat and a peek are not blurred: you open them on purpose. Hovering or focusing a blurred line does not reveal it, and blurred text cannot be selected.
+
+While the mode is on, macOS notifications keep their title (who or where) and replace the message with "Message hidden", because they show over a shared screen too.
+
+While the mode is on, a small footer at the bottom of the sidebar says "Message text hidden" with a **Show** button, which turns it off in one click. The avatar menu item reads **Show message text**.
+
+The mode is remembered across a relaunch, and the first frame after a relaunch is already blurred: a restart in the middle of a call must never show text. Juno never turns it off by itself. (Turning it on by itself when sharing starts is researched in `docs/research/screen-share-detection.md`, not built.)
+
 ### Row anatomy
 
-Each row is a tile followed by three lines. The tile is the topic's art: a small AI-drawn illustration about what the topic discusses, with no container. Every topic gets one, including a channel's Main and threads inside DMs. Until the art exists, or when AI is off, the tile shows a calm free-form placeholder shape picked per topic. A DM's Main shows the person's Slack profile photo instead (coloured initials when there is no photo). Line one is the title and time. Line two is a one-line preview of the latest message as "Sender: text", ending with an ellipsis when it does not fit, with any ">" quote lines stripped. Every row is the same height. Line three is meta: channel icon and name, a small stack of participant avatars, and tags such as Main or Reopened. There is no message count and no "messages outside threads" label. A Main row may also show a thread icon with the number of threads started in that channel since you last read its Main, hidden when zero. Unread topics have a semibold title and a soft grey count tag. Mentions of you get a quiet "@" tag. Density (Preferences › Appearance, section 14) is the only choice that changes the row.
+Each row is a tile followed by three lines. The tile is the topic's art: a small AI-drawn illustration about what the topic discusses, with no container. Every topic gets one, including a channel's Main and threads inside DMs. Until the art exists, or when AI is off, the tile shows a calm free-form placeholder shape picked per topic. A DM's Main shows the person's Slack profile photo instead (coloured initials when there is no photo). Line one is the title and time. Line two is a one-line preview of the latest message as "Sender: text", ending with an ellipsis when it does not fit, with any ">" quote lines stripped. Every row is the same height. Line three is meta: channel icon and name, a small stack of participant avatars, and tags such as Main or Reopened. The stack never shows you, and rows in a DM or a group DM (its Main and its threads) have no stack, since the row already names the people. With no stack, the tags take its place at the same gap. There is no message count and no "messages outside threads" label. A Main row may also show a thread icon with the number of threads started in that channel since you last read its Main, hidden when zero. Unread topics have a semibold title and a soft grey count tag. Mentions of you get a quiet "@" tag. Density (Preferences › Appearance, section 14) is the only choice that changes the row.
 
 ### What shows up
 
@@ -549,6 +565,7 @@ Use the Littlebird design system's tokens.
 | ⌃Tab / ⌃⇧Tab, ⌘⇧] / ⌘⇧[ | Next / previous tab |
 | ⌘[ / ⌘] | Back / forward in the tab's history |
 | ⌃⌘S | Hide or show the sidebar |
+| ⌃⌘H | Hide or show message text (privacy mode, section 5) |
 | ⌘J | In a topic, open or close the Juno panel. Elsewhere, open the Juno tab with the composer focused |
 | ⌘Z | Undo the last topic action: resolve, reopen, pin, rename, mark read or unread, Notify me change or ignore. Sends are final (ADR 0010) |
 | ⌘ click / ⌘ Enter | Open in a new tab |

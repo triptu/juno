@@ -593,6 +593,7 @@ export class Juno {
   readonly allTopics: AllTopicsPane
   readonly home: HomePane
   readonly peek: PeekPopover
+  readonly privacy: PrivacyMode
 
   constructor(app: ElectronApplication, win: Page) {
     this.app = app
@@ -610,6 +611,7 @@ export class Juno {
     this.allTopics = new AllTopicsPane(win)
     this.home = new HomePane(win)
     this.peek = new PeekPopover(win)
+    this.privacy = new PrivacyMode(app, win)
   }
 
   /** Makes the next native context menu pick `id` without showing it. */
@@ -984,6 +986,11 @@ export class AllTopicsRow {
 
   async expectVisible(): Promise<void> {
     await expect.poll(() => this.reveal(), { timeout: 10_000 }).toBe(true)
+  }
+
+  /** The "Sender: text" line under the title, the one part privacy mode blurs. */
+  get preview(): Locator {
+    return this.root.locator('[data-sensitive]')
   }
 
   async expectAbsent(): Promise<void> {
@@ -1391,25 +1398,39 @@ export class TopicPane {
     await expect.poll(() => this.distanceFromBottom(), { timeout: 5_000 }).toBeLessThanOrEqual(BOTTOM_SLACK)
   }
 
-  /** Scrolls the list up by `pixels` and waits for the scroll to settle. */
+  /**
+   * Scrolls the list up by `pixels` with the mouse wheel over it, as a user
+   * does, and waits for the scroll to settle. The wheel is what lets go of
+   * the list's hold on the bottom; a scroll set from a script does not, and a
+   * commit that adds rows before it settles puts the bottom back.
+   */
   async scrollUp(pixels: number): Promise<void> {
-    await this.scrollTo({ by: -pixels })
+    const box = await this.scroller.boundingBox()
+    if (box === null) throw new Error('No message list to scroll')
+    await this.win.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+    type Watched = HTMLElement & { scrollEnded?: Promise<void> }
+    // The listener is in place before the wheel turns: the wheel reaches the page by another path than evaluate.
+    await this.scroller.evaluate((scroller: Watched) => {
+      scroller.scrollEnded = new Promise((resolve) => scroller.addEventListener('scrollend', () => resolve(), { once: true }))
+    })
+    await this.win.mouse.wheel(0, -pixels)
+    await this.scroller.evaluate((scroller: Watched) => scroller.scrollEnded)
   }
 
   async scrollToBottom(): Promise<void> {
-    await this.scrollTo({ to: 'bottom' })
+    await this.scrollTo('bottom')
   }
 
   async scrollToTop(): Promise<void> {
-    await this.scrollTo({ to: 'top' })
+    await this.scrollTo('top')
   }
 
-  private async scrollTo(where: { readonly by: number } | { readonly to: 'top' | 'bottom' }): Promise<void> {
+  private async scrollTo(where: 'top' | 'bottom'): Promise<void> {
     await this.scroller.evaluate(
       (scroller, target) =>
         new Promise<void>((resolve) => {
           const max = scroller.scrollHeight - scroller.clientHeight
-          const to = 'by' in target ? scroller.scrollTop + target.by : target.to === 'top' ? 0 : max
+          const to = target === 'top' ? 0 : max
           if (Math.abs(Math.min(max, Math.max(0, to)) - scroller.scrollTop) < 1) return resolve()
           scroller.addEventListener('scrollend', () => resolve(), { once: true })
           scroller.scrollTop = to
@@ -1656,6 +1677,7 @@ export type AppMenuItem =
   | 'back'
   | 'forward'
   | 'toggle-sidebar'
+  | 'toggle-privacy'
   | 'juno'
   | 'undo'
   | `tab-${1 | 2 | 3 | 4 | 5 | 6 | 7 | 8}`
@@ -1773,6 +1795,41 @@ export class SidebarFrame {
   /** View › Hide Sidebar's label, which names what it will do. */
   async menuLabel(): Promise<string | undefined> {
     return this.app.evaluate(({ Menu }) => Menu.getApplicationMenu()?.getMenuItemById('toggle-sidebar')?.label)
+  }
+}
+
+/** Privacy mode (SPEC section 5): blurred message text, the sidebar footer, View › Hide Message Text. */
+export class PrivacyMode {
+  constructor(
+    readonly app: ElectronApplication,
+    readonly win: Page,
+  ) {}
+
+  /** The sidebar footer that says the mode is on. */
+  get footer(): Locator {
+    return this.win.getByRole('complementary', { name: 'Sidebar' }).getByRole('status').filter({ hasText: 'Message text hidden' })
+  }
+
+  get showButton(): Locator {
+    return this.footer.getByRole('button', { name: 'Show message text' })
+  }
+
+  /** The CSS filter on an element: `blur(6px)` while hidden, `none` otherwise. */
+  filterOf(target: Locator): Promise<string> {
+    return target.evaluate((node) => getComputedStyle(node).filter)
+  }
+
+  async expectBlurred(target: Locator, blurred = true): Promise<void> {
+    await expect.poll(() => this.filterOf(target)).toBe(blurred ? 'blur(6px)' : 'none')
+  }
+
+  async toggleWithMenu(): Promise<void> {
+    await clickAppMenu(this.app, 'toggle-privacy')
+  }
+
+  /** View › Hide or Show Message Text, which names what it will do. */
+  menuLabel(): Promise<string | undefined> {
+    return this.app.evaluate(({ Menu }) => Menu.getApplicationMenu()?.getMenuItemById('toggle-privacy')?.label)
   }
 }
 

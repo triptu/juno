@@ -822,6 +822,8 @@ export const sizes = stylex.defineVars({
   '--tab-unread-dot': '6px',
   '--focus-ring-width': '2px',
   '--focus-ring-offset': '2px',
+  // Privacy mode: how far message text is blurred (tokens/global.css, [data-sensitive]).
+  '--privacy-blur': '6px',
 })
 
 /* -------------------------------------------------------------------------- */
