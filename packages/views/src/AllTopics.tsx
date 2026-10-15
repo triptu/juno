@@ -290,7 +290,7 @@ export function AllTopics({
                 {...activateHandlers<HTMLButtonElement>(() => onStatus(chip.id))}
               >
                 {chip.label}
-                <Text variant="ui" tone="muted" weight="regular" numeric sx={styles.count}>
+                <Text variant="ui" tone="subtle" weight="regular" numeric sx={styles.count}>
                   {counts[chip.id]}
                 </Text>
               </Button>
