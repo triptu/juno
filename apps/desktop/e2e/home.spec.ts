@@ -47,8 +47,8 @@ test('Home shows what waits with no tab open and from the sidebar, and each row 
   await home.openItem('moved')
   await topic.expectTitle(STAGING)
 
-  // Follow-up (AI assist on): the promise the user made to Sam opens the DM.
-  await home.open()
+  // Follow-up (AI assist on): the job finds the promise the user made to Sam; it opens the DM.
+  await expect.poll(() => freshHome(juno, OFFSITE), { timeout: 30_000 }).toContain('followUp')
   await expect(home.title('followUp')).toHaveText("You said you'd review Dev's packet this week")
   await home.openItem('followUp')
   await topic.expectTitle('Sam')
