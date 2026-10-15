@@ -522,3 +522,16 @@ emoji read; the guard now permits `emojis/list`. That correction does not
 change the timed boot. Aggregate logs are in
 `.remote/20261015T171747-6397/run.log` and
 `.remote/20261015T182935-62134/run.log`. No live Slack was accessed.
+
+The final full engine benchmark passed all five cases after isolated reads
+were changed to stop the engine before opening a second store. Waiting for
+a sync cycle alone could time out on this seed, and opening a second writer
+while the engine was active could fail with `SQLITE_BUSY`. Event timings
+still run against the active engine before that stop.
+
+That full run had reported one-minute loads of 7.3–14.5 and missed several
+reported budgets: sidebar event p95 was 17.80 ms and All topics warm p95
+31.31 ms. Messages live-query p95 was 4.54 ms; search p95 was 8.62 ms while
+10,000 backfill messages landed. The command was not in strict timing mode;
+its pass confirms the scenarios and assertions, not every timing budget.
+The log is `/tmp/juno-speed-engine-bench-final-2.log`.
