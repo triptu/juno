@@ -102,6 +102,7 @@ export function startAgent(config: AgentConfig, connection: HostConnection, opti
                   ...turns,
                   agentDir: config.agentDir,
                   host: bound.reads,
+                  online: () => bound.presence()?.online === true,
                   views: viewHost,
                   schedule: bound.schedule,
                   actions: { ...turns.actions, host: actionHost },
@@ -117,7 +118,7 @@ export function startAgent(config: AgentConfig, connection: HostConnection, opti
           )
           // A click waits while no Slack account is known; each presence lets it look again.
           yield* bound.presenceChanges.pipe(
-            Stream.runForEach(() => Effect.sync(() => engine.actions.kick())),
+            Stream.runForEach(() => Effect.sync(() => { engine.networkChanged(); engine.actions.kick() })),
             Effect.forkScoped,
             Scope.provide(scope),
           )

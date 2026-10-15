@@ -724,6 +724,7 @@ export const layout = stylex.defineVars({
   '--settings-label-width': '104px',
   '--palette-width': '560px',
   '--palette-top': '96px',
+  '--palette-list-max-height': '400px',
   '--menu-width': '236px',
   '--menu-width-account': '248px',
   '--menu-width-browse': '300px',

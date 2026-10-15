@@ -15,6 +15,7 @@ type Fake = ReturnType<typeof fakeProvider>
 type Ended = Extract<TurnEvent, { _tag: 'ended' }>
 
 export interface HarnessOptions {
+  readonly online?: () => boolean
   readonly now?: () => number
   readonly schedule?: import('../src/router/open').TurnsOptions['schedule']
   readonly watchHost?: import('../src/schedule/commands').WatchHost
@@ -46,6 +47,7 @@ export async function turnsHarness(options: HarnessOptions = {}) {
   const reports: unknown[] = []
   const opened = await openTurns({
     agentDir: dir,
+    ...(options.online ? { online: options.online } : {}),
     ...(options.now ? { now: options.now } : {}),
     ...(options.schedule ? { schedule: options.schedule } : {}),
     provider: options.app?.provider ?? ((store) => createProviderGuard({ store, transport: options.transport?.(fake) ?? fake.models })),

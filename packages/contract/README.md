@@ -38,7 +38,9 @@ No tests of its own. The routes are exercised by `packages/engine/test` (the rea
 
 ## M4 local routes
 
-- `search.query { query, limit? }` is a live value of at most 50 `SearchResult`s: topic, channel, person or message. Titles come first, then channels, people and messages; FTS ranks matches within each group. The last word is a prefix. An empty query returns recent topics. Ignored and non-member channels are excluded. There is no search UI until M9.
+- `search.query { query, limit? }` is a live value of at most 50 `SearchResult`s, each with what the ⌘K palette shows: a topic (title, place, last activity), a message (its topic's title, place, sender and plain text), a channel (and its Main when the store has one) or a person (and the Main of your DM). Channels and people come first, at most `SEARCH_PLACES_MAX` each, then titles, then messages; FTS ranks matches within each group. The last word is a prefix. An empty query returns recent topics. Ignored and non-member channels are excluded.
+- `search.slack { query }` asks Slack's message search for what the cache lacks and returns `SearchMessage`s, `stored: false` for those the store does not hold. It stores nothing, and is empty when Slack cannot be reached.
+- `search.command { text }` reads the palette's text as a `PaletteCommand` (send to a person, open a DM, post in a channel, ask Juno, resolve a topic), or `null`; always `null` while AI assist is off.
 - `reads.markRead { id, upTo? }` and `reads.markUnread { id, from? }` change Juno's read pointer and return the undo (`UndoCommand` gains both); they fail only with `NotSignedIn` or `NotFound`, never because Slack could not be reached. `reads.mirror` is the live mirror setting `{ on, explicit }`; the preference behind it is `MIRROR_READS_PREF` (`reads.mirror`), written with `prefs.set`.
 - `prefs.get { key }` is a live JSON value from the open workspace's user.db; an absent key returns null. `prefs.set { key, value }` writes one JSON value and invalidates prefs. It fails with `NotSignedIn` without an open workspace. WP5 uses the key `tabs`.
 
