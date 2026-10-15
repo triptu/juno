@@ -14,6 +14,7 @@ import { spawn } from 'node:child_process'
 import { dirname, join, relative, resolve } from 'node:path'
 import { createInterface } from 'node:readline'
 import { fileURLToPath } from 'node:url'
+import { stripVTControlCharacters } from 'node:util'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const suites = [
@@ -56,7 +57,7 @@ const child = spawn(process.execPath, args, { cwd: root, stdio: ['ignore', 'pipe
 for (const stream of [child.stdout, child.stderr]) {
   createInterface({ input: stream }).on('line', (line) => {
     console.log(line)
-    const plain = line.replace(/\x1b\[[0-9;]*m/g, '').replace(/^\[\d+\/\d+\] /, '')
+    const plain = stripVTControlCharacters(line).replace(/^\[\d+\/\d+\] /, '')
     const total = /^\s*(\d+) (passed|failed|flaky|skipped)\b/.exec(plain)
     if (total) counts[total[2]] += Number(total[1])
     const failed = /^\s*\d+\) (.+)$/.exec(plain)
