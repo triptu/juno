@@ -249,8 +249,9 @@ const styles = stylex.create({
     contentVisibility: 'auto',
     containIntrinsicSize: `auto ${sizes['--row-message-estimate']}`,
     // Paint containment clips at the row's edge; the raised toolbar of a
-    // narrow row (NARROW_ROW) and its shadow paint this far above it.
-    overflowClipMargin: `calc(${layout['--toolbar-height']} + ${spacing['--space-2']})`,
+    // narrow row (NARROW_ROW) and its shadow paint this far above it. A plain
+    // token: Chromium drops overflow-clip-margin given any calc().
+    overflowClipMargin: layout['--toolbar-clip-margin'],
     containerName: 'message',
     containerType: 'inline-size',
     backgroundColor: {

@@ -698,6 +698,10 @@ export const layout = stylex.defineVars({
   // plus a 20px gap.
   '--toolbar-height': '36px',
   '--toolbar-reserve': '243px',
+  // How far a message row may paint outside its box: the toolbar's height
+  // and its shadow, for the toolbar raised above a narrow row. A length, not
+  // a calc(): Chromium ignores calc() in overflow-clip-margin.
+  '--toolbar-clip-margin': '44px',
   // Image thumbnails in a message: never wider or taller than this, scaled
   // by their own aspect ratio. File cards share the width.
   '--thumb-max-width': '360px',
