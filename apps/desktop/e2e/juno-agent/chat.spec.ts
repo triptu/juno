@@ -184,3 +184,39 @@ test('Ask Juno in the channel menu on the context pill asks about the channel, a
   await expect(panel.composer).toBeFocused()
   await expect(panel.root.locator('[data-about-chip]')).toHaveCount(0)
 })
+
+test('an answer that arrives while the chat is on screen in the focused window is read, with no "new" divider', async ({ juno }) => {
+  await ready(juno)
+  await setWindowWidth(juno, 1400)
+  expect(await juno.win.evaluate(() => document.hasFocus())).toBe(true)
+  // Records any "new" divider that shows in a Juno chat, even for a frame.
+  await juno.win.evaluate(() => {
+    const seen = window as unknown as { dividerSeen: boolean }
+    seen.dividerSeen = false
+    new MutationObserver(() => {
+      if (document.querySelector('[data-juno-chat] [data-new-divider]') !== null) seen.dividerSeen = true
+    }).observe(document.body, { childList: true, subtree: true })
+  })
+  const dividerSeen = () => juno.win.evaluate(() => (window as unknown as { dividerSeen: boolean }).dividerSeen)
+  const count = juno.win.getByTitle(/unread from Juno$/)
+
+  await junoNav(juno).click()
+  const tab = JunoChatPane.tab(juno.win)
+  await tab.send('what is on today?')
+  await tab.expectJuno('You said: what is on today?')
+  await expect(count).toHaveCount(0)
+  expect(await dividerSeen()).toBe(false)
+
+  // The panel beside a topic too.
+  await juno.sidebar.row(POSTGRES).open()
+  await juno.tabs.menu('juno')
+  const panel = JunoChatPane.panel(juno.win)
+  await panel.send('and tomorrow?')
+  await panel.expectJuno('You said: and tomorrow?')
+  await expect(count).toHaveCount(0)
+
+  // Read, so the chat opens again at the bottom with no divider.
+  await junoNav(juno).click()
+  await tab.expectJuno('You said: and tomorrow?')
+  expect(await dividerSeen()).toBe(false)
+})

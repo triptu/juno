@@ -3,7 +3,7 @@
  * in-memory queues that connect steps (roots to fetch, users to name).
  */
 import type { Me } from '@juno/domain'
-import type { Queue } from 'effect'
+import { Clock, Effect, type Queue } from 'effect'
 import type { SyncConfigShape } from './config'
 
 export interface RootFetch {
@@ -30,7 +30,32 @@ export interface SyncContext {
   readonly missingUsers: Map<string, Set<string>>
   /** Ids the edge did not return (`failed_ids`: bots, Slack Connect users). Not asked for again in this session. */
   readonly unknownUsers: Set<string>
+  /** Page fetches outside the work permit (opened topics, root fetches) in flight, with when each was requested. */
+  readonly fetchesInFlight: Set<{ readonly at: number }>
 }
+
+/** Runs a page fetch outside the work permit, so the recheck can wait for it (`awaitEarlierFetches`). */
+export const trackFetch = <A, E, R>(ctx: SyncContext, fetch: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> =>
+  Effect.acquireUseRelease(
+    Effect.map(Clock.currentTimeMillis, (at) => {
+      const entry = { at }
+      ctx.fetchesInFlight.add(entry)
+      return entry
+    }),
+    () => fetch,
+    (entry) => Effect.sync(() => ctx.fetchesInFlight.delete(entry)),
+  )
+
+/**
+ * Waits until every tracked fetch requested up to now has landed, so no
+ * older answer arrives after the recheck's (specs/catchup.qnt `olderPage`).
+ * Fetches end within the request timeout.
+ */
+export const awaitEarlierFetches = (ctx: SyncContext): Effect.Effect<void> =>
+  Effect.gen(function* () {
+    const now = yield* Clock.currentTimeMillis
+    while ([...ctx.fetchesInFlight].some((entry) => entry.at <= now)) yield* Effect.sleep(50)
+  })
 
 /** `reindexTopics` options bound to a context: missing names are collected for the users step. */
 export const reindexOptions = (ctx: SyncContext) => ({

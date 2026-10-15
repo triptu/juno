@@ -75,6 +75,7 @@ import {
 import { chatCopy, type JunoPage } from '@juno/agent-contract'
 import { afterPaint, measure } from '@juno/state/perf'
 import { toggleSidebar } from './layout'
+import { togglePrivacy } from './privacy'
 
 /** Longest an open waits for the first message window before it shows the tab anyway, with the list loading. It always waits for the header. */
 const READY_WAIT_MS = 150
@@ -438,6 +439,8 @@ export function runMenuCommand(command: MenuCommand): void {
       return stepTabHistory(1)
     case 'sidebar.toggle':
       return toggleSidebar()
+    case 'privacy.toggle':
+      return togglePrivacy()
     case 'juno.toggle':
       // `juno/actions.ts` handles it.
       return

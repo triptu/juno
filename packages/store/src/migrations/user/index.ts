@@ -10,6 +10,7 @@ import agentAttempts from './202610151200_agent_attempts'
 import postOutbox from './202610151500_post_outbox'
 import home from './202610151600_home'
 import sidebarViews from './202610151730_sidebar_views'
+import automatedView from './202610152300_automated_view'
 
 /**
  * Migrations for `user.db`, keyed `<timestamp>_<name>`. Add a file per change
@@ -27,4 +28,5 @@ export const userMigrations: Record<string, Effect.Effect<void, unknown, SqlClie
   '202610151500_post_outbox': postOutbox,
   '202610151600_home': home,
   '202610151730_sidebar_views': sidebarViews,
+  '202610152300_automated_view': automatedView,
 }

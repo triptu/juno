@@ -19,7 +19,8 @@
  * - Cards (WP15) sit at the time Juno proposed them, under their run; a
  *   Task card at the time its job started. A card is unread like a bubble.
  *
- * Notes come with the pin events; they are not listed yet.
+ * A removed owner message is a "Removed" note in its place. Other notes
+ * come with the pin events; they are not listed yet.
  */
 import type {
   BubbleId,
@@ -63,7 +64,7 @@ export interface ChatSource {
   /** Juno items at or before this time are read. */
   readonly readAt: number
   /** Why accepted messages wait, if they do. */
-  readonly waiting: 'network' | 'resume' | undefined
+  readonly waiting: 'network' | 'resume' | 'review' | undefined
   /** Local midnight of the day `at` falls in. */
   readonly dayOf: (at: number) => number
 }
@@ -125,6 +126,7 @@ function caches() {
     started: memo<Map<string, number>>(),
     bubbles: keyedMemo<ReturnType<typeof archivedBubbles>>(),
     entries: keyedMemo<Entry>(),
+    removed: memo<{ readonly ops: ReadonlySet<string>; readonly bubbles: ReadonlySet<string> }>(),
     grouped: keyedMemo<ChatItem>(),
   }
 }
@@ -249,7 +251,12 @@ function buildItems(source: ChatSource, cache: Caches, revision: ReturnType<Retu
     return { original, text: new Map(ops.map((op) => [op.opId, op.text])), handles: new Map(ops.map((op) => [`n${op.seq}`, op.opId])) }
   })
   const ownerOp = (opId: string) => maps.original.get(opId) ?? opId
-  const opText = maps.text
+  // A removed message shows as "Removed", and a quote of it reads Removed (WP16). A removal clears inbox and archive text in one transaction.
+  const removed = cache.removed(revision('inbox', 'messages'), () => ({
+    ops: new Set((store.db.prepare('SELECT op_id AS opId FROM removed_ops').all() as Array<{ opId: string }>).map((row) => row.opId)),
+    bubbles: new Set((store.db.prepare('SELECT bubble_id AS id FROM removed_bubbles').all() as Array<{ id: string }>).map((row) => row.id)),
+  }))
+  const opText = { get: (opId: string) => (removed.ops.has(opId) ? undefined : maps.text.get(opId)) }
   const handles = maps.handles
   const times = cache.times(revision('chat_bubbles'), () => new Map(
     store.db.prepare('SELECT id, at FROM chat_bubbles').all().map((row) => [String(row.id), Number(row.at)]),
@@ -283,7 +290,7 @@ function buildItems(source: ChatSource, cache: Caches, revision: ReturnType<Retu
           : { target: { _tag: 'owner', opId: opId as OpId }, preview: firstLine(text) }
       }
       case 'bubble': {
-        const text = bubbleTexts.get(target.id)
+        const text = removed.bubbles.has(target.id) ? undefined : bubbleTexts.get(target.id)
         return text === undefined ? { target, preview: '', removed: true } : { target, preview: firstLine(text) }
       }
       case 'card':
@@ -381,8 +388,12 @@ function buildItems(source: ChatSource, cache: Caches, revision: ReturnType<Retu
 
   for (const op of ops) {
     if (op.kind === 'retry') continue
-    const data = parse<{ replyTo?: ReplyTarget; context?: SendContext }>(op.data)
     const id = archiveIds.get(op.opId)
+    if (removed.ops.has(op.opId)) {
+      entries.push({ by: 'line', at: op.at, item: { _tag: 'note', id: id ?? (`removed:${op.opId}` as ChatMessageId), kind: 'removed' } })
+      continue
+    }
+    const data = parse<{ replyTo?: ReplyTarget; context?: SendContext }>(op.data)
     const quote = data?.replyTo === undefined ? undefined : quoteOf(data.replyTo)
     const reactions = reactionsOf('owner', op.opId)
     const waiting = op.state === 'accepted' ? source.waiting : undefined

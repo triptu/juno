@@ -20,10 +20,12 @@
  * trusted side: they are written to `agent.sqlite` at FULL before they
  * answer, without an inbox op.
  *
- * The header banner, by precedence: `updateNeeded` (the records are newer
- * than this build), `aiOff` (AI assist is off in Juno), `paused`, `offline`
- * (the host is not live), else `none`. `otherDevice` and `recovery` come
- * with ownership (WP21).
+ * The header banner, by precedence: `otherDevice` (this Mac released Juno:
+ * every command is refused as read-only), `updateNeeded` (the records are
+ * newer than this build), `recovery` (restored from backup: sends wait for
+ * the review, and open cards may already have happened), `aiOff` (AI
+ * assist is off in Juno), `paused`, `offline` (the host is not live), else
+ * `none`.
  */
 import { Effect, Layer, Queue, Stream } from 'effect'
 import { RpcServer } from 'effect/rpc'
@@ -66,6 +68,13 @@ export interface ChatHost {
 
 const unavailable = (message: string) => Effect.fail(new AgentCommandError({ reason: 'unavailable', message }))
 const notYet = (what: string) => () => unavailable(`${what} is not available yet.`)
+const readOnly = () => Effect.fail(new AgentCommandError({ reason: 'readOnly', message: chatCopy.banner.otherDevice.line }))
+/** Backup folder work; a folder Juno cannot read or write is the command's error, not a defect. */
+const folderWork = <A>(f: () => Promise<A>) =>
+  Effect.tryPromise({ try: f, catch: () => new AgentCommandError({ reason: 'unavailable', message: 'Juno could not use the backup folder. Check that it is available and try again.' }) })
+/** An ownership command's refusal as the RPC's error. */
+const ownershipAnswer = (opId: OpId, result: { readonly _tag: string } | { readonly _tag: 'refused'; readonly reason: 'unavailable' | 'readOnly' | 'invalid' | 'stale'; readonly message: string }) =>
+  'reason' in result ? Effect.fail(new AgentCommandError({ reason: result.reason, message: result.message })) : Effect.succeed({ opId })
 /** How often the Memory page looks for a newly published view: compaction moves it between runs. */
 const MEMORY_RECHECK = '2 seconds'
 
@@ -135,10 +144,12 @@ function chatState(host: ChatHost) {
     host.presenceChanges.pipe(Stream.drop(1), Stream.map(() => undefined)),
   )
 
-  const items = (cards = turns?.actions.views() ?? []): ReadonlyArray<ChatItem> => {
+  const views = () => (turns === undefined ? [] : turns.actions.views().map(turns.ownership.restored))
+  const items = (cards = views()): ReadonlyArray<ChatItem> => {
     if (turns === undefined) return []
     const presence = host.presence()
     const mode = turns.mode()
+    const recovery = turns.ownership.owner().state === 'recovery'
     return cache!.items({
       store: turns.store,
       live: turns.run(),
@@ -151,13 +162,16 @@ function chatState(host: ChatHost) {
       jobs: turns.jobs.list(),
       cards,
       readAt: readAt(turns.store),
-      waiting: mode === 'paused' ? 'resume' : presence?.online === false ? 'network' : undefined,
+      waiting: recovery ? 'review' : mode === 'paused' ? 'resume' : presence?.online === false ? 'network' : undefined,
       dayOf,
     })
   }
 
   const banner = (): Banner => {
+    const owner = turns?.ownership.owner()
+    if (owner?.state === 'released') return { _tag: 'otherDevice', deviceName: owner.deviceName ?? '' }
     if (host.turns?._tag === 'updateNeeded') return { _tag: 'updateNeeded' }
+    if (owner?.state === 'recovery') return { _tag: 'recovery', pending: turns!.ownership.pending() }
     const presence = host.presence()
     if (presence?.aiEnabled === false || turns?.mode() === 'off') return { _tag: 'aiOff' }
     if (turns?.mode() === 'paused') return { _tag: 'paused' }
@@ -166,7 +180,7 @@ function chatState(host: ChatHost) {
   }
 
   const page = (window: ChatWindow) => {
-    const cards = turns?.actions.views() ?? []
+    const cards = views()
     const all = items(cards)
     const slice = windowOf(all, window)
     const current = banner()
@@ -175,7 +189,7 @@ function chatState(host: ChatHost) {
       banner: current,
       moreAbove: slice.moreAbove,
       moreBelow: slice.moreBelow,
-      composerEnabled: turns !== undefined && current._tag !== 'aiOff' && current._tag !== 'updateNeeded',
+      composerEnabled: turns !== undefined && current._tag !== 'aiOff' && current._tag !== 'updateNeeded' && current._tag !== 'otherDevice',
     }
     const ids = slice.items.flatMap((item) => (item._tag === 'owner' && item.id !== undefined ? [Number(item.id)] : []))
     const versions = turns === undefined || ids.length === 0
@@ -224,6 +238,7 @@ const engine = (state: ReturnType<typeof chatState>, host: ChatHost) =>
   Effect.suspend(() => {
     if (host.turns?._tag === 'updateNeeded') return unavailable('Juno needs to update its records.')
     if (state.turns === undefined) return unavailable('Juno is not running.')
+    if (state.turns.ownership.owner().state === 'released') return readOnly()
     if (host.presence()?.aiEnabled === false) return unavailable('AI assist is off.')
     return Effect.succeed(state.turns)
   })
@@ -299,7 +314,23 @@ export function agentHandlers(host: ChatHost) {
               .run(at)
             state.changed()
           }),
-        'agent.chat.remove': notYet('Removing a message'),
+        // The owner's Remove is a local sheet: it works paused, offline and with AI assist off (SPEC 13.8).
+        'agent.chat.remove': ({ opId, messageId, alsoRemoveReply }) =>
+          Effect.suspend(() => {
+            const turns = state.turns
+            if (host.turns?._tag === 'updateNeeded') return unavailable('Juno needs to update its records.')
+            if (turns === undefined) return unavailable('Juno is not running.')
+            return changed(
+              Effect.tryPromise({
+                try: () => turns.redaction.remove({ opId, messageIds: [Number(messageId)], alsoRemoveReply }),
+                catch: () => new AgentCommandError({ reason: 'notDelivered', message: 'Juno could not remove the message.' }),
+              }).pipe(
+                Effect.flatMap((result) =>
+                  result._tag === 'notFound' ? Effect.fail(new AgentCommandError({ reason: 'stale', message: 'That message is not in the chat.' })) : Effect.succeed({ opId }),
+                ),
+              ),
+            )
+          }),
 
         'agent.cards.prepare': ({ identity, choice }) =>
           Effect.flatMap(engine(state, host), (turns) => {
@@ -342,7 +373,7 @@ export function agentHandlers(host: ChatHost) {
         'agent.cards.undo': ({ opId, identity }) => Effect.flatMap(engine(state, host), (turns) =>
           Effect.promise(() => turns.actions.undo(identity)).pipe(Effect.flatMap((done) => done ? Effect.succeed({ opId }) : refused({ _tag: 'refused', reason: 'stale' })))),
         'agent.jobs.stop': ({ opId, jobId }) =>
-          Effect.flatMap(engine(state, host), (turns) => changed(Effect.promise(() => turns.jobs.stop(jobId)).pipe(Effect.as({ opId })))),
+          Effect.flatMap(engine(state, host), (turns) => changed(Effect.promise(() => turns.jobs.stop(jobId, opId)).pipe(Effect.as({ opId })))),
 
         'agent.scheduled.page': () => host.schedule === undefined ? Stream.make({ page: { schedules: [] }, revisions: [] }) : live(Stream.merge(state.changes, Stream.tick(MEMORY_RECHECK)), host.schedule.scheduler.page),
         'agent.schedule.watchReply': (input) => {
@@ -386,9 +417,16 @@ export function agentHandlers(host: ChatHost) {
         'agent.connections.page': () => host.connections ? connectionHandlers(host.connections).page() : Stream.make({ connections: [] }),
         'agent.connections.action': (input) => host.connections ? connectionHandlers(host.connections).action(input) : notYet('Connections')(),
         'agent.connections.tier': (input) => host.connections ? connectionHandlers(host.connections).tier(input) : notYet('Connections')(),
-        'agent.connections.address': notYet('Connections'),
-        'agent.review.page': () => Stream.make(reviewPage()),
-        'agent.review.activate': notYet('Review'),
+        'agent.connections.address': (input) => host.connections ? connectionHandlers(host.connections).address(input) : notYet('Connections')(),
+        'agent.connections.add': (input) => host.connections ? connectionHandlers(host.connections).add(input) : notYet('Connections')(),
+        'agent.review.page': () => (state.turns === undefined ? Stream.make(reviewPage()) : live(state.changes, () => state.turns!.ownership.review())),
+        // Activate is the owner's, on the trusted side: AI assist off does not block it.
+        'agent.review.activate': ({ opId, backupAt }) =>
+          changed(
+            Effect.suspend(() =>
+              state.turns === undefined ? unavailable('Juno is not running.') : ownershipAnswer(opId, state.turns.ownership.activate({ backupAt })),
+            ),
+          ),
         'agent.settings.page': () => {
           const settings = host.settings
           if (settings === undefined) return Stream.die(new Error('Settings › Juno needs the engine'))
@@ -411,7 +449,23 @@ export function agentHandlers(host: ChatHost) {
             }),
           ),
         'agent.settings.credentials': notYet('Signing in to Codex'),
-        'agent.settings.ownership': notYet('Moving Juno'),
+        'agent.settings.ownership': ({ opId, action }) =>
+          changed(
+            Effect.suspend(() => {
+              const turns = state.turns
+              if (turns === undefined) return unavailable('Juno is not running.')
+              switch (action._tag) {
+                case 'exportPhrase':
+                  return turns.backup === undefined
+                    ? unavailable('Backup is not available on this Mac.')
+                    : folderWork(() => turns.backup!.exportPhrase()).pipe(Effect.as({ opId }))
+                case 'move':
+                  return folderWork(() => turns.ownership.move()).pipe(Effect.flatMap((result) => ownershipAnswer(opId, result)))
+                case 'restore':
+                  return folderWork(() => turns.ownership.restore(action.backupPath)).pipe(Effect.flatMap((result) => ownershipAnswer(opId, result)))
+              }
+            }),
+          ),
       })
     }),
   )

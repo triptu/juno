@@ -74,7 +74,14 @@ export interface CardText {
   readonly quote: (cardId: string) => string | undefined
 }
 
+/** Whether a removal took the item (WP16): its quote is the placeholder. */
+const removedTarget = (store: Store, target: ReplyTarget) =>
+  target._tag === 'owner' ? store.db.prepare('SELECT 1 FROM removed_ops WHERE op_id = ?').get(target.opId) !== undefined
+  : target._tag === 'bubble' ? store.db.prepare('SELECT 1 FROM removed_bubbles WHERE bubble_id = ?').get(target.id) !== undefined
+  : false
+
 function quote(store: Store, target: ReplyTarget, bubble: (id: string) => string | undefined, cards?: CardText): string {
+  if (removedTarget(store, target)) return target._tag === 'owner' ? '<quote from="owner" removed="true"></quote>' : '<quote from="juno" removed="true"></quote>'
   switch (target._tag) {
     case 'bubble': {
       const text = bubble(target.id)

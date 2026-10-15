@@ -1,9 +1,10 @@
 import * as stylex from '@stylexjs/stylex'
 import { Broom } from '@phosphor-icons/react/dist/icons/Broom'
 import { CaretRight } from '@phosphor-icons/react/dist/icons/CaretRight'
+import { Robot } from '@phosphor-icons/react/dist/icons/Robot'
 import { Sparkle } from '@phosphor-icons/react/dist/icons/Sparkle'
 import { useId, type MouseEvent } from 'react'
-import type { HomeItem } from '@juno/contract'
+import type { AutomatedPlace, HomeItem } from '@juno/contract'
 import { accent, colors, layout, motion, radii, sizes, spacing, text, weights } from '@juno/tokens/tokens.stylex'
 import { activateHandlers, Button, Icon, Kbd, Text, TopicArt, type ActivateEvent } from '@juno/ui'
 import { HomeScene, type HomeSceneName } from './HomeScene'
@@ -28,6 +29,10 @@ export interface HomeProps {
   readonly onOpen: (topicId: string, event: ActivateEvent) => void
   readonly onMarkDone: (itemId: string) => void
   readonly onResolveAll: (itemId: string) => void
+  /** Automated's Move (`automated`) and Keep in All (`kept`). */
+  readonly onSort: (itemId: string, to: Exclude<AutomatedPlace, 'ask'>) => void
+  /** Right-click on Automated's row: the conversation's menu, with Ignore. */
+  readonly onItemMenu: (itemId: string) => void
   /** Opens the Juno chat. */
   readonly onAsk: () => void
   /** A running job's state line, shown in the field in place of "Ask Juno…" (SPEC 13.4). */
@@ -42,7 +47,7 @@ export interface HomeProps {
  * Every size is fixed before data arrives, so nothing moves when a title
  * line is rewritten: a title is one ellipsised line in a 52px row.
  */
-export function Home({ scene, title, line, items, done, now, caughtUp, enter = true, onOpen, onMarkDone, onResolveAll, onAsk, askLine, onBrowseAll }: HomeProps) {
+export function Home({ scene, title, line, items, done, now, caughtUp, enter = true, onOpen, onMarkDone, onResolveAll, onSort, onItemMenu, onAsk, askLine, onBrowseAll }: HomeProps) {
   const headingId = useId()
   let step = 0
   const part = () => (enter ? [styles.rise, styles.delay(step++)] : [])
@@ -63,7 +68,17 @@ export function Home({ scene, title, line, items, done, now, caughtUp, enter = t
         {items.length === 0 ? null : (
           <ul aria-labelledby={headingId} {...stylex.props(styles.items, ...part())}>
             {items.map((item) => (
-              <HomeRow key={item.id} item={item} done={done?.has(item.id) === true} now={now} onOpen={onOpen} onMarkDone={onMarkDone} onResolveAll={onResolveAll} />
+              <HomeRow
+                key={item.id}
+                item={item}
+                done={done?.has(item.id) === true}
+                now={now}
+                onOpen={onOpen}
+                onMarkDone={onMarkDone}
+                onResolveAll={onResolveAll}
+                onSort={onSort}
+                onItemMenu={onItemMenu}
+              />
             ))}
           </ul>
         )}
@@ -91,6 +106,8 @@ interface HomeRowProps {
   readonly onOpen: (topicId: string, event: ActivateEvent) => void
   readonly onMarkDone: (itemId: string) => void
   readonly onResolveAll: (itemId: string) => void
+  readonly onSort: HomeProps['onSort']
+  readonly onItemMenu: HomeProps['onItemMenu']
 }
 
 /** The meta line: plain data, the same with and without AI. */
@@ -98,25 +115,35 @@ function metaOf(item: HomeItem, now: number): string {
   if (item.kind === 'tidyUp') return item.topics.map((topic) => topic.title).join(', ')
   const topic = item.topics[0]
   const last = item.kind === 'moved' ? `${item.newCount ?? 0} new` : item.at === undefined ? undefined : relativeTime(item.at, now)
-  return [topic?.title, topic?.place, last].filter((part) => part !== undefined && part !== '').join(' · ')
+  // Automated: why it is asked, instead of the conversation's name the title already says.
+  const first = item.kind === 'automated' ? (item.fromApps === undefined ? undefined : `${item.fromApps.apps} of the last ${item.fromApps.of} from apps`) : topic?.title
+  const place = item.kind === 'automated' ? undefined : topic?.place
+  return [first, place, last].filter((part) => part !== undefined && part !== '').join(' · ')
 }
 
 const preventNavigation = (event: MouseEvent) => event.preventDefault()
 
-/** One row: a link to the topic (Tidy up opens nothing), and Mark done or Resolve all in a slot that is always there. */
-function HomeRow({ item, done, now, onOpen, onMarkDone, onResolveAll }: HomeRowProps) {
+/**
+ * One row: a link to the topic (Tidy up opens nothing), and its buttons in
+ * a slot that is always there: Mark done, Resolve all, or Automated's Keep
+ * in All and Move. Automated's row opens the conversation's menu on
+ * right-click, where Ignore is.
+ */
+function HomeRow({ item, done, now, onOpen, onMarkDone, onResolveAll, onSort, onItemMenu }: HomeRowProps) {
   const topic = item.topics[0]
+  const tileIcon = item.kind === 'tidyUp' ? Broom : item.kind === 'automated' ? Robot : undefined
   const body = (
     <>
-      {item.kind === 'tidyUp' || topic === undefined ? (
-        <span {...stylex.props(styles.tidyTile)}>
-          <Icon icon={Broom} size={18} />
+      {tileIcon !== undefined || topic === undefined ? (
+        <span {...stylex.props(styles.iconTile)}>
+          <Icon icon={tileIcon ?? Broom} size={18} />
         </span>
       ) : (
         <TopicArt topicId={topic.id} recipe={topic.art} size={40} />
       )}
       <span {...stylex.props(styles.text)}>
-        <span data-home-title="" {...stylex.props(styles.itemTitle)}>
+        {/* An assistant title can quote the messages; the plain one only says what kind of thing waits. */}
+        <span data-home-title="" data-sensitive={item.aiTitle === undefined ? undefined : ''} {...stylex.props(styles.itemTitle)}>
           {item.aiTitle ?? item.title}
         </span>
         <span data-home-meta="" {...stylex.props(styles.itemMeta)}>
@@ -125,11 +152,27 @@ function HomeRow({ item, done, now, onOpen, onMarkDone, onResolveAll }: HomeRowP
       </span>
     </>
   )
-  const button =
-    item.kind === 'followUp' ? { label: 'Mark done', run: () => onMarkDone(item.id) } : item.kind === 'tidyUp' ? { label: 'Resolve all', run: () => onResolveAll(item.id) } : undefined
+  const buttons =
+    item.kind === 'followUp'
+      ? [{ label: 'Mark done', run: () => onMarkDone(item.id) }]
+      : item.kind === 'tidyUp'
+        ? [{ label: 'Resolve all', run: () => onResolveAll(item.id) }]
+        : item.kind === 'automated'
+          ? [
+              { label: 'Keep in All', run: () => onSort(item.id, 'kept') },
+              { label: 'Move', run: () => onSort(item.id, 'automated') },
+            ]
+          : []
   const handlers = topic === undefined ? undefined : activateHandlers<HTMLAnchorElement>((event) => onOpen(topic.id, event))
+  const menu =
+    item.kind === 'automated'
+      ? (event: MouseEvent) => {
+          event.preventDefault()
+          onItemMenu(item.id)
+        }
+      : undefined
   return (
-    <li data-home-item={item.kind} {...stylex.props(styles.row)}>
+    <li data-home-item={item.kind} onContextMenu={menu} {...stylex.props(styles.row)}>
       {item.kind === 'tidyUp' || handlers === undefined ? (
         <div {...stylex.props(styles.link)}>{body}</div>
       ) : (
@@ -148,13 +191,15 @@ function HomeRow({ item, done, now, onOpen, onMarkDone, onResolveAll }: HomeRowP
           </span>
         </a>
       )}
-      {button === undefined ? null : (
+      {buttons.length === 0 ? null : (
         <span {...stylex.props(styles.slot)}>
-          {done ? null : (
-            <Button variant="ghost" size="sm" tone="muted" onClick={button.run}>
-              {button.label}
-            </Button>
-          )}
+          {done
+            ? null
+            : buttons.map((button) => (
+                <Button key={button.label} variant="ghost" size="sm" tone="muted" onClick={button.run}>
+                  {button.label}
+                </Button>
+              ))}
         </span>
       )}
     </li>
@@ -256,7 +301,7 @@ const styles = stylex.create({
     outlineOffset: `calc(-1 * ${sizes['--focus-ring-width']})`,
     outlineColor: accent['--focus-ring'],
   },
-  tidyTile: {
+  iconTile: {
     display: 'inline-flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -304,6 +349,7 @@ const styles = stylex.create({
   slot: {
     display: 'inline-flex',
     justifyContent: 'flex-end',
+    gap: spacing['--space-0-5'],
     flexShrink: 0,
     opacity: 'var(--home-action-opacity)',
   },

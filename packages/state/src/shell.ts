@@ -79,6 +79,17 @@ export const resolvedThemeAtom = Atom.make((get): ResolvedTheme => {
 /** Comfortable or Compact. Starts as the saved one. */
 export const densityAtom = Atom.make<Density>(savedDensity())
 
+/**
+ * Privacy mode (SPEC section 5): message text is blurred, for screen sharing.
+ * Starts as saved (`?privacy=on`), so a relaunch mid-share never shows text.
+ */
+export const privacyAtom = Atom.make<boolean>(launchParam('privacy') === 'on')
+
+/** Tells main, which remembers it for the next launch and hides notification text while it is on. */
+export function persistPrivacy(privacy: boolean): void {
+  window.juno.launch.setPrivacy(privacy).catch(() => {})
+}
+
 /** Tells main, so the next launch's first render already uses this density. */
 export function persistDensity(density: Density): void {
   window.juno.launch.setDensity(density).catch(() => {})

@@ -6,7 +6,9 @@
 // every-active-thread rule.
 import type { Page } from '@playwright/test'
 import { expectNoLayoutShift, waitForLayoutReady } from '@juno/testing/layout-shift'
+import type { FakeSlack } from '@juno/fake-slack'
 import { expect, test } from './fixtures'
+import type { Juno } from './driver/juno'
 
 // Every test signs in and waits for the sync before it looks at rows.
 test.describe.configure({ timeout: 60_000 })
@@ -30,6 +32,16 @@ async function resolveColorVar(win: Page, name: string): Promise<string> {
   }, name)
 }
 
+/**
+ * A new message in #incidents' Main, so a row sits above the Postgres
+ * thread: after the first sync it is the newest in All, since Automated
+ * keeps the busier bot channels out.
+ */
+async function postAbovePostgres(juno: Juno, fake: FakeSlack): Promise<void> {
+  fake.injectMessage({ channel: 'C0INCIDENTS', user: 'U0JONAS', text: 'Paging drill at 3pm.' })
+  await expect.poll(() => juno.sidebar.titles('Recent').then((titles) => titles[0])).toBe('#incidents')
+}
+
 function brightness(rgb: string): number {
   const [r = 0, g = 0, b = 0] = rgb.match(/\d+/g)?.map(Number) ?? []
   return (r + g + b) / 3
@@ -50,8 +62,8 @@ test('after sign-in the sidebar lists followed threads and Main, newest first, w
   await postgres.expectRead()
   await postgres.expectPreview('Dev: Booked 2–4pm. Will post results here.')
   await postgres.expectChannel('eng')
-  // The participant stack names everyone in it (the fake's display names are first names).
-  await expect(postgres.root.getByRole('img', { name: /Dev.*Leo/ })).toBeVisible()
+  // The participant stack names everyone but you (the fake's display names are first names).
+  await expect(postgres.root.getByRole('img', { name: 'Dev, Leo', exact: true })).toBeVisible()
 
   // A thread with an unread mention: semibold title, the @ tag, then the count.
   const rina = sidebar.row(RINA)
@@ -65,25 +77,42 @@ test('after sign-in the sidebar lists followed threads and Main, newest first, w
   await roadmap.expectMention()
   await roadmap.expectPreview(/^Maya: Draft is up\. Cross-posting to #leadership once @Tushar has looked\./)
 
-  // A channel's Main: the channel label as the title and the Main tag.
+  // Newest activity first. #alerts-prod, newer than all of them, is a bot channel: Automated keeps it out of All.
+  const titles = await sidebar.titles('Recent')
+  const at = (prefix: string) => titles.findIndex((title) => title.startsWith(prefix))
+  expect(at(ALERTS_MAIN)).toBe(-1)
+  expect(at(POSTGRES)).toBeGreaterThanOrEqual(0)
+  expect(at(POSTGRES)).toBeLessThan(at(RINA))
+  expect(at(RINA)).toBeLessThan(at(ROADMAP))
+  expect(at(ROADMAP)).toBeLessThan(at(OFFSITE))
+
+  // A channel's Main, in the Automated view: the channel label as the title and the Main tag.
+  await sidebar.selectView('Automated')
   const alerts = sidebar.row(ALERTS_MAIN)
   await alerts.expectTag('Main')
   // Nine unread, exactly: the boot's history page reaches back to the read pointer.
   await expect(alerts.root.getByTitle(/^9 unread$/)).toHaveText('9')
   await alerts.expectPreview('Grafana: [RESOLVED] queue depth > 5k on billing-consumer')
-
-  // Newest activity first.
-  const titles = await sidebar.titles('Recent')
-  const at = (prefix: string) => titles.findIndex((title) => title.startsWith(prefix))
-  expect(at(ALERTS_MAIN)).toBeGreaterThanOrEqual(0)
-  expect(at(ALERTS_MAIN)).toBeLessThan(at(POSTGRES))
-  expect(at(POSTGRES)).toBeLessThan(at(RINA))
-  expect(at(RINA)).toBeLessThan(at(ROADMAP))
-  expect(at(ROADMAP)).toBeLessThan(at(OFFSITE))
+  await sidebar.filter('All')
 
   // Both groups have unread topics, so both dots show.
   await sidebar.expectFilterDot('Channels', true)
   await sidebar.expectFilterDot('DMs', true)
+})
+
+test('rows in a DM or a group DM show no participant stack', async ({ juno }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  const { sidebar, win } = juno
+  await sidebar.filter('DMs')
+
+  // A thread in the DM with Maya, the DM's Main and the group DM's Main: the
+  // title or the channel already names the people, so the meta line does not.
+  const rows = [sidebar.row(OFFSITE).root, win.locator('[data-topic-id="m:D0MAYA"]'), win.locator('[data-topic-id="m:G0MAYALEO"]')]
+  for (const row of rows) {
+    await expect(row).toBeVisible()
+    await expect(row.getByRole('img')).toHaveCount(0)
+  }
 })
 
 test('the quick filters narrow the list and the Unread toggle hides read rows', async ({ juno }) => {
@@ -154,8 +183,7 @@ test('a reply from another client updates its row in place and moves it to the t
   const { sidebar } = juno
   const postgres = sidebar.row(POSTGRES)
   await postgres.expectVisible()
-  const before = await sidebar.titles('Recent')
-  expect(before[0]).toBe(ALERTS_MAIN)
+  await postAbovePostgres(juno, fake)
 
   const root = fake.messages('C0ENG').find((message) => message.text?.startsWith('Draft plan is in the doc.'))!
   fake.injectMessage({ channel: 'C0ENG', threadTs: root.ts, user: 'U0LEO', text: 'Results look good. Cutover is a go.' })
@@ -280,10 +308,11 @@ test('pressing a row selects it, and the keyboard moves the selection', async ({
   await expect(third.root).toHaveAttribute('tabindex', '-1')
 })
 
-test('after arrowing to a row, Tab reaches that row\'s Resolve', async ({ juno, win }) => {
+test('after arrowing to a row, Tab reaches that row\'s Resolve', async ({ juno, win, fake }) => {
   await juno.signIn()
   await juno.waitForSync()
   const { sidebar } = juno
+  await postAbovePostgres(juno, fake)
   const titles = await sidebar.titles('Recent')
   const first = sidebar.row(titles[0]!)
   const postgres = sidebar.row(POSTGRES)
@@ -335,6 +364,7 @@ test('a title cut off by the row shows in full on hover, and one that fits shows
   await rina.titleText.hover()
   await expect(rina.titleText).toHaveAttribute('title', (await rina.titleText.textContent()) ?? '')
 
+  await sidebar.selectView('Automated')
   const alerts = sidebar.row(ALERTS_MAIN)
   await alerts.titleText.hover()
   await expect(alerts.titleText).not.toHaveAttribute('title')

@@ -11,6 +11,7 @@ const pid = (id: string) => id as RemembersPage['pins'][number]['id']
 const mid = (id: string) => id as NonNullable<RemembersPage['pins'][number]['source']>['messageId']
 const rid = (id: string) => id as ActivityPage['runs'][number]['id']
 const cid = (id: string) => id as ConnectionsPage['connections'][number]['id']
+const hash = (digit: string) => digit.repeat(64) as NonNullable<ConnectionsPage['connections'][number]['tools'][number]['schemaHash']>
 const jid = (id: string) => id as NonNullable<JunoSettingsPage['removalPending']>['jobId']
 
 export { NOW }
@@ -99,51 +100,50 @@ export const activity: ActivityPage = {
 export const connections: ConnectionsPage = {
   connections: [
     {
-      id: cid('slack'),
-      label: 'Slack',
+      id: cid('notion'),
+      label: 'Notion',
       state: 'ready',
+      address: 'https://mcp.notion.com/mcp',
       tools: [
-        { name: 'read_topic', tier: 0, hint: 'Reads the messages of one topic', allowlisted: true },
-        { name: 'send_message', tier: 3, hint: 'Posts a message to a channel or thread', allowlisted: true },
-        { name: 'resolve_topic', tier: 3, allowlisted: true },
+        { name: 'notion-search', tier: 0, schemaHash: hash('1'), hint: 'Search pages and databases in the workspace', allowlisted: true },
+        { name: 'notion-fetch', tier: 0, schemaHash: hash('2'), hint: 'Fetch a page by its id or URL', allowlisted: true },
+        { name: 'notion-update-page', tier: 3, schemaHash: hash('3'), hint: 'Change the content of a page', allowlisted: false },
       ],
       enabled: true,
     },
+    { id: cid('littlebird'), label: 'Littlebird', state: 'off', address: 'https://mcp.littlebird.ai/mcp', tools: [], enabled: false },
     {
       id: cid('t3'),
       label: 'T3 Code',
       state: 'needsSignIn',
       detail: 'The sign-in expired. Sessions keep running.',
-      address: 'http://127.0.0.1:4320',
-      t3: { url: 'http://127.0.0.1:4320', allowNetwork: false },
+      address: 'http://localhost:3773/mcp',
+      t3: { url: 'http://localhost:3773/mcp', allowNetwork: false },
       tools: [
-        { name: 'thread_read', tier: 0, hint: 'Reads a thread', allowlisted: true },
-        { name: 'thread_launch', tier: 3, hint: 'Starts a session in a worktree', allowlisted: true },
-        { name: 'thread_send', tier: 3, hint: 'Tells a running session something', allowlisted: true, changed: true },
+        { name: 't3_thread_read', tier: 0, schemaHash: hash('4'), hint: 'Reads a thread', allowlisted: true },
+        { name: 't3_thread_send', tier: 3, schemaHash: hash('5'), hint: 'Tells a running session something', allowlisted: false, changed: true },
       ],
       enabled: true,
     },
     {
-      id: cid('notion'),
-      label: 'Notion',
+      id: cid('server-docs'),
+      label: 'Team docs',
       state: 'degraded',
-      detail: 'Search is slow today. Reads and writes work.',
-      tools: [
-        { name: 'search', tier: 0, hint: 'Finds pages by title', allowlisted: true },
-        { name: 'update_page', tier: 3, hint: 'Changes a page', allowlisted: false },
-      ],
+      detail: 'The connection is unavailable. Juno will reconnect.',
+      address: 'https://docs.example.com/mcp',
+      tools: [{ name: 'search_docs', tier: 3, schemaHash: hash('6'), allowlisted: false }],
       enabled: true,
+      removable: true,
     },
-    { id: cid('littlebird'), label: 'Littlebird', state: 'off', tools: [], enabled: false },
   ],
 }
 
 const models = (selected: string, provider: 'openrouter' | 'codex' = 'openrouter') => [
-  { family: 'Claude Sonnet', resolved: 'Claude Sonnet 5.5', provider, price: '$3 / $15 per million tokens', selected: selected === 'Claude Sonnet' },
-  { family: 'Claude Opus', resolved: 'Claude Opus 5.5', provider, price: '$15 / $75 per million tokens', selected: selected === 'Claude Opus' },
-  { family: 'Muse', resolved: 'Muse 2', provider, price: '$2 / $8 per million tokens', selected: selected === 'Muse' },
+  { family: 'Claude Sonnet', resolved: 'Claude Sonnet 5.5', provider, price: '$3 in, $15 out per million tokens', selected: selected === 'Claude Sonnet' },
+  { family: 'Claude Opus', resolved: 'Claude Opus 5.5', provider, price: '$15 in, $75 out per million tokens', selected: selected === 'Claude Opus' },
+  { family: 'Muse', resolved: 'Muse 2', provider, price: '$2 in, $8 out per million tokens', selected: selected === 'Muse' },
   { family: 'GPT Sol', provider, selected: false },
-  { family: 'Grok', resolved: 'Grok 5', provider, price: '$3 / $15 per million tokens', selected: selected === 'Grok' },
+  { family: 'Grok', resolved: 'Grok 5', provider, price: '$3 in, $15 out per million tokens', selected: selected === 'Grok' },
 ]
 
 export const settings: JunoSettingsPage = {

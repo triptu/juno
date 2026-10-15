@@ -2,6 +2,7 @@ import * as stylex from '@stylexjs/stylex'
 import { spacing } from '@juno/tokens/tokens.stylex'
 import { defineFixtures, fixture, scene, type FixtureFrame } from '@juno/ui'
 import { homeItems, rewritten } from './fixtures/home'
+import { PrivacyOn } from './fixtures/privacy'
 import { NOW } from './fixtures/topics'
 import { Home, type HomeProps } from './Home'
 import { HomeScene, type HomeSceneName } from './HomeScene'
@@ -19,6 +20,8 @@ const base: HomeProps = {
   onOpen: noop,
   onMarkDone: noop,
   onResolveAll: noop,
+  onSort: noop,
+  onItemMenu: noop,
   onAsk: noop,
   onBrowseAll: noop,
 }
@@ -36,8 +39,16 @@ export default defineFixtures(
       three: state(),
       // The same rows with the assistant's title lines: every box stays where it was (gallery behaviour test).
       'ai-titles': state({ items: [rewritten.waiting, rewritten.resume, rewritten.moved] }),
+      // Privacy mode: an assistant title can quote the messages, so it blurs; the plain title and the meta line stay.
+      'ai-titles-privacy': scene<HomeProps>(() => (
+        <PrivacyOn>
+          <Home {...base} items={[rewritten.waiting, homeItems.resume, rewritten.moved]} />
+        </PrivacyOn>
+      )),
       'follow-up-and-tidy-up': state({ scene: 'evening', title: 'Evening, Tushar.', items: [homeItems.waiting, homeItems.followUp, homeItems.tidyUp] }),
       'buttons-used': state({ scene: 'evening', title: 'Evening, Tushar.', items: [homeItems.waiting, homeItems.followUp, homeItems.tidyUp], done: new Set([homeItems.followUp.id, homeItems.tidyUp.id]) }),
+      // The Automated question, after the ones it ranks below.
+      automated: state({ scene: 'midday', title: 'Hello, Tushar.', items: [homeItems.waiting, homeItems.resume, homeItems.automated] }),
       one: state({ scene: 'friday', title: 'Happy Friday, Tushar.', line: 'One thing wants you.', items: [homeItems.resume] }),
       // A running job's state line in place of "Ask Juno…" (SPEC 13.4); a long one takes an ellipsis.
       'ask-job-line': state({ askLine: 'T3 Code · tests running, 2 of 5' }),
@@ -53,6 +64,7 @@ export default defineFixtures(
       'hover-row': state({}, { width: 720, height: 560, padded: false, hover: '[data-home-item="waiting"] a' }),
       'focus-row': state({}, { width: 720, height: 560, padded: false, focus: '[data-home-item="resume"] a' }),
       'hover-follow-up': state({ items: [homeItems.waiting, homeItems.followUp, homeItems.tidyUp] }, { width: 720, height: 560, padded: false, hover: '[data-home-item="followUp"] a' }),
+      'hover-automated': state({ items: [homeItems.waiting, homeItems.resume, homeItems.automated] }, { width: 720, height: 560, padded: false, hover: '[data-home-item="automated"] a' }),
       'hover-ask': state({}, { width: 720, height: 560, padded: false, hover: 'button[aria-label="Ask Juno"]' }),
       entrance: state({ enter: true }),
     },

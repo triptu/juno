@@ -76,6 +76,8 @@ export interface RouterOptions {
   readonly onRunEnded?: () => void
   /** Card outcomes the model has not read, and a reply's quote of a card (WP15). */
   readonly cards?: CardText
+  /** Whether this Mac may start or steer a run besides the run mode: it owns Juno (WP21). Default yes. */
+  readonly admits?: () => boolean
   readonly onReport?: (error: unknown) => void
 }
 
@@ -168,9 +170,10 @@ export function createRouter(options: RouterOptions) {
     signalled = true
     wake?.()
   }
+  const admitting = () => mode(store) === 'on' && (options.admits?.() ?? true)
   const idleWaiters: Array<() => void> = []
   const rotateWaiters: Array<() => void> = []
-  const isIdle = () => current === undefined && (mode(store) !== 'on' || nextAccepted(store) === undefined)
+  const isIdle = () => current === undefined && (!admitting() || nextAccepted(store) === undefined)
   const notifyIdle = () => {
     if (isIdle()) for (const resolve of idleWaiters.splice(0)) resolve()
   }
@@ -373,7 +376,7 @@ export function createRouter(options: RouterOptions) {
   /** Delivers held input into the live run at a boundary, oldest first. */
   const flush = async () => {
     const run = current
-    if (run === undefined || mode(store) !== 'on') return
+    if (run === undefined || !admitting()) return
     const work = (async () => {
       for (;;) {
         const op = nextAccepted(store)
@@ -482,7 +485,7 @@ export function createRouter(options: RouterOptions) {
         for (const resolve of waiting) resolve()
         continue
       }
-      const op = mode(store) === 'on' ? nextAccepted(store) : undefined
+      const op = admitting() ? nextAccepted(store) : undefined
       if (op === undefined) {
         notifyIdle()
         if (!signalled) await new Promise<void>((resolve) => (wake = resolve))

@@ -23,8 +23,8 @@
  *   (`internal_error` and friends), a rate limit or no session: tried again
  *   with backoff, also after a restart.
  *
- * Nothing is sent while no sync runs. The end of each boot or catch-up
- * makes every row due (architecture 5.8).
+ * Nothing is sent while no sync runs or its socket is down. The end of
+ * each boot or catch-up makes every row due (architecture 5.8).
  */
 import { Clock, Context, Effect, Layer, Queue, Stream } from 'effect'
 import { millisToTs, type Ts } from '@juno/domain'
@@ -161,7 +161,8 @@ export class ActionWorker extends Context.Service<
         Effect.gen(function* () {
           const local = inStore(open)
           const fetcher = yield* link.fetcher
-          if (fetcher === undefined) return undefined
+          // No sync, no session, or offline: rows wait for the connection.
+          if (fetcher === undefined || !(yield* link.online)) return undefined
           const now = yield* Clock.currentTimeMillis
           const held = new Set<string>()
           const waiting = new Set<number>()
@@ -194,6 +195,7 @@ export class ActionWorker extends Context.Service<
 
       yield* Effect.forkScoped(Stream.runForEach(workspace.changes, () => wake))
       yield* Effect.forkScoped(Stream.runForEach(link.caughtUps, () => flush))
+      yield* Effect.forkScoped(Stream.runForEach(Stream.filter(link.onlineChanges, (online) => online), () => wake))
       yield* Effect.forkScoped(loop)
       return ActionWorker.of({ wake })
     }),

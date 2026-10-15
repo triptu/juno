@@ -1,7 +1,8 @@
 /** Behaviour through the AiProvider interface with the fake, the way the assistant will use it. */
-import { Effect } from 'effect'
+import { Effect, Fiber } from 'effect'
+import { TestClock } from 'effect/testing'
 import { describe, expect, it } from 'vitest'
-import { AiProvider, FakeAiProvider, tasks, validateOutput, type Decision } from '../src/index'
+import { AiProvider, FakeAiProvider, makeFakeAiProvider, tasks, validateOutput, type Decision } from '../src/index'
 import { NOW, T, channels, msg, people, postgres, stagingBill } from './fixtures'
 
 const run = <A>(f: (p: typeof AiProvider.Service) => Effect.Effect<A>) =>
@@ -54,6 +55,28 @@ describe('FakeAiProvider decisions', () => {
     expect(search.command).toBeNull()
   })
 
+})
+
+describe('FakeAiProvider when the model is slow', () => {
+  const input = { draft: 'Jonas scaled the perf cluster down, the staging bill should drop', channel: '#eng', topics: [stagingBill, postgres] }
+  const after = <A>(millis: number, answer: Effect.Effect<A>) =>
+    Effect.runPromise(
+      Effect.gen(function* () {
+        const fiber = yield* Effect.forkChild(answer)
+        yield* TestClock.adjust(millis)
+        return yield* Fiber.join(fiber)
+      }).pipe(Effect.provide(TestClock.layer())),
+    )
+
+  it('answers once the delay has passed when that is inside the timeout', async () => {
+    const decision = await after(1_000, makeFakeAiProvider({ delayMillis: 1_000 }).decide(tasks.routeCheck, input))
+    expect(decided(decision).replyTo).toBe(stagingBill.id)
+  })
+
+  it('gives up at the task timeout with no decision', async () => {
+    const decision = await after(tasks.routeCheck.timeoutMillis, makeFakeAiProvider({ delayMillis: 10_000 }).decide(tasks.routeCheck, input))
+    expect(decision._tag === 'NoDecision' && decision.reason).toBe('timeout')
+  })
 })
 
 describe('FakeAiProvider generation', () => {

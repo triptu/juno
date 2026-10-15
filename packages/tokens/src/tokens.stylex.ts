@@ -423,26 +423,23 @@ export const tracking = stylex.defineVars({
  * enough that the 0.01em tracking Inter needed is gone.
  */
 export const text = stylex.defineVars({
-  // Pinned / Recent / People / Channels headings. Rendered uppercase.
+  // Pinned / Recent / People / Channels headings, in sentence case (SPEC 17).
   '--text-section-label-family': fonts['--font-sans'],
   '--text-section-label-size': '11px',
   '--text-section-label-weight': '500',
   '--text-section-label-leading': 'normal',
-  '--text-section-label-tracking': '0.06em',
 
-  // Table column headers. Rendered uppercase.
+  // Table column headers, in sentence case.
   '--text-table-header-family': fonts['--font-sans'],
   '--text-table-header-size': '11.5px',
   '--text-table-header-weight': '500',
   '--text-table-header-leading': 'normal',
-  '--text-table-header-tracking': '0.06em',
 
-  // "3 NEW" divider label. Rendered uppercase.
+  // The "3 new" divider label and the Juno chat's day label, in sentence case.
   '--text-divider-family': fonts['--font-sans'],
   '--text-divider-size': '11.5px',
   '--text-divider-weight': '600',
   '--text-divider-leading': 'normal',
-  '--text-divider-tracking': '0.06em',
 
   // Tags and count badges: Main, Reopened, unread count, @, hints.
   '--text-tag-family': fonts['--font-sans'],
@@ -701,6 +698,10 @@ export const layout = stylex.defineVars({
   // plus a 20px gap.
   '--toolbar-height': '36px',
   '--toolbar-reserve': '243px',
+  // How far a message row may paint outside its box: the toolbar's height
+  // and its shadow, for the toolbar raised above a narrow row. A length, not
+  // a calc(): Chromium ignores calc() in overflow-clip-margin.
+  '--toolbar-clip-margin': '44px',
   // Image thumbnails in a message: never wider or taller than this, scaled
   // by their own aspect ratio. File cards share the width.
   '--thumb-max-width': '360px',
@@ -717,7 +718,6 @@ export const layout = stylex.defineVars({
   '--page-width-narrow': '680px',
   '--page-width': '720px',
   '--page-width-settings': '760px',
-  '--page-width-wide': '880px',
   // The label column of Preferences' rows (Theme, Accent, Density, Hold to peek), so the controls share one edge.
   '--settings-label-width': '104px',
   '--palette-width': '560px',
@@ -822,6 +822,8 @@ export const sizes = stylex.defineVars({
   '--tab-unread-dot': '6px',
   '--focus-ring-width': '2px',
   '--focus-ring-offset': '2px',
+  // Privacy mode: how far message text is blurred (tokens/global.css, [data-sensitive]).
+  '--privacy-blur': '6px',
 })
 
 /* -------------------------------------------------------------------------- */

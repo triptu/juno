@@ -12,7 +12,7 @@ export interface GroupLabelProps {
 }
 
 /**
- * The 11px uppercase label over a proactive group ("Scheduled · Daily
+ * The 11px label over a proactive group ("Scheduled · Daily
  * catch-up", "T3 Code · 2 jobs") with "Why this?" and one quiet action by
  * origin: "Pause schedule" or "Mute updates". Neither stops a job.
  */
@@ -50,7 +50,6 @@ const styles = stylex.create({
     marginBottom: `calc(${spacing['--space-1']} - ${spacing['--space-2']})`,
     paddingInlineStart: `calc(${spacing['--space-7']} + ${spacing['--space-2-5']})`,
     color: colors['--foreground-muted'],
-    textTransform: 'uppercase',
     userSelect: 'none',
   },
   text: {

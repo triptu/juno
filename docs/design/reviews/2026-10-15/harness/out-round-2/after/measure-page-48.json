@@ -1,0 +1,82 @@
+[
+  {
+    "tag": "h1",
+    "label": "What Juno remembers",
+    "rect": {
+      "x": 559,
+      "y": 84,
+      "w": 435,
+      "h": 39.1
+    },
+    "padding": "0px",
+    "gap": "normal",
+    "radius": "0px",
+    "font": "34px/39.1px 400 \"Instrument Serif\"",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "0px none rgb(35, 33, 26)",
+    "shadow": "none",
+    "outline": "none 3px rgb(35, 33, 26) offset 0px",
+    "children": []
+  },
+  {
+    "tag": "p",
+    "label": "Lines you asked Juno to keep, in your wo",
+    "rect": {
+      "x": 559,
+      "y": 131.1,
+      "w": 435,
+      "h": 23.2
+    },
+    "padding": "0px",
+    "gap": "normal",
+    "radius": "0px",
+    "font": "14.5px/23.2px 400 \"Figtree Variable\"",
+    "color": "rgb(96, 94, 82)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "0px none rgb(96, 94, 82)",
+    "shadow": "none",
+    "outline": "none 3px rgb(96, 94, 82) offset 0px",
+    "children": []
+  },
+  {
+    "tag": "h2",
+    "label": "Nothing pinned yet",
+    "rect": {
+      "x": 823.7,
+      "y": 318.8,
+      "w": 126.6,
+      "h": 23.2
+    },
+    "padding": "0px",
+    "gap": "normal",
+    "radius": "0px",
+    "font": "14.5px/23.2px 500 \"Figtree Variable\"",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "0px none rgb(35, 33, 26)",
+    "shadow": "none",
+    "outline": "none 3px rgb(35, 33, 26) offset 0px",
+    "children": []
+  },
+  {
+    "tag": "p",
+    "label": "Say \"remember that …\" in the chat, or ch",
+    "rect": {
+      "x": 731.3,
+      "y": 349.9,
+      "w": 311.4,
+      "h": 40.5
+    },
+    "padding": "0px",
+    "gap": "normal",
+    "radius": "0px",
+    "font": "13.5px/20.25px 400 \"Figtree Variable\"",
+    "color": "rgb(112, 110, 102)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "0px none rgb(112, 110, 102)",
+    "shadow": "none",
+    "outline": "none 3px rgb(112, 110, 102) offset 0px",
+    "children": []
+  }
+]

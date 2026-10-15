@@ -1,6 +1,6 @@
 export { command, liveQuery, prefetch, rowAtom, runCommand, type CommandAtom, type ErrorOf, type LiveListAtom, type LiveValueAtom } from './atoms'
 export { configureConnection, connectionStateAtom, makeRegistry, registry, restartEngine, type ConnectionState, type Registry } from './client'
-export { engineStatusAtom, pingCommand } from './engine'
+export { engineStatusAtom, OFFLINE_GRACE_MILLIS, pingCommand, syncNoticeAtom, type SyncNotice } from './engine'
 export { importFromSlackAppCommand, sessionStatusAtom, signedInAtom, signInCommand, signOutCommand, type ReadySession } from './session'
 export { viewPillsAtom, viewSheetAtom, viewsAtom, type ViewPill, type ViewSheetState } from './views'
 export { defaultTopicListFilter, joinTopicWindow, topicCountsAtom, topicListAtom, type TopicListFilter } from './topics'
@@ -111,9 +111,10 @@ export {
   untouched,
   type NewChat,
 } from './newChat'
-export { deleteMessage, discardMessage, draftAtom, editMessage, reactToMessage, retryMessage, saveDraft, sendMessage } from './send'
+export { checkMessage, deleteMessage, discardMessage, draftAtom, editMessage, precheckMessage, reactToMessage, retryMessage, saveDraft, SEND_CHECK_WAIT_MS, sendMessage } from './send'
 export { errorOf } from './result'
 export {
+  aiAssistOnAtom,
   currentNotificationSettings,
   loadNotificationSettings,
   loadWhy,
@@ -139,9 +140,11 @@ export {
   openInSlack,
   persistAccent,
   persistDensity,
+  persistPrivacy,
   persistSidebar,
   persistTheme,
   popupContextMenu,
+  privacyAtom,
   resolvedThemeAtom,
   setViewing,
   sidebarLayoutAtom,

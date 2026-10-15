@@ -36,13 +36,13 @@ test('sidebar views: the pill row with views, a mention dot and the view sheet, 
   await juno.signIn()
   await juno.waitForSync()
   const { sidebar } = juno
-  await sidebar.createView({ name: 'Bots', icon: 'Robot', conversations: ['alerts-prod'], keepOutOfAll: true })
+  // Automated is there already: the first sync put #alerts-prod and #deploys in it.
   await sidebar.createView({ name: 'Design crit', conversations: ['eng'] })
   await sidebar.createView({ name: 'Leadership', conversations: ['hiring'] })
   await sidebar.createView({ name: 'Work', icon: 'Briefcase' })
   await sidebar.filter('All')
   fake.injectMessage({ channel: 'C0ALERTSPROD', user: 'U0LEO', text: '<@U0TUSHAR> can you take the pager tonight?' })
-  await sidebar.expectViewDot('Bots', true)
+  await sidebar.expectViewDot('Automated', true)
   for (const theme of ['light', 'dark'] as const) {
     if (theme === 'dark') await juno.setTheme('Dark')
     await win.mouse.move(900, 400)
@@ -50,7 +50,7 @@ test('sidebar views: the pill row with views, a mention dot and the view sheet, 
     await win.evaluate(() => document.fonts.ready)
     await win.waitForTimeout(300)
     await win.screenshot({ path: resolve(screens, `views-${theme}.png`) })
-    await sidebar.viewMenu('Bots', 'view-edit')
+    await sidebar.viewMenu('Automated', 'view-edit')
     await expect(sidebar.viewSheet).toBeVisible()
     await win.waitForTimeout(300)
     await win.screenshot({ path: resolve(screens, `views-sheet-${theme}.png`) })
@@ -137,8 +137,8 @@ test('sending in a Main: a failed send, a send on its way and a draft, light and
   await topic.expectTitle('Main')
   // The first send is refused; the second waits for Slack's answer, so it stays on its way.
   fake.forceError({ method: 'chat.postMessage', error: 'restricted_action' })
-  await topic.send('Can someone look at the staging bill before Friday?')
-  await expect(topic.failed('Can someone look at the staging bill').row).toBeVisible()
+  await topic.send('Can someone look at the dashboards before Friday?')
+  await expect(topic.failed('Can someone look at the dashboards').row).toBeVisible()
   fake.holdNext({ method: 'chat.postMessage', before: true })
   await topic.send('Moving the cutover to Thursday night.')
   await expect(topic.message('Moving the cutover to Thursday night.')).toHaveAttribute('data-pending', 'sending')
@@ -153,6 +153,41 @@ test('sending in a Main: a failed send, a send on its way and a draft, light and
     await win.screenshot({ path: resolve(screens, `send-${theme.toLowerCase()}.png`) })
   }
   fake.release()
+})
+
+test('the checks on send: the wrong-place bar, the clarity bar and the audience line, light and dark', async ({ juno, win }) => {
+  test.setTimeout(180_000)
+  await juno.signIn()
+  await juno.waitForSync()
+  const { topic } = juno
+  const shot = async (name: string) => {
+    await win.mouse.move(20, 760)
+    await win.evaluate(() => document.fonts.ready)
+    await expect(win.locator('html')).not.toHaveAttribute('data-theme-switching', /.*/)
+    await win.waitForTimeout(300)
+    await win.screenshot({ path: resolve(screens, name) })
+  }
+  // Preferences opens in the active tab, so the theme is set before the topic opens.
+  for (const theme of ['Light', 'Dark'] as const) {
+    await juno.setTheme(theme)
+    await juno.sidebar.row('#eng').open()
+    await topic.expectTitle('Main')
+    await topic.composer.fill('the preview environments reaper should cut the staging bill')
+    // The wrong-place question is asked while typing pauses; the fake model answers at once.
+    await win.waitForTimeout(1000)
+    await topic.composer.press('Enter')
+    await expect(topic.checkBar.bar).toBeVisible()
+    await shot(`send-check-route-${theme.toLowerCase()}.png`)
+    await topic.composer.press('Escape')
+
+    await topic.composer.fill('The offer for the new backend hire goes out Friday, can you recieve the the signed letter')
+    await expect(topic.audienceWarning).toBeVisible()
+    await topic.composer.press('Enter')
+    await expect(topic.checkBar.bar).toBeVisible()
+    await shot(`send-check-clarity-${theme.toLowerCase()}.png`)
+    await topic.composer.press('Escape')
+    await topic.composer.fill('')
+  }
 })
 
 test('All topics, light and dark', async ({ juno, win }) => {

@@ -1,4 +1,5 @@
 import { defineFixtures, scene } from '@juno/ui'
+import { PrivacyOn } from './fixtures/privacy'
 import type { AllTopicsCounts, ChannelRef, TopicRow } from '@juno/contract'
 import { AllTopics, AllTopicsPlaceholderRow, AllTopicsRow, type AllTopicsFilterState, type AllTopicsProps } from './AllTopics'
 import { channels, NOW, rows } from './fixtures/topics'
@@ -78,6 +79,12 @@ export default defineFixtures(
       empty: page({ list: [], query: 'nothing like this', counts: { all: 0, open: 0, resolved: 0, quiet: 0, unsubscribed: 0 } }),
       // Before the first window: the chrome, and no rows yet.
       loading: page({ list: [], ready: false }),
+      // Privacy mode: the previews blur, the titles stay readable.
+      privacy: scene<AllTopicsProps>(() => (
+        <PrivacyOn>
+          <AllTopics {...props()} />
+        </PrivacyOn>
+      ), { width: 1000, height: 640, padded: false }),
       'narrowed-to-a-channel': page({ list: [rows.postgres], filter: { status: 'all', kind: 'channels', scope: channels.eng.id, sort: 'messages' } }),
     },
     Size: {

@@ -231,6 +231,27 @@ describe('send', () => {
     expect(engine.fake.messages('C0ENG').filter((m) => m.client_msg_id === id)).toHaveLength(1)
   })
 
+  it('waits out a lost connection: a send made offline stays queued, then posts once when the socket is back', async () => {
+    const engine = await booted()
+    const rows = watch(engine, MAIN)
+    await rows((list) => list.length > 0, 'the window')
+    engine.main.network.offline = true
+    engine.fake.goOffline()
+    await engine.phase('offline')
+    const id = await send(engine, 'Written on the train', rows)
+    // Nothing leaves while offline, so the row never becomes a lookup.
+    await new Promise((resolve) => setTimeout(resolve, 1_000))
+    expect(apiCalls(engine, 'chat.postMessage')).toHaveLength(0)
+    expect(inStore(engine, id)).toEqual({ stored: 0, pending: 'queued' })
+    engine.main.network.offline = false
+    engine.fake.goOnline()
+    await rows(settled('Written on the train'), 'posted after the reconnect')
+    await quiet(engine)
+    expect(apiCalls(engine, 'chat.postMessage')).toHaveLength(1)
+    expect(inStore(engine, id)).toEqual({ stored: 1, pending: undefined })
+    expect(inSlack(engine, id)).toBe(1)
+  })
+
   it('posts in a thread', async () => {
     const engine = await booted()
     const root = engine.fake.messages('C0ENG').find((m) => (m.reply_count ?? 0) > 0)!
