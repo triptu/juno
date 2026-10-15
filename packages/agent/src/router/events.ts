@@ -48,8 +48,8 @@ export interface RunState {
   readonly runId: string
   readonly opId: string
   readonly origin: Origin
-  /** The bubbles so far. */
-  readonly bubbles: ReadonlyArray<{ readonly id: string; readonly text: string; readonly replyTo?: string }>
+  /** The bubbles so far, each with its sources resolved. */
+  readonly bubbles: ReadonlyArray<{ readonly id: string; readonly text: string; readonly body: ReadonlyArray<BubbleSpan>; readonly replyTo?: string }>
   /** The status bubble below them: `{}` shows dots; `{ text }` shows a tool's line. */
   readonly status: { readonly text?: string }
 }

@@ -5,12 +5,32 @@ import { accent, colors, density, layout, motion, opacity, radii, sizes, spacing
 import { WarningCircle } from '@phosphor-icons/react/dist/icons/WarningCircle'
 import { Avatar, Icon, Text, type ActivateEvent, type HueName } from '@juno/ui'
 import { Files } from './FileCard'
+import type { MenuAnchor } from './header/HeaderControls'
+import { HoverToolbar } from './HoverToolbar'
 import { hueFor, initials } from './look'
 import { MessageBody } from './MessageBody'
 import { Reactions } from './Reactions'
 import { TextButton } from './juno-chat/TextButton'
 import { ThreadLink } from './ThreadLink'
 import { fullTime } from './time'
+
+/**
+ * What the hover toolbar and the delete confirm do, for every row of a list.
+ * Created once by the container and taking the message, so a row stays
+ * memoized (performance 5.1).
+ */
+export interface MessageActions {
+  readonly onReact: (message: MessageView, name: string) => void
+  /** Opens the emoji picker at `at`. */
+  readonly onMoreReactions: (message: MessageView, at: MenuAnchor) => void
+  readonly onQuote: (message: MessageView) => void
+  /** Main only: opens the message's thread. */
+  readonly onReply?: (message: MessageView) => void
+  /** The message menu at `at`. */
+  readonly onMore: (message: MessageView, at: MenuAnchor) => void
+  readonly onConfirmDelete: (message: MessageView) => void
+  readonly onCancelDelete: () => void
+}
 
 export interface MessageProps {
   /** The row as the engine shaped it. Identity-stable while its `rev` holds. */
@@ -37,8 +57,12 @@ export interface MessageProps {
   /** Roving tabindex: the one row that Tab reaches. */
   readonly tabbable?: boolean
   readonly hueOf: (id: string) => HueName
-  /** The hover toolbar for this row. The row reserves its place; nothing moves when it shows. */
-  readonly toolbar?: ReactNode
+  /** The hover toolbar's actions. With them the row has a toolbar and reserves its place, so nothing moves when it shows. */
+  readonly actions?: MessageActions
+  /** The toolbar asks to confirm a delete and stays shown. */
+  readonly confirmingDelete?: boolean
+  /** The inline edit field, in place of the body while the message is edited. */
+  readonly editor?: ReactNode
   readonly onOpenThread?: (id: string, event: ActivateEvent) => void
   readonly onChannel?: (id: string) => void
   readonly onLink?: (url: string) => void
@@ -83,7 +107,9 @@ export const Message = memo(function Message({
   eager = false,
   tabbable = false,
   hueOf,
-  toolbar,
+  actions,
+  confirmingDelete = false,
+  editor,
   onOpenThread,
   onChannel,
   onLink,
@@ -100,6 +126,20 @@ export const Message = memo(function Message({
   }
   const toggle = onToggleReaction === undefined ? undefined : (reaction: string) => onToggleReaction(message.ts, reaction)
   const { pending, clientMsgId } = message
+  // A failed send has Retry and Delete draft instead; a deleted or unloaded message has nothing to act on.
+  const toolbar =
+    actions === undefined || message.kind !== 'message' || pending === 'failed' || editor !== undefined ? undefined : (
+      <HoverToolbar
+        main={main}
+        tabIndex={tabbable ? 0 : -1}
+        onReact={(reaction) => actions.onReact(message, reaction)}
+        onMoreReactions={(at) => actions.onMoreReactions(message, at)}
+        onQuote={() => actions.onQuote(message)}
+        {...(main && actions.onReply !== undefined ? { onReply: () => actions.onReply?.(message) } : {})}
+        onMore={(at) => actions.onMore(message, at)}
+        {...(confirmingDelete ? { confirmDelete: { onConfirm: () => actions.onConfirmDelete(message), onCancel: actions.onCancelDelete } } : {})}
+      />
+    )
 
   return (
     <div
@@ -108,7 +148,14 @@ export const Message = memo(function Message({
       data-message-row={message.ts}
       data-pending={pending}
       onFocus={focus}
-      {...stylex.props(styles.row, eager && styles.rowEager, header && !flush && styles.rowGroupStart, message.mentionsMe && styles.rowMention)}
+      data-editing={editor === undefined ? undefined : ''}
+      {...stylex.props(
+        styles.row,
+        eager && styles.rowEager,
+        header && !flush && styles.rowGroupStart,
+        message.mentionsMe && styles.rowMention,
+        (confirmingDelete || editor !== undefined) && styles.rowHeld,
+      )}
     >
       <span data-sender={header ? '' : undefined} {...stylex.props(styles.gutter)}>
         {header ? (
@@ -121,7 +168,7 @@ export const Message = memo(function Message({
       </span>
       <span {...stylex.props(styles.content, pending === 'sending' && styles.sending)}>
         {header ? (
-          <span {...stylex.props(styles.header, toolbar !== undefined && styles.headerWithToolbar)}>
+          <span {...stylex.props(styles.header, actions !== undefined && styles.headerWithToolbar)}>
             <Text variant="messageName" tone="default" truncate tooltipWhenTruncated dir="auto" as="span" sx={styles.name} data-sender="">
               {name}
             </Text>
@@ -135,14 +182,16 @@ export const Message = memo(function Message({
             ) : null}
           </span>
         ) : null}
-        {message.kind === 'message' ? (
+        {editor !== undefined ? (
+          editor
+        ) : message.kind === 'message' ? (
           <MessageBody body={message.body} now={now} hueOf={hueOf} onChannel={onChannel} onLink={onLink} tabbable={tabbable} />
         ) : (
           <Text variant="body" tone="muted" as="p" sx={styles.placeholder}>
             {message.kind === 'deleted' ? 'This message was deleted.' : 'Loading message'}
           </Text>
         )}
-        {message.edited ? (
+        {message.edited && editor === undefined ? (
           <Text variant="tag" tone="muted" as="span" sx={styles.edited}>
             edited
           </Text>
@@ -214,6 +263,11 @@ const styles = stylex.create({
   rowEager: {
     contentVisibility: 'visible',
   },
+  // Being edited, or asking to confirm a delete: the row keeps its hover look and its toolbar until that ends.
+  rowHeld: {
+    backgroundColor: colors['--surface-hover'],
+    '--row-action-opacity': '1',
+  },
   rowGroupStart: {
     marginTop: density['--density-message-group-gap'],
   },
@@ -260,8 +314,8 @@ const styles = stylex.create({
     userSelect: 'none',
   },
   // The toolbar's footprint (inventory 6.5). A continuation row has no
-  // header, so its first line is not protected; M6 decides the toolbar's
-  // final place.
+  // header, so the toolbar shows over the end of its first line, as Slack's
+  // does; the row's paint containment keeps it inside the row.
   headerWithToolbar: {
     paddingInlineEnd: layout['--toolbar-reserve'],
     minHeight: `calc(${layout['--toolbar-height']} - ${spacing['--space-0-5']})`,

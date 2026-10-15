@@ -17,6 +17,7 @@ export { composeOutgoing } from './outgoing'
 export type { MentionTargets, OutgoingMessage } from './outgoing'
 export {
   customEmojiLookup,
+  emojiCatalog,
   PICKER_EMOJI,
   QUICK_REACTIONS,
   emojiUnicode,
@@ -24,4 +25,5 @@ export {
   reactionDisplay,
   splitEmojiName,
   unicodeFromHex,
+  type EmojiCategory,
 } from './emoji'

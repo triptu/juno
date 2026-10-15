@@ -10,6 +10,15 @@
  *   same transaction.
  * - `messages.retry`: Retry on a failed row. It is queued again.
  * - `messages.discard`: Delete draft on a failed row. It is removed.
+ * - `messages.edit`, `messages.delete`: the user's own message, from the
+ *   hover toolbar's More menu, the message menu or the keyboard. Both write
+ *   locally and answer at once: the list shows the change straight away and
+ *   the outbox sends it. A message Slack may not have yet waits for it
+ *   (`depends_on`). Neither has an undo (ADR 0010).
+ * - `messages.react`: adds or removes the user's reaction, the same way.
+ *
+ * A message Slack refuses to change (too old to edit, say) goes back to
+ * what Slack has.
  *
  * Drafts, kept per topic in `user.db` so they outlive the app:
  * - `drafts.get`: the topic's draft, `''` when it has none (a live value).
@@ -49,10 +58,35 @@ export const messagesRetry = Rpc.make('messages.retry', { payload: { clientMsgId
 /** Delete draft on a failed row. `NotFound` when the row is gone or not failed. */
 export const messagesDiscard = Rpc.make('messages.discard', { payload: { clientMsgId: Schema.String }, success: Schema.Void, error: NotFound })
 
+/**
+ * A message as the list shows it: its channel and `ts`, which is
+ * `pending:<clientMsgId>` for a post Slack does not have yet, and its
+ * `clientMsgId` when it has one, so a pending post is found after it
+ * becomes the stored message.
+ */
+export const MessageRef = Schema.Struct({ channelId: Schema.String, ts: Schema.String, clientMsgId: Schema.optionalKey(Schema.String) })
+export type MessageRef = typeof MessageRef.Type
+
+export const MessageActionError = Schema.Union([NotFound, NotSignedIn, Rejected])
+export type MessageActionError = typeof MessageActionError.Type
+
+/** Edit an own message. `NotFound` when it is gone or not the user's; `Rejected` `no_text` for an empty text. */
+export const messagesEdit = Rpc.make('messages.edit', { payload: { message: MessageRef, text: Schema.String }, success: Schema.Void, error: MessageActionError })
+
+/** Delete an own message. `NotFound` when it is gone or not the user's. */
+export const messagesDelete = Rpc.make('messages.delete', { payload: { message: MessageRef }, success: Schema.Void, error: MessageActionError })
+
+/** Add (`on`) or remove the user's reaction `name` (Slack's name, such as `+1`). `NotFound` when the message is gone. */
+export const messagesReact = Rpc.make('messages.react', {
+  payload: { message: MessageRef, name: Schema.String, on: Schema.Boolean },
+  success: Schema.Void,
+  error: MessageActionError,
+})
+
 /** The draft of one topic, `''` when it has none. */
 export const draftsGet = liveValueRoute('drafts.get', { payload: { topicId: Schema.String }, value: Schema.String })
 
 /** Replaces a topic's draft; an empty or blank text deletes it. */
 export const draftsSet = Rpc.make('drafts.set', { payload: { topicId: Schema.String, text: Schema.String }, success: Schema.Void, error: NotSignedIn })
 
-export const SendRoutes = RpcGroup.make(messagesSend, messagesRetry, messagesDiscard, draftsGet, draftsSet)
+export const SendRoutes = RpcGroup.make(messagesSend, messagesRetry, messagesDiscard, messagesEdit, messagesDelete, messagesReact, draftsGet, draftsSet)

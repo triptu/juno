@@ -39,11 +39,15 @@ import {
   type OpId,
 } from '@juno/agent-contract'
 import { Revision } from '@juno/agent-cards'
+import { watchReplyCommand, type WatchHost } from '../schedule/commands'
+import type { Scheduler } from '../schedule/scheduler'
 import type { Choice } from '../actions/cards'
 import type { Presence } from '../host/reads'
 import type { Turns } from '../router/open'
 import type { PinResult } from '../pins/pins'
 import type { UpdateNeeded } from '../runtime/core'
+import { connectionHandlers } from '../mcp/pages'
+import type { McpManagerApi } from '../mcp/manager'
 import type { JunoSettings } from '../settings/settings'
 import { chatItems, chatSummary, readMarkOf, windowOf, type ChatWindow } from './chat'
 import { activityPage, emptyRemembers, memoryPage, remembersPage, reviewPage } from './pages'
@@ -56,6 +60,8 @@ export interface ChatHost {
   readonly presenceChanges: Stream.Stream<Presence | undefined>
   /** Settings › Juno, when the engine runs on a model picker. */
   readonly settings?: JunoSettings
+  readonly connections?: McpManagerApi
+  readonly schedule?: { readonly scheduler: Scheduler; readonly host: WatchHost }
 }
 
 const unavailable = (message: string) => Effect.fail(new AgentCommandError({ reason: 'unavailable', message }))
@@ -335,9 +341,24 @@ export function agentHandlers(host: ChatHost) {
         'agent.jobs.stop': ({ opId, jobId }) =>
           Effect.flatMap(engine(state, host), (turns) => changed(Effect.promise(() => turns.jobs.stop(jobId)).pipe(Effect.as({ opId })))),
 
-        'agent.scheduled.page': () => Stream.make({ page: { schedules: [] }, revisions: [] }),
-        'agent.scheduled.edit': notYet('Scheduled'),
-        'agent.scheduled.action': notYet('Scheduled'),
+        'agent.scheduled.page': () => host.schedule === undefined ? Stream.make({ page: { schedules: [] }, revisions: [] }) : live(Stream.merge(state.changes, Stream.tick(MEMORY_RECHECK)), host.schedule.scheduler.page),
+        'agent.schedule.watchReply': (input) => {
+          const turns = state.turns
+          return host.schedule === undefined || turns === undefined ? unavailable('Reply watches are not available yet.') : watchReplyCommand({ store: turns.store, scheduler: host.schedule.scheduler, propose: turns.actions.propose }, host.schedule.host, input)
+        },
+        'agent.scheduled.edit': ({ opId, id, revision, what, schedule, deliver }) => Effect.suspend(() => {
+          const scheduler = host.schedule?.scheduler
+          if (scheduler === undefined) return unavailable('Scheduled is not available yet.')
+          const row = scheduler.get(id)
+          const done = scheduler.command(opId, () => row !== undefined && scheduler.edit(id, revision, opId, { ...row.definition, what, schedule, deliver }))
+          return done ? Effect.succeed({ opId }) : Effect.fail(new AgentCommandError({ reason: 'stale', message: 'This schedule changed.' }))
+        }),
+        'agent.scheduled.action': ({ opId, id, revision, action }) => Effect.suspend(() => {
+          if (host.schedule === undefined) return unavailable('Scheduled is not available yet.')
+          const scheduler = host.schedule.scheduler
+          const done = scheduler.command(opId, () => action === 'resume' ? scheduler.resume(id, revision, opId) : scheduler.cancel(id, revision, action === 'pause' ? 'paused' : 'deleted'))
+          return done ? Effect.succeed({ opId }) : Effect.fail(new AgentCommandError({ reason: 'stale', message: 'This schedule changed.' }))
+        }),
         'agent.remembers.page': () => (state.turns === undefined ? Stream.make(emptyRemembers) : live(state.changes, () => remembersPage(state.turns!.store))),
         'agent.remembers.edit': ({ opId, id, revision, text }) =>
           Effect.flatMap(engine(state, host), (turns) => changed(Effect.suspend(() => pinAnswer(opId, turns.pins.edit({ id, version: revision }, text))))),
@@ -359,9 +380,9 @@ export function agentHandlers(host: ChatHost) {
             : live(Stream.merge(state.changes, Stream.tick(MEMORY_RECHECK)), () => memoryPage(state.turns!.store, window)),
         'agent.activity.page': ({ window }) =>
           state.turns === undefined ? Stream.make({ runs: [], moreAbove: false }) : live(state.changes, () => activityPage(state.turns!.store, window)),
-        'agent.connections.page': () => Stream.make({ connections: [] }),
-        'agent.connections.action': notYet('Connections'),
-        'agent.connections.tier': notYet('Connections'),
+        'agent.connections.page': () => host.connections ? connectionHandlers(host.connections).page() : Stream.make({ connections: [] }),
+        'agent.connections.action': (input) => host.connections ? connectionHandlers(host.connections).action(input) : notYet('Connections')(),
+        'agent.connections.tier': (input) => host.connections ? connectionHandlers(host.connections).tier(input) : notYet('Connections')(),
         'agent.connections.address': notYet('Connections'),
         'agent.review.page': () => Stream.make(reviewPage()),
         'agent.review.activate': notYet('Review'),

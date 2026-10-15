@@ -2,7 +2,8 @@ import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import ts from 'typescript'
+// TypeScript 7 has no JS parser API yet; the size report keeps 5.9 for ts.createSourceFile.
+import ts from 'typescript-5'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const fileLimit = 400

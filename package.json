@@ -55,6 +55,7 @@
     "jscpd": "5.4.1",
     "knip": "6.41.0",
     "oxlint": "1.87.0",
-    "typescript": "5.9.3"
+    "typescript": "7.0.2",
+    "typescript-5": "npm:typescript@5.9.3"
   }
 }

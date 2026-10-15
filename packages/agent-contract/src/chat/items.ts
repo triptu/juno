@@ -126,13 +126,17 @@ export const OwnerMessageItem = Schema.TaggedStruct('owner', {
 export type OwnerMessageItem = typeof OwnerMessageItem.Type
 
 /**
- * Juno's text is plain. The only mark-up is a recall
- * citation, which links to the day it quotes and scrolls the chat there
- * ("On 12 Mar you said …").
+ * Juno's text is plain. The mark-up is a recall citation, which links to the
+ * day it quotes and scrolls the chat there ("On 12 Mar you said …"), and a
+ * source (plan v3 §19.1): words Juno took from a Slack message it read in
+ * that reply, which open the topic at that message. `place` is the channel
+ * as the owner sees it ("#eng"); the view adds the message's time for the
+ * tooltip, from `ts`.
  */
 export const JunoInline = Schema.Union([
   Schema.TaggedStruct('text', { text: Schema.String }),
   Schema.TaggedStruct('cite', { text: Schema.String, messageId: ChatMessageId }),
+  Schema.TaggedStruct('source', { text: Schema.String, channelId: Schema.String, ts: Schema.String, place: Schema.String }),
 ])
 export type JunoInline = typeof JunoInline.Type
 

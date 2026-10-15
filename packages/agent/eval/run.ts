@@ -7,18 +7,24 @@
  *   pnpm agent:eval --live --model haiku    another family; repeat --model to run several
  *   pnpm agent:eval --case remember         only these cases; repeatable
  *   pnpm agent:eval --live --judge opus     the judge's family (default opus)
+ *   pnpm agent:eval --live --case x --repeat 3   run the cases 3 times, to tell noise from a change
  *
  * Live runs need `OPENROUTER_API_KEY` in the environment or in the repo's
- * `.env`, cost money, and save their report under `eval/reports/`. A
- * scripted run saves only with `--save`.
+ * `.env` and cost money. A full live run saves its report under
+ * `eval/reports/`; a run of some cases, or a repeated one, saves nothing
+ * there, so it never replaces a full report, and writes its transcripts to
+ * the system temp folder. A scripted run saves only with `--save`.
  */
 import { execFileSync } from 'node:child_process'
+import { mkdtempSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 import { DEFAULT_CHAT_FAMILY, DEFAULT_COMPACTION_FAMILY, type ModelFamily } from '../src/index'
 import { piFamilyModel } from '../src/providers/catalog'
 import { CASES } from './cases'
-import { passed, markdown, save, type RunInfo } from './report'
+import { passed, markdown, save, transcripts, type RunInfo } from './report'
 import { openRouterJudge, scriptedJudge } from './judge'
 import { fakeBackend, openRouterBackend, runSuite } from './suite'
 
@@ -29,8 +35,11 @@ const { values } = parseArgs({
     case: { type: 'string', multiple: true },
     judge: { type: 'string', default: 'opus' },
     save: { type: 'boolean', default: false },
+    repeat: { type: 'string', default: '1' },
   },
 })
+const repeat = Number(values.repeat)
+if (!Number.isInteger(repeat) || repeat < 1) throw new Error(`--repeat takes a whole number of runs, not ${values.repeat}`)
 
 const cases = values.case ? CASES.filter((c) => values.case!.includes(c.id)) : CASES
 if (cases.length === 0) throw new Error(`no case named ${values.case!.join(', ')}; the cases are ${CASES.map((c) => c.id).join(', ')}`)
@@ -70,17 +79,27 @@ async function main(): Promise<void> {
   const apiKey = async () => key
   const judge = family(values.judge)
   const helper = family(DEFAULT_COMPACTION_FAMILY)
+  const full = values.case === undefined && repeat === 1
+  const scratch = full ? undefined : mkdtempSync(join(tmpdir(), 'juno-eval-'))
   for (const name of values.model ?? [DEFAULT_CHAT_FAMILY]) {
     const chat = family(name)
-    console.error(`\n${chat.id}, judged by ${judge.id}`)
-    const started = Date.now()
-    const results = await runSuite(cases, {
-      backend: () => openRouterBackend(chat, helper, apiKey),
-      judge: () => openRouterJudge({ model: judge.id, apiKey }),
-      timeoutMs: 180_000,
-      onCase: progress,
-    })
-    finish({ date, commit, mode: 'live', model: chat.id, judge: judge.id, seconds: (Date.now() - started) / 1000 }, results, true)
+    for (let n = 1; n <= repeat; n++) {
+      console.error(`\n${chat.id}, judged by ${judge.id}${repeat > 1 ? `, run ${n} of ${repeat}` : ''}`)
+      const started = Date.now()
+      const results = await runSuite(cases, {
+        backend: () => openRouterBackend(chat, helper, apiKey),
+        judge: () => openRouterJudge({ model: judge.id, apiKey }),
+        timeoutMs: 180_000,
+        onCase: progress,
+      })
+      const info: RunInfo = { date, commit, mode: 'live', model: chat.id, judge: judge.id, seconds: (Date.now() - started) / 1000 }
+      finish(info, results, full)
+      if (scratch !== undefined) {
+        const file = join(scratch, `${chat.id.replace(/[^\w.-]+/g, '-')}-${n}.transcripts.md`)
+        writeFileSync(file, transcripts(results))
+        console.log(`Transcripts in ${file}`)
+      }
+    }
   }
 }
 
