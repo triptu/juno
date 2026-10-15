@@ -181,7 +181,7 @@ async function main(): Promise<number> {
     const latest = thread.root_msg.latest_reply ?? thread.root_msg.thread_ts
     if (tsSeconds(latest) >= from) threads.push({ kind: 'thread', channel: thread.root_msg.channel, threadTs: thread.root_msg.thread_ts, activity: tsSeconds(latest) })
   }
-  const targets = [...mains, ...threads].sort((a, b) => b.activity - a.activity).slice(0, 10)
+  const targets = [...mains, ...threads].toSorted((a, b) => b.activity - a.activity).slice(0, 10)
   console.log(`probe-live: recheck targets: ${mains.length} Main and ${threads.length} followed threads active in 24 h (first getView page); reading ${targets.length}`)
 
   const historyPages: Array<{ channel: string; messages: Array<Msg>; purpose: string }> = []
@@ -207,7 +207,7 @@ async function main(): Promise<number> {
   const read = new Set(targets.filter((t) => t.kind === 'main').map((t) => t.channel))
   const older = ((counts?.['channels'] as Array<{ id: string; latest?: string }> | undefined) ?? [])
     .filter((entry) => entry.latest !== undefined && !read.has(entry.id))
-    .sort((a, b) => tsSeconds(b.latest!) - tsSeconds(a.latest!))
+    .toSorted((a, b) => tsSeconds(b.latest!) - tsSeconds(a.latest!))
     .slice(0, 5)
   for (const entry of older) {
     const page = await call('conversations.history', { channel: entry.id, limit: 100, ignore_replies: true, no_user_profile: true }, 'older-main')
@@ -370,7 +370,7 @@ function keyCensus(objects: ReadonlyArray<unknown>): Record<string, string> {
       seen.set(name, entry)
     }
   }
-  return Object.fromEntries([...seen].sort(([a], [b]) => a.localeCompare(b)).map(([key, { n, types }]) => [key, `${n}/${objects.length} ${[...types].join('|')}`]))
+  return Object.fromEntries([...seen].toSorted(([a], [b]) => a.localeCompare(b)).map(([key, { n, types }]) => [key, `${n}/${objects.length} ${[...types].join('|')}`]))
 }
 
 function historyCensus(pages: ReadonlyArray<{ messages: Array<Msg>; purpose: string }>) {
@@ -454,7 +454,7 @@ function searchCensus(
     }
     return {
       query: names[index],
-      topKeys: Object.keys(response).sort(),
+      topKeys: Object.keys(response).toSorted(),
       pagination: response['pagination'] === undefined ? undefined : keyCensus([response['pagination']]),
       paginationValues: response['pagination'] === undefined ? undefined : pick(response['pagination'] as Json, ['page', 'page_count', 'per_page', 'total_count', 'first', 'last']),
       responseMetadata: response['response_metadata'] === undefined ? undefined : keyCensus([response['response_metadata']]),
@@ -484,7 +484,6 @@ function markerCensus(messages: ReadonlyArray<Json>): Record<string, number> {
   const kinds: ReadonlyArray<readonly [string, RegExp]> = [
     ['private-use U+E000/U+E001', /[\ue000\ue001]/],
     ['other private-use', /[\ue002-\uf8ff]/],
-    ['control U+0002/U+0003', /[\u0002\u0003]/],
     ['<em> or <b> tag', /<\/?(em|b|mark)>/],
   ]
   const out: Record<string, number> = {}
@@ -507,7 +506,7 @@ function prefsCensus(prefs: Json | undefined, dnd: Json | undefined) {
   )
   return {
     prefsCount: Object.keys(all).length,
-    topKeys: prefs === undefined ? undefined : Object.keys(prefs).sort(),
+    topKeys: prefs === undefined ? undefined : Object.keys(prefs).toSorted(),
     schedule,
     dndKeys: dnd === undefined ? undefined : keyCensus([dnd]),
   }
