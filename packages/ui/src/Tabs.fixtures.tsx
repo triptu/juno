@@ -113,7 +113,8 @@ export default defineFixtures(
         { hover: '[data-tab]:nth-of-type(1) [role="tab"]' },
       ),
       'narrow-hover': scene(() => <ThirtySeven />, { hover: '[data-tab]:nth-of-type(33) [role="tab"]' }),
-      'narrow-focus-tab': scene(() => <ThirtySeven />, { focus: '[data-tab]:nth-of-type(34) [role="tab"]' }),
+      // The strip's one Tab stop is the active tab; arrows move the selection with the focus.
+      'narrow-focus-tab': scene(() => <ThirtySeven />, { focus: '[role="tab"][aria-selected="true"]' }),
     },
   },
   { width: 720, padded: false },
