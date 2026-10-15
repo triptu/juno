@@ -76,10 +76,6 @@ const variants = stylex.create({
       default: colors['--input-border'],
       ':focus': accent['--focus-ring'],
     },
-    boxShadow: {
-      default: 'none',
-      ':focus': `0 0 0 1px ${accent['--focus-ring']}`,
-    },
     borderRadius: radii['--radius-lg'],
     backgroundColor: colors['--background'],
     fontFamily: text['--text-body-family'],

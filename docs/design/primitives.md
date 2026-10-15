@@ -99,7 +99,7 @@ Typography. `variant` maps to the five variables of a type role in tokens: `sect
 
 ## 9. Surface, Divider, LabelledRule
 
-`Surface` `kind`: `card` (surface + `--card-ring`, radius 20, padding 14), `popover` (`--pop-shadow`, radius 13, padding 6), `toolbar` (`--pop-shadow`, radius 16), `group` (card with no padding, clips children), `inset` (`--background` + 1px `--border-default`, radius 8), `field` (the composer frame: surface + 1px `--input-border`, focus colour and 1px ring on `:focus-within`, radius 20, a pill at its single-line height), `toast` (ink on paper, `--shadow-lg`, radius 14), `island` (the page header's islands: `--surface-default`, `--card-ring`, `--radius-pill`, a flex row with a 2px gap, the inset of 3 that is left around a 28px control, height `--header-island-height`; inventory §5). `--card-ring` and `--pop-shadow` are wide soft shadows with no ring. `padding` `none` | `xs` 4 | `sm` 6 | `md` 12 | `lg` 14 and `radius` override the defaults. Floating kinds carry a transparent 1px border so a ring never changes layout.
+`Surface` `kind`: `card` (surface + `--card-ring`, radius 20, padding 14), `popover` (`--pop-shadow`, radius 13, padding 6), `toolbar` (`--pop-shadow`, radius 16), `group` (card with no padding, clips children), `inset` (`--background` + 1px `--border-default`, radius 8), `field` (the composer frame: surface + 1px `--input-border` that turns `--focus-ring` on `:focus-within`, with no extra ring, radius 20, a pill at its single-line height), `toast` (ink on paper, `--shadow-lg`, radius 14), `island` (the page header's islands: `--surface-default`, `--card-ring`, `--radius-pill`, a flex row with a 2px gap, the inset of 3 that is left around a 28px control, height `--header-island-height`; inventory §5). `--card-ring` and `--pop-shadow` are wide soft shadows with no ring. `padding` `none` | `xs` 4 | `sm` 6 | `md` 12 | `lg` 14 and `radius` override the defaults. Floating kinds carry a transparent 1px border so a ring never changes layout.
 
 `Divider`: 1px, `tone` `default` | `subtle`, `vertical`, `inset`. `LabelledRule`: the "3 NEW" divider, `label` + rule in `--hl` / `--hl-rule` (or `muted`); fills its row.
 
@@ -123,7 +123,7 @@ Menus are not a separate primitive: an in-app menu (the account menu) is an `Opt
 
 ## 12. Fields
 
-`TextField`: 1px `--input-border`, surface background, focus shown on the container (`--focus-ring` border and 1px ring). `size` 30, 32, 34, 36, 44 (radius 7 / 7 / 8 / 8 / 10). `leadingIcon` (search), `leading` slot (the "To" label and a ContextPill), `trailing`, `width` (`full` | `search` 260 | `keyword` 160), `text`, `label` (required without a visible label), `invalid` (danger border, `aria-invalid`).
+`TextField`: 1px `--input-border`, surface background, focus shown on the container (the border turns `--focus-ring`; no extra ring, since a field always holding focus, like the Juno panel's composer, read heavy with two). `size` 30, 32, 34, 36, 44 (radius 7 / 7 / 8 / 8 / 10). `leadingIcon` (search), `leading` slot (the "To" label and a ContextPill), `trailing`, `width` (`full` | `search` 260 | `keyword` 160), `text`, `label` (required without a visible label), `invalid` (danger border, `aria-invalid`).
 
 `Textarea`: `variant` `inline` (composer: no border, 22px line height, grows with `field-sizing: content` to `maxHeight` `composer` 194 or `assistant` 160 then scrolls; no layout is read on a keystroke), `card` (send card, `--background`, 2 rows).
 
