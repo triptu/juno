@@ -1,5 +1,7 @@
+import * as stylex from '@stylexjs/stylex'
 import type { ReactNode } from 'react'
 import type { IgnoredChannel } from '@juno/contract'
+import { spacing } from '@juno/tokens/tokens.stylex'
 import { Checkbox, Page, PageHeader, Section, Surface, Text } from '@juno/ui'
 import { AppearanceSettings, type AppearanceSettingsProps } from './AppearanceSettings'
 import { IgnoredChannels } from './IgnoredChannels'
@@ -86,8 +88,10 @@ export function SettingsAbout({ build, updates, diagnostics }: SettingsAboutProp
       <PageHeader title="About" />
       <Section heading="Version">
         <Surface kind="group" padding="md">
-          {build}
-          {updates}
+          <div {...stylex.props(styles.stack)}>
+            {build}
+            {updates}
+          </div>
         </Surface>
       </Section>
       <Section heading="Diagnostics" sub="What the sync engine is doing. Useful when something looks wrong.">
@@ -96,3 +100,12 @@ export function SettingsAbout({ build, updates, diagnostics }: SettingsAboutProp
     </Page>
   )
 }
+
+const styles = stylex.create({
+  stack: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: spacing['--space-3'],
+  },
+})
