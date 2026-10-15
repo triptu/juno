@@ -32,7 +32,7 @@ test('Settings › Juno shows what is built, with the provider in use, and pause
   // Backup and This Mac are their own section.
   const sections = juno.win.getByRole('navigation', { name: 'Settings' })
   await sections.getByRole('button', { name: 'Backup & This Mac' }).click()
-  for (const heading of ['Backup', 'This Mac']) await expect(page.getByRole('heading', { name: heading })).toBeVisible()
+  for (const heading of ['Backup', 'This Mac']) await expect(page.getByRole('heading', { name: heading, exact: true })).toBeVisible()
   await sections.getByRole('button', { name: 'Juno' }).click()
   await expect(page.getByRole('heading', { name: 'Provider' })).toBeVisible()
   // The launch set OpenRouter up: its key is set and it is in use.
