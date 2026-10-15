@@ -3,6 +3,8 @@ import { PreferencesPage, type PreferencesPageProps } from './PreferencesPage'
 
 const noop = () => {}
 const base: PreferencesPageProps = {
+  newTabPage: 'newChat',
+  onNewTabPageChange: noop,
   classifier: true,
   onClassifierChange: noop,
   theme: 'system',
@@ -30,6 +32,7 @@ export default defineFixtures(
   {
     Page: {
       default: fixture(base),
+      'new-tab-home': fixture({ ...base, newTabPage: 'home' }),
       'classifier-off': fixture({ ...base, classifier: false }),
       ignored: fixture({ ...base, ignored }),
       'ignored-loading': fixture({ ...base, ignored: undefined }),

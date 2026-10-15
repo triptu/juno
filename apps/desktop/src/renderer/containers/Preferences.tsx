@@ -1,7 +1,7 @@
 import { prefsGet, prefsSet } from '@juno/contract'
 import { AppInfo } from './AppInfo'
 import { Updates } from './Updates'
-import { liveQuery, runCommand, accentAtom, densityAtom, ignoredChannelsAtom, peekKeyAtom, stopIgnoring, persistAccent, persistDensity, persistTheme, registry, setPeekKey, themeAtom, type Accent, type Density, type PeekKey, type Theme } from '@juno/state'
+import { liveQuery, runCommand, accentAtom, densityAtom, ignoredChannelsAtom, newTabPageAtom, peekKeyAtom, setNewTabPage, stopIgnoring, persistAccent, persistDensity, persistTheme, registry, setPeekKey, themeAtom, type Accent, type Density, type PeekKey, type Theme } from '@juno/state'
 import { useAtom, useAtomValue } from '@juno/state/react'
 import { PreferencesPage as PreferencesPageView } from '@juno/views'
 import { openNotifications } from './navigation'
@@ -12,7 +12,7 @@ function changePeekKey(key: PeekKey): void {
   setPeekKey(registry, key)
 }
 
-/** Preferences (SPEC 14): Appearance, saved to main for the next launch's first frame, the peek key and the ignore list. */
+/** Preferences (SPEC 14): General (what a new tab opens), Appearance, saved to main for the next launch's first frame, the peek key and the ignore list. */
 export function PreferencesPage() {
   const [theme, setTheme] = useAtom(themeAtom)
   const [accent, setAccent] = useAtom(accentAtom)
@@ -25,6 +25,7 @@ export function PreferencesPage() {
     void runCommand(registry, prefsSet, { key: 'aiModels', value: enabled ? value : { ...value, classifier: '' } })
   }
   const peekKey = useAtomValue(peekKeyAtom)
+  const newTabPage = useAtomValue(newTabPageAtom)
   const ignored = useAtomValue(ignoredChannelsAtom, (result) => (result._tag === 'Success' ? result.value : undefined))
   const changeTheme = (next: Theme) => {
     setTheme(next)
@@ -40,6 +41,8 @@ export function PreferencesPage() {
   }
   return (
     <PreferencesPageView
+      newTabPage={newTabPage}
+      onNewTabPageChange={(page) => setNewTabPage(registry, page)}
       classifier={classifier}
       onClassifierChange={changeClassifier}
       about={<><AppInfo /><Updates /></>}

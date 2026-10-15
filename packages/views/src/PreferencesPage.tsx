@@ -4,9 +4,13 @@ import { Button, Checkbox, Page, PageHeader, Section, Surface, Text, type Accent
 import type { IgnoredChannel } from '@juno/contract'
 import { AppearanceSettings } from './AppearanceSettings'
 import { IgnoredChannels } from './IgnoredChannels'
+import { NewTabSetting, type NewTabPageName } from './NewTabSetting'
 import { PeekKeySetting, type PeekKeyName } from './PeekKeySetting'
 
 export interface PreferencesPageProps {
+  /** What a new tab opens. */
+  readonly newTabPage: NewTabPageName
+  readonly onNewTabPageChange: (page: NewTabPageName) => void
   readonly classifier: boolean
   readonly onClassifierChange: (enabled: boolean) => void
   readonly about?: ReactNode
@@ -25,14 +29,19 @@ export interface PreferencesPageProps {
 }
 
 /**
- * Preferences (SPEC 14, inventory 14): the Appearance group, the peek key,
+ * Preferences (SPEC 14, inventory 14): General (what a new tab opens), the Appearance group, the peek key,
  * the ignore list, and the way to the notification settings. Anything Juno can do from the owner's words
  * belongs in the chat, not here.
  */
-export function PreferencesPage({ classifier, onClassifierChange, about, theme, accent, density, onThemeChange, onAccentChange, onDensityChange, peekKey, onPeekKeyChange, ignored, onStopIgnoring, onOpenNotifications }: PreferencesPageProps) {
+export function PreferencesPage({ newTabPage, onNewTabPageChange, classifier, onClassifierChange, about, theme, accent, density, onThemeChange, onAccentChange, onDensityChange, peekKey, onPeekKeyChange, ignored, onStopIgnoring, onOpenNotifications }: PreferencesPageProps) {
   return (
     <Page width="settings">
       <PageHeader title="Preferences" />
+      <Section heading="General">
+        <Surface kind="group" padding="md">
+          <NewTabSetting value={newTabPage} onChange={onNewTabPageChange} />
+        </Surface>
+      </Section>
       <Section heading="Appearance">
         <Surface kind="group" padding="md">
           <AppearanceSettings theme={theme} accent={accent} density={density} onThemeChange={onThemeChange} onAccentChange={onAccentChange} onDensityChange={onDensityChange} />
