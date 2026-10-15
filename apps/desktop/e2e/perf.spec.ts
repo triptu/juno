@@ -414,6 +414,104 @@ test.describe.serial('large workspace', () => {
     }
   })
 
+  test('All topics: open, then scroll the whole list, moving its window', async () => {
+    test.setTimeout(300_000)
+    const running = await launch()
+    try {
+      const juno = new Juno(running.app, running.win)
+      const { win } = running
+      await juno.sidebar.expectRows()
+      await juno.expectEngineLive(120_000)
+      // The page's chunk loads on idle after the first paint, as it does for a person.
+      await win.waitForTimeout(1_000)
+
+      // Open: mouse down on the nav item to the page painted with rows. Each round closes the tab, so every open mounts the page afresh.
+      const nav = juno.allTopics.navItem
+      const box = (await nav.boundingBox())!
+      for (let i = 0; i < 12; i++) {
+        const before = (await juno.measures('juno.all-topics-open')).length
+        await win.mouse.move(box.x + 40, box.y + box.height / 2)
+        await press(win)
+        await expect.poll(async () => (await juno.measures('juno.all-topics-open')).length).toBe(before + 1)
+        await juno.tabs.close('All topics')
+        await expect(juno.allTopics.table).toHaveCount(0)
+      }
+      const opens = (await juno.measures('juno.all-topics-open')).slice(2)
+      const open = stats('All topics open, press to rows painted (juno.all-topics-open)', opens)
+      within('All topics open, p95', open.p95, 50)
+
+      await juno.allTopics.open()
+      const table = juno.allTopics.table
+      const total = Number(await table.getAttribute('aria-rowcount')) - 1
+      console.log(`All topics rows: ${total}`)
+      const tableBox = (await table.boundingBox())!
+      await win.mouse.move(tableBox.x + tableBox.width / 2, tableBox.y + tableBox.height / 2)
+      await win.evaluate(() => {
+        const w = window as unknown as { __loaf: string[] }
+        w.__loaf = []
+        new PerformanceObserver((entries) => {
+          for (const entry of entries.getEntries()) w.__loaf.push(`+${Math.round(entry.startTime)}ms ${entry.duration.toFixed(0)}ms`)
+        }).observe({ type: 'long-animation-frame', buffered: false })
+      })
+      const interval = await refreshInterval(win)
+      const sweep = async (label: string) => {
+        let frames: number[] = []
+        let loaf: string[] = []
+        let placeholders = 0
+        // About 2 000 px/s for 3 s down and back: 115 rows each way, past the 40-row edge where the window moves.
+        const { work } = await traced(win, `scroll-all-topics-${label.replace(' ', '-')}`, async () => {
+          await win.evaluate(() => {
+            const w = window as unknown as { __frames: number[]; __sampling: boolean; __loaf: string[]; __placeholders: number }
+            w.__frames = []
+            w.__loaf = []
+            w.__placeholders = 0
+            w.__sampling = true
+            let last = performance.now()
+            const grid = document.querySelector('[data-all-topics-table]')!
+            const tick = (now: number) => {
+              w.__frames.push(now - last)
+              last = now
+              // Rows on screen still waiting for their window.
+              const view = grid.getBoundingClientRect()
+              for (const row of grid.querySelectorAll('[aria-busy="true"]')) {
+                const rect = row.getBoundingClientRect()
+                if (rect.bottom > view.top && rect.top < view.bottom) w.__placeholders++
+              }
+              if (w.__sampling) requestAnimationFrame(tick)
+            }
+            requestAnimationFrame(tick)
+          })
+          for (let i = 0; i < 30; i++) {
+            await win.mouse.wheel(0, 200)
+            await win.waitForTimeout(100)
+          }
+          for (let i = 0; i < 30; i++) {
+            await win.mouse.wheel(0, -200)
+            await win.waitForTimeout(100)
+          }
+          ;({ frames, loaf, placeholders } = await win.evaluate(() => {
+            const w = window as unknown as { __frames: number[]; __sampling: boolean; __loaf: string[]; __placeholders: number }
+            w.__sampling = false
+            return { frames: w.__frames.slice(1), loaf: w.__loaf, placeholders: w.__placeholders }
+          }))
+        })
+        const sorted = frames.toSorted((a, b) => a - b)
+        const over = frames.filter((f) => f > interval * 1.5).length
+        console.log(`scroll All topics ${label}: ${frames.length} frames, p95 ${(sorted[Math.floor(0.95 * sorted.length)] ?? 0).toFixed(1)} ms, frames over 1.5 intervals ${over}, long animation frames ${loaf.length}, placeholder rows on screen summed over frames ${placeholders}, load ${loadavg()[0]!.toFixed(1)}`)
+        for (const line of loaf) console.log(`  loaf ${line}`)
+        const perFrame = stats(`scroll All topics ${label}, main-thread work per frame`, work)
+        within(`scroll All topics ${label}, main-thread work per frame, p95`, perFrame.p95, 8.3)
+        expect(loaf).toEqual([])
+        expect(over / frames.length).toBeLessThan(0.01)
+      }
+      await sweep('first pass')
+      await win.waitForTimeout(1_000)
+      await sweep('second pass')
+    } finally {
+      await running.close()
+    }
+  })
+
   test('sidebar drag: main-thread work per frame while the edge moves', async () => {
     test.setTimeout(300_000)
     const running = await launch()
