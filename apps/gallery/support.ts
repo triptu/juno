@@ -29,6 +29,8 @@ export function stateUrl(route: Pick<Route, 'component' | 'id'>, theme: Theme = 
 /** Opens the index once and reads every state from the page. */
 export async function readRoutes(page: Page): Promise<ReadonlyArray<Route>> {
   await page.goto('/#/')
+  // The gallery sets the list once its script has run, which a busy machine can delay past the load event.
+  await page.waitForFunction(() => (window as unknown as { __galleryRoutes?: unknown }).__galleryRoutes !== undefined)
   const routes = await page.evaluate(() => (window as unknown as { __galleryRoutes: ReadonlyArray<Route> }).__galleryRoutes)
   expect(routes.length).toBeGreaterThan(0)
   return routes

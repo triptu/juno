@@ -1,6 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
 import type { ElementType, HTMLAttributes, ReactNode, Ref } from 'react'
-import { colors } from '@juno/tokens/tokens.stylex'
+import { colors, layout } from '@juno/tokens/tokens.stylex'
 import type { LayoutStyles } from './internal/sx'
 
 export type ScrollAreaScrollbar = 'always' | 'hover'
@@ -12,6 +12,12 @@ export interface ScrollAreaProps extends Omit<HTMLAttributes<HTMLElement>, 'styl
    * the pointer is over the area. Default `always`.
    */
   readonly scrollbar?: ScrollAreaScrollbar
+  /**
+   * The area runs under a page header's islands (inventory 5): its content
+   * starts `--header-inset` down, keyboard moves and `scrollIntoView` stop
+   * below the band, and the scrollbar track starts below the band. All CSS.
+   */
+  readonly underHeader?: boolean
   /** The scroll element, for an owner that reads or restores its position. */
   readonly ref?: Ref<HTMLElement>
   readonly as?: ElementType
@@ -31,16 +37,27 @@ const HOVER = '@media (hover: hover)'
  * thumb's colour, so showing or hiding it never moves the content. Keyboard
  * and trackpad scrolling are the browser's own.
  */
-export function ScrollArea({ scrollbar = 'always', as, sx, children, ...rest }: ScrollAreaProps) {
+export function ScrollArea({ scrollbar = 'always', underHeader = false, as, sx, children, ...rest }: ScrollAreaProps) {
   const Tag = as ?? 'div'
   return (
-    <Tag data-scroll-area={scrollbar} {...rest} {...stylex.props(styles.area, scrollbar === 'hover' && styles.hoverScrollbar, sx)}>
+    <Tag
+      data-scroll-area={scrollbar}
+      // global.css moves the track below the band for this attribute: a
+      // pseudo-element rule here would lose to its unlayered one.
+      data-under-header={underHeader ? '' : undefined}
+      {...rest}
+      {...stylex.props(styles.area, scrollbar === 'hover' && styles.hoverScrollbar, underHeader && styles.underHeader, sx)}
+    >
       {children}
     </Tag>
   )
 }
 
 const styles = stylex.create({
+  underHeader: {
+    paddingTop: layout['--header-inset'],
+    scrollPaddingTop: layout['--header-band'],
+  },
   area: {
     minHeight: 0,
     overflowY: 'auto',

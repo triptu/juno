@@ -75,6 +75,12 @@ textarea {
   background: transparent;
 }
 
+/* A list under a page header's islands (ScrollArea underHeader): the track
+   starts below the band, so the thumb never goes under an island. */
+[data-under-header]::-webkit-scrollbar-track {
+  margin-top: var(--header-band);
+}
+
 ::-webkit-scrollbar-thumb {
   background-color: var(--scrollbar-thumb, var(--border-strong));
   border: 3px solid transparent;

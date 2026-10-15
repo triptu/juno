@@ -118,11 +118,12 @@ function zoom(window: BaseWindow | undefined, step: number | 'reset'): void {
   fitMinimumSizeToZoom(target)
 }
 
-/** Hands a tab command to the app page of `window`. ⌘W closes any other window. */
+/** Hands a menu command to the app page of `window`. In any other window ⌘W closes it and ⌘Z is the plain undo. */
 function tabCommand(window: BaseWindow | undefined, command: MenuCommand): void {
   if (window === undefined || window.isDestroyed()) return
   if (!mainWindows.has(window) || !(window instanceof BrowserWindow)) {
     if (command === 'tab.close') window.close()
+    if (command === 'edit.undo' && window instanceof BrowserWindow) window.webContents.undo()
     return
   }
   window.webContents.send(Events.menuCommand, command)
@@ -181,6 +182,19 @@ function setAppMenu(sidebarHidden: boolean, rebuild = false): void {
     command('close-tab', 'Close Tab', 'CommandOrControl+W', 'tab.close'),
     { role: 'close', accelerator: 'CommandOrControl+Shift+W' },
   ]
+  // Undo has no role: the renderer undoes typing in a text field that has
+  // text, and otherwise Juno's last action (architecture, shortcuts).
+  const edit: MenuItemConstructorOptions[] = [
+    command('undo', 'Undo', 'CommandOrControl+Z', 'edit.undo'),
+    { role: 'redo' },
+    { type: 'separator' },
+    { role: 'cut' },
+    { role: 'copy' },
+    { role: 'paste' },
+    { role: 'pasteAndMatchStyle' },
+    { role: 'delete' },
+    { role: 'selectAll' },
+  ]
   const go: MenuItemConstructorOptions[] = [
     command('back', 'Back', 'CommandOrControl+[', 'history.back'),
     command('forward', 'Forward', 'CommandOrControl+]', 'history.forward'),
@@ -203,7 +217,7 @@ function setAppMenu(sidebarHidden: boolean, rebuild = false): void {
     Menu.buildFromTemplate([
       ...(process.platform === 'darwin' ? [{ role: 'appMenu' } satisfies MenuItemConstructorOptions] : []),
       { label: 'File', submenu: file },
-      { role: 'editMenu' },
+      { label: 'Edit', submenu: edit },
       { label: 'View', submenu: view },
       { label: 'Go', submenu: go },
       { role: 'window', submenu: windowItems },

@@ -58,7 +58,7 @@ test('Back and Forward move through the topics one tab showed', async ({ juno })
   await tabs.menu('new-tab')
   await tabs.expectCount(2)
   await tabs.expectActive('New chat')
-  await juno.expectNothingOpen()
+  await juno.newChat.expectEmpty()
   await nav.expectCanGo(false, false)
   await sidebar.row(POSTGRES).open()
   await tabs.expectCount(2)
@@ -180,7 +180,8 @@ test('an inactive tab shows the unread dot until its topic is read', async ({ ju
   await tabs.expectUnread(POSTGRES, false)
 })
 
-test('the sidebar resizes by its edge, resets on double-click, and hides', async ({ juno, running, userData, fake, slackApp }) => {
+// @mac: on Linux the width is not restored after the relaunch at the end (macOS quit and menu path); the Mac runs it.
+test('the sidebar resizes by its edge, resets on double-click, and hides', { tag: '@mac' }, async ({ juno, running, userData, fake, slackApp }) => {
   await juno.signIn()
   await juno.waitForSync()
   const { frame, nav, sidebar } = juno

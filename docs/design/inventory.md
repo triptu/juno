@@ -178,7 +178,7 @@ Density also changes the message list (§6.1). The prototype's "airy" level is g
   - Close: 20×20, radius 4, `x` 12 muted, hover bg `--secondary-default`, accessible name "Close tab". Always visible on the active tab and on inactive tabs wider than 140px. [built M4] On a narrower inactive tab the label takes the button's space and the button appears over the label's end on hover or focus (Safari does the same), so nothing moves.
   - **Unread dot**: on an inactive topic tab whose topic has unread messages, a 6px round dot in `--foreground-muted` sits right after the label (before the close button), the same soft grey as unread counts. One style for everything; a mention does not change it. Never on the active tab (opening marks read) and never on pages.
 - **Pinned tabs** sit first, in pin order, as compact icon-only tabs: 40px wide, the same height and radius, the 16px icon centred, no label and no close button; the title is the tooltip. A pinned tab's unread dot sits at the icon's top-right corner with a 1.5px ring in the strip background. Pinned tabs are saved with the other tabs.
-- New chat button after the last tab: 28×28, radius 8, `plus` 15 muted, margin `0 0 4 4`, name "New chat ⌘T"; opens a New chat in a new tab (§8). [built] Until New chat is built, "+", ⌘T and ⌘N open a tab titled "New chat" (`note-pencil`) that shows the empty workspace; a topic opened in it replaces it in its history.
+- New chat button after the last tab: 28×28, radius 8, `plus` 15 muted, margin `0 0 4 4`, name "New chat ⌘T"; opens a New chat in a new tab (§8). [built] "+", ⌘T, ⌘N and the sidebar's New chat button focus an untouched New chat tab (no draft, no destination) instead of opening a second one. A topic opened in a New chat tab replaces the New chat in its history.
 - Behaviour: everything opens in the current tab; ⌘-click or "Open in new tab" adds one. Pages (Home, All topics, Juno, Notifications, Preferences) are singletons: opening again focuses the existing tab. Closing a tab focuses the tab now at the same index (the right neighbour), else the last one. With no tabs the workspace shows the empty state (§17).
 - **History.** Each tab keeps its own back and forward list, like a browser tab. An entry is one thing opened in that tab: a topic or a page. Opening something else in the tab pushes an entry and clears Forward. Scroll positions, peeks, popovers and the Juno panel are not entries; going back to a topic restores where you were in it from its saved scroll snapshot. A New chat that sends replaces its own entry with the topic, so Back never returns to an empty New chat. At most 50 entries per tab, in memory only. Back and Forward open the entry as an ordinary open (it marks read by the usual rule). Inputs: the buttons (§1), ⌘[ and ⌘], the mouse's back and forward buttons (`mouseup` buttons 3 and 4 in the renderer), and the three-finger swipe (`BrowserWindow` `swipe` event on macOS; two-finger swipe is not exposed to Electron apps).
 - **Tab menu** (right-click any tab, native): Pin tab / Unpin tab · separator · Close tab (⌘W) · Close other tabs · Close tabs to the right · Close all tabs · and on topic tabs, separator · Copy Slack link · Open in Slack. [built] Each bulk close is disabled when it would close nothing. Copy Slack link copies the topic's link (`https://<workspace>.slack.com/archives/<channel>/p<root ts>`, the channel alone for Main); Open in Slack opens the channel in the Slack app (`slack://channel?team=&id=`), because Slack has no documented link to a thread. "Close other", "to the right" and "all" leave pinned tabs open, as browsers do; ⌘W or Close tab on a pinned tab closes it. Every close goes onto the reopen stack.
@@ -198,7 +198,7 @@ No bar and no rule. Two islands float over the top of the topic area (below the 
 
 Left island (`flex: 0 1 auto`, `min-width: 0`, padding `3 3 3 5`):
 
-- **Context pill**: `ContextPill size={24}`: `--radius-pill`, padding 0 9, gap 5, 12.5/600, icon 13, the channel name only. The kind is the tint, the icon, the tooltip and the accessible name ("eng, public channel"). Click narrows the sidebar to the channel (§2.4); right-click opens the channel menu (§15.2). Never hidden.
+- **Context pill**: `ContextPill size={24}`: `--radius-pill`, padding 0 8, gap 6, 12.5/600, icon 13, the channel name only, at most 160px with an ellipsis. The kind is the tint, the icon, the tooltip and the accessible name ("eng, public channel"). Click narrows the sidebar to the channel (§2.4); right-click opens the channel menu (§15.2). Never hidden.
 
   | Kind | Icon | Text | Colours |
   | --- | --- | --- | --- |
@@ -207,14 +207,14 @@ Left island (`flex: 0 1 auto`, `min-width: 0`, padding `3 3 3 5`):
   | Direct message | `user` | "Maya Chen" | `--tint-dm` (blue) |
   | Group DM | `users` | "Maya, Leo" | `--tint-dm` |
 
-- **Title button**: 28px, `--radius-pill`, padding 0 8, gap 6: title 14/600 single line ellipsis, `dir="auto"`, then `caret-down` 12 muted. Hover `--surface-hover`; open `--secondary-default`. A menu button (`aria-haspopup="menu"`, `aria-expanded`) inside the page's `h1`. Click, Enter, Space or ↓ opens the topic menu (§15.1, the row's menu) anchored under the island, left-aligned, 6px below. The context-menu key and right-click open it too. Main's title is "Main".
-- **Rename** (from the menu): the title button becomes an input in place: 28px, padding 0 8, 14/600, 1px `--border-strongest`, `--radius-pill`, bg `--surface-default`, preselected. Enter saves, Esc cancels, blur saves. Saving an empty title, or the same text as the AI title, clears the manual title. There is no double-click rename in the header.
+- **Title button**: 28px, `--radius-pill`, padding 0 8, gap 6: title 14/600 single line ellipsis, `dir="auto"`, then `caret-down` 12 muted. At least 72px wide; it shortens before the pill does. Hover `--surface-hover`; open `--secondary-default`. A menu button (`aria-haspopup="menu"`, `aria-expanded`) inside the page's `h1`. Click, Enter, Space or ↓ opens the topic menu (§15.1, the row's menu) anchored under the island, left-aligned, 6px below. The context-menu key and right-click open it too. Main's title is "Main".
+- **Rename** (from the menu): the title button becomes an input in place: 28px, padding 0 8, 14/600, 1px `--border-strongest`, `--radius-pill`, bg `--surface-default`, preselected. [built M5] `RenameField size="header"` sizes to its text (`field-sizing: content`) from the title's 72px floor up to the island's room. Enter saves, Esc cancels, blur saves. Saving an empty title, or the same text as the AI title, clears the manual title. There is no double-click rename in the header.
 
 Right island (`flex: none`, padding 3):
 
-- **Resolve / Reopen**: 28px, `--radius-pill`, padding 0 10, gap 6, 12.5/500 `--foreground-default`, icon 14 subtle (`circle-check` / `rotate-ccw`), hover `--surface-hover`. Undo toast. Not on Main.
+- **Resolve / Reopen**: 28px, `--radius-pill`, padding 0 10, gap 6, 12.5/500 `--foreground-default`, icon 14 subtle (`circle-check` / `rotate-ccw`), hover `--surface-hover`. Undo toast. Not on Main. [built M5] It runs the row check's resolve call, and Reopen runs `topics.reopen`.
 - **Threads** (Main only, in Resolve's place): the same button, `chats-circle` 14, "Threads · 12". Opens the 300px `ActiveThreads` popover, anchored under it, right-aligned (§2 behaviour unchanged: rows are buttons named by the title and described by the counts; Escape closes and puts focus back on Threads).
-- **Juno**: 28 round icon button (`sparkle` 16 duotone), a toggle (`aria-pressed`) for the panel (§12.1). Name "Juno ⌘J". Pressed: `--secondary-default`. Hidden when AI assist is off.
+- **Juno**: 28 round icon button (`sparkle` 16 duotone), a toggle (`aria-pressed`) for the panel (§12.1). Name "Juno ⌘J". Pressed: `--secondary-default`. Hidden when AI assist is off. [not built] Hidden until the Juno panel is built, since a button that does nothing is worse than none.
 - Pin, Notify me and More are not in the header. They are in the topic menu, which is the row's menu.
 
 Narrow (a container query on the topic area): under 480px, Resolve is a 28px icon button (name still "Resolve" / "Reopen") and Threads shows `chats-circle` and the count only ("12", name "Threads, 12"). The pill shows its full name up to 160px, then takes an ellipsis; the title takes the rest and shortens first. The pill's icon and tint always show. At the minimum window (720 by 480, sidebar shown) the topic is 336px and every variant fits.
@@ -330,7 +330,7 @@ A tab with the message list's area on top and the composer at the bottom, like a
 - **Tab**: icon `note-pencil`; label "New chat" until a destination is picked, then the destination's label (the thread title, or "eng" / "Maya Chen" for Main), still with `note-pencil`. After the first send it is an ordinary topic tab.
 - **Empty state** (no destination): the list area holds one line, centred vertically, 14 muted, "Write your message, then pick where it goes." No illustration, no buttons.
 - **Picker row**: directly above the composer box, inside its 752px column, margin-bottom 8, gap 6, left-aligned. Two buttons, each 28px, `--radius-pill`, padding `0 8 0 10`, gap 6, 12.5/600, a trailing `caret-down` 12 muted:
-  - **Conversation**: unset, bg `--secondary-default`, fg subtle, `at` 13 + "Pick a conversation". Set, it is the context pill (§5) for that conversation, with the same tint, icon and "{name} · {kind}" text, plus the caret.
+  - **Conversation**: unset, bg `--secondary-default`, fg subtle, `at` 13 + "Pick a conversation". Set, it is the context pill (§5) for that conversation, with the same tint and icon and the name, plus the caret. [built] No kind text after the name, following SPEC §7: the tint and icon say the kind, and the list rows still say it in their sub line.
   - **Thread**: bg `--secondary-default`, fg default; `message-square` 13 + "Main" (default once a conversation is set), or `chats-circle` 13 + the thread's title (ellipsis, max-width 260). With no conversation: "Any thread", fg subtle.
   - Names "Conversation: {value}" and "Thread: {value}". In the Tab order before the composer; Space, Enter or ↓ opens.
 - **Picker popover**: opens above its button (`bottom: calc(100% + 6px)`), 340px, radius 13, `--pop-shadow`, overflow hidden. Search header as ⌘K's at small size (padding `10 12`, `magnifying-glass` 14 muted, input 13px, border-bottom 1px `--border-default`), autofocused. List padding 6, max-height 360, contained scroll; headings 10.5/500 uppercase muted, padding `8 10 4`.
@@ -341,6 +341,7 @@ A tab with the message list's area on top and the composer at the bottom, like a
 - **Composer**: §7, placeholder "Message" until a destination is set, then the destination's own placeholder. Send checks run against the destination (§7.3). Enter with no destination opens the conversation picker with the draft kept.
 - **After send**: the picker row is removed and the topic header (§5) appears in the same frame the sent message appears; the tab becomes the topic. Nothing else moves: the composer keeps its place.
 - **Closing with a draft**: toast "Draft closed" with Undo (reopens the tab with the draft and destination).
+- [built] The composer is a plain text field (Enter sends, Shift Enter adds a line); attachments, @ and # suggestions and drafts that outlive the app are M6, and the send checks are M8, so a New chat sends without them for now. The message is posted before it shows: the tab becomes the topic once Slack has accepted it and the store holds it, with no pending row, and a failed send keeps the draft. ⌘⇧T on a New chat brings back its draft and destination from memory; the "Draft closed" toast is not wired yet.
 
 ## 9. ⌘K palette
 
@@ -388,7 +389,7 @@ A tab with the message list's area on top and the composer at the bottom, like a
 
 **Shows:** `docs/design/home/` (layout A; `home-variants-*.png`, `in-context-*.png`). SPEC §12 decides behaviour; the home README has the copy, scene rules, ranking and sizes.
 
-- Opens from the sidebar's Home item as a singleton tab (`house`), and shows without a tab when no tab is open. Layout A: scene 120×83, greeting (serif line and sans line), up to three item rows (52px each, fixed-width column), the Ask Juno field.
+- Opens from the sidebar's Home item as a singleton tab (`house`), and shows without a tab when no tab is open. [built] The Home item and the tab work; until the page below is built, Home shows the empty workspace ("Nothing open yet"), from `containers/Home.tsx`. Layout A: scene 120×83, greeting (serif line and sans line), up to three item rows (52px each, fixed-width column), the Ask Juno field.
 - Item kinds: Waiting on you, Pick up where you left off, Moved a lot, Follow-up and Tidy up (the last two with AI assist on). The two that came from For you carry one trailing button, 26px ghost 12.5/500, shown on hover and focus in a reserved slot so nothing shifts: **Mark done** (Follow-up; toast "Follow-up done", no Undo) and **Resolve all** (Tidy up; toast "Resolved 3 topics" with Undo). Tidy up's title line reads "3 topics look settled" and its meta line lists their titles (ellipsis); the row itself does not open anything.
 - Everything else from the For you page is gone: the page, its nav count, the Coding agent prompt block, reply starters and reply ideas, and Dismiss.
 
@@ -516,8 +517,10 @@ Native menus **[spec]**. Prototype rendering for reference: 236px, padding 5, ra
 | — | | | | |
 | Copy Slack link | `link` | | always | |
 | Open in Slack | `arrow-square-out` | | always | opens the Slack app at the topic (`slack://` deep link, falling back to the web permalink) |
-| Notify me | `bell` | current level | always | submenu §15.3: for a thread, the thread's own choice (Every message and When it matters follow it in Slack, Never unfollows it; SPEC §5); for Main, the channel's or DM's |
+| Notify me | `bell` | current level | always | submenu §15.3: for a thread, the thread's own choice (Every message and When it matters follow it in Slack, Never unfollows it; SPEC §5); for Main, the channel's or DM's. [built] Threads only, through `topics.subscribe` and `topics.unsubscribe`: a followed thread shows When it matters, since the Every message level is not stored yet; Main has no item until channel levels are |
 | Ignore #product | `ban` | | channel is not a DM | toast "Ignoring #product" with Undo |
+
+[built] The row and the header's title show this menu, and every item works (M5). Rename from the row edits the row's title (§3.2), from the header the header's title (§5). Each action shows its toast with Undo (§16). The hints are not drawn, since a native menu has only a shortcut column.
 
 ### 15.2 Channel menu (context pill, #channel chip, ⌘K channel result)
 
@@ -542,6 +545,8 @@ Shown from 15.1 (also opened from the header's title, §5), 15.2 and 15.6. Three
 
 Right-click on a message, and the message's More menu (the why item is new; the others wait for M6): Copy text (`copy`), Reply in thread (`message-square-reply`, Main only), separator, **Why did this notify?** / **Why no notification?** (`circle-help`, by what happened; hidden for your own messages), **Tell me if nobody replies** (`alarm`, your own messages only, AI assist on). The last one creates the reply watch at once, with no Juno run: a reply from anyone but you counts, and the wait ends at the same time on your next notification day, or at the start of notification hours if that time is outside them. It shows the toast "Watching for a reply until Thu 9:00 · Undo" (Undo deletes the watch) and adds a Schedule card to the Juno chat; nothing opens. Disabled while Juno is paused or on another Mac (SPEC 13.6).
 
+[built M5] Right-click (or the context-menu key on a focused message) shows Copy Slack link and Open in Slack. A reply's link carries `?thread_ts=&cid=`, as Slack's own links do; Open in Slack opens the channel, as on the tab menu. The other items come with their features.
+
 The why popover anchors under the item: 300px, padding `14 16`, radius 13, bg surface, `--pop-shadow`, gap 6. Title 13/600 ("Notified you at 13:42", "Didn't notify you", "In the 9am summary") · reason 13 subtle lh 1.5 (the decision's reason) · one button right-aligned, 28px secondary: **Change** when the reason is a setting (opens §15.3 for that channel or person, or the Notifications page for hours), **Tell Juno** when it was Juno's call (opens the Juno chat with the message quoted in the composer). Esc or outside click closes.
 
 ### 15.5 Tab menu
@@ -559,7 +564,8 @@ Right-click a sender's name or avatar in a message, or an @person chip. Notify m
 - Position: bottom-left, left 16, bottom 16, z 45, max-width 352. Padding `8 8 8 14`, radius 10, bg `--foreground-default`, text `--background`, `--shadow-lg`, 13px, gap 12. Text ellipsis on one line.
 - Undo button (reversible actions only): 26px, padding 0 8, radius 6, bg `color-mix(var(--background) 16%, transparent)`, "Undo" 12.5/600 + "⌘Z" mono 11 at .75 opacity.
 - One toast at a time; a new one replaces the old. Auto-dismiss 5s (with Undo) or 4s (info). No enter/exit animation in the prototype; [proposed] 150ms fade is acceptable.
-- Undo stack holds 20 actions; ⌘Z pops the last one (resolve, reopen, Notify me change, ignore, routed post, command send, Resolve all on Home) when focus is not in a non-empty input.
+- Undo stack holds 20 actions; ⌘Z pops the last one (resolve, reopen, pin, unpin, rename, mark read or unread, Notify me change, ignore, routed post, command send, Resolve all on Home) when focus is not in a non-empty input.
+- [built M5] `ActionToast` in `@juno/views`, mounted once by the shell over both panes, with the `Toast` rise. The undo stack and the toast are `undoStackAtom` and `toastAtom` in `@juno/state`; an action that changed nothing shows no toast. No exit fade yet.
 
 | Copy | Undo |
 | --- | --- |
@@ -567,6 +573,9 @@ Right-click a sender's name or avatar in a message, or an @person chip. Notify m
 | Resolved · #eng (Main rows use the channel label) | yes |
 | Reopened · … / "{topic or channel}: Never" (and the other Notify me choices) | yes |
 | Ignoring #deploys | yes |
+| Pinned · … / Unpinned · … | yes |
+| Marked as read · … / Marked as unread · … | yes |
+| Renamed · {new title} / Title cleared | yes |
 | Posted in Staging bill doubled since August · Posted in #eng · Main | yes |
 | Resolved 3 topics (Home's Tidy up) | yes |
 | Draft closed (a New chat closed with a draft) | yes |

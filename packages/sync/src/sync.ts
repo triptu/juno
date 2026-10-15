@@ -20,14 +20,14 @@
  */
 import { mainTopicId, millisToTs, type ChannelId, type Ts } from '@juno/domain'
 import { SlackApi, SlackAuthRequired, SlackEdge, SlackSession, SlackSocket, type SocketEvent } from '@juno/slack'
-import { Invalidation, StoreReader, StoreWriter, transaction } from '@juno/store'
+import { Invalidation, StoreReader, StoreWriter, transaction, type SqlError } from '@juno/store'
 import { Clock, Effect, FiberSet, Queue, Scope, Semaphore } from 'effect'
 import { Stream } from 'effect'
 import { bootState, catchUp, coldBoot, followPass, warmBoot, type BootState, type Phase } from './boot'
 import { syncEmoji } from './emoji'
 import { SyncConfig } from './config'
 import { reindexOptions, type RootFetch, type SyncContext } from './context'
-import { applyFrame } from './events'
+import { applyFrame, applySent } from './events'
 import { fetchOlder, fetchTopic, type FetchLane, type FetchReport, type OpenError } from './open'
 import { applyPage } from './pages'
 import { reindexTopics } from './reindex'
@@ -63,6 +63,8 @@ export interface RunSyncOptions {
 export interface TopicFetcher {
   readonly open: (topicId: string) => Effect.Effect<FetchReport, OpenError>
   readonly older: (topicId: string, before: string) => Effect.Effect<FetchReport, OpenError>
+  /** Stores what Juno's own send got back, in the sync's context (`applySent`). */
+  readonly sent: (sent: Parameters<typeof applySent>[1]) => Effect.Effect<void, SqlError>
 }
 
 export type SyncServices = SlackApi | SlackEdge | SlackSocket | SlackSession | StoreWriter | StoreReader | Invalidation
@@ -128,6 +130,7 @@ export const runSync = (options: RunSyncOptions): Effect.Effect<never, SlackAuth
     const fetcher: TopicFetcher = {
       open: (topicId) => fetched((lane) => fetchTopic(ctx, topicId, lane), 'open'),
       older: (topicId, before) => fetched((lane) => fetchOlder(ctx, topicId, before, lane), 'older page'),
+      sent: (sent) => applySent(ctx, sent).pipe(Effect.provide(services)),
     }
     if (options.onFetcher !== undefined) yield* options.onFetcher(fetcher)
 

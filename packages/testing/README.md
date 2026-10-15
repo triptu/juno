@@ -11,7 +11,7 @@ await expectNoLayoutShift(page, () => row.hover())
 await expectNoLayoutShift(page, () => page.mouse.down())
 ```
 
-Starts a `PerformanceObserver` for `layout-shift` entries (only from the start of the action), runs the action, waits two frames plus the longest transition or animation declared under the root, then fails if any entry has a value above 0 or any element's layout box moved or resized. Entries flagged `hadRecentInput` are counted too: Chromium sets that flag within 500 ms of a keypress or pointer press. Hovering alone need not set it.
+Starts a `PerformanceObserver` for `layout-shift` entries (only from the start of the action), runs the action, waits two frames and then until every transition or animation running under the root has finished (one iteration of an endless one; motion that is declared but idle is not waited for), then fails if any entry has a value above 0 or any element's layout box moved or resized. Entries flagged `hadRecentInput` are counted too: Chromium sets that flag within 500 ms of a keypress or pointer press. Hovering alone need not set it.
 
 The box comparison reads `offsetLeft`, `offsetTop`, `offsetWidth` and `offsetHeight` of every HTML element under the root, relative to the root. Those ignore transforms, so the press scale (or any scale, translate or opacity effect) is not counted, while a change of size, padding, border or position is. Elements are compared to themselves, so nothing needs to be excluded.
 

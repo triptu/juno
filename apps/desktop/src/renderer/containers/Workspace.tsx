@@ -1,9 +1,12 @@
 import { Activity, useEffect } from 'react'
 import type { TopicDetail } from '@juno/contract'
-import { currentPlace, mountedTabs, onMenuCommand, sidebarLayoutAtom, tabsAtom, tabStripAtom, type TabSummary } from '@juno/state'
+import { currentPlace, mountedTabs, onMenuCommand, sidebarLayoutAtom, tabsAtom, tabStripAtom, type Tab, type TabSummary } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import { TopicArt, Workspace as WorkspaceView, type ActivateEvent, type WorkspaceTab, type WorkspaceTabIcon } from '@juno/views'
+import { HomePage } from './Home'
 import { closeTabById, openNewTab, runMenuCommand, showTabMenu, stepTabHistory, switchToTab } from './navigation'
+import { NewChatTab } from './NewChat'
+import { runUndoCommand } from './topicActions'
 import { TitlebarNav } from './TitlebarNav'
 import { hasArt, TopicTab } from './TopicView'
 
@@ -24,8 +27,10 @@ function stripTab(summary: TabSummary): WorkspaceTab {
   const base = { id: summary.id, pinned: summary.pinned }
   const tab: WorkspaceTab =
     place.kind === 'newChat'
-      ? { ...base, title: 'New chat', icon: 'new-chat' }
-      : {
+      ? { ...base, title: summary.chatTitle ?? 'New chat', icon: 'new-chat' }
+      : place.kind === 'home'
+        ? { ...base, title: 'Home', icon: 'home' }
+        : {
           ...base,
           title: detail == null ? '' : detail.kind === 'main' ? detail.channel.name : detail.title,
           icon: detail == null ? 'hash' : kindIcons[detail.channel.kind],
@@ -34,6 +39,19 @@ function stripTab(summary: TabSummary): WorkspaceTab {
         }
   tabs.set(summary, tab)
   return tab
+}
+
+/** What a tab shows. A topic is keyed by its id, so a new place in the tab mounts afresh. */
+function Page({ tab }: { readonly tab: Tab }) {
+  const place = currentPlace(tab)
+  switch (place.kind) {
+    case 'topic':
+      return <TopicTab key={place.topicId} tabId={tab.id} id={place.topicId} />
+    case 'newChat':
+      return <NewChatTab key="new-chat" tabId={tab.id} />
+    case 'home':
+      return <HomePage key="home" />
+  }
 }
 
 function selectTab(id: string, _event: ActivateEvent): void {
@@ -55,9 +73,9 @@ function onMouseUp(event: MouseEvent): void {
  * active stay mounted in `<Activity>` (performance 4.3), so a switch is a
  * display toggle; older tabs unmount and come back at their scroll
  * snapshot. A tab's topic is keyed by its id, so Back and Forward mount the
- * topic they bring back. A New chat tab, and no tab at all, show the empty
- * workspace. While the sidebar is hidden the strip starts with its
- * controls.
+ * topic they bring back, and a New chat that sends becomes its topic in one
+ * commit. With no tab open the workspace shows Home. While the sidebar is
+ * hidden the strip starts with its controls.
  */
 export function Workspace() {
   const state = useAtomValue(tabsAtom)
@@ -66,15 +84,13 @@ export function Workspace() {
   const mounted = mountedTabs(state)
 
   useEffect(() => onMenuCommand(runMenuCommand), [])
+  useEffect(() => onMenuCommand(runUndoCommand), [])
   useEffect(() => {
     window.addEventListener('mouseup', onMouseUp)
     return () => window.removeEventListener('mouseup', onMouseUp)
   }, [])
 
-  const topics = state.tabs.flatMap((tab) => {
-    const place = currentPlace(tab)
-    return mounted.has(tab.id) && place.kind === 'topic' ? [{ tab, topicId: place.topicId }] : []
-  })
+  const pages = state.tabs.filter((tab) => mounted.has(tab.id))
 
   return (
     <WorkspaceView
@@ -85,13 +101,14 @@ export function Workspace() {
       onNewTab={openNewTab}
       onTabContextMenu={tabMenu}
       {...(sidebarHidden ? { leading: <TitlebarNav /> } : {})}
-      nothingShown={!topics.some(({ tab }) => tab.id === state.active)}
+      nothingShown={state.active === undefined}
+      empty={<HomePage />}
     >
-      {topics.length === 0
+      {pages.length === 0
         ? undefined
-        : topics.map(({ tab, topicId }) => (
+        : pages.map((tab) => (
             <Activity key={tab.id} mode={tab.id === state.active ? 'visible' : 'hidden'}>
-              <TopicTab key={topicId} tabId={tab.id} id={topicId} />
+              <Page tab={tab} />
             </Activity>
           ))}
     </WorkspaceView>

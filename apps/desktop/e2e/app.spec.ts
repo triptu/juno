@@ -99,7 +99,7 @@ test('exposes only the bridge to the page', async ({ win }) => {
     agent: ['requestPort'],
     launch: ['setTheme', 'setAccent', 'setSidebar'],
     contextMenu: ['popup'],
-    shell: ['openExternal', 'openInSlack'],
+    shell: ['openExternal', 'openInSlack', 'editUndo'],
     clipboard: ['writeText'],
     menu: ['onCommand'],
   })

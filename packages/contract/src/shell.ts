@@ -50,12 +50,23 @@ export const DEFAULT_SIDEBAR: SidebarLayout = { width: SIDEBAR_WIDTH.default, co
 export const SlackTarget = Schema.Struct({ teamId: Schema.String, channelId: Schema.String })
 export type SlackTarget = typeof SlackTarget.Type
 
+const ContextMenuLeaf = Schema.Union([
+  Schema.Struct({
+    id: Schema.String,
+    label: Schema.String,
+    enabled: Schema.optionalKey(Schema.Boolean),
+    checked: Schema.optionalKey(Schema.Boolean),
+    accelerator: Schema.optionalKey(Schema.String),
+  }),
+  Schema.Struct({ separator: Schema.Literal(true) }),
+])
+
 export const ContextMenuItems = Schema.Array(
-  Schema.Union([
-    Schema.Struct({ id: Schema.String, label: Schema.String, enabled: Schema.optionalKey(Schema.Boolean), accelerator: Schema.optionalKey(Schema.String) }),
-    Schema.Struct({ separator: Schema.Literal(true) }),
-  ]),
+  Schema.Union([ContextMenuLeaf, Schema.Struct({ label: Schema.String, submenu: Schema.Array(ContextMenuLeaf).check(Schema.isMaxLength(20)) })]),
 ).check(Schema.isMaxLength(20))
+
+/** Where the menu opens, in CSS pixels from the window's top left. */
+export const ContextMenuAt = Schema.Struct({ x: Schema.Number, y: Schema.Number })
 
 /** renderer -> main request/response routes over `ipcRenderer.invoke`. */
 export const ShellRoutes = {
@@ -66,10 +77,11 @@ export const ShellRoutes = {
   [Channels.launchSetTheme]: { input: Schema.Struct({ theme: ThemeSchema }), output: Schema.Void },
   [Channels.launchSetAccent]: { input: Schema.Struct({ accent: AccentSchema }), output: Schema.Void },
   [Channels.launchSetSidebar]: { input: SidebarLayout, output: Schema.Void },
-  [Channels.contextMenuPopup]: { input: Schema.Struct({ items: ContextMenuItems }), output: Schema.NullOr(Schema.String) },
+  [Channels.contextMenuPopup]: { input: Schema.Struct({ items: ContextMenuItems, at: Schema.optionalKey(ContextMenuAt) }), output: Schema.NullOr(Schema.String) },
   [Channels.shellOpenExternal]: { input: Schema.Struct({ url: Schema.String }), output: Schema.Void },
   [Channels.shellOpenInSlack]: { input: SlackTarget, output: Schema.Void },
   [Channels.clipboardWriteText]: { input: Schema.Struct({ text: Schema.String.check(Schema.isMaxLength(2048)) }), output: Schema.Void },
+  [Channels.shellEditUndo]: { input: Schema.Void, output: Schema.Void },
 } as const
 
 export type ShellRoutes = typeof ShellRoutes
