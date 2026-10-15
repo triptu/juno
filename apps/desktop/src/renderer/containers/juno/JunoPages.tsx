@@ -234,13 +234,18 @@ function Scheduled() {
 function Connections() {
   const result = useAtomValue(connectionsPageAtom)
   if (result._tag !== 'Success') return null
-  // Moving a tool between tiers needs its schema hash from the manager (WP17), which lists no connection yet.
+  const page = result.value
+  // A tier change binds the tool's current schema; a tool listed without one cannot be moved yet.
+  const schemaOf = (id: string, tool: string) => page.connections.find((row) => row.id === id)?.tools.find((entry) => entry.name === tool)?.schemaHash
   return (
     <ConnectionsPage
-      page={result.value}
+      page={page}
       onEnabled={(id, enabled) => void actions.connection(id, enabled ? 'enable' : 'disable')}
       onT3Address={(_id, address) => void actions.t3Address(address)}
-      onTier={() => {}}
+      onTier={(id, tool, tier) => {
+        const schemaHash = schemaOf(id, tool)
+        if (schemaHash !== undefined) void actions.tier(id, tool, schemaHash, tier)
+      }}
     />
   )
 }

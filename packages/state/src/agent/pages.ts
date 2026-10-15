@@ -73,6 +73,7 @@ export function junoPageActions(registry: Registry) {
     editPin: (id: PinId, revision: Revision, text: string) => outcome(call(registry, 'agent.remembers.edit', { opId: op(), id, revision, text })),
     removePin: (id: PinId, revision: Revision) => outcome(call(registry, 'agent.remembers.remove', { opId: op(), id, revision })),
     schedule: (id: ScheduleId, revision: Revision, action: 'pause' | 'resume' | 'delete') => outcome(call(registry, 'agent.scheduled.action', { opId: op(), id, revision, action })),
+    tier: (id: ConnectionId, tool: string, schemaHash: string, tier: 0 | 3) => outcome(call(registry, 'agent.connections.tier', { opId: op(), id, tool, schemaHash, tier })),
     connection: (id: ConnectionId, action: 'enable' | 'disable') => outcome(call(registry, 'agent.connections.action', { opId: op(), id, action })),
     t3Address: (address: T3Address) => outcome(call(registry, 'agent.connections.address', { opId: op(), address })),
   }
