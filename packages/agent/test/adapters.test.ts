@@ -7,6 +7,7 @@ import { createProviderGuard, openTurns } from '../src'
 import { createMcpManager, MCP_MIGRATIONS, T3, LITTLEBIRD, mcpExecutors, mcpTools, type Credentials, type McpManagerApi } from '../src/mcp'
 import { parseObject } from '../src/mcp/catalogue'
 import { createT3Adapter } from '../src/t3'
+import { createJobs } from '../src/jobs/jobs'
 import { SONNET } from './turns-harness'
 import { openDatabase } from '../src/store/database'
 import { initialize } from '../src/store/store'
@@ -365,4 +366,21 @@ it('says a T3 question needs an answer in T3 Code when Juno cannot show it', asy
   await click()
   await expect.poll(() => turns.jobs.list()[0]?.state).toBe('T3 Code needs your answer in T3 Code')
   expect(turns.actions.views().some((v) => v.card._tag === 'question')).toBe(false)
+})
+
+it('writes a job only when its phase or line changes', async () => {
+  const { turns } = await fixture('t3', t3Tools)
+  const lost = { event: 'lostSight', state: 'Sign in to T3 Code to keep watching' } as const
+  // A watcher that is signed out says the same line every second until the connection returns.
+  const jobs = createJobs({
+    store: turns.store, accept: () => ({ _tag: 'accepted' }) as never,
+    drivers: [{ kind: 't3', resumable: false, run: async (_job, _signal, update) => {
+      for (let i = 0; i < 5; i += 1) update(lost)
+      return { event: 'done', state: 'Done' }
+    } }],
+  })
+  turns.store.db.exec('CREATE TEMP TABLE job_writes (n INTEGER); CREATE TEMP TRIGGER count_job_writes AFTER UPDATE ON jobs BEGIN INSERT INTO job_writes VALUES (1); END')
+  jobs.start({ kind: 't3', runId: 'run-test', originOp: 'op-test', callId: 'call-test', title: 'Fix test', place: 'project-test', task: '{}' })
+  await jobs.idle()
+  expect((turns.store.db.prepare('SELECT count(*) AS n FROM job_writes').get() as { n: number }).n).toBe(2)
 })

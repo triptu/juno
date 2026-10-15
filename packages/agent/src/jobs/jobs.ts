@@ -87,6 +87,8 @@ export function createJobs(options: JobsOptions) {
     const phase = transitionJob(before.phase, update.event)
     const stepped = update.event === 'progress' && update.state !== undefined && update.state !== before.state
     const reporting = update.report !== undefined && phase !== before.phase
+    // A driver repeats its line while nothing moves (a lost connection, a long wait): write only a change.
+    if (phase === before.phase && (update.state ?? before.state) === before.state) return
     if (reporting) {
       const seq = (store.db.prepare('SELECT reports FROM jobs WHERE id = ?').get(id) as { reports: number }).reports + 1
       options.accept({ opId: `report:${id}:${seq}:${update.event}`, kind: 'report', text: update.report! })
