@@ -1,0 +1,69 @@
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { audienceCheck, type PickConversation, type SendTarget } from '@juno/contract'
+import { aiAssistOnAtom, checkMessage, precheckMessage, registry } from '@juno/state'
+import { useAtomValue } from '@juno/state/react'
+import { AudienceWarning } from '@juno/views'
+import SendCheckPanel from './SendCheckPanel'
+import { afterCheck, choose, type CheckBar, type Destination, type Outcome } from './sendChecks'
+
+/** Checks use only a channel already picked. Enter reads cached findings, never a model. */
+export function useNewChatChecks(text: string, target: SendTarget | undefined, deliver: (text: string, to: Destination) => void, conversation: PickConversation | undefined) {
+  const enabled = useAtomValue(aiAssistOnAtom)
+  const checking = useRef<object | undefined>(undefined)
+  const channelId = target?.kind === 'channel' ? target.channelId : undefined
+  const threadTs = target?.kind === 'channel' ? target.threadTs : undefined
+  const key = useMemo(() => ({ text, channelId, threadTs, enabled }), [text, channelId, threadTs, enabled])
+  const [finding, setFinding] = useState<{ key: object; bar: CheckBar | undefined }>()
+  const [warning, setWarning] = useState<{ key: object; message: string }>()
+  const [waitingFor, setWaitingFor] = useState<object>()
+  const bar = finding?.key === key ? finding.bar : undefined
+  const setBar = (bar: CheckBar | undefined) => setFinding({ key, bar })
+  const setWaiting = (waiting: boolean) => setWaitingFor(waiting ? key : undefined)
+  const clear = () => {
+    checking.current = undefined
+    setWaiting(false)
+    setBar(undefined)
+  }
+  useLayoutEffect(() => {
+    checking.current = undefined
+    return () => { checking.current = undefined }
+  }, [text, channelId, threadTs, enabled])
+  useEffect(() => {
+    if (!enabled || channelId === undefined || text.trim() === '') return
+    const timer = setTimeout(() => {
+      if (threadTs === undefined) precheckMessage(registry, channelId, text)
+      const found = conversation === undefined ? undefined : audienceCheck(text, conversation)
+      if (found !== undefined) setWarning({ key, message: found.message })
+    }, 400)
+    return () => clearTimeout(timer)
+  }, [text, channelId, threadTs, enabled, conversation, key])
+  const follow = (outcome: Outcome) => {
+    if (outcome.kind === 'bar') setBar(outcome.bar)
+    else {
+      setBar(undefined)
+      if (outcome.kind === 'send') deliver(outcome.text, outcome.to)
+    }
+  }
+  const pick = (choice: 'primary' | 'secondary') => {
+    if (bar !== undefined) follow(choose(bar, choice))
+  }
+  const send = () => {
+    if (bar !== undefined) return pick('primary')
+    if (checking.current !== undefined) return
+    if (!enabled || channelId === undefined || text.trim() === '') return deliver(text, { kind: 'here' })
+    const token = {}
+    checking.current = token
+    setWaiting(true)
+    void checkMessage(registry, { channelId, ...(threadTs === undefined ? {} : { threadTs }) }, text).then(found => {
+      if (checking.current !== token) return
+      checking.current = undefined
+      setWaiting(false)
+      follow(afterCheck(text, found))
+    })
+  }
+  const notices = <>
+    {warning?.key === key ? <AudienceWarning message={warning.message} /> : null}
+    {bar === undefined ? null : <SendCheckPanel bar={bar} onPick={pick} />}
+  </>
+  return { send, waiting: waitingFor === key, clear, notices }
+}

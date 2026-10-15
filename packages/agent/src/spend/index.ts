@@ -105,13 +105,11 @@ export function createSpend(store: Store, cap: () => number = () => 2 * DOLLAR) 
       money(snapshot(day).cap + snapshot(day).raises + DOLLAR)
       db.prepare('INSERT OR IGNORE INTO spend_raises(id, day, amount) VALUES (?, ?, ?)').run(clickId, day, DOLLAR)
     }),
-    /** Settings may lower the cap only as far as today's committed obligations. */
+    /** A lower cap blocks new reservations; existing reservations still settle. */
     setCap: (amount: number): boolean => transaction(db, () => {
       money(amount)
       const day = today()
       ensureDay(day)
-      const s = snapshot(day)
-      if (s.actual + s.reserved > amount + s.raises || s.compaction > Math.floor((amount + s.raises) / 4)) return false
       db.prepare('UPDATE spend_days SET cap = ? WHERE day = ?').run(amount, day)
       return true
     }),

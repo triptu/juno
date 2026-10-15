@@ -6,21 +6,22 @@
  *
  * A driver runs one kind of job and reports updates. The runner keeps the
  * phase machine and posts an update's report into the inbox when the phase
- * moves (a question, done, failed). The router makes it a steer of the live
- * run, or a new run, and the model decides whether the owner hears about
+ * moves (a question, done, failed), or a new report key arrives. The router
+ * makes it a steer of the live run, or a new run, and the model decides whether the owner hears about
  * it: an update can pass without a bubble. There is no fixed schedule of
  * milestone messages.
  *
  * A report is accepted into the inbox before the job's phase moves, as
  * `report:<job>:<seq>:<event>`. A crash in between leaves the job in its old
  * phase; when it runs again it posts the same op, which the inbox takes
- * once, and a different milestone gets its own op.
+ * once, and a different milestone gets its own op. Questions use the request
+ * id as their key, so another question during the same wait gets a report.
  *
  * At startup, a job that was running starts again if its driver can resume
  * it, and is `unknown` otherwise (§6.5).
  */
 import { transitionJob, type JobEvent, type JobRecordPhase as JobPhase } from '@juno/agent-cards'
-import type { Accept } from '../inbox/inbox'
+import { find, type Accept } from '../inbox/inbox'
 import { transaction } from '../store/database'
 import { uuidv7, type Store } from '../store/store'
 
@@ -36,6 +37,7 @@ export interface Job {
   readonly task: string
   readonly phase: JobPhase
   readonly state: string | null
+  readonly stopFailed?: boolean
   readonly stepAt: number
 }
 
@@ -45,6 +47,8 @@ export interface JobUpdate {
   readonly state?: string
   /** Posted as a report on a milestone. */
   readonly report?: string
+  /** A distinct milestone, even while the phase stays the same. */
+  readonly reportKey?: string
 }
 
 export interface JobDriver {
@@ -64,10 +68,10 @@ export interface JobsOptions {
   readonly onChange?: (job: Job) => void
 }
 
-type Row = { id: string; kind: JobKind; run_id: string; origin_op: string; title: string; place: string; task: string; phase: JobPhase; state: string | null; step_at: number }
+type Row = { id: string; kind: JobKind; run_id: string; origin_op: string; title: string; place: string; task: string; phase: JobPhase; state: string | null; stop_failed: number; step_at: number }
 const jobOf = (row: Row): Job => ({
   id: row.id, kind: row.kind, runId: row.run_id, originOp: row.origin_op, title: row.title, place: row.place, task: row.task,
-  phase: row.phase, state: row.state, stepAt: row.step_at,
+  phase: row.phase, state: row.state, stopFailed: row.stop_failed === 1, stepAt: row.step_at,
 })
 const settled = (phase: JobPhase) => phase === 'done' || phase === 'failed' || phase === 'stopped' || phase === 'unknown'
 
@@ -88,12 +92,13 @@ export function createJobs(options: JobsOptions) {
     if (before === undefined) return
     const phase = transitionJob(before.phase, update.event)
     const stepped = update.event === 'progress' && update.state !== undefined && update.state !== before.state
-    const reporting = update.report !== undefined && phase !== before.phase
+    const reportOp = update.reportKey === undefined ? undefined : `report:${id}:${update.reportKey}:${update.event}`
+    const reporting = update.report !== undefined && (reportOp === undefined ? phase !== before.phase : find(store, reportOp) === undefined)
     // A driver repeats its line while nothing moves (a lost connection, a long wait): write only a change.
-    if (phase === before.phase && (update.state ?? before.state) === before.state) return
+    if (!reporting && phase === before.phase && (update.state ?? before.state) === before.state) return
     if (reporting) {
       const seq = (store.db.prepare('SELECT reports FROM jobs WHERE id = ?').get(id) as { reports: number }).reports + 1
-      options.accept({ opId: `report:${id}:${seq}:${update.event}`, kind: 'report', text: update.report! })
+      options.accept({ opId: reportOp ?? `report:${id}:${seq}:${update.event}`, kind: 'report', text: update.report! })
     }
     transaction(store.db, () => {
       store.db
@@ -147,6 +152,11 @@ export function createJobs(options: JobsOptions) {
       options.onChange?.(job)
       launch(job)
       return job
+    },
+    stopFailed: (id: string) => {
+      store.db.prepare('UPDATE jobs SET stop_failed = 1 WHERE id = ?').run(id)
+      const job = get(id)
+      if (job !== undefined) options.onChange?.(job)
     },
     /** The Task card's Stop. */
     stop: async (id: string) => {

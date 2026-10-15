@@ -221,6 +221,7 @@ export const TaskCard = Schema.TaggedStruct('task', {
   phase: JobPhase,
   /** The live state line under the title, while `running`, `needsYou` or `stopping`. */
   state: Schema.optionalKey(Schema.String),
+  stopFailed: Schema.optionalKey(Schema.Boolean),
   /** Open the thread, or the PR once there is one. */
   open: Schema.optionalKey(OpenTarget),
 })

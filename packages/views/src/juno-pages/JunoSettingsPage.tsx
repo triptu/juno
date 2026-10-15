@@ -169,7 +169,7 @@ export function JunoSettingsPage({
         </Surface>
       </Section>
 
-      <Section heading="Spend" sub="Juno stops for the day at the cap and asks before going over.">
+      <Section heading="Spend" sub="At the cap, new spending waits until tomorrow or you raise it. Work already under way can finish.">
         <Surface kind="group">
           <ListRow
             trailing={

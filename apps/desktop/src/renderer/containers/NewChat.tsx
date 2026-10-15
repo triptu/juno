@@ -18,6 +18,8 @@ import { Composer, DestinationPickers, NewChat as NewChatView, startOfConversati
 import { takeAttachments, useAttachments } from './attachments'
 import { useMentions } from './mentions'
 import { settleSentChat } from './navigation'
+import { useNewChatChecks } from './newChatChecks'
+import type { Destination } from './sendChecks'
 import { TopicPreview } from './TopicView'
 
 /** The composer's placeholder: "Message" until a destination is picked, then the destination's own. */
@@ -76,20 +78,23 @@ export const NewChatTab = memo(function NewChatTab({ tabId }: NewChatTabProps) {
     inputRef.current?.focus()
   }
 
-  const send = async () => {
-    const target = sendTarget(chat)
+  const send = async (body: string, to: Destination) => {
+    const here = sendTarget(chat)
+    const target = to.kind === 'thread' && here?.kind === 'channel' ? { ...here, threadTs: to.threadTs } : here
     if (target === undefined) return openPicker('conversation')
     if ((chat.draft.trim() === '' && files.files.length === 0) || sending) return
     const attached = takeAttachments(tabId)
     if (attached === undefined) return
     setSending(true)
-    const exit = await sendMessage(registry, target, encodeMentions(chat.draft, chat.mentions), undefined, attached.ids)
+    const exit = await sendMessage(registry, target, encodeMentions(body, chat.mentions), undefined, attached.ids)
     if (exit._tag === 'Success') return settleSentChat(tabId, exit.value.topicId)
     // The draft and its files stay; the send can be tried again.
     attached.restore()
     setSending(false)
     console.warn('juno: send failed', exit.cause)
   }
+
+  const checks = useNewChatChecks(chat.draft, sendTarget(chat), (body, to) => { void send(body, to) }, chat.conversation)
 
   // The atom is read at the moment of each change: a pick sets the mentions and then the text in one event.
   const mentions = useMentions({
@@ -112,9 +117,11 @@ export const NewChatTab = memo(function NewChatTab({ tabId }: NewChatTabProps) {
         <Composer
           value={chat.draft}
           {...mentions}
-          onSend={() => void send()}
+          onSend={() => { if (!sending && !files.files.some(file => file.state === 'staging')) checks.send() }}
           placeholder={placeholderOf(chat)}
-          sending={sending}
+          sending={sending || checks.waiting}
+          notices={checks.notices}
+          onEscape={checks.clear}
           inputRef={inputRef}
           leading={files.leading}
           attachments={files.chips}

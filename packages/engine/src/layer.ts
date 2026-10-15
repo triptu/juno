@@ -8,6 +8,7 @@ import type { EnginePhase, SessionStatus } from '@juno/contract'
 import type { SyncPhase } from '@juno/sync'
 import { NotificationControl } from './notificationRuntime'
 import { JunoHostLive, PhaseSource } from './agent-host/host'
+import { AiWarmup } from './aiWarmup'
 import { AiProviderLive } from './ai'
 import { ArtHandlers } from './art/handlers'
 import { ArtJob } from './art/job'
@@ -80,7 +81,7 @@ const EnginePhases = Layer.effectDiscard(
 )
 
 /** Everything the route handlers need. Requires the host seams (`HostLink`, `HttpTransport`) and `EngineConfig`. */
-export const Services = Layer.mergeAll(EnginePhases, ArtJob, HomeJob, AutomatedJob).pipe(
+export const Services = Layer.mergeAll(EnginePhases, ArtJob, HomeJob, AutomatedJob, AiWarmup).pipe(
   Layer.provideMerge(MarkWorker.layer),
   Layer.provideMerge(PostWorker.layer),
   Layer.provideMerge(Staging.layer),
