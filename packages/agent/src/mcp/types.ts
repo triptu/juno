@@ -61,7 +61,11 @@ export function endpoint(url: string, allowNetwork = true, localNetwork = false)
   let parsed: URL
   try { parsed = new URL(url) } catch { throw new McpError({ reason: 'invalid', message: 'Enter a full address, like https://mcp.example.com/mcp.' }) }
   const loopback = ['localhost', '127.0.0.1', '[::1]'].includes(parsed.hostname)
-  const privateHost = /^(?:10\.|192\.168\.|172\.(?:1[6-9]|2[0-9]|3[01])\.|169\.254\.)/.test(parsed.hostname)
+  const octets = parsed.hostname.split('.').map(Number)
+  const [first, second] = octets
+  const privateHost = octets.length === 4 && octets.every((octet) => Number.isInteger(octet) && octet >= 0 && octet <= 255) &&
+    (first === 10 || (first === 192 && second === 168) ||
+      (first === 172 && second !== undefined && second >= 16 && second <= 31) || (first === 169 && second === 254))
   if ((parsed.protocol !== 'https:' && !(parsed.protocol === 'http:' && (loopback || (localNetwork && privateHost)))) || parsed.username || parsed.password || parsed.hash || parsed.search) {
     throw new McpError({ reason: 'invalid', message: 'Use HTTPS, or HTTP on this Mac, without credentials in the address.' })
   }

@@ -184,7 +184,8 @@ test('T3 Code on loopback is used before the LAN address', async ({ juno, t3 }) 
   await ready(juno)
   const page = await openPage(juno, 'Connections')
   const row = page.locator('[data-connection-id="t3"]')
-  await row.getByLabel('Allow T3 Code over the local network').check()
+  await row.getByLabel('Allow T3 Code over the local network').click()
+  await expect(row.getByLabel('Allow T3 Code over the local network')).toBeChecked()
   await connectT3(juno, t3.lanUrl)
   // The row shows the address in use.
   await expect(row).toContainText(t3.loopbackUrl)
@@ -194,7 +195,6 @@ test('T3 Code on loopback is used before the LAN address', async ({ juno, t3 }) 
 
 
 test('hostile Slack makes instructions to a running T3 job a card with a Because line', async ({ juno, t3, fake, slack }) => {
-  // t3/work.ts proposes the Change card without the taint explanation.
   await ready(juno)
   await connectT3(juno, t3.loopbackUrl)
   const { pane } = await startTask(juno, t3)

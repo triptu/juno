@@ -347,6 +347,7 @@ async function start(
     store,
     drivers: [...(subagentModel ? [subagentDriver({ store, guard, builder, model: subagentModel })] : []), ...(options.jobDrivers?.() ?? [])],
     accept: (input) => router.message(input),
+    onChange: () => actions.changed(),
     ...(options.onReport ? { onReport: options.onReport } : {}),
   })
   const memoryTools = [

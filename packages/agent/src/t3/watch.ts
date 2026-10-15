@@ -22,8 +22,9 @@ export function t3Driver(manager: McpManagerApi, questions: (job: Job, threadId:
           const branch = await sessionBranch(manager, session.threadId) ?? (read.thread.threadId === session.threadId ? read.thread.branch ?? undefined : undefined)
           if (branch !== undefined) manager.store.db.prepare('UPDATE jobs SET place = ? WHERE id = ? AND place != ?').run(`${session.project} · ${branch}`, job.id, `${session.project} · ${branch}`)
           if (signal.aborted) break
-          if (read.thread.threadId === session.threadId && read.thread.linkedPullRequest) {
-            manager.store.db.prepare('UPDATE jobs SET task = ? WHERE id = ?').run(JSON.stringify({ ...session, pullRequest: read.thread.linkedPullRequest }), job.id)
+          if (read.thread.threadId === session.threadId && read.thread.linkedPullRequest !== undefined) {
+            const task = JSON.stringify({ ...session, pullRequest: read.thread.linkedPullRequest ?? undefined })
+            manager.store.db.prepare('UPDATE jobs SET task = ? WHERE id = ? AND task != ?').run(task, job.id, task)
           }
           const status = read.thread.status
           if (status === 'completed') return { event: 'done', state: 'Done', report: `T3 Code finished ${job.title}. Open session ${session.threadId} for the result.` }

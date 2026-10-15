@@ -397,6 +397,7 @@ it('lets a new Stop click try again after a lost interrupt, and never throws fro
   if (!job) throw new Error('No job')
   server.loseNextCall('t3_thread_interrupt')
   await turns.jobs.stop(job.id, 'stop-1')
+  expect(turns.store.db.prepare("SELECT op_id FROM approvals WHERE op_id = 'stop-1'").all()).toEqual([{ op_id: 'stop-1' }])
   expect(turns.jobs.list()[0]?.phase).not.toBe('stopped')
   await manager.connect('t3')
   // The same click again is the same click: nothing more is sent.

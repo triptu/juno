@@ -117,7 +117,7 @@ export const isT3ThreadUrl = (url: string): boolean => /^t3-thread:\/\/v1\/[a-zA
 export const isOpenableUrl = (url: string): boolean => OPENABLE.test(url) || isT3ThreadUrl(url)
 
 export const OpenableUrl = Schema.String.check(
-  Schema.makeFilter((url: string) => isOpenableUrl(url) || 'an https: URL, or http: on loopback', {
+  Schema.makeFilter((url: string) => isOpenableUrl(url) || 'an https: URL, http: on loopback, or a T3 thread link', {
     title: 'OpenableUrl',
   }),
 )

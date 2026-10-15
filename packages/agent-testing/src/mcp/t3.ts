@@ -227,7 +227,7 @@ export async function startFakeT3(options: FakeT3Options = {}): Promise<FakeT3> 
         thread.pending = thread.pending.filter((r) => r !== request)
         answers.push({ requestId: request.requestId, answers: given as Record<string, unknown> })
         if (thread.pending.length === 0 && thread.status === 'waiting') thread.status = 'running'
-        return json({ requestId: request.requestId, accepted: true })
+        return json({ sequence: answers.length })
       },
     },
     t3_worktree_list: {

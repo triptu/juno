@@ -80,7 +80,7 @@ describe('card schema parity', () => {
   })
 
   it('agrees on URL validation inside nested card targets', () => {
-    const urls = fc.oneof(text, fc.tuple(
+    const urls = fc.oneof(text, fc.constantFrom('t3-thread://v1/thread-1', 't3-thread://v1/../other'), fc.tuple(
       fc.constantFrom('https://', 'http://', 'file://', 'javascript:', ''),
       fc.constantFrom('localhost', 'localhost.evil.com', '127.0.0.1', '[::1]', 'example.com', ''),
       text,

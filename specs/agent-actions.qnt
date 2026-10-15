@@ -84,6 +84,9 @@ module actionsProtocol {
   // A card runs once and has no retry button, so a click on a child that was
   // already authorized is never honoured unless its destination deduplicates
   // (`noRepeatAuthorization`). The owner asks Juno for a new card instead.
+  // Task Stop supplies this click for a separate interrupt intent, under the
+  // Stop op id. It cannot reuse the launch approval. Ask again on an expired
+  // card supplies no click: a fresh owner request must first propose new work.
   action click(k: int): bool = {
     nondet i = currentIntent(k).oneOf()
     s' = { ...s, approvals: s.approvals.union(Set({ id: s.nextApproval, child: k,
