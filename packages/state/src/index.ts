@@ -1,6 +1,6 @@
 export { command, liveQuery, prefetch, rowAtom, runCommand, type CommandAtom, type ErrorOf, type LiveListAtom, type LiveValueAtom } from './atoms'
 export { configureConnection, connectionStateAtom, makeRegistry, registry, restartEngine, type ConnectionState, type Registry } from './client'
-export { engineStatusAtom, pingCommand } from './engine'
+export { engineStatusAtom, OFFLINE_GRACE_MILLIS, pingCommand, syncNoticeAtom, type SyncNotice } from './engine'
 export { importFromSlackAppCommand, sessionStatusAtom, signedInAtom, signInCommand, signOutCommand, type ReadySession } from './session'
 export { viewPillsAtom, viewSheetAtom, viewsAtom, type ViewPill, type ViewSheetState } from './views'
 export { defaultTopicListFilter, joinTopicWindow, topicCountsAtom, topicListAtom, type TopicListFilter } from './topics'
