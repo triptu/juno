@@ -4,6 +4,8 @@
  * Times are minutes before the clock's "now" when the seed runs.
  */
 import type { Team, Ts, User } from '@juno/slack-schema'
+import { fileObject } from './files.ts'
+import { samplePdf, samplePng } from './samples.ts'
 import { NEVER_READ, Workspace, type ConversationKind } from './state.ts'
 
 export const TEAM: Team = {
@@ -60,8 +62,41 @@ export interface SeedMessage {
   readonly ago: number
   readonly reactions?: ReadonlyArray<readonly [name: string, ...users: string[]]>
   readonly replies?: ReadonlyArray<SeedMessage>
+  /** Files on the message. Their urls serve the bytes. */
+  readonly files?: ReadonlyArray<SeedFile>
   /** Thread settings, on a root only. Default: subscribed, all read. */
   readonly thread?: { readonly subscribed?: boolean; readonly unread?: number }
+}
+
+export interface SeedFile {
+  readonly id: string
+  readonly name: string
+  readonly title: string
+  readonly mimetype: string
+  readonly bytes: () => Buffer
+}
+
+/** An image and a PDF in the product thread "Proposal: cut offline mode…", for attachment tests. */
+export const EARLY_ACCESS_PNG: SeedFile = {
+  id: 'F0SEEDFLOW',
+  name: 'early-access-flow.png',
+  title: 'Early access flow',
+  mimetype: 'image/png',
+  bytes: () => samplePng(960, 640),
+}
+
+export const Q4_PLAN_PDF: SeedFile = {
+  id: 'F0SEEDPLAN',
+  name: 'q4-plan.pdf',
+  title: 'Q4 plan',
+  mimetype: 'application/pdf',
+  bytes: () =>
+    samplePdf('Q4 plan', [
+      'One big bet: sync reliability.',
+      'Cut: offline mode, public API v3.',
+      'Design partners get an early access flow for v3.',
+      'Review on Thursday.',
+    ]),
 }
 
 const DAY = 1440
@@ -147,8 +182,8 @@ export const CONVERSATIONS: ReadonlyArray<SeedConversation> = [
           { from: 'U0PRIYA', text: 'Agree on offline. API v3 has two design partners waiting, though.', ago: 102 },
           { from: 'U0TUSHAR', text: "Eng view: cutting both frees about three engineers for sync. I'm for it.", ago: 75 },
           { from: 'U0MAYA', text: "Great. I'll write it up for Thursday's review.", ago: 64, reactions: [['pray', 'U0PRIYA']] },
-          { from: 'U0PRIYA', text: "I'll mock an early access flow for the partners so v3 doesn't feel dropped.", ago: 57 },
-          { from: 'U0MAYA', text: 'Draft is up. Cross-posting to <#C0LEADERSHIP|leadership> once <@U0TUSHAR> has looked.', ago: 25 },
+          { from: 'U0PRIYA', text: "I'll mock an early access flow for the partners so v3 doesn't feel dropped.", ago: 57, files: [EARLY_ACCESS_PNG] },
+          { from: 'U0MAYA', text: 'Draft is up. Cross-posting to <#C0LEADERSHIP|leadership> once <@U0TUSHAR> has looked.', ago: 25, files: [Q4_PLAN_PDF] },
         ],
       },
       {
@@ -442,6 +477,8 @@ export function seedWorkspace(workspace: Workspace, avatarBase: string): void {
   const now = workspace.clock.now()
   const minute = 60_000
   const at = (ago: number) => now - ago * minute
+  // Avatars are served at `<base>/avatars`, files at `<base>/files`.
+  const baseUrl = avatarBase.replace(/\/avatars$/, '')
 
   for (const person of PEOPLE) workspace.addUser(userObject(person, avatarBase))
 
@@ -488,11 +525,18 @@ export function seedWorkspace(workspace: Workspace, avatarBase: string): void {
   const tsOf = new Map<SeedMessage, Ts>()
   for (const entry of flat) {
     const parentTs = entry.parent === undefined ? undefined : tsOf.get(entry.parent)
+    const files = entry.seed.files?.map((file) => {
+      const bytes = file.bytes()
+      const stored = { id: file.id, name: file.name, title: file.title, length: bytes.length, user: entry.seed.from, created: at(entry.seed.ago), bytes, mimetype: file.mimetype }
+      workspace.files.set(file.id, stored)
+      return fileObject(baseUrl, stored, workspace.conversation(entry.channel)?.kind === 'public')
+    })
     const posted = workspace.post({
       channel: entry.channel,
       user: entry.seed.from,
       text: entry.seed.text,
       at: at(entry.seed.ago),
+      ...(files === undefined ? {} : { files }),
       ...(parentTs === undefined ? {} : { threadTs: parentTs }),
       silent: true,
     })

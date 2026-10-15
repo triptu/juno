@@ -5,6 +5,8 @@
  */
 import type { Message, MethodArgs, MethodName, MethodOk, SearchMatch, ThreadView } from '@juno/slack-schema'
 import { compareTs, isReply, permalinkPath } from '@juno/slack-schema'
+import { fileObject } from './files.ts'
+import { blocksToText } from './richtext.ts'
 import type { Workspace } from './state.ts'
 
 export class ApiError {
@@ -443,33 +445,54 @@ export const handlers: Handlers = {
     }
   },
 
-  'files.getUploadURLExternal': (ctx, args) => {
+  'files.getUploadURL': (ctx, args) => {
     const ws = ctx.workspace
     const id = `F0${String(ws.files.size + 1).padStart(4, '0')}`
     ws.files.set(id, { id, name: args.filename, length: args.length, user: ws.selfId, created: ws.clock.now(), bytes: undefined, mimetype: 'application/octet-stream' })
-    return { upload_url: ctx.uploadUrl(id), file_id: id }
+    return { upload_url: ctx.uploadUrl(id), file: id }
   },
 
-  'files.completeUploadExternal': (ctx, args) => {
+  'files.completeUpload': (ctx, args) => {
     const ws = ctx.workspace
-    const files = []
+    const stored = []
     for (const entry of args.files) {
-      const stored = ws.files.get(entry.id)
-      if (stored === undefined || stored.bytes === undefined) return new ApiError('file_not_found')
-      files.push(fileObject(ctx, stored, entry.title))
+      const file = ws.files.get(entry.id)
+      if (file?.bytes === undefined) return new ApiError('file_not_found')
+      stored.push({ file, title: entry.title })
     }
-    if (args.channel_id !== undefined) {
-      const conversation = requireConversation(ctx, args.channel_id, true)
-      if (conversation instanceof ApiError) return conversation
-      ws.post({
-        channel: args.channel_id,
-        user: ws.selfId,
-        text: args.initial_comment ?? '',
-        ...(args.blocks === undefined ? {} : { blocks: args.blocks }),
-        ...(args.thread_ts === undefined ? {} : { threadTs: args.thread_ts }),
-        files,
-      })
+    for (const { file, title } of stored) if (title !== undefined && title !== '') file.title = title
+    return { files: stored.map(({ file }) => fileObject(ctx.baseUrl, file)) }
+  },
+
+  /** Posts one message by self carrying the files, like `chat.postMessage` (same events). */
+  'files.share': (ctx, args) => {
+    const ws = ctx.workspace
+    if (args.files.length === 0) return new ApiError('invalid_arguments')
+    const conversation = requireConversation(ctx, args.channel, true)
+    if (conversation instanceof ApiError) return conversation
+    if (conversation.archived) return new ApiError('is_archived')
+    const stored = []
+    for (const id of args.files) {
+      const file = ws.files.get(id)
+      if (file?.bytes === undefined) return new ApiError('file_not_found')
+      stored.push(file)
     }
+    if (args.thread_ts !== undefined) {
+      const root = ws.find(args.channel, args.thread_ts)
+      if (root === undefined || isReply(root)) return new ApiError('thread_not_found')
+    }
+    const files = stored.map((file) => fileObject(ctx.baseUrl, file, conversation.kind === 'public'))
+    const text = args.comment ?? (args.blocks === undefined ? undefined : blocksToText(args.blocks))
+    ws.post({
+      channel: args.channel,
+      user: ws.selfId,
+      ...(text === undefined ? {} : { text }),
+      ...(args.blocks === undefined ? {} : { blocks: args.blocks }),
+      ...(args.thread_ts === undefined ? {} : { threadTs: args.thread_ts }),
+      ...(args.broadcast === undefined ? {} : { broadcast: args.broadcast }),
+      clientMsgId: args.client_msg_id,
+      files,
+    })
     return { files }
   },
 }
@@ -482,29 +505,6 @@ function reaction(ctx: MethodContext, args: MethodArgs<'reactions.add'>, add: bo
   if (!/^[a-z0-9_+-]+(::skin-tone-\d)?$/.test(args.name)) return new ApiError('invalid_name')
   const failure = ws.react(args.channel, args.timestamp, args.name, ws.selfId, add)
   return failure === undefined ? {} : new ApiError(failure)
-}
-
-function fileObject(ctx: MethodContext, stored: { id: string; name: string; length: number; user: string; created: number; mimetype: string }, title?: string) {
-  const url = `${ctx.baseUrl}/files/${stored.id}/${encodeURIComponent(stored.name)}`
-  return {
-    id: stored.id,
-    created: Math.floor(stored.created / 1000),
-    timestamp: Math.floor(stored.created / 1000),
-    name: stored.name,
-    title: title ?? stored.name,
-    mimetype: stored.mimetype,
-    filetype: stored.name.split('.').pop() ?? '',
-    pretty_type: stored.mimetype,
-    user: stored.user,
-    size: stored.length,
-    mode: 'hosted',
-    is_external: false,
-    is_public: false,
-    url_private: url,
-    url_private_download: `${url}?download=1`,
-    permalink: url,
-    ...(stored.mimetype.startsWith('image/') ? { thumb_64: `${url}?thumb=64`, thumb_360: `${url}?thumb=360` } : {}),
-  }
 }
 
 interface ParsedQuery {

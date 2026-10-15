@@ -192,3 +192,14 @@ export {
   type HomeScene,
   type HomeShown,
 } from './home'
+export { attachFiles, type FileLike } from './staging'
+export {
+  attachmentsAtom,
+  clearAttachments,
+  downloadFile,
+  readyFiles,
+  removeAttachment,
+  restoreAttachments,
+  uploadProgressAtom,
+  type Attachment,
+} from './attachments'

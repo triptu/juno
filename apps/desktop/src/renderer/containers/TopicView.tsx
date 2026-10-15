@@ -1,5 +1,5 @@
-import { memo, startTransition, useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
-import { MESSAGE_WINDOW_MAX, readsMarkRead, type MessageView, type TopicDetail } from '@juno/contract'
+import { lazy, memo, startTransition, Suspense, useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
+import { MESSAGE_WINDOW_MAX, readsMarkRead, type FileView, type MessageView, type TopicDetail } from '@juno/contract'
 import {
   bottomWindow,
   catchUpDoneAtom,
@@ -25,6 +25,8 @@ import {
   topicAtom,
   type MessageWindow,
   type ScrollSnapshot,
+  uploadProgressAtom,
+  downloadFile,
 } from '@juno/state'
 import { afterPaint, measure } from '@juno/state/perf'
 import { useAtomValue } from '@juno/state/react'
@@ -48,6 +50,7 @@ import { useMessageActions, type ComposerHandle } from './messageActions'
 import { showPersonMenu } from './notifyActions'
 import { scopeToChannel, showChannelMenu } from './placeMenus'
 import { takeSendMark } from './sendMark'
+import { attach } from './attachments'
 import { TopicComposer } from './TopicComposer'
 import { cancelRename, renameTopic, showTopicMenu, toggleResolved } from './topicActions'
 
@@ -210,6 +213,21 @@ function MainThreads({ channel, onClose }: { readonly channel: string; readonly 
 }
 
 /** Every topic draws its art (or the Tide placeholder) except a DM's Main, which keeps the person, as the sidebar tile does. */
+const ImageViewerPanel = lazy(() => import('./ImageViewerPanel'))
+
+/** Fetch the viewer's chunk once a topic has painted, so the first open does not wait for it. */
+let viewerLoaded = false
+function preloadViewer(): void {
+  if (viewerLoaded) return
+  viewerLoaded = true
+  window.requestIdleCallback(() => void import('./ImageViewerPanel'))
+}
+
+/** Download on a file row or in the viewer: main saves it into ~/Downloads and shows it in Finder. */
+function downloadMessageFile(file: FileView): void {
+  if (file.download !== undefined) void downloadFile({ url: file.download, name: file.name })
+}
+
 export function hasArt(detail: TopicDetail): boolean {
   return !(detail.kind === 'main' && (detail.channel.kind === 'im' || detail.channel.kind === 'mpim'))
 }
@@ -308,6 +326,11 @@ function Topic({ id, detail, readOnly = false, underHeader = true }: TopicProps)
   const [far, setFar] = useState(false)
   // The newest message the user has seen at the bottom; the pill counts those after it.
   const [seenTs, setSeenTs] = useState<string | undefined>(undefined)
+  // Files dragged over the topic, and the image open in the viewer.
+  const [dropping, setDropping] = useState(false)
+  const [viewing, setViewing] = useState<FileView | undefined>(undefined)
+  const progress = useAtomValue(uploadProgressAtom)
+  useEffect(preloadViewer, [])
   // The position to hold (`Pin`), and the scrollTop it last set.
   const pin = useRef<Pin | undefined>(undefined)
   const pinnedTop = useRef(0)
@@ -583,9 +606,12 @@ function Topic({ id, detail, readOnly = false, underHeader = true }: TopicProps)
       onOpenThread={readOnly ? openThreadInNewTab : openThread}
       onChannel={scopeToChannel}
       onLink={openExternal}
+      onDownload={downloadMessageFile}
+      {...(progress._tag === 'Success' && Object.keys(progress.value).length > 0 ? { uploadProgress: progress.value } : {})}
       {...(readOnly
         ? {}
         : {
+            onOpenImage: setViewing,
             onRetry: retry,
             onDiscard: discard,
             onMessageMenu: messageActions.onMessageMenu,
@@ -627,8 +653,19 @@ function Topic({ id, detail, readOnly = false, underHeader = true }: TopicProps)
         />
       }
       pill={showPill ? <NewMessagesPill count={newCount} onJump={jumpToLatest} /> : undefined}
-      composer={<TopicComposer key={id} detail={detail} onSent={sent} handle={composer} onArrowUpEmpty={messageActions.selectNewest} />}
-      floating={messageActions.floating}
+      composer={<TopicComposer key={id} detail={detail} onSent={sent} handle={composer} onArrowUpEmpty={messageActions.selectNewest} dropping={dropping} />}
+      floating={
+        <>
+          {messageActions.floating}
+          {viewing === undefined ? null : (
+            <Suspense fallback={null}>
+              <ImageViewerPanel file={viewing} onClose={() => setViewing(undefined)} onDownload={downloadMessageFile} />
+            </Suspense>
+          )}
+        </>
+      }
+      onFiles={(files) => attach(id, files)}
+      onDragFiles={setDropping}
     >
       {messages}
     </TopicViewFrame>

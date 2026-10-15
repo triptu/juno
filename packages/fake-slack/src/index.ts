@@ -14,7 +14,8 @@ import { asTs, Workspace, type Subscription } from './state.ts'
 export type { CallRecord, Session } from './server.ts'
 export type { ConversationRecord, PostInput, Subscription } from './state.ts'
 export { Workspace } from './state.ts'
-export { CONVERSATIONS, PEOPLE, SELF_ID, TEAM, seedWorkspace } from './fixtures.ts'
+export { CONVERSATIONS, EARLY_ACCESS_PNG, PEOPLE, Q4_PLAN_PDF, SELF_ID, TEAM, seedWorkspace, type SeedFile } from './fixtures.ts'
+export { samplePdf, samplePng } from './samples.ts'
 
 export interface FakeSlackOptions {
   /** 0 picks a free port. */
@@ -300,6 +301,15 @@ export class FakeSlack {
     this.server.delayFiles(input.ms)
   }
 
+  /**
+   * The next `times` (default 1) upload POSTs answer HTTP 500 and store
+   * nothing, so a client can show a failed upload and retry. With `after`,
+   * that many POSTs succeed first.
+   */
+  failUploads(input: { times?: number; after?: number } = {}): void {
+    this.server.failUploads(input.times ?? 1, input.after ?? 0)
+  }
+
   /** Frames of these types wait for `releaseFrames`, so a test can deliver an event late or never. */
   holdFrames(input: { types: ReadonlyArray<string> }): void {
     this.server.holdFrames(input.types)
@@ -361,6 +371,7 @@ export class FakeSlack {
       loseResponse: (i) => this.loseResponse(i),
       holdFrames: (i) => this.holdFrames(i),
       delayFiles: (i) => this.delayFiles(i),
+      failUploads: (i) => this.failUploads(i),
       releaseFrames: (i) => this.releaseFrames(i),
       heldFrames: () => this.heldFrames(),
       expireSession: () => this.expireSession(),

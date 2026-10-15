@@ -53,6 +53,8 @@ export interface StoredFile {
   readonly created: number
   bytes: Buffer | undefined
   mimetype: string
+  /** Set by `files.completeUpload`. The name stands in until then. */
+  title?: string
 }
 
 export interface PostInput {

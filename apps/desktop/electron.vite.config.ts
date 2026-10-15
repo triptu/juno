@@ -36,6 +36,44 @@ function contentSecurityPolicy(): Plugin {
   }
 }
 
+// The icon weights Juno draws: `IconWeight` in packages/ui/src/Icon.tsx. Keep the two lists the same.
+const ICON_WEIGHTS = new Set(['regular', 'bold', 'fill', 'duotone'])
+
+/**
+ * Drops the icon weights Juno never draws (thin and light) from each
+ * Phosphor icon module. Every icon ships all six weights as one `Map`
+ * built when the module loads, so tree shaking cannot remove the unused
+ * ones; they were about a third of the icons' share of the first bundle.
+ */
+function phosphorWeights(): Plugin {
+  const defs = /@phosphor-icons\/react\/dist\/defs\/[A-Za-z0-9]+\.es\.js$/
+  return {
+    name: 'juno:phosphor-weights',
+    enforce: 'pre',
+    transform(code, id) {
+      if (!defs.test(id)) return undefined
+      let out = code
+      for (const weight of ['thin', 'light']) {
+        if (ICON_WEIGHTS.has(weight)) continue
+        const start = out.search(new RegExp(`\\[\\s*"${weight}",`))
+        if (start < 0) continue
+        // The entry ends at the bracket that closes it; path data holds no brackets or quotes.
+        let depth = 0
+        let end = start
+        for (; end < out.length; end++) {
+          const char = out[end]
+          if (char === '[' || char === '(' || char === '{') depth++
+          else if (char === ']' || char === ')' || char === '}') depth--
+          if (depth === 0) break
+        }
+        const comma = /^\s*,/.exec(out.slice(end + 1))
+        out = out.slice(0, start) + out.slice(end + 1 + (comma?.[0].length ?? 0))
+      }
+      return { code: out, map: null }
+    },
+  }
+}
+
 /**
  * Preloads the fonts the first screen uses (performance.md 2.3): Figtree for
  * the shell and the sidebar, Instrument Serif for Home's greeting. Without
@@ -135,6 +173,7 @@ export default defineConfig({
     },
     plugins: [
       contentSecurityPolicy(),
+      phosphorWeights(),
       preloadFonts([/figtree-latin-wght-normal-[^/]*\.woff2$/, /instrument-serif-latin-400-normal-[^/]*\.woff2$/]),
       stylex.vite({
         useCSSLayers: true,

@@ -26,9 +26,18 @@ import {
 import { liveQuery, runCommand } from './atoms'
 import type { Registry } from './client'
 
-/** Queues the text for `to`. With `draftOf`, that topic's draft is cleared with it. Resolves with the `Exit`; on success, the topic. */
-export const sendMessage = (registry: Registry, to: SendTarget, text: string, draftOf?: string) =>
-  runCommand(registry, messagesSend, { to, text, clientMsgId: crypto.randomUUID(), ...(draftOf === undefined ? {} : { draftOf }) })
+/**
+ * Queues the text, and any staged `files`, for `to`. With `draftOf`, that topic's draft is cleared with it.
+ * Resolves with the `Exit`; on success, the topic.
+ */
+export const sendMessage = (registry: Registry, to: SendTarget, text: string, draftOf?: string, files?: ReadonlyArray<string>) =>
+  runCommand(registry, messagesSend, {
+    to,
+    text,
+    clientMsgId: crypto.randomUUID(),
+    ...(draftOf === undefined ? {} : { draftOf }),
+    ...(files === undefined || files.length === 0 ? {} : { files }),
+  })
 
 /**
  * The longest a send waits for its checks. They read the store only, so

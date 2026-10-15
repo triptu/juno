@@ -80,7 +80,7 @@ export function windowStatements(target: WindowTarget, range: { readonly anchor?
 
 /** The topic's pending messages (architecture 5.7), oldest first, through `pending_messages_channel (channel, thread_ts)`. */
 export function pendingStatement(target: WindowTarget): Statement {
-  const columns = 'client_msg_id, channel, thread_ts, text, blocks_json, created_at, state'
+  const columns = 'client_msg_id, channel, thread_ts, text, blocks_json, file_ids_json, created_at, state'
   return target.kind === 'main'
     ? { sql: `SELECT ${columns} FROM pending_messages WHERE channel = ? AND thread_ts IS NULL ORDER BY created_at, client_msg_id`, params: [target.channel] }
     : { sql: `SELECT ${columns} FROM pending_messages WHERE channel = ? AND thread_ts = ? ORDER BY created_at, client_msg_id`, params: [target.channel, target.threadTs] }

@@ -57,8 +57,22 @@ export interface CallOptions {
   readonly singleAttempt?: boolean
 }
 
+/** A file's bytes as `upload` sends them. */
+export interface UploadBody {
+  readonly name: string
+  readonly mimetype: string
+  readonly bytes: Uint8Array
+}
+
 export interface SlackApiShape {
   call<M extends MethodName>(method: M, args: MethodArgs<M>, options?: CallOptions): Effect.Effect<MethodOk<M>, SlackApiError>
+  /**
+   * Posts a file's bytes to the `upload_url` that `files.getUploadURL`
+   * gave, as the official client does: `multipart/form-data` with one
+   * field, `file`, and no token (the url carries its own grant). One
+   * attempt; any answer but HTTP 200 is a `SlackTransportError`.
+   */
+  upload(url: string, file: UploadBody): Effect.Effect<void, SlackTransportError>
 }
 
 export class SlackApi extends Context.Service<SlackApi, SlackApiShape>()('juno/slack/SlackApi') {
@@ -103,7 +117,22 @@ export class SlackApi extends Context.Service<SlackApi, SlackApiShape>()('juno/s
           return yield* withRetries(queue, attempts, lane, method, (attempt) => once(method, fields, attempt))
         }).pipe(Effect.withSpan('SlackApi.call', { attributes: { method, lane: options.lane ?? 'interactive' } }))
 
-      return SlackApi.of({ call })
+      const upload = (url: string, file: UploadBody) =>
+        Effect.gen(function* () {
+          const method = 'upload'
+          const body = new FormData()
+          body.append('file', new Blob([file.bytes as Uint8Array<ArrayBuffer>], { type: file.mimetype }), file.name)
+          const response = yield* transport.request({ url, method: 'POST', headers: {}, body }).pipe(
+            // A large file takes longer than a call: the timeout grows by a second per 50 KB.
+            Effect.timeout(config.requestTimeoutMillis + Math.ceil(file.bytes.byteLength / 50)),
+            Effect.mapError((error) => new SlackTransportError({ method, message: error._tag === 'TimeoutError' ? 'timeout' : error.message, retryable: true })),
+          )
+          if (response.status !== 200) {
+            return yield* new SlackTransportError({ method, status: response.status, message: `HTTP ${response.status}`, retryable: isRetryableStatus(response.status) })
+          }
+        }).pipe(Effect.withSpan('SlackApi.upload', { attributes: { size: file.bytes.byteLength } }))
+
+      return SlackApi.of({ call, upload })
     }),
   )
 }
