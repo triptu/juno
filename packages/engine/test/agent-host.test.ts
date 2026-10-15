@@ -355,3 +355,23 @@ describe('the AgentHost port', () => {
     expect(found).toMatchObject({ _tag: 'found' })
   })
 })
+
+describe('reply-watch host reads', () => {
+  it('verifies the owner, emits conversation changes, and refreshes beyond one Slack page', async () => {
+    const { engine, agent, account } = await hostWithAgent('disabled')
+    const root = engine.fake.injectMessage({ channel: CHANNEL, user: 'U0TUSHAR', text: 'Can someone check the test plan?' })
+    const conversation = { channelId: CHANNEL, ts: root.ts, threadTs: root.ts }
+    const check = (refresh: boolean) => agent.client['host.schedule.check']({ accountId: account, conversation, refresh })
+    await waitFor(async () => (await ok(check(false))).ownMessage || undefined, 30_000, 'the owner message in the local store')
+    const changed = ok(agent.client['host.schedule.changes']().pipe(Stream.drop(1), Stream.take(1), Stream.runDrain))
+    for (let n = 0; n < 205; n++) engine.fake.injectMessage({ channel: CHANNEL, user: 'U0MAYA', threadTs: root.ts, text: `Test reply ${n}` })
+    await changed
+    const snapshot = await ok(check(true))
+    expect(snapshot.owner).toBe('U0TUSHAR')
+    expect(snapshot.ownMessage).toBe(true)
+    expect(snapshot.messages).toHaveLength(205)
+    expect(snapshot.messages.every((message) => message.threadTs === root.ts && message.userId === 'U0MAYA' && !('text' in message))).toBe(true)
+    expect(await ok(agent.client['host.schedule.hours']({ accountId: account }))).toMatchObject({ weekdays: [1, 2, 3, 4, 5], start: 540, end: 1140 })
+    expect(await failure(agent.client['host.schedule.check']({ accountId: 'wrong-account' as typeof account, conversation, refresh: true }))).toMatchObject({ reason: 'stale' })
+  })
+})

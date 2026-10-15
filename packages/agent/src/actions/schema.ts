@@ -123,4 +123,4 @@ const actions2 = [
   ) STRICT`,
 ]
 
-export const ACTIONS_MIGRATIONS: MigrationSet = { name: 'actions', steps: [actions1, actions2] }
+export const ACTIONS_MIGRATIONS: MigrationSet = { name: 'actions', steps: [actions1, actions2, ['ALTER TABLE cards ADD COLUMN expired_at INTEGER']] }

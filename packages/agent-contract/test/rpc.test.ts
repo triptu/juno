@@ -60,6 +60,9 @@ const cases: Record<string, readonly [unknown, unknown]> = {
   'host.topics.resolve': [dispatch, unknown],
   'host.outbox.cancel': [{ authorizationId: 'authorization', attemptId: 'attempt' }, { _tag: 'cancel-requested' }],
   'host.outbox.reconcileSend': [{ accountId: 'account', channelId: 'channel', actionId: 'action', attemptId: 'attempt' }, { _tag: 'unknown' }],
+  'host.schedule.check': [{ accountId: 'account', conversation: { channelId: 'C', ts: '100' }, refresh: true }, { owner: 'U', ownMessage: true, messages: [] }],
+  'host.schedule.hours': [{ accountId: 'account' }, { timeZone: 'UTC', weekdays: [1], start: 540, end: 1020 }],
+  'host.schedule.changes': [null, undefined],
   'host.presence': [null, { online: true, aiEnabled: true, quietHours: false, ownerActive: true, accountId: 'account', thisTopic: null }],
   'host.notification.deliver': [{ id: 'notification', title: 'Example', body: 'Example', deliver: 'digest' }, 'held'],
 }
@@ -74,7 +77,7 @@ function roundTrip<S extends Schema.Codec<unknown, unknown>>(schema: S, value: u
 const groups = { ChatRpcs: C.ChatRpcs, CardRpcs: C.CardRpcs, ScheduledRpcs: C.ScheduledRpcs, RemembersRpcs: C.RemembersRpcs,
   MemoryRpcs: C.MemoryRpcs, ActivityRpcs: C.ActivityRpcs, ConnectionsRpcs: C.ConnectionsRpcs, ReviewRpcs: C.ReviewRpcs,
   SettingsRpcs: C.SettingsRpcs, HostHelloRpcs: C.HostHelloRpcs, HostReadRpcs: C.HostReadRpcs,
-  HostActionRpcs: C.HostActionRpcs, HostPresenceRpcs: C.HostPresenceRpcs, HostNotificationRpcs: C.HostNotificationRpcs }
+  HostActionRpcs: C.HostActionRpcs, HostPresenceRpcs: C.HostPresenceRpcs, HostScheduleRpcs: C.HostScheduleRpcs, HostNotificationRpcs: C.HostNotificationRpcs }
 
 describe('RPC group wire round trips', () => {
   for (const [name, group] of Object.entries(groups)) it(name, () => {
