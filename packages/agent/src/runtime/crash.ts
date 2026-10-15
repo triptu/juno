@@ -31,7 +31,7 @@ export const CRASH_POINTS = {
     expect: '§3: the journal is ahead of the inbox and the archive; recovery resumes and projection catches up.',
   },
   'approval.committed': {
-    spec: 'agent-actions.qnt', after: 'click', before: 'authorize', scenarios: ['approvedEventuallyAttempted'],
+    spec: 'agent-actions.qnt', after: 'click', before: 'authorize', scenarios: ['approvedDrain'],
     expect: '§6.3: the click is durable and nothing is authorized; the restarted agent authorizes it once and dispatches it.',
   },
   'authorization.consumed': {

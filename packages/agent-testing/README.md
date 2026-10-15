@@ -68,7 +68,7 @@ The host's action RPCs as the agent's `ActionHost` takes them (`openTurns({ acti
 | `inbox.committed` | recovery | `inbox` | `ack` | `inboxPowerLoss` |
 | `bridge.reset` | recovery | `reset` | `submit` | `bridgeReplay` |
 | `bridge.submitted` | recovery | `submit` | `submitted` | `bridgeReplay`, `journalAheadStep` |
-| `approval.committed` | actions | `click` | `authorize` | `approvedEventuallyAttempted` |
+| `approval.committed` | actions | `click` | `authorize` | `approvedDrain` |
 | `authorization.consumed` | actions | `authorize` | `send` | `startupAttempt`, recovery `authorityCrash` |
 | `attempt.beforeReceipt` | actions | `accept` | `receipt` | `negativeLookup`, `unknownRetry` |
 | `rotation.drained` | recovery | `project` | `rotate` | `rotationIdentity` |
