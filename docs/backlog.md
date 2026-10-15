@@ -3,7 +3,6 @@
 Small items noticed during work that are not yet assigned to a milestone. Remove an item when it is done.
 
 - Identity-provider sign-in (Google, Okta) leaves slack.com and is blocked by the sign-in window allow-list. The Slack-app import covers it for now.
-- The socket does not use the system proxy yet: main resolves it, but no `ws` agent is passed.
 - `pnpm smoke:live` always imports from the Slack app; it cannot reuse `secrets.bin` outside Electron.
 - After the body-sniff sign-in fallback, `secrets.bin` keeps `userId: ''` until a later sign-in.
 - A lint rule that bans raw colour and size values in components (StyleX does not enforce token use).
@@ -16,6 +15,7 @@ Small items noticed during work that are not yet assigned to a milestone. Remove
 - Confirm search-based thread discovery (`is:thread after:`) works with an `xoxc` session in the live smoke.
 - Edits and deletes made during a socket drop are recovered only for thread text (via search). Opening a topic, and the reconnect refresh of open topics, fetch only messages newer than the stored ones, so an edit to an older stored message is not recovered either. `cached_latest_updates` is still unknown.
 - Sync: `subscriptions.thread.getView` returns 10 threads per page regardless of `limit` (32 calls on the real workspace). Consider paging in parallel within the lane budget.
+- The socket proxy agent speaks HTTP CONNECT only; a SOCKS-only system proxy connects directly. Proxy authentication is not passed to `ws`.
 - Cold boot on the real workspace takes about 7 minutes to reach `live` (sidebar data complete after 29 s) because of the 1.5 s background lane spacing. Revisit the spacing once the rate-limit behaviour is measured.
 - AI: the eval's expectations test the direction of each judgement, not calibration. Before the assistant fixes its confidence thresholds, collect a few hundred real decisions from the classifier and check its probabilities against them.
 - AI: `routeCheck` has a 1.5 s budget that only the classifier meets. With the classifier preference empty, the chat model answers in about 1.5 s and the check mostly times out; either accept that or give the chat path its own budget.

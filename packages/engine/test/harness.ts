@@ -95,7 +95,7 @@ export function fakeMain(fake: FakeSlack, initial?: Credentials) {
           cookie: current === undefined ? '' : `d=${current.cookie}`,
           origin: 'https://app.slack.com',
           userAgent: 'Juno test',
-          proxy: 'DIRECT',
+          proxy: network.proxy,
         })
         break
       default:
@@ -104,7 +104,8 @@ export function fakeMain(fake: FakeSlack, initial?: Credentials) {
   })
   // The engine's HTTP transport: the cookie Chromium would attach comes from the "session".
   // With `network.offline` every request fails the way a dropped connection does.
-  const network = { offline: false }
+  // `network.proxy` is Chromium's proxy answer for the socket URL.
+  const network = { offline: false, proxy: 'DIRECT' }
   const httpTransport = HttpTransport.nodeFetch({
     fetch: (input, init) =>
       network.offline
@@ -114,7 +115,7 @@ export function fakeMain(fake: FakeSlack, initial?: Credentials) {
   return {
     host,
     httpTransport,
-    /** Set `offline` to fail every Slack API request as a dropped connection would. */
+    /** Set `offline` to fail every Slack API request as a dropped connection would; `proxy` to answer the socket handshake with a proxy. */
     network,
     get stored() {
       return stored
