@@ -57,6 +57,11 @@ Titles resolve in this order. A title you set by renaming (stored in Juno only) 
 - **Home** (section 12) is what the workspace shows with no tab open, and the Home item in the sidebar opens it as a tab.
 - **Reading width.** Message columns are capped around 800px and centered, so long lines stay readable on wide windows.
 
+### Sign-in
+
+- **The sign-in page.** With no session the window is one page: "Hi, I'm Juno", **Sign in to Slack** (Slack's own sign-in, in a window) and **Use the Slack app's session** (reads the signed-in Slack app; macOS asks for its keychain item). One line under them says what is happening or what went wrong. A session Slack no longer accepts shows "Slack signed you out" with the same two actions.
+- **Set up Juno.** After the first sign-in, when no model provider is set up, the same page shows "Set up Juno" before the app. It offers **OpenRouter** (an API key), **OpenAI-compatible** (a base URL and an optional key) and **Codex** when it is installed on this Mac (Sign in to Codex opens the browser and signs in to Juno's own Codex home, not yours). Once one is set up, a Model row offers its chat models, Sonnet by default. **Continue** saves the key, then finishes with the chosen model; **Skip for now** opens the app with nothing set up. Keys go to the keychain, as in Settings › Juno (13.10). After Skip, AI assist stays on, and the Juno tab and panel say "Juno needs a model" with Add a provider (13.7). The step shows once; Settings › Juno is where the model changes later. Slack syncs in the background while it shows.
+
 ## 5. Sidebar
 
 ### Top to bottom
