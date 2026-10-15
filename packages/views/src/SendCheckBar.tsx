@@ -13,8 +13,6 @@ export type SendCheckFinding =
 
 export interface SendCheckBarProps {
   readonly finding: SendCheckFinding
-  /** 0 to 1, shown as a percentage. */
-  readonly confidence: number
   /** Post in thread, Fix and send, or Send (when the only note is a long sentence). Enter takes it too. */
   readonly onPrimary: () => void
   /** Send to Main, Send as is, or Keep editing. */
@@ -29,11 +27,11 @@ export function sendCheckLabels(finding: SendCheckFinding): readonly [primary: s
 
 /**
  * The bar inside the composer when a check on send finds something
- * (inventory 7.3): what was found, how sure the check is, and two choices.
+ * (inventory 7.3): what was found and two choices.
  * Enter takes the first and Esc returns to editing; the composer owns the
  * keys, the bar only draws.
  */
-export function SendCheckBar({ finding, confidence, onPrimary, onSecondary }: SendCheckBarProps) {
+export function SendCheckBar({ finding, onPrimary, onSecondary }: SendCheckBarProps) {
   const [primary, secondary] = sendCheckLabels(finding)
   return (
     <div data-send-check={finding.kind} {...stylex.props(styles.bar)}>
@@ -55,9 +53,6 @@ export function SendCheckBar({ finding, confidence, onPrimary, onSecondary }: Se
         )}
       </Text>
       <span {...stylex.props(styles.choices)}>
-        <Text variant="kbd" tone="muted">
-          {`${Math.round(confidence * 100)}%`}
-        </Text>
         <Button variant="raised" size="sm" kbd="↵" onClick={onPrimary}>
           {primary}
         </Button>
@@ -108,7 +103,7 @@ const styles = stylex.create({
   note: {
     color: colors['--foreground-muted'],
   },
-  // At the end of the text's line, or of a line of their own. They wrap only in a field too narrow for all three.
+  // At the end of the text's line, or of a line of their own. They wrap only in a field too narrow for both.
   choices: {
     display: 'flex',
     flexWrap: 'wrap',
