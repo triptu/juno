@@ -31,7 +31,7 @@ module actionsProtocol {
     schedule: bool, scheduleRev: int, scheduleAuthority: str, scheduleProposal: int, scheduleApproved: int, wake: Occurrence,
     queued: bool, admissions: List[Occurrence], starts: List[Occurrence],
     quiet: bool, deliverNow: bool, notifications: int,
-    spends: Set[Spend], nextSpend: int, day: int, caps: int -> int, raiseLog: List[Raise], overCapAdmissions: int,
+    spends: Set[Spend], nextSpend: int, day: int, caps: int -> int, capReductions: int -> int, raiseLog: List[Raise], overCapAdmissions: int,
     sealed: bool, label: str, target: int
   }
   var s: State
@@ -56,7 +56,7 @@ module actionsProtocol {
     schedule: false, scheduleRev: 1, scheduleAuthority: "none", scheduleProposal: 0, scheduleApproved: 0,
     wake: { schedule: 1, rev: 1, due: 1 }, queued: false, admissions: List(), starts: List(),
     quiet: false, deliverNow: false, notifications: 0,
-    spends: Set(), nextSpend: 1, day: 0, caps: days.mapBy(_ => 8), raiseLog: List(), overCapAdmissions: 0, sealed: false, label: "init", target: 0
+    spends: Set(), nextSpend: 1, day: 0, caps: days.mapBy(_ => 8), capReductions: days.mapBy(_ => 0), raiseLog: List(), overCapAdmissions: 0, sealed: false, label: "init", target: 0
   }
   pure val days = 0.to(2)
   // A dollar is 4 units; the default cap is $2.
@@ -287,11 +287,12 @@ module actionsProtocol {
     s' = { ...s, raiseLog: s.raiseLog.append({ click: click, day: s.day }), label: "raise" }
   // The local date changes. The new day starts at the default cap.
   action newDay = if (s.day >= 2) idle else s' = { ...s, day: s.day + 1, label: "newDay" }
-  // Settings may lower today's cap only as far as today's obligations.
+  // Lowering the cap preserves existing obligations. The ghost records the
+  // removed allowance so the invariant still checks earlier admissions.
   action setCap(amount: int): bool = {
-    val limit = amount + limitOn(s.day) - s.caps.get(s.day)
-    if (reservedOn(s.day) + actualOn(s.day) > limit or compactionOn(s.day, "") > limit / 4) idle else
-    s' = { ...s, caps: s.caps.set(s.day, amount), label: "setCap" }
+    val removed = if (amount < s.caps.get(s.day)) s.caps.get(s.day) - amount else 0
+    s' = { ...s, caps: s.caps.set(s.day, amount),
+      capReductions: s.capReductions.set(s.day, s.capReductions.get(s.day) + removed), label: "setCap" }
   }
   action invalidate(kind: str): bool = if (kind == "redact") redact("scoped") else s' = { ...s,
     schema: s.schema + (if (kind == "schema") 1 else 0), account: s.account + (if (kind == "account") 1 else 0),
@@ -374,18 +375,15 @@ module actionsProtocol {
       (before.scheduleProposal > 0 and before.scheduleApproved == before.scheduleProposal))) or
     (s.scheduleAuthority == "menu" and (s.label != "scheduleMenu" or beforeMayAuthorize))
   val cleanRunForNoClick = newAuths.forall(a => not(a.grant) or (before.ownerRun and before.clean))
-  // Per day: what the ledger holds stays within the cap and the owner's raises,
-  // compaction within a quarter of it, and no reservation records less than
-  // the provider charged.
-  // The ledger records at least what the provider charged. No reservation is
-  // admitted while the day is at or over its cap. The day, and its compaction
-  // share, exceed the owner's limit by at most what settled requests reported
-  // beyond their reservations: requests already in flight when it filled.
+  // The ledger records at least what the provider charged. New reservations
+  // obey the current cap. Existing obligations may exceed a lowered cap;
+  // capReductions preserves the allowance under which they were admitted.
+  // Settled requests may also report more than their reservations.
   val noAdmissionOverCap = s.overCapAdmissions == 0
   val capHard = noAdmissionOverCap and
     s.spends.forall(r => r.charged <= (if (r.state == "settled") r.actual else r.amount)) and
-    days.forall(d => totalOn(d) <= grantedOn(d) + overReportOn(d, false) and
-      compactionOn(d, "") <= grantedOn(d) / 4 + overReportOn(d, true))
+    days.forall(d => totalOn(d) <= grantedOn(d) + s.capReductions.get(d) + overReportOn(d, false) and
+      compactionOn(d, "") <= (grantedOn(d) + s.capReductions.get(d)) / 4 + overReportOn(d, true))
   // The rule before the over-report decision: the cap is never passed. It does
   // not hold once a request reports more than it reserved (`overReportStep`).
   val strictCap = days.forall(d => totalOn(d) <= grantedOn(d))

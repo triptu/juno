@@ -18,7 +18,7 @@
  *   so the cap cannot track it (`spendUntracked`).
  * - Spend: today's spend from the WP9 ledger (actual plus unknown spend),
  *   and the cap. A new cap applies today at once and is saved for later
- *   days; it may not go below what today has already committed.
+ *   days; existing reservations are kept when it is lowered.
  * - Keys: only whether the active provider refused its key on the last
  *   call. Whether each key is set is main's (`ProviderState`); the keys
  *   themselves stay with main and the provider.
@@ -224,7 +224,7 @@ export function createJunoSettings(options: SettingsOptions): JunoSettings {
       }
       case 'cap': {
         const cap = dollars(next.usd)
-        if (!turns.guard.spend.setCap(cap)) return { _tag: 'refused', reason: 'invalid', message: 'Today has already used more than that.' }
+        turns.guard.spend.setCap(cap)
         save(store, { cap })
         break
       }

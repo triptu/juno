@@ -27,7 +27,6 @@ Small items noticed during work that are not yet assigned to a milestone. Remove
 - Sidebar times should use domain `relativeTime` (needs a `desktop → domain` edge decision).
 - Main rows: engine field for "threads started since Main was last read" (contract + topics query), wired to the TopicRow `newThreads` prop. After M4 WP1 merges.
 - Topic art track: placeholder is a library of free-form Tide-style shapes picked per topic, no container (owner decision 10-13).
-- Juno Agent spend: `setCap` refuses a cap below today's use. Default to take (orchestrator): allow a lower cap; it blocks new spend until tomorrow and never undoes what is spent. WP14 settings container applies it.
 - Juno Agent copy: `chatCopy` needs a missing-key line (today it reuses "OpenRouter rejected the key…"), a rate-limit line (today the generic provider line), and a price-hint template for the model picker. WP12/WP14.
 - Juno Agent: `router/open.ts` copies `openCore`'s open sequence because the router needs the journal for steering. Let `openCore` take a router in place of its serial loop (WP8 owner), then drop the copy.
 - Juno Agent turns, not built in WP11: a `zoom` tool (paged results and the tail placeholder tell the model to zoom), coalescing reports that arrive within 30 s, a proactive run waiting while Juno has an open question, emergency merges before a request is blocked as too large, and applying a chat model change without reopening the engine.

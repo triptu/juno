@@ -487,3 +487,22 @@ async function waitUntil(test: () => boolean, timeoutMs = 10_000) {
     await new Promise((resolve) => setTimeout(resolve, 5))
   }
 }
+
+it('lowering the cap leaves the current reply running and blocks the next one', async () => {
+  h = await turnsHarness({ compaction: false })
+  const inFlight = deferred()
+  const release = deferred()
+  h.fake.script([reply(async () => {
+    inFlight.resolve()
+    await release.promise
+    return answer(say('The current reply finished.'))
+  })])
+  const first = h.send('finish this reply')
+  await inFlight.promise
+  expect(h.turns.guard.spend.setCap(0)).toBe(true)
+  release.resolve()
+  expect((await h.ended(first)).ending).toEqual({ _tag: 'complete' })
+  const second = h.send('another reply')
+  expect((await h.ended(second)).ending).toEqual({ _tag: 'blocked', reason: 'budget' })
+  expect(h.chatRequests()).toHaveLength(1)
+})
