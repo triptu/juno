@@ -1,95 +1,37 @@
-import { execFile, spawn } from 'node:child_process'
-import { mkdir, mkdtemp, rm } from 'node:fs/promises'
+import { codexWriter } from './codex/lifecycle'
+import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
-import { createInterface } from 'node:readline'
-import { promisify } from 'node:util'
-import { Schema } from 'effect'
+import { join } from 'node:path'
+import { createCodexLocal } from './codex/local'
+import type { SpendLedger } from '../spend'
+import { upper, limits } from '@juno/agent-memory'
 import { Codex } from '@openai/codex-sdk'
 import type { Api, Model } from '@earendil-works/pi-ai'
-import { AdmissionError, providerFailure, type ProviderFailure, type ProviderGuardApi, type Revision } from './guard'
+import { AdmissionError, providerFailure, type ProviderFailure, type Revision } from './guard'
 
-const exec = promisify(execFile)
-const Listing = Schema.Struct({ id: Schema.Number, result: Schema.optionalKey(Schema.Unknown) })
-const ModelList = Schema.Struct({ data: Schema.Array(Schema.Struct({ id: Schema.String, hidden: Schema.optionalKey(Schema.Boolean) })), nextCursor: Schema.optionalKey(Schema.NullOr(Schema.String)) })
-const decodeListing = Schema.decodeUnknownOption(Listing)
 export interface CodexOptions {
   readonly agentDir: string
-  readonly guard: ProviderGuardApi
-  /** The bundled CLI in production; startFakeCodex().path in tests. */
+  readonly guard: { readonly spend: SpendLedger; readonly admitHarness: (revision: Revision, model: Model<Api>, prompt: string) => string }
+  /** A removal invalidates every reusable thread before its files are purged. */
+  readonly threadExists?: (id: string) => boolean
+  /** The installed local CLI; startFakeCodex().path in tests. */
   readonly executable: string
 }
+export type CodexStatus = 'signedIn' | 'signedOut' | 'missing'
 export type CodexResult = { readonly kind: 'done'; readonly text: string; readonly threadId: string | null }
   | { readonly kind: 'failed'; readonly failure: ProviderFailure; readonly threadId: string | null }
 
-/** WP20 owns the durable juno.harnessTurn task and the per-turn MCP server. */
+/** Isolated local harness. Never retries a turn, including after a process crash. */
 export function createCodexAdapter(options: CodexOptions) {
-  const home = resolve(options.agentDir, 'codex')
-  const env: Record<string, string> = { CODEX_HOME: home }
-  // No inherited keys, Codex configuration or MCP credentials.
-  for (const name of ['PATH', 'HOME', 'TMPDIR', 'SYSTEMROOT']) {
-    const value = process.env[name]
-    if (value !== undefined) env[name] = value
-  }
-  const status = async (): Promise<'signedIn' | 'signedOut'> => {
-    await mkdir(home, { recursive: true, mode: 0o700 })
-    try {
-      await exec(options.executable, ['login', 'status'], { env, timeout: 10_000, maxBuffer: 64 * 1024 })
-      return 'signedIn'
-    } catch (error) {
-      if (error instanceof Error && /not logged in|signed out/i.test(error.message)) return 'signedOut'
-      throw error
-    }
-  }
+  const local = createCodexLocal(options)
+  const { home, status, environment: env } = local
+  const sessions = new Map<string, { id: string; gen: number; pinRev: number; model: string; tokens: number }>()
+  const busy = new Set<string>()
   return {
-    home,
-    status,
-    /** No login is started implicitly. Settings must sign in using this home. */
-    loginEnvironment: () => ({ ...env }),
-    listModels: async (): Promise<readonly string[] | undefined> => {
-      await mkdir(home, { recursive: true, mode: 0o700 })
-      return new Promise(resolveModels => {
-        const child = spawn(options.executable, ['app-server'], { env, stdio: ['pipe', 'pipe', 'ignore'] })
-        const lines = createInterface({ input: child.stdout })
-        let finished = false
-        const ids: string[] = []
-        const cursors = new Set<string>()
-        const finish = (listed?: readonly string[]) => {
-          if (finished) return
-          finished = true
-          clearTimeout(timer)
-          lines.close()
-          child.kill()
-          resolveModels(listed)
-        }
-        const timer = setTimeout(() => finish(), 10_000)
-        child.on('error', () => finish())
-        child.on('exit', () => finish())
-        child.stdin.on('error', () => finish())
-        lines.on('line', line => {
-          try {
-            const decoded = decodeListing(JSON.parse(line))
-            if (decoded._tag !== 'Some') return
-            if (decoded.value.id === 1) {
-              child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', method: 'initialized' })}\n`)
-              child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'model/list', params: {} })}\n`)
-            } else if (decoded.value.id === 2) {
-              const page = Schema.decodeUnknownSync(ModelList)(decoded.value.result)
-              ids.push(...page.data.filter(m => !m.hidden).map(m => m.id))
-              if (!page.nextCursor) finish(ids)
-              else if (cursors.has(page.nextCursor)) finish()
-              else {
-                cursors.add(page.nextCursor)
-                child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'model/list', params: { cursor: page.nextCursor } })}\n`)
-              }
-            }
-          } catch { finish() }
-        })
-        child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { clientInfo: { name: 'juno', version: '0.1.0' } } })}\n`)
-      })
-    },
+    ...local,
     turn: async (input: {
       /** What the builder built the prompt against, such as the admitted `Request`. */
+      readonly sessionId?: string
       readonly revision: Revision
       readonly prompt: string
       readonly model: Model<Api>
@@ -97,9 +39,16 @@ export function createCodexAdapter(options: CodexOptions) {
       readonly signal?: AbortSignal
     }): Promise<CodexResult> => {
       let threadId: string | null = null
+      const sessionId = input.sessionId
+      if (sessionId && busy.has(sessionId)) return { kind: 'failed', failure: providerFailure(new AdmissionError({ _tag: 'interrupted' })), threadId }
+      if (sessionId) busy.add(sessionId)
+      const controller = new AbortController()
+      const signal = input.signal ? AbortSignal.any([input.signal, controller.signal]) : controller.signal
+      const finish = codexWriter(home, controller)
       let cwd: string | undefined
       try {
-        if (await status() === 'signedOut') throw new AdmissionError({ _tag: 'failed', reason: 'codexSignedOut' })
+        const availability = await status()
+        if (availability !== 'signedIn') throw new AdmissionError({ _tag: 'failed', reason: availability === 'missing' ? 'codexMissing' : 'codexSignedOut' })
         const endpoint = new URL(input.mcp.url)
         if (endpoint.protocol !== 'http:' || endpoint.hostname !== '127.0.0.1' || !endpoint.port || endpoint.username || endpoint.password) {
           throw new Error('Codex tools require a loopback endpoint')
@@ -111,30 +60,61 @@ export function createCodexAdapter(options: CodexOptions) {
             computer_use: false, in_app_browser: false, memories: false },
           include_permissions_instructions: false, include_apps_instructions: false, include_environment_context: false,
         } })
-        const thread = codex.startThread({ model: input.model.id, workingDirectory: cwd, skipGitRepoCheck: true,
-          sandboxMode: 'read-only', approvalPolicy: 'never', networkAccessEnabled: false, webSearchMode: 'disabled' })
+        const threadOptions = { model: input.model.id, workingDirectory: cwd, skipGitRepoCheck: true,
+          sandboxMode: 'read-only', approvalPolicy: 'never', networkAccessEnabled: false, webSearchMode: 'disabled' } as const
+        const previous = sessionId ? sessions.get(sessionId) : undefined
+        // Reserve room for Codex's own prompt and the next reply. Never rely on its automatic compaction.
+        const promptTokens = upper([input.prompt], 1.25)
+        if (promptTokens + limits.reserve + 32_000 >= input.model.contextWindow) throw new AdmissionError({ _tag: 'blocked', reason: 'tooLarge' })
+        const reuse = previous && previous.gen === input.revision.gen && previous.pinRev === input.revision.pinRev &&
+          previous.model === input.model.id && options.threadExists?.(previous.id) !== false &&
+          previous.tokens + promptTokens + limits.reserve + 32_000 < input.model.contextWindow
+        const thread = reuse ? codex.resumeThread(previous.id, threadOptions) : codex.startThread(threadOptions)
+        if (reuse) threadId = previous.id
+        if (sessionId) sessions.delete(sessionId)
         const prompt = options.guard.admitHarness(input.revision, input.model, input.prompt)
-        input.signal?.throwIfAborted()
+        signal.throwIfAborted()
         const turnId = options.guard.spend.countCodex(home)
-        const stream = await thread.runStreamed(prompt, { signal: input.signal })
+        if (threadId) options.guard.spend.recordThread(turnId, threadId)
+        const stream = await thread.runStreamed(prompt, { signal })
         let text = ''
         let completed = false
+        let tokens = 0
+        let failure: Error | undefined
         for await (const event of stream.events) {
           if (event.type === 'thread.started') {
             threadId = event.thread_id
             options.guard.spend.recordThread(turnId, threadId)
           } else if (event.type === 'item.completed' && event.item.type === 'agent_message') text = event.item.text
-          else if (event.type === 'turn.completed') completed = true
-          else if (event.type === 'turn.failed') throw new Error(event.error.message)
-          else if (event.type === 'error') throw new Error(event.message)
+          else if (event.type === 'turn.completed') {
+            completed = true
+            tokens = event.usage.input_tokens + event.usage.output_tokens
+          } else if ((event.type === 'item.started' || event.type === 'item.completed') &&
+            (event.item.type === 'command_execution' || event.item.type === 'file_change' || event.item.type === 'web_search' ||
+              (event.item.type === 'mcp_tool_call' && event.item.server !== 'juno'))) { failure = new Error('Codex used a disabled tool'); controller.abort() }
+          else if (event.type === 'turn.failed') failure = new Error(event.error.message)
+          else if (event.type === 'error') failure = new Error(event.message)
         }
-        if (!completed) throw new Error('terminated')
+        if (failure) throw failure
+        if (!completed) throw new Error('Codex process exited')
+        if (sessionId && threadId && tokens > 0) sessions.set(sessionId, { id: threadId, ...input.revision, model: input.model.id, tokens: Math.max(tokens, (reuse ? previous.tokens : 32_000) + promptTokens + upper([text], 1.25)) })
         return { kind: 'done', text, threadId }
       } catch (error) {
-        return { kind: 'failed', failure: providerFailure(error), threadId }
+        if (sessionId) sessions.delete(sessionId)
+        return { kind: 'failed', failure: signal.aborted ? providerFailure(new AdmissionError({ _tag: 'interrupted' })) : codexFailure(error), threadId }
       } finally {
+        finish()
+        if (sessionId) busy.delete(sessionId)
         if (cwd) await rm(cwd, { recursive: true, force: true })
       }
     },
   }
+}
+
+function codexFailure(error: unknown): ProviderFailure {
+  if (error instanceof AdmissionError) return providerFailure(error)
+  const message = error instanceof Error ? error.message : String(error)
+  if (/quota|usage limit|rate.?limit|429/i.test(message)) return { ending: { _tag: 'failed', reason: 'codexQuota' }, rateLimited: false }
+  if (/not logged in|signed out|401|403/i.test(message)) return { ending: { _tag: 'failed', reason: 'codexSignedOut' }, rateLimited: false }
+  return { ending: { _tag: 'failed', reason: 'codexCrash' }, rateLimited: false }
 }

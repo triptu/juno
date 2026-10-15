@@ -74,7 +74,7 @@ parent.on('message', (event) => {
       if (started) return
       started = true
       const config = message.config
-      const picker = modelPicker(connection, config.openRouterOrigin === undefined ? {} : { origin: config.openRouterOrigin })
+      const picker = modelPicker(connection, { ...(config.openRouterOrigin === undefined ? {} : { origin: config.openRouterOrigin }), codex: { agentDir: config.agentDir, executable: 'codex' } })
       // The engine opens on the saved model of the active provider, so it waits for main to name one.
       void connection
         .get()

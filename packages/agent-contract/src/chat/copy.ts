@@ -71,6 +71,9 @@ export const chatCopy = {
     failed: {
       provider: "Juno didn't answer. Give it a moment and try again.",
       keyRejected: 'OpenRouter rejected the key. Check it in Settings.',
+      codexMissing: 'Codex is not installed on this Mac. Install Codex and try again.',
+      codexQuota: 'Codex has used the available ChatGPT quota. Try again when it resets.',
+      codexCrash: 'Codex stopped before finishing. Check any action cards before trying again.',
       codexSignedOut: 'Codex is signed out on this Mac. Sign in to Codex and try again.',
       offline: 'Juno lost the connection. Try again when you are back online.',
     },

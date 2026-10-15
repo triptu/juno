@@ -18,7 +18,8 @@
  *
  * The agent runs while a model provider is set up (`providers.ts`): main
  * starts it once the provider store has loaded one, sends every change to
- * the running process, and stops it when none is left. With none, a
+ * the running process, and stops it when none is left. A configured local
+ * Codex home also starts the agent, which checks CLI availability and sign-in. With none, a
  * renderer that asks for a port is told `failed`, and the Juno tab shows
  * "Add a provider".
  *
@@ -28,6 +29,7 @@
  */
 import { app, MessageChannelMain, utilityProcess, type MessagePortMain, type UtilityProcess, type WebContents } from 'electron'
 import { join } from 'node:path'
+import { existsSync } from 'node:fs'
 import { Schema } from 'effect'
 import { AgentToMain, type AgentConfig, type AgentProvider, type CredentialRequest, type HostHello, type MainToAgent } from '@juno/agent-contract'
 import { Events } from '@juno/contract/channels'
@@ -126,7 +128,7 @@ export class AgentSupervisor {
    */
   setProvider(provider: AgentProvider | null): void {
     this.provider = provider
-    if (provider === null) {
+    if (provider === null && !existsSync(join(this.config.agentDir, 'codex', 'auth.json'))) {
       if (this.state !== 'stopped') this.stop()
       return
     }
