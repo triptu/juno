@@ -14,6 +14,8 @@ export interface RunInfo {
   readonly model: string
   readonly judge: string
   readonly seconds: number
+  readonly cost?: number
+  readonly unknown?: number
 }
 
 interface Tally {
@@ -55,6 +57,7 @@ export function markdown(info: RunInfo, results: ReadonlyArray<CaseResult>): str
     '',
     `${info.mode} · commit ${info.commit} · judge ${info.judge} · ${results.length} cases · ${Math.round(info.seconds)} s`,
     '',
+    ...(info.cost === undefined ? [] : [`Chat and judge cost: $${info.cost.toFixed(6)}. Requests with unknown cost: ${info.unknown ?? 0}.`, '']),
     '| Behaviour | Passed | Score |',
     '| --- | --- | --- |',
     ...items.map((item) => `| ${ITEMS[item]} | ${ratio(s.items[item])} | ${share(s.items[item])} |`),
@@ -90,7 +93,7 @@ export const transcripts = (results: ReadonlyArray<CaseResult>): string => resul
  */
 export function save(dir: string, info: RunInfo, results: ReadonlyArray<CaseResult>): string {
   mkdirSync(dir, { recursive: true })
-  const name = `${info.date}-${info.model.replace(/[^\w.-]+/g, '-')}`
+  const name = `${info.date}-${info.model.replace(/[^\w.-]+/g, '-')}-${info.commit}`
   const page = join(dir, `${name}.md`)
   writeFileSync(page, markdown(info, results))
   writeFileSync(join(dir, `${name}.transcripts.md`), transcripts(results))
