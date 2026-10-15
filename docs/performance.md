@@ -470,3 +470,84 @@ placeholder between topic and Home. The inspected Home filmstrip still shows
 the specified staggered entrance; the check is about data readiness, not making
 that animation instantaneous. The log is `.juno-status/perf-4b/feel-final.log`,
 and the filmstrips are under `apps/desktop/feel-report/`.
+
+### Engine speed measurements (2026-10-15)
+
+Five alternating baseline/revised runs on the shared Apple M2, through the
+exclusive `pnpm bench:engine -t '^topics.list on the large seed'` command.
+Each run used 300 channels and sampled 50 injected message updates after
+boot. Both sides used the corrected harness: wait for the injected message
+itself, and construct a fresh cache for each uncached isolated query. The
+baseline is query.ts at `1b88efc7`; other code and the harness were held fixed.
+
+| Measurement | Before | After |
+| --- | --- | --- |
+| Event query p95, five runs (ms) | 4.17, 3.41, 4.04, 3.95, 11.16 | 3.01, 3.18, 4.26, 3.94, 5.26 |
+| Median of those p95 readings (ms) | 4.04 | 3.94 |
+| Median warm isolated query (median of runs, ms) | 2.14 | 2.11 |
+| Row snapshot / refs / largest delta (bytes) | 175834 / 91760 / 520 | 175834 / 91760 / 520 |
+
+This is a small improvement with overlapping ranges, not a reliable large
+speedup. Four revised runs met 5 ms; one did not. The backlog stays open.
+The existing cache already reused shaped rows. This pass avoids collecting
+unchanged user ids, retains the people map while its source holds, and uses
+an array instead of a temporary row-keyed map. Source columns are still
+compared after the version check: deleting and recreating an index row can
+reuse its version.
+
+Three preliminary remote pairs on 4-vCPU machines gave before p95 readings
+of 5.13, 3.77, 5.54 ms and after readings of 4.54, 5.36, 8.31 ms. They do not
+establish an improvement; host variation and event-loop contention dominate
+that comparison. Remaining remote repeats were cancelled at the shared
+capacity limit. The Mac runs above provide the complete five-pair series.
+
+The production-paced large fake cold boot (`pnpm remote bench:sync`, one
+4-vCPU machine per run) reached `live` in 579.264 s before and 459.310 s
+after, a 119.954 s reduction. That run spaced history and replies 1,200 ms apart; they were later set back to 1,500 ms per method to leave room for the official client on the shared token, so part of this gain (about 78 s by the earlier projection) does not apply. Sidebar setup reached catch-up in 25.749 s
+and 16.537 s respectively. Both runs made 471 Web API calls: 300 history,
+113 getView, 50 replies, three discovery search calls and five setup calls;
+they stored the same 6,179 messages, 1,525 roots, 3,478 replies, 300 ranges
+and 2,574 reactions. Neither reported rate-limit or decode failures.
+
+This pair measures paced waiting, not throughput: the revised remote run
+averaged 2% CPU busy on four cores. History call time fell from 444.909 to
+357.526 s and replies from 74.740 to 58.682 s. Unpublished getView calls
+can now overlap independently with other methods. The seed and budgets
+were unchanged; discovery metadata saves a separate root lookup in the
+warm-boot test, but did not lower this cold-boot call total.
+
+These are single paced runs, not a repeated latency distribution. The
+baseline recorded `live` before its read-only guard rejected the later
+emoji read; the guard now permits `emojis/list`. That correction does not
+change the timed boot. Aggregate logs are in
+`.remote/20261015T171747-6397/run.log` and
+`.remote/20261015T182935-62134/run.log`. No live Slack was accessed.
+
+The final full engine benchmark passed all five cases after isolated reads
+were changed to stop the engine before opening a second store. Waiting for
+a sync cycle alone could time out on this seed, and opening a second writer
+while the engine was active could fail with `SQLITE_BUSY`. Event timings
+still run against the active engine before that stop.
+
+That full run had reported one-minute loads of 7.3–14.5 and missed several
+reported budgets: sidebar event p95 was 17.80 ms and All topics warm p95
+31.31 ms. Messages live-query p95 was 4.54 ms; search p95 was 8.62 ms while
+10,000 backfill messages landed. The command was not in strict timing mode;
+its pass confirms the scenarios and assertions, not every timing budget.
+The log is `/tmp/juno-speed-engine-bench-final-2.log`.
+
+Final verification on the merged branch: the focused engine run passed 72
+tests in seven files; the engine benchmark passed five cases. `pnpm affected`
+passed typechecking, the 22 Slack tests, 34 schema tests, specs, 97 gallery
+tests and 261 desktop tests (34 Linux skips), plus health and pool checks.
+Its broad unit run stopped in the unchanged agent chat-cache benchmark:
+one of five p95 readings was 50.105 ms against the strict 50 ms limit
+(279 agent tests passed). It therefore did not finish the remaining unit
+packages. The focused engine run above covers this change separately.
+
+Lint initially passed, then one restart failed because Knip produced no
+report; a focused `pnpm lint` retry passed without code changes. The affected
+run is not fully green. Logs: `/tmp/juno-speed-affected-final-3.log`,
+`/tmp/juno-speed-focused-final.log`, and `/tmp/juno-speed-lint-final.log`.
+After queueing at the 24-vCPU cap, final remote checks used the supported
+`JUNO_REMOTE_MACHINE=linux/amd64:2x4` override. No pool limit was raised.

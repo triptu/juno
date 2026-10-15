@@ -308,8 +308,7 @@ describe('warm boot', () => {
       // Back to the window, then the complete pass.
       'api:subscriptions.thread.getView': 4,
       'api:search.modules.messages': 1,
-      // The searched reply is newer than its root's counters, so the root is fetched for Slack's reply_count.
-      'api:conversations.replies': 1,
+      // Search supplies the root counters; there is no per-thread lookup.
     })
     // The recheck for the time the app was closed: the ten most recently active topics, one page each.
     expect((rechecks['recheck:conversations.history'] ?? 0) + (rechecks['recheck:conversations.replies'] ?? 0)).toBe(10)
@@ -697,6 +696,29 @@ describe('followed threads past one getView page (review M3 finding 2)', () => {
 })
 
 describe('search matches (review M3 finding 3)', () => {
+  it('uses root metadata on a search page without a per-thread lookup', async () => {
+    const first = await bootedEngine()
+    await quiet(first)
+    const { fake, userData } = first
+    const credentials = fake.credentials()
+    await first.handle.stop()
+    engines.splice(engines.indexOf(first), 1)
+    const root = fake.workspace.post({ channel: 'C0ENG', user: 'U0MAYA', text: 'Search-only root' })
+    const reply = fake.workspace.post({ channel: 'C0ENG', user: 'U0SAM', text: 'Search-only reply', threadTs: root.ts })
+    // The history page is unavailable; discovery must establish this thread.
+    fake.forceError({ method: 'conversations.history', error: 'not_allowed' })
+    fake.resetCalls()
+    const second = await startTestEngine({ reuse: { fake, userData, credentials }, recheckTopics: 0 })
+    engines.push(second)
+    await second.phase('live')
+    await quiet(second)
+    expect(apiCalls(second, 'search.modules.messages').every((c) => c.args['extra_message_data'] === '1')).toBe(true)
+    expect(apiCalls(second, 'conversations.replies').filter((c) => c.args['ts'] === root.ts)).toHaveLength(0)
+    const stored = readDb(second, 'cache.db', (db) => db.prepare('SELECT text, reply_count, latest_reply FROM messages WHERE channel = ? AND ts = ?').get('C0ENG', root.ts))
+    expect(stored).toMatchObject({ text: 'Search-only root', reply_count: 1, latest_reply: reply.ts })
+    expect(readDb(second, 'cache.db', (db) => db.prepare('SELECT text FROM messages WHERE channel = ? AND ts = ?').get('C0ENG', reply.ts))).toMatchObject({ text: 'Search-only reply' })
+  })
+
   it('the discovery sweep keeps the files and blocks of a stored reply', async () => {
     const engine = await bootedEngine()
     await engine.rowsUntil((rows) => rows.length >= 20, 'rows')
@@ -982,7 +1004,7 @@ describe('cold boot details (review M3 finding 10)', () => {
       for (let i = 0; i < 70; i++) posted.push(fake.injectMessage({ channel: 'C0PLATFORM', user: 'U0LEO', text: `Flag ${i} removed.`, threadTs: tsOf(flags) }).ts)
     })
     await quiet(second)
-    expect(apiCalls(second, 'search.modules.messages').every((c) => c.args['sort'] === 'timestamp' && c.args['sort_dir'] === 'desc')).toBe(true)
+    expect(apiCalls(second, 'search.modules.messages').every((c) => c.args['sort'] === 'timestamp' && c.args['sort_dir'] === 'desc' && c.args['extra_message_data'] === '1')).toBe(true)
     const stored = readDb(second, 'cache.db', (db) => db.prepare('SELECT ts FROM messages WHERE channel = ? AND thread_ts = ?').all('C0PLATFORM', tsOf(flags)) as Array<{ ts: string }>)
     const storedTs = new Set(stored.map((r) => r.ts))
     expect(posted.filter((ts) => !storedTs.has(ts))).toEqual([])

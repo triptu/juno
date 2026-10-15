@@ -340,6 +340,17 @@ Inferred
 
 - Slack applies Tier limits per method and per token; the client's 60 s default backoff on 429 is a good default for Juno.
 
+### Background pacing policy (2026-10-15)
+
+The published [history](https://docs.slack.dev/reference/methods/conversations.history/) and [replies](https://docs.slack.dev/reference/methods/conversations.replies/) methods have Tier 3 limits (50+ per minute) for Marketplace and internal customer-built apps. Those pages also document a separate 1/minute policy for affected commercially distributed non-Marketplace apps. Neither policy establishes the limit of the internal `xoxc` session Juno uses. The live runs above only establish that 40/minute caused no 429.
+
+Juno spaces background starts 1,500 ms apart per method (40 per minute), independently for each method. This is the rate the live runs measured as safe. It stays below the published 50 per minute because the session token is shared with the official Slack client, which needs room for its own calls. A 429 retains Retry-After and doubles that method's spacing for the session, capped at 60 s. No recovery ramp is assumed without more live evidence. Test overrides can disable spacing.
+
+The earlier live run made 147 history calls and 114 replies calls. The gain comes from admitting methods independently and from discovery metadata, not from a faster per-method rate.
+
+`subscriptions.thread.getView` cannot be paged in parallel from the known API: `current_ts` is the last preceding page's `latest_reply`, not an offset or an independently obtainable cursor. Guessing timestamps risks gaps when activity is uneven or moves between requests. The existing sequential pass remains; increasing `limit` does not remove its 10-row cap.
+
+
 ## 7. Notifications
 
 Observed (`boot-async` `ojMJ` `maybeShowNotification`; `shared` `shouldShowNotificationFor*`; `boot-async` `bMHo` reason table)

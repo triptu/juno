@@ -93,7 +93,7 @@ Known limits: thread marks made elsewhere while the socket was down reach Juno a
 ## Known gaps
 
 - Edits, deletes and reactions made during a disconnect or while the app was closed are recovered by the recheck (below) for the topics on screen and the 10 most recently active ones, back to 24 hours before the gap. Older messages and other topics wait until the topic is opened, and then only for messages newer than the stored ones. ADR 0011's `cached_latest_updates` path waits on the live smoke.
-- A message first stored from a search match has no reaction state, files or blocks until a page or an event brings it.
+- Search requests extra thread metadata and applies roots before replies within each page, avoiding a lookup when the root counters are present. Missing roots still need a lookup. Search fields remain partial: missing reactions never clear stored ones.
 - A follow changed elsewhere during a drop, on a thread with no activity since the last sync, waits for the next window pass (at most an hour). A follow older than the window waits for its thread's next reply.
 - The sweep reads at most 150 matches per gap; a longer outage in a busy workspace misses older thread activity until the next sweep or open.
 - Read marks, posts, and edits, deletes and reactions have their own persisted workers in the engine (`markWorker.ts`, `send/worker.ts`, `send/actionWorker.ts`); follows still use the `Outbox` seam.
