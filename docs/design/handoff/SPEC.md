@@ -292,6 +292,8 @@ A full page in a tab, listing everything: quiet, resolved, unfollowed. On an emp
 
 Home is a calm resting page: a small scene with Juno's mascot that changes with the time of day, a short greeting, at most three things that want you, an "Ask Juno…" field, and an all-caught-up scene when nothing needs you. Design: `docs/design/home/` (layout A).
 
+On a cold visit, the greeting says "Syncing with Slack." and reserves space for the possible rows and the Browse link. That space stays for the visit when sync finishes, so the greeting and Ask Juno field do not move. Later visits use the items available when Home opens.
+
 - **Getting there.** Home is the first item in the sidebar navigation. It opens in a tab like any page and is a singleton. With no tab open, the workspace shows Home without a tab, and the Home item reads as selected.
 - **What wants you.** Each item is one row with a title line and a plain meta line. The kinds, ranked:
   - **Waiting on you.** A message that asks you something and has no reply from you.

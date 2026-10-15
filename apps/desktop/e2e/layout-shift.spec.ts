@@ -153,7 +153,8 @@ for (const destination of ['Home', 'All topics'] as const) {
     if (destination === 'All topics') await juno.allTopics.open()
     const selector = destination === 'Home' ? '[data-home-item]' : '[data-all-topics-row]'
     await expect(win.locator(selector)).toHaveCount(0)
-    await expectStableAnchor(win, selector, async () => {
+    const anchor = destination === 'Home' ? '[data-home-scene]' : selector
+    await expectStableAnchor(win, anchor, async () => {
       fake.release({ method: 'subscriptions.thread.getView' })
       await expect(win.locator('[data-topic-row]').first()).toBeVisible()
       await expect(win.locator(selector).first()).toBeVisible()

@@ -89,6 +89,7 @@ export function HomePage() {
   return (
     <Home
       loading={shown.loading}
+      reservedItems={shown.reservedItems}
       scene={shown.scene}
       // While syncing there are no rows to hold still, so the greeting takes the name once the boot has stored it.
       title={shown.loading && value !== undefined ? homeGreeting({ now: new Date(shown.now), firstName: value.firstName, items: 0, caughtUp: false }).title : shown.title}

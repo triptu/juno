@@ -146,6 +146,8 @@ export interface HomeShown {
   readonly used: ReadonlySet<string>
   /** The first sync is still running: the greeting shows with `HOME_SYNCING_LINE` and no items. */
   readonly loading: boolean
+  /** Row slots held through the cold visit so its greeting and composer stay put. */
+  readonly reservedItems: number
 }
 
 /** Home's second line until the first sync is done: present tense, names what is happening (SPEC 17). */
@@ -178,6 +180,7 @@ export function showHome(registry: Registry, key: string, options: { readonly wi
       enter: options.enter,
       used: new Set<string>(),
       loading: true,
+      reservedItems: homeItemLimit(options.windowHeight),
     })
   }
   const view = result.value
@@ -195,6 +198,7 @@ export function showHome(registry: Registry, key: string, options: { readonly wi
     enter: options.enter,
     used: new Set<string>(),
     loading: false,
+    reservedItems: previous?.loading === true ? previous.reservedItems : 0,
   })
 }
 

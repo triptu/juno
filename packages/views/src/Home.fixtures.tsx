@@ -58,7 +58,7 @@ export default defineFixtures(
     Empty: {
       'caught-up': state({ scene: 'caughtUp', title: 'All caught up.', line: 'Nothing is waiting on you.', items: [], caughtUp: true }),
       // The first sync is still running: the greeting and one calm line, no rows, never a blank page.
-      syncing: state({ line: 'Syncing with Slack.', items: [], loading: true }),
+      syncing: state({ line: 'Syncing with Slack.', items: [], loading: true, reservedItems: 3 }),
       'nothing-waiting': state({ scene: 'night', title: 'Still up, Tushar.', line: 'Nothing is waiting on you.', items: [] }),
       'no-name': state({ scene: 'midday', title: 'Hello.', line: 'One thing wants you.', items: [homeItems.waiting] }),
     },
