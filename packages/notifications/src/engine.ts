@@ -1,5 +1,5 @@
 import { AiProvider, urgencyGate } from '@juno/ai'
-import { channelLabel, inHours, localTime, nextHoursStart, decideNotification, hoursStartSummary, scheduledPresence, slackPresence, type NotificationDecision, type Presence } from '@juno/domain'
+import { channelLabel, inHours, localTime, nextHoursStart, decideNotification, hoursStartSummary, scheduledPresence, type NotificationDecision, type Presence } from '@juno/domain'
 import { Invalidation, StoreWriter, type StoreReader } from '@juno/store'
 import { Clock, Effect, Schema, Semaphore, SubscriptionRef } from 'effect'
 import { Candidate, Judgement, type Notifier, type SummarySource } from './model'
@@ -19,7 +19,7 @@ interface Row {
 }
 
 /** One instance per signed-in workspace. All decisions and delivery claims share a permit. */
-export const makeNotifications = Effect.fn('Notifications.make')(function* (notifier: Notifier, setPresence: (value: 'auto' | 'away') => Effect.Effect<boolean>) {
+export const makeNotifications = Effect.fn('Notifications.make')(function* (notifier: Notifier, setPresence: (value: Presence) => Effect.Effect<boolean>) {
   const sql = yield* StoreWriter
   const invalidation = yield* Invalidation
   /** The Notifications page's Today and the why popover read the log. */
@@ -130,7 +130,7 @@ export const makeNotifications = Effect.fn('Notifications.make')(function* (noti
     const { settings } = yield* configuration
     const next = scheduledPresence(localTime(yield* Clock.currentTimeMillis), settings.presenceHours)
     if (force || next !== scheduled) {
-      if (yield* setPresence(slackPresence(next))) {
+      if (yield* setPresence(next)) {
         scheduled = next
         yield* SubscriptionRef.set(current, next)
       }
@@ -147,8 +147,10 @@ export const makeNotifications = Effect.fn('Notifications.make')(function* (noti
     /** What Slack shows, once known, then every change. */
     presenceChanges: SubscriptionRef.changes(current),
     observePresence: (value: Presence) => SubscriptionRef.set(current, value),
+    /** Slack's value at boot (`client.userBoot` `self.manual_presence`), kept only while nothing newer is known: a set or an event wins. */
+    seedPresence: (value: Presence) => SubscriptionRef.update(current, (known) => known ?? value),
     setPresence: (value: Presence) => Effect.gen(function* () {
-      if (!(yield* setPresence(slackPresence(value)))) return
+      if (!(yield* setPresence(value))) return
       yield* SubscriptionRef.set(current, value)
       // A change by hand holds until the next switch, even when it comes before the first tick.
       const { settings } = yield* configuration

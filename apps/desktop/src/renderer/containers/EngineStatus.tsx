@@ -1,8 +1,8 @@
 import { useRef } from 'react'
 import type { EngineStatus as Status } from '@juno/contract'
-import { connectionStateAtom, engineStatusAtom, pingCommand, registry, restartEngine, syncNoticeAtom } from '@juno/state'
+import { connectionStateAtom, engineStatusAtom, pingCommand, registry, restartEngine, syncNoticeAtom, syncProgressAtom } from '@juno/state'
 import { useAtomSet, useAtomValue } from '@juno/state/react'
-import { EngineNotice, EngineStatusView } from '@juno/views'
+import { EngineNotice, EngineStatusView, SyncProgress } from '@juno/views'
 
 const phaseLabel = (phase: Status['phase']): string => {
   switch (phase._tag) {
@@ -56,9 +56,16 @@ function restart(): void {
   void restartEngine(registry)
 }
 
-/** The line under the sidebar's filters when the rows may be behind Slack (`syncNoticeAtom`), with Restart when the engine stopped. */
+/**
+ * The line under the sidebar's filters: why the rows may be behind Slack
+ * (`syncNoticeAtom`), with Restart when the engine stopped; otherwise,
+ * during the first sync, its progress (`syncProgressAtom`); otherwise
+ * nothing.
+ */
 export function SyncNotice() {
   const kind = useAtomValue(syncNoticeAtom)
-  if (kind === undefined) return null
-  return <EngineNotice kind={kind} onRestart={restart} />
+  const progress = useAtomValue(syncProgressAtom)
+  if (kind !== undefined) return <EngineNotice kind={kind} onRestart={restart} />
+  if (progress === undefined) return null
+  return <SyncProgress {...progress} />
 }

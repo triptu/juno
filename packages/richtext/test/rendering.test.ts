@@ -98,9 +98,9 @@ describe('rich_text blocks', () => {
     })
   })
 
-  it('falls back to the raw id when a lookup does not know it', () => {
+  it('shows "Someone", never the raw id, when a lookup does not know the person yet', () => {
     const body = messageBody({ blocks: richText([{ type: 'rich_text_section', elements: [{ type: 'user', user_id: 'U0NEW' }] }]) }, lookups)
-    expect(body.blocks[0]).toEqual({ kind: 'paragraph', children: [{ kind: 'user', id: 'U0NEW', name: 'U0NEW', isMe: false }] })
+    expect(body.blocks[0]).toEqual({ kind: 'paragraph', children: [{ kind: 'user', id: 'U0NEW', name: 'Someone', isMe: false }] })
   })
 
   it('renders unicode emoji, skin tones from the hex form, and custom emoji by url', () => {
@@ -295,7 +295,8 @@ describe('mrkdwn text', () => {
     ['<!channel>', { kind: 'paragraph', children: [{ kind: 'broadcast', range: 'channel' }] }],
     ['<!everyone|@everyone>', { kind: 'paragraph', children: [{ kind: 'broadcast', range: 'everyone' }] }],
     ['see <https://example.com|the doc>', { kind: 'paragraph', children: [{ kind: 'text', text: 'see ' }, { kind: 'link', url: 'https://example.com', text: 'the doc' }] }],
-    ['<https://example.com/x?a=1&amp;b=2>', { kind: 'paragraph', children: [{ kind: 'link', url: 'https://example.com/x?a=1&amp;b=2', text: 'https://example.com/x?a=1&amp;b=2' }] }],
+    ['<https://example.com/x?a=1&amp;b=2>', { kind: 'paragraph', children: [{ kind: 'link', url: 'https://example.com/x?a=1&b=2', text: 'https://example.com/x?a=1&b=2' }] }],
+    ['<https://example.com|a &lt;b&gt; &amp; c>', { kind: 'paragraph', children: [{ kind: 'link', url: 'https://example.com', text: 'a <b> & c' }] }],
     ['on <!date^1700000000^{date_short}|Nov 14, 2023>', { kind: 'paragraph', children: [{ kind: 'text', text: 'on ' }, { kind: 'date', timestamp: 1700000000, format: '{date_short}', fallback: 'Nov 14, 2023' }] }],
     ['*bold* and _italic_ and ~strike~', {
       kind: 'paragraph',

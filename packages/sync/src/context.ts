@@ -3,7 +3,7 @@
  * in-memory queues that connect steps (roots to fetch, users to name).
  */
 import type { Me } from '@juno/domain'
-import { Clock, Effect, type Queue } from 'effect'
+import { Clock, Effect, Queue } from 'effect'
 import type { SyncConfigShape } from './config'
 
 export interface RootFetch {
@@ -26,8 +26,14 @@ export interface SyncContext {
    * reaction is not lost to the older snapshot. Bounded; oldest dropped.
    */
   readonly lateReactions: Map<string, string>
-  /** Users whose name a preview needed and the users table lacked, with the topics to re-index once they arrive. */
+  /** Users whose name is wanted and the users table lacked, with the topics to re-index once they arrive (`users.ts`). */
   readonly missingUsers: Map<string, Set<string>>
+  /** Wakes `nameUsers` when `missingUsers` grows. Sliding, capacity 1: one wake-up stands for any number of ids. */
+  readonly usersWanted: Queue.Queue<void>
+  /** The next batch goes on the background lane: Slack held the interactive lane back. */
+  usersOnBackground: boolean
+  /** Hands the user's own presence from `client.userBoot` to whoever shows it. */
+  readonly onSelfPresence: (presence: 'active' | 'away') => Effect.Effect<void>
   /** Ids the edge did not return (`failed_ids`: bots, Slack Connect users). Not asked for again in this session. */
   readonly unknownUsers: Set<string>
   /** Page fetches outside the work permit (opened topics, root fetches) in flight, with when each was requested. */
@@ -57,15 +63,28 @@ export const awaitEarlierFetches = (ctx: SyncContext): Effect.Effect<void> =>
     while ([...ctx.fetchesInFlight].some((entry) => entry.at <= now)) yield* Effect.sleep(50)
   })
 
-/** `reindexTopics` options bound to a context: missing names are collected for the users step. */
-export const reindexOptions = (ctx: SyncContext) => ({
-  me: ctx.me,
-  onMissingUser: (userId: string, topicId: string) => {
-    let topics = ctx.missingUsers.get(userId)
+/**
+ * Asks `nameUsers` for `ids`, with the topic to re-index once each arrives.
+ * Synchronous, so a re-index can call it from inside a transaction.
+ */
+export const wantUsers = (ctx: SyncContext, ids: Iterable<string>, background = false, topicId?: string): void => {
+  let added = false
+  for (const id of ids) {
+    if (ctx.unknownUsers.has(id) || !/^[UW][A-Z0-9]+$/.test(id)) continue
+    let topics = ctx.missingUsers.get(id)
     if (topics === undefined) {
       topics = new Set()
-      ctx.missingUsers.set(userId, topics)
+      ctx.missingUsers.set(id, topics)
+      added = true
     }
-    topics.add(topicId)
-  },
+    if (topicId !== undefined) topics.add(topicId)
+  }
+  if (background) ctx.usersOnBackground = true
+  if (added || background) Queue.offerUnsafe(ctx.usersWanted, undefined)
+}
+
+/** `reindexTopics` options bound to a context: a missing name is asked for at once (`users.ts`). */
+export const reindexOptions = (ctx: SyncContext) => ({
+  me: ctx.me,
+  onMissingUser: (userId: string, topicId: string) => wantUsers(ctx, [userId], false, topicId),
 })

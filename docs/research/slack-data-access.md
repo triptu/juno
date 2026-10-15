@@ -211,6 +211,9 @@ Permalinks
 
 Presence
 - Subscribe over the socket: `{ type: "presence_sub", ids: [userIds] }` (`client-boot`, `sendPresenceSubEvent`). Updates arrive as `presence_change` events (section 4). `presence.set` exists for the self user. No `users.getPresence`.
+- **Setting your own presence, read 2026-10-16** (`boot-async`, `toggleUserPresence` in module `whHN`, `setCurrentMemberPresence` and `toggleMemberPresence` in `qj7u`; method constant in the vendors-async fetcher `presenceSetFetcher`). The menu toggle calls `presence.set { presence }` with `presence` from the enum `{ Away: "away", Active: "active" }` (`uCdg`): `active` or `away`, never `auto`. `auto` is the public `users.setPresence` value. The client updates its own `manual_presence` and `presence` optimistically and reverts them when the call fails; the answer is not read.
+- **Reading it back.** `client.userBoot` `self` carries `manual_presence` (observed live 2026-10-16, key only). The client keeps it current from `manual_presence_change { presence }`, whose value must be `active` or `away` (anything else is logged as unknown).
+- Unknown: the error `presence.set` gives for another value. Juno sent `auto` until 2026-10-16 and "Set yourself active" did nothing on the owner's workspace, which fits a rejection; the fake now refuses anything but `active` and `away` with `invalid_presence`, the public API's error name.
 
 Files
 - `files.getUploadURL` / `files.completeUpload` (and `files.uploadExternal`, `files.info`, `files.list`, `files.share`) exist in the async vendors chunk. The file object on messages, `files.info` and download auth were observed live (section 10, "Live probe", Files).
@@ -549,3 +552,18 @@ Confirms the read of the same day in section 7, "Slack's notification schedule".
 
 - **`users.prefs.get`** without arguments: `{ ok, prefs }`, 729 prefs. The schedule keys are there with these types: `dnd_enabled`, `dnd_weekdays_off_allday`, `priority_dnd_override`, `priority_sidebar_section`, `dnd_custom_new_badge_seen`, `dnd_notification_schedule_new_badge_seen` booleans; `dnd_days` and the seven `dnd_enabled_<day>` enum strings; `dnd_start_hour`, `dnd_end_hour` and the fourteen `dnd_before_<day>` / `dnd_after_<day>` time strings, again a mix of `H:MM` and `HH:MM`; `vip_users`, `today_priority_channels` and `scheduled_dnd_status` strings; `mega_dnd_expiration` a number.
 - **`dnd.info`** without arguments: `{ ok, dnd_enabled, next_dnd_start_ts, next_dnd_end_ts, snooze_enabled }`: two booleans and two Unix-second numbers. `dnd.info` is now in `@juno/slack-schema`'s `Methods`, with a synthetic fake-server test of this shape.
+
+#### 8. Users (2026-10-16)
+
+Why the first real session showed user ids instead of names. `JUNO_LIVE=1 pnpm probe:live -- --only users`: `client.userBoot`, `client.counts`, `api.getFlannelHttpUrl`, 8 history pages (the most recently active member conversations, 50 messages each), then the ids those reference through the edge `users/info`, one page of edge `users/list` and one of `users.list`. 14 calls, no rate limit, nothing failed or failed to decode. Counts only.
+
+| What | Number |
+| --- | --- |
+| Member DMs, member group DMs | 46, 26; all 26 group DMs carry `members` in `client.userBoot` |
+| Distinct user ids referenced | 57: 46 DM partners, 24 group DM members, 18 senders and 13 mentions on the 310 messages read, 25 in `reply_users`; none start with `W` |
+| `users/info` for all 57, one call | 57 returned as an array, `failed_ids` 0, `pending_ids` 0, `invalid_ids` 0. 12 from another team (`team_id` differs, `is_stranger` set: Slack Connect), 15 bots, 23 with an empty `profile.display_name` |
+| Edge `users/list`, `count=100` | `ok`, 100 results, a `next_marker` |
+| `users.list`, `limit=200` | `ok`, 200 members, a `next_cursor` |
+| Messages whose `text` holds `&amp;`, `&lt;` or `&gt;` | 7 of 310 |
+
+So the edge answers every id the sync asks about, Slack Connect users included, and the names were missing because of when and what Juno asked. The cold boot fetched users once, after the history of every active conversation (several minutes on the background lane, section "The sync dry run"); the ids it asked for were senders and DM partners only, never group DM members, mentions or repliers; and the views fell back to the raw id. Since then the sync names the people of every DM and group DM right after `client.counts`, names the people on each boot page before it lands, and asks for anyone else as soon as they appear, all on the interactive lane (`packages/sync/src/users.ts`). An empty `display_name` is common, so the shown name falls back to the real name, then the handle.

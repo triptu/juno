@@ -14,7 +14,9 @@ export function unescapeMrkdwn(text: string): string {
 }
 
 /** Inline parser state: a cursor over one line (no newlines inside). */
-function parseAngle(content: string, lookups: Lookups): Inline {
+function parseAngle(escaped: string, lookups: Lookups): Inline {
+  // Slack escapes inside the brackets too: a link's `&` arrives as `&amp;`, a label's `>` as `&gt;`.
+  const content = unescapeMrkdwn(escaped)
   // <@U123>, <@U123|name>
   let m = /^@([A-Z0-9]+)(?:\|(.*))?$/.exec(content)
   if (m && m[1] !== undefined) return userInline(m[1], lookups, m[2] || undefined)

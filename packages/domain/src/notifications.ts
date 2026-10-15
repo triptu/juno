@@ -191,11 +191,6 @@ export function scheduledPresence(at: LocalTime, presenceHours: Hours): Presence
   return inHours(at, presenceHours) ? 'active' : 'away'
 }
 
-/** Slack's `presence.set` value. Active is `auto`, so Slack still shows an idle owner as away. */
-export function slackPresence(presence: Presence): 'auto' | 'away' {
-  return presence === 'active' ? 'auto' : 'away'
-}
-
 /** What a Notify me choice applies to: a thread topic id, a channel or DM id, or a user id. */
 export interface NotifyTarget {
   readonly kind: 'thread' | 'channel' | 'person'

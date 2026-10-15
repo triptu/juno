@@ -15,7 +15,7 @@ import {
 } from '@juno/slack-schema'
 import { Invalidation, StoreWriter, transaction, type MessageRow, type SqlError } from '@juno/store'
 import { Clock, Effect, Queue } from 'effect'
-import { reindexOptions, type SyncContext } from './context'
+import { reindexOptions, wantUsers, type SyncContext } from './context'
 import { mergeRootCounters, mergeTombstone, type MergeSource } from './merge'
 import { mainTopicOf, mergeOne, threadTopicOf } from './pages'
 import { reindexTopics, topicsOfMessages } from './reindex'
@@ -172,7 +172,12 @@ export const applyFrame = (ctx: SyncContext, frame: RtmFrame): Effect.Effect<voi
         return yield* transaction(
           Effect.gen(function* () {
             const id = typeof frame.channel === 'string' ? frame.channel : frame.channel.id
-            if (typeof frame.channel !== 'string') yield* upsertConversations([toConversationRow(frame.channel)])
+            if (typeof frame.channel !== 'string') {
+              const row = toConversationRow(frame.channel)
+              yield* upsertConversations([row])
+              // The other side of a new DM, or the members of a group DM, before its row shows.
+              wantUsers(ctx, [...(row.user_id === null ? [] : [row.user_id]), ...(row.member_ids_json === null ? [] : (JSON.parse(row.member_ids_json) as Array<string>))])
+            }
             yield* patchConversation(id, { is_member: 1 })
           }),
         )

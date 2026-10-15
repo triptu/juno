@@ -32,12 +32,13 @@ import { applyActed, applyFrame, applySent, type Acted } from './events'
 import { fetchOlder, fetchTopic, type FetchLane, type FetchReport, type OpenError } from './open'
 import { applyPage } from './pages'
 import { reindexTopics } from './reindex'
-import { fetchUsers } from './users'
+import { nameUsers, wantUsers } from './users'
 import { clearPendingFollows, endEventCoverage, observeRead } from './write'
 
+/** `first`: the cold boot of an empty store, the first sync the user waits through. */
 export type SyncPhase =
-  | { readonly _tag: 'booting' }
-  | { readonly _tag: 'catching-up'; readonly done: number; readonly total: number }
+  | { readonly _tag: 'booting'; readonly first?: boolean }
+  | { readonly _tag: 'catching-up'; readonly done: number; readonly total: number; readonly first?: boolean }
   | { readonly _tag: 'live' }
   | { readonly _tag: 'offline' }
 
@@ -46,6 +47,8 @@ export interface RunSyncOptions {
   readonly onEvent?: (event: SocketEvent, me: import('@juno/domain').Me) => Effect.Effect<void>
   /** Brackets each boot, reboot or reconciliation, including its background follow pass. */
   readonly onCycle?: (event: 'started' | 'finished') => Effect.Effect<void>
+  /** Called with the user's own presence as `client.userBoot` reports it (`self.manual_presence`), at every workspace refresh. */
+  readonly onSelfPresence?: (presence: 'active' | 'away') => Effect.Effect<void>
   /** Called on every phase change. */
   readonly onPhase: (phase: SyncPhase) => Effect.Effect<void>
   /** Called when the socket says hello (true) and when it drops (false): whether Slack can be reached now. */
@@ -93,6 +96,9 @@ export const runSync = (options: RunSyncOptions): Effect.Effect<never, SlackAuth
       rootFetches: yield* Queue.unbounded<RootFetch>(),
       readLookups: yield* Queue.unbounded<string>(),
       missingUsers: new Map(),
+      usersWanted: yield* Queue.sliding<void>(1),
+      usersOnBackground: false,
+      onSelfPresence: options.onSelfPresence ?? (() => Effect.void),
       unknownUsers: new Set(),
       lateReactions: new Map(),
       fetchesInFlight: new Set(),
@@ -119,16 +125,8 @@ export const runSync = (options: RunSyncOptions): Effect.Effect<never, SlackAuth
     // Catch-ups and reboots run in the background; joining the set below is what lets their auth failures end the sync.
     const background = yield* FiberSet.make<void, SlackAuthRequired>()
 
-    /** Names the senders an open fetch found unknown, in the background. */
-    const nameSenders = (report: FetchReport) =>
-      report.unknownUsers.length === 0
-        ? Effect.void
-        : FiberSet.run(
-            background,
-            fetchUsers(ctx, report.unknownUsers.filter((id) => !ctx.unknownUsers.has(id))).pipe(
-              Effect.catchIf(isNotAuth, (error) => Effect.logWarning('sync: senders not named', { tag: error._tag })),
-            ),
-          ).pipe(Effect.asVoid)
+    /** Names the senders an open fetch found unknown, through `nameUsers`. */
+    const nameSenders = (report: FetchReport) => Effect.sync(() => wantUsers(ctx, report.unknownUsers))
     const services = yield* Effect.context<SyncServices>()
     const fetched = (fetch: (lane: FetchLane) => Effect.Effect<FetchReport, OpenError, SyncServices>, label: string): Effect.Effect<FetchReport, OpenError> => {
       const run = (lane: FetchLane) => trackFetch(ctx, fetch(lane))
@@ -374,6 +372,6 @@ export const runSync = (options: RunSyncOptions): Effect.Effect<never, SlackAuth
       }
     })
 
-    yield* Effect.all([consumer, bootLoop, fetchRoots, lookUpReads, FiberSet.join(background)], { concurrency: 'unbounded', discard: true })
+    yield* Effect.all([consumer, bootLoop, fetchRoots, lookUpReads, nameUsers(ctx), FiberSet.join(background)], { concurrency: 'unbounded', discard: true })
     return yield* Effect.never
   })

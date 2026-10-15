@@ -2001,7 +2001,7 @@ export class HomePane {
   constructor(readonly win: Page) {}
 
   get root(): Locator {
-    return this.win.locator('[data-home]:not([data-home-waiting])').filter({ visible: true })
+    return this.win.locator('[data-home]:not([data-home-waiting]):not([data-home-loading])').filter({ visible: true })
   }
 
   get greeting(): Locator {

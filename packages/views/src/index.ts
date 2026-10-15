@@ -12,7 +12,7 @@ export { MentionSuggestions, mentionRowId } from './MentionSuggestions'
 export { ComposerSlot } from './ComposerSlot'
 export { DestinationPickers, type PickerName } from './DestinationPickers'
 export { EmojiPicker } from './EmojiPicker'
-export { EngineNotice, EngineStatusView } from './EngineStatusView'
+export { EngineNotice, EngineStatusView, SyncProgress } from './EngineStatusView'
 export { ImageViewer, type ImageViewerProps } from './ImageViewer'
 
 export { type MessageActions } from './Message'

@@ -295,7 +295,9 @@ prefs. It reuses the cached session, refuses methods outside its own read-only a
 calls 1.5 s apart, and honours `Retry-After` once. It prints counts, key censuses and
 milliseconds only, and writes redacted shapes to `--out DIR` (a temporary directory by default);
 copy a shape into the recorded fixtures by hand and run `node scripts/check-fixtures-redacted.mjs`.
-`-- --only search` runs the search part alone (four calls). A full run is about 34 calls. The
+`-- --only search` runs the search part alone (four calls). `-- --only users` asks the edge
+`users/info` about every person the newest conversations reference and reads one page of each
+users list (about 14 calls). A full run is about 34 calls. The
 results are in research section 10, "Live probe".
 
 ## The live sync dry run

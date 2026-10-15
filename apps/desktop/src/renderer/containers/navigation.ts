@@ -270,7 +270,8 @@ export function openNewChatTo(conversation: PickConversation): void {
 }
 
 /**
- * Keep the topic on screen until Home's local rows are ready. After the
+ * Keep the topic on screen until Home has a value (its rows, or the
+ * syncing state of a first sync). After the
  * subscription expires, replacing it first would lay out an empty page
  * and then Home in separate frames. The wait is bounded as for All topics.
  */
@@ -288,7 +289,7 @@ export function openHome(options: OpenOptions = {}): void {
     }
     const check = () => {
       const result = registry.get(homeViewAtom)
-      if (result._tag === 'Failure' || (result._tag === 'Success' && result.value.ready)) finish()
+      if (result._tag === 'Failure' || result._tag === 'Success') finish()
     }
     const timer = setTimeout(finish, READY_WAIT_MS)
     const off = registry.subscribe(homeViewAtom, check, { immediate: false })

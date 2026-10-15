@@ -1,6 +1,8 @@
 export type { Lookups, MessageBody } from './model'
 export { inlinesOf } from './model'
+export { UNKNOWN_PERSON } from './inline'
 
+export { unescapeMrkdwn } from './from-mrkdwn'
 export { bodyFromMrkdwn, messageBody, plainText, previewLine, previewText, type MessageContent } from './body'
 
 export { composeOutgoing } from './outgoing'

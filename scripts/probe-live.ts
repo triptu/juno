@@ -22,6 +22,11 @@
  * `--only search` runs step 4 alone, plus one search with the exact
  * arguments the discovery sweep sends.
  *
+ * `--only users` answers why senders show as ids: `client.userBoot`,
+ * `client.counts`, eight history pages, then the ids those reference
+ * (senders, mentions, DM and group DM members) through the edge
+ * `users/info`, one page of edge `users/list` and one of `users.list`.
+ *
  * Output is counts, key censuses and milliseconds. No id, text, name, URL or
  * value is printed. `--out DIR` writes the redacted response shapes there
  * (default: a new temporary directory); copy the ones a fixture needs into
@@ -33,7 +38,7 @@
 import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { Methods, type MethodName } from '@juno/slack-schema'
+import { EdgeUsersInfoResponse, Methods, type MethodName } from '@juno/slack-schema'
 import { apiBaseFromWorkspace, slackRoute } from '@juno/slack'
 import { decodeIssues, readCachedSession, redact } from './live-common.ts'
 
@@ -47,7 +52,12 @@ const READ_ONLY_METHODS = [
   'files.info',
   'users.prefs.get',
   'dnd.info',
+  'client.userBoot',
+  'api.getFlannelHttpUrl',
+  'users.list',
 ] as const
+/** Edge methods `--only users` may call, all reads. */
+const READ_ONLY_EDGE = ['users/info', 'users/list'] as const
 type ReadOnlyMethod = (typeof READ_ONLY_METHODS)[number]
 
 const SPACING_MILLIS = 1_500
@@ -160,6 +170,33 @@ async function main(): Promise<number> {
   const now = Date.now() / 1000
   if (flag('--only') === 'search') {
     await searchOnly(call, now)
+    return writeShapes(out)
+  }
+  if (flag('--only') === 'users') {
+    const edge = async (method: (typeof READ_ONLY_EDGE)[number], base: string, body: Json, purpose: string): Promise<Json | undefined> => {
+      if (!(READ_ONLY_EDGE as ReadonlyArray<string>).includes(method)) throw new Error(`refusing edge ${method}`)
+      const wait = lastStart + SPACING_MILLIS - Date.now()
+      if (wait > 0) await sleep(wait)
+      lastStart = Date.now()
+      const started = performance.now()
+      const response = await fetch(`${base}/${method}?_x_app_name=client`, {
+        method: 'POST',
+        body: JSON.stringify({ token: session.token, ...body }),
+        headers: { cookie, 'content-type': 'application/json' },
+      })
+      const text = await response.text()
+      let json: Json | undefined
+      try {
+        json = JSON.parse(text) as Json
+      } catch {
+        json = undefined
+      }
+      const issues = json !== undefined && method === 'users/info' ? decodeIssues(EdgeUsersInfoResponse, text) : []
+      calls.push({ method: `edge:${method}`, purpose, millis: Math.round(performance.now() - started), status: response.status, ok: json?.['ok'] === true, ...(json?.['ok'] === false ? { error: String(json['error']) } : {}), decodeIssues: issues })
+      if (json !== undefined && !shapes.has(`edge.${method.replace('/', '.')}.${purpose}`)) shapes.set(`edge.${method.replace('/', '.')}.${purpose}`, redact(json))
+      return json
+    }
+    console.log(JSON.stringify(await usersOnly(call, edge, session.teamId), null, 2))
     return writeShapes(out)
   }
 
@@ -310,6 +347,76 @@ async function writeShapes(out: string): Promise<number> {
   for (const [name, shape] of shapes) await writeFile(join(out, `${name}.json`), JSON.stringify(shape, null, 2) + '\n')
   console.log(`probe-live: wrote ${shapes.size} redacted shapes to ${out}`)
   return 0
+}
+
+type Edge = (method: (typeof READ_ONLY_EDGE)[number], base: string, body: Json, purpose: string) => Promise<Json | undefined>
+
+/** `--only users`: which ids the store would hold and what the edge says about them. Counts only. */
+async function usersOnly(call: Call, edge: Edge, teamId: string): Promise<unknown> {
+  const boot = await call('client.userBoot', { version_all_channels: true, return_all_relevant_mpdms: true }, 'users')
+  const counts = await call('client.counts', { thread_counts_by_channel: true }, 'users')
+  const flannel = await call('api.getFlannelHttpUrl', { include_external_workspaces: true }, 'users')
+  const base = String(flannel?.['url'] ?? '').replace(/\/+$/, '')
+  const channels = (boot?.['channels'] as Array<Json> | undefined) ?? []
+  const ims = (boot?.['ims'] as Array<Json> | undefined) ?? []
+  const memberIds = new Set(['channels', 'mpims', 'ims'].flatMap((list) => ((counts?.[list] as Array<{ id: string }> | undefined) ?? []).map((e) => e.id)))
+  const mpims = channels.filter((c) => c['is_mpim'] === true && memberIds.has(String(c['id'])))
+  const ids = { sender: new Set<string>(), mention: new Set<string>(), im: new Set<string>(), mpim: new Set<string>(), replyUser: new Set<string>() }
+  for (const im of ims) if (memberIds.has(String(im['id'])) && typeof im['user'] === 'string') ids.im.add(im['user'])
+  for (const mpim of mpims) for (const member of (mpim['members'] as Array<string> | undefined) ?? []) ids.mpim.add(member)
+  const recent = ['channels', 'mpims', 'ims'].flatMap((list) => (counts?.[list] as Array<{ id: string; latest?: string }> | undefined) ?? [])
+    .filter((e) => e.latest !== undefined)
+    .toSorted((a, b) => tsSeconds(b.latest!) - tsSeconds(a.latest!))
+    .slice(0, 8)
+  let messages = 0
+  let escaped = 0
+  for (const entry of recent) {
+    const page = await call('conversations.history', { channel: entry.id, limit: 50, ignore_replies: true, no_user_profile: true }, 'users')
+    for (const m of (page?.['messages'] as Array<Msg> | undefined) ?? []) {
+      messages++
+      if (typeof m['user'] === 'string') ids.sender.add(m['user'])
+      for (const u of (m['reply_users'] as Array<string> | undefined) ?? []) ids.replyUser.add(u)
+      const text = typeof m['text'] === 'string' ? m['text'] : ''
+      if (/&(amp|lt|gt);/.test(text)) escaped++
+      for (const match of text.matchAll(/<@([UW][A-Z0-9]+)/g)) ids.mention.add(match[1]!)
+    }
+  }
+  const all = [...new Set([...ids.sender, ...ids.mention, ...ids.im, ...ids.mpim, ...ids.replyUser])].filter((id) => /^[UW][A-Z0-9]+$/.test(id))
+  const info = { calls: 0, resultsShape: new Set<string>(), results: 0, failed: 0, pending: 0, invalid: 0, disconnected: 0, otherTeam: 0, emptyDisplayName: 0, noProfile: 0, bots: 0, keys: new Map<string, number>() }
+  const returned = new Set<string>()
+  for (let i = 0; i < all.length && base !== ''; i += 100) {
+    const answer = await edge('users/info', base, { ids: all.slice(i, i + 100) }, 'users')
+    info.calls++
+    const results = answer?.['results']
+    info.resultsShape.add(Array.isArray(results) ? 'array' : typeof results)
+    const list = Array.isArray(results) ? (results as Array<Json>) : results !== null && typeof results === 'object' ? Object.values(results as Record<string, Json>) : []
+    for (const user of list) {
+      info.results++
+      returned.add(String(user['id']))
+      if (user['team_id'] !== teamId) info.otherTeam++
+      if (user['is_bot'] === true) info.bots++
+      const profile = user['profile'] as Json | undefined
+      if (profile === undefined) info.noProfile++
+      else if (profile['display_name'] === '') info.emptyDisplayName++
+      for (const key of Object.keys(user)) info.keys.set(key, (info.keys.get(key) ?? 0) + 1)
+    }
+    info.failed += ((answer?.['failed_ids'] as Array<unknown> | undefined) ?? []).length
+    info.pending += ((answer?.['pending_ids'] as Array<unknown> | undefined) ?? []).length
+    info.invalid += ((answer?.['invalid_ids'] as Array<unknown> | undefined) ?? []).length
+    info.disconnected += ((answer?.['disconnected_ids'] as Array<unknown> | undefined) ?? []).length
+  }
+  const missingBy = (set: Set<string>) => [...set].filter((id) => !returned.has(id)).length
+  const edgeList = base === '' ? undefined : await edge('users/list', base, { count: 100, present_first: false }, 'users')
+  const webList = await call('users.list', { limit: 200 }, 'users')
+  return {
+    calls: summariseCalls(),
+    boot: { topLevelKeys: Object.keys(boot ?? {}).toSorted(), imsOfMember: ids.im.size, mpimsOfMember: mpims.length, mpimsWithMembers: mpims.filter((c) => Array.isArray(c['members'])).length },
+    history: { pages: recent.length, messages, textWithEntities: escaped },
+    ids: { all: all.length, sender: ids.sender.size, mention: ids.mention.size, im: ids.im.size, mpim: ids.mpim.size, replyUser: ids.replyUser.size, wPrefix: all.filter((id) => id.startsWith('W')).length },
+    usersInfo: { ...info, resultsShape: [...info.resultsShape], keys: Object.fromEntries([...info.keys].toSorted()), notReturned: { all: all.length - returned.size, sender: missingBy(ids.sender), mention: missingBy(ids.mention), im: missingBy(ids.im), mpim: missingBy(ids.mpim) } },
+    edgeUsersList: { ok: edgeList?.['ok'], error: edgeList?.['error'], results: Array.isArray(edgeList?.['results']) ? (edgeList['results'] as Array<unknown>).length : typeof edgeList?.['results'], nextMarker: typeof edgeList?.['next_marker'] === 'string' },
+    usersList: { ok: webList?.['ok'] ?? false, members: ((webList?.['members'] as Array<unknown> | undefined) ?? []).length, nextCursor: ((webList?.['response_metadata'] as Json | undefined)?.['next_cursor'] ?? '') !== '' },
+  }
 }
 
 type Call = (method: ReadOnlyMethod, args: Record<string, string | number | boolean>, purpose: string) => Promise<Json | undefined>

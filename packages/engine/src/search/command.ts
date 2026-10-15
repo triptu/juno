@@ -9,7 +9,7 @@
  */
 import type { PaletteCommand } from '@juno/contract'
 import { AiProvider, tasks } from '@juno/ai'
-import { describeCommand, firstWords, mainLabel, mainTopicId, parseCommand, type ChannelId, type ChannelInfo, type Command, type CommandContext, type ConversationKind, type RawCommand, type TopicId, type UserId } from '@juno/domain'
+import { describeCommand, FALLBACK_TITLE_WORDS, firstWords, mainLabel, mainTopicId, parseCommand, type ChannelId, type ChannelInfo, type Command, type CommandContext, type ConversationKind, type RawCommand, type TopicId, type UserId } from '@juno/domain'
 import { StoreReader, type SqlClient } from '@juno/store'
 import { Effect } from 'effect'
 import { aiAssistOn } from '../ai'
@@ -54,12 +54,14 @@ const readContext = (sql: SqlClient.SqlClient) =>
     const dms = new Map<string, string>()
     for (const person of people) if (person.dm !== null && !dms.has(person.id)) dms.set(person.id, person.dm)
     const users = new Map<string, UserRow>(people.map((person) => [person.id, person]))
+    // A fallback title names the people it mentions; bots and anyone not stored read "Someone".
+    const names = { user: (id: string) => (users.has(id) ? userName(id, users.get(id)) : undefined) }
     return {
       people: [...users.values()].map((person) => ({ id: person.id as UserId, name: userName(person.id, person) })),
       channels: channels.map((c): ChannelInfo => ({ id: c.id as ChannelId, kind: c.kind, name: c.name ?? c.id })),
       topics: topics.map((t) => {
         const channel: ChannelInfo = { id: t.channel as ChannelId, kind: t.c_kind, name: t.c_name ?? t.channel }
-        return { id: t.id as TopicId, title: t.kind === 'main' ? mainLabel(channel) : t.named || firstWords(t.title) || t.c_name || t.channel, channel }
+        return { id: t.id as TopicId, title: t.kind === 'main' ? mainLabel(channel) : t.named || firstWords(t.title, FALLBACK_TITLE_WORDS, names) || t.c_name || t.channel, channel }
       }),
       dms,
       users,

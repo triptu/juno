@@ -26,6 +26,7 @@ import { Clock, Effect } from 'effect'
 import { reindexOptions, type SyncContext } from './context'
 import { applyPage, mainTopicOf, threadTopicOf } from './pages'
 import { reindexTopics } from './reindex'
+import { referencedUserIds } from './users'
 import { addSyncedRange, latestSyncedRange, markRepliesComplete, readMessage, readState } from './write'
 
 /** Messages one open fetches at most to reach the read pointer. */
@@ -299,11 +300,10 @@ const olderMain = (ctx: SyncContext, channel: string, before: string, lane: Fetc
     return { fetched: true, complete: page.from === HISTORY_START, unknownUsers: yield* unknownSenders(page.messages) }
   })
 
-/** Senders of `messages` with no `users` row, for the caller to name. */
+/** People `messages` show (senders, mentions, repliers) with no `users` row, for the caller to name. */
 const unknownSenders = (messages: ReadonlyArray<Message>): Effect.Effect<ReadonlyArray<string>, SqlError, StoreWriter> =>
   Effect.gen(function* () {
-    const ids = new Set<string>()
-    for (const message of messages) if (message.user !== undefined && /^[UW][A-Z0-9]+$/.test(message.user)) ids.add(message.user)
+    const ids = new Set(referencedUserIds(messages))
     if (ids.size === 0) return []
     const sql = yield* StoreWriter
     const known = yield* sql<{ id: string }>`SELECT id FROM users WHERE id IN ${sql.in([...ids])}`

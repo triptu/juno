@@ -1,7 +1,7 @@
 /** Shared session composition and host seam for the notifications feature. */
 import { ChannelId, UserId, isDm, messageMentionsMe, type Me, type Presence } from '@juno/domain'
 import { makeNotifications, readSettings, type Notifier, type Notifications } from '@juno/notifications'
-import { messageBody, plainText } from '@juno/richtext'
+import { messageBody, plainText, UNKNOWN_PERSON } from '@juno/richtext'
 import { SlackApi, SlackSession, type SocketEvent } from '@juno/slack'
 import type { NotificationSource, NotificationTarget } from '@juno/contract'
 import { HostChannelId, HostMessageTs, type HostSummary } from '@juno/agent-contract'
@@ -148,7 +148,15 @@ export const startNotifications = Effect.gen(function* () {
     const user = 'user' in frame ? frame.user : undefined
     if (user === session.userId) return
     const text = frame.type === 'desktop_notification' ? frame.content : ('text' in frame ? frame.text ?? '' : '')
-    const body = messageBody(frame.type === 'desktop_notification' ? { text } : frame)
+    // The people the message mentions, by name: the notification's text never shows an id.
+    const mentioned = new Set([...`${text} ${'blocks' in frame ? JSON.stringify(frame.blocks ?? []) : ''}`.matchAll(/<@([UW][A-Z0-9]+)|"user_id":"([UW][A-Z0-9]+)"/g)].map((m) => (m[1] ?? m[2])!))
+    const names = new Map<string, string>()
+    if (mentioned.size > 0) {
+      for (const row of yield* sql<{ id: string; name: string | null }>`SELECT id, COALESCE(display_name, real_name, name) AS name FROM users WHERE id IN ${sql.in([...mentioned])}`) {
+        if (row.name !== null) names.set(row.id, row.name)
+      }
+    }
+    const body = messageBody(frame.type === 'desktop_notification' ? { text } : frame, { user: (id) => names.get(id) })
     const mentionsMe = messageMentionsMe(body, me)
     const conversations = yield* sql<ConversationRow & { ignored: number; person_name: string | null; sender_name: string | null }>`SELECT c.*, ig.channel IS NOT NULL AS ignored,
       COALESCE(u.display_name, u.real_name, u.name) AS person_name,
@@ -163,7 +171,7 @@ export const startNotifications = Effect.gen(function* () {
       if (settings.channels[channel.id] !== 'every' && settings.people[user ?? ''] !== 'every' && settings.threads?.[topicId] !== 'every') return
     }
     yield* notifications.receive({ channel: { id: ChannelId.make(channel.id), kind: channel.kind,
-      name: channel.person_name ?? channel.name ?? channel.id, ignored: channel.ignored === 1 },
+      name: channel.person_name ?? channel.name ?? (channel.kind === 'im' ? UNKNOWN_PERSON : channel.id), ignored: channel.ignored === 1 },
       senderId: UserId.make(user ?? ''), ...(channel.sender_name === null ? {} : { senderName: channel.sender_name }), mentionsMe, ts, text: plainText(body),
       topicId })
   })
@@ -202,5 +210,9 @@ export const startNotifications = Effect.gen(function* () {
       yield* safe(notifications.tick)
     }
   }))
-  return (event: SocketEvent, me: Me) => event._tag === 'Frame' ? Queue.offer(queue, { frame: event.frame, me }).pipe(Effect.asVoid) : Effect.void
+  return {
+    onEvent: (event: SocketEvent, me: Me) => event._tag === 'Frame' ? Queue.offer(queue, { frame: event.frame, me }).pipe(Effect.asVoid) : Effect.void,
+    /** Slack's presence for the user as the boot read it. */
+    onSelfPresence: (presence: Presence) => notifications.seedPresence(presence),
+  }
 })

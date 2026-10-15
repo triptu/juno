@@ -8,7 +8,6 @@ import {
   nextHoursStart,
   localTime,
   scheduledPresence,
-  slackPresence,
   untilLabel,
   decideWithCause,
   pausedLabel,
@@ -152,11 +151,6 @@ describe('presence', () => {
     expect(scheduledPresence(at(MON, 19), settings.presenceHours)).toBe('active')
     expect(scheduledPresence(at(MON, 20), settings.presenceHours)).toBe('away')
     expect(scheduledPresence(at(SAT, 12), settings.presenceHours)).toBe('away')
-  })
-
-  it('sets Slack to auto when active, so an idle owner still shows away', () => {
-    expect(slackPresence('active')).toBe('auto')
-    expect(slackPresence('away')).toBe('away')
   })
 
   it('says until when the status changes next', () => {
