@@ -19,6 +19,7 @@ const active: ReadonlySet<JobPhase> = new Set(['running', 'needsYou', 'lostSight
 
 /** The state line's text by phase: the agent's live line while it runs, fixed copy otherwise. */
 function stateLine(card: TaskCardModel): string {
+  if (card.stopFailed && active.has(card.phase)) return copy.stopFailed
   switch (card.phase) {
     case 'running':
     case 'needsYou':

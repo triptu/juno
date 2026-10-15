@@ -104,7 +104,7 @@ Integration limits found during WP9:
 | `router/` | The router (one owner input, one run), the engine (`open.ts`), turn events, the Slack read tools over the host port, sources (`sources.ts`), the `runs` tables |
 | `request/` | The request builder in pi's `beforeRequest`: one snapshot, `buildRequest`, then `guard.stamp`. The tool shape and Juno's system text |
 | `compactor/` | Background memory jobs on `runJob` and WP9's compaction provider: at most 8 at once, never past a live run's cutoff, paused while Juno is paused or compaction's share of the cap is used |
-| `jobs/` | Background jobs behind Task cards (subagents now, T3 in WP18), the `delegate` tool, milestone reports into the inbox |
+| `jobs/` | Background jobs behind Task cards (subagents now, T3 in WP18), the `delegate` tool, milestone reports into the inbox; each T3 question has its own report, even during an existing wait. Failed Task Stop attempts stay visible on the card while the session is watched |
 | `memory-tools/` | `remember` |
 | `pins/` | Pin changes on the trusted side, each bumping `pin_rev` in its transaction |
 

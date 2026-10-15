@@ -165,6 +165,7 @@ export const chatCopy = {
       failed: 'Failed',
       showInActivity: 'Show in Activity',
       stopping: 'Stopping',
+      stopFailed: 'Could not stop the task. Open it in T3 Code.',
       stopped: 'Stopped',
       lostSight: 'Sign in to T3 Code to keep watching',
       signIn: 'Sign in',
