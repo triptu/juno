@@ -7,7 +7,15 @@
  *   `ShellRoutes` (`shell.ts`).
  * - engine <-> main and the port handoff: `protocol.ts`.
  */
-export { Channels, Events, PORT_HANDOFF_TAG, SIDEBAR_WIDTH, type Channel, type ContextMenuAt, type ContextMenuItem, type ContextMenuLeaf, type JunoBridge, type MenuCommand } from './channels'
+export {
+  Channels,
+  Events,
+  SIDEBAR_WIDTH,
+  type ContextMenuAt,
+  type ContextMenuItem,
+  type ContextMenuLeaf,
+  type MenuCommand,
+} from './channels'
 export * from './errors'
 export * from './live'
 export * from './protocol'

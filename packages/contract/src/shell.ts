@@ -7,7 +7,6 @@ import { Schema } from 'effect'
 import { Channels, SIDEBAR_WIDTH } from './channels'
 
 export const PlatformSchema = Schema.Literals(['darwin', 'win32', 'linux'])
-export type Platform = typeof PlatformSchema.Type
 
 /** The theme the owner picks; System follows macOS. `state`, `main` and `ui` all read it from here. */
 export const ThemeSchema = Schema.Literals(['system', 'light', 'dark'])

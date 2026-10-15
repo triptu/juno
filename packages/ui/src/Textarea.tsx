@@ -16,7 +16,7 @@ export interface TextareaMark {
 }
 
 /** The anchor name of the character at `anchorAt`, for a popover placed with CSS anchor positioning. */
-export const TEXTAREA_ANCHOR = '--textarea-anchor'
+const TEXTAREA_ANCHOR = '--textarea-anchor'
 
 export interface TextareaProps extends Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'style' | 'className' | 'value'> {
   /**

@@ -13,19 +13,6 @@ import { Attachment, File } from './message.ts'
 
 const opt = S.optionalKey
 
-export const SearchModule = S.Literals([
-  'messages',
-  'files',
-  'people',
-  'channels',
-  'dms',
-  'shortcuts',
-  'workflows',
-  'salesforce',
-  'agents',
-  'default',
-])
-
 export const SearchMessagesArgs = S.Struct({
   module: S.Literal('messages'),
   query: S.String,

@@ -3,4 +3,4 @@
  * runs as the user types, reached here because the renderer does not
  * import domain (as with `menus.ts`).
  */
-export { audienceCheck, type AudienceWarning } from '@juno/domain'
+export { audienceCheck } from '@juno/domain'

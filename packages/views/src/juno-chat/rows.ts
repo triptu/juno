@@ -8,7 +8,7 @@ import * as stylex from '@stylexjs/stylex'
 import type { GroupPosition } from '@juno/agent-contract'
 import { chat, colors, radii, sizes, spacing } from '@juno/tokens/tokens.stylex'
 
-export const HOVER = '@media (hover: hover)'
+const HOVER = '@media (hover: hover)'
 
 /** The space between a bubble and the one before it: 2px inside a group, 8px between groups (the 18px line slot adds the rest). */
 export const groupGap = stylex.create({

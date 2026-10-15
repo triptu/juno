@@ -23,7 +23,8 @@ import { Star } from '@phosphor-icons/react/dist/icons/Star'
 import { Trophy } from '@phosphor-icons/react/dist/icons/Trophy'
 import { Truck } from '@phosphor-icons/react/dist/icons/Truck'
 import { Wrench } from '@phosphor-icons/react/dist/icons/Wrench'
-import { radii, sizes, weights } from '@juno/tokens/tokens.stylex'
+import { radii, weights } from '@juno/tokens/tokens.stylex'
+import { tileSizes } from './internal/tileSizes'
 import { hueStyles, type AvatarSize } from './Avatar'
 import { Icon, type IconSize, type PhosphorIcon } from './Icon'
 import { firstGrapheme } from './internal/grapheme'
@@ -68,27 +69,12 @@ export const channelIconNames = Object.keys(channelIcons) as ReadonlyArray<Chann
 export type ChannelColorName = HueName
 export const channelColorNames: ReadonlyArray<ChannelColorName> = hueNames
 
-export interface ChannelLook {
-  /** Unset means the first letter of the channel name. */
-  readonly icon?: ChannelIconName
-  readonly color: ChannelColorName
-}
-
-/**
- * The look a channel gets before anyone changes it: a colour from a hash of
- * its id, and its first letter rather than an icon, so a list of untouched
- * channels still tells them apart.
- */
-export function defaultChannelLook(id: string): ChannelLook {
-  return { color: hueForId(id) }
-}
-
 export interface ChannelIconProps {
   /** The channel name without "#". Its first character (a whole emoji, never half of one) is the default glyph. */
   readonly name: string
   /** The chosen icon; unset shows the first letter. */
   readonly icon?: ChannelIconName
-  /** The chosen colour. Default: `defaultChannelLook(id).color` when `id` is given, else rose. */
+  /** The chosen colour. Default: `hueForId(id)` when `id` is given, else rose. */
   readonly color?: ChannelColorName
   /** The channel id, for the deterministic default colour. */
   readonly id?: string
@@ -112,7 +98,7 @@ export function ChannelIcon({ name, icon, color, id, size = 44, label }: Channel
       role={label ? 'img' : undefined}
       aria-label={label}
       aria-hidden={label ? undefined : true}
-      {...stylex.props(styles.tile, sizeStyles[size], tileRadius[size], hueStyles[hue])}
+      {...stylex.props(styles.tile, tileSizes[size], tileRadius[size], hueStyles[hue])}
     >
       {Glyph ? <Icon icon={Glyph} size={iconBySize[size]} /> : firstGrapheme(name)}
     </span>
@@ -134,16 +120,6 @@ const styles = stylex.create({
     overflow: 'hidden',
     whiteSpace: 'nowrap',
   },
-})
-
-const sizeStyles = stylex.create({
-  44: { width: sizes['--tile-44'], height: sizes['--tile-44'], fontSize: sizes['--initials-44'] },
-  36: { width: sizes['--tile-36'], height: sizes['--tile-36'], fontSize: sizes['--initials-36'] },
-  32: { width: sizes['--avatar-32'], height: sizes['--avatar-32'], fontSize: sizes['--initials-32'] },
-  28: { width: sizes['--avatar-28'], height: sizes['--avatar-28'], fontSize: sizes['--initials-28'] },
-  24: { width: sizes['--avatar-24'], height: sizes['--avatar-24'], fontSize: sizes['--initials-24'] },
-  20: { width: sizes['--avatar-20'], height: sizes['--avatar-20'], fontSize: sizes['--initials-20'] },
-  18: { width: sizes['--avatar-18'], height: sizes['--avatar-18'], fontSize: sizes['--initials-18'] },
 })
 
 // Tile radius follows the nesting rule against the row it sits in.

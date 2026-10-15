@@ -48,11 +48,3 @@ export function deactivatePin(pins: Pins, expected: Pin): PinChange {
       p.sourceId === expected.sourceId && p.sourceVersion === expected.sourceVersion)) return { kind: 'refused', reason: 'conflict' };
   return change(pins, pins.active.filter(p => p.id !== expected.id));
 }
-export function redactPins(pins: Pins, removed: ReadonlySet<number>): Pins {
-  const active = pins.active.filter(p => !removed.has(p.sourceId));
-  return active.length === pins.active.length ? pins : { revision: pins.revision + 1, active };
-}
-/** Admission must check both values inside the caller's transaction. */
-export function snapshotCurrent(expected: { readonly gen: number; readonly pinRev: number }, current: { readonly gen: number; readonly pinRev: number }): boolean {
-  return expected.gen === current.gen && expected.pinRev === current.pinRev;
-}

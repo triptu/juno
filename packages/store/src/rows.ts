@@ -78,18 +78,6 @@ export interface SyncedRangeRow {
   readonly to_ts: string
 }
 
-export interface OutboxRow {
-  readonly id: number
-  readonly kind: string
-  readonly target_key: string
-  readonly payload_json: string
-  readonly depends_on: string | null
-  readonly created_at: string
-  readonly attempts: number
-  readonly next_at: string | null
-  readonly last_error: string | null
-}
-
 /** `topic_art`: one drawing, or one finished attempt, per topic (user.db). */
 export interface TopicArtRow {
   readonly topic_id: string

@@ -75,16 +75,6 @@ export class Feel {
   }
 }
 
-/**
- * A scenario that cannot run yet; it shows in the contact sheet with the
- * reason. The `placeholder` annotation lets it skip without failing the run
- * (`e2e/no-skips.ts`).
- */
-export async function recordSkipped(name: string, title: string, testTitle: string, reason: string): Promise<void> {
-  base.info().annotations.push({ type: 'placeholder', description: reason })
-  await writeResult(join(REPORT_DIR, name), { name, title, test: testTitle, status: 'skipped', reason, verdicts: [], frames: 0, animationFrames: 0, durationMs: 0, load: currentLoad(), timeline: [], video: null, filmstrip: null, notes: [] })
-}
-
 export const test = base.extend<{ feel: Feel }, { studio: Studio }>({
   studio: [
     // oxlint-disable-next-line no-empty-pattern

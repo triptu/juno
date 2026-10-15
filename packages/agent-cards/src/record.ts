@@ -110,5 +110,3 @@ export function transitionJob(phase: JobRecordPhase, event: JobEvent): JobRecord
     case 'failed': case 'unknown': return event
   }
 }
-
-export const unknownCard = (id: typeof P.CardId.Type, kind: string): P.UnknownCard => ({ _tag: 'unknown', id, kind })
