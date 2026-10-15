@@ -101,8 +101,8 @@ export default defineFixtures(
       'with-page-wide': scene(() => <StripWithPage />, { width: 1400, height: 160 }),
     },
     Interaction: {
-      hover: scene(() => <StripWithPage />, { height: 160, hover: '[role="tab"]:nth-of-type(1)' }),
-      'close-hover': scene(() => <StripWithPage />, { height: 160, hover: '[role="tab"]:nth-of-type(2) button' }),
+      hover: scene(() => <StripWithPage />, { height: 160, hover: '[data-tab]:nth-of-type(1) [role="tab"]' }),
+      'close-hover': scene(() => <StripWithPage />, { height: 160, hover: '[data-tab]:nth-of-type(2) button' }),
       'pinned-hover': scene(
         () => (
           <TabStrip trailing={newTab}>
@@ -110,10 +110,10 @@ export default defineFixtures(
             <Tab icon={Hash} label="Postgres 16 migration plan" active onClose={() => {}} />
           </TabStrip>
         ),
-        { hover: '[role="tab"]:nth-of-type(1)' },
+        { hover: '[data-tab]:nth-of-type(1) [role="tab"]' },
       ),
-      'narrow-hover': scene(() => <ThirtySeven />, { hover: '[role="tab"]:nth-of-type(33)' }),
-      'narrow-focus-close': scene(() => <ThirtySeven />, { focus: '[role="tab"]:nth-of-type(34) button' }),
+      'narrow-hover': scene(() => <ThirtySeven />, { hover: '[data-tab]:nth-of-type(33) [role="tab"]' }),
+      'narrow-focus-tab': scene(() => <ThirtySeven />, { focus: '[data-tab]:nth-of-type(34) [role="tab"]' }),
     },
   },
   { width: 720, padded: false },
