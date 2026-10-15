@@ -54,9 +54,10 @@ test('Home shows what waits with no tab open and from the sidebar, and each row 
   await topic.expectTitle('Sam')
 
   // Pick up where you left off: a topic open for a minute, then new messages.
+  // The visit's minute runs on the page's clock, so install the fake one before the topic opens.
+  await win.clock.install()
   await sidebar.row(POSTGRES).open()
   await topic.expectTitle(POSTGRES)
-  await win.clock.install()
   await win.clock.fastForward('01:05')
   await sidebar.row(OFFSITE).open()
   await topic.expectTitle(OFFSITE)
