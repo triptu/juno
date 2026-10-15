@@ -17,6 +17,7 @@ import {
   openExternal,
   openedAtNewAtom,
   openTopic as fetchTopic,
+  refreshMessages,
   registry,
   retryMessage,
   runCommand,
@@ -341,8 +342,14 @@ function Topic({ id, view, detail, readOnly = false, underHeader = true }: Topic
   useEffect(() => {
     if (fetched.current) return
     fetched.current = true
-    void fetchTopic(registry, id).then((exit) => setFetchState(exit._tag === 'Success' && (exit.value.outcome === 'fetched' || exit.value.outcome === 'cached') ? 'done' : 'offline'))
-  }, [id])
+    void fetchTopic(registry, id).then((exit) => {
+      const done = exit._tag === 'Success' && (exit.value.outcome === 'fetched' || exit.value.outcome === 'cached')
+      // This tab's window can have started while the fetch was writing the history it covers (a first send
+      // to someone never messaged) and missed that change; ask for it again, or it never shows its rows.
+      if (done && registry.get(messageListAtom(view)).meta.windowCovered !== true) refreshMessages(registry, view)
+      setFetchState(done ? 'done' : 'offline')
+    })
+  }, [id, view])
   const [slow, setSlow] = useState(false)
   useEffect(() => {
     if (fetchState !== 'pending') return

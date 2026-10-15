@@ -41,6 +41,7 @@ export {
   messageWindowSpecAtom,
   openTopic,
   prefetchTopic,
+  refreshMessages,
   topicAtom,
   topicOfView,
   topicView,

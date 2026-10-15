@@ -128,6 +128,15 @@ export function liveQuery<R extends Rpc.Any>(route: R): (payload: Payload<R>) =>
   return make as (payload: Payload<R>) => LiveAtomFor<R>
 }
 
+/**
+ * Starts the subscription under a live query atom again, for a reader that
+ * knows the engine's answer has moved on without reaching it. The atom keeps
+ * what it showed until the new snapshot arrives.
+ */
+export function refreshLive(registry: Registry, atom: Atom.Atom<unknown>): void {
+  registry.refresh(subscriptionOf.get(atom) ?? atom)
+}
+
 export type CommandAtom<R> = Atom.AtomResultFn<Payload<R>, SuccessOf<R>, ErrorOf<R> | RpcClientError>
 
 function makeCommandAtom<R extends Rpc.Any>(route: R): CommandAtom<R> {

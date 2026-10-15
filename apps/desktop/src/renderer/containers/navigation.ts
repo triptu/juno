@@ -146,7 +146,10 @@ function apply(change: (tabs: Tabs) => Tabs): Tabs {
  * A fresh open landed: the tab that now shows the topic takes the window
  * the open waited for, and starts at `snapshot` (a message a link asked
  * for) or else at the divider or the bottom. A tab that already showed the
- * topic before the change keeps its own.
+ * topic before the change keeps its own. The tab's window is its own
+ * subscription; if the topic's first fetch covers its history only after
+ * that subscription started, the tab asks for it again (`refreshMessages`
+ * in `TopicView`).
  */
 function landFresh(before: Tabs, next: Tabs, topicId: string, snapshot: ScrollSnapshot | undefined): void {
   const tab = activeTab(next)

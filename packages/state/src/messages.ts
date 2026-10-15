@@ -35,7 +35,7 @@ import {
   topicsOpen,
   type MessageView,
 } from '@juno/contract'
-import { liveQuery, prefetch, runCommand } from './atoms'
+import { liveQuery, prefetch, refreshLive, runCommand } from './atoms'
 import type { Registry } from './client'
 import { emptyWindow, sameOrder, type ListWindow } from './list'
 import { mark } from './perf'
@@ -125,6 +125,15 @@ export const openTopic = (registry: Registry, id: string) => runCommand(registry
 
 /** The topic that holds a message (its thread, or Main), for a Juno source link. */
 export const locateMessage = (registry: Registry, channel: string, ts: string) => runCommand(registry, messagesLocate, { channel, ts })
+
+/**
+ * A view's window asked for again: its own subscription can start while the
+ * topic's first fetch is still writing history (a New chat's first send to
+ * someone never messaged) and miss the change that covers it.
+ */
+export function refreshMessages(registry: Registry, view: string): void {
+  refreshLive(registry, messagesAtom(topicOfView(view), registry.get(messageWindowSpecAtom(view))))
+}
 
 /** Makes sure the page before `before` is stored; then widen the view's `messageWindowSpecAtom`. */
 export const loadOlderMessages = (registry: Registry, id: string, before: string) => runCommand(registry, messagesLoadOlder, { id, before })
