@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-15 17:20 · orchestrator · Merged: a Slack force_reload during the boot-retry wait now boots at once (one boot at a time, backoff and auth handling unchanged); a test-clock regression test fails on the old code. No Quint spec models boot retries.
 - 10-15 17:05 · Tushar · Sidebar row preview is one line, not two.
 - 10-15 17:00 · orchestrator · Merged WP19 end to end: the scheduler starts with the agent and admits due wakes, reply watches check for replies through the host with no model run, and an open nudge card expires when a reply arrives; four clock-driven flow tests, 171 agent tests pass.
 - 10-15 16:25 · orchestrator · Merged the WP17 MCP manager backend: connecting, listing and disconnecting MCP servers, tools split into read and outward by policy, results treated as untrusted, write tools as card executors, Notion as the first connection, the Connections page data; 167 agent tests pass. Still to do: wiring into agent startup and main's keychain/OAuth bridge, then one live Notion check with Tushar's sign-in.
