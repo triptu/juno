@@ -5,7 +5,6 @@
 import type { FixtureSet } from '@juno/ui'
 import AccountMenu from './AccountMenu.fixtures'
 import AllTopics from './AllTopics.fixtures'
-import ActiveThreads from './ActiveThreads.fixtures'
 import AppearanceSettings from './AppearanceSettings.fixtures'
 import AppInfoView from './AppInfoView.fixtures'
 import AttachmentChips from './AttachmentChips.fixtures'
@@ -28,6 +27,7 @@ import NotificationsPage from './NotificationsPage.fixtures'
 import UpdateSettings from './UpdateSettings.fixtures'
 import PreferencesPage from './PreferencesPage.fixtures'
 import NewTabSetting from './NewTabSetting.fixtures'
+import TopicSwitcher from './TopicSwitcher.fixtures'
 import PeekKeySetting from './PeekKeySetting.fixtures'
 import PeekView from './PeekView.fixtures'
 import Reactions from './Reactions.fixtures'
@@ -70,7 +70,6 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   AccountMenu,
   AllTopics,
   ActivityPage,
-  ActiveThreads,
   AppearanceSettings,
   AppInfoView,
   AttachmentChips,
@@ -108,6 +107,7 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   SendCheckBar,
   NotificationsPage,
   NewTabSetting,
+  TopicSwitcher,
   PeekKeySetting,
   PeekView,
   OwnerBubble,

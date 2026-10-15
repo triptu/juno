@@ -1,5 +1,4 @@
 export { AccountMenu, type AccountMenuAction } from './AccountMenu'
-export { ActiveThreads } from './ActiveThreads'
 export { AppearanceSettings } from './AppearanceSettings'
 export { AppInfoView } from './AppInfoView'
 export { CommandPalette, type PaletteIconName, type PaletteItem, type PaletteSection } from './CommandPalette'
@@ -33,6 +32,7 @@ export { Shell } from './Shell'
 export { Sidebar, type SidebarNavTarget } from './Sidebar'
 
 export { TopicHeader } from './TopicHeader'
+export { TopicSwitcher } from './TopicSwitcher'
 export { ActionToast } from './ActionToast'
 
 export { type MenuAnchor } from './header/HeaderControls'

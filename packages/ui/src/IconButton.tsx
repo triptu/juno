@@ -26,6 +26,8 @@ export interface IconButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonEle
    * the fill pops in with the spring, toggling off just cross-fades.
    */
   readonly pressed?: boolean
+  /** A menu button whose menu is showing: `aria-expanded`, drawn as pressed. */
+  readonly expanded?: boolean
   readonly dimmed?: boolean
   /** Hides the native tooltip when the label would repeat visible text. */
   readonly noTooltip?: boolean
@@ -76,6 +78,7 @@ export function IconButton({
   variant = 'ghost',
   tone = 'subtle',
   pressed,
+  expanded,
   dimmed = false,
   noTooltip = false,
   type = 'button',
@@ -90,6 +93,7 @@ export function IconButton({
       aria-label={label}
       title={noTooltip ? undefined : label}
       aria-pressed={pressed}
+      aria-expanded={expanded}
       aria-disabled={dimmed || undefined}
       disabled={disabled}
       {...rest}
@@ -104,7 +108,7 @@ export function IconButton({
         radiusStyles[radius ?? radiusBySize[size]],
         variants[variant],
         variant === 'ghost' && tones[tone],
-        pressed && pressedStyles[variant],
+        (pressed === true || expanded === true) && pressedStyles[variant],
         (dimmed || disabled) && interactive.dimmed,
       )}
     >

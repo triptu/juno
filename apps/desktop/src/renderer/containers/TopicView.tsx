@@ -1,9 +1,9 @@
 import { lazy, memo, startTransition, Suspense, useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
-import { MESSAGE_WINDOW_MAX, readsMarkRead, type FileView, type MessageView, type TopicDetail } from '@juno/contract'
+import { mainTopicOf, MESSAGE_WINDOW_MAX, readsMarkRead, type FileView, type MessageView, type TopicDetail } from '@juno/contract'
 import {
   bottomWindow,
   catchUpDoneAtom,
-  channelThreadsAtom,
+  channelTopicsAtom,
   discardMessage,
   dividerIndex,
   headerRenamingAtom,
@@ -32,12 +32,12 @@ import {
 import { afterPaint, mark, measure } from '@juno/state/perf'
 import { useAtomValue } from '@juno/state/react'
 import {
-  ActiveThreads,
   flashChatRow,
   hueFor,
   MessageList,
   NewMessagesPill,
   TopicHeader,
+  TopicSwitcher as TopicSwitcherView,
   TopicView as TopicViewFrame,
   type ActivateEvent,
   type MenuAnchor,
@@ -200,17 +200,27 @@ function useWindowFocused(): boolean {
   return focused
 }
 
-/** Main's "Threads" popover: the channel's active threads. Mounted only while open. */
-function MainThreads({ channel, onClose }: { readonly channel: string; readonly onClose: () => void }) {
-  const result = useAtomValue(channelThreadsAtom(channel))
+/**
+ * The title's topic switcher (SPEC 7): the channel's Main and threads, from
+ * local queries the topic keeps live while shown, so it opens with its rows
+ * in the first frame. Mounted only while open; the query text is its own.
+ */
+function Switcher({ detail, onClose }: { readonly detail: TopicDetail; readonly onClose: () => void }) {
+  const channel = detail.channel.id
+  const mainId = mainTopicOf(channel)
+  const result = useAtomValue(channelTopicsAtom(channel))
+  const mainUnread = useAtomValue(topicAtom(mainId), (header) => (header._tag === 'Success' ? (header.value?.unreadCount ?? 0) : 0))
   const now = useAtomValue(nowAtom)
+  const [query, setQuery] = useState('')
   const window = result._tag === 'Success' ? result.value : undefined
-  const threads = window === undefined ? [] : window.order.map((id) => window.rows.get(id)!)
-  const open = (id: string, event: ActivateEvent) => {
+  const threads = window === undefined ? undefined : window.order.map((id) => window.rows.get(id)!)
+  const open = (id: string, event: { readonly metaKey: boolean }) => {
     onClose()
-    openTopic(id, { newTab: event.metaKey })
+    if (id !== detail.id || event.metaKey) openTopic(id, { newTab: event.metaKey })
   }
-  return <ActiveThreads threads={threads} now={now} status={window === undefined ? 'loading' : 'ready'} onOpen={open} />
+  return (
+    <TopicSwitcherView mainId={mainId} mainUnread={mainUnread} currentId={detail.id} threads={threads} now={now} query={query} onQuery={setQuery} onOpen={open} onClose={onClose} />
+  )
 }
 
 /** Every topic draws its art (or the Tide placeholder) except a DM's Main, which keeps the person, as the sidebar tile does. */
@@ -567,9 +577,9 @@ function Topic({ id, view, detail, readOnly = false, underHeader = true }: Topic
     setSeenTs(last)
   }
 
-  const [threadsOpen, setThreadsOpen] = useState(false)
+  const [switcherOpen, setSwitcherOpen] = useState(false)
   const main = detail.kind === 'main'
-  // The title's native menu: the title shows it open until the menu closes.
+  // The topic's native menu, from ⋯ or a right-click on the title: ⋯ shows it open until the menu closes.
   const [menuOpen, setMenuOpen] = useState(false)
   const openMenu = (at: MenuAnchor) => {
     setMenuOpen(true)
@@ -577,9 +587,13 @@ function Topic({ id, view, detail, readOnly = false, underHeader = true }: Topic
   }
   const renaming = useAtomValue(headerRenamingAtom(detail.id))
   const channel = detail.channel.id
-  // Main keeps its threads query live while shown, from after its first frame, so the Threads
-  // popover opens with its rows in the first frame instead of "Loading threads".
-  useEffect(() => (main && drawnAll && !readOnly ? registry.mount(channelThreadsAtom(channel)) : undefined), [main, drawnAll, readOnly, channel])
+  // The switcher's queries stay live while the topic is shown, from after its first frame, so the
+  // title opens the switcher with its rows in the first frame (performance 4.4).
+  useEffect(() => {
+    if (!drawnAll || readOnly) return undefined
+    const releases = [registry.mount(channelTopicsAtom(channel)), registry.mount(topicAtom(mainTopicOf(channel)))]
+    return () => releases.forEach((release) => release())
+  }, [drawnAll, readOnly, channel])
 
   const composer = useRef<ComposerHandle>(null)
   const messageActions = useMessageActions({ detail, list, scrollRef, composer })
@@ -661,9 +675,7 @@ function Topic({ id, view, detail, readOnly = false, underHeader = true }: Topic
           {...(agentOn ? { juno: { open: panelOpen, onToggle: toggleJunoPanel } } : {})}
           {...(renaming ? { rename: { onSave: (title: string) => renameTopic(detail.id, title), onCancel: cancelRename } } : {})}
           {...(main ? {} : { onResolve: () => toggleResolved(detail.id) })}
-          threadsOpen={threadsOpen}
-          {...(main ? { onThreads: setThreadsOpen } : {})}
-          threads={threadsOpen ? <MainThreads channel={detail.channel.id} onClose={() => setThreadsOpen(false)} /> : null}
+          switcher={{ open: switcherOpen, onOpen: setSwitcherOpen, content: switcherOpen ? <Switcher detail={detail} onClose={() => setSwitcherOpen(false)} /> : null }}
         />
       }
       pill={showPill ? <NewMessagesPill count={newCount} onJump={jumpToLatest} /> : undefined}

@@ -1,9 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Button, defineFixtures, scene, type FixtureFrame } from '@juno/ui'
 import type { TopicDetail } from '@juno/contract'
-import { ActiveThreads } from './ActiveThreads'
+import { TopicSwitcher } from './TopicSwitcher'
 import { ComposerSlot } from './ComposerSlot'
-import { details, emojiOnly, engThreads, hostile, main, mainDividerBefore, mentions, rtl, thread, threadDividerBefore, withFiles } from './fixtures/messages'
+import { details, emojiOnly, engTopics, hostile, main, mainDividerBefore, mentions, rtl, thread, threadDividerBefore, withFiles } from './fixtures/messages'
 import { NOW } from './fixtures/topics'
 import type { EmojiCategory } from '@juno/contract'
 import { EmojiPicker } from './EmojiPicker'
@@ -85,7 +85,11 @@ function HeaderCycles() {
 
 const topic = (props: Scene, frame?: FixtureFrame) => scene<TopicViewProps>(() => <Topic {...props} />, frame)
 
-const threads = <ActiveThreads threads={engThreads} now={NOW} onOpen={noop} />
+const switcher = {
+  open: true,
+  onOpen: noop,
+  content: <TopicSwitcher mainId="C0ENG:main" mainUnread={3} currentId="C0ENG:main" threads={engTopics} now={NOW} query="" onQuery={noop} onOpen={noop} onClose={noop} />,
+}
 
 /** A few emoji, so the picker reads like the real one without the whole catalog. */
 const pickerCatalog: ReadonlyArray<EmojiCategory> = [
@@ -165,7 +169,7 @@ export default defineFixtures(
     },
     Main: {
       'channel-main': topic({ detail: details.engMain, items: main.slice(4), list: { dividerBefore: mainDividerBefore } }),
-      'threads-open': topic({ detail: details.engMain, items: main, header: { threadsOpen: true, threads } }),
+      'switcher-open': topic({ detail: details.engMain, items: main, header: { switcher } }),
     },
     // The list runs under the islands: at the top the inset keeps the first message clear of the band; scrolled, text fades out under it.
     Header: {

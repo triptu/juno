@@ -52,7 +52,7 @@ const postgresPage = (
 )
 
 const engPage = (
-  <TopicView header={<TopicHeader detail={details.engMain} onMenu={noop} onPill={noop} onThreads={noop} juno={{ open: false, onToggle: noop }} />} composer={<ComposerSlot placeholder="Message #eng" />}>
+  <TopicView header={<TopicHeader detail={details.engMain} onMenu={noop} onPill={noop} juno={{ open: false, onToggle: noop }} />} composer={<ComposerSlot placeholder="Message #eng" />}>
     <MessageList items={main} main now={NOW} dividerBefore={mainDividerBefore} onOpenThread={noop} onChannel={noop} onLink={noop} />
   </TopicView>
 )

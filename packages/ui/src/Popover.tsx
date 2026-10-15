@@ -165,6 +165,8 @@ const styles = stylex.create({
   },
   panel: {
     position: 'absolute',
+    // A popover hung off an island in a header layer that lets the pointer through still takes it.
+    pointerEvents: 'auto',
   },
   surface: {
     display: 'flex',
