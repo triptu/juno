@@ -42,13 +42,13 @@ export function HomePage() {
   // The newest running job's state line replaces the field's placeholder (SPEC 13.4).
   const jobLine = useAtomValue(junoNavAtom, (nav) => nav.jobLine)
 
-  const ready = latest !== undefined
-  const known = value !== undefined
+  // Nothing yet, the first sync running, or ready: Home is taken again at each step.
+  const stage = latest !== undefined ? 2 : value !== undefined ? 1 : 0
   useLayoutEffect(() => {
     // The entrance plays once, when Home first has something to show; the items arriving after the sync just appear.
-    showHome(registry, key, { windowHeight: window.innerHeight, enter: known && !appeared.current })
-    if (known) appeared.current = true
-  }, [key, ready, known])
+    showHome(registry, key, { windowHeight: window.innerHeight, enter: stage > 0 && !appeared.current })
+    if (stage > 0) appeared.current = true
+  }, [key, stage])
 
   if (shown === undefined) return <div data-home="" data-home-waiting="" />
   const view = latest === undefined ? shown.view : freezeHome(shown.view, latest)

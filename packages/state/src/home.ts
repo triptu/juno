@@ -154,12 +154,6 @@ export const HOME_SYNCING_LINE = 'Syncing with Slack.'
 /** By a key of the Home component's own, so two Homes never share one. Reset when nothing reads it. */
 export const homeShownAtom = Atom.family((_key: string) => Atom.make<HomeShown | undefined>(undefined))
 
-/** The current `home.view`, once the first sync is done. */
-export function readyHomeView(registry: Registry): HomeView | undefined {
-  const result = registry.get(homeViewAtom)
-  return result._tag === 'Success' && result.value.ready ? result.value : undefined
-}
-
 /**
  * Home appeared (mounted, shown again, or its first value arrived): takes
  * the items, the copy and the scene now, or nothing while there is no

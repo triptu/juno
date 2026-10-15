@@ -1,6 +1,6 @@
 export { liveQuery, runCommand, type LiveListAtom, type LiveValueAtom } from './atoms'
 export { configureConnection, connectionStateAtom, makeRegistry, registry, restartEngine, type Registry } from './client'
-export { engineStatusAtom, pingCommand, syncNoticeAtom, syncProgressAtom, type SyncProgress } from './engine'
+export { engineStatusAtom, pingCommand, syncNoticeAtom, syncProgressAtom } from './engine'
 export { importFromSlackAppCommand, sessionStatusAtom, signedInAtom, signInCommand, signOutCommand } from './session'
 export { viewPillsAtom, viewSheetAtom, viewsAtom, type ViewSheetState } from './views'
 export { defaultTopicListFilter, topicCountsAtom, topicListAtom, type TopicListFilter } from './topics'

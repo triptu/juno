@@ -359,12 +359,12 @@ async function usersOnly(call: Call, edge: Edge, teamId: string): Promise<unknow
   const base = String(flannel?.['url'] ?? '').replace(/\/+$/, '')
   const channels = (boot?.['channels'] as Array<Json> | undefined) ?? []
   const ims = (boot?.['ims'] as Array<Json> | undefined) ?? []
-  const memberIds = new Set([...['channels', 'mpims', 'ims'].flatMap((list) => ((counts?.[list] as Array<{ id: string }> | undefined) ?? []).map((e) => e.id))])
+  const memberIds = new Set(['channels', 'mpims', 'ims'].flatMap((list) => ((counts?.[list] as Array<{ id: string }> | undefined) ?? []).map((e) => e.id)))
   const mpims = channels.filter((c) => c['is_mpim'] === true && memberIds.has(String(c['id'])))
   const ids = { sender: new Set<string>(), mention: new Set<string>(), im: new Set<string>(), mpim: new Set<string>(), replyUser: new Set<string>() }
   for (const im of ims) if (memberIds.has(String(im['id'])) && typeof im['user'] === 'string') ids.im.add(im['user'])
   for (const mpim of mpims) for (const member of (mpim['members'] as Array<string> | undefined) ?? []) ids.mpim.add(member)
-  const recent = [...['channels', 'mpims', 'ims'].flatMap((list) => (counts?.[list] as Array<{ id: string; latest?: string }> | undefined) ?? [])]
+  const recent = ['channels', 'mpims', 'ims'].flatMap((list) => (counts?.[list] as Array<{ id: string; latest?: string }> | undefined) ?? [])
     .filter((e) => e.latest !== undefined)
     .toSorted((a, b) => tsSeconds(b.latest!) - tsSeconds(a.latest!))
     .slice(0, 8)
@@ -415,7 +415,7 @@ async function usersOnly(call: Call, edge: Edge, teamId: string): Promise<unknow
     ids: { all: all.length, sender: ids.sender.size, mention: ids.mention.size, im: ids.im.size, mpim: ids.mpim.size, replyUser: ids.replyUser.size, wPrefix: all.filter((id) => id.startsWith('W')).length },
     usersInfo: { ...info, resultsShape: [...info.resultsShape], keys: Object.fromEntries([...info.keys].toSorted()), notReturned: { all: all.length - returned.size, sender: missingBy(ids.sender), mention: missingBy(ids.mention), im: missingBy(ids.im), mpim: missingBy(ids.mpim) } },
     edgeUsersList: { ok: edgeList?.['ok'], error: edgeList?.['error'], results: Array.isArray(edgeList?.['results']) ? (edgeList['results'] as Array<unknown>).length : typeof edgeList?.['results'], nextMarker: typeof edgeList?.['next_marker'] === 'string' },
-    usersList: { ok: webList?.['ok'] ?? false, members: ((webList?.['members'] as Array<unknown> | undefined) ?? []).length, nextCursor: typeof (webList?.['response_metadata'] as Json | undefined)?.['next_cursor'] === 'string' && (webList?.['response_metadata'] as Json)['next_cursor'] !== '' },
+    usersList: { ok: webList?.['ok'] ?? false, members: ((webList?.['members'] as Array<unknown> | undefined) ?? []).length, nextCursor: ((webList?.['response_metadata'] as Json | undefined)?.['next_cursor'] ?? '') !== '' },
   }
 }
 
