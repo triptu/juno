@@ -46,6 +46,40 @@ export type AppInfo = typeof AppInfo.Type
 export const PortRequestResult = Schema.Literals(['sent', 'failed'])
 export type PortRequestResult = typeof PortRequestResult.Type
 
+/**
+ * Juno Agent's model provider, as main holds it (SPEC 13.10). One is active
+ * at a time; `null` means none is set up, and then the agent does not run.
+ * Keys never leave main: only whether each one is set.
+ */
+export const ProviderKind = Schema.Literals(['openRouter', 'custom'])
+export type ProviderKind = typeof ProviderKind.Type
+export const ProviderState = Schema.Struct({
+  active: Schema.NullOr(ProviderKind),
+  openRouter: Schema.Struct({ key: Schema.Literals(['missing', 'set']) }),
+  /** An OpenAI-compatible endpoint. `baseUrl` is empty until one is set; its key may stay missing (a local model). */
+  custom: Schema.Struct({ baseUrl: Schema.String, key: Schema.Literals(['missing', 'set']) }),
+})
+export type ProviderState = typeof ProviderState.Type
+
+/**
+ * A change from Settings › Juno. Setting a provider up makes it active. For
+ * `custom`, `key` absent keeps the stored key and `null` removes it.
+ * `use` switches to a provider already set up, or to none.
+ */
+export const ProviderChange = Schema.Union([
+  Schema.TaggedStruct('openRouter', { key: Schema.NullOr(Schema.String.check(Schema.isMaxLength(256))) }),
+  Schema.TaggedStruct('custom', {
+    baseUrl: Schema.String.check(Schema.isMaxLength(2048)),
+    key: Schema.optionalKey(Schema.NullOr(Schema.String.check(Schema.isMaxLength(1024)))),
+  }),
+  Schema.TaggedStruct('use', { provider: Schema.NullOr(ProviderKind) }),
+])
+export type ProviderChange = typeof ProviderChange.Type
+
+/** `invalid`: not a key, or not an http(s) address; nothing was stored. `failed`: the keychain refused. */
+export const ProviderResult = Schema.Literals(['saved', 'removed', 'invalid', 'failed'])
+export type ProviderResult = typeof ProviderResult.Type
+
 /** The sidebar's width in CSS pixels (280 to 480) and whether it is hidden (spec section 4). */
 export const SidebarLayout = Schema.Struct({
   width: Schema.Int.check(Schema.isBetween({ minimum: SIDEBAR_WIDTH.min, maximum: SIDEBAR_WIDTH.max })),
@@ -84,8 +118,10 @@ export const ShellRoutes = {
   [Channels.agentRequestPort]: { input: Schema.Void, output: PortRequestResult },
   [Channels.agentSetOpenRouterKey]: {
     input: Schema.Struct({ key: Schema.NullOr(Schema.String.check(Schema.isMaxLength(256))) }),
-    output: Schema.Literals(['saved', 'removed', 'invalid', 'failed']),
+    output: ProviderResult,
   },
+  [Channels.agentProvider]: { input: Schema.Void, output: ProviderState },
+  [Channels.agentSetProvider]: { input: ProviderChange, output: ProviderResult },
   [Channels.launchSetTheme]: { input: Schema.Struct({ theme: ThemeSchema }), output: Schema.Void },
   [Channels.launchSetAccent]: { input: Schema.Struct({ accent: AccentSchema }), output: Schema.Void },
   [Channels.launchSetDensity]: { input: Schema.Struct({ density: DensitySchema }), output: Schema.Void },

@@ -16,16 +16,16 @@
  * A send the agent had in flight when it died is still answered by the host
  * (`@juno/agent-juno`, single-attempt dispatch).
  *
- * Off unless JUNO_AGENT=1 until the chat ships (M2); a renderer that asks
- * for a port is told `failed`. The OpenRouter key is main's
- * (`keychain.ts`): each new agent process gets the current one once it is
- * loaded, and a running one gets every change. OAuth requests come with
- * Connections (WP17).
+ * The agent runs while a model provider is set up (`providers.ts`): main
+ * starts it once the provider store has loaded one, sends every change to
+ * the running process, and stops it when none is left. With none, a
+ * renderer that asks for a port is told `failed`, and the Juno tab shows
+ * "Add a provider". OAuth requests come with Connections (WP17).
  */
 import { app, MessageChannelMain, utilityProcess, type MessagePortMain, type UtilityProcess, type WebContents } from 'electron'
 import { join } from 'node:path'
 import { Schema } from 'effect'
-import { AgentToMain, type AgentConfig, type HostHello, type MainToAgent } from '@juno/agent-contract'
+import { AgentToMain, type AgentConfig, type AgentProvider, type HostHello, type MainToAgent } from '@juno/agent-contract'
 import { Events } from '@juno/contract/channels'
 import type { PortRequestResult } from '@juno/contract'
 
@@ -48,8 +48,8 @@ export class AgentSupervisor {
   private restartTimer: NodeJS.Timeout | undefined
   /** Renderer ports asked for while the agent was not spawned, by renderer. */
   private readonly pendingRendererPorts = new Map<WebContents, MessagePortMain>()
-  /** The OpenRouter key main holds; undefined until the keychain has been read. */
-  private openRouterKey: string | null | undefined
+  /** The active provider; the agent runs only while there is one. */
+  private provider: AgentProvider | null = null
 
   constructor(
     private readonly config: AgentConfig,
@@ -79,7 +79,7 @@ export class AgentSupervisor {
     child.on('spawn', () => {
       this.spawned = true
       this.send({ _tag: 'config', config: this.config })
-      if (this.openRouterKey !== undefined) this.send({ _tag: 'openRouterKey', key: this.openRouterKey })
+      this.send({ _tag: 'provider', provider: this.provider })
       if (this.engineReady()) this.linkHost()
       for (const port of this.pendingRendererPorts.values()) this.send({ _tag: 'rendererPort' }, [port])
       this.pendingRendererPorts.clear()
@@ -98,13 +98,32 @@ export class AgentSupervisor {
         this.hello = message.host
       }
     })
-    child.on('exit', (code) => this.onExit(code))
+    child.on('exit', (code) => {
+      // A process stopped for a provider change may exit after its successor started.
+      if (this.child !== undefined && this.child !== child) return
+      this.onExit(code)
+    })
   }
 
-  /** The key to give the agent: now if it runs, and to every process it starts later. */
-  setOpenRouterKey(key: string | null): void {
-    this.openRouterKey = key
-    if (this.child && this.spawned) this.send({ _tag: 'openRouterKey', key })
+  /**
+   * The provider to give the agent: starts the agent when there is one and
+   * it is not running, hands a running one the change, and stops it when
+   * there is none. A change after main gave up starts it again.
+   */
+  setProvider(provider: AgentProvider | null): void {
+    this.provider = provider
+    if (provider === null) {
+      if (this.state !== 'stopped') this.stop()
+      return
+    }
+    if (this.child) {
+      if (this.spawned) this.send({ _tag: 'provider', provider })
+      return
+    }
+    if (this.state === 'restarting') return
+    this.exits.length = 0
+    this.attempt = 0
+    this.start()
   }
 
   /** A new channel between the engine's AgentHost server and the agent. Call when the engine is ready. */

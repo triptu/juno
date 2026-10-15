@@ -41,7 +41,7 @@ import type {
 } from '@juno/agent-contract'
 import { aboutOf } from '@juno/agent-contract'
 import type { Registry } from '../client'
-import { junoAgentOnAtom } from '../shell'
+import { agentProviderAtom } from './provider'
 import { AgentClient } from './client'
 import { uuidv7 } from './ids'
 
@@ -93,11 +93,10 @@ const quiet: ChatSummary = { unread: 0, busy: false }
 
 /**
  * The sidebar's Juno item: the unread count and the busy sparkle. Nothing
- * asks the agent for it while the agent is off, so main is not asked for a
- * port every second for nothing.
+ * asks the agent for it while no provider is set up, since no agent runs.
  */
 export const junoNavAtom = Atom.make((get): ChatSummary => {
-  if (!get(junoAgentOnAtom)) return quiet
+  if (get(agentProviderAtom)?.active == null) return quiet
   const summary = get(chatSummaryAtom)
   return AsyncResult.isSuccess(summary) ? summary.value : quiet
 })

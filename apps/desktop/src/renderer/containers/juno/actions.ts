@@ -14,7 +14,7 @@ import {
   currentPlace,
   focusJunoComposer,
   junoAboutAtom,
-  junoAgentOnAtom,
+  junoAvailableAtom,
   junoPanelOpenAtom,
   registry,
   setJunoPanelOpen,
@@ -72,7 +72,7 @@ export function moveJunoToTab(): void {
 
 /** View › Juno (⌘J): the panel in a topic tab, the Juno tab elsewhere. Nothing while the agent is off. */
 export function runJunoShortcut(): void {
-  if (!registry.get(junoAgentOnAtom)) return
+  if (!registry.get(junoAvailableAtom)) return
   if (topicTabActive()) toggleJunoPanel()
   else openJunoTab()
 }

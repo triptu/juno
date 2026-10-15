@@ -38,6 +38,7 @@ import Workspace from './Workspace.fixtures'
 import WhyPopover from './WhyPopover.fixtures'
 import ChatCard, { budgetCard, changeCard, connectCard, proposedScheduleCard, proposedTaskCard, providerCard, questionCard, removeCard, resolveCard, scheduleCard, sendMessageCard, taskCard, topicsCardSet, unknownCardSet } from './juno-chat/cards/ChatCard.fixtures'
 import EmptyChat from './juno-chat/EmptyChat.fixtures'
+import NoProvider from './juno-chat/NoProvider.fixtures'
 import JunoChatList from './juno-chat/JunoChatList.fixtures'
 import JunoComposer from './juno-chat/JunoComposer.fixtures'
 import JunoHeader from './juno-chat/JunoHeader.fixtures'
@@ -49,6 +50,7 @@ import ActivityPage from './juno-pages/ActivityPage.fixtures'
 import ConnectionsPage from './juno-pages/ConnectionsPage.fixtures'
 import JunoSettingsPage from './juno-pages/JunoSettingsPage.fixtures'
 import MemoryPage from './juno-pages/MemoryPage.fixtures'
+import ProviderSection from './juno-pages/ProviderSection.fixtures'
 import RemembersPage from './juno-pages/RemembersPage.fixtures'
 import ReviewPage from './juno-pages/ReviewPage.fixtures'
 import ScheduledPage from './juno-pages/ScheduledPage.fixtures'
@@ -72,6 +74,7 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   EmojiPicker,
   EngineNotice: engineNoticeFixtures,
   EmptyChat,
+  NoProvider,
   EngineStatusView,
   Home,
   HoverToolbar,
@@ -79,6 +82,7 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   JunoComposer,
   JunoHeader,
   JunoSettingsPage,
+  ProviderSection,
   MemoryPage,
   Message,
   MessageList,

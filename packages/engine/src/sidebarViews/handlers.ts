@@ -9,7 +9,7 @@ import { keys, liveQuery, type InvalidationKeys } from '@juno/store'
 import { EngineConfig } from '../config'
 import { retryFirstRun, serveLiveValue, timed } from '../protocol/live'
 import { Workspace } from '../workspace'
-import { deleteView, listViews, reorderViews, restoreView, saveView, setViewChannel } from './views'
+import { deleteView, listViews, reorderViews, restoreView, saveView, setViewChannel } from '../viewCommands'
 
 const LIST_KEYS: InvalidationKeys = [...keys.sidebarViews, 'conversations', 'users']
 
