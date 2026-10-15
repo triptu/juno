@@ -68,7 +68,7 @@ test('a rewritten Home title line leaves every box where it was', async ({ page 
     await page.goto(`/#/Home?__state=${state}`)
     await expect(page.locator('[data-home-item]')).toHaveCount(3)
     return page.locator('[data-fixture-frame]').evaluate((frame) =>
-      [...frame.querySelectorAll('[data-home-item], [data-home-title], [data-home-meta], h2, button')].map((node) => {
+      Array.from(frame.querySelectorAll('[data-home-item], [data-home-title], [data-home-meta], h2, button')).map((node) => {
         const box = node.getBoundingClientRect()
         return [node.tagName, Math.round(box.x), Math.round(box.y), Math.round(box.width), Math.round(box.height)].join(' ')
       }),
