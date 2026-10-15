@@ -329,7 +329,7 @@ it('ends a run whose provider call fails with the fixed ending for the cause, an
   // A refused key or a rate limit did no work, and nothing stays reserved for them.
   const cases = [
     [serverError(503), { _tag: 'failed', reason: 'provider' }, true],
-    [rateLimited(), { _tag: 'failed', reason: 'provider' }, false],
+    [rateLimited(), { _tag: 'failed', reason: 'rateLimited' }, false],
     [rejectedKey(), { _tag: 'failed', reason: 'keyRejected' }, false],
     [reply(async () => { throw new Error('fetch failed') }), { _tag: 'failed', reason: 'offline' }, true],
   ] as const

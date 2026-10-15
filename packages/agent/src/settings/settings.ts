@@ -35,6 +35,7 @@
  * Codex uses its own local home and the same picker. Its turns are counted separately.
  */
 import { isAbsolute } from 'node:path'
+import { chatCopy } from '@juno/agent-contract'
 import type { JunoSettingsPage, ModelChoice, Ownership, SettingsChange } from '@juno/agent-contract'
 import { pickerFamilies, type PickerModel } from '../providers/catalog'
 import type { ProviderConnection } from '../providers/connection'
@@ -73,7 +74,6 @@ export interface SettingsOptions {
   readonly onReport?: (error: unknown) => void
 }
 
-const money = (usd: number) => (Number.isInteger(usd) ? `$${usd}` : `$${usd.toFixed(2)}`)
 /** "Anthropic: Claude Sonnet 5.5" is listed as "Claude Sonnet 5.5". */
 const shortName = (name: string) => name.replace(/^[^:]+:\s*/, '')
 const ref = (row: PickerModel | undefined) => (row === undefined ? undefined : { provider: row.model.provider, modelId: row.model.id })
@@ -125,7 +125,7 @@ export function createJunoSettings(options: SettingsOptions): JunoSettings {
   const offConnection = connection.subscribe(() => void refresh(true))
   const offOwnership = turns.ownership.subscribe(changed)
 
-  const priceText = (row: PickerModel) => row.choice.provider === 'codex' ? { price: `Uses your ChatGPT plan · ${turns.guard.spend.snapshot().codexTurns} turns today · remaining quota is not reported` } : (row.price === undefined ? {} : { price: `${money(row.price.input)} in, ${money(row.price.output)} out per million tokens` })
+  const priceText = (row: PickerModel) => row.choice.provider === 'codex' ? { price: `Uses your ChatGPT plan · ${turns.guard.spend.snapshot().codexTurns} turns today · remaining quota is not reported` } : (row.price === undefined ? {} : { price: chatCopy.modelPrice(row.price.input, row.price.output) })
 
   /** The custom endpoint's rows: what it lists, with a typed model added when chosen. */
   const customChoices = (): ReadonlyArray<ModelChoice> => {
