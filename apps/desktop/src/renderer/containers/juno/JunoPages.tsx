@@ -53,8 +53,8 @@ export const JunoPageTab = memo(function JunoPageTab({ page }: { readonly page: 
 })
 
 /**
- * Settings › Juno. The models, spend, the OpenRouter key and Pause are
- * served (juno-settings). Codex (WP20), Rules (WP15), Backup and This Mac
+ * Settings › Juno. The models, spend, the OpenRouter key, Pause (juno-settings)
+ * and the owner's rules (WP15) are served. Codex (WP20), Backup and This Mac
  * (WP21) get no callbacks, so the view leaves them out until they are built.
  * The key goes from the field to main's keychain, never through the page.
  */
@@ -64,11 +64,28 @@ function Settings() {
   const [entry, setEntry] = useState<{ readonly draft: string; readonly error?: string } | undefined>(undefined)
   // A change shows at once (performance 1: one frame for direct feedback) and gives way when the agent's page agrees or refuses it.
   const [shown, setShown] = useState<Shown>({})
+  // The rules list while the owner edits it, saved as a whole.
+  const [rules, setRules] = useState<ReadonlyArray<Rule> | undefined>(undefined)
+  const [rulesError, setRulesError] = useState<string | undefined>(undefined)
   const served = result._tag === 'Success' ? result.value : undefined
   const left = served === undefined ? shown : unconfirmed(served, shown)
   if (left !== shown) setShown(left)
+  // The saved list gives way to the agent's once the page shows it.
+  if (served !== undefined && rules !== undefined && rulesError === undefined && sameRules(served.rules, rules)) setRules(undefined)
   if (served === undefined) return null
-  const page = withShown(served, shown)
+  const shownPage = withShown(served, shown)
+  const page = rules === undefined ? shownPage : { ...shownPage, rules }
+  // The rules are saved as a whole list when a field loses focus; empty rows are dropped, as the agent takes no empty rule.
+  const commitRules = (next: ReadonlyArray<Rule> | undefined = rules) => {
+    if (next === undefined) return
+    const kept = next.filter((rule) => rule.text.trim() !== '')
+    void actions.settings({ _tag: 'rules', rules: kept }).then((outcome) => {
+      if (outcome === 'ok') {
+        setRules(kept)
+        setRulesError(undefined)
+      } else setRulesError(chatCopy.pages.settings.rulesInvalid)
+    })
+  }
   const change = (next: Shown, request: JunoSettingsChange) => {
     setShown({ ...shown, ...next })
     void actions.settings(request).then((outcome) => {
@@ -102,9 +119,22 @@ function Settings() {
       onOpenRouterKey={() => setEntry({ draft: '' })}
       {...(keyEntry === undefined ? {} : { keyEntry })}
       onPaused={(value) => change({ paused: value }, { _tag: 'paused', value })}
+      onRuleChange={(id, text) => setRules(page.rules.map((rule) => (rule.id === id ? { id, text } : rule)))}
+      onRuleAdd={() => setRules([...page.rules, { id: crypto.randomUUID(), text: '' }])}
+      onRuleRemove={(id) => {
+        const next = page.rules.filter((rule) => rule.id !== id)
+        setRules(next)
+        commitRules(next)
+      }}
+      onRulesCommit={() => commitRules()}
+      {...(rulesError === undefined ? {} : { rulesError })}
     />
   )
 }
+
+type Rule = { readonly id: string; readonly text: string }
+
+const sameRules = (a: ReadonlyArray<Rule>, b: ReadonlyArray<Rule>) => a.length === b.length && a.every((rule, i) => rule.id === b[i]!.id && rule.text === b[i]!.text)
 
 /** Changes the owner just made, shown until the agent's page arrives with them. */
 interface Shown {

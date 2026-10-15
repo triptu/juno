@@ -34,6 +34,10 @@ export interface JunoSettingsPageProps {
   readonly onRuleChange?: (id: string, text: string) => void
   readonly onRuleRemove?: (id: string) => void
   readonly onRuleAdd?: () => void
+  /** A rule field lost focus or took Enter: the edited list is saved as a whole. */
+  readonly onRulesCommit?: () => void
+  /** Why the agent refused the list: "Each rule is one line of up to 280 bytes, and there are at most 20." */
+  readonly rulesError?: string
   readonly onBackupFolder?: () => void
   readonly onExportPhrase?: () => void
   readonly onMove?: () => void
@@ -74,6 +78,8 @@ export function JunoSettingsPage({
   onRuleChange,
   onRuleRemove,
   onRuleAdd,
+  onRulesCommit,
+  rulesError,
   onPaused,
   onBackupFolder,
   onExportPhrase,
@@ -89,9 +95,11 @@ export function JunoSettingsPage({
       <PageHeader
         title="Juno"
         subtitle={
-          onRuleChange !== undefined && onMove !== undefined
+          onMove !== undefined
             ? "Models, spend, rules and where Juno's state lives. Only you can change these."
-            : 'Models, spend and the provider. Only you can change these.'
+            : onRuleChange !== undefined
+              ? 'Models, spend, the provider and your rules. Only you can change these.'
+              : 'Models, spend and the provider. Only you can change these.'
         }
       />
 
@@ -238,13 +246,31 @@ export function JunoSettingsPage({
                   </Button>
                 }
               >
-                <TextField size={30} label="Rule" value={rule.text} onChange={(event) => onRuleChange(rule.id, event.currentTarget.value)} dir="auto" />
+                <TextField
+                  size={30}
+                  label="Rule"
+                  value={rule.text}
+                  onChange={(event) => onRuleChange(rule.id, event.currentTarget.value)}
+                  onBlur={() => onRulesCommit?.()}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') onRulesCommit?.()
+                  }}
+                  autoFocus={rule.text === ''}
+                  dir="auto"
+                />
               </ListRow>
             ))}
             <ListRow divider={false} minHeight={44}>
-              <Button variant="ghost" size="sm" tone="subtle" onClick={onRuleAdd}>
-                Add a rule
-              </Button>
+              <span {...stylex.props(cell.lines)}>
+                <Button variant="ghost" size="sm" tone="subtle" onClick={onRuleAdd}>
+                  Add a rule
+                </Button>
+                {rulesError === undefined ? null : (
+                  <Text variant="meta" tone="danger" data-rules-error="">
+                    {rulesError}
+                  </Text>
+                )}
+              </span>
             </ListRow>
           </Surface>
         </Section>

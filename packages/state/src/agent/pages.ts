@@ -48,11 +48,13 @@ const activityFamily = Atom.family((limit: number) => page<ActivityPage>('agent.
 export const memoryPageAtom = (limit: number) => memoryFamily(limit)
 export const activityPageAtom = (limit: number) => activityFamily(limit)
 
-/** A model family, the cap, Pause: what Settings › Juno changes today. Rules and the backup folder come with WP15 and WP21. */
+/** A model family, the cap, Pause and the rules: what Settings › Juno changes today. The backup folder comes with WP21. */
 export type JunoSettingsChange =
   | { readonly _tag: 'model'; readonly purpose: 'chat' | 'compaction'; readonly provider: 'openrouter' | 'codex'; readonly family: string }
   | { readonly _tag: 'cap'; readonly usd: number }
   | { readonly _tag: 'paused'; readonly value: boolean }
+  /** The whole list, in order. */
+  | { readonly _tag: 'rules'; readonly rules: ReadonlyArray<{ readonly id: string; readonly text: string }> }
 
 /** `ok`, or why the agent refused (`stale`, `invalid`, `unavailable`, ...). */
 export type PageOutcome = 'ok' | string

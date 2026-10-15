@@ -24,9 +24,21 @@ const page = (props: Pick<JunoSettingsPageProps, 'page'>) =>
     onStopJob: noop,
   })
 
-/** What the app wires today: the models, spend, OpenRouter and Pause. Codex, Rules, Backup and This Mac wait for their work packages. */
-const today = (props: Pick<JunoSettingsPageProps, 'page' | 'keyEntry'>) =>
-  fixture<JunoSettingsPageProps>({ ...props, now: NOW, onChatModel: noop, onCompactionModel: noop, onCap: noop, onOpenRouterKey: noop, onPaused: noop })
+/** What the app wires today: the models, spend, OpenRouter, the rules and Pause. Codex, Backup and This Mac wait for their work packages. */
+const today = (props: Pick<JunoSettingsPageProps, 'page' | 'keyEntry' | 'rulesError'>) =>
+  fixture<JunoSettingsPageProps>({
+    ...props,
+    now: NOW,
+    onChatModel: noop,
+    onCompactionModel: noop,
+    onCap: noop,
+    onOpenRouterKey: noop,
+    onPaused: noop,
+    onRuleChange: noop,
+    onRuleRemove: noop,
+    onRuleAdd: noop,
+    onRulesCommit: noop,
+  })
 
 const entry = (draft: string, error?: string) => ({ draft, ...(error === undefined ? {} : { error }), onDraft: noop, onSave: noop, onCancel: noop })
 
@@ -46,6 +58,8 @@ export default defineFixtures(
       'key-entry': today({ page: { ...settings, openRouterKey: 'missing' }, keyEntry: entry('sk-or-v1-0123') }),
       'key-invalid': today({ page: { ...settings, openRouterKey: 'missing' }, keyEntry: entry('not a key', chatCopy.pages.settings.keyInvalid) }),
       'key-rejected': today({ page: { ...settings, openRouterKey: 'rejected' } }),
+      'no-rules': today({ page: { ...settings, rules: [] } }),
+      'rules-refused': today({ page: settings, rulesError: chatCopy.pages.settings.rulesInvalid }),
     },
   },
   { width: 960, height: 880, padded: false },

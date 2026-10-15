@@ -258,6 +258,8 @@ export const chatCopy = {
       /** Under the key field: main refused it as not a key, or the keychain did not take it. */
       keyInvalid: 'That is not an OpenRouter key.',
       keyFailed: 'The keychain did not save the key. Try again.',
+      /** Under the rules when the agent refused the list. */
+      rulesInvalid: 'Each rule is one line, a sentence or two, and there are at most 20.',
       exportPhrase: 'Export recovery phrase',
       move: 'Move to another Mac',
       restore: 'Restore from backup',
