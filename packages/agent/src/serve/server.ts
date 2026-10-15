@@ -49,7 +49,7 @@ import type { UpdateNeeded } from '../runtime/core'
 import { connectionHandlers } from '../mcp/pages'
 import type { McpManagerApi } from '../mcp/manager'
 import type { JunoSettings } from '../settings/settings'
-import { chatItems, chatSummary, readMarkOf, windowOf, type ChatWindow } from './chat'
+import { createChatCache, chatSummary, readMarkOf, windowOf, type ChatWindow } from './chat'
 import { activityPage, emptyRemembers, memoryPage, remembersPage, reviewPage } from './pages'
 import { runnerPlatform, type RendererTransport } from './runner'
 
@@ -106,6 +106,7 @@ const readAt = (store: Turns['store']) =>
 /** The chat server's state over one engine: the change signal, and when each bubble was first shown. */
 function chatState(host: ChatHost) {
   const turns = host.turns?._tag === 'running' ? host.turns : undefined
+  const cache = turns === undefined ? undefined : createChatCache(turns.store, () => changed())
   const listeners = new Set<() => void>()
   const changed = () => {
     for (const listener of listeners) listener()
@@ -138,7 +139,7 @@ function chatState(host: ChatHost) {
     if (turns === undefined) return []
     const presence = host.presence()
     const mode = turns.mode()
-    return chatItems({
+    return cache!.items({
       store: turns.store,
       live: turns.run(),
       seen: (id, fallback) => {
@@ -190,6 +191,7 @@ function chatState(host: ChatHost) {
   return {
     turns, changed, changes, items, page,
     close: () => {
+      cache?.close()
       unsubscribe?.()
       unsubscribeCards?.()
     },
