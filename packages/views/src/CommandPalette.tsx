@@ -314,6 +314,8 @@ const styles = stylex.create({
     borderBottomStyle: 'solid',
     borderBottomColor: colors['--border-default'],
     cursor: 'text',
+    // Its own compositor layer, so a keystroke re-rasters this row and not the window-sized overlay with the panel's shadows (performance 2.3).
+    willChange: 'transform',
   },
   searchIcon: {
     display: 'inline-flex',
