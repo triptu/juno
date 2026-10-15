@@ -335,3 +335,59 @@ describe('send', () => {
     await waitFor(() => (draft() === '' ? true : undefined), WAIT_MS, 'the draft cleared')
   })
 })
+
+// Review 2026-10-17 (docs/reviews/2026-10-17-correctness.md): the copy's delete is decided once, when the
+// copy is stored, and is not checked again before it goes out. These fail while that holds.
+describe('send: a copy whose delete waits', () => {
+  /** A post the network sent twice, the copy's delete refused for its first `failures` tries. Answers both ts. */
+  async function copyWithSlowDelete(engine: RunningEngine, text: string, failures: number) {
+    engine.main.network.resend = true
+    const rows = watch(engine, MAIN)
+    await rows((list) => list.length > 0, 'the window')
+    engine.fake.holdFrames({ types: ['message'] })
+    engine.fake.loseResponse({ method: 'chat.postMessage' })
+    const id = await post(engine, text)
+    await rows(settled(text), 'the answer stored')
+    const kept = readDb(engine, 'user.db', (db) => (db.prepare('SELECT ts FROM sent_posts WHERE client_msg_id = ?').get(id) as { ts: string }).ts)
+    const copy = engine.fake.messages('C0ENG').find((m) => m.client_msg_id === id && m.ts !== kept)!.ts
+    // Slack's own trouble: the delete is tried again with backoff (1 s, 2 s, 4 s).
+    engine.fake.forceError({ method: 'chat.delete', error: 'internal_error', times: failures })
+    engine.fake.releaseFrames()
+    await waitFor(() => (apiCalls(engine, 'chat.delete').length > 0 ? true : undefined), WAIT_MS, 'the first delete refused')
+    return { id, kept, copy, rows }
+  }
+
+  const deletesLeft = (engine: RunningEngine) =>
+    readDb(engine, 'user.db', (db) => (db.prepare(`SELECT count(*) AS n FROM outbox WHERE kind = 'delete'`).get() as { n: number }).n)
+
+  it('keeps a copy that another person replied to while its delete waited', async () => {
+    const engine = await booted()
+    const { copy } = await copyWithSlowDelete(engine, 'Copy that gets a reply', 3)
+    // Other people's clients show both messages until the delete lands. Maya replies to the copy.
+    engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0MAYA', text: 'Replying to the copy', threadTs: copy })
+    await waitFor(
+      () => (readDb(engine, 'cache.db', (db) => (db.prepare('SELECT reply_count AS n FROM messages WHERE channel = ? AND ts = ?').get('C0ENG', copy) as { n: number } | undefined)?.n) === 1 ? true : undefined),
+      WAIT_MS,
+      'the reply stored',
+    )
+    await waitFor(() => (deletesLeft(engine) === 0 ? true : undefined), WAIT_MS, 'the delete row settled')
+    // ADR 0014: "A copy that has replies is left alone."
+    // In the fake, as in Slack, a deleted root with replies becomes a tombstone.
+    expect(engine.fake.messages('C0ENG').find((m) => m.ts === copy)?.subtype).toBeUndefined()
+  })
+
+  it('keeps the copy when the user deletes the kept message from another device while the delete waits', async () => {
+    const engine = await booted()
+    const { id, kept } = await copyWithSlowDelete(engine, 'Deleted on the phone', 3)
+    // On the phone the user sees two messages and deletes one of them: the one Juno kept.
+    engine.fake.deleteMessage({ channel: 'C0ENG', ts: kept })
+    await waitFor(
+      () => (readDb(engine, 'cache.db', (db) => (db.prepare('SELECT deleted FROM messages WHERE channel = ? AND ts = ?').get('C0ENG', kept) as { deleted: number } | undefined)?.deleted) !== 0 ? true : undefined),
+      WAIT_MS,
+      'the delete from the phone stored',
+    )
+    await waitFor(() => (deletesLeft(engine) === 0 ? true : undefined), WAIT_MS, 'the delete row settled')
+    // The user meant to keep one message. Juno deleting the other leaves none.
+    expect(inSlack(engine, id)).toBe(1)
+  })
+})
