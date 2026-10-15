@@ -17,6 +17,14 @@
  *   the outbox sends it. A message Slack may not have yet waits for it
  *   (`depends_on`). Neither has an undo (ADR 0010).
  * - `messages.react`: adds or removes the user's reaction, the same way.
+ * - `messages.precheck`: while typing pauses in a Main, asks the model
+ *   whether the draft reads like a reply to one of the channel's latest
+ *   topics (`routeCheck`) and stores the answer. Answers once it is stored.
+ * - `messages.check`: the checks on send (spec section 8), run on Enter
+ *   before `messages.send`. It never waits for a model: the wrong-place
+ *   finding is the precheck's stored answer for this exact draft, if there
+ *   is one, and the clarity check's minimal fixes run on every draft. Empty
+ *   when nothing was found or AI assist is off: the message then just sends.
  *
  * A message Slack refuses to change (too old to edit, say) goes back to
  * what Slack has.
@@ -94,10 +102,48 @@ export const messagesReact = Rpc.make('messages.react', {
   error: MessageActionError,
 })
 
+/** Wrong place: the draft reads like a reply to this topic of the channel. */
+export const RouteFinding = Schema.Struct({
+  topicId: Schema.String,
+  /** The thread's root, where Post in thread sends. */
+  threadTs: Schema.String,
+  title: Schema.String,
+  /** 0 to 1, shown as a percentage. */
+  confidence: Schema.Number,
+})
+export type RouteFinding = typeof RouteFinding.Type
+
+/** Clarity: minimal fixes, a note about a long sentence, or both. */
+export const ClarityFinding = Schema.Struct({
+  /** "recieve → receive", "the the → the", "add ?". Empty when only the note applies. */
+  fixes: Schema.Array(Schema.String),
+  /** The draft with every fix applied. */
+  fixed: Schema.String,
+  /** "One sentence runs over 40 words." */
+  note: Schema.optionalKey(Schema.String),
+  confidence: Schema.Number,
+})
+export type ClarityFinding = typeof ClarityFinding.Type
+
+export const SendCheck = Schema.Struct({ route: Schema.optionalKey(RouteFinding), clarity: Schema.optionalKey(ClarityFinding) })
+export type SendCheck = typeof SendCheck.Type
+
+/** The checks on send for a draft going to the channel (`threadTs` absent: its Main). */
+export const messagesCheck = Rpc.make('messages.check', {
+  payload: { channelId: Schema.String, threadTs: Schema.optionalKey(Schema.String), text: Schema.String },
+  success: SendCheck,
+})
+
+/** The wrong-place question for a Main draft, asked while typing pauses so `messages.check` finds the answer. */
+export const messagesPrecheck = Rpc.make('messages.precheck', {
+  payload: { channelId: Schema.String, text: Schema.String },
+  success: Schema.Void,
+})
+
 /** The draft of one topic, `''` when it has none. */
 export const draftsGet = liveValueRoute('drafts.get', { payload: { topicId: Schema.String }, value: Schema.String })
 
 /** Replaces a topic's draft; an empty or blank text deletes it. */
 export const draftsSet = Rpc.make('drafts.set', { payload: { topicId: Schema.String, text: Schema.String }, success: Schema.Void, error: NotSignedIn })
 
-export const SendRoutes = RpcGroup.make(messagesSend, messagesRetry, messagesDiscard, messagesEdit, messagesDelete, messagesReact, draftsGet, draftsSet)
+export const SendRoutes = RpcGroup.make(messagesSend, messagesRetry, messagesDiscard, messagesEdit, messagesDelete, messagesReact, messagesCheck, messagesPrecheck, draftsGet, draftsSet)

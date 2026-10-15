@@ -44,7 +44,7 @@ import type { MigrationSet } from '../store/schema'
 import { initialize, type Store } from '../store/store'
 import { createCompactor, type Compactor, type CompactorState } from '../compactor/scheduler'
 import { delegateTool } from '../jobs/delegate'
-import { createJobs, type Job } from '../jobs/jobs'
+import { createJobs, type Job, type Jobs, type JobDriver } from '../jobs/jobs'
 import { JOBS_MIGRATIONS } from '../jobs/schema'
 import { subagentDriver } from '../jobs/subagent'
 import { rememberTool } from '../memory-tools/remember'
@@ -107,7 +107,14 @@ export interface TurnsOptions {
   /** The host's actions and other folders' executors (WP15). No Slack send without `actions.host`. */
   readonly actions?: ActionsOptions
   /** Fixed tools supplied by a connection adapter; called before the journal resumes. */
-  readonly tools?: (context: { readonly store: Store; readonly actions: Actions; readonly current: () => Promise<ToolRun | undefined> }) => ReadonlyArray<JunoTool & { readonly taints?: boolean }>
+  readonly tools?: (context: { readonly store: Store; readonly actions: Actions; readonly jobs: Jobs; readonly current: () => Promise<ToolRun | undefined> }) => ReadonlyArray<JunoTool & { readonly taints?: boolean }>
+  /**
+   * Stops a job whose work runs outside Juno (a T3 Code session). `click` is the Task
+   * card's Stop. Without one (a removal) it only proposes a Stop card the owner clicks.
+   * Resolves true once the work is confirmed stopped.
+   */
+  readonly stopExternalJob?: (job: Job, click: string | undefined) => Promise<boolean>
+  readonly jobDrivers?: () => ReadonlyArray<JobDriver>
   /** Other folders' migration sets. Spend, turns and jobs are always applied. */
   readonly migrations?: ReadonlyArray<MigrationSet>
   readonly schedule?: Pick<SchedulerOptions, 'replies' | 'cachedReplies' | 'account' | 'enabled'>
@@ -187,7 +194,7 @@ export interface Turns {
     readonly list: () => ReadonlyArray<Job>
     readonly active: () => ReadonlyArray<Job>
     /** The Task card's Stop. */
-    readonly stop: (jobId: string) => Promise<void>
+    readonly stop: (jobId: string, opId?: string) => Promise<void>
     readonly idle: () => Promise<void>
   }
   readonly compaction: {
@@ -338,7 +345,7 @@ async function start(
   const subagentModel = options.subagent ?? initial.compaction
   const jobs = createJobs({
     store,
-    drivers: subagentModel ? [subagentDriver({ store, guard, builder, model: subagentModel })] : [],
+    drivers: [...(subagentModel ? [subagentDriver({ store, guard, builder, model: subagentModel })] : []), ...(options.jobDrivers?.() ?? [])],
     accept: (input) => router.message(input),
     ...(options.onReport ? { onReport: options.onReport } : {}),
   })
@@ -375,7 +382,12 @@ async function start(
     rotate: () => router.rotate(),
     stopJob: async (jobId) => {
       actions.jobStopped(jobId)
-      await jobs.stop(jobId)
+      const job = jobs.get(jobId)
+      if (job?.kind !== 't3') return jobs.stop(jobId)
+      // A T3 Code session runs outside Juno. Juno stops watching it, so no report reaches the
+      // model, without claiming it stopped; the interrupt waits on a Stop card the owner clicks.
+      await jobs.release(jobId, 'Juno stopped watching after a removal. The session may still be running in T3 Code.')
+      await options.stopExternalJob?.(job, undefined)
     },
     changed: () => {
       actions.changed()
@@ -406,7 +418,7 @@ async function start(
   }
   const slackTools = options.host ? hostTools(options.host, handles) : []
   const actionHost = options.actions?.host
-  const extraTools = options.tools?.({ store, actions, current: () => router.toolRun() }) ?? []
+  const extraTools = options.tools?.({ store, actions, jobs, current: () => router.toolRun() }) ?? []
   const actionTools = actionHost ? [sendMessageTool({ store, current: () => router.toolRun(), propose: actions.propose, host: actionHost })] : []
   // §5.4: a run the daily cap blocked brings the Budget card, one per day and raise.
   router.subscribe((event) => {
@@ -576,7 +588,9 @@ async function start(
     jobs: {
       list: jobs.list,
       active: jobs.active,
-      stop: (jobId) => {
+      stop: async (jobId, opId) => {
+        const job = jobs.get(jobId)
+        if (job?.kind === 't3' && !await options.stopExternalJob?.(job, opId ?? uuidv7(store.now()))) return
         actions.jobStopped(jobId)
         return jobs.stop(jobId)
       },

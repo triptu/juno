@@ -56,6 +56,7 @@ Style: transparent, colour `--foreground-subtle`, hover `--surface-hover`, press
 - Separator 1px `--border-default`, margin `2 6 4`.
 - Items 32px, radius 6, padding 0 8, gap 10, icon 15 `--foreground-subtle`, label 13, right hint 11 muted:
   - Set yourself away (`moon`) / Set yourself active (`sun`) — by state; calls `presence.set` and lasts until the next switch in the active hours
+  - Hide message text (`eye-slash`) / Show message text (`eye`) — by state, hint "⌃⌘H"; privacy mode (SPEC section 5)
   - Set status (`circle-dot`)
   - Notifications (`bell`) — hint "Paused until 9am" outside notification hours, none inside
   - Preferences (`settings`) — hint "⌘,"
@@ -64,7 +65,10 @@ Style: transparent, colour `--foreground-subtle`, hover `--surface-hover`, press
   - Switch workspace (`arrow-left-right`)
   - Sign out (`log-out`)
 - Closes on Esc, outside click, or picking an item.
+- [built] Hide or Show message text, after Set yourself away or active.
 - [built M10] Header, Set yourself away or active, Notifications (with "Paused until 9am") and Preferences ("⌘,", also Juno › Settings… in the app menu). Set status, AI assist, Switch workspace and Sign out as an item are not built; the Session block (with Sign out) and the diagnostics stay under the items until they are. The line under the name is the workspace until presence is known. The away dot's ring is 1px.
+
+**Privacy footer** (SPEC section 5, Privacy mode). Shown only while the mode is on, under the topic list. The strip has the sidebar inset (`--sidebar-inset` 10) on all four sides and a 1px `--border-subtle` top rule. Inside it, one 30px line (`--control-30`), radius 8, bg `--secondary-default`, colour `--foreground-subtle`: `eye-slash` 14 at 10 from the left, gap 8, "Message text hidden" 12 meta subtle with an ellipsis, then a raised xs button "Show" (22px; accessible name "Show message text") 4px from the top, right and bottom. One click turns the mode off and the strip goes. [built] The gallery's geometry test holds the 10 / 10 / 10 and 4 / 4 / 4.
 
 ### 2.2 Navigation
 
@@ -146,7 +150,7 @@ Centered, padding `48 16`, gap 8: title 14/500, body 13 muted lh 1.5, button 30p
 - Line 2 (gap 8): preview 13px lh 1.45, muted (subtle when unread), one line with an ellipsis (`Text truncate`; the full text is the tooltip while it is cut off). Text is "Sender: text" with "You:" for own messages and ">" quote lines stripped. Right column (gap 4, padding-top 1):
   - **@ tag** when the latest unread run mentions you: 18px, min-width 18, radius 6, bg `--hl-soft`, inset 1px ring `--border-strong`, "@" 11/500 subtle, title "Mentions you".
   - **count tag** = unread count: 18px, min-width 18, padding 0 5, radius 6, 11/500 tabular; unread row bg `--secondary-active` fg subtle; otherwise `--secondary-default` fg muted. Hidden at 0.
-- Line 3 (12px muted, gap 12, margin-top 3): channel icon 12 + name (no "#"), on Main rows too (the prototype's "Messages outside threads" label is gone). Then the avatar stack (18px circles, −4 overlap, 1.5px `--background-subtle` ring, initials 7.5/600, up to 4 participants), on every row. Then optional tags in order (gap 6):
+- Line 3 (12px muted, gap 12, margin-top 3): channel icon 12 + name (no "#"), on Main rows too (the prototype's "Messages outside threads" label is gone). Then the avatar stack (18px circles, −4 overlap, 1.5px `--background-subtle` ring, initials 7.5/600, up to 4 participants, never you), on channel rows only: rows in a DM or a group DM have none. With no stack, nothing is drawn and the tags follow at the same gap 12. Then optional tags in order (gap 6):
   - Main tag: 18px, padding 0 6, radius 6, 1px `--border-strong`, 11/500 subtle.
   - Reopened tag: same but filled `--secondary-default`, no border, title "New activity after it was resolved".
   - Then, on Main rows only, `chats-circle` 13 + the number of threads started since Main was last read (tabular, title "3 new threads"). Hidden at 0. No message count on any row.
@@ -339,6 +343,8 @@ Typing `@` or `#` at a word start opens a popover above the composer: `bottom: c
 
 While typing in a **public** channel, if the draft matches hiring/people terms (offer, salary, comp, candidate, layoffs, performance review, headcount, fired, onsite), a line appears at the top of the box: margin `8 8 0`, padding 6 10, radius 6, bg warning-14% over surface, text warning-45% over fg, 12px, `sparkles` 13: "This reads like hiring or people detail. eng is a public channel." Disappears as soon as the draft stops matching. Not a block.
 
+[built M8] `AudienceWarning` in the topic composer's `notices`, from the domain's `audienceCheck` (reached through `@juno/contract`). It shows once typing pauses (400 ms, with the draft save) and goes at once when the draft stops matching; nothing with AI assist off. Its radius is 12, concentric with the composer's 20px corners 8px in; the text is the 12.5px `meta` type.
+
 ### 7.3 Send checks
 
 On Enter (AI assist on) the draft is checked, route first (Main only), then clarity. If nothing is found it sends. If something is found a bar appears inside the box above the input: margin `8 8 0`, padding `8 8 8 12`, radius 8, bg `--surface-hover`, 13px lh 1.45, gap 10. Esc returns to editing (bar closes, draft unchanged). Editing the draft also closes it. Enter takes the first option.
@@ -350,6 +356,8 @@ On Enter (AI assist on) the draft is checked, route first (Main only), then clar
 | Clarity (long only) | `spell-check` | "Reads a bit long. One sentence runs over 40 words." | "74%" | **Send ↵** | Keep editing |
 
 Buttons: primary 28px, padding 0 10, radius 6, bg surface, `--shadow-sm`, 12.5/500, with "↵" mono 10.5 muted; secondary ghost 28px, fg subtle, hover bg `--secondary-default`. "Post in thread" posts into that topic, clears the draft and shows the toast "Posted in {title}" with Undo. "Send to Main" sends skipping the route check (clarity still runs). Fixes are minimal (typo table, doubled words, lowercase "i", missing "?"), never rewrites. Checks compare against the last 3–4 open topics in the channel.
+
+[built M8] The model is asked the wrong-place question while typing pauses; Enter in a topic composer calls `messages.check` (architecture 10), which uses that answer only if it is already there, and sends at once when it finds nothing; New chat sends unchecked. `SendCheckBar` (raised `sm` primary with "↵", ghost `sm` secondary, radius 12 like the audience line) sits in the composer's `notices` above the text row, which does not move (`apps/gallery/shift.spec.ts`, "Composer notices"). A route bar is followed by the clarity bar when clarity found something too, for either place. Clicking a choice returns focus to the field. "Posted in {title}" has no Undo: a send has none (ADR 0010). The field waits at most 250 ms for the check, then sends. The confidence is shown as this table asks.
 
 ### 7.4 Quoting
 

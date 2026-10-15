@@ -16,3 +16,8 @@ export function takeSendMark(): boolean {
   pending = false
   return was
 }
+
+/** The send did not happen (a check bar showed): the next paint ends no measure. */
+export function cancelSendMark(): void {
+  pending = false
+}

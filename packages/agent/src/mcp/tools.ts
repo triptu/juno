@@ -1,9 +1,10 @@
+import { littlebirdCatalogue } from '../littlebird'
 import { defineTool, type ToolRun } from '../request/tool'
 import { toolDecision } from '../policy/policy'
 import type { Actions } from '../actions'
 import type { McpManagerApi } from './manager'
 import { changeCard, connectCard } from './actions'
-import { McpError } from './types'
+import { McpError, T3 } from './types'
 
 export function mcpTools(manager: McpManagerApi, context: {
   readonly current: () => Promise<ToolRun | undefined>
@@ -22,7 +23,7 @@ export function mcpTools(manager: McpManagerApi, context: {
           const id = context.propose({ runId: run.runId, callId: call.callId, payload: connectCard(manager, server) })
           return { text: `Connection unavailable. Proposed Connect card ${id}.` }
         }
-        return result(JSON.stringify(manager.definitions(server)))
+        return result(JSON.stringify(server === 'littlebird' ? littlebirdCatalogue(manager) : manager.definitions(server)))
       } catch { return { text: 'This connection is unavailable.', isError: true } }
     },
   })
@@ -34,7 +35,10 @@ export function mcpTools(manager: McpManagerApi, context: {
       const run = await context.current()
       if (!run) return { text: 'No active run.', isError: true }
       try {
-        const decision = toolDecision(manager.tool(server, tool).tier === 0 ? 'read' : 'outward', run)
+        if (server === T3.id && ['t3_thread_launch', 't3_thread_send', 't3_thread_interrupt'].includes(tool)) return { text: 'Use t3_start, t3_send or t3_stop. Every start needs a Start card; existing jobs require their grant or an owner click.', isError: true }
+        // T3 Code can start, fork and steer sessions under many names, so only its known reads skip a card (SPEC 13.4).
+        const read = manager.tool(server, tool).tier === 0 && (server !== T3.id || T3.allowlist.includes(tool))
+        const decision = toolDecision(read ? 'read' : 'outward', run)
         if (decision._tag === 'card') {
           const payload = await changeCard(manager, server, tool, args)
           const id = context.propose({ runId: run.runId, callId: call.callId, payload })

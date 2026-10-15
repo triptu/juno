@@ -1,10 +1,11 @@
 /**
  * Handlers for the send routes (`contract/src/routes/send.ts`). The commands
  * write locally and wake `PostWorker` and `ActionWorker`; `drafts.get` follows the open
- * workspace and never calls Slack.
+ * workspace and never calls Slack. `messages.precheck` asks the AI provider and `messages.check` reads its answer (`checks.ts`).
  */
 import { NotSignedIn, SendRoutes } from '@juno/contract'
 import { liveQuery, transaction } from '@juno/store'
+import { AiProvider } from '@juno/ai'
 import { Effect, Stream } from 'effect'
 import { Staging } from '../staging'
 import { Outbox } from '../outbox'
@@ -12,6 +13,7 @@ import { retryFirstRun, serveLiveValue, timed } from '../protocol/live'
 import { Workspace } from '../workspace'
 import { ActionWorker } from './actionWorker'
 import { deleteMessage, editMessage, reactToMessage } from './actions'
+import { checkMessage, dailyBudget, precheckMessage, ROUTE_DAILY_BUDGET } from './checks'
 import { discardMessage, retryMessage, sendMessage } from './commands'
 import { draftKeys, readDraft, writeDraft } from './drafts'
 import { PostWorker } from './worker'
@@ -23,6 +25,8 @@ export const SendHandlers = SendRoutes.toLayer(
     const worker = yield* PostWorker
     const actions = yield* ActionWorker
     const staging = yield* Staging
+    const ai = yield* AiProvider
+    const routeBudget = dailyBudget(ROUTE_DAILY_BUDGET)
     const provide = <A, E>(effect: Effect.Effect<A, E, Workspace | Outbox | Staging>) =>
       effect.pipe(
         Effect.provideService(Workspace, workspace),
@@ -37,6 +41,8 @@ export const SendHandlers = SendRoutes.toLayer(
       'messages.edit': ({ message, text }) => provide(editMessage(message, text)),
       'messages.delete': ({ message }) => provide(deleteMessage(message)),
       'messages.react': ({ message, name, on }) => provide(reactToMessage(message, name, on)),
+      'messages.check': (payload) => checkMessage(payload).pipe(Effect.provideService(Workspace, workspace)),
+      'messages.precheck': (payload) => precheckMessage(payload, routeBudget).pipe(Effect.provideService(Workspace, workspace), Effect.provideService(AiProvider, ai)),
       'drafts.get': ({ topicId }) =>
         serveLiveValue(
           workspace.changes.pipe(

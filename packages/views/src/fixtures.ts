@@ -9,6 +9,7 @@ import ActiveThreads from './ActiveThreads.fixtures'
 import AppearanceSettings from './AppearanceSettings.fixtures'
 import AppInfoView from './AppInfoView.fixtures'
 import AttachmentChips from './AttachmentChips.fixtures'
+import AudienceWarning from './AudienceWarning.fixtures'
 import ChannelIconPicker from './ChannelIconPicker.fixtures'
 import Composer from './Composer.fixtures'
 import ComposerSlot from './ComposerSlot.fixtures'
@@ -27,6 +28,7 @@ import PreferencesPage from './PreferencesPage.fixtures'
 import PeekKeySetting from './PeekKeySetting.fixtures'
 import PeekView from './PeekView.fixtures'
 import Reactions from './Reactions.fixtures'
+import SendCheckBar from './SendCheckBar.fixtures'
 import SessionView from './SessionView.fixtures'
 import SignInView from './SignInView.fixtures'
 import Shell from './Shell.fixtures'
@@ -70,6 +72,7 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   BudgetCard: budgetCard,
   ChangeCard: changeCard,
   ChatCard,
+  AudienceWarning,
   Composer,
   ComposerSlot,
   ConnectCard: connectCard,
@@ -93,6 +96,7 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   NewChat,
   NewDivider,
   NewMessagesPill,
+  SendCheckBar,
   NotificationsPage,
   PeekKeySetting,
   PeekView,

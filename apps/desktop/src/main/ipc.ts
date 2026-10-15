@@ -70,6 +70,7 @@ export interface IpcDeps {
   readonly setTheme: (theme: Launch['theme']) => void
   readonly setAccent: (accent: NonNullable<Launch['accent']>) => void
   readonly setDensity: (density: NonNullable<Launch['density']>) => void
+  readonly setPrivacy: (privacy: boolean) => void
   readonly setSidebar: (sidebar: NonNullable<Launch['sidebar']>) => void
   /** The topic the window shows, or null while it shows none or is not focused. */
   readonly setViewing: (topicId: string | null) => void
@@ -77,7 +78,7 @@ export interface IpcDeps {
   readonly downloadFile: (file: { readonly url: string; readonly name: string }) => Promise<DownloadResult>
 }
 
-export function registerIpc({ supervisor, agent, providers, setTheme, setAccent, setDensity, setSidebar, setViewing, downloadFile }: IpcDeps): void {
+export function registerIpc({ supervisor, agent, providers, setTheme, setAccent, setDensity, setPrivacy, setSidebar, setViewing, downloadFile }: IpcDeps): void {
   handle(Channels.appGetInfo, () => ({
     name: app.getName(),
     version: app.getVersion(),
@@ -114,6 +115,10 @@ export function registerIpc({ supervisor, agent, providers, setTheme, setAccent,
 
   handle(Channels.launchSetDensity, ({ density }) => {
     setDensity(density)
+  })
+
+  handle(Channels.launchSetPrivacy, ({ privacy }) => {
+    setPrivacy(privacy)
   })
 
   handle(Channels.launchSetSidebar, (sidebar) => {
