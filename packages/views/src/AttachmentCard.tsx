@@ -13,7 +13,7 @@ export function AttachmentCard({ attachment, title, children, footer, tabbable }
   return <section aria-label="Attachment" {...stylex.props(styles.card, tintStyles[attachment.tint])}>
     {attachment.title.length > 0 && <div {...stylex.props(styles.title)}>{title}</div>}
     <div {...stylex.props(styles.content, long && !expanded && styles.collapsed)}>{children}</div>
-    {long && <div {...stylex.props(styles.more)}><Button size="sm" variant="ghost" tabIndex={tabbable ? 0 : -1} aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>{expanded ? 'Show less' : 'Show more'}</Button></div>}
+    {long && <div data-expands-in-place="" {...stylex.props(styles.more)}><Button size="sm" variant="ghost" tabIndex={tabbable ? 0 : -1} aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>{expanded ? 'Show less' : 'Show more'}</Button></div>}
     {attachment.footer.length > 0 && <div {...stylex.props(styles.footer)}>{footer}</div>}
   </section>
 }
@@ -28,9 +28,17 @@ const styles = stylex.create({
   title: { fontWeight: text['--text-heading-weight'] },
   content: { display: 'flex', flexDirection: 'column', gap: spacing['--space-2'], minWidth: 0 },
   // The cut fades out, so a half line never reads as a whole one.
-  collapsed: { maxHeight: layout['--thumb-max-height'], overflow: 'hidden', maskImage: 'linear-gradient(to bottom, black 70%, transparent)' },
+  collapsed: {
+    maxHeight: layout['--thumb-max-height'],
+    overflow: 'hidden',
+    maskImage: 'linear-gradient(to bottom, black 70%, transparent)', // tokens-allow: a mask's alpha, not a colour that shows.
+  },
   // Show more starts where the text starts: the ghost button's inset and 1px border are pulled back.
-  more: { display: 'flex', marginInlineStart: `calc(-1 * (${spacing['--space-2-5']} + 1px))`, marginBlock: `calc(-1 * ${spacing['--space-1']})` }, // tokens-allow: the button's 1px border.
+  more: {
+    display: 'flex',
+    marginInlineStart: `calc(-1 * (${spacing['--space-2-5']} + 1px))`, // tokens-allow: the button's 1px border.
+    marginBlock: `calc(-1 * ${spacing['--space-1']})`,
+  },
   footer: { fontSize: text['--text-tag-small-size'], color: colors['--foreground-muted'] },
   imageBox: (width: number, height: number) => ({ position: 'relative', flexShrink: 0, width, height, maxWidth: '100%', aspectRatio: `${width} / ${height}`, backgroundColor: colors['--background-subtle'], borderRadius: radii['--radius-md'], overflow: 'hidden' }),
   image: { position: 'absolute', inset: 0, display: 'block', width: '100%', height: '100%', objectFit: 'contain' },
