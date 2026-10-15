@@ -123,6 +123,8 @@ test('keystroke controls: composer, bare input and palette', async ({ juno, win 
     })
     stats(`${surface}, Event Timing keydown/keypress >=16 ms (diagnostic)`, result.events)
     const presented = stats(`${surface}, input timestamp to character presented`, result.presented)
+    stats(`${surface}, input to animation frame callback`, result.frame)
+    stats(`${surface}, animation frame callback to presentation`, result.afterFrame)
     expect(result.count).toBe(40)
     await expect(input).toHaveValue('deployment'.repeat(4))
     expect.soft(presented.p95, `${surface}: input to character presented`).toBeLessThanOrEqual(budget)

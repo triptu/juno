@@ -54,9 +54,9 @@ export async function typingReading(win: Page, input: Locator, name: string, typ
       return { events: probe.events, count: probe.count, valid: probe.valid }
     })
     if (!result.valid || result.count === 0) throw new Error('The typed characters did not reach their frame')
-    const presented = inputPresentations(json)
-    if (presented.length !== result.count) throw new Error(`Presentation feedback for ${presented.length} of ${result.count} inputs`)
-    return { ...result, presented }
+    const timings = inputTimings(json)
+    if (timings.length !== result.count) throw new Error(`Presentation feedback for ${timings.length} of ${result.count} inputs`)
+    return { ...result, presented: timings.map((t) => t.presented), frame: timings.map((t) => t.frame), afterFrame: timings.map((t) => t.afterFrame) }
   } finally {
     await win.evaluate(() => { window.__typingProbe?.stop(); delete window.__typingProbe })
   }
@@ -72,7 +72,7 @@ interface InputTraceEvent {
 }
 
 /** Parse only the trace fields this measurement uses. Never substitute a timer for missing feedback. */
-export function inputPresentations(json: string): number[] {
+export function inputTimings(json: string): Array<{ presented: number; frame: number; afterFrame: number }> {
   const raw: unknown = JSON.parse(json)
   if (typeof raw !== 'object' || raw === null || !('traceEvents' in raw) || !Array.isArray(raw.traceEvents)) throw new Error('Invalid trace')
   const events: InputTraceEvent[] = []
@@ -108,7 +108,7 @@ export function inputPresentations(json: string): number[] {
     const frame = frames.find(({ start, end }) => start.pid === mark.pid && start.tid === mark.tid && start.ts <= mark.ts && mark.ts <= end)
     const end = frame === undefined ? undefined : feedback.get(`${frame.start.pid}:${frame.start.frameId}`)
     if (input === undefined || end === undefined || end < mark.ts) throw new Error(`Missing presentation for ${mark.name}`)
-    return (end - input.ts) / 1000
+    return { presented: (end - input.ts) / 1000, frame: (mark.ts - input.ts) / 1000, afterFrame: (end - mark.ts) / 1000 }
   })
 }
 
