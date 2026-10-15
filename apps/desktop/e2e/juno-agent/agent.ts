@@ -51,7 +51,7 @@ export async function addServer(juno: Juno, name: string, url: string): Promise<
   await add.getByLabel('Address').fill(url)
   await add.getByRole('button', { name: 'Add' }).click()
   await expect(page.getByRole('heading', { name, exact: true })).toBeVisible()
-  const row = page.locator('[data-connection-id^="server-"]').filter({ has: juno.win.getByRole('heading', { name, exact: true }) })
+  const row = page.locator('[data-connection-id^="server-"]').filter({ hasText: url })
   const id = await row.getAttribute('data-connection-id')
   if (id === null) throw new Error(`No connection id for ${name}`)
   await row.getByRole('button', { name: 'Connect' }).click()
@@ -86,4 +86,42 @@ export async function launchArmed(userData: string, options: LaunchOptions, poin
 export async function expectKilled(app: ElectronApplication, pid: number | undefined): Promise<void> {
   if (pid === undefined) throw new Error('No agent process to watch')
   await expect.poll(() => hooks(app, 'agentPid'), { timeout: 30_000 }).not.toBe(pid)
+}
+
+/** Arms the next agent only, keeping main's fake keychain alive across its restart. */
+export async function restartArmed(app: ElectronApplication, point: CrashPoint, ageDatabase?: string): Promise<void> {
+  const pid = await hooks(app, 'agentPid')
+  if (pid === undefined) throw new Error('No agent to restart')
+  await app.evaluate(({ utilityProcess }, input) => {
+    const { DatabaseSync } = process.getBuiltinModule('node:sqlite')
+    const fork = utilityProcess.fork
+    const probe = { killed: false }
+    Object.assign(globalThis, { junoCrashProbe: probe })
+    utilityProcess.fork = (modulePath, args, options) => {
+      if (options?.serviceName !== 'juno-agent') return fork(modulePath, args, options)
+      if (input.ageDatabase !== undefined) {
+        const db = new DatabaseSync(input.ageDatabase)
+        try { db.prepare('UPDATE incarnations SET created_at = 1 WHERE retired_at IS NULL').run() } finally { db.close() }
+      }
+      const child = fork(modulePath, args, { ...options, env: { ...process.env, [input.env]: input.point } })
+      child.once('exit', (code) => {
+        // Restore stages a file and requests an ordinary restart before restore.swapped.
+        if (code !== 0) {
+          probe.killed = true
+          utilityProcess.fork = fork
+        }
+      })
+      return child
+    }
+    process.kill(input.pid, 'SIGKILL')
+  }, { pid, env: CRASH_ENV, point, ageDatabase })
+  await expectKilled(app, pid)
+}
+
+export async function expectArmedCrash(app: ElectronApplication): Promise<void> {
+  await expect.poll(() => app.evaluate(() => {
+    const state = globalThis as unknown as { junoCrashProbe: { killed: boolean } }
+    return state.junoCrashProbe.killed
+  }), { timeout: 30_000 }).toBe(true)
+  await agentReady(app)
 }
