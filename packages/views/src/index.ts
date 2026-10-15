@@ -6,6 +6,7 @@ export { ChannelIconPicker, type ChannelIconPickerProps } from './ChannelIconPic
 export { Composer, type ComposerProps } from './Composer'
 export { ComposerSlot, type ComposerSlotProps } from './ComposerSlot'
 export { DestinationPickers, type DestinationPickersProps, type PickerName } from './DestinationPickers'
+export { EmojiPicker, type EmojiPickerProps } from './EmojiPicker'
 export { EngineNotice, EngineStatusView, type EngineNoticeKind, type EngineNoticeProps, type EngineStatusViewProps } from './EngineStatusView'
 export { HoverToolbar, quickReactions, type HoverToolbarProps, type QuickReaction } from './HoverToolbar'
 export { Message, type MessageProps } from './Message'

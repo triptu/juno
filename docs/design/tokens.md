@@ -347,6 +347,7 @@ All [proto] measured at 1280×800 with Inter unless marked.
 | `--toast-max-width` | 352px |
 | `--peek-width` | 480px peek popover, 8px right of the sidebar, from under the title bar to 8px above the window's bottom; never wider than the window has room for |
 | `--popover-max-height` | 400px, and never taller than the window below the title bar (`100vh − --titlebar-height − --space-5`), so the account menu fits at the minimum window size; the content scrolls inside. `--picker-max-height` 300px |
+| `--emoji-picker-width` / `--emoji-picker-height` | 314px / 360px. The full emoji picker (`EmojiPicker`): nine 32px cells, 12px and 2px padding, the 10px scrollbar gutter and a 1px border each side, so the search field and the grid share edges. Fixed height; the grid scrolls inside |
 | `--scrollbar` | 10px, thumb `--border-strong` with 3px transparent inset, radius 10. `ScrollArea scrollbar="hover"` keeps the thumb transparent until the area is hovered; the 10px gutter stays |
 | `--search-field-width` | 260px filter search; `--keyword-field-width` 160px keyword rule input |
 | `--code-block-max-height` | 150px, then the block scrolls inside; the wheel goes on to the page at its edges |

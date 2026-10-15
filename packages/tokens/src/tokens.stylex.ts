@@ -708,6 +708,11 @@ export const layout = stylex.defineVars({
   // at the minimum size and under zoom; the content scrolls inside.
   '--popover-max-height': 'min(400px, calc(100vh - var(--titlebar-height) - var(--space-5)))',
   '--picker-max-height': '300px',
+  // The full emoji picker at a fixed size, so opening it never moves
+  // anything: nine 32px cells, 12px and 2px padding, the 10px scrollbar
+  // gutter and the 1px border on each side.
+  '--emoji-picker-width': '314px',
+  '--emoji-picker-height': '360px',
   '--toast-max-width': '352px',
   '--toast-inset': '16px',
   '--scrollbar-size': '10px',
