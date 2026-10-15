@@ -305,3 +305,12 @@ it('does not queue a T3 interrupt while paused, so Resume sends nothing', async 
   await turns.jobs.stop(job.id)
   expect(server.calls.filter((c) => c.name === 't3_thread_interrupt')).toHaveLength(1)
 })
+
+it('keeps every T3 tool off the read list a card, even if the owner made it Read', async () => {
+  const fork: FakeTool = { name: 't3_thread_fork', inputSchema: threadArgs, call: () => json({ threadId: 'thread-fork' }) }
+  const { server, manager, turns, call } = await fixture('t3', [...t3Tools, fork])
+  manager.setTier('t3', fork.name, manager.tool('t3', fork.name).hash, 0)
+  await call('call_tool', { server: 't3', tool: fork.name, args: { threadId: 'thread-test' } })
+  expect(server.calls.filter((c) => c.name === fork.name)).toHaveLength(0)
+  expect(turns.actions.views().at(-1)?.card).toMatchObject({ _tag: 'change', status: { _tag: 'open' } })
+})

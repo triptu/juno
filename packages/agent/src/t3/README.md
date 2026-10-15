@@ -21,7 +21,10 @@ unknown. A launch carries `[juno:<action id>]`; reconciliation reads candidate
 threads and requires the same project and exact original message. A negative
 search never permits another launch. A reconciled receipt does not restore a
 revoked grant. Generic `call_tool` cannot launch, even if launch was moved to
-Read in Connections.
+Read in Connections. Through `call_tool`, a T3 tool skips the card only when it
+is on the T3 preset's read list and still Read: T3 Code can also start, fork
+and steer sessions under other names, so moving those to Read does not remove
+the click.
 
 `t3_send` and `t3_stop` use an existing job, never a model-supplied grant. A
 clean owner run with the job's live grant records a Change intent and an
