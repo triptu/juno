@@ -128,13 +128,13 @@ const unstable = [
     spec: /^effect\/rpc(?:\/|$)/,
     allow: [
       'packages/contract/src/', 'packages/engine/src/protocol/', 'packages/state/src/', 'packages/agent-contract/src/host/', 'packages/agent-contract/src/rpc/', 'packages/agent/src/host/',
-      'packages/engine/test/agent-host.test.ts',
+      'packages/agent/src/serve/', 'packages/engine/test/agent-host.test.ts', 'packages/agent/test/serve-harness.ts',
     ],
   },
   {
     label: 'effect/workers',
     spec: /^effect\/workers(?:\/|$)/,
-    allow: ['packages/state/src/transport.ts', 'packages/engine/src/protocol/runner.ts', 'packages/agent/src/host/port.ts'],
+    allow: ['packages/state/src/transport.ts', 'packages/engine/src/protocol/runner.ts', 'packages/agent/src/host/port.ts', 'packages/agent/src/serve/runner.ts'],
   },
   {
     label: 'effect/sql and @effect/sql-sqlite-node',

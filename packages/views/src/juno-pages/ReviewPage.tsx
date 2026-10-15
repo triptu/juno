@@ -22,9 +22,11 @@ export function ReviewPage({ page, now, actions, onActivate }: ReviewPageProps) 
   return (
     <Page>
       <PageHeader title={copy.title} subtitle={copy.body} />
-      <Text variant="meta" tone="muted" as="p">
-        Backup from {fullTime(page.backupAt)}.
-      </Text>
+      {page.backupAt === undefined ? null : (
+        <Text variant="meta" tone="muted" as="p">
+          Backup from {fullTime(page.backupAt)}.
+        </Text>
+      )}
       {page.pending.length === 0 ? (
         <Text variant="body" tone="subtle" as="p">
           Nothing was pending.

@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { messagesSend, newChatConversations, newChatThreads, type PickConversations, type PickThread } from '@juno/contract'
-import { liveQuery, runCommand } from '@juno/state'
+import { newChatConversations, newChatThreads, type PickConversations, type PickThread } from '@juno/contract'
+import { liveQuery } from '@juno/state'
 import { waitFor, WAIT_MS, type RunningEngine } from './harness'
-import { apiCalls, bootedEngine, readDb, valueOf } from './scenario'
+import { bootedEngine } from './scenario'
 
 const engines: Array<RunningEngine> = []
 const unmounts: Array<() => void> = []
@@ -56,35 +56,5 @@ describe('New chat', () => {
     const title = inEng[0]!.title.split(' ')[0]!
     const matched = await threads(engine, { query: title }, (rows) => rows.length > 0)
     expect(matched.map((row) => row.id)).toContain(inEng[0]!.id)
-  })
-
-  it('sends to a thread and stores the reply before answering', async () => {
-    const engine = await bootedEngine(engines)
-    const [root] = await threads(engine, { channel: 'C0ENG', query: '' }, (rows) => rows.length > 0)
-    const exit = await runCommand(engine.registry, messagesSend, {
-      to: { kind: 'channel', channelId: 'C0ENG', threadTs: root!.rootTs },
-      text: 'Thursday works for me',
-      clientMsgId: 'client-thread-1',
-    })
-    expect(valueOf(exit)).toEqual({ topicId: root!.id })
-    const stored = readDb(engine, 'cache.db', (db) => db.prepare(`SELECT thread_ts FROM messages WHERE client_msg_id = 'client-thread-1'`).get() as { thread_ts: string } | undefined)
-    expect(stored?.thread_ts).toBe(root!.rootTs)
-  })
-
-  it('opens a DM with conversations.open for a person never messaged, then sends', async () => {
-    const engine = await bootedEngine(engines)
-    engine.fake.resetCalls()
-    const exit = await runCommand(engine.registry, messagesSend, { to: { kind: 'person', userId: 'U0JONAS' }, text: 'Welcome aboard', clientMsgId: 'client-dm-1' })
-    const { topicId } = valueOf(exit)
-    const opens = apiCalls(engine, 'conversations.open')
-    expect(opens).toHaveLength(1)
-    expect(opens[0]!.args['users']).toBe('U0JONAS')
-    const channel = topicId.slice('m:'.length)
-    expect(apiCalls(engine, 'chat.postMessage')[0]!.args['channel']).toBe(channel)
-    const topic = readDb(engine, 'cache.db', (db) => db.prepare(`SELECT kind FROM topic_index WHERE topic_id = ?`).get(topicId) as { kind: string } | undefined)
-    expect(topic?.kind).toBe('main')
-
-    const after = await conversations(engine, 'jon', (value) => value.people.some((row) => row.channelId === channel))
-    expect(after.people).toContainEqual(expect.objectContaining({ key: channel, name: 'Jonas', empty: false }))
   })
 })

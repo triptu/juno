@@ -48,7 +48,7 @@ const cases: Record<string, readonly [unknown, unknown]> = {
   'agent.settings.change': [{ ...op, change: { _tag: 'cap', usd: 2 } }, accepted],
   'agent.settings.credentials': [{ provider: 'codex', action: 'setUp' }, undefined],
   'agent.settings.ownership': [{ ...op, action: { _tag: 'move' } }, accepted],
-  'host.hello': [{ protocol: 1 }, { host: 'juno', protocol: 1 }],
+  'host.hello': [{ protocol: 2 }, { host: 'juno', protocol: 2 }],
   'host.slack.search': [{ accountId: 'account', query: 'Example', limit: 20 }, messagePage],
   'host.slack.history': [{ accountId: 'account', channelId: 'channel', limit: 20 }, messagePage],
   'host.slack.replies': [{ accountId: 'account', channelId: 'channel', threadTs: '1.0', limit: 20 }, messagePage],
@@ -72,7 +72,7 @@ function roundTrip<S extends Schema.Codec<unknown, unknown>>(schema: S, value: u
 
 const groups = { ChatRpcs: C.ChatRpcs, CardRpcs: C.CardRpcs, ScheduledRpcs: C.ScheduledRpcs, RemembersRpcs: C.RemembersRpcs,
   MemoryRpcs: C.MemoryRpcs, ActivityRpcs: C.ActivityRpcs, ConnectionsRpcs: C.ConnectionsRpcs, ReviewRpcs: C.ReviewRpcs,
-  SettingsRpcs: C.SettingsRpcs, AgentHostRpcs: C.AgentHostRpcs, HostReadRpcs: C.HostReadRpcs,
+  SettingsRpcs: C.SettingsRpcs, HostHelloRpcs: C.HostHelloRpcs, HostReadRpcs: C.HostReadRpcs,
   HostActionRpcs: C.HostActionRpcs, HostPresenceRpcs: C.HostPresenceRpcs, HostNotificationRpcs: C.HostNotificationRpcs }
 
 describe('RPC group wire round trips', () => {

@@ -63,11 +63,14 @@ export interface RouterOptions {
   readonly store: Store
   readonly session: Session
   readonly builder: RequestBuilder
-  readonly model: { readonly provider: string; readonly modelId: string }
+  /** The model pi runs with now. It changes only between runs (`beforeRun`). */
+  readonly model: () => { readonly provider: string; readonly modelId: string }
   readonly tools: () => ReadonlyArray<JunoTool & { readonly taints?: boolean }>
   /** Rotation between runs (§3): when asked, or when the journal is a month old. */
   readonly rotate: () => Promise<void>
   readonly rotationDue: () => boolean
+  /** Called with no run live, before the next one begins: a model change applies here. */
+  readonly beforeRun?: () => Promise<void>
   readonly onRunEnded?: () => void
   readonly onReport?: (error: unknown) => void
 }
@@ -377,7 +380,8 @@ export function createRouter(options: RouterOptions) {
         if (run === undefined) throw new Error('no live run')
         await session.catchUp()
         run.streamed = false
-        const model = api.models.getModel(options.model.provider, options.model.modelId)
+        const ref = options.model()
+        const model = api.models.getModel(ref.provider, ref.modelId)
         if (model === undefined) {
           run.failure ??= { _tag: 'interrupted' }
           throw new Error('the chat model is not available')
@@ -461,6 +465,7 @@ export function createRouter(options: RouterOptions) {
         wake = undefined
         continue
       }
+      await options.beforeRun?.()
       await begin(op)
     }
   }

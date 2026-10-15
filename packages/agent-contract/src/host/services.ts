@@ -2,7 +2,7 @@ import { Schema } from 'effect'
 import { Rpc, RpcGroup } from 'effect/rpc'
 import { AccountId, ActionId, AuthorizationId, AttemptId, Digest, ExecutableIdentity } from '@juno/agent-cards'
 import { OpenTarget, Place, TopicLink } from '../chat/place'
-import { AgentHostRpcs } from './port'
+import { HostHelloRpcs } from './port'
 
 export const HostChannelId = Schema.String.pipe(Schema.brand('HostChannelId'))
 export const HostTopicId = Schema.String.pipe(Schema.brand('HostTopicId'))
@@ -72,6 +72,5 @@ export const hostNotify = Rpc.make('host.notification.deliver', {
 })
 export const HostNotificationRpcs = RpcGroup.make(hostNotify)
 
-/** WP13 serves this group once all handlers exist. Protocol 1 remains the hello scaffold. */
-export const AGENT_HOST_FULL_PROTOCOL = 2
-export const AgentHostFullRpcs = AgentHostRpcs.merge(HostReadRpcs, HostActionRpcs, HostPresenceRpcs, HostNotificationRpcs)
+/** The whole AgentHost group, protocol `AGENT_HOST_PROTOCOL` (2). */
+export const AgentHostRpcs = HostHelloRpcs.merge(HostReadRpcs, HostActionRpcs, HostPresenceRpcs, HostNotificationRpcs)

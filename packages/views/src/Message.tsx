@@ -1,12 +1,14 @@
 import * as stylex from '@stylexjs/stylex'
 import { memo, type FocusEvent, type ReactNode } from 'react'
 import type { MessageView, Person } from '@juno/contract'
-import { accent, colors, density, layout, radii, sizes, spacing, tints, z } from '@juno/tokens/tokens.stylex'
-import { Avatar, Text, type ActivateEvent, type HueName } from '@juno/ui'
+import { accent, colors, density, layout, motion, opacity, radii, sizes, spacing, tints, z } from '@juno/tokens/tokens.stylex'
+import { WarningCircle } from '@phosphor-icons/react/dist/icons/WarningCircle'
+import { Avatar, Icon, Text, type ActivateEvent, type HueName } from '@juno/ui'
 import { Files } from './FileCard'
 import { hueFor, initials } from './look'
 import { MessageBody } from './MessageBody'
 import { Reactions } from './Reactions'
+import { TextButton } from './juno-chat/TextButton'
 import { ThreadLink } from './ThreadLink'
 import { fullTime } from './time'
 
@@ -23,11 +25,12 @@ export interface MessageProps {
   readonly main: boolean
   /**
    * Show the name and avatar even when the message continues its sender's
-   * run: the first message of the window and the one after the "N new"
-   * divider. The row's top margin follows the same rule.
+   * run: the one after the "N new" divider. Otherwise `message.groupStart`
+   * decides, which the engine works out from the message before, even when
+   * that one is outside the window.
    */
   readonly startsGroup: boolean
-  /** No top margin: the first row, or the row right after the divider. */
+  /** No top margin: the topic's first message, or the row right after the divider. */
   readonly flush?: boolean
   /** Laid out in full even off screen, never at the size estimate. */
   readonly eager?: boolean
@@ -42,9 +45,18 @@ export interface MessageProps {
   readonly onToggleReaction?: (ts: string, name: string) => void
   /** The row took keyboard focus: the list moves its tabbable row here. */
   readonly onFocus?: (ts: string) => void
+  /** Retry on a failed send, with its `clientMsgId`. */
+  readonly onRetry?: (clientMsgId: string) => void
+  /** Delete draft on a failed send, with its `clientMsgId`. */
+  readonly onDiscard?: (clientMsgId: string) => void
 }
 
 const HOVER = '@media (hover: hover)'
+
+const dim = stylex.keyframes({
+  from: { opacity: 1 },
+  to: { opacity: opacity['--opacity-dim'] },
+})
 
 /**
  * One flat message (inventory 6.1): the avatar column, then the name and
@@ -54,6 +66,11 @@ const HOVER = '@media (hover: hover)'
  * inside its box, so showing it never forces a layout: on a row with a
  * toolbar the header keeps its end free and is as tall as the toolbar, so
  * neither the name nor the first body line runs under it.
+ *
+ * A message Juno is still sending looks like the message it becomes, so the
+ * swap moves nothing; a send that takes longer than `--delay-pending` dims
+ * its content. A failed send keeps its text and shows "Not sent" with Retry
+ * and Delete draft under it.
  */
 export const Message = memo(function Message({
   message,
@@ -72,6 +89,8 @@ export const Message = memo(function Message({
   onLink,
   onToggleReaction,
   onFocus,
+  onRetry,
+  onDiscard,
 }: MessageProps) {
   const name = sender?.name ?? message.senderId ?? 'Unknown'
   const hue = sender === undefined ? hueOf(message.senderId ?? message.ts) : hueFor(sender.color, sender.id)
@@ -80,12 +99,14 @@ export const Message = memo(function Message({
     if (event.target === event.currentTarget) onFocus?.(message.ts)
   }
   const toggle = onToggleReaction === undefined ? undefined : (reaction: string) => onToggleReaction(message.ts, reaction)
+  const { pending, clientMsgId } = message
 
   return (
     <div
       role="listitem"
       tabIndex={tabbable ? 0 : -1}
       data-message-row={message.ts}
+      data-pending={pending}
       onFocus={focus}
       {...stylex.props(styles.row, eager && styles.rowEager, header && !flush && styles.rowGroupStart, message.mentionsMe && styles.rowMention)}
     >
@@ -98,7 +119,7 @@ export const Message = memo(function Message({
           </Text>
         )}
       </span>
-      <span {...stylex.props(styles.content)}>
+      <span {...stylex.props(styles.content, pending === 'sending' && styles.sending)}>
         {header ? (
           <span {...stylex.props(styles.header, toolbar !== undefined && styles.headerWithToolbar)}>
             <Text variant="messageName" tone="default" truncate tooltipWhenTruncated dir="auto" as="span" sx={styles.name} data-sender="">
@@ -129,6 +150,23 @@ export const Message = memo(function Message({
         <Files files={message.files} />
         <Reactions reactions={message.reactions} onToggle={toggle} />
         {main && message.thread !== undefined && onOpenThread !== undefined ? <ThreadLink link={message.thread} onOpen={onOpenThread} tabIndex={tabbable ? 0 : -1} /> : null}
+        {pending === 'failed' && clientMsgId !== undefined ? (
+          <Text variant="meta" tone="muted" as="p" data-send-failed="" sx={styles.failed}>
+            <span {...stylex.props(styles.failedIcon)}>
+              <Icon icon={WarningCircle} size={14} weight="bold" />
+            </span>
+            <Text variant="meta" tone="danger" as="span">
+              Not sent.
+            </Text>{' '}
+            <TextButton tone="default" onClick={() => onRetry?.(clientMsgId)}>
+              Retry
+            </TextButton>
+            {' · '}
+            <TextButton tone="muted" onClick={() => onDiscard?.(clientMsgId)}>
+              Delete draft
+            </TextButton>
+          </Text>
+        ) : null}
       </span>
       {toolbar !== undefined ? <span {...stylex.props(styles.toolbar)}>{toolbar}</span> : null}
     </div>
@@ -200,12 +238,17 @@ const styles = stylex.create({
     opacity: 'var(--row-action-opacity)',
     whiteSpace: 'nowrap',
   },
+  // Whole pixels tall, whatever the text inside (performance 3.3): a row
+  // laid out above the view for the first time grows from its estimate, and
+  // scroll anchoring can only move the list by whole device pixels, so a
+  // fractional height leaves the rows in view a part of a pixel off.
   content: {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'flex-start',
     flexGrow: 1,
     minWidth: 0,
+    height: 'calc-size(auto, round(up, size, 1px))',
   },
   header: {
     display: 'flex',
@@ -233,6 +276,24 @@ const styles = stylex.create({
   },
   placeholder: {
     fontStyle: 'italic',
+  },
+  // Opacity only, after the delay: a quick send never changes how the row looks.
+  sending: {
+    animationName: dim,
+    animationDuration: motion['--duration-fast'],
+    animationDelay: motion['--delay-pending'],
+    animationFillMode: 'both',
+    animationTimingFunction: motion['--ease-out'],
+  },
+  failed: {
+    marginTop: spacing['--space-0-5'],
+    userSelect: 'none',
+  },
+  failedIcon: {
+    display: 'inline-flex',
+    verticalAlign: 'text-bottom',
+    marginInlineEnd: spacing['--space-1'],
+    color: colors['--danger'],
   },
   edited: {
     marginTop: spacing['--space-0-5'],

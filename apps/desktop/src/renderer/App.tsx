@@ -3,6 +3,7 @@ import { accentAtom, densityAtom, persistAccent, persistTheme, resolvedThemeAtom
 import { useAtom, useAtomValue } from '@juno/state/react'
 import { AppearanceSettings, applyTheme, Shell, type AccentName, type DensityName, type ThemeName, type ThemePreference } from '@juno/views'
 import { Frame } from './containers/Frame'
+import { Peek } from './containers/Peek'
 import { Session } from './containers/Session'
 import { Sidebar } from './containers/Sidebar'
 import { Workspace } from './containers/Workspace'
@@ -44,7 +45,7 @@ export function App() {
   // the appearance block under it.
   if (signedIn !== undefined) {
     return (
-      <Frame sidebar={<Sidebar />}>
+      <Frame sidebar={<Sidebar />} peek={<Peek />}>
         <Workspace />
       </Frame>
     )

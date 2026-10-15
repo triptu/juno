@@ -4,9 +4,9 @@
  */
 import { createModels, createProvider, fauxAssistantMessage, fauxProvider, fauxToolCall, type ClassifierAnswer, type ClassifierContext, type FauxResponseStep } from '@earendil-works/pi-ai'
 import { createFauxCore } from '@earendil-works/pi-ai/providers/faux'
-import { Effect, Stream } from 'effect'
+import { Effect } from 'effect'
 import { describe, expect, it } from 'vitest'
-import { OPENROUTER, chatTools, defineStructuredTask, defineTextTask, makePiAiProvider, tasks, type AiConfig, type Decision } from '../src/index'
+import { OPENROUTER, defineStructuredTask, defineTextTask, makePiAiProvider, tasks, type AiConfig, type Decision } from '../src/index'
 import { NOW, postgres, stagingBill } from './fixtures'
 
 const DECISION = 'test/decider'
@@ -252,55 +252,5 @@ describe('PiAiProvider generation', () => {
     const { provider } = scripted([fauxAssistantMessage('<svg data-hue="teal"><text>a</text></svg>'), fauxAssistantMessage('<svg data-hue="teal"><circle cx="20" cy="20" r="5" fill="#f00"/></svg>')], artConfig)
     const decision = await Effect.runPromise(provider.generate(tasks.topicArt, artInput))
     expect(decision).toMatchObject({ _tag: 'NoDecision', reason: 'invalid-output', detail: 'fill must be one of ink, soft, accent, accent2, none; got "#f00"', meta: { attempts: 2 } })
-  })
-})
-
-describe('PiAiProvider chat', () => {
-  const context = { now: NOW, viewing: { id: postgres.id, title: postgres.title, channel: '#eng' }, messages: [{ role: 'user' as const, text: 'summarize this' }] }
-
-  it('streams text deltas and validated tool calls, then done with the whole text', async () => {
-    const { provider } = scripted([fauxAssistantMessage(['Reading it now.', fauxToolCall('read_topic', { topicId: postgres.id })].map((c) => (typeof c === 'string' ? { type: 'text', text: c } : c)))])
-    const events = await Effect.runPromise(Stream.runCollect(provider.chat(context, chatTools)))
-    const text = events.filter((e) => e.type === 'text').map((e) => e.delta).join('')
-    expect(text).toBe('Reading it now.')
-    expect(events.filter((e) => e.type === 'toolCall')).toMatchObject([{ call: { name: 'read_topic', arguments: { topicId: postgres.id } } }])
-    expect(events.at(-1)).toMatchObject({ type: 'done', text: 'Reading it now.', toolCalls: [{ name: 'read_topic' }] })
-  })
-
-  it('fails the turn on a tool call that does not match the tools', async () => {
-    const { provider } = scripted([fauxAssistantMessage(fauxToolCall('read_topic', { limit: 'all' }))])
-    const events = await Effect.runPromise(Stream.runCollect(provider.chat(context, chatTools)))
-    expect(events.at(-1)).toMatchObject({ type: 'failed', reason: 'invalid-output' })
-  })
-
-  it('fails the turn without a key', async () => {
-    const { provider } = scripted([], {})
-    const events = await Effect.runPromise(Stream.runCollect(provider.chat(context, chatTools)))
-    expect(events).toMatchObject([{ type: 'failed', reason: 'missing-key' }])
-  })
-
-  it('carries earlier assistant turns and tool results into the request', async () => {
-    const { provider } = scripted([
-      (ctx) => {
-        const roles = ctx.messages.map((m) => m.role)
-        return fauxAssistantMessage(roles.join(','))
-      },
-    ])
-    const events = await Effect.runPromise(
-      Stream.runCollect(
-        provider.chat(
-          {
-            ...context,
-            messages: [
-              { role: 'user', text: 'summarize this' },
-              { role: 'assistant', text: '', toolCalls: [{ id: 'c1', name: 'read_topic', arguments: { topicId: postgres.id } }] },
-              { role: 'tool', callId: 'c1', name: 'read_topic', result: 'Dev: draft is in the doc.' },
-            ],
-          },
-          chatTools,
-        ),
-      ),
-    )
-    expect(events.at(-1)).toMatchObject({ type: 'done', text: expect.stringContaining('user,assistant,toolResult') })
   })
 })

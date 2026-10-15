@@ -1,4 +1,7 @@
-export { startAgent, HostProtocolMismatch, type AgentHandle, type AgentTurns } from './start'
+export { startAgent, HostProtocolMismatch, type AgentHandle, type AgentOptions, type AgentTurns } from './start'
+export { rendererPorts, type RendererTransport } from './serve/runner'
+export { rendererServer, type ChatHost } from './serve/server'
+export { CHAT_MIGRATIONS } from './serve/schema'
 export { hostProtocol, type HostConnection, type HostPort } from './host/port'
 export {
   AGENT_DATABASE_FILE, CoreOpenFailed, CRASH_ENV, CRASH_POINTS, crashPoint, DurableCore, openCore, OwnerLockHeld, OWNER_LOCK_FILE, ROTATION_AGE_MS,

@@ -1,13 +1,18 @@
-import { accentAtom, densityAtom, persistAccent, persistDensity, persistTheme, themeAtom, type Accent, type Density, type Theme } from '@juno/state'
-import { useAtom } from '@juno/state/react'
+import { accentAtom, densityAtom, peekKeyAtom, persistAccent, persistDensity, persistTheme, registry, setPeekKey, themeAtom, type Accent, type Density, type PeekKey, type Theme } from '@juno/state'
+import { useAtom, useAtomValue } from '@juno/state/react'
 import { PreferencesPage as PreferencesPageView } from '@juno/views'
 import { openNotifications } from './navigation'
 
-/** Preferences (SPEC 14): Appearance, saved to main for the next launch's first frame. */
+function changePeekKey(key: PeekKey): void {
+  setPeekKey(registry, key)
+}
+
+/** Preferences (SPEC 14): Appearance, saved to main for the next launch's first frame, and the peek key. */
 export function PreferencesPage() {
   const [theme, setTheme] = useAtom(themeAtom)
   const [accent, setAccent] = useAtom(accentAtom)
   const [density, setDensity] = useAtom(densityAtom)
+  const peekKey = useAtomValue(peekKeyAtom)
   const changeTheme = (next: Theme) => {
     setTheme(next)
     persistTheme(next)
@@ -28,6 +33,8 @@ export function PreferencesPage() {
       onThemeChange={changeTheme}
       onAccentChange={changeAccent}
       onDensityChange={changeDensity}
+      peekKey={peekKey}
+      onPeekKeyChange={changePeekKey}
       onOpenNotifications={() => openNotifications()}
     />
   )

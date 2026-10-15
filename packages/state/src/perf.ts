@@ -22,6 +22,10 @@ export type PerfName =
   | 'juno.palette-results'
   | 'juno.send'
   | 'juno.live-update'
+  /** Mark: a topic was warmed by hover, focus or keyboard selection (performance.md 4.2). */
+  | 'juno.prefetch'
+  /** From the peek key's keydown to the first frame with the peeked topic's messages. */
+  | 'juno.peek-open'
 
 const TRACK = 'Juno'
 
@@ -31,6 +35,7 @@ interface PerformanceLike {
   mark(name: string, options?: { readonly detail?: unknown }): { readonly startTime: number }
   measure(name: string, options: { readonly start: string | number; readonly end: number; readonly detail?: unknown }): unknown
   clearMeasures?(name?: string): void
+  clearMarks?(name?: string): void
 }
 
 interface EntryLike {
@@ -53,9 +58,13 @@ interface Globals {
 const globals = globalThis as unknown as Globals
 const perf = typeof globals.performance?.mark === 'function' ? globals.performance : undefined
 
-/** Records a point in time. Returns the mark's timestamp. */
-export function mark(name: PerfName, detail?: Record<string, unknown>): number {
+/**
+ * Records a point in time. Returns the mark's timestamp. `replace` drops the
+ * earlier marks of that name first, as for `measure`.
+ */
+export function mark(name: PerfName, detail?: Record<string, unknown>, options?: { readonly replace?: boolean }): number {
   if (!perf) return 0
+  if (options?.replace) perf.clearMarks?.(name)
   return perf.mark(name, detail ? { detail } : undefined).startTime
 }
 

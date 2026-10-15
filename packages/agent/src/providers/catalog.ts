@@ -31,6 +31,8 @@ const families = [
   { family: 'flash', label: 'Gemini Flash', pattern: /^google\/gemini-\d+(?:\.\d+)*-flash$/, path: 'compaction' },
 ] as const
 export type ModelFamily = typeof families[number]['family']
+/** The picker's families in their order, with the label the owner sees. */
+export const pickerFamilies: ReadonlyArray<{ readonly family: ModelFamily; readonly label: string; readonly path: 'chat' | 'compaction' }> = families
 export type ModelChoice = { readonly family: ModelFamily; readonly provider: 'openrouter' } | { readonly family: 'sol'; readonly provider: 'codex' }
 export interface PickerModel {
   readonly choice: ModelChoice
@@ -89,6 +91,30 @@ export function resolveCatalogue(body: unknown, options: CatalogueOptions): read
   })
 }
 
+/**
+ * The newest model of `family` in pi-ai's own OpenRouter catalogue, for a
+ * start before OpenRouter's live catalogue has been read (no network). The
+ * same family patterns as the picker, so no slug is hard-coded.
+ */
+export function piFamilyModel(family: ModelFamily, piModels: readonly Model<Api>[] = Object.values(OPENROUTER_MODELS)): Model<Api> | undefined {
+  const pattern = families.find(f => f.family === family)!.pattern
+  return piModels.filter(m => pattern.test(m.id)).toSorted((a, b) => b.id.localeCompare(a.id, undefined, { numeric: true }))[0]
+}
+
+/**
+ * The picker's rows from pi-ai's own OpenRouter catalogue, for a start
+ * before OpenRouter's live catalogue has been read (no network, no cache).
+ * One row per OpenRouter family that pi-ai knows, priced from pi-ai.
+ */
+export function piRows(piModels: readonly Model<Api>[] = Object.values(OPENROUTER_MODELS)): readonly PickerModel[] {
+  return families.flatMap(family => {
+    const model = piFamilyModel(family.family, piModels)
+    if (!model) return []
+    return [{ choice: { family: family.family, provider: 'openrouter' }, label: family.label, path: family.path,
+      model, price: { input: model.cost.input, output: model.cost.output } } satisfies PickerModel]
+  })
+}
+
 /** app-server lists availability; pi supplies the windows it does not report. */
 export function resolveCodexModels(ids: readonly string[] | undefined, options: Pick<CatalogueOptions, 'systemAndTools' | 'multiplier'>): PickerModel | undefined {
   const candidates = Object.values(OPENAI_CODEX_MODELS).filter(m => /^gpt-\d+(?:\.\d+)*-sol$/.test(m.id) &&
@@ -99,7 +125,11 @@ export function resolveCodexModels(ids: readonly string[] | undefined, options: 
 
 export interface ModelChange { readonly family: string; readonly previous: string; readonly current: string }
 /** Call at startup and daily. Concurrent callers share one refresh; offline uses the last cache. */
-export function createCatalogue(store: Store, options: CatalogueOptions & { readonly fetch?: typeof fetch }) {
+export function createCatalogue(store: Store, options: CatalogueOptions & {
+  readonly fetch?: typeof fetch
+  /** OpenRouter's public model list. Tests point it at a fake. */
+  readonly url?: string
+}) {
   let refresh: Promise<{ readonly rows: readonly PickerModel[]; readonly changes: readonly ModelChange[]; readonly stale: boolean }> | undefined
   const resolve = (body: unknown) => resolveCatalogue(body, { ...options, multiplier:
     store.db.prepare("SELECT 1 FROM provider_bounds WHERE provider = 'openrouter'").get() ? 1.25 : options.multiplier })
@@ -109,7 +139,7 @@ export function createCatalogue(store: Store, options: CatalogueOptions & { read
     if (cached?.day === day) return { rows: resolve(JSON.parse(String(cached.body))), changes: [], stale: false }
     let body: unknown
     try {
-      const response = await (options.fetch ?? fetch)('https://openrouter.ai/api/v1/models', { signal: AbortSignal.timeout(15_000) })
+      const response = await (options.fetch ?? fetch)(options.url ?? 'https://openrouter.ai/api/v1/models', { signal: AbortSignal.timeout(15_000) })
       if (!response.ok) throw new Error(`Catalogue request failed (${response.status})`)
       body = await response.json()
       const rows = resolve(body)

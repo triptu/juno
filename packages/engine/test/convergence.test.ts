@@ -1,8 +1,11 @@
 // The randomised convergence test of architecture 5.4 and ADR 0011: after a
 // seeded mix of posts, replies, edits, deletes, reactions, read marks,
 // follows and unfollows (from another client and from Juno's commands),
-// follow events the socket delays across commands, and socket drops, the
-// store equals the fake, follow state equals the fake's (specs/follow.qnt
+// follow events the socket delays across commands, Juno's own sends through
+// the outbox with lost answers and errors Slack may give after posting, and
+// socket drops, the store equals the fake, follow state equals the fake's
+// (specs/follow.qnt `quietAgreement`), every send is in Slack and in the
+// store exactly once with no pending row left (specs/outbox.qnt
 // `quietAgreement`), and the incremental topic index equals a full rebuild.
 // Throughout, an Unsubscribe Slack accepted is never undone while it is
 // Slack's latest follow change for the thread (`acceptedUnfollow`). The
@@ -14,6 +17,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { Store, workspacePathsFromDir } from '@juno/store'
 import { reindexAll } from '@juno/sync'
 import { UserId } from '@juno/domain'
+import { sendMessage } from '@juno/state'
 import { sleep, startTestEngine, waitFor, type RunningEngine } from './harness'
 import { DAY, quiet, seedThread, storedFollow, subscribe, unsubscribe, valueOf } from './scenario'
 
@@ -98,7 +102,24 @@ describe('convergence', () => {
       else fake.followThread({ channel: root.channel, threadTs: root.message.ts })
     }
 
+    /** Juno's own sends, by `client_msg_id`. */
+    const sent: Array<string> = []
+    /** A send from Juno's composer, sometimes with its answer lost or an error Slack may give after posting. */
+    const sendFromJuno = async (round: number) => {
+      const fault = rand()
+      if (fault < 0.25) fake.loseResponse({ method: 'chat.postMessage' })
+      else if (fault < 0.35) fake.forceError({ method: 'chat.postMessage', error: 'internal_error' })
+      const inThread = rand() < 0.4 ? pick(roots().filter((r) => r.message.thread_ts === undefined || r.message.thread_ts === r.message.ts)) : undefined
+      const channel = inThread?.channel ?? pick(conversations)
+      const before = new Set(fake.calls.filter((c) => c.method === 'chat.postMessage').map((c) => c.args['client_msg_id']))
+      const exit = await sendMessage(engine!.registry, { kind: 'channel', channelId: channel, ...(inThread === undefined ? {} : { threadTs: inThread.message.ts }) }, `sent ${round}`)
+      valueOf(exit)
+      const id = await waitFor(() => fake.calls.find((c) => c.method === 'chat.postMessage' && !before.has(c.args['client_msg_id']))?.args['client_msg_id'] as string | undefined, 30_000, 'the post')
+      sent.push(id)
+    }
+
     for (let round = 0; round < ROUNDS; round++) {
+      if (rand() < 0.1) await sendFromJuno(round)
       const roll = rand()
       if (roll < 0.3) {
         const channel = pick(conversations)
@@ -202,7 +223,15 @@ describe('convergence', () => {
     )
     await sleep(200)
 
-    // 1. Every stored message says what the fake says; every created message is there; deleted ones are tombstones.
+    // 1. Every send is in Slack once and stored once, and no pending row is left.
+    await waitFor(() => ((db.prepare('SELECT count(*) AS n FROM pending_messages').get() as { n: number }).n === 0 ? true : undefined), 30_000, 'no pending row')
+    const all = conversations.flatMap((channel) => fake.messages(channel))
+    for (const id of sent) {
+      expect(all.filter((m) => m.client_msg_id === id), `${id} in Slack`).toHaveLength(1)
+      expect((db.prepare('SELECT count(*) AS n FROM messages WHERE client_msg_id = ?').get(id) as { n: number }).n, `${id} stored`).toBe(1)
+    }
+
+    // 2. Every stored message says what the fake says; every created message is there; deleted ones are tombstones.
     const mismatches: Array<string> = []
     for (const row of stored()) {
       const actual = fake.messages(row.channel).find((m) => m.ts === row.ts)
@@ -230,7 +259,7 @@ describe('convergence', () => {
     }
     expect(mismatches).toEqual([])
 
-    // 2. Follow state equals Slack's: a followed thread is stored as followed, any other is not.
+    // 3. Follow state equals Slack's: a followed thread is stored as followed, any other is not.
     const follows = new Map(
       (db.prepare('SELECT channel, thread_ts, subscribed FROM thread_subs').all() as Array<{ channel: string; thread_ts: string; subscribed: number }>).map((r) => [
         `${r.channel}:${r.thread_ts}`,
@@ -250,14 +279,14 @@ describe('convergence', () => {
     }
     expect([...new Set(followMismatches)]).toEqual([])
 
-    // 3. Read pointers follow the server marks.
+    // 4. Read pointers follow the server marks.
     for (const channel of conversations) {
       const read = db.prepare('SELECT last_read_ts FROM topic_reads WHERE topic_id = ?').get(`m:${channel}`) as { last_read_ts: string } | undefined
       expect(read?.last_read_ts, channel).toBe(fake.workspace.reads.get(channel))
     }
     db.close()
 
-    // 4. The incremental index equals a full rebuild: re-indexing every topic changes nothing.
+    // 5. The incremental index equals a full rebuild: re-indexing every topic changes nothing.
     const changed = await Effect.runPromise(
       reindexAll({ me: { userId: UserId.make(fake.selfId) } }).pipe(Effect.provide(Store.layer(paths)), Effect.scoped),
     )

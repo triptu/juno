@@ -16,6 +16,8 @@ export interface ShellProps {
   readonly onSidebarResetWidth?: () => void
   /** A drag on the edge ended far enough left to hide the sidebar. */
   readonly onSidebarCollapse?: () => void
+  /** The peek popover (`PeekView`), while one is open. It hangs off the sidebar's right edge. */
+  readonly peek?: ReactNode
   /** The toast (bottom-left of the window), over both panes. */
   readonly toast?: ReactNode
   readonly children?: ReactNode
@@ -31,7 +33,7 @@ const COLLAPSE_BELOW = 200
  * waits on the engine renders its own waiting state inside. Nothing above
  * the panes may change on a tick (performance 4.3).
  */
-export function Shell({ sidebar, sidebarWidth = SIDEBAR_WIDTH.default, sidebarHidden = false, onSidebarResize, onSidebarResetWidth, onSidebarCollapse, toast, children }: ShellProps) {
+export function Shell({ sidebar, sidebarWidth = SIDEBAR_WIDTH.default, sidebarHidden = false, onSidebarResize, onSidebarResetWidth, onSidebarCollapse, peek, toast, children }: ShellProps) {
   const slot = useRef<HTMLDivElement>(null)
   // The width is set on the sidebar's own box, here and by a drag, never
   // through React state, so a drag re-renders nothing. It is a plain width,
@@ -46,6 +48,7 @@ export function Shell({ sidebar, sidebarWidth = SIDEBAR_WIDTH.default, sidebarHi
         <div ref={slot} {...stylex.props(styles.sidebarSlot, sidebarHidden && styles.hidden)}>
           {sidebar}
           <SidebarEdge width={sidebarWidth} onResize={onSidebarResize} onReset={onSidebarResetWidth} onCollapse={onSidebarCollapse} />
+          {peek}
         </div>
         {children}
         {toast}

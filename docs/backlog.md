@@ -46,7 +46,7 @@ Small items noticed during work that are not yet assigned to a milestone. Remove
 - Notifications (M10): Tell Juno in the why popover (inventory 15.4) opens the Juno chat with the message quoted. It shows no button until the chat exists; wire it in `notificationBridge.tsx`.
 - Notifications (M10): a Juno Agent tool to read and change notification settings and hours (Local tier, Undo, only from the owner's own words), over `notifications.settings`, `notifications.setHours`, `notifications.setMatters` and `notifications.setLevel`.
 - Notifications: a notification for a topic that is already open in a tab only focuses that tab; it does not scroll to the message. A fresh open lands at the message when it is in the first window.
-- Preferences: the peek key and the ignore list (inventory 14) are not on the page yet; it has Appearance and the way to Notifications.
+- Preferences: the ignore list (inventory 14) is not on the page yet; it has Appearance, the peek key and the way to Notifications.
 - Notifications: `docs/design/handoff/screenshots/12-ui.png` shows the old page; replace it with a shot of the built page in M10.
 - Juno Agent ideas adopted 10-14 from `docs/research/agent-native-chat-products.md`: specced in SPEC (principle 5, sections 5, 7, 13.1, 13.3, 13.4, 13.6, 13.9, 14, 15), inventory §12, §12.1, §15.2, §15.4 and §15.6, and plan v3 §19, which names the work package for each. Still to build:
   - Sources on every Slack claim (WP7, WP11, WP12, WP14).
