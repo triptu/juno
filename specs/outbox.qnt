@@ -25,9 +25,19 @@ module outboxProtocol {
     actSent: Set[int], acted: Set[int],
     // Copies the network made of an accepted post (0 or 1) and copies Juno
     // deleted. `copyRow`: none, hidden (stored hidden, its delete row
-    // waits) or shown (the bug: listed as a second message).
-    dup: int -> int, deletes: int -> int, copyRow: int -> str
+    // waits), shown (the bug: listed as a second message) or kept (its
+    // delete was cancelled, and it is shown as Slack holds it).
+    dup: int -> int, deletes: int -> int, copyRow: int -> str,
+    // Which message Juno keeps: the first it stored, or the copy once the
+    // first was deleted elsewhere.
+    kept: int -> str,
+    // Changes other clients make that bear on a copy: `gone` (the user
+    // deleted the kept message on another device) and `reply` (someone
+    // replied to the copy). `slack` is what Slack has; `seen` what the
+    // store has. `inStep` is false from a socket drop until the catch-up.
+    slack: Set[Change], seen: Set[Change], inStep: bool
   }
+  type Change = { key: int, what: str }
   var s: State
   var remaining: int
   var turn: int
@@ -39,14 +49,22 @@ module outboxProtocol {
       online: true, connected: true, catchup: false, sealed: false, claimedOffline: false, label: "init", target: 0,
       act: drafts.mapBy(_ => "none"), actKind: drafts.mapBy(_ => "change"), stale: Set(),
       actSent: Set(), acted: Set(),
-      dup: drafts.mapBy(_ => 0), deletes: drafts.mapBy(_ => 0), copyRow: drafts.mapBy(_ => "none") },
+      dup: drafts.mapBy(_ => 0), deletes: drafts.mapBy(_ => 0), copyRow: drafts.mapBy(_ => "none"),
+      kept: drafts.mapBy(_ => "first"), slack: Set(), seen: Set(), inStep: true },
     remaining' = drainLimit, turn' = 0
   }
 
   def actPending(k: int): bool = Set("waiting", "transit", "accepted").contains(s.act.get(k))
   def actInFlight(k: int): bool = Set("transit", "accepted").contains(s.act.get(k))
+  def keptGone(k: int): bool = s.slack.contains({ key: k, what: "gone" })
+  def copyReplied(k: int): bool = s.slack.contains({ key: k, what: "reply" })
   // Messages Slack holds for one client_msg_id.
-  def held(k: int): int = s.server.get(k) + s.dup.get(k) - s.deletes.get(k)
+  def held(k: int): int = s.server.get(k) + s.dup.get(k) - s.deletes.get(k) - (if (keptGone(k)) 1 else 0)
+  def copyInSlack(k: int): bool = s.dup.get(k) > s.deletes.get(k)
+  // What the store says against deleting the copy (`copyKeepReason`).
+  // Reactions from others and an edit follow the reply's rule and are not
+  // modelled apart.
+  def keepReasonSeen(k: int): bool = s.seen.contains({ key: k, what: "gone" }) or s.seen.contains({ key: k, what: "reply" })
   // A copy in Slack that Juno has not stored yet.
   def copyUnseen(k: int): bool = s.dup.get(k) > s.deletes.get(k) and s.copyRow.get(k) == "none"
 
@@ -100,25 +118,61 @@ module outboxProtocol {
   // echo, the answer, a page or a lookup shows it. Whichever it stored
   // first is the message; this one is hidden in the same transaction and a
   // delete row is queued for it. With the guard off it is listed.
+  // A copy that the store already says should stay is kept at once.
   action observeCopyWith(k: int, guard: bool): bool = all {
     s.connected, s.stored.contains(k), copyUnseen(k),
-    s' = { ...s, copyRow: s.copyRow.set(k, if (guard) "hidden" else "shown"), label: "observeCopy", target: k }
+    s' = { ...s, copyRow: s.copyRow.set(k, if (not(guard)) "shown" else if (keepReasonSeen(k)) "kept" else "hidden"),
+      kept: if (guard and s.seen.contains({ key: k, what: "gone" })) s.kept.set(k, "copy") else s.kept,
+      label: "observeCopy", target: k }
   }
   action observeCopy(k: int): bool = observeCopyWith(k, true)
   // The delete row's `chat.delete`. A lost answer sends it again, and
   // `message_not_found` counts as done, so only its success is modelled.
   // With `byId` off, the bug takes a message with the same text for a copy:
   // every draft here has the same text, so another stored draft is enough.
-  action deleteCopyWith(k: int, byId: bool): bool = all {
+  // `check`: "full" checks the store again in the transaction before the
+  // call and goes only after the catch-up that follows a socket drop;
+  // "noWait" checks but does not wait; "none" is the old code, which
+  // decided once, when the copy was stored.
+  action deleteCopyWith(k: int, byId: bool, check: str): bool = all {
     s.online, s.connected,
-    if (byId) s.copyRow.get(k) == "hidden" else all {
+    if (byId) all {
+      s.copyRow.get(k) == "hidden",
+      check == "none" or not(keepReasonSeen(k)),
+      check != "full" or s.inStep
+    } else all {
       s.stored.contains(k), s.copyRow.get(k) == "none", held(k) > 0,
       drafts.exists(j => j != k and s.stored.contains(j))
     },
     s' = { ...s, deletes: s.deletes.set(k, s.deletes.get(k) + 1),
       copyRow: if (byId) s.copyRow.set(k, "none") else s.copyRow, label: "deleteCopy", target: k }
   }
-  action deleteCopy(k: int): bool = deleteCopyWith(k, true)
+  action deleteCopy(k: int): bool = deleteCopyWith(k, true, "full")
+  // The check before the call fails: the delete row ends unsent and the
+  // copy is shown. If the kept message was deleted, the copy is the
+  // message now (`sent_posts.ts`).
+  action keepCopy(k: int): bool = all {
+    s.online, s.connected, s.inStep, s.copyRow.get(k) == "hidden", keepReasonSeen(k),
+    s' = { ...s, copyRow: s.copyRow.set(k, "kept"),
+      kept: if (s.seen.contains({ key: k, what: "gone" })) s.kept.set(k, "copy") else s.kept,
+      label: "keepCopy", target: k }
+  }
+  // Another client changes Slack. The user sees two messages on another
+  // device and deletes the one Juno kept; or someone replies to the copy.
+  // While the socket is up its event is stored in the same step; otherwise
+  // the catch-up's recheck finds it. **Assumption:** the time between Slack
+  // applying the change and Juno storing its event, and between the check
+  // and Slack applying Juno's delete, is not modelled. A change in that
+  // window can still race the delete.
+  action remoteChange(k: int, what: str): bool = {
+    val c = { key: k, what: what }
+    all {
+      not(s.sealed), s.stored.contains(k), copyInSlack(k), not(s.slack.contains(c)),
+      what != "gone" or s.kept.get(k) == "first",
+      s' = { ...s, slack: s.slack.union(Set(c)), seen: if (s.connected) s.seen.union(Set(c)) else s.seen,
+        label: "remoteChange", target: k }
+    }
+  }
 
   // Slack can drop the request without an answer.
   action drop(k: int): bool = all {
@@ -301,11 +355,11 @@ module outboxProtocol {
 
   action disconnect = all {
     not(s.sealed), s.connected,
-    s' = { ...s, connected: false, events: Set(), scan: Set(), catchup: false, label: "disconnect" }
+    s' = { ...s, connected: false, events: Set(), scan: Set(), catchup: false, inStep: false, label: "disconnect" }
   }
   action goOffline = all {
     not(s.sealed), s.online,
-    s' = { ...s, online: false, connected: false, events: Set(), scan: Set(), catchup: false, label: "goOffline" }
+    s' = { ...s, online: false, connected: false, events: Set(), scan: Set(), catchup: false, inStep: false, label: "goOffline" }
   }
   action goOnline = all { not(s.online), s' = { ...s, online: true, label: "goOnline" } }
   action reconnect = all {
@@ -313,9 +367,10 @@ module outboxProtocol {
     s' = { ...s, connected: true, catchup: true, scan: s.created, label: "reconnect" }
   }
   // End of catch-up, after all its pages: flush every queued or unknown row.
+  // Its recheck has stored what other clients changed meanwhile.
   action catchUp = all {
     s.catchup, s.scan.size() == 0, not(s.fetches.exists(f => f.kind == "catchup")),
-    s' = { ...s, catchup: false,
+    s' = { ...s, catchup: false, inStep: true, seen: s.slack,
       due: s.due.union(drafts.filter(k => Set("queued", "unknown").contains(s.row.get(k)))), label: "catchUp" }
   }
   action seal = all { not(s.sealed), s' = { ...s, sealed: true, label: "seal" } }
@@ -324,7 +379,16 @@ module outboxProtocol {
   // not Juno's submission and is deleted instead.
   val atMostOnce = drafts.forall(k => s.server.get(k) <= 1)
   val shownOnce = drafts.forall(k => s.copyRow.get(k) != "shown")
+  // Slack always holds at least one copy of every real send: Juno never
+  // deletes the last one, whether it took a real send for a copy or the
+  // user deleted the kept message elsewhere while the copy's delete waited.
   val keepsRealSends = drafts.forall(k => s.stored.contains(k) implies held(k) >= 1)
+  // A copy someone replied to is never deleted, so the replies keep their root.
+  val repliesKeepRoot = drafts.forall(k => copyReplied(k) implies copyInSlack(k))
+  // Once the copy replaced the deleted first message, Slack holds it.
+  def keptHeld(k: int): bool = s.kept.get(k) == "copy" implies copyInSlack(k)
+  // A kept copy stays beside the first message unless it replaced it.
+  def expectedHeld(k: int): int = if (s.copyRow.get(k) == "kept" and not(keptGone(k))) 2 else 1
   val noDoubleShow = drafts.forall(k => s.stored.contains(k) implies s.row.get(k) == "gone")
   val noSilentLoss = s.created.forall(k => s.row.get(k) == "gone" implies
     (s.stored.contains(k) or s.discarded.contains(k)))
@@ -333,7 +397,7 @@ module outboxProtocol {
       s.request.get(k) == "idle" and Set("gone", "failed").contains(s.row.get(k)) and not(actPending(k)) and
       s.copyRow.get(k) != "hidden" and not(copyUnseen(k)))
   val agreed = s.created.forall(k => s.discarded.contains(k) or
-    (s.row.get(k) == "gone" and s.stored.contains(k) and s.server.get(k) == 1 and held(k) == 1) or
+    (s.row.get(k) == "gone" and s.stored.contains(k) and s.server.get(k) == 1 and held(k) == expectedHeld(k) and keptHeld(k)) or
     (s.row.get(k) == "failed" and not(s.stored.contains(k)) and held(k) == 0)) and
     drafts.forall(k => s.act.get(k) == "done" implies s.acted.contains(k))
   val quietAgreement = (s.sealed and quiet) implies agreed
@@ -344,13 +408,13 @@ module outboxProtocol {
   val sendsWaitOffline = not(s.claimedOffline)
   val actionsDrain = remaining > 0 or drafts.forall(k => not(actPending(k)))
   val invariants = atMostOnce and noDoubleShow and noSilentLoss and quietAgreement and drainBound and
-    actionNeedsMessage and noActionOnDiscarded and actionsDrain and sendsWaitOffline and shownOnce and keepsRealSends
+    actionNeedsMessage and noActionOnDiscarded and actionsDrain and sendsWaitOffline and shownOnce and keepsRealSends and repliesKeepRoot
 
   action work = any {
     goOnline, reconnect, catchUp,
     { nondet k = drafts.oneOf(); nondet withEcho = Set(true, false).oneOf(); any {
       claim(k), accept(k, withEcho), answer(k), refused(k), lookup(k), wake(k),
-      runAction(k), actAccept(k), actAnswer(k), dropAction(k), observeCopy(k), deleteCopy(k),
+      runAction(k), actAccept(k), actAnswer(k), dropAction(k), observeCopy(k), deleteCopy(k), keepCopy(k),
       all { s.request.get(k) == "dropped", lost(k) }
     } },
     { nondet k = s.events.oneOf(); echo(k) },
@@ -364,7 +428,7 @@ module outboxProtocol {
     nondet kind = Set("change", "delete").oneOf()
     any {
       send(k), refuse(k, later), drop(k), resend(k), lost(k), crash, retry(k), discard(k), uploadFail(k),
-      queueAction(k, kind), actFail(k), actRefuse(k),
+      queueAction(k, kind), actFail(k), actRefuse(k), remoteChange(k, "gone"), remoteChange(k, "reply"),
       page(k), disconnect, goOffline, seal,
       { nondet f = s.fetches.oneOf(); failLookup(f) }
     }
@@ -581,11 +645,68 @@ module outboxProtocol {
     if (turn == 5) claim(2) else
     if (turn == 6) accept(2, false) else
     if (turn == 7) answer(2) else
-    if (turn == 8) (if (guard) seal else deleteCopyWith(2, false)) else
+    if (turn == 8) (if (guard) seal else deleteCopyWith(2, false, "none")) else
     seal
   ) }
   action sameTextStep = sameTextWith(true)
   action sameTextBugStep = sameTextWith(false)
+
+  // The first five turns of each schedule below: Slack holds the post and
+  // its network copy, Juno keeps the first and hides the copy.
+  def copyHidden(turn: int): bool = turn <= 5
+  action copySetup = any {
+    all { turn == 0, send(1) }, all { turn == 1, claim(1) }, all { turn == 2, accept(1, true) },
+    all { turn == 3, resend(1) }, all { turn == 4, answer(1) }, all { turn == 5, echo(1) }
+  }
+
+  // S1: the copy's delete waits (backoff), and the user deletes the kept
+  // message on another device. The check finds it deleted, keeps the copy
+  // and makes it the message. The bug deletes the copy too.
+  action keptDeletedWith(check: str): bool = all { not(reachedAgreement), tick(
+    if (s.sealed) progress else
+    if (copyHidden(turn)) copySetup else
+    if (turn == 6) observeCopy(1) else
+    if (turn == 7) remoteChange(1, "gone") else
+    if (turn == 8) (if (check == "full") keepCopy(1) else deleteCopyWith(1, true, check)) else
+    seal
+  ) }
+  action keptDeletedStep = keptDeletedWith("full")
+  action keptDeletedBugStep = keptDeletedWith("none")
+
+  // S2: someone replies to the copy while its delete waits. The check
+  // keeps the copy. The bug deletes it, leaving the replies under a
+  // deleted root.
+  action copyReplyWith(check: str): bool = all { not(reachedAgreement), tick(
+    if (s.sealed) progress else
+    if (copyHidden(turn)) copySetup else
+    if (turn == 6) observeCopy(1) else
+    if (turn == 7) remoteChange(1, "reply") else
+    if (turn == 8) (if (check == "full") keepCopy(1) else deleteCopyWith(1, true, check)) else
+    seal
+  ) }
+  action copyReplyStep = copyReplyWith("full")
+  action copyReplyBugStep = copyReplyWith("none")
+
+  // The socket drops while the copy's delete waits, and the user deletes
+  // the kept message meanwhile. The store learns it only from the
+  // catch-up's recheck. The guarded delete waits for the catch-up, then
+  // keeps the copy. The bug checks the store at once, on the reconnect,
+  // finds nothing against the delete, and deletes the copy.
+  action deletedOfflineWith(check: str): bool = all { not(reachedAgreement), tick(
+    if (s.sealed) progress else
+    if (copyHidden(turn)) copySetup else
+    if (turn == 6) observeCopy(1) else
+    if (turn == 7) disconnect else
+    if (turn == 8) remoteChange(1, "gone") else
+    if (turn == 9) reconnect else
+    if (turn == 10) (if (check == "full") startFetch(1, "catchup") else deleteCopyWith(1, true, check)) else
+    if (turn == 11) { nondet f = s.fetches.oneOf(); finishFetch(f) } else
+    if (turn == 12) catchUp else
+    if (turn == 13) keepCopy(1) else
+    seal
+  ) }
+  action deletedOfflineStep = deletedOfflineWith("full")
+  action deletedOfflineBugStep = deletedOfflineWith("noWait")
 }
 
 module outbox {
