@@ -11,6 +11,7 @@ pi packages and the Codex SDK may be imported anywhere in this package (`check-d
 | You are testing | Use |
 | --- | --- |
 | A chat run, the guard, spend, a provider failure line | `fakeProvider()` with a script |
+| The agent process in the desktop app's e2e tests | `startFakeOpenRouter()` from `@juno/agent-testing/openrouter` |
 | Compaction jobs and node text | `fakeProvider()`; requests to Haiku or Flash go to the compactor |
 | The Codex harness (WP20) | `startFakeCodex()` as `codexPathOverride` |
 | MCP manager logic without HTTP | any fake's `connectInMemory()` |
@@ -29,6 +30,14 @@ A provider registered as `openrouter` with today's resolved slugs, their real co
   - `serverError(500 | 502 | 503)`, `rejectedKey()` (401), `rateLimited()` (429), `httpError(status, message)`: one `error` event before any `start`, with `errorMessage` `"<status>: <body JSON>"` as pi-ai formats OpenAI-compatible errors.
 - Requests to a model in `compactionModels` (default Haiku 5.5 and Gemini 3.8 Flash) never use the script. The compactor answers `Summary of messages a–b: <input>` cut to 512 bytes, from the `<input>` block of `@juno/agent-memory`'s compaction task. `compactor: { oversizedAnswers: n }` makes the first `n` answers too long.
 - `requests` lists every request (model, context, options). `pending()` counts unused steps. A chat request with no step left fails with "No more faux responses queued".
+
+## Model over HTTP: `startFakeOpenRouter(options?)`
+
+For the desktop app's e2e tests, where the agent runs in its own process and cannot load `fakeProvider()`. A loopback server that speaks the Anthropic Messages stream OpenRouter serves for Claude, which is what pi-ai sends Juno's default models to. Launch the app with `fakeOpenRouterUrl: fake.url` (`apps/desktop/e2e/fixtures.ts`); under `JUNO_E2E` the agent then calls it instead of openrouter.ai.
+
+- `answer(request)` gives the model's whole text for a chat request (default: a `<say>` bubble echoing the input's last line). Requests to a compaction model get the compactor's answer, as with `fakeProvider()`.
+- `requests` lists every request (model, `compaction`, every message's text, `input`: the last user message). `inputs()` is the chat requests' inputs.
+- Import it from the `@juno/agent-testing/openrouter` subpath: the package index loads pi-ai, which is ESM only, and Playwright loads tests as CommonJS.
 
 ## Codex: `startFakeCodex(options?)`
 

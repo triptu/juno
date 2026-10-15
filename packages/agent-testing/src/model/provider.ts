@@ -27,7 +27,9 @@ import {
   type TranscriptContext,
   type Usage,
 } from '@earendil-works/pi-ai'
-import { compactorAnswer, type CompactorOptions } from './compactor'
+import { COMPACTION_MODELS, compactorAnswer, type CompactorOptions } from './compactor'
+
+export { COMPACTION_MODELS }
 
 export const FAKE_PROVIDER = 'openrouter'
 
@@ -48,8 +50,6 @@ export const fakeCatalogue: ReadonlyArray<FauxModelDefinition> = [
   { id: 'google/gemini-3.8-flash', contextWindow: 1_048_576, maxTokens: 64_000, cost: price(0.75, 3.75) },
 ]
 
-/** The compaction default and its alternative (plan v3 §7.1). */
-export const COMPACTION_MODELS: ReadonlyArray<string> = ['anthropic/claude-haiku-5.5', 'google/gemini-3.8-flash']
 
 /** What the provider reports as used. Cost is computed from the model's prices. */
 export interface UsageReport {

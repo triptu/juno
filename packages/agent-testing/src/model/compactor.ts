@@ -11,6 +11,9 @@
  */
 import type { Message, TranscriptContext } from '@earendil-works/pi-ai'
 
+/** The compaction default and its alternative (plan v3 §7.1). */
+export const COMPACTION_MODELS: ReadonlyArray<string> = ['anthropic/claude-haiku-5.5', 'google/gemini-3.8-flash']
+
 export interface CompactorOptions {
   /** Default 512, the target in `compactionTask`. */
   readonly targetBytes?: number
@@ -19,7 +22,12 @@ export interface CompactorOptions {
 }
 
 export function compactorAnswer(context: TranscriptContext, index: number, options: CompactorOptions = {}): string {
-  const text = context.messages.filter((message) => message.role === 'user').map(textOf).join('\n')
+  return compactorText(context.messages.filter((message) => message.role === 'user').map(textOf), index, options)
+}
+
+/** The same answer from the user messages' text, for the fake OpenRouter, which reads them off the wire. */
+export function compactorText(userTexts: ReadonlyArray<string>, index: number, options: CompactorOptions = {}): string {
+  const text = userTexts.join('\n')
   const input = /<input>\n([\s\S]*?)\n<\/input>/.exec(text)?.[1]
   if (input === undefined) return 'No input to summarize.'
   const range = /messages (\d+)–(\d+)/.exec(text)

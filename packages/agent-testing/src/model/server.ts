@@ -3,15 +3,19 @@
  * agent process cannot load the in-process scripted model, so it reaches
  * this server through `openRouterTurns(key, { baseUrl })` instead. pi-ai
  * sends Juno's default models (Claude) to OpenRouter's Anthropic Messages
- * endpoint, so this speaks that stream. It answers each request with
- * `answer` and records what it was sent.
+ * endpoint, so this speaks that stream. It answers each chat request with
+ * `answer`, each compaction request with the deterministic compactor, and
+ * records what it was sent.
  */
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import type { AddressInfo } from 'node:net'
+import { COMPACTION_MODELS, compactorText } from './compactor'
 
 /** One request as the model got it: every message's text, in order. */
 export interface FakeOpenRouterRequest {
   readonly model: string
+  /** A compaction model's request, answered by the compactor, not `answer`. */
+  readonly compaction: boolean
   readonly messages: ReadonlyArray<{ readonly role: string; readonly text: string }>
   /** The last user message's text: the input the request answers. */
   readonly input: string
@@ -26,6 +30,8 @@ export interface FakeOpenRouter {
   /** The base URL the models take in place of `https://openrouter.ai/api`. */
   readonly url: string
   readonly requests: ReadonlyArray<FakeOpenRouterRequest>
+  /** The last user message of each chat request, in order. */
+  readonly inputs: () => ReadonlyArray<string>
   readonly close: () => Promise<void>
 }
 
@@ -51,9 +57,12 @@ export async function startFakeOpenRouter(options: FakeOpenRouterOptions = {}): 
   const messages = async (raw: string, response: ServerResponse) => {
     const parsed = JSON.parse(raw) as { model: string; messages: ReadonlyArray<WireMessage> }
     const seen = parsed.messages.map((message) => ({ role: message.role, text: textOf(message.content) }))
-    const request: FakeOpenRouterRequest = { model: parsed.model, messages: seen, input: seen.findLast((message) => message.role === 'user')?.text ?? '' }
+    const compaction = COMPACTION_MODELS.includes(parsed.model)
+    const request: FakeOpenRouterRequest = { model: parsed.model, compaction, messages: seen, input: seen.findLast((message) => message.role === 'user')?.text ?? '' }
     requests.push(request)
-    const text = await answer(request)
+    const text = compaction
+      ? compactorText(seen.filter((message) => message.role === 'user').map((message) => message.text), requests.filter((r) => r.compaction).length - 1)
+      : await answer(request)
     const input = Math.ceil(raw.length / 4)
     response.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' })
     response.write(
@@ -86,6 +95,7 @@ export async function startFakeOpenRouter(options: FakeOpenRouterOptions = {}): 
   return {
     url: `http://127.0.0.1:${port}/api`,
     requests,
+    inputs: () => requests.filter((request) => !request.compaction).map((request) => request.input),
     close: () => new Promise<void>((resolve) => server.close(() => resolve())),
   }
 }

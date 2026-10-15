@@ -245,6 +245,9 @@ importers:
         specifier: 19.3.0
         version: 19.3.0(react@19.3.0)
     devDependencies:
+      '@juno/agent-testing':
+        specifier: workspace:*
+        version: link:../../packages/agent-testing
       '@juno/fake-slack':
         specifier: workspace:*
         version: link:../../packages/fake-slack

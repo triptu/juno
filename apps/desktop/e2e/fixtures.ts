@@ -39,6 +39,8 @@ export interface LaunchOptions {
   readonly keychainPassword?: string
   /** Start the Juno Agent utility process (JUNO_AGENT=1). */
   readonly agent?: boolean
+  /** The fake OpenRouter the agent's models call (`startFakeOpenRouter`), with a stand-in key. */
+  readonly fakeOpenRouterUrl?: string
 }
 
 /**
@@ -57,6 +59,7 @@ export async function launchApp(userData: string, options: LaunchOptions = {}): 
   if (options.slackAppDir !== undefined) env.JUNO_SLACK_APP_DIR = options.slackAppDir
   if (options.keychainPassword !== undefined) env.JUNO_SLACK_SAFE_STORAGE_PASSWORD = options.keychainPassword
   if (options.agent === true) env.JUNO_AGENT = '1'
+  if (options.fakeOpenRouterUrl !== undefined) env.JUNO_FAKE_OPENROUTER_URL = options.fakeOpenRouterUrl
 
   // Launch the package directory (like `electron .`), not the script, so
   // Electron reads package.json for the app name and version.

@@ -30,6 +30,7 @@
     "react-dom": "19.3.0"
   },
   "devDependencies": {
+    "@juno/agent-testing": "workspace:*",
     "@juno/fake-slack": "workspace:*",
     "@juno/testing": "workspace:*",
     "@playwright/test": "1.64.0",
@@ -59,6 +60,7 @@
       "@juno/views"
     ],
     "testDeps": [
+      "@juno/agent-testing",
       "@juno/fake-slack",
       "@juno/testing"
     ]
