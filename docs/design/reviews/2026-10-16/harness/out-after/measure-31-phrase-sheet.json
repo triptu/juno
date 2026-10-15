@@ -1,0 +1,92 @@
+[
+  {
+    "tag": "section",
+    "label": "Your recovery phrase",
+    "rect": [
+      420,
+      286,
+      560,
+      261
+    ],
+    "padding": "0px",
+    "radius": "13px",
+    "font": "14.5px/21.75px 400",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgb(251, 251, 248)"
+  },
+  {
+    "tag": "h2",
+    "label": "Your recovery phrase",
+    "rect": [
+      441,
+      307,
+      518,
+      21
+    ],
+    "padding": "0px",
+    "radius": "0px",
+    "font": "15.5px/20.925px 600",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "tag": "p",
+    "label": "It opens your backup on another Mac. Jun",
+    "rect": [
+      441,
+      332,
+      518,
+      43
+    ],
+    "padding": "0px",
+    "radius": "0px",
+    "font": "14px/21.7px 400",
+    "color": "rgb(96, 94, 82)",
+    "bg": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "tag": "span",
+    "label": "Your recovery phrase",
+    "rect": [
+      602,
+      408,
+      197,
+      55
+    ],
+    "padding": "0px",
+    "radius": "0px",
+    "font": "15.5px/23.25px 400",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "tag": "button",
+    "label": "Copy",
+    "rect": [
+      836,
+      496,
+      59,
+      30
+    ],
+    "padding": "0px 12px",
+    "radius": "12px",
+    "font": "13.5px/20.25px 500",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgb(241, 238, 228)"
+  },
+  {
+    "tag": "button",
+    "label": "Done",
+    "rect": [
+      901,
+      496,
+      58,
+      30
+    ],
+    "padding": "0px 12px",
+    "radius": "12px",
+    "font": "13.5px/20.25px 500",
+    "color": "rgb(255, 255, 255)",
+    "bg": "rgb(204, 70, 40)"
+  }
+]

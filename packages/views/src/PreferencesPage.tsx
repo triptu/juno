@@ -1,7 +1,9 @@
 import type { ReactNode } from 'react'
 import { Bell } from '@phosphor-icons/react/dist/icons/Bell'
-import { Button, Page, PageHeader, Section, Surface, type AccentName, type DensityName, type ThemePreference } from '@juno/ui'
+import { Button, Page, PageHeader, Section, Surface, Text, type AccentName, type DensityName, type ThemePreference } from '@juno/ui'
+import type { IgnoredChannel } from '@juno/contract'
 import { AppearanceSettings } from './AppearanceSettings'
+import { IgnoredChannels } from './IgnoredChannels'
 import { PeekKeySetting, type PeekKeyName } from './PeekKeySetting'
 
 export interface PreferencesPageProps {
@@ -14,15 +16,18 @@ export interface PreferencesPageProps {
   readonly onDensityChange: (density: DensityName) => void
   readonly peekKey: PeekKeyName
   readonly onPeekKeyChange: (key: PeekKeyName) => void
+  /** The ignore list; undefined until it arrives. */
+  readonly ignored: ReadonlyArray<IgnoredChannel> | undefined
+  readonly onStopIgnoring: (channel: IgnoredChannel) => void
   readonly onOpenNotifications: () => void
 }
 
 /**
  * Preferences (SPEC 14, inventory 14): the Appearance group, the peek key,
- * and the way to the notification settings. Anything Juno can do from the owner's words
+ * the ignore list, and the way to the notification settings. Anything Juno can do from the owner's words
  * belongs in the chat, not here.
  */
-export function PreferencesPage({ about, theme, accent, density, onThemeChange, onAccentChange, onDensityChange, peekKey, onPeekKeyChange, onOpenNotifications }: PreferencesPageProps) {
+export function PreferencesPage({ about, theme, accent, density, onThemeChange, onAccentChange, onDensityChange, peekKey, onPeekKeyChange, ignored, onStopIgnoring, onOpenNotifications }: PreferencesPageProps) {
   return (
     <Page width="settings">
       <PageHeader title="Preferences" />
@@ -35,6 +40,14 @@ export function PreferencesPage({ about, theme, accent, density, onThemeChange, 
         <Surface kind="group" padding="md">
           <PeekKeySetting value={peekKey} onChange={onPeekKeyChange} />
         </Surface>
+      </Section>
+      <Section heading="Ignored channels" sub="Hidden from your topics, search and All topics, and they never notify you. Nothing changes in Slack.">
+        <Surface kind="group" padding="md">
+          <IgnoredChannels channels={ignored} onStopIgnoring={onStopIgnoring} />
+        </Surface>
+        <Text variant="meta" tone="muted" as="p">
+          Right-click a channel to ignore it.
+        </Text>
       </Section>
       <Section heading="Notifications" sub="Your hours, and what Juno lets through.">
         <div>

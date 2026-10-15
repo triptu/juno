@@ -1,4 +1,5 @@
 import { Schema } from 'effect'
+import { OpenableUrl } from '@juno/agent-contract'
 import { McpError } from '../mcp/types'
 import { parseObject } from '../mcp/catalogue'
 import type { McpManagerApi } from '../mcp/manager'
@@ -12,11 +13,12 @@ export function content(result: Awaited<ReturnType<McpManagerApi['invoke']>>): u
   return JSON.parse(text.text)
 }
 
-export const Session = Schema.Struct({ threadId: Schema.NonEmptyString, project: Schema.NonEmptyString, epoch: Schema.String })
+const PullRequest = Schema.Struct({ number: Schema.Number, url: OpenableUrl })
+export const Session = Schema.Struct({ threadId: Schema.NonEmptyString, project: Schema.NonEmptyString, epoch: Schema.String, pullRequest: Schema.optionalKey(PullRequest) })
 export type Session = typeof Session.Type
 export const sessionOf = (task: string) => Schema.decodeUnknownSync(Session)(JSON.parse(task))
 export const launched = Schema.decodeUnknownSync(Schema.Struct({ threadId: Schema.NonEmptyString }))
-export const threadState = Schema.decodeUnknownSync(Schema.Struct({ thread: Schema.Struct({ status: Schema.String, threadId: Schema.optionalKey(Schema.String), branch: Schema.optionalKey(Schema.NullOr(Schema.String)) }) }))
+export const threadState = Schema.decodeUnknownSync(Schema.Struct({ thread: Schema.Struct({ status: Schema.String, threadId: Schema.optionalKey(Schema.String), branch: Schema.optionalKey(Schema.NullOr(Schema.String)), linkedPullRequest: Schema.optionalKey(Schema.NullOr(PullRequest)) }) }))
 
 /** Never use the calling thread's worktree as the launched thread's branch. */
 export async function sessionBranch(manager: McpManagerApi, threadId: string): Promise<string | undefined> {

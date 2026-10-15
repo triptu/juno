@@ -4,6 +4,7 @@ import { makeNotifications, readSettings, type Notifier, type Notifications } fr
 import { messageBody, plainText } from '@juno/richtext'
 import { SlackApi, SlackSession, type SocketEvent } from '@juno/slack'
 import type { NotificationSource, NotificationTarget } from '@juno/contract'
+import { HostChannelId, HostMessageTs, type HostSummary } from '@juno/agent-contract'
 import { liveQuery, StoreReader, type ConversationRow } from '@juno/store'
 import { Clock, Context, Effect, Layer, Queue, Ref, Stream, SubscriptionRef } from 'effect'
 import { HostLink } from './protocol/host'
@@ -15,6 +16,14 @@ export interface NotificationHost {
   readonly notifier: Notifier
   /** Whether any topic has an unread mention, on every change. Main shows the dock badge. */
   readonly badge?: (mentions: boolean) => Effect.Effect<void>
+  /** The hours-start summaries waiting for the agent to append them to the Juno chat (`host.notification.summaries`). */
+  readonly summaries?: ChatSummaries
+}
+
+/** Summaries offered to the agent until it says it appended them. Held in memory: a summary not taken before the engine stops is lost from the chat, not from the OS notification. */
+export interface ChatSummaries {
+  readonly pending: Stream.Stream<ReadonlyArray<HostSummary>>
+  readonly taken: (id: string) => Effect.Effect<void>
 }
 export class NotificationControl extends Context.Service<NotificationControl, {
   readonly attach: (notifications: Notifications | undefined) => Effect.Effect<void>
@@ -57,14 +66,16 @@ export const NotificationHost = Context.Reference<NotificationHost>('juno/engine
 /**
  * The host for the Electron engine: notifications go to main over the host
  * link, and main says which topic is on screen in a focused window. The
- * Juno chat cannot take the hours-start summary yet (WP14), so the summary
- * keeps its first message for the click, and its id stands in for the chat
- * message.
+ * hours-start summary is offered to the agent, which appends it to the Juno
+ * chat as one message keyed by the summary's id (plan v3 §19.1); the click
+ * opens the chat at it, and keeps the first message for when Juno is off by
+ * then.
  */
 export const hostNotificationHost = Layer.effect(NotificationHost, Effect.gen(function* () {
   const link = yield* HostLink
   const viewing = yield* Ref.make<string | null>(null)
   const firstOf = new Map<string, NotificationSource>()
+  const pending = yield* SubscriptionRef.make<ReadonlyArray<HostSummary>>([])
   const messages = yield* link.messages
   yield* Effect.forkScoped(Stream.runForEach(messages, (message) => message._tag === 'viewing' ? Ref.set(viewing, message.topicId) : Effect.void))
   const host: NotificationHost = {
@@ -80,14 +91,27 @@ export const hostNotificationHost = Layer.effect(NotificationHost, Effect.gen(fu
         }
         yield* link.send({ _tag: 'notify', notification: { id, title, body, target: to } })
       }),
-      summary: ({ id, sources }) => Effect.sync(() => {
+      summary: ({ id, at, title, sources }) => Effect.gen(function* () {
         const first = sources[0]
-        if (first !== undefined) firstOf.set(id, first)
+        if (first === undefined) return id
+        firstOf.set(id, { channelId: first.channelId, ts: first.ts, topicId: first.topicId })
+        const summary: HostSummary = {
+          id, at: new Date(at).getTime(), title,
+          sources: sources.map((source) => ({
+            channelId: HostChannelId.make(source.channelId), ts: HostMessageTs.make(source.ts), place: source.place,
+            ...(source.sender === undefined ? {} : { sender: source.sender }),
+          })),
+        }
+        yield* SubscriptionRef.update(pending, (list) => (list.some((known) => known.id === id) ? list : [...list, summary]))
         return id
       }),
       viewing: (topicId) => Effect.map(Ref.get(viewing), (shown) => shown === topicId),
     },
     badge: (mentions) => link.send({ _tag: 'badge', mentions }),
+    summaries: {
+      pending: SubscriptionRef.changes(pending),
+      taken: (id) => SubscriptionRef.update(pending, (list) => list.filter((known) => known.id !== id)),
+    },
   }
   return host
 }))

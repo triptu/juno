@@ -153,6 +153,8 @@ export const handlers: Handlers = {
     }
   },
 
+  'dnd.info': () => ({ dnd_enabled: false, next_dnd_start_ts: 0, next_dnd_end_ts: 0, snooze_enabled: false }),
+
   'users.prefs.get': (ctx) => ({ prefs: ctx.workspace.prefs }),
 
   'client.getWebSocketURL': (ctx) => ({
@@ -199,8 +201,8 @@ export const handlers: Handlers = {
     const inclusive = args.inclusive ?? false
     const after = tsFromCursor(args.cursor)
     const thread = [root, ...ws.replies(args.channel, args.ts)]
-      .filter((m) => inWindow(m.ts, args.oldest, args.latest, inclusive))
-      .filter((m) => after === undefined || compareTs(m.ts, after) > 0)
+      .filter((m) => m.ts === root.ts || inWindow(m.ts, args.oldest, args.latest, inclusive))
+      .filter((m) => m.ts === root.ts || after === undefined || compareTs(m.ts, after) > 0)
     const limit = args.limit ?? DEFAULT_LIMIT
     const page = thread.slice(0, limit)
     const hasMore = thread.length > limit

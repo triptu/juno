@@ -1,0 +1,122 @@
+[
+  {
+    "tag": "p",
+    "label": "/var/folders/x2/h8x122r93wx5m7t24ccdgdt4",
+    "rect": [
+      554,
+      492,
+      560,
+      23
+    ],
+    "padding": "0px",
+    "radius": "0px",
+    "font": "14.5px/23.2px 400",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "tag": "span",
+    "label": "No backup yet",
+    "rect": [
+      554,
+      517,
+      560,
+      15
+    ],
+    "padding": "0px",
+    "radius": "0px",
+    "font": "12.5px/normal 400",
+    "color": "rgb(112, 110, 102)",
+    "bg": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "tag": "button",
+    "label": "Choose folder",
+    "rect": [
+      1126,
+      501,
+      94,
+      22
+    ],
+    "padding": "0px 8px",
+    "radius": "999px",
+    "font": "12px/normal 500",
+    "color": "rgb(96, 94, 82)",
+    "bg": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "tag": "button",
+    "label": "Export recovery phrase",
+    "rect": [
+      1076,
+      559,
+      144,
+      22
+    ],
+    "padding": "0px 8px",
+    "radius": "999px",
+    "font": "12px/normal 500",
+    "color": "rgb(96, 94, 82)",
+    "bg": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "tag": "p",
+    "label": "This Mac owns Juno’s state.",
+    "rect": [
+      554,
+      703,
+      179,
+      23
+    ],
+    "padding": "0px",
+    "radius": "0px",
+    "font": "14.5px/23.2px 400",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "tag": "span",
+    "label": "Active here",
+    "rect": [
+      1138,
+      704,
+      73,
+      20
+    ],
+    "padding": "0px",
+    "radius": "0px",
+    "font": "14.5px/21.75px 400",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "tag": "button",
+    "label": "Move",
+    "rect": [
+      1172,
+      756,
+      48,
+      22
+    ],
+    "padding": "0px 8px",
+    "radius": "999px",
+    "font": "12px/normal 500",
+    "color": "rgb(96, 94, 82)",
+    "bg": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "tag": "button",
+    "label": "Restore",
+    "rect": [
+      1160,
+      813,
+      60,
+      22
+    ],
+    "padding": "0px 8px",
+    "radius": "999px",
+    "font": "12px/normal 500",
+    "color": "rgb(96, 94, 82)",
+    "bg": "rgba(0, 0, 0, 0)"
+  }
+]

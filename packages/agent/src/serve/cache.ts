@@ -1,7 +1,7 @@
 /** Connection-local revisions: writes and rollbacks invalidate together, including archive edits. */
 import type { Store } from '../store/store'
 
-const tables = ['inbox', 'messages', 'runs', 'run_inputs', 'reactions', 'sources', 'chat_bubbles', 'jobs'] as const
+const tables = ['inbox', 'messages', 'runs', 'run_inputs', 'reactions', 'sources', 'chat_bubbles', 'jobs', 'tool_blocks', 'chat_summaries'] as const
 type Table = typeof tables[number]
 
 export function chatRevisions(store: Store) {

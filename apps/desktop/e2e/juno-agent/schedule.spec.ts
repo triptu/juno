@@ -153,8 +153,7 @@ test('a schedule from a clean run wakes once after a quit past its due time', as
   }
 })
 
-test.fixme('a wake shows under a "Scheduled · …" group label', async ({ juno, running, userData, launch }) => {
-  // serve/chat.ts originOf still labels schedule runs as owner runs.
+test('a wake shows under a "Scheduled · …" group label', async ({ juno, running, userData, launch }) => {
   await ready(juno)
   const chatPane = await openChat(juno)
   await chatPane.send('remind me shortly')
@@ -284,16 +283,32 @@ test.fixme('quiet hours hold the schedule notification only, and the wake still 
   } finally { await next.running.close() }
 })
 
-test.fixme('"Tell me if nobody replies" on a message watches it and a reply ends the watch', async ({ juno, slack }) => {
-  // messageActions.tsx does not yet offer the reply-watch command.
+test('"Tell me if nobody replies" on a message watches it and a reply ends the watch', async ({ juno, slack, model }) => {
   await ready(juno)
+  const requests = model.requests.length
   await juno.sidebar.row(POSTGRES).open()
   await juno.topic.composer.fill('Can someone confirm the cutover?')
   await juno.topic.composer.press('Enter')
   const menu = await juno.topic.chooseInMessageMenu('Can someone confirm the cutover?', 'watch-reply')
   expect(menu.labels).toContain('Tell me if nobody replies')
+  await expect(juno.win.getByRole('status')).toContainText('Watching for a reply until')
+  expect(model.requests).toHaveLength(requests)
   const page = await openPage(juno, 'Scheduled')
   await expect(page.locator('[data-schedule]')).toHaveCount(1)
   slack.as('Leo').replyIn(POSTGRES, 'Cutover is a go')
   await expect(page.getByText('Nothing scheduled')).toBeVisible()
+})
+
+test('Undo on a menu reply watch deletes it without a model run', async ({ juno, model }) => {
+  await ready(juno)
+  const requests = model.requests.length
+  await juno.sidebar.row(POSTGRES).open()
+  await juno.topic.composer.fill('Please confirm the test window.')
+  await juno.topic.composer.press('Enter')
+  await juno.topic.chooseInMessageMenu('Please confirm the test window.', 'watch-reply')
+  await expect(juno.win.getByRole('status')).toContainText('Watching for a reply until')
+  await juno.undoFromToast()
+  const page = await openPage(juno, 'Scheduled')
+  await expect(page.getByText('Nothing scheduled')).toBeVisible()
+  expect(model.requests).toHaveLength(requests)
 })

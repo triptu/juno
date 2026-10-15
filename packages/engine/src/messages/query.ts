@@ -37,9 +37,10 @@ import {
   type Topic,
   type Ts,
   type UserId,
+  type Me,
 } from '@juno/domain'
 import { emojiUnicode, messageBody, plainText, splitEmojiName, type MessageBody, type MessageContent } from '@juno/richtext'
-import { StoreReader, type SqlClient, type SqlError } from '@juno/store'
+import { syncState, StoreReader, type SqlClient, type SqlError } from '@juno/store'
 import type { PendingFile } from '@juno/sync'
 import { uploadsUrl } from '../staging'
 import type { ListRun } from '../protocol/live'
@@ -78,6 +79,7 @@ export interface MessageCache {
   epoch: number
   people: Map<string, Person>
   selfId: string | undefined
+  membership: string
 }
 
 export const makeMessageCache = (): MessageCache => ({
@@ -89,6 +91,7 @@ export const makeMessageCache = (): MessageCache => ({
   epoch: 0,
   people: new Map(),
   selfId: undefined,
+  membership: '',
 })
 
 /** Drops the names and emoji a cache has read, after `users`, `conversations` or `emoji` changed. */
@@ -138,6 +141,8 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
 
     const team = yield* sql<{ self_user_id: string | null }>`SELECT self_user_id FROM team LIMIT 1`
     const selfId = team[0]?.self_user_id ?? undefined
+    const me = (yield* syncState.get<Me>('me')) ?? (selfId === undefined ? undefined : { userId: selfId as UserId })
+    const membership = JSON.stringify(me) ?? ''
 
     // Juno's own messages Slack does not hold yet come after the newest stored one (architecture 5.7).
     const pending = new Map<string, PendingRow>()
@@ -151,7 +156,8 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
     const actions = listed.length === 0 ? emptyIntents : intentsOf(yield* sql.unsafe<ActionRow>(actionsStatement(target.channel).sql, actionsStatement(target.channel).params))
     const rows = actions.size === 0 ? listed : withIntents(listed, actions, target)
 
-    if (cache.selfId !== selfId) {
+    if (cache.selfId !== selfId || cache.membership !== membership) {
+      cache.membership = membership
       cache.selfId = selfId
       cache.rows = new Map()
       cache.bodies = new Map()
@@ -204,7 +210,6 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
         return url ?? undefined
       },
     }
-    const me = selfId === undefined ? undefined : { userId: selfId as UserId }
     const parse = (row: WindowMessage): CachedBody => {
       const content: MessageContent = {
         text: row.text,
@@ -242,11 +247,11 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
     const people = new Map<string, Person>()
     // Grouping starts from the message before the window, so the first row's header does not depend on where the window begins.
     let previous: GroupMessage | undefined =
-      beforeWindow === undefined ? undefined : { senderId: beforeWindow.user_id, body: { blocks: [] }, isThreadRoot: target.kind === 'thread' && beforeWindow.ts === target.threadTs }
+      beforeWindow === undefined ? undefined : { senderId: groupSender(beforeWindow), body: { blocks: [] }, isThreadRoot: target.kind === 'thread' && beforeWindow.ts === target.threadTs }
     for (const row of rows) {
       const body = bodies.get(row.ts)!
       const isRoot = target.kind === 'thread' && row.ts === target.threadTs
-      const group: GroupMessage = { senderId: row.user_id, body: body.body, isThreadRoot: isRoot }
+      const group: GroupMessage = { senderId: groupSender(row), body: body.body, isThreadRoot: isRoot }
       const groupStart = startsGroup(previous, group)
       previous = group
       const intent = intentOf(actions, row)
@@ -276,7 +281,9 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
       nextRows.set(row.ts, { key, row: view })
       out.push(view)
       if (view.senderId !== undefined && !people.has(view.senderId)) {
-        const person = personFrom(view.senderId, cache.users.get(view.senderId), cache.people.get(view.senderId))
+        const person = row.bot_name !== null || row.bot_icon !== null
+          ? personFrom(view.senderId, { id: view.senderId, name: row.bot_name ?? row.user_id, display_name: row.bot_name, real_name: null, avatar_url: row.bot_icon ?? cache.users.get(row.user_id ?? '')?.avatar_url ?? null })
+          : personFrom(view.senderId, cache.users.get(view.senderId), cache.people.get(view.senderId))
         people.set(view.senderId, person)
       }
     }
@@ -390,7 +397,7 @@ function shapeRow(row: WindowMessage, body: CachedBody, input: ShapeInput): Mess
     ts: row.ts,
     at: input.pending === undefined ? tsToMillis(row.ts as Ts) : Number(input.pending.created_at),
     kind,
-    ...(row.user_id === null || kind === 'unloaded' ? {} : { senderId: row.user_id }),
+    ...(row.user_id === null || kind === 'unloaded' ? {} : { senderId: row.bot_name !== null || row.bot_icon !== null ? `bot:${row.channel}:${row.ts}` : row.user_id }),
     fromMe: input.selfId !== undefined && row.user_id === input.selfId,
     body: body.body,
     edited: row.edited_ts !== null && kind === 'message',
@@ -514,12 +521,17 @@ function withReactionIntents(
   return out
 }
 
+const groupSender = (row: WindowMessage): string | null =>
+  row.bot_name !== null || row.bot_icon !== null ? JSON.stringify([row.user_id, row.bot_name, row.bot_icon]) : row.user_id
+
 /** A pending message as the window's other rows are read, from the signed-in user, so it groups and parses like the message it becomes. */
 const pendingMessage = (row: PendingRow, selfId: string | undefined): WindowMessage => ({
   channel: row.channel,
   ts: pendingRowId(row.client_msg_id),
   thread_ts: row.thread_ts,
   user_id: selfId ?? null,
+  bot_name: null,
+  bot_icon: null,
   subtype: null,
   text: row.text,
   blocks_json: row.blocks_json,

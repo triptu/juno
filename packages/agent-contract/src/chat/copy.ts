@@ -86,6 +86,8 @@ export const chatCopy = {
     undo: 'Undo',
   },
   groupLabel: {
+    /** Over the hours-start summary (SPEC 14). It carries no Why this? and no action. */
+    summary: 'Summary',
     why: 'Why this?',
     pauseSchedule: 'Pause schedule',
     muteUpdates: 'Mute updates',
@@ -334,7 +336,7 @@ export const chatCopy = {
         cancel: 'Cancel',
       },
       allowNetwork: 'Allow T3 Code over the local network',
-      allowNetworkNote: 'Only an https address works over the network.',
+      allowNetworkNote: 'Tries this Mac first. Network sign-in may require https.',
     },
     connections: {
       connect: 'Connect',
@@ -342,7 +344,7 @@ export const chatCopy = {
       cancel: 'Cancel',
       disconnect: 'Disconnect',
       remove: 'Remove',
-      signingIn: 'Finish signing in in your browser.',
+      signingIn: 'Your browser is open to finish signing in.',
       add: 'Add a server',
       addSub: 'Any MCP server by its address. Juno signs in if the server asks.',
       name: 'Name',

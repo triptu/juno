@@ -258,4 +258,6 @@ const core3 = [
   'CREATE INDEX inbox_by_state ON inbox (state, seq)',
 ]
 
-export const CORE_MIGRATIONS: MigrationSet = { name: 'core', steps: [core1, core2, core3] }
+export const CORE_MIGRATIONS: MigrationSet = { name: 'core', steps: [core1, core2, core3, [
+  `CREATE TABLE tool_blocks (call_id TEXT PRIMARY KEY, run_id TEXT NOT NULL, at INTEGER NOT NULL) STRICT`,
+]] }

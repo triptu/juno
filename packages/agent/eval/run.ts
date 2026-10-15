@@ -86,13 +86,15 @@ async function main(): Promise<void> {
     for (let n = 1; n <= repeat; n++) {
       console.error(`\n${chat.id}, judged by ${judge.id}${repeat > 1 ? `, run ${n} of ${repeat}` : ''}`)
       const started = Date.now()
+      let cost = 0
+      let unknown = 0
       const results = await runSuite(cases, {
-        backend: () => openRouterBackend(chat, helper, apiKey),
-        judge: () => openRouterJudge({ model: judge.id, apiKey }),
+        backend: () => ({ ...openRouterBackend(chat, helper, apiKey), spent: (amount, unsettled) => { cost += amount; unknown += unsettled } }),
+        judge: () => openRouterJudge({ model: judge.id, apiKey, spent: (amount) => { if (amount === undefined) unknown++; else cost += amount } }),
         timeoutMs: 180_000,
         onCase: progress,
       })
-      const info: RunInfo = { date, commit, mode: 'live', model: chat.id, judge: judge.id, seconds: (Date.now() - started) / 1000 }
+      const info: RunInfo = { date, commit, mode: 'live', cost, unknown, model: chat.id, judge: judge.id, seconds: (Date.now() - started) / 1000 }
       finish(info, results, full)
       if (scratch !== undefined) {
         const file = join(scratch, `${chat.id.replace(/[^\w.-]+/g, '-')}-${n}.transcripts.md`)

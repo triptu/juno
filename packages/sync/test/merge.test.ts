@@ -12,6 +12,17 @@ const event = (at: number) => ({ kind: 'event' as const, eventTs: ts(at) })
 const partial = (at: number) => ({ kind: 'partial' as const, requestedAt: ts(at) })
 
 describe('mergeMessage', () => {
+  it('keeps bot identity through partial and older content, and accepts newer edits', () => {
+    const original = message({ ts: ts(1), bot_id: 'B0TEST', username: 'Build helper', bot_profile: { id: 'B0TEST', icons: { image_72: 'https://example.test/build.png' } }, edited: { ts: ts(3) } })
+    const stored = toMessageRow(C, original)
+    const partial = mergeMessage(stored, message({ ts: ts(1) }), C, { kind: 'partial', requestedAt: ts(4) })
+    expect(partial.row.bot_name).toBe('Build helper')
+    const stale = mergeMessage(stored, { ...original, username: 'Old helper', edited: { ts: ts(2) } }, C, page(5))
+    expect(stale.row.bot_name).toBe('Build helper')
+    const updated = mergeMessage(stored, { ...original, username: 'Release helper', edited: { ts: ts(6) } }, C, event(6))
+    expect(updated.row).toMatchObject({ bot_name: 'Release helper', bot_icon: 'https://example.test/build.png' })
+  })
+
   it('stores a new message and takes reactions from any source', () => {
     const merged = mergeMessage(undefined, message({ ts: ts(1), reactions: [{ name: 'eyes', users: ['U0LEO'], count: 1 }] }), C, page(5))
     expect(merged.changed).toBe(true)

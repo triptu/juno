@@ -3,7 +3,7 @@ import type { Banner, ChatItem, Ending } from '@juno/agent-contract'
 import { defineFixtures, fixture, scene, type FixtureFrame } from '@juno/ui'
 import { noopActions } from './commands'
 import { useFixtureControl } from './fixtures/control'
-import { bubbles, budget, conversation, day, essay, failedSend, jobs, juno, junoReplies, longText, manyCards, messageId, NOW, owner, ownerReplies, reacted, reactions, rightToLeft, scheduled, sourced, status, unusualReactions, withNewDivider } from './fixtures/data'
+import { bubbles, budget, conversation, day, essay, failedSend, jobs, juno, junoReplies, longText, manyCards, messageId, NOW, owner, ownerReplies, reacted, reactions, rightToLeft, scheduled, sourced, status, summary, unusualReactions, withNewDivider } from './fixtures/data'
 import { JunoChatList, type JunoChatListProps } from './JunoChatList'
 
 const noop = () => {}
@@ -85,6 +85,7 @@ export default defineFixtures(
       empty: list([]),
       'new-divider': list(withNewDivider),
       'scheduled-group': list(scheduled),
+      'summary-group': list(summary),
       'jobs-group': list(jobs),
       'more-above': list(conversation, { moreAbove: true }),
     },

@@ -18,6 +18,9 @@
  *
  * - Cards (WP15) sit at the time Juno proposed them, under their run; a
  *   Task card at the time its job started. A card is unread like a bubble.
+ * - An hours-start summary (`chat_summaries`) is one Juno bubble with
+ *   origin `summary` under a "Summary" label, at the time the host made
+ *   it. It has no run: its `runId` is `summary:<id>`.
  *
  * Removed messages leave a "Removed" note in their place. The server adds
  * pin notes and their time-limited Undo after this cached projection.
@@ -40,15 +43,18 @@ import type {
   ReplyTarget,
   RunId,
   SendContext,
+  ScheduleId,
 } from '@juno/agent-contract'
 import type { CardView } from '../actions/cards'
-import { aboutOf } from '@juno/agent-contract'
+import { sessionOf } from '../t3/protocol'
+import { aboutOf, chatCopy, summaryBubbleId } from '@juno/agent-contract'
 import type { Job } from '../jobs/jobs'
 import type { RunState } from '../router/events'
 import { parseOutput } from '../router/output'
 import { resolveSpans, sourceTable, type BubbleSpan } from '../router/sources'
 import type { Store } from '../store/store'
 import { chatRevisions, keyedMemo, memo } from './cache'
+import { summaryBody, type SummaryRow } from './summaries'
 
 const GROUP_GAP_MS = 2 * 60_000
 const PREVIEW_CHARS = 120
@@ -118,6 +124,7 @@ function caches() {
     sourceKeys: memo<Map<string, string>>(),
     endings: keyedMemo<Entry | undefined>(),
     runs: memo<ReadonlyArray<RunRow>>(),
+    summaries: memo<ReadonlyArray<SummaryRow>>(),
     archiveIds: memo<Map<string, ChatMessageId>>(),
     archive: memo<ReadonlyArray<ArchiveRow>>(),
     reactions: memo<ReadonlyArray<ReactionRow>>(),
@@ -148,7 +155,7 @@ export function createChatCache(store: Store, changed: () => void = () => {}) {
   registered.add(invalidateAll)
   invalidators.set(store.db, registered)
   const inputs = (source: ChatSource, revision: ReturnType<typeof revisions>) => [
-    ...revision('inbox', 'messages', 'runs', 'run_inputs', 'sources', 'chat_bubbles', 'jobs'),
+    ...revision('inbox', 'messages', 'runs', 'run_inputs', 'sources', 'chat_bubbles', 'jobs', 'tool_blocks', 'chat_summaries'),
     source.readAt, source.waiting, source.dayOf, new Date().getTimezoneOffset(),
     JSON.stringify(source.jobs), JSON.stringify(source.cards.map((view) => [view.at, view.runId, view.card.id])),
     JSON.stringify(source.live === undefined ? undefined : { ...source.live, status: undefined }),
@@ -335,8 +342,8 @@ function buildItems(source: ChatSource, cache: Caches, revision: ReturnType<Retu
   for (const run of runs) {
     const live = source.live?.runId === run.id ? source.live : undefined
     const job = run.origin === 'report' ? source.jobs.find((candidate) => candidate.id === reportJob(run.opId)) : undefined
-    const origin = cache.origins.get(run.id, [run.origin, run.opId, job?.id, job?.title], () => originOf(run, source.jobs))
-    const originKey = origin._tag === 'job' ? `job:${origin.jobs.map((j) => j.jobId).join(',')}` : origin._tag
+    const origin = cache.origins.get(run.id, [run.origin, run.opId, job?.id, job?.title], () => originOf(run, source.jobs, store))
+    const originKey = origin._tag === 'job' ? `job:${origin.jobs.map((j) => j.jobId).join(',')}` : origin._tag === 'schedule' ? `schedule:${origin.scheduleId}` : origin._tag
     let bubbles: ReadonlyArray<{ id: string; text: string; body: ReadonlyArray<BubbleSpan>; replyTo?: string; at: number }>
     if (live !== undefined) {
       bubbles = live.bubbles.map((b) => ({ ...b, at: source.seen(b.id, Date.now()) }))
@@ -386,6 +393,25 @@ function buildItems(source: ChatSource, cache: Caches, revision: ReturnType<Retu
     }
   }
 
+  const summaries = cache.summaries(revision('chat_summaries'), () => store.db
+    .prepare('SELECT id, at, title, sources FROM chat_summaries ORDER BY at, id')
+    .all() as unknown as ReadonlyArray<SummaryRow>)
+  for (const row of summaries) {
+    const id = summaryBubbleId(row.id)
+    const origin: Origin = { _tag: 'summary', at: row.at }
+    const label = `label:summary:${row.id}`
+    junoEntries.push(cache.entries.get(label, [row.at], () => ({ by: 'line', at: row.at, item: { _tag: 'groupLabel', id: label, origin, text: chatCopy.groupLabel.summary } })))
+    const reactions = reactionsOf('bubble', id)
+    const body = summaryBody(row)
+    bubbleTexts.set(id, body.map((inline) => inline.text).join(''))
+    junoEntries.push(cache.entries.get(`bubble:${id}`, [row.at, row.title, row.sources, JSON.stringify(reactions), row.at > source.readAt], () => ({
+      by: 'juno',
+      at: row.at,
+      originKey: `summary:${row.id}`,
+      item: { _tag: 'juno', id, runId: `summary:${row.id}` as RunId, body, at: row.at, origin, reactions, unread: row.at > source.readAt },
+    })))
+  }
+
   for (const op of ops) {
     if (op.kind === 'retry') continue
     const id = archiveIds.get(op.opId)
@@ -414,6 +440,9 @@ function buildItems(source: ChatSource, cache: Caches, revision: ReturnType<Retu
     })))
   }
   entries.push(...junoEntries)
+  for (const row of store.db.prepare('SELECT call_id, at FROM tool_blocks').all()) {
+    entries.push({ by: 'line', at: Number(row.at), item: { _tag: 'note', id: `blocked:${String(row.call_id)}` as ChatMessageId, kind: 'secretBlocked' } })
+  }
   for (const id of removed.bubbles) {
     const shown = store.db.prepare('SELECT at FROM chat_bubbles WHERE id = ?').get(id) as { at: number } | undefined
     if (shown !== undefined) entries.push({ by: 'line', at: shown.at, item: { _tag: 'note', id: `removed:${id}` as ChatMessageId, kind: 'removed' } })
@@ -428,7 +457,14 @@ function buildItems(source: ChatSource, cache: Caches, revision: ReturnType<Retu
   ))
   for (const job of source.jobs) {
     const at = started.get(job.id) ?? job.stepAt
+    const session = job.kind === 't3' ? sessionOf(job.task) : undefined
+    const pr = session?.pullRequest
+    const open = session === undefined ? {} : { open: { _tag: 'url' as const,
+      url: job.phase === 'done' && pr ? pr.url : `t3-thread://v1/${session.threadId}`,
+      label: job.phase === 'done' && pr ? `Open PR ${pr.number}` : 'Open',
+    } }
     const card = {
+      ...open,
       _tag: 'task' as const, id: `task:${job.id}` as CardId, jobId: job.id as JobId, kind: job.kind, title: job.title, where: job.place,
       phase: job.phase === 'unknown' ? ('failed' as const) : job.phase, ...(job.state === null ? {} : { state: job.state }),
     }
@@ -476,8 +512,13 @@ const inlineOf = (span: BubbleSpan): JunoInline =>
 
 const reportJob = (opId: string) => /^report:([^:]+):/.exec(opId)?.[1]
 
-/** What started a run, as the chat labels it. Schedules come with WP19; until then a wake shows as Juno's own. */
-function originOf(run: RunRow, jobs: ReadonlyArray<Job>): Origin {
+/** What started a run, using the persisted occurrence for a schedule wake. */
+function originOf(run: RunRow, jobs: ReadonlyArray<Job>, store: Store): Origin {
+  if (run.origin === 'wake') {
+    const row = store.db.prepare(`SELECT s.id, json_extract(s.definition, '$.what') AS name
+      FROM schedules s JOIN schedule_occurrences o ON o.schedule_id = s.id WHERE o.op_id = ?`).get(run.opId)
+    if (typeof row?.id === 'string' && typeof row.name === 'string') return { _tag: 'schedule', scheduleId: row.id as ScheduleId, name: row.name }
+  }
   if (run.origin !== 'report') return { _tag: 'owner' }
   const jobId = reportJob(run.opId)
   const job = jobs.find((j) => j.id === jobId)
@@ -493,6 +534,8 @@ function labelOf(origin: Origin, jobs: ReadonlyArray<Job>): string {
     }
     case 'schedule':
       return `Scheduled · ${origin.name}`
+    case 'summary':
+      return chatCopy.groupLabel.summary
     case 'owner':
       return ''
   }

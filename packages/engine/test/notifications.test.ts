@@ -193,3 +193,20 @@ it('consumes both socket inputs, observes manual presence and responds to prefs 
   await engine.handle.setPresence('active')
   expect(await engine.handle.currentPresence()).toBe('active')
 })
+
+it('notifies for your user group but not another group', async () => {
+  const record = recorder()
+  const engine = await bootedEngine(engines, { notifications: { notifier: record.notifier }, initial: (fake) => {
+    fake.setSelfUsergroups({ ids: ['S0PLATFORM'] })
+    return fake.signIn()
+  } })
+  await runCommand(engine.registry, prefsSet, { key: 'aiAssist', value: false })
+  const minute = localTime(Date.now()).minutes
+  await runCommand(engine.registry, prefsSet, { key: 'notifications', value: Schema.decodeUnknownSync(Schema.Json)({
+    ...defaultNotificationSettings, notificationHours: { days: [0, 1, 2, 3, 4, 5, 6], from: (minute + 1380) % 1440, to: (minute + 60) % 1440 },
+  }) })
+  const other = engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0MAYA', text: '<!subteam^S0OTHER|@other> Review this.' })
+  const own = engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0MAYA', text: '<!subteam^S0PLATFORM|@platform> Review this.' })
+  await waitFor(() => record.shown.some((item) => item.target.kind === 'message' && item.target.source.ts === own.ts) ? true : undefined)
+  expect(record.shown.some((item) => item.target.kind === 'message' && item.target.source.ts === other.ts)).toBe(false)
+})

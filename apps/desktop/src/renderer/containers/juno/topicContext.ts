@@ -5,8 +5,10 @@
  * and the range only when a message is sent, so the topic's list does no
  * extra work on scroll.
  */
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { MAX_SELECTION_CHARS, type Selection } from '@juno/agent-contract'
+import { junoQuoteAtom, registry } from '@juno/state'
+import { useAtomValue } from '@juno/state/react'
 
 const ROW = '[data-message-row]'
 
@@ -25,15 +27,33 @@ function senderOf(row: Element): string | undefined {
   return undefined
 }
 
+/** The whole of one message in the visible topic, with its sender, as a quote: Tell Juno in the why popover (SPEC 14). */
+export function messageQuote(ts: string): Selection | undefined {
+  const row = visibleTopicView()?.querySelector(`${ROW}[data-message-row="${CSS.escape(ts)}"]`)
+  const text = row?.querySelector('[data-msg-text]')?.textContent?.trim().slice(0, MAX_SELECTION_CHARS)
+  if (row === null || row === undefined || text === undefined || text === '') return undefined
+  const sender = senderOf(row)
+  return { text, ...(sender === undefined ? {} : { sender }) }
+}
+
 /**
  * The owner's selection in the topic's messages. A new selection replaces
  * the last; a selection that collapses (a click into the panel's composer)
  * keeps it, so it stays until sent or removed. A selection made before the
- * panel opened is taken when it opens. A new topic starts empty.
+ * panel opened is taken when it opens. A new topic starts empty. Tell Juno's
+ * quote of a message in this topic (`junoQuoteAtom`) replaces it the same way.
  */
 export function useTopicSelection(topicId: string | undefined): readonly [Selection | undefined, () => void] {
   // Kept with the topic it came from, so another topic starts with none.
   const [held, setHeld] = useState<{ readonly topicId: string; readonly selection: Selection } | undefined>(undefined)
+  const quote = useAtomValue(junoQuoteAtom)
+  const quoteTaken = useRef(0)
+  useEffect(() => {
+    if (quote === undefined || quote.n <= quoteTaken.current || quote.topicId !== topicId) return
+    quoteTaken.current = quote.n
+    registry.set(junoQuoteAtom, undefined)
+    setHeld({ topicId, selection: quote.selection })
+  }, [quote, topicId])
   useEffect(() => {
     if (topicId === undefined) return
     const onChange = () => {

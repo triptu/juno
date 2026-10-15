@@ -70,6 +70,7 @@ describe('composer upload flow', () => {
       is_public: true,
       original_w: 1200,
       original_h: 500,
+      thumb_tiny: expect.any(String),
       thumb_360_w: 360,
       thumb_360_h: 150,
       thumb_480_w: 480,

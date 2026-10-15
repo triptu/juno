@@ -11,7 +11,7 @@ const Input = Schema.Struct({ topicIds: Schema.Array(Schema.String).check(Schema
 export function resolveTool(context: ProposeContext & { readonly host: ActionHost }) {
   return defineTool<typeof Input.Type>({
     name: 'topics_resolve',
-    description: 'Propose resolving one to twenty topics in Juno. Always shows a Resolve card and waits for the owner to click. Resolving hides the topics and marks them read, with Undo. It does not unfollow threads or send messages to Slack.',
+    description: 'Offer to resolve one to twenty finished topics in Juno by proposing a Resolve card. The card is the offer: proposing it does not resolve anything or require a separate yes in chat. Always shows a Resolve card and waits for the owner to click. Resolving hides the topics and marks them read, with Undo. It does not unfollow threads or send messages to Slack.',
     parameters: { type: 'object', properties: { topicIds: { type: 'array', items: { type: 'string' }, minItems: 1, maxItems: 20 } }, required: ['topicIds'], additionalProperties: false },
     replay: 'safe', status: () => 'Preparing to resolve topics',
     run: async (input, call) => {

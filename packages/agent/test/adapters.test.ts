@@ -397,6 +397,7 @@ it('lets a new Stop click try again after a lost interrupt, and never throws fro
   if (!job) throw new Error('No job')
   server.loseNextCall('t3_thread_interrupt')
   await turns.jobs.stop(job.id, 'stop-1')
+  expect(turns.store.db.prepare("SELECT op_id FROM approvals WHERE op_id = 'stop-1'").all()).toEqual([{ op_id: 'stop-1' }])
   expect(turns.jobs.list()[0]?.phase).not.toBe('stopped')
   await manager.connect('t3')
   // The same click again is the same click: nothing more is sent.
@@ -474,9 +475,11 @@ it('makes a read the code adds to the T3 preset Read for an install that already
   expect(current.tool('t3', read.name).tier).toBe(0)
   // An install whose stored list already names it, discovered before that: the migration makes it Read.
   const path = join(dir, 'b.sqlite')
-  const before = await discoverOld(path, [{ ...MCP_MIGRATIONS, steps: MCP_MIGRATIONS.steps.slice(0, 1) }])
-  before.db.prepare("UPDATE mcp_connections SET config = json_set(config, '$.allowlist', json(?)) WHERE id = 't3'").run(JSON.stringify(preset.allowlist))
-  before.db.close()
+  const before = openDatabase(path, [{ ...MCP_MIGRATIONS, steps: MCP_MIGRATIONS.steps.slice(0, 1) }])
+  before.prepare('INSERT INTO mcp_connections (id, config, epoch, discovered) VALUES (?, ?, ?, ?)').run('t3', JSON.stringify(preset), 'old', 1)
+  const oldTool = current.tool('t3', read.name)
+  before.prepare('INSERT INTO mcp_tools VALUES (?, ?, ?, ?, ?, ?, ?)').run('t3', read.name, oldTool.definition, oldTool.hash, 3, 0, 1)
+  before.close()
   const after = openDatabase(path, [MCP_MIGRATIONS])
   cleanup.push(async () => { after.close() })
   expect(after.prepare("SELECT tier FROM mcp_tools WHERE connection_id = 't3' AND name = ?").get(read.name)).toEqual({ tier: 0 })

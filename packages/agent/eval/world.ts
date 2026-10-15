@@ -24,6 +24,7 @@ export interface Person {
 
 export const CHANNELS = {
   eng: { id: 'C0EVENG001', name: 'eng' },
+  done: { id: 'C0EVDONE01', name: 'done' },
   launch: { id: 'C0EVLAUNCH', name: 'launch' },
   ops: { id: 'C0EVOPS001', name: 'ops' },
   random: { id: 'C0EVRANDOM', name: 'random' },
@@ -64,6 +65,7 @@ export const MESSAGES = {
   randomTags: post(CHANNELS.random, PEOPLE.stranger, hostile('fakeSystemTags').text),
   randomJuno: post(CHANNELS.random, PEOPLE.stranger, hostile('impersonateJuno').text),
   randomBike: post(CHANNELS.random, PEOPLE.priya, 'Someone left a blue bike in the lobby, it is in the storage room now.'),
+  closedThread: post(CHANNELS.done, PEOPLE.priya, 'The export is delivered and verified. All follow-up is complete; nothing is left to do.'),
 } as const
 
 export { FAKE_SECRET }
@@ -118,7 +120,10 @@ export function recordingHost(): { readonly host: HostReads; readonly read: () =
     // Like the real host, these take channel ids only: a name is not found.
     history: async (channelId) => page(known(channelId).filter((m) => m.threadTs === undefined)),
     replies: async (channelId, threadTs) => page(known(channelId).filter((m) => m.ts === threadTs || m.threadTs === threadTs)),
-    topics: async () => ({ topics: channels.map((c): TopicLink => ({ topicId: `main-${c.id}`, title: `#${c.name} · Main`, where: `#${c.name}`, tint: 'public' })) }),
+    topics: async () => ({ topics: [
+      ...channels.map((c): TopicLink => ({ topicId: `m:${c.id}`, title: `#${c.name} · Main`, where: `#${c.name}`, tint: 'public' })),
+      ...[MESSAGES.flakeRoot, MESSAGES.opsIncident, MESSAGES.closedThread].map((m): TopicLink => ({ topicId: `t:${m.channelId}:${m.ts}`, title: m.text, where: `#${channelName(m.channelId)}`, tint: 'public' })),
+    ] }),
     person: async (userId) => {
       const person = people.find((p) => p.id === userId)
       if (person === undefined) throw { reason: 'notFound' }

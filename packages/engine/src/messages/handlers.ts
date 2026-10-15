@@ -113,7 +113,7 @@ export const MessagesHandlers = MessagesRoutes.toLayer(
           before: Math.max(0, payload.before ?? MESSAGE_WINDOW_BEFORE),
           limit: Math.max(1, Math.min(MESSAGE_WINDOW_MAX, payload.range.limit)),
         }
-        const keys: InvalidationKeys = { messages: [payload.id], users: [], conversations: [], emoji: [], topic_overlay: [], team: [] }
+        const keys: InvalidationKeys = { messages: [payload.id], users: [], conversations: [], emoji: [], topic_overlay: [], team: [], sync_state: [] }
         const setup = Effect.gen(function* () {
           const cache = makeMessageCache()
           const invalidation = yield* Invalidation

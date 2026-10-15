@@ -119,9 +119,7 @@ test('a pin from the owner\'s words is edited, then goes with its source, whose 
   await expect(page).not.toContainText(ASKED)
 })
 
-test.fixme('a message removed from a card does not come back at the bottom of the chat', async ({ juno }) => {
-  // packages/state/src/agent/chat.ts:133-135 adds back every sent message the page has no owner item for, and a removed
-  // message is a note, so its text shows again as a new bubble at the bottom until the 60 s prune at :271.
+test('a message removed from a card does not come back at the bottom of the chat', async ({ juno }) => {
   await ready(juno)
   const chat = await openChat(juno)
   await chat.send(ASKED)
@@ -134,9 +132,7 @@ test.fixme('a message removed from a card does not come back at the bottom of th
   await expect(chat.ownerBubble(ASKED)).toHaveCount(0)
 })
 
-test.fixme('Remember shows "Remembered · Undo" in the chat, and Undo drops the pin', async ({ juno }) => {
-  // packages/agent/src/serve/chat.ts:393 emits only "removed" notes (the router's "remembered" event at
-  // packages/agent/src/router/open.ts:356 has no consumer), and apps/desktop/src/renderer/containers/juno/JunoChat.tsx:377 makes Undo a no-op.
+test('Remember shows "Remembered · Undo" in the chat, and Undo drops the pin', async ({ juno }) => {
   await ready(juno)
   const chat = await openChat(juno)
   await chat.send(ASKED)
@@ -152,8 +148,7 @@ test.fixme('Remember shows "Remembered · Undo" in the chat, and Undo drops the 
   await expect(page.getByText('Nothing pinned yet')).toBeVisible()
 })
 
-test.fixme('Remember this and Remove in an owner message\'s menu pin it and remove it with the pin', async ({ juno }) => {
-  // apps/desktop/src/renderer/containers/juno/JunoChat.tsx:470,472 shows both menu items disabled.
+test('Remember this and Remove in an owner message\'s menu pin it and remove it with the pin', async ({ juno }) => {
   await ready(juno)
   let chat = await openChat(juno)
   const message = `My notes: ${FACT}. Ask the owner before changing it.`

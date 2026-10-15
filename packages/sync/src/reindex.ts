@@ -198,9 +198,9 @@ const reindexOne = (id: string, options: ReindexOptions): Effect.Effect<boolean,
     }
     const rootText = root !== undefined && root.deleted === 0 && root.text !== '' ? root.text.slice(0, ROOT_TEXT_CHARS) : undefined
     const preview: StoredPreview = {
-      sender: indexed.preview?.sender ?? '',
+      sender: latest?.bot_name ?? indexed.preview?.sender ?? '',
       text: indexed.preview?.text ?? '',
-      ...(latest?.user_id === null || latest?.user_id === undefined ? {} : { senderId: latest.user_id }),
+      ...(latest?.bot_name != null || latest?.user_id === null || latest?.user_id === undefined ? {} : { senderId: latest.user_id }),
       ...(rootText === undefined ? {} : { rootText }),
     }
     const next: TopicIndexRow = {

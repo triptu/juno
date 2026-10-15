@@ -296,14 +296,20 @@ export function openPreferences(options: OpenOptions = {}): void {
 const MESSAGE_TOP = 80
 
 /**
- * Opens a topic at one message, as a clicked notification does: a fresh
- * open lands with that message near the top, taking the window around it
- * when it is older than the first window. A tab that already shows the
- * topic is focused as it is. With `flash`, the message flashes once shown.
+ * Opens a topic at one message, as a clicked notification or a Juno source
+ * link does: a fresh open lands with that message near the top, taking the
+ * window around it when it is older than the first window. A tab that
+ * already shows the topic is focused, and its window moves to the message
+ * when the message is not in it. With `flash`, the topic scrolls to the
+ * message once shown (letting go of the bottom) and flashes it.
  */
 export function openTopicAt(id: string, ts: string, options: OpenOptions & { readonly flash?: boolean } = {}): void {
   if (options.flash === true) flashMessage(registry, id, ts)
-  if (tabShowing(registry.get(tabsAtom), id) !== undefined) return openTopic(id)
+  if (tabShowing(registry.get(tabsAtom), id) !== undefined) {
+    const list = registry.get(messageListAtom(id))
+    if (list.ready && !list.order.includes(ts)) registry.set(messageWindowSpecAtom(id), { anchor: ts, before: MESSAGE_WINDOW_BEFORE, limit: MESSAGE_WINDOW_DEFAULT })
+    return openTopic(id)
+  }
   openTopicFresh(id, options.newTab === true ? { newTab: true } : {}, ts)
   registry.set(scrollSnapshotAtom(id), { anchorKey: ts, offset: MESSAGE_TOP })
 }

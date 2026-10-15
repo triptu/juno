@@ -155,10 +155,15 @@ export const queryConversations = Effect.fn('newChat.conversations')(function* (
           people.map((person) => person.id),
         )
   const channels = yield* sql.unsafe<ConversationRow>(
-    `SELECT ${CONVERSATION_COLUMNS} FROM channels_fts f
-      JOIN conversations c ON c.rowid = f.rowid LEFT JOIN ignored_channels g ON g.channel = c.id
-      WHERE channels_fts MATCH ? AND c.kind != 'im' AND c.is_member = 1 AND g.channel IS NULL ORDER BY f.rank, c.id LIMIT ?`,
-    [query, PICK_LIMIT],
+    `SELECT ${CONVERSATION_COLUMNS} FROM conversations c
+      LEFT JOIN ignored_channels g ON g.channel = c.id
+      WHERE c.kind != 'im' AND c.is_member = 1 AND g.channel IS NULL AND (
+        c.rowid IN (SELECT rowid FROM channels_fts WHERE channels_fts MATCH ?)
+        OR (c.kind = 'mpim' AND EXISTS (
+          SELECT 1 FROM json_each(c.member_ids_json) member JOIN users u ON u.id = member.value
+          WHERE u.id != ? AND u.rowid IN (SELECT rowid FROM people_fts WHERE people_fts MATCH ?)
+        ))) ORDER BY c.id LIMIT ?`,
+    [query, selfId ?? '', query, PICK_LIMIT],
   )
   const users = yield* readUsers(sql, new Set([...peopleOf(channels), ...people.map((person) => person.id)]))
   for (const person of people) users.set(person.id, person)

@@ -12,6 +12,8 @@ export type { ConversationKind, TopicKind }
 export type Flag = 0 | 1
 
 export interface MessageRow {
+  readonly bot_name: string | null
+  readonly bot_icon: string | null
   readonly channel: string
   readonly ts: string
   readonly thread_ts: string | null

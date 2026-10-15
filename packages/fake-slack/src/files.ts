@@ -4,6 +4,7 @@
  * thumbnail sizes Slack would make. Thumbnail urls serve the original bytes.
  */
 import type { File } from '@juno/slack-schema'
+import { samplePng } from './samples.ts'
 import type { StoredFile } from './state.ts'
 
 interface FileType {
@@ -110,7 +111,7 @@ const SIZED_THUMBS = [360, 480, 720, 800, 960, 1024] as const
  * before it. Each fits its square box and is never larger than the original.
  */
 function thumbs(url: string, width: number, height: number): Partial<File> {
-  const out: Record<string, string | number> = {}
+  const out: Record<string, string | number> = { thumb_tiny: samplePng(1, 1).toString('base64') }
   for (const size of SQUARE_THUMBS) out[`thumb_${size}`] = `${url}?thumb=${size}`
   const long = Math.max(width, height)
   SIZED_THUMBS.forEach((size, index) => {

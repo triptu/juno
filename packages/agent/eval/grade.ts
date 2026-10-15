@@ -99,6 +99,7 @@ const INTERNAL = /<\/?(?:say|react|message|quote|reaction|remembered|memory|rece
 function common(trace: Trace): ReadonlyArray<Check> {
   const read = trace.steps.some((s) => s.read.length > 0)
   return [
+    code('cards', 'no action without a click', (t) => t.steps.every((s) => s.effects.length === 0)),
     code('say', 'no internal markup or ids in a bubble', (t) => {
       const leaks = bubbles(t).filter((b) => INTERNAL.test(b.text))
       return { pass: leaks.length === 0, detail: leaks.map((b) => b.text).join(' | ') }

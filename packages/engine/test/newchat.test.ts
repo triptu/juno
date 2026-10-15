@@ -44,6 +44,16 @@ describe('New chat', () => {
     expect(eng.channels).toContainEqual(expect.objectContaining({ key: 'C0ENG', name: 'eng', kind: 'public', tint: 'public' }))
   })
 
+  it('finds group DMs by their members and shows member names', async () => {
+    const engine = await bootedEngine(engines)
+    for (const name of ['maya', 'leo']) {
+      const result = await conversations(engine, name)
+      expect(result.channels).toContainEqual(expect.objectContaining({
+        key: 'G0MAYALEO', kind: 'mpim', name: 'Maya, Leo',
+      }))
+    }
+  })
+
   it('lists a channel’s threads, and recent threads everywhere with their conversation', async () => {
     const engine = await bootedEngine(engines)
     const inEng = await threads(engine, { channel: 'C0ENG', query: '' }, (rows) => rows.length > 0)
