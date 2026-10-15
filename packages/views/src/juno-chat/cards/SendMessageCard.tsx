@@ -134,7 +134,7 @@ const styles = stylex.create({
   sentText: {
     boxSizing: 'border-box',
     margin: 0,
-    minHeight: `calc(2 * ${text['--text-body-size']} * ${text['--text-body-small-leading']} + 2 * ${spacing['--space-2']} + 2px)`,
+    minHeight: `calc(2 * ${text['--text-body-size']} * ${text['--text-body-small-leading']} + 2 * ${spacing['--space-2']} + ${spacing['--space-0-5']})`,
     fontFamily: text['--text-body-family'],
     fontSize: text['--text-body-size'],
     fontWeight: text['--text-body-weight'],

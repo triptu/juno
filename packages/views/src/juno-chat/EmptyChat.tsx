@@ -1,6 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
 import { chatCopy } from '@juno/agent-contract'
-import { accent, colors, motion, radii, sizes, spacing, text } from '@juno/tokens/tokens.stylex'
+import { accent, colors, motion, radii, sizes, spacing, text, layout } from '@juno/tokens/tokens.stylex'
 import { Illustration, Text } from '@juno/ui'
 
 export interface EmptyChatProps {
@@ -63,7 +63,7 @@ const styles = stylex.create({
     display: 'block',
   },
   body: {
-    maxWidth: '520px',
+    maxWidth: layout['--chat-empty-width'],
     textWrap: 'pretty',
   },
   pills: {

@@ -243,7 +243,7 @@ export const chipVariants = stylex.create({
   soft: {
     color: colors['--foreground-subtle'],
     backgroundColor: accent['--hl-soft'],
-    boxShadow: `inset 0 0 0 1px ${colors['--border-strong']}`,
+    boxShadow: `inset 0 0 0 1px ${colors['--border-strong']}`, // tokens-allow: The inset ring is a 1px hairline.
   },
   accent: {
     color: accent['--hl-fg'],

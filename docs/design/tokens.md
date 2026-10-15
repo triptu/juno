@@ -274,6 +274,7 @@ Line-height tokens: `--leading-title 1.3`, `--leading-card 1.35`, `--leading-pre
 
 | Token | px | Typical use |
 | --- | --- | --- |
+| `--space-pixel` | 1 | Fine padding and alignment |
 | `--space-0-5` | 2 | Gaps between icon buttons, tab gap, chat-row gap, toolbar padding |
 | `--space-1` | 4 | Reaction gap, tag gap, hint padding |
 | `--space-1-5` | 6 | Card-style row gap, popover padding, inline gaps |
@@ -301,6 +302,7 @@ Odd values the prototype uses once (3, 5, 9, 18) are component-local; keep them 
 
 | Token | px | Use |
 | --- | --- | --- |
+| `--radius-inline` | 2 | Inline link focus corners |
 | `--radius-xs` | 4 | Kbd, tiny close buttons, Mark read |
 | `--radius-sm` | 5 | Dismiss buttons, segmented-control segment, 18–20px channel tiles |
 | `--radius-md` | 6 | Menu items, small buttons (28), quote block, thread link, 24px channel tiles |
@@ -519,3 +521,15 @@ Apply these when porting; the prototype values are listed so no one copies them 
 | Lucide outline icons | Phosphor, weight by size, fill for active (`friendly-layer.md` §2) |
 | Radius 6 tags, chips, pills and reactions | Pills (`--radius-tag`, `--radius-pill`); rows and tiles 16, cards 20, nav 12, composer 20 (a pill at one line), 32px+ buttons pills, toast 14 |
 | No entrances; everything 150ms | Entrances 240ms, exits 150ms, pops 220ms with a spring; rows, tabs and typing still never animate |
+
+### Inline and empty-chat measurements
+
+| Token | Value | Use |
+| --- | --- | --- |
+| `--inline-em` | 1em | Inline checkbox size and vertical divider minimum |
+| `--link-underline-offset` | 0.12em | Rich-text link underline |
+| `--chat-empty-width` | 520px | Empty chat and missing-provider content |
+
+Raw zero, percentages and 1px border/outline hairlines are allowed in StyleX.
+Other literal lengths and colours require tokens, or a trailing
+`// tokens-allow: reason` for geometry such as border overlap or pixel rounding.
