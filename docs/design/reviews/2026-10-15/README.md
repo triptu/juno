@@ -141,7 +141,7 @@ Missing scenarios for today's surfaces, to add under `apps/desktop/e2e/feel/`:
 
 ## Verification
 
-- `pnpm affected` after the first six fixes: typecheck, lint, `test:gallery` and `test:desktop` passed (119 passed, 24 skipped). Re-run after the Page fix: see the report.
+- `pnpm affected` after the first six fixes: typecheck, lint, `test:gallery` and `test:desktop` passed (119 passed, 24 skipped). Run again after the Page fix and after merging main (`bd46339d`): all four passed.
 - `pnpm build` passed after each fix; the bundle stays under budget.
 - The after shots were taken with the same harness, and the numbers in findings 3, 4 and 6 come from `harness/out-after/`.
 - Not verified: finding 9 in a focused window; the `tabs.feel.ts` scenario, whose precondition failed.
