@@ -95,10 +95,10 @@ test('adds a server, signs in, configures its tools, uses a read in chat, turns 
   await expect(row).toHaveAttribute('data-connection', 'ready', { timeout: 20_000 })
   expect(mcp.oauth.stats()).toMatchObject({ registrations: 1, exchanges: 1 })
 
-  // Configure lists every tool across the server's pages, each on, the reads marked Read.
+  // Configure lists every tool across the server's pages, each on; the server marks the lookups read-only.
   const sheet = await configure(juno, row)
   for (const tool of ['search_meetings', 'get_account', 'add_material', 'update_routine']) await expect(sheet.locator(`[data-tool="${tool}"]`)).toHaveAttribute('data-tool-enabled', 'true')
-  await expect(sheet.locator('[data-tool="search_meetings"]')).toHaveAttribute('data-tool-review', 'read')
+  await expect(sheet.locator('[data-tool="search_meetings"]')).toHaveAttribute('data-tool-read-only', 'true')
   await expect(sheet.locator('[data-tool="add_material"]')).toHaveAttribute('data-tool-review', 'auto')
 
   // A read runs with no click, and Juno answers from its result.

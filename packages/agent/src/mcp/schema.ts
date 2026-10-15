@@ -22,5 +22,10 @@ export const MCP_MIGRATIONS: MigrationSet = {
     "ALTER TABLE mcp_connections ADD COLUMN review TEXT NOT NULL DEFAULT 'auto' CHECK(review IN ('auto','always','never'))",
     // The authority for a connection call the review let run with no click: one row per call, bound to its card.
     'CREATE TABLE mcp_reviews (id TEXT PRIMARY KEY, card_id TEXT NOT NULL UNIQUE, source_op TEXT NOT NULL, at INTEGER NOT NULL) STRICT',
+  ], [
+    // A tool that changed, or appeared after the owner chose Never ask for its connection, has its own
+    // Auto until the owner sets a rule again. Tools that changed before this are treated the same.
+    'ALTER TABLE mcp_tools ADD COLUMN fresh INTEGER NOT NULL DEFAULT 0',
+    "UPDATE mcp_tools SET fresh = 1 WHERE changed = 1 AND review = 'auto'",
   ]],
 }

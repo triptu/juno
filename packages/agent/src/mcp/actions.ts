@@ -4,7 +4,7 @@ import type { Executor, ExecutorResult } from '../actions/executor'
 import { memoryGen } from '../actions/cards'
 import { uuidv7 } from '../store/store'
 import type { McpManagerApi } from './manager'
-import { denied, destructiveArguments } from './types'
+import { McpError, denied, destructiveArguments, forbidden } from './types'
 import { json, parseObject, validateArguments } from './catalogue'
 import { notionCheck, notionPreconditions, notionReconcile } from './notion'
 
@@ -34,7 +34,7 @@ export async function runWrite(manager: McpManagerApi, id: string, name: string,
   try {
     // Recheck after asynchronous preconditions, before opening the transport.
     if (identity(manager, id, payload) !== 'valid' || manager.tool(id, name).hash !== payload.schema_hash) return { result: { _tag: 'failed', detail: 'The connection or tool changed.' } }
-    const value = await manager.invoke(id, name, payload.args, true)
+    const value = await manager.invoke(id, name, payload.args, 'write')
     // MCP isError is not proof that a server made no partial change.
     return { value, result: value.isError ? { _tag: 'unknown', detail: 'The server reported an error.' } : { _tag: 'done', receipt: { confirmed: true } } }
   } catch { return { result: { _tag: 'unknown', detail: 'The server did not confirm the change.' } } }
@@ -90,6 +90,7 @@ export async function changeCard(manager: McpManagerApi, id: string, name: strin
   const tool = manager.tool(id, name)
   const parsed = parseObject(args)
   validateArguments(tool.definition, parsed)
+  if (destructiveArguments(parsed, forbidden)) throw new McpError({ reason: 'forbidden', message: 'Juno does not merge, buy or force-push.' })
   await manager.checkSecrets(parsed)
   const preconditions = await notionPreconditions(manager, id, name, parsed)
   return Schema.decodeUnknownSync(CardPayload)({

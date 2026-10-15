@@ -56,6 +56,10 @@ export const actionCases = [
   ['neverTaint', 'untrustedNeverAuthorizes'],
   ['reviewFailure', 'reviewGated'],
   ['alwaysAsk', 'reviewGated'],
+  ['hintTainted', 'reviewGated'],
+  ['hintAlways', 'reviewGated'],
+  ['freshNever', 'reviewGated'],
+  ['ruleDuringReview', 'reviewGated'],
 ]
 
 export const recoveryCases = [

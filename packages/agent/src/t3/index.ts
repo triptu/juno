@@ -41,7 +41,7 @@ export function createT3Adapter(manager: McpManagerApi) {
     run: async (call) => {
       if (!bound || await check(call.payload) !== 'valid') return { _tag: 'failed', detail: 'T3 Code or its launch tool changed. Ask for a new card.' }
       try {
-        const result = launched(content(await manager.invoke('t3', LAUNCH, call.payload.args, true)))
+        const result = launched(content(await manager.invoke('t3', LAUNCH, call.payload.args, 'write')))
         const job = attach(call, result.threadId, true)
         if (!job) return { _tag: 'unknown', detail: 'The session started but its card is unavailable.' }
         return { _tag: 'done', receipt: { threadId: result.threadId, jobId: job.id } }

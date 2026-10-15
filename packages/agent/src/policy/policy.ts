@@ -102,15 +102,16 @@ export function floorRisk(review: Review, destructive: boolean): Review {
 export const needsReview = (rule: ReviewRule, clean: boolean): boolean => rule === 'auto' || (rule === 'never' && !clean)
 
 /** Which fixed line says why (agent-contract `chatCopy.card.change.review`). */
-export type ReviewLine = 'always' | 'failed' | 'notAsked' | 'untrusted' | 'implied' | 'delete' | 'send' | 'write' | 'ranExplicit' | 'ranNever'
+export type ReviewLine = 'always' | 'failed' | 'notAsked' | 'untrusted' | 'implied' | 'delete' | 'send' | 'write' | 'ranExplicit' | 'ranNever' | 'ruleChanged'
 
 /**
  * Run a connection call with no click, or show its card (spec `reviewAllows`):
  *
  * - Always ask: a card.
  * - Never ask: runs in a clean run; in a run that read untrusted content it
- *   runs only if the owner's words at least implied it. Untrusted text alone
- *   never authorizes, under any rule.
+ *   runs only if the owner's words at least implied it and the review found
+ *   it can be undone. Untrusted text alone never authorizes, under any rule.
+ *   A delete never gets here: its rule is always Always ask.
  * - Auto: runs only when the owner asked for exactly this and it can be undone.
  * - A failed review asks.
  */
@@ -119,7 +120,8 @@ export function reviewDecision(rule: ReviewRule, clean: boolean, review: Review)
   if (rule === 'never') {
     if (clean) return { _tag: 'run', line: 'ranNever' }
     if (review._tag !== 'answered') return { _tag: 'card', line: 'failed' }
-    return review.intent === 'notAsked' ? { _tag: 'card', line: 'untrusted' } : { _tag: 'run', line: 'ranNever' }
+    if (review.intent === 'notAsked') return { _tag: 'card', line: 'untrusted' }
+    return review.risk === 'reversible' ? { _tag: 'run', line: 'ranNever' } : { _tag: 'card', line: review.risk }
   }
   if (review._tag !== 'answered') return { _tag: 'card', line: 'failed' }
   if (review.intent === 'explicit' && review.risk === 'reversible') return { _tag: 'run', line: 'ranExplicit' }
