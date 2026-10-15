@@ -1020,7 +1020,7 @@ test.describe('topic view', () => {
   })
 })
 
-test.describe.serial('Juno chat', () => {
+test.describe('Juno chat', () => {
   let fake: FakeSlack
   let model: FakeOpenRouter
   let userData: string
