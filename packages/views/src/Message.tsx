@@ -246,8 +246,14 @@ export const Message = memo(function Message({
           tabbable={tabbable}
           progress={pending === 'sending' ? progress : undefined}
         />
-        <Reactions reactions={message.reactions} onToggle={toggle} />
-        {main && message.thread !== undefined && onOpenThread !== undefined ? <ThreadLink link={message.thread} onOpen={onOpenThread} tabIndex={tabbable ? 0 : -1} /> : null}
+        <div {...stylex.props(styles.reactionSlot)}>
+          <Reactions reactions={message.reactions} onToggle={toggle} />
+        </div>
+        {main ? (
+          <div {...stylex.props(styles.threadSlot)}>
+            {message.thread !== undefined && onOpenThread !== undefined ? <ThreadLink link={message.thread} onOpen={onOpenThread} tabIndex={tabbable ? 0 : -1} /> : null}
+          </div>
+        ) : null}
         {pending === 'failed' && clientMsgId !== undefined ? (
           <Text variant="meta" tone="muted" as="p" data-send-failed="" sx={styles.failed}>
             <span {...stylex.props(styles.failedIcon)}>
@@ -391,7 +397,18 @@ const styles = stylex.create({
       [NARROW_ROW]: 0,
     },
   },
+  reactionSlot: {
+    display: 'flex',
+    minHeight: `calc(${sizes['--control-24']} + ${spacing['--space-1-5']})`,
+    width: '100%',
+  },
+  threadSlot: {
+    display: 'flex',
+    minHeight: `calc(${sizes['--control-26']} + ${spacing['--space-1-5']})`,
+    maxWidth: '100%',
+  },
   name: {
+    width: sizes['--message-sender-width'],
     flexShrink: 1,
     minWidth: 0,
   },

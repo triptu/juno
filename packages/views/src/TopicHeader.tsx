@@ -79,6 +79,7 @@ export function TopicHeader({ detail, menuOpen = false, onMenu, rename, onPill, 
   const threadCount = detail.threadCount ?? 0
   const threadsButton = (
     <IslandButton
+      reserveCount
       icon={ChatsCircle}
       label={threadCount > 0 ? `Threads · ${threadCount}` : 'Threads'}
       narrowLabel={threadCount > 0 ? String(threadCount) : 'Threads'}
