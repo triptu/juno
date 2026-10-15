@@ -2,6 +2,7 @@
  * Titles: manual, then AI, then the first six or so words of the first
  * message. Main rows show the channel label instead.
  */
+import { bodyFromMrkdwn, previewText, type Lookups } from '@juno/richtext'
 import { channelLabel } from './channel'
 import type { Topic } from './topic'
 
@@ -15,19 +16,24 @@ export interface ResolvedTitle {
 export const FALLBACK_TITLE_WORDS = 6
 
 /**
- * The first `count` words of a message, with an ellipsis when it was cut.
+ * Slack's `text` (mrkdwn) as one plain line: `&amp;`, `&lt;` and `&gt;`
+ * decoded, links as their label, mentions as "@Name" (from `lookups`, else
+ * the label Slack sent, else "Someone"), formatting marks and quote lines
+ * dropped.
+ */
+export function slackLine(text: string, lookups: Lookups = {}): string {
+  return previewText(bodyFromMrkdwn(text, lookups))
+}
+
+/**
+ * The first `count` words of a message's Slack text, with an ellipsis when it was cut.
  * A cut that lands on the end of a sentence keeps the sentence and adds no
  * ellipsis ("Draft plan is in the doc", not "doc.…"); a final full stop is
  * dropped, a question or exclamation mark stays. A cut after a comma, colon
  * or dash drops that mark before the ellipsis.
  */
-export function firstWords(text: string, count = FALLBACK_TITLE_WORDS): string {
-  const words = text
-    .split('\n')
-    .filter((line) => !/^\s*>/.test(line))
-    .join(' ')
-    .replace(/\s+/g, ' ')
-    .trim()
+export function firstWords(text: string, count = FALLBACK_TITLE_WORDS, lookups: Lookups = {}): string {
+  const words = slackLine(text, lookups)
     .split(' ')
     .filter((w) => w.length > 0)
   if (words.length === 0) return ''
@@ -40,13 +46,14 @@ export function firstWords(text: string, count = FALLBACK_TITLE_WORDS): string {
   return `${trimmed.length > 0 ? trimmed : head}…`
 }
 
-export function resolveTitle(topic: Topic): ResolvedTitle {
+/** The title a topic shows. `lookups` names the people a fallback title mentions. */
+export function resolveTitle(topic: Topic, lookups: Lookups = {}): ResolvedTitle {
   if (topic.kind === 'main') return { text: channelLabel(topic.channel), source: 'channel' }
   const manual = topic.overlay.manualTitle?.trim()
   if (manual) return { text: manual, source: 'manual' }
   const ai = topic.overlay.aiTitle?.trim()
   if (ai) return { text: ai, source: 'ai' }
-  const fallback = firstWords(topic.firstMessageText ?? '')
+  const fallback = firstWords(topic.firstMessageText ?? '', FALLBACK_TITLE_WORDS, lookups)
   if (fallback) return { text: fallback, source: 'fallback' }
   // A thread whose root has no text (a file, say) falls back to where it lives.
   return { text: channelLabel(topic.channel), source: 'channel' }

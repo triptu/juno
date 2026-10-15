@@ -102,13 +102,14 @@ export const topicDetail = (id: string, target: WindowTarget, now: number): Effe
     const ids = new Set<string>()
     userIdsOf(row, columns, ids)
     const users = yield* readUsers(sql, ids)
-    const info = channelInfoOf(row, columns, selfId, (userId) => userName(userId, users.get(userId)))
+    const nameOf = (userId: string) => userName(userId, users.get(userId))
+    const info = channelInfoOf(row, columns, selfId, nameOf)
     const topic = topicFrom(row, columns, info)
     const partnerId = row.c_kind === 'im' ? (row.c_user_id ?? undefined) : undefined
     const { partnerId: _partnerId, ...channel } = channelRefOf(info, partnerId)
     const reads = yield* sql<{ last_read_ts: string | null }>`SELECT last_read_ts FROM topic_reads WHERE topic_id = ${id}`
     const lastReadTs = reads[0]?.last_read_ts ?? undefined
-    const title = resolveTitle(topic)
+    const title = resolveTitle(topic, { user: nameOf })
     const status = topicStatus(topic, ctx)
     const art = artRefOf(row, aiAssist)
     let threadCount: number | undefined

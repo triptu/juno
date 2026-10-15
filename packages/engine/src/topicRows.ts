@@ -114,13 +114,16 @@ function parsePreview(json: string | null): StoredPreview {
   }
 }
 
-/** Every user id the row names: participants, the DM partner, group DM members and the preview's sender. */
+/** Every user id the row names: participants, the DM partner, group DM members, the preview's sender and the people the root mentions (for the title). */
 export function userIdsOf(row: JoinedRow, columns: ParsedColumns, into: Set<string>): void {
   for (const id of columns.participants) into.add(id)
   for (const id of columns.members) into.add(id)
   if (row.c_user_id !== null) into.add(row.c_user_id)
   if (columns.preview.senderId !== undefined) into.add(columns.preview.senderId)
+  for (const match of columns.preview.rootText?.matchAll(MENTION) ?? []) into.add(match[1]!)
 }
+
+const MENTION = /<@([UW][A-Z0-9]+)(?:\|[^>]*)?>/g
 
 export function channelInfoOf(
   row: Pick<JoinedRow, 'channel' | 'c_kind' | 'c_name' | 'c_user_id'>,

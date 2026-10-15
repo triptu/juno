@@ -22,6 +22,7 @@ import { Clock, Effect } from 'effect'
 import { aiAssistOn } from '../ai'
 import { channelInfoOf, parseColumns, topicFrom, TOPIC_COLUMNS, TOPIC_FROM, userName, type JoinedRow, type UserRow } from '../topicRows'
 import { Workspace } from '../workspace'
+import { bodyFromMrkdwn, plainText } from '@juno/richtext'
 
 /** How many of the channel's latest open topics a Main draft is compared with (spec section 8: 3 or 4). */
 export const ROUTE_TOPICS = 4
@@ -101,7 +102,7 @@ const latestTopics = (channelId: string, now: number) =>
           .map(
             (m): AiMessage => ({
               sender: m.user_id === null ? 'Someone' : userName(m.user_id, users.get(m.user_id)),
-              text: m.text.slice(0, 600),
+              text: plainText(bodyFromMrkdwn(m.text)).slice(0, 600),
               at: isoOf(m.ts),
               ...(m.user_id !== null && m.user_id === self ? { fromMe: true } : {}),
             }),

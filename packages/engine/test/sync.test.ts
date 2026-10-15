@@ -842,6 +842,21 @@ describe('names (first real session)', () => {
     expect(rows.find((row) => row.channel.kind === 'mpim')?.channel.name).toBe('Maya, Leo')
     expect(unnamed(rows)).toEqual([])
   })
+
+  it("decodes Slack's escaping in titles and previews, and names the people the text mentions", async () => {
+    let seeded: SeededThread | undefined
+    const engine = await bootedEngine({
+      initial: (fake) => {
+        // The fake stores fixture text as Slack does: `->` arrives as `-&gt;`, `&` as `&amp;`.
+        seeded = seedThread(fake, { channel: 'C0ENG', text: 'is the granola mcp -> action items flow live for <@U0DEV> & QA?', ago: 60 * 60_000, replies: [30 * 60_000], follow: true })
+        return fake.signIn()
+      },
+    })
+    const rows = await engine.rowsUntil((list) => list.some((row) => row.id === seeded!.id), 'the seeded thread')
+    const row = rows.find((r) => r.id === seeded!.id)!
+    expect(row.title).toBe('is the granola mcp -> action…')
+    expect(row.preview).toEqual({ sender: 'Maya', text: 'is the granola mcp -> action items flow live for @Dev & QA? reply 1' })
+  })
 })
 
 describe('cold boot details (review M3 finding 10)', () => {

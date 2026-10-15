@@ -71,9 +71,10 @@ const defer = (memory: Memory, key: string, now: number) => {
 /** The title and place a task reads for a topic. */
 const describe = (row: HomeRow, selfId: string | undefined, users: ReadonlyMap<string, UserRow>) => {
   const columns = parseColumns(row)
-  const info = channelInfoOf(row, columns, selfId, (id) => userName(id, users.get(id)))
+  const nameOf = (id: string) => userName(id, users.get(id))
+  const info = channelInfoOf(row, columns, selfId, nameOf)
   const label = channelLabel(info)
-  return { title: row.kind === 'main' ? label : resolveTitle(topicFrom(row, columns, info)).text, channel: label }
+  return { title: row.kind === 'main' ? label : resolveTitle(topicFrom(row, columns, info), { user: nameOf }).text, channel: label }
 }
 
 const runPass = (memory: Memory): Effect.Effect<void, SqlError, StoreServices | AiProvider> =>

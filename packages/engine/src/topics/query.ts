@@ -53,6 +53,7 @@ import {
   topicStatus,
   tsToMillis,
   byLatestActivity,
+  type ResolvedTitle,
   type Topic,
   type TopicStatus,
 } from '@juno/domain'
@@ -116,6 +117,8 @@ export interface CacheEntry {
   readonly participantIds: ReadonlyArray<string>
   /** The preview's sender as the row shows it. */
   readonly sender: string
+  /** The title, with the people a fallback title mentions named. */
+  readonly title: ResolvedTitle
   readonly shaped?: { readonly section: TopicListRow['section']; readonly status: TopicStatus; readonly row: TopicListRow }
 }
 
@@ -476,7 +479,7 @@ function entryOf(
   columns: ParsedColumns,
   selfId: string | undefined,
   personOf: (id: string) => Person,
-): Pick<CacheEntry, 'topic' | 'people' | 'channel' | 'named' | 'participantIds' | 'sender'> {
+): Pick<CacheEntry, 'topic' | 'people' | 'channel' | 'named' | 'participantIds' | 'sender' | 'title'> {
   const { participants, preview } = columns
   const used: Array<Person> = []
   const use = (id: string): Person => {
@@ -492,8 +495,10 @@ function entryOf(
   const named = shown.map(use)
   if (partner !== undefined) named.push(partner)
   const sender = preview.senderId !== undefined && preview.sender !== 'You' ? use(preview.senderId).name : preview.sender
+  const topic = topicFrom(row, columns, info)
   return {
-    topic: topicFrom(row, columns, info),
+    topic,
+    title: resolveTitle(topic, { user: (id) => use(id).name }),
     people: used,
     channel: channelRefOf(info, partner?.id),
     named,
@@ -508,7 +513,7 @@ function entryOf(
  * subscription. The channel and people are refs and not part of it.
  */
 function shape(entry: CacheEntry, section: TopicListRow['section'], status: TopicStatus): TopicListRow {
-  const { topic, source: row, sender } = entry
+  const { topic, source: row, sender, title } = entry
   const stored = entry.parsed.preview
   const label = channelLabel(topic.channel)
   // Everything the row is built from, in one short string; the row's rev is its hash.
@@ -529,10 +534,11 @@ function shape(entry: CacheEntry, section: TopicListRow['section'], status: Topi
     section,
     status,
     sender,
+    title.text,
+    title.source,
     ...entry.participantIds,
   ].join('\u0001')
 
-  const title = resolveTitle(topic)
   return {
     id: topic.id,
     rev: hashId(key),

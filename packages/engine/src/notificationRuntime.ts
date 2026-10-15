@@ -148,7 +148,15 @@ export const startNotifications = Effect.gen(function* () {
     const user = 'user' in frame ? frame.user : undefined
     if (user === session.userId) return
     const text = frame.type === 'desktop_notification' ? frame.content : ('text' in frame ? frame.text ?? '' : '')
-    const body = messageBody(frame.type === 'desktop_notification' ? { text } : frame)
+    // The people the message mentions, by name: the notification's text never shows an id.
+    const mentioned = new Set([...`${text} ${'blocks' in frame ? JSON.stringify(frame.blocks ?? []) : ''}`.matchAll(/<@([UW][A-Z0-9]+)|"user_id":"([UW][A-Z0-9]+)"/g)].map((m) => (m[1] ?? m[2])!))
+    const names = new Map<string, string>()
+    if (mentioned.size > 0) {
+      for (const row of yield* sql<{ id: string; name: string | null }>`SELECT id, COALESCE(display_name, real_name, name) AS name FROM users WHERE id IN ${sql.in([...mentioned])}`) {
+        if (row.name !== null) names.set(row.id, row.name)
+      }
+    }
+    const body = messageBody(frame.type === 'desktop_notification' ? { text } : frame, { user: (id) => names.get(id) })
     const mentionsMe = messageMentionsMe(body, me)
     const conversations = yield* sql<ConversationRow & { ignored: number; person_name: string | null; sender_name: string | null }>`SELECT c.*, ig.channel IS NOT NULL AS ignored,
       COALESCE(u.display_name, u.real_name, u.name) AS person_name,
