@@ -65,7 +65,7 @@ it('a compaction model change applies to compaction, and an unknown family is re
   expect(codex).toMatchObject({ _tag: 'Failure', failure: { reason: 'unavailable' } })
 })
 
-it("shows today's spend from the ledger, and a new cap applies today but not below what today used", async () => {
+it("shows today's spend from the ledger, and a lower cap blocks new spend without changing what today used", async () => {
   const { h, client, follow, pageWhere } = await served()
   const settings = follow(client['agent.settings.page']())
   // Sonnet in the fake costs $2 and $10 per million tokens: 10,000 in and 1,000 out is $0.03.
@@ -80,8 +80,9 @@ it("shows today's spend from the ledger, and a new cap applies today but not bel
   expect(h.turns.guard.spend.snapshot().cap).toBe(5_000_000_000)
 
   const below = await run(client['agent.settings.change']({ opId: 'op-3' as OpId, change: { _tag: 'cap', usd: 0.01 } }))
-  expect(below).toMatchObject({ _tag: 'Failure', failure: { reason: 'invalid' } })
-  expect((await first(client['agent.settings.page']()))?.capUsd).toBe(5)
+  expect(below).toMatchObject({ _tag: 'Success' })
+  expect((await first(client['agent.settings.page']()))?.capUsd).toBe(0.01)
+  expect(h.turns.guard.spend.reserve('chat', 0).kind).toBe('blocked')
 })
 
 it('Pause holds new messages until Resume', async () => {

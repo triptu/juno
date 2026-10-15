@@ -1,10 +1,11 @@
 import { setTimeout } from 'node:timers/promises'
 import type { Job, JobDriver } from '../jobs/jobs'
+import type { proposeQuestions } from './questions'
 import type { McpManagerApi } from '../mcp/manager'
 import { content, sessionOf, sessionBranch, threadState } from './protocol'
 
 /** Resuming observes a recorded thread. It never launches or sends anything. */
-export function t3Driver(manager: McpManagerApi, questions: (job: Job, threadId: string, signal: AbortSignal) => Promise<boolean>): JobDriver {
+export function t3Driver(manager: McpManagerApi, questions: (job: Job, threadId: string, signal: AbortSignal) => ReturnType<typeof proposeQuestions>): JobDriver {
   return {
     kind: 't3', resumable: true,
     run: async (job, signal, update) => {
@@ -31,9 +32,10 @@ export function t3Driver(manager: McpManagerApi, questions: (job: Job, threadId:
           if (['failed', 'rolled_back'].includes(status)) return { event: 'failed', state: 'Failed', report: `T3 Code reported that ${job.title} failed.` }
           if (['interrupted', 'cancelled'].includes(status)) return { event: 'cancelled', state: 'Stopped' }
           if (status === 'waiting') {
-            const shown = await questions(job, session.threadId, signal)
-            // The report reaches Juno once per wait: the runner posts it only when the phase moves to needsYou.
-            update({
+            const { shown, requestIds } = await questions(job, session.threadId, signal)
+            if (signal.aborted) break
+            for (const requestId of requestIds.length ? requestIds : [undefined]) update({
+              ...(requestId === undefined ? {} : { reportKey: `question:${requestId}` }),
               event: 'needsYou', state: shown ? 'T3 Code needs your answer' : 'T3 Code needs your answer in T3 Code',
               report: `T3 Code is waiting for an answer in ${job.title}. ${shown ? 'The question is on a Question card.' : 'Juno cannot show this question; the owner answers it in T3 Code.'}`,
             })

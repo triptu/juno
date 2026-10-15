@@ -14,7 +14,7 @@
 // lockfile or the Dockerfile changes. The worktree is streamed in as the files
 // git sees, tracked or new, with ignored files left out (.env, node_modules,
 // out/, test output). Reports come back into .remote/<run>/. After a clean run
-// the machine goes back to the pool and is destroyed after 5 idle minutes;
+// the machine goes back to the pool and is destroyed after 1 idle minute;
 // after a failure or Ctrl-C it is destroyed at once. `--status` lists the pool
 // and `--drain` destroys its idle machines.
 //
@@ -254,7 +254,7 @@ if (options.dryRun) {
   console.log(`  a warm ${options.machine} machine from the pool, or nsc ${create('3h').map(quote).join(' ')} --cidfile <tmp>/id`)
   console.log(`  git ls-files ... | tar -czf - --null -T - | nsc ssh -T <id> ${quote(container('<image>'))}`)
   console.log(`  nsc ssh -T <id> 'cat /tmp/out/reports.tgz' | tar -xzf - -C .remote/${runId}`)
-  console.log(`  back to the pool after a clean run (destroyed when idle for 5 minutes), else nsc destroy <id> --force${options.keep ? '   (--keep: tracked until its 3-hour expiry)' : ''}`)
+  console.log(`  back to the pool after a clean run (destroyed when idle for 1 minute), else nsc destroy <id> --force${options.keep ? '   (--keep: tracked until its 3-hour expiry)' : ''}`)
   process.exit(0)
 }
 

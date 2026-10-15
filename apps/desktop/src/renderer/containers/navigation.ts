@@ -37,6 +37,7 @@ import {
   allTopicsPlace,
   allTopicsTab,
   homePlace,
+  homeViewAtom,
   flashMessage,
   junoPagePlace,
   locateMessage,
@@ -257,9 +258,35 @@ export function openNewChatTo(conversation: PickConversation): void {
   }, undefined)
 }
 
-/** The sidebar's Home item. Home is a singleton: the tab that shows it is focused. */
+/**
+ * Keep the topic on screen until Home's local rows are ready. After the
+ * subscription expires, replacing it first would lay out an empty page
+ * and then Home in separate frames. The wait is bounded as for All topics.
+ */
 export function openHome(options: OpenOptions = {}): void {
-  show((tabs) => openPlace(tabs, homePlace, options), undefined)
+  const ticket = ++currentTicket
+  const ready = new Promise<void>((resolve) => {
+    const release = registry.mount(homeViewAtom)
+    let done = false
+    const finish = () => {
+      if (done) return
+      done = true
+      clearTimeout(timer)
+      off()
+      resolve()
+      afterPaint(release)
+    }
+    const check = () => {
+      const result = registry.get(homeViewAtom)
+      if (result._tag === 'Failure' || (result._tag === 'Success' && result.value.ready)) finish()
+    }
+    const timer = setTimeout(finish, READY_WAIT_MS)
+    const off = registry.subscribe(homeViewAtom, check, { immediate: false })
+    check()
+  })
+  queue = queue.then(() => ready).then(() => {
+    if (ticket === currentTicket) apply((tabs) => openPlace(tabs, homePlace, options))
+  })
 }
 
 /** A page behind the Juno menu, or Settings › Juno (SPEC 13.10). Each shows in one tab. */

@@ -596,7 +596,7 @@ async function start(
       active: jobs.active,
       stop: async (jobId, opId) => {
         const job = jobs.get(jobId)
-        if (job?.kind === 't3' && !await options.stopExternalJob?.(job, opId ?? uuidv7(store.now()))) return
+        if (job?.kind === 't3' && !await options.stopExternalJob?.(job, opId ?? uuidv7(store.now()))) return jobs.stopFailed(job.id)
         actions.jobStopped(jobId)
         return jobs.stop(jobId)
       },

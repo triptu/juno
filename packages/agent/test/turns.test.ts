@@ -329,7 +329,7 @@ it('ends a run whose provider call fails with the fixed ending for the cause, an
   // A refused key or a rate limit did no work, and nothing stays reserved for them.
   const cases = [
     [serverError(503), { _tag: 'failed', reason: 'provider' }, true],
-    [rateLimited(), { _tag: 'failed', reason: 'provider' }, false],
+    [rateLimited(), { _tag: 'failed', reason: 'rateLimited' }, false],
     [rejectedKey(), { _tag: 'failed', reason: 'keyRejected' }, false],
     [reply(async () => { throw new Error('fetch failed') }), { _tag: 'failed', reason: 'offline' }, true],
   ] as const
@@ -487,3 +487,22 @@ async function waitUntil(test: () => boolean, timeoutMs = 10_000) {
     await new Promise((resolve) => setTimeout(resolve, 5))
   }
 }
+
+it('lowering the cap leaves the current reply running and blocks the next one', async () => {
+  h = await turnsHarness({ compaction: false })
+  const inFlight = deferred()
+  const release = deferred()
+  h.fake.script([reply(async () => {
+    inFlight.resolve()
+    await release.promise
+    return answer(say('The current reply finished.'))
+  })])
+  const first = h.send('finish this reply')
+  await inFlight.promise
+  expect(h.turns.guard.spend.setCap(0)).toBe(true)
+  release.resolve()
+  expect((await h.ended(first)).ending).toEqual({ _tag: 'complete' })
+  const second = h.send('another reply')
+  expect((await h.ended(second)).ending).toEqual({ _tag: 'blocked', reason: 'budget' })
+  expect(h.chatRequests()).toHaveLength(1)
+})

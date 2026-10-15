@@ -99,7 +99,10 @@ const agent = createAgentSupervisor(
   appMcpCredentials(e2e, (url) => shell.openExternal(url)),
   backupSecrets.answer,
 )
-supervisor.onReady(() => agent.linkHost())
+supervisor.onReady(() => {
+  agent.linkHost()
+  if (appWindow()?.isVisible()) supervisor.send({ _tag: 'painted' })
+})
 
 // The providers: keys in the keychain (in memory under tests), OPENROUTER_API_KEY as a development override.
 const providers = new ProviderStore(
@@ -168,6 +171,7 @@ app.whenReady().then(() => {
 
 function openWindow(): BrowserWindow {
   const window = createMainWindow(launch)
+  window.once('ready-to-show', () => supervisor.send({ _tag: 'painted' }))
   window.on('close', () => updateLaunch({ bounds: window.getNormalBounds() }))
   return window
 }
