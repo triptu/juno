@@ -89,6 +89,7 @@ const styles = stylex.create({
     display: 'flex',
     flexDirection: 'column',
     justifyContent: 'flex-end',
+    width: '100%',
     height: '100%',
   },
 })
