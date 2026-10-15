@@ -13,7 +13,7 @@ export {
 } from './model/provider'
 
 export { openRouterCatalogue } from './model/openrouter'
-export { fakeReview, fakeReviewer, type FakeReviewer, type FakeReviewRequest, type FakeReviewAnswers } from './model/review'
+export { fakeReview, fakeReviewer, type FakeReviewRequest, type FakeReviewAnswers } from './model/review'
 export { startFakeOpenAi, type FakeOpenAi, type FakeOpenAiOptions } from './model/openai'
 export { startFakeCodex, type FakeCodex } from './codex/fakeCodex'
 

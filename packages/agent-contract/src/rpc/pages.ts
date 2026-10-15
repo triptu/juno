@@ -1,6 +1,6 @@
 import { Schema } from 'effect'
 import { Rpc, RpcGroup } from 'effect/rpc'
-import { Digest, Revision } from '@juno/agent-cards'
+import { Revision } from '@juno/agent-cards'
 import * as C from '../chat'
 import { CardBinding } from './identity'
 import { Accepted, AgentCommandError, PageWindow, operation } from './common'

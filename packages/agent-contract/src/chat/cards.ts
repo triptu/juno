@@ -19,8 +19,6 @@ export {
   ChangeCard,
   ToolReview,
   ReviewRule,
-  ReviewIntent,
-  ReviewRisk,
   RemoveCard,
   BudgetCard,
   ProviderCard,

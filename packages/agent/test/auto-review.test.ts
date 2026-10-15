@@ -99,7 +99,7 @@ it('asks when the owner only implied the call, and the click runs it once', asyn
 })
 
 it("asks for a call that can't be undone", async () => {
-  const { turns, ask, writes, update } = await fixture((request) => ({ ...fakeReview(request), risk: request.state.call.args.includes('replace') ? 'write' : 'reversible' }))
+  const { turns, ask, writes } = await fixture((request) => ({ ...fakeReview(request), risk: request.state.call.args.includes('replace') ? 'write' : 'reversible' }))
   await ask('Update the roadmap page with the new plan.', { tool: 'notion-update-page', args: { page_id: 'page-roadmap', command: 'replace_content', content: 'New plan.' } })
   expect(turns.actions.views().at(-1)?.card).toMatchObject({ review: { intent: 'explicit', risk: 'write', line: "Asked because this change can't be undone." } })
   expect(writes()).toHaveLength(0)

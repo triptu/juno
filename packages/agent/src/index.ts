@@ -22,6 +22,5 @@ export { liveGrant, mintGrant } from './grants/grants'
 
 export * from './backup'
 export * from './mcp'
-export { reviewCall, reviewRequest, ownerWordsInRun, REVIEW_TIMEOUT_MS, type ReviewModel, type ReviewRequest, type ReviewAnswer } from './review/review'
 export * from './schedule'
 export * from './redaction'
