@@ -17,6 +17,7 @@ const recoveryOnly = process.argv.includes('--recovery')
 const actionsOnly = process.argv.includes('--actions')
 const memoryOnly = process.argv.includes('--memory')
 const boundedOnly = process.argv.includes('--bounded')
+const outboxOnly = process.argv.includes('--outbox')
 const backend = process.env.QUINT_SIMULATOR ?? 'rust'
 const seed = '20261013'
 const samples = tracesOnly ? 100 : 10000
@@ -244,7 +245,7 @@ function simulate(file, step, invariant, output, violation = false, randomized =
         }
       }
       if (options.requireCompletion && !report.includes(`reachedAgreement was witnessed in ${options.samples} trace(s) out of ${options.samples}`)) {
-        throw new Error('A corrected agent schedule stopped before completing its drain')
+        throw new Error('A corrected schedule stopped before completing its drain')
       }
       const trace = JSON.parse(readFileSync(path, 'utf8'))
       if (!Array.isArray(trace.states) || trace.states.length < 2) throw new Error(`No usable trace in ${path}`)
@@ -307,33 +308,45 @@ const regressions = [
   ['readstate', 'latePage', 'acceptedUnreadProtected', 'late-read-page'],
   ['readstate', 'pendingPage', 'acceptedUnreadProtected', 'pending-read-page'],
   ['readstate', 'pendingMark', 'quietAgreement', 'pending-read-event'],
+  ['outbox', 'blindRetry', 'atMostOnce', 'outbox-blind-retry'],
+  ['outbox', 'crashResend', 'atMostOnce', 'outbox-crash-resend'],
+  ['outbox', 'echoKeepsRow', 'noDoubleShow', 'outbox-echo-keeps-row'],
+  ['outbox', 'answerAfterEcho', 'noDoubleShow', 'outbox-answer-after-echo'],
 ]
 
-const selectedSpec = actionsOnly ? 'agent-actions.qnt' : recoveryOnly ? 'agent-recovery.qnt' : memoryOnly ? 'agent-memory.qnt' : undefined
+const selectedSpec = actionsOnly ? 'agent-actions.qnt' : recoveryOnly ? 'agent-recovery.qnt' : memoryOnly ? 'agent-memory.qnt' : outboxOnly ? 'outbox.qnt' : undefined
 for (const file of readdirSync(join(root, 'specs')).filter(name => name.endsWith('.qnt') && (!selectedSpec || name === selectedSpec || (recoveryOnly && name === 'agent-recovery-replay.qnt'))).toSorted()) {
   quint(['typecheck', `specs/${file}`])
 }
 
 if (!memoryOnly && !actionsOnly && !recoveryOnly && !boundedOnly) {
-  for (const file of ['follow', 'readstate']) {
-    simulate(file, 'simulationStep', 'invariants', `${file}.itf.json`, false, true)
+  for (const file of (outboxOnly ? ['outbox'] : ['follow', 'readstate', 'outbox'])) {
+    simulate(file, 'simulationStep', 'invariants', `${file}.itf.json`, false, true,
+      file === 'outbox' ? { witnesses: ['reachedAgreement'] } : {})
   }
-  for (const [file, schedule, invariant, name, guardedInvariant = 'invariants'] of regressions) {
-    simulate(file, `${schedule}Step`, guardedInvariant, `${name}.itf.json`)
+  for (const [file, schedule, invariant, name, guardedInvariant = 'invariants'] of regressions.filter(([file]) => !outboxOnly || file === 'outbox')) {
+    simulate(file, `${schedule}Step`, guardedInvariant, `${name}.itf.json`, false, false,
+      file === 'outbox' ? { samples: 1, witnesses: ['reachedAgreement'], requireCompletion: true } : {})
     simulate(file, `${schedule}BugStep`, invariant, `${name}-bug.itf.json`, true)
   }
-  simulate('readstate', 'peekBugStep', 'peekNeverMarks', 'peek-bug.itf.json', true)
-  for (const schedule of ['ambiguousFailure', 'pendingObservation', 'failedFirstSubscribe', 'unknownRoot', 'oldFollowActivity', 'oldFollowQuiet']) {
-    simulate('follow', `${schedule}Step`, 'invariants', `${schedule}.itf.json`)
+  for (const schedule of ['answerBeforeEcho', 'lostLookupAbsent', 'reconnectPage']) {
+    simulate('outbox', `${schedule}Step`, 'invariants', `outbox-${schedule}.itf.json`, false, false,
+      { samples: 1, witnesses: ['reachedAgreement'], requireCompletion: true })
   }
-  simulate('readstate', 'coalesceStep', 'coalescingSafety', 'read-coalesce.itf.json')
-  for (const schedule of ['retryAfterAccept', 'peekThenMark']) {
-    simulate('readstate', `${schedule}Step`, 'invariants', `read-${schedule}.itf.json`)
+  if (!outboxOnly) {
+    simulate('readstate', 'peekBugStep', 'peekNeverMarks', 'peek-bug.itf.json', true)
+    for (const schedule of ['ambiguousFailure', 'pendingObservation', 'failedFirstSubscribe', 'unknownRoot', 'oldFollowActivity', 'oldFollowQuiet']) {
+      simulate('follow', `${schedule}Step`, 'invariants', `${schedule}.itf.json`)
+    }
+    simulate('readstate', 'coalesceStep', 'coalescingSafety', 'read-coalesce.itf.json')
+    for (const schedule of ['retryAfterAccept', 'peekThenMark']) {
+      simulate('readstate', `${schedule}Step`, 'invariants', `read-${schedule}.itf.json`)
+    }
   }
 }
 
 // WP2 uses real transactions for both random runs and directed failure pairs.
-if (!boundedOnly && !actionsOnly && !recoveryOnly) {
+if (!outboxOnly && !boundedOnly && !actionsOnly && !recoveryOnly) {
   const memoryOptions = { main: 'agent_memory' }
   simulate('agent-memory', 'simulationStep', 'invariants', 'agent-memory.itf.json', false, true,
     { ...memoryOptions, samples: tracesOnly ? 100 : 1000, steps: 140 })
@@ -378,7 +391,7 @@ if (!boundedOnly && !actionsOnly && !recoveryOnly) {
   }
 }
 
-if (!boundedOnly && !memoryOnly && !recoveryOnly) {
+if (!outboxOnly && !boundedOnly && !memoryOnly && !recoveryOnly) {
   const options = { main: 'agent_actions' }
   simulate('agent-actions', 'simulationStep', 'invariants', 'agent-actions.itf.json', false, true,
     { ...options, samples: tracesOnly ? 100 : 1000, steps: 100 })
@@ -397,7 +410,7 @@ if (!boundedOnly && !memoryOnly && !recoveryOnly) {
   simulate('agent-actions', 'overReportStep', 'strictCap', 'actions-overReport-strictCap.itf.json', true, false, options)
 }
 
-if (!boundedOnly && !memoryOnly && !actionsOnly) {
+if (!outboxOnly && !boundedOnly && !memoryOnly && !actionsOnly) {
   simulate('agent-recovery-replay', 'suiteStep', 'safety', 'recovery-replay-corrected.itf.json', false, true,
     { init: 'suiteInit', samples: 64, steps: 40,
       witnesses: ['reachedAgreement', 'case0', 'case1', 'case2', 'case3'], requireCompletion: true })
@@ -425,7 +438,7 @@ if (!boundedOnly && !memoryOnly && !actionsOnly) {
   }
 }
 
-if (!tracesOnly) {
+if (!tracesOnly && !outboxOnly) {
   // Find a working Java: PATH first, then JAVA_HOME, then Homebrew's keg-only JDKs.
   // macOS ships a /usr/bin/java stub that fails when no JDK is installed.
   const javaCandidates = [
@@ -444,7 +457,7 @@ if (!tracesOnly) {
   if (!javaPath) {
     console.log('Mode: randomized simulator only (Java unavailable).')
     console.log(`Seed ${seed}; selected agent protocols: 1000 random samples and all corrected witnesses (unless --bounded).`)
-    console.log('Temporal formulas are typechecked only. Drain bounds: follow 64, read 48, memory 64, actions 32, recovery 64.')
+    console.log('Temporal formulas are typechecked only. Drain bounds: follow 64, read 48, outbox 48, memory 64, actions 32, recovery 64.')
   } else {
     if (!memoryOnly && !actionsOnly && !recoveryOnly) {
       for (const [file, step] of [['follow', 'step'], ['readstate', 'boundedStep']]) {

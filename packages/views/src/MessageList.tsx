@@ -58,6 +58,10 @@ export interface MessageListProps {
   readonly onChannel?: (id: string) => void
   readonly onLink?: (url: string) => void
   readonly onToggleReaction?: (ts: string, name: string) => void
+  /** Retry on a failed send. */
+  readonly onRetry?: (clientMsgId: string) => void
+  /** Delete draft on a failed send. */
+  readonly onDiscard?: (clientMsgId: string) => void
   /** Right-click or the context-menu key on a message: its menu, at the pointer. */
   readonly onMessageMenu?: (ts: string, event: MouseEvent) => void
 }
@@ -114,6 +118,8 @@ export function MessageList({
   onChannel,
   onLink,
   onToggleReaction,
+  onRetry,
+  onDiscard,
   onMessageMenu,
 }: MessageListProps) {
   const [focusedTs, setFocusedTs] = useState<string | undefined>(undefined)
@@ -149,7 +155,8 @@ export function MessageList({
           // changes no row's height. Only the topic's first message, with nothing that can arrive above it, sits flush.
           const first = index === 0 && notDrawnAbove === 0 && older === 'none'
           return (
-            <Row key={item.message.ts} atDivider={atDivider} newCount={newCount} anchorRef={anchorRef}>
+            // A message's client_msg_id outlives its pending row, so the row becomes the stored message in place.
+            <Row key={item.message.clientMsgId ?? item.message.ts} atDivider={atDivider} newCount={newCount} anchorRef={anchorRef}>
               <Message
                 message={item.message}
                 sender={item.sender}
@@ -166,6 +173,8 @@ export function MessageList({
                 onChannel={onChannel}
                 onLink={onLink}
                 onToggleReaction={onToggleReaction}
+                onRetry={onRetry}
+                onDiscard={onDiscard}
                 onFocus={setFocusedTs}
               />
             </Row>

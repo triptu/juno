@@ -838,6 +838,38 @@ export class TopicPane {
     return this.list.locator('[data-message-row]').filter({ hasText: text })
   }
 
+  /** The composer's text field. */
+  get composer(): Locator {
+    return this.root.locator('[data-composer] textarea')
+  }
+
+  /** The composer's box, which must not move as rows come and go. */
+  get composerField(): Locator {
+    return this.root.locator('[data-composer-field]')
+  }
+
+  /** Types `text` into the composer and presses Enter. */
+  async send(text: string): Promise<void> {
+    await this.composer.fill(text)
+    await this.composer.press('Enter')
+  }
+
+  /** The message is shown as Slack holds it: once, and not pending. */
+  async expectSent(text: string): Promise<void> {
+    await expect(this.message(text)).toHaveCount(1, { timeout: 15_000 })
+    await expect(this.message(text)).not.toHaveAttribute('data-pending', /.*/, { timeout: 15_000 })
+  }
+
+  /** A failed send's row, with its Retry and Delete draft. */
+  failed(text: string) {
+    const row = this.message(text).and(this.list.locator('[data-pending="failed"]'))
+    return {
+      row,
+      retry: () => row.getByRole('button', { name: 'Retry' }).click(),
+      discard: () => row.getByRole('button', { name: 'Delete draft' }).click(),
+    }
+  }
+
   async expectTitle(title: string | RegExp): Promise<void> {
     await expect(this.header).toContainText(title, { timeout: 15_000 })
   }

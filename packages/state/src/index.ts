@@ -86,11 +86,11 @@ export {
   pickThread,
   pickThreadsAtom,
   previewTopic,
-  sendMessage,
   sendTarget,
   untouched,
   type NewChat,
 } from './newChat'
+export { discardMessage, draftAtom, retryMessage, saveDraft, sendMessage } from './send'
 export { errorOf } from './result'
 export { acquireRendererPort, EngineFailed } from './port'
 export {

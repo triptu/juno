@@ -257,12 +257,13 @@ export function mountedTabs(tabs: Tabs): ReadonlySet<string> {
 
 /**
  * Where the "N new" divider goes: the index of the first message after the
- * read pointer, or -1 when every message is read or none is (a topic never
- * read opens at the bottom with no divider).
+ * read pointer that the user did not send (`mine`), or -1 when every message
+ * is read or none is (a topic never read opens at the bottom with no
+ * divider). The user's own messages, sent or still sending, are never new.
  */
-export function dividerIndex(order: ReadonlyArray<string>, lastReadTs: string | undefined): number {
+export function dividerIndex(order: ReadonlyArray<string>, lastReadTs: string | undefined, mine: (ts: string) => boolean = () => false): number {
   if (lastReadTs === undefined) return -1
-  return order.findIndex((ts) => ts > lastReadTs)
+  return order.findIndex((ts) => !mine(ts) && ts > lastReadTs)
 }
 
 // Persistence

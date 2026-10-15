@@ -1,5 +1,8 @@
-import { defineFixtures, fixture, type FixtureFrame } from '@juno/ui'
-import { emojiOnly, failedFile, hostile, longCode, longFirstLine, main as mainStream, mainDividerBefore, manyReactions, mentions, pendingFile, rtl, thread, threadDividerBefore, withFiles } from './fixtures/messages'
+import { useState } from 'react'
+import type { MessageView } from '@juno/contract'
+import { defineFixtures, fixture, scene, type FixtureFrame } from '@juno/ui'
+import { useFixtureControl } from './juno-chat/fixtures/control'
+import { emojiOnly, failedFile, failedSend, hostile, longCode, longFirstLine, main as mainStream, mainDividerBefore, manyReactions, mentions, pendingFile, rtl, sending, thread, threadDividerBefore, withFiles } from './fixtures/messages'
 import { NOW } from './fixtures/topics'
 import { HoverToolbar } from './HoverToolbar'
 import { MessageList, type MessageListProps } from './MessageList'
@@ -12,6 +15,24 @@ const state = (props: Partial<MessageListProps> & Pick<MessageListProps, 'items'
 
 const ROW = '[data-message-row]'
 const toolbar = (main: boolean) => () => <HoverToolbar main={main} />
+
+/**
+ * A send settles: the pending row is replaced by the message Slack stored,
+ * which looks the same, so nothing in the list moves. The test drives it
+ * through `window.__fixtureControls.settle`.
+ */
+function PendingSettles() {
+  const [settled, setSettled] = useState(false)
+  useFixtureControl('settle', () => setSettled(true))
+  const last = sending[2]!
+  const items = settled ? [...sending.slice(0, 2), { ...last, message: { ...settledMessage, groupStart: last.message.groupStart } }] : sending
+  return <MessageList {...base} items={items} main={false} />
+}
+const settledMessage: MessageView = (() => {
+  const { pending: _pending, ...rest } = sending[2]!.message
+  const ts = `${Math.floor(NOW / 1000)}.000999`
+  return { ...rest, id: ts, ts }
+})()
 
 export default defineFixtures(
   MessageList,
@@ -40,6 +61,13 @@ export default defineFixtures(
       thumbnails: state({ items: withFiles, main: false }),
       'thumbnail-pending': state({ items: pendingFile, main: false }),
       'thumbnail-failed': state({ items: failedFile, main: false }),
+    },
+    Send: {
+      sending: state({ items: sending, main: false }),
+      failed: state({ items: failedSend, main: false, onRetry: noop, onDiscard: noop }),
+    },
+    Shift: {
+      'pending-settles': scene(() => <PendingSettles />),
     },
     Data: {
       'empty-thread': state({ items: [], main: false }),

@@ -607,6 +607,8 @@ export const motion = stylex.defineVars({
     default: '150ms',
     [REDUCED_MOTION]: '0.01ms',
   },
+  // How long a send may take before its pending row dims (inventory 6.1).
+  '--delay-pending': '800ms',
   // The gap between the illustration, title and action of an empty state.
   '--stagger': {
     default: '80ms',

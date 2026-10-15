@@ -447,6 +447,7 @@ Three ideas (`friendly-layer.md` §5): instant for the things you do constantly,
 | `--duration-pop` | 220ms | Reaction pop, toggle fill, resolve check |
 | `--duration-appear` | 240ms | Toast, popover, palette, card and empty-state entrance |
 | `--duration-exit` | 150ms | Every exit |
+| `--delay-pending` | 800ms | How long a send may take before its pending row dims |
 | `--stagger` | 80ms | Between the parts of an empty state as they enter |
 | `--ease-out` | `cubic-bezier(0.2, 0, 0, 1)` | Presses, toggles, entrances, exits |
 | `--ease-spring` | `cubic-bezier(0.34, 1.4, 0.64, 1)` | The three pops only; overshoots about 8% |

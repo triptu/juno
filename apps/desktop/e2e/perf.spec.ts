@@ -235,6 +235,25 @@ test('live update: a reply from another client to pixels', async ({ juno, fake }
   stats('live update, inject call to new preview seen by Playwright', wall)
 })
 
+test('send: Enter to the pending row painted', async ({ juno }) => {
+  test.setTimeout(120_000)
+  await juno.signIn()
+  await juno.waitForSync()
+  await juno.sidebar.row(POSTGRES).open()
+  await juno.topic.expectTitle(POSTGRES)
+  const measured: number[] = []
+  for (let i = 0; i < 9; i++) {
+    const text = `Perf send ${i} ${Date.now()}`
+    await juno.topic.send(text)
+    await juno.topic.expectSent(text)
+    measured.push((await juno.measure('juno.send'))!)
+    await juno.win.waitForTimeout(300)
+  }
+  // A local transaction, the delta and the paint; the Slack call is not part of it.
+  const send = stats('send, Enter to the pending row painted (juno.send)', measured)
+  within('send, p95', send.p95, 50)
+})
+
 // The large-workspace scenarios share one synced user-data directory: the
 // fake's 1,200-topic seed fills the 300-row window, and syncing it once
 // keeps the run short. Every scenario launches the app warm on it.
