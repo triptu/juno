@@ -25,7 +25,7 @@ const POSTGRES = 'Draft plan is in the doc'
 
 /** Fails the scenario when `value` is over its budget from docs/performance.md section 1. */
 function within(name: string, value: number, budget: number): void {
-  expect(value, `${name}: ${value.toFixed(1)} ms against a budget of ${budget.toFixed(1)} ms`).toBeLessThanOrEqual(budget)
+  expect.soft(value, `${name}: ${value.toFixed(1)} ms against a budget of ${budget.toFixed(1)} ms`).toBeLessThanOrEqual(budget)
 }
 
 /** The display's refresh interval: the median of 30 animation frame intervals. */
@@ -235,7 +235,14 @@ test('home open: from a topic to Home painted', async ({ juno, win }) => {
           (event) => {
             const start = event.timeStamp
             const shown = () => document.querySelector('[data-home]:not([data-home-waiting]) [data-home-item]') !== null
-            const frame = () => requestAnimationFrame(() => (shown() ? setTimeout(() => resolve(performance.now() - start), 0) : frame()))
+            const frame = () => requestAnimationFrame(() => {
+              if (!shown()) return frame()
+              setTimeout(() => {
+                const end = performance.now()
+                performance.measure('juno.home-open', { start, end })
+                resolve(end - start)
+              }, 0)
+            })
             frame()
           },
           { once: true },
@@ -245,8 +252,12 @@ test('home open: from a topic to Home painted', async ({ juno, win }) => {
     // `press`, not `click`: a pointerup in the next frame defers the end of the measure by a frame (performance.md 7.1).
     const box = (await nav.boundingBox())!
     await win.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
-    await press(win)
-    samples.push(await win.evaluate(() => (window as unknown as { __homeSample: Promise<number> }).__homeSample))
+    const measureOpen = async () => {
+      await press(win)
+      samples.push(await win.evaluate(() => (window as unknown as { __homeSample: Promise<number> }).__homeSample))
+    }
+    if (process.env['JUNO_PERF_TRACE'] !== undefined) await traced(win, `home-open-${i}`, measureOpen)
+    else await measureOpen()
     if (i % 4 === 3) {
       await win.waitForTimeout(100)
       const query = await win.evaluate((from) => (window as unknown as { __homeQuery: number[] }).__homeQuery.slice(from), queries)
