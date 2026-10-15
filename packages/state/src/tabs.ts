@@ -163,19 +163,32 @@ export function openPlace(tabs: Tabs, place: Place, { newTab = false }: OpenOpti
  * After a New chat in tab `tabId` sent to `topicId`: the tab shows the topic
  * in place of the New chat's entry, so Back goes to what the tab showed
  * before. If another tab already shows the topic, that tab is focused and
- * the New chat tab closes; it does not go onto the reopen stack.
+ * the New chat tab closes; it does not go onto the reopen stack. A tab
+ * closed while the message was sending comes back from the reopen stack
+ * showing the topic, not the sent draft.
  */
 export function settleNewChat(tabs: Tabs, tabId: string, topicId: string): Tabs {
   const at = tabs.tabs.findIndex((tab) => tab.id === tabId)
   const tab = tabs.tabs[at]
-  if (tab === undefined || currentPlace(tab).kind !== 'newChat') return tabs
+  if (tab === undefined) {
+    const closedAt = tabs.closed.findIndex((closed) => closed.tab.id === tabId)
+    const closed = tabs.closed[closedAt]
+    if (closed === undefined || currentPlace(closed.tab).kind !== 'newChat') return tabs
+    return { ...tabs, closed: tabs.closed.with(closedAt, { ...closed, tab: { ...closed.tab, history: sentHistory(closed.tab.history, topicId) } }) }
+  }
+  if (currentPlace(tab).kind !== 'newChat') return tabs
   const showing = tabShowing(tabs, topicId)
   if (showing !== undefined) {
     const closed = closeTab(tabs, tabId)
     return activateTab({ ...closed, closed: tabs.closed }, showing.id)
   }
-  const entries = [...tab.history.entries.slice(0, tab.history.index), topicPlace(topicId)]
-  return { ...tabs, tabs: tabs.tabs.with(at, { ...tab, history: { entries, index: entries.length - 1 } }) }
+  return { ...tabs, tabs: tabs.tabs.with(at, { ...tab, history: sentHistory(tab.history, topicId) }) }
+}
+
+/** The history with its New chat entry replaced by the topic it sent to. */
+function sentHistory(history: TabHistory, topicId: string): TabHistory {
+  const entries = [...history.entries.slice(0, history.index), topicPlace(topicId)]
+  return { entries, index: entries.length - 1 }
 }
 
 /** The place Back (-1) or Forward (1) would show in the active tab, if there is one. */

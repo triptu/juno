@@ -139,6 +139,30 @@ test('a person never messaged: the start of the conversation, then conversations
   expect(fake.workspace.conversation(String(posted?.args['channel']))?.kind).toBe('im')
 })
 
+test('a New chat closed while it sends comes back as the conversation, so Enter cannot send it again', async ({ juno, fake }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  const { tabs, newChat, topic } = juno
+
+  await tabs.newTabButton.click()
+  await newChat.pickConversation('jon', 'Jonas')
+  await newChat.write('Welcome once')
+  fake.holdNext({ method: 'conversations.open' })
+  await newChat.send()
+  await tabs.menu('close-tab')
+  await tabs.expectCount(0)
+  fake.release()
+  await expect.poll(() => fake.calls.filter((call) => call.method === 'chat.postMessage').length).toBe(1)
+
+  await tabs.menu('reopen-tab')
+  await tabs.expectActive('Jonas')
+  await topic.expectSent('Welcome once')
+  await expect(newChat.composer).toHaveCount(0)
+  await topic.composer.press('Enter')
+  await juno.win.waitForTimeout(500)
+  expect(fake.calls.filter((call) => call.method === 'chat.postMessage')).toHaveLength(1)
+})
+
 test('Home opens from the sidebar as one tab, and reads as selected with no tab open', async ({ juno, win }) => {
   await juno.signIn()
   await juno.waitForSync()

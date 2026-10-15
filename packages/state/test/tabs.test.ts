@@ -137,6 +137,13 @@ describe('a New chat that sends', () => {
   it('changes nothing once the tab shows something else', () => {
     expect(settleNewChat(three, three.active!, 'd')).toBe(three)
   })
+
+  it('a tab closed while sending comes back showing the topic', () => {
+    const chat = openPlace(three, newChatPlace, { newTab: true })
+    const closed = closeTab(chat, chat.active!)
+    const sent = settleNewChat(closed, chat.active!, 'd')
+    expect(shown(reopenClosedTab(sent))).toEqual(['a', 'b', 'd', 'c'])
+  })
 })
 
 describe('history', () => {

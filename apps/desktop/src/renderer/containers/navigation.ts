@@ -367,15 +367,16 @@ export function openAllTopics(options: OpenOptions = {}): void {
 /**
  * A New chat sent to `topicId`: its tab becomes the topic, in the frame the
  * topic can paint, or closes when another tab shows it (`settleNewChat`).
- * Never replaced by a later open, so the sent message always shows.
+ * Never replaced by a later open, so the sent message always shows. The
+ * draft is cleared even when the tab was closed during the send, so
+ * reopening it can never send the message again.
  */
 export function settleSentChat(tabId: string, topicId: string): void {
   registry.set(scrollSnapshotAtom(topicId), undefined)
   show(
     (tabs) => {
-      const next = settleNewChat(tabs, tabId, topicId)
-      if (next !== tabs) registry.set(newChatAtom(tabId), emptyNewChat)
-      return next
+      registry.set(newChatAtom(tabId), emptyNewChat)
+      return settleNewChat(tabs, tabId, topicId)
     },
     { id: topicId, fresh: true, name: 'juno.topic-open' },
     false,
