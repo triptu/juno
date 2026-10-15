@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import * as stylex from '@stylexjs/stylex'
-import { chatCopy, type ConnectionId, type ConnectionRow, type ConnectionState, type ConnectionsPage as ConnectionsPageModel, type DiscoveredTool, type T3Address } from '@juno/agent-contract'
+import { chatCopy, type ConnectionId, type ConnectionRow, type ConnectionState, type ConnectionsPage as ConnectionsPageModel, type T3Address } from '@juno/agent-contract'
 import { Button, Checkbox, Chip, EmptyState, ListRow, Page, PageHeader, Section, Surface, Text, TextField } from '@juno/ui'
 import { cell } from './cell'
 
@@ -10,13 +10,10 @@ export interface ConnectionsPageProps {
   readonly page: ConnectionsPageModel
   /** A command the agent refused, shown under that row, or under Add a server for `new`. */
   readonly error?: { readonly id: ConnectionId | 'new'; readonly message: string }
-  readonly onEnabled: (id: ConnectionId, enabled: boolean) => void
   /** Connect (or Sign in) opens the server's sign-in in the browser when it asks for one. Disconnect forgets the sign-in. */
   readonly onAction: (id: ConnectionId, action: ConnectionAction) => void
-  /** The T3 Code row's address settings, on Enter, on leaving the field, or on the switch. */
-  readonly onT3Address: (id: ConnectionId, address: T3Address) => void
-  /** Only the owner moves a tool between Read and Outward. */
-  readonly onTier: (id: ConnectionId, tool: string, tier: 0 | 3) => void
+  /** Opens the connection's tools and auto-review rules (`ConnectionToolsSheet`). */
+  readonly onConfigure: (id: ConnectionId) => void
   /** Another server by address. */
   readonly onAdd: (label: string, url: string) => void
 }
@@ -31,19 +28,32 @@ const stateLabel: Record<ConnectionState, string> = {
 }
 
 /**
- * Each server's state, the address in use, and the tools it offers with
- * their tier (SPEC 13.10). The T3 Code row also holds its address and the
- * local-network switch; over the network only an https address works.
- * Below the servers, the owner adds another one by its address.
+ * Each server as one compact row (SPEC 13.10): its name and state, the
+ * address in use, Connect, Sign in or Disconnect, and Configure, which opens
+ * its tools with their Enabled switches and auto-review rules. Below the
+ * servers, the owner adds another one by its address.
  */
-export function ConnectionsPage({ page, error, onEnabled, onAction, onT3Address, onTier, onAdd }: ConnectionsPageProps) {
+export function ConnectionsPage({ page, error, onAction, onConfigure, onAdd }: ConnectionsPageProps) {
+  const copy = chatCopy.pages.connections
   return (
     <Page>
-      <PageHeader title="Connections" subtitle="Where Juno can read and act. A tool on a server's read list needs no click; everything else is a card, every time." />
-      {page.connections.length === 0 ? <EmptyState illustration="nothing-here" title="No connections" body="Juno's connections show up here once they are set up." enter={false} /> : null}
-      {page.connections.map((row) => (
-        <Connection key={row.id} row={row} error={error?.id === row.id ? error.message : undefined} onEnabled={onEnabled} onAction={onAction} onT3Address={onT3Address} onTier={onTier} />
-      ))}
+      <PageHeader title="Connections" subtitle={copy.intro} />
+      {page.connections.length === 0 ? (
+        <EmptyState illustration="nothing-here" title="No connections" body="Juno's connections show up here once they are set up." enter={false} />
+      ) : (
+        <Surface kind="group" data-connections="">
+          {page.connections.map((row, index) => (
+            <Connection
+              key={row.id}
+              row={row}
+              last={index === page.connections.length - 1}
+              error={error?.id === row.id ? error.message : undefined}
+              onAction={onAction}
+              onConfigure={onConfigure}
+            />
+          ))}
+        </Surface>
+      )}
       <AddServer error={error?.id === 'new' ? error.message : undefined} onAdd={onAdd} />
     </Page>
   )
@@ -63,62 +73,67 @@ function primaryAction(row: ConnectionRow): { readonly action: ConnectionAction;
   }
 }
 
-function Connection({ row, error, onEnabled, onAction, onT3Address, onTier }: { readonly row: ConnectionRow; readonly error: string | undefined } & Pick<ConnectionsPageProps, 'onEnabled' | 'onAction' | 'onT3Address' | 'onTier'>) {
+function Connection({ row, last, error, onAction, onConfigure }: { readonly row: ConnectionRow; readonly last: boolean; readonly error: string | undefined } & Pick<ConnectionsPageProps, 'onAction' | 'onConfigure'>) {
   const copy = chatCopy.pages.connections
   const primary = primaryAction(row)
   const signingIn = row.state === 'connecting' && !row.enabled
   return (
-    <Section heading={row.label} sub={row.detail}>
-      <Surface kind="group" data-connection={row.state} data-connection-id={row.id}>
-        {/* A divider only when a row follows: a server with no tools yet is one row, with no line over the card's edge. */}
-        <ListRow
-          divider={row.t3 !== undefined || row.tools.length > 0}
-          trailing={
-            <span {...stylex.props(cell.controls)}>
-              <Chip variant={row.state === 'ready' ? 'filled' : 'outline'} size={20}>
-                {stateLabel[row.state]}
-              </Chip>
-              {row.removable ? (
-                <Button variant="ghost" size="xs" tone="subtle" onClick={() => onAction(row.id, 'remove')}>
-                  {copy.remove}
-                </Button>
-              ) : null}
-              <Button variant="secondary" size="xs" onClick={() => onAction(row.id, primary.action)}>
-                {primary.label}
-              </Button>
-            </span>
-          }
-        >
-          <span {...stylex.props(cell.lines)}>
-            <Checkbox size="lg" label="Enabled" checked={row.enabled} onChange={(event) => onEnabled(row.id, event.currentTarget.checked)} />
-            {row.address !== undefined ? (
-              <Text variant="meta" tone="muted" truncate>
-                {row.address}
-              </Text>
-            ) : null}
-            {signingIn ? (
-              <Text variant="meta" tone="muted">
-                {copy.signingIn}
-              </Text>
-            ) : null}
-            {error !== undefined ? (
-              <Text variant="meta" tone="danger" data-connection-error="">
-                {error}
-              </Text>
-            ) : null}
-          </span>
-        </ListRow>
-        {row.t3 !== undefined ? <T3AddressRow key={`${row.t3.url} ${row.t3.allowNetwork}`} id={row.id} address={row.t3} onT3Address={onT3Address} /> : null}
-        {row.tools.map((tool, index) => (
-          <Tool key={tool.name} tool={tool} last={index === row.tools.length - 1} onTier={(tier) => onTier(row.id, tool.name, tier)} />
-        ))}
-      </Surface>
-    </Section>
+    <ListRow
+      data-connection={row.state}
+      data-connection-id={row.id}
+      divider={!last}
+      trailing={
+        <span {...stylex.props(cell.controls)}>
+          {row.removable ? (
+            <Button variant="ghost" size="xs" tone="subtle" onClick={() => onAction(row.id, 'remove')}>
+              {copy.remove}
+            </Button>
+          ) : null}
+          <Button variant="secondary" size="xs" onClick={() => onAction(row.id, primary.action)}>
+            {primary.label}
+          </Button>
+          <Button variant="secondary" size="xs" onClick={() => onConfigure(row.id)}>
+            {copy.configure}
+          </Button>
+        </span>
+      }
+    >
+      <span {...stylex.props(cell.lines)}>
+        <span {...stylex.props(cell.line)}>
+          <Text variant="body" weight="medium" truncate data-connection-name="">
+            {row.label}
+          </Text>
+          <Chip variant={row.state === 'ready' ? 'filled' : 'outline'} size={20}>
+            {stateLabel[row.state]}
+          </Chip>
+        </span>
+        {row.address !== undefined ? (
+          <Text variant="meta" tone="muted" truncate>
+            {row.address}
+          </Text>
+        ) : null}
+        {row.detail !== undefined ? (
+          <Text variant="meta" tone="muted" sx={cell.wrap}>
+            {row.detail}
+          </Text>
+        ) : null}
+        {signingIn ? (
+          <Text variant="meta" tone="muted">
+            {copy.signingIn}
+          </Text>
+        ) : null}
+        {error !== undefined ? (
+          <Text variant="meta" tone="danger" data-connection-error="">
+            {error}
+          </Text>
+        ) : null}
+      </span>
+    </ListRow>
   )
 }
 
 /** Keyed by the saved address, so a saved change resets the draft. */
-function T3AddressRow({ id, address, onT3Address }: { readonly id: ConnectionId; readonly address: T3Address } & Pick<ConnectionsPageProps, 'onT3Address'>) {
+export function T3AddressRow({ id, address, onT3Address }: { readonly id: ConnectionId; readonly address: T3Address; readonly onT3Address: (id: ConnectionId, address: T3Address) => void }) {
   const copy = chatCopy.pages
   const [url, setUrl] = useState(address.url)
   const commit = () => {
@@ -195,45 +210,6 @@ function AddServer({ error, onAdd }: { readonly error: string | undefined } & Pi
         </ListRow>
       </Surface>
     </Section>
-  )
-}
-
-function Tool({ tool, last, onTier }: { readonly tool: DiscoveredTool; readonly last: boolean; readonly onTier: (tier: 0 | 3) => void }) {
-  const read = tool.tier === 0
-  return (
-    <ListRow
-      data-tool={tool.name}
-      data-tool-tier={tool.tier}
-      divider={!last}
-      trailing={
-        <span {...stylex.props(cell.controls)}>
-          <Checkbox label="Runs without asking" checked={read} onChange={(event) => onTier(event.currentTarget.checked ? 0 : 3)} />
-        </span>
-      }
-    >
-      <span {...stylex.props(cell.lines)}>
-        <span {...stylex.props(cell.line)}>
-          <Text variant="body" truncate>
-            {tool.name}
-          </Text>
-          {tool.allowlisted && !read ? (
-            <Text variant="meta" tone="muted">
-              Default
-            </Text>
-          ) : null}
-        </span>
-        {tool.hint !== undefined ? (
-          <Text variant="meta" tone="muted" truncate dir="auto">
-            {tool.hint}
-          </Text>
-        ) : null}
-        {tool.changed ? (
-          <Text variant="meta" tone="muted" sx={cell.wrap}>
-            This tool changed since you reviewed it, so it asks every time until you check it again.
-          </Text>
-        ) : null}
-      </span>
-    </ListRow>
   )
 }
 

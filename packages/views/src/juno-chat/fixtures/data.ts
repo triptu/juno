@@ -273,7 +273,7 @@ export const connect = (id: string, cardStatus: CardStatus = open): Card => ({
   leaves: 'Page titles and the text Juno writes go to Notion. Nothing from Slack goes there unless you approve a card.',
 })
 
-export const change = (id: string, cardStatus: CardStatus = open, long = false): Card => ({
+export const change = (id: string, cardStatus: CardStatus = open, long = false, review?: Extract<Card, { _tag: 'change' }>['review']): Card => ({
   _tag: 'change',
   id: cardId(id),
   status: cardStatus,
@@ -295,6 +295,7 @@ export const change = (id: string, cardStatus: CardStatus = open, long = false):
       : []),
   ],
   caption: 'Moves the offsite a day later, as you asked Maya.',
+  ...(review === undefined ? {} : { review }),
 })
 
 export const remove = (id: string, cardStatus: CardStatus = open): Card => ({

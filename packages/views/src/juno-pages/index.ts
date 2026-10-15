@@ -1,5 +1,6 @@
 export { ActivityPage } from './ActivityPage'
 export { ConnectionsPage } from './ConnectionsPage'
+export { ConnectionToolsSheet } from './ConnectionToolsSheet'
 export { JunoSettingsPage, type JunoSettingsPageProps } from './JunoSettingsPage'
 export { MemoryPage } from './MemoryPage'
 export { ProviderSection, type ProviderDrafts } from './ProviderSection'
