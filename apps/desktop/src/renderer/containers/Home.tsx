@@ -1,6 +1,6 @@
 import { useId, useLayoutEffect, useRef } from 'react'
 import { viewsSortChannel } from '@juno/contract'
-import { freezeHome, homeGreeting, homeShownAtom, homeViewAtom, junoAvailableAtom, markFollowUpDone, markHomeItemUsed, registry, resolveAllTopics, runAction, showHome } from '@juno/state'
+import { fillHome, freezeHome, homeGreeting, homeShownAtom, homeViewAtom, junoAvailableAtom, markFollowUpDone, markHomeItemUsed, registry, resolveAllTopics, runAction, showHome } from '@juno/state'
 import { junoNavAtom } from '@juno/state/agent'
 import { useAtomValue } from '@juno/state/react'
 import { Home, type ActivateEvent } from '@juno/views'
@@ -29,7 +29,7 @@ function askJuno(): void {
  * from a hidden tab, and once more when the first value arrives); later
  * values change only a row's title line (`freezeHome`). Until the first
  * sync is done it shows the scene and the greeting with "Syncing with
- * Slack." and no items. Until there is any value (a few milliseconds) the
+ * Slack.", and rows fill reserved slots as they land (`fillHome`). Until there is any value (a few milliseconds) the
  * page is blank, never a spinner, so it paints whole.
  */
 export function HomePage() {
@@ -51,9 +51,13 @@ export function HomePage() {
     showHome(registry, key, { windowHeight: window.innerHeight, enter: stage > 0 && !appeared.current })
     if (stage > 0) appeared.current = true
   }, [key, stage])
+  // While the first sync runs, each new value may bring items for the free slots.
+  useLayoutEffect(() => {
+    if (stage === 1) fillHome(registry, key)
+  }, [key, stage, value])
 
   if (shown === undefined) return <div data-home="" data-home-waiting="" />
-  const view = latest === undefined ? shown.view : freezeHome(shown.view, latest)
+  const view = value === undefined ? shown.view : freezeHome(shown.view, value)
 
   const itemOf = (itemId: string) => view.items.find((candidate) => candidate.id === itemId)
   const markDone = (itemId: string) => {
@@ -94,6 +98,7 @@ export function HomePage() {
       title={shown.loading && value !== undefined ? homeGreeting({ now: new Date(shown.now), firstName: value.firstName, items: 0, caughtUp: false }).title : shown.title}
       line={shown.line}
       items={view.items}
+      slots={shown.slots}
       done={shown.used}
       now={shown.now}
       caughtUp={shown.caughtUp}
