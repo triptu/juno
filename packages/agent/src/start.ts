@@ -12,6 +12,7 @@
  * then the host client, so the owner lock is released last of the engine's
  * resources.
  */
+import { mkdirSync } from 'node:fs'
 import { Context, Effect, Exit, Layer, Schema, Scope } from 'effect'
 import { AGENT_HOST_PROTOCOL, HostHello, type AgentConfig } from '@juno/agent-contract'
 import { AgentHost } from './host/client'
@@ -62,6 +63,8 @@ export function startAgent(config: AgentConfig, connection: HostConnection, opti
         const hello = yield* client['host.hello']({ protocol: AGENT_HOST_PROTOCOL })
         if (hello.protocol !== AGENT_HOST_PROTOCOL) return yield* new HostProtocolMismatch({ host: hello })
         const bound = yield* bindHost.pipe(Effect.provide(context), Scope.provide(scope))
+        // A first start has no agent directory yet.
+        if (turns !== undefined) mkdirSync(config.agentDir, { recursive: true })
         const engine =
           turns === undefined
             ? undefined
