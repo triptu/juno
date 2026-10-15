@@ -411,6 +411,7 @@ A tab with the message list's area on top and the composer at the bottom, like a
   | no DM exists | Message Jonas Weber | Starts a conversation | `user` | ↵ (opens a New chat addressed to them, §8) |
 
   A send command posts straight into that Main with the toast "Posted in Maya Chen · Main" and Undo (⌘Z). Search results still follow below the command (up to 6).
+- Selection follows the displayed query. Once highlighted, a result keeps the highlight through local refreshes, late commands and Slack results. If it disappears, Enter does nothing until another row is chosen. Older queries cannot replace the current results.
 - Keys: ⌘K toggles (also closes). ArrowUp/Down move; Enter runs the active row; ⌘Enter opens a topic result in a new tab (hint: a `⌘↵` keycap followed by muted "New tab"); Esc closes. Input is autofocused.
 
 [built M9] `CommandPalette` in `@juno/views`, `Palette` in the desktop containers (its own chunk, loaded on idle). Differences from the prototype, and choices the prototype left open:

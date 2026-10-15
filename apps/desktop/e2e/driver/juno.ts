@@ -1733,6 +1733,11 @@ export class PaletteDriver {
     await this.input.pressSequentially(text)
   }
 
+  /** Local results now belong to the current input, rather than the held previous query. */
+  async expectResults(): Promise<void> {
+    await expect(this.root.getByRole('listbox')).toHaveAttribute('aria-busy', 'false', { timeout: 15_000 })
+  }
+
   async clear(): Promise<void> {
     await this.input.fill('')
   }

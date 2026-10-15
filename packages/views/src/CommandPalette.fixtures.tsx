@@ -2,6 +2,7 @@ import * as stylex from '@stylexjs/stylex'
 import { useState } from 'react'
 import { colors } from '@juno/tokens/tokens.stylex'
 import { defineFixtures, scene } from '@juno/ui'
+import { useFixtureControl } from './juno-chat/fixtures/control'
 import { CommandPalette, type PaletteItem, type PaletteSection } from './CommandPalette'
 
 const NOW = Date.UTC(2026, 9, 15, 15, 0)
@@ -36,7 +37,31 @@ function Palette({ initial, sections, settled = true }: { readonly initial: stri
   const [query, setQuery] = useState(initial)
   return (
     <div {...stylex.props(styles.window)}>
-      <CommandPalette query={query} onQuery={setQuery} sections={sections} settled={settled} now={NOW} onSelect={noop} onMenu={noop} onClose={noop} />
+      <CommandPalette query={query} resultsQuery={query} onQuery={setQuery} sections={sections} settled={settled} now={NOW} onSelect={noop} onMenu={noop} onClose={noop} />
+    </div>
+  )
+}
+
+function UpdatingResults() {
+  const [items, setItems] = useState(results)
+  const [withCommand, setWithCommand] = useState(false)
+  const [chosen, setChosen] = useState('')
+  useFixtureControl('prepend-command', () => setWithCommand(true))
+  useFixtureControl('reverse-results', () => setItems((rows) => rows.toReversed()))
+  useFixtureControl('remove-first', () => setItems((rows) => rows.filter((row) => row.id !== 'c1')))
+  return (
+    <div {...stylex.props(styles.window)}>
+      <output data-activation-log="">{chosen}</output>
+      <CommandPalette
+        query="eng"
+        resultsQuery="eng"
+        onQuery={noop}
+        sections={[...(withCommand ? [{ heading: 'Juno' as const, items: [command] }] : []), { heading: 'Results', items }]}
+        settled
+        now={NOW}
+        onSelect={setChosen}
+        onClose={noop}
+      />
     </div>
   )
 }
@@ -63,6 +88,7 @@ export default defineFixtures(
       waiting: scene(() => <Palette initial="zebra" sections={[]} settled={false} />),
     },
     Interaction: {
+      updates: scene(() => <UpdatingResults />),
       'hover-second': scene(() => <Palette initial="eng" sections={[{ heading: 'Results', items: results }]} />, { hover: '#palette-c1-scope' }),
     },
   },

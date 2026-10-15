@@ -164,31 +164,37 @@ const commandRow = (command: PaletteCommand): Row => ({
   run: () => void runPaletteCommand(command),
 })
 
+/** Each edit owns its async answers, including when the same text is typed again. */
+interface Query {
+  readonly text: string
+}
+
 /** The palette while it is open: mounted on open, so each open starts empty. */
 export function OpenPalette() {
-  const [query, setQuery] = useState('')
-  const deferred = useDeferredValue(query)
-  const text = deferred.trim()
-  const result = useAtomValue(searchAtom(deferred))
+  const [request, setRequest] = useState<Query>({ text: '' })
+  const query = request.text
+  const deferred = useDeferredValue(request)
+  const result = useAtomValue(searchAtom(deferred.text))
   const now = useAtomValue(nowAtom)
 
   // The rows of the last text that has results, held until the next text's arrive, so typing never flashes an empty list.
-  const [held, setHeld] = useState<{ readonly text: string; readonly results: ReadonlyArray<SearchResult> } | undefined>(undefined)
-  if (result._tag === 'Success' && (held?.text !== text || held.results !== result.value)) setHeld({ text, results: result.value })
-  const local = result._tag === 'Success' ? { text, results: result.value } : held
-  const settled = local !== undefined && local.text === query.trim()
+  const [held, setHeld] = useState<{ readonly request: Query; readonly results: ReadonlyArray<SearchResult> } | undefined>(undefined)
+  const current = deferred === request && result._tag === 'Success'
+  if (current && (held?.request !== request || held.results !== result.value)) setHeld({ request, results: result.value })
+  const local = current ? { request, results: result.value } : held
+  const settled = local?.request === request
 
-  const command = useLater(query, COMMAND_MIN_LENGTH, COMMAND_DELAY_MS, readCommand)
-  const slack = useLater(query, SLACK_MIN_LENGTH, SLACK_DELAY_MS, searchSlackMessages)
+  const command = useLater(request, COMMAND_MIN_LENGTH, COMMAND_DELAY_MS, readCommand)
+  const slack = useLater(request, SLACK_MIN_LENGTH, SLACK_DELAY_MS, searchSlackMessages)
 
   const results = local?.results ?? []
-  const shownCommand = local !== undefined && command?.text === local.text ? command.value : null
-  const max = local?.text === '' ? PALETTE_RECENT : shownCommand !== null ? RESULTS_UNDER_COMMAND : PALETTE_RESULTS
+  const shownCommand = settled ? command ?? null : null
+  const max = local?.request.text.trim() === '' ? PALETTE_RECENT : shownCommand !== null ? RESULTS_UNDER_COMMAND : PALETTE_RESULTS
   const localRows = results.flatMap(rowsOf).slice(0, max)
-  const rows = local !== undefined && slack?.text === local.text && local.text !== '' ? appendUnseen(localRows, slack.value.map(messageRow), PALETTE_SLACK_RESULTS) : localRows
+  const rows = settled && slack !== undefined && query.trim() !== '' ? appendUnseen(localRows, slack.map(messageRow), PALETTE_SLACK_RESULTS) : localRows
   const sections: ReadonlyArray<PaletteSection> = [
     ...(shownCommand === null ? [] : [{ heading: 'Juno' as const, items: [commandRow(shownCommand)] }]),
-    { heading: local?.text === '' ? ('Recent' as const) : ('Results' as const), items: rows },
+    { heading: local?.request.text.trim() === '' ? ('Recent' as const) : ('Results' as const), items: rows },
   ]
   const byId = new Map<string, Row>([...(shownCommand === null ? [] : [commandRow(shownCommand)]), ...rows].map((row) => [row.id, row]))
 
@@ -202,7 +208,7 @@ export function OpenPalette() {
       afterPaint(() => measure('juno.palette-open', 'juno.palette-open'))
     }
     const keystroke = typed.current
-    if (keystroke !== undefined && keystroke.text === local?.text) {
+    if (keystroke !== undefined && keystroke.text === local?.request.text.trim()) {
       typed.current = undefined
       afterPaint(() => measure('juno.palette-results', keystroke.at, { detail: { rows: rows.length } }))
     }
@@ -210,7 +216,7 @@ export function OpenPalette() {
 
   const onQuery = (next: string) => {
     typed.current = { text: next.trim(), at: performance.now() }
-    setQuery(next)
+    setRequest({ text: next })
   }
 
   const onSelect = (id: string, options: { readonly newTab: boolean }) => {
@@ -231,6 +237,7 @@ export function OpenPalette() {
   return (
     <CommandPalette
       query={query}
+      resultsQuery={local?.request.text.trim() ?? ''}
       onQuery={onQuery}
       sections={sections}
       settled={settled}
@@ -248,23 +255,23 @@ export function OpenPalette() {
 
 /**
  * A one-shot answer for the text, asked once typing pauses for `delay`.
- * Answers for older text arrive with their own text, so a late one is never
- * shown against newer typing.
+ * Answers carry the edit that requested them, so an older answer cannot
+ * replace the current one, even when the user types the same text again.
  */
 function useLater<A>(
-  query: string,
+  query: Query,
   minLength: number,
   delay: number,
   ask: (target: Registry, text: string) => Promise<{ readonly _tag: 'Success'; readonly value: A } | { readonly _tag: 'Failure' }>,
-): { readonly text: string; readonly value: A } | undefined {
-  const [answer, setAnswer] = useState<{ readonly text: string; readonly value: A } | undefined>(undefined)
+): A | undefined {
+  const [answer, setAnswer] = useState<{ readonly query: Query; readonly value: A } | undefined>(undefined)
   useEffect(() => {
-    const text = query.trim()
+    const text = query.text.trim()
     if (text.length < minLength) return
     let live = true
     const timer = setTimeout(() => {
       void ask(registry, text).then((exit) => {
-        if (live && exit._tag === 'Success') setAnswer({ text, value: exit.value })
+        if (live && exit._tag === 'Success') setAnswer({ query, value: exit.value })
       })
     }, delay)
     return () => {
@@ -272,5 +279,5 @@ function useLater<A>(
       clearTimeout(timer)
     }
   }, [query, minLength, delay, ask])
-  return answer
+  return answer?.query === query ? answer.value : undefined
 }

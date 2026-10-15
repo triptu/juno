@@ -62,6 +62,8 @@ export interface PaletteSection {
 export interface CommandPaletteProps {
   readonly query: string
   readonly onQuery: (query: string) => void
+  /** The query that produced the displayed rows, which may lag the input. */
+  readonly resultsQuery: string
   readonly sections: ReadonlyArray<PaletteSection>
   /** The results for the query are known, so an empty list says "No matches." */
   readonly settled: boolean
@@ -80,25 +82,29 @@ const rowDomId = (id: string) => `palette-${id}`
 /**
  * ⌘K (spec section 10, inventory 9): a search field over sections of
  * results. Dumb: the owner gives the rows and runs what is chosen. The
- * active row is the one the arrows or the pointer chose, else the first;
+ * active row keeps its identity until the displayed query changes;
  * Enter runs it, ⌘Enter opens it in a new tab, Esc and a press outside
  * close.
  */
-export function CommandPalette({ query, onQuery, sections, settled, now, onSelect, onActiveChange, onMenu, onClose }: CommandPaletteProps) {
+export function CommandPalette({ query, onQuery, resultsQuery, sections, settled, now, onSelect, onActiveChange, onMenu, onClose }: CommandPaletteProps) {
   const items = sections.flatMap((section) => section.items)
   const ids = items.map((item) => item.id)
-  const [chosen, setChosen] = useState<string | undefined>(undefined)
-  const activeId = chosen !== undefined && ids.includes(chosen) ? chosen : ids[0]
-
-  const activate = (id: string) => {
-    setChosen(id)
-    onActiveChange?.(id)
+  const [selection, setSelection] = useState({ query: resultsQuery, id: ids[0] })
+  // Pin even the automatic first selection. A late command or re-ranked
+  // local result must not change what Enter will open.
+  const chosen = selection.query === resultsQuery ? selection.id : ids[0]
+  if (selection.query !== resultsQuery || (chosen === undefined && ids.length > 0)) {
+    setSelection({ query: resultsQuery, id: chosen ?? ids[0] })
   }
-  // The first row becomes active without a key or a pointer: warm it too.
-  const warmFirst = useEffectEvent((id: string) => onActiveChange?.(id))
+  // If a selected result disappears, Enter does nothing until the user
+  // chooses another row; it must not silently open the new first result.
+  const activeId = chosen !== undefined && ids.includes(chosen) ? chosen : undefined
+
+  const activate = (id: string) => setSelection({ query: resultsQuery, id })
+  const warmActive = useEffectEvent((id: string) => onActiveChange?.(id))
   useEffect(() => {
-    if (activeId !== undefined && chosen === undefined) warmFirst(activeId)
-  }, [activeId, chosen])
+    if (activeId !== undefined) warmActive(activeId)
+  }, [activeId])
 
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     const index = activeId === undefined ? -1 : ids.indexOf(activeId)
@@ -157,7 +163,6 @@ export function CommandPalette({ query, onQuery, sections, settled, now, onSelec
             spellCheck={false}
             value={query}
             onChange={(event) => {
-              setChosen(undefined)
               onQuery(event.target.value)
             }}
             onKeyDown={onKeyDown}
@@ -166,7 +171,7 @@ export function CommandPalette({ query, onQuery, sections, settled, now, onSelec
           <Kbd look="key">esc</Kbd>
         </label>
         <div {...stylex.props(styles.scroll)}>
-          <OptionList id="palette-results" label="Results" {...(activeId === undefined ? {} : { activeId: rowDomId(activeId) })}>
+          <OptionList id="palette-results" label="Results" aria-busy={!settled} {...(activeId === undefined ? {} : { activeId: rowDomId(activeId) })}>
             {sections.map((section) =>
               section.items.length === 0 ? null : (
                 <div key={section.heading} role="group" aria-label={section.heading}>
