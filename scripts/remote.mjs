@@ -38,7 +38,7 @@ const started = Date.now()
 /** Scripts that give the same result on Linux. feel and perf time the Mac and stay local. */
 const remoteScripts = ['typecheck', 'lint', 'test', 'specs:check', 'specs:traces', 'test:agent', 'test:agent-contracts', 'test:agent-testing', 'test:gallery', 'test:desktop', 'test:e2e', 'test:remote-pool']
 /**
- * The smallest shape that keeps each script within about three minutes,
+ * Cost-conscious shapes for each script,
  * measured on 2026-10-15 (docs/development.md, "Machine shapes"). Namespace bills
  * vCPU-minutes, so a bigger machine only pays when the script keeps it busy.
  */
@@ -182,7 +182,7 @@ const transport = (command) => backend === 'ssh' ? ['ssh', [...runner.args, comm
 const container = (image) =>
   `echo __juno_remote_started; rm -rf ${outputDir} && mkdir -p ${outputDir} && chmod 777 ${outputDir} && s=$(date +%s) && ${backend === 'ssh' ? `docker image inspect ${image} >/dev/null` : `docker pull -q ${image} >/dev/null`} && echo "remote: image pulled in $(( $(date +%s) - s )) s" >&2 && echo __juno_remote_ready && docker run --name juno-${runId} --rm -i --init --ipc=host ${backend === 'ssh' ? `--cpus ${cores} -e JUNO_RUNNER_JOB_CORES=${cores}` : ''} -v ${outputDir}:/out ${options.env.map((pair) => `-e ${quote(pair)}`).join(' ')} ${image} ` +
   `bash -c 'tar -xzf - -C /work && exec bash scripts/remote/run.sh "$@"' _ ${scriptArgs}; code=$?; [ -s ${outputDir}/reports.tgz ] && echo __juno_remote_reports; echo "${exitMarker}$code"`
-const create = (duration) => ['create', '--bare', '--machine_type', options.machine, '--duration', duration, '--label', 'juno-remote=1', '--purpose', 'juno remote', ...(process.env.JUNO_REMOTE_IMAGE_CACHE === 'off' ? [] : ['--experimental', JSON.stringify({ container_cache: { tag: 'juno-remote-images-v1', size_mb: 16384 } })])]
+const create = (duration) => ['create', '--bare', '--machine_type', options.machine, '--duration', duration, '--label', 'juno-remote=1', '--purpose', 'juno remote', ...(process.env.JUNO_REMOTE_IMAGE_CACHE === 'off' ? [] : ['--experimental', JSON.stringify({ container_cache: { tag: 'juno-remote-images-v1', size_mb: 8192 } })])]
 
 console.error(`remote: ${files.length} files (${(bytes / 1024 / 1024).toFixed(1)} MB before compression), no secrets found`)
 if (options.dryRun) {
