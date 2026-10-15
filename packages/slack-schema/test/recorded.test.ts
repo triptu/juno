@@ -22,6 +22,7 @@ describe('recorded responses', () => {
       expect.arrayContaining([
         'auth.test.json',
         'client.userBoot.json',
+        'users.prefs.get.json',
         'client.counts.json',
         'subscriptions.thread.getView.json',
         'conversations.history.json',
