@@ -82,7 +82,7 @@ A view is a set of channels and DMs you pick. Its pill shows the Main and thread
 Juno has one view of its own, **Automated** (the robot icon), for bot and alert channels and DMs with apps. It keeps them out of All. It appears once it holds a conversation, and from then on it is a view like any other: edit it, reorder it, turn off Keep these out of All, or delete it. A deleted Automated view is never made again.
 
 - **Clear cases move by themselves.** A channel goes in when most of its latest messages come from apps, or half do and its name says integration (alerts, deploys, ci, notifications and the like), and you have not written there. A DM with an app goes in. This happens as conversations sync, so a bot channel is not in All after the first sync. The view sheet marks these "Added by Juno"; unchecking one takes it out.
-- **Unclear ones are asked.** With AI assist on, Juno judges a channel the rules cannot place, once, from its latest messages. What stays unclear, and every unclear channel while AI assist is off, becomes a Home item: "Move #releases to Automated?" with **Move** and **Keep in All** (12). Right-click the item for the channel's menu, which has Ignore channel for a channel you never want to see.
+- **Unclear ones are asked.** With AI assist on, Juno judges a channel the rules cannot place, once, from its latest messages. What stays unclear, and every unclear channel while AI assist is off, becomes a Home item: "Move #releases?" with **Move** and **Keep in All** (12). Right-click the item for the channel's menu, which has Ignore channel for a channel you never want to see.
 - **Your choice wins.** A conversation you put in or took out of any view by hand, or answered about on Home, is never moved again. New channels are sorted when they appear; nothing already answered is asked again.
 - **Noise you never want** is Ignore channel (below, "What shows up"), as before. Automated is for channels worth a look now and then.
 
@@ -232,6 +232,8 @@ Pressing Enter runs fast checks before anything goes out. If they find nothing, 
 
 *Figure 6. The clarity check listing fixes before sending.*
 
+The send-check bar shows the finding and two choices, without a confidence number.
+
 ## 9. New chat
 
 A blank conversation where you write first and choose where it goes, with the destination's messages shown above as soon as you pick it. Design: `docs/design/new-chat/`.
@@ -254,6 +256,7 @@ A blank conversation where you write first and choose where it goes, with the de
 - **Search.** ⌘K searches topic titles, message text, channels and people. With an empty query it shows recent topics.
 - **DMs.** A person's result reads "Message Maya Chen" and opens your Main with them, or a New chat addressed to them when you have never messaged (section 9).
 - **Channels.** A channel has two results: open its Main, and "Show its topics", which narrows the sidebar to it.
+- **Placeholder.** "Search, or ask Juno".
 - **Commands.** Natural-language input is recognised as a command:  The command appears as the top result with a small confidence badge. Enter runs it.
   - "tell maya …" or "post in #eng …": an instant send card.
   - "summarize …" or "what did I miss": opens Juno with that request.
@@ -282,7 +285,7 @@ Home is a calm resting page: a small scene with Juno's mascot that changes with 
   - **Pick up where you left off.** The last topic you had open, when it has new messages.
   - **Moved a lot.** A followed topic with many new messages since you looked.
   - **Follow-up** (AI on). Something you said you would do, with Mark done.
-  - **Automated.** A channel neither the rules nor Juno could place (5, "Automated"): "Move #releases to Automated?", with how many of its latest messages came from apps in the meta line, Move and Keep in All, each with Undo. Right-clicking it opens the channel's menu.
+  - **Automated.** A channel neither the rules nor Juno could place (5, "Automated"): "Move #releases?", with "To Automated" on the line below, quiet Keep in All then raised Move, each with Undo. Right-clicking it opens the channel's menu.
   - **Tidy up** (AI on). Topics that look settled, listed in the meta line, with Resolve all and Undo.
   Clicking a row opens its topic. Items are computed when Home appears and do not change under the pointer. With AI on, a row's title line may be rewritten to say what it is about; the meta line never changes.
 - **Ask Juno** opens the Juno chat. Anything else that used to be a suggestion card (a coding prompt from a discussion, reply ideas) is something you ask Juno for, here or in the Juno panel beside the topic.
@@ -421,6 +424,8 @@ Juno remembers the whole chat. Older parts are kept as a summary that grows dens
 - **Forget** as a correction is a message ("forget the Wednesday slot"); Juno confirms in words. **Remove**, from a message's context menu, opens a local sheet that works in every state: it deletes the message, everything Juno derived from it, and pending actions that saw it. The chat shows "Removed" where it was. Juno's later replies that quote it stay unless you also remove them. Copies already sent to the model provider cannot be recalled, and the sheet says so. A removal Juno proposes is a Remove card with the same text.
 - **Memory of this chat** shows Juno's summary as a dated timeline. Lines being rebuilt after a removal read "being updated".
 - **One Mac at a time.** Juno's state lives on this Mac with an encrypted backup in a folder you choose (under the app's data folder by default). Moving to another Mac is a handover from the old one. A restore from backup opens in recovery (13.7) until you review what was pending.
+The Backup folder path is cut in the middle when it does not fit; hovering shows the full path. Export recovery phrase remains focusable during export and ignores repeat presses. Closing the phrase sheet returns keyboard focus to its opener.
+
 - **Move, restore and activate.** Settings › Juno shows who owns Juno's state, and offers "Export recovery phrase", "Move to another Mac" and "Restore from backup". Move finishes what is running, makes this Mac read-only, writes a final backup and shows a move code; the other Mac restores from it, shows the code of the backup it found, and takes over once you confirm the two codes match. Restore without a move asks you to confirm the old Mac is off, erased, or has Juno removed, and says Juno cannot check this: "If Juno is still running on the old Mac, both Macs can act until it sees this Mac's backup, which happens only if they share a backup folder." Either way Juno opens in recovery: nothing runs, the header chip offers Review, and the Review page lists every pending card with "This may already have happened." Approve the ones you still want, then press "Activate Juno". Cards still open are expired.
 - **Removed messages and an older backup.** When Juno restores on a new Mac without a move code, and "Rotate recovery phrase after removals" is off, it cannot tell whether the folder holds your newest backup. The Review page says: "Juno can't check that this backup is the newest. If the folder is out of date, messages you removed may come back. You can remove them again."
 
@@ -443,7 +448,7 @@ Juno remembers the whole chat. Older parts are kept as a summary that grows dens
 
 ### 13.10 Settings and pages
 
-The Juno header menu (the chevron beside "Juno" in the Juno tab and the panel) opens Scheduled, What Juno remembers, Memory of this chat, Activity, Connections and Settings › Juno. **Settings › Juno** holds the chat model (the newest of Claude Sonnet, Claude Opus, Muse, GPT Sol or Grok, resolved from the provider's catalogue; Sonnet by default; each choice reads as the model's own name and its price, "Claude Sonnet 5.5 · $2 in, $10 out per million tokens"), the compaction model, today's spend and the daily cap ($2 by default; lowering it below today's use blocks new spending without cancelling work already under way), the OpenRouter key (with a line when the provider rejected it) and Codex status. Local Codex uses an isolated sign-in, is available without an API key, and shows ChatGPT-plan turns today instead of a dollar price. Remaining quota is not reported. Settings also holds your rules, Pause, the backup folder with "Rotate recovery phrase after removals" (off by default), and who owns Juno's state with Export recovery phrase, Move to another Mac and Restore from backup (13.8). **Connections** shows each server's state, the address in use, and the tools it offers with their tier. The T3 Code row also holds its address and the switch "Allow T3 Code over the local network", off by default; over the network only an https address works, so with the switch off Juno uses T3 Code on this Mac only.
+The Juno header menu (the chevron beside "Juno" in the Juno tab and the panel) opens Scheduled, What Juno remembers, Memory of this chat, Activity, Connections and Settings › Juno. **Settings › Juno** holds the chat model (the newest of Claude Sonnet, Claude Opus, Muse, GPT Sol or Grok, resolved from the provider's catalogue; Sonnet by default; each choice reads as the model's own name and its price, "Claude Sonnet 5.5 · $2 in, $10 out per million tokens"), the compaction model, today's spend and the daily cap ($2 by default; lowering it below today's use blocks new spending without cancelling work already under way), the OpenRouter key (with a line when the provider rejected it) and Codex status. Local Codex uses an isolated sign-in, is available without an API key, and shows ChatGPT-plan turns today instead of a dollar price. Remaining quota is not reported. Settings also holds your rules, Pause, the backup folder with "Rotate recovery phrase after removals" (off by default), and who owns Juno's state with Export recovery phrase, Move to another Mac and Restore from backup (13.8). **Connections** shows each server's state, the address in use, and one "Runs without asking" checkbox per tool. Read and Asks every time chips are omitted. Default is quiet text only for an allowlisted tool changed to ask. Connect and Sign in are secondary buttons; no action on this page is accent-filled. The T3 Code row also holds its address and the switch "Allow T3 Code over the local network", off by default; over the network only an https address works, so with the switch off Juno uses T3 Code on this Mac only.
 
 ### 13.11 Writing
 

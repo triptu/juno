@@ -112,12 +112,12 @@ interface HomeRowProps {
 
 /** The meta line: plain data, the same with and without AI. */
 function metaOf(item: HomeItem, now: number): string {
+  if (item.kind === 'automated') return 'To Automated'
   if (item.kind === 'tidyUp') return item.topics.map((topic) => topic.title).join(', ')
   const topic = item.topics[0]
   const last = item.kind === 'moved' ? `${item.newCount ?? 0} new` : item.at === undefined ? undefined : relativeTime(item.at, now)
-  // Automated: why it is asked, instead of the conversation's name the title already says.
-  const first = item.kind === 'automated' ? (item.fromApps === undefined ? undefined : `${item.fromApps.apps} of the last ${item.fromApps.of} from apps`) : topic?.title
-  const place = item.kind === 'automated' ? undefined : topic?.place
+  const first = topic?.title
+  const place = topic?.place
   return [first, place, last].filter((part) => part !== undefined && part !== '').join(' · ')
 }
 
@@ -196,7 +196,7 @@ function HomeRow({ item, done, now, onOpen, onMarkDone, onResolveAll, onSort, on
           {done
             ? null
             : buttons.map((button) => (
-                <Button key={button.label} variant="ghost" size="sm" tone="muted" onClick={button.run}>
+                <Button key={button.label} variant={button.label === 'Move' ? 'raised' : 'ghost'} size="sm" tone={button.label === 'Move' ? 'default' : 'muted'} onClick={button.run}>
                   {button.label}
                 </Button>
               ))}

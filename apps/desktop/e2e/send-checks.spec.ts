@@ -58,7 +58,7 @@ test('a reply typed into Main is offered to its thread, and Post in thread posts
   await typeAndPause(topic, userData, fake.teamId, BILL_REPLY)
   await topic.composer.press('Enter')
   await expect(topic.checkBar.bar).toContainText('Looks like a reply to')
-  await expect(topic.checkBar.bar).toContainText('%')
+  await expect(topic.checkBar.bar).not.toContainText('%')
   // The bar grows the composer upwards; the text stays where it was.
   expect(await topic.composer.boundingBox()).toEqual(field)
   expect(posts(fake)).toHaveLength(0)

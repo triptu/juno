@@ -162,8 +162,8 @@ export function CommandPalette({ query, onQuery, resultsQuery, sections, settled
             aria-controls="palette-results"
             aria-autocomplete="list"
             aria-activedescendant={activeId === undefined ? undefined : rowDomId(activeId)}
-            aria-label="Search, or tell Juno"
-            placeholder="Search, or tell Juno: message maya the slot works"
+            aria-label="Search, or ask Juno"
+            placeholder="Search, or ask Juno"
             spellCheck={false}
             value={query}
             onChange={(event) => {
