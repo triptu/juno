@@ -417,7 +417,8 @@ export function agentHandlers(host: ChatHost) {
         'agent.connections.page': () => host.connections ? connectionHandlers(host.connections).page() : Stream.make({ connections: [] }),
         'agent.connections.action': (input) => host.connections ? connectionHandlers(host.connections).action(input) : notYet('Connections')(),
         'agent.connections.tier': (input) => host.connections ? connectionHandlers(host.connections).tier(input) : notYet('Connections')(),
-        'agent.connections.address': notYet('Connections'),
+        'agent.connections.address': (input) => host.connections ? connectionHandlers(host.connections).address(input) : notYet('Connections')(),
+        'agent.connections.add': (input) => host.connections ? connectionHandlers(host.connections).add(input) : notYet('Connections')(),
         'agent.review.page': () => (state.turns === undefined ? Stream.make(reviewPage()) : live(state.changes, () => state.turns!.ownership.review())),
         // Activate is the owner's, on the trusted side: AI assist off does not block it.
         'agent.review.activate': ({ opId, backupAt }) =>

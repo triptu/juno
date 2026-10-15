@@ -144,6 +144,8 @@ export const ConnectionRow = Schema.Struct({
   t3: Schema.optionalKey(T3Address),
   tools: Schema.Array(DiscoveredTool),
   enabled: Schema.Boolean,
+  /** The owner added this server; Remove deletes it. Notion, Littlebird and T3 Code stay. */
+  removable: Schema.optionalKey(Schema.Literal(true)),
 })
 export type ConnectionRow = typeof ConnectionRow.Type
 

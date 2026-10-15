@@ -297,6 +297,22 @@ export const chatCopy = {
       allowNetwork: 'Allow T3 Code over the local network',
       allowNetworkNote: 'Only an https address works over the network.',
     },
+    connections: {
+      connect: 'Connect',
+      signIn: 'Sign in',
+      cancel: 'Cancel',
+      disconnect: 'Disconnect',
+      remove: 'Remove',
+      signingIn: 'Finish signing in in your browser.',
+      add: 'Add a server',
+      addSub: 'Any MCP server by its address. Juno signs in if the server asks.',
+      name: 'Name',
+      address: 'Address',
+      addButton: 'Add',
+      t3Address: 'T3 Code address',
+      invalidAddress: 'Use an https address, or http on this Mac.',
+      failed: 'That did not work. Check the connection and try again.',
+    },
   },
 } as const
 

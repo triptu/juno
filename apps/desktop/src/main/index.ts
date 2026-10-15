@@ -1,7 +1,8 @@
-import { app, BrowserWindow, Notification, powerMonitor } from 'electron'
+import { app, BrowserWindow, Notification, powerMonitor, shell } from 'electron'
 import { Events, type NotificationTarget } from '@juno/contract'
 import { join } from 'node:path'
 import { createAgentSupervisor } from './agent'
+import { appMcpCredentials } from './mcpCredentials'
 import { createSupervisor } from './engine'
 import { contextMenuForTests, registerIpc, slackLinksForTests } from './ipc'
 import { CUSTOM_ITEM, macKeychain, memoryKeychain, OPENROUTER_ITEM } from './keychain'
@@ -85,6 +86,8 @@ supervisor.onReady(() => notifier.engineReady())
 const agent = createAgentSupervisor(
   (port) => supervisor.send({ _tag: 'agentPort' }, [port]),
   () => supervisor.currentState === 'ready',
+  // MCP sign-in: OAuth state in the keychain (memory under tests), sign-in pages in the system browser.
+  appMcpCredentials(e2e, (url) => shell.openExternal(url)),
 )
 supervisor.onReady(() => agent.linkHost())
 

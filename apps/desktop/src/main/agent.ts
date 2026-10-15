@@ -20,12 +20,16 @@
  * starts it once the provider store has loaded one, sends every change to
  * the running process, and stops it when none is left. With none, a
  * renderer that asks for a port is told `failed`, and the Juno tab shows
- * "Add a provider". OAuth requests come with Connections (WP17).
+ * "Add a provider".
+ *
+ * The agent's MCP connections ask main for their OAuth state and to open a
+ * sign-in page (`credential`, WP17). `mcpCredentials.ts` answers; the answer
+ * goes only to the process that asked, never to one started after it.
  */
 import { app, MessageChannelMain, utilityProcess, type MessagePortMain, type UtilityProcess, type WebContents } from 'electron'
 import { join } from 'node:path'
 import { Schema } from 'effect'
-import { AgentToMain, type AgentConfig, type AgentProvider, type HostHello, type MainToAgent } from '@juno/agent-contract'
+import { AgentToMain, type AgentConfig, type AgentProvider, type CredentialRequest, type HostHello, type MainToAgent } from '@juno/agent-contract'
 import { Events } from '@juno/contract/channels'
 import type { PortRequestResult } from '@juno/contract'
 
@@ -57,6 +61,8 @@ export class AgentSupervisor {
     private readonly sendToEngine: (port: MessagePortMain) => void,
     /** Whether the engine is ready to take a port now. */
     private readonly engineReady: () => boolean,
+    /** Answers an MCP credential request (`mcpCredentials.ts`). */
+    private readonly credential: (request: CredentialRequest) => Promise<string | null | undefined>,
   ) {}
 
   get currentState(): AgentState {
@@ -90,6 +96,14 @@ export class AgentSupervisor {
         message = decodeFromAgent(data)
       } catch (cause) {
         console.error('main: bad message from agent', cause)
+        return
+      }
+      if (message._tag === 'credential') {
+        const reply = (answer: Omit<Extract<MainToAgent, { _tag: 'credentialReply' }>, '_tag' | 'requestId'>) => {
+          if (this.child === child) child.postMessage({ _tag: 'credentialReply', requestId: message.requestId, ...answer } satisfies MainToAgent)
+        }
+        // No detail crosses back: a keychain error could echo what it was given.
+        this.credential(message.request).then((value) => reply({ ok: true, ...(value === undefined ? {} : { value }) }), () => reply({ ok: false }))
         return
       }
       if (message._tag === 'ready') {
@@ -198,7 +212,11 @@ export class AgentSupervisor {
   }
 }
 
-export function createAgentSupervisor(sendToEngine: (port: MessagePortMain) => void, engineReady: () => boolean): AgentSupervisor {
+export function createAgentSupervisor(
+  sendToEngine: (port: MessagePortMain) => void,
+  engineReady: () => boolean,
+  credential: (request: CredentialRequest) => Promise<string | null | undefined>,
+): AgentSupervisor {
   const e2e = process.env.JUNO_E2E === '1'
   // Read only under JUNO_E2E, so a real run can never be pointed elsewhere.
   const openRouterOrigin = e2e ? process.env.JUNO_FAKE_OPENROUTER_URL : undefined
@@ -206,5 +224,6 @@ export function createAgentSupervisor(sendToEngine: (port: MessagePortMain) => v
     { agentDir: join(app.getPath('userData'), 'agent'), e2e, ...(openRouterOrigin === undefined ? {} : { openRouterOrigin }) },
     sendToEngine,
     engineReady,
+    credential,
   )
 }
