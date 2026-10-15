@@ -69,6 +69,8 @@ Channels are `ChannelIcon` (section 4a).
 
 `Swatch`: a round 24px colour choice, a bold check and a ring when `selected` (`aria-pressed`). Required `label`. `hue` draws a person or channel colour in the avatar mix (the channel picker); `accent` draws an accent's solid fill from the `accentSwatches` tokens (the appearance settings). The accent picker uses it too.
 
+`DayToggles`: seven 28px round toggle buttons, Monday first ("M T W T F S S", each named by its day, `aria-pressed`), in a group named by `label`. An on day is filled with `--secondary-default`; an off day is muted text. `days` uses 0 for Sunday, as `Date.getDay`. The Notifications page's hours rows use it.
+
 ## 5. Chip
 
 Small inline label. Replaces tags, count badges, status chips, decision chips, summary chips, confidence badge, scope chip.
@@ -173,6 +175,6 @@ Feature components that compose the above and hold app logic: `Sidebar`, `TopicR
 
 ## Count
 
-23 primitives (Surface gains the `island` kind and `HeaderBand`): Icon, Button, NavItem, IconButton, Avatar (+AvatarStack, AvatarButton), ChannelIcon (+Swatch), Chip, ContextPill, Kbd, Text, Surface (+Divider, LabelledRule), Popover/OptionList, ScrollArea, Tabs, Fields (TextField, Textarea, Select, Checkbox, Slider, Segmented), ListRow, Toast, EmptyState, Illustration, Logo, Page/PageHeader/Section, CodeBlock, Card.
+23 primitives (Surface gains the `island` kind and `HeaderBand`): Icon, Button, NavItem, IconButton, Avatar (+AvatarStack, AvatarButton), ChannelIcon (+Swatch, DayToggles), Chip, ContextPill, Kbd, Text, Surface (+Divider, LabelledRule), Popover/OptionList, ScrollArea, Tabs, Fields (TextField, Textarea, Select, Checkbox, Slider, Segmented), ListRow, Toast, EmptyState, Illustration, Logo, Page/PageHeader/Section, CodeBlock, Card.
 
 Differences from the first proposal: Button's accent variant is called `primary`; Tile and Avatar are one component; Menu/MenuItem were folded into OptionList (same row anatomy, one keyboard model); PageHeader got a `Page` container for the width and padding instead of setting them itself; `Icon` takes a component rather than a name.

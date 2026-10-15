@@ -7,7 +7,8 @@ The notification pipeline and scheduled presence for one signed-in workspace. It
 - `receive(candidate)` deduplicates by channel and message timestamp, runs `decideNotification`, and stores the reason and any AI judgement. `urgencyGate` receives the owner's `matters` text. After two seconds without an answer, DMs and mentions notify under the AI-off rule. Hours are checked again after the gate, so its delay cannot notify past the closing boundary.
 - `settingsChanged` re-runs today's rows at their original decision time, using stored judgements. It makes no model calls. A row without a judgement uses the AI-off rule. An already delivered or focused-topic-suppressed row cannot notify again.
 - `tick` applies a changed presence schedule and sends due summaries. `wake` also reapplies scheduled presence. The engine calls it on launch and wake. A manual change holds until the next schedule switch or wake.
-- `observePresence` tracks Slack's manual-presence event. `setPresence` handles an explicit change from the owner through the same Slack callback.
+- `observePresence` tracks Slack's manual-presence event. `setPresence` handles an explicit change from the owner through the same Slack callback. `presenceChanges` streams what Slack shows, for the avatar menu.
+- Every write to `notification_log` invalidates the `notification_log` key, so the Notifications page's Today and the why popover follow.
 
 The appended user migration retains the existing unique message constraint and adds the candidate, judgement, and summary due time. Each summary row records its next local hours start. A due row remains eligible after the window ends, so a missed start is delivered on relaunch. No configured start means that a summary remains pending.
 
@@ -19,7 +20,7 @@ With AI assist on, `Notifier.summary` receives the full source list and the summ
 
 Delivery is claimed in SQLite before the OS call, to prevent a duplicate interruption. A crash between the claim and the OS call can lose that interruption. Reasons and message content remain in the log. The agent summary callback runs before the delivery claim.
 
-The agent host on this branch has no summary append method yet. The callback is the M10 engine handoff for WP13 and plan v3 section 19.1. Main supplies the OS implementation and focused-topic state. Without a host adapter, the engine's default callbacks show nothing.
+The agent host on this branch has no summary append method yet. The callback is the M10 engine handoff for WP13 and plan v3 section 19.1. In the app, `hostNotificationHost` in the engine sends notifications to main (`apps/desktop/src/main/notifier.ts`), which shows them and reports the focused topic; until the chat can take the summary, its click opens the first source.
 
 ## Tests
 
