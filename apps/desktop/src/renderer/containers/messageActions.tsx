@@ -18,11 +18,12 @@
  * that window has the new text, so the old text never flashes back.
  */
 import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from 'react'
-import type { MessageRef, MessageView, TopicDetail } from '@juno/contract'
+import type { MessageView, TopicDetail } from '@juno/contract'
 import { deleteMessage, editMessage, reactToMessage, registry, type MessageWindow } from '@juno/state'
 import { Floating, InlineEdit, SelectionQuote, type MenuAnchor, type MessageActions } from '@juno/views'
 import { openTopic } from './navigation'
 import { showMessageMenu } from './topicActions'
+import { isOwnEditable, landedTs, refOf } from './messageRows'
 
 const EmojiPickerPanel = lazy(() => import('./EmojiPickerPanel'))
 
@@ -57,27 +58,10 @@ function preloadPicker(): void {
 /** The node is inside a message's text in this list. */
 const inMessageText = (node: Node | null, scroller: HTMLElement) => (node instanceof Element ? node : node?.parentElement)?.closest('[data-msg-text]') != null && scroller.contains(node)
 
-const refOf = (channel: string, message: MessageView): MessageRef => ({
-  channelId: channel,
-  ts: message.ts,
-  ...(message.clientMsgId === undefined ? {} : { clientMsgId: message.clientMsgId }),
-})
-
-/** The message can be edited and deleted by the user: their own, shown as a message, and not a failed send (that one has Delete draft). */
-export const isOwnEditable = (message: MessageView): boolean => message.fromMe && message.kind === 'message' && message.pending !== 'failed' && message.editText !== undefined
-
 /** The text a whole-message quote takes: the body as the list draws it, mentions as their names. */
 function textOf(scroller: HTMLElement | null, ts: string): string {
   const body = rowOf(scroller, ts)?.querySelector<HTMLElement>('[data-msg-text]')
   return body?.innerText.trim() ?? ''
-}
-
-/** The ts a row that was `pending:<clientMsgId>` has now that Slack has the message, if it is in the window. */
-function landedTs(rows: ReadonlyMap<string, MessageView>, pendingTs: string): string | undefined {
-  if (!pendingTs.startsWith('pending:')) return undefined
-  const clientMsgId = pendingTs.slice('pending:'.length)
-  for (const message of rows.values()) if (message.clientMsgId === clientMsgId && message.pending === undefined) return message.ts
-  return undefined
 }
 
 export interface MessageActionsInput {
