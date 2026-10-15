@@ -1,6 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
 import type { FocusEvent, KeyboardEvent, ReactNode } from 'react'
-import { colors, spacing } from '@juno/tokens/tokens.stylex'
+import { colors, layout, spacing } from '@juno/tokens/tokens.stylex'
 import { Button, EmptyState, ScrollArea, Text } from '@juno/ui'
 
 export type TopicListSectionId = 'pinned' | 'recent'
@@ -155,7 +155,9 @@ const styles = stylex.create({
   // Scroll anchoring keeps the viewport still when rows arrive above it.
   scroller: {
     flexGrow: 1,
-    paddingInline: spacing['--space-2'],
+    // The sidebar inset on the left; on the right the 10px scrollbar gutter is part of it, so rows sit at the same inset on both sides.
+    paddingInlineStart: layout['--sidebar-inset'],
+    paddingInlineEnd: `calc(${layout['--sidebar-inset']} - ${layout['--scrollbar-size']})`,
     paddingBottom: spacing['--space-4'],
   },
   section: {

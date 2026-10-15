@@ -129,7 +129,7 @@ export function MessageList({
   const newCount = dividerIndex < 0 ? 0 : items.length - dividerIndex
 
   return (
-    <ScrollArea scrollbar="hover" underHeader={underHeader} ref={scrollRef} data-scroll="" sx={styles.scroller}>
+    <ScrollArea scrollbar="hover" evenInset underHeader={underHeader} ref={scrollRef} data-scroll="" sx={styles.scroller}>
       <div
         role="list"
         aria-label="Messages"

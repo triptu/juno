@@ -51,7 +51,7 @@ export interface JunoChatListProps {
 export function JunoChatList({ items, banner, moreAbove, moreBelow, now, actions, onSuggest, scrollRef, anchorRef, topEdgeRef, bottomEdgeRef, enterEmpty = true }: JunoChatListProps) {
   const empty = items.length === 0
   return (
-    <ScrollArea scrollbar="hover" underHeader ref={scrollRef} data-scroll="" sx={styles.scroller}>
+    <ScrollArea scrollbar="hover" evenInset underHeader ref={scrollRef} data-scroll="" sx={styles.scroller}>
       <div role="list" aria-label="Juno chat" {...stylex.props(styles.column)}>
         <div ref={topEdgeRef} data-chat-edge={moreAbove ? 'more' : 'end'} aria-hidden {...stylex.props(styles.edge)} />
         {empty ? <EmptyChat onSuggest={onSuggest} enter={enterEmpty} /> : null}
