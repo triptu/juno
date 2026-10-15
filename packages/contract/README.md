@@ -47,3 +47,5 @@ No tests of its own. The routes are exercised by `packages/engine/test` (the rea
 The shell update routes (`updates.get`, `updates.set`, `updates.restart`) and `UpdateState` keep release handling in main. `updates.changed` forwards changes to the renderer.
 
 - `mentions.emoji` serves cached workspace emoji and aliases once per workspace; composer keystrokes filter it locally. It never calls Slack.
+
+New chat’s `newChat.frequent` live query returns up to six local conversations, ranked by own sends over 30 days with a seven-day half-life, then filled by member activity (DMs first). Archived and ignored channels are excluded. It never calls Slack. The renderer reads `frequentConversationsAtom` on page open without waiting to paint.

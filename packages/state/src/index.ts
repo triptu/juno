@@ -86,6 +86,7 @@ export {
 export {
   emptyNewChat,
   newChatAtom,
+  frequentConversationsAtom,
   pickConversation,
   pickConversationsAtom,
   pickThread,
