@@ -460,3 +460,38 @@ base('06 AI assist off from the start', async ({ juno, fake, slackApp, userData,
   }
   flushLog('06-ai-off')
 })
+
+setup('07 Set up Juno after sign-in', async ({ juno }) => {
+  base.skip(!only('setup'))
+  log.length = 0
+  const { win, app } = juno
+  await setSize(app, 1400, 900)
+  await juno.signIn({ skipSetUp: false })
+  const { setUp } = juno
+  await step('set up', async () => {
+    await expect(setUp.getByRole('heading', { name: 'Set up Juno' })).toBeVisible({ timeout: 15_000 })
+    await win.mouse.move(1300, 880)
+    await both(win, '40-set-up')
+    save('measure-set-up', await measure(win, '[data-set-up-juno], [data-set-up-juno] :is(h1, p, button, input, select, [role=radiogroup])'))
+    await setSize(app, 720, 600)
+    await both(win, '40b-set-up-720')
+    await setSize(app, 1400, 900)
+    await setUp.getByRole('radio', { name: 'OpenAI-compatible' }).click()
+    await both(win, '41-set-up-custom')
+    await setUp.getByRole('radio', { name: 'OpenRouter' }).click()
+    await setUp.getByLabel('API key').fill('two words')
+    await setUp.getByRole('button', { name: 'Continue' }).click()
+    await both(win, '42-set-up-bad-key')
+    await setUp.getByLabel('API key').fill(KEY)
+    await setUp.getByRole('button', { name: 'Continue' }).click()
+    await one(win, '43-set-up-saving')
+    await expect(setUp.locator('[data-set-up-model] select')).toBeVisible({ timeout: 20_000 })
+    await win.mouse.move(1300, 880)
+    await both(win, '44-set-up-model')
+    await setUp.getByRole('button', { name: 'Continue' }).click()
+    await juno.waitForSync()
+    await win.mouse.move(1300, 880)
+    await both(win, '45-after-set-up')
+  })
+  flushLog('07-set-up')
+})

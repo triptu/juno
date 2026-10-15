@@ -5,7 +5,7 @@ The owner is about to use Juno every day for the first time. This review walks t
 ## Scope and how it was checked
 
 - **The app.** `harness/review.spec.ts` drives the built app at 1400 × 900 (and 720 × 600 for sign-in and Home). It shoots each state in light and dark and writes what the window holds over time (`harness/out-*/snapshot-*.json`, `series-*.json`). To see the first sync, it holds the fake's `client.userBoot`, then `conversations.history`, and shoots each hold. A third test signs in to the fake's 1,200-topic seed and shoots every two seconds for 90 seconds.
-- **Runs.** `before/` is `520f9429` (main), `after/` is this branch. The harness writes PNGs; they are kept here as half-size JPEGs, and of the time series only the first frames are kept. `compare/` stacks before over after for each fix. Run from `apps/desktop` after `pnpm build`: `REVIEW_SET=after REVIEW_ONLY=signin,import,cold,pages,juno,aioff node ../../scripts/heavy.mjs pnpm exec playwright test -c ../../docs/design/reviews/2026-10-16-first-run/harness/desktop.config.ts`.
+- **Runs.** `before/` is `520f9429` (main), `after/` is this branch. The harness writes PNGs; they are kept here as half-size JPEGs, and of the time series only the first frames are kept. `compare/` stacks before over after for each fix. Run from `apps/desktop` after `pnpm build`: `REVIEW_SET=after REVIEW_ONLY=signin,import,cold,pages,juno,aioff,setup node ../../scripts/heavy.mjs pnpm exec playwright test -c ../../docs/design/reviews/2026-10-16-first-run/harness/desktop.config.ts`.
 - **AI assist off.** The app has no switch for it (finding 3), so the harness writes the pref into the workspace database and relaunches, as `home.spec.ts` does.
 - **Not reviewed.** A real cold boot. The fake answers in milliseconds, so even the 1,200-topic seed had rows in 2.3 s and Home ready at once (`out-before/series-cold.json`; its `engine` field is the supervisor's state, not the sync phase, so the series ran its full 90 s). The held calls stand in for a slow Slack. Also not reviewed: the macOS keychain prompt for the import, which the fixture skips; VoiceOver; native menus.
 
@@ -31,10 +31,9 @@ Right after sign-in, until the first conversations arrive, the list showed the q
 **Fix.**
 
 - The sidebar shows "Getting your topics" with "Juno is reading your conversations from Slack. Topics show up here as they arrive." It has no illustration and no button. This shows while the engine's phase is before `live` and nothing has arrived.
-- Home shows its scene and greeting with "Getting your conversations from Slack." (no items, not "All caught up"). The items enter when the sync is done. Before `home.view` answers at all, Home stays blank as before.
-- The gallery has `Sidebar` › Empty › `syncing` and `Home` › Empty › `first-sync`.
-- `sidebar.spec.ts` holds the boot and checks both.
-- After: `after/03-signed-in-boot-held-*`, `after/04-history-held-*`. Compare: `compare/01-first-sync-*`, `compare/01b-first-sync-rows-*`.
+- Home's blank page is left to the `real-data-1` work, which fixes it and adds a sync progress line to the sidebar header. This branch first gave Home a "Getting your conversations from Slack." line (`ebd52cd8`), then reverted it (`1fcd1d61`) so the two do not collide.
+- The gallery has `Sidebar` › Empty › `syncing`. `sidebar.spec.ts` holds the boot and checks the sidebar.
+- After: `after/03-signed-in-boot-held-*` (shot before the revert, so its Home still has the line). Compare: `compare/01-first-sync-*`.
 
 ### 2. With AI assist off, the Juno tab asked for a model, and Home kept Ask Juno. High. Fixed.
 
@@ -102,6 +101,23 @@ The menu's header reads "tushar", the handle, where the rest of the app says "Tu
 - **Connections intro.** It said "A tool on a server's read list needs no click; everything else is a card, every time." Tools now have one "Runs without asking" checkbox and no read list. Fixed: "Where Juno can read and act. Tools that run without asking need no click; everything else asks with a card."
 - **Apostrophes.** The sign-in page uses straight ones ("I'm", "app's") and its status line a curly one ("Slack app’s session").
 
+## Added after the review: Set up Juno
+
+The owner tried the real app and could not find where to add the OpenRouter key. The model setup is now part of signing in. After the first Slack sign-in, with no provider set up, the sign-in page shows "Set up Juno" before the app.
+
+- **The choices:**
+  - OpenRouter, with its API key.
+  - OpenAI-compatible, with a base URL and an optional key.
+  - Codex, only when it is installed. Sign in to Codex runs `codex login` in Juno's own Codex home, which opens the browser.
+- **Saving:** the key goes through `setAgentProvider` to the keychain, the same path as Settings › Juno. The agent then starts, and a Model row offers its chat models, with Sonnet already chosen.
+- **The buttons:** Continue saves the key, then finishes. Skip for now opens the app with AI assist on, and the Juno tab says "Juno needs a model" as before.
+- **When it shows:** once, after a first sign-in. It does not show after "Slack signed you out", or when a provider is already set up.
+- **The page:** the sign-in page and the step share `SignInPage`, so the mark, title, body and status line sit in the same place on both.
+- **Docs:** SPEC section 4 has a new "Sign-in" part, the inventory has 1.1, and the architecture doc lists `agent.codex` and `agent.codexSignIn`.
+- **Shots:** `after/40-set-up-*` (720: `40b`), `41-set-up-custom-*`, `42-set-up-bad-key-*`, `43-set-up-saving`, `44-set-up-model-*`, `45-after-set-up-*`.
+- **Tests:** `e2e/juno-agent/set-up.spec.ts` covers sign-in, then set-up and the first chat, and sign-in, then Skip. The e2e driver's `signIn` and `importFromSlackApp` press Skip for now unless a test passes `skipSetUp: false`.
+- **Not covered by a test:** Codex. No Codex is installed under tests (main looks only at `JUNO_E2E_CODEX`), and Codex's browser sign-in was not tried against a real Codex.
+
 ## Questions for the owner
 
 Each has a recommendation. They are left open because each changes what a surface offers or how it reads.
@@ -115,18 +131,21 @@ Each has a recommendation. They are left open because each changes what a surfac
 | Q5 | When do Session and Diagnostics leave the avatar menu? (For the `settings-one` work, which owns the menu.) | Now. Make Sign out the menu's last item, move the version to Preferences › About (it is already there), and keep Ping engine for development builds. Show the real name in the header. |
 | Q6 | What does ⌘K offer when nothing matches? | "Search Slack for "…"" as the one row when Slack search is wired; until then "No matches. Try fewer words." |
 | Q7 | One page width for every settings-like page? | Yes, 760 for all of them, so the titles stay put when switching tabs. Juno's chat column stays 720. |
-| Q8 | Should Home say "Nothing is waiting on you" while the first sync is still catching up? | Home is ready once the boot is done, but older conversations still arrive after that (`series-cold.json`: "Nothing is waiting on you." at 2.3 s). Keep "Getting your conversations from Slack." until the engine is `live` on the first run, then show the items. |
+| Q8 | Should Home say "Nothing is waiting on you" while the first sync is still catching up? (For the `real-data-1` work.) | Home is ready once the boot is done, but older conversations still arrive after that (`series-cold.json`: "Nothing is waiting on you." at 2.3 s). Keep "Getting your conversations from Slack." until the engine is `live` on the first run, then show the items. |
 
 ## Commits on `first-run-1`
 
 - `84679b78` Say the sidebar is getting topics during the first sync, and name an empty view (findings 1, 6)
-- `ebd52cd8` Show the greeting on Home during the first sync, with a line saying why it is empty (1)
+- `ebd52cd8` Show the greeting on Home during the first sync (1), reverted by `1fcd1d61` for the real-data work
 - `fb490553` Keep the All topics scrollbar gutter, so the column heads stay put when the table empties (8)
 - `1e247984` With AI assist off, say Juno is off and leave Ask Juno off Home (2)
 - `fc59de67` Keep Settings › Juno's intro to one line before the agent runs (7)
 - `57929c79` Show Juno's AI-off line when AI assist is off and no agent runs (2)
 - `ac0d88e3` With AI assist off, show the empty chat as the one AI-off line, with the composer dimmed (2)
-- Rewrite the Connections intro for the Runs without asking checkbox (12)
+- `9bba2cc2` Rewrite the Connections intro for the Runs without asking checkbox (12)
+- `b702da7f` Let the renderer check local Codex and sign in to it, in Juno's own Codex home (Set up Juno)
+- `9ab9bb32` Show Set up Juno after the first Slack sign-in
+- `6bad4ef3` Describe sign-in and Set up Juno in the spec, inventory and architecture
 - This review (the document, the harness, the shots).
 
 ## Verification
