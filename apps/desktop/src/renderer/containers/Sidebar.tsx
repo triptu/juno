@@ -23,6 +23,7 @@ import { EngineStatus, SyncNotice } from './EngineStatus'
 import { markFilterChange } from './filterMark'
 import { openJunoTab } from './juno/actions'
 import { openAllTopics, openHome, openNewTab, openNotifications, openPreferences } from './navigation'
+import { openPalette } from './paletteActions'
 import { setPrivacy } from './privacy'
 import { Session } from './Session'
 import { TitlebarNav } from './TitlebarNav'
@@ -134,9 +135,7 @@ export function Sidebar() {
           ]}
         />
       }
-      onSearch={() => {
-        // TODO(M9): open the ⌘K palette.
-      }}
+      onSearch={openPalette}
       {...(activeNav === undefined ? {} : { activeNav })}
       junoUnread={junoUnread}
       junoBusy={junoBusy}
