@@ -680,10 +680,10 @@ export const layout = stylex.defineVars({
   '--code-block-max-height': '150px',
   // The message hover toolbar: its height, and the width a message header
   // keeps free at its end so the name and time never run under it. The Main
-  // toolbar is 193px (six 28px buttons, 2px gaps, a 5px rule, 4px padding)
+  // toolbar is 223px (seven 28px buttons, 2px gaps, a 5px rule, 4px padding)
   // plus a 20px gap.
   '--toolbar-height': '36px',
-  '--toolbar-reserve': '213px',
+  '--toolbar-reserve': '243px',
   // Image thumbnails in a message: never wider or taller than this, scaled
   // by their own aspect ratio. File cards share the width.
   '--thumb-max-width': '360px',

@@ -9,8 +9,10 @@ export interface TopicViewProps {
   readonly children: ReactNode
   /** The `NewMessagesPill`, floated over the bottom of the list while scrolled up. */
   readonly pill?: ReactNode
-  /** The `ComposerSlot` now, the composer from M6. */
+  /** The `ComposerSlot` until the draft loads, then the composer. */
   readonly composer?: ReactNode
+  /** Over the list, outside its rows: the emoji picker, the selection's Quote button (`Floating`). Positioned from the list area's top left. */
+  readonly floating?: ReactNode
 }
 
 /**
@@ -20,13 +22,14 @@ export interface TopicViewProps {
  * change never moves a message. The header comes first in the DOM, so it
  * is first in the Tab order.
  */
-export function TopicView({ header, children, pill, composer }: TopicViewProps) {
+export function TopicView({ header, children, pill, composer, floating }: TopicViewProps) {
   return (
     <div data-topic-view="" {...stylex.props(styles.root)}>
-      <div {...stylex.props(styles.middle)}>
+      <div data-topic-middle="" {...stylex.props(styles.middle)}>
         {header}
         {children}
         {pill !== undefined ? <div {...stylex.props(styles.pill)}>{pill}</div> : null}
+        {floating}
       </div>
       {composer}
     </div>

@@ -4,8 +4,9 @@ import { defineFixtures, fixture, scene, type FixtureFrame } from '@juno/ui'
 import { useFixtureControl } from './juno-chat/fixtures/control'
 import { emojiOnly, failedFile, failedSend, hostile, longCode, longFirstLine, main as mainStream, mainDividerBefore, manyReactions, mentions, pendingFile, rtl, sending, thread, threadDividerBefore, withFiles } from './fixtures/messages'
 import { NOW } from './fixtures/topics'
-import { HoverToolbar } from './HoverToolbar'
-import { MessageList, type MessageListProps } from './MessageList'
+import { noopActions } from './fixtures/actions'
+import { InlineEdit } from './InlineEdit'
+import { MessageList, type MessageListItem, type MessageListProps } from './MessageList'
 
 const noop = () => {}
 
@@ -14,7 +15,6 @@ const base: Pick<MessageListProps, 'now' | 'onOpenThread' | 'onChannel' | 'onLin
 const state = (props: Partial<MessageListProps> & Pick<MessageListProps, 'items' | 'main'>, frame?: FixtureFrame) => fixture<MessageListProps>({ ...base, ...props }, frame)
 
 const ROW = '[data-message-row]'
-const toolbar = (main: boolean) => () => <HoverToolbar main={main} />
 
 /**
  * A send settles: the pending row is replaced by the message Slack stored,
@@ -33,6 +33,59 @@ const settledMessage: MessageView = (() => {
   const ts = `${Math.floor(NOW / 1000)}.000999`
   return { ...rest, id: ts, ts }
 })()
+
+/** `items` with the reactions of row `index` replaced. */
+const withReactions = (items: ReadonlyArray<MessageListItem>, index: number, reactions: MessageView['reactions']): ReadonlyArray<MessageListItem> =>
+  items.map((item, i) => (i === index ? { ...item, message: { ...item.message, reactions } } : item))
+
+/** The row with no reactions and the row with a 👍 chip (yours) in the thread fixture. */
+const BARE = 2
+const CHIPPED = 3
+
+/**
+ * Reactions change under the owner's eyes: a chip joins a row of chips, a
+ * count goes up, a chip leaves, and the first chip of a message appears and
+ * goes. The test drives each step through `window.__fixtureControls` and
+ * checks what moved.
+ */
+function ReactionChanges() {
+  const chips = thread[CHIPPED]!.message.reactions
+  const [step, setStep] = useState<'base' | 'joined' | 'counted' | 'first'>('base')
+  useFixtureControl('chip-joins', () => setStep('joined'))
+  useFixtureControl('count-up', () => setStep('counted'))
+  useFixtureControl('chip-leaves', () => setStep('base'))
+  useFixtureControl('first-chip', () => setStep('first'))
+  const eyes = { name: 'eyes', count: 1, me: true, unicode: '👀' }
+  const items =
+    step === 'joined'
+      ? withReactions(thread, CHIPPED, [...chips, eyes])
+      : step === 'counted'
+        ? withReactions(thread, CHIPPED, [...chips, { ...eyes, count: 2 }])
+        : step === 'first'
+          ? withReactions(thread, BARE, [eyes])
+          : thread
+  return <MessageList {...base} items={items} main={false} actions={noopActions} />
+}
+
+/** The delete confirm takes the toolbar's place and the edit field the body's, on the owner's command. */
+function OwnRowChanges() {
+  const [mode, setMode] = useState<'none' | 'confirm' | 'edit'>('none')
+  useFixtureControl('confirm', () => setMode('confirm'))
+  useFixtureControl('edit', () => setMode('edit'))
+  useFixtureControl('done', () => setMode('none'))
+  const own = sending[2]!.message.ts
+  const items = sending.map((item) => (item.message.ts === own ? { ...item, message: { ...settledMessage, ts: own, id: own, groupStart: item.message.groupStart } } : item))
+  return (
+    <MessageList
+      {...base}
+      items={items}
+      main={false}
+      actions={noopActions}
+      confirmingDelete={mode === 'confirm' ? own : undefined}
+      editing={mode === 'edit' ? { ts: own, editor: <InlineEdit value="Shipping the fix today" onChange={noop} onSave={noop} onCancel={noop} /> } : undefined}
+    />
+  )
+}
 
 export default defineFixtures(
   MessageList,
@@ -68,6 +121,8 @@ export default defineFixtures(
     },
     Shift: {
       'pending-settles': scene(() => <PendingSettles />),
+      'reaction-changes': scene(() => <ReactionChanges />),
+      'own-row-changes': scene(() => <OwnRowChanges />),
     },
     Data: {
       'empty-thread': state({ items: [], main: false }),
@@ -78,10 +133,10 @@ export default defineFixtures(
     Interaction: {
       hover: state({ items: thread, main: false }, { hover: `${ROW}:nth-of-type(4)` }),
       'hover-grouped': state({ items: thread, main: false }, { hover: `${ROW}:nth-of-type(5)` }),
-      'hover-toolbar': state({ items: thread, main: false, renderToolbar: toolbar(false) }, { hover: `${ROW}:nth-of-type(4)` }),
-      'hover-toolbar-main': state({ items: mainStream, main: true, renderToolbar: toolbar(true) }, { hover: `${ROW}:nth-of-type(5)` }),
-      'hover-toolbar-long-line': state({ items: longFirstLine, main: true, renderToolbar: toolbar(true) }, { hover: `${ROW}:first-of-type` }),
-      focus: state({ items: thread, main: false, renderToolbar: toolbar(false) }, { focus: `${ROW}:last-of-type` }),
+      'hover-toolbar': state({ items: thread, main: false, actions: noopActions }, { hover: `${ROW}:nth-of-type(4)` }),
+      'hover-toolbar-main': state({ items: mainStream, main: true, actions: noopActions }, { hover: `${ROW}:nth-of-type(5)` }),
+      'hover-toolbar-long-line': state({ items: longFirstLine, main: true, actions: noopActions }, { hover: `${ROW}:first-of-type` }),
+      focus: state({ items: thread, main: false, actions: noopActions }, { focus: `${ROW}:last-of-type` }),
       'hover-thread-link': state({ items: mainStream, main: true }, { hover: '[data-thread-link]' }),
       'focus-thread-link': state({ items: mainStream, main: true }, { focus: '[data-thread-link]' }),
     },
