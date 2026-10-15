@@ -40,11 +40,9 @@ function contention(): string {
   }
   const others = new Set<string>()
   for (const line of listing.split('\n')) {
-    // A checkout's own Electron binary, or a Playwright run from a checkout.
+    // A checkout's own Electron app running: a queued or idle test runner is no load.
     const program = line.split(' ')[0] ?? ''
-    const app = program.includes('/node_modules/') && program.includes('/electron/dist/')
-    const runner = /\/node_modules\/.*playwright.*\/cli\.js|\/\.bin\/playwright/.test(line)
-    if ((!app && !runner) || line.includes(ROOT)) continue
+    if (!program.includes('/node_modules/') || !program.includes('/electron/dist/') || line.includes(ROOT)) continue
     others.add(line.match(/\/([^/ ]+)\/(?:apps|packages)\/[^/ ]+\/node_modules\//)?.[1] ?? line.match(/\/([^/ ]+)\/node_modules\//)?.[1] ?? 'another checkout')
   }
   return others.size === 0 ? '' : `, contended by ${[...others].join(', ')}`
