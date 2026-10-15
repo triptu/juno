@@ -1,7 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
-import { memo } from 'react'
-import { chatCopy, type Delivery, type OwnerMessageItem } from '@juno/agent-contract'
-import { chat, spacing } from '@juno/tokens/tokens.stylex'
+import { memo, type MouseEvent } from 'react'
+import { aboutLabel, chatCopy, type About, type Delivery, type OwnerMessageItem } from '@juno/agent-contract'
+import { accent, chat, sizes, spacing } from '@juno/tokens/tokens.stylex'
 import { Text } from '@juno/ui'
 import type { ChatActions } from './commands'
 import { QuoteStub } from './QuoteStub'
@@ -19,7 +19,9 @@ export interface OwnerBubbleProps {
 /**
  * The owner's bubble (inventory 12): right-aligned in the owner fill, the
  * tail on the last of a group, the time on hover to its left, and the
- * delivery line in the fixed slot under the group's last bubble. A reply
+ * delivery line in the fixed slot under the group's last bubble. A message
+ * sent from the Juno panel or with an About chip has the "About …" line
+ * over its group's first bubble; a topic's opens the topic. A reply
  * shows its quote above; Juno's reaction sits on the top corner, out of
  * flow. A message sent while Juno works looks like any other. The fill
  * and text come from the `chat` token group, so the owner's colour choice
@@ -29,8 +31,10 @@ export const OwnerBubble = memo(function OwnerBubble({ item, now, actions }: Own
   const end = isGroupEnd(item.group)
   const menu = actions.onContextMenu
   const replyTo = item.replyTo
+  const about = item.about !== undefined && (item.group === 'first' || item.group === 'single') ? item.about : undefined
   return (
     <div data-chat-owner={item.opId} {...stylex.props(groupGap[item.group], styles.root)}>
+      {about !== undefined ? <AboutLine about={about} actions={actions} /> : null}
       {replyTo !== undefined ? (
         <div {...stylex.props(styles.quote)}>
           <QuoteStub quote={replyTo} onOpen={() => actions.onQuote(replyTo.target)} />
@@ -58,6 +62,26 @@ export const OwnerBubble = memo(function OwnerBubble({ item, now, actions }: Own
     </div>
   )
 })
+
+function AboutLine({ about, actions }: { readonly about: About; readonly actions: ChatActions }) {
+  const text = `${chatCopy.about.prefix}${aboutLabel(about)}`
+  if (about._tag !== 'topic') {
+    return (
+      <Text variant="tag" tone="muted" truncate dir="auto" data-about={about._tag} sx={styles.about}>
+        {text}
+      </Text>
+    )
+  }
+  const open = (event: MouseEvent<HTMLButtonElement>) =>
+    actions.onOpen({ _tag: 'topic', topicId: about.topicId }, { metaKey: event.metaKey, shiftKey: event.shiftKey, altKey: event.altKey, source: 'pointer' })
+  return (
+    <button type="button" data-about="topic" onClick={open} {...stylex.props(styles.about, styles.aboutButton)}>
+      <Text variant="tag" tone="muted" truncate dir="auto">
+        {text}
+      </Text>
+    </button>
+  )
+}
 
 function DeliveryLine({ delivery, onRetry }: { readonly delivery: Delivery; readonly onRetry: () => void }) {
   const copy = chatCopy.delivery
@@ -103,6 +127,27 @@ const styles = stylex.create({
     justifyContent: 'flex-end',
     textAlign: 'end',
     paddingInlineEnd: spacing['--space-0-5'],
+  },
+  // One line over the group, right-aligned and no wider than a bubble.
+  about: {
+    display: 'flex',
+    maxWidth: chat['--bubble-max-width'],
+    minWidth: 0,
+    marginBottom: spacing['--space-0-5'],
+    userSelect: 'none',
+  },
+  aboutButton: {
+    appearance: 'none',
+    padding: 0,
+    borderWidth: 0,
+    backgroundColor: 'transparent',
+    font: 'inherit',
+    textAlign: 'end',
+    cursor: 'default',
+    outlineStyle: { default: 'none', ':focus-visible': 'solid' },
+    outlineWidth: sizes['--focus-ring-width'],
+    outlineOffset: sizes['--focus-ring-offset'],
+    outlineColor: accent['--focus-ring'],
   },
   quote: {
     display: 'flex',

@@ -21,7 +21,21 @@ export const chatCopy = {
   },
   composer: {
     placeholder: 'Ask Juno, like "what did I miss in #eng?"',
+    /** In the Juno panel beside a topic. */
+    panelPlaceholder: 'Ask about this topic',
     send: 'Send',
+  },
+  /** The About line over an owner bubble and the About chip above the panel's composer (SPEC 7). */
+  about: {
+    prefix: 'About ',
+    remove: 'Remove',
+  },
+  /** The Juno panel (SPEC 7, inventory 12.1). */
+  panel: {
+    catchMeUp: 'Catch me up',
+    openInTab: 'Open in a tab',
+    close: 'Close Juno ⌘J',
+    removeQuote: 'Remove quote',
   },
   list: {
     newMessage: 'New message',

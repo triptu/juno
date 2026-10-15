@@ -56,6 +56,11 @@ const HOVER = '@media (hover: hover)'
  * toolbar the header keeps its end free and is as tall as the toolbar, so
  * neither the name nor the first body line runs under it.
  */
+/** Marks a sender's avatar and name for the person menu (inventory 15.6), which the list opens on right-click. */
+function personData(senderId: string | undefined, name: string, shown: boolean) {
+  return senderId === undefined || !shown ? {} : { 'data-person': senderId, 'data-person-name': name }
+}
+
 export const Message = memo(function Message({
   message,
   sender,
@@ -90,7 +95,7 @@ export const Message = memo(function Message({
       onFocus={focus}
       {...stylex.props(styles.row, eager && styles.rowEager, header && !flush && styles.rowGroupStart, message.mentionsMe && styles.rowMention)}
     >
-      <span {...stylex.props(styles.gutter)}>
+      <span {...personData(message.senderId, name, header)} {...stylex.props(styles.gutter)}>
         {header ? (
           <Avatar label={sender === undefined ? '?' : initials(name)} name={name} size={32} hue={hue} {...(sender?.avatarUrl === undefined ? {} : { src: sender.avatarUrl })} />
         ) : (
@@ -102,7 +107,7 @@ export const Message = memo(function Message({
       <span {...stylex.props(styles.content)}>
         {header ? (
           <span {...stylex.props(styles.header, toolbar !== undefined && styles.headerWithToolbar)}>
-            <Text variant="messageName" tone="default" truncate tooltipWhenTruncated dir="auto" as="span" sx={styles.name}>
+            <Text variant="messageName" tone="default" truncate tooltipWhenTruncated dir="auto" as="span" sx={styles.name} {...personData(message.senderId, name, true)}>
               {name}
             </Text>
             <Text variant="meta" tone="muted" numeric as="time" title={fullTime(message.at)} sx={styles.time}>

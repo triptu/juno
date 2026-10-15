@@ -11,7 +11,7 @@ import { Sparkle } from '@phosphor-icons/react/dist/icons/Sparkle'
 import { User } from '@phosphor-icons/react/dist/icons/User'
 import { Users } from '@phosphor-icons/react/dist/icons/Users'
 import type { KeyboardEvent, MouseEvent, ReactNode } from 'react'
-import { colors } from '@juno/tokens/tokens.stylex'
+import { colors, layout, z } from '@juno/tokens/tokens.stylex'
 import { EmptyState, IconButton, Tab, TabStrip, type ActivateEvent, type PhosphorIcon } from '@juno/ui'
 
 /** The icon a tab shows: the channel kind for a topic, the page's own icon otherwise. */
@@ -49,6 +49,12 @@ export interface WorkspaceProps {
   readonly nothingShown?: boolean
   /** What shows with no page: Home's content. Default the empty state. */
   readonly empty?: ReactNode
+  /**
+   * The Juno panel, on the right of the page below the strip, 360px with a
+   * hairline. When the page would keep less than 480px, it covers the page
+   * instead, at full width.
+   */
+  readonly side?: ReactNode
 }
 
 const icons: Record<WorkspaceTabIcon, PhosphorIcon> = {
@@ -63,6 +69,9 @@ const icons: Record<WorkspaceTabIcon, PhosphorIcon> = {
   notifications: Bell,
   preferences: Gear,
 }
+
+// --juno-panel-width + --juno-panel-topic-min: under this the page would be too narrow to read beside the panel.
+const COVER = '@container workspace-body (width < 840px)'
 
 const keyboard: ActivateEvent = { metaKey: false, shiftKey: false, altKey: false, source: 'keyboard' }
 
@@ -90,7 +99,7 @@ function stepIndex(key: string, index: number, count: number): number | undefine
  * holds its controls. The strip is an APG tablist: the active tab is the one Tab stop, the arrow
  * keys select its neighbours, Delete closes it.
  */
-export function Workspace({ tabs = [], activeId, onSelectTab, onCloseTab, onNewTab, onTabContextMenu, leading, children, nothingShown = false, empty }: WorkspaceProps) {
+export function Workspace({ tabs = [], activeId, onSelectTab, onCloseTab, onNewTab, onTabContextMenu, leading, children, nothingShown = false, empty, side }: WorkspaceProps) {
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (onSelectTab === undefined || !(event.target instanceof HTMLElement) || event.target.getAttribute('role') !== 'tab') return
     const next = stepIndex(event.key, tabs.findIndex((tab) => tab.id === activeId), tabs.length)
@@ -117,10 +126,17 @@ export function Workspace({ tabs = [], activeId, onSelectTab, onCloseTab, onNewT
           />
         ))}
       </TabStrip>
-      <main {...stylex.props(styles.page)}>
-        {children}
-        {children == null || nothingShown ? (empty ?? <WorkspaceEmpty />) : null}
-      </main>
+      <div {...stylex.props(styles.body)}>
+        <main {...stylex.props(styles.page)}>
+          {children}
+          {children == null || nothingShown ? (empty ?? <WorkspaceEmpty />) : null}
+        </main>
+        {side == null ? null : (
+          <aside aria-label="Juno" data-juno-panel="" {...stylex.props(styles.side)}>
+            {side}
+          </aside>
+        )}
+      </div>
     </section>
   )
 }
@@ -148,6 +164,42 @@ const styles = stylex.create({
     // zoom) the pane shrinks to nothing; its content must not paint over the
     // sidebar.
     overflow: 'hidden',
+    backgroundColor: colors['--background'],
+  },
+  // The page and the Juno panel side by side under the strip. A named
+  // container, so the panel's cover rule reads the width both share.
+  body: {
+    position: 'relative',
+    display: 'flex',
+    flexGrow: 1,
+    minWidth: 0,
+    minHeight: 0,
+    containerType: 'inline-size',
+    containerName: 'workspace-body',
+  },
+  side: {
+    display: 'flex',
+    flexDirection: 'column',
+    flexShrink: 0,
+    boxSizing: 'border-box',
+    width: {
+      default: layout['--juno-panel-width'],
+      [COVER]: '100%',
+    },
+    position: {
+      default: 'relative',
+      [COVER]: 'absolute',
+    },
+    insetBlock: 0,
+    insetInlineEnd: 0,
+    zIndex: z['--z-panel'],
+    minHeight: 0,
+    borderInlineStartWidth: {
+      default: '1px',
+      [COVER]: 0,
+    },
+    borderInlineStartStyle: 'solid',
+    borderInlineStartColor: colors['--border-default'],
     backgroundColor: colors['--background'],
   },
   // The page fills the pane under the strip; a tall page scrolls inside

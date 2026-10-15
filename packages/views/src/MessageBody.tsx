@@ -172,7 +172,7 @@ function Inline({ inline, now, hueOf, onChannel, onLink, tabIndex }: InlineProps
           <bdi>@{inline.name}</bdi>
         </Chip>
       ) : (
-        <Chip variant="person" size="inline" hue={hueOf(inline.id)}>
+        <Chip variant="person" size="inline" hue={hueOf(inline.id)} data-person={inline.id} data-person-name={inline.name}>
           <bdi>@{inline.name}</bdi>
         </Chip>
       )
@@ -186,6 +186,7 @@ function Inline({ inline, now, hueOf, onChannel, onLink, tabIndex }: InlineProps
           }}
           title={`Show only #${inline.name}`}
           tabIndex={tabIndex}
+          data-channel={inline.id}
           {...stylex.props(styles.channelButton)}
         >
           <Chip variant="filled" size="inline">
