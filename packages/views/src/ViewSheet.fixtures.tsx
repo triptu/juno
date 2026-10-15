@@ -41,6 +41,15 @@ export default defineFixtures(
       filled: sheet({ name: 'Bots', icon: 'robot', keepOutOfAll: true, chosen: alerts, query: 'alerts', results: [...alerts, { id: 'C0ALERTSBILLING', name: 'alerts-billing', kind: 'private' }] }),
       // An edit with no icon and a name at the limit.
       edit: sheet({ mode: 'edit', name: 'Customer escalations and incide', chosen: alerts.slice(0, 1), results: [] }),
+      // The built-in Automated view: what Juno put there says so; #ci-builds the user added.
+      automated: sheet({
+        mode: 'edit',
+        name: 'Automated',
+        icon: 'robot',
+        keepOutOfAll: true,
+        chosen: [...alerts.map((c) => ({ ...c, addedByJuno: true })), { id: 'C0CIBUILDS', name: 'ci-builds', kind: 'public' }],
+        results: [],
+      }),
       // Many conversations: the list scrolls, the sheet does not grow.
       'many-chosen': sheet({
         name: 'Everything',

@@ -1,10 +1,12 @@
 import { useId, useLayoutEffect, useRef } from 'react'
-import { freezeHome, homeShownAtom, homeViewAtom, markFollowUpDone, markHomeItemUsed, registry, resolveAllTopics, showHome } from '@juno/state'
+import { viewsSortChannel } from '@juno/contract'
+import { freezeHome, homeShownAtom, homeViewAtom, markFollowUpDone, markHomeItemUsed, registry, resolveAllTopics, runAction, showHome } from '@juno/state'
 import { junoNavAtom } from '@juno/state/agent'
 import { useAtomValue } from '@juno/state/react'
 import { Home, type ActivateEvent } from '@juno/views'
 import { openJunoTab } from './juno/actions'
 import { openAllTopics, openTopic } from './navigation'
+import { showChannelMenu } from './placeMenus'
 
 function openItem(topicId: string, event: ActivateEvent): void {
   openTopic(topicId, { newTab: event.metaKey })
@@ -63,6 +65,20 @@ export function HomePage() {
     )
   }
 
+  // Automated's question: Move or Keep in All, remembered, with Undo; right-click has the conversation's menu, with Ignore.
+  const sort = (itemId: string, to: 'automated' | 'kept') => {
+    const channel = itemOf(itemId)?.channel
+    if (channel === undefined) return
+    markHomeItemUsed(registry, key, itemId)
+    void runAction(registry, viewsSortChannel, { channel: channel.id, to }, { text: to === 'automated' ? `Moved ${channel.label} to Automated` : `Keeping ${channel.label} in All` })
+  }
+  const itemMenu = (itemId: string) => {
+    const item = itemOf(itemId)
+    if (item?.channel === undefined) return
+    const main = item.topics[0]?.id
+    void showChannelMenu({ ...item.channel, ...(main === undefined ? {} : { mainId: main }) })
+  }
+
   return (
     <Home
       scene={shown.scene}
@@ -76,6 +92,8 @@ export function HomePage() {
       onOpen={openItem}
       onMarkDone={markDone}
       onResolveAll={resolveAll}
+      onSort={sort}
+      onItemMenu={itemMenu}
       onAsk={askJuno}
       {...(jobLine === undefined ? {} : { askLine: jobLine })}
       onBrowseAll={browseAll}
