@@ -6,8 +6,8 @@
  *   long: if the method is paused for longer than `interactiveMaxWaitMillis`
  *   the call fails at once with `SlackRateLimited`, so the route can answer
  *   from the cache and the engine can show `rate-limited`.
- * - `background`: backfill and sweeps. Concurrency 2, starts spaced by
- *   `backgroundMinIntervalMillis` (40 per minute by default).
+ * - `background`: backfill and sweeps. Concurrency 2, independent method tiers (research section 6).
+ *   A 429 doubles that method's interval for the session, up to 60 s.
  * - `send`: one in flight, like the official client's message queue.
  *
  * The lanes have separate permits, so a flood of background calls cannot
@@ -47,8 +47,16 @@ export class RequestQueue extends Context.Service<RequestQueue, RequestQueueShap
         send: yield* Semaphore.make(config.lanes.sendConcurrency),
       }
       const paused = yield* Ref.make(new Map<string, number>())
-      const nextBackgroundStart = yield* Ref.make(0)
-      const slotLock = yield* Semaphore.make(1)
+      const buckets = new Map<string, { next: number; interval: number }>()
+      const bucketOf = (method: string) => {
+        let bucket = buckets.get(method)
+        if (bucket === undefined) {
+          const tier = method === 'conversations.history' || method === 'conversations.replies' ? 1_200 : 1_500
+          bucket = { next: 0, interval: config.lanes.backgroundMinIntervalMillis ?? tier }
+          buckets.set(method, bucket)
+        }
+        return bucket
+      }
       const slowed = yield* SubscriptionRef.make<number | undefined>(undefined)
       const scope = yield* Effect.scope
 
@@ -69,6 +77,8 @@ export class RequestQueue extends Context.Service<RequestQueue, RequestQueueShap
 
       const pause = (method: string, retryAfterMillis: number) =>
         Effect.gen(function* () {
+          const bucket = bucketOf(method)
+          bucket.interval = Math.min(60_000, bucket.interval * 2)
           const now = yield* Clock.currentTimeMillis
           const wait = Math.min(Math.max(retryAfterMillis, 0), config.maxRetryAfterMillis)
           const until = now + wait
@@ -92,26 +102,28 @@ export class RequestQueue extends Context.Service<RequestQueue, RequestQueueShap
           }
         })
 
-      /** Reserves the next background start time and waits for it. */
-      const spaceBackground = Effect.gen(function* () {
-        const wait = yield* slotLock.withPermit(
-          Effect.gen(function* () {
-            const now = yield* Clock.currentTimeMillis
-            const next = yield* Ref.get(nextBackgroundStart)
-            const start = Math.max(now, next)
-            yield* Ref.set(nextBackgroundStart, start + config.lanes.backgroundMinIntervalMillis)
-            return start - now
-          }),
-        )
-        if (wait > 0) yield* Effect.sleep(wait)
-      })
-
       const run = <A, E, R>(lane: Lane, method: string, effect: Effect.Effect<A, E, R>) =>
         Effect.gen(function* () {
-          yield* waitForMethod(lane, method)
-          return yield* permits[lane].withPermit(
-            lane === 'background' ? Effect.andThen(spaceBackground, effect) : effect,
-          )
+          while (true) {
+            yield* waitForMethod(lane, method)
+            const result = yield* permits[lane].withPermit(Effect.gen(function* () {
+              const now = yield* Clock.currentTimeMillis
+              const pausedUntil = (yield* Ref.get(paused)).get(method) ?? 0
+              const bucket = lane === 'background' ? bucketOf(method) : undefined
+              const until = Math.max(pausedUntil, bucket?.next ?? 0)
+              // Do not reserve a future slot or hold a lane permit while sleeping.
+              // Another method can run, and a new pause is checked on every admission.
+              if (until > now) return { kind: 'wait', millis: until - now } as const
+              if (bucket !== undefined) bucket.next = now + bucket.interval
+              const value = yield* effect
+              return { kind: 'done', value } as const
+            }))
+            if (result.kind === 'done') return result.value
+            if (lane === 'interactive' && result.millis > config.interactiveMaxWaitMillis) {
+              return yield* new SlackRateLimited({ method, retryAfterMillis: result.millis })
+            }
+            yield* Effect.sleep(result.millis)
+          }
         })
 
       return RequestQueue.of({ run, pause, pausedUntil, slowedUntil: SubscriptionRef.changes(slowed) })

@@ -412,7 +412,7 @@ export const handlers: Handlers = {
             {
               iid: `${conversation.id}-${full.ts}-m`,
               ts: full.ts,
-              ...(args.extra_message_data === 1 ? { ...(inThread ? { thread_ts: full.thread_ts ?? full.ts } : {}), ...(full.reply_count === undefined ? {} : { reply_count: full.reply_count }) } : {}),
+              ...(args.extra_message_data === 1 ? { ...(inThread ? { thread_ts: full.thread_ts ?? full.ts } : {}), ...(full.reply_count === undefined ? {} : { reply_count: full.reply_count }), ...(full.latest_reply === undefined ? {} : { latest_reply: full.latest_reply }) } : {}),
               text: full.text ?? '',
               ...(full.user === undefined ? {} : { user: full.user }),
               ...(user?.name === undefined ? {} : { username: user.name }),
