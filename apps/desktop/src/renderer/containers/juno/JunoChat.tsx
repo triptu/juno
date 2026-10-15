@@ -23,6 +23,8 @@ type Window = typeof ChatWindow.Type
 
 /** The agent's page limit: the most rows a window holds. */
 const WINDOW = 200
+/** The rows the panel opens with: more than its column shows. */
+const PANEL_WINDOW = 40
 /** Rows kept above the anchor when the window moves. */
 const OVERLAP = 100
 /** Within this of the end counts as at the bottom (performance 3.3). */
@@ -112,7 +114,8 @@ export interface JunoChatProps {
  */
 export function JunoChat({ column, header, contextOf, composerContext, onSent, onEscape, sendRef }: JunoChatProps) {
   const agent = useAtomValue(agentConnectionStateAtom)
-  const [window, setWindow] = useState<Window>(() => (column === 'page' ? { _tag: 'unread', limit: WINDOW } : latest))
+  // The panel opens in one frame (performance 1), so it mounts a screenful and pages up from there.
+  const [window, setWindow] = useState<Window>(() => (column === 'page' ? { _tag: 'unread', limit: WINDOW } : { _tag: 'latest', limit: PANEL_WINDOW }))
   const result = useAtomValue(chatItemsAtom(window))
   // The previous window's page shows until the next one arrives: never an empty list in between (performance 5.3).
   const [held, setHeld] = useState<ChatPage | undefined>(undefined)
@@ -169,14 +172,16 @@ export function JunoChat({ column, header, contextOf, composerContext, onSent, o
   }, [column, positioned, loaded])
 
   // `juno.chat-bubble`: from a send to the first Juno bubble after it, painted.
-  const sentAt = useRef<{ readonly at: number; readonly bubbles: number } | undefined>(undefined)
-  const bubbles = items.filter((item) => item._tag === 'juno').length
+  // Keyed on the newest bubble, not a count: a full window drops a row for each one that arrives.
+  const sentAt = useRef<{ readonly at: number; readonly newest: string | undefined } | undefined>(undefined)
+  const newestBubble = items.findLast((item) => item._tag === 'juno')
+  const newestBubbleId = newestBubble?._tag === 'juno' ? newestBubble.id : undefined
   useLayoutEffect(() => {
     const sent = sentAt.current
-    if (sent === undefined || bubbles <= sent.bubbles) return
+    if (sent === undefined || newestBubbleId === sent.newest) return
     sentAt.current = undefined
     afterPaint(() => measure('juno.chat-bubble', sent.at))
-  }, [bubbles])
+  }, [newestBubbleId])
 
   // At the bottom, a new row (a bubble, the status bubble, a send) is scrolled into view before paint.
   useLayoutEffect(() => {
@@ -289,7 +294,7 @@ export function JunoChat({ column, header, contextOf, composerContext, onSent, o
 
   const send = (text: string) => {
     const at = performance.now()
-    sentAt.current = { at, bubbles }
+    sentAt.current = { at, newest: newestBubbleId }
     afterPaint(() => measure('juno.chat-send', at))
     const context = contextOf?.()
     junoCommands.send(text, { ...(context === undefined ? {} : { context }), ...(quote === undefined ? {} : { replyTo: quote.target }) })

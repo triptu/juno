@@ -744,6 +744,8 @@ export const sizes = stylex.defineVars({
   // The same estimate for off-screen message rows: one line of body under a
   // name, without the row's block padding (performance.md 3.3).
   '--row-message-estimate': '56px',
+  // A one-line chat bubble off screen: 8px padding above and below a 22px line.
+  '--row-bubble-estimate': '38px',
 
   '--tile-44': '44px',
   '--tile-36': '36px',

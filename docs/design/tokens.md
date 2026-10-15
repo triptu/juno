@@ -370,6 +370,7 @@ All [proto] measured at 1280×800 with Inter unless marked.
 | `--row-44` / `--row-48` / `--row-52` | 44, 48, 52px | Today log row, notification rule row, All topics table row (ListRow `minHeight`) |
 | `--row-topic-estimate` | 85px | The `contain-intrinsic-size` estimate for sidebar rows off screen (performance.md 3.2). It sizes the content box, so it is the measured row (Comfortable, two preview lines: 107px) minus the 22px of block padding |
 | `--row-message-estimate` | 56px | The same estimate for message rows off screen (performance.md 3.3): a name line and one body line, without the row's block padding |
+| `--row-bubble-estimate` | 38px | The estimate for a Juno chat bubble row off screen: one 22px line with 8px padding above and below |
 
 ### Tiles and avatars
 
