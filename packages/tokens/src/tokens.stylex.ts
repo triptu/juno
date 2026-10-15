@@ -423,26 +423,23 @@ export const tracking = stylex.defineVars({
  * enough that the 0.01em tracking Inter needed is gone.
  */
 export const text = stylex.defineVars({
-  // Pinned / Recent / People / Channels headings. Rendered uppercase.
+  // Pinned / Recent / People / Channels headings, in sentence case (SPEC 17).
   '--text-section-label-family': fonts['--font-sans'],
   '--text-section-label-size': '11px',
   '--text-section-label-weight': '500',
   '--text-section-label-leading': 'normal',
-  '--text-section-label-tracking': '0.06em',
 
-  // Table column headers. Rendered uppercase.
+  // Table column headers, in sentence case.
   '--text-table-header-family': fonts['--font-sans'],
   '--text-table-header-size': '11.5px',
   '--text-table-header-weight': '500',
   '--text-table-header-leading': 'normal',
-  '--text-table-header-tracking': '0.06em',
 
-  // "3 NEW" divider label. Rendered uppercase.
+  // The "3 new" divider label and the Juno chat's day label, in sentence case.
   '--text-divider-family': fonts['--font-sans'],
   '--text-divider-size': '11.5px',
   '--text-divider-weight': '600',
   '--text-divider-leading': 'normal',
-  '--text-divider-tracking': '0.06em',
 
   // Tags and count badges: Main, Reopened, unread count, @, hints.
   '--text-tag-family': fonts['--font-sans'],

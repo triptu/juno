@@ -349,7 +349,7 @@ Juno speaks on its own only about things you set up: schedules you asked for, pr
   - **In the chat.** "Tell me if Sam doesn't reply by Thursday" sets one. Juno picks who has to reply and how long to wait from your words, or by its own judgement when you gave none, and shows the watch as a Schedule card.
   - **From the menu.** Tell me if nobody replies in your own message's menu (section 7) sets the watch at once, without asking Juno: your click is the approval. A reply from anyone but you counts. The wait is one notification day: the same time on your next notification day, or the start of your notification hours if that time falls outside them. A toast says "Watching for a reply until Thu 9:00 · Undo", and the chat shows the watch as a Schedule card. To change the time or who must reply, reply to the card or just say so. The item is disabled while Juno is paused or working on your other Mac.
   - A reply ends the watch quietly. If the wait runs out with no reply, Juno says so and brings a Send message card with a nudge draft in that thread, written to sound like you. You can edit it, and it sends only on your click. If a reply arrives while the card is open, the card expires. Juno never sets a watch again on its own. Watches are listed on Scheduled with the schedules.
-- **The label.** A proactive group carries a small uppercase label ("Scheduled · Daily catch-up", "T3 Code · Fix the sidebar flake") with "Why this?" and one quiet action: "Pause schedule" on a schedule's group, "Mute updates" on a job's group. Mute updates stops Juno's updates about that job; the job runs on and stops only from its Task card.
+- **The label.** A proactive group carries a small label ("Scheduled · Daily catch-up", "T3 Code · Fix the sidebar flake") with "Why this?" and one quiet action: "Pause schedule" on a schedule's group, "Mute updates" on a job's group. Mute updates stops Juno's updates about that job; the job runs on and stops only from its Task card.
 - **The summary when notification hours start** (section 14) also lands in the chat as one Juno message labelled "Summary", one line per message with a link to it. The app writes it from the list the notification counts, not the model, so it costs nothing.
 - **Nothing to say, nothing shown.** A wake that finds nothing worth saying shows nothing in the chat; Activity records that it ran.
 - **Delivery.** The chat always gets the message. Whether your Mac notifies follows section 14. A schedule either notifies or doesn't; there is no digest.
@@ -530,7 +530,7 @@ Use the Littlebird design system's tokens.
 
 ## 17. Writing
 
-- **Case.** Sentence case everywhere.
+- **Case.** Sentence case everywhere, small labels included: "Today", "3 new", "Channels", never uppercase.
 - **Buttons** are short and start with a verb: Resolve, Send, Post in thread, Fix and send.
 - **Relative time:** 4m, 2h, Yesterday, 3d.
 - **Emoji.** None in chrome. Users' messages are their own, and so are reactions in the Juno chat: a reaction is content, not chrome.

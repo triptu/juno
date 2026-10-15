@@ -232,13 +232,13 @@ Root text settings: `font-size: 14.5px; line-height: 1.5; letter-spacing: 0; -we
 
 ### 2.2 Type roles
 
-Sizes are the Figtree values; the prototype's Inter value is half a pixel smaller for every sans role at or below 15px (see 2.1). Letter spacing is 0 for every sans role except the three uppercase labels. Family is sans unless stated.
+Sizes are the Figtree values; the prototype's Inter value is half a pixel smaller for every sans role at or below 15px (see 2.1). Letter spacing is 0 for every sans role. Every label is in sentence case (SPEC §17); there are no uppercase labels, so none needs tracking. Family is sans unless stated.
 
 | Role | Size | Weight | Line height | Letter spacing | Colour | Where |
 | --- | --- | --- | --- | --- | --- | --- |
-| Section label | 11px | 500 | normal | 0.06em, uppercase | muted | Pinned / Recent / channel groups, popover headings (People, Channels, Recent, Results, Juno) |
-| Table header | 11.5px | 500 | normal | 0.06em, uppercase | muted | All topics columns |
-| New divider | 11.5px | 600 | normal | 0.06em, uppercase | `--hl` | "3 NEW" |
+| Section label | 11px | 500 | normal | 0 | muted | Pinned / Recent / channel groups, popover headings (People, Channels, Recent, Results, Juno) |
+| Table header | 11.5px | 500 | normal | 0 | muted | All topics columns |
+| New divider | 11.5px | 600 | normal | 0 | `--hl` | "3 new", and the Juno chat's day label ("Today") in muted |
 | Tag | 11.5px | 500 | 18px box | 0 | subtle / muted | Main, Reopened, counts, @, confidence badge, menu hints, ⌘ hints |
 | Tag small | 12px | 500 / 400 | | 0 | | Row Resolve button, card footnotes, "Use", Mark read |
 | Meta | 12.5px | 400 | normal | 0 | muted | Row line 3, times, message timestamps, card headers, status chips (500), bubble name line, log reasons, the page header's 24px context pill (600) and island buttons (500) |
