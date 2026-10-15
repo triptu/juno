@@ -15,6 +15,9 @@ export const keys = {
   syncState: ['sync_state'] satisfies InvalidationKeys,
   prefs: ['prefs'] satisfies InvalidationKeys,
   topicArt: ['topic_art'] satisfies InvalidationKeys,
+  aiCache: ['ai_cache'] satisfies InvalidationKeys,
+  topicVisits: ['topic_visits'] satisfies InvalidationKeys,
+  followUps: ['follow_ups'] satisfies InvalidationKeys,
   syncedRanges: (channel: string) => ({ synced_ranges: [channel] }) satisfies InvalidationKeys,
   messages: (channel: string) => ({ messages: [channel] }) satisfies InvalidationKeys,
 }
