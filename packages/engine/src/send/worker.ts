@@ -12,7 +12,9 @@
  *   `sending` in its own transaction, and one `chat.postMessage`, or
  *   `files.share` for a post with files, with its `client_msg_id` goes out through
  *   `Outbox.sendOnce`, which never retries, because a retry after a lost
- *   answer posts twice. The answer is stored as the echo would store it,
+ *   answer posts twice. The claim records the post in `sent_posts`, so a
+ *   copy Chromium makes by sending the request again is deleted when it is
+ *   stored (ADR 0014). The answer is stored as the echo would store it,
  *   which ends the row. A refusal makes it `failed`; a rate limit or a lost
  *   session puts it back to `queued` for later; a lost answer, or an
  *   answer Slack gives when it may have run the call (`internal_error` and
@@ -48,6 +50,7 @@ import {
   postUnknown,
   recoverPosts,
   requeuePost,
+  storedMe,
   type PendingPost,
   type TopicFetcher,
 } from '@juno/sync'
@@ -165,7 +168,9 @@ export class PostWorker extends Context.Service<
           const local = inStore(open)
           const fileIds = row.files.length === 0 ? [] : yield* upload(open, row)
           if (fileIds === undefined) return
-          if (!(yield* local(transaction(claimPost(row.clientMsgId))))) return
+          // Recorded as the user's send, so a copy the network makes is deleted (ADR 0014).
+          const me = (yield* local(storedMe))?.userId ?? ''
+          if (!(yield* local(transaction(claimPost(row.clientMsgId, me))))) return
           const blocks = row.blocksJson === null ? undefined : JSON.parse(row.blocksJson)
           const threadTs = row.threadTs === undefined ? {} : { thread_ts: row.threadTs as Ts }
           const result = yield* outbox

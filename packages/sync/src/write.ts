@@ -24,6 +24,7 @@ import { Invalidation, StoreWriter, type ConversationRow, type MessageRow, type 
 import { Effect } from 'effect'
 import { syncKeys } from './keys'
 import { reconcilePost } from './posts'
+import { reconcileSent } from './sent'
 
 type Writer = Effect.Effect<void, SqlError, StoreWriter | Invalidation>
 
@@ -50,6 +51,8 @@ export const writeMessage = (row: MessageRow): Writer =>
         last_event_ts = excluded.last_event_ts, version = excluded.version`
     // Whichever of the answer, the echo or a page stores Juno's own message first ends its pending row (5.7).
     if (row.client_msg_id !== null) yield* reconcilePost(row.client_msg_id)
+    // A second copy of a post the network sent twice is hidden and deleted (ADR 0014).
+    yield* reconcileSent(row)
     yield* invalidate(syncKeys.messagesOf(row))
   })
 

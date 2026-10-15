@@ -23,12 +23,15 @@
  *   (`internal_error` and friends), a rate limit or no session: tried again
  *   with backoff, also after a restart.
  *
+ * Sync also writes rows: the delete of a second copy of one of Juno's
+ * posts (`@juno/sync` `sent.ts`), which wakes this worker.
+ *
  * Nothing is sent while no sync runs or its socket is down. The end of
  * each boot or catch-up makes every row due (architecture 5.8).
  */
 import { Clock, Context, Effect, Layer, Queue, Stream } from 'effect'
 import { millisToTs, type Ts } from '@juno/domain'
-import { transaction } from '@juno/store'
+import { liveQuery, transaction } from '@juno/store'
 import { actionDone, deferAction, dropAction, flushActions, pendingActions, placeOf, settleOnFailedPost, storedMe, type Acted, type PendingAction, type TopicFetcher } from '@juno/sync'
 import { Outbox, type MirrorError } from '../outbox'
 import { SyncLink } from '../syncLink'
@@ -194,6 +197,11 @@ export class ActionWorker extends Context.Service<
       })
 
       yield* Effect.forkScoped(Stream.runForEach(workspace.changes, () => wake))
+      // A copy of a post that the network sent twice gets its delete row when sync stores it (ADR 0014).
+      const queuedBySync = workspace.changes.pipe(
+        Stream.switchMap((open) => (open === undefined ? Stream.empty : liveQuery(['outbox'], Effect.void).pipe(Stream.provide(open.context)))),
+      )
+      yield* Effect.forkScoped(Stream.runForEach(queuedBySync, () => wake))
       yield* Effect.forkScoped(Stream.runForEach(link.caughtUps, () => flush))
       yield* Effect.forkScoped(Stream.runForEach(Stream.filter(link.onlineChanges, (online) => online), () => wake))
       yield* Effect.forkScoped(loop)
