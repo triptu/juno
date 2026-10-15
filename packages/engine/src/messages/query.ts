@@ -40,6 +40,8 @@ import {
 } from '@juno/domain'
 import { emojiUnicode, messageBody, plainText, splitEmojiName, type MessageBody, type MessageContent } from '@juno/richtext'
 import { StoreReader, type SqlClient, type SqlError } from '@juno/store'
+import type { PendingFile } from '@juno/sync'
+import { uploadsUrl } from '../files/staging'
 import type { ListRun } from '../protocol/live'
 import { personFrom, userName, type UserRow } from '../topicRows'
 import { actionsStatement, pendingStatement, reactionsStatement, threadTitlesStatement, windowStatements, type WindowMessage, type WindowTarget } from './window'
@@ -397,7 +399,7 @@ function shapeRow(row: WindowMessage, body: CachedBody, input: ShapeInput): Mess
     broadcast: row.subtype === 'thread_broadcast',
     root: input.isRoot,
     reactions: kind === 'message' ? reactions : [],
-    files: kind === 'message' ? filesOf(row) : [],
+    files: kind !== 'message' ? [] : input.pending === undefined ? filesOf(row) : pendingFiles(input.pending),
     ...(input.thread === undefined ? {} : { thread: input.thread }),
     ...(row.client_msg_id === null ? {} : { clientMsgId: row.client_msg_id }),
     ...(input.pending === undefined ? {} : { pending: input.pending.state === 'failed' ? ('failed' as const) : ('sending' as const) }),
@@ -414,6 +416,7 @@ interface PendingRow {
   readonly thread_ts: string | null
   readonly text: string
   readonly blocks_json: string | null
+  readonly file_ids_json: string | null
   readonly created_at: string
   readonly state: 'queued' | 'sending' | 'unknown' | 'failed'
 }
@@ -549,6 +552,9 @@ interface SlackFile {
   readonly thumb_360_h?: number
   readonly thumb_480?: string
   readonly thumb_720?: string
+  readonly thumb_1024?: string
+  readonly url_private?: string
+  readonly url_private_download?: string
 }
 
 /** The longest side of a thumbnail as the message list shows it, in CSS pixels. */
@@ -575,6 +581,36 @@ function thumbOf(file: SlackFile): FileView['thumb'] {
   }
 }
 
+/**
+ * The files of a message Juno is sending, from their staged copies. An
+ * image's box is worked out as `thumbOf` works out Slack's, from the same
+ * pixel size, so the row does not move when the stored message replaces it.
+ */
+function pendingFiles(row: PendingRow): ReadonlyArray<FileView> {
+  const files = parseJson<ReadonlyArray<PendingFile>>(row.file_ids_json) ?? []
+  return files.map((file) => {
+    const kind = fileKind(file.mimetype)
+    const src = uploadsUrl(file.stagedName)
+    const sized = kind === 'image' && file.width !== undefined && file.height !== undefined && !file.stagedName.endsWith('.bin')
+    const scale = sized ? Math.min(1, THUMB_BOX / Math.max(file.width!, file.height!)) : 1
+    return {
+      id: file.id,
+      name: file.name,
+      kind,
+      mimetype: file.mimetype,
+      size: file.size,
+      ...(sized
+        ? {
+            width: file.width!,
+            height: file.height!,
+            thumb: { src, width: Math.max(1, Math.round(file.width! * scale)), height: Math.max(1, Math.round(file.height! * scale)) },
+            full: src,
+          }
+        : {}),
+    }
+  })
+}
+
 function fileKind(mimetype: string | undefined): FileView['kind'] {
   if (mimetype === undefined) return 'file'
   if (mimetype.startsWith('image/')) return 'image'
@@ -596,6 +632,8 @@ function filesOf(row: WindowMessage): ReadonlyArray<FileView> {
     }
     const kind = fileKind(file.mimetype)
     const thumb = kind === 'image' ? thumbOf(file) : undefined
+    // The viewer shows the original (Slack's `url_private`).
+    const full = thumb === undefined ? undefined : file.url_private ?? file.thumb_1024
     out.push({
       id: file.id,
       name: file.title || file.name || file.id,
@@ -604,6 +642,8 @@ function filesOf(row: WindowMessage): ReadonlyArray<FileView> {
       ...(file.size === undefined ? {} : { size: file.size }),
       ...(file.original_w === undefined || file.original_h === undefined ? {} : { width: file.original_w, height: file.original_h }),
       ...(thumb === undefined ? {} : { thumb }),
+      ...(full === undefined ? {} : { full: `juno://files/${encodeURIComponent(file.id)}/full?url=${encodeURIComponent(full)}` }),
+      ...(file.url_private_download === undefined ? {} : { download: file.url_private_download }),
     })
   }
   return out

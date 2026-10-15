@@ -19,6 +19,9 @@ import { MessagesHandlers } from './messages/handlers'
 import { NewChatHandlers } from './newchat/handlers'
 import { NotificationsHandlers } from './notifications/handlers'
 import { SendHandlers } from './send/handlers'
+import { FilesHandlers } from './files/handlers'
+import { UploadProgress } from './files/progress'
+import { Staging } from './files/staging'
 import { ActionWorker } from './send/actionWorker'
 import { PostWorker } from './send/worker'
 import { ReadsHandlers } from './reads/handlers'
@@ -68,6 +71,8 @@ const EnginePhases = Layer.effectDiscard(
 export const Services = Layer.mergeAll(EnginePhases, ArtJob, HomeJob).pipe(
   Layer.provideMerge(MarkWorker.layer),
   Layer.provideMerge(PostWorker.layer),
+  Layer.provideMerge(Staging.layer),
+  Layer.provideMerge(UploadProgress.layer),
   Layer.provideMerge(ActionWorker.layer),
   Layer.provideMerge(SyncRunner.layer),
   Layer.provideMerge(AiProviderLive),
@@ -81,7 +86,7 @@ export const Services = Layer.mergeAll(EnginePhases, ArtJob, HomeJob).pipe(
 )
 
 /** One `toLayer` per feature, merged. Requires `Services`. */
-export const Handlers = Layer.mergeAll(StatusHandlers, SessionHandlers, TopicsHandlers, SearchHandlers, PrefsHandlers, MessagesHandlers, ReadsHandlers, ArtHandlers, NewChatHandlers, SendHandlers, HomeHandlers, AllTopicsHandlers, NotificationsHandlers, ViewsHandlers)
+export const Handlers = Layer.mergeAll(StatusHandlers, SessionHandlers, TopicsHandlers, SearchHandlers, PrefsHandlers, MessagesHandlers, ReadsHandlers, ArtHandlers, NewChatHandlers, SendHandlers, HomeHandlers, AllTopicsHandlers, NotificationsHandlers, ViewsHandlers, FilesHandlers)
 
 /** The engine's side of the AgentHost port (ADR 0012): `JunoHost` over `Services`, with the engine phase from the status feature. */
 export const AgentHost = JunoHostLive.pipe(Layer.provide(Layer.effect(PhaseSource, Status.use((status) => Effect.succeed(status.phases)))))
