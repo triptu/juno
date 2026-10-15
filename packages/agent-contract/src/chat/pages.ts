@@ -163,12 +163,16 @@ export type ReviewPage = typeof ReviewPage.Type
 
 /* Settings › Juno ---------------------------------------------------------- */
 
-/** One row of the model picker: a family resolved to today's newest model. */
+/**
+ * One row of the model picker: on OpenRouter, a family resolved to today's
+ * newest model; on a custom endpoint, one model it lists, by id.
+ */
 export const ModelChoice = Schema.Struct({
+  /** "Claude Sonnet", or a custom endpoint's model id. */
   family: Schema.String,
   /** "Claude Sonnet 5.5". Absent when the catalogue has no model that fits. */
   resolved: Schema.optionalKey(Schema.String),
-  provider: Schema.Literals(['openrouter', 'codex']),
+  provider: Schema.Literals(['openrouter', 'codex', 'custom']),
   /** "$3 / $15 per million tokens". */
   price: Schema.optionalKey(Schema.String),
   selected: Schema.Boolean,
@@ -200,6 +204,18 @@ export const JunoSettingsPage = Schema.Struct({
   ]),
   /** `rejected`: the provider refused the key on the last call. */
   openRouterKey: Schema.Literals(['missing', 'set', 'rejected']),
+  /** The active provider (main's `ProviderState` says what is set up). Absent means OpenRouter. */
+  provider: Schema.optionalKey(Schema.Literals(['openrouter', 'custom'])),
+  /** The custom endpoint refused its key on the last call. */
+  customKeyRejected: Schema.optionalKey(Schema.Literal(true)),
+  /**
+   * The custom endpoint did not list its models, so the chat model is typed
+   * in (`chatModels` holds the typed one, if any). Compaction uses the chat
+   * model on a custom endpoint.
+   */
+  modelTyped: Schema.optionalKey(Schema.Literal(true)),
+  /** The chat model reports no prices: it counts as $0 against the cap, which cannot track it. */
+  spendUntracked: Schema.optionalKey(Schema.Literal(true)),
   /** The owner's rules, one line each. They can only tighten tiers. */
   rules: Schema.Array(Schema.Struct({ id: Schema.String, text: Schema.String })),
   paused: Schema.Boolean,
