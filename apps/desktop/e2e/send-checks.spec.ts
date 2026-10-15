@@ -181,6 +181,15 @@ test('Enter never waits for a slow model: before its answer the message sends at
     await topic.composer.press('Enter')
     await expect(topic.checkBar.bar).toContainText('Looks like a reply to')
     expect(posts(fake)).toHaveLength(1)
+
+    await restarted.tabs.newTabButton.click()
+    await restarted.newChat.pickConversation('eng', 'eng')
+    await restarted.newChat.write(`${BILL_REPLY} next week`)
+    await restarted.win.waitForTimeout(500)
+    await restarted.newChat.send()
+    await expect(restarted.newChat.root).toHaveCount(0, { timeout: 500 })
+    await expect.poll(() => posts(fake).length).toBe(2)
+    expect(posts(fake)[1]!.args['thread_ts']).toBeUndefined()
   } finally {
     await again.close()
   }
@@ -218,4 +227,46 @@ test('with AI assist off, Enter sends at once and nothing is checked', async ({ 
   } finally {
     await again.close()
   }
+})
+
+test('New chat checks a channel draft and can post in the suggested thread', async ({ juno, fake, userData }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  await juno.tabs.newTabButton.click()
+  await juno.newChat.pickConversation('eng', 'eng')
+  const since = Date.now()
+  await juno.newChat.write(BILL_REPLY)
+  await routeAnswered(userData, fake.teamId, since)
+  await juno.newChat.send()
+  await expect(juno.newChat.root.getByText('Looks like a reply to', { exact: false })).toBeVisible()
+  expect(posts(fake)).toHaveLength(0)
+  await juno.newChat.send()
+  await expect.poll(() => posts(fake).length).toBe(1)
+  expect(posts(fake)[0]!.args['thread_ts']).toBeDefined()
+  expect(posts(fake)[0]!.args['text']).toBe(BILL_REPLY)
+})
+
+test('New chat offers the same clarity fixes before sending', async ({ juno, fake }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  await juno.tabs.newTabButton.click()
+  await juno.newChat.pickConversation('eng', 'eng')
+  await juno.newChat.write(TYPOS)
+  await juno.newChat.send()
+  await expect(juno.newChat.root.getByRole('button', { name: 'Fix and send' })).toBeVisible()
+  expect(posts(fake)).toHaveLength(0)
+  await juno.newChat.send()
+  await expect.poll(() => posts(fake).length).toBe(1)
+  expect(posts(fake)[0]!.args['text']).toBe(FIXED)
+})
+
+test('New chat warns about the audience of the chosen channel', async ({ juno }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  await juno.tabs.newTabButton.click()
+  await juno.newChat.pickConversation('eng', 'eng')
+  await juno.newChat.write('The salary offer goes out Friday')
+  await expect(juno.newChat.root.getByText('This reads like hiring or people detail.', { exact: false })).toBeVisible()
+  await juno.newChat.pickConversation('hiring', 'hiring')
+  await expect(juno.newChat.root.getByText('This reads like hiring or people detail.', { exact: false })).toHaveCount(0)
 })

@@ -212,7 +212,7 @@ export const resolve = (id: string, cardStatus: CardStatus = open, count: 1 | 2 
 
 export const topicsCard = (id: string): Card => ({ _tag: 'topics', id: cardId(id), status: open, links: [topics.postgres, topics.offsite, topics.hiring] })
 
-export const task = (id: string, phase: Extract<Card, { _tag: 'task' }>['phase'], extra: Partial<Pick<Extract<Card, { _tag: 'task' }>, 'state' | 'open' | 'because' | 'kind' | 'title' | 'where'>> = {}): Card => ({
+export const task = (id: string, phase: Extract<Card, { _tag: 'task' }>['phase'], extra: Partial<Pick<Extract<Card, { _tag: 'task' }>, 'state' | 'stopFailed' | 'open' | 'because' | 'kind' | 'title' | 'where'>> = {}): Card => ({
   _tag: 'task',
   id: cardId(id),
   jobId: jobId(`job-${id}`),

@@ -13,7 +13,10 @@
 /** "$2.00", "$0.35". Two decimals, always. */
 const usd = (amount: number): string => `$${amount.toFixed(2)}`
 
+const priceUsd = (amount: number) => Number.isInteger(amount) ? `$${amount}` : usd(amount)
+
 export const chatCopy = {
+  modelPrice: (input: number, output: number) => `${priceUsd(input)} in, ${priceUsd(output)} out per million tokens`,
   empty: {
     title: 'What do you need?',
     body: 'Ask me to find, summarize, catch you up or tidy up. I can read your topics and propose messages, but nothing is sent until you press Send.',
@@ -70,6 +73,8 @@ export const chatCopy = {
     },
     failed: {
       provider: "Juno didn't answer. Give it a moment and try again.",
+      missingKey: 'Add an OpenRouter key in Settings to send this message.',
+      rateLimited: 'The provider is busy. Your message is kept. Try again shortly.',
       keyRejected: 'OpenRouter rejected the key. Check it in Settings.',
       codexMissing: 'Codex is not installed on this Mac. Install Codex and try again.',
       codexQuota: 'Codex has used the available ChatGPT quota. Try again when it resets.',
@@ -160,6 +165,7 @@ export const chatCopy = {
       failed: 'Failed',
       showInActivity: 'Show in Activity',
       stopping: 'Stopping',
+      stopFailed: 'Could not stop the task. Open it in T3 Code.',
       stopped: 'Stopped',
       lostSight: 'Sign in to T3 Code to keep watching',
       signIn: 'Sign in',
@@ -292,6 +298,8 @@ export const chatCopy = {
       /** "Removal pending · 1 copy in a running job". */
       removalPending: (copies: number) => `Removal pending · ${copies === 1 ? '1 copy' : `${copies} copies`} in a running job`,
       stopJob: 'Stop job',
+      missingKey: 'Add an OpenRouter key in Settings to send this message.',
+      rateLimited: 'The provider is busy. Your message is kept. Try again shortly.',
       keyRejected: 'OpenRouter rejected this key',
       /** Under the rules when the agent refused the list. */
       rulesInvalid: 'Each rule is one line, a sentence or two, and there are at most 20.',

@@ -111,6 +111,7 @@ export const taskCard = defineFixtures(
       'needs-you': card(task('k2', 'needsYou', { state: 'Waiting for your answer', open: thread })),
       'lost-sight': card(task('k4', 'lostSight', { open: thread })),
       stopping: card(task('k5', 'stopping', { open: thread })),
+      'stop-failed': card(task('k12', 'running', { stopFailed: true, open: thread })),
       done: card(task('k6', 'done', { open: pr })),
       failed: card(task('k7', 'failed')),
       stopped: card(task('k8', 'stopped')),
