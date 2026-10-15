@@ -1,5 +1,6 @@
 import type { Effect } from 'effect'
 import type { SqlClient } from 'effect/sql'
+import dropForYouCards from './202610160200_drop_for_you_cards'
 import initial from './202610121200_initial'
 import overlayPinned from './202610131000_overlay_pinned'
 import search from './202610140100_search'
@@ -31,4 +32,5 @@ export const userMigrations: Record<string, Effect.Effect<void, unknown, SqlClie
   '202610151730_sidebar_views': sidebarViews,
   '202610152300_automated_view': automatedView,
   '202610160100_agent_resolves': agentResolves,
+  '202610160200_drop_for_you_cards': dropForYouCards,
 }

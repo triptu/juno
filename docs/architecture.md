@@ -250,7 +250,6 @@ pending_messages(client_msg_id PK, channel, thread_ts, text, blocks_json, file_i
 prefs[notifications] (notificationHours, presenceHours, matters, channels, people, threads?)
 notification_log     (id PK, at, channel, ts, UNIQUE(channel, ts), topic_id, preview, outcome /*now|summary|hold*/,
                       reason, candidate_json, judgement_json, summary_due_at, delivered_at, suppressed_at)
-for_you_cards   (id PK, kind, topic_id, payload_json, input_hash, created_at, dismissed_at, done_at)
 juno_chat       (id PK, role, content_json, created_at)
 drafts          (topic_id PK, text, updated_at)
 outbox          (id PK, kind, target_key, payload_json, depends_on, created_at, attempts, next_at, last_error)
@@ -269,7 +268,7 @@ Sidebar views (SPEC 5 "Views", `engine/sidebarViews/`) are local: the `views.*` 
 
 The built-in **Automated** view (SPEC 5 "Automated") is a `sidebar_views` row with the fixed id `automated`, so a rename, an icon change or Undo of a delete keeps it the built-in one. `builtin_views` records that Juno made it; listed there and missing from `sidebar_views` means the user deleted it, and nothing makes it again. `automated_channels` is where each conversation stands: in Automated, kept where it is, or asked about on Home, and who settled it. The rules (`domain/automated.ts`, `classifyConversation`) read the senders of a conversation's latest 30 messages (an app is a `bot_message`, a bot user or a `B` id). `automatedView.ts` holds the shared writes and the rules' pass, `sortClearCases`, which the sync runs through its `onBooted` hook after each boot and before it reports live, so a clear bot channel is never in All once the first sync is done. The job in `home/automated.ts` runs after that on changes (3 second windows) and every 15 minutes: it looks only at active conversations in no view whose place is not settled by `you`, again only when one has new activity or AI assist changed, moves clear cases, asks `automatedChannel` once per unclear channel with AI assist on (counted in Home's budget), and writes `ask` for what stays unclear. Every hand change to a view's conversations (the sheet, Add to view, the agent's `juno_views`) and every answer on Home (`views.sortChannel`, whose undo is the place before) is written `by 'you'`, which the rules and Juno never overwrite.
 
-Unused since the 10-14 simplification and kept because migrations are append-only: `topic_overlay.tracked`, `unsubscribed_at` (Main's old client-only Unsubscribe; Main now takes its channel's Notify me level), `grouping_dismissed_ts`, and the `main_groups`, `main_group_msgs` and `for_you_cards` tables. `notification_levels` gains the `thread` kind for a thread set to Every message; a thread's Never is its Slack follow flag, not a row.
+Unused since the 10-14 simplification and kept because migrations are append-only: `topic_overlay.tracked`, `unsubscribed_at` (Main's old client-only Unsubscribe; Main now takes its channel's Notify me level), `grouping_dismissed_ts`, and the `main_groups` and `main_group_msgs` tables. The unused `for_you_cards` table was dropped by migration. `notification_levels` gains the `thread` kind for a thread set to Every message; a thread's Never is its Slack follow flag, not a row.
 
 ### 4.4 Topics are derived (ADR 0004)
 
