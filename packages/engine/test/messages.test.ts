@@ -308,7 +308,7 @@ describe('live messages', () => {
 })
 
 describe('files', () => {
-  it('gives an image a juno:// thumbnail with its box before the bytes arrive', async () => {
+  it('gives an image a juno:// thumbnail with its box before the bytes arrive, and the original for the viewer', async () => {
     const engine = await bootedEngine()
     const file = {
       id: 'F0CHART',
@@ -340,6 +340,7 @@ describe('files', () => {
         width: 1600,
         height: 900,
         thumb: { src: `juno://files/F0CHART/720?url=${encodeURIComponent(file.thumb_720)}`, width: 360, height: 203 },
+        full: `juno://files/F0CHART/full?url=${encodeURIComponent(file.url_private)}`,
       },
     ])
     expect(row.body.blocks.some((block) => block.kind === 'file' && block.id === 'F0CHART')).toBe(true)

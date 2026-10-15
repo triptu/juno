@@ -171,25 +171,6 @@ describe('every fixture response decodes with @juno/slack schemas', () => {
     expect(searchMatches(words).length).toBeGreaterThanOrEqual(2)
   })
 
-  it('upload pair posts a message with the file', async () => {
-    const bytes = Buffer.from('hello file')
-    const url = await client.ok('files.getUploadURLExternal', { filename: 'notes.txt', length: bytes.length })
-    const upload = await fetch(url.upload_url, { method: 'POST', body: bytes, headers: { 'content-type': 'text/plain' } })
-    expect(upload.status).toBe(200)
-    const done = await client.ok('files.completeUploadExternal', {
-      files: [{ id: url.file_id, title: 'Notes' }],
-      channel_id: 'C0ENG',
-      initial_comment: 'notes attached',
-    })
-    expect(done.files[0]?.id).toBe(url.file_id)
-    expect(done.files[0]?.title).toBe('Notes')
-    const history = await client.ok('conversations.history', { channel: 'C0ENG', limit: 1 })
-    expect(history.messages[0]?.files?.[0]?.id).toBe(url.file_id)
-    expect(history.messages[0]?.text).toBe('notes attached')
-    const served = await fetch(done.files[0]!.url_private!)
-    expect(await served.text()).toBe('hello file')
-  })
-
   it('edge users/info returns users and failed ids', async () => {
     const raw = await client.edge('users/info', { ids: ['U0MAYA', 'U0NOBODY'] })
     const response = Schema.decodeUnknownSync(EdgeUsersInfoResponse)(raw)

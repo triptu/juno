@@ -149,6 +149,14 @@ describe('form arguments', () => {
     expect(back.blocks?.[0]?.type).toBe('rich_text')
   })
 
+  it('sends files.share file ids comma-joined, as the official form builder does, and reads a JSON array too', () => {
+    const args = Methods['files.share'].args
+    const form = Schema.encodeSync(args)({ files: ['F01', 'F02'], channel: 'C0ENG', client_msg_id: 'uuid-1', resharing_aware: true })
+    expect(form).toEqual({ files: 'F01,F02', channel: 'C0ENG', client_msg_id: 'uuid-1', resharing_aware: 'true' })
+    expect(Schema.decodeUnknownSync(args)({ files: '["F01","F02"]', channel: 'C0ENG', client_msg_id: 'uuid-1' }).files).toEqual(['F01', 'F02'])
+    expect(Schema.decodeUnknownSync(args)({ files: 'F01', channel: 'C0ENG', client_msg_id: 'uuid-1' }).files).toEqual(['F01'])
+  })
+
   it('decodes an ok and an error response of the same method', () => {
     const decode = Schema.decodeUnknownSync(Methods['conversations.mark'].response)
     expect(decode({ ok: true })).toEqual({ ok: true })

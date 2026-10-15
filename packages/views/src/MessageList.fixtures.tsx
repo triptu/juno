@@ -2,7 +2,27 @@ import { useState } from 'react'
 import type { MessageView } from '@juno/contract'
 import { defineFixtures, fixture, scene, type FixtureFrame } from '@juno/ui'
 import { useFixtureControl } from './juno-chat/fixtures/control'
-import { emojiOnly, failedFile, failedSend, hostile, longCode, longFirstLine, main as mainStream, mainDividerBefore, manyReactions, mentions, pendingFile, rtl, sending, thread, threadDividerBefore, withFiles } from './fixtures/messages'
+import {
+  emojiOnly,
+  failedFile,
+  failedSend,
+  hostile,
+  longCode,
+  longFirstLine,
+  main as mainStream,
+  mainDividerBefore,
+  manyReactions,
+  mentions,
+  pendingFile,
+  rtl,
+  sending,
+  thread,
+  threadDividerBefore,
+  uploadFailed,
+  uploading,
+  withDownloads,
+  withFiles,
+} from './fixtures/messages'
 import { NOW } from './fixtures/topics'
 import { noopActions } from './fixtures/actions'
 import { InlineEdit } from './InlineEdit'
@@ -87,6 +107,25 @@ function OwnRowChanges() {
   )
 }
 
+/** The `clientMsgId` of the uploading row, for its progress. */
+const uploadingId = uploading[uploading.length - 1]!.message.clientMsgId!
+
+/** The upload line appears, moves and goes under the pending row's files. The test checks that no row moves. */
+function UploadProgress() {
+  const [progress, setProgress] = useState<number | undefined>(undefined)
+  useFixtureControl('start', () => setProgress(0.2))
+  useFixtureControl('advance', () => setProgress(0.8))
+  useFixtureControl('done', () => setProgress(undefined))
+  return <MessageList {...base} items={uploading} main={false} uploadProgress={progress === undefined ? {} : { [uploadingId]: progress }} />
+}
+
+/** The cards gain their Download button. The test checks that no card changes height. */
+function DownloadAppears() {
+  const [download, setDownload] = useState(false)
+  useFixtureControl('download', () => setDownload(true))
+  return <MessageList {...base} items={withDownloads} main={false} {...(download ? { onDownload: noop } : {})} />
+}
+
 export default defineFixtures(
   MessageList,
   {
@@ -114,15 +153,22 @@ export default defineFixtures(
       thumbnails: state({ items: withFiles, main: false }),
       'thumbnail-pending': state({ items: pendingFile, main: false }),
       'thumbnail-failed': state({ items: failedFile, main: false }),
+      // Cards with Download, and thumbnails that open the viewer.
+      downloads: state({ items: withDownloads, main: false, onDownload: noop, onOpenImage: noop }),
+      'focus-thumbnail': state({ items: withDownloads, main: false, onDownload: noop, onOpenImage: noop }, { focus: '[data-thumbnail]' }),
     },
     Send: {
       sending: state({ items: sending, main: false }),
       failed: state({ items: failedSend, main: false, onRetry: noop, onDiscard: noop }),
+      uploading: state({ items: uploading, main: false, uploadProgress: { [uploadingId]: 0.45 } }),
+      'upload-failed': state({ items: uploadFailed, main: false, onRetry: noop, onDiscard: noop }),
     },
     Shift: {
       'pending-settles': scene(() => <PendingSettles />),
       'reaction-changes': scene(() => <ReactionChanges />),
       'own-row-changes': scene(() => <OwnRowChanges />),
+      'upload-progress': scene(() => <UploadProgress />),
+      'download-appears': scene(() => <DownloadAppears />),
     },
     Data: {
       'empty-thread': state({ items: [], main: false }),

@@ -71,6 +71,13 @@ module outboxProtocol {
     s' = { ...s, request: s.request.set(k, if (retryLater) "later" else "refused"),
       label: "refuse", target: k }
   }
+  // A post with files uploads them before it is claimed. Uploading posts
+  // nothing, so a refused upload fails the row with no message in Slack, and
+  // Retry uploads only what is missing. A lost connection leaves it queued.
+  action uploadFail(k: int): bool = all {
+    not(s.sealed), s.row.get(k) == "queued", s.due.contains(k), s.request.get(k) == "idle",
+    s' = { ...s, row: s.row.set(k, "failed"), due: s.due.exclude(Set(k)), label: "uploadFail", target: k }
+  }
   // Slack can drop the request without an answer.
   action drop(k: int): bool = all {
     not(s.sealed), s.request.get(k) == "transit",
@@ -95,6 +102,8 @@ module outboxProtocol {
   }
   // An ambiguous failure is observable only after Slack has decided the
   // request. It cannot still be in transit when an absent lookup permits resend.
+  // An accepted `files.share` answers without the message, which is this
+  // action from `accepted`: the row waits for the echo or a lookup.
   action lostWith(k: int, guard: bool): bool = all {
     not(s.sealed) or s.request.get(k) == "dropped",
     Set("accepted", "dropped", "refused", "later").contains(s.request.get(k)),
@@ -307,7 +316,7 @@ module outboxProtocol {
     nondet later = Set(true, false).oneOf()
     nondet kind = Set("change", "delete").oneOf()
     any {
-      send(k), refuse(k, later), drop(k), lost(k), crash, retry(k), discard(k),
+      send(k), refuse(k, later), drop(k), lost(k), crash, retry(k), discard(k), uploadFail(k),
       queueAction(k, kind), actFail(k), actRefuse(k),
       page(k), disconnect, goOffline, seal,
       { nondet f = s.fetches.oneOf(); failLookup(f) }
@@ -401,6 +410,22 @@ module outboxProtocol {
     if (turn == 9) { nondet f = s.fetches.filter(f => f.kind == "catchup").oneOf(); finishFetch(f) } else
     if (turn == 10) catchUp else
     if (turn == 11) { nondet f = s.fetches.oneOf(); finishFetch(f) } else
+    seal
+  ) }
+
+  // An upload is refused, the user retries, the files go and the post is
+  // shared; its answer has no message, so the lookup stores it.
+  action uploadRetryStep = all { not(reachedAgreement), tick(
+    if (s.sealed) progress else
+    if (turn == 0) send(1) else
+    if (turn == 1) uploadFail(1) else
+    if (turn == 2) retry(1) else
+    if (turn == 3) claim(1) else
+    if (turn == 4) accept(1, false) else
+    if (turn == 5) lost(1) else
+    if (turn == 6) wake(1) else
+    if (turn == 7) lookup(1) else
+    if (turn == 8) { nondet f = s.fetches.oneOf(); finishFetch(f) } else
     seal
   ) }
 

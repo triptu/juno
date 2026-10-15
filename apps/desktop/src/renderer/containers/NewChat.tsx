@@ -15,6 +15,7 @@ import {
 } from '@juno/state'
 import { useAtom, useAtomValue } from '@juno/state/react'
 import { Composer, DestinationPickers, NewChat as NewChatView, startOfConversation, type PickerName } from '@juno/views'
+import { takeAttachments, useAttachments } from './attachments'
 import { settleSentChat } from './navigation'
 import { TopicPreview } from './TopicView'
 
@@ -47,6 +48,8 @@ export const NewChatTab = memo(function NewChatTab({ tabId }: NewChatTabProps) {
   const [sending, setSending] = useState(false)
   const now = useAtomValue(nowAtom)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  // The files stay with the draft through every change of destination (spec section 9).
+  const files = useAttachments(tabId)
 
   useEffect(() => {
     inputRef.current?.focus()
@@ -73,11 +76,14 @@ export const NewChatTab = memo(function NewChatTab({ tabId }: NewChatTabProps) {
   const send = async () => {
     const target = sendTarget(chat)
     if (target === undefined) return openPicker('conversation')
-    if (chat.draft.trim() === '' || sending) return
+    if ((chat.draft.trim() === '' && files.files.length === 0) || sending) return
+    const attached = takeAttachments(tabId)
+    if (attached === undefined) return
     setSending(true)
-    const exit = await sendMessage(registry, target, chat.draft)
+    const exit = await sendMessage(registry, target, chat.draft, undefined, attached.ids)
     if (exit._tag === 'Success') return settleSentChat(tabId, exit.value.topicId)
-    // The draft stays; the send can be tried again.
+    // The draft and its files stay; the send can be tried again.
+    attached.restore()
     setSending(false)
     console.warn('juno: send failed', exit.cause)
   }
@@ -97,6 +103,9 @@ export const NewChatTab = memo(function NewChatTab({ tabId }: NewChatTabProps) {
           placeholder={placeholderOf(chat)}
           sending={sending}
           inputRef={inputRef}
+          leading={files.leading}
+          attachments={files.chips}
+          onFiles={files.onFiles}
           above={
             <DestinationPickers
               conversation={chat.conversation}

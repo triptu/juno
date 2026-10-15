@@ -1,4 +1,5 @@
-import { rm } from 'node:fs/promises'
+import { rm, writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import type { Page } from '@playwright/test'
 import { expect, launchApp, tempUserData, test } from './fixtures'
 
@@ -22,6 +23,7 @@ function brightness(rgb: string): number {
 test('a dark-theme user gets a dark window and a dark page on relaunch', async () => {
   const userData = await tempUserData()
   try {
+    await writeFile(join(userData, 'launch.json'), JSON.stringify({ theme: 'light' }))
     const first = await launchApp(userData)
     const lightBackground = await resolveColorVar(first.win, '--background')
     const lightWindow = await first.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.getBackgroundColor())

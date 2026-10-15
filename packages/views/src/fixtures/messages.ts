@@ -293,6 +293,30 @@ export const withFiles = window([
 /** One image that never arrives: the box is its final size from the start. */
 export const pendingFile = window([{ ago: 10, from: people.priya, text: 'Staging after the fix:', files: [files.pending] }])
 
+/** A made-up download url: main fetches the real one on the Slack session. */
+const downloadUrl = (id: string) => `https://files.example.invalid/${id}/download`
+
+/** Files Slack holds: the cards get Download, the images open in the viewer at full size. */
+export const downloadable = {
+  pdf: { ...files.pdf, download: downloadUrl(files.pdf.id) },
+  sheet: { ...files.sheet, download: downloadUrl(files.sheet.id) },
+  landscape: { ...files.landscape, full: picture(1600, 900, '#8EB5C9'), download: downloadUrl(files.landscape.id) },
+  portrait: { ...files.portrait, full: picture(900, 1400, '#C9A98E'), download: downloadUrl(files.portrait.id) },
+} satisfies Record<string, FileView>
+
+export const withDownloads = window([
+  { ago: 60, from: people.sam, text: 'Runbook and the sizing sheet.', files: [downloadable.pdf, downloadable.sheet] },
+  { ago: 55, from: people.priya, text: 'Dashboard from this morning.', files: [downloadable.landscape] },
+])
+
+/** The owner's message going out with a picture and a runbook, still uploading or refused. */
+const uploadInputs = (state: PendingState): ReadonlyArray<MessageInput> => [
+  { ago: 12, from: people.maya, text: 'Can you share the numbers from last night?' },
+  { ago: 0, from: me, text: 'Here they are, with the runbook.', files: [files.landscape, files.pdf], pending: state },
+]
+export const uploading = window(uploadInputs('sending'))
+export const uploadFailed = window(uploadInputs('failed'))
+
 /** One image whose bytes fail: the box keeps its size and shows a glyph. */
 export const failedFile = window([{ ago: 10, from: people.priya, text: 'Expired thumbnail:', files: [files.failed] }])
 
