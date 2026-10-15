@@ -389,9 +389,12 @@ test.describe('large workspace', () => {
         if (i > 0) runs.push(times)
         // Where the start goes: main to the renderer's navigation, the bundle loaded and run (`juno.start` is
         // marked after every import), then the shell and the rows. Times after `+` are from the navigation.
-        const created = await running.app.evaluate(({ app }) => app.getAppMetrics().find((metric) => metric.type === 'Browser')?.creationTime ?? 0)
+        const [created, renderer] = await running.app.evaluate(({ app }) => {
+          const metrics = app.getAppMetrics()
+          return [metrics.find((metric) => metric.type === 'Browser')?.creationTime ?? 0, metrics.find((metric) => metric.type === 'Tab')?.creationTime ?? Number.NaN] as const
+        })
         const page = await running.win.evaluate(() => ({ origin: performance.timeOrigin, start: performance.getEntriesByName('juno.start', 'mark')[0]?.startTime ?? Number.NaN }))
-        if (i > 0) console.log(`warm start ${i}: main to navigation ${(page.origin - created).toFixed(0)} ms, bundle run at +${page.start.toFixed(0)}, shell at +${(created + times.mainToShell - page.origin).toFixed(0)}, rows at +${(created + times.mainToRows - page.origin).toFixed(0)}`)
+        if (i > 0) console.log(`warm start ${i}: main to renderer process ${(renderer - created).toFixed(0)} ms, to navigation ${(page.origin - created).toFixed(0)} ms, bundle run at +${page.start.toFixed(0)}, shell at +${(created + times.mainToShell - page.origin).toFixed(0)}, rows at +${(created + times.mainToRows - page.origin).toFixed(0)}`)
       } finally {
         await running.close()
       }
