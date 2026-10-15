@@ -11,12 +11,12 @@ import { SqlClient } from 'effect/sql'
 export default Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient
   yield* sql`
-    CREATE TABLE sent_posts (
+    CREATE TABLE IF NOT EXISTS sent_posts (
       client_msg_id TEXT PRIMARY KEY,
       channel TEXT NOT NULL,
       user_id TEXT NOT NULL,
       ts TEXT,
       sent_at INTEGER NOT NULL
     )`
-  yield* sql`CREATE INDEX sent_posts_sent_at ON sent_posts (sent_at)`
+  yield* sql`CREATE INDEX IF NOT EXISTS sent_posts_sent_at ON sent_posts (sent_at)`
 })
