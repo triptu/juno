@@ -26,7 +26,7 @@ What each folder does, and the spec transitions it implements (`specs/agent-reco
 
 | Folder | Does | Spec |
 | --- | --- | --- |
-| `store/` | `schema.ts`: the tables, as named migration sets. `database.ts`: open, pragmas, migrate. `ledger.ts`: Pause, AI off, authorization, attempt, receipt, startup classification. `memory.ts`: memory queue, jobs, publication and the compaction seam | `startup`, `pause`, `cancel`, `authorize`; memory `project`, `start`, `complete`, `publish`, `extend`, `merge`, `failJob` |
+| `store/` | `schema.ts`: the tables, as named migration sets. `database.ts`: open, pragmas, migrate. `ledger.ts`: Pause, AI off, authorization, attempt, receipt, startup classification. `memory.ts`: memory queue, jobs, publication and the compaction seam | `startup`, `pause`, `cancel`, `authorize`; memory `project`, `start`, `complete`, `publish`, `extend`, `merge`, `failJob`, and `redact` and `purge` for `redaction/` |
 | `inbox/` | `inbox.ts`: owner input, durable before it is acknowledged. `bridge.ts`: reset, submit with `requestId = op_id`, then `submitted` | `acceptInput`, `acknowledge`, `resetBridge`, `submit`, `markSubmitted` |
 | `projection/` | One transaction per pi commit: archive messages (chunks of at most 16 KB), their memory keys, the cursor | `project` |
 | `recovery/` | Incarnations and rotation; the open sequence: a journal at or ahead of both the archive cursor and the latest authorized position resumes, behind either rotates, newer schema stops | `openJournal`, `rollbackJournal`, `rotate`; `agent-recovery-replay.qnt` |
@@ -55,7 +55,7 @@ Each folder has one owner (plan v3 §17). Only that folder imports its library (
 | `src/providers/`, `src/spend/` | WP9, WP20 | `src/providers/` is the only importer of `@earendil-works/pi-ai` and `@openai/codex-sdk` |
 | `src/request/`, `src/compactor/`, `src/router/`, `src/jobs/`, `src/memory-tools/`, `src/pins/` | WP11 | |
 | `src/actions/`, `src/grants/`, `src/policy/` | WP15 (built; see "Actions") | |
-| `src/redaction/` | WP16 | |
+| `src/redaction/` | WP16 (built; see "Redaction") | |
 | `src/mcp/` | WP17 | the only importer of `@earendil-works/pi-mcp` |
 | `src/t3/`, `src/littlebird/` | WP18 | |
 | `src/schedule/` | WP19 | |
@@ -179,6 +179,39 @@ startup: open authorizations ─▶ unknown (recovery) ─▶ reconcile once ─
 
 `test/policy.test.ts` checks the pure rules with properties; `test/actions.test.ts` runs every card kind on the engine (click, consume, send, receipt, unknown, dismiss); `test/actions-crash.test.ts` kills the agent at `approval.committed`, `authorization.consumed` and `attempt.beforeReceipt`.
 
+## Redaction (WP16)
+
+`src/redaction/` removes messages (plan v3 §4.5, §14.4; SPEC 13.8; specs `agent-memory.qnt` `redact` and `purge`, `agent-recovery.qnt` `raiseDeletion` and `redact`, `agent-actions.qnt` `invalidate("redact")`). `Turns.redaction` is the service; `openTurns({ backup })` takes the backup's hooks.
+
+| File | Does |
+| --- | --- |
+| `scope.ts` | Pure rules: what a removal reaches (`removalScope`), whether Juno's reply follows (`replyOf`), the runs that saw it (`runsThatSaw`) |
+| `redaction.ts` | The removal, in order, and the purge |
+| `card.ts` | `remove_messages` (the model proposes a Remove card) and the card's executor |
+| `schema.ts` | `REDACTION_MIGRATIONS`: `removals`, `removed_ops`, and the local `redaction_purges` |
+
+**What a removal reaches.** A message is its whole pi entry (every chunk). An owner input also takes every entry of the same words sent again ("Try again" is a new op). "Also remove Juno's reply" takes everything the run wrote after the input and before the next one: Juno's words and tool calls, and the tool results, which can echo the owner's words (`remember` does).
+
+**One removal, in order.**
+
+1. The backup's `raiseDeletion(gen + 1)`, before anything else (G13). A crash here leaves the record ahead and nothing removed (`redaction.deletionRaised`).
+2. One transaction: `redactMemory` (in `store/memory.ts`) tombstones the messages (text cleared, ids kept, `redactions` rows), masks every view line whose node depends on them, moves `gen` and queues rebuilds. Then the attachments go, the inbox ops' text is cleared, pins sourced from them are deactivated and every version's text cleared (bumping `pin_rev`), remove cards that name them lose their preview line, `revokeAllGrants(store, 'redaction')`, and reports waiting in the inbox from jobs started in runs that saw them are failed with `removed`. The moved `gen` expires every open card, refuses a waiting click (`sourceChanged`), refuses a request built before it at the guard, and makes a running compaction job's publication stale (`redaction.committed`).
+3. Jobs started in runs that saw the messages are stopped, as their Task card's Stop does.
+4. The purge, one durable step at a time, in order, retried on the memory queue's delays: `purgeNodes` (node versions that depend on a removed message), `purgeCodexThreads` (`providers/codex-purge.ts`: the session files of every recorded Codex thread), the journal (the router rotates between runs, which deletes the old file), then the backup's `regenerate(gen)`. One run of a step settles every removal waiting on it. Startup resumes it (`redaction.purged`).
+
+The same op again is the same removal; a removal of messages already gone changes nothing. Removals run one at a time.
+
+**The `remove` card.** `remove_messages({ messages: ['n12'] })` names owner messages by handle; the trusted side builds the card with each message's first line and time, and `offerReply` when Juno's reply follows the first. Its child is Tier 3 and deduplicated; the click runs the removal under `card:<action id>` with `args.choice.alsoRemoveReply`, and reconcile finds it by that op.
+
+**Not covered yet.**
+
+- Copies inside other messages: a later owner message that replies to a removed one carried the quote in its own text, and Juno's later replies may quote it. Both stay, as plan v3 §4.5 states for Juno's replies.
+- Payloads of other cards proposed in runs that saw the message: they expire, and their text stays in the ledger.
+- `agent.sqlite` is not written with `secure_delete`, so cleared text can stay in free pages and the WAL until SQLite reuses them. Plan v3 §4.5 does not promise forensic erasure.
+- The Settings line "Removal pending · 1 copy in a running job" is not shown: jobs are stopped at the removal, and the journal rotates at the next run boundary.
+
+`test/redaction-scope.test.ts` checks the pure rules with properties; `test/redaction.test.ts` runs removals on the engine (every place the words lived, a removal racing a running compaction, stale work refused, the Remove card, the owner's sheet through the renderer); `test/redaction-crash.test.ts` kills the agent at `redaction.deletionRaised`, `redaction.committed` and after each purge step.
+
 ## Settings › Juno
 
 `src/settings/settings.ts` serves the page and the owner's changes over the running engine (SPEC 13.10, plan v3 §7.1, §5.4). The owner's choices are one row of `juno_settings` (`SETTINGS_MIGRATIONS`, replicated): the chat family, the compaction family and the cap for days not yet started.
@@ -200,7 +233,8 @@ startup: open authorizations ─▶ unknown (recovery) ─▶ reconcile once ─
 - **Commands**: send, react and retry go to the engine's inbox and answer after the commit; a second Try again for the same failure names the retry already queued; `tooLong` and a failed write (`notDelivered`) come back as errors. With AI assist off they answer `unavailable`.
 - **Cards** (WP15): the page lists every card at the time Juno proposed it, and each job's Task card at the time it started; `cards` carries the `CardBinding` of each open card in the window. `agent.cards.approve`, `dismiss` and `editMessage` answer after their commit; a click or edit on a card the owner no longer sees is `stale`, on an expired card `expired`, on a card that does not take it `invalid`. `prepare` writes a button's data (an option, a reply, Keep, Pause or Delete on a schedule) into a new revision and returns the binding to approve; a button with no data returns the card's current binding. `askAgain` on an expired card sends the owner message "Ask again", replying to the card. `undo` answers `unavailable`.
 - **The Juno menu's pages** (`pages.ts`) are rebuilt on the same signal. What Juno remembers lists the active pins with their source message; edit, remove and "Remember this" check the pin's (or the message's) version and answer `stale` when it moved. Memory of this chat is the published view as a timeline, each line dated from its messages' earliest to latest time, and rechecked every 2 s because compaction publishes between runs. Activity lists each finished run: who asked ("You", a job's title, "A schedule"), when, the outcome (`stayedQuiet` when a complete run said nothing), whether it read untrusted content, and its actions (`actions/activity.ts`): each card the run proposed with its decision (approved, dismissed, expired, refused), outcome and a plain failure line with the detail behind Copy details, and each job it started with no click. The folded read line is not built. Scheduled lists persisted schedules and reply watches; Review streams an empty page. Connections streams the MCP manager when `ChatHost.connections` is supplied. Memory and Activity page with `{ cursor?, limit }`: the newest `limit` rows before the cursor, oldest first, and `moreAbove`.
-- **Not served yet**: Remove (WP16), review and ownership (WP21), and Codex sign-in (WP20). Their commands answer `unavailable`.
+- **Remove** (WP16): `agent.chat.remove` runs the owner's removal (`Turns.redaction.remove`) and answers once it committed. It works paused, offline and with AI assist off; only a missing engine or `updateNeeded` refuses it, and a message that is not in the chat is `stale`. A removed owner message is a `removed` note in its place, and a quote of it reads Removed.
+- **Not served yet**: review and ownership (WP21), and Codex sign-in (WP20). Their commands answer `unavailable`.
 - **Not listed yet**: notes ("Remembered"), and schedule origins (a wake shows as Juno's own run).
 - **What a message is about.** A message's `context` (a topic from the Juno panel, or a person or channel from Ask Juno) is stored with the op, reaches the model as an `<about>` element inside `<message>` (`router/input.ts`), and shows as the owner bubble's `about` line. A topic context is Slack content, so the run starts tainted, or is tainted when the message steers it.
 - **Cost**: each change rebuilds the whole list with a few queries, and parses finished runs' text again. That is fine for M2; a 5,000-message chat will want finished runs cached, against the budget in `docs/performance.md`.
