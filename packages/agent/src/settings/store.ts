@@ -46,7 +46,7 @@ export const capOf = (store: Store): number => saved(store).cap
 /** The custom endpoint's model in use: the saved id (listed or typed), else the first one listed. */
 function customChoice(store: Store, picker: ModelPicker): PickerModel | undefined {
   const id = saved(store).customModel
-  const rows = picker.rows()
+  const rows = picker.rows().filter(row => row.choice.provider === 'custom')
   return rows.find((row) => row.model.id === id) ?? (id === null ? rows[0] : picker.typed(id))
 }
 
@@ -56,6 +56,7 @@ function customChoice(store: Store, picker: ModelPicker): PickerModel | undefine
  * the first row. On a custom endpoint, compaction uses the chat model.
  */
 export function modelFor(store: Store, picker: ModelPicker, purpose: Purpose): PickerModel | undefined {
+  if (purpose === 'chat' && saved(store).chat === 'codex:sol') return picker.rows().find(row => row.choice.provider === 'codex')
   if (picker.provider() === 'custom') return customChoice(store, picker)
   const usable = picker.rows().filter((row) => row.path === purpose && row.choice.provider === 'openrouter')
   const family = purpose === 'chat' ? saved(store).chat : saved(store).compaction
