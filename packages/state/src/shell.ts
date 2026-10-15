@@ -1,10 +1,10 @@
 /** Atoms backed by main through the bridge, not the engine. */
 import { Effect, Schema } from 'effect'
 import * as Atom from 'effect/reactivity/Atom'
-import { AccentSchema, AppInfo, DEFAULT_ACCENT, DEFAULT_SIDEBAR, SIDEBAR_WIDTH, ThemeSchema, type Accent, type SidebarLayout, type SlackTarget, type Theme } from '@juno/contract'
+import { AccentSchema, AppInfo, DEFAULT_ACCENT, DEFAULT_DENSITY, DEFAULT_SIDEBAR, DEFAULT_THEME, DensitySchema, NotificationTarget, SIDEBAR_WIDTH, ThemeSchema, type Accent, type Density, type ResolvedTheme, type SidebarLayout, type SlackTarget, type Theme } from '@juno/contract'
 import type { ContextMenuAt, ContextMenuItem, JunoBridge, MenuCommand } from '@juno/contract/channels'
 
-export type { Accent, Theme } from '@juno/contract'
+export type { Accent, Density, ResolvedTheme, Theme } from '@juno/contract'
 
 declare const window: { readonly juno: JunoBridge }
 
@@ -21,6 +21,7 @@ export const appInfoAtom = Atom.make(
 
 const isTheme = Schema.is(ThemeSchema)
 const isAccent = Schema.is(AccentSchema)
+const isDensity = Schema.is(DensitySchema)
 
 /** One value of the page's query string, or undefined without a location (tests). */
 function launchParam(name: string): string | undefined {
@@ -29,14 +30,19 @@ function launchParam(name: string): string | undefined {
 }
 
 /**
- * Main loads the page as `index.html?theme=<saved>&accent=<saved>`, so the
- * first render already uses the theme the window was painted in and the
- * saved accent (performance 2.1). Light and Coral when the page has no
- * location (tests) or no parameter.
+ * Main loads the page as `index.html?theme=<saved>&accent=<saved>&density=<saved>`,
+ * so the first render already uses the theme the window was painted in,
+ * the saved accent and the density (performance 2.1). System, Coral and
+ * Comfortable when the page has no location (tests) or no parameter.
  */
 function savedTheme(): Theme {
   const theme = launchParam('theme')
-  return isTheme(theme) ? theme : 'light'
+  return isTheme(theme) ? theme : DEFAULT_THEME
+}
+
+function savedDensity(): Density {
+  const density = launchParam('density')
+  return isDensity(density) ? density : DEFAULT_DENSITY
 }
 
 function savedAccent(): Accent {
@@ -50,8 +56,39 @@ function savedAccent(): Accent {
  */
 export const junoAgentOnAtom = Atom.make(launchParam('agent') === '1')
 
-/** The current theme. Starts as the saved theme; the OS setting is not read yet. */
+/** The theme the owner picked. Starts as the saved one. */
 export const themeAtom = Atom.make<Theme>(savedTheme())
+
+/** The part of `MediaQueryList` the theme reads; the state package has no DOM types. */
+interface DarkQuery {
+  readonly matches: boolean
+  addEventListener(type: 'change', listener: (event: { readonly matches: boolean }) => void): void
+  removeEventListener(type: 'change', listener: (event: { readonly matches: boolean }) => void): void
+}
+
+/** Whether macOS is in dark mode now, and on every change. Light without a window (tests). */
+const systemDarkAtom = Atom.make((get) => {
+  const media = (globalThis as { readonly matchMedia?: (query: string) => DarkQuery }).matchMedia?.('(prefers-color-scheme: dark)')
+  if (media === undefined) return false
+  const onChange = (event: { readonly matches: boolean }) => get.setSelf(event.matches)
+  media.addEventListener('change', onChange)
+  get.addFinalizer(() => media.removeEventListener('change', onChange))
+  return media.matches
+})
+
+/** The theme the window shows: System resolved against macOS. */
+export const resolvedThemeAtom = Atom.make((get): ResolvedTheme => {
+  const theme = get(themeAtom)
+  return theme === 'system' ? (get(systemDarkAtom) ? 'dark' : 'light') : theme
+})
+
+/** Comfortable or Compact. Starts as the saved one. */
+export const densityAtom = Atom.make<Density>(savedDensity())
+
+/** Tells main, so the next launch's first render already uses this density. */
+export function persistDensity(density: Density): void {
+  window.juno.launch.setDensity(density).catch(() => {})
+}
 
 /** Tells main, so the next launch paints the window in this theme before the page loads. */
 export function persistTheme(theme: Theme): void {
@@ -124,4 +161,19 @@ export function openExternal(url: string): void {
 /** Calls `listener` for each app-menu command (the tab keys, Back and Forward, Hide Sidebar). Returns the unsubscribe. */
 export function onMenuCommand(listener: (command: MenuCommand) => void): () => void {
   return window.juno.menu.onCommand(listener)
+}
+
+/** Tells main which topic the window shows, or null. Main adds the window's focus; a notification for it is not shown. */
+export function setViewing(topicId: string | null): void {
+  window.juno.notifications.setViewing(topicId).catch(() => {})
+}
+
+const decodeTarget = Schema.decodeUnknownOption(NotificationTarget)
+
+/** Calls `listener` with what a clicked notification opens. Returns the unsubscribe. */
+export function onNotificationOpen(listener: (target: NotificationTarget) => void): () => void {
+  return window.juno.notifications.onOpen((raw) => {
+    const target = decodeTarget(raw)
+    if (target._tag === 'Some') listener(target.value)
+  })
 }

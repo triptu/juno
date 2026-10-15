@@ -213,6 +213,46 @@ test('row hover to paint', async ({ juno, win }) => {
   within('row hover, p95', hover.p95, oneFrameBudget(await refreshInterval(win)))
 })
 
+// Home from the sidebar's Home item, with a topic open in the tab: the
+// pointerdown to the first presented frame that shows Home's greeting and
+// rows, read from the local cache (performance.md section 1, "Home open").
+// Every fourth sample comes back after the home.view subscription's idle
+// time, so both a warm and a cold query are in the numbers.
+test('home open: from a topic to Home painted', async ({ juno, win }) => {
+  test.setTimeout(360_000)
+  await juno.signIn()
+  await juno.waitForSync()
+  const { home, sidebar, topic } = juno
+  await home.open()
+  await expect(home.item('waiting')).toBeVisible()
+  const samples: number[] = []
+  for (let i = 0; i < 20; i++) {
+    await sidebar.row(POSTGRES).open()
+    await topic.expectTitle(POSTGRES)
+    await win.waitForTimeout(i % 4 === 3 ? 31_000 : 300)
+    const nav = home.navItem
+    await nav.evaluate((node) => {
+      const w = window as unknown as { __homeSample?: Promise<number> }
+      w.__homeSample = new Promise((resolve) => {
+        node.addEventListener(
+          'pointerdown',
+          (event) => {
+            const start = event.timeStamp
+            const shown = () => document.querySelector('[data-home]:not([data-home-waiting]) [data-home-item]') !== null
+            const frame = () => requestAnimationFrame(() => (shown() ? setTimeout(() => resolve(performance.now() - start), 0) : frame()))
+            frame()
+          },
+          { once: true },
+        )
+      })
+    })
+    await nav.click()
+    samples.push(await win.evaluate(() => (window as unknown as { __homeSample: Promise<number> }).__homeSample))
+  }
+  const open = stats('home open (pointerdown on Home) to Home painted', samples)
+  within('home open, p95', open.p95, 50)
+})
+
 test('live update: a reply from another client to pixels', async ({ juno, fake }) => {
   test.setTimeout(120_000)
   await juno.signIn()
@@ -433,6 +473,106 @@ test.describe.serial('large workspace', () => {
       for (const metric of metrics) console.log(`memory ${metric.type}${metric.name ? ` ${metric.name}` : ''}: ${metric.mb.toFixed(0)} MB working set`)
       const page = await win.evaluate(() => ({ heap: (performance as unknown as { memory?: { usedJSHeapSize: number } }).memory?.usedJSHeapSize ?? 0, nodes: document.getElementsByTagName('*').length }))
       console.log(`renderer JS heap ${(page.heap / 1024 / 1024).toFixed(1)} MB, ${page.nodes} DOM elements`)
+    } finally {
+      await running.close()
+    }
+  })
+
+  test('All topics: open, then scroll the whole list, moving its window', async () => {
+    test.setTimeout(300_000)
+    const running = await launch()
+    try {
+      const juno = new Juno(running.app, running.win)
+      const { win } = running
+      await juno.sidebar.expectRows()
+      await juno.expectEngineLive(120_000)
+      // The page's chunk loads on idle after the first paint, as it does for a person.
+      await win.waitForTimeout(1_000)
+
+      // Open: mouse down on the nav item to the page painted with rows. Each round closes the tab, so every open mounts the page afresh.
+      const nav = juno.allTopics.navItem
+      const box = (await nav.boundingBox())!
+      for (let i = 0; i < 12; i++) {
+        const before = (await juno.measures('juno.all-topics-open')).length
+        await win.mouse.move(box.x + 40, box.y + box.height / 2)
+        await press(win)
+        await expect.poll(async () => (await juno.measures('juno.all-topics-open')).length).toBe(before + 1)
+        await juno.tabs.close('All topics')
+        await expect(juno.allTopics.table).toHaveCount(0)
+      }
+      const opens = (await juno.measures('juno.all-topics-open')).slice(2)
+      const open = stats('All topics open, press to rows painted (juno.all-topics-open)', opens)
+      within('All topics open, p95', open.p95, 50)
+
+      await juno.allTopics.open()
+      const table = juno.allTopics.table
+      const total = Number(await table.getAttribute('aria-rowcount')) - 1
+      console.log(`All topics rows: ${total}`)
+      const tableBox = (await table.boundingBox())!
+      await win.mouse.move(tableBox.x + tableBox.width / 2, tableBox.y + tableBox.height / 2)
+      await win.evaluate(() => {
+        const w = window as unknown as { __loaf: string[] }
+        w.__loaf = []
+        new PerformanceObserver((entries) => {
+          for (const entry of entries.getEntries()) w.__loaf.push(`+${Math.round(entry.startTime)}ms ${entry.duration.toFixed(0)}ms`)
+        }).observe({ type: 'long-animation-frame', buffered: false })
+      })
+      const interval = await refreshInterval(win)
+      const sweep = async (label: string) => {
+        let frames: number[] = []
+        let loaf: string[] = []
+        let placeholders = 0
+        // About 2 000 px/s for 8 s down and back: about 300 rows each way, so the 200-row window moves on the way down and again on the way up.
+        const { work } = await traced(win, `scroll-all-topics-${label.replace(' ', '-')}`, async () => {
+          await win.evaluate(() => {
+            const w = window as unknown as { __frames: number[]; __sampling: boolean; __loaf: string[]; __placeholders: number }
+            w.__frames = []
+            w.__loaf = []
+            w.__placeholders = 0
+            w.__sampling = true
+            let last = performance.now()
+            const grid = document.querySelector('[data-all-topics-table]')!
+            const tick = (now: number) => {
+              w.__frames.push(now - last)
+              last = now
+              // Rows on screen still waiting for their window.
+              const view = grid.getBoundingClientRect()
+              for (const row of grid.querySelectorAll('[aria-busy="true"]')) {
+                const rect = row.getBoundingClientRect()
+                if (rect.bottom > view.top && rect.top < view.bottom) w.__placeholders++
+              }
+              if (w.__sampling) requestAnimationFrame(tick)
+            }
+            requestAnimationFrame(tick)
+          })
+          for (let i = 0; i < 80; i++) {
+            await win.mouse.wheel(0, 200)
+            await win.waitForTimeout(100)
+          }
+          const offset = await win.evaluate(() => document.querySelector('[data-all-topics-row]')?.getAttribute('aria-rowindex'))
+          console.log(`first row drawn at the bottom of the sweep: ${offset}`)
+          for (let i = 0; i < 80; i++) {
+            await win.mouse.wheel(0, -200)
+            await win.waitForTimeout(100)
+          }
+          ;({ frames, loaf, placeholders } = await win.evaluate(() => {
+            const w = window as unknown as { __frames: number[]; __sampling: boolean; __loaf: string[]; __placeholders: number }
+            w.__sampling = false
+            return { frames: w.__frames.slice(1), loaf: w.__loaf, placeholders: w.__placeholders }
+          }))
+        })
+        const sorted = frames.toSorted((a, b) => a - b)
+        const over = frames.filter((f) => f > interval * 1.5).length
+        console.log(`scroll All topics ${label}: ${frames.length} frames, p95 ${(sorted[Math.floor(0.95 * sorted.length)] ?? 0).toFixed(1)} ms, frames over 1.5 intervals ${over}, long animation frames ${loaf.length}, placeholder rows on screen summed over frames ${placeholders}, load ${loadavg()[0]!.toFixed(1)}`)
+        for (const line of loaf) console.log(`  loaf ${line}`)
+        const perFrame = stats(`scroll All topics ${label}, main-thread work per frame`, work)
+        within(`scroll All topics ${label}, main-thread work per frame, p95`, perFrame.p95, 8.3)
+        expect(loaf).toEqual([])
+        expect(over / frames.length).toBeLessThan(0.01)
+      }
+      await sweep('first pass')
+      await win.waitForTimeout(1_000)
+      await sweep('second pass')
     } finally {
       await running.close()
     }

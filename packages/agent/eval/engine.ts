@@ -8,7 +8,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { BubbleId, Ending } from '@juno/agent-contract'
-import { openTurns, type ModelRef, type ProviderGuardApi, type TurnEvent, type Turns } from '../src/index'
+import { openTurns, sourceTable, type ModelRef, type ProviderGuardApi, type TurnEvent, type Turns } from '../src/index'
 import type { Store } from '../src/store/store'
 import { fromArchive, handleTable, unique, type StepTrace, type Trace } from './trace'
 import { recordingHost } from './world'
@@ -61,7 +61,7 @@ export async function runSteps(steps: ReadonlyArray<Step>, backend: Backend, tim
         input,
         ...fromArchive(turns.messages(firstRow, 10_000)),
         read: stepRead,
-        handles: handleTable(stepRead),
+        handles: handleTable(stepEvents.flatMap((e) => (e._tag === 'started' ? [sourceTable(turns.store, e.runId)] : [])), read()),
         endings: stepEvents.flatMap((e): Ending[] => (e._tag === 'ended' ? [e.ending] : [])),
         remembered: stepEvents.flatMap((e) => (e._tag === 'remembered' ? [e.text] : [])),
       })

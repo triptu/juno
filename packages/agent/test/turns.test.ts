@@ -107,6 +107,46 @@ it('messages sent during a tool call join right after it, together, before Juno 
   expect(h.bubbles()).toEqual([['Two vegetarian places near the office, both open at 1.']])
 })
 
+it('gives each Slack message a run reads one handle, and resolves only those handles in a bubble', async () => {
+  const review = { channelId: 'C0ENG', ts: '1.000001', senderId: 'U0MAYA', senderName: 'Maya Chen', channelName: '#eng', text: 'Review moved to Thursday.' }
+  const room = { channelId: 'C0ENG', ts: '1.000002', senderId: 'U0SAM', text: 'Room 4 is booked.' }
+  let searches = 0
+  const host: HostReads = {
+    search: async () => ({ messages: (++searches === 1 ? [review] : [room, review]) as never }),
+    history: async () => ({ messages: [] }),
+    replies: async () => ({ messages: [] }),
+    topics: async () => ({ topics: [] }),
+    person: async (id) => ({ id, name: 'maya', displayName: 'Maya' }),
+  }
+  h = await turnsHarness({ compaction: false, host })
+  h.fake.script([
+    reply({ type: 'toolCall', id: 'call-1', name: 'slack_search', arguments: { query: 'review' } }),
+    reply({ type: 'toolCall', id: 'call-2', name: 'slack_search', arguments: { query: 'room' } }),
+    reply('<say>It moved to <src m="m1">Thursday</src>, in <src m="m2">room 4</src>, says <src m="m9">Maya</src>.</say>'),
+  ])
+  const op = h.send('when is the review?')
+  expect((await h.ended(op)).ending).toEqual({ _tag: 'complete' })
+
+  const results = h.chatRequests()[2]!.context.messages.filter((m) => m.role === 'toolResult').map(textOf)
+  expect(results).toEqual([
+    'm1 #eng (C0ENG) ts 1.000001, Maya Chen: Review moved to Thursday.',
+    'm2 C0ENG ts 1.000002, U0SAM: Room 4 is booked.\nm1 #eng (C0ENG) ts 1.000001, Maya Chen: Review moved to Thursday.',
+  ])
+  const bubble = h.events.find((e) => e._tag === 'bubble')
+  expect(bubble).toMatchObject({
+    text: 'It moved to Thursday, in room 4, says Maya.',
+    body: [
+      { text: 'It moved to ' },
+      { text: 'Thursday', source: { channelId: 'C0ENG', ts: '1.000001', place: '#eng' } },
+      { text: ', in ' },
+      { text: 'room 4', source: { channelId: 'C0ENG', ts: '1.000002' } },
+      { text: ', says ' },
+      { text: 'Maya' },
+      { text: '.' },
+    ],
+  })
+})
+
 it('"stop" is a message like any other: Juno reads it at its next step and the run ends normally', async () => {
   h = await turnsHarness()
   const inFlight = deferred()

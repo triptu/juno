@@ -49,16 +49,16 @@ The first name comes from the Slack profile. If there is none, drop the name and
 | 2 | Two things want you. |
 | 3 | Three things want you. |
 | 0, caught up | Nothing is waiting on you. |
-| 0, but unread exists | Nothing is waiting on you. Nothing new since yesterday either. |
+| 0, not caught up (unread in followed topics) | Nothing is waiting on you. The time-of-day line stays. |
 
 ### Item templates
 
-Each item has a title line (13.5px, medium) and a meta line (12.5px, muted): the topic title, then the channel, then a time or a count. The title line is the template; the meta line is always plain data.
+Each item has the topic's art (40px; Tidy up has a broom tile), a title line (13.5px, medium) and a meta line (12.5px, muted): the topic title, then the channel, then a time or a count ("14 new"). Tidy up's meta line lists the settled topics' titles. The title line is the template; the meta line is always plain data.
 
 | Kind | Rule (AI off) | Title, AI off | Title, AI on (example) |
 | --- | --- | --- | --- |
-| Waiting on you | A message in a followed thread or DM that mentions you and ends in a question mark, with no reply from you after it | `<Name> asked you something` | `Elena wants a call on Rina's competing offer by Friday` |
-| Pick up where you left off | The last topic you had open for more than a minute, if it has new messages since | `Pick up where you left off` | `Pick up where you left off: Dev wants the Postgres 16 cutover window` |
+| Waiting on you | An unread message in a followed thread or group DM that mentions you and ends in a question mark, or any unread question in a one-to-one DM, with no message from you after it | `<Name> asked you something` | `Elena wants a call on Rina's competing offer by Friday` |
+| Pick up where you left off | The last topic you had open for more than a minute, if it has unread messages | `Pick up where you left off` | `Pick up where you left off: Dev wants the Postgres 16 cutover window` |
 | Moved a lot | A followed topic with the most new messages since you last opened it, at least 8 | `Moved a lot since you looked` | `Maya's proposal grew 14 replies, leaning toward cutting offline mode` |
 | Follow-up (AI on only) | Something you said you would do, found by the assistant in your own messages; Mark done clears it | not shown | `You said you'd send Rina the scorecard` |
 | Tidy up (AI on only) | Topics the settled decision scored high, at least two | not shown | `3 topics look settled`, with Resolve all |
@@ -81,7 +81,7 @@ The eight scenes in `scenes.png`: morning, midday, evening, late night, Friday, 
 ## Items: how they are chosen and capped
 
 - Candidates come from the local cache only: followed topics, read state, the last-opened log and mentions. No network call, no AI call, before first paint.
-- Rank: waiting on you first, then pick up where you left off, then moved a lot, then follow-ups, then tidy up. At most one of each kind; tidy up is one row for several topics.
+- Rank: waiting on you first, then pick up where you left off, then moved a lot, then follow-ups, then tidy up. At most one of each kind; tidy up is one row for several topics. "Followed" is a thread Slack follows or a DM; a channel's Main is a stream, not a followed topic, so it never shows as Moved a lot.
 - Cap at three. If the window is shorter than 600px, cap at two.
 - Each item is one topic, except tidy up. A topic appears once; if it qualifies for two kinds, the higher kind wins.
 - Opening an item opens the topic in the current tab like any row, with ⌘-click for a new tab. Opening it marks it read under the normal rule, so it leaves the list on the next visit.
@@ -100,7 +100,7 @@ The eight scenes in `scenes.png`: morning, midday, evening, late night, Friday, 
 ## Performance
 
 - The scenes are inline SVG symbols in the bundle, about 4 KB for all eight. Nothing is fetched. The first paint has the scene, the greeting and the items; there is no loading state and no spinner.
-- The layout is fixed before data arrives: the scene box is 120 by 83, the greeting is one line, the items column has a fixed width and each row is 52px. A row that arrives late is not allowed; items are read synchronously from the cache at mount, so the page never reflows.
+- The layout is fixed before data arrives: the scene box is 120 by 83, the greeting is one line, the items column has a fixed width and each row is 52px. A row that arrives late is not allowed. Home paints whole when `home.view` (a local query) answers, usually in the frame it mounts; until then, and on a first run until the first sync has finished, the page is blank, never "All caught up" too early. The items it showed stay until Home appears again.
 - The AI rewrite of an item's title is the only thing that can arrive after paint. It replaces the text of a one-line, ellipsised title, so the row height does not change.
 - No timers. The scene and greeting do not update on the minute.
 

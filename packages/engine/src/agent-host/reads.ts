@@ -11,6 +11,7 @@
 import {
   channelKindLabel,
   channelLabel,
+  type ConversationKind,
   channelLabelBare,
   contextTint,
   isResolved,
@@ -22,7 +23,7 @@ import { ftsQuery, StoreReader, type SqlClient } from '@juno/store'
 import { Effect } from 'effect'
 import { AgentHostError, type HostCursor, type HostUserId, type Place, type TopicLink } from '@juno/agent-contract'
 import type { Message, MessagePage, Topic } from '@juno/agent-juno'
-import { channelInfoOf, parseColumns, TOPIC_COLUMNS, TOPIC_FROM, topicFrom, userName, type JoinedRow, type UserRow } from '../topicRows'
+import { channelInfoOf, parseColumns, parseIds, TOPIC_COLUMNS, TOPIC_FROM, topicFrom, userName, type JoinedRow, type UserRow } from '../topicRows'
 
 type Cursor = typeof HostCursor.Type
 const cursor = (value: string): Cursor => value as Cursor
@@ -51,6 +52,45 @@ export const toMessage = (row: MessageRow): Message =>
     ...(row.client_msg_id === null ? {} : { clientMessageId: row.client_msg_id }),
   }) as Message
 
+const placeholders = (values: ReadonlyArray<unknown>) => values.map(() => '?').join(', ')
+
+interface ConversationRow {
+  readonly id: string
+  readonly kind: ConversationKind
+  readonly name: string | null
+  readonly user_id: string | null
+  readonly member_ids_json: string | null
+}
+
+/** The messages with the sender's and the channel's names, as Juno's rows show them. */
+const named = (sql: SqlClient.SqlClient, rows: ReadonlyArray<MessageRow>) =>
+  Effect.gen(function* () {
+    const channelIds = [...new Set(rows.map((r) => r.channel))]
+    const conversations = channelIds.length === 0
+      ? []
+      : yield* sql.unsafe<ConversationRow>(`SELECT id, kind, name, user_id, member_ids_json FROM conversations WHERE id IN (${placeholders(channelIds)})`, channelIds)
+    const [team] = yield* sql<{ self_user_id: string | null }>`SELECT self_user_id FROM team LIMIT 1`
+    const members = (c: ConversationRow) => (c.kind === 'mpim' ? parseIds(c.member_ids_json).filter((id) => id !== team?.self_user_id) : [])
+    const userIds = [...new Set([
+      ...rows.flatMap((r) => (r.user_id ? [r.user_id] : [])),
+      ...conversations.flatMap((c) => [...(c.user_id ? [c.user_id] : []), ...members(c)]),
+    ])]
+    const users = userIds.length === 0
+      ? []
+      : yield* sql.unsafe<UserRow>(`SELECT id, name, display_name, real_name, avatar_url FROM users WHERE id IN (${placeholders(userIds)})`, userIds)
+    const byId = new Map(users.map((u) => [u.id, u]))
+    const nameOf = (id: string) => userName(id, byId.get(id))
+    const channelNames = new Map(conversations.map((c) => [c.id, channelLabel({
+      kind: c.kind,
+      name: c.kind === 'im' && c.user_id !== null ? nameOf(c.user_id) : (c.name ?? c.id),
+      memberNames: members(c).map(nameOf),
+    })]))
+    return rows.map((row): Message => {
+      const channelName = channelNames.get(row.channel)
+      return { ...toMessage(row), ...(row.user_id ? { senderName: nameOf(row.user_id) } : {}), ...(channelName ? { channelName } : {}) }
+    })
+  })
+
 const notFound = (message: string) => new AgentHostError({ reason: 'notFound', message })
 
 /** A channel the owner sees in Juno: a member, and not ignored. */
@@ -66,7 +106,7 @@ export const history = (channelId: string, before: string | undefined, limit: nu
       before === undefined ? [channelId, limit + 1] : [channelId, before, limit + 1],
     )
     const page = rows.slice(0, limit).toReversed()
-    return { messages: page.map(toMessage), ...(rows.length > limit && page[0] ? { next: cursor(page[0].ts) } : {}) } satisfies MessagePage
+    return { messages: yield* named(sql, page), ...(rows.length > limit && page[0] ? { next: cursor(page[0].ts) } : {}) } satisfies MessagePage
   })
 
 export const replies = (channelId: string, threadTs: string, after: string | undefined, limit: number) =>
@@ -80,7 +120,7 @@ export const replies = (channelId: string, threadTs: string, after: string | und
     )
     const page = rows.slice(0, limit)
     const last = page.at(-1)
-    return { messages: page.map(toMessage), ...(rows.length > limit && last ? { next: cursor(last.ts) } : {}) } satisfies MessagePage
+    return { messages: yield* named(sql, page), ...(rows.length > limit && last ? { next: cursor(last.ts) } : {}) } satisfies MessagePage
   })
 
 /** A search split into its words and Slack's `from:` and `in:` modifiers. */
@@ -153,7 +193,7 @@ export const search = (query: string, offsetCursor: string | undefined, limit: n
        WHERE ${where.join(' AND ')} ORDER BY ${terms === '' ? '' : 'f.rank, '}m.ts DESC LIMIT ? OFFSET ?`,
       [...params, limit + 1, offset],
     )
-    return { messages: rows.slice(0, limit).map(toMessage), ...(rows.length > limit ? { next: cursor(String(offset + limit)) } : {}) } satisfies MessagePage
+    return { messages: yield* named(sql, rows.slice(0, limit)), ...(rows.length > limit ? { next: cursor(String(offset + limit)) } : {}) } satisfies MessagePage
   })
 
 export const person = (userId: string) =>

@@ -67,10 +67,11 @@ export class SidebarRow {
   constructor(
     readonly win: Page,
     readonly title: string,
+    exact = false,
   ) {
     // Rows are focusable list items named by their title (a button would
     // flatten the Resolve button inside it).
-    this.root = win.getByRole('listitem', { name: new RegExp(`^${escapeRegExp(title)}`) })
+    this.root = win.getByRole('listitem', { name: new RegExp(`^${escapeRegExp(title)}${exact ? '$' : ''}`) })
   }
 
   get resolveButton() {
@@ -219,8 +220,9 @@ export class Sidebar {
     return this.list.locator('[data-topic-row]')
   }
 
-  row(title: string): SidebarRow {
-    return new SidebarRow(this.win, title)
+  /** The row whose title starts with `title`, or is exactly `title` with `exact`. */
+  row(title: string, options: { readonly exact?: boolean } = {}): SidebarRow {
+    return new SidebarRow(this.win, title, options.exact === true)
   }
 
   section(name: SidebarSectionName) {
@@ -342,7 +344,7 @@ export class Sidebar {
   }
 }
 
-/** The popover behind the avatar button: session, appearance, diagnostics. */
+/** The popover behind the avatar button: presence, Notifications, Preferences, session, diagnostics. */
 export class AccountMenu {
   readonly root: Locator
 
@@ -381,17 +383,90 @@ export class AccountMenu {
     return this.root.getByRole('button', { name: 'Sign out' })
   }
 
-  themeRadio(name: 'Light' | 'Dark') {
+  /** Set yourself away or active, Notifications, Preferences (inventory 2.1). */
+  item(name: string | RegExp) {
+    return this.root.getByRole('menuitem', { name })
+  }
+
+  /** The line under the name: "Active", "Away until 9am". */
+  async expectPresence(text: string | RegExp): Promise<void> {
+    await expect(this.root.getByText(text)).toBeVisible({ timeout: 10_000 })
+  }
+
+  async choose(name: string | RegExp): Promise<void> {
+    await this.open()
+    await this.item(name).click()
+    await expect(this.root).toHaveCount(0)
+  }
+}
+
+/** Preferences (inventory 14): the Appearance group. */
+export class PreferencesPage {
+  readonly root: Locator
+
+  constructor(readonly win: Page) {
+    this.root = win.getByRole('main')
+  }
+
+  themeRadio(name: 'System' | 'Light' | 'Dark') {
     return this.root.getByRole('radio', { name })
   }
 
-  /** "Hold to peek": ⌥ Option or Space. */
-  async setPeekKey(key: PeekKeyName): Promise<void> {
-    await this.open()
-    const radio = this.root.getByRole('radiogroup', { name: 'Hold to peek' }).getByRole('radio', { name: key === 'option' ? '⌥ Option' : 'Space' })
-    await radio.click()
-    await expect(radio).toHaveAttribute('aria-checked', 'true')
-    await this.close()
+  densityRadio(name: 'Comfortable' | 'Compact') {
+    return this.root.getByRole('radio', { name })
+  }
+}
+
+/** The Notifications page (inventory 13). */
+export class NotificationsPage {
+  readonly root: Locator
+
+  constructor(readonly win: Page) {
+    this.root = win.getByRole('main')
+  }
+
+  /** The Notifications or Active in Slack row. */
+  hoursRow(which: 'Notifications' | 'Active in Slack'): Locator {
+    return this.root.getByLabel(which, { exact: true })
+  }
+
+  async setFrom(which: 'Notifications' | 'Active in Slack', label: string): Promise<void> {
+    await this.root.getByRole('combobox', { name: `${which} from` }).selectOption({ label })
+  }
+
+  async setTo(which: 'Notifications' | 'Active in Slack', label: string): Promise<void> {
+    await this.root.getByRole('combobox', { name: `${which} to` }).selectOption({ label })
+  }
+
+  day(which: 'Notifications' | 'Active in Slack', day: string): Locator {
+    return this.root.getByRole('group', { name: `${which} days` }).getByRole('button', { name: day })
+  }
+
+  get matters(): Locator {
+    return this.root.getByRole('textbox', { name: 'What matters to you' })
+  }
+
+  /** Types into What matters to you and leaves the field, which saves it. */
+  async writeMatters(text: string): Promise<void> {
+    await this.matters.fill(text)
+    await this.matters.blur()
+  }
+
+  /** The Every message or Never row. */
+  level(name: 'Every message' | 'Never'): Locator {
+    return this.root.getByLabel(name, { exact: true })
+  }
+
+  async removeTag(name: string): Promise<void> {
+    await this.root.getByRole('button', { name: `Remove ${name}` }).click()
+  }
+
+  get showWhy(): Locator {
+    return this.root.getByRole('button', { name: 'Show why' })
+  }
+
+  get interrupted(): Locator {
+    return this.root.getByRole('list', { name: 'Messages that interrupted you' })
   }
 }
 
@@ -427,11 +502,15 @@ export class Juno {
   readonly win: Page
   readonly sidebar: Sidebar
   readonly accountMenu: AccountMenu
+  readonly preferences: PreferencesPage
+  readonly notifications: NotificationsPage
   readonly topic: TopicPane
   readonly newChat: NewChatPane
   readonly tabs: TabStrip
   readonly nav: Navigation
   readonly frame: SidebarFrame
+  readonly allTopics: AllTopicsPane
+  readonly home: HomePane
   readonly peek: PeekPopover
 
   constructor(app: ElectronApplication, win: Page) {
@@ -440,11 +519,15 @@ export class Juno {
     appOf.set(win, app)
     this.sidebar = new Sidebar(win)
     this.accountMenu = new AccountMenu(win, this.sidebar)
+    this.preferences = new PreferencesPage(win)
+    this.notifications = new NotificationsPage(win)
     this.topic = new TopicPane(win)
     this.newChat = new NewChatPane(win)
     this.tabs = new TabStrip(app, win)
     this.nav = new Navigation(app, win)
     this.frame = new SidebarFrame(app, win)
+    this.allTopics = new AllTopicsPane(win)
+    this.home = new HomePane(win)
     this.peek = new PeekPopover(win)
   }
 
@@ -495,9 +578,9 @@ export class Juno {
     return this.app.evaluate(() => [...(globalThis as unknown as { junoTest: { slackLinks: string[] } }).junoTest.slackLinks])
   }
 
-  /** The empty workspace shown when no tab is open. */
+  /** Home, which the workspace shows when no tab is open. */
   async expectNothingOpen(): Promise<void> {
-    await expect(this.win.getByText('Nothing open yet', { exact: true })).toBeVisible()
+    await this.home.expectShown()
   }
 
   /**
@@ -580,16 +663,63 @@ export class Juno {
   async waitForSync(): Promise<void> {
     await this.sidebar.expectRows()
     await this.expectEngineLive()
-    // Park the pointer and the focus on the empty workspace.
-    await this.win.mouse.click(900, 400)
+    // Park the pointer and the focus on the workspace. With no tab open that is Home, whose rows sit
+    // where a blind click would land, so wait for it and click its greeting, which does nothing.
+    const tabOpen = this.win.getByRole('tablist').getByRole('tab', { selected: true })
+    await expect(this.home.greeting.or(tabOpen).first()).toBeVisible()
+    if (await this.home.greeting.isVisible()) await this.home.greeting.click()
+    else await this.win.mouse.click(900, 400)
   }
 
-  /** Switches the theme from the account menu and waits for the page to follow. */
+  /** Switches the theme in Preferences and waits for the page to follow, then closes Preferences. */
   async setTheme(theme: 'Light' | 'Dark'): Promise<void> {
-    await this.accountMenu.open()
-    await this.accountMenu.themeRadio(theme).click()
-    await expect(this.accountMenu.themeRadio(theme)).toHaveAttribute('aria-checked', 'true')
-    await this.accountMenu.close()
+    await this.openPreferences()
+    await this.preferences.themeRadio(theme).click()
+    await expect(this.preferences.themeRadio(theme)).toHaveAttribute('aria-checked', 'true')
+    await this.tabs.close('Preferences')
+    await expect(this.tabs.tab('Preferences')).toHaveCount(0)
+  }
+
+  /** Preferences › Hold to peek: ⌥ Option or Space. Closes Preferences after. */
+  async setPeekKey(key: PeekKeyName): Promise<void> {
+    await this.openPreferences()
+    const radio = this.preferences.root.getByRole('radiogroup', { name: 'Hold to peek' }).getByRole('radio', { name: key === 'option' ? '⌥ Option' : 'Space' })
+    await radio.click()
+    await expect(radio).toHaveAttribute('aria-checked', 'true')
+    await this.tabs.close('Preferences')
+    await expect(this.tabs.tab('Preferences')).toHaveCount(0)
+  }
+
+  /** Preferences, from the avatar menu. */
+  async openPreferences(): Promise<void> {
+    await this.accountMenu.choose('Preferences')
+    await this.tabs.expectActive('Preferences')
+  }
+
+  /** The Notifications page, from the avatar menu. */
+  async openNotifications(): Promise<void> {
+    await this.accountMenu.choose(/^Notifications/)
+    await this.tabs.expectActive('Notifications')
+  }
+
+  /** The OS notifications main showed (recorded under JUNO_E2E), oldest first. */
+  osNotifications(): Promise<Array<{ readonly title: string; readonly body: string }>> {
+    return this.app.evaluate(() => (globalThis as unknown as { junoTest: { notifications: () => Array<{ title: string; body: string }> } }).junoTest.notifications())
+  }
+
+  /** Clicks the OS notification at `index`, as the user would in Notification Center. */
+  async clickOsNotification(index: number): Promise<void> {
+    await this.app.evaluate((_electron, at) => (globalThis as unknown as { junoTest: { clickNotification: (i: number) => void } }).junoTest.clickNotification(at), index)
+  }
+
+  /** The dock's badge text: "•" with unread mentions, else empty. */
+  dockBadge(): Promise<string> {
+    return this.app.evaluate(() => (globalThis as unknown as { junoTest: { dockBadge: () => string } }).junoTest.dockBadge())
+  }
+
+  /** The why popover (inventory 15.4), by its title. */
+  whyPopover(title: string | RegExp): Locator {
+    return this.win.getByRole('dialog', { name: title })
   }
 
   /** Waits until the engine has caught up with Slack and says it is live. */
@@ -688,6 +818,10 @@ const appOf = new WeakMap<Page, ElectronApplication>()
 async function lastMenu(win: Page): Promise<{ readonly labels: string[]; readonly at: { readonly x: number; readonly y: number } | null }> {
   const app = appOf.get(win)
   if (app === undefined) throw new Error('lastMenu needs the app; use the Juno driver')
+  // A menu may wait for the engine before it opens (the why item asks first); wait until it took the chosen item.
+  await expect
+    .poll(() => app.evaluate(() => (globalThis as unknown as { junoTest: { contextMenu: { next: string | null | undefined } } }).junoTest.contextMenu.next === undefined), { timeout: 10_000 })
+    .toBe(true)
   return app.evaluate(() => {
     const menu = (globalThis as unknown as { junoTest: { contextMenu: { lastLabels: string[]; lastAt: { x: number; y: number } | null } } }).junoTest.contextMenu
     return { labels: [...menu.lastLabels], at: menu.lastAt }
@@ -724,6 +858,175 @@ export type TopicMenuItem =
   | 'ignore-channel'
 
 /** The topic shown in the active tab. Hidden tabs stay in the page with `display: none`. */
+export type AllTopicsChipName = 'All' | 'Open' | 'Resolved' | 'Quiet' | 'Unfollowed'
+
+/** One row of the All topics table, found by the start of its title. */
+export class AllTopicsRow {
+  readonly root: Locator
+
+  constructor(
+    readonly win: Page,
+    readonly title: string,
+  ) {
+    this.root = win.locator('[data-all-topics-row]').filter({ has: win.locator('[data-row-title]', { hasText: new RegExp(`^${escapeRegExp(title)}`) }) })
+  }
+
+  /**
+   * The table is a virtual list: only the rows near the viewport are in the
+   * page. Scrolls it from the top, a screen at a time, until the row is
+   * drawn; false when the whole list has no such row.
+   */
+  async reveal(): Promise<boolean> {
+    const table = this.win.locator('[data-all-topics-table]')
+    await table.evaluate((node) => {
+      node.scrollTop = 0
+    })
+    for (;;) {
+      await settle(table)
+      if ((await this.root.count()) > 0) {
+        await this.root.scrollIntoViewIfNeeded()
+        return true
+      }
+      if (!(await pageDown(table))) return false
+    }
+  }
+
+  async expectVisible(): Promise<void> {
+    await expect.poll(() => this.reveal(), { timeout: 10_000 }).toBe(true)
+  }
+
+  async expectAbsent(): Promise<void> {
+    await expect.poll(() => this.reveal(), { timeout: 10_000 }).toBe(false)
+  }
+
+  /** The status chip in the row: Open, Resolved, Quiet or Unfollowed. */
+  async expectStatus(status: Exclude<AllTopicsChipName, 'All'>): Promise<void> {
+    await expect.poll(async () => ((await this.reveal()) ? this.root.getByRole('gridcell').nth(2).textContent() : null), { timeout: 10_000 }).toBe(status)
+  }
+
+  async expectWhere(name: string): Promise<void> {
+    await this.expectVisible()
+    await expect(this.root.getByRole('gridcell').nth(1)).toHaveText(name)
+  }
+
+  /** Opens the topic with the mouse (rows activate on mouse down); with `newTab`, ⌘-click. */
+  async open({ newTab = false }: { readonly newTab?: boolean } = {}): Promise<void> {
+    await this.expectVisible()
+    const box = await this.root.boundingBox()
+    if (!box) throw new Error(`All topics row "${this.title}" is not on screen`)
+    await this.win.mouse.move(box.x + 40, box.y + box.height / 2)
+    if (newTab) await this.win.keyboard.down('Meta')
+    await press(this.win)
+    if (newTab) await this.win.keyboard.up('Meta')
+  }
+
+  /** Right-click, then `item` in the topic menu. Returns the menu's labels. */
+  async chooseInMenu(item: TopicMenuItem): Promise<{ readonly labels: string[]; readonly at: { readonly x: number; readonly y: number } | null }> {
+    await this.expectVisible()
+    await chooseNextMenuItem(this.win, item)
+    await this.root.click({ button: 'right', position: { x: 40, y: 20 } })
+    return lastMenu(this.win)
+  }
+}
+
+/** Two frames for the virtual table to draw the rows a scroll brought in, then until no row on screen waits for its window. */
+async function settle(table: Locator): Promise<void> {
+  await table.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
+  await expect.poll(() => table.locator('[aria-busy="true"]').count(), { timeout: 5_000 }).toBe(0)
+}
+
+/** Scrolls the table down most of a screen; false at the end. */
+function pageDown(table: Locator): Promise<boolean> {
+  return table.evaluate((node) => {
+    const before = node.scrollTop
+    node.scrollTop += Math.floor(node.clientHeight * 0.8)
+    return node.scrollTop !== before
+  })
+}
+
+/** The All topics page (spec section 11): the status chips, the three selects, the text filter and the table. */
+export class AllTopicsPane {
+  constructor(readonly win: Page) {}
+
+  get navItem(): Locator {
+    return this.win.getByRole('navigation', { name: 'Pages' }).getByRole('button', { name: 'All topics' })
+  }
+
+  get table(): Locator {
+    return this.win.getByRole('grid', { name: 'All topics' })
+  }
+
+  get search(): Locator {
+    return this.win.getByRole('textbox', { name: 'Filter topics' })
+  }
+
+  /** Opens the page from the sidebar's All topics item and waits for its rows. */
+  async open(): Promise<void> {
+    await this.navItem.click()
+    await expect(this.table).toBeVisible()
+  }
+
+  row(title: string): AllTopicsRow {
+    return new AllTopicsRow(this.win, title)
+  }
+
+  chip(name: AllTopicsChipName): Locator {
+    return this.win.getByRole('group', { name: 'Status' }).getByRole('button', { name: new RegExp(`^${name} \\d+$`) })
+  }
+
+  async filterStatus(name: AllTopicsChipName): Promise<void> {
+    await this.chip(name).click()
+    await expect(this.chip(name)).toHaveAttribute('aria-pressed', 'true')
+  }
+
+  /** The count after a chip's label. */
+  async expectCount(name: AllTopicsChipName, count: number): Promise<void> {
+    await expect(this.chip(name)).toHaveText(`${name}${count}`)
+  }
+
+  async filterKind(label: 'Channels and DMs' | 'Channels' | 'DMs'): Promise<void> {
+    await this.win.getByRole('combobox', { name: 'Kind' }).selectOption({ label })
+  }
+
+  /** The place select: "Anywhere", "#eng", "Maya Chen". */
+  async filterPlace(label: string): Promise<void> {
+    await this.win.getByRole('combobox', { name: 'Where' }).selectOption({ label })
+  }
+
+  async sort(label: 'Most recent' | 'Oldest first' | 'Most messages'): Promise<void> {
+    await this.win.getByRole('combobox', { name: 'Sort' }).selectOption({ label })
+  }
+
+  async type(text: string): Promise<void> {
+    await this.search.fill(text)
+  }
+
+  /** Every row's title in list order, read by scrolling the virtual table from top to bottom. */
+  async titles(): Promise<string[]> {
+    const table = this.table
+    const byIndex = new Map<number, string>()
+    await table.evaluate((node) => {
+      node.scrollTop = 0
+    })
+    do {
+      await settle(table)
+      const seen = await table
+        .locator('[data-all-topics-row]')
+        .evaluateAll((nodes) => nodes.map((node) => [Number(node.getAttribute('aria-rowindex')), node.querySelector('[data-row-title]')?.textContent ?? ''] as const))
+      for (const [index, title] of seen) byIndex.set(index, title)
+    } while (await pageDown(table))
+    return [...byIndex].toSorted((a, b) => a[0] - b[0]).map(([, title]) => title)
+  }
+
+  async expectEmpty(): Promise<void> {
+    await expect(this.win.getByText('No topics match these filters.')).toBeVisible()
+  }
+
+  async clearFilters(): Promise<void> {
+    await this.win.getByRole('button', { name: 'Clear filters' }).click()
+  }
+}
+
 /** A New chat tab: the two pickers, the composer and the preview (spec section 9). */
 export class NewChatPane {
   readonly root: Locator
@@ -831,6 +1134,18 @@ export class TopicPane {
 
   get divider() {
     return this.root.locator('[data-new-divider]')
+  }
+
+  /**
+   * Right-clicks the message that starts with `text` and picks `item` in its
+   * menu; on its sender's name with `onSender`. Returns the menu's labels.
+   */
+  async chooseInMessageMenu(text: string, item: string, options: { readonly onSender?: boolean } = {}): Promise<{ readonly labels: string[] }> {
+    await chooseNextMenuItem(this.win, item)
+    const message = this.message(text)
+    await message.scrollIntoViewIfNeeded()
+    await (options.onSender === true ? message.locator('[data-sender]').last() : message).click({ button: 'right' })
+    return lastMenu(this.win)
   }
 
   /** A message by the start of its text. */
@@ -1345,5 +1660,65 @@ export class SidebarFrame {
   /** View › Hide Sidebar's label, which names what it will do. */
   async menuLabel(): Promise<string | undefined> {
     return this.app.evaluate(({ Menu }) => Menu.getApplicationMenu()?.getMenuItemById('toggle-sidebar')?.label)
+  }
+}
+
+export type HomeItemKind = 'waiting' | 'resume' | 'moved' | 'followUp' | 'tidyUp'
+
+/** Home (SPEC section 12): the greeting, the rows and the Ask Juno field, in the visible page. */
+export class HomePane {
+  constructor(readonly win: Page) {}
+
+  get root(): Locator {
+    return this.win.locator('[data-home]:not([data-home-waiting])').filter({ visible: true })
+  }
+
+  get greeting(): Locator {
+    return this.root.getByRole('heading', { level: 2 })
+  }
+
+  async expectShown(): Promise<void> {
+    await expect(this.greeting).toBeVisible()
+  }
+
+  /** The sidebar's Home item. */
+  get navItem(): Locator {
+    return this.win.getByRole('navigation', { name: 'Pages' }).getByRole('button', { name: 'Home' })
+  }
+
+  /** Opens Home from the sidebar, which reads the items afresh. */
+  async open(): Promise<void> {
+    await this.navItem.click()
+    await this.expectShown()
+  }
+
+  item(kind: HomeItemKind): Locator {
+    return this.root.locator(`[data-home-item="${kind}"]`)
+  }
+
+  title(kind: HomeItemKind): Locator {
+    return this.item(kind).locator('[data-home-title]')
+  }
+
+  meta(kind: HomeItemKind): Locator {
+    return this.item(kind).locator('[data-home-meta]')
+  }
+
+  /** The kinds shown, top to bottom. */
+  kinds(): Promise<string[]> {
+    return this.root.locator('[data-home-item]').evaluateAll((rows) => rows.map((row) => row.getAttribute('data-home-item') ?? ''))
+  }
+
+  /** Clicks a row's link, which opens its topic. */
+  async openItem(kind: HomeItemKind): Promise<void> {
+    await this.item(kind).getByRole('link').click()
+  }
+
+  button(kind: HomeItemKind, name: 'Mark done' | 'Resolve all'): Locator {
+    return this.item(kind).getByRole('button', { name })
+  }
+
+  get ask(): Locator {
+    return this.root.getByRole('button', { name: 'Ask Juno' })
   }
 }

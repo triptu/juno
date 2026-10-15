@@ -42,7 +42,8 @@ import {
 } from '@juno/views'
 import { toggleJunoPanel } from './juno/actions'
 import { closeTabById, onLeaveTab, openTopic, takeOpenStart } from './navigation'
-import { scopeToChannel, showChannelMenu, showPersonMenu } from './placeMenus'
+import { showPersonMenu } from './notifyActions'
+import { scopeToChannel, showChannelMenu } from './placeMenus'
 import { takeSendMark } from './sendMark'
 import { TopicComposer } from './TopicComposer'
 import { cancelRename, renameTopic, showMessageMenu, showTopicMenu, toggleResolved } from './topicActions'
@@ -553,7 +554,11 @@ function Topic({ id, detail, readOnly = false, underHeader = true }: TopicProps)
         : {
             onRetry: retry,
             onDiscard: discard,
-            onMessageMenu: (ts: string) => void showMessageMenu(detail, ts),
+            onMessageMenu: (ts: string, event: { readonly clientX: number; readonly clientY: number }, onSender: boolean) => {
+              const senderId = list.rows.get(ts)?.senderId
+              const sender = senderId === undefined ? undefined : { id: senderId, name: people.get(senderId)?.name ?? senderId }
+              void showMessageMenu(detail, ts, { x: event.clientX, y: event.clientY }, sender, onSender)
+            },
             onPersonMenu: personMenu,
             onChannelMenu: (chip: { readonly id: string; readonly name: string }) => {
               const known = list.refs.channels.get(chip.id)

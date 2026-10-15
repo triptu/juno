@@ -19,12 +19,12 @@
  * first value has nothing to re-emit, so the subscription starts again with
  * backoff and the renderer keeps what it shows until a run succeeds.
  *
- * The follow commands (`commands.ts`) write the current store and mirror
+ * The follow commands (`../follow.ts`, shared with notifications) write the current store and mirror
  * to Slack through the `Outbox` seam. The topic actions (`actions.ts`) are
  * local; a resolve that queued a read mark wakes `MarkWorker`.
  */
 import { Clock, Effect, Schema, type Scope, Semaphore, Stream } from 'effect'
-import { SIDEBAR_WINDOW, TopicListRow, TopicsRoutes, type CommandResult } from '@juno/contract'
+import { ALL_TOPICS_WINDOW, AllTopicsRoutes, SIDEBAR_WINDOW, TopicListRow, TopicsRoutes, type CommandResult } from '@juno/contract'
 import { Invalidation, liveQuery, type InvalidationKeys, type SqlError } from '@juno/store'
 import { EngineConfig } from '../config'
 import { MarkWorker } from '../markWorker'
@@ -32,7 +32,8 @@ import { Outbox } from '../outbox'
 import { retryFirstRun, serveLiveList, serveLiveValue, timed, type Run } from '../protocol/live'
 import { Workspace, type StoreServices } from '../workspace'
 import { renameTopic, reopenTopic, resolveTopic, restoreTopic, setChannelIgnored, setPinned } from './actions'
-import { setSubscribed } from './commands'
+import { listAllTopics, matchQuery, summarizeAllTopics } from './allTopics'
+import { setSubscribed } from '../follow'
 import { countTopics, forgetUsers, listTopics, makeRowCache } from './query'
 
 const LIST_KEYS: InvalidationKeys = ['topics', 'topic_overlay', 'topic_reads', 'conversations', 'users', 'ignored_channels', 'thread_subs', 'prefs', 'topic_art']
@@ -40,6 +41,48 @@ const COUNT_KEYS: InvalidationKeys = ['topics', 'topic_overlay', 'conversations'
 const QUIET_TICK = '1 minute'
 
 const encodeRow = Schema.encodeSync(Schema.toCodecJson(TopicListRow))
+
+/**
+ * Query runs from the current store; nothing while no workspace is open.
+ * `setup` runs once per open workspace, in a scope that lasts as long as
+ * the workspace does, and returns the query. With `tick`, the query also
+ * runs once a minute so a topic turns quiet on time; only this
+ * subscription re-runs. Runs of one subscription never overlap, so a
+ * later run's value is never sent before an earlier one's.
+ */
+function liveRuns<A>(
+  workspace: Workspace['Service'],
+  keys: InvalidationKeys,
+  setup: Effect.Effect<Effect.Effect<A, SqlError, StoreServices>, never, StoreServices | Scope.Scope>,
+  tick: boolean,
+): Stream.Stream<Run<A, SqlError>> {
+  return workspace.changes.pipe(
+    Stream.switchMap((open) => {
+      if (open === undefined) return Stream.empty
+      const opened = Effect.gen(function* () {
+        const query = yield* setup
+        const lane = Semaphore.makeUnsafe(1)
+        const run = lane.withPermit(timed(query))
+        const live = liveQuery(keys, run)
+        // `Stream.tick` emits at once; the live query already runs at subscribe time.
+        const ticks = Stream.tick(QUIET_TICK).pipe(Stream.drop(1), Stream.mapEffect(() => Effect.result(run)))
+        return tick ? Stream.merge(live, ticks) : live
+      })
+      return Stream.scoped(Stream.unwrap(opened).pipe(Stream.provide(open.context)))
+    }),
+  )
+}
+
+/** A row cache for one subscription that forgets the users it read whenever the `users` table changes. */
+const rowCacheForSubscription = Effect.gen(function* () {
+  const cache = makeRowCache({ keepUsers: true })
+  const invalidation = yield* Invalidation
+  yield* Effect.acquireRelease(
+    Effect.sync(() => invalidation.subscribeUnsafe(['users'], () => forgetUsers(cache))),
+    (cancel) => Effect.sync(cancel),
+  )
+  return cache
+})
 
 export const TopicsHandlers = TopicsRoutes.toLayer(
   Effect.gen(function* () {
@@ -58,34 +101,8 @@ export const TopicsHandlers = TopicsRoutes.toLayer(
         Effect.map(({ result }) => result),
       )
 
-    /**
-     * Query runs from the current store; nothing while no workspace is open.
-     * `setup` runs once per open workspace, in a scope that lasts as long as
-     * the workspace does, and returns the query. With `tick`, the query also
-     * runs once a minute so a topic turns quiet on time; only this
-     * subscription re-runs. Runs of one subscription never overlap, so a
-     * later run's value is never sent before an earlier one's.
-     */
-    const runs = <A>(
-      keys: InvalidationKeys,
-      setup: Effect.Effect<Effect.Effect<A, SqlError, StoreServices>, never, StoreServices | Scope.Scope>,
-      tick: boolean,
-    ): Stream.Stream<Run<A, SqlError>> =>
-      workspace.changes.pipe(
-        Stream.switchMap((open) => {
-          if (open === undefined) return Stream.empty
-          const opened = Effect.gen(function* () {
-            const query = yield* setup
-            const lane = Semaphore.makeUnsafe(1)
-            const run = lane.withPermit(timed(query))
-            const live = liveQuery(keys, run)
-            // `Stream.tick` emits at once; the live query already runs at subscribe time.
-            const ticks = Stream.tick(QUIET_TICK).pipe(Stream.drop(1), Stream.mapEffect(() => Effect.result(run)))
-            return tick ? Stream.merge(live, ticks) : live
-          })
-          return Stream.scoped(Stream.unwrap(opened).pipe(Stream.provide(open.context)))
-        }),
-      )
+    const runs = <A>(keys: InvalidationKeys, setup: Effect.Effect<Effect.Effect<A, SqlError, StoreServices>, never, StoreServices | Scope.Scope>, tick: boolean) =>
+      liveRuns(workspace, keys, setup, tick)
 
     return {
       'topics.list': (payload) => {
@@ -93,12 +110,7 @@ export const TopicsHandlers = TopicsRoutes.toLayer(
         const filter = { kind: payload.kind, unreadOnly: payload.unreadOnly, scope: payload.scope }
         // One row cache per workspace. It keeps the users it has read until the `users` table changes.
         const setup = Effect.gen(function* () {
-          const cache = makeRowCache({ keepUsers: true })
-          const invalidation = yield* Invalidation
-          yield* Effect.acquireRelease(
-            Effect.sync(() => invalidation.subscribeUnsafe(['users'], () => forgetUsers(cache))),
-            (cancel) => Effect.sync(cancel),
-          )
+          const cache = yield* rowCacheForSubscription
           return Effect.gen(function* () {
             const now = yield* Clock.currentTimeMillis
             return yield* listTopics(filter, { now, limit }, cache)
@@ -118,6 +130,36 @@ export const TopicsHandlers = TopicsRoutes.toLayer(
       'topics.restore': ({ id, overlay, unreadFrom }) => act(restoreTopic(id, overlay, unreadFrom)),
       'channels.ignore': ({ channel }) => setChannelIgnored(channel, true).pipe(Effect.provideService(Workspace, workspace)),
       'channels.unignore': ({ channel }) => setChannelIgnored(channel, false).pipe(Effect.provideService(Workspace, workspace)),
+    }
+  }),
+)
+
+/** A text filter searches messages, so its runs follow them too. */
+const allTopicsKeys = (query: string | undefined): InvalidationKeys => (matchQuery(query) === '' ? LIST_KEYS : [...LIST_KEYS, 'messages'])
+
+/**
+ * All topics (`allTopics.ts`). Both routes re-run on what the sidebar list
+ * re-runs on, plus `messages` while a text filter searches them, and once a
+ * minute so a topic turns quiet on time. Each list subscription is one
+ * window with its own row cache.
+ */
+export const AllTopicsHandlers = AllTopicsRoutes.toLayer(
+  Effect.gen(function* () {
+    const workspace = yield* Workspace
+    const config = yield* EngineConfig
+    const measure = config.e2e || config.dev
+    return {
+      'allTopics.list': ({ range, offset, ...filter }) => {
+        const limit = Math.max(1, Math.min(ALL_TOPICS_WINDOW, range.limit))
+        const setup = Effect.map(rowCacheForSubscription, (cache) =>
+          Effect.flatMap(Clock.currentTimeMillis, (now) => listAllTopics(filter, { now, offset, limit }, cache)),
+        )
+        return serveLiveList(liveRuns(workspace, allTopicsKeys(filter.query), setup, true), { encodeRow, measure }).pipe(retryFirstRun('allTopics.list'), Stream.orDie)
+      },
+      'allTopics.summary': (narrowing) => {
+        const setup = Effect.succeed(Effect.flatMap(Clock.currentTimeMillis, (now) => summarizeAllTopics(narrowing, now)))
+        return serveLiveValue(liveRuns(workspace, allTopicsKeys(narrowing.query), setup, true), { measure }).pipe(retryFirstRun('allTopics.summary'), Stream.orDie)
+      },
     }
   }),
 )

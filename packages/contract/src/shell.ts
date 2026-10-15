@@ -9,9 +9,17 @@ import { Channels, SIDEBAR_WIDTH } from './channels'
 export const PlatformSchema = Schema.Literals(['darwin', 'win32', 'linux'])
 export type Platform = typeof PlatformSchema.Type
 
-/** The one theme value. `state`, `main` and `ui` all read it from here. */
-export const ThemeSchema = Schema.Literals(['light', 'dark'])
+/** The theme the owner picks; System follows macOS. `state`, `main` and `ui` all read it from here. */
+export const ThemeSchema = Schema.Literals(['system', 'light', 'dark'])
 export type Theme = typeof ThemeSchema.Type
+/** The theme a window paints in: System resolved against macOS. */
+export type ResolvedTheme = Exclude<Theme, 'system'>
+export const DEFAULT_THEME: Theme = 'system'
+
+/** Preferences › Appearance › Density (inventory 3.3). */
+export const DensitySchema = Schema.Literals(['comfortable', 'compact'])
+export type Density = typeof DensitySchema.Type
+export const DEFAULT_DENSITY: Density = 'comfortable'
 
 /**
  * The accent names, in the order the picker shows them. Coral is the
@@ -80,12 +88,14 @@ export const ShellRoutes = {
   },
   [Channels.launchSetTheme]: { input: Schema.Struct({ theme: ThemeSchema }), output: Schema.Void },
   [Channels.launchSetAccent]: { input: Schema.Struct({ accent: AccentSchema }), output: Schema.Void },
+  [Channels.launchSetDensity]: { input: Schema.Struct({ density: DensitySchema }), output: Schema.Void },
   [Channels.launchSetSidebar]: { input: SidebarLayout, output: Schema.Void },
   [Channels.contextMenuPopup]: { input: Schema.Struct({ items: ContextMenuItems, at: Schema.optionalKey(ContextMenuAt) }), output: Schema.NullOr(Schema.String) },
   [Channels.shellOpenExternal]: { input: Schema.Struct({ url: Schema.String }), output: Schema.Void },
   [Channels.shellOpenInSlack]: { input: SlackTarget, output: Schema.Void },
   [Channels.clipboardWriteText]: { input: Schema.Struct({ text: Schema.String.check(Schema.isMaxLength(2048)) }), output: Schema.Void },
   [Channels.shellEditUndo]: { input: Schema.Void, output: Schema.Void },
+  [Channels.notificationsViewing]: { input: Schema.Struct({ topicId: Schema.NullOr(Schema.String) }), output: Schema.Void },
 } as const
 
 export type ShellRoutes = typeof ShellRoutes

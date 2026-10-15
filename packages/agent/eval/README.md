@@ -55,9 +55,9 @@ A case whose run does not end `complete` (provider failure, timeout) is reported
 
 Not covered yet, because the agent cannot do them: the dismissal case of §19.5 (needs WP15's card outcomes), recall over a long chat and compaction quality (§16), and the proposed card itself (see below).
 
-## What this build cannot score
+## Sources and cards
 
-- **Sources.** Plan v3 §19.1 gives each message in a Slack read result a handle (`m3`) and has Juno write `<src m="m3">words</src>`. The router does not assign handles or tell the model about them yet (WP11), so live models cite nothing and score 0 on sources. Until it does, `trace.ts` numbers the messages of a run's read results in the order they came back, which is how §19.1 describes them; when the router exports its handle table, read it there.
+- **Sources.** The router gives each message a run reads a handle and exports its table (`sourceTable`); `engine.ts` reads it for each step's runs, so a source counts only when it names a message the router numbered in that reply.
 - **Cards.** No tool proposes a card yet (WP15), so `proposes a card` is reported as not scored, and the card cases grade what Juno says instead. When WP15 lands, list its card tools in `CARD_TOOLS` in `grade.ts`.
 
 ## Reports

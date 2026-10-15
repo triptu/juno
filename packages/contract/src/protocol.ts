@@ -31,6 +31,25 @@ export const EngineConfig = Schema.Struct({
 })
 export type EngineConfig = typeof EngineConfig.Type
 
+/** A message a notification opens: its topic at that message. */
+export const NotificationSource = Schema.Struct({ channelId: Schema.String, ts: Schema.String, topicId: Schema.String })
+export type NotificationSource = typeof NotificationSource.Type
+
+/**
+ * What clicking a notification opens: a message, or the hours-start
+ * summary. The summary opens the Juno chat at its message (`id`) once the
+ * chat exists, and until then the first message it names (`first`).
+ */
+export const NotificationTarget = Schema.Union([
+  Schema.TaggedStruct('message', { source: NotificationSource }),
+  Schema.TaggedStruct('summary', { id: Schema.String, first: NotificationSource }),
+])
+export type NotificationTarget = typeof NotificationTarget.Type
+
+/** One OS notification. The id is stable, so main shows a repeated one once. */
+export const OsNotification = Schema.Struct({ id: Schema.String, title: Schema.String, body: Schema.String, target: NotificationTarget })
+export type OsNotification = typeof OsNotification.Type
+
 /** main -> engine over parentPort. A `port` message carries the port in `ports[0]`. */
 export const MainToEngine = Schema.Union([
   Schema.TaggedStruct('config', { config: EngineConfig }),
@@ -53,6 +72,10 @@ export const MainToEngine = Schema.Union([
     /** Chromium's proxy resolution, for example `DIRECT` or `PROXY host:port`. */
     proxy: Schema.String,
   }),
+  /** The topic on screen in a focused window, or null. Notifications for it are suppressed. */
+  Schema.TaggedStruct('viewing', { topicId: Schema.NullOr(Schema.String) }),
+  /** The Mac woke from sleep: apply the presence schedule again. */
+  Schema.TaggedStruct('wake', {}),
 ])
 export type MainToEngine = typeof MainToEngine.Type
 
@@ -76,5 +99,9 @@ export const EngineToMain = Schema.Union([
   Schema.TaggedStruct('handshake', { id: Schema.Int, url: Schema.String }),
   /** `Set-Cookie` values from a socket upgrade response, to be stored in the session for `url`. */
   Schema.TaggedStruct('setCookies', { url: Schema.String, cookies: Schema.Array(Schema.String) }),
+  /** Please show this OS notification. */
+  Schema.TaggedStruct('notify', { notification: OsNotification }),
+  /** Whether any topic has an unread mention: the dock shows a `•` badge. */
+  Schema.TaggedStruct('badge', { mentions: Schema.Boolean }),
 ])
 export type EngineToMain = typeof EngineToMain.Type

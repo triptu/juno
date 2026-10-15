@@ -52,6 +52,7 @@ import { THUMBS_UP, type ReplyTarget } from '@juno/agent-contract'
 import type { Origin, RunState, TurnEvent } from './events'
 import { archivedBubble, modelText, ownerOpOf, readsTopic, runText } from './input'
 import { parseOutput } from './output'
+import { resolveSpans, sourceTable } from './sources'
 
 export interface Session {
   readonly journal: () => Journal
@@ -309,7 +310,8 @@ export function createRouter(options: RouterOptions) {
       const replyTo = bubble.replyTo === undefined ? undefined : ownerOpOf(store, bubble.replyTo)
       run.bubbles.push({ id, text: bubble.text, ...(replyTo ? { replyTo } : {}) })
       run.status = {}
-      emit({ _tag: 'bubble', runId: run.runId, id, text: bubble.text, ...(replyTo ? { replyTo } : {}) })
+      const body = resolveSpans(bubble.spans, sourceTable(store, run.runId))
+      emit({ _tag: 'bubble', runId: run.runId, id, text: bubble.text, body, ...(replyTo ? { replyTo } : {}) })
     }
     for (const reaction of output.reactions.slice(run.reactions)) {
       const target = ownerOpOf(store, reaction.to)

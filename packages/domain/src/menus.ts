@@ -20,7 +20,7 @@ export type TopicMenuAction =
   | NotifyAction
   | 'ignore-channel'
 
-export type ChannelMenuAction = 'show-topics' | 'open-main' | 'mark-channel-read' | 'mark-channel-unread' | 'ignore-channel' | 'ask-juno'
+export type ChannelMenuAction = 'show-topics' | 'open-main' | 'mark-channel-read' | 'mark-channel-unread' | NotifyAction | 'ignore-channel' | 'ask-juno'
 export type PersonMenuAction = 'ask-juno'
 
 export type MenuItem<A extends string> =
@@ -39,12 +39,16 @@ export type NotifyAction = 'notify-every' | 'notify-matters' | 'notify-never'
 const notifyLabels: Record<NotifyChoice, string> = { every: 'Every message', matters: 'When it matters', never: 'Never' }
 
 /**
- * A thread's Notify me choice from Slack's follow flag. Juno does not keep
- * Every message apart yet, so a followed thread shows the default, When
- * it matters; a thread you do not follow shows Never.
+ * A thread's Notify me choice: Never when you do not follow it in Slack,
+ * else Every message when its level says so, else When it matters.
  */
-export function threadNotifyChoice(subscribed: boolean): NotifyChoice {
-  return subscribed ? 'matters' : 'never'
+export function threadNotifyChoice(subscribed: boolean, level?: NotifyLevel): NotifyChoice {
+  return !subscribed ? 'never' : level === 'every' ? 'every' : 'matters'
+}
+
+/** A channel's, DM's or person's Notify me choice: When it matters unless a level is stored. */
+export function notifyChoice(level: NotifyLevel | undefined): NotifyChoice {
+  return level ?? 'matters'
 }
 
 /** The Notify me choice an action picks. */
@@ -63,7 +67,7 @@ export interface TopicMenuState {
   readonly unread: boolean
   readonly pinned: boolean
   readonly resolved: boolean
-  /** The thread's Notify me choice. Main has no item of its own. */
+  /** The thread's Notify me choice; on Main, its channel's or DM's. */
   readonly notify: NotifyChoice
 }
 
@@ -73,9 +77,14 @@ function item<A extends string>(id: A, label: string, hint?: string): MenuItem<A
   return hint === undefined ? { type: 'item', id, label } : { type: 'item', id, label, hint }
 }
 
-function notifyMenu(current: NotifyChoice): MenuItem<TopicMenuAction> {
-  const choice = (level: NotifyChoice): MenuItem<TopicMenuAction> => ({ type: 'item', id: `notify-${level}`, label: notifyLabels[level], checked: level === current })
-  return { type: 'submenu', label: 'Notify me', hint: notifyLabels[current], items: [choice('every'), choice('matters'), choice('never')] }
+function notifyMenu(current: NotifyChoice, label = 'Notify me'): MenuItem<NotifyAction> {
+  const choice = (level: NotifyChoice): MenuItem<NotifyAction> => ({ type: 'item', id: `notify-${level}`, label: notifyLabels[level], checked: level === current })
+  return { type: 'submenu', label, hint: notifyLabels[current], items: [choice('every'), choice('matters'), choice('never')] }
+}
+
+/** How a toast names a choice: "#design-review: Never". */
+export function notifyChoiceLabel(choice: NotifyChoice): string {
+  return notifyLabels[choice]
 }
 
 /** The menu for a topic row and the page header's title (inventory 15.1). */
@@ -87,7 +96,7 @@ export function topicMenuItems(state: TopicMenuState): ReadonlyArray<MenuItem<To
   items.push(state.pinned ? item('unpin', 'Unpin') : item('pin', 'Pin'))
   items.push(state.resolved ? item('reopen', 'Reopen') : item('resolve', 'Resolve'))
   items.push(separator, item('copy-link', 'Copy Slack link'), item('open-in-slack', 'Open in Slack'))
-  if (!isMain) items.push(notifyMenu(state.notify))
+  items.push(notifyMenu(state.notify))
   if (!isDm(state.channel.kind)) items.push(item('ignore-channel', `Ignore ${channelLabel(state.channel)}`))
   return items
 }
@@ -95,6 +104,8 @@ export function topicMenuItems(state: TopicMenuState): ReadonlyArray<MenuItem<To
 export interface ChannelMenuState {
   readonly channel: ChannelInfo
   readonly hasMain: boolean
+  /** The channel's Notify me choice; the submenu shows when it is given. */
+  readonly notify?: NotifyChoice
   /** The Juno Agent is on: Ask Juno shows (SPEC 7). */
   readonly askJuno?: boolean
 }
@@ -104,19 +115,30 @@ export function channelMenuItems(state: ChannelMenuState): ReadonlyArray<MenuIte
   const items: MenuItem<ChannelMenuAction>[] = [item('show-topics', 'Show its topics')]
   if (state.hasMain) items.push(item('open-main', 'Open Main'))
   items.push(separator, item('mark-channel-read', 'Mark channel as read'), item('mark-channel-unread', 'Mark channel as unread'))
-  if (!isDm(state.channel.kind)) items.push(separator, item('ignore-channel', 'Ignore channel', 'Hide in Juno'))
+  if (state.notify !== undefined || !isDm(state.channel.kind)) items.push(separator)
+  if (state.notify !== undefined) items.push(notifyMenu(state.notify))
+  if (!isDm(state.channel.kind)) items.push(item('ignore-channel', 'Ignore channel', 'Hide in Juno'))
   if (state.askJuno === true) items.push(separator, item('ask-juno', 'Ask Juno'))
   return items
 }
 
 export interface PersonMenuState {
+  readonly name: string
+  readonly notify: NotifyChoice
   /** The Juno Agent is on: Ask Juno shows (SPEC 7). */
-  readonly askJuno: boolean
+  readonly askJuno?: boolean
 }
 
-/** The person menu (inventory 15.6): a sender's name or avatar, an @person chip. Notify me comes with the notifications work. */
-export function personMenuItems(state: PersonMenuState): ReadonlyArray<MenuItem<PersonMenuAction>> {
-  return state.askJuno ? [item('ask-juno', 'Ask Juno')] : []
+/** The person menu (inventory 15.6): Notify me about them, then Ask Juno while the agent runs. */
+export function personMenuItems(person: PersonMenuState): ReadonlyArray<MenuItem<NotifyAction | PersonMenuAction>> {
+  const first = person.name.split(' ')[0] ?? person.name
+  const notify: MenuItem<NotifyAction | PersonMenuAction> = notifyMenu(person.notify, `Notify me about ${first}`)
+  return person.askJuno === true ? [notify, separator, item('ask-juno', 'Ask Juno')] : [notify]
+}
+
+/** The message menu's why item (inventory 15.4), by what happened to the message. */
+export function whyLabel(notified: boolean): string {
+  return notified ? 'Why did this notify?' : 'Why no notification?'
 }
 
 export type TabKind = 'topic' | 'all-topics' | 'juno' | 'notifications' | 'preferences'

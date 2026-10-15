@@ -15,6 +15,7 @@ import type { Rpc } from 'effect/rpc'
 import {
   channelsIgnore,
   channelsUnignore,
+  notificationsSetLevel,
   readsMarkRead,
   readsMarkUnread,
   topicsRestore,
@@ -114,5 +115,9 @@ function replay(registry: Registry, undo: UndoCommand): Promise<unknown> {
       return runCommand(registry, readsMarkRead, payloadOf(undo))
     case 'reads.markUnread':
       return runCommand(registry, readsMarkUnread, payloadOf(undo))
+    case 'notifications.setLevel':
+      return runCommand(registry, notificationsSetLevel, payloadOf(undo))
+    case 'topics.restoreAll':
+      return Promise.all(undo.restores.map((restore) => runCommand(registry, topicsRestore, restore)))
   }
 }

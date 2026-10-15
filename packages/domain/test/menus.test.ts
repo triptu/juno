@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { channelMenuItems, personMenuItems, followsThread, notifyChoiceOf, tabMenuItems, threadNotifyChoice, topicMenuItems, type MenuItem, type TopicMenuState } from '../src/index'
+import { channelMenuItems, followsThread, notifyChoiceOf, personMenuItems, tabMenuItems, threadNotifyChoice, topicMenuItems, whyLabel, type MenuItem, type TopicMenuState } from '../src/index'
 import { eng, group, maya } from './fixtures'
 
 const labels = (items: ReadonlyArray<MenuItem<string>>) => items.map((i) => (i.type === 'separator' ? '—' : i.label))
@@ -46,10 +46,10 @@ describe('topic row menu', () => {
     ])
   })
 
-  it('has no Rename or Notify me for Main, and no Ignore for DMs', () => {
+  it('has no Rename for Main, and no Ignore for DMs', () => {
     const main = labels(topicMenuItems({ ...base, kind: 'main' }))
     expect(main).not.toContain('Rename')
-    expect(main).not.toContain('Notify me')
+    expect(main).toContain('Notify me')
     expect(labels(topicMenuItems({ ...base, channel: maya }))).not.toContain('Ignore Maya Chen')
     expect(labels(topicMenuItems({ ...base, channel: group })).at(-1)).toBe('Notify me')
   })
@@ -81,9 +81,23 @@ describe('Notify me on a thread', () => {
     expect(followsThread(notifyChoiceOf('notify-never'))).toBe(false)
   })
 
-  it('shows a followed thread as When it matters and one you do not follow as Never', () => {
+  it('shows a followed thread by its level, and one you do not follow as Never', () => {
     expect(threadNotifyChoice(true)).toBe('matters')
-    expect(threadNotifyChoice(false)).toBe('never')
+    expect(threadNotifyChoice(true, 'every')).toBe('every')
+    expect(threadNotifyChoice(false, 'every')).toBe('never')
+  })
+})
+
+describe('person and message menus', () => {
+  it('names the person by first name and checks their level', () => {
+    const [notify] = personMenuItems({ name: 'Maya Chen', notify: 'every' })
+    expect(notify?.type === 'submenu' && notify.label).toBe('Notify me about Maya')
+    expect(notify?.type === 'submenu' && notify.items.map((item) => item.type === 'item' && item.checked)).toEqual([true, false, false])
+  })
+
+  it('asks why by what happened', () => {
+    expect(whyLabel(true)).toBe('Why did this notify?')
+    expect(whyLabel(false)).toBe('Why no notification?')
   })
 })
 
@@ -102,16 +116,29 @@ describe('channel menu', () => {
     expect(labels(channelMenuItems({ channel: eng, hasMain: false }))).not.toContain('Open Main')
   })
 
-  it('ends with Ask Juno while the Juno Agent is on', () => {
-    expect(labels(channelMenuItems({ channel: maya, hasMain: true, askJuno: true })).slice(-2)).toEqual(['—', 'Ask Juno'])
-    expect(labels(channelMenuItems({ channel: eng, hasMain: true, askJuno: false }))).not.toContain('Ask Juno')
-  })
 })
 
-describe('person menu', () => {
-  it('offers Ask Juno only while the Juno Agent is on', () => {
-    expect(labels(personMenuItems({ askJuno: true }))).toEqual(['Ask Juno'])
-    expect(personMenuItems({ askJuno: false })).toEqual([])
+
+describe('Juno in the menus', () => {
+  it('the channel menu has Notify me with its choice, and ends with Ask Juno while the Juno Agent is on', () => {
+    expect(labels(channelMenuItems({ channel: eng, hasMain: true, notify: 'never', askJuno: true }))).toEqual([
+      'Show its topics',
+      'Open Main',
+      '—',
+      'Mark channel as read',
+      'Mark channel as unread',
+      '—',
+      'Notify me',
+      'Ignore channel',
+      '—',
+      'Ask Juno',
+    ])
+    expect(labels(channelMenuItems({ channel: eng, hasMain: true, askJuno: false }))).not.toContain('Ask Juno')
+  })
+
+  it('the person menu ends with Ask Juno while the Juno Agent is on', () => {
+    expect(labels(personMenuItems({ name: 'Maya Chen', notify: 'matters', askJuno: true }))).toEqual(['Notify me about Maya', '—', 'Ask Juno'])
+    expect(labels(personMenuItems({ name: 'Maya Chen', notify: 'matters' }))).toEqual(['Notify me about Maya'])
   })
 })
 

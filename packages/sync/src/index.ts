@@ -19,7 +19,7 @@ export {
   type RootCounters,
 } from './merge'
 export { reindexAll, reindexTopics, topicsOfMessages, type ReindexOptions, type StoredPreview } from './reindex'
-export { storedMe, type BootState } from './boot'
+export { BOOT_KEY, storedMe, type BootState } from './boot'
 export {
   applyRootSubscription,
   beginPendingFollow,

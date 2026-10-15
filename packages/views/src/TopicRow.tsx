@@ -9,7 +9,7 @@ import { User } from '@phosphor-icons/react/dist/icons/User'
 import { Users } from '@phosphor-icons/react/dist/icons/Users'
 import { memo, useId, type FocusEvent, type MouseEvent, type PointerEvent } from 'react'
 import type { TopicRow as TopicRowModel } from '@juno/contract'
-import { accent, colors, opacity, radii, sizes, spacing, tints } from '@juno/tokens/tokens.stylex'
+import { accent, colors, density, opacity, radii, sizes, spacing, tints } from '@juno/tokens/tokens.stylex'
 import {
   activateHandlers,
   Avatar,
@@ -59,9 +59,6 @@ export interface TopicRowProps {
 
 const HOVER = '@media (hover: hover)'
 
-// Row padding is 11 12 (inventory 3.1). There is no 11px step in the
-// spacing scale and nothing else uses it.
-const ROW_PADDING_BLOCK = '11px'
 
 const REOPENED_TITLE = 'New activity after it was resolved'
 const PRIVATE_TITLE = 'Private channel'
@@ -317,7 +314,7 @@ const styles = stylex.create({
     alignItems: 'flex-start',
     gap: spacing['--space-3'],
     minWidth: 0,
-    paddingBlock: ROW_PADDING_BLOCK,
+    paddingBlock: density['--density-row-padding-block'],
     paddingInline: spacing['--space-3'],
     borderRadius: radii['--radius-3xl'],
     color: colors['--foreground-default'],
@@ -327,7 +324,7 @@ const styles = stylex.create({
     // (docs/performance.md 3.2).
     contain: 'content',
     contentVisibility: 'auto',
-    containIntrinsicSize: `auto ${sizes['--row-topic-estimate']}`,
+    containIntrinsicSize: `auto ${density['--density-row-estimate']}`,
     backgroundColor: {
       default: 'transparent',
       ':hover': { default: null, [HOVER]: colors['--surface-hover'] },
@@ -363,6 +360,7 @@ const styles = stylex.create({
   tile: {
     display: 'inline-flex',
     flexShrink: 0,
+    zoom: density['--density-row-tile-zoom'],
   },
   artSlot: {
     display: 'inline-flex',
@@ -432,7 +430,7 @@ const styles = stylex.create({
     alignItems: 'center',
     gap: spacing['--space-3'],
     minWidth: 0,
-    marginTop: spacing['--space-0-5'],
+    marginTop: density['--density-row-line-gap'],
     color: colors['--foreground-muted'],
   },
   where: {

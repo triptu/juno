@@ -39,7 +39,10 @@ export const PEOPLE = {
 const decode = Schema.decodeUnknownSync(HostMessage)
 let clock = 0
 const post = (channel: Channel, from: Person, text: string, threadTs?: string): SlackMessage =>
-  decode({ channelId: channel.id, ts: `1760500000.${String(++clock).padStart(6, '0')}`, senderId: from.id, text, ...(threadTs ? { threadTs } : {}) })
+  decode({
+    channelId: channel.id, ts: `1760500000.${String(++clock).padStart(6, '0')}`, senderId: from.id, text,
+    senderName: from.name, channelName: `#${channel.name}`, ...(threadTs ? { threadTs } : {}),
+  })
 
 const flakeRoot = post(CHANNELS.eng, PEOPLE.sam, 'The checkout e2e test failed again on main, third time this week.')
 

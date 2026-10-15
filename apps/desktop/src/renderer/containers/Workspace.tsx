@@ -1,4 +1,4 @@
-import { Activity, useEffect } from 'react'
+import { Activity, lazy, Suspense, useEffect } from 'react'
 import { chatCopy } from '@juno/agent-contract'
 import type { TopicDetail } from '@juno/contract'
 import {
@@ -8,7 +8,9 @@ import {
   junoPanelOpenAtom,
   mountedTabs,
   onMenuCommand,
+  registry,
   sidebarLayoutAtom,
+  startVisitLog,
   tabsAtom,
   tabStripAtom,
   tabTopic,
@@ -23,11 +25,17 @@ import { runJunoShortcut } from './juno/actions'
 import { JunoPageTab } from './juno/JunoPages'
 import { JunoPanel } from './juno/JunoPanel'
 import { JunoTab } from './juno/JunoTab'
-import { closeTabById, openNewTab, runMenuCommand, showTabMenu, stepTabHistory, switchToTab } from './navigation'
+import { NotificationsPage } from './Notifications'
+import { useNotificationBridge, WhyLayer } from './notificationBridge'
+import { PreferencesPage } from './Preferences'
+import { closeTabById, loadAllTopicsPage, openNewTab, runMenuCommand, showTabMenu, stepTabHistory, switchToTab } from './navigation'
 import { NewChatTab } from './NewChat'
 import { runUndoCommand } from './topicActions'
 import { TitlebarNav } from './TitlebarNav'
 import { hasArt, TopicTab } from './TopicView'
+
+/** The All topics page is its own chunk (performance 2.1), loaded on idle once the window is up. */
+const AllTopicsPage = lazy(loadAllTopicsPage)
 
 const kindIcons: Record<TopicDetail['channel']['kind'], WorkspaceTabIcon> = {
   public: 'hash',
@@ -49,11 +57,17 @@ function stripTab(summary: TabSummary): WorkspaceTab {
       ? { ...base, title: summary.chatTitle ?? 'New chat', icon: 'new-chat' }
       : place.kind === 'home'
         ? { ...base, title: 'Home', icon: 'home' }
-        : place.kind === 'juno'
-          ? { ...base, title: 'Juno', icon: 'juno' }
-          : place.kind === 'junoPage'
-            ? { ...base, title: chatCopy.pageTitles[place.page], icon: place.page === 'settings' ? 'preferences' : 'juno' }
-            : {
+        : place.kind === 'allTopics'
+          ? { ...base, title: 'All topics', icon: 'all-topics' }
+          : place.kind === 'notifications'
+            ? { ...base, title: 'Notifications', icon: 'notifications' }
+            : place.kind === 'preferences'
+              ? { ...base, title: 'Preferences', icon: 'preferences' }
+              : place.kind === 'juno'
+                ? { ...base, title: 'Juno', icon: 'juno' }
+                : place.kind === 'junoPage'
+                  ? { ...base, title: chatCopy.pageTitles[place.page], icon: place.page === 'settings' ? 'preferences' : 'juno' }
+                  : {
           ...base,
           title: detail == null ? '' : detail.kind === 'main' ? detail.channel.name : detail.title,
           icon: detail == null ? 'hash' : kindIcons[detail.channel.kind],
@@ -78,6 +92,16 @@ function Page({ tab }: { readonly tab: Tab }) {
       return <JunoTab key="juno" />
     case 'junoPage':
       return <JunoPageTab key={place.page} page={place.page} />
+    case 'notifications':
+      return <NotificationsPage key="notifications" />
+    case 'preferences':
+      return <PreferencesPage key="preferences" />
+    case 'allTopics':
+      return (
+        <Suspense key="all-topics" fallback={null}>
+          <AllTopicsPage />
+        </Suspense>
+      )
   }
 }
 
@@ -120,9 +144,16 @@ export function Workspace() {
   const panelOpen = useAtomValue(junoPanelOpenAtom)
   const panelTopic = useAtomValue(tabsAtom, activeTopicOf)
 
+  useNotificationBridge()
   useEffect(() => onMenuCommand(runMenuCommand), [])
   useEffect(() => onMenuCommand(runUndoCommand), [])
   useEffect(() => onMenuCommand((command) => command === 'juno.toggle' && runJunoShortcut()), [])
+  // "Pick up where you left off" on Home: the topic that stayed on screen for a minute.
+  useEffect(() => startVisitLog(registry), [])
+  useEffect(() => {
+    const idle = requestIdleCallback(() => void loadAllTopicsPage(), { timeout: 5_000 })
+    return () => cancelIdleCallback(idle)
+  }, [])
   useEffect(() => {
     window.addEventListener('mouseup', onMouseUp)
     return () => window.removeEventListener('mouseup', onMouseUp)
@@ -131,6 +162,7 @@ export function Workspace() {
   const pages = state.tabs.filter((tab) => mounted.has(tab.id))
 
   return (
+    <>
     <WorkspaceView
       tabs={strip.map(stripTab)}
       {...(state.active === undefined ? {} : { activeId: state.active })}
@@ -151,5 +183,7 @@ export function Workspace() {
             </Activity>
           ))}
     </WorkspaceView>
+    <WhyLayer />
+    </>
   )
 }
