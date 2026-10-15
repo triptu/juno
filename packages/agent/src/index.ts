@@ -12,7 +12,8 @@ export type { Mode, Outcome } from './store/ledger'
 export { CORE_MIGRATIONS, type MigrationSet } from './store/schema'
 import { LOCAL_TABLES as CORE_LOCAL_TABLES } from './store/schema'
 import { PROVIDER_LOCAL_TABLES } from './spend/schema'
-export const LOCAL_TABLES: ReadonlyArray<string> = [...CORE_LOCAL_TABLES, ...PROVIDER_LOCAL_TABLES]
+import { REDACTION_LOCAL_TABLES } from './redaction/schema'
+export const LOCAL_TABLES: ReadonlyArray<string> = [...CORE_LOCAL_TABLES, ...PROVIDER_LOCAL_TABLES, ...REDACTION_LOCAL_TABLES]
 export { runJob, type CompactionModel, type MemoryView } from './store/memory'
 export { createSpend, Spend, dollars, DOLLAR, spendDay, SPEND_MIGRATIONS, PROVIDER_LOCAL_TABLES,
   type SpendLedger, type SpendSnapshot, type SpendPath, type Reservation } from './spend'
@@ -41,3 +42,4 @@ export { liveGrant, mintGrant, revokeAllGrants, revokeGrant, type Grant, type Gr
 
 export * from './mcp'
 export * from './schedule'
+export * from './redaction'
