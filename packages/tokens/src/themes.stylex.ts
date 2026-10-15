@@ -49,6 +49,7 @@ export const darkColors = stylex.createTheme(colors, {
   '--accent-foreground-muted': 'hsla(48, 10%, 10%, 1)',
 
   '--overlay': 'rgba(0, 0, 0, 0.5)',
+  '--overlay-viewer': 'rgba(27, 25, 22, 0.94)',
 
   // The light danger red is 3.0:1 on ink; this one is 6.6:1.
   '--danger': '#F8767E',

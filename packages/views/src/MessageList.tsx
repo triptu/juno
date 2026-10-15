@@ -1,6 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
 import { useState, type KeyboardEvent, type MouseEvent, type ReactNode, type Ref } from 'react'
-import type { MessageView, Person } from '@juno/contract'
+import type { FileView, MessageView, Person } from '@juno/contract'
 import { layout, sizes, spacing } from '@juno/tokens/tokens.stylex'
 import { EmptyState, hueForId, ScrollArea, Text, type ActivateEvent, type HueName } from '@juno/ui'
 import { Message, type MessageActions } from './Message'
@@ -72,6 +72,12 @@ export interface MessageListProps {
   readonly onRetry?: (clientMsgId: string) => void
   /** Delete draft on a failed send. */
   readonly onDiscard?: (clientMsgId: string) => void
+  /** A thumbnail was opened. Created once, like every row callback. */
+  readonly onOpenImage?: (file: FileView) => void
+  /** Download on a file card. Created once. */
+  readonly onDownload?: (file: FileView) => void
+  /** Upload progress of the messages being sent with files, by `clientMsgId`, 0 to 1. */
+  readonly uploadProgress?: Readonly<Record<string, number>>
   /** Right-click or the context-menu key on a message: its menu, at the pointer. `onSender` on the sender's name or avatar (the person menu). */
   readonly onMessageMenu?: (ts: string, event: MouseEvent, onSender: boolean) => void
   /** Right-click on an @person chip: the person menu (inventory 15.6). */
@@ -164,6 +170,9 @@ export function MessageList({
   onToggleReaction,
   onRetry,
   onDiscard,
+  onOpenImage,
+  onDownload,
+  uploadProgress,
   onMessageMenu,
   onPersonMenu,
   onChannelMenu,
@@ -225,6 +234,9 @@ export function MessageList({
                 onToggleReaction={onToggleReaction}
                 onRetry={onRetry}
                 onDiscard={onDiscard}
+                onOpenImage={onOpenImage}
+                onDownload={onDownload}
+                progress={item.message.clientMsgId === undefined ? undefined : uploadProgress?.[item.message.clientMsgId]}
                 onFocus={setFocusedTs}
               />
             </Row>

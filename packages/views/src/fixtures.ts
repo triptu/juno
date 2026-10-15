@@ -8,6 +8,7 @@ import AllTopics from './AllTopics.fixtures'
 import ActiveThreads from './ActiveThreads.fixtures'
 import AppearanceSettings from './AppearanceSettings.fixtures'
 import AppInfoView from './AppInfoView.fixtures'
+import AttachmentChips from './AttachmentChips.fixtures'
 import ChannelIconPicker from './ChannelIconPicker.fixtures'
 import Composer from './Composer.fixtures'
 import ComposerSlot from './ComposerSlot.fixtures'
@@ -15,6 +16,7 @@ import EmojiPicker from './EmojiPicker.fixtures'
 import EngineStatusView, { engineNoticeFixtures } from './EngineStatusView.fixtures'
 import Home from './Home.fixtures'
 import HoverToolbar from './HoverToolbar.fixtures'
+import ImageViewer from './ImageViewer.fixtures'
 import Message from './Message.fixtures'
 import MessageList from './MessageList.fixtures'
 import NewChat from './NewChat.fixtures'
@@ -63,6 +65,7 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   ActiveThreads,
   AppearanceSettings,
   AppInfoView,
+  AttachmentChips,
   ChannelIconPicker,
   BudgetCard: budgetCard,
   ChangeCard: changeCard,
@@ -76,6 +79,7 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   EmptyChat,
   NoProvider,
   EngineStatusView,
+  ImageViewer,
   Home,
   HoverToolbar,
   JunoChatList,

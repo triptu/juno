@@ -1,7 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import { ArrowUp } from '@phosphor-icons/react/dist/icons/ArrowUp'
-import type { KeyboardEvent, ReactNode, Ref } from 'react'
-import { layout, spacing } from '@juno/tokens/tokens.stylex'
+import type { ClipboardEvent, DragEvent, KeyboardEvent, ReactNode, Ref } from 'react'
+import { accent, layout, sizes, spacing } from '@juno/tokens/tokens.stylex'
 import { IconButton, Surface, Textarea } from '@juno/ui'
 
 export interface ComposerProps {
@@ -20,11 +20,20 @@ export interface ComposerProps {
   /** ↑ in an empty field: a topic selects its newest message (SPEC section 7, Keyboard). */
   readonly onArrowUpEmpty?: () => void
   /**
-   * Before the text: the attach button, once attachments exist (inventory 7).
-   * Nothing is passed until then, so the composer shows no control that does nothing.
+   * Before the text: the attach button (`AttachButton`, inventory 7). With
+   * it the field's start padding is 6px, the send button's end inset.
    */
   readonly leading?: ReactNode
+  /** The chips of the files going with the message: a row inside the field, above the text. */
+  readonly attachments?: ReactNode
+  /** Files pasted into the field or dropped on the composer. */
+  readonly onFiles?: (files: ReadonlyArray<File>) => void
+  /** Files are being dragged over the topic: the field shows a quiet accent ring. */
+  readonly dropping?: boolean
 }
+
+/** A drag that carries files from Finder, not text or a link. */
+const carriesFiles = (event: DragEvent<HTMLElement>) => event.dataTransfer.types.includes('Files')
 
 /**
  * The composer (inventory 7): a 752px field whose textarea grows to 194px,
@@ -33,7 +42,7 @@ export interface ComposerProps {
  * geometry, so one replaces the other with no shift. The text starts 18px in,
  * as in the Juno composer; `leading` is where the attach button goes.
  */
-export function Composer({ value, onChange, onSend, placeholder, sending = false, above, inputRef, onArrowUpEmpty, leading }: ComposerProps) {
+export function Composer({ value, onChange, onSend, placeholder, sending = false, above, inputRef, onArrowUpEmpty, leading, attachments, onFiles, dropping = false }: ComposerProps) {
   const empty = value.trim().length === 0
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === 'ArrowUp' && value === '' && onArrowUpEmpty !== undefined && !event.shiftKey && !event.metaKey && !event.altKey && !event.ctrlKey) {
@@ -45,10 +54,34 @@ export function Composer({ value, onChange, onSend, placeholder, sending = false
     event.preventDefault()
     if (!sending) onSend()
   }
+  // Only a paste or a drop with files is taken; text pastes and text drags stay the browser's.
+  const onPaste = (event: ClipboardEvent<HTMLTextAreaElement>) => {
+    const files = Array.from(event.clipboardData.files)
+    if (files.length === 0 || onFiles === undefined) return
+    event.preventDefault()
+    onFiles(files)
+  }
+  const onDragOver = (event: DragEvent<HTMLDivElement>) => {
+    if (onFiles === undefined || !carriesFiles(event)) return
+    event.preventDefault()
+    event.dataTransfer.dropEffect = 'copy'
+  }
+  const onDrop = (event: DragEvent<HTMLDivElement>) => {
+    const files = Array.from(event.dataTransfer.files)
+    if (files.length === 0 || onFiles === undefined) return
+    event.preventDefault()
+    onFiles(files)
+  }
   return (
-    <div data-composer="" {...stylex.props(styles.outer)}>
+    <div data-composer="" onDragOver={onFiles === undefined ? undefined : onDragOver} onDrop={onFiles === undefined ? undefined : onDrop} {...stylex.props(styles.outer)}>
       {above !== undefined ? <div {...stylex.props(styles.above)}>{above}</div> : null}
-      <Surface kind="field" data-composer-field="" sx={[styles.box, leading !== undefined && styles.boxWithLeading]}>
+      <Surface
+        kind="field"
+        data-composer-field=""
+        data-dropping={dropping ? '' : undefined}
+        sx={[styles.box, leading !== undefined && styles.boxWithLeading, attachments !== undefined && styles.boxWithAttachments, dropping && styles.dropping]}
+      >
+        {attachments !== undefined ? <div {...stylex.props(styles.attachments)}>{attachments}</div> : null}
         <div {...stylex.props(styles.row)}>
           {leading}
           <Textarea
@@ -60,6 +93,7 @@ export function Composer({ value, onChange, onSend, placeholder, sending = false
             value={value}
             onChange={(event) => onChange(event.currentTarget.value)}
             onKeyDown={onKeyDown}
+            onPaste={onFiles === undefined ? undefined : onPaste}
             dir="auto"
           />
           <span {...stylex.props(styles.send)}>
@@ -111,6 +145,22 @@ const styles = stylex.create({
   // A 28px leading control sits 6px in, as the send button does at the end.
   boxWithLeading: {
     paddingInlineStart: spacing['--space-1-5'],
+  },
+  boxWithAttachments: {
+    flexDirection: 'column',
+  },
+  // An outline over the 1px border and just outside it: one ring, and no layout change.
+  dropping: {
+    outlineStyle: 'solid',
+    outlineWidth: sizes['--focus-ring-width'],
+    outlineOffset: '-1px',
+    outlineColor: accent['--hl-ring'],
+  },
+  // The chips start 6px in, under the attach button, and sit 6px under the field's top edge.
+  attachments: {
+    display: 'flex',
+    paddingTop: spacing['--space-1-5'],
+    minWidth: 0,
   },
   // The row is 40px at one line (the textarea's 9 + 22 + 9). It reaches into the field's 1px border,
   // so the field is 40px tall too, like the ComposerSlot it replaces.

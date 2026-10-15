@@ -642,3 +642,50 @@ test.describe('Topic header', () => {
     await expect(page.getByRole('button', { name: 'Resolve', exact: true })).toHaveText('Resolve', { useInnerText: true })
   })
 })
+
+/**
+ * Attachments (SPEC section 8): a chip leaving the composer, the upload line
+ * under a sending message and a card's Download button move nothing.
+ */
+test.describe('Attachments', () => {
+  const open = (page: Page, component: string, id: string) => openState(page, { component, id, route: `${component}/${id}`, group: '', groupId: '', state: '', frame: {} })
+  const step = (page: Page, name: string) => page.evaluate((control) => (window as unknown as { __fixtureControls?: Record<string, () => void> }).__fixtureControls?.[control]?.(), name)
+  const boxes = (locator: Locator) => locator.evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().toJSON() as DOMRect))
+
+  test('removing a chip leaves the text row and the field where they were', async ({ page }) => {
+    await open(page, 'Composer', 'attachments/chip-removal')
+    const fixed = page.locator('[data-composer] textarea, [data-composer-field]')
+    const before = await boxes(fixed)
+    await step(page, 'remove')
+    await expect(page.locator('[data-attachment]')).toHaveCount(2)
+    expect(await boxes(fixed)).toEqual(before)
+    await step(page, 'remove')
+    await expect(page.locator('[data-attachment]')).toHaveCount(1)
+    expect(await boxes(fixed)).toEqual(before)
+  })
+
+  test('the upload line appearing, moving and going changes no row', async ({ page }) => {
+    await open(page, 'MessageList', 'shift/upload-progress')
+    const rows = page.locator('[data-message-row]')
+    const before = await boxes(rows)
+    await step(page, 'start')
+    await expect(page.getByRole('progressbar', { name: 'Uploading' })).toHaveAttribute('aria-valuenow', '20')
+    expect(await boxes(rows)).toEqual(before)
+    await step(page, 'advance')
+    await expect(page.getByRole('progressbar', { name: 'Uploading' })).toHaveAttribute('aria-valuenow', '80')
+    expect(await boxes(rows)).toEqual(before)
+    await step(page, 'done')
+    await expect(page.getByRole('progressbar')).toHaveCount(0)
+    expect(await boxes(rows)).toEqual(before)
+  })
+
+  test('a card’s Download button changes neither the card nor the rows', async ({ page }) => {
+    await open(page, 'MessageList', 'shift/download-appears')
+    const cards = page.locator('[data-file-card]')
+    const rows = page.locator('[data-message-row]')
+    const before = { cards: await boxes(cards), rows: await boxes(rows) }
+    await step(page, 'download')
+    await expect(page.getByRole('button', { name: /^Download / })).toHaveCount(2)
+    expect({ cards: await boxes(cards), rows: await boxes(rows) }).toEqual(before)
+  })
+})

@@ -102,3 +102,28 @@ test.describe('centred columns', () => {
     })
   }
 })
+
+test.describe('composer controls', () => {
+  test('the attach button mirrors the send button: 6px from its edge, centred on the one-line field', async ({ page }) => {
+    await open(page, 'Composer', 'attachments/attach-button')
+    const at = await page.evaluate(() => {
+      const field = document.querySelector('[data-composer-field]')!
+      const box = field.getBoundingClientRect()
+      const border = parseFloat(getComputedStyle(field).borderLeftWidth)
+      const attach = document.querySelector('button[aria-label="Attach files"]')!.getBoundingClientRect()
+      const send = document.querySelector('[data-composer-field] button[aria-label="Send"]')!.getBoundingClientRect()
+      return {
+        height: box.height,
+        attach: { start: attach.left - box.left - border, top: attach.top - box.top - border, bottom: box.bottom - border - attach.bottom, size: attach.width },
+        send: { end: box.right - border - send.right, top: send.top - box.top - border, bottom: box.bottom - border - send.bottom, size: send.width },
+      }
+    })
+    expect(at.height).toBe(40)
+    expect(at.attach.size).toBe(28)
+    expect(at.attach.start).toBe(6)
+    expect(at.send.end).toBe(at.attach.start)
+    expect(at.attach.top).toBe(at.attach.bottom)
+    expect(at.send.top).toBe(at.send.bottom)
+    expect(at.attach.top).toBe(at.send.top)
+  })
+})

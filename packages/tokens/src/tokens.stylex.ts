@@ -62,6 +62,8 @@ export const colors = stylex.defineVars({
 
   // The dim behind the command palette.
   '--overlay': 'rgba(27, 28, 21, 0.16)',
+  // Behind the image viewer: the page, nearly opaque, so only the picture reads.
+  '--overlay-viewer': 'hsla(48, 50%, 98%, 0.94)',
 
   // Status. Warning and info are only ever mixed into tints, never used as
   // text on their own (2.1:1 and 3.9:1).
@@ -855,6 +857,8 @@ export const z = stylex.defineVars({
   '--z-picker': '10',
   '--z-menu': '20',
   '--z-palette': '30',
+  // The image viewer, over the whole window. Never open with the palette.
+  '--z-viewer': '30',
   '--z-selection': '35',
   '--z-context': '40',
   '--z-toast': '45',

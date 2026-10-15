@@ -1,6 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
 import { memo, type FocusEvent, type ReactNode } from 'react'
-import type { MessageView, Person } from '@juno/contract'
+import type { FileView, MessageView, Person } from '@juno/contract'
 import { accent, colors, density, layout, motion, opacity, radii, sizes, spacing, tints, z } from '@juno/tokens/tokens.stylex'
 import { WarningCircle } from '@phosphor-icons/react/dist/icons/WarningCircle'
 import { Avatar, Icon, Text, type ActivateEvent, type HueName } from '@juno/ui'
@@ -73,6 +73,12 @@ export interface MessageProps {
   readonly onRetry?: (clientMsgId: string) => void
   /** Delete draft on a failed send, with its `clientMsgId`. */
   readonly onDiscard?: (clientMsgId: string) => void
+  /** A thumbnail was opened: the image viewer. */
+  readonly onOpenImage?: ((file: FileView) => void) | undefined
+  /** Download on a file card. */
+  readonly onDownload?: ((file: FileView) => void) | undefined
+  /** How far a sending message's files have uploaded, 0 to 1. */
+  readonly progress?: number | undefined
 }
 
 const HOVER = '@media (hover: hover)'
@@ -126,6 +132,9 @@ export const Message = memo(function Message({
   onFocus,
   onRetry,
   onDiscard,
+  onOpenImage,
+  onDownload,
+  progress,
 }: MessageProps) {
   const name = sender?.name ?? message.senderId ?? 'Unknown'
   const hue = sender === undefined ? hueOf(message.senderId ?? message.ts) : hueFor(sender.color, sender.id)
@@ -205,7 +214,13 @@ export const Message = memo(function Message({
             edited
           </Text>
         ) : null}
-        <Files files={message.files} />
+        <Files
+          files={message.files}
+          onOpenImage={onOpenImage}
+          onDownload={onDownload}
+          tabbable={tabbable}
+          progress={pending === 'sending' ? progress : undefined}
+        />
         <Reactions reactions={message.reactions} onToggle={toggle} />
         {main && message.thread !== undefined && onOpenThread !== undefined ? <ThreadLink link={message.thread} onOpen={onOpenThread} tabIndex={tabbable ? 0 : -1} /> : null}
         {pending === 'failed' && clientMsgId !== undefined ? (
