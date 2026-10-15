@@ -44,3 +44,18 @@ export async function runShards({ total, rest, self, root, desktop, dryRun }) {
   console.error(`remote: shards exited with ${codes.join(', ')}`)
   return Math.max(...codes)
 }
+
+// Run the two suites with their own shapes. Passing Playwright shards to the
+// combined root shell script would repeat desktop tests or lose gallery states.
+export async function runCombined({ args, scriptAt, self, root }) {
+  const children = new Set()
+  forwardSignals(children)
+  const codes = await Promise.all(['test:desktop', 'test:gallery'].map((script) => new Promise((resolve) => {
+    const child = spawn(process.execPath, [self, ...args.slice(0, scriptAt), script], { cwd: root, stdio: ['ignore', 'pipe', 'pipe'] })
+    children.add(child)
+    for (const stream of [child.stdout, child.stderr]) createInterface({ input: stream }).on('line', (line) => console.log(`[${script}] ${line}`))
+    child.on('error', () => resolve(255))
+    child.on('close', (code) => { children.delete(child); resolve(code ?? 1) })
+  })))
+  return Math.max(...codes)
+}

@@ -29,7 +29,7 @@ import { createInterface } from 'node:readline'
 import { fileURLToPath } from 'node:url'
 import { runnerConfig, checkRunner, runnerCommand } from './remote/runner.mjs'
 import { imageTag, ensureImage, nsc, retry, quote, sleep } from './remote/image.mjs'
-import { runShards } from './remote/shards.mjs'
+import { runShards, runCombined } from './remote/shards.mjs'
 import { acquire, destroy, keep, reap, release, status } from './remote/pool.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -122,6 +122,13 @@ if (process.argv[2] === '--drain') {
 // --shards n runs the script on n machines at once, each with JUNO_SHARD=i/n
 // (0-based), and fails if any shard fails. specs:check honours JUNO_SHARD.
 const shardsAt = process.argv.indexOf('--shards')
+const withoutShards = process.argv.slice(2).filter((_, index) => shardsAt < 0 || (index !== shardsAt - 2 && index !== shardsAt - 1))
+const combined = parse(withoutShards)
+if (combined.script === 'test:e2e') {
+  if (combined.args.length) throw new Error('Select files with test:desktop or test:gallery')
+  const args = process.argv.slice(2)
+  process.exit(await runCombined({ args, scriptAt: args.indexOf('test:e2e'), self, root }))
+}
 if (shardsAt > 1) {
   const total = Number(process.argv[shardsAt + 1])
   const rest = process.argv.slice(2).filter((_, index) => index !== shardsAt - 2 && index !== shardsAt - 1)
@@ -218,18 +225,26 @@ const cleanup = () => {
   rmSync(work, { recursive: true, force: true })
   rmSync(join(root, '.remote', `cache-${runId}`), { recursive: true, force: true })
 }
-process.on('exit', cleanup)
+process.on('exit', (exitCode) => { cleanup(); finishLog(exitCode) })
 for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
   process.on(signal, () => {
     console.error(`remote: ${signal}, stopping the remote run`)
     activeSsh?.kill(signal)
     activeTar?.kill(signal)
     cleanup()
+    finishLog(130)
+    console.error(`remote: output in ${relative(root, runLog)}`)
     process.exit(130)
   })
 }
 
 let code = 1
+let finalized = false
+function finishLog(result) {
+  if (finalized) return
+  finalized = true
+  appendFileSync(runLog, `remote: exited with ${result}\nremote: summary ${JSON.stringify({ code: result, backend, warm, readySeconds, startupSeconds, machineSeconds, wallSeconds: (Date.now() - started) / 1000 })}\n`)
+}
 try {
   runner = runnerConfig()
   if (runner) {
@@ -373,6 +388,6 @@ try {
   cleanup()
 }
 console.error(`remote: pnpm ${options.script} exited with ${code} after ${elapsed()}`)
-appendFileSync(runLog, `remote: exited with ${code}\nremote: summary ${JSON.stringify({ code, backend, warm, readySeconds, startupSeconds, machineSeconds, wallSeconds: (Date.now() - started) / 1000 })}\n`)
+finishLog(code)
 console.error(`remote: output in ${relative(root, runLog)}`)
 process.exit(code)
