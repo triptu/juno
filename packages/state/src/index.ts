@@ -111,9 +111,10 @@ export {
   untouched,
   type NewChat,
 } from './newChat'
-export { deleteMessage, discardMessage, draftAtom, editMessage, reactToMessage, retryMessage, saveDraft, sendMessage } from './send'
+export { checkMessage, deleteMessage, discardMessage, draftAtom, editMessage, reactToMessage, retryMessage, saveDraft, SEND_CHECK_WAIT_MS, sendMessage } from './send'
 export { errorOf } from './result'
 export {
+  aiAssistOnAtom,
   currentNotificationSettings,
   loadNotificationSettings,
   loadWhy,
