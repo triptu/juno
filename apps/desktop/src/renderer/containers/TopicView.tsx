@@ -359,7 +359,11 @@ function Topic({ id, detail, readOnly = false, underHeader = true }: TopicProps)
       if (row === null) return
       const box = row.getBoundingClientRect()
       const view = scroller.getBoundingClientRect()
-      if (box.top < view.top || box.bottom > view.bottom) row.scrollIntoView({ block: 'center', behavior: 'instant' })
+      if (box.top < view.top || box.bottom > view.bottom) {
+        // A source jump releases the hold before any rows can change, like the user's scrolling.
+        pin.current = undefined
+        row.scrollIntoView({ block: 'center', behavior: 'instant' })
+      }
       flashChatRow(row)
     })
   }, [readOnly, flash, positioned])

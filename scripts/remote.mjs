@@ -22,7 +22,7 @@
 
 import { spawn, spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { appendFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, relative, resolve } from 'node:path'
 import { createInterface } from 'node:readline'
@@ -259,6 +259,9 @@ if (options.dryRun) {
 }
 
 const started = Date.now()
+mkdirSync(reportDir, { recursive: true })
+const runLog = join(reportDir, 'run.log')
+writeFileSync(runLog, `pnpm ${scriptArgs}\n`)
 const elapsed = () => `${((Date.now() - started) / 1000).toFixed(0)} s`
 const work = mkdtempSync(join(tmpdir(), 'juno-remote-'))
 // Set while this run holds a machine; a run that ends any other way than
@@ -316,6 +319,7 @@ try {
     let errors = ''
     ssh.stderr.on('data', (chunk) => {
       errors += chunk
+      appendFileSync(runLog, chunk)
       process.stderr.write(chunk)
     })
     const closed = new Promise((resolvePromise) => ssh.on('close', resolvePromise))
@@ -339,7 +343,10 @@ try {
       lines++
       if (line.startsWith(exitMarker)) reported = Number(line.slice(exitMarker.length))
       else if (line === '__juno_remote_reports') hasReports = true
-      else console.log(line)
+      else {
+        appendFileSync(runLog, `${line}\n`)
+        console.log(line)
+      }
     }
     await closed
     clearTimeout(dialTimer)
@@ -371,6 +378,7 @@ try {
     console.error(`remote: reports in ${relative(root, reportDir)}/`)
   }
 } catch (error) {
+  appendFileSync(runLog, `remote: ${error.message}\n`)
   console.error(`remote: ${error.message}`)
   code = 255
 } finally {
@@ -378,4 +386,6 @@ try {
   cleanup()
 }
 console.error(`remote: pnpm ${options.script} exited with ${code} after ${elapsed()}`)
+appendFileSync(runLog, `remote: exited with ${code}\n`)
+console.error(`remote: output in ${relative(root, runLog)}`)
 process.exit(code)

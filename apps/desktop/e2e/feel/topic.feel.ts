@@ -60,7 +60,11 @@ test('a reaction and a live reply arrive while reading at the bottom', async ({ 
   await juno.signIn()
   await juno.waitForSync()
   await juno.sidebar.row(POSTGRES).open()
+  // Enough replies that the list scrolls: in a list that fits, staying at the bottom proves nothing.
+  for (let i = 1; i <= 8; i++) slack.as('Leo').replyIn(POSTGRES, `Notes from the dry run, part ${i}.`)
+  await juno.topic.expectMessage('Notes from the dry run, part 8.')
   await juno.topic.expectAtBottom()
+  await expect.poll(() => juno.topic.scroller.evaluate((scroller) => scroller.scrollHeight - scroller.clientHeight)).toBeGreaterThan(200)
   await juno.win.waitForTimeout(500)
   const root = slack.root(POSTGRES)
   const leo = slack.as('Leo').id
