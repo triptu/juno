@@ -305,8 +305,7 @@ describe('warm boot', () => {
       // Back to the window, then the complete pass.
       'api:subscriptions.thread.getView': 4,
       'api:search.modules.messages': 1,
-      // The searched reply is newer than its root's counters, so the root is fetched for Slack's reply_count.
-      'api:conversations.replies': 1,
+      // Search supplies the root counters; there is no per-thread lookup.
     })
     // The recheck for the time the app was closed: the ten most recently active topics, one page each.
     expect((rechecks['recheck:conversations.history'] ?? 0) + (rechecks['recheck:conversations.replies'] ?? 0)).toBe(10)

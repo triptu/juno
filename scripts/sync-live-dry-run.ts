@@ -71,7 +71,7 @@ const READ_ONLY_METHODS = [
   'conversations.info',
   'search.modules.messages',
 ] as const satisfies ReadonlyArray<MethodName>
-const READ_ONLY_EDGE = ['users/info'] as const
+const READ_ONLY_EDGE = ['users/info', 'emojis/list'] as const
 
 const isReadOnly = (method: string): method is (typeof READ_ONLY_METHODS)[number] => (READ_ONLY_METHODS as ReadonlyArray<string>).includes(method)
 
