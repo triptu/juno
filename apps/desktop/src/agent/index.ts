@@ -135,9 +135,9 @@ parent.on('message', (event) => {
           }),
         )
         .then(
-        (started) => {
-          agent = started
-          send({ _tag: 'ready', host: started.host })
+        (handle) => {
+          agent = handle
+          send({ _tag: 'ready', host: handle.host })
         },
         (cause: unknown) => {
           console.error('agent: failed to start', cause)
