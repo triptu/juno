@@ -7,7 +7,7 @@
 // machine, so without a shared queue they all run at once and the machine stalls.
 // The lock lives outside the repo, so every worktree shares it.
 //
-// JUNO_HEAVY_SLOTS sets how many heavy jobs may run at once (default 2: e2e and gallery runs mostly wait, so two fit on an 8-core, 8 GB machine).
+// JUNO_HEAVY_SLOTS sets how many heavy jobs may run at once (default 2; --electron also takes the single app-launch slot).
 // JUNO_HEAVY_HELD=1 is set for the child, so nested heavy commands do not wait
 // on their own parent.
 //
@@ -24,8 +24,10 @@ import { join } from 'node:path'
 // that must not pile up but should not wait behind test runs (typecheck).
 const queueAt = process.argv[2] === '--queue' ? process.argv[3] : undefined
 const rest = process.argv.slice(queueAt ? 4 : 2)
-const exclusive = rest[0] === '--exclusive'
-const args = rest.slice(exclusive ? 1 : 0)
+const flags = rest.slice(0, rest.findIndex((arg) => !arg.startsWith('--')) === -1 ? rest.length : rest.findIndex((arg) => !arg.startsWith('--')))
+const exclusive = flags.includes('--exclusive')
+const electron = flags.includes('--electron') && process.platform === 'darwin'
+const args = rest.slice(flags.length)
 if (args.length === 0) {
   console.error('usage: node scripts/heavy.mjs <command> [args...]')
   process.exit(2)
@@ -97,10 +99,13 @@ const tryAcquire = () => {
     return held
   }
   if (draining()) return undefined
+  const appSlot = join(root, 'electron')
+  if (electron && !take(appSlot)) return undefined
   for (let index = 0; index < slots; index++) {
     const dir = join(root, `slot-${index}`)
-    if (take(dir)) return [dir]
+    if (take(dir)) return electron ? [dir, appSlot] : [dir]
   }
+  if (electron) rmSync(appSlot, { recursive: true, force: true })
   return undefined
 }
 
