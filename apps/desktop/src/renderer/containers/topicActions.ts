@@ -27,6 +27,7 @@ import {
   type ContextMenuLeaf,
   type MenuCommand,
   type MenuItem,
+  type MessageView,
   type NotifyChoice,
   type TopicDetail,
   type TopicMenuAction,
@@ -175,19 +176,32 @@ function openTopicInSlack(topic: ActionTopic): void {
   if (session !== undefined) openInSlack({ teamId: session.teamId, channelId: topic.channel.id })
 }
 
+/** What the message menu leaves to the topic: the edit field, the delete confirm, opening the thread. */
+export type MessageMenuChoice = 'edit' | 'delete' | 'reply'
+
 /**
- * The message menu (SPEC 7, inventory 15.4): Copy Slack link and Open in
- * Slack. A reply's link carries its thread. The other items come with
- * their features (M6).
+ * The message menu (SPEC 7 "More", inventory 15.4), from the toolbar's More
+ * and from a right-click: Edit and Delete on your own messages, Reply in
+ * thread in Main, then Copy Slack link and Open in Slack. A reply's link
+ * carries its thread. A message Slack does not have yet has no link.
  */
-export async function showMessageMenu(topic: ActionTopic, ts: string): Promise<void> {
-  const chosen = await popupContextMenu([
-    { id: 'copy-link', label: 'Copy Slack link' },
+export async function showMessageMenu(topic: ActionTopic, message: Pick<MessageView, 'ts' | 'pending'>, own: boolean, at?: ContextMenuAt): Promise<MessageMenuChoice | undefined> {
+  const linkable = message.pending === undefined
+  const items: Array<ContextMenuItem> = [
+    ...(own ? [{ id: 'edit', label: 'Edit' }, { id: 'delete', label: 'Delete' }, { separator: true } as const] : []),
+    ...(topic.kind === 'main' && linkable ? [{ id: 'reply', label: 'Reply in thread' }, { separator: true } as const] : []),
+    { id: 'copy-link', label: 'Copy Slack link', ...(linkable ? {} : { enabled: false }) },
     { id: 'open-in-slack', label: 'Open in Slack' },
-  ])
-  if (chosen === 'open-in-slack') return openTopicInSlack(topic)
+  ]
+  const chosen = await popupContextMenu(items, at)
+  if (chosen === 'edit' || chosen === 'delete' || chosen === 'reply') return chosen
+  if (chosen === 'open-in-slack') {
+    openTopicInSlack(topic)
+    return undefined
+  }
   const session = registry.get(signedInAtom)
-  if (chosen === 'copy-link' && session !== undefined) copyText(messageLink(session.workspaceUrl, topic.channel.id, ts, topic.kind === 'thread' ? topic.rootTs : undefined))
+  if (chosen === 'copy-link' && session !== undefined) copyText(messageLink(session.workspaceUrl, topic.channel.id, message.ts, topic.kind === 'thread' ? topic.rootTs : undefined))
+  return undefined
 }
 
 /** Whether focus is in a text field that has text, where ⌘Z undoes typing. */
