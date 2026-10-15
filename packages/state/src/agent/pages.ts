@@ -133,7 +133,7 @@ export async function watchReply(registry: Registry, message: { readonly channel
   const until = new Intl.DateTimeFormat(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit' }).format(at)
   showToast(registry, { text: `Watching for a reply until ${until}`, onUndo: async () => {
     const unmount = registry.mount(scheduledPageAtom)
-    const snapshot = await Effect.runPromiseExit(AtomRegistry.getResult(registry, scheduledPageAtom, { suspendOnWaiting: true })).finally(unmount)
+    const snapshot = await Effect.runPromiseExit(AtomRegistry.getResult(registry, scheduledPageAtom)).finally(unmount)
     if (Exit.isFailure(snapshot)) return false
     const row = snapshot.value.revisions.find((candidate) => candidate.id === id)
     return row !== undefined && await junoPageActions(registry).schedule(id, row.revision, 'delete') === 'ok'
