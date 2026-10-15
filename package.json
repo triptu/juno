@@ -11,7 +11,7 @@
   "scripts": {
     "dev": "pnpm --filter @juno/desktop dev",
     "build": "pnpm --filter @juno/desktop build",
-    "typecheck": "pnpm -r --workspace-concurrency=3 typecheck && tsc -p scripts/tsconfig.json",
+    "typecheck": "node scripts/typecheck.mjs",
     "lint": "oxlint . && node scripts/check-no-pointer-cursor.mjs && node scripts/check-deps.mjs && node scripts/check-fixtures-redacted.mjs",
     "check-deps": "node scripts/check-deps.mjs",
     "health": "node scripts/health.mjs",
@@ -30,6 +30,7 @@
     "smoke:live": "node scripts/smoke-live.ts",
     "sync:live": "node --import ./scripts/ts-resolve-hooks.mjs scripts/sync-live-dry-run.ts",
     "ai:eval": "pnpm --filter @juno/ai eval",
+    "agent:eval": "pnpm --filter @juno/agent exec node --import ../../scripts/ts-resolve-hooks.mjs eval/run.ts",
     "remote": "node scripts/remote.mjs",
     "affected": "node scripts/affected.mjs",
     "verify:main": "node scripts/verify-main.mjs",

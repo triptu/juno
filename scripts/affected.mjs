@@ -157,6 +157,15 @@ function closure(start) {
 const touches = (reached) => changed.some((file) => reached.has(file))
 const plan = []
 
+// Typecheck: the tsc projects whose inputs have not passed before
+// (scripts/typecheck.mjs keeps that cache and skips the rest when it runs).
+const typecheckPending = !flag('--no-cache')
+  ? JSON.parse(spawnSync(process.execPath, [join(root, 'scripts/typecheck.mjs'), '--pending'], { cwd: root, encoding: 'utf8' }).stdout || '[]')
+  : ['every project']
+if (typecheckPending.length > 0) plan.push({ script: 'typecheck', args: flag('--no-cache') ? ['--no-cache'] : [], items: [], why: `${typecheckPending.length} tsc project(s): ${typecheckPending.slice(0, 4).join(', ')}${typecheckPending.length > 4 ? ', ...' : ''}` })
+// The whole lint takes about 3 s, less than a remote machine's overhead, so it runs here.
+if (changed.some((file) => !file.endsWith('.md'))) plan.push({ script: 'lint', args: [], items: [], local: true, why: 'the whole lint, on this Mac (about 3 s)' })
+
 // Results. A passing item is recorded under a hash of every file it reaches, the
 // package and suite configs it depends on, and the lockfile, in the system temp
 // folder shared by every worktree. An item whose key passed before is skipped,
@@ -271,9 +280,10 @@ if (renderer) console.log('  (UI changed: run pnpm test:feel and pnpm perf on th
 if (flag('--plan') || plan.length === 0) process.exit(0)
 
 // Each step runs at once: on its own Namespace machine, or one after another locally.
-const local = flag('--local')
+const localAll = flag('--local')
 const run = (step) =>
   new Promise((resolvePromise) => {
+    const local = localAll || step.local
     const env = Object.entries(step.env ?? {}).flatMap(([key, value]) => ['--env', `${key}=${value}`])
     const command = local ? ['pnpm', [step.script, ...step.args]] : ['node', [join(root, 'scripts/remote.mjs'), ...env, step.script, ...step.args]]
     const child = spawn(command[0], command[1], { cwd: root, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, ...(local ? step.env : {}) } })
@@ -288,8 +298,8 @@ const run = (step) =>
     }
     child.on('close', (code) => resolvePromise({ step, code: code ?? 1 }))
   })
-const results = local ? [] : await Promise.all(plan.map(run))
-if (local) for (const step of plan) results.push(await run(step))
+const results = localAll ? [] : await Promise.all(plan.map(run))
+if (localAll) for (const step of plan) results.push(await run(step))
 mkdirSync(resultsDir, { recursive: true })
 for (const { step, code } of results) if (code === 0) for (const item of step.items) writeFileSync(join(resultsDir, item.key), `${item.suite} ${item.id}\n`)
 console.log('affected: results')
