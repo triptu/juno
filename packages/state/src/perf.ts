@@ -23,6 +23,10 @@ export type PerfName =
   | 'juno.palette-open'
   | 'juno.palette-results'
   | 'juno.send'
+  /** The send's store-only checks answered, the queue command answered, and its row committed. */
+  | 'juno.send-checked'
+  | 'juno.send-queued'
+  | 'juno.send-commit'
   | 'juno.live-update'
   /** Mark: a topic was warmed by hover, focus or keyboard selection (performance.md 4.2). */
   | 'juno.prefetch'

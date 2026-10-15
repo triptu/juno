@@ -13,8 +13,6 @@ export interface SidebarFilter {
   readonly scope?: ChannelId
 }
 
-export const defaultSidebarFilter: SidebarFilter = { kind: 'all', unreadOnly: false }
-
 export interface SidebarList {
   readonly pinned: ReadonlyArray<Topic>
   readonly recent: ReadonlyArray<Topic>

@@ -34,8 +34,6 @@ export const MESSAGE_WINDOW_MAX = 500
 export const MESSAGE_WINDOW_DEFAULT = 150
 /** Rows before the anchor when the payload does not say (`messages.list` `before`). */
 export const MESSAGE_WINDOW_BEFORE = 50
-/** Messages `topics.open` fetches at most to reach the read pointer, so the "N new" count is exact. */
-export const OPEN_FETCH_MAX = 500
 /** Rows `channel.threads` returns at most. */
 export const THREADS_WINDOW_MAX = 100
 

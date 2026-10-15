@@ -356,5 +356,3 @@ export const chatCopy = {
     },
   },
 } as const
-
-export type ChatCopy = typeof chatCopy

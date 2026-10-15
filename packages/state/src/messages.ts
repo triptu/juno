@@ -13,10 +13,6 @@
  * - `messageListAtom(id)`: the window shown. After the spec changes it keeps
  *   the old window until the new one's first snapshot arrives, then swaps in
  *   one update; rows whose `rev` is unchanged keep their objects.
- * - `messageOrderAtom(id)`: the ids, for the list container. Notifies only
- *   when the ids change.
- * - `messageItemAtom(id, ts)`: one message with its sender joined from the
- *   window's refs. Notifies only when the message or its sender changes.
  *
  * The commands: `openTopic(registry, id)` once when a tab shows a topic,
  * `loadOlderMessages(registry, id, before)` when the first row nears the top.
@@ -35,7 +31,6 @@ import {
   topicsGet,
   topicsOpen,
   type MessageView,
-  type Person,
 } from '@juno/contract'
 import { liveQuery, prefetch, runCommand } from './atoms'
 import type { Registry } from './client'
@@ -106,49 +101,6 @@ export const messageListAtom = Atom.family((id: string) =>
     return carryOver(shown, result.value, spec)
   }),
 )
-
-export interface MessageOrder {
-  readonly ready: boolean
-  readonly ids: ReadonlyArray<string>
-}
-
-/** The ids of the shown window, oldest first, for the list container. Equal ids do not notify. */
-export const messageOrderAtom = Atom.family((id: string) =>
-  Atom.make((get): MessageOrder => {
-    const window = get(messageListAtom(id))
-    return { ready: window.ready, ids: window.order }
-  }).pipe(Atom.withEquality((a: MessageOrder, b: MessageOrder) => a.ready === b.ready && sameOrder(a.ids, b.ids))),
-)
-
-/** One message as a row draws it: the message and its sender. */
-export interface MessageItem {
-  readonly message: MessageView
-  /** `undefined` for a message with no sender (an unloaded root). */
-  readonly sender: Person | undefined
-}
-
-const items = new WeakMap<MessageView, MessageItem>()
-
-/** The message `ts` of topic `id` with its sender. Notifies only when the message object or the sender object changes. */
-export const messageItemAtom = Atom.family((key: string) => {
-  const split = key.indexOf('\u0000')
-  const id = key.slice(0, split)
-  const ts = key.slice(split + 1)
-  return Atom.make((get): MessageItem | undefined => {
-    const window = get(messageListAtom(id))
-    const message = window.rows.get(ts)
-    if (message === undefined) return undefined
-    const sender = message.senderId === undefined ? undefined : window.refs.people.get(message.senderId)
-    const held = items.get(message)
-    if (held !== undefined && held.sender === sender) return held
-    const item = { message, sender }
-    items.set(message, item)
-    return item
-  }).pipe(Atom.withEquality((a, b) => a === b))
-})
-
-/** `messageItemAtom` for a topic and a message ts. */
-export const messageItem = (id: string, ts: string) => messageItemAtom(`${id}\u0000${ts}`)
 
 /** Fetches what the store lacks for a topic a tab now shows. Never in a prefetch. */
 export const openTopic = (registry: Registry, id: string) => runCommand(registry, topicsOpen, { id })

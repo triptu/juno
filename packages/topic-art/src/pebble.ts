@@ -11,7 +11,7 @@
  * about 30px across at 40px, so the placeholder weighs the same as a line
  * drawing beside it and is a shape among shapes, not a box.
  */
-import { HUE_NAMES, tideVar, type HueName } from './palette'
+import { HUE_NAMES, tideVar } from './palette'
 import type { ArtSize } from './render'
 import { SMALL_BELOW } from './render'
 
@@ -87,12 +87,6 @@ function pebblePath(r: Rng): string {
   return `${d} Z`
 }
 
-/** The hue a topic's pebble leads with, for anything that wants to match it. */
-export function pebbleHue(topicId: string): HueName {
-  const r = rng(hashId(topicId))
-  return HUE_NAMES[r.int(0, HUE_NAMES.length - 1)]!
-}
-
 /**
  * The placeholder for a topic as inline SVG. The clip path's id is derived
  * from the topic id, so two pebbles of one topic on the same page share one
@@ -136,4 +130,3 @@ export function renderPebble(topicId: string, size: ArtSize): string {
     `<g clip-path="url(#${clipId})">${inner}</g></svg>`
   )
 }
-

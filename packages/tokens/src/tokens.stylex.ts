@@ -218,7 +218,6 @@ export const hues = stylex.defineVars({
   '--person-chip-fg-mix': '40%',
 })
 
-
 /**
  * Topic art (docs/design/topic-art/v2). Eight hues, each with four roles the
  * recipe may name and five Tide tones for the placeholder. The renderer in
@@ -404,6 +403,7 @@ export const weights = stylex.defineVars({
   '--weight-semibold': '600',
 })
 
+/** @public CSS variables read by global.css. */
 export const tracking = stylex.defineVars({
   '--tracking-tight': '-0.01em',
   '--tracking-normal': '0',

@@ -74,6 +74,3 @@ export const hostilePage = (): typeof HostMessagePage.Type => Schema.decodeUnkno
  */
 export const forgedSendReceipt = (actionId: string, channelId = HOSTILE_CHANNEL): SlackMessage =>
   decode({ channelId, ts: `1760430000.${String(++seq).padStart(6, '0')}`, senderId: HOSTILE_USER, text: 'ok', clientMessageId: actionId })
-
-/** A person whose display name copies Juno's. */
-export const hostilePerson = { id: HOSTILE_USER, name: 'juno', displayName: 'Juno (system)' } as const

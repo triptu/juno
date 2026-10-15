@@ -3,8 +3,7 @@
  *
  * - `liveQuery(route)` gives a memoized `(payload) => atom` for a stream
  *   route. A `liveValueRoute` yields the latest value; a `liveListRoute`
- *   yields a `ListWindow` kept by `applyListDelta`, with `rowAtom` for
- *   per-row subscriptions.
+ *   yields a `ListWindow` kept by `applyListDelta`.
  * - `command(route)` gives a writable atom that runs the command when
  *   written to and exposes the result as an `AsyncResult`.
  *
@@ -127,24 +126,6 @@ export function liveQuery<R extends Rpc.Any>(route: R): (payload: Payload<R>) =>
   const make = (payload: unknown) => family(payloadKey(payload))
   liveFamilies.set(route, make)
   return make as (payload: Payload<R>) => LiveAtomFor<R>
-}
-
-const rowFamilies = new WeakMap<Atom.Atom<unknown>, (id: string) => Atom.Atom<unknown>>()
-
-/**
- * One row of a list window. Re-renders its subscriber only when that row's
- * `rev` changes. The per-list families are held by the list atom, so a row
- * keeps its atom for as long as the list exists.
- */
-export function rowAtom<Row, E>(list: LiveListAtom<Row, E>): (id: string) => Atom.Atom<Row | undefined> {
-  let rows = rowFamilies.get(list)
-  if (rows === undefined) {
-    rows = Atom.family((id: string) =>
-      Atom.make((get) => AsyncResult.getOrElse(get(list), () => emptyWindow<Row>()).rows.get(id)).pipe(Atom.withEquality((a, b) => a === b)),
-    )
-    rowFamilies.set(list, rows)
-  }
-  return rows as (id: string) => Atom.Atom<Row | undefined>
 }
 
 export type CommandAtom<R> = Atom.AtomResultFn<Payload<R>, SuccessOf<R>, ErrorOf<R> | RpcClientError>

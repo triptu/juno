@@ -14,7 +14,7 @@
  */
 import { Schema } from 'effect'
 import { Rpc, RpcGroup } from 'effect/rpc'
-import { AllTopicsStatus, ChannelColor, ChannelIcon, ContextTint, ConversationKind, RowTag, TopicKind } from '@juno/domain'
+import { AllTopicsStatus, ConversationKind, RowTag, TopicKind } from '@juno/domain'
 import { NotFound, NotSignedIn, Offline, RateLimited, Rejected } from '../errors'
 import { liveListRoute, liveValueRoute, RowFields } from '../live'
 import { ChannelRef, Person } from '../refs'
@@ -22,7 +22,7 @@ import { AutomatedPlace, SavedView } from '../views'
 
 // The vocabulary is `@juno/domain`'s. It is re-exported so a renderer package
 // that may not import domain still names the same literals.
-export { ChannelColor, ChannelIcon, ContextTint, ConversationKind, RowTag, TopicKind }
+export { ConversationKind, RowTag, TopicKind }
 /** The status a sidebar row shows. `ignored` never reaches a row. */
 export const TopicStatus = AllTopicsStatus
 export type TopicStatus = typeof TopicStatus.Type

@@ -1,6 +1,6 @@
 # @juno/agent-contract
 
-Juno Agent's wire. Schemas, the two chat rules (`isOpenableUrl`, `sendMessageStatus`), and the typed `projectCard` bridge to the pure catalogue. No services or I/O.
+Juno Agent's wire. Schemas, shared card projections from `@juno/agent-cards/presentation`, and the typed `projectCard` bridge to the pure catalogue. No services or I/O.
 
 | Folder | Owner | Holds |
 | --- | --- | --- |

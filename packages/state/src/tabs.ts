@@ -109,14 +109,10 @@ const samePlace = (a: Place, b: Place) =>
 export const activeTab = (tabs: Tabs): Tab | undefined => tabs.tabs.find((tab) => tab.id === tabs.active)
 /** The tab that shows `topicId`, if one does. */
 export const tabShowing = (tabs: Tabs, topicId: string): Tab | undefined => tabs.tabs.find((tab) => tabTopic(tab) === topicId)
-/** The tab that shows Home, if one does. Home is a singleton. */
-export const homeTab = (tabs: Tabs): Tab | undefined => pageTab(tabs, 'home')
 /** The tab that shows a page. Pages are singletons. */
 const pageTab = (tabs: Tabs, kind: Place['kind']): Tab | undefined => tabs.tabs.find((tab) => currentPlace(tab).kind === kind)
 /** The tab that shows All topics, if one does. All topics is a singleton. */
 export const allTopicsTab = (tabs: Tabs): Tab | undefined => pageTab(tabs, 'allTopics')
-/** The tab that shows the Juno chat, if one does. There is one chat, so one tab. */
-export const junoTab = (tabs: Tabs): Tab | undefined => pageTab(tabs, 'juno')
 const pinnedCount = (tabs: ReadonlyArray<Tab>) => tabs.filter((tab) => tab.pinned).length
 
 /** A tab id no open or closed tab has. Ids are `tab-<n>`, so the next is one past the highest. */

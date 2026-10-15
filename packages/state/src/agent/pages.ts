@@ -117,5 +117,3 @@ export function junoPageActions(registry: Registry) {
     stopJob: (jobId: JobId) => outcome(call(registry, 'agent.jobs.stop', { opId: op(), jobId })),
   }
 }
-
-export type JunoPageActions = ReturnType<typeof junoPageActions>
