@@ -23,7 +23,7 @@ Run these from the repo root.
 | `pnpm dev` | Starts electron-vite with HMR for the renderer and reload for main and preload. |
 | `pnpm build` | Builds main, preload and renderer into `apps/desktop/out/`, then checks the renderer bundle size. |
 | `pnpm typecheck` | Typechecks every tsc project (each package's configs and `scripts/tsconfig.json`), skipping the ones whose inputs passed before; see "Typecheck". |
-| `pnpm lint` | Runs oxlint, the `cursor: pointer` check, then `check-deps`. |
+| `pnpm lint` | Runs oxlint, cursor and token checks, dependency and fixture checks, and the health ratchet. |
 | `pnpm check-deps` | The package graph and the import rules in `docs/architecture.md` section 3. Part of `pnpm lint`; run it alone for a quicker loop. |
 | `pnpm health` | Reports unused code and dependencies, duplication, and large files and functions. Writes `.juno-status/health.json`. |
 | `pnpm test` | Runs every package's vitest suite (`packages/*/test`). |
@@ -473,7 +473,7 @@ Effect and StyleX pitfalls are in their skills: `.claude/skills/effect/SKILL.md`
 
 ## Typecheck
 
-The repo uses TypeScript 7.0.2, the native compiler (`tsc` from the `typescript` package hands over to a platform binary). TypeScript 7 offers no JS API like `ts.createSourceFile`; `scripts/health-size.mjs`, the only code that needs it, imports `typescript-5` (an alias for 5.9.3, a root devDependency, used for nothing else). No other tool loads TypeScript: Vite, electron-vite and vitest transpile with esbuild, StyleX, the React Compiler and Playwright with Babel, oxlint and knip parse natively, and Quint does not use it. No tsconfig loads a language-service plugin.
+The repo uses TypeScript 7.0.2, the native compiler (`tsc` from the `typescript` package hands over to a platform binary). TypeScript 7 offers no JS API like `ts.createSourceFile`; `scripts/health-size.mjs`, and `scripts/check-tokens.mjs` import `typescript-5` (an alias for 5.9.3, a root devDependency, used by these checks). No other tool loads TypeScript: Vite, electron-vite and vitest transpile with esbuild, StyleX, the React Compiler and Playwright with Babel, oxlint and knip parse natively, and Quint does not use it. No tsconfig loads a language-service plugin.
 
 Packages ship TypeScript source, so each package's `tsc -p` also checks the source of every workspace package it depends on, and 29 projects repeat much of the same work. `pnpm typecheck` (`scripts/typecheck.mjs`) runs the same projects with the same tsconfigs, so the rules are unchanged, but:
 
@@ -529,7 +529,7 @@ An import graph over `apps/` and `packages/` decides what each change reaches: r
 - **Results.** Output streams live and is saved as `.remote/<run>/run.log`, including failing test names even if downloading the reports fails. Reports (spec traces, Playwright results and any generated HTML report) land in the same directory. The exit code is the script's own.
 - **Warm pool.** After a clean run the machine goes back to a pool kept in the system temp folder (`scripts/remote/pool.mjs`); the next run on this Mac claims it with the image already pulled, which takes a small suite from about 190 s to 19 s. A machine runs one job at a time. The pool keeps at most `JUNO_REMOTE_IDLE_PER_SHAPE` (default 2) idle machines of each shape; a detached reaper destroys one after `JUNO_REMOTE_IDLE_MINUTES` (default 5) idle minutes, every machine ends after 3 hours, and after a failure or Ctrl-C the machine is destroyed at once. `pnpm remote --status` lists the pool; `pnpm remote --drain` destroys the idle machines.
 - **Recovery.** Creation attempts are recorded before `nsc create`; machines carry pool-owner and attempt labels. A reaper starts before acquisition and reconciles the workspace every 30 seconds, as does each acquisition. Untracked pool machines get a five-minute grace period; live local owners and pending creates are protected. Machines labelled for another pool are left alone. Legacy `juno-remote=1` machines without an owner label are reconciled against this Mac's shared state. Failed destroys stay marked `destroying` and are retried. A failed workspace listing stops acquisition rather than treating usage as zero.
-- **Cap.** Machines in use and idle stay within `JUNO_REMOTE_MAX_VCPU` (default 64 vCPU, the Team plan's Linux limit: for example sixteen 4x8 machines, or about three typical `pnpm affected` runs at once). A run waits while the pool is full; after a minute it reports tracked and untracked workspace vCPU. An idle machine of another shape is destroyed to make room.
+- **Cap.** Machines in use and idle stay within `JUNO_REMOTE_MAX_VCPU` (default 24 vCPU since 10-16, to hold cost down; the Team plan allows 64). A run waits while the pool is full; after a minute it reports tracked and untracked workspace vCPU. An idle machine of another shape is destroyed to make room.
 - **Cost.** Namespace bills vCPU-minutes (about $0.001 each on the Team plan), whatever the shape, so a machine costs its vCPU count times the minutes it is up, idle or not. The cap bounds the spend at about $1 an hour with every machine busy. `--keep` leaves a machine available for `nsc ssh <id>` and tracked until its 3-hour expiry; it is neither reused nor drained.
 - **Setup.** `brew install namespacelabs/namespace/nsc` and `nsc login` once on the Mac. No credentials live in the repo.
 - **Timings** (2026-10-15, 16x32). Local times are with a free slot, before any queue wait. A new machine adds about 20 s to create and 45 s to pull the image; a warm one adds about 10 s.
@@ -716,3 +716,22 @@ strip `ELECTRON_RUN_AS_NODE` remain useful with the unmodified development
 Electron. Playwright's Electron launcher needs Node inspection and cannot drive
 the hardened package; the packaged smoke instead uses Chromium CDP. The
 `JUNO_E2E` fake-server seams remain available independently of the Node fuses.
+
+## StyleX token check
+
+`pnpm lint` runs `node scripts/check-tokens.mjs` over `packages/ui`,
+`packages/views` and the desktop renderer. It parses StyleX `create` calls,
+including aliased imports and nested conditions. Raw CSS colours, px/rem/em
+lengths (also inside templates and calc), and numeric length properties fail.
+Zero, percentages, unitless values, token references and 1px border/outline
+hairlines pass. Named component constants and runtime style parameters are
+not evaluated. For a real geometry exception, put `// tokens-allow: reason`
+after the declaration on the same line; an empty reason does not pass.
+Run the rule tests with `node --test scripts/check-tokens.test.mjs`.
+
+Measured on the shared Mac (2026-10-15), the token check alone took 0.36 s
+median (0.35–0.50 s, five successful runs including Node startup). Five
+alternating full lint runs with and without the check took 3.59 s
+(3.42–4.88 s) and 3.85 s (3.11–4.95 s) respectively. Other worktrees were
+active, so that full-lint difference is noise; budget about 0.36 s extra
+for parsing the StyleX source files, not a lint speedup.

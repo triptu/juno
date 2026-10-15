@@ -101,7 +101,7 @@ The eight scenes in `scenes.png`: morning, midday, evening, late night, Friday, 
 ## Performance
 
 - The scenes are inline SVG symbols in the bundle, about 4 KB for all eight. Nothing is fetched. The first paint has the scene, the greeting and the items; there is no loading state and no spinner.
-- The layout is fixed before data arrives: the scene box is 120 by 83, the greeting is one line, the items column has a fixed width and each row is 52px. A row that arrives late is not allowed. Home paints whole when `home.view` (a local query) answers, usually in the frame it mounts; until then, and on a first run until the first sync has finished, the page is blank, never "All caught up" too early. The items it showed stay until Home appears again.
+- The layout is fixed before data arrives: the scene box is 120 by 83, the greeting is one line, the items column has a fixed width and each row is 52px. A row that arrives late is not allowed. Home paints whole when `home.view` (a local query) answers. Opening it from a topic keeps the topic on screen while the local result arrives, for at most 150 ms, as All topics does. On first launch, or if that wait expires, Home stays blank until its result is ready and the first sync has finished; it never says "All caught up" too early. The items it showed stay until Home appears again.
 - The AI rewrite of an item's title is the only thing that can arrive after paint. It replaces the text of a one-line, ellipsised title, so the row height does not change.
 - No timers. The scene and greeting do not update on the minute.
 

@@ -76,7 +76,7 @@ const styles = stylex.create({
     flexGrow: 0,
     flexShrink: 1,
     minWidth: 0,
-    paddingInlineStart: `calc((${layout['--header-island-height']} - ${sizes['--control-28']}) / 2 - 1px + ${spacing['--space-0-5']})`,
+    paddingInlineStart: `calc((${layout['--header-island-height']} - ${sizes['--control-28']}) / 2 - 1px + ${spacing['--space-0-5']})`, // tokens-allow: Subtract the 1px island border from the inset.
   },
   right: {
     flexShrink: 0,

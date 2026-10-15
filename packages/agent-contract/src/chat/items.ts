@@ -173,7 +173,7 @@ export const Ending = Schema.Union([
   Schema.TaggedStruct('interrupted', { retry: Schema.optionalKey(OpId) }),
   Schema.TaggedStruct('blocked', { reason: Schema.Literals(['tooLarge', 'budget']) }),
   Schema.TaggedStruct('failed', {
-    reason: Schema.Literals(['provider', 'keyRejected', 'codexSignedOut', 'codexMissing', 'codexQuota', 'codexCrash', 'offline']),
+    reason: Schema.Literals(['provider', 'missingKey', 'rateLimited', 'keyRejected', 'codexSignedOut', 'codexMissing', 'codexQuota', 'codexCrash', 'offline']),
     retry: Schema.optionalKey(OpId),
   }),
 ])

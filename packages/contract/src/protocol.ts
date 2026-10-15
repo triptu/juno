@@ -56,6 +56,8 @@ export type OsNotification = typeof OsNotification.Type
 export const MainToEngine = Schema.Union([
   Schema.TaggedStruct('config', { config: EngineConfig }),
   Schema.TaggedStruct('port', {}),
+  /** The app window has painted; background provider warm-up may start. */
+  Schema.TaggedStruct('painted', {}),
   /** A port to the agent utility process, in `ports[0]`. The engine serves the AgentHost group on it (ADR 0012). */
   Schema.TaggedStruct('agentPort', {}),
   /** The answer to `requestSecrets`, `signIn` and `importFromSlackApp`: the stored or just captured session, or nothing. */

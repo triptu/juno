@@ -34,20 +34,20 @@ function answer(request: OpenRouterRequest): string | ToolCallAnswer {
   return echo(request)
 }
 
-const test = chat.extend<{ readonly t3: FakeT3; readonly model: FakeOpenRouter }>({
+const test = chat.extend<{ readonly t3: FakeT3; readonly model: FakeOpenRouter; readonly omitInterrupt: boolean }>({
+  omitInterrupt: [false, { option: true }],
   // oxlint-disable-next-line no-empty-pattern
   model: async ({}, use) => {
     const model = await startFakeOpenRouter({ answer })
     await use(model)
     await model.close()
   },
-  // oxlint-disable-next-line no-empty-pattern
-  t3: async ({}, use) => {
+  t3: async ({ omitInterrupt }, use) => {
     // pi-mcp has only an ESM entry and Playwright loads specs as CommonJS. The package root would
     // load the model fakes again as ESM beside the CommonJS copy `./chat` holds, and fail, so this
     // loads the T3 fake alone; it is not on `@juno/agent-testing/mcp`.
     const { startFakeT3 } = await import('../../../../packages/agent-testing/src/mcp/t3')
-    const server = await startFakeT3()
+    const server = await startFakeT3({ omitTools: omitInterrupt ? ['t3_thread_interrupt'] : [] })
     await use(server)
     await server.close()
   },
@@ -208,4 +208,19 @@ test('hostile Slack makes instructions to a running T3 job a card with a Because
   await expect(change).toHaveAttribute('data-card-status', 'open')
   expect(t3.calls.filter((call) => call.name === 't3_thread_send')).toHaveLength(0)
   await expect(change).toContainText('Because Juno read Slack or a report in this reply')
+})
+
+test.describe('when T3 Code cannot stop a task', () => {
+  test.use({ omitInterrupt: true })
+  test('keeps watching and shows the failure on the Task card', async ({ juno, t3 }) => {
+    await ready(juno)
+    await connectT3(juno, t3.loopbackUrl)
+    const { task, threadId } = await startTask(juno, t3)
+    await task.getByRole('button', { name: 'Stop' }).click()
+    await expect(task).toContainText('Could not stop the task. Open it in T3 Code.')
+    await expect(task.getByRole('button', { name: 'Open', exact: true })).toBeVisible()
+    t3.advance(threadId, { status: 'completed' })
+    await expect(task.locator('[data-task-phase]')).toHaveAttribute('data-task-phase', 'done', { timeout: POLL })
+    await expect(task).not.toContainText('Could not stop the task.')
+  })
 })

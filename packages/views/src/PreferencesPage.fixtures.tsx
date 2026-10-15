@@ -3,6 +3,8 @@ import { PreferencesPage, type PreferencesPageProps } from './PreferencesPage'
 
 const noop = () => {}
 const base: PreferencesPageProps = {
+  classifier: true,
+  onClassifierChange: noop,
   theme: 'system',
   accent: 'coral',
   density: 'comfortable',
@@ -28,6 +30,7 @@ export default defineFixtures(
   {
     Page: {
       default: fixture(base),
+      'classifier-off': fixture({ ...base, classifier: false }),
       ignored: fixture({ ...base, ignored }),
       'ignored-loading': fixture({ ...base, ignored: undefined }),
       'dark-teal-compact': fixture({ ...base, theme: 'dark', accent: 'teal', density: 'compact', peekKey: 'space' }),

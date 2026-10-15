@@ -1,12 +1,14 @@
 import type { ReactNode } from 'react'
 import { Bell } from '@phosphor-icons/react/dist/icons/Bell'
-import { Button, Page, PageHeader, Section, Surface, Text, type AccentName, type DensityName, type ThemePreference } from '@juno/ui'
+import { Button, Checkbox, Page, PageHeader, Section, Surface, Text, type AccentName, type DensityName, type ThemePreference } from '@juno/ui'
 import type { IgnoredChannel } from '@juno/contract'
 import { AppearanceSettings } from './AppearanceSettings'
 import { IgnoredChannels } from './IgnoredChannels'
 import { PeekKeySetting, type PeekKeyName } from './PeekKeySetting'
 
 export interface PreferencesPageProps {
+  readonly classifier: boolean
+  readonly onClassifierChange: (enabled: boolean) => void
   readonly about?: ReactNode
   readonly theme: ThemePreference
   readonly accent: AccentName
@@ -27,13 +29,18 @@ export interface PreferencesPageProps {
  * the ignore list, and the way to the notification settings. Anything Juno can do from the owner's words
  * belongs in the chat, not here.
  */
-export function PreferencesPage({ about, theme, accent, density, onThemeChange, onAccentChange, onDensityChange, peekKey, onPeekKeyChange, ignored, onStopIgnoring, onOpenNotifications }: PreferencesPageProps) {
+export function PreferencesPage({ classifier, onClassifierChange, about, theme, accent, density, onThemeChange, onAccentChange, onDensityChange, peekKey, onPeekKeyChange, ignored, onStopIgnoring, onOpenNotifications }: PreferencesPageProps) {
   return (
     <Page width="settings">
       <PageHeader title="Preferences" />
       <Section heading="Appearance">
         <Surface kind="group" padding="md">
           <AppearanceSettings theme={theme} accent={accent} density={density} onThemeChange={onThemeChange} onAccentChange={onAccentChange} onDensityChange={onDensityChange} />
+        </Surface>
+      </Section>
+      <Section heading="AI assist" sub="Use a fast model for decisions. Turn this off to use the decision chat model.">
+        <Surface kind="group" padding="md">
+          <Checkbox label="Use fast classifier" checked={classifier} onChange={(event) => onClassifierChange(event.currentTarget.checked)} />
         </Surface>
       </Section>
       <Section heading="Peek" sub="Hold the key over a topic in the sidebar to read it without marking it read.">
