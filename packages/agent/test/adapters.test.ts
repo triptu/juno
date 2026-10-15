@@ -8,6 +8,8 @@ import { createMcpManager, MCP_MIGRATIONS, T3, LITTLEBIRD, mcpExecutors, mcpTool
 import { parseObject } from '../src/mcp/catalogue'
 import { createT3Adapter } from '../src/t3'
 import { SONNET } from './turns-harness'
+import { openDatabase } from '../src/store/database'
+import { initialize } from '../src/store/store'
 
 const cleanup: Array<() => Promise<void>> = []
 afterEach(async () => { for (const close of cleanup.splice(0).toReversed()) await close() })
@@ -313,4 +315,37 @@ it('keeps every T3 tool off the read list a card, even if the owner made it Read
   await call('call_tool', { server: 't3', tool: fork.name, args: { threadId: 'thread-test' } })
   expect(server.calls.filter((c) => c.name === fork.name)).toHaveLength(0)
   expect(turns.actions.views().at(-1)?.card).toMatchObject({ _tag: 'change', status: { _tag: 'open' } })
+})
+
+it('drops read names a preset no longer lists, before and after discovery', async () => {
+  const lookup: FakeTool = { name: 'search_meetings', inputSchema: { type: 'object', properties: { term: str } }, call: () => json({ matches: [] }) }
+  const account: FakeTool = { name: 'get_account', inputSchema: { type: 'object', properties: {} }, call: () => json({}) }
+  const server = await startFakeMcpServer({ tools: [lookup, account] })
+  cleanup.push(server.close)
+  const dir = await mkdtemp(join(tmpdir(), 'juno-adapters-'))
+  cleanup.push(() => rm(dir, { recursive: true, force: true }))
+  const store = { db: openDatabase(join(dir, 'agent.sqlite'), [MCP_MIGRATIONS]), now: Date.now }
+  initialize(store)
+  cleanup.push(async () => { store.db.close() })
+  const credentials: Credentials = { oauth: () => ({ load: () => undefined, save: () => undefined }), bearer: async () => undefined, values: async () => [], clear: async () => undefined, openAuthorization: async () => undefined }
+  const preset = { ...LITTLEBIRD, url: server.url, auth: { kind: 'none' as const } }
+  // An older build stored guessed read names and discovered one of them.
+  const old = createMcpManager({ store, credentials, defaults: [{ ...preset, allowlist: ['search_meetings', 'get_account'] }] })
+  await old.connect('littlebird')
+  expect(old.tool('littlebird', 'search_meetings').tier).toBe(0)
+  await old.close()
+  // The current build lists no Littlebird reads.
+  const current = createMcpManager({ store, credentials, defaults: [preset] })
+  cleanup.push(() => current.close())
+  expect(current.stored('littlebird').config.allowlist).toEqual([])
+  expect(current.tool('littlebird', 'search_meetings').tier).toBe(3)
+  // A store that never discovered still holds the guess; first discovery must not use it.
+  const fresh = { db: openDatabase(join(dir, 'fresh.sqlite'), [MCP_MIGRATIONS]), now: Date.now }
+  initialize(fresh)
+  cleanup.push(async () => { fresh.db.close() })
+  await createMcpManager({ store: fresh, credentials, defaults: [{ ...preset, allowlist: ['get_account'] }] }).close()
+  const later = createMcpManager({ store: fresh, credentials, defaults: [preset] })
+  cleanup.push(() => later.close())
+  await later.connect('littlebird')
+  expect(later.tool('littlebird', 'get_account').tier).toBe(3)
 })

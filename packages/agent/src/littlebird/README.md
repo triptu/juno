@@ -11,8 +11,10 @@ There are no invented Littlebird tool aliases. The WP17 preset's guessed read
 names were removed. First connect starts with every tool Outward. The owner
 reviews the actual read tools in Connections and selects Read for their
 current schema hashes. Later schema changes drop those decisions to Outward.
-A read-only annotation is a hint, never authority. Existing installations
-retain their saved owner configuration; review old preset entries too.
+A read-only annotation is a hint, never authority. A preset's read list
+comes from the code at every start, not from the stored row, so an older
+build's guessed names are cleared, and a tool they made Read is Outward again
+until the owner reviews it.
 
 The plan asks for a default read list matched to published names, but S8 did
 not authenticate and no published names were verified. Until the owner
