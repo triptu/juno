@@ -306,6 +306,9 @@ function labelOf(origin: Origin, jobs: ReadonlyArray<Job>): string {
     }
     case 'schedule':
       return `Scheduled · ${origin.name}`
+    // Added with the summary origin; the reference never lists summaries.
+    case 'summary':
+      return 'Summary'
     case 'owner':
       return ''
   }

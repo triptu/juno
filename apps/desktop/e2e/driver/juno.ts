@@ -496,6 +496,15 @@ export class PreferencesPage {
   densityRadio(name: 'Comfortable' | 'Compact') {
     return this.root.getByRole('radio', { name })
   }
+
+  /** One ignored channel's row on the ignore list (inventory 14), by name without "#". */
+  ignored(name: string): Locator {
+    return this.root.locator('[data-ignored-channel]').filter({ hasText: name })
+  }
+
+  async stopIgnoring(name: string): Promise<void> {
+    await this.ignored(name).getByRole('button', { name: `Stop ignoring ${name}` }).click()
+  }
 }
 
 /** The Notifications page (inventory 13). */

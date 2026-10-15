@@ -11,16 +11,27 @@ const base: PreferencesPageProps = {
   onDensityChange: noop,
   peekKey: 'option',
   onPeekKeyChange: noop,
+  ignored: [],
+  onStopIgnoring: noop,
   onOpenNotifications: noop,
 }
+
+const ignored: PreferencesPageProps['ignored'] = [
+  { id: 'C1', name: 'deploys', kind: 'public', hidden: 3 },
+  { id: 'C2', name: 'alerts-prod', kind: 'public', hidden: 1000 },
+  { id: 'C3', name: 'oncall-pages', kind: 'private', hidden: 1 },
+  { id: 'C4', name: 'ci-builds', kind: 'public', hidden: 0 },
+]
 
 export default defineFixtures(
   PreferencesPage,
   {
     Page: {
       default: fixture(base),
+      ignored: fixture({ ...base, ignored }),
+      'ignored-loading': fixture({ ...base, ignored: undefined }),
       'dark-teal-compact': fixture({ ...base, theme: 'dark', accent: 'teal', density: 'compact', peekKey: 'space' }),
     },
   },
-  { width: 900, height: 600 },
+  { width: 900, height: 900 },
 )

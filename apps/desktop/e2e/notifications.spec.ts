@@ -1,14 +1,18 @@
 /**
  * Notifications from the owner's side (SPEC 14): Notify me on a channel,
- * thread or person, the OS notification and its click, why a message did
- * or did not notify, the Notifications page and Preferences, and Set
- * yourself away or active. Main records OS notifications instead of
+ * thread or person, the OS notification and its click (also on a topic
+ * already open in a tab), why a message did or did not notify, the
+ * Notifications page, Preferences and its ignore list, and Set yourself
+ * away or active. Main records OS notifications instead of
  * showing them (`junoTest.notifications`).
  */
+import { seedWorkspace, startFakeSlack, topic300Seed } from '@juno/fake-slack'
 import { expect, test } from './fixtures'
+import { watchFlashes } from './driver/flashes'
 
 const ALERTS_MAIN = '#alerts-prod'
 const RINA = 'Rina finished the onsite.'
+const LONG_THREAD = 'Review the rollout checklist 1.'
 
 test('Notify me on a channel lists it on the page, and removing it there has Undo', async ({ juno }) => {
   await juno.signIn()
@@ -151,4 +155,70 @@ test('Set yourself away and active from the avatar menu sets Slack presence', as
   slack.resetCalls()
   await juno.accountMenu.item(startsActive ? 'Set yourself active' : 'Set yourself away').click()
   await slack.expectPresenceSet(startsActive ? 'auto' : 'away')
+})
+
+test('Preferences lists an ignored channel, and Stop ignoring has Undo', async ({ juno }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  await juno.openPreferences()
+  const preferences = juno.preferences
+  await expect(preferences.root.getByText('Nothing ignored.')).toBeVisible()
+
+  await juno.sidebar.selectView('Automated')
+  await juno.sidebar.row(ALERTS_MAIN).chooseInMenu('ignore-channel')
+  await juno.expectToast('Ignoring #alerts-prod')
+  await juno.tabs.select('Preferences')
+  await expect(preferences.ignored('alerts-prod')).toContainText('Nothing hidden yet')
+
+  await preferences.stopIgnoring('alerts-prod')
+  await juno.expectToast('Stopped ignoring #alerts-prod')
+  await expect(preferences.root.getByText('Nothing ignored.')).toBeVisible()
+  await juno.undoFromToast()
+  await expect(preferences.ignored('alerts-prod')).toBeVisible()
+  await expect(preferences.root.getByText('Nothing ignored.')).toHaveCount(0)
+})
+
+const longThread = test.extend({
+  // oxlint-disable-next-line no-empty-pattern
+  fake: async ({}, use) => {
+    const fake = await startFakeSlack({
+      seed: (workspace, avatars) => {
+        seedWorkspace(workspace, avatars)
+        topic300Seed()(workspace, avatars)
+      },
+    })
+    await use(fake)
+    await fake.close()
+  },
+})
+
+longThread('a notification for a topic open in another tab focuses it, scrolls to the message and flashes it', async ({ juno, slack }) => {
+  longThread.setTimeout(90_000)
+  await juno.signIn()
+  await juno.waitForSync()
+  const thread = juno.sidebar.row(LONG_THREAD)
+  await thread.chooseInMenu('notify-every')
+  await juno.expectToast(': Every message')
+  await thread.open()
+  await juno.topic.expectAtBottom()
+  await juno.topic.scrollToTop()
+  await juno.sidebar.row(RINA).openInNewTab()
+  await juno.tabs.expectActive('Rina finished the onsite')
+  const flashes = await watchFlashes(juno.win)
+
+  slack.as('Leo').replyIn(LONG_THREAD, 'Cutover is a go')
+  await expect.poll(async () => (await juno.osNotifications()).map((notification) => notification.body), { timeout: 15_000 }).toContain('Cutover is a go')
+  const shown = (await juno.osNotifications()).findIndex((notification) => notification.body === 'Cutover is a go')
+  await juno.clickOsNotification(shown)
+
+  await juno.tabs.expectActive('Review the rollout checklist 1')
+  const reply = juno.topic.message('Cutover is a go')
+  await expect(reply).toBeInViewport({ ratio: 1 })
+  await expect.poll(flashes).toContainEqual(expect.stringContaining('Cutover is a go'))
+  // Back to the other tab and here again: the request was taken once, so nothing flashes again.
+  const before = (await flashes()).length
+  await juno.tabs.select('Rina finished the onsite')
+  await juno.tabs.select('Review the rollout checklist 1')
+  await juno.win.waitForTimeout(500)
+  expect(await flashes()).toHaveLength(before)
 })

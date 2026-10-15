@@ -4,11 +4,13 @@
  * - the Juno tab, a page like Home, one tab for the one chat;
  * - the Juno panel beside a topic tab, open or closed for every topic tab;
  * - Ask Juno in a person's or channel's menu, which opens the panel (or the
- *   tab when no topic tab is active) with an About chip.
+ *   tab when no topic tab is active) with an About chip;
+ * - Tell Juno in the why popover, which opens the panel the same way with
+ *   the message quoted.
  *
  * Each of these asks the composer it brings on screen for focus.
  */
-import type { About } from '@juno/agent-contract'
+import type { About, Selection } from '@juno/agent-contract'
 import {
   activeTab,
   currentPlace,
@@ -16,8 +18,10 @@ import {
   junoAboutAtom,
   junoAvailableAtom,
   junoPanelOpenAtom,
+  quoteInJuno,
   registry,
   setJunoPanelOpen,
+  showInJunoChat,
   tabsAtom,
 } from '@juno/state'
 import { chatActions, junoPageActions } from '@juno/state/agent'
@@ -80,6 +84,20 @@ export function runJunoShortcut(): void {
 /** Ask Juno in a person's or channel's menu (SPEC 7, plan v3 §19.3). */
 export function askJunoAbout(about: Exclude<About, { _tag: 'topic' }>): void {
   registry.set(junoAboutAtom, about)
+  if (topicTabActive()) openPanel()
+  else openJunoTab()
+}
+
+/** The hours-start summary's notification (SPEC 14): the Juno tab, at the summary's message, which flashes. */
+export function openJunoAt(messageId: string): void {
+  showInJunoChat(registry, messageId)
+  openJuno()
+}
+
+/** Tell Juno in the why popover (SPEC 14, inventory 15.4): the chat beside the topic, with the message quoted in its composer. */
+export function tellJunoAbout(topicId: string, quote: Selection | undefined): void {
+  registry.set(junoAboutAtom, undefined)
+  if (quote !== undefined) quoteInJuno(registry, topicId, quote)
   if (topicTabActive()) openPanel()
   else openJunoTab()
 }
