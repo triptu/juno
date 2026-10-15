@@ -662,6 +662,9 @@ export const layout = stylex.defineVars({
   '--sidebar-min-width': '280px',
   '--sidebar-max-width': '480px',
   '--sidebar-resize-hit': '6px',
+  // The sidebar's inset on both sides: the title bar's end, the nav, the filter row and the rows. The list's
+  // scrollbar gutter sits inside it on the right, so the rows' right edge matches their left.
+  '--sidebar-inset': '10px',
   '--titlebar-height': '44px',
   // Kept free for the traffic lights at the start of the sidebar bar, or of
   // the tab strip while the sidebar is hidden.
@@ -723,6 +726,10 @@ export const layout = stylex.defineVars({
   '--menu-width-mention': '280px',
   // The New chat pickers' lists.
   '--menu-width-picker': '340px',
+  // A sidebar view's name pill (inventory 2.3): longer names end with an ellipsis.
+  '--filter-pill-max-width': '120px',
+  // The view sheet's conversation list (inventory 2.3), which scrolls past this.
+  '--view-sheet-list-max-height': '200px',
   // The peek popover beside the sidebar; never wider than the room left of the window.
   '--peek-width': '480px',
   // Never taller than the window below a title-bar anchor, so a menu fits
@@ -760,10 +767,11 @@ export const sizes = stylex.defineVars({
   '--row-44': '44px',
   '--row-48': '48px',
   '--row-52': '52px',
-  // The contain-intrinsic-size estimate for off-screen sidebar rows. It sizes
-  // the content box, so it is the row's measured height without its 11px
-  // block padding: 85px for a two-line preview (the row is 107px).
-  '--row-topic-estimate': '85px',
+  // A sidebar row's content box: three lines (title, one-line preview, meta),
+  // rounded up to a whole pixel. The row is this plus its block padding (88px
+  // in Comfortable) whatever it shows, so the off-screen estimate
+  // (contain-intrinsic-size) is exact and rows never land on a fraction.
+  '--row-topic-estimate': '66px',
   // The same estimate for off-screen message rows: one line of body under a
   // name, without the row's block padding (performance.md 3.3).
   '--row-message-estimate': '56px',

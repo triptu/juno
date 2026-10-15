@@ -36,6 +36,8 @@ Conventions that apply everywhere (SPEC §16):
 
 **Shows:** S01 (whole sidebar; its Browse and Theme icons and For you item are removed), S02 (row context menu), shot 30-avatar-menu, shot 33-scope-chip.
 
+**One inset** (`--sidebar-inset`, 10px) on both sides of everything that spans the sidebar: the title bar's end, the nav items, the filter row and the topic rows, measured from the sidebar's content box (inside its right border). The list's 10px scrollbar gutter is part of the right inset, so the 4px thumb sits inside the margin and reserves no extra width; a row is 10px from either edge with a scrollbar or without one. The gallery's `geometry.spec.ts` checks this to the pixel. Before 10-15 the rows sat 8px from the left and 18px from the right.
+
 ### 2.1 Title bar icons
 
 Right-aligned group, gap 2px, inside the 44px bar.
@@ -66,7 +68,7 @@ Style: transparent, colour `--foreground-subtle`, hover `--surface-hover`, press
 
 ### 2.2 Navigation
 
-Container padding `4 10 0`, gap 2. Three full-width buttons, none with a count, 32px, radius 7, padding 0 10, gap 10, 13/500, icon 15 `--foreground-subtle`:
+Container padding `4 10 0` (`--sidebar-inset`), gap 2. Three full-width buttons, none with a count, 32px, radius 7, padding 0 10, gap 10, 13/500, icon 15 `--foreground-subtle`:
 
 | Label | Icon | Trailing | Active when |
 | --- | --- | --- | --- |
@@ -78,12 +80,28 @@ Hover `--surface-hover`. ⌘-click opens in a new tab.
 
 Hairline below: 1px `--border-default`, margin `12 16 10`.
 
-### 2.3 Quick filters
+### 2.3 Quick filters and views
 
-Row padding `0 10 10`, gap 2. Buttons 28px, radius 7, padding 0 10, 13px.
+Row padding `0 10 10`, height 28, never taller. Two parts: a horizontal scroller (flex 1, min-width 0) with the pills, gap 2, and the **Unread** toggle fixed at the right, 6px after the scroller. `docs/design/sidebar-views/` has the mock.
 
-- Left: **All · Channels · DMs** (segmented by state, not a visible control). Selected: weight 600, bg `--secondary-default`, fg default. Unselected: weight 500, transparent, fg muted; hover fg default. A 5px dot in `--hl` after "Channels" or "DMs" when that group has unread topics in the sidebar and the group is not selected. DMs include group DMs. Picking Channels/DMs clears a scope of the other kind.
-- Right: **Unread** toggle, weight 500. On: bg `--secondary-default`, fg default. No count, no dot. Accessible name "Show unread only".
+- **The scroller** (`PillRow` in `@juno/ui`): `overflow-x: auto`, no visible scrollbar, `overscroll-behavior: contain` (a sideways swipe at an end never reaches Back or Forward, a wheel never reaches the list). A vertical wheel over it scrolls it sideways. When it overflows, the side it can scroll toward fades over 16px (`--space-4`): a sticky gradient in `--background-subtle` at each end, shown by a `scroll-state` container query, so no script watches the scroll. Keyboard focus scrolls the focused pill into view.
+- **Pills**, 28px, radius 8 (`Button variant="filter"`): selected bg `--secondary-default`, fg default; unselected transparent, fg muted, hover fg default. Weight 500 in both, so selecting never changes a width.
+  - **All**: text.
+  - **Channels** (`hash` 14) and **DMs** (`user` 14): icon-only, 28×28. Tooltip and accessible name "Channels" and "DMs".
+  - **A view**: its icon 14 in a 28×28 pill when it has one (tooltip and name are the view's name), otherwise its name as text, at most 120px (`--filter-pill-max-width`) with an ellipsis.
+  - **New view**: `plus` 14, 28×28, fg muted, tooltip and name "New view". Always last.
+- **Dot**: 5px `--hl` at the pill's top right (4px in from the top and right edge), absolute so it moves nothing; only its opacity changes. Channels and DMs: the group has unread topics the sidebar would show. A view: one of its topics has an unread mention (plain unread does not count). Never on the selected pill. The name says it: "Channels, unread", "Bots, unread mention".
+- **Picking**: on pointer down, like the rows. Picking a view clears the scope chip. A view's list follows the same rules as All, limited to its conversations; Unread narrows it as it does All.
+- **Right-click a view pill** (native menu, §15.7): Edit view… · Move left · Move right · — · Delete view. Dragging a pill along the row reorders it (a 2px `--hl` caret shows where it lands); All, Channels, DMs and New view do not move.
+
+**View sheet** (`ViewSheet` in `@juno/views`): a popover dialog anchored under the filter row, start-aligned, 300px (`--menu-width-browse`), padding 14, radius 13, `--pop-shadow`, gap 12. Opens from New view, Edit view… and New view… in Add to view. Four fields, nothing else:
+
+1. **Name**: text field, 30px, placeholder "Name", at most 32 characters. Required.
+2. **Icon**: "Icon" 11/500 muted, then a grid of 24px icon buttons (8 per row, gap 2) from the view icon set, the first cell "None" (`prohibit`). Selected: bg `--secondary-default`, fg default. Optional.
+3. **Conversations**: a search field (30px, `magnifying-glass` 14, placeholder "Add channels and people") over a list, at most 200px tall (`--view-sheet-list-max-height`), scrolling. Chosen conversations first, each a 30px row with its channel icon or photo, name, and a check; then, while the field has text, matches from the New chat picker (`newChat.conversations`, channels, group DMs and DMs that exist). Clicking a row toggles it. "3 conversations" 12 muted under the list.
+4. **Keep these out of All**: a checkbox (`Checkbox`, as macOS sheets use), 13px, with "They show only in this view." 12 muted under it.
+
+Buttons at the bottom right: Cancel (ghost) and Save (primary), 28px; Save disabled until there is a name. Enter saves from the name field; Esc cancels. Saving a new view selects it. The sheet makes no change until Save.
 
 ### 2.4 Scope chip
 
@@ -117,14 +135,14 @@ Centered, padding `48 16`, gap 8: title 14/500, body 13 muted lh 1.5, button 30p
 
 ```
 [tile 44]  [line 1: title ........................ time | Resolve]  height 22
-           [line 2: Sender: preview, 2 lines .....  @ | count ]
+           [line 2: Sender: preview, 1 line …........  @ | count ]
            [line 3: ⌗ channel   ○○○   ▢ 7   ]              margin-top 3
 ```
 
-- Container: `role="listitem"` in a `role="list"`, `tabindex` (roving), named by the title (`aria-labelledby`), `aria-current` when selected; Enter and Space open it. Not a button: a button's children are presentational, which would hide the Resolve button inside. Flex, gap 12, align start, padding `11 12`, radius 10, transparent. Hover `--surface-hover`. Selected (open in the active tab) `--secondary-default`.
+- Container: `role="listitem"` in a `role="list"`, `tabindex` (roving), named by the title (`aria-labelledby`), `aria-current` when selected; Enter and Space open it. Not a button: a button's children are presentational, which would hide the Resolve button inside. Flex, gap 12, align start, padding `11 12`, a fixed height of 88px (80 compact: `--density-row-estimate` plus the padding), radius 10, transparent. Hover `--surface-hover`. Selected (open in the active tab) `--secondary-default`.
 - Tile: 44×44 (36 compact). Channel: first letter uppercase, 14/600, bg `--secondary-default`, fg subtle, radius 10. DM: person avatar, round, person colours (tokens §1.6). Group DM: first initials of each member ("ML").
 - Line 1 (22px box, gap 6): title 14.5px (13.5 compact), weight 500 (600 unread), letter-spacing 0, single line ellipsis, `flex: 0 1 auto` so the icons stay visible. Then `bell-slash` 13 muted on a thread set to Never that shows because it mentions you. Spacer. Then time 12px tabular, muted (subtle when unread).
-- Line 2 (gap 8): preview 13px lh 1.45, muted (subtle when unread), `-webkit-line-clamp` 2, `text-wrap: pretty`. Text is "Sender: text" with "You:" for own messages and ">" quote lines stripped. Right column (gap 4, padding-top 1):
+- Line 2 (gap 8): preview 13px lh 1.45, muted (subtle when unread), one line with an ellipsis (`Text truncate`; the full text is the tooltip while it is cut off). Text is "Sender: text" with "You:" for own messages and ">" quote lines stripped. Right column (gap 4, padding-top 1):
   - **@ tag** when the latest unread run mentions you: 18px, min-width 18, radius 6, bg `--hl-soft`, inset 1px ring `--border-strong`, "@" 11/500 subtle, title "Mentions you".
   - **count tag** = unread count: 18px, min-width 18, padding 0 5, radius 6, 11/500 tabular; unread row bg `--secondary-active` fg subtle; otherwise `--secondary-default` fg muted. Hidden at 0.
 - Line 3 (12px muted, gap 12, margin-top 3): channel icon 12 + name (no "#"), on Main rows too (the prototype's "Messages outside threads" label is gone). Then the avatar stack (18px circles, −4 overlap, 1.5px `--background-subtle` ring, initials 7.5/600, up to 4 participants), on every row. Then optional tags in order (gap 6):
@@ -152,10 +170,12 @@ Centered, padding `48 16`, gap 8: title 14/500, body 13 muted lh 1.5, button 30p
 
 ### 3.3 Density (Preferences › Appearance)
 
-| Density | Vertical padding | Line gap | Title | Tile | Row height (1 / 2 preview lines) |
+| Density | Vertical padding | Line gap | Title | Tile | Row height |
 | --- | --- | --- | --- | --- | --- |
-| Comfortable (default; the prototype's "balanced") | 11 | 3 | 14.5 | 44 | 90 / 109 |
-| Compact | 8 | 1 | 13.5 | 36 | 80 / 99 |
+| Comfortable (default; the prototype's "balanced") | 11 | 2 | 14.5 | 44 | 88 |
+| Compact | 8 | 0 | 14.5 | 36 | 80 |
+
+The preview is one line in both, so the row height is fixed (measured 10-15: 87.56 and 79.56px, rounded up to whole pixels; before, 107px with a two-line preview).
 
 Density also changes the message list (§6.1). The prototype's "airy" level is gone.
 
@@ -237,7 +257,7 @@ Keyboard order inside the header: context pill → title button → Resolve or T
 
 **Shows:** S01 (flat, new divider, quote, mentions, reaction; its catch-up card is removed), S04 (thread link; its grouping card is removed), S14 (mention tint), S15 (dark), shot 07, 08 (hover toolbar, picker), shot 15 (selection quote), shot 19 (settled hint).
 
-Scroll container `[data-scroll]` with contained scroll; inner column max-width 800, centered, padding `20 24 16`.
+Scroll container `[data-scroll]` with contained scroll; inner column max-width 800, centered, padding `20 24 16`. The container mirrors its 10px scrollbar gutter on the left (`ScrollArea evenInset`), so the column is centred in the pane, not 5px left of it (`geometry.spec.ts`).
 
 ### 6.1 Flat messages
 
@@ -411,6 +431,8 @@ A tab with the message list's area on top and the composer at the bottom, like a
 
 **Shows:** S11 (empty), `docs/design/juno-chat/mock.html` (bubbles, status bubble, cards, states; renders `mock-light.png`, `mock-dark.png`). SPEC §13 decides behaviour; the view models are `@juno/agent-contract` `src/chat/`.
 
+The chat's scroll container mirrors its scrollbar gutter on the left, as the message list does, so the column is centred in the pane.
+
 One long list, no "new chat". Scroll container under the header islands (§5); column max-width `--page-width` 720, padding `40 32 24` below the `--header-inset`. The list is virtualised (`@tanstack/react-virtual`); it opens at the "New" divider when there are unread Juno messages, otherwise at the bottom, and shows the "New message" pill (§6) when scrolled up and something arrives. Row kinds are the `ChatItem` union: owner bubble, Juno bubble, status bubble, note, group label, day separator, New divider.
 
 - **Empty state** (padding-top 40, gap 18): `juno` illustration 40 (`--illustration-figure`) · "What do you need?" `--text-display` serif 38 · body 14 lh 1.6 subtle max-width 520: "Ask me to find, summarize, catch you up or tidy up. I can read your topics and propose messages, but nothing is sent until you press Send." · four suggestion pills (wrap, gap 8): 34px, padding 0 12, 1px `--border-strong`, `--radius-pill`, bg surface, 13px: "Catch me up on today", "Summarize this topic", "Draft a reply in this topic", "Anything settled I can resolve?" (`chatCopy.empty.suggestions`). Clicking sends the text. Staggered entrance per friendly-layer §5.
@@ -539,6 +561,7 @@ Native menus **[spec]**. Prototype rendering for reference: 236px, padding 5, ra
 | Copy Slack link | `link` | | always | |
 | Open in Slack | `arrow-square-out` | | always | opens the Slack app at the topic (`slack://` deep link, falling back to the web permalink) |
 | Notify me | `bell` | current level | always | submenu §15.3: for a thread, the thread's own choice (Every message and When it matters follow it in Slack, Never unfollows it; SPEC §5); for Main, the channel's or DM's. [built M10] Through `notifications.setLevel`: on a thread the engine follows or unfollows it and keeps Every message as its level; on Main it sets the channel's or DM's level |
+| Add to view | `stack` | | Main only | submenu §15.8 for the row's channel or DM |
 | Ignore #product | `ban` | | channel is not a DM | toast "Ignoring #product" with Undo |
 
 [built] The row and the header's title show this menu, and every item works (M5). Rename from the row edits the row's title (§3.2), from the header the header's title (§5). Each action shows its toast with Undo (§16). The hints are not drawn, since a native menu has only a shortcut column.
@@ -554,6 +577,7 @@ Native menus **[spec]**. Prototype rendering for reference: 236px, padding 5, ra
 | Mark channel as unread | `circle-dot` | | always (marks the latest topic unread) |
 | — | | | |
 | Notify me | `bell` | | always (submenu §15.3) |
+| Add to view | `stack` | | always (submenu §15.8) |
 | Ignore channel | `ban` | Hide in Juno | not DM |
 | — | | | |
 | Ask Juno | `sparkle` | | AI assist on (opens the Juno panel with an "About #eng" chip, §12.1) |
@@ -584,6 +608,14 @@ Right-click a sender's name or avatar in a message, or an @person chip. Notify m
 
 [built M10, WP14] On a sender's name or avatar (`data-sender` in `Message`), not on your own, and on an @person chip: Notify me about Maya, then Ask Juno while the Juno Agent runs (`notifyActions.showPersonMenu`).
 
+### 15.7 View pill menu
+
+Right-click a view's pill (§2.3). Edit view… (opens the view sheet) · Move left (disabled on the first view) · Move right (disabled on the last) · — · Delete view. Delete shows the toast "Deleted view · Bots" with Undo, which puts the view back with its conversations, icon, switch and place. All, Channels, DMs and New view have no menu.
+
+### 15.8 Add to view submenu
+
+Shown from 15.1 (Main rows) and 15.2. One item per view, in pill order, with a check on the views that hold the conversation; choosing an unchecked view adds it ("Added #alerts-prod to Bots"), a checked one removes it ("Removed #alerts-prod from Bots"), each with Undo. Then a separator and **New view…**, which opens the sheet with the conversation already chosen. With no views, the submenu holds New view… alone.
+
 ## 16. Toasts
 
 **Shows:** shot 18-toast-undo.
@@ -591,7 +623,7 @@ Right-click a sender's name or avatar in a message, or an @person chip. Notify m
 - Position: bottom-left, left 16, bottom 16, z 45, max-width 352. Padding `8 8 8 14`, radius 10, bg `--foreground-default`, text `--background`, `--shadow-lg`, 13px, gap 12. Text ellipsis on one line.
 - Undo button (reversible actions only): 26px, padding 0 8, radius 6, bg `color-mix(var(--background) 16%, transparent)`, "Undo" 12.5/600 + "⌘Z" mono 11 at .75 opacity.
 - One toast at a time; a new one replaces the old. Auto-dismiss 5s (with Undo) or 4s (info). No enter/exit animation in the prototype; [proposed] 150ms fade is acceptable.
-- Undo stack holds 20 actions; ⌘Z pops the last one (resolve, reopen, pin, unpin, rename, redraw, mark read or unread, Notify me change, ignore, routed post, command send, Resolve all on Home) when focus is not in a non-empty input.
+- Undo stack holds 20 actions; ⌘Z pops the last one (resolve, reopen, pin, unpin, rename, redraw, mark read or unread, Notify me change, ignore, routed post, command send, Resolve all on Home, delete view, add to or remove from a view) when focus is not in a non-empty input.
 - [built M5] `ActionToast` in `@juno/views`, mounted once by the shell over both panes, with the `Toast` rise. The undo stack and the toast are `undoStackAtom` and `toastAtom` in `@juno/state`; an action that changed nothing shows no toast. No exit fade yet.
 
 | Copy | Undo |
@@ -609,6 +641,8 @@ Right-click a sender's name or avatar in a message, or an @person chip. Notify m
 | Resolved 3 topics (Home's Tidy up) | yes |
 | Draft closed (a New chat closed with a draft) | yes |
 | Follow-up done | no |
+| Deleted view · Bots | yes |
+| Added #alerts-prod to Bots / Removed #alerts-prod from Bots | yes |
 
 ## 17. Empty states
 
@@ -637,7 +671,7 @@ Right-click a sender's name or avatar in a message, or an @person chip. Notify m
 
 ## 19. Preferences that change the look
 
-Stored as user preferences. Nothing else from the prototype's design panel (`data-props`) survives: `rowStyle`, `previewLines`, `showAvatars`, `grouping`, `quietDays` and `messageStyle` are removed, with their variants.
+Stored as user preferences. Nothing else from the prototype's design panel (`data-props`) survives: `rowStyle`, `showAvatars`, `grouping`, `quietDays` and `messageStyle` are removed, with their variants.
 
 | Preference | Options | Default | Affects |
 | --- | --- | --- | --- |

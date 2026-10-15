@@ -18,6 +18,7 @@ export const keys = {
   aiCache: ['ai_cache'] satisfies InvalidationKeys,
   topicVisits: ['topic_visits'] satisfies InvalidationKeys,
   followUps: ['follow_ups'] satisfies InvalidationKeys,
+  sidebarViews: ['sidebar_views'] satisfies InvalidationKeys,
   syncedRanges: (channel: string) => ({ synced_ranges: [channel] }) satisfies InvalidationKeys,
   messages: (channel: string) => ({ messages: [channel] }) satisfies InvalidationKeys,
 }

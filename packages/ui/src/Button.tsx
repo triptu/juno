@@ -118,6 +118,7 @@ export function Button({
         variantStyles[variant],
         (variant === 'ghost' || variant === 'outline') && tones[tone],
         pressed && pressedStyles[variant],
+        filter && (children === undefined || children === null) && styles.filterSquare,
         dimmed && interactive.dimmed,
         disabled && interactive.dimmed,
       )}
@@ -142,6 +143,11 @@ const styles = stylex.create({
     borderStyle: 'solid',
     borderColor: 'transparent',
     verticalAlign: 'middle',
+  },
+  // An icon-only filter pill (Channels, DMs, a view with an icon) is square.
+  filterSquare: {
+    width: sizes['--control-28'],
+    paddingInline: 0,
   },
   weightMedium: {
     fontWeight: weights['--weight-medium'],
@@ -212,6 +218,8 @@ const variantStyles = stylex.create({
     boxShadow: shadows['--shadow-sm'],
   },
   filter: {
+    // Inside a `FilterPill` a name longer than the pill's width ends with an ellipsis.
+    maxWidth: '100%',
     color: {
       default: colors['--foreground-muted'],
       ':hover': { default: null, [HOVER]: colors['--foreground-default'] },

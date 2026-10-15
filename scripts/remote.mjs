@@ -1,6 +1,6 @@
 // Runs a root test script on a Namespace Linux machine and streams its output.
 //
-//   pnpm remote [--dry-run] [--machine linux/amd64:16x32] [--keep] [--env KEY=VALUE] <script> [args...]
+//   pnpm remote [--dry-run] [--machine linux/amd64:4x8] [--keep] [--env KEY=VALUE] <script> [args...]
 //   pnpm remote test
 //   pnpm remote specs:check --memory
 //   pnpm remote --shards 2 specs:check     one script split across machines
@@ -33,6 +33,24 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
 /** Scripts that give the same result on Linux. feel and perf time the Mac and stay local. */
 const remoteScripts = ['typecheck', 'lint', 'test', 'specs:check', 'specs:traces', 'test:agent', 'test:agent-contracts', 'test:agent-testing', 'test:gallery', 'test:desktop', 'test:e2e']
+/**
+ * The smallest shape that keeps each script within about three minutes,
+ * measured on 2026-10-15 (docs/development.md, "Machine shapes"). Namespace bills
+ * vCPU-minutes, so a bigger machine only pays when the script keeps it busy.
+ */
+const remoteShapes = {
+  typecheck: '2x4',
+  lint: '2x4',
+  test: '4x8',
+  'test:agent': '2x4',
+  'test:agent-contracts': '2x4',
+  'test:agent-testing': '2x4',
+  'test:gallery': '4x8',
+  'test:desktop': '8x16',
+  'test:e2e': '8x16',
+  'specs:check': '8x16',
+  'specs:traces': '8x16',
+}
 const localOnly = { perf: 'timing', 'test:feel': 'timing', 'gallery:shots': 'the Mac look' }
 
 function parse(argv) {
@@ -50,9 +68,7 @@ function parse(argv) {
   if (!script) throw new Error('usage: pnpm remote [--dry-run] [--machine linux/amd64:8x16] [--keep] <script> [args...]')
   if (localOnly[script]) throw new Error(`${script} measures ${localOnly[script]} and runs only on the Mac. Run pnpm ${script} locally.`)
   if (!remoteScripts.includes(script)) throw new Error(`${script} is not set up for remote runs. Remote scripts: ${remoteScripts.join(', ')}`)
-  // One shape for every script, so any warm machine fits any run. Spec checks,
-  // the gallery and e2e fill 16 cores; the engine tests use the extra workers.
-  options.machine ??= 'linux/amd64:16x32'
+  options.machine ??= process.env.JUNO_REMOTE_MACHINE ?? `linux/amd64:${remoteShapes[script] ?? '4x8'}`
   return { ...options, script, args }
 }
 

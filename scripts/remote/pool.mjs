@@ -5,8 +5,10 @@
 //
 // - A machine runs one job at a time. A run claims it by creating its lock
 //   directory, which only one process can do.
-// - After a clean run the machine goes back to the pool. A detached reaper
-//   destroys it once it has been idle for JUNO_REMOTE_IDLE_MINUTES (default 10).
+// - After a clean run the machine goes back to the pool, unless the pool already
+//   has JUNO_REMOTE_IDLE_PER_SHAPE (default 2) idle machines of its shape. A
+//   detached reaper destroys it once it has been idle for
+//   JUNO_REMOTE_IDLE_MINUTES (default 5).
 //   Each machine also ends on its own after its Namespace duration (3 hours),
 //   and is not handed out in its last 30 minutes.
 // - Machines in use and idle together stay within JUNO_REMOTE_MAX_VCPU (default
@@ -19,7 +21,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 const dir = join(tmpdir(), 'juno-remote-pool')
-const idleMs = Number(process.env.JUNO_REMOTE_IDLE_MINUTES ?? 10) * 60_000
+const idleMs = Number(process.env.JUNO_REMOTE_IDLE_MINUTES ?? 5) * 60_000
+const idlePerShape = Number(process.env.JUNO_REMOTE_IDLE_PER_SHAPE ?? 2)
 const maxVcpu = Number(process.env.JUNO_REMOTE_MAX_VCPU ?? 64)
 const lifetime = '3h'
 const lifetimeMs = 3 * 60 * 60_000
@@ -150,6 +153,12 @@ async function decideOnce(machine, create) {
 export function release(id, image, reaper) {
   const state = read(id)
   if (!state) return
+  // Keep only a few idle machines of each shape; the rest cost money for nothing.
+  const idle = machines().filter((other) => other.id !== id && other.machine === state.machine && lockOwner(other.id) === undefined)
+  if (idle.length >= idlePerShape) {
+    destroy(id)
+    return
+  }
   write({ ...state, lastUsed: Date.now(), images: [...new Set([...(state.images ?? []), image])] })
   rmSync(lockPath(id), { recursive: true, force: true })
   const pidFile = join(dir, `${id}.reaper`)

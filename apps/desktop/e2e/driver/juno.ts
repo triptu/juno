@@ -301,6 +301,76 @@ export class Sidebar {
     await expect(this.unreadToggle).toHaveAttribute('aria-pressed', 'false')
   }
 
+  // Views (SPEC 5 "Views", inventory 2.3).
+
+  /** The horizontally scrolling row of pills. */
+  get pillRow() {
+    return this.root.getByRole('group', { name: 'Quick filters' }).locator('[data-pill-row]')
+  }
+
+  /** A view's pill. Its name gains ", unread mention" while its dot shows. */
+  viewPill(name: string) {
+    return this.root.getByRole('group', { name: 'Quick filters' }).getByRole('button', { name: new RegExp(`^${escapeRegExp(name)}(, unread mention)?$`) })
+  }
+
+  /** The views' names, in pill order. */
+  viewNames(): Promise<string[]> {
+    return this.root.locator('[data-view-pill]').evaluateAll((pills) => pills.map((pill) => (pill.getAttribute('aria-label') ?? '').replace(/, unread mention$/, '')))
+  }
+
+  /** A view's id, for the menus' items. */
+  async viewId(name: string): Promise<string> {
+    return (await this.viewPill(name).getAttribute('data-view-pill'))!
+  }
+
+  async selectView(name: string): Promise<void> {
+    await this.viewPill(name).click()
+    await expect(this.viewPill(name)).toHaveAttribute('aria-pressed', 'true')
+  }
+
+  async expectViewDot(name: string, shown: boolean): Promise<void> {
+    await expect(this.viewPill(name)).toHaveAccessibleName(shown ? `${name}, unread mention` : name, { timeout: 10_000 })
+  }
+
+  /** The view sheet, new or edit. */
+  get viewSheet() {
+    return this.win.locator('[data-view-sheet]')
+  }
+
+  /**
+   * Makes a view through the New view pill and the sheet: the name, an icon
+   * by its label, the conversations by searching for each name, and Keep
+   * these out of All. A new view is selected once saved.
+   */
+  async createView(view: { readonly name: string; readonly icon?: string; readonly conversations?: ReadonlyArray<string>; readonly keepOutOfAll?: boolean }): Promise<void> {
+    await this.root.getByRole('button', { name: 'New view', exact: true }).click()
+    await expect(this.viewSheet).toBeVisible()
+    await this.fillViewSheet(view)
+    await this.viewSheet.getByRole('button', { name: 'Save' }).click()
+    await expect(this.viewSheet).toHaveCount(0)
+    await expect(this.viewPill(view.name)).toHaveAttribute('aria-pressed', 'true')
+  }
+
+  /** Fills the open sheet. Conversations are toggled: one already chosen is removed. */
+  async fillViewSheet(view: { readonly name?: string; readonly icon?: string; readonly conversations?: ReadonlyArray<string>; readonly keepOutOfAll?: boolean }): Promise<void> {
+    const sheet = this.viewSheet
+    if (view.name !== undefined) await sheet.getByRole('textbox', { name: 'Name' }).fill(view.name)
+    if (view.icon !== undefined) await sheet.getByRole('radio', { name: view.icon }).click()
+    for (const conversation of view.conversations ?? []) {
+      await sheet.getByRole('combobox', { name: 'Add channels and people' }).fill(conversation)
+      await sheet.getByRole('option', { name: conversation, exact: true }).click()
+      await expect(sheet.getByRole('option', { name: conversation, exact: true })).toHaveAttribute('aria-selected', 'true')
+    }
+    if (view.keepOutOfAll !== undefined) await sheet.getByRole('checkbox', { name: /Keep these out of All/ }).setChecked(view.keepOutOfAll)
+  }
+
+  /** Right-click a view's pill, then `item` in its menu (inventory 15.7). Returns the menu's labels. */
+  async viewMenu(name: string, item: 'view-edit' | 'view-left' | 'view-right' | 'view-delete'): Promise<string[]> {
+    await chooseNextMenuItem(this.win, item)
+    await this.viewPill(name).click({ button: 'right' })
+    return (await lastMenu(this.win)).labels
+  }
+
   /** The status line under the filters, shown when the list may be behind Slack. */
   get syncStatus() {
     return this.root.getByRole('status', { name: 'Sync status' })
@@ -873,6 +943,10 @@ export type TopicMenuItem =
   | 'notify-matters'
   | 'notify-never'
   | 'ignore-channel'
+  // Add to view (inventory 15.8), by the view's id.
+  | `view-add:${string}`
+  | `view-remove:${string}`
+  | 'view-new'
 
 /** The topic shown in the active tab. Hidden tabs stay in the page with `display: none`. */
 export type AllTopicsChipName = 'All' | 'Open' | 'Resolved' | 'Quiet' | 'Unfollowed'

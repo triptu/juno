@@ -16,7 +16,7 @@ Six or more agents work in parallel on one 8-core, 8 GB Mac. Every heavy suite t
 - Inside, `scripts/remote/run.sh` links the workspace offline, runs the script under xvfb as a normal user with workers sized to the machine, samples CPU use, and packs reports. `nsc ssh` reports every failure as exit code 1, so the script's own code comes back as a marker line.
 - The machine is destroyed when the run ends, on failure, on Ctrl-C and when the client exits; `--duration` ends a machine whose client died. A dial timeout before the script starts is retried.
 - `perf` and `test:feel` are refused: they time the Mac.
-- `specs:check` gets a 16x32 machine (Apalache servers next to the simulations fill it); the rest get 8x16.
+- Each script gets the smallest shape that keeps it within about three minutes (2x4 to 8x16, `docs/development.md`, "Machine shapes"). Namespace bills vCPU-minutes, so big machines that sit half idle cost more for little gain; an earlier 16x32-for-everything setup was replaced on 2026-10-15.
 
 ### Which suites match the Mac on Linux
 
@@ -30,7 +30,7 @@ Six or more agents work in parallel on one 8-core, 8 GB Mac. Every heavy suite t
 
 ## Cost
 
-Prices from <https://namespace.so/pricing>, October 2026: Linux 8x16 is $0.008 a minute prepaid, 16x32 about twice that, billed by the minute. A `specs:check` run on 16x32 takes about 3.5 minutes end to end, so about $0.06. Six agents running twenty remote jobs a day each is about 120 runs and well under $10 a day.
+Prices from <https://namespace.so/pricing>, October 2026: Linux is billed in vCPU-minutes (unit minutes), about $0.001 each prepaid, with a one-minute minimum, whatever the shape. A typical `pnpm affected` run uses about 38 vCPU-minutes on the shapes in `docs/development.md` ($0.04), plus at most 90 vCPU-minutes of idle warm machines ($0.09).
 
 ## Alternatives
 

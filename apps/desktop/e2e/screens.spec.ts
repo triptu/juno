@@ -31,6 +31,33 @@ test('the sidebar, light and dark', async ({ juno, win }) => {
   await win.screenshot({ path: resolve(screens, 'sidebar-dark.png') })
 })
 
+test('sidebar views: the pill row with views, a mention dot and the view sheet, light and dark', async ({ juno, win, fake }) => {
+  test.setTimeout(180_000)
+  await juno.signIn()
+  await juno.waitForSync()
+  const { sidebar } = juno
+  await sidebar.createView({ name: 'Bots', icon: 'Robot', conversations: ['alerts-prod'], keepOutOfAll: true })
+  await sidebar.createView({ name: 'Design crit', conversations: ['eng'] })
+  await sidebar.createView({ name: 'Leadership', conversations: ['hiring'] })
+  await sidebar.createView({ name: 'Work', icon: 'Briefcase' })
+  await sidebar.filter('All')
+  fake.injectMessage({ channel: 'C0ALERTSPROD', user: 'U0LEO', text: '<@U0TUSHAR> can you take the pager tonight?' })
+  await sidebar.expectViewDot('Bots', true)
+  for (const theme of ['light', 'dark'] as const) {
+    if (theme === 'dark') await juno.setTheme('Dark')
+    await win.mouse.move(900, 400)
+    await expect(win.locator('html')).not.toHaveAttribute('data-theme-switching', /.*/)
+    await win.evaluate(() => document.fonts.ready)
+    await win.waitForTimeout(300)
+    await win.screenshot({ path: resolve(screens, `views-${theme}.png`) })
+    await sidebar.viewMenu('Bots', 'view-edit')
+    await expect(sidebar.viewSheet).toBeVisible()
+    await win.waitForTimeout(300)
+    await win.screenshot({ path: resolve(screens, `views-sheet-${theme}.png`) })
+    await sidebar.viewSheet.getByRole('button', { name: 'Cancel' }).click()
+  }
+})
+
 test('peek, light and dark', async ({ juno, win }) => {
   test.setTimeout(120_000)
   await juno.signIn()

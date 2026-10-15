@@ -18,6 +18,13 @@ export interface ScrollAreaProps extends Omit<HTMLAttributes<HTMLElement>, 'styl
    * below the band, and the scrollbar track starts below the band. All CSS.
    */
   readonly underHeader?: boolean
+  /**
+   * Mirror the scrollbar gutter on the left, so the content's left and right
+   * insets match to the pixel and a centered column sits in the middle of
+   * the area, not 5px left of it. Owners that pad their own content set the
+   * right padding as their inset minus `--scrollbar-size` instead.
+   */
+  readonly evenInset?: boolean
   /** The scroll element, for an owner that reads or restores its position. */
   readonly ref?: Ref<HTMLElement>
   readonly as?: ElementType
@@ -37,7 +44,7 @@ const HOVER = '@media (hover: hover)'
  * thumb's colour, so showing or hiding it never moves the content. Keyboard
  * and trackpad scrolling are the browser's own.
  */
-export function ScrollArea({ scrollbar = 'always', underHeader = false, as, sx, children, ...rest }: ScrollAreaProps) {
+export function ScrollArea({ scrollbar = 'always', underHeader = false, evenInset = false, as, sx, children, ...rest }: ScrollAreaProps) {
   const Tag = as ?? 'div'
   return (
     <Tag
@@ -46,7 +53,7 @@ export function ScrollArea({ scrollbar = 'always', underHeader = false, as, sx, 
       // pseudo-element rule here would lose to its unlayered one.
       data-under-header={underHeader ? '' : undefined}
       {...rest}
-      {...stylex.props(styles.area, scrollbar === 'hover' && styles.hoverScrollbar, underHeader && styles.underHeader, sx)}
+      {...stylex.props(styles.area, scrollbar === 'hover' && styles.hoverScrollbar, underHeader && styles.underHeader, evenInset && styles.evenInset, sx)}
     >
       {children}
     </Tag>
@@ -54,6 +61,9 @@ export function ScrollArea({ scrollbar = 'always', underHeader = false, as, sx, 
 }
 
 const styles = stylex.create({
+  evenInset: {
+    paddingInlineStart: layout['--scrollbar-size'],
+  },
   underHeader: {
     paddingTop: layout['--header-inset'],
     scrollPaddingTop: layout['--header-band'],
