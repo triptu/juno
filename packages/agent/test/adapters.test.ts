@@ -368,6 +368,40 @@ it('says a T3 question needs an answer in T3 Code when Juno cannot show it', asy
   expect(turns.actions.views().some((v) => v.card._tag === 'question')).toBe(false)
 })
 
+it('makes a read the code adds to the T3 preset Read for an install that already discovered it', async () => {
+  const read: FakeTool = { name: 't3_pending_request_read', inputSchema: { type: 'object', properties: { threadId: str, requestId: str } }, call: () => json({}) }
+  const server = await startFakeMcpServer({ tools: [read] })
+  cleanup.push(server.close)
+  const dir = await mkdtemp(join(tmpdir(), 'juno-adapters-'))
+  cleanup.push(() => rm(dir, { recursive: true, force: true }))
+  const credentials: Credentials = { oauth: () => ({ load: () => undefined, save: () => undefined }), bearer: async () => undefined, values: async () => [], clear: async () => undefined, openAuthorization: async () => undefined }
+  const preset = { ...T3, url: server.url, auth: { kind: 'none' as const } }
+  const older = { ...preset, allowlist: preset.allowlist.filter((name) => name !== read.name) }
+  const discoverOld = async (path: string, sets: Parameters<typeof openDatabase>[1]) => {
+    const store = { db: openDatabase(path, sets), now: Date.now }
+    initialize(store)
+    const old = createMcpManager({ store, credentials, defaults: [older] })
+    await old.connect('t3')
+    expect(old.tool('t3', read.name).tier).toBe(3)
+    await old.close()
+    return store
+  }
+  // An install from before the read was added: the manager sees the name as new.
+  const store = await discoverOld(join(dir, 'a.sqlite'), [MCP_MIGRATIONS])
+  cleanup.push(async () => { store.db.close() })
+  const current = createMcpManager({ store, credentials, defaults: [preset] })
+  cleanup.push(() => current.close())
+  expect(current.tool('t3', read.name).tier).toBe(0)
+  // An install whose stored list already names it, discovered before that: the migration makes it Read.
+  const path = join(dir, 'b.sqlite')
+  const before = await discoverOld(path, [{ ...MCP_MIGRATIONS, steps: MCP_MIGRATIONS.steps.slice(0, 1) }])
+  before.db.prepare("UPDATE mcp_connections SET config = json_set(config, '$.allowlist', json(?)) WHERE id = 't3'").run(JSON.stringify(preset.allowlist))
+  before.db.close()
+  const after = openDatabase(path, [MCP_MIGRATIONS])
+  cleanup.push(async () => { after.close() })
+  expect(after.prepare("SELECT tier FROM mcp_tools WHERE connection_id = 't3' AND name = ?").get(read.name)).toEqual({ tier: 0 })
+})
+
 it('writes a job only when its phase or line changes', async () => {
   const { turns } = await fixture('t3', t3Tools)
   const lost = { event: 'lostSight', state: 'Sign in to T3 Code to keep watching' } as const
