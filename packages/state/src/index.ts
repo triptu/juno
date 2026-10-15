@@ -189,3 +189,15 @@ export {
   type HomeScene,
   type HomeShown,
 } from './home'
+export {
+  attachFiles,
+  attachmentsAtom,
+  clearAttachments,
+  downloadFile,
+  readyFiles,
+  removeAttachment,
+  restoreAttachments,
+  uploadProgressAtom,
+  type Attachment,
+  type FileLike,
+} from './attachments'
