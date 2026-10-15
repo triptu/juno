@@ -137,8 +137,8 @@ test('sending in a Main: a failed send, a send on its way and a draft, light and
   await topic.expectTitle('Main')
   // The first send is refused; the second waits for Slack's answer, so it stays on its way.
   fake.forceError({ method: 'chat.postMessage', error: 'restricted_action' })
-  await topic.send('Can someone look at the staging bill before Friday?')
-  await expect(topic.failed('Can someone look at the staging bill').row).toBeVisible()
+  await topic.send('Can someone look at the dashboards before Friday?')
+  await expect(topic.failed('Can someone look at the dashboards').row).toBeVisible()
   fake.holdNext({ method: 'chat.postMessage', before: true })
   await topic.send('Moving the cutover to Thursday night.')
   await expect(topic.message('Moving the cutover to Thursday night.')).toHaveAttribute('data-pending', 'sending')
