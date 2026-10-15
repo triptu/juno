@@ -231,6 +231,16 @@ test('send: Enter to the pending row painted', async ({ juno }) => {
     // The measure ends after the frame is presented, which can be after the row settles.
     await expect.poll(async () => (await juno.measures('juno.send')).length, { timeout: 15_000 }).toBeGreaterThan(before)
     measured.push((await juno.measures('juno.send')).at(-1)!)
+    if (measured.at(-1)! > 50) {
+      const stages = await juno.win.evaluate(() => {
+        const start = performance.getEntriesByName('juno.send', 'mark').at(-1)!.startTime
+        return ['checked', 'queued', 'commit'].map((stage) => {
+          const at = performance.getEntriesByName(`juno.send-${stage}`, 'mark').at(-1)?.startTime
+          return `${stage} ${at !== undefined && at >= start ? `+${(at - start).toFixed(1)} ms` : 'not recorded'}`
+        }).join(', ')
+      })
+      console.log(`slow send ${i}: ${measured.at(-1)!.toFixed(1)} ms; ${stages}`)
+    }
     await juno.win.waitForTimeout(300)
   }
   expect(await hidden(), 'the window lost focus or was hidden while measuring; this sample is contended').toBe(0)

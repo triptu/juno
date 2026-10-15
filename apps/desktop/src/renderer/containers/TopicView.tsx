@@ -26,7 +26,7 @@ import {
   type MessageWindow,
   type ScrollSnapshot,
 } from '@juno/state'
-import { afterPaint, measure } from '@juno/state/perf'
+import { afterPaint, mark, measure } from '@juno/state/perf'
 import { useAtomValue } from '@juno/state/react'
 import {
   ActiveThreads,
@@ -410,7 +410,10 @@ function Topic({ id, detail, readOnly = false, underHeader = true }: TopicProps)
 
   // `juno.send`: from Enter to the frame that shows the message, pending or, after a very quick answer, settled.
   useLayoutEffect(() => {
-    if (last !== undefined && list.rows.get(last)?.fromMe === true && takeSendMark()) afterPaint(() => measure('juno.send', 'juno.send'))
+    if (last !== undefined && list.rows.get(last)?.fromMe === true && takeSendMark()) {
+      mark('juno.send-commit', undefined, { replace: true })
+      afterPaint(() => measure('juno.send', 'juno.send'))
+    }
   }, [last, list.rows])
 
   // The user's own scrolling lets go of the pin; where the list comes to rest decides the next one.
