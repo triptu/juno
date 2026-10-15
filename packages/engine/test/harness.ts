@@ -112,7 +112,7 @@ export function fakeMain(fake: FakeSlack, initial?: Credentials) {
     fetch(input, { ...init, headers: { ...(init?.headers as Record<string, string>), ...(current === undefined ? {} : { cookie: `d=${current.cookie}` }) } })
   const httpTransport = HttpTransport.nodeFetch({
     fetch: (input, init) =>
-      network.offline ? Promise.reject(new TypeError('fetch failed')) : send(input, init).catch((cause: unknown) => (network.resend ? send(input, init) : Promise.reject(cause))),
+      network.offline ? Promise.reject(new TypeError('fetch failed')) : send(input, init).catch((cause: unknown) => (network.resend && !init?.signal?.aborted ? send(input, init) : Promise.reject(cause))),
   })
   return {
     host,
