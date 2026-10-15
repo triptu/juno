@@ -393,3 +393,21 @@ test('Home Automated keeps its two lines aligned and its actions evenly inset', 
   for (const button of at.buttons) expect(button).toEqual({ top: 12, bottom: 12 })
   expect(at.gap).toBeGreaterThan(0)
 })
+
+test('the topic switcher opens on the topic on screen: one row lit, not that one and Main', async ({ page }) => {
+  for (const id of ['switcher/switcher-thread', 'switcher/switcher-main']) {
+    await open(page, 'TopicHeader', id)
+    const rows = await page.evaluate(() => {
+      const search = document.querySelector('[data-topic-switcher] input')!
+      return [...document.querySelectorAll('[data-topic-switcher] [role="option"]')].map((row) => ({
+        selected: row.getAttribute('aria-selected') === 'true',
+        active: row.id === search.getAttribute('aria-activedescendant'),
+        lit: getComputedStyle(row).backgroundColor !== 'rgba(0, 0, 0, 0)',
+      }))
+    })
+    const selected = rows.filter((row) => row.selected)
+    expect(selected, id).toHaveLength(1)
+    expect(selected[0]!.active, id).toBe(true)
+    expect(rows.filter((row) => row.lit), id).toHaveLength(1)
+  }
+})

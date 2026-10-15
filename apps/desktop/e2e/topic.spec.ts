@@ -69,13 +69,16 @@ test('Main shows thread links; a link opens the thread in the tab, and the title
   await switcher.open(POSTGRES)
   await juno.topic.expectTitle(POSTGRES)
 
-  // From the keyboard: Enter on the title opens it with the search focused, ↓ moves, Enter opens, Escape returns to the title.
+  // From the keyboard: Enter on the title opens it with the search focused and the current topic highlighted,
+  // Home moves to Main, Enter opens, Escape returns to the title.
   switcher = await juno.topic.openSwitcherWithKeyboard()
   await expect(switcher.search).toBeFocused()
+  await expect(switcher.search).toHaveAttribute('aria-activedescendant', (await switcher.row(POSTGRES).getAttribute('id'))!)
   await juno.win.keyboard.press('Escape')
   await expect(switcher.root).toHaveCount(0)
   await expect(juno.topic.titleButton).toBeFocused()
   switcher = await juno.topic.openSwitcherWithKeyboard()
+  await juno.win.keyboard.press('Home')
   await juno.win.keyboard.press('Enter')
   await juno.topic.expectTitle('Main')
   await juno.tabs.expectCount(1)
