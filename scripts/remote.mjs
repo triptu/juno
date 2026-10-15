@@ -45,8 +45,9 @@ function parse(argv) {
   if (!script) throw new Error('usage: pnpm remote [--dry-run] [--machine linux/amd64:8x16] [--keep] <script> [args...]')
   if (localOnly[script]) throw new Error(`${script} measures ${localOnly[script]} and runs only on the Mac. Run pnpm ${script} locally.`)
   if (!remoteScripts.includes(script)) throw new Error(`${script} is not set up for remote runs. Remote scripts: ${remoteScripts.join(', ')}`)
-  // Spec checks fill 16 cores (Apalache lanes plus simulations); the rest fill 8.
-  options.machine ??= script.startsWith('specs:') ? 'linux/amd64:16x32' : 'linux/amd64:8x16'
+  // Spec checks (Apalache lanes plus simulations), the gallery and e2e (two
+  // workers per core) use 16 cores; unit tests do not scale past 8.
+  options.machine ??= /^(specs:|test:gallery|gallery:|test:desktop|test:e2e)/.test(script) ? 'linux/amd64:16x32' : 'linux/amd64:8x16'
   return { ...options, script, args }
 }
 

@@ -24,8 +24,8 @@ Six or more agents work in parallel on one 8-core, 8 GB Mac. Every heavy suite t
 | --- | --- | --- |
 | `test`, `test:agent*` | Same results (verified) | Node and SQLite only. |
 | `specs:check` | Same results (verified) | Quint's Rust simulator and Apalache, fixed seed. |
-| `test:gallery`, `gallery:shots` | To verify | The shift guard compares a page with itself, never with a Mac image. Fonts are bundled, so text uses the same faces; the rasteriser differs. |
-| `test:e2e` (Electron) | To verify | The app already handles non-Mac platforms, and the tests use no Cmd shortcuts. |
+| `test:gallery` | Same results (verified) | The shift guard compares a page with itself, never with a Mac image. A behaviour test checks that every font family comes from the bundle, which it does on Linux too. Screenshots (`gallery:shots`) are for reviewing the Mac look; shoot them on the Mac. |
+| `test:desktop`, `test:e2e` (Electron) | Same results (verified), except one test tagged `@mac` | Under xvfb. Electron is started once before the workers (parallel first starts failed with ETXTBSY), and Chromium is told there is a mouse so `(hover: hover)` styles apply. The sidebar width is not restored after a relaunch on Linux, so that test runs on the Mac only. |
 | `perf`, `test:feel` | No | They time frames on the Mac. |
 
 ## Cost

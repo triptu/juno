@@ -416,7 +416,7 @@ Effect and StyleX pitfalls are in their skills: `.claude/skills/effect/SKILL.md`
 
 ## Remote runs
 
-`pnpm remote <script> [args...]` runs a root script on a Namespace Linux machine (16 vCPU, 32 GB for `specs:*`, 8 vCPU, 16 GB for the rest; `--machine` overrides) and streams its output and exit code back. Each run gets its own machine, so agents never wait for each other; nothing takes the local heavy-job lock. Use it for `test`, `specs:check` and `test:agent*`. `perf` and `test:feel` are refused: they time the Mac.
+`pnpm remote <script> [args...]` runs a root script on a Namespace Linux machine (16 vCPU, 32 GB for `specs:*`, the gallery and e2e; 8 vCPU, 16 GB for the rest; `--machine` overrides) and streams its output and exit code back. Each run gets its own machine, so agents never wait for each other; nothing takes the local heavy-job lock. Use it for `test`, `specs:check`, `test:agent*`, `test:gallery`, `test:desktop` (the desktop e2e alone; it passes arguments on, for example `pnpm remote test:desktop e2e/topic.spec.ts`) and `test:e2e`. `perf` and `test:feel` are refused: they time the Mac. Desktop e2e tests tagged `@mac` (`{ tag: '@mac' }`) depend on macOS behaviour and are skipped on Linux; the Mac runs them. Today that is one test, the sidebar width surviving a relaunch.
 
 - **What is sent.** The files git sees in the worktree (tracked or new, not ignored), so uncommitted work is tested; `.env`, `node_modules`, build output and design images under `docs/` are not. The script stops if a file looks like a key or token file or holds what looks like a real Slack token.
 - **Where it runs.** In the image from `scripts/remote/Dockerfile` (Playwright's Ubuntu image with Node 26, pnpm, Java 21, the installed workspace and Quint's downloads). Its tag is a hash of the Dockerfile, `pnpm-lock.yaml` and `pnpm-workspace.yaml`; when the registry lacks it, the first run builds it with `nsc build` (about two minutes) while others on the same Mac wait. Inside, `scripts/remote/run.sh` links the workspace offline and runs the script under xvfb with more workers than the Mac uses.
@@ -429,6 +429,10 @@ Effect and StyleX pitfalls are in their skills: `.claude/skills/effect/SKILL.md`
   | --- | --- | --- | --- | --- |
   | `test` | 160 s | 145 to 223 s (8x16; 223 s included an image build) | about 100 s | not measured yet |
   | `specs:check` | 629 s (614 to 645 s in other agents' logs) | 214 s (16x32) | 99.6 s | 87% of 16 cores |
+  | `test:agent`, `test:agent-contracts`, `test:agent-testing` | about 50 s, 5 s, 5 s | 84 s, 69 s, 65 s (8x16) | 18 s, 2 s, 2 s | 22 to 30% |
+  | `test:gallery` | 16.4 min (13.7 to 18.5 min in other agents' logs) | 163 to 193 s (16x32) | 1.4 min | 30 to 36% of 16 cores |
+  | `test:desktop` | 2.9 min plus the build | 124 to 134 s (16x32) | 25 s | not measured |
+  | `test:e2e` (both) | 19.7 min | about 4 min (16x32) | | |
 
   About 20 s of each remote run is creating the machine and 45 s pulling the image.
 - **`--dry-run`** prints the steps without creating anything.
