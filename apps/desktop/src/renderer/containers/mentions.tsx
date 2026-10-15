@@ -16,6 +16,9 @@ import { mentionChannelsAtom, mentionPeopleAtom, onFirstMentionAnswer, type Ment
 import { useAtomValue } from '@juno/state/react'
 import { hueFor, MentionSuggestions, mentionRowId, type ComposerMention } from '@juno/views'
 
+import { editField, listKey } from './suggestionKeys'
+import { useEmojiSuggestions } from './emojiSuggestions'
+
 type Rows = { readonly kind: 'person'; readonly rows: ReadonlyArray<MentionPerson> } | { readonly kind: 'channel'; readonly rows: ReadonlyArray<MentionChannel> }
 
 export interface MentionsOptions {
@@ -44,6 +47,7 @@ export interface MentionsOptions {
  * ⌘Z undoes them like typing.
  */
 export function useMentions({ text, picks, onPicks, onChange, field, place }: MentionsOptions) {
+  const emoji = useEmojiSuggestions({ text, onChange, field })
   const listId = useId()
   const [caret, setCaret] = useState(text.length)
   // Esc closed the list for the query starting here; typing a new "@" opens it again.
@@ -104,13 +108,13 @@ export function useMentions({ text, picks, onPicks, onChange, field, place }: Me
       held.drop()
       // A new query, or none: Esc's choice was for the one before.
       if (dismissed !== undefined && mentionQueryAt(value, at, mentionTokens(value, picks))?.start !== dismissed) setDismissed(undefined)
-      onChange(value)
+      emoji.onChange(value, at)
     },
-    onCaret: setCaret,
-    onFieldKey,
+    onCaret: (at: number) => { setCaret(at); emoji.onCaret(at) },
+    onFieldKey: (event: KeyboardEvent<HTMLTextAreaElement>) => emoji.onFieldKey(event) || onFieldKey(event),
     marks: marksOf(tokens),
     ...(typed === undefined
-      ? {}
+      ? emoji.mention === undefined ? {} : { mention: emoji.mention }
       : {
           mention: {
             anchorAt: typed.start,
@@ -171,43 +175,6 @@ function useHeldEnter(place: MentionPlace, insert: (at: MentionQuery, first: Men
     })
   }
   return { hold, drop }
-}
-
-/** The open list's keys: ↑ ↓ move, Enter or Tab picks, Esc closes. True when the key was taken. */
-function listKey(
-  event: KeyboardEvent<HTMLTextAreaElement>,
-  ids: ReadonlyArray<string>,
-  activeId: string,
-  on: { readonly move: (id: string) => void; readonly pick: (id: string) => void; readonly close: () => void },
-): boolean {
-  const index = ids.indexOf(activeId)
-  switch (event.key) {
-    case 'ArrowDown':
-    case 'ArrowUp':
-      event.preventDefault()
-      on.move(ids[(index + (event.key === 'ArrowDown' ? 1 : -1) + ids.length) % ids.length]!)
-      return true
-    case 'Enter':
-    case 'Tab':
-      if (event.shiftKey) return false
-      event.preventDefault()
-      on.pick(activeId)
-      return true
-    case 'Escape':
-      event.preventDefault()
-      on.close()
-      return true
-    default:
-      return false
-  }
-}
-
-/** Replaces `from`..`to` in the field the way typing would, so ⌘Z undoes it. */
-function editField(element: HTMLTextAreaElement | null, from: number, to: number, insert: string): void {
-  if (element === null) return
-  element.setSelectionRange(from, to)
-  if (insert === '') document.execCommand('delete')
-  else document.execCommand('insertText', false, insert)
 }
 
 /** The picked names as the field draws them: a person in their hue, a channel as its chip. */

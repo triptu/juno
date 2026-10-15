@@ -5,7 +5,7 @@
  */
 import * as AsyncResult from 'effect/reactivity/AsyncResult'
 import * as Atom from 'effect/reactivity/Atom'
-import { mentionsChannels, mentionsPeople, type MentionChannel, type MentionPerson } from '@juno/contract'
+import { mentionsChannels, mentionsEmoji, mentionsPeople, type MentionChannel, type MentionPerson } from '@juno/contract'
 import { registry } from './client'
 import { liveQuery } from './atoms'
 
@@ -60,3 +60,6 @@ export function onFirstMentionAnswer(
       : registry.subscribe(mentionChannelsAtom(query), answer, { immediate: true })
   return end
 }
+
+/** One local subscription per workspace, independent of the typed query. */
+export const composerEmojiAtom = liveQuery(mentionsEmoji)(undefined)

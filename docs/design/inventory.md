@@ -755,3 +755,7 @@ Stored as user preferences. Nothing else from the prototype's design panel (`dat
 - Main labels: "#eng · Main", "Maya Chen · Main"; tab shows "eng"; row shows "#eng" + Main tag; header sub "Messages posted outside threads".
 - "#" is never repeated next to a hash icon (pills, tabs, row line 3, table Where column).
 - Never emoji in chrome; reactions and user text are the user's own.
+
+### Composer emoji suggestions
+
+The shared mention suggestion list also shows local emoji matches: glyph or workspace image, then `:shortcode:`. It uses the same 32px rows, caret anchor, keyboard selection and light and dark tokens. Topic replies, Main, New chat and Juno share this interaction (SPEC §8).

@@ -45,3 +45,5 @@ No tests of its own. The routes are exercised by `packages/engine/test` (the rea
 - `prefs.get { key }` is a live JSON value from the open workspace's user.db; an absent key returns null. `prefs.set { key, value }` writes one JSON value and invalidates prefs. It fails with `NotSignedIn` without an open workspace. WP5 uses the key `tabs`.
 
 The shell update routes (`updates.get`, `updates.set`, `updates.restart`) and `UpdateState` keep release handling in main. `updates.changed` forwards changes to the renderer.
+
+- `mentions.emoji` serves cached workspace emoji and aliases once per workspace; composer keystrokes filter it locally. It never calls Slack.

@@ -182,6 +182,7 @@ The header has no bar. Two islands float over the top of the message list, 8px u
   - Quote.
   - In Main threads, Reply in thread.
   - More: Edit, Delete and Tell me if nobody replies (13.6) on your own messages, Copy Slack link and Open in Slack. Right-clicking a message opens the same menu.
+- **Open actions.** A message keeps its active background and toolbar while its reaction picker or More menu is open.
 - **Keyboard.** ↑ in an empty composer selects the newest message; ↑ and ↓ move the selection, and Esc returns to the composer. On your own selected message, E edits it inline and Delete or Backspace deletes it after one inline confirm (Enter confirms, Esc cancels).
 - **Quoting** follows Slack. Quoting inserts "> " lines into your reply. Selecting any part of a message shows a floating Quote button that quotes only the selection.
 - **Thread links.** In Main, a message that has a thread shows a small "2 replies · Title ›" link under it.
@@ -216,6 +217,8 @@ Juno can sit beside any topic, so you can talk about what you are looking at wit
 - **Drafts.** Each topic keeps its own draft, through tab switches and restarts.
 - **Mentions.** Typing @ suggests people and # suggests channels, with arrow keys and Enter or Tab to pick.
 - **Audience check.** When what you type reads like hiring or people details and the channel is public, a quiet amber line warns you as you type.
+
+- **Emoji suggestions.** In every composer, `:` at a word start followed by at least two characters opens local emoji matches, ranked by recent use, then prefix, then substring. Rows show the glyph or workspace image and `:shortcode:`. ↑ and ↓ move; Enter or Tab inserts; Esc closes and keeps the text. An exact closing `:` converts a standard shortcode to Unicode. Workspace emoji insert `:name:` for Slack.
 
 ### Checks on send
 

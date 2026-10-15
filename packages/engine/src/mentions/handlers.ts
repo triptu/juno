@@ -5,7 +5,7 @@
  * conversations change; who posted lately is read again on the next query.
  */
 import { MentionsRoutes } from '@juno/contract'
-import type { InvalidationKeys } from '@juno/store'
+import { StoreReader, type InvalidationKeys } from '@juno/store'
 import { Effect } from 'effect'
 import { serveWorkspaceValue } from '../protocol/live'
 import { Workspace } from '../workspace'
@@ -18,6 +18,10 @@ export const MentionsHandlers = MentionsRoutes.toLayer(
     const workspace = yield* Workspace
     const live = <A, E, R>(name: string, query: Effect.Effect<A, E, R>) => serveWorkspaceValue(workspace.changes, name, KEYS, query)
     return {
+      'mentions.emoji': () => serveWorkspaceValue(workspace.changes, 'mentions.emoji', ['emoji', 'team'], Effect.gen(function* () {
+        const sql = yield* StoreReader
+        return yield* sql<{ name: string; url: string | null; alias_for: string | null }>`SELECT name, url, alias_for FROM emoji ORDER BY name`
+      })),
       'mentions.people': ({ channel, threadTs, query }) => live('mentions.people', queryPeople(channel, threadTs, query)),
       'mentions.channels': ({ query }) => live('mentions.channels', queryChannels(query)),
     }

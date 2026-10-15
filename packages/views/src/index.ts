@@ -8,7 +8,7 @@ export { AttachmentChips, type AttachmentChipsProps } from './AttachmentChips'
 
 export { AudienceWarning } from './AudienceWarning'
 export { Composer, type ComposerMention } from './Composer'
-export { MentionSuggestions, mentionRowId } from './MentionSuggestions'
+export { MentionSuggestions, mentionRowId, type EmojiSuggestion } from './MentionSuggestions'
 export { ComposerSlot } from './ComposerSlot'
 export { DestinationPickers, type PickerName } from './DestinationPickers'
 export { EmojiPicker } from './EmojiPicker'
