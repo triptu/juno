@@ -44,7 +44,7 @@ import type { MigrationSet } from '../store/schema'
 import { initialize, type Store } from '../store/store'
 import { createCompactor, type Compactor, type CompactorState } from '../compactor/scheduler'
 import { delegateTool } from '../jobs/delegate'
-import { createJobs, type Job } from '../jobs/jobs'
+import { createJobs, type Job, type Jobs, type JobDriver } from '../jobs/jobs'
 import { JOBS_MIGRATIONS } from '../jobs/schema'
 import { subagentDriver } from '../jobs/subagent'
 import { rememberTool } from '../memory-tools/remember'
@@ -107,7 +107,9 @@ export interface TurnsOptions {
   /** The host's actions and other folders' executors (WP15). No Slack send without `actions.host`. */
   readonly actions?: ActionsOptions
   /** Fixed tools supplied by a connection adapter; called before the journal resumes. */
-  readonly tools?: (context: { readonly store: Store; readonly actions: Actions; readonly current: () => Promise<ToolRun | undefined> }) => ReadonlyArray<JunoTool & { readonly taints?: boolean }>
+  readonly tools?: (context: { readonly store: Store; readonly actions: Actions; readonly jobs: Jobs; readonly current: () => Promise<ToolRun | undefined> }) => ReadonlyArray<JunoTool & { readonly taints?: boolean }>
+  readonly stopExternalJob?: (job: Job) => Promise<boolean>
+  readonly jobDrivers?: () => ReadonlyArray<JobDriver>
   /** Other folders' migration sets. Spend, turns and jobs are always applied. */
   readonly migrations?: ReadonlyArray<MigrationSet>
   readonly schedule?: Pick<SchedulerOptions, 'replies' | 'cachedReplies' | 'account' | 'enabled'>
@@ -338,7 +340,7 @@ async function start(
   const subagentModel = options.subagent ?? initial.compaction
   const jobs = createJobs({
     store,
-    drivers: subagentModel ? [subagentDriver({ store, guard, builder, model: subagentModel })] : [],
+    drivers: [...(subagentModel ? [subagentDriver({ store, guard, builder, model: subagentModel })] : []), ...(options.jobDrivers?.() ?? [])],
     accept: (input) => router.message(input),
     ...(options.onReport ? { onReport: options.onReport } : {}),
   })
@@ -406,7 +408,7 @@ async function start(
   }
   const slackTools = options.host ? hostTools(options.host, handles) : []
   const actionHost = options.actions?.host
-  const extraTools = options.tools?.({ store, actions, current: () => router.toolRun() }) ?? []
+  const extraTools = options.tools?.({ store, actions, jobs, current: () => router.toolRun() }) ?? []
   const actionTools = actionHost ? [sendMessageTool({ store, current: () => router.toolRun(), propose: actions.propose, host: actionHost })] : []
   // §5.4: a run the daily cap blocked brings the Budget card, one per day and raise.
   router.subscribe((event) => {
@@ -576,7 +578,9 @@ async function start(
     jobs: {
       list: jobs.list,
       active: jobs.active,
-      stop: (jobId) => {
+      stop: async (jobId) => {
+        const job = jobs.get(jobId)
+        if (job?.kind === 't3' && !await options.stopExternalJob?.(job)) return
         actions.jobStopped(jobId)
         return jobs.stop(jobId)
       },
