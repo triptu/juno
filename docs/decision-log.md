@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-15 17:05 · Tushar · Sidebar row preview is one line, not two.
 - 10-15 17:00 · orchestrator · Merged WP19 end to end: the scheduler starts with the agent and admits due wakes, reply watches check for replies through the host with no model run, and an open nudge card expires when a reply arrives; four clock-driven flow tests, 171 agent tests pass.
 - 10-15 16:25 · orchestrator · Merged the WP17 MCP manager backend: connecting, listing and disconnecting MCP servers, tools split into read and outward by policy, results treated as untrusted, write tools as card executors, Notion as the first connection, the Connections page data; 167 agent tests pass. Still to do: wiring into agent startup and main's keychain/OAuth bridge, then one live Notion check with Tushar's sign-in.
 - 10-15 15:30 · orchestrator · Merged M6b: edit and delete your own messages (toolbar More, right-click, and the keyboard: ↑ from an empty composer, E, Delete), reactions with three quick ones and the full emoji picker (custom emoji wait for an engine route), quote and selection quote, reply in thread from Main; all through the outbox, with `specs/outbox.qnt` extended. Desktop e2e 103 passed and unit tests pass remotely on the merged tree.
