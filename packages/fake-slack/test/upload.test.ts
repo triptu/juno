@@ -85,7 +85,7 @@ describe('composer upload flow', () => {
     })
     for (const size of [64, 80, 160]) expect(shared?.[`thumb_${size}` as 'thumb_64']).toBe(`${shared?.url_private}?thumb=${size}`)
 
-    const served = await fetch(shared!.thumb_720!)
+    const served = await fetch(shared!.thumb_720!, { headers: { cookie: `d=${fake.credentials().cookie}` } })
     expect(served.headers.get('content-type')).toBe('image/png')
     expect(Buffer.from(await served.arrayBuffer()).equals(bytes)).toBe(true)
     expect(served.headers.get('content-disposition')).toBeNull()
@@ -147,6 +147,21 @@ describe('composer upload flow', () => {
 })
 
 describe('seeded files', () => {
+  it('requires the d cookie for thumbnails and downloads, not a bearer token', async () => {
+    const files = fake.messages('C0PRODUCT').flatMap((message) => message.files ?? [])
+    const image = files.find((file) => file.mimetype === 'image/png')!
+    for (const url of [image.thumb_360!, image.url_private_download!]) {
+      for (const headers of [{}, { authorization: `Bearer ${fake.credentials().token}` }]) {
+        const response = await fetch(url, { headers, redirect: 'manual' })
+        expect(response.status).toBe(302)
+        expect(response.headers.get('location')).toBe('/signin')
+      }
+      const response = await fetch(url, { headers: { cookie: `d=${fake.credentials().cookie}` } })
+      expect(response.status).toBe(200)
+      expect(response.headers.get('content-type')).toBe('image/png')
+    }
+  })
+
   it('the product thread carries an image and a PDF whose urls serve real bytes', async () => {
     const root = fake.messages('C0PRODUCT').find((m) => m.text?.startsWith('Proposal: cut offline mode'))!
     const replies = await client.ok('conversations.replies', { channel: 'C0PRODUCT', ts: root.ts, limit: 50 })
@@ -157,7 +172,7 @@ describe('seeded files', () => {
     expect(image).toMatchObject({ original_w: 960, original_h: 640, thumb_960_w: 960, thumb_960_h: 640, thumb_720_w: 720, thumb_720_h: 480 })
     expect(image?.thumb_1024).toBeUndefined()
 
-    const download = await fetch(pdf!.url_private_download!)
+    const download = await fetch(pdf!.url_private_download!, { headers: { cookie: `d=${fake.credentials().cookie}` } })
     expect(download.headers.get('content-type')).toBe('application/pdf')
     expect(download.headers.get('content-disposition')).toBe('attachment; filename="q4-plan.pdf"')
     const text = Buffer.from(await download.arrayBuffer()).toString('latin1')

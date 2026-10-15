@@ -181,7 +181,7 @@ test('an image opens in the viewer, and Esc closes it', async ({ juno }) => {
   await open.click()
   const viewer = juno.win.getByRole('dialog')
   await expect(viewer).toBeVisible()
-  await expect(viewer.locator('img[src*="/full?"]')).toHaveJSProperty('complete', true)
+  await expect.poll(() => viewer.locator('img[src*="/full?"]').evaluate((image: HTMLImageElement) => image.naturalWidth)).toBeGreaterThan(0)
   await expect(viewer.getByRole('button', { name: 'Close' })).toBeFocused()
   await juno.win.keyboard.press('Escape')
   await expect(viewer).toHaveCount(0)
@@ -202,4 +202,43 @@ test('Download saves the file into Downloads', async ({ juno }) => {
     .then(() => juno.app.evaluate(() => (globalThis as unknown as { junoTest: { downloads: string[] } }).junoTest.downloads[0]!))
   expect(saved).toMatch(/Downloads\/q4-plan\.pdf$/)
   expect((await readFile(saved)).subarray(0, 5).toString('latin1')).toBe('%PDF-')
+})
+
+
+test('a send check keeps the draft while a newly attached file is still being read', async ({ juno, fake }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  const { topic } = juno
+  await juno.sidebar.row(ENG_MAIN).open()
+  await topic.expectTitle('Main')
+  await topic.composer.fill('can you recieve the the report by friday')
+  await topic.composer.press('Enter')
+  const fix = topic.root.getByRole('button', { name: /Fix and send/ })
+  await expect(fix).toBeVisible()
+
+  // Hold the file read, as when the selected file is on a slow volume.
+  await juno.win.evaluate(() => {
+    const slice = File.prototype.slice
+    File.prototype.slice = function (...args) {
+      File.prototype.slice = slice
+      const blob = slice.apply(this, args)
+      const read = blob.arrayBuffer.bind(blob)
+      blob.arrayBuffer = () => new Promise<ArrayBuffer>((resolve) => {
+        window.addEventListener('release-file-read', () => void read().then(resolve), { once: true })
+      })
+      return blob
+    }
+  })
+  await paste(topic.composer, [chart()])
+  await expect(chip(topic, 'chart.png')).toBeVisible()
+  await fix.click()
+  await expect(topic.composer).toHaveValue('can you recieve the the report by friday')
+  await expect(fix).toBeVisible()
+  expect(fake.calls.filter((call) => call.method === 'chat.postMessage' || call.method === 'files.share')).toHaveLength(0)
+
+  await juno.win.evaluate(() => window.dispatchEvent(new Event('release-file-read')))
+  await expect(topic.root.locator('[data-composer] img[src^="juno://uploads/"]')).toHaveCount(1)
+  await fix.click()
+  await topic.expectSent('can you receive the report by friday?')
+  expect(fake.calls.filter((call) => call.method === 'files.share')).toHaveLength(1)
 })

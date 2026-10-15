@@ -138,6 +138,8 @@ function LoadedComposer({ detail, initial, placeholder, onSent, handle, onArrowU
 
   const here = { channelId: detail.channel.id, ...(detail.kind === 'thread' && detail.rootTs !== undefined ? { threadTs: detail.rootTs } : {}) }
   const deliver = (body: string, to: Destination) => {
+    const attached = takeAttachments(id)
+    if (attached === undefined) return
     // The send clears the stored draft; a save still waiting must not write it back.
     clearTimeout(timer.current)
     unsaved.current = undefined
@@ -146,13 +148,11 @@ function LoadedComposer({ detail, initial, placeholder, onSent, handle, onArrowU
     setBar(undefined)
     onSent()
     const target: SendTarget = { kind: 'channel', ...(to.kind === 'here' ? here : { channelId: detail.channel.id, threadTs: to.threadTs }) }
-    // The files go with the message; a chip added while the checks ran waits for the next send.
-    const attached = takeAttachments(id)
-    void sendMessage(registry, target, body, id, attached?.ids).then((exit) => {
+    void sendMessage(registry, target, body, id, attached.ids).then((exit) => {
       if (exit._tag === 'Failure') {
         // Nothing was queued: the text and the files come back so they can be sent again.
         setText((current) => (current === '' ? body : current))
-        attached?.restore()
+        attached.restore()
         console.warn('juno: send failed', exit.cause)
       } else if (to.kind === 'thread') {
         showToast(registry, { text: `Posted in ${to.title}` })

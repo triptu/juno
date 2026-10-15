@@ -369,7 +369,16 @@ export class FakeServer {
     if (path.startsWith('/api/') && method === 'POST') return this.#api(path.slice('/api/'.length), request, response)
     if (path.startsWith('/edge/') && method === 'POST') return this.#edge(path.slice('/edge/'.length), request, response)
     if (path.startsWith('/upload/') && (method === 'POST' || method === 'PUT')) return this.#upload(path.slice('/upload/'.length), request, response)
-    if (path.startsWith('/files/') && method === 'GET') return this.#file(path.split('/')[2] ?? '', url.searchParams.get('download') === '1', response)
+    if (path.startsWith('/files/') && method === 'GET') {
+      const cookie = parseCookies(request.headers.cookie)['d']
+      const session = cookie === undefined ? undefined : this.sessions.get(cookie)
+      if (session === undefined || session.expired) {
+        response.writeHead(302, { location: '/signin' })
+        response.end()
+        return
+      }
+      return this.#file(path.split('/')[2] ?? '', url.searchParams.get('download') === '1', response)
+    }
     if (path.startsWith('/avatars/') && method === 'GET') return this.#avatar(path.slice('/avatars/'.length).replace(/\.svg$/, ''), response)
     if (path.startsWith('/control/') && method === 'POST') return this.#controlRoute(path.slice('/control/'.length), request, response)
     if ((path === '/' || path === '/signin') && method === 'GET') return html(response, 200, signInPage({}))
