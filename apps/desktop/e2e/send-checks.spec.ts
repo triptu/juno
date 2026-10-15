@@ -24,7 +24,7 @@ test('a reply typed into Main is offered to its thread, and Post in thread posts
   await juno.signIn()
   await juno.waitForSync()
   const { topic } = juno
-  const root = fake.messages('C0ENG').find((message) => message.text.startsWith('Unrelated: has anyone looked at the staging bill'))!
+  const root = fake.messages('C0ENG').find((message) => (message.text ?? '').startsWith('Unrelated: has anyone looked at the staging bill'))!
   await juno.sidebar.row(ENG_MAIN).open()
   await topic.expectTitle('Main')
 
