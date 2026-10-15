@@ -4,6 +4,13 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-16 22:10 · orchestrator · Merges land in batches: finished branches are merged into a local batch branch, conflicts resolved there, one full `pnpm affected` runs, and main moves only when it is green. Why: under the 24 vCPU cap one run per branch took 30+ minutes and most died on Namespace timeouts.
+- 10-16 21:00 · orchestrator · The sidebar's first-sync progress lives in the sidebar header: a 2px bar on the header's bottom edge that takes no space, and "Syncing N of M" in a fixed slot. Nothing below the header moves when sync starts or ends.
+- 10-16 21:00 · orchestrator · Growth the user asks for, such as Show more on a card, is exempt from the layout-shift guard (`data-expands-in-place`). Everything that moves on its own still fails the guard.
+- 10-16 20:40 · orchestrator · Set up Juno loads on demand to keep the startup bundle under 1000 KB.
+- 10-16 20:00 · orchestrator · Local desktop tests rebuild first when sources changed (Playwright global setup with build-cached), after a stale build made a fixed bug look live.
+- 10-16 19:30 · orchestrator · A post the network sends twice is reconciled by its client message id: the copy is hidden and deleted through the outbox; a copy with replies stays (ADR 0014).
+- 10-16 18:30 · orchestrator · Background Slack calls stay at 40 per minute per method, below the published 50, because the session token is shared with the official client.
 - 10-16 15:40 · Tushar · New chat shows a short "Frequent" list of up to 6 channels and DMs, ranked by the user's own recent sends (7-day half-life over 30 days) and filled from recent activity; choosing one sets the destination and focuses the composer.
 - 10-16 15:10 · Tushar · The Juno panel becomes a floating, inset Mac-style inspector (rounded, soft shadow, subtle tint with translucency) that reads as Juno inside the tab; wider by default; open state per tab; no Juno mark beside its bubbles; Catch me up styled as a suggestion chip, not a reply; a quiet context line above the composer shows what Juno sees (topic, plus selection).
 - 10-16 15:00 · Tushar · Links in message content that open outside the app use the pointing-hand cursor, as native Mac apps do for text links. Every other control keeps the arrow; the lint check allows only that one place.
