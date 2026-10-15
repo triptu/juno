@@ -15,6 +15,7 @@ import { AGENT_PORT_HANDOFF_TAG, type JunoBridge } from '@juno/contract/channels
 import type { Registry } from '../client'
 import { acquirePort } from '../port'
 import { portProtocol, type PortConnection, type PortLike } from '../transport'
+import { whenProviderActive } from './provider'
 
 /**
  * How the renderer reaches the agent. `off`: main says no agent runs (it is
@@ -33,9 +34,14 @@ export class AgentOff extends Error {
   }
 }
 
-/** Asks main for a port to the agent; the preload forwards it as a tagged window message. */
-export function acquireAgentPort(): Promise<PortLike> {
+/**
+ * Asks main for a port to the agent; the preload forwards it as a tagged
+ * window message. While no provider is set up no agent runs, so it waits
+ * for one instead of asking (`provider.ts`).
+ */
+export async function acquireAgentPort(): Promise<PortLike> {
   const win = globalThis as unknown as { readonly juno: JunoBridge }
+  await whenProviderActive(win.juno)
   return acquirePort(() => win.juno.agent.requestPort(), AGENT_PORT_HANDOFF_TAG, () => new AgentOff(), 'agent')
 }
 

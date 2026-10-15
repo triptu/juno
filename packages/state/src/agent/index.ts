@@ -18,3 +18,4 @@ export {
   type ChatCommands,
   type PendingSend,
 } from './chat'
+export { agentProviderAtom, setAgentProvider, whenProviderActive } from './provider'
