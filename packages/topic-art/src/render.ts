@@ -18,7 +18,7 @@ export const STROKE = 2.75
 export const SMALL_BELOW = 20
 const SMALL_STROKE_SCALE = 1.3
 
-/** The sizes the app draws art at: 40 in rows, 20 in the topic header, 16 in tabs. */
+/** The sizes the app draws art at: 40 in rows, 20 in peek, 16 in tabs. */
 export type ArtSize = 40 | 20 | 16
 
 const fixed = (n: number): string => (Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/0+$/, '').replace(/\.$/, ''))

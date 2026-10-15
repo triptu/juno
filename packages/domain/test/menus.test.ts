@@ -11,6 +11,7 @@ const base: TopicMenuState = {
   pinned: false,
   resolved: false,
   notify: 'matters',
+  aiAssist: true,
 }
 
 describe('topic row menu', () => {
@@ -19,6 +20,7 @@ describe('topic row menu', () => {
       'Open in new tab',
       '—',
       'Rename',
+      'Redraw',
       'Mark as unread',
       'Pin',
       'Resolve',
@@ -35,6 +37,7 @@ describe('topic row menu', () => {
       'Open in new tab',
       '—',
       'Rename',
+      'Redraw',
       'Mark as read',
       'Unpin',
       'Reopen',
@@ -52,6 +55,14 @@ describe('topic row menu', () => {
     expect(main).toContain('Notify me')
     expect(labels(topicMenuItems({ ...base, channel: maya }))).not.toContain('Ignore Maya Chen')
     expect(labels(topicMenuItems({ ...base, channel: group })).at(-1)).toBe('Notify me')
+  })
+
+  it('offers Redraw only with AI assist on, and never on a DM Main, which shows the person', () => {
+    expect(labels(topicMenuItems({ ...base, aiAssist: false }))).not.toContain('Redraw')
+    expect(labels(topicMenuItems({ ...base, kind: 'main' }))).toContain('Redraw')
+    expect(labels(topicMenuItems({ ...base, channel: maya }))).toContain('Redraw')
+    expect(labels(topicMenuItems({ ...base, kind: 'main', channel: maya }))).not.toContain('Redraw')
+    expect(labels(topicMenuItems({ ...base, kind: 'main', channel: group }))).not.toContain('Redraw')
   })
 
   it('offers the three Notify me choices with the current one checked and named in the hint', () => {
