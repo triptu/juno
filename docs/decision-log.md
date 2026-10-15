@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-15 05:30 · orchestrator · Merged M5 topic actions: resolve, reopen, pin, unpin, rename (title island and row), ignore, mark read and unread, Copy Slack link and Open in Slack in row, title and message menus; each returns an engine-computed undo, shown in one toast and on ⌘Z (20 kept). Resolve marks read and never unfollows; mark read clears Reopened. The header's Juno button is hidden until the panel exists. All topics has no page yet.
 - 10-15 05:00 · orchestrator · Merged New chat + Home and the floating header (B) to main. On the merged tree: typecheck, lint and unit tests pass, desktop e2e 64 of 64; the gallery had two parts time out (15 min shift part 4, 2 min cursor check) at load 15 to 17, with no layout or cursor failure reported; both branches passed the gallery on their own. Pushed; the gallery reruns remotely once remote runs land.
 - 10-15 04:40 · Tushar · Verification must not be a bottleneck: saturate remote machines (parallel inside one, fan out across several), run only the tests affected by a change while iterating, run full suites on a schedule against main, cache passed checks by input hash, and find other ways to remove waiting.
 - 10-15 04:25 · Tushar · Namespace account and `nsc` CLI are set up; remote test runs become the top priority because the Mac is overloaded (load 11 to 15, about 20 queued heavy jobs). Perf and feel stay on the Mac.
