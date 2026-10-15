@@ -3,17 +3,20 @@
 //
 //   pnpm verify:main                 local main
 //   pnpm verify:main --ref origin/main
-//   pnpm verify:main --with-mac      also the e2e tests tagged @mac, on this Mac
+//   pnpm verify:main --with-mac      also, on this Mac: the e2e tests tagged @mac,
+//                                    then `perf` and `test:feel`
 //
 // It checks main out into a temporary detached worktree, so nothing local is
 // sent, and runs `test`, `specs:check` (with no cache: every Quint run),
 // `test:gallery` and `test:desktop` through scripts/remote.mjs at the same time.
 // The summary goes to .juno-status/verify-main.md and .json in this checkout,
 // the full logs to .juno-status/verify-main/<run>/. The exit code is 1 if any
-// suite failed. perf and test:feel are not part of it: they need the whole Mac.
+// suite failed. perf and test:feel time the Mac, so they run only with
+// --with-mac, one after the other, each holding the whole machine; the feel
+// contact sheet is copied next to the logs.
 
 import { spawn, spawnSync } from 'node:child_process'
-import { createWriteStream, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { cpSync, createWriteStream, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -75,7 +78,13 @@ if (withMac) {
     })(),
   )
 }
-const results = await Promise.all(runs)
+let results = await Promise.all(runs)
+if (withMac) {
+  // After the rest, so they do not time a machine the other suites are using.
+  for (const suite of ['perf', 'test:feel']) results = [...results, await run(suite, 'pnpm', [suite], checkout)]
+  const sheet = join(checkout, 'apps/desktop/feel-report')
+  if (existsSync(sheet)) cpSync(sheet, join(logDir, 'feel-report'), { recursive: true, force: true })
+}
 
 /** The failing tests a log names: Playwright's numbered failures, vitest's FAIL lines, a failed spec job. */
 function failures(log) {
@@ -88,6 +97,7 @@ function failures(log) {
   const lines = text.split('\n')
   const found = [
     ...lines.filter((line) => /^\s+\d+\) /.test(line)).map((line) => line.trim().replace(/\s*─+$/, '')),
+    ...lines.filter((line) => /^did not run: |against a budget of/.test(line)).map((line) => line.trim()),
     ...lines.filter((line) => /\bFAIL\b/.test(line) && /\.test\.ts/.test(line)).map((line) => line.replace(/^.*?FAIL\s+/, 'FAIL ').trim()),
     ...lines.filter((line) => /^Error: (Quint|Spec check|Missing|A corrected|Agent schedule|No usable)/.test(line)),
     ...lines.filter((line) => /^remote: (?!.*exited with)/.test(line) && /failed|lost the connection|not reach/.test(line)),
