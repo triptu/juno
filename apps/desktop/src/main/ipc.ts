@@ -3,7 +3,7 @@ import { Schema } from 'effect'
 import { Channels, ShellRoutes, type ContextMenuLeaf, type ShellInput, type ShellOutput } from '@juno/contract'
 import type { AgentSupervisor } from './agent'
 import type { EngineSupervisor } from './engine'
-import type { OpenRouterKeyStore } from './keychain'
+import type { ProviderStore } from './providers'
 import type { Launch } from './launch'
 import { APP_ORIGIN } from './scheme'
 
@@ -65,8 +65,8 @@ const e2e = process.env.JUNO_E2E === '1'
 export interface IpcDeps {
   readonly supervisor: EngineSupervisor
   /** The agent's supervisor; absent while the agent is off. */
-  readonly agent: AgentSupervisor | undefined
-  readonly openRouterKey: OpenRouterKeyStore
+  readonly agent: AgentSupervisor
+  readonly providers: ProviderStore
   readonly setTheme: (theme: Launch['theme']) => void
   readonly setAccent: (accent: NonNullable<Launch['accent']>) => void
   readonly setDensity: (density: NonNullable<Launch['density']>) => void
@@ -75,7 +75,7 @@ export interface IpcDeps {
   readonly setViewing: (topicId: string | null) => void
 }
 
-export function registerIpc({ supervisor, agent, openRouterKey, setTheme, setAccent, setDensity, setSidebar, setViewing }: IpcDeps): void {
+export function registerIpc({ supervisor, agent, providers, setTheme, setAccent, setDensity, setSidebar, setViewing }: IpcDeps): void {
   handle(Channels.appGetInfo, () => ({
     name: app.getName(),
     version: app.getVersion(),
@@ -88,9 +88,14 @@ export function registerIpc({ supervisor, agent, openRouterKey, setTheme, setAcc
   // answer says whether one will come at all.
   handle(Channels.engineRequestPort, (_input, event) => supervisor.connect(event.sender))
   // The same for the Juno Agent; `failed` while it is off.
-  handle(Channels.agentRequestPort, (_input, event) => agent?.connect(event.sender) ?? 'failed')
-  // The key goes to the keychain and the agent, never to a file or a log (keychain.ts).
-  handle(Channels.agentSetOpenRouterKey, ({ key }) => openRouterKey.set(key))
+  handle(Channels.agentRequestPort, (_input, event) => agent.connect(event.sender))
+  // Keys go to the keychain and the agent, never to a file or a log (providers.ts).
+  handle(Channels.agentSetOpenRouterKey, ({ key }) => providers.set({ _tag: 'openRouter', key }))
+  handle(Channels.agentProvider, async () => {
+    await providers.load()
+    return providers.state
+  })
+  handle(Channels.agentSetProvider, (change) => providers.set(change))
 
   // The sidebar's Restart, after the supervisor gave up on the engine.
   handle(Channels.engineRestart, () => {

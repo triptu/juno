@@ -27,6 +27,15 @@ const bridge: JunoBridge = {
   agent: {
     requestPort: () => ipcRenderer.invoke(Channels.agentRequestPort),
     setOpenRouterKey: (key) => ipcRenderer.invoke(Channels.agentSetOpenRouterKey, { key }),
+    provider: () => ipcRenderer.invoke(Channels.agentProvider),
+    setProvider: (change) => ipcRenderer.invoke(Channels.agentSetProvider, change),
+    onProvider: (listener) => {
+      const forward = (_event: unknown, state: unknown) => listener(state)
+      ipcRenderer.on(Events.agentProviderChanged, forward)
+      return () => {
+        ipcRenderer.off(Events.agentProviderChanged, forward)
+      }
+    },
   },
   launch: {
     setTheme: (theme) => ipcRenderer.invoke(Channels.launchSetTheme, { theme }),
