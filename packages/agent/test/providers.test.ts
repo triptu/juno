@@ -35,7 +35,7 @@ it('never sends an unstamped, changed, oversized or unaffordable request', async
 it.each([
   ['a server error', serverError(), 'provider', false, 'kept'],
   ['a rejected key', rejectedKey(), 'keyRejected', false, 'released'],
-  ['a rate limit', rateLimited(), 'provider', true, 'released'],
+  ['a rate limit', rateLimited(), 'rateLimited', true, 'released'],
   ['a lost stream', lostStream('an unfinished answer', { afterChars: 4 }), 'offline', false, 'kept'],
   ['a failed connection', httpError(0, 'fetch failed'), 'offline', false, 'kept'],
 ] as const)('maps %s to its reason, sends once and keeps any spend it cannot rule out', async (_, step, reason, rateLimit, spend) => {
@@ -76,4 +76,10 @@ it('runs compaction through the same guard and stops it at its share of the cap'
   await expect(compactor.summarize(['Compaction: compress messages 1–1 into one line.', '<input>\nInvented text\n</input>'])).rejects.toThrow('budget')
   expect(guard.spend.reserve('chat', dollars(1.5)).kind).toBe('reserved')
   expect(h.fake.requests).toHaveLength(1)
+})
+
+it('distinguishes a missing key from a rejected key and a rate limit', () => {
+  expect(providerFailure(new Error('No API key'))).toEqual({ ending: { _tag: 'failed', reason: 'missingKey' }, rateLimited: false })
+  expect(providerFailure('JUNO:failed:missingKey').ending).toEqual({ _tag: 'failed', reason: 'missingKey' })
+  expect(providerFailure('JUNO:failed:rateLimited:429')).toEqual({ ending: { _tag: 'failed', reason: 'rateLimited' }, rateLimited: true })
 })

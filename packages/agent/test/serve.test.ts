@@ -80,7 +80,7 @@ it('a failed run shows its ending line, and Try again sends the same message wit
   h.fake.script([rateLimited(), reply(say('Here it is.'))])
   await run(client['agent.chat.send']({ opId: 'op-1' as OpId, text: 'summarise #eng' }))
   const failed = await pageWhere((p) => of(p, 'ending').length === 1, 'the ending line')
-  expect(of(failed, 'ending')[0]).toMatchObject({ ending: { _tag: 'failed', reason: 'provider', retry: 'op-1' } })
+  expect(of(failed, 'ending')[0]).toMatchObject({ ending: { _tag: 'failed', reason: 'rateLimited', retry: 'op-1' } })
 
   const retried = await run(client['agent.chat.retry']({ opId: 'op-2' as OpId, interruptedOpId: 'op-1' as OpId }))
   expect(retried).toMatchObject({ _tag: 'Success', success: { opId: 'op-2' } })

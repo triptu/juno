@@ -466,7 +466,7 @@ function buildItems(source: ChatSource, cache: Caches, revision: ReturnType<Retu
     const card = {
       ...open,
       _tag: 'task' as const, id: `task:${job.id}` as CardId, jobId: job.id as JobId, kind: job.kind, title: job.title, where: job.place,
-      phase: job.phase === 'unknown' ? ('failed' as const) : job.phase, ...(job.state === null ? {} : { state: job.state }),
+      ...(job.stopFailed ? { stopFailed: true } : {}), phase: job.phase === 'unknown' ? ('failed' as const) : job.phase, ...(job.state === null ? {} : { state: job.state }),
     }
     const reactions = reactionsOf('card', card.id)
     entries.push(cache.entries.get(`card:${card.id}`, [at, job.runId, JSON.stringify(card), JSON.stringify(reactions), at > source.readAt],

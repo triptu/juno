@@ -10,6 +10,8 @@ export interface FrameWork {
 }
 
 const TRACE_DIR = process.env['JUNO_PERF_TRACE']
+/** With JUNO_TRACE_SKIA too: the GPU process's raster passes (blurs, image filters) and pipeline compiles. */
+const SKIA = ['skia', 'disabled-by-default-skia', 'disabled-by-default-skia.gpu', 'disabled-by-default-skia.shaders', 'gpu.dawn', 'disabled-by-default-gpu.dawn', 'gpu.graphite', 'disabled-by-default-gpu.graphite']
 
 /**
  * Records a Chrome trace of the renderer while `run` runs and answers with
@@ -28,7 +30,7 @@ export async function recordTrace(win: Page, name: string, run: () => Promise<vo
   const categories =
     TRACE_DIR === undefined
       ? ['devtools.timeline', 'disabled-by-default-devtools.timeline', 'blink.user_timing', 'benchmark']
-      : ['devtools.timeline', 'disabled-by-default-devtools.timeline', 'disabled-by-default-devtools.timeline.frame', 'blink.user_timing', 'v8.execute', 'blink', 'cc', 'benchmark', 'gpu', 'viz']
+      : ['devtools.timeline', 'disabled-by-default-devtools.timeline', 'disabled-by-default-devtools.timeline.frame', 'blink.user_timing', 'v8.execute', 'blink', 'cc', 'benchmark', 'gpu', 'viz', ...(process.env['JUNO_TRACE_SKIA'] === undefined ? [] : SKIA)]
   await cdp.send('Tracing.start', { traceConfig: { includedCategories: categories }, transferMode: 'ReturnAsStream' })
   let trace = ''
   let layers: Array<{ layerId: string; backendNodeId?: number; width: number; height: number; drawsContent: boolean }> = []
