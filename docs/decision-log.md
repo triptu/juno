@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-15 15:05 · orchestrator · Merged agent-quality-2: sources render as quiet inline links (a `source` JunoInline and a `message` open target; the click waits for WP14's open path), warnings cite the hostile message, and the ❓ regression is fixed by two prompt lines (it came from the sources rule pushing a fresh read). Live evals: Sonnet 64/70 (91%, sources 78%), Haiku 60/70 (86%, sources 63%). Decided: the card check counts only proposed cards; stale handles stay a failure and the router must never show raw handle text.
 - 10-15 14:50 · orchestrator · Merged the WP19 scheduler core: persisted occurrences, reply watches, schedule tools and card executors, the Scheduled page data and `agent.schedule.watchReply` (156 agent tests pass). Not yet wired end to end; a follow-up connects router startup, the reply checks and nudge-card expiry.
 - 10-15 14:35 · Tushar · Juno Agent on by default whenever a provider is configured. Providers in Settings › Juno: OpenRouter key, or one generic OpenAI-compatible endpoint (base URL, key, model) for local models or other services.
 - 10-15 14:35 · Tushar · Keep the custom thin sidebar scrollbar (looks over the small speed gain). Sidebar left and right insets must match exactly; the scrollbar sits inside the margin. Spacing is measured, not eyeballed, with geometry checks.
