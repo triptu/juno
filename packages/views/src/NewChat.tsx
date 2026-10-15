@@ -36,7 +36,6 @@ export function NewChat({ preview, note = NEW_CHAT_NOTE, composer, frequent = []
           <div {...stylex.props(styles.frequentArea)}>
             <div {...stylex.props(styles.column)}>
               <FrequentConversations conversations={frequent} selected={selectedConversation} onPick={onPickConversation} />
-              <Text variant="body" tone="muted">{NEW_CHAT_NOTE}</Text>
             </div>
           </div>
         ) : preview ?? (
@@ -75,7 +74,9 @@ const styles = stylex.create({
     flexDirection: 'column',
     flexGrow: 1,
     paddingInline: spacing['--space-6'],
-    paddingBlock: spacing['--space-4'],
+    // Include the composer's 8px top inset in the space above its destination chips.
+    paddingTop: spacing['--space-5'],
+    paddingBottom: spacing['--space-3'],
     overflowY: 'auto',
   },
   column: {

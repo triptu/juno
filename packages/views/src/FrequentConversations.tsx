@@ -3,8 +3,8 @@ import { Hash } from '@phosphor-icons/react/dist/icons/Hash'
 import { Lock } from '@phosphor-icons/react/dist/icons/Lock'
 import { Users } from '@phosphor-icons/react/dist/icons/Users'
 import type { PickConversation } from '@juno/contract'
-import { spacing } from '@juno/tokens/tokens.stylex'
-import { Avatar, Icon, ListRow, OptionGroupLabel, Text } from '@juno/ui'
+import { layout, spacing } from '@juno/tokens/tokens.stylex'
+import { Avatar, Icon, ListRow, Text } from '@juno/ui'
 import { hueFor, initials } from './look'
 
 interface FrequentConversationsProps {
@@ -16,25 +16,27 @@ interface FrequentConversationsProps {
 /** Standard list rows; every destination is a separate Tab stop. */
 export function FrequentConversations({ conversations, selected, onPick }: FrequentConversationsProps) {
   return (
-    <div {...stylex.props(styles.block)}>
-      <OptionGroupLabel>Frequent</OptionGroupLabel>
+    <div data-frequent-block="" {...stylex.props(styles.block)}>
+      <Text variant="sectionLabel" tone="muted" as="div" sx={styles.label}>Frequent</Text>
       <div role="list" aria-label="Frequent conversations">
         {conversations.map(conversation => (
           <div key={conversation.key} role="listitem">
             <ListRow
-              minHeight={44}
+              minHeight={32}
+              padding="navigation"
               divider={false}
               selected={conversation.key === selected}
               leading={<DestinationMark conversation={conversation} />}
-              trailing={conversation.kind === 'private' ? <Icon icon={Lock} size={15} /> : undefined}
               onMouseDown={event => { if (event.button === 0 && !event.ctrlKey) event.preventDefault() }}
               onSelect={() => onPick(conversation)}
             >
-              <Text variant="ui" truncate>{conversation.name}</Text>
+              <Text variant="ui" truncate><span data-frequent-name="">{conversation.name}</span></Text>
+              {conversation.kind === 'private' ? <Icon icon={Lock} size={13} /> : null}
             </ListRow>
           </div>
         ))}
       </div>
+      <Text variant="body" tone="muted" as="div" sx={styles.hint}>Write your message, then pick where it goes.</Text>
     </div>
   )
 }
@@ -47,8 +49,15 @@ function DestinationMark({ conversation }: { readonly conversation: PickConversa
 
 const styles = stylex.create({
   block: {
-    width: 'max-content',
+    width: layout['--sidebar-width'],
     maxWidth: '100%',
-    paddingBottom: spacing['--space-3'],
+  },
+  label: {
+    paddingInline: spacing['--space-3'],
+    paddingBottom: spacing['--space-1'],
+  },
+  hint: {
+    paddingInline: spacing['--space-3'],
+    paddingTop: spacing['--space-3'],
   },
 })
