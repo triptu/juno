@@ -173,11 +173,13 @@ export {
   junoChatTargetAtom,
   junoFocusAtom,
   junoPanelOpenAtom,
+  junoPanelWidthAtom,
   junoQuoteAtom,
   messageFlashAtom,
   openedAtNewAtom,
   quoteInJuno,
   setJunoPanelOpen,
+  setJunoPanelWidth,
   showInJunoChat,
 } from './junoPanel'
 export {

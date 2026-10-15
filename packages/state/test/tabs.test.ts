@@ -17,6 +17,7 @@ import {
   parseTabs,
   reopenClosedTab,
   savedTabs,
+  setJunoPanel,
   setPinned,
   settleNewChat,
   stepHistory,
@@ -355,5 +356,23 @@ describe('saved tabs', () => {
     const lost = parseTabs({ tabs: [{ id: 'a' }], active: 'gone', recent: ['gone'] })
     expect(lost.active).toBe('a')
     expect(lost.recent).toEqual(['a'])
+  })
+})
+
+describe('the Juno panel per tab', () => {
+  it('opens in one tab, stays closed in the others, and survives a switch, a close and reopen, and a save', () => {
+    const two = open(open(noTabs, 'a'), 'b', { newTab: true })
+    const [a, b] = two.tabs.map((tab) => tab.id)
+    const opened = setJunoPanel(two, a!, true)
+    const panelOf = (tabs: Tabs, id: string) => tabs.tabs.find((tab) => tab.id === id)?.junoPanel === true
+    expect(panelOf(opened, a!)).toBe(true)
+    expect(panelOf(opened, b!)).toBe(false)
+    expect(setJunoPanel(opened, a!, true)).toBe(opened)
+    const reopened = reopenClosedTab(closeTab(opened, a!))
+    expect(panelOf(reopened, a!)).toBe(true)
+    const restored = parseTabs(JSON.parse(JSON.stringify(savedTabs(opened))))
+    expect(panelOf(restored, a!)).toBe(true)
+    expect(panelOf(restored, b!)).toBe(false)
+    expect(panelOf(setJunoPanel(opened, a!, false), a!)).toBe(false)
   })
 })

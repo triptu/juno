@@ -65,6 +65,8 @@ export interface Tab {
   readonly id: string
   readonly pinned: boolean
   readonly history: TabHistory
+  /** The Juno panel is open in this tab (SPEC 7). It shows while the tab shows a topic. */
+  readonly junoPanel?: true
 }
 
 /** A closed tab and where it was in the strip. */
@@ -265,6 +267,15 @@ export function setPinned(tabs: Tabs, id: string, pinned: boolean): Tabs {
   return { ...tabs, tabs: rest.toSpliced(pinnedCount(rest), 0, { ...tab, pinned }) }
 }
 
+/** Opens or closes the Juno panel in one tab; the other tabs keep theirs. */
+export function setJunoPanel(tabs: Tabs, id: string, open: boolean): Tabs {
+  const at = tabs.tabs.findIndex((tab) => tab.id === id)
+  const tab = tabs.tabs[at]
+  if (tab === undefined || (tab.junoPanel === true) === open) return tabs
+  const { junoPanel: _open, ...rest } = tab
+  return { ...tabs, tabs: tabs.tabs.with(at, open ? { ...rest, junoPanel: true } : rest) }
+}
+
 /** The next (1) or previous (-1) tab, wrapping around. */
 export function cycleTab(tabs: Tabs, step: 1 | -1): Tabs {
   const count = tabs.tabs.length
@@ -315,7 +326,7 @@ const PlaceJson = Schema.Union([
  * topic's. Tabs saved with the old `stealth` flag still read back; the flag
  * is dropped.
  */
-const TabJson = Schema.Union([Schema.Struct({ id: Schema.String, pinned: Schema.Boolean, place: PlaceJson }), Schema.Struct({ id: Schema.String })])
+const TabJson = Schema.Union([Schema.Struct({ id: Schema.String, pinned: Schema.Boolean, place: PlaceJson, junoPanel: Schema.optionalKey(Schema.Boolean) }), Schema.Struct({ id: Schema.String })])
 const TabsJson = Schema.Struct({
   tabs: Schema.Array(TabJson),
   active: Schema.NullOr(Schema.String),
@@ -330,7 +341,9 @@ export function parseTabs(value: unknown): Tabs {
     onSome: (saved) => {
       const ids = new Set(saved.tabs.map((tab) => tab.id))
       if (ids.size !== saved.tabs.length) return noTabs
-      const tabs = saved.tabs.map((tab): Tab => ('place' in tab ? { id: tab.id, pinned: tab.pinned, history: { entries: [tab.place], index: 0 } } : freshTab(tab.id, topicPlace(tab.id))))
+      const tabs = saved.tabs.map((tab): Tab =>
+        'place' in tab ? { id: tab.id, pinned: tab.pinned, history: { entries: [tab.place], index: 0 }, ...(tab.junoPanel === true ? { junoPanel: true } : {}) } : freshTab(tab.id, topicPlace(tab.id)),
+      )
       const ordered = [...tabs.filter((tab) => tab.pinned), ...tabs.filter((tab) => !tab.pinned)]
       const active = saved.active !== null && ids.has(saved.active) ? saved.active : ordered[0]?.id
       const recent = saved.recent.filter((id) => ids.has(id))
@@ -339,10 +352,10 @@ export function parseTabs(value: unknown): Tabs {
   })
 }
 
-/** What `TABS_PREF` holds: each tab with the place it shows. */
+/** What `TABS_PREF` holds: each tab with the place it shows, and whether its Juno panel is open. */
 export function savedTabs(tabs: Tabs): unknown {
   return {
-    tabs: tabs.tabs.map((tab) => ({ id: tab.id, pinned: tab.pinned, place: currentPlace(tab) })),
+    tabs: tabs.tabs.map((tab) => ({ id: tab.id, pinned: tab.pinned, place: currentPlace(tab), ...(tab.junoPanel === true ? { junoPanel: true } : {}) })),
     active: tabs.active ?? null,
     recent: tabs.recent,
   }
