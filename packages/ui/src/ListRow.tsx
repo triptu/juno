@@ -25,7 +25,7 @@ export interface ListRowProps extends Omit<HTMLAttributes<HTMLDivElement>, 'styl
   readonly selected?: boolean
   /** Draw the 1px rule under the row. Default true. */
   readonly divider?: boolean
-  /** Padding preset: `settings` 8 10 8 14, `table` 8 12, `log` 6 4. */
+  /** Padding preset: `settings` 8 14 (the same inset at both ends), `table` 8 12, `log` 6 4. */
   readonly padding?: 'settings' | 'table' | 'log'
   readonly children?: ReactNode
 }
@@ -131,10 +131,10 @@ const heights = stylex.create({
 })
 
 const paddings = stylex.create({
+  // The same 14px at both ends: a row's text starts where its last control ends from the other edge.
   settings: {
     paddingBlock: spacing['--space-2'],
-    paddingInlineStart: spacing['--space-3-5'],
-    paddingInlineEnd: spacing['--space-2-5'],
+    paddingInline: spacing['--space-3-5'],
   },
   table: {
     paddingBlock: spacing['--space-2'],

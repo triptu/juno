@@ -1,0 +1,280 @@
+{
+  "ok": true,
+  "pagination": {
+    "total_count": 2043,
+    "page": 1,
+    "per_page": 20,
+    "page_count": 103,
+    "first": 1,
+    "last": 20
+  },
+  "query": "redacted",
+  "filters": {
+    "is": [
+      "redacted"
+    ],
+    "after": "redacted"
+  },
+  "ai_filters": {},
+  "manual_filters": {
+    "is": [
+      "redacted"
+    ],
+    "after": "redacted"
+  },
+  "module": "redacted",
+  "items": [
+    {
+      "iid": "redacted",
+      "team": "T0REDACTED",
+      "channel": {
+        "id": "D0REDACTED",
+        "is_channel": false,
+        "is_group": false,
+        "is_im": true,
+        "is_mpim": false,
+        "is_shared": false,
+        "is_org_shared": false,
+        "is_ext_shared": false,
+        "is_private": true,
+        "is_archived": false,
+        "name": "U0REDACTED",
+        "user": "U0REDACTED"
+      },
+      "messages": [
+        {
+          "ts": "1700000000.000001",
+          "user": "U0REDACTED",
+          "iid": "redacted",
+          "text": "redacted",
+          "permalink": "https://redacted.invalid/",
+          "extracts": [],
+          "username": "redacted",
+          "blocks": [
+            {
+              "type": "rich_text",
+              "block_id": "redacted",
+              "elements": [
+                {
+                  "type": "rich_text_section",
+                  "elements": [
+                    {
+                      "type": "text",
+                      "text": "redacted"
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "blocks_extracts": [
+            {
+              "type": "rich_text",
+              "block_id": "redacted",
+              "elements": [
+                {
+                  "type": "rich_text_section",
+                  "elements": [
+                    {
+                      "type": "text",
+                      "text": "redacted"
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "blocks_extracts_typed": [
+            {
+              "type": "rich_text",
+              "block_id": "redacted",
+              "elements": [
+                {
+                  "type": "rich_text_section",
+                  "elements": [
+                    {
+                      "type": "text",
+                      "text": "redacted"
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "thread_ts": "1700000000.000001"
+        }
+      ]
+    },
+    {
+      "iid": "redacted",
+      "team": "T0REDACTED",
+      "channel": {
+        "id": "C0REDACTED",
+        "is_channel": true,
+        "is_group": false,
+        "is_im": false,
+        "is_mpim": false,
+        "is_shared": false,
+        "is_org_shared": false,
+        "is_ext_shared": false,
+        "is_private": false,
+        "is_archived": false,
+        "name": "redacted",
+        "pending_shared": [],
+        "is_pending_ext_shared": false
+      },
+      "messages": [
+        {
+          "ts": "1700000000.000001",
+          "user": "U0REDACTED",
+          "iid": "redacted",
+          "text": "",
+          "permalink": "https://redacted.invalid/",
+          "extracts": [],
+          "subtype": "thread_broadcast",
+          "username": "redacted",
+          "bot_id": "B0REDACTED",
+          "attachments": [
+            {
+              "id": 1,
+              "footer_icon": "https://redacted.invalid/",
+              "ts": 1700000000,
+              "color": "redacted",
+              "fallback": "redacted",
+              "pretext": "redacted",
+              "title": "redacted",
+              "footer": "redacted",
+              "extracts": {}
+            }
+          ],
+          "thread_ts": "1700000000.000001"
+        }
+      ]
+    },
+    {
+      "iid": "redacted",
+      "team": "T0REDACTED",
+      "channel": {
+        "id": "C0REDACTED",
+        "is_channel": true,
+        "is_group": false,
+        "is_im": false,
+        "is_mpim": false,
+        "is_shared": false,
+        "is_org_shared": false,
+        "is_ext_shared": false,
+        "is_private": false,
+        "is_archived": false,
+        "name": "redacted",
+        "pending_shared": [],
+        "is_pending_ext_shared": false
+      },
+      "messages": [
+        {
+          "ts": "1700000000.000001",
+          "user": "U0REDACTED",
+          "iid": "redacted",
+          "text": "",
+          "permalink": "https://redacted.invalid/",
+          "extracts": [],
+          "subtype": "thread_broadcast",
+          "username": "redacted",
+          "bot_id": "B0REDACTED",
+          "blocks": [
+            {
+              "type": "section",
+              "block_id": "redacted",
+              "text": {
+                "type": "mrkdwn",
+                "text": "redacted",
+                "verbatim": false
+              }
+            },
+            {
+              "type": "context",
+              "block_id": "redacted",
+              "elements": [
+                {
+                  "type": "mrkdwn",
+                  "text": "redacted",
+                  "verbatim": false
+                }
+              ]
+            },
+            {
+              "type": "actions",
+              "block_id": "redacted",
+              "elements": [
+                {
+                  "type": "button",
+                  "action_id": "redacted",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "redacted",
+                    "emoji": true
+                  },
+                  "value": "redacted"
+                },
+                {
+                  "type": "button",
+                  "action_id": "redacted",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "redacted",
+                    "emoji": true
+                  },
+                  "value": "redacted"
+                },
+                {
+                  "type": "external_select",
+                  "action_id": "redacted",
+                  "placeholder": {
+                    "type": "plain_text",
+                    "text": "redacted",
+                    "emoji": true
+                  }
+                }
+              ]
+            }
+          ],
+          "blocks_extracts": [],
+          "blocks_extracts_typed": [],
+          "thread_ts": "1700000000.000001"
+        }
+      ]
+    }
+  ],
+  "filter_suggestions": {
+    "in": [
+      {
+        "id": "U0REDACTED",
+        "facet_count": 14,
+        "checked": true
+      },
+      {
+        "id": "C0REDACTED",
+        "facet_count": 2,
+        "checked": true
+      },
+      {
+        "id": "C0REDACTED",
+        "facet_count": 2,
+        "checked": true
+      }
+    ],
+    "from": [
+      {
+        "id": "U0REDACTED",
+        "facet_count": 11
+      },
+      {
+        "id": "U0REDACTED",
+        "facet_count": 3
+      },
+      {
+        "id": "U0REDACTED",
+        "facet_count": 2
+      }
+    ]
+  }
+}

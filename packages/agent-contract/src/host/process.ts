@@ -13,6 +13,10 @@ export const AgentConfig = Schema.Struct({
   e2e: Schema.Boolean,
   /** Under Playwright only: the fake OpenRouter's origin, for the catalogue and the models. */
   openRouterOrigin: Schema.optionalKey(Schema.String),
+  /** Under Playwright only: this Mac's name in the backup manifest. Otherwise the agent reads the computer name. */
+  deviceName: Schema.optionalKey(Schema.String),
+  /** Under Playwright only: how often the backup exports what changed. Otherwise once a minute. */
+  backupIntervalMs: Schema.optionalKey(Schema.Number),
 })
 export type AgentConfig = typeof AgentConfig.Type
 
@@ -43,6 +47,8 @@ export const MainToAgent = Schema.Union([
   Schema.TaggedStruct('provider', { provider: Schema.NullOr(AgentProvider) }),
   /** Main's answer to a `credential` request. `value` is only set for `load`. */
   Schema.TaggedStruct('credentialReply', { requestId: Schema.Number, ok: Schema.Boolean, value: Schema.optionalKey(Schema.NullOr(Schema.String)) }),
+  /** Main's answer to a `secret` request. `value` is only set for `get`; null when there is none. */
+  Schema.TaggedStruct('secretReply', { requestId: Schema.Number, ok: Schema.Boolean, value: Schema.optionalKey(Schema.NullOr(Schema.String)) }),
 ])
 export type MainToAgent = typeof MainToAgent.Type
 
@@ -60,10 +66,28 @@ export const CredentialRequest = Schema.Union([
 ])
 export type CredentialRequest = typeof CredentialRequest.Type
 
+/** The backup's secrets in main's keychain (WP21): the backup key, the deletion record and the recovery phrase. */
+export const BackupSecretName = Schema.Literals(['backupKey', 'deletionRecord', 'recoveryPhrase'])
+export type BackupSecretName = typeof BackupSecretName.Type
+
+/**
+ * What the backup asks main for (WP21). Main keeps each secret in the login
+ * keychain and nowhere else. A `set` of `recoveryPhrase` is an export: main
+ * shows the phrase to the owner once.
+ */
+export const SecretRequest = Schema.Union([
+  Schema.TaggedStruct('get', { name: BackupSecretName }),
+  Schema.TaggedStruct('set', { name: BackupSecretName, value: Schema.String }),
+])
+export type SecretRequest = typeof SecretRequest.Type
+
 /** agent -> main. */
 export const AgentToMain = Schema.Union([
   /** The agent reached its host on the current port. */
   Schema.TaggedStruct('ready', { host: HostHello }),
   Schema.TaggedStruct('credential', { requestId: Schema.Number, request: CredentialRequest }),
+  Schema.TaggedStruct('secret', { requestId: Schema.Number, request: SecretRequest }),
+  /** The agent is about to exit so a staged restore installs at the next open. Main starts it again at once. */
+  Schema.TaggedStruct('restart', {}),
 ])
 export type AgentToMain = typeof AgentToMain.Type

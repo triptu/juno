@@ -393,7 +393,7 @@ Every state the chat can be in, and what it shows.
 | Not delivered | "Not delivered · Try again". Only when Juno could not store the message on this Mac. Try again resubmits the same message |
 | Too long | "That is too long to send as one message. Split it up and send the parts." The message stays in the chat, marked not sent |
 | Interrupted | "Juno was interrupted. Your message is kept. Try again". No Try again when a schedule or a job started the run |
-| Failed | One line and Try again: "Juno didn't answer. Give it a moment and try again.", "OpenRouter rejected the key. Check it in Settings.", "Codex is signed out on this Mac. Sign in to Codex and try again.", or "Juno lost the connection. Try again when you are back online." |
+| Failed | One line and Try again: "Juno didn't answer. Give it a moment and try again.", "OpenRouter rejected the key. Check it in Settings.", "Codex is signed out on this Mac. Sign in to Codex and try again.", "Codex is not installed on this Mac. Install Codex and try again.", "Codex has used the available ChatGPT quota. Try again when it resets.", "Codex stopped before finishing. Check any action cards before trying again.", or "Juno lost the connection. Try again when you are back online." |
 | Blocked | "Juno can't fit this in one request. Removing a pin or starting a smaller task helps." No card |
 | Budget reached mid-reply | "Juno has used today's budget." under the reply, with the Budget card |
 | Offline | A chip, "You're offline". The composer works and a send that needs the network waits. Schedules that fall due offline run once when back |
@@ -443,7 +443,7 @@ Juno remembers the whole chat. Older parts are kept as a summary that grows dens
 
 ### 13.10 Settings and pages
 
-The Juno header menu (the chevron beside "Juno" in the Juno tab and the panel) opens Scheduled, What Juno remembers, Memory of this chat, Activity, Connections and Settings › Juno. **Settings › Juno** holds the chat model (the newest of Claude Sonnet, Claude Opus, Muse, GPT Sol or Grok, resolved from the provider's catalogue; Sonnet by default; each choice reads as the model's own name and its price, "Claude Sonnet 5.5 · $2 in, $10 out per million tokens"), the compaction model, today's spend and the daily cap ($2 by default), the OpenRouter key (with a line when the provider rejected it) and Codex status, your rules, Pause, the backup folder with "Rotate recovery phrase after removals" (off by default), and who owns Juno's state with Export recovery phrase, Move to another Mac and Restore from backup (13.8). **Connections** shows each server's state, the address in use, and the tools it offers with their tier. The T3 Code row also holds its address and the switch "Allow T3 Code over the local network", off by default; over the network only an https address works, so with the switch off Juno uses T3 Code on this Mac only.
+The Juno header menu (the chevron beside "Juno" in the Juno tab and the panel) opens Scheduled, What Juno remembers, Memory of this chat, Activity, Connections and Settings › Juno. **Settings › Juno** holds the chat model (the newest of Claude Sonnet, Claude Opus, Muse, GPT Sol or Grok, resolved from the provider's catalogue; Sonnet by default; each choice reads as the model's own name and its price, "Claude Sonnet 5.5 · $2 in, $10 out per million tokens"), the compaction model, today's spend and the daily cap ($2 by default), the OpenRouter key (with a line when the provider rejected it) and Codex status. Local Codex uses an isolated sign-in, is available without an API key, and shows ChatGPT-plan turns today instead of a dollar price. Remaining quota is not reported. Settings also holds your rules, Pause, the backup folder with "Rotate recovery phrase after removals" (off by default), and who owns Juno's state with Export recovery phrase, Move to another Mac and Restore from backup (13.8). **Connections** shows each server's state, the address in use, and the tools it offers with their tier. The T3 Code row also holds its address and the switch "Allow T3 Code over the local network", off by default; over the network only an https address works, so with the switch off Juno uses T3 Code on this Mac only.
 
 ### 13.11 Writing
 
@@ -451,7 +451,7 @@ Section 17 applies to the app's own copy. Juno says "I" in its own bubbles; the 
 
 ### 13.12 Performance
 
-Your bubble within a frame of Enter. A reaction on its bubble within a frame of the click. The status bubble within 100ms. First status text or first bubble within 2.5s on OpenRouter (a Codex turn can be slower and shows the dots meanwhile). A 5,000-message chat opens within the list budget in `docs/performance.md`.
+Your bubble within a frame of Enter. A reaction on its bubble within a frame of the click. The status bubble within 100ms. First status text or first bubble within 2.5s on OpenRouter (a Codex turn can be slower and says “Waiting for Codex” until a tool supplies progress). A 5,000-message chat opens within the list budget in `docs/performance.md`.
 
 ### 13.13 Not in v1
 

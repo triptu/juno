@@ -1,0 +1,280 @@
+[
+  {
+    "tag": "div",
+    "label": "engMain",
+    "rect": {
+      "x": 516,
+      "y": 52,
+      "w": 140.4,
+      "h": 36
+    },
+    "padding": "0px 3px 0px 5px",
+    "gap": "2px",
+    "radius": "999px",
+    "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgb(251, 251, 248)",
+    "border": "1px solid rgba(0, 0, 0, 0)",
+    "shadow": "oklch(0 0 0 / 0.03) 0px 1px 2px 0px, oklch(0 0 0 / 0.07) 0px 6px 20px -4px",
+    "outline": "none 3px rgb(35, 33, 26) offset 0px",
+    "children": [
+      {
+        "tag": "span",
+        "label": "eng",
+        "rect": {
+          "x": 522,
+          "y": 58,
+          "w": 56.4,
+          "h": 24
+        },
+        "padding": "0px",
+        "gap": "normal",
+        "radius": "0px",
+        "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+        "color": "rgb(35, 33, 26)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(35, 33, 26)",
+        "shadow": "none",
+        "outline": "none 3px rgb(35, 33, 26) offset 0px"
+      },
+      {
+        "tag": "h1",
+        "label": "Main",
+        "rect": {
+          "x": 580.4,
+          "y": 56,
+          "w": 72,
+          "h": 28
+        },
+        "padding": "0px",
+        "gap": "normal",
+        "radius": "0px",
+        "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+        "color": "rgb(35, 33, 26)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(35, 33, 26)",
+        "shadow": "none",
+        "outline": "none 3px rgb(35, 33, 26) offset 0px"
+      }
+    ]
+  },
+  {
+    "tag": "span",
+    "label": "eng",
+    "rect": {
+      "x": 522,
+      "y": 58,
+      "w": 56.4,
+      "h": 24
+    },
+    "padding": "0px",
+    "gap": "normal",
+    "radius": "0px",
+    "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "0px none rgb(35, 33, 26)",
+    "shadow": "none",
+    "outline": "none 3px rgb(35, 33, 26) offset 0px",
+    "children": [
+      {
+        "tag": "button",
+        "label": "eng, public channel. Show in sidebar.",
+        "rect": {
+          "x": 522,
+          "y": 58,
+          "w": 56.4,
+          "h": 24
+        },
+        "padding": "0px 8px",
+        "gap": "6px",
+        "radius": "999px",
+        "font": "12.5px/24px 600 \"Figtree Variable\"",
+        "color": "rgb(96, 94, 82)",
+        "bg": "rgb(241, 238, 228)",
+        "border": "0px solid rgba(0, 0, 0, 0)",
+        "shadow": "none",
+        "outline": "none 2px rgb(180, 53, 31) offset 2px"
+      }
+    ]
+  },
+  {
+    "tag": "h1",
+    "label": "Main",
+    "rect": {
+      "x": 580.4,
+      "y": 56,
+      "w": 72,
+      "h": 28
+    },
+    "padding": "0px",
+    "gap": "normal",
+    "radius": "0px",
+    "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "0px none rgb(35, 33, 26)",
+    "shadow": "none",
+    "outline": "none 3px rgb(35, 33, 26) offset 0px",
+    "children": [
+      {
+        "tag": "button",
+        "label": "Main",
+        "rect": {
+          "x": 580.4,
+          "y": 56,
+          "w": 72,
+          "h": 28
+        },
+        "padding": "0px 8px",
+        "gap": "6px",
+        "radius": "999px",
+        "font": "14px/28px 600 \"Figtree Variable\"",
+        "color": "rgb(35, 33, 26)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px outset rgb(0, 0, 0)",
+        "shadow": "none",
+        "outline": "none 2px rgb(180, 53, 31) offset 2px"
+      }
+    ]
+  },
+  {
+    "tag": "div",
+    "label": "Threads · 33",
+    "rect": {
+      "x": 1128,
+      "y": 52,
+      "w": 140,
+      "h": 36
+    },
+    "padding": "0px 3px",
+    "gap": "2px",
+    "radius": "999px",
+    "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgb(251, 251, 248)",
+    "border": "1px solid rgba(0, 0, 0, 0)",
+    "shadow": "oklch(0 0 0 / 0.03) 0px 1px 2px 0px, oklch(0 0 0 / 0.07) 0px 6px 20px -4px",
+    "outline": "none 3px rgb(35, 33, 26) offset 0px",
+    "children": [
+      {
+        "tag": "div",
+        "label": "Threads · 33",
+        "rect": {
+          "x": 1132,
+          "y": 56,
+          "w": 102,
+          "h": 28
+        },
+        "padding": "0px",
+        "gap": "normal",
+        "radius": "0px",
+        "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+        "color": "rgb(35, 33, 26)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(35, 33, 26)",
+        "shadow": "none",
+        "outline": "none 3px rgb(35, 33, 26) offset 0px"
+      },
+      {
+        "tag": "button",
+        "label": "Juno ⌘J",
+        "rect": {
+          "x": 1236,
+          "y": 56,
+          "w": 28,
+          "h": 28
+        },
+        "padding": "0px",
+        "gap": "normal",
+        "radius": "999px",
+        "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+        "color": "rgb(35, 33, 26)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px solid rgba(0, 0, 0, 0)",
+        "shadow": "none",
+        "outline": "none 2px rgb(180, 53, 31) offset 2px"
+      }
+    ]
+  },
+  {
+    "tag": "div",
+    "label": "Threads · 33",
+    "rect": {
+      "x": 1132,
+      "y": 56,
+      "w": 102,
+      "h": 28
+    },
+    "padding": "0px",
+    "gap": "normal",
+    "radius": "0px",
+    "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "0px none rgb(35, 33, 26)",
+    "shadow": "none",
+    "outline": "none 3px rgb(35, 33, 26) offset 0px",
+    "children": [
+      {
+        "tag": "button",
+        "label": "Threads, 3",
+        "rect": {
+          "x": 1132,
+          "y": 56,
+          "w": 102,
+          "h": 28
+        },
+        "padding": "0px 10px",
+        "gap": "6px",
+        "radius": "999px",
+        "font": "12.5px/normal 500 \"Figtree Variable\"",
+        "color": "rgb(35, 33, 26)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px outset rgb(0, 0, 0)",
+        "shadow": "none",
+        "outline": "none 2px rgb(180, 53, 31) offset 2px"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "label": "Juno ⌘J",
+    "rect": {
+      "x": 1236,
+      "y": 56,
+      "w": 28,
+      "h": 28
+    },
+    "padding": "0px",
+    "gap": "normal",
+    "radius": "999px",
+    "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "0px solid rgba(0, 0, 0, 0)",
+    "shadow": "none",
+    "outline": "none 2px rgb(180, 53, 31) offset 2px",
+    "children": [
+      {
+        "tag": "span",
+        "label": "",
+        "rect": {
+          "x": 1242,
+          "y": 62,
+          "w": 16,
+          "h": 16
+        },
+        "padding": "0px",
+        "gap": "normal",
+        "radius": "0px",
+        "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+        "color": "rgb(35, 33, 26)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(35, 33, 26)",
+        "shadow": "none",
+        "outline": "none 3px rgb(35, 33, 26) offset 0px"
+      }
+    ]
+  }
+]

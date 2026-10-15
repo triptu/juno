@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react'
-import { agentProviderAtom } from '@juno/state/agent'
+import { agentProviderAtom, junoSettingsAtom } from '@juno/state/agent'
 import { useAtomValue } from '@juno/state/react'
 import { JunoChatFrame, JunoHeader, NoProvider } from '@juno/views'
 import { openJunoPage } from './actions'
@@ -9,7 +9,9 @@ import { openJunoPage } from './actions'
  * the chat shows as usual, since a provider is the common case.
  */
 export function useNoProvider(): boolean {
-  return useAtomValue(agentProviderAtom, (state) => state !== undefined && state.active === null)
+  const noApi = useAtomValue(agentProviderAtom, (state) => state !== undefined && state.active === null)
+  const local = useAtomValue(junoSettingsAtom, result => result._tag === 'Success' && result.value.chatModels.some(model => model.provider === 'codex' && model.selected))
+  return noApi && !local
 }
 
 /**

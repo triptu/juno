@@ -1,0 +1,141 @@
+[
+  {
+    "tag": "header",
+    "label": "Juno",
+    "rect": {
+      "x": 384,
+      "y": 44,
+      "w": 1016,
+      "h": 68
+    },
+    "padding": "0px",
+    "gap": "normal",
+    "radius": "0px",
+    "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "0px none rgb(35, 33, 26)",
+    "shadow": "none",
+    "outline": "none 3px rgb(35, 33, 26) offset 0px",
+    "children": [
+      {
+        "tag": "div",
+        "label": "",
+        "rect": {
+          "x": 384,
+          "y": 44,
+          "w": 1016,
+          "h": 68
+        },
+        "padding": "0px",
+        "gap": "normal",
+        "radius": "0px",
+        "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+        "color": "rgb(35, 33, 26)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(35, 33, 26)",
+        "shadow": "none",
+        "outline": "none 3px rgb(35, 33, 26) offset 0px"
+      },
+      {
+        "tag": "div",
+        "label": "Juno",
+        "rect": {
+          "x": 532,
+          "y": 52,
+          "w": 720,
+          "h": 36
+        },
+        "padding": "0px 32px",
+        "gap": "8px",
+        "radius": "0px",
+        "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+        "color": "rgb(35, 33, 26)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(35, 33, 26)",
+        "shadow": "none",
+        "outline": "none 3px rgb(35, 33, 26) offset 0px"
+      }
+    ]
+  },
+  {
+    "tag": "div",
+    "label": "Juno",
+    "rect": {
+      "x": 564,
+      "y": 52,
+      "w": 99.5,
+      "h": 36
+    },
+    "padding": "0px 3px 0px 5px",
+    "gap": "2px",
+    "radius": "999px",
+    "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgb(251, 251, 248)",
+    "border": "1px solid rgba(0, 0, 0, 0)",
+    "shadow": "oklch(0 0 0 / 0.03) 0px 1px 2px 0px, oklch(0 0 0 / 0.07) 0px 6px 20px -4px",
+    "outline": "none 3px rgb(35, 33, 26) offset 0px",
+    "children": [
+      {
+        "tag": "div",
+        "label": "Juno",
+        "rect": {
+          "x": 570,
+          "y": 56,
+          "w": 89.5,
+          "h": 28
+        },
+        "padding": "0px",
+        "gap": "normal",
+        "radius": "0px",
+        "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+        "color": "rgb(35, 33, 26)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(35, 33, 26)",
+        "shadow": "none",
+        "outline": "none 3px rgb(35, 33, 26) offset 0px"
+      }
+    ]
+  },
+  {
+    "tag": "div",
+    "label": "Juno",
+    "rect": {
+      "x": 570,
+      "y": 56,
+      "w": 89.5,
+      "h": 28
+    },
+    "padding": "0px",
+    "gap": "normal",
+    "radius": "0px",
+    "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "0px none rgb(35, 33, 26)",
+    "shadow": "none",
+    "outline": "none 3px rgb(35, 33, 26) offset 0px",
+    "children": [
+      {
+        "tag": "h1",
+        "label": "Juno",
+        "rect": {
+          "x": 570,
+          "y": 56,
+          "w": 89.5,
+          "h": 28
+        },
+        "padding": "0px",
+        "gap": "normal",
+        "radius": "0px",
+        "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+        "color": "rgb(35, 33, 26)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(35, 33, 26)",
+        "shadow": "none",
+        "outline": "none 3px rgb(35, 33, 26) offset 0px"
+      }
+    ]
+  }
+]

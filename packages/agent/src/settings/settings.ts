@@ -32,7 +32,7 @@
  *   folder starts a generation there. Move, restore and Activate are their
  *   own RPCs (`agent.settings.ownership`, `agent.review.activate`).
  *
- * Not yet served: Codex (WP20; shown as not installed).
+ * Codex uses its own local home and the same picker. Its turns are counted separately.
  */
 import { isAbsolute } from 'node:path'
 import type { JunoSettingsPage, ModelChoice, Ownership, SettingsChange } from '@juno/agent-contract'
@@ -43,6 +43,7 @@ import type { Turns } from '../router/open'
 import { DOLLAR, dollars } from '../spend'
 import { ownerRules, setOwnerRules } from '../actions/rules'
 import { defaultBackupFolder } from '../backup/backup'
+import { backupFailure } from '../backup/errors'
 import { modelFor, save, type Purpose } from './store'
 
 /** How often the catalogue is checked; it is read at most once a day. */
@@ -50,11 +51,12 @@ const REFRESH_CHECK_MS = 60 * 60_000
 
 export type SettingsResult =
   | { readonly _tag: 'done' }
-  | { readonly _tag: 'refused'; readonly reason: 'invalid' | 'unavailable'; readonly message: string }
+  | { readonly _tag: 'refused'; readonly reason: 'invalid' | 'unavailable' | 'readOnly'; readonly message: string }
 
 export interface JunoSettings {
   readonly page: () => JunoSettingsPage
-  readonly change: (change: SettingsChange) => SettingsResult
+  /** A folder change answers once the backup is in the new folder. */
+  readonly change: (change: SettingsChange) => SettingsResult | Promise<SettingsResult>
   /** Called when the page may have changed: the provider, the catalogue, a run's spend. */
   readonly subscribe: (listener: () => void) => () => void
   /** Resolves after the first catalogue read, whatever its outcome. */
@@ -123,32 +125,33 @@ export function createJunoSettings(options: SettingsOptions): JunoSettings {
   const offConnection = connection.subscribe(() => void refresh(true))
   const offOwnership = turns.ownership.subscribe(changed)
 
-  const priceText = (row: PickerModel) => (row.price === undefined ? {} : { price: `${money(row.price.input)} in, ${money(row.price.output)} out per million tokens` })
+  const priceText = (row: PickerModel) => row.choice.provider === 'codex' ? { price: `Uses your ChatGPT plan · ${turns.guard.spend.snapshot().codexTurns} turns today · remaining quota is not reported` } : (row.price === undefined ? {} : { price: `${money(row.price.input)} in, ${money(row.price.output)} out per million tokens` })
 
   /** The custom endpoint's rows: what it lists, with a typed model added when chosen. */
   const customChoices = (): ReadonlyArray<ModelChoice> => {
     const chosen = modelFor(store, picker, 'chat')
-    const listed = rows()
-    const all = chosen !== undefined && !listed.some((row) => row.model.id === chosen.model.id) ? [...listed, chosen] : listed
+    const listed = rows().filter(row => row.choice.provider === 'custom')
+    const all = chosen !== undefined && chosen.choice.provider === 'custom' && !listed.some((row) => row.model.id === chosen.model.id) ? [...listed, chosen] : listed
     return all.map((row) => ({ family: row.model.id, resolved: row.model.id, provider: 'custom', ...priceText(row), selected: row.model.id === chosen?.model.id }))
   }
 
   const choices = (purpose: Purpose): ReadonlyArray<ModelChoice> => {
-    if (picker.provider() === 'custom') return purpose === 'chat' ? customChoices() : []
+    const codex = purpose === 'chat' ? rows().filter(row => row.choice.provider === 'codex').map(row => ({ family: row.label, resolved: shortName(row.model.name), provider: 'codex' as const, ...priceText(row), selected: modelFor(store, picker, purpose)?.choice.provider === 'codex' })) : []
+    if (picker.provider() === 'custom') return purpose === 'chat' ? [...customChoices(), ...codex] : []
     const all = rows()
     const selected = modelFor(store, picker, purpose)?.choice.family
-    return pickerFamilies
+    return [...pickerFamilies
       .filter((family) => family.path === purpose)
       .map((family) => {
         const row = all.find((r) => r.choice.family === family.family && r.choice.provider === 'openrouter')
         return {
           family: family.label,
           ...(row === undefined ? {} : { resolved: shortName(row.model.name) }),
-          provider: 'openrouter',
+          provider: 'openrouter' as const,
           ...(row === undefined ? {} : priceText(row)),
-          selected: row !== undefined && family.family === selected,
+          selected: row !== undefined && family.family === selected && modelFor(store, picker, purpose)?.choice.provider === 'openrouter',
         }
-      })
+      }), ...codex]
   }
 
   const ownership = (): Ownership => {
@@ -178,7 +181,7 @@ export function createJunoSettings(options: SettingsOptions): JunoSettings {
       compactionModels: choices('compaction'),
       spentTodayUsd: (spend.actual + spend.unknown) / DOLLAR,
       capUsd: spend.cap / DOLLAR,
-      codex: { _tag: 'missing' },
+      codex: picker.codexStatus?.() ?? { _tag: 'missing' },
       openRouterKey: active?._tag === 'openRouter' ? (connection.isRejected() ? 'rejected' : 'set') : 'missing',
       ...(custom ? { provider: 'custom' as const } : {}),
       ...(custom && connection.isRejected() ? { customKeyRejected: true as const } : {}),
@@ -193,17 +196,22 @@ export function createJunoSettings(options: SettingsOptions): JunoSettings {
     }
   }
 
-  const change = (next: SettingsChange): SettingsResult => {
+  const change = (next: SettingsChange): SettingsResult | Promise<SettingsResult> => {
     switch (next._tag) {
       case 'model': {
-        if (next.provider === 'codex') return { _tag: 'refused', reason: 'unavailable', message: 'Codex is not available yet.' }
+        if (next.provider === 'codex') {
+          if (next.purpose !== 'chat' || !rows().some(row => row.choice.provider === 'codex' && row.label === next.family)) return { _tag: 'refused', reason: 'unavailable', message: 'Codex is not available on this Mac.' }
+          save(store, { chat: 'codex:sol' })
+          apply()
+          break
+        }
         if ((next.provider === 'custom') !== (picker.provider() === 'custom')) {
           return { _tag: 'refused', reason: 'invalid', message: 'That provider is not the one in use.' }
         }
         if (next.provider === 'custom') {
           const id = next.family.trim()
           if (id === '' || next.purpose !== 'chat') return { _tag: 'refused', reason: 'invalid', message: 'Enter a model id.' }
-          save(store, { customModel: id })
+          save(store, { customModel: id, chat: 'sonnet' })
           apply()
           break
         }
@@ -232,8 +240,18 @@ export function createJunoSettings(options: SettingsOptions): JunoSettings {
       case 'backupFolder': {
         if (backup === undefined) return { _tag: 'refused', reason: 'unavailable', message: 'Backup is not available on this Mac.' }
         if (!isAbsolute(next.path)) return { _tag: 'refused', reason: 'invalid', message: 'Choose a folder.' }
-        void backup.setFolder(next.path).catch(options.onReport)
-        break
+        // Answers once the first backup is in the new folder, or with why it is not.
+        return backup.setFolder(next.path).then(
+          (): SettingsResult => {
+            changed()
+            return { _tag: 'done' }
+          },
+          (error: unknown): SettingsResult => {
+            options.onReport?.(error)
+            changed()
+            return { _tag: 'refused', ...backupFailure(error) }
+          },
+        )
       }
     }
     changed()

@@ -106,3 +106,29 @@ function issuePaths(issue: SchemaIssue.Issue, path: ReadonlyArray<PropertyKey>):
 /** Array indexes become `[]`, so the same problem in every item of a list is one path. */
 const format = (path: ReadonlyArray<PropertyKey>) =>
   path.length === 0 ? '(root)' : path.map((part) => (typeof part === 'number' ? '[]' : String(part))).join('.')
+
+// Redaction: the shape survives, the values do not.
+
+const KEEP_KEYS = new Set(['ok', 'type', 'subtype', 'error', 'kind', 'presence', 'mode', 'variant', 'reason', 'priority', 'style'])
+const TS = /^\d{10}\.\d{6}$/
+const ID = /^[A-Z][A-Z0-9]{4,}$/
+
+export function redact(value: unknown, key?: string): unknown {
+  if (Array.isArray(value)) return value.slice(0, 3).map((item) => redact(item))
+  if (value !== null && typeof value === 'object') {
+    const out: Record<string, unknown> = {}
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) out[ID.test(k) ? 'ID' : k] = redact(v, k)
+    return out
+  }
+  if (typeof value === 'string') {
+    if (key !== undefined && KEEP_KEYS.has(key)) return value
+    if (TS.test(value)) return '1700000000.000001'
+    if (ID.test(value)) return `${value[0]}0REDACTED`
+    if (/^https?:\/\//.test(value)) return 'https://redacted.invalid/'
+    if (/^wss?:\/\//.test(value)) return 'wss://redacted.invalid/'
+    if (value.startsWith('xox')) return 'xoxc-redacted'
+    return value === '' ? '' : 'redacted'
+  }
+  if (typeof value === 'number') return Number.isInteger(value) ? (value > 1_000_000_000 ? 1_700_000_000 : value) : 0.5
+  return value
+}

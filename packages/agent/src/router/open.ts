@@ -312,7 +312,7 @@ async function start(
     catchUp: () => projection!.catchUp(),
   }
 
-  const tools = () => [...memoryTools, ...jobTools, ...slackTools, ...actionTools, ...scheduleTools, ...(viewSettings ? [viewSettings.tool] : []), ...redactionTools, ...extraTools]
+  const tools = () => [...memoryTools, ...jobTools, ...slackTools, ...actionTools, ...scheduleTools, ...(viewSettings ? [viewSettings.tool] : []), ...redactionTools, ...extraTools, ...(guard.harnessTool ? [guard.harnessTool] : [])]
   const section = () => {
     const base = instructions(jobs.active().map((job) => ({ title: job.title, line: job.state ?? job.phase })))
     const rules = rulesSection(ownerRules(store))

@@ -1,4 +1,6 @@
-export { createBackup, defaultBackupFolder, ForeignBackup, type Backup, type BackupKeychain, type BackupOptions, type BackupSecret, type RemovalHooks } from './backup'
+export { createBackup, defaultBackupFolder, ForeignBackup, OwnedElsewhere, type Backup, type BackupKeychain, type BackupOptions, type BackupSecret, type RemovalHooks } from './backup'
 export { generations, manifestPath, parseManifest, segmentPath, type Manifest, type ManifestOwner } from './folder'
 export { BACKUP_LOCAL_TABLES, BACKUP_MIGRATIONS } from './schema'
 export { clearStagedRestore, installStaged, stageRestore, stagedRestore, type Install, type StagedRestore, type StageResult } from './restore'
+export { keychainBridge, KeychainUnavailable, type SecretReply } from './bridge'
+export { backupFailure, describeFailure, type BackupFailure } from './errors'

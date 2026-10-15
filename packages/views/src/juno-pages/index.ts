@@ -6,3 +6,5 @@ export { ProviderSection, type ProviderDrafts, type ProviderSectionProps } from 
 export { RemembersPage, type RemembersPageProps } from './RemembersPage'
 export { ReviewPage, type ReviewPageProps } from './ReviewPage'
 export { ScheduledPage, type ScheduledPageProps } from './ScheduledPage'
+export { MoveSheet, RecoveryPhraseSheet, RestoreSheet, SheetLayer, type MoveSheetProps, type RecoveryPhraseSheetProps, type RestoreSheetProps } from './BackupSheets'
+export { BackupSection, ThisMacSection, type BackupSectionProps, type ThisMacSectionProps } from './BackupSections'

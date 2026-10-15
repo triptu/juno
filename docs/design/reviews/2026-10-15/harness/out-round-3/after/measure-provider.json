@@ -1,0 +1,182 @@
+[
+  {
+    "tag": "h1",
+    "label": "Juno",
+    "rect": {
+      "x": 539,
+      "y": 84,
+      "w": 576.1,
+      "h": 39.1
+    },
+    "padding": "0px",
+    "gap": "normal",
+    "radius": "0px",
+    "font": "34px/39.1px 400 \"Instrument Serif\"",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "0px none rgb(35, 33, 26)",
+    "shadow": "none",
+    "outline": "none 3px rgb(35, 33, 26) offset 0px",
+    "children": []
+  },
+  {
+    "tag": "h2",
+    "label": "Provider",
+    "rect": {
+      "x": 539,
+      "y": 213.5,
+      "w": 696,
+      "h": 20.9
+    },
+    "padding": "0px",
+    "gap": "normal",
+    "radius": "0px",
+    "font": "15.5px/20.925px 600 \"Figtree Variable\"",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "0px none rgb(35, 33, 26)",
+    "shadow": "none",
+    "outline": "none 3px rgb(35, 33, 26) offset 0px",
+    "children": []
+  },
+  {
+    "tag": "button",
+    "label": "OpenRouter",
+    "rect": {
+      "x": 541,
+      "y": 270.7,
+      "w": 87.1,
+      "h": 24
+    },
+    "padding": "0px 9px",
+    "gap": "normal",
+    "radius": "5px",
+    "font": "12.5px/normal 500 \"Figtree Variable\"",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgb(251, 251, 248)",
+    "border": "0px solid rgba(0, 0, 0, 0)",
+    "shadow": "rgba(27, 28, 21, 0.04) 0px 1px 2px 0px",
+    "outline": "none 2px rgb(180, 53, 31) offset -2px",
+    "children": []
+  },
+  {
+    "tag": "button",
+    "label": "OpenAI-compatible",
+    "rect": {
+      "x": 630.1,
+      "y": 270.7,
+      "w": 129.7,
+      "h": 24
+    },
+    "padding": "0px 9px",
+    "gap": "normal",
+    "radius": "5px",
+    "font": "12.5px/normal 500 \"Figtree Variable\"",
+    "color": "rgb(112, 110, 102)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "0px solid rgba(0, 0, 0, 0)",
+    "shadow": "none",
+    "outline": "none 2px rgb(180, 53, 31) offset -2px",
+    "children": []
+  },
+  {
+    "tag": "label",
+    "label": "",
+    "rect": {
+      "x": 1060,
+      "y": 318.2,
+      "w": 160,
+      "h": 30
+    },
+    "padding": "0px 10px",
+    "gap": "8px",
+    "radius": "7px",
+    "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgb(251, 251, 248)",
+    "border": "1px solid rgb(216, 213, 203)",
+    "shadow": "none",
+    "outline": "none 3px rgb(35, 33, 26) offset 0px",
+    "children": [
+      {
+        "tag": "input",
+        "label": "API key",
+        "rect": {
+          "x": 1071,
+          "y": 319.2,
+          "w": 138,
+          "h": 28
+        },
+        "padding": "0px",
+        "gap": "normal",
+        "radius": "0px",
+        "font": "13.5px/20.25px 400 \"Figtree Variable\"",
+        "color": "rgb(35, 33, 26)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px inset rgb(118, 118, 118)",
+        "shadow": "none",
+        "outline": "none 3px rgb(35, 33, 26) offset 0px"
+      }
+    ]
+  },
+  {
+    "tag": "input",
+    "label": "API key",
+    "rect": {
+      "x": 1071,
+      "y": 319.2,
+      "w": 138,
+      "h": 28
+    },
+    "padding": "0px",
+    "gap": "normal",
+    "radius": "0px",
+    "font": "13.5px/20.25px 400 \"Figtree Variable\"",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "0px inset rgb(118, 118, 118)",
+    "shadow": "none",
+    "outline": "none 3px rgb(35, 33, 26) offset 0px",
+    "children": []
+  },
+  {
+    "tag": "button",
+    "label": "Save",
+    "rect": {
+      "x": 1175.8,
+      "y": 370.7,
+      "w": 44.2,
+      "h": 22
+    },
+    "padding": "0px 8px",
+    "gap": "4px",
+    "radius": "999px",
+    "font": "12px/normal 500 \"Figtree Variable\"",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgb(241, 238, 228)",
+    "border": "1px solid rgba(0, 0, 0, 0)",
+    "shadow": "none",
+    "outline": "none 2px rgb(180, 53, 31) offset 2px",
+    "children": [
+      {
+        "tag": "span",
+        "label": "Save",
+        "rect": {
+          "x": 1184.8,
+          "y": 374.4,
+          "w": 26.2,
+          "h": 14.5
+        },
+        "padding": "0px",
+        "gap": "normal",
+        "radius": "0px",
+        "font": "12px/normal 500 \"Figtree Variable\"",
+        "color": "rgb(35, 33, 26)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(35, 33, 26)",
+        "shadow": "none",
+        "outline": "none 3px rgb(35, 33, 26) offset 0px"
+      }
+    ]
+  }
+]
