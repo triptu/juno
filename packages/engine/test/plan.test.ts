@@ -10,6 +10,8 @@ import * as os from 'node:os'
 import * as path from 'node:path'
 import { Store, StoreReader, workspacePathsFromDir, type StoreError } from '@juno/store'
 import { reactionsStatement, threadsStatements, threadTitlesStatement, windowStatements, type WindowTarget } from '../src/messages/window'
+import { homeStatements } from '../src/home/query'
+import { staleStatement } from '../src/home/job'
 import { pickerStatements } from '../src/newchat/query'
 import { countsStatement as allTopicsCountsStatement, orderStatement, placesStatement } from '../src/topics/allTopics'
 import { countsStatement, listStatements, type ListFilter } from '../src/topics/query'
@@ -139,6 +141,22 @@ describe('query plans', () => {
             assert.deepStrictEqual(scans(lines), [], `${channel ?? 'everywhere'} ${match ?? ''}\n${lines.join('\n')}`)
           }
         }
+      }
+    }).pipe(Effect.provide(freshStore)),
+  )
+
+  it.effect('Home reads topic_index and messages through their indexes', () =>
+    Effect.gen(function* () {
+      const statements = [
+        homeStatements.unread('1700000000.000000'),
+        homeStatements.topics(['t:C0ENG:1700000000.000100', 'm:D0MAYA']),
+        homeStatements.threadAfter('C0ENG', '1700000000.000100', '1700000000.000000'),
+        homeStatements.mainAfter('D0MAYA', '1700000000.000000'),
+        staleStatement('settledScore', '1700000000.000000', '1800000000.000000', 12),
+      ]
+      for (const statement of statements) {
+        const lines = yield* plan(statement.sql, statement.params)
+        assert.deepStrictEqual(scans(lines), [], `${statement.sql}\n${lines.join('\n')}`)
       }
     }).pipe(Effect.provide(freshStore)),
   )

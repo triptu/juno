@@ -49,3 +49,5 @@ export { dayLabel, fullTime, messageTime, relativeTime, slackDate } from './time
 export { accentNames, applyTheme, defaultAccent, type AccentName, type ActivateEvent, type ThemeName } from '@juno/ui'
 // The topic tile, for the header and tab containers in the desktop app, which does not depend on ui.
 export { TopicArt, type TopicArtProps, type TopicArtSize } from '@juno/ui'
+export { Home, type HomeProps } from './Home'
+export { HomeScene, type HomeSceneName } from './HomeScene'

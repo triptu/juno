@@ -1,6 +1,6 @@
 import { Activity, lazy, Suspense, useEffect } from 'react'
 import type { TopicDetail } from '@juno/contract'
-import { currentPlace, mountedTabs, onMenuCommand, sidebarLayoutAtom, tabsAtom, tabStripAtom, type Tab, type TabSummary } from '@juno/state'
+import { currentPlace, mountedTabs, onMenuCommand, registry, sidebarLayoutAtom, startVisitLog, tabsAtom, tabStripAtom, type Tab, type TabSummary } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import { TopicArt, Workspace as WorkspaceView, type ActivateEvent, type WorkspaceTab, type WorkspaceTabIcon } from '@juno/views'
 import { HomePage } from './Home'
@@ -96,6 +96,8 @@ export function Workspace() {
 
   useEffect(() => onMenuCommand(runMenuCommand), [])
   useEffect(() => onMenuCommand(runUndoCommand), [])
+  // "Pick up where you left off" on Home: the topic that stayed on screen for a minute.
+  useEffect(() => startVisitLog(registry), [])
   useEffect(() => {
     const idle = requestIdleCallback(() => void loadAllTopicsPage(), { timeout: 5_000 })
     return () => cancelIdleCallback(idle)
