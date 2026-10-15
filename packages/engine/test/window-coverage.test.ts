@@ -46,3 +46,18 @@ it('marks a Main window covered when its first history page brings nothing new',
   expect(ranges.n).toBe(1)
   await until((window) => window.meta.windowCovered === true, 'the window covered by the new range')
 })
+
+it('marks a thread window covered when the replies page changes only coverage', async () => {
+  const engine = await bootedEngine(engines)
+  await quiet(engine)
+  const root = engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0MAYA', text: 'Thread with incomplete counters' })
+  engine.fake.emitFrame({ type: 'message', subtype: 'message_replied', channel: 'C0ENG', message: { ts: root.ts, reply_count: 10 }, event_ts: root.ts })
+  const id = `t:C0ENG:${root.ts}`
+  const until = watchList(engine, id)
+  await until((window) => window.rows.has(root.ts) && window.meta.windowCovered === false, 'thread without coverage')
+  const version = () => readDb(engine, 'cache.db', (db) => db.prepare('SELECT version FROM messages WHERE channel = ? AND ts = ?').get('C0ENG', root.ts))
+  const before = version()
+  expect(valueOf(await openTopic(engine.registry, id)).outcome).toBe('fetched')
+  expect(version()).toEqual(before)
+  await until((window) => window.meta.windowCovered === true, 'thread covered by unchanged replies page')
+})
