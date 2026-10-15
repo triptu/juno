@@ -11,7 +11,9 @@ import { bindViewHost } from './view-tools/host'
  * compactor (`router/open.ts`). Given `renderer`, it serves the
  * renderer's RPCs (`AgentRpcs`) on the ports that transport gives
  * (`serve/server.ts`), with Settings › Juno when `turns` brings a model
- * picker and a provider connection (`providerTurns`). `stop` closes the renderer server, then the engine,
+ * picker and a provider connection (`providerTurns`). Given `mcp`, it
+ * runs the MCP manager on the engine's store with main's keychain bridge,
+ * gives the model its tools and serves Connections (`mcp/app.ts`). `stop` closes the renderer server, then the engine,
  * then the host client, so the owner lock is released last of the engine's
  * resources.
  */
@@ -22,6 +24,8 @@ import { bindActionHost } from './actions/host'
 import { AgentHost } from './host/client'
 import { bindHost, type BoundHost } from './host/reads'
 import type { HostConnection } from './host/port'
+import { withMcp } from './mcp/app'
+import type { Credentials } from './mcp/types'
 import type { ProviderConnection } from './providers/connection'
 import type { ModelPicker } from './providers/picker'
 import type { Turns, TurnsOptions } from './router/open'
@@ -63,13 +67,20 @@ export interface AgentOptions {
   readonly turns?: AgentTurns
   /** Serves the renderer's RPCs on these ports. */
   readonly renderer?: RendererTransport
+  /**
+   * Main's keychain and browser bridge for the MCP connections (WP17). With
+   * it and `turns`, the agent runs the MCP manager and serves Connections.
+   */
+  readonly mcp?: { readonly credentials: Credentials }
 }
 
 /** The host speaks another AgentHost protocol version than this agent. */
 export class HostProtocolMismatch extends Schema.TaggedError<HostProtocolMismatch>()('HostProtocolMismatch', { host: HostHello }) {}
 
 export function startAgent(config: AgentConfig, connection: HostConnection, options: AgentOptions = {}): Promise<AgentHandle> {
-  const { turns, renderer } = options
+  const { renderer } = options
+  const mcp = options.turns !== undefined && options.mcp !== undefined ? withMcp(options.turns, options.mcp.credentials) : undefined
+  const turns = mcp?.turns ?? options.turns
   return Effect.runPromise(
     Effect.gen(function* () {
       const scope = yield* Scope.make()
@@ -111,6 +122,14 @@ export function startAgent(config: AgentConfig, connection: HostConnection, opti
             Scope.provide(scope),
           )
         }
+        const manager = engine?._tag === 'running' ? mcp?.manager() : undefined
+        if (engine?._tag === 'running' && manager !== undefined) {
+          // Registered after the engine, so the manager closes first.
+          yield* Effect.acquireRelease(Effect.sync(() => manager.subscribe(() => engine.actions.kick())), (unsubscribe) =>
+            Effect.promise(async () => { unsubscribe(); await manager.close() })).pipe(Scope.provide(scope))
+          // Reconnects the enabled servers without opening a browser; it never fails.
+          void manager.start()
+        }
         const picker = turns?.picker
         const provider = turns?.connection
         const settings =
@@ -127,7 +146,7 @@ export function startAgent(config: AgentConfig, connection: HostConnection, opti
             : undefined
         if (renderer !== undefined) {
           yield* Layer.buildWithScope(
-            rendererServer(renderer, { turns: engine, presence: bound.presence, presenceChanges: bound.presenceChanges, ...(engine?._tag === 'running' ? { schedule: { scheduler: engine.scheduler, host: bound.schedule } } : {}), ...(settings ? { settings } : {}) }),
+            rendererServer(renderer, { turns: engine, presence: bound.presence, presenceChanges: bound.presenceChanges, ...(engine?._tag === 'running' ? { schedule: { scheduler: engine.scheduler, host: bound.schedule } } : {}), ...(settings ? { settings } : {}), ...(manager ? { connections: manager } : {}) }),
             scope,
           )
         }
