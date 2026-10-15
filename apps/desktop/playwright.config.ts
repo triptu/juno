@@ -6,6 +6,7 @@ delete process.env.ELECTRON_RUN_AS_NODE
 
 export default defineConfig({
   testDir: 'e2e',
+  globalSetup: './e2e/build.ts',
   timeout: 30_000,
   expect: { timeout: 5_000 },
   // One Electron app at a time on the shared Mac. Each test has its own fake

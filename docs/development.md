@@ -381,6 +381,33 @@ Names are explained in `docs/architecture.md` sections 2.6 and 7.
 
 Tests that need the Effect test clock use `@effect/vitest`; see the effect skill.
 
+### Single-instance check
+
+The second-launch test in `apps/desktop/e2e/app.spec.ts` starts a normal Electron
+child against the first app's user-data directory. It requires exit code 0, a
+`second-instance` event in the first app, and the original window remaining usable.
+On macOS it also minimizes that window and checks that handover restores it.
+The Linux runner uses Xvfb without a window manager, so it does not check minimize.
+
+Do not use `expect(launchApp(...)).rejects` as the handover assertion. Playwright
+waits for debugging endpoints and a window, while this process must exit before
+opening one. Any launch error would satisfy that assertion, even a crash.
+Playwright global setup runs `build-cached` before the desktop tests, including
+direct `playwright test` calls and the perf config. Unchanged inputs and output
+skip the build. The package scripts do not build a second time. Repeat locally with
+`node scripts/heavy.mjs pnpm --filter @juno/desktop exec playwright test e2e/app.spec.ts -g "second launch" --repeat-each=10 --retries=0`.
+`pnpm flake` runs remotely. Set `DEBUG=pw:browser` to capture the first app's
+process logs. The test attaches the second process's output as `second-launch.log`.
+The test allows 90 seconds overall and 30 seconds for the second process to exit.
+This checks the development executable, not an installed DMG or Finder launch.
+
+The three Mac failures reported on October 15 used a stale local build. The
+first-run branch built at 18:43 UTC, then merged the single-instance lock at
+19:03 UTC, and ran Playwright directly without rebuilding. Its earlier main
+entry had no lock. Remote runs rebuilt, which explained the different results.
+The recorded assertion failed after 4.2–8.9 seconds, before the 30-second test
+timeout. Global setup prevents this mismatch after a merge.
+
 ## The gallery
 
 `pnpm gallery` serves every primitive and view at http://localhost:4174. A component page shows one state at a time, with the states listed beside it under group headings (a select above the frame in a narrow window). The list is plain system styling on purpose, so it is never mistaken for product UI.

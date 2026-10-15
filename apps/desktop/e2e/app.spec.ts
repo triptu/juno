@@ -1,5 +1,7 @@
 import type { Page } from '@playwright/test'
+import { execFile } from 'node:child_process'
 import { writeFile } from 'node:fs/promises'
+import { promisify } from 'node:util'
 import { join } from 'node:path'
 import { expect, launchApp, test } from './fixtures'
 
@@ -111,10 +113,36 @@ test('exposes only the bridge to the page', async ({ win }) => {
   })
 })
 
-test('a second launch on the same data hands over to the open window', async ({ win, userData }) => {
+test('a second launch on the same data hands over to the open window', async ({ app: electronApp, win, userData }, testInfo) => {
+  // Two process launches can take longer on the shared Mac.
+  test.slow()
   await expect(win.getByRole('button', { name: 'Sign in to Slack' })).toBeVisible()
-  // The second process quits before it opens a window.
-  await expect(launchApp(userData)).rejects.toThrow()
+  const launch = await electronApp.evaluate(({ app }) => ({ executable: process.execPath, path: app.getAppPath(), userData: app.getPath('userData') }))
+  expect(launch.userData).toBe(userData)
+  const handover = await electronApp.evaluateHandle(({ app }) => {
+    const received = { count: 0 }
+    app.on('second-instance', () => { received.count += 1 })
+    return received
+  })
+  const mainWindow = await electronApp.browserWindow(win)
+  // Xvfb has no window manager to handle minimize on the Linux runner.
+  if (process.platform === 'darwin') {
+    await mainWindow.evaluate((window) => window.minimize())
+    await expect.poll(() => mainWindow.evaluate((window) => window.isMinimized())).toBe(true)
+  }
+
+  // This process should exit before opening a window. Playwright's launcher
+  // waits for debugging endpoints, so use a normal launch and require exit 0.
+  const env: NodeJS.ProcessEnv = { ...process.env, JUNO_USER_DATA: userData, JUNO_E2E: '1' }
+  delete env.ELECTRON_RUN_AS_NODE
+  delete env.NODE_OPTIONS
+  // Match Playwright's Linux launch flags for the remote container.
+  const args = process.platform === 'linux' ? ['--no-sandbox', launch.path] : [launch.path]
+  const result = await promisify(execFile)(launch.executable, args, { env, timeout: 30_000 })
+  await testInfo.attach('second-launch.log', { body: result.stdout + result.stderr, contentType: 'text/plain' })
+  await expect.poll(() => handover.evaluate((received) => received.count)).toBe(1)
+  await expect.poll(() => mainWindow.evaluate((window) => window.isMinimized())).toBe(false)
+  expect(await electronApp.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length)).toBe(1)
   await expect(win.getByRole('button', { name: 'Sign in to Slack' })).toBeVisible()
 })
 
