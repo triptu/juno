@@ -135,14 +135,10 @@ test('the composer grows to about eight lines, then scrolls inside', async ({ ju
   await expect(topic.composer).toHaveValue('first line\nsecond line')
 })
 
-// Fixme (break pass, 2026-10-15; owner: outbox). `Outbox.sendOnce` makes one attempt, but
-// Chromium's network stack resends a request on its own when a reused keep-alive connection
-// closes before any answer (net.fetch in the engine, ADR 0007). Slack has run the first post, so
-// the message is posted twice. The fake's `loseResponse` closes the connection after running the
-// call, which is that case. The engine's vitest suites use Node fetch, which does not resend, so
-// they pass. A fix needs a transport for single-attempt calls that Chromium cannot resend, or a
-// check after the answer for a second message with the same client_msg_id.
-test.fixme('a post whose answer is lost is in Slack once', async ({ juno, fake }) => {
+// `loseResponse` runs the call, then closes the connection with no answer. Chromium's network
+// stack then sends the request again by itself, so Slack runs it twice (ADR 0014). Juno keeps the
+// first copy it stores and deletes the other, which has the same client_msg_id.
+test('a post whose answer is lost is in Slack once', async ({ juno, fake }) => {
   await juno.signIn()
   await juno.waitForSync()
   const { topic } = juno
@@ -151,5 +147,58 @@ test.fixme('a post whose answer is lost is in Slack once', async ({ juno, fake }
   fake.loseResponse({ method: 'chat.postMessage', times: 1 })
   await topic.send('Sent once over a lost answer')
   await topic.expectSent('Sent once over a lost answer')
-  expect(fake.messages('C0ENG').filter((m) => m.text === 'Sent once over a lost answer')).toHaveLength(1)
+  await expect.poll(() => fake.messages('C0ENG').filter((m) => m.text === 'Sent once over a lost answer').length).toBe(1)
+  // Every post call ran, the lost one too: each copy after the first has been deleted, and nothing shows it again.
+  const copies = fake.calls.filter((call) => call.method === 'chat.postMessage').length
+  await expect.poll(() => fake.calls.filter((call) => call.method === 'chat.delete' && call.ok).length).toBe(copies - 1)
+  await expect(topic.message('Sent once over a lost answer')).toHaveCount(1)
+})
+
+test('an edit whose answer is lost leaves one message with the new text', async ({ juno, fake }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  const { topic } = juno
+  await juno.sidebar.row(ENG_MAIN).open()
+  await topic.send('Edit me over a lost answer')
+  await topic.expectSent('Edit me over a lost answer')
+  const before = fake.messages('C0ENG').length
+  await juno.chooseNextMenuItem('edit')
+  await topic.message('Edit me over a lost answer').click({ button: 'right' })
+  const field = topic.list.getByRole('textbox', { name: 'Edit message' })
+  await field.fill('Edited over a lost answer')
+  fake.loseResponse({ method: 'chat.update', times: 1 })
+  await field.press('Enter')
+  await expect.poll(() => fake.messages('C0ENG').filter((m) => m.text === 'Edited over a lost answer').length).toBe(1)
+  await expect(field).toHaveCount(0)
+  await topic.expectSent('Edited over a lost answer')
+  await expect(topic.message('Edit me over a lost answer')).toHaveCount(0)
+  expect(fake.messages('C0ENG')).toHaveLength(before)
+})
+
+test('a reaction whose answer is lost is added once and taken away once', async ({ juno, fake }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  const { topic } = juno
+  await juno.sidebar.row(ENG_MAIN).open()
+  fake.injectMessage({ channel: 'C0ENG', user: 'U0MAYA', text: 'React over a lost answer' })
+  const row = topic.message('React over a lost answer')
+  await expect(row).toBeVisible()
+  const ts = fake.messages('C0ENG').find((m) => m.text === 'React over a lost answer')!.ts
+  const reactionsOf = () => fake.messages('C0ENG').find((m) => m.ts === ts)?.reactions ?? []
+
+  fake.loseResponse({ method: 'reactions.add', times: 1 })
+  await row.hover()
+  await row.getByRole('button', { name: 'React 👍' }).click()
+  const chip = row.getByRole('button', { name: '1 👍, including you' })
+  await expect(chip).toBeVisible()
+  await expect.poll(reactionsOf).toEqual([expect.objectContaining({ name: '+1', count: 1 })])
+  await expect.poll(() => fake.calls.some((call) => call.method === 'reactions.add' && (call.ok || call.error === 'already_reacted'))).toBe(true)
+  await expect(chip).toBeVisible()
+
+  fake.loseResponse({ method: 'reactions.remove', times: 1 })
+  await chip.click()
+  await expect(row.getByRole('button', { name: /^\d+ 👍/ })).toHaveCount(0)
+  await expect.poll(() => reactionsOf().some((r) => r.name === '+1')).toBe(false)
+  await expect.poll(() => fake.calls.some((call) => call.method === 'reactions.remove' && (call.ok || call.error === 'no_reaction'))).toBe(true)
+  await expect(row.getByRole('button', { name: /^\d+ 👍/ })).toHaveCount(0)
 })
