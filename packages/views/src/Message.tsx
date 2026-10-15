@@ -25,11 +25,12 @@ export interface MessageProps {
   readonly main: boolean
   /**
    * Show the name and avatar even when the message continues its sender's
-   * run: the first message of the window and the one after the "N new"
-   * divider. The row's top margin follows the same rule.
+   * run: the one after the "N new" divider. Otherwise `message.groupStart`
+   * decides, which the engine works out from the message before, even when
+   * that one is outside the window.
    */
   readonly startsGroup: boolean
-  /** No top margin: the first row, or the row right after the divider. */
+  /** No top margin: the topic's first message, or the row right after the divider. */
   readonly flush?: boolean
   /** Laid out in full even off screen, never at the size estimate. */
   readonly eager?: boolean
@@ -237,12 +238,17 @@ const styles = stylex.create({
     opacity: 'var(--row-action-opacity)',
     whiteSpace: 'nowrap',
   },
+  // Whole pixels tall, whatever the text inside (performance 3.3): a row
+  // laid out above the view for the first time grows from its estimate, and
+  // scroll anchoring can only move the list by whole device pixels, so a
+  // fractional height leaves the rows in view a part of a pixel off.
   content: {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'flex-start',
     flexGrow: 1,
     minWidth: 0,
+    height: 'calc-size(auto, round(up, size, 1px))',
   },
   header: {
     display: 'flex',

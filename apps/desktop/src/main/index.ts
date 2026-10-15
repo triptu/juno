@@ -71,6 +71,7 @@ app.whenReady().then(() => {
   serveAppScheme(join(__dirname, '../renderer'), fakeSlackUrl === undefined ? undefined : new URL(fakeSlackUrl).origin)
   registerIpc({
     supervisor,
+    agent,
     setTheme: (theme) => updateLaunch({ theme }),
     setAccent: (accent) => updateLaunch({ accent }),
     setSidebar: (sidebar) => {

@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fakeProvider, type FakeProviderOptions } from '@juno/agent-testing'
 import type { BubbleId, ReplyTarget } from '@juno/agent-contract'
-import { createProviderGuard, openTurns, type HostReads, type ModelRef, type TurnEvent, type Turns } from '../src/index'
+import { createProviderGuard, openTurns, type HostReads, type MigrationSet, type ModelRef, type TurnEvent, type Turns } from '../src/index'
 
 export const SONNET: ModelRef = { provider: 'openrouter', modelId: 'anthropic/claude-sonnet-5.5' }
 export const HAIKU: ModelRef = { provider: 'openrouter', modelId: 'anthropic/claude-haiku-5.5' }
@@ -23,6 +23,7 @@ export interface HarnessOptions {
   readonly host?: HostReads
   /** Wraps the fake's models, for example to hold compaction requests. */
   readonly transport?: (fake: Fake) => Fake['models']
+  readonly migrations?: ReadonlyArray<MigrationSet>
 }
 
 export async function turnsHarness(options: HarnessOptions = {}) {
@@ -36,6 +37,7 @@ export async function turnsHarness(options: HarnessOptions = {}) {
     ...(options.compaction === false ? {} : { compaction: HAIKU }),
     ...(options.subagent ? { subagent: options.subagent } : {}),
     ...(options.host ? { host: options.host } : {}),
+    ...(options.migrations ? { migrations: options.migrations } : {}),
     onReport: (error) => reports.push(error),
   })
   if (opened._tag !== 'running') throw new Error('a fresh engine did not open')

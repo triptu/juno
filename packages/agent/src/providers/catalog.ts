@@ -89,6 +89,16 @@ export function resolveCatalogue(body: unknown, options: CatalogueOptions): read
   })
 }
 
+/**
+ * The newest model of `family` in pi-ai's own OpenRouter catalogue, for a
+ * start before OpenRouter's live catalogue has been read (no network). The
+ * same family patterns as the picker, so no slug is hard-coded.
+ */
+export function piFamilyModel(family: ModelFamily, piModels: readonly Model<Api>[] = Object.values(OPENROUTER_MODELS)): Model<Api> | undefined {
+  const pattern = families.find(f => f.family === family)!.pattern
+  return piModels.filter(m => pattern.test(m.id)).toSorted((a, b) => b.id.localeCompare(a.id, undefined, { numeric: true }))[0]
+}
+
 /** app-server lists availability; pi supplies the windows it does not report. */
 export function resolveCodexModels(ids: readonly string[] | undefined, options: Pick<CatalogueOptions, 'systemAndTools' | 'multiplier'>): PickerModel | undefined {
   const candidates = Object.values(OPENAI_CODEX_MODELS).filter(m => /^gpt-\d+(?:\.\d+)*-sol$/.test(m.id) &&

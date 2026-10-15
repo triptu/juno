@@ -118,16 +118,20 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
   Effect.gen(function* () {
     const sql = yield* StoreReader
     const statements = windowStatements(target, range)
+    // The older statement reads one extra row, the message before the window (see `windowStatements`).
+    const older = yield* sql.unsafe<WindowMessage>(statements[0]!.sql, statements[0]!.params)
+    const olderCount = statements.length === 1 ? range.limit : Math.min(range.before, range.limit)
+    const beforeWindow = older[olderCount]
+    const shown = older.slice(0, olderCount).toReversed()
     let stored: ReadonlyArray<WindowMessage>
     let atNewest = true
     if (statements.length === 1) {
-      stored = (yield* sql.unsafe<WindowMessage>(statements[0]!.sql, statements[0]!.params)).toReversed()
+      stored = shown
     } else {
-      const older = yield* sql.unsafe<WindowMessage>(statements[0]!.sql, statements[0]!.params)
       const newer = yield* sql.unsafe<WindowMessage>(statements[1]!.sql, statements[1]!.params)
-      const room = Math.max(0, range.limit - older.length)
+      const room = Math.max(0, range.limit - shown.length)
       atNewest = newer.length <= room
-      stored = [...older.toReversed(), ...newer.slice(0, room)]
+      stored = [...shown, ...newer.slice(0, room)]
     }
 
     const team = yield* sql<{ self_user_id: string | null }>`SELECT self_user_id FROM team LIMIT 1`
@@ -230,7 +234,9 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
     const out: Array<MessageView> = []
     const nextRows = new Map<string, CachedRow>()
     const people = new Map<string, Person>()
-    let previous: GroupMessage | undefined
+    // Grouping starts from the message before the window, so the first row's header does not depend on where the window begins.
+    let previous: GroupMessage | undefined =
+      beforeWindow === undefined ? undefined : { senderId: beforeWindow.user_id, body: { blocks: [] }, isThreadRoot: target.kind === 'thread' && beforeWindow.ts === target.threadTs }
     for (const row of rows) {
       const body = bodies.get(row.ts)!
       const isRoot = target.kind === 'thread' && row.ts === target.threadTs

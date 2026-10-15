@@ -6,9 +6,9 @@ Plain data in, plain data out. The package never touches the store, Electron or 
 
 ## Public API
 
-- `AiProvider`: the service. `decide(task, input)` runs a structured task and resolves to a `Decision<Output>`. `generate(task, input)` runs a text task and resolves to a `Decision<string>`. `chat(context, tools)` streams one Juno chat turn as `ChatEvent`s (`text`, `toolCall`, then `done` or `failed`). Nothing fails: every effect has error type `never`, and a stream ends with `failed` instead of an error.
+- `AiProvider`: the service. `decide(task, input)` runs a structured task and resolves to a `Decision<Output>`. `generate(task, input)` runs a text task and resolves to a `Decision<string>`. Nothing fails: every effect has error type `never`. The Juno chat is not here: it is the Juno Agent (`@juno/agent`), which runs in its own process.
 - `Decision<A>`: `{ _tag: 'Decided', value, meta }` or `{ _tag: 'NoDecision', reason, detail?, meta }`. Reasons: `missing-key`, `timeout`, `invalid-output`, `provider-error`. `meta` has the model slug, latency, attempts and the cost in USD when pi-ai knows the model's price.
-- `tasks`: `titleTopic`, `routeCheck`, `settledScore`, `urgencyGate`, `parseCommand`, `chat`, `topicArt`. Each is a `StructuredTask` (has `output`, a TypeBox schema, and `tool`; optionally `classify`, a decision-model mapping) or a `TextTask` (has `maxChars`, and may have `check`, a validation that can rewrite the text to a canonical form, and `retry`, the message a retry sends with the failure's reason). All have `name`, `version`, `tier`, `timeoutMillis`, `prompt`, `render(input)` and `key(input)`. `decisionTasks` lists the structured ones. `chatTools` holds the six Juno chat tool shapes.
+- `tasks`: `titleTopic`, `routeCheck`, `settledScore`, `urgencyGate`, `parseCommand`, `topicArt`. Each is a `StructuredTask` (has `output`, a TypeBox schema, and `tool`; optionally `classify`, a decision-model mapping) or a `TextTask` (has `maxChars`, and may have `check`, a validation that can rewrite the text to a canonical form, and `retry`, the message a retry sends with the failure's reason). All have `name`, `version`, `tier`, `timeoutMillis`, `prompt`, `render(input)` and `key(input)`. `decisionTasks` lists the structured ones.
 - `cacheKeyOf(task, input)`: `{ task, key, inputHash }` for the assistant's `ai_cache`. The hash covers the task version and the canonical input (sorted keys, `undefined` dropped), so equal inputs hash the same and a prompt change is made visible by bumping `version`.
 - `validateOutput(task, input, args)`: the schema check (pi-ai's validator) plus the task's `accept` rule. Both providers use it, for tool calls and for classifier answers.
 - `PiAiProvider.layer(config, models?)`: `config` is an `Effect<AiConfig>` read on every call, so a key or model added in preferences applies without a restart. `AiConfig` is `{ apiKey?, models?: { classifier?, decision?, generation?, art? } }`. `defaultModelPrefs` holds the default slugs.
@@ -31,8 +31,7 @@ Ids in outputs are plain strings. The `accept` rule of each task guarantees they
 - **Topic art is a text task that checks its text.** `topicArt` renders a thread (title, channel, first and latest message) or a channel's Main (name, purpose, topic, recent messages) into the art-directed brief from the study, and its `check` is `@juno/topic-art`'s `parseRecipe`: the output is the canonical recipe rebuilt from the checked drawing, never the reply's bytes. `data-confident="false"` in it is the model saying it had nothing to draw. An `avoid` on the input (the previous hue and a one-line summary) asks a redraw to differ.
 - **Notification decisions.** `urgencyGate` reads `matters` and returns `{ notify, reason }`. The classifier chooses a reason category and maps it to a decision and explanation. The chat model returns a specific reason. Both use the same two-second budget.
 - **Prompts are code.** `src/tasks/<task>.prompt.ts` next to each task, plain template strings; the classifier instructions and criteria live in the same file. Shared rules in `src/tasks/shared.ts`: plain text, no markdown or emoji, never write for the user, quiet option when unsure.
-- **The fake validates too.** Word rules in `src/fake/rules.ts`, canned chat turns in `src/fake/replies.ts`. Their output goes through `validateOutput` and a text task's `check`, so a broken rule is a `NoDecision` in a test, never a crash. The fake's `topicArt` picks an object by words in the topic and a hue by hash, marks a very short title not confident, steps to the next hue and object on a redraw, and answers outside the vocabulary when the text contains `::invalid-art::`, so tests can see what the app does with a drawing that fails.
-- **Chat is one turn.** `chat` streams the assistant's reply and its tool calls, validated against `tools`; the caller runs the tools, appends `tool` messages and calls again. The chat system prompt plus the facts block (`now`, the topic "this" means) come from the `chat` task.
+- **The fake validates too.** Word rules in `src/fake/rules.ts`. Their output goes through `validateOutput` and a text task's `check`, so a broken rule is a `NoDecision` in a test, never a crash. The fake's `topicArt` picks an object by words in the topic and a hue by hash, marks a very short title not confident, steps to the next hue and object on a redraw, and answers outside the vocabulary when the text contains `::invalid-art::`, so tests can see what the app does with a drawing that fails.
 
 ## Defaults and timeouts
 
@@ -46,7 +45,6 @@ Ids in outputs are plain strings. The `accept` rule of each task guarantees they
 | `parseCommand` | chat decision | 4 s | ⌘K fallback after the grammar; search results show meanwhile. Luna p50 1.5 s, p95 2.3 s, the odd call near 3 s. |
 | `titleTopic` | generation | 20 s | Measured 1.6 to 1.9 s. |
 | `topicArt` | art | 15 s | Background, when a topic first enters the sidebar; nobody waits. The study measured a median of 2.3 s and a p90 of 4.8 s; the live check on 2026-10-14 saw 4.2 to 14.0 s per call (median 4.5 s, 9 of 10 valid first time, about $0.003 per icon), so there is room for one slow call. |
-| `chat` | generation | 60 s | One streamed turn with tools. |
 
 ## Measurements
 
@@ -95,7 +93,7 @@ What the numbers say:
 
 ## Tests
 
-`pnpm --filter @juno/ai test`. Behaviour through the interface with the fake; the schema and `accept` rules; `PiAiProvider` against pi-ai's scripted faux provider plus a scripted System One classifier (valid call, retry, two invalid answers, provider error, timeout, missing key, tool choice by tier and the `auto` fallback, classifier questions and answers, classifier off, chat streaming); cache key stability. No test depends on prompt wording.
+`pnpm --filter @juno/ai test`. Behaviour through the interface with the fake; the schema and `accept` rules; `PiAiProvider` against pi-ai's scripted faux provider plus a scripted System One classifier (valid call, retry, two invalid answers, provider error, timeout, missing key, tool choice by tier and the `auto` fallback, classifier questions and answers, classifier off); cache key stability. No test depends on prompt wording.
 
 ## Open questions
 
