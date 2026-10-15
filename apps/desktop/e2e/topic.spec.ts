@@ -112,13 +112,14 @@ test('the title opens the topic menu under the left island, and Notify me follow
   await expect.poll(() => slack.fake.calls.some((call) => call.method === 'subscriptions.thread.add'), { timeout: 10_000 }).toBe(true)
 })
 
-test('Main’s menu has no Notify me of its own, and the header is reached pill, title, Threads', async ({ juno, win }) => {
+test('Main’s Notify me is its channel’s, and the header is reached pill, title, Threads', async ({ juno, win }) => {
   await juno.signIn()
   await juno.waitForSync()
   await juno.sidebar.row(ENG_MAIN).open()
   await juno.topic.expectTitle('Main')
   const { labels } = await juno.topic.chooseInMenu('copy-link')
-  expect(labels).not.toContain('Notify me')
+  expect(labels).toContain('Notify me')
+  expect(labels).toContain('> When it matters ✓')
   expect(labels).not.toContain('Rename')
 
   await juno.topic.contextPill.focus()

@@ -67,10 +67,11 @@ export class SidebarRow {
   constructor(
     readonly win: Page,
     readonly title: string,
+    exact = false,
   ) {
     // Rows are focusable list items named by their title (a button would
     // flatten the Resolve button inside it).
-    this.root = win.getByRole('listitem', { name: new RegExp(`^${escapeRegExp(title)}`) })
+    this.root = win.getByRole('listitem', { name: new RegExp(`^${escapeRegExp(title)}${exact ? '$' : ''}`) })
   }
 
   get resolveButton() {
@@ -210,8 +211,9 @@ export class Sidebar {
     return this.list.locator('[data-topic-row]')
   }
 
-  row(title: string): SidebarRow {
-    return new SidebarRow(this.win, title)
+  /** The row whose title starts with `title`, or is exactly `title` with `exact`. */
+  row(title: string, options: { readonly exact?: boolean } = {}): SidebarRow {
+    return new SidebarRow(this.win, title, options.exact === true)
   }
 
   section(name: SidebarSectionName) {
@@ -333,7 +335,7 @@ export class Sidebar {
   }
 }
 
-/** The popover behind the avatar button: session, appearance, diagnostics. */
+/** The popover behind the avatar button: presence, Notifications, Preferences, session, diagnostics. */
 export class AccountMenu {
   readonly root: Locator
 
@@ -372,8 +374,90 @@ export class AccountMenu {
     return this.root.getByRole('button', { name: 'Sign out' })
   }
 
-  themeRadio(name: 'Light' | 'Dark') {
+  /** Set yourself away or active, Notifications, Preferences (inventory 2.1). */
+  item(name: string | RegExp) {
+    return this.root.getByRole('menuitem', { name })
+  }
+
+  /** The line under the name: "Active", "Away until 9am". */
+  async expectPresence(text: string | RegExp): Promise<void> {
+    await expect(this.root.getByText(text)).toBeVisible({ timeout: 10_000 })
+  }
+
+  async choose(name: string | RegExp): Promise<void> {
+    await this.open()
+    await this.item(name).click()
+    await expect(this.root).toHaveCount(0)
+  }
+}
+
+/** Preferences (inventory 14): the Appearance group. */
+export class PreferencesPage {
+  readonly root: Locator
+
+  constructor(readonly win: Page) {
+    this.root = win.getByRole('main')
+  }
+
+  themeRadio(name: 'System' | 'Light' | 'Dark') {
     return this.root.getByRole('radio', { name })
+  }
+
+  densityRadio(name: 'Comfortable' | 'Compact') {
+    return this.root.getByRole('radio', { name })
+  }
+}
+
+/** The Notifications page (inventory 13). */
+export class NotificationsPage {
+  readonly root: Locator
+
+  constructor(readonly win: Page) {
+    this.root = win.getByRole('main')
+  }
+
+  /** The Notifications or Active in Slack row. */
+  hoursRow(which: 'Notifications' | 'Active in Slack'): Locator {
+    return this.root.getByLabel(which, { exact: true })
+  }
+
+  async setFrom(which: 'Notifications' | 'Active in Slack', label: string): Promise<void> {
+    await this.root.getByRole('combobox', { name: `${which} from` }).selectOption({ label })
+  }
+
+  async setTo(which: 'Notifications' | 'Active in Slack', label: string): Promise<void> {
+    await this.root.getByRole('combobox', { name: `${which} to` }).selectOption({ label })
+  }
+
+  day(which: 'Notifications' | 'Active in Slack', day: string): Locator {
+    return this.root.getByRole('group', { name: `${which} days` }).getByRole('button', { name: day })
+  }
+
+  get matters(): Locator {
+    return this.root.getByRole('textbox', { name: 'What matters to you' })
+  }
+
+  /** Types into What matters to you and leaves the field, which saves it. */
+  async writeMatters(text: string): Promise<void> {
+    await this.matters.fill(text)
+    await this.matters.blur()
+  }
+
+  /** The Every message or Never row. */
+  level(name: 'Every message' | 'Never'): Locator {
+    return this.root.getByLabel(name, { exact: true })
+  }
+
+  async removeTag(name: string): Promise<void> {
+    await this.root.getByRole('button', { name: `Remove ${name}` }).click()
+  }
+
+  get showWhy(): Locator {
+    return this.root.getByRole('button', { name: 'Show why' })
+  }
+
+  get interrupted(): Locator {
+    return this.root.getByRole('list', { name: 'Messages that interrupted you' })
   }
 }
 
@@ -382,6 +466,8 @@ export class Juno {
   readonly win: Page
   readonly sidebar: Sidebar
   readonly accountMenu: AccountMenu
+  readonly preferences: PreferencesPage
+  readonly notifications: NotificationsPage
   readonly topic: TopicPane
   readonly newChat: NewChatPane
   readonly tabs: TabStrip
@@ -394,6 +480,8 @@ export class Juno {
     appOf.set(win, app)
     this.sidebar = new Sidebar(win)
     this.accountMenu = new AccountMenu(win, this.sidebar)
+    this.preferences = new PreferencesPage(win)
+    this.notifications = new NotificationsPage(win)
     this.topic = new TopicPane(win)
     this.newChat = new NewChatPane(win)
     this.tabs = new TabStrip(app, win)
@@ -537,12 +625,45 @@ export class Juno {
     await this.win.mouse.click(900, 400)
   }
 
-  /** Switches the theme from the account menu and waits for the page to follow. */
+  /** Switches the theme in Preferences and waits for the page to follow, then closes Preferences. */
   async setTheme(theme: 'Light' | 'Dark'): Promise<void> {
-    await this.accountMenu.open()
-    await this.accountMenu.themeRadio(theme).click()
-    await expect(this.accountMenu.themeRadio(theme)).toHaveAttribute('aria-checked', 'true')
-    await this.accountMenu.close()
+    await this.openPreferences()
+    await this.preferences.themeRadio(theme).click()
+    await expect(this.preferences.themeRadio(theme)).toHaveAttribute('aria-checked', 'true')
+    await this.tabs.close('Preferences')
+    await expect(this.tabs.tab('Preferences')).toHaveCount(0)
+  }
+
+  /** Preferences, from the avatar menu. */
+  async openPreferences(): Promise<void> {
+    await this.accountMenu.choose('Preferences')
+    await this.tabs.expectActive('Preferences')
+  }
+
+  /** The Notifications page, from the avatar menu. */
+  async openNotifications(): Promise<void> {
+    await this.accountMenu.choose(/^Notifications/)
+    await this.tabs.expectActive('Notifications')
+  }
+
+  /** The OS notifications main showed (recorded under JUNO_E2E), oldest first. */
+  osNotifications(): Promise<Array<{ readonly title: string; readonly body: string }>> {
+    return this.app.evaluate(() => (globalThis as unknown as { junoTest: { notifications: () => Array<{ title: string; body: string }> } }).junoTest.notifications())
+  }
+
+  /** Clicks the OS notification at `index`, as the user would in Notification Center. */
+  async clickOsNotification(index: number): Promise<void> {
+    await this.app.evaluate((_electron, at) => (globalThis as unknown as { junoTest: { clickNotification: (i: number) => void } }).junoTest.clickNotification(at), index)
+  }
+
+  /** The dock's badge text: "•" with unread mentions, else empty. */
+  dockBadge(): Promise<string> {
+    return this.app.evaluate(() => (globalThis as unknown as { junoTest: { dockBadge: () => string } }).junoTest.dockBadge())
+  }
+
+  /** The why popover (inventory 15.4), by its title. */
+  whyPopover(title: string | RegExp): Locator {
+    return this.win.getByRole('dialog', { name: title })
   }
 
   /** Waits until the engine has caught up with Slack and says it is live. */
@@ -636,6 +757,10 @@ const appOf = new WeakMap<Page, ElectronApplication>()
 async function lastMenu(win: Page): Promise<{ readonly labels: string[]; readonly at: { readonly x: number; readonly y: number } | null }> {
   const app = appOf.get(win)
   if (app === undefined) throw new Error('lastMenu needs the app; use the Juno driver')
+  // A menu may wait for the engine before it opens (the why item asks first); wait until it took the chosen item.
+  await expect
+    .poll(() => app.evaluate(() => (globalThis as unknown as { junoTest: { contextMenu: { next: string | null | undefined } } }).junoTest.contextMenu.next === undefined), { timeout: 10_000 })
+    .toBe(true)
   return app.evaluate(() => {
     const menu = (globalThis as unknown as { junoTest: { contextMenu: { lastLabels: string[]; lastAt: { x: number; y: number } | null } } }).junoTest.contextMenu
     return { labels: [...menu.lastLabels], at: menu.lastAt }
@@ -779,6 +904,18 @@ export class TopicPane {
 
   get divider() {
     return this.root.locator('[data-new-divider]')
+  }
+
+  /**
+   * Right-clicks the message that starts with `text` and picks `item` in its
+   * menu; on its sender's name with `onSender`. Returns the menu's labels.
+   */
+  async chooseInMessageMenu(text: string, item: string, options: { readonly onSender?: boolean } = {}): Promise<{ readonly labels: string[] }> {
+    await chooseNextMenuItem(this.win, item)
+    const message = this.message(text)
+    await message.scrollIntoViewIfNeeded()
+    await (options.onSender === true ? message.locator('[data-sender]').last() : message).click({ button: 'right' })
+    return lastMenu(this.win)
   }
 
   /** A message by the start of its text. */
