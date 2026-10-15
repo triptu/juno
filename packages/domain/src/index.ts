@@ -23,3 +23,4 @@ export * from './automated'
 
 // The standard emoji, for the renderer's picker through @juno/contract.
 export { emojiCatalog, type EmojiCategory } from '@juno/richtext'
+export * from './composer-mentions'

@@ -2,7 +2,7 @@ import { AiProvider, urgencyGate } from '@juno/ai'
 import { channelLabel, inHours, localTime, nextHoursStart, decideNotification, hoursStartSummary, scheduledPresence, slackPresence, type NotificationDecision, type Presence } from '@juno/domain'
 import { Invalidation, StoreWriter, type StoreReader } from '@juno/store'
 import { Clock, Effect, Schema, Semaphore, SubscriptionRef } from 'effect'
-import { Candidate, Judgement, type MessageSource, type Notifier } from './model'
+import { Candidate, Judgement, type Notifier, type SummarySource } from './model'
 import { readSettings } from './settings'
 
 interface Row {
@@ -103,18 +103,24 @@ export const makeNotifications = Effect.fn('Notifications.make')(function* (noti
     const now = new Date(yield* Clock.currentTimeMillis).toISOString()
     const rows = yield* sql<Row>`SELECT * FROM notification_log WHERE outcome = 'summary' AND delivered_at IS NULL AND suppressed_at IS NULL
       AND summary_due_at <= ${now} AND candidate_json IS NOT NULL ORDER BY at, id`
-    const summary = hoursStartSummary(rows.map((row) => ({ decision: { outcome: row.outcome, reason: row.reason },
-      where: channelLabel(Schema.decodeUnknownSync(Candidate)(JSON.parse(row.candidate_json)).channel) })))
+    const candidates = rows.map((row) => Schema.decodeUnknownSync(Candidate)(JSON.parse(row.candidate_json)))
+    const summary = hoursStartSummary(rows.map((row, n) => ({ decision: { outcome: row.outcome, reason: row.reason }, where: channelLabel(candidates[n]!.channel) })))
     const first = rows[0]
     if (summary === undefined || first === undefined) return
-    const sources: ReadonlyArray<MessageSource> = rows.map((row) => ({ channelId: row.channel, ts: row.ts, topicId: row.topic_id }))
+    const sources: ReadonlyArray<SummarySource> = rows.map((row, n) => {
+      const candidate = candidates[n]!
+      const place = channelLabel(candidate.channel)
+      // A DM's place is the person already.
+      const sender = candidate.senderName !== undefined && candidate.senderName !== place ? candidate.senderName : undefined
+      return { channelId: row.channel, ts: row.ts, topicId: row.topic_id, place, ...(sender === undefined ? {} : { sender }) }
+    })
     const source = sources[0]
     if (source === undefined) return
     const id = `summary:${rows.map((row) => row.id).join(',')}`
     const { aiAssist } = yield* configuration
     const target = aiAssist
       ? { kind: 'summary' as const, id: yield* notifier.summary({ id, at: now, sources, ...summary }) }
-      : { kind: 'message' as const, source }
+      : { kind: 'message' as const, source: { channelId: source.channelId, ts: source.ts, topicId: source.topicId } }
     yield* sql`UPDATE notification_log SET delivered_at = ${now} WHERE id IN ${sql.in(rows.map((row) => row.id))}`
     yield* logChanged
     yield* notifier.show({ id, ...summary, target })

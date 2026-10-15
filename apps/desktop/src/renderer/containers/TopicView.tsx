@@ -372,14 +372,19 @@ function Topic({ id, detail, readOnly = false, underHeader = true }: TopicProps)
     setPositioned(true)
   }, [id, readOnly, positioned, list.ready, list.rows, last, atEnd])
 
-  // A Juno source link asked for a message: once the topic is positioned, it is scrolled into view if it is not, and flashes.
+  // A Juno source link or a notification asked for a message: once the topic is positioned and the row is in its
+  // window, it is scrolled into view if it is not, and flashes. Each request is taken once, so showing a hidden tab
+  // again (`<Activity>` runs its effects again) does not jump back to it.
   const flash = useAtomValue(messageFlashAtom(id))
+  const flashTaken = useRef(0)
   useEffect(() => {
     const scroller = scrollRef.current
-    if (readOnly || flash === undefined || !positioned || scroller === null) return
+    if (readOnly || flash === undefined || flash.n <= flashTaken.current || !positioned || scroller === null || !list.rows.has(flash.ts)) return
     afterPaint(() => {
       const row = scroller.querySelector(rowSelector(flash.ts))
-      if (row === null) return
+      if (row === null || flash.n <= flashTaken.current) return
+      flashTaken.current = flash.n
+      if (registry.get(messageFlashAtom(id))?.n === flash.n) registry.set(messageFlashAtom(id), undefined)
       const box = row.getBoundingClientRect()
       const view = scroller.getBoundingClientRect()
       if (box.top < view.top || box.bottom > view.bottom) {
@@ -389,7 +394,7 @@ function Topic({ id, detail, readOnly = false, underHeader = true }: TopicProps)
       }
       flashChatRow(row)
     })
-  }, [readOnly, flash, positioned])
+  }, [id, readOnly, flash, positioned, list.rows])
 
   // Rows added above the ones in view (the rest of the window after the first frame, an older page):
   // scroll anchoring keeps the rows in view still, except at offset 0, where Chromium does not anchor.

@@ -292,6 +292,19 @@ export const channelsIgnore = action('channels.ignore', { channel: Schema.String
 
 export const channelsUnignore = action('channels.unignore', { channel: Schema.String })
 
+/** One ignored channel on Preferences (inventory 14). `hidden` counts the messages since it was ignored, at most `IGNORED_HIDDEN_CAP`. */
+export const IgnoredChannel = Schema.Struct({
+  id: Schema.String,
+  name: Schema.String,
+  kind: Schema.Literals(['public', 'private']),
+  hidden: Schema.Int,
+})
+export type IgnoredChannel = typeof IgnoredChannel.Type
+export const IGNORED_HIDDEN_CAP = 1000
+
+/** The ignore list, newest first. */
+export const channelsIgnored = liveValueRoute('channels.ignored', { value: Schema.Array(IgnoredChannel) })
+
 export const TopicsRoutes = RpcGroup.make(
   topicsList,
   topicsCounts,
@@ -305,4 +318,5 @@ export const TopicsRoutes = RpcGroup.make(
   topicsRestore,
   channelsIgnore,
   channelsUnignore,
+  channelsIgnored,
 )

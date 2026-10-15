@@ -1,10 +1,11 @@
 import { lazy, Suspense, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type Ref } from 'react'
-import { audienceCheck, type SendTarget, type TopicDetail } from '@juno/contract'
+import { audienceCheck, decodeMentions, encodeMentions, type MentionPick, type SendTarget, type TopicDetail } from '@juno/contract'
 import { aiAssistOnAtom, checkMessage, draftAtom, precheckMessage, registry, saveDraft, sendMessage, showToast } from '@juno/state'
 import { mark } from '@juno/state/perf'
 import { useAtomValue } from '@juno/state/react'
 import { AudienceWarning, Composer, ComposerSlot } from '@juno/views'
 import { takeAttachments, useAttachments } from './attachments'
+import { useMentions } from './mentions'
 import type { ComposerHandle } from './messageActions'
 import { afterCheck, choose, type CheckBar, type Destination, type Outcome } from './sendChecks'
 import { cancelSendMark, markSend } from './sendMark'
@@ -62,7 +63,9 @@ export function withQuote(draft: string, text: string): string {
  * and the pending row shows in the list at once; otherwise the check bar
  * shows inside the composer until a choice, Esc or an edit. While typing
  * pauses in a public channel, the audience line warns about hiring and
- * people details.
+ * people details. Typing @ or # suggests people and channels
+ * (`useMentions`); the draft and the send carry the picked ones encoded as
+ * Slack does (`encodeMentions`), while the checks read the text as shown.
  */
 export function TopicComposer({ detail, onSent, handle, onArrowUpEmpty, dropping }: TopicComposerProps) {
   const stored = useAtomValue(draftAtom(detail.id))
@@ -75,9 +78,14 @@ function LoadedComposer({ detail, initial, placeholder, onSent, handle, onArrowU
   const id = detail.id
   const files = useAttachments(id)
   const aiAssist = useAtomValue(aiAssistOnAtom)
-  const [text, setText] = useState(initial)
+  const [start] = useState(() => decodeMentions(initial))
+  const [text, setText] = useState(start.text)
+  const [picks, setPicks] = useState(start.picks)
+  // Read when the draft is saved or sent, which can be in the same event as a pick.
+  const picked = useRef<ReadonlyArray<MentionPick>>(start.picks)
+  const encoded = (value: string) => encodeMentions(value, picked.current)
   // The draft as it was when typing last paused: the audience line reads it.
-  const [paused, setPaused] = useState(initial)
+  const [paused, setPaused] = useState(start.text)
   const [bar, setBar] = useState<CheckBar | undefined>(undefined)
   // The check Enter started; an edit or a newer Enter replaces it, and its answer is dropped.
   const checking = useRef<object | undefined>(undefined)
@@ -112,7 +120,7 @@ function LoadedComposer({ detail, initial, placeholder, onSent, handle, onArrowU
   // A saved Main draft is asked about once, as if typing had just paused.
   useEffect(() => {
     preloadBar()
-    if (aiAssist && detail.kind === 'main' && initial.trim() !== '') precheckMessage(registry, detail.channel.id, initial)
+    if (aiAssist && detail.kind === 'main' && start.text.trim() !== '') precheckMessage(registry, detail.channel.id, start.text)
     // Once per mount: later drafts are asked about as typing pauses.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -127,7 +135,7 @@ function LoadedComposer({ detail, initial, placeholder, onSent, handle, onArrowU
     // Editing closes the bar and drops a check still running: Enter checks the new text.
     setBar(undefined)
     stopChecking()
-    unsaved.current = next
+    unsaved.current = encoded(next)
     clearTimeout(timer.current)
     timer.current = setTimeout(() => {
       setPaused(next)
@@ -149,7 +157,7 @@ function LoadedComposer({ detail, initial, placeholder, onSent, handle, onArrowU
     setBar(undefined)
     onSent()
     const target: SendTarget = { kind: 'channel', ...(to.kind === 'here' ? here : { channelId: detail.channel.id, threadTs: to.threadTs }) }
-    void sendMessage(registry, target, body, id, attached.ids).then((exit) => {
+    void sendMessage(registry, target, encoded(body), id, attached.ids).then((exit) => {
       if (exit._tag === 'Success') mark('juno.send-queued', undefined, { replace: true })
       if (exit._tag === 'Failure') {
         // Nothing was queued: the text and the files come back so they can be sent again.
@@ -216,10 +224,22 @@ function LoadedComposer({ detail, initial, placeholder, onSent, handle, onArrowU
     },
   }))
 
+  const mentions = useMentions({
+    text,
+    picks,
+    onPicks: (next) => {
+      picked.current = next
+      setPicks(next)
+    },
+    onChange: change,
+    field,
+    place: { channel: detail.channel.id, ...(detail.kind === 'thread' && detail.rootTs !== undefined ? { threadTs: detail.rootTs } : {}) },
+  })
+
   return (
     <Composer
       value={text}
-      onChange={change}
+      {...mentions}
       onSend={send}
       placeholder={placeholder}
       inputRef={field}

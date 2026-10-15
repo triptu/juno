@@ -61,14 +61,17 @@ describe('pagination', () => {
     expect(first.messages).toHaveLength(3)
     expect(first.has_more).toBe(true)
     const second = await client.ok('conversations.replies', { channel: 'C0ENG', ts: root.ts, limit: 3, cursor: first.response_metadata!.next_cursor! })
-    expect(compareTs(second.messages[0]!.ts, first.messages[2]!.ts)).toBe(1)
+    expect(second.messages[0]?.ts).toBe(root.ts)
+    expect(compareTs(second.messages[1]!.ts, first.messages[2]!.ts)).toBe(1)
     const third = await client.ok('conversations.replies', { channel: 'C0ENG', ts: root.ts, limit: 3, cursor: second.response_metadata!.next_cursor! })
     expect(third.has_more).toBe(false)
-    const total = first.messages.length + second.messages.length + third.messages.length
+    expect(third.messages[0]?.ts).toBe(root.ts)
+    const total = new Set([...first.messages, ...second.messages, ...third.messages].map((message) => message.ts)).size
     expect(total).toBe((root.reply_count ?? 0) + 1)
-    // The latest two replies only, as the preview fetch does.
+    // The root still occupies one place when oldest selects only the latest reply.
     const tail = await client.ok('conversations.replies', { channel: 'C0ENG', ts: root.ts, oldest: root.latest_reply!, inclusive: true, limit: 2 })
-    expect(tail.messages.map((m) => m.ts)).toEqual([root.latest_reply])
+    expect(tail.messages.map((m) => m.ts)).toEqual([root.ts, root.latest_reply])
+    expect(tail.has_more).toBe(false)
   })
 
   it('thread view pages by current_ts and caps a page at 10 whatever limit says', async () => {

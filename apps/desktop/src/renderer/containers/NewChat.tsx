@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react'
-import type { PickConversation, PickThread } from '@juno/contract'
+import { encodeMentions, type PickConversation, type PickThread } from '@juno/contract'
 import {
   newChatAtom,
   nowAtom,
@@ -16,6 +16,7 @@ import {
 import { useAtom, useAtomValue } from '@juno/state/react'
 import { Composer, DestinationPickers, NewChat as NewChatView, startOfConversation, type PickerName } from '@juno/views'
 import { takeAttachments, useAttachments } from './attachments'
+import { useMentions } from './mentions'
 import { settleSentChat } from './navigation'
 import { TopicPreview } from './TopicView'
 
@@ -38,7 +39,9 @@ export interface NewChatTabProps {
  * preview is the destination's topic, read-only (`TopicPreview`). Enter
  * with no destination opens the conversation picker; Enter after picking
  * sends: the message is queued and the tab becomes its topic at once,
- * with the message pending in it (`settleSentChat`). The tab lives in an `<Activity>`: each time it shows,
+ * with the message pending in it (`settleSentChat`). @ and # suggest
+ * people and channels as in a topic (`useMentions`), ranked for the picked
+ * conversation once there is one. The tab lives in an `<Activity>`: each time it shows,
  * the composer takes focus.
  */
 export const NewChatTab = memo(function NewChatTab({ tabId }: NewChatTabProps) {
@@ -80,13 +83,23 @@ export const NewChatTab = memo(function NewChatTab({ tabId }: NewChatTabProps) {
     const attached = takeAttachments(tabId)
     if (attached === undefined) return
     setSending(true)
-    const exit = await sendMessage(registry, target, chat.draft, undefined, attached.ids)
+    const exit = await sendMessage(registry, target, encodeMentions(chat.draft, chat.mentions), undefined, attached.ids)
     if (exit._tag === 'Success') return settleSentChat(tabId, exit.value.topicId)
     // The draft and its files stay; the send can be tried again.
     attached.restore()
     setSending(false)
     console.warn('juno: send failed', exit.cause)
   }
+
+  // The atom is read at the moment of each change: a pick sets the mentions and then the text in one event.
+  const mentions = useMentions({
+    text: chat.draft,
+    picks: chat.mentions,
+    onPicks: (picks) => setChat({ ...registry.get(newChatAtom(tabId)), mentions: picks }),
+    onChange: (draft) => setChat({ ...registry.get(newChatAtom(tabId)), draft }),
+    field: inputRef,
+    place: { channel: chat.conversation?.channelId, threadTs: chat.thread?.rootTs },
+  })
 
   const topic = previewTopic(chat)
   const person = chat.conversation?.channelId === undefined ? chat.conversation?.person : undefined
@@ -98,7 +111,7 @@ export const NewChatTab = memo(function NewChatTab({ tabId }: NewChatTabProps) {
       composer={
         <Composer
           value={chat.draft}
-          onChange={(draft) => setChat({ ...registry.get(newChatAtom(tabId)), draft })}
+          {...mentions}
           onSend={() => void send()}
           placeholder={placeholderOf(chat)}
           sending={sending}

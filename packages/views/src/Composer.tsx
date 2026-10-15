@@ -1,13 +1,27 @@
 import * as stylex from '@stylexjs/stylex'
 import { ArrowUp } from '@phosphor-icons/react/dist/icons/ArrowUp'
-import type { ClipboardEvent, DragEvent, KeyboardEvent, ReactNode, Ref } from 'react'
+import type { ClipboardEvent, DragEvent, KeyboardEvent, ReactNode, Ref, SyntheticEvent } from 'react'
 import { accent, layout, sizes, spacing } from '@juno/tokens/tokens.stylex'
-import { IconButton, Surface, Textarea } from '@juno/ui'
+import { IconButton, Surface, Textarea, type TextareaMark } from '@juno/ui'
+
+/** The open @ or # suggestions (inventory 7.1). */
+export interface ComposerMention {
+  /** The offset of the "@" or "#" being typed: the list lines up under it. */
+  readonly anchorAt: number
+  /** The list's element id, and its highlighted row's. */
+  readonly listId: string
+  readonly activeId: string | undefined
+  /** `MentionSuggestions`, or nothing while there is no match. */
+  readonly list: ReactNode
+  /** The field lost focus: the list closes. */
+  readonly onDismiss: () => void
+}
 
 export interface ComposerProps {
   /** The draft is the owner's: controlled. */
   readonly value: string
-  readonly onChange: (value: string) => void
+  /** With the caret's offset after the change. */
+  readonly onChange: (value: string, caret: number) => void
   /** Enter, or the send button. Called with an empty draft too: the owner decides (New chat opens the picker). */
   readonly onSend: () => void
   /** "Message", "Message #eng", "Reply". */
@@ -34,6 +48,25 @@ export interface ComposerProps {
   readonly onFiles?: (files: ReadonlyArray<File>) => void
   /** Files are being dragged over the topic: the field shows a quiet accent ring. */
   readonly dropping?: boolean
+  /** Picked @people and #channels, drawn as chips in the field. */
+  readonly marks?: ReadonlyArray<TextareaMark>
+  /** The @ or # suggestions while they are open. */
+  readonly mention?: ComposerMention
+  /** Sees every key in the field first; true when it took the key (the suggestions' arrows, Enter, Tab, Esc, Backspace). */
+  readonly onFieldKey?: (event: KeyboardEvent<HTMLTextAreaElement>) => boolean
+  /** The caret moved without the text changing: a click or an arrow key. */
+  readonly onCaret?: (caret: number) => void
+}
+
+/** The field's side of the @ and # suggestions: chips, the caret, the list's anchor and its ARIA wiring. */
+function mentionProps(marks: ComposerProps['marks'], mention: ComposerMention | undefined, onCaret: ComposerProps['onCaret']) {
+  return {
+    ...(onCaret === undefined ? {} : { onSelect: (event: SyntheticEvent<HTMLTextAreaElement>) => onCaret(event.currentTarget.selectionStart) }),
+    ...(marks === undefined ? {} : { marks, 'aria-autocomplete': 'list' as const }),
+    ...(mention === undefined
+      ? {}
+      : { anchorAt: mention.anchorAt, onBlur: mention.onDismiss, 'aria-controls': mention.listId, 'aria-activedescendant': mention.activeId, 'aria-expanded': mention.list !== null && mention.list !== undefined }),
+  }
 }
 
 /** A drag that carries files from Finder, not text or a link. */
@@ -47,9 +80,10 @@ const carriesFiles = (event: DragEvent<HTMLElement>) => event.dataTransfer.types
  * as in the Juno composer; `leading` is where the attach button goes.
  * `notices` grow the box upwards; the text row stays where it is.
  */
-export function Composer({ value, onChange, onSend, placeholder, sending = false, above, inputRef, onArrowUpEmpty, leading, notices, onEscape, attachments, onFiles, dropping = false }: ComposerProps) {
+export function Composer({ value, onChange, onSend, placeholder, sending = false, above, inputRef, onArrowUpEmpty, leading, notices, onEscape, attachments, onFiles, dropping = false, marks, mention, onFieldKey, onCaret }: ComposerProps) {
   const empty = value.trim().length === 0
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (onFieldKey?.(event) === true) return
     if (event.key === 'ArrowUp' && value === '' && onArrowUpEmpty !== undefined && !event.shiftKey && !event.metaKey && !event.altKey && !event.ctrlKey) {
       event.preventDefault()
       onArrowUpEmpty()
@@ -97,8 +131,9 @@ export function Composer({ value, onChange, onSend, placeholder, sending = false
             label={placeholder}
             placeholder={placeholder}
             value={value}
-            onChange={(event) => onChange(event.currentTarget.value)}
+            onChange={(event) => onChange(event.currentTarget.value, event.currentTarget.selectionStart)}
             onKeyDown={onKeyDown}
+            {...mentionProps(marks, mention, onCaret)}
             onPaste={onFiles === undefined ? undefined : onPaste}
             dir="auto"
           />
@@ -119,6 +154,7 @@ export function Composer({ value, onChange, onSend, placeholder, sending = false
           </span>
         </div>
       </Surface>
+      {mention?.list}
     </div>
   )
 }
@@ -131,6 +167,9 @@ const styles = stylex.create({
     paddingInline: spacing['--space-6'],
     paddingBottom: spacing['--space-5'],
     boxSizing: 'border-box',
+    // The suggestions are placed against the field box and the "@" inside it (`MentionSuggestions`).
+    position: 'relative',
+    anchorScope: 'all',
   },
   above: {
     display: 'flex',
@@ -146,6 +185,7 @@ const styles = stylex.create({
     maxWidth: layout['--composer-width'],
     marginInline: 'auto',
     boxSizing: 'border-box',
+    anchorName: '--composer-box',
   },
   // An outline over the 1px border and just outside it: one ring, and no layout change.
   dropping: {

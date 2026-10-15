@@ -70,6 +70,12 @@ export const Methods = {
   'auth.test': method(AuthTestArgs, AuthTestFields),
   'client.userBoot': method(ClientUserBootArgs, ClientUserBootFields),
   'client.counts': method(ClientCountsArgs, ClientCountsFields),
+  'dnd.info': method(S.Struct({}), {
+    dnd_enabled: S.Boolean,
+    next_dnd_start_ts: S.Number,
+    next_dnd_end_ts: S.Number,
+    snooze_enabled: S.Boolean,
+  }),
   'users.prefs.get': method(UsersPrefsGetArgs, UsersPrefsGetFields),
   'client.getWebSocketURL': method(GetWebSocketUrlArgs, GetWebSocketUrlFields),
   'api.getFlannelHttpUrl': method(GetFlannelHttpUrlArgs, GetFlannelHttpUrlFields),

@@ -496,6 +496,15 @@ export class PreferencesPage {
   densityRadio(name: 'Comfortable' | 'Compact') {
     return this.root.getByRole('radio', { name })
   }
+
+  /** One ignored channel's row on the ignore list (inventory 14), by name without "#". */
+  ignored(name: string): Locator {
+    return this.root.locator('[data-ignored-channel]').filter({ hasText: name })
+  }
+
+  async stopIgnoring(name: string): Promise<void> {
+    await this.ignored(name).getByRole('button', { name: `Stop ignoring ${name}` }).click()
+  }
 }
 
 /** The Notifications page (inventory 13). */
@@ -1139,6 +1148,21 @@ export class NewChatPane {
     return this.root.locator('[data-composer] textarea')
   }
 
+  /** The @ or # suggestions above the composer (inventory 7.1). */
+  get suggestions(): Locator {
+    return this.root.locator('[data-mention-suggestions]')
+  }
+
+  /** The suggestion row whose name starts with `name`. */
+  suggestion(name: string): Locator {
+    return this.suggestions.getByRole('option', { name: new RegExp(`^${escapeRegExp(name)}(\\s|$)`) })
+  }
+
+  /** The picked people and channels drawn as chips in the composer's field. */
+  get composerChips(): Locator {
+    return this.root.locator('[data-composer] [data-mark]')
+  }
+
   /** The composer's field, whose box must not move when the tab becomes the topic. */
   get field(): Locator {
     return this.win.locator('[data-composer-field]').filter({ visible: true })
@@ -1256,6 +1280,21 @@ export class TopicPane {
   /** The composer's text field. */
   get composer(): Locator {
     return this.root.locator('[data-composer] textarea')
+  }
+
+  /** The @ or # suggestions above the composer (inventory 7.1). */
+  get suggestions(): Locator {
+    return this.root.locator('[data-mention-suggestions]')
+  }
+
+  /** The suggestion row whose name starts with `name`. */
+  suggestion(name: string): Locator {
+    return this.suggestions.getByRole('option', { name: new RegExp(`^${escapeRegExp(name)}(\\s|$)`) })
+  }
+
+  /** The picked people and channels drawn as chips in the composer's field. */
+  get composerChips(): Locator {
+    return this.root.locator('[data-composer] [data-mark]')
   }
 
   /** The composer's box, which must not move as rows come and go. */

@@ -16,6 +16,9 @@ module catchupProtocol {
   // request start on the shared stamp clock (the code compares Slack's event
   // ts with the request's ts in the same way). `known` is what the store held
   // at the request, for the recheck's deletions; other pages infer none.
+  // A content version includes text, blocks, files and the message-owned bot
+  // display name and icon. They follow the same edit ordering as other content;
+  // omitted bot metadata preserves the stored value. User profiles are separate.
   type Page = { requestedAt: int, recheck: bool, present: Set[int], version: int -> int, react: int -> bool, known: Set[int] }
   type Event = { kind: str, key: int, stamp: int, version: int, react: bool }
 

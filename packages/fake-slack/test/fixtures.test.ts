@@ -45,6 +45,10 @@ describe('every fixture response decodes with @juno/slack schemas', () => {
     expect(counts.threads.mention_count).toBeGreaterThan(0)
     expect(counts.ims.find((c) => c.id === 'D0MAYA')?.has_unreads).toBe(false)
 
+    expect(await client.ok('dnd.info', {})).toMatchObject({
+      dnd_enabled: false, next_dnd_start_ts: 0, next_dnd_end_ts: 0, snooze_enabled: false,
+    })
+
     const prefs = await client.ok('users.prefs.get', {})
     expect(prefs.prefs.highlight_words).toBe('postgres,offsite')
 

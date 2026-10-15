@@ -26,6 +26,8 @@
  * starts it again with backoff instead.
  */
 import { Clock, Effect, Option, Result, Schedule, Stream } from 'effect'
+import { liveQuery, type InvalidationKeys } from '@juno/store'
+import type { OpenWorkspace } from '../workspace'
 import { LIVE_DELTA_MAX_BYTES, LIVE_SNAPSHOT_MAX_BYTES, type ChannelRef, type ListDelta, type LiveMeta, type LiveValue, type Person, type Refs, type TopicArt } from '@juno/contract'
 
 /** A successful query run: its value and how long it took. */
@@ -256,3 +258,14 @@ export const retryFirstRun =
       Stream.tapError((error) => Effect.logWarning(`${label}: the first run failed; retrying`, error)),
       Stream.retry(schedule),
     )
+
+/**
+ * A live value that follows the open workspace, as New chat's pickers and
+ * the mention suggestions do: `query` re-runs on `keys` in whichever
+ * workspace is open, and nothing is sent while none is. A failed first run
+ * is retried (`retryFirstRun`).
+ */
+export const serveWorkspaceValue = <A, E, R>(changes: Stream.Stream<OpenWorkspace | undefined>, name: string, keys: InvalidationKeys, query: Effect.Effect<A, E, R>) =>
+  serveLiveValue(
+    changes.pipe(Stream.switchMap((open) => (open === undefined ? Stream.empty : liveQuery(keys, timed(query)).pipe(Stream.provide(open.context))))),
+  ).pipe(retryFirstRun(name), Stream.orDie)

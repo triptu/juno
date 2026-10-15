@@ -20,7 +20,7 @@ import type { MessageRow } from '@juno/store'
 export const MAIN_CONDITION = `(thread_ts IS NULL OR thread_ts = ts OR subtype = 'thread_broadcast')`
 
 /** The columns a message row needs. */
-export const MESSAGE_COLUMNS = `channel, ts, thread_ts, user_id, subtype, text, blocks_json, files_json, attachments_json,
+export const MESSAGE_COLUMNS = `channel, ts, thread_ts, user_id, bot_name, bot_icon, subtype, text, blocks_json, files_json, attachments_json,
   edited_ts, deleted, client_msg_id, reply_count, latest_reply, version, last_event_ts`
 
 export type WindowMessage = Pick<
@@ -29,6 +29,8 @@ export type WindowMessage = Pick<
   | 'ts'
   | 'thread_ts'
   | 'user_id'
+  | 'bot_name'
+  | 'bot_icon'
   | 'subtype'
   | 'text'
   | 'blocks_json'

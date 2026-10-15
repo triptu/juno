@@ -114,7 +114,7 @@ export function Chip(props: ChipProps) {
     size !== 'inline' && typeVariants[size <= 20 ? 'tag' : size === 22 || size === 24 ? 'meta' : size === 26 ? 'pill' : 'ui'],
     styles.weightMedium,
     sizeStyles[size],
-    variants[variant],
+    chipVariants[variant],
     variant === 'person' && personHues[hue],
     numeric && styles.numeric,
     onRemove !== undefined && styles.removable,
@@ -226,7 +226,7 @@ const sizeStyles = stylex.create({
   inline: { display: 'inline', paddingInline: MENTION_PADDING, lineHeight: 'inherit', verticalAlign: 'baseline', userSelect: 'text' },
 })
 
-const variants = stylex.create({
+export const chipVariants = stylex.create({
   outline: {
     color: colors['--foreground-subtle'],
     backgroundColor: colors['--surface-default'],
@@ -267,8 +267,9 @@ const variants = stylex.create({
 })
 
 // 16% of the hue over the surface, 40% over the text: 4.5:1 or better for
-// every hue in both themes (lowest 5.7:1, midnight in dark).
-const personHues = stylex.create({
+// every hue in both themes (lowest 5.7:1, midnight in dark). The composer's
+// marked field (`Textarea marks`) draws picked people with them too.
+export const personHues = stylex.create({
   cyan: {
     backgroundColor: `color-mix(in oklch, ${hues['--hue-cyan']} ${hues['--person-chip-bg-mix']}, ${colors['--surface-default']})`,
     color: `color-mix(in oklch, ${hues['--hue-cyan']} ${hues['--person-chip-fg-mix']}, ${colors['--foreground-default']})`,

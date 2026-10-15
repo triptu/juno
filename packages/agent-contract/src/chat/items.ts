@@ -77,8 +77,21 @@ export const Origin = Schema.Union([
   Schema.TaggedStruct('schedule', { scheduleId: ScheduleId, name: Schema.String }),
   /** One or more background jobs reported. */
   Schema.TaggedStruct('job', { jobs: Schema.Array(JobRef).check(Schema.isMinLength(1)) }),
+  /**
+   * The hours-start summary (SPEC 14, plan v3 §19.1): what would have
+   * notified outside notification hours, posted by the host with no run and
+   * no model call. `at` is when the hours started, in ms.
+   */
+  Schema.TaggedStruct('summary', { at: Schema.Number }),
 ])
 export type Origin = typeof Origin.Type
+
+/**
+ * The bubble a host summary becomes. The host names the summary; the chat
+ * keys its one bubble by it, so the notification's click can open the chat
+ * at it before the agent has appended it.
+ */
+export const summaryBubbleId = (summaryId: string): BubbleId => BubbleId.make(`summary:${summaryId}:0`)
 
 /**
  * An owner send's delivery, as the line under the bubble:
