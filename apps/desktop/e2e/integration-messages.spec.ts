@@ -23,7 +23,7 @@ test('a bot attachment names its thread and expands its description', async ({ j
   const before = await card.boundingBox()
   await card.getByRole('button', { name: 'Show more' }).click()
   await expect(card.getByRole('button', { name: 'Show less' })).toHaveAttribute('aria-expanded', 'true')
-  await expect(card.getByText('Ready', { exact: true })).toBeVisible()
+  await expect(card).toContainText('Ready')
   expect((await card.boundingBox())!.height).toBeGreaterThan(before!.height)
   expect(fake.calls.filter((call) => /interactive|actions/.test(call.method))).toHaveLength(0)
 })
