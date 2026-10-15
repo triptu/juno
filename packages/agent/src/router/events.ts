@@ -6,7 +6,8 @@
  * - `started`: the status bubble appears with typing dots.
  * - `bubble`: the model closed a `<say>` block. The bubble shows whole and
  *   the dots go back below it while the run goes on. `replyTo` is the owner
- *   op it answers.
+ *   op it answers. `body` is `text` with each source the run read resolved
+ *   (plan v3 §19.1); an unknown handle is plain text.
  * - `status`: the run called a tool. The status bubble shows a line that
  *   names real things until the next bubble.
  * - `reaction`: a reaction was set or removed (`emoji: null`), by the owner
@@ -17,12 +18,20 @@
  * - `ended`: the run settled with its ending; the status bubble clears.
  */
 import type { Ending } from '@juno/agent-contract'
+import type { BubbleSpan } from './sources'
 
 export type Origin = 'owner' | 'wake' | 'report' | 'click'
 
 export type TurnEvent =
   | { readonly _tag: 'started'; readonly runId: string; readonly opId: string; readonly origin: Origin }
-  | { readonly _tag: 'bubble'; readonly runId: string; readonly id: string; readonly text: string; readonly replyTo?: string }
+  | {
+      readonly _tag: 'bubble'
+      readonly runId: string
+      readonly id: string
+      readonly text: string
+      readonly body: ReadonlyArray<BubbleSpan>
+      readonly replyTo?: string
+    }
   | { readonly _tag: 'status'; readonly runId: string; readonly text: string }
   | {
       readonly _tag: 'reaction'
