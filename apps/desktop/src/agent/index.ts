@@ -10,10 +10,14 @@
  * (`providerTurns`), once main has sent the provider, and serves the
  * renderer's RPCs on the renderer ports. Keys stay in memory.
  * `providerConnection` follows every later provider change.
+ *
+ * The MCP connections reach main's keychain and the system browser through
+ * `credentialBridge`: a `credential` request to main, a `credentialReply`
+ * back. OAuth state stays in this process's memory once loaded.
  */
 import { Schema } from 'effect'
 import { MainToAgent, type AgentToMain } from '@juno/agent-contract'
-import { modelPicker, providerConnection, providerTurns, rendererPorts, startAgent, type HostPort } from '@juno/agent'
+import { credentialBridge, modelPicker, providerConnection, providerTurns, rendererPorts, startAgent, type HostPort } from '@juno/agent'
 import type { MessagePortMain } from 'electron'
 
 const parent = process.parentPort
@@ -52,6 +56,7 @@ const nextPort = () =>
   })
 
 const renderers = rendererPorts()
+const mcp = credentialBridge((requestId, request) => send({ _tag: 'credential', requestId, request }))
 // The provider arrives from main at spawn and on every change.
 const connection = providerConnection()
 
@@ -73,7 +78,7 @@ parent.on('message', (event) => {
       // The engine opens on the saved model of the active provider, so it waits for main to name one.
       void connection
         .get()
-        .then(() => startAgent(config, { acquire: nextPort }, { turns: providerTurns(connection, picker), renderer: renderers }))
+        .then(() => startAgent(config, { acquire: nextPort }, { turns: providerTurns(connection, picker), renderer: renderers, mcp: { credentials: mcp.credentials } }))
         .then(
         (agent) => send({ _tag: 'ready', host: agent.host }),
         (cause: unknown) => {
@@ -85,6 +90,10 @@ parent.on('message', (event) => {
     }
     case 'provider': {
       connection.set(message.provider)
+      return
+    }
+    case 'credentialReply': {
+      mcp.answer(message)
       return
     }
     case 'rendererPort': {
