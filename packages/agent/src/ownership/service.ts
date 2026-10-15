@@ -4,15 +4,16 @@
  * the owner reviews what was pending and activates Juno.
  *
  * **Move, on the old Mac** (§14.2, spec `cooperativeTransferStep`):
- * 1. stop admitting new runs and let the live run, dispatch and projection
- *    finish (`drain`);
- * 2. commit `released`: the Mac admits and authorizes nothing from here,
- *    also after a crash;
+ * 1. commit `released`: from here the Mac admits no run and authorizes
+ *    nothing, also after a crash. Releasing first closes the window in
+ *    which a click could authorize between the drain and the release;
+ * 2. let the live run, dispatch already handed off and projection finish
+ *    (`drain`, spec `drain`, which the spec's checkpoint guard requires);
  * 3. write the final checkpoint, a new backup generation, so it holds
  *    everything up to the release;
  * 4. publish its manifest as `released` and show the move code.
- * A crash between 2 and 4 reopens released, and `resume` writes the
- * checkpoint again (spec `releaseCrash`, `checkpointReopen`).
+ * A crash after 1 reopens released, and `resume` or Move again finishes
+ * (spec `releaseCrash`, `checkpointReopen`).
  *
  * **Restore, on the new Mac** (§14.3): the owner attests that the old Mac is
  * off, erased or has Juno removed (Juno cannot check this). The backup is
@@ -40,7 +41,7 @@ export interface OwnershipOptions {
   readonly agentDir: string
   /** Without a backup there is no move and no restore. */
   readonly backup?: { readonly backup: Backup; readonly keychain: BackupKeychain }
-  /** Lets the live run, dispatch and projection finish. Admission is already off. */
+  /** Lets the live run, dispatch and projection finish. The Mac is already released. */
   readonly drain: () => Promise<void>
   /** This Mac became the owner: waiting clicks and inputs run now (WP15's `actions.kick`). */
   readonly kick: () => void
@@ -59,7 +60,7 @@ export type ActivateResult = { readonly _tag: 'activated' } | Refused<'readOnly'
 
 export interface Ownership {
   readonly owner: () => Owner
-  /** Whether a new run may start: this Mac owns Juno and no move is draining. */
+  /** Whether a run may start or be steered: this Mac owns Juno. */
   readonly admits: () => boolean
   /** In recovery, an open card from the backup says it may already have happened. */
   readonly restored: (view: CardView) => CardView
@@ -89,7 +90,6 @@ export function createOwnership(options: OwnershipOptions): Ownership {
   const changed = () => {
     for (const listener of listeners) listener()
   }
-  let moving = false
 
   const recovering = () => ownerOf(store).state === 'recovery'
   const restored = (view: CardView): CardView =>
@@ -105,7 +105,7 @@ export function createOwnership(options: OwnershipOptions): Ownership {
 
   return {
     owner: () => ownerOf(store),
-    admits: () => !moving && ownerOf(store).state === 'active',
+    admits: () => ownerOf(store).state === 'active',
     restored,
     pending: () => pendingViews().length,
     review: () => {
@@ -122,25 +122,19 @@ export function createOwnership(options: OwnershipOptions): Ownership {
       }
     },
     move: async () => {
-      if (options.backup === undefined) return refused('unavailable', 'Moving needs a backup folder.')
-      // Move again after the final backup failed: the release stands, so only the publication is left.
-      if (unpublished(ownerOf(store))) return { _tag: 'moved', code: await publishFinal(options.backup.backup) }
-      if (moving || ownerOf(store).state !== 'active') return refused('readOnly', 'This Mac does not own Juno.')
-      moving = true
-      changed()
-      try {
-        await options.drain()
+      const backup = options.backup?.backup
+      if (backup === undefined) return refused('unavailable', 'Moving needs a backup folder.')
+      const owner = ownerOf(store)
+      // Move again after the final backup failed: the release stands, so only the rest is left.
+      if (owner.state === 'active') {
         releaseOwner(store)
         crashPoint('ownership.released')
         changed()
-      } catch (error) {
-        moving = false
-        changed()
-        options.kick()
-        throw error
+      } else if (!unpublished(owner)) {
+        return refused('readOnly', 'This Mac does not own Juno.')
       }
-      moving = false
-      return { _tag: 'moved', code: await publishFinal(options.backup.backup) }
+      await options.drain()
+      return { _tag: 'moved', code: await publishFinal(backup) }
     },
     restore: async (folder) => {
       if (options.backup === undefined) return refused('unavailable', 'Restoring needs the keychain.')

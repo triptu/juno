@@ -21,6 +21,7 @@ const backup1 = [
   //   last_at    when the last manifest was published
   //   phrase_at  when the recovery phrase was last exported
   //   phrase     the backup key wrapped by the recovery phrase, as JSON; every manifest carries it
+  //   retired    earlier folders, as a JSON array, whose generations go once a generation is published here
   `CREATE TABLE backup_progress (
     singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
     folder TEXT,
@@ -33,7 +34,8 @@ const backup1 = [
     clean INTEGER NOT NULL DEFAULT 0 CHECK (clean IN (0, 1)),
     last_at INTEGER,
     phrase_at INTEGER,
-    phrase TEXT CHECK (phrase IS NULL OR json_valid(phrase))
+    phrase TEXT CHECK (phrase IS NULL OR json_valid(phrase)),
+    retired TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(retired))
   ) STRICT`,
 ]
 

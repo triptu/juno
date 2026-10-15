@@ -22,7 +22,8 @@
  * carries.
  *
  * **The deletion record (G13).** A trusted record comes from this Mac's
- * keychain or from a move's final manifest. With one, a generation older
+ * keychain, when this Mac's key opened the backup (so the record belongs to
+ * the same Juno), or from a move's final manifest. With one, a generation older
  * than the record is refused: it may hold removed messages. Without one,
  * Juno restores the newest authenticated generation and the Review page
  * says it cannot check that it is the newest (`trusted: false`). The strict
@@ -53,6 +54,10 @@ export interface StagedRestore {
   /** The deletion record the install checks against: this Mac's, or the move's. */
   readonly deletion: number
   readonly trusted: boolean
+  /** This Mac's keychain record applies: its own key opened the backup. */
+  readonly recordTrusted: boolean
+  /** The backup key came from the recovery phrase; the install makes it this Mac's. */
+  readonly fromPhrase: boolean
   /** The move code of a move's final manifest. */
   readonly moveCode?: string
   readonly epoch: number
@@ -109,13 +114,16 @@ function syncDir(dir: string): void {
 /** Stage 1. `device` is this Mac's `ownership.device_id`. */
 export async function stageRestore(input: { readonly agentDir: string; readonly folder: string; readonly keychain: BackupKeychain; readonly device: string }): Promise<StageResult> {
   const { agentDir, folder, keychain } = input
+  // An earlier staging is replaced whole, so its record can never describe this database.
+  clearStagedRestore(agentDir)
   const found = await newest(folder, keychain)
   if (typeof found === 'string') return { _tag: 'refused', reason: found }
   const { manifest, key } = found
   const moved = manifest.owner.state === 'released'
   const record = await keychain.get('deletionRecord')
-  const trusted = record !== undefined || moved
-  const deletion = Math.max(Number(record ?? 0), moved ? manifest.deletion : 0)
+  const recordTrusted = record !== undefined && !found.fromPhrase
+  const trusted = recordTrusted || moved
+  const deletion = Math.max(recordTrusted ? Number(record) : 0, moved ? manifest.deletion : 0)
   // Spec `install`'s guard, checked first here and again at install.
   if (trusted && manifest.label < deletion) return { _tag: 'refused', reason: 'stale' }
 
@@ -150,11 +158,10 @@ export async function stageRestore(input: { readonly agentDir: string; readonly 
     if (!complete) rmSync(temp, { force: true })
   }
 
-  if (found.fromPhrase && (await keychain.get('backupKey')) === undefined) await keychain.set('backupKey', key.toString('base64'))
   renameSync(temp, join(agentDir, RESTORE_DATABASE))
   syncDir(agentDir)
   const restore: StagedRestore = {
-    folder, gen: manifest.gen, label: manifest.label, backupAt: manifest.at, deletion, trusted,
+    folder, gen: manifest.gen, label: manifest.label, backupAt: manifest.at, deletion, trusted, recordTrusted, fromPhrase: found.fromPhrase,
     ...(moved ? { moveCode: moveCode(manifestHash(found.text)) } : {}),
     epoch: manifest.owner.epoch, from: manifest.owner.name, device: input.device,
     ...(manifest.phrase ? { phrase: manifest.phrase } : {}),
@@ -195,8 +202,8 @@ export async function installStaged(agentDir: string, keychain: BackupKeychain |
     return { _tag: 'none' }
   }
   if (existsSync(staged)) {
-    const record = Number((await keychain?.get('deletionRecord')) ?? 0)
-    if ((restore.trusted || record > 0) && restore.label < Math.max(record, restore.deletion)) {
+    const record = restore.recordTrusted ? Number((await keychain?.get('deletionRecord')) ?? 0) : 0
+    if (restore.trusted && restore.label < Math.max(record, restore.deletion)) {
       clearStagedRestore(agentDir)
       return { _tag: 'quarantined' }
     }
@@ -207,4 +214,21 @@ export async function installStaged(agentDir: string, keychain: BackupKeychain |
     crashPoint('restore.swapped')
   }
   return { _tag: 'installed', restore }
+}
+
+/**
+ * The keychain after an install: the restored backup's key becomes this
+ * Mac's, so its next generation is readable with the phrase the owner holds
+ * and the old Mac's manifests verify. The deletion record becomes the
+ * restored store's: a record from the store this Mac had before belongs to
+ * another Juno.
+ */
+export async function adoptRestoredKeys(restore: StagedRestore, keychain: BackupKeychain): Promise<void> {
+  if (restore.fromPhrase) {
+    const phrase = await keychain.get('recoveryPhrase')
+    if (phrase === undefined || restore.phrase === undefined) throw new Error('the recovery phrase that opened the backup is gone')
+    await keychain.set('backupKey', unwrapWithPhrase(phrase, restore.phrase).toString('base64'))
+  }
+  const own = restore.recordTrusted ? Number((await keychain.get('deletionRecord')) ?? 0) : 0
+  await keychain.set('deletionRecord', String(Math.max(own, restore.deletion, restore.label)))
 }

@@ -65,7 +65,7 @@ import type { JournalPosition, Mode } from '../store/ledger'
 import { ACTIONS_MIGRATIONS, budgetCard, createActions, proposedTask, sendMessageTool, type Actions, type ActionsOptions } from '../actions'
 import { mintGrant } from '../grants/grants'
 import { createBackup, type Backup, type BackupKeychain } from '../backup/backup'
-import { clearStagedRestore, installStaged } from '../backup/restore'
+import { adoptRestoredKeys, clearStagedRestore, installStaged } from '../backup/restore'
 import { BACKUP_MIGRATIONS, LOCAL_TABLES } from '../backup/schema'
 import { enterRecovery, observeOwner } from '../ownership/ownership'
 import { OWNERSHIP_MIGRATIONS } from '../ownership/schema'
@@ -202,6 +202,7 @@ export async function openTurns(options: TurnsOptions): Promise<Turns | UpdateNe
   const now = options.now ?? Date.now
   const lock = acquireOwnerLock(options.agentDir)
   let db: Database | undefined
+  let backup: Backup | undefined
   try {
     // A restore staged before the restart replaces agent.sqlite now (§14.4).
     const install = await installStaged(options.agentDir, options.backup?.keychain)
@@ -220,14 +221,18 @@ export async function openTurns(options: TurnsOptions): Promise<Turns | UpdateNe
     initialize(store)
     if (install._tag === 'installed') {
       enterRecovery(store, install.restore)
-      const keychain = options.backup?.keychain
-      if (keychain !== undefined && Number((await keychain.get('deletionRecord')) ?? 0) < install.restore.deletion) {
-        await keychain.set('deletionRecord', String(install.restore.deletion))
-      }
+      if (options.backup !== undefined) await adoptRestoredKeys(install.restore, options.backup.keychain)
       clearStagedRestore(options.agentDir)
     }
+    // Capture starts before recovery writes anything, so a continued generation misses no row.
+    const relay = { notify: noop }
+    backup = openBackup(store, options, (name) => {
+      observeOwner(store, name)
+      relay.notify()
+    }, () => relay.notify())
     const recovery = await recover(store, options.agentDir)
     if (recovery._tag === 'updateNeeded') {
+      backup?.stop()
       db.close()
       return updateNeeded(lock.release)
     }
@@ -236,11 +241,12 @@ export async function openTurns(options: TurnsOptions): Promise<Turns | UpdateNe
       chat: typeof options.model === 'function' ? options.model(store) : options.model,
       compaction: typeof options.compaction === 'function' ? options.compaction(store) : options.compaction,
     }
-    return await start(store, guard, models, recovery.file, recovery._tag === 'resume' ? 'resumed' : 'rotated', options, () => {
+    return await start(store, guard, models, recovery.file, recovery._tag === 'resume' ? 'resumed' : 'rotated', options, { backup, relay }, () => {
       store.db.close()
       lock.release()
     })
   } catch (error) {
+    backup?.stop()
     if (db?.isOpen) db.close()
     lock.release()
     throw error
@@ -286,8 +292,10 @@ async function start(
   file: { readonly start: (settings: JournalSettings) => Promise<Journal> },
   opened: 'resumed' | 'rotated',
   options: TurnsOptions,
+  early: { readonly backup: Backup | undefined; readonly relay: { notify: () => void } },
   release: () => void,
 ): Promise<Turns> {
+  const { backup, relay } = early
   let journal: Journal | undefined
   let projection: ReturnType<typeof projector> | undefined
   let unsubscribe: () => void = noop
@@ -360,10 +368,6 @@ async function start(
     accept: (input) => router.message(input),
     ...(options.onReport ? { onReport: options.onReport } : {}),
   })
-  const backup = openBackup(store, options, (name) => {
-    observeOwner(store, name)
-    ownership.notify()
-  }, () => ownership.notify())
   const removalBackup = options.removalBackup ?? backup?.removal
   const redaction = createRedaction({
     store,
@@ -456,7 +460,6 @@ async function start(
     agentDir: options.agentDir,
     ...(backup !== undefined ? { backup: { backup, keychain: options.backup!.keychain } } : {}),
     drain: async () => {
-      router.kick()
       await router.idle()
       await actions.idle()
       await projection!.catchUp()
@@ -473,6 +476,7 @@ async function start(
   // The chat's banner and cards and Settings › Juno read ownership; they rebuild on a card change.
   const ownershipChanged = () => actions.changed()
   ownership.subscribe(ownershipChanged)
+  relay.notify = ownership.notify
 
   attach(await file.start(settings))
   // pi keeps the model of its last configure: a run it resumes uses that one.
