@@ -139,11 +139,11 @@ export const connections: ConnectionsPage = {
 }
 
 const models = (selected: string, provider: 'openrouter' | 'codex' = 'openrouter') => [
-  { family: 'Claude Sonnet', resolved: 'Claude Sonnet 5.5', provider, price: '$3 / $15 per million tokens', selected: selected === 'Claude Sonnet' },
-  { family: 'Claude Opus', resolved: 'Claude Opus 5.5', provider, price: '$15 / $75 per million tokens', selected: selected === 'Claude Opus' },
-  { family: 'Muse', resolved: 'Muse 2', provider, price: '$2 / $8 per million tokens', selected: selected === 'Muse' },
+  { family: 'Claude Sonnet', resolved: 'Claude Sonnet 5.5', provider, price: '$3 in, $15 out per million tokens', selected: selected === 'Claude Sonnet' },
+  { family: 'Claude Opus', resolved: 'Claude Opus 5.5', provider, price: '$15 in, $75 out per million tokens', selected: selected === 'Claude Opus' },
+  { family: 'Muse', resolved: 'Muse 2', provider, price: '$2 in, $8 out per million tokens', selected: selected === 'Muse' },
   { family: 'GPT Sol', provider, selected: false },
-  { family: 'Grok', resolved: 'Grok 5', provider, price: '$3 / $15 per million tokens', selected: selected === 'Grok' },
+  { family: 'Grok', resolved: 'Grok 5', provider, price: '$3 in, $15 out per million tokens', selected: selected === 'Grok' },
 ]
 
 export const settings: JunoSettingsPage = {
