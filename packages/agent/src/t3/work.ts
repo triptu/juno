@@ -30,10 +30,12 @@ export function workTools(manager: McpManagerApi, context: { readonly jobs: Jobs
         const decision = toolDecision(operation === 'send' ? 'steer' : 'stopJob', run, { liveGrant: liveGrant(manager.store, 'job', job.id) !== undefined })
         if (decision._tag === 'refused') return { text: 'Use Stop on the Task card.', isError: true }
         if (operation === 'send' && !args.message?.trim()) return { text: 'The task instruction is empty.', isError: true }
-        const proposed = await changeCard(manager, 't3', operation === 'send' ? 't3_thread_send' : 't3_thread_interrupt', {
+        const discovered = await changeCard(manager, 't3', operation === 'send' ? 't3_thread_send' : 't3_thread_interrupt', {
           threadId: session.threadId, ...(operation === 'send' ? { message: args.message } : {}),
         })
-        if (proposed._tag !== 'change') throw new Error('Expected change')
+        if (discovered._tag !== 'change') throw new Error('Expected change')
+        const proposed = Schema.decodeUnknownSync(CardPayload)({ ...discovered, target: job.title, action: { ...discovered.action, payload: { ...discovered.action.payload, destination_ids: [session.threadId] } } })
+        if (proposed._tag !== 'change') throw new Error('Expected task change')
         const payload = decision._tag === 'card' ? proposed : Schema.decodeUnknownSync(CardPayload)({ ...proposed, action: { ...proposed.action, tier: 2 } })
         const id = context.actions.propose({ runId: run.runId, callId: call.callId, payload })
         if (decision._tag === 'card') return { text: `Proposed Change card ${id}. Nothing is sent until the owner clicks.` }

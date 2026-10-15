@@ -230,6 +230,7 @@ it('uses a job grant only in clean owner runs and requires a click after reading
   expect(server.calls.filter((c) => c.name === 't3_thread_send')).toHaveLength(1)
   expect(turns.store.db.prepare('SELECT grant_id FROM authorizations WHERE grant_id IS NOT NULL').all()).toHaveLength(1)
   await call('t3_send', { job: job.id, message: 'Check the synthetic result.' }, true)
+  expect(turns.actions.views().at(-1)?.card).toMatchObject({ _tag: 'change', target: job.title, status: { _tag: 'open' } })
   expect(server.calls.filter((c) => c.name === 't3_thread_send')).toHaveLength(1)
   await click()
   expect(server.calls.filter((c) => c.name === 't3_thread_send')).toHaveLength(2)
