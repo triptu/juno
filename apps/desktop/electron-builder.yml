@@ -1,4 +1,4 @@
-# Packaging config for `pnpm package`. Not run in CI yet.
+# Shared by unsigned local packages and the opt-in release build.
 appId: app.juno.desktop
 productName: Juno
 directories:
@@ -16,4 +16,22 @@ mac:
   darkModeSupport: true
   icon: build/icon.icns
   hardenedRuntime: true
-npmRebuild: false
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
+  notarize: false
+npmRebuild: true
+asarUnpack:
+  - "**/*.node"
+  - "**/koffi/**"
+electronFuses:
+  runAsNode: false
+  enableNodeOptionsEnvironmentVariable: false
+  enableNodeCliInspectArguments: false
+  enableEmbeddedAsarIntegrityValidation: true
+  onlyLoadAppFromAsar: true
+  enableCookieEncryption: true
+publish:
+  provider: github
+  owner: triptu
+  repo: juno
+  releaseType: draft

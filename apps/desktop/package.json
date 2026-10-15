@@ -14,7 +14,8 @@
     "test:e2e": "node ../../scripts/build-cached.mjs out pnpm build && node ../../scripts/without-run-as-node.mjs playwright test",
     "perf": "node ../../scripts/build-cached.mjs out pnpm build && JUNO_PERF=1 node ../../scripts/without-run-as-node.mjs playwright test -c playwright.perf.config.ts",
     "test:feel": "node ../../scripts/build-cached.mjs out pnpm build && node ../../scripts/without-run-as-node.mjs playwright test -c playwright.feel.config.ts",
-    "package": "pnpm build && electron-builder --config electron-builder.yml"
+    "package": "pnpm build && node build/package.cjs",
+    "test:package": "node ../../scripts/without-run-as-node.mjs playwright test -c playwright.package.config.ts"
   },
   "dependencies": {
     "@juno/agent": "workspace:*",
@@ -27,10 +28,12 @@
     "@juno/views": "workspace:*",
     "@stylexjs/stylex": "0.19.1",
     "effect": "4.0.3",
+    "electron-updater": "6.8.3",
     "react": "19.3.0",
     "react-dom": "19.3.0"
   },
   "devDependencies": {
+    "@electron/fuses": "1.8.0",
     "@juno/agent-testing": "workspace:*",
     "@juno/fake-slack": "workspace:*",
     "@juno/testing": "workspace:*",
