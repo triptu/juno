@@ -24,7 +24,7 @@ Every budget is a p95 over the runs of the scenario in section 8 unless marked p
 | Sidebar filter or scope change | 50 ms | Query, delta, render. The old list stays on screen until the new one is ready. |
 | ⌘K open | 50 ms | Input focused and recent rows painted. |
 | ⌘K keystroke → results painted | 100 ms, typing never blocked | Local FTS only. The AI command parse arrives later and never delays results. |
-| Composer keystroke → character painted | 16 ms; zero long animation frames while typing | Event Timing `duration` for `keydown` ≤ 32 ms. |
+| Composer keystroke → character painted | 16 ms; zero long animation frames while typing | Event Timing `duration` for `keydown` ≤ 32 ms. The @ and # suggestions keep to it: each keystroke narrows the last answer in the renderer and the engine's answer follows (`mentions.people`, `mentions.channels`, local only). Asserted by `mention typing` in `perf.spec.ts` (keydown of "@ma" to the next frame) and the `mention-typing` feel scenario. |
 | Send (Enter) → pending message painted | 50 ms | The checks on send, local transaction, delta, render. The Slack call is invisible. A clean send pays one `messages.check` round trip first, which reads the store only: the model is asked while typing pauses, never on Enter. The `send in Main` scenario presses Enter while a 1 s fake model is still answering. |
 | Scroll, sidebar and message list | p95 frame ≤ 8.3 ms main-thread work; zero long animation frames (> 50 ms) in a 3 s scroll at 2 000 px/s; dropped frames < 1 % | Measured with a CDP trace and the LoAF observer. |
 | Juno chat: Enter → your bubble painted | 16 ms | One frame (SPEC 13.12). The bubble is the renderer's pending send, shown before the agent stores it. `juno.chat-send`. |

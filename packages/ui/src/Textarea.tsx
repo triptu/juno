@@ -71,7 +71,7 @@ export function Textarea({ variant = 'inline', maxHeight = 'composer', label, ro
   if (marks === undefined) return field
   return (
     <div {...stylex.props(styles.marked)}>
-      <div ref={layer} aria-hidden {...stylex.props(variants.inline, styles.layer)}>
+      <div ref={layer} aria-hidden data-textarea-layer="" {...stylex.props(variants.inline, styles.layer)}>
         {drawn(rest.value ?? '', marks, anchorAt)}
       </div>
       {field}
