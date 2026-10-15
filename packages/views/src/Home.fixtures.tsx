@@ -58,6 +58,8 @@ export default defineFixtures(
     Empty: {
       'caught-up': state({ scene: 'caughtUp', title: 'All caught up.', line: 'Nothing is waiting on you.', items: [], caughtUp: true }),
       'nothing-waiting': state({ scene: 'night', title: 'Still up, Tushar.', line: 'Nothing is waiting on you.', items: [] }),
+      // The first sync is still running: the greeting says so, and the items come when it is done.
+      'first-sync': state({ scene: 'evening', title: 'Evening, Tushar.', line: 'Getting your conversations from Slack.', items: [] }),
       'no-name': state({ scene: 'midday', title: 'Hello.', line: 'One thing wants you.', items: [homeItems.waiting] }),
     },
     Interaction: {

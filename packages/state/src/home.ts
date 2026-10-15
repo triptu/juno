@@ -149,21 +149,33 @@ export interface HomeShown {
 /** By a key of the Home component's own, so two Homes never share one. Reset when nothing reads it. */
 export const homeShownAtom = Atom.family((_key: string) => Atom.make<HomeShown | undefined>(undefined))
 
-/** The current `home.view`, once the first sync is done. */
-export function readyHomeView(registry: Registry): HomeView | undefined {
-  const result = registry.get(homeViewAtom)
-  return result._tag === 'Success' && result.value.ready ? result.value : undefined
-}
+/** The line under the greeting while the first sync runs, in place of what wants the user. */
+const HOME_SYNCING_LINE = 'Getting your conversations from Slack.'
 
 /**
  * Home appeared (mounted, shown again, or its first value arrived): takes
  * the items, the copy and the scene now, or nothing while there is no
- * value yet.
+ * value yet. Before the first sync is done it shows the greeting and
+ * `HOME_SYNCING_LINE`, with no items and not caught up.
  */
 export function showHome(registry: Registry, key: string, options: { readonly windowHeight: number; readonly enter: boolean }): void {
-  const view = readyHomeView(registry)
-  if (view === undefined) return registry.set(homeShownAtom(key), undefined)
+  const result = registry.get(homeViewAtom)
+  if (result._tag !== 'Success') return registry.set(homeShownAtom(key), undefined)
   const now = new Date()
+  if (!result.value.ready) {
+    const greeting = homeGreeting({ now, firstName: result.value.firstName, items: 0, caughtUp: false })
+    return registry.set(homeShownAtom(key), {
+      view: { ...result.value, items: [] },
+      scene: homeScene({ now, caughtUp: false, firstVisitToday: false }),
+      title: greeting.title,
+      line: HOME_SYNCING_LINE,
+      now: now.getTime(),
+      caughtUp: false,
+      enter: options.enter,
+      used: new Set<string>(),
+    })
+  }
+  const view = result.value
   const items = view.items.slice(0, homeItemLimit(options.windowHeight))
   const shown = { ...view, items }
   const done = caughtUp(shown)
