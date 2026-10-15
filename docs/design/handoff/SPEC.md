@@ -543,7 +543,7 @@ Use the Littlebird design system's tokens.
 
 ### Feels native
 
-- **No pointer cursor.** Use the default arrow cursor everywhere, including buttons, rows, tabs and menu items, as macOS apps do. The text cursor appears only over editable text. Never set `cursor: pointer`.
+- **Pointer cursor.** Use the default arrow cursor for buttons, rows, tabs, menu items, and links that navigate inside Juno. Links in message content that open outside the app use `cursor: pointer`, as native Mac apps do for text links. The text cursor appears only over editable text.
 - **Real menus.** Use native right-click context menus and the context-menu key on every row, tab and channel.
 - **Instant feedback.** High-frequency interactions get instant feedback or at most 150ms on background colour. These include row hover, tab switching and typing. Buttons scale to 0.96 when pressed, never when disabled.
 - **Hover only with a pointer.** Hover styles apply only on devices with a hover-capable pointer.

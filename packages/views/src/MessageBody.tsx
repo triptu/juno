@@ -335,7 +335,7 @@ const styles = stylex.create({
     textDecorationLine: 'underline',
     textDecorationColor: 'color-mix(in oklch, currentColor 35%, transparent)',
     textUnderlineOffset: sizes['--link-underline-offset'],
-    cursor: 'default',
+    cursor: 'pointer', // external-link-cursor
   },
   bold: {
     fontWeight: weights['--weight-semibold'],
