@@ -339,8 +339,8 @@ try {
   if (reports?.status === 0 && reports.stdout.length > 0) {
     mkdirSync(reportDir, { recursive: true })
     spawnSync('tar', ['-xzf', '-', '-C', reportDir], { input: reports.stdout })
-    const returned = join(reportDir, stagedCache)
-    if (carriesCache && existsSync(returned)) {
+    const returned = carriesCache ? join(reportDir, stagedCache) : undefined
+    if (returned && existsSync(returned)) {
       mkdirSync(specCache, { recursive: true })
       const before = existsSync(specCache) ? readdirSync(specCache).length : 0
       cpSync(returned, specCache, { recursive: true, force: false })
