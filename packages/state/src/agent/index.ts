@@ -37,3 +37,4 @@ export {
 } from './pages'
 export { chooseFolder, takeRecoveryPhrase, typeRecoveryPhrase } from './backup'
 export { agentProviderAtom, setAgentProvider, whenProviderActive } from './provider'
+export { messageActions } from './messages'

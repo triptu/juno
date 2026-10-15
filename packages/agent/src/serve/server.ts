@@ -42,6 +42,8 @@ import {
 } from '@juno/agent-contract'
 import { authorityOf } from '../grants/grants'
 import { mayAuthorize } from '../policy/policy'
+import { pinNotes } from './pin-notes'
+import { messageMenu } from './message-menu'
 import { Revision } from '@juno/agent-cards'
 import { watchReplyCommand, type WatchHost } from '../schedule/commands'
 import type { Scheduler } from '../schedule/scheduler'
@@ -164,7 +166,7 @@ function chatState(host: ChatHost) {
     const presence = host.presence()
     const mode = turns.mode()
     const recovery = turns.ownership.owner().state === 'recovery'
-    return cache!.items({
+    return pinNotes(turns.store, cache!.items({
       store: turns.store,
       live: turns.run(),
       seen: (id, fallback) => {
@@ -178,7 +180,7 @@ function chatState(host: ChatHost) {
       readAt: readAt(turns.store),
       waiting: recovery ? 'review' : mode === 'paused' ? 'resume' : presence?.online === false ? 'network' : undefined,
       dayOf,
-    })
+    }))
   }
 
   const banner = (): Banner => {
@@ -299,7 +301,7 @@ export function agentHandlers(host: ChatHost) {
       const changed = <A, E, R>(effect: Effect.Effect<A, E, R>) => Effect.tap(effect, () => Effect.sync(state.changed))
       return AgentRpcs.of({
         'agent.chat.page': ({ window }) =>
-          state.changes.pipe(
+          Stream.merge(state.changes, Stream.tick('1 second')).pipe(
             Stream.map(() => state.page(window)),
             Stream.changesWith((a, b) => JSON.stringify(a) === JSON.stringify(b)),
           ),
@@ -337,6 +339,7 @@ export function agentHandlers(host: ChatHost) {
             state.changed()
           }),
         // The owner's Remove is a local sheet: it works paused, offline and with AI assist off (SPEC 13.8).
+        'agent.chat.message': ({ target }) => Effect.sync(() => state.turns === undefined ? null : messageMenu(state.turns.store, target)),
         'agent.chat.remove': ({ opId, messageId, alsoRemoveReply }) =>
           Effect.suspend(() => {
             const turns = state.turns
@@ -426,7 +429,7 @@ export function agentHandlers(host: ChatHost) {
               Effect.suspend(() => {
                 const message = turns.store.db.prepare('SELECT version FROM messages WHERE id = ?').get(Number(messageId)) as { version: number } | undefined
                 if (message?.version !== revision) return Effect.fail(new AgentCommandError({ reason: 'stale', message: 'That message changed.' }))
-                return pinAnswer(opId, turns.pins.pinMessage({ messageId: Number(messageId), from: startByte, to: endByte }))
+                return pinAnswer(opId, turns.pins.pinMessage({ id: opId, messageId: Number(messageId), from: startByte, to: endByte }))
               }),
             ),
           ),
