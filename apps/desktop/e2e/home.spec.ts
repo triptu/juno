@@ -1,8 +1,10 @@
 // Home (SPEC section 12, docs/design/home/): what wants the user, shown with
 // no tab open and from the sidebar's Home item; each kind of row opens its
-// topic; Mark done and Resolve all with Undo; and Home with AI assist off.
+// topic; Mark done and Resolve all with Undo; Home with AI assist off; and
+// the caught-up state's Browse all topics.
 import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
+import { SELF_ID, startFakeSlack, TEAM } from '@juno/fake-slack'
 import { expect, launchApp, test } from './fixtures'
 import { Juno } from './driver/juno'
 
@@ -119,4 +121,37 @@ test('with AI assist off, Home shows the rules alone, with their plain titles', 
   } finally {
     await again.close()
   }
+})
+
+/** A workspace where everything is read and nobody waits: Home is caught up. */
+const quiet = test.extend({
+  // oxlint-disable-next-line no-empty-pattern
+  fake: async ({}, use) => {
+    const fake = await startFakeSlack({
+      seed: (workspace, avatarBase) => {
+        const now = workspace.clock.now()
+        for (const [id, name] of [[SELF_ID, 'Tushar'], ['U0LEO', 'Leo Park']] as const) {
+          workspace.addUser({ id, team_id: TEAM.id, name, real_name: name, profile: { display_name: name, image_72: `${avatarBase}/${id}.svg` } })
+        }
+        workspace.addConversation({ id: 'C0QUIET', name: 'general', kind: 'public', members: new Set([SELF_ID, 'U0LEO']), created: now, topic: '', purpose: '', isOpen: true, archived: false })
+        const last = workspace.post({ channel: 'C0QUIET', user: 'U0LEO', text: 'Release notes are out.', at: now - 60 * 60_000, silent: true })
+        workspace.reads.set('C0QUIET', last.ts)
+      },
+    })
+    await use(fake)
+    await fake.close()
+  },
+})
+
+quiet('caught up, Home offers Browse all topics, which opens the All topics tab', async ({ juno, win }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  const { home, tabs, allTopics } = juno
+  await expect(home.greeting).toHaveText('All caught up.')
+  expect(await home.kinds()).toEqual([])
+  const browse = home.root.getByRole('button', { name: 'Browse all topics' })
+  await browse.click()
+  await tabs.expectActive('All topics')
+  await expect(allTopics.table).toBeVisible()
+  await expect(win.getByRole('navigation', { name: 'Pages' }).getByRole('button', { name: 'All topics' })).toHaveAttribute('aria-current', 'page')
 })
