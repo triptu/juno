@@ -1,4 +1,5 @@
-import { expect, test } from './fixtures'
+import { expect, hooks, test } from './fixtures'
+import { JunoChatPane, test as chatTest } from './juno-agent/chat'
 import { expectStableAnchor } from './shiftProbe'
 
 test.describe.configure({ timeout: 60_000, mode: 'parallel' })
@@ -143,4 +144,17 @@ test('the probe rejects a one-pixel movement that returns before the action ends
       anchor.style.transform = ''
     })
   })).rejects.toThrow('anchor must move by exactly 0 px')
+})
+
+chatTest('a Juno response leaves the owner bubble where it first painted', async ({ juno, win }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  await expect.poll(() => hooks(juno.app, 'agentState'), { timeout: 15_000 }).toBe('ready')
+  await win.getByRole('navigation', { name: 'Pages' }).getByRole('button', { name: /^Juno/ }).click()
+  const chat = JunoChatPane.tab(win)
+  await chat.composer.fill('Check the layout of this reply')
+  await expectStableAnchor(win, '[data-chat-owner]', async () => {
+    await chat.composer.press('Enter')
+    await chat.expectJuno('You said: Check the layout of this reply')
+  })
 })
