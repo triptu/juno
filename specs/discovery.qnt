@@ -14,7 +14,7 @@ module discovery {
     rootKnown' = false, counters' = 0, reactions' = true,
     followed' = true, calls' = 0, finished' = false, pageHadRoot' = false,
   }
-  action page(hasRoot: bool, repliesFirst: bool) = all {
+  action page(hasRoot: bool, repliesFirst: bool): bool = all {
     not(finished),
     // Apply the root before its reply, even when search returns newest first.
     rootKnown' = true,
