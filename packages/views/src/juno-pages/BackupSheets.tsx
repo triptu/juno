@@ -1,5 +1,5 @@
 import * as stylex from '@stylexjs/stylex'
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { chatCopy } from '@juno/agent-contract'
 import { colors, fonts, layout, radii, sizes, spacing, text, z } from '@juno/tokens/tokens.stylex'
 import { Button, Checkbox, Surface, Text, TextField } from '@juno/ui'
@@ -24,11 +24,12 @@ const FOCUSABLE = 'button:not(:disabled), input:not(:disabled), textarea:not(:di
 export function SheetLayer({ onClose, children }: { readonly onClose: () => void; readonly children: ReactNode }) {
   const close = useRef(onClose)
   const layer = useRef<HTMLDivElement>(null)
+  // Read on the first render, before the sheet's own autofocused button takes focus.
+  const [opener] = useState(() => (document.activeElement instanceof HTMLElement ? document.activeElement : null))
   useEffect(() => {
     close.current = onClose
   })
   useEffect(() => {
-    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') return close.current()
       if (event.key !== 'Tab' || layer.current === null) return
@@ -50,7 +51,7 @@ export function SheetLayer({ onClose, children }: { readonly onClose: () => void
       window.removeEventListener('keydown', onKey)
       if (opener?.isConnected === true) opener.focus()
     }
-  }, [])
+  }, [opener])
   return (
     <div ref={layer} {...stylex.props(styles.layer)}>
       {children}
