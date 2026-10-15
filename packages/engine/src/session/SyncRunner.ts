@@ -14,13 +14,15 @@
  * (`EngineConfig.fakeSlackUrl`) the complete follow pass runs with every
  * catch-up instead of hourly.
  *
- * `phases` is the sync's phase while one runs, `undefined` otherwise, and
- * `syncing` says whether one of its cycles is running; the composition layer
- * folds both into `engine.status`. While a sync runs, its
+ * `phases` is the sync's phase while one runs, `undefined` otherwise,
+ * `syncing` says whether one of its cycles is running, and `slowedUntil`
+ * when Slack's rate limits hold the session's client back; the composition
+ * layer folds them into `engine.status`. While a sync runs, its
  * fetcher for opened topics is in `SyncLink`, and the topics `SyncLink`
  * lists as shown are fetched again after each reconnect.
  */
 import { Cause, Context, Effect, Fiber, Layer, Stream, SubscriptionRef } from 'effect'
+import { RequestQueue } from '@juno/slack'
 import { AiProvider } from '@juno/ai'
 import { NotificationControl, startNotifications } from '../notificationRuntime'
 import { quietDaysOf } from '@juno/domain'
@@ -39,6 +41,8 @@ export class SyncRunner extends Context.Service<
     readonly phases: Stream.Stream<SyncPhase | undefined>
     /** Whether a cycle of the running sync (boot, catch-up or sweep, with its follow pass) is running: at subscribe time, then every change. */
     readonly syncing: Stream.Stream<boolean>
+    /** Until when a rate limit holds the running session's client back (`RequestQueue.slowedUntil`): at subscribe time, then every change. */
+    readonly slowedUntil: Stream.Stream<number | undefined>
   }
 >()('juno/engine/SyncRunner') {
   static readonly layer: Layer.Layer<SyncRunner, never, Session | Workspace | EngineConfig | SyncLink | AiProvider | NotificationControl> = Layer.effect(
@@ -52,6 +56,7 @@ export class SyncRunner extends Context.Service<
       const scope = yield* Effect.scope
       const phase = yield* SubscriptionRef.make<SyncPhase | undefined>(undefined)
       const syncing = yield* SubscriptionRef.make(false)
+      const slowed = yield* SubscriptionRef.make<number | undefined>(undefined)
       let running: { readonly active: ActiveSession; readonly fiber: Fiber.Fiber<never, SlackAuthRequired> } | undefined
 
       const stop = Effect.gen(function* () {
@@ -59,8 +64,10 @@ export class SyncRunner extends Context.Service<
         running = undefined
         if (current !== undefined) yield* Fiber.interrupt(current.fiber)
         yield* link.setFetcher(undefined)
+        yield* link.setOnline(false)
         yield* SubscriptionRef.set(phase, undefined)
         yield* SubscriptionRef.set(syncing, false)
+        yield* SubscriptionRef.set(slowed, undefined)
       })
 
       const start = (active: ActiveSession) =>
@@ -89,6 +96,7 @@ export class SyncRunner extends Context.Service<
                   Effect.andThen(Effect.sync(() => control.onCycle?.(event))),
                 ),
               onPhase: (next) => SubscriptionRef.set(phase, next),
+              onConnection: link.setOnline,
               // The topic view's fetches run in this sync's context while it lives.
               onFetcher: (fetcher) => link.setFetcher(fetcher),
               openTopics: link.shown,
@@ -108,6 +116,10 @@ export class SyncRunner extends Context.Service<
           )
           const fiber = yield* Effect.forkIn(program, active.scope)
           running = { active, fiber }
+          yield* Effect.forkIn(
+            Stream.runForEach(Context.get(active.context, RequestQueue).slowedUntil, (until) => SubscriptionRef.set(slowed, until)),
+            active.scope,
+          )
           // Outside the session scope: a fatal auth condition ends the session, which closes the scope this fiber lives in.
           yield* Effect.forkIn(
             Effect.gen(function* () {
@@ -115,6 +127,7 @@ export class SyncRunner extends Context.Service<
               if (running?.fiber === fiber) {
                 running = undefined
                 yield* link.setFetcher(undefined)
+                yield* link.setOnline(false)
                 yield* SubscriptionRef.set(syncing, false)
               }
               if (exit._tag === 'Failure') {
@@ -141,7 +154,12 @@ export class SyncRunner extends Context.Service<
         scope,
       )
 
-      return SyncRunner.of({ current: SubscriptionRef.get(phase), phases: SubscriptionRef.changes(phase), syncing: SubscriptionRef.changes(syncing) })
+      return SyncRunner.of({
+        current: SubscriptionRef.get(phase),
+        phases: SubscriptionRef.changes(phase),
+        syncing: SubscriptionRef.changes(syncing),
+        slowedUntil: SubscriptionRef.changes(slowed),
+      })
     }),
   )
 }

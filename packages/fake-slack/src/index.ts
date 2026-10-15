@@ -240,10 +240,11 @@ export class FakeSlack {
    * The next `times` calls of `method` run as usual but their answer waits
    * for `release`. For tests that land events while a page is in flight: the
    * request has started (its `requestedAt` is set), the events arrive, then
-   * the page lands.
+   * the page lands. With `reason`, only calls whose `_x_reason` matches
+   * are held.
    */
-  holdNext(input: { method: string; times?: number; before?: boolean }): void {
-    this.server.holdNext(input.method, input.times ?? 1, input.before ?? false)
+  holdNext(input: { method: string; times?: number; before?: boolean; reason?: string }): void {
+    this.server.holdNext(input.method, input.times ?? 1, input.before ?? false, input.reason)
   }
 
   /** Answers the held calls of `method`, or of every method. */
