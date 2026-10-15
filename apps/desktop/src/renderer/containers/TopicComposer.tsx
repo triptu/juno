@@ -3,6 +3,7 @@ import type { SendTarget, TopicDetail } from '@juno/contract'
 import { draftAtom, registry, saveDraft, sendMessage } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import { Composer, ComposerSlot } from '@juno/views'
+import { takeAttachments, useAttachments } from './attachments'
 import type { ComposerHandle } from './messageActions'
 import { markSend } from './sendMark'
 
@@ -17,6 +18,8 @@ export interface TopicComposerProps {
   readonly handle?: Ref<ComposerHandle>
   /** ↑ in the empty field: the topic selects its newest message. */
   readonly onArrowUpEmpty?: () => void
+  /** Files are being dragged over the topic. */
+  readonly dropping?: boolean
 }
 
 /** `text` as Slack quotes it: every line starts with "> ". */
@@ -42,15 +45,16 @@ export function withQuote(draft: string, text: string): string {
  * Enter queues the message (`messages.send`, which clears the stored draft
  * in the same transaction); the pending row shows in the list at once.
  */
-export function TopicComposer({ detail, onSent, handle, onArrowUpEmpty }: TopicComposerProps) {
+export function TopicComposer({ detail, onSent, handle, onArrowUpEmpty, dropping }: TopicComposerProps) {
   const stored = useAtomValue(draftAtom(detail.id))
   const placeholder = detail.kind === 'main' ? `Message ${detail.channel.label}` : 'Reply'
   if (stored._tag !== 'Success') return <ComposerSlot placeholder={placeholder} />
-  return <LoadedComposer detail={detail} initial={stored.value} placeholder={placeholder} onSent={onSent} handle={handle} onArrowUpEmpty={onArrowUpEmpty} />
+  return <LoadedComposer detail={detail} initial={stored.value} placeholder={placeholder} onSent={onSent} handle={handle} onArrowUpEmpty={onArrowUpEmpty} dropping={dropping} />
 }
 
-function LoadedComposer({ detail, initial, placeholder, onSent, handle, onArrowUpEmpty }: TopicComposerProps & { readonly initial: string; readonly placeholder: string }) {
+function LoadedComposer({ detail, initial, placeholder, onSent, handle, onArrowUpEmpty, dropping = false }: TopicComposerProps & { readonly initial: string; readonly placeholder: string }) {
   const id = detail.id
+  const files = useAttachments(id)
   const [text, setText] = useState(initial)
   const field = useRef<HTMLTextAreaElement>(null)
   // A quote just went in: the caret goes after it once it is drawn.
@@ -89,17 +93,21 @@ function LoadedComposer({ detail, initial, placeholder, onSent, handle, onArrowU
 
   const target: SendTarget = { kind: 'channel', channelId: detail.channel.id, ...(detail.kind === 'thread' && detail.rootTs !== undefined ? { threadTs: detail.rootTs } : {}) }
   const send = () => {
-    if (text.trim() === '') return
+    if (text.trim() === '' && files.files.length === 0) return
+    const attached = takeAttachments(id)
+    // A file is still on its way to the engine: Enter waits for it.
+    if (attached === undefined) return
     markSend()
     // The send clears the stored draft; a save still waiting must not write it back.
     clearTimeout(timer.current)
     unsaved.current = undefined
     setText('')
     onSent()
-    void sendMessage(registry, target, text, id).then((exit) => {
+    void sendMessage(registry, target, text, id, attached.ids).then((exit) => {
       if (exit._tag === 'Failure') {
-        // Nothing was queued: the text comes back so it can be sent again.
+        // Nothing was queued: the text and the files come back so they can be sent again.
         setText((current) => (current === '' ? text : current))
+        attached.restore()
         console.warn('juno: send failed', exit.cause)
       }
     })
@@ -114,5 +122,18 @@ function LoadedComposer({ detail, initial, placeholder, onSent, handle, onArrowU
     },
   }))
 
-  return <Composer value={text} onChange={change} onSend={send} placeholder={placeholder} inputRef={field} {...(onArrowUpEmpty === undefined ? {} : { onArrowUpEmpty })} />
+  return (
+    <Composer
+      value={text}
+      onChange={change}
+      onSend={send}
+      placeholder={placeholder}
+      inputRef={field}
+      leading={files.leading}
+      attachments={files.chips}
+      onFiles={files.onFiles}
+      dropping={dropping}
+      {...(onArrowUpEmpty === undefined ? {} : { onArrowUpEmpty })}
+    />
+  )
 }
