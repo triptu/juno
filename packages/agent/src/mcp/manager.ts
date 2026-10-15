@@ -249,7 +249,9 @@ export function createMcpManager({ store, credentials, defaults = PRESETS }: Man
 /** The server's own words about a tool, shown and never trusted: its description, and whether it claims to only read. */
 function hintOf(definition: string): { hint?: string } {
   const tool = parseObject(JSON.parse(definition))
-  const description = typeof tool.description === 'string' ? tool.description.split('\n')[0]?.trim().slice(0, 200) ?? '' : ''
+  const first = typeof tool.description === 'string' ? tool.description.split('\n')[0]?.trim().slice(0, 200) ?? '' : ''
+  // Some servers repeat the name as the description; it says nothing new.
+  const description = first === tool.name ? '' : first
   const annotations = parseObject(tool.annotations ?? {})
   const hint = [description, annotations.readOnlyHint === true ? 'The server says it only reads.' : ''].filter(Boolean).join(' ')
   return hint === '' ? {} : { hint }
