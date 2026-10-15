@@ -1,5 +1,5 @@
 import * as stylex from '@stylexjs/stylex'
-import { ArrowBendUpLeft } from '@phosphor-icons/react/dist/icons/ArrowBendUpLeft'
+import { ChatsCircle } from '@phosphor-icons/react/dist/icons/ChatsCircle'
 import { DotsThree } from '@phosphor-icons/react/dist/icons/DotsThree'
 import { Quotes } from '@phosphor-icons/react/dist/icons/Quotes'
 import { Smiley } from '@phosphor-icons/react/dist/icons/Smiley'
@@ -22,8 +22,10 @@ export const quickReactions: ReadonlyArray<QuickReaction> = [
 ]
 
 export interface HoverToolbarProps {
-  /** Main only: adds Reply in thread. */
+  /** Main only: adds Start thread or Open thread. */
   readonly main?: boolean
+  /** The message already has a thread. */
+  readonly hasThread?: boolean
   readonly reactions?: ReadonlyArray<QuickReaction>
   readonly onReact?: (name: string) => void
   /** Opens the emoji picker under the toolbar's bottom right corner. */
@@ -50,11 +52,11 @@ function below(event: MouseEvent<HTMLElement>): MenuAnchor {
 /**
  * The toolbar that appears over a hovered or focused message (inventory
  * 6.5): quick reactions, More reactions (the emoji picker), Quote, in Main
- * Reply in thread, and More (the message menu). Icon only. The message
+ * Start thread or Open thread, and More (the message menu). Icon only. The message
  * reserves its place, so showing it moves nothing. While a delete waits for
  * its confirm, the toolbar holds the question instead.
  */
-export function HoverToolbar({ main = false, reactions = quickReactions, onReact, onMoreReactions, onQuote, onReply, onMore, confirmDelete, tabIndex = 0 }: HoverToolbarProps) {
+export function HoverToolbar({ main = false, hasThread = false, reactions = quickReactions, onReact, onMoreReactions, onQuote, onReply, onMore, confirmDelete, tabIndex = 0 }: HoverToolbarProps) {
   if (confirmDelete !== undefined) {
     return (
       <Surface kind="toolbar" padding="xs" role="group" aria-label="Delete this message?" data-delete-confirm="" sx={[styles.toolbar, styles.confirm]}>
@@ -80,7 +82,7 @@ export function HoverToolbar({ main = false, reactions = quickReactions, onReact
       </span>
       <IconButton icon={Smiley} label="More reactions" size={28} tabIndex={tabIndex} onClick={onMoreReactions === undefined ? undefined : (event) => onMoreReactions(below(event))} />
       <IconButton icon={Quotes} label="Quote" size={28} tabIndex={tabIndex} onClick={onQuote} />
-      {main ? <IconButton icon={ArrowBendUpLeft} label="Reply in thread" size={28} tabIndex={tabIndex} onClick={onReply} /> : null}
+      {main ? <IconButton icon={ChatsCircle} label={hasThread ? 'Open thread' : 'Start thread'} size={28} tabIndex={tabIndex} onClick={onReply} /> : null}
       {onMore !== undefined ? <IconButton icon={DotsThree} label="More" size={28} tabIndex={tabIndex} onClick={(event) => onMore(below(event))} /> : null}
     </Surface>
   )

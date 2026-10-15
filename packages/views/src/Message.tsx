@@ -41,7 +41,7 @@ export interface MessageProps {
   readonly time: string
   /** Epoch milliseconds, for `date` inlines. */
   readonly now: number
-  /** Main: thread links under messages, Reply in thread on the toolbar. */
+  /** Main: thread links under messages, Start thread or Open thread on the toolbar. */
   readonly main: boolean
   /**
    * Show the name and avatar even when the message continues its sender's
@@ -173,6 +173,7 @@ export const Message = memo(function Message({
     actions === undefined || message.kind !== 'message' || pending === 'failed' || editor !== undefined ? undefined : (
       <HoverToolbar
         main={main}
+        hasThread={message.thread !== undefined}
         tabIndex={tabbable ? 0 : -1}
         onReact={(reaction) => actions.onReact(message, reaction)}
         onMoreReactions={(at) => actions.onMoreReactions(message, at)}
