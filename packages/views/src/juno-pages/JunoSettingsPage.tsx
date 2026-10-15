@@ -1,18 +1,9 @@
 import * as stylex from '@stylexjs/stylex'
 import { chatCopy, type JobId, type JunoSettingsPage as JunoSettingsPageModel, type ModelChoice } from '@juno/agent-contract'
 import { Button, Checkbox, Chip, ListRow, Page, PageHeader, Section, Select, Surface, Text, TextField } from '@juno/ui'
+import type { ReactNode } from 'react'
 import { cell } from './cell'
 import { fullTime, messageTime } from '../time'
-
-/** The OpenRouter key being typed in its row. The draft is the renderer's; the key goes to main, never to the page. */
-export interface KeyEntry {
-  readonly draft: string
-  /** "That is not an OpenRouter key." and the like, under the field. */
-  readonly error?: string
-  readonly onDraft: (draft: string) => void
-  readonly onSave: () => void
-  readonly onCancel: () => void
-}
 
 /**
  * A section whose work is not built yet is left out by leaving out its
@@ -21,14 +12,15 @@ export interface KeyEntry {
  * (`onMove`, `onRestore`, `onStopJob`).
  */
 export interface JunoSettingsPageProps {
-  readonly page: JunoSettingsPageModel
+  /** The agent's page. Absent while no provider is set up, as no agent runs: the page shows the provider alone. */
+  readonly page?: JunoSettingsPageModel
   readonly now: number
+  /** The provider section (`ProviderSection`), from main's state rather than the agent's page. */
+  readonly providers: ReactNode
+  /** A chat model: a family on OpenRouter, a model id on a custom endpoint, listed or typed. */
   readonly onChatModel: (family: string) => void
   readonly onCompactionModel: (family: string) => void
   readonly onCap: (usd: number) => void
-  readonly onOpenRouterKey: () => void
-  /** Open while the owner types a key. */
-  readonly keyEntry?: KeyEntry
   readonly onPaused: (paused: boolean) => void
   readonly onSignInCodex?: () => void
   readonly onRuleChange?: (id: string, text: string) => void
@@ -50,12 +42,21 @@ function commitCap(text: string, current: number, onCap: (usd: number) => void):
   if (text.trim() !== '' && Number.isFinite(value) && value >= 0 && value !== current) onCap(value)
 }
 
+function commitModel(text: string, current: string, onChatModel: (id: string) => void): void {
+  const id = text.trim()
+  if (id !== '' && id !== current) onChatModel(id)
+}
+
 const usd = (amount: number): string => `$${amount.toFixed(2)}`
 
 function modelOptions(models: ReadonlyArray<ModelChoice>) {
   return models.map((model) => ({
     value: model.family,
-    label: model.resolved === undefined ? `${model.family} (not available)` : `${model.family} · ${model.resolved}${model.price === undefined ? '' : ` · ${model.price}`}`,
+    // A custom endpoint's row is a model id, its own name.
+    label:
+      model.resolved === undefined
+        ? `${model.family} (not available)`
+        : `${model.resolved === model.family ? model.family : `${model.family} · ${model.resolved}`}${model.price === undefined ? '' : ` · ${model.price}`}`,
     disabled: model.resolved === undefined,
   }))
 }
@@ -72,8 +73,7 @@ export function JunoSettingsPage({
   onChatModel,
   onCompactionModel,
   onCap,
-  onOpenRouterKey,
-  keyEntry,
+  providers,
   onSignInCodex,
   onRuleChange,
   onRuleRemove,
@@ -88,6 +88,15 @@ export function JunoSettingsPage({
   onStopJob,
 }: JunoSettingsPageProps) {
   const copy = chatCopy.pages.settings
+  if (page === undefined) {
+    return (
+      <Page width="settings">
+        <PageHeader title="Juno" subtitle={chatCopy.providers.noneBody} />
+        {providers}
+      </Page>
+    )
+  }
+  const custom = page.provider === 'custom'
   const chatSelected = page.chatModels.find((model) => model.selected)?.family ?? ''
   const compactionSelected = page.compactionModels.find((model) => model.selected)?.family ?? ''
   return (
@@ -103,14 +112,49 @@ export function JunoSettingsPage({
         }
       />
 
-      <Section heading="Model" sub="The newest model of each family, from the provider's catalogue.">
+      {providers}
+
+      <Section heading="Model" sub={custom ? 'The model this endpoint runs. Compaction uses it too.' : "The newest model of each family, from the provider's catalogue."}>
         <Surface kind="group">
-          <ListRow trailing={<Select size={30} label="Chat model" options={modelOptions(page.chatModels)} value={chatSelected} onChange={(event) => onChatModel(event.currentTarget.value)} />}>
-            <Text variant="body">Chat</Text>
-          </ListRow>
-          <ListRow divider={false} trailing={<Select size={30} label="Compaction model" options={modelOptions(page.compactionModels)} value={compactionSelected} onChange={(event) => onCompactionModel(event.currentTarget.value)} />}>
-            <Text variant="body">Compaction</Text>
-          </ListRow>
+          {page.modelTyped === true ? (
+            <ListRow
+              divider={false}
+              trailing={
+                <TextField
+                  size={30}
+                  label={chatCopy.providers.modelId}
+                  placeholder="llama3.2"
+                  // Committed on blur or Enter, as the cap is.
+                  key={chatSelected}
+                  defaultValue={chatSelected}
+                  onBlur={(event) => commitModel(event.currentTarget.value, chatSelected, onChatModel)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') commitModel(event.currentTarget.value, chatSelected, onChatModel)
+                  }}
+                  width="keyword"
+                />
+              }
+            >
+              <span {...stylex.props(cell.lines)}>
+                <Text variant="body">Chat</Text>
+                <Text variant="meta" tone="muted">
+                  {chatCopy.providers.modelTyped}
+                </Text>
+              </span>
+            </ListRow>
+          ) : (
+            <ListRow
+              divider={!custom}
+              trailing={<Select size={30} label="Chat model" options={modelOptions(page.chatModels)} value={chatSelected} onChange={(event) => onChatModel(event.currentTarget.value)} />}
+            >
+              <Text variant="body">Chat</Text>
+            </ListRow>
+          )}
+          {custom ? null : (
+            <ListRow divider={false} trailing={<Select size={30} label="Compaction model" options={modelOptions(page.compactionModels)} value={compactionSelected} onChange={(event) => onCompactionModel(event.currentTarget.value)} />}>
+              <Text variant="body">Compaction</Text>
+            </ListRow>
+          )}
         </Surface>
       </Section>
 
@@ -146,67 +190,23 @@ export function JunoSettingsPage({
               />
             }
           >
-            <Text variant="body">Daily cap</Text>
+            {page.spendUntracked === true ? (
+              <span {...stylex.props(cell.lines)}>
+                <Text variant="body">Daily cap</Text>
+                <Text variant="meta" tone="muted" data-spend-untracked="">
+                  {chatCopy.providers.spendUntracked}
+                </Text>
+              </span>
+            ) : (
+              <Text variant="body">Daily cap</Text>
+            )}
           </ListRow>
         </Surface>
       </Section>
 
-      <Section heading="Providers">
-        <Surface kind="group">
-          <ListRow
-            divider={onSignInCodex !== undefined}
-            data-openrouter={page.openRouterKey}
-            trailing={
-              keyEntry === undefined ? (
-                <span {...stylex.props(cell.controls)}>
-                  <Chip variant={page.openRouterKey === 'set' ? 'filled' : 'outline'} size={20}>
-                    {page.openRouterKey === 'set' ? 'Key set' : page.openRouterKey === 'rejected' ? 'Rejected' : 'No key'}
-                  </Chip>
-                  <Button variant="ghost" size="xs" tone="subtle" onClick={onOpenRouterKey}>
-                    {page.openRouterKey === 'missing' ? 'Add key' : 'Change key'}
-                  </Button>
-                </span>
-              ) : (
-                <span {...stylex.props(cell.controls)}>
-                  <TextField
-                    size={30}
-                    label="OpenRouter key"
-                    type="password"
-                    placeholder="sk-or-…"
-                    value={keyEntry.draft}
-                    invalid={keyEntry.error !== undefined}
-                    autoFocus
-                    onChange={(event) => keyEntry.onDraft(event.currentTarget.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter') keyEntry.onSave()
-                      else if (event.key === 'Escape') keyEntry.onCancel()
-                    }}
-                    width="keyword"
-                  />
-                  <Button variant="secondary" size="md" onClick={keyEntry.onSave} disabled={keyEntry.draft.trim() === ''}>
-                    Save
-                  </Button>
-                  <Button variant="ghost" size="md" tone="subtle" onClick={keyEntry.onCancel}>
-                    Cancel
-                  </Button>
-                </span>
-              )
-            }
-          >
-            <span {...stylex.props(cell.lines)}>
-              <Text variant="body">OpenRouter</Text>
-              {keyEntry?.error !== undefined ? (
-                <Text variant="meta" tone="danger" data-key-error="">
-                  {keyEntry.error}
-                </Text>
-              ) : page.openRouterKey === 'rejected' ? (
-                <Text variant="meta" tone="danger">
-                  {copy.keyRejected}
-                </Text>
-              ) : null}
-            </span>
-          </ListRow>
-          {onSignInCodex === undefined ? null : (
+      {onSignInCodex === undefined ? null : (
+        <Section heading="Codex">
+          <Surface kind="group">
             <ListRow
               divider={false}
               data-codex={page.codex._tag}
@@ -230,9 +230,9 @@ export function JunoSettingsPage({
                 </Text>
               </span>
             </ListRow>
-          )}
-        </Surface>
-      </Section>
+          </Surface>
+        </Section>
+      )}
 
       {onRuleChange === undefined || onRuleRemove === undefined || onRuleAdd === undefined ? null : (
         <Section heading="Rules" sub="One line each. Rules can only make Juno ask more, never less.">
@@ -241,7 +241,7 @@ export function JunoSettingsPage({
               <ListRow
                 key={rule.id}
                 trailing={
-                  <Button variant="ghost" size="xs" tone="subtle" onClick={() => onRuleRemove(rule.id)}>
+                  <Button variant="ghost" size="xs" tone="subtle" aria-label="Remove rule" onClick={() => onRuleRemove(rule.id)}>
                     Remove
                   </Button>
                 }

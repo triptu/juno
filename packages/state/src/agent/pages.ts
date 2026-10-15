@@ -50,7 +50,8 @@ export const activityPageAtom = (limit: number) => activityFamily(limit)
 
 /** A model family, the cap, Pause and the rules: what Settings › Juno changes today. The backup folder comes with WP21. */
 export type JunoSettingsChange =
-  | { readonly _tag: 'model'; readonly purpose: 'chat' | 'compaction'; readonly provider: 'openrouter' | 'codex'; readonly family: string }
+  /** On a custom endpoint `family` is the model id, listed or typed. */
+  | { readonly _tag: 'model'; readonly purpose: 'chat' | 'compaction'; readonly provider: 'openrouter' | 'codex' | 'custom'; readonly family: string }
   | { readonly _tag: 'cap'; readonly usd: number }
   | { readonly _tag: 'paused'; readonly value: boolean }
   /** The whole list, in order. */
