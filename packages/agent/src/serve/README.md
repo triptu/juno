@@ -49,12 +49,14 @@ independent of the cache implementation.
 The benchmark seeds 5,000 synthetic messages in the real SQLite schema and keeps
 a live run and a task card. Five alternating pairs of fresh Node processes measure
 the original and cached projection. Each process warms up for ten events, then
-measures 100 alternating reaction writes, status changes and card updates through
+measures 100 alternating reaction writes, status changes, card updates, live bubble appends
+and read marks through
 the encoded 40-row window. It checks the changed value on every iteration. No
 provider, renderer, port or durable disk fsync is included; this measures the
 agent's page preparation, not write-to-pixels latency.
 
-The check fails above 5 ms p95 for warm query work, 50 ms p95 from event through
+The check fails above 5 ms p95 for queries after an in-place update, 50 ms p95 from
+any event through
 encoding, or 200 KB for the snapshot (`docs/performance.md`). It also caps retained
 cache heap at 32 MiB. Memory is measured after explicit GC, relative to the seeded
 process before creating its projection; RSS and peak RSS are reported separately.

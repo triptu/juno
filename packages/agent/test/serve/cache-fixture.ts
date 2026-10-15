@@ -31,6 +31,6 @@ export function chatFixture(count: number) {
     if (known !== undefined) return Number(known.at)
     db.prepare('INSERT INTO chat_bubbles VALUES (?, ?)').run(id, fallback)
     return fallback
-  }, jobs: [], cards: [], readAt: 0, waiting: undefined, dayOf: (at) => Math.floor(at / 86_400_000) * 86_400_000 }
+  }, jobs: [], cards: [], readAt: 0, waiting: undefined, dayOf: (at) => new Date(at).setHours(0, 0, 0, 0) }
   return { source, close: () => db.close() }
 }

@@ -385,7 +385,8 @@ function buildItems(source: ChatSource, cache: Caches, revision: ReturnType<Retu
     const id = archiveIds.get(op.opId)
     const quote = data?.replyTo === undefined ? undefined : quoteOf(data.replyTo)
     const reactions = reactionsOf('owner', op.opId)
-    entries.push(cache.entries.get(`owner:${op.opId}`, [op.text, op.at, op.state, op.data, id, source.waiting, JSON.stringify(quote), JSON.stringify(reactions)], () => ({
+    const waiting = op.state === 'accepted' ? source.waiting : undefined
+    entries.push(cache.entries.get(`owner:${op.opId}`, [op.text, op.at, op.state, op.data, id, waiting, JSON.stringify(quote), JSON.stringify(reactions)], () => ({
       by: 'owner',
       at: op.at,
       item: {
@@ -394,7 +395,7 @@ function buildItems(source: ChatSource, cache: Caches, revision: ReturnType<Retu
         ...(id === undefined ? {} : { id }),
         text: op.text,
         at: op.at,
-        delivery: op.state === 'accepted' && source.waiting !== undefined ? { _tag: 'waiting', for: source.waiting } : { _tag: 'sent' },
+        delivery: waiting !== undefined ? { _tag: 'waiting', for: waiting } : { _tag: 'sent' },
         ...(quote === undefined ? {} : { replyTo: quote }),
         ...(data?.context === undefined ? {} : { about: aboutOf(data.context) }),
         reactions,

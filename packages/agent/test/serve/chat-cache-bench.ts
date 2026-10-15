@@ -28,6 +28,7 @@ gc()
 const warmHeap = process.memoryUsage().heapUsed
 const eventMs: number[] = []
 const queryMs: number[] = []
+const structuralMs: number[] = []
 let bytes = 0
 const profile = process.env.JUNO_CHAT_PROFILE
 const session = profile === undefined ? undefined : new Session()
@@ -40,10 +41,18 @@ if (session) {
 try {
   for (let n = 0; n < 110; n++) {
     const start = performance.now()
-    const kind = n % 3
+    const kind = n % 5
     if (kind === 0) write.run(`bench-${n}`, n % 2 ? '👍' : null)
     else if (kind === 1 && source.live) source = { ...source, live: { ...source.live, status: { text: `Working ${n}` } } }
-    else source = { ...source, cards: source.cards.map((view) => ({ ...view, card: { ...view.card, title: `Task ${n}` } })) }
+    else if (kind === 2) source = { ...source, cards: source.cards.map((view) => ({ ...view, card: { ...view.card, title: `Task ${n}` } })) }
+    else if (kind === 3 && source.live) {
+      const id = `live:${n}`
+      source.store.db.prepare('INSERT INTO chat_bubbles VALUES (?, ?)').run(id, source.store.now() + 3_000_000 + n)
+      source = { ...source, live: { ...source.live, bubbles: [...source.live.bubbles, { id, text: `Bubble ${n}`, body: [{ text: `Bubble ${n}` }] }] } }
+    } else {
+      source = { ...source, readAt: source.store.now() + n * 1000 }
+      source.store.db.prepare('INSERT INTO chat_read VALUES (1, ?) ON CONFLICT (singleton) DO UPDATE SET through_at = excluded.through_at').run(source.readAt)
+    }
 
     const queryStart = performance.now()
     page = build()
@@ -58,8 +67,14 @@ try {
       assert(bubble?._tag === 'juno')
       assert.deepEqual(bubble.reactions, n % 2 ? [{ by: 'owner', emoji: '👍' }] : [])
     } else if (kind === 1) assert(encoded.includes(`Working ${n}`))
-    else assert(encoded.includes(`Task ${n}`))
-    if (n >= 10) { eventMs.push(end - start); queryMs.push(queryEnd - queryStart) }
+    else if (kind === 2) assert(encoded.includes(`Task ${n}`))
+    else if (kind === 3) assert(encoded.includes(`Bubble ${n}`))
+    else assert(page.items.some((item) => item._tag === 'juno' && item.unread))
+    if (n >= 10) {
+      eventMs.push(end - start)
+      if (kind < 3) queryMs.push(queryEnd - queryStart)
+      else structuralMs.push(end - start)
+    }
   }
   if (session) {
     const result = await session.post('Profiler.stop')
@@ -69,7 +84,7 @@ try {
   gc()
   const retainedHeap = process.memoryUsage().heapUsed - initialHeap
   console.log(JSON.stringify({
-    p50: percentile(eventMs, .5), p95: percentile(eventMs, .95), queryP95: percentile(queryMs, .95),
+    p50: percentile(eventMs, .5), p95: percentile(eventMs, .95), queryP95: percentile(queryMs, .95), structuralP95: percentile(structuralMs, .95),
     warmHeap: warmHeap - initialHeap, retainedHeap, rss: process.memoryUsage().rss, peakRss: process.resourceUsage().maxRSS * 1024,
     bytes, events: eventMs.length,
   }))

@@ -5,7 +5,7 @@ import { Schema } from 'effect'
 import { expect, it } from 'vitest'
 
 const Measurement = Schema.Struct({
-  p50: Schema.Number, p95: Schema.Number, queryP95: Schema.Number, warmHeap: Schema.Number,
+  p50: Schema.Number, p95: Schema.Number, queryP95: Schema.Number, structuralP95: Schema.Number, warmHeap: Schema.Number,
   retainedHeap: Schema.Number, rss: Schema.Number, peakRss: Schema.Number, bytes: Schema.Number, events: Schema.Number,
 })
 
