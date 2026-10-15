@@ -73,6 +73,7 @@ export default defineFixtures(
     Frequent: {
       rows: page({ frequent: true, draft: '' }),
       chosen: page({ frequent: true, conversation: conversations.maya, draft: '' }),
+      hover: page({ frequent: true, conversation: conversations.maya, draft: '' }, { hover: '[data-frequent-block] [role="listitem"]:nth-child(3) [role="button"]' }),
       empty: page({ draft: '' }),
     },
     Flow: {

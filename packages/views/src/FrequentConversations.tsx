@@ -36,7 +36,7 @@ export function FrequentConversations({ conversations, selected, onPick }: Frequ
           </div>
         ))}
       </div>
-      <Text variant="body" tone="muted" as="div" sx={styles.hint}>Write your message, then pick where it goes.</Text>
+      <Text variant="meta" tone="muted" as="div" sx={styles.hint}>Write your message, then pick where it goes.</Text>
     </div>
   )
 }
@@ -56,8 +56,9 @@ const styles = stylex.create({
     paddingInline: spacing['--space-3'],
     paddingBottom: spacing['--space-1'],
   },
+  // As far below the last row's text as the label is above the first row's.
   hint: {
     paddingInline: spacing['--space-3'],
-    paddingTop: spacing['--space-3'],
+    paddingTop: spacing['--space-1'],
   },
 })

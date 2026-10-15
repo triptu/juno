@@ -1,6 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
 import type { HTMLAttributes, ReactNode } from 'react'
-import { colors, radii, sizes, spacing } from '@juno/tokens/tokens.stylex'
+import { accent, colors, radii, sizes, spacing } from '@juno/tokens/tokens.stylex'
 import { activateHandlers, type ActivateEvent } from './internal/activate'
 import { interactive } from './internal/interactive'
 
@@ -63,6 +63,7 @@ export function ListRow({
         isButton && styles.button,
         selected && styles.selected,
         padding === 'navigation' && styles.navigation,
+        padding === 'navigation' && selected && styles.navigationSelected,
       )}
     >
       {leading !== undefined ? <span {...stylex.props(styles.leading, padding === 'navigation' && styles.navigationLeading)}>{leading}</span> : null}
@@ -86,6 +87,14 @@ const styles = stylex.create({
   navigation: {
     gap: spacing['--space-2'],
     borderRadius: radii['--radius-xl'],
+  },
+  // The sidebar's current-row fill (NavItem), so a picked row reads apart
+  // from a hovered one beside it.
+  navigationSelected: {
+    backgroundColor: {
+      default: accent['--hl-nav'],
+      ':hover': { default: null, [HOVER]: accent['--hl-nav'] },
+    },
   },
   navigationLeading: {
     width: sizes['--control-20'],
