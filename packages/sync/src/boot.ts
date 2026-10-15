@@ -29,6 +29,7 @@ import { Invalidation, StoreWriter, transaction, type SqlError } from '@juno/sto
 import { Clock, Effect, Queue } from 'effect'
 import { reindexOptions, type SyncContext } from './context'
 import { discoverSince } from './discovery'
+import { recheck, type RecheckOptions } from './recheck'
 import { applyPage, mainTopicOf, threadTopicOf } from './pages'
 import { reindexTopics } from './reindex'
 import { fillUsers } from './users'
@@ -478,13 +479,16 @@ export interface CatchUpOptions {
   readonly refreshWorkspace: boolean
   /** Page the followed threads with activity since the window (warm boot) or `lastSyncAt` (reconnect). */
   readonly refreshThreads: boolean
+  /** Read the likely topics again for changes made during a gap (`recheck.ts`): after a drop or a restart, not on a sweep. */
+  readonly recheck?: RecheckOptions
 }
 
 /**
  * Brings a populated cache up to date: counts, history since the synced
  * ranges where `latest` moved, the followed threads with activity since the
- * store was last in step, the discovery sweep for the gap since `since`, and
- * unknown users. Used by the warm boot and after every reconnect.
+ * store was last in step, the discovery sweep for the gap since `since`,
+ * after a gap the recheck of the likely topics, and unknown users. Used by
+ * the warm boot and after every reconnect.
  */
 export const catchUp = (ctx: SyncContext, previous: BootState, phase: Phase, options: CatchUpOptions): Effect.Effect<void, BootError, BootServices> =>
   Effect.gen(function* () {
@@ -513,6 +517,7 @@ export const catchUp = (ctx: SyncContext, previous: BootState, phase: Phase, opt
       yield* loadThreadViews(ctx, { until, probe: options.refreshWorkspace, lane: 'interactive' })
     }
     const discovered = yield* discoverOrLog(discoverSince(ctx, previous.lastSyncAt, counts.entries, {}))
+    if (options.recheck !== undefined) yield* recheck(ctx, options.recheck)
     yield* fillUsers(ctx)
     const state: BootState = {
       completedAt: yield* Clock.currentTimeMillis,
@@ -522,9 +527,9 @@ export const catchUp = (ctx: SyncContext, previous: BootState, phase: Phase, opt
     yield* transaction(setSyncState(BOOT_KEY, state))
   })
 
-/** The warm boot: `catchUp` with a workspace refresh. */
-export const warmBoot = (ctx: SyncContext, previous: BootState, phase: Phase): Effect.Effect<void, BootError, BootServices> =>
+/** The warm boot: `catchUp` with a workspace refresh, and the recheck for the time the app was closed. */
+export const warmBoot = (ctx: SyncContext, previous: BootState, phase: Phase, first: ReadonlyArray<string>): Effect.Effect<void, BootError, BootServices> =>
   Effect.gen(function* () {
     yield* phase({ _tag: 'booting' })
-    yield* catchUp(ctx, previous, phase, { refreshWorkspace: true, refreshThreads: true })
+    yield* catchUp(ctx, previous, phase, { refreshWorkspace: true, refreshThreads: true, recheck: { since: previous.lastSyncAt, first } })
   })

@@ -19,6 +19,10 @@ export interface ComposerProps {
   readonly inputRef?: Ref<HTMLTextAreaElement>
   /** ↑ in an empty field: a topic selects its newest message (SPEC section 7, Keyboard). */
   readonly onArrowUpEmpty?: () => void
+  /** Inside the box, above the text: the audience warning and the send check bar (inventory 7). */
+  readonly notices?: ReactNode
+  /** Esc in the field, while there is something to close (the send check bar). */
+  readonly onEscape?: () => void
   /**
    * Before the text: the attach button, once attachments exist (inventory 7).
    * Nothing is passed until then, so the composer shows no control that does nothing.
@@ -32,13 +36,19 @@ export interface ComposerProps {
  * sends, Shift Enter adds a line. At one line it has the `ComposerSlot`'s
  * geometry, so one replaces the other with no shift. The text starts 18px in,
  * as in the Juno composer; `leading` is where the attach button goes.
+ * `notices` grow the box upwards; the text row stays where it is.
  */
-export function Composer({ value, onChange, onSend, placeholder, sending = false, above, inputRef, onArrowUpEmpty, leading }: ComposerProps) {
+export function Composer({ value, onChange, onSend, placeholder, sending = false, above, inputRef, onArrowUpEmpty, leading, notices, onEscape }: ComposerProps) {
   const empty = value.trim().length === 0
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === 'ArrowUp' && value === '' && onArrowUpEmpty !== undefined && !event.shiftKey && !event.metaKey && !event.altKey && !event.ctrlKey) {
       event.preventDefault()
       onArrowUpEmpty()
+      return
+    }
+    if (event.key === 'Escape' && onEscape !== undefined && !event.nativeEvent.isComposing) {
+      event.preventDefault()
+      onEscape()
       return
     }
     if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) return
@@ -48,8 +58,9 @@ export function Composer({ value, onChange, onSend, placeholder, sending = false
   return (
     <div data-composer="" {...stylex.props(styles.outer)}>
       {above !== undefined ? <div {...stylex.props(styles.above)}>{above}</div> : null}
-      <Surface kind="field" data-composer-field="" sx={[styles.box, leading !== undefined && styles.boxWithLeading]}>
-        <div {...stylex.props(styles.row)}>
+      <Surface kind="field" data-composer-field="" sx={styles.box}>
+        {notices}
+        <div {...stylex.props(styles.row, leading !== undefined && styles.rowWithLeading)}>
           {leading}
           <Textarea
             ref={inputRef}
@@ -101,26 +112,27 @@ const styles = stylex.create({
   },
   box: {
     display: 'flex',
+    flexDirection: 'column',
     width: '100%',
     maxWidth: layout['--composer-width'],
     marginInline: 'auto',
-    paddingInlineStart: spacing['--space-3-5'],
-    paddingInlineEnd: spacing['--space-1-5'],
     boxSizing: 'border-box',
-  },
-  // A 28px leading control sits 6px in, as the send button does at the end.
-  boxWithLeading: {
-    paddingInlineStart: spacing['--space-1-5'],
   },
   // The row is 40px at one line (the textarea's 9 + 22 + 9). It reaches into the field's 1px border,
   // so the field is 40px tall too, like the ComposerSlot it replaces.
   row: {
     display: 'flex',
     alignItems: 'flex-end',
-    flexGrow: 1,
     minWidth: 0,
+    // The padding is the row's, not the box's, so the notices above it span the box.
+    paddingInlineStart: spacing['--space-3-5'],
+    paddingInlineEnd: spacing['--space-1-5'],
     gap: spacing['--space-1'],
     marginBlock: '-1px',
+  },
+  // A 28px leading control sits 6px in, as the send button does at the end.
+  rowWithLeading: {
+    paddingInlineStart: spacing['--space-1-5'],
   },
   send: {
     display: 'inline-flex',

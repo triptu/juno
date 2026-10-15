@@ -11,6 +11,8 @@ module outboxProtocol {
     server: int -> int, request: int -> str, due: Set[int],
     events: Set[int], fetches: Set[Fetch], scan: Set[int],
     online: bool, connected: bool, catchup: bool, sealed: bool,
+    // A post claimed while Juno saw the socket down.
+    claimedOffline: bool,
     label: str, target: int,
     // One action row per message (edit, delete or reaction toggle): none,
     // waiting, transit, accepted, done or dropped. Kind `change` stands for
@@ -28,7 +30,7 @@ module outboxProtocol {
     s' = { created: Set(), row: drafts.mapBy(_ => "gone"), stored: Set(), discarded: Set(),
       server: drafts.mapBy(_ => 0), request: drafts.mapBy(_ => "idle"), due: Set(),
       events: Set(), fetches: Set(), scan: Set(),
-      online: true, connected: true, catchup: false, sealed: false, label: "init", target: 0,
+      online: true, connected: true, catchup: false, sealed: false, claimedOffline: false, label: "init", target: 0,
       act: drafts.mapBy(_ => "none"), actKind: drafts.mapBy(_ => "change"), stale: Set(),
       actSent: Set(), acted: Set() },
     remaining' = drainLimit, turn' = 0
@@ -45,11 +47,17 @@ module outboxProtocol {
 
   // Persist sending before the single HTTP attempt leaves. There is no
   // transport retry action. A crash before the call leaves is a dropped call.
-  action claim(k: int): bool = all {
-    s.online, s.row.get(k) == "queued", s.due.contains(k), s.request.get(k) == "idle",
+  // The worker claims only while Juno sees the socket connected, so a send
+  // made offline stays queued; with the guard off it claims whenever HTTP
+  // happens to work.
+  action claimWith(k: int, guard: bool): bool = all {
+    s.online, not(guard) or s.connected,
+    s.row.get(k) == "queued", s.due.contains(k), s.request.get(k) == "idle",
     s' = { ...s, row: s.row.set(k, "sending"), request: s.request.set(k, "transit"),
-      due: s.due.exclude(Set(k)), label: "claim", target: k }
+      due: s.due.exclude(Set(k)), claimedOffline: s.claimedOffline or not(s.connected),
+      label: "claim", target: k }
   }
+  action claim(k: int): bool = claimWith(k, true)
   action accept(k: int, withEcho: bool): bool = all {
     s.request.get(k) == "transit",
     s' = { ...s, server: s.server.set(k, s.server.get(k) + 1),
@@ -130,7 +138,7 @@ module outboxProtocol {
   action startFetch(k: int, kind: str): bool = all {
     s.online, s.created.contains(k), s.fetches.size() < fetchLimit,
     if (kind == "lookup") all {
-      s.row.get(k) == "unknown", s.due.contains(k),
+      s.connected, s.row.get(k) == "unknown", s.due.contains(k),
       not(s.fetches.exists(f => f.key == k and f.kind == "lookup"))
     } else if (kind == "catchup") s.scan.contains(k) else not(s.sealed),
     s' = { ...s, fetches: s.fetches.union(Set({ key: k, found: s.server.get(k) > 0, kind: kind })),
@@ -195,7 +203,7 @@ module outboxProtocol {
   // The worker resolves the ts from the stored message when it runs. With
   // the guard off it calls with a guessed ts before the post is stored.
   action runActionWith(k: int, guard: bool): bool = all {
-    s.online, s.act.get(k) == "waiting", not(guard) or s.stored.contains(k),
+    s.online, s.connected, s.act.get(k) == "waiting", not(guard) or s.stored.contains(k),
     s' = { ...s, act: s.act.set(k, "transit"), stale: s.stale.exclude(Set(k)),
       actSent: s.actSent.union(Set(k)), label: "runAction", target: k }
   }
@@ -277,9 +285,10 @@ module outboxProtocol {
   val drainBound = remaining > 0 or reachedAgreement
   val actionNeedsMessage = s.actSent.subseteq(s.stored) and s.acted.subseteq(s.stored)
   val noActionOnDiscarded = s.actSent.intersect(s.discarded) == Set()
+  val sendsWaitOffline = not(s.claimedOffline)
   val actionsDrain = remaining > 0 or drafts.forall(k => not(actPending(k)))
   val invariants = atMostOnce and noDoubleShow and noSilentLoss and quietAgreement and drainBound and
-    actionNeedsMessage and noActionOnDiscarded and actionsDrain
+    actionNeedsMessage and noActionOnDiscarded and actionsDrain and sendsWaitOffline
 
   action work = any {
     goOnline, reconnect, catchUp,
@@ -394,6 +403,21 @@ module outboxProtocol {
     if (turn == 11) { nondet f = s.fetches.oneOf(); finishFetch(f) } else
     seal
   ) }
+
+  // A send made while the socket is down waits for the reconnect, then
+  // posts once. The bug claims it while Juno knows it is offline.
+  action offlineSendWith(guard: bool): bool = all { not(reachedAgreement), tick(
+    if (s.sealed) progress else
+    if (turn == 0) disconnect else
+    if (turn == 1) send(1) else
+    if (turn == 2) (if (guard) reconnect else claimWith(1, false)) else
+    if (turn == 3) claim(1) else
+    if (turn == 4) accept(1, false) else
+    if (turn == 5) answer(1) else
+    seal
+  ) }
+  action offlineSendStep = offlineSendWith(true)
+  action offlineSendBugStep = offlineSendWith(false)
 
   // An edit queued while the post is out waits for the stored message. The
   // bug calls with a guessed ts at once.

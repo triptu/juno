@@ -18,6 +18,7 @@
 import {
   compareTs,
   indexTopic,
+  MAX_PARTICIPANTS,
   maxTs,
   parseTopicId,
   type IndexInput,
@@ -191,8 +192,8 @@ const reindexOne = (id: string, options: ReindexOptions): Effect.Effect<boolean,
     const participants = [...activity.participants]
     if (root?.reply_users_json !== null && root?.reply_users_json !== undefined) {
       for (const user of JSON.parse(root.reply_users_json) as Array<string>) {
-        if (participants.length >= 4) break
-        if (!participants.includes(user as UserId)) participants.push(user as UserId)
+        if (participants.length >= MAX_PARTICIPANTS) break
+        if (user !== options.me.userId && !participants.includes(user as UserId)) participants.push(user as UserId)
       }
     }
     const rootText = root !== undefined && root.deleted === 0 && root.text !== '' ? root.text.slice(0, ROOT_TEXT_CHARS) : undefined

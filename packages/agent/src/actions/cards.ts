@@ -471,6 +471,17 @@ function receiptOf(store: Store, child: ChildEvidence | undefined): unknown {
   return row === undefined ? undefined : JSON.parse(row.evidence)
 }
 
+/** Records the card's outcome for the model once every child has settled (§19.5). */
+export function settleCardOutcome(store: Store, cardId: string): void {
+  const card = cardRow(store, cardId)
+  if (card === undefined) return
+  const view = viewOf(store, card, store.now()).card
+  if (!('status' in view)) return
+  const status = view.status._tag
+  if (status !== 'done' && status !== 'failed' && status !== 'expired') return
+  transaction(store.db, () => recordOutcome(store, cardId, status, summaryOf(payloadOf(store, card))))
+}
+
 /** Every card Juno proposed, oldest first, as the chat shows it. */
 export function cardViews(store: Store, now: number): ReadonlyArray<CardView> {
   const rows = store.db.prepare("SELECT * FROM cards WHERE kind != 'task' ORDER BY created_at, id").all() as unknown as CardRow[]

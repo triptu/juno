@@ -7,6 +7,7 @@ import { createProviderGuard, openTurns } from '../src'
 import { createMcpManager, MCP_MIGRATIONS, T3, LITTLEBIRD, mcpExecutors, mcpTools, type Credentials, type McpManagerApi } from '../src/mcp'
 import { parseObject } from '../src/mcp/catalogue'
 import { createT3Adapter } from '../src/t3'
+import { createJobs } from '../src/jobs/jobs'
 import { SONNET } from './turns-harness'
 import { openDatabase } from '../src/store/database'
 import { initialize } from '../src/store/store'
@@ -47,7 +48,7 @@ async function fixture(serverId: 't3' | 'littlebird', tools: FakeTool[]) {
       return createProviderGuard({ store, transport: fake.models })
     },
     jobDrivers: () => t3 ? [t3.driver] : [],
-    stopExternalJob: async (job) => t3?.stop(job) ?? false,
+    stopExternalJob: async (job, click) => t3?.stop(job, click) ?? false,
     actions: { executors: () => [...(manager ? mcpExecutors(manager) : []), ...(t3?.executors ?? [])] },
     tools: (context) => {
       if (!manager) throw new Error('No manager')
@@ -73,7 +74,7 @@ async function fixture(serverId: 't3' | 'littlebird', tools: FakeTool[]) {
     await turns.actions.idle()
     return binding
   }
-  return { server, turns, manager: m, call, click }
+  return { server, turns, manager: m, call, click, fake }
 }
 
 it('requires a Start card, starts once, records a grant and reads the session branch', async () => {
@@ -365,4 +366,152 @@ it('says a T3 question needs an answer in T3 Code when Juno cannot show it', asy
   await click()
   await expect.poll(() => turns.jobs.list()[0]?.state).toBe('T3 Code needs your answer in T3 Code')
   expect(turns.actions.views().some((v) => v.card._tag === 'question')).toBe(false)
+})
+
+it('after a removal, stops watching a T3 session and leaves its interrupt to an owner click', async () => {
+  const { server, turns, call, click } = await fixture('t3', t3Tools)
+  await call('t3_start', start)
+  await click()
+  const job = turns.jobs.list()[0]
+  if (!job) throw new Error('No job')
+  const { opId } = turns.store.db.prepare('SELECT op_id AS opId FROM runs WHERE id = ?').get(job.runId) as { opId: string }
+  const { id } = turns.store.db.prepare("SELECT min(id) AS id FROM messages WHERE kind = 'user' AND origin_op = ?").get(opId) as { id: number }
+  await turns.redaction.remove({ opId: 'remove-test', messageIds: [id], alsoRemoveReply: false })
+  await expect.poll(() => turns.jobs.list()[0]?.phase).toBe('unknown')
+  const open = () => turns.actions.views().find((v) => v.card._tag === 'change' && v.binding)
+  await expect.poll(() => open()?.card).toMatchObject({ _tag: 'change', caption: 'Juno stopped watching this session after a removal.' })
+  await turns.actions.idle()
+  // Not claimed stopped, and nothing sent on its own.
+  expect(turns.jobs.list()[0]?.state).toContain('Juno stopped watching')
+  expect(server.calls.filter((c) => c.name === 't3_thread_interrupt')).toHaveLength(0)
+  const stop = open()
+  await click(stop?.card.id)
+  expect(server.calls.filter((c) => c.name === 't3_thread_interrupt')).toHaveLength(1)
+})
+
+it('lets a new Stop click try again after a lost interrupt, and never throws from Stop', async () => {
+  const { server, turns, manager, call, click } = await fixture('t3', t3Tools)
+  await call('t3_start', start)
+  await click()
+  const job = turns.jobs.list()[0]
+  if (!job) throw new Error('No job')
+  server.loseNextCall('t3_thread_interrupt')
+  await turns.jobs.stop(job.id, 'stop-1')
+  expect(turns.jobs.list()[0]?.phase).not.toBe('stopped')
+  await manager.connect('t3')
+  // The same click again is the same click: nothing more is sent.
+  await turns.jobs.stop(job.id, 'stop-1')
+  expect(server.calls.filter((c) => c.name === 't3_thread_interrupt')).toHaveLength(1)
+  await turns.jobs.stop(job.id, 'stop-2')
+  expect(server.calls.filter((c) => c.name === 't3_thread_interrupt')).toHaveLength(2)
+  expect(turns.jobs.list()[0]?.phase).toBe('stopped')
+})
+
+it('a T3 Stop that cannot be built leaves the job running instead of failing the click', async () => {
+  const { server, turns, manager, call, click } = await fixture('t3', t3Tools)
+  await call('t3_start', start)
+  await click()
+  const job = turns.jobs.list()[0]
+  if (!job) throw new Error('No job')
+  server.setTools(t3Tools.filter((tool) => tool.name !== 't3_thread_interrupt'))
+  await manager.refresh('t3')
+  await expect(turns.jobs.stop(job.id, 'stop-test')).resolves.toBeUndefined()
+  expect(turns.jobs.list()[0]?.phase).not.toBe('stopped')
+})
+
+it('shows a session T3 Code started even when the account changed during the launch, without a grant', async () => {
+  let changeAccount = () => {}
+  const tools: FakeTool[] = [{ ...launch, call: () => { changeAccount(); return json({ threadId: 'thread-test' }) } }, ...t3Tools.slice(1)]
+  const { turns, call, click } = await fixture('t3', tools)
+  changeAccount = () => { turns.store.db.prepare("UPDATE mcp_connections SET epoch = 'account-test' WHERE id = 't3'").run() }
+  await call('t3_start', start)
+  await click()
+  expect(turns.actions.views()[0]?.card).toMatchObject({ _tag: 'proposedTask', status: { _tag: 'done' } })
+  expect(turns.jobs.list()).toHaveLength(1)
+  expect(turns.store.db.prepare('SELECT id FROM grants').all()).toHaveLength(0)
+  await expect.poll(() => turns.jobs.list()[0]?.phase).toBe('unknown')
+})
+
+it('settles a lost grant-backed send like a click: Activity detail and the card outcome', async () => {
+  const { server, manager, turns, call, click } = await fixture('t3', t3Tools)
+  await call('t3_start', start)
+  await click()
+  const job = turns.jobs.list()[0]
+  if (!job) throw new Error('No job')
+  server.loseNextCall('t3_thread_send')
+  await call('t3_send', { job: job.id, message: 'Run the synthetic test once.' })
+  await manager.connect('t3')
+  const auth = turns.store.db.prepare('SELECT id FROM authorizations WHERE grant_id IS NOT NULL').get() as { id: string }
+  expect(turns.store.db.prepare('SELECT detail FROM action_results WHERE authorization_id = ?').all(auth.id)).toHaveLength(1)
+  const card = turns.actions.views().find((v) => v.card._tag === 'change')
+  if (!card) throw new Error('No card')
+  expect(turns.store.db.prepare('SELECT outcome FROM card_outcomes WHERE card_id = ?').all(card.card.id)).toEqual([{ outcome: 'failed' }])
+})
+
+it('makes a read the code adds to the T3 preset Read for an install that already discovered it', async () => {
+  const read: FakeTool = { name: 't3_pending_request_read', inputSchema: { type: 'object', properties: { threadId: str, requestId: str } }, call: () => json({}) }
+  const server = await startFakeMcpServer({ tools: [read] })
+  cleanup.push(server.close)
+  const dir = await mkdtemp(join(tmpdir(), 'juno-adapters-'))
+  cleanup.push(() => rm(dir, { recursive: true, force: true }))
+  const credentials: Credentials = { oauth: () => ({ load: () => undefined, save: () => undefined }), bearer: async () => undefined, values: async () => [], clear: async () => undefined, openAuthorization: async () => undefined }
+  const preset = { ...T3, url: server.url, auth: { kind: 'none' as const } }
+  const older = { ...preset, allowlist: preset.allowlist.filter((name) => name !== read.name) }
+  const discoverOld = async (path: string, sets: Parameters<typeof openDatabase>[1]) => {
+    const store = { db: openDatabase(path, sets), now: Date.now }
+    initialize(store)
+    const old = createMcpManager({ store, credentials, defaults: [older] })
+    await old.connect('t3')
+    expect(old.tool('t3', read.name).tier).toBe(3)
+    await old.close()
+    return store
+  }
+  // An install from before the read was added: the manager sees the name as new.
+  const store = await discoverOld(join(dir, 'a.sqlite'), [MCP_MIGRATIONS])
+  cleanup.push(async () => { store.db.close() })
+  const current = createMcpManager({ store, credentials, defaults: [preset] })
+  cleanup.push(() => current.close())
+  expect(current.tool('t3', read.name).tier).toBe(0)
+  // An install whose stored list already names it, discovered before that: the migration makes it Read.
+  const path = join(dir, 'b.sqlite')
+  const before = await discoverOld(path, [{ ...MCP_MIGRATIONS, steps: MCP_MIGRATIONS.steps.slice(0, 1) }])
+  before.db.prepare("UPDATE mcp_connections SET config = json_set(config, '$.allowlist', json(?)) WHERE id = 't3'").run(JSON.stringify(preset.allowlist))
+  before.db.close()
+  const after = openDatabase(path, [MCP_MIGRATIONS])
+  cleanup.push(async () => { after.close() })
+  expect(after.prepare("SELECT tier FROM mcp_tools WHERE connection_id = 't3' AND name = ?").get(read.name)).toEqual({ tier: 0 })
+})
+
+it('writes a job only when its phase or line changes', async () => {
+  const { turns } = await fixture('t3', t3Tools)
+  const lost = { event: 'lostSight', state: 'Sign in to T3 Code to keep watching' } as const
+  // A watcher that is signed out says the same line every second until the connection returns.
+  const jobs = createJobs({
+    store: turns.store, accept: () => ({ _tag: 'accepted' }) as never,
+    drivers: [{ kind: 't3', resumable: false, run: async (_job, _signal, update) => {
+      for (let i = 0; i < 5; i += 1) update(lost)
+      return { event: 'done', state: 'Done' }
+    } }],
+  })
+  turns.store.db.exec('CREATE TEMP TABLE job_writes (n INTEGER); CREATE TEMP TRIGGER count_job_writes AFTER UPDATE ON jobs BEGIN INSERT INTO job_writes VALUES (1); END')
+  jobs.start({ kind: 't3', runId: 'run-test', originOp: 'op-test', callId: 'call-test', title: 'Fix test', place: 'project-test', task: '{}' })
+  await jobs.idle()
+  expect((turns.store.db.prepare('SELECT count(*) AS n FROM job_writes').get() as { n: number }).n).toBe(2)
+})
+
+it('posts a report when a T3 session waits on a question, so Juno hears it', async () => {
+  const tools: FakeTool[] = [launch,
+    { name: 't3_thread_read', inputSchema: threadArgs, call: () => json({ thread: { status: 'waiting' } }) },
+    t3Tools[2]!,
+    { name: 't3_pending_request_list', inputSchema: threadArgs, call: () => json({ requestIds: ['request-test'] }) },
+    { name: 't3_pending_request_read', inputSchema: { type: 'object', properties: { threadId: str, requestId: str } }, call: () => json({ requestId: 'request-test', questions: [{ id: 'q1', question: 'Use the small fix?', options: [{ label: 'Yes' }, { label: 'No' }] }] }) },
+    { name: 't3_pending_request_respond', inputSchema: { type: 'object', properties: { threadId: str, requestId: str, answers: { type: 'object' } }, required: ['threadId', 'requestId', 'answers'] }, call: () => json({}) },
+  ]
+  const { turns, call, click, fake } = await fixture('t3', tools)
+  await call('t3_start', start)
+  fake.script([reply('<say>T3 Code has a question.</say>')])
+  await click()
+  await expect.poll(() => turns.store.db.prepare("SELECT text FROM inbox WHERE kind = 'report' AND op_id LIKE 'report:%:needsYou'").all()).toEqual([
+    { text: 'T3 Code is waiting for an answer in Fix test. The question is on a Question card.' },
+  ])
 })

@@ -3,22 +3,23 @@
 Small items noticed during work that are not yet assigned to a milestone. Remove an item when it is done.
 
 - Identity-provider sign-in (Google, Okta) leaves slack.com and is blocked by the sign-in window allow-list. The Slack-app import covers it for now.
-- The socket does not use the system proxy yet: main resolves it, but no `ws` agent is passed.
 - `pnpm smoke:live` always imports from the Slack app; it cannot reuse `secrets.bin` outside Electron.
 - After the body-sniff sign-in fallback, `secrets.bin` keeps `userId: ''` until a later sign-in.
 - A lint rule that bans raw colour and size values in components (StyleX does not enforce token use).
 - Dark and tinted macOS 26 app icons. electron-builder 26.15 supports an Icon Composer `.icon` file in `mac.icon` (it compiles it with `actool`, which needs Xcode 26 or newer, and still bundles `icon.icns`). We ship the light `.icns` only. A hand-written `.icon` compiled, but its dark fill was ignored, so author it in Icon Composer from `assets/icon.svg` and `assets/icon-dark.svg`, check the dark and tinted looks, then point `mac.icon` at it.
 - Layout-shift guard: the helper and the gallery test exist (`@juno/testing`), and the feel suite (`pnpm test:feel`) covers sidebar hover, tab switch, live messages and image loads in the app. Still to wire into the perf harness.
 - Break passes with the `interfaces:break` skill at each UI milestone end, plus a final pass before shipping.
-- Edits, deletes and reactions during a socket drop are recovered only for thread text (search sweep) or when a topic is opened. Decide after the live smoke whether `cached_latest_updates` (ADR 0011) is usable.
 - The live smoke has not yet confirmed `search.modules.messages` with `is:thread after:` for an `xoxc` session (architecture 5.3, open question 17.2). `SyncConfig.discovery: 'history'` is the fallback.
 - `topics.list` p95 is 6.7–9 ms inside the engine while events land (budget 5 ms). The cost is JavaScript row shaping, not SQL.
 - Confirm search-based thread discovery (`is:thread after:`) works with an `xoxc` session in the live smoke.
-- Edits and deletes made during a socket drop are recovered only for thread text (via search). Opening a topic, and the reconnect refresh of open topics, fetch only messages newer than the stored ones, so an edit to an older stored message is not recovered either. `cached_latest_updates` is still unknown.
 - Sync: `subscriptions.thread.getView` returns 10 threads per page regardless of `limit` (32 calls on the real workspace). Consider paging in parallel within the lane budget.
+- The recheck after a drop or restart reads 10 topics back 24 hours (`recheckTopics`, `recheckLookbackMillis`). An edit to an older message, or in an eleventh active topic, still waits for the topic to be opened. Measure the live cost and how far back people edit before changing either number.
+- The socket proxy agent speaks HTTP CONNECT only; a SOCKS-only system proxy connects directly. Proxy authentication is not passed to `ws`.
 - Cold boot on the real workspace takes about 7 minutes to reach `live` (sidebar data complete after 29 s) because of the 1.5 s background lane spacing. Revisit the spacing once the rate-limit behaviour is measured.
 - AI: the eval's expectations test the direction of each judgement, not calibration. Before the assistant fixes its confidence thresholds, collect a few hundred real decisions from the classifier and check its probabilities against them.
 - AI: `routeCheck` has a 1.5 s budget that only the classifier meets. With the classifier preference empty, the chat model answers in about 1.5 s and the check mostly times out; either accept that or give the chat path its own budget.
+- Send checks: the wrong-place question is asked on every typing pause in a Main whose draft changed, so a long draft can cost several `routeCheck` calls; Enter right after typing (within 400 ms plus the model's time) finds no answer and sends unchecked. Watch the call count against the 500-a-day budget and how often Enter beats the answer once real drafts go through it; a shorter pause would catch more and cost more.
+- Send checks: New chat's composer sends unchecked; `messages.check` takes a channel, so a New chat to a channel could run it too.
 - AI: the first decision of a process pays DNS and TLS to OpenRouter (0.3 s idle, more under load) and misses `routeCheck`'s 1.5 s budget once in the live eval. If that shows in use, keep a connection warm from the assistant (an undici agent with a longer keep-alive) or accept the single miss.
 - AI: the assistant's preferences UI needs a third model slot (`classifier`) next to `decision` and `generation`, or a switch that empties it.
 - Quint specs (queued after M3 fix A): `specs/` with follow/unfollow and read-state models first, then merge ordering and outbox/echo reconciliation before M6. Run the model checker in CI, feed generated traces into the engine convergence test, and add the "update the spec with sync changes" rule to CLAUDE.md.
@@ -61,3 +62,4 @@ Small items noticed during work that are not yet assigned to a milestone. Remove
 - Home: Ask Juno does nothing until the renderer has a Juno tab (`askJuno` in `containers/Home.tsx`; the Juno Agent wiring opens it there, and ⌘J); the field does not show `jobLine` yet.
 - Home: "muted" in SPEC 12 is read as a thread set to Never (not followed); a DM whose Notify me is Never can still show. Use the notification levels once they are in the store.
 - Home: `for_you_cards` (user.db) is unused; drop it in a migration when the schema is next touched.
+- Juno Agent T3: a Task Stop that cannot be built does nothing visible; show a short failure line on the card. A second T3 question that arrives while a session already waits sends no new report.
