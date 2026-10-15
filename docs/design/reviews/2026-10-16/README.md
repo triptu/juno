@@ -151,6 +151,6 @@ Each has a recommendation. They are left open because each changes what a surfac
 - `pnpm --filter @juno/views typecheck` after each change, and `pnpm build`: the bundle stays under budget (JS 935.5 KB, CSS 117.3 KB).
 - Locally under the heavy lock, after the last fix: `e2e/palette.spec.ts` (10 passed) and `e2e/juno-agent/backup.spec.ts` (passed).
 - The geometry checks were measured in the gallery while being written.
-- `pnpm affected`: see the report for the final run.
+- `pnpm affected` after merging origin/main: typecheck, lint, `pnpm test`, `test:gallery` and `test:desktop` (207 passed) all passed. An earlier run before the merge passed everything but `test:desktop`, which never started because Namespace could not create a machine.
 - The harness ran twice, before (clean `b218096a`) and after (this branch). The numbers in findings 1 to 3 come from its `out-*` files.
 - Not run: `pnpm test:feel`. The heavy lock was held by another worktree's exclusive perf runs for most of this review. None of these changes touch a list, a scroll path or an animation.
