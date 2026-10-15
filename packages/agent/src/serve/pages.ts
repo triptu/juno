@@ -11,8 +11,8 @@
  * - Activity: one row per run: who asked, when, how it ended, whether it
  *   read untrusted content, and its actions (`actions/activity.ts`). The
  *   folded read line is not built yet.
- * - Scheduled (WP19), Connections (WP17) and Review (WP21: there is no
- *   restore yet, so never recovery) are empty.
+ * - Scheduled (WP19) and Review (WP21) are empty. Connections is served
+ *   separately by mcp/pages.ts when its manager is supplied.
  */
 import { limits, utf8Bytes } from '@juno/agent-memory'
 import {

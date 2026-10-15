@@ -14,14 +14,14 @@
  * catch-up, sweep or root fetch included, fails the effect with
  * `SlackAuthRequired` and the engine ends the session. Any other boot
  * failure is logged and retried after `bootRetryMillis` with the phase at
- * `offline`; any other catch-up failure is logged and the phase settles. A
- * store error is a bug; it is logged per event so one bad frame does not
+ * `offline`; `force_reload` cuts that wait short. Any other catch-up failure
+ * is logged and the phase settles. A store error is a bug; it is logged per event so one bad frame does not
  * end the sync, and surfaces in the engine log.
  */
 import { mainTopicId, millisToTs, type ChannelId, type Ts } from '@juno/domain'
 import { SlackApi, SlackAuthRequired, SlackEdge, SlackSession, SlackSocket, type SocketEvent } from '@juno/slack'
 import { Invalidation, StoreReader, StoreWriter, transaction, type SqlError } from '@juno/store'
-import { Clock, Effect, FiberSet, Queue, Scope, Semaphore } from 'effect'
+import { Clock, Deferred, Effect, FiberSet, Queue, Scope, Semaphore } from 'effect'
 import { Stream } from 'effect'
 import { bootState, catchUp, coldBoot, followPass, warmBoot, type BootState, type Phase } from './boot'
 import { syncEmoji } from './emoji'
@@ -88,6 +88,7 @@ export const runSync = (options: RunSyncOptions): Effect.Effect<never, SlackAuth
       lateReactions: new Map(),
     }
     const state = { connected: false, booted: false, lastBoot: undefined as BootState | undefined, lastFollowPass: undefined as number | undefined }
+    let bootRetry: Deferred.Deferred<void> | undefined
     const work = yield* Semaphore.make(1)
     const phase = options.onPhase
     const cycle = <A, E, R>(effect: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> =>
@@ -195,7 +196,10 @@ export const runSync = (options: RunSyncOptions): Effect.Effect<never, SlackAuth
             Effect.andThen(phase({ _tag: 'offline' })),
           )
         case 'Frame':
-          if (event.frame.type === 'force_reload') return FiberSet.run(background, reboot).pipe(Effect.asVoid)
+          if (event.frame.type === 'force_reload') {
+            if (bootRetry !== undefined) return Deferred.succeed(bootRetry, undefined).pipe(Effect.asVoid)
+            return FiberSet.run(background, reboot).pipe(Effect.asVoid)
+          }
           return applyFrame(ctx, event.frame).pipe(
             Effect.catchCause((cause) => Effect.logError('sync: event not applied', { type: event.frame.type, cause })),
           )
@@ -229,8 +233,12 @@ export const runSync = (options: RunSyncOptions): Effect.Effect<never, SlackAuth
         const error = result.failure
         if (error._tag === 'SlackAuthRequired') return yield* error
         yield* Effect.logWarning('sync: boot failed, retrying', { tag: error._tag })
-        yield* phase({ _tag: 'offline' })
-        yield* Effect.sleep(config.bootRetryMillis)
+        const wake = yield* Deferred.make<void>()
+        bootRetry = wake
+        yield* phase({ _tag: 'offline' }).pipe(
+          Effect.andThen(Effect.raceFirst(Effect.sleep(config.bootRetryMillis), Deferred.await(wake))),
+          Effect.ensuring(Effect.sync(() => { bootRetry = undefined })),
+        )
       }
       state.booted = true
       yield* settle()

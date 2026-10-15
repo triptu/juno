@@ -423,13 +423,17 @@ Effect and StyleX pitfalls are in their skills: `.claude/skills/effect/SKILL.md`
 
 ## Typecheck
 
+The repo uses TypeScript 7.0.2, the native compiler (`tsc` from the `typescript` package hands over to a platform binary). TypeScript 7 offers no JS API like `ts.createSourceFile`; `scripts/health-size.mjs`, the only code that needs it, imports `typescript-5` (an alias for 5.9.3, a root devDependency, used for nothing else). No other tool loads TypeScript: Vite, electron-vite and vitest transpile with esbuild, StyleX, the React Compiler and Playwright with Babel, oxlint and knip parse natively, and Quint does not use it. No tsconfig loads a language-service plugin.
+
 Packages ship TypeScript source, so each package's `tsc -p` also checks the source of every workspace package it depends on, and 29 projects repeat much of the same work. `pnpm typecheck` (`scripts/typecheck.mjs`) runs the same projects with the same tsconfigs, so the rules are unchanged, but:
 
 - **Skips what passed.** A project's key is a hash of its package's files, the files of every workspace package it depends on (directly or not), its tsconfig chain, `tsconfig.base.json`, the lockfile and the TypeScript version. A passing key is recorded in the system temp folder (`juno-cache/typecheck`), shared by every worktree; `pnpm remote typecheck` brings its results back. An unchanged project costs nothing. `--no-cache` checks everything.
 - **Incremental.** A project that runs uses `tsc --incremental`, with its build info in the package's `node_modules/.cache/tsc/`, so only what changed is checked again.
 - **Queued.** At most `JUNO_TYPECHECK_JOBS` (default 2) tsc processes in one run, and at most two at once on the Mac across every worktree (a separate `typecheck` queue in `scripts/heavy.mjs`, apart from the test slots).
 
-Timings (2026-10-15):
+TypeScript 7 against 5.9.3 (2026-10-15), the same `pnpm typecheck --no-cache` with no build info, run back to back on the Mac at load 6 to 24: 102 s and 54 s with 7.0.2, against 511 s and 341 s with 5.9.3. The peak memory of the tsc processes (two at once) was about the same: 961 and 975 MB against 970 and 904 MB. One project alone (`apps/desktop` web) took 5.2 s and up to 910 MB with 7.0.2, against 64 to 91 s and up to 505 MB with 5.9.3; a warm incremental run took 0.5 s against 8 to 12.5 s. On a 16x32 machine with nothing cached the whole typecheck takes 5.5 s (14.5 s with 5.9.3).
+
+Earlier timings, all with TypeScript 5.9.3 (2026-10-15):
 
 | Run | Old `pnpm -r typecheck` | `pnpm typecheck` |
 | --- | --- | --- |

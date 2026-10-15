@@ -62,7 +62,7 @@ export async function served(options: HarnessOptions = {}) {
   cleanups.push(() => Effect.runPromise(Scope.close(scope, Exit.void)))
   await Effect.runPromise(
     Layer.buildWithScope(
-      rendererServer(transport, { turns: h.turns, presence: () => current, presenceChanges: SubscriptionRef.changes(presence), settings }),
+      rendererServer(transport, { turns: h.turns, presence: () => current, presenceChanges: SubscriptionRef.changes(presence), settings, ...(options.watchHost ? { schedule: { scheduler: h.turns.scheduler, host: options.watchHost } } : {}) }),
       scope,
     ),
   )

@@ -23,6 +23,7 @@ import { SyncLink } from '../syncLink'
 import { Workspace, type StoreServices } from '../workspace'
 import * as attempts from './attempts'
 import * as reads from './reads'
+import { watchSnapshot, watchHours, watchChanges } from './schedule'
 
 /** The engine phase, which lives in the status feature; the composition layer provides it. */
 export class PhaseSource extends Context.Service<PhaseSource, Stream.Stream<EnginePhase>>()('juno/engine/agent-host/PhaseSource') {}
@@ -190,6 +191,36 @@ export const JunoHostLive: Layer.Layer<JunoHost, never, Workspace | Outbox | Syn
       topic: (topicId) => inStore(reads.topic(topicId)),
       person: (userId) => inStore(reads.person(userId)),
       presence,
+      schedule: {
+        hours: inStore(watchHours),
+        changes: watchChanges(workspace),
+        check: (conversation, refresh) => Effect.gen(function* () {
+          const before = yield* account
+          const local = yield* inStore(watchSnapshot(conversation))
+          if (!refresh) return local
+          const messages = []
+          let cursor: string | undefined
+          const seen = new Set<string>()
+          do {
+            const page = yield* outbox.lookup((api) => conversation.threadTs === undefined
+              ? api.call('conversations.history', { channel: conversation.channelId, oldest: conversation.ts, limit: 200, ...(cursor ? { cursor } : {}) })
+              : api.call('conversations.replies', { channel: conversation.channelId, ts: conversation.threadTs as Ts, oldest: conversation.ts, limit: 200, ...(cursor ? { cursor } : {}) })).pipe(Effect.mapError(hostError))
+            for (const message of page.messages) {
+              if (message.user === undefined || message.ts <= conversation.ts) continue
+              const threadTs = message.thread_ts === message.ts ? undefined : message.thread_ts
+              if (conversation.threadTs === undefined && threadTs !== undefined) continue
+              messages.push({ channelId: conversation.channelId, ts: message.ts, userId: message.user, ...(threadTs === undefined ? {} : { threadTs }) })
+            }
+            if ('is_limited' in page && page.is_limited === true) return yield* new AgentHostError({ reason: 'offline', message: 'The conversation refresh was limited.' })
+            cursor = page.response_metadata?.next_cursor || undefined
+            if (page.has_more && cursor === undefined || cursor !== undefined && seen.has(cursor)) return yield* new AgentHostError({ reason: 'offline', message: 'The conversation refresh was incomplete.' })
+            if (cursor !== undefined) seen.add(cursor)
+          } while (cursor !== undefined)
+          const after = yield* account
+          if (before.id !== after.id) return yield* new AgentHostError({ reason: 'stale', message: 'Another Slack account is signed in.' })
+          return { ...local, messages }
+        }),
+      },
       attempts: {
         claim: (attempt) => inStore(attempts.claim(attempt)),
         cancel: (authorizationId, attemptId) => inStore(attempts.cancel(authorizationId, attemptId)),
