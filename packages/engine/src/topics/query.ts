@@ -487,6 +487,7 @@ function entryOf(
   const info = channelInfoOf(row, columns, selfId, (id) => use(id).name)
   const partner = row.c_kind === 'im' && row.c_user_id !== null ? use(row.c_user_id) : undefined
   // The meta line's people (SPEC section 5): never you, and none in a DM, whose title already names everyone.
+  // The index leaves you out already; rows indexed before it did may still hold you until they are reindexed.
   const shown = row.c_kind === 'im' || row.c_kind === 'mpim' ? [] : participants.filter((id) => id !== selfId)
   const named = shown.map(use)
   if (partner !== undefined) named.push(partner)
