@@ -14,6 +14,8 @@ test('Notify me on a channel lists it on the page, and removing it there has Und
   await juno.signIn()
   await juno.waitForSync()
 
+  // A bot channel: the Automated view holds it.
+  await juno.sidebar.selectView('Automated')
   const alerts = juno.sidebar.row(ALERTS_MAIN)
   const before = await alerts.chooseInMenu('notify-never')
   expect(before.labels).toContain('> When it matters ✓')
@@ -22,6 +24,7 @@ test('Notify me on a channel lists it on the page, and removing it there has Und
   expect(after.labels).toContain('> Never ✓')
 
   // A thread: Every message follows it and is kept as its level.
+  await juno.sidebar.filter('All')
   const rina = juno.sidebar.row(RINA)
   await rina.chooseInMenu('notify-every')
   // The toast names the topic by its title, which drops the final full stop.
@@ -70,6 +73,7 @@ test('a DM set to Every message notifies, the click opens it at the message, and
   await expect(why).toHaveCount(0)
 
   // A channel message without a mention never reaches the pipeline, and the menu says so.
+  await juno.sidebar.selectView('Automated')
   await juno.sidebar.row(ALERTS_MAIN).open()
   slack.as('Leo').postIn('alerts-prod', 'Weekly error report is up')
   await juno.topic.expectMessage('Weekly error report is up')
@@ -86,6 +90,7 @@ test('a topic on screen in a focused window does not notify, and unread mentions
   await juno.waitForSync()
   await expect.poll(() => juno.dockBadge(), { timeout: 15_000 }).toBe('•')
 
+  await juno.sidebar.selectView('Automated')
   await juno.sidebar.row(ALERTS_MAIN).chooseInMenu('notify-every')
   await juno.sidebar.row(ALERTS_MAIN).open()
   await juno.focusWindow()

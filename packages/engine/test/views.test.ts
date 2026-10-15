@@ -35,6 +35,8 @@ describe('sidebar views', () => {
   it('gathers its conversations, keeps them out of All, lights its dot for a mention, and undoes a delete', async () => {
     const engine = await bootedEngine(engines)
     const callsBefore = engine.fake.callCount()
+    // Without the built-in Automated view, which holds #alerts-prod after the first sync, and stays deleted.
+    valueOf(await runCommand(engine.registry, viewsDelete, { id: 'automated' }))
     const all = await engine.rowsUntil((rows) => channelsOf(rows).has('C0ALERTSPROD') && channelsOf(rows).has('C0HIRING'), 'alerts and hiring in All')
     expect(all.length).toBeGreaterThan(5)
 

@@ -20,3 +20,11 @@ export const SavedView = Schema.Struct({
   position: Schema.Int,
 })
 export type SavedView = typeof SavedView.Type
+
+/**
+ * Where a conversation goes when the user answers about the Automated view
+ * (SPEC section 5, "Automated"): into it, kept where it is (Keep in All), or
+ * back to an open question on Home, which is only the undo of an answer.
+ */
+export const AutomatedPlace = Schema.Literals(['automated', 'kept', 'ask'])
+export type AutomatedPlace = typeof AutomatedPlace.Type

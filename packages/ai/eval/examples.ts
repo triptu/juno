@@ -295,6 +295,37 @@ export const examples: ReadonlyArray<Example> = [
     },
     (o) => o.title.length > 0,
   ),
+  ex(
+    tasks.automatedChannel,
+    'an alerts channel where only an app posts',
+    {
+      channelId: 'C0CIBUILDS',
+      channel: '#ci-builds',
+      messages: [
+        { ...m('CI', 'main #4812 passed in 9m 12s', 90), fromApp: true },
+        { ...m('CI', 'main #4813 failed: 2 tests in api/search', 60), fromApp: true },
+        { ...m('CI', 'main #4814 passed in 9m 40s', 30), fromApp: true },
+        { ...m('CI', 'release/2.3 #77 passed in 11m 2s', 10), fromApp: true },
+      ],
+    },
+    (o) => o.probability >= 0.85,
+  ),
+  ex(
+    tasks.automatedChannel,
+    'people working through the alerts an app posts',
+    {
+      channelId: 'C0ONCALL',
+      channel: '#oncall',
+      messages: [
+        { ...m('Grafana', '[FIRING] api p95 > 800ms (prod-eu)', 90), fromApp: true },
+        m('Jonas Weber', 'Looking. Probably the search index again.', 85),
+        m('Dev Patel', 'I rolled back the last deploy, watch the graph.', 70),
+        { ...m('Grafana', '[RESOLVED] api p95 > 800ms (prod-eu)', 60), fromApp: true },
+        m('Jonas Weber', 'Back to normal. Writing it up in the incident doc.', 55),
+      ],
+    },
+    (o) => o.probability < 0.5,
+  ),
 ]
 
 /** The structured examples, which carry an expectation. */
