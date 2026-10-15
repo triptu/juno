@@ -299,17 +299,19 @@ test.describe('settings forms', () => {
     expect(at.errorStart).toBe(at.fieldStart)
   })
 
-  test('Connections: a server with no tools is one row with no divider over the card’s bottom edge', async ({ page }) => {
+  test('Connections: each server is one compact row with Configure, and no divider over the card’s bottom edge', async ({ page }) => {
     await open(page, 'ConnectionsPage', 'connections/servers')
-    const lines = await page.evaluate(() =>
-      [...document.querySelectorAll('[data-connection-id]')].map((card) => {
-        const rows = [...card.children]
-        const last = rows.at(-1)!
-        return { id: card.getAttribute('data-connection-id'), rows: rows.length, lastBorder: getComputedStyle(last).borderBottomWidth, lastShadow: getComputedStyle(last).boxShadow }
-      }),
+    const rows = await page.evaluate(() =>
+      [...document.querySelectorAll('[data-connection-id]')].map((row) => ({
+        id: row.getAttribute('data-connection-id'),
+        configure: [...row.querySelectorAll('button')].some((button) => button.textContent === 'Configure'),
+        tools: row.querySelectorAll('[data-tool]').length,
+        border: getComputedStyle(row).borderBottomWidth,
+      })),
     )
-    expect(lines.find((card) => card.id === 'littlebird')?.rows).toBe(1)
-    for (const card of lines) expect({ id: card.id, border: card.lastBorder, shadow: card.lastShadow }).toEqual({ id: card.id, border: '0px', shadow: 'none' })
+    expect(rows.map((row) => row.id)).toEqual(['notion', 'littlebird', 't3', 'server-docs'])
+    for (const row of rows) expect(row).toMatchObject({ configure: true, tools: 0 })
+    expect(rows.at(-1)?.border).toBe('0px')
   })
 
   test('Restore from backup: the folder box is drawn as the phrase field under it, its text on the same line', async ({ page }) => {
@@ -336,19 +338,23 @@ test.describe('settings forms', () => {
 })
 
 
-test('Connections tools keep symmetric row insets with one tier checkbox', async ({ page }) => {
-  await open(page, 'ConnectionsPage', 'connections/servers')
-  const rows = page.locator('[data-tool]')
-  for (const row of await rows.all()) {
-    await expect(row.getByRole('checkbox', { name: 'Runs without asking' })).toHaveCount(1)
-    const insets = await row.evaluate((node) => {
-      const box = node.closest('[data-connection-id]')!.getBoundingClientRect()
-      const name = node.firstElementChild!.getBoundingClientRect()
-      const control = node.lastElementChild!.getBoundingClientRect()
-      return { start: name.left - box.left, end: box.right - control.right }
+test('Configure: every tool row lines up with the Tool, Enabled and Auto-review columns', async ({ page }) => {
+  await open(page, 'ConnectionToolsSheet', 'configure/tools')
+  const at = await page.evaluate(() => {
+    const [tool, enabled, review] = [...document.querySelectorAll('[role="columnheader"]')].map((node) => node.getBoundingClientRect())
+    return [...document.querySelectorAll('[data-tool]')].map((row) => {
+      const [name, toggle, rule] = [...row.children].map((cell) => cell.getBoundingClientRect())
+      const box = row.querySelector('input[type="checkbox"]')!.getBoundingClientRect()
+      return {
+        name: name!.left - tool!.left,
+        toggle: Math.round(box.left + box.width / 2 - (enabled!.left + enabled!.width / 2)),
+        rule: rule!.left - review!.left,
+        cell: toggle!.left - enabled!.left,
+      }
     })
-    expect(insets).toEqual({ start: 15, end: 15 })
-  }
+  })
+  expect(at.length).toBe(9)
+  for (const row of at) expect(row).toEqual({ name: 0, toggle: 0, rule: 0, cell: 0 })
 })
 
 test('Backup cuts the path in the middle and keeps the row insets', async ({ page }) => {

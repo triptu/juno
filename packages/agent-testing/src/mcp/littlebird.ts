@@ -7,14 +7,15 @@
  * Littlebird's real tool names were not read (S8 stopped before sign-in), so
  * the names here are invented to match the plan's description: reads for
  * meetings, context search, routine reports and the account; writes for
- * adding material and creating or updating routines. `unknownTool()` makes a
- * tool the default allowlist has never heard of.
+ * adding material, deleting it, and creating or updating routines. The reads
+ * mark themselves read-only, as an MCP server should; the writes do not.
+ * `unknownTool()` makes a tool no read list has heard of.
  */
 import { json, type FakeTool } from './handler'
 import { startFakeMcpServer, type FakeMcpServer } from './server'
 
 export const LITTLEBIRD_READ_TOOLS = ['search_meetings', 'get_meeting', 'search_context', 'get_routine_report', 'get_account'] as const
-export const LITTLEBIRD_WRITE_TOOLS = ['add_material', 'create_routine', 'update_routine'] as const
+export const LITTLEBIRD_WRITE_TOOLS = ['add_material', 'delete_material', 'create_routine', 'update_routine'] as const
 
 export interface FakeLittlebirdOptions {
   /** More tools, listed after the known ones (for example `unknownTool()`). */
@@ -34,7 +35,11 @@ export interface FakeLittlebird extends FakeMcpServer {
   readonly materials: () => ReadonlyArray<{ readonly title: string; readonly text: string }>
 }
 
-/** A tool on no allowlist. Its annotations claim read-only, which must not grant Tier 0 (§10.1). */
+/**
+ * A tool on no read list that claims to be read-only. Juno takes the claim as
+ * a read only as the server made it when Juno first saw the tool, and only
+ * while its schema is unchanged (SPEC 13.9).
+ */
 export const unknownTool = (name = 'export_everything'): FakeTool => ({
   name,
   description: 'Export all workspace data.',
@@ -53,19 +58,25 @@ export async function startFakeLittlebird(options: FakeLittlebirdOptions = {}): 
     { id: 'meeting-2', title: 'Planning', date: '2026-10-14', summary: 'Moved the launch to Tuesday.' },
   ]
   const known: FakeTool[] = [
-    { name: 'search_meetings', inputSchema: query, call: ({ query: q }) => json({ meetings: meetings.filter((m) => `${m.title} ${m.summary}`.toLowerCase().includes(String(q).toLowerCase())) }) },
-    { name: 'get_meeting', inputSchema: byId, call: ({ id }) => {
+    { name: 'search_meetings', annotations: { readOnlyHint: true }, inputSchema: query, call: ({ query: q }) => json({ meetings: meetings.filter((m) => `${m.title} ${m.summary}`.toLowerCase().includes(String(q).toLowerCase())) }) },
+    { name: 'get_meeting', annotations: { readOnlyHint: true }, inputSchema: byId, call: ({ id }) => {
       const meeting = meetings.find((m) => m.id === id)
       if (!meeting) throw new Error(`No meeting ${String(id)}`)
       return json(meeting)
     } },
-    { name: 'search_context', inputSchema: query, call: ({ query: q }) => json({ results: materials.filter((m) => m.text.includes(String(q))) }) },
-    { name: 'get_routine_report', inputSchema: byId, call: ({ id }) => json({ id, report: `No new items for ${String(id)}.` }) },
-    { name: 'get_account', call: () => json({ name: 'Test Owner', plan: 'free' }) },
+    { name: 'search_context', annotations: { readOnlyHint: true }, inputSchema: query, call: ({ query: q }) => json({ results: materials.filter((m) => m.text.includes(String(q))) }) },
+    { name: 'get_routine_report', annotations: { readOnlyHint: true }, inputSchema: byId, call: ({ id }) => json({ id, report: `No new items for ${String(id)}.` }) },
+    { name: 'get_account', annotations: { readOnlyHint: true }, call: () => json({ name: 'Test Owner', plan: 'free' }) },
     { name: 'add_material', inputSchema: { type: 'object', properties: { title: { type: 'string' }, text: { type: 'string' } }, required: ['title', 'text'] },
       call: ({ title, text }) => {
         materials.push({ title: String(title), text: String(text) })
         return json({ id: `material-${materials.length}` })
+      } },
+    { name: 'delete_material', inputSchema: { type: 'object', properties: { title: { type: 'string' } }, required: ['title'] },
+      call: ({ title }) => {
+        const index = materials.findIndex((m) => m.title === title)
+        if (index >= 0) materials.splice(index, 1)
+        return json({ deleted: index >= 0 })
       } },
     { name: 'create_routine', inputSchema: { type: 'object', properties: { name: { type: 'string' }, prompt: { type: 'string' } }, required: ['name', 'prompt'] },
       call: ({ name, prompt }) => {

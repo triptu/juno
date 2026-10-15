@@ -11,6 +11,8 @@ const roots = ['apps', 'packages']
 const skip = new Set(['node_modules', 'out', 'dist', 'release', 'test-results', 'playwright-report'])
 const extensions = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.css', '.html'])
 const pattern = /cursor\s*:\s*['"]?pointer\b/i
+// Only message links that open in the browser may use the hand cursor.
+const allowlist = new Map([['packages/views/src/MessageBody.tsx', '// external-link-cursor']])
 
 async function* walk(dir) {
   for (const entry of await readdir(dir, { withFileTypes: true })) {
@@ -26,7 +28,12 @@ for (const base of roots) {
   for await (const file of walk(path.join(root, base))) {
     const lines = (await readFile(file, 'utf8')).split('\n')
     lines.forEach((line, i) => {
-      if (pattern.test(line)) hits.push(`${path.relative(root, file)}:${i + 1}: ${line.trim()}`)
+      if (pattern.test(line)) {
+        const relative = path.relative(root, file)
+        if (allowlist.get(relative) === undefined || !line.includes(allowlist.get(relative))) {
+          hits.push(`${relative}:${i + 1}: ${line.trim()}`)
+        }
+      }
     })
   }
 }

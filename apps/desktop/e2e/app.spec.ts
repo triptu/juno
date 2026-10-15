@@ -50,9 +50,9 @@ test('answers app.getInfo over the typed IPC bridge', async ({ juno, app }) => {
   await juno.signIn()
   const version = await app.evaluate((electronModule) => electronModule.app.getVersion())
   const electron = await app.evaluate(() => process.versions.electron)
-  // The build line lives in the account menu's diagnostics block.
-  await juno.accountMenu.open()
-  await expect(juno.accountMenu.root.getByText(`Juno ${version} on ${process.platform}, Electron ${electron}`)).toBeVisible()
+  // The build line is in Settings › About.
+  await juno.openSettings('About')
+  await expect(juno.settings.root.getByText(`Juno ${version} on ${process.platform}, Electron ${electron}`)).toBeVisible()
 })
 
 test('switches to the dark theme in place', async ({ win }) => {
@@ -101,7 +101,7 @@ test('exposes only the bridge to the page', async ({ win }) => {
     updates: ['get', 'set', 'restart', 'onChange'],
     app: ['getInfo'],
     engine: ['requestPort', 'restart'],
-    agent: ['requestPort', 'setOpenRouterKey', 'provider', 'setProvider', 'onProvider', 'chooseFolder', 'recoveryPhrase', 'typeRecoveryPhrase'],
+    agent: ['requestPort', 'setOpenRouterKey', 'provider', 'setProvider', 'codex', 'codexSignIn', 'onProvider', 'chooseFolder', 'recoveryPhrase', 'typeRecoveryPhrase'],
     launch: ['setTheme', 'setAccent', 'setDensity', 'setPrivacy', 'setSidebar'],
     contextMenu: ['popup'],
     shell: ['openExternal', 'openInSlack', 'editUndo', 'downloadFile'],

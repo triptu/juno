@@ -4,7 +4,7 @@ import type { ClipboardEvent, DragEvent, KeyboardEvent, ReactNode, Ref, Syntheti
 import { accent, layout, sizes, spacing } from '@juno/tokens/tokens.stylex'
 import { IconButton, Surface, Textarea, type TextareaMark } from '@juno/ui'
 
-/** The open @ or # suggestions (inventory 7.1). */
+/** The open @, # or emoji suggestions (inventory 7.1). */
 export interface ComposerMention {
   /** The offset of the "@" or "#" being typed: the list lines up under it. */
   readonly anchorAt: number
@@ -50,7 +50,7 @@ export interface ComposerProps {
   readonly dropping?: boolean
   /** Picked @people and #channels, drawn as chips in the field. */
   readonly marks?: ReadonlyArray<TextareaMark>
-  /** The @ or # suggestions while they are open. */
+  /** The @, # or emoji suggestions while they are open. */
   readonly mention?: ComposerMention
   /** Sees every key in the field first; true when it took the key (the suggestions' arrows, Enter, Tab, Esc, Backspace). */
   readonly onFieldKey?: (event: KeyboardEvent<HTMLTextAreaElement>) => boolean
@@ -59,7 +59,7 @@ export interface ComposerProps {
 }
 
 /** The field's side of the @ and # suggestions: chips, the caret, the list's anchor and its ARIA wiring. */
-function mentionProps(marks: ComposerProps['marks'], mention: ComposerMention | undefined, onCaret: ComposerProps['onCaret']) {
+export function mentionProps(marks: ComposerProps['marks'], mention: ComposerMention | undefined, onCaret: ComposerProps['onCaret']) {
   return {
     ...(onCaret === undefined ? {} : { onSelect: (event: SyntheticEvent<HTMLTextAreaElement>) => onCaret(event.currentTarget.selectionStart) }),
     ...(marks === undefined ? {} : { marks, 'aria-autocomplete': 'list' as const }),

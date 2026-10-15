@@ -27,6 +27,7 @@ import { bindHost, type BoundHost } from './host/reads'
 import type { HostConnection } from './host/port'
 import { withMcp } from './mcp/app'
 import type { Credentials } from './mcp/types'
+import type { ReviewModel } from './review/review'
 import type { ProviderConnection } from './providers/connection'
 import type { ModelPicker } from './providers/picker'
 import type { Turns, TurnsOptions } from './router/open'
@@ -74,7 +75,7 @@ export interface AgentOptions {
    * Main's keychain and browser bridge for the MCP connections (WP17). With
    * it and `turns`, the agent runs the MCP manager and serves Connections.
    */
-  readonly mcp?: { readonly credentials: Credentials }
+  readonly mcp?: { readonly credentials: Credentials; readonly review?: ReviewModel }
 }
 
 /** The host speaks another AgentHost protocol version than this agent. */
@@ -82,7 +83,7 @@ export class HostProtocolMismatch extends Schema.TaggedError<HostProtocolMismatc
 
 export function startAgent(config: AgentConfig, connection: HostConnection, options: AgentOptions = {}): Promise<AgentHandle> {
   const { renderer } = options
-  const mcp = options.turns !== undefined && options.mcp !== undefined ? withMcp(options.turns, options.mcp.credentials) : undefined
+  const mcp = options.turns !== undefined && options.mcp !== undefined ? withMcp(options.turns, options.mcp.credentials, options.mcp.review) : undefined
   const turns = mcp?.turns ?? options.turns
   return Effect.runPromise(
     Effect.gen(function* () {

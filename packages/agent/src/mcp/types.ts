@@ -30,7 +30,7 @@ export interface Credentials {
 }
 
 export class McpError extends Schema.TaggedError<McpError>()('McpError', {
-  reason: Schema.Literals(['unavailable', 'invalid', 'stale', 'secret', 'destructive']),
+  reason: Schema.Literals(['unavailable', 'invalid', 'stale', 'secret']),
   message: Schema.String,
 }) {}
 

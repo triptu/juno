@@ -119,7 +119,10 @@ export type ActionTarget = { readonly kind: 'stored'; readonly row: MessageRow }
 const storedByClientMsgId = (channel: string, clientMsgId: string): Effect.Effect<MessageRow | undefined, SqlError, StoreWriter> =>
   Effect.gen(function* () {
     const sql = yield* StoreWriter
-    const rows = yield* sql<MessageRow>`SELECT * FROM messages WHERE client_msg_id = ${clientMsgId} AND channel = ${channel}`
+    // The network can post a message twice (`sent.ts`): the copy Juno kept comes first.
+    const rows = yield* sql<MessageRow>`SELECT m.* FROM messages m LEFT JOIN sent_posts s ON s.client_msg_id = m.client_msg_id
+      WHERE m.client_msg_id = ${clientMsgId} AND m.channel = ${channel}
+      ORDER BY CASE WHEN m.ts = s.ts THEN 0 ELSE 1 END, m.ts LIMIT 1`
     return rows[0]
   })
 
@@ -247,6 +250,20 @@ export const queueDelete = (input: DeleteInput): Effect.Effect<ActionRefusal | u
     const { channel, dependsOn, ...fields } = targetFields(target)
     yield* insertAction('delete', channel, dependsOn, fields, input.now)
     return undefined
+  })
+
+/**
+ * A second copy of one of Juno's posts (`sent.ts`): a `delete` row for it
+ * alone. It names the copy by ts and carries no `client_msg_id`, so neither
+ * the list nor the worker takes it for the message Juno kept. Answers false
+ * when the copy already has one.
+ */
+export const queueCopyDelete = (row: MessageRow, now: number): Effect.Effect<boolean, SqlError, StoreWriter | Invalidation> =>
+  Effect.gen(function* () {
+    const actions = yield* channelActions(row.channel)
+    if (actions.some((action) => action.kind === 'delete' && action.payload.ts === row.ts)) return false
+    yield* insertAction('delete', row.channel, null, { ts: row.ts, clientMsgId: null, topics: messageTopics(row) }, now)
+    return true
   })
 
 export interface ReactInput {

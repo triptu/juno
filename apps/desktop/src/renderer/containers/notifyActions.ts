@@ -22,7 +22,7 @@ import {
 } from '@juno/contract'
 import { currentNotificationSettings, junoAvailableAtom, loadNotificationSettings, popupContextMenu, registry, runAction, whyPopoverAtom } from '@juno/state'
 import { askJunoAbout } from './juno/actions'
-import { openNotifications } from './navigation'
+import { openSettings } from './navigation'
 
 /** Sets a Notify me choice: "#design-review: Never", with Undo. */
 export function setNotifyLevel(target: NotifyTargetView, choice: NotifyChoice, label: string): void {
@@ -77,7 +77,7 @@ export function closeWhy(): void {
 /** The popover's Change: Notify me for the setting that decided it, or the Notifications page for the hours. */
 export async function changeFromWhy(why: Why, at: ContextMenuAt): Promise<void> {
   closeWhy()
-  if (why.action.kind === 'hours') return openNotifications()
+  if (why.action.kind === 'hours') return openSettings('notifications')
   if (why.action.kind !== 'change') return
   const { target, name } = why.action
   const settings = await loadNotificationSettings(registry)

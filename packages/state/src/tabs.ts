@@ -1,7 +1,7 @@
 /**
  * Workspace tabs (spec section 6, inventory 4, performance 4.3 and 4.5).
  *
- * A tab shows one place, a topic, a New chat or a page (Home, All topics, Notifications, Preferences, the Juno chat or a Juno page), and keeps its own
+ * A tab shows one place, a topic, a New chat or a page (Home, All topics, Settings, the Juno chat or a Juno page), and keeps its own
  * history of the places it showed, like a browser tab. The rules are pure
  * functions over `Tabs`:
  * - `openPlace`: a place opens in the current tab (a new history entry), or
@@ -10,6 +10,8 @@
  *   that tab; a new tab always opens, so one place can show in several tabs.
  * - `ensureTab`: there is never no tab. Closing the last one, or a launch
  *   with none saved, leaves one tab with what a new tab opens (`newTabPage.ts`).
+ * - `openSettingsSection`: Settings at a section, in the tab that shows
+ *   Settings if one does, where the section replaces the one it showed.
  * - `settleNewChat`: a New chat that sent becomes the topic it sent to, in
  *   place of its own entry, or closes when another tab shows that topic.
  * - `stepHistory` (Back and Forward), `goToEntry` (the history menu).
@@ -30,7 +32,7 @@ import { Option, Schema } from 'effect'
 import * as AsyncResult from 'effect/reactivity/AsyncResult'
 import * as Atom from 'effect/reactivity/Atom'
 import { JunoPage } from '@juno/agent-contract'
-import { prefsGet, prefsSet, type TopicDetail } from '@juno/contract'
+import { prefsGet, prefsSet, SettingsSectionSchema, type SettingsSection, type TopicDetail } from '@juno/contract'
 import { liveQuery, runCommand } from './atoms'
 import type { Registry } from './client'
 import { topicAtom } from './messages'
@@ -38,25 +40,27 @@ import { newChatAtom, newChatTitle } from './newChat'
 import { newTabPageAtom, type NewTabPage } from './newTabPage'
 import { signedInAtom } from './session'
 
-/** What a tab shows: a topic, a New chat (spec section 9), or a page: Home (section 12), All topics (section 11), Notifications or Preferences (section 14), the Juno chat (section 13) or a Juno page (13.10). */
+/** The Juno menu's pages that have a tab of their own. Its Connections and Settings are sections of Settings. */
+export type JunoTabPage = Exclude<JunoPage, 'settings' | 'connections'>
+
+/** What a tab shows: a topic, a New chat (spec section 9), or a page: Home (section 12), All topics (section 11), Settings at one of its sections (section 14), the Juno chat (section 13) or a Juno page (13.10). */
 export type Place =
   | { readonly kind: 'topic'; readonly topicId: string }
   | { readonly kind: 'newChat' }
   | { readonly kind: 'home' }
   | { readonly kind: 'allTopics' }
-  | { readonly kind: 'notifications' }
-  | { readonly kind: 'preferences' }
+  /** One tab for Settings, whichever section it shows. */
+  | { readonly kind: 'settings'; readonly section: SettingsSection }
   | { readonly kind: 'juno' }
-  /** A page behind the Juno menu, or Settings › Juno (SPEC 13.10). */
-  | { readonly kind: 'junoPage'; readonly page: JunoPage }
+  /** A page behind the Juno menu (SPEC 13.10). */
+  | { readonly kind: 'junoPage'; readonly page: JunoTabPage }
 
 export const newChatPlace: Place = { kind: 'newChat' }
 export const homePlace: Place = { kind: 'home' }
 export const allTopicsPlace: Place = { kind: 'allTopics' }
-export const notificationsPlace: Place = { kind: 'notifications' }
-export const preferencesPlace: Place = { kind: 'preferences' }
+export const settingsPlace = (section: SettingsSection): Place => ({ kind: 'settings', section })
 export const junoPlace: Place = { kind: 'juno' }
-export const junoPagePlace = (page: JunoPage): Place => ({ kind: 'junoPage', page })
+export const junoPagePlace = (page: JunoTabPage): Place => ({ kind: 'junoPage', page })
 export const topicPlace = (topicId: string): Place => ({ kind: 'topic', topicId })
 
 /** The places a tab showed, oldest first, and the one it shows. */
@@ -69,6 +73,8 @@ export interface Tab {
   readonly id: string
   readonly pinned: boolean
   readonly history: TabHistory
+  /** The Juno panel is open in this tab (SPEC 7). It shows while the tab shows a topic. */
+  readonly junoPanel?: true
 }
 
 /** A closed tab and where it was in the strip. */
@@ -109,6 +115,7 @@ export function tabTopic(tab: Tab): string | undefined {
   const place = currentPlace(tab)
   return place.kind === 'topic' ? place.topicId : undefined
 }
+/** Settings is one place whatever its section, so it shows in one tab. */
 const samePlace = (a: Place, b: Place) =>
   a.kind === 'topic' ? b.kind === 'topic' && a.topicId === b.topicId : a.kind === 'junoPage' ? b.kind === 'junoPage' && a.page === b.page : a.kind === b.kind
 
@@ -187,6 +194,20 @@ export function ensureTab(tabs: Tabs, place: Place): Tabs {
 
 /** What a new tab shows. */
 export const newTabPlace = (page: NewTabPage): Place => (page === 'home' ? homePlace : newChatPlace)
+
+/**
+ * Settings at `section`. The tab that shows Settings is focused and shows
+ * the section in place of the one it showed, so moving between sections
+ * adds nothing to Back. Otherwise Settings opens as any page does.
+ */
+export function openSettingsSection(tabs: Tabs, section: SettingsSection, options: OpenOptions = {}): Tabs {
+  const at = tabs.tabs.findIndex((tab) => currentPlace(tab).kind === 'settings')
+  if (at < 0) return openPlace(tabs, settingsPlace(section), options)
+  const tab = tabs.tabs[at]!
+  const shown = currentPlace(tab)
+  const next = shown.kind === 'settings' && shown.section === section ? tab : { ...tab, history: { ...tab.history, entries: tab.history.entries.with(tab.history.index, settingsPlace(section)) } }
+  return activateTab(next === tab ? tabs : { ...tabs, tabs: tabs.tabs.with(at, next) }, tab.id)
+}
 
 /**
  * After a New chat in tab `tabId` sent to `topicId`: the tab shows the topic
@@ -292,6 +313,15 @@ export function setPinned(tabs: Tabs, id: string, pinned: boolean): Tabs {
   return { ...tabs, tabs: rest.toSpliced(pinnedCount(rest), 0, { ...tab, pinned }) }
 }
 
+/** Opens or closes the Juno panel in one tab; the other tabs keep theirs. */
+export function setJunoPanel(tabs: Tabs, id: string, open: boolean): Tabs {
+  const at = tabs.tabs.findIndex((tab) => tab.id === id)
+  const tab = tabs.tabs[at]
+  if (tab === undefined || (tab.junoPanel === true) === open) return tabs
+  const { junoPanel: _open, ...rest } = tab
+  return { ...tabs, tabs: tabs.tabs.with(at, open ? { ...rest, junoPanel: true } : rest) }
+}
+
 /** The next (1) or previous (-1) tab, wrapping around. */
 export function cycleTab(tabs: Tabs, step: 1 | -1): Tabs {
   const count = tabs.tabs.length
@@ -334,15 +364,32 @@ export const TABS_PREF = 'tabs'
 
 const PlaceJson = Schema.Union([
   Schema.Struct({ kind: Schema.Literal('topic'), topicId: Schema.String }),
-  Schema.Struct({ kind: Schema.Literals(['newChat', 'home', 'allTopics', 'notifications', 'preferences', 'juno']) }),
+  Schema.Struct({ kind: Schema.Literals(['newChat', 'home', 'allTopics', 'juno']) }),
+  Schema.Struct({ kind: Schema.Literal('settings'), section: SettingsSectionSchema }),
+  // Saved before Settings was one page: Notifications, Preferences, and Settings › Juno and Connections as Juno pages.
+  Schema.Struct({ kind: Schema.Literals(['notifications', 'preferences']) }),
   Schema.Struct({ kind: Schema.Literal('junoPage'), page: JunoPage }),
 ])
+
+/** A saved place as it reads today: the pages that became sections of Settings open there. */
+function placeOf(saved: typeof PlaceJson.Type): Place {
+  switch (saved.kind) {
+    case 'notifications':
+      return settingsPlace('notifications')
+    case 'preferences':
+      return settingsPlace('general')
+    case 'junoPage':
+      return saved.page === 'settings' ? settingsPlace('juno') : saved.page === 'connections' ? settingsPlace('connections') : junoPagePlace(saved.page)
+    default:
+      return saved
+  }
+}
 /**
  * A saved tab, or one saved before history, when a tab's id was its
  * topic's. Tabs saved with the old `stealth` flag still read back; the flag
  * is dropped.
  */
-const TabJson = Schema.Union([Schema.Struct({ id: Schema.String, pinned: Schema.Boolean, place: PlaceJson }), Schema.Struct({ id: Schema.String })])
+const TabJson = Schema.Union([Schema.Struct({ id: Schema.String, pinned: Schema.Boolean, place: PlaceJson, junoPanel: Schema.optionalKey(Schema.Boolean) }), Schema.Struct({ id: Schema.String })])
 const TabsJson = Schema.Struct({
   tabs: Schema.Array(TabJson),
   active: Schema.NullOr(Schema.String),
@@ -357,19 +404,25 @@ export function parseTabs(value: unknown): Tabs {
     onSome: (saved) => {
       const ids = new Set(saved.tabs.map((tab) => tab.id))
       if (ids.size !== saved.tabs.length) return noTabs
-      const tabs = saved.tabs.map((tab): Tab => ('place' in tab ? { id: tab.id, pinned: tab.pinned, history: { entries: [tab.place], index: 0 } } : freshTab(tab.id, topicPlace(tab.id))))
+      const read = saved.tabs.map((tab): Tab =>
+        'place' in tab ? { id: tab.id, pinned: tab.pinned, history: { entries: [placeOf(tab.place)], index: 0 }, ...(tab.junoPanel === true ? { junoPanel: true } : {}) } : freshTab(tab.id, topicPlace(tab.id)),
+      )
+      // Old Preferences, Notifications and Settings › Juno tabs all read as Settings, which has one tab.
+      const firstSettings = read.find((tab) => currentPlace(tab).kind === 'settings')
+      const tabs = read.filter((tab) => tab === firstSettings || currentPlace(tab).kind !== 'settings')
+      const kept = new Set(tabs.map((tab) => tab.id))
       const ordered = [...tabs.filter((tab) => tab.pinned), ...tabs.filter((tab) => !tab.pinned)]
-      const active = saved.active !== null && ids.has(saved.active) ? saved.active : ordered[0]?.id
-      const recent = saved.recent.filter((id) => ids.has(id))
+      const active = saved.active !== null && kept.has(saved.active) ? saved.active : ordered[0]?.id
+      const recent = saved.recent.filter((id) => kept.has(id))
       return { tabs: ordered, active, recent: active === undefined ? recent : touch(recent, active), closed: [] }
     },
   })
 }
 
-/** What `TABS_PREF` holds: each tab with the place it shows. */
+/** What `TABS_PREF` holds: each tab with the place it shows, and whether its Juno panel is open. */
 export function savedTabs(tabs: Tabs): unknown {
   return {
-    tabs: tabs.tabs.map((tab) => ({ id: tab.id, pinned: tab.pinned, place: currentPlace(tab) })),
+    tabs: tabs.tabs.map((tab) => ({ id: tab.id, pinned: tab.pinned, place: currentPlace(tab), ...(tab.junoPanel === true ? { junoPanel: true } : {}) })),
     active: tabs.active ?? null,
     recent: tabs.recent,
   }

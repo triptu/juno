@@ -18,6 +18,7 @@ import type {
   CardBinding,
   ActivityPage,
   ConnectionId,
+  ReviewRule,
   ConnectionsPage,
   JunoSettingsPage,
   MemoryPage,
@@ -107,7 +108,10 @@ export function junoPageActions(registry: Registry) {
     editPin: (id: PinId, revision: Revision, text: string) => outcome(call(registry, 'agent.remembers.edit', { opId: op(), id, revision, text })),
     removePin: (id: PinId, revision: Revision) => outcome(call(registry, 'agent.remembers.remove', { opId: op(), id, revision })),
     schedule: (id: ScheduleId, revision: Revision, action: 'pause' | 'resume' | 'delete') => outcome(call(registry, 'agent.scheduled.action', { opId: op(), id, revision, action })),
-    tier: (id: ConnectionId, tool: string, schemaHash: string, tier: 0 | 3) => outcome(call(registry, 'agent.connections.tier', { opId: op(), id, tool, schemaHash, tier })),
+    /** One tool's Enabled switch or auto-review rule. */
+    tool: (id: ConnectionId, tool: string, change: { readonly enabled?: boolean; readonly review?: ReviewRule }) => outcome(call(registry, 'agent.connections.tool', { opId: op(), id, tool, ...change })),
+    /** The connection's own auto-review rule. */
+    rule: (id: ConnectionId, review: ReviewRule) => outcome(call(registry, 'agent.connections.rule', { opId: op(), id, review })),
     /** Connect waits for the browser sign-in when the server asks for one. */
     connection: (id: ConnectionId, action: 'enable' | 'disable' | 'connect' | 'disconnect' | 'remove') => outcome(call(registry, 'agent.connections.action', { opId: op(), id, action })),
     addConnection: (label: string, url: string) => outcome(call(registry, 'agent.connections.add', { opId: op(), label, url })),

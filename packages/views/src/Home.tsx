@@ -33,12 +33,14 @@ export interface HomeProps {
   readonly onSort: (itemId: string, to: Exclude<AutomatedPlace, 'ask'>) => void
   /** Right-click on Automated's row: the conversation's menu, with Ignore. */
   readonly onItemMenu: (itemId: string) => void
-  /** Opens the Juno chat. */
-  readonly onAsk: () => void
+  /** Opens the Juno chat. Absent with AI assist off, which leaves the field out. */
+  readonly onAsk?: () => void
   /** A running job's state line, shown in the field in place of "Ask Juno…" (SPEC 13.4). */
   readonly askLine?: string
   /** "Browse all topics". Fires on mouse down; `event.metaKey` asks for a new tab. */
   readonly onBrowseAll?: (event: ActivateEvent) => void
+  /** The first sync is still running: `line` says so and there are no items yet. */
+  readonly loading?: boolean
 }
 
 /**
@@ -47,12 +49,12 @@ export interface HomeProps {
  * Every size is fixed before data arrives, so nothing moves when a title
  * line is rewritten: a title is one ellipsised line in a 52px row.
  */
-export function Home({ scene, title, line, items, done, now, caughtUp, enter = true, onOpen, onMarkDone, onResolveAll, onSort, onItemMenu, onAsk, askLine, onBrowseAll }: HomeProps) {
+export function Home({ scene, title, line, items, done, now, caughtUp, enter = true, onOpen, onMarkDone, onResolveAll, onSort, onItemMenu, onAsk, askLine, onBrowseAll, loading = false }: HomeProps) {
   const headingId = useId()
   let step = 0
   const part = () => (enter ? [styles.rise, styles.delay(step++)] : [])
   return (
-    <div data-home="" {...stylex.props(styles.root)}>
+    <div data-home="" data-home-loading={loading ? '' : undefined} aria-busy={loading || undefined} {...stylex.props(styles.root)}>
       <div {...stylex.props(styles.column)}>
         <div {...stylex.props(...part())}>
           <HomeScene name={scene} />
@@ -82,13 +84,15 @@ export function Home({ scene, title, line, items, done, now, caughtUp, enter = t
             ))}
           </ul>
         )}
-        <button type="button" aria-label="Ask Juno" aria-keyshortcuts="Meta+J" onClick={onAsk} {...stylex.props(styles.ask, ...part())}>
-          <Icon icon={Sparkle} size={16} weight="duotone" />
-          <span data-ask-line={askLine === undefined ? undefined : ''} {...stylex.props(styles.askText)}>
-            {askLine ?? 'Ask Juno…'}
-          </span>
-          <Kbd look="key">⌘J</Kbd>
-        </button>
+        {onAsk === undefined ? null : (
+          <button type="button" aria-label="Ask Juno" aria-keyshortcuts="Meta+J" onClick={onAsk} {...stylex.props(styles.ask, ...part())}>
+            <Icon icon={Sparkle} size={16} weight="duotone" />
+            <span data-ask-line={askLine === undefined ? undefined : ''} {...stylex.props(styles.askText)}>
+              {askLine ?? 'Ask Juno…'}
+            </span>
+            <Kbd look="key">⌘J</Kbd>
+          </button>
+        )}
         {caughtUp && onBrowseAll !== undefined ? (
           <button type="button" {...activateHandlers<HTMLButtonElement>(onBrowseAll)} {...stylex.props(styles.quietLink, ...part())}>
             Browse all topics
@@ -209,8 +213,8 @@ function HomeRow({ item, done, now, onOpen, onMarkDone, onResolveAll, onSort, on
 const HOVER = '@media (hover: hover)'
 
 const rise = stylex.keyframes({
-  from: { opacity: 0, transform: `translateY(${motion['--rise-stagger']})` },
-  to: { opacity: 1, transform: 'translateY(0)' },
+  from: { opacity: 0 },
+  to: { opacity: 1 },
 })
 
 const styles = stylex.create({

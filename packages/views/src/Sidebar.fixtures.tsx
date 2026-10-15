@@ -1,7 +1,7 @@
 import { defineFixtures, scene, type FixtureFrame } from '@juno/ui'
 import { AccountMenu } from './AccountMenu'
 import { AppearanceSettings } from './AppearanceSettings'
-import { EngineNotice } from './EngineStatusView'
+import { EngineNotice, SyncProgress } from './EngineStatusView'
 import { PrivacyOn } from './fixtures/privacy'
 import { hostileIds, newThreadsById, NOW, pinnedIds, recentIds, rows, rowsById } from './fixtures/topics'
 import { Sidebar, type SidebarProps, type SidebarViewPill } from './Sidebar'
@@ -154,6 +154,9 @@ export default defineFixtures(
       'caught-up': scene(() => full({ filter: { kind: 'all', unreadOnly: true }, dots: { channels: false, dms: false } }, { sections: [], empty: 'caught-up', onClearFilters: noop })),
       filtered: scene(() => full({ filter: { kind: 'dms', unreadOnly: false }, dots: { channels: true, dms: false } }, { sections: [], empty: 'filtered', onClearFilters: noop, onViewAll: noop })),
       quiet: scene(() => full({ dots: { channels: false, dms: false } }, { sections: [], empty: 'quiet', onViewAll: noop })),
+      // The first sync has not brought a topic yet.
+      syncing: scene(() => full({ dots: { channels: false, dms: false } }, { sections: [], empty: 'syncing' })),
+      'empty-view': scene(() => full({ dots: { channels: false, dms: false } }, { sections: [], empty: 'empty-view', onEditView: noop })),
       // Nothing has arrived from the engine yet: the chrome paints, the list stays blank.
       loading: scene(() => full({ dots: { channels: false, dms: false } }, { sections: [] })),
     },
@@ -167,6 +170,7 @@ export default defineFixtures(
       offline: scene(() => full({ status: <EngineNotice kind="offline" /> })),
       'rate-limited': scene(() => full({ status: <EngineNotice kind="rate-limited" /> })),
       stopped: scene(() => full({ status: <EngineNotice kind="stopped" onRestart={noop} /> })),
+      'first sync': scene(() => full({ status: <SyncProgress done={30} total={143} /> })),
     },
     Nav: {
       // Home tab active, or no tab open.

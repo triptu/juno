@@ -6,7 +6,7 @@ import { interactive } from './internal/interactive'
 
 const HOVER = '@media (hover: hover)'
 
-export type ListRowHeight = 44 | 48 | 52
+export type ListRowHeight = 32 | 44 | 48 | 52
 
 export interface ListRowProps extends Omit<HTMLAttributes<HTMLDivElement>, 'style' | 'className' | 'onSelect' | 'onClick' | 'onPointerDown' | 'onKeyDown'> {
   readonly minHeight?: ListRowHeight
@@ -25,8 +25,8 @@ export interface ListRowProps extends Omit<HTMLAttributes<HTMLDivElement>, 'styl
   readonly selected?: boolean
   /** Draw the 1px rule under the row. Default true. */
   readonly divider?: boolean
-  /** Padding preset: `settings` 8 14 (the same inset at both ends), `table` 8 12, `log` 6 4. */
-  readonly padding?: 'settings' | 'table' | 'log'
+  /** Padding preset: `settings` 8 14 (the same inset at both ends), `table` 8 12, `log` 6 4, `navigation` 0 12 with a fixed leading slot and 8px gap. */
+  readonly padding?: 'settings' | 'table' | 'log' | 'navigation'
   readonly children?: ReactNode
 }
 
@@ -62,10 +62,11 @@ export function ListRow({
         isButton && interactive.focusRingInset,
         isButton && styles.button,
         selected && styles.selected,
+        padding === 'navigation' && styles.navigation,
       )}
     >
-      {leading !== undefined ? <span {...stylex.props(styles.leading)}>{leading}</span> : null}
-      <span {...stylex.props(styles.body)}>{children}</span>
+      {leading !== undefined ? <span {...stylex.props(styles.leading, padding === 'navigation' && styles.navigationLeading)}>{leading}</span> : null}
+      <span {...stylex.props(styles.body, padding === 'navigation' && styles.navigationBody)}>{children}</span>
       {trailing !== undefined ? <span {...stylex.props(styles.trailing)}>{trailing}</span> : null}
     </div>
   )
@@ -81,6 +82,16 @@ const styles = stylex.create({
     contain: 'content',
     userSelect: 'none',
     color: colors['--foreground-default'],
+  },
+  navigation: {
+    gap: spacing['--space-2'],
+    borderRadius: radii['--radius-xl'],
+  },
+  navigationLeading: {
+    width: sizes['--control-20'],
+  },
+  navigationBody: {
+    gap: spacing['--space-1'],
   },
   divider: {
     borderBottomWidth: '1px',
@@ -125,12 +136,17 @@ const styles = stylex.create({
 })
 
 const heights = stylex.create({
+  32: { minHeight: sizes['--control-32'] },
   44: { minHeight: sizes['--row-44'] },
   48: { minHeight: sizes['--row-48'] },
   52: { minHeight: sizes['--row-52'] },
 })
 
 const paddings = stylex.create({
+  navigation: {
+    paddingBlock: 0,
+    paddingInline: spacing['--space-3'],
+  },
   // The same 14px at both ends: a row's text starts where its last control ends from the other edge.
   settings: {
     paddingBlock: spacing['--space-2'],

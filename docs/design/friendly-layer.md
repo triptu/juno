@@ -254,7 +254,7 @@ Keep SPEC §17: sentence case, verb-first buttons, no emoji in chrome, undo over
 | Sign-in, session expired | Engine session expired | Slack signed you out / Sign in again to pick up where you left off. [button: Sign in] |
 | Offline | Engine offline | You're offline / Juno shows what it has and catches up when you're back. |
 | Rate limited | Engine rate limited | Slack asked us to slow down / Juno will catch up in a minute. |
-| Catching up | Engine catching up, 12 of 40 | Catching up, 12 of 40 channels |
+| Catching up | Engine catching up, 12 of 40 | First sync only, under the sidebar's filters where the offline line goes: a thin line that fills, and "Syncing 30 of 143" ("Syncing" while the conversations are still being listed). Gone when the first sync is done; later catch-ups show nothing. Offline and rate limited take its place while they last. |
 | Send failed | | Couldn't send that. Your message is still in the composer. [button: Try again] |
 
 Rules that fall out of the table:

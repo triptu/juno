@@ -185,7 +185,7 @@ tests, so test a service through its public layer.
   `packages/state/src/transport.ts` sets it high: one port carries everything.
 - **The test clock stops time.** Under `it.effect`, sleeps and debounce windows never end on their own.
   Store tests call `TestClock.adjust(DEFAULT_LIVE_QUERY_DEBOUNCE)`; Slack client tests that make
-  several background calls in a row set `backgroundMinIntervalMillis: 0` (the lane spaces calls 1.5 s)
+  several background calls in a row set `backgroundMinIntervalMillis: 0` (the lane spaces calls per method)
   or use `it.live`.
 - **Two servers in one build need `Layer.fresh`.** Layers are shared by reference within one build, so
   serving a second `RpcGroup` with `RpcServer.layerProtocolWorkerRunner` on another transport reuses

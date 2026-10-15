@@ -9,7 +9,7 @@ const base: BackupSectionProps = { page: settings, now: NOW, onBackupFolder: noo
 // The frame sizes a lone component to its content; the page fills the frame as it fills its tab.
 const column = stylex.create({ fill: { width: '100%' } })
 
-/** In the settings column, at the width Settings › Juno gives it. */
+/** In the settings column, at the width Settings gives it. */
 const inPage = (props: Partial<BackupSectionProps> = {}): Fixture<BackupSectionProps> =>
   scene(() => (
     <div {...stylex.props(column.fill)}>

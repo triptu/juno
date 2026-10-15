@@ -2,6 +2,7 @@
 // where it goes, pick a thread first, change the destination, a preview that
 // never marks read, a first DM opened with conversations.open, and Home from
 // the sidebar.
+import { SELF_ID } from '@juno/fake-slack'
 import { expect, test } from './fixtures'
 
 test.describe.configure({ timeout: 120_000 })
@@ -62,7 +63,7 @@ test('a thread picked first fills in the conversation, and the reply lands in th
   await newChat.expectConversation('eng')
   await newChat.expectThread(POSTGRES)
   await tabs.expectActive(POSTGRES)
-  await newChat.expectPreview('Draft plan is in the doc')
+  await expect(newChat.root.getByRole('list', { name: 'Frequent conversations' })).toBeVisible()
 
   await newChat.send()
   await topic.expectTitle(POSTGRES)
@@ -73,7 +74,7 @@ test('a thread picked first fills in the conversation, and the reply lands in th
   expect(posted?.args['thread_ts']).toBe(root.ts)
 })
 
-test('changing the destination before sending swaps the preview and sets the thread back to Main', async ({ juno, fake }) => {
+test('changing the destination before sending keeps Frequent and sets the thread back to Main', async ({ juno, fake }) => {
   await juno.signIn()
   await juno.waitForSync()
   const { tabs, newChat, topic } = juno
@@ -86,7 +87,7 @@ test('changing the destination before sending swaps the preview and sets the thr
   await newChat.pickConversation('maya', 'Maya')
   await newChat.expectConversation('Maya')
   await newChat.expectThread('Main')
-  await newChat.expectPreview(OFFSITE)
+  await expect(newChat.root.getByRole('list', { name: 'Frequent conversations' })).toBeVisible()
   await expect(newChat.composer).toHaveValue('Sending this to Maya instead')
 
   await newChat.send()
@@ -96,7 +97,7 @@ test('changing the destination before sending swaps the preview and sets the thr
   expect(posted.map((call) => [call.args['channel'], call.args['thread_ts']])).toEqual([['D0MAYA', undefined]])
 })
 
-test('the preview never marks anything read', async ({ juno, slack }) => {
+test('choosing a destination never marks anything read', async ({ juno, slack }) => {
   await juno.signIn()
   await juno.waitForSync()
   const { tabs, newChat, sidebar } = juno
@@ -110,12 +111,12 @@ test('the preview never marks anything read', async ({ juno, slack }) => {
 
   await tabs.newTabButton.click()
   await newChat.pickConversation('eng', 'eng')
-  await newChat.expectPreview('Replica lag is under a second now')
+  await expect(newChat.root.getByRole('list', { name: 'Frequent conversations' })).toBeVisible()
   await slack.expectNoMarks()
   await engMain.expectUnread(unread)
 })
 
-test('a person never messaged: the start of the conversation, then conversations.open on send', async ({ juno, fake }) => {
+test('a person never messaged: keep Frequent, then conversations.open on send', async ({ juno, fake }) => {
   await juno.signIn()
   await juno.waitForSync()
   const { tabs, newChat, topic } = juno
@@ -126,7 +127,7 @@ test('a person never messaged: the start of the conversation, then conversations
   await expect(newChat.option('Jonas')).toContainText('No messages yet')
   await newChat.option('Jonas').click()
   await newChat.expectConversation('Jonas')
-  await newChat.expectNote('This is the start of your conversation with Jonas.')
+  await expect(newChat.root.getByRole('list', { name: 'Frequent conversations' })).toBeVisible()
   expect(fake.calls.some((call) => call.method === 'conversations.open')).toBe(false)
 
   await newChat.write('Welcome aboard. Your laptop arrives Monday.')
@@ -216,4 +217,38 @@ test('Home opens from the sidebar in the current tab; a plain open focuses its t
   await expect(tabs.tab('Home')).toHaveCount(2)
   await tabs.expectActiveAt('Home', 1)
   await juno.home.expectShown()
+})
+
+
+test('frequent destinations choose where a new message is sent', async ({ juno, fake }) => {
+  // Seed before sign-in so boot history, rather than socket timing, decides the order.
+  for (let i = 0; i < 12; i++) fake.injectMessage({ channel: 'C0ENG', user: SELF_ID, text: `Frequent send ${i}` })
+  fake.injectMessage({ channel: 'C0PRODUCT', user: SELF_ID, text: 'Less frequent send' })
+  await juno.signIn()
+  await juno.waitForSync()
+  await juno.tabs.newTabButton.click()
+  const list = juno.newChat.root.getByRole('list', { name: 'Frequent conversations' })
+  const rows = list.getByRole('button')
+  await expect(rows).toHaveCount(6)
+  await expect(rows.first()).toHaveText('eng')
+  await rows.first().dispatchEvent('pointerdown', { button: 0, pointerType: 'mouse' })
+  await juno.newChat.expectConversation('eng')
+  await expect(juno.newChat.composer).toBeFocused()
+  await expect(rows.first()).toHaveAttribute('aria-pressed', 'true')
+  // The list remains, and choosing another row with the keyboard changes the chip.
+  const next = rows.nth(1)
+  const nextName = await next.innerText()
+  await rows.first().focus()
+  await juno.win.keyboard.press('Tab')
+  await expect(next).toBeFocused()
+  await next.press('Space')
+  await juno.newChat.expectConversation(nextName)
+  await expect(juno.newChat.composer).toBeFocused()
+  await rows.first().focus()
+  await rows.first().press('Enter')
+  await juno.newChat.write('The release checklist is ready.')
+  await juno.newChat.send()
+  await juno.topic.expectMessage('The release checklist is ready.')
+  await expect.poll(() => fake.messages('C0ENG').some(message => message.text === 'The release checklist is ready.')).toBe(true)
+  expect(fake.calls.filter(call => call.method === 'chat.postMessage').map(call => call.args['channel'])).toEqual(['C0ENG'])
 })

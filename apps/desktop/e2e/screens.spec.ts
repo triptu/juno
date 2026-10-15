@@ -167,7 +167,7 @@ test('the checks on send: the wrong-place bar, the clarity bar and the audience 
     await win.waitForTimeout(300)
     await win.screenshot({ path: resolve(screens, name) })
   }
-  // Preferences opens in the active tab, so the theme is set before the topic opens.
+  // Settings opens in the active tab, so the theme is set before the topic opens.
   for (const theme of ['Light', 'Dark'] as const) {
     await juno.setTheme(theme)
     await juno.sidebar.row('#eng').open()

@@ -5,9 +5,19 @@ module actionsProtocol {
   const drainLimit: int
   type Payload = { connection: int, account: int, destination: int, tool: int,
     schema: int, args: int, precondition: int, ops: List[int] }
-  type Intent = { id: int, rev: int, payload: Payload, tier: int, deduped: bool, source: int }
+  // `conn`: a connection tool (MCP), which the reviewer may run without a card.
+  // `clean`: the run that proposed it had read nothing untrusted. `cause` is a
+  // ghost: "owner" when the owner's words are a reason for the call,
+  // "untrusted" when only text the run read is (SPEC 13.9, auto-review).
+  type Intent = { id: int, rev: int, payload: Payload, tier: int, deduped: bool, source: int,
+    conn: bool, clean: bool, cause: str }
   type Approval = { id: int, child: int, rev: int, digest: Payload, batch: int }
-  type Authorization = { id: int, intent: Intent, approval: int, consumed: bool, epoch: int, grant: bool }
+  // `review`: authorized with no click because the reviewer and the owner's rule allowed it.
+  type Authorization = { id: int, intent: Intent, approval: int, consumed: bool, epoch: int, grant: bool, review: bool }
+  // The reviewer's two answers about one intent revision: how explicit the
+  // owner's intent was ("explicit", "implied", "notAsked", or "failed" when
+  // the model call failed or timed out), and whether the call can be undone.
+  type Review = { id: int, rev: int, intent: str, reversible: bool }
   type Attempt = { id: int, auth: int, child: int, payload: Payload, key: int }
   type Receipt = { attempt: int, child: int, payload: Payload }
   // `pauses` is how many Pauses had happened when it was minted: Pause revokes
@@ -32,7 +42,9 @@ module actionsProtocol {
     queued: bool, admissions: List[Occurrence], starts: List[Occurrence],
     quiet: bool, deliverNow: bool, notifications: int,
     spends: Set[Spend], nextSpend: int, day: int, caps: int -> int, capReductions: int -> int, raiseLog: List[Raise], overCapAdmissions: int,
-    sealed: bool, label: str, target: int
+    sealed: bool, label: str, target: int,
+    // The owner's auto-review rule for the connection tool: "auto", "always" (ask) or "never" (ask).
+    rule: str, reviews: Set[Review]
   }
   var s: State
   var before: State
@@ -56,7 +68,8 @@ module actionsProtocol {
     schedule: false, scheduleRev: 1, scheduleAuthority: "none", scheduleProposal: 0, scheduleApproved: 0,
     wake: { schedule: 1, rev: 1, due: 1 }, queued: false, admissions: List(), starts: List(),
     quiet: false, deliverNow: false, notifications: 0,
-    spends: Set(), nextSpend: 1, day: 0, caps: days.mapBy(_ => 8), capReductions: days.mapBy(_ => 0), raiseLog: List(), overCapAdmissions: 0, sealed: false, label: "init", target: 0
+    spends: Set(), nextSpend: 1, day: 0, caps: days.mapBy(_ => 8), capReductions: days.mapBy(_ => 0), raiseLog: List(), overCapAdmissions: 0, sealed: false, label: "init", target: 0,
+    rule: "auto", reviews: Set()
   }
   pure val days = 0.to(2)
   // A dollar is 4 units; the default cap is $2.
@@ -72,13 +85,47 @@ module actionsProtocol {
   val mayAuthorize = s.active and s.epoch == s.localEpoch and not(s.paused or s.off or s.crashed)
   def liveGrant(k: int): bool = s.grants.exists(g => g.target == k and g.opClass == 2 and g.source == s.gen)
   action idle = s' = { ...s, label: "blocked" }
-  action propose(k: int, tier: int, deduped: bool): bool = {
+  action proposeWith(k: int, tier: int, deduped: bool, conn: bool, cause: str): bool = {
     val rev = s.current.get(k) + 1
     val p = { ...payload(k), args: rev, schema: s.schema, account: s.account,
       connection: s.connection, precondition: s.precondition }
-    s' = { ...s, intents: s.intents.union(Set({ id: k, rev: rev, payload: p, tier: tier, deduped: deduped, source: s.gen })),
+    // Only a run that read untrusted text can propose a call that text alone asked for.
+    if (cause == "untrusted" and s.clean) idle else
+    s' = { ...s, intents: s.intents.union(Set({ id: k, rev: rev, payload: p, tier: tier, deduped: deduped, source: s.gen,
+      conn: conn, clean: s.clean, cause: cause })),
       current: s.current.set(k, rev), label: "propose", target: k }
   }
+  action propose(k: int, tier: int, deduped: bool): bool = proposeWith(k, tier, deduped, false, "owner")
+  // A connection tool call that is not on the read list (Tier 3).
+  action proposeConn(k: int, cause: str): bool = proposeWith(k, 3, false, true, cause)
+  // The auto-review: one decision-model call per call, made once. It sees only
+  // the owner's own words in the run and the proposed call, so a call that
+  // only untrusted text asked for is "notAsked" whatever that text says.
+  // `untrustedIntent` is the bug that also shows it the text the run read.
+  action reviewWith(k: int, answer: str, reversible: bool, bug: str): bool = {
+    nondet i = currentIntent(k).oneOf()
+    val said = if (i.cause == "untrusted" and answer != "failed" and bug != "untrustedIntent") "notAsked" else answer
+    if (not(i.conn) or s.reviews.exists(r => r.id == k and r.rev == i.rev)) idle else
+    s' = { ...s, reviews: s.reviews.union(Set({ id: k, rev: i.rev, intent: said, reversible: reversible and said != "failed" })),
+      label: "review", target: k }
+  }
+  // Settings › Connections: only the owner sets a rule.
+  action setRule(rule: str): bool = s' = { ...s, rule: rule, label: "rule" }
+  pure def reviewMatches(st: State, i: Intent, answers: Set[str], needReversible: bool): bool =
+    st.reviews.exists(r => r.id == i.id and r.rev == i.rev and answers.contains(r.intent) and (r.reversible or not(needReversible)))
+  // Whether the reviewer and the owner's rule let this connection call run
+  // with no click. Always ask: never. Auto: an explicit, reversible review.
+  // Never ask: a call from a clean run, or one the owner's words at least
+  // implied; untrusted text alone still asks. A failed review asks.
+  pure def reviewAllows(st: State, i: Intent): bool = i.conn and i.tier == 3 and st.rule != "always" and
+    (if (st.rule == "never") i.clean or reviewMatches(st, i, Set("explicit", "implied"), false)
+     else reviewMatches(st, i, Set("explicit"), true))
+  // The same rule with one bug enabled: `alwaysIgnored`, `neverTaint`, `failOpen`.
+  def reviewAllowsWith(i: Intent, bug: str): bool =
+    if (bug == "alwaysIgnored") i.conn and reviewMatches(s, i, Set("explicit"), true)
+    else if (bug == "neverTaint") i.conn and s.rule == "never"
+    else if (bug == "failOpen") i.conn and (reviewAllows(s, i) or reviewMatches(s, i, Set("failed"), false))
+    else reviewAllows(s, i)
   // A click identifies one immutable child. A batch click is the ordered
   // expansion into these child clicks, never a reusable batch transport token.
   // A card runs once and has no retry button, so a click on a child that was
@@ -113,15 +160,17 @@ module actionsProtocol {
       (bug == "reuse" or not(used.contains(a.id))) and
       (bug == "retry" or not(s.auths.exists(a => a.intent.id == k)) or i.deduped))
     val grant = i.tier == 2 and s.ownerRun and s.clean and liveGrant(k)
+    val reviewed = reviewAllowsWith(i, bug)
     val allowed = (mayAuthorize or bug == "owner" or bug == "pause") and
       (valid(i) or bug == "current") and
       (not(i.deduped) or s.auths.forall(a => a.intent.id != k or a.intent.payload == i.payload)) and (i.tier < 4 or bug == "tier4") and
       (not(done(k)) or bug == "batch") and
-      (approvals != Set() or grant or bug == "grant" or bug == "tier4" or bug == "batch")
+      (approvals != Set() or grant or reviewed or bug == "grant" or bug == "tier4" or bug == "batch")
     if (allowed) {
       nondet approval = (if (approvals == Set()) Set(0) else approvals.map(a => a.id)).oneOf()
+      val byReview = approval == 0 and reviewed and not(grant)
       s' = { ...s, auths: s.auths.union(Set({ id: s.nextAuth, intent: i, approval: approval,
-        consumed: bug != "consume", epoch: s.localEpoch, grant: approval == 0 })),
+        consumed: bug != "consume", epoch: s.localEpoch, grant: approval == 0 and not(byReview), review: byReview })),
         nextAuth: s.nextAuth + 1, label: "authorize", target: k }
     } else idle
   }
@@ -318,7 +367,7 @@ module actionsProtocol {
 
   val newAuths = s.auths.exclude(before.auths)
   val intentBeforeDispatch = newAuths.forall(a => before.intents.contains(a.intent)) and before.intents.subseteq(s.intents)
-  val approvalExact = newAuths.forall(a => a.grant or before.approvals.exists(p =>
+  val approvalExact = newAuths.forall(a => a.grant or a.review or before.approvals.exists(p =>
     p.id == a.approval and p.child == a.intent.id and p.rev == a.intent.rev and p.digest == a.intent.payload and
     (p.batch == 0 or (p.batch == before.batchId and before.expanded == before.batchOrder and before.batchOrder.listSet().contains(a.intent)))))
   val approvalCurrentAtAuthorization = newAuths.forall(a => a.intent.rev == before.current.get(a.intent.id) and
@@ -351,7 +400,16 @@ module actionsProtocol {
     (s.label == "scheduleClick" and before.scheduleProposal > 0 and before.scheduleApproved == before.scheduleProposal) or
     (s.label == "scheduleMenu" and beforeMayAuthorize)
   val tier4NeverDispatched = s.auths.forall(a => a.intent.tier < 4)
-  val allWritesGated = s.attempts.listSet().forall(t => s.auths.exists(a => a.id == t.auth and a.consumed and a.intent.payload == t.payload))
+  // Every write runs under one consumed authorization of exactly its payload:
+  // an owner click, a live grant (Tier 2), or, for a connection tool only, the
+  // reviewer-gated rule (`reviewGated`).
+  val allWritesGated = s.attempts.listSet().forall(t => s.auths.exists(a => a.id == t.auth and a.consumed and a.intent.payload == t.payload and
+    (a.approval != 0 or (a.grant and a.intent.tier <= 2) or (a.review and a.intent.conn) or not(a.grant or a.review))))
+  // A no-click connection call ran only as the owner's rule and the reviewer's answers allow.
+  val reviewGated = newAuths.forall(a => not(a.review) or reviewAllows(before, a.intent))
+  // Untrusted text never authorizes: a call that only text the run read asked
+  // for is never run without a click, under any rule.
+  val untrustedNeverAuthorizes = s.auths.forall(a => not(a.review) or a.intent.cause == "owner")
   // This is the local ownership authority only. WP4 deliberately disproves
   // the stronger cross-device interpretation without an external fence.
   val currentOwnerAuthorizes = newAuths.forall(a => before.active and a.epoch == before.epoch)
@@ -398,7 +456,7 @@ module actionsProtocol {
     currentOwnerAuthorizes and pauseBlocksAuthorization and quietHoursHoldNotifications and scheduleGrantValid and
     occurrenceAdmissionOnce and cancelWinsBeforeAdmission and batchEffectsIndependent and outcomeEvidenceStable and
     scheduleFromOwnerAuthority and cleanRunForNoClick and capHard and oneRaisePerClick and pauseRevokesGrants and
-    redactionRevokesExposed and redactionKeepsUnrelated
+    redactionRevokesExposed and redactionKeepsUnrelated and reviewGated and untrustedNeverAuthorizes
 
   val pendingApproved = ids.filter(k => not(done(k)) and currentIntent(k).exists(i => valid(i) and
     s.approvals.exists(p => p.child == k and p.rev == i.rev and p.digest == i.payload and
@@ -435,6 +493,11 @@ module actionsProtocol {
       crash, startup(true), pause("pause"), resume, cancel(true), taint(true), grantWith(k, true),
       proposeSchedule, clickSchedule, scheduleFromClick(true), scheduleWith(true), scheduleFromMenu(true), queueWake, deleteSchedule, admitWake(""), startWake(true),
       redact("scoped"), see, invalidate("schema"), seal,
+      all { s.current.get(k) == 0, proposeConn(k, "owner") }, all { s.current.get(k) == 0, proposeConn(k, "untrusted") },
+      { nondet answer = Set("explicit", "implied", "notAsked", "failed").oneOf()
+        nondet reversible = Set(true, false).oneOf()
+        all { currentIntent(k) != Set(), reviewWith(k, answer, reversible, "") } },
+      { nondet rule = Set("auto", "always", "never").oneOf(); setRule(rule) },
       all { s.nextSpend < 8, reserve(false, 2, true, "") }, all { s.nextSpend < 8, reserve(true, 2, true, "") },
       all { s.nextSpend < 8, reserve(false, 0, true, "") },
       { nondet cost = 0.to(3).oneOf(); settle("done", cost, cost, "") }, settle("refused", 0, 0, ""),
@@ -456,6 +519,15 @@ module actionsProtocol {
     if (op == "deduped") propose(k, 3, true) else
     if (op == "tier2") propose(k, 2, false) else
     if (op == "tier4") propose(k, 4, false) else
+    if (op == "conn") proposeConn(k, "owner") else
+    if (op == "connUntrusted") proposeConn(k, "untrusted") else
+    if (op == "reviewExplicit") reviewWith(k, "explicit", true, bug) else
+    if (op == "reviewNotAsked") reviewWith(k, "notAsked", true, bug) else
+    if (op == "reviewIrreversible") reviewWith(k, "explicit", false, bug) else
+    if (op == "reviewImplied") reviewWith(k, "implied", false, bug) else
+    if (op == "reviewFailed") reviewWith(k, "failed", false, bug) else
+    if (op == "alwaysRule") setRule("always") else
+    if (op == "neverRule") setRule("never") else
     if (op == "clickBatch") clickBatch else
     if (op == "expandBatch") expandBatch else
     if (op == "reorderBatch") reorderBatch else
@@ -685,9 +757,27 @@ module actionsProtocol {
   pure val redactUnrelated = List(c("schedule", 0), c("see", 0), c("tier2", 0), c("grant", 0), c("redact", 0), c("queue", 0))
   action redactUnrelatedStep = script(redactUnrelated, "")
   action redactUnrelatedBugStep = script(redactUnrelated, "revokeAll")
-  action suiteInit = { nondet which = 0.to(51).oneOf(); all { s' = initial, before' = initial, pc' = 0, remaining' = drainLimit, scenario' = which } }
+  // Auto-review (10-16). Untrusted text the run read asks for a call and the
+  // reviewer is shown it: it must still answer "notAsked", so the call asks.
+  pure val untrustedIntent = List(c("report", 0), c("connUntrusted", 0), c("reviewExplicit", 0), c("authorize", 0))
+  action untrustedIntentStep = script(untrustedIntent, "")
+  action untrustedIntentBugStep = script(untrustedIntent, "untrustedIntent")
+  // "Never ask" skips the review only for a clean run: a call that only untrusted text asked for still asks.
+  pure val neverTaint = List(c("neverRule", 0), c("report", 0), c("connUntrusted", 0), c("reviewNotAsked", 0), c("authorize", 0))
+  action neverTaintStep = script(neverTaint, "")
+  action neverTaintBugStep = script(neverTaint, "neverTaint")
+  // A review that failed or timed out asks; it never runs the call.
+  pure val reviewFailure = List(c("conn", 0), c("reviewFailed", 0), c("authorize", 0))
+  action reviewFailureStep = script(reviewFailure, "")
+  action reviewFailureBugStep = script(reviewFailure, "failOpen")
+  // "Always ask" overrides an explicit, reversible review.
+  pure val alwaysAsk = List(c("alwaysRule", 0), c("conn", 0), c("reviewExplicit", 0), c("authorize", 0))
+  action alwaysAskStep = script(alwaysAsk, "")
+  action alwaysAskBugStep = script(alwaysAsk, "alwaysIgnored")
+  action suiteInit = { nondet which = 0.to(55).oneOf(); all { s' = initial, before' = initial, pc' = 0, remaining' = drainLimit, scenario' = which } }
   val suiteCommands = List(negativeLookup, unknownRetry, hiddenRetry, approvalEdit, schemaRace, accountRace, connectionRace, preconditionRace, expireRace, redactRace, consumeBeforeSend, approvalReuse, startupAttempt, payloadBinding, receiptBinding, scopedGrant, reportGrant, reportLaunch, reportSchedule, wakeSchedule, destructive, ownerRace, pauseRace, offRace, quietNotification, cancelWake, cancelQueuedWake, duplicateWake, lateCancel, partialBatch, dedupeKey, dedupeAccept, parallelBudget, unknownSpend, compactionBudget, unknownDrain, approvedDrain, wakeDrain, pauseDrain, attemptEvidence, batchOrderRace, clickedSchedule,
-    compactionSettle, refusedSpend, dailyReset, raiseClick, overReportCap, capReached, menuSchedule, resumeGrant, redactExposed, redactUnrelated).nth(scenario)
+    compactionSettle, refusedSpend, dailyReset, raiseClick, overReportCap, capReached, menuSchedule, resumeGrant, redactExposed, redactUnrelated,
+    untrustedIntent, neverTaint, reviewFailure, alwaysAsk).nth(scenario)
   action suiteStep = script(suiteCommands, "")
   val case0 = scenario == 0 and reachedAgreement and (s.unknown == Set(1) and s.explained == Set(1))
   val case1 = scenario == 1 and reachedAgreement and (s.auths.size() == 1)
@@ -744,6 +834,18 @@ module actionsProtocol {
   val case50 = scenario == 50 and reachedAgreement and s.grants == Set() and s.auths == Set()
   val case51 = scenario == 51 and reachedAgreement and s.schedule and s.admissions.length() == 1 and
     s.grants.forall(g => g.opClass == 1)
+  val case52 = scenario == 52 and reachedAgreement and s.auths == Set() and s.reviews.forall(r => r.intent == "notAsked")
+  val case53 = scenario == 53 and reachedAgreement and s.auths == Set()
+  val case54 = scenario == 54 and reachedAgreement and s.auths == Set()
+  val case55 = scenario == 55 and reachedAgreement and s.auths == Set()
+  // An explicit, reversible call the owner asked for runs once with no click, under Auto and under Never ask.
+  action reviewedRunWitnessStep = script(List(c("conn", 0), c("reviewExplicit", 0), c("authorize", 0)), "")
+  val reviewedRunSent = reachedAgreement and s.auths.size() == 1 and s.auths.forall(a => a.review) and s.receipts.size() == 1
+  // The owner's words implied it, after reading Notion: Auto asks, Never ask runs it.
+  action neverImpliedWitnessStep = script(List(c("neverRule", 0), c("report", 0), c("conn", 0), c("reviewImplied", 0), c("authorize", 0)), "")
+  // An irreversible call under Auto asks: the click runs it once.
+  action irreversibleClickWitnessStep = script(List(c("conn", 0), c("reviewIrreversible", 0), c("authorize", 0), c("click", 0)), "")
+  val clickedOnce = reachedAgreement and s.auths.size() == 1 and s.auths.forall(a => not(a.review)) and s.receipts.size() == 1
   // A click made before Pause waits, and after Resume is authorized and sent once.
   action resumedClickWitnessStep = script(List(c("propose", 0), c("click", 0), c("pause", 0), c("resume", 0)), "")
   val resumedClickSent = reachedAgreement and s.auths.size() == 1 and s.attempts.length() == 1 and s.receipts.size() == 1

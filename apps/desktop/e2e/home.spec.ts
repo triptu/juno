@@ -23,6 +23,28 @@ const POSTGRES = 'Draft plan is in the doc'
 const STAGING = 'Unrelated: has anyone looked at the'
 const OFFSITE = 'Can eng take the Wednesday afternoon'
 
+test('During the first sync Home greets and says it is syncing, and the sidebar shows how far it got', async ({ juno, slack, win }) => {
+  // The first conversation's history waits, as a real workspace's backfill takes minutes.
+  slack.fake.holdNext({ method: 'conversations.history' })
+  await juno.signIn()
+  // A launch opens a New chat tab; Home is one click away.
+  await juno.home.navItem.click()
+  const syncing = win.locator('[data-home][data-home-loading]')
+  await expect(syncing.getByRole('heading', { level: 2 })).toHaveText(/Tushar\.$/, { timeout: 30_000 })
+  await expect(syncing.getByText('Syncing with Slack.')).toBeVisible()
+  await expect(syncing.getByText('All caught up.')).toHaveCount(0)
+  const progress = juno.sidebar.root.getByRole('status', { name: 'Sync status' })
+  await expect(progress).toHaveText(/^Syncing 0 of \d+$/)
+  await expect(juno.sidebar.root.getByRole('progressbar', { name: 'Sync progress' })).toBeVisible()
+
+  // Once the history lands the first sync finishes: Home shows what waits and the line goes.
+  slack.fake.release()
+  await juno.waitForSync()
+  await juno.home.expectShown()
+  await expect(juno.home.greeting).toHaveText(/Tushar\.$/)
+  await expect(progress).toHaveCount(0)
+})
+
 test('Home shows what waits from the sidebar, and each row opens its topic', async ({ juno, slack, win }) => {
   await juno.signIn()
   await juno.waitForSync()
@@ -99,7 +121,7 @@ test('Mark done clears a follow-up, and Resolve all resolves the settled topics 
   expect(await freshHome(juno, POSTGRES)).not.toContain('followUp')
 })
 
-test('with AI assist off, Home shows the rules alone, with their plain titles', async ({ juno, fake, slackApp, userData, running }) => {
+test('with AI assist off, Home shows the rules alone, with their plain titles and no Ask Juno, and the Juno tab says Juno is off', async ({ juno, fake, slackApp, userData, running }) => {
   await juno.signIn()
   await juno.waitForSync()
   await running.close()
@@ -118,7 +140,13 @@ test('with AI assist off, Home shows the rules alone, with their plain titles', 
     // Nothing arrives later either.
     await again.win.waitForTimeout(3_000)
     await expect(home.title('waiting')).toHaveText('Elena asked you something')
-    await expect(home.ask).toBeVisible()
+    // Ask Juno is an AI surface: it is left out, and the Juno tab says Juno is off rather than asking for a model.
+    await expect(home.ask).toHaveCount(0)
+    await again.win.getByRole('navigation', { name: 'Pages' }).getByRole('button', { name: /^Juno/ }).click()
+    await expect(again.win.locator('main').getByText('Juno is off. Turn on AI assist in Settings.')).toBeVisible()
+    await expect(again.win.locator('main [data-juno-no-provider]')).toHaveCount(0)
+    await expect(again.win.locator('main').getByText('What do you need?')).toHaveCount(0)
+    await expect(again.win.locator('main').getByRole('textbox', { name: /^Ask Juno/ })).toBeDisabled()
   } finally {
     await again.close()
   }

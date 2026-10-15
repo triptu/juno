@@ -2,6 +2,7 @@ import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { encodeMentions, type PickConversation, type PickThread } from '@juno/contract'
 import {
   newChatAtom,
+  frequentConversationsAtom,
   nowAtom,
   pickConversation,
   pickConversationsAtom,
@@ -38,6 +39,7 @@ export interface NewChatTabProps {
  * One New chat tab (spec section 9). The draft and the destination live in
  * `newChatAtom(tabId)`, so they survive a change of destination and the tab
  * being hidden. The pickers' lists are live queries only while open. The
+ * frequent list stays after a pick. Without frequent destinations, the
  * preview is the destination's topic, read-only (`TopicPreview`). Enter
  * with no destination opens the conversation picker; Enter after picking
  * sends: the message is queued and the tab becomes its topic at once,
@@ -52,6 +54,7 @@ export const NewChatTab = memo(function NewChatTab({ tabId }: NewChatTabProps) {
   const [query, setQuery] = useState('')
   const [sending, setSending] = useState(false)
   const now = useAtomValue(nowAtom)
+  const frequent = useAtomValue(frequentConversationsAtom)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   // The files stay with the draft through every change of destination (spec section 9).
   const files = useAttachments(tabId)
@@ -112,6 +115,9 @@ export const NewChatTab = memo(function NewChatTab({ tabId }: NewChatTabProps) {
 
   return (
     <NewChatView
+      frequent={frequent._tag === 'Success' ? frequent.value : []}
+      selectedConversation={chat.conversation?.key}
+      onPickConversation={conversation => picked(current => pickConversation(current, conversation))}
       {...(topic === undefined ? {} : { preview: <TopicPreview key={topic} id={topic} /> })}
       {...(person === undefined ? {} : { note: startOfConversation(person.name) })}
       composer={

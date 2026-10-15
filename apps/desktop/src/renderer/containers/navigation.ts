@@ -52,11 +52,10 @@ import {
   newChatAtom,
   newChatPlace,
   newTabPageAtom,
-  notificationsPlace,
-  preferencesPlace,
   emptyNewChat,
   openInSlack,
   openPlace,
+  openSettingsSection,
   pickConversation,
   popupContextMenu,
   prefetchTopic,
@@ -85,6 +84,7 @@ import {
   type Tabs,
 } from '@juno/state'
 import { chatCopy, type JunoPage } from '@juno/agent-contract'
+import type { SettingsSection } from '@juno/contract'
 import { afterPaint, measure } from '@juno/state/perf'
 import { toggleSidebar } from './layout'
 import { togglePrivacy } from './privacy'
@@ -294,9 +294,13 @@ function openTopicFresh(id: string, options: OpenOptions, target: string | undef
  * the current tab stays in its history, so Back returns to what was written.
  */
 function openHere(tabs: Tabs, place: Place, options: OpenOptions = {}): Tabs {
+  return openPlace(tabs, place, { ...options, keepNewChat: keepsNewChat(tabs) })
+}
+
+/** The current tab is a New chat with a draft or a destination, which stays in its history. */
+function keepsNewChat(tabs: Tabs): boolean {
   const tab = tabs.tabs.find((each) => each.id === tabs.active)
-  const keepNewChat = tab !== undefined && currentPlace(tab).kind === 'newChat' && !untouched(registry.get(newChatAtom(tab.id)))
-  return openPlace(tabs, place, { ...options, keepNewChat })
+  return tab !== undefined && currentPlace(tab).kind === 'newChat' && !untouched(registry.get(newChatAtom(tab.id)))
 }
 
 /**
@@ -342,7 +346,8 @@ export function openNewChatTo(conversation: PickConversation): void {
 }
 
 /**
- * Keep the topic on screen until Home's local rows are ready. After the
+ * Keep the topic on screen until Home has a value (its rows, or the
+ * syncing state of a first sync). After the
  * subscription expires, replacing it first would lay out an empty page
  * and then Home in separate frames. The wait is bounded as for All topics.
  */
@@ -360,7 +365,7 @@ export function openHome(options: OpenOptions = {}): void {
     }
     const check = () => {
       const result = registry.get(homeViewAtom)
-      if (result._tag === 'Failure' || (result._tag === 'Success' && result.value.ready)) finish()
+      if (result._tag === 'Failure' || result._tag === 'Success') finish()
     }
     const timer = setTimeout(finish, READY_WAIT_MS)
     const off = registry.subscribe(homeViewAtom, check, { immediate: false })
@@ -370,8 +375,14 @@ export function openHome(options: OpenOptions = {}): void {
   show((tabs) => openHere(tabs, homePlace, options), undefined, options.newTab !== true, ready)
 }
 
-/** A page behind the Juno menu, or Settings › Juno (SPEC 13.10). A plain open focuses a tab that shows it. */
+/**
+ * A page behind the Juno menu (SPEC 13.10). A plain open focuses a tab that
+ * shows it. Its Settings and Connections are sections of Settings, so links
+ * to them open there.
+ */
 export function openJunoPage(page: JunoPage, options: OpenOptions = {}): void {
+  if (page === 'settings') return openSettings('juno', options)
+  if (page === 'connections') return openSettings('connections', options)
   show((tabs) => openHere(tabs, junoPagePlace(page), options), undefined)
 }
 
@@ -380,14 +391,13 @@ export function openJuno(options: OpenOptions = {}): void {
   show((tabs) => openHere(tabs, junoPlace, options), undefined)
 }
 
-/** The Notifications page (SPEC 14). A plain open focuses a tab that shows it, as for Home. */
-export function openNotifications(options: OpenOptions = {}): void {
-  show((tabs) => openHere(tabs, notificationsPlace, options), undefined)
-}
-
-/** Preferences (SPEC 14). A plain open focuses a tab that shows it, as for Home. */
-export function openPreferences(options: OpenOptions = {}): void {
-  show((tabs) => openHere(tabs, preferencesPlace, options), undefined)
+/**
+ * Settings at a section (SPEC 14), in its one tab. Every way in comes here:
+ * ⌘,, the avatar menu, the Juno menu and "Add a provider" (Juno, which
+ * puts focus in the key field while no provider is set up).
+ */
+export function openSettings(section: SettingsSection = 'general', options: OpenOptions = {}): void {
+  show((tabs) => openSettingsSection(tabs, section, { ...options, keepNewChat: keepsNewChat(tabs) }), undefined)
 }
 
 /** Below the header band, where a message a notification opens lands. */
@@ -620,8 +630,8 @@ export function runMenuCommand(command: MenuCommand): void {
     case 'palette.toggle':
       // `Palette.tsx` handles it.
       return
-    case 'preferences.open':
-      return openPreferences()
+    case 'settings.open':
+      return openSettings()
     default: {
       const tab = tabByNumber(tabs, Number(command.slice('tab.select.'.length)))
       if (tab !== undefined) switchToTab(tab.id)
@@ -684,8 +694,7 @@ function placeLabel(place: Place): string {
   if (place.kind === 'home') return 'Home'
   if (place.kind === 'juno') return 'Juno'
   if (place.kind === 'junoPage') return chatCopy.pageTitles[place.page]
-  if (place.kind === 'notifications') return 'Notifications'
-  if (place.kind === 'preferences') return 'Preferences'
+  if (place.kind === 'settings') return 'Settings'
   if (place.kind === 'allTopics') return 'All topics'
   const result = registry.get(topicAtom(place.topicId))
   const detail = result._tag === 'Success' ? result.value : null

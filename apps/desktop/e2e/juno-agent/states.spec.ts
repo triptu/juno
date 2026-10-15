@@ -7,7 +7,7 @@ import { dirname, join } from 'node:path'
 import { chatCopy } from '@juno/agent-contract'
 import { Juno } from '../driver/juno'
 import { launchApp } from '../fixtures'
-import { agentReady, card, openChat, openPage, ready } from './agent'
+import { agentReady, card, openChat, openPage, openSettings, ready } from './agent'
 import { answer, expect, JunoChatPane, test as base } from './chat'
 import { startScriptedModel, type CatalogueModel, type ScriptedModel } from './model'
 
@@ -60,7 +60,7 @@ const picker = base.extend<{ readonly model: ScriptedModel }>({
 
 picker('the chat model picker offers the newest usable model per family and hides batch, no-tools and small-window models', async ({ juno }) => {
   await ready(juno)
-  const page = await openPage(juno, 'Settings › Juno')
+  const page = await openSettings(juno, 'Juno')
   const names = () =>
     page
       .getByLabel('Chat model')
@@ -81,7 +81,7 @@ picker('the model settings offer Sol through Codex', async ({ fake, slackApp, us
     running = await relaunch(userData, { fake, slackApp, model })
     const juno = new Juno(running.app, running.win)
     await ready(juno)
-    const page = await openPage(juno, 'Settings › Juno')
+    const page = await openSettings(juno, 'Juno')
     const select = page.getByLabel('Chat model')
     const option = select.locator('option').filter({ hasText: /Sol.*Codex/ })
     await expect(option).toHaveCount(1)
@@ -103,7 +103,7 @@ picker('the model settings offer Sol through Codex', async ({ fake, slackApp, us
 
 test('while Juno is paused a message waits for Resume, then runs', async ({ juno, model }) => {
   await ready(juno)
-  const settings = await openPage(juno, 'Settings › Juno')
+  const settings = await openSettings(juno, 'Juno')
   await settings.getByLabel('Juno is paused').check()
   const chat = await openChat(juno)
   await expect(chat.root.locator('[data-banner="paused"]')).toHaveText(`${chatCopy.banner.paused.chip} · ${chatCopy.banner.paused.resume}`)
@@ -208,7 +208,7 @@ test('a message at the send limit is kept when request framing makes it too larg
 
 test('with a $0 daily cap a message brings the Budget card', async ({ juno, model }) => {
   await ready(juno)
-  const settings = await openPage(juno, 'Settings › Juno')
+  const settings = await openSettings(juno, 'Juno')
   const cap = settings.getByLabel('Daily cap in dollars')
   await cap.fill('0')
   await cap.press('Enter')

@@ -1,7 +1,8 @@
 /**
  * The actions under a run on the Activity page (plan v3 §13.3; SPEC 13.9):
  * each action the run proposed with the decision made about it and its
- * outcome, and each job the run started with no click. An open card has no
+ * outcome (a connection call the auto-review ran is `noClick`, with the
+ * review's answers and line), and each job the run started with no click. An open card has no
  * decision yet and is not listed. A failure is in plain words; what the
  * destination said is behind "Copy details".
  */
@@ -50,7 +51,11 @@ type SendChild = Extract<CardPayload, { _tag: 'sendMessage' }>['messages'][numbe
 
 function cardAction(store: Store, card: CardRow, payload: CardPayload, child?: SendChild): ActivityAction | undefined {
   const approvals = store.db.prepare('SELECT refused FROM approvals WHERE card_id = ?').all(card.id) as Array<{ refused: string | null }>
-  const base = { id: child?.actionId ?? card.id, tier: tierOf(payload), label: child === undefined ? labelOf(payload) : `Message to ${child.target.name}` }
+  const base = {
+    id: child?.actionId ?? card.id, tier: tierOf(payload), label: child === undefined ? labelOf(payload) : `Message to ${child.target.name}`,
+    // A connection call's auto-review: why it asked, or why it ran with no click.
+    ...(payload._tag === 'change' && payload.review !== undefined ? { review: payload.review } : {}),
+  }
   if (card.dismissed_at !== null) return { ...base, decision: 'dismissed', outcome: 'none' }
   const refused = approvals.find((a) => a.refused !== null)?.refused
   const auths = store.db

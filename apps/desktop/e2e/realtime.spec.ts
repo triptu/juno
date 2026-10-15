@@ -57,6 +57,7 @@ test('a 429 storm: the line says Slack asked us to slow down, every method waits
   await sidebar.expectNoSyncStatus(60_000)
   await expect(sidebar.row('#product').preview).toContainText('Pricing page copy is live.', { timeout: 30_000 })
 
+  await juno.expectEngineLive(60_000)
   const limited = fake.calls.filter((call) => call.kind === 'api' && call.status === 429)
   expect(new Set(limited.map((call) => call.method))).toEqual(new Set(methods))
   for (const call of limited) {
@@ -108,16 +109,7 @@ test('an engine restart mid-session keeps the open topic, the unsent text and th
   await topic.expectMessage('Back after the restart.')
 })
 
-// Fixme (break pass, 2026-10-15; owner: sync). The catch-up after a reconnect runs with
-// `refreshWorkspace: false` (packages/sync/src/sync.ts), and `loadCounts` only fetches
-// conversations it has never seen, so a `channel_rename` lost while the socket was down is never
-// made up for: the sidebar, header and tab keep the old name until a restart. Leaves and archives
-// in the gap are missed the same way. A full refresh alone is unsafe: loadWorkspace and
-// replaceMembership overwrite socket changes received while their requests are in flight.
-// Fix needs an observation fence for conversation metadata and membership, a full refresh
-// after gaps, and a Quint model of stale snapshots versus newer events. This is broader than
-// changing refreshWorkspace to true; retain this regression until that protocol is covered.
-test.fixme('a channel renamed while the socket is down shows its new name once it is back', async ({ juno, fake }) => {
+test('a channel renamed while the socket is down shows its new name once it is back', async ({ juno, fake }) => {
   await openMain(juno)
   fake.goOffline()
   await juno.sidebar.expectSyncStatus("You're offline")
@@ -126,4 +118,44 @@ test.fixme('a channel renamed while the socket is down shows its new name once i
   await juno.sidebar.expectNoSyncStatus()
   await expect(juno.sidebar.row('#engineering').root).toBeVisible({ timeout: 15_000 })
   await expect(juno.topic.header).toContainText('engineering')
+  await expect.poll(() => juno.tabs.titles()).toEqual([expect.stringContaining('engineering')])
 })
+
+for (const change of ['leave', 'archive'] as const) {
+  test(`a channel ${change} while the socket is down removes it once it is back`, async ({ juno, fake }) => {
+    await openMain(juno)
+    fake.goOffline()
+    await juno.sidebar.expectSyncStatus("You're offline")
+    if (change === 'leave') fake.leaveChannel({ channel: 'C0ENG' })
+    else fake.workspace.conversations.get('C0ENG')!.archived = true
+    fake.goOnline()
+    await juno.expectEngineLive()
+    await expect(juno.sidebar.row(ENG_MAIN).root).toHaveCount(0)
+  })
+}
+
+for (const change of ['rename', 'leave', 'archive'] as const) {
+  test(`a channel ${change} event during the reconnect snapshot wins over its stale answer`, async ({ juno, fake }) => {
+    await openMain(juno)
+    const method = change === 'leave' ? 'client.counts' : 'client.userBoot'
+    fake.holdNext({ method })
+    fake.dropSocket()
+    await expect.poll(() => fake.heldCount({ method }), { timeout: 30_000 }).toBe(1)
+    if (change === 'rename') fake.renameChannel({ channel: 'C0ENG', name: 'engineering' })
+    else if (change === 'leave') fake.leaveChannel({ channel: 'C0ENG' })
+    else {
+      fake.workspace.conversations.get('C0ENG')!.archived = true
+      fake.emitFrame({ type: 'channel_archive', channel: 'C0ENG' })
+    }
+    // Establish that the event landed before releasing the older HTTP answer.
+    if (change === 'rename') await expect(juno.topic.header).toContainText('engineering')
+    else await expect(juno.sidebar.row(ENG_MAIN).root).toHaveCount(0)
+    fake.release()
+    await juno.expectEngineLive()
+    if (change === 'rename') {
+      await expect(juno.sidebar.row('#engineering').root).toBeVisible()
+      await expect(juno.topic.header).toContainText('engineering')
+      await expect.poll(() => juno.tabs.titles()).toEqual([expect.stringContaining('engineering')])
+    } else await expect(juno.sidebar.row(ENG_MAIN).root).toHaveCount(0)
+  })
+}

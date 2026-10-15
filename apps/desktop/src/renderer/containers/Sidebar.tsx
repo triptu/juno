@@ -1,7 +1,9 @@
 import { startTransition, useState } from 'react'
 import {
   activeTab,
+  connectionStateAtom,
   currentPlace,
+  engineStatusAtom,
   notificationStatusAtom,
   popupContextMenu,
   privacyAtom,
@@ -19,11 +21,10 @@ import {
 import { junoNavAtom } from '@juno/state/agent'
 import { useAtom, useAtomValue } from '@juno/state/react'
 import { AccountMenu, hueFor, initials, Sidebar as SidebarView, type AccountMenuAction, type ActivateEvent, type SidebarNavTarget } from '@juno/views'
-import { AppInfo } from './AppInfo'
-import { EngineStatus, SyncNotice } from './EngineStatus'
+import { SyncNotice } from './EngineStatus'
 import { markFilterChange } from './filterMark'
 import { openJunoTab } from './juno/actions'
-import { openAllTopics, openHome, openNewChat, openNotifications, openPreferences } from './navigation'
+import { openAllTopics, openHome, openNewChat, openSettings } from './navigation'
 import { openPalette } from './paletteActions'
 import { setPrivacy } from './privacy'
 import { Session } from './Session'
@@ -66,9 +67,9 @@ function activeNavOf(tabs: Tabs): SidebarNavTarget | undefined {
  * Wires the sidebar chrome: the filters and scope (local UI state), the
  * filter dots (booleans from the counts live value, so a count that changes
  * without a dot changing re-renders nothing), the sync status line, and
- * the account menu, which holds the appearance settings
- * and the M1 diagnostics until Preferences exists. The list is a memoized
- * child with no props, so a render here does not reach the rows.
+ * the account menu, whose Notifications and Settings open Settings. The
+ * list is a memoized child with no props, so a render here does not reach
+ * the rows.
  */
 export function Sidebar() {
   const [filter, setFilter] = useAtom(sidebarFilterAtom)
@@ -83,6 +84,9 @@ export function Sidebar() {
   const [menuOpen, setMenuOpen] = useState(false)
   const status = useAtomValue(notificationStatusAtom)
   const privacy = useAtomValue(privacyAtom)
+  // Whether the list may still change: the engine is not live, or a sync cycle runs. Two booleans, so a status tick re-renders nothing.
+  const connected = useAtomValue(connectionStateAtom, (state) => state === 'connected')
+  const caughtUp = useAtomValue(engineStatusAtom, (engine) => engine._tag === 'Success' && engine.value.phase._tag === 'live' && !engine.value.syncing)
   // The scope chip names the channel the list is narrowed to; its rows' refs carry it.
   const scopeChannel = useAtomValue(sidebarListAtom, (list) => (filter.scope === undefined ? undefined : list.refs.channels.get(filter.scope)))
 
@@ -93,8 +97,8 @@ export function Sidebar() {
   const paused = status._tag === 'Success' ? status.value.paused : undefined
   const accountAction = (action: AccountMenuAction) => {
     setMenuOpen(false)
-    if (action === 'notifications') return openNotifications()
-    if (action === 'preferences') return openPreferences()
+    if (action === 'notifications') return openSettings('notifications')
+    if (action === 'settings') return openSettings()
     if (action === 'privacy') return setPrivacy(!privacy)
     setPresence(registry, presence?.active === false ? 'active' : 'away')
   }
@@ -128,18 +132,7 @@ export function Sidebar() {
           {...(paused === undefined ? {} : { paused })}
           privacy={privacy}
           onAction={accountAction}
-          sections={[
-            { title: 'Session', content: <Session /> },
-            {
-              title: 'Diagnostics',
-              content: (
-                <>
-                  <AppInfo />
-                  <EngineStatus />
-                </>
-              ),
-            },
-          ]}
+          sections={[{ title: 'Session', content: <Session /> }]}
         />
       }
       onSearch={openPalette}
@@ -162,6 +155,7 @@ export function Sidebar() {
       status={<SyncNotice />}
       privacy={privacy}
       onPrivacyOff={() => setPrivacy(false)}
+      syncing={!connected || !caughtUp}
     >
       <TopicList />
     </SidebarView>

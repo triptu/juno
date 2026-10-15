@@ -74,7 +74,13 @@ function takeLock(id) {
   return lock(id)
 }
 function list() {
-  const result = spawnSync('nsc', ['list', '-o', 'json'], { encoding: 'utf8', timeout: 30_000 })
+  // Namespace's API can take over 30 s when many runs poll it at once, so a
+  // slow answer is retried rather than failing the run.
+  let result
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    result = spawnSync('nsc', ['list', '-o', 'json'], { encoding: 'utf8', timeout: 90_000 })
+    if (result.status === 0) break
+  }
   if (result.status !== 0) throw new Error(`nsc list failed: ${result.error?.message ?? result.stderr.trim()}`)
   // nsc prints `null`, not `[]`, when no instance exists.
   const instances = JSON.parse(result.stdout) ?? []

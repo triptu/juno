@@ -1,21 +1,17 @@
 import * as stylex from '@stylexjs/stylex'
-import { chatCopy, modelChoiceKey, type JobId, type JunoSettingsPage as JunoSettingsPageModel, type ModelChoice } from '@juno/agent-contract'
+import { chatCopy, modelChoiceKey, type JunoSettingsPage as JunoSettingsPageModel, type ModelChoice } from '@juno/agent-contract'
 import { Button, Checkbox, Chip, ListRow, Page, PageHeader, Section, Select, Surface, Text, TextField } from '@juno/ui'
 import type { ReactNode } from 'react'
-import { BackupSection, ThisMacSection } from './BackupSections'
+import { BackupSection, ThisMacSection, type BackupSectionProps, type ThisMacSectionProps } from './BackupSections'
 import { cell } from './cell'
 
 /**
  * A section whose work is not built yet is left out by leaving out its
- * callbacks: Rules (`onRuleChange`, `onRuleRemove`,
- * `onRuleAdd`), Backup (`onBackupFolder`, `onExportPhrase`) and This Mac
- * (`onMove`, `onRestore`). Without `onStopJob` a removal pending in a job
- * is not shown.
+ * callbacks: Rules (`onRuleChange`, `onRuleRemove`, `onRuleAdd`).
  */
 export interface JunoSettingsPageProps {
   /** The agent's page. Absent while no provider is set up, as no agent runs: the page shows the provider alone. */
   readonly page?: JunoSettingsPageModel
-  readonly now: number
   /** The provider section (`ProviderSection`), from main's state rather than the agent's page. */
   readonly providers: ReactNode
   /** A listed modelChoiceKey, or a typed custom model id. */
@@ -31,15 +27,6 @@ export interface JunoSettingsPageProps {
   readonly onRulesCommit?: () => void
   /** Why the agent refused the list: "Each rule is one line of up to 280 bytes, and there are at most 20." */
   readonly rulesError?: string
-  readonly onBackupFolder?: () => void
-  readonly onExportPhrase?: () => void
-  readonly onMove?: () => void
-  readonly onRestore?: () => void
-  readonly onStopJob?: (jobId: JobId) => void
-  /** A folder change or an export in flight: its button waits. */
-  readonly backupBusy?: 'folder' | 'phrase'
-  /** Why the last folder change or export failed, under its row. */
-  readonly backupError?: { readonly row: 'folder' | 'phrase'; readonly message: string }
 }
 
 function commitCap(text: string, current: number, onCap: (usd: number) => void): void {
@@ -54,7 +41,8 @@ function commitModel(text: string, current: string, onChatModel: (id: string) =>
 
 const usd = (amount: number): string => `$${amount.toFixed(2)}`
 
-function modelOptions(models: ReadonlyArray<ModelChoice>) {
+/** The model select's rows: the resolved name, Codex, and the price, as Settings › Juno and Set up Juno show them. */
+export function modelOptions(models: ReadonlyArray<ModelChoice>) {
   return models.map((model) => ({
     value: modelChoiceKey(model),
     // A custom endpoint's row is a model id, its own name.
@@ -68,14 +56,12 @@ function modelOptions(models: ReadonlyArray<ModelChoice>) {
 }
 
 /**
- * Settings › Juno (SPEC 13.10): the models, today's spend and the cap, the
- * providers, the owner's rules, Pause, the backup folder, and who owns
- * Juno's state with Export recovery phrase, Move and Restore. Settings
- * change only here; no conversation can change them.
+ * Settings › Juno (SPEC 13.10): the providers, the models, today's spend
+ * and the cap, Codex, the owner's rules and Pause. Settings change only
+ * here; no conversation can change them.
  */
 export function JunoSettingsPage({
   page,
-  now,
   onChatModel,
   onCompactionModel,
   onCap,
@@ -87,18 +73,12 @@ export function JunoSettingsPage({
   onRulesCommit,
   rulesError,
   onPaused,
-  onBackupFolder,
-  onExportPhrase,
-  onMove,
-  onRestore,
-  onStopJob,
-  backupBusy,
-  backupError,
 }: JunoSettingsPageProps) {
   if (page === undefined) {
     return (
       <Page width="settings">
-        <PageHeader title="Juno" subtitle={chatCopy.providers.noneBody} />
+        {/* One line, as on the full page, so nothing moves when the agent's part arrives after a key is saved. */}
+        <PageHeader title="Juno" subtitle="Models, spend and the provider. Only you can change these." />
         {providers}
       </Page>
     )
@@ -112,13 +92,7 @@ export function JunoSettingsPage({
     <Page width="settings">
       <PageHeader
         title="Juno"
-        subtitle={
-          onMove !== undefined
-            ? "Models, spend, rules and where Juno's state lives. Only you can change these."
-            : onRuleChange !== undefined
-              ? 'Models, spend, the provider and your rules. Only you can change these.'
-              : 'Models, spend and the provider. Only you can change these.'
-        }
+        subtitle={onRuleChange !== undefined ? 'Models, spend, the provider and your rules. Only you can change these.' : 'Models, spend and the provider. Only you can change these.'}
       />
 
       {providers}
@@ -294,18 +268,40 @@ export function JunoSettingsPage({
         </Surface>
       </Section>
 
-      {onBackupFolder === undefined || onExportPhrase === undefined ? null : (
-        <BackupSection
-          page={page}
-          now={now}
-          onBackupFolder={onBackupFolder}
-          onExportPhrase={onExportPhrase}
-          {...(backupBusy === undefined ? {} : { backupBusy })}
-          {...(backupError === undefined ? {} : { backupError })}
-        />
-      )}
-      {onMove === undefined || onRestore === undefined ? null : (
-        <ThisMacSection page={page} onMove={onMove} onRestore={onRestore} {...(onStopJob === undefined ? {} : { onStopJob })} />
+    </Page>
+  )
+}
+
+export type JunoBackupPageProps = Omit<BackupSectionProps, 'page'> &
+  Omit<ThisMacSectionProps, 'page'> & {
+    /** The agent's page. Absent while no provider is set up, as no agent runs. */
+    readonly page?: BackupSectionProps['page'] & ThisMacSectionProps['page']
+    /** With no agent running: opens Settings › Juno to add a provider. */
+    readonly onAddProvider: () => void
+  }
+
+/**
+ * Settings › Backup & This Mac (SPEC 13.8, 13.10): the backup folder, the
+ * recovery phrase, and who owns Juno's state with Move and Restore. With
+ * no provider no agent runs, so the page says where to start.
+ */
+export function JunoBackupPage({ page, onAddProvider, ...props }: JunoBackupPageProps) {
+  return (
+    <Page width="settings">
+      <PageHeader title="Backup & This Mac" subtitle="Where Juno's state is kept, and which Mac runs Juno." />
+      {page === undefined ? (
+        <Section heading="Backup" sub="Juno's backup settings show once Juno has a model.">
+          <div>
+            <Button variant="secondary" size="sm" onClick={onAddProvider}>
+              {chatCopy.providers.add}
+            </Button>
+          </div>
+        </Section>
+      ) : (
+        <>
+          <BackupSection page={page} {...props} />
+          <ThisMacSection page={page} {...props} />
+        </>
       )}
     </Page>
   )

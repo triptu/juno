@@ -1,0 +1,44 @@
+[
+  {
+    "tag": "h2",
+    "label": "Still up, Tushar.",
+    "rect": [
+      796,
+      382,
+      191,
+      41
+    ],
+    "padding": "0px",
+    "margin": "0px",
+    "font": "36px/41.4px 400",
+    "color": "rgb(35, 33, 26)"
+  },
+  {
+    "tag": "li",
+    "label": "Elena asks: She has a competing offer with a FridayRina fini",
+    "rect": [
+      652,
+      476,
+      480,
+      52
+    ],
+    "padding": "0px 6px 0px 0px",
+    "margin": "0px",
+    "font": "14.5px/21.75px 400",
+    "color": "rgb(35, 33, 26)"
+  },
+  {
+    "tag": "button",
+    "label": "Ask Juno",
+    "rect": [
+      652,
+      552,
+      480,
+      40
+    ],
+    "padding": "1px 12px 1px 14px",
+    "margin": "24px 0px 0px",
+    "font": "14.5px/normal 400",
+    "color": "rgb(96, 94, 82)"
+  }
+]

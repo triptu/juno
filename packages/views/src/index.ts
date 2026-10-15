@@ -7,11 +7,11 @@ export { AttachmentChips, type AttachmentChipsProps } from './AttachmentChips'
 
 export { AudienceWarning } from './AudienceWarning'
 export { Composer, type ComposerMention } from './Composer'
-export { MentionSuggestions, mentionRowId } from './MentionSuggestions'
+export { MentionSuggestions, mentionRowId, type EmojiSuggestion } from './MentionSuggestions'
 export { ComposerSlot } from './ComposerSlot'
 export { DestinationPickers, type PickerName } from './DestinationPickers'
 export { EmojiPicker } from './EmojiPicker'
-export { EngineNotice, EngineStatusView } from './EngineStatusView'
+export { EngineNotice, EngineStatusView, SyncProgress } from './EngineStatusView'
 export { ImageViewer, type ImageViewerProps } from './ImageViewer'
 
 export { type MessageActions } from './Message'
@@ -27,6 +27,7 @@ export { SendCheckBar, type SendCheckFinding } from './SendCheckBar'
 export { PeekView } from './PeekView'
 
 export { SessionView } from './SessionView'
+export { SetUpJunoView, type SetUpChoice, type SetUpCodex } from './SetUpJunoView'
 export { SignInView } from './SignInView'
 export { Shell } from './Shell'
 export { Sidebar, type SidebarNavTarget } from './Sidebar'
@@ -59,7 +60,8 @@ export {
 // The topic tile, for the header and tab containers in the desktop app, which does not depend on ui.
 export { TopicArt } from '@juno/ui'
 export { NotificationsPage, type HoursKind } from './NotificationsPage'
-export { PreferencesPage } from './PreferencesPage'
+export { SettingsPage } from './SettingsPage'
+export { SettingsAbout, SettingsAppearance, SettingsGeneral, SettingsIgnored } from './SettingsSections'
 export { WhyPopover } from './WhyPopover'
 export { Home } from './Home'
 

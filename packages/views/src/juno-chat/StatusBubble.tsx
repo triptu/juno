@@ -3,7 +3,6 @@ import { memo } from 'react'
 import type { StatusItem } from '@juno/agent-contract'
 import { chat, colors, motion, radii, sizes, spacing } from '@juno/tokens/tokens.stylex'
 import { Text } from '@juno/ui'
-import { JunoMark } from './JunoMark'
 import { groupGap, rowStyles } from './rows'
 
 export interface StatusBubbleProps {
@@ -19,9 +18,6 @@ export interface StatusBubbleProps {
 export const StatusBubble = memo(function StatusBubble({ item }: StatusBubbleProps) {
   return (
     <div data-chat-status={item.runId} role="status" aria-label={item.text ?? 'Juno is working'} {...stylex.props(groupGap.single, rowStyles.row, styles.row)}>
-      <span {...stylex.props(styles.gutter)}>
-        <JunoMark />
-      </span>
       <div {...stylex.props(styles.bubble)}>
         <span aria-hidden {...stylex.props(styles.dots)}>
           <i {...stylex.props(styles.dot, styles.dot1)} />
@@ -56,12 +52,6 @@ const fade = stylex.keyframes({
 const styles = stylex.create({
   row: {
     alignItems: 'center',
-  },
-  gutter: {
-    display: 'inline-flex',
-    flexShrink: 0,
-    alignSelf: 'flex-end',
-    userSelect: 'none',
   },
   bubble: {
     display: 'flex',

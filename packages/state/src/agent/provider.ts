@@ -13,11 +13,12 @@
  */
 import { Schema } from 'effect'
 import * as Atom from 'effect/reactivity/Atom'
-import { ProviderResult, ProviderState, type ProviderChange } from '@juno/contract'
+import { CodexSetup, ProviderResult, ProviderState, type ProviderChange } from '@juno/contract'
 import type { JunoBridge } from '@juno/contract/channels'
 
 const decodeState = Schema.decodeUnknownOption(ProviderState)
 const decodeResult = Schema.decodeUnknownOption(ProviderResult)
+const decodeCodex = Schema.decodeUnknownOption(CodexSetup)
 
 const bridge = (): JunoBridge | undefined => (globalThis as { readonly juno?: JunoBridge }).juno
 
@@ -50,6 +51,18 @@ export async function setAgentProvider(change: ProviderChange): Promise<Provider
   if (juno === undefined) return 'failed'
   const result = decodeResult(await juno.agent.setProvider(change).catch(() => undefined))
   return result._tag === 'Some' ? result.value : 'failed'
+}
+
+/**
+ * Local Codex in Juno's own Codex home (`missing`, `signedOut`, `signedIn`).
+ * With `signIn`, runs Codex's sign-in first, which opens the browser and
+ * resolves once it ends. `missing` outside the app or when main cannot say.
+ */
+export async function codexSetup(signIn = false): Promise<CodexSetup> {
+  const juno = bridge()
+  if (juno === undefined) return 'missing'
+  const result = decodeCodex(await (signIn ? juno.agent.codexSignIn() : juno.agent.codex()).catch(() => undefined))
+  return result._tag === 'Some' ? result.value : 'missing'
 }
 
 /** Resolves once main says a provider is active. */

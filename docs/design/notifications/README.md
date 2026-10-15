@@ -36,7 +36,7 @@ Two sets of hours, one paragraph of plain words, two short lists, and Juno's jud
 4. **People and channels** have three levels, set from their context menu:
    - **Every message** notifies, even outside notification hours. This is the safety valve (#incidents, your manager).
    - **When it matters** is the default. Juno decides. It is not listed on the page.
-   - **Never** notifies, but the messages stay in Juno. Ignore (in Preferences) still exists for hiding a channel entirely.
+   - **Never** notifies, but the messages stay in Juno. Ignore (Settings › Ignored) still exists for hiding a channel entirely.
    - There is no order. If a person and a channel disagree, **Every message wins**, so nothing important is silently lost.
 5. **Away by hand.** The avatar menu has "Set yourself away" or "Set yourself active". It changes presence only, and lasts until the next switch in the active hours.
 6. **Why, on demand.** A message's context menu has "Why did this notify?" or "Why no notification?". A small popover gives the reason in words. If the reason is a setting, it offers Change; if it was Juno's call, Tell Juno opens the chat quoting the message. The page keeps only a one-line Today ("4 messages interrupted you. Juno held 23.") with Show why, which lists the ones that interrupted you and their reasons.

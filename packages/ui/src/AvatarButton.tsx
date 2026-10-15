@@ -5,7 +5,7 @@ import { Avatar, type HueName } from './Avatar'
 import { interactive } from './internal/interactive'
 
 export interface AvatarButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'style' | 'className' | 'children'> {
-  /** Required accessible name, for example "Account and preferences". */
+  /** Required accessible name, for example "Account and settings". */
   readonly label: string
   /** The initials to draw while the photo loads or when there is none. */
   readonly initials: string

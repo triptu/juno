@@ -1,5 +1,5 @@
-import { useLayoutEffect } from 'react'
-import { accentAtom, densityAtom, persistAccent, persistTheme, privacyAtom, resolvedThemeAtom, signedInAtom, themeAtom, type Accent, type Density, type ResolvedTheme, type Theme } from '@juno/state'
+import { lazy, Suspense, useLayoutEffect } from 'react'
+import { accentAtom, densityAtom, junoSetupPendingAtom, persistAccent, persistTheme, privacyAtom, resolvedThemeAtom, signedInAtom, themeAtom, type Accent, type Density, type ResolvedTheme, type Theme } from '@juno/state'
 import { useAtom, useAtomValue } from '@juno/state/react'
 import { AppearanceSettings, applyPrivacy, applyTheme, Shell, type AccentName, type DensityName, type ThemeName, type ThemePreference } from '@juno/views'
 import { Frame } from './containers/Frame'
@@ -7,6 +7,9 @@ import { Peek } from './containers/Peek'
 import { Session } from './containers/Session'
 import { Sidebar } from './containers/Sidebar'
 import { Workspace } from './containers/Workspace'
+
+// Shown once, after a first sign-in, so it loads on demand (performance.md, bundle budget).
+const SetUpJuno = lazy(() => import('./containers/SetUpJuno').then((chunk) => ({ default: chunk.SetUpJuno })))
 
 // The contract's names and the tokens' names must be the same set. These
 // assignments fail to compile if either side drifts.
@@ -34,6 +37,7 @@ export function App() {
   const [accent, setAccent] = useAtom(accentAtom)
   const density = useAtomValue(densityAtom)
   const signedIn = useAtomValue(signedInAtom)
+  const setUpPending = useAtomValue(junoSetupPendingAtom)
 
   useLayoutEffect(() => applyTheme(resolved, accent, density), [resolved, accent, density])
 
@@ -47,9 +51,19 @@ export function App() {
     persistAccent(next)
   }
 
-  // Signed in: the sidebar and the workspace; Preferences holds the
-  // appearance settings. Otherwise the sign-in page is the whole page, with
-  // the appearance block under it.
+  // Signed in: the sidebar and the workspace; Settings holds the
+  // appearance settings. Right after a first sign-in with no model set up,
+  // "Set up Juno" on the same page first. Otherwise the sign-in page is the
+  // whole page, with the appearance block under it.
+  if (signedIn !== undefined && setUpPending) {
+    return (
+      <Shell>
+        <Suspense fallback={null}>
+          <SetUpJuno />
+        </Suspense>
+      </Shell>
+    )
+  }
   if (signedIn !== undefined) {
     return (
       <>

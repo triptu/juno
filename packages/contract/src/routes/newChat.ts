@@ -1,5 +1,5 @@
 /**
- * New chat (spec section 9, inventory 8): the two destination pickers.
+ * New chat (spec section 9, inventory 8): destinations and the two pickers.
  *
  * Live queries, which never call Slack:
  * - `newChat.conversations`: the conversation picker's sections. With an
@@ -7,6 +7,8 @@
  *   people (everyone in the workspace, including people never messaged)
  *   and the matching channels and group DMs you are in. Ignored channels
  *   are left out.
+ * - `newChat.frequent`: up to six local destinations by decayed own sends,
+ *   with member activity as the fallback, DMs first; no archived channels.
  * - `newChat.threads`: the thread picker's rows. With a channel, its
  *   threads by latest activity, followed or not; without one, recent
  *   threads from everywhere. Main is not a row: the renderer puts it first.
@@ -75,4 +77,8 @@ export const newChatThreads = liveValueRoute('newChat.threads', {
   value: Schema.Array(PickThread),
 })
 
-export const NewChatRoutes = RpcGroup.make(newChatConversations, newChatThreads)
+
+/** Up to six local destinations ranked by own recent sends, then activity. */
+export const newChatFrequent = liveValueRoute('newChat.frequent', { value: Schema.Array(PickConversation) })
+
+export const NewChatRoutes = RpcGroup.make(newChatConversations, newChatThreads, newChatFrequent)

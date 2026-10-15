@@ -1,10 +1,9 @@
 import * as stylex from '@stylexjs/stylex'
 import { memo } from 'react'
 import type { JunoBubbleItem, JunoInline } from '@juno/agent-contract'
-import { colors, motion, sizes, spacing } from '@juno/tokens/tokens.stylex'
+import { colors, motion, spacing } from '@juno/tokens/tokens.stylex'
 import { Text } from '@juno/ui'
 import type { ChatActions } from './commands'
-import { JunoMark } from './JunoMark'
 import { QuoteStub } from './QuoteStub'
 import { ReactionBadge } from './ReactionBadge'
 import { InlineLink } from './InlineLink'
@@ -22,8 +21,8 @@ export interface JunoBubbleProps {
 
 /**
  * One Juno bubble (inventory 12). It arrives whole, never streamed, and
- * fades in at full size. The mark sits beside the last bubble of a group;
- * a reply shows its quote above; reactions sit on the top corner out of
+ * fades in at full size. The bubbles carry Juno's voice alone, with no
+ * mark beside them (SPEC 13.1); a reply shows its quote above; reactions sit on the top corner out of
  * flow; React and Reply wait beside it. The slot under a group's last
  * bubble is kept, as the owner's is, so the spacing matches.
  */
@@ -40,7 +39,6 @@ export const JunoBubble = memo(function JunoBubble({ item, now, actions, enter =
         </div>
       ) : null}
       <div {...stylex.props(rowStyles.row, rowStyles.contained)}>
-        <span {...stylex.props(styles.gutter)}>{end ? <JunoMark /> : null}</span>
         <div
           onContextMenu={menu === undefined ? undefined : (event) => menu({ kind: 'juno', id: item.id }, event)}
           {...stylex.props(rowStyles.bubble, rowStyles.anchor, styles.bubble, end && rowStyles.tailStart)}
@@ -107,23 +105,15 @@ const styles = stylex.create({
     animationTimingFunction: motion['--ease-out'],
     animationFillMode: 'both',
   },
-  gutter: {
-    display: 'inline-flex',
-    flexShrink: 0,
-    width: sizes['--avatar-28'],
-    minHeight: sizes['--avatar-28'],
-    userSelect: 'none',
-  },
   bubble: {
     backgroundColor: colors['--surface-hover'],
     color: colors['--foreground-default'],
   },
-  // Above the bubble, past the mark's column: 28px mark plus the 10px gap.
+  // Above the bubble, on its edge.
   quote: {
     display: 'flex',
     maxWidth: '100%',
     boxSizing: 'border-box',
-    paddingInlineStart: `calc(${spacing['--space-7']} + ${spacing['--space-2-5']})`,
     marginBottom: spacing['--space-0-5'],
   },
 })

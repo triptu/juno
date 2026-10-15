@@ -9,7 +9,7 @@ import { Schema as S } from 'effect'
 import { Blocks } from './blocks.ts'
 import { FormNumber, ResponseMetadata } from './common.ts'
 import { Ts } from './ts.ts'
-import { Attachment, File } from './message.ts'
+import { Attachment, BotProfile, File } from './message.ts'
 
 const opt = S.optionalKey
 
@@ -56,10 +56,14 @@ const searchMessageFields = {
   type: opt(S.String),
   user: opt(S.String),
   username: opt(S.String),
+  bot_id: opt(S.String),
+  bot_profile: opt(BotProfile),
+  subtype: opt(S.String),
   text: opt(S.String),
   permalink: opt(S.String),
   thread_ts: opt(Ts),
   reply_count: opt(S.Number),
+  latest_reply: opt(Ts),
   blocks: opt(Blocks),
   attachments: opt(S.Array(Attachment)),
   files: opt(S.Array(File)),
@@ -87,11 +91,15 @@ export const SearchMatch = S.Struct({
   type: opt(S.String),
   user: opt(S.String),
   username: opt(S.String),
+  bot_id: opt(S.String),
+  bot_profile: opt(BotProfile),
+  subtype: opt(S.String),
   ts: opt(Ts),
   text: opt(S.String),
   permalink: opt(S.String),
   thread_ts: opt(Ts),
   reply_count: opt(S.Number),
+  latest_reply: opt(Ts),
   blocks: opt(Blocks),
   attachments: opt(S.Array(Attachment)),
   files: opt(S.Array(File)),

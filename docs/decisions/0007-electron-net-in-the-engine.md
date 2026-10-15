@@ -19,4 +19,5 @@ ADR 0001 v1 said the utility process must use Node `fetch` and attach the `d` co
 - Cookie rotation, proxies, CAs and the TLS fingerprint are Chromium's problem, not ours.
 - The socket handshake is the one hand-held cookie path; it is small, isolated and covered by a fake test that rejects an upgrade without the cookie.
 - Engine tests under Node use the `NodeFetch` layer and a plain `ws` connection to the fake.
+- Chromium sends a request again by itself when a reused connection closes before any answer, POSTs included. A post can then reach Slack twice; ADR 0014 records how Juno deletes the copy.
 - `webRequest` listeners on `persist:slack` also see the engine's requests, so the sign-in body sniff (fallback capture) is unregistered right after capture.

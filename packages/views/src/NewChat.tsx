@@ -1,9 +1,14 @@
 import * as stylex from '@stylexjs/stylex'
 import type { ReactNode } from 'react'
-import { colors, spacing } from '@juno/tokens/tokens.stylex'
+import type { PickConversation } from '@juno/contract'
+import { colors, layout, spacing } from '@juno/tokens/tokens.stylex'
 import { Text } from '@juno/ui'
+import { FrequentConversations } from './FrequentConversations'
 
 export interface NewChatProps {
+  readonly frequent?: ReadonlyArray<PickConversation>
+  readonly selectedConversation?: string | undefined
+  readonly onPickConversation?: (conversation: PickConversation) => void
   /** The destination's latest messages, read-only (a `MessageList`). Nothing before a destination is picked. */
   readonly preview?: ReactNode
   /** One muted line in the middle when there is no preview. */
@@ -20,14 +25,20 @@ export const startOfConversation = (name: string) => `This is the start of your 
 
 /**
  * A New chat in a tab (spec section 9, inventory 8): a topic without its
- * header. The preview, or one muted line, fills the middle; the pickers and
+ * header. Frequent destinations, a preview, or one muted line fill the middle; the pickers and
  * the composer sit at the bottom, where the topic's composer will be.
  */
-export function NewChat({ preview, note = NEW_CHAT_NOTE, composer }: NewChatProps) {
+export function NewChat({ preview, note = NEW_CHAT_NOTE, composer, frequent = [], selectedConversation, onPickConversation }: NewChatProps) {
   return (
     <div data-new-chat="" {...stylex.props(styles.root)}>
       <div {...stylex.props(styles.middle)}>
-        {preview ?? (
+        {frequent.length > 0 && onPickConversation !== undefined ? (
+          <div {...stylex.props(styles.frequentArea)}>
+            <div {...stylex.props(styles.column)}>
+              <FrequentConversations conversations={frequent} selected={selectedConversation} onPick={onPickConversation} />
+            </div>
+          </div>
+        ) : preview ?? (
           <div {...stylex.props(styles.note)}>
             <Text variant="body" tone="muted">
               {note}
@@ -57,6 +68,23 @@ const styles = stylex.create({
     flexDirection: 'column',
     flexGrow: 1,
     minHeight: 0,
+  },
+  frequentArea: {
+    display: 'flex',
+    flexDirection: 'column',
+    flexGrow: 1,
+    paddingInline: spacing['--space-6'],
+    // Include the composer's 8px top inset in the space above its destination chips.
+    paddingTop: spacing['--space-5'],
+    paddingBottom: spacing['--space-3'],
+    overflowY: 'auto',
+  },
+  column: {
+    width: '100%',
+    maxWidth: layout['--composer-width'],
+    marginInline: 'auto',
+    marginBlock: 'auto',
+    boxSizing: 'border-box',
   },
   note: {
     display: 'flex',

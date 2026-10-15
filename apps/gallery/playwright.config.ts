@@ -1,7 +1,10 @@
 import { defineConfig } from '@playwright/test'
 
-// GALLERY_PORT lets two worktrees run the tests at the same time.
-const port = Number(process.env.GALLERY_PORT ?? 4174)
+// Each worktree gets its own port, so a local run never reuses a gallery
+// server another worktree left running (reuseExistingServer below).
+// GALLERY_PORT overrides it.
+const worktreeOffset = [...import.meta.dirname].reduce((hash, char) => (hash * 31 + char.charCodeAt(0)) % 997, 7)
+const port = Number(process.env.GALLERY_PORT ?? 4174 + worktreeOffset)
 // One id per run, set before the workers start, so the shift guard's parts share one queue.
 process.env.GALLERY_SHIFT_RUN ??= `${Date.now()}-${process.pid}`
 // JUNO_SHARD=i/n (pnpm remote --shards n): shard 0 runs every test; the others
@@ -38,7 +41,7 @@ export default defineConfig({
   projects: [
     // Wide enough for the 240px switcher plus the widest frame (1400px).
     { name: 'shots', testMatch: 'shots.spec.ts', use: { viewport: { width: 1800, height: 1000 } } },
-    { name: 'behaviour', testMatch: ['behaviour.spec.ts', 'shift.spec.ts', 'geometry.spec.ts'] },
+    { name: 'behaviour', testMatch: ['behaviour.spec.ts', 'shift.spec.ts', '*geometry.spec.ts', 'attachment-images.spec.ts', 'settings.spec.ts'] },
   ],
   webServer: {
     command: `pnpm exec vite preview --port ${port} --strictPort`,

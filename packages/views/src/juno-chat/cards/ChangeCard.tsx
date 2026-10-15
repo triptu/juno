@@ -46,6 +46,12 @@ export function ChangeCard({ card, actions, enter }: ChangeCardProps) {
           {card.caption}
         </Text>
       ) : null}
+      {/* Why the auto-review asked: fixed copy, never the model's words. */}
+      {card.review !== undefined ? (
+        <Text variant="meta" tone="muted" as="p" data-change-review={card.review.intent ?? (card.review.failed ? 'failed' : 'none')}>
+          {card.review.line}
+        </Text>
+      ) : null}
     </ChatCard>
   )
 }

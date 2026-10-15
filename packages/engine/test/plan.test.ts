@@ -13,7 +13,7 @@ import { reactionsStatement, threadsStatements, threadTitlesStatement, windowSta
 import { homeStatements } from '../src/home/query'
 import { staleStatement } from '../src/home/job'
 import { automatedStatements } from '../src/automatedView'
-import { pickerStatements } from '../src/newchat/query'
+import { frequentConversationsStatement, frequentSendsStatement, pickerStatements } from '../src/newchat/query'
 import { mentionStatements } from '../src/mentions/query'
 import { searchStatements } from '../src/search/query'
 import { countsStatement as allTopicsCountsStatement, orderStatement, placesStatement } from '../src/topics/allTopics'
@@ -147,6 +147,9 @@ describe('query plans', () => {
 
   it.effect('the New chat pickers read topic_index through an index', () =>
     Effect.gen(function* () {
+      assert.deepStrictEqual(scans(yield* plan(frequentConversationsStatement, [])), [])
+      const sends = frequentSendsStatement('U0SELF', 1_800_000_000_000)
+      assert.deepStrictEqual(scans(yield* plan(sends.sql, sends.params)), [])
       for (const channel of [undefined, 'C0ENG']) {
         for (const match of [undefined, 'cutover*']) {
           const { recent, threads } = pickerStatements('1700000000.000000', channel, match)

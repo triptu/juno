@@ -1,7 +1,7 @@
 export { liveQuery, runCommand, type LiveListAtom, type LiveValueAtom } from './atoms'
 export { configureConnection, connectionStateAtom, makeRegistry, registry, restartEngine, type Registry } from './client'
-export { engineStatusAtom, pingCommand, syncNoticeAtom } from './engine'
-export { importFromSlackAppCommand, sessionStatusAtom, signedInAtom, signInCommand, signOutCommand } from './session'
+export { engineStatusAtom, pingCommand, syncNoticeAtom, syncProgressAtom } from './engine'
+export { importFromSlackAppCommand, junoSetupPendingAtom, sessionStatusAtom, signedInAtom, signInCommand, signOutCommand } from './session'
 export { viewPillsAtom, viewSheetAtom, viewsAtom, type ViewSheetState } from './views'
 export { defaultTopicListFilter, topicCountsAtom, topicListAtom, type TopicListFilter } from './topics'
 export {
@@ -14,7 +14,7 @@ export {
   type AllTopicsLayout,
 } from './allTopics'
 export { mirrorReadsAtom, shouldMarkRead } from './reads'
-export { isPeekKey, peekKeyAtom, setPeekKey, type PeekKey } from './peek'
+export { isPeekKey, peekKeyAtom, setPeekKey } from './peek'
 export { newTabPageAtom, setNewTabPage } from './newTabPage'
 export {
   currentRowAtom,
@@ -65,8 +65,7 @@ export {
   homePlace,
   junoPagePlace,
   junoPlace,
-  notificationsPlace,
-  preferencesPlace,
+  openSettingsSection,
   newChatPlace,
   openPlace,
   reopenClosedTab,
@@ -81,6 +80,7 @@ export {
   topicPlace,
   updateTabs,
   type OpenOptions,
+  type JunoTabPage,
   type Place,
   type ScrollSnapshot,
   type Tab,
@@ -90,6 +90,7 @@ export {
 export {
   emptyNewChat,
   newChatAtom,
+  frequentConversationsAtom,
   pickConversation,
   pickConversationsAtom,
   pickThread,
@@ -99,7 +100,7 @@ export {
   untouched,
   type NewChat,
 } from './newChat'
-export { mentionChannelsAtom, mentionPeopleAtom, onFirstMentionAnswer, type MentionPlace } from './mentions'
+export { composerEmojiAtom, mentionChannelsAtom, mentionPeopleAtom, onFirstMentionAnswer, type MentionPlace } from './mentions'
 export {
   checkMessage,
   deleteMessage,
@@ -177,15 +178,18 @@ export {
   junoChatTargetAtom,
   junoFocusAtom,
   junoPanelOpenAtom,
+  junoPanelWidthAtom,
   junoQuoteAtom,
   messageFlashAtom,
   openedAtNewAtom,
   quoteInJuno,
   setJunoPanelOpen,
+  setJunoPanelWidth,
   showInJunoChat,
 } from './junoPanel'
 export {
   freezeHome,
+  homeGreeting,
   homeShownAtom,
   homeViewAtom,
   markFollowUpDone,

@@ -351,7 +351,10 @@ export class FakeServer {
         ws.send(JSON.stringify(encodeRtmFrame({ type: 'pong', reply_to: frame['id'] })))
       } else if (frame['type'] === 'presence_sub' && Array.isArray(frame['ids'])) {
         const users = frame['ids'].filter((id): id is string => typeof id === 'string' && this.workspace.users.has(id))
-        if (users.length > 0) ws.send(JSON.stringify(encodeRtmFrame({ type: 'presence_change', presence: 'active', users })))
+        const self = users.filter((id) => id === this.workspace.selfId && this.workspace.manualPresence === 'away')
+        const others = users.filter((id) => !self.includes(id))
+        if (others.length > 0) ws.send(JSON.stringify(encodeRtmFrame({ type: 'presence_change', presence: 'active', users: others })))
+        if (self.length > 0) ws.send(JSON.stringify(encodeRtmFrame({ type: 'presence_change', presence: 'away', users: self })))
       }
     })
     ws.send(JSON.stringify(encodeRtmFrame({ type: 'hello', region: 'fake', host_id: 'fake-1', fast_reconnect: false, start: true })))
@@ -423,6 +426,8 @@ export class FakeServer {
 
   #run<M extends MethodName>(method: M, fields: FormFields): ApiError | { ok: true } {
     const definition = Methods[method]
+    // Slack's own error for a presence it does not take (`auto` is the public API's word, not this method's).
+    if (method === 'presence.set' && fields['presence'] !== 'active' && fields['presence'] !== 'away') return new ApiError('invalid_presence')
     let args: (typeof definition)['args']['Type']
     try {
       args = Schema.decodeUnknownSync(definition.args)(fields) as (typeof definition)['args']['Type']
@@ -449,13 +454,15 @@ export class FakeServer {
 
   async #edge(method: string, request: IncomingMessage, response: ServerResponse): Promise<void> {
     const body = parseJson(await readBody(request))
-    const record = (status: number, payload: { ok: boolean; error?: string }) => {
+    const record = async (status: number, payload: { ok: boolean; error?: string }) => {
       this.calls.push({ at: this.workspace.clock.now(), kind: 'edge', method, args: redact(stringify(body)), status, ok: payload.ok, ...(payload.error === undefined ? {} : { error: payload.error }) })
+      await this.#hold(this.#holds, `edge:${method}`, redact(stringify(body)))
       json(response, status, payload)
     }
     const token = typeof body['token'] === 'string' ? body['token'] : undefined
     const auth = this.#authenticate(parseCookies(request.headers.cookie)['d'], token)
     if (typeof auth === 'string') return record(200, { ok: false, error: auth })
+    await this.#hold(this.#stalls, `edge:${method}`, redact(stringify(body)))
     const limit = this.#takeRateLimit(`edge:${method}`)
     if (limit !== undefined) {
       response.setHeader('Retry-After', String(limit.retryAfter))
@@ -472,7 +479,7 @@ export class FakeServer {
     const ids = args.ids ?? Object.keys(args.updated_ids ?? {})
     const results = ids.flatMap((id) => this.workspace.users.get(id) ?? [])
     const failed = ids.filter((id) => !this.workspace.users.has(id))
-    record(200, Schema.encodeSync(EdgeUsersInfoOk)({ ok: true, results, failed_ids: failed, pending_ids: [], invalid_ids: [] }))
+    await record(200, Schema.encodeSync(EdgeUsersInfoOk)({ ok: true, results, failed_ids: failed, pending_ids: [], invalid_ids: [] }))
   }
 
   /**
@@ -507,6 +514,8 @@ export class FakeServer {
 
   /** Serves a file's bytes; `?download=1` asks the browser to save it. Thumb urls get the original bytes. */
   async #file(fileId: string, download: boolean, response: ServerResponse): Promise<void> {
+    await this.#hold(this.#stalls, 'file:bytes', { fileId })
+    await this.#hold(this.#holds, 'file:bytes', { fileId })
     if (this.#fileDelayMs > 0) await new Promise((resolve) => setTimeout(resolve, this.#fileDelayMs))
     const stored = this.workspace.files.get(fileId)
     if (stored?.bytes === undefined) return json(response, 404, { ok: false, error: 'file_not_found' })

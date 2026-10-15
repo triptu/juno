@@ -5,7 +5,7 @@
  */
 import * as AsyncResult from 'effect/reactivity/AsyncResult'
 import * as Atom from 'effect/reactivity/Atom'
-import { mentionsChannels, mentionsPeople, type MentionChannel, type MentionPerson } from '@juno/contract'
+import { mentionsChannels, mentionsEmoji, mentionsPeople, type MentionChannel, type MentionPerson } from '@juno/contract'
 import { registry } from './client'
 import { liveQuery } from './atoms'
 
@@ -60,3 +60,7 @@ export function onFirstMentionAnswer(
       : registry.subscribe(mentionChannelsAtom(query), answer, { immediate: true })
   return end
 }
+
+/** Read workspace emoji only while a colon query needs them. */
+const emojiFamily = liveQuery(mentionsEmoji)
+export const composerEmojiAtom = (open: boolean) => open ? emojiFamily(undefined) : closed

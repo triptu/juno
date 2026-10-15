@@ -166,10 +166,12 @@ const styles = stylex.create({
     display: 'inline-flex',
     minWidth: 0,
   },
+  // A panel that hangs off the title bar (the avatar menu) is not part of its drag region.
   panel: {
     position: 'absolute',
     // A popover hung off an island in a header layer that lets the pointer through still takes it.
     pointerEvents: 'auto',
+    WebkitAppRegion: 'no-drag',
   },
   surface: {
     display: 'flex',

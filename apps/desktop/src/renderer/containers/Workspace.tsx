@@ -6,10 +6,12 @@ import {
   currentPlace,
   junoAvailableAtom,
   junoPanelOpenAtom,
+  junoPanelWidthAtom,
   mountedTabs,
   newTabPageAtom,
   onMenuCommand,
   registry,
+  setJunoPanelWidth,
   sidebarLayoutAtom,
   startVisitLog,
   tabsAtom,
@@ -19,6 +21,7 @@ import {
   type Tabs,
   type TabSummary,
 } from '@juno/state'
+import { JUNO_PANEL_WIDTH } from '@juno/contract'
 import { useAtomValue } from '@juno/state/react'
 import { TopicArt, Workspace as WorkspaceView, type ActivateEvent, type WorkspaceTab, type WorkspaceTabIcon } from '@juno/views'
 import { HomePage } from './Home'
@@ -34,8 +37,7 @@ import { hasArt, TopicTab } from './TopicView'
 /** The All topics page is its own chunk (performance 2.1), loaded on idle once the window is up. */
 const AllTopicsPage = lazy(loadAllTopicsPage)
 // Rare pages load on first open, to keep the first bundle in budget.
-const NotificationsPage = lazy(() => import('./Notifications').then((chunk) => ({ default: chunk.NotificationsPage })))
-const PreferencesPage = lazy(() => import('./Preferences').then((chunk) => ({ default: chunk.PreferencesPage })))
+const SettingsTab = lazy(() => import('./Settings').then((chunk) => ({ default: chunk.SettingsTab })))
 
 const kindIcons: Record<TopicDetail['channel']['kind'], WorkspaceTabIcon> = {
   public: 'hash',
@@ -59,15 +61,13 @@ function stripTab(summary: TabSummary): WorkspaceTab {
         ? { ...base, title: 'Home', icon: 'home' }
         : place.kind === 'allTopics'
           ? { ...base, title: 'All topics', icon: 'all-topics' }
-          : place.kind === 'notifications'
-            ? { ...base, title: 'Notifications', icon: 'notifications' }
-            : place.kind === 'preferences'
-              ? { ...base, title: 'Preferences', icon: 'preferences' }
-              : place.kind === 'juno'
-                ? { ...base, title: 'Juno', icon: 'juno' }
-                : place.kind === 'junoPage'
-                  ? { ...base, title: chatCopy.pageTitles[place.page], icon: place.page === 'settings' ? 'preferences' : 'juno' }
-                  : {
+          : place.kind === 'settings'
+            ? { ...base, title: 'Settings', icon: 'settings' }
+            : place.kind === 'juno'
+              ? { ...base, title: 'Juno', icon: 'juno' }
+              : place.kind === 'junoPage'
+                ? { ...base, title: chatCopy.pageTitles[place.page], icon: 'juno' }
+                : {
           ...base,
           title: detail == null ? '' : detail.kind === 'main' ? detail.channel.name : detail.title,
           icon: detail == null ? 'hash' : kindIcons[detail.channel.kind],
@@ -100,16 +100,10 @@ function Page({ tab }: { readonly tab: Tab }) {
           <JunoPageTab page={place.page} />
         </Suspense>
       )
-    case 'notifications':
+    case 'settings':
       return (
-        <Suspense key="notifications" fallback={null}>
-          <NotificationsPage />
-        </Suspense>
-      )
-    case 'preferences':
-      return (
-        <Suspense key="preferences" fallback={null}>
-          <PreferencesPage />
+        <Suspense key="settings" fallback={null}>
+          <SettingsTab section={place.section} />
         </Suspense>
       )
     case 'allTopics':
@@ -135,6 +129,14 @@ function tabMenu(id: string): void {
   void showTabMenu(id)
 }
 
+function resizePanel(width: number): void {
+  setJunoPanelWidth(registry, width)
+}
+
+function resetPanelWidth(): void {
+  setJunoPanelWidth(registry, JUNO_PANEL_WIDTH.default)
+}
+
 /** The mouse's back and forward buttons. */
 function onMouseUp(event: MouseEvent): void {
   if (event.button === 3) stepTabHistory(-1)
@@ -156,9 +158,10 @@ export function Workspace() {
   const strip = useAtomValue(tabStripAtom)
   const sidebarHidden = useAtomValue(sidebarLayoutAtom, (layout) => layout.collapsed)
   const mounted = mountedTabs(state)
-  // The Juno panel shows beside a topic tab while it is open, and never on a page (SPEC 7).
+  // The Juno panel shows beside a topic tab while it is open in that tab, and never on a page (SPEC 7).
   const agentOn = useAtomValue(junoAvailableAtom)
   const panelOpen = useAtomValue(junoPanelOpenAtom)
+  const panelWidth = useAtomValue(junoPanelWidthAtom)
   const panelTopic = useAtomValue(tabsAtom, activeTopicOf)
   const newTabPage = useAtomValue(newTabPageAtom)
 
@@ -205,6 +208,9 @@ export function Workspace() {
           </Suspense>
         ) : undefined
       }
+      sideWidth={panelWidth}
+      onSideResize={resizePanel}
+      onSideResetWidth={resetPanelWidth}
     >
       {pages.length === 0
         ? undefined

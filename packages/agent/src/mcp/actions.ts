@@ -1,10 +1,10 @@
 import { Schema } from 'effect'
 import { CardPayload, digestJson, type ExecutableIdentity } from '@juno/agent-cards'
-import type { Executor } from '../actions/executor'
+import type { Executor, ExecutorResult } from '../actions/executor'
 import { memoryGen } from '../actions/cards'
 import { uuidv7 } from '../store/store'
 import type { McpManagerApi } from './manager'
-import { McpError, destructiveArguments } from './types'
+import { denied, destructiveArguments } from './types'
 import { json, parseObject, validateArguments } from './catalogue'
 import { notionCheck, notionPreconditions, notionReconcile } from './notion'
 
@@ -13,6 +13,31 @@ const connectHash = (manager: McpManagerApi, id: string) => digestJson(json(mana
 const identity = (manager: McpManagerApi, id: string, payload: ExecutableIdentity) => {
   const row = manager.stored(id)
   return payload.connection_id !== id ? 'connectionChanged' : payload.account_id !== row.epoch ? 'accountChanged' : 'valid'
+}
+
+/**
+ * Whether a call looks like a delete in its own terms: the tool's name, the
+ * operation in its arguments, or the server's own destructive mark. It only
+ * ever makes the review's risk answer stricter (`floorRisk`), never looser.
+ */
+export function looksDestructive(manager: McpManagerApi, id: string, name: string, args: unknown): boolean {
+  const annotations = parseObject(parseObject(JSON.parse(manager.tool(id, name).definition)).annotations ?? {})
+  return denied(name) || destructiveArguments(args) || annotations.destructiveHint === true
+}
+
+/**
+ * One write, after its authorization and attempt are recorded: the tool's
+ * result for the model, and what the ledger records. Never retried; anything
+ * the server does not confirm is unknown.
+ */
+export async function runWrite(manager: McpManagerApi, id: string, name: string, payload: ExecutableIdentity): Promise<{ readonly result: ExecutorResult; readonly value?: Awaited<ReturnType<McpManagerApi['invoke']>> }> {
+  try {
+    // Recheck after asynchronous preconditions, before opening the transport.
+    if (identity(manager, id, payload) !== 'valid' || manager.tool(id, name).hash !== payload.schema_hash) return { result: { _tag: 'failed', detail: 'The connection or tool changed.' } }
+    const value = await manager.invoke(id, name, payload.args, true)
+    // MCP isError is not proof that a server made no partial change.
+    return { value, result: value.isError ? { _tag: 'unknown', detail: 'The server reported an error.' } : { _tag: 'done', receipt: { confirmed: true } } }
+  } catch { return { result: { _tag: 'unknown', detail: 'The server did not confirm the change.' } } }
 }
 
 export function mcpExecutors(manager: McpManagerApi): ReadonlyArray<Executor> {
@@ -40,15 +65,7 @@ export function mcpExecutors(manager: McpManagerApi): ReadonlyArray<Executor> {
           return 'valid'
         } catch { return 'preconditionFailed' }
       },
-      run: async ({ payload }) => {
-        try {
-          // Recheck after asynchronous preconditions, before opening the transport.
-          if (identity(manager, config.id, payload) !== 'valid' || manager.tool(config.id, tool.name).hash !== payload.schema_hash) return { _tag: 'failed', detail: 'The connection or tool changed.' }
-          const result = await manager.invoke(config.id, tool.name, payload.args, true)
-          // MCP isError is not proof that a server made no partial change.
-          return result.isError ? { _tag: 'unknown', detail: 'The server reported an error.' } : { _tag: 'done', receipt: { confirmed: true } }
-        } catch { return { _tag: 'unknown', detail: 'The server did not confirm the change.' } }
-      },
+      run: async ({ payload }) => (await runWrite(manager, config.id, tool.name, payload)).result,
       reconcile: async ({ payload }) => {
         if (identity(manager, config.id, payload) !== 'valid' || tool.name !== 'notion-update-page') return { _tag: 'unknown' }
         try {
@@ -72,7 +89,6 @@ function child(manager: McpManagerApi, id: string, tool: string, hash: string, a
 export async function changeCard(manager: McpManagerApi, id: string, name: string, args: unknown): Promise<CardPayload> {
   const tool = manager.tool(id, name)
   const parsed = parseObject(args)
-  if (destructiveArguments(parsed)) throw new McpError({ reason: 'destructive', message: 'Juno does not offer destructive operations.' })
   validateArguments(tool.definition, parsed)
   await manager.checkSecrets(parsed)
   const preconditions = await notionPreconditions(manager, id, name, parsed)

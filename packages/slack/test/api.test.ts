@@ -122,6 +122,35 @@ describe('SlackApi.call', () => {
     }),
   )
 
+  it.live('background methods have independent tiers and queued calls respect a new Retry-After', () =>
+    Effect.gen(function* () {
+      const fake = yield* fakeSlack
+      const program = Effect.gen(function* () {
+        const api = yield* SlackApi
+        const queue = yield* RequestQueue
+        const history = api.call('conversations.history', { channel: CHANNEL, limit: 1 }, { lane: 'background' })
+        yield* history
+        const waiting = yield* Effect.forkScoped(history)
+        yield* api.call('client.counts', {}, { lane: 'background' })
+        // The history call is already waiting for its slot when the pause arrives.
+        const pausedAt = Date.now()
+        yield* queue.pause('conversations.history', 1_500)
+        yield* Fiber.join(waiting)
+        yield* history
+        const calls = fake.calls.filter((call) => call.method === 'conversations.history')
+        assert.lengthOf(calls, 3)
+        assert.isAtLeast(calls[1]!.at - pausedAt, 1_450)
+        // A 429 doubles the Tier 3 interval for this session.
+        assert.isAtLeast(calls[2]!.at - calls[1]!.at, 2_350)
+        const counts = fake.calls.find((call) => call.method === 'client.counts')!
+        assert.isBelow(counts.at, calls[1]!.at)
+        assert.isTrue(fake.calls.every((call) => call.status === 200))
+      })
+      yield* program.pipe(Effect.provide(clientLayer(fake, { lanes: { backgroundConcurrency: 1 } })))
+    }),
+    10_000,
+  )
+
   it.effect('a flood of background calls does not starve the interactive lane', () =>
     Effect.gen(function* () {
       const fake = yield* fakeSlack

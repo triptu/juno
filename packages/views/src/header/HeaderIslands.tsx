@@ -31,6 +31,26 @@ export interface HeaderIslandsProps {
  * width alone.
  */
 export function HeaderIslands({ column, left, right, data, wrapLeft }: HeaderIslandsProps) {
+  // The panel floats already, so its header is the islands' row with no
+  // surfaces of its own: the controls sit on the panel, 4px in from its top
+  // corners, on the same line as the topic's islands.
+  if (column === 'panel') {
+    return (
+      <header {...data} {...stylex.props(styles.root)}>
+        <HeaderBand surface="panel" />
+        <div {...stylex.props(styles.row, columns.panel)}>
+          <div data-island="left" {...stylex.props(styles.bare, styles.left, styles.bareLeft)}>
+            {left}
+          </div>
+          {right === undefined ? null : (
+            <div data-island="right" {...stylex.props(styles.bare, styles.right)}>
+              {right}
+            </div>
+          )}
+        </div>
+      </header>
+    )
+  }
   const island = (
     <Surface kind="island" data-island="left" sx={styles.left}>
       {left}
@@ -86,11 +106,24 @@ const styles = stylex.create({
   right: {
     flexShrink: 0,
   },
+  // An island's row with no surface: the island's height and gap, so the 28px controls sit 4px from the row's edges.
+  bare: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: spacing['--space-0-5'],
+    height: layout['--header-island-height'],
+    minWidth: 0,
+    pointerEvents: 'auto',
+  },
+  bareLeft: {
+    paddingInlineStart: 0,
+  },
 })
 
 // The islands' outer edges line up with the column's: the composer's edges in a topic, the chat's in the Juno tab.
 const columns = stylex.create({
   reading: { maxWidth: layout['--reading-width'], paddingInline: spacing['--space-6'] },
   page: { maxWidth: layout['--page-width'], paddingInline: spacing['--space-8'] },
-  panel: { paddingInline: spacing['--space-3'] },
+  // (36 - 28) / 2: the controls nest in the panel's 18px corners.
+  panel: { paddingInline: `calc((${layout['--header-island-height']} - ${sizes['--control-28']}) / 2)` },
 })

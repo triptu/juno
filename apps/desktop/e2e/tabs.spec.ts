@@ -203,8 +203,8 @@ test('closing the last tab opens a new tab: a New chat, or Home once Settings sa
   await expect(juno.newChat.composer).toBeFocused()
 
   // Settings › General: a new tab opens Home.
-  await juno.openPreferences()
-  const home = juno.preferences.root.getByRole('radiogroup', { name: 'New tabs open' }).getByRole('radio', { name: 'Home' })
+  await juno.openSettings('General')
+  const home = juno.settings.root.getByRole('radiogroup', { name: 'New tabs open' }).getByRole('radio', { name: 'Home' })
   await home.click()
   await expect(home).toHaveAttribute('aria-checked', 'true')
   await expect(tabs.newTabButton).toHaveAccessibleName('New tab ⌘T')

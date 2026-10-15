@@ -41,8 +41,19 @@ describe('first words', () => {
     ['one two three four five six – seven', 'one two three four five six…'],
     // A text that is not cut keeps its punctuation.
     ['Final copy for pricing is in.', 'Final copy for pricing is in.'],
+    // Slack's text is escaped: entities decode, links read as their label, a quote line is still dropped.
+    ['is the granola mcp -&gt; action items flow live?', 'is the granola mcp -> action…'],
+    ['a &lt; b &amp;&amp; c', 'a < b && c'],
+    ['&gt; quoted line\nactual reply here', 'actual reply here'],
+    ['see <https://example.com/x?a=1&amp;b=2|the doc> now', 'see the doc now'],
+    ['*Heads up*: deploy at 2pm', 'Heads up: deploy at 2pm'],
   ])('%j → %j', (text, expected) => {
     expect(firstWords(text)).toBe(expected)
+  })
+
+  it('names the people a title mentions, and never shows their id', () => {
+    expect(firstWords('<@U0MAYA> can you review the doc today', 6, { user: (id) => (id === 'U0MAYA' ? 'Maya' : undefined) })).toBe('@Maya can you review the doc…')
+    expect(firstWords('<@U0MAYA> can you review')).toBe('@Someone can you review')
   })
 })
 

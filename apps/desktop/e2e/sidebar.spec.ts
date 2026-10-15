@@ -177,6 +177,19 @@ test('the empty state offers to clear the filters, and shows at once when it was
   await sidebar.row(POSTGRES).expectVisible()
 })
 
+test('during the first sync the list says Juno is getting the topics, not that it is quiet', async ({ juno, fake }) => {
+  // Hold the first boot call, so nothing has arrived when the window opens.
+  fake.holdNext({ method: 'client.userBoot', before: true })
+  await juno.signIn()
+  const { sidebar } = juno
+  await sidebar.expectEmpty('Getting your topics')
+  await expect(sidebar.list.getByText("It's quiet")).toHaveCount(0)
+
+  fake.release({ method: 'client.userBoot' })
+  await juno.waitForSync()
+  await sidebar.row(POSTGRES).expectVisible()
+})
+
 test('a reply from another client updates its row in place and moves it to the top', async ({ juno, fake }) => {
   await juno.signIn()
   await juno.waitForSync()
@@ -385,11 +398,11 @@ test('zooming in from the View menu keeps the whole sidebar inside the window', 
   expect(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.webContents.getZoomFactor())).toBeGreaterThan(1.9)
   const right = (selector: string) => win.evaluate((query) => ({ right: document.querySelector(query)!.getBoundingClientRect().right, width: window.innerWidth }), selector)
   await expect.poll(async () => { const { right: edge, width } = await right('aside'); return edge <= width }).toBe(true)
-  const account = await right('aside [aria-label="Account and preferences"]')
+  const account = await right('aside [aria-label="Account and settings"]')
   expect(account.right).toBeLessThanOrEqual(account.width)
 
   // The account menu ends inside the window; what does not fit scrolls inside it.
-  await win.evaluate(() => document.querySelector<HTMLElement>('aside [aria-label="Account and preferences"]')!.click())
+  await win.evaluate(() => document.querySelector<HTMLElement>('aside [aria-label="Account and settings"]')!.click())
   const menu = () => win.evaluate(() => ({ bottom: document.querySelector('[role="dialog"][aria-label="Account"]')?.getBoundingClientRect().bottom ?? Infinity, height: window.innerHeight }))
   await expect.poll(async () => { const { bottom, height } = await menu(); return bottom <= height }).toBe(true)
   await win.keyboard.press('Escape')

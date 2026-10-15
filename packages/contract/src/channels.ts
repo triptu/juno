@@ -26,6 +26,10 @@ export const Channels = {
   agentProvider: 'agent.provider',
   /** Sets up, removes or switches the agent's provider; keys go to the keychain. */
   agentSetProvider: 'agent.setProvider',
+  /** Local Codex in Juno's own Codex home: missing, signed out or signed in. */
+  agentCodex: 'agent.codex',
+  /** Signs in to Codex in Juno's own Codex home (Codex opens the browser); the status after. */
+  agentCodexSignIn: 'agent.codexSignIn',
   /** A folder picker for the backup folder or a backup to restore from; the chosen path, or null. */
   agentChooseFolder: 'agent.chooseFolder',
   /** The recovery phrase from the last export, once; null after that. */
@@ -77,7 +81,7 @@ export const Events = {
  * The app-menu items main hands to the renderer (architecture, shortcuts):
  * the tab keys, Back and Forward (also the three-finger swipe), Hide
  * Sidebar, Hide Message Text (⌃⌘H), ⌘J for Juno, ⌘K for the palette, Edit › Undo, which undoes typing in a text field or else
- * Juno's last action, and Settings (⌘,), which opens Preferences.
+ * Juno's last action, and Settings (⌘,), which opens Settings.
  */
 export type MenuCommand =
   /** ⌘T: a new tab with what Settings › General chooses. */
@@ -96,7 +100,7 @@ export type MenuCommand =
   | 'juno.toggle'
   | 'palette.toggle'
   | 'edit.undo'
-  | 'preferences.open'
+  | 'settings.open'
 
 /** One item of a context menu the renderer asks for, or a separator. */
 export type ContextMenuLeaf =
@@ -123,6 +127,9 @@ export interface ContextMenuAt {
 
 /** The sidebar's width range in CSS pixels, and the width a double-click on its edge resets to (spec section 4). */
 export const SIDEBAR_WIDTH = { min: 280, max: 480, default: 384 } as const
+
+/** The Juno panel's width in CSS pixels: `--juno-panel-min-width`, `--juno-panel-max-width` and `--juno-panel-width`. */
+export const JUNO_PANEL_WIDTH = { min: 360, max: 640, default: 440 } as const
 
 /** The tag the preload puts on the `window.postMessage` that forwards the port. */
 export const PORT_HANDOFF_TAG = 'juno.enginePort'
@@ -178,6 +185,10 @@ export interface JunoBridge {
     readonly provider: () => Promise<unknown>
     /** Applies a `ProviderChange`; resolves with a `ProviderResult`. The agent starts or stops to match. */
     readonly setProvider: (change: ProviderChange) => Promise<unknown>
+    /** Local Codex (`CodexSetup`): `missing` when the CLI is not installed, else signed in or out in Juno's own Codex home. */
+    readonly codex: () => Promise<unknown>
+    /** Runs Codex's sign-in in Juno's own Codex home, which opens the browser; resolves with the `CodexSetup` after. A signed-in Codex starts the agent. */
+    readonly codexSignIn: () => Promise<unknown>
     /** Calls `listener` with each new `ProviderState`, undecoded. Returns the unsubscribe. */
     readonly onProvider: (listener: (state: unknown) => void) => () => void
     /** Shows the folder picker; resolves with the chosen absolute path, or null when cancelled. */

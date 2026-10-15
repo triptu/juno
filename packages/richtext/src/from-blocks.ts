@@ -1,6 +1,6 @@
 /** Slack `blocks` → `MessageBody`. `rich_text` is rendered faithfully; layout blocks get a plain rendering. */
 import type { Block as SlackBlock, RichTextElement, RichTextInline, RichTextListStyle, TextObject } from '@juno/slack-schema'
-import type { Block, Inline, ListStyle, Lookups, MessageBody } from './model'
+import type { ContentBlock as Block, Inline, ListStyle, Lookups } from './model'
 import { channelInline, dateInline, emojiInline, inlineText, normalize, textRuns, toStyle, usergroupInline, userInline } from './inline'
 import { mrkdwnBlocks, mrkdwnInlines } from './from-mrkdwn'
 
@@ -107,7 +107,8 @@ function blocksFromMessageBlock(block: SlackBlock, lookups: Lookups): Block[] {
     case 'section': {
       const out: Block[] = []
       if (block.text) out.push(...(block.text.type === 'mrkdwn' ? mrkdwnBlocks(block.text.text, lookups) : paragraphOf(textObjectInlines(block.text, lookups))))
-      for (const field of block.fields ?? []) out.push(...paragraphOf(textObjectInlines(field, lookups)))
+      if (block.fields?.length) out.push({ kind: 'fields', items: block.fields.map((field) => textObjectInlines(field, lookups)) })
+      if (block.accessory !== null && typeof block.accessory === 'object') out.push(...unknownBlocks(Object.fromEntries(Object.entries(block.accessory)), lookups))
       return out
     }
     case 'header': {
@@ -117,17 +118,19 @@ function blocksFromMessageBlock(block: SlackBlock, lookups: Lookups): Block[] {
     case 'context': {
       const children: Inline[] = []
       for (const el of block.elements) {
-        if (el.type !== 'mrkdwn' && el.type !== 'plain_text') continue
+        if (el.type === 'image') { children.push(...textRuns(el.alt_text)); continue }
+        if (el.type === 'unknown') { children.push(...textRuns(unknownText(el.raw))); continue }
         if (children.length > 0) children.push({ kind: 'text', text: ' ' })
         children.push(...textObjectInlines(el, lookups))
       }
-      return paragraphOf(normalize(children))
+      return children.length ? [{ kind: 'context', children: normalize(children) }] : []
     }
     case 'divider':
       return [{ kind: 'divider' }]
     case 'image':
+      return block.image_url ? [{ kind: 'image', url: block.image_url, alt: block.alt_text }] : paragraphOf(textRuns(block.alt_text))
     case 'unknown':
-      return []
+      return unknownBlocks(block.raw, lookups)
   }
 }
 
@@ -136,6 +139,14 @@ function paragraphOf(children: Inline[]): Block[] {
 }
 
 /** Renders `blocks`. Returns an empty body when nothing in them is renderable. */
-export function bodyFromBlocks(blocks: ReadonlyArray<SlackBlock>, lookups: Lookups = {}): MessageBody {
+export function bodyFromBlocks(blocks: ReadonlyArray<SlackBlock>, lookups: Lookups = {}): { readonly blocks: ReadonlyArray<Block> } {
   return { blocks: blocks.flatMap((block) => blocksFromMessageBlock(block, lookups)) }
+}
+
+function unknownBlocks(raw: Readonly<Record<string, unknown>>, lookups: Lookups): Block[] {
+  if (typeof raw.image_url === 'string') return [{ kind: 'image', url: raw.image_url, alt: typeof raw.alt_text === 'string' ? raw.alt_text : 'Attachment image' }]
+  const label = typeof raw.text === 'string' ? raw.text : raw.text && typeof raw.text === 'object' && 'text' in raw.text && typeof raw.text.text === 'string' ? raw.text.text : unknownText(raw)
+  const children = typeof raw.url === 'string' ? [{ kind: 'link' as const, url: raw.url, text: label || raw.url }] : mrkdwnInlines(label, lookups)
+  const nested = Array.isArray(raw.elements) ? raw.elements.flatMap((el: unknown) => el !== null && typeof el === 'object' ? unknownBlocks(Object.fromEntries(Object.entries(el)), lookups) : []) : []
+  return [...paragraphOf(children), ...nested]
 }

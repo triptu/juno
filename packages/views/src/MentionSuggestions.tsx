@@ -3,7 +3,7 @@ import { Hash } from '@phosphor-icons/react/dist/icons/Hash'
 import { Lock } from '@phosphor-icons/react/dist/icons/Lock'
 import type { MentionChannel, MentionPerson } from '@juno/contract'
 import { layout, sizes, spacing, z } from '@juno/tokens/tokens.stylex'
-import { Avatar, Icon, OptionGroupLabel, OptionList, OptionRow, Surface } from '@juno/ui'
+import { Avatar, Icon, Text, OptionGroupLabel, OptionList, OptionRow, Surface } from '@juno/ui'
 import { hueFor, initials } from './look'
 
 // StyleX reads only static values, so the anchor names are written here as
@@ -12,7 +12,22 @@ import { hueFor, initials } from './look'
 const COMPOSER_BOX_ANCHOR = '--composer-box'
 const TEXTAREA_ANCHOR = '--textarea-anchor'
 
+export interface EmojiSuggestion {
+  readonly id: string
+  readonly name: string
+  readonly insert: string
+  readonly url?: string
+}
+
 export type MentionSuggestionsProps =
+  | {
+      readonly kind: 'emoji'
+      readonly rows: ReadonlyArray<EmojiSuggestion>
+      readonly id: string
+      readonly activeId: string | undefined
+      readonly onActivate: (rowId: string) => void
+      readonly onPick: (rowId: string) => void
+    }
   | {
       readonly kind: 'person'
       readonly rows: ReadonlyArray<MentionPerson>
@@ -44,10 +59,10 @@ export const mentionRowId = (listId: string, id: string) => `${listId}-${id}`
 export function MentionSuggestions(props: MentionSuggestionsProps) {
   const { id, activeId, onActivate, onPick } = props
   return (
-    <div data-mention-suggestions="" {...stylex.props(styles.panel, props.kind === 'person' ? styles.underPerson : styles.underChannel)}>
+    <div data-mention-suggestions="" {...stylex.props(styles.panel, props.kind === 'channel' ? styles.underChannel : styles.underPerson)}>
       <Surface kind="popover">
-      <OptionList id={id} label={props.kind === 'person' ? 'People' : 'Channels'} {...(activeId === undefined ? {} : { activeId })}>
-        <OptionGroupLabel>{props.kind === 'person' ? 'People' : 'Channels'}</OptionGroupLabel>
+      <OptionList id={id} label={props.kind === 'person' ? 'People' : props.kind === 'emoji' ? 'Emoji' : 'Channels'} {...(activeId === undefined ? {} : { activeId })}>
+        <OptionGroupLabel>{props.kind === 'person' ? 'People' : props.kind === 'emoji' ? 'Emoji' : 'Channels'}</OptionGroupLabel>
         {props.kind === 'person'
           ? props.rows.map((person) => {
               const rowId = mentionRowId(id, person.id)
@@ -65,7 +80,12 @@ export function MentionSuggestions(props: MentionSuggestionsProps) {
                 />
               )
             })
-          : props.rows.map((channel) => {
+          : props.kind === 'emoji' ? props.rows.map((emoji) => {
+              const rowId = mentionRowId(id, emoji.id)
+              return <OptionRow key={emoji.id} id={rowId} size={32} active={rowId === activeId}
+                leading={emoji.url === undefined ? <Text aria-hidden>{emoji.insert}</Text> : <img src={emoji.url} alt="" {...stylex.props(styles.emoji)} />}
+                label={`:${emoji.name}:`} onSelect={() => onPick(rowId)} onActivate={() => onActivate(rowId)} />
+            }) : props.rows.map((channel) => {
               const rowId = mentionRowId(id, channel.id)
               return (
                 <OptionRow
@@ -91,6 +111,7 @@ export function MentionSuggestions(props: MentionSuggestionsProps) {
 const CHANNEL_ICON = '15px'
 
 const styles = stylex.create({
+  emoji: { width: sizes['--avatar-20'], height: sizes['--avatar-20'], objectFit: 'contain' },
   // Above the field box with the usual 6px gap, never over the text. The
   // names line up under the "@"; the panel stays inside the box's width.
   panel: {

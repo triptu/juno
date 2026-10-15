@@ -3,7 +3,7 @@ import { chatCopy, type About, type Place, type SendContext } from '@juno/agent-
 import type { TopicDetail } from '@juno/contract'
 import { catchUpDoneAtom, junoAboutAtom, openedAtNewAtom, registry, topicAtom } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
-import { JunoHeader, JunoPanelActions, JunoPanelContext } from '@juno/views'
+import { JunoHeader, JunoPanelActions, JunoPanelContext, type PanelPlace } from '@juno/views'
 import { closeJunoPanel, moveJunoToTab, openJunoPage, resumeJuno } from './actions'
 import { JunoChat } from './JunoChat'
 import { NoProviderFrame, useNoProvider } from './NoProviderFrame'
@@ -38,6 +38,9 @@ function close(): void {
 
 /** The About line's title for a topic: its title, or "#eng · Main". */
 const titleOf = (detail: TopicDetail) => (detail.kind === 'main' ? `${detail.channel.label} · Main` : detail.title)
+
+/** The context line's words: "eng · Main" or "eng · Postgres 16 migration plan", after the kind icon that stands for the "#". */
+const panelPlaceOf = (detail: TopicDetail): PanelPlace => ({ tint: detail.channel.tint, label: `${detail.channel.name} · ${detail.kind === 'main' ? 'Main' : detail.title}` })
 
 /**
  * The Juno panel beside a topic (SPEC 7, inventory 12.1): the same single
@@ -102,6 +105,7 @@ function PanelChat({ topicId }: { readonly topicId: string }) {
       sendRef={sendRef}
       composerContext={
         <JunoPanelContext
+          {...(detail === undefined ? {} : { place: panelPlaceOf(detail) })}
           {...(selection === undefined ? {} : { selection, onRemoveSelection: clearSelection })}
           {...(about === undefined ? {} : { about, onRemoveAbout: () => registry.set(junoAboutAtom, undefined) })}
           {...(newFrom !== undefined && !catchUpDone ? { onCatchMeUp: () => sendRef.current?.(chatCopy.panel.catchMeUp) } : {})}

@@ -52,7 +52,7 @@ async function fixture(serverId: 't3' | 'littlebird', tools: FakeTool[]) {
     actions: { executors: () => [...(manager ? mcpExecutors(manager) : []), ...(t3?.executors ?? [])] },
     tools: (context) => {
       if (!manager) throw new Error('No manager')
-      return [...mcpTools(manager, { current: context.current, propose: context.actions.propose }), ...(t3?.tools(context) ?? [])]
+      return [...mcpTools(manager, { current: context.current, actions: context.actions }), ...(t3?.tools(context) ?? [])]
     },
   })
   if (turns._tag !== 'running' || !manager) throw new Error('No engine')
@@ -109,23 +109,22 @@ it('replaces only an open proposal and rejects its old click', async () => {
   expect(server.calls.find((c) => c.name === launch.name)?.args).toMatchObject({ workspaceStrategy: { baseRef: 'release' } })
 })
 
-it('cannot launch through call_tool even if the owner made it Read', async () => {
+it('cannot launch through call_tool even under Never ask', async () => {
   const { server, manager, turns, call } = await fixture('t3', t3Tools)
-  manager.setTier('t3', launch.name, manager.tool('t3', launch.name).hash, 0)
+  manager.setTool('t3', launch.name, { review: 'never' })
   await call('call_tool', { server: 't3', tool: launch.name, args: {} })
   expect(server.calls.filter((c) => c.name === launch.name)).toHaveLength(0)
   expect(turns.actions.views()).toHaveLength(0)
 })
 
-it('uses discovered Littlebird read names and gates writes and unknown read hints', async () => {
+it('reads Littlebird tools marked read-only at first sight and asks for writes', async () => {
   const tools: FakeTool[] = [
-    { name: 'context_lookup_v7', description: 'Find context', inputSchema: { type: 'object', properties: { term: str }, required: ['term'] }, call: () => json({ matches: [] }) },
+    { name: 'context_lookup_v7', description: 'Find context', annotations: { readOnlyHint: true }, inputSchema: { type: 'object', properties: { term: str }, required: ['term'] }, call: () => json({ matches: [] }) },
     { name: 'material_append_v2', inputSchema: { type: 'object', properties: { text: str }, required: ['text'] }, call: () => json({ id: 'material-test' }) },
     { name: 'unreviewed', annotations: { readOnlyHint: true }, call: () => json({}) },
   ]
   const { server, manager, turns, call, click } = await fixture('littlebird', tools)
   const read = manager.tool('littlebird', 'context_lookup_v7')
-  manager.setTier('littlebird', read.name, read.hash, 0)
   await call('find_tools', { server: 'littlebird' })
   await call('call_tool', { server: 'littlebird', tool: read.name, args: { term: 'synthetic' } })
   expect(turns.actions.views()).toHaveLength(0)
@@ -134,7 +133,8 @@ it('uses discovered Littlebird read names and gates writes and unknown read hint
   expect(server.calls.filter((c) => c.name === 'material_append_v2')).toHaveLength(0)
   await click()
   expect(server.calls.filter((c) => c.name === 'material_append_v2')).toHaveLength(1)
-  expect(manager.tool('littlebird', 'unreviewed').tier).toBe(3)
+  expect(manager.tool('littlebird', 'unreviewed').tier).toBe(0)
+  expect(manager.tool('littlebird', 'material_append_v2').tier).toBe(3)
 })
 
 it('never repeats an outward start after a lost response', async () => {
@@ -309,10 +309,10 @@ it('does not queue a T3 interrupt while paused, so Resume sends nothing', async 
   expect(server.calls.filter((c) => c.name === 't3_thread_interrupt')).toHaveLength(1)
 })
 
-it('keeps every T3 tool off the read list a card, even if the owner made it Read', async () => {
-  const fork: FakeTool = { name: 't3_thread_fork', inputSchema: threadArgs, call: () => json({ threadId: 'thread-fork' }) }
+it('keeps every T3 tool off the read list a card, even under Never ask or a read-only claim', async () => {
+  const fork: FakeTool = { name: 't3_thread_fork', annotations: { readOnlyHint: true }, inputSchema: threadArgs, call: () => json({ threadId: 'thread-fork' }) }
   const { server, manager, turns, call } = await fixture('t3', [...t3Tools, fork])
-  manager.setTier('t3', fork.name, manager.tool('t3', fork.name).hash, 0)
+  manager.setTool('t3', fork.name, { review: 'never' })
   await call('call_tool', { server: 't3', tool: fork.name, args: { threadId: 'thread-test' } })
   expect(server.calls.filter((c) => c.name === fork.name)).toHaveLength(0)
   expect(turns.actions.views().at(-1)?.card).toMatchObject({ _tag: 'change', status: { _tag: 'open' } })

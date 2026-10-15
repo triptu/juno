@@ -15,7 +15,11 @@ export type Theme = typeof ThemeSchema.Type
 export type ResolvedTheme = Exclude<Theme, 'system'>
 export const DEFAULT_THEME: Theme = 'system'
 
-/** Preferences › Appearance › Density (inventory 3.3). */
+/** The sections of Settings (SPEC 14), in the order its list shows them. */
+export const SettingsSectionSchema = Schema.Literals(['general', 'appearance', 'notifications', 'ignored', 'juno', 'connections', 'backup', 'about'])
+export type SettingsSection = typeof SettingsSectionSchema.Type
+
+/** Settings › Appearance › Density (inventory 3.3). */
 export const DensitySchema = Schema.Literals(['comfortable', 'compact'])
 export type Density = typeof DensitySchema.Type
 export const DEFAULT_DENSITY: Density = 'comfortable'
@@ -79,6 +83,10 @@ export type ProviderChange = typeof ProviderChange.Type
 export const ProviderResult = Schema.Literals(['saved', 'removed', 'invalid', 'failed'])
 export type ProviderResult = typeof ProviderResult.Type
 
+/** Local Codex for the Juno Agent: not installed, or signed in or out in Juno's own Codex home (not the owner's). */
+export const CodexSetup = Schema.Literals(['missing', 'signedOut', 'signedIn'])
+export type CodexSetup = typeof CodexSetup.Type
+
 /** The sidebar's width in CSS pixels (280 to 480) and whether it is hidden (spec section 4). */
 export const SidebarLayout = Schema.Struct({
   width: Schema.Int.check(Schema.isBetween({ minimum: SIDEBAR_WIDTH.min, maximum: SIDEBAR_WIDTH.max })),
@@ -134,6 +142,8 @@ export const ShellRoutes = {
   },
   [Channels.agentProvider]: { input: Schema.Void, output: ProviderState },
   [Channels.agentSetProvider]: { input: ProviderChange, output: ProviderResult },
+  [Channels.agentCodex]: { input: Schema.Void, output: CodexSetup },
+  [Channels.agentCodexSignIn]: { input: Schema.Void, output: CodexSetup },
   [Channels.agentChooseFolder]: { input: Schema.Struct({ purpose: Schema.Literals(['backup', 'restore']) }), output: Schema.NullOr(Schema.String) },
   [Channels.agentRecoveryPhrase]: { input: Schema.Void, output: Schema.NullOr(Schema.String) },
   [Channels.agentTypeRecoveryPhrase]: {

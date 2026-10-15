@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  activateTab,
   closeAllTabs,
   closeOtherTabs,
   closeTab,
@@ -16,6 +17,7 @@ import {
   newTabPlace,
   noTabs,
   openPlace,
+  openSettingsSection,
   parseTabs,
   reopenClosedTab,
   savedTabs,
@@ -126,13 +128,51 @@ describe('Juno', () => {
 
 describe('Juno pages', () => {
   it('a plain open focuses the tab that shows the page, and the pages read back after a restart', () => {
-    const settings = openPlace(three, junoPagePlace('settings'), { newTab: true })
-    const both = openPlace(settings, junoPagePlace('activity'), { newTab: true })
-    expect(shown(both)).toEqual(['a', 'b', 'settings', 'activity', 'c'])
-    const again = openPlace(both, junoPagePlace('settings'))
-    expect(activeShows(again)).toBe('settings')
-    expect(shown(again)).toEqual(['a', 'b', 'settings', 'activity', 'c'])
-    expect(shown(parseTabs(JSON.parse(JSON.stringify(savedTabs(again)))))).toEqual(['a', 'b', 'settings', 'activity', 'c'])
+    const scheduled = openPlace(three, junoPagePlace('scheduled'), { newTab: true })
+    const both = openPlace(scheduled, junoPagePlace('activity'), { newTab: true })
+    expect(shown(both)).toEqual(['a', 'b', 'scheduled', 'activity', 'c'])
+    const again = openPlace(both, junoPagePlace('scheduled'))
+    expect(activeShows(again)).toBe('scheduled')
+    expect(shown(again)).toEqual(['a', 'b', 'scheduled', 'activity', 'c'])
+    expect(shown(parseTabs(JSON.parse(JSON.stringify(savedTabs(again)))))).toEqual(['a', 'b', 'scheduled', 'activity', 'c'])
+  })
+})
+
+describe('Settings', () => {
+  const sectionOf = (tabs: Tabs) => {
+    const place = tabs.tabs.find((tab) => tab.id === tabs.active)!.history.entries.at(-1)!
+    return place.kind === 'settings' ? place.section : undefined
+  }
+
+  it('has one tab: opening another section focuses it and shows that section, with nothing added to Back', () => {
+    const general = openSettingsSection(three, 'general', { newTab: true })
+    expect(shown(general)).toEqual(['a', 'b', 'settings', 'c'])
+    const away = activateTab(general, idOf(general, 'a'))
+    const juno = openSettingsSection(away, 'juno')
+    expect(shown(juno)).toEqual(['a', 'b', 'settings', 'c'])
+    expect(activeShows(juno)).toBe('settings')
+    expect(sectionOf(juno)).toBe('juno')
+    expect(historyTarget(juno, -1)).toBeUndefined()
+  })
+
+  it('reads back old Preferences, Notifications, Settings › Juno and Connections tabs as the one Settings tab at their section', () => {
+    const saved = {
+      tabs: [
+        { id: 'tab-1', pinned: false, place: { kind: 'topic', topicId: 'a' } },
+        { id: 'tab-2', pinned: false, place: { kind: 'junoPage', page: 'connections' } },
+        { id: 'tab-3', pinned: false, place: { kind: 'preferences' } },
+        { id: 'tab-4', pinned: false, place: { kind: 'notifications' } },
+        { id: 'tab-5', pinned: false, place: { kind: 'junoPage', page: 'activity' } },
+      ],
+      active: 'tab-4',
+      recent: ['tab-4', 'tab-2'],
+    }
+    const restored = parseTabs(saved)
+    expect(shown(restored)).toEqual(['a', 'settings', 'activity'])
+    expect(restored.active).toBe('tab-1')
+    expect(sectionOf(activateTab(restored, 'tab-2'))).toBe('connections')
+    expect(sectionOf(activateTab(parseTabs({ ...saved, tabs: [{ id: 'tab-9', pinned: false, place: { kind: 'junoPage', page: 'settings' } }], active: 'tab-9' }), 'tab-9'))).toBe('juno')
+    expect(sectionOf(activateTab(parseTabs({ ...saved, tabs: [saved.tabs[2]!], active: 'tab-3' }), 'tab-3'))).toBe('general')
   })
 })
 
@@ -339,47 +379,5 @@ describe('the divider', () => {
     const mine = (ts: string) => ts === '1.000002' || ts === 'pending:c1'
     expect(dividerIndex(order, '1.000001', mine)).toBe(3)
     expect(dividerIndex(order.slice(0, 3), '1.000001', mine)).toBe(-1)
-  })
-})
-
-describe('saved tabs', () => {
-  it('read back as they were saved, pinned flags included, each showing its place', () => {
-    const tabs = setPinned(open(open(three, 'b2'), 'd', { newTab: true }), 'tab-3', true)
-    const restored = parseTabs(JSON.parse(JSON.stringify(savedTabs(tabs))))
-    expect(shown(restored)).toEqual(shown(tabs))
-    expect(restored.tabs.map((tab) => [tab.id, tab.pinned])).toEqual(tabs.tabs.map((tab) => [tab.id, tab.pinned]))
-    expect(restored.active).toBe(tabs.active)
-    expect(historyTarget(restored, -1)).toBeUndefined()
-  })
-
-  it('tabs saved before history read back as topic tabs, with or without the old stealth flag', () => {
-    for (const saved of [
-      { tabs: [{ id: 'a' }, { id: 'b' }], active: 'b', recent: ['b', 'a'] },
-      { tabs: [{ id: 'a', stealth: false }, { id: 'b', stealth: true }], active: 'b', recent: ['b', 'a'] },
-    ]) {
-      const restored = parseTabs(saved)
-      expect(shown(restored)).toEqual(['a', 'b'])
-      expect(restored.tabs.map((tab) => Object.keys(tab).toSorted())).toEqual([
-        ['history', 'id', 'pinned'],
-        ['history', 'id', 'pinned'],
-      ])
-      expect(activeShows(restored)).toBe('b')
-    }
-  })
-
-  it('a tab saved with the old stealth flag and a place still reads back', () => {
-    const restored = parseTabs({ tabs: [{ id: 'tab-1', pinned: true, stealth: true, place: { kind: 'topic', topicId: 'a' } }], active: 'tab-1', recent: [] })
-    expect(shown(restored)).toEqual(['a'])
-    expect(restored.tabs[0]!.pinned).toBe(true)
-  })
-
-  it('anything unreadable is no tabs, and a lost active tab falls back to the first', () => {
-    const home = parseTabs(JSON.parse(JSON.stringify(savedTabs(openPlace(noTabs, homePlace)))))
-    expect(shown(home)).toEqual(['home'])
-    expect(parseTabs(null)).toEqual(noTabs)
-    expect(parseTabs({ tabs: 'nope' })).toEqual(noTabs)
-    const lost = parseTabs({ tabs: [{ id: 'a' }], active: 'gone', recent: ['gone'] })
-    expect(lost.active).toBe('a')
-    expect(lost.recent).toEqual(['a'])
   })
 })

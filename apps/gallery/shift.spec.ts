@@ -490,7 +490,7 @@ test.describe('Juno chat', () => {
   test("the status bubble's text changes in place", async ({ page }) => {
     await open(page, 'JunoChatList', 'shift/status-text-changes')
     const status = page.locator('[data-chat-status]')
-    const fixed = [page.locator('[data-chat-owner]'), status.locator('svg'), status.locator('i').first()]
+    const fixed = [page.locator('[data-chat-owner]'), status.locator('i').first()]
     const before = await Promise.all(fixed.map((el) => el.boundingBox()))
     const height = (await status.boundingBox())?.height
     for (let round = 0; round < 3; round++) {

@@ -12,7 +12,7 @@ import { JunoChatFrame } from './juno-chat/JunoChatFrame'
 import { JunoChatList } from './juno-chat/JunoChatList'
 import { JunoComposer } from './juno-chat/JunoComposer'
 import { JunoHeader, JunoPanelActions } from './juno-chat/JunoHeader'
-import { JunoPanelContext } from './juno-chat/JunoPanelContext'
+import { JunoPanelContext, type JunoPanelContextProps } from './juno-chat/JunoPanelContext'
 import { Workspace, type WorkspaceProps, type WorkspaceTab } from './Workspace'
 
 const noop = () => {}
@@ -51,6 +51,12 @@ const postgresPage = (
   </TopicView>
 )
 
+const postgresPanelPage = (
+  <TopicView header={<TopicHeader detail={details.postgres} onMenu={noop} onPill={noop} onResolve={noop} juno={{ open: true, onToggle: noop }} />} composer={<ComposerSlot placeholder="Reply" />}>
+    <MessageList items={thread} main={false} now={NOW} onOpenThread={noop} onChannel={noop} onLink={noop} />
+  </TopicView>
+)
+
 const engPage = (
   <TopicView header={<TopicHeader detail={details.engMain} onMenu={noop} onPill={noop} juno={{ open: false, onToggle: noop }} />} composer={<ComposerSlot placeholder="Message #eng" />}>
     <MessageList items={main} main now={NOW} dividerBefore={mainDividerBefore} onOpenThread={noop} onChannel={noop} onLink={noop} />
@@ -63,15 +69,21 @@ const panelItems = [
   ...juno('m-w1-r', 'Not yet. Leo asked for a reviewer from platform before Thursday, and nobody has said yes.', { at: NOW - 4 * 60_000 }),
 ]
 
+const postgresPlace = { tint: 'public', label: 'eng · Postgres 16 migration plan' } as const
+
 /** The Juno panel as the workspace's side shows it, beside the Postgres topic. */
-const junoPanel = (
+const panel = (context: JunoPanelContextProps, items: Parameters<typeof JunoChatList>[0]['items'] = panelItems) => (
   <JunoChatFrame
+    column="panel"
     header={<JunoHeader column="panel" banner={{ _tag: 'none' }} menuOpen={false} onMenu={noop} onOpenPage={noop} onResume={noop} actions={<JunoPanelActions onOpenInTab={noop} onClose={noop} />} />}
-    composer={<JunoComposer column="panel" value="" onChange={noop} onSend={noop} enabled placeholder="Ask about this topic" context={<JunoPanelContext onCatchMeUp={noop} />} />}
+    composer={<JunoComposer column="panel" value="" onChange={noop} onSend={noop} enabled placeholder="Ask about this topic" context={<JunoPanelContext place={postgresPlace} {...context} />} />}
   >
-    <JunoChatList column="panel" items={panelItems} banner={{ _tag: 'none' }} moreAbove={false} moreBelow={false} now={NOW} actions={noopActions} onSuggest={noop} enterEmpty={false} />
+    <JunoChatList column="panel" items={items} banner={{ _tag: 'none' }} moreAbove={false} moreBelow={false} now={NOW} actions={noopActions} onSuggest={noop} enterEmpty={false} />
   </JunoChatFrame>
 )
+
+const junoPanel = panel({ onCatchMeUp: noop })
+const selection = { text: 'We could use logical replication for the cutover and keep the old primary as a fallback.', sender: 'Leo Park' }
 
 const junoPage = (
   <JunoChatFrame header={<JunoHeader banner={{ _tag: 'none' }} menuOpen={false} onMenu={noop} onOpenPage={noop} onResume={noop} />} composer={<JunoComposer value="" onChange={noop} onSend={noop} enabled />}>
@@ -114,10 +126,21 @@ export default defineFixtures(
       // Home's content is the empty workspace until the Home page is built.
       'home-tab': workspace({ tabs: [tabs.home, tabs.postgres], activeId: tabs.home.id }),
       'juno-tab': workspace({ tabs: [tabs.postgres, tabs.juno], activeId: tabs.juno.id }, junoPage),
-      // The topic keeps 480px or more: the panel sits beside it.
-      'juno-panel': workspace({ side: junoPanel }, postgresPage, { width: 1200, height: 640 }),
-      // Under 480px for the topic: the panel covers it.
-      'juno-panel-covers': workspace({ side: junoPanel }, postgresPage, { width: 760, height: 640 }),
+      // The topic keeps 480px or more: the panel floats beside it at its default 440px.
+      'juno-panel': workspace({ side: junoPanel }, postgresPanelPage, { width: 1200, height: 720 }),
+      // Dragged wider, to 600px.
+      'juno-panel-wide': workspace({ side: junoPanel, sideWidth: 600 }, postgresPanelPage, { width: 1440, height: 720 }),
+      // The context line says what Juno sees: the topic, and "+ selection" while text is selected in it.
+      'juno-panel-context': workspace({ side: panel({}) }, postgresPanelPage, { width: 1200, height: 720 }),
+      'juno-panel-selection': workspace({ side: panel({ selection, onRemoveSelection: noop }) }, postgresPanelPage, { width: 1200, height: 720 }),
+      // Ask Juno about a person: the line names them instead of the topic.
+      'juno-panel-about': workspace({ side: panel({ about: { _tag: 'person', userId: 'U0MAYA', name: 'Maya Chen' }, onRemoveAbout: noop }) }, postgresPanelPage, { width: 1200, height: 720 }),
+      // Nothing said yet: the empty chat with its suggestion chips, and Catch me up above the composer.
+      'juno-panel-empty': workspace({ side: panel({ onCatchMeUp: noop }, []) }, postgresPanelPage, { width: 1200, height: 720 }),
+      // The panel gives way to keep the topic 480px wide, down to its 360px minimum.
+      'juno-panel-gives-way': workspace({ side: junoPanel }, postgresPanelPage, { width: 900, height: 640 }),
+      // Under that the panel covers the topic, which shows through it.
+      'juno-panel-covers': workspace({ side: junoPanel }, postgresPanelPage, { width: 760, height: 640 }),
       'sidebar-hidden': workspace({ tabs: browserTabs, activeId: tabs.postgres.id, leading: sidebarControls }, postgresPage),
       'sidebar-hidden-minimum-window': workspace({ tabs: browserTabs, activeId: tabs.postgres.id, leading: sidebarControls }, postgresPage, { width: 720, height: 480 }),
       'thirty-seven-tabs': workspace({ tabs: thirtySeven, ...(lastTab === undefined ? {} : { activeId: lastTab }) }, postgresPage),

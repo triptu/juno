@@ -63,7 +63,7 @@ async function fixture(engine = false) {
     actions: { executors: () => manager ? mcpExecutors(manager) : [] },
     tools: (context) => {
       if (!manager) throw new Error('No manager')
-      return mcpTools(manager, { current: context.current, propose: context.actions.propose })
+      return mcpTools(manager, { current: context.current, actions: context.actions })
     },
   })
   if (turns._tag !== 'running' || !manager) throw new Error('No engine')
@@ -79,7 +79,9 @@ it('signs in on loopback, discovers Notion, refreshes tokens and disconnects', a
   const { server, manager } = await fixture()
   expect(manager.page().connections[0]).toMatchObject({ state: 'ready', address: server.url })
   expect(manager.tool('notion', 'notion-search').tier).toBe(0)
-  expect(manager.tool('notion', 'notion-get-self').tier).toBe(3)
+  // The server marks it read-only and Juno has seen no schema change: a read.
+  expect(manager.tool('notion', 'notion-get-self').tier).toBe(0)
+  expect(manager.tool('notion', 'notion-update-page').tier).toBe(3)
   server.oauth.expireAccessTokens()
   await manager.invoke('notion', 'notion-fetch', { id: 'page-roadmap' })
   expect(server.oauth.stats().refreshes).toBe(1)
@@ -150,7 +152,7 @@ it('blocks secrets, invalid arguments and non-read tools before transport', asyn
   expect(server.calls).toHaveLength(count)
 })
 
-it('discovers paginated tools, demotes changed schemas and refuses stale tier edits', async () => {
+it('discovers paginated tools, reads a tool marked read-only until its schema changes, and resets Never ask on a change', async () => {
   const server = await startFakeLittlebird()
   cleanup.push(() => server.close())
   const dir = await mkdtemp(join(tmpdir(), 'juno-mcp-list-'))
@@ -160,16 +162,17 @@ it('discovers paginated tools, demotes changed schemas and refuses stale tier ed
   const manager = createMcpManager({ store, credentials: credentials(server.oauth!.approve), defaults: [{ ...NOTION, url: server.url }] })
   cleanup.push(() => manager.close())
   await manager.authorize('notion')
-  const first = manager.definitions('notion')[0]
-  if (!first) throw new Error('No tools')
-  manager.setTier('notion', first.name, first.hash, 0)
-  server.changeSchema(first.name, { type: 'object', properties: { newer: { type: 'string' } } })
-  await expect.poll(() => manager.tool('notion', first.name).tier).toBe(3)
-  expect(manager.tool('notion', first.name).changed).toBe(1)
-  expect(() => manager.setTier('notion', first.name, first.hash, 0)).toThrow()
+  expect(manager.definitions('notion').length).toBeGreaterThan(3)
+  // A tool the server marks read-only when Juno first sees it is a read.
+  const hinted = unknownTool().name
   server.addTool(unknownTool())
-  await expect.poll(() => manager.definitions('notion').some((t) => t.name === unknownTool().name)).toBe(true)
-  expect(manager.tool('notion', unknownTool().name).tier).toBe(3)
+  await expect.poll(() => manager.definitions('notion').some((t) => t.name === hinted)).toBe(true)
+  expect(manager.tool('notion', hinted).tier).toBe(0)
+  manager.setTool('notion', hinted, { review: 'never' })
+  // Its schema changes: the claim no longer counts, and the owner's Never ask was for the old tool.
+  server.changeSchema(hinted, { type: 'object', properties: { newer: { type: 'string' } } })
+  await expect.poll(() => manager.tool('notion', hinted).tier).toBe(3)
+  expect(manager.tool('notion', hinted)).toMatchObject({ changed: 1, review: 'auto' })
 })
 
 it('serves only approved tools on an authenticated per-turn loopback endpoint', async () => {
@@ -200,7 +203,7 @@ it('archives large results as ordinary attachments and pages them before the nex
   expect(JSON.stringify(rows)).toContain('Invented content. '.repeat(100))
 })
 
-it('the model can only propose an outward tool, and destructive arguments never get a card', async () => {
+it('asks for a write when no review can run, and a destructive argument still gets a card', async () => {
   const { server, manager, turns, fake } = await fixture(true)
   if (!turns || !fake) throw new Error('No engine')
   fake.script([
@@ -209,23 +212,31 @@ it('the model can only propose an outward tool, and destructive arguments never 
   ])
   turns.accept({ opId: 'write-op', kind: 'send', text: 'Update the roadmap' })
   await turns.idle()
-  expect(turns.actions.views()[0]?.card._tag).toBe('change')
+  expect(turns.actions.views()[0]?.card).toMatchObject({ _tag: 'change', review: { rule: 'auto', failed: true, line: "Asked because Juno couldn't review this call." } })
   expect(server.calls.filter((c) => c.name === 'notion-update-page')).toHaveLength(0)
-  await expect(changeCard(manager, 'notion', 'notion-update-page', { page_id: 'page-roadmap', command: 'replace_content', content: '', archived: true })).rejects.toMatchObject({ reason: 'destructive' })
+  await expect(changeCard(manager, 'notion', 'notion-update-page', { page_id: 'page-roadmap', command: 'replace_content', content: '', archived: true })).resolves.toMatchObject({ _tag: 'change' })
 })
 
-it('keeps the owner tier decision and connection identity across a manager restart', async () => {
+it("keeps the owner's tool switches, rules and connection identity across a manager restart", async () => {
   const { manager, creds } = await fixture()
   const old = manager.tool('notion', 'notion-search')
   const epoch = manager.stored('notion').epoch
-  manager.setTier('notion', old.name, old.hash, 3)
+  manager.setTool('notion', 'notion-get-self', { enabled: false })
+  manager.setTool('notion', 'notion-update-page', { review: 'always' })
+  manager.setRule('notion', 'never')
   await manager.close()
   const restarted = createMcpManager({ store: manager.store, credentials: creds })
   cleanup.push(() => restarted.close())
   await restarted.start()
   expect(restarted.state('notion')).toBe('ready')
   expect(restarted.stored('notion').epoch).toBe(epoch)
-  expect(restarted.tool('notion', old.name).tier).toBe(3)
+  expect(restarted.tool('notion', old.name).tier).toBe(0)
+  expect(() => restarted.tool('notion', 'notion-get-self')).toThrow()
+  expect(restarted.definitions('notion').some((tool) => tool.name === 'notion-get-self')).toBe(false)
+  expect(restarted.rule('notion', 'notion-update-page')).toBe('always')
+  expect(restarted.rule('notion', 'notion-create-pages')).toBe('never')
+  expect(restarted.page().connections[0]).toMatchObject({ review: 'never' })
+  expect(restarted.page().connections[0]?.tools.find((tool) => tool.name === 'notion-get-self')).toMatchObject({ enabled: false, review: 'auto', read: true })
 })
 
 it('offers Notion, Littlebird and T3 Code, and adds a server by address that signs in only when it asks', async () => {
@@ -249,7 +260,7 @@ it('offers Notion, Littlebird and T3 Code, and adds a server by address that sig
 
   // A server without auth connects with no browser at all.
   await manager.authorize(openRow.id)
-  expect(manager.page().connections[3]).toMatchObject({ state: 'ready', tools: [{ name: 'lookup', tier: 3, hint: 'Looks something up.' }] })
+  expect(manager.page().connections[3]).toMatchObject({ state: 'ready', tools: [{ name: 'lookup', read: false, enabled: true, review: 'auto', hint: 'Looks something up.' }] })
   expect(opened).toHaveLength(0)
 
   // One that answers 401 gets the OAuth sign-in, and its tools.
