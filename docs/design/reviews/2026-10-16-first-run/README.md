@@ -99,6 +99,7 @@ The menu's header reads "tushar", the handle, where the rest of the app says "Tu
 - **What Juno remembers, empty**: "0.0 KB of 4.0 KB used." is noise until something is pinned.
 - **The key field after Save** is empty with its "sk-or-…" placeholder beside a "Key set" chip. For a moment Save stays filled (`before/23-after-save-0`). A masked value ("sk-or-…cdef") would say what is stored.
 - **A Home title at 720** is cut at a word with a space before the ellipsis ("Elena asks: She has a …", `before/10b-home-720-*`).
+- **Connections intro.** It said "A tool on a server's read list needs no click; everything else is a card, every time." Tools now have one "Runs without asking" checkbox and no read list. Fixed: "Where Juno can read and act. Tools that run without asking need no click; everything else asks with a card."
 - **Apostrophes.** The sign-in page uses straight ones ("I'm", "app's") and its status line a curly one ("Slack app’s session").
 
 ## Questions for the owner
@@ -125,6 +126,7 @@ Each has a recommendation. They are left open because each changes what a surfac
 - `fc59de67` Keep Settings › Juno's intro to one line before the agent runs (7)
 - `57929c79` Show Juno's AI-off line when AI assist is off and no agent runs (2)
 - `ac0d88e3` With AI assist off, show the empty chat as the one AI-off line, with the composer dimmed (2)
+- Rewrite the Connections intro for the Runs without asking checkbox (12)
 - This review (the document, the harness, the shots).
 
 ## Verification
