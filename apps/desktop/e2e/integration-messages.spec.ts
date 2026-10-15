@@ -24,7 +24,8 @@ test('a bot attachment names its thread and expands its description', async ({ j
   const card = juno.win.getByRole('region', { name: 'Attachment' }).filter({ has: juno.win.getByRole('link', { name: '#42 Improve cache' }) })
   await expect(card.getByRole('link', { name: '#42 Improve cache' })).toHaveAttribute('href', 'https://example.test/pull/42')
   await expect(card.getByRole('link', { name: '#42 Improve cache' })).toHaveCSS('cursor', 'pointer')
-  await expect(card).toHaveCSS('cursor', 'default')
+  // The card's text is selectable like message text, so it may show the text cursor, never the hand.
+  await expect(card).not.toHaveCSS('cursor', 'pointer')
   await expect(card.getByRole('button', { name: 'Show more' })).toHaveCSS('cursor', 'default')
   const before = await card.boundingBox()
   await card.getByRole('button', { name: 'Show more' }).click()
