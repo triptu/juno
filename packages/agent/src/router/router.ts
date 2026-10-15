@@ -266,6 +266,7 @@ export function createRouter(options: RouterOptions) {
   }
   const begin = async (op: InboxOp): Promise<Live | undefined> => {
     await session.catchUp()
+    if (!admitting()) return undefined
     const origin = originOf(op.kind)
     // A message sent beside a topic carries Slack content (SPEC 7): the run starts tainted.
     const row = { id: uuidv7(store.now()), op_id: op.opId, origin, h: archiveLength(), clean: origin === 'owner' && !readsTopic(op) ? 1 : 0 }

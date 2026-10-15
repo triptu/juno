@@ -259,8 +259,8 @@ export function chatActions(registry: Registry) {
       ...(send.replyTo ? { replyTo: send.replyTo } : {}),
     })
     if (Exit.isSuccess(exit)) {
-      // Stored: the agent's row replaces this one as soon as the page has it.
-      setPending(send.opId, { ...send, delivery: { _tag: 'sent' } })
+      // The acknowledgement follows the durable inbox commit.
+      setPending(send.opId, undefined)
       return
     }
     const error = Exit.isFailure(exit) ? exit.cause.reasons.find((r) => r._tag === 'Fail')?.error : undefined

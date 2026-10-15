@@ -24,6 +24,7 @@ const cases: Record<string, readonly [unknown, unknown]> = {
   'agent.chat.react': [{ ...op, target: { _tag: 'bubble', id: 'run:0' }, emoji: '🎉' }, accepted],
   'agent.chat.retry': [{ ...op, interruptedOpId: 'previous' }, accepted],
   'agent.chat.read': [{ through: '1' }, undefined],
+  'agent.chat.message': [{ target: { _tag: 'owner', opId: 'previous' } }, null],
   'agent.chat.remove': [{ ...op, messageId: '1', alsoRemoveReply: true }, accepted],
   'agent.cards.prepare': [{ ...op, identity, choice: { _tag: 'send' } }, { card, identity, children: [child] }],
   'agent.cards.approve': [{ ...op, identity, children: [child] }, accepted],
