@@ -21,6 +21,7 @@
  * the other results as notes, because the memory rules pair one call id
  * with one entry; the guard still counts every byte sent.
  */
+import { pageMcpResult } from '../mcp/results'
 import { buildRequest, type ActiveEntry, type Line, type Pins, type Source } from '@juno/agent-memory'
 import type { Ending } from '@juno/agent-contract'
 import { AdmissionError, providerFailure, type ProviderGuardApi, type StreamProgress } from '../providers'
@@ -40,7 +41,7 @@ export type BuiltRequest =
 
 type Row = { id: number; kind: Source['kind']; text: string; version: number; redacted_gen: number | null; entry_id: number; incarnation: string }
 type Part = { readonly type?: string; readonly id?: string }
-type Attached = { readonly model?: ReadonlyArray<{ readonly content?: string | ReadonlyArray<Part>; readonly toolCallId?: string }> }
+type Attached = { readonly model?: ReadonlyArray<{ readonly content?: string | ReadonlyArray<Part>; readonly toolCallId?: string; readonly toolName?: string }> }
 
 export interface ChatRequest {
   /** The run's history cutoff. */
@@ -84,7 +85,7 @@ export function createRequestBuilder(options: {
       const tail = rest.slice(0, rest.length - built.active.length)
       const paged = new Map<string, string>()
       built.active.forEach((entry, i) => {
-        if (entry.kind === 'tool-result' && entry.text !== snapshot.active[i]?.text) paged.set(entry.callId, entry.text)
+        if (entry.kind === 'tool-result' && (entry.text !== snapshot.active[i]?.text || entry.text.startsWith('Untrusted connection result saved as attachment'))) paged.set(entry.callId, entry.text)
       })
       const memoryMessage = {
         role: 'user', timestamp: 0,
@@ -191,7 +192,7 @@ function activeEntries(store: Store, rows: ReadonlyArray<Row>): ReadonlyArray<Ac
       const callId = message?.toolCallId
       if (callId === undefined || !calls.has(callId)) return { ...span, kind: 'note' }
       calls.delete(callId)
-      return { ...span, kind: 'tool-result', callId }
+      return { ...span, text: pageMcpResult(message?.toolName, span.text, first.id), kind: 'tool-result', callId }
     }
     return { ...span, kind: first.kind === 'echo' ? 'note' : first.kind }
   })
