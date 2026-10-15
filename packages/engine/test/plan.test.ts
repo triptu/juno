@@ -62,6 +62,14 @@ describe('query plans', () => {
           assert.deepStrictEqual(scans(lines), [], `${JSON.stringify(filter)}\n${lines.join('\n')}`)
           assert.isTrue(lines.some((line) => line.includes('topic_index')), 'the window comes from a topic_index index')
         }
+        // Unscoped (a view included), Pinned and older unread rows come through their own partial indexes, never every topic of a channel.
+        if (filter.scope === undefined) {
+          const [, pinned, unread] = listStatements(filter, '1700000000.000000', 300)
+          const pinnedLines = yield* plan(pinned!.sql, pinned!.params)
+          assert.isTrue(pinnedLines.some((line) => line.includes('topic_overlay_pinned')), `${JSON.stringify(filter)} pinned\n${pinnedLines.join('\n')}`)
+          const unreadLines = yield* plan(unread!.sql, unread!.params)
+          assert.isTrue(unreadLines.some((line) => line.includes('topic_index_unread')), `${JSON.stringify(filter)} unread\n${unreadLines.join('\n')}`)
+        }
       }
     }).pipe(Effect.provide(freshStore)),
   )

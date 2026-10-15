@@ -209,11 +209,15 @@ const KEPT_OUT = ` AND NOT EXISTS (SELECT 1 FROM sidebar_view_channels vc JOIN s
 /**
  * Which conversations the filter shows, after membership and the ignored
  * list: the scope's one channel; else a view's conversations; else the kind,
- * without the conversations a view keeps out of All.
+ * without the conversations a view keeps out of All. A view's list drives
+ * the walk only where `drive` says so (the activity window, per channel on
+ * `topic_index_channel_activity`); elsewhere it is `+i.channel`, a filter,
+ * so the pinned and older-unread statements keep their own indexes instead
+ * of reading every topic of every channel in the view.
  */
-function placeClause(filter: ListFilter): { readonly sql: string; readonly params: ReadonlyArray<unknown> } {
+function placeClause(filter: ListFilter, drive: boolean): { readonly sql: string; readonly params: ReadonlyArray<unknown> } {
   if (filter.scope !== undefined) return { sql: `${kindClause(filter.kind)} AND i.channel = ?`, params: [filter.scope] }
-  if (filter.view !== undefined) return { sql: ` AND i.channel IN (SELECT channel FROM sidebar_view_channels WHERE view_id = ?)`, params: [filter.view] }
+  if (filter.view !== undefined) return { sql: ` AND ${drive ? '' : '+'}i.channel IN (SELECT channel FROM sidebar_view_channels WHERE view_id = ?)`, params: [filter.view] }
   return { sql: `${kindClause(filter.kind)}${KEPT_OUT}`, params: [] }
 }
 
@@ -233,22 +237,26 @@ const OPEN_RULE = ` AND (o.resolved_at IS NULL OR (o.resolved_activity_ts IS NOT
  * the last two only when the window alone leaves room.
  */
 export function listStatements(filter: ListFilter, cutoff: string, limit: number): ReadonlyArray<{ readonly sql: string; readonly params: ReadonlyArray<unknown> }> {
-  const place = placeClause(filter)
   // Unread only is `+i.unread_count`: a filter, never a reason to walk `topic_index_unread` instead of each statement's own index.
-  const common = ` AND c.is_member = 1 AND c.is_archived = 0 AND ig.channel IS NULL${place.sql}${filter.unreadOnly ? ' AND +i.unread_count > 0' : ''}`
+  const common = (drive: boolean) => {
+    const place = placeClause(filter, drive)
+    return { sql: ` AND c.is_member = 1 AND c.is_archived = 0 AND ig.channel IS NULL${place.sql}${filter.unreadOnly ? ' AND +i.unread_count > 0' : ''}`, params: place.params }
+  }
+  const window = common(true)
+  const rest = common(false)
   const scopeParams = filter.scope === undefined ? [] : [filter.scope]
   return [
     {
-      sql: `${SELECT_IN_WINDOW}${FROM} WHERE i.last_activity_ts >= ?${common}${THREAD_RULE}${OPEN_RULE} ORDER BY i.last_activity_ts DESC LIMIT ?`,
-      params: [cutoff, ...place.params, limit],
+      sql: `${SELECT_IN_WINDOW}${FROM} WHERE i.last_activity_ts >= ?${window.sql}${THREAD_RULE}${OPEN_RULE} ORDER BY i.last_activity_ts DESC LIMIT ?`,
+      params: [cutoff, ...window.params, limit],
     },
     {
-      sql: `${SELECT}${FROM} WHERE o.pinned_at IS NOT NULL${common}`,
-      params: place.params,
+      sql: `${SELECT}${FROM} WHERE o.pinned_at IS NOT NULL${rest.sql}`,
+      params: rest.params,
     },
     {
-      sql: `${SELECT}${FROM} WHERE i.unread_count > 0 AND i.last_activity_ts < ?${common}${THREAD_RULE} ORDER BY i.last_activity_ts DESC LIMIT ?`,
-      params: [cutoff, ...place.params, limit],
+      sql: `${SELECT}${FROM} WHERE i.unread_count > 0 AND i.last_activity_ts < ?${rest.sql}${THREAD_RULE} ORDER BY i.last_activity_ts DESC LIMIT ?`,
+      params: [cutoff, ...rest.params, limit],
     },
     {
       // Main rows kept alive by replies in the channel's threads: one indexed probe per member conversation for a topic
@@ -257,8 +265,8 @@ export function listStatements(filter: ListFilter, cutoff: string, limit: number
           SELECT 'm:' || cv.id FROM conversations cv
           WHERE cv.is_member = 1${filter.scope === undefined ? '' : ' AND cv.id = ?'}
             AND EXISTS (SELECT 1 FROM topic_index t WHERE t.channel = cv.id AND t.last_activity_ts >= ?))
-        AND i.last_activity_ts < ?${common} LIMIT ?`,
-      params: [...scopeParams, cutoff, cutoff, ...place.params, limit],
+        AND i.last_activity_ts < ?${rest.sql} LIMIT ?`,
+      params: [...scopeParams, cutoff, cutoff, ...rest.params, limit],
     },
   ]
 }

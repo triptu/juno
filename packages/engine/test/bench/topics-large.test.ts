@@ -88,8 +88,8 @@ describe.skipIf(process.env['JUNO_BENCH'] !== '1')('topics.list on the large see
       const channelIds = [...new Set(rows.map((row) => row.channel.id))]
       const bots = await runCommand(engine.registry, viewsSave, { name: 'Bots', keepOutOfAll: true, channels: channelIds.slice(0, 5) })
       const wide = await runCommand(engine.registry, viewsSave, { name: 'Wide', keepOutOfAll: false, channels: channelIds.slice(5, 45) })
+      // A command has committed when it returns.
       if (!Exit.isSuccess(bots) || !Exit.isSuccess(wide)) throw new Error('views.save failed')
-      await engine.syncIdle()
       // The query alone, on a reader of its own: every row shaped (no cache), then a subscription's re-run (warm cache).
       const paths = workspacePathsFromDir(join(engine.userData, 'workspaces', engine.fake.teamId))
       const isolated = await Effect.runPromise(
