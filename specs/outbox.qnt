@@ -35,7 +35,9 @@ module outboxProtocol {
     // deleted the kept message on another device) and `reply` (someone
     // replied to the copy). `slack` is what Slack has; `seen` what the
     // store has. `inStep` is false from a socket drop until the catch-up.
-    slack: Set[Change], seen: Set[Change], inStep: bool
+    // `gapped`: posts sent before the last drop. `rechecked`: posts whose
+    // topic the catch-up after that drop read again.
+    slack: Set[Change], seen: Set[Change], inStep: bool, gapped: Set[int], rechecked: Set[int]
   }
   type Change = { key: int, what: str }
   var s: State
@@ -50,7 +52,8 @@ module outboxProtocol {
       act: drafts.mapBy(_ => "none"), actKind: drafts.mapBy(_ => "change"), stale: Set(),
       actSent: Set(), acted: Set(),
       dup: drafts.mapBy(_ => 0), deletes: drafts.mapBy(_ => 0), copyRow: drafts.mapBy(_ => "none"),
-      kept: drafts.mapBy(_ => "first"), slack: Set(), seen: Set(), inStep: true },
+      kept: drafts.mapBy(_ => "first"), slack: Set(), seen: Set(), inStep: true,
+      gapped: Set(), rechecked: Set() },
     remaining' = drainLimit, turn' = 0
   }
 
@@ -65,6 +68,8 @@ module outboxProtocol {
   // Reactions from others and an edit follow the reply's rule and are not
   // modelled apart.
   def keepReasonSeen(k: int): bool = s.seen.contains({ key: k, what: "gone" }) or s.seen.contains({ key: k, what: "reply" })
+  // The store may have missed a change to the post during the last gap.
+  def unchecked(k: int): bool = s.gapped.contains(k) and not(s.rechecked.contains(k))
   // A copy in Slack that Juno has not stored yet.
   def copyUnseen(k: int): bool = s.dup.get(k) > s.deletes.get(k) and s.copyRow.get(k) == "none"
 
@@ -131,15 +136,18 @@ module outboxProtocol {
   // With `byId` off, the bug takes a message with the same text for a copy:
   // every draft here has the same text, so another stored draft is enough.
   // `check`: "full" checks the store again in the transaction before the
-  // call and goes only after the catch-up that follows a socket drop;
-  // "noWait" checks but does not wait; "none" is the old code, which
-  // decided once, when the copy was stored.
+  // call, goes only after the catch-up that follows a socket drop, and,
+  // for a post sent before the drop, only once that catch-up read the
+  // post's topic; "noRecheck" waits for the catch-up but does not ask
+  // whether it read the topic; "noWait" checks but does not wait; "none"
+  // is the old code, which decided once, when the copy was stored.
   action deleteCopyWith(k: int, byId: bool, check: str): bool = all {
     s.online, s.connected,
     if (byId) all {
       s.copyRow.get(k) == "hidden",
       check == "none" or not(keepReasonSeen(k)),
-      check != "full" or s.inStep
+      check == "none" or check == "noWait" or s.inStep,
+      check != "full" or not(unchecked(k))
     } else all {
       s.stored.contains(k), s.copyRow.get(k) == "none", held(k) > 0,
       drafts.exists(j => j != k and s.stored.contains(j))
@@ -150,9 +158,13 @@ module outboxProtocol {
   action deleteCopy(k: int): bool = deleteCopyWith(k, true, "full")
   // The check before the call fails: the delete row ends unsent and the
   // copy is shown. If the kept message was deleted, the copy is the
-  // message now (`sent_posts.ts`).
+  // message now (`sent_posts.ts`). It fails when the store has a reason
+  // to keep the copy, when the catch-up did not read the topic of a post
+  // sent before the drop, and when the catch-up does not end in time (the
+  // deadline is abstracted: any step while it has not ended).
   action keepCopy(k: int): bool = all {
-    s.online, s.connected, s.inStep, s.copyRow.get(k) == "hidden", keepReasonSeen(k),
+    s.online, s.connected, s.copyRow.get(k) == "hidden",
+    not(s.inStep) or keepReasonSeen(k) or unchecked(k),
     s' = { ...s, copyRow: s.copyRow.set(k, "kept"),
       kept: if (s.seen.contains({ key: k, what: "gone" })) s.kept.set(k, "copy") else s.kept,
       label: "keepCopy", target: k }
@@ -355,11 +367,13 @@ module outboxProtocol {
 
   action disconnect = all {
     not(s.sealed), s.connected,
-    s' = { ...s, connected: false, events: Set(), scan: Set(), catchup: false, inStep: false, label: "disconnect" }
+    s' = { ...s, connected: false, events: Set(), scan: Set(), catchup: false, inStep: false,
+      gapped: s.created, rechecked: Set(), label: "disconnect" }
   }
   action goOffline = all {
     not(s.sealed), s.online,
-    s' = { ...s, online: false, connected: false, events: Set(), scan: Set(), catchup: false, inStep: false, label: "goOffline" }
+    s' = { ...s, online: false, connected: false, events: Set(), scan: Set(), catchup: false, inStep: false,
+      gapped: s.created, rechecked: Set(), label: "goOffline" }
   }
   action goOnline = all { not(s.online), s' = { ...s, online: true, label: "goOnline" } }
   action reconnect = all {
@@ -367,12 +381,15 @@ module outboxProtocol {
     s' = { ...s, connected: true, catchup: true, scan: s.created, label: "reconnect" }
   }
   // End of catch-up, after all its pages: flush every queued or unknown row.
-  // Its recheck has stored what other clients changed meanwhile.
-  action catchUp = all {
+  // Its recheck reads only the likely topics (`covered`) and stores what
+  // other clients changed there meanwhile.
+  action catchUpWith(covered: Set[int]): bool = all {
     s.catchup, s.scan.size() == 0, not(s.fetches.exists(f => f.kind == "catchup")),
-    s' = { ...s, catchup: false, inStep: true, seen: s.slack,
+    s' = { ...s, catchup: false, inStep: true, rechecked: covered,
+      seen: s.seen.union(s.slack.filter(c => covered.contains(c.key))),
       due: s.due.union(drafts.filter(k => Set("queued", "unknown").contains(s.row.get(k)))), label: "catchUp" }
   }
+  action catchUp = catchUpWith(drafts)
   action seal = all { not(s.sealed), s' = { ...s, sealed: true, label: "seal" } }
 
   // Juno submits each ID at most once that Slack accepts; a network copy is
@@ -411,7 +428,7 @@ module outboxProtocol {
     actionNeedsMessage and noActionOnDiscarded and actionsDrain and sendsWaitOffline and shownOnce and keepsRealSends and repliesKeepRoot
 
   action work = any {
-    goOnline, reconnect, catchUp,
+    goOnline, reconnect, { nondet covered = drafts.powerset().oneOf(); catchUpWith(covered) },
     { nondet k = drafts.oneOf(); nondet withEcho = Set(true, false).oneOf(); any {
       claim(k), accept(k, withEcho), answer(k), refused(k), lookup(k), wake(k),
       runAction(k), actAccept(k), actAnswer(k), dropAction(k), observeCopy(k), deleteCopy(k), keepCopy(k),
@@ -707,6 +724,26 @@ module outboxProtocol {
   ) }
   action deletedOfflineStep = deletedOfflineWith("full")
   action deletedOfflineBugStep = deletedOfflineWith("noWait")
+
+  // As `deletedOffline`, but the recheck after the reconnect does not read
+  // the post's topic, so the store never learns the kept message is gone.
+  // The guarded delete needs the topic read again and keeps the copy. The
+  // bug waits for the catch-up only, then deletes the copy.
+  action uncoveredRecheckWith(check: str): bool = all { not(reachedAgreement), tick(
+    if (s.sealed) progress else
+    if (copyHidden(turn)) copySetup else
+    if (turn == 6) observeCopy(1) else
+    if (turn == 7) disconnect else
+    if (turn == 8) remoteChange(1, "gone") else
+    if (turn == 9) reconnect else
+    if (turn == 10) startFetch(1, "catchup") else
+    if (turn == 11) { nondet f = s.fetches.oneOf(); finishFetch(f) } else
+    if (turn == 12) catchUpWith(Set()) else
+    if (turn == 13) (if (check == "full") keepCopy(1) else deleteCopyWith(1, true, check)) else
+    seal
+  ) }
+  action uncoveredRecheckStep = uncoveredRecheckWith("full")
+  action uncoveredRecheckBugStep = uncoveredRecheckWith("noRecheck")
 }
 
 module outbox {

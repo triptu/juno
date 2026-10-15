@@ -323,6 +323,7 @@ const regressions = [
   ['outbox', 'keptDeleted', 'keepsRealSends', 'outbox-kept-deleted'],
   ['outbox', 'copyReply', 'repliesKeepRoot', 'outbox-copy-reply'],
   ['outbox', 'deletedOffline', 'keepsRealSends', 'outbox-deleted-offline'],
+  ['outbox', 'uncoveredRecheck', 'keepsRealSends', 'outbox-uncovered-recheck'],
   ['catchup', 'newerThanPage', 'noFalseDelete', 'catchup-newer-than-page'],
   ['catchup', 'dropChanges', 'quietAgreement', 'catchup-drop-changes'],
   ['catchup', 'olderPage', 'quietAgreement', 'catchup-older-page'],
