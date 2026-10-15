@@ -1,3 +1,6 @@
+import { mkdirSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { expect, test, type Locator, type Page, type Route as NetworkRoute } from '@playwright/test'
 import { expectNoLayoutShift, measureLayoutShift } from '@juno/testing/layout-shift'
 import { openState, readRoutes, type Route } from './support'
@@ -37,20 +40,27 @@ const interactive = [
 /** Elements tried per state. A state with more (an icon grid) is sampled from both ends. */
 const perState = 8
 
-/** The tests split the components between them so they run in parallel. */
-const shards = 12
+/** The tests share the states between them so they run in parallel. GALLERY_SHIFT_PARTS sets how many (pnpm remote uses one per worker). */
+const shards = Number(process.env.GALLERY_SHIFT_PARTS ?? 12)
 
-/** Deals components out, biggest first, to whichever part has the fewest states so far. */
-function partsOf(routes: ReadonlyArray<Route>): string[][] {
-  const sizes = new Map<string, number>()
-  for (const route of routes) sizes.set(route.component, (sizes.get(route.component) ?? 0) + 1)
-  const parts = Array.from({ length: shards }, () => ({ load: 0, components: [] as string[] }))
-  for (const [component, size] of [...sizes].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))) {
-    const lightest = parts.reduce((least, part) => (part.load < least.load ? part : least))
-    lightest.load += size
-    lightest.components.push(component)
+/**
+ * Hands out the next state no part has taken yet, in component order. The
+ * parts take from one queue, so they finish together however long each
+ * state takes. A claim is a directory: mkdir succeeds for one process only.
+ */
+function claimNext(routes: ReadonlyArray<Route>, only: ReadonlyArray<string> | undefined): Route | undefined {
+  const queue = join(tmpdir(), 'juno-gallery-shift', process.env.GALLERY_SHIFT_RUN ?? 'local')
+  mkdirSync(queue, { recursive: true })
+  for (const route of routes) {
+    if (only && !only.includes(route.component)) continue
+    try {
+      mkdirSync(join(queue, encodeURIComponent(route.route)))
+      return route
+    } catch {
+      // Another part has it.
+    }
   }
-  return parts.map((part) => part.components)
+  return undefined
 }
 
 async function targets(page: Page, route: Route): Promise<Locator[]> {
@@ -100,21 +110,17 @@ const only = process.env.GALLERY_SHIFT_ONLY?.split(',').map((name) => name.trim(
 
 for (let shard = 0; shard < shards; shard++) {
   // The states come from the built gallery, so the list can only be read once
-  // a page is open; each component is a step so the report groups by component.
+  // a page is open; each state is a step in the report.
   test(`no interaction shifts the layout, in any state of any component (part ${shard + 1} of ${shards})`, async ({ page }) => {
-    // Each part walks about forty states, at up to eight elements and six touches each, with a wait per touch for the longest declared motion.
+    // A part walks states until the queue is empty, at up to eight elements and six touches per state, waiting out the motion each touch starts.
     test.setTimeout(15 * 60_000)
     const routes = await readRoutes(page)
-    const components = partsOf(routes)[shard] ?? []
     const failures: string[] = []
-    for (const component of components) {
-      if (only && !only.includes(component)) continue
-      await test.step(component, async () => {
-        for (const route of routes.filter((candidate) => candidate.component === component)) {
-          await openState(page, route)
-          for (const [index, element] of (await targets(page, route)).entries()) {
-            for (const failure of await touch(page, element)) failures.push(`${route.route} (element ${index + 1}) ${failure}`)
-          }
+    for (let route = claimNext(routes, only); route !== undefined; route = claimNext(routes, only)) {
+      await test.step(route.route, async () => {
+        await openState(page, route)
+        for (const [index, element] of (await targets(page, route)).entries()) {
+          for (const failure of await touch(page, element)) failures.push(`${route.route} (element ${index + 1}) ${failure}`)
         }
       })
     }
