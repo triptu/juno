@@ -78,6 +78,17 @@ export class SidebarRow {
     return this.root.getByRole('button', { name: new RegExp(`^Resolve ${escapeRegExp(this.title)}`) })
   }
 
+  /** The row's tile: `data-topic-art` is `art` once the topic has a drawing, `placeholder` for the pebble. */
+  get art(): Locator {
+    return this.root.locator('[data-topic-art]')
+  }
+
+  /** The drawing's markup, once the row shows one. */
+  async artMarkup(): Promise<string> {
+    await expect(this.art).toHaveAttribute('data-topic-art', 'art', { timeout: 15_000 })
+    return this.art.innerHTML()
+  }
+
   hover(): Promise<void> {
     return pointAt(this.win, this.root)
   }
@@ -844,6 +855,7 @@ const DIVIDER_OFFSET = 148
 export type TopicMenuItem =
   | 'open-new-tab'
   | 'rename'
+  | 'redraw'
   | 'mark-read'
   | 'mark-unread'
   | 'pin'
