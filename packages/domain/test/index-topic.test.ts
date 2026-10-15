@@ -18,7 +18,7 @@ describe('topic index row', () => {
   it('computes activity, participants and the preview from the messages', () => {
     const row = indexTopic(input([reply2, root, reply1], { reads: { lastReadTs: reply2.ts, markedUnread: false, pendingLocalWrite: false } }))
     expect(row).toEqual({
-      activity: { lastActivityTs: reply2.ts, messageCount: 3, unreadCount: 0, unreadExact: true, mentionsMe: false, participants: [me, mayaId, leoId] },
+      activity: { lastActivityTs: reply2.ts, messageCount: 3, unreadCount: 0, unreadExact: true, mentionsMe: false, participants: [mayaId, leoId] },
       preview: { sender: 'You', text: 'On it.' },
       rootTs: root.ts,
     })

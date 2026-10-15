@@ -16,7 +16,9 @@ before a card or launch. Native plan mode is preferred; its absence adds
 approved brief. Replacing an open T3 proposal uses WP15's expiry path.
 
 The Start click records one attempt, invokes `t3_thread_launch` once, records
-the returned thread in the job, and mints its grant. Lost responses stay
+the returned thread in the job, and mints its grant. A session T3 Code
+confirmed always gets its job and Task card; the grant needs the card's memory
+generation and the connection's account to still hold. Lost responses stay
 unknown. A launch carries `[juno:<action id>]`; reconciliation reads candidate
 threads and requires the same project and exact original message. A negative
 search never permits another launch. A reconciled receipt does not restore a
@@ -31,12 +33,23 @@ clean owner run with the job's live grant records a Change intent and an
 attempt without a click. The settled Change card is the audit record. A
 send without that authority leaves the Change card open; a stop without it
 points to the Task card. Task Stop is already an owner click: it approves
-one stored interrupt through the dispatcher, with no second click. While
-Juno is paused or off, Stop approves nothing and the job keeps running: Pause
-stops every job, and an interrupt queued then would reach T3 Code on Resume
-with no click. Failed stops remain visible on their Change card and do not
-claim the session stopped.
+one stored interrupt through the dispatcher, under the click's op, with no
+second click. While Juno is paused or off, Stop approves nothing and the job
+keeps running: Pause stops every job, and an interrupt queued then would reach
+T3 Code on Resume with no click. Failed stops remain visible on their Change
+card and do not claim the session stopped. A later Stop click is a new click:
+it gets a new interrupt card, since an interrupt repeated on a session is
+harmless; an interrupt still on its way is not sent again. A Stop that cannot
+be built leaves the job running and never fails the click.
 Closing Juno only stops observation; it does not interrupt the external session.
+
+A removal that reaches the run that started a session makes Juno stop
+watching it: the job settles unknown with "Juno stopped watching after a
+removal", so no report carries the removed words to the model and the card
+does not claim the session stopped. The interrupt goes through the same
+Change card, proposed with a line saying why, and is sent only when the owner
+clicks Apply. The removal click is not taken as approval of an interrupt the
+owner has not seen.
 
 The watcher resumes from the recorded thread, never from the launch brief.
 It reads durable thread state, updates the job's `where` from a targeted
@@ -51,7 +64,9 @@ Single-choice pending user questions with two to four options become Question
 cards. Their exact selected value or free text reaches
 `t3_pending_request_respond` once. Unknown, multi-question and multi-select
 shapes stay in T3, and the Task card says "T3 Code needs your answer in T3
-Code". The current API cannot answer permission approvals.
+Code". Each wait posts one report, when the job moves to needs-you, so Juno
+hears that the session is waiting and decides what to tell the owner. The
+current API cannot answer permission approvals.
 
 ## Evidence and owner live checks
 

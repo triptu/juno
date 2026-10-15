@@ -1267,6 +1267,21 @@ export class TopicPane {
     await this.composer.press('Enter')
   }
 
+  /** The bar a check on send shows inside the composer (spec section 8). */
+  get checkBar() {
+    const bar = this.root.locator('[data-send-check]')
+    return {
+      bar,
+      /** Picks one of its two choices by name: Post in thread, Send to Main, Fix and send, Send as is. */
+      choose: (name: string) => bar.getByRole('button', { name: new RegExp(`^${name}`) }).click(),
+    }
+  }
+
+  /** The amber line that warns about hiring or people details in a public channel. */
+  get audienceWarning(): Locator {
+    return this.root.locator('[data-audience-warning]')
+  }
+
   /** The message is shown as Slack holds it: once, and not pending. */
   async expectSent(text: string): Promise<void> {
     await expect(this.message(text)).toHaveCount(1, { timeout: 15_000 })

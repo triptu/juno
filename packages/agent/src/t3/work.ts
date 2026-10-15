@@ -1,12 +1,12 @@
 import { Schema } from 'effect'
 import { CardPayload, actionDigest } from '@juno/agent-cards'
 import type { Actions } from '../actions'
-import { cardRow, intentOf, payloadOf, memoryGen, expiry } from '../actions/cards'
+import { cardRow, intentOf, payloadOf, memoryGen, expiry, settleCardOutcome } from '../actions/cards'
 import { authorityOf, liveGrant } from '../grants/grants'
 import type { Jobs } from '../jobs/jobs'
 import { authorizeDecision, toolDecision } from '../policy/policy'
 import { defineTool, type ToolRun } from '../request/tool'
-import { authorize, recordAttempt, recordReceipt } from '../store/ledger'
+import { authorize, recordAttempt, recordReceipt, settleAuthorization } from '../store/ledger'
 import { changeCard, mcpExecutors } from '../mcp/actions'
 import type { McpManagerApi } from '../mcp/manager'
 import { sessionOf } from './protocol'
@@ -57,8 +57,10 @@ export function workTools(manager: McpManagerApi, context: { readonly jobs: Jobs
         const attempt = recordAttempt(manager.store, auth.id)
         if (!attempt) return { text: 'The action was cancelled before sending.', isError: true }
         const result = await executor.run({ actionId: stored.action.id, authorizationId: auth.id, attemptId: attempt, digest: intent.digest, payload: stored.action.payload, cardId: id, opId: run.opId })
+        // Settled as the dispatcher settles a click: the evidence, Activity's detail, and the card's outcome for the model.
         if (result._tag === 'done') recordReceipt(manager.store, attempt, result.receipt)
-        else manager.store.db.prepare('UPDATE authorizations SET outcome = ? WHERE id = ?').run(result._tag, auth.id)
+        else settleAuthorization(manager.store, auth.id, result._tag, result.detail)
+        settleCardOutcome(manager.store, id)
         context.actions.changed()
         if (result._tag !== 'done') return { text: 'T3 Code did not confirm the action. Check the session; Juno will not retry.', isError: true }
         if (operation === 'stop') { context.actions.jobStopped(job.id); await context.jobs.stop(job.id) }

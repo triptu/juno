@@ -373,7 +373,7 @@ export function agentHandlers(host: ChatHost) {
         'agent.cards.undo': ({ opId, identity }) => Effect.flatMap(engine(state, host), (turns) =>
           Effect.promise(() => turns.actions.undo(identity)).pipe(Effect.flatMap((done) => done ? Effect.succeed({ opId }) : refused({ _tag: 'refused', reason: 'stale' })))),
         'agent.jobs.stop': ({ opId, jobId }) =>
-          Effect.flatMap(engine(state, host), (turns) => changed(Effect.promise(() => turns.jobs.stop(jobId)).pipe(Effect.as({ opId })))),
+          Effect.flatMap(engine(state, host), (turns) => changed(Effect.promise(() => turns.jobs.stop(jobId, opId)).pipe(Effect.as({ opId })))),
 
         'agent.scheduled.page': () => host.schedule === undefined ? Stream.make({ page: { schedules: [] }, revisions: [] }) : live(Stream.merge(state.changes, Stream.tick(MEMORY_RECHECK)), host.schedule.scheduler.page),
         'agent.schedule.watchReply': (input) => {

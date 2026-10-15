@@ -27,9 +27,9 @@ import { authorizeDecision, type Invalid } from '../policy/policy'
 import { authorityOf } from '../grants/grants'
 import { crashPoint } from '../runtime/crash'
 import { transaction } from '../store/database'
-import { authorize, recordAttempt, recordReceipt, type JournalPosition } from '../store/ledger'
+import { authorize, recordAttempt, recordReceipt, settleAuthorization, type JournalPosition } from '../store/ledger'
 import type { Store } from '../store/store'
-import { cardRow, expiry, memoryGen, payloadOf, recordOutcome, summaryOf, viewOf, type IntentRow } from './cards'
+import { cardRow, expiry, memoryGen, payloadOf, settleCardOutcome, type IntentRow } from './cards'
 import type { Executor, ExecutorCall } from './executor'
 
 export interface DispatcherOptions {
@@ -48,8 +48,6 @@ interface Pending {
   readonly cardId: string
   readonly intent: IntentRow
 }
-
-const ATTEMPT_OPEN = "('consumed', 'sent', 'cancel-requested')"
 
 export function createDispatcher(options: DispatcherOptions) {
   const { store } = options
@@ -97,23 +95,7 @@ export function createDispatcher(options: DispatcherOptions) {
     settleCard(item.cardId)
   }
 
-  /** Records the card's outcome for the model once every child has settled (§19.5). */
-  const settleCard = (cardId: string) => {
-    const card = cardRow(store, cardId)
-    if (card === undefined) return
-    const view = viewOf(store, card, store.now()).card
-    if (!('status' in view)) return
-    const status = view.status._tag
-    if (status !== 'done' && status !== 'failed' && status !== 'expired') return
-    transaction(store.db, () => recordOutcome(store, cardId, status, summaryOf(payloadOf(store, card))))
-  }
-
-  const settleAuthorization = (authorizationId: string, outcome: 'failed' | 'unknown', detail: string) => {
-    transaction(store.db, () => {
-      store.db.prepare(`UPDATE authorizations SET outcome = ? WHERE id = ? AND outcome IN ${ATTEMPT_OPEN}`).run(outcome, authorizationId)
-      store.db.prepare('INSERT OR IGNORE INTO action_results (authorization_id, detail, at) VALUES (?, ?, ?)').run(authorizationId, detail, store.now())
-    })
-  }
+  const settleCard = (cardId: string) => settleCardOutcome(store, cardId)
 
   /** One approved child: check, authorize, attempt, run, record. Returns false when the drain must wait (paused, off, not the owner, no account yet). */
   const dispatch = async (item: Pending): Promise<boolean> => {
@@ -181,10 +163,10 @@ export function createDispatcher(options: DispatcherOptions) {
         recordReceipt(store, attemptId, result.receipt)
         break
       case 'failed':
-        settleAuthorization(authorized.id, 'failed', result.detail)
+        settleAuthorization(store, authorized.id, 'failed', result.detail)
         break
       case 'unknown':
-        settleAuthorization(authorized.id, 'unknown', result.detail)
+        settleAuthorization(store, authorized.id, 'unknown', result.detail)
         break
     }
     settleCard(item.cardId)
