@@ -198,9 +198,12 @@ export function useMessageActions({ detail, list, scrollRef, composer }: Message
       const people = latest.current.list.refs.people
       const sender = message.senderId === undefined ? undefined : { id: message.senderId, name: people.get(message.senderId)?.name ?? message.senderId }
       const chosen = await showMessageMenu(latest.current.detail, message, isOwnEditable(message), at, sender, onSender)
-      if (chosen === 'edit') startEdit(message)
-      else if (chosen === 'delete') askDelete(message)
-      else if (chosen === 'reply') handlers.onReply?.(message)
+      // The message may have been edited or deleted while the menu was open: act on it as it is now.
+      const now = latest.current.list.rows.get(message.ts)
+      if (now === undefined) return
+      if (chosen === 'edit' && isOwnEditable(now)) startEdit(now)
+      else if (chosen === 'delete' && isOwnEditable(now)) askDelete(now)
+      else if (chosen === 'reply') handlers.onReply?.(now)
     }
     return { ...handlers, menu }
     // `channel` is fixed for a topic tab; the rest is read through refs.

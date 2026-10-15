@@ -130,6 +130,21 @@ test('Edit and Delete from the toolbar’s More menu and from a right-click', as
   await expect.poll(() => fake.messages('C0ENG').some((m) => m.ts === ts)).toBe(false)
 })
 
+test('a message edited elsewhere while its menu is open: Edit starts from the new text', async ({ juno, fake }) => {
+  await openMain(juno)
+  const { topic } = juno
+  const ts = await sendOwn(juno, fake, 'Standup at 10')
+
+  await juno.chooseNextMenuItem('edit', { hold: true })
+  await topic.message('Standup at 10').click({ button: 'right' })
+  fake.editMessage({ channel: 'C0ENG', ts, text: 'Standup at 11' })
+  await expect(topic.message('Standup at 11')).toBeVisible()
+  await juno.releaseMenu()
+
+  const field = topic.list.getByRole('textbox', { name: 'Edit message' })
+  await expect(field).toHaveValue('Standup at 11')
+})
+
 test('an edit made while the message is still sending reaches Slack once it has the message', async ({ juno, fake }) => {
   await openMain(juno)
   const { topic } = juno

@@ -54,10 +54,19 @@ function testLabel(item: ContextMenuLeaf): string {
   return item.checked === true ? `${label} ✓` : label
 }
 
-export const contextMenuForTests: { next: string | null | undefined; lastLabels: ReadonlyArray<string>; lastAt: { readonly x: number; readonly y: number } | null } = {
+export const contextMenuForTests: {
+  next: string | null | undefined
+  lastLabels: ReadonlyArray<string>
+  lastAt: { readonly x: number; readonly y: number } | null
+  /** Keeps the next menu open, as if the user were still reading it, until `release` is called. */
+  hold: boolean
+  release: (() => void) | undefined
+} = {
   next: undefined,
   lastLabels: [],
   lastAt: null,
+  hold: false,
+  release: undefined,
 }
 
 /** Under JUNO_E2E the folder picker is out of Playwright's reach too: a test sets the folder the next one picks. */
@@ -165,7 +174,13 @@ export function registerIpc({ updates, supervisor, agent, providers, backupSecre
           contextMenuForTests.next = undefined
           contextMenuForTests.lastAt = at ?? null
           contextMenuForTests.lastLabels = items.flatMap((item) => ('submenu' in item ? [item.label, ...item.submenu.map((sub) => `> ${testLabel(sub)}`)] : [testLabel(item)]))
-          return resolve(next)
+          if (!contextMenuForTests.hold) return resolve(next)
+          contextMenuForTests.hold = false
+          contextMenuForTests.release = () => {
+            contextMenuForTests.release = undefined
+            resolve(next)
+          }
+          return
         }
         let chosen: string | null = null
         const leaf = (item: ContextMenuLeaf): MenuItemConstructorOptions =>
