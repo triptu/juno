@@ -31,6 +31,8 @@ export interface HarnessOptions {
   readonly actions?: ActionsOptions
   /** Open on an existing agent directory, as a restart does. */
   readonly dir?: string
+  /** Removal's backup hooks. */
+  readonly backup?: import('../src/redaction').RemovalBackup
 }
 
 export async function turnsHarness(options: HarnessOptions = {}) {
@@ -48,6 +50,7 @@ export async function turnsHarness(options: HarnessOptions = {}) {
     ...(options.host ? { host: options.host } : {}),
     ...(options.migrations ? { migrations: options.migrations } : {}),
     ...(options.actions ? { actions: options.actions } : {}),
+    ...(options.backup ? { backup: options.backup } : {}),
     onReport: (error) => reports.push(error),
   })
   if (opened._tag !== 'running') throw new Error('a fresh engine did not open')
