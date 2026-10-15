@@ -318,7 +318,12 @@ test('send: Enter to the pending row painted', async ({ juno }) => {
 // The large-workspace scenarios share one synced user-data directory: the
 // fake's 1,200-topic seed fills the 300-row window, and syncing it once
 // keeps the run short. Every scenario launches the app warm on it.
-test.describe.serial('large workspace', () => {
+//
+// The groups here are not serial: a serial group skips every scenario after
+// one that fails, so a budget missed early would leave the rest unmeasured.
+// With one worker they still run in order on one setup; after a failure the
+// next worker runs the setup again and goes on.
+test.describe('large workspace', () => {
   let fake: FakeSlack
   let userData: string
   let slackDir: string
@@ -672,7 +677,7 @@ test('topic open, uncached: a thread whose replies were never fetched, to the he
 // The M4 gate (performance 3.4) on the topic300 seed: a 300-message thread
 // and a 300-message Main, 20 % images and 10 % code blocks. One synced
 // user-data directory; every scenario launches the app warm on it.
-test.describe.serial('topic view', () => {
+test.describe('topic view', () => {
   let fake: FakeSlack
   let userData: string
   let slackDir: string
