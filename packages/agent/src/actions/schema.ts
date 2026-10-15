@@ -124,4 +124,4 @@ const actions2 = [
   ) STRICT`,
 ]
 
-export const ACTIONS_MIGRATIONS: MigrationSet = { name: 'actions', steps: [actions1, actions2, ['ALTER TABLE cards ADD COLUMN expired_at INTEGER']] }
+export const ACTIONS_MIGRATIONS: MigrationSet = { name: 'actions', steps: [actions1, actions2, ['ALTER TABLE cards ADD COLUMN expired_at INTEGER'], ['CREATE TABLE resolve_undos (card_id TEXT PRIMARY KEY REFERENCES cards(id))']] }

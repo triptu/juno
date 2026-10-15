@@ -8,8 +8,8 @@
  * - Sends are single-attempt (`dispatch.ts`). They are off unless the
  *   options turn them on. The desktop enables them for approved cards;
  *   a disabled host refuses before recording an attempt.
- * - Resolve and OS notification delivery fail with `unsupported`: Juno has
- *   no resolve command or notifier yet (M3 and M10 add them).
+ * - Resolve uses the local topic command and retains its Undo.
+ * - OS notification delivery remains unsupported.
  *
  * `host.hello` answers the one protocol the host serves; the agent refuses
  * a host whose protocol differs from its own.
@@ -73,7 +73,8 @@ export const agentHostHandlers = (options: HandlerOptions) =>
         'host.outbox.cancel': ({ authorizationId, attemptId }) => dispatcher.cancel(authorizationId, attemptId),
         'host.outbox.reconcileSend': ({ accountId, channelId, actionId, attemptId }) =>
           Effect.flatMap(accountFor(accountId), (account) => dispatcher.reconcile(attemptId, channelId, actionId, account.userId)),
-        'host.topics.resolve': () => unsupported('Juno cannot resolve a topic for the agent yet.'),
+        'host.topics.resolve': (dispatch) => asAccount(dispatch.payload.account_id, host.resolve?.(dispatch) ?? unsupported('Resolve is unavailable.')),
+        'host.topics.undoResolve': ({ accountId, actionId }) => asAccount(accountId, host.undoResolve?.(actionId) ?? unsupported('Resolve Undo is unavailable.')),
 
         'host.schedule.check': ({ accountId, conversation, refresh }) => asAccount(accountId, host.schedule?.check(conversation, refresh) ?? unsupported('Reply watches are unavailable.')).pipe(Effect.tap(() => accountFor(accountId))),
         'host.schedule.hours': ({ accountId }) => asAccount(accountId, host.schedule?.hours ?? unsupported('Notification hours are unavailable.')),

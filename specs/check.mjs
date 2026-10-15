@@ -401,6 +401,8 @@ if (!outboxOnly && !boundedOnly && !actionsOnly && !recoveryOnly) {
 }
 
 if (!outboxOnly && !boundedOnly && !memoryOnly && !recoveryOnly) {
+  simulate('agent-actions', 'step', 'undoSurvivesRedelivery', 'resolve-corrected.itf.json', false, false, { main: 'agent_resolve', samples: 1, steps: 4 })
+  simulate('agent-actions', 'bugStep', 'undoSurvivesRedelivery', 'resolve-bug.itf.json', true, false, { main: 'agent_resolve', samples: 1, steps: 4 })
   const options = { main: 'agent_actions' }
   simulate('agent-actions', 'simulationStep', 'invariants', 'agent-actions.itf.json', false, true,
     { ...options, samples: tracesOnly ? 100 : 1000, steps: 100 })
