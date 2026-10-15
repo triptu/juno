@@ -57,6 +57,29 @@ test.describe('mouse-down activation', () => {
  * hovered; one that fits shows none. The browser draws the tooltip itself, so
  * the check reads the `title` attribute the hover sets.
  */
+/**
+ * Home's title lines may be rewritten by the assistant after Home paints
+ * (SPEC section 12). The two states hold the same rows with the plain and
+ * the rewritten titles: every row, title, meta line, button and the ask
+ * field sit in the same boxes in both, so the swap moves nothing.
+ */
+test('a rewritten Home title line leaves every box where it was', async ({ page }) => {
+  const boxes = async (state: string) => {
+    await page.goto(`/#/Home?__state=${state}`)
+    await expect(page.locator('[data-home-item]')).toHaveCount(3)
+    return page.locator('[data-fixture-frame]').evaluate((frame) =>
+      [...frame.querySelectorAll('[data-home-item], [data-home-title], [data-home-meta], h2, button')].map((node) => {
+        const box = node.getBoundingClientRect()
+        return [node.tagName, Math.round(box.x), Math.round(box.y), Math.round(box.width), Math.round(box.height)].join(' ')
+      }),
+    )
+  }
+  const plain = await boxes('items/three')
+  const rewritten = await boxes('items/ai-titles')
+  expect(rewritten).toEqual(plain)
+  await expect(page.locator('[data-home-title]').first()).toHaveText("Elena wants a call on Rina's competing offer by Friday")
+})
+
 test.describe('truncation tooltip', () => {
   const hoverText = async (page: Page, text: string | RegExp) => {
     const node = page.locator('[data-fixture-frame]').getByText(text, { exact: true }).first()
