@@ -28,13 +28,15 @@
  */
 import { Clock, Context, Effect, Layer, Queue, Stream } from 'effect'
 import { millisToTs, type Ts } from '@juno/domain'
-import type { Message } from '@juno/slack-schema'
 import { transaction } from '@juno/store'
 import { actionDone, deferAction, dropAction, flushActions, pendingActions, placeOf, settleOnFailedPost, storedMe, type Acted, type PendingAction, type TopicFetcher } from '@juno/sync'
 import { Outbox, type MirrorError } from '../outbox'
 import { SyncLink } from '../syncLink'
 import { Workspace, type OpenWorkspace } from '../workspace'
 import { inStore } from './worker'
+
+/** A message as Slack sends it, the shape `TopicFetcher.acted` stores. */
+type Message = Parameters<TopicFetcher['sent']>[0]['message']
 
 /** Longest wait between two tries of a row that keeps failing. */
 const MAX_BACKOFF_MILLIS = 5 * 60_000
