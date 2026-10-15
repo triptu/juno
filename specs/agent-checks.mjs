@@ -86,6 +86,7 @@ export const recoveryCases = [
   ['cursorGaps', 'drainBound'],
   ['foreignJournal', 'journalRollbackStopsResume'],
   ['bridgeToolReplay', 'bridgePreservesRun'],
+  ['offlineInput', 'networkAdmission'],
 ]
 
 // WP8's trailing-state rollback slice (agent-recovery-replay.qnt). The

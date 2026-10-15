@@ -32,7 +32,7 @@ export class PhaseSource extends Context.Service<PhaseSource, Stream.Stream<Engi
 
 const isSqlError = (error: unknown): error is SqlError => (error as { readonly _tag?: unknown } | undefined)?._tag === 'SqlError'
 
-const ONLINE = new Set<EnginePhase['_tag']>(['catching-up', 'live', 'rate-limited'])
+const ONLINE = new Set<EnginePhase['_tag']>(['first-run', 'catching-up', 'live', 'rate-limited'])
 
 const hostError = (error: MirrorError): AgentHostError => {
   switch (error._tag) {

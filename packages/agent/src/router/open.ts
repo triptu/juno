@@ -117,6 +117,8 @@ export interface TurnsOptions {
   readonly jobDrivers?: () => ReadonlyArray<JobDriver>
   /** Other folders' migration sets. Spend, turns and jobs are always applied. */
   readonly migrations?: ReadonlyArray<MigrationSet>
+  /** Host socket availability. Stored input waits until it is online. */
+  readonly online?: () => boolean
   readonly schedule?: Pick<SchedulerOptions, 'replies' | 'cachedReplies' | 'account' | 'enabled'>
   /** The encrypted backup, move and restore (WP21). Without it Juno keeps no backup and cannot move. */
   readonly backup?: {
@@ -151,6 +153,8 @@ export interface Turns {
   readonly position: () => Promise<JournalPosition>
   /** A message (maybe a reply), a reaction, a report, a wake or a click. Durable before it returns; the same op again is a no-op. */
   readonly accept: (input: Input) => Queued
+  /** Wake queued input after the host socket changes. */
+  readonly networkChanged: () => void
   /** "Try again" on an interrupted or failed send. */
   readonly retry: (input: { readonly opId: string; readonly interruptedOpId: string }) => Retry
   readonly mode: () => Mode
@@ -339,7 +343,7 @@ async function start(
     },
     onRunEnded: () => compactor?.poke(),
     cards: { carry: (opId) => actions.carry(opId), quote: (cardId) => actions.quote(cardId) },
-    admits: () => ownership.admits(),
+    admits: () => ownership.admits() && (options.online?.() ?? true),
     ...(options.onReport ? { onReport: options.onReport } : {}),
   })
   const subagentModel = options.subagent ?? initial.compaction
@@ -573,6 +577,7 @@ async function start(
         .all(from, limit) as unknown as ReadonlyArray<ArchiveMessage>,
     memory: () => view(store),
     subscribe: router.subscribe,
+    networkChanged: router.kick,
     idle: router.idle,
     rotate: router.rotate,
     pins: {
