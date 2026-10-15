@@ -183,7 +183,7 @@ startup: open authorizations ─▶ unknown (recovery) ─▶ reconcile once ─
 
 ## Auto-review
 
-A connection (MCP) call that is not a read runs once with no click or shows its Change card, as the owner's rule and one review decide (`mcp/tools.ts` `call_tool`; spec `reviewAllows`, `reviewGated`, `untrustedNeverAuthorizes`).
+A connection (MCP) call that is not a read runs once with no click or shows its Change card, as the owner's rule and one review decide (`mcp/tools.ts` `call_tool`, `mcp/reviewed.ts`; spec `reviewAllows`, `reviewGated`, `untrustedNeverAuthorizes`).
 
 | Piece | Where |
 | --- | --- |
@@ -192,7 +192,7 @@ A connection (MCP) call that is not a read runs once with no click or shows its 
 | The review: the owner's words in the run (`ownerWordsInRun`), the request, the spend reservation, the 3 s limit | `review/review.ts` |
 | The decision model: Jev on OpenRouter through pi-ai `classify`, no retry; none without an OpenRouter key | `providers/review.ts` (`reviewModel`) |
 | The rules: `needsReview`, `reviewDecision`, `floorRisk`; `authorizeDecision` with `review` | `policy/policy.ts` |
-| A call that runs: a quiet card, an `mcp_reviews` authority, authorize, attempt, `runWrite`, settle | `mcp/tools.ts`, `mcp/actions.ts` |
+| The rule, the review and the decision for one call (`reviewChange`); a call that runs: a quiet card, an `mcp_reviews` authority, authorize, attempt, `runWrite`, settle (`runReviewed`) | `mcp/reviewed.ts`, `mcp/actions.ts` |
 
 - **The rule** is the tool's own unless it is Auto, else the connection's. Always ask: a card, no review. Never ask: no review when the run was clean when the model wrote the call (`ToolRun.cleanAtRequest`; a call's own taint at its start does not count), else a review that must find the intent at least implied. Auto: a review that must find it explicit and reversible. T3 Code's generic tools always ask (O3).
 - **The review** reads only `{ owner, call }`: the text of the run's `send`, `steer` and `retry` inputs (never quotes, reports, wakes or tool results), and the call's server label, tool name and arguments. It reserves on the `chat` path before the call and settles with the reported cost, or keeps the reservation. No model (another provider than OpenRouter), no budget, an error, a timeout or an answer outside the choices is `failed`, and the call asks. A permissive answer below 0.6 confidence counts as the next safer one. `floorRisk` makes a call named like a delete, with a destructive argument (`archived`, `in_trash`, a delete `command`), or marked `destructiveHint` never reversible.
