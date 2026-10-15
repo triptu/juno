@@ -6,7 +6,7 @@
  * view (inventory 15.8) adds the channel to a sidebar view or removes it. The
  * person menu is `notifyActions.showPersonMenu`.
  */
-import { channelMenuItems, channelsIgnore, isViewMenuAction, notifyChoiceOf, type ChannelMenuAction, type NotifyAction, type NotifyTargetView, type RowChannel } from '@juno/contract'
+import { channelMenuItems, channelsIgnore, isViewMenuAction, notifyChoiceOf, type ChannelMenuAction, type ContextMenuAt, type NotifyAction, type NotifyTargetView, type RowChannel } from '@juno/contract'
 import { currentNotificationSettings, junoAvailableAtom, loadNotificationSettings, popupContextMenu, registry, runAction, sidebarFilterAtom } from '@juno/state'
 import { markFilterChange } from './filterMark'
 import { askJunoAbout } from './juno/actions'
@@ -32,7 +32,8 @@ export function scopeToChannel(channel: string): void {
   registry.set(sidebarFilterAtom, { ...filter, scope: channel })
 }
 
-export async function showChannelMenu(channel: MenuChannel): Promise<void> {
+/** Shows the menu at the pointer, or at `at`. Resolves with the chosen action once it has run. */
+export async function showChannelMenu(channel: MenuChannel, at?: ContextMenuAt): Promise<ChannelMenuAction | undefined> {
   const settings = currentNotificationSettings(registry) ?? (await loadNotificationSettings(registry))
   const target: NotifyTargetView = { kind: 'channel', id: channel.id }
   const items = channelMenuItems({
@@ -42,8 +43,12 @@ export async function showChannelMenu(channel: MenuChannel): Promise<void> {
     views: viewChoices(channel.id),
     askJuno: registry.get(junoAvailableAtom),
   })
-  const chosen = (await popupContextMenu(nativeMenu(items, (id) => !pending.has(id)))) as ChannelMenuAction | undefined
-  if (chosen === undefined) return
+  const chosen = (await popupContextMenu(nativeMenu(items, (id) => !pending.has(id)), at)) as ChannelMenuAction | undefined
+  if (chosen !== undefined) await runChannelAction(chosen, channel, target)
+  return chosen
+}
+
+async function runChannelAction(chosen: ChannelMenuAction, channel: MenuChannel, target: NotifyTargetView): Promise<void> {
   if (isNotify(chosen)) return setNotifyLevel(target, notifyChoiceOf(chosen), channel.label)
   if (isViewMenuAction(chosen)) return runViewMenuAction(chosen, channel)
   switch (chosen) {

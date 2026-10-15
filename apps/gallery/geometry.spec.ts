@@ -123,6 +123,21 @@ test.describe('centred columns', () => {
   }
 })
 
+for (const state of ['recent', 'results', 'people', 'overflowing']) {
+  test(`palette ${state}: rows have symmetric insets`, async ({ page }) => {
+    await open(page, 'CommandPalette', `states/${state}`)
+    const insets = await page.getByRole('dialog', { name: 'Search and commands' }).evaluate((panel) => {
+      const box = panel.getBoundingClientRect()
+      return [...panel.querySelectorAll('[role="option"]')].map((row) => {
+        const rect = row.getBoundingClientRect()
+        return { left: rect.left - box.left, right: box.right - rect.right }
+      })
+    })
+    expect(insets.length).toBeGreaterThan(0)
+    for (const inset of insets) expect(inset.left).toBe(inset.right)
+  })
+}
+
 test.describe('composer controls', () => {
   test('the attach button mirrors the send button: 6px from its edge, centred on the one-line field', async ({ page }) => {
     await open(page, 'Composer', 'attachments/attach-button')
