@@ -117,12 +117,15 @@ for (let shard = 0; shard < shards; shard++) {
     const routes = await readRoutes(page)
     const failures: string[] = []
     for (let route = claimNext(routes, only); route !== undefined; route = claimNext(routes, only)) {
+      const started = Date.now()
       await test.step(route.route, async () => {
         await openState(page, route)
         for (const [index, element] of (await targets(page, route)).entries()) {
           for (const failure of await touch(page, element)) failures.push(`${route.route} (element ${index + 1}) ${failure}`)
         }
       })
+      // A slow state holds up its part; name it so it can be looked at.
+      if (Date.now() - started > 10_000) console.log(`slow state: ${route.route} took ${Math.round((Date.now() - started) / 1000)} s`)
     }
     expect(failures.join('\n\n')).toBe('')
   })
