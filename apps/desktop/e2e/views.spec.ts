@@ -115,6 +115,16 @@ test('Add to view on a channel’s menu adds and removes it, with Undo, and New 
   await juno.undo()
   await sidebar.row(ALERTS_MAIN).expectVisible()
 
+  // The channel menu on a topic's context pill offers the same submenu.
+  await sidebar.filter('All')
+  await sidebar.row(POSTGRES).open()
+  await juno.chooseNextMenuItem(`view-remove:${ops}`)
+  await juno.topic.contextPill.click({ button: 'right' })
+  await juno.expectToast('Removed #eng from Ops')
+  await juno.undoFromToast()
+  await sidebar.selectView('Ops')
+  await sidebar.row(POSTGRES).expectVisible()
+
   // New view… opens the sheet with the channel already chosen.
   await sidebar.row(ALERTS_MAIN).chooseInMenu('view-new')
   await expect(sidebar.viewSheet).toBeVisible()
