@@ -35,7 +35,7 @@ export const HomeItem = Schema.Struct({
   /** Stable for the same thing: `<kind>:<topic id>`, `followUp:<topic id>:<ts>`, `tidyUp`, `automated:<channel id>`. */
   id: Schema.String,
   kind: HomeItemKind,
-  /** The title line with AI off: "Elena asked you something", "3 topics look settled", "Move #ci-builds to Automated?". */
+  /** The title line with AI off: "Elena asked you something", "3 topics look settled", "Move #ci-builds?". */
   title: Schema.String,
   /** A sharper title line from the assistant, only when it was confident. Never changes the meta line. */
   aiTitle: Schema.optionalKey(Schema.String),

@@ -41,6 +41,6 @@ export const cell = stylex.create({
     display: 'inline-flex',
   },
   endChip: {
-    marginInlineEnd: `calc(${spacing['--space-2']} + 1px)`,
+    marginInlineEnd: `calc(${spacing['--space-2']} + 1px)`, // tokens-allow: Include the table cell border in the overlap.
   },
 })

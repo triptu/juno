@@ -89,7 +89,7 @@ const styles = stylex.create({
   noticeIcon: {
     display: 'inline-flex',
     flexShrink: 0,
-    paddingTop: '1px',
+    paddingTop: spacing['--space-pixel'],
     color: colors['--foreground-muted'],
   },
   noticeText: {

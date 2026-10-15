@@ -191,7 +191,7 @@ const styles = stylex.create({
   dropping: {
     outlineStyle: 'solid',
     outlineWidth: sizes['--focus-ring-width'],
-    outlineOffset: '-1px',
+    outlineOffset: '-1px', // tokens-allow: Inset the outline by the border width.
     outlineColor: accent['--hl-ring'],
   },
   // Under the notices and over the text: the chips start 6px in, under the attach button, 6px under what is above.
@@ -211,7 +211,7 @@ const styles = stylex.create({
     paddingInlineStart: spacing['--space-3-5'],
     paddingInlineEnd: spacing['--space-1-5'],
     gap: spacing['--space-1'],
-    marginBlock: '-1px',
+    marginBlock: '-1px', // tokens-allow: Overlap the composer border by one pixel.
   },
   // A 28px leading control sits 6px in, as the send button does at the end.
   rowWithLeading: {

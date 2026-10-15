@@ -226,7 +226,7 @@ const styles = stylex.create({
     flexShrink: 1,
     minWidth: 0,
     height: '100%',
-    marginBottom: '-1px',
+    marginBottom: '-1px', // tokens-allow: Overlap the page border by one pixel.
     overflowX: 'auto',
     overflowY: 'hidden',
     scrollbarWidth: 'none',

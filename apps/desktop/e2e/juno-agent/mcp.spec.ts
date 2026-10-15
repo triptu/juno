@@ -1,5 +1,5 @@
 // Notion and Littlebird on Connections (plan v3 §16, flow 7): a tool Juno has never heard of is
-// Tier 3, so a call to it only proposes a Change card, until the owner moves it to "Needs no click".
+// Tier 3, so a call to it only proposes a Change card, until the owner moves it to "Runs without asking".
 // The offered rows cannot point at a fake, so both fakes are added by address on loopback.
 import type { FakeLittlebird, FakeNotion } from '@juno/agent-testing/mcp'
 import type { OpenRouterRequest, ToolCallAnswer } from '@juno/agent-testing/openrouter'
@@ -48,7 +48,7 @@ test.describe.configure({ timeout: 150_000 })
 
 const exports = (littlebird: FakeLittlebird) => littlebird.calls.filter((call) => call.name === 'export_everything')
 
-test('an unknown tool is Tier 3 and proposes a card until it is moved to Needs no click', async ({ juno, notion, littlebird }) => {
+test('an unknown tool is Tier 3 and proposes a card until it is moved to Runs without asking', async ({ juno, notion, littlebird }) => {
   await ready(juno)
   const docs = await addServer(juno, 'Docs', notion.url)
   for (const tool of ['notion-search', 'notion-fetch', 'notion-create-pages']) await expect(docs.row.locator(`[data-tool="${tool}"]`)).toBeVisible()

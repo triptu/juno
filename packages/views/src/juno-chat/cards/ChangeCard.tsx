@@ -1,7 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import { useState } from 'react'
 import { chatCopy, type ChangeCard as ChangeCardModel, type ChangeField } from '@juno/agent-contract'
-import { colors, radii, spacing } from '@juno/tokens/tokens.stylex'
+import { colors, radii, spacing, text } from '@juno/tokens/tokens.stylex'
 import { Button, Text } from '@juno/ui'
 import type { ChatActions } from '../commands'
 import { TextButton } from '../TextButton'
@@ -120,7 +120,7 @@ const styles = stylex.create({
   },
   // Six lines of the 14px body at 1.55, plus the padding.
   clamped: {
-    maxHeight: `calc(6 * 1.55 * 14px + 2 * ${spacing['--space-2-5']})`,
+    maxHeight: `calc(6 * 1.55 * ${text['--text-body-small-size']} + 2 * ${spacing['--space-2-5']})`,
     boxSizing: 'border-box',
     overflow: 'hidden',
   },

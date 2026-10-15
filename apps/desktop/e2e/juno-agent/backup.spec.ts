@@ -73,12 +73,14 @@ test('backup to a shared folder, export the phrase, restore on a second Mac, and
   // Choose the shared folder: the first backup there updates "Last backup".
   await pickFolderNext(juno.app, shared)
   await studio.getByRole('button', { name: 'Choose folder' }).click()
-  await expect(studio.locator('[data-backup-folder]')).toHaveText(shared)
+  await expect(studio.locator('[data-backup-folder]')).toHaveAttribute('title', shared)
   await expect.poll(() => lastBackupAt(juno)).toBeGreaterThan(before)
 
   // Export the phrase: the sheet shows it once, and Copy says so.
   await expect(studio.locator('[data-phrase-exported]')).toHaveAttribute('data-phrase-exported', 'no')
-  await studio.getByRole('button', { name: 'Export recovery phrase' }).click()
+  const exportButton = studio.getByRole('button', { name: 'Export recovery phrase' })
+  await exportButton.focus()
+  await exportButton.press('Enter')
   const sheet = juno.win.getByRole('dialog', { name: 'Your recovery phrase' })
   await expect(sheet).toBeVisible()
   const phrase = (await sheet.locator('[data-recovery-phrase] > span').allTextContents()).join('-')
@@ -92,6 +94,7 @@ test('backup to a shared folder, export the phrase, restore on a second Mac, and
   }
   await sheet.getByRole('button', { name: 'Done' }).click()
   await expect(sheet).toHaveCount(0)
+  await expect(exportButton).toBeFocused()
   // A sheet opened from the keyboard gives focus back to its button when it closes (a click on macOS focuses no button).
   await studio.getByRole('button', { name: 'Restore', exact: true }).focus()
   await juno.win.keyboard.press('Enter')
