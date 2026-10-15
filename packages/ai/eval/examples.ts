@@ -251,6 +251,50 @@ export const examples: ReadonlyArray<Example> = [
     first: 'hmm',
     last: 'yeah',
   }),
+
+  ex(
+    tasks.followUps,
+    'a promise with no result yet',
+    {
+      topicId: postgres.id,
+      title: postgres.title,
+      channel: '#eng',
+      now: NOW,
+      messages: [
+        { ...m('Dev Patel', 'Can someone send Rina the scorecard before Friday?', 60), id: '1728800000.000100' },
+        { ...m('Tushar', "I'll send Rina the scorecard tomorrow.", 50), fromMe: true, id: '1728800000.000200' },
+      ],
+    },
+    (o) => o.followUps.length === 1 && o.followUps[0]?.messageId === '1728800000.000200',
+  ),
+  ex(
+    tasks.followUps,
+    'a promise already kept',
+    {
+      topicId: postgres.id,
+      title: postgres.title,
+      channel: '#eng',
+      now: NOW,
+      messages: [
+        { ...m('Tushar', "I'll book the staging dry run.", 90), fromMe: true, id: '1728800000.000300' },
+        { ...m('Tushar', 'Done, booked for Thursday 2pm.', 30), fromMe: true, id: '1728800000.000400' },
+      ],
+    },
+    (o) => o.followUps.length === 0,
+  ),
+  ex(
+    tasks.homeTitle,
+    'someone asked a question',
+    {
+      itemId: `waiting:${postgres.id}`,
+      kind: 'waiting',
+      title: postgres.title,
+      channel: '#eng',
+      newCount: 1,
+      messages: [m('Dev Patel', 'Tushar, can you pick the cutover window by Friday?', 10)],
+    },
+    (o) => o.title.length > 0,
+  ),
 ]
 
 /** The structured examples, which carry an expectation. */

@@ -137,3 +137,22 @@ export { redrawTopic, topicArtAtom } from './art'
 export { messageLink, slackLink, threadRootTs } from './links'
 export { headerRenamingAtom, renamingAtom, rowRenamingAtom, type RenameTarget } from './rename'
 export { dismissToast, runAction, showToast, TOAST_LIFE_MS, toastAtom, undoLast, undoStackAtom, UNDO_LIMIT, type Toast, type ToastContent } from './undo'
+export {
+  caughtUp,
+  freezeHome,
+  homeAppeared,
+  homeGreeting,
+  homeItemLimit,
+  homeScene,
+  homeShownAtom,
+  homeViewAtom,
+  markFollowUpDone,
+  markHomeItemUsed,
+  readyHomeView,
+  showHome,
+  resolveAllTopics,
+  startVisitLog,
+  VISIT_MILLIS,
+  type HomeScene,
+  type HomeShown,
+} from './home'

@@ -11,6 +11,7 @@ import ChannelIconPicker from './ChannelIconPicker.fixtures'
 import Composer from './Composer.fixtures'
 import ComposerSlot from './ComposerSlot.fixtures'
 import EngineStatusView, { engineNoticeFixtures } from './EngineStatusView.fixtures'
+import Home from './Home.fixtures'
 import HoverToolbar from './HoverToolbar.fixtures'
 import Message from './Message.fixtures'
 import MessageList from './MessageList.fixtures'
@@ -68,6 +69,7 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   EngineNotice: engineNoticeFixtures,
   EmptyChat,
   EngineStatusView,
+  Home,
   HoverToolbar,
   JunoChatList,
   JunoComposer,

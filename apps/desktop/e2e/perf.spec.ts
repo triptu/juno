@@ -211,6 +211,46 @@ test('row hover to paint', async ({ juno, win }) => {
   within('row hover, p95', hover.p95, oneFrameBudget(await refreshInterval(win)))
 })
 
+// Home from the sidebar's Home item, with a topic open in the tab: the
+// pointerdown to the first presented frame that shows Home's greeting and
+// rows, read from the local cache (performance.md section 1, "Home open").
+// Every fourth sample comes back after the home.view subscription's idle
+// time, so both a warm and a cold query are in the numbers.
+test('home open: from a topic to Home painted', async ({ juno, win }) => {
+  test.setTimeout(360_000)
+  await juno.signIn()
+  await juno.waitForSync()
+  const { home, sidebar, topic } = juno
+  await home.open()
+  await expect(home.item('waiting')).toBeVisible()
+  const samples: number[] = []
+  for (let i = 0; i < 20; i++) {
+    await sidebar.row(POSTGRES).open()
+    await topic.expectTitle(POSTGRES)
+    await win.waitForTimeout(i % 4 === 3 ? 31_000 : 300)
+    const nav = home.navItem
+    await nav.evaluate((node) => {
+      const w = window as unknown as { __homeSample?: Promise<number> }
+      w.__homeSample = new Promise((resolve) => {
+        node.addEventListener(
+          'pointerdown',
+          (event) => {
+            const start = event.timeStamp
+            const shown = () => document.querySelector('[data-home]:not([data-home-waiting]) [data-home-item]') !== null
+            const frame = () => requestAnimationFrame(() => (shown() ? setTimeout(() => resolve(performance.now() - start), 0) : frame()))
+            frame()
+          },
+          { once: true },
+        )
+      })
+    })
+    await nav.click()
+    samples.push(await win.evaluate(() => (window as unknown as { __homeSample: Promise<number> }).__homeSample))
+  }
+  const open = stats('home open (pointerdown on Home) to Home painted', samples)
+  within('home open, p95', open.p95, 50)
+})
+
 test('live update: a reply from another client to pixels', async ({ juno, fake }) => {
   test.setTimeout(120_000)
   await juno.signIn()

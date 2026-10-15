@@ -186,6 +186,8 @@ export const UndoCommand = Schema.Union([
   Schema.TaggedStruct('reads.markRead', { id: Schema.String, upTo: Schema.optionalKey(Schema.String) }),
   Schema.TaggedStruct('reads.markUnread', { id: Schema.String, from: Schema.optionalKey(Schema.String) }),
   Schema.TaggedStruct('notifications.setLevel', { target: NotifyTargetSchema, choice: NotifyChoiceSchema }),
+  // Several resolves undone together (Home's Resolve all): `topics.restore` for each.
+  Schema.TaggedStruct('topics.restoreAll', { restores: Schema.Array(Schema.Struct(restorePayload)) }),
 ])
 export type UndoCommand = typeof UndoCommand.Type
 
