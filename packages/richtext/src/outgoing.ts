@@ -1,10 +1,13 @@
 /**
  * Composer text → what Slack accepts on send.
  *
- * The composer holds plain text with "@Maya Chen" and "#eng" tokens that the
- * suggestion popover inserted, "> " quote lines, and ":shortcode:" emoji.
- * This turns that into one `rich_text` block (sections and quotes) and a
- * mrkdwn `text` fallback with `<@U…>` / `<#C…|name>` encodings.
+ * The composer sends plain text with the people and channels its
+ * suggestions picked already encoded as `<@U…|Maya>` and `<#C…|eng>`
+ * (`encodeMentions` in `@juno/domain`), "> " quote lines, and ":shortcode:"
+ * emoji. An edit's text names them as "@Maya Chen" and "#eng" instead, with
+ * `MentionTargets` saying who they are. This turns either into one
+ * `rich_text` block (sections and quotes) and a mrkdwn `text` fallback with
+ * `<@U…>` / `<#C…|name>` encodings.
  */
 import type { RichTextBlock, RichTextElement, RichTextInline } from '@juno/slack-schema'
 import { emojiUnicode, isKnownEmoji } from './emoji'
@@ -36,7 +39,23 @@ function escapeRegExp(s: string): string {
 
 const EMOJI_RE = /:([a-z0-9_+\-']+(?:::skin-tone-[2-6])?):/g
 
+/** A person or channel the composer picked, as it sends them. The name is what the field showed. */
+const WIRE_TOKEN = /<@([UW][A-Z0-9]+)(?:\|([^>]*))?>|<#([CG][A-Z0-9]+)(?:\|([^>]*))?>/g
+
 function tokenizeLine(line: string, targets: MentionTargets): Token[] {
+  const out: Token[] = []
+  let last = 0
+  for (const m of line.matchAll(WIRE_TOKEN)) {
+    if (m.index > last) out.push(...tokenizeText(line.slice(last, m.index), targets))
+    if (m[1] !== undefined) out.push({ kind: 'user', id: m[1], name: m[2] ?? m[1] })
+    else out.push({ kind: 'channel', id: m[3]!, name: m[4] ?? m[3]! })
+    last = m.index + m[0].length
+  }
+  if (last < line.length) out.push(...tokenizeText(line.slice(last), targets))
+  return out
+}
+
+function tokenizeText(line: string, targets: MentionTargets): Token[] {
   const names: Array<{ readonly text: string; readonly token: Token }> = []
   for (const p of targets.people ?? []) {
     names.push({ text: `@${p.name}`, token: { kind: 'user', id: p.id, name: p.name } })

@@ -125,7 +125,7 @@ Menus are not a separate primitive: an in-app menu (the account menu) is an `Opt
 
 `TextField`: 1px `--input-border`, surface background, focus shown on the container (the border turns `--focus-ring`; no extra ring, since a field always holding focus, like the Juno panel's composer, read heavy with two). `size` 30, 32, 34, 36, 44 (radius 7 / 7 / 8 / 8 / 10). `leadingIcon` (search), `leading` slot (the "To" label and a ContextPill), `trailing`, `width` (`full` | `search` 260 | `keyword` 160), `text`, `label` (required without a visible label), `invalid` (danger border, `aria-invalid`).
 
-`Textarea`: `variant` `inline` (composer: no border, 22px line height, grows with `field-sizing: content` to `maxHeight` `composer` 194 or `assistant` 160 then scrolls; no layout is read on a keystroke), `card` (send card, `--background`, 2 rows).
+`Textarea`: `variant` `inline` (composer: no border, 22px line height, grows with `field-sizing: content` to `maxHeight` `composer` 194 or `assistant` 160 then scrolls; no layout is read on a keystroke), `card` (send card, `--background`, 2 rows). `marks` (inline only) draws runs of the text as chips: the field's own text turns transparent and a layer under it draws the same text in the same box, with each marked run in the `person` chip's hue or the `filled` chip's look. Chips keep the text's weight and give their 2px inset back with a negative margin, so no glyph moves from where the caret and selection expect it; the layer follows the field's scroll. `anchorAt` makes that character the `--textarea-anchor` for CSS anchor positioning (the mention list).
 
 `Select`: native `<select>` styled like a 30 or 32px field with a muted chevron; `options[]`.
 
@@ -171,7 +171,7 @@ Mono 12.5 lh 1.6 inside a `Surface inset`, pre-wrap, max-height 150 with contain
 
 ## What is not a primitive
 
-Feature components that compose the above and hold app logic: `Sidebar`, `TopicRow`, `TopicHeader`, `MessageList` / `Message` / `Bubble`, `MessageText` (token segmenting into Chips), `HoverToolbar`, `Composer` (with `SendCheckBar`, `AudienceWarning`, `MentionSuggest`), `CommandPalette`, `AllTopicsTable`, `ForYouCard`, `JunoThread` (+ `SendCard`, `TopicsCard`, `ResolveCard`), `NotificationRules`, `IgnoreList`, `NewMessageForm`, `ContextMenu` (native bridge).
+Feature components that compose the above and hold app logic: `Sidebar`, `TopicRow`, `TopicHeader`, `MessageList` / `Message` / `Bubble`, `MessageText` (token segmenting into Chips), `HoverToolbar`, `Composer` (with `SendCheckBar`, `AudienceWarning`, `MentionSuggestions`), `CommandPalette`, `AllTopicsTable`, `ForYouCard`, `JunoThread` (+ `SendCard`, `TopicsCard`, `ResolveCard`), `NotificationRules`, `IgnoreList`, `NewMessageForm`, `ContextMenu` (native bridge).
 
 ## Count
 

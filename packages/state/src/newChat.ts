@@ -9,17 +9,20 @@
  */
 import * as AsyncResult from 'effect/reactivity/AsyncResult'
 import * as Atom from 'effect/reactivity/Atom'
-import { newChatConversations, newChatThreads, type PickConversation, type PickThread, type SendTarget } from '@juno/contract'
+import { newChatConversations, newChatThreads, type MentionPick, type PickConversation, type PickThread, type SendTarget } from '@juno/contract'
 import { liveQuery } from './atoms'
 
 export interface NewChat {
+  /** The text as the field shows it. */
   readonly draft: string
+  /** The people and channels picked from the @ and # suggestions; the send encodes them (`encodeMentions`). */
+  readonly mentions: ReadonlyArray<MentionPick>
   readonly conversation: PickConversation | undefined
   /** A thread in `conversation`; none is Main. */
   readonly thread: PickThread | undefined
 }
 
-export const emptyNewChat: NewChat = { draft: '', conversation: undefined, thread: undefined }
+export const emptyNewChat: NewChat = { draft: '', mentions: [], conversation: undefined, thread: undefined }
 
 /** Each New chat tab's draft and destination, by tab id. */
 export const newChatAtom = Atom.family((_tabId: string) => Atom.make<NewChat>(emptyNewChat).pipe(Atom.keepAlive))
