@@ -21,6 +21,7 @@ import { Option } from 'effect'
 import * as Atom from 'effect/reactivity/Atom'
 import * as AsyncResult from 'effect/reactivity/AsyncResult'
 import type { RowChannel, TopicRow } from '@juno/contract'
+import { engineStatusAtom } from './engine'
 import { emptyWindow, samePerson, sameOrder, type ListWindow } from './list'
 import { defaultTopicListFilter, topicCountsAtom, topicListAtom, type TopicListFilter } from './topics'
 
@@ -105,7 +106,23 @@ export const sidebarListAtom = Atom.make((get): SidebarWindow => {
   const result = get(topicListAtom(filter))
   const shown = Option.getOrUndefined(get.self<SidebarWindow>())
   if (!AsyncResult.isSuccess(result) || result.value.meta.seq === 0) return shown ?? { ...emptyWindow<TopicRow>(), filter }
-  return { ...carryOver(shown, result.value), filter }
+  const status = get(engineStatusAtom)
+  const syncing = status._tag !== 'Success' || status.value.phase._tag === 'booting' || status.value.phase._tag === 'catching-up'
+  if (result.value.meta.windowCovered === false) return shown !== undefined && shown.order.length > 0 ? shown : { ...emptyWindow<TopicRow>(), meta: result.value.meta, filter }
+  if (shown?.meta.windowCovered === false && syncing) return shown
+  const next = carryOver(shown, result.value)
+  if (shown !== undefined && shown.filter === filter) {
+    // Finishing sync is not a reason to reorder a painted list. The next live
+    // activity or an explicit filter change resumes the ordinary recency order.
+    if (shown.meta === next.meta) return shown
+    if (syncing) {
+      const kept = shown.order.filter((id) => next.rows.has(id))
+      const known = new Set(kept)
+      const order = [...kept, ...next.order.filter((id) => !known.has(id))]
+      return { ...next, order: sameOrder(shown.order, order) ? shown.order : order, filter }
+    }
+  }
+  return { ...next, filter }
 })
 
 /** One row of the sidebar, by id across every filter. Notifies only when the row's object changes, which is when its `rev` does. */
@@ -142,7 +159,7 @@ export const sidebarSectionsAtom = Atom.make((get): SidebarSections => {
     if (row.section === 'pinned') pinned.push(id)
     else recent.push(id)
   }
-  return { ready: window.meta.seq > 0, pinned, recent, total: window.meta.total, filter: window.filter }
+  return { ready: window.meta.seq > 0 && window.meta.windowCovered !== false, pinned, recent, total: window.meta.total, filter: window.filter }
 }).pipe(Atom.withEquality(sameSections))
 
 /**

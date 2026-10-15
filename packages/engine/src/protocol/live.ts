@@ -126,6 +126,7 @@ export function serveLiveValue<A, E, SE, R>(
 export interface ListRun<Row> {
   readonly rows: ReadonlyArray<Row>
   readonly total?: number
+  readonly windowCovered?: boolean
   /**
    * Every person and channel the rows name. `serveLiveList` sends only the
    * ones the subscription has not been sent, or that changed since.
@@ -159,6 +160,7 @@ export function serveLiveList<Row extends RowLike, E, SE, R>(
   options: ServeOptions & { readonly encodeRow: (row: Row) => unknown },
 ): Stream.Stream<ListDelta<Row>, E | SE, R> {
   let seq = 0
+  let windowCovered: boolean | undefined
   let order: ReadonlyArray<string> = []
   let revById = new Map<string, number>()
   const sentPeople = new Map<string, Person>()
@@ -191,7 +193,7 @@ export function serveLiveList<Row extends RowLike, E, SE, R>(
           people.length === 0 && channels.length === 0 && art.length === 0
             ? undefined
             : { ...(people.length === 0 ? {} : { people }), ...(channels.length === 0 ? {} : { channels }), ...(art.length === 0 ? {} : { art }) }
-        if (!reset && upsert.length === 0 && remove.length === 0 && refs === undefined && sameOrder(order, nextOrder)) return Option.none()
+        if (windowCovered === run.windowCovered && !reset && upsert.length === 0 && remove.length === 0 && refs === undefined && sameOrder(order, nextOrder)) return Option.none()
         let encodeMs = 0
         if (options.measure) {
           const measured = measureEncode(() => upsert.map(options.encodeRow))
@@ -206,7 +208,8 @@ export function serveLiveList<Row extends RowLike, E, SE, R>(
         for (const person of people) sentPeople.set(person.id, person)
         for (const channel of channels) sentChannels.set(channel.id, channel)
         for (const drawing of art) sentArt.set(drawing.id, drawing)
-        const meta: LiveMeta = { seq: ++seq, queryMs, encodeMs, at, ...(run.total === undefined ? {} : { total: run.total }) }
+        windowCovered = run.windowCovered
+        const meta: LiveMeta = { ...(windowCovered === undefined ? {} : { windowCovered }), seq: ++seq, queryMs, encodeMs, at, ...(run.total === undefined ? {} : { total: run.total }) }
         return Option.some({ reset, order, upsert, remove, ...(refs === undefined ? {} : { refs }), meta })
       }),
     ),

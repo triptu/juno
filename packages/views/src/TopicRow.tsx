@@ -181,22 +181,24 @@ export const TopicRow = memo(function TopicRow({
               </>
             )}
           </Text>
-          {row.mentionsMe || unread ? (
-            <span {...stylex.props(styles.badges)}>
+          <span {...stylex.props(styles.badges)}>
+            <span {...stylex.props(styles.badgeSlot)}>
               {row.mentionsMe ? (
                 <Chip variant="soft" title="Mentions you">
                   @
                 </Chip>
               ) : null}
+            </span>
+            <span {...stylex.props(styles.badgeSlot)}>
               {unread ? (
                 <Chip variant="strong" numeric title={unreadLabel}>
                   {countLabel(row.unreadCount, row.unreadExact)}
                 </Chip>
               ) : null}
             </span>
-          ) : null}
+          </span>
         </span>
-        <span {...stylex.props(styles.line3)}>
+        <span {...stylex.props(styles.line3, main && styles.line3Main)}>
           <span {...stylex.props(styles.where)}>
             {row.channel.kind === 'private' ? (
               <span {...stylex.props(styles.lock)} title={PRIVATE_TITLE}>
@@ -209,25 +211,27 @@ export const TopicRow = memo(function TopicRow({
               {row.channel.name}
             </Text>
           </span>
-          {people.length > 0 ? <AvatarStack people={people} surface={selected ? 'surface' : 'subtle'} /> : null}
-          {main || reopened ? (
-            <span {...stylex.props(styles.tags)}>
-              {main ? <Chip variant="outline">Main</Chip> : null}
-              {reopened ? (
-                <Chip variant="filled" title={REOPENED_TITLE}>
-                  Reopened
-                </Chip>
-              ) : null}
-            </span>
-          ) : null}
-          {threads > 0 ? (
-            <span {...stylex.props(styles.threads)} title={threadsLabel}>
-              <Icon icon={ChatsCircle} size={13} />
-              <Text variant="meta" tone="muted" numeric>
-                {threads}
-              </Text>
-            </span>
-          ) : null}
+          <span {...stylex.props(styles.people)}>
+            <AvatarStack people={people} surface={selected ? 'surface' : 'subtle'} />
+          </span>
+          <span {...stylex.props(styles.tags)}>
+            {main ? <Chip variant="outline">Main</Chip> : null}
+            {reopened ? (
+              <Chip variant="filled" title={REOPENED_TITLE}>
+                Reopened
+              </Chip>
+            ) : null}
+          </span>
+          {main ? <span {...stylex.props(styles.threads)} title={threads > 0 ? threadsLabel : undefined}>
+            {threads > 0 ? (
+              <>
+                <Icon icon={ChatsCircle} size={13} />
+                <Text variant="meta" tone="muted" numeric>
+                  {threads}
+                </Text>
+              </>
+            ) : null}
+          </span> : null}
           <span {...stylex.props(styles.actionSlot)}>
             {row.canResolveOnHover && !renaming ? (
               <IconButton
@@ -406,6 +410,7 @@ const styles = stylex.create({
     color: colors['--foreground-muted'],
   },
   time: {
+    width: sizes['--topic-time-width'],
     flexShrink: 0,
     marginInlineStart: 'auto',
     paddingInlineStart: spacing['--space-1'],
@@ -420,6 +425,16 @@ const styles = stylex.create({
     flexGrow: 1,
     minWidth: 0,
   },
+  badgeSlot: {
+    display: 'inline-flex',
+    width: sizes['--control-28'],
+    flexShrink: 0,
+  },
+  people: {
+    display: 'inline-flex',
+    width: sizes['--topic-people-width'],
+    overflow: 'hidden',
+  },
   badges: {
     display: 'inline-flex',
     alignItems: 'center',
@@ -428,12 +443,16 @@ const styles = stylex.create({
     paddingTop: spacing['--space-pixel'],
   },
   line3: {
-    display: 'flex',
+    display: 'grid',
+    gridTemplateColumns: `minmax(0, 1fr) ${sizes['--topic-people-width']} ${sizes['--topic-tags-width']} ${sizes['--control-22']}`,
     alignItems: 'center',
-    gap: spacing['--space-3'],
+    gap: spacing['--space-1'],
     minWidth: 0,
     marginTop: density['--density-row-line-gap'],
     color: colors['--foreground-muted'],
+  },
+  line3Main: {
+    gridTemplateColumns: `minmax(0, 1fr) ${sizes['--topic-people-width']} ${sizes['--control-36']} ${sizes['--control-32']} ${sizes['--control-22']}`,
   },
   where: {
     display: 'inline-flex',

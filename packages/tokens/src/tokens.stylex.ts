@@ -739,6 +739,7 @@ export const layout = stylex.defineVars({
   // updated. Under the minimum width (the columns' minimums, their gaps and
   // the row and table padding) the table scrolls sideways.
   '--all-topics-columns': 'minmax(200px, 1fr) minmax(0, 150px) 104px 44px 84px',
+  '--all-topics-place-width': '160px',
   '--all-topics-table-min': '576px',
   '--keyword-field-width': '160px',
   // Home's column: the item rows and the Ask Juno field.
@@ -790,6 +791,12 @@ export const sizes = stylex.defineVars({
   '--control-20': '20px',
   '--control-22': '22px',
   '--control-24': '24px',
+  '--topic-time-width': '48px',
+  '--topic-people-width': '60px',
+  '--topic-tags-width': '76px',
+  '--message-sender-width': '128px',
+  '--threads-button-width': '128px',
+  '--threads-button-narrow-width': '64px',
   '--control-26': '26px',
   '--control-28': '28px',
   '--control-30': '30px',

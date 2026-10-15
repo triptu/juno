@@ -454,13 +454,15 @@ export class FakeServer {
 
   async #edge(method: string, request: IncomingMessage, response: ServerResponse): Promise<void> {
     const body = parseJson(await readBody(request))
-    const record = (status: number, payload: { ok: boolean; error?: string }) => {
+    const record = async (status: number, payload: { ok: boolean; error?: string }) => {
       this.calls.push({ at: this.workspace.clock.now(), kind: 'edge', method, args: redact(stringify(body)), status, ok: payload.ok, ...(payload.error === undefined ? {} : { error: payload.error }) })
+      await this.#hold(this.#holds, `edge:${method}`, redact(stringify(body)))
       json(response, status, payload)
     }
     const token = typeof body['token'] === 'string' ? body['token'] : undefined
     const auth = this.#authenticate(parseCookies(request.headers.cookie)['d'], token)
     if (typeof auth === 'string') return record(200, { ok: false, error: auth })
+    await this.#hold(this.#stalls, `edge:${method}`, redact(stringify(body)))
     const limit = this.#takeRateLimit(`edge:${method}`)
     if (limit !== undefined) {
       response.setHeader('Retry-After', String(limit.retryAfter))
@@ -477,7 +479,7 @@ export class FakeServer {
     const ids = args.ids ?? Object.keys(args.updated_ids ?? {})
     const results = ids.flatMap((id) => this.workspace.users.get(id) ?? [])
     const failed = ids.filter((id) => !this.workspace.users.has(id))
-    record(200, Schema.encodeSync(EdgeUsersInfoOk)({ ok: true, results, failed_ids: failed, pending_ids: [], invalid_ids: [] }))
+    await record(200, Schema.encodeSync(EdgeUsersInfoOk)({ ok: true, results, failed_ids: failed, pending_ids: [], invalid_ids: [] }))
   }
 
   /**
@@ -512,6 +514,8 @@ export class FakeServer {
 
   /** Serves a file's bytes; `?download=1` asks the browser to save it. Thumb urls get the original bytes. */
   async #file(fileId: string, download: boolean, response: ServerResponse): Promise<void> {
+    await this.#hold(this.#stalls, 'file:bytes', { fileId })
+    await this.#hold(this.#holds, 'file:bytes', { fileId })
     if (this.#fileDelayMs > 0) await new Promise((resolve) => setTimeout(resolve, this.#fileDelayMs))
     const stored = this.workspace.files.get(fileId)
     if (stored?.bytes === undefined) return json(response, 404, { ok: false, error: 'file_not_found' })

@@ -538,3 +538,15 @@ Apply these when porting; the prototype values are listed so no one copies them 
 Raw zero, percentages and 1px border/outline hairlines are allowed in StyleX.
 Other literal lengths and colours require tokens, or a trailing
 `// tokens-allow: reason` for geometry such as border overlap or pixel rounding.
+
+### Stable metadata
+
+| Token | Value | Used for |
+| --- | --- | --- |
+| `--all-topics-place-width` | 160px | Native place select while options load. |
+| `--topic-time-width` | 48px | Stable relative-time slot in topic rows. |
+| `--topic-people-width` | 60px | Four overlapping participant avatars. |
+| `--topic-tags-width` | 76px | Reopened status slot; Main uses the 36px control token. |
+| `--message-sender-width` | 128px | Sender names keep timestamps fixed while names resolve. |
+| `--threads-button-width` | 128px | Threads button before and after its count arrives. |
+| `--threads-button-narrow-width` | 64px | Threads button below the header's 480px breakpoint. |

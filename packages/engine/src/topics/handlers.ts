@@ -39,7 +39,7 @@ import { listIgnoredChannels } from './ignored'
 
 const LIST_KEYS: InvalidationKeys = ['topics', 'topic_overlay', 'topic_reads', 'conversations', 'users', 'ignored_channels', 'thread_subs', 'prefs', 'topic_art']
 /** The sidebar list and counts also follow the views: a view's conversations and Keep these out of All. All topics does not. */
-const SIDEBAR_KEYS: InvalidationKeys = [...LIST_KEYS, 'sidebar_views']
+const SIDEBAR_KEYS: InvalidationKeys = [...LIST_KEYS, 'sidebar_views', 'sync_state']
 const COUNT_KEYS: InvalidationKeys = ['topics', 'topic_overlay', 'conversations', 'ignored_channels', 'thread_subs', 'sidebar_views']
 const QUIET_TICK = '1 minute'
 /** The ignore list counts the messages each channel hid, so it follows them too. */
@@ -142,7 +142,7 @@ export const TopicsHandlers = TopicsRoutes.toLayer(
 )
 
 /** A text filter searches messages, so its runs follow them too. */
-const allTopicsKeys = (query: string | undefined): InvalidationKeys => (matchQuery(query) === '' ? LIST_KEYS : [...LIST_KEYS, 'messages'])
+const allTopicsKeys = (query: string | undefined): InvalidationKeys => [...LIST_KEYS, 'sync_state', ...(matchQuery(query) === '' ? [] : ['messages'] as const)]
 
 /**
  * All topics (`allTopics.ts`). Both routes re-run on what the sidebar list
