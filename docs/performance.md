@@ -470,3 +470,33 @@ placeholder between topic and Home. The inspected Home filmstrip still shows
 the specified staggered entrance; the check is about data readiness, not making
 that animation instantaneous. The log is `.juno-status/perf-4b/feel-final.log`,
 and the filmstrips are under `apps/desktop/feel-report/`.
+
+### Engine speed measurements (2026-10-15)
+
+Five alternating baseline/revised runs on the shared Apple M2, through the
+exclusive `pnpm bench:engine -t '^topics.list on the large seed'` command.
+Each run used 300 channels and sampled 50 injected message updates after
+boot. Both sides used the corrected harness: wait for the injected message
+itself, and construct a fresh cache for each uncached isolated query. The
+baseline is query.ts at `1b88efc7`; other code and the harness were held fixed.
+
+| Measurement | Before | After |
+| --- | --- | --- |
+| Event query p95, five runs (ms) | 4.17, 3.41, 4.04, 3.95, 11.16 | 3.01, 3.18, 4.26, 3.94, 5.26 |
+| Median of those p95 readings (ms) | 4.04 | 3.94 |
+| Median warm isolated query (median of runs, ms) | 2.14 | 2.11 |
+| Row snapshot / refs / largest delta (bytes) | 175834 / 91760 / 520 | 175834 / 91760 / 520 |
+
+This is a small improvement with overlapping ranges, not a reliable large
+speedup. Four revised runs met 5 ms; one did not. The backlog stays open.
+The existing cache already reused shaped rows. This pass avoids collecting
+unchanged user ids, retains the people map while its source holds, and uses
+an array instead of a temporary row-keyed map. Source columns are still
+compared after the version check: deleting and recreating an index row can
+reuse its version.
+
+Three preliminary remote pairs on 4-vCPU machines gave before p95 readings
+of 5.13, 3.77, 5.54 ms and after readings of 4.54, 5.36, 8.31 ms. They do not
+establish an improvement; host variation and event-loop contention dominate
+that comparison. Remaining remote repeats were cancelled at the shared
+capacity limit. The Mac runs above provide the complete five-pair series.

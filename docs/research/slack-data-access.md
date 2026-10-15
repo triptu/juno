@@ -343,6 +343,8 @@ The published [history](https://docs.slack.dev/reference/methods/conversations.h
 
 Juno uses 1,200 ms between background history starts and between background replies starts, independently. Unpublished methods start at 1,500 ms per method; this is a conservative local default, not a measured Slack tier. A 429 retains Retry-After and doubles that method's spacing for the session, capped at 60 s. No recovery ramp is assumed without more live evidence. Test overrides can disable spacing.
 
+The earlier live run made 147 history calls and 114 replies calls. Reducing their spacing by 300 ms removes about 78 s of serialized waiting: 424 s to roughly 346 s (5.8 minutes), before any gain from independent method admission or discovery metadata. This is a projection with unchanged latency and no 429, not a new live measurement.
+
 `subscriptions.thread.getView` cannot be paged in parallel from the known API: `current_ts` is the last preceding page's `latest_reply`, not an offset or an independently obtainable cursor. Guessing timestamps risks gaps when activity is uneven or moves between requests. The existing sequential pass remains; increasing `limit` does not remove its 10-row cap.
 
 
