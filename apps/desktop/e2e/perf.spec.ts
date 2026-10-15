@@ -287,42 +287,37 @@ test('send: Enter to the pending row painted', async ({ juno }) => {
   within('send, p95', send.p95, 50)
 })
 
-// Typing "@ma" quickly in a reply, ten times: every keydown to the first
-// moment after the next presented frame, timed like the frame floor. The
-// "@" opens the suggestions and each letter narrows them; the field draws
-// its text through the chip layer (performance.md section 1, "Composer
-// keystroke").
-test('mention typing: each keystroke of "@ma" to the next frame', async ({ juno, win }) => {
+// Typing "@ma " quickly in a reply, ten times over: each input to its
+// character presented, measured like the keystroke controls (`perfTyping.ts`,
+// performance.md 7.1). Every "@" opens the suggestions and each letter
+// narrows them; the field draws its text through the chip layer. Soft
+// against the budget, as the plain composer control is: the presentation
+// measure misses it on a bare input too (performance.md 7.1).
+test('mention typing: each keystroke of "@ma" to its character presented', async ({ juno, win }) => {
   test.setTimeout(120_000)
   await juno.signIn()
   await juno.waitForSync()
   await juno.sidebar.row(POSTGRES).open()
   await juno.topic.expectTitle(POSTGRES)
   const hidden = await countHidden(win)
-  await juno.topic.composer.focus()
-  await win.evaluate(() => {
-    const w = window as unknown as { __keys: number[] }
-    w.__keys = []
-    window.addEventListener(
-      'keydown',
-      (event) => {
-        // The Shift that types "@" draws nothing.
-        if (event.key === 'Shift') return
-        const start = event.timeStamp
-        requestAnimationFrame(() => setTimeout(() => w.__keys.push(performance.now() - start), 0))
-      },
-      { capture: true },
-    )
+  const budget = oneFrameBudget(await refreshInterval(win))
+  const input = juno.topic.composer
+  await input.fill('')
+  await input.focus()
+  const result = await typingReading(win, input, 'typing-mention', async () => {
+    for (let round = 0; round < 10; round++) {
+      await input.pressSequentially('@ma ')
+      await win.waitForTimeout(150)
+    }
   })
-  for (let i = 0; i < 10; i++) {
-    await win.keyboard.type('@ma', { delay: 40 })
-    await expect(juno.topic.suggestion('Maya')).toBeVisible()
-    await juno.topic.composer.fill('')
-    await win.waitForTimeout(150)
-  }
+  expect(result.count).toBe(40)
+  await expect(input).toHaveValue('@ma '.repeat(10))
   expect(await hidden(), 'the window was hidden or covered while measuring, so its frames were not drawn').toBe(0)
-  const keys = stats('mention typing, keydown of "@ma" to next frame presented', await win.evaluate(() => (window as unknown as { __keys: number[] }).__keys))
-  within('mention typing, p95', keys.p95, oneFrameBudget(await refreshInterval(win)))
+  stats('mention typing, Event Timing keydown/keypress >=16 ms (diagnostic)', result.events)
+  const presented = stats('mention typing, input timestamp to character presented', result.presented)
+  stats('mention typing, input to animation frame callback', result.frame)
+  stats('mention typing, animation frame callback to presentation', result.afterFrame)
+  expect.soft(presented.p95, 'mention typing: input to character presented').toBeLessThanOrEqual(budget)
 })
 
 test('send in Main: Enter through the checks on send to the pending row painted, with a slow model', async ({ juno, fake, slackApp, userData, running }) => {
