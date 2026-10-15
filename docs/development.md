@@ -35,6 +35,7 @@ Run these from the repo root.
 | `pnpm gallery:shots` | Builds the gallery and screenshots every state in light and dark into `apps/gallery/shots/<Component>/<group>/<state>-<theme>.png`. |
 | `pnpm specs:check` | Checks every Quint spec in `specs/`, including the broken and corrected pairs for Juno Agent. Runs simulations three at a time, the Apalache checks on one shared server, and skips checks that passed before with the same inputs (see "Faster test runs"). `--memory`, `--actions` or `--recovery` selects one agent spec. See `specs/README.md`. |
 | `pnpm remote <script>` | Runs a Linux-safe root script (`test`, `specs:check`, `test:agent*`, `test:gallery`, `test:e2e`) on a fresh Namespace machine and streams the output. `--dry-run` shows what would be sent and run. See ADR 0013. |
+| `pnpm flake <spec>` | Repeats one or more desktop e2e or gallery specs many times on remote machines (`-g <title>`, `--repeat 40`, `--machines 1\|2`, `--workers n`) and reports how many runs failed, with traces of the failures. See "Hunting a flaky test". |
 | `pnpm test:agent-contracts` | Runs the `agent-cards` and `agent-contract` property tests: card identities, digests, retries, the RPC codecs and the chat projection. |
 | `pnpm --filter @juno/agent-memory test` | Runs the pure memory rules' property tests. Its script takes the heavy-job lock itself. |
 | `pnpm --filter @juno/engine test` | Runs one package's suite (here the engine's: the port protocol over an in-memory MessageChannel, live query serving). |
@@ -494,6 +495,17 @@ An import graph over `apps/` and `packages/` decides what each change reaches: r
 - **Spec cache.** A remote spec check takes the Mac's cache of passing Quint runs along (staged in `.remote/`) and brings back what it adds, so a check that passed anywhere is not run again.
 - **Dials.** About one dial in four to Namespace's SSH gateway fails from this network and nsc takes 16 s to give up. The remote command prints a start line first; with none after 8 s, the run dials again (up to six times).
 - **`--dry-run`** prints the steps without creating anything.
+
+## Hunting a flaky test
+
+`pnpm flake <spec...> [-g <title>] [--repeat 40] [--machines 2] [--workers n]` runs the specs (all under `apps/desktop/e2e` or all under `apps/gallery`) through `pnpm remote` with Playwright's `--repeat-each`, no retries and traces kept on failure. The repeats are split across the machines (at most two, so other agents keep theirs), and each machine runs its usual number of workers, so the tests run under the load of a normal remote run; `--workers` raises it. It ends with one line, `flake: 2 of 160 failed`, and the names of the failing tests. Traces are in `.remote/<run>/`; `pnpm exec playwright show-trace <trace.zip>` opens one.
+
+```sh
+pnpm flake apps/desktop/e2e/sidebar.spec.ts -g "list scrollbar" --repeat 120
+pnpm flake apps/gallery/behaviour.spec.ts -g "rewritten Home" --repeat 400 --workers 32
+```
+
+Measure the failure rate before a fix and prove the fix with the same count and load. A test that fails a few times in a hundred needs a hundred or more runs to show it. To see what the app was doing when a test failed, add a temporary `console.log` of what the test cannot see in its assertion (what `:hover` matches, which Slack calls arrived) and repeat; the line reporter prints it.
 
 ## Heavy jobs share one queue
 
