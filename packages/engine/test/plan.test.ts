@@ -2,7 +2,7 @@
 // scan messages, topic_index, reactions or topic_overlay. The sidebar's
 // statements, and the topic view's: the Main and thread windows, their
 // reactions and thread titles, a channel's active threads, and the New chat
-// pickers.
+// pickers, and All topics: its order, counts and places.
 import { assert, describe, it } from '@effect/vitest'
 import { Effect, Layer } from 'effect'
 import * as fs from 'node:fs/promises'
@@ -13,6 +13,7 @@ import { reactionsStatement, threadsStatements, threadTitlesStatement, windowSta
 import { homeStatements } from '../src/home/query'
 import { staleStatement } from '../src/home/job'
 import { pickerStatements } from '../src/newchat/query'
+import { countsStatement as allTopicsCountsStatement, orderStatement, placesStatement } from '../src/topics/allTopics'
 import { countsStatement, listStatements, type ListFilter } from '../src/topics/query'
 
 const tempDir = Effect.acquireRelease(
@@ -24,7 +25,7 @@ const freshStore: Layer.Layer<Layer.Success<ReturnType<typeof Store.layer>>, Sto
 )
 
 /** Table aliases the statements use, back to the tables the rule names. */
-const ALIASES: Record<string, string> = { i: 'topic_index', t: 'topic_index', o: 'topic_overlay', m: 'messages' }
+const ALIASES: Record<string, string> = { i: 'topic_index', t: 'topic_index', ti: 'topic_index', o: 'topic_overlay', ov: 'topic_overlay', m: 'messages' }
 const GUARDED = new Set(['messages', 'topic_index', 'reactions', 'topic_overlay'])
 
 const plan = (sql: string, params: ReadonlyArray<unknown>) =>
@@ -69,6 +70,29 @@ describe('query plans', () => {
         const statement = countsStatement(scope)
         const lines = yield* plan(statement.sql, statement.params)
         assert.deepStrictEqual(scans(lines), [], lines.join('\n'))
+      }
+    }).pipe(Effect.provide(freshStore)),
+  )
+
+  it.effect('allTopics.list and allTopics.summary never scan the guarded tables, for every chip, narrowing, sort and a text filter', () =>
+    Effect.gen(function* () {
+      const cutoff = '1700000000.000000'
+      const narrowings = [{ kind: 'all' }, { kind: 'channels' }, { kind: 'dms', scope: 'D0MAYA' }, { kind: 'all', query: 'postgres plan' }] as const
+      for (const narrowing of narrowings) {
+        for (const status of ['all', 'quiet'] as const) {
+          for (const sort of ['recent', 'oldest', 'messages'] as const) {
+            const statement = orderStatement({ ...narrowing, status, sort }, cutoff, 200, 200)
+            const lines = yield* plan(statement.sql, statement.params)
+            assert.deepStrictEqual(scans(lines), [], `${JSON.stringify({ ...narrowing, status, sort })}\n${lines.join('\n')}`)
+            assert.isTrue(lines.some((line) => /SEARCH i USING (COVERING )?INDEX topic_index_channel/.test(line)), `each conversation reads its topics through the channel index\n${lines.join('\n')}`)
+          }
+        }
+        const counts = allTopicsCountsStatement(narrowing, cutoff)
+        const countLines = yield* plan(counts.sql, counts.params)
+        assert.deepStrictEqual(scans(countLines), [], countLines.join('\n'))
+        const places = placesStatement(narrowing.kind)
+        const placeLines = yield* plan(places.sql, places.params)
+        assert.deepStrictEqual(scans(placeLines), [], placeLines.join('\n'))
       }
     }).pipe(Effect.provide(freshStore)),
   )

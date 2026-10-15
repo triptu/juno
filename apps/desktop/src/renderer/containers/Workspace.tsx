@@ -1,14 +1,17 @@
-import { Activity, useEffect } from 'react'
+import { Activity, lazy, Suspense, useEffect } from 'react'
 import type { TopicDetail } from '@juno/contract'
 import { currentPlace, mountedTabs, onMenuCommand, registry, sidebarLayoutAtom, startVisitLog, tabsAtom, tabStripAtom, type Tab, type TabSummary } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import { TopicArt, Workspace as WorkspaceView, type ActivateEvent, type WorkspaceTab, type WorkspaceTabIcon } from '@juno/views'
 import { HomePage } from './Home'
-import { closeTabById, openNewTab, runMenuCommand, showTabMenu, stepTabHistory, switchToTab } from './navigation'
+import { closeTabById, loadAllTopicsPage, openNewTab, runMenuCommand, showTabMenu, stepTabHistory, switchToTab } from './navigation'
 import { NewChatTab } from './NewChat'
 import { runUndoCommand } from './topicActions'
 import { TitlebarNav } from './TitlebarNav'
 import { hasArt, TopicTab } from './TopicView'
+
+/** The All topics page is its own chunk (performance 2.1), loaded on idle once the window is up. */
+const AllTopicsPage = lazy(loadAllTopicsPage)
 
 const kindIcons: Record<TopicDetail['channel']['kind'], WorkspaceTabIcon> = {
   public: 'hash',
@@ -30,7 +33,9 @@ function stripTab(summary: TabSummary): WorkspaceTab {
       ? { ...base, title: summary.chatTitle ?? 'New chat', icon: 'new-chat' }
       : place.kind === 'home'
         ? { ...base, title: 'Home', icon: 'home' }
-        : {
+        : place.kind === 'allTopics'
+          ? { ...base, title: 'All topics', icon: 'all-topics' }
+          : {
           ...base,
           title: detail == null ? '' : detail.kind === 'main' ? detail.channel.name : detail.title,
           icon: detail == null ? 'hash' : kindIcons[detail.channel.kind],
@@ -51,6 +56,12 @@ function Page({ tab }: { readonly tab: Tab }) {
       return <NewChatTab key="new-chat" tabId={tab.id} />
     case 'home':
       return <HomePage key="home" />
+    case 'allTopics':
+      return (
+        <Suspense key="all-topics" fallback={null}>
+          <AllTopicsPage />
+        </Suspense>
+      )
   }
 }
 
@@ -87,6 +98,10 @@ export function Workspace() {
   useEffect(() => onMenuCommand(runUndoCommand), [])
   // "Pick up where you left off" on Home: the topic that stayed on screen for a minute.
   useEffect(() => startVisitLog(registry), [])
+  useEffect(() => {
+    const idle = requestIdleCallback(() => void loadAllTopicsPage(), { timeout: 5_000 })
+    return () => cancelIdleCallback(idle)
+  }, [])
   useEffect(() => {
     window.addEventListener('mouseup', onMouseUp)
     return () => window.removeEventListener('mouseup', onMouseUp)

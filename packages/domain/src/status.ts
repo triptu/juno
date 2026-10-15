@@ -156,6 +156,6 @@ export function statusLabel(status: AllTopicsStatus): string {
     case 'quiet':
       return 'Quiet'
     case 'unsubscribed':
-      return 'Unsubscribed'
+      return 'Unfollowed'
   }
 }

@@ -3,6 +3,18 @@ export { configureConnection, connectionStateAtom, makeRegistry, registry, resta
 export { engineStatusAtom, pingCommand } from './engine'
 export { importFromSlackAppCommand, sessionStatusAtom, signedInAtom, signInCommand, signOutCommand, type ReadySession } from './session'
 export { defaultTopicListFilter, joinTopicWindow, topicCountsAtom, topicListAtom, type TopicListFilter } from './topics'
+export {
+  allTopicsFilterAtom,
+  allTopicsLayoutAtom,
+  allTopicsListAtom,
+  allTopicsOffsetAtom,
+  allTopicsRowAtom,
+  allTopicsSummaryAtom,
+  allTopicsWindowAtom,
+  defaultAllTopicsFilter,
+  type AllTopicsLayout,
+  type AllTopicsWindow,
+} from './allTopics'
 export { mirrorReadsAtom, shouldMarkRead, type ReadTrigger, type ReadView } from './reads'
 export { isPeekKey, PEEK_KEY_PREF, peekKeyAtom, setPeekKey, type PeekKey } from './peek'
 export {
@@ -53,6 +65,8 @@ export {
   historyStateAtom,
   historyTarget,
   mountedTabs,
+  allTopicsPlace,
+  allTopicsTab,
   homePlace,
   homeTab,
   newChatPlace,
@@ -113,7 +127,7 @@ export {
 export type { PortConnection, PortLike } from './transport'
 export { redrawTopic, topicArtAtom } from './art'
 export { messageLink, slackLink, threadRootTs } from './links'
-export { headerRenamingAtom, renamingAtom, rowRenamingAtom, type RenameTarget } from './rename'
+export { headerRenamingAtom, renamingAtom, rowRenamingAtom, tableRenamingAtom, type RenameTarget } from './rename'
 export { dismissToast, runAction, showToast, TOAST_LIFE_MS, toastAtom, undoLast, undoStackAtom, UNDO_LIMIT, type Toast, type ToastContent } from './undo'
 export {
   caughtUp,
