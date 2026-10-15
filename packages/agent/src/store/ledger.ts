@@ -116,6 +116,18 @@ export function recordReceipt(store: Store, attemptId: string, evidence: unknown
 }
 
 /**
+ * A definite rejection or an unconfirmed attempt (spec `reject`, `lose`).
+ * Only an open authorization moves, so earlier evidence is never overwritten;
+ * `detail` is kept for Activity.
+ */
+export function settleAuthorization(store: Store, authorizationId: string, outcome: 'failed' | 'unknown', detail: string): void {
+  transaction(store.db, () => {
+    store.db.prepare("UPDATE authorizations SET outcome = ? WHERE id = ? AND outcome IN ('consumed', 'sent', 'cancel-requested')").run(outcome, authorizationId)
+    store.db.prepare('INSERT OR IGNORE INTO action_results (authorization_id, detail, at) VALUES (?, ?, ?)').run(authorizationId, detail, store.now())
+  })
+}
+
+/**
  * Startup (§6.5, spec `startup`): before pi resumes, every authorization
  * without a receipt that is still open becomes `unknown`. It is never
  * dispatched again; reconcile looks for evidence in the background.

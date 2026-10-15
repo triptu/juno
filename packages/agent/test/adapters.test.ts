@@ -368,6 +368,22 @@ it('says a T3 question needs an answer in T3 Code when Juno cannot show it', asy
   expect(turns.actions.views().some((v) => v.card._tag === 'question')).toBe(false)
 })
 
+it('settles a lost grant-backed send like a click: Activity detail and the card outcome', async () => {
+  const { server, manager, turns, call, click } = await fixture('t3', t3Tools)
+  await call('t3_start', start)
+  await click()
+  const job = turns.jobs.list()[0]
+  if (!job) throw new Error('No job')
+  server.loseNextCall('t3_thread_send')
+  await call('t3_send', { job: job.id, message: 'Run the synthetic test once.' })
+  await manager.connect('t3')
+  const auth = turns.store.db.prepare('SELECT id FROM authorizations WHERE grant_id IS NOT NULL').get() as { id: string }
+  expect(turns.store.db.prepare('SELECT detail FROM action_results WHERE authorization_id = ?').all(auth.id)).toHaveLength(1)
+  const card = turns.actions.views().find((v) => v.card._tag === 'change')
+  if (!card) throw new Error('No card')
+  expect(turns.store.db.prepare('SELECT outcome FROM card_outcomes WHERE card_id = ?').all(card.card.id)).toEqual([{ outcome: 'failed' }])
+})
+
 it('makes a read the code adds to the T3 preset Read for an install that already discovered it', async () => {
   const read: FakeTool = { name: 't3_pending_request_read', inputSchema: { type: 'object', properties: { threadId: str, requestId: str } }, call: () => json({}) }
   const server = await startFakeMcpServer({ tools: [read] })
