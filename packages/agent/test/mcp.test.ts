@@ -79,8 +79,8 @@ it('signs in on loopback, discovers Notion, refreshes tokens and disconnects', a
   const { server, manager } = await fixture()
   expect(manager.page().connections[0]).toMatchObject({ state: 'ready', address: server.url })
   expect(manager.tool('notion', 'notion-search').tier).toBe(0)
-  // The server marks it read-only and Juno has seen no schema change: a read.
-  expect(manager.tool('notion', 'notion-get-self').tier).toBe(0)
+  // The server marks it read-only and Juno has seen no schema change: it may skip the review in a clean run.
+  expect(manager.tool('notion', 'notion-get-self')).toMatchObject({ tier: 3, hinted: true })
   expect(manager.tool('notion', 'notion-update-page').tier).toBe(3)
   server.oauth.expireAccessTokens()
   await manager.invoke('notion', 'notion-fetch', { id: 'page-roadmap' })
@@ -152,7 +152,7 @@ it('blocks secrets, invalid arguments and non-read tools before transport', asyn
   expect(server.calls).toHaveLength(count)
 })
 
-it('discovers paginated tools, reads a tool marked read-only until its schema changes, and resets Never ask on a change', async () => {
+it('discovers paginated tools, trusts a read-only mark until its schema changes, and resets Never ask on a change', async () => {
   const server = await startFakeLittlebird()
   cleanup.push(() => server.close())
   const dir = await mkdtemp(join(tmpdir(), 'juno-mcp-list-'))
@@ -163,16 +163,54 @@ it('discovers paginated tools, reads a tool marked read-only until its schema ch
   cleanup.push(() => manager.close())
   await manager.authorize('notion')
   expect(manager.definitions('notion').length).toBeGreaterThan(3)
-  // A tool the server marks read-only when Juno first sees it is a read.
+  // A tool the server marks read-only when Juno first sees it keeps that mark.
   const hinted = unknownTool().name
   server.addTool(unknownTool())
   await expect.poll(() => manager.definitions('notion').some((t) => t.name === hinted)).toBe(true)
-  expect(manager.tool('notion', hinted).tier).toBe(0)
+  expect(manager.tool('notion', hinted)).toMatchObject({ tier: 3, hinted: true, fresh: 0 })
   manager.setTool('notion', hinted, { review: 'never' })
   // Its schema changes: the claim no longer counts, and the owner's Never ask was for the old tool.
   server.changeSchema(hinted, { type: 'object', properties: { newer: { type: 'string' } } })
-  await expect.poll(() => manager.tool('notion', hinted).tier).toBe(3)
-  expect(manager.tool('notion', hinted)).toMatchObject({ changed: 1, review: 'auto' })
+  await expect.poll(() => manager.tool('notion', hinted).hinted).toBe(false)
+  expect(manager.tool('notion', hinted)).toMatchObject({ changed: 1, review: 'auto', fresh: 1 })
+  // Under a connection-wide Never ask it keeps its own Auto, until the owner sets a rule again.
+  manager.setRule('notion', 'never')
+  expect(manager.rule('notion', hinted)).toBe('never')
+  server.changeSchema(hinted, { type: 'object', properties: { newest: { type: 'string' } } })
+  await expect.poll(() => manager.rule('notion', hinted)).toBe('auto')
+  expect(manager.page().connections[0]?.tools.find((tool) => tool.name === hinted)).toMatchObject({ changed: true })
+  // A tool that appears after the owner chose Never ask is new: its own Auto, marked New.
+  server.addTool({ ...unknownTool(), name: 'later_tool' })
+  await expect.poll(() => manager.definitions('notion').some((t) => t.name === 'later_tool')).toBe(true)
+  expect(manager.rule('notion', 'later_tool')).toBe('auto')
+  expect(manager.page().connections[0]?.tools.find((tool) => tool.name === 'later_tool')).toMatchObject({ added: true })
+  manager.setTool('notion', 'later_tool', { review: 'auto' })
+  expect(manager.rule('notion', 'later_tool')).toBe('never')
+})
+
+it('never offers a tool that merges, buys or force-pushes, and a delete always asks', async () => {
+  const server = await startFakeLittlebird({ extraTools: [unknownTool('merge_pull_request'), unknownTool('buyCredits'), { ...unknownTool('purge_cache'), annotations: { destructiveHint: true } }] })
+  cleanup.push(() => server.close())
+  const dir = await mkdtemp(join(tmpdir(), 'juno-mcp-locked-'))
+  cleanup.push(() => rm(dir, { recursive: true, force: true }))
+  const store = { db: openDatabase(join(dir, 'db'), [MCP_MIGRATIONS]), now: Date.now }
+  cleanup.push(async () => { store.db.close() })
+  const manager = createMcpManager({ store, credentials: credentials(server.oauth!.approve), defaults: [{ ...NOTION, url: server.url }] })
+  cleanup.push(() => manager.close())
+  await manager.authorize('notion')
+  manager.setRule('notion', 'never')
+  const offered = manager.definitions('notion').map((tool) => tool.name)
+  expect(offered).not.toContain('merge_pull_request')
+  expect(offered).not.toContain('buyCredits')
+  expect(() => manager.tool('notion', 'merge_pull_request')).toThrow()
+  // A delete, by its name or the server's own mark, is offered but always asks, whatever the rules say.
+  expect(offered).toEqual(expect.arrayContaining(['delete_material', 'purge_cache']))
+  expect(manager.rule('notion', 'delete_material')).toBe('always')
+  expect(manager.rule('notion', 'purge_cache')).toBe('always')
+  expect(() => manager.setTool('notion', 'delete_material', { review: 'never' })).toThrow()
+  const tools = manager.page().connections[0]?.tools ?? []
+  expect(tools.find((tool) => tool.name === 'delete_material')).toMatchObject({ locked: 'delete' })
+  expect(tools.find((tool) => tool.name === 'merge_pull_request')).toMatchObject({ locked: 'forbidden' })
 })
 
 it('serves only approved tools on an authenticated per-turn loopback endpoint', async () => {
@@ -236,7 +274,7 @@ it("keeps the owner's tool switches, rules and connection identity across a mana
   expect(restarted.rule('notion', 'notion-update-page')).toBe('always')
   expect(restarted.rule('notion', 'notion-create-pages')).toBe('never')
   expect(restarted.page().connections[0]).toMatchObject({ review: 'never' })
-  expect(restarted.page().connections[0]?.tools.find((tool) => tool.name === 'notion-get-self')).toMatchObject({ enabled: false, review: 'auto', read: true })
+  expect(restarted.page().connections[0]?.tools.find((tool) => tool.name === 'notion-get-self')).toMatchObject({ enabled: false, review: 'auto', read: false, readOnly: true })
 })
 
 it('offers Notion, Littlebird and T3 Code, and adds a server by address that signs in only when it asks', async () => {

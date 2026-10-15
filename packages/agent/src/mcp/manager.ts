@@ -5,7 +5,7 @@ import { ConnectionId, ReviewRule, type ConnectionsPage, type ConnectionState } 
 import { uuidv7, type Store } from '../store/store'
 import { catalogue, discover, json, parseObject, validateArguments } from './catalogue'
 import { clientFor, connectionAuth, signIn } from './auth'
-import { ConnectionConfig, McpError, PRESETS, T3, endpoint, hasSecret, type Credentials } from './types'
+import { ConnectionConfig, McpError, PRESETS, T3, destructiveArguments, endpoint, forbidden, hasSecret, type Credentials } from './types'
 
 const Stored = Schema.Struct({ config: Schema.String, epoch: Schema.String, discovered: Schema.Number, active_url: Schema.NullOr(Schema.String), review: ReviewRule })
 interface Session {
@@ -174,23 +174,29 @@ export function createMcpManager({ store, credentials, defaults = PRESETS }: Man
     return pending
   }
   const tool = (id: string, name: string) => {
-    // A tool the owner turned off is not offered, and is never called.
-    const found = catalogue(store, id).find((row) => row.name === name && row.present === 1 && row.enabled === 1)
+    // A tool the owner turned off, or one that merges, buys or force-pushes, is not offered, and is never called.
+    const found = catalogue(store, id).find((row) => row.name === name && row.present === 1 && row.enabled === 1 && row.lock !== 'forbidden')
     if (!found) throw new McpError({ reason: 'unavailable', message: 'This tool is not available.' })
     return found
   }
   const checkSecrets = async (args: unknown) => {
     if (hasSecret(args, await credentials.values())) throw new McpError({ reason: 'secret', message: 'Juno blocked a key or token in these arguments.' })
   }
-  /** Trusted adapter boundary only. Model tools must use the read policy or an Executor. */
-  const invoke = async (id: string, name: string, args: unknown, write = false) => {
+  /**
+   * Trusted adapter boundary only. Model tools must use the read policy or an Executor. `hinted`: a
+   * tool the server marked read-only, which the caller has checked may run as a read (SPEC 13.9).
+   */
+  const invoke = async (id: string, name: string, args: unknown, access: 'read' | 'hinted' | 'write' = 'read') => {
+    const write = access === 'write'
     const initial = tool(id, name)
     const epoch = stored(id).epoch
     const parsed = parseObject(args)
     validateArguments(initial.definition, parsed)
+    if (destructiveArguments(parsed, forbidden)) throw new McpError({ reason: 'forbidden', message: 'Juno does not merge, buy or force-push.' })
     await checkSecrets(parsed)
     const current = tool(id, name)
-    if (current.hash !== initial.hash || stored(id).epoch !== epoch || (!write && current.tier !== 0)) throw new McpError({ reason: 'stale', message: 'Review this tool before using it.' })
+    const readable = current.tier === 0 || (access === 'hinted' && current.hinted)
+    if (current.hash !== initial.hash || stored(id).epoch !== epoch || (!write && !readable)) throw new McpError({ reason: 'stale', message: 'Review this tool before using it.' })
     const s = session(id)
     if (s.state !== 'ready' || !s.client) throw new McpError({ reason: 'unavailable', message: 'The connection is not ready.' })
     let client = s.client
@@ -244,20 +250,29 @@ export function createMcpManager({ store, credentials, defaults = PRESETS }: Man
     setTool: (id: string, name: string, change: { readonly enabled?: boolean; readonly review?: ReviewRule }) => {
       const found = catalogue(store, id).find((row) => row.name === name && row.present === 1)
       if (!found) throw new McpError({ reason: 'stale', message: 'This tool is not available.' })
-      store.db.prepare('UPDATE mcp_tools SET enabled = ?, review = ? WHERE connection_id = ? AND name = ?')
-        .run(change.enabled === undefined ? found.enabled : change.enabled ? 1 : 0, change.review ?? found.review, id, name)
+      if (change.review !== undefined && found.lock !== undefined) throw new McpError({ reason: 'invalid', message: 'This tool always asks.' })
+      // Setting a rule on the tool is the owner looking at it again: it is no longer new or changed for the rule.
+      store.db.prepare('UPDATE mcp_tools SET enabled = ?, review = ?, fresh = ? WHERE connection_id = ? AND name = ?')
+        .run(change.enabled === undefined ? found.enabled : change.enabled ? 1 : 0, change.review ?? found.review, change.review === undefined ? found.fresh : 0, id, name)
       changed()
     },
-    /** The connection's own rule, for its tools that have none. */
+    /** The connection's own rule, for its tools that have none. Every tool of it then follows it again. */
     setRule: (id: string, review: ReviewRule) => {
       stored(id)
       store.db.prepare('UPDATE mcp_connections SET review = ? WHERE id = ?').run(review, id)
+      store.db.prepare('UPDATE mcp_tools SET fresh = 0 WHERE connection_id = ?').run(id)
       changed()
     },
-    /** The rule a call to this tool follows: the tool's own, else the connection's (SPEC 13.9). */
+    /**
+     * The rule a call to this tool follows (SPEC 13.9): Always ask for a delete; else the tool's own;
+     * else the connection's, except that a new or changed tool does not follow its Never ask.
+     */
     rule: (id: string, name: string): ReviewRule => {
-      const own = tool(id, name).review
-      return own !== 'auto' ? own : stored(id).review
+      const found = tool(id, name)
+      if (found.lock !== undefined) return 'always'
+      if (found.review !== 'auto') return found.review
+      const connection = stored(id).review
+      return found.fresh === 1 && connection === 'never' ? 'auto' : connection
     },
     /**
      * The name the model uses for a connection: a preset's id, or a short slug of the label the
@@ -274,7 +289,7 @@ export function createMcpManager({ store, credentials, defaults = PRESETS }: Man
       return names
     },
     /** What the model is offered: present tools the owner has not turned off. */
-    definitions: (id: string) => catalogue(store, id).filter((row) => row.present === 1 && row.enabled === 1).map((row) => ({ ...row, definition: json(JSON.parse(row.definition)) })),
+    definitions: (id: string) => catalogue(store, id).filter((row) => row.present === 1 && row.enabled === 1 && row.lock !== 'forbidden').map((row) => ({ ...row, definition: json(JSON.parse(row.definition)) })),
     page: (): ConnectionsPage => ({ connections: configs().map((config) => ({
       id: ConnectionId.make(config.id), label: config.label, enabled: config.enabled,
       state: session(config.id).state, address: session(config.id).address ?? config.url, review: stored(config.id).review,
@@ -283,7 +298,9 @@ export function createMcpManager({ store, credentials, defaults = PRESETS }: Man
       ...(session(config.id).state === 'error' || session(config.id).state === 'degraded' ? { detail: 'The connection is unavailable. Juno will reconnect.' } : {}),
       tools: catalogue(store, config.id).filter((row) => row.present === 1).map((row) => ({
         name: row.name, read: row.tier === 0, schemaHash: row.hash, ...hintOf(row.definition), enabled: row.enabled === 1, review: row.review,
-        ...(row.changed === 1 ? { changed: true as const } : {}),
+        ...(row.hinted ? { readOnly: true as const } : {}),
+        ...(row.changed === 1 ? { changed: true as const } : row.fresh === 1 ? { added: true as const } : {}),
+        ...(row.lock === undefined ? {} : { locked: row.lock }),
       })),
     })) }),
     subscribe: (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener) } },

@@ -207,6 +207,7 @@ export const chatCopy = {
         send: "Asked because sending can't be undone.", write: "Asked because this change can't be undone.",
         ranExplicit: 'Ran without asking because you asked for it and it can be undone.',
         ranNever: 'Ran without asking because your rule for this tool is Never ask.',
+        ruleChanged: 'Asked because your rule for this tool changed.',
       },
 
     },
@@ -374,7 +375,11 @@ export const chatCopy = {
       rules: { auto: 'Auto', always: 'Always ask', never: 'Never ask' },
       connectionRule: 'Auto-review for all tools',
       connectionRuleNote: "A tool's own rule comes first. Never ask still asks when only something Juno read asked for the call.",
-      changed: 'Changed since Juno first saw it',
+      changed: 'Changed',
+      added: 'New',
+      /** Why a fixed rule is fixed, under the tool's name. */
+      locked: { delete: "Deleting can't be undone, so Juno always asks.", forbidden: 'Juno never merges, buys or force-pushes.' },
+      notOffered: 'Not offered',
       noTools: 'Connect to see its tools.', noMatch: 'No tools match.', done: 'Done',
       connect: 'Connect',
       signIn: 'Sign in',

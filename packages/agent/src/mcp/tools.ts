@@ -7,7 +7,7 @@ import type { McpManagerApi } from './manager'
 import { changeCard, connectCard } from './actions'
 import { findTools, resolveServer, serverIndex, toolSchema } from './discovery'
 import { result } from './results'
-import { reviewChange, runReviewed } from './reviewed'
+import { reviewChange, ruleFor, runReviewed } from './reviewed'
 import { McpError, T3 } from './types'
 
 /**
@@ -62,14 +62,18 @@ export function mcpTools(manager: McpManagerApi, context: McpToolsContext) {
       try {
         const server = resolveServer(manager, name)
         if (server === T3.id && ['t3_thread_launch', 't3_thread_send', 't3_thread_interrupt'].includes(tool)) return { text: 'Use t3_start, t3_send or t3_stop. Every start needs a Start card; existing jobs require their grant or an owner click.', isError: true }
-        if (manager.tool(server, tool).tier === 0) {
-          const value = await manager.invoke(server, tool, args)
+        const found = manager.tool(server, tool)
+        // A tool the server marked read-only runs as a read only while the model had read nothing
+        // untrusted when it wrote this call, and never under Always ask (SPEC 13.9).
+        const hinted = found.hinted && (run.cleanAtRequest ?? run.clean) && ruleFor(manager, server, tool, args) !== 'always'
+        if (found.tier === 0 || hinted) {
+          const value = await manager.invoke(server, tool, args, found.tier === 0 ? 'read' : 'hinted')
           return { ...result(JSON.stringify(value)), ...(value.isError ? { isError: true } : {}) }
         }
         const proposed = await changeCard(manager, server, tool, args)
         if (proposed._tag !== 'change') throw new Error('Expected a change')
         const reviewed = await reviewChange(manager, context, run, tool, proposed)
-        if (reviewed.decision === 'run' && mayAuthorize(authorityOf(store))) return await runReviewed(manager, context, reviewed.payload, run, call, tool)
+        if (reviewed.decision === 'run' && mayAuthorize(authorityOf(store))) return await runReviewed(manager, context, reviewed, run, call, tool)
         const id = context.actions.propose({ runId: run.runId, callId: call.callId, payload: reviewed.payload })
         return { text: `Proposed Change card ${id}. Nothing runs until the owner clicks. ${reviewed.line}` }
       } catch (error) {

@@ -30,7 +30,7 @@ export interface Credentials {
 }
 
 export class McpError extends Schema.TaggedError<McpError>()('McpError', {
-  reason: Schema.Literals(['unavailable', 'invalid', 'stale', 'secret']),
+  reason: Schema.Literals(['unavailable', 'invalid', 'stale', 'secret', 'forbidden']),
   message: Schema.String,
 }) {}
 
@@ -73,7 +73,12 @@ export function endpoint(url: string, allowNetwork = true, localNetwork = false)
   return parsed.href
 }
 
-export const denied = (name: string): boolean => /(^|[-_.])(delete|remove|archive|trash|merge|purchase|buy|force[-_]?push)([-_.]|$)/i.test(name.replace(/([a-z])([A-Z])/g, '$1-$2'))
+const words = (name: string) => name.replace(/([a-z])([A-Z])/g, '$1-$2')
+/** Acts outside what the owner can undo (SPEC 13.4, 13.9): a tool named like this is never offered, and never called. */
+export const forbidden = (name: string): boolean => /(^|[-_.])(merge|purchase|buy|force[-_]?push)([-_.]|$)/i.test(words(name))
+/** Deletes: offered, but always asks with a card, whatever the owner's rule. */
+export const deletes = (name: string): boolean => /(^|[-_.])(delete|remove|archive|trash)([-_.]|$)/i.test(words(name))
+export const denied = (name: string): boolean => forbidden(name) || deletes(name)
 
 export function hasSecret(value: unknown, secrets: ReadonlyArray<string>): boolean {
   if (typeof value === 'string') return secrets.some((secret) => secret.length > 0 && value.includes(secret)) || /(?:sk-(?:or-v1-|proj-)?[a-zA-Z0-9_-]{16,}|xox[baprs]-[a-zA-Z0-9-]{10,}|gh[pousr]_[a-zA-Z0-9]{20,}|-----BEGIN [A-Z ]*PRIVATE KEY-----)/.test(value)
@@ -83,11 +88,11 @@ export function hasSecret(value: unknown, secrets: ReadonlyArray<string>): boole
 }
 
 /** Destructive operations can also hide behind a generic update tool. */
-export function destructiveArguments(args: unknown): boolean {
-  if (Array.isArray(args)) return args.some(destructiveArguments)
+export function destructiveArguments(args: unknown, named: (name: string) => boolean = denied): boolean {
+  if (Array.isArray(args)) return args.some((item) => destructiveArguments(item, named))
   if (args === null || typeof args !== 'object') return false
   return Object.entries(args).some(([key, value]) =>
-    ((key === 'archived' || key === 'in_trash' || key === 'delete') && value === true) ||
-    ((key === 'command' || key === 'operation' || key === 'action') && typeof value === 'string' && denied(value)) ||
-    destructiveArguments(value))
+    (named !== forbidden && (key === 'archived' || key === 'in_trash' || key === 'delete') && value === true) ||
+    ((key === 'command' || key === 'operation' || key === 'action') && typeof value === 'string' && named(value)) ||
+    destructiveArguments(value, named))
 }
