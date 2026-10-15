@@ -1,0 +1,79 @@
+name: Release
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: write
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: macos-26
+    env:
+      JUNO_RELEASE_REPOSITORY: ${{ vars.RELEASE_REPOSITORY || github.repository }}
+      GH_TOKEN: ${{ secrets.RELEASE_GITHUB_TOKEN || github.token }}
+      CSC_LINK: ${{ secrets.CSC_LINK }}
+      CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      APPLE_API_KEY_BASE64: ${{ secrets.APPLE_API_KEY_BASE64 }}
+      APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+      APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+      - run: npm install --global pnpm@12.11.2
+      - run: pnpm install --frozen-lockfile
+      - name: Check tag matches the app version
+        run: node -e 'if (process.env.GITHUB_REF_NAME !== "v" + require("./apps/desktop/package.json").version) process.exit(1)'
+      - name: Select unsigned or signed release
+        shell: bash
+        run: |
+          if [[ -n "$CSC_LINK" && -n "$CSC_KEY_PASSWORD" ]] &&
+             { [[ -n "$APPLE_ID" && -n "$APPLE_APP_SPECIFIC_PASSWORD" && -n "$APPLE_TEAM_ID" ]] ||
+               [[ -n "$APPLE_API_KEY_BASE64" && -n "$APPLE_API_KEY_ID" && -n "$APPLE_API_ISSUER" ]]; }; then
+            echo 'JUNO_RELEASE=1' >> "$GITHUB_ENV"
+            if [[ -n "$APPLE_API_KEY_BASE64" ]]; then
+              key="$RUNNER_TEMP/AuthKey.p8"
+              umask 077
+              printf '%s' "$APPLE_API_KEY_BASE64" | base64 --decode > "$key"
+              echo "APPLE_API_KEY=$key" >> "$GITHUB_ENV"
+            fi
+          else
+            echo 'Release credentials absent; building unsigned artifacts only.'
+          fi
+      - name: Check the signed update feed is public
+        if: env.JUNO_RELEASE == '1'
+        run: test "$(gh repo view "$JUNO_RELEASE_REPOSITORY" --json isPrivate --jq .isPrivate)" = false
+      - run: pnpm package
+      - name: Check the signed package
+        if: env.JUNO_RELEASE == '1'
+        run: |
+          codesign --verify --deep --strict apps/desktop/release/mac-arm64/Juno.app
+          xcrun stapler validate apps/desktop/release/mac-arm64/Juno.app
+      - run: pnpm test:package
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-arm64
+          path: |
+            apps/desktop/release/*.dmg
+            apps/desktop/release/*.zip
+            apps/desktop/release/*.blockmap
+            apps/desktop/release/latest-mac.yml
+      - name: Upload a draft GitHub release
+        shell: bash
+        run: |
+          if ! gh release view "$GITHUB_REF_NAME" --repo "$JUNO_RELEASE_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$GITHUB_REF_NAME" --repo "$JUNO_RELEASE_REPOSITORY" --draft --title "Juno $GITHUB_REF_NAME" --notes 'macOS Apple Silicon build. Check signing and notarization before publishing.'
+          fi
+          test "$(gh release view "$GITHUB_REF_NAME" --repo "$JUNO_RELEASE_REPOSITORY" --json isDraft --jq .isDraft)" = true
+          shopt -s nullglob
+          files=(apps/desktop/release/*.dmg apps/desktop/release/*.zip apps/desktop/release/*.blockmap apps/desktop/release/latest-mac.yml)
+          gh release upload "$GITHUB_REF_NAME" --repo "$JUNO_RELEASE_REPOSITORY" "${files[@]}" --clobber
+      - name: Remove API key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/AuthKey.p8"

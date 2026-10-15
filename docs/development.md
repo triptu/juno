@@ -40,7 +40,7 @@ Run these from the repo root.
 | `pnpm --filter @juno/agent-memory test` | Runs the pure memory rules' property tests. Its script takes the heavy-job lock itself. |
 | `pnpm --filter @juno/engine test` | Runs one package's suite (here the engine's: the port protocol over an in-memory MessageChannel, live query serving). |
 | `node scripts/build-icons.mjs` | Rebuilds `apps/desktop/build/icon.icns` and `icon.png` from `assets/icon.svg`. See "App icon". |
-| `pnpm package` | Builds a DMG and zip with electron-builder into `apps/desktop/release/`. Not run in CI yet. |
+| `pnpm package` | Builds a DMG and zip with electron-builder into `apps/desktop/release/`. The tag workflow also builds these; see "Releasing". |
 | `JUNO_LIVE=1 pnpm smoke:live` | The read-only live smoke against your real workspace (see "Sign-in and the live smoke"). `pnpm smoke:live -- --fake` runs the same script against an in-process fake. |
 | `JUNO_LIVE=1 pnpm sync:live` | The read-only sync dry run: the real `@juno/sync` cold boot against your workspace into a temporary directory, numbers only (see "The live sync dry run"). `pnpm sync:live -- --fake` runs it against an in-process fake. |
 | `pnpm ai:eval` | Runs every AI task on invented examples with the fake provider and prints the outputs. `JUNO_AI=live pnpm ai:eval` uses OpenRouter through pi-ai with `OPENROUTER_API_KEY` (environment or `.env`) and prints outputs, latency and cost; without a key it says so and exits. `pnpm ai:eval routeCheck` runs one task. See `packages/ai/README.md`. |
@@ -576,3 +576,98 @@ Both wall times include waiting for machines, because other worktrees still on 1
 
 Tests, e2e runs, gallery shots, benchmarks and spec checks spawn many processes. Several agents often work in separate worktrees on the same machine, so the root scripts (`pnpm test`, `pnpm test:e2e`, `pnpm test:feel`, `pnpm test:gallery`, `pnpm gallery:shots`, `pnpm specs:check`, `pnpm test:agent-contracts`, `pnpm test:agent-testing`) run through `scripts/heavy.mjs`. It takes a machine-wide lock in the system temp folder, shared by every worktree, and waits for a free slot. There are two slots by default (`JUNO_HEAVY_SLOTS` changes it): e2e and gallery runs spend most of their time waiting, so two fit on an 8-core, 8 GB machine. Timing runs (`pnpm perf`, `pnpm test:feel`) pass `--exclusive`, which takes every slot and stops new jobs from starting while it waits, so their numbers are not skewed by another run. Running a package's tests directly bypasses the queue, so prefer the root scripts.
 
+
+## Releasing
+
+The release target is macOS Apple Silicon. `pnpm package` builds the app, rebuilds
+native dependencies for Electron, and writes the DMG, ZIP, block maps and
+`latest-mac.yml` to `apps/desktop/release/`. It never publishes. Developer ID
+signing and notarization require the explicit `JUNO_RELEASE=1` switch; without it,
+the build prints one unsigned-build line and disables identity discovery.
+On Apple Silicon, electron-builder repairs the local **ad-hoc** signature after
+flipping fuses. This uses no certificate or credentials and does not grant
+Gatekeeper trust. A literally unsigned ARM64 executable is killed by macOS;
+"unsigned" here means without Developer ID signing or notarization.
+
+The engine and agent use Electron's built-in `node:sqlite`, so there is no SQLite
+addon to rebuild. `npmRebuild` is enabled for future native dependencies; `.node`
+files and koffi are explicitly unpacked. electron-builder also detects and
+unpacks the bundled Codex executables. Keep the ZIP: macOS auto-update needs it.
+
+### What the owner provides
+
+- A **Developer ID Application** certificate with its private key, exported as a
+  password-protected `.p12`. Set `CSC_LINK` to its path locally or its base64
+  contents in CI, and `CSC_KEY_PASSWORD` to the export password. An already
+  installed identity can instead be selected locally with `CSC_NAME`.
+- The Apple Developer **Team ID** (`APPLE_TEAM_ID`).
+- Either `APPLE_ID` and `APPLE_APP_SPECIFIC_PASSWORD`, or an App Store Connect
+  team API key: `APPLE_API_KEY` (absolute path to its `.p8`), `APPLE_API_KEY_ID`
+  and `APPLE_API_ISSUER`. In Actions, store the file as the
+  `APPLE_API_KEY_BASE64` secret; the workflow writes it to a temporary file and
+  deletes it after the build. Supply one authentication method at a time.
+- A GitHub token with **Contents: write** access to `triptu/juno` for uploading
+  releases. `triptu/juno` is private. Choose a public distribution repository
+  and set `JUNO_RELEASE_REPOSITORY=owner/repo` when packaging locally. In Actions,
+  set the `RELEASE_REPOSITORY` variable and the `RELEASE_GITHUB_TOKEN` secret
+  with Contents: write on that repository. The workflow otherwise uses its
+  scoped `github.token` and the source repository, and refuses a signed build
+  whose feed is private. A local upload uses `GH_TOKEN`. The installed app
+  contains no GitHub token; release assets must be publicly readable.
+
+Keep all credentials in the environment or repository Actions secrets. Never
+commit certificates, keys, passwords or tokens. No secrets are needed for PR
+lint/typecheck. Heavy checks run through `pnpm affected` on Namespace.
+
+### Steps
+
+1. Install Node 26, pnpm 12.11.2 and Xcode (including its command-line tools).
+   Run `pnpm install --frozen-lockfile` and `pnpm affected`.
+2. Set the desktop version in `apps/desktop/package.json`. Build and smoke the
+   local package with `pnpm package` and `pnpm test:package`. The smoke launches
+   the executable directly, signs in to fake Slack, waits for sidebar rows,
+   starts the agent against fake OpenRouter, and relaunches the cached account.
+   It uses temporary data and never reads a real Slack session. Its reported
+   timing includes CDP attachment and polling, so it is a smoke duration, not
+   the first-presented-frame performance budget.
+3. For a local signed release, provide the variables above (including the public release repository), then run
+   `JUNO_RELEASE=1 pnpm package`. electron-builder uses `notarytool` and staples
+   the ticket. Partial release credentials fail the build. Verify with
+   `codesign --verify --deep --strict apps/desktop/release/mac-arm64/Juno.app`
+   and `xcrun stapler validate apps/desktop/release/mac-arm64/Juno.app`, then
+   run `pnpm test:package` again.
+4. For CI, configure those repository secrets, commit the version, and create
+   and push the matching `v<version>` tag. `.github/workflows/release.yml` runs
+   on `macos-26`. Complete credentials enable signing and notarization;
+   otherwise it builds unsigned artifacts. It uploads artifacts to a **draft**
+   GitHub release in the configured distribution repository and will not modify
+   an already published release. In a separate distribution repository, GitHub
+   creates the version tag there; the build still comes from the source tag.
+5. Review the artifacts and signing/notarization results before publishing the
+   draft. Never publish the unsigned fallback as an update. On another Mac,
+   install the prior signed build, opt into updates in Preferences › About,
+   publish the newer signed release, and check **Restart to update**. This
+   cross-version signature and installation check requires the owner's ID and
+   cannot be verified by the unsigned smoke.
+
+Updates are off by default and unavailable in development and tests. An enabled
+install checks 30 seconds after launch and every six hours, quietly downloads,
+and shows a single ready line in Preferences › About. Closing the app does not
+install the update; only **Restart to update** does. Turning the setting off
+cancels a download and suppresses the ready line. Errors retry quietly later.
+
+The hardened runtime entitlements grant JIT for Electron's V8 and network client
+access. There is no application sandbox entitlement or disabled library
+validation. No shared keychain access group is used today: secrets use
+Electron `safeStorage` and generic login-keychain items through
+`/usr/bin/security`. Adding a Team-ID-prefixed sharing group would not describe
+those existing items, so the entitlement deliberately has none.
+
+The six configured fuses turn RunAsNode, NODE_OPTIONS and Node CLI inspection
+off, and cookie encryption, embedded asar integrity validation and asar-only
+loading on. Engine and agent use `utilityProcess.fork`, not Electron-as-Node.
+The Codex child is a separate native executable. Development wrappers that
+strip `ELECTRON_RUN_AS_NODE` remain useful with the unmodified development
+Electron. Playwright's Electron launcher needs Node inspection and cannot drive
+the hardened package; the packaged smoke instead uses Chromium CDP. The
+`JUNO_E2E` fake-server seams remain available independently of the Node fuses.
