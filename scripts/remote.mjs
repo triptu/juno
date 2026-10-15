@@ -1,6 +1,6 @@
 // Runs a root test script on a fresh Namespace Linux machine and streams its output.
 //
-//   pnpm remote [--dry-run] [--machine linux/amd64:8x16] [--keep] <script> [args...]
+//   pnpm remote [--dry-run] [--machine linux/amd64:8x16] [--keep] [--env KEY=VALUE] <script> [args...]
 //   pnpm remote test
 //   pnpm remote specs:check --memory
 //
@@ -27,11 +27,11 @@ import { fileURLToPath } from 'node:url'
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
 /** Scripts that give the same result on Linux. feel and perf time the Mac and stay local. */
-const remoteScripts = ['test', 'specs:check', 'specs:traces', 'test:agent', 'test:agent-contracts', 'test:agent-testing', 'test:gallery', 'gallery:shots', 'test:desktop', 'test:e2e']
-const localOnly = { perf: 'timing', 'test:feel': 'timing' }
+const remoteScripts = ['test', 'specs:check', 'specs:traces', 'test:agent', 'test:agent-contracts', 'test:agent-testing', 'test:gallery', 'test:desktop', 'test:e2e']
+const localOnly = { perf: 'timing', 'test:feel': 'timing', 'gallery:shots': 'the Mac look' }
 
 function parse(argv) {
-  const options = { dryRun: false, keep: false, machine: undefined, duration: '60m' }
+  const options = { dryRun: false, keep: false, machine: undefined, duration: '60m', env: [] }
   let index = 0
   for (; index < argv.length && argv[index].startsWith('--'); index++) {
     const flag = argv[index]
@@ -39,6 +39,7 @@ function parse(argv) {
     else if (flag === '--keep') options.keep = true
     else if (flag === '--machine') options.machine = argv[++index]
     else if (flag === '--duration') options.duration = argv[++index]
+    else if (flag === '--env') options.env.push(argv[++index])
     else throw new Error(`Unknown option ${flag}`)
   }
   const [script, ...args] = argv.slice(index)
@@ -161,7 +162,7 @@ const reportDir = join(root, '.remote', runId)
 const exitMarker = `__juno_remote_exit_${runId}=`
 const scriptArgs = [options.script, ...options.args].map(quote).join(' ')
 const container = (image) =>
-  `mkdir -p /tmp/out && chmod 777 /tmp/out && s=$(date +%s) && docker pull -q ${image} >/dev/null && echo "remote: image pulled in $(( $(date +%s) - s )) s" >&2 && docker run --rm -i --init --ipc=host -v /tmp/out:/out ${image} ` +
+  `mkdir -p /tmp/out && chmod 777 /tmp/out && s=$(date +%s) && docker pull -q ${image} >/dev/null && echo "remote: image pulled in $(( $(date +%s) - s )) s" >&2 && docker run --rm -i --init --ipc=host -v /tmp/out:/out ${options.env.map((pair) => `-e ${quote(pair)}`).join(' ')} ${image} ` +
   `bash -c 'tar -xzf - -C /work && exec bash scripts/remote/run.sh "$@"' _ ${scriptArgs}; echo "${exitMarker}$?"`
 const create = ['create', '--bare', '--machine_type', options.machine, '--duration', options.duration, '--label', 'juno-remote=1', '--purpose', `juno remote ${options.script}`]
 
