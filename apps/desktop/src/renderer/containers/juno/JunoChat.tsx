@@ -178,7 +178,6 @@ export function JunoChat({ column, header, contextOf, composerContext, onSent, o
     afterPaint(() => measure('juno.chat-bubble', sent.at))
   }, [bubbles])
 
-
   // At the bottom, a new row (a bubble, the status bubble, a send) is scrolled into view before paint.
   useLayoutEffect(() => {
     const scroller = scrollRef.current

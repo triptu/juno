@@ -4,10 +4,24 @@
 import { test as agentTest } from '../juno-agent/chat'
 import { expect, hooks } from '../fixtures'
 import { happened, landsAndStays, neverBlank, noFlicker, noLayoutShift, switchesOnce } from './checks'
-import { Feel, feelFixtures } from './feel'
-import type { Studio } from './studio'
+import { Feel } from './feel'
+import { Studio } from './studio'
 
-const test = agentTest.extend<{ feel: Feel }, { studio: Studio }>(feelFixtures)
+// The feel fixtures of `./feel`, on the base that runs the agent.
+const test = agentTest.extend<{ feel: Feel }, { studio: Studio }>({
+  studio: [
+    // oxlint-disable-next-line no-empty-pattern
+    async ({}, use) => {
+      const studio = new Studio()
+      await use(studio)
+      await studio.close()
+    },
+    { scope: 'worker' },
+  ],
+  feel: async ({ win, studio }, use, info) => {
+    await use(new Feel(win, studio, info.title))
+  },
+})
 
 const POSTGRES = 'Draft plan is in the doc'
 const TAB = 'main [data-juno-chat]'

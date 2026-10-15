@@ -80,22 +80,19 @@ export async function recordSkipped(name: string, title: string, testTitle: stri
   await writeResult(join(REPORT_DIR, name), { name, title, test: testTitle, status: 'skipped', reason, verdicts: [], frames: 0, animationFrames: 0, durationMs: 0, load: currentLoad(), timeline: [], video: null, filmstrip: null, notes: [] })
 }
 
-/** The `feel` and `studio` fixtures, for `test` here and for a base that launches the app another way (the Juno Agent's). */
-export const feelFixtures = {
+export const test = base.extend<{ feel: Feel }, { studio: Studio }>({
   studio: [
     // oxlint-disable-next-line no-empty-pattern
-    async ({}, use: (studio: Studio) => Promise<void>) => {
+    async ({}, use) => {
       const studio = new Studio()
       await use(studio)
       await studio.close()
     },
     { scope: 'worker' },
   ],
-  feel: async ({ win, studio }: { readonly win: Page; readonly studio: Studio }, use: (feel: Feel) => Promise<void>, info: { readonly title: string }) => {
+  feel: async ({ win, studio }, use, info) => {
     await use(new Feel(win, studio, info.title))
   },
-} as const
-
-export const test = base.extend<{ feel: Feel }, { studio: Studio }>(feelFixtures)
+})
 
 export { expect }

@@ -51,7 +51,7 @@ export function useTopicSelection(topicId: string | undefined): readonly [Select
     document.addEventListener('selectionchange', onChange)
     return () => document.removeEventListener('selectionchange', onChange)
   }, [topicId])
-  return [held?.topicId === topicId ? held.selection : undefined, () => setHeld(undefined)]
+  return [held !== undefined && held.topicId === topicId ? held.selection : undefined, () => setHeld(undefined)]
 }
 
 /** The first and last message on screen in the visible topic, as Slack `ts`. Read once, at send time. */
