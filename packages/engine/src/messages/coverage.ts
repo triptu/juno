@@ -8,10 +8,10 @@ export const windowCovered = (target: WindowTarget, first: string | undefined) =
     const sql = yield* StoreReader
     if (first === undefined) return false
     if (target.kind === 'main') {
-      // Socket messages can extend the tail past the last history fetch. The
-      // oldest shown row must come from a covered range, not an isolated hit.
+      // Socket messages can extend a cached window beyond its fetched range.
+      // A channel with no history range has only isolated socket or search hits.
       const ranges = yield* sql<{ covered: number }>`SELECT 1 AS covered FROM synced_ranges
-        WHERE channel = ${target.channel} AND from_ts <= ${first} AND to_ts >= ${first} LIMIT 1`
+        WHERE channel = ${target.channel} LIMIT 1`
       return ranges.length > 0
     }
     const roots = yield* sql<{ reply_count: number; user_id: string | null; text: string; blocks_json: string | null }>`
