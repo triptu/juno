@@ -40,6 +40,9 @@ const interactive = [
 /** Elements tried per state. A state with more (an icon grid) is sampled from both ends. */
 const perState = 8
 
+const shardMatch = /^(\d+)\/(\d+)$/.exec(process.env.JUNO_SHARD ?? '')
+const shard = shardMatch ? { index: Number(shardMatch[1]), total: Number(shardMatch[2]) } : undefined
+
 /** The tests share the states between them so they run in parallel. GALLERY_SHIFT_PARTS sets how many (pnpm remote uses one per worker). */
 const shards = Number(process.env.GALLERY_SHIFT_PARTS ?? 12)
 
@@ -51,8 +54,10 @@ const shards = Number(process.env.GALLERY_SHIFT_PARTS ?? 12)
 function claimNext(routes: ReadonlyArray<Route>, only: ReadonlyArray<string> | undefined): Route | undefined {
   const queue = join(tmpdir(), 'juno-gallery-shift', process.env.GALLERY_SHIFT_RUN ?? 'local')
   mkdirSync(queue, { recursive: true })
-  for (const route of routes) {
+  for (const [index, route] of routes.entries()) {
     if (only && !only.includes(route.component)) continue
+    // JUNO_SHARD=i/n (pnpm remote --shards n): this machine takes every n-th state.
+    if (shard && index % shard.total !== shard.index) continue
     try {
       mkdirSync(join(queue, encodeURIComponent(route.route)))
       return route
