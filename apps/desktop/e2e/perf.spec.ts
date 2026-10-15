@@ -64,6 +64,22 @@ function oneFrameBudget(interval: number): number {
   return interval < 10 ? 16 : interval + 8
 }
 
+/**
+ * Counts the times the window is hidden from now on. macOS hides a window
+ * that another window covers, and a hidden window draws no frames, so every
+ * measure that ends after a paint waits until it shows again.
+ */
+async function countHidden(win: Page): Promise<() => Promise<number>> {
+  await win.evaluate(() => {
+    const w = window as unknown as { __hidden: number }
+    w.__hidden = document.visibilityState === 'hidden' ? 1 : 0
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') w.__hidden++
+    })
+  })
+  return () => win.evaluate(() => (window as unknown as { __hidden: number }).__hidden)
+}
+
 /** Main-thread work per frame, in milliseconds: what the scroll budget is about. */
 interface FrameWork {
   readonly work: ReadonlyArray<number>
@@ -281,14 +297,19 @@ test('send: Enter to the pending row painted', async ({ juno }) => {
   await juno.waitForSync()
   await juno.sidebar.row(POSTGRES).open()
   await juno.topic.expectTitle(POSTGRES)
+  const hidden = await countHidden(juno.win)
   const measured: number[] = []
   for (let i = 0; i < 9; i++) {
     const text = `Perf send ${i} ${Date.now()}`
+    const before = (await juno.measures('juno.send')).length
     await juno.topic.send(text)
     await juno.topic.expectSent(text)
-    measured.push((await juno.measure('juno.send'))!)
+    // The measure ends after the frame is presented, which can be after the row settles.
+    await expect.poll(async () => (await juno.measures('juno.send')).length, { timeout: 15_000 }).toBeGreaterThan(before)
+    measured.push((await juno.measures('juno.send')).at(-1)!)
     await juno.win.waitForTimeout(300)
   }
+  expect(await hidden(), 'the window was hidden or covered while measuring, so its frames were not drawn').toBe(0)
   // A local transaction, the delta and the paint; the Slack call is not part of it.
   const send = stats('send, Enter to the pending row painted (juno.send)', measured)
   within('send, p95', send.p95, 50)
@@ -697,9 +718,12 @@ test.describe.serial('topic view', () => {
       await juno.signIn()
       await juno.sidebar.expectRows()
       await juno.expectEngineLive(120_000)
-      // Read both once, so later opens are at the bottom of a cached, read topic.
+      // Read both once, so later opens are at the bottom of a cached, read topic. Main's oldest messages are
+      // the user's, so its first open is at the "N new" divider after them, not at the bottom.
       for (const title of [THREAD, MAIN]) {
         await juno.sidebar.row(title).open()
+        await expect(juno.topic.divider.or(juno.topic.list.locator('[data-message-row]').last()).first()).toBeVisible({ timeout: 15_000 })
+        if ((await juno.topic.divider.count()) > 0) await juno.topic.jumpToLatest()
         await juno.topic.expectAtBottom()
         await juno.sidebar.row(title).expectRead()
       }
