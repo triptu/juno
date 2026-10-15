@@ -1,6 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import { useState } from 'react'
 import { colors, hues, motion, radii, sizes, weights } from '@juno/tokens/tokens.stylex'
+import { tileSizes } from './internal/tileSizes'
 import { hueForId, hueNames, type HueName } from './internal/hue'
 
 export { hueForId, hueNames, type HueName }
@@ -50,7 +51,7 @@ export function Avatar({ kind = 'person', label, name, size = 32, hue = 'rose', 
       aria-label={name}
       aria-hidden={name ? undefined : true}
       data-kind={kind}
-      {...stylex.props(styles.base, sizeStyles[size], hueStyles[hue], ring && rings[ring])}
+      {...stylex.props(styles.base, tileSizes[size], hueStyles[hue], ring && rings[ring])}
     >
       {label}
       {showImage ? (
@@ -107,16 +108,6 @@ const rings = stylex.create({
   background: { boxShadow: `0 0 0 ${sizes['--avatar-ring']} ${colors['--background']}` },
   subtle: { boxShadow: `0 0 0 ${sizes['--avatar-ring']} ${colors['--background-subtle']}` },
   surface: { boxShadow: `0 0 0 ${sizes['--avatar-ring']} ${colors['--surface-default']}` },
-})
-
-const sizeStyles = stylex.create({
-  44: { width: sizes['--tile-44'], height: sizes['--tile-44'], fontSize: sizes['--initials-44'] },
-  36: { width: sizes['--tile-36'], height: sizes['--tile-36'], fontSize: sizes['--initials-36'] },
-  32: { width: sizes['--avatar-32'], height: sizes['--avatar-32'], fontSize: sizes['--initials-32'] },
-  28: { width: sizes['--avatar-28'], height: sizes['--avatar-28'], fontSize: sizes['--initials-28'] },
-  24: { width: sizes['--avatar-24'], height: sizes['--avatar-24'], fontSize: sizes['--initials-24'] },
-  20: { width: sizes['--avatar-20'], height: sizes['--avatar-20'], fontSize: sizes['--initials-20'] },
-  18: { width: sizes['--avatar-18'], height: sizes['--avatar-18'], fontSize: sizes['--initials-18'] },
 })
 
 // Background: the avatar mix of the hue over the surface. Foreground: the

@@ -16,7 +16,8 @@ Juno as the agent's host. It runs inside the engine and serves the whole AgentHo
 | `host.outbox.send` | A single-attempt Slack send (below). Fails with `unsupported` while writes are disabled, the default for embedders. The desktop app enables them through the guarded dispatcher |
 | `host.outbox.cancel` | Before any send: records the authorization as cancelled, and a later send fails with reason `cancelled`. In flight: `cancel-requested`. Settled: the recorded result |
 | `host.outbox.reconcileSend` | Asks Slack for the send. `found` only on positive evidence; otherwise `unknown` |
-| `host.topics.resolve` | `unsupported`: Juno has no resolve command yet (M3) |
+| `host.topics.resolve` | Tier 3 approved local resolve, through the user's topic command. One transaction stores the batch and its Undo; repeated dispatch returns the original result, even after Undo |
+| `host.topics.undoResolve` | Restores the recorded topic overlays and unread state once, for the signed-in account |
 | `host.notification.deliver` | `unsupported`: Juno has no OS notifier yet (M10) |
 
 ## Single-attempt sends
@@ -46,3 +47,5 @@ The sidebar view routes (`host.views.*`) enforce the same account check and
 forward to the engine's shared sheet commands. They are local settings, so
 `writes: disabled` does not disable them. `host.slack.channels` reads only the
 cached channel directory, with a paginated name glob.
+
+Resolve is local to Juno, available with Slack writes disabled. Its mark-read step uses the same read-mirroring preference as the user command. It never unfollows or posts a Slack message.

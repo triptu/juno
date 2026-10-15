@@ -20,9 +20,9 @@ import { NotFound, NotSignedIn, type EngineConfig as Config, type CommandResult,
 import { compareTs, manualTitleAfterRename, parseTopicId, type ParsedTopicId, type Ts } from '@juno/domain'
 import { StoreWriter, transaction, type Invalidation, type SqlError } from '@juno/store'
 import { patchOverlay, readOverlay, setIgnored } from '@juno/sync'
-import { EngineConfig } from '../config'
-import { markReadStep, markUnreadStep, type Marked } from '../marks'
-import { Workspace } from '../workspace'
+import { EngineConfig } from './config'
+import { markReadStep, markUnreadStep, type Marked } from './marks'
+import { Workspace } from './workspace'
 
 type Step = (topic: ParsedTopicId, config: Config, now: number) => Effect.Effect<Marked | 'missing', SqlError, StoreWriter | Invalidation>
 

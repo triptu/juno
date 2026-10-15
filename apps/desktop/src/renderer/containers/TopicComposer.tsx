@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type Ref } from 'react'
 import { audienceCheck, type SendTarget, type TopicDetail } from '@juno/contract'
 import { aiAssistOnAtom, checkMessage, draftAtom, precheckMessage, registry, saveDraft, sendMessage, showToast } from '@juno/state'
+import { mark } from '@juno/state/perf'
 import { useAtomValue } from '@juno/state/react'
 import { AudienceWarning, Composer, ComposerSlot } from '@juno/views'
 import { takeAttachments, useAttachments } from './attachments'
@@ -149,6 +150,7 @@ function LoadedComposer({ detail, initial, placeholder, onSent, handle, onArrowU
     onSent()
     const target: SendTarget = { kind: 'channel', ...(to.kind === 'here' ? here : { channelId: detail.channel.id, threadTs: to.threadTs }) }
     void sendMessage(registry, target, body, id, attached.ids).then((exit) => {
+      if (exit._tag === 'Success') mark('juno.send-queued', undefined, { replace: true })
       if (exit._tag === 'Failure') {
         // Nothing was queued: the text and the files come back so they can be sent again.
         setText((current) => (current === '' ? body : current))
@@ -178,6 +180,7 @@ function LoadedComposer({ detail, initial, placeholder, onSent, handle, onArrowU
     setWaiting(true)
     void checkMessage(registry, here, text).then((found) => {
       if (checking.current !== token) return
+      mark('juno.send-checked', undefined, { replace: true })
       stopChecking()
       const outcome = afterCheck(text, found)
       // The send measure is Enter to the pending row; a bar ends it without one.

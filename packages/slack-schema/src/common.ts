@@ -85,9 +85,6 @@ export type ErrorResponse = typeof ErrorResponse.Type
 /** `{ ok: true, ...fields }`. */
 export const okResponse = <const F extends S.Struct.Fields>(fields: F) => S.Struct({ ok: S.Literal(true), ...fields })
 
-/** `{ ok: true, ...fields } | { ok: false, error }`. */
-export const response = <const F extends S.Struct.Fields>(fields: F) => S.Union([okResponse(fields), ErrorResponse])
-
 /** Errors the official client never retries. Any of these means the session is unusable. */
 export const FatalAuthErrors = [
   'invalid_auth',

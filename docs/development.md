@@ -57,8 +57,9 @@ Copy `.env.example` to `.env` for local secrets. `.env` is ignored by git.
 ## Codebase health
 
 Run `pnpm health` for a summary and the largest clone pairs, files, and functions.
-It runs separately from lint, does not take the heavy-job lock, and always exits successfully.
-Findings and tool errors are report-only. These checks become blocking once the existing findings are cleaned up.
+`pnpm lint` runs the same scan with `--check` against `health-baseline.json`.
+Knip and jscpd run concurrently; neither uses a cached result. Health scans do not
+need the heavy-job lock. Tool errors fail both reporting and lint.
 
 - **Knip** checks unused files, value exports, type exports, dependencies, and unlisted dependencies across all workspaces, scripts, and test entries. `pnpm health:knip` prints every finding. Private package exports are included, so a barrel export with no consumers is a finding even if its implementation is used internally.
 - **jscpd** checks `packages/*/src` and `apps/*/src`, including fixtures and CSS. Clones need at least 100 tokens and eight lines. Comments and whitespace do not count as matching tokens. The percentage is duplicated lines divided by scanned source lines. `pnpm health:clones` writes the full clone report.
@@ -66,7 +67,38 @@ Findings and tool errors are report-only. These checks become blocking once the 
 
 `.juno-status/health.json` contains a timestamp, counts, duplication percentage, top offenders, and full Knip and size findings. `complete: false`, a null count, and an `errors` entry mean a tool failed, not that it found zero issues. Each external tool has a 20-second timeout. Raw reports are in `.juno-status/knip-report.json` and `.juno-status/jscpd-report.json`; all reports are gitignored.
 
-Knip exceptions are commented in `knip.config.mjs`. Fontsource dependencies are loaded by CSS `@import`, which Knip does not parse. Babel loads `babel-plugin-react-compiler` by a string in both Vite configs. The default exports of the Knip and electron-vite configs are tool entry points. The icon script resolves Playwright through desktop's manifest with `createRequire`, where it is declared. Exports used inside their own module are omitted because that code is live; unused barrel re-exports remain visible. No source files or existing findings are excluded.
+Knip exceptions are commented in `knip.config.mjs`. Fontsource dependencies are loaded by CSS `@import`, which Knip does not parse. Babel loads `babel-plugin-react-compiler` by a string in both Vite configs. The default exports of the Knip and electron-vite configs are tool entry points. The icon script resolves Playwright through desktop's manifest with `createRequire`, where it is declared. Exports used inside their own module are omitted because that code is live; unused barrel re-exports remain visible. Playwright's alternate configs, packaging hooks, agent evals and benchmarks, research spike scripts,
+and the engine's compile-time body compatibility check are explicit entries. The `tracking`
+token group is tagged `@public` because `global.css` reads its emitted CSS variables.
+No blanket source exclusion hides unused code.
+
+The baseline caps unused files, exports, types, unused and unlisted dependencies,
+clone pairs and cloned lines, and the two size counts. It also lists each oversized
+file and function, so removing one does not allow a different oversized item.
+Function identities use enclosing names and call labels, with an occurrence number
+for otherwise identical callbacks; moving lines or editing a body preserves the id.
+Renaming a function or changing a test label may require a reviewed baseline update.
+Existing oversized functions are allowed to grow; new functions over 80 lines are not.
+
+On 2026-10-15, five alternating warm runs on the same cleaned Mac worktree took
+0.63 s median for the previous lint command (0.54–0.73 s) and 2.86 s with health
+(2.59–3.37 s): about 2.23 s added. Every run completed all checks successfully;
+Knip and jscpd scanned the source each time. This measures local scan overhead,
+not app performance; timings vary with machine load.
+
+To change the baseline deliberately, first run `pnpm health` and inspect the full
+reports. Fix false positives with a narrow, explained Knip entry or annotation.
+Then run `pnpm health:baseline`, review `git diff -- health-baseline.json`, and commit
+it with the change and its reason. This command records current counts and lists,
+including improvements. It refuses to record a failed scan. Do not hand-edit counts
+to hide a tool failure. `pnpm test:health` checks regression detection and stable
+function identities through the shared heavy-job queue.
+
+The engine/agent runner clone remains: neither package may import the other, and
+transport implementations do not belong in their schema-only contracts. Sharing it
+needs a separate architecture decision. The maintenance pass deliberately leaves
+`TopicView.tsx`, `JunoChat.tsx`, `agent/src/router/*`, composer code, and
+`apps/desktop/e2e/perf.spec.ts` as future split candidates.
 
 ## Layout
 

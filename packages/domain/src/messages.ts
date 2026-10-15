@@ -16,5 +16,3 @@ export function startsGroup(prev: GroupMessage | undefined, next: GroupMessage):
 export function threadLinkLabel(replyCount: number): string {
   return replyCount <= 0 ? 'Thread' : replyCount === 1 ? '1 reply' : `${replyCount} replies`
 }
-
-export { mainLabel } from './channel'

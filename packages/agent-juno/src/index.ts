@@ -1,5 +1,5 @@
 export { agentHostHandlers, type HandlerOptions } from './handlers'
-export { proves, SLACK_SEND_TOOL } from './dispatch'
+
 export {
   JunoHost,
   type Account,

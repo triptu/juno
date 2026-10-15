@@ -35,19 +35,6 @@ export type ChatPostMessageArgs = typeof ChatPostMessageArgs.Type
 
 export const ChatPostMessageFields = { channel: S.String, ts: Ts, message: Message } as const
 
-/** `chat.postMessage` errors the official client handles specially. */
-export const PostMessageErrors = [
-  'message_limit_exceeded',
-  'ekm_access_denied',
-  'dlp_user_warning',
-  'message_send_ratelimit',
-  'msg_too_long',
-  'no_text',
-  'is_archived',
-  'not_in_channel',
-  'channel_not_found',
-] as const
-
 // chat.update
 
 export const ChatUpdateArgs = S.Struct({

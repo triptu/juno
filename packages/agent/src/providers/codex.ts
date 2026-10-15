@@ -17,7 +17,6 @@ export interface CodexOptions {
   /** The installed local CLI; startFakeCodex().path in tests. */
   readonly executable: string
 }
-export type CodexStatus = 'signedIn' | 'signedOut' | 'missing'
 export type CodexResult = { readonly kind: 'done'; readonly text: string; readonly threadId: string | null }
   | { readonly kind: 'failed'; readonly failure: ProviderFailure; readonly threadId: string | null }
 
