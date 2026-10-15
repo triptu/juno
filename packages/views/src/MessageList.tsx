@@ -55,6 +55,7 @@ export interface MessageListProps {
   /** The hover toolbar's actions, created once. Without them rows have no toolbar (a preview). */
   readonly actions?: MessageActions
   /** The row whose toolbar asks to confirm a delete. */
+  readonly activeMessage?: string | undefined
   readonly confirmingDelete?: string | undefined
   /** The row being edited, and its inline edit field. */
   readonly editing?: { readonly ts: string; readonly editor: ReactNode } | undefined
@@ -161,6 +162,7 @@ export function MessageList({
   anchorRef,
   hueOf = hueForId,
   actions,
+  activeMessage,
   confirmingDelete,
   editing,
   onRowKey,
@@ -226,6 +228,7 @@ export function MessageList({
                 tabbable={item.message.ts === tabbable}
                 hueOf={hueOf}
                 actions={actions}
+                active={activeMessage === item.message.ts}
                 confirmingDelete={confirmingDelete === item.message.ts}
                 editor={editing?.ts === item.message.ts ? editing.editor : undefined}
                 onOpenThread={onOpenThread}

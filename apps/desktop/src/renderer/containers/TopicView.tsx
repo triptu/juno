@@ -624,6 +624,7 @@ function Topic({ id, detail, readOnly = false, underHeader = true }: TopicProps)
             onDiscard: discard,
             onMessageMenu: messageActions.onMessageMenu,
             actions: messageActions.actions,
+            activeMessage: messageActions.activeMessage,
             confirmingDelete: messageActions.confirmingDelete,
             editing: messageActions.editing,
             onRowKey: messageActions.onRowKey,
