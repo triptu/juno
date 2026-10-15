@@ -2,6 +2,8 @@
  * Word rules per task. Each returns the raw arguments the model would have put
  * in the tool call; the provider validates them like any other output.
  */
+import type { FollowUpsInput } from '../tasks/followUps'
+import type { HomeTitleInput } from '../tasks/homeTitle'
 import type { ParseCommandInput } from '../tasks/parseCommand'
 import type { RouteCheckInput } from '../tasks/routeCheck'
 import type { SettledScoreInput } from '../tasks/settledScore'
@@ -73,6 +75,37 @@ export function fakeParseCommand(input: ParseCommandInput): unknown {
   }
   if (ASK.test(text)) return { command: { kind: 'ask', prompt: text }, confidence: 0.8 }
   return { command: null, confidence: 0.9 }
+}
+
+/** "I'll send Rina the scorecard." from the user, with nothing after it saying done, is "You said you'd send Rina the scorecard". */
+const PROMISE = /\b(?:I'll|I will|I can|let me)\s+(.+?)[.!]*$/i
+
+export function fakeFollowUps(input: FollowUpsInput): unknown {
+  const found: Array<{ messageId: string; text: string }> = []
+  input.messages.forEach((message, index) => {
+    if (message.fromMe !== true) return
+    const promise = PROMISE.exec(message.text.replace(/\s+/g, ' ').trim())
+    if (!promise?.[1]) return
+    const kept = input.messages.slice(index + 1).some((later) => later.fromMe === true && CLOSING.test(later.text))
+    if (!kept) found.push({ messageId: message.id, text: `You said you'd ${promise[1]}`.slice(0, 120) })
+  })
+  return { followUps: found.slice(-3) }
+}
+
+/** The latest message from someone else, stripped of mentions: what the title line is about. */
+export function fakeHomeTitle(input: HomeTitleInput): unknown {
+  const last = input.messages.findLast((message) => message.fromMe !== true)
+  if (!last) return { title: input.title, confident: false }
+  const about = sentenceCase(firstWords(firstSentence(last.text.replace(/<@[^>]+>/g, '').trim()), 8))
+  const who = firstName(last.sender)
+  switch (input.kind) {
+    case 'waiting':
+      return { title: `${who} asks: ${about}`, confident: true }
+    case 'resume':
+      return { title: `Pick up where you left off: ${who} says ${about.charAt(0).toLowerCase()}${about.slice(1)}`, confident: true }
+    case 'moved':
+      return { title: `${input.title} grew ${input.newCount} replies`, confident: true }
+  }
 }
 
 export function fakeTitle(input: TitleTopicInput): string {

@@ -1,8 +1,13 @@
-/** The All topics page: status chips with counts, filters, sort and text filter (spec section 11). */
+/**
+ * The All topics page (spec section 11): status chips with counts, the kind
+ * and place filters and the sort, as a pure rule. The engine runs the same
+ * rule in SQL over the whole index (`engine/src/topics/allTopics.ts`); an
+ * engine test holds the two together. The text filter is not here: it is a
+ * full-text search the engine runs over titles and messages.
+ */
 import type { ChannelId } from './ids'
 import { byLatestActivity, matchesKind, type KindFilter } from './sidebar'
 import { allTopicsStatus, showsInAllTopics, type AllTopicsStatus } from './status'
-import { resolveTitle } from './title'
 import type { RuleContext, Topic } from './topic'
 
 export type StatusChip = 'all' | AllTopicsStatus
@@ -13,8 +18,6 @@ export interface AllTopicsFilter {
   readonly kind: KindFilter
   readonly scope?: ChannelId
   readonly sort: AllTopicsSort
-  /** Matched against title and preview text, case-insensitive. */
-  readonly query?: string
 }
 
 export const defaultAllTopicsFilter: AllTopicsFilter = { status: 'all', kind: 'all', sort: 'recent' }
@@ -34,16 +37,8 @@ export interface AllTopicsCounts {
 
 export interface AllTopicsList {
   readonly rows: ReadonlyArray<AllTopicsRow>
-  /** Counts after the kind, scope and text filters, before the status chip. */
+  /** Counts after the kind and scope filters, before the status chip. */
   readonly counts: AllTopicsCounts
-}
-
-function matchesQuery(topic: Topic, query: string): boolean {
-  const q = query.trim().toLowerCase()
-  if (q.length === 0) return true
-  if (resolveTitle(topic).text.toLowerCase().includes(q)) return true
-  const preview = topic.preview
-  return preview !== undefined && `${preview.sender}: ${preview.text}`.toLowerCase().includes(q)
 }
 
 export function sortRows(rows: ReadonlyArray<AllTopicsRow>, sort: AllTopicsSort): AllTopicsRow[] {
@@ -64,7 +59,6 @@ export function allTopicsList(topics: ReadonlyArray<Topic>, filter: AllTopicsFil
     if (!showsInAllTopics(topic)) continue
     if (!matchesKind(topic, filter.kind)) continue
     if (filter.scope !== undefined && topic.channel.id !== filter.scope) continue
-    if (filter.query !== undefined && !matchesQuery(topic, filter.query)) continue
     const status = allTopicsStatus(topic, ctx)
     counts.all++
     counts[status]++

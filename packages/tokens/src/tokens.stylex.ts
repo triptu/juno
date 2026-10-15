@@ -554,6 +554,13 @@ export const text = stylex.defineVars({
   '--text-display-leading': '1.1',
   '--text-display-tracking': '0',
 
+  // Home's greeting: "Morning, Tushar."
+  '--text-greeting-family': fonts['--font-serif'],
+  '--text-greeting-size': '36px',
+  '--text-greeting-weight': '400',
+  '--text-greeting-leading': '1.15',
+  '--text-greeting-tracking': '0',
+
   // "Nothing open"
   '--text-empty-title-family': fonts['--font-serif'],
   '--text-empty-title-size': '30px',
@@ -689,7 +696,14 @@ export const layout = stylex.defineVars({
   '--thumb-max-width': '360px',
   '--thumb-max-height': '280px',
   '--search-field-width': '260px',
+  // The All topics table (inventory 10): topic, where, status, messages,
+  // updated. Under the minimum width (the columns' minimums, their gaps and
+  // the row and table padding) the table scrolls sideways.
+  '--all-topics-columns': 'minmax(200px, 1fr) minmax(0, 150px) 104px 44px 84px',
+  '--all-topics-table-min': '576px',
   '--keyword-field-width': '160px',
+  // Home's column: the item rows and the Ask Juno field.
+  '--home-width': '480px',
   '--page-width-narrow': '680px',
   '--page-width': '720px',
   '--page-width-settings': '760px',

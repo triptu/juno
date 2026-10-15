@@ -432,6 +432,8 @@ export class Juno {
   readonly tabs: TabStrip
   readonly nav: Navigation
   readonly frame: SidebarFrame
+  readonly allTopics: AllTopicsPane
+  readonly home: HomePane
   readonly peek: PeekPopover
 
   constructor(app: ElectronApplication, win: Page) {
@@ -445,6 +447,8 @@ export class Juno {
     this.tabs = new TabStrip(app, win)
     this.nav = new Navigation(app, win)
     this.frame = new SidebarFrame(app, win)
+    this.allTopics = new AllTopicsPane(win)
+    this.home = new HomePane(win)
     this.peek = new PeekPopover(win)
   }
 
@@ -495,9 +499,9 @@ export class Juno {
     return this.app.evaluate(() => [...(globalThis as unknown as { junoTest: { slackLinks: string[] } }).junoTest.slackLinks])
   }
 
-  /** The empty workspace shown when no tab is open. */
+  /** Home, which the workspace shows when no tab is open. */
   async expectNothingOpen(): Promise<void> {
-    await expect(this.win.getByText('Nothing open yet', { exact: true })).toBeVisible()
+    await this.home.expectShown()
   }
 
   /**
@@ -580,8 +584,12 @@ export class Juno {
   async waitForSync(): Promise<void> {
     await this.sidebar.expectRows()
     await this.expectEngineLive()
-    // Park the pointer and the focus on the empty workspace.
-    await this.win.mouse.click(900, 400)
+    // Park the pointer and the focus on the workspace. With no tab open that is Home, whose rows sit
+    // where a blind click would land, so wait for it and click its greeting, which does nothing.
+    const tabOpen = this.win.getByRole('tablist').getByRole('tab', { selected: true })
+    await expect(this.home.greeting.or(tabOpen).first()).toBeVisible()
+    if (await this.home.greeting.isVisible()) await this.home.greeting.click()
+    else await this.win.mouse.click(900, 400)
   }
 
   /** Switches the theme from the account menu and waits for the page to follow. */
@@ -724,6 +732,175 @@ export type TopicMenuItem =
   | 'ignore-channel'
 
 /** The topic shown in the active tab. Hidden tabs stay in the page with `display: none`. */
+export type AllTopicsChipName = 'All' | 'Open' | 'Resolved' | 'Quiet' | 'Unfollowed'
+
+/** One row of the All topics table, found by the start of its title. */
+export class AllTopicsRow {
+  readonly root: Locator
+
+  constructor(
+    readonly win: Page,
+    readonly title: string,
+  ) {
+    this.root = win.locator('[data-all-topics-row]').filter({ has: win.locator('[data-row-title]', { hasText: new RegExp(`^${escapeRegExp(title)}`) }) })
+  }
+
+  /**
+   * The table is a virtual list: only the rows near the viewport are in the
+   * page. Scrolls it from the top, a screen at a time, until the row is
+   * drawn; false when the whole list has no such row.
+   */
+  async reveal(): Promise<boolean> {
+    const table = this.win.locator('[data-all-topics-table]')
+    await table.evaluate((node) => {
+      node.scrollTop = 0
+    })
+    for (;;) {
+      await settle(table)
+      if ((await this.root.count()) > 0) {
+        await this.root.scrollIntoViewIfNeeded()
+        return true
+      }
+      if (!(await pageDown(table))) return false
+    }
+  }
+
+  async expectVisible(): Promise<void> {
+    await expect.poll(() => this.reveal(), { timeout: 10_000 }).toBe(true)
+  }
+
+  async expectAbsent(): Promise<void> {
+    await expect.poll(() => this.reveal(), { timeout: 10_000 }).toBe(false)
+  }
+
+  /** The status chip in the row: Open, Resolved, Quiet or Unfollowed. */
+  async expectStatus(status: Exclude<AllTopicsChipName, 'All'>): Promise<void> {
+    await expect.poll(async () => ((await this.reveal()) ? this.root.getByRole('gridcell').nth(2).textContent() : null), { timeout: 10_000 }).toBe(status)
+  }
+
+  async expectWhere(name: string): Promise<void> {
+    await this.expectVisible()
+    await expect(this.root.getByRole('gridcell').nth(1)).toHaveText(name)
+  }
+
+  /** Opens the topic with the mouse (rows activate on mouse down); with `newTab`, ⌘-click. */
+  async open({ newTab = false }: { readonly newTab?: boolean } = {}): Promise<void> {
+    await this.expectVisible()
+    const box = await this.root.boundingBox()
+    if (!box) throw new Error(`All topics row "${this.title}" is not on screen`)
+    await this.win.mouse.move(box.x + 40, box.y + box.height / 2)
+    if (newTab) await this.win.keyboard.down('Meta')
+    await press(this.win)
+    if (newTab) await this.win.keyboard.up('Meta')
+  }
+
+  /** Right-click, then `item` in the topic menu. Returns the menu's labels. */
+  async chooseInMenu(item: TopicMenuItem): Promise<{ readonly labels: string[]; readonly at: { readonly x: number; readonly y: number } | null }> {
+    await this.expectVisible()
+    await chooseNextMenuItem(this.win, item)
+    await this.root.click({ button: 'right', position: { x: 40, y: 20 } })
+    return lastMenu(this.win)
+  }
+}
+
+/** Two frames for the virtual table to draw the rows a scroll brought in, then until no row on screen waits for its window. */
+async function settle(table: Locator): Promise<void> {
+  await table.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
+  await expect.poll(() => table.locator('[aria-busy="true"]').count(), { timeout: 5_000 }).toBe(0)
+}
+
+/** Scrolls the table down most of a screen; false at the end. */
+function pageDown(table: Locator): Promise<boolean> {
+  return table.evaluate((node) => {
+    const before = node.scrollTop
+    node.scrollTop += Math.floor(node.clientHeight * 0.8)
+    return node.scrollTop !== before
+  })
+}
+
+/** The All topics page (spec section 11): the status chips, the three selects, the text filter and the table. */
+export class AllTopicsPane {
+  constructor(readonly win: Page) {}
+
+  get navItem(): Locator {
+    return this.win.getByRole('navigation', { name: 'Pages' }).getByRole('button', { name: 'All topics' })
+  }
+
+  get table(): Locator {
+    return this.win.getByRole('grid', { name: 'All topics' })
+  }
+
+  get search(): Locator {
+    return this.win.getByRole('textbox', { name: 'Filter topics' })
+  }
+
+  /** Opens the page from the sidebar's All topics item and waits for its rows. */
+  async open(): Promise<void> {
+    await this.navItem.click()
+    await expect(this.table).toBeVisible()
+  }
+
+  row(title: string): AllTopicsRow {
+    return new AllTopicsRow(this.win, title)
+  }
+
+  chip(name: AllTopicsChipName): Locator {
+    return this.win.getByRole('group', { name: 'Status' }).getByRole('button', { name: new RegExp(`^${name} \\d+$`) })
+  }
+
+  async filterStatus(name: AllTopicsChipName): Promise<void> {
+    await this.chip(name).click()
+    await expect(this.chip(name)).toHaveAttribute('aria-pressed', 'true')
+  }
+
+  /** The count after a chip's label. */
+  async expectCount(name: AllTopicsChipName, count: number): Promise<void> {
+    await expect(this.chip(name)).toHaveText(`${name}${count}`)
+  }
+
+  async filterKind(label: 'Channels and DMs' | 'Channels' | 'DMs'): Promise<void> {
+    await this.win.getByRole('combobox', { name: 'Kind' }).selectOption({ label })
+  }
+
+  /** The place select: "Anywhere", "#eng", "Maya Chen". */
+  async filterPlace(label: string): Promise<void> {
+    await this.win.getByRole('combobox', { name: 'Where' }).selectOption({ label })
+  }
+
+  async sort(label: 'Most recent' | 'Oldest first' | 'Most messages'): Promise<void> {
+    await this.win.getByRole('combobox', { name: 'Sort' }).selectOption({ label })
+  }
+
+  async type(text: string): Promise<void> {
+    await this.search.fill(text)
+  }
+
+  /** Every row's title in list order, read by scrolling the virtual table from top to bottom. */
+  async titles(): Promise<string[]> {
+    const table = this.table
+    const byIndex = new Map<number, string>()
+    await table.evaluate((node) => {
+      node.scrollTop = 0
+    })
+    do {
+      await settle(table)
+      const seen = await table
+        .locator('[data-all-topics-row]')
+        .evaluateAll((nodes) => nodes.map((node) => [Number(node.getAttribute('aria-rowindex')), node.querySelector('[data-row-title]')?.textContent ?? ''] as const))
+      for (const [index, title] of seen) byIndex.set(index, title)
+    } while (await pageDown(table))
+    return [...byIndex].toSorted((a, b) => a[0] - b[0]).map(([, title]) => title)
+  }
+
+  async expectEmpty(): Promise<void> {
+    await expect(this.win.getByText('No topics match these filters.')).toBeVisible()
+  }
+
+  async clearFilters(): Promise<void> {
+    await this.win.getByRole('button', { name: 'Clear filters' }).click()
+  }
+}
+
 /** A New chat tab: the two pickers, the composer and the preview (spec section 9). */
 export class NewChatPane {
   readonly root: Locator
@@ -1344,5 +1521,65 @@ export class SidebarFrame {
   /** View › Hide Sidebar's label, which names what it will do. */
   async menuLabel(): Promise<string | undefined> {
     return this.app.evaluate(({ Menu }) => Menu.getApplicationMenu()?.getMenuItemById('toggle-sidebar')?.label)
+  }
+}
+
+export type HomeItemKind = 'waiting' | 'resume' | 'moved' | 'followUp' | 'tidyUp'
+
+/** Home (SPEC section 12): the greeting, the rows and the Ask Juno field, in the visible page. */
+export class HomePane {
+  constructor(readonly win: Page) {}
+
+  get root(): Locator {
+    return this.win.locator('[data-home]:not([data-home-waiting])').filter({ visible: true })
+  }
+
+  get greeting(): Locator {
+    return this.root.getByRole('heading', { level: 2 })
+  }
+
+  async expectShown(): Promise<void> {
+    await expect(this.greeting).toBeVisible()
+  }
+
+  /** The sidebar's Home item. */
+  get navItem(): Locator {
+    return this.win.getByRole('navigation', { name: 'Pages' }).getByRole('button', { name: 'Home' })
+  }
+
+  /** Opens Home from the sidebar, which reads the items afresh. */
+  async open(): Promise<void> {
+    await this.navItem.click()
+    await this.expectShown()
+  }
+
+  item(kind: HomeItemKind): Locator {
+    return this.root.locator(`[data-home-item="${kind}"]`)
+  }
+
+  title(kind: HomeItemKind): Locator {
+    return this.item(kind).locator('[data-home-title]')
+  }
+
+  meta(kind: HomeItemKind): Locator {
+    return this.item(kind).locator('[data-home-meta]')
+  }
+
+  /** The kinds shown, top to bottom. */
+  kinds(): Promise<string[]> {
+    return this.root.locator('[data-home-item]').evaluateAll((rows) => rows.map((row) => row.getAttribute('data-home-item') ?? ''))
+  }
+
+  /** Clicks a row's link, which opens its topic. */
+  async openItem(kind: HomeItemKind): Promise<void> {
+    await this.item(kind).getByRole('link').click()
+  }
+
+  button(kind: HomeItemKind, name: 'Mark done' | 'Resolve all'): Locator {
+    return this.item(kind).getByRole('button', { name })
+  }
+
+  get ask(): Locator {
+    return this.root.getByRole('button', { name: 'Ask Juno' })
   }
 }

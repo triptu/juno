@@ -377,22 +377,24 @@ A tab with the message list's area on top and the composer at the bottom, like a
 
 **Shows:** S09, shot 40b (Resolved filter), shot 40c (empty), shot 64 (dark).
 
+[built] `containers/AllTopics.tsx` (a lazy chunk) over the `AllTopics` view; the gallery has its states. Text sizes come from the nearest type roles: the title is `bodySmall` (14), the preview `meta` (12.5), where and the numbers `ui` (13.5).
+
 - Header: padding `32 40 16`, gap 18, border-bottom 1px `--border-subtle`. Title "All topics" serif 32 lh 1.1; sub "Everything you're part of, including quiet, resolved and unfollowed topics." 13 muted. Right: search field 260×34, radius 8, 1px `--input-border`, `search` 14 muted, placeholder "Filter by title or message", 13px. Wraps under the title on narrow windows.
-- Filter row (gap 2, wraps): status chips 28px radius 7 padding 0 10 13/500 with the count in 400 muted: **All 21 · Open 15 · Resolved 1 · Quiet 4 · Unfollowed 1**. Selected bg `--secondary-default` fg default; others transparent muted. Right: three selects 30px, radius 7, 1px `--input-border`, bg surface, 13px: "Channels and DMs | Channels | DMs", "Anywhere | #eng | … | Maya Chen", "Most recent | Oldest first | Most messages". [proposed] native `<select>` is fine on macOS.
-- Table: padding `4 28 40`, horizontal scroll on narrow windows. Grid `minmax(200px,1fr) minmax(0,150px) 104px 44px 84px`, gap 16. Header row 11/500 uppercase 0.06em muted, padding 10 12: TOPIC · WHERE · STATUS · MSGS (right) · UPDATED (right).
-- Row: `role="button"`, min-height 52, padding 8 12, radius 8, border-bottom 1px `--border-subtle`, hover `--surface-hover`, gap 1 between lines.
-  - Topic: title 14 (600 unread, else 500) ellipsis + Main tag + `pin` 12 muted if pinned; preview "Sender: text" 12.5 muted ellipsis.
+- Filter row (gap 2, wraps): status chips 28px radius 7 padding 0 10 13/500 with the count in 400 muted: **All 21 · Open 15 · Resolved 1 · Quiet 4 · Unfollowed 1**. Selected bg `--secondary-default` fg default; others transparent muted. Right: three selects 30px, radius 7, 1px `--input-border`, bg surface, 13px: "Channels and DMs | Channels | DMs", "Anywhere | #eng | … | Maya Chen" (the conversations of the kind that have topics, channels then DMs, by name; a new kind drops a place of the other kind), "Most recent | Oldest first | Most messages". Native `<select>`. The text filter finds words in titles and in any message of a topic, each word a prefix.
+- Table: padding `4 28 40`, horizontal scroll on narrow windows (under `--all-topics-table-min`, 576px). Grid `minmax(200px,1fr) minmax(0,150px) 104px 44px 84px` (`--all-topics-columns`), gap 16. The header row is sticky. A virtual list (performance 3.5): rows the engine has not sent yet are placeholders with the row's geometry. Header row 11/500 uppercase 0.06em muted, padding 10 12: TOPIC · WHERE · STATUS · MSGS (right) · UPDATED (right).
+- Row: `role="row"` in a `grid` with `aria-rowindex`, height 52, padding 8 12, radius 8, border-bottom 1px `--border-subtle`, hover `--surface-hover`. ↑ and ↓ move between rows (roving tabindex), Enter opens.
+  - Topic: title 14 (600 unread, else 500) ellipsis, a Main row's title is its channel label ("#eng") + Main tag + `pin` 12 muted if pinned; preview "Sender: text" 12.5 muted ellipsis. Rename from the menu turns the title into the rename field, as on a sidebar row.
   - Where: channel icon 13 + name, 13 subtle.
   - Status chip 22px, padding 0 8, radius 6, 12/500: Open (`--secondary-default` / subtle), Resolved (success tint), Quiet and Unfollowed (transparent, muted).
   - Msgs 13 subtle tabular right; Updated 13 muted tabular right ("3m", "1h", "Yesterday").
-- Click opens (⌘-click new tab); right-click gives the row context menu, so Reopen and Notify me (following again) happen here. Empty: "No topics match these filters." centered 13 muted, padding 48.
-- Status definition: resolved → Resolved; a thread set to Never (not followed in Slack) → Unfollowed; older than the quiet window and not pinned/unread → Quiet; else Open. Ignored channels are excluded.
+- Click opens (⌘-click new tab); right-click gives the row context menu, so Reopen and Notify me (following again) happen here. Empty: "No topics match these filters." with the `nothing-here` illustration and Clear filters, which resets the chips, selects and text.
+- Status definition: resolved → Resolved; a thread set to Never (not followed in Slack) → Unfollowed; older than the quiet window and not pinned/unread → Quiet; else Open. A thread Slack never said anything about (never followed) is Open. Ignored channels are excluded; archived channels the user is in are listed.
 
 ## 11. Home
 
 **Shows:** `docs/design/home/` (layout A; `home-variants-*.png`, `in-context-*.png`). SPEC §12 decides behaviour; the home README has the copy, scene rules, ranking and sizes.
 
-- Opens from the sidebar's Home item as a singleton tab (`house`), and shows without a tab when no tab is open. [built] The Home item and the tab work; until the page below is built, Home shows the empty workspace ("Nothing open yet"), from `containers/Home.tsx`. Layout A: scene 120×83, greeting (serif line and sans line), up to three item rows (52px each, fixed-width column), the Ask Juno field.
+- Opens from the sidebar's Home item as a singleton tab (`house`), and shows without a tab when no tab is open. [built] Layout A (`Home` and `HomeScene` in `@juno/views`, `containers/Home.tsx`): scene 120×83, greeting (serif 36 line and sans line), up to three item rows (52px each, in the 480px `--home-width` column; two on a window shorter than 600px), the Ask Juno field (a 40px pill button with ⌘J). A row is the topic's art (40), a title line (13.5/500, one line, ellipsis) and a meta line (12.5 muted: topic title · place · time, or "N new" for Moved a lot); the caret shows on hover and keyboard focus. Until the first sync has finished, Home is blank rather than "All caught up". Ask Juno and "Browse all topics" (caught up) wait for the Juno tab and the All topics page: the button is there and does nothing yet, the link is hidden.
 - Item kinds: Waiting on you, Pick up where you left off, Moved a lot, Follow-up and Tidy up (the last two with AI assist on). The two that came from For you carry one trailing button, 26px ghost 12.5/500, shown on hover and focus in a reserved slot so nothing shifts: **Mark done** (Follow-up; toast "Follow-up done", no Undo) and **Resolve all** (Tidy up; toast "Resolved 3 topics" with Undo). Tidy up's title line reads "3 topics look settled" and its meta line lists their titles (ellipsis); the row itself does not open anything.
 - Everything else from the For you page is gone: the page, its nav count, the Coding agent prompt block, reply starters and reply ideas, and Dismiss.
 
@@ -598,7 +600,7 @@ Right-click a sender's name or avatar in a message, or an @person chip. Notify m
 | Ignored list | "Nothing ignored." | 13 muted | |
 | Thread with no replies (thread link) | "Thread" instead of "N replies" | | |
 
-[spec] Empty states say why and offer one next step; All topics and ⌘K empties in the prototype have no action. [proposed] add "Clear filters" to the All topics empty state.
+[spec] Empty states say why and offer one next step; All topics and ⌘K empties in the prototype have no action. [built] the All topics empty state has "Clear filters".
 
 ## 18. Dark mode
 
