@@ -140,9 +140,7 @@ describe('opening a topic', () => {
     // Before the open the store has nothing: a header from the conversation and no rows, and no call to Slack.
     const bare = await header.until((detail) => detail !== null, 'the header of an unstored thread')
     expect(bare).toMatchObject({ kind: 'thread', title: '#eng', titleSource: 'channel', channel: { id: 'C0ENG', label: '#eng' } })
-    const empty = await list.until(() => true, 'the empty window')
-    expect(empty.order).toEqual([])
-    expect(empty.meta.windowCovered).toBe(false)
+    expect(await list.until(() => true, 'the empty window')).toMatchObject({ order: [], meta: { windowCovered: false } })
     expect(apiCalls(engine)).toHaveLength(0)
 
     expect(valueOf(await openTopic(engine.registry, id)).outcome).toBe('fetched')
@@ -154,8 +152,7 @@ describe('opening a topic', () => {
     ])
     expect(rows.every((row) => row.groupStart)).toBe(true)
     await header.until((detail) => detail?.title === 'Old thread about lag', 'the title from the root')
-    const window = list.current()
-    expect(window.meta.windowCovered).toBe(true)
+    const window = await list.until((value) => value.meta.windowCovered === true, 'history coverage')
     expect(window.refs.people.get('U0MAYA')?.name).toBe('Maya')
 
     // Every reply is stored now: the second open asks only for replies after the newest one.

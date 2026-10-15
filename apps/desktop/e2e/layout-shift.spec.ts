@@ -13,7 +13,7 @@ for (const path of ['topic bottom', 'topic divider', 'Main with threads', 'DM', 
     fake.holdNext({ method: 'conversations.replies', reason: 'open' })
     fake.holdNext({ method: 'conversations.history', reason: 'open' })
     if (path === 'Home') await juno.sidebar.row(POSTGRES).open()
-    const selector = path === 'Home' ? '[data-home] h2' : path === 'All topics' ? '[data-all-topics-table]' : path === 'Juno' ? '[data-juno-header]' : '[data-topic-view] [data-message-row]'
+    const selector = path === 'Home' ? '[data-home-item]' : path === 'All topics' ? '[data-all-topics-row]' : path === 'Juno' ? '[data-juno-header]' : '[data-topic-view] [data-message-row]'
     await expectStableAnchor(win, selector, async () => {
       switch (path) {
         case 'Home':
