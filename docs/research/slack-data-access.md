@@ -156,7 +156,7 @@ Listing conversations
 
 History (`shared`, module with `fetchHistory`/`fetchReplies`, around `determineDefaultHistoryLimit`)
 - `conversations.history` args: `{ channel, limit (default 28), oldest?, latest?, inclusive: true, ignore_replies: true, include_pin_count: true, no_user_profile: true, include_stories: true, include_free_team_extra_messages: true, include_date_joined?, include_tombstones?, cursor?, cached_latest_updates: {[ts]: version} }`. Response: `{ messages, has_more, is_limited, pin_count, channel_actions_count, deleted: Ts[], response_metadata: { next_cursor? }, latest_updates?, unchanged_messages?: Ts[], date_joined? }`.
-- `conversations.replies` args: `{ channel, ts: thread_ts, inclusive: true, limit, oldest?, latest?, cursor?, include_tombstones?, cached_latest_updates }`. Response: `{ messages, has_more, response_metadata, deleted, latest_updates, unchanged_messages }`. First message is the root. Error `thread_not_found` is handled.
+- `conversations.replies` args: `{ channel, ts: thread_ts, inclusive: true, limit, oldest?, latest?, cursor?, include_tombstones?, cached_latest_updates }`. Response: `{ messages, has_more, response_metadata, deleted, latest_updates, unchanged_messages }`. First message is the root, also when `oldest` is after it (observed live 2026-10-15, section 10, "Live probe"). Error `thread_not_found` is handled.
 - `conversations.view` (section 2).
 - Observed live (`conversations.history` with `limit`, `ignore_replies=true`): `{ ok, messages, has_more, pin_count, channel_actions_count, channel_actions_ts (null), response_metadata: { next_cursor } }`. Every message had `type, ts, text, client_msg_id, user`; `blocks` on nearly all, `attachments` on about two thirds, `reactions` on half; roots carry `thread_ts, reply_count, reply_users, reply_users_count, latest_reply, subscribed, is_locked` and sometimes `last_read`; `thread_broadcast` messages carry `root`.
 - `conversations.historyChanges` returns `{ ekm_change_ts }` (enterprise key management only).
@@ -213,7 +213,7 @@ Presence
 - Subscribe over the socket: `{ type: "presence_sub", ids: [userIds] }` (`client-boot`, `sendPresenceSubEvent`). Updates arrive as `presence_change` events (section 4). `presence.set` exists for the self user. No `users.getPresence`.
 
 Files
-- `files.getUploadURL` / `files.completeUpload` (and `files.uploadExternal`, `files.info`, `files.list`, `files.share`) exist in the async vendors chunk. Not read in detail.
+- `files.getUploadURL` / `files.completeUpload` (and `files.uploadExternal`, `files.info`, `files.list`, `files.share`) exist in the async vendors chunk. Not read in detail. The file object on messages, `files.info` and the download auth were observed live (section 10, "Live probe", Files).
 
 Activity / mentions (`boot-async`, `fetchActivityFeed` thunk; fetcher `activityFeedFetcher`)
 - `activity.feed` args: `{ mode: "chrono_v1" | "chrono_unreads" | "priority_unreads_inbox_v1", types: string[], limit: 20, cursor?, archiveOnly, unreadOnly, priorityOnly, channelIds?, channelSectionIds?, excludeAutomations? }`. Also `activity.markRead`, `activity.markUnread`, `activity.markAllRead`, `activity.archive`.
@@ -318,6 +318,7 @@ Observed (`shared`, `DW51` `BaseRequest`, `GGwr` `SlackApiRequest`, `kPEx` API q
 - Response envelope: `{ ok: boolean, error?: string, response_metadata?: { next_cursor?: string, messages?: string[] }, ... }`. Pagination: `cursor`/`next_cursor` for `conversations.history`/`replies` (plus `oldest`/`latest`/`has_more` windows), `marker`/`next_marker` for edge queries, `page`/`cursor` for search, `cursor` for `activity.feed`, `cursor_mark`/`next_cursor_mark` for usergroup search.
 - History fetch loop protection: the client logs an error every 100 history fetches for one channel (`react_messages_loop_fetch`), implying no hard client-side rate limit on history.
 - Socket rate limiting: `error.retry_after` on the socket, backoff capped at 60 s.
+- Live, no Web API call has been rate limited yet: 0 in the 298 calls of the sync dry run and 0 in the 34 of the probe (section 10, "Live probe"). The value a real 429 carries in `Retry-After` is still Unknown.
 
 Inferred
 
@@ -435,7 +436,7 @@ Problems reported by the smoke: 0. Two findings changed code: the socket must no
 - Every item: `channel` (an object with `id`, `name` and the `is_*` flags), `iid`, `team`, and `messages`, an array. The message fields are inside `messages`: `ts`, `text`, `user`, `username`, `permalink`, `iid`, `extracts`, sometimes `attachments` (with a numeric `ts`). No `thread_ts`, no `reply_count`, no `blocks`, no `files`, no reactions in the sample, so a reply's thread is known only from its permalink's `thread_ts` parameter.
 - The flat shape the schema expected (fields on the item) did not decode; `@juno/slack-schema` now decodes both and `searchMatches` flattens them. The fake answers in the live shape.
 
-Not yet measured: whether `is:thread` filters exactly, whether `sort=timestamp` is honoured (the sync relies on it to stop at the gap's start), and whether a root's match ever carries `reply_count`.
+Measured on 2026-10-15 ("Live probe" below): `is:thread` filters exactly, `sort=timestamp` is honoured, and with `extra_message_data=1` every match carries `thread_ts` and roots carry `reply_count`. The run above did not send `extra_message_data`, which is why it saw no `thread_ts`.
 
 ### The sync dry run
 
@@ -459,3 +460,79 @@ What this changed or confirmed:
 - `subscriptions.thread.getView` returned 10 threads per page whatever `limit` said (`limit: 50` here, 20 in the smoke, 10 each time), so paging the followed threads costs one interactive call per 10 threads: 32 calls and about 20 s before the sidebar is complete. Inferred: the page size is capped at 10 server-side. A follow-up could page in parallel or stop earlier.
 - `users.prefs.get`, `conversations.replies` and the edge `users/info` decode with the schemas as they are; `conversations.replies` with `oldest = latest_reply, inclusive, limit 2` gives the preview as designed.
 - The cost estimate of architecture 5.1 holds: about one history call per active conversation, on the background lane at 1.5 s spacing, a few minutes for 150 channels.
+
+### Live probe (2026-10-15)
+
+`JUNO_LIVE=1 pnpm probe:live` (`scripts/probe-live.ts`, docs/development.md) against the same single-workspace account, read-only, with the cached session. 34 Web API calls in all (27 in the full run, 7 in two `--only search` runs), started at least 1.5 s apart, plus 3 GETs of one thumbnail. Counts, key names and milliseconds only; no value was printed or kept. Redacted shapes: `conversations.replies.json`, `search.modules.messages.json` and `users.prefs.get.json` in `packages/slack-schema/test/fixtures/recorded/`. Every response decoded with `@juno/slack-schema` where the method is in `Methods`.
+
+#### 1. The cost of the M7 recheck (2026-10-15)
+
+Run as a warm boot would run it now (architecture 5.8): the 10 most recently active topics of the last 24 hours, one page each, back 24 hours, `limit=100`. The probe picked them from `client.counts` `latest` and the first `getView` page, which approximates the store's `topic_index` (it misses unfollowed threads).
+
+| What | Number |
+| --- | --- |
+| Member Main topics with activity in the last 24 hours | 84; the first `getView` page had 10 followed threads active in that time |
+| Topics rechecked | 10: 8 Main (`conversations.history`), 2 threads (`conversations.replies`) |
+| Calls | 10, one per topic. Latency 257 to 446 ms each |
+| Time | 14.9 s. The 1.5 s background spacing sets it, not Slack: the recheck reads one topic after the other |
+| Messages per page | Main 3 to 100, threads 4 and 9; 328 in all |
+| Pages that did not reach back 24 hours | 1 of 10 (`has_more`, 100 messages in under 24 hours) |
+| Rate limits, failures, decode issues | 0, 0, 0 |
+
+Edits, from `edited.ts` on every message the probe read (827 distinct messages: the 10 recheck pages, 5 older Main pages that reached 1 to 30 days back, and 3 replies pages):
+
+| Time from posting to the last edit | Messages |
+| --- | --- |
+| Under 1 minute | 32 |
+| 1 minute to 1 hour | 33 |
+| 1 hour to 24 hours | 6 |
+| More than 24 hours | 0 |
+
+71 of 827 messages (8.6 %) carried `edited`; 166 of them were older than 24 hours when read. No edit came more than 24 hours after its message. Limits: `edited` holds only the last edit; the sample is small; 523 of the 815 history messages were `bot_message`s, which bots often update soon after posting. Deletions and reaction changes leave no trace on a page, so their age cannot be measured this way.
+
+#### 2. `conversations.history` with `ignore_replies` (2026-10-15)
+
+- **Thread broadcasts are returned.** The 13 history pages (815 messages) held 33 `thread_broadcast` messages and no other reply. The one broadcast found in a replies page was also returned by a history read at its ts with `ignore_replies=true`, with subtype `thread_broadcast`.
+- **`reactions` is left out when a message has none.** 27 of 828 messages carried `reactions`; none carried an empty array.
+
+#### 3. `conversations.replies` with `oldest` (2026-10-15)
+
+The root is always the first message, whatever `oldest` says. Seen in all 3 pages: a recheck page whose root is older than `oldest`, one whose root is newer, and `oldest = latest_reply`, `inclusive`, `limit=2`, which returned the root and the latest reply with `has_more: false`. So the root takes one place of `limit`.
+
+#### 4. Retry-After (2026-10-15)
+
+No 429 and no `ok:false` rate-limit error in the 34 calls, and no `Retry-After` header on any response. The value a real 429 carries is still Unknown. What is known comes from the bundle (section 6): the client waits `Retry-After` seconds when the header is there, 60 s for a 429 without it, at most 180 s, and the socket's `error.retry_after` is capped at 60 s. Juno's defaults are the same (`defaultRetryAfterMillis` 60 s, `maxRetryAfterMillis` 180 s). The sync dry run (298 calls at the default spacing) hit none either.
+
+#### 5. Search with an `xoxc` session (2026-10-15)
+
+`search.modules.messages` works for the session, and `is:thread after:<date>` does what the discovery sweep needs.
+
+- **`is:thread` filters.** `is:thread after:<date>` counted 2 043 matches where `after:<date>` alone counted 5 887. All 80 `is:thread` matches on four pages were thread messages (each had `thread_ts` or a permalink with `thread_ts`); the page with `thread_ts` held 17 replies and 3 roots. Of 20 matches of `after:` alone, at least 10 were plain messages (checked against history pages).
+- **`after:` excludes the named day.** No match was older than the end of that day (UTC).
+- **`sort=timestamp`, `sort_dir=desc` is honoured.** Every page was newest first. A query without `sort` was also newest first (20 of 20), so whether leaving it out gives relevance order is Unknown.
+- **Pagination is by page.** `pagination: { page, page_count, per_page, total_count, first, last }`, numbers; no `response_metadata` and no cursor. `count=20` gave 20 matches per page.
+- **Every item holds exactly one message** (145 of 145 items). Item keys: `channel`, `iid`, `team`, `messages`.
+- **Channel object:** `id`, `name`, `is_archived`, `is_channel`, `is_group`, `is_im`, `is_mpim`, `is_private`, `is_shared`, `is_ext_shared`, `is_org_shared`, all present; `user` on DMs; `is_pending_ext_shared` and `pending_shared` on some.
+- **Message keys depend on `extra_message_data`.** With the discovery sweep's arguments (`no_user_profile`, `sort`, `sort_dir`, no `extra_message_data`): `ts`, `text`, `user`, `username`, `permalink`, `iid`, `extracts`, and on most `blocks`, `blocks_extracts`, `blocks_extracts_typed`, sometimes `attachments`. No `thread_ts`. With the official client's arguments (`extracts=1`, `highlight=1`, `max_extract_len=200`, `extra_message_data=1`) every thread match also carries `thread_ts`, roots carry `reply_count` and `latest_reply`, and bot messages carry `subtype`, `bot_id`, `bot_profile` and `icons`; `files` (2 of 20) and `reactions` (1 of 20) appear when the message has them.
+- **No highlights.** With `highlight=1` and `extracts=1`, by time or without `sort`, `extracts` was an empty array on every match (80 of 80), and no string in any match held U+E000/U+E001 or any other private-use marker, or an `<em>`, `<b>` or `<mark>` tag (one `<em>` was inside a snippet file's `preview`, which is file content). `blocks_extracts` and `blocks_extracts_typed` are `rich_text` blocks of `rich_text_section`s of `text` elements, with no style in the sampled elements. How the official client highlights is Unknown; Juno must mark the query terms itself.
+- **Latency** 300 to 540 ms per call. No rate limit in 11 search calls.
+
+#### 6. Files (2026-10-15)
+
+From the messages read above: 6 files (3 `png`, 2 `mov`, 1 `markdown` snippet; `mode` `hosted` ×5, `snippet` ×1). One `files.info`, and 3 GETs of one image's `thumb_64`.
+
+- **Every file:** `id`, `created`, `timestamp`, `name`, `title`, `mimetype`, `filetype`, `pretty_type`, `user`, `user_team`, `username`, `size`, `mode`, `editable`, `is_external`, `external_type`, `is_public`, `public_url_shared`, `display_as_bot`, `is_starred`, `is_modified_by_ai`, `has_rich_preview`, `skipped_shares`, `file_access`, `url_private`, `url_private_download`, `permalink`, `permalink_public`; `media_display_type` on 5 of 6.
+- **Images:** `original_w`, `original_h`, `thumb_64`, `thumb_80`, `thumb_160`, `thumb_360` and `thumb_480` with `_w`/`_h` on 360 and 480, `thumb_tiny`, and `thumb_720`, `thumb_800`, `thumb_960`, `thumb_1024` with their `_w`/`_h` only when the original is large enough.
+- **Videos:** `mp4`, `hls`, `hls_embed`, `thumb_video` with `_w`/`_h`, `duration_ms`, `transcription`, `media_progress`, `is_transcription_region_supported`. No `thumb_360` and no `original_w`/`_h`.
+- **Snippets:** `preview`, `preview_highlight`, `preview_is_truncated`, `lines`, `lines_more`, `edit_link`.
+- **`url_private` host:** `files.slack.com` for all 6.
+- **`files.info { file }`** returns `{ ok, file, comments, paging }`. The file has the keys above plus `channels`, `groups`, `ims`, `shares`, `has_more_shares`, `comments_count` and `favorites`.
+- **Download auth is the `d` cookie.** GET of `thumb_64`: no credentials gave 302 to a sign-in page; the `d` cookie alone gave 200 with an image content type; `Authorization: Bearer <xoxc token>` without the cookie gave 302 to sign-in. Fetching through the `persist:slack` session (architecture 9) is the right path.
+- **Upload.** Not tested, nothing was uploaded. What research knows is in section 3: the web client's fetchers are named `files.getUploadURL` and `files.completeUpload` (with `files.uploadExternal`, `files.share`), not read in detail. Architecture 9 builds on the public `files.getUploadURLExternal` / `files.completeUploadExternal` pair, and whether an `xoxc` session may use it is still open question 17.3, to be checked with a write in the private test channel.
+
+#### 7. Notification schedule (2026-10-15)
+
+Confirms the read of the same day in section 7, "Slack's notification schedule".
+
+- **`users.prefs.get`** without arguments: `{ ok, prefs }`, 729 prefs. The schedule keys are there with these types: `dnd_enabled`, `dnd_weekdays_off_allday`, `priority_dnd_override`, `priority_sidebar_section`, `dnd_custom_new_badge_seen`, `dnd_notification_schedule_new_badge_seen` booleans; `dnd_days` and the seven `dnd_enabled_<day>` enum strings; `dnd_start_hour`, `dnd_end_hour` and the fourteen `dnd_before_<day>` / `dnd_after_<day>` time strings, again a mix of `H:MM` and `HH:MM`; `vip_users`, `today_priority_channels` and `scheduled_dnd_status` strings; `mega_dnd_expiration` a number.
+- **`dnd.info`** without arguments: `{ ok, dnd_enabled, next_dnd_start_ts, next_dnd_end_ts, snooze_enabled }`: two booleans and two Unix-second numbers. `dnd.info` is not in `@juno/slack-schema`'s `Methods`, so its shape is recorded here and not as a fixture.

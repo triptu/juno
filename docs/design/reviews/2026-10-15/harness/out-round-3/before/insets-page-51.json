@@ -1,0 +1,79 @@
+[
+  {
+    "what": "label Enabled",
+    "left": 15,
+    "right": 478,
+    "width": 163,
+    "cardWidth": 656
+  },
+  {
+    "what": "button Connect",
+    "left": 580,
+    "right": 11,
+    "width": 65,
+    "cardWidth": 656
+  },
+  {
+    "what": "label Enabled",
+    "left": 15,
+    "right": 483,
+    "width": 158,
+    "cardWidth": 656
+  },
+  {
+    "what": "button Connect",
+    "left": 580,
+    "right": 11,
+    "width": 65,
+    "cardWidth": 656
+  },
+  {
+    "what": "label Enabled",
+    "left": 15,
+    "right": 494,
+    "width": 147,
+    "cardWidth": 656
+  },
+  {
+    "what": "button Connect",
+    "left": 580,
+    "right": 11,
+    "width": 65,
+    "cardWidth": 656
+  },
+  {
+    "what": "label ",
+    "left": 15,
+    "right": 337,
+    "width": 304,
+    "cardWidth": 656
+  },
+  {
+    "what": "label Allow T3 Code over the local n",
+    "left": 15,
+    "right": 337,
+    "width": 304,
+    "cardWidth": 656
+  },
+  {
+    "what": "label ",
+    "left": 15,
+    "right": 483,
+    "width": 159,
+    "cardWidth": 656
+  },
+  {
+    "what": "label ",
+    "left": 15,
+    "right": 483,
+    "width": 159,
+    "cardWidth": 656
+  },
+  {
+    "what": "button Add",
+    "left": 15,
+    "right": 601,
+    "width": 40,
+    "cardWidth": 656
+  }
+]

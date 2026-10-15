@@ -71,7 +71,7 @@ export function providerTurns(connection: ProviderConnection, picker: ModelPicke
 } {
   return {
     provider: (store) =>
-      createProviderGuard({ store, transport: createProviderTransport(connection, () => servedModels(store, picker)), spend: createSpend(store, () => capOf(store)) }),
+      createProviderGuard({ store, transport: createProviderTransport(connection, () => servedModels(store, picker)), spend: createSpend(store, () => capOf(store)), ...(picker.codex ? { codex: picker.codex } : {}) }),
     model: (store) => ref(modelFor(store, picker, 'chat')) ?? NO_MODEL,
     compaction: (store) => ref(modelFor(store, picker, 'compaction')),
     picker,

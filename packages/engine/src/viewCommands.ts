@@ -13,9 +13,10 @@
  */
 import { randomUUID } from 'node:crypto'
 import { Clock, Effect } from 'effect'
-import { NotFound, NotSignedIn, type CommandResult, type SavedView, type SidebarView, type ViewDraft } from '@juno/contract'
-import { viewName, type ViewIcon } from '@juno/domain'
+import { NotFound, NotSignedIn, type AutomatedPlace, type CommandResult, type SavedView, type SidebarView, type ViewDraft } from '@juno/contract'
+import { AUTOMATED_VIEW_ID, viewName, type ViewIcon } from '@juno/domain'
 import { invalidate, keys, StoreReader, StoreWriter, transaction, type Invalidation, type SqlError } from '@juno/store'
+import { leaveAutomated, moveToAutomated, placedByHand, setVerdict } from './automatedView'
 import { channelInfoOf, channelRefOf, userName, type UserRow } from './topicRows'
 import { Workspace } from './workspace'
 
@@ -60,7 +61,10 @@ const inWorkspace = <A>(step: (now: number) => Effect.Effect<A, SqlError, StoreW
     const open = yield* (yield* Workspace).current
     if (open === undefined) return yield* new NotSignedIn()
     const now = yield* Clock.currentTimeMillis
-    return yield* transaction(Effect.flatMap(step(now), (result) => Effect.as(invalidate(keys.sidebarViews), result))).pipe(Effect.provide(open.context), Effect.orDie)
+    return yield* transaction(Effect.flatMap(step(now), (result) => Effect.as(invalidate([...keys.sidebarViews, ...keys.automatedChannels]), result))).pipe(
+      Effect.provide(open.context),
+      Effect.orDie,
+    )
   })
 
 /** Creates a view (last in the row) or replaces one whole. A blank name, or an id the store does not know, is `NotFound`. */
@@ -82,12 +86,19 @@ export const saveView = (draft: ViewDraft) =>
           const previousChannels = yield* sql<{ channel: string }>`SELECT channel FROM sidebar_view_channels WHERE view_id = ${draft.id}`
           for (const { channel } of previousChannels) if (!kept.has(channel)) yield* sql`DELETE FROM sidebar_view_channels WHERE view_id = ${draft.id} AND channel = ${channel}`
           yield* writeChannels(draft.id, draft.channels, now)
+          const was = new Set(before.channels)
+          yield* placedByHand(
+            draft.id,
+            [...before.channels.filter((channel) => !kept.has(channel)).map((channel) => ({ channel, member: false })), ...[...kept].filter((channel) => !was.has(channel)).map((channel) => ({ channel, member: true }))],
+            now,
+          )
           return { id: draft.id, before, after: (yield* readView(draft.id))! }
         }
         const id = `v${randomUUID().replaceAll('-', '').slice(0, 12)}`
         const last = (yield* sql<{ position: number | null }>`SELECT max(position) AS position FROM sidebar_views`)[0]?.position ?? -1
         yield* sql`INSERT INTO sidebar_views (id, name, icon, position, keep_out_of_all, created_at) VALUES (${id}, ${name}, ${icon}, ${last + 1}, ${keep}, ${String(now)})`
         yield* writeChannels(id, draft.channels, now)
+        yield* placedByHand(id, [...new Set(draft.channels)].map((channel) => ({ channel, member: true })), now)
         return { id, before: null, after: (yield* readView(id))! }
       }),
     )
@@ -136,6 +147,7 @@ export const setViewChannel = (id: string, channel: string, member: boolean) =>
         if (there === member) return false
         if (member) yield* writeChannels(id, [channel], now)
         else yield* sql`DELETE FROM sidebar_view_channels WHERE view_id = ${id} AND channel = ${channel}`
+        yield* placedByHand(id, [{ channel, member }], now)
         return true
       }),
     )
@@ -155,6 +167,34 @@ export const reorderViews = (ids: ReadonlyArray<string>) =>
       for (const [position, id] of order.entries()) yield* sql`UPDATE sidebar_views SET position = ${position} WHERE id = ${id} AND position <> ${position}`
     }),
   )
+
+/**
+ * The user's answer about Automated (Home's Move and Keep in All), or its
+ * undo (`ask`, or the earlier answer). Move makes the view if needed, even
+ * one the user deleted, since they asked for it. The undo is the place the
+ * conversation had before; nothing changed, no undo.
+ */
+export const sortChannel = (channel: string, to: AutomatedPlace) =>
+  Effect.gen(function* () {
+    const before = yield* inWorkspace((now) =>
+      Effect.gen(function* () {
+        const sql = yield* StoreWriter
+        const inView = (yield* sql<{ n: number }>`SELECT count(*) AS n FROM sidebar_view_channels WHERE view_id = ${AUTOMATED_VIEW_ID} AND channel = ${channel}`)[0]?.n === 1
+        const row = (yield* sql<{ verdict: string; by: string }>`SELECT verdict, by FROM automated_channels WHERE channel = ${channel}`)[0]
+        const place: AutomatedPlace = inView ? 'automated' : row?.verdict === 'kept' ? 'kept' : 'ask'
+        if (place === to && (to === 'ask' || row?.by === 'you')) return undefined
+        if (to === 'automated') yield* moveToAutomated(channel, 'you', now)
+        else {
+          yield* leaveAutomated(channel)
+          // Back to a question the rules asked; the job looks at it again when the conversation moves.
+          yield* setVerdict(channel, to, to === 'ask' ? 'rules' : 'you', now)
+        }
+        return place
+      }),
+    )
+    if (before === undefined) return {} satisfies CommandResult
+    return { undo: { _tag: 'views.sortChannel', channel, to: before } } satisfies CommandResult
+  })
 
 interface MemberRow extends ViewRow {
   readonly channel: string | null
@@ -186,12 +226,22 @@ export const listViews: Effect.Effect<ReadonlyArray<SidebarView>, SqlError, Stor
   const users = new Map<string, UserRow>()
   if (userIds.size > 0) for (const user of yield* sql<UserRow>`SELECT id, name, display_name, real_name, avatar_url FROM users WHERE id IN ${sql.in([...userIds])}`) users.set(user.id, user)
   const nameOf = (id: string) => userName(id, users.get(id))
+  const byJuno = rows.some((row) => row.id === AUTOMATED_VIEW_ID)
+    ? (yield* sql<{ channel: string }>`SELECT channel FROM automated_channels WHERE verdict = 'automated' AND by IN ('rules', 'juno')`).map((row) => row.channel)
+    : []
 
   const views: Array<SidebarView & { channels: Array<SidebarView['channels'][number]> }> = []
   for (const row of rows) {
     let view = views.at(-1)
     if (view?.id !== row.id) {
-      view = { id: row.id, name: row.name, ...(row.icon === null ? {} : { icon: row.icon as ViewIcon }), keepOutOfAll: row.keep_out_of_all === 1, channels: [] }
+      view = {
+        id: row.id,
+        name: row.name,
+        ...(row.icon === null ? {} : { icon: row.icon as ViewIcon }),
+        keepOutOfAll: row.keep_out_of_all === 1,
+        channels: [],
+        ...(row.id === AUTOMATED_VIEW_ID ? { addedByJuno: byJuno } : {}),
+      }
       views.push(view)
     }
     const ids = members.get(row)

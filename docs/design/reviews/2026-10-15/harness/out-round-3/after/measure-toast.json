@@ -1,0 +1,260 @@
+[
+  {
+    "tag": "div",
+    "label": "Resolved · Draft plan is in the docUndo⌘",
+    "rect": {
+      "x": 16,
+      "y": 773,
+      "w": 332,
+      "h": 44
+    },
+    "padding": "8px 8px 8px 14px",
+    "gap": "12px",
+    "radius": "14px",
+    "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+    "color": "rgb(252, 251, 247)",
+    "bg": "rgb(35, 33, 26)",
+    "border": "1px solid rgba(0, 0, 0, 0)",
+    "shadow": "rgba(27, 28, 21, 0.1) 0px 8px 24px 0px",
+    "outline": "none 3px rgb(252, 251, 247) offset 0px",
+    "children": [
+      {
+        "tag": "span",
+        "label": "",
+        "rect": {
+          "x": 31,
+          "y": 787,
+          "w": 16,
+          "h": 16
+        },
+        "padding": "0px",
+        "gap": "normal",
+        "radius": "0px",
+        "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+        "color": "oklch(0.695767 0.0523345 169.682)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none oklch(0.695767 0.0523345 169.682)",
+        "shadow": "none",
+        "outline": "none 3px oklch(0.695767 0.0523345 169.682) offset 0px"
+      },
+      {
+        "tag": "span",
+        "label": "Resolved · Draft plan is in the doc",
+        "rect": {
+          "x": 55,
+          "y": 784.9,
+          "w": 201.1,
+          "h": 20.3
+        },
+        "padding": "0px",
+        "gap": "normal",
+        "radius": "0px",
+        "font": "13.5px/20.25px 400 \"Figtree Variable\"",
+        "color": "rgb(252, 251, 247)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(252, 251, 247)",
+        "shadow": "none",
+        "outline": "none 3px rgb(252, 251, 247) offset 0px"
+      },
+      {
+        "tag": "button",
+        "label": "Undo⌘Z",
+        "rect": {
+          "x": 268.1,
+          "y": 782,
+          "w": 71,
+          "h": 26
+        },
+        "padding": "0px 10px",
+        "gap": "6px",
+        "radius": "999px",
+        "font": "13px/normal 600 \"Figtree Variable\"",
+        "color": "rgb(252, 251, 247)",
+        "bg": "oklch(0.987739 0.00539942 none / 0.16)",
+        "border": "0px solid rgba(0, 0, 0, 0)",
+        "shadow": "none",
+        "outline": "none 2px rgb(252, 251, 247) offset 2px"
+      }
+    ]
+  },
+  {
+    "tag": "span",
+    "label": "",
+    "rect": {
+      "x": 31,
+      "y": 787,
+      "w": 16,
+      "h": 16
+    },
+    "padding": "0px",
+    "gap": "normal",
+    "radius": "0px",
+    "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+    "color": "oklch(0.695767 0.0523345 169.682)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "0px none oklch(0.695767 0.0523345 169.682)",
+    "shadow": "none",
+    "outline": "none 3px oklch(0.695767 0.0523345 169.682) offset 0px",
+    "children": [
+      {
+        "tag": "svg",
+        "label": "",
+        "rect": {
+          "x": 31,
+          "y": 787,
+          "w": 16,
+          "h": 16
+        },
+        "padding": "0px",
+        "gap": "normal",
+        "radius": "0px",
+        "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+        "color": "oklch(0.695767 0.0523345 169.682)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none oklch(0.695767 0.0523345 169.682)",
+        "shadow": "none",
+        "outline": "none 3px oklch(0.695767 0.0523345 169.682) offset 0px"
+      }
+    ]
+  },
+  {
+    "tag": "svg",
+    "label": "",
+    "rect": {
+      "x": 31,
+      "y": 787,
+      "w": 16,
+      "h": 16
+    },
+    "padding": "0px",
+    "gap": "normal",
+    "radius": "0px",
+    "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+    "color": "oklch(0.695767 0.0523345 169.682)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "0px none oklch(0.695767 0.0523345 169.682)",
+    "shadow": "none",
+    "outline": "none 3px oklch(0.695767 0.0523345 169.682) offset 0px",
+    "children": [
+      {
+        "tag": "path",
+        "label": "",
+        "rect": {
+          "x": 32.5,
+          "y": 788.5,
+          "w": 13,
+          "h": 13
+        },
+        "padding": "0px",
+        "gap": "normal",
+        "radius": "0px",
+        "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+        "color": "oklch(0.695767 0.0523345 169.682)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none oklch(0.695767 0.0523345 169.682)",
+        "shadow": "none",
+        "outline": "none 3px oklch(0.695767 0.0523345 169.682) offset 0px"
+      }
+    ]
+  },
+  {
+    "tag": "path",
+    "label": "",
+    "rect": {
+      "x": 32.5,
+      "y": 788.5,
+      "w": 13,
+      "h": 13
+    },
+    "padding": "0px",
+    "gap": "normal",
+    "radius": "0px",
+    "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+    "color": "oklch(0.695767 0.0523345 169.682)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "0px none oklch(0.695767 0.0523345 169.682)",
+    "shadow": "none",
+    "outline": "none 3px oklch(0.695767 0.0523345 169.682) offset 0px",
+    "children": []
+  },
+  {
+    "tag": "span",
+    "label": "Resolved · Draft plan is in the doc",
+    "rect": {
+      "x": 55,
+      "y": 784.9,
+      "w": 201.1,
+      "h": 20.3
+    },
+    "padding": "0px",
+    "gap": "normal",
+    "radius": "0px",
+    "font": "13.5px/20.25px 400 \"Figtree Variable\"",
+    "color": "rgb(252, 251, 247)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "0px none rgb(252, 251, 247)",
+    "shadow": "none",
+    "outline": "none 3px rgb(252, 251, 247) offset 0px",
+    "children": []
+  },
+  {
+    "tag": "button",
+    "label": "Undo⌘Z",
+    "rect": {
+      "x": 268.1,
+      "y": 782,
+      "w": 71,
+      "h": 26
+    },
+    "padding": "0px 10px",
+    "gap": "6px",
+    "radius": "999px",
+    "font": "13px/normal 600 \"Figtree Variable\"",
+    "color": "rgb(252, 251, 247)",
+    "bg": "oklch(0.987739 0.00539942 none / 0.16)",
+    "border": "0px solid rgba(0, 0, 0, 0)",
+    "shadow": "none",
+    "outline": "none 2px rgb(252, 251, 247) offset 2px",
+    "children": [
+      {
+        "tag": "kbd",
+        "label": "⌘Z",
+        "rect": {
+          "x": 315.8,
+          "y": 787.8,
+          "w": 13.2,
+          "h": 14.5
+        },
+        "padding": "0px",
+        "gap": "normal",
+        "radius": "0px",
+        "font": "11px/normal 400 \"JetBrains Mono\"",
+        "color": "rgb(252, 251, 247)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(252, 251, 247)",
+        "shadow": "none",
+        "outline": "none 3px rgb(252, 251, 247) offset 0px"
+      }
+    ]
+  },
+  {
+    "tag": "kbd",
+    "label": "⌘Z",
+    "rect": {
+      "x": 315.8,
+      "y": 787.8,
+      "w": 13.2,
+      "h": 14.5
+    },
+    "padding": "0px",
+    "gap": "normal",
+    "radius": "0px",
+    "font": "11px/normal 400 \"JetBrains Mono\"",
+    "color": "rgb(252, 251, 247)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "0px none rgb(252, 251, 247)",
+    "shadow": "none",
+    "outline": "none 3px rgb(252, 251, 247) offset 0px",
+    "children": []
+  }
+]

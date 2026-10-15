@@ -14,10 +14,18 @@
  * The MCP connections reach main's keychain and the system browser through
  * `credentialBridge`: a `credential` request to main, a `credentialReply`
  * back. OAuth state stays in this process's memory once loaded.
+ *
+ * The encrypted backup (WP21) reaches main's keychain the same way
+ * (`keychainBridge`: `secret`, `secretReply`). After a restore is staged,
+ * `restart` tells main and exits; main starts the agent again at once and
+ * the next open installs the restore. This Mac's name for the
+ * other Mac's banner is the computer name from System Settings.
  */
+import { execFileSync } from 'node:child_process'
+import { hostname } from 'node:os'
 import { Schema } from 'effect'
 import { MainToAgent, type AgentToMain } from '@juno/agent-contract'
-import { credentialBridge, modelPicker, providerConnection, providerTurns, rendererPorts, startAgent, type HostPort } from '@juno/agent'
+import { credentialBridge, describeFailure, keychainBridge, modelPicker, providerConnection, providerTurns, rendererPorts, startAgent, type HostPort } from '@juno/agent'
 import type { MessagePortMain } from 'electron'
 
 const parent = process.parentPort
@@ -55,8 +63,37 @@ const nextPort = () =>
     else waiting.push(resolve)
   })
 
+/** "Tushar's MacBook Air", or the host name when System Settings has none. */
+function computerName(): string {
+  try {
+    const name = execFileSync('/usr/sbin/scutil', ['--get', 'ComputerName'], { encoding: 'utf8', timeout: 2_000 }).trim()
+    if (name !== '') return name
+  } catch {
+    // Not macOS, or scutil failed: the host name will do.
+  }
+  return hostname().replace(/\.local$/, '')
+}
+
 const renderers = rendererPorts()
 const mcp = credentialBridge((requestId, request) => send({ _tag: 'credential', requestId, request }))
+const secrets = keychainBridge((requestId, request) => send({ _tag: 'secret', requestId, request }))
+
+let restarting = false
+/**
+ * After a staged restore. The restore's answer is still on its way to the renderer, so the exit waits a
+ * moment. The process exits without a graceful stop: a stop would end the renderer's streams as if they
+ * were done, while a closed port makes the renderer ask for the new process's. The store is safe to
+ * leave this way (the crash harness kills it at every step), and the exit releases the owner lock.
+ */
+const restart = () => {
+  if (restarting) return
+  restarting = true
+  setTimeout(() => {
+    // Main ends this process when it reads `restart`; exiting here too covers a message that never arrives.
+    send({ _tag: 'restart' })
+    setTimeout(() => process.exit(0), 1_000).unref()
+  }, 200)
+}
 // The provider arrives from main at spawn and on every change.
 const connection = providerConnection()
 
@@ -74,11 +111,27 @@ parent.on('message', (event) => {
       if (started) return
       started = true
       const config = message.config
-      const picker = modelPicker(connection, config.openRouterOrigin === undefined ? {} : { origin: config.openRouterOrigin })
+      const picker = modelPicker(connection, { ...(config.openRouterOrigin === undefined ? {} : { origin: config.openRouterOrigin }), codex: { agentDir: config.agentDir, executable: 'codex' } })
       // The engine opens on the saved model of the active provider, so it waits for main to name one.
       void connection
         .get()
-        .then(() => startAgent(config, { acquire: nextPort }, { turns: providerTurns(connection, picker), renderer: renderers, mcp: { credentials: mcp.credentials } }))
+        .then(() =>
+          startAgent(config, { acquire: nextPort }, {
+            turns: {
+              ...providerTurns(connection, picker),
+              backup: {
+                keychain: secrets.keychain,
+                deviceName: config.deviceName ?? computerName(),
+                restart,
+                ...(config.backupIntervalMs === undefined ? {} : { intervalMs: config.backupIntervalMs }),
+              },
+              // Paths and error codes only: no key, phrase or message text reaches an error the backup throws.
+              onReport: (cause) => console.error('agent:', describeFailure(cause)),
+            },
+            renderer: renderers,
+            mcp: { credentials: mcp.credentials },
+          }),
+        )
         .then(
         (agent) => send({ _tag: 'ready', host: agent.host }),
         (cause: unknown) => {
@@ -94,6 +147,10 @@ parent.on('message', (event) => {
     }
     case 'credentialReply': {
       mcp.answer(message)
+      return
+    }
+    case 'secretReply': {
+      secrets.answer(message)
       return
     }
     case 'rendererPort': {

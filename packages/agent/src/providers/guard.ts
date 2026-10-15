@@ -1,3 +1,5 @@
+import { createCodexHarness } from './codex/harness'
+import { resolveCodexModels } from './catalog'
 import { createHash } from 'node:crypto'
 import { Context as EffectContext, Effect, Layer } from 'effect'
 import { limits, upper } from '@juno/agent-memory'
@@ -13,7 +15,7 @@ import type { Store } from '../store/store'
 export type Revision = { readonly gen: number; readonly pinRev: number }
 export type ProviderFailure = { readonly ending: Ending; readonly rateLimited: boolean }
 /** What a stamped request has streamed so far: its text and how many tool calls it has started. */
-export type StreamProgress = { readonly text: string; readonly toolCalls: number }
+export type StreamProgress = { readonly text: string; readonly toolCalls: number; readonly status?: string }
 type Observer = (progress: StreamProgress) => void
 const progressOf = (message: AssistantMessage): StreamProgress => ({
   text: message.content.flatMap(part => (part.type === 'text' ? [part.text] : [])).join(''),
@@ -29,12 +31,12 @@ export class AdmissionError extends Error {
 type Reason = Exclude<Ending, { _tag: 'complete' }>
 /** The guard's failures travel through pi as `errorMessage`. Only this fixed code is kept, never a provider's error body. */
 const code = (ending: Ending, rateLimited = false) => `JUNO:${ending._tag}${'reason' in ending ? `:${ending.reason}` : ''}${rateLimited ? ':429' : ''}`
-const CODE = /^JUNO:(interrupted|blocked:(?:tooLarge|budget)|failed:(?:provider|keyRejected|codexSignedOut|offline))(:429)?$/
+const CODE = /^JUNO:(interrupted|blocked:(?:tooLarge|budget)|failed:(?:provider|keyRejected|codexSignedOut|codexMissing|codexQuota|codexCrash|offline))(:429)?$/
 function decode(match: string): Reason {
   const [tag, reason] = match.split(':')
   if (tag === 'interrupted') return { _tag: 'interrupted' }
   if (tag === 'blocked') return { _tag: 'blocked', reason: reason === 'budget' ? 'budget' : 'tooLarge' }
-  return { _tag: 'failed', reason: reason === 'keyRejected' || reason === 'codexSignedOut' || reason === 'offline' ? reason : 'provider' }
+  return { _tag: 'failed', reason: reason === 'keyRejected' || reason === 'codexSignedOut' || reason === 'codexMissing' || reason === 'codexQuota' || reason === 'codexCrash' || reason === 'offline' ? reason : 'provider' }
 }
 /** SDK errors start with the status ("401 …", "429: {…}"); pi's prefixed form is "Provider (503): …". */
 const httpStatus = (text: string): number | undefined => {
@@ -89,6 +91,7 @@ export interface GuardOptions {
   readonly store: Store
   readonly transport: Models
   readonly spend?: SpendLedger
+  readonly codex?: { readonly agentDir: string; readonly executable: string }
   readonly onFailure?: (failure: ProviderFailure) => void
 }
 
@@ -126,9 +129,16 @@ export function createProviderGuard(options: GuardOptions) {
       let wirePassed = false
       let definitelyNotSent = false
       try {
-        const model = transport.getModel(requested.provider, requested.id)
+        const model = requested.provider === 'openai-codex' && harness ? requested : transport.getModel(requested.provider, requested.id)
         if (!model || !stamp) throw new AdmissionError({ _tag: 'interrupted' })
         bound = check(model, copy, stamp.revision)
+        if (model.provider === 'openai-codex' && harness) {
+          const message = harness.response(model, copy, stamp.revision, stamp.observe)
+          if (message.stopReason === 'error') outer.push({ type: 'error', reason: 'error', error: message })
+          else outer.push({ type: 'done', reason: message.stopReason === 'toolUse' ? 'toolUse' : 'stop', message })
+          outer.end(message)
+          return
+        }
         const held = spend.reserve(stamp.path, reservationCost(model, bound))
         if (held.kind === 'blocked') throw new AdmissionError({ _tag: 'blocked', reason: 'budget' })
         reservation = held.id
@@ -192,7 +202,15 @@ export function createProviderGuard(options: GuardOptions) {
     })()
     return outer
   }
+  const admitHarness = (revision: Revision, model: Model<Api>, prompt: string): string => {
+    check(model, { messages: [{ role: 'user', content: prompt, timestamp: 0 }] }, revision)
+    return prompt
+  }
+  const harness = options.codex ? createCodexHarness({ ...options.codex, store, guard: { spend, admitHarness } }) : undefined
   const register = () => {
+    const codex = harness ? resolveCodexModels(undefined, { systemAndTools: [] }) : undefined
+    if (codex) models.setProvider(createProvider({ id: 'openai-codex', models: [codex.model],
+      auth: { apiKey: { name: 'Codex', resolve: async () => ({ auth: {} }) } }, api: { stream, streamSimple: stream } }))
     for (const provider of transport.getProviders()) models.setProvider(createProvider({
       id: provider.id,
       auth: { apiKey: { name: provider.name, resolve: async () => ({ auth: {} }) } },
@@ -204,6 +222,7 @@ export function createProviderGuard(options: GuardOptions) {
   const publicModels: Models = models
   return {
     models: publicModels,
+    harnessTool: harness?.tool,
     /** Takes the transport's model list again, after the picker's catalogue changed. */
     refreshModels: register,
     spend,
@@ -222,10 +241,7 @@ export function createProviderGuard(options: GuardOptions) {
       return copy
     },
     /** The Codex harness gets the same memory admission. Its turns are counted, not charged. */
-    admitHarness: (revision: Revision, model: Model<Api>, prompt: string): string => {
-      check(model, { messages: [{ role: 'user', content: prompt, timestamp: 0 }] }, revision)
-      return prompt
-    },
+    admitHarness,
   }
 }
 export type ProviderGuardApi = ReturnType<typeof createProviderGuard>

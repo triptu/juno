@@ -1,0 +1,140 @@
+[
+  {
+    "tag": "svg",
+    "label": "",
+    "rect": {
+      "x": 832,
+      "y": 284.7,
+      "w": 120,
+      "h": 83.1
+    },
+    "padding": "0px",
+    "gap": "normal",
+    "radius": "0px",
+    "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+    "color": "rgb(96, 94, 82)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "0px none rgb(96, 94, 82)",
+    "shadow": "none",
+    "outline": "none 3px rgb(96, 94, 82) offset 0px",
+    "children": [
+      {
+        "tag": "g",
+        "label": "",
+        "rect": {
+          "x": 833.2,
+          "y": 335,
+          "w": 30,
+          "h": 15
+        },
+        "padding": "0px",
+        "gap": "normal",
+        "radius": "0px",
+        "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+        "color": "rgb(96, 94, 82)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(96, 94, 82)",
+        "shadow": "none",
+        "outline": "none 3px rgb(96, 94, 82) offset 0px"
+      },
+      {
+        "tag": "path",
+        "label": "",
+        "rect": {
+          "x": 834.3,
+          "y": 350,
+          "w": 30,
+          "h": 0
+        },
+        "padding": "0px",
+        "gap": "normal",
+        "radius": "0px",
+        "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+        "color": "rgb(96, 94, 82)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(96, 94, 82)",
+        "shadow": "none",
+        "outline": "none 3px rgb(96, 94, 82) offset 0px"
+      },
+      {
+        "tag": "g",
+        "label": "",
+        "rect": {
+          "x": 866,
+          "y": 300.2,
+          "w": 57.7,
+          "h": 55.5
+        },
+        "padding": "0px",
+        "gap": "normal",
+        "radius": "0px",
+        "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+        "color": "rgb(96, 94, 82)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(96, 94, 82)",
+        "shadow": "none",
+        "outline": "none 3px rgb(96, 94, 82) offset 0px"
+      }
+    ]
+  },
+  {
+    "tag": "h2",
+    "label": "Evening, Tushar.",
+    "rect": {
+      "x": 790,
+      "y": 381.7,
+      "w": 204.1,
+      "h": 41.4
+    },
+    "padding": "0px",
+    "gap": "normal",
+    "radius": "0px",
+    "font": "36px/41.4px 400 \"Instrument Serif\"",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "0px none rgb(35, 33, 26)",
+    "shadow": "none",
+    "outline": "none 3px rgb(35, 33, 26) offset 0px",
+    "children": []
+  },
+  {
+    "tag": "li",
+    "label": "Elena asks: She has a competing offer wi",
+    "rect": {
+      "x": 652,
+      "y": 476.3,
+      "w": 480,
+      "h": 52
+    },
+    "padding": "0px 6px 0px 0px",
+    "gap": "normal",
+    "radius": "16px",
+    "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "0px none rgb(35, 33, 26)",
+    "shadow": "none",
+    "outline": "none 3px rgb(35, 33, 26) offset 0px",
+    "children": [
+      {
+        "tag": "a",
+        "label": "Elena asks: She has a competing offer wi",
+        "rect": {
+          "x": 652,
+          "y": 476.3,
+          "w": 474,
+          "h": 52
+        },
+        "padding": "0px 6px",
+        "gap": "12px",
+        "radius": "16px",
+        "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+        "color": "rgb(35, 33, 26)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(35, 33, 26)",
+        "shadow": "none",
+        "outline": "none 2px rgb(180, 53, 31) offset -2px"
+      }
+    ]
+  }
+]

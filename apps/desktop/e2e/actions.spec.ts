@@ -123,6 +123,8 @@ test('Rename from a row edits the row, from the header edits the header, and cle
 test('Ignore hides the channel’s topics, and Undo shows them again', async ({ juno }) => {
   await juno.signIn()
   await juno.waitForSync()
+  // A bot channel: the Automated view holds it.
+  await juno.sidebar.selectView('Automated')
   const alerts = juno.sidebar.row(ALERTS_MAIN)
   const { labels } = await alerts.chooseInMenu('ignore-channel')
   expect(labels).toContain('Ignore #alerts-prod')

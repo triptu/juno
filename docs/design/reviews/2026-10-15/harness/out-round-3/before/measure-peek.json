@@ -1,0 +1,101 @@
+[
+  {
+    "tag": "div",
+    "label": "Rina finished the onsite. Panel notes…#h",
+    "rect": {
+      "x": 392,
+      "y": 44,
+      "w": 480,
+      "h": 781
+    },
+    "padding": "0px",
+    "gap": "normal",
+    "radius": "0px",
+    "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "0px none rgb(35, 33, 26)",
+    "shadow": "none",
+    "outline": "none 3px rgb(35, 33, 26) offset 0px",
+    "children": [
+      {
+        "tag": "div",
+        "label": "Rina finished the onsite. Panel notes…#h",
+        "rect": {
+          "x": 392,
+          "y": 44,
+          "w": 480,
+          "h": 781
+        },
+        "padding": "0px",
+        "gap": "normal",
+        "radius": "13px",
+        "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+        "color": "rgb(35, 33, 26)",
+        "bg": "rgb(251, 251, 248)",
+        "border": "1px solid rgba(0, 0, 0, 0)",
+        "shadow": "oklch(0 0 0 / 0.05) 0px 2px 6px -1px, oklch(0 0 0 / 0.13) 0px 14px 36px -8px",
+        "outline": "none 3px rgb(35, 33, 26) offset 0px"
+      }
+    ]
+  },
+  {
+    "tag": "div",
+    "label": "Rina finished the onsite. Panel notes…#h",
+    "rect": {
+      "x": 392,
+      "y": 44,
+      "w": 480,
+      "h": 781
+    },
+    "padding": "0px",
+    "gap": "normal",
+    "radius": "13px",
+    "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgb(251, 251, 248)",
+    "border": "1px solid rgba(0, 0, 0, 0)",
+    "shadow": "oklch(0 0 0 / 0.05) 0px 2px 6px -1px, oklch(0 0 0 / 0.13) 0px 14px 36px -8px",
+    "outline": "none 3px rgb(35, 33, 26) offset 0px",
+    "children": [
+      {
+        "tag": "div",
+        "label": "Rina finished the onsite. Panel notes…#h",
+        "rect": {
+          "x": 393,
+          "y": 45,
+          "w": 478,
+          "h": 47
+        },
+        "padding": "12px 16px",
+        "gap": "8px",
+        "radius": "0px",
+        "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+        "color": "rgb(35, 33, 26)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(35, 33, 26)",
+        "shadow": "none",
+        "outline": "none 3px rgb(35, 33, 26) offset 0px"
+      },
+      {
+        "tag": "div",
+        "label": "EElena15:18Rina finished the onsite. Pan",
+        "rect": {
+          "x": 393,
+          "y": 92,
+          "w": 478,
+          "h": 732
+        },
+        "padding": "0px",
+        "gap": "normal",
+        "radius": "0px",
+        "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+        "color": "rgb(35, 33, 26)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(35, 33, 26)",
+        "shadow": "none",
+        "outline": "none 3px rgb(35, 33, 26) offset 0px"
+      }
+    ]
+  }
+]

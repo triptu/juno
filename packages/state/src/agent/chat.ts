@@ -69,11 +69,16 @@ export function live<A, E>(tag: string, payload: unknown): Stream.Stream<A, E, A
 const cards = new Map<string, { readonly card: Card; readonly binding: Binding }>()
 
 function remember(snapshot: Snapshot): Snapshot {
-  for (const binding of snapshot.cards) {
-    const item = snapshot.page.items.find((i) => i._tag === 'card' && i.card.id === binding.identity.cardId)
-    if (item?._tag === 'card') cards.set(binding.identity.cardId, { card: item.card, binding })
-  }
+  rememberCards(snapshot.page.items.flatMap((item) => (item._tag === 'card' ? [item.card] : [])), snapshot.cards)
   return snapshot
+}
+
+/** Keeps the bindings of cards on screen outside the chat (the Review page), so their buttons work. */
+export function rememberCards(shown: ReadonlyArray<Card>, bindings: ReadonlyArray<Binding>): void {
+  for (const binding of bindings) {
+    const card = shown.find((candidate) => candidate.id === binding.identity.cardId)
+    if (card !== undefined) cards.set(binding.identity.cardId, { card, binding })
+  }
 }
 
 const pageFamily = Atom.family((key: string) =>

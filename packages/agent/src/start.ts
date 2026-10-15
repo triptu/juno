@@ -146,7 +146,7 @@ export function startAgent(config: AgentConfig, connection: HostConnection, opti
             : undefined
         if (renderer !== undefined) {
           yield* Layer.buildWithScope(
-            rendererServer(renderer, { turns: engine, presence: bound.presence, presenceChanges: bound.presenceChanges, ...(engine?._tag === 'running' ? { schedule: { scheduler: engine.scheduler, host: bound.schedule } } : {}), ...(settings ? { settings } : {}), ...(manager ? { connections: manager } : {}) }),
+            rendererServer(renderer, { turns: engine, presence: bound.presence, presenceChanges: bound.presenceChanges, ...(engine?._tag === 'running' ? { schedule: { scheduler: engine.scheduler, host: bound.schedule } } : {}), ...(settings ? { settings } : {}), ...(manager ? { connections: manager } : {}), ...(turns?.onReport ? { report: turns.onReport } : {}) }),
             scope,
           )
         }

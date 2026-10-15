@@ -1,47 +1,34 @@
-// The warm pool behind scripts/remote.mjs: Namespace machines that already
-// pulled the image wait here between runs, so a run skips creating a machine
-// and pulling (about a minute). The pool lives in the system temp folder, shared
-// by every worktree on this Mac.
-//
-// - A machine runs one job at a time. A run claims it by creating its lock
-//   directory, which only one process can do.
-// - After a clean run the machine goes back to the pool, unless the pool already
-//   has JUNO_REMOTE_IDLE_PER_SHAPE (default 2) idle machines of its shape. A
-//   detached reaper destroys it once it has been idle for
-//   JUNO_REMOTE_IDLE_MINUTES (default 5).
-//   Each machine also ends on its own after its Namespace duration (3 hours),
-//   and is not handed out in its last 30 minutes.
-// - Machines in use and idle together stay within JUNO_REMOTE_MAX_VCPU (default
-//   64, the Team plan's Linux limit), counting every juno-remote machine in the
-//   Namespace workspace. A run waits while the pool is full.
-
+// Shared by every worktree on this Mac. Persist ownership before creating or
+// destroying machines so a killed run or failed Namespace call can be recovered.
 import { spawn, spawnSync } from 'node:child_process'
-import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { createHash, randomUUID } from 'node:crypto'
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { hostname, tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { capacity, machinesToDestroy } from './pool-decisions.mjs'
 
 const dir = join(tmpdir(), 'juno-remote-pool')
+const owner = createHash('sha256').update(hostname()).update(dir).digest('hex').slice(0, 16)
 const idleMs = Number(process.env.JUNO_REMOTE_IDLE_MINUTES ?? 5) * 60_000
 const idlePerShape = Number(process.env.JUNO_REMOTE_IDLE_PER_SHAPE ?? 2)
 const maxVcpu = Number(process.env.JUNO_REMOTE_MAX_VCPU ?? 64)
-const lifetime = '3h'
 const lifetimeMs = 3 * 60 * 60_000
 const handOutMs = lifetimeMs - 30 * 60_000
 mkdirSync(dir, { recursive: true })
-
 const sleep = (ms) => new Promise((resolvePromise) => setTimeout(resolvePromise, ms))
 const alive = (pid) => {
+  if (!pid) return false
   try {
     process.kill(pid, 0)
     return true
-  } catch {
-    return false
+  } catch (error) {
+    return error.code === 'EPERM'
   }
 }
 const vcpu = (machine) => Number(/:(\d+)x/.exec(machine)?.[1] ?? 8)
 const statePath = (id) => join(dir, `${id}.json`)
 const lockPath = (id) => join(dir, `${id}.lock`)
-
 function read(id) {
   try {
     return JSON.parse(readFileSync(statePath(id), 'utf8'))
@@ -49,9 +36,20 @@ function read(id) {
     return undefined
   }
 }
-const write = (state) => writeFileSync(statePath(state.id), JSON.stringify(state))
-const machines = () => readdirSync(dir).filter((name) => name.endsWith('.json')).map((name) => read(name.slice(0, -5))).filter(Boolean)
-
+function write(state) {
+  const temporary = `${statePath(state.id)}.${process.pid}.tmp`
+  writeFileSync(temporary, JSON.stringify(state))
+  renameSync(temporary, statePath(state.id))
+}
+const entries = () => readdirSync(dir).filter((name) => name.endsWith('.json')).map((name) => read(name.slice(0, -5))).filter(Boolean)
+const machines = () => entries().filter((state) => !state.pending)
+function lockOwner(id) {
+  try {
+    return Number(readFileSync(join(lockPath(id), 'pid'), 'utf8'))
+  } catch {
+    return undefined
+  }
+}
 function lock(id) {
   try {
     mkdirSync(lockPath(id))
@@ -61,137 +59,156 @@ function lock(id) {
     return false
   }
 }
-function lockOwner(id) {
-  try {
-    return Number(readFileSync(join(lockPath(id), 'pid'), 'utf8'))
-  } catch {
-    return undefined
+const unlock = (id) => rmSync(lockPath(id), { recursive: true, force: true })
+function lockIsNew(id) {
+  try { return Date.now() - statSync(lockPath(id)).mtimeMs <= 30_000 } catch { return false }
+}
+function takeLock(id) {
+  const pid = lockOwner(id)
+  if (pid !== undefined && !alive(pid)) unlock(id)
+  if (pid === undefined && existsSync(lockPath(id))) {
+    // A process can die between mkdir and writing its PID. Allow time for a
+    // live creator to finish publishing the lock before recovering it.
+    if (!lockIsNew(id)) unlock(id)
   }
+  return lock(id)
+}
+function list() {
+  const result = spawnSync('nsc', ['list', '-o', 'json'], { encoding: 'utf8', timeout: 30_000 })
+  if (result.status !== 0) throw new Error(`nsc list failed: ${result.error?.message ?? result.stderr.trim()}`)
+  const instances = JSON.parse(result.stdout)
+  if (!Array.isArray(instances)) throw new Error('nsc list did not return an array')
+  return instances
+}
+function forget(id) {
+  rmSync(statePath(id), { force: true })
+  unlock(id)
+}
+function ensureReaper() {
+  const pidFile = join(dir, 'watcher.pid')
+  try { if (alive(Number(readFileSync(pidFile, 'utf8')))) return } catch { /* No watcher yet. */ }
+  const child = spawn(process.execPath, [fileURLToPath(import.meta.url), '--watch'], { detached: true, stdio: 'ignore' })
+  writeFileSync(pidFile, String(child.pid))
+  child.unref()
 }
 
+/** A failed destroy remains recorded and cannot be handed out again. */
 export function destroy(id) {
-  spawnSync('nsc', ['destroy', id, '--force'], { stdio: 'ignore' })
-  rmSync(statePath(id), { force: true })
-  rmSync(lockPath(id), { recursive: true, force: true })
-}
-
-/**
- * vCPU of every juno-remote machine in the Namespace workspace, including ones
- * started from other Macs or outside the pool, so the cap holds for the workspace.
- */
-function workspaceVcpu() {
-  const listed = spawnSync('nsc', ['list', '-o', 'json'], { encoding: 'utf8' })
-  try {
-    return JSON.parse(listed.stdout)
-      .filter((instance) => instance.labels?.['juno-remote'] === '1')
-      .reduce((sum, instance) => sum + (instance.shape?.virtual_cpu ?? 8), 0)
-  } catch {
-    return 0
+  if (alive(lockOwner(id)) && lockOwner(id) !== process.pid) return false
+  if (lockOwner(id) !== process.pid && !takeLock(id)) return false
+  write({ ...read(id), id, destroying: true })
+  const result = spawnSync('nsc', ['destroy', id, '--force'], { encoding: 'utf8', timeout: 30_000 })
+  let gone = result.status === 0
+  if (!gone) {
+    try { gone = !list().some((instance) => instance.cluster_id === id) } catch { /* Retain state when the workspace cannot be read. */ }
   }
-}
-
-/** Takes a machine out of the pool without destroying it (`pnpm remote --keep`). */
-export function forget(id) {
-  rmSync(statePath(id), { force: true })
-  rmSync(lockPath(id), { recursive: true, force: true })
-}
-
-/** Destroys machines that are too old, gone, or left locked by a run that died. */
-function tidy() {
-  for (const state of machines()) {
-    const owner = lockOwner(state.id)
-    const orphaned = owner !== undefined && !alive(owner)
-    if (orphaned || Date.now() - state.created > lifetimeMs) destroy(state.id)
+  if (gone) forget(id)
+  else {
+    unlock(id)
+    console.error(`remote: destroy ${id} failed; retained for retry: ${result.error?.message ?? result.stderr.trim()}`)
+    ensureReaper()
   }
+  return gone
 }
 
-/**
- * A machine for one run: an idle warm one of this shape, or a new one when the
- * pool has room. `create` makes a machine and returns its id.
- */
+/** Keep debugging machines tracked until their Namespace lifetime ends. */
+export function keep(id) {
+  const state = read(id)
+  if (state) write({ ...state, kept: true })
+  unlock(id)
+  ensureReaper()
+}
+
+function reconcile() {
+  const instances = list()
+  const states = machines().map((state) => {
+    const pid = lockOwner(state.id)
+    const publishing = pid === undefined && lockIsNew(state.id)
+    return { ...state, live: alive(pid) || publishing, abandoned: existsSync(lockPath(state.id)) && !alive(pid) && !publishing }
+  })
+  const pending = entries().filter((entry) => entry.pending).map((entry) => ({ ...entry, live: alive(entry.pid) }))
+  const targets = machinesToDestroy({ instances, states, pending, owner, now: Date.now(), idleMs, lifetimeMs })
+  for (const id of targets) destroy(id)
+  const present = new Set(instances.map((instance) => instance.cluster_id))
+  for (const state of states) if (!present.has(state.id) && !state.live) forget(state.id)
+  for (const entry of pending) if (!entry.live) rmSync(statePath(entry.id), { force: true })
+  return targets.length ? list() : instances
+}
+
 export async function acquire(machine, create, log) {
-  for (let waited = 0; ; waited++) {
-    // One process at a time decides, so two runs cannot both take the last room.
-    if (!lock('decide')) {
-      if (!alive(lockOwner('decide') ?? 0)) rmSync(lockPath('decide'), { recursive: true, force: true })
-      await sleep(500)
-      waited--
-      continue
-    }
+  ensureReaper()
+  const started = Date.now()
+  let reported = false
+  for (;;) {
+    if (!takeLock('decide')) { await sleep(500); continue }
     try {
-      const claimed = await decideOnce(machine, create)
-      if (claimed) return claimed
-    } finally {
-      rmSync(lockPath('decide'), { recursive: true, force: true })
-    }
-    if (waited % 6 === 0) log(`the pool is full (JUNO_REMOTE_MAX_VCPU=${maxVcpu}); waiting for a machine`)
+      const instances = reconcile()
+      const all = machines()
+      for (const state of all) {
+        if (!state.destroying && !state.kept && state.machine === machine && Date.now() - state.created < handOutMs && takeLock(state.id)) {
+          return { id: state.id, warm: true, images: state.images ?? [] }
+        }
+      }
+      let usage = capacity(instances, all)
+      let used = usage.tracked + usage.untracked
+      for (const state of all) {
+        if (used + vcpu(machine) <= maxVcpu) break
+        if (!state.kept && !state.destroying && takeLock(state.id) && destroy(state.id)) used -= vcpu(state.machine)
+      }
+      if (used + vcpu(machine) <= maxVcpu) {
+        const token = randomUUID()
+        const pending = { id: `pending-${token}`, pending: true, token, pid: process.pid, created: Date.now(), machine }
+        write(pending)
+        // Do not retry creation: a timeout can mean the machine was created.
+        // The attempt label lets reconciliation recover even a lost response.
+        try {
+          const id = await create('3h', { 'juno-pool': owner, 'juno-create': token })
+          write({ id, machine, created: Date.now(), lastUsed: Date.now(), images: [] })
+          lock(id)
+          rmSync(statePath(pending.id), { force: true })
+          return { id, warm: false, images: [] }
+        } catch (error) {
+          write({ ...pending, pid: undefined })
+          throw error
+        }
+      }
+      if (!reported && Date.now() - started >= 60_000) {
+        usage = capacity(list(), machines())
+        log(`waiting for capacity (cap ${maxVcpu} vCPU): ${usage.tracked} tracked, ${usage.untracked} untracked vCPU in the workspace`)
+        reported = true
+      }
+    } finally { unlock('decide') }
     await sleep(10_000)
   }
 }
 
-async function decideOnce(machine, create) {
-  tidy()
-  const all = machines()
-  for (const state of all.filter((candidate) => candidate.machine === machine && Date.now() - candidate.created < handOutMs)) {
-    if (lock(state.id)) return { id: state.id, warm: true, images: state.images ?? [] }
-  }
-  let used = Math.max(all.reduce((sum, state) => sum + vcpu(state.machine), 0), workspaceVcpu())
-  // An idle machine of another shape gives way to a new one when the pool is full.
-  while (used + vcpu(machine) > maxVcpu) {
-    const idle = all.find((state) => state.machine !== machine && read(state.id) && lock(state.id))
-    if (!idle) return undefined
-    destroy(idle.id)
-    used -= vcpu(idle.machine)
-  }
-  const id = await create(lifetime)
-  write({ id, machine, created: Date.now(), lastUsed: Date.now(), images: [] })
-  lock(id)
-  return { id, warm: false, images: [] }
-}
-
-/** Puts a machine back after a clean run and makes sure a reaper watches it. */
-export function release(id, image, reaper) {
+export function release(id, image) {
   const state = read(id)
-  if (!state) return
-  // Keep only a few idle machines of each shape; the rest cost money for nothing.
-  const idle = machines().filter((other) => other.id !== id && other.machine === state.machine && lockOwner(other.id) === undefined)
-  if (idle.length >= idlePerShape) {
-    destroy(id)
-    return
-  }
+  if (!state || state.destroying) return
+  const idle = machines().filter((other) => other.id !== id && !other.kept && !other.destroying && other.machine === state.machine && !existsSync(lockPath(other.id)))
+  if (idle.length >= idlePerShape) { destroy(id); return }
   write({ ...state, lastUsed: Date.now(), images: [...new Set([...(state.images ?? []), image])] })
-  rmSync(lockPath(id), { recursive: true, force: true })
-  const pidFile = join(dir, `${id}.reaper`)
-  let running
+  unlock(id)
+  ensureReaper()
+}
+
+/** Also accepts old per-machine reaper invocations during rollout. */
+export async function reap() {
+  if (!takeLock('watcher')) return
+  const started = Date.now()
   try {
-    running = alive(Number(readFileSync(pidFile, 'utf8')))
-  } catch {
-    running = false
-  }
-  if (!running) {
-    const child = spawn(process.execPath, [reaper, '--reap', id], { detached: true, stdio: 'ignore' })
-    writeFileSync(pidFile, String(child.pid))
-    child.unref()
-  }
-}
-
-/** The reaper's loop: destroys the machine once it has been idle long enough, then exits. */
-export async function reap(id) {
-  for (;;) {
-    await sleep(30_000)
-    const state = read(id)
-    if (!state) break
-    if (lockOwner(id) !== undefined) continue
-    if (Date.now() - state.lastUsed >= idleMs || Date.now() - state.created > lifetimeMs) {
-      // Take the lock so no run claims it while it goes.
-      if (lock(id)) destroy(id)
-      break
+    for (;;) {
+      await sleep(30_000)
+      if (!takeLock('decide')) continue
+      try {
+        const instances = reconcile()
+        if (entries().length === 0 && Date.now() - started > 6 * 60_000 && !instances.some((instance) => instance.labels?.['juno-remote'] === '1' && (!instance.labels['juno-pool'] || instance.labels['juno-pool'] === owner))) return
+      } catch (error) { console.error(`remote: reconciliation failed: ${error.message}`) }
+      finally { unlock('decide') }
     }
-  }
-  rmSync(join(dir, `${id}.reaper`), { force: true })
+  } finally { unlock('watcher') }
 }
-
-/** Every machine in the pool, for `pnpm remote --status`. */
 export function status() {
-  return machines().map((state) => ({ ...state, busy: lockOwner(state.id) !== undefined, idleFor: Date.now() - state.lastUsed }))
+  return machines().map((state) => ({ ...state, busy: alive(lockOwner(state.id)), idleFor: Date.now() - state.lastUsed }))
 }
+if (process.argv[1] === fileURLToPath(import.meta.url) && process.argv[2] === '--watch') await reap()

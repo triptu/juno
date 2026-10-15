@@ -344,6 +344,7 @@ export function createRouter(options: RouterOptions) {
 
   const progress = (run: Live, update: StreamProgress) => {
     if (run !== current) return
+    if (update.status !== undefined) { showStatus(run, update.status); return }
     run.streamed = true
     if (update.text === run.partial) return
     run.partial = update.text

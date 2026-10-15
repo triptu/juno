@@ -23,9 +23,7 @@ import { TopicArt, Workspace as WorkspaceView, type ActivateEvent, type Workspac
 import { HomePage } from './Home'
 import { runJunoShortcut } from './juno/actions'
 import { JunoPageTab, JunoPanel, JunoTab, loadJuno } from './juno/lazy'
-import { NotificationsPage } from './Notifications'
 import { useNotificationBridge, WhyLayer } from './notificationBridge'
-import { PreferencesPage } from './Preferences'
 import { closeTabById, loadAllTopicsPage, openNewTab, runMenuCommand, showTabMenu, stepTabHistory, switchToTab } from './navigation'
 import { NewChatTab } from './NewChat'
 import { runUndoCommand } from './topicActions'
@@ -34,6 +32,9 @@ import { hasArt, TopicTab } from './TopicView'
 
 /** The All topics page is its own chunk (performance 2.1), loaded on idle once the window is up. */
 const AllTopicsPage = lazy(loadAllTopicsPage)
+// Rare pages load on first open, to keep the first bundle in budget.
+const NotificationsPage = lazy(() => import('./Notifications').then((chunk) => ({ default: chunk.NotificationsPage })))
+const PreferencesPage = lazy(() => import('./Preferences').then((chunk) => ({ default: chunk.PreferencesPage })))
 
 const kindIcons: Record<TopicDetail['channel']['kind'], WorkspaceTabIcon> = {
   public: 'hash',
@@ -99,9 +100,17 @@ function Page({ tab }: { readonly tab: Tab }) {
         </Suspense>
       )
     case 'notifications':
-      return <NotificationsPage key="notifications" />
+      return (
+        <Suspense key="notifications" fallback={null}>
+          <NotificationsPage />
+        </Suspense>
+      )
     case 'preferences':
-      return <PreferencesPage key="preferences" />
+      return (
+        <Suspense key="preferences" fallback={null}>
+          <PreferencesPage />
+        </Suspense>
+      )
     case 'allTopics':
       return (
         <Suspense key="all-topics" fallback={null}>

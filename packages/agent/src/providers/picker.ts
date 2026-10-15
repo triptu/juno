@@ -1,3 +1,5 @@
+import { createCodexLocal } from './codex/local'
+import type { JunoSettingsPage } from '@juno/agent-contract'
 /**
  * The model picker's rows (plan v3 §7.1, SPEC 13.10), for the active
  * provider. On OpenRouter: its catalogue once read today, else the last
@@ -13,6 +15,8 @@ import type { ProviderConnection } from './connection'
 import { customRow, listCustomModels } from './custom'
 
 export interface ModelPicker {
+  readonly codex?: { readonly agentDir: string; readonly executable: string }
+  readonly codexStatus?: () => JunoSettingsPage['codex']
   readonly provider: () => 'openrouter' | 'custom'
   readonly rows: () => readonly PickerModel[]
   /** The custom endpoint listed its models. */
@@ -28,6 +32,7 @@ export interface ModelPicker {
 }
 
 export interface PickerOptions {
+  readonly codex?: { readonly agentDir: string; readonly executable: string }
   readonly fetch?: typeof fetch
   /**
    * Another origin for OpenRouter, for the catalogue and every model's base
@@ -45,6 +50,9 @@ export function modelPicker(connection: ProviderConnection, options: PickerOptio
       ? row
       : { ...row, model: { ...row.model, baseUrl: options.origin + row.model.baseUrl.slice(OPENROUTER_ORIGIN.length) } }
   let openRouterRows = piRows().map(rebase)
+  const local = options.codex ? createCodexLocal(options.codex) : undefined
+  let codexRow: PickerModel | undefined
+  let codexStatus: JunoSettingsPage['codex'] = { _tag: 'missing' }
   let customRows: readonly PickerModel[] | undefined
   let catalogue: ReturnType<typeof createCatalogue> | undefined
   const endpoint = () => {
@@ -52,8 +60,10 @@ export function modelPicker(connection: ProviderConnection, options: PickerOptio
     return current?._tag === 'custom' ? current : undefined
   }
   const provider = () => (endpoint() === undefined ? 'openrouter' : 'custom')
-  const rows = () => (provider() === 'custom' ? (customRows ?? []) : openRouterRows)
+  const rows = () => [...(provider() === 'custom' ? (customRows ?? []) : openRouterRows), ...(codexRow ? [codexRow] : [])]
   return {
+    codex: options.codex,
+    codexStatus: () => codexStatus,
     provider,
     rows,
     listed: () => customRows !== undefined,
@@ -62,7 +72,13 @@ export function modelPicker(connection: ProviderConnection, options: PickerOptio
       return custom === undefined ? undefined : customRow(custom.baseUrl, id)
     },
     refresh: async (store) => {
-      const before = signature(rows())
+      const before = JSON.stringify([signature(rows()), codexStatus])
+      if (local) {
+        const state = await local.status().catch(() => 'signedOut' as const)
+        codexStatus = state === 'signedIn' ? { _tag: 'ready', version: await local.version() } : { _tag: state }
+        const codexCatalogue = catalogue ?? createCatalogue(store, { systemAndTools: [JUNO_INSTRUCTIONS] })
+        codexRow = state === 'signedIn' ? codexCatalogue.codex(await local.listModels()).row : undefined
+      }
       const custom = endpoint()
       if (custom !== undefined) {
         customRows = await listCustomModels(custom, options.fetch)
@@ -72,9 +88,9 @@ export function modelPicker(connection: ProviderConnection, options: PickerOptio
           ...(options.fetch ? { fetch: options.fetch } : {}),
           ...(options.origin ? { url: `${options.origin}/api/v1/models` } : {}),
         })
-        openRouterRows = (await catalogue.refresh()).rows.map(rebase)
+        openRouterRows = (await catalogue.refresh().catch(() => ({ rows: openRouterRows }))).rows.map(rebase)
       }
-      return signature(rows()) !== before
+      return JSON.stringify([signature(rows()), codexStatus]) !== before
     },
   }
 }
