@@ -12,7 +12,8 @@
  *    moves (`redactMemory`), their attachments are deleted, the inbox ops'
  *    text is cleared, pins sourced from them are deactivated and cleared
  *    (bumping `pin_rev`), the previews of remove cards that name them are
- *    cleared, grants minted by runs that saw the messages are revoked (the
+ *    cleared, quotes of them in later replies and reactions become the
+ *    "Removed" placeholder, grants minted by runs that saw the messages are revoked (the
  *    rest carry into the new generation), and reports waiting from jobs started
  *    in runs that saw them are quarantined. The moved `gen` expires every
  *    open card, refuses a waiting click (`sourceChanged`), refuses a request
@@ -35,6 +36,7 @@ import { crashPoint } from '../runtime/crash'
 import { transaction } from '../store/database'
 import { purgeNodes, redactMemory } from '../store/memory'
 import type { Store } from '../store/store'
+import { clearQuotes, movePins, removedBubbles } from './quotes'
 import { removalScope, runsThatSaw, type ArchiveRow, type OpRow, type RunRow, type Scope } from './scope'
 
 /**
@@ -132,7 +134,12 @@ function commit(store: Store, input: RemoveInput, expected: number): Committed |
   const { archive, scope } = planned
   const runs = runsThatSaw(runRows(store), archive, scope.messages)
 
-  const memory = redactMemory(store, scope.messages)
+  // Quotes of what goes become placeholders; this needs the words before they are cleared.
+  const removedSet = new Set(scope.messages)
+  const bubbles = removedBubbles(store, removedSet)
+  const words = new Map(scope.ops.map((op) => [op, (db.prepare('SELECT text FROM inbox WHERE op_id = ?').get(op) as { text: string } | undefined)?.text ?? '']))
+  const rewritten = clearQuotes(store, { ops: words, bubbles }, removedSet)
+  const memory = redactMemory(store, scope.messages, rewritten)
   // Spec `deletionRecordedBeforeRemoved`: the record was raised to this generation before the commit.
   if (memory.gen !== expected) throw new Error(`the deletion record is at ${expected}, the removal at ${memory.gen}`)
   const ids = memory.removed
@@ -145,7 +152,10 @@ function commit(store: Store, input: RemoveInput, expected: number): Committed |
   // §4.4: pins sourced from a removed message go, with every older version's text.
   const pins = db.prepare(`UPDATE pins SET active = 0 WHERE active = 1 AND source_id IN (${placeholders(ids.length)})`).run(...ids)
   db.prepare(`UPDATE pins SET text = '' WHERE source_id IN (${placeholders(ids.length)})`).run(...ids)
-  if (Number(pins.changes) > 0) db.prepare('UPDATE memory_head SET pin_rev = pin_rev + 1 WHERE singleton = 1').run()
+  const moved = movePins(store, rewritten)
+  if (Number(pins.changes) > 0 || moved) db.prepare('UPDATE memory_head SET pin_rev = pin_rev + 1 WHERE singleton = 1').run()
+  const bubble = db.prepare('INSERT OR IGNORE INTO removed_bubbles (bubble_id, gen) VALUES (?, ?)')
+  for (const id of bubbles.keys()) bubble.run(id, memory.gen)
   clearRemovePreviews(store, new Set(ids.map(String)))
   revokeExposedGrants(store, new Set(runs), memory.gen)
 

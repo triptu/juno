@@ -148,6 +148,54 @@ it('a removal revokes only the grants of runs that saw the message: earlier sche
   expect(states).toEqual({ earlier: 'active', later: 'paused', watch: 'active' })
 })
 
+it('quotes of a removed message in later replies and reactions become the Removed placeholder, in the archive and for the model', async () => {
+  const h = await turnsHarness()
+  harnesses.push(h)
+  h.fake.script([reply(say(`Saved ${SECRET}.`))])
+  const said = h.send(`The gate code is ${SECRET}.`)
+  await h.ended(said)
+  const bubble = h.events.find((e): e is Extract<typeof e, { _tag: 'bubble' }> => e._tag === 'bubble')!.id
+  h.fake.script([reply(say('Blue it is.'))])
+  const replied = h.send('and the shed is blue', { replyTo: { _tag: 'owner', opId: said as OpId } })
+  await h.ended(replied)
+  h.fake.script([reply(say('Glad it helps.'))])
+  const reacted = h.react(bubble, '🎉')
+  await h.ended(reacted)
+  h.fake.script([reply(say('Any time.'))])
+  const thanked = h.send('thanks for that', { replyTo: { _tag: 'bubble', id: bubble as never } })
+  await h.ended(thanked)
+  // The owner pins words from the reply that quotes the removed message.
+  const replyRow = ownerMessageId(h.turns, replied)
+  const pinned = h.turns.pins.pinMessage({ messageId: replyRow })
+  expect(pinned._tag).toBe('changed')
+  await h.turns.compaction.idle()
+  expect(leaks(h.turns).filter((row) => row.startsWith('messages:')).length).toBeGreaterThan(2)
+
+  await h.turns.redaction.remove({ opId: 'remove-1', messageIds: [ownerMessageId(h.turns, said)], alsoRemoveReply: true })
+  const text = (op: string) =>
+    (h.turns.store.db.prepare("SELECT group_concat(text, '') AS text FROM messages WHERE origin_op = ? AND kind = 'user'").get(op) as { text: string }).text
+  expect(text(replied)).toBe(`<message id="n2"><quote from="owner" removed="true"></quote>and the shed is blue</message>`)
+  expect(text(reacted)).toBe(`<reaction id="n3" emoji="🎉"><quote from="juno" removed="true"></quote></reaction>`)
+  expect(text(thanked)).toContain('<quote from="juno" removed="true"></quote>thanks for that')
+  // The pin keeps its words, at their new place in the rewritten message.
+  const [pin] = h.turns.pins.active().active
+  const row = h.turns.store.db.prepare('SELECT text, version FROM messages WHERE id = ?').get(replyRow) as { text: string; version: number }
+  expect(pin).toMatchObject({ text: 'and the shed is blue', sourceVersion: row.version })
+  if (pin?.kind !== 'span') throw new Error('expected a span pin')
+  expect(Buffer.from(row.text).subarray(pin.from, pin.to).toString()).toBe('and the shed is blue')
+
+  await h.turns.compaction.idle()
+  await h.turns.redaction.idle()
+  expect(leaks(h.turns)).toEqual([])
+  expect(h.turns.memory().lines.every((line) => line.kind === 'node')).toBe(true)
+  // A reply to the removed message sent afterwards quotes the placeholder too, and the model never reads the words.
+  h.fake.script([reply(say('Noted.'))])
+  const late = h.send('one more thing', { replyTo: { _tag: 'owner', opId: said as OpId } })
+  await h.ended(late)
+  expect(text(late)).toContain('<quote from="owner" removed="true"></quote>one more thing')
+  expect(JSON.stringify(h.chatRequests().at(-1)!.context)).not.toContain(SECRET)
+})
+
 it('a compaction job that read the message before the removal is discarded, and the summary is rebuilt without it', async () => {
   const hold = deferred()
   let held = 0

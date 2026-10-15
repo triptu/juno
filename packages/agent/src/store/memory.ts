@@ -252,13 +252,19 @@ function advanceView(store: Store, h: number | undefined): void {
  * each tainted key that has no clean node left. A job that read the old
  * generation is discarded at publication. Messages already removed are
  * skipped; with none left, nothing changes.
+ *
+ * `rewritten` are messages whose text the removal changed (a quote of a
+ * removed message became a placeholder; their version moved). Every node
+ * version built from them is deleted now, since it is not tainted by a
+ * tombstone and would otherwise read as clean, and its line is masked until
+ * the rebuild.
  */
-export function redactMemory(store: Store, ids: ReadonlyArray<number>): { readonly gen: number; readonly removed: ReadonlyArray<number>; readonly masked: number } {
+export function redactMemory(store: Store, ids: ReadonlyArray<number>, rewritten: ReadonlyArray<number> = []): { readonly gen: number; readonly removed: ReadonlyArray<number>; readonly masked: number } {
   if (!store.db.isTransaction) throw new Error('redactMemory runs inside the removal transaction')
   const before = head(store)
   const known = removedIds(store)
-  const fresh = [...new Set(ids)].filter((id) => !known.has(id)).sort((a, b) => a - b)
-  if (fresh.length === 0) return { gen: before.gen, removed: [], masked: 0 }
+  const fresh = [...new Set(ids)].filter((id) => !known.has(id)).toSorted((a, b) => a - b)
+  if (fresh.length === 0 && rewritten.length === 0) return { gen: before.gen, removed: [], masked: 0 }
   const gen = before.gen + 1
   const { db, now } = store
   const tombstone = db.prepare("UPDATE messages SET text = '', bytes = 0, redacted_gen = ? WHERE id = ?")
@@ -268,8 +274,9 @@ export function redactMemory(store: Store, ids: ReadonlyArray<number>): { readon
     record.run(id, gen, now())
   }
   const removed = new Set([...known, ...fresh])
+  const changed = new Set(rewritten)
   const current = view(store)
-  const lines = mask(current.lines, removed)
+  const lines = mask(current.lines, new Set([...removed, ...changed]))
   const masked = lines.filter((line, i) => line !== current.lines[i]).length
   const entries: Entry[] = lines.map((line) => (line.kind === 'node' ? { node: [line.node.ref.a, line.node.ref.w, line.node.ref.v] } : { masked: [line.key.a, line.key.w] }))
   const rev = current.rev + 1
@@ -278,7 +285,9 @@ export function redactMemory(store: Store, ids: ReadonlyArray<number>): { readon
   if (advanced.changes !== 1) throw new Error('memory head moved inside the removal transaction')
   const all = (db.prepare('SELECT * FROM nodes').all() as unknown as NodeRow[]).map(nodeOf)
   const queue = db.prepare('INSERT OR IGNORE INTO queue (a, w, due_at) VALUES (?, ?, ?)')
-  for (const node of taintClosure(all, removed)) {
+  const drop = db.prepare('DELETE FROM nodes WHERE a = ? AND w = ? AND ver = ?')
+  for (const node of taintClosure(all, changed)) drop.run(node.ref.a, node.ref.w, node.ref.v)
+  for (const node of taintClosure(all, new Set([...removed, ...changed]))) {
     if (currentNode(store, node.ref, removed) === undefined) queue.run(node.ref.a, node.ref.w, now())
   }
   return { gen, removed: fresh, masked }

@@ -35,7 +35,15 @@ const redaction1 = [
   ) STRICT`,
 ]
 
-export const REDACTION_MIGRATIONS: MigrationSet = { name: 'redaction', steps: [redaction1] }
+const redaction2 = [
+  // Juno bubbles a removal took (`<runId>:<n>`): a reply or reaction that quotes one reads Removed.
+  `CREATE TABLE removed_bubbles (
+    bubble_id TEXT PRIMARY KEY,
+    gen INTEGER NOT NULL
+  ) STRICT`,
+]
+
+export const REDACTION_MIGRATIONS: MigrationSet = { name: 'redaction', steps: [redaction1, redaction2] }
 
 /** Redaction's per-device tables, which a backup never captures. */
 export const REDACTION_LOCAL_TABLES = ['redaction_purges'] as const

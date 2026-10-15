@@ -120,6 +120,7 @@ export function chatItems(source: ChatSource): ReadonlyArray<ChatItem> {
   const ownerOp = (opId: string) => original.get(opId) ?? opId
   // A removed message shows as "Removed", and a quote of it reads Removed (WP16).
   const removed = new Set((store.db.prepare('SELECT op_id AS opId FROM removed_ops').all() as Array<{ opId: string }>).map((row) => row.opId))
+  const removedBubbles = new Set((store.db.prepare('SELECT bubble_id AS id FROM removed_bubbles').all() as Array<{ id: string }>).map((row) => row.id))
   const opText = new Map(ops.filter((op) => !removed.has(op.opId)).map((op) => [op.opId, op.text]))
 
   const archiveIds = new Map(
@@ -155,7 +156,7 @@ export function chatItems(source: ChatSource): ReadonlyArray<ChatItem> {
           : { target: { _tag: 'owner', opId: opId as OpId }, preview: firstLine(text) }
       }
       case 'bubble': {
-        const text = bubbleTexts.get(target.id)
+        const text = removedBubbles.has(target.id) ? undefined : bubbleTexts.get(target.id)
         return text === undefined ? { target, preview: '', removed: true } : { target, preview: firstLine(text) }
       }
       case 'card':
