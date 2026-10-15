@@ -581,8 +581,8 @@ Tests, e2e runs, gallery shots, benchmarks and spec checks spawn many processes.
 
 The release target is macOS Apple Silicon. `pnpm package` builds the app, rebuilds
 native dependencies for Electron, and writes the DMG, ZIP, block maps and
-`latest-mac.yml` to `apps/desktop/release/`. It never publishes. Developer ID
-signing and notarization require the explicit `JUNO_RELEASE=1` switch; without it,
+update metadata (when a feed is configured) to `apps/desktop/release/`. It never
+publishes. Developer ID signing and notarization require the explicit `JUNO_RELEASE=1` switch; without it,
 the build prints one unsigned-build line and disables identity discovery.
 On Apple Silicon, electron-builder repairs the local **ad-hoc** signature after
 flipping fuses. This uses no certificate or credentials and does not grant
@@ -591,8 +591,10 @@ Gatekeeper trust. A literally unsigned ARM64 executable is killed by macOS;
 
 The engine and agent use Electron's built-in `node:sqlite`, so there is no SQLite
 addon to rebuild. `npmRebuild` is enabled for future native dependencies; `.node`
-files and koffi are explicitly unpacked. electron-builder also detects and
-unpacks the bundled Codex executables. Keep the ZIP: macOS auto-update needs it.
+files and koffi are explicitly unpacked. Only `electron-updater` and its runtime
+dependencies ship as node_modules; application dependencies are bundled by Vite.
+Source maps are excluded. Codex uses the separately installed `codex` executable;
+its unused vendor binaries do not ship. Keep the ZIP: macOS auto-update needs it.
 
 ### What the owner provides
 
@@ -606,14 +608,16 @@ unpacks the bundled Codex executables. Keep the ZIP: macOS auto-update needs it.
   and `APPLE_API_ISSUER`. In Actions, store the file as the
   `APPLE_API_KEY_BASE64` secret; the workflow writes it to a temporary file and
   deletes it after the build. Supply one authentication method at a time.
-- A GitHub token with **Contents: write** access to `triptu/juno` for uploading
-  releases. `triptu/juno` is private. Choose a public distribution repository
-  and set `JUNO_RELEASE_REPOSITORY=owner/repo` when packaging locally. In Actions,
-  set the `RELEASE_REPOSITORY` variable and the `RELEASE_GITHUB_TOKEN` secret
-  with Contents: write on that repository. The workflow otherwise uses its
-  scoped `github.token` and the source repository, and refuses a signed build
-  whose feed is private. A local upload uses `GH_TOKEN`. The installed app
-  contains no GitHub token; release assets must be publicly readable.
+- A public update feed URL, supplied at build time as `JUNO_UPDATE_FEED_URL`
+  (Actions variable `UPDATE_FEED_URL`). For GitHub Releases, use
+  `https://github.com/<owner>/<repo>/releases/latest/download`. There is no default
+  repository or feed. Without a feed, updates remain unavailable.
+- A release destination (`RELEASE_REPOSITORY=owner/repo` in Actions) and a GitHub
+  token with **Contents: write** access to it (`RELEASE_GITHUB_TOKEN`). A local
+  upload uses `GH_TOKEN`. The workflow can use its scoped `github.token` when
+  publishing to its own repository. Without a destination, CI only uploads
+  Actions artifacts. The installed app contains no GitHub token; update assets
+  must be publicly readable.
 
 Keep all credentials in the environment or repository Actions secrets. Never
 commit certificates, keys, passwords or tokens. No secrets are needed for PR
@@ -627,10 +631,13 @@ lint/typecheck. Heavy checks run through `pnpm affected` on Namespace.
    local package with `pnpm package` and `pnpm test:package`. The smoke launches
    the executable directly, signs in to fake Slack, waits for sidebar rows,
    starts the agent against fake OpenRouter, and relaunches the cached account.
-   It uses temporary data and never reads a real Slack session. Its reported
-   timing includes CDP attachment and polling, so it is a smoke duration, not
-   the first-presented-frame performance budget.
-3. For a local signed release, provide the variables above (including the public release repository), then run
+   It uses temporary data and never reads a real Slack session. Without a Developer
+   ID signature, it applies `codesign -s -` locally and verifies the result. It
+   measures five cached-account launches from process spawn to the renderer's
+   first sidebar-row paint marker, reporting median and range. These are warm
+   filesystem-cache runs with CDP attached, not a cold-disk benchmark.
+3. For a local signed release, provide the variables above (including the public
+   feed URL), then run
    `JUNO_RELEASE=1 pnpm package`. electron-builder uses `notarytool` and staples
    the ticket. Partial release credentials fail the build. Verify with
    `codesign --verify --deep --strict apps/desktop/release/mac-arm64/Juno.app`
@@ -650,8 +657,8 @@ lint/typecheck. Heavy checks run through `pnpm affected` on Namespace.
    cross-version signature and installation check requires the owner's ID and
    cannot be verified by the unsigned smoke.
 
-Updates are off by default and unavailable in development and tests. An enabled
-install checks 30 seconds after launch and every six hours, quietly downloads,
+Updates are off by default and unavailable without a configured feed, in
+development, and in tests. An enabled install checks 30 seconds after launch and every six hours, quietly downloads,
 and shows a single ready line in Preferences › About. Closing the app does not
 install the update; only **Restart to update** does. Turning the setting off
 cancels a download and suppresses the ready line. Errors retry quietly later.

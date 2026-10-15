@@ -619,8 +619,10 @@ and `updates.restart` IPC routes. The opt-in setting persists in `launch.json`;
 main broadcasts a schema-checked update state to a renderer container, which
 passes props to the dumb `UpdateSettings` view in Preferences › About. The
 updater loads only when enabled, after startup, and uses the public GitHub
-Releases feed configured by electron-builder. It never installs on ordinary
-quit and never checks in development or tests. A downloaded update is installed
+Releases feed set at build time through `JUNO_UPDATE_FEED_URL`. There is no
+default repository; without a public feed, updates are unavailable. The app
+contains no release token. It never installs on ordinary quit and never checks
+in development or tests. A downloaded update is installed
 only after Restart to update. Signing, notarization and publishing are separate
 from checking for updates; see development.md, Releasing.
 
