@@ -339,3 +339,27 @@ Findings and limits:
 - **Home:** cold traced opens included 27–46 ms of native layout, while the home query took roughly 1–3 ms. Holding the clock did not reliably improve the cold opens. Starting the query on pointerdown did not help and was reverted. The exclusive run also had a 503 ms outlier whose cause remains unresolved. The evidence does not support attributing Home's miss solely to the clock.
 
 Local logs and diagnostic traces are in the ignored `.juno-status/perf-fix-3/` directory. Profiling runs were used for attribution only, not for the table's final numbers.
+
+### 8.2 Resumed measurements (10-15)
+
+The resumed work changes the typing measurement, adds the composer and native-input controls, and increases thread send to 30 samples. It makes no new production performance change. Main through `c6dffd41` was merged into `556c4e84` before the final run. A preceding exclusive checkpoint was superseded when attachment layout and agent resolve changes landed on main; only the merged run supplies the final table below.
+
+The baseline is the original handoff, not a new paired baseline. In particular, the original scroll p95 used separate sweeps and the original palette number used thresholded, rounded Event Timing. Their differences from the final measurements must not be presented as measured speedups.
+
+| Scenario | Original handoff | Final merged run | Budget |
+| --- | --- | --- | --- |
+| Thread send | 130–545 ms slow sample, about 30 ms median | 36.7 ms p95, 29.5 ms median, 37.1 ms maximum; 30 samples | 50 ms p95 |
+| Warm start to rows | 713 ms median | 530.7 ms median, 510.3–1,649.3 ms range; 5 launches | 500 ms median |
+| All topics scroll | 11.4 ms p95 | 12.3 ms pooled p95; 9.0 ms held-clock | 8.3 ms p95 |
+| Palette character presentation | 56 ms Event Timing p95 | 38.9 ms input-to-presentation p95; 102 inputs | 24.7 ms p95 at 60 Hz |
+| Home open, including idle | 81 ms p95 | 123.2 ms p95, 11.1 ms median; 20 samples | 50 ms p95 |
+
+Thread send passed without reproducing the rare stall; its cause is still not proven fixed. Startup remains dominated by main-to-navigation time (308–1,433 ms in this run), followed by roughly 195–216 ms from navigation to rows. Shell paint also exceeds its 400 ms median target at 428.5 ms. Earlier startup probes did not establish a reliable improvement and remain reverted. Home's five idle opens took 62.1–235.0 ms while the queries took 1.9–3.0 ms. The saved native-layout evidence explains part of the cost, but not the full tail; attributing it solely to CPU clock speed is unsupported.
+
+The final run passed 14 of 20 scenarios. All topics still spends too much time in rendering: holding the clock helps, but its 9.0 ms held-clock p95 still exceeds 8.3 ms. Its heavy frames have at most 128 dirty layout objects and 92 styled elements. The structural ceiling passes; bounded work is not necessarily cheap enough. No new rendering optimization was retained in this resumed work.
+
+The same-run character controls read 38.0 ms p95 in the composer, 39.0 ms in the native input and 51.2 ms in the palette (40 inputs each). The separate large-workspace palette scenario reads 38.9 ms over 102 inputs; its open p95 is 15.7 ms and results p95 is 33.2 ms, both within budget. The common input-to-presentation delay remains above the one-frame budget even without application code. The corrected measurement exposes it rather than replacing presentation with a faster timer endpoint. The reported 56 ms plateau was not a palette-only cost; the remaining shared delay is not fixed.
+
+Other scroll readings, ordinary / held-clock p95: sidebar 7.7 / 5.0 ms, messages 6.7 / 3.4 ms, chat 7.0 / 4.1 ms. Maximum dirty layout objects across all measured frames were 206, 128, 43 and 22 for sidebar, All topics, messages and chat respectively; every structural check passed. Chat recorded one long animation frame, failing its zero-LoAF rule despite the passing p95. This pause is not attributed by the final unprofiled run. Other scrolls recorded zero LoAF; all four had fewer than 1% dropped frames. Sidebar drag passed at 7.2 ms p95 and uncached open at 39.0 ms p95.
+
+`pnpm affected` passed on the merged tree (typecheck, lint, unit tests and desktop tests). The final performance log is the ignored `.juno-status/perf-fix-3/perf-latest-main-exclusive.log`; the superseded run is `perf-resumed-exclusive.log`. The final `pnpm test:feel` run passed 8 of 9 tests and again showed five blank chat frames after send. Its filmstrip was inspected; the sent bubble disappears and returns. This is a separate visible failure, not a typing measurement result. The log is `.juno-status/perf-fix-3/feel-latest-main.log` and the filmstrip is `apps/desktop/feel-report/juno-first-bubble/filmstrip.png`. No thresholds were relaxed.
