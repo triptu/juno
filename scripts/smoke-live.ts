@@ -2,7 +2,7 @@
 /**
  * The live smoke (architecture 13 and 16 M2): read-only calls against a real
  * workspace, decoded through @juno/slack-schema, plus 30 s of socket events.
- * Run with `pnpm smoke:live`. It refuses to run without `JUNO_LIVE=1`.
+ * Run with `pnpm smoke:live`. Questions it does not answer go to `probe-live.ts`. It refuses to run without `JUNO_LIVE=1`.
  *
  * Session: imported from the installed Slack app the way the desktop app does
  * it (copies of its files, the "Slack Safe Storage" keychain password, which
@@ -45,11 +45,12 @@ import {
   type SlackSessionShape,
 } from '@juno/slack'
 import { COOKIES_FILE, LOCAL_STORAGE_DIR, readSlackAppSession } from '@juno/slack/import'
-import { decodeIssues, forgetCachedSession, readCachedSession, SESSION_SERVICE, security, storeCachedSession, type CachedSession } from './live-common.ts'
+import { decodeIssues, forgetCachedSession, redact, readCachedSession, SESSION_SERVICE, security, storeCachedSession, type CachedSession } from './live-common.ts'
 
 const READ_ONLY_METHODS = [
   'auth.test',
   'client.userBoot',
+  'users.prefs.get',
   'client.counts',
   'subscriptions.thread.getView',
   'conversations.history',
@@ -218,6 +219,8 @@ async function run(target: Target): Promise<number> {
     if (auth !== undefined) console.log(`    team ${auth.team_id}, user ${auth.user_id}${auth.enterprise_id === undefined ? '' : ', enterprise present'}`)
     const boot = yield* call('client.userBoot', { version_all_channels: true, return_all_relevant_mpdms: true })
     if (boot !== undefined) console.log(`    ${boot.channels.length} channels, ${boot.ims.length} ims, enterprise ${boot.team.enterprise_id === undefined ? 'absent' : 'present'}`)
+    const prefs = yield* call('users.prefs.get', {})
+    if (prefs !== undefined) console.log(`    ${Object.keys(prefs.prefs).length} prefs`)
     const counts = yield* call('client.counts', { thread_counts_by_channel: true })
     if (counts !== undefined) console.log(`    counts for ${counts.channels.length} channels`)
     const view = yield* call('subscriptions.thread.getView', { limit: 20 })
@@ -326,32 +329,6 @@ function frameTypeOf(data: string): string {
   } catch {
     return 'not-json'
   }
-}
-
-// Redaction: the shape survives, the values do not.
-
-const KEEP_KEYS = new Set(['ok', 'type', 'subtype', 'error', 'kind', 'presence', 'mode', 'variant', 'reason', 'priority', 'style'])
-const TS = /^\d{10}\.\d{6}$/
-const ID = /^[A-Z][A-Z0-9]{4,}$/
-
-function redact(value: unknown, key?: string): unknown {
-  if (Array.isArray(value)) return value.slice(0, 3).map((item) => redact(item))
-  if (value !== null && typeof value === 'object') {
-    const out: Record<string, unknown> = {}
-    for (const [k, v] of Object.entries(value as Record<string, unknown>)) out[ID.test(k) ? 'ID' : k] = redact(v, k)
-    return out
-  }
-  if (typeof value === 'string') {
-    if (key !== undefined && KEEP_KEYS.has(key)) return value
-    if (TS.test(value)) return '1700000000.000001'
-    if (ID.test(value)) return `${value[0]}0REDACTED`
-    if (/^https?:\/\//.test(value)) return 'https://redacted.invalid/'
-    if (/^wss?:\/\//.test(value)) return 'wss://redacted.invalid/'
-    if (value.startsWith('xox')) return 'xoxc-redacted'
-    return value === '' ? '' : 'redacted'
-  }
-  if (typeof value === 'number') return Number.isInteger(value) ? (value > 1_000_000_000 ? 1_700_000_000 : value) : 0.5
-  return value
 }
 
 main().then(

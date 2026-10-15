@@ -256,6 +256,16 @@ prompt, because `security` itself created the item. `pnpm smoke:live --
 (`auth.test: SlackAuthRequired`) and cache again, or before handing the machine
 to someone else. The desktop app never reads this item.
 
+`JUNO_LIVE=1 pnpm probe:live` (`scripts/probe-live.ts`) answers questions the smoke does not:
+the cost of the M7 recheck, what `conversations.history` and `conversations.replies` return
+around threads, the search response, file objects and thumbnail auth, and the notification
+prefs. It reuses the cached session, refuses methods outside its own read-only allow-list, starts
+calls 1.5 s apart, and honours `Retry-After` once. It prints counts, key censuses and
+milliseconds only, and writes redacted shapes to `--out DIR` (a temporary directory by default);
+copy a shape into the recorded fixtures by hand and run `node scripts/check-fixtures-redacted.mjs`.
+`-- --only search` runs the search part alone (four calls). A full run is about 34 calls. The
+results are in research section 10, "Live probe".
+
 ## The live sync dry run
 
 `JUNO_LIVE=1 pnpm sync:live` (`scripts/sync-live-dry-run.ts`) runs the real `@juno/sync`
