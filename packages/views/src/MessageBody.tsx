@@ -3,7 +3,7 @@ import type { MouseEvent, ReactNode } from 'react'
 import type { BodyBlock, BodyInline, MessageBody as MessageBodyModel } from '@juno/contract'
 import { accent, colors, radii, spacing, text, weights, sizes } from '@juno/tokens/tokens.stylex'
 import { Chip, CodeBlock, Divider, Text, type HueName } from '@juno/ui'
-import { AttachmentCard, AttachmentImage } from './AttachmentCard'
+import { AttachmentCard, AttachmentFields, AttachmentImage } from './AttachmentCard'
 import { slackDate } from './time'
 
 export interface MessageBodyProps {
@@ -80,13 +80,7 @@ function Block({ block, now, hueOf, onChannel, onLink, tabIndex }: BlockProps) {
     case 'image':
       return <AttachmentImage image={block} />
     case 'fields':
-      return <div {...stylex.props(styles.fields)}>{block.items.map((item, index) => {
-        const { label, value } = fieldParts(item)
-        return <div key={index} data-field="" {...stylex.props(styles.field)}>
-          {label !== undefined && <div data-field-label="" {...stylex.props(styles.fieldLabel)}>{label}</div>}
-          <div><Inlines inlines={value} now={now} hueOf={hueOf} onChannel={onChannel} onLink={onLink} tabIndex={tabIndex} /></div>
-        </div>
-      })}</div>
+      return <AttachmentFields items={block.items} render={(inlines) => <Inlines inlines={inlines} now={now} hueOf={hueOf} onChannel={onChannel} onLink={onLink} tabIndex={tabIndex} />} />
     case 'context':
       return <div {...stylex.props(styles.context)}><Inlines inlines={block.children} now={now} hueOf={hueOf} onChannel={onChannel} onLink={onLink} tabIndex={tabIndex} /></div>
     case 'paragraph':
@@ -250,19 +244,6 @@ function Inline({ inline, now, hueOf, onChannel, onLink, tabIndex }: InlineProps
   }
 }
 
-/**
- * Slack writes a field as "*Label*\nValue" (attachment fields, and most
- * Block Kit section fields): bold text, then a line break. That first line
- * is the field's label, shown above the value in the secondary style.
- */
-function fieldParts(item: ReadonlyArray<BodyInline>): { readonly label?: string; readonly value: ReadonlyArray<BodyInline> } {
-  const end = item.findIndex((inline) => inline.kind === 'break')
-  if (end <= 0) return { value: item }
-  const lead = item.slice(0, end)
-  if (!lead.every((inline) => inline.kind === 'text' && inline.style?.bold === true)) return { value: item }
-  return { label: lead.map((inline) => (inline.kind === 'text' ? inline.text : '')).join(''), value: item.slice(end + 1) }
-}
-
 function styled(value: string, style: { bold?: true; italic?: true; strike?: true; code?: true } | undefined): ReactNode {
   if (style === undefined) return value
   let node: ReactNode = value
@@ -274,10 +255,6 @@ function styled(value: string, style: { bold?: true; italic?: true; strike?: tru
 }
 
 const styles = stylex.create({
-  // Slack's short fields: two columns, each a label above its value.
-  fields: { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: spacing['--space-3'], whiteSpace: 'pre-wrap' },
-  field: { display: 'flex', flexDirection: 'column', gap: spacing['--space-0-5'], minWidth: 0 },
-  fieldLabel: { color: colors['--foreground-muted'], fontFamily: text['--text-tag-small-family'], fontSize: text['--text-tag-small-size'], fontWeight: text['--text-tag-small-weight'], lineHeight: text['--text-tag-small-leading'], letterSpacing: text['--text-tag-small-tracking'] },
   context: { color: colors['--foreground-muted'], fontSize: text['--text-tag-small-size'] },
   body: {
     display: 'flex',

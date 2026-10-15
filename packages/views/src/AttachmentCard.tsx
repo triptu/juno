@@ -1,6 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
 import { useState, type ReactNode } from 'react'
-import type { BodyBlock } from '@juno/contract'
+import type { BodyBlock, BodyInline } from '@juno/contract'
 import { colors, spacing, text, tints, layout, radii } from '@juno/tokens/tokens.stylex'
 import { Button } from '@juno/ui'
 import { thumbnailBox } from './FileCard'
@@ -18,12 +18,40 @@ export function AttachmentCard({ attachment, title, children, footer, tabbable }
   </section>
 }
 
+/** Two-column fields, in attachments and Block Kit sections. `render` draws a run of inlines. */
+export function AttachmentFields({ items, render }: { readonly items: ReadonlyArray<ReadonlyArray<BodyInline>>; readonly render: (inlines: ReadonlyArray<BodyInline>) => ReactNode }) {
+  return <div {...stylex.props(styles.fields)}>{items.map((item, index) => {
+    const { label, value } = fieldParts(item)
+    return <div key={index} data-field="" {...stylex.props(styles.field)}>
+      {label !== undefined && <div data-field-label="" {...stylex.props(styles.fieldLabel)}>{label}</div>}
+      <div>{render(value)}</div>
+    </div>
+  })}</div>
+}
+
+/**
+ * Slack writes a field as "*Label*\nValue" (attachment fields, and most
+ * Block Kit section fields): bold text, then a line break. That first line
+ * is the field's label, shown above the value in the secondary style.
+ */
+function fieldParts(item: ReadonlyArray<BodyInline>): { readonly label?: string; readonly value: ReadonlyArray<BodyInline> } {
+  const end = item.findIndex((inline) => inline.kind === 'break')
+  if (end <= 0) return { value: item }
+  const lead = item.slice(0, end)
+  if (!lead.every((inline) => inline.kind === 'text' && inline.style?.bold === true)) return { value: item }
+  return { label: lead.map((inline) => (inline.kind === 'text' ? inline.text : '')).join(''), value: item.slice(end + 1) }
+}
+
 export function AttachmentImage({ image }: { readonly image: Extract<BodyBlock, { kind: 'image' }> }) {
   const box = image.width && image.height && image.width > 0 && image.height > 0 ? thumbnailBox(image.width, image.height) : thumbnailBox()
   return <div {...stylex.props(styles.imageBox(box.width, box.height))}><img src={image.url} alt={image.alt} loading="lazy" decoding="async" {...stylex.props(styles.image)} /></div>
 }
 
 const styles = stylex.create({
+  // Slack's short fields: two columns, each a label above its value.
+  fields: { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: spacing['--space-3'], whiteSpace: 'pre-wrap' },
+  field: { display: 'flex', flexDirection: 'column', gap: spacing['--space-0-5'], minWidth: 0 },
+  fieldLabel: { color: colors['--foreground-muted'], fontFamily: text['--text-tag-small-family'], fontSize: text['--text-tag-small-size'], fontWeight: text['--text-tag-small-weight'], lineHeight: text['--text-tag-small-leading'], letterSpacing: text['--text-tag-small-tracking'] },
   card: { borderInlineStartWidth: spacing['--space-0-5'], borderInlineStartStyle: 'solid', paddingInline: spacing['--space-3'], paddingBlock: spacing['--space-2'], marginBlock: spacing['--space-1'], display: 'flex', flexDirection: 'column', gap: spacing['--space-2'], minWidth: 0 },
   title: { fontWeight: text['--text-heading-weight'] },
   content: { display: 'flex', flexDirection: 'column', gap: spacing['--space-2'], minWidth: 0 },
