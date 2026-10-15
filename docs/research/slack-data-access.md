@@ -541,7 +541,7 @@ From the messages read above: 6 files (3 `png`, 2 `mov`, 1 `markdown` snippet; `
 - **`url_private` host:** `files.slack.com` for all 6.
 - **`files.info { file }`** returns `{ ok, file, comments, paging }`. The file has the keys above plus `channels`, `groups`, `ims`, `shares`, `has_more_shares`, `comments_count` and `favorites`.
 - **Download auth is the `d` cookie.** GET of `thumb_64`: no credentials gave 302 to a sign-in page; the `d` cookie alone gave 200 with an image content type; `Authorization: Bearer <xoxc token>` without the cookie gave 302 to sign-in. Fetching through the `persist:slack` session (architecture 9) is the right path.
-- **Upload.** Not tested, nothing was uploaded. What research knows is in section 3: the web client's fetchers are named `files.getUploadURL` and `files.completeUpload` (with `files.uploadExternal`, `files.share`), not read in detail. Architecture 9 builds on the public `files.getUploadURLExternal` / `files.completeUploadExternal` pair, and whether an `xoxc` session may use it is still open question 17.3, to be checked with a write in the private test channel.
+- **Upload.** Not tested, nothing was uploaded. The later bundle reading in section 3 documents the official composer’s internal `files.getUploadURL`, multipart POST, `files.completeUpload` and `files.share` flow. Architecture 9 follows that flow. Live upload with an `xoxc` session remains open question 17.3, to be checked with one synthetic image and a short message in the owner’s self-DM or private test channel.
 
 #### 7. Notification schedule (2026-10-15)
 
