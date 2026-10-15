@@ -56,7 +56,7 @@ export { Surface, type SurfaceKind, type SurfacePadding, type SurfaceProps, type
 export { Swatch, type SwatchProps } from './Swatch'
 export { Tab, TabStrip, type TabProps, type TabStripProps } from './Tabs'
 export { Text, type TextProps, type TextTone, type TextVariant, type Weight } from './Text'
-export { Textarea, type TextareaProps, type TextareaVariant } from './Textarea'
+export { Textarea, TEXTAREA_ANCHOR, type TextareaMark, type TextareaProps, type TextareaVariant } from './Textarea'
 export { TextField, type TextFieldProps, type TextFieldSize } from './TextField'
 export { Toast, ToastRegion, type ToastAction, type ToastProps, type ToastRegionProps } from './Toast'
 export { TopicArt, type TopicArtProps, type TopicArtSize } from './TopicArt'
