@@ -1,3 +1,5 @@
+import { AppInfo } from './AppInfo'
+import { Updates } from './Updates'
 import { accentAtom, densityAtom, peekKeyAtom, persistAccent, persistDensity, persistTheme, registry, setPeekKey, themeAtom, type Accent, type Density, type PeekKey, type Theme } from '@juno/state'
 import { useAtom, useAtomValue } from '@juno/state/react'
 import { PreferencesPage as PreferencesPageView } from '@juno/views'
@@ -27,6 +29,7 @@ export function PreferencesPage() {
   }
   return (
     <PreferencesPageView
+      about={<><AppInfo /><Updates /></>}
       theme={theme}
       accent={accent}
       density={density}

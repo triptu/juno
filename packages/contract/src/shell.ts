@@ -110,8 +110,17 @@ export const ContextMenuItems = Schema.Array(
 /** Where the menu opens, in CSS pixels from the window's top left. */
 export const ContextMenuAt = Schema.Struct({ x: Schema.Number, y: Schema.Number })
 
+export const UpdateState = Schema.Union([
+  Schema.Struct({ kind: Schema.Literals(['unavailable', 'disabled', 'idle']) }),
+  Schema.Struct({ kind: Schema.Literal('ready'), version: Schema.String }),
+])
+export type UpdateState = typeof UpdateState.Type
+
 /** renderer -> main request/response routes over `ipcRenderer.invoke`. */
 export const ShellRoutes = {
+  [Channels.updatesGet]: { input: Schema.Void, output: UpdateState },
+  [Channels.updatesSet]: { input: Schema.Struct({ enabled: Schema.Boolean }), output: UpdateState },
+  [Channels.updatesRestart]: { input: Schema.Void, output: Schema.Void },
   [Channels.appGetInfo]: { input: Schema.Void, output: AppInfo },
   [Channels.engineRequestPort]: { input: Schema.Void, output: PortRequestResult },
   [Channels.engineRestart]: { input: Schema.Void, output: Schema.Void },

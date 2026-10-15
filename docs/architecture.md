@@ -616,6 +616,27 @@ Each milestone lists parallel tracks; each track owns disjoint files. Done alway
 
 **M8 AI.** Providers, assistant cache and budget, titles (no marker), send checks, settled, off switch. **M9 Search and ⌘K** (built: the palette, local search, Slack's search for what the cache lacks, the commands, the channel menu on channel results; e2e `palette.spec.ts`, perf scenario `palette`). **M10 Notifications** (pipeline, notification and active hours with the presence job, Every message and Never levels, the hours-start summary, Today and the why popover, OS notifications, badge, dedupe). **M11 Juno chat, the Juno panel and Home's AI items** (follow-ups, tidy up, title rewrites). **M12 Polish and ship** (Preferences with the Appearance group: theme, accent and density, dark mode, accessibility, packaging, fuses, auto-update, live write smoke, signed DMG passing CI on `macos-26`).
 
+### M12 packaging and updates
+
+The Electron shell owns `electron-updater` and the `updates.get`, `updates.set`
+and `updates.restart` IPC routes. The opt-in setting persists in `launch.json`;
+main broadcasts a schema-checked update state to a renderer container, which
+passes props to the dumb `UpdateSettings` view in Preferences › About. The
+updater loads only when enabled, after startup, and uses the public GitHub
+Releases feed set at build time through `JUNO_UPDATE_FEED_URL`. There is no
+default repository; without a public feed, updates are unavailable. The app
+contains no release token. It never installs on ordinary quit and never checks
+in development or tests. A downloaded update is installed
+only after Restart to update. Signing, notarization and publishing are separate
+from checking for updates; see development.md, Releasing.
+
+The package uses asar integrity validation and asar-only loading, encrypts
+cookies, and disables RunAsNode, NODE_OPTIONS and Node CLI inspection. Both
+utility processes work without these Node entry points. The packaged smoke
+uses renderer CDP because Playwright's Electron launcher requires Node
+inspection. It checks the actual DMG's companion `.app`, not a development
+Electron with relaxed fuses.
+
 ## 17. Remaining open questions
 
 1. Does the owner's `localConfig_v2` contain an `enterprise_id`? If yes, Grid moves into M2 and M3.

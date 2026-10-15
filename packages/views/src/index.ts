@@ -63,3 +63,5 @@ export { Home, type HomeProps } from './Home'
 export { HomeScene, type HomeSceneName } from './HomeScene'
 export { ViewSheet, type ViewSheetConversation, type ViewSheetProps } from './ViewSheet'
 export type { ViewIconName } from '@juno/ui'
+
+export { UpdateSettings, type UpdateSettingsProps } from './UpdateSettings'

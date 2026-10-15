@@ -43,3 +43,5 @@ No tests of its own. The routes are exercised by `packages/engine/test` (the rea
 - `search.command { text }` reads the palette's text as a `PaletteCommand` (send to a person, open a DM, post in a channel, ask Juno, resolve a topic), or `null`; always `null` while AI assist is off.
 - `reads.markRead { id, upTo? }` and `reads.markUnread { id, from? }` change Juno's read pointer and return the undo (`UndoCommand` gains both); they fail only with `NotSignedIn` or `NotFound`, never because Slack could not be reached. `reads.mirror` is the live mirror setting `{ on, explicit }`; the preference behind it is `MIRROR_READS_PREF` (`reads.mirror`), written with `prefs.set`.
 - `prefs.get { key }` is a live JSON value from the open workspace's user.db; an absent key returns null. `prefs.set { key, value }` writes one JSON value and invalidates prefs. It fails with `NotSignedIn` without an open workspace. WP5 uses the key `tabs`.
+
+The shell update routes (`updates.get`, `updates.set`, `updates.restart`) and `UpdateState` keep release handling in main. `updates.changed` forwards changes to the renderer.
