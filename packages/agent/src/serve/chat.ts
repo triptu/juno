@@ -63,7 +63,7 @@ export interface ChatSource {
   /** Juno items at or before this time are read. */
   readonly readAt: number
   /** Why accepted messages wait, if they do. */
-  readonly waiting: 'network' | 'resume' | undefined
+  readonly waiting: 'network' | 'resume' | 'review' | undefined
   /** Local midnight of the day `at` falls in. */
   readonly dayOf: (at: number) => number
 }
