@@ -46,12 +46,29 @@ const encode = Schema.encodeSync(Launch)
 
 const file = (userData: string) => join(userData, 'launch.json')
 
+/**
+ * The saved values, each field on its own: one field main cannot read (an
+ * accent from a newer version, a bad width) falls back alone, and the rest,
+ * privacy mode above all, are kept. An unreadable file gives the defaults.
+ */
 export function readLaunch(userData: string): Launch {
+  let saved: unknown
   try {
-    return decode(JSON.parse(readFileSync(file(userData), 'utf8')))
+    saved = JSON.parse(readFileSync(file(userData), 'utf8'))
   } catch {
     return DEFAULTS
   }
+  if (typeof saved !== 'object' || saved === null || Array.isArray(saved)) return DEFAULTS
+  let launch: Launch = DEFAULTS
+  for (const [key, value] of Object.entries(saved)) {
+    try {
+      const field = (decode({ ...DEFAULTS, [key]: value }) as Record<string, unknown>)[key]
+      if (field !== undefined) launch = { ...launch, [key]: field }
+    } catch {
+      console.warn(`main: ignoring launch.json field ${key}`)
+    }
+  }
+  return launch
 }
 
 export interface LaunchWriter {

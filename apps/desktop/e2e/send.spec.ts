@@ -134,3 +134,22 @@ test('the composer grows to about eight lines, then scrolls inside', async ({ ju
   await topic.composer.pressSequentially('second line')
   await expect(topic.composer).toHaveValue('first line\nsecond line')
 })
+
+// Fixme (break pass, 2026-10-15; owner: outbox). `Outbox.sendOnce` makes one attempt, but
+// Chromium's network stack resends a request on its own when a reused keep-alive connection
+// closes before any answer (net.fetch in the engine, ADR 0007). Slack has run the first post, so
+// the message is posted twice. The fake's `loseResponse` closes the connection after running the
+// call, which is that case. The engine's vitest suites use Node fetch, which does not resend, so
+// they pass. A fix needs a transport for single-attempt calls that Chromium cannot resend, or a
+// check after the answer for a second message with the same client_msg_id.
+test.fixme('a post whose answer is lost is in Slack once', async ({ juno, fake }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  const { topic } = juno
+  await juno.sidebar.row(ENG_MAIN).open()
+  await topic.expectTitle('Main')
+  fake.loseResponse({ method: 'chat.postMessage', times: 1 })
+  await topic.send('Sent once over a lost answer')
+  await topic.expectSent('Sent once over a lost answer')
+  expect(fake.messages('C0ENG').filter((m) => m.text === 'Sent once over a lost answer')).toHaveLength(1)
+})

@@ -150,7 +150,8 @@ export function JunoChat({ column, header, contextOf, composerContext, onSent, o
   if (current !== undefined && current !== held) setHeld(current)
   // A window that reaches the newest row follows it from then on. Only its own page says so, not the one held from before.
   if (current !== undefined && !current.moreBelow && window._tag !== 'latest') setWindow(latest)
-  const page = agent === 'off' ? off : (current ?? held ?? empty)
+  const available = current ?? held ?? empty
+  const page = agent === 'off' || available.banner._tag === 'aiOff' ? off : available
   const loaded = current !== undefined || held !== undefined || agent === 'off'
   const now = useAtomValue(nowAtom, (time) => Math.floor(time / TIME_STEP) * TIME_STEP)
 

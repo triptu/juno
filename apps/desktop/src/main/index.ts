@@ -28,6 +28,11 @@ const e2e = process.env.JUNO_E2E === '1'
 const userData = process.env.JUNO_USER_DATA ?? (app.isPackaged ? undefined : join(app.getPath('appData'), 'JunoDev'))
 if (userData) app.setPath('userData', userData)
 
+// One app per user-data directory: two would run two engines on the same
+// databases and post every notification twice. The lock is per directory,
+// so a second launch hands over to the first, which shows its window.
+if (!app.requestSingleInstanceLock()) process.exit(0)
+
 // Scheme privileges must be registered before ready. launch.json is the one
 // synchronous read: theme and bounds for a window that paints right first.
 registerAppScheme()
@@ -166,13 +171,20 @@ app.whenReady().then(() => {
   openWindow()
   updates.start()
 
+  // The Dock icon, or a second launch: the app window comes back even while another window (sign-in) is open.
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) openWindow()
+    if (appWindow() === undefined) openWindow()
+  })
+  app.on('second-instance', () => {
+    const window = appWindow()
+    if (window === undefined) return void openWindow()
+    if (window.isMinimized()) window.restore()
+    window.focus()
   })
 })
 
 function openWindow(): BrowserWindow {
-  const window = createMainWindow(launch)
+  const window = createMainWindow(() => launch)
   window.once('ready-to-show', () => supervisor.send({ _tag: 'painted' }))
   window.on('close', () => updateLaunch({ bounds: window.getNormalBounds() }))
   return window

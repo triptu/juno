@@ -1,7 +1,7 @@
 // Sign-in and session, end to end: the sign-in window against the fake's
 // sign-in page, the Slack-app import through the test seam, sign-out, and
 // the session expiring under the app.
-import { readFile, access } from 'node:fs/promises'
+import { readFile, access, readdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { expect, launchApp, test } from './fixtures'
 import { Juno } from './driver/juno'
@@ -51,6 +51,23 @@ test('comes back signed in after a relaunch', async ({ juno, fake, userData, run
   try {
     await new Juno(again.app, again.win).expectSignedIn('Juno Fake')
     expect(fake.callCount('auth.test')).toBe(2)
+  } finally {
+    await again.close()
+  }
+})
+
+test('comes back signed in when the local cache is damaged, and syncs it again', async ({ juno, fake, userData, running, slackApp }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  await running.close()
+  const [workspace] = await readdir(join(userData, 'workspaces'))
+  await writeFile(join(userData, 'workspaces', workspace!, 'cache.db'), 'not a database '.repeat(400))
+
+  const again = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword })
+  try {
+    const restarted = new Juno(again.app, again.win)
+    await restarted.expectSignedIn('Juno Fake')
+    await restarted.sidebar.row('Draft plan is in the doc').expectVisible()
   } finally {
     await again.close()
   }
