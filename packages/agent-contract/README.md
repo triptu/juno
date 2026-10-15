@@ -48,7 +48,7 @@ Rules of the shape:
 
 Approval identities and source revisions travel beside the view models. A card click binds the card revision/digest and ordered child revision/digests. `prepare` stores choice arguments (for example a question answer) before `approve`; approval never accepts replacement executable arguments. Editing send text creates a new stored proposal. `dismiss` serves every button that only declines (Dismiss, Skip, Keep on Remove, Wait until tomorrow). `askAgain` takes an expired card; the agent writes the owner message that quotes it. The handler must reject stale bindings and already-consumed approvals.
 
-Scheduled and Remembers snapshots also carry revisions, because their WP7 rows do not. Credentials use main's setup flow and never put secret values into the inbox. Settings changes and ownership operations are renderer-only commands, not model tools.
+Scheduled and Remembers snapshots also carry revisions, because their WP7 rows do not. Credentials use main's setup flow and never put secret values into the inbox. Model, spend, rule and connection settings, and ownership operations, are renderer-only commands. Sidebar views have the local settings tool described below.
 
 ## Host contracts
 

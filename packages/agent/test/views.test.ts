@@ -4,8 +4,9 @@ import { AccountId } from '@juno/agent-cards'
 import { HostChannelId, HostView, OpId } from '@juno/agent-contract'
 import { reply } from '@juno/agent-testing'
 import type { ViewHost } from '../src/view-tools/host'
-import { fakeHost, say } from './turns-harness'
+import { fakeHost, say, turnsHarness } from './turns-harness'
 
+import { activityActions } from '../src/actions/activity'
 import { served, run } from './serve-harness'
 const account = AccountId.make('test-owner')
 let calls = 0
@@ -48,6 +49,7 @@ it.each([false, true])('creates the requested view with Undo; Slack read = %s', 
   ])
   const ended = await h.ended(h.send('make a Bots view with every alerts channel'))
   expect(ended.ending).toEqual({ _tag: 'complete' })
+  if (!tainted) expect(activityActions(h.turns.store, ended.runId)).toEqual([expect.objectContaining({ tier: 1, decision: 'noClick', outcome: 'done' })])
   expect(patterns).toEqual(['*alerts*'])
   const [card] = h.turns.actions.views()
   expect(card?.card._tag).toBe('change')
@@ -57,7 +59,7 @@ it.each([false, true])('creates the requested view with Undo; Slack read = %s', 
     expect(h.turns.actions.approve('apply-view', card!.binding!.identity, card!.binding!.children)).toEqual({ _tag: 'accepted' })
     await h.turns.actions.idle()
   }
-  expect([...local.views.values()]).toEqual([expect.objectContaining({ name: 'Bots', channels: ['C_ALERTS', 'C_BOT'], keepOutOfAll: false })])
+  expect([...local.views.values()], JSON.stringify({ messages: h.turns.messages(), reports: h.reports, authorizations: h.turns.store.db.prepare('SELECT * FROM authorizations').all() })).toEqual([expect.objectContaining({ name: 'Bots', channels: ['C_ALERTS', 'C_BOT'], keepOutOfAll: false })])
   if (!tainted) expect(h.turns.actions.approve('no-second-apply', card!.binding!.identity, card!.binding!.children)).toEqual({ _tag: 'refused', reason: 'stale' })
   const [applied] = h.turns.actions.views()
   expect(applied?.card).toMatchObject({ status: { _tag: 'done', line: 'Applied', undo: true } })
@@ -66,4 +68,23 @@ it.each([false, true])('creates the requested view with Undo; Slack read = %s', 
   expect(local.views.size).toBe(0)
   expect(h.turns.actions.views()[0]?.card).toMatchObject({ status: { _tag: 'done', line: 'Undone' } })
   expect(h.reports).toEqual([])
+})
+
+
+it('keeps Undo across restart and does not replay the view change', async () => {
+  const local = fakeViews()
+  let h = await turnsHarness({ compaction: false, views: local.host })
+  try {
+    h.fake.script([call('juno_views', { _tag: 'create', view: { name: 'Bots', channels: ['C_ALERTS'], keepOutOfAll: true } }), reply(say('Created it.'))])
+    await h.ended(h.send('make a Bots view for the alerts channel'))
+    const binding = h.turns.actions.views()[0]!.binding!
+    await h.stop()
+    h = await turnsHarness({ dir: h.dir, compaction: false, views: local.host })
+    expect(local.views.size).toBe(1)
+    expect(h.turns.actions.views()[0]?.card).toMatchObject({ status: { _tag: 'done', undo: true } })
+    expect(await h.turns.actions.undo(binding.identity)).toBe(true)
+    expect(local.views.size).toBe(0)
+  } finally {
+    await h.close()
+  }
 })

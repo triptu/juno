@@ -79,7 +79,12 @@ export function createViewSettings(context: {
       const intent = intentOf(store, child.id, child.rev)!
       if (store.db.prepare('SELECT 1 FROM authorizations WHERE intent_id = ?').get(intent.id) !== undefined) return { text: 'This view change was already attempted.', isError: true }
       // Authorize before the host call and retain the journal position, as for other local effects.
-      const auth = authorize(store, { intentId: intent.id, originOp: run.opId, position: run.position })
+      // A single-use grant from these owner words, bound to this card. It is never
+      // offered to the dispatcher as a live job/schedule grant or reused after Pause.
+      const grantId = uuidv7(store.now())
+      store.db.prepare('INSERT INTO view_authorities (id, card_id, source_op, source_gen) VALUES (?, ?, ?, ?)')
+        .run(grantId, id, run.opId, child.source)
+      const auth = authorize(store, { intentId: intent.id, grantId, originOp: run.opId, position: run.position })
       if (auth._tag !== 'authorized') return { text: 'Views could not be changed while Juno is paused or unavailable.', isError: true }
       const attempt = recordAttempt(store, auth.id)
       if (attempt === undefined) return { text: 'The view change was cancelled.', isError: true }

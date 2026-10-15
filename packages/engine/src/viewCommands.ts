@@ -215,7 +215,7 @@ export const undoView = (id: string, expected: SavedView | null, restore: SavedV
     const current = (yield* readView(id)) ?? null
     const same = (a: SavedView | null, b: SavedView | null) => a === null || b === null ? a === b :
       a.id === b.id && a.name === b.name && a.icon === b.icon && a.keepOutOfAll === b.keepOutOfAll && a.position === b.position &&
-      [...a.channels].sort().join('\0') === [...b.channels].sort().join('\0')
+      a.channels.toSorted().join('\0') === b.channels.toSorted().join('\0')
     if (same(current, restore)) return true
     if (!same(current, expected)) return false
     const sql = yield* StoreWriter
