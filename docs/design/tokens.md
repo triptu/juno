@@ -256,7 +256,7 @@ Sizes are the Figtree values; the prototype's Inter value is half a pixel smalle
 | Body large | 15px | 400 | 1.6 | 0 | | Unused since the airy density was removed |
 | Heading | 15.5px | 600 | 1.35 | 0 | default | Settings section titles, palette input (400) |
 | Topic title | 20px | 600 | 1.3 | -0.01em | default | Unused since the floating header; the header title is 14px 600 (the Body small size at the semibold weight) |
-| Page title | serif 34px (32 All topics) | 400 | 1.1–1.15 | 0 | default | Notifications, Preferences, All topics |
+| Page title | serif 34px (32 All topics) | 400 | 1.1–1.15 | 0 | default | Settings sections, All topics |
 | Display | serif 38px | 400 | 1.1 | 0 | default | "What do you need?" |
 | Greeting | serif 36px | 400 | 1.15 | 0 | default | Home's first line, "Morning, Tushar." (`--text-greeting-*`) |
 | Empty title | serif 30px | 400 | | | subtle | "Nothing open" |
@@ -349,8 +349,9 @@ All [proto] measured at 1280×800 with Inter unless marked.
 | `--home-width` | 480px: Home's column of item rows and the Ask Juno field |
 | `--page-width-narrow` | 680px |
 | `--page-width` | 720px (Juno) |
-| `--page-width-settings` | 760px: Notifications, Preferences and Settings › Juno, so the settings pages share one column and one title edge |
-| `--settings-label-width` | 104px: the label column of Preferences' rows (Theme, Accent, Density, Hold to peek), so every control starts on one edge |
+| `--page-width-settings` | 760px: every section of Settings, so the sections share one column and one title edge |
+| `--settings-label-width` | 104px: the label column of Settings' rows (Theme, Accent, Density, Hold to peek), so every control starts on one edge |
+| `--settings-nav-width` | 200px: Settings' list of sections, with the sidebar's 10px inset on both sides; fits "Backup & This Mac" |
 | `--palette-width` | 560px, max calc(100% − 48px), top offset 96px |
 | `--palette-list-max-height` | 400px; the palette list scrolls within this height |
 | `--menu-width` | 236px context menu; `--menu-width-account` 248px avatar menu, `--menu-width-browse` 300px, `--menu-width-mention` 280px mention popover, `--menu-width-picker` 340px New chat pickers |
@@ -415,7 +416,7 @@ The `chat` group (`tokens.stylex.ts`). `--owner-bubble-bg` and `--owner-bubble-f
 
 ### Rows
 
-Sidebar row heights per density (Preferences › Appearance; rows include the tile; measured with Inter, 2-line titles do not occur). The two values are 1-line / 2-line previews. The prototype's list and cards styles and its airy density are removed.
+Sidebar row heights per density (Settings › Appearance; rows include the tile; measured with Inter, 2-line titles do not occur). The two values are 1-line / 2-line previews. The prototype's list and cards styles and its airy density are removed.
 
 | Density | Row | Vertical padding | Line gap | Title size |
 | --- | --- | --- | --- | --- |

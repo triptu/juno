@@ -53,7 +53,7 @@ Titles resolve in this order. A title you set by renaming (stored in Juno only) 
 - **Resizing the sidebar.** Drag its right edge to make it between 280 and 480px wide; double-click the edge to go back to 384. The width is remembered. The list does not re-render while you drag.
 - **Hiding the sidebar.** The sidebar button in its top bar, ⌃⌘S, or View › Hide Sidebar hides it; the same again shows it. ⌃⌘S is the macOS standard for Show and Hide Sidebar (Mail, Notes, Reminders and SwiftUI's default sidebar command use it). Dragging the edge far enough left also hides it. Hidden or shown is remembered. While hidden, the traffic lights, the sidebar button, Back and Forward move to the start of the tab strip, so nothing becomes unreachable.
 - **Title bar.** The macOS traffic lights sit in the sidebar's top bar, followed by the sidebar button, Back and Forward. The workspace's top bar is the tab strip. Both bars are window drag regions.
-- **Workspace tabs** work like browser tabs. The "+" button is labelled "New chat" and opens a New chat in a new tab (section 9): a new tab is a new chat. Every page opens in a tab: a topic, a New chat, Home, All topics, Juno, Notifications or Preferences.
+- **Workspace tabs** work like browser tabs. The "+" button is labelled "New chat" and opens a New chat in a new tab (section 9): a new tab is a new chat. Every page opens in a tab: a topic, a New chat, Home, All topics, Juno, a Juno page or Settings.
 - **Home** (section 12) is what the workspace shows with no tab open, and the Home item in the sidebar opens it as a tab.
 - **Reading width.** Message columns are capped around 800px and centered, so long lines stay readable on wide windows.
 
@@ -61,7 +61,7 @@ Titles resolve in this order. A title you set by renaming (stored in Juno only) 
 
 ### Top to bottom
 
-1. **Title bar**: on the left, after the traffic lights, the sidebar button, Back and Forward (section 6); on the right, Search (⌘K), New chat (⌘N, section 9), and your avatar. The avatar menu holds Set yourself away or active, status, Notifications, Preferences, AI assist, switch workspace and sign out. There is no name label, and no footer except the privacy footer while privacy mode is on (below).
+1. **Title bar**: on the left, after the traffic lights, the sidebar button, Back and Forward (section 6); on the right, Search (⌘K), New chat (⌘N, section 9), and your avatar. The avatar menu holds Set yourself away or active, Hide message text, status, Notifications, Settings (⌘,), AI assist, switch workspace and sign out. Notifications and Settings open Settings (section 14) at those sections. Diagnostics are not in the menu; they are in Settings › About. There is no name label, and no footer except the privacy footer while privacy mode is on (below).
 2. **Navigation**: Home, All topics and Juno (⌘J). Only Juno shows a count: its unread messages, as a soft grey tag. A properly spaced hairline separates these from the list.
 3. **Quick filters** on one row: a horizontally scrollable row of pills on the left and an Unread only toggle on the right, an icon pill like Channels and DMs (a box with a dot on its corner) with that tooltip and accessible name, shown pressed while it is on. The pills are All, Channels (a hash icon), DMs (a person icon), then your views (below), then a "+" pill that makes a new view. Channels and DMs are icon-only, with a tooltip and an accessible name. DMs include group DMs. The row never grows taller: when the pills overflow, the row scrolls sideways with the trackpad or the mouse wheel and the list does not move. Unread only stays fixed at the right. There are no counters or dots on it. A small dot appears on Channels or DMs when that group has unread topics you are not viewing.
 4. **Scope chip**, shown only when narrowed to one channel: "#eng ×". Picking a view clears it. Narrowing is rare. It happens from ⌘K (a channel's "Show its topics" result), by clicking a #channel chip in a message, or by clicking a topic's context pill.
@@ -104,7 +104,7 @@ The mode is remembered across a relaunch, and the first frame after a relaunch i
 
 ### Row anatomy
 
-Each row is a tile followed by three lines. The tile is the topic's art: a small AI-drawn illustration about what the topic discusses, with no container. Every topic gets one, including a channel's Main and threads inside DMs. Until the art exists, or when AI is off, the tile shows a calm free-form placeholder shape picked per topic. A DM's Main shows the person's Slack profile photo instead (coloured initials when there is no photo). Line one is the title and time. Line two is a one-line preview of the latest message as "Sender: text", ending with an ellipsis when it does not fit, with any ">" quote lines stripped. Every row is the same height. Line three is meta: channel icon and name, a small stack of participant avatars, and tags such as Main or Reopened. The stack never shows you, and rows in a DM or a group DM (its Main and its threads) have no stack, since the row already names the people. With no stack, the tags take its place at the same gap. There is no message count and no "messages outside threads" label. A Main row may also show a thread icon with the number of threads started in that channel since you last read its Main, hidden when zero. Unread topics have a semibold title and a soft grey count tag. Mentions of you get a quiet "@" tag. Density (Preferences › Appearance, section 14) is the only choice that changes the row.
+Each row is a tile followed by three lines. The tile is the topic's art: a small AI-drawn illustration about what the topic discusses, with no container. Every topic gets one, including a channel's Main and threads inside DMs. Until the art exists, or when AI is off, the tile shows a calm free-form placeholder shape picked per topic. A DM's Main shows the person's Slack profile photo instead (coloured initials when there is no photo). Line one is the title and time. Line two is a one-line preview of the latest message as "Sender: text", ending with an ellipsis when it does not fit, with any ">" quote lines stripped. Every row is the same height. Line three is meta: channel icon and name, a small stack of participant avatars, and tags such as Main or Reopened. The stack never shows you, and rows in a DM or a group DM (its Main and its threads) have no stack, since the row already names the people. With no stack, the tags take its place at the same gap. There is no message count and no "messages outside threads" label. A Main row may also show a thread icon with the number of threads started in that channel since you last read its Main, hidden when zero. Unread topics have a semibold title and a soft grey count tag. Mentions of you get a quiet "@" tag. Density (Settings › Appearance, section 14) is the only choice that changes the row.
 
 ### What shows up
 
@@ -138,7 +138,7 @@ Each row is a tile followed by three lines. The tile is the topic's art: a small
   - Ignore #channel
 - **Channel context menu** (right-click a topic's context pill, a #channel chip in a message, or a channel result in ⌘K): Show its topics, Open Main, Mark channel as read or unread, Notify me, Add to view, Ignore channel, and Ask Juno (section 7, Juno panel).
 - **Person menu** (right-click a sender's name or avatar in a message, or an @person chip): Notify me about them, and Ask Juno.
-- **Peek** is how you read without marking anything read. Hold the peek key while the pointer is over a sidebar row and the topic opens in a popover to the right of the sidebar. It is read-only and scrolls, and it does not mark anything read, open a tab or move focus, so you stay where you were. Moving to another row while holding the key switches the peek; releasing it closes the popover. The key defaults to ⌥ Option, which works while you type; Preferences can change it to Space, which works only when no text field has focus. (Fn is not offered: macOS does not report it to apps reliably.)
+- **Peek** is how you read without marking anything read. Hold the peek key while the pointer is over a sidebar row and the topic opens in a popover to the right of the sidebar. It is read-only and scrolls, and it does not mark anything read, open a tab or move focus, so you stay where you were. Moving to another row while holding the key switches the peek; releasing it closes the popover. The key defaults to ⌥ Option, which works while you type; Settings › General can change it to Space, which works only when no text field has focus. (Fn is not offered: macOS does not report it to apps reliably.)
 - **Rename** happens inline in the row or the topic header. Enter saves and Esc cancels.
 - **Undo toasts** appear bottom-left for reversible actions only. Info-only toasts like "Prompt copied" never show Undo.
 
@@ -426,7 +426,7 @@ Juno remembers the whole chat. Older parts are kept as a summary that grows dens
 - **One Mac at a time.** Juno's state lives on this Mac with an encrypted backup in a folder you choose (under the app's data folder by default). Moving to another Mac is a handover from the old one. A restore from backup opens in recovery (13.7) until you review what was pending.
 The Backup folder path is cut in the middle when it does not fit; hovering shows the full path. Export recovery phrase remains focusable during export and ignores repeat presses. Closing the phrase sheet returns keyboard focus to its opener.
 
-- **Move, restore and activate.** Settings › Juno shows who owns Juno's state, and offers "Export recovery phrase", "Move to another Mac" and "Restore from backup". Move finishes what is running, makes this Mac read-only, writes a final backup and shows a move code; the other Mac restores from it, shows the code of the backup it found, and takes over once you confirm the two codes match. Restore without a move asks you to confirm the old Mac is off, erased, or has Juno removed, and says Juno cannot check this: "If Juno is still running on the old Mac, both Macs can act until it sees this Mac's backup, which happens only if they share a backup folder." Either way Juno opens in recovery: nothing runs, the header chip offers Review, and the Review page lists every pending card with "This may already have happened." Approve the ones you still want, then press "Activate Juno". Cards still open are expired.
+- **Move, restore and activate.** Settings › Backup & This Mac shows who owns Juno's state, and offers "Export recovery phrase", "Move to another Mac" and "Restore from backup". Move finishes what is running, makes this Mac read-only, writes a final backup and shows a move code; the other Mac restores from it, shows the code of the backup it found, and takes over once you confirm the two codes match. Restore without a move asks you to confirm the old Mac is off, erased, or has Juno removed, and says Juno cannot check this: "If Juno is still running on the old Mac, both Macs can act until it sees this Mac's backup, which happens only if they share a backup folder." Either way Juno opens in recovery: nothing runs, the header chip offers Review, and the Review page lists every pending card with "This may already have happened." Approve the ones you still want, then press "Activate Juno". Cards still open are expired.
 - **Removed messages and an older backup.** When Juno restores on a new Mac without a move code, and "Rotate recovery phrase after removals" is off, it cannot tell whether the folder holds your newest backup. The Review page says: "Juno can't check that this backup is the newest. If the folder is out of date, messages you removed may come back. You can remove them again."
 
 ### 13.9 Trust
@@ -448,7 +448,7 @@ The Backup folder path is cut in the middle when it does not fit; hovering shows
 
 ### 13.10 Settings and pages
 
-The Juno header menu (the chevron beside "Juno" in the Juno tab and the panel) opens Scheduled, What Juno remembers, Memory of this chat, Activity, Connections and Settings › Juno. **Settings › Juno** holds the chat model (the newest of Claude Sonnet, Claude Opus, Muse, GPT Sol or Grok, resolved from the provider's catalogue; Sonnet by default; each choice reads as the model's own name and its price, "Claude Sonnet 5.5 · $2 in, $10 out per million tokens"), the compaction model, today's spend and the daily cap ($2 by default; lowering it below today's use blocks new spending without cancelling work already under way), the OpenRouter key (with a line when the provider rejected it) and Codex status. Local Codex uses an isolated sign-in, is available without an API key, and shows ChatGPT-plan turns today instead of a dollar price. Remaining quota is not reported. Settings also holds your rules, Pause, the backup folder with "Rotate recovery phrase after removals" (off by default), and who owns Juno's state with Export recovery phrase, Move to another Mac and Restore from backup (13.8). **Connections** shows each server's state, the address in use, and one "Runs without asking" checkbox per tool. Read and Asks every time chips are omitted. Default is quiet text only for an allowlisted tool changed to ask. Connect and Sign in are secondary buttons; no action on this page is accent-filled. The T3 Code row also holds its address and the switch "Allow T3 Code over the local network", off by default; over the network only an https address works, so with the switch off Juno uses T3 Code on this Mac only.
+The Juno header menu (the chevron beside "Juno" in the Juno tab and the panel) opens Scheduled, What Juno remembers, Memory of this chat, Activity, Connections and Settings. Connections and Settings are sections of the one Settings page (section 14); the menu's Settings opens it at Juno. **Settings › Juno** holds the provider and its key (the OpenRouter key, with a line when the provider rejected it, or an OpenAI-compatible endpoint), the chat model (the newest of Claude Sonnet, Claude Opus, Muse, GPT Sol or Grok, resolved from the provider's catalogue; Sonnet by default; each choice reads as the model's own name and its price, "Claude Sonnet 5.5 · $2 in, $10 out per million tokens"), the compaction model, today's spend and the daily cap ($2 by default; lowering it below today's use blocks new spending without cancelling work already under way), Codex status, your rules and Pause. Local Codex uses an isolated sign-in, is available without an API key, and shows ChatGPT-plan turns today instead of a dollar price. Remaining quota is not reported. **Settings › Backup & This Mac** holds the backup folder with "Rotate recovery phrase after removals" (off by default), and who owns Juno's state with Export recovery phrase, Move to another Mac and Restore from backup (13.8); with no provider no agent runs, so it points to Settings › Juno. **Settings › Connections** shows each server's state, the address in use, and one "Runs without asking" checkbox per tool. Read and Asks every time chips are omitted. Default is quiet text only for an allowlisted tool changed to ask. Connect and Sign in are secondary buttons; no action on this page is accent-filled. The T3 Code row also holds its address and the switch "Allow T3 Code over the local network", off by default; over the network only an https address works, so with the switch off Juno uses T3 Code on this Mac only.
 
 ### 13.11 Writing
 
@@ -462,7 +462,7 @@ Your bubble within a frame of Enter. A reaction on its bubble within a frame of 
 
 Destructive actions and purchases, a mobile surface, more than one person in the chat, live sync across two running Macs, and messages Juno sends on its own that you did not set up.
 
-## 14. Notifications and preferences
+## 14. Notifications and settings
 
 Everything is always visible when you open Juno. Notification settings only decide when the operating system interrupts you, which is the main fix for constant pings during a manager's day. Juno's judgement does most of the work; you set a few things in plain words. Design: `docs/design/notifications/`.
 
@@ -489,19 +489,27 @@ The order: ignored channel → Every message (thread, channel or person) → Nev
 | A job you started finished | Now inside notification hours, in the summary outside them |
 | A job started | None |
 
-**Preferences** holds the **ignore list** for noisy channels such as alerts and deploys. Ignored channels are hidden from topics, search and All topics, and never notify. Nothing changes in Slack. You can also ignore a channel from any context menu, with undo.
+**Settings** (⌘,) is the one place for everything you set, in the app and for Juno Agent. It opens in a tab like any page, and there is one Settings tab. A quiet list of sections runs down its left side, as in a Mac app's settings, and the open section shows beside it in the settings column:
 
-**Appearance**, also in Preferences, has three choices and nothing else:
+- **General**: the peek key (section 5) and Use fast classifier (section 15).
+- **Appearance**, **Notifications** (the settings above), **Ignored** and **About**, below.
+- **Juno**, **Connections**, and **Backup & This Mac** (section 13.10).
+
+⌘,, the avatar menu's Settings and Juno › Settings… in the app menu open it at General. The avatar menu's Notifications opens it at Notifications. The Juno menu's Settings, and Add a provider when Juno needs a model, open it at Juno, with the key field focused while no provider is set up. Picking a section shows it in the same tab and adds nothing to Back.
+
+**Settings › Ignored** holds the **ignore list** for noisy channels such as alerts and deploys. Ignored channels are hidden from topics, search and All topics, and never notify. Nothing changes in Slack. You can also ignore a channel from any context menu, with undo.
+
+**Settings › Appearance** has three choices and nothing else:
 
 - **Theme:** System (the default), Light or Dark.
 - **Accent:** the accent colours in `docs/design/tokens.md`, Coral by default.
 - **Density:** Comfortable (the default) or Compact, which fits more text in the sidebar and the messages.
 
-**About**, in Preferences, shows the version and an opt-in "Download updates automatically" setting. Checks and downloads are quiet. Once downloaded, one line says "Juno {version} is ready" with **Restart to update**. Updates are off in development and tests; ordinary quit never installs an update.
+**Settings › About** shows the version and an opt-in "Download updates automatically" setting. Checks and downloads are quiet. Once downloaded, one line says "Juno {version} is ready" with **Restart to update**. Updates are off in development and tests; ordinary quit never installs an update. About also holds the diagnostics: the sync engine's state ("Engine catching up, 30 of 143") and Ping engine.
 
-![Preferences with ignored channels](screenshots/13-ui.png)
+![The ignore list, in an earlier design where it sat on a Preferences page](screenshots/13-ui.png)
 
-*Figure 13. Preferences and the ignore list.*
+*Figure 13. The ignore list, from an earlier design; it is now Settings › Ignored.*
 
 ## 15. AI system
 
@@ -521,21 +529,21 @@ Split the AI work into two kinds. **Decisions** are fast, cheap and structured: 
 
 Things AI must not do: send anything without a click, rewrite your voice (the one exception is the nudge draft when a reply watch runs out, 13.6), add "needs you" style labels to the sidebar, or create noise to look helpful. A global AI assist switch turns off every AI surface, the Juno chat included.
 
-The Juno chat runs apart from the decision features: its own process, its own memory, and a chat model you pick in Settings (section 13.10) from OpenRouter or a local Codex. The decision features keep the fast path above. Preferences has a Use fast classifier switch, on by default; turning it off uses the decision chat model instead.
+The Juno chat runs apart from the decision features: its own process, its own memory, and a chat model you pick in Settings (section 13.10) from OpenRouter or a local Codex. The decision features keep the fast path above. Settings › General has a Use fast classifier switch, on by default; turning it off uses the decision chat model instead.
 
 ## 16. Visual system
 
 Use the Littlebird design system's tokens.
 
-- **Colour.** Warm paper backgrounds (hsla 48 50% 98%). Warm near-black text. Nearly invisible borders. A single accent, chosen in Preferences › Appearance (section 14).
-- **Type.** Söhne for UI and Meraki serif only for page titles such as "All topics", "Notifications" and "Preferences".
+- **Colour.** Warm paper backgrounds (hsla 48 50% 98%). Warm near-black text. Nearly invisible borders. A single accent, chosen in Settings › Appearance (section 14).
+- **Type.** Söhne for UI and Meraki serif only for page titles such as "All topics" and the sections of Settings.
 - **Icons.** Lucide outline icons, tinted with the surrounding text colour.
 - **Radii.** 6–10px. Inner and outer radii nest, so the outer radius equals the inner radius plus the padding.
 - **Surfaces.** Popovers, menus and toolbars float on a layered shadow ring, not a hard border. Cards use a 1px shadow ring. Inputs keep a soft border.
 - **Page headers** (a topic, the Juno tab, the Juno panel) have no bar and no rule. Their controls sit in solid pill-shaped islands over the content, which scrolls under them and fades out below them. No blur.
 - **Bubbles** (the Juno chat, section 13.1). Yours take the owner fill, pending the owner's choice between the four options in `docs/design/juno-chat/` (section 19); Juno's take the hover surface. Radius 16 with a 4px tail corner on the last bubble of a group, text at 14px, at most three quarters of the column wide. Cards under a bubble take the card radius, the soft shadow in light and the ring in dark.
 - **Context tints** for channel types: neutral for public, amber for private, blue for DMs.
-- **Dark mode** uses the cool near-black system palette. Theme is chosen in Preferences › Appearance and follows the system by default. Switching theme suppresses transitions so colours change in one frame.
+- **Dark mode** uses the cool near-black system palette. Theme is chosen in Settings › Appearance and follows the system by default. Switching theme suppresses transitions so colours change in one frame.
 
 ![Juno in dark mode](screenshots/15-ui.png)
 
@@ -576,6 +584,7 @@ Use the Littlebird design system's tokens.
 | Keys | Action |
 | --- | --- |
 | ⌘K | Search and commands |
+| ⌘, | Settings (section 14) |
 | ⌘N or ⌘T | New chat in a new tab (section 9) |
 | ⌘W / ⌘⇧T | Close the tab / reopen the last closed tab |
 | ⌘1 to ⌘8, ⌘9 | Go to that tab, or the last tab |

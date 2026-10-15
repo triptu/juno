@@ -690,14 +690,14 @@ lint/typecheck. Heavy checks run through `pnpm affected` on Namespace.
    creates the version tag there; the build still comes from the source tag.
 5. Review the artifacts and signing/notarization results before publishing the
    draft. Never publish the unsigned fallback as an update. On another Mac,
-   install the prior signed build, opt into updates in Preferences › About,
+   install the prior signed build, opt into updates in Settings › About,
    publish the newer signed release, and check **Restart to update**. This
    cross-version signature and installation check requires the owner's ID and
    cannot be verified by the unsigned smoke.
 
 Updates are off by default and unavailable without a configured feed, in
 development, and in tests. An enabled install checks 30 seconds after launch and every six hours, quietly downloads,
-and shows a single ready line in Preferences › About. Closing the app does not
+and shows a single ready line in Settings › About. Closing the app does not
 install the update; only **Restart to update** does. Turning the setting off
 cancels a download and suppresses the ready line. Errors retry quietly later.
 
