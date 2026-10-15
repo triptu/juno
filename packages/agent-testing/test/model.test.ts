@@ -2,7 +2,7 @@
 import { expect, it } from 'vitest'
 import { fauxToolCall, type AssistantMessage, type AssistantMessageEvent, type Context } from '@earendil-works/pi-ai'
 import { compactionTask, start } from '@juno/agent-memory'
-import { fakeProvider, lostStream, rateLimited, rejectedKey, reply, serverError, type FakeProvider } from '../src/index'
+import { fakeReview, fakeProvider, lostStream, rateLimited, rejectedKey, reply, serverError, type FakeProvider } from '../src/index'
 
 const ask = (text: string): Context => ({ messages: [{ role: 'user', content: text, timestamp: 0 }] })
 const text = (m: AssistantMessage) => m.content.map((c) => (c.type === 'text' ? c.text : '')).join('')
@@ -94,4 +94,14 @@ it('answers compaction tasks deterministically, outside the chat script', async 
   expect(second).toBe(text(first))
   expect(first.content.some((c) => c.type === 'toolCall')).toBe(false)
   expect(fake.pending()).toBe(1)
+})
+
+it.each([
+  ['save a note on server-00000000-0000-0000-0000-00000000add0', 'implied'],
+  ['save a note about the address', 'implied'],
+  ['Add, please, a note on the server.', 'explicit'],
+  ['', 'notAsked'],
+])('the fake reviewer reads action words in %j', (owner, intent) => {
+  expect(fakeReview({ state: { owner: [owner], call: { server: 'Notes', tool: 'add_material', args: '{}' } } }))
+    .toEqual({ intent, risk: 'reversible' })
 })
