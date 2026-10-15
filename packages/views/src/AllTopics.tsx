@@ -167,12 +167,12 @@ export const AllTopicsRow = memo(function AllTopicsRow({
         </Chip>
       </span>
       <span role="gridcell" {...stylex.props(styles.cell, styles.end)}>
-        <Text variant="ui" tone="subtle" numeric>
+        <Text variant="ui" tone="subtle" numeric sx={styles.messageCount}>
           {row.messageCount}
         </Text>
       </span>
       <span role="gridcell" {...stylex.props(styles.cell, styles.end)}>
-        <Text variant="ui" tone="muted" numeric>
+        <Text variant="ui" tone="muted" numeric sx={styles.time}>
           {time}
         </Text>
       </span>
@@ -298,13 +298,15 @@ export function AllTopics({
           </div>
           <div {...stylex.props(styles.selects)}>
             <Select size={30} label="Kind" value={filter.kind} options={KIND_OPTIONS} onChange={(event) => onKind(event.currentTarget.value as KindFilter)} />
-            <Select
-              size={30}
-              label="Where"
-              value={filter.scope ?? ANYWHERE}
-              options={[{ value: ANYWHERE, label: 'Anywhere' }, ...places.map((place) => ({ value: place.id, label: place.label }))]}
-              onChange={(event) => onScope(event.currentTarget.value === ANYWHERE ? undefined : event.currentTarget.value)}
-            />
+            <span {...stylex.props(styles.place)}>
+              <Select
+                size={30}
+                label="Where"
+                value={filter.scope ?? ANYWHERE}
+                options={[{ value: ANYWHERE, label: 'Anywhere' }, ...places.map((place) => ({ value: place.id, label: place.label }))]}
+                onChange={(event) => onScope(event.currentTarget.value === ANYWHERE ? undefined : event.currentTarget.value)}
+              />
+            </span>
             <Select size={30} label="Sort" value={filter.sort} options={SORT_OPTIONS} onChange={(event) => onSort(event.currentTarget.value as AllTopicsSort)} />
           </div>
         </div>
@@ -450,8 +452,16 @@ const styles = stylex.create({
     flexWrap: 'wrap',
     gap: spacing['--space-0-5'],
   },
+  time: { width: sizes['--topic-time-width'] },
+  messageCount: { width: sizes['--control-40'] },
   count: {
+    display: 'inline-block',
+    width: sizes['--control-40'],
     marginInlineStart: spacing['--space-1-5'],
+  },
+  place: {
+    display: 'grid',
+    width: layout['--all-topics-place-width'],
   },
   selects: {
     display: 'flex',
@@ -463,7 +473,6 @@ const styles = stylex.create({
     flexGrow: 1,
     minHeight: 0,
     overflow: 'auto',
-    // The gutter stays when nothing overflows, so the column heads do not move when a filter empties the table.
     scrollbarGutter: 'stable',
     overscrollBehavior: 'contain',
   },

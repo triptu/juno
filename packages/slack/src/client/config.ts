@@ -29,8 +29,8 @@ export interface SlackConfigShape {
   readonly lanes: {
     readonly interactiveConcurrency: number
     readonly backgroundConcurrency: number
-    /** Minimum spacing between two background starts. 1500 ms is 40 calls per minute. */
-    readonly backgroundMinIntervalMillis: number
+    /** Override per-method background spacing; zero disables pacing in fake-server tests. */
+    readonly backgroundMinIntervalMillis?: number
     readonly sendConcurrency: number
   }
   readonly socket: {
@@ -63,7 +63,6 @@ export const defaultSlackConfig: SlackConfigShape = {
   lanes: {
     interactiveConcurrency: 3,
     backgroundConcurrency: 2,
-    backgroundMinIntervalMillis: 1_500,
     sendConcurrency: 1,
   },
   socket: {

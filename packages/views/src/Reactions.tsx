@@ -36,13 +36,13 @@ export function Reactions({ reactions, onToggle }: ReactionsProps) {
         )
         // The emoji is hidden and the title is not read reliably, so the item carries the words.
         return onToggle === undefined ? (
-          <span role="listitem" aria-label={label} key={reaction.name}>
+          <span role="listitem" aria-label={label} key={reaction.name} {...stylex.props(styles.item)}>
             <Chip variant={reaction.me ? 'soft' : 'outline'} size={24} numeric title={label}>
               {content}
             </Chip>
           </span>
         ) : (
-          <span role="listitem" key={reaction.name}>
+          <span role="listitem" key={reaction.name} {...stylex.props(styles.item)}>
             <Chip interactive variant="surface" size={24} numeric pressed={reaction.me} title={label} aria-label={label} onClick={() => onToggle(reaction.name)}>
               {content}
             </Chip>
@@ -56,9 +56,16 @@ export function Reactions({ reactions, onToggle }: ReactionsProps) {
 const styles = stylex.create({
   row: {
     display: 'flex',
-    flexWrap: 'wrap',
+    flexWrap: 'nowrap',
+    overflowX: 'auto',
+    scrollbarWidth: 'none',
+    maxWidth: '100%',
     gap: spacing['--space-1'],
     marginTop: spacing['--space-1-5'],
+  },
+  item: {
+    display: 'flex',
+    flexShrink: 0,
   },
   image: {
     width: CHIP_EMOJI_SIZE,

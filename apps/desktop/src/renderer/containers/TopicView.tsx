@@ -319,7 +319,27 @@ function Topic({ id, detail, readOnly = false, underHeader = true }: TopicProps)
   const agentOn = useAtomValue(junoAvailableAtom)
   const panelOpen = useAtomValue(junoPanelOpenAtom)
 
+  // What Slack has that the store lacks, once per mount; a hidden tab coming back does not ask again.
+  const [fetchState, setFetchState] = useState<'pending' | 'done' | 'offline'>('pending')
+  const fetched = useRef(false)
+  useEffect(() => {
+    if (fetched.current) return
+    fetched.current = true
+    void fetchTopic(registry, id).then((exit) => setFetchState(exit._tag === 'Success' && (exit.value.outcome === 'fetched' || exit.value.outcome === 'cached') ? 'done' : 'offline'))
+  }, [id])
+  const [slow, setSlow] = useState(false)
+  useEffect(() => {
+    if (fetchState !== 'pending') return
+    const timer = setTimeout(() => setSlow(true), LOADING_DELAY_MS)
+    return () => clearTimeout(timer)
+  }, [fetchState])
+
+  // A partial cache is not an opening window. The header and composer paint immediately;
+  // messages wait for coverage, or show the available cache when fetching cannot finish.
   const [positioned, setPositioned] = useState(false)
+  const contextLoaded = readAtOpen.lastReadTs === undefined || (list.order[0] !== undefined && list.order[0] <= readAtOpen.lastReadTs)
+  const showWindow = positioned || (list.meta.windowCovered === true && (contextLoaded || fetchState === 'done')) || fetchState === 'offline' || (fetchState === 'done' && list.order.length >= list.spec.limit)
+
   // Until the first frame is presented, only the rows from `firstRows()` above the open position down are drawn.
   const [drawnAll, setDrawnAll] = useState(false)
   const [atBottom, setAtBottom] = useState(true)
@@ -350,7 +370,7 @@ function Topic({ id, detail, readOnly = false, underHeader = true }: TopicProps)
   // The open position, before the first frame with rows is painted.
   useLayoutEffect(() => {
     const scroller = scrollRef.current
-    if (scroller === null || positioned || !list.ready || last === undefined) return
+    if (scroller === null || positioned || !showWindow || !list.ready || last === undefined) return
     const snapshot = readOnly ? undefined : registry.get(scrollSnapshotAtom(id))
     const row = snapshot === undefined ? null : scroller.querySelector(rowSelector(snapshot.anchorKey))
     pin.current =
@@ -370,7 +390,7 @@ function Topic({ id, detail, readOnly = false, underHeader = true }: TopicProps)
     setFar(distance > scroller.clientHeight)
     setSeenTs(last)
     setPositioned(true)
-  }, [id, readOnly, positioned, list.ready, list.rows, last, atEnd])
+  }, [id, readOnly, positioned, showWindow, list.ready, list.rows, last, atEnd])
 
   // A Juno source link or a notification asked for a message: once the topic is positioned and the row is in its
   // window, it is scrolled into view if it is not, and flashes. Each request is taken once, so showing a hidden tab
@@ -401,7 +421,7 @@ function Topic({ id, detail, readOnly = false, underHeader = true }: TopicProps)
   useLayoutEffect(() => {
     const scroller = scrollRef.current
     if (scroller !== null && positioned) hold(scroller, pin, pinnedTop)
-  }, [positioned, first, drawnAll])
+  }, [positioned, first, drawnAll, list.rows])
 
   // A wider or narrower window reflows the rows; at the bottom, stay there. Resize runs before the frame's paint.
   useEffect(() => {
@@ -416,10 +436,10 @@ function Topic({ id, detail, readOnly = false, underHeader = true }: TopicProps)
 
   // `juno.topic-open` (or `juno.tab-switch` back to an unmounted tab): to the first frame with the header and the list in place.
   useLayoutEffect(() => {
-    if (!list.ready || (list.order.length > 0 && !positioned)) return
+    if (!list.ready || (showWindow && list.order.length > 0 && !positioned)) return
     const started = takeOpenStart(id)
     if (started !== undefined) afterPaint(() => measure(started.name, started.at, { detail: { id, rows: list.order.length } }))
-  }, [id, list.ready, list.order.length, positioned])
+  }, [id, list.ready, list.order.length, positioned, showWindow])
 
   // The rows above the first frame's, once it is on screen; scroll anchoring keeps the rows in view still.
   useEffect(() => {
@@ -526,21 +546,6 @@ function Topic({ id, detail, readOnly = false, underHeader = true }: TopicProps)
     return () => observer.disconnect()
   }, [id, drawnAll, older, first])
 
-  // What Slack has that the store lacks, once per mount; a hidden tab coming back does not ask again.
-  const [fetchState, setFetchState] = useState<'pending' | 'done' | 'offline'>('pending')
-  const fetched = useRef(false)
-  useEffect(() => {
-    if (fetched.current) return
-    fetched.current = true
-    void fetchTopic(registry, id).then((exit) => setFetchState(exit._tag === 'Success' && exit.value.outcome === 'offline' ? 'offline' : 'done'))
-  }, [id])
-  const [slow, setSlow] = useState(false)
-  useEffect(() => {
-    if (fetchState !== 'pending') return
-    const timer = setTimeout(() => setSlow(true), LOADING_DELAY_MS)
-    return () => clearTimeout(timer)
-  }, [fetchState])
-
   // The read rule. Opening, and showing the tab again, marks the topic read. A preview never does.
   useEffect(() => {
     if (!readOnly && shouldMarkRead('open', { active: true, focused: true, atBottom: false })) void markRead(id)
@@ -583,7 +588,7 @@ function Topic({ id, detail, readOnly = false, underHeader = true }: TopicProps)
 
   const items = itemsOf(list)
   const rows = firstRows()
-  const openAt = drawnAll ? list.order.length : openIndex(list, at, readOnly ? undefined : registry.get(scrollSnapshotAtom(id)))
+  const openAt = openIndex(list, at, readOnly ? undefined : registry.get(scrollSnapshotAtom(id)))
   const from = drawnAll ? 0 : Math.max(0, openAt - rows)
   const shown = from === 0 ? items : items.slice(from)
   const eager = eagerRows(list.order, openAt, heldAt === undefined ? -1 : list.order.indexOf(heldAt), rows)
@@ -595,17 +600,17 @@ function Topic({ id, detail, readOnly = false, underHeader = true }: TopicProps)
 
   // An empty list says nothing until Slack has answered or 300 ms have passed.
   const status: MessageListStatus =
-    list.order.length > 0 ? 'ready' : fetchState === 'offline' ? 'offline' : list.ready && fetchState === 'done' ? 'ready' : slow ? 'loading' : 'pending'
+    showWindow && list.order.length > 0 ? 'ready' : fetchState === 'offline' ? 'offline' : list.ready && fetchState === 'done' ? 'ready' : slow ? 'loading' : 'pending'
 
   const messages = (
     <MessageList
-      items={shown}
+      items={showWindow ? shown : []}
       eager={eager}
-      notDrawnAbove={from}
+      notDrawnAbove={showWindow ? from : 0}
       main={main}
       now={now}
       status={status}
-      older={list.order.length === 0 ? 'none' : older}
+      older={!showWindow || list.order.length === 0 ? 'none' : older}
       {...(dividerBefore === undefined ? {} : { dividerBefore })}
       scrollRef={scrollRef}
       underHeader={underHeader}
@@ -624,6 +629,7 @@ function Topic({ id, detail, readOnly = false, underHeader = true }: TopicProps)
             onDiscard: discard,
             onMessageMenu: messageActions.onMessageMenu,
             actions: messageActions.actions,
+            activeMessage: messageActions.activeMessage,
             confirmingDelete: messageActions.confirmingDelete,
             editing: messageActions.editing,
             onRowKey: messageActions.onRowKey,

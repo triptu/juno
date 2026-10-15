@@ -1,6 +1,6 @@
 import { SEARCH_LIMIT_MAX, SEARCH_PLACES_MAX, type SearchMessage, type SearchPlace, type SearchResult } from '@juno/contract'
-import { firstWords, mainLabel, mainTopicId, threadTopicId, tsToMillis, type ChannelId, type ConversationKind, type Ts } from '@juno/domain'
-import { messageBody, plainText } from '@juno/richtext'
+import { FALLBACK_TITLE_WORDS, firstWords, mainLabel, mentionedUserIds, mainTopicId, threadTopicId, tsToMillis, type ChannelId, type ConversationKind, type Ts } from '@juno/domain'
+import { messageBody, plainText, type Lookups, type MessageContent } from '@juno/richtext'
 import { ftsQuery, StoreReader, type SqlClient } from '@juno/store'
 import { Effect } from 'effect'
 import { channelInfoOf, channelRefOf, parseIds, personFrom, userName, type UserRow } from '../topicRows'
@@ -23,6 +23,9 @@ interface TopicHit {
 }
 
 interface MessageHit {
+  readonly attachments_json?: string | null
+  readonly blocks_json?: string | null
+  readonly bot_name?: string | null
   readonly channel: string
   readonly ts: string
   readonly thread_ts: string | null
@@ -56,7 +59,7 @@ export function searchStatements(sql: SqlClient.SqlClient, query: string, limit:
       (SELECT d.id FROM conversations d WHERE d.kind = 'im' AND d.user_id = u.id AND d.is_member = 1
         AND EXISTS (SELECT 1 FROM topic_index t WHERE t.topic_id = 'm:' || d.id) ORDER BY d.id LIMIT 1) AS dm
     FROM people_fts f JOIN users u ON u.rowid = f.rowid WHERE people_fts MATCH ${query} AND u.deleted = 0 ORDER BY f.rank, u.id LIMIT ${places}`
-  const messages = sql<MessageHit>`SELECT m.channel, m.ts, m.thread_ts, m.reply_count, m.user_id, m.text
+  const messages = sql<MessageHit>`SELECT m.channel, m.ts, m.thread_ts, m.reply_count, m.user_id, m.text, m.blocks_json, m.attachments_json, m.bot_name
     FROM messages_fts f JOIN messages m ON m.rowid = f.rowid JOIN conversations c ON c.id = m.channel
     LEFT JOIN ignored_channels g ON g.channel = m.channel
     WHERE messages_fts MATCH ${query} AND m.deleted = 0 AND c.is_member = 1 AND g.channel IS NULL ORDER BY f.rank, m.channel, m.ts LIMIT ${limit}`
@@ -116,8 +119,18 @@ function placeOf(places: ReadonlyMap<string, SearchPlace>, id: string): SearchPl
   return place
 }
 
-const topicTitle = (hit: Pick<TopicHit, 'kind' | 'named_title' | 'title'>, place: SearchPlace): string =>
-  hit.kind === 'main' ? mainLabel({ id: place.id as ChannelId, kind: place.kind, name: place.name }) : hit.named_title || firstWords(hit.title) || place.label
+/** `lookups` names the people a fallback title mentions: "@Maya fix the…", never `<@U…>`. */
+const topicTitle = (hit: Pick<TopicHit, 'kind' | 'named_title' | 'title'>, place: SearchPlace, lookups: Lookups = {}): string =>
+  hit.kind === 'main'
+    ? mainLabel({ id: place.id as ChannelId, kind: place.kind, name: place.name })
+    : hit.named_title || firstWords(hit.title, FALLBACK_TITLE_WORDS, lookups) || place.label
+
+/** Names for the people the fallback titles of `texts` mention. */
+const titleLookups = (sql: SqlClient.SqlClient, texts: ReadonlyArray<string>) =>
+  Effect.gen(function* () {
+    const users = yield* readUsers(sql, new Set(texts.flatMap((text) => mentionedUserIds(text))))
+    return { user: (id: string) => (users.has(id) ? userName(id, users.get(id)) : undefined) } satisfies Lookups
+  })
 
 /** One line, for a result's sub line. */
 const oneLine = (text: string): string => text.replace(/\s+/g, ' ').trim()
@@ -137,7 +150,14 @@ export const messageResults = (
       FROM topic_index i LEFT JOIN topic_overlay o ON o.topic_id = i.topic_id WHERE i.topic_id IN ${sql.in(topicIds)}`) titles.set(row.id, row)
     const places = yield* readPlaces(sql, new Set(hits.map((hit) => hit.channel)))
     const mentioned = (pattern: RegExp) => hits.flatMap((hit) => [...hit.text.matchAll(pattern)].map((match) => match[1] as string))
-    const users = yield* readUsers(sql, new Set([...hits.flatMap((hit) => (hit.user_id === null ? [] : [hit.user_id])), ...mentioned(/<@([A-Z0-9]+)/g)]))
+    const users = yield* readUsers(
+      sql,
+      new Set([
+        ...hits.flatMap((hit) => (hit.user_id === null ? [] : [hit.user_id])),
+        ...mentioned(/<@([A-Z0-9]+)/g),
+        ...[...titles.values()].flatMap((known) => mentionedUserIds(known.title)),
+      ]),
+    )
     const channelIds = [...new Set(mentioned(/<#([A-Z0-9]+)/g))]
     const channelNames = new Map(
       channelIds.length === 0 ? [] : (yield* sql<{ id: string; name: string | null }>`SELECT id, name FROM conversations WHERE id IN ${sql.in(channelIds)}`).map((row) => [row.id, row.name ?? row.id]),
@@ -147,7 +167,12 @@ export const messageResults = (
       const place = placeOf(places, hit.channel)
       const known = titles.get(hit.topicId)
       const main = hit.topicId.startsWith('m:')
-      const title = known !== undefined ? topicTitle(known, place) : main ? mainLabel({ id: place.id as ChannelId, kind: place.kind, name: place.name }) : firstWords(hit.text) || place.label
+      const title =
+        known !== undefined
+          ? topicTitle(known, place, lookups)
+          : main
+            ? mainLabel({ id: place.id as ChannelId, kind: place.kind, name: place.name })
+            : firstWords(hit.text, FALLBACK_TITLE_WORDS, lookups) || place.label
       return {
         kind: 'message',
         id: `${hit.channel}:${hit.ts}`,
@@ -155,8 +180,8 @@ export const messageResults = (
         title,
         ts: hit.ts,
         place,
-        sender: hit.user_id === null ? (hit.username ?? '') : userName(hit.user_id, users.get(hit.user_id)),
-        text: oneLine(plainText(messageBody({ text: hit.text }, lookups))),
+        sender: hit.bot_name ?? (hit.user_id === null ? (hit.username ?? '') : userName(hit.user_id, users.get(hit.user_id))),
+        text: oneLine(plainText(messageBody({ text: hit.text, attachments: hit.attachments_json ? JSON.parse(hit.attachments_json) as MessageContent['attachments'] : undefined, blocks: hit.blocks_json ? JSON.parse(hit.blocks_json) as MessageContent['blocks'] : undefined }, lookups))),
         stored: hit.stored,
       }
     })
@@ -176,7 +201,8 @@ export const querySearch = Effect.fn('search.query')(function* (text: string, re
     const recent = yield* sql.unsafe<TopicHit>(`SELECT ${topicColumns} FROM topic_index i ${topicJoins}
       WHERE ${visible} ORDER BY i.last_activity_ts DESC, i.topic_id LIMIT ?`, [limit])
     const places = yield* readPlaces(sql, new Set(recent.map((hit) => hit.channel)))
-    return recent.map((hit) => topicResult(hit, placeOf(places, hit.channel)))
+    const names = yield* titleLookups(sql, recent.map((hit) => hit.title))
+    return recent.map((hit) => topicResult(hit, placeOf(places, hit.channel), names))
   }
   // Only the last word is a prefix, matching an input still being typed.
   const statements = searchStatements(sql, `${terms}*`, limit)
@@ -186,10 +212,11 @@ export const querySearch = Effect.fn('search.query')(function* (text: string, re
   const topics = room > 0 ? yield* statements.topics : []
   const messages = room - topics.length > 0 ? yield* statements.messages : []
   const places = yield* readPlaces(sql, new Set([...channels.map((hit) => hit.id), ...topics.map((hit) => hit.channel)]))
+  const names = yield* titleLookups(sql, topics.map((hit) => hit.title))
   const results: SearchResult[] = [
     ...channels.map((hit): SearchResult => ({ kind: 'channel', id: hit.id, place: placeOf(places, hit.id), ...(hit.main === 1 ? { mainId: mainTopicId(hit.id as ChannelId) } : {}) })),
     ...people.map((hit): SearchResult => ({ kind: 'person', id: hit.id, person: personFrom(hit.id, hit), ...(hit.dm === null ? {} : { mainId: mainTopicId(hit.dm as ChannelId) }) })),
-    ...topics.slice(0, room).map((hit) => topicResult(hit, placeOf(places, hit.channel))),
+    ...topics.slice(0, room).map((hit) => topicResult(hit, placeOf(places, hit.channel), names)),
   ]
   const left = limit - results.length
   if (left <= 0) return results
@@ -197,6 +224,6 @@ export const querySearch = Effect.fn('search.query')(function* (text: string, re
   return [...results, ...(yield* messageResults(found))]
 })
 
-function topicResult(hit: TopicHit, place: SearchPlace): SearchResult {
-  return { kind: 'topic', id: hit.id, title: topicTitle(hit, place), place, at: millisOf(hit.last_activity_ts) }
+function topicResult(hit: TopicHit, place: SearchPlace, names: Lookups): SearchResult {
+  return { kind: 'topic', id: hit.id, title: topicTitle(hit, place, names), place, at: millisOf(hit.last_activity_ts) }
 }

@@ -81,7 +81,7 @@ export const Events = {
  * The app-menu items main hands to the renderer (architecture, shortcuts):
  * the tab keys, Back and Forward (also the three-finger swipe), Hide
  * Sidebar, Hide Message Text (⌃⌘H), ⌘J for Juno, ⌘K for the palette, Edit › Undo, which undoes typing in a text field or else
- * Juno's last action, and Settings (⌘,), which opens Preferences.
+ * Juno's last action, and Settings (⌘,), which opens Settings.
  */
 export type MenuCommand =
   | 'tab.new'
@@ -97,7 +97,7 @@ export type MenuCommand =
   | 'juno.toggle'
   | 'palette.toggle'
   | 'edit.undo'
-  | 'preferences.open'
+  | 'settings.open'
 
 /** One item of a context menu the renderer asks for, or a separator. */
 export type ContextMenuLeaf =
@@ -124,6 +124,9 @@ export interface ContextMenuAt {
 
 /** The sidebar's width range in CSS pixels, and the width a double-click on its edge resets to (spec section 4). */
 export const SIDEBAR_WIDTH = { min: 280, max: 480, default: 384 } as const
+
+/** The Juno panel's width in CSS pixels: `--juno-panel-min-width`, `--juno-panel-max-width` and `--juno-panel-width`. */
+export const JUNO_PANEL_WIDTH = { min: 360, max: 640, default: 440 } as const
 
 /** The tag the preload puts on the `window.postMessage` that forwards the port. */
 export const PORT_HANDOFF_TAG = 'juno.enginePort'

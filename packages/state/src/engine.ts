@@ -9,6 +9,27 @@ export const engineStatusAtom = liveQuery(engineStatus)(undefined)
 
 export const pingCommand = command(enginePing)
 
+/** How far the first sync has come: conversations read out of all, both absent while it is still listing them. */
+export interface SyncProgress {
+  readonly done?: number
+  readonly total?: number
+}
+
+/**
+ * The first sync's progress for the sidebar, while it runs: the cold boot
+ * of an empty store (the engine marks its phases `first`). Undefined
+ * otherwise, so a later catch-up shows nothing.
+ */
+export const syncProgressAtom = Atom.make((get): SyncProgress | undefined => {
+  if (get(connectionStateAtom) !== 'connected') return undefined
+  const status = get(engineStatusAtom)
+  if (status._tag !== 'Success') return undefined
+  const phase = status.value.phase
+  if (phase._tag === 'booting' && phase.first === true) return {}
+  if (phase._tag === 'catching-up' && phase.first === true) return { done: phase.done, total: phase.total }
+  return undefined
+})
+
 /** Why the sidebar may be behind Slack. `stopped`: the engine has stopped for good and needs a restart. */
 export type SyncNotice = 'offline' | 'rate-limited' | 'stopped'
 

@@ -10,9 +10,10 @@ import { compareTs, mainTopicId, threadTopicId, type ChannelId, type Ts } from '
 import { isReply, type Message } from '@juno/slack-schema'
 import { Invalidation, StoreWriter, transaction, type MessageRow, type SqlError } from '@juno/store'
 import { Effect, Queue } from 'effect'
-import { reindexOptions, type SyncContext } from './context'
+import { reindexOptions, wantUsers, type SyncContext } from './context'
 import { mergeMessage, mergeRootCounters, stubRoot, type MergeSource } from './merge'
 import { reindexTopics, topicsOfMessages } from './reindex'
+import { referencedUserIds } from './users'
 import { applyRootSubscription, markRepliesComplete, observeRead, readMessage, replaceReactions, seedTopicRead, writeMessage } from './write'
 
 /** Merges one message and returns the rows it produced (the message, and a stub root when needed). */
@@ -26,7 +27,11 @@ export const mergeOne = (
     const existing = yield* readMessage(channel, message.ts)
     const merged = mergeMessage(existing, message, channel, source)
     const touched: Array<MessageRow> = [merged.row]
-    if (merged.changed) yield* writeMessage(merged.row)
+    if (merged.changed) {
+      yield* writeMessage(merged.row)
+      // Everyone the message shows gets a name as soon as possible; `nameUsers` skips the ones the store has.
+      wantUsers(ctx, referencedUserIds([message]))
+    }
     if (merged.applyReactions) yield* replaceReactions(merged.row, message.reactions ?? [], ctx.me.userId)
     // A reaction event came before this message was stored; a page requested before it does not have it.
     if (source.kind !== 'event') {

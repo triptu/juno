@@ -52,7 +52,6 @@ const styles = stylex.create({
     minWidth: 0,
     marginTop: spacing['--space-5'],
     marginBottom: `calc(${spacing['--space-1']} - ${spacing['--space-2']})`,
-    paddingInlineStart: `calc(${spacing['--space-7']} + ${spacing['--space-2-5']})`,
     color: colors['--foreground-muted'],
     userSelect: 'none',
   },

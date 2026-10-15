@@ -50,6 +50,7 @@ import { Outbox } from '../outbox'
 import { retryFirstRun, serveLiveValue, timed, type Run } from '../protocol/live'
 import { setSubscribed } from '../follow'
 import { Workspace, type StoreServices } from '../workspace'
+import { UNKNOWN_PERSON } from '@juno/richtext'
 
 const SETTINGS_KEYS: InvalidationKeys = ['prefs']
 const PAGE_KEYS: InvalidationKeys = ['prefs', 'notification_log', 'conversations', 'users']
@@ -87,7 +88,7 @@ const tagsFor = (settings: NotificationSettings, level: 'every' | 'never') =>
     }
     for (const id of personIds) {
       const row = personById.get(id)
-      tags.push({ kind: 'person', id, name: row?.name ?? id, ...(row?.avatar_url == null ? {} : { avatarUrl: row.avatar_url }) })
+      tags.push({ kind: 'person', id, name: row?.name ?? UNKNOWN_PERSON, ...(row?.avatar_url == null ? {} : { avatarUrl: row.avatar_url }) })
     }
     return tags.toSorted((a, b) => a.name.localeCompare(b.name))
   })
@@ -192,7 +193,7 @@ const whyUnseen = (topicId: string, channel: string, ts: string, settings: Notif
     const row = rows[0]
     const title = "Didn't notify you"
     if (row === undefined) return { notified: false, title, reason: 'Juno does not know this conversation yet.', action: { kind: 'none' } } satisfies Why
-    const where = channelLabel({ kind: row.kind, name: row.person ?? row.name ?? channel })
+    const where = channelLabel({ kind: row.kind, name: row.person ?? row.name ?? (row.kind === 'im' ? UNKNOWN_PERSON : channel) })
     if (row.ignored === 1) return { notified: false, title, reason: `${where} is ignored`, action: { kind: 'none' } } satisfies Why
     if (parsed?.kind === 'thread' && row.subscribed === 0) {
       return { notified: false, title, reason: 'This thread is set to Never', action: { kind: 'change', target: { kind: 'thread', id: topicId }, name: 'This thread' } } satisfies Why
@@ -201,7 +202,7 @@ const whyUnseen = (topicId: string, channel: string, ts: string, settings: Notif
       return { notified: false, title, reason: `${where} is set to Never`, action: { kind: 'change', target: { kind: 'channel', id: channel }, name: where } } satisfies Why
     }
     if (row.sender !== null && settings.people[row.sender] === 'never') {
-      const name = row.sender_name ?? row.sender
+      const name = row.sender_name ?? UNKNOWN_PERSON
       return { notified: false, title, reason: `${name} is set to Never`, action: { kind: 'change', target: { kind: 'person', id: row.sender }, name } } satisfies Why
     }
     return {

@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { Juno } from '../driver/juno'
 import { launchApp } from '../fixtures'
 import type { OpenRouterRequest, ToolCallAnswer } from '@juno/agent-testing/openrouter'
-import { agentReady, card, openChat, openPage, ready } from './agent'
+import { agentReady, card, openChat, openPage, openSettings, ready } from './agent'
 import { answer as echo, expect, test as base } from './chat'
 import { startScriptedModel, type ScriptedModel } from './model'
 
@@ -129,7 +129,7 @@ test('after reading a hostile Slack message, a task becomes a card with a Becaus
 
 test('at the daily cap the Budget card appears, and Allow $1 more lets the answer through', async ({ juno }) => {
   await ready(juno)
-  const settings = await openPage(juno, 'Settings › Juno')
+  const settings = await openSettings(juno, 'Juno')
   const cap = settings.getByLabel('Daily cap in dollars')
   await cap.fill('0')
   await cap.press('Enter')
@@ -152,7 +152,7 @@ test('at the daily cap the Budget card appears, and Allow $1 more lets the answe
 
 test('at the daily cap, Wait until tomorrow closes the Budget card and Juno stays quiet', async ({ juno, model }) => {
   await ready(juno)
-  const settings = await openPage(juno, 'Settings › Juno')
+  const settings = await openSettings(juno, 'Juno')
   const cap = settings.getByLabel('Daily cap in dollars')
   await cap.fill('0')
   await cap.press('Enter')

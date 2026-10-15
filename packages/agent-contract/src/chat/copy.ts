@@ -20,7 +20,7 @@ export const chatCopy = {
   empty: {
     title: 'What do you need?',
     body: 'Ask me to find, summarize, catch you up or tidy up. I can read your topics and propose messages, but nothing is sent until you press Send.',
-    suggestions: ['Catch me up on today', 'Summarize this topic', 'Draft a reply in this topic', 'Anything settled I can resolve?'],
+    suggestions: ['Catch me up on today', 'Summarize this topic', 'Draft a reply in this topic', 'Find topics I can resolve'],
   },
   composer: {
     placeholder: 'Ask Juno, like "what did I miss in #eng?"',
@@ -40,7 +40,7 @@ export const chatCopy = {
     memory: 'Memory of this chat',
     activity: 'Activity',
     connections: 'Connections',
-    settings: 'Settings › Juno',
+    settings: 'Settings',
     review: 'Review',
   },
   /** The Juno panel (SPEC 7, inventory 12.1). */
@@ -49,6 +49,10 @@ export const chatCopy = {
     openInTab: 'Open in a tab',
     close: 'Close Juno ⌘J',
     removeQuote: 'Remove quote',
+    /** The context line above the composer: what Juno sees with the next message. */
+    contextLabel: (place: string) => `Juno sees ${place}`,
+    selection: '+ selection',
+    removeSelection: 'Remove selection',
   },
   list: {
     newMessage: 'New message',

@@ -55,6 +55,7 @@ export interface MessageListProps {
   /** The hover toolbar's actions, created once. Without them rows have no toolbar (a preview). */
   readonly actions?: MessageActions
   /** The row whose toolbar asks to confirm a delete. */
+  readonly activeMessage?: string | undefined
   readonly confirmingDelete?: string | undefined
   /** The row being edited, and its inline edit field. */
   readonly editing?: { readonly ts: string; readonly editor: ReactNode } | undefined
@@ -161,6 +162,7 @@ export function MessageList({
   anchorRef,
   hueOf = hueForId,
   actions,
+  activeMessage,
   confirmingDelete,
   editing,
   onRowKey,
@@ -195,7 +197,7 @@ export function MessageList({
         }
         {...stylex.props(styles.column)}
       >
-        {older !== 'none' ? (
+        {items.length > 0 ? (
           <div aria-live="polite" {...stylex.props(styles.olderLine)}>
             {older === 'loading' ? (
               <Text variant="meta" tone="muted">
@@ -210,7 +212,7 @@ export function MessageList({
           const atDivider = index === dividerIndex && index > 0
           // A row's header and margin never depend on its place in the window, so a page added above
           // changes no row's height. Only the topic's first message, with nothing that can arrive above it, sits flush.
-          const first = index === 0 && notDrawnAbove === 0 && older === 'none'
+          const first = item.message.root
           return (
             // A message's client_msg_id outlives its pending row, so the row becomes the stored message in place.
             <Row key={item.message.clientMsgId ?? item.message.ts} atDivider={atDivider} newCount={newCount} anchorRef={anchorRef}>
@@ -226,6 +228,7 @@ export function MessageList({
                 tabbable={item.message.ts === tabbable}
                 hueOf={hueOf}
                 actions={actions}
+                active={activeMessage === item.message.ts}
                 confirmingDelete={confirmingDelete === item.message.ts}
                 editor={editing?.ts === item.message.ts ? editing.editor : undefined}
                 onOpenThread={onOpenThread}

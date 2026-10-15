@@ -98,7 +98,7 @@ export const handlers: Handlers = {
     const ims = records.filter((c) => c.kind === 'im').map((c) => ws.imObject(c))
     const cacheTs = `${Math.floor(ws.clock.now() / 1000)}.000000`
     return {
-      self,
+      self: { ...self, manual_presence: ws.manualPresence },
       team: { ...ws.team, url: `${ctx.baseUrl}/` },
       prefs: ws.prefs,
       channels,
@@ -318,7 +318,8 @@ export const handlers: Handlers = {
   },
 
   'presence.set': (ctx, args) => {
-    ctx.workspace.emit({ type: 'manual_presence_change', presence: args.presence === 'auto' ? 'active' : 'away', user: ctx.workspace.selfId })
+    ctx.workspace.manualPresence = args.presence
+    ctx.workspace.emit({ type: 'manual_presence_change', presence: args.presence, user: ctx.workspace.selfId })
     return {}
   },
   'chat.postMessage': (ctx, args) => {
@@ -336,7 +337,8 @@ export const handlers: Handlers = {
     const message = ws.post({
       channel: args.channel,
       user: ws.selfId,
-      ...(text === undefined ? {} : { text }),
+      // Slack keeps what the client escaped and escapes what it did not.
+      ...(text === undefined ? {} : { text, mrkdwn: args.text !== undefined }),
       ...(args.blocks === undefined ? {} : { blocks: args.blocks }),
       ...(args.thread_ts === undefined ? {} : { threadTs: args.thread_ts }),
       ...(args.reply_broadcast === undefined ? {} : { broadcast: args.reply_broadcast }),
@@ -354,7 +356,7 @@ export const handlers: Handlers = {
     if (existing.user !== ws.selfId) return new ApiError('cant_update_message')
     const text = args.text ?? args.markdown_text
     if ((text === undefined || text === '') && args.blocks === undefined) return new ApiError('no_text')
-    const message = ws.edit(args.channel, args.ts, text ?? '', ws.selfId)
+    const message = ws.edit(args.channel, args.ts, text ?? '', ws.selfId, args.text !== undefined)
     return { channel: args.channel, ts: args.ts, text: message.text ?? '', message: withChannel(ws, args.channel, message) }
   },
 
@@ -412,7 +414,7 @@ export const handlers: Handlers = {
             {
               iid: `${conversation.id}-${full.ts}-m`,
               ts: full.ts,
-              ...(args.extra_message_data === 1 ? { ...(inThread ? { thread_ts: full.thread_ts ?? full.ts } : {}), ...(full.reply_count === undefined ? {} : { reply_count: full.reply_count }) } : {}),
+              ...(args.extra_message_data === 1 ? { ...(inThread ? { thread_ts: full.thread_ts ?? full.ts } : {}), ...(full.reply_count === undefined ? {} : { reply_count: full.reply_count }), ...(full.latest_reply === undefined ? {} : { latest_reply: full.latest_reply }) } : {}),
               text: full.text ?? '',
               ...(full.user === undefined ? {} : { user: full.user }),
               ...(user?.name === undefined ? {} : { username: user.name }),

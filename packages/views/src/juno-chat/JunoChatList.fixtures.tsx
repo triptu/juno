@@ -52,7 +52,7 @@ function ReactionArrives() {
   return <JunoChatList {...base} items={items} />
 }
 
-/** The status bubble's text changes: the dots and the mark stay put and the bubble keeps its height. Driven as above. */
+/** The status bubble's text changes: the dots stay put and the bubble keeps its height. Driven as above. */
 function StatusTextChanges() {
   const [step, setStep] = useState(0)
   const texts = [undefined, 'Reading 3 topics', 'Looking back through March', 'Reading 3 topics and looking back through March for the room booking']

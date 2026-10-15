@@ -1,7 +1,7 @@
 import { defineFixtures, scene, type FixtureFrame } from '@juno/ui'
 import { AccountMenu } from './AccountMenu'
 import { AppearanceSettings } from './AppearanceSettings'
-import { EngineNotice } from './EngineStatusView'
+import { EngineNotice, SyncProgress } from './EngineStatusView'
 import { PrivacyOn } from './fixtures/privacy'
 import { hostileIds, newThreadsById, NOW, pinnedIds, recentIds, rows, rowsById } from './fixtures/topics'
 import { Sidebar, type SidebarProps, type SidebarViewPill } from './Sidebar'
@@ -170,6 +170,7 @@ export default defineFixtures(
       offline: scene(() => full({ status: <EngineNotice kind="offline" /> })),
       'rate-limited': scene(() => full({ status: <EngineNotice kind="rate-limited" /> })),
       stopped: scene(() => full({ status: <EngineNotice kind="stopped" onRestart={noop} /> })),
+      'first sync': scene(() => full({ status: <SyncProgress done={30} total={143} /> })),
     },
     Nav: {
       // Home tab active, or no tab open.

@@ -11,7 +11,7 @@
  */
 import { AiProvider, cacheKeyOf, tasks, type Decision, type TopicArtInput } from '@juno/ai'
 import type { StoredArt } from '@juno/contract'
-import { channelLabel, resolveTitle, type TopicId } from '@juno/domain'
+import { channelLabel, resolveTitle, type TopicId, slackLine } from '@juno/domain'
 import { Invalidation, keys, StoreReader, StoreWriter, type SqlError } from '@juno/store'
 import { parseRecipe } from '@juno/topic-art'
 import { Clock, Effect } from 'effect'
@@ -71,13 +71,14 @@ export const artInputOf = (
         channel,
         ...(purpose === '' ? {} : { purpose }),
         ...(topicLine === '' ? {} : { topic: topicLine }),
-        recent: roots.map((root) => oneLine(root.text)).toReversed(),
+        recent: roots.map((root) => oneLine(slackLine(root.text))).toReversed(),
         ...(avoid === undefined ? {} : { avoid }),
       }
       return { input, titleSource: title.source }
     }
     const root = row.root_ts === null ? undefined : (yield* sql<{ text: string }>`SELECT text FROM messages WHERE channel = ${row.channel} AND ts = ${row.root_ts} AND deleted = 0`)[0]
-    const first = oneLine(columns.preview.rootText ?? root?.text)
+    const rootText = columns.preview.rootText ?? root?.text
+    const first = oneLine(rootText === undefined ? undefined : slackLine(rootText))
     const last = oneLine(columns.preview.text) || first
     const input: TopicArtInput = { kind: 'thread', topicId, title: title.text, channel, first, last, ...(avoid === undefined ? {} : { avoid }) }
     return { input, titleSource: title.source }

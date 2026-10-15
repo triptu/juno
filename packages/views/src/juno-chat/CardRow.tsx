@@ -35,13 +35,12 @@ export const CardRow = memo(function CardRow({ item, now, actions }: CardRowProp
 })
 
 const styles = stylex.create({
-  // 28px mark plus the 10px gap, so the card lines up under the bubbles.
+  // Lined up under the bubbles, at the column's edge.
   row: {
     alignItems: 'flex-start',
     width: '100%',
     boxSizing: 'border-box',
     marginTop: spacing['--space-2'],
-    paddingInlineStart: `calc(${spacing['--space-7']} + ${spacing['--space-2-5']})`,
   },
   card: {
     display: 'flex',

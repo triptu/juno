@@ -163,8 +163,10 @@ const styles = stylex.create({
     display: 'inline-flex',
     minWidth: 0,
   },
+  // A panel that hangs off the title bar (the avatar menu) is not part of its drag region.
   panel: {
     position: 'absolute',
+    WebkitAppRegion: 'no-drag',
   },
   surface: {
     display: 'flex',

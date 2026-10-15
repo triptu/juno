@@ -256,7 +256,7 @@ Sizes are the Figtree values; the prototype's Inter value is half a pixel smalle
 | Body large | 15px | 400 | 1.6 | 0 | | Unused since the airy density was removed |
 | Heading | 15.5px | 600 | 1.35 | 0 | default | Settings section titles, palette input (400) |
 | Topic title | 20px | 600 | 1.3 | -0.01em | default | Unused since the floating header; the header title is 14px 600 (the Body small size at the semibold weight) |
-| Page title | serif 34px (32 All topics) | 400 | 1.1–1.15 | 0 | default | Notifications, Preferences, All topics |
+| Page title | serif 34px (32 All topics) | 400 | 1.1–1.15 | 0 | default | Settings sections, All topics |
 | Display | serif 38px | 400 | 1.1 | 0 | default | "What do you need?" |
 | Greeting | serif 36px | 400 | 1.15 | 0 | default | Home's first line, "Morning, Tushar." (`--text-greeting-*`) |
 | Empty title | serif 30px | 400 | | | subtle | "Nothing open" |
@@ -317,6 +317,7 @@ Odd values the prototype uses once (3, 5, 9, 18) are component-local; keep them 
 | `--radius-palette` | 14 | ⌘K panel, user chat bubble (with 4px tail corner) |
 | `--radius-toast` | 14 | Toast |
 | `--radius-bubble` | 16 | Message bubbles (tail corner 4) |
+| `--radius-panel` | 18 | The Juno panel: half its 36px header row, so the 28px controls 4px in nest in its corners |
 | `--radius-tag` | 999 | Tags, count badges, @ tag, status chips, decision chips, scope chip, confidence badge, reaction chips, inline @person and #channel chips (padding 0 5), the row Resolve button (22) and the toast Undo button (26) |
 | `--radius-pill` | 999 | Context pill (header, To field, send card); the 32px and taller buttons (Discard/Send, Sign in); the page header's islands, title button and island buttons |
 | `--radius-full` | 999 | Avatars, attach/send buttons, colour swatches |
@@ -336,7 +337,9 @@ All [proto] measured at 1280×800 with Inter unless marked.
 | `--sidebar-width` | 384px default; the owner drags it between `--sidebar-min-width` 280px and `--sidebar-max-width` 480px. The live width is an inline `width` on the shell's sidebar box, set during the drag, not a token value |
 | `--sidebar-resize-hit` | 6px hit area centred on the sidebar edge |
 | `--titlebar-lights-inset` | 78px kept free for the traffic lights, in the sidebar bar or, with the sidebar hidden, at the start of the tab strip |
-| `--juno-panel-width` | 360px; the topic beside it keeps at least `--juno-panel-topic-min` 480px, else the panel covers the topic (the `Workspace` view's container query repeats the sum, 840px) |
+| `--juno-panel-width` | 440px default (a Juno bubble holds about 50 characters a line at 14px); `--juno-panel-min-width` 360 and `--juno-panel-max-width` 640 bound a drag on its edge. Beside the topic it gives way to keep `--juno-panel-topic-min` 480px, down to its minimum; under that it covers the topic (the `Workspace` view's container query repeats min + topic min + two insets, 856px) |
+| `--juno-panel-inset` | 8px, the header islands' top gap: the panel's inset from the tab strip, the window edge, the bottom and the topic |
+| `--juno-panel-resize-hit` | 8px: the drag area, the gap on the panel's left |
 | `--titlebar-height` | 44px (sidebar top bar and tab strip; both are drag regions) |
 | `--tab-height` | 35px, bottom margin -1px so the active tab merges with the page |
 | `--tab-width` | flex 0 1 230px; `--tab-min-width` 120px (the prototype's 72 fit only the icon and the close button). The strip scrolls sideways once the tabs reach the floor. `--tab-pinned-width` 40px (icon only) |
@@ -349,8 +352,9 @@ All [proto] measured at 1280×800 with Inter unless marked.
 | `--home-width` | 480px: Home's column of item rows and the Ask Juno field |
 | `--page-width-narrow` | 680px |
 | `--page-width` | 720px (Juno) |
-| `--page-width-settings` | 760px: Notifications, Preferences and Settings › Juno, so the settings pages share one column and one title edge |
-| `--settings-label-width` | 104px: the label column of Preferences' rows (Theme, Accent, Density, Hold to peek), so every control starts on one edge |
+| `--page-width-settings` | 760px: every section of Settings, so the sections share one column and one title edge |
+| `--settings-label-width` | 104px: the label column of Settings' rows (Theme, Accent, Density, Hold to peek), so every control starts on one edge |
+| `--settings-nav-width` | 200px: Settings' list of sections, with the sidebar's 10px inset on both sides; fits "Backup & This Mac" |
 | `--palette-width` | 560px, max calc(100% − 48px), top offset 96px |
 | `--palette-list-max-height` | 400px; the palette list scrolls within this height |
 | `--menu-width` | 236px context menu; `--menu-width-account` 248px avatar menu, `--menu-width-browse` 300px, `--menu-width-mention` 280px mention popover, `--menu-width-picker` 340px New chat pickers |
@@ -407,7 +411,7 @@ Phosphor (`@phosphor-icons/react`, imported per icon). Weight by size: `bold` at
 
 ### Juno chat
 
-The `chat` group (`tokens.stylex.ts`). `--owner-bubble-bg` and `--owner-bubble-fg` are the owner bubble's fill and text, set to option B (`--hl-bubble` / `--foreground-default`); the other options are listed beside the group, and switching is a change to those two lines. `--bubble-max-width` 76% (`--bubble-max-width-panel` 85% in the Juno panel), `--bubble-tail` 4px (the last bubble of a group), `--card-max-width` 560px. The status bubble: `--status-dot` 6px, `--status-min-width` 52px, `--status-loop` 1200ms, `--status-pulse-scale` 1.35 (1 under reduced motion), `--status-dot-opacity` 1 (0.6 under reduced motion). `--reaction-offset` 10px is how far a reaction badge sits out over its bubble's top corner.
+The `chat` group (`tokens.stylex.ts`). `--owner-bubble-bg` and `--owner-bubble-fg` are the owner bubble's fill and text, set to option B (`--hl-bubble` / `--foreground-default`); the other options are listed beside the group, and switching is a change to those two lines. `--bubble-max-width` 76% (`--bubble-max-width-panel` 85% in the Juno panel), `--bubble-tail` 4px (the last bubble of a group), `--card-max-width` 560px. The status bubble: `--status-dot` 6px, `--status-min-width` 52px, `--status-loop` 1200ms, `--status-pulse-scale` 1.35 (1 under reduced motion), `--status-dot-opacity` 1 (0.6 under reduced motion). `--reaction-offset` 10px is how far a reaction badge sits out over its bubble's top corner. The Juno panel's material: `--panel-fill` is `--surface-default` with 1.5% of `--hl` (opaque; beside a topic it sits on the page colour alone, so nothing behind it moves and it costs nothing to composite), `--panel-glass` the same at 80% for when it covers the topic, with `--panel-backdrop` `blur(24px) saturate(1.6)`. 3% read as pink on paper in light; 1.5% is a tint you notice only beside the page.
 
 ### Illustrations and the mark
 
@@ -415,7 +419,7 @@ The `chat` group (`tokens.stylex.ts`). `--owner-bubble-bg` and `--owner-bubble-f
 
 ### Rows
 
-Sidebar row heights per density (Preferences › Appearance; rows include the tile; measured with Inter, 2-line titles do not occur). The two values are 1-line / 2-line previews. The prototype's list and cards styles and its airy density are removed.
+Sidebar row heights per density (Settings › Appearance; rows include the tile; measured with Inter, 2-line titles do not occur). The two values are 1-line / 2-line previews. The prototype's list and cards styles and its airy density are removed.
 
 | Density | Row | Vertical padding | Line gap | Title size |
 | --- | --- | --- | --- | --- |
@@ -444,6 +448,7 @@ Single line 40px; grows to `max-height` then scrolls inside. Prototype max is 18
 | `--shadow-lg` | `0 8px 24px 0 rgba(27,28,21,.10)` | `0 8px 24px 0 rgba(0,0,0,.50)` | css | Toast |
 | `--card-ring` | `0 1px 2px 0 oklch(0 0 0 / .03), 0 6px 20px -4px oklch(0 0 0 / .07)` | `0 1px 2px 0 oklch(0 0 0 / .3), 0 6px 20px -4px oklch(0 0 0 / .35)` | options D1 | Cards: settled hint, Juno cards, settings groups. The name is historical; there is no ring any more |
 | `--pop-shadow` | `0 2px 6px -1px oklch(0 0 0 / .05), 0 14px 36px -8px oklch(0 0 0 / .13)` | `0 2px 6px -1px oklch(0 0 0 / .3), 0 14px 36px -8px oklch(0 0 0 / .5)` | options D1 | Menus, popovers, palette, hover toolbar |
+| `--panel-shadow` | `0 0 0 1px oklch(0 0 0 / .05), 0 1px 2px 0 oklch(0 0 0 / .04), 0 8px 24px -6px oklch(0 0 0 / .08), 0 24px 56px -12px oklch(0 0 0 / .12)` | `inset 0 0 0 1px oklch(1 0 0 / .06), 0 0 0 1px oklch(0 0 0 / .5), 0 1px 2px 0 oklch(0 0 0 / .3), 0 8px 24px -6px oklch(0 0 0 / .4), 0 24px 56px -12px oklch(0 0 0 / .5)` | 10-16 | The Juno panel floating over the page: a hairline ring, a contact shadow, two wide soft ones; in dark a faint light inner edge |
 
 Floating surfaces have `border: 1px solid transparent` plus the shadow, never a coloured border. Inputs keep a real 1px `--input-border`. The raised button (`Button variant="raised"`) is a control, not a floating surface: it keeps a 1px `--border-default` edge plus `--shadow-sm`. In dark the shadows alone do not separate a popover from the page, so popovers and the hover toolbar sit on `--surface-raised` (1.2). The header islands are the calm exception: `--surface-default` with `--card-ring` in both themes, because they are always on screen and sit on the page, not over another surface.
 
@@ -533,3 +538,15 @@ Apply these when porting; the prototype values are listed so no one copies them 
 Raw zero, percentages and 1px border/outline hairlines are allowed in StyleX.
 Other literal lengths and colours require tokens, or a trailing
 `// tokens-allow: reason` for geometry such as border overlap or pixel rounding.
+
+### Stable metadata
+
+| Token | Value | Used for |
+| --- | --- | --- |
+| `--all-topics-place-width` | 160px | Native place select while options load. |
+| `--topic-time-width` | 48px | Stable relative-time slot in topic rows. |
+| `--topic-people-width` | 60px | Four overlapping participant avatars. |
+| `--topic-tags-width` | 76px | Reopened status slot; Main uses the 36px control token. |
+| `--message-sender-width` | 128px | Sender names keep timestamps fixed while names resolve. |
+| `--threads-button-width` | 128px | Threads button before and after its count arrives. |
+| `--threads-button-narrow-width` | 64px | Threads button below the header's 480px breakpoint. |

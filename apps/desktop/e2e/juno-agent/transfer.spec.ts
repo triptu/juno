@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { startFakeOpenRouter, type FakeOpenRouter } from '@juno/agent-testing/openrouter'
 import { Juno } from '../driver/juno'
 import { launchApp, tempUserData } from '../fixtures'
-import { agentReady, card, expectArmedCrash, openChat, openPage, ready, restartArmed } from './agent'
+import { agentReady, card, expectArmedCrash, openChat, openSettings, ready, restartArmed } from './agent'
 import { answer, expect, test as base } from './chat'
 
 const test = base.extend<{ readonly shared: string; readonly model: FakeOpenRouter }>({
@@ -47,7 +47,7 @@ test(`a move restores the chat and pending cards for review${point === undefined
   await chat.send('draft an update')
   await chat.expectJuno('The draft is ready.')
   await expect(card(chat, 'sendMessage')).toHaveAttribute('data-card-status', 'open')
-  const settings = await openPage(juno, 'Settings › Juno')
+  const settings = await openSettings(juno, 'Backup & This Mac')
   await pickFolder(juno, shared)
   await settings.getByRole('button', { name: 'Choose folder' }).click()
   await expect(settings.locator('[data-backup-folder]')).toHaveText(shared)
@@ -75,7 +75,7 @@ test(`a move restores the chat and pending cards for review${point === undefined
       await restartArmed(second.app, point)
       await agentReady(second.app)
     }
-    const page = await openPage(mac, 'Settings › Juno')
+    const page = await openSettings(mac, 'Backup & This Mac')
     await page.getByRole('button', { name: 'Restore', exact: true }).click()
     const restore = mac.win.getByRole('dialog', { name: 'Restore from backup' })
     await pickFolder(mac, shared)

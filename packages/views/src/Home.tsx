@@ -39,6 +39,8 @@ export interface HomeProps {
   readonly askLine?: string
   /** "Browse all topics". Fires on mouse down; `event.metaKey` asks for a new tab. */
   readonly onBrowseAll?: (event: ActivateEvent) => void
+  /** The first sync is still running: `line` says so and there are no items yet. */
+  readonly loading?: boolean
 }
 
 /**
@@ -47,12 +49,12 @@ export interface HomeProps {
  * Every size is fixed before data arrives, so nothing moves when a title
  * line is rewritten: a title is one ellipsised line in a 52px row.
  */
-export function Home({ scene, title, line, items, done, now, caughtUp, enter = true, onOpen, onMarkDone, onResolveAll, onSort, onItemMenu, onAsk, askLine, onBrowseAll }: HomeProps) {
+export function Home({ scene, title, line, items, done, now, caughtUp, enter = true, onOpen, onMarkDone, onResolveAll, onSort, onItemMenu, onAsk, askLine, onBrowseAll, loading = false }: HomeProps) {
   const headingId = useId()
   let step = 0
   const part = () => (enter ? [styles.rise, styles.delay(step++)] : [])
   return (
-    <div data-home="" {...stylex.props(styles.root)}>
+    <div data-home="" data-home-loading={loading ? '' : undefined} aria-busy={loading || undefined} {...stylex.props(styles.root)}>
       <div {...stylex.props(styles.column)}>
         <div {...stylex.props(...part())}>
           <HomeScene name={scene} />
@@ -211,8 +213,8 @@ function HomeRow({ item, done, now, onOpen, onMarkDone, onResolveAll, onSort, on
 const HOVER = '@media (hover: hover)'
 
 const rise = stylex.keyframes({
-  from: { opacity: 0, transform: `translateY(${motion['--rise-stagger']})` },
-  to: { opacity: 1, transform: 'translateY(0)' },
+  from: { opacity: 0 },
+  to: { opacity: 1 },
 })
 
 const styles = stylex.create({

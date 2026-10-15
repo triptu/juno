@@ -26,8 +26,8 @@ shape, but if they use a raw value that now has a token, use the token. Rules co
    `import { colors, spacing } from '@juno/tokens/tokens.stylex'`. Each group is a named export;
    read a token as `colors['--foreground-default']`. `packages/tokens/README.md` lists the groups
    and the naming scheme, and `tokens.stylex.ts` is the source of truth.
-3. **Never `cursor: pointer`.** Interactive elements use `cursor: 'default'`. `pnpm lint` runs
-   `scripts/check-no-pointer-cursor.mjs`, which fails on it in any ts, tsx, css or html file.
+3. **Never `cursor: pointer`, except on links in message content that open outside the app.** Interactive elements use `cursor: 'default'`. The exception is marked `// external-link-cursor` in `MessageBody.tsx`. `pnpm lint` runs
+   `scripts/check-no-pointer-cursor.mjs`, which fails on it in any other ts, tsx, css or html file.
 4. **Hover only for hover-capable pointers**, and nested so that it falls back to nothing:
    ```ts
    backgroundColor: {

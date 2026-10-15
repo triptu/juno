@@ -94,6 +94,23 @@ describe('local search through the engine', () => {
   })
 })
 
+describe('palette text from Slack', () => {
+  it('names the people a title or snippet mentions and decodes Slack escaping', async () => {
+    engine = await startTestEngine({ initial: (fake) => fake.signIn(), fakeOptions: { seed: (workspace) => {
+      workspace.addUser({ id: workspace.selfId, name: 'self' })
+      workspace.addUser({ id: 'U0MAYA', name: 'maya', profile: { display_name: 'Maya Chen' } })
+      workspace.addConversation({ id: 'C0SEARCH', name: 'rollout', kind: 'public', members: new Set([workspace.selfId, 'U0MAYA']), created: workspace.clock.now(), topic: '', purpose: '', isOpen: true, archived: false })
+      // Stored as Slack stores it: `<@U0MAYA> canary -&gt; prod`.
+      const root = workspace.post({ channel: 'C0SEARCH', user: 'U0MAYA', text: '<@U0MAYA> canary -> prod', at: workspace.clock.now() - 60_000, silent: true })
+      workspace.post({ channel: 'C0SEARCH', user: 'U0MAYA', text: 'Done', threadTs: root.ts, at: workspace.clock.now() - 5_000, silent: true })
+    } } })
+    await engine.phase('live')
+    const results = await search(engine, 'canary')
+    expect(results).toContainEqual(expect.objectContaining({ kind: 'topic', title: '@Maya Chen canary -> prod' }))
+    expect(results).toContainEqual(expect.objectContaining({ kind: 'message', title: '@Maya Chen canary -> prod', text: '@Maya Chen canary -> prod' }))
+  })
+})
+
 describe("Slack's search through the engine", () => {
   it('finds a message the store lacks in its thread, and drops channels the user is not in or ignores', async () => {
     const e = await boot()
@@ -123,4 +140,17 @@ describe('palette commands through the engine', () => {
     await runCommand(e.registry, prefsSet, { key: 'aiAssist', value: false })
     expect(await command('tell maya the slot works')).toBeNull()
   })
+})
+
+it('searches attachment and section text from fake Slack, then removes deleted content', async () => {
+  const e = await boot()
+  const message = e.fake.workspace.post({ channel: 'C0SEARCH', user: 'U0MAYA', text: 'Integration updated', attachments: [{ title: 'Cache invalidation', text: 'Unique attachment detail' }], blocks: [{ type: 'section', fields: [{ type: 'plain_text', text: 'Unique section detail' }] }] })
+  await waitFor(async () => {
+    const results = await search(e, 'invalidation')
+    return results.some((result) => result.kind === 'message' && result.ts === message.ts) ? true : undefined
+  })
+  const sections = await search(e, 'section')
+  expect(sections).toContainEqual(expect.objectContaining({ kind: 'message', text: expect.stringContaining('Unique section detail') }))
+  e.fake.deleteMessage({ channel: 'C0SEARCH', ts: message.ts })
+  await waitFor(async () => (await search(e, 'invalidation')).every((result) => result.kind !== 'message' || result.ts !== message.ts) ? true : undefined)
 })

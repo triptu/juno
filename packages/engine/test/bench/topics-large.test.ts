@@ -63,15 +63,15 @@ describe.skipIf(process.env['JUNO_BENCH'] !== '1')('topics.list on the large see
       const latencies: Array<number> = []
       // Channels with a shown Main row, so each message changes the window and reaches the renderer as a delta.
       const channels = [...new Set(rows.filter((row) => row.kind === 'main').map((row) => row.channel.id))]
-      for (let i = 0; i < 10; i++) {
+      for (let i = 0; i < 50; i++) {
         const before = engine.registry.get(engine.topicsAtom())
         const beforeSeq = before._tag === 'Success' ? before.value.meta.seq : 0
         const channel = channels[(i * 37) % channels.length]!
         const at = Date.now()
         engine.fake.injectMessage({ channel, user: 'U000001L', text: `bench ${i}` })
-        const after = await engine.rowsUntil(() => {
+        const after = await engine.rowsUntil((rows) => {
           const result = engine.registry.get(engine.topicsAtom())
-          return result._tag === 'Success' && result.value.meta.seq > beforeSeq
+          return result._tag === 'Success' && result.value.meta.seq > beforeSeq && rows.some((row) => row.kind === 'main' && row.channel.id === channel && row.preview.text === `bench ${i}`)
         }, `update ${i}`)
         latencies.push(Date.now() - at)
         const result = engine.registry.get(engine.topicsAtom())
@@ -91,6 +91,7 @@ describe.skipIf(process.env['JUNO_BENCH'] !== '1')('topics.list on the large see
       // A command has committed when it returns.
       if (!Exit.isSuccess(bots) || !Exit.isSuccess(wide)) throw new Error('views.save failed')
       // The query alone, on a reader of its own: every row shaped (no cache), then a subscription's re-run (warm cache).
+      await engine.handle.stop()
       const paths = workspacePathsFromDir(join(engine.userData, 'workspaces', engine.fake.teamId))
       const isolated = await Effect.runPromise(
         Effect.gen(function* () {
@@ -108,7 +109,7 @@ describe.skipIf(process.env['JUNO_BENCH'] !== '1')('topics.list on the large see
             }).pipe(Effect.provideService(StoreReader, reader))
           const filter = { kind: 'all', unreadOnly: false } as const
           const now = Date.now()
-          const cold = yield* time(40, listTopics(filter, { now, limit: 300 }))
+          const cold = yield* time(40, Effect.suspend(() => listTopics(filter, { now, limit: 300 })))
           const cache = makeRowCache({ keepUsers: true })
           const warm = yield* time(40, listTopics(filter, { now, limit: 300 }, cache))
           const snapshot = yield* listTopics(filter, { now, limit: 300 }).pipe(Effect.provideService(StoreReader, reader))
@@ -159,6 +160,7 @@ describe.skipIf(process.env['JUNO_BENCH'] !== '1')('topics.list on the large see
         countsMsMedian: median(isolated.counts),
         countsMsP95: p95(isolated.counts),
         firstQueryMs: Number(window.meta.queryMs.toFixed(2)),
+        querySamples: samples.length,
         queryMsMedian: median(samples),
         queryMsP95: p95(samples),
         snapshotBytes,
@@ -196,8 +198,8 @@ describe.skipIf(process.env['JUNO_BENCH'] !== '1')('allTopics.list on the large 
     try {
       await engine.status('ready')
       await engine.phase('live', 600_000)
-      // The store is opened a second time below; the engine must have stopped writing.
-      await engine.syncIdle()
+      // Freeze the boot snapshot before opening a separate store for isolated timings.
+      await engine.handle.stop()
       const paths = workspacePathsFromDir(join(engine.userData, 'workspaces', engine.fake.teamId))
       const report = await Effect.runPromise(
         Effect.gen(function* () {

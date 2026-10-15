@@ -57,7 +57,7 @@ Rules:
 
 - **V8 code cache on `juno://`.** Register the scheme with `codeCache: true` as well as `standard` and `secure`; the code cache only covers `http(s)` otherwise and `codeCache` requires `standard` ([custom scheme privileges](https://www.electronjs.org/docs/latest/api/structures/custom-scheme)). Set `webPreferences.v8CacheOptions: 'bypassHeatCheck'` so the main bundle is cached on the first run ([web preferences](https://www.electronjs.org/docs/latest/api/structures/web-preferences)). Measure warm start before and after; keep it if it helps.
 - **No synchronous IPC.** `ipcRenderer.sendSync` blocks the renderer until main answers ([ipcRenderer](https://www.electronjs.org/docs/latest/api/ipc-renderer)); `pnpm lint` fails on it (`scripts/check-deps.mjs`). `@electron/remote` is not used. Main never does work that could block the UI thread: no sync file reads after `ready`, no JSON of any size, no `net` waits.
-- **One bundle per process, workspace packages bundled.** No `require` at runtime in the renderer. Pages other than the sidebar and topic view (`Preferences`, `Notifications`, `Juno`, `All topics`) are `React.lazy` chunks, prefetched on idle after the sidebar paints.
+- **One bundle per process, workspace packages bundled.** No `require` at runtime in the renderer. Pages other than the sidebar and topic view (`Settings`, `Juno`, `All topics`) are `React.lazy` chunks, prefetched on idle after the sidebar paints.
 - **Fonts.** Bundled, never from a URL. The two Latin files (Figtree variable, Instrument Serif) are `<link rel="preload" as="font">` in `index.html` (added at build by `juno:preload-fonts` in `electron.vite.config.ts`, which fails the build if a file is missing; before 10-15 there was no preload, so the first layout requested Figtree and its arrival laid the page out again) so they are ready before the first content paint; other subsets load on demand. `@font-face` uses `font-display: swap` plus a `size-adjust`/`ascent-override` fallback face built from the system font so a swap never moves text ([font-display](https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/font-display), [size-adjust](https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/size-adjust)). The e2e asserts `document.fonts.check` for both faces before the first rows.
 - **Background throttling stays on** (default `true`). Timers and `requestAnimationFrame` in a hidden window slow to 1 Hz, which is what we want: the engine owns the clock and the network, and port messages are still delivered. Nothing in the renderer may rely on a timer firing while hidden. Do not call `setBackgroundThrottling(false)`; it affects the whole window ([webContents](https://www.electronjs.org/docs/latest/api/web-contents)).
 - **Process count is fixed**: main, one renderer, the engine, Chromium's GPU and network helpers. No second window, no `webview`, no `BrowserView` for a feature. Every process costs tens of MB and a startup.
@@ -105,6 +105,7 @@ Why TanStack Virtual over the others (versions as of 2026-10-12). `@tanstack/rea
 
 ### 3.2 Rules for the sidebar list
 
+- During boot and catch-up, existing sidebar rows retain their order and newly discovered rows append. Finishing sync does not reorder the painted list; the next live activity or a user filter change restores ordinary recency ordering.
 - Rows are keyed by topic id. React moves DOM nodes on reorder; the browser's scroll anchoring keeps the viewport stable when the user is scrolled down. At `scrollTop === 0` new activity pushes rows down, which is the WhatsApp behaviour the spec wants.
 - Every row: `content-visibility: auto; contain-intrinsic-size: auto 92px` (chat style, balanced density; the number comes from the primitive's measured height per style and density and lives in tokens).
 - Section headers are `position: sticky; top: 0` inside the scroll container. Sticky elements and the row that contains the keyboard focus are never skipped; Chromium renders focused content regardless.
@@ -117,13 +118,15 @@ Why TanStack Virtual over the others (versions as of 2026-10-12). `@tanstack/rea
 ### 3.3 Rules for the message list
 
 - Bottom-anchored: the container is a normal `overflow-y: auto` column; "stick to bottom" is a boolean in the container (`isAtBottom`, true when within 32 px of the end at the last `scrollend`). On a delta that appends while `isAtBottom`, scroll to the end in the same `useLayoutEffect`, before paint. When not at the bottom, show the "N new messages" affordance and leave the viewport alone.
-- Holding a position: rows are laid out at their `contain-intrinsic-size` estimate until they come into view, so a position computed from estimates lands short once they grow (a long topic opened about 1,000 px short of the bottom). The rows that decide the position are laid out in full instead (`content-visibility: visible`, the `eager` rows of `MessageList`): a window's worth around the open position (the divider, a snapshot's row) until the rest of the window is drawn, a window's worth of an older page above the row held while it goes in (drawn at their estimate, the page's rows between the top of the view and the held row would grow a frame later and move what is on screen), and always the last window's worth, where messages arrive and the bottom is held. The container sets `scrollTop` from exact sizes in a layout effect, before paint; a row that grows later is above the rows in view, where scroll anchoring absorbs it. The container keeps a pin (the bottom, or a row at an offset from the top: the divider on open, a snapshot's row on restore, the row in view during a prepend) and puts it back in the layout effect of a commit that adds rows above, and in the window's `resize` event at the bottom. Nothing writes from a `ResizeObserver`. The user's own input (wheel, touch, pointer, key) or a scroll that ends elsewhere lets go of the pin.
+- Holding a position: rows are laid out at their `contain-intrinsic-size` estimate until they come into view, so a position computed from estimates lands short once they grow (a long topic opened about 1,000 px short of the bottom). The rows that decide the position are laid out in full instead (`content-visibility: visible`, the `eager` rows of `MessageList`): a window's worth around the open position (the divider, a snapshot's row), including after the rest of the window is drawn, a window's worth of an older page above the row held while it goes in (drawn at their estimate, the page's rows between the top of the view and the held row would grow a frame later and move what is on screen), and always the last window's worth, where messages arrive and the bottom is held. The container sets `scrollTop` from exact sizes in a layout effect, before paint; a row that grows later is above the rows in view, where scroll anchoring absorbs it. The container keeps a pin (the bottom, or a row at an offset from the top: the divider on open, a snapshot's row on restore, the row in view during a prepend) and puts it back in the layout effect of a commit that adds rows above, and in the window's `resize` event at the bottom. Nothing writes from a `ResizeObserver`. The user's own input (wheel, touch, pointer, key) or a scroll that ends elsewhere lets go of the pin.
 - Opening mounts in two commits, as the sidebar does (3.2): the first draws the rows from a window's worth above the open position to the end (`innerHeight` over the 40 px minimum row height), with a spacer at the row estimate in place of the rows above, so the scroll height and the position are already final; the rest replace the spacer in a `startTransition` after that frame is presented. Measured on the topic300 seed (`perf.spec.ts`, three runs, load 3 to 17): a prefetched open went from a median of 23.9 ms (p95 34.7 ms) to 17.2 ms (p95 19.0 to 19.3 ms), a cached open from 19.0 ms (p95 33.6 ms) to 16.5 ms (p95 18.0 to 18.5 ms); the press handler went from 8 to 14 ms to about 6 ms.
 - Open position: if the topic has unread messages, the first paint already has the "N new" divider 80 px below the header band, `--header-band` + 80 from the scroller's top, since the list runs under the header (inventory §5) (`useLayoutEffect` scrolls before the frame is presented); otherwise the first paint is at the bottom. There is no visible jump.
 - Prepending older pages: rows are inserted at the top in flow; Chromium's scroll anchoring keeps the visible messages fixed, except at scroll offset 0, where it does not anchor and the pin above does the same job ([overflow-anchor](https://developer.mozilla.org/en-US/docs/Web/CSS/overflow-anchor), [CSS scroll anchoring spec](https://drafts.csswg.org/css-scroll-anchoring/)). Nothing may trigger anchoring suppression in that frame: no change to `position`, `transform`, `overflow` or `display` on the scroller or the anchor's ancestors, and no `overflow-anchor: none` anywhere in the list. Request the next page when the first row is within 1 000 px of the top, at most one request in flight.
 - A row's height never depends on its place in the window. The engine decides a row's header (`groupStart`) from the message before it, reading one row past the window's oldest for the first row, and only the topic's first message sits flush (no top margin). Before this, the window's first row always had a header and no margin, so an older page arriving above it took both away and moved everything below it by about 20 px.
 - Rows are a whole number of pixels tall. A row laid out for the first time above the view grows from the 56 px estimate, and scroll anchoring moves `scrollTop` by the difference, but `scrollTop` lands on device pixels. With text at 23.2 px a line, the difference was fractional, so the rows in view were left up to a quarter pixel off and their text jumped a device pixel for a frame (the feel suite's long-thread flicker). The message's content box rounds its height up to a whole pixel (`height: calc-size(auto, round(up, size, 1px))`), so this holds for any content; `apps/gallery/behaviour.spec.ts` checks every message row in the gallery.
 - Window cap: 500 rows. Beyond it, the end furthest from the viewport is dropped from the subscription window. Dropping rows at the bottom clears `isAtBottom`; "Jump to bottom" re-anchors the window at the end and scrolls there.
+- Partial message caches carry `meta.windowCovered` from the message query. An isolated socket or search result does not establish the initial scroll position. The header and empty body still paint within the 50 ms uncached budget; the list waits for history coverage around the read pointer or the fetch outcome. Offline fetches expose the available cache. The divider keeps its eager rows after the deferred rows mount.
+- Messages reserve one reaction row and Main reserves a thread-link row. Reactions stay on one horizontally scrollable line; arriving chips never increase the row height. Sender names reserve a width so resolving them does not move timestamps. The Threads counter reserves its button width.
 - Late-loading images never change layout: every image box gets `aspect-ratio` and a max size from Slack's `thumb_w`/`thumb_h` (or `original_w`/`original_h`) before the bytes arrive. A file with no dimensions renders as a fixed-height card. The catch-up card and the grouping suggestion arrive after the first paint; they insert above the anchor and scroll anchoring absorbs them, but they must still have no entering animation that changes height.
 - Messages set `content-visibility: auto; contain-intrinsic-size: auto 56px` and `contain: content`. Text is selectable (`user-select: text` on bodies, `none` on chrome). Because rows stay in flow, selection and ⌘F behave like a normal page for the whole window.
 - Reactions, hover toolbars and the selection-quote button are positioned inside the message's containing block so they never force a layout of the list. A narrow row's toolbar sits above the row's top edge and paints there through the row's `overflow-clip-margin`, so the row keeps `contain: content`. Near the list's top it drops inside the row instead; that is decided by one rect read on pointer enter or focus, written as a custom property on the row, never per frame.
@@ -167,7 +170,7 @@ Navigation (sidebar rows, tabs, nav items, filter chips, ⌘K rows, Browse rows,
 - `messagesAtom` has a 30 s idle TTL so a hidden tab's query is not torn down and rebuilt during a quick switch away and back.
 - Tabs beyond the 5 are unmounted and keep a `ScrollSnapshot { anchorKey, offset }` (`scrollSnapshotAtom(topicId)` in `@juno/state`, recorded on each `scrollend`; kept per topic, so Back and ⌘⇧T come back to where the topic was left). Switching back waits until the topic's header and window are local, as an open does, and the container restores the snapshot in `useLayoutEffect` before paint.
 - Every component under a tab must clean up its effects correctly; hidden means "as if unmounted". StrictMode in dev double-invokes mounts to catch this.
-- Page tabs (Home, All topics, Juno, Notifications, Preferences) are singletons and follow the same rule.
+- Page tabs (Home, All topics, Juno, each Juno page, Settings) are singletons and follow the same rule.
 
 ### 4.4 Feedback timing
 
@@ -470,3 +473,88 @@ placeholder between topic and Home. The inspected Home filmstrip still shows
 the specified staggered entrance; the check is about data readiness, not making
 that animation instantaneous. The log is `.juno-status/perf-4b/feel-final.log`,
 and the filmstrips are under `apps/desktop/feel-report/`.
+
+### Engine speed measurements (2026-10-15)
+
+Five alternating baseline/revised runs on the shared Apple M2, through the
+exclusive `pnpm bench:engine -t '^topics.list on the large seed'` command.
+Each run used 300 channels and sampled 50 injected message updates after
+boot. Both sides used the corrected harness: wait for the injected message
+itself, and construct a fresh cache for each uncached isolated query. The
+baseline is query.ts at `1b88efc7`; other code and the harness were held fixed.
+
+| Measurement | Before | After |
+| --- | --- | --- |
+| Event query p95, five runs (ms) | 4.17, 3.41, 4.04, 3.95, 11.16 | 3.01, 3.18, 4.26, 3.94, 5.26 |
+| Median of those p95 readings (ms) | 4.04 | 3.94 |
+| Median warm isolated query (median of runs, ms) | 2.14 | 2.11 |
+| Row snapshot / refs / largest delta (bytes) | 175834 / 91760 / 520 | 175834 / 91760 / 520 |
+
+This is a small improvement with overlapping ranges, not a reliable large
+speedup. Four revised runs met 5 ms; one did not. The backlog stays open.
+The existing cache already reused shaped rows. This pass avoids collecting
+unchanged user ids, retains the people map while its source holds, and uses
+an array instead of a temporary row-keyed map. Source columns are still
+compared after the version check: deleting and recreating an index row can
+reuse its version.
+
+Three preliminary remote pairs on 4-vCPU machines gave before p95 readings
+of 5.13, 3.77, 5.54 ms and after readings of 4.54, 5.36, 8.31 ms. They do not
+establish an improvement; host variation and event-loop contention dominate
+that comparison. Remaining remote repeats were cancelled at the shared
+capacity limit. The Mac runs above provide the complete five-pair series.
+
+The production-paced large fake cold boot (`pnpm remote bench:sync`, one
+4-vCPU machine per run) reached `live` in 579.264 s before and 459.310 s
+after, a 119.954 s reduction. That run spaced history and replies 1,200 ms apart; they were later set back to 1,500 ms per method to leave room for the official client on the shared token, so part of this gain (about 78 s by the earlier projection) does not apply. Sidebar setup reached catch-up in 25.749 s
+and 16.537 s respectively. Both runs made 471 Web API calls: 300 history,
+113 getView, 50 replies, three discovery search calls and five setup calls;
+they stored the same 6,179 messages, 1,525 roots, 3,478 replies, 300 ranges
+and 2,574 reactions. Neither reported rate-limit or decode failures.
+
+This pair measures paced waiting, not throughput: the revised remote run
+averaged 2% CPU busy on four cores. History call time fell from 444.909 to
+357.526 s and replies from 74.740 to 58.682 s. Unpublished getView calls
+can now overlap independently with other methods. The seed and budgets
+were unchanged; discovery metadata saves a separate root lookup in the
+warm-boot test, but did not lower this cold-boot call total.
+
+These are single paced runs, not a repeated latency distribution. The
+baseline recorded `live` before its read-only guard rejected the later
+emoji read; the guard now permits `emojis/list`. That correction does not
+change the timed boot. Aggregate logs are in
+`.remote/20261015T171747-6397/run.log` and
+`.remote/20261015T182935-62134/run.log`. No live Slack was accessed.
+
+The final full engine benchmark passed all five cases after isolated reads
+were changed to stop the engine before opening a second store. Waiting for
+a sync cycle alone could time out on this seed, and opening a second writer
+while the engine was active could fail with `SQLITE_BUSY`. Event timings
+still run against the active engine before that stop.
+
+That full run had reported one-minute loads of 7.3–14.5 and missed several
+reported budgets: sidebar event p95 was 17.80 ms and All topics warm p95
+31.31 ms. Messages live-query p95 was 4.54 ms; search p95 was 8.62 ms while
+10,000 backfill messages landed. The command was not in strict timing mode;
+its pass confirms the scenarios and assertions, not every timing budget.
+The log is `/tmp/juno-speed-engine-bench-final-2.log`.
+
+Final verification on the merged branch: the focused engine run passed 72
+tests in seven files; the engine benchmark passed five cases. `pnpm affected`
+passed typechecking, the 22 Slack tests, 34 schema tests, specs, 97 gallery
+tests and 261 desktop tests (34 Linux skips), plus health and pool checks.
+Its broad unit run stopped in the unchanged agent chat-cache benchmark:
+one of five p95 readings was 50.105 ms against the strict 50 ms limit
+(279 agent tests passed). It therefore did not finish the remaining unit
+packages. The focused engine run above covers this change separately.
+
+Lint initially passed, then one restart failed because Knip produced no
+report; a focused `pnpm lint` retry passed without code changes. The affected
+run is not fully green. Logs: `/tmp/juno-speed-affected-final-3.log`,
+`/tmp/juno-speed-focused-final.log`, and `/tmp/juno-speed-lint-final.log`.
+After queueing at the 24-vCPU cap, final remote checks used the supported
+`JUNO_REMOTE_MACHINE=linux/amd64:2x4` override. No pool limit was raised.
+
+The sidebar holds its first list on an empty cache until cold sync and Automated classification establish membership. Cached rows still paint immediately. Topic-row timestamps, unread badges, participant stacks and status tags reserve their widths; New view stays beside Unread only while view pills fill.
+
+All topics holds its first cold rows until sync completes, and reserves the status-count and place-select widths and its scrollbar gutter. Cold-sync checks for Home and All topics hold thread subscriptions while the page paints, then release them under the same zero-shift probe.

@@ -32,6 +32,15 @@ describe('control API', () => {
     socket.close()
   })
 
+  it('holds an edge user response until release', async () => {
+    fake.holdNext({ method: 'edge:users/info' })
+    const response = client.edge('users/info', { ids: ['U0MAYA'] })
+    await expect.poll(() => fake.heldCount({ method: 'edge:users/info' })).toBe(1)
+    fake.release({ method: 'edge:users/info' })
+    expect(await response).toMatchObject({ ok: true, results: [{ id: 'U0MAYA' }] })
+    expect(fake.heldCount()).toBe(0)
+  })
+
   it('holdNext runs the handler but answers only on release, so events can land while a page is in flight', async () => {
     fake.holdNext({ method: 'conversations.history' })
     const held = client.ok('conversations.history', { channel: 'C0ENG', limit: 5 })

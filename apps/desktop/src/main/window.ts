@@ -295,7 +295,7 @@ function setAppMenu(state: MenuState, rebuild = false): void {
               submenu: [
                 { role: 'about' },
                 { type: 'separator' },
-                command('preferences', 'Settings…', 'CommandOrControl+,', 'preferences.open'),
+                command('settings', 'Settings…', 'CommandOrControl+,', 'settings.open'),
                 { type: 'separator' },
                 { role: 'services' },
                 { type: 'separator' },

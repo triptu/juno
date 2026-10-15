@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-16 15:40 · Tushar · New chat shows a short "Frequent" list of up to 6 channels and DMs, ranked by the user's own recent sends (7-day half-life over 30 days) and filled from recent activity; choosing one sets the destination and focuses the composer.
 - 10-16 15:10 · Tushar · The Juno panel becomes a floating, inset Mac-style inspector (rounded, soft shadow, subtle tint with translucency) that reads as Juno inside the tab; wider by default; open state per tab; no Juno mark beside its bubbles; Catch me up styled as a suggestion chip, not a reply; a quiet context line above the composer shows what Juno sees (topic, plus selection).
 - 10-16 15:00 · Tushar · Links in message content that open outside the app use the pointing-hand cursor, as native Mac apps do for text links. Every other control keeps the arrow; the lint check allows only that one place.
 - 10-16 14:50 · Tushar · Integration messages (GitHub and the like) must show their real content. Cause: Slack carries it in attachments and Block Kit blocks, which Juno only partly rendered, so titles and previews fell back to the channel name. Fix: render attachments and common blocks as calm cards, and take titles, previews, search text and bot names from them; no GitHub MCP or gh needed.

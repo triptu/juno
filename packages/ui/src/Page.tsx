@@ -6,7 +6,7 @@ import { Text } from './Text'
 export type PageWidth = 'narrow' | 'default' | 'settings'
 
 export interface PageProps {
-  /** narrow 680, default 720, settings 760 (Notifications, Preferences and Settings › Juno). */
+  /** narrow 680, default 720, settings 760 (every section of Settings). */
   readonly width?: PageWidth
   readonly children?: ReactNode
 }

@@ -351,6 +351,18 @@ describe('the AgentHost port', () => {
     expect(engine.fake.callCount('chat.postMessage')).toBe(2)
   })
 
+  it('deletes the copy when the network sends an agent post twice', async () => {
+    const { engine, agent, account } = await hostWithAgent('enabled')
+    engine.main.network.resend = true
+    const dispatch = send(account, 'Sent twice by the network')
+    engine.fake.loseResponse({ method: 'chat.postMessage' })
+    const result = await ok(agent.client['host.outbox.send'](dispatch))
+    expect(result).toMatchObject({ _tag: 'done', attemptId: dispatch.attemptId })
+    expect(engine.fake.callCount('chat.postMessage')).toBe(2)
+    await waitFor(() => (posted(engine, dispatch.actionId).length === 1 ? true : undefined), 15_000, 'the copy deleted')
+    expect(engine.fake.callCount('chat.delete')).toBe(1)
+  })
+
   it('settles a lost send whose text Slack stores escaped', async () => {
     const { engine, agent, account } = await hostWithAgent('enabled')
     const lost = send(account, 'Ship it if p95 < 200ms & errors > 0? <@U0MAYA>')

@@ -28,7 +28,7 @@ export type Inline =
 
 export type ListStyle = 'bullet' | 'ordered' | 'checked' | 'unchecked'
 
-export type Block =
+export type ContentBlock =
   | { readonly kind: 'paragraph'; readonly children: ReadonlyArray<Inline> }
   | { readonly kind: 'quote'; readonly children: ReadonlyArray<Inline> }
   | { readonly kind: 'code'; readonly text: string }
@@ -40,7 +40,18 @@ export type Block =
     }
   | { readonly kind: 'heading'; readonly children: ReadonlyArray<Inline> }
   | { readonly kind: 'divider' }
+  | { readonly kind: 'fields'; readonly items: ReadonlyArray<ReadonlyArray<Inline>> }
+  | { readonly kind: 'context'; readonly children: ReadonlyArray<Inline> }
+  | { readonly kind: 'image'; readonly url: string; readonly alt: string; readonly width?: number; readonly height?: number }
   | { readonly kind: 'file'; readonly id: string; readonly name: string; readonly mimetype: string; readonly width?: number; readonly height?: number }
+
+export type Block = ContentBlock | {
+  readonly kind: 'attachment'
+  readonly tint: 'neutral' | 'info' | 'success' | 'warning' | 'danger'
+  readonly title: ReadonlyArray<Inline>
+  readonly blocks: ReadonlyArray<ContentBlock>
+  readonly footer: ReadonlyArray<Inline>
+}
 
 export interface MessageBody {
   readonly blocks: ReadonlyArray<Block>
@@ -68,6 +79,16 @@ export function inlinesOf(body: MessageBody): ReadonlyArray<Inline> {
   const out: Inline[] = []
   for (const block of body.blocks) {
     switch (block.kind) {
+      case 'attachment':
+        out.push(...block.title, ...inlinesOf({ blocks: block.blocks }), ...block.footer)
+        break
+      case 'image':
+        out.push({ kind: 'text', text: block.alt })
+        break
+      case 'fields':
+        for (const item of block.items) out.push(...item)
+        break
+      case 'context':
       case 'paragraph':
       case 'quote':
       case 'heading':

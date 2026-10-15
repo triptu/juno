@@ -1,5 +1,5 @@
 import * as stylex from '@stylexjs/stylex'
-import type { InputHTMLAttributes, ReactNode } from 'react'
+import type { InputHTMLAttributes, ReactNode, Ref } from 'react'
 import { accent, colors, layout, radii, sizes, spacing } from '@juno/tokens/tokens.stylex'
 import { Icon, type PhosphorIcon } from './Icon'
 import { variants as typeVariants } from './internal/type'
@@ -21,6 +21,8 @@ export interface TextFieldProps extends Omit<InputHTMLAttributes<HTMLInputElemen
   readonly label?: string
   /** The value failed a check: danger border, sets aria-invalid. */
   readonly invalid?: boolean
+  /** The input, for an owner that moves focus to it. */
+  readonly ref?: Ref<HTMLInputElement>
 }
 
 const textBySize: Record<TextFieldSize, 'ui' | 'bodySmall' | 'body' | 'heading'> = {

@@ -105,17 +105,19 @@ export function fakeMain(fake: FakeSlack, initial?: Credentials) {
   // The engine's HTTP transport: the cookie Chromium would attach comes from the "session".
   // With `network.offline` every request fails the way a dropped connection does.
   // `network.proxy` is Chromium's proxy answer for the socket URL.
-  const network = { offline: false, proxy: 'DIRECT' }
+  // With `network.resend`, a request whose connection closes before any answer is sent once more,
+  // as Chromium does on a reused connection (ADR 0014); Node's fetch never does.
+  const network = { offline: false, proxy: 'DIRECT', resend: false }
+  const send = (input: Parameters<typeof fetch>[0], init: Parameters<typeof fetch>[1]) =>
+    fetch(input, { ...init, headers: { ...(init?.headers as Record<string, string>), ...(current === undefined ? {} : { cookie: `d=${current.cookie}` }) } })
   const httpTransport = HttpTransport.nodeFetch({
     fetch: (input, init) =>
-      network.offline
-        ? Promise.reject(new TypeError('fetch failed'))
-        : fetch(input, { ...init, headers: { ...(init?.headers as Record<string, string>), ...(current === undefined ? {} : { cookie: `d=${current.cookie}` }) } }),
+      network.offline ? Promise.reject(new TypeError('fetch failed')) : send(input, init).catch((cause: unknown) => (network.resend ? send(input, init) : Promise.reject(cause))),
   })
   return {
     host,
     httpTransport,
-    /** Set `offline` to fail every Slack API request as a dropped connection would; `proxy` to answer the socket handshake with a proxy. */
+    /** Set `offline` to fail every Slack API request as a dropped connection would; `proxy` to answer the socket handshake with a proxy; `resend` to send a request again after its connection closed, as Chromium does. */
     network,
     get stored() {
       return stored

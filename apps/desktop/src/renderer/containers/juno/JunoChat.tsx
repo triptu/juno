@@ -1,3 +1,4 @@
+import { useEmojiSuggestions } from '../emojiSuggestions'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode, type RefObject } from 'react'
 import { chatCopy, type MessageMenu, type BubbleId, type ChatItem, type ChatPage, type ChatWindow, type OpId, type Quote, type ReplyTarget, type SendContext } from '@juno/agent-contract'
 import { copyText, registry, junoAvailableAtom, junoChatTargetAtom, junoFocusAtom, nowAtom, openExternal, popupContextMenu } from '@juno/state'
@@ -304,6 +305,7 @@ export function JunoChat({ column, header, contextOf, composerContext, onSent, o
 
   // The composer: the draft, and the bubble or card a reply quotes.
   const [draft, setDraft] = useState('')
+  const emojiSuggestions = useEmojiSuggestions({ text: draft, onChange: setDraft, field: inputRef })
   const [quote, setQuote] = useState<Quote | undefined>(undefined)
 
   // ⌘J, Ask Juno and the sidebar's item ask for focus; the chat they name takes each request once, now or when it shows.
@@ -454,13 +456,17 @@ export function JunoChat({ column, header, contextOf, composerContext, onSent, o
       }} />
     </SheetLayer>}
     <JunoChatFrame
+      column={column}
       header={header(page.banner)}
       pill={positioned && !atBottom && (unseen || page.moreBelow) ? <NewMessagesPill count={0} label={chatCopy.list.newMessage} onJump={toBottom} /> : undefined}
       composer={
         <JunoComposer
           column={column}
           value={draft}
-          onChange={setDraft}
+          onChange={emojiSuggestions.onChange}
+          onCaret={emojiSuggestions.onCaret}
+          onFieldKey={emojiSuggestions.onFieldKey}
+          {...(emojiSuggestions.mention === undefined ? {} : { mention: emojiSuggestions.mention })}
           onSend={() => {
             const text = draft.trim()
             if (text === '') return

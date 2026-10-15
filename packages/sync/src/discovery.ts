@@ -10,7 +10,7 @@
  * are dropped (search also covers public channels the user is not in). A
  * match is a partial message: it creates rows the store lacks, fills stub
  * roots and moves counters, but never replaces stored content (it carries
- * no files and no reactions). An unknown root becomes a stub and is fetched.
+ * incomplete fields, including reactions). An unknown root becomes a stub and is fetched.
  * A match that says nothing about its thread (no `thread_ts`, not in the
  * permalink, no `reply_count`) is dropped.
  *
@@ -19,12 +19,12 @@
  * `conversations.replies` since the stored replies for roots whose
  * `latest_reply` moved. It leaves the gap for unfollowed old roots.
  *
- * Against the fake, search is honoured as documented; whether a real `xoxc`
- * session honours `is:thread` is still to be confirmed by the live smoke.
+ * Live research confirms `is:thread` and the extra thread metadata. Roots
+ * outside the returned pages still need their existing lookup.
  */
 import { millisToTs, type Ts } from '@juno/domain'
 import { SlackApi, type SlackApiError } from '@juno/slack'
-import { searchMatchChannelId, searchMatches, type CountEntry, type FlatSearchMatch, type Message } from '@juno/slack-schema'
+import { isReply, searchMatchChannelId, searchMatches, type CountEntry, type FlatSearchMatch, type Message } from '@juno/slack-schema'
 import { Invalidation, StoreWriter, type SqlError } from '@juno/store'
 import { Clock, Effect } from 'effect'
 import type { SyncContext } from './context'
@@ -59,6 +59,7 @@ const matchToMessage = (match: FlatSearchMatch): Message | undefined => {
     ...(match.files === undefined ? {} : { files: match.files }),
     ...(threadTs === undefined ? {} : { thread_ts: threadTs }),
     ...(match.reply_count === undefined ? {} : { reply_count: match.reply_count }),
+    ...(match.latest_reply === undefined ? {} : { latest_reply: match.latest_reply }),
   }
 }
 
@@ -79,7 +80,7 @@ const discoverBySearch = (ctx: SyncContext, sinceMillis: number, options: Discov
       const requestedAt = yield* Effect.map(Clock.currentTimeMillis, (now) => millisToTs(now))
       const answer = yield* api.call(
         'search.modules.messages',
-        { module: 'messages', query, count: ctx.config.searchPageCount, page, no_user_profile: 1, sort: 'timestamp', sort_dir: 'desc' },
+        { module: 'messages', query, count: ctx.config.searchPageCount, page, no_user_profile: 1, extra_message_data: 1, sort: 'timestamp', sort_dir: 'desc' },
         { lane: 'background', reason: 'discovery' },
       )
       const matches = searchMatches(answer)
@@ -98,7 +99,12 @@ const discoverBySearch = (ctx: SyncContext, sinceMillis: number, options: Discov
         }
         list.push(message)
       }
-      for (const [channel, messages] of byChannel) yield* applyPage(ctx, channel, messages, { kind: 'partial', requestedAt }, options.seedReadBefore === undefined ? {} : { seedReadBefore: options.seedReadBefore })
+      for (const [channel, messages] of byChannel) {
+        // Search is newest first. Store roots before replies on this page, so
+        // their counters prevent a redundant stub/root lookup for each reply.
+        messages.sort((a, b) => Number(isReply(a)) - Number(isReply(b)))
+        yield* applyPage(ctx, channel, messages, { kind: 'partial', requestedAt }, options.seedReadBefore === undefined ? {} : { seedReadBefore: options.seedReadBefore })
+      }
       const pageCount = answer.pagination?.page_count ?? answer.messages?.pagination?.page_count
       const next = answer.response_metadata?.next_cursor
       const hasMore = (pageCount !== undefined && page < pageCount) || (next !== undefined && next !== '')

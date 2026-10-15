@@ -26,6 +26,8 @@
  *
  * Flags:
  *   --fake        run against an in-process fake Slack instead (no keychain, no JUNO_LIVE)
+ *   --large       with --fake, use the large seed
+ *   --paced       with --fake, retain production request pacing
  *   --seconds N   time limit for boot and discovery (default 900)
  *   --until-quiet after `live`, keep running until no call has been made for 30 s
  *                 (the background follow pass), within the same time limit
@@ -37,7 +39,7 @@ import { join } from 'node:path'
 import { performance } from 'node:perf_hooks'
 import { Cause, Deferred, Effect, Exit, Fiber, Layer, Logger, Scope } from 'effect'
 import { listTopics, SIDEBAR_WINDOW } from '@juno/engine'
-import { startFakeSlack } from '@juno/fake-slack'
+import { largeSeed, startFakeSlack } from '@juno/fake-slack'
 import { EdgeUsersInfoResponse, Methods, type MethodName } from '@juno/slack-schema'
 import {
   HttpTransport,
@@ -69,7 +71,7 @@ const READ_ONLY_METHODS = [
   'conversations.info',
   'search.modules.messages',
 ] as const satisfies ReadonlyArray<MethodName>
-const READ_ONLY_EDGE = ['users/info'] as const
+const READ_ONLY_EDGE = ['users/info', 'emojis/list'] as const
 
 const isReadOnly = (method: string): method is (typeof READ_ONLY_METHODS)[number] => (READ_ONLY_METHODS as ReadonlyArray<string>).includes(method)
 
@@ -257,7 +259,7 @@ async function liveTarget(): Promise<Target | undefined> {
 }
 
 async function fakeTarget(): Promise<Target> {
-  const fake = await startFakeSlack()
+  const fake = await startFakeSlack(process.argv.includes('--large') ? { seed: largeSeed() } : {})
   const c = fake.credentials()
   return {
     cached: { session: { teamId: c.teamId, userId: c.userId, workspaceUrl: c.url, token: c.token }, cookie: `d=${c.cookie}` },
@@ -282,8 +284,8 @@ async function run(target: Target, workspaceDir: string): Promise<number> {
         SocketHandshake.fixed({ cookie: cached.cookie, userAgent: 'Juno sync dry run' }),
         slackConfigLayer({
           socket: { allowedHosts: [...target.allowedHosts], onDiagnostic: (line) => console.log(`  socket: ${line}`) },
-          // The fake has no rate limits, as in the engine tests; live keeps the 1.5 s background spacing.
-          ...(useFake ? { lanes: { backgroundMinIntervalMillis: 0 } } : {}),
+          // The fake normally skips pacing; --paced retains the production method budgets.
+          ...(useFake && !process.argv.includes('--paced') ? { lanes: { backgroundMinIntervalMillis: 0 } } : {}),
         }),
       ),
     ),
@@ -326,6 +328,7 @@ async function run(target: Target, workspaceDir: string): Promise<number> {
     yield* Scope.close(scope, Exit.void)
     yield* Fiber.interrupt(sync)
     yield* report(bootTime, phases)
+    if (outcome._tag === 'None') return yield* Effect.fail(new Error('sync did not reach live before the time limit'))
   })
 
   const exit = await Effect.runPromiseExit(program.pipe(Effect.provide(layer), Effect.scoped))

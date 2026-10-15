@@ -79,6 +79,9 @@ export function HeaderTitleButton({ title, leading, expanded, onOpen, ref }: Hea
 }
 
 export interface IslandButtonProps {
+  /** Keep the counter's space while its value loads or changes. */
+  readonly reserveCount?: boolean
+
   readonly icon: PhosphorIcon
   /** The visible text in a roomy header. */
   readonly label: string
@@ -97,7 +100,7 @@ export interface IslandButtonProps {
  * narrow header it becomes a 28px icon button, or the icon and a short
  * label, by CSS alone; its accessible name never changes.
  */
-export function IslandButton({ icon, label, narrowLabel, name, pressed, expanded, onClick }: IslandButtonProps) {
+export function IslandButton({ reserveCount = false, icon, label, narrowLabel, name, pressed, expanded, onClick }: IslandButtonProps) {
   return (
     <button
       type="button"
@@ -105,7 +108,7 @@ export function IslandButton({ icon, label, narrowLabel, name, pressed, expanded
       title={name ?? label}
       aria-expanded={expanded}
       onClick={onClick}
-      {...stylex.props(styles.reset, styles.island, narrowLabel === undefined && styles.iconOnlyWhenNarrow, (pressed === true || expanded === true) && styles.islandDown)}
+      {...stylex.props(styles.reset, styles.island, reserveCount && styles.countWidth, narrowLabel === undefined && styles.iconOnlyWhenNarrow, (pressed === true || expanded === true) && styles.islandDown)}
     >
       <span {...stylex.props(styles.islandIcon)}>
         <Icon icon={icon} size={14} />
@@ -127,6 +130,10 @@ export function JunoToggle({ pressed, onToggle }: JunoToggleProps) {
 }
 
 const styles = stylex.create({
+  countWidth: {
+    justifyContent: 'flex-start',
+    width: { default: sizes['--threads-button-width'], [NARROW]: sizes['--threads-button-narrow-width'] },
+  },
   heading: {
     display: 'flex',
     flexGrow: 0,

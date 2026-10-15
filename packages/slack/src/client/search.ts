@@ -15,6 +15,9 @@ export interface MessageMatch {
   readonly ts: string
   readonly user?: string
   readonly username?: string
+  readonly botName?: string
+  readonly attachments?: FlatSearchMatch['attachments']
+  readonly blocks?: FlatSearchMatch['blocks']
   readonly text: string
   /** From the match, else from its permalink's `thread_ts` parameter when extra message data is unavailable. */
   readonly threadTs?: string
@@ -33,10 +36,14 @@ export const searchMessages = (api: SlackApiShape, query: string, count: number)
     (answer) =>
       searchMatches(answer).map((match) => {
         const threadTs = threadTsOf(match)
+        const botName = match.bot_id || match.bot_profile || match.subtype === 'bot_message' ? match.bot_profile?.name || match.username || match.attachments?.find((a) => a.author_name)?.author_name : undefined
         return {
           channel: searchMatchChannelId(match),
           ts: match.ts,
           text: match.text ?? '',
+          ...(botName === undefined ? {} : { botName }),
+          ...(match.attachments === undefined ? {} : { attachments: match.attachments }),
+          ...(match.blocks === undefined ? {} : { blocks: match.blocks }),
           ...(match.user === undefined ? {} : { user: match.user }),
           ...(match.username === undefined ? {} : { username: match.username }),
           ...(threadTs === undefined ? {} : { threadTs }),

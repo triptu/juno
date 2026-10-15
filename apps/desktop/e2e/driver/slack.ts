@@ -46,8 +46,8 @@ export class Slack {
     this.fake.resetCalls()
   }
 
-  /** Juno set your presence in Slack: `auto` for active, `away`. */
-  async expectPresenceSet(presence: 'auto' | 'away'): Promise<void> {
+  /** Juno set your presence in Slack: `active` or `away`, as the official client sends them. */
+  async expectPresenceSet(presence: 'active' | 'away'): Promise<void> {
     await expect.poll(() => this.fake.calls.some((call) => call.method === 'presence.set' && call.args['presence'] === presence), { timeout: 10_000 }).toBe(true)
   }
 

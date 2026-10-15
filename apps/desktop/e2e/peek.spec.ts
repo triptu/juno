@@ -1,4 +1,4 @@
-// Peek (spec section 5): hold ⌥ (or Space, set in Preferences) over a
+// Peek (spec section 5): hold ⌥ (or Space, set in Settings › General) over a
 // sidebar row to read the topic in a popover. A peek marks nothing read,
 // opens no tab and moves no focus; letting go or moving off the rows closes it.
 import { expectNoLayoutShift } from '@juno/testing/layout-shift'

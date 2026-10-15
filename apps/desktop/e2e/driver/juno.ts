@@ -421,11 +421,11 @@ export class Sidebar {
   }
 
   get accountButton() {
-    return this.root.getByRole('button', { name: 'Account and preferences' })
+    return this.root.getByRole('button', { name: 'Account and settings' })
   }
 }
 
-/** The popover behind the avatar button: presence, Notifications, Preferences, session, diagnostics. */
+/** The popover behind the avatar button: presence, privacy, Notifications, Settings and the session. */
 export class AccountMenu {
   readonly root: Locator
 
@@ -452,19 +452,11 @@ export class AccountMenu {
     return this.root.getByRole('status', { name: 'Session status' })
   }
 
-  get engineStatus() {
-    return this.root.getByRole('status', { name: 'Engine status' })
-  }
-
-  get pingButton() {
-    return this.root.getByRole('button', { name: 'Ping engine' })
-  }
-
   get signOutButton() {
     return this.root.getByRole('button', { name: 'Sign out' })
   }
 
-  /** Set yourself away or active, Notifications, Preferences (inventory 2.1). */
+  /** Set yourself away or active, Hide message text, Notifications, Settings (inventory 2.1). */
   item(name: string | RegExp) {
     return this.root.getByRole('menuitem', { name })
   }
@@ -481,12 +473,33 @@ export class AccountMenu {
   }
 }
 
-/** Preferences (inventory 14): the Appearance group. */
-export class PreferencesPage {
+/** Settings (inventory 14): its list of sections, and the open section's page. */
+export class SettingsPage {
   readonly root: Locator
+  readonly nav: Locator
 
   constructor(readonly win: Page) {
     this.root = win.getByRole('main')
+    this.nav = this.root.getByRole('navigation', { name: 'Settings' })
+  }
+
+  section(name: SettingsSectionName): Locator {
+    return this.nav.getByRole('button', { name, exact: true })
+  }
+
+  /** Goes to a section and waits for the list to mark it. */
+  async show(name: SettingsSectionName): Promise<void> {
+    await this.section(name).click()
+    await expect(this.section(name)).toHaveAttribute('aria-current', 'page')
+  }
+
+  /** About's engine line. */
+  get engineStatus() {
+    return this.root.getByRole('status', { name: 'Engine status' })
+  }
+
+  get pingButton() {
+    return this.root.getByRole('button', { name: 'Ping engine' })
   }
 
   themeRadio(name: 'System' | 'Light' | 'Dark') {
@@ -507,7 +520,9 @@ export class PreferencesPage {
   }
 }
 
-/** The Notifications page (inventory 13). */
+export type SettingsSectionName = 'General' | 'Appearance' | 'Notifications' | 'Ignored' | 'Juno' | 'Connections' | 'Backup & This Mac' | 'About'
+
+/** Settings › Notifications (inventory 13). */
 export class NotificationsPage {
   readonly root: Locator
 
@@ -592,7 +607,7 @@ export class Juno {
   readonly win: Page
   readonly sidebar: Sidebar
   readonly accountMenu: AccountMenu
-  readonly preferences: PreferencesPage
+  readonly settings: SettingsPage
   readonly notifications: NotificationsPage
   readonly topic: TopicPane
   readonly newChat: NewChatPane
@@ -611,7 +626,7 @@ export class Juno {
     appOf.set(win, app)
     this.sidebar = new Sidebar(win)
     this.accountMenu = new AccountMenu(win, this.sidebar)
-    this.preferences = new PreferencesPage(win)
+    this.settings = new SettingsPage(win)
     this.notifications = new NotificationsPage(win)
     this.topic = new TopicPane(win)
     this.newChat = new NewChatPane(win)
@@ -791,35 +806,38 @@ export class Juno {
     else await this.win.mouse.click(900, 400)
   }
 
-  /** Switches the theme in Preferences and waits for the page to follow, then closes Preferences. */
+  /** Switches the theme in Settings › Appearance and waits for the page to follow, then closes Settings. */
   async setTheme(theme: 'Light' | 'Dark'): Promise<void> {
-    await this.openPreferences()
-    await this.preferences.themeRadio(theme).click()
-    await expect(this.preferences.themeRadio(theme)).toHaveAttribute('aria-checked', 'true')
-    await this.tabs.close('Preferences')
-    await expect(this.tabs.tab('Preferences')).toHaveCount(0)
+    await this.openSettings('Appearance')
+    await this.settings.themeRadio(theme).click()
+    await expect(this.settings.themeRadio(theme)).toHaveAttribute('aria-checked', 'true')
+    await this.tabs.close('Settings')
+    await expect(this.tabs.tab('Settings')).toHaveCount(0)
   }
 
-  /** Preferences › Hold to peek: ⌥ Option or Space. Closes Preferences after. */
+  /** Settings › General › Hold to peek: ⌥ Option or Space. Closes Settings after. */
   async setPeekKey(key: PeekKeyName): Promise<void> {
-    await this.openPreferences()
-    const radio = this.preferences.root.getByRole('radiogroup', { name: 'Hold to peek' }).getByRole('radio', { name: key === 'option' ? '⌥ Option' : 'Space' })
+    await this.openSettings('General')
+    const radio = this.settings.root.getByRole('radiogroup', { name: 'Hold to peek' }).getByRole('radio', { name: key === 'option' ? '⌥ Option' : 'Space' })
     await radio.click()
     await expect(radio).toHaveAttribute('aria-checked', 'true')
-    await this.tabs.close('Preferences')
-    await expect(this.tabs.tab('Preferences')).toHaveCount(0)
+    await this.tabs.close('Settings')
+    await expect(this.tabs.tab('Settings')).toHaveCount(0)
   }
 
-  /** Preferences, from the avatar menu. */
-  async openPreferences(): Promise<void> {
-    await this.accountMenu.choose('Preferences')
-    await this.tabs.expectActive('Preferences')
+  /** Settings from the avatar menu, which opens it at General, then `section`. */
+  async openSettings(section: SettingsSectionName = 'General'): Promise<void> {
+    await this.accountMenu.choose(/^Settings/)
+    await this.tabs.expectActive('Settings')
+    await expect(this.settings.section('General')).toHaveAttribute('aria-current', 'page')
+    if (section !== 'General') await this.settings.show(section)
   }
 
-  /** The Notifications page, from the avatar menu. */
+  /** Settings › Notifications, from the avatar menu's Notifications. */
   async openNotifications(): Promise<void> {
     await this.accountMenu.choose(/^Notifications/)
-    await this.tabs.expectActive('Notifications')
+    await this.tabs.expectActive('Settings')
+    await expect(this.settings.section('Notifications')).toHaveAttribute('aria-current', 'page')
   }
 
   /** The OS notifications main showed (recorded under JUNO_E2E), oldest first. */
@@ -843,15 +861,13 @@ export class Juno {
   }
 
   /**
-   * Waits until the engine says it is live and its sync cycle has ended. A
-   * cycle goes on after "Engine live" with work on the background lane (the
-   * follow pass), whose Slack calls and row changes would land in the test.
+   * Waits until the engine is live and its sync cycle has ended: the sidebar
+   * is no longer `aria-busy`. A cycle goes on after "Engine live" with work
+   * on the background lane (the follow pass), whose Slack calls and row
+   * changes would land in the test.
    */
   async expectEngineLive(timeout = 30_000): Promise<void> {
-    await this.accountMenu.open()
-    await expect(this.accountMenu.engineStatus).toHaveText('Engine live', { timeout })
-    await expect(this.accountMenu.engineStatus).toHaveAttribute('aria-busy', 'false', { timeout })
-    await this.accountMenu.close()
+    await expect(this.sidebar.root).toHaveAttribute('aria-busy', 'false', { timeout })
   }
 
   /** Reads one of the app's performance measures (`@juno/state/perf`), in milliseconds. */
@@ -2018,7 +2034,7 @@ export class HomePane {
   constructor(readonly win: Page) {}
 
   get root(): Locator {
-    return this.win.locator('[data-home]:not([data-home-waiting])').filter({ visible: true })
+    return this.win.locator('[data-home]:not([data-home-waiting]):not([data-home-loading])').filter({ visible: true })
   }
 
   get greeting(): Locator {

@@ -144,38 +144,57 @@ export interface HomeShown {
   readonly enter: boolean
   /** Items whose Mark done or Resolve all was used. */
   readonly used: ReadonlySet<string>
+  /** The first sync is still running: the greeting shows with `HOME_SYNCING_LINE` and no items. */
+  readonly loading: boolean
 }
+
+/** Home's second line until the first sync is done: present tense, names what is happening (SPEC 17). */
+export const HOME_SYNCING_LINE = 'Syncing with Slack.'
 
 /** By a key of the Home component's own, so two Homes never share one. Reset when nothing reads it. */
 export const homeShownAtom = Atom.family((_key: string) => Atom.make<HomeShown | undefined>(undefined))
 
-/** The current `home.view`, once the first sync is done. */
-export function readyHomeView(registry: Registry): HomeView | undefined {
-  const result = registry.get(homeViewAtom)
-  return result._tag === 'Success' && result.value.ready ? result.value : undefined
-}
-
 /**
  * Home appeared (mounted, shown again, or its first value arrived): takes
  * the items, the copy and the scene now, or nothing while there is no
- * value yet.
+ * value yet. Before the first sync is done it shows the greeting with
+ * `HOME_SYNCING_LINE` and no items, never a blank page and never "All
+ * caught up"; the scene it picked then stays when the items arrive.
  */
 export function showHome(registry: Registry, key: string, options: { readonly windowHeight: number; readonly enter: boolean }): void {
-  const view = readyHomeView(registry)
-  if (view === undefined) return registry.set(homeShownAtom(key), undefined)
+  const result = registry.get(homeViewAtom)
+  if (result._tag !== 'Success') return registry.set(homeShownAtom(key), undefined)
   const now = new Date()
+  const previous = registry.get(homeShownAtom(key))
+  if (!result.value.ready) {
+    const greeting = homeGreeting({ now, firstName: result.value.firstName, items: 0, caughtUp: false })
+    return registry.set(homeShownAtom(key), {
+      view: { ...result.value, items: [] },
+      scene: previous?.loading === true ? previous.scene : homeScene({ now, caughtUp: false, firstVisitToday: homeAppeared(registry, now) }),
+      title: greeting.title,
+      line: HOME_SYNCING_LINE,
+      now: now.getTime(),
+      caughtUp: false,
+      enter: options.enter,
+      used: new Set<string>(),
+      loading: true,
+    })
+  }
+  const view = result.value
   const items = view.items.slice(0, homeItemLimit(options.windowHeight))
   const shown = { ...view, items }
   const done = caughtUp(shown)
   const greeting = homeGreeting({ now, firstName: view.firstName, items: items.length, caughtUp: done })
   registry.set(homeShownAtom(key), {
     view: shown,
-    scene: homeScene({ now, caughtUp: done, firstVisitToday: homeAppeared(registry, now) }),
+    // Coming out of the syncing state the scene stays, unless there is nothing to do.
+    scene: previous?.loading === true && !done ? previous.scene : homeScene({ now, caughtUp: done, firstVisitToday: homeAppeared(registry, now) }),
     ...greeting,
     now: now.getTime(),
     caughtUp: done,
     enter: options.enter,
     used: new Set<string>(),
+    loading: false,
   })
 }
 

@@ -46,7 +46,7 @@ export const searchSlack = (api: SlackApiShape, query: string) =>
       if (seen.has(key) || row?.deleted === 1) continue
       seen.add(key)
       const topicId = row !== undefined ? topicOfMessage(match.channel, match.ts, row.thread_ts, row.reply_count) : topicOfMessage(match.channel, match.ts, match.threadTs ?? null, match.replyCount ?? 0)
-      hits.push({ channel: match.channel, ts: match.ts, thread_ts: null, reply_count: 0, user_id: match.user ?? null, username: match.username, text: match.text, topicId, stored: row !== undefined })
+      hits.push({ channel: match.channel, ts: match.ts, thread_ts: null, reply_count: 0, user_id: match.user ?? null, username: match.username, bot_name: match.botName, text: match.text, attachments_json: JSON.stringify(match.attachments), blocks_json: JSON.stringify(match.blocks), topicId, stored: row !== undefined })
     }
     return yield* messageResults(hits)
   })

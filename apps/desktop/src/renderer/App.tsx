@@ -49,7 +49,7 @@ export function App() {
     persistAccent(next)
   }
 
-  // Signed in: the sidebar and the workspace; Preferences holds the
+  // Signed in: the sidebar and the workspace; Settings holds the
   // appearance settings. Right after a first sign-in with no model set up,
   // "Set up Juno" on the same page first. Otherwise the sign-in page is the
   // whole page, with the appearance block under it.

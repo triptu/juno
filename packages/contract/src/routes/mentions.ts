@@ -59,4 +59,9 @@ export const mentionsChannels = liveValueRoute('mentions.channels', {
   value: Schema.Array(MentionChannel),
 })
 
-export const MentionsRoutes = RpcGroup.make(mentionsPeople, mentionsChannels)
+/** Workspace emoji loaded once, then filtered locally by the composer. */
+export const mentionsEmoji = liveValueRoute('mentions.emoji', {
+  value: Schema.Array(Schema.Struct({ name: Schema.String, url: Schema.NullOr(Schema.String), alias_for: Schema.NullOr(Schema.String) })),
+})
+
+export const MentionsRoutes = RpcGroup.make(mentionsPeople, mentionsChannels, mentionsEmoji)

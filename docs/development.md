@@ -48,7 +48,7 @@ Run these from the repo root.
 
 `GALLERY_SHOTS_ONLY=Sidebar,Workspace pnpm gallery:shots` refreshes only those components and leaves other shots untouched.
 
-The switcher, key and index tests use `GalleryTestComponent`, declared in `apps/gallery/src/testFixtures.tsx`. It is registered only when the page is opened as `/?test-fixtures#/...`, so it never shows in the normal gallery or the screenshots. Set `GALLERY_PORT` to run the tests while another worktree holds port 4174.
+The switcher, key and index tests use `GalleryTestComponent`, declared in `apps/gallery/src/testFixtures.tsx`. It is registered only when the page is opened as `/?test-fixtures#/...`, so it never shows in the normal gallery or the screenshots. The tests serve the built gallery on a port derived from the worktree's path, so two worktrees never share a server; a run reuses a server only if one is already up on its own port. Set `GALLERY_PORT` to choose the port.
 
 Before calling work done: `pnpm affected`, which covers typecheck, lint and the tests the change reaches (see "Affected tests").
 
@@ -295,7 +295,9 @@ prefs. It reuses the cached session, refuses methods outside its own read-only a
 calls 1.5 s apart, and honours `Retry-After` once. It prints counts, key censuses and
 milliseconds only, and writes redacted shapes to `--out DIR` (a temporary directory by default);
 copy a shape into the recorded fixtures by hand and run `node scripts/check-fixtures-redacted.mjs`.
-`-- --only search` runs the search part alone (four calls). A full run is about 34 calls. The
+`-- --only search` runs the search part alone (four calls). `-- --only users` asks the edge
+`users/info` about every person the newest conversations reference and reads one page of each
+users list (about 14 calls). A full run is about 34 calls. The
 results are in research section 10, "Live probe".
 
 ## The live sync dry run
@@ -690,14 +692,14 @@ lint/typecheck. Heavy checks run through `pnpm affected` on Namespace.
    creates the version tag there; the build still comes from the source tag.
 5. Review the artifacts and signing/notarization results before publishing the
    draft. Never publish the unsigned fallback as an update. On another Mac,
-   install the prior signed build, opt into updates in Preferences › About,
+   install the prior signed build, opt into updates in Settings › About,
    publish the newer signed release, and check **Restart to update**. This
    cross-version signature and installation check requires the owner's ID and
    cannot be verified by the unsigned smoke.
 
 Updates are off by default and unavailable without a configured feed, in
 development, and in tests. An enabled install checks 30 seconds after launch and every six hours, quietly downloads,
-and shows a single ready line in Preferences › About. Closing the app does not
+and shows a single ready line in Settings › About. Closing the app does not
 install the update; only **Restart to update** does. Turning the setting off
 cancels a download and suppresses the ready line. Errors retry quietly later.
 
@@ -717,6 +719,10 @@ Electron. Playwright's Electron launcher needs Node inspection and cannot drive
 the hardened package; the packaged smoke instead uses Chromium CDP. The
 `JUNO_E2E` fake-server seams remain available independently of the Node fuses.
 
+### Engine and sync benchmarks
+
+`pnpm bench:engine` runs `packages/engine/test/bench` with one worker and serial files, through the exclusive machine lock. `pnpm bench:sync` runs the read-only sync harness against the large fake seed with production pacing; it never opens a real session and fails if it cannot reach `live` within an hour. Both can run through `pnpm remote` on a dedicated 4x8 Linux machine. Compare runs on the same shape; renderer performance budgets still run on the Mac. The fake's normal engine tests disable pacing, so their boot time does not measure the request budget.
+
 ## StyleX token check
 
 `pnpm lint` runs `node scripts/check-tokens.mjs` over `packages/ui`,
@@ -735,3 +741,13 @@ alternating full lint runs with and without the check took 3.59 s
 (3.42–4.88 s) and 3.85 s (3.11–4.95 s) respectively. Other worktrees were
 active, so that full-lint difference is noise; budget about 0.36 s extra
 for parsing the StyleX source files, not a lint speedup.
+
+## Delayed-load layout checks
+
+At `d0876483`, all 18 cases passed in 38.5 seconds on one `linux/amd64:4x8` remote runner with two workers. This is test time, excluding allocation, image pull and build. Use `pnpm remote --machine linux/amd64:4x8 test:desktop layout-shift.spec.ts` for the same runner size.
+
+`pnpm remote test:desktop layout-shift.spec.ts` runs the desktop shift checks against fake Slack. They are ordinary desktop e2e tests, so `pnpm affected` includes them whenever renderer inputs change. No Mac timing or filmstrip recording is required.
+
+`expectStableAnchor` in `apps/desktop/e2e/shiftProbe.ts` samples a retained DOM anchor's screen coordinates every animation frame and asserts exactly zero movement. It also requires Chromium's Layout Shift observer and rejects entries without recent input. The anchor check includes the recent-input interval, which otherwise hides jumps for 500 ms. Start it before releasing delayed data, and wait for the resulting UI inside its action. A missing anchor fails.
+
+Use `fake.holdNext({ method, reason: 'open' })`, assert the call is held, then `fake.release({ method })` to exercise partial caches. Use silent fake posts followed by one socket message to reproduce history missing above the latest message. Do not substitute a settled gallery fixture for this case. Repeat with `pnpm flake apps/desktop/e2e/layout-shift.spec.ts --repeat 20 --machines 1`. Keep `JUNO_REMOTE_MAX_VCPU` at 24 or lower.

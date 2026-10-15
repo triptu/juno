@@ -1,5 +1,5 @@
 // Setting up a model provider from the Juno tab, as a first-time user does:
-// "Juno needs a model", Settings › Juno's provider section, then the chat.
+// "Juno needs a model", the provider section of Settings › Juno, then the chat.
 import { startFakeOpenAi } from '@juno/agent-testing/openai'
 import { startFakeOpenRouter, type FakeOpenRouter } from '@juno/agent-testing/openrouter'
 import type { Juno } from '../driver/juno'
@@ -45,10 +45,12 @@ test('with no provider the tab and the panel say Juno needs a model, and Add a p
   const empty = juno.win.locator('main [data-juno-no-provider]')
   await expect(empty).toContainText('Juno needs a model')
   await empty.getByRole('button', { name: 'Add a provider' }).click()
-  await juno.tabs.expectActive('Settings › Juno')
+  await juno.tabs.expectActive('Settings')
 
-  // With no agent running the page is the provider section alone.
+  // Settings opens at Juno with the key field focused. With no agent running the page is the provider section alone.
   const page = juno.win.locator('main')
+  await expect(juno.win.getByRole('navigation', { name: 'Settings' }).getByRole('button', { name: 'Juno' })).toHaveAttribute('aria-current', 'page')
+  await expect(page.getByLabel('API key')).toBeFocused()
   await expect(page.locator('[data-provider-shown]')).toHaveAttribute('data-provider-shown', 'openRouter')
   await expect(page.getByRole('heading', { name: 'Model' })).toHaveCount(0)
   await page.getByLabel('API key').fill('two words')

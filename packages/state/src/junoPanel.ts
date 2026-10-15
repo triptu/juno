@@ -2,8 +2,11 @@
  * The Juno panel beside a topic (SPEC 7, inventory 12.1): renderer state the
  * agent does not keep.
  *
- * - `junoPanelOpenAtom`: whether the panel is open, one flag for every topic
- *   tab, saved to the workspace preference `JUNO_PANEL_PREF`.
+ * - `junoPanelOpenAtom`: whether the panel is open in the active tab. Each
+ *   tab keeps its own flag, saved with the tabs (`Tab.junoPanel`), so the
+ *   panel can be open in one tab and closed in another.
+ * - `junoPanelWidthAtom`: the panel's width, one for every tab, saved to the
+ *   workspace preference `JUNO_PANEL_PREF`.
  * - `junoAboutAtom`: the About chip from Ask Juno in a person's or channel's
  *   menu. It holds until removed or the panel closes.
  * - `openedAtNewAtom(topicId)`: the first message under the "new" divider the
@@ -20,12 +23,13 @@
 import { Schema } from 'effect'
 import * as AsyncResult from 'effect/reactivity/AsyncResult'
 import * as Atom from 'effect/reactivity/Atom'
-import { prefsGet, prefsSet } from '@juno/contract'
+import { JUNO_PANEL_WIDTH, prefsGet, prefsSet } from '@juno/contract'
 import type { About, Selection } from '@juno/agent-contract'
 import { liveQuery, runCommand } from './atoms'
 import { aiAssistOnAtom } from './notifications'
 import type { Registry } from './client'
 import { signedInAtom } from './session'
+import { activeTab, setJunoPanel, tabsAtom, updateTabs } from './tabs'
 
 export const JUNO_PANEL_PREF = 'junoPanel'
 
@@ -36,27 +40,41 @@ export const JUNO_PANEL_PREF = 'junoPanel'
  */
 export const junoAvailableAtom = aiAssistOnAtom
 
-const savedPanelAtom = liveQuery(prefsGet)({ key: JUNO_PANEL_PREF })
-const changedPanelAtom = Atom.family((_teamId: string) => Atom.make<boolean | undefined>(undefined).pipe(Atom.keepAlive))
-const decodeOpen = Schema.decodeUnknownOption(Schema.Struct({ open: Schema.Boolean }))
-
 export const junoPanelOpenAtom = Atom.make((get): boolean => {
-  const teamId = get(signedInAtom)?.teamId
-  if (teamId === undefined) return false
-  const changed = get(changedPanelAtom(teamId))
-  if (changed !== undefined) return changed
-  const saved = get(savedPanelAtom)
-  if (!AsyncResult.isSuccess(saved)) return false
-  const decoded = decodeOpen(saved.value)
-  return decoded._tag === 'Some' && decoded.value.open
+  const tabs = get(tabsAtom)
+  return tabs.tabs.find((tab) => tab.id === tabs.active)?.junoPanel === true
 })
 
+/** Opens or closes the panel in the active tab. */
 export function setJunoPanelOpen(registry: Registry, open: boolean): void {
-  const teamId = registry.get(signedInAtom)?.teamId
-  if (teamId === undefined || registry.get(junoPanelOpenAtom) === open) return
-  registry.set(changedPanelAtom(teamId), open)
+  const tab = activeTab(registry.get(tabsAtom))
+  if (tab === undefined || (tab.junoPanel === true) === open) return
+  updateTabs(registry, (tabs) => setJunoPanel(tabs, tab.id, open))
   if (!open) registry.set(junoAboutAtom, undefined)
-  void runCommand(registry, prefsSet, { key: JUNO_PANEL_PREF, value: { open } })
+}
+
+const savedPanelAtom = liveQuery(prefsGet)({ key: JUNO_PANEL_PREF })
+const changedWidthAtom = Atom.family((_teamId: string) => Atom.make<number | undefined>(undefined).pipe(Atom.keepAlive))
+const decodeWidth = Schema.decodeUnknownOption(Schema.Struct({ width: Schema.Number }))
+const validWidth = (width: number) => Number.isInteger(width) && width >= JUNO_PANEL_WIDTH.min && width <= JUNO_PANEL_WIDTH.max
+
+export const junoPanelWidthAtom = Atom.make((get): number => {
+  const teamId = get(signedInAtom)?.teamId
+  if (teamId === undefined) return JUNO_PANEL_WIDTH.default
+  const changed = get(changedWidthAtom(teamId))
+  if (changed !== undefined) return changed
+  const saved = get(savedPanelAtom)
+  if (!AsyncResult.isSuccess(saved)) return JUNO_PANEL_WIDTH.default
+  const decoded = decodeWidth(saved.value)
+  return decoded._tag === 'Some' && validWidth(decoded.value.width) ? decoded.value.width : JUNO_PANEL_WIDTH.default
+})
+
+/** A drag on the panel's edge ended at `width`, or a double-click asked for the default. */
+export function setJunoPanelWidth(registry: Registry, width: number): void {
+  const teamId = registry.get(signedInAtom)?.teamId
+  if (teamId === undefined || !validWidth(width) || registry.get(junoPanelWidthAtom) === width) return
+  registry.set(changedWidthAtom(teamId), width)
+  void runCommand(registry, prefsSet, { key: JUNO_PANEL_PREF, value: { width } })
 }
 
 export const junoAboutAtom = Atom.make<Exclude<About, { _tag: 'topic' }> | undefined>(undefined).pipe(Atom.keepAlive)

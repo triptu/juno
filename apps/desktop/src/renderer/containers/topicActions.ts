@@ -202,14 +202,14 @@ export type MessageMenuChoice = 'edit' | 'delete' | 'reply'
 /**
  * The message menu (SPEC 7 "More", inventory 15.4 and 15.6), from the
  * toolbar's More and from a right-click: Edit and Delete on your own
- * messages, Reply in thread in Main, Copy Slack link and Open in Slack,
+ * messages, Start thread or Open thread in Main, Copy Slack link and Open in Slack,
  * and, on someone else's message, why it did or did not notify. A reply's
  * link carries its thread; a message Slack does not have yet has none. On
  * the sender's name or avatar it is the person menu.
  */
 export async function showMessageMenu(
   topic: ActionTopic,
-  message: Pick<MessageView, 'ts' | 'pending'>,
+  message: Pick<MessageView, 'ts' | 'pending' | 'thread'>,
   editable: boolean,
   at: ContextMenuAt,
   sender: { readonly id: string; readonly name: string } | undefined,
@@ -226,7 +226,7 @@ export async function showMessageMenu(
   const why = own || !linkable ? undefined : await loadWhy(registry, topic.id, ts)
   const items: ContextMenuItem[] = [
     ...(editable ? [{ id: 'edit', label: 'Edit' }, { id: 'delete', label: 'Delete' }, { separator: true } as const] : []),
-    ...(topic.kind === 'main' && linkable ? [{ id: 'reply', label: 'Reply in thread' }, { separator: true } as const] : []),
+    ...(topic.kind === 'main' && linkable ? [{ id: 'reply', label: message.thread === undefined ? 'Start thread' : 'Open thread' }, { separator: true } as const] : []),
     ...(own && linkable ? [{ id: 'watch-reply', label: 'Tell me if nobody replies', enabled: registry.get(junoNavAtom).mayAuthorize === true }] : []),
     { id: 'copy-link', label: 'Copy Slack link', ...(linkable ? {} : { enabled: false }) },
     { id: 'open-in-slack', label: 'Open in Slack' },

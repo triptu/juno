@@ -1,22 +1,22 @@
 import { expect, hooks, test } from './fixtures'
 
-// The engine's diagnostic line sits in the account menu of the signed-in
-// shell, so every test here signs in and opens the menu first.
+// The engine's diagnostic line sits in Settings › About of the signed-in
+// shell, so every test here signs in and opens it first.
 test('shows the engine status that arrives over the port', async ({ juno }) => {
   await juno.signIn()
-  await juno.accountMenu.open()
-  await expect(juno.accountMenu.engineStatus).toHaveText('Engine live')
+  await juno.openSettings('About')
+  await expect(juno.settings.engineStatus).toHaveText('Engine live')
 })
 
 test('answers a command from the engine', async ({ juno }) => {
   await juno.signIn()
-  await juno.accountMenu.open()
-  await expect(juno.accountMenu.engineStatus).toHaveText('Engine live')
-  const ping = juno.accountMenu.pingButton
+  await juno.openSettings('About')
+  await expect(juno.settings.engineStatus).toHaveText('Engine live')
+  const ping = juno.settings.pingButton
   await ping.click()
-  await expect(juno.accountMenu.root.getByText('Pong 2')).toBeVisible()
+  await expect(juno.settings.root.getByText('Pong 2')).toBeVisible()
   await ping.click()
-  await expect(juno.accountMenu.root.getByText('Pong 3')).toBeVisible()
+  await expect(juno.settings.root.getByText('Pong 3')).toBeVisible()
 })
 
 test('is served from the juno: scheme', async ({ win }) => {
@@ -36,8 +36,8 @@ test('is served from the juno: scheme', async ({ win }) => {
 
 test('recovers after the engine process is killed', async ({ juno, app }) => {
   await juno.signIn()
-  await juno.accountMenu.open()
-  const line = juno.accountMenu.engineStatus
+  await juno.openSettings('About')
+  const line = juno.settings.engineStatus
   await expect(line).toHaveText('Engine live')
   const pid = await hooks(app, 'enginePid')
   expect(pid).toBeDefined()
@@ -54,14 +54,14 @@ test('recovers after the engine process is killed', async ({ juno, app }) => {
   await expect.poll(() => hooks(app, 'engineState'), { timeout: 15_000 }).toBe('ready')
 
   // Commands work on the new port too.
-  await juno.accountMenu.pingButton.click()
-  await expect(juno.accountMenu.root.getByText(/Pong \d+/)).toBeVisible()
+  await juno.settings.pingButton.click()
+  await expect(juno.settings.root.getByText(/Pong \d+/)).toBeVisible()
 })
 
 test('says so when the supervisor gives up on the engine', async ({ juno, app }) => {
   await juno.signIn()
-  await juno.accountMenu.open()
-  const line = juno.accountMenu.engineStatus
+  await juno.openSettings('About')
+  const line = juno.settings.engineStatus
   await expect(line).toHaveText('Engine live')
 
   await hooks(app, 'failEngine')

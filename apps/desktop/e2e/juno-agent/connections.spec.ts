@@ -55,7 +55,7 @@ async function openConnections(juno: Juno): Promise<void> {
   await openChat(juno)
   await juno.win.locator('main [data-juno-header]').getByRole('button', { name: 'Juno' }).click()
   await juno.win.getByRole('menuitem', { name: 'Connections' }).click()
-  await juno.tabs.expectActive('Connections')
+  await juno.tabs.expectActive('Settings')
 }
 
 const openChat = (juno: Juno) => juno.win.getByRole('navigation', { name: 'Pages' }).getByRole('button', { name: /^Juno/ }).click()
