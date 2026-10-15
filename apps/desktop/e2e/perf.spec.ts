@@ -458,7 +458,7 @@ test.describe.serial('large workspace', () => {
         let frames: number[] = []
         let loaf: string[] = []
         let placeholders = 0
-        // About 2 000 px/s for 3 s down and back: 115 rows each way, past the 40-row edge where the window moves.
+        // About 2 000 px/s for 8 s down and back: about 300 rows each way, so the 200-row window moves on the way down and again on the way up.
         const { work } = await traced(win, `scroll-all-topics-${label.replace(' ', '-')}`, async () => {
           await win.evaluate(() => {
             const w = window as unknown as { __frames: number[]; __sampling: boolean; __loaf: string[]; __placeholders: number }
@@ -481,11 +481,13 @@ test.describe.serial('large workspace', () => {
             }
             requestAnimationFrame(tick)
           })
-          for (let i = 0; i < 30; i++) {
+          for (let i = 0; i < 80; i++) {
             await win.mouse.wheel(0, 200)
             await win.waitForTimeout(100)
           }
-          for (let i = 0; i < 30; i++) {
+          const offset = await win.evaluate(() => document.querySelector('[data-all-topics-row]')?.getAttribute('aria-rowindex'))
+          console.log(`first row drawn at the bottom of the sweep: ${offset}`)
+          for (let i = 0; i < 80; i++) {
             await win.mouse.wheel(0, -200)
             await win.waitForTimeout(100)
           }
