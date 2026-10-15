@@ -50,6 +50,13 @@ describe('Home copy and scene', () => {
 })
 
 describe('freezeHome', () => {
+  it('takes art drawn after Home appeared', () => {
+    const topic = { id: 't:C0ENG:1.000001', title: 'Postgres 16 migration plan', place: 'eng' }
+    const shown = view({ ...item('a'), topics: [topic] })
+    const later = freezeHome(shown, view({ ...item('a'), topics: [{ ...topic, art: '<svg/>' }] }))
+    expect(later.items[0]!.topics[0]!.art).toBe('<svg/>')
+  })
+
   it('keeps the rows it showed and takes only their new title lines', () => {
     const shown = view(item('a'), item('b'))
     expect(freezeHome(shown, view(item('b'), item('c')))).toBe(shown)

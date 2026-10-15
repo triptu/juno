@@ -109,16 +109,25 @@ export function homeAppeared(registry: Registry, now: Date): boolean {
 
 /**
  * What Home shows from now on: the items of `shown` in their order, each
- * with the newest `aiTitle` the engine has for it. Returns `shown` itself
- * when nothing changed, so React keeps the rows.
+ * with the newest `aiTitle` and topic art the engine has for it (a text
+ * swap in a one-line title, and art that fades in over its placeholder, so
+ * nothing moves). Returns `shown` itself when nothing changed, so React
+ * keeps the rows.
  */
 export function freezeHome(shown: HomeView, latest: HomeView): HomeView {
   let changed = false
   const items = shown.items.map((item): HomeItem => {
-    const aiTitle = latest.items.find((next) => next.id === item.id)?.aiTitle
-    if (aiTitle === undefined || aiTitle === item.aiTitle) return item
+    const next = latest.items.find((candidate) => candidate.id === item.id)
+    if (next === undefined) return item
+    const aiTitle = next.aiTitle ?? item.aiTitle
+    const topics = item.topics.map((topic) => {
+      const art = next.topics.find((candidate) => candidate.id === topic.id)?.art
+      return art === undefined || art === topic.art ? topic : { ...topic, art }
+    })
+    const artChanged = topics.some((topic, index) => topic !== item.topics[index])
+    if (aiTitle === item.aiTitle && !artChanged) return item
     changed = true
-    return { ...item, aiTitle }
+    return { ...item, ...(aiTitle === undefined ? {} : { aiTitle }), topics }
   })
   return changed ? { ...shown, items } : shown
 }
