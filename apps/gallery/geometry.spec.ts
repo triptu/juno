@@ -148,6 +148,48 @@ test.describe('composer controls', () => {
   })
 })
 
+test.describe('composer attachments', () => {
+  test('the check bar, the chip row and the attach button share the 6px inset; the bar is 6px from the end too', async ({ page }) => {
+    await open(page, 'Composer', 'attachments/check-bar-with-chips')
+    const at = await page.evaluate(() => {
+      const field = document.querySelector('[data-composer-field]')!
+      const box = field.getBoundingClientRect()
+      const border = parseFloat(getComputedStyle(field).borderLeftWidth)
+      const inset = (element: Element) => {
+        const b = element.getBoundingClientRect()
+        return { start: b.left - box.left - border, end: box.right - border - b.right, top: b.top - box.top - border, bottom: b.bottom - box.top - border }
+      }
+      const chips = [...field.querySelectorAll('[data-attachment]')].map(inset)
+      return {
+        bar: inset(field.firstElementChild!),
+        chips,
+        attach: inset(field.querySelector('button[aria-label="Attach files"]')!),
+        send: inset(field.querySelector('button[aria-label="Send"]')!),
+      }
+    })
+    expect(at.attach.start).toBe(6)
+    expect(at.bar.start).toBe(at.attach.start)
+    expect(at.chips[0]!.start).toBe(at.attach.start)
+    expect(at.bar.end).toBe(at.send.end)
+    expect(at.bar.top).toBe(6)
+    expect(at.chips[0]!.top - at.bar.bottom).toBe(6)
+  })
+
+  test('image and file chips are the same 44px frame, with the remove button 4px from the top and end', async ({ page }) => {
+    await open(page, 'AttachmentChips', 'state/ready')
+    const chips = await page.evaluate(() =>
+      [...document.querySelectorAll('[data-attachment]')].map((chip) => {
+        const box = chip.getBoundingClientRect()
+        const remove = chip.querySelector('button')!.getBoundingClientRect()
+        const frame = getComputedStyle(chip.querySelector('[data-chip-frame]')!)
+        return { height: box.height, radius: getComputedStyle(chip).borderTopLeftRadius, border: `${frame.borderTopWidth} ${frame.borderTopStyle}`, top: remove.top - box.top, end: box.right - remove.right, size: remove.width }
+      }),
+    )
+    expect(chips.length).toBe(4)
+    for (const chip of chips) expect(chip).toEqual({ height: 44, radius: '14px', border: '1px solid', top: 4, end: 4, size: 20 })
+  })
+})
+
 test.describe('message images', () => {
   test('one image fits 360 by 240; images side by side are a two-column grid of equal cells', async ({ page }) => {
     await open(page, 'MessageList', 'files/thumbnails')
