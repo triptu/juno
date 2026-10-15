@@ -1,7 +1,7 @@
 import { AiProvider, urgencyGate } from '@juno/ai'
 import { channelLabel, inHours, localTime, nextHoursStart, decideNotification, hoursStartSummary, scheduledPresence, slackPresence, type NotificationDecision, type Presence } from '@juno/domain'
-import { StoreWriter, type StoreReader } from '@juno/store'
-import { Clock, Effect, Schema, Semaphore } from 'effect'
+import { Invalidation, StoreWriter, type StoreReader } from '@juno/store'
+import { Clock, Effect, Schema, Semaphore, SubscriptionRef } from 'effect'
 import { Candidate, Judgement, type MessageSource, type Notifier } from './model'
 import { readSettings } from './settings'
 
@@ -21,12 +21,15 @@ interface Row {
 /** One instance per signed-in workspace. All decisions and delivery claims share a permit. */
 export const makeNotifications = Effect.fn('Notifications.make')(function* (notifier: Notifier, setPresence: (value: 'auto' | 'away') => Effect.Effect<boolean>) {
   const sql = yield* StoreWriter
+  const invalidation = yield* Invalidation
+  /** The Notifications page's Today and the why popover read the log. */
+  const logChanged = invalidation.invalidate(['notification_log'])
   const ai = yield* AiProvider
   const settingsContext = yield* Effect.context<StoreReader>()
   const configuration = readSettings.pipe(Effect.provide(settingsContext))
   const lock = yield* Semaphore.make(1)
   let scheduled: Presence | undefined
-  let current: Presence | undefined
+  const current = yield* SubscriptionRef.make<Presence | undefined>(undefined)
 
   const storeDecision = (id: number, candidate: Candidate, at: number, decision: NotificationDecision, due: number | undefined) =>
     Effect.gen(function* () {
@@ -72,6 +75,7 @@ export const makeNotifications = Effect.fn('Notifications.make')(function* (noti
       ON CONFLICT(channel, ts) DO NOTHING RETURNING id`
     const row = rows[0]
     if (row !== undefined) yield* storeDecision(row.id, candidate, now, decision, due)
+    yield* logChanged
   })
 
   const rerun = Effect.gen(function* () {
@@ -92,6 +96,7 @@ export const makeNotifications = Effect.fn('Notifications.make')(function* (noti
     yield* sql`UPDATE notification_log SET summary_due_at = ${next === undefined ? null : new Date(next).toISOString()}
       WHERE outcome = 'summary' AND delivered_at IS NULL AND suppressed_at IS NULL
       AND (summary_due_at IS NULL OR summary_due_at > ${new Date(now).toISOString()})`
+    yield* logChanged
   })
 
   const summarize = Effect.gen(function* () {
@@ -111,6 +116,7 @@ export const makeNotifications = Effect.fn('Notifications.make')(function* (noti
       ? { kind: 'summary' as const, id: yield* notifier.summary({ id, at: now, sources, ...summary }) }
       : { kind: 'message' as const, source }
     yield* sql`UPDATE notification_log SET delivered_at = ${now} WHERE id IN ${sql.in(rows.map((row) => row.id))}`
+    yield* logChanged
     yield* notifier.show({ id, ...summary, target })
   })
 
@@ -118,7 +124,10 @@ export const makeNotifications = Effect.fn('Notifications.make')(function* (noti
     const { settings } = yield* configuration
     const next = scheduledPresence(localTime(yield* Clock.currentTimeMillis), settings.presenceHours)
     if (force || next !== scheduled) {
-      if (yield* setPresence(slackPresence(next))) { scheduled = next; current = next }
+      if (yield* setPresence(slackPresence(next))) {
+        scheduled = next
+        yield* SubscriptionRef.set(current, next)
+      }
     }
     yield* summarize
   })
@@ -128,10 +137,12 @@ export const makeNotifications = Effect.fn('Notifications.make')(function* (noti
     settingsChanged: rerun.pipe(Effect.andThen(tick(false)), lock.withPermit),
     tick: tick(false).pipe(lock.withPermit),
     wake: tick(true).pipe(lock.withPermit),
-    currentPresence: Effect.sync(() => current),
-    observePresence: (value: Presence) => Effect.sync(() => { current = value }),
+    currentPresence: SubscriptionRef.get(current),
+    /** What Slack shows, once known, then every change. */
+    presenceChanges: SubscriptionRef.changes(current),
+    observePresence: (value: Presence) => SubscriptionRef.set(current, value),
     setPresence: (value: Presence) => Effect.gen(function* () {
-      if (yield* setPresence(slackPresence(value))) current = value
+      if (yield* setPresence(slackPresence(value))) yield* SubscriptionRef.set(current, value)
     }).pipe(lock.withPermit),
   }
 })

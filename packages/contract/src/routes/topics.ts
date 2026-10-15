@@ -172,6 +172,11 @@ const restorePayload = {
   unreadFrom: Schema.optionalKey(Schema.String),
 }
 
+/** What a Notify me choice applies to: a thread topic id, a channel or DM id, or a user id. */
+export const NotifyTargetSchema = Schema.Struct({ kind: Schema.Literals(['thread', 'channel', 'person']), id: Schema.String })
+export type NotifyTargetView = typeof NotifyTargetSchema.Type
+export const NotifyChoiceSchema = Schema.Literals(['every', 'matters', 'never'])
+
 export const UndoCommand = Schema.Union([
   Schema.TaggedStruct('topics.restore', restorePayload),
   Schema.TaggedStruct('channels.ignore', { channel: Schema.String }),
@@ -180,6 +185,7 @@ export const UndoCommand = Schema.Union([
   Schema.TaggedStruct('topics.unsubscribe', { id: Schema.String }),
   Schema.TaggedStruct('reads.markRead', { id: Schema.String, upTo: Schema.optionalKey(Schema.String) }),
   Schema.TaggedStruct('reads.markUnread', { id: Schema.String, from: Schema.optionalKey(Schema.String) }),
+  Schema.TaggedStruct('notifications.setLevel', { target: NotifyTargetSchema, choice: NotifyChoiceSchema }),
 ])
 export type UndoCommand = typeof UndoCommand.Type
 

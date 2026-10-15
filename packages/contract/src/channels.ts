@@ -31,6 +31,8 @@ export const Channels = {
   clipboardWriteText: 'clipboard.writeText',
   /** Undo in the focused text field (`webContents.undo()`), for ⌘Z while one has text. */
   shellEditUndo: 'shell.editUndo',
+  /** The topic the window shows, or null. Main adds whether the window is focused and tells the engine. */
+  notificationsViewing: 'notifications.viewing',
 } as const
 
 export type Channel = (typeof Channels)[keyof typeof Channels]
@@ -41,6 +43,8 @@ export const Events = {
   enginePort: 'engine.port',
   /** An app-menu item the renderer acts on, with a `MenuCommand`. */
   menuCommand: 'menu.command',
+  /** A notification was clicked, with its `NotificationTarget`. */
+  notificationOpen: 'notification.open',
 } as const
 
 /**
@@ -131,5 +135,11 @@ export interface JunoBridge {
   readonly menu: {
     /** Calls `listener` for each app-menu command. Returns the unsubscribe. */
     readonly onCommand: (listener: (command: MenuCommand) => void) => () => void
+  }
+  readonly notifications: {
+    /** The topic the window shows now, or null for a page or nothing. */
+    readonly setViewing: (topicId: string | null) => Promise<unknown>
+    /** Calls `listener` with the target of each clicked notification, undecoded. Returns the unsubscribe. */
+    readonly onOpen: (listener: (target: unknown) => void) => () => void
   }
 }

@@ -15,6 +15,7 @@ import { SearchHandlers } from './search/handlers'
 import { PrefsHandlers } from './prefs/handlers'
 import { MessagesHandlers } from './messages/handlers'
 import { NewChatHandlers } from './newchat/handlers'
+import { NotificationsHandlers } from './notifications/handlers'
 import { ReadsHandlers } from './reads/handlers'
 import { MarkWorker } from './markWorker'
 import { Outbox } from './outbox'
@@ -71,7 +72,7 @@ export const Services = Layer.mergeAll(EnginePhases, ArtJob).pipe(
 )
 
 /** One `toLayer` per feature, merged. Requires `Services`. */
-export const Handlers = Layer.mergeAll(StatusHandlers, SessionHandlers, TopicsHandlers, SearchHandlers, PrefsHandlers, MessagesHandlers, ReadsHandlers, ArtHandlers, NewChatHandlers)
+export const Handlers = Layer.mergeAll(StatusHandlers, SessionHandlers, TopicsHandlers, SearchHandlers, PrefsHandlers, MessagesHandlers, ReadsHandlers, ArtHandlers, NewChatHandlers, NotificationsHandlers)
 
 /** The engine's side of the AgentHost port (ADR 0012): `JunoHost` over `Services`, with the engine phase from the status feature. */
 export const AgentHost = JunoHostLive.pipe(Layer.provide(Layer.effect(PhaseSource, Status.use((status) => Effect.succeed(status.phases)))))
