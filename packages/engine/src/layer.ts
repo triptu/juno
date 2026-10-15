@@ -12,6 +12,7 @@ import { AiProviderLive } from './ai'
 import { ArtHandlers } from './art/handlers'
 import { ArtJob } from './art/job'
 import { HomeHandlers } from './home/handlers'
+import { AutomatedJob } from './home/automated'
 import { HomeJob } from './home/job'
 import { SearchHandlers } from './search/handlers'
 import { PrefsHandlers } from './prefs/handlers'
@@ -78,7 +79,7 @@ const EnginePhases = Layer.effectDiscard(
 )
 
 /** Everything the route handlers need. Requires the host seams (`HostLink`, `HttpTransport`) and `EngineConfig`. */
-export const Services = Layer.mergeAll(EnginePhases, ArtJob, HomeJob).pipe(
+export const Services = Layer.mergeAll(EnginePhases, ArtJob, HomeJob, AutomatedJob).pipe(
   Layer.provideMerge(MarkWorker.layer),
   Layer.provideMerge(PostWorker.layer),
   Layer.provideMerge(Staging.layer),

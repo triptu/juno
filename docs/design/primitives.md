@@ -139,7 +139,7 @@ The composer is a feature component: `Surface field` + slots + `IconButton` + `T
 
 ## 13. ListRow
 
-Generic row for settings groups, logs and tables: `minHeight` 44 | 48 | 52, `padding` `settings` | `table` | `log`, bottom `divider` (default on), `leading`, `trailing`, children. With `onSelect` it is a focusable `role="button"` with a hover background and radius 16 (`selected` for the current row; muted text inside a selected row renders subtle). Rows set `contain: content`. Sidebar topic rows and All topics rows are feature components built on this.
+Generic row for settings groups, logs and tables: `minHeight` 44 | 48 | 52, `padding` `settings` (8 14, the same inset at both ends) | `table` | `log`, bottom `divider` (default on), `leading`, `trailing`, children. With `onSelect` it is a focusable `role="button"` with a hover background and radius 16 (`selected` for the current row; muted text inside a selected row renders subtle). Rows set `contain: content`. Sidebar topic rows and All topics rows are feature components built on this.
 
 ## 14. Toast
 

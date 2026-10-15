@@ -51,6 +51,9 @@ import ReactionPicker from './juno-chat/ReactionPicker.fixtures'
 import RemoveSheet from './juno-chat/RemoveSheet.fixtures'
 import StatusBubble from './juno-chat/StatusBubble.fixtures'
 import ActivityPage from './juno-pages/ActivityPage.fixtures'
+import BackupSection from './juno-pages/BackupSections.fixtures'
+import { moveSheet, phraseSheet, restoreSheet } from './juno-pages/BackupSheets.fixtures'
+import ThisMacSection from './juno-pages/ThisMacSection.fixtures'
 import ConnectionsPage from './juno-pages/ConnectionsPage.fixtures'
 import JunoSettingsPage from './juno-pages/JunoSettingsPage.fixtures'
 import MemoryPage from './juno-pages/MemoryPage.fixtures'
@@ -68,6 +71,7 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   AppearanceSettings,
   AppInfoView,
   AttachmentChips,
+  BackupSection,
   ChannelIconPicker,
   BudgetCard: budgetCard,
   ChangeCard: changeCard,
@@ -93,6 +97,7 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   MemoryPage,
   Message,
   MessageList,
+  MoveSheet: moveSheet,
   NewChat,
   NewDivider,
   NewMessagesPill,
@@ -106,12 +111,14 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   ProposedTaskCard: proposedTaskCard,
   ProviderCard: providerCard,
   QuestionCard: questionCard,
+  RecoveryPhraseSheet: phraseSheet,
   ReactionPicker,
   Reactions,
   RemembersPage,
   RemoveCard: removeCard,
   RemoveSheet,
   ResolveCard: resolveCard,
+  RestoreSheet: restoreSheet,
   ReviewPage,
   ScheduleCard: scheduleCard,
   ScheduledPage,
@@ -122,6 +129,7 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   SignInView,
   StatusBubble,
   TaskCard: taskCard,
+  ThisMacSection,
   ThreadLink,
   TitlebarNav,
   TopicsCard: topicsCardSet,

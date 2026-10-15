@@ -186,6 +186,13 @@ export default defineFixtures(
       'hover-thread-link': state({ items: mainStream, main: true }, { hover: '[data-thread-link]' }),
       'focus-thread-link': state({ items: mainStream, main: true }, { focus: '[data-thread-link]' }),
     },
+    // A 336px column, a topic in the 720px window: the toolbar rises above a row,
+    // except near the list's top, where it drops inside under the name line.
+    Narrow: {
+      'hover-toolbar': state({ items: thread, main: false, actions: noopActions }, { width: 336, height: 600, padded: false, hover: `${ROW}:nth-of-type(4)` }),
+      'hover-toolbar-top': state({ items: thread, main: false, actions: noopActions }, { width: 336, height: 600, padded: false, hover: `${ROW}:first-of-type` }),
+      'focus-top': state({ items: thread, main: false, actions: noopActions }, { width: 336, height: 600, padded: false, focus: `${ROW}:first-of-type` }),
+    },
   },
   { width: 816, height: 600, padded: false },
 )

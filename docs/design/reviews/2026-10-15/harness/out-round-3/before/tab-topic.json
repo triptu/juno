@@ -1,0 +1,122 @@
+[
+  {
+    "tag": "button",
+    "role": null,
+    "name": "Draft plan is in the doc",
+    "ring": "solid 2px rgb(180, 53, 31) +2px",
+    "shadow": "none",
+    "rect": [
+      580,
+      56,
+      177,
+      28
+    ]
+  },
+  {
+    "tag": "button",
+    "role": null,
+    "name": "Resolve",
+    "ring": "solid 2px rgb(180, 53, 31) +2px",
+    "shadow": "none",
+    "rect": [
+      1150,
+      56,
+      84,
+      28
+    ]
+  },
+  {
+    "tag": "button",
+    "role": null,
+    "name": "Juno ⌘J",
+    "ring": "solid 2px rgb(180, 53, 31) +2px",
+    "shadow": "none",
+    "rect": [
+      1236,
+      56,
+      28,
+      28
+    ]
+  },
+  {
+    "tag": "div",
+    "role": "listitem",
+    "name": "DDev15:51Booked 2–4pm. Will post results here.👍✅\ud83d",
+    "ring": "solid 2px rgb(180, 53, 31) +-2px",
+    "shadow": "none",
+    "rect": [
+      516,
+      558,
+      752,
+      51
+    ]
+  },
+  {
+    "tag": "body"
+  },
+  {
+    "tag": "textarea",
+    "role": null,
+    "name": "Reply",
+    "ring": "none 3px rgb(35, 33, 26) +0px",
+    "shadow": "none",
+    "rect": [
+      531,
+      773,
+      698,
+      40
+    ]
+  },
+  {
+    "tag": "button",
+    "role": null,
+    "name": "Send",
+    "ring": "solid 2px rgb(180, 53, 31) +2px",
+    "shadow": "none",
+    "rect": [
+      1233,
+      779,
+      28,
+      28
+    ]
+  },
+  {
+    "tag": "button",
+    "role": null,
+    "name": "Hide sidebar ⌃⌘S",
+    "ring": "solid 2px rgb(180, 53, 31) +2px",
+    "shadow": "none",
+    "rect": [
+      78,
+      7,
+      30,
+      30
+    ]
+  },
+  {
+    "tag": "button",
+    "role": null,
+    "name": "Search ⌘K",
+    "ring": "solid 2px rgb(180, 53, 31) +2px",
+    "shadow": "none",
+    "rect": [
+      275,
+      7,
+      30,
+      30
+    ]
+  },
+  {
+    "tag": "button",
+    "role": null,
+    "name": "New chat ⌘N",
+    "ring": "solid 2px rgb(180, 53, 31) +2px",
+    "shadow": "none",
+    "rect": [
+      307,
+      7,
+      30,
+      30
+    ]
+  }
+]

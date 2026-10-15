@@ -176,6 +176,31 @@ export class FakeSlack {
     if (failure !== undefined) throw new Error(failure)
   }
 
+  /**
+   * A public channel self is in, with messages posted `ago` minutes back and
+   * read up to the last. Like the seed, it sends no events: add it before
+   * the app signs in.
+   */
+  addChannel(input: { id: string; name: string; messages: ReadonlyArray<{ user: string; text: string; ago: number }> }): void {
+    const now = this.workspace.clock.now()
+    this.workspace.addConversation({
+      id: input.id,
+      name: input.name,
+      kind: 'public',
+      members: new Set([this.selfId, ...input.messages.map((message) => message.user)]),
+      created: now - 90 * 24 * 60 * 60_000,
+      topic: '',
+      purpose: '',
+      isOpen: true,
+      archived: false,
+    })
+    let last: Message | undefined
+    for (const message of input.messages.toSorted((a, b) => b.ago - a.ago)) {
+      last = this.workspace.post({ channel: input.id, user: message.user, text: message.text, at: now - message.ago * 60_000, silent: true })
+    }
+    if (last !== undefined) this.workspace.reads.set(input.id, last.ts)
+  }
+
   /** `user` (self by default) joins a channel. Emits `channel_joined`/`group_joined` to self and `member_joined_channel`. */
   joinChannel(input: { channel: string; user?: string }): void {
     this.workspace.join(input.channel, input.user ?? this.selfId)
@@ -323,6 +348,7 @@ export class FakeSlack {
       markThreadRead: (i) => this.markThreadRead(i),
       addReaction: (i) => this.addReaction(i),
       removeReaction: (i) => this.removeReaction(i),
+      addChannel: (i) => this.addChannel(i),
       joinChannel: (i) => this.joinChannel(i),
       leaveChannel: (i) => this.leaveChannel(i),
       renameChannel: (i) => this.renameChannel(i),

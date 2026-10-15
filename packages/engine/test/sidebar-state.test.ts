@@ -13,6 +13,7 @@ import {
   sidebarSectionsAtom,
   type SidebarWindow,
 } from '@juno/state'
+import type { TopicRow } from '@juno/contract'
 import { startTestEngine, waitFor, type RunningEngine } from './harness'
 
 const engines: Array<RunningEngine> = []
@@ -133,7 +134,9 @@ describe('the participant stack on a busy thread', () => {
     }
     fake.followThread({ channel: 'C0ENG', threadTs: root.ts })
     const id = `t:C0ENG:${root.ts}`
-    const rows = await engine.rowsUntil((all) => all.find((r) => r.id === id)?.participants.length === 4, 'the busy thread with four people')
+    // Four people show while the replies are still arriving, so wait for the stack after the last one.
+    const stack = (all: ReadonlyArray<TopicRow>) => all.find((r) => r.id === id)?.participants.map((p) => p.id).join()
+    const rows = await engine.rowsUntil((all) => stack(all) === 'U0JONAS,U0PRIYA,U0SAM,U0LEO', 'the busy thread with four people')
     expect(rows.find((r) => r.id === id)!.participants.map((p) => p.id)).toEqual(['U0JONAS', 'U0PRIYA', 'U0SAM', 'U0LEO'])
   })
 })

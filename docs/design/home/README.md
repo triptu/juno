@@ -61,6 +61,7 @@ Each item has the topic's art (40px; Tidy up has a broom tile), a title line (13
 | Pick up where you left off | The last topic you had open for more than a minute, if it has unread messages | `Pick up where you left off` | `Pick up where you left off: Dev wants the Postgres 16 cutover window` |
 | Moved a lot | A followed topic with the most new messages since you last opened it, at least 8 | `Moved a lot since you looked` | `Maya's proposal grew 14 replies, leaning toward cutting offline mode` |
 | Follow-up (AI on only) | Something you said you would do, found by the assistant in your own messages; Mark done clears it | not shown | `You said you'd send Rina the scorecard` |
+| Automated | The newest channel neither the rules nor Juno could place in the Automated view (SPEC §5 "Automated"); a robot tile, and the meta line says how many of its latest messages came from apps | `Move #releases to Automated?`, with Keep in All and Move | the same |
 | Tidy up (AI on only) | Topics the settled decision scored high, at least two | not shown | `3 topics look settled`, with Resolve all |
 
 AI never adds an item the rules did not find; it only rewrites the title line of an item that is already there, and only when its confidence is high. If the rewrite is missing, late or low confidence, the AI-off title shows. The meta line never changes, so the row's second line is identical with and without AI and nothing shifts when a rewrite arrives.

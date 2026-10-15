@@ -90,6 +90,29 @@ const HOVER = '@media (hover: hover)'
 // Slack's does, so it never covers the name or the time.
 const NARROW_ROW = '@container message (width < 464px)'
 
+/**
+ * Where a narrow row's toolbar goes, decided once as the row is pointed at or
+ * focused (never per frame). It rises above the row unless that would put it
+ * under the header band at the list's top, where the band's fade washes it
+ * out; there it drops inside the row, under the name and time line so they
+ * stay readable, or at the top of a continuation row, which has no such line.
+ * The answer is a custom property on the row, so nothing re-renders.
+ */
+function placeToolbar(row: HTMLElement): void {
+  const scroller = row.closest('[data-scroll-area]')
+  if (scroller === null) return
+  const rowTop = row.getBoundingClientRect().top
+  const style = getComputedStyle(scroller)
+  const listTop = scroller.getBoundingClientRect().top + (Number.parseFloat(style.scrollPaddingTop) || 0)
+  const toolbarHeight = Number.parseFloat(style.getPropertyValue('--toolbar-height')) || 0
+  if (rowTop - toolbarHeight >= listTop) {
+    row.style.removeProperty('--row-toolbar-top')
+    return
+  }
+  const header = row.querySelector('[data-message-header]')
+  row.style.setProperty('--row-toolbar-top', header === null ? 'var(--space-0-5)' : `${header.getBoundingClientRect().bottom - rowTop}px`)
+}
+
 const dim = stylex.keyframes({
   from: { opacity: 1 },
   to: { opacity: opacity['--opacity-dim'] },
@@ -140,6 +163,7 @@ export const Message = memo(function Message({
   const hue = sender === undefined ? hueOf(message.senderId ?? message.ts) : hueFor(sender.color, sender.id)
   const header = startsGroup || message.groupStart
   const focus = (event: FocusEvent<HTMLDivElement>) => {
+    if (actions !== undefined) placeToolbar(event.currentTarget)
     if (event.target === event.currentTarget) onFocus?.(message.ts)
   }
   const toggle = onToggleReaction === undefined ? undefined : (reaction: string) => onToggleReaction(message.ts, reaction)
@@ -166,6 +190,7 @@ export const Message = memo(function Message({
       data-message-row={message.ts}
       data-pending={pending}
       onFocus={focus}
+      onPointerEnter={actions === undefined ? undefined : (event) => placeToolbar(event.currentTarget)}
       data-editing={editor === undefined ? undefined : ''}
       {...stylex.props(
         styles.row,
@@ -186,7 +211,7 @@ export const Message = memo(function Message({
       </span>
       <span {...stylex.props(styles.content, pending === 'sending' && styles.sending)}>
         {header ? (
-          <span {...stylex.props(styles.header, actions !== undefined && styles.headerWithToolbar)}>
+          <span data-message-header="" {...stylex.props(styles.header, actions !== undefined && styles.headerWithToolbar)}>
             <Text variant="messageName" tone="default" truncate tooltipWhenTruncated dir="auto" as="span" sx={styles.name} data-sender="" data-person-name={name}>
               {name}
             </Text>
@@ -407,7 +432,8 @@ const styles = stylex.create({
     position: 'absolute',
     top: {
       default: spacing['--space-0-5'],
-      [NARROW_ROW]: `calc(-1 * ${layout['--toolbar-height']})`,
+      // Raised, unless placeToolbar found the row too near the list's top.
+      [NARROW_ROW]: `var(--row-toolbar-top, calc(-1 * ${layout['--toolbar-height']}))`,
     },
     right: spacing['--space-2'],
     zIndex: z['--z-toolbar'],

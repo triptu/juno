@@ -31,7 +31,7 @@
  * Exports run one at a time, every minute while something changed, so the
  * recovery point stays within the 5 minutes §14.3 states.
  */
-import { readFileSync, rmSync } from 'node:fs'
+import { accessSync, constants, mkdirSync, readFileSync, rmSync } from 'node:fs'
 import { isAbsolute, join } from 'node:path'
 import { crashPoint } from '../runtime/crash'
 import { transaction } from '../store/database'
@@ -142,6 +142,14 @@ export class ForeignBackup extends Error {
   constructor(folder: string) {
     super(`${folder} holds another Juno backup`)
     this.name = 'ForeignBackup'
+  }
+}
+
+/** Another Mac took Juno over: its manifest in the folder has a later epoch (G7). */
+export class OwnedElsewhere extends Error {
+  constructor() {
+    super('Another Mac owns Juno now.')
+    this.name = 'OwnedElsewhere'
   }
 }
 
@@ -379,6 +387,8 @@ export function createBackup(options: BackupOptions): Backup {
         const old = folder()
         if (old === path) return
         // Checked before the setting changes, so a refused folder is never used.
+        mkdirSync(path, { recursive: true })
+        accessSync(path, constants.W_OK)
         if (owner().state === 'active' && ownedElsewhere(await backupKey(), path)) return
         transaction(db, () =>
           db.prepare("UPDATE backup_progress SET folder = ?, retired = json_insert(retired, '$[#]', ?) WHERE singleton = 1").run(path, old),
@@ -401,7 +411,7 @@ export function createBackup(options: BackupOptions): Backup {
       serial(async () => {
         if (owner().state !== 'released') throw new Error('The final checkpoint needs a released owner.')
         const key = await backupKey()
-        if (ownedElsewhere(key)) throw new Error('Another Mac owns Juno now.')
+        if (ownedElsewhere(key)) throw new OwnedElsewhere()
         // A crash after publishing, before the code was recorded: the published manifest is the final one.
         const me = owner()
         const newest = generations(folder())[0]

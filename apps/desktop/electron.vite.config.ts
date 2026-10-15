@@ -72,6 +72,28 @@ function phosphorWeights(): Plugin {
   }
 }
 
+/**
+ * Preloads the fonts the first screen uses (performance.md 2.3): Figtree for
+ * the shell and the sidebar, Instrument Serif for Home's greeting. Without
+ * it the font is only requested once the first layout finds it, and when it
+ * arrives the whole page is laid out again. The build fails if a file is
+ * not in the bundle, so a renamed font cannot drop the preload quietly.
+ */
+function preloadFonts(patterns: ReadonlyArray<RegExp>): Plugin {
+  return {
+    name: 'juno:preload-fonts',
+    apply: 'build',
+    transformIndexHtml(_html, context) {
+      const files = Object.keys(context.bundle ?? {})
+      return patterns.map((pattern) => {
+        const file = files.find((name) => pattern.test(name))
+        if (file === undefined) throw new Error(`juno:preload-fonts: no bundled font matches ${pattern}`)
+        return { tag: 'link', attrs: { rel: 'preload', as: 'font', type: 'font/woff2', crossorigin: '', href: `./${file}` }, injectTo: 'head' as const }
+      })
+    },
+  }
+}
+
 // The monorepo root. StyleX hashes class names relative to this directory and
 // needs it to resolve the workspace token package, no matter which directory
 // the build is started from.
@@ -140,6 +162,7 @@ export default defineConfig({
     plugins: [
       contentSecurityPolicy(),
       phosphorWeights(),
+      preloadFonts([/figtree-latin-wght-normal-[^/]*\.woff2$/, /instrument-serif-latin-400-normal-[^/]*\.woff2$/]),
       stylex.vite({
         useCSSLayers: true,
         unstable_moduleResolution: { type: 'commonJS', rootDir: repoRoot },

@@ -9,9 +9,9 @@ import { keys, liveQuery, type InvalidationKeys } from '@juno/store'
 import { EngineConfig } from '../config'
 import { retryFirstRun, serveLiveValue, timed } from '../protocol/live'
 import { Workspace } from '../workspace'
-import { deleteView, listViews, reorderViews, restoreView, saveView, setViewChannel } from '../viewCommands'
+import { deleteView, listViews, reorderViews, restoreView, saveView, setViewChannel, sortChannel } from '../viewCommands'
 
-const LIST_KEYS: InvalidationKeys = [...keys.sidebarViews, 'conversations', 'users']
+const LIST_KEYS: InvalidationKeys = [...keys.sidebarViews, ...keys.automatedChannels, 'conversations', 'users']
 
 export const ViewsHandlers = ViewsRoutes.toLayer(
   Effect.gen(function* () {
@@ -32,6 +32,7 @@ export const ViewsHandlers = ViewsRoutes.toLayer(
       'views.addChannel': ({ id, channel }) => provide(setViewChannel(id, channel, true)),
       'views.removeChannel': ({ id, channel }) => provide(setViewChannel(id, channel, false)),
       'views.reorder': ({ ids }) => provide(reorderViews(ids)),
+      'views.sortChannel': ({ channel, to }) => provide(sortChannel(channel, to)),
     }
   }),
 )

@@ -206,6 +206,9 @@ export const Ownership = Schema.Union([
 ])
 export type Ownership = typeof Ownership.Type
 
+/** Provider disambiguates the same family offered through two transports. */
+export const modelChoiceKey = (model: Pick<ModelChoice, 'provider' | 'family'>): string => model.provider === 'codex' ? `codex:${model.family}` : model.family
+
 export const JunoSettingsPage = Schema.Struct({
   chatModels: Schema.Array(ModelChoice),
   compactionModels: Schema.Array(ModelChoice),

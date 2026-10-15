@@ -1,0 +1,107 @@
+[
+  {
+    "what": "button System",
+    "left": 143,
+    "right": 492,
+    "width": 61,
+    "cardWidth": 696
+  },
+  {
+    "what": "button Light",
+    "left": 206,
+    "right": 444,
+    "width": 47,
+    "cardWidth": 696
+  },
+  {
+    "what": "button Dark",
+    "left": 254,
+    "right": 398,
+    "width": 44,
+    "cardWidth": 696
+  },
+  {
+    "what": "button Coral",
+    "left": 141,
+    "right": 531,
+    "width": 24,
+    "cardWidth": 696
+  },
+  {
+    "what": "button Near-black",
+    "left": 173,
+    "right": 499,
+    "width": 24,
+    "cardWidth": 696
+  },
+  {
+    "what": "button Marigold",
+    "left": 205,
+    "right": 467,
+    "width": 24,
+    "cardWidth": 696
+  },
+  {
+    "what": "button Teal",
+    "left": 237,
+    "right": 435,
+    "width": 24,
+    "cardWidth": 696
+  },
+  {
+    "what": "button Midnight blue",
+    "left": 269,
+    "right": 403,
+    "width": 24,
+    "cardWidth": 696
+  },
+  {
+    "what": "button Dark emerald",
+    "left": 301,
+    "right": 371,
+    "width": 24,
+    "cardWidth": 696
+  },
+  {
+    "what": "button Claret",
+    "left": 333,
+    "right": 339,
+    "width": 24,
+    "cardWidth": 696
+  },
+  {
+    "what": "button Cyan",
+    "left": 365,
+    "right": 307,
+    "width": 24,
+    "cardWidth": 696
+  },
+  {
+    "what": "button Comfortable",
+    "left": 143,
+    "right": 464,
+    "width": 89,
+    "cardWidth": 696
+  },
+  {
+    "what": "button Compact",
+    "left": 234,
+    "right": 391,
+    "width": 70,
+    "cardWidth": 696
+  },
+  {
+    "what": "button ⌥ Option",
+    "left": 143,
+    "right": 480,
+    "width": 73,
+    "cardWidth": 696
+  },
+  {
+    "what": "button Space",
+    "left": 218,
+    "right": 425,
+    "width": 53,
+    "cardWidth": 696
+  }
+]

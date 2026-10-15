@@ -28,8 +28,11 @@ export {
   remembersPageAtom,
   reviewPageAtom,
   scheduledPageAtom,
+  type CommandAnswer,
   type JunoPageActions,
   type JunoSettingsChange,
+  type OwnershipAction,
   type PageOutcome,
 } from './pages'
+export { chooseFolder, takeRecoveryPhrase, typeRecoveryPhrase } from './backup'
 export { agentProviderAtom, setAgentProvider, whenProviderActive } from './provider'

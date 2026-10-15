@@ -1,7 +1,8 @@
-import { app, BrowserWindow, clipboard, ipcMain, Menu, shell, type IpcMainInvokeEvent, type MenuItemConstructorOptions } from 'electron'
+import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, shell, type IpcMainInvokeEvent, type MenuItemConstructorOptions } from 'electron'
 import { Schema } from 'effect'
 import { Channels, ShellRoutes, type ContextMenuLeaf, type DownloadResult, type ShellInput, type ShellOutput } from '@juno/contract'
 import type { AgentSupervisor } from './agent'
+import type { BackupSecrets } from './backupSecrets'
 import type { EngineSupervisor } from './engine'
 import type { ProviderStore } from './providers'
 import type { Launch } from './launch'
@@ -58,6 +59,9 @@ export const contextMenuForTests: { next: string | null | undefined; lastLabels:
   lastAt: null,
 }
 
+/** Under JUNO_E2E the folder picker is out of Playwright's reach too: a test sets the folder the next one picks. */
+export const folderForTests: { next: string | null | undefined } = { next: undefined }
+
 /** Under JUNO_E2E, links for the Slack app are recorded here instead of opening it. */
 export const slackLinksForTests: string[] = []
 const e2e = process.env.JUNO_E2E === '1'
@@ -67,6 +71,8 @@ export interface IpcDeps {
   /** The agent's supervisor; absent while the agent is off. */
   readonly agent: AgentSupervisor
   readonly providers: ProviderStore
+  /** The backup's secrets: the phrase shown once after an export, and one typed for a restore. */
+  readonly backupSecrets: BackupSecrets
   readonly setTheme: (theme: Launch['theme']) => void
   readonly setAccent: (accent: NonNullable<Launch['accent']>) => void
   readonly setDensity: (density: NonNullable<Launch['density']>) => void
@@ -78,7 +84,7 @@ export interface IpcDeps {
   readonly downloadFile: (file: { readonly url: string; readonly name: string }) => Promise<DownloadResult>
 }
 
-export function registerIpc({ supervisor, agent, providers, setTheme, setAccent, setDensity, setPrivacy, setSidebar, setViewing, downloadFile }: IpcDeps): void {
+export function registerIpc({ supervisor, agent, providers, backupSecrets, setTheme, setAccent, setDensity, setPrivacy, setSidebar, setViewing, downloadFile }: IpcDeps): void {
   handle(Channels.appGetInfo, () => ({
     name: app.getName(),
     version: app.getVersion(),
@@ -99,6 +105,25 @@ export function registerIpc({ supervisor, agent, providers, setTheme, setAccent,
     return providers.state
   })
   handle(Channels.agentSetProvider, (change) => providers.set(change))
+  // The backup folder, or a backup to restore from (SPEC 13.8). The agent checks the path again.
+  handle(Channels.agentChooseFolder, async ({ purpose }, event) => {
+    if (e2e && folderForTests.next !== undefined) {
+      const next = folderForTests.next
+      folderForTests.next = undefined
+      return next
+    }
+    const window = BrowserWindow.fromWebContents(event.sender)
+    const options: Electron.OpenDialogOptions = {
+      properties: ['openDirectory', 'createDirectory'],
+      buttonLabel: 'Choose',
+      message: purpose === 'backup' ? 'Choose a folder for Juno’s backup.' : 'Choose the folder with the backup to restore.',
+    }
+    const result = window ? await dialog.showOpenDialog(window, options) : await dialog.showOpenDialog(options)
+    return result.canceled ? null : (result.filePaths[0] ?? null)
+  })
+  // Once after an export; never logged (backupSecrets.ts).
+  handle(Channels.agentRecoveryPhrase, async () => (await backupSecrets.takePhrase()) ?? null)
+  handle(Channels.agentTypeRecoveryPhrase, ({ phrase }) => backupSecrets.typePhrase(phrase))
 
   // The sidebar's Restart, after the supervisor gave up on the engine.
   handle(Channels.engineRestart, () => {
