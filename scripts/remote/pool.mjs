@@ -135,7 +135,7 @@ function reconcile() {
   return targets.length ? list() : instances
 }
 
-export async function acquire(machine, create, log) {
+export async function acquire(machine, create, log, { fresh = false } = {}) {
   if (!Number.isFinite(maxVcpu) || maxVcpu < 0) throw new Error('JUNO_REMOTE_MAX_VCPU must be non-negative')
   if (maxVcpu === 0) throw new Error('Namespace is disabled (JUNO_REMOTE_MAX_VCPU=0)')
   if (vcpu(machine) > maxVcpu) throw new Error(`machine needs ${vcpu(machine)} vCPU, above cap ${maxVcpu}`)
@@ -149,7 +149,7 @@ export async function acquire(machine, create, log) {
       const instances = reconcile()
       const all = machines()
       for (const state of all) {
-        if (!state.destroying && !state.kept && state.machine === machine && Date.now() - state.created < handOutMs && takeLock(state.id)) {
+        if (!fresh && !state.destroying && !state.kept && state.machine === machine && Date.now() - state.created < handOutMs && takeLock(state.id)) {
           return { id: state.id, warm: true, images: state.images ?? [] }
         }
       }
