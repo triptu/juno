@@ -42,6 +42,8 @@ function fromMessagePortMain(port: MessagePortMain): HostPort {
     postMessage: (message) => port.postMessage(message),
     onMessage: (f) => {
       port.on('message', (event) => f(event.data))
+      // Keep the host's ready frame queued until the RPC client can hear it.
+      port.start()
     },
     onClose: (f) => {
       if (closed) f()
@@ -49,7 +51,6 @@ function fromMessagePortMain(port: MessagePortMain): HostPort {
     },
     close: () => port.close(),
   }
-  port.start()
   return hostPort
 }
 
