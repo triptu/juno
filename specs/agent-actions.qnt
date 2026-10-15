@@ -778,7 +778,7 @@ module agent_resolve {
   var resolved: bool
   var recorded: bool
   action init = all { pc' = 0, resolved' = false, recorded' = false }
-  action advance(forget: bool) = all {
+  action advance(forget: bool): bool = all {
     pc' = pc + 1,
     if (pc == 0) all { resolved' = true, recorded' = true }
     else if (pc == 1) all { resolved' = false, recorded' = not(forget) }
