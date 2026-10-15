@@ -71,7 +71,7 @@ export function createT3Adapter(manager: McpManagerApi) {
     tools: (context: { readonly actions: Actions; readonly jobs: Jobs; readonly current: () => Promise<ToolRun | undefined> }) => {
       bound = context
       return [...workTools(manager, context), defineTool<Start>({
-        name: START, description: 'Propose a T3 Code session. Always needs the owner to click Start. Choose the project id and base branch. The session has full access in a new worktree. Use replaces to correct an open proposal.',
+        name: START, description: 'Propose a T3 Code session. Always needs the owner to click Start. Use the projectId returned by t3_project_list through call_tool (server t3), not the project display name. Keep the base branch the owner requested. The session has full access in a new worktree. Use replaces to correct an open proposal.',
         replay: 'safe', status: () => 'Proposing a task',
         parameters: { type: 'object', properties: { project: { type: 'string' }, baseBranch: { type: 'string' }, title: { type: 'string' }, brief: { type: 'string' }, planFirst: { type: 'boolean' }, replaces: { type: 'string' } }, required: ['project', 'baseBranch', 'title', 'brief', 'planFirst'], additionalProperties: false },
         run: async (args, call) => {
