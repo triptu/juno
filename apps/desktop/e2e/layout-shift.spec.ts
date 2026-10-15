@@ -98,14 +98,21 @@ test('a sender name resolves without moving the timestamp or message', async ({ 
 test('a Main message gains a thread link without moving', async ({ juno, win, slack, fake }) => {
   await juno.signIn()
   await juno.waitForSync()
-  const channel = slack.channel('eng')
+  const channel = slack.channel('deploys')
   const user = slack.as('Leo').id
   const root = fake.injectMessage({ channel, user, text: 'A new Main message for the thread slot' })
-  await juno.sidebar.row('#eng').open()
+  await win.getByRole('button', { name: 'Automated', exact: true }).click()
+  await juno.sidebar.row('#deploys').open()
   await juno.topic.expectMessage('A new Main message for the thread slot')
+  const threads = juno.topic.header.getByRole('button', { name: /^Threads/ })
+  await expect(threads).toHaveAttribute('aria-label', 'Threads')
+  const counter = threads.locator('svg')
+  const counterBefore = await counter.boundingBox()
   await expectStableAnchor(win, `[data-message-row="${root.ts}"]`, async () => {
     fake.injectMessage({ channel, user, threadTs: root.ts, text: 'A reply arriving after Main paints' })
     await expect(juno.topic.list.locator(`[data-thread-link="t:${channel}:${root.ts}"]`)).toBeVisible()
+    await expect(threads).toHaveAttribute('aria-label', 'Threads, 1')
+    expect(await counter.boundingBox()).toEqual(counterBefore)
   })
 })
 
@@ -126,9 +133,10 @@ test('sidebar rows stay fixed while sync fills the remaining topics', async ({ j
   fake.holdNext({ method: 'subscriptions.thread.getView' })
   await juno.signIn()
   await expect.poll(() => fake.heldCount({ method: 'subscriptions.thread.getView' })).toBe(1)
+  await expect(win.locator('[data-topic-row]')).toHaveCount(0)
   await expectStableAnchor(win, '[data-topic-row]', async () => {
     fake.release({ method: 'subscriptions.thread.getView' })
-    await juno.waitForSync()
+    await juno.home.expectShown()
     await expect(win.locator('[data-topic-row]').first()).toBeVisible()
   })
 })

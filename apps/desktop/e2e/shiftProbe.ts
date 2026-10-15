@@ -2,7 +2,7 @@ import { expect, type Page } from '@playwright/test'
 import { waitForLayoutReady } from '@juno/testing/layout-shift'
 
 interface AnchorProbe {
-  readonly shifts: number[]
+  readonly shifts: Array<{ value: number; sources: string[] }>
   readonly observer: PerformanceObserver
   readonly drain: () => void
 
@@ -22,10 +22,13 @@ export async function expectStableAnchor(page: Page, selector: string, action: (
   await waitForLayoutReady(page)
   await page.evaluate((target) => {
     if (!PerformanceObserver.supportedEntryTypes.includes('layout-shift')) throw new Error('layout-shift observer unavailable')
-    const shifts: number[] = []
+    const shifts: Array<{ value: number; sources: string[] }> = []
     const collect = (entries: PerformanceEntry[]) => {
       for (const entry of entries) {
-        if ('hadRecentInput' in entry && entry.hadRecentInput === false && 'value' in entry && typeof entry.value === 'number') shifts.push(entry.value)
+        if ('hadRecentInput' in entry && entry.hadRecentInput === false && 'value' in entry && typeof entry.value === 'number') {
+          const shift = entry as PerformanceEntry & { sources?: Array<{ node: Node | null; previousRect: DOMRectReadOnly; currentRect: DOMRectReadOnly }> }
+          shifts.push({ value: entry.value, sources: (shift.sources ?? []).map(({ node, previousRect, currentRect }) => `${node instanceof Element ? node.outerHTML.slice(0, 240) : node?.parentElement?.outerHTML.slice(0, 240)}: ${previousRect.x},${previousRect.y} → ${currentRect.x},${currentRect.y}`) })
+        }
       }
     }
     const observer = new PerformanceObserver((list) => collect(list.getEntries()))
