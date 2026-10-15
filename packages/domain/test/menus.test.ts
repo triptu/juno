@@ -126,6 +126,31 @@ describe('channel menu', () => {
     expect(labels(channelMenuItems({ channel: maya, hasMain: true }))).toEqual(['Show its topics', 'Open Main', '—', 'Mark channel as read', 'Mark channel as unread'])
     expect(labels(channelMenuItems({ channel: eng, hasMain: false }))).not.toContain('Open Main')
   })
+
+})
+
+
+describe('Juno in the menus', () => {
+  it('the channel menu has Notify me with its choice, and ends with Ask Juno while the Juno Agent is on', () => {
+    expect(labels(channelMenuItems({ channel: eng, hasMain: true, notify: 'never', askJuno: true }))).toEqual([
+      'Show its topics',
+      'Open Main',
+      '—',
+      'Mark channel as read',
+      'Mark channel as unread',
+      '—',
+      'Notify me',
+      'Ignore channel',
+      '—',
+      'Ask Juno',
+    ])
+    expect(labels(channelMenuItems({ channel: eng, hasMain: true, askJuno: false }))).not.toContain('Ask Juno')
+  })
+
+  it('the person menu ends with Ask Juno while the Juno Agent is on', () => {
+    expect(labels(personMenuItems({ name: 'Maya Chen', notify: 'matters', askJuno: true }))).toEqual(['Notify me about Maya', '—', 'Ask Juno'])
+    expect(labels(personMenuItems({ name: 'Maya Chen', notify: 'matters' }))).toEqual(['Notify me about Maya'])
+  })
 })
 
 describe('tab menu', () => {

@@ -1,6 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
 import { ArrowUp } from '@phosphor-icons/react/dist/icons/ArrowUp'
-import type { KeyboardEvent, Ref } from 'react'
+import type { KeyboardEvent, ReactNode, Ref } from 'react'
 import { chatCopy, type Quote } from '@juno/agent-contract'
 import { layout, spacing } from '@juno/tokens/tokens.stylex'
 import { IconButton, Surface, Textarea } from '@juno/ui'
@@ -24,6 +24,10 @@ export interface JunoComposerProps {
   readonly placeholder?: string
   /** The textarea, for ⌘J to focus it. */
   readonly inputRef?: Ref<HTMLTextAreaElement>
+  /** `panel`: the Juno panel's padding, full width. Default `page`. */
+  readonly column?: 'page' | 'panel'
+  /** Above the field in the panel: the selection quote, the About chip, Catch me up. */
+  readonly context?: ReactNode
 }
 
 /**
@@ -31,7 +35,8 @@ export interface JunoComposerProps {
  * 160px, and the round send button, dimmed while the draft is empty and
  * never disabled by a run. Enter sends, Shift Enter adds a line.
  */
-export function JunoComposer({ value, onChange, onSend, onEscape, quote, onClearQuote, enabled, placeholder = chatCopy.composer.placeholder, inputRef }: JunoComposerProps) {
+export function JunoComposer({ value, onChange, onSend, onEscape, quote, onClearQuote, enabled, placeholder = chatCopy.composer.placeholder, inputRef, column = 'page', context }: JunoComposerProps) {
+  const panel = column === 'panel'
   const canSend = enabled && value.trim().length > 0
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
@@ -44,13 +49,14 @@ export function JunoComposer({ value, onChange, onSend, onEscape, quote, onClear
     }
   }
   return (
-    <div data-juno-composer="" {...stylex.props(styles.outer)}>
+    <div data-juno-composer={column} {...stylex.props(styles.outer, panel && styles.outerPanel)}>
+      {context}
       {quote !== undefined ? (
-        <div data-composer-quote="" {...stylex.props(styles.quote)}>
+        <div data-composer-quote="" {...stylex.props(styles.quote, panel && styles.wide)}>
           <QuoteStub quote={quote} {...(onClearQuote ? { onClear: onClearQuote } : {})} />
         </div>
       ) : null}
-      <Surface kind="field" sx={styles.box}>
+      <Surface kind="field" sx={[styles.box, panel && styles.wide]}>
         <Textarea
           ref={inputRef}
           variant="inline"
@@ -79,6 +85,14 @@ const styles = stylex.create({
     paddingInline: spacing['--space-6'],
     paddingBottom: spacing['--space-5'],
     boxSizing: 'border-box',
+  },
+  outerPanel: {
+    paddingTop: 0,
+    paddingInline: spacing['--space-3'],
+    paddingBottom: spacing['--space-3'],
+  },
+  wide: {
+    maxWidth: 'none',
   },
   box: {
     display: 'flex',

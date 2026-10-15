@@ -37,6 +37,7 @@ export {
   bottomWindow,
   channelThreadsAtom,
   loadOlderMessages,
+  locateMessage,
   messageItem,
   messageItemAtom,
   messageListAtom,
@@ -68,6 +69,9 @@ export {
   allTopicsPlace,
   allTopicsTab,
   homePlace,
+  junoPagePlace,
+  junoPlace,
+  junoTab,
   homeTab,
   notificationsPlace,
   preferencesPlace,
@@ -128,6 +132,7 @@ export {
   copyText,
   densityAtom,
   editUndo,
+  junoAgentOnAtom,
   onMenuCommand,
   onNotificationOpen,
   openExternal,
@@ -138,11 +143,13 @@ export {
   persistTheme,
   popupContextMenu,
   resolvedThemeAtom,
+  setOpenRouterKey,
   setViewing,
   sidebarLayoutAtom,
   themeAtom,
   type Accent,
   type Density,
+  type OpenRouterKeyResult,
   type ResolvedTheme,
   type Theme,
 } from './shell'
@@ -151,6 +158,19 @@ export { redrawTopic, topicArtAtom } from './art'
 export { messageLink, slackLink, threadRootTs } from './links'
 export { headerRenamingAtom, renamingAtom, rowRenamingAtom, tableRenamingAtom, type RenameTarget } from './rename'
 export { dismissToast, runAction, showToast, TOAST_LIFE_MS, toastAtom, undoLast, undoStackAtom, UNDO_LIMIT, type Toast, type ToastContent } from './undo'
+export {
+  catchUpDoneAtom,
+  flashMessage,
+  focusJunoComposer,
+  JUNO_PANEL_PREF,
+  junoAboutAtom,
+  junoFocusAtom,
+  junoPanelOpenAtom,
+  messageFlashAtom,
+  openedAtNewAtom,
+  setJunoPanelOpen,
+  type JunoFocusRequest,
+} from './junoPanel'
 export {
   caughtUp,
   freezeHome,

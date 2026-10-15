@@ -1,7 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import type { ReactNode, Ref } from 'react'
 import { chatCopy, type Banner, type ChatItem } from '@juno/agent-contract'
-import { layout, sizes, spacing } from '@juno/tokens/tokens.stylex'
+import { chat, layout, sizes, spacing } from '@juno/tokens/tokens.stylex'
 import { ScrollArea, Text } from '@juno/ui'
 import { CardRow } from './CardRow'
 import type { ChatActions } from './commands'
@@ -35,6 +35,8 @@ export interface JunoChatListProps {
   readonly bottomEdgeRef?: Ref<HTMLDivElement>
   /** Play the empty state's entrance. Pass false when it was visible less than a second ago. */
   readonly enterEmpty?: boolean
+  /** `page` for the Juno tab's 720px column, `panel` for the Juno panel's narrow one. Default `page`. */
+  readonly column?: 'page' | 'panel'
 }
 
 /**
@@ -48,11 +50,11 @@ export interface JunoChatListProps {
  * slots above and below have a fixed height whether or not more items
  * exist, so a page arriving never moves the rows.
  */
-export function JunoChatList({ items, banner, moreAbove, moreBelow, now, actions, onSuggest, scrollRef, anchorRef, topEdgeRef, bottomEdgeRef, enterEmpty = true }: JunoChatListProps) {
+export function JunoChatList({ items, banner, moreAbove, moreBelow, now, actions, onSuggest, scrollRef, anchorRef, topEdgeRef, bottomEdgeRef, enterEmpty = true, column = 'page' }: JunoChatListProps) {
   const empty = items.length === 0
   return (
     <ScrollArea scrollbar="hover" underHeader ref={scrollRef} data-scroll="" sx={styles.scroller}>
-      <div role="list" aria-label="Juno chat" {...stylex.props(styles.column)}>
+      <div role="list" aria-label="Juno chat" {...stylex.props(styles.column, column === 'panel' && styles.panel)}>
         <div ref={topEdgeRef} data-chat-edge={moreAbove ? 'more' : 'end'} aria-hidden {...stylex.props(styles.edge)} />
         {empty ? <EmptyChat onSuggest={onSuggest} enter={enterEmpty} /> : null}
         {items.map((item) => (
@@ -134,6 +136,15 @@ const styles = stylex.create({
     paddingInline: spacing['--space-8'],
     paddingBottom: spacing['--space-6'],
     boxSizing: 'border-box',
+  },
+  // The panel's column: the full width, tighter padding, wider bubbles and cards at full width.
+  panel: {
+    maxWidth: 'none',
+    paddingTop: spacing['--space-4'],
+    paddingInline: spacing['--space-4'],
+    paddingBottom: spacing['--space-3'],
+    '--bubble-max-width': chat['--bubble-max-width-panel'],
+    '--card-max-width': '100%',
   },
   // A fixed slot at each end, so a page arriving never moves the rows.
   edge: {

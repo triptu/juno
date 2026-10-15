@@ -21,7 +21,31 @@ export const chatCopy = {
   },
   composer: {
     placeholder: 'Ask Juno, like "what did I miss in #eng?"',
+    /** In the Juno panel beside a topic. */
+    panelPlaceholder: 'Ask about this topic',
     send: 'Send',
+  },
+  /** The About line over an owner bubble and the About chip above the panel's composer (SPEC 7). */
+  about: {
+    prefix: 'About ',
+    remove: 'Remove',
+  },
+  /** A Juno page's tab title, as the Juno menu names it (SPEC 13.10). */
+  pageTitles: {
+    scheduled: 'Scheduled',
+    remembers: 'What Juno remembers',
+    memory: 'Memory of this chat',
+    activity: 'Activity',
+    connections: 'Connections',
+    settings: 'Settings › Juno',
+    review: 'Review',
+  },
+  /** The Juno panel (SPEC 7, inventory 12.1). */
+  panel: {
+    catchMeUp: 'Catch me up',
+    openInTab: 'Open in a tab',
+    close: 'Close Juno ⌘J',
+    removeQuote: 'Remove quote',
   },
   list: {
     newMessage: 'New message',
@@ -231,6 +255,11 @@ export const chatCopy = {
       removalPending: (copies: number) => `Removal pending · ${copies === 1 ? '1 copy' : `${copies} copies`} in a running job`,
       stopJob: 'Stop job',
       keyRejected: 'OpenRouter rejected this key',
+      /** Under the key field: main refused it as not a key, or the keychain did not take it. */
+      keyInvalid: 'That is not an OpenRouter key.',
+      keyFailed: 'The keychain did not save the key. Try again.',
+      /** Under the rules when the agent refused the list. */
+      rulesInvalid: 'Each rule is one line, a sentence or two, and there are at most 20.',
       exportPhrase: 'Export recovery phrase',
       move: 'Move to another Mac',
       restore: 'Restore from backup',

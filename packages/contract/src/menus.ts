@@ -4,6 +4,7 @@
  * the renderer reaches them here, as it reaches the domain's schemas.
  */
 export {
+  channelMenuItems,
   followsThread,
   notifyChoice,
   notifyChoiceLabel,
@@ -11,10 +12,14 @@ export {
   personMenuItems,
   threadNotifyChoice,
   topicMenuItems,
+  type ChannelMenuAction,
+  type ChannelMenuState,
   whyLabel,
   type MenuItem,
   type NotifyAction,
   type NotifyChoice,
+  type PersonMenuAction,
+  type PersonMenuState,
   type TopicMenuAction,
   type TopicMenuState,
 } from '@juno/domain'

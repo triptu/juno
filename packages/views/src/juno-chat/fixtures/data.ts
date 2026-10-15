@@ -4,6 +4,7 @@
  * workspace. Times are relative to `NOW` so the labels never drift.
  */
 import type {
+  About,
   BubbleId,
   Card,
   CardId,
@@ -69,7 +70,7 @@ export const owner = (
   group: GroupPosition = 'single',
   delivery: Delivery = { _tag: 'sent' },
   at = NOW - 4 * MINUTE,
-  extra: { readonly replyTo?: Quote; readonly reactions?: ReadonlyArray<Reaction> } = {},
+  extra: { readonly replyTo?: Quote; readonly reactions?: ReadonlyArray<Reaction>; readonly about?: About } = {},
 ): OwnerMessageItem => ({
   _tag: 'owner',
   opId: opId(`op-${id}`),
@@ -78,9 +79,16 @@ export const owner = (
   at,
   delivery,
   ...(extra.replyTo === undefined ? {} : { replyTo: extra.replyTo }),
+  ...(extra.about === undefined ? {} : { about: extra.about }),
   reactions: extra.reactions ?? [],
   group,
 })
+
+/** What a message from the Juno panel or an About chip was about. */
+export const aboutTopic: About = { _tag: 'topic', topicId: 't:C0ENG:1760000000.000100', title: 'Postgres 16 migration plan' }
+export const aboutMain: About = { _tag: 'topic', topicId: 'm:C0ENG', title: '#eng · Main' }
+export const aboutPerson: Extract<About, { _tag: 'person' }> = { _tag: 'person', userId: 'U0MAYA', name: 'Maya Chen' }
+export const aboutChannel: Extract<About, { _tag: 'channel' }> = { _tag: 'channel', channelId: 'C0ENG', name: 'eng', tint: 'public' }
 
 /** A reaction by one side. */
 export const reacted = (by: Reaction['by'], emoji: string): Reaction => ({ by, emoji })

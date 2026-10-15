@@ -8,6 +8,7 @@ import { MessageView, type ThreadSummary, type TopicDetail } from '@juno/contrac
 import {
   channelThreadsAtom,
   loadOlderMessages,
+  locateMessage,
   messagesAtom,
   openTopic,
   prefetchTopic,
@@ -81,6 +82,21 @@ const encodeMessage = Schema.encodeSync(Schema.toCodecJson(MessageView))
 const bytes = (value: unknown) => new TextEncoder().encode(JSON.stringify(value)).byteLength
 
 const conversationCalls = (engine: RunningEngine) => apiCalls(engine).filter((call) => call.method.startsWith('conversations.'))
+
+describe('locating a message for a Juno source link', () => {
+  it('names the thread of a reply and of a root, and Main for the rest', async () => {
+    const engine = await bootedEngine()
+    const id = oldThread(engine)
+    const list = watchList(engine, messagesAtom(id))
+    expect(valueOf(await openTopic(engine.registry, id)).outcome).toBe('fetched')
+    const [root, reply] = rowsOf(await list.until((window) => window.order.length === 2, 'the root and its reply'))
+    expect(valueOf(await locateMessage(engine.registry, 'C0ENG', reply!.ts))).toEqual({ topicId: id })
+    expect(valueOf(await locateMessage(engine.registry, 'C0ENG', root!.ts))).toEqual({ topicId: id })
+    const deploys = rowsOf(await watchList(engine, messagesAtom('m:C0DEPLOYS')).until((window) => window.order.length > 0, 'a deploy'))
+    expect(valueOf(await locateMessage(engine.registry, 'C0DEPLOYS', deploys[0]!.ts))).toEqual({ topicId: 'm:C0DEPLOYS' })
+    expect(valueOf(await locateMessage(engine.registry, 'C0ENG', '1.000001'))).toEqual({ topicId: 'm:C0ENG' })
+  })
+})
 
 describe('opening a topic', () => {
   it('fetches an unstored thread with one replies call, then only what is newer', async () => {

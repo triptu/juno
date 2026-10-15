@@ -2,34 +2,43 @@
  * A fake OpenRouter over HTTP, for tests that run the agent the way the app
  * does: OpenRouter's public model list, and the two chat APIs pi-ai speaks
  * to it (Anthropic Messages for Claude, OpenAI chat completions for the
- * rest), each streaming one scripted answer. It records which model each
- * request named and which key it carried, so a test can check that the key
- * set in Settings reached the provider and that the picked model is used.
+ * rest), each streaming one answer. It records which model each request
+ * named, which key it carried and the last user message, so a test can check
+ * that the key set in Settings reached the provider, that the picked model is
+ * used, and what the agent sent. Compaction models are answered by the
+ * deterministic compactor, as in the in-process fake.
  *
  * The catalogue is `fakeCatalogue` in OpenRouter's shape, so the picker
  * resolves the same slugs as the in-process fake provider.
  */
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
-import { fakeCatalogue } from './catalogue'
+import { COMPACTION_MODELS, fakeCatalogue } from './catalogue'
+import { compactorText } from './compactor'
 
 export interface OpenRouterRequest {
   readonly path: string
   readonly model: string
   /** The key the request carried (`x-api-key` or a bearer token). */
   readonly key: string | undefined
+  /** A compaction model's request, answered by the compactor. */
+  readonly compaction: boolean
+  /** The last user message's text: the input the request answers. */
+  readonly input: string
 }
 
 export interface FakeOpenRouterOptions {
   /** When set, a request with any other key is refused with 401, as OpenRouter does. */
   readonly key?: string
-  /** What every chat request answers. Default: one bubble. */
-  readonly answer?: string
+  /** What a chat request answers: fixed text, or text from the request. Default: one bubble. */
+  readonly answer?: string | ((request: OpenRouterRequest) => string)
 }
 
 export interface FakeOpenRouter {
   /** The origin to give the agent in place of `https://openrouter.ai`. */
   readonly origin: string
   readonly requests: ReadonlyArray<OpenRouterRequest>
+  /** The chat requests' inputs, in order. */
+  readonly inputs: () => ReadonlyArray<string>
   readonly catalogueReads: () => number
   readonly close: () => Promise<void>
 }
@@ -69,6 +78,11 @@ const read = (req: IncomingMessage) =>
     req.on('error', reject)
   })
 
+type WireMessage = { readonly role: string; readonly content: unknown }
+
+const textOf = (content: unknown): string =>
+  typeof content === 'string' ? content : Array.isArray(content) ? content.map((part: { text?: unknown }) => (typeof part.text === 'string' ? part.text : '')).join('') : ''
+
 const event = (res: ServerResponse, name: string | undefined, data: unknown) =>
   res.write(`${name === undefined ? '' : `event: ${name}\n`}data: ${typeof data === 'string' ? data : JSON.stringify(data)}\n\n`)
 
@@ -102,6 +116,7 @@ export async function startFakeOpenRouter(options: FakeOpenRouterOptions = {}): 
   const requests: OpenRouterRequest[] = []
   let catalogueReads = 0
   const answer = options.answer ?? '<say>Hello from the fake.</say>'
+  let compactions = 0
   const server = createServer((req, res) => {
     void (async () => {
       const path = new URL(req.url ?? '/', 'http://fake').pathname
@@ -114,17 +129,20 @@ export async function startFakeOpenRouter(options: FakeOpenRouterOptions = {}): 
         res.writeHead(404).end()
         return
       }
-      const body = JSON.parse(await read(req)) as { model?: string }
+      const body = JSON.parse(await read(req)) as { model?: string; messages?: ReadonlyArray<WireMessage> }
       const bearer = req.headers.authorization?.replace(/^Bearer\s+/i, '')
       const key = (req.headers['x-api-key'] as string | undefined) ?? bearer
       const model = body.model ?? ''
-      requests.push({ path, model, key })
+      const users = (body.messages ?? []).filter((message) => message.role === 'user').map((message) => textOf(message.content))
+      const request: OpenRouterRequest = { path, model, key, compaction: COMPACTION_MODELS.includes(model), input: users.at(-1) ?? '' }
+      requests.push(request)
       if (options.key !== undefined && key !== options.key) {
         res.writeHead(401, { 'content-type': 'application/json' }).end(JSON.stringify({ error: { message: 'User not found.', code: 401 } }))
         return
       }
-      if (path === '/api/v1/messages') anthropic(res, model, answer)
-      else completions(res, model, answer)
+      const text = request.compaction ? compactorText(users, compactions++) : typeof answer === 'string' ? answer : answer(request)
+      if (path === '/api/v1/messages') anthropic(res, model, text)
+      else completions(res, model, text)
     })().catch(() => {
       if (!res.headersSent) res.writeHead(500).end()
     })
@@ -135,6 +153,7 @@ export async function startFakeOpenRouter(options: FakeOpenRouterOptions = {}): 
   return {
     origin: `http://127.0.0.1:${address.port}`,
     requests,
+    inputs: () => requests.filter((request) => !request.compaction).map((request) => request.input),
     catalogueReads: () => catalogueReads,
     close: () =>
       new Promise((resolve) => {

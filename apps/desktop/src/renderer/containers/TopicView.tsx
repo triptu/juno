@@ -2,22 +2,26 @@ import { memo, startTransition, useEffect, useLayoutEffect, useRef, useState, ty
 import { MESSAGE_WINDOW_MAX, readsMarkRead, type MessageView, type TopicDetail } from '@juno/contract'
 import {
   bottomWindow,
+  catchUpDoneAtom,
   channelThreadsAtom,
   discardMessage,
   dividerIndex,
   headerRenamingAtom,
+  junoAgentOnAtom,
+  junoPanelOpenAtom,
   loadOlderMessages,
+  messageFlashAtom,
   messageListAtom,
   messageWindowSpecAtom,
   nowAtom,
   openExternal,
+  openedAtNewAtom,
   openTopic as fetchTopic,
   registry,
   retryMessage,
   runCommand,
   scrollSnapshotAtom,
   shouldMarkRead,
-  sidebarFilterAtom,
   topicAtom,
   type MessageWindow,
   type ScrollSnapshot,
@@ -26,6 +30,7 @@ import { afterPaint, measure } from '@juno/state/perf'
 import { useAtomValue } from '@juno/state/react'
 import {
   ActiveThreads,
+  flashChatRow,
   hueFor,
   MessageList,
   NewMessagesPill,
@@ -37,9 +42,11 @@ import {
   type MessageListStatus,
   type OlderStatus,
 } from '@juno/views'
-import { markFilterChange } from './filterMark'
+import { toggleJunoPanel } from './juno/actions'
 import { closeTabById, onLeaveTab, openTopic, takeOpenStart } from './navigation'
 import { useMessageActions, type ComposerHandle } from './messageActions'
+import { showPersonMenu } from './notifyActions'
+import { scopeToChannel, showChannelMenu } from './placeMenus'
 import { takeSendMark } from './sendMark'
 import { TopicComposer } from './TopicComposer'
 import { cancelRename, renameTopic, showTopicMenu, toggleResolved } from './topicActions'
@@ -85,11 +92,7 @@ function openThread(id: string, event: ActivateEvent): void {
   openTopic(id, { newTab: event.metaKey })
 }
 
-/** A #channel chip scopes the sidebar to that channel. */
-function scopeToChannel(channel: string): void {
-  markFilterChange()
-  registry.set(sidebarFilterAtom, { ...registry.get(sidebarFilterAtom), scope: channel })
-}
+const personMenu = (person: { readonly id: string; readonly name: string }) => void showPersonMenu(person)
 
 const markRead = (id: string) => runCommand(registry, readsMarkRead, { id })
 const retry = (clientMsgId: string) => void retryMessage(registry, clientMsgId)
@@ -284,6 +287,15 @@ function Topic({ id, detail, readOnly = false, underHeader = true }: TopicProps)
   const at = readOnly ? -1 : dividerIndex(list.order, readAtOpen.lastReadTs, (ts) => list.rows.get(ts)?.fromMe === true)
   const dividerBefore = at > 0 ? list.order[at] : undefined
 
+  // The Juno panel offers Catch me up while the topic opened at a "new" divider (SPEC 7); a new divider offers it again.
+  useEffect(() => {
+    if (readOnly || registry.get(openedAtNewAtom(id)) === dividerBefore) return
+    registry.set(openedAtNewAtom(id), dividerBefore)
+    registry.set(catchUpDoneAtom(id), false)
+  }, [id, readOnly, dividerBefore])
+  const agentOn = useAtomValue(junoAgentOnAtom)
+  const panelOpen = useAtomValue(junoPanelOpenAtom)
+
   const [positioned, setPositioned] = useState(false)
   // Until the first frame is presented, only the rows from `firstRows()` above the open position down are drawn.
   const [drawnAll, setDrawnAll] = useState(false)
@@ -331,6 +343,21 @@ function Topic({ id, detail, readOnly = false, underHeader = true }: TopicProps)
     setSeenTs(last)
     setPositioned(true)
   }, [id, readOnly, positioned, list.ready, last, atEnd])
+
+  // A Juno source link asked for a message: once the topic is positioned, it is scrolled into view if it is not, and flashes.
+  const flash = useAtomValue(messageFlashAtom(id))
+  useEffect(() => {
+    const scroller = scrollRef.current
+    if (readOnly || flash === undefined || !positioned || scroller === null) return
+    afterPaint(() => {
+      const row = scroller.querySelector(rowSelector(flash.ts))
+      if (row === null) return
+      const box = row.getBoundingClientRect()
+      const view = scroller.getBoundingClientRect()
+      if (box.top < view.top || box.bottom > view.bottom) row.scrollIntoView({ block: 'center', behavior: 'instant' })
+      flashChatRow(row)
+    })
+  }, [readOnly, flash, positioned])
 
   // Rows added above the ones in view (the rest of the window after the first frame, an older page):
   // scroll anchoring keeps the rows in view still, except at offset 0, where Chromium does not anchor.
@@ -554,6 +581,11 @@ function Topic({ id, detail, readOnly = false, underHeader = true }: TopicProps)
             editing: messageActions.editing,
             onRowKey: messageActions.onRowKey,
             onToggleReaction: messageActions.onToggleReaction,
+            onPersonMenu: personMenu,
+            onChannelMenu: (chip: { readonly id: string; readonly name: string }) => {
+              const known = list.refs.channels.get(chip.id)
+              void showChannelMenu(known ?? { id: chip.id, kind: 'public', name: chip.name, label: `#${chip.name}`, tint: 'public' })
+            },
           })}
     />
   )
@@ -572,6 +604,8 @@ function Topic({ id, detail, readOnly = false, underHeader = true }: TopicProps)
           menuOpen={menuOpen}
           onMenu={openMenu}
           onPill={() => scopeToChannel(detail.channel.id)}
+          onPillMenu={() => void showChannelMenu(detail.channel)}
+          {...(agentOn ? { juno: { open: panelOpen, onToggle: toggleJunoPanel } } : {})}
           {...(renaming ? { rename: { onSave: (title: string) => renameTopic(detail.id, title), onCancel: cancelRename } } : {})}
           {...(main ? {} : { onResolve: () => toggleResolved(detail.id) })}
           threadsOpen={threadsOpen}

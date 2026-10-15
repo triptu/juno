@@ -38,7 +38,7 @@ export const rowStyles = stylex.create({
   contained: {
     contain: 'content',
     contentVisibility: 'auto',
-    containIntrinsicSize: `auto ${sizes['--row-message-estimate']}`,
+    containIntrinsicSize: `auto ${sizes['--row-bubble-estimate']}`,
   },
   time: {
     flexShrink: 0,
