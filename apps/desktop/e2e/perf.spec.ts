@@ -348,6 +348,8 @@ test('send in Main: Enter through the checks on send to the pending row painted,
   const again = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword, fakeAiDelayMillis: 1_000 })
   try {
     const slow = new Juno(again.app, again.win)
+    // The relaunch catches up with Slack first; measure once it is live, as the other scenarios do.
+    await slow.waitForSync()
     await slow.sidebar.row('#eng').open()
     await slow.topic.expectTitle('Main')
     const hidden = await countHidden(slow.win)
