@@ -83,6 +83,19 @@ const bytes = (value: unknown) => new TextEncoder().encode(JSON.stringify(value)
 
 const conversationCalls = (engine: RunningEngine) => apiCalls(engine).filter((call) => call.method.startsWith('conversations.'))
 
+it('tints mentions of stored user groups and leaves other groups plain', async () => {
+  const engine = await boot(engines, { initial: (fake) => {
+    fake.setSelfUsergroups({ ids: ['S0PLATFORM'] })
+    return fake.signIn()
+  } })
+  const list = watchList(engine, messagesAtom('m:C0ENG'))
+  const own = engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0MAYA', text: '<!subteam^S0PLATFORM|@platform> Review this.' })
+  const other = engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0MAYA', text: '<!subteam^S0OTHER|@other> Review this.' })
+  const window = await list.until((value) => value.rows.has(other.ts), 'group mentions')
+  expect(window.rows.get(own.ts)?.mentionsMe).toBe(true)
+  expect(window.rows.get(other.ts)?.mentionsMe).toBe(false)
+})
+
 describe('locating a message for a Juno source link', () => {
   it('names the thread of a reply and of a root, and Main for the rest', async () => {
     const engine = await bootedEngine()

@@ -27,7 +27,6 @@ Small items noticed during work that are not yet assigned to a milestone. Remove
 - Sidebar times should use domain `relativeTime` (needs a `desktop → domain` edge decision).
 - Main rows: engine field for "threads started since Main was last read" (contract + topics query), wired to the TopicRow `newThreads` prop. After M4 WP1 merges.
 - Topic art track: placeholder is a library of free-form Tide-style shapes picked per topic, no container (owner decision 10-13).
-- Topic view: the message's mention tint does not count the user's groups (`@group`), because the engine does not keep the groups from `client.userBoot` outside the sync. Keep them in `team` or hand them over through `SyncLink`.
 - Topic view: bot messages show the bot id as the sender name: `messages` does not keep `username` or `bot_profile`. Store the bot's name with the message.
 - Juno Agent spend: `setCap` refuses a cap below today's use. Default to take (orchestrator): allow a lower cap; it blocks new spend until tomorrow and never undoes what is spent. WP14 settings container applies it.
 - Juno Agent copy: `chatCopy` needs a missing-key line (today it reuses "OpenRouter rejected the key…"), a rate-limit line (today the generic provider line), and a price-hint template for the model picker. WP12/WP14.
