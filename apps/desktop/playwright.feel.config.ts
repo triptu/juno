@@ -17,7 +17,8 @@ export default defineConfig({
   workers: 1,
   fullyParallel: false,
   retries: 0,
-  reporter: 'list',
+  // A scenario that did not run fails the run (e2e/no-skips.ts).
+  reporter: [['list'], ['./e2e/no-skips.ts']],
   outputDir: 'test-results/feel',
   use: {
     trace: 'off',

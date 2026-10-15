@@ -306,8 +306,8 @@ function Topic({ id, detail, readOnly = false, underHeader = true }: TopicProps)
   // The position to hold (`Pin`), and the scrollTop it last set.
   const pin = useRef<Pin | undefined>(undefined)
   const pinnedTop = useRef(0)
-  // The last message and window size the bottom was held for.
-  const heldFor = useRef<string | undefined>(undefined)
+  // The rows and window size the bottom was held for.
+  const heldFor = useRef<{ readonly rows: MessageWindow['rows']; readonly size: string } | undefined>(undefined)
   const last = list.order.at(-1)
   const first = list.order[0]
   // The window holds the newest message: no anchor.
@@ -336,13 +336,13 @@ function Topic({ id, detail, readOnly = false, underHeader = true }: TopicProps)
     const bottom = atEnd && distance <= BOTTOM_SLACK
     if (bottom) {
       pin.current = { kind: 'bottom' }
-      heldFor.current = `${last} ${window.innerWidth}x${window.innerHeight}`
+      heldFor.current = { rows: list.rows, size: `${window.innerWidth}x${window.innerHeight}` }
     }
     setAtBottom(bottom)
     setFar(distance > scroller.clientHeight)
     setSeenTs(last)
     setPositioned(true)
-  }, [id, readOnly, positioned, list.ready, last, atEnd])
+  }, [id, readOnly, positioned, list.ready, list.rows, last, atEnd])
 
   // A Juno source link asked for a message: once the topic is positioned, it is scrolled into view if it is not, and flashes.
   const flash = useAtomValue(messageFlashAtom(id))
@@ -389,18 +389,19 @@ function Topic({ id, detail, readOnly = false, underHeader = true }: TopicProps)
     if (positioned && !drawnAll) afterPaint(() => startTransition(() => setDrawnAll(true)))
   }, [positioned, drawnAll])
 
-  // Stick to the bottom: a message that arrives while at the bottom is scrolled into view before paint.
-  // A tab shown again with no new message and the same window size is still at the bottom (Chromium
-  // keeps a hidden scroller's offset), so it skips the layout that reading the position would force.
+  // Stick to the bottom: a message that arrives, or a row that grows (a reaction, an edit), while at the
+  // bottom is scrolled into view before paint. Rows keep their identity until a row changes, so a tab
+  // shown again with nothing new and the same window size is still at the bottom (Chromium keeps a
+  // hidden scroller's offset), and skips the layout that reading the position would force.
   useLayoutEffect(() => {
     const scroller = scrollRef.current
     if (scroller === null || !positioned || pin.current?.kind !== 'bottom' || !atEnd) return
-    const key = `${last} ${window.innerWidth}x${window.innerHeight}`
-    if (heldFor.current === key) return
-    heldFor.current = key
+    const size = `${window.innerWidth}x${window.innerHeight}`
+    if (heldFor.current?.rows === list.rows && heldFor.current.size === size) return
+    heldFor.current = { rows: list.rows, size }
     hold(scroller, pin, pinnedTop)
     setSeenTs(last)
-  }, [positioned, last, atEnd])
+  }, [positioned, list.rows, last, atEnd])
 
   // `juno.send`: from Enter to the frame that shows the message, pending or, after a very quick answer, settled.
   useLayoutEffect(() => {

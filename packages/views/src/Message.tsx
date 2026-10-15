@@ -264,6 +264,16 @@ const styles = stylex.create({
       ':focus-visible': '1',
       ':has(:focus-visible)': '1',
     },
+    // The toolbar is out of the layout until then too: every row has one, and
+    // laid out but transparent it was most of the list's style and layout work
+    // when a topic opened or the pane changed width (performance.md 8). It is
+    // absolutely placed in a reserved slot, so showing it moves nothing.
+    '--row-toolbar-display': {
+      default: 'none',
+      ':hover': { default: null, [HOVER]: 'block' },
+      ':focus-visible': 'block',
+      ':has(:focus-visible)': 'block',
+    },
   },
   rowEager: {
     contentVisibility: 'visible',
@@ -272,6 +282,7 @@ const styles = stylex.create({
   rowHeld: {
     backgroundColor: colors['--surface-hover'],
     '--row-action-opacity': '1',
+    '--row-toolbar-display': 'block',
   },
   rowGroupStart: {
     marginTop: density['--density-message-group-gap'],
@@ -361,6 +372,7 @@ const styles = stylex.create({
   // Inside the row's box (content-visibility brings paint containment, so
   // nothing can hang above it), top right, over the header line's empty end.
   toolbar: {
+    display: 'var(--row-toolbar-display)',
     position: 'absolute',
     top: spacing['--space-0-5'],
     right: spacing['--space-2'],

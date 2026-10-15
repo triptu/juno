@@ -114,8 +114,10 @@ const sessionHost = new SessionHost({
 })
 
 app.whenReady().then(() => {
-  // A packaged app gets its icon from the bundle. In dev the Dock would show Electron's.
-  if (process.platform === 'darwin' && !app.isPackaged) app.dock?.setIcon(join(__dirname, '../../build/icon.png'))
+  // A packaged app gets its icon from the bundle. In dev the Dock would show Electron's. Not under
+  // tests: decoding the 1,024 px icon holds main for about 80 ms before the window opens, a cost the
+  // packaged app does not have, so the start-up scenarios would measure something that never ships.
+  if (process.platform === 'darwin' && !app.isPackaged && !e2e) app.dock?.setIcon(join(__dirname, '../../build/icon.png'))
   serveAppScheme(join(__dirname, '../renderer'), fakeSlackUrl === undefined ? undefined : new URL(fakeSlackUrl).origin)
   powerMonitor.on('resume', () => notifier.wake())
   registerIpc({

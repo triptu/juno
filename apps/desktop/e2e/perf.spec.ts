@@ -66,6 +66,22 @@ function oneFrameBudget(interval: number): number {
   return interval < 10 ? 16 : interval + 8
 }
 
+/**
+ * Counts the times the window is hidden from now on. macOS hides a window
+ * that another window covers, and a hidden window draws no frames, so every
+ * measure that ends after a paint waits until it shows again.
+ */
+async function countHidden(win: Page): Promise<() => Promise<number>> {
+  await win.evaluate(() => {
+    const w = window as unknown as { __hidden: number }
+    w.__hidden = document.visibilityState === 'hidden' ? 1 : 0
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') w.__hidden++
+    })
+  })
+  return () => win.evaluate(() => (window as unknown as { __hidden: number }).__hidden)
+}
+
 /** Main-thread work per frame, in milliseconds: what the scroll budget is about. */
 interface FrameWork {
   readonly work: ReadonlyArray<number>
@@ -225,12 +241,25 @@ test('home open: from a topic to Home painted', async ({ juno, win }) => {
   const { home, sidebar, topic } = juno
   await home.open()
   await expect(home.item('waiting')).toBeVisible()
+  // The engine's time for each home.view run, from its juno.live-update measures.
+  await win.evaluate(() => {
+    const w = window as unknown as { __homeQuery: number[] }
+    w.__homeQuery = []
+    new PerformanceObserver((list) => {
+      for (const entry of list.getEntries() as Array<PerformanceEntry & { detail?: { devtools?: { properties?: ReadonlyArray<readonly [string, unknown]> } } }>) {
+        const properties = new Map(entry.detail?.devtools?.properties ?? [])
+        if (entry.name === 'juno.live-update' && properties.get('route') === 'home.view') w.__homeQuery.push(Number(properties.get('queryMs')))
+      }
+    }).observe({ type: 'measure' })
+  })
   const samples: number[] = []
+  const cold: string[] = []
   for (let i = 0; i < 20; i++) {
     await sidebar.row(POSTGRES).open()
     await topic.expectTitle(POSTGRES)
     await win.waitForTimeout(i % 4 === 3 ? 31_000 : 300)
     const nav = home.navItem
+    const queries = await win.evaluate(() => (window as unknown as { __homeQuery: number[] }).__homeQuery.length)
     await nav.evaluate((node) => {
       const w = window as unknown as { __homeSample?: Promise<number> }
       w.__homeSample = new Promise((resolve) => {
@@ -246,9 +275,18 @@ test('home open: from a topic to Home painted', async ({ juno, win }) => {
         )
       })
     })
-    await nav.click()
+    // `press`, not `click`: a pointerup in the next frame defers the end of the measure by a frame (performance.md 7.1).
+    const box = (await nav.boundingBox())!
+    await win.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+    await press(win)
     samples.push(await win.evaluate(() => (window as unknown as { __homeSample: Promise<number> }).__homeSample))
+    if (i % 4 === 3) {
+      await win.waitForTimeout(100)
+      const query = await win.evaluate((from) => (window as unknown as { __homeQuery: number[] }).__homeQuery.slice(from), queries)
+      cold.push(`${samples.at(-1)!.toFixed(1)} ms (home.view ${query.map((ms) => ms.toFixed(1)).join(', ') || 'no run'})`)
+    }
   }
+  console.log(`home open after the subscription's idle time: ${cold.join('; ')}`)
   const open = stats('home open (pointerdown on Home) to Home painted', samples)
   within('home open, p95', open.p95, 50)
 })
@@ -283,14 +321,19 @@ test('send: Enter to the pending row painted', async ({ juno }) => {
   await juno.waitForSync()
   await juno.sidebar.row(POSTGRES).open()
   await juno.topic.expectTitle(POSTGRES)
+  const hidden = await countHidden(juno.win)
   const measured: number[] = []
   for (let i = 0; i < 9; i++) {
     const text = `Perf send ${i} ${Date.now()}`
+    const before = (await juno.measures('juno.send')).length
     await juno.topic.send(text)
     await juno.topic.expectSent(text)
-    measured.push((await juno.measure('juno.send'))!)
+    // The measure ends after the frame is presented, which can be after the row settles.
+    await expect.poll(async () => (await juno.measures('juno.send')).length, { timeout: 15_000 }).toBeGreaterThan(before)
+    measured.push((await juno.measures('juno.send')).at(-1)!)
     await juno.win.waitForTimeout(300)
   }
+  expect(await hidden(), 'the window was hidden or covered while measuring, so its frames were not drawn').toBe(0)
   // A local transaction, the delta and the paint; the Slack call is not part of it.
   const send = stats('send, Enter to the pending row painted (juno.send)', measured)
   within('send, p95', send.p95, 50)
@@ -299,7 +342,12 @@ test('send: Enter to the pending row painted', async ({ juno }) => {
 // The large-workspace scenarios share one synced user-data directory: the
 // fake's 1,200-topic seed fills the 300-row window, and syncing it once
 // keeps the run short. Every scenario launches the app warm on it.
-test.describe.serial('large workspace', () => {
+//
+// The groups here are not serial: a serial group skips every scenario after
+// one that fails, so a budget missed early would leave the rest unmeasured.
+// With one worker they still run in order on one setup; after a failure the
+// next worker runs the setup again and goes on.
+test.describe('large workspace', () => {
   let fake: FakeSlack
   let userData: string
   let slackDir: string
@@ -341,6 +389,17 @@ test.describe.serial('large workspace', () => {
         await juno.sidebar.expectRows()
         const times = await juno.startupTimes()
         if (i > 0) runs.push(times)
+        // Where the start goes: main to the renderer's navigation, the bundle loaded and run (`juno.start` is
+        // marked after every import), then the shell and the rows. Times after `+` are from the navigation.
+        const [created, renderer] = await running.app.evaluate(({ app }) => {
+          const metrics = app.getAppMetrics()
+          return [metrics.find((metric) => metric.type === 'Browser')?.creationTime ?? 0, metrics.find((metric) => metric.type === 'Tab')?.creationTime ?? Number.NaN] as const
+        })
+        const page = await running.win.evaluate(() => {
+          const first = (name: string) => performance.getEntriesByName(name, 'mark')[0]?.startTime ?? Number.NaN
+          return { origin: performance.timeOrigin, start: first('juno.start'), snapshot: first('juno.sidebar-snapshot') }
+        })
+        if (i > 0) console.log(`warm start ${i}: main to renderer process ${(renderer - created).toFixed(0)} ms, to navigation ${(page.origin - created).toFixed(0)} ms, bundle run at +${page.start.toFixed(0)}, sidebar snapshot at +${page.snapshot.toFixed(0)}, shell at +${(created + times.mainToShell - page.origin).toFixed(0)}, rows at +${(created + times.mainToRows - page.origin).toFixed(0)}`)
       } finally {
         await running.close()
       }
@@ -653,7 +712,7 @@ test('topic open, uncached: a thread whose replies were never fetched, to the he
 // The M4 gate (performance 3.4) on the topic300 seed: a 300-message thread
 // and a 300-message Main, 20 % images and 10 % code blocks. One synced
 // user-data directory; every scenario launches the app warm on it.
-test.describe.serial('topic view', () => {
+test.describe('topic view', () => {
   let fake: FakeSlack
   let userData: string
   let slackDir: string
@@ -699,10 +758,11 @@ test.describe.serial('topic view', () => {
       await juno.signIn()
       await juno.sidebar.expectRows()
       await juno.expectEngineLive(120_000)
-      // Read both once, so later opens are at the bottom of a cached, read topic.
+      // Read both once, so later opens are at the bottom of a cached, read topic. Main's oldest messages are
+      // the user's, so its first open is at the "N new" divider after them, not at the bottom.
       for (const title of [THREAD, MAIN]) {
         await juno.sidebar.row(title).open()
-        await juno.topic.expectAtBottom()
+        await juno.topic.toLatest()
         await juno.sidebar.row(title).expectRead()
       }
     } finally {
@@ -756,6 +816,19 @@ test.describe.serial('topic view', () => {
         expect(distances.length).toBeGreaterThan(5)
         expect(Math.max(...distances)).toBeLessThanOrEqual(2)
       }
+      // Every row renders its hover toolbar; only a shown one should be laid out (performance.md 8).
+      const dom = await running.win.evaluate(() => {
+        const view = [...document.querySelectorAll<HTMLElement>('[data-topic-view]')].find((node) => node.offsetParent !== null)
+        const toolbars = [...(view?.querySelectorAll('[role="toolbar"][aria-label="Message actions"]') ?? [])]
+        return {
+          rows: view?.querySelectorAll('[data-message-row]').length ?? 0,
+          elements: view?.getElementsByTagName('*').length ?? 0,
+          toolbars: toolbars.length,
+          inToolbars: toolbars.reduce((sum, bar) => sum + bar.getElementsByTagName('*').length + 1, 0),
+          laidOut: toolbars.filter((bar) => bar.getClientRects().length > 0).length,
+        }
+      })
+      console.log(`topic open DOM: ${dom.rows} rows, ${dom.elements} elements, ${dom.toolbars} hover toolbars with ${dom.inToolbars} elements, ${dom.laidOut} of them laid out`)
       const oneFrame = oneFrameBudget(await refreshInterval(running.win))
       within('topic open cached, p95', stats('topic open, cached 300 rows, press to rows painted at position (juno.topic-open)', cached).p95, 50)
       within('topic open prefetched, p95', stats('topic open, prefetched (juno.topic-open)', prefetched).p95, oneFrame)
@@ -956,7 +1029,7 @@ test.describe.serial('topic view', () => {
   })
 })
 
-test.describe.serial('Juno chat', () => {
+test.describe('Juno chat', () => {
   let fake: FakeSlack
   let model: FakeOpenRouter
   let userData: string
