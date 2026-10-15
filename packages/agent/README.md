@@ -256,3 +256,10 @@ are wired by `startAgent`; `openTurns` starts the scheduler and registers its to
 runtime, the message-menu RPC and reply-based Send card expiry.
 `mintGrant` now joins a caller's transaction so a schedule and its grant commit
 together.
+
+## Sidebar view tool
+
+`src/view-tools/` owns `juno_views`, the local sidebar settings tool and its
+Undo records. It uses WP15's policy and Change cards, and binds the AgentHost
+view routes at startup. See [the tool README](src/view-tools/README.md).
+`slack_channels` finds all cached channels by name glob without reading messages.

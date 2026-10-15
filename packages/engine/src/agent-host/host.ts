@@ -21,6 +21,8 @@ import { liveQuery, StoreReader, type SqlError } from '@juno/store'
 import { Outbox, type MirrorError } from '../outbox'
 import { SyncLink } from '../syncLink'
 import { Workspace, type StoreServices } from '../workspace'
+import { savedViews } from '../viewCommands'
+import * as views from './views'
 import * as attempts from './attempts'
 import * as reads from './reads'
 import { watchSnapshot, watchHours, watchChanges } from './schedule'
@@ -184,6 +186,13 @@ export const JunoHostLive: Layer.Layer<JunoHost, never, Workspace | Outbox | Syn
 
     return JunoHost.of({
       account,
+      channels: (pattern, cursor, limit) => inStore(reads.channels(pattern, cursor, limit)),
+      views: {
+        list: inStore(savedViews),
+        save: (view, id) => views.save(view, id).pipe(Effect.provideService(Workspace, workspace)),
+        delete: (id) => views.remove(id).pipe(Effect.provideService(Workspace, workspace)),
+        undo: (undo) => views.undo(undo).pipe(Effect.provideService(Workspace, workspace)),
+      },
       search: (query, cursor, limit) => inStore(reads.search(query, cursor, limit)),
       history: (channelId, cursor, limit) => inStore(reads.history(channelId, cursor, limit)),
       replies: (channelId, threadTs, cursor, limit) => inStore(reads.replies(channelId, threadTs, cursor, limit)),

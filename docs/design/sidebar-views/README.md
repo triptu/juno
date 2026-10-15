@@ -17,6 +17,6 @@ The owner's request (10-15, `docs/decision-log.md`): more custom views in the si
 - **The row never grows.** It scrolls sideways; a vertical wheel scrolls it sideways too; overscroll is contained, so it never moves the list or triggers Back and Forward. The edge it can scroll toward fades.
 - **The dot sits in the pill's corner**, so icon pills stay 28×28 and nothing moves when it shows.
 - **Keep these out of All is a checkbox**, as in a macOS sheet; the app has no switch primitive and one checkbox is enough.
-- **Juno making a view** ("make a Bots view with every alerts channel") is a seam: the engine's `views.save` is the command a Juno settings tool will call. Wiring it into the agent needs a new AgentHost route, so it is left for the agent work.
+- **Juno making a view** ("make a Bots view with every alerts channel") uses `juno_views` through the AgentHost view routes and the shared sheet commands. It finds ids through `slack_channels`. A clean owner request applies with Undo; after reading Slack content it proposes a Change card.
 
 `before-two-line-light.png` and `before-two-line-dark.png` are the real app before the preview became one line (10-15); `docs/design/screens/sidebar-*.png` and `views-*.png` are after.

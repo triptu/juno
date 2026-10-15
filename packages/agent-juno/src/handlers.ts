@@ -44,6 +44,12 @@ export const agentHostHandlers = (options: HandlerOptions) =>
       return AgentHostRpcs.of({
         'host.hello': () => Effect.succeed({ host: 'juno', protocol: AGENT_HOST_PROTOCOL }),
 
+        'host.slack.channels': ({ accountId, pattern, cursor, limit }) => asAccount(accountId, host.channels?.(pattern, cursor, limit) ?? unsupported('Channel lookup is unavailable.')),
+        'host.views.list': ({ accountId }) => asAccount(accountId, host.views?.list ?? unsupported('Views are unavailable.')),
+        'host.views.create': ({ accountId, view }) => asAccount(accountId, host.views?.save(view) ?? unsupported('Views are unavailable.')),
+        'host.views.update': ({ accountId, id, view }) => asAccount(accountId, host.views?.save(view, id) ?? unsupported('Views are unavailable.')),
+        'host.views.delete': ({ accountId, id }) => asAccount(accountId, host.views?.delete(id) ?? unsupported('Views are unavailable.')),
+        'host.views.undo': ({ accountId, undo }) => asAccount(accountId, host.views?.undo(undo) ?? unsupported('Views are unavailable.')),
         'host.slack.search': ({ accountId, query, cursor, limit }) => asAccount(accountId, host.search(query, cursor, limit)),
         'host.slack.history': ({ accountId, channelId, cursor, limit }) => asAccount(accountId, host.history(channelId, cursor, limit)),
         'host.slack.replies': ({ accountId, channelId, threadTs, cursor, limit }) => asAccount(accountId, host.replies(channelId, threadTs, cursor, limit)),

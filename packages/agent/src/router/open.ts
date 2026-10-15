@@ -1,3 +1,6 @@
+import { VIEW_MIGRATIONS } from '../view-tools/schema'
+import { createViewSettings } from '../view-tools/views'
+import type { ViewHost } from '../view-tools/host'
 import { createScheduler, SCHEDULE_MIGRATIONS, scheduleCreateTool, ownScheduleTool, scheduleExecutors, type Scheduler, type SchedulerOptions } from '../schedule'
 import { driveScheduler } from '../schedule/driver'
 /**
@@ -93,6 +96,7 @@ export interface TurnsOptions {
   /** The subagents' cheaper model. Default: the compaction model; no `delegate` tool without either. */
   readonly subagent?: ModelRef
   /** Slack reads through the AgentHost port. No Slack tools without it. */
+  readonly views?: ViewHost
   readonly host?: HostReads
   /** The host's actions and other folders' executors (WP15). No Slack send without `actions.host`. */
   readonly actions?: ActionsOptions
@@ -178,7 +182,7 @@ export async function openTurns(options: TurnsOptions): Promise<Turns | UpdateNe
     try {
       db = openDatabase(
         join(options.agentDir, AGENT_DATABASE_FILE),
-        [SPEND_MIGRATIONS, TURNS_MIGRATIONS, JOBS_MIGRATIONS, SETTINGS_MIGRATIONS, ACTIONS_MIGRATIONS, SCHEDULE_MIGRATIONS, REDACTION_MIGRATIONS, ...(options.migrations ?? []).filter((set) => set.name !== SCHEDULE_MIGRATIONS.name)],
+        [SPEND_MIGRATIONS, TURNS_MIGRATIONS, JOBS_MIGRATIONS, SETTINGS_MIGRATIONS, ACTIONS_MIGRATIONS, SCHEDULE_MIGRATIONS, VIEW_MIGRATIONS, REDACTION_MIGRATIONS, ...(options.migrations ?? []).filter((set) => set.name !== SCHEDULE_MIGRATIONS.name)],
         now,
       )
     } catch (error) {
@@ -237,7 +241,7 @@ async function start(
     catchUp: () => projection!.catchUp(),
   }
 
-  const tools = () => [...memoryTools, ...jobTools, ...slackTools, ...actionTools, ...scheduleTools, ...redactionTools, ...extraTools]
+  const tools = () => [...memoryTools, ...jobTools, ...slackTools, ...actionTools, ...scheduleTools, ...(viewSettings ? [viewSettings.tool] : []), ...redactionTools, ...extraTools]
   const section = () => {
     const base = instructions(jobs.active().map((job) => ({ title: job.title, line: job.state ?? job.phase })))
     const rules = rulesSection(ownerRules(store))
@@ -289,9 +293,11 @@ async function start(
     ...(options.schedule?.cachedReplies ? { cachedReplies: options.schedule.cachedReplies } : {}),
     changed: () => { router.kick(); actions.changed() },
   })
-  const actions = createActions({
+  const viewSettings = options.views ? createViewSettings({ store, host: options.views, current: () => router.toolRun(), actions: () => actions }) : undefined
+  const actions: Actions = createActions({
     ...options.actions,
-    executors: () => [...(typeof options.actions?.executors === 'function' ? options.actions.executors() : options.actions?.executors ?? []), ...scheduleExecutors({ store, scheduler, propose: (proposal) => actions.propose(proposal) }), removeExecutor(redaction, store)],
+    ...(viewSettings ? { decorateCard: viewSettings.decorate, undoCard: viewSettings.undo } : {}),
+    executors: () => [...(viewSettings ? [viewSettings.executor] : []), ...(typeof options.actions?.executors === 'function' ? options.actions.executors() : options.actions?.executors ?? []), ...scheduleExecutors({ store, scheduler, propose: (proposal) => actions.propose(proposal) }), removeExecutor(redaction, store)],
     onProposed: scheduler.bindNudge,
     store, position, jobs, spend: guard.spend, place: subagentModel?.modelId ?? '',
     accept: (input) => router.message(input),

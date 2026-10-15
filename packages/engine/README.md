@@ -79,3 +79,8 @@ and `host.schedule.changes` (message-store invalidations). The check includes
 the owner's identity and verifies the source author for the menu command.
 No message text crosses these routes. Account checks surround refreshes, and
 incomplete or limited Slack history fails rather than reporting no reply.
+
+`src/viewCommands.ts` holds the shared sidebar view commands, used by the sheet
+handlers and `agent-host/views.ts`. Saving captures the previous and resulting
+view in the same writer transaction. AgentHost Undo compares that snapshot
+before restoring it, so a later edit is not overwritten.
