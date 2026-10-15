@@ -1,6 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
 import { parseRecipe, renderArt, renderPebble, type ArtSize } from '@juno/topic-art'
-import { motion } from '@juno/tokens/tokens.stylex'
+import { motion, sizes as tokenSizes } from '@juno/tokens/tokens.stylex'
 
 export type TopicArtSize = ArtSize
 
@@ -93,7 +93,7 @@ const styles = stylex.create({
 })
 
 const sizes = stylex.create({
-  40: { width: '40px', height: '40px' },
-  20: { width: '20px', height: '20px' },
-  16: { width: '16px', height: '16px' },
+  40: { width: tokenSizes['--illustration-figure'], height: tokenSizes['--illustration-figure'] },
+  20: { width: tokenSizes['--icon-20'], height: tokenSizes['--icon-20'] },
+  16: { width: tokenSizes['--icon-16'], height: tokenSizes['--icon-16'] },
 })

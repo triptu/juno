@@ -122,7 +122,7 @@ const styles = stylex.create({
     flexGrow: 1,
     minWidth: 0,
     gap: spacing['--space-1'],
-    marginBlock: '-1px',
+    marginBlock: '-1px', // tokens-allow: Overlap the composer border by one pixel.
   },
   send: {
     display: 'inline-flex',

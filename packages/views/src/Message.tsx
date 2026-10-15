@@ -370,7 +370,7 @@ const styles = stylex.create({
     alignItems: 'flex-start',
     flexGrow: 1,
     minWidth: 0,
-    height: 'calc-size(auto, round(up, size, 1px))',
+    height: 'calc-size(auto, round(up, size, 1px))', // tokens-allow: Round measured rows to whole CSS pixels to prevent scroll drift.
   },
   header: {
     display: 'flex',

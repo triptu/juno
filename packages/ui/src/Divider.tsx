@@ -1,5 +1,5 @@
 import * as stylex from '@stylexjs/stylex'
-import { accent, colors, spacing } from '@juno/tokens/tokens.stylex'
+import { accent, colors, spacing, sizes } from '@juno/tokens/tokens.stylex'
 import { variants as typeVariants } from './internal/type'
 
 export interface DividerProps {
@@ -48,12 +48,12 @@ const styles = stylex.create({
   },
   horizontal: {
     width: '100%',
-    height: '1px',
+    height: '1px', // tokens-allow: The divider is a 1px hairline.
   },
   vertical: {
-    width: '1px',
+    width: '1px', // tokens-allow: The divider is a 1px hairline.
     alignSelf: 'stretch',
-    minHeight: '1em',
+    minHeight: sizes['--inline-em'],
   },
   default: { backgroundColor: colors['--border-default'] },
   subtle: { backgroundColor: colors['--border-subtle'] },
@@ -69,7 +69,7 @@ const styles = stylex.create({
   labelMuted: { color: colors['--foreground-muted'] },
   rule: {
     flexGrow: 1,
-    height: '1px',
+    height: '1px', // tokens-allow: The divider is a 1px hairline.
   },
   ruleAccent: { backgroundColor: accent['--hl-rule'] },
   ruleMuted: { backgroundColor: colors['--border-default'] },
