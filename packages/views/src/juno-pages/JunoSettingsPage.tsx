@@ -98,7 +98,8 @@ export function JunoSettingsPage({
   if (page === undefined) {
     return (
       <Page width="settings">
-        <PageHeader title="Juno" subtitle={chatCopy.providers.noneBody} />
+        {/* One line, as on the full page, so nothing moves when the agent's part arrives after a key is saved. */}
+        <PageHeader title="Juno" subtitle="Models, spend and the provider. Only you can change these." />
         {providers}
       </Page>
     )
