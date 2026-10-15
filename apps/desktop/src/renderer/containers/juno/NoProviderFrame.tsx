@@ -23,6 +23,7 @@ export function NoProviderFrame({ column, actions }: { readonly column: 'page' |
   const [menuOpen, setMenuOpen] = useState(false)
   return (
     <JunoChatFrame
+      column={column}
       header={
         <JunoHeader
           column={column}

@@ -442,6 +442,7 @@ export function JunoChat({ column, header, contextOf, composerContext, onSent, o
       }} />
     </SheetLayer>}
     <JunoChatFrame
+      column={column}
       header={header(page.banner)}
       pill={positioned && !atBottom && (unseen || page.moreBelow) ? <NewMessagesPill count={0} label={chatCopy.list.newMessage} onJump={toBottom} /> : undefined}
       composer={
