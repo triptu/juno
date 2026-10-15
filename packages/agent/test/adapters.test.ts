@@ -288,3 +288,20 @@ it('reconciles a lost launch only from its exact message, without relaunching or
   expect(turns.jobs.list()).toHaveLength(1)
   expect(turns.store.db.prepare('SELECT id FROM grants').all()).toHaveLength(0)
 })
+
+it('does not queue a T3 interrupt while paused, so Resume sends nothing', async () => {
+  const { server, turns, call, click } = await fixture('t3', t3Tools)
+  await call('t3_start', start)
+  await click()
+  const job = turns.jobs.list()[0]
+  if (!job) throw new Error('No job')
+  // Settings' Pause asks every active job to stop; that is not a click on an interrupt.
+  turns.setMode('paused')
+  await turns.jobs.stop(job.id)
+  turns.setMode('on')
+  await turns.actions.idle()
+  expect(server.calls.filter((c) => c.name === 't3_thread_interrupt')).toHaveLength(0)
+  expect(turns.store.db.prepare("SELECT 1 FROM approvals WHERE op_id LIKE 't3-stop:%'").all()).toHaveLength(0)
+  await turns.jobs.stop(job.id)
+  expect(server.calls.filter((c) => c.name === 't3_thread_interrupt')).toHaveLength(1)
+})
