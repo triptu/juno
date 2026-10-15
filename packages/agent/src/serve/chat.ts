@@ -28,6 +28,7 @@ import type {
   Ending,
   GroupPosition,
   JobId,
+  JunoInline,
   OpId,
   Origin,
   Quote,
@@ -41,6 +42,7 @@ import type { Job } from '../jobs/jobs'
 import { ownerOpOf } from '../router/input'
 import type { RunState } from '../router/events'
 import { parseOutput } from '../router/output'
+import { resolveSpans, sourceTable, type BubbleSpan } from '../router/sources'
 import type { Store } from '../store/store'
 
 const GROUP_GAP_MS = 2 * 60_000
@@ -173,7 +175,7 @@ export function chatItems(source: ChatSource): ReadonlyArray<ChatItem> {
     const live = source.live?.runId === run.id ? source.live : undefined
     const origin = originOf(run, source.jobs)
     const originKey = origin._tag === 'job' ? `job:${origin.jobs.map((j) => j.jobId).join(',')}` : origin._tag
-    let bubbles: ReadonlyArray<{ id: string; text: string; replyTo?: string; at: number }>
+    let bubbles: ReadonlyArray<{ id: string; text: string; body: ReadonlyArray<BubbleSpan>; replyTo?: string; at: number }>
     if (live !== undefined) {
       bubbles = live.bubbles.map((b) => ({ ...b, at: source.seen(b.id, Date.now()) }))
     } else {
@@ -193,7 +195,7 @@ export function chatItems(source: ChatSource): ReadonlyArray<ChatItem> {
           _tag: 'juno',
           id: bubble.id as BubbleId,
           runId: run.id as RunId,
-          body: [{ _tag: 'text', text: bubble.text }],
+          body: bubble.body.map(inlineOf),
           at: bubble.at,
           origin,
           ...(replyTo ? { replyTo: quoteOf(replyTo) } : {}),
@@ -250,11 +252,19 @@ function archivedBubbles(store: Store, runId: string, rows: ReadonlyArray<{ text
   // How many bubbles each entry closed, to time each bubble by its entry.
   const times: number[] = []
   for (const entry of entries) for (let n = parseOutput(entry.text).bubbles.length; n > 0; n--) times.push(entry.at)
+  const sources = sourceTable(store, runId)
   return output.bubbles.map((bubble, n) => {
     const replyTo = bubble.replyTo === undefined ? undefined : ownerOpOf(store, bubble.replyTo)
-    return { id: `${runId}:${n}`, text: bubble.text, at: times[n] ?? entries.at(-1)?.at ?? startedAt, ...(replyTo ? { replyTo } : {}) }
+    const body = resolveSpans(bubble.spans, sources)
+    return { id: `${runId}:${n}`, text: bubble.text, body, at: times[n] ?? entries.at(-1)?.at ?? startedAt, ...(replyTo ? { replyTo } : {}) }
   })
 }
+
+/** A span of a bubble as the chat shows it. A source the host did not name a channel for shows its channel id as the place. */
+const inlineOf = (span: BubbleSpan): JunoInline =>
+  'source' in span
+    ? { _tag: 'source', text: span.text, channelId: span.source.channelId, ts: span.source.ts, place: span.source.place ?? span.source.channelId }
+    : { _tag: 'text', text: span.text }
 
 const reportJob = (opId: string) => /^report:([^:]+):/.exec(opId)?.[1]
 
