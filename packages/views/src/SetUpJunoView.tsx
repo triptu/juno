@@ -1,7 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import { chatCopy, type ModelChoice } from '@juno/agent-contract'
 import { spacing } from '@juno/tokens/tokens.stylex'
-import { Button, ListRow, Segmented, Select, Surface, Text, TextField } from '@juno/ui'
+import { Button, Chip, ListRow, Segmented, Select, Surface, Text, TextField } from '@juno/ui'
 import { cell } from './juno-pages/cell'
 import { modelOptions } from './juno-pages/JunoSettingsPage'
 import { SignInPage } from './SignInPage'
@@ -125,17 +125,25 @@ function Fields({ shown, codex, drafts, saved, busy, error, onDraft, onSignInCod
     <ListRow
       divider={saved}
       trailing={
-        <TextField
-          size={30}
-          label={openRouter ? providers.key : providers.keyOptional}
-          type="password"
-          placeholder={saved ? providers.keySet : openRouter ? 'sk-or-…' : ''}
-          value={openRouter ? drafts.openRouterKey : drafts.customKey}
-          invalid={error !== undefined}
-          onChange={(event) => onDraft(openRouter ? { ...drafts, openRouterKey: event.currentTarget.value } : { ...drafts, customKey: event.currentTarget.value })}
-          onKeyDown={enter}
-          width="keyword"
-        />
+        // As Settings › Juno draws it: a saved key is a chip beside the field, which keeps its placeholder.
+        <span {...stylex.props(cell.controls)}>
+          {saved ? (
+            <Chip variant="filled" size={20}>
+              {providers.keySet}
+            </Chip>
+          ) : null}
+          <TextField
+            size={30}
+            label={openRouter ? providers.key : providers.keyOptional}
+            type="password"
+            placeholder={openRouter ? 'sk-or-…' : ''}
+            value={openRouter ? drafts.openRouterKey : drafts.customKey}
+            invalid={error !== undefined}
+            onChange={(event) => onDraft(openRouter ? { ...drafts, openRouterKey: event.currentTarget.value } : { ...drafts, customKey: event.currentTarget.value })}
+            onKeyDown={enter}
+            width="keyword"
+          />
+        </span>
       }
     >
       <Text variant="body">{openRouter ? providers.key : providers.keyOptional}</Text>
