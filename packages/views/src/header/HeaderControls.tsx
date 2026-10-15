@@ -131,6 +131,7 @@ export function JunoToggle({ pressed, onToggle }: JunoToggleProps) {
 
 const styles = stylex.create({
   countWidth: {
+    justifyContent: 'flex-start',
     width: { default: sizes['--threads-button-width'], [NARROW]: sizes['--threads-button-narrow-width'] },
   },
   heading: {

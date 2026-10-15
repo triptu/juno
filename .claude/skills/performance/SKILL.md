@@ -67,7 +67,7 @@ The bar: the app must feel native and insanely fast. Input paints on the next fr
 
 Run `pnpm remote test:desktop layout-shift.spec.ts` for renderer changes that affect opening or loading. `pnpm affected` includes this ordinary desktop spec. Its frame-by-frame screen anchor check requires exactly 0 px movement, alongside Layout Shift entries excluding recent input. Hold fake Slack methods and release them in the measured action; assert both the held request and the final UI so a no-op cannot pass. Prove additions with `pnpm flake apps/desktop/e2e/layout-shift.spec.ts --repeat 20 --machines 1`. See docs/development.md, "Delayed-load layout checks".
 
-Partial message windows do not establish the open position. The header and composer paint within the existing uncached-open budget while the body waits for history coverage. Keep eager rows around the divider after the first paint. Message reaction and Main thread-link slots reserve their height before metadata arrives; sender and Threads counter widths are fixed.
+Partial message windows do not establish the open position. The header and composer paint within the existing uncached-open budget while the body waits for history coverage. Keep eager rows around the divider after the first paint. Message reaction and Main thread-link slots reserve their height before metadata arrives; sender and Threads counter widths are fixed. Sidebar metadata has fixed slots; on an empty cache, its first list waits for cold sync membership and Automated classification. Cached sidebar rows paint immediately.
 
 ## Review questions
 

@@ -260,12 +260,12 @@ export function Sidebar({
                 />
               </FilterPill>
               <ViewPills views={views} selected={selected} onFilterView={onFilterView} onViewMenu={onViewMenu} onMoveView={onMoveView} />
-              {onNewView === undefined ? null : (
-                <FilterPill>
-                  <Button variant="filter" iconStart={Plus} title="New view" aria-label="New view" aria-haspopup="dialog" pressed={false} onClick={onNewView} />
-                </FilterPill>
-              )}
             </PillRow>
+            {onNewView === undefined ? null : (
+              <FilterPill>
+                <Button variant="filter" iconStart={Plus} title="New view" aria-label="New view" aria-haspopup="dialog" pressed={false} onClick={onNewView} />
+              </FilterPill>
+            )}
             <span {...stylex.props(styles.unread)}>
               {/* An icon pill like Channels and DMs: the dot on its corner is the unread mark the pills already use. */}
               <Button

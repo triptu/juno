@@ -473,3 +473,5 @@ placeholder between topic and Home. The inspected Home filmstrip still shows
 the specified staggered entrance; the check is about data readiness, not making
 that animation instantaneous. The log is `.juno-status/perf-4b/feel-final.log`,
 and the filmstrips are under `apps/desktop/feel-report/`.
+
+The sidebar holds its first list on an empty cache until cold sync and Automated classification establish membership. Cached rows still paint immediately. Topic-row timestamps, unread badges, participant stacks and status tags reserve their widths; New view stays beside Unread only while view pills fill.

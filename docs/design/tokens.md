@@ -538,6 +538,9 @@ Other literal lengths and colours require tokens, or a trailing
 
 | Token | Value | Used for |
 | --- | --- | --- |
+| `--topic-time-width` | 48px | Stable relative-time slot in topic rows. |
+| `--topic-people-width` | 60px | Four overlapping participant avatars. |
+| `--topic-tags-width` | 76px | Reopened status slot; Main uses the 36px control token. |
 | `--message-sender-width` | 128px | Sender names keep timestamps fixed while names resolve. |
 | `--threads-button-width` | 128px | Threads button before and after its count arrives. |
 | `--threads-button-narrow-width` | 64px | Threads button below the header's 480px breakpoint. |
