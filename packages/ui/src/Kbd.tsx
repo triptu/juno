@@ -30,10 +30,10 @@ const styles = stylex.create({
   },
   key: {
     color: colors['--foreground-subtle'],
-    paddingBlock: '1px',
+    paddingBlock: spacing['--space-pixel'],
     paddingInline: spacing['--space-1'],
     borderWidth: '1px',
-    borderBottomWidth: '2px',
+    borderBottomWidth: spacing['--space-0-5'],
     borderStyle: 'solid',
     borderColor: colors['--border-strong'],
     borderRadius: radii['--radius-xs'],

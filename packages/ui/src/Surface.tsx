@@ -123,7 +123,7 @@ const kinds = stylex.create({
     gap: spacing['--space-0-5'],
     height: layout['--header-island-height'],
     paddingBlock: 0,
-    paddingInline: `calc((${layout['--header-island-height']} - ${sizes['--control-28']}) / 2 - 1px)`,
+    paddingInline: `calc((${layout['--header-island-height']} - ${sizes['--control-28']}) / 2 - 1px)`, // tokens-allow: Subtract the 1px surface border from the inset.
     backgroundColor: colors['--surface-default'],
     boxShadow: shadows['--card-ring'],
     pointerEvents: 'auto',

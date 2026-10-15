@@ -425,7 +425,7 @@ const styles = stylex.create({
     alignItems: 'center',
     gap: spacing['--space-1'],
     flexShrink: 0,
-    paddingTop: '1px',
+    paddingTop: spacing['--space-pixel'],
   },
   line3: {
     display: 'flex',

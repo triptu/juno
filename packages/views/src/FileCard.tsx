@@ -338,7 +338,7 @@ const styles = stylex.create({
   track: {
     position: 'absolute',
     insetInline: 0,
-    top: 'calc(100% + 1px)',
+    top: 'calc(100% + 1px)', // tokens-allow: Place the menu past the 1px border.
     height: PROGRESS_HEIGHT,
     borderRadius: radii['--radius-full'],
     backgroundColor: colors['--secondary-default'],
