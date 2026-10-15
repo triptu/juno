@@ -187,9 +187,12 @@ describe('cold boot', () => {
       'api:conversations.replies': 2,
       // Discovery over the window at the end of the cold boot: more than 50 thread messages, so two pages.
       'api:search.modules.messages': 2,
-      'edge:users/info': 1,
+      // Names before rows: the DM and group DM people right after counts, then each person once, on the page they first appear on.
+      'edge:users/info': 7,
       'edge:emojis/list': 1,
     })
+    const asked = engine.fake.calls.filter((c) => c.method === 'users/info').flatMap((c) => JSON.parse(c.args['ids'] ?? '[]') as Array<string>)
+    expect(new Set(asked).size).toBe(asked.length)
   })
 
   it('filters by kind, unread and scope, and counts for the dots', async () => {
@@ -820,7 +823,7 @@ describe('names (first real session)', () => {
     const engine = await startTestEngine({
       initial: (fake) => {
         // Every history page waits, so names cannot come from the end of the boot.
-        fake.holdNext({ method: 'conversations.history', times: activeMains })
+        fake.holdNext({ method: 'conversations.history' })
         return fake.signIn()
       },
     })
@@ -832,11 +835,14 @@ describe('names (first real session)', () => {
     const early = await engine.rowsUntil((rows) => rows.length > 0, 'the followed threads')
     expect(unnamed(early)).toEqual([])
     // History lands one conversation at a time: each new row, DMs and group DMs included, is named when it shows.
-    for (let page = 0; page < activeMains; page++) {
+    for (let page = 1; page < activeMains; page++) {
+      // `release` forgets the hold, so the next page is held again first.
       engine.fake.release({ method: 'conversations.history' })
-      await waitFor(() => (engine.fake.heldCount({ method: 'conversations.history' }) === 1 || page === activeMains - 1 ? true : undefined), 20_000, 'the next history page')
+      engine.fake.holdNext({ method: 'conversations.history' })
+      await waitFor(() => (engine.fake.heldCount({ method: 'conversations.history' }) === 1 ? true : undefined), 20_000, 'the next history page')
       expect(unnamed(await engine.rows())).toEqual([])
     }
+    engine.fake.release({ method: 'conversations.history' })
     await engine.phase('live', 30_000)
     const rows = await engine.rowsUntil((list) => list.some((row) => row.channel.kind === 'mpim'), 'the group DM')
     expect(rows.find((row) => row.channel.kind === 'mpim')?.channel.name).toBe('Maya, Leo')
