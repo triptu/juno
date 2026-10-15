@@ -37,11 +37,7 @@ const started = Date.now()
 
 /** Scripts that give the same result on Linux. feel and perf time the Mac and stay local. */
 const remoteScripts = ['typecheck', 'lint', 'test', 'specs:check', 'specs:traces', 'test:agent', 'test:agent-contracts', 'test:agent-testing', 'test:gallery', 'test:desktop', 'test:e2e', 'test:remote-pool']
-/**
- * Cost-conscious shapes for each script,
- * measured on 2026-10-15 (docs/development.md, "Machine shapes"). Namespace bills
- * vCPU-minutes, so a bigger machine only pays when the script keeps it busy.
- */
+// Measured shapes and rejected alternatives: docs/development.md, "Machine shapes".
 const remoteShapes = {
   typecheck: '2x4',
   lint: '2x4',

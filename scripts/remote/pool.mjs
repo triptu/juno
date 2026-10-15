@@ -118,7 +118,7 @@ function forget(id) {
   rmSync(statePath(id), { force: true })
   unlock(id)
 }
-function ensureReaper() {
+export function ensureReaper() {
   if (!takeLock('watcher-start')) return
   try {
     const pidFile = join(dir, 'watcher.pid')
@@ -126,7 +126,7 @@ function ensureReaper() {
     let pid
     try { pid = Number(readFileSync(pidFile, 'utf8')) } catch { /* No watcher yet. */ }
     const version = existsSync(versionFile) ? Number(readFileSync(versionFile, 'utf8')) : 1
-    if (alive(pid) && version >= 7) return
+    if (alive(pid) && version >= 8) return
     // Upgrade housekeeping only. Machine/job owners are untouched.
     if (alive(pid)) {
       const command = spawnSync('ps', ['-p', String(pid), '-o', 'args='], { encoding: 'utf8', timeout: 1000 }).stdout ?? ''
@@ -135,7 +135,7 @@ function ensureReaper() {
     }
     const child = spawn(process.execPath, [fileURLToPath(import.meta.url), '--watch'], { detached: true, stdio: 'ignore', env: { ...process.env, JUNO_REMOTE_IDLE_MINUTES: '1' } })
     writeFileSync(pidFile, String(child.pid))
-    writeFileSync(versionFile, '7')
+    writeFileSync(versionFile, '8')
     child.unref()
   } finally { unlock('watcher-start') }
 }
@@ -177,13 +177,16 @@ function machineStates() {
   })
 }
 
-/** Per-machine locks protect idle cleanup while inventory admission is busy. */
-export function reapIdle() {
-  const targets = machinesToDestroy({ instances: [], states: machineStates(), pending: [], owner, now: Date.now(), idleMs, lifetimeMs })
+/** The decision lock is held; an unavailable inventory must not retain known idle machines. */
+function reapIdle() {
+  // Failed creates need the inventory labels to clear their pending reservation.
+  const states = machineStates().filter((state) => !state.destroying)
+  const targets = machinesToDestroy({ instances: [], states, pending: [], owner, now: Date.now(), idleMs, lifetimeMs })
   for (const id of targets) destroy(id)
 }
 
 function reconcile() {
+  reapIdle()
   const snapshot = list()
   const { instances } = snapshot
   const states = machineStates()
@@ -234,8 +237,12 @@ export async function acquire(machine, create, log, { fresh = false } = {}) {
       const instances = reconcile()
       const all = machines()
       for (const state of all) {
-        if (!fresh && !state.destroying && !state.kept && state.machine === machine && Date.now() - state.created < handOutMs && takeLock(state.id)) {
-          return { id: state.id, warm: true, images: state.images ?? [] }
+        if (!fresh && state.machine === machine && takeLock(state.id)) {
+          const current = read(state.id)
+          if (current && !current.destroying && !current.kept && current.machine === machine && Date.now() - current.created < handOutMs) {
+            return { id: current.id, warm: true, images: current.images ?? [] }
+          }
+          unlock(state.id)
         }
       }
       let usage = capacity(instances, all)
@@ -305,7 +312,6 @@ export async function reap() {
   try {
     for (;;) {
       await sleep(30_000)
-      try { reapIdle() } catch (error) { console.error(`remote: idle cleanup failed: ${error.message}`) }
       if (!takeLock('decide')) continue
       try {
         const instances = reconcile()

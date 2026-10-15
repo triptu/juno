@@ -140,7 +140,7 @@ import { mkdirSync, writeFileSync, readFileSync, readdirSync } from 'node:fs';
 import { acquire, destroy } from ${JSON.stringify(new URL('./pool.mjs', import.meta.url).href)};
 mkdirSync(${JSON.stringify(poolDir)}, { recursive: true });
 writeFileSync(${JSON.stringify(join(poolDir, 'watcher.pid'))}, String(process.pid));
-writeFileSync(${JSON.stringify(join(poolDir, 'watcher.version'))}, '7');
+writeFileSync(${JSON.stringify(join(poolDir, 'watcher.version'))}, '8');
 let attempts = 0;
 const logs = [];
 const request = acquire('linux/amd64:2x4', async (_, labels) => {
@@ -213,7 +213,7 @@ ${body}
 import { writeFileSync } from 'node:fs';
 const poolDir = ${JSON.stringify(join(dir, 'juno-remote-pool'))};
 writeFileSync(poolDir + '/watcher.pid', String(process.pid));
-writeFileSync(poolDir + '/watcher.version', '7');
+writeFileSync(poolDir + '/watcher.version', '8');
 writeFileSync(poolDir + '/new.json', JSON.stringify({ id: 'new', machine: 'linux/amd64:4x8', created: list().startedAt + 1, lastUsed: Date.now() }));
 const result = await acquire('linux/amd64:4x8', () => { throw new Error('must reuse the newly recorded machine') }, () => {});
 if (!result.warm || result.id !== 'new') throw new Error('lost a machine newer than the cached inventory');
@@ -239,7 +239,7 @@ if (!result.warm || result.id !== 'new') throw new Error('lost a machine newer t
   } finally { rmSync(dir, { recursive: true, force: true }) }
 })
 
-test('idle cleanup does not wait for inventory admission or reclaim live machines', () => {
+test('idle cleanup precedes a failed inventory and preserves live machines', () => {
   const dir = mkdtempSync(join(tmpdir(), 'juno-reap-idle-'))
   const calls = join(dir, 'calls')
   writeFileSync(join(dir, 'nsc'), '#!/bin/sh\nprintf "%s %s\\n" "$1" "$2" >> "$TEST_CALLS"\n[ "$1" = destroy ]\n')
@@ -247,21 +247,21 @@ test('idle cleanup does not wait for inventory admission or reclaim live machine
   const script = `
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
-import { reapIdle } from ${JSON.stringify(new URL('./pool.mjs', import.meta.url).href)};
+import { acquire } from ${JSON.stringify(new URL('./pool.mjs', import.meta.url).href)};
 const pool = ${JSON.stringify(join(dir, 'juno-remote-pool'))};
-for (const name of ['decide', 'live']) {
- mkdirSync(pool + '/' + name + '.lock');
- writeFileSync(pool + '/' + name + '.lock/pid', String(process.ppid));
-}
+writeFileSync(pool + '/watcher.pid', String(process.pid));
+writeFileSync(pool + '/watcher.version', '8');
+mkdirSync(pool + '/live.lock');
+writeFileSync(pool + '/live.lock/pid', String(process.ppid));
 for (const id of ['idle', 'live', 'kept']) writeFileSync(pool + '/' + id + '.json', JSON.stringify({
  id, machine: 'linux/amd64:8x16', created: Date.now() - 120000, lastUsed: Date.now() - 120000, kept: id === 'kept'
 }));
-reapIdle();
-assert.equal(readFileSync(process.env.TEST_CALLS, 'utf8'), 'destroy idle\\n');
+await assert.rejects(acquire('linux/amd64:2x4', () => { throw new Error('must not create after inventory failure') }, () => {}), /nsc list failed/);
+assert.equal(readFileSync(process.env.TEST_CALLS, 'utf8'), 'destroy idle\\nlist -o\\n');
 assert(!existsSync(pool + '/idle.json'));
 assert(existsSync(pool + '/live.json'));
 assert(existsSync(pool + '/kept.json'));
-assert(existsSync(pool + '/decide.lock'));
+assert(!existsSync(pool + '/decide.lock'));
 `
   try {
     const result = spawnSync(process.execPath, ['--input-type=module', '-e', script], {
