@@ -32,8 +32,10 @@ export SPECS_JOBS=${SPECS_JOBS:-$(at_least $(( cores / 2 )) 1)} SPECS_APALACHE=$
     [ $total -gt 0 ] && echo $(( 100 * (total - idle) / total )) >> /out/cpu.txt; prev=("${now[@]}")
   done ) &
 sampler=$!
+script_started=$SECONDS
 xvfb-run --auto-servernum --server-args='-screen 0 1920x1080x24' pnpm "$@"
 code=$?
+echo "remote: script time $(( SECONDS - script_started )) s" >&2
 kill $sampler 2>/dev/null
 if [ -s /out/cpu.txt ]; then
   sort -n /out/cpu.txt | awk '{ s += $1; v[NR] = $1 } END { printf "remote: CPU busy %d%% on average, %d%% at the median, over %d s on %d cores\n", s / NR, v[int((NR + 1) / 2)], NR * 2, '"$(nproc)"' }' >&2

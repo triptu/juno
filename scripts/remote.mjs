@@ -14,7 +14,7 @@
 // lockfile or the Dockerfile changes. The worktree is streamed in as the files
 // git sees, tracked or new, with ignored files left out (.env, node_modules,
 // out/, test output). Reports come back into .remote/<run>/. After a clean run
-// the machine goes back to the pool and is destroyed after 5 idle minutes;
+// the machine goes back to the pool and is destroyed after the configured idle window;
 // after a failure or Ctrl-C it is destroyed at once. `--status` lists the pool
 // and `--drain` destroys its idle machines.
 //
@@ -243,9 +243,9 @@ const reportDir = join(root, '.remote', runId)
 const exitMarker = `__juno_remote_exit_${runId}=`
 const scriptArgs = [options.script, ...options.args].map(quote).join(' ')
 const container = (image) =>
-  `echo __juno_remote_started; rm -rf /tmp/out && mkdir -p /tmp/out && chmod 777 /tmp/out && s=$(date +%s) && docker pull -q ${image} >/dev/null && echo "remote: image pulled in $(( $(date +%s) - s )) s" >&2 && docker run --rm -i --init --ipc=host -v /tmp/out:/out ${options.env.map((pair) => `-e ${quote(pair)}`).join(' ')} ${image} ` +
+  `echo __juno_remote_started; rm -rf /tmp/out && mkdir -p /tmp/out && chmod 777 /tmp/out && s=$(date +%s) && docker pull -q ${image} >/dev/null && echo "remote: image pulled in $(( $(date +%s) - s )) s" >&2 && echo __juno_remote_ready && docker run --rm -i --init --ipc=host -v /tmp/out:/out ${options.env.map((pair) => `-e ${quote(pair)}`).join(' ')} ${image} ` +
   `bash -c 'tar -xzf - -C /work && exec bash scripts/remote/run.sh "$@"' _ ${scriptArgs}; code=$?; [ -s /tmp/out/reports.tgz ] && echo __juno_remote_reports; echo "${exitMarker}$code"`
-const create = (duration) => ['create', '--bare', '--machine_type', options.machine, '--duration', duration, '--label', 'juno-remote=1', '--purpose', 'juno remote']
+const create = (duration) => ['create', '--bare', '--machine_type', options.machine, '--duration', duration, '--label', 'juno-remote=1', '--purpose', 'juno remote', ...(process.env.JUNO_REMOTE_IMAGE_CACHE === 'off' ? [] : ['--volume', 'cache:juno-remote-docker-v1:/var/lib/docker:16GB'])]
 
 console.error(`remote: ${files.length} files (${(bytes / 1024 / 1024).toFixed(1)} MB before compression), no secrets found`)
 if (options.dryRun) {
@@ -261,7 +261,7 @@ if (options.dryRun) {
 const started = Date.now()
 mkdirSync(reportDir, { recursive: true })
 const runLog = join(reportDir, 'run.log')
-writeFileSync(runLog, `pnpm ${scriptArgs}\n`)
+writeFileSync(runLog, `pnpm ${scriptArgs}\nremote: run ${JSON.stringify({ version: 1, script: options.script, args: options.args, machine: options.machine, started: new Date(started).toISOString() })}\n`)
 const elapsed = () => `${((Date.now() - started) / 1000).toFixed(0)} s`
 const work = mkdtempSync(join(tmpdir(), 'juno-remote-'))
 // Set while this run holds a machine; a run that ends any other way than
@@ -269,10 +269,15 @@ const work = mkdtempSync(join(tmpdir(), 'juno-remote-'))
 let id
 let image
 let clean = false
+let acquiredAt
+let readySeconds
+let warm
+let machineSeconds
 const cleanup = () => {
   if (id && options.keep) keep(id)
   else if (id && clean) release(id, image)
   else if (id) destroy(id)
+  if (acquiredAt) machineSeconds = (Date.now() - acquiredAt) / 1000
   id = undefined
   rmSync(work, { recursive: true, force: true })
   rmSync(join(root, '.remote', `cache-${runId}`), { recursive: true, force: true })
@@ -299,9 +304,11 @@ try {
       nsc([...create(duration), ...Object.entries(labels).flatMap(([key, value]) => ['--label', `${key}=${value}`]), '--cidfile', cidfile])
       return readFileSync(cidfile, 'utf8').trim()
     },
-    (message) => console.error(`remote: ${message}`),
+    (message) => { console.error(`remote: ${message}`); appendFileSync(runLog, `remote: ${message}\n`) },
   )
   id = claimed.id
+  acquiredAt = Date.now()
+  warm = claimed.warm
   console.error(`remote: ${claimed.warm ? 'warm' : 'new'} machine ${id} (${options.machine}) after ${elapsed()}; running pnpm ${options.script}`)
 
   const list = join(work, 'files')
@@ -334,6 +341,11 @@ try {
     }, 8000)
     let lines = 0
     for await (const line of createInterface({ input: ssh.stdout })) {
+      if (line === '__juno_remote_ready') {
+        readySeconds = (Date.now() - started) / 1000
+        console.error(`remote: image ready after ${readySeconds.toFixed(1)} s`)
+        continue
+      }
       if (line === '__juno_remote_started') {
         started = true
         clearTimeout(dialTimer)
@@ -386,6 +398,6 @@ try {
   cleanup()
 }
 console.error(`remote: pnpm ${options.script} exited with ${code} after ${elapsed()}`)
-appendFileSync(runLog, `remote: exited with ${code}\n`)
+appendFileSync(runLog, `remote: exited with ${code}\nremote: summary ${JSON.stringify({ code, warm, readySeconds, machineSeconds, wallSeconds: (Date.now() - started) / 1000 })}\n`)
 console.error(`remote: output in ${relative(root, runLog)}`)
 process.exit(code)
