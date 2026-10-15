@@ -54,4 +54,44 @@ test.describe('Settings', () => {
     expect(inSettings.column.width).toBe(alone.column.width)
     expect(inSettings.titleInPage).toBe(alone.titleInPage)
   })
+
+  /** How far each group card's content starts from the card's leading edge: the leftmost text or control. */
+  const leadingInsets = (page: Page) =>
+    page.evaluate(() => {
+      const column = document.querySelector('[data-fixture-frame] h1')!.closest('header')!.parentElement!
+      const style = getComputedStyle(column)
+      const width = column.getBoundingClientRect().width - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight)
+      const cards = [...column.querySelectorAll('*')].filter(
+        (el) => el.getBoundingClientRect().width === width && getComputedStyle(el).borderTopLeftRadius !== '0px',
+      )
+      return cards.map((card) => {
+        const left = card.getBoundingClientRect().left
+        const starts: number[] = []
+        const walker = document.createTreeWalker(card, NodeFilter.SHOW_TEXT)
+        for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
+          if (node.textContent!.trim() === '') continue
+          const range = document.createRange()
+          range.selectNodeContents(node)
+          const box = range.getBoundingClientRect()
+          if (box.width > 0) starts.push(box.left)
+        }
+        for (const control of card.querySelectorAll('input, [role="radiogroup"], svg')) {
+          const box = control.getBoundingClientRect()
+          if (box.width > 0) starts.push(box.left)
+        }
+        return Math.round(Math.min(...starts) - left)
+      })
+    })
+
+  test('every card in General, Appearance, Ignored and About starts its rows 15px in, as the Juno rows do', async ({ page }) => {
+    await open(page, 'SettingsPage', 'sections/juno')
+    const [juno] = await leadingInsets(page)
+    expect(juno).toBe(15)
+    for (const id of ['sections/general', 'sections/appearance', 'sections/ignored', 'sections/about']) {
+      await open(page, 'SettingsPage', id)
+      const insets = await leadingInsets(page)
+      expect(insets.length, id).toBeGreaterThan(0)
+      for (const inset of insets) expect(inset, id).toBe(juno)
+    }
+  })
 })

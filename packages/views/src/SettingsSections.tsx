@@ -28,17 +28,17 @@ export function SettingsGeneral({ newTabPage, onNewTabPageChange, peekKey, onPee
     <Page width="settings">
       <PageHeader title="General" />
       <Section heading="Tabs" sub="What the + button, ⌘T and closing the last tab open.">
-        <Surface kind="group" padding="md">
+        <Surface kind="group" padding="md" sx={styles.card}>
           <NewTabSetting value={newTabPage} onChange={onNewTabPageChange} />
         </Surface>
       </Section>
       <Section heading="Peek" sub="Hold the key over a topic in the sidebar to read it without marking it read.">
-        <Surface kind="group" padding="md">
+        <Surface kind="group" padding="md" sx={styles.card}>
           <PeekKeySetting value={peekKey} onChange={onPeekKeyChange} />
         </Surface>
       </Section>
       <Section heading="AI assist" sub="Use a fast model for decisions. Turn this off to use the decision chat model.">
-        <Surface kind="group" padding="md">
+        <Surface kind="group" padding="md" sx={styles.card}>
           <Checkbox label="Use fast classifier" checked={classifier} onChange={(event) => onClassifierChange(event.currentTarget.checked)} />
         </Surface>
       </Section>
@@ -51,7 +51,7 @@ export function SettingsAppearance(props: AppearanceSettingsProps) {
   return (
     <Page width="settings">
       <PageHeader title="Appearance" subtitle="System follows macOS. Density changes the sidebar and the messages." />
-      <Surface kind="group" padding="md">
+      <Surface kind="group" padding="md" sx={styles.card}>
         <AppearanceSettings {...props} />
       </Surface>
     </Page>
@@ -70,7 +70,7 @@ export function SettingsIgnored({ ignored, onStopIgnoring }: SettingsIgnoredProp
     <Page width="settings">
       <PageHeader title="Ignored" subtitle="Ignored channels are hidden from your topics, search and All topics, and they never notify you. Nothing changes in Slack." />
       <Section heading="Channels">
-        <Surface kind="group" padding="md">
+        <Surface kind="group" padding="md" sx={styles.card}>
           <IgnoredChannels channels={ignored} onStopIgnoring={onStopIgnoring} />
         </Surface>
         <Text variant="meta" tone="muted" as="p">
@@ -96,7 +96,7 @@ export function SettingsAbout({ build, updates, diagnostics }: SettingsAboutProp
     <Page width="settings">
       <PageHeader title="About" />
       <Section heading="Version">
-        <Surface kind="group" padding="md">
+        <Surface kind="group" padding="md" sx={styles.card}>
           <div {...stylex.props(styles.stack)}>
             {build}
             {updates}
@@ -104,13 +104,18 @@ export function SettingsAbout({ build, updates, diagnostics }: SettingsAboutProp
         </Surface>
       </Section>
       <Section heading="Diagnostics" sub="What the sync engine is doing. Useful when something looks wrong.">
-        <Surface kind="group" padding="md">{diagnostics}</Surface>
+        <Surface kind="group" padding="md" sx={styles.card}>{diagnostics}</Surface>
       </Section>
     </Page>
   )
 }
 
 const styles = stylex.create({
+  // 14px in, so labels start 15px from the card's edge with its 1px border,
+  // on the same line as the rows of Notifications, Juno, Connections and Backup.
+  card: {
+    paddingInline: spacing['--space-3-5'],
+  },
   stack: {
     display: 'flex',
     flexDirection: 'column',
