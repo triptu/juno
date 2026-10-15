@@ -259,6 +259,20 @@ export function createMcpManager({ store, credentials, defaults = PRESETS }: Man
       const own = tool(id, name).review
       return own !== 'auto' ? own : stored(id).review
     },
+    /**
+     * The name the model uses for a connection: a preset's id, or a short slug of the label the
+     * owner gave a server they added. Never its internal id, address or anything else.
+     */
+    handles: (): ReadonlyMap<string, string> => {
+      const names = new Map<string, string>()
+      for (const config of configs()) {
+        const base = presets.has(config.id) ? config.id : config.label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 32) || 'server'
+        let name = base
+        for (let n = 2; names.has(name); n++) name = `${base}-${n}`
+        names.set(name, config.id)
+      }
+      return names
+    },
     /** What the model is offered: present tools the owner has not turned off. */
     definitions: (id: string) => catalogue(store, id).filter((row) => row.present === 1 && row.enabled === 1).map((row) => ({ ...row, definition: json(JSON.parse(row.definition)) })),
     page: (): ConnectionsPage => ({ connections: configs().map((config) => ({
@@ -288,7 +302,7 @@ export function createMcpManager({ store, credentials, defaults = PRESETS }: Man
   }
 }
 /** The server's own one line about a tool, shown and never trusted. */
-function hintOf(definition: string): { hint?: string } {
+export function hintOf(definition: string): { hint?: string } {
   const tool = parseObject(JSON.parse(definition))
   const first = typeof tool.description === 'string' ? tool.description.split('\n')[0]?.trim().slice(0, 200) ?? '' : ''
   // Some servers repeat the name as the description; it says nothing new.

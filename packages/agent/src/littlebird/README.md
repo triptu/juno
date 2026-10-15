@@ -1,11 +1,12 @@
 # Littlebird adapter (WP18)
 
 Littlebird uses WP17's existing HTTP/OAuth manager at
-`https://mcp.littlebird.ai/mcp`. `find_tools({ server: 'littlebird' })` returns
-`littlebirdCatalogue`: discovered names, schemas, schema hashes and whether
-each call is a read or requires a card. `call_tool` validates against that
-schema. Reviewed reads run without a card; writes are exact Change cards,
-once per click. All results taint the run as untrusted connection content.
+`https://mcp.littlebird.ai/mcp`, and the same discovery as every connection:
+`find_tools({ server: 'littlebird' })` lists its tools one line each, and
+`find_tools({ server: 'littlebird', tool })` gives one tool's schema
+(`../mcp/discovery.ts`). `call_tool` validates against that schema. Reads run
+without a card; other calls go through the auto-review. All results taint the
+run as untrusted connection content.
 
 There are no invented Littlebird tool aliases. The WP17 preset's guessed read
 names were removed, and the code's read list is empty. Since the auto-review

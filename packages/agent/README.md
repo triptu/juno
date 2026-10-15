@@ -200,6 +200,8 @@ A connection (MCP) call that is not a read runs once with no click or shows its 
 - **A call that runs** is a card row with `quiet = 1`: the chat never lists it, it takes no click, and it leaves no card outcome (the model has the tool's result). Its single-use authority is an `mcp_reviews` row passed as `grantId`. It is authorized only if `authorizeDecision` allows it with `review: true` (mode, owner, validity, no earlier authorization), attempted once and settled as a click is; an unconfirmed result is `unknown` and never retried. If it cannot be authorized the quiet card is dismissed and the model is told nothing was done. Activity lists it as `noClick` with the review.
 - **Disabled tools** are left out of `definitions` (so `find_tools` never offers them and they get no executor) and refused by `tool`.
 
+**Discovery is progressive** (`mcp/discovery.ts`; see [the MCP hand-off](src/mcp/README.md), "Discovery and execution"): a bare `find_tools` returns the servers that are on with their state and tool counts; a `query`, optionally with a `server`, returns matching tools one line each; a tool's argument schema comes only when the model names that tool. Servers are named by handles, so internal ids, schema hashes and addresses never reach the model. `test/discovery.test.ts` measures the bytes of each step.
+
 `test/auto-review.test.ts` runs the flows on the engine with `fakeReviewer` (`@juno/agent-testing`); `test/policy.test.ts` checks the rules with properties.
 
 ## Redaction (WP16)
