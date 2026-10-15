@@ -78,12 +78,28 @@ Hover `--surface-hover`. ⌘-click opens in a new tab.
 
 Hairline below: 1px `--border-default`, margin `12 16 10`.
 
-### 2.3 Quick filters
+### 2.3 Quick filters and views
 
-Row padding `0 10 10`, gap 2. Buttons 28px, radius 7, padding 0 10, 13px.
+Row padding `0 10 10`, height 28, never taller. Two parts: a horizontal scroller (flex 1, min-width 0) with the pills, gap 2, and the **Unread** toggle fixed at the right, 6px after the scroller. `docs/design/sidebar-views/` has the mock.
 
-- Left: **All · Channels · DMs** (segmented by state, not a visible control). Selected: weight 600, bg `--secondary-default`, fg default. Unselected: weight 500, transparent, fg muted; hover fg default. A 5px dot in `--hl` after "Channels" or "DMs" when that group has unread topics in the sidebar and the group is not selected. DMs include group DMs. Picking Channels/DMs clears a scope of the other kind.
-- Right: **Unread** toggle, weight 500. On: bg `--secondary-default`, fg default. No count, no dot. Accessible name "Show unread only".
+- **The scroller** (`PillRow` in `@juno/ui`): `overflow-x: auto`, no visible scrollbar, `overscroll-behavior: contain` (a sideways swipe at an end never reaches Back or Forward, a wheel never reaches the list). A vertical wheel over it scrolls it sideways. When it overflows, the side it can scroll toward fades over 16px (`--pill-fade`, a CSS mask driven by the scroll position). Keyboard focus scrolls the focused pill into view.
+- **Pills**, 28px, radius 8 (`Button variant="filter"`): selected bg `--secondary-default`, fg default; unselected transparent, fg muted, hover fg default. Weight 500 in both, so selecting never changes a width.
+  - **All**: text.
+  - **Channels** (`hash` 14) and **DMs** (`user` 14): icon-only, 28×28. Tooltip and accessible name "Channels" and "DMs".
+  - **A view**: its icon 14 in a 28×28 pill when it has one (tooltip and name are the view's name), otherwise its name as text, at most 120px with an ellipsis.
+  - **New view**: `plus` 14, 28×28, fg muted, tooltip and name "New view". Always last.
+- **Dot**: 5px `--hl` at the pill's top right (4px in from the top and right edge), absolute so it moves nothing; only its opacity changes. Channels and DMs: the group has unread topics the sidebar would show. A view: one of its topics has an unread mention (plain unread does not count). Never on the selected pill. The name says it: "Channels, unread", "Bots, unread mention".
+- **Picking**: on pointer down, like the rows. Picking a view clears the scope chip. A view's list follows the same rules as All, limited to its conversations; Unread narrows it as it does All.
+- **Right-click a view pill** (native menu, §15.7): Edit view… · Move left · Move right · — · Delete view. Dragging a pill along the row reorders it (a 2px `--hl` caret shows where it lands); All, Channels, DMs and New view do not move.
+
+**View sheet** (`ViewSheet` in `@juno/views`): a popover dialog anchored under the filter row, start-aligned, 300px (`--menu-width-browse`), padding 14, radius 13, `--pop-shadow`, gap 12. Opens from New view, Edit view… and New view… in Add to view. Four fields, nothing else:
+
+1. **Name**: text field, 30px, placeholder "Name", at most 32 characters. Required.
+2. **Icon**: "Icon" 11/500 muted, then a grid of 24px icon buttons (8 per row, gap 2) from the view icon set, the first cell "None" (`prohibit`). Selected: bg `--secondary-default`, fg default. Optional.
+3. **Conversations**: a search field (30px, `magnifying-glass` 14, placeholder "Add channels and people") over a list, at most 200px tall, scrolling. Chosen conversations first, each a 30px row with its channel icon or photo, name, and a check; then, while the field has text, matches from the New chat picker (`newChat.conversations`, channels, group DMs and DMs that exist). Clicking a row toggles it. "3 conversations" 12 muted under the list.
+4. **Keep these out of All**: a checkbox (`Checkbox`, as macOS sheets use), 13px, with "They show only in this view." 12 muted under it.
+
+Buttons at the bottom right: Cancel (ghost) and Save (primary), 28px; Save disabled until there is a name. Enter saves from the name field; Esc cancels. Saving a new view selects it. The sheet makes no change until Save.
 
 ### 2.4 Scope chip
 
@@ -529,6 +545,7 @@ Native menus **[spec]**. Prototype rendering for reference: 236px, padding 5, ra
 | Copy Slack link | `link` | | always | |
 | Open in Slack | `arrow-square-out` | | always | opens the Slack app at the topic (`slack://` deep link, falling back to the web permalink) |
 | Notify me | `bell` | current level | always | submenu §15.3: for a thread, the thread's own choice (Every message and When it matters follow it in Slack, Never unfollows it; SPEC §5); for Main, the channel's or DM's. [built M10] Through `notifications.setLevel`: on a thread the engine follows or unfollows it and keeps Every message as its level; on Main it sets the channel's or DM's level |
+| Add to view | `stack` | | Main only | submenu §15.8 for the row's channel or DM |
 | Ignore #product | `ban` | | channel is not a DM | toast "Ignoring #product" with Undo |
 
 [built] The row and the header's title show this menu, and every item works (M5). Rename from the row edits the row's title (§3.2), from the header the header's title (§5). Each action shows its toast with Undo (§16). The hints are not drawn, since a native menu has only a shortcut column.
@@ -544,6 +561,7 @@ Native menus **[spec]**. Prototype rendering for reference: 236px, padding 5, ra
 | Mark channel as unread | `circle-dot` | | always (marks the latest topic unread) |
 | — | | | |
 | Notify me | `bell` | | always (submenu §15.3) |
+| Add to view | `stack` | | always (submenu §15.8) |
 | Ignore channel | `ban` | Hide in Juno | not DM |
 | — | | | |
 | Ask Juno | `sparkle` | | AI assist on (opens the Juno panel with an "About #eng" chip, §12.1) |
@@ -572,6 +590,14 @@ Right-click a sender's name or avatar in a message, or an @person chip. Notify m
 
 [built M10] On a sender's name or avatar (`data-sender` in `Message`), not on your own: Notify me about Maya only. The @person chip and Ask Juno come later.
 
+### 15.7 View pill menu
+
+Right-click a view's pill (§2.3). Edit view… (opens the view sheet) · Move left (disabled on the first view) · Move right (disabled on the last) · — · Delete view. Delete shows the toast "Deleted view · Bots" with Undo, which puts the view back with its conversations, icon, switch and place. All, Channels, DMs and New view have no menu.
+
+### 15.8 Add to view submenu
+
+Shown from 15.1 (Main rows) and 15.2. One item per view, in pill order, with a check on the views that hold the conversation; choosing an unchecked view adds it ("Added #alerts-prod to Bots"), a checked one removes it ("Removed #alerts-prod from Bots"), each with Undo. Then a separator and **New view…**, which opens the sheet with the conversation already chosen. With no views, the submenu holds New view… alone.
+
 ## 16. Toasts
 
 **Shows:** shot 18-toast-undo.
@@ -579,7 +605,7 @@ Right-click a sender's name or avatar in a message, or an @person chip. Notify m
 - Position: bottom-left, left 16, bottom 16, z 45, max-width 352. Padding `8 8 8 14`, radius 10, bg `--foreground-default`, text `--background`, `--shadow-lg`, 13px, gap 12. Text ellipsis on one line.
 - Undo button (reversible actions only): 26px, padding 0 8, radius 6, bg `color-mix(var(--background) 16%, transparent)`, "Undo" 12.5/600 + "⌘Z" mono 11 at .75 opacity.
 - One toast at a time; a new one replaces the old. Auto-dismiss 5s (with Undo) or 4s (info). No enter/exit animation in the prototype; [proposed] 150ms fade is acceptable.
-- Undo stack holds 20 actions; ⌘Z pops the last one (resolve, reopen, pin, unpin, rename, mark read or unread, Notify me change, ignore, routed post, command send, Resolve all on Home) when focus is not in a non-empty input.
+- Undo stack holds 20 actions; ⌘Z pops the last one (resolve, reopen, pin, unpin, rename, mark read or unread, Notify me change, ignore, routed post, command send, Resolve all on Home, delete view, add to or remove from a view) when focus is not in a non-empty input.
 - [built M5] `ActionToast` in `@juno/views`, mounted once by the shell over both panes, with the `Toast` rise. The undo stack and the toast are `undoStackAtom` and `toastAtom` in `@juno/state`; an action that changed nothing shows no toast. No exit fade yet.
 
 | Copy | Undo |
@@ -595,6 +621,8 @@ Right-click a sender's name or avatar in a message, or an @person chip. Notify m
 | Resolved 3 topics (Home's Tidy up) | yes |
 | Draft closed (a New chat closed with a draft) | yes |
 | Follow-up done | no |
+| Deleted view · Bots | yes |
+| Added #alerts-prod to Bots / Removed #alerts-prod from Bots | yes |
 
 ## 17. Empty states
 
