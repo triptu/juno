@@ -1,7 +1,7 @@
 /**
  * Handlers for the send routes (`contract/src/routes/send.ts`). The commands
  * write locally and wake `PostWorker` and `ActionWorker`; `drafts.get` follows the open
- * workspace and never calls Slack. `messages.check` asks the AI provider (`checks.ts`).
+ * workspace and never calls Slack. `messages.precheck` asks the AI provider and `messages.check` reads its answer (`checks.ts`).
  */
 import { NotSignedIn, SendRoutes } from '@juno/contract'
 import { liveQuery, transaction } from '@juno/store'
@@ -12,7 +12,7 @@ import { retryFirstRun, serveLiveValue, timed } from '../protocol/live'
 import { Workspace } from '../workspace'
 import { ActionWorker } from './actionWorker'
 import { deleteMessage, editMessage, reactToMessage } from './actions'
-import { checkMessage, dailyBudget, ROUTE_DAILY_BUDGET } from './checks'
+import { checkMessage, dailyBudget, precheckMessage, ROUTE_DAILY_BUDGET } from './checks'
 import { discardMessage, retryMessage, sendMessage } from './commands'
 import { draftKeys, readDraft, writeDraft } from './drafts'
 import { PostWorker } from './worker'
@@ -34,7 +34,8 @@ export const SendHandlers = SendRoutes.toLayer(
       'messages.edit': ({ message, text }) => provide(editMessage(message, text)),
       'messages.delete': ({ message }) => provide(deleteMessage(message)),
       'messages.react': ({ message, name, on }) => provide(reactToMessage(message, name, on)),
-      'messages.check': (payload) => checkMessage(payload, routeBudget).pipe(Effect.provideService(Workspace, workspace), Effect.provideService(AiProvider, ai)),
+      'messages.check': (payload) => checkMessage(payload).pipe(Effect.provideService(Workspace, workspace)),
+      'messages.precheck': (payload) => precheckMessage(payload, routeBudget).pipe(Effect.provideService(Workspace, workspace), Effect.provideService(AiProvider, ai)),
       'drafts.get': ({ topicId }) =>
         serveLiveValue(
           workspace.changes.pipe(

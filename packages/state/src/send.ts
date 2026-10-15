@@ -5,12 +5,14 @@
  * message shows as a pending row in `messages.list` until Slack has it.
  * Drafts live in the engine per topic, so they outlive tabs and restarts;
  * the composer reads one once and writes it back as the user types.
- * `checkMessage` runs the checks on send before the composer sends.
+ * `precheckMessage` asks the model while typing pauses; `checkMessage` runs
+ * the checks on send before the composer sends, with no model in the way.
  */
 import {
   draftsGet,
   draftsSet,
   messagesCheck,
+  messagesPrecheck,
   messagesDelete,
   messagesDiscard,
   messagesEdit,
@@ -29,11 +31,10 @@ export const sendMessage = (registry: Registry, to: SendTarget, text: string, dr
   runCommand(registry, messagesSend, { to, text, clientMsgId: crypto.randomUUID(), ...(draftOf === undefined ? {} : { draftOf }) })
 
 /**
- * The longest a send waits for its checks: `routeCheck`'s 1.5 s timeout in
- * the engine, and room for the round trip. A slow model never holds a
- * message longer.
+ * The longest a send waits for its checks. They read the store only, so
+ * this is a guard against a busy engine, not a model's timeout.
  */
-export const SEND_CHECK_WAIT_MS = 2_000
+export const SEND_CHECK_WAIT_MS = 250
 
 /**
  * The checks on send for `text` going to the channel (spec section 8).
@@ -47,6 +48,11 @@ export function checkMessage(registry: Registry, to: { readonly channelId: strin
   })
   const checked = runCommand(registry, messagesCheck, { ...to, text }).then((exit): SendCheck => (exit._tag === 'Success' ? exit.value : {}))
   return Promise.race([checked, late]).finally(() => clearTimeout(timer))
+}
+
+/** Asks the wrong-place question for a Main draft now, so Enter finds the answer. Nothing to wait for. */
+export function precheckMessage(registry: Registry, channelId: string, text: string): void {
+  void runCommand(registry, messagesPrecheck, { channelId, text })
 }
 
 /** Retry on a failed row. */

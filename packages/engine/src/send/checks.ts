@@ -1,16 +1,18 @@
 /**
- * `messages.check`: the checks on send (spec section 8, architecture 10).
+ * The checks on send (spec section 8, architecture 10).
  *
- * Nothing runs while AI assist is off. Otherwise the clarity check (pure,
- * `@juno/domain`) runs on every draft, and in a Main the wrong-place check
- * asks `routeCheck` whether the draft replies to one of the channel's
- * latest open topics. The provider gives up at the task's 1.5 s timeout;
- * no answer, a low confidence or a spent budget find nothing, so the
- * message just sends.
+ * `messages.precheck` runs while typing pauses in a Main: it asks
+ * `routeCheck` whether the draft replies to one of the channel's latest
+ * open topics and keeps the answer in `ai_cache` under
+ * `cacheKeyOf(routeCheck, input)`. The input covers the draft and the
+ * topics' latest messages, so an answer is for exactly that draft in that
+ * channel state. Nothing reads it live, so the write invalidates nothing.
  *
- * Answers are kept in `ai_cache` under `cacheKeyOf(routeCheck, input)`, so
- * pressing Enter again on the same draft asks nothing. Nothing reads them
- * live, so the write invalidates nothing.
+ * `messages.check` runs on Enter and never waits for a model: the
+ * wrong-place finding is the stored answer for the draft as it is, if there
+ * is one, and the clarity check (pure, `@juno/domain`) runs on every draft.
+ * Nothing runs while AI assist is off. No answer yet, a low confidence, a
+ * timeout or a spent budget find nothing, so the message just sends.
  */
 import { AiProvider, cacheKeyOf, routeCheck, type AiMessage, type RouteCheckInput } from '@juno/ai'
 import type { ClarityFinding, RouteFinding, SendCheck } from '@juno/contract'
@@ -127,27 +129,36 @@ const store = (input: RouteCheckInput, value: unknown, model: string, costUsd: n
         cost_usd = excluded.cost_usd, created_at = excluded.created_at`
   })
 
-const wrongPlace = (
-  input: CheckInput,
-  budget: ReturnType<typeof dailyBudget>,
-): Effect.Effect<RouteFinding | undefined, SqlError, AiProvider | StoreReader | StoreWriter> =>
+/** What `routeCheck` is asked for a draft in the channel's Main, or nothing when the channel has no open topics. */
+const routeInput = (channelId: string, text: string) =>
   Effect.gen(function* () {
-    const now = yield* Clock.currentTimeMillis
-    const latest = yield* latestTopics(input.channelId, now)
+    const latest = yield* latestTopics(channelId, yield* Clock.currentTimeMillis)
     if (latest.topics.length === 0) return undefined
-    const ask: RouteCheckInput = { draft: input.text, channel: latest.channel, topics: latest.topics.map(({ id, title, recent }) => ({ id, title, recent })) }
-    let answer = yield* cached(ask)
-    if (answer === undefined) {
-      if (!budget.take(now)) return undefined
-      const decision = yield* (yield* AiProvider).decide(routeCheck, ask)
-      if (decision._tag !== 'Decided') return undefined
-      answer = decision.value
-      yield* store(ask, answer, decision.meta.model, decision.meta.costUsd, now)
-    }
-    const { replyTo, confidence } = answer
-    const topic = latest.topics.find((t) => t.id === replyTo)
-    if (topic === undefined || confidence < ROUTE_CONFIDENCE) return undefined
-    return { topicId: threadTopicId(input.channelId as ChannelId, topic.rootTs as Ts), threadTs: topic.rootTs, title: topic.title, confidence }
+    const input: RouteCheckInput = { draft: text, channel: latest.channel, topics: latest.topics.map(({ id, title, recent }) => ({ id, title, recent })) }
+    return { input, topics: latest.topics }
+  })
+
+/** Asks the model about a draft unless an answer for it is stored. Called while typing pauses. */
+const askRoute = (input: CheckInput, budget: ReturnType<typeof dailyBudget>): Effect.Effect<void, SqlError, AiProvider | StoreReader | StoreWriter> =>
+  Effect.gen(function* () {
+    const ask = yield* routeInput(input.channelId, input.text)
+    if (ask === undefined || (yield* cached(ask.input)) !== undefined) return
+    const now = yield* Clock.currentTimeMillis
+    if (!budget.take(now)) return
+    const decision = yield* (yield* AiProvider).decide(routeCheck, ask.input)
+    if (decision._tag === 'Decided') yield* store(ask.input, decision.value, decision.meta.model, decision.meta.costUsd, now)
+  })
+
+/** The stored answer for the draft as it is now, as a finding. Never asks the model. */
+const wrongPlace = (input: CheckInput): Effect.Effect<RouteFinding | undefined, SqlError, StoreReader> =>
+  Effect.gen(function* () {
+    const ask = yield* routeInput(input.channelId, input.text)
+    if (ask === undefined) return undefined
+    const answer = yield* cached(ask.input)
+    if (answer === undefined) return undefined
+    const topic = ask.topics.find((t) => t.id === answer.replyTo)
+    if (topic === undefined || answer.confidence < ROUTE_CONFIDENCE) return undefined
+    return { topicId: threadTopicId(input.channelId as ChannelId, topic.rootTs as Ts), threadTs: topic.rootTs, title: topic.title, confidence: answer.confidence }
   })
 
 const clarity = (text: string): ClarityFinding | undefined => {
@@ -156,15 +167,25 @@ const clarity = (text: string): ClarityFinding | undefined => {
   return { fixes: found.fixes.map((fix) => fix.label), fixed: found.fixed, confidence: found.confidence, ...(found.note === undefined ? {} : { note: found.note }) }
 }
 
-/** Runs the checks for one draft. Empty when there is nothing to say. */
-export const checkMessage = (input: CheckInput, budget: ReturnType<typeof dailyBudget>): Effect.Effect<SendCheck, never, Workspace | AiProvider> =>
+/** The checks on Enter for one draft. Empty when there is nothing to say. Reads the store only. */
+export const checkMessage = (input: CheckInput): Effect.Effect<SendCheck, never, Workspace> =>
   Effect.gen(function* () {
     const open = yield* (yield* Workspace).current
     if (open === undefined || input.text.trim() === '') return {}
     return yield* Effect.gen(function* () {
       if (!(yield* aiAssistOn)) return {}
-      const route = input.threadTs === undefined ? yield* wrongPlace(input, budget) : undefined
+      const route = input.threadTs === undefined ? yield* wrongPlace(input) : undefined
       const found = clarity(input.text)
       return { ...(route === undefined ? {} : { route }), ...(found === undefined ? {} : { clarity: found }) }
+    }).pipe(Effect.provide(open.context), Effect.orDie)
+  })
+
+/** The wrong-place question for a Main draft while typing pauses, so Enter finds the answer stored. */
+export const precheckMessage = (input: { readonly channelId: string; readonly text: string }, budget: ReturnType<typeof dailyBudget>): Effect.Effect<void, never, Workspace | AiProvider> =>
+  Effect.gen(function* () {
+    const open = yield* (yield* Workspace).current
+    if (open === undefined || input.text.trim() === '') return
+    yield* Effect.gen(function* () {
+      if (yield* aiAssistOn) yield* askRoute(input, budget)
     }).pipe(Effect.provide(open.context), Effect.orDie)
   })
