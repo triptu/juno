@@ -4,8 +4,8 @@
  * served with the helpers in `protocol/live.ts`, services from `yield*`.
  *
  * Feature handlers backed by the store pass `liveQuery(keys, timed(query))`
- * as the runs. Status has no store keys: it re-runs on its own phase
- * changes, with no debounce.
+ * as the runs. Status has no store keys: it re-runs on its own changes,
+ * with no debounce.
  */
 import { Clock, Effect, Stream } from 'effect'
 import { EngineRoutes } from '@juno/contract'
@@ -20,7 +20,7 @@ export const StatusHandlers = EngineRoutes.toLayer(
     const measure = config.e2e || config.dev
     return {
       'engine.status': () =>
-        serveLiveValue(status.phases.pipe(Stream.mapEffect(() => Effect.result(timed(status.current)))), { measure }),
+        serveLiveValue(status.changes.pipe(Stream.mapEffect(() => Effect.result(timed(status.current)))), { measure }),
       'engine.ping': ({ n }) =>
         config.e2e && n < 0
           ? Effect.die(new Error(`engine.ping: negative n (${n}) is a defect under e2e`))

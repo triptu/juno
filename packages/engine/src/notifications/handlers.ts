@@ -331,7 +331,9 @@ export const NotificationsHandlers = NotificationsRoutes.toLayer(
         ).pipe(retryFirstRun('notifications.page'), Stream.orDie),
       'notifications.status': () =>
         serveLiveValue(
-          runs(SETTINGS_KEYS, status, Stream.merge(control.presence.pipe(Stream.drop(1)), Stream.tick('1 minute').pipe(Stream.drop(1)))),
+          // The presence stream starts with the current value, which can be newer than what the first
+          // run read (the two start together), so it is not dropped: it costs one more run.
+          runs(SETTINGS_KEYS, status, Stream.merge(control.presence, Stream.tick('1 minute').pipe(Stream.drop(1)))),
         ).pipe(retryFirstRun('notifications.status'), Stream.orDie),
       'notifications.why': ({ topicId, ts }) =>
         inWorkspace(

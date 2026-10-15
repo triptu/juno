@@ -1,4 +1,5 @@
 import { _electron as electron, test as base, type ElectronApplication, type Page } from '@playwright/test'
+import { spawn } from 'node:child_process'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -131,8 +132,44 @@ export interface Fixtures {
   readonly slack: Slack
 }
 
+/**
+ * Starts an X server of its own (Linux only) and returns its display, such
+ * as `:12`. Workers that share one display stack their windows at the same
+ * place, and when another test's window maps or closes over this one, X
+ * sends crossing events at the real pointer, which Chromium takes as a
+ * mouse move: hover jumps away from where the test put the mouse.
+ */
+async function startDisplay(): Promise<{ readonly display: string; readonly stop: () => void }> {
+  const xvfb = spawn('Xvfb', ['-displayfd', '3', '-screen', '0', '1920x1080x24', '-nolisten', 'tcp'], { stdio: ['ignore', 'ignore', 'pipe', 'pipe'] })
+  let errors = ''
+  xvfb.stderr?.on('data', (chunk: Buffer) => (errors += chunk))
+  const number = await new Promise<string>((resolve, reject) => {
+    xvfb.stdio[3]?.on('data', (chunk: Buffer) => resolve(String(chunk).trim()))
+    xvfb.once('error', reject)
+    xvfb.once('exit', (code) => reject(new Error(`Xvfb exited with ${code}: ${errors}`)))
+  })
+  return { display: `:${number}`, stop: () => xvfb.kill() }
+}
+
+export interface WorkerFixtures {
+  /** The X display this worker's apps open on; undefined on macOS. */
+  readonly display: string | undefined
+}
+
 /** Launches the app once per test with a fresh user-data directory, against its own fake Slack. */
-export const test = base.extend<Fixtures>({
+export const test = base.extend<Fixtures, WorkerFixtures>({
+  // Every test of the worker, launchApp included, inherits DISPLAY.
+  display: [
+    // oxlint-disable-next-line no-empty-pattern
+    async ({}, use) => {
+      if (process.platform !== 'linux') return use(undefined)
+      const own = await startDisplay()
+      process.env.DISPLAY = own.display
+      await use(own.display)
+      own.stop()
+    },
+    { scope: 'worker', auto: true },
+  ],
   // Playwright requires the destructuring pattern even with no dependencies.
   // oxlint-disable-next-line no-empty-pattern
   fake: async ({}, use) => {

@@ -6,7 +6,7 @@ import { createSupervisor } from './engine'
 import { contextMenuForTests, registerIpc, slackLinksForTests } from './ipc'
 import { CUSTOM_ITEM, macKeychain, memoryKeychain, OPENROUTER_ITEM } from './keychain'
 import { ProviderStore } from './providers'
-import { readLaunch, writeLaunch, type Launch } from './launch'
+import { launchWriter, readLaunch, type Launch } from './launch'
 import { registerAppScheme, serveAppScheme } from './scheme'
 import { SecretsStore } from './secrets'
 import { SessionHost } from './session'
@@ -27,11 +27,12 @@ if (userData) app.setPath('userData', userData)
 // synchronous read: theme and bounds for a window that paints right first.
 registerAppScheme()
 let launch = readLaunch(app.getPath('userData'))
+const launchFile = launchWriter(app.getPath('userData'))
 
 /** The one place launch.json changes, so a theme change and a window close never overwrite each other. */
 function updateLaunch(patch: Partial<Launch>): void {
   launch = { ...launch, ...patch }
-  void writeLaunch(app.getPath('userData'), launch)
+  launchFile.write(launch)
 }
 
 // Test seams (architecture 13): the fake Slack to sign in against, a fixture
@@ -154,6 +155,15 @@ app.on('window-all-closed', () => {
 app.on('before-quit', () => {
   supervisor.stop()
   agent.stop()
+})
+
+// The window's close writes its bounds as the app quits; a process that
+// exits mid-write would leave launch.json empty and lose every choice in it.
+app.on('will-quit', (event) => {
+  const pending = launchFile.pending()
+  if (pending === undefined) return
+  event.preventDefault()
+  void pending.then(() => app.quit())
 })
 
 // Test hooks. Playwright reaches main through app.evaluate; the engine itself
