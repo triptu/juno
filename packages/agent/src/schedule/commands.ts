@@ -7,6 +7,7 @@ import type { NotificationHours } from './rules'
 
 /** Host must verify this is the owner's message, and supply saved notification hours. */
 export interface WatchHost {
+  readonly account?: () => string | undefined
   readonly ownMessage: (input: { readonly channelId: string; readonly ts: string; readonly threadTs?: string }) => Promise<boolean>
   readonly hours: () => Promise<NotificationHours>
 }
@@ -16,8 +17,10 @@ export function watchReplyCommand(context: ScheduleCards, host: WatchHost, input
   return Effect.tryPromise({
     try: async () => {
       if (!mayAuthorize(authorityOf(context.store))) throw new AgentCommandError({ reason: 'readOnly', message: 'Juno cannot set a watch now.' })
+      const account = host.account?.()
       if (!await host.ownMessage(input)) throw new AgentCommandError({ reason: 'invalid', message: 'Choose one of your own messages.' })
       const hours = await host.hours()
+      if (account !== host.account?.()) throw new AgentCommandError({ reason: 'stale', message: 'Another Slack account is signed in.' })
       const row = context.scheduler.watchReply({ opId: input.opId, watch: input, hours })
       if (row === undefined) throw new AgentCommandError({ reason: 'readOnly', message: 'Juno cannot set a watch now.' })
       context.propose({ runId: `schedule:${row.id}`, callId: `schedule-card:${row.id}`, payload: scheduleCard(context.store, row) })

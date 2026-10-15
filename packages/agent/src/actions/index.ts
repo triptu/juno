@@ -38,6 +38,7 @@ type Identity = typeof CardBinding.Type['identity']
 
 export function createActions(options: ActionsOptions & {
   readonly store: Store
+  readonly onProposed?: (id: string, proposal: Proposal) => void
   readonly position: () => Promise<JournalPosition>
   readonly jobs: Jobs | undefined
   readonly spend: SpendLedger
@@ -70,9 +71,10 @@ export function createActions(options: ActionsOptions & {
 
   return {
     executors,
+    changed,
     /** Stores a proposal. The same call id is the same card. */
     propose: (proposal: Proposal): string => {
-      const id = proposeCard(store, proposal)
+      const id = proposeCard(store, proposal, options.onProposed)
       changed()
       return id
     },
