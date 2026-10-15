@@ -463,6 +463,8 @@ const styles = stylex.create({
     flexGrow: 1,
     minHeight: 0,
     overflow: 'auto',
+    // The gutter stays when nothing overflows, so the column heads do not move when a filter empties the table.
+    scrollbarGutter: 'stable',
     overscrollBehavior: 'contain',
   },
   table: {
