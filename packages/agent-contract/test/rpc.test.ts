@@ -29,6 +29,7 @@ const cases: Record<string, readonly [unknown, unknown]> = {
   'agent.cards.editMessage': [{ ...op, identity, messageId: 'message', text: 'Changed' }, { card, identity }],
   'agent.cards.undo': [{ ...op, identity }, accepted],
   'agent.jobs.stop': [{ ...op, jobId: 'job' }, accepted],
+  'agent.schedule.watchReply': [{ ...op, channelId: 'C-test', ts: '100.000001' }, { ...accepted, id: 'watch', at: 1234 }],
   'agent.scheduled.page': [null, { page: { schedules: [] }, revisions: [] }],
   'agent.scheduled.edit': [{ ...op, id: 'schedule', revision: 1, what: 'Example', schedule: { _tag: 'once', at: 1234 }, deliver: 'digest' }, accepted],
   'agent.scheduled.action': [{ ...op, id: 'schedule', revision: 1, action: 'pause' }, accepted],

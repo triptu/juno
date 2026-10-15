@@ -80,6 +80,9 @@ export function historyRow(info: RunInfo, results: ReadonlyArray<CaseResult>): s
   return [info.date, info.commit, info.mode, info.model, info.judge, ratio(s.cases), ratio(s.checks), ...items.map((i) => ratio(s.items[i])), `${s.sources.cited}/${s.sources.claims}`].join('\t')
 }
 
+/** Every case's transcript, as the judge read it. */
+export const transcripts = (results: ReadonlyArray<CaseResult>): string => results.map((r) => `# ${r.id}\n\n${r.transcript ?? r.error ?? ''}\n`).join('\n')
+
 /**
  * Writes `<date>-<model>.md`, appends the history row, and writes every
  * case's transcript beside the page (`.transcripts.md`, not committed).
@@ -90,7 +93,7 @@ export function save(dir: string, info: RunInfo, results: ReadonlyArray<CaseResu
   const name = `${info.date}-${info.model.replace(/[^\w.-]+/g, '-')}`
   const page = join(dir, `${name}.md`)
   writeFileSync(page, markdown(info, results))
-  writeFileSync(join(dir, `${name}.transcripts.md`), results.map((r) => `# ${r.id}\n\n${r.transcript ?? r.error ?? ''}\n`).join('\n'))
+  writeFileSync(join(dir, `${name}.transcripts.md`), transcripts(results))
   const history = join(dir, 'history.tsv')
   if (!existsSync(history)) writeFileSync(history, `${HEADER}\n`)
   appendFileSync(history, `${historyRow(info, results)}\n`)

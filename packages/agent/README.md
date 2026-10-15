@@ -211,3 +211,13 @@ startup: open authorizations ─▶ unknown (recovery) ─▶ reconcile once ─
 `src/mcp/` owns HTTP connections, loopback OAuth sign-in, tool discovery and tier decisions, the two fixed model tools, Notion's version checks and read-back, and the per-turn MCP endpoint for WP20. See [the MCP hand-off](src/mcp/README.md) for bootstrap, credential bridge and WP14 wiring, tests and the owner-only live check.
 
 Contract additions: `ActionsOptions.executors` accepts a callback for discovered tools; `TurnsOptions.tools` registers fixed adapter tools before resume; `ChatHost.connections` serves the Connections routes; discovered rows carry an optional `schemaHash` (always present from the manager). The request builder pages MCP results over 20 KB using ordinary archive attachments. No action protocol changed.
+
+## Scheduler (WP19)
+
+`src/schedule/` implements persisted occurrences, grant checks at admission and
+start, reply watches, schedule tools and card executors. Its page and commands
+are served when `ChatHost.schedule` is supplied. See
+[`src/schedule/README.md`](src/schedule/README.md) for the router and host
+integration contract, the message-menu RPC and the remaining startup wiring.
+`mintGrant` now joins a caller's transaction so a schedule and its grant commit
+together.

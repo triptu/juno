@@ -38,11 +38,11 @@ import {
   type Ts,
   type UserId,
 } from '@juno/domain'
-import { emojiUnicode, messageBody, splitEmojiName, type MessageBody, type MessageContent } from '@juno/richtext'
+import { emojiUnicode, messageBody, plainText, splitEmojiName, type MessageBody, type MessageContent } from '@juno/richtext'
 import { StoreReader, type SqlClient, type SqlError } from '@juno/store'
 import type { ListRun } from '../protocol/live'
 import { personFrom, userName, type UserRow } from '../topicRows'
-import { pendingStatement, reactionsStatement, threadTitlesStatement, windowStatements, type WindowMessage, type WindowTarget } from './window'
+import { actionsStatement, pendingStatement, reactionsStatement, threadTitlesStatement, windowStatements, type WindowMessage, type WindowTarget } from './window'
 
 export interface MessageRange {
   readonly anchor?: string | undefined
@@ -143,7 +143,11 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
       const statement = pendingStatement(target)
       for (const row of yield* sql.unsafe<PendingRow>(statement.sql, statement.params)) pending.set(pendingRowId(row.client_msg_id), row)
     }
-    const rows: ReadonlyArray<WindowMessage> = pending.size === 0 ? stored : [...stored, ...[...pending.values()].map((row) => pendingMessage(row, selfId))]
+    const listed: ReadonlyArray<WindowMessage> = pending.size === 0 ? stored : [...stored, ...[...pending.values()].map((row) => pendingMessage(row, selfId))]
+
+    // Juno's own edits, deletes and reactions show over the stored message until Slack has them (architecture 5.7).
+    const actions = listed.length === 0 ? emptyIntents : intentsOf(yield* sql.unsafe<ActionRow>(actionsStatement(target.channel).sql, actionsStatement(target.channel).params))
+    const rows = actions.size === 0 ? listed : withIntents(listed, actions, target)
 
     if (cache.selfId !== selfId) {
       cache.selfId = selfId
@@ -243,7 +247,8 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
       const group: GroupMessage = { senderId: row.user_id, body: body.body, isThreadRoot: isRoot }
       const groupStart = startsGroup(previous, group)
       previous = group
-      const own = reactions.get(row.ts) ?? []
+      const intent = intentOf(actions, row)
+      const own = intent === undefined || intent.reactions.size === 0 ? (reactions.get(row.ts) ?? []) : withReactionIntents(reactions.get(row.ts) ?? [], intent.reactions)
       const topicId = target.kind === 'main' && row.reply_count > 0 && row.thread_ts === row.ts ? threadTopicId(target.channel as ChannelId, row.ts as Ts) : undefined
       const title = topicId === undefined ? undefined : titles.get(topicId)
       const key = [
@@ -396,6 +401,7 @@ function shapeRow(row: WindowMessage, body: CachedBody, input: ShapeInput): Mess
     ...(input.thread === undefined ? {} : { thread: input.thread }),
     ...(row.client_msg_id === null ? {} : { clientMsgId: row.client_msg_id }),
     ...(input.pending === undefined ? {} : { pending: input.pending.state === 'failed' ? ('failed' as const) : ('sending' as const) }),
+    ...(kind === 'message' && input.selfId !== undefined && row.user_id === input.selfId ? { editText: composerText(body.body) } : {}),
   }
   return { ...fields, rev: hashId(JSON.stringify(fields)) } as MessageView
 }
@@ -413,6 +419,98 @@ interface PendingRow {
 }
 
 
+/** A version for content that is not stored as Slack's: below every stored version, and different for different content, so its body is parsed again when it changes. */
+function contentVersion(text: string, blocksJson: string | null): number {
+  let hash = 5381
+  const content = `${text}\u0001${blocksJson ?? ''}`
+  for (let i = 0; i < content.length; i++) hash = ((hash << 5) + hash + content.charCodeAt(i)) | 0
+  return -1 - (hash >>> 0)
+}
+
+/** A message as the edit field starts with it: the composer's text, without the names of its files. */
+function composerText(body: MessageBody): string {
+  return plainText({ blocks: body.blocks.filter((block) => block.kind !== 'file') })
+}
+
+// Edits, deletes and reactions not yet in Slack
+
+interface ActionRow {
+  readonly id: number
+  readonly kind: 'edit' | 'delete' | 'react'
+  readonly payload_json: string
+}
+
+/** What the user has asked for one message: the text of an edit, a delete, and reactions by name. */
+interface Intent {
+  edit?: { readonly text: string; readonly blocksJson: string | null }
+  deleted: boolean
+  readonly reactions: Map<string, boolean>
+}
+
+/** Intents by the message's ts and by its `client_msg_id`, for posts Slack did not have when the user acted. */
+type Intents = { readonly size: number; readonly byTs: Map<string, Intent>; readonly byClientMsgId: Map<string, Intent> }
+
+const emptyIntents: Intents = { size: 0, byTs: new Map(), byClientMsgId: new Map() }
+
+function intentsOf(rows: ReadonlyArray<ActionRow>): Intents {
+  const byTs = new Map<string, Intent>()
+  const byClientMsgId = new Map<string, Intent>()
+  for (const row of rows) {
+    const payload = parseJson<{ ts: string | null; clientMsgId: string | null; text?: string; blocksJson?: string | null; name?: string; want?: boolean }>(row.payload_json)
+    if (payload === undefined) continue
+    const intent = (payload.ts !== null ? byTs.get(payload.ts) : undefined) ?? (payload.clientMsgId !== null ? byClientMsgId.get(payload.clientMsgId) : undefined) ?? { deleted: false, reactions: new Map<string, boolean>() }
+    if (payload.ts !== null) byTs.set(payload.ts, intent)
+    if (payload.clientMsgId !== null) byClientMsgId.set(payload.clientMsgId, intent)
+    if (row.kind === 'delete') intent.deleted = true
+    else if (row.kind === 'edit' && payload.text !== undefined) intent.edit = { text: payload.text, blocksJson: payload.blocksJson ?? null }
+    else if (row.kind === 'react' && payload.name !== undefined) intent.reactions.set(payload.name, payload.want === true)
+  }
+  return { size: rows.length, byTs, byClientMsgId }
+}
+
+const intentOf = (intents: Intents, row: Pick<WindowMessage, 'ts' | 'client_msg_id'>): Intent | undefined =>
+  intents.size === 0 ? undefined : (intents.byTs.get(row.ts) ?? (row.client_msg_id === null ? undefined : intents.byClientMsgId.get(row.client_msg_id)))
+
+/**
+ * The window with the intents applied: an edited message shows its new
+ * text and "edited"; a deleted one goes, except a root with replies, which
+ * keeps its place as deleted, as Slack shows it.
+ */
+function withIntents(rows: ReadonlyArray<WindowMessage>, intents: Intents, target: WindowTarget): ReadonlyArray<WindowMessage> {
+  const out: Array<WindowMessage> = []
+  for (const row of rows) {
+    const intent = intentOf(intents, row)
+    if (intent === undefined) {
+      out.push(row)
+    } else if (intent.deleted) {
+      const keepsPlace = row.reply_count > 0 || (target.kind === 'thread' && row.ts === target.threadTs)
+      if (keepsPlace) out.push({ ...row, deleted: 1, text: '', blocks_json: null, files_json: null, attachments_json: null, version: contentVersion('', 'deleted') })
+    } else if (intent.edit !== undefined) {
+      const { text, blocksJson } = intent.edit
+      out.push({ ...row, text, blocks_json: blocksJson, edited_ts: row.edited_ts ?? row.ts, version: contentVersion(text, blocksJson) })
+    } else {
+      out.push(row)
+    }
+  }
+  return out
+}
+
+/** Stored reactions with the user's own intents applied: theirs counted in or out, an emptied chip gone, a new one last. */
+function withReactionIntents(
+  stored: ReadonlyArray<{ readonly name: string; readonly count: number; readonly me: 0 | 1 }>,
+  intents: ReadonlyMap<string, boolean>,
+): ReadonlyArray<{ readonly name: string; readonly count: number; readonly me: 0 | 1 }> {
+  const out: Array<{ readonly name: string; readonly count: number; readonly me: 0 | 1 }> = []
+  for (const reaction of stored) {
+    const want = intents.get(reaction.name)
+    if (want === undefined || want === (reaction.me === 1)) out.push(reaction)
+    else if (want) out.push({ name: reaction.name, count: reaction.count + 1, me: 1 })
+    else if (reaction.count > 1) out.push({ name: reaction.name, count: reaction.count - 1, me: 0 })
+  }
+  for (const [name, want] of intents) if (want && !stored.some((reaction) => reaction.name === name)) out.push({ name, count: 1, me: 1 })
+  return out
+}
+
 /** A pending message as the window's other rows are read, from the signed-in user, so it groups and parses like the message it becomes. */
 const pendingMessage = (row: PendingRow, selfId: string | undefined): WindowMessage => ({
   channel: row.channel,
@@ -429,7 +527,8 @@ const pendingMessage = (row: PendingRow, selfId: string | undefined): WindowMess
   client_msg_id: row.client_msg_id,
   reply_count: 0,
   latest_reply: null,
-  version: 0,
+  // An edit before the post went out rewrites the row's text, so its body is parsed again.
+  version: contentVersion(row.text, row.blocks_json),
   last_event_ts: null,
 })
 

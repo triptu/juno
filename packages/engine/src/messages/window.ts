@@ -86,6 +86,11 @@ export function pendingStatement(target: WindowTarget): Statement {
     : { sql: `SELECT ${columns} FROM pending_messages WHERE channel = ? AND thread_ts = ? ORDER BY created_at, client_msg_id`, params: [target.channel, target.threadTs] }
 }
 
+/** Juno's own edits, deletes and reactions in a channel that Slack has not confirmed (architecture 5.7), through `outbox_target`. */
+export function actionsStatement(channel: string): Statement {
+  return { sql: `SELECT id, kind, payload_json FROM outbox WHERE target_key = ? AND kind IN ('edit', 'delete', 'react') ORDER BY id`, params: [channel] }
+}
+
 /** Reactions of the window's messages, by primary key. */
 export function reactionsStatement(channel: string, ts: ReadonlyArray<string>): Statement {
   return {

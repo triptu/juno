@@ -11,6 +11,7 @@ const topic = fc.record({ topicId: text, title: text, where: text, tint })
 const target = fc.oneof(
   fc.record({ _tag: fc.constant('topic'), topicId: text }),
   fc.record({ _tag: fc.constant('chatMessage'), messageId: text }),
+  fc.record({ _tag: fc.constant('message'), channelId: text, ts: text }),
   fc.record({ _tag: fc.constant('url'), url: fc.constantFrom('https://example.com/pull/1', 'http://localhost:3773/x', 'http://127.0.0.1/', 'http://[::1]:3773'), label: text }),
   fc.record({ _tag: fc.constant('page'), page: fc.constantFrom('scheduled', 'remembers', 'memory', 'activity', 'connections', 'settings', 'review') }),
 )
