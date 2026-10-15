@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { join, relative } from 'node:path'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { tmpdir } from 'node:os'
+import { execFileSync } from 'node:child_process'
 import { test } from 'node:test'
 import { healthBaseline, healthRegressions } from './health-ratchet.mjs'
 import { collectSizeReport } from './health-size.mjs'
@@ -58,12 +60,14 @@ test('failed tools and invalid baselines cannot pass or become a baseline', () =
 })
 
 test('size identities survive line moves and body edits, and distinguish callbacks', () => {
-  const directory = mkdtempSync('scripts/health-fixture-')
-  const file = join(directory, 'sample.ts')
+  const directory = mkdtempSync(join(tmpdir(), 'juno-health-'))
+  execFileSync('git', ['init', '-q', directory])
+  mkdirSync(join(directory, 'scripts'))
+  const file = join(directory, 'scripts/sample.ts')
   const body = Array.from({ length: 82 }, (_, i) => `  work(${i})`).join('\n')
   const source = `test('first', () => {\n${body}\n})\ntest('second', () => {\n${body}\n})\n`
-  const read = () => collectSizeReport().oversizedFunctions
-    .filter((item) => item.file === relative(process.cwd(), file)).map(({ id }) => id)
+  const read = () => collectSizeReport(directory).oversizedFunctions
+    .filter((item) => item.file === 'scripts/sample.ts').map(({ id }) => id)
   try {
     writeFileSync(file, source)
     const before = read()

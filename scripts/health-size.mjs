@@ -30,15 +30,15 @@ function functionContext(node, source) {
   return parts.join('/') || '<callback>'
 }
 
-export function collectSizeReport() {
+export function collectSizeReport(directory = root) {
   // Git excludes builds, dependencies and other worktrees, and includes new source files.
   const files = execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard', '-z',
-    '--', 'apps', 'packages', 'scripts', 'specs', 'knip.config.mjs'], { cwd: root, encoding: 'utf8' })
-    .split('\0').filter((file) => /\.(?:[cm]?[jt]sx?|css)$/.test(file) && existsSync(resolve(root, file)))
+    '--', 'apps', 'packages', 'scripts', 'specs', 'knip.config.mjs'], { cwd: directory, encoding: 'utf8' })
+    .split('\0').filter((file) => /\.(?:[cm]?[jt]sx?|css)$/.test(file) && existsSync(resolve(directory, file)))
   const oversizedFiles = []
   const oversizedFunctions = []
   for (const file of new Set(files)) {
-    const text = readFileSync(resolve(root, file), 'utf8')
+    const text = readFileSync(resolve(directory, file), 'utf8')
     const lines = text ? text.split('\n').length - Number(text.endsWith('\n')) : 0
     if (lines > fileLimit) oversizedFiles.push({ file, lines })
     if (file.endsWith('.css') || file.endsWith('.d.ts')) continue
