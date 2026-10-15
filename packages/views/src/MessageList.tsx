@@ -56,8 +56,8 @@ export interface MessageListProps {
   readonly onChannel?: (id: string) => void
   readonly onLink?: (url: string) => void
   readonly onToggleReaction?: (ts: string, name: string) => void
-  /** Right-click or the context-menu key on a message: its menu, at the pointer. */
-  readonly onMessageMenu?: (ts: string, event: MouseEvent) => void
+  /** Right-click or the context-menu key on a message: its menu, at the pointer. `onSender` on the sender's name or avatar (the person menu). */
+  readonly onMessageMenu?: (ts: string, event: MouseEvent, onSender: boolean) => void
 }
 
 const ROW = '[data-message-row]'
@@ -77,13 +77,13 @@ function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
 }
 
 /** One handler for every row: the row under the pointer, or the focused row for the context-menu key. A field keeps its own menu. */
-function messageMenu(event: MouseEvent, onMessageMenu: (ts: string, event: MouseEvent) => void) {
+function messageMenu(event: MouseEvent, onMessageMenu: (ts: string, event: MouseEvent, onSender: boolean) => void) {
   const target = event.target
   if (!(target instanceof Element) || target.closest('input, textarea') !== null) return
   const ts = target.closest<HTMLElement>(ROW)?.dataset.messageRow
   if (ts === undefined) return
   event.preventDefault()
-  onMessageMenu(ts, event)
+  onMessageMenu(ts, event, target.closest('[data-sender]') !== null)
 }
 
 /**

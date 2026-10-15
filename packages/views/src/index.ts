@@ -1,4 +1,4 @@
-export { AccountMenu, type AccountMenuProps, type AccountMenuSection } from './AccountMenu'
+export { AccountMenu, type AccountMenuAction, type AccountMenuProps, type AccountMenuSection } from './AccountMenu'
 export { ActiveThreads, type ActiveThreadsProps } from './ActiveThreads'
 export { AppearanceSettings, type AppearanceSettingsProps } from './AppearanceSettings'
 export { AppInfoView, type AppInfoViewProps } from './AppInfoView'
@@ -43,6 +43,9 @@ export * from './juno-pages'
 export { hueFor, initials } from './look'
 export { dayLabel, fullTime, messageTime, relativeTime, slackDate } from './time'
 // The theme entry point for apps, so the shell reaches ui through views.
-export { accentNames, applyTheme, defaultAccent, type AccentName, type ActivateEvent, type ThemeName } from '@juno/ui'
+export { accentNames, applyTheme, defaultAccent, type AccentName, type ActivateEvent, type DensityName, type ThemeName, type ThemePreference } from '@juno/ui'
 // The topic tile, for the header and tab containers in the desktop app, which does not depend on ui.
 export { TopicArt, type TopicArtProps, type TopicArtSize } from '@juno/ui'
+export { NotificationsPage, type HoursKind, type NotificationsPageProps } from './NotificationsPage'
+export { PreferencesPage, type PreferencesPageProps } from './PreferencesPage'
+export { WhyPopover, type WhyPopoverProps } from './WhyPopover'

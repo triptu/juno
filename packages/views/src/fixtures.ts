@@ -17,6 +17,8 @@ import MessageList from './MessageList.fixtures'
 import NewChat from './NewChat.fixtures'
 import NewDivider from './NewDivider.fixtures'
 import NewMessagesPill from './NewMessagesPill.fixtures'
+import NotificationsPage from './NotificationsPage.fixtures'
+import PreferencesPage from './PreferencesPage.fixtures'
 import Reactions from './Reactions.fixtures'
 import SessionView from './SessionView.fixtures'
 import SignInView from './SignInView.fixtures'
@@ -28,6 +30,7 @@ import TopicHeader from './TopicHeader.fixtures'
 import TopicRow from './TopicRow.fixtures'
 import TopicView from './TopicView.fixtures'
 import Workspace from './Workspace.fixtures'
+import WhyPopover from './WhyPopover.fixtures'
 import ChatCard, { budgetCard, changeCard, connectCard, proposedScheduleCard, proposedTaskCard, providerCard, questionCard, removeCard, resolveCard, scheduleCard, sendMessageCard, taskCard, topicsCardSet, unknownCardSet } from './juno-chat/cards/ChatCard.fixtures'
 import EmptyChat from './juno-chat/EmptyChat.fixtures'
 import JunoChatList from './juno-chat/JunoChatList.fixtures'
@@ -74,7 +77,9 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   NewChat,
   NewDivider,
   NewMessagesPill,
+  NotificationsPage,
   OwnerBubble,
+  PreferencesPage,
   ProposedScheduleCard: proposedScheduleCard,
   ProposedTaskCard: proposedTaskCard,
   ProviderCard: providerCard,
@@ -102,5 +107,6 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   TopicRow,
   TopicView,
   UnknownCard: unknownCardSet,
+  WhyPopover,
   Workspace,
 }
