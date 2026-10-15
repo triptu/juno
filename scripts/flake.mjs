@@ -14,6 +14,7 @@ import { spawn } from 'node:child_process'
 import { dirname, join, relative, resolve } from 'node:path'
 import { createInterface } from 'node:readline'
 import { fileURLToPath } from 'node:url'
+import { forwardSignals } from './remote/children.mjs'
 import { stripVTControlCharacters } from 'node:util'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -54,6 +55,7 @@ console.error(`flake: ${options.specs.join(' ')}${options.grep ? ` -g "${options
 const counts = { passed: 0, failed: 0, flaky: 0, skipped: 0 }
 const failures = []
 const child = spawn(process.execPath, args, { cwd: root, stdio: ['ignore', 'pipe', 'pipe'] })
+forwardSignals([child])
 for (const stream of [child.stdout, child.stderr]) {
   createInterface({ input: stream }).on('line', (line) => {
     console.log(line)

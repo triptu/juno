@@ -28,6 +28,7 @@
     "gallery": "pnpm --filter @juno/gallery dev",
     "gallery:shots": "node scripts/heavy.mjs pnpm --filter @juno/gallery shots",
     "smoke:live": "node scripts/smoke-live.ts",
+    "probe:live": "node scripts/probe-live.ts",
     "sync:live": "node --import ./scripts/ts-resolve-hooks.mjs scripts/sync-live-dry-run.ts",
     "ai:eval": "pnpm --filter @juno/ai eval",
     "agent:eval": "pnpm --filter @juno/agent exec node --import ../../scripts/ts-resolve-hooks.mjs eval/run.ts",
@@ -40,7 +41,8 @@
     "test:agent-testing": "node scripts/heavy.mjs pnpm --filter @juno/agent-testing test",
     "test:agent": "node scripts/heavy.mjs pnpm --filter @juno/agent test",
     "test:notifications": "node scripts/heavy.mjs pnpm --filter @juno/engine test",
-    "flake": "node scripts/flake.mjs"
+    "flake": "node scripts/flake.mjs",
+    "test:remote-pool": "node scripts/heavy.mjs node --test scripts/remote/pool-decisions.test.mjs"
   },
   "devDependencies": {
     "@informalsystems/quint": "0.33.0",

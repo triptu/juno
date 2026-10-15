@@ -291,7 +291,7 @@ unknown ─reconcile─▶ done (positive evidence) | unknown (kept; the card sh
 
 ### 7.2 Adapters
 - **Model providers** (OpenRouter now; Sign in with ChatGPT if feasible): pi-ai through the guard, a key from the keychain via main, `sessionId` affinity, cache marks (S2).
-- **Codex (local) harness:** Each turn is a fresh Codex thread through the SDK, running in an empty temporary directory with a `read-only` sandbox. Juno's tools are offered through a loopback MCP endpoint (`127.0.0.1`, a random port, a per-turn bearer token) served by `agent/src/mcp/serve.ts`. Codex's built-in tools are turned off where possible (S3). The turn runs as the custom task `juno.harnessTurn`, which is not replay-safe. Its prompt passes through the same builder and guard. Its thread files are recorded for redaction.
+- **Codex (local) harness:** Reuse one Codex thread per Juno chat session through the SDK, rotating on removal, pin or model changes, failure, restart, or before the accumulated context plus the next request exceeds the window, running in an empty temporary directory with a `read-only` sandbox. Juno's tools are offered through a loopback MCP endpoint (`127.0.0.1`, a random port, a per-turn bearer token) served by `agent/src/mcp/serve.ts`. Codex's built-in tools are turned off where possible (S3). The turn runs as the unsafe pi tool task `juno_harnessTurn`; its nested MCP calls use pi tool tasks too. The generation task only requests the harness or converts its result, and never runs the SDK itself. Reused context makes the run tainted, so outward actions still require approval. Its prompt passes through the same builder and guard. Its thread files are recorded for redaction.
 
 ## 8. Orchestration behind the status bubble (B1, B5, M7, M8, M11)
 
@@ -625,7 +625,7 @@ S4 (how to reach T3) is resolved by the owner and replaced by S8.
 | **M3 Actions** | WP15, WP16, WP22 flows 3, 5, 10 and 11 | Cards, ledger, grants, Activity, pins and redaction, budget |
 | **M4 Connections** | WP17, WP18, WP22 flows 4, 7 and 8 | Notion, Littlebird and T3 for real. Writes go only through the dispatcher |
 | **M5 Proactive** | WP19, flow 6 | |
-| **M6 Codex** | WP20 | Sol via Codex in the picker. ChatGPT sign-in if feasible |
+| **M6 Codex** | WP20 | Sol via local Codex in the picker. Separate ChatGPT sign-in is not planned |
 | **M7 Ownership** | WP21, flow 14 | |
 
 The ideas adopted on 10-14 16:40 add work to WP7, WP11, WP12, WP13, WP14, WP15, WP18, WP19 and WP23, and to M10 notifications; §19 lists it per idea. Each UI milestone ends with the design and performance reviews. WP23 runs from M2 onward. `m1-review.md` sets M2's launch order. It splits WP13 into a host side (`agent-juno`, `engine/src/agent-host`, the outbox mode, the desktop process wiring), which needs only the WP6 contracts and starts with WP8, and a wire-up (`state/src/agent`, removing `chat` from `ai`, the protocol-2 switch), which needs WP11.

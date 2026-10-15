@@ -1,15 +1,16 @@
 import * as stylex from '@stylexjs/stylex'
-import { chatCopy, type JobId, type JunoSettingsPage as JunoSettingsPageModel, type ModelChoice } from '@juno/agent-contract'
+import { chatCopy, modelChoiceKey, type JobId, type JunoSettingsPage as JunoSettingsPageModel, type ModelChoice } from '@juno/agent-contract'
 import { Button, Checkbox, Chip, ListRow, Page, PageHeader, Section, Select, Surface, Text, TextField } from '@juno/ui'
 import type { ReactNode } from 'react'
+import { BackupSection, ThisMacSection } from './BackupSections'
 import { cell } from './cell'
-import { fullTime, messageTime } from '../time'
 
 /**
  * A section whose work is not built yet is left out by leaving out its
- * callbacks: Codex (`onSignInCodex`), Rules (`onRuleChange`, `onRuleRemove`,
+ * callbacks: Rules (`onRuleChange`, `onRuleRemove`,
  * `onRuleAdd`), Backup (`onBackupFolder`, `onExportPhrase`) and This Mac
- * (`onMove`, `onRestore`, `onStopJob`).
+ * (`onMove`, `onRestore`). Without `onStopJob` a removal pending in a job
+ * is not shown.
  */
 export interface JunoSettingsPageProps {
   /** The agent's page. Absent while no provider is set up, as no agent runs: the page shows the provider alone. */
@@ -17,7 +18,7 @@ export interface JunoSettingsPageProps {
   readonly now: number
   /** The provider section (`ProviderSection`), from main's state rather than the agent's page. */
   readonly providers: ReactNode
-  /** A chat model: a family on OpenRouter, a model id on a custom endpoint, listed or typed. */
+  /** A listed modelChoiceKey, or a typed custom model id. */
   readonly onChatModel: (family: string) => void
   readonly onCompactionModel: (family: string) => void
   readonly onCap: (usd: number) => void
@@ -35,6 +36,10 @@ export interface JunoSettingsPageProps {
   readonly onMove?: () => void
   readonly onRestore?: () => void
   readonly onStopJob?: (jobId: JobId) => void
+  /** A folder change or an export in flight: its button waits. */
+  readonly backupBusy?: 'folder' | 'phrase'
+  /** Why the last folder change or export failed, under its row. */
+  readonly backupError?: { readonly row: 'folder' | 'phrase'; readonly message: string }
 }
 
 function commitCap(text: string, current: number, onCap: (usd: number) => void): void {
@@ -51,13 +56,13 @@ const usd = (amount: number): string => `$${amount.toFixed(2)}`
 
 function modelOptions(models: ReadonlyArray<ModelChoice>) {
   return models.map((model) => ({
-    value: model.family,
+    value: modelChoiceKey(model),
     // A custom endpoint's row is a model id, its own name.
     label:
       model.resolved === undefined
         ? `${model.family} (not available)`
         : // The resolved name already names its family: "Claude Sonnet 5.5", not "Claude Sonnet · Claude Sonnet 5.5".
-          `${model.resolved}${model.price === undefined ? '' : ` · ${model.price}`}`,
+          `${model.resolved}${model.provider === 'codex' ? ' · Codex' : ''}${model.price === undefined ? '' : ` · ${model.price}`}`,
     disabled: model.resolved === undefined,
   }))
 }
@@ -87,8 +92,9 @@ export function JunoSettingsPage({
   onMove,
   onRestore,
   onStopJob,
+  backupBusy,
+  backupError,
 }: JunoSettingsPageProps) {
-  const copy = chatCopy.pages.settings
   if (page === undefined) {
     return (
       <Page width="settings">
@@ -98,7 +104,9 @@ export function JunoSettingsPage({
     )
   }
   const custom = page.provider === 'custom'
-  const chatSelected = page.chatModels.find((model) => model.selected)?.family ?? ''
+  const chatChoice = page.chatModels.find((model) => model.selected)
+  const customSelected = page.chatModels.find(model => model.provider === 'custom')?.family ?? ''
+  const chatSelected = chatChoice === undefined ? '' : modelChoiceKey(chatChoice)
   const compactionSelected = page.compactionModels.find((model) => model.selected)?.family ?? ''
   return (
     <Page width="settings">
@@ -126,11 +134,11 @@ export function JunoSettingsPage({
                   label={chatCopy.providers.modelId}
                   placeholder="llama3.2"
                   // Committed on blur or Enter, as the cap is.
-                  key={chatSelected}
-                  defaultValue={chatSelected}
-                  onBlur={(event) => commitModel(event.currentTarget.value, chatSelected, onChatModel)}
+                  key={customSelected}
+                  defaultValue={customSelected}
+                  onBlur={(event) => commitModel(event.currentTarget.value, customSelected, onChatModel)}
                   onKeyDown={(event) => {
-                    if (event.key === 'Enter') commitModel(event.currentTarget.value, chatSelected, onChatModel)
+                    if (event.key === 'Enter') commitModel(event.currentTarget.value, customSelected, onChatModel)
                   }}
                   width="keyword"
                 />
@@ -143,14 +151,15 @@ export function JunoSettingsPage({
                 </Text>
               </span>
             </ListRow>
-          ) : (
+          ) : null}
+          {page.modelTyped !== true || page.chatModels.some(model => model.provider === 'codex') ? (
             <ListRow
               divider={!custom}
               trailing={<Select size={30} label="Chat model" options={modelOptions(page.chatModels)} value={chatSelected} onChange={(event) => onChatModel(event.currentTarget.value)} />}
             >
               <Text variant="body">Chat</Text>
             </ListRow>
-          )}
+          ) : null}
           {custom ? null : (
             <ListRow divider={false} trailing={<Select size={30} label="Compaction model" options={modelOptions(page.compactionModels)} value={compactionSelected} onChange={(event) => onCompactionModel(event.currentTarget.value)} />}>
               <Text variant="body">Compaction</Text>
@@ -200,7 +209,7 @@ export function JunoSettingsPage({
               <span {...stylex.props(cell.lines)}>
                 <Text variant="body">Daily cap</Text>
                 <Text variant="meta" tone="muted" data-spend-untracked="">
-                  {chatCopy.providers.spendUntracked}
+                  {chatChoice?.provider === 'codex' ? 'Codex uses your ChatGPT plan. The daily cap applies to API models only.' : chatCopy.providers.spendUntracked}
                 </Text>
               </span>
             ) : (
@@ -210,7 +219,7 @@ export function JunoSettingsPage({
         </Surface>
       </Section>
 
-      {onSignInCodex === undefined ? null : (
+      {(
         <Section heading="Codex">
           <Surface kind="group">
             <ListRow
@@ -221,7 +230,7 @@ export function JunoSettingsPage({
                   <Chip variant={page.codex._tag === 'ready' ? 'filled' : 'outline'} size={20}>
                     {page.codex._tag === 'ready' ? `Ready · ${page.codex.version}` : page.codex._tag === 'signedOut' ? 'Signed out' : 'Not installed'}
                   </Chip>
-                  {page.codex._tag === 'signedOut' ? (
+                  {page.codex._tag === 'signedOut' && onSignInCodex !== undefined ? (
                     <Button variant="ghost" size="xs" tone="subtle" onClick={onSignInCodex}>
                       Sign in
                     </Button>
@@ -286,95 +295,17 @@ export function JunoSettingsPage({
       </Section>
 
       {onBackupFolder === undefined || onExportPhrase === undefined ? null : (
-        <Section heading="Backup" sub="An encrypted copy of Juno's state, in a folder you choose.">
-          <Surface kind="group">
-            <ListRow
-              trailing={
-                <Button variant="ghost" size="xs" tone="subtle" onClick={onBackupFolder}>
-                  Choose folder
-                </Button>
-              }
-            >
-              <span {...stylex.props(cell.lines)}>
-                <Text variant="body" truncate>
-                  {page.backupFolder}
-                </Text>
-                <Text variant="meta" tone="muted">
-                  {page.lastBackupAt === undefined ? 'No backup yet' : (
-                    <>
-                      Last backup <time title={fullTime(page.lastBackupAt)}>{messageTime(page.lastBackupAt, now)}</time>
-                    </>
+        <BackupSection
+          page={page}
+          now={now}
+          onBackupFolder={onBackupFolder}
+          onExportPhrase={onExportPhrase}
+          {...(backupBusy === undefined ? {} : { backupBusy })}
+          {...(backupError === undefined ? {} : { backupError })}
+        />
       )}
-              </Text>
-            </span>
-          </ListRow>
-          <ListRow divider={false} trailing={<Button variant="ghost" size="xs" tone="subtle" onClick={onExportPhrase}>{copy.exportPhrase}</Button>}>
-            <span {...stylex.props(cell.lines)}>
-              <Text variant="body">Recovery phrase</Text>
-              <Text variant="meta" tone="muted">
-                {page.recoveryPhraseExportedAt === undefined ? 'Not exported yet. Without it a backup cannot be read on another Mac.' : (
-                  <>
-                    Exported <time title={fullTime(page.recoveryPhraseExportedAt)}>{messageTime(page.recoveryPhraseExportedAt, now)}</time>
-                  </>
-                )}
-              </Text>
-            </span>
-          </ListRow>
-        </Surface>
-      </Section>
-
-      )}
-      {onMove === undefined || onRestore === undefined || onStopJob === undefined ? null : (
-        <Section heading="This Mac" sub="Juno runs on one Mac at a time.">
-          <Surface kind="group" data-ownership={page.ownership._tag}>
-            <ListRow
-              trailing={
-                <Chip variant={page.ownership._tag === 'active' ? 'filled' : 'outline'} size={20}>
-                  {page.ownership._tag === 'active' ? 'Active here' : page.ownership._tag === 'released' ? 'Moving' : 'Recovery'}
-                </Chip>
-              }
-            >
-              <span {...stylex.props(cell.lines)}>
-                <Text variant="body">
-                  {page.ownership._tag === 'active'
-                    ? 'This Mac owns Juno’s state.'
-                    : page.ownership._tag === 'released'
-                      ? 'This Mac is read-only until the other Mac takes over.'
-                      : `Restored from a backup. ${page.ownership.pending === 1 ? '1 action was' : `${page.ownership.pending} actions were`} pending.`}
-                </Text>
-              </span>
-            </ListRow>
-            {page.removalPending !== undefined ? (
-              <ListRow
-                data-removal-pending=""
-                trailing={
-                  <Button variant="ghost" size="xs" tone="subtle" onClick={() => page.removalPending !== undefined && onStopJob(page.removalPending.jobId)}>
-                    {copy.stopJob}
-                  </Button>
-                }
-              >
-                <Text variant="body">{copy.removalPending(page.removalPending.copies)}</Text>
-              </ListRow>
-            ) : null}
-            <ListRow
-              divider={false}
-              trailing={
-                <span {...stylex.props(cell.controls)}>
-                  <Button variant="ghost" size="xs" tone="subtle" onClick={onMove} disabled={page.ownership._tag !== 'active'}>
-                    {copy.move}
-                  </Button>
-                  <Button variant="ghost" size="xs" tone="subtle" onClick={onRestore}>
-                    {copy.restore}
-                  </Button>
-                </span>
-              }
-            >
-              <Text variant="meta" tone="muted" sx={cell.wrap}>
-                {copy.attest}
-              </Text>
-            </ListRow>
-          </Surface>
-        </Section>
+      {onMove === undefined || onRestore === undefined ? null : (
+        <ThisMacSection page={page} onMove={onMove} onRestore={onRestore} {...(onStopJob === undefined ? {} : { onStopJob })} />
       )}
     </Page>
   )

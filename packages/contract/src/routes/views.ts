@@ -17,7 +17,7 @@ import { Rpc, RpcGroup } from 'effect/rpc'
 import { NotFound, NotSignedIn } from '../errors'
 import { liveValueRoute } from '../live'
 import { ChannelRef } from '../refs'
-import { SavedView, ViewIcon } from '../views'
+import { AutomatedPlace, SavedView, ViewIcon } from '../views'
 import { CommandResult, TopicActionError } from './topics'
 
 /** A view as the pill row and the sheet show it: its conversations joined, by name. */
@@ -28,6 +28,8 @@ export const SidebarView = Schema.Struct({
   keepOutOfAll: Schema.Boolean,
   /** Conversations the store knows, by name. */
   channels: Schema.Array(ChannelRef),
+  /** Automated only: the conversations Juno put there itself, which the sheet marks "Added by Juno". */
+  addedByJuno: Schema.optionalKey(Schema.Array(Schema.String)),
 })
 export type SidebarView = typeof SidebarView.Type
 
@@ -67,4 +69,12 @@ export const viewsRemoveChannel = Rpc.make('views.removeChannel', { payload: mem
 /** The pill order: every view id, in order. Ids it does not name keep their place after these. */
 export const viewsReorder = Rpc.make('views.reorder', { payload: { ids: Schema.Array(Schema.String) }, success: Schema.Void, error: NotSignedIn })
 
-export const ViewsRoutes = RpcGroup.make(viewsList, viewsSave, viewsDelete, viewsRestore, viewsAddChannel, viewsRemoveChannel, viewsReorder)
+/**
+ * The user's answer about the Automated view, from Home's question: Move puts
+ * the conversation in the view (making the view if Juno has not yet), Keep
+ * in All keeps it where it is. Either is remembered and never asked again.
+ * The undo puts back the question, or the earlier answer.
+ */
+export const viewsSortChannel = Rpc.make('views.sortChannel', { payload: { channel: Schema.String, to: AutomatedPlace }, success: CommandResult, error: TopicActionError })
+
+export const ViewsRoutes = RpcGroup.make(viewsList, viewsSave, viewsDelete, viewsRestore, viewsAddChannel, viewsRemoveChannel, viewsReorder, viewsSortChannel)

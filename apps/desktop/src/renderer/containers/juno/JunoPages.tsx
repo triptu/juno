@@ -1,5 +1,5 @@
 import { memo, useState } from 'react'
-import { chatCopy, type ConnectionId, type JunoPage, type JunoSettingsPage as JunoSettingsPageModel, type PinId } from '@juno/agent-contract'
+import { chatCopy, modelChoiceKey, type ConnectionId, type JunoPage, type JunoSettingsPage as JunoSettingsPageModel, type PinId } from '@juno/agent-contract'
 import type { ProviderChange, ProviderKind } from '@juno/contract'
 import { copyText, nowAtom, registry } from '@juno/state'
 import {
@@ -16,7 +16,9 @@ import {
   type JunoSettingsChange,
 } from '@juno/state/agent'
 import { useAtomValue } from '@juno/state/react'
-import { ActivityPage, ConnectionsPage, JunoSettingsPage, MemoryPage, noopActions, ProviderSection, RemembersPage, ReviewPage, ScheduledPage, type ProviderDrafts } from '@juno/views'
+import { ActivityPage, ConnectionsPage, JunoSettingsPage, MemoryPage, noopActions, ProviderSection, RemembersPage, ReviewPage, ScheduledPage, type ChatActions, type ProviderDrafts } from '@juno/views'
+import { junoCommands, openJunoTab } from './actions'
+import { useBackupSettings } from './BackupSettings'
 
 /** The pages' RPC-backed commands, one set for the app. */
 const actions = junoPageActions(registry)
@@ -57,9 +59,10 @@ export const JunoPageTab = memo(function JunoPageTab({ page }: { readonly page: 
 
 /**
  * Settings › Juno. The provider comes from main (juno-providers); the models,
- * spend, Pause (juno-settings) and the owner's rules (WP15) from the agent. Codex (WP20), Backup and This Mac
- * (WP21) get no callbacks, so the view leaves them out until they are built.
- * The key goes from the field to main's keychain, never through the page.
+ * spend, Pause (juno-settings), the owner's rules (WP15), and Backup and This
+ * Mac (WP21, `BackupSettings.tsx`) from the agent. Codex (WP20) gets no
+ * callback, so the view leaves it out until it is built. The key goes from
+ * the field to main's keychain, never through the page.
  */
 function Settings() {
   const result = useAtomValue(junoSettingsAtom)
@@ -69,6 +72,7 @@ function Settings() {
   // The rules list while the owner edits it, saved as a whole.
   const [rules, setRules] = useState<ReadonlyArray<Rule> | undefined>(undefined)
   const [rulesError, setRulesError] = useState<string | undefined>(undefined)
+  const backup = useBackupSettings()
   const served = result._tag === 'Success' ? result.value : undefined
   const left = served === undefined ? shown : unconfirmed(served, shown)
   if (left !== shown) setShown(left)
@@ -99,24 +103,31 @@ function Settings() {
   // On a custom endpoint the chat model is an id, listed or typed; on OpenRouter a family.
   const provider = page.provider === 'custom' ? 'custom' : 'openrouter'
   return (
-    <JunoSettingsPage
-      page={page}
-      now={now}
-      providers={providers}
-      onChatModel={(family) => change({ chat: family }, { _tag: 'model', purpose: 'chat', provider, family })}
-      onCompactionModel={(family) => change({ compaction: family }, { _tag: 'model', purpose: 'compaction', provider, family })}
-      onCap={(usd) => void actions.settings({ _tag: 'cap', usd })}
-      onPaused={(value) => change({ paused: value }, { _tag: 'paused', value })}
-      onRuleChange={(id, text) => setRules(page.rules.map((rule) => (rule.id === id ? { id, text } : rule)))}
-      onRuleAdd={() => setRules([...page.rules, { id: crypto.randomUUID(), text: '' }])}
-      onRuleRemove={(id) => {
-        const next = page.rules.filter((rule) => rule.id !== id)
-        setRules(next)
-        commitRules(next)
-      }}
-      onRulesCommit={() => commitRules()}
-      {...(rulesError === undefined ? {} : { rulesError })}
-    />
+    <>
+      <JunoSettingsPage
+        page={page}
+        now={now}
+        providers={providers}
+        {...backup.props}
+        onChatModel={(key) => {
+          const choice = page.chatModels.find(model => modelChoiceKey(model) === key)
+          change({ chat: key }, { _tag: 'model', purpose: 'chat', provider: choice?.provider ?? provider, family: choice?.family ?? key })
+        }}
+        onCompactionModel={(family) => change({ compaction: family }, { _tag: 'model', purpose: 'compaction', provider, family })}
+        onCap={(usd) => void actions.settings({ _tag: 'cap', usd })}
+        onPaused={(value) => change({ paused: value }, { _tag: 'paused', value })}
+        onRuleChange={(id, text) => setRules(page.rules.map((rule) => (rule.id === id ? { id, text } : rule)))}
+        onRuleAdd={() => setRules([...page.rules, { id: crypto.randomUUID(), text: '' }])}
+        onRuleRemove={(id) => {
+          const next = page.rules.filter((rule) => rule.id !== id)
+          setRules(next)
+          commitRules(next)
+        }}
+        onRulesCommit={() => commitRules()}
+        {...(rulesError === undefined ? {} : { rulesError })}
+      />
+      {backup.sheet}
+    </>
   )
 }
 
@@ -192,7 +203,10 @@ interface Shown {
   readonly compaction?: string
 }
 
-const selectedFamily = (models: JunoSettingsPageModel['chatModels']) => models.find((model) => model.selected)?.family
+const selectedFamily = (models: JunoSettingsPageModel['chatModels']) => {
+  const selected = models.find(model => model.selected)
+  return selected === undefined ? undefined : modelChoiceKey(selected)
+}
 
 /** The changes the agent's page does not show yet; the same object when nothing was confirmed. */
 function unconfirmed(page: JunoSettingsPageModel, shown: Shown): Shown {
@@ -208,7 +222,7 @@ function unconfirmed(page: JunoSettingsPageModel, shown: Shown): Shown {
 }
 
 function withShown(page: JunoSettingsPageModel, shown: Shown): JunoSettingsPageModel {
-  const pick = (models: JunoSettingsPageModel['chatModels'], family: string | undefined) => (family === undefined ? models : models.map((model) => ({ ...model, selected: model.family === family })))
+  const pick = (models: JunoSettingsPageModel['chatModels'], family: string | undefined) => (family === undefined ? models : models.map((model) => ({ ...model, selected: modelChoiceKey(model) === family })))
   return {
     ...page,
     ...(shown.paused === undefined ? {} : { paused: shown.paused }),
@@ -310,10 +324,33 @@ function Connections() {
   )
 }
 
+/** The Review page's cards take the chat's card commands: an approval waits until Activate. */
+const reviewActions: ChatActions = { ...noopActions, onCard: (id, command) => void junoCommands.onCard(id, command) }
+
 function Review() {
   const result = useAtomValue(reviewPageAtom)
   const now = useNow()
+  const [activating, setActivating] = useState(false)
+  const [error, setError] = useState<string | undefined>(undefined)
   if (result._tag !== 'Success') return null
-  // Activate needs the owner's word that the old Mac is off (WP21); recovery cannot happen before then.
-  return <ReviewPage page={result.value.page} now={now} actions={noopActions} onActivate={() => {}} />
+  const { page } = result.value
+  const activate = async (backupAt: number) => {
+    setActivating(true)
+    setError(undefined)
+    const answer = await actions.activate(backupAt)
+    setActivating(false)
+    if (answer.outcome === 'ok') openJunoTab()
+    else setError('message' in answer && answer.message !== undefined ? answer.message : 'That did not work. Try again.')
+  }
+  return (
+    <ReviewPage
+      page={page}
+      now={now}
+      actions={reviewActions}
+      activating={activating}
+      {...(error === undefined ? {} : { error })}
+      // Activate names the restore the owner reviewed here.
+      onActivate={() => page.backupAt !== undefined && void activate(page.backupAt)}
+    />
+  )
 }

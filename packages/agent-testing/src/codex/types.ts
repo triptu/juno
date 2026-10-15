@@ -14,6 +14,10 @@ export interface CodexTurn {
   readonly reply?: string
   /** Ends the turn with `turn.failed` and this message instead of a reply. */
   readonly fail?: string
+  /** Kill the process after its tool calls, before a reply or receipt. */
+  readonly crash?: boolean
+  /** Attempts built-ins; the fake enforces the CLI flags before any side effect. */
+  readonly builtIns?: ReadonlyArray<'shell' | 'edit' | 'web'>
   /** Waits this long before the reply, to stand in for Codex's 5 s first text (spikes.md, S3). */
   readonly delayMs?: number
   /** Reported in `turn.completed`. Default: S3's measured turn, 20,000 input and 110 output tokens. */

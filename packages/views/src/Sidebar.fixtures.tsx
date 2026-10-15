@@ -30,9 +30,9 @@ const chrome: Omit<SidebarProps, 'children'> = {
   onClearScope: noop,
 }
 
-// Views (spec section 5): icon pills and name pills, enough to overflow a 384px sidebar.
+// Views (spec section 5): the built-in Automated first, then icon pills and name pills, enough to overflow a 384px sidebar.
 const views: ReadonlyArray<SidebarViewPill> = [
-  { id: 'vbots', name: 'Bots', icon: 'robot', mention: true },
+  { id: 'automated', name: 'Automated', icon: 'robot', mention: true },
   { id: 'vdesign', name: 'Design crit', mention: false },
   { id: 'vlead', name: 'Leadership', mention: false },
   { id: 'vwork', name: 'Work', icon: 'briefcase', mention: false },
@@ -121,12 +121,29 @@ export default defineFixtures(
     // The filter row as scrollable pills (inventory 2.3): it never grows taller than the row of three.
     Views: {
       overflowing: scene(() => full(viewChrome)),
-      'view-selected': scene(() => full({ ...viewChrome, filter: { kind: 'all', unreadOnly: false, view: 'vbots' } }, { sections: [{ id: 'recent', ids: [rows.alertsMain.id] }] })),
+      'view-selected': scene(() => full({ ...viewChrome, filter: { kind: 'all', unreadOnly: false, view: 'automated' } }, { sections: [{ id: 'recent', ids: [rows.alertsMain.id] }] })),
       'name-selected': scene(() => full({ ...viewChrome, filter: { kind: 'all', unreadOnly: true, view: 'vdesign' } }, { sections: [{ id: 'recent', ids: [rows.roadmap.id] }] })),
       'no-views': scene(() => full({ ...viewChrome, views: [] })),
       'sheet-new': scene(() => full({ ...viewChrome, views: views.slice(0, 2), viewSheet: <ViewSheet {...sheetProps} /> })),
       'sheet-edit': scene(() =>
         full({ ...viewChrome, views: views.slice(0, 2), viewSheet: <ViewSheet {...sheetProps} mode="edit" name="Design crit" icon={undefined} keepOutOfAll={false} query="" chosen={sheetProps.chosen.slice(0, 1)} /> }),
+      ),
+      // Automated's sheet: what Juno put there says so; #ci-builds the user added.
+      'sheet-automated': scene(() =>
+        full({
+          ...viewChrome,
+          views: views.slice(0, 2),
+          viewSheet: (
+            <ViewSheet
+              {...sheetProps}
+              mode="edit"
+              name="Automated"
+              query=""
+              results={[]}
+              chosen={[...sheetProps.chosen.map((c) => ({ ...c, addedByJuno: true })), { id: 'C0CIBUILDS', name: 'ci-builds', kind: 'public' }]}
+            />
+          ),
+        }),
       ),
     },
     Content: {

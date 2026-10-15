@@ -24,9 +24,10 @@ export function ViewSheet({ sheet }: { readonly sheet: ViewSheetState }) {
   const [name, setName] = useState(editing?.name ?? '')
   const [icon, setIcon] = useState<ViewIconName | undefined>(editing?.icon)
   const [keepOutOfAll, setKeepOutOfAll] = useState(editing?.keepOutOfAll ?? false)
-  const [chosen, setChosen] = useState<ReadonlyArray<ViewSheetConversation>>(() =>
-    (editing?.channels ?? (sheet.mode === 'new' ? sheet.channels : [])).map((c) => ({ id: c.id, name: c.name, kind: c.kind })),
-  )
+  const [chosen, setChosen] = useState<ReadonlyArray<ViewSheetConversation>>(() => {
+    const byJuno = new Set(editing?.addedByJuno)
+    return (editing?.channels ?? (sheet.mode === 'new' ? sheet.channels : [])).map((c) => ({ id: c.id, name: c.name, kind: c.kind, ...(byJuno.has(c.id) ? { addedByJuno: true } : {}) }))
+  })
   const [query, setQuery] = useState('')
   const deferred = useDeferredValue(query)
   const picks = useAtomValue(pickConversationsAtom(deferred))

@@ -17,6 +17,7 @@ The owner's request (10-15, `docs/decision-log.md`): more custom views in the si
 - **The row never grows.** It scrolls sideways; a vertical wheel scrolls it sideways too; overscroll is contained, so it never moves the list or triggers Back and Forward. The edge it can scroll toward fades.
 - **The dot sits in the pill's corner**, so icon pills stay 28×28 and nothing moves when it shows.
 - **Keep these out of All is a checkbox**, as in a macOS sheet; the app has no switch primitive and one checkbox is enough.
+- **Automated is built in** (SPEC 5 "Automated"): the robot icon, Keep these out of All on, made the first time a conversation goes in and never again after a delete. Clear bot channels move in by rules; unclear ones are asked on Home with Move and Keep in All. The sheet marks what Juno added.
 - **Juno making a view** ("make a Bots view with every alerts channel") uses `juno_views` through the AgentHost view routes and the shared sheet commands. It finds ids through `slack_channels`. A clean owner request applies with Undo; after reading Slack content it proposes a Change card.
 
 `before-two-line-light.png` and `before-two-line-dark.png` are the real app before the preview became one line (10-15); `docs/design/screens/sidebar-*.png` and `views-*.png` are after.

@@ -77,6 +77,15 @@ A view is a set of channels and DMs you pick. Its pill shows the Main and thread
 - **Adding a conversation.** A channel's or DM's menu (and a Main row's menu) has **Add to view ›**: your views with a check on the ones that hold it (choosing a checked one removes it), then New view…, which opens the sheet with the conversation already in it. Adding and removing show a toast with Undo.
 - **Juno can make one.** "Make a Bots view with every alerts channel" is a Juno settings task: the same command the sheet uses. (Not wired to Juno yet; the engine command is the seam.)
 
+### Automated
+
+Juno has one view of its own, **Automated** (the robot icon), for bot and alert channels and DMs with apps. It keeps them out of All. It appears once it holds a conversation, and from then on it is a view like any other: edit it, reorder it, turn off Keep these out of All, or delete it. A deleted Automated view is never made again.
+
+- **Clear cases move by themselves.** A channel goes in when most of its latest messages come from apps, or half do and its name says integration (alerts, deploys, ci, notifications and the like), and you have not written there. A DM with an app goes in. This happens as conversations sync, so a bot channel is not in All after the first sync. The view sheet marks these "Added by Juno"; unchecking one takes it out.
+- **Unclear ones are asked.** With AI assist on, Juno judges a channel the rules cannot place, once, from its latest messages. What stays unclear, and every unclear channel while AI assist is off, becomes a Home item: "Move #releases to Automated?" with **Move** and **Keep in All** (12). Right-click the item for the channel's menu, which has Ignore channel for a channel you never want to see.
+- **Your choice wins.** A conversation you put in or took out of any view by hand, or answered about on Home, is never moved again. New channels are sorted when they appear; nothing already answered is asked again.
+- **Noise you never want** is Ignore channel (below, "What shows up"), as before. Automated is for channels worth a look now and then.
+
 ### Privacy mode
 
 For screen sharing. **Hide message text** in the avatar menu (or ⌃⌘H, View › Hide Message Text) blurs message text that shows without you opening anything, so it cannot be read over a shared screen:
@@ -273,6 +282,7 @@ Home is a calm resting page: a small scene with Juno's mascot that changes with 
   - **Pick up where you left off.** The last topic you had open, when it has new messages.
   - **Moved a lot.** A followed topic with many new messages since you looked.
   - **Follow-up** (AI on). Something you said you would do, with Mark done.
+  - **Automated.** A channel neither the rules nor Juno could place (5, "Automated"): "Move #releases to Automated?", with how many of its latest messages came from apps in the meta line, Move and Keep in All, each with Undo. Right-clicking it opens the channel's menu.
   - **Tidy up** (AI on). Topics that look settled, listed in the meta line, with Resolve all and Undo.
   Clicking a row opens its topic. Items are computed when Home appears and do not change under the pointer. With AI on, a row's title line may be rewritten to say what it is about; the meta line never changes.
 - **Ask Juno** opens the Juno chat. Anything else that used to be a suggestion card (a coding prompt from a discussion, reply ideas) is something you ask Juno for, here or in the Juno panel beside the topic.
@@ -383,7 +393,7 @@ Every state the chat can be in, and what it shows.
 | Not delivered | "Not delivered · Try again". Only when Juno could not store the message on this Mac. Try again resubmits the same message |
 | Too long | "That is too long to send as one message. Split it up and send the parts." The message stays in the chat, marked not sent |
 | Interrupted | "Juno was interrupted. Your message is kept. Try again". No Try again when a schedule or a job started the run |
-| Failed | One line and Try again: "Juno didn't answer. Give it a moment and try again.", "OpenRouter rejected the key. Check it in Settings.", "Codex is signed out on this Mac. Sign in to Codex and try again.", or "Juno lost the connection. Try again when you are back online." |
+| Failed | One line and Try again: "Juno didn't answer. Give it a moment and try again.", "OpenRouter rejected the key. Check it in Settings.", "Codex is signed out on this Mac. Sign in to Codex and try again.", "Codex is not installed on this Mac. Install Codex and try again.", "Codex has used the available ChatGPT quota. Try again when it resets.", "Codex stopped before finishing. Check any action cards before trying again.", or "Juno lost the connection. Try again when you are back online." |
 | Blocked | "Juno can't fit this in one request. Removing a pin or starting a smaller task helps." No card |
 | Budget reached mid-reply | "Juno has used today's budget." under the reply, with the Budget card |
 | Offline | A chip, "You're offline". The composer works and a send that needs the network waits. Schedules that fall due offline run once when back |
@@ -433,7 +443,7 @@ Juno remembers the whole chat. Older parts are kept as a summary that grows dens
 
 ### 13.10 Settings and pages
 
-The Juno header menu (the chevron beside "Juno" in the Juno tab and the panel) opens Scheduled, What Juno remembers, Memory of this chat, Activity, Connections and Settings › Juno. **Settings › Juno** holds the chat model (the newest of Claude Sonnet, Claude Opus, Muse, GPT Sol or Grok, resolved from the provider's catalogue; Sonnet by default; each choice reads as the model's own name and its price, "Claude Sonnet 5.5 · $2 in, $10 out per million tokens"), the compaction model, today's spend and the daily cap ($2 by default), the OpenRouter key (with a line when the provider rejected it) and Codex status, your rules, Pause, the backup folder with "Rotate recovery phrase after removals" (off by default), and who owns Juno's state with Export recovery phrase, Move to another Mac and Restore from backup (13.8). **Connections** shows each server's state, the address in use, and the tools it offers with their tier. The T3 Code row also holds its address and the switch "Allow T3 Code over the local network", off by default; over the network only an https address works, so with the switch off Juno uses T3 Code on this Mac only.
+The Juno header menu (the chevron beside "Juno" in the Juno tab and the panel) opens Scheduled, What Juno remembers, Memory of this chat, Activity, Connections and Settings › Juno. **Settings › Juno** holds the chat model (the newest of Claude Sonnet, Claude Opus, Muse, GPT Sol or Grok, resolved from the provider's catalogue; Sonnet by default; each choice reads as the model's own name and its price, "Claude Sonnet 5.5 · $2 in, $10 out per million tokens"), the compaction model, today's spend and the daily cap ($2 by default), the OpenRouter key (with a line when the provider rejected it) and Codex status. Local Codex uses an isolated sign-in, is available without an API key, and shows ChatGPT-plan turns today instead of a dollar price. Remaining quota is not reported. Settings also holds your rules, Pause, the backup folder with "Rotate recovery phrase after removals" (off by default), and who owns Juno's state with Export recovery phrase, Move to another Mac and Restore from backup (13.8). **Connections** shows each server's state, the address in use, and the tools it offers with their tier. The T3 Code row also holds its address and the switch "Allow T3 Code over the local network", off by default; over the network only an https address works, so with the switch off Juno uses T3 Code on this Mac only.
 
 ### 13.11 Writing
 
@@ -441,7 +451,7 @@ Section 17 applies to the app's own copy. Juno says "I" in its own bubbles; the 
 
 ### 13.12 Performance
 
-Your bubble within a frame of Enter. A reaction on its bubble within a frame of the click. The status bubble within 100ms. First status text or first bubble within 2.5s on OpenRouter (a Codex turn can be slower and shows the dots meanwhile). A 5,000-message chat opens within the list budget in `docs/performance.md`.
+Your bubble within a frame of Enter. A reaction on its bubble within a frame of the click. The status bubble within 100ms. First status text or first bubble within 2.5s on OpenRouter (a Codex turn can be slower and says “Waiting for Codex” until a tool supplies progress). A 5,000-message chat opens within the list budget in `docs/performance.md`.
 
 ### 13.13 Not in v1
 

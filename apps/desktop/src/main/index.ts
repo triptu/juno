@@ -2,9 +2,10 @@ import { app, BrowserWindow, Notification, powerMonitor, shell } from 'electron'
 import { Events, type NotificationTarget } from '@juno/contract'
 import { join } from 'node:path'
 import { createAgentSupervisor } from './agent'
+import { appBackupSecrets } from './backupSecrets'
 import { appMcpCredentials } from './mcpCredentials'
 import { createSupervisor } from './engine'
-import { contextMenuForTests, registerIpc, slackLinksForTests } from './ipc'
+import { contextMenuForTests, folderForTests, registerIpc, slackLinksForTests } from './ipc'
 import { CUSTOM_ITEM, macKeychain, memoryKeychain, OPENROUTER_ITEM } from './keychain'
 import { ProviderStore } from './providers'
 import { launchWriter, readLaunch, type Launch } from './launch'
@@ -83,12 +84,16 @@ const notifier = new Notifier({
 })
 supervisor.onReady(() => notifier.engineReady())
 
+// The backup's secrets in the keychain (memory under tests), WP21.
+const backupSecrets = appBackupSecrets(e2e)
+
 // The agent runs whenever a model provider is set up (ADR 0012, SPEC 13.10).
 const agent = createAgentSupervisor(
   (port) => supervisor.send({ _tag: 'agentPort' }, [port]),
   () => supervisor.currentState === 'ready',
   // MCP sign-in: OAuth state in the keychain (memory under tests), sign-in pages in the system browser.
   appMcpCredentials(e2e, (url) => shell.openExternal(url)),
+  backupSecrets.answer,
 )
 supervisor.onReady(() => agent.linkHost())
 
@@ -129,6 +134,7 @@ app.whenReady().then(() => {
     setViewing: (topicId) => notifier.setViewing(topicId),
     agent,
     providers,
+    backupSecrets,
     setTheme: (theme) => updateLaunch({ theme }),
     setAccent: (accent) => updateLaunch({ accent }),
     setDensity: (density) => updateLaunch({ density }),
@@ -185,6 +191,7 @@ if (e2e) {
       engineState: () => supervisor.currentState,
       failEngine: () => supervisor.giveUp(),
       contextMenu: contextMenuForTests,
+      folder: folderForTests,
       slackLinks: slackLinksForTests,
       agentState: () => agent.currentState,
       agentHost: () => agent.host?.host,
