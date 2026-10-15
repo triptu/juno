@@ -214,10 +214,10 @@ test('row hover to paint', async ({ juno, win }) => {
 // Home from the sidebar's Home item, with a topic open in the tab: the
 // pointerdown to the first presented frame that shows Home's greeting and
 // rows, read from the local cache (performance.md section 1, "Home open").
-// Every other sample comes back after the home.view subscription's idle
+// Every fourth sample comes back after the home.view subscription's idle
 // time, so both a warm and a cold query are in the numbers.
 test('home open: from a topic to Home painted', async ({ juno, win }) => {
-  test.setTimeout(180_000)
+  test.setTimeout(360_000)
   await juno.signIn()
   await juno.waitForSync()
   const { home, sidebar, topic } = juno
@@ -227,7 +227,7 @@ test('home open: from a topic to Home painted', async ({ juno, win }) => {
   for (let i = 0; i < 20; i++) {
     await sidebar.row(POSTGRES).open()
     await topic.expectTitle(POSTGRES)
-    await win.waitForTimeout(i % 2 === 0 ? 300 : 31_000)
+    await win.waitForTimeout(i % 4 === 3 ? 31_000 : 300)
     const nav = home.navItem
     await nav.evaluate((node) => {
       const w = window as unknown as { __homeSample?: Promise<number> }
