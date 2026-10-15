@@ -10,6 +10,7 @@
  * a timeout, a provider error) stores nothing; the job tries again later.
  */
 import { AiProvider, cacheKeyOf, tasks, type Decision, type TopicArtInput } from '@juno/ai'
+import type { StoredArt } from '@juno/contract'
 import { channelLabel, resolveTitle, type TopicId } from '@juno/domain'
 import { Invalidation, keys, StoreReader, StoreWriter, type SqlError } from '@juno/store'
 import { parseRecipe } from '@juno/topic-art'
@@ -108,6 +109,20 @@ const storeArt = (
         model = excluded.model, status = excluded.status, hue = excluded.hue, title_source = excluded.title_source, source = excluded.source, created_at = excluded.created_at`
     yield* invalidation.invalidate(keys.topicArt)
     return status
+  })
+
+/** Puts a drawing back as it was (the undo of a redraw), or removes the row when the topic had none. */
+export const restoreArt = (topicId: string, previous: StoredArt | null): Effect.Effect<void, SqlError, StoreWriter | Invalidation> =>
+  Effect.gen(function* () {
+    const sql = yield* StoreWriter
+    const invalidation = yield* Invalidation
+    if (previous === null) yield* sql`DELETE FROM topic_art WHERE topic_id = ${topicId}`
+    else
+      yield* sql`INSERT INTO topic_art (topic_id, recipe, recipe_hash, input_hash, model, status, hue, title_source, source, created_at)
+        VALUES (${topicId}, ${previous.recipe}, ${hashOf(previous.recipe)}, ${previous.inputHash}, ${previous.model}, ${previous.status}, ${previous.hue}, ${previous.titleSource}, ${previous.source}, ${previous.createdAt})
+        ON CONFLICT (topic_id) DO UPDATE SET recipe = excluded.recipe, recipe_hash = excluded.recipe_hash, input_hash = excluded.input_hash,
+          model = excluded.model, status = excluded.status, hue = excluded.hue, title_source = excluded.title_source, source = excluded.source, created_at = excluded.created_at`
+    yield* invalidation.invalidate(keys.topicArt)
   })
 
 /** Asks the model for one topic's drawing and stores what came back. */

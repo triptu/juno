@@ -93,7 +93,7 @@ interface Live {
   /** The current request's response has started. */
   streamed: boolean
   /** Bubbles and reactions already published, by index in the run's parsed text. */
-  readonly bubbles: Array<{ readonly id: string; readonly text: string; readonly replyTo?: string }>
+  readonly bubbles: Array<RunState['bubbles'][number]>
   reactions: number
   /** The status bubble: dots, or a tool's line. */
   status: { text?: string }
@@ -234,7 +234,8 @@ export function createRouter(options: RouterOptions) {
     // What the run already wrote, so bubble numbers carry on where they were.
     run.done = runText(store, run.runId)
     const published = parseOutput(run.done)
-    run.bubbles.push(...published.bubbles.map((bubble, n) => ({ id: `${run.runId}:${n}`, text: bubble.text })))
+    const sources = sourceTable(store, run.runId)
+    run.bubbles.push(...published.bubbles.map((bubble, n) => ({ id: `${run.runId}:${n}`, text: bubble.text, body: resolveSpans(bubble.spans, sources) })))
     run.reactions = published.reactions.length
     const inputs = store.db.prepare('SELECT op_id AS opId FROM run_inputs WHERE run_id = ?').all(run.runId) as Array<{ opId: string }>
     for (const input of inputs) run.inputs.set(input.opId, find(store, input.opId)?.submissionId ?? undefined)
@@ -310,9 +311,9 @@ export function createRouter(options: RouterOptions) {
     for (const bubble of output.bubbles.slice(run.bubbles.length)) {
       const id = `${run.runId}:${run.bubbles.length}`
       const replyTo = bubble.replyTo === undefined ? undefined : ownerOpOf(store, bubble.replyTo)
-      run.bubbles.push({ id, text: bubble.text, ...(replyTo ? { replyTo } : {}) })
-      run.status = {}
       const body = resolveSpans(bubble.spans, sourceTable(store, run.runId))
+      run.bubbles.push({ id, text: bubble.text, body, ...(replyTo ? { replyTo } : {}) })
+      run.status = {}
       emit({ _tag: 'bubble', runId: run.runId, id, text: bubble.text, body, ...(replyTo ? { replyTo } : {}) })
     }
     for (const reaction of output.reactions.slice(run.reactions)) {

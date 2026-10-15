@@ -20,6 +20,16 @@ describe('emoji table', () => {
     expect(emojiUnicode('wave::skin-tone-2')).toBe('👋🏻')
   })
 
+  it('knows every standard emoji by its Slack name and aliases', () => {
+    expect(emojiUnicode('partying_face')).toBe('🥳')
+    expect(emojiUnicode('flag-gb')).toBe(emojiUnicode('uk'))
+    expect(emojiUnicode('email')).toBe('✉️')
+  })
+
+  it('puts the skin tone on the person in a joined sequence', () => {
+    expect(emojiUnicode('woman-raising-hand::skin-tone-2')).toBe('🙋🏻‍♀️')
+  })
+
   it('returns undefined for unknown names', () => {
     expect(emojiUnicode('not_an_emoji')).toBeUndefined()
   })

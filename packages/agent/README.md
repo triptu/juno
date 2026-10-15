@@ -205,3 +205,13 @@ startup: open authorizations ─▶ unknown (recovery) ─▶ reconcile once ─
 - **Cost**: each change rebuilds the whole list with a few queries, and parses finished runs' text again. That is fine for M2; a 5,000-message chat will want finished runs cached, against the budget in `docs/performance.md`.
 
 `test/serve.test.ts` and `test/juno-pages.test.ts` run the server on the real engine with the scripted model, through an RPC client on a Node `MessageChannel` (`test/serve-harness.ts`). `packages/state/test/agent-chat.test.ts` runs the renderer's atoms against it.
+
+## Scheduler (WP19)
+
+`src/schedule/` implements persisted occurrences, grant checks at admission and
+start, reply watches, schedule tools and card executors. Its page and commands
+are served when `ChatHost.schedule` is supplied. See
+[`src/schedule/README.md`](src/schedule/README.md) for the router and host
+integration contract, the message-menu RPC and the remaining startup wiring.
+`mintGrant` now joins a caller's transaction so a schedule and its grant commit
+together.

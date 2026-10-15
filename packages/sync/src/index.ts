@@ -63,5 +63,25 @@ export {
   type PendingPost,
   type PostState,
 } from './posts'
-export { applyOpened } from './events'
+export { applyOpened, type Acted } from './events'
+export {
+  actionDone,
+  deferAction,
+  dropAction,
+  flushActions,
+  pendingActions,
+  placeOf,
+  queueDelete,
+  queueEdit,
+  queueReaction,
+  resolveTarget,
+  settleOnFailedPost,
+  type ActionKind,
+  type ActionPayload,
+  type ActionPlace,
+  type ActionRefusal,
+  type ActionTarget,
+  type MessageRef,
+  type PendingAction,
+} from './actions'
 export { syncEmoji } from './emoji'
