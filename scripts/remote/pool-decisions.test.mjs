@@ -25,7 +25,7 @@ test('kept machines remain tracked until expiry', () => {
   assert.deepEqual(decide({ instances: [instance('kept')], states: [state('kept', { kept: true, lastUsed: 0 }), state('expired-kept', { kept: true, created: now - 10_800_000 })] }), ['expired-kept'])
 })
 test('capacity counts the whole workspace, without counting local state twice', () => {
-  assert.deepEqual(capacity([instance('tracked'), instance('orphan'), instance('other', { 'juno-remote': '0' })], [state('tracked'), state('gone')]), { tracked: 4, untracked: 8 })
+  assert.deepEqual(capacity([instance('tracked'), instance('orphan'), instance('other', { 'juno-remote': '0' })], [state('tracked'), state('new', { machine: 'linux/amd64:2x4' })]), { tracked: 6, untracked: 8 })
 })
 
 test('pending capacity is reserved until visible, without double counting', () => {

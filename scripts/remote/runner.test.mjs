@@ -112,7 +112,7 @@ test('watcher upgrade never signals an unrelated process with a reused PID', asy
 })
 
 test('pool retries inventory failures and reclaims timed-out creates before retrying', () => {
-  for (const [knownId, exhausted] of [[false, false], [true, false], [true, true]]) {
+  for (const [knownId, exhausted, failedDestroy] of [[false, false, false], [true, false, false], [true, true, false], [true, false, true]]) {
     const dir = mkdtempSync(join(tmpdir(), 'juno-pool-retry-'))
     const poolDir = join(dir, 'juno-remote-pool')
     const state = join(dir, 'instances.json')
@@ -126,8 +126,10 @@ if (process.argv[2] === 'list') {
  const count = fs.existsSync(process.env.TEST_LISTS) ? Number(fs.readFileSync(process.env.TEST_LISTS)) : 0;
  fs.writeFileSync(process.env.TEST_LISTS, String(count + 1));
  if (count < 3) { console.error(count ? 'Unavailable' : 'spawnSync nsc ETIMEDOUT'); process.exit(1); }
- console.log(fs.readFileSync(file, 'utf8'));
+ const instances = JSON.parse(fs.readFileSync(file, 'utf8'));
+ console.log(JSON.stringify(instances.length ? instances : null));
 } else if (process.argv[2] === 'destroy') {
+ if (${failedDestroy} && !fs.existsSync(file + '.destroy')) { fs.writeFileSync(file + '.destroy', '1'); console.error('context deadline exceeded'); process.exit(1); }
  fs.writeFileSync(file, JSON.stringify(JSON.parse(fs.readFileSync(file)).filter(x => x.cluster_id !== process.argv[3])));
 } else process.exit(2);
 `)
@@ -138,7 +140,7 @@ import { mkdirSync, writeFileSync, readFileSync, readdirSync } from 'node:fs';
 import { acquire, destroy } from ${JSON.stringify(new URL('./pool.mjs', import.meta.url).href)};
 mkdirSync(${JSON.stringify(poolDir)}, { recursive: true });
 writeFileSync(${JSON.stringify(join(poolDir, 'watcher.pid'))}, String(process.pid));
-writeFileSync(${JSON.stringify(join(poolDir, 'watcher.version'))}, '4');
+writeFileSync(${JSON.stringify(join(poolDir, 'watcher.version'))}, '5');
 let attempts = 0;
 const logs = [];
 const request = acquire('linux/amd64:2x4', async (_, labels) => {

@@ -22,10 +22,13 @@ export function machinesToDestroy({ instances, states, pending, owner, now, idle
 
 export function capacity(instances, states) {
   const ids = new Set(states.map((state) => state.id))
+  // A create can finish after the inventory read and replace its pending reservation.
+  const visible = new Set(instances.map((instance) => instance.cluster_id))
+  const reserved = states.filter((state) => !visible.has(state.id)).reduce((sum, state) => sum + Number(/:(\d+)x/.exec(state.machine)?.[1] ?? 8), 0)
   return instances.reduce((total, instance) => {
     total[ids.has(instance.cluster_id) ? 'tracked' : 'untracked'] += instance.shape?.virtual_cpu ?? 8
     return total
-  }, { tracked: 0, untracked: 0 })
+  }, { tracked: reserved, untracked: 0 })
 }
 
 /** Creates not yet visible in the workspace still reserve their requested cores. */

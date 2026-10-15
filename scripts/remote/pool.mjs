@@ -100,7 +100,7 @@ function ensureReaper() {
     let pid
     try { pid = Number(readFileSync(pidFile, 'utf8')) } catch { /* No watcher yet. */ }
     const version = existsSync(versionFile) ? Number(readFileSync(versionFile, 'utf8')) : 1
-    if (alive(pid) && version >= 4) return
+    if (alive(pid) && version >= 5) return
     // Upgrade housekeeping only. Machine/job owners are untouched.
     if (alive(pid)) {
       const command = spawnSync('ps', ['-p', String(pid), '-o', 'args='], { encoding: 'utf8', timeout: 1000 }).stdout ?? ''
@@ -109,7 +109,7 @@ function ensureReaper() {
     }
     const child = spawn(process.execPath, [fileURLToPath(import.meta.url), '--watch'], { detached: true, stdio: 'ignore', env: { ...process.env, JUNO_REMOTE_IDLE_MINUTES: '1' } })
     writeFileSync(pidFile, String(child.pid))
-    writeFileSync(versionFile, '4')
+    writeFileSync(versionFile, '5')
     child.unref()
   } finally { unlock('watcher-start') }
 }
@@ -171,8 +171,7 @@ async function provision(machine, pending, create) {
     return { id, warm: false, images: [] }
   } catch (error) {
     write({ ...pending, pid: undefined, failed: true })
-    if (error.instanceId && !destroy(error.instanceId)) throw new Error(`could not reclaim failed instance ${error.instanceId}; retained for reaper`)
-    if (error.instanceId) rmSync(statePath(pending.id), { force: true })
+    if (error.instanceId && destroy(error.instanceId)) rmSync(statePath(pending.id), { force: true })
     throw error
   }
 }
