@@ -57,7 +57,8 @@ import {
   type TopicStatus,
 } from '@juno/domain'
 import type { ChannelRef, Person, TopicArt, TopicCounts, TopicListRow } from '@juno/contract'
-import { StoreReader, type SqlError } from '@juno/store'
+import { StoreReader, syncState, type SqlError } from '@juno/store'
+import { BOOT_KEY } from '@juno/sync'
 import { Effect } from 'effect'
 import type { ListRun } from '../protocol/live'
 import {
@@ -336,7 +337,7 @@ export const listTopics = (filter: ListFilter, options: QueryOptions, cache: Row
 
     for (const entry of pinned) shaper.place(entry, 'pinned', topicStatus(entry.topic, ctx))
     for (const entry of recent.slice(0, Math.max(0, options.limit - pinned.length))) shaper.place(entry, 'recent', topicStatus(entry.topic, ctx))
-    return shaper.finish()
+    return { ...shaper.finish(), windowCovered: (yield* syncState.get(BOOT_KEY)) !== undefined }
   })
 
 /** The quiet window's start as a ts, to the millisecond, so `ts < cutoff` is exactly the domain's quiet rule. */
