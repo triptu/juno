@@ -1061,3 +1061,32 @@ test.describe('Juno chat', () => {
     }
   })
 })
+
+test('New chat open to first paint', async ({ juno, win }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  const samples: number[] = []
+  for (let i = 0; i < 20; i++) {
+    await juno.sidebar.row(POSTGRES).open()
+    await juno.topic.expectTitle(POSTGRES)
+    await win.evaluate(() => {
+      const button = document.querySelector('[aria-label="New chat ⌘T"]')
+      if (!button) throw new Error('New chat button missing')
+      button.addEventListener('click', () => {
+        performance.mark('new-chat-open-start')
+        const observer = new MutationObserver(() => {
+          if (![...document.querySelectorAll('[data-new-chat]')].some(node => node.getClientRects().length > 0)) return
+          observer.disconnect()
+          requestAnimationFrame(() => setTimeout(() => performance.measure('new-chat-open', 'new-chat-open-start'), 0))
+        })
+        observer.observe(document.body, { childList: true, subtree: true, attributes: true })
+      }, { once: true })
+    })
+    await juno.tabs.newTabButton.hover()
+    await press(win)
+    await expect(juno.newChat.root).toBeVisible()
+    await expect.poll(() => win.evaluate(() => performance.getEntriesByName('new-chat-open').length)).toBe(i + 1)
+    samples.push(await win.evaluate(() => performance.getEntriesByName('new-chat-open').at(-1)!.duration))
+  }
+  within('New chat open, p95', stats('New chat open to first paint', samples).p95, 50)
+})
