@@ -160,6 +160,10 @@ export type ConnectionsPage = typeof ConnectionsPage.Type
 export const ReviewPage = Schema.Struct({
   /** When the backup Juno restored from was taken. Absent outside recovery. */
   backupAt: Schema.optionalKey(Schema.Number),
+  /** A move: the code of the backup found. The owner checks it matches the old Mac's before Activate. */
+  moveCode: Schema.optionalKey(Schema.String),
+  /** No trusted deletion record checked this backup: the page says `chatCopy.pages.review.unchecked`. */
+  unchecked: Schema.optionalKey(Schema.Literal(true)),
   pending: Schema.Array(Card),
 })
 export type ReviewPage = typeof ReviewPage.Type
@@ -189,7 +193,13 @@ export type ModelChoice = typeof ModelChoice.Type
  */
 export const Ownership = Schema.Union([
   Schema.TaggedStruct('active', { epoch: Schema.Int }),
-  Schema.TaggedStruct('released', { epoch: Schema.Int }),
+  Schema.TaggedStruct('released', {
+    epoch: Schema.Int,
+    /** After a move: the code the other Mac must show. Absent until the final backup is written. */
+    moveCode: Schema.optionalKey(Schema.String),
+    /** The Mac that owns Juno now, when this one saw it in the backup folder. */
+    deviceName: Schema.optionalKey(Schema.String),
+  }),
   Schema.TaggedStruct('recovery', { pending: Schema.Int }),
 ])
 export type Ownership = typeof Ownership.Type

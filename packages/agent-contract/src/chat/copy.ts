@@ -278,6 +278,10 @@ export const chatCopy = {
       title: 'Check what was pending',
       body: 'Juno restored from a backup. These actions were waiting. Each may already have happened. Approve the ones you still want, then activate Juno.',
       activate: 'Activate Juno',
+      /** Shown when no trusted deletion record checked the backup (SPEC 13.8). */
+      unchecked: "Juno can't check that this backup is the newest. If the folder is out of date, messages you removed may come back. You can remove them again.",
+      /** "Move code 7KQ2-M9XA. Check that your other Mac shows the same code." */
+      moveCode: (code: string) => `Move code ${code}. Check that your other Mac shows the same code.`,
     },
     settings: {
       /** "Removal pending · 1 copy in a running job". */
