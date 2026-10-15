@@ -83,20 +83,22 @@ export const HomeHandlers = HomeRoutes.toLayer(
       )
     }
 
-    const view = serveLiveValue(
-      workspace.changes.pipe(
-        Stream.switchMap((open) =>
-          open === undefined
-            ? Stream.empty
-            : liveQuery(
-                KEYS,
-                timed(readHome().pipe(Effect.tap((run) => (run.aiAssist && run.view.ready ? rewrite(open, run) : Effect.void)))).pipe(
-                  Effect.map((timedRun) => ({ value: timedRun.value.view, queryMs: timedRun.queryMs })),
-                ),
-              ).pipe(Stream.provide(open.context)),
+    // One stream per subscription: `serveLiveValue` remembers the last value it sent.
+    const view = () =>
+      serveLiveValue(
+        workspace.changes.pipe(
+          Stream.switchMap((open) =>
+            open === undefined
+              ? Stream.empty
+              : liveQuery(
+                  KEYS,
+                  timed(readHome().pipe(Effect.tap((run) => (run.aiAssist && run.view.ready ? rewrite(open, run) : Effect.void)))).pipe(
+                    Effect.map((timedRun) => ({ value: timedRun.value.view, queryMs: timedRun.queryMs })),
+                  ),
+                ).pipe(Stream.provide(open.context)),
+          ),
         ),
-      ),
-    ).pipe(retryFirstRun('home.view'), Stream.orDie)
+      ).pipe(retryFirstRun('home.view'), Stream.orDie)
 
     /** Runs a write in the open workspace's store. A store failure is a bug (architecture 2.6). */
     const write = (effect: Effect.Effect<void, SqlError, StoreWriter | Invalidation>): Effect.Effect<void, NotSignedIn> =>
@@ -107,7 +109,7 @@ export const HomeHandlers = HomeRoutes.toLayer(
       })
 
     return {
-      'home.view': () => view,
+      'home.view': () => view(),
       'home.visit': ({ id }) =>
         write(
           Effect.gen(function* () {

@@ -30,6 +30,16 @@ function burst(engine: RunningEngine, channel: string, threadTs: string, count =
 }
 
 describe('Home', () => {
+  it('answers a second subscription with the current value at once', async () => {
+    const engine = await bootedEngine(engines)
+    const first = await homeUntil(engine, (view) => view.ready && view.items.length > 0, 'the first subscription')
+    for (const unmount of unmounts.splice(0)) unmount()
+    // Past the renderer's idle time, so the subscription ends and a new one starts.
+    await new Promise((resolve) => setTimeout(resolve, 31_000))
+    const again = await homeUntil(engine, (view) => view.ready, 'the second subscription')
+    expect(again.items.map((item) => item.id)).toContain(first.items[0]!.id)
+  }, 90_000)
+
   it('with AI assist off, ranks what waits, where the user left off and what moved, and adds nothing from the assistant', async () => {
     const engine = await bootedEngine(engines)
     valueOf(await runCommand(engine.registry, prefsSet, { key: 'aiAssist', value: false }))
