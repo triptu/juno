@@ -69,9 +69,9 @@ describe.skipIf(process.env['JUNO_BENCH'] !== '1')('topics.list on the large see
         const channel = channels[(i * 37) % channels.length]!
         const at = Date.now()
         engine.fake.injectMessage({ channel, user: 'U000001L', text: `bench ${i}` })
-        const after = await engine.rowsUntil(() => {
+        const after = await engine.rowsUntil((rows) => {
           const result = engine.registry.get(engine.topicsAtom())
-          return result._tag === 'Success' && result.value.meta.seq > beforeSeq
+          return result._tag === 'Success' && result.value.meta.seq > beforeSeq && rows.some((row) => row.kind === 'main' && row.channel.id === channel && row.preview.text === `bench ${i}`)
         }, `update ${i}`)
         latencies.push(Date.now() - at)
         const result = engine.registry.get(engine.topicsAtom())
@@ -109,7 +109,7 @@ describe.skipIf(process.env['JUNO_BENCH'] !== '1')('topics.list on the large see
             }).pipe(Effect.provideService(StoreReader, reader))
           const filter = { kind: 'all', unreadOnly: false } as const
           const now = Date.now()
-          const cold = yield* time(40, listTopics(filter, { now, limit: 300 }))
+          const cold = yield* time(40, Effect.suspend(() => listTopics(filter, { now, limit: 300 })))
           const cache = makeRowCache({ keepUsers: true })
           const warm = yield* time(40, listTopics(filter, { now, limit: 300 }, cache))
           const snapshot = yield* listTopics(filter, { now, limit: 300 }).pipe(Effect.provideService(StoreReader, reader))

@@ -91,12 +91,12 @@ import {
  *   from a synchronous invalidation handler, so the forget always lands
  *   before the run that the same change triggers.
  * Make one per subscription and workspace with `makeRowCache()`. A run
- * replaces `entries` and `people` with what it read, so they never outgrow
- * one window; `users` grows to the people the windows have named.
+ * replaces `entries` with one window. People and users are retained while
+ * their source map is unchanged, up to the people the windows have named.
  */
 export interface RowCache {
   entries: ReadonlyMap<string, CacheEntry>
-  people: ReadonlyMap<string, Person>
+  people: Map<string, Person>
   selfId: string | undefined
   readonly keepUsers: boolean
   users: Map<string, UserRow | null> | undefined
@@ -335,7 +335,7 @@ export const listTopics = (filter: ListFilter, options: QueryOptions, cache: Row
     recent.sort((a, b) => byLatestActivity(a.topic, b.topic))
 
     for (const entry of pinned) shaper.place(entry, 'pinned', topicStatus(entry.topic, ctx))
-    for (const entry of recent.slice(0, Math.max(0, options.limit - pinned.length))) shaper.place(entry, 'recent', topicStatus(entry.topic, ctx))
+    for (const entry of recent.slice(0, Math.max(0, options.limit - pinned.length))) shaper.place(entry, 'recent', 'open')
     return shaper.finish()
   })
 
@@ -404,13 +404,9 @@ export const shapeRows = (
     // When no user was read or forgotten since the last run, every known person holds as it is.
     const peopleHold = cache.keepUsers && missing.length === 0 && users === cache.usersRead
     const knownPeople = cache.people
-    const people = new Map<string, Person>()
+    const people = peopleHold ? cache.people : new Map<string, Person>()
     const personOf = (id: string): Person => {
       let person = people.get(id)
-      if (person === undefined && peopleHold) {
-        person = knownPeople.get(id)
-        if (person !== undefined) people.set(id, person)
-      }
       if (person === undefined) {
         person = personFrom(id, users.get(id), knownPeople.get(id))
         people.set(id, person)
@@ -431,7 +427,6 @@ export const shapeRows = (
           ? hit
           : { ...entryOf(row, columns, selfId, personOf), source: row, parsed: columns }
       next.set(row.topic_id, entry)
-      for (const person of entry.people) people.set(person.id, person)
       entries.push(entry)
     }
 
@@ -459,21 +454,13 @@ export const shapeRows = (
     return { entries, place, finish }
   })
 
-/** Check the version first, then values: a removed index row can be recreated with the same version. */
+/** Every column of the joined row equal: the topic built from it still holds. */
 function sameSource(a: ListRow, b: ListRow): boolean {
-  return a.rev === b.rev &&
-    a.channel === b.channel && a.kind === b.kind && a.root_ts === b.root_ts &&
-    a.last_activity_ts === b.last_activity_ts && a.message_count === b.message_count &&
-    a.unread_count === b.unread_count && a.unread_exact === b.unread_exact && a.mentions_me === b.mentions_me &&
-    a.participants_json === b.participants_json && a.preview_json === b.preview_json &&
-    a.c_kind === b.c_kind && a.c_name === b.c_name &&
-    a.c_user_id === b.c_user_id && a.c_members === b.c_members &&
-    a.manual_title === b.manual_title && a.ai_title === b.ai_title &&
-    a.resolved_at === b.resolved_at && a.resolved_activity_ts === b.resolved_activity_ts &&
-    a.reopened_at === b.reopened_at && a.pinned_at === b.pinned_at &&
-    a.subscribed === b.subscribed && a.new_threads === b.new_threads &&
-    a.channel_activity_ts === b.channel_activity_ts &&
-    a.art_recipe === b.art_recipe && a.art_status === b.art_status
+  if (a.rev !== b.rev) return false
+  const left = a as unknown as Record<string, unknown>
+  const right = b as unknown as Record<string, unknown>
+  for (const key in right) if (left[key] !== right[key]) return false
+  return true
 }
 
 /** Every person the entry was built from is the same object this run: no name or photo changed. */
