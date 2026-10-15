@@ -19,7 +19,7 @@ for (const theme of ['light', 'dark']) {
     await expect.poll(() => image.evaluate((element: HTMLImageElement) => element.complete && element.naturalHeight === 800)).toBe(true)
     expect(await frame.boundingBox()).toEqual(before)
     const box = await image.boundingBox()
-    expect(box!.width).toBeLessThanOrEqual(360)
-    expect(box!.height).toBeLessThanOrEqual(240)
+    expect(box!.width).toBe(360)
+    expect(box!.height).toBe(240)
   })
 }

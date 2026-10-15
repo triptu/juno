@@ -106,7 +106,7 @@ const THUMB_MAX_WIDTH = 360
 const THUMB_MAX_HEIGHT = 240
 
 /** The box an image gets, from its own dimensions and the caps, before any bytes arrive. */
-export function thumbnailBox(width: number, height: number): { readonly width: number; readonly height: number } {
+export function thumbnailBox(width = THUMB_MAX_WIDTH, height = THUMB_MAX_HEIGHT): { readonly width: number; readonly height: number } {
   const safeWidth = Math.max(1, width)
   const safeHeight = Math.max(1, height)
   const scale = Math.min(1, THUMB_MAX_WIDTH / safeWidth, THUMB_MAX_HEIGHT / safeHeight)

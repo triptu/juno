@@ -3,6 +3,7 @@ import { useState, type ReactNode } from 'react'
 import type { BodyBlock } from '@juno/contract'
 import { colors, spacing, text, tints, layout, radii } from '@juno/tokens/tokens.stylex'
 import { Button } from '@juno/ui'
+import { thumbnailBox } from './FileCard'
 
 type Attachment = Extract<BodyBlock, { kind: 'attachment' }>
 
@@ -18,8 +19,8 @@ export function AttachmentCard({ attachment, title, children, footer, tabbable }
 }
 
 export function AttachmentImage({ image }: { readonly image: Extract<BodyBlock, { kind: 'image' }> }) {
-  const ratio = image.width && image.height && image.width > 0 && image.height > 0 ? image.width / image.height : 1.5
-  return <div {...stylex.props(styles.imageBox(ratio))}><img src={image.url} alt={image.alt} loading="lazy" decoding="async" {...stylex.props(styles.image)} /></div>
+  const box = image.width && image.height && image.width > 0 && image.height > 0 ? thumbnailBox(image.width, image.height) : thumbnailBox()
+  return <div {...stylex.props(styles.imageBox(box.width, box.height))}><img src={image.url} alt={image.alt} loading="lazy" decoding="async" {...stylex.props(styles.image)} /></div>
 }
 
 const styles = stylex.create({
@@ -28,7 +29,7 @@ const styles = stylex.create({
   content: { display: 'flex', flexDirection: 'column', gap: spacing['--space-2'], minWidth: 0 },
   collapsed: { maxHeight: layout['--thumb-max-height'], overflow: 'hidden' },
   footer: { fontSize: text['--text-tag-small-size'], color: colors['--foreground-muted'] },
-  imageBox: (ratio: number) => ({ position: 'relative', flexShrink: 0, width: `min(100%, ${layout['--thumb-max-width']}, calc(${layout['--thumb-max-height']} * ${ratio}))`, aspectRatio: ratio, backgroundColor: colors['--background-subtle'], borderRadius: radii['--radius-md'], overflow: 'hidden' }),
+  imageBox: (width: number, height: number) => ({ position: 'relative', flexShrink: 0, width, height, maxWidth: '100%', aspectRatio: `${width} / ${height}`, backgroundColor: colors['--background-subtle'], borderRadius: radii['--radius-md'], overflow: 'hidden' }),
   image: { position: 'absolute', inset: 0, display: 'block', width: '100%', height: '100%', objectFit: 'contain' },
 })
 const tintStyles = stylex.create({
