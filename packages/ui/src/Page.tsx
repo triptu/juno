@@ -79,6 +79,10 @@ const styles = stylex.create({
     minHeight: 0,
     overflowY: 'auto',
     overscrollBehavior: 'contain',
+    // The scrollbar's room is kept whether or not the page overflows, so a page
+    // that grows past the window (Settings › Juno once the agent's part arrives)
+    // does not move its centred column sideways.
+    scrollbarGutter: 'stable',
   },
   column: {
     display: 'flex',

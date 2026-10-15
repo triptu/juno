@@ -1,0 +1,15 @@
+{
+  "light": [
+    {
+      "text": "28",
+      "fg": "rgb(112, 110, 102)",
+      "bg": "241,238,228,1",
+      "ratio": 4.4,
+      "opacity": 1,
+      "size": "13.5px",
+      "weight": "400",
+      "path": "span<span<button<div[group]<div<div"
+    }
+  ],
+  "dark": []
+}

@@ -6,7 +6,7 @@
  */
 
 export interface CrashPointSpec {
-  readonly spec: 'agent-recovery.qnt' | 'agent-actions.qnt'
+  readonly spec: 'agent-recovery.qnt' | 'agent-actions.qnt' | 'agent-memory.qnt'
   /** The transition that has just committed. */
   readonly after: string
   /** The transition that has not run. */
@@ -49,6 +49,18 @@ export const CRASH_POINTS = {
   'rotation.committed': {
     spec: 'agent-recovery.qnt', after: 'rotate', before: 'resume', scenarios: ['rotationIdentity'],
     expect: '§3 rotation: the new incarnation is committed and never reused; the old journal file may still exist and is deleted, not reopened.',
+  },
+  'redaction.deletionRaised': {
+    spec: 'agent-recovery.qnt', after: 'raiseDeletion', before: 'redact', scenarios: ['deletionAheadStep', 'deletionOrder'],
+    expect: '§14.4 (G13): the deletion record is ahead of the data and nothing is removed; the owner sees no "Removed" and can remove again, which commits once.',
+  },
+  'redaction.committed': {
+    spec: 'agent-memory.qnt', after: 'redact', before: 'purge', scenarios: ['queueCurrent', 'localTaint'],
+    expect: '§4.5: the tombstones, the masked view, the new gen and the revoked grants are durable; startup finishes the purge.',
+  },
+  'redaction.purged': {
+    spec: 'agent-memory.qnt', after: 'purge', before: 'purge', scenarios: ['queueCurrent'],
+    expect: '§4.5 step 3: the steps before this one are done; startup runs the rest, and running a done step again changes nothing.',
   },
   'backup.segmentWritten': {
     spec: 'agent-recovery.qnt', after: 'encrypt', before: 'manifest', scenarios: ['nonceAfterCrash', 'manifestBeforeSegment'],

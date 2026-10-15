@@ -6,6 +6,13 @@
  * FULL alone does not survive power loss (spikes finding 2). SQLite ignores
  * the two fullfsync pragmas on other systems.
  *
+ * `secure_delete = ON` (agent.sqlite only): SQLite zeroes deleted content,
+ * freed pages included, so a removed message does not stay in free space
+ * (plan v3 §4.5). FAST is not enough: it leaves freed pages as they were, and
+ * a message over one page lives on overflow pages that are freed whole. The
+ * zeroed pages reach the main file at a checkpoint; a removal's purge forces
+ * one (`checkpointTruncate`).
+ *
  * `node:sqlite` is synchronous, so a commit blocks the event loop for its
  * fsync (about 3 ms with fullfsync, spikes S5). Every write here is one
  * small transaction.
@@ -55,12 +62,23 @@ export function openDatabase(path: string, sets: ReadonlyArray<MigrationSet> = [
   try {
     for (const pragma of DURABLE_PRAGMAS) db.exec(pragma)
     db.exec('PRAGMA foreign_keys = ON')
+    db.exec('PRAGMA secure_delete = ON')
     migrate(db, [CORE_MIGRATIONS, ...sets], now)
     return db
   } catch (error) {
     db.close()
     throw error
   }
+}
+
+/**
+ * Copies every WAL frame into the main file and truncates the WAL to zero
+ * bytes, so neither holds a page from before. Throws when a reader blocked
+ * it; the caller retries.
+ */
+export function checkpointTruncate(db: Database): void {
+  const row = db.prepare('PRAGMA wal_checkpoint(TRUNCATE)').get() as { busy: number }
+  if (row.busy !== 0) throw new Error('the checkpoint was blocked by a reader')
 }
 
 function migrate(db: Database, sets: ReadonlyArray<MigrationSet>, now: () => number): void {

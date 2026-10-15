@@ -63,10 +63,6 @@ const styles = stylex.create({
       default: colors['--input-border'],
       ':focus-within': accent['--focus-ring'],
     },
-    boxShadow: {
-      default: 'none',
-      ':focus-within': `0 0 0 1px ${accent['--focus-ring']}`,
-    },
     color: colors['--foreground-default'],
     cursor: 'text',
     minWidth: 0,
@@ -76,10 +72,6 @@ const styles = stylex.create({
     borderColor: {
       default: colors['--danger'],
       ':focus-within': colors['--danger'],
-    },
-    boxShadow: {
-      default: 'none',
-      ':focus-within': `0 0 0 1px ${colors['--danger']}`,
     },
   },
   icon: {

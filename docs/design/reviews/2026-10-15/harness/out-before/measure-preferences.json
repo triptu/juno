@@ -1,0 +1,461 @@
+[
+  {
+    "tag": "h1",
+    "label": "Preferences",
+    "rect": {
+      "x": 544,
+      "y": 84,
+      "w": 132.5,
+      "h": 39.1
+    },
+    "padding": "0px",
+    "gap": "normal",
+    "radius": "0px",
+    "font": "34px/39.1px 400 \"Instrument Serif\"",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "0px none rgb(35, 33, 26)",
+    "shadow": "none",
+    "outline": "none 3px rgb(35, 33, 26) offset 0px",
+    "children": []
+  },
+  {
+    "tag": "h2",
+    "label": "Appearance",
+    "rect": {
+      "x": 544,
+      "y": 159.1,
+      "w": 696,
+      "h": 20.9
+    },
+    "padding": "0px",
+    "gap": "normal",
+    "radius": "0px",
+    "font": "15.5px/20.925px 600 \"Figtree Variable\"",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "0px none rgb(35, 33, 26)",
+    "shadow": "none",
+    "outline": "none 3px rgb(35, 33, 26) offset 0px",
+    "children": []
+  },
+  {
+    "tag": "button",
+    "label": "System",
+    "rect": {
+      "x": 655,
+      "y": 209,
+      "w": 60.5,
+      "h": 24
+    },
+    "padding": "0px 9px",
+    "gap": "normal",
+    "radius": "5px",
+    "font": "12.5px/normal 500 \"Figtree Variable\"",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgb(251, 251, 248)",
+    "border": "0px solid rgba(0, 0, 0, 0)",
+    "shadow": "rgba(27, 28, 21, 0.04) 0px 1px 2px 0px",
+    "outline": "none 2px rgb(180, 53, 31) offset -2px",
+    "children": []
+  },
+  {
+    "tag": "button",
+    "label": "Light",
+    "rect": {
+      "x": 717.5,
+      "y": 209,
+      "w": 46.8,
+      "h": 24
+    },
+    "padding": "0px 9px",
+    "gap": "normal",
+    "radius": "5px",
+    "font": "12.5px/normal 500 \"Figtree Variable\"",
+    "color": "rgb(112, 110, 102)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "0px solid rgba(0, 0, 0, 0)",
+    "shadow": "none",
+    "outline": "none 2px rgb(180, 53, 31) offset -2px",
+    "children": []
+  },
+  {
+    "tag": "button",
+    "label": "Dark",
+    "rect": {
+      "x": 766.3,
+      "y": 209,
+      "w": 43.7,
+      "h": 24
+    },
+    "padding": "0px 9px",
+    "gap": "normal",
+    "radius": "5px",
+    "font": "12.5px/normal 500 \"Figtree Variable\"",
+    "color": "rgb(112, 110, 102)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "0px solid rgba(0, 0, 0, 0)",
+    "shadow": "none",
+    "outline": "none 2px rgb(180, 53, 31) offset -2px",
+    "children": []
+  },
+  {
+    "tag": "button",
+    "label": "Coral",
+    "rect": {
+      "x": 653,
+      "y": 257.6,
+      "w": 24,
+      "h": 24
+    },
+    "padding": "0px",
+    "gap": "normal",
+    "radius": "999px",
+    "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+    "color": "rgb(255, 255, 255)",
+    "bg": "rgb(204, 70, 40)",
+    "border": "0px solid rgba(0, 0, 0, 0)",
+    "shadow": "rgb(251, 251, 248) 0px 0px 0px 2px, rgb(35, 33, 26) 0px 0px 0px 4px",
+    "outline": "none 2px rgb(180, 53, 31) offset 2px",
+    "children": [
+      {
+        "tag": "svg",
+        "label": "",
+        "rect": {
+          "x": 658.5,
+          "y": 263.1,
+          "w": 13,
+          "h": 13
+        },
+        "padding": "0px",
+        "gap": "normal",
+        "radius": "0px",
+        "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+        "color": "rgb(255, 255, 255)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(255, 255, 255)",
+        "shadow": "none",
+        "outline": "none 3px rgb(255, 255, 255) offset 0px"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "label": "Near-black",
+    "rect": {
+      "x": 685,
+      "y": 257.6,
+      "w": 24,
+      "h": 24
+    },
+    "padding": "0px",
+    "gap": "normal",
+    "radius": "999px",
+    "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+    "color": "rgb(245, 244, 240)",
+    "bg": "rgb(27, 24, 14)",
+    "border": "0px solid rgba(0, 0, 0, 0)",
+    "shadow": "none",
+    "outline": "none 2px rgb(180, 53, 31) offset 2px",
+    "children": []
+  },
+  {
+    "tag": "button",
+    "label": "Marigold",
+    "rect": {
+      "x": 717,
+      "y": 257.6,
+      "w": 24,
+      "h": 24
+    },
+    "padding": "0px",
+    "gap": "normal",
+    "radius": "999px",
+    "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+    "color": "rgb(43, 30, 0)",
+    "bg": "rgb(242, 169, 0)",
+    "border": "0px solid rgba(0, 0, 0, 0)",
+    "shadow": "none",
+    "outline": "none 2px rgb(180, 53, 31) offset 2px",
+    "children": []
+  },
+  {
+    "tag": "button",
+    "label": "Teal",
+    "rect": {
+      "x": 749,
+      "y": 257.6,
+      "w": 24,
+      "h": 24
+    },
+    "padding": "0px",
+    "gap": "normal",
+    "radius": "999px",
+    "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+    "color": "rgb(255, 255, 255)",
+    "bg": "rgb(11, 122, 117)",
+    "border": "0px solid rgba(0, 0, 0, 0)",
+    "shadow": "none",
+    "outline": "none 2px rgb(180, 53, 31) offset 2px",
+    "children": []
+  },
+  {
+    "tag": "button",
+    "label": "Midnight blue",
+    "rect": {
+      "x": 781,
+      "y": 257.6,
+      "w": 24,
+      "h": 24
+    },
+    "padding": "0px",
+    "gap": "normal",
+    "radius": "999px",
+    "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+    "color": "rgb(255, 250, 235)",
+    "bg": "rgb(46, 31, 100)",
+    "border": "0px solid rgba(0, 0, 0, 0)",
+    "shadow": "none",
+    "outline": "none 2px rgb(180, 53, 31) offset 2px",
+    "children": []
+  },
+  {
+    "tag": "button",
+    "label": "Dark emerald",
+    "rect": {
+      "x": 813,
+      "y": 257.6,
+      "w": 24,
+      "h": 24
+    },
+    "padding": "0px",
+    "gap": "normal",
+    "radius": "999px",
+    "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+    "color": "rgb(255, 250, 235)",
+    "bg": "rgb(0, 103, 79)",
+    "border": "0px solid rgba(0, 0, 0, 0)",
+    "shadow": "none",
+    "outline": "none 2px rgb(180, 53, 31) offset 2px",
+    "children": []
+  },
+  {
+    "tag": "button",
+    "label": "Claret",
+    "rect": {
+      "x": 845,
+      "y": 257.6,
+      "w": 24,
+      "h": 24
+    },
+    "padding": "0px",
+    "gap": "normal",
+    "radius": "999px",
+    "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+    "color": "rgb(255, 250, 235)",
+    "bg": "rgb(127, 23, 52)",
+    "border": "0px solid rgba(0, 0, 0, 0)",
+    "shadow": "none",
+    "outline": "none 2px rgb(180, 53, 31) offset 2px",
+    "children": []
+  },
+  {
+    "tag": "button",
+    "label": "Cyan",
+    "rect": {
+      "x": 877,
+      "y": 257.6,
+      "w": 24,
+      "h": 24
+    },
+    "padding": "0px",
+    "gap": "normal",
+    "radius": "999px",
+    "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+    "color": "rgb(6, 5, 5)",
+    "bg": "rgb(0, 138, 179)",
+    "border": "0px solid rgba(0, 0, 0, 0)",
+    "shadow": "none",
+    "outline": "none 2px rgb(180, 53, 31) offset 2px",
+    "children": []
+  },
+  {
+    "tag": "button",
+    "label": "Comfortable",
+    "rect": {
+      "x": 655,
+      "y": 306.3,
+      "w": 89.5,
+      "h": 24
+    },
+    "padding": "0px 9px",
+    "gap": "normal",
+    "radius": "5px",
+    "font": "12.5px/normal 500 \"Figtree Variable\"",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgb(251, 251, 248)",
+    "border": "0px solid rgba(0, 0, 0, 0)",
+    "shadow": "rgba(27, 28, 21, 0.04) 0px 1px 2px 0px",
+    "outline": "none 2px rgb(180, 53, 31) offset -2px",
+    "children": []
+  },
+  {
+    "tag": "button",
+    "label": "Compact",
+    "rect": {
+      "x": 746.5,
+      "y": 306.3,
+      "w": 70.4,
+      "h": 24
+    },
+    "padding": "0px 9px",
+    "gap": "normal",
+    "radius": "5px",
+    "font": "12.5px/normal 500 \"Figtree Variable\"",
+    "color": "rgb(112, 110, 102)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "0px solid rgba(0, 0, 0, 0)",
+    "shadow": "none",
+    "outline": "none 2px rgb(180, 53, 31) offset -2px",
+    "children": []
+  },
+  {
+    "tag": "h2",
+    "label": "Peek",
+    "rect": {
+      "x": 544,
+      "y": 383.3,
+      "w": 696,
+      "h": 20.9
+    },
+    "padding": "0px",
+    "gap": "normal",
+    "radius": "0px",
+    "font": "15.5px/20.925px 600 \"Figtree Variable\"",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "0px none rgb(35, 33, 26)",
+    "shadow": "none",
+    "outline": "none 3px rgb(35, 33, 26) offset 0px",
+    "children": []
+  },
+  {
+    "tag": "button",
+    "label": "⌥ Option",
+    "rect": {
+      "x": 559,
+      "y": 481.7,
+      "w": 72.5,
+      "h": 24
+    },
+    "padding": "0px 9px",
+    "gap": "normal",
+    "radius": "5px",
+    "font": "12.5px/normal 500 \"Figtree Variable\"",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgb(251, 251, 248)",
+    "border": "0px solid rgba(0, 0, 0, 0)",
+    "shadow": "rgba(27, 28, 21, 0.04) 0px 1px 2px 0px",
+    "outline": "none 2px rgb(180, 53, 31) offset -2px",
+    "children": []
+  },
+  {
+    "tag": "button",
+    "label": "Space",
+    "rect": {
+      "x": 633.5,
+      "y": 481.7,
+      "w": 53.2,
+      "h": 24
+    },
+    "padding": "0px 9px",
+    "gap": "normal",
+    "radius": "5px",
+    "font": "12.5px/normal 500 \"Figtree Variable\"",
+    "color": "rgb(112, 110, 102)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "0px solid rgba(0, 0, 0, 0)",
+    "shadow": "none",
+    "outline": "none 2px rgb(180, 53, 31) offset -2px",
+    "children": []
+  },
+  {
+    "tag": "h2",
+    "label": "Notifications",
+    "rect": {
+      "x": 544,
+      "y": 556.7,
+      "w": 696,
+      "h": 20.9
+    },
+    "padding": "0px",
+    "gap": "normal",
+    "radius": "0px",
+    "font": "15.5px/20.925px 600 \"Figtree Variable\"",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "0px none rgb(35, 33, 26)",
+    "shadow": "none",
+    "outline": "none 3px rgb(35, 33, 26) offset 0px",
+    "children": []
+  },
+  {
+    "tag": "button",
+    "label": "Open notification settings",
+    "rect": {
+      "x": 544,
+      "y": 611.9,
+      "w": 207.5,
+      "h": 30
+    },
+    "padding": "0px 12px",
+    "gap": "6px",
+    "radius": "12px",
+    "font": "13.5px/20.25px 500 \"Figtree Variable\"",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "1px solid rgb(234, 230, 215)",
+    "shadow": "none",
+    "outline": "none 2px rgb(180, 53, 31) offset 2px",
+    "children": [
+      {
+        "tag": "svg",
+        "label": "",
+        "rect": {
+          "x": 557,
+          "y": 618.9,
+          "w": 16,
+          "h": 16
+        },
+        "padding": "0px",
+        "gap": "normal",
+        "radius": "0px",
+        "font": "13.5px/20.25px 500 \"Figtree Variable\"",
+        "color": "rgb(35, 33, 26)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(35, 33, 26)",
+        "shadow": "none",
+        "outline": "none 3px rgb(35, 33, 26) offset 0px"
+      },
+      {
+        "tag": "span",
+        "label": "Open notification settings",
+        "rect": {
+          "x": 579,
+          "y": 616.7,
+          "w": 159.5,
+          "h": 20.3
+        },
+        "padding": "0px",
+        "gap": "normal",
+        "radius": "0px",
+        "font": "13.5px/20.25px 500 \"Figtree Variable\"",
+        "color": "rgb(35, 33, 26)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(35, 33, 26)",
+        "shadow": "none",
+        "outline": "none 3px rgb(35, 33, 26) offset 0px"
+      }
+    ]
+  }
+]

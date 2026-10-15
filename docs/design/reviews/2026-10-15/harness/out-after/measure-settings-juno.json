@@ -1,0 +1,915 @@
+[
+  {
+    "tag": "h1",
+    "label": "Juno",
+    "rect": {
+      "x": 539,
+      "y": 84,
+      "w": 459.3,
+      "h": 39.1
+    },
+    "padding": "0px",
+    "gap": "normal",
+    "radius": "0px",
+    "font": "34px/39.1px 400 \"Instrument Serif\"",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "0px none rgb(35, 33, 26)",
+    "shadow": "none",
+    "outline": "none 3px rgb(35, 33, 26) offset 0px",
+    "children": []
+  },
+  {
+    "tag": "p",
+    "label": "Models, spend, the provider and your rul",
+    "rect": {
+      "x": 539,
+      "y": 131.1,
+      "w": 459.3,
+      "h": 23.2
+    },
+    "padding": "0px",
+    "gap": "normal",
+    "radius": "0px",
+    "font": "14.5px/23.2px 400 \"Figtree Variable\"",
+    "color": "rgb(96, 94, 82)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "0px none rgb(96, 94, 82)",
+    "shadow": "none",
+    "outline": "none 3px rgb(96, 94, 82) offset 0px",
+    "children": []
+  },
+  {
+    "tag": "h2",
+    "label": "Provider",
+    "rect": {
+      "x": 539,
+      "y": 190.3,
+      "w": 696,
+      "h": 20.9
+    },
+    "padding": "0px",
+    "gap": "normal",
+    "radius": "0px",
+    "font": "15.5px/20.925px 600 \"Figtree Variable\"",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "0px none rgb(35, 33, 26)",
+    "shadow": "none",
+    "outline": "none 3px rgb(35, 33, 26) offset 0px",
+    "children": []
+  },
+  {
+    "tag": "p",
+    "label": "Juno uses one at a time. Keys stay in yo",
+    "rect": {
+      "x": 539,
+      "y": 213.2,
+      "w": 696,
+      "h": 20.3
+    },
+    "padding": "0px",
+    "gap": "normal",
+    "radius": "0px",
+    "font": "13.5px/20.25px 400 \"Figtree Variable\"",
+    "color": "rgb(112, 110, 102)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "0px none rgb(112, 110, 102)",
+    "shadow": "none",
+    "outline": "none 3px rgb(112, 110, 102) offset 0px",
+    "children": []
+  },
+  {
+    "tag": "button",
+    "label": "OpenRouter",
+    "rect": {
+      "x": 541,
+      "y": 247.5,
+      "w": 87.1,
+      "h": 24
+    },
+    "padding": "0px 9px",
+    "gap": "normal",
+    "radius": "5px",
+    "font": "12.5px/normal 500 \"Figtree Variable\"",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgb(251, 251, 248)",
+    "border": "0px solid rgba(0, 0, 0, 0)",
+    "shadow": "rgba(27, 28, 21, 0.04) 0px 1px 2px 0px",
+    "outline": "none 2px rgb(180, 53, 31) offset -2px",
+    "children": []
+  },
+  {
+    "tag": "button",
+    "label": "OpenAI-compatible",
+    "rect": {
+      "x": 630.1,
+      "y": 247.5,
+      "w": 129.7,
+      "h": 24
+    },
+    "padding": "0px 9px",
+    "gap": "normal",
+    "radius": "5px",
+    "font": "12.5px/normal 500 \"Figtree Variable\"",
+    "color": "rgb(112, 110, 102)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "0px solid rgba(0, 0, 0, 0)",
+    "shadow": "none",
+    "outline": "none 2px rgb(180, 53, 31) offset -2px",
+    "children": []
+  },
+  {
+    "tag": "p",
+    "label": "API key",
+    "rect": {
+      "x": 554,
+      "y": 298.4,
+      "w": 47.9,
+      "h": 23.2
+    },
+    "padding": "0px",
+    "gap": "normal",
+    "radius": "0px",
+    "font": "14.5px/23.2px 400 \"Figtree Variable\"",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "0px none rgb(35, 33, 26)",
+    "shadow": "none",
+    "outline": "none 3px rgb(35, 33, 26) offset 0px",
+    "children": []
+  },
+  {
+    "tag": "label",
+    "label": "",
+    "rect": {
+      "x": 1064,
+      "y": 295,
+      "w": 160,
+      "h": 30
+    },
+    "padding": "0px 10px",
+    "gap": "8px",
+    "radius": "7px",
+    "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgb(251, 251, 248)",
+    "border": "1px solid rgb(216, 213, 203)",
+    "shadow": "none",
+    "outline": "none 3px rgb(35, 33, 26) offset 0px",
+    "children": [
+      {
+        "tag": "input",
+        "label": "API key",
+        "rect": {
+          "x": 1075,
+          "y": 296,
+          "w": 138,
+          "h": 28
+        },
+        "padding": "0px",
+        "gap": "normal",
+        "radius": "0px",
+        "font": "13.5px/20.25px 400 \"Figtree Variable\"",
+        "color": "rgb(35, 33, 26)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px inset rgb(118, 118, 118)",
+        "shadow": "none",
+        "outline": "none 3px rgb(35, 33, 26) offset 0px"
+      }
+    ]
+  },
+  {
+    "tag": "input",
+    "label": "API key",
+    "rect": {
+      "x": 1075,
+      "y": 296,
+      "w": 138,
+      "h": 28
+    },
+    "padding": "0px",
+    "gap": "normal",
+    "radius": "0px",
+    "font": "13.5px/20.25px 400 \"Figtree Variable\"",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "0px inset rgb(118, 118, 118)",
+    "shadow": "none",
+    "outline": "none 3px rgb(35, 33, 26) offset 0px",
+    "children": []
+  },
+  {
+    "tag": "button",
+    "label": "Remove",
+    "rect": {
+      "x": 1113.8,
+      "y": 347.5,
+      "w": 62,
+      "h": 22
+    },
+    "padding": "0px 8px",
+    "gap": "4px",
+    "radius": "999px",
+    "font": "12px/normal 500 \"Figtree Variable\"",
+    "color": "rgb(96, 94, 82)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "1px solid rgba(0, 0, 0, 0)",
+    "shadow": "none",
+    "outline": "none 2px rgb(180, 53, 31) offset 2px",
+    "children": [
+      {
+        "tag": "span",
+        "label": "Remove",
+        "rect": {
+          "x": 1122.8,
+          "y": 351.2,
+          "w": 44,
+          "h": 14.5
+        },
+        "padding": "0px",
+        "gap": "normal",
+        "radius": "0px",
+        "font": "12px/normal 500 \"Figtree Variable\"",
+        "color": "rgb(96, 94, 82)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(96, 94, 82)",
+        "shadow": "none",
+        "outline": "none 3px rgb(96, 94, 82) offset 0px"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "label": "Save",
+    "rect": {
+      "x": 1179.8,
+      "y": 347.5,
+      "w": 44.2,
+      "h": 22
+    },
+    "padding": "0px 8px",
+    "gap": "4px",
+    "radius": "999px",
+    "font": "12px/normal 500 \"Figtree Variable\"",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgb(241, 238, 228)",
+    "border": "1px solid rgba(0, 0, 0, 0)",
+    "shadow": "none",
+    "outline": "none 2px rgb(180, 53, 31) offset 2px",
+    "children": [
+      {
+        "tag": "span",
+        "label": "Save",
+        "rect": {
+          "x": 1188.8,
+          "y": 351.2,
+          "w": 26.2,
+          "h": 14.5
+        },
+        "padding": "0px",
+        "gap": "normal",
+        "radius": "0px",
+        "font": "12px/normal 500 \"Figtree Variable\"",
+        "color": "rgb(35, 33, 26)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(35, 33, 26)",
+        "shadow": "none",
+        "outline": "none 3px rgb(35, 33, 26) offset 0px"
+      }
+    ]
+  },
+  {
+    "tag": "h2",
+    "label": "Model",
+    "rect": {
+      "x": 539,
+      "y": 419.5,
+      "w": 696,
+      "h": 20.9
+    },
+    "padding": "0px",
+    "gap": "normal",
+    "radius": "0px",
+    "font": "15.5px/20.925px 600 \"Figtree Variable\"",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "0px none rgb(35, 33, 26)",
+    "shadow": "none",
+    "outline": "none 3px rgb(35, 33, 26) offset 0px",
+    "children": []
+  },
+  {
+    "tag": "p",
+    "label": "The newest model of each family, from th",
+    "rect": {
+      "x": 539,
+      "y": 442.4,
+      "w": 696,
+      "h": 20.3
+    },
+    "padding": "0px",
+    "gap": "normal",
+    "radius": "0px",
+    "font": "13.5px/20.25px 400 \"Figtree Variable\"",
+    "color": "rgb(112, 110, 102)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "0px none rgb(112, 110, 102)",
+    "shadow": "none",
+    "outline": "none 3px rgb(112, 110, 102) offset 0px",
+    "children": []
+  },
+  {
+    "tag": "p",
+    "label": "Chat",
+    "rect": {
+      "x": 554,
+      "y": 487.5,
+      "w": 31.4,
+      "h": 23.2
+    },
+    "padding": "0px",
+    "gap": "normal",
+    "radius": "0px",
+    "font": "14.5px/23.2px 400 \"Figtree Variable\"",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "0px none rgb(35, 33, 26)",
+    "shadow": "none",
+    "outline": "none 3px rgb(35, 33, 26) offset 0px",
+    "children": []
+  },
+  {
+    "tag": "select",
+    "label": "Chat model",
+    "rect": {
+      "x": 908.5,
+      "y": 484.1,
+      "w": 315.5,
+      "h": 30
+    },
+    "padding": "0px 24px 0px 10px",
+    "gap": "normal",
+    "radius": "7px",
+    "font": "13.5px/20.25px 400 \"Figtree Variable\"",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgb(251, 251, 248)",
+    "border": "1px solid rgb(216, 213, 203)",
+    "shadow": "none",
+    "outline": "none 2px rgb(180, 53, 31) offset 2px",
+    "children": [
+      {
+        "tag": "option",
+        "label": "Claude Sonnet 5.5 · $2 / $10 per million",
+        "rect": {
+          "x": 0,
+          "y": 0,
+          "w": 0,
+          "h": 0
+        },
+        "padding": "0px 2px 1px",
+        "gap": "6.75px",
+        "radius": "0px",
+        "font": "13.5px/20.25px 400 \"Figtree Variable\"",
+        "color": "rgb(35, 33, 26)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(35, 33, 26)",
+        "shadow": "none",
+        "outline": "none 3px rgb(35, 33, 26) offset 0px"
+      },
+      {
+        "tag": "option",
+        "label": "Claude Opus 5.5 · $4 / $20 per million t",
+        "rect": {
+          "x": 0,
+          "y": 0,
+          "w": 0,
+          "h": 0
+        },
+        "padding": "0px 2px 1px",
+        "gap": "6.75px",
+        "radius": "0px",
+        "font": "13.5px/20.25px 400 \"Figtree Variable\"",
+        "color": "rgb(35, 33, 26)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(35, 33, 26)",
+        "shadow": "none",
+        "outline": "none 3px rgb(35, 33, 26) offset 0px"
+      },
+      {
+        "tag": "option",
+        "label": "Muse Wonder · $4 / $20 per million token",
+        "rect": {
+          "x": 0,
+          "y": 0,
+          "w": 0,
+          "h": 0
+        },
+        "padding": "0px 2px 1px",
+        "gap": "6.75px",
+        "radius": "0px",
+        "font": "13.5px/20.25px 400 \"Figtree Variable\"",
+        "color": "rgb(35, 33, 26)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(35, 33, 26)",
+        "shadow": "none",
+        "outline": "none 3px rgb(35, 33, 26) offset 0px"
+      },
+      {
+        "tag": "option",
+        "label": "GPT-6.1 Sol · $2 / $10 per million token",
+        "rect": {
+          "x": 0,
+          "y": 0,
+          "w": 0,
+          "h": 0
+        },
+        "padding": "0px 2px 1px",
+        "gap": "6.75px",
+        "radius": "0px",
+        "font": "13.5px/20.25px 400 \"Figtree Variable\"",
+        "color": "rgb(35, 33, 26)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(35, 33, 26)",
+        "shadow": "none",
+        "outline": "none 3px rgb(35, 33, 26) offset 0px"
+      },
+      {
+        "tag": "option",
+        "label": "Grok 4.7 · $2 / $6 per million tokens",
+        "rect": {
+          "x": 0,
+          "y": 0,
+          "w": 0,
+          "h": 0
+        },
+        "padding": "0px 2px 1px",
+        "gap": "6.75px",
+        "radius": "0px",
+        "font": "13.5px/20.25px 400 \"Figtree Variable\"",
+        "color": "rgb(35, 33, 26)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(35, 33, 26)",
+        "shadow": "none",
+        "outline": "none 3px rgb(35, 33, 26) offset 0px"
+      }
+    ]
+  },
+  {
+    "tag": "p",
+    "label": "Compaction",
+    "rect": {
+      "x": 554,
+      "y": 536,
+      "w": 80.3,
+      "h": 23.2
+    },
+    "padding": "0px",
+    "gap": "normal",
+    "radius": "0px",
+    "font": "14.5px/23.2px 400 \"Figtree Variable\"",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "0px none rgb(35, 33, 26)",
+    "shadow": "none",
+    "outline": "none 3px rgb(35, 33, 26) offset 0px",
+    "children": []
+  },
+  {
+    "tag": "select",
+    "label": "Compaction model",
+    "rect": {
+      "x": 886,
+      "y": 532.6,
+      "w": 338,
+      "h": 30
+    },
+    "padding": "0px 24px 0px 10px",
+    "gap": "normal",
+    "radius": "7px",
+    "font": "13.5px/20.25px 400 \"Figtree Variable\"",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgb(251, 251, 248)",
+    "border": "1px solid rgb(216, 213, 203)",
+    "shadow": "none",
+    "outline": "none 2px rgb(180, 53, 31) offset 2px",
+    "children": [
+      {
+        "tag": "option",
+        "label": "Claude Haiku 5.5 · $0.10 / $0.50 per mil",
+        "rect": {
+          "x": 0,
+          "y": 0,
+          "w": 0,
+          "h": 0
+        },
+        "padding": "0px 2px 1px",
+        "gap": "6.75px",
+        "radius": "0px",
+        "font": "13.5px/20.25px 400 \"Figtree Variable\"",
+        "color": "rgb(35, 33, 26)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(35, 33, 26)",
+        "shadow": "none",
+        "outline": "none 3px rgb(35, 33, 26) offset 0px"
+      },
+      {
+        "tag": "option",
+        "label": "Gemini 3.8 Flash · $0.75 / $3.75 per mil",
+        "rect": {
+          "x": 0,
+          "y": 0,
+          "w": 0,
+          "h": 0
+        },
+        "padding": "0px 2px 1px",
+        "gap": "6.75px",
+        "radius": "0px",
+        "font": "13.5px/20.25px 400 \"Figtree Variable\"",
+        "color": "rgb(35, 33, 26)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(35, 33, 26)",
+        "shadow": "none",
+        "outline": "none 3px rgb(35, 33, 26) offset 0px"
+      }
+    ]
+  },
+  {
+    "tag": "h2",
+    "label": "Spend",
+    "rect": {
+      "x": 539,
+      "y": 608.6,
+      "w": 696,
+      "h": 20.9
+    },
+    "padding": "0px",
+    "gap": "normal",
+    "radius": "0px",
+    "font": "15.5px/20.925px 600 \"Figtree Variable\"",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "0px none rgb(35, 33, 26)",
+    "shadow": "none",
+    "outline": "none 3px rgb(35, 33, 26) offset 0px",
+    "children": []
+  },
+  {
+    "tag": "p",
+    "label": "Juno stops for the day at the cap and as",
+    "rect": {
+      "x": 539,
+      "y": 631.6,
+      "w": 696,
+      "h": 20.3
+    },
+    "padding": "0px",
+    "gap": "normal",
+    "radius": "0px",
+    "font": "13.5px/20.25px 400 \"Figtree Variable\"",
+    "color": "rgb(112, 110, 102)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "0px none rgb(112, 110, 102)",
+    "shadow": "none",
+    "outline": "none 3px rgb(112, 110, 102) offset 0px",
+    "children": []
+  },
+  {
+    "tag": "p",
+    "label": "Today",
+    "rect": {
+      "x": 554,
+      "y": 676.7,
+      "w": 38.9,
+      "h": 23.2
+    },
+    "padding": "0px",
+    "gap": "normal",
+    "radius": "0px",
+    "font": "14.5px/23.2px 400 \"Figtree Variable\"",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "0px none rgb(35, 33, 26)",
+    "shadow": "none",
+    "outline": "none 3px rgb(35, 33, 26) offset 0px",
+    "children": []
+  },
+  {
+    "tag": "p",
+    "label": "$0.00",
+    "rect": {
+      "x": 1185.7,
+      "y": 676.7,
+      "w": 38.3,
+      "h": 23.2
+    },
+    "padding": "0px",
+    "gap": "normal",
+    "radius": "0px",
+    "font": "14.5px/23.2px 400 \"Figtree Variable\"",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "0px none rgb(35, 33, 26)",
+    "shadow": "none",
+    "outline": "none 3px rgb(35, 33, 26) offset 0px",
+    "children": []
+  },
+  {
+    "tag": "p",
+    "label": "Daily cap",
+    "rect": {
+      "x": 554,
+      "y": 725.2,
+      "w": 58.9,
+      "h": 23.2
+    },
+    "padding": "0px",
+    "gap": "normal",
+    "radius": "0px",
+    "font": "14.5px/23.2px 400 \"Figtree Variable\"",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "0px none rgb(35, 33, 26)",
+    "shadow": "none",
+    "outline": "none 3px rgb(35, 33, 26) offset 0px",
+    "children": []
+  },
+  {
+    "tag": "label",
+    "label": "$",
+    "rect": {
+      "x": 1064,
+      "y": 721.8,
+      "w": 160,
+      "h": 30
+    },
+    "padding": "0px 10px",
+    "gap": "8px",
+    "radius": "7px",
+    "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgb(251, 251, 248)",
+    "border": "1px solid rgb(216, 213, 203)",
+    "shadow": "none",
+    "outline": "none 3px rgb(35, 33, 26) offset 0px",
+    "children": [
+      {
+        "tag": "span",
+        "label": "$",
+        "rect": {
+          "x": 1075,
+          "y": 726.7,
+          "w": 6.8,
+          "h": 20.3
+        },
+        "padding": "0px",
+        "gap": "normal",
+        "radius": "0px",
+        "font": "13.5px/20.25px 400 \"Figtree Variable\"",
+        "color": "rgb(112, 110, 102)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(112, 110, 102)",
+        "shadow": "none",
+        "outline": "none 3px rgb(112, 110, 102) offset 0px"
+      },
+      {
+        "tag": "input",
+        "label": "Daily cap in dollars",
+        "rect": {
+          "x": 1089.8,
+          "y": 722.8,
+          "w": 123.2,
+          "h": 28
+        },
+        "padding": "0px",
+        "gap": "normal",
+        "radius": "0px",
+        "font": "13.5px/20.25px 400 \"Figtree Variable\"",
+        "color": "rgb(35, 33, 26)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px inset rgb(118, 118, 118)",
+        "shadow": "none",
+        "outline": "none 3px rgb(35, 33, 26) offset 0px"
+      }
+    ]
+  },
+  {
+    "tag": "input",
+    "label": "Daily cap in dollars",
+    "rect": {
+      "x": 1089.8,
+      "y": 722.8,
+      "w": 123.2,
+      "h": 28
+    },
+    "padding": "0px",
+    "gap": "normal",
+    "radius": "0px",
+    "font": "13.5px/20.25px 400 \"Figtree Variable\"",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "0px inset rgb(118, 118, 118)",
+    "shadow": "none",
+    "outline": "none 3px rgb(35, 33, 26) offset 0px",
+    "children": []
+  },
+  {
+    "tag": "h2",
+    "label": "Rules",
+    "rect": {
+      "x": 539,
+      "y": 797.8,
+      "w": 696,
+      "h": 20.9
+    },
+    "padding": "0px",
+    "gap": "normal",
+    "radius": "0px",
+    "font": "15.5px/20.925px 600 \"Figtree Variable\"",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "0px none rgb(35, 33, 26)",
+    "shadow": "none",
+    "outline": "none 3px rgb(35, 33, 26) offset 0px",
+    "children": []
+  },
+  {
+    "tag": "p",
+    "label": "One line each. Rules can only make Juno ",
+    "rect": {
+      "x": 539,
+      "y": 820.7,
+      "w": 696,
+      "h": 20.3
+    },
+    "padding": "0px",
+    "gap": "normal",
+    "radius": "0px",
+    "font": "13.5px/20.25px 400 \"Figtree Variable\"",
+    "color": "rgb(112, 110, 102)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "0px none rgb(112, 110, 102)",
+    "shadow": "none",
+    "outline": "none 3px rgb(112, 110, 102) offset 0px",
+    "children": []
+  },
+  {
+    "tag": "button",
+    "label": "Add a rule",
+    "rect": {
+      "x": 554,
+      "y": 862,
+      "w": 81.1,
+      "h": 28
+    },
+    "padding": "0px 10px",
+    "gap": "6px",
+    "radius": "8px",
+    "font": "13px/normal 500 \"Figtree Variable\"",
+    "color": "rgb(96, 94, 82)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "1px solid rgba(0, 0, 0, 0)",
+    "shadow": "none",
+    "outline": "none 2px rgb(180, 53, 31) offset 2px",
+    "children": [
+      {
+        "tag": "span",
+        "label": "Add a rule",
+        "rect": {
+          "x": 565,
+          "y": 868,
+          "w": 59.1,
+          "h": 16
+        },
+        "padding": "0px",
+        "gap": "normal",
+        "radius": "0px",
+        "font": "13px/normal 500 \"Figtree Variable\"",
+        "color": "rgb(96, 94, 82)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(96, 94, 82)",
+        "shadow": "none",
+        "outline": "none 3px rgb(96, 94, 82) offset 0px"
+      }
+    ]
+  },
+  {
+    "tag": "h2",
+    "label": "Pause",
+    "rect": {
+      "x": 539,
+      "y": 935,
+      "w": 696,
+      "h": 20.9
+    },
+    "padding": "0px",
+    "gap": "normal",
+    "radius": "0px",
+    "font": "15.5px/20.925px 600 \"Figtree Variable\"",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "0px none rgb(35, 33, 26)",
+    "shadow": "none",
+    "outline": "none 3px rgb(35, 33, 26) offset 0px",
+    "children": []
+  },
+  {
+    "tag": "p",
+    "label": "Stops the current reply, asks every runn",
+    "rect": {
+      "x": 539,
+      "y": 957.9,
+      "w": 696,
+      "h": 20.3
+    },
+    "padding": "0px",
+    "gap": "normal",
+    "radius": "0px",
+    "font": "13.5px/20.25px 400 \"Figtree Variable\"",
+    "color": "rgb(112, 110, 102)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "0px none rgb(112, 110, 102)",
+    "shadow": "none",
+    "outline": "none 3px rgb(112, 110, 102) offset 0px",
+    "children": []
+  },
+  {
+    "tag": "label",
+    "label": "Juno is paused",
+    "rect": {
+      "x": 554,
+      "y": 1003.5,
+      "w": 122.1,
+      "h": 23.2
+    },
+    "padding": "0px",
+    "gap": "10px",
+    "radius": "0px",
+    "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "0px none rgb(35, 33, 26)",
+    "shadow": "none",
+    "outline": "none 3px rgb(35, 33, 26) offset 0px",
+    "children": [
+      {
+        "tag": "input",
+        "label": "",
+        "rect": {
+          "x": 554,
+          "y": 1005.5,
+          "w": 15,
+          "h": 15
+        },
+        "padding": "0px",
+        "gap": "normal",
+        "radius": "0px",
+        "font": "13.3333px/normal 400 Arial",
+        "color": "rgb(0, 0, 0)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(0, 0, 0)",
+        "shadow": "none",
+        "outline": "none 2px rgb(180, 53, 31) offset 2px"
+      },
+      {
+        "tag": "span",
+        "label": "Juno is paused",
+        "rect": {
+          "x": 579,
+          "y": 1003.5,
+          "w": 97.1,
+          "h": 23.2
+        },
+        "padding": "0px",
+        "gap": "2px",
+        "radius": "0px",
+        "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+        "color": "rgb(35, 33, 26)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(35, 33, 26)",
+        "shadow": "none",
+        "outline": "none 3px rgb(35, 33, 26) offset 0px"
+      }
+    ]
+  },
+  {
+    "tag": "input",
+    "label": "",
+    "rect": {
+      "x": 554,
+      "y": 1005.5,
+      "w": 15,
+      "h": 15
+    },
+    "padding": "0px",
+    "gap": "normal",
+    "radius": "0px",
+    "font": "13.3333px/normal 400 Arial",
+    "color": "rgb(0, 0, 0)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "0px none rgb(0, 0, 0)",
+    "shadow": "none",
+    "outline": "none 2px rgb(180, 53, 31) offset 2px",
+    "children": []
+  }
+]
