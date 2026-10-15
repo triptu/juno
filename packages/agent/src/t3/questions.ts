@@ -56,22 +56,29 @@ export function questionExecutor(manager: McpManagerApi): Executor {
   }
 }
 
-/** Unknown question shapes remain in T3; never invent approval answers. */
-export async function proposeQuestions(manager: McpManagerApi, actions: Actions, job: Job, threadId: string, signal: AbortSignal) {
+/**
+ * Unknown question shapes remain in T3; never invent approval answers.
+ * Resolves false when a pending question has no card, so the job can say to answer it in T3 Code.
+ */
+export async function proposeQuestions(manager: McpManagerApi, actions: Actions, job: Job, threadId: string, signal: AbortSignal): Promise<boolean> {
   const source = memoryGen(manager.store)
   const epoch = manager.stored('t3').epoch
   const list = Schema.decodeUnknownSync(Schema.Struct({ requestIds: Schema.Array(Schema.String) }))(
     content(await manager.invoke('t3', 't3_pending_request_list', { threadId })),
   )
+  let shown = true
   for (const requestId of list.requestIds) {
     const callId = `t3-question:${threadId}:${requestId}`
     if (manager.store.db.prepare('SELECT 1 FROM cards WHERE call_id = ?').get(callId)) continue
     const request = Schema.decodeUnknownSync(Request)(content(await manager.invoke('t3', 't3_pending_request_read', { threadId, requestId })))
     const q = request.questions[0]
-    if (request.requestId !== requestId || request.questions.length !== 1 || !q || q.multiSelect || q.options.length < 2 || q.options.length > 4) throw new Error('Unsupported T3 Code question. Answer it in T3 Code.')
+    if (request.requestId !== requestId || request.questions.length !== 1 || !q || q.multiSelect || q.options.length < 2 || q.options.length > 4) {
+      shown = false
+      continue
+    }
     const tool = manager.tool('t3', RESPOND)
     const options = q.options.map((o, i) => ({ id: `option-${i}`, label: o.label, value: o.value ?? o.label }))
-    if (signal.aborted || source !== memoryGen(manager.store) || epoch !== manager.stored('t3').epoch) return
+    if (signal.aborted || source !== memoryGen(manager.store) || epoch !== manager.stored('t3').epoch) return shown
     actions.propose({ runId: job.runId, callId, payload: Schema.decodeUnknownSync(CardPayload)({
       _tag: 'question', asks: { _tag: 't3', job: { jobId: job.id, title: job.title } },
       prompt: q.question, options: options.map(({ id, label }) => ({ id, label })), freeText: q.allowCustomAnswer === true,
@@ -80,4 +87,5 @@ export async function proposeQuestions(manager: McpManagerApi, actions: Actions,
           args: { threadId, requestId, questionId: q.id, options: options.map(({ id, value }) => ({ id, value })) }, preconditions: {}, ops: [] } },
     }) })
   }
+  return shown
 }
