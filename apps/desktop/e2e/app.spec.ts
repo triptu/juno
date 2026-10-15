@@ -100,7 +100,7 @@ test('exposes only the bridge to the page', async ({ win }) => {
     agent: ['requestPort', 'setOpenRouterKey', 'provider', 'setProvider', 'onProvider'],
     launch: ['setTheme', 'setAccent', 'setDensity', 'setSidebar'],
     contextMenu: ['popup'],
-    shell: ['openExternal', 'openInSlack', 'editUndo'],
+    shell: ['openExternal', 'openInSlack', 'editUndo', 'downloadFile'],
     clipboard: ['writeText'],
     menu: ['onCommand'],
     notifications: ['setViewing', 'onOpen'],
