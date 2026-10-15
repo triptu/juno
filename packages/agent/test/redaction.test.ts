@@ -46,17 +46,19 @@ async function fileLeaks(dir: string): Promise<ReadonlyArray<string>> {
 
 /** A backup that records the order of its calls and what a regenerated generation would hold. */
 function fakeBackup(turns: () => Turns) {
-  const calls: Array<{ readonly call: 'raise' | 'regenerate'; readonly gen: number; readonly headGen: number; readonly leaks?: ReadonlyArray<string> }> = []
+  const log: Array<{ readonly call: 'raise' | 'regenerate'; readonly gen: number; readonly headGen: number; readonly leaks?: ReadonlyArray<string> }> = []
   const headGen = () => (turns().store.db.prepare('SELECT gen FROM memory_head').get() as { gen: number }).gen
   const backup: RemovalBackup = {
-    raiseDeletion: async (gen) => void calls.push({ call: 'raise', gen, headGen: headGen() }),
-    regenerate: async (gen) => void calls.push({ call: 'regenerate', gen, headGen: headGen(), leaks: leaks(turns()) }),
+    raiseDeletion: async (gen) => void log.push({ call: 'raise', gen, headGen: headGen() }),
+    regenerate: async (gen) => void log.push({ call: 'regenerate', gen, headGen: headGen(), leaks: leaks(turns()) }),
   }
-  return { backup, calls }
+  return { backup, calls: log }
 }
 
 const ownerMessageId = (turns: Turns, opId: string) =>
   (turns.store.db.prepare("SELECT min(id) AS id FROM messages WHERE kind = 'user' AND origin_op = ?").get(opId) as { id: number }).id
+
+const of = <T extends ChatItem['_tag']>(page: ChatPage, tag: T) => page.items.filter((item): item is Extract<ChatItem, { _tag: T }> => item._tag === tag)
 
 type View = { readonly card: Card; readonly binding?: typeof CardBinding.Type }
 const statusOf = (view: View | undefined) => (view !== undefined && 'status' in view.card ? view.card.status : undefined)
@@ -105,7 +107,7 @@ it('a removal reaches every place the words lived, and Juno never sees them agai
   expect(h.turns.incarnation()).not.toBe(oldJournal)
   expect(await fileLeaks(h.dir)).toEqual([])
   // The backup's record was raised before the commit, and the new generation is sanitized.
-  expect(backup.calls.map(({ call, gen, headGen }) => [call, gen, headGen])).toEqual([['raise', 1, 0], ['regenerate', 1, 1]])
+  expect(backup.calls.map((c) => [c.call, c.gen, c.headGen])).toEqual([['raise', 1, 0], ['regenerate', 1, 1]])
   expect(backup.calls[1]!.leaks).toEqual([])
   // Memory is rebuilt without them.
   expect(h.turns.memory().lines.every((line) => line.kind === 'node')).toBe(true)
@@ -224,7 +226,6 @@ it('the owner removes a message from the sheet with AI assist off, and the chat 
   const messageId = String(ownerMessageId(h.turns, said)) as ChatMessageId
   const result = await run(client['agent.chat.remove']({ opId: 'remove-1' as OpId, messageId, alsoRemoveReply: true }))
   expect(result).toMatchObject({ _tag: 'Success', success: { opId: 'remove-1' } })
-  const of = <T extends ChatItem['_tag']>(page: ChatPage, tag: T) => page.items.filter((item): item is Extract<ChatItem, { _tag: T }> => item._tag === tag)
   const page = await pageWhere((p) => of(p, 'note').length === 1, 'the Removed note')
   expect(of(page, 'note')[0]).toEqual({ _tag: 'note', id: messageId, kind: 'removed' })
   expect(of(page, 'owner').map((o) => o.text)).toEqual(['and the shed is blue'])

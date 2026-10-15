@@ -43,9 +43,10 @@ const turns = await openTurns({
     },
     regenerate: async (gen) => {
       // A restart resumes the purge while the engine is still opening.
-      while (opened === undefined) await new Promise((resolve) => setTimeout(resolve, 5))
+      let engine = opened
+      for (; engine === undefined; engine = opened) await new Promise((resolve) => setTimeout(resolve, 5))
       const backup = readBackup()
-      writeBackup({ ...backup, generations: [...backup.generations, { gen, leaks: leaks(opened!).length }] })
+      writeBackup({ ...backup, generations: [...backup.generations, { gen, leaks: leaks(engine).length }] })
     },
   },
 })
@@ -87,7 +88,7 @@ const summary = {
   gen: turns.memory().gen,
   removals: (turns.store.db.prepare('SELECT count(*) AS n FROM removals').get() as { n: number }).n,
   pending: turns.redaction.pending().map((row) => row.step),
-  leaks: [...new Set(leaks(turns))].sort(),
+  leaks: [...new Set(leaks(turns))].toSorted(),
   files,
   backup: readBackup(),
 }

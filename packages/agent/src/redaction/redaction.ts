@@ -293,7 +293,7 @@ export function createRedaction(options: RedactionOptions) {
     start: kick,
     /** Resolves when no purge step runs and none is due now. */
     idle: async () => {
-      while (draining !== undefined) await draining
+      for (let current = draining; current !== undefined; current = draining) await current
     },
     close: async () => {
       closed = true

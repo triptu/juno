@@ -79,8 +79,8 @@ export function removalScope(archive: ReadonlyArray<ArchiveRow>, ops: ReadonlyAr
     if (INPUT_KINDS.has(row.kind) || (alsoRemoveReply && (row.kind === 'juno' || row.kind === 'tool'))) entries.add(row.entry)
   }
   return {
-    messages: archive.filter((row) => entries.has(row.entry)).map((row) => row.id).sort((a, b) => a - b),
-    ops: [...inputs].sort(),
+    messages: archive.filter((row) => entries.has(row.entry)).map((row) => row.id).toSorted((a, b) => a - b),
+    ops: [...inputs].toSorted(),
   }
 }
 

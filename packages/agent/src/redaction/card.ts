@@ -52,7 +52,7 @@ function ownerMessage(store: Store, handle: string): { readonly id: number; read
 export function removeCard(store: Store, handles: ReadonlyArray<string>): CardPayload | undefined {
   const found = handles.map((handle) => ownerMessage(store, handle))
   if (found.length === 0 || found.some((m) => m === undefined)) return undefined
-  const messages = [...new Map(found.map((m) => [m!.id, m!])).values()].sort((a, b) => a.id - b.id)
+  const messages = [...new Map(found.map((m) => [m!.id, m!])).values()].toSorted((a, b) => a.id - b.id)
   const archive = store.db
     .prepare("SELECT id, kind, origin_op AS originOp, incarnation || '/' || entry_id AS entry FROM messages WHERE id >= ? AND redacted_gen IS NULL ORDER BY id")
     .all(messages[0]!.id) as unknown as ReadonlyArray<ArchiveRow>
