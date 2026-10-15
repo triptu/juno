@@ -178,15 +178,16 @@ function AddServer({ error, onAdd }: { readonly error: string | undefined } & Pi
               onChange={(event) => setUrl(event.currentTarget.value)}
               onKeyDown={keyDown}
             />
-            <span {...stylex.props(cell.line)}>
-              <Button variant="secondary" size="xs" onClick={add} disabled={!canAdd}>
-                {copy.addButton}
-              </Button>
+            {/* The action ends the form, at the card's trailing inset with every other button on the page; a refusal reads before it. */}
+            <span {...stylex.props(cell.line, styles.addLine)}>
               {error !== undefined ? (
-                <Text variant="meta" tone="danger" data-connection-error="">
+                <Text variant="meta" tone="danger" data-connection-error="" sx={styles.addError}>
                   {error}
                 </Text>
               ) : null}
+              <Button variant="secondary" size="xs" onClick={add} disabled={!canAdd}>
+                {copy.addButton}
+              </Button>
             </span>
           </span>
         </ListRow>
@@ -236,3 +237,13 @@ function Tool({ tool, last, onTier }: { readonly tool: DiscoveredTool; readonly 
     </ListRow>
   )
 }
+
+const styles = stylex.create({
+  addLine: {
+    justifyContent: 'flex-end',
+  },
+  addError: {
+    flexGrow: 1,
+    minWidth: 0,
+  },
+})
