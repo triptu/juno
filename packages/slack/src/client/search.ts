@@ -16,7 +16,7 @@ export interface MessageMatch {
   readonly user?: string
   readonly username?: string
   readonly text: string
-  /** From the match, else from its permalink's `thread_ts` parameter (live matches carry no `thread_ts`). */
+  /** From the match, else from its permalink's `thread_ts` parameter when extra message data is unavailable. */
   readonly threadTs?: string
   readonly replyCount?: number
 }
@@ -29,7 +29,7 @@ function threadTsOf(match: FlatSearchMatch): string | undefined {
 /** The first page of matches for `query`, in Slack's order, on the interactive lane. */
 export const searchMessages = (api: SlackApiShape, query: string, count: number): Effect.Effect<ReadonlyArray<MessageMatch>, SlackApiError> =>
   Effect.map(
-    api.call('search.modules.messages', { module: 'messages', query, count, page: 1, no_user_profile: 1 }, { lane: 'interactive', reason: 'palette' }),
+    api.call('search.modules.messages', { module: 'messages', query, count, page: 1, no_user_profile: 1, extra_message_data: 1 }, { lane: 'interactive', reason: 'palette' }),
     (answer) =>
       searchMatches(answer).map((match) => {
         const threadTs = threadTsOf(match)

@@ -167,6 +167,15 @@ describe('every fixture response decodes with @juno/slack schemas', () => {
     expect(matches.every((m) => m.thread_ts === undefined && m.reply_count === undefined && m.blocks === undefined && m.files === undefined)).toBe(true)
     expect(matches.filter((m) => m.permalink?.includes('?thread_ts=') === true).length).toBeGreaterThan(10)
     expect(matches.every((m) => typeof m.channel === 'object' && m.channel.id.length > 0)).toBe(true)
+    for (const match of matches) {
+      expect(match.channel).toEqual(expect.objectContaining({
+        is_archived: expect.any(Boolean), is_group: expect.any(Boolean),
+        is_shared: false, is_ext_shared: false, is_org_shared: false,
+      }))
+    }
+    const extra = searchMatches(await client.ok('search.modules.messages', { module: 'messages', query: 'is:thread', count: 100, extra_message_data: 1 }))
+    expect(extra.every((match) => match.thread_ts !== undefined)).toBe(true)
+    expect(extra.some((match) => match.ts === match.thread_ts && (match.reply_count ?? 0) > 0)).toBe(true)
     const words = await client.ok('search.modules.messages', { module: 'messages', query: 'rollback in:#eng', count: 20 })
     expect(searchMatches(words).length).toBeGreaterThanOrEqual(2)
   })

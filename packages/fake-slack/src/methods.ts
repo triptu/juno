@@ -386,24 +386,29 @@ export const handlers: Handlers = {
         const text = (full.text ?? '').toLowerCase()
         if (!query.terms.every((term) => text.includes(term))) continue
         const user = full.user === undefined ? undefined : ws.users.get(full.user)
-        // As observed live: one item per match holding the message in `messages[]`. The thread is in the
-        // permalink only; there is no `thread_ts`, `reply_count`, blocks, files or reactions, so a client must
-        // not take a match for the whole message (review M3 finding 3).
+        // The module returns one message per item; thread fields require extra_message_data.
         matches.push({
           iid: `${conversation.id}-${full.ts}`,
           team: ws.team.id,
           channel: {
             id: conversation.id,
             name: conversation.name,
+            is_archived: conversation.archived,
+            is_group: conversation.kind === 'private',
+            is_shared: false,
+            is_ext_shared: false,
+            is_org_shared: false,
+            ...(conversation.kind === 'im' ? { user: [...conversation.members].find((id) => id !== ws.selfId) } : {}),
             is_channel: conversation.kind === 'public' || conversation.kind === 'private',
             is_im: conversation.kind === 'im',
             is_mpim: conversation.kind === 'mpim',
-            is_private: conversation.kind === 'private' || conversation.kind === 'mpim',
+            is_private: conversation.kind !== 'public',
           },
           messages: [
             {
               iid: `${conversation.id}-${full.ts}-m`,
               ts: full.ts,
+              ...(args.extra_message_data === 1 ? { ...(inThread ? { thread_ts: full.thread_ts ?? full.ts } : {}), ...(full.reply_count === undefined ? {} : { reply_count: full.reply_count }) } : {}),
               text: full.text ?? '',
               ...(full.user === undefined ? {} : { user: full.user }),
               ...(user?.name === undefined ? {} : { username: user.name }),
@@ -422,7 +427,7 @@ export const handlers: Handlers = {
       matches.sort((a, b) => relevance(a.iid ?? '') - relevance(b.iid ?? ''))
     }
     const perPage = args.count ?? 20
-    const page = Math.max(1, args.page ?? pageFromCursor(args.cursor) ?? 1)
+    const page = Math.max(1, args.page ?? 1)
     const start = (page - 1) * perPage
     const items = matches.slice(start, start + perPage)
     const pageCount = Math.max(1, Math.ceil(matches.length / perPage))
@@ -439,7 +444,6 @@ export const handlers: Handlers = {
         last: start + items.length,
       },
       total: matches.length,
-      response_metadata: { next_cursor: page < pageCount ? Buffer.from(`page:${page + 1}`).toString('base64') : '' },
     }
   },
 
@@ -539,10 +543,4 @@ function relevance(id: string): number {
     hash = Math.imul(hash, 0x01000193) >>> 0
   }
   return hash
-}
-
-function pageFromCursor(cursor: string | undefined): number | undefined {
-  if (cursor === undefined || cursor === '') return undefined
-  const decoded = Buffer.from(cursor, 'base64').toString('utf8')
-  return decoded.startsWith('page:') ? Number(decoded.slice(5)) : undefined
 }

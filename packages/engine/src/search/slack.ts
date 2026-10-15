@@ -5,9 +5,8 @@
  * stores nothing: the palette shows the matches, and opening one fetches
  * its page through the usual open path.
  *
- * Unknowns to confirm live (architecture 17.2): that a free-text query is
- * answered for an `xoxc` session as it is for `is:thread`, the ranking
- * Slack applies without `sort`, and the rate tier while someone types.
+ * Ranking without `sort` and the rate tier while typing remain unknown
+ * (research section 10, Live probe).
  */
 import { SLACK_SEARCH_MAX } from '@juno/contract'
 import { searchMessages, type SlackApiShape } from '@juno/slack'
