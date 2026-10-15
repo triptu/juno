@@ -1,7 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import type { MouseEvent, ReactNode } from 'react'
 import type { BodyBlock, BodyInline, MessageBody as MessageBodyModel } from '@juno/contract'
-import { accent, colors, radii, spacing, text, weights } from '@juno/tokens/tokens.stylex'
+import { accent, colors, radii, spacing, text, weights, sizes } from '@juno/tokens/tokens.stylex'
 import { Chip, CodeBlock, Divider, Text, type HueName } from '@juno/ui'
 import { slackDate } from './time'
 
@@ -300,8 +300,8 @@ const styles = stylex.create({
     display: 'inline-flex',
     alignItems: 'center',
     justifyContent: 'center',
-    width: '1em',
-    height: '1em',
+    width: sizes['--inline-em'],
+    height: sizes['--inline-em'],
     marginInlineEnd: spacing['--space-1-5'],
     borderRadius: radii['--radius-xs'],
     borderWidth: '1px',
@@ -334,7 +334,7 @@ const styles = stylex.create({
     color: accent['--hl-text'],
     textDecorationLine: 'underline',
     textDecorationColor: 'color-mix(in oklch, currentColor 35%, transparent)',
-    textUnderlineOffset: '0.12em',
+    textUnderlineOffset: sizes['--link-underline-offset'],
     cursor: 'default',
   },
   bold: {
@@ -371,8 +371,8 @@ const styles = stylex.create({
       default: 'none',
       ':focus-visible': 'solid',
     },
-    outlineWidth: '2px',
-    outlineOffset: '2px',
+    outlineWidth: sizes['--focus-ring-width'],
+    outlineOffset: sizes['--focus-ring-offset'],
     outlineColor: accent['--focus-ring'],
   },
 })
