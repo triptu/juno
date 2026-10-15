@@ -35,3 +35,16 @@ it('names the people a thread link and the Threads list mention, and decodes Sla
   const listed = await watchList(engine, channelThreadsAtom('C0ENG'))((current) => rowsOf(current).some((row) => row.rootTs === root.ts), 'the thread in the list')
   expect(rowsOf(listed).find((row) => row.rootTs === root.ts)!.title).toBe('@Dev fix the backend -> github…')
 })
+
+it('updates a cached sidebar title when a mentioned person arrives later', async () => {
+  const engine = await bootedEngine(engines)
+  await quiet(engine)
+  const root = engine.fake.injectMessage({ channel: 'C0ENG', user: engine.fake.workspace.selfId, text: '<@U0LATE> review the release' })
+  engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0MAYA', threadTs: root.ts, text: 'Ready.' })
+  const id = `t:C0ENG:${root.ts}`
+  const before = await engine.rowsUntil((rows) => rows.some((row) => row.id === id && row.title === '@Someone review the release'), 'the title before the person arrives')
+  const maya = engine.fake.workspace.users.get('U0MAYA')!
+  engine.fake.emitFrame({ type: 'user_change', user: { ...maya, id: 'U0LATE', name: 'dev', profile: { ...maya.profile, display_name: 'Dev' } } })
+  const after = await engine.rowsUntil((rows) => rows.some((row) => row.id === id && row.title === '@Dev review the release'), 'the title with the late name')
+  expect(after.find((row) => row.id === id)!.rev).not.toBe(before.find((row) => row.id === id)!.rev)
+})
