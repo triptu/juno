@@ -211,7 +211,7 @@ export const queryThreads = Effect.fn('newChat.threads')(function* (channel: str
 export const frequentSendsStatement = (selfId: string, now: number) => ({
   sql: `SELECT channel, ts FROM messages INDEXED BY messages_sender_ts
     WHERE user_id = ? AND ts >= ? AND ts <= ? AND deleted = 0`,
-  params: [selfId, String((now - 30 * DAY) / 1000), String(now / 1000)],
+  params: [selfId, ((now - 30 * DAY) / 1000).toFixed(6), (now / 1000).toFixed(6)],
 })
 
 /** Member destinations and their latest cached activity, using the channel index. */
