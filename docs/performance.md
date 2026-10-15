@@ -475,3 +475,5 @@ that animation instantaneous. The log is `.juno-status/perf-4b/feel-final.log`,
 and the filmstrips are under `apps/desktop/feel-report/`.
 
 The sidebar holds its first list on an empty cache until cold sync and Automated classification establish membership. Cached rows still paint immediately. Topic-row timestamps, unread badges, participant stacks and status tags reserve their widths; New view stays beside Unread only while view pills fill.
+
+All topics holds its first cold rows until sync completes, and reserves the status-count and place-select widths and its scrollbar gutter. Cold-sync checks for Home and All topics hold thread subscriptions while the page paints, then release them under the same zero-shift probe.

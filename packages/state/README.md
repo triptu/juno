@@ -59,3 +59,5 @@ cards retain only the identity Ask again needs; that RPC submits a fresh
 owner message quoting the card. It never approves the expired payload.
 
 On an empty cache, the sidebar holds its first rows until cold sync and Automated classification finish. A cached window paints immediately. While catch-up fills the sidebar, existing rows retain their order and newly discovered rows append. The phase becoming live does not itself reorder the painted list. An explicit filter change or the next live activity uses the normal recency order again.
+
+All topics also holds its first rows on an empty cache until cold sync completes; cached and filtered windows keep the existing snapshot handoff.

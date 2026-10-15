@@ -145,6 +145,22 @@ test('sidebar rows stay fixed while sync fills the remaining topics', async ({ j
 })
 
 
+for (const destination of ['Home', 'All topics'] as const) {
+  test(`cold sync fills ${destination} without moving painted rows`, async ({ juno, win, fake }) => {
+    fake.holdNext({ method: 'subscriptions.thread.getView' })
+    await juno.signIn()
+    await expect.poll(() => fake.heldCount({ method: 'subscriptions.thread.getView' })).toBe(1)
+    if (destination === 'All topics') await juno.allTopics.open()
+    const selector = destination === 'Home' ? '[data-home-item]' : '[data-all-topics-row]'
+    await expect(win.locator(selector)).toHaveCount(0)
+    await expectStableAnchor(win, selector, async () => {
+      fake.release({ method: 'subscriptions.thread.getView' })
+      await expect(win.locator('[data-topic-row]').first()).toBeVisible()
+      await expect(win.locator(selector).first()).toBeVisible()
+    })
+  })
+}
+
 test('the probe rejects a one-pixel movement that returns before the action ends', async ({ win }) => {
   await win.setContent('<div id="anchor">Anchor</div>')
   await expect(expectStableAnchor(win, '#anchor', async () => {

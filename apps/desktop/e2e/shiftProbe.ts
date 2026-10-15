@@ -27,7 +27,7 @@ export async function expectStableAnchor(page: Page, selector: string, action: (
       for (const entry of entries) {
         if ('hadRecentInput' in entry && entry.hadRecentInput === false && 'value' in entry && typeof entry.value === 'number') {
           const shift = entry as PerformanceEntry & { sources?: Array<{ node: Node | null; previousRect: DOMRectReadOnly; currentRect: DOMRectReadOnly }> }
-          shifts.push({ value: entry.value, sources: (shift.sources ?? []).map(({ node, previousRect, currentRect }) => `${node instanceof Element ? node.outerHTML.slice(0, 240) : node?.parentElement?.outerHTML.slice(0, 240)}: ${previousRect.x},${previousRect.y} → ${currentRect.x},${currentRect.y}`) })
+          shifts.push({ value: entry.value, sources: (shift.sources ?? []).map(({ node, previousRect, currentRect }) => `${node instanceof Element ? node.outerHTML.slice(0, 240) : node?.parentElement?.outerHTML.slice(0, 240)}: ${JSON.stringify(previousRect)} → ${JSON.stringify(currentRect)}`) })
         }
       }
     }

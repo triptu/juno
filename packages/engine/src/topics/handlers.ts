@@ -142,7 +142,7 @@ export const TopicsHandlers = TopicsRoutes.toLayer(
 )
 
 /** A text filter searches messages, so its runs follow them too. */
-const allTopicsKeys = (query: string | undefined): InvalidationKeys => (matchQuery(query) === '' ? LIST_KEYS : [...LIST_KEYS, 'messages'])
+const allTopicsKeys = (query: string | undefined): InvalidationKeys => [...LIST_KEYS, 'sync_state', ...(matchQuery(query) === '' ? [] : ['messages'] as const)]
 
 /**
  * All topics (`allTopics.ts`). Both routes re-run on what the sidebar list
