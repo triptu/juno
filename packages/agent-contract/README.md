@@ -80,3 +80,19 @@ and `host.schedule.changes` (message-store invalidations). The check includes
 the owner's identity and verifies the source author for the menu command.
 No message text crosses these routes. Account checks surround refreshes, and
 incomplete or limited Slack history fails rather than reporting no reply.
+
+
+## Sidebar view host routes
+
+`HostViewRpcs` adds `host.views.list`, `create`, `update`, `delete` and `undo`.
+Every request carries `accountId`. Create takes `view` (name, optional icon,
+conversation ids in `channels`, and `keepOutOfAll`); update also takes `id` and
+replaces the whole view. Mutations return `{ id, undo }`. Undo carries the exact
+expected state and the previous snapshot, including position. It refuses newer
+edits. These are local Juno settings and work with outward Slack writes disabled.
+The host validates icons against the app's set. Listing retains every stored
+conversation id, even if it has left the Slack cache.
+
+`host.slack.channels` adds a paginated directory read: account, name `pattern`
+(case-insensitive glob, `*` and `?`), cursor and limit; channel ids/names and the
+next cursor. It returns no messages, topics, descriptions or user profiles.

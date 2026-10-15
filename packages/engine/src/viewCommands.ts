@@ -16,8 +16,8 @@ import { Clock, Effect } from 'effect'
 import { NotFound, NotSignedIn, type CommandResult, type SavedView, type SidebarView, type ViewDraft } from '@juno/contract'
 import { viewName, type ViewIcon } from '@juno/domain'
 import { invalidate, keys, StoreReader, StoreWriter, transaction, type Invalidation, type SqlError } from '@juno/store'
-import { channelInfoOf, channelRefOf, userName, type UserRow } from '../topicRows'
-import { Workspace } from '../workspace'
+import { channelInfoOf, channelRefOf, userName, type UserRow } from './topicRows'
+import { Workspace } from './workspace'
 
 interface ViewRow {
   readonly id: string
@@ -37,7 +37,7 @@ const savedOf = (row: ViewRow, channels: ReadonlyArray<string>): SavedView => ({
 })
 
 /** A view as stored, or undefined. */
-const readView = (id: string): Effect.Effect<SavedView | undefined, SqlError, StoreWriter> =>
+export const readView = (id: string): Effect.Effect<SavedView | undefined, SqlError, StoreWriter> =>
   Effect.gen(function* () {
     const sql = yield* StoreWriter
     const row = (yield* sql<ViewRow>`SELECT id, name, icon, position, keep_out_of_all FROM sidebar_views WHERE id = ${id}`)[0]
@@ -74,25 +74,25 @@ export const saveView = (draft: ViewDraft) =>
         const icon = draft.icon ?? null
         const keep = draft.keepOutOfAll ? 1 : 0
         if (draft.id !== undefined) {
-          const found = yield* sql<{ id: string }>`SELECT id FROM sidebar_views WHERE id = ${draft.id}`
-          if (found.length === 0) return undefined
+          const before = yield* readView(draft.id)
+          if (before === undefined) return undefined
           yield* sql`UPDATE sidebar_views SET name = ${name}, icon = ${icon}, keep_out_of_all = ${keep} WHERE id = ${draft.id}`
           // Conversations that stay keep their place; the rest go.
           const kept = new Set(draft.channels)
-          const before = yield* sql<{ channel: string }>`SELECT channel FROM sidebar_view_channels WHERE view_id = ${draft.id}`
-          for (const { channel } of before) if (!kept.has(channel)) yield* sql`DELETE FROM sidebar_view_channels WHERE view_id = ${draft.id} AND channel = ${channel}`
+          const previousChannels = yield* sql<{ channel: string }>`SELECT channel FROM sidebar_view_channels WHERE view_id = ${draft.id}`
+          for (const { channel } of previousChannels) if (!kept.has(channel)) yield* sql`DELETE FROM sidebar_view_channels WHERE view_id = ${draft.id} AND channel = ${channel}`
           yield* writeChannels(draft.id, draft.channels, now)
-          return draft.id
+          return { id: draft.id, before, after: (yield* readView(draft.id))! }
         }
         const id = `v${randomUUID().replaceAll('-', '').slice(0, 12)}`
         const last = (yield* sql<{ position: number | null }>`SELECT max(position) AS position FROM sidebar_views`)[0]?.position ?? -1
         yield* sql`INSERT INTO sidebar_views (id, name, icon, position, keep_out_of_all, created_at) VALUES (${id}, ${name}, ${icon}, ${last + 1}, ${keep}, ${String(now)})`
         yield* writeChannels(id, draft.channels, now)
-        return id
+        return { id, before: null, after: (yield* readView(id))! }
       }),
     )
     if (outcome === undefined) return yield* new NotFound({ kind: 'view', id: draft.id ?? '' })
-    return { id: outcome }
+    return outcome
   })
 
 /** Deletes a view. The undo puts it back whole. */
@@ -201,3 +201,30 @@ export const listViews: Effect.Effect<ReadonlyArray<SidebarView>, SqlError, Stor
   }
   return views
 })
+
+/** Raw membership, including conversations no longer in the Slack cache. */
+export const savedViews = Effect.gen(function* () {
+  const sql = yield* StoreWriter
+  const ids = yield* sql<{ id: string }>`SELECT id FROM sidebar_views ORDER BY position, id`
+  return yield* Effect.forEach(ids, ({ id }) => readView(id).pipe(Effect.map((view) => view!)))
+})
+
+/** Undo only the exact state the command left; never overwrite a later edit. */
+export const undoView = (id: string, expected: SavedView | null, restore: SavedView | null) =>
+  inWorkspace((now) => Effect.gen(function* () {
+    const current = (yield* readView(id)) ?? null
+    const same = (a: SavedView | null, b: SavedView | null) => a === null || b === null ? a === b :
+      a.id === b.id && a.name === b.name && a.icon === b.icon && a.keepOutOfAll === b.keepOutOfAll && a.position === b.position &&
+      [...a.channels].sort().join('\0') === [...b.channels].sort().join('\0')
+    if (same(current, restore)) return true
+    if (!same(current, expected)) return false
+    const sql = yield* StoreWriter
+    yield* sql`DELETE FROM sidebar_view_channels WHERE view_id = ${id}`
+    yield* sql`DELETE FROM sidebar_views WHERE id = ${id}`
+    if (restore !== null) {
+      yield* sql`INSERT INTO sidebar_views (id, name, icon, position, keep_out_of_all, created_at)
+        VALUES (${id}, ${restore.name}, ${restore.icon ?? null}, ${restore.position}, ${restore.keepOutOfAll ? 1 : 0}, ${String(now)})`
+      yield* writeChannels(id, restore.channels, now)
+    }
+    return true
+  }))
