@@ -7,7 +7,12 @@
  * camel-case hues, so the two tables below translate. An icon with no
  * Phosphor counterpart draws the channel's first letter instead.
  */
-import { channelIconNames, firstGrapheme, hueForId, hueNames, type ChannelIconName, type HueName } from '@juno/ui'
+import { Hash } from '@phosphor-icons/react/dist/icons/Hash'
+import { Lock } from '@phosphor-icons/react/dist/icons/Lock'
+import { User } from '@phosphor-icons/react/dist/icons/User'
+import { Users } from '@phosphor-icons/react/dist/icons/Users'
+import type { ConversationKind } from '@juno/contract'
+import { channelIconNames, firstGrapheme, hueForId, hueNames, type ChannelIconName, type HueName, type PhosphorIcon } from '@juno/ui'
 
 const icons: Readonly<Record<string, ChannelIconName>> = {
   hash: 'hash',
@@ -81,4 +86,18 @@ export function groupInitials(name: string): string {
 export function countLabel(count: number, exact = true): string {
   if (count > 99) return '99+'
   return exact ? String(count) : `${count}+`
+}
+
+/** The icon for a kind of conversation, where a list names one without its tile: a scope chip, the view sheet. */
+export function kindIcon(kind: ConversationKind): PhosphorIcon {
+  switch (kind) {
+    case 'private':
+      return Lock
+    case 'im':
+      return User
+    case 'mpim':
+      return Users
+    default:
+      return Hash
+  }
 }

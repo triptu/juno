@@ -67,6 +67,11 @@ test('a rewritten Home title line leaves every box where it was', async ({ page 
   const boxes = async (state: string) => {
     await page.goto(`/#/Home?__state=${state}`)
     await expect(page.locator('[data-home-item]')).toHaveCount(3)
+    // Boxes measured in a fallback font differ from the web font's. Layout starts the font loads; wait for them.
+    await page.evaluate(() => {
+      document.body.getBoundingClientRect()
+      return document.fonts.ready
+    })
     return page.locator('[data-fixture-frame]').evaluate((frame) =>
       Array.from(frame.querySelectorAll('[data-home-item], [data-home-title], [data-home-meta], h2, button')).map((node) => {
         const box = node.getBoundingClientRect()

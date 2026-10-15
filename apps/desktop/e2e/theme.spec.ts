@@ -31,10 +31,7 @@ test('a dark-theme user gets a dark window and a dark page on relaunch', async (
     const darkBackground = await resolveColorVar(first.win, '--background')
     expect(brightness(darkBackground)).toBeLessThan(brightness(lightBackground))
 
-    // The choice is written in the background; closing the window must not undo it.
-    await expect
-      .poll(() => first.win.evaluate(() => window.juno.launch.setTheme('dark').then(() => true)))
-      .toBe(true)
+    // The choice is written in the background; quitting at once must not lose it.
     await first.close()
 
     const second = await launchApp(userData)
@@ -74,10 +71,7 @@ test('a chosen accent colours the primary button and survives a relaunch', async
     // Focus ring and selection follow the accent too.
     expect(await resolveColorVar(first.win, '--focus-ring')).not.toBe('rgba(0, 0, 0, 0)')
 
-    // The choice is written in the background; make sure it landed before closing.
-    await expect
-      .poll(() => first.win.evaluate(() => window.juno.launch.setAccent('teal').then(() => true)))
-      .toBe(true)
+    // The choice is written in the background; quitting at once must not lose it.
     await first.close()
 
     const second = await launchApp(userData)

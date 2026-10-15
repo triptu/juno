@@ -22,7 +22,7 @@ function replace(hash: string) {
 
 export function App() {
   const location = useLocation()
-  useLayoutEffect(() => applyTheme(location.theme, location.accent), [location.theme, location.accent])
+  useLayoutEffect(() => applyTheme(location.theme, location.accent, location.density), [location.theme, location.accent, location.density])
 
   useEffect(() => {
     // Exposed for the test runners, so they never have to parse the DOM.

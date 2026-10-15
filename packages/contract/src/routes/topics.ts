@@ -18,6 +18,7 @@ import { AllTopicsStatus, ChannelColor, ChannelIcon, ContextTint, ConversationKi
 import { NotFound, NotSignedIn, Offline, RateLimited, Rejected } from '../errors'
 import { liveListRoute, liveValueRoute, RowFields } from '../live'
 import { ChannelRef, Person } from '../refs'
+import { SavedView } from '../views'
 
 // The vocabulary is `@juno/domain`'s. It is re-exported so a renderer package
 // that may not import domain still names the same literals.
@@ -128,8 +129,14 @@ export type KindFilter = typeof KindFilter.Type
 export const TopicListFilter = {
   kind: KindFilter,
   unreadOnly: Schema.Boolean,
-  /** Narrowed to one channel from Browse or ⌘K. */
+  /** Narrowed to one channel from Browse or ⌘K. It wins over `view`, and shows the channel even when a view keeps it out of All. */
   scope: Schema.optionalKey(Schema.String),
+  /**
+   * A sidebar view's id: only its conversations, by the same rules. `kind`
+   * is ignored. Without one, conversations a view keeps out of All are
+   * left out.
+   */
+  view: Schema.optionalKey(Schema.String),
 }
 
 /** The sidebar list. Window of 300 rows, pinned first, then recent by latest activity. Rows name their channel and people; both are in `refs`. */
@@ -139,6 +146,8 @@ export const TopicCounts = Schema.Struct({
   /** Unread topics the sidebar would show, per group, within the scope. */
   channelsUnread: Schema.Int,
   dmsUnread: Schema.Int,
+  /** The views with a topic that has an unread mention of the user, for their dots. Plain unread does not count. */
+  viewMentions: Schema.Array(Schema.String),
 })
 export type TopicCounts = typeof TopicCounts.Type
 
@@ -208,6 +217,10 @@ export const UndoCommand = Schema.Union([
   // Several resolves undone together (Home's Resolve all): `topics.restore` for each.
   Schema.TaggedStruct('topics.restoreAll', { restores: Schema.Array(Schema.Struct(restorePayload)) }),
   Schema.TaggedStruct('art.restore', artRestorePayload),
+  // A deleted view, put back whole; and a conversation added to or removed from a view.
+  Schema.TaggedStruct('views.restore', { view: SavedView }),
+  Schema.TaggedStruct('views.addChannel', { id: Schema.String, channel: Schema.String }),
+  Schema.TaggedStruct('views.removeChannel', { id: Schema.String, channel: Schema.String }),
 ])
 export type UndoCommand = typeof UndoCommand.Type
 

@@ -34,6 +34,8 @@ export interface TopicListFilter {
   readonly kind: KindFilter
   readonly unreadOnly: boolean
   readonly scope?: string | undefined
+  /** A sidebar view's id. `kind` stays as it was, for when the view is left. */
+  readonly view?: string | undefined
 }
 
 export const defaultTopicListFilter: TopicListFilter = { kind: 'all', unreadOnly: false }
@@ -101,6 +103,8 @@ export const topicListAtom = (filter: TopicListFilter = defaultTopicListFilter) 
       kind: filter.kind,
       unreadOnly: filter.unreadOnly,
       ...(filter.scope === undefined ? {} : { scope: filter.scope }),
+      // The scope wins over a view, so a scoped list is the same subscription with or without one.
+      ...(filter.view === undefined || filter.scope !== undefined ? {} : { view: filter.view }),
       range: { limit: SIDEBAR_WINDOW },
     }),
   )

@@ -46,6 +46,7 @@ export function EngineStatus() {
     <EngineStatusView
       line={line}
       pong={pong._tag === 'Success' ? `Pong ${pong.value.pong}` : pong._tag === 'Failure' ? 'Ping failed' : undefined}
+      busy={connection === 'connected' && status._tag === 'Success' && status.value.syncing}
       onPing={() => ping({ n: ++count.current })}
     />
   )

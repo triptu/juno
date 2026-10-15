@@ -3,10 +3,12 @@
  * first frame already has the right background and size (performance 2.1).
  * Read synchronously once before `ready`; written asynchronously after.
  * Main keeps one `Launch` value in memory and writes it whole, so a change
- * to one field never overwrites another.
+ * to one field never overwrites another. Writes run one at a time through a
+ * temporary file and a rename, so the file is never half written, and main
+ * waits for the last one before it quits.
  */
 import { readFileSync } from 'node:fs'
-import { writeFile } from 'node:fs/promises'
+import { rename, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { Schema } from 'effect'
 import { nativeTheme } from 'electron'
@@ -49,8 +51,31 @@ export function readLaunch(userData: string): Launch {
   }
 }
 
-export function writeLaunch(userData: string, launch: Launch): Promise<void> {
-  return writeFile(file(userData), JSON.stringify(encode(launch)), 'utf8').catch((cause: unknown) => {
-    console.warn('main: could not write launch.json', cause)
-  })
+export interface LaunchWriter {
+  /** Queues a write of the whole value. */
+  readonly write: (launch: Launch) => void
+  /** Resolves once every queued write has finished; undefined when none is queued. */
+  readonly pending: () => Promise<void> | undefined
+}
+
+export function launchWriter(userData: string): LaunchWriter {
+  const target = file(userData)
+  const temporary = `${target}.tmp`
+  let last: Promise<void> | undefined
+  return {
+    write: (launch) => {
+      const contents = JSON.stringify(encode(launch))
+      const next = (last ?? Promise.resolve())
+        .then(() => writeFile(temporary, contents, 'utf8'))
+        .then(() => rename(temporary, target))
+        .catch((cause: unknown) => {
+          console.warn('main: could not write launch.json', cause)
+        })
+        .finally(() => {
+          if (last === next) last = undefined
+        })
+      last = next
+    },
+    pending: () => last,
+  }
 }

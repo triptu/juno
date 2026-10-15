@@ -1,5 +1,4 @@
 import { startTransition, useState } from 'react'
-import type { KindFilter } from '@juno/contract'
 import {
   activeTab,
   currentPlace,
@@ -11,6 +10,8 @@ import {
   sidebarListAtom,
   signedInAtom,
   tabsAtom,
+  viewPillsAtom,
+  viewSheetAtom,
   type Tabs,
 } from '@juno/state'
 import { junoNavAtom } from '@juno/state/agent'
@@ -24,6 +25,8 @@ import { openAllTopics, openHome, openNewTab, openNotifications, openPreferences
 import { Session } from './Session'
 import { TitlebarNav } from './TitlebarNav'
 import { TopicList } from './TopicList'
+import { closeViewSheet, moveView, newView, selectKind, selectView, showViewPillMenu } from './viewActions'
+import { ViewSheet } from './ViewSheet'
 
 function navigate(target: SidebarNavTarget, event: ActivateEvent): void {
   if (target === 'home') return openHome({ newTab: event.metaKey })
@@ -59,6 +62,8 @@ function activeNavOf(tabs: Tabs): SidebarNavTarget | undefined {
  */
 export function Sidebar() {
   const [filter, setFilter] = useAtom(sidebarFilterAtom)
+  const views = useAtomValue(viewPillsAtom)
+  const sheet = useAtomValue(viewSheetAtom)
   const channelsDot = useAtomValue(sidebarDotAtom('channels'))
   const dmsDot = useAtomValue(sidebarDotAtom('dms'))
   const user = useAtomValue(signedInAtom)
@@ -82,12 +87,6 @@ export function Sidebar() {
     setPresence(registry, presence?.active === false ? 'active' : 'away')
   }
 
-  const changeKind = (kind: KindFilter) => {
-    if (kind === filter.kind) return
-    markFilterChange()
-    // The old rows stay until the new window arrives; never a blank list in between (performance.md 5.3).
-    startTransition(() => setFilter({ ...filter, kind }))
-  }
   const toggleUnread = () => {
     markFilterChange()
     startTransition(() => setFilter({ ...filter, unreadOnly: !filter.unreadOnly }))
@@ -104,7 +103,7 @@ export function Sidebar() {
     <SidebarView
       titlebarLeading={<TitlebarNav />}
       account={account}
-      filter={{ kind: filter.kind, unreadOnly: filter.unreadOnly }}
+      filter={{ kind: filter.kind, unreadOnly: filter.unreadOnly, view: filter.view }}
       dots={dots}
       {...(filter.scope === undefined ? {} : { scope: { name: scopeChannel?.name ?? filter.scope, kind: scopeChannel?.kind ?? 'public' } })}
       accountMenuOpen={menuOpen}
@@ -138,7 +137,14 @@ export function Sidebar() {
       junoBusy={junoBusy}
       onNewChat={openNewTab}
       onNavigate={navigate}
-      onFilterKind={changeKind}
+      onFilterKind={selectKind}
+      views={views}
+      onFilterView={selectView}
+      onNewView={newView}
+      onViewMenu={(id) => void showViewPillMenu(id)}
+      onMoveView={moveView}
+      {...(sheet === undefined ? {} : { viewSheet: <ViewSheet key={JSON.stringify(sheet)} sheet={sheet} /> })}
+      onCloseViewSheet={closeViewSheet}
       onToggleUnread={toggleUnread}
       onClearScope={clearScope}
       status={<SyncNotice />}
