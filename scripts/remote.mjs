@@ -3,6 +3,7 @@
 //   pnpm remote [--dry-run] [--machine linux/amd64:16x32] [--keep] [--env KEY=VALUE] <script> [args...]
 //   pnpm remote test
 //   pnpm remote specs:check --memory
+//   pnpm remote --shards 2 specs:check     one script split across machines
 //   pnpm remote --status | --drain
 //
 // Each run has a machine to itself: a warm one from the pool in
@@ -21,7 +22,7 @@
 
 import { spawn, spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, relative, resolve } from 'node:path'
 import { createInterface } from 'node:readline'
@@ -173,6 +174,24 @@ if (process.argv[2] === '--drain') {
   process.exit(0)
 }
 
+// --shards n runs the script on n machines at once, each with JUNO_SHARD=i/n
+// (0-based), and fails if any shard fails. specs:check honours JUNO_SHARD.
+const shardsAt = process.argv.indexOf('--shards')
+if (shardsAt > 1 && process.argv.slice(2, shardsAt).every((arg) => arg.startsWith('--'))) {
+  const total = Number(process.argv[shardsAt + 1])
+  const rest = process.argv.slice(2).filter((_, index) => index !== shardsAt - 2 && index !== shardsAt - 1)
+  const runs = Array.from({ length: total }, (_, index) =>
+    new Promise((resolvePromise) => {
+      const child = spawn(process.execPath, [self, '--env', `JUNO_SHARD=${index}/${total}`, ...rest], { stdio: ['ignore', 'pipe', 'pipe'] })
+      for (const stream of [child.stdout, child.stderr]) createInterface({ input: stream }).on('line', (line) => console.log(`[${index + 1}/${total}] ${line}`))
+      child.on('close', (code) => resolvePromise(code ?? 1))
+    }),
+  )
+  const codes = await Promise.all(runs)
+  console.error(`remote: shards exited with ${codes.join(', ')}`)
+  process.exit(Math.max(...codes))
+}
+
 let options
 let snapshotted
 try {
@@ -184,11 +203,24 @@ try {
 }
 const { files, bytes } = snapshotted
 const runId = `${new Date().toISOString().replace(/[-:]/g, '').replace(/\..*/, '')}-${process.pid}`
+
+// Spec checks take the Mac's cache of passing Quint runs along (staged in the
+// ignored .remote/ folder) and bring back what they add, so a check that passed
+// anywhere is not run again.
+const specCache = join(tmpdir(), 'juno-cache', 'specs')
+const stagedCache = `.remote/cache-${runId}/specs`
+const carriesCache = options.script.startsWith('specs:') && process.env.SPECS_CACHE !== 'off' && !options.args.includes('--no-cache')
+if (carriesCache && !options.dryRun) {
+  mkdirSync(join(root, stagedCache), { recursive: true })
+  if (existsSync(specCache)) cpSync(specCache, join(root, stagedCache), { recursive: true })
+  for (const name of readdirSync(join(root, stagedCache))) files.push(`${stagedCache}/${name}`)
+  options.env.push(`SPECS_CACHE_DIR=/work/${stagedCache}`)
+}
 const reportDir = join(root, '.remote', runId)
 const exitMarker = `__juno_remote_exit_${runId}=`
 const scriptArgs = [options.script, ...options.args].map(quote).join(' ')
 const container = (image) =>
-  `rm -rf /tmp/out && mkdir -p /tmp/out && chmod 777 /tmp/out && s=$(date +%s) && docker pull -q ${image} >/dev/null && echo "remote: image pulled in $(( $(date +%s) - s )) s" >&2 && docker run --rm -i --init --ipc=host -v /tmp/out:/out ${options.env.map((pair) => `-e ${quote(pair)}`).join(' ')} ${image} ` +
+  `echo __juno_remote_started; rm -rf /tmp/out && mkdir -p /tmp/out && chmod 777 /tmp/out && s=$(date +%s) && docker pull -q ${image} >/dev/null && echo "remote: image pulled in $(( $(date +%s) - s )) s" >&2 && docker run --rm -i --init --ipc=host -v /tmp/out:/out ${options.env.map((pair) => `-e ${quote(pair)}`).join(' ')} ${image} ` +
   `bash -c 'tar -xzf - -C /work && exec bash scripts/remote/run.sh "$@"' _ ${scriptArgs}; code=$?; [ -s /tmp/out/reports.tgz ] && echo __juno_remote_reports; echo "${exitMarker}$code"`
 const create = (duration) => ['create', '--bare', '--machine_type', options.machine, '--duration', duration, '--label', 'juno-remote=1', '--purpose', 'juno remote']
 
@@ -217,6 +249,7 @@ const cleanup = () => {
   else if (id) destroy(id)
   id = undefined
   rmSync(work, { recursive: true, force: true })
+  rmSync(join(root, '.remote', `cache-${runId}`), { recursive: true, force: true })
 }
 process.on('exit', cleanup)
 for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
@@ -244,7 +277,6 @@ try {
   )
   id = claimed.id
   console.error(`remote: ${claimed.warm ? 'warm' : 'new'} machine ${id} (${options.machine}) after ${elapsed()}; running pnpm ${options.script}`)
-  if (!claimed.warm) await retry('reaching the machine', () => nsc(['ssh', '-T', id, 'true']))
 
   const list = join(work, 'files')
   writeFileSync(list, files.join('\0'))
@@ -264,14 +296,30 @@ try {
       process.stderr.write(chunk)
     })
     const closed = new Promise((resolvePromise) => ssh.on('close', resolvePromise))
+    // A dial that fails takes nsc about 16 s to give up on; one that works
+    // prints the start line within about 4 s. Give up after 8 s and dial again.
+    let started = false
+    const dialTimer = setTimeout(() => {
+      if (!started) {
+        errors += 'dial tcp: no start line within 8 s'
+        ssh.kill()
+      }
+    }, 8000)
     let lines = 0
     for await (const line of createInterface({ input: ssh.stdout })) {
+      if (line === '__juno_remote_started') {
+        started = true
+        clearTimeout(dialTimer)
+        continue
+      }
+      if (lines === 0) console.error(`remote: first output after ${elapsed()}`)
       lines++
       if (line.startsWith(exitMarker)) reported = Number(line.slice(exitMarker.length))
       else if (line === '__juno_remote_reports') hasReports = true
       else console.log(line)
     }
     await closed
+    clearTimeout(dialTimer)
     tar.kill()
     if (reported !== undefined) break
     if (lines > 0 || !/dial tcp|i\/o timeout|connection refused/.test(errors) || tries === 6) {
@@ -283,11 +331,20 @@ try {
   }
   code = reported
   clean = true
+  console.error(`remote: script done after ${elapsed()}`)
 
   const reports = hasReports ? spawnSync('nsc', ['ssh', '-T', id, 'cat /tmp/out/reports.tgz'], { maxBuffer: 1024 * 1024 * 1024 }) : undefined
   if (reports?.status === 0 && reports.stdout.length > 0) {
     mkdirSync(reportDir, { recursive: true })
     spawnSync('tar', ['-xzf', '-', '-C', reportDir], { input: reports.stdout })
+    const returned = join(reportDir, stagedCache)
+    if (carriesCache && existsSync(returned)) {
+      mkdirSync(specCache, { recursive: true })
+      const before = existsSync(specCache) ? readdirSync(specCache).length : 0
+      cpSync(returned, specCache, { recursive: true, force: false })
+      console.error(`remote: spec cache ${before} -> ${readdirSync(specCache).length} entries`)
+      rmSync(join(reportDir, '.remote'), { recursive: true, force: true })
+    }
     console.error(`remote: reports in ${relative(root, reportDir)}/`)
   }
 } catch (error) {

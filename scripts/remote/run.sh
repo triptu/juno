@@ -32,5 +32,7 @@ reports=()
 for path in specs/traces apps/desktop/test-results apps/gallery/test-results apps/gallery/playwright-report apps/gallery/shots; do
   [ -e "$path" ] && reports+=("$path")
 done
+# The spec cache pnpm remote brought along, with what this run added to it.
+[ -n "${SPECS_CACHE_DIR:-}" ] && [ -d "$SPECS_CACHE_DIR" ] && reports+=("${SPECS_CACHE_DIR#/work/}")
 [ ${#reports[@]} -gt 0 ] && tar -czf /out/reports.tgz "${reports[@]}"
 exit $code

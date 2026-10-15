@@ -33,7 +33,8 @@ mkdirSync(generated, { recursive: true })
 // check is not run again. Bump cacheVersion when the checks on a result or the
 // Apalache adapter below change. The cache is shared by every worktree. SPECS_CACHE=off or --no-cache runs everything.
 const jobs = []
-const cacheDir = join(tmpdir(), 'juno-cache', 'specs')
+// SPECS_CACHE_DIR: pnpm remote brings the Mac's cache along and back.
+const cacheDir = process.env.SPECS_CACHE_DIR ?? join(tmpdir(), 'juno-cache', 'specs')
 const useCache = process.env.SPECS_CACHE !== 'off' && !process.argv.includes('--no-cache')
 const parallel = Math.max(1, Number(process.env.SPECS_JOBS ?? 3))
 const apalacheLanes = Math.max(1, Number(process.env.SPECS_APALACHE ?? 1))
@@ -173,7 +174,27 @@ async function runJob(job, lane = 0) {
   return `${log}${notes}`
 }
 
+// JUNO_SHARD=i/n (pnpm remote --shards n) keeps this machine's share of the
+// jobs: typechecks on every shard, the rest dealt by expected cost to the
+// lightest shard, so every job runs on exactly one shard.
+function shardJobs() {
+  const match = /^(\d+)\/(\d+)$/.exec(process.env.JUNO_SHARD ?? '')
+  if (!match) return
+  const [index, total] = [Number(match[1]), Number(match[2])]
+  const loads = Array.from({ length: total }, () => 0)
+  const cost = job => (job.args[0] === 'verify' ? 30 : Number(job.args[job.args.indexOf('--max-samples') + 1] ?? 1) >= 500 ? 20 : 1)
+  const kept = jobs.filter(job => {
+    if (job.args[0] === 'typecheck') return true
+    const lightest = loads.indexOf(Math.min(...loads))
+    loads[lightest] += cost(job)
+    return lightest === index
+  })
+  console.log(`Shard ${index + 1} of ${total}: ${kept.length} of ${jobs.length} jobs.`)
+  jobs.splice(0, jobs.length, ...kept)
+}
+
 async function runAll() {
+  shardJobs()
   // On the Mac (SPECS_APALACHE=1): simulations first, SPECS_JOBS at a time, then
   // the Apalache checks one at a time and alone, because a JVM warming up next
   // to simulations on a loaded machine can miss its deadline. A machine of its

@@ -10,7 +10,8 @@
 //   Each machine also ends on its own after its Namespace duration (3 hours),
 //   and is not handed out in its last 30 minutes.
 // - Machines in use and idle together stay within JUNO_REMOTE_MAX_VCPU (default
-//   64, the Team plan's Linux limit). A run waits while the pool is full.
+//   64, the Team plan's Linux limit), counting every juno-remote machine in the
+//   Namespace workspace. A run waits while the pool is full.
 
 import { spawn, spawnSync } from 'node:child_process'
 import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
@@ -71,6 +72,21 @@ export function destroy(id) {
   rmSync(lockPath(id), { recursive: true, force: true })
 }
 
+/**
+ * vCPU of every juno-remote machine in the Namespace workspace, including ones
+ * started from other Macs or outside the pool, so the cap holds for the workspace.
+ */
+function workspaceVcpu() {
+  const listed = spawnSync('nsc', ['list', '-o', 'json'], { encoding: 'utf8' })
+  try {
+    return JSON.parse(listed.stdout)
+      .filter((instance) => instance.labels?.['juno-remote'] === '1')
+      .reduce((sum, instance) => sum + (instance.shape?.virtual_cpu ?? 8), 0)
+  } catch {
+    return 0
+  }
+}
+
 /** Takes a machine out of the pool without destroying it (`pnpm remote --keep`). */
 export function forget(id) {
   rmSync(statePath(id), { force: true })
@@ -116,7 +132,7 @@ async function decideOnce(machine, create) {
   for (const state of all.filter((candidate) => candidate.machine === machine && Date.now() - candidate.created < handOutMs)) {
     if (lock(state.id)) return { id: state.id, warm: true, images: state.images ?? [] }
   }
-  let used = all.reduce((sum, state) => sum + vcpu(state.machine), 0)
+  let used = Math.max(all.reduce((sum, state) => sum + vcpu(state.machine), 0), workspaceVcpu())
   // An idle machine of another shape gives way to a new one when the pool is full.
   while (used + vcpu(machine) > maxVcpu) {
     const idle = all.find((state) => state.machine !== machine && read(state.id) && lock(state.id))
