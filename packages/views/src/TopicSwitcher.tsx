@@ -22,7 +22,6 @@ export interface TopicSwitcherProps {
   readonly onQuery: (query: string) => void
   /** A topic picked: click or Enter in the current tab, ⌘-click or ⌘Enter in a new one (`event.metaKey`). */
   readonly onOpen: (id: string, event: Pick<ActivateEvent, 'metaKey'>) => void
-  readonly onClose: () => void
 }
 
 const replies = (count: number) => (count === 1 ? '1 reply' : `${count} replies`)
@@ -43,9 +42,10 @@ const rowId = (id: string) => `switch-${id}`
  * activity first, with the resolved ones last under their own label. Unread
  * shows as in the sidebar, a bold title and a count; the topic on screen is
  * the selected row. Typing filters, ↑ ↓ move, Enter opens and ⌘Enter opens
- * in a new tab, Esc closes. New chat's thread picker is the same list.
+ * in a new tab. Esc is the popover's: it closes and gives focus back to
+ * the title. New chat's thread picker is the same list.
  */
-export function TopicSwitcher({ mainId, mainUnread, currentId, threads, now, query, onQuery, onOpen, onClose }: TopicSwitcherProps) {
+export function TopicSwitcher({ mainId, mainUnread, currentId, threads, now, query, onQuery, onOpen }: TopicSwitcherProps) {
   const main = matches('Main', query)
   const shown = (threads ?? []).filter((thread) => matches(thread.title, query))
   const open = shown.filter((thread) => thread.resolved !== true)
@@ -58,7 +58,7 @@ export function TopicSwitcher({ mainId, mainUnread, currentId, threads, now, que
     const topicId = topicIds[ids.indexOf(id)]
     if (topicId !== undefined) onOpen(topicId, { metaKey })
   }
-  const keys = useOptionListKeys({ ids, activeId, onActiveChange: setChosen, onSelect: (id) => pick(id), onClose })
+  const keys = useOptionListKeys({ ids, activeId, onActiveChange: setChosen, onSelect: (id) => pick(id) })
   const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
     if (event.key === 'Enter' && event.metaKey && activeId !== undefined) {
       event.preventDefault()

@@ -219,7 +219,7 @@ function Switcher({ detail, onClose }: { readonly detail: TopicDetail; readonly 
     if (id !== detail.id || event.metaKey) openTopic(id, { newTab: event.metaKey })
   }
   return (
-    <TopicSwitcherView mainId={mainId} mainUnread={mainUnread} currentId={detail.id} threads={threads} now={now} query={query} onQuery={setQuery} onOpen={open} onClose={onClose} />
+    <TopicSwitcherView mainId={mainId} mainUnread={mainUnread} currentId={detail.id} threads={threads} now={now} query={query} onQuery={setQuery} onOpen={open} />
   )
 }
 

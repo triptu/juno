@@ -88,7 +88,7 @@ const topic = (props: Scene, frame?: FixtureFrame) => scene<TopicViewProps>(() =
 const switcher = {
   open: true,
   onOpen: noop,
-  content: <TopicSwitcher mainId="C0ENG:main" mainUnread={3} currentId="C0ENG:main" threads={engTopics} now={NOW} query="" onQuery={noop} onOpen={noop} onClose={noop} />,
+  content: <TopicSwitcher mainId="C0ENG:main" mainUnread={3} currentId="C0ENG:main" threads={engTopics} now={NOW} query="" onQuery={noop} onOpen={noop} />,
 }
 
 /** A few emoji, so the picker reads like the real one without the whole catalog. */

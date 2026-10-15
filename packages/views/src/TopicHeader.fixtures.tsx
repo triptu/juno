@@ -14,7 +14,7 @@ const state = (props: Partial<TopicHeaderProps> & Pick<TopicHeaderProps, 'detail
 const switcher = (currentId: string, query = '') => ({
   open: true,
   onOpen: noop,
-  content: <TopicSwitcher mainId="C0ENG:main" mainUnread={3} currentId={currentId} threads={engTopics} now={NOW} query={query} onQuery={noop} onOpen={noop} onClose={noop} />,
+  content: <TopicSwitcher mainId="C0ENG:main" mainUnread={3} currentId={currentId} threads={engTopics} now={NOW} query={query} onQuery={noop} onOpen={noop} />,
 })
 
 // The header lies over the top of its area; the frame is that area's top, the band's height.

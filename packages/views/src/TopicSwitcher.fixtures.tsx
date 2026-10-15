@@ -14,7 +14,6 @@ const base: TopicSwitcherProps = {
   query: '',
   onQuery: noop,
   onOpen: noop,
-  onClose: noop,
 }
 
 // The popover's width (`--browse-width`), on the popover's surface.
