@@ -7,9 +7,10 @@
 //   pnpm perf                  every scenario
 //   pnpm perf -g "topic view"  some of them
 //   JUNO_PERF_TRACE=<dir>      also write traces and CPU profiles (scripts/perf-trace.mjs)
+import { execFileSync } from 'node:child_process'
 import { mkdir, rm, writeFile } from 'node:fs/promises'
 import { loadavg } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import type { Page } from '@playwright/test'
 import { largeSeed, startFakeSlack, topic300Seed, TOPIC300_MAIN_CHANNEL, TOPIC300_THREAD_CHANNEL, type FakeSlack } from '@juno/fake-slack'
 import { startFakeOpenRouter, type FakeOpenRouter } from '@juno/agent-testing/openrouter'
@@ -21,6 +22,34 @@ test.skip(process.env['JUNO_PERF'] !== '1', 'set JUNO_PERF=1 to measure')
 
 const POSTGRES = 'Draft plan is in the doc'
 
+const ROOT = resolve(__dirname, '../../..')
+
+/**
+ * Other checkouts' Electron and Playwright processes running now. The
+ * heavy-job lock only holds back runs that take it; one that launches the
+ * app directly still shares the machine, and its frames and timers change
+ * these numbers. Printed with every result, so a contended number is never
+ * read as a clean one.
+ */
+function contention(): string {
+  let listing = ''
+  try {
+    listing = execFileSync('ps', ['-Ao', 'command'], { encoding: 'utf8' })
+  } catch {
+    return ''
+  }
+  const others = new Set<string>()
+  for (const line of listing.split('\n')) {
+    // A checkout's own Electron binary, or a Playwright run from a checkout.
+    const program = line.split(' ')[0] ?? ''
+    const app = program.includes('/node_modules/') && program.includes('/electron/dist/')
+    const runner = /\/node_modules\/.*playwright.*\/cli\.js|\/\.bin\/playwright/.test(line)
+    if ((!app && !runner) || line.includes(ROOT)) continue
+    others.add(line.match(/\/([^/ ]+)\/(?:apps|packages)\/[^/ ]+\/node_modules\//)?.[1] ?? line.match(/\/([^/ ]+)\/node_modules\//)?.[1] ?? 'another checkout')
+  }
+  return others.size === 0 ? '' : `, contended by ${[...others].join(', ')}`
+}
+
 function stats(name: string, samples: ReadonlyArray<number>): { readonly median: number; readonly p95: number } {
   const sorted = samples.toSorted((a, b) => a - b)
   // Nearest rank: the p95 of 20 samples is the 19th, not the largest.
@@ -29,7 +58,7 @@ function stats(name: string, samples: ReadonlyArray<number>): { readonly median:
   const p95 = at(0.95)
   const load = loadavg()[0]!.toFixed(1)
   const shown = sorted.length <= 60 ? `, samples ${sorted.map((s) => s.toFixed(1)).join(' ')}` : ''
-  console.log(`${name}: median ${median.toFixed(1)} ms, p95 ${p95.toFixed(1)} ms, n=${samples.length}, load ${load}${shown}`)
+  console.log(`${name}: median ${median.toFixed(1)} ms, p95 ${p95.toFixed(1)} ms, n=${samples.length}, load ${load}${contention()}${shown}`)
   return { median, p95 }
 }
 
