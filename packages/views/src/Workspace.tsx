@@ -267,6 +267,13 @@ const styles = stylex.create({
   // islands, so the page's header variables are set for the panel's own
   // top here: the row at 0, the band and list inset 8px shorter.
   side: {
+    // Not drawn until its chat has mounted (the Juno chunk loads lazily),
+    // so the topic reflows and the panel appears in the same frame, never
+    // as an empty floating box.
+    display: {
+      default: 'flex',
+      ':not(:has([data-juno-chat]))': 'none',
+    },
     position: {
       default: 'relative',
       [COVER]: 'absolute',
@@ -276,7 +283,6 @@ const styles = stylex.create({
       [COVER]: layout['--juno-panel-inset'],
     },
     zIndex: z['--z-panel'],
-    display: 'flex',
     flexDirection: 'column',
     flexShrink: 0,
     boxSizing: 'border-box',
