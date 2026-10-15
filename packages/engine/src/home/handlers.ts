@@ -35,6 +35,8 @@ const KEYS: InvalidationKeys = [
   'follow_ups',
   'topic_visits',
   'sync_state',
+  'automated_channels',
+  'sidebar_views',
 ]
 
 /** Visits kept; Home reads only the newest. */

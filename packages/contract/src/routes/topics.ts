@@ -18,7 +18,7 @@ import { AllTopicsStatus, ChannelColor, ChannelIcon, ContextTint, ConversationKi
 import { NotFound, NotSignedIn, Offline, RateLimited, Rejected } from '../errors'
 import { liveListRoute, liveValueRoute, RowFields } from '../live'
 import { ChannelRef, Person } from '../refs'
-import { SavedView } from '../views'
+import { AutomatedPlace, SavedView } from '../views'
 
 // The vocabulary is `@juno/domain`'s. It is re-exported so a renderer package
 // that may not import domain still names the same literals.
@@ -221,6 +221,8 @@ export const UndoCommand = Schema.Union([
   Schema.TaggedStruct('views.restore', { view: SavedView }),
   Schema.TaggedStruct('views.addChannel', { id: Schema.String, channel: Schema.String }),
   Schema.TaggedStruct('views.removeChannel', { id: Schema.String, channel: Schema.String }),
+  // An answer about the Automated view, put back as it was.
+  Schema.TaggedStruct('views.sortChannel', { channel: Schema.String, to: AutomatedPlace }),
 ])
 export type UndoCommand = typeof UndoCommand.Type
 

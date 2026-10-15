@@ -16,7 +16,7 @@ import {
 import { Invalidation, StoreWriter, transaction, type MessageRow, type SqlError } from '@juno/store'
 import { Clock, Effect, Queue } from 'effect'
 import { reindexOptions, type SyncContext } from './context'
-import { mergeRootCounters, mergeTombstone } from './merge'
+import { mergeRootCounters, mergeTombstone, type MergeSource } from './merge'
 import { mainTopicOf, mergeOne, threadTopicOf } from './pages'
 import { reindexTopics, topicsOfMessages } from './reindex'
 import {
@@ -240,11 +240,11 @@ const writeChanged = (ctx: SyncContext, channel: string, message: Message, event
     yield* reindexTopics(topicsOfMessages(rows), reindexOptions(ctx))
   })
 
-/** A deleted message (`message_deleted`, or Juno's own delete answered). */
-const writeDeleted = (ctx: SyncContext, channel: string, deletedTs: string, eventTs: string): Effect.Effect<void, SqlError, Services> =>
+/** A deleted message (`message_deleted`, Juno's own delete answered, or a message the recheck found gone). */
+export const writeDeleted = (ctx: SyncContext, channel: string, deletedTs: string, source: MergeSource): Effect.Effect<void, SqlError, Services> =>
   Effect.gen(function* () {
     const existing = yield* readMessage(channel, deletedTs)
-    const merged = mergeTombstone(existing, channel, deletedTs, { kind: 'event', eventTs })
+    const merged = mergeTombstone(existing, channel, deletedTs, source)
     if (merged.changed) yield* writeMessage(merged.row)
     const topics = topicsOfMessages([merged.row])
     // A deleted reply: the root's counters follow the stored replies when they are complete, else drop by one.
@@ -310,7 +310,7 @@ export const applyActed = <E>(
             yield* writeChanged(ctx, acted.channel, acted.message, acted.message.edited?.ts ?? eventTs)
             break
           case 'deleted':
-            yield* writeDeleted(ctx, acted.channel, acted.ts, eventTs)
+            yield* writeDeleted(ctx, acted.channel, acted.ts, { kind: 'event', eventTs })
             break
           case 'reacted':
             yield* writeReaction(ctx, { channel: acted.channel, ts: acted.ts, name: acted.name, user: ctx.me.userId, added: acted.added }, eventTs)
@@ -327,7 +327,7 @@ const applyMessageFrame = (ctx: SyncContext, frame: Extract<RtmFrame, { type: 'm
     return transaction(writePosted(ctx, frame.channel, message as Message, eventTsOf(frame, now), now))
   }
   if (isMessageChanged(frame)) return transaction(writeChanged(ctx, frame.channel, frame.message, eventTsOf(frame, now)))
-  if (isMessageDeleted(frame)) return transaction(writeDeleted(ctx, frame.channel, frame.deleted_ts, eventTsOf(frame, now)))
+  if (isMessageDeleted(frame)) return transaction(writeDeleted(ctx, frame.channel, frame.deleted_ts, { kind: 'event', eventTs: eventTsOf(frame, now) }))
   if (isMessageReplied(frame)) {
     return transaction(
       Effect.gen(function* () {

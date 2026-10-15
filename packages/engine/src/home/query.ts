@@ -13,6 +13,9 @@
  *   done, found by the job (`job.ts`).
  * - Tidy up (AI assist on): followed topics the settled decision scored at
  *   least `SETTLED_MIN_SCORE`, scored after their latest activity.
+ * - Automated: the most recently active conversation the rules and Juno
+ *   could not place (`ask` in `automated_channels`, by `automated.ts`), in
+ *   no view, while the user has not deleted the Automated view.
  *
  * "Followed" is a thread Slack follows or a DM's Main. Resolved topics and
  * ignored channels never appear. `rankHomeItems` keeps at most one of each
@@ -23,6 +26,8 @@
 import { HOME_ITEM_LIMIT, type HomeItem, type HomeTopic, type HomeView } from '@juno/contract'
 import {
   asksUser,
+  AUTOMATED_SAMPLE,
+  AUTOMATED_VIEW_ID,
   channelLabel,
   channelLabelBare,
   firstName,
@@ -39,7 +44,7 @@ import { StoreReader, syncState, type SqlError } from '@juno/store'
 import { BOOT_KEY } from '@juno/sync'
 import { Clock, Effect } from 'effect'
 import { aiAssistOn } from '../ai'
-import { artRefOf, channelInfoOf, parseColumns, topicFrom, TOPIC_COLUMNS, TOPIC_FROM, userIdsOf, userName, type JoinedRow, type UserRow } from '../topicRows'
+import { artRefOf, channelInfoOf, channelRefOf, parseColumns, topicFrom, TOPIC_COLUMNS, TOPIC_FROM, userIdsOf, userName, type JoinedRow, type UserRow } from '../topicRows'
 
 /** A topic row with Juno's read pointer. */
 export interface HomeRow extends JoinedRow {
@@ -81,6 +86,23 @@ export const homeStatements = {
   threadAfter: (channel: string, threadTs: string, after: string, limit = QUESTION_WINDOW): Statement => ({
     sql: `SELECT ts, user_id, text FROM messages WHERE channel = ? AND thread_ts = ? AND ts > ? AND deleted = 0 ORDER BY ts DESC LIMIT ?`,
     params: [channel, threadTs, after, limit],
+  }),
+  /** The Main of the newest conversation Home asks about for Automated. */
+  automated: (): Statement => ({
+    sql: `${HOME_SELECT}
+      WHERE i.channel IN (SELECT channel FROM automated_channels WHERE verdict = 'ask') AND i.kind = 'main' AND ${OPEN}
+        AND NOT EXISTS (SELECT 1 FROM sidebar_view_channels vc WHERE vc.channel = i.channel)
+        AND NOT EXISTS (SELECT 1 FROM builtin_views b WHERE b.id = ? AND NOT EXISTS (SELECT 1 FROM sidebar_views v WHERE v.id = b.id))
+      ORDER BY +i.last_activity_ts DESC LIMIT 1`,
+    params: [AUTOMATED_VIEW_ID],
+  }),
+  /** How many of a conversation's latest messages came from apps, for the meta line. */
+  fromApps: (channel: string): Statement => ({
+    sql: `SELECT count(*) AS of, coalesce(sum(app), 0) AS apps FROM (
+        SELECT (m.subtype = 'bot_message' OR u.is_bot = 1 OR m.user_id LIKE 'B%') AS app FROM messages m LEFT JOIN users u ON u.id = m.user_id
+        WHERE m.channel = ? AND m.deleted = 0 AND (m.subtype IS NULL OR m.subtype IN ('bot_message', 'thread_broadcast', 'file_share', 'me_message'))
+        ORDER BY m.ts DESC LIMIT ?)`,
+    params: [channel, AUTOMATED_SAMPLE],
   }),
   mainAfter: (channel: string, after: string, limit = QUESTION_WINDOW): Statement => ({
     sql: `SELECT ts, user_id, text FROM messages WHERE channel = ? AND ts > ? AND (thread_ts IS NULL OR thread_ts = ts OR subtype = 'thread_broadcast') AND deleted = 0
@@ -216,6 +238,22 @@ export const readHome = (): Effect.Effect<HomeRun, SqlError, StoreReader> =>
       }
     }
 
+    // Automated: a conversation the rules and Juno could not place. Asked with AI on or off.
+    const [asked] = yield* run(homeStatements.automated())
+    if (asked !== undefined) {
+      const counts = (yield* sql.unsafe<{ apps: number; of: number }>(homeStatements.fromApps(asked.channel).sql, homeStatements.fromApps(asked.channel).params))[0]
+      add(
+        {
+          id: `automated:${asked.channel}`,
+          kind: 'automated',
+          title: '',
+          ...(asked.last_activity_ts === null ? {} : { at: tsToMillis(asked.last_activity_ts as Ts) }),
+          ...(counts === undefined ? {} : { fromApps: { apps: counts.apps, of: counts.of } }),
+        },
+        [asked],
+      )
+    }
+
     const ranked = rankHomeItems(candidates, HOME_ITEM_LIMIT)
 
     // Names: the shown topics' people and the senders of the questions, and the user for the greeting.
@@ -240,6 +278,11 @@ export const readHome = (): Effect.Effect<HomeRun, SqlError, StoreReader> =>
       }
     }
 
+    const automatedChannelOf = (row: HomeRow) => {
+      const info = channelInfoOf(row, parseColumns(row), selfId, nameOf)
+      return channelRefOf(info, row.c_kind === 'im' ? (row.c_user_id ?? undefined) : undefined)
+    }
+
     // Rewrites the assistant made after each topic's latest activity.
     const rewriteIds = ranked.filter((c) => c.kind === 'waiting' || c.kind === 'resume' || c.kind === 'moved').map((c) => c.value.item.id)
     const rewrites =
@@ -251,11 +294,18 @@ export const readHome = (): Effect.Effect<HomeRun, SqlError, StoreReader> =>
     const items = ranked.map((candidate): HomeItem => {
       const rows = candidate.value.rows.filter((row) => candidate.topicIds.includes(row.topic_id))
       const base = candidate.value.item
+      const channel = base.kind === 'automated' && rows[0] !== undefined ? automatedChannelOf(rows[0]) : undefined
       const title =
-        base.kind === 'waiting' ? `${firstName(nameOf(base.title))} asked you something` : base.kind === 'tidyUp' ? `${rows.length} topics look settled` : base.title
+        base.kind === 'waiting'
+          ? `${firstName(nameOf(base.title))} asked you something`
+          : base.kind === 'tidyUp'
+            ? `${rows.length} topics look settled`
+            : channel !== undefined
+              ? `Move ${channel.label} to Automated?`
+              : base.title
       const cached = rewrites.find((entry) => entry.key === base.id)
       const aiTitle = cached !== undefined && rows[0] !== undefined && freshFor(cached.created_at, rows[0]) ? parseTitle(cached.output_json) : undefined
-      const item: HomeItem = { ...base, title, topics: rows.map(topicOf), ...(aiTitle === undefined ? {} : { aiTitle }) }
+      const item: HomeItem = { ...base, title, topics: rows.map(topicOf), ...(aiTitle === undefined ? {} : { aiTitle }), ...(channel === undefined ? {} : { channel }) }
       if (aiAssist && rewriteIds.includes(base.id) && rows[0] !== undefined && (cached === undefined || !freshFor(cached.created_at, rows[0]))) rewritable.push({ item, row: rows[0] })
       return item
     })

@@ -8,6 +8,7 @@ const hiring = { id: 't:C0HIRING:1759990000.000300', title: 'Rina finished the o
 const postgres = { id: 't:C0ENG:1759990000.000100', title: 'Postgres 16 migration plan', place: 'eng', art: art.database }
 const proposal = { id: 't:C0PRODUCT:1759990000.000200', title: 'Proposal: cut offline mode and public API v3 from Q4', place: 'product', art: art.calendar }
 const packet = { id: 'm:D0SAM', title: 'Sam Okafor', place: 'Sam Okafor' }
+const releases = { id: 'm:C0RELEASES', title: '#releases', place: 'releases' }
 
 export const homeItems = {
   waiting: { id: `waiting:${hiring.id}`, kind: 'waiting', title: 'Elena asked you something', topics: [hiring], at: NOW - 12 * MINUTE },
@@ -30,6 +31,15 @@ export const homeItems = {
       { id: 't:C0INCIDENTS:1759980000.000600', title: 'p95 regression on search', place: 'incidents' },
       { id: 't:C0DESIGNREV:1759980000.000700', title: 'Icon refresh', place: 'design-review' },
     ],
+  },
+  automated: {
+    id: 'automated:C0RELEASES',
+    kind: 'automated',
+    title: 'Move #releases to Automated?',
+    topics: [releases],
+    at: NOW - 35 * MINUTE,
+    channel: { id: 'C0RELEASES', kind: 'public', name: 'releases', label: '#releases', tint: 'public', icon: 'rocket', color: 'cyan' },
+    fromApps: { apps: 12, of: 30 },
   },
 } satisfies Record<string, HomeItem>
 

@@ -14,6 +14,8 @@ export interface ViewSheetConversation {
   /** "eng", "Maya Chen": without "#". */
   readonly name: string
   readonly kind: ConversationKind
+  /** Automated: Juno put it there. The row says so; unchecking it takes it out, and Juno leaves it out. */
+  readonly addedByJuno?: boolean
 }
 
 export interface ViewSheetProps {
@@ -178,6 +180,7 @@ export function ViewSheet({
                   active={active === rowId(row.id)}
                   leading={<Icon icon={kindIcon(row.kind)} size={13} />}
                   label={row.name}
+                  {...(on && row.addedByJuno === true ? { sub: 'Added by Juno', subPlacement: 'end' as const } : {})}
                   trailing={on ? <Icon icon={Check} size={13} /> : undefined}
                   onActivate={() => setActive(rowId(row.id))}
                   onSelect={() => onToggle(row)}

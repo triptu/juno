@@ -2,6 +2,7 @@
  * Word rules per task. Each returns the raw arguments the model would have put
  * in the tool call; the provider validates them like any other output.
  */
+import type { AutomatedChannelInput } from '../tasks/automatedChannel'
 import type { FollowUpsInput } from '../tasks/followUps'
 import type { HomeTitleInput } from '../tasks/homeTitle'
 import type { ParseCommandInput } from '../tasks/parseCommand'
@@ -106,6 +107,13 @@ export function fakeHomeTitle(input: HomeTitleInput): unknown {
     case 'moved':
       return { title: `${input.title} grew ${input.newCount} replies`, confident: true }
   }
+}
+
+/** The share of messages from apps, as the probability: half and half stays in between, so Home asks. */
+export function fakeAutomatedChannel(input: AutomatedChannelInput): unknown {
+  if (input.messages.length === 0) return { probability: 0, reason: 'no messages' }
+  const apps = input.messages.filter((message) => message.fromApp === true).length
+  return { probability: Math.round((apps / input.messages.length) * 100) / 100, reason: 'share of app messages' }
 }
 
 export function fakeTitle(input: TitleTopicInput): string {

@@ -99,6 +99,8 @@ Row padding `0 10 10`, height 28, never taller. Two parts: a horizontal scroller
 - **Picking**: on pointer down, like the rows. Picking a view clears the scope chip. A view's list follows the same rules as All, limited to its conversations; Unread narrows it as it does All.
 - **Right-click a view pill** (native menu, §15.7): Edit view… · Move left · Move right · — · Delete view. Dragging a pill along the row reorders it (a 2px `--hl` caret shows where it lands); All, Channels, DMs and New view do not move.
 
+**Automated** (SPEC §5 "Automated"): Juno's own view, id `automated`, name "Automated", icon `robot`, Keep these out of All on. Made the first time a conversation goes in, last in the row; after a delete it is not made again. Its pill and sheet are those of any view. In its sheet, a conversation Juno put there shows "Added by Juno" 12 muted at the end of its row, before the check.
+
 **View sheet** (`ViewSheet` in `@juno/views`): a popover dialog anchored under the filter row, start-aligned, 300px (`--menu-width-browse`), padding 14, radius 13, `--pop-shadow`, gap 12. Opens from New view, Edit view… and New view… in Add to view. Four fields, nothing else:
 
 1. **Name**: text field, 30px, placeholder "Name", at most 32 characters. Required.
@@ -441,7 +443,8 @@ A tab with the message list's area on top and the composer at the bottom, like a
 **Shows:** `docs/design/home/` (layout A; `home-variants-*.png`, `in-context-*.png`). SPEC §12 decides behaviour; the home README has the copy, scene rules, ranking and sizes.
 
 - Opens from the sidebar's Home item as a singleton tab (`house`), and shows without a tab when no tab is open. [built] Layout A (`Home` and `HomeScene` in `@juno/views`, `containers/Home.tsx`): scene 120×83, greeting (serif 36 line and sans line), up to three item rows (52px each, in the 480px `--home-width` column; two on a window shorter than 600px), the Ask Juno field (a 40px pill button with ⌘J). A row is the topic's art (40), a title line (13.5/500, one line, ellipsis) and a meta line (12.5 muted: topic title · place · time, or "N new" for Moved a lot); the caret shows on hover and keyboard focus. Until the first sync has finished, Home is blank rather than "All caught up". "Browse all topics" (caught up only) opens the All topics tab on mouse down, ⌘ for a new tab. Ask Juno waits for the Juno tab: the button is there and does nothing yet.
-- Item kinds: Waiting on you, Pick up where you left off, Moved a lot, Follow-up and Tidy up (the last two with AI assist on). The two that came from For you carry one trailing button, 26px ghost 12.5/500, shown on hover and focus in a reserved slot so nothing shifts: **Mark done** (Follow-up; toast "Follow-up done", no Undo) and **Resolve all** (Tidy up; toast "Resolved 3 topics" with Undo). Tidy up's title line reads "3 topics look settled" and its meta line lists their titles (ellipsis); the row itself does not open anything.
+- Item kinds: Waiting on you, Pick up where you left off, Moved a lot, Follow-up, Automated and Tidy up (Follow-up and Tidy up with AI assist on). The two that came from For you carry one trailing button, 26px ghost 12.5/500, shown on hover and focus in a reserved slot so nothing shifts: **Mark done** (Follow-up; toast "Follow-up done", no Undo) and **Resolve all** (Tidy up; toast "Resolved 3 topics" with Undo). Tidy up's title line reads "3 topics look settled" and its meta line lists their titles (ellipsis); the row itself does not open anything.
+- **Automated** (SPEC §5 "Automated"): the tile is `robot` 18 in the 36px tile Tidy up uses; the title line reads "Move #releases to Automated?"; the meta line is "12 of the last 30 from apps · 35m" (how many of its latest messages came from apps, kept short so it fits beside two buttons). Two buttons in the slot, the same ghost style: **Keep in All** then **Move**. Toasts "Moved #releases to Automated" and "Keeping #releases in All", each with Undo, which asks again. The row opens the channel's Main; right-click (or the context-menu key) opens the channel menu (§15.2), whose Ignore channel is the way to hide a channel that is only noise.
 - Everything else from the For you page is gone: the page, its nav count, the Coding agent prompt block, reply starters and reply ideas, and Dismiss.
 
 ## 12. Juno chat
@@ -640,7 +643,7 @@ Shown from 15.1 (Main rows) and 15.2. One item per view, in pill order, with a c
 - Position: bottom-left, left 16, bottom 16, z 45, max-width 352. Padding `8 8 8 14`, radius 10, bg `--foreground-default`, text `--background`, `--shadow-lg`, 13px, gap 12. Text ellipsis on one line.
 - Undo button (reversible actions only): 26px, padding 0 8, radius 6, bg `color-mix(var(--background) 16%, transparent)`, "Undo" 12.5/600 + "⌘Z" mono 11 at .75 opacity.
 - One toast at a time; a new one replaces the old. Auto-dismiss 5s (with Undo) or 4s (info). No enter/exit animation in the prototype; [proposed] 150ms fade is acceptable.
-- Undo stack holds 20 actions; ⌘Z pops the last one (resolve, reopen, pin, unpin, rename, redraw, mark read or unread, Notify me change, ignore, routed post, command send, Resolve all on Home, delete view, add to or remove from a view) when focus is not in a non-empty input.
+- Undo stack holds 20 actions; ⌘Z pops the last one (resolve, reopen, pin, unpin, rename, redraw, mark read or unread, Notify me change, ignore, routed post, command send, Resolve all on Home, delete view, add to or remove from a view, Move or Keep in All on Home) when focus is not in a non-empty input.
 - [built M5] `ActionToast` in `@juno/views`, mounted once by the shell over both panes, with the `Toast` rise. The undo stack and the toast are `undoStackAtom` and `toastAtom` in `@juno/state`; an action that changed nothing shows no toast. No exit fade yet.
 
 | Copy | Undo |
@@ -660,6 +663,7 @@ Shown from 15.1 (Main rows) and 15.2. One item per view, in pill order, with a c
 | Follow-up done | no |
 | Deleted view · Bots | yes |
 | Added #alerts-prod to Bots / Removed #alerts-prod from Bots | yes |
+| Moved #releases to Automated / Keeping #releases in All (Home) | yes |
 
 ## 17. Empty states
 

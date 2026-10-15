@@ -24,6 +24,7 @@ import {
   topicsUnsubscribe,
   viewsAddChannel,
   viewsRemoveChannel,
+  viewsSortChannel,
   viewsRestore,
   type CommandResult,
   type UndoCommand,
@@ -131,5 +132,7 @@ function replay(registry: Registry, undo: UndoCommand): Promise<unknown> {
       return runCommand(registry, viewsAddChannel, payloadOf(undo))
     case 'views.removeChannel':
       return runCommand(registry, viewsRemoveChannel, payloadOf(undo))
+    case 'views.sortChannel':
+      return runCommand(registry, viewsSortChannel, payloadOf(undo))
   }
 }

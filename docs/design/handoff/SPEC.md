@@ -77,6 +77,15 @@ A view is a set of channels and DMs you pick. Its pill shows the Main and thread
 - **Adding a conversation.** A channel's or DM's menu (and a Main row's menu) has **Add to view ›**: your views with a check on the ones that hold it (choosing a checked one removes it), then New view…, which opens the sheet with the conversation already in it. Adding and removing show a toast with Undo.
 - **Juno can make one.** "Make a Bots view with every alerts channel" is a Juno settings task: the same command the sheet uses. (Not wired to Juno yet; the engine command is the seam.)
 
+### Automated
+
+Juno has one view of its own, **Automated** (the robot icon), for bot and alert channels and DMs with apps. It keeps them out of All. It appears once it holds a conversation, and from then on it is a view like any other: edit it, reorder it, turn off Keep these out of All, or delete it. A deleted Automated view is never made again.
+
+- **Clear cases move by themselves.** A channel goes in when most of its latest messages come from apps, or half do and its name says integration (alerts, deploys, ci, notifications and the like), and you have not written there. A DM with an app goes in. This happens as conversations sync, so a bot channel is not in All after the first sync. The view sheet marks these "Added by Juno"; unchecking one takes it out.
+- **Unclear ones are asked.** With AI assist on, Juno judges a channel the rules cannot place, once, from its latest messages. What stays unclear, and every unclear channel while AI assist is off, becomes a Home item: "Move #releases to Automated?" with **Move** and **Keep in All** (12). Right-click the item for the channel's menu, which has Ignore channel for a channel you never want to see.
+- **Your choice wins.** A conversation you put in or took out of any view by hand, or answered about on Home, is never moved again. New channels are sorted when they appear; nothing already answered is asked again.
+- **Noise you never want** is Ignore channel (below, "What shows up"), as before. Automated is for channels worth a look now and then.
+
 ### Privacy mode
 
 For screen sharing. **Hide message text** in the avatar menu (or ⌃⌘H, View › Hide Message Text) blurs message text that shows without you opening anything, so it cannot be read over a shared screen:
@@ -273,6 +282,7 @@ Home is a calm resting page: a small scene with Juno's mascot that changes with 
   - **Pick up where you left off.** The last topic you had open, when it has new messages.
   - **Moved a lot.** A followed topic with many new messages since you looked.
   - **Follow-up** (AI on). Something you said you would do, with Mark done.
+  - **Automated.** A channel neither the rules nor Juno could place (5, "Automated"): "Move #releases to Automated?", with how many of its latest messages came from apps in the meta line, Move and Keep in All, each with Undo. Right-clicking it opens the channel's menu.
   - **Tidy up** (AI on). Topics that look settled, listed in the meta line, with Resolve all and Undo.
   Clicking a row opens its topic. Items are computed when Home appears and do not change under the pointer. With AI on, a row's title line may be rewritten to say what it is about; the meta line never changes.
 - **Ask Juno** opens the Juno chat. Anything else that used to be a suggestion card (a coding prompt from a discussion, reply ideas) is something you ask Juno for, here or in the Juno panel beside the topic.
