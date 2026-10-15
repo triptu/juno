@@ -717,7 +717,6 @@ export const layout = stylex.defineVars({
   '--page-width-narrow': '680px',
   '--page-width': '720px',
   '--page-width-settings': '760px',
-  '--page-width-wide': '880px',
   // The label column of Preferences' rows (Theme, Accent, Density, Hold to peek), so the controls share one edge.
   '--settings-label-width': '104px',
   '--palette-width': '560px',

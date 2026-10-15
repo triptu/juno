@@ -345,7 +345,7 @@ All [proto] measured at 1280×800 with Inter unless marked.
 | `--home-width` | 480px: Home's column of item rows and the Ask Juno field |
 | `--page-width-narrow` | 680px |
 | `--page-width` | 720px (Juno) |
-| `--page-width-settings` | 760px (Preferences), 880px (Notifications) |
+| `--page-width-settings` | 760px: Notifications, Preferences and Settings › Juno, so the settings pages share one column and one title edge |
 | `--settings-label-width` | 104px: the label column of Preferences' rows (Theme, Accent, Density, Hold to peek), so every control starts on one edge |
 | `--palette-width` | 560px, max calc(100% − 48px), top offset 96px |
 | `--menu-width` | 236px context menu; `--menu-width-account` 248px avatar menu, `--menu-width-browse` 300px, `--menu-width-mention` 280px mention popover, `--menu-width-picker` 340px New chat pickers |

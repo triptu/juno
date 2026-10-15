@@ -489,7 +489,7 @@ One long list, no "new chat". Scroll container under the header islands (§5); c
 
 **Shows:** `docs/design/notifications/compare-light.png` (right column). SPEC 14 decides behaviour.
 
-Page max-width 880, padding `40 40 56`, gap 36.
+`Page width="settings"`: max-width `--page-width-settings` 760, the same column as Preferences and Settings › Juno, padding `40 32 72`, gap 36.
 
 - Title "Notifications" serif 34; sub "During your notification hours, Juno lets through what needs you and holds the rest. Everything is in Juno whenever you open it." 14 lh 1.6 subtle max-width 620.
 - Section pattern: heading 15/600, optional sub 13 muted (gap 2), then a group card (radius 10, bg surface, `--card-ring`, rows divided by 1px `--border-subtle`).

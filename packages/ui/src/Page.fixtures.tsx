@@ -14,7 +14,7 @@ export default defineFixtures(
     Pages: {
       notifications: scene(
         () => (
-          <Page width="wide">
+          <Page width="settings">
             <PageHeader
               title="Notifications"
               subtitle="Everything is in Juno whenever you open it. This only decides when your Mac interrupts you: right away, in a digest, or not at all."
@@ -48,7 +48,7 @@ export default defineFixtures(
     'Header widths': {
       'all-topics-header': scene(
         () => (
-          <Page width="wide">
+          <Page width="settings">
             <PageHeader
               title="All topics"
               size="compact"
@@ -61,7 +61,7 @@ export default defineFixtures(
       ),
       'all-topics-header-narrow': scene(
         () => (
-          <Page width="wide">
+          <Page width="settings">
             <PageHeader
               title="All topics"
               size="compact"
@@ -74,7 +74,7 @@ export default defineFixtures(
       ),
       'all-topics-header-wide': scene(
         () => (
-          <Page width="wide">
+          <Page width="settings">
             <PageHeader
               title="All topics"
               size="compact"
