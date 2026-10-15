@@ -522,7 +522,7 @@ An import graph over `apps/` and `packages/` decides what each change reaches: r
 
 ## Remote runs
 
-`pnpm remote <script> [args...]` runs a root script on a Namespace Linux machine of the shape that script needs (see "Machine shapes"; `--machine` or `JUNO_REMOTE_MACHINE` overrides) and streams its output and exit code back. Each run gets its own machine, so agents never wait for each other; nothing takes the local heavy-job lock. Use it for `test`, `specs:check`, `test:agent*`, `test:gallery`, `test:desktop` (the desktop e2e alone; it passes arguments on, for example `pnpm remote test:desktop e2e/topic.spec.ts`) and `test:e2e`. `perf` and `test:feel` are refused: they time the Mac. Desktop e2e tests tagged `@mac` (`{ tag: '@mac' }`) depend on macOS behaviour and are skipped on Linux; the Mac runs them. Today that is one test, the sidebar width surviving a relaunch.
+`pnpm remote <script> [args...]` runs a root script on a Namespace Linux machine of the shape that script needs (see "Machine shapes"; `--machine` or `JUNO_REMOTE_MACHINE` overrides) and streams its output and exit code back. Each run gets its own machine and waits when the shared core cap is full; nothing takes the local heavy-job lock. Use it for `test`, `specs:check`, `test:agent*`, `test:gallery`, `test:desktop` (the desktop e2e alone; it passes arguments on, for example `pnpm remote test:desktop e2e/topic.spec.ts`) and `test:e2e`. `perf` and `test:feel` are refused: they time the Mac. Desktop e2e tests tagged `@mac` (`{ tag: '@mac' }`) depend on macOS behaviour and are skipped on Linux; the Mac runs them. Today that is one test, the sidebar width surviving a relaunch.
 
 - **What is sent.** The files git sees in the worktree (tracked or new, not ignored), so uncommitted work is tested; `.env`, `node_modules`, build output and design images under `docs/` are not. The script stops if a file looks like a key or token file or holds what looks like a real Slack token.
 - **Where it runs.** In the image from `scripts/remote/Dockerfile` (Playwright's Ubuntu image with Node 26, pnpm, Java 21, the installed workspace and Quint's downloads). Its tag is a hash of the Dockerfile, `pnpm-lock.yaml` and `pnpm-workspace.yaml`; when the registry lacks it, the first run builds it with `nsc build` (about two minutes) while others on the same Mac wait. Inside, `scripts/remote/run.sh` links the workspace offline and runs the script under xvfb with more workers than the Mac uses.
@@ -549,6 +549,48 @@ An import graph over `apps/` and `packages/` decides what each change reaches: r
 - **Spec cache.** A remote spec check takes the Mac's cache of passing Quint runs along (staged in `.remote/`) and brings back what it adds, so a check that passed anywhere is not run again.
 - **Dials.** About one dial in four to Namespace's SSH gateway fails from this network and nsc takes 16 s to give up. The remote command prints a start line first; with none after 8 s, the run dials again (up to six times).
 - **`--dry-run`** prints the steps without creating anything.
+
+## Current cost controls
+
+The defaults are 24 vCPU in the workspace, one idle machine per shape and one
+idle minute. `JUNO_REMOTE_MAX_VCPU=0` refuses Namespace runs before an image build.
+A request larger than the cap fails instead of waiting forever.
+`JUNO_REMOTE_IDLE_MINUTES=0` destroys a machine immediately on release.
+These settings never reclaim a machine with a live owner. Releases record their
+own idle window. The pool upgrades the old background reaper so its five-minute
+policy does not survive a code update; it verifies the reaper command before
+sending it a signal.
+
+`pnpm remote:usage [--days 7]` reads `.remote/*/run.log` in all registered worktrees.
+It reports counts, failures, cores, CPU busy, median script/startup/wall time,
+measured core-minutes and the share of fresh machines. New logs include the
+script, arguments, backend, machine shape, result and total wall time. Older
+missing values are `?`; coverage counts show which logs support the cost total.
+Core-minutes include measured creation, execution, reports and cleanup, but not
+pool idle time. See [the cost audit](remote-costs.md) for the day-level machine
+inventory and its limits.
+
+Set `JUNO_REMOTE_IMAGE_CACHE=on` to try Namespace's native container image cache,
+backed by an 8 GB cache volume for the measured 6 GB image working set. It caches
+unpacked layers and downloaded blobs. It is off by default: five alternating
+pairs gave 54.7 seconds uncached versus 54.5 seconds with the cache among
+successes; the cache arm completed three of five attempts. Cache volumes add
+storage charges. The roughly ten-second target was reached only on cache hits.
+`--fresh` requests a new machine instead of claiming a warm one, for startup
+measurements. Cache misses still pull from the registry. The image is unchanged, so this does not trigger a
+new builder. The pool records pending creates as reserved cores and releases its
+decision lock before provisioning, allowing independent creates within the cap.
+
+`pnpm remote test:desktop` splits Playwright across two 4x8 machines. Each shard uses three workers and
+returns a blob report and the parent merges them into `.remote/shards-*/html`.
+A failed shard or missing report fails the parent. `--shards n` changes the split;
+`JUNO_REMOTE_DESKTOP_SHARDS=1` or an explicit `--machine` runs one machine.
+`test:e2e` runs the desktop and gallery through their separate remote shapes.
+`pnpm flake` keeps its repetition semantics instead of splitting its selected tests.
+
+Namespace stays the default. An optional SSH backend is enabled only by
+`JUNO_RUNNER_HOST`. Setup, health checks and a standalone Windows setup prompt are
+in [Set up an optional SSH runner](self-hosted-runner.md).
 
 ## Hunting a flaky test
 
@@ -584,20 +626,35 @@ Causes found so far (2026-10-15):
 
 ## Machine shapes
 
-`pnpm remote` picks the smallest shape that keeps each script within about three minutes (`remoteShapes` in `scripts/remote.mjs`). Measured on 2026-10-15 with TypeScript 7; "script" is the time the script itself took, without the minute or so a new machine needs to start and pull the image:
+`pnpm remote` picks a cost-conscious shape for each script (`remoteShapes` in `scripts/remote.mjs`). Measured on 2026-10-15 with TypeScript 7; "script" is the time the script itself took, without the minute or so a new machine needs to start and pull the image:
 
 | Script | Shape | Script time | Why not smaller or bigger |
 | --- | --- | --- | --- |
 | `typecheck`, `lint`, `test:agent*` | 2x4 | typecheck with nothing cached 31 s (5.5 s on 16x32) | small and short; a bigger machine costs more than it saves |
-| `test` | 4x8 | about 96 s (158 s on 2x4, 85 s on 16x32) | the engine's `sync.test.ts` alone takes about 35 s, so more cores barely help |
+| `test` | 2x4 | 262 s in the current full suite; 156 s on 4x8 | saves running compute, but misses the two-minute target; see the current measurements below |
 | `test:gallery`, some components | 4x8 | a few components take under a minute | |
 | `test:gallery`, every component | 8x16 (`pnpm affected` asks for it) | 1.4 min (2.6 min on 4x8, 53 s on 16x32) | 4x8 goes over three minutes with the start-up |
-| `test:desktop`, `test:e2e` | 8x16, 4 workers | 1.2 min (2.3 min on 4x8 with 2 workers, 26 s on 16x32) | on 4x8 with 4 workers two tests timed out; 2 workers are too slow |
+| `test:desktop` | two 4x8 machines, 3 workers each | 272 / 210 s, 32.1 core-min total | reports merge after both shards; explicit `--machine` disables the split |
+| `test:e2e` | desktop shards plus gallery shape | depends on both suites | each suite uses its own shape |
 | `specs:check`, nothing cached | 8x16 | 126 s (214 s on 4x8, 82 to 100 s on 16x32) | CPU-bound at 90%; with the cache a run takes seconds on any shape |
 
-Workers follow the core count (`scripts/remote/run.sh`): vitest one per core, Electron one per two cores, the gallery three per core, spec simulations one per two cores beside one Apalache server per four. `pnpm remote --shards n` also splits the gallery (each machine takes every n-th state) and the spec check across n machines; it costs about the same and is not the default.
+Workers follow the core count (`scripts/remote/run.sh`): vitest at least four workers, two unit packages at a time, with the agent timing project run afterwards on 2-core machines, Electron one per two cores, except three workers on each 4-core desktop shard, the gallery three per core, spec simulations one per two cores beside one Apalache server per four. `pnpm remote --shards n` also splits the gallery (each machine takes every n-th state) and the spec check across n machines; it costs about the same and is not the default.
 
-A typical `pnpm affected` run (a view and an engine file changed: typecheck, lint, 90 vitest files, the gallery for one component and the whole desktop e2e), measured on 2026-10-15 with every item run (`--no-cache`):
+Current full-suite pilots on the same prebuilt image (15 October 2026):
+
+| Work | Before: script / busy / core-min | After: script / busy / core-min |
+| --- | --- | --- |
+| Unit | 4 cores: 156 s / 43% / 10.4 | 2 cores: 262 s / 67% / 8.7 |
+| Desktop | 8 cores: 277 s / 56% / 36.9 | two 4-core shards: 272 and 210 s / 42% and 72% / 32.1 total |
+
+The two-core unit run passed, but misses the two-minute target. Desktop shards
+passed and their reports merged; five tests were added on main between pilots.
+The longest shard is no slower in this pilot, but shared-capacity waits staggered
+them: total wall time grew from 738 to about 2,734 seconds. This does not prove
+parallel end-to-end wall time. Unit total wall time was 246 seconds before and
+303 after. See [the measurement limits and reproduction commands](remote-costs.md).
+
+Historical measurements before the cost controls above: a typical `pnpm affected` run (a view and an engine file changed: typecheck, lint, 90 vitest files, the gallery for one component and the whole desktop e2e), measured on 2026-10-15 with every item run (`--no-cache`):
 
 | | Before: 16x32 for every step | After: shapes above |
 | --- | --- | --- |
@@ -612,7 +669,7 @@ Both wall times include waiting for machines, because other worktrees still on 1
 
 ## Heavy jobs share one queue
 
-Tests, e2e runs, gallery shots, benchmarks and spec checks spawn many processes. Several agents often work in separate worktrees on the same machine, so the root scripts (`pnpm test`, `pnpm test:e2e`, `pnpm test:feel`, `pnpm test:gallery`, `pnpm gallery:shots`, `pnpm specs:check`, `pnpm test:agent-contracts`, `pnpm test:agent-testing`) run through `scripts/heavy.mjs`. It takes a machine-wide lock in the system temp folder, shared by every worktree, and waits for a free slot. There are two slots by default (`JUNO_HEAVY_SLOTS` changes it): e2e and gallery runs spend most of their time waiting, so two fit on an 8-core, 8 GB machine. Timing runs (`pnpm perf`, `pnpm test:feel`) pass `--exclusive`, which takes every slot and stops new jobs from starting while it waits, so their numbers are not skewed by another run. Running a package's tests directly bypasses the queue, so prefer the root scripts.
+Tests, e2e runs, gallery shots, benchmarks and spec checks spawn many processes. Several agents often work in separate worktrees on the same machine, so the root scripts (`pnpm test`, `pnpm test:e2e`, `pnpm test:feel`, `pnpm test:gallery`, `pnpm gallery:shots`, `pnpm specs:check`, `pnpm test:agent-contracts`, `pnpm test:agent-testing`) run through `scripts/heavy.mjs`. It takes a machine-wide lock in the system temp folder, shared by every worktree, and waits for a free slot. There are two slots by default (`JUNO_HEAVY_SLOTS` changes it). On the Mac, `--electron` also takes a single shared app-launch slot. `test:desktop`, `test:e2e`, `test:gallery` and `gallery:shots` use it, so only one of these jobs runs at once. Ordinary jobs can still use both slots, or run beside one app job. An app job waiting for the app-launch slot holds no general slot. Timing runs (`pnpm perf`, `pnpm test:feel`) pass `--exclusive`, which takes every slot and stops new jobs from starting while it waits, so their numbers are not skewed by another run. Running a package's tests directly bypasses the queue, so prefer the root scripts.
 
 
 ## Releasing
