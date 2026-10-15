@@ -15,6 +15,8 @@ export interface JunoChatFrameProps {
   readonly composer: ReactNode
   /** The reaction picker, open at a point in the window (the React button's corner). */
   readonly picker?: ReactionPickerAt
+  /** `panel`: drawn on the Juno panel's own material, with no page colour. Default `page`. */
+  readonly column?: 'page' | 'panel'
 }
 
 export interface ReactionPickerAt {
@@ -31,9 +33,9 @@ export interface ReactionPickerAt {
  * it. Neither the header nor the pill takes part in the list's layout. The
  * reaction picker floats at the point the container gives it.
  */
-export function JunoChatFrame({ header, children, pill, composer, picker }: JunoChatFrameProps) {
+export function JunoChatFrame({ header, children, pill, composer, picker, column = 'page' }: JunoChatFrameProps) {
   return (
-    <div data-juno-chat="" {...stylex.props(styles.root)}>
+    <div data-juno-chat="" {...stylex.props(styles.root, column === 'panel' && styles.panel)}>
       <div {...stylex.props(styles.middle)}>
         {header}
         {children}
@@ -60,7 +62,7 @@ function appearDuration(): number {
 
 /** Flashes a row the chat scrolled to (a citation, a reply's quote) with the soft accent, once. */
 export function flashChatRow(row: Element): void {
-  row.animate([{ backgroundColor: accent['--hl-soft'] }, { backgroundColor: colors['--background'] }], { duration: appearDuration(), easing: 'ease-out' })
+  row.animate([{ backgroundColor: accent['--hl-soft'] }, { backgroundColor: 'transparent' }], { duration: appearDuration(), easing: 'ease-out' })
 }
 
 const styles = stylex.create({
@@ -73,6 +75,9 @@ const styles = stylex.create({
     minWidth: 0,
     minHeight: 0,
     backgroundColor: colors['--background'],
+  },
+  panel: {
+    backgroundColor: 'transparent',
   },
   middle: {
     position: 'relative',

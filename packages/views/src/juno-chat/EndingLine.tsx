@@ -38,8 +38,8 @@ export const EndingLine = memo(function EndingLine({ item, actions }: { readonly
 })
 
 const styles = stylex.create({
-  // Past the mark's column, as the bubbles: 28px mark, the 10px gap and the bubble's 2px.
+  // The bubble's 2px in from the column's edge.
   slot: {
-    paddingInlineStart: `calc(${spacing['--space-7']} + ${spacing['--space-2-5']} + ${spacing['--space-0-5']})`,
+    paddingInlineStart: spacing['--space-0-5'],
   },
 })

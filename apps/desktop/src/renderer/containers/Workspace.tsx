@@ -6,9 +6,11 @@ import {
   currentPlace,
   junoAvailableAtom,
   junoPanelOpenAtom,
+  junoPanelWidthAtom,
   mountedTabs,
   onMenuCommand,
   registry,
+  setJunoPanelWidth,
   sidebarLayoutAtom,
   startVisitLog,
   tabsAtom,
@@ -18,6 +20,7 @@ import {
   type Tabs,
   type TabSummary,
 } from '@juno/state'
+import { JUNO_PANEL_WIDTH } from '@juno/contract'
 import { useAtomValue } from '@juno/state/react'
 import { TopicArt, Workspace as WorkspaceView, type ActivateEvent, type WorkspaceTab, type WorkspaceTabIcon } from '@juno/views'
 import { HomePage } from './Home'
@@ -134,6 +137,14 @@ function tabMenu(id: string): void {
   void showTabMenu(id)
 }
 
+function resizePanel(width: number): void {
+  setJunoPanelWidth(registry, width)
+}
+
+function resetPanelWidth(): void {
+  setJunoPanelWidth(registry, JUNO_PANEL_WIDTH.default)
+}
+
 /** The mouse's back and forward buttons. */
 function onMouseUp(event: MouseEvent): void {
   if (event.button === 3) stepTabHistory(-1)
@@ -154,9 +165,10 @@ export function Workspace() {
   const strip = useAtomValue(tabStripAtom)
   const sidebarHidden = useAtomValue(sidebarLayoutAtom, (layout) => layout.collapsed)
   const mounted = mountedTabs(state)
-  // The Juno panel shows beside a topic tab while it is open, and never on a page (SPEC 7).
+  // The Juno panel shows beside a topic tab while it is open in that tab, and never on a page (SPEC 7).
   const agentOn = useAtomValue(junoAvailableAtom)
   const panelOpen = useAtomValue(junoPanelOpenAtom)
+  const panelWidth = useAtomValue(junoPanelWidthAtom)
   const panelTopic = useAtomValue(tabsAtom, activeTopicOf)
 
   useNotificationBridge()
@@ -201,6 +213,9 @@ export function Workspace() {
           </Suspense>
         ) : undefined
       }
+      sideWidth={panelWidth}
+      onSideResize={resizePanel}
+      onSideResetWidth={resetPanelWidth}
     >
       {pages.length === 0
         ? undefined

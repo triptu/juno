@@ -103,7 +103,7 @@ Typography. `variant` maps to the five variables of a type role in tokens: `sect
 
 `Divider`: 1px, `tone` `default` | `subtle`, `vertical`, `inset`. `LabelledRule`: the "3 new" divider, `label` + rule in `--hl` / `--hl-rule` (or `muted`); fills its row.
 
-`HeaderBand`: the static band behind a page header's islands (`--header-band` tall, solid to `--header-band-solid`, then a fade), `aria-hidden`, no pointer events. Used by the topic header, the Juno tab and the Juno panel.
+`HeaderBand`: the static band behind a page header's islands (`--header-band` tall, solid to `--header-band-solid`, then a fade), `aria-hidden`, no pointer events. Used by the topic header, the Juno tab and the Juno panel; `surface="panel"` draws it in `--panel-fill` for the panel.
 
 ## 10. Popover and OptionList
 

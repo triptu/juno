@@ -175,6 +175,15 @@ export const chat = stylex.defineVars({
   },
   // How far a reaction badge sits out over its bubble's top corner.
   '--reaction-offset': '10px',
+  // The Juno panel's material: the surface with a breath of the accent, so
+  // it reads as Juno's without colouring anything in it. Beside a topic it
+  // sits on the page colour alone, so it is drawn opaque and costs nothing
+  // to composite. Over the topic (a narrow window) it is the same fill, let
+  // through and blurred like a macOS inspector; the header band fades the
+  // list into the opaque fill.
+  '--panel-fill': `color-mix(in oklch, ${accent['--hl']} 1.5%, ${colors['--surface-default']})`,
+  '--panel-glass': `color-mix(in oklch, ${accent['--hl']} 1.5%, color-mix(in oklch, ${colors['--surface-default']} 80%, transparent))`,
+  '--panel-backdrop': 'blur(24px) saturate(1.6)',
 })
 
 /**
@@ -319,6 +328,9 @@ export const shadows = stylex.defineVars({
   '--shadow-lg': '0 8px 24px 0 rgba(27, 28, 21, 0.10)',
   '--card-ring': '0 1px 2px 0 oklch(0 0 0 / 0.03), 0 6px 20px -4px oklch(0 0 0 / 0.07)',
   '--pop-shadow': '0 2px 6px -1px oklch(0 0 0 / 0.05), 0 14px 36px -8px oklch(0 0 0 / 0.13)',
+  // The Juno panel floating over the page: a hairline ring, a tight contact
+  // shadow and two wide soft ones, so it lifts without a border.
+  '--panel-shadow': '0 0 0 1px oklch(0 0 0 / 0.05), 0 1px 2px 0 oklch(0 0 0 / 0.04), 0 8px 24px -6px oklch(0 0 0 / 0.08), 0 24px 56px -12px oklch(0 0 0 / 0.12)',
 })
 
 /* -------------------------------------------------------------------------- */
@@ -354,6 +366,9 @@ export const radii = stylex.defineVars({
   '--radius-palette': '14px',
   '--radius-toast': '14px',
   '--radius-bubble': '16px',
+  // The Juno panel: half the 36px header row, so the 28px controls 4px in
+  // from its top corners nest in them (14 + 4).
+  '--radius-panel': '18px',
   // Tags, counts, chips, reactions, the row Resolve and toast Undo buttons.
   '--radius-tag': '999px',
   // The context pill (header, To field, send card).
@@ -686,11 +701,19 @@ export const layout = stylex.defineVars({
   '--header-band': '68px',
   '--header-inset': '56px',
   '--reading-width': '800px',
-  // The Juno panel beside a topic. The topic keeps at least
-  // --juno-panel-topic-min, else the panel covers it (views/Workspace.tsx
-  // repeats the sum in its container query, which cannot read a variable).
-  '--juno-panel-width': '360px',
+  // The Juno panel beside a topic: a floating inspector, inset from the
+  // tab strip, the window edge and the topic by the header islands' gap.
+  // The default width gives a Juno bubble about 50 characters a line at
+  // 14px. A drag on its edge sets a width from min to max. Beside the topic
+  // it gives way down to its min so the topic keeps --juno-panel-topic-min;
+  // under that it covers the topic (views/Workspace.tsx repeats min + topic
+  // min + two insets in its container query, which cannot read a variable).
+  '--juno-panel-width': '440px',
+  '--juno-panel-min-width': '360px',
+  '--juno-panel-max-width': '640px',
   '--juno-panel-topic-min': '480px',
+  '--juno-panel-inset': '8px',
+  '--juno-panel-resize-hit': '8px',
   '--composer-width': '752px',
   '--composer-max-height': '194px',
   '--composer-line-height': '22px',

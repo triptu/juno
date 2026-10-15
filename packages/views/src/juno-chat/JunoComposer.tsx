@@ -30,7 +30,7 @@ export interface JunoComposerProps {
   readonly inputRef?: Ref<HTMLTextAreaElement>
   /** `panel`: the Juno panel's padding, full width. Default `page`. */
   readonly column?: 'page' | 'panel'
-  /** Above the field in the panel: the selection quote, the About chip, Catch me up. */
+  /** Above the field in the panel: Catch me up and the context line. */
   readonly context?: ReactNode
 }
 
@@ -97,10 +97,11 @@ const styles = stylex.create({
     paddingBottom: spacing['--space-5'],
     boxSizing: 'border-box',
   },
-  // The bottom inset is the topic composer's, so the two fields end on one line when the panel sits beside a topic.
+  // With the panel's 8px inset under it, the topic composer's 20px bottom inset, so the two fields end on one line.
   outerPanel: {
     paddingTop: 0,
     paddingInline: spacing['--space-3'],
+    paddingBottom: spacing['--space-3'],
   },
   wide: {
     maxWidth: 'none',

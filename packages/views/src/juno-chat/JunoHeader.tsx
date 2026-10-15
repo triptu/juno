@@ -48,7 +48,7 @@ export function JunoHeader({ banner, menuOpen, onMenu, onOpenPage, onResume, col
           placement="bottom-start"
           role="menu"
           label="Juno menu"
-          anchor={<HeaderTitleButton title="Juno" leading={<JunoMark size={18} />} expanded={menuOpen} onOpen={() => onMenu(!menuOpen)} />}
+          anchor={<HeaderTitleButton title="Juno" leading={<JunoMark />} expanded={menuOpen} onOpen={() => onMenu(!menuOpen)} />}
         >
           <OptionList role="menu" label="Juno pages" focusable>
             {pages.map((entry) => (
