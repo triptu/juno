@@ -22,7 +22,7 @@ export const AI_ASSIST_PREF = 'aiAssist'
 export const AiProviderLive: Layer.Layer<AiProvider, never, EngineConfig | Workspace> = Layer.unwrap(
   Effect.gen(function* () {
     const config = yield* EngineConfig
-    if (config.ai === 'fake') return FakeAiProvider.layer
+    if (config.ai === 'fake') return config.fakeAiDelayMillis === undefined ? FakeAiProvider.layer : FakeAiProvider.layerWith({ delayMillis: config.fakeAiDelayMillis })
     const workspace = yield* Workspace
     const readConfig: Effect.Effect<AiConfig> = Effect.gen(function* () {
       const open = yield* workspace.current

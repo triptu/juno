@@ -28,6 +28,8 @@ export const EngineConfig = Schema.Struct({
   ai: Schema.optionalKey(Schema.Literals(['fake', 'live'])),
   /** The OpenRouter key, in memory, for the live provider. Absent means every AI task answers "no decision" (ADR 0006). */
   openRouterApiKey: Schema.optionalKey(Schema.String),
+  /** Tests only: how long the fake AI takes to answer, to watch a slow model hit a task's timeout. */
+  fakeAiDelayMillis: Schema.optionalKey(Schema.Number),
 })
 export type EngineConfig = typeof EngineConfig.Type
 

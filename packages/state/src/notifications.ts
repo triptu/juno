@@ -4,6 +4,7 @@
  * only read and write.
  */
 import { Exit } from 'effect'
+import * as AsyncResult from 'effect/reactivity/AsyncResult'
 import * as Atom from 'effect/reactivity/Atom'
 import {
   notificationsPage,
@@ -23,6 +24,12 @@ import type { Registry } from './client'
 
 /** The settings as stored, with AI assist. The menus read the Notify me levels here. */
 export const notificationSettingsAtom = liveQuery(notificationsSettings)(undefined)
+
+/** The global AI assist switch (SPEC section 15). On until the settings say otherwise. */
+export const aiAssistOnAtom = Atom.make((get): boolean => {
+  const settings = get(notificationSettingsAtom)
+  return !(AsyncResult.isSuccess(settings) && settings.value.aiAssist === false)
+})
 
 /** The Notifications page beyond the settings: the two lists and today. */
 export const notificationsPageAtom = liveQuery(notificationsPage)(undefined)

@@ -279,6 +279,35 @@ test.describe('Send', () => {
  * the toolbar's place and the edit field the body's without moving any row
  * above. Driven through `window.__fixtureControls`.
  */
+/**
+ * The checks on send (spec section 8): the audience line and the check bar
+ * appear inside the composer, above the text. The composer grows upwards
+ * from where it sits; the text row and the field's bottom edge never move.
+ */
+test.describe('Composer notices', () => {
+  const step = (page: Page, name: string) => page.evaluate((control) => (window as unknown as { __fixtureControls?: Record<string, () => void> }).__fixtureControls?.[control]?.(), name)
+
+  test('the audience line and the check bar come and go without moving the text', async ({ page }) => {
+    await openState(page, { component: 'Composer', id: 'shift/notices-come-and-go', route: 'Composer/shift/notices-come-and-go', group: '', groupId: '', state: '', frame: {} })
+    const text = page.locator('[data-composer] textarea')
+    const field = page.locator('[data-composer-field]')
+    const bottom = async () => {
+      const box = (await field.boundingBox())!
+      return box.y + box.height
+    }
+    const before = { text: await text.boundingBox(), bottom: await bottom(), height: (await field.boundingBox())!.height }
+    for (const notices of ['audience', 'bar', 'both', 'none'] as const) {
+      await step(page, notices)
+      await expect(page.locator('[data-audience-warning]')).toHaveCount(notices === 'audience' || notices === 'both' ? 1 : 0)
+      await expect(page.locator('[data-send-check]')).toHaveCount(notices === 'bar' || notices === 'both' ? 1 : 0)
+      expect(await text.boundingBox(), notices).toEqual(before.text)
+      expect(await bottom(), notices).toBe(before.bottom)
+      if (notices !== 'none') expect((await field.boundingBox())!.height, notices).toBeGreaterThan(before.height)
+    }
+    expect((await field.boundingBox())!.height).toBe(before.height)
+  })
+})
+
 test.describe('Message actions', () => {
   const open = (page: Page, component: string, id: string) => openState(page, { component, id, route: `${component}/${id}`, group: '', groupId: '', state: '', frame: {} })
   const step = (page: Page, name: string) => page.evaluate((control) => (window as unknown as { __fixtureControls?: Record<string, () => void> }).__fixtureControls?.[control]?.(), name)
