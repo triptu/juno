@@ -107,3 +107,19 @@ test('an engine restart mid-session keeps the open topic, the unsent text and th
   fake.injectMessage({ channel: 'C0ENG', user: 'U0MAYA', text: 'Back after the restart.' })
   await topic.expectMessage('Back after the restart.')
 })
+
+// Fixme (break pass, 2026-10-15; owner: sync). The catch-up after a reconnect runs with
+// `refreshWorkspace: false` (packages/sync/src/sync.ts), and `loadCounts` only fetches
+// conversations it has never seen, so a `channel_rename` lost while the socket was down is never
+// made up for: the sidebar, header and tab keep the old name until a restart. Leaves and archives
+// in the gap are missed the same way.
+test.fixme('a channel renamed while the socket is down shows its new name once it is back', async ({ juno, fake }) => {
+  await openMain(juno)
+  fake.goOffline()
+  await juno.sidebar.expectSyncStatus("You're offline")
+  fake.renameChannel({ channel: 'C0ENG', name: 'engineering' })
+  fake.goOnline()
+  await juno.sidebar.expectNoSyncStatus()
+  await expect(juno.sidebar.row('#engineering').root).toBeVisible({ timeout: 15_000 })
+  await expect(juno.topic.header).toContainText('engineering')
+})
