@@ -65,15 +65,16 @@ export interface SidebarWindow extends ListWindow<TopicRow> {
 /**
  * The new window, with the objects of the window shown before wherever a
  * row's `rev` is unchanged, and the old order array when the order is.
+ * All topics carries its windows over the same way.
  */
-function carryOver(shown: SidebarWindow | undefined, next: ListWindow<TopicRow>, filter: TopicListFilter): SidebarWindow {
-  if (shown === undefined) return { ...next, filter }
+export function carryOver(shown: ListWindow<TopicRow> | undefined, next: ListWindow<TopicRow>): ListWindow<TopicRow> {
+  if (shown === undefined) return next
   const rows = new Map<string, TopicRow>()
   for (const [id, row] of next.rows) {
     const old = shown.rows.get(id)
     rows.set(id, old !== undefined && sameRow(old, row) ? old : row)
   }
-  return { order: sameOrder(shown.order, next.order) ? shown.order : next.order, rows, refs: next.refs, meta: next.meta, filter }
+  return { order: sameOrder(shown.order, next.order) ? shown.order : next.order, rows, refs: next.refs, meta: next.meta }
 }
 
 /**
@@ -104,7 +105,7 @@ export const sidebarListAtom = Atom.make((get): SidebarWindow => {
   const result = get(topicListAtom(filter))
   const shown = Option.getOrUndefined(get.self<SidebarWindow>())
   if (!AsyncResult.isSuccess(result) || result.value.meta.seq === 0) return shown ?? { ...emptyWindow<TopicRow>(), filter }
-  return carryOver(shown, result.value, filter)
+  return { ...carryOver(shown, result.value), filter }
 })
 
 /** One row of the sidebar, by id across every filter. Notifies only when the row's object changes, which is when its `rev` does. */
