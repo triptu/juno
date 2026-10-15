@@ -105,12 +105,21 @@ async function exec() {
   const index = existsSync(counter) ? Number(readFileSync(counter, 'utf8')) : 0
   writeFileSync(counter, String(index + 1))
   const turn: CodexTurn | undefined = script.turns[index]
-  emit({ type: 'thread.started', thread_id: args.includes('resume') ? args[args.indexOf('resume') + 1] : randomUUID() })
+  const threadId = args.includes('resume') ? args[args.indexOf('resume') + 1]! : randomUUID()
+  mkdirSync(join(home, 'sessions'), { recursive: true })
+  appendFileSync(join(home, 'sessions', `rollout-${threadId}.jsonl`), `${JSON.stringify({ prompt })}\n`)
+  emit({ type: 'thread.started', thread_id: threadId })
   emit({ type: 'turn.started' })
   if (!turn) {
     log(prompt)
     emit({ type: 'turn.failed', error: { message: 'fake codex: no scripted turn left' } })
     return
+  }
+  for (const tool of turn.builtIns ?? []) {
+    const refused = tool === 'shell' ? (config.features as Record<string, unknown>)?.shell_tool === false
+      : tool === 'edit' ? flags.sandbox === 'read-only' : config.web_search === 'disabled'
+    toolCalls.push({ server: 'builtin', tool, status: refused ? 'failed' : 'completed' })
+    if (!refused) { log(prompt); process.exit(2) }
   }
   let result = ''
   let n = 0
@@ -129,6 +138,7 @@ async function exec() {
   }
   if (turn.delayMs) await new Promise((resolve) => setTimeout(resolve, turn.delayMs))
   log(prompt)
+  if (turn.crash) { process.kill(process.pid, 'SIGKILL'); return }
   if (turn.fail !== undefined) {
     emit({ type: 'turn.failed', error: { message: turn.fail } })
     return
