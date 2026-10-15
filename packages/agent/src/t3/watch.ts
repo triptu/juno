@@ -28,7 +28,11 @@ export function t3Driver(manager: McpManagerApi, questions: (job: Job, threadId:
           if (['interrupted', 'cancelled'].includes(status)) return { event: 'cancelled', state: 'Stopped' }
           if (status === 'waiting') {
             const shown = await questions(job, session.threadId, signal)
-            update({ event: 'needsYou', state: shown ? 'T3 Code needs your answer' : 'T3 Code needs your answer in T3 Code' })
+            // The report reaches Juno once per wait: the runner posts it only when the phase moves to needsYou.
+            update({
+              event: 'needsYou', state: shown ? 'T3 Code needs your answer' : 'T3 Code needs your answer in T3 Code',
+              report: `T3 Code is waiting for an answer in ${job.title}. ${shown ? 'The question is on a Question card.' : 'Juno cannot show this question; the owner answers it in T3 Code.'}`,
+            })
           } else update({ event: 'progress', state: 'T3 Code · running' })
           // Short polling also observes questions; thread_wait only wakes on completion on S8's server.
           await setTimeout(10_000, undefined, { signal }).catch(() => undefined)

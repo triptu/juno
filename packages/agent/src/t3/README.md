@@ -51,7 +51,9 @@ Single-choice pending user questions with two to four options become Question
 cards. Their exact selected value or free text reaches
 `t3_pending_request_respond` once. Unknown, multi-question and multi-select
 shapes stay in T3, and the Task card says "T3 Code needs your answer in T3
-Code". The current API cannot answer permission approvals.
+Code". Each wait posts one report, when the job moves to needs-you, so Juno
+hears that the session is waiting and decides what to tell the owner. The
+current API cannot answer permission approvals.
 
 ## Evidence and owner live checks
 

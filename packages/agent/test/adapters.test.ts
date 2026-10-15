@@ -74,7 +74,7 @@ async function fixture(serverId: 't3' | 'littlebird', tools: FakeTool[]) {
     await turns.actions.idle()
     return binding
   }
-  return { server, turns, manager: m, call, click }
+  return { server, turns, manager: m, call, click, fake }
 }
 
 it('requires a Start card, starts once, records a grant and reads the session branch', async () => {
@@ -383,4 +383,21 @@ it('writes a job only when its phase or line changes', async () => {
   jobs.start({ kind: 't3', runId: 'run-test', originOp: 'op-test', callId: 'call-test', title: 'Fix test', place: 'project-test', task: '{}' })
   await jobs.idle()
   expect((turns.store.db.prepare('SELECT count(*) AS n FROM job_writes').get() as { n: number }).n).toBe(2)
+})
+
+it('posts a report when a T3 session waits on a question, so Juno hears it', async () => {
+  const tools: FakeTool[] = [launch,
+    { name: 't3_thread_read', inputSchema: threadArgs, call: () => json({ thread: { status: 'waiting' } }) },
+    t3Tools[2]!,
+    { name: 't3_pending_request_list', inputSchema: threadArgs, call: () => json({ requestIds: ['request-test'] }) },
+    { name: 't3_pending_request_read', inputSchema: { type: 'object', properties: { threadId: str, requestId: str } }, call: () => json({ requestId: 'request-test', questions: [{ id: 'q1', question: 'Use the small fix?', options: [{ label: 'Yes' }, { label: 'No' }] }] }) },
+    { name: 't3_pending_request_respond', inputSchema: { type: 'object', properties: { threadId: str, requestId: str, answers: { type: 'object' } }, required: ['threadId', 'requestId', 'answers'] }, call: () => json({}) },
+  ]
+  const { turns, call, click, fake } = await fixture('t3', tools)
+  await call('t3_start', start)
+  fake.script([reply('<say>T3 Code has a question.</say>')])
+  await click()
+  await expect.poll(() => turns.store.db.prepare("SELECT text FROM inbox WHERE kind = 'report' AND op_id LIKE 'report:%:needsYou'").all()).toEqual([
+    { text: 'T3 Code is waiting for an answer in Fix test. The question is on a Question card.' },
+  ])
 })
