@@ -56,7 +56,7 @@ export function toMessageRow(channel: string, message: Message): MessageRow {
     ts: message.ts,
     thread_ts: message.thread_ts ?? null,
     user_id: message.user ?? message.bot_id ?? message.bot_profile?.id ?? null,
-    bot_name: message.bot_id || message.bot_profile || message.subtype === 'bot_message' ? (message.username || message.bot_profile?.name || null) : null,
+    bot_name: message.bot_id || message.bot_profile || message.subtype === 'bot_message' ? (message.bot_profile?.name || message.username || message.attachments?.find((attachment) => attachment.author_name)?.author_name || null) : null,
     bot_icon: message.bot_profile?.icons?.image_72 ?? message.bot_profile?.icons?.image_48 ?? message.bot_profile?.icons?.image_36 ?? null,
     subtype: message.subtype ?? null,
     text: deleted ? '' : (message.text ?? ''),

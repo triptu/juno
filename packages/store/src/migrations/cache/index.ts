@@ -1,5 +1,6 @@
 import type { Effect } from 'effect'
 import type { SqlClient } from 'effect/sql'
+import integrationSearch from './202610160300_integration_search'
 import botSender from './202610160200_bot_sender'
 import initial from './202610121200_initial'
 import topicIndexes from './202610131000_topic_indexes'
@@ -15,7 +16,7 @@ import mainWindow from './202610141000_main_window'
  * mirror is disposable, so its migrations only ever run on an empty file and
  * never transform data (ADR 0008).
  */
-export const CACHE_SCHEMA_VERSION = 7
+export const CACHE_SCHEMA_VERSION = 8
 
 /** Migrations for `cache.db`, keyed `<timestamp>_<name>`. */
 export const cacheMigrations: Record<string, Effect.Effect<void, unknown, SqlClient.SqlClient>> = {
@@ -26,4 +27,5 @@ export const cacheMigrations: Record<string, Effect.Effect<void, unknown, SqlCli
   '202610140900_thread_subs_commanded': threadSubsCommanded,
   '202610141000_main_window': mainWindow,
   '202610160200_bot_sender': botSender,
+  '202610160300_integration_search': integrationSearch,
 }

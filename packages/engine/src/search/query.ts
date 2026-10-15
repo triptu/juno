@@ -1,6 +1,6 @@
 import { SEARCH_LIMIT_MAX, SEARCH_PLACES_MAX, type SearchMessage, type SearchPlace, type SearchResult } from '@juno/contract'
 import { firstWords, mainLabel, mainTopicId, threadTopicId, tsToMillis, type ChannelId, type ConversationKind, type Ts } from '@juno/domain'
-import { messageBody, plainText } from '@juno/richtext'
+import { messageBody, plainText, type MessageContent } from '@juno/richtext'
 import { ftsQuery, StoreReader, type SqlClient } from '@juno/store'
 import { Effect } from 'effect'
 import { channelInfoOf, channelRefOf, parseIds, personFrom, userName, type UserRow } from '../topicRows'
@@ -23,6 +23,9 @@ interface TopicHit {
 }
 
 interface MessageHit {
+  readonly attachments_json?: string | null
+  readonly blocks_json?: string | null
+  readonly bot_name?: string | null
   readonly channel: string
   readonly ts: string
   readonly thread_ts: string | null
@@ -56,7 +59,7 @@ export function searchStatements(sql: SqlClient.SqlClient, query: string, limit:
       (SELECT d.id FROM conversations d WHERE d.kind = 'im' AND d.user_id = u.id AND d.is_member = 1
         AND EXISTS (SELECT 1 FROM topic_index t WHERE t.topic_id = 'm:' || d.id) ORDER BY d.id LIMIT 1) AS dm
     FROM people_fts f JOIN users u ON u.rowid = f.rowid WHERE people_fts MATCH ${query} AND u.deleted = 0 ORDER BY f.rank, u.id LIMIT ${places}`
-  const messages = sql<MessageHit>`SELECT m.channel, m.ts, m.thread_ts, m.reply_count, m.user_id, m.text
+  const messages = sql<MessageHit>`SELECT m.channel, m.ts, m.thread_ts, m.reply_count, m.user_id, m.text, m.blocks_json, m.attachments_json, m.bot_name
     FROM messages_fts f JOIN messages m ON m.rowid = f.rowid JOIN conversations c ON c.id = m.channel
     LEFT JOIN ignored_channels g ON g.channel = m.channel
     WHERE messages_fts MATCH ${query} AND m.deleted = 0 AND c.is_member = 1 AND g.channel IS NULL ORDER BY f.rank, m.channel, m.ts LIMIT ${limit}`
@@ -155,8 +158,8 @@ export const messageResults = (
         title,
         ts: hit.ts,
         place,
-        sender: hit.user_id === null ? (hit.username ?? '') : userName(hit.user_id, users.get(hit.user_id)),
-        text: oneLine(plainText(messageBody({ text: hit.text }, lookups))),
+        sender: hit.bot_name ?? (hit.user_id === null ? (hit.username ?? '') : userName(hit.user_id, users.get(hit.user_id))),
+        text: oneLine(plainText(messageBody({ text: hit.text, attachments: hit.attachments_json ? JSON.parse(hit.attachments_json) as MessageContent['attachments'] : undefined, blocks: hit.blocks_json ? JSON.parse(hit.blocks_json) as MessageContent['blocks'] : undefined }, lookups))),
         stored: hit.stored,
       }
     })
