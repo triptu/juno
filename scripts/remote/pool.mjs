@@ -76,7 +76,8 @@ function takeLock(id) {
 function list() {
   const result = spawnSync('nsc', ['list', '-o', 'json'], { encoding: 'utf8', timeout: 30_000 })
   if (result.status !== 0) throw new Error(`nsc list failed: ${result.error?.message ?? result.stderr.trim()}`)
-  const instances = JSON.parse(result.stdout)
+  // nsc prints `null`, not `[]`, when no instance exists.
+  const instances = JSON.parse(result.stdout) ?? []
   if (!Array.isArray(instances)) throw new Error('nsc list did not return an array')
   return instances
 }
