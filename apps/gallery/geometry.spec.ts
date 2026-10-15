@@ -353,7 +353,8 @@ test('Configure: every tool row lines up with the Tool, Enabled and Auto-review 
       }
     })
   })
-  expect(at.length).toBe(9)
+  // Every tool in the fixture, including the locked delete and the tool that is not offered.
+  expect(at.length).toBe(10)
   for (const row of at) expect(row).toEqual({ name: 0, toggle: 0, rule: 0, cell: 0 })
 })
 
