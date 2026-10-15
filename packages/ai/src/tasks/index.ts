@@ -1,5 +1,4 @@
 /** The task table. One row per AI feature in SPEC section 15 and architecture section 10. */
-import { chat } from './chat'
 import { followUps } from './followUps'
 import { homeTitle } from './homeTitle'
 import { parseCommand } from './parseCommand'
@@ -15,7 +14,6 @@ export const tasks = {
   settledScore,
   urgencyGate,
   parseCommand,
-  chat,
   topicArt,
   followUps,
   homeTitle,
@@ -32,7 +30,6 @@ export * from './routeCheck'
 export * from './settledScore'
 export * from './urgencyGate'
 export * from './parseCommand'
-export * from './chat'
 export * from './topicArt'
 export * from './followUps'
 export * from './homeTitle'

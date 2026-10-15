@@ -115,6 +115,17 @@ export const MessageKind = Schema.Literals(['message', 'deleted', 'unloaded'])
 export type MessageKind = typeof MessageKind.Type
 
 /**
+ * One of Juno's own messages that Slack does not hold yet (architecture
+ * 5.7): `sending` until Slack has it, when the row becomes the message;
+ * `failed` when Slack refused it, with Retry and Delete draft.
+ */
+export const PendingState = Schema.Literals(['sending', 'failed'])
+export type PendingState = typeof PendingState.Type
+
+/** The `id` and `ts` of a pending row. Never a Slack ts, so never an anchor or a read pointer. */
+export const pendingRowId = (clientMsgId: string): string => `pending:${clientMsgId}`
+
+/**
  * One message row, shaped for the view. `id` is the message `ts`, unique in
  * a topic; `rev` changes whenever anything the row shows changes, except the
  * sender's name and photo, which are in `refs`.
@@ -147,6 +158,19 @@ export const MessageView = Schema.Struct({
   files: Schema.Array(FileView),
   /** Main only: the message has a thread. */
   thread: Schema.optionalKey(ThreadLink),
+  /**
+   * The `client_msg_id` the sending client gave the message. The view keys
+   * rows by it when present, so a pending row becomes the stored message in
+   * place.
+   */
+  clientMsgId: Schema.optionalKey(Schema.String),
+  /**
+   * A message Juno is sending. Pending rows come after every stored message
+   * of a window that reaches the newest one; `id` and `ts` are
+   * `pending:<clientMsgId>` and `at` is when it was sent. Never an anchor or
+   * a read pointer.
+   */
+  pending: Schema.optionalKey(PendingState),
 })
 export type MessageView = typeof MessageView.Type
 

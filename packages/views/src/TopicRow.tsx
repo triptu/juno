@@ -7,7 +7,7 @@ import { Hash } from '@phosphor-icons/react/dist/icons/Hash'
 import { Lock } from '@phosphor-icons/react/dist/icons/Lock'
 import { User } from '@phosphor-icons/react/dist/icons/User'
 import { Users } from '@phosphor-icons/react/dist/icons/Users'
-import { memo, useId, type FocusEvent, type MouseEvent } from 'react'
+import { memo, useId, type FocusEvent, type MouseEvent, type PointerEvent } from 'react'
 import type { TopicRow as TopicRowModel } from '@juno/contract'
 import { accent, colors, opacity, radii, sizes, spacing, tints } from '@juno/tokens/tokens.stylex'
 import {
@@ -18,6 +18,7 @@ import {
   Chip,
   Icon,
   IconButton,
+  pointerMoved,
   Text,
   TopicArt,
   type ActivateEvent,
@@ -39,7 +40,7 @@ export interface TopicRowProps {
   /** Fires on mouse down; `event.metaKey` asks for a new tab. */
   readonly onOpen: (id: string, event: ActivateEvent) => void
   readonly onResolve: (id: string) => void
-  /** Pointer enter or keyboard focus: warm the topic's query. */
+  /** Pointer enter or keyboard focus: warm the topic's query. Not when the row scrolls under a still pointer. */
   readonly onPrefetch?: (id: string) => void
   readonly onContextMenu?: (id: string, event: MouseEvent<HTMLDivElement>) => void
   /** The title is a field for Rename: the row does not open and shows no Resolve until it ends. */
@@ -117,6 +118,9 @@ export const TopicRow = memo(function TopicRow({
   const onFocus = (event: FocusEvent<HTMLDivElement>) => {
     if (event.target === event.currentTarget) onPrefetch?.(row.id)
   }
+  const onPointerEnter = (event: PointerEvent<HTMLDivElement>) => {
+    if (pointerMoved(event)) onPrefetch?.(row.id)
+  }
 
   return (
     <div
@@ -127,7 +131,7 @@ export const TopicRow = memo(function TopicRow({
       aria-describedby={state === undefined ? previewId : `${stateId} ${previewId}`}
       data-topic-row=""
       data-topic-id={row.id}
-      onPointerEnter={onPrefetch === undefined ? undefined : () => onPrefetch(row.id)}
+      onPointerEnter={onPrefetch === undefined ? undefined : onPointerEnter}
       onFocus={onFocus}
       onContextMenu={onContextMenu === undefined ? undefined : (event) => onContextMenu(row.id, event)}
       {...activateHandlers<HTMLDivElement>((event) => onOpen(row.id, event), { disabled: renaming })}

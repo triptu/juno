@@ -14,6 +14,8 @@ export { MessageList, type MessageListItem, type MessageListProps, type MessageL
 export { NEW_CHAT_NOTE, NewChat, startOfConversation, type NewChatProps } from './NewChat'
 export { NewDivider, type NewDividerProps } from './NewDivider'
 export { NewMessagesPill, type NewMessagesPillProps } from './NewMessagesPill'
+export { PeekKeySetting, type PeekKeyName, type PeekKeySettingProps } from './PeekKeySetting'
+export { PeekView, type PeekViewProps } from './PeekView'
 export { Reactions, type ReactionsProps } from './Reactions'
 export { SessionView, type SessionViewProps } from './SessionView'
 export { SignInView, type SignInViewProps } from './SignInView'

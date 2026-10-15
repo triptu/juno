@@ -11,13 +11,24 @@ export const AgentConfig = Schema.Struct({
   agentDir: Schema.String,
   /** True under Playwright. */
   e2e: Schema.Boolean,
+  /** Under Playwright only: the fake OpenRouter's origin, for the catalogue and the models. */
+  openRouterOrigin: Schema.optionalKey(Schema.String),
 })
 export type AgentConfig = typeof AgentConfig.Type
 
-/** main -> agent. A `hostPort` message carries a port to the host in `ports[0]`; a new one follows every host restart. */
+/**
+ * main -> agent. A `hostPort` message carries a port to the host in
+ * `ports[0]`; a new one follows every host restart. A `rendererPort` carries
+ * a port to one renderer, for the agent's RPCs (`AgentRpcs`). `openRouterKey`
+ * is the key main holds (the keychain's, or `OPENROUTER_API_KEY` in
+ * development), sent once it is loaded and again on every change from
+ * Settings › Juno; the agent keeps it in memory. `null` when there is none.
+ */
 export const MainToAgent = Schema.Union([
   Schema.TaggedStruct('config', { config: AgentConfig }),
   Schema.TaggedStruct('hostPort', {}),
+  Schema.TaggedStruct('rendererPort', {}),
+  Schema.TaggedStruct('openRouterKey', { key: Schema.NullOr(Schema.String) }),
 ])
 export type MainToAgent = typeof MainToAgent.Type
 

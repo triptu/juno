@@ -1,36 +1,13 @@
 /**
- * What the chat views call back with. One command union for every card
- * button, so the container maps a click to one RPC and a card view never
- * knows which. The decline buttons (Skip, Keep on a Remove card, Wait until
- * tomorrow) are `dismiss`, as the M1 review documents.
+ * What the chat views call back with. Card buttons use one command union,
+ * `CardCommand` (in `@juno/agent-contract`, so the state layer can map it to
+ * the card RPCs without importing views).
  */
 import type { MouseEvent } from 'react'
-import type { BubbleId, CardId, ChatMessageId, OpId, OpenTarget, ProposedMessageId, QuestionOptionId, ReplyTarget } from '@juno/agent-contract'
+import type { BubbleId, CardCommand, CardId, ChatMessageId, OpId, OpenTarget, ReplyTarget } from '@juno/agent-contract'
 import type { ActivateEvent } from '@juno/ui'
 
-export type CardCommand =
-  /** Send every row; `texts` carries the edited text of each. */
-  | { readonly _tag: 'send'; readonly texts: ReadonlyArray<{ readonly id: ProposedMessageId; readonly text: string }> }
-  | { readonly _tag: 'dismiss' }
-  | { readonly _tag: 'resolve' }
-  | { readonly _tag: 'undo' }
-  /** On an expired card: Juno is sent a message quoting the request. */
-  | { readonly _tag: 'askAgain' }
-  | { readonly _tag: 'start' }
-  /** The Task card's Stop: ends a running job. It is not a chat Stop; the chat has none. */
-  | { readonly _tag: 'stop' }
-  /** The task card's Sign in, when the T3 sign-in lapsed. */
-  | { readonly _tag: 'signIn' }
-  | { readonly _tag: 'choose'; readonly optionId: QuestionOptionId }
-  | { readonly _tag: 'reply'; readonly text: string }
-  | { readonly _tag: 'keep' }
-  | { readonly _tag: 'pause' }
-  | { readonly _tag: 'delete' }
-  | { readonly _tag: 'connect' }
-  | { readonly _tag: 'apply' }
-  | { readonly _tag: 'remove'; readonly alsoReply: boolean }
-  | { readonly _tag: 'allow' }
-  | { readonly _tag: 'setUp'; readonly provider: 'openrouter' | 'codex' }
+export type { CardCommand } from '@juno/agent-contract'
 
 /** What the owner can react to: a Juno bubble or a card. */
 export type ReactionTarget = Extract<ReplyTarget, { _tag: 'bubble' | 'card' }>

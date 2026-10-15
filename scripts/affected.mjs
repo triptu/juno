@@ -26,7 +26,9 @@
 // - perf and test:feel never run here. They are listed when the renderer changed.
 
 import { spawn, spawnSync } from 'node:child_process'
-import { existsSync, readFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { dirname, join, normalize, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -155,26 +157,55 @@ function closure(start) {
 const touches = (reached) => changed.some((file) => reached.has(file))
 const plan = []
 
-// Unit tests.
-const unit = []
-for (const file of files) {
-  if (!/^packages\/[^/]+\/test\/.*\.test\.ts$/.test(file)) continue
-  const dir = file.split('/').slice(0, 2).join('/')
-  const own = changed.some((path) => path === `${dir}/package.json` || path.startsWith(`${dir}/vitest.config`) || path === `${dir}/tsconfig.json`)
-  if (everythingChanged.length > 0 || own || touches(closure(file))) unit.push(file)
+// Results. A passing item is recorded under a hash of every file it reaches, the
+// package and suite configs it depends on, and the lockfile, in the system temp
+// folder shared by every worktree. An item whose key passed before is skipped,
+// whether it passed here or on a remote machine. --no-cache runs everything.
+const resultsDir = join(tmpdir(), 'juno-cache', 'results')
+const useCache = !flag('--no-cache')
+const contentHash = new Map()
+const hashOf = (file) => {
+  if (!contentHash.has(file)) contentHash.set(file, existsSync(join(root, file)) ? createHash('sha256').update(readFileSync(join(root, file))).digest('hex') : 'absent')
+  return contentHash.get(file)
 }
+const shared = ['pnpm-lock.yaml', 'pnpm-workspace.yaml', 'package.json', 'tsconfig.base.json']
+const keyOf = (suite, id, inputs) => {
+  const hash = createHash('sha256').update(`${suite}\0${id}\0`)
+  for (const file of [...new Set([...shared, ...inputs])].toSorted()) hash.update(`${file}\0${hashOf(file)}\0`)
+  return hash.digest('hex')
+}
+const passed = (key) => useCache && existsSync(join(resultsDir, key))
+let skipped = 0
+/** The items that need a run: their inputs changed (or everything did) and their key has not passed. */
+const pending = (items) =>
+  items.filter((item) => {
+    if (!(everythingChanged.length > 0 || item.own || touches(item.inputs))) return false
+    item.key = keyOf(item.suite, item.id, item.inputs)
+    if (passed(item.key)) skipped++
+    return !passed(item.key)
+  })
+
+// Unit tests.
+const unitItems = [...files]
+  .filter((file) => /^packages\/[^/]+\/test\/.*\.test\.ts$/.test(file))
+  .map((file) => {
+    const dir = file.split('/').slice(0, 2).join('/')
+    const config = [`${dir}/package.json`, `${dir}/vitest.config.ts`, `${dir}/tsconfig.json`]
+    return { suite: 'test', id: file, inputs: new Set([...closure(file), ...config]), own: changed.some((path) => config.includes(path)) }
+  })
+const unit = pending(unitItems)
 // vitest matches filters against paths inside each package. Two packages with a
 // test of the same name both run it, which only costs time.
-const filters = [...new Set(unit.map((file) => file.split('/').slice(2).join('/')))]
-if (unit.length > 0) plan.push({ script: 'test', args: everythingChanged.length > 0 ? [] : ['--passWithNoTests', ...filters], why: `${unit.length} vitest file(s)` })
+const filters = [...new Set(unit.map((item) => item.id.split('/').slice(2).join('/')))]
+if (unit.length > 0) plan.push({ script: 'test', args: unit.length === unitItems.length ? [] : ['--passWithNoTests', ...filters], items: unit, why: `${unit.length} vitest file(s)` })
 
-// Specs.
+// Specs. specs:check keeps its own cache of passing Quint runs.
 const specChanges = changed.filter((file) => file.startsWith('specs/') && !file.endsWith('.md'))
 if (everythingChanged.length > 0 || specChanges.length > 0) {
   const only = { 'specs/agent-memory.qnt': '--memory', 'specs/agent-actions.qnt': '--actions', 'specs/agent-recovery.qnt': '--recovery', 'specs/agent-recovery-replay.qnt': '--recovery' }
   const modes = new Set(specChanges.map((file) => only[file] ?? 'all'))
   const args = everythingChanged.length === 0 && modes.size === 1 && !modes.has('all') ? [...modes] : []
-  plan.push({ script: 'specs:check', args, why: `${specChanges.length || 'shared'} spec input(s) changed${args.length ? `, ${args[0].slice(2)} only` : ''}` })
+  plan.push({ script: 'specs:check', args, items: [], why: `${specChanges.length || 'shared'} spec input(s) changed${args.length ? `, ${args[0].slice(2)} only` : ''}` })
 }
 
 // Gallery.
@@ -193,25 +224,48 @@ function componentFixtures() {
   }
   return map
 }
-const galleryWhole = everythingChanged.length > 0 || changed.some((file) => (file.startsWith('apps/gallery/') && file !== 'apps/gallery/shots.spec.ts') || file.startsWith('packages/testing/') || file.startsWith('packages/tokens/'))
-const components = [...componentFixtures()].filter(([, fixture]) => touches(closure(fixture))).map(([name]) => name)
-if (galleryWhole) plan.push({ script: 'test:gallery', args: [], why: 'the gallery, its tests, the tokens or @juno/testing changed: every component' })
-else if (components.length > 0) plan.push({ script: 'test:gallery', args: [], env: { GALLERY_SHIFT_ONLY: components.join(',') }, why: `${components.length} component(s): ${components.join(', ')}` })
+// The gallery app, its tests and what they share reach every component.
+const galleryBase = [...files].filter((file) => (file.startsWith('apps/gallery/') && file !== 'apps/gallery/shots.spec.ts') || file.startsWith('packages/testing/') || file.startsWith('packages/tokens/'))
+const componentItems = [...componentFixtures()].map(([name, fixture]) => ({ suite: 'gallery', id: name, inputs: new Set([...closure(fixture), ...galleryBase]) }))
+const behaviourItem = { suite: 'gallery', id: 'behaviour', inputs: new Set(componentItems.flatMap((item) => [...item.inputs])) }
+const components = pending(componentItems)
+const behaviour = pending([behaviourItem])
+if (components.length > 0 || behaviour.length > 0) {
+  const all = components.length === componentItems.length
+  plan.push({
+    script: 'test:gallery',
+    args: [],
+    // A name no component has keeps the shift guard idle when only the behaviour tests need a run.
+    env: all ? undefined : { GALLERY_SHIFT_ONLY: components.length > 0 ? components.map((item) => item.id).join(',') : 'none' },
+    items: [...components, ...behaviour],
+    why: all ? 'every component' : `${components.length} component(s)${components.length ? `: ${components.map((item) => item.id).join(', ')}` : ''}${behaviour.length ? ' and the behaviour tests' : ''}`,
+  })
+}
 
-// Desktop e2e.
+// Desktop e2e, by spec file: the app and the e2e support reach every one.
 const desktopEntries = [...files].filter((file) => /^apps\/desktop\/src\/(main|preload|engine|agent)\/index\.ts$/.test(file) || file === 'apps/desktop/src/renderer/main.tsx' || file === 'apps/desktop/electron.vite.config.ts')
 const support = [...files].filter((file) => /^apps\/desktop\/e2e\/(fixtures\.ts|driver\/)/.test(file) || file === 'apps/desktop/playwright.config.ts' || file === 'apps/desktop/package.json')
 const app = new Set(desktopEntries.flatMap((entry) => [...closure(entry)]))
 for (const file of support) for (const reached of closure(file)) app.add(reached)
 for (const file of [...files].filter((path) => path.startsWith('apps/desktop/src/renderer/'))) app.add(file)
-const e2eChanged = changed.filter((file) => /^apps\/desktop\/e2e\/.*\.spec\.ts$/.test(file) && !file.includes('perf.spec'))
-if (everythingChanged.length > 0 || touches(app)) plan.push({ script: 'test:desktop', args: [], why: 'the app or the e2e support changed: every desktop e2e test' })
-else if (e2eChanged.length > 0) plan.push({ script: 'test:desktop', args: e2eChanged.map((file) => file.replace('apps/desktop/', '')), why: `${e2eChanged.length} changed e2e spec(s)` })
+const specItems = [...files]
+  .filter((file) => /^apps\/desktop\/e2e\/.*\.spec\.ts$/.test(file) && !/perf\.spec|screens\.spec|live\.spec/.test(file))
+  .map((file) => ({ suite: 'desktop', id: file, inputs: new Set([...app, ...closure(file)]) }))
+const specs = pending(specItems)
+if (specs.length > 0) {
+  plan.push({
+    script: 'test:desktop',
+    args: specs.length === specItems.length ? [] : specs.map((item) => item.id.replace('apps/desktop/', '')),
+    items: specs,
+    why: specs.length === specItems.length ? 'every desktop e2e spec' : `${specs.length} e2e spec file(s)`,
+  })
+}
 
 const renderer = changed.some((file) => file.startsWith('apps/desktop/src/renderer/') || file.startsWith('packages/views/src/') || file.startsWith('packages/ui/src/') || file.startsWith('packages/tokens/'))
 
 console.log(`affected: ${changed.length} changed file(s) since ${base.slice(0, 10)}${everythingChanged.length ? `; ${everythingChanged.join(', ')} changed, so everything runs` : ''}`)
 for (const step of plan) console.log(`  pnpm ${step.script}${step.args.length ? ` ${step.args.length > 6 ? `${step.args.slice(0, 6).join(' ')} ... (${step.args.length} args)` : step.args.join(' ')}` : ''}${step.env ? ` with ${Object.entries(step.env).map(([key, value]) => `${key}=${value}`).join(' ')}` : ''}   # ${step.why}`)
+if (skipped > 0) console.log(`  (${skipped} item(s) skipped: they passed before with the same inputs; --no-cache runs them)`)
 if (plan.length === 0) console.log('  nothing to run')
 if (renderer) console.log('  (UI changed: run pnpm test:feel and pnpm perf on the Mac before a milestone review)')
 if (flag('--plan') || plan.length === 0) process.exit(0)
@@ -236,6 +290,8 @@ const run = (step) =>
   })
 const results = local ? [] : await Promise.all(plan.map(run))
 if (local) for (const step of plan) results.push(await run(step))
+mkdirSync(resultsDir, { recursive: true })
+for (const { step, code } of results) if (code === 0) for (const item of step.items) writeFileSync(join(resultsDir, item.key), `${item.suite} ${item.id}\n`)
 console.log('affected: results')
 for (const { step, code } of results) console.log(`  ${code === 0 ? 'passed' : `failed (${code})`}  pnpm ${step.script}`)
 process.exit(results.every(({ code }) => code === 0) ? 0 : 1)

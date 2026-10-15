@@ -10,9 +10,10 @@ import { HomeRoutes } from './home'
 import { MessagesRoutes } from './messages'
 import { NewChatRoutes } from './newChat'
 import { ReadsRoutes } from './reads'
+import { SendRoutes } from './send'
 import { SessionRoutes } from './session'
 import { TopicsRoutes } from './topics'
 
-export const AllRoutes = EngineRoutes.merge(SessionRoutes).merge(TopicsRoutes).merge(SearchRoutes).merge(PrefsRoutes).merge(MessagesRoutes).merge(ReadsRoutes).merge(ArtRoutes).merge(NewChatRoutes).merge(HomeRoutes)
+export const AllRoutes = EngineRoutes.merge(SessionRoutes).merge(TopicsRoutes).merge(SearchRoutes).merge(PrefsRoutes).merge(MessagesRoutes).merge(ReadsRoutes).merge(ArtRoutes).merge(NewChatRoutes).merge(SendRoutes).merge(HomeRoutes)
 
 export type AllRoutes = typeof AllRoutes

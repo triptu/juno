@@ -1,5 +1,5 @@
 export * from './chat'
-export { AGENT_HOST_PROTOCOL, AgentHostRpcs, HostHello, hostHello } from './host/port'
+export { AGENT_HOST_PROTOCOL, HostHello, HostHelloRpcs, hostHello } from './host/port'
 export { AgentConfig, AgentToMain, MainToAgent } from './host/process'
 export * from './host/services'
 export * from './rpc'

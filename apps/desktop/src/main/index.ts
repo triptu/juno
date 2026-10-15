@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { createAgentSupervisor } from './agent'
 import { createSupervisor } from './engine'
 import { contextMenuForTests, registerIpc, slackLinksForTests } from './ipc'
+import { macKeychain, memoryKeychain, OpenRouterKeyStore } from './keychain'
 import { readLaunch, writeLaunch, type Launch } from './launch'
 import { registerAppScheme, serveAppScheme } from './scheme'
 import { SecretsStore } from './secrets'
@@ -54,6 +55,12 @@ const agent =
     : undefined
 supervisor.onReady(() => agent?.linkHost())
 
+// The OpenRouter key: the keychain's, or OPENROUTER_API_KEY in development. Tests get a keychain in memory.
+const openRouterKey = new OpenRouterKeyStore(e2e ? memoryKeychain() : macKeychain(), e2e ? undefined : process.env.OPENROUTER_API_KEY, (key) =>
+  agent?.setOpenRouterKey(key),
+)
+if (agent) void openRouterKey.load()
+
 const sessionHost = new SessionHost({
   secrets: new SecretsStore(app.getPath('userData'), { plaintext: e2e }),
   send: (message) => supervisor.send(message),
@@ -71,6 +78,8 @@ app.whenReady().then(() => {
   serveAppScheme(join(__dirname, '../renderer'), fakeSlackUrl === undefined ? undefined : new URL(fakeSlackUrl).origin)
   registerIpc({
     supervisor,
+    agent,
+    openRouterKey,
     setTheme: (theme) => updateLaunch({ theme }),
     setAccent: (accent) => updateLaunch({ accent }),
     setSidebar: (sidebar) => {

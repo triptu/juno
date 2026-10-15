@@ -1,6 +1,6 @@
 /// <reference lib="dom" />
 import { contextBridge, ipcRenderer } from 'electron'
-import { Channels, Events, PORT_HANDOFF_TAG, type ContextMenuLeaf, type JunoBridge, type MenuCommand } from '@juno/contract/channels'
+import { AGENT_PORT_HANDOFF_TAG, Channels, Events, PORT_HANDOFF_TAG, type ContextMenuLeaf, type JunoBridge, type MenuCommand } from '@juno/contract/channels'
 
 /** A menu item copied field by field, so nothing else the page put on it crosses to main. */
 function leaf(item: ContextMenuLeaf): ContextMenuLeaf {
@@ -23,6 +23,10 @@ const bridge: JunoBridge = {
   engine: {
     requestPort: () => ipcRenderer.invoke(Channels.engineRequestPort),
     restart: () => ipcRenderer.invoke(Channels.engineRestart),
+  },
+  agent: {
+    requestPort: () => ipcRenderer.invoke(Channels.agentRequestPort),
+    setOpenRouterKey: (key) => ipcRenderer.invoke(Channels.agentSetOpenRouterKey, { key }),
   },
   launch: {
     setTheme: (theme) => ipcRenderer.invoke(Channels.launchSetTheme, { theme }),
@@ -61,4 +65,9 @@ contextBridge.exposeInMainWorld('juno', bridge)
 // Forward it as a window message; the page checks event.source and the tag.
 ipcRenderer.on(Events.enginePort, (event) => {
   window.postMessage({ _tag: PORT_HANDOFF_TAG }, '*', event.ports)
+})
+
+// The same for the Juno Agent's port.
+ipcRenderer.on(Events.agentPort, (event) => {
+  window.postMessage({ _tag: AGENT_PORT_HANDOFF_TAG }, '*', event.ports)
 })

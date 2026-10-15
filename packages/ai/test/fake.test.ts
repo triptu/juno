@@ -1,7 +1,7 @@
 /** Behaviour through the AiProvider interface with the fake, the way the assistant will use it. */
-import { Effect, Stream } from 'effect'
+import { Effect } from 'effect'
 import { describe, expect, it } from 'vitest'
-import { AiProvider, FakeAiProvider, chatTools, tasks, validateOutput, type ChatEvent, type Decision } from '../src/index'
+import { AiProvider, FakeAiProvider, tasks, validateOutput, type Decision } from '../src/index'
 import { NOW, T, channels, msg, people, postgres, stagingBill } from './fixtures'
 
 const run = <A>(f: (p: typeof AiProvider.Service) => Effect.Effect<A>) =>
@@ -105,8 +105,6 @@ describe('FakeAiProvider generation', () => {
 
 })
 
-const collect = (events: Stream.Stream<ChatEvent>) => Stream.runCollect(events)
-
 describe('FakeAiProvider Home tasks', () => {
   const base = { topicId: postgres.id, title: postgres.title, channel: '#eng', now: NOW }
 
@@ -149,42 +147,5 @@ describe('FakeAiProvider Home tasks', () => {
     expect(asked).toEqual({ title: 'Dev asks: Can you pick the cutover window', confident: true })
     const empty = decided(await run((p) => p.decide(tasks.homeTitle, { ...item, messages: [] })))
     expect(empty.confident).toBe(false)
-  })
-})
-
-describe('FakeAiProvider chat', () => {
-  it('turns "tell maya …" into a propose_message tool call and ends with done', async () => {
-    const events = await run((p) =>
-      collect(p.chat({ now: NOW, viewing: { id: postgres.id, title: postgres.title, channel: '#eng' }, messages: [{ role: 'user', text: 'tell maya the wednesday slot works' }] }, chatTools)),
-    )
-    const calls = events.filter((e) => e.type === 'toolCall')
-    expect(calls).toHaveLength(1)
-    expect(calls[0]).toMatchObject({ call: { name: 'propose_message', arguments: { topicId: postgres.id, text: 'the wednesday slot works' } } })
-    const done = events.at(-1)
-    expect(done?.type).toBe('done')
-    const text = events.filter((e) => e.type === 'text').map((e) => e.delta).join('')
-    expect(text).toBe('Ready to send to Maya.')
-    expect(text).not.toMatch(/[*#_`]/)
-  })
-
-  it('reads a tool result back as the answer on the next turn', async () => {
-    const events = await run((p) =>
-      collect(
-        p.chat(
-          {
-            now: NOW,
-            viewing: { id: postgres.id, title: postgres.title, channel: '#eng' },
-            messages: [
-              { role: 'user', text: 'summarize this' },
-              { role: 'assistant', text: '', toolCalls: [{ id: 'c1', name: 'read_topic', arguments: { topicId: postgres.id } }] },
-              { role: 'tool', callId: 'c1', name: 'read_topic', result: 'Dev Patel: Draft of the Postgres 16 migration plan is in the doc.' },
-            ],
-          },
-          chatTools,
-        ),
-      ),
-    )
-    const done = events.at(-1)
-    expect(done).toMatchObject({ type: 'done', text: 'Short version: Dev Patel: Draft of the Postgres 16 migration plan is in the doc.' })
   })
 })
