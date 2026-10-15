@@ -37,44 +37,44 @@ export async function scrollReading(win: Page, name: string, options: {
   const sweep = async (label: string) => {
     let result = { frames: [] as number[], loaf: 0, placeholders: 0 }
     const trace = await traced(win, `${name}-${label}`, async () => {
-        await win.evaluate((checkPlaceholders) => {
-          const state = { frames: [] as number[], loaf: 0, placeholders: 0, sampling: true }
-          const observer = new PerformanceObserver((entries) => { state.loaf += entries.getEntries().length })
-          observer.observe({ type: 'long-animation-frame' })
-          let last: number | undefined
-          const grid = checkPlaceholders ? document.querySelector('[data-all-topics-table]') : null
-          const tick = (now: number) => {
-            if (!state.sampling) return
-            if (last !== undefined) state.frames.push(now - last)
-            last = now
-            if (grid !== null) {
-              const rows = grid.querySelectorAll('[aria-busy="true"]')
-              if (rows.length > 0) {
-                const view = grid.getBoundingClientRect()
-                for (const row of rows) {
-                  const rect = row.getBoundingClientRect()
-                  if (rect.bottom > view.top && rect.top < view.bottom) state.placeholders++
-                }
+      await win.evaluate((checkPlaceholders) => {
+        const state = { frames: [] as number[], loaf: 0, placeholders: 0, sampling: true }
+        const observer = new PerformanceObserver((entries) => { state.loaf += entries.getEntries().length })
+        observer.observe({ type: 'long-animation-frame' })
+        let last: number | undefined
+        const grid = checkPlaceholders ? document.querySelector('[data-all-topics-table]') : null
+        const tick = (now: number) => {
+          if (!state.sampling) return
+          if (last !== undefined) state.frames.push(now - last)
+          last = now
+          if (grid !== null) {
+            const rows = grid.querySelectorAll('[aria-busy="true"]')
+            if (rows.length > 0) {
+              const view = grid.getBoundingClientRect()
+              for (const row of rows) {
+                const rect = row.getBoundingClientRect()
+                if (rect.bottom > view.top && rect.top < view.bottom) state.placeholders++
               }
             }
-            requestAnimationFrame(tick)
           }
           requestAnimationFrame(tick)
-          Object.assign(window, { __scrollSample: () => {
-            state.sampling = false
-            state.loaf += observer.takeRecords().length
-            observer.disconnect()
-            return { frames: state.frames, loaf: state.loaf, placeholders: state.placeholders }
-          } })
-        }, options.placeholders ?? false)
-        for (const direction of [options.direction, -options.direction]) {
-          for (let step = 0; step < options.steps; step++) {
-            await win.mouse.wheel(0, direction * 200)
-            await win.waitForTimeout(100)
-          }
         }
-        result = await win.evaluate(() => (window as unknown as { __scrollSample: () => typeof result }).__scrollSample())
-      })
+        requestAnimationFrame(tick)
+        Object.assign(window, { __scrollSample: () => {
+          state.sampling = false
+          state.loaf += observer.takeRecords().length
+          observer.disconnect()
+          return { frames: state.frames, loaf: state.loaf, placeholders: state.placeholders }
+        } })
+      }, options.placeholders ?? false)
+      for (const direction of [options.direction, -options.direction]) {
+        for (let step = 0; step < options.steps; step++) {
+          await win.mouse.wheel(0, direction * 200)
+          await win.waitForTimeout(100)
+        }
+      }
+      result = await win.evaluate(() => (window as unknown as { __scrollSample: () => typeof result }).__scrollSample())
+    })
     return { ...trace, ...result }
   }
   type Sweep = Awaited<ReturnType<typeof sweep>>

@@ -309,3 +309,25 @@ Location: `apps/desktop/perf/`, a separate Playwright project `perf` (`pnpm perf
 - The LoAF observer attributes scripts only on the main thread; engine stalls show up as late `live-update` measures instead.
 - `app.getAppMetrics()` reports working set, which overstates shared memory; the private figure from inside each process is the one the budget uses.
 - CDP sessions on Electron pages are not documented by Playwright but work because the page is a Chromium target; if a Chromium upgrade breaks them, the `contentTracing` path is the fallback.
+
+### 8.1 Follow-up measurements (10-15, perf-fix-3)
+
+The exclusive run after merging `0a462578` passed 11 of 18 scenarios. Budgets are unchanged. The measurements below come from one run; the preceding handoff used separate scroll sweeps, so its scroll p95 is not directly comparable to the pooled statistic.
+
+| Scenario | Handoff | Exclusive follow-up | Budget |
+| --- | --- | --- | --- |
+| Thread send | 130–545 ms slow sample, about 30 ms median | 35.7 ms p95, 25.7 ms median, 9 samples | 50 ms p95 |
+| Warm start to rows | 713 ms median | 599.5 ms median | 500 ms median |
+| All topics scroll | 11.4 ms p95 | 13.9 ms pooled p95; 6.8 ms held-clock | 8.3 ms p95 |
+| Home open, including 31 s idle | 81 ms p95 | 106.1 ms p95 | 50 ms p95 |
+
+Other misses in this run: sidebar scroll 9.2 ms (held-clock 4.6), chat scroll 9.2 ms (held-clock 4.1), sidebar drag 10.0 ms, uncached topic open 57.2 ms. Message scroll passed at 5.4 ms (held-clock 3.3). All four scroll scenarios had zero long animation frames and fewer than 1% dropped frames. Maximum dirty layout objects were 207 in the sidebar, 128 in All topics, 42 in messages and 22 in chat; all structural checks passed.
+
+Findings and limits:
+
+- **Send:** an early run with another checkout's Electron active recorded 598 ms, with checks complete at 52 ms and the command response at 55 ms. That locates most of that sample after the command response, but does not identify the cause. A later 30-sample run without another Electron passed at 45.2 ms p95, as did the exclusive run. This does not prove the rare stall is fixed. Bounded check, response and commit marks now distinguish the remaining stages; the harness rejects focus loss. The inherited transaction probe was removed because stack capture and synchronous file logging on every transaction changed the work being measured.
+- **Startup:** in the exclusive run, main-to-navigation took 319–937 ms; the page then took 193–229 ms to paint rows. Alternating probes of window-before-engine, engine-after-paint and disabled code caching gave no reliable gain; deferring the engine delayed data. A separate five-pair probe of disabling throttling only until first paint gave medians of 1,268 ms unchanged and 1,196 ms modified, with ranges spanning 440–1,746 ms. This is too noisy to retain. All startup probes were reverted; code caching and background throttling remain enabled.
+- **All topics:** the held-clock comparison confirms a substantial clock effect, while the ordinary reading still represents the user-visible workload and still fails. Traces show bounded layout and rendering work. An opaque scroller background and scroller containment neither changed the relevant compositing layer structure nor reliably reduced frame work, so both were reverted.
+- **Home:** cold traced opens included 27–46 ms of native layout, while the home query took roughly 1–3 ms. Holding the clock did not reliably improve the cold opens. Starting the query on pointerdown did not help and was reverted. The exclusive run also had a 503 ms outlier whose cause remains unresolved. The evidence does not support attributing Home's miss solely to the clock.
+
+Local logs and diagnostic traces are in the ignored `.juno-status/perf-fix-3/` directory. Profiling runs were used for attribution only, not for the table's final numbers.
