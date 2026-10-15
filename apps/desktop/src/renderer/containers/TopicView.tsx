@@ -278,7 +278,7 @@ function Topic({ id, detail, readOnly = false }: TopicProps) {
 
   // The read pointer when this tab first showed the topic, for the divider.
   const [readAtOpen] = useState(() => ({ lastReadTs: detail.lastReadTs }))
-  const at = readOnly ? -1 : dividerIndex(list.order, readAtOpen.lastReadTs)
+  const at = readOnly ? -1 : dividerIndex(list.order, readAtOpen.lastReadTs, (ts) => list.rows.get(ts)?.fromMe === true)
   const dividerBefore = at > 0 ? list.order[at] : undefined
 
   const [positioned, setPositioned] = useState(false)

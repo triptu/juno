@@ -31,11 +31,18 @@ test('a reply in a thread shows at once and settles in place, posted once', asyn
 
   const row = topic.message('Thursday works for the freeze')
   const before = await row.boundingBox()
-  const shift = await measureLayoutShift(juno.win, async () => {
-    fake.release()
-    await topic.expectSent('Thursday works for the freeze')
-  })
-  expect(shift).toBe(0)
+  // The sidebar moves the thread to the top for its new activity, as it should; the topic moves nothing.
+  const report = await measureLayoutShift(
+    juno.win,
+    async () => {
+      fake.release()
+      await topic.expectSent('Thursday works for the freeze')
+    },
+    { root: '[data-topic-view]', settleMs: 200 },
+  )
+  // No message row moved. The list's own height may change as rows far above the view reach their real
+  // size (they are laid out at an estimate until then), and the browser's shift entries cover the whole window.
+  expect(report.moved.filter((moved) => moved.element.includes('listitem'))).toEqual([])
   expect(await topic.message('Thursday works for the freeze').boundingBox()).toEqual(before)
 
   const posted = fake.calls.filter((call) => call.method === 'chat.postMessage')
@@ -50,7 +57,7 @@ test('a message in Main settles when the echo comes before the answer', async ({
   await juno.waitForSync()
   const { topic } = juno
   await juno.sidebar.row(ENG_MAIN).open()
-  await topic.expectTitle('#eng')
+  await topic.expectTitle('Main')
   fake.holdNext({ method: 'chat.postMessage' })
   await topic.send('Cutover moves to Thursday night')
   await topic.expectSent('Cutover moves to Thursday night')
@@ -65,7 +72,7 @@ test('a refused send stays in the row with Retry and Delete draft', async ({ jun
   await juno.waitForSync()
   const { topic } = juno
   await juno.sidebar.row(ENG_MAIN).open()
-  await topic.expectTitle('#eng')
+  await topic.expectTitle('Main')
 
   fake.forceError({ method: 'chat.postMessage', error: 'restricted_action', times: 2 })
   await topic.send('Please try this one again')

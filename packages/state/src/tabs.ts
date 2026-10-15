@@ -26,7 +26,7 @@
 import { Option, Schema } from 'effect'
 import * as AsyncResult from 'effect/reactivity/AsyncResult'
 import * as Atom from 'effect/reactivity/Atom'
-import { isPendingRowId, prefsGet, prefsSet, type TopicDetail } from '@juno/contract'
+import { prefsGet, prefsSet, type TopicDetail } from '@juno/contract'
 import { liveQuery, runCommand } from './atoms'
 import type { Registry } from './client'
 import { topicAtom } from './messages'
@@ -257,13 +257,13 @@ export function mountedTabs(tabs: Tabs): ReadonlySet<string> {
 
 /**
  * Where the "N new" divider goes: the index of the first message after the
- * read pointer, or -1 when every message is read or none is (a topic never
- * read opens at the bottom with no divider).
+ * read pointer that the user did not send (`mine`), or -1 when every message
+ * is read or none is (a topic never read opens at the bottom with no
+ * divider). The user's own messages, sent or still sending, are never new.
  */
-export function dividerIndex(order: ReadonlyArray<string>, lastReadTs: string | undefined): number {
+export function dividerIndex(order: ReadonlyArray<string>, lastReadTs: string | undefined, mine: (ts: string) => boolean = () => false): number {
   if (lastReadTs === undefined) return -1
-  // A message still sending is the user's own, never unread.
-  return order.findIndex((ts) => !isPendingRowId(ts) && ts > lastReadTs)
+  return order.findIndex((ts) => !mine(ts) && ts > lastReadTs)
 }
 
 // Persistence

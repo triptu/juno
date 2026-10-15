@@ -261,6 +261,13 @@ describe('the divider', () => {
     expect(dividerIndex(order, '1.000003')).toBe(-1)
     expect(dividerIndex(order, undefined)).toBe(-1)
   })
+
+  it('never goes before the user’s own messages, sent or still sending', () => {
+    const order = ['1.000001', '1.000002', 'pending:c1', '1.000003']
+    const mine = (ts: string) => ts === '1.000002' || ts === 'pending:c1'
+    expect(dividerIndex(order, '1.000001', mine)).toBe(3)
+    expect(dividerIndex(order.slice(0, 3), '1.000001', mine)).toBe(-1)
+  })
 })
 
 describe('saved tabs', () => {

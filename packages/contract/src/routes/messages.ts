@@ -124,7 +124,6 @@ export type PendingState = typeof PendingState.Type
 
 /** The `id` and `ts` of a pending row. Never a Slack ts, so never an anchor or a read pointer. */
 export const pendingRowId = (clientMsgId: string): string => `pending:${clientMsgId}`
-export const isPendingRowId = (id: string): boolean => id.startsWith('pending:')
 
 /**
  * One message row, shaped for the view. `id` is the message `ts`, unique in
