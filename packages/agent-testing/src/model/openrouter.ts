@@ -10,7 +10,7 @@
  * resolves the same slugs as the in-process fake provider.
  */
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
-import { fakeCatalogue } from './provider'
+import { fakeCatalogue } from './catalogue'
 
 export interface OpenRouterRequest {
   readonly path: string
