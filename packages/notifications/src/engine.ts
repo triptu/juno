@@ -142,7 +142,11 @@ export const makeNotifications = Effect.fn('Notifications.make')(function* (noti
     presenceChanges: SubscriptionRef.changes(current),
     observePresence: (value: Presence) => SubscriptionRef.set(current, value),
     setPresence: (value: Presence) => Effect.gen(function* () {
-      if (yield* setPresence(slackPresence(value))) yield* SubscriptionRef.set(current, value)
+      if (!(yield* setPresence(slackPresence(value)))) return
+      yield* SubscriptionRef.set(current, value)
+      // A change by hand holds until the next switch, even when it comes before the first tick.
+      const { settings } = yield* configuration
+      scheduled = scheduledPresence(localTime(yield* Clock.currentTimeMillis), settings.presenceHours)
     }).pipe(lock.withPermit),
   }
 })

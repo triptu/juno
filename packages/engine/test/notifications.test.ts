@@ -149,7 +149,12 @@ describe('notifications service', () => {
       yield* TestClock.setTime(monday(19))
       yield* service.tick
       expect(yield* service.currentPresence).toBe('away')
-      expect(fake.callCount('presence.set')).toBe(4)
+      // Active by hand before the first tick of a fresh start holds until the next switch.
+      const fresh = yield* makeNotifications(record.notifier, (presence) => api.call('presence.set', { presence }).pipe(Effect.as(true), Effect.orDie))
+      yield* fresh.setPresence('active')
+      yield* fresh.tick
+      expect(yield* fresh.currentPresence).toBe('active')
+      expect(fake.callCount('presence.set')).toBe(5)
     }).pipe(Effect.provide(clientLayer(fake, { lanes: { backgroundMinIntervalMillis: 0 } })))
   }).pipe(Effect.provide(Layer.merge(freshStore, aiLayer)), Effect.scoped))
 })
