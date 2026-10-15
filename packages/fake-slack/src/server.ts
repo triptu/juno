@@ -3,7 +3,8 @@
  * docs/research/slack-data-access.md sections 1, 4 and 6: multipart POST to
  * /api/<method> with `token` as a form field and the `d` cookie, `ok:false`
  * errors, 429 with Retry-After, the edge API with JSON bodies, and the socket
- * with hello, ping/pong and events.
+ * with hello, ping/pong and events. Also the upload url (`/upload/<id>`) and
+ * file downloads (`/files/<id>/<name>`).
  */
 import { randomBytes } from 'node:crypto'
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
@@ -12,7 +13,8 @@ import { Schema } from 'effect'
 import { WebSocketServer, type WebSocket } from 'ws'
 import type { MethodName, RtmFrame } from '@juno/slack-schema'
 import { EdgeEmojisListOk, EdgeUsersInfoArgs, EdgeUsersInfoOk, encodeRtmFrame, isMethodName, Methods } from '@juno/slack-schema'
-import { parseCookies, parseFields, parseJson, readBody, type FormFields } from './body.ts'
+import { parseCookies, parseFields, parseJson, parseMultipartParts, readBody, type FormFields } from './body.ts'
+import { mimetypeOf } from './files.ts'
 import { ApiError, handlers, type MethodContext } from './methods.ts'
 import { clientPage, signInPage } from './signin.ts'
 import type { Workspace } from './state.ts'
@@ -72,6 +74,8 @@ export class FakeServer {
   readonly #lost = new Map<string, number>()
   #frameHold: ReadonlySet<string> | undefined
   #fileDelayMs = 0
+  #failedUploads = 0
+  #uploadsBeforeFailing = 0
   readonly #heldFrames: RtmFrame[] = []
   readonly workspace: Workspace
   readonly #control: (name: string, input: Record<string, unknown>) => unknown
@@ -241,12 +245,18 @@ export class FakeServer {
 
   // Held frames
 
-  /** From now on, frames of these types wait for `releaseFrames` instead of reaching the sockets. */
   /** File downloads answer after `ms`, so images arrive late. 0 turns it off. */
   delayFiles(ms: number): void {
     this.#fileDelayMs = ms
   }
 
+  /** After `after` more upload POSTs succeed, the next `times` answer HTTP 500 and store nothing. */
+  failUploads(times: number, after = 0): void {
+    this.#failedUploads = times
+    this.#uploadsBeforeFailing = after
+  }
+
+  /** From now on, frames of these types wait for `releaseFrames` instead of reaching the sockets. */
   holdFrames(types: ReadonlyArray<string>): void {
     this.#frameHold = new Set(types)
   }
@@ -356,7 +366,7 @@ export class FakeServer {
     if (path.startsWith('/api/') && method === 'POST') return this.#api(path.slice('/api/'.length), request, response)
     if (path.startsWith('/edge/') && method === 'POST') return this.#edge(path.slice('/edge/'.length), request, response)
     if (path.startsWith('/upload/') && (method === 'POST' || method === 'PUT')) return this.#upload(path.slice('/upload/'.length), request, response)
-    if (path.startsWith('/files/') && method === 'GET') return this.#file(path.split('/')[2] ?? '', response)
+    if (path.startsWith('/files/') && method === 'GET') return this.#file(path.split('/')[2] ?? '', url.searchParams.get('download') === '1', response)
     if (path.startsWith('/avatars/') && method === 'GET') return this.#avatar(path.slice('/avatars/'.length).replace(/\.svg$/, ''), response)
     if (path.startsWith('/control/') && method === 'POST') return this.#controlRoute(path.slice('/control/'.length), request, response)
     if ((path === '/' || path === '/signin') && method === 'GET') return html(response, 200, signInPage({}))
@@ -455,26 +465,46 @@ export class FakeServer {
     record(200, Schema.encodeSync(EdgeUsersInfoOk)({ ok: true, results, failed_ids: failed, pending_ids: [], invalid_ids: [] }))
   }
 
+  /**
+   * The bytes of a file, as the official client sends them: multipart with
+   * one field named `file`. A raw body is accepted too. No token or cookie.
+   */
   async #upload(fileId: string, request: IncomingMessage, response: ServerResponse): Promise<void> {
     const stored = this.workspace.files.get(fileId)
-    const bytes = await readBody(request)
-    const ok = stored !== undefined
-    if (stored !== undefined) {
-      stored.bytes = bytes
-      const type = request.headers['content-type']
-      if (type !== undefined && !type.startsWith('multipart/')) stored.mimetype = type
+    const body = await readBody(request)
+    const record = (status: number, length: number) =>
+      this.calls.push({ at: this.workspace.clock.now(), kind: 'upload', method: fileId, args: { length: String(length) }, status, ok: status === 200 })
+    if (this.#failedUploads > 0 && this.#uploadsBeforeFailing > 0) this.#uploadsBeforeFailing -= 1
+    else if (this.#failedUploads > 0) {
+      this.#failedUploads -= 1
+      record(500, body.length)
+      response.writeHead(500, { 'content-type': 'text/plain' })
+      return void response.end('Internal Server Error')
     }
-    this.calls.push({ at: this.workspace.clock.now(), kind: 'upload', method: fileId, args: { length: String(bytes.length) }, status: ok ? 200 : 404, ok })
-    if (!ok) return json(response, 404, { ok: false, error: 'file_not_found' })
+    if (stored === undefined) {
+      record(404, body.length)
+      return json(response, 404, { ok: false, error: 'file_not_found' })
+    }
+    const type = request.headers['content-type'] ?? ''
+    const part = type.toLowerCase().startsWith('multipart/form-data') ? parseMultipartParts(type, body).find((p) => p.name === 'file') : undefined
+    const bytes = part === undefined ? body : part.data
+    stored.bytes = bytes
+    stored.mimetype = mimetypeOf(stored.name, bytes, part === undefined ? type : part.contentType)
+    record(200, bytes.length)
     response.writeHead(200, { 'content-type': 'text/plain' })
     response.end('OK - ' + bytes.length)
   }
 
-  async #file(fileId: string, response: ServerResponse): Promise<void> {
+  /** Serves a file's bytes; `?download=1` asks the browser to save it. Thumb urls get the original bytes. */
+  async #file(fileId: string, download: boolean, response: ServerResponse): Promise<void> {
     if (this.#fileDelayMs > 0) await new Promise((resolve) => setTimeout(resolve, this.#fileDelayMs))
     const stored = this.workspace.files.get(fileId)
     if (stored?.bytes === undefined) return json(response, 404, { ok: false, error: 'file_not_found' })
-    response.writeHead(200, { 'content-type': stored.mimetype, 'content-length': stored.bytes.length })
+    response.writeHead(200, {
+      'content-type': stored.mimetype,
+      'content-length': stored.bytes.length,
+      ...(download ? { 'content-disposition': `attachment; filename="${stored.name.replaceAll('"', '')}"` } : {}),
+    })
     response.end(stored.bytes)
   }
 
