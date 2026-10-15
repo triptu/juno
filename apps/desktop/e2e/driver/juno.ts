@@ -1302,25 +1302,39 @@ export class TopicPane {
     await expect.poll(() => this.distanceFromBottom(), { timeout: 5_000 }).toBeLessThanOrEqual(BOTTOM_SLACK)
   }
 
-  /** Scrolls the list up by `pixels` and waits for the scroll to settle. */
+  /**
+   * Scrolls the list up by `pixels` with the mouse wheel over it, as a user
+   * does, and waits for the scroll to settle. The wheel is what lets go of
+   * the list's hold on the bottom; a scroll set from a script does not, and a
+   * commit that adds rows before it settles puts the bottom back.
+   */
   async scrollUp(pixels: number): Promise<void> {
-    await this.scrollTo({ by: -pixels })
+    const box = await this.scroller.boundingBox()
+    if (box === null) throw new Error('No message list to scroll')
+    await this.win.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+    type Watched = HTMLElement & { scrollEnded?: Promise<void> }
+    // The listener is in place before the wheel turns: the wheel reaches the page by another path than evaluate.
+    await this.scroller.evaluate((scroller: Watched) => {
+      scroller.scrollEnded = new Promise((resolve) => scroller.addEventListener('scrollend', () => resolve(), { once: true }))
+    })
+    await this.win.mouse.wheel(0, -pixels)
+    await this.scroller.evaluate((scroller: Watched) => scroller.scrollEnded)
   }
 
   async scrollToBottom(): Promise<void> {
-    await this.scrollTo({ to: 'bottom' })
+    await this.scrollTo('bottom')
   }
 
   async scrollToTop(): Promise<void> {
-    await this.scrollTo({ to: 'top' })
+    await this.scrollTo('top')
   }
 
-  private async scrollTo(where: { readonly by: number } | { readonly to: 'top' | 'bottom' }): Promise<void> {
+  private async scrollTo(where: 'top' | 'bottom'): Promise<void> {
     await this.scroller.evaluate(
       (scroller, target) =>
         new Promise<void>((resolve) => {
           const max = scroller.scrollHeight - scroller.clientHeight
-          const to = 'by' in target ? scroller.scrollTop + target.by : target.to === 'top' ? 0 : max
+          const to = target === 'top' ? 0 : max
           if (Math.abs(Math.min(max, Math.max(0, to)) - scroller.scrollTop) < 1) return resolve()
           scroller.addEventListener('scrollend', () => resolve(), { once: true })
           scroller.scrollTop = to
