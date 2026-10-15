@@ -61,7 +61,7 @@ export interface MessageListProps {
   /** Right-click on a sender's avatar or name, or an @person chip: the person menu (inventory 15.6). */
   readonly onPersonMenu?: (person: { readonly id: string; readonly name: string }, event: MouseEvent) => void
   /** Right-click on a #channel chip: the channel menu (inventory 15.2). */
-  readonly onChannelMenu?: (channelId: string, event: MouseEvent) => void
+  readonly onChannelMenu?: (channel: { readonly id: string; readonly name: string }, event: MouseEvent) => void
 }
 
 const ROW = '[data-message-row]'
@@ -83,7 +83,7 @@ function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
 interface Menus {
   readonly onMessageMenu: ((ts: string, event: MouseEvent) => void) | undefined
   readonly onPersonMenu: ((person: { readonly id: string; readonly name: string }, event: MouseEvent) => void) | undefined
-  readonly onChannelMenu: ((channelId: string, event: MouseEvent) => void) | undefined
+  readonly onChannelMenu: ((channel: { readonly id: string; readonly name: string }, event: MouseEvent) => void) | undefined
 }
 
 /**
@@ -103,7 +103,7 @@ function messageMenu(event: MouseEvent, { onMessageMenu, onPersonMenu, onChannel
   const channel = onChannelMenu === undefined ? null : target.closest<HTMLElement>('[data-channel]')
   if (channel !== null && onChannelMenu !== undefined) {
     event.preventDefault()
-    onChannelMenu(channel.dataset.channel ?? '', event)
+    onChannelMenu({ id: channel.dataset.channel ?? '', name: channel.dataset.channelName ?? '' }, event)
     return
   }
   if (onMessageMenu === undefined) return

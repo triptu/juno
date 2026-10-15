@@ -187,6 +187,7 @@ function Inline({ inline, now, hueOf, onChannel, onLink, tabIndex }: InlineProps
           title={`Show only #${inline.name}`}
           tabIndex={tabIndex}
           data-channel={inline.id}
+          data-channel-name={inline.name}
           {...stylex.props(styles.channelButton)}
         >
           <Chip variant="filled" size="inline">

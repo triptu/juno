@@ -1,6 +1,8 @@
 import { chatCopy, type Banner, type JunoPage } from '@juno/agent-contract'
 import type { ReactNode } from 'react'
-import { Chip, OptionList, OptionRow, Popover } from '@juno/ui'
+import { ArrowsOutSimple } from '@phosphor-icons/react/dist/icons/ArrowsOutSimple'
+import { X } from '@phosphor-icons/react/dist/icons/X'
+import { Chip, IconButton, OptionList, OptionRow, Popover } from '@juno/ui'
 import { HeaderTitleButton } from '../header/HeaderControls'
 import { HeaderIslands } from '../header/HeaderIslands'
 import { JunoMark } from './JunoMark'
@@ -76,6 +78,16 @@ export function JunoHeader({ banner, menuOpen, onMenu, onOpenPage, onResume, col
         )
       }
     />
+  )
+}
+
+/** The panel's right island after the banner chip (inventory 12.1): Open in a tab, then Close. */
+export function JunoPanelActions({ onOpenInTab, onClose }: { readonly onOpenInTab: () => void; readonly onClose: () => void }) {
+  return (
+    <>
+      <IconButton icon={ArrowsOutSimple} label={chatCopy.panel.openInTab} size={28} iconSize={15} radius="full" tone="default" onClick={onOpenInTab} />
+      <IconButton icon={X} label={chatCopy.panel.close} size={28} iconSize={15} radius="full" tone="default" onClick={onClose} />
+    </>
   )
 }
 

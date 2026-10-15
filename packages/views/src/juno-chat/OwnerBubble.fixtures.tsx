@@ -2,7 +2,7 @@ import * as stylex from '@stylexjs/stylex'
 import { accent, colors, spacing } from '@juno/tokens/tokens.stylex'
 import { defineFixtures, fixture, scene, Text } from '@juno/ui'
 import { noopActions } from './commands'
-import { bubbleId, NOW, owner, quoteOf, reacted } from './fixtures/data'
+import { aboutChannel, aboutMain, aboutPerson, aboutTopic, bubbleId, NOW, owner, quoteOf, reacted } from './fixtures/data'
 import { OwnerBubble, type OwnerBubbleProps } from './OwnerBubble'
 
 const MINUTE = 60_000
@@ -80,6 +80,24 @@ export default defineFixtures(
     Reply: {
       'to-bubble': fixture<OwnerBubbleProps>({ item: owner('m-r1', 'which deploy?', 'single', { _tag: 'sent' }, at, { replyTo: quoteOf({ _tag: 'bubble', id: bubbleId('b1') }, 'The deploy is green on staging. Production goes at 4.') }), now: NOW, actions: noopActions }),
       removed: fixture<OwnerBubbleProps>({ item: owner('m-r2', 'and this one?', 'single', { _tag: 'sent' }, at, { replyTo: quoteOf({ _tag: 'bubble', id: bubbleId('b2') }, '', true) }), now: NOW, actions: noopActions }),
+    },
+    About: {
+      topic: fixture<OwnerBubbleProps>({ item: owner('m-a1', 'is this settled?', 'single', { _tag: 'sent' }, at, { about: aboutTopic }), now: NOW, actions: noopActions }),
+      main: fixture<OwnerBubbleProps>({ item: owner('m-a2', 'anything I should answer here?', 'single', { _tag: 'sent' }, at, { about: aboutMain }), now: NOW, actions: noopActions }),
+      person: fixture<OwnerBubbleProps>({ item: owner('m-a3', 'what is she working on this week?', 'single', { _tag: 'sent' }, at, { about: aboutPerson }), now: NOW, actions: noopActions }),
+      channel: fixture<OwnerBubbleProps>({ item: owner('m-a4', 'anything new?', 'single', { _tag: 'sent' }, at, { about: aboutChannel }), now: NOW, actions: noopActions }),
+      'long-title': fixture<OwnerBubbleProps>({
+        item: owner('m-a5', 'ok', 'single', { _tag: 'sent' }, at, { about: { _tag: 'topic', topicId: 't:x', title: 'The very long thread about the offsite room booking, the catering and who brings the projector' } }),
+        now: NOW,
+        actions: noopActions,
+      }),
+      // Only the group's first bubble carries the line.
+      group: scene<OwnerBubbleProps>(() => (
+        <>
+          <OwnerBubble item={owner('m-a6', 'is this settled?', 'first', { _tag: 'sent' }, at, { about: aboutTopic })} now={NOW} actions={noopActions} />
+          <OwnerBubble item={owner('m-a7', 'and who owns the cutover?', 'last', { _tag: 'sent' }, at, { about: aboutTopic })} now={NOW} actions={noopActions} />
+        </>
+      )),
     },
     Reactions: {
       'juno-reacted': fixture<OwnerBubbleProps>({ item: owner('m-x1', 'thanks!', 'single', { _tag: 'sent' }, at, { reactions: [reacted('juno', '👍')] }), now: NOW, actions: noopActions }),
