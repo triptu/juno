@@ -58,3 +58,12 @@ export function applyTheme(theme: ThemeName, accent: AccentName = defaultAccent,
   root.dataset['density'] = density
   requestAnimationFrame(() => requestAnimationFrame(() => root.removeAttribute('data-theme-switching')))
 }
+
+/**
+ * Privacy mode (SPEC section 5): `data-privacy` on <html> blurs every element
+ * marked `data-sensitive` (tokens/global.css). One attribute, so turning it
+ * on or off re-renders nothing.
+ */
+export function applyPrivacy(on: boolean): void {
+  document.documentElement.toggleAttribute('data-privacy', on)
+}

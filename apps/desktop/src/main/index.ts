@@ -12,7 +12,7 @@ import { registerAppScheme, serveAppScheme } from './scheme'
 import { SecretsStore } from './secrets'
 import { SessionHost } from './session'
 import { Notifier, type ShownNotification } from './notifier'
-import { appWindow, createMainWindow, setSidebarHidden } from './window'
+import { appWindow, createMainWindow, setMenuPrivacy, setSidebarHidden } from './window'
 
 // Every renderer runs in the Chromium sandbox. Must be called before ready.
 app.enableSandbox()
@@ -79,6 +79,7 @@ const notifier = new Notifier({
   },
   open: openTarget,
   send: (message) => supervisor.send(message),
+  privacy: () => launch.privacy === true,
 })
 supervisor.onReady(() => notifier.engineReady())
 
@@ -131,6 +132,10 @@ app.whenReady().then(() => {
     setTheme: (theme) => updateLaunch({ theme }),
     setAccent: (accent) => updateLaunch({ accent }),
     setDensity: (density) => updateLaunch({ density }),
+    setPrivacy: (privacy) => {
+      updateLaunch({ privacy })
+      setMenuPrivacy(privacy)
+    },
     setSidebar: (sidebar) => {
       updateLaunch({ sidebar })
       setSidebarHidden(sidebar.collapsed)
