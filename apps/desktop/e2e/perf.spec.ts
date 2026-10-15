@@ -15,6 +15,7 @@ import { expect, hooks, launchApp, tempUserData, test, writeSlackApp, type Runni
 import { stats } from './perfStats'
 import { traced } from './perfTrace'
 import { scrollReading } from './perfScroll'
+import { typingReading } from './perfTyping'
 import { answer } from './juno-agent/chat'
 import { Juno, press, type SidebarFilterName } from './driver/juno'
 
@@ -93,6 +94,41 @@ test('frame floor: input with no work to the next frame', async ({ juno, win }) 
     await win.waitForTimeout(37 + (i % 7) * 3)
   }
   stats('frame floor, pointerdown with no work to next frame presented', await win.evaluate(() => (window as unknown as { __floor: number[] }).__floor))
+})
+
+test('keystroke controls: composer, bare input and palette', async ({ juno, win }) => {
+  test.setTimeout(120_000)
+  await juno.signIn()
+  await juno.waitForSync()
+  await juno.sidebar.row(POSTGRES).open()
+  await juno.topic.expectTitle(POSTGRES)
+  const hidden = await countHidden(win)
+  const budget = oneFrameBudget(await refreshInterval(win))
+  for (const surface of ['composer', 'bare input', 'palette']) {
+    if (surface === 'bare input') await win.evaluate(() => {
+      const input = document.createElement('input')
+      input.id = 'perf-input'
+      input.style.cssText = 'position:fixed;top:100px;left:500px;z-index:9999;background:white;color:black'
+      document.body.append(input)
+    })
+    if (surface === 'palette') await juno.palette.open()
+    const input = surface === 'composer' ? juno.topic.composer : surface === 'palette' ? juno.palette.input : win.locator('#perf-input')
+    await input.fill('')
+    await input.focus()
+    const result = await typingReading(win, input, `typing-${surface.replace(' ', '-')}`, async () => {
+      for (let round = 0; round < 4; round++) {
+        await input.pressSequentially('deployment')
+        await win.waitForTimeout(150)
+      }
+    })
+    stats(`${surface}, Event Timing keydown/keypress >=16 ms (diagnostic)`, result.events)
+    const presented = stats(`${surface}, input timestamp to character presented`, result.presented)
+    expect(result.count).toBe(40)
+    await expect(input).toHaveValue('deployment'.repeat(4))
+    expect.soft(presented.p95, `${surface}: input to character presented`).toBeLessThanOrEqual(budget)
+    if (surface === 'bare input') await input.evaluate((node) => node.remove())
+  }
+  expect(await hidden()).toBe(0)
 })
 
 test('row hover to paint', async ({ juno, win }) => {
@@ -223,7 +259,7 @@ test('send: Enter to the pending row painted', async ({ juno }) => {
   await juno.topic.expectTitle(POSTGRES)
   const hidden = await countHidden(juno.win)
   const measured: number[] = []
-  for (let i = 0; i < 9; i++) {
+  for (let i = 0; i < 30; i++) {
     const text = `Perf send ${i} ${Date.now()}`
     const before = (await juno.measures('juno.send')).length
     await juno.topic.send(text)
@@ -471,14 +507,9 @@ test.describe('large workspace', () => {
       await juno.sidebar.expectRows()
       await juno.expectEngineLive(120_000)
       const interval = await refreshInterval(win)
-      // Event Timing: each keystroke from the key press to the frame that shows it, rounded to 8 ms by the browser.
-      await win.evaluate(() => {
-        const w = window as unknown as { __keys: number[] }
-        w.__keys = []
-        new PerformanceObserver((entries) => {
-          for (const entry of entries.getEntries()) if (entry.name === 'keydown' || entry.name === 'keypress') w.__keys.push(entry.duration)
-        }).observe({ type: 'event', durationThreshold: 16, buffered: false } as PerformanceObserverInit)
-      })
+      const hidden = await countHidden(win)
+      const keys: number[] = []
+      const eventKeys: number[] = []
       const words = ['deplo', 'rollou', 'staging bil', 'index missin']
       for (let round = 0; round < 12; round++) {
         const opened = (await juno.measures('juno.palette-open')).length
@@ -486,7 +517,10 @@ test.describe('large workspace', () => {
         await expect.poll(async () => (await juno.measures('juno.palette-open')).length).toBe(opened + 1)
         const typed = (await juno.measures('juno.palette-results')).length
         const text = words[round % words.length]!
-        await palette.type(text)
+        const reading = await typingReading(win, palette.input, `palette-keys-${round}`, () => palette.type(text))
+        keys.push(...reading.presented)
+        eventKeys.push(...reading.events)
+        expect(reading.count).toBe(text.length)
         await expect(palette.input).toHaveValue(text)
         // Each keystroke ends its measure once its rows are painted; deferred renders may fold a fast run of keys into one.
         await expect.poll(async () => (await juno.measures('juno.palette-results')).length, { timeout: 10_000 }).toBeGreaterThan(typed)
@@ -494,14 +528,15 @@ test.describe('large workspace', () => {
         await palette.press('Escape')
         await palette.expectClosed()
       }
+      expect(await hidden(), 'palette lost focus or visibility').toBe(0)
       const open = stats('palette open, ⌘K to recent rows painted (juno.palette-open)', (await juno.measures('juno.palette-open')).slice(2))
       const results = stats('palette keystroke to its rows painted (juno.palette-results)', (await juno.measures('juno.palette-results')).slice(5))
-      const keys = await win.evaluate(() => (window as unknown as { __keys: number[] }).__keys)
       const budget = oneFrameBudget(interval)
-      console.log(`keystrokes over 16 ms (Event Timing): ${keys.length}, ${keys.join(' ')}; frame budget ${budget.toFixed(1)} ms`)
+      stats('palette Event Timing keydown/keypress >=16 ms (diagnostic)', eventKeys)
+      const characters = stats('palette input timestamp to character presented', keys)
       within('palette open, p95', open.p95, 50)
       within('palette keystroke to rows, p95', results.p95, 100)
-      expect(keys.filter((duration) => duration > budget)).toEqual([])
+      within('palette input to character presented, p95', characters.p95, budget)
     } finally {
       await running.close()
     }

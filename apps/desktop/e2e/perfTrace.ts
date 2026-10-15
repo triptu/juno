@@ -19,6 +19,11 @@ const TRACE_DIR = process.env['JUNO_PERF_TRACE']
  * `<name>.trace.json` and `<name>.cpuprofile` for scripts/perf-trace.mjs.
  */
 export async function traced(win: Page, name: string, run: () => Promise<void>): Promise<FrameWork> {
+  return frameWork(await recordTrace(win, name, run))
+}
+
+/** Records frame and input timestamps on Chromium's shared trace clock. */
+export async function recordTrace(win: Page, name: string, run: () => Promise<void>): Promise<string> {
   const cdp = await win.context().newCDPSession(win)
   const categories =
     TRACE_DIR === undefined
@@ -67,7 +72,7 @@ export async function traced(win: Page, name: string, run: () => Promise<void>):
       await writeFile(join(TRACE_DIR, `${name}.cpuprofile`), JSON.stringify(profile))
     }
   }
-  return frameWork(trace)
+  return trace
 }
 
 interface TraceEvent {
