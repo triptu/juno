@@ -30,6 +30,13 @@ it('shows a source as its words, and keeps the handle the model wrote', () => {
   ])
 })
 
+it('never shows a handle: a malformed source keeps only its words', () => {
+  const texts = parseOutput(
+    "<say>A <src m='m3'>single-quoted</src> one, a <src m=\"m4\"/>closed one, a <src>bare</src> one and <src m=\"m5\" >a spaced</src> one.</say>",
+  ).bubbles.map((b) => b.text)
+  expect(texts).toEqual(['A single-quoted one, a closed one, a bare one and a spaced one.'])
+})
+
 it('never shows a stray tag inside a bubble', () => {
   expect(parseOutput('<say>One <src m="m1">open, <say>nested</say>').bubbles.map((b) => b.text)).toEqual(['One open, nested'])
   expect(parseOutput('<say>Done.</src> <react to="n1">👍</react></say>').bubbles.map((b) => b.text)).toEqual(['Done. '])
