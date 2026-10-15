@@ -4,7 +4,8 @@
  *
  * It reaches the host and checks the protocol, follows `host.presence`,
  * then, given `turns`, opens the turn engine on the agent directory with
- * the Slack reads bound to the host (`host/reads.ts`): the owner lock,
+ * the Slack reads and the card actions bound to the host (`host/reads.ts`,
+ * `actions/host.ts`): the owner lock,
  * recovery, the guarded provider, pi, the router, the jobs and the
  * compactor (`router/open.ts`). Given `renderer`, it serves the
  * renderer's RPCs (`AgentRpcs`) on the ports that transport gives
@@ -14,8 +15,9 @@
  * resources.
  */
 import { mkdirSync } from 'node:fs'
-import { Context, Effect, Exit, Layer, Schema, Scope } from 'effect'
+import { Context, Effect, Exit, Layer, Schema, Scope, Stream } from 'effect'
 import { AGENT_HOST_PROTOCOL, HostHello, type AgentConfig } from '@juno/agent-contract'
+import { bindActionHost } from './actions/host'
 import { AgentHost } from './host/client'
 import { bindHost, type BoundHost } from './host/reads'
 import type { HostConnection } from './host/port'
@@ -44,10 +46,13 @@ export interface AgentHandle {
 
 /**
  * What the engine needs beside the agent directory, which comes from
- * `config`, and the host reads, which come from the port. With a picker,
- * the renderer gets Settings › Juno; with a key, the page shows its state.
+ * `config`, and the host reads and sends, which come from the port. With a
+ * picker, the renderer gets Settings › Juno; with a key, the page shows its
+ * state.
  */
-export type AgentTurns = Omit<TurnsOptions, 'agentDir' | 'host'> & {
+export type AgentTurns = Omit<TurnsOptions, 'agentDir' | 'host' | 'actions'> & {
+  /** Executors other folders own. The host's sends come from the port. */
+  readonly actions?: Omit<NonNullable<TurnsOptions['actions']>, 'host'>
   readonly picker?: ModelPicker
   readonly key?: OpenRouterKey
 }
@@ -73,15 +78,30 @@ export function startAgent(config: AgentConfig, connection: HostConnection, opti
         const hello = yield* client['host.hello']({ protocol: AGENT_HOST_PROTOCOL })
         if (hello.protocol !== AGENT_HOST_PROTOCOL) return yield* new HostProtocolMismatch({ host: hello })
         const bound = yield* bindHost.pipe(Effect.provide(context), Scope.provide(scope))
+        const actionHost = yield* bindActionHost(bound.presence).pipe(Effect.provide(context))
         // A first start has no agent directory yet.
         if (turns !== undefined) mkdirSync(config.agentDir, { recursive: true })
         const engine =
           turns === undefined
             ? undefined
             : yield* Scope.provide(
-                open({ ...turns, agentDir: config.agentDir, host: bound.reads, migrations: [CHAT_MIGRATIONS, ...(turns.migrations ?? [])] }),
+                open({
+                  ...turns,
+                  agentDir: config.agentDir,
+                  host: bound.reads,
+                  actions: { ...turns.actions, host: actionHost },
+                  migrations: [CHAT_MIGRATIONS, ...(turns.migrations ?? [])],
+                }),
                 scope,
               )
+        if (engine?._tag === 'running') {
+          // A click waits while no Slack account is known; each presence lets it look again.
+          yield* bound.presenceChanges.pipe(
+            Stream.runForEach(() => Effect.sync(() => engine.actions.kick())),
+            Effect.forkScoped,
+            Scope.provide(scope),
+          )
+        }
         const picker = turns?.picker
         const settings =
           engine?._tag === 'running' && picker !== undefined

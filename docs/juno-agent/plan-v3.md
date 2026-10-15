@@ -266,7 +266,7 @@ unknown ─reconcile─▶ done (positive evidence) | unknown (kept; the card sh
 
 ### 6.5 Startup and Pause (R12)
 - At startup, every `attempt` without a receipt becomes `unknown` before `resume()`. A reconcile fiber works through them in the background. Unrelated chat runs at once. Resumed runs see unresolved outcomes in turn state.
-- Pause and AI off **stop new authorizations** and ask jobs to cancel. Authorizations already consumed may still land. States distinguish `cancel-requested`, `cancelled`, `unknown` and `done`, and earlier evidence is never overwritten. Pause does not end the current run: it finishes without acting. There is no Stop (O1).
+- Pause and AI off **stop new authorizations**, revoke every grant, and ask jobs to cancel. Resume restores no grant; a click that waited through Pause runs once after Resume if it is still current (WP15; spec `pauseRevokesGrants`, `resumedClickWitnessStep`). Authorizations already consumed may still land. States distinguish `cancel-requested`, `cancelled`, `unknown` and `done`, and earlier evidence is never overwritten. Pause does not end the current run: it finishes without acting. There is no Stop (O1).
 
 ## 7. Providers and the model picker
 
@@ -689,7 +689,7 @@ The owner adopted six ideas from `docs/research/agent-native-chat-products.md` (
 
 **Belongs to** WP15 (record) and WP11 (request). No view change.
 
-- **Record (WP15).** Dismiss, Skip, Keep on a `remove` card, and expiry write a card outcome to the archive: `{ cardId, kind, outcome: declined | expired, summary }`. It is Juno-internal state, so it does not taint a run.
+- **Record (WP15).** Dismiss, Skip, Keep on a `remove` card, and expiry write a card outcome: `{ cardId, kind, outcome: declined | expired, summary }`. A settled click writes `done` or `failed` the same way, so the model neither proposes a sent message again nor claims a failed one landed (WP15 added this). It is Juno-internal state, so it does not taint a run. As built, the outcome waits in `card_outcomes` and reaches the archive inside the next input pi reads.
 - **Request (WP11).** The next request carries it at its place in the chat, as `<card-outcome card="c7" outcome="declined">Send message to #eng</card-outcome>`. It starts no run; it waits for the next input. Compaction keeps it like a message, so a no is remembered.
 - **Eval (WP23).** After a dismissal, Juno does not propose the same card again unless the owner asks or its source changed.
 - **Specs.** None. To `agent-memory.qnt` the outcome is one more archive entry with an opaque payload.

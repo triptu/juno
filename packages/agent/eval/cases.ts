@@ -19,8 +19,8 @@ export interface Case {
 }
 
 let calls = 0
-const call = (name: string, args: Record<string, string>): ModelStep =>
-  reply([{ type: 'toolCall', id: `call-${++calls}`, name, arguments: args }])
+const call = (name: string, args: Record<string, unknown>): ModelStep =>
+  reply([{ type: 'toolCall', id: `call-${++calls}`, name, arguments: args as never }])
 const text = (s: string): ModelStep => reply(s)
 
 const proportionate = (reaction: string) =>
@@ -188,6 +188,7 @@ export const CASES: ReadonlyArray<Case> = [
     ],
     script: [
       call('slack_search', { query: 'in:#launch Thursday' }),
+      call('send_message', { messages: [{ topic: `m:${CHANNELS.launch.id}`, text: 'I can make Thursday.' }] }),
       text('<say>Here is a reply for #launch, ready for you to send: "I can make Thursday."</say>'),
     ],
   },
