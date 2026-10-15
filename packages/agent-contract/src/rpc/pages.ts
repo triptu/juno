@@ -16,7 +16,11 @@ export const scheduledEdit = Rpc.make('agent.scheduled.edit', { payload: { ...op
   what: Schema.String, schedule: ScheduleDefinition, deliver: C.Deliver }, success: Accepted, error: AgentCommandError })
 export const scheduledAction = Rpc.make('agent.scheduled.action', { payload: { ...operation, id: C.ScheduleId, revision: Revision,
   action: Schema.Literals(['pause', 'resume', 'delete']) }, success: Accepted, error: AgentCommandError })
-export const ScheduledRpcs = RpcGroup.make(scheduledPage, scheduledEdit, scheduledAction)
+export const scheduleWatchReply = Rpc.make('agent.schedule.watchReply', {
+  payload: { ...operation, channelId: Schema.String, ts: Schema.String, threadTs: Schema.optionalKey(Schema.String) },
+  success: Schema.Struct({ opId: C.OpId, id: C.ScheduleId, at: Schema.Number }), error: AgentCommandError,
+})
+export const ScheduledRpcs = RpcGroup.make(scheduledPage, scheduledEdit, scheduledAction, scheduleWatchReply)
 
 export const remembersPage = Rpc.make('agent.remembers.page', { success: Schema.Struct({ page: C.RemembersPage, revisions: Schema.Array(Schema.Struct({ id: C.PinId, revision: Revision })) }), stream: true })
 export const remembersEdit = Rpc.make('agent.remembers.edit', { payload: { ...operation, id: C.PinId, revision: Revision,
