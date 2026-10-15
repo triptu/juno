@@ -408,6 +408,8 @@ Sidebar row heights per density (Preferences › Appearance; rows include the ti
 | Comfortable (default) | 90 / 109 | 11px | 3px | 14.5px |
 | Compact | 80 / 99 | 8px | 1px | 13.5px |
 
+[built M10] The `density` group in `tokens.stylex.ts` holds what changes, and `compact` in `themes.stylex.ts` overrides it on `<html>`: `--density-row-padding-block` 11px / 8px, `--density-row-line-gap` (line three's margin) 2px / 0px, `--density-row-tile-zoom` 1 / 0.8182 (the 44px tile drawn at 36px), `--density-row-estimate` (the off-screen estimate) `--row-topic-estimate` / 83px, `--density-message-padding-block` 4px / 2px, `--density-message-group-gap` 12px / 6px. The title size does not change yet.
+
 Gap between rows: 2px. All topics table row: min 52px. Notification rule row: min 48px. Today log row: min 44px. Palette result: 55px. Menu item: 30px (context) / 32px (other menus). Message group spacing (margin above a new sender): Compact 6px, Comfortable 12px. Message padding: 2 8 / 4 8.
 
 ### Composer

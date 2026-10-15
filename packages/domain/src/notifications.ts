@@ -143,15 +143,45 @@ export function nextSwitch(at: LocalTime, hours: Hours): Switch | undefined {
 
 const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const
 
+function until(at: LocalTime, inMinutes: number, then: LocalTime): string {
+  const time = hourLabel(then.minutes)
+  const daysAhead = Math.floor((at.minutes + inMinutes) / DAY)
+  if (daysAhead === 0) return `until ${time}`
+  if (daysAhead === 1) return `until tomorrow ${time}`
+  return `until ${dayNames[then.weekday]} ${time}`
+}
+
 /** "until 9am", "until tomorrow 9am", "until Mon 9am": for "Away until 9am" and "Paused until 9am". */
 export function untilLabel(at: LocalTime, hours: Hours): string | undefined {
   const next = nextSwitch(at, hours)
-  if (!next) return undefined
-  const time = hourLabel(next.at.minutes)
-  const daysAhead = Math.floor((at.minutes + next.inMinutes) / DAY)
-  if (daysAhead === 0) return `until ${time}`
-  if (daysAhead === 1) return `until tomorrow ${time}`
-  return `until ${dayNames[next.at.weekday]} ${time}`
+  return next === undefined ? undefined : until(at, next.inMinutes, next.at)
+}
+
+/** The next time `hours` start (`starts`) or end after `at`, within a week. */
+function nextBoundary(at: LocalTime, hours: Hours, starts: boolean): Switch | undefined {
+  const first = nextSwitch(at, hours)
+  if (first === undefined || first.starts === starts) return first
+  const second = nextSwitch(first.at, hours)
+  return second === undefined ? undefined : { ...second, inMinutes: first.inMinutes + second.inMinutes }
+}
+
+/**
+ * The avatar menu's status line (inventory 2.1): "Active", "Away until
+ * 9am", or "Active until 8pm" when a change by hand runs past the end of
+ * the active hours. `presence` is what Slack shows now.
+ */
+export function presenceLabel(at: LocalTime, presence: Presence, presenceHours: Hours): string {
+  if (presence === 'active' && scheduledPresence(at, presenceHours) === 'active') return 'Active'
+  const next = nextBoundary(at, presenceHours, presence === 'away')
+  const name = presence === 'active' ? 'Active' : 'Away'
+  return next === undefined ? name : `${name} ${until(at, next.inMinutes, next.at)}`
+}
+
+/** The avatar menu's hint on Notifications: "Paused until 9am" outside notification hours, nothing inside. */
+export function pausedLabel(at: LocalTime, notificationHours: Hours): string | undefined {
+  if (inHours(at, notificationHours)) return undefined
+  const next = nextBoundary(at, notificationHours, true)
+  return next === undefined ? 'Paused' : `Paused ${until(at, next.inMinutes, next.at)}`
 }
 
 export type Presence = 'active' | 'away'
@@ -166,6 +196,26 @@ export function slackPresence(presence: Presence): 'auto' | 'away' {
   return presence === 'active' ? 'auto' : 'away'
 }
 
+/** What a Notify me choice applies to: a thread topic id, a channel or DM id, or a user id. */
+export interface NotifyTarget {
+  readonly kind: 'thread' | 'channel' | 'person'
+  readonly id: string
+}
+
+/**
+ * What decided a message, for the why popover (inventory 15.4): a Notify
+ * me level offers Change on that thread, channel or person; the hours offer
+ * Change on the Notifications page; Juno's call offers Tell Juno.
+ */
+export type DecisionCause =
+  | { readonly kind: 'level'; readonly target: NotifyTarget }
+  | { readonly kind: 'hours' }
+  | { readonly kind: 'juno' }
+  | { readonly kind: 'ignored' }
+  | { readonly kind: 'aiOff' }
+
+export type CausedDecision = { readonly decision: NotificationDecision; readonly cause: DecisionCause } | { readonly needsJudgement: true }
+
 /**
  * Decides what happens to one incoming message. When the answer depends on
  * Juno's judgement and none was given, it returns `{ needsJudgement: true }`;
@@ -177,24 +227,42 @@ export function decideNotification(
   context: DecisionContext,
   judgement?: Judgement,
 ): DecisionResult {
+  const result = decideWithCause(candidate, settings, context, judgement)
+  return 'needsJudgement' in result ? result : result.decision
+}
+
+function level(kind: NotifyTarget['kind'], id: string, outcome: NotificationOutcome, reason: string): CausedDecision {
+  return { decision: { outcome, reason }, cause: { kind: 'level', target: { kind, id } } }
+}
+
+/** `decideNotification`, with what decided it. */
+export function decideWithCause(
+  candidate: NotificationCandidate,
+  settings: NotificationSettings,
+  context: DecisionContext,
+  judgement?: Judgement,
+): CausedDecision {
   const { channel, senderId } = candidate
   const where = channelLabel(channel)
-  if (channel.ignored) return { outcome: 'hold', reason: `${where} is ignored` }
+  if (channel.ignored) return { decision: { outcome: 'hold', reason: `${where} is ignored` }, cause: { kind: 'ignored' } }
 
-  const threadLevel = candidate.topicId?.startsWith('t:') ? settings.threads?.[candidate.topicId] : undefined
+  const thread = candidate.topicId?.startsWith('t:') ? candidate.topicId : undefined
+  const threadLevel = thread === undefined ? undefined : settings.threads?.[thread]
   const channelLevel = settings.channels[channel.id]
   const personLevel = settings.people[senderId]
   const person = context.userName?.(senderId) ?? senderId
-  if (threadLevel === 'every') return { outcome: 'now', reason: 'This thread is set to Every message' }
-  if (channelLevel === 'every') return { outcome: 'now', reason: `${where} is set to Every message` }
-  if (personLevel === 'every') return { outcome: 'now', reason: `${person} is set to Every message` }
-  if (threadLevel === 'never') return { outcome: 'hold', reason: 'This thread is set to Never' }
-  if (channelLevel === 'never') return { outcome: 'hold', reason: `${where} is set to Never` }
-  if (personLevel === 'never') return { outcome: 'hold', reason: `${person} is set to Never` }
+  if (thread !== undefined && threadLevel === 'every') return level('thread', thread, 'now', 'This thread is set to Every message')
+  if (channelLevel === 'every') return level('channel', channel.id, 'now', `${where} is set to Every message`)
+  if (personLevel === 'every') return level('person', senderId, 'now', `${person} is set to Every message`)
+  if (thread !== undefined && threadLevel === 'never') return level('thread', thread, 'hold', 'This thread is set to Never')
+  if (channelLevel === 'never') return level('channel', channel.id, 'hold', `${where} is set to Never`)
+  if (personLevel === 'never') return level('person', senderId, 'hold', `${person} is set to Never`)
 
   const inside = inHours(candidate.at, settings.notificationHours)
-  const later = (decision: NotificationDecision): NotificationDecision =>
-    inside || decision.outcome !== 'now' ? decision : { outcome: 'summary', reason: `Outside your notification hours. ${decision.reason}` }
+  const later = (decision: NotificationDecision, cause: DecisionCause): CausedDecision =>
+    inside || decision.outcome !== 'now'
+      ? { decision, cause }
+      : { decision: { outcome: 'summary', reason: `Outside your notification hours. ${decision.reason}` }, cause: { kind: 'hours' } }
 
   if (!context.aiAssist) {
     const direct = isDm(channel.kind) || candidate.mentionsMe
@@ -202,11 +270,12 @@ export function decideNotification(
       direct
         ? { outcome: 'now', reason: 'AI assist is off, and DMs and mentions notify you' }
         : { outcome: 'hold', reason: 'AI assist is off, so only DMs and mentions notify you' },
+      { kind: 'aiOff' },
     )
   }
 
   if (!judgement) return { needsJudgement: true }
-  return later({ outcome: judgement.notify ? 'now' : 'hold', reason: `Juno: ${judgement.reason}` })
+  return later({ outcome: judgement.notify ? 'now' : 'hold', reason: `Juno: ${judgement.reason}` }, { kind: 'juno' })
 }
 
 /** The one notification when notification hours start, or nothing when no message was kept for it. */

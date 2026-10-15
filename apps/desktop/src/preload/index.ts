@@ -31,6 +31,7 @@ const bridge: JunoBridge = {
   launch: {
     setTheme: (theme) => ipcRenderer.invoke(Channels.launchSetTheme, { theme }),
     setAccent: (accent) => ipcRenderer.invoke(Channels.launchSetAccent, { accent }),
+    setDensity: (density) => ipcRenderer.invoke(Channels.launchSetDensity, { density }),
     setSidebar: ({ width, collapsed }) => ipcRenderer.invoke(Channels.launchSetSidebar, { width, collapsed }),
   },
   contextMenu: {
@@ -54,6 +55,16 @@ const bridge: JunoBridge = {
       ipcRenderer.on(Events.menuCommand, forward)
       return () => {
         ipcRenderer.off(Events.menuCommand, forward)
+      }
+    },
+  },
+  notifications: {
+    setViewing: (topicId) => ipcRenderer.invoke(Channels.notificationsViewing, { topicId }),
+    onOpen: (listener) => {
+      const forward = (_event: unknown, target: unknown) => listener(target)
+      ipcRenderer.on(Events.notificationOpen, forward)
+      return () => {
+        ipcRenderer.off(Events.notificationOpen, forward)
       }
     },
   },

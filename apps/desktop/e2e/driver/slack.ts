@@ -46,6 +46,11 @@ export class Slack {
     this.fake.resetCalls()
   }
 
+  /** Juno set your presence in Slack: `auto` for active, `away`. */
+  async expectPresenceSet(presence: 'auto' | 'away'): Promise<void> {
+    await expect.poll(() => this.fake.calls.some((call) => call.method === 'presence.set' && call.args['presence'] === presence), { timeout: 10_000 }).toBe(true)
+  }
+
   /** Juno sent no read mark to Slack since the last `resetCalls`. */
   async expectNoMarks(): Promise<void> {
     // Marks leave the engine in the background; give one a moment to show up.
@@ -70,6 +75,14 @@ export class Person {
   replyIn(rootText: string, text: string): void {
     const root = this.slack.root(rootText)
     this.slack.fake.injectMessage({ channel: root.channel, threadTs: root.ts, user: this.id, text })
+  }
+
+  /** Sends you a DM. Returns the message ts. */
+  dm(text: string): string {
+    for (const [id, conversation] of this.slack.fake.workspace.conversations) {
+      if (conversation.kind === 'im' && conversation.members.has(this.id)) return this.slack.fake.injectMessage({ channel: id, user: this.id, text }).ts
+    }
+    throw new Error(`No DM with ${this.id}`)
   }
 
   /** Posts in a channel's Main. Returns the message ts. */

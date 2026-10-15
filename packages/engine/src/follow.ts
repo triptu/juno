@@ -1,5 +1,6 @@
 /**
- * `topics.subscribe` and `topics.unsubscribe`: follow and unfollow a thread
+ * `topics.subscribe` and `topics.unsubscribe`, and Notify me on a thread
+ * (`notifications.setLevel`): follow and unfollow a thread
  * (spec section 5 "Notify me on a thread"; architecture 4.4 and 5.7; ADR
  * 0010). Main has no follow; a Main id is `NotFound`.
  *
@@ -49,8 +50,8 @@ import {
   threadSub,
   type ThreadSubRow,
 } from '@juno/sync'
-import { Outbox } from '../outbox'
-import { Workspace, type StoreServices } from '../workspace'
+import { Outbox } from './outbox'
+import { Workspace, type StoreServices } from './workspace'
 
 type Services = Workspace | Outbox
 

@@ -20,7 +20,7 @@ import { HttpTransport } from '@juno/slack'
 import { EngineConfig, SyncControl, type SyncControlOptions } from './config'
 import { agentHostServer } from './protocol/agentHost'
 import { HostLink, silentHost, type Host } from './protocol/host'
-import { NotificationControl, NotificationHost } from './notificationRuntime'
+import { hostNotificationHost, NotificationControl, NotificationHost } from './notificationRuntime'
 import type { Presence } from '@juno/domain'
 import { Outbox } from './outbox'
 import { AgentHost, Handlers, Services } from './layer'
@@ -59,15 +59,18 @@ export function startEngine(transport: Transport, config: Config, options: Engin
         options.agentTransport === undefined
           ? protocolServer(transport)
           : Layer.merge(protocolServer(transport), agentHostServer(options.agentTransport, { writes: options.agentWrites ?? 'disabled' }).pipe(Layer.provide(AgentHost)))
+      const hostLink = HostLink.layer(options.host ?? silentHost())
+      // Without a notifier of its own (tests pass one), notifications go to main over the host link.
+      const notificationHost = options.notifications === undefined ? hostNotificationHost.pipe(Layer.provide(hostLink)) : Layer.succeed(NotificationHost, options.notifications)
       const app = servers.pipe(
         Layer.provide(Handlers),
         Layer.provideMerge(Services),
         Layer.provide(
           Layer.mergeAll(
             EngineConfig.layer(config),
-            Layer.succeed(NotificationHost, options.notifications ?? NotificationHost.defaultValue()),
+            notificationHost,
             Layer.succeed(SyncControl, options.sync ?? {}),
-            HostLink.layer(options.host ?? silentHost()),
+            hostLink,
             options.httpTransport ?? HttpTransport.nodeFetch(),
           ),
         ),

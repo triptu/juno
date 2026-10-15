@@ -539,7 +539,17 @@ function Topic({ id, detail, readOnly = false, underHeader = true }: TopicProps)
       onOpenThread={readOnly ? openThreadInNewTab : openThread}
       onChannel={scopeToChannel}
       onLink={openExternal}
-      {...(readOnly ? {} : { onRetry: retry, onDiscard: discard, onMessageMenu: (ts: string) => void showMessageMenu(detail, ts) })}
+      {...(readOnly
+        ? {}
+        : {
+            onRetry: retry,
+            onDiscard: discard,
+            onMessageMenu: (ts: string, event: { readonly clientX: number; readonly clientY: number }, onSender: boolean) => {
+              const senderId = list.rows.get(ts)?.senderId
+              const sender = senderId === undefined ? undefined : { id: senderId, name: people.get(senderId)?.name ?? senderId }
+              void showMessageMenu(detail, ts, { x: event.clientX, y: event.clientY }, sender, onSender)
+            },
+          })}
     />
   )
   if (readOnly) return messages

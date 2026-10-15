@@ -1,8 +1,8 @@
 import { memo, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { isPeekKey, messageListAtom, peekKeyAtom, registry, setPeekKey, topicAtom, type PeekKey } from '@juno/state'
+import { isPeekKey, messageListAtom, peekKeyAtom, registry, topicAtom } from '@juno/state'
 import { afterPaint, measure } from '@juno/state/perf'
 import { useAtomValue } from '@juno/state/react'
-import { PeekKeySetting, PeekView, TopicArt } from '@juno/views'
+import { PeekView, TopicArt } from '@juno/views'
 import { hasArt, TopicPreview } from './TopicView'
 
 const ROW = '[data-topic-row]'
@@ -197,12 +197,3 @@ function PeekTopic({ id, at }: { readonly id: string; readonly at: number }) {
   )
 }
 
-/** The peek key preference, in the account menu until Preferences exists. */
-export function PeekKeyPreference() {
-  const peekKey = useAtomValue(peekKeyAtom)
-  return <PeekKeySetting value={peekKey} onChange={changePeekKey} />
-}
-
-function changePeekKey(key: PeekKey): void {
-  setPeekKey(registry, key)
-}
