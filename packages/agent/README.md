@@ -89,7 +89,7 @@ Pass `migrations: [SPEND_MIGRATIONS]` to `openCore` or `DurableCore.layer`, alon
 
 Integration limits found during WP9:
 
-- WP8 requires models before opening the core, but the guard needs the core's store. The application must provide a deferred model facade, attach the guard after `openCore`, then start requests. WP11 must address startup ordering before resuming queued journal work; WP9 does not change WP8's automatic resume loop.
+- The default `openCore` serial loop requires models at open. `openTurns` uses the core's router hook to build the guard on the recovered store before starting pi; it needs no deferred model facade.
 - The hard cap holds while reported usage stays within the reserved upper bound and quoted prices. A provider that reports more is recorded as it reports: the ledger never records less than was charged, so one request can take the day over its cap. Once the day (or compaction's share) is at or over its limit, every new reservation is refused, whatever its amount, until midnight or a raise (decision log, 10-14 09:49; spec `overReportStep`). The 1.25 multiplier then applies to the provider's later requests; it does not undo the charge.
 - The actions spec conservatively keeps the original compaction allocation even after known settlement. The ledger releases the unused part of a known reservation, as §5.4 specifies, while enforcing the same 25% invariant. The spec has no daily reset or raise action; the implementation tests those as well. The spec also settles every reservation either as known or as lost; releasing a reservation the provider refused (key, rate limit) is a known settlement of zero. No specs were changed in WP9.
 
@@ -97,7 +97,7 @@ Integration limits found during WP9:
 
 `openTurns({ agentDir, provider, model, compaction?, subagent?, host? })` opens the engine: the durable core's open sequence with the router in place of WP8's serial loop. `provider(store)` builds the guarded provider (`createOpenRouter`, or `createProviderGuard` in tests) on the opened store.
 
-**Startup order.** Lock, `agent.sqlite` and migrations (spend, turns, jobs and the caller's), recovery (open authorizations become `unknown`), then `provider(store)`, then pi on the journal with only the guard's models, then the router restores the live run, and only then does pi resume. So pi never reaches a model before the guard exists, and a resumed request is built and stamped like any other; no deferred model facade is needed. `router/open.ts` copies `openCore`'s open sequence because the router needs the journal and its hooks for steering and the core does not expose them. Letting `openCore` take a router would remove the copy.
+**Startup order.** Lock, `agent.sqlite` and migrations (spend, turns, jobs and the caller's), recovery (open authorizations become `unknown`), then `provider(store)`, then pi on the journal with only the guard's models, then the router restores the live run, and only then does pi resume. So pi never reaches a model before the guard exists, and a resumed request is built and stamped like any other; no deferred model facade is needed. `openCore` owns that open sequence. Its router hook receives the recovered journal file and the database release callback; `router/open.ts` builds the turn services and attaches the journal before resuming it. Restore and backup hooks run under the owner lock, before recovery.
 
 | Folder | Does |
 | --- | --- |
