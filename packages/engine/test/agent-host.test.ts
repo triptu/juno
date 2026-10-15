@@ -10,7 +10,7 @@ import { MessageChannel, type MessagePort } from 'node:worker_threads'
 import { afterEach, describe, expect, it } from 'vitest'
 import { Effect, Exit, Layer, Schema, Scope, Stream } from 'effect'
 import { RpcClient, type RpcClientError, type RpcGroup } from 'effect/rpc'
-import { AgentHostRpcs, HostDispatch, type HostPresence } from '@juno/agent-contract'
+import { AgentHostRpcs, HostDispatch, HostPresence } from '@juno/agent-contract'
 import { hostProtocol, startAgent, type HostConnection, type HostPort } from '@juno/agent'
 import { forgedSendReceipt, hostileMessages, HOSTILE_USER } from '@juno/agent-testing'
 import { prefsSet } from '@juno/contract'
@@ -127,6 +127,33 @@ function send(account: string, text: string, ids: { readonly n?: number } = {}) 
 const posted = (engine: RunningEngine, clientMsgId: string) => engine.fake.messages(CHANNEL).filter((m) => m.client_msg_id === clientMsgId)
 
 describe('the AgentHost port', () => {
+  it('lists, creates, updates, deletes and undoes local views while Slack writes are disabled', async () => {
+    const { engine, agent: { client }, account } = await hostWithAgent('disabled')
+    const directory = await ok(client['host.slack.channels']({ accountId: account, pattern: '*E*', limit: 1 }))
+    expect(directory.channels).toHaveLength(1)
+    const remaining = directory.next === undefined ? [] : (await ok(client['host.slack.channels']({ accountId: account, pattern: '*e*', cursor: directory.next, limit: 200 }))).channels
+    expect([...directory.channels, ...remaining].some((channel) => channel.id === CHANNEL)).toBe(true)
+    expect(await ok(client['host.slack.channels']({ accountId: account, pattern: 'no-such-channel-*', limit: 200 }))).toEqual({ channels: [] })
+    const slackCalls = engine.fake.calls.length
+    const view = { name: 'Bots', icon: 'robot', channels: [CHANNEL], keepOutOfAll: true }
+    const created = await ok(client['host.views.create']({ accountId: account, view }))
+    expect(await ok(client['host.views.list']({ accountId: account }))).toEqual([{ ...view, id: created.id, position: 0 }])
+    const updated = await ok(client['host.views.update']({ accountId: account, id: created.id, view: { ...view, name: 'Alerts', channels: [] } }))
+    expect(await failure(client['host.views.undo']({ accountId: account, undo: created.undo }))).toMatchObject({ reason: 'stale' })
+    await ok(client['host.views.undo']({ accountId: account, undo: updated.undo }))
+    const deleted = await ok(client['host.views.delete']({ accountId: account, id: created.id }))
+    expect(await ok(client['host.views.list']({ accountId: account }))).toEqual([])
+    await ok(client['host.views.undo']({ accountId: account, undo: deleted.undo }))
+    expect(await ok(client['host.views.list']({ accountId: account }))).toEqual([{ ...view, id: created.id, position: 0 }])
+    await ok(client['host.views.undo']({ accountId: account, undo: created.undo }))
+    await ok(client['host.views.undo']({ accountId: account, undo: created.undo }))
+    expect(await ok(client['host.views.list']({ accountId: account }))).toEqual([])
+    expect(await failure(client['host.views.update']({ accountId: account, id: 'missing', view }))).toMatchObject({ reason: 'notFound' })
+    expect(await failure(client['host.views.create']({ accountId: account, view: { ...view, icon: 'invalid' } }))).toMatchObject({ reason: 'rejected' })
+    expect(await failure(client['host.views.create']({ accountId: Schema.decodeUnknownSync(HostPresence.fields.accountId)('other')!, view }))).toMatchObject({ reason: 'stale' })
+    expect(engine.fake.calls).toHaveLength(slackCalls)
+  })
+
   it('serves Slack and topic reads from the store, hostile text as it is', async () => {
     const { engine, agent, account } = await hostWithAgent('disabled')
     for (const { message } of hostileMessages.filter((f) => f.message.threadTs === undefined && f.name !== 'loneSurrogate')) {

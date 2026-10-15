@@ -2,6 +2,7 @@ export { command, liveQuery, prefetch, rowAtom, runCommand, type CommandAtom, ty
 export { configureConnection, connectionStateAtom, makeRegistry, registry, restartEngine, type ConnectionState, type Registry } from './client'
 export { engineStatusAtom, pingCommand } from './engine'
 export { importFromSlackAppCommand, sessionStatusAtom, signedInAtom, signInCommand, signOutCommand, type ReadySession } from './session'
+export { viewPillsAtom, viewSheetAtom, viewsAtom, type ViewPill, type ViewSheetState } from './views'
 export { defaultTopicListFilter, joinTopicWindow, topicCountsAtom, topicListAtom, type TopicListFilter } from './topics'
 export {
   allTopicsFilterAtom,
@@ -132,24 +133,23 @@ export {
   copyText,
   densityAtom,
   editUndo,
-  junoAgentOnAtom,
   onMenuCommand,
   onNotificationOpen,
   openExternal,
   openInSlack,
   persistAccent,
   persistDensity,
+  persistPrivacy,
   persistSidebar,
   persistTheme,
   popupContextMenu,
+  privacyAtom,
   resolvedThemeAtom,
-  setOpenRouterKey,
   setViewing,
   sidebarLayoutAtom,
   themeAtom,
   type Accent,
   type Density,
-  type OpenRouterKeyResult,
   type ResolvedTheme,
   type Theme,
 } from './shell'
@@ -164,6 +164,7 @@ export {
   focusJunoComposer,
   JUNO_PANEL_PREF,
   junoAboutAtom,
+  junoAvailableAtom,
   junoFocusAtom,
   junoPanelOpenAtom,
   messageFlashAtom,

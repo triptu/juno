@@ -5,9 +5,9 @@
  * it, and a sandboxed preload should stay tiny. Schemas live in shell.ts; the
  * types below are imported from them, which is erased at compile time.
  */
-import type { Accent, Density, SidebarLayout, SlackTarget, Theme } from './shell'
+import type { Accent, Density, ProviderChange, SidebarLayout, SlackTarget, Theme } from './shell'
 
-export type { Accent, AppInfo, Density, Platform, SidebarLayout, SlackTarget, Theme } from './shell'
+export type { Accent, AppInfo, Density, Platform, ProviderChange, ProviderKind, ProviderResult, ProviderState, SidebarLayout, SlackTarget, Theme } from './shell'
 
 export const Channels = {
   appGetInfo: 'app.getInfo',
@@ -19,12 +19,18 @@ export const Channels = {
   agentRequestPort: 'agent.requestPort',
   /** Stores the OpenRouter key in the keychain and hands it to the agent; null removes it. */
   agentSetOpenRouterKey: 'agent.setOpenRouterKey',
+  /** The agent's provider state: which is active, and what is set up. */
+  agentProvider: 'agent.provider',
+  /** Sets up, removes or switches the agent's provider; keys go to the keychain. */
+  agentSetProvider: 'agent.setProvider',
   /** Remember the theme so the next launch paints the window in it. */
   launchSetTheme: 'launch.setTheme',
   /** Remember the accent so the next launch's first render already uses it. */
   launchSetAccent: 'launch.setAccent',
   /** Remember the density so the next launch's first render already uses it. */
   launchSetDensity: 'launch.setDensity',
+  /** Remember privacy mode, so the next launch's first render already hides message text. */
+  launchSetPrivacy: 'launch.setPrivacy',
   /** Remember the sidebar's width and hidden state so the next launch's first render has them. */
   launchSetSidebar: 'launch.setSidebar',
   /** Shows a native context menu at the pointer and answers with the chosen item's id, or null. */
@@ -53,12 +59,14 @@ export const Events = {
   menuCommand: 'menu.command',
   /** A notification was clicked, with its `NotificationTarget`. */
   notificationOpen: 'notification.open',
+  /** The agent's provider state changed, with the new `ProviderState`. */
+  agentProviderChanged: 'agent.providerChanged',
 } as const
 
 /**
  * The app-menu items main hands to the renderer (architecture, shortcuts):
  * the tab keys, Back and Forward (also the three-finger swipe), Hide
- * Sidebar, ⌘J for Juno, Edit › Undo, which undoes typing in a text field or else
+ * Sidebar, Hide Message Text (⌃⌘H), ⌘J for Juno, Edit › Undo, which undoes typing in a text field or else
  * Juno's last action, and Settings (⌘,), which opens Preferences.
  */
 export type MenuCommand =
@@ -71,6 +79,7 @@ export type MenuCommand =
   | 'history.back'
   | 'history.forward'
   | 'sidebar.toggle'
+  | 'privacy.toggle'
   | 'juno.toggle'
   | 'edit.undo'
   | 'preferences.open'
@@ -141,11 +150,22 @@ export interface JunoBridge {
      * refused). Settings › Juno shows the result through its own stream.
      */
     readonly setOpenRouterKey: (key: string | null) => Promise<unknown>
+    /**
+     * The provider state (`ProviderState`): which provider is active, and
+     * whether each is set up. With `active: null` the agent does not run and
+     * the Juno tab and panel show "Add a provider".
+     */
+    readonly provider: () => Promise<unknown>
+    /** Applies a `ProviderChange`; resolves with a `ProviderResult`. The agent starts or stops to match. */
+    readonly setProvider: (change: ProviderChange) => Promise<unknown>
+    /** Calls `listener` with each new `ProviderState`, undecoded. Returns the unsubscribe. */
+    readonly onProvider: (listener: (state: unknown) => void) => () => void
   }
   readonly launch: {
     readonly setTheme: (theme: Theme) => Promise<unknown>
     readonly setAccent: (accent: Accent) => Promise<unknown>
     readonly setDensity: (density: Density) => Promise<unknown>
+    readonly setPrivacy: (privacy: boolean) => Promise<unknown>
     readonly setSidebar: (sidebar: SidebarLayout) => Promise<unknown>
   }
   readonly contextMenu: {

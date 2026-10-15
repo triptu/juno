@@ -6,7 +6,7 @@
  */
 
 export interface CrashPointSpec {
-  readonly spec: 'agent-recovery.qnt' | 'agent-actions.qnt'
+  readonly spec: 'agent-recovery.qnt' | 'agent-actions.qnt' | 'agent-memory.qnt'
   /** The transition that has just committed. */
   readonly after: string
   /** The transition that has not run. */
@@ -50,6 +50,18 @@ export const CRASH_POINTS = {
     spec: 'agent-recovery.qnt', after: 'rotate', before: 'resume', scenarios: ['rotationIdentity'],
     expect: '§3 rotation: the new incarnation is committed and never reused; the old journal file may still exist and is deleted, not reopened.',
   },
+  'redaction.deletionRaised': {
+    spec: 'agent-recovery.qnt', after: 'raiseDeletion', before: 'redact', scenarios: ['deletionAheadStep', 'deletionOrder'],
+    expect: '§14.4 (G13): the deletion record is ahead of the data and nothing is removed; the owner sees no "Removed" and can remove again, which commits once.',
+  },
+  'redaction.committed': {
+    spec: 'agent-memory.qnt', after: 'redact', before: 'purge', scenarios: ['queueCurrent', 'localTaint'],
+    expect: '§4.5: the tombstones, the masked view, the new gen and the revoked grants are durable; startup finishes the purge.',
+  },
+  'redaction.purged': {
+    spec: 'agent-memory.qnt', after: 'purge', before: 'purge', scenarios: ['queueCurrent'],
+    expect: '§4.5 step 3: the steps before this one are done; startup runs the rest, and running a done step again changes nothing.',
+  },
   'backup.segmentWritten': {
     spec: 'agent-recovery.qnt', after: 'encrypt', before: 'manifest', scenarios: ['nonceAfterCrash', 'manifestBeforeSegment'],
     expect: '§14.4: the segment exists but no manifest names it; the next run uses a fresh nonce and the export cursor has not moved.',
@@ -57,6 +69,18 @@ export const CRASH_POINTS = {
   'backup.manifestRenamed': {
     spec: 'agent-recovery.qnt', after: 'manifest', before: 'export', scenarios: ['exportCrash'],
     expect: '§14.4: the manifest is renamed but the export cursor is behind it; the next run re-exports, and the cursor never passes the manifest.',
+  },
+  'ownership.released': {
+    spec: 'agent-recovery.qnt', after: 'releaseOwner', before: 'checkpoint', scenarios: ['releaseCrash', 'checkpointReopen'],
+    expect: '§14.2: the release is durable, so the Mac reopens released and admits and authorizes nothing; the next start writes the final checkpoint and publishes it.',
+  },
+  'restore.staged': {
+    spec: 'agent-recovery.qnt', after: 'replay', before: 'install', scenarios: ['manifestBeforeSegment', 'redactionDuringRestore'],
+    expect: '§14.4: the staged database is complete; the next open rechecks the deletion record, then installs it.',
+  },
+  'restore.swapped': {
+    spec: 'agent-recovery.qnt', after: 'install', before: 'review', scenarios: ['restoreApproval', 'restoreAttempt'],
+    expect: '§14.3: agent.sqlite is the restored file but recovery mode is not yet written; the next open finishes the install, so nothing is authorized before review.',
   },
 } as const satisfies Record<string, CrashPointSpec>
 

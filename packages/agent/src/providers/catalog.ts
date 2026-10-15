@@ -33,7 +33,11 @@ const families = [
 export type ModelFamily = typeof families[number]['family']
 /** The picker's families in their order, with the label the owner sees. */
 export const pickerFamilies: ReadonlyArray<{ readonly family: ModelFamily; readonly label: string; readonly path: 'chat' | 'compaction' }> = families
-export type ModelChoice = { readonly family: ModelFamily; readonly provider: 'openrouter' } | { readonly family: 'sol'; readonly provider: 'codex' }
+export type ModelChoice =
+  | { readonly family: ModelFamily; readonly provider: 'openrouter' }
+  | { readonly family: 'sol'; readonly provider: 'codex' }
+  /** A custom endpoint's model, by id. */
+  | { readonly family: string; readonly provider: 'custom' }
 export interface PickerModel {
   readonly choice: ModelChoice
   readonly label: string

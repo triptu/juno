@@ -14,6 +14,9 @@ const unknown = { _tag: 'unknown', attemptId: 'attempt' }
 const topic = { topicId: 'topic', title: 'Example', where: 'test', tint: 'public' }
 const place = { channelId: 'channel', name: 'test', kindLabel: 'Public channel', tint: 'public' }
 const messagePage = { messages: [], next: 'next' }
+const view = { id: 'view', name: 'Bots', icon: 'robot', channels: ['channel'], keepOutOfAll: true, position: 0 }
+const undo = { id: 'view', expected: view, restore: null }
+const viewChange = { id: 'view', undo }
 const cases: Record<string, readonly [unknown, unknown]> = {
   'agent.chat.page': [{ window: { _tag: 'around', anchor: '1', before: 5, limit: 20 } }, { page: { items: [], banner: { _tag: 'none' }, moreAbove: true, moreBelow: true, composerEnabled: true }, cards: [], messages: [] }],
   'agent.chat.summary': [null, { unread: 1, busy: false }],
@@ -43,6 +46,7 @@ const cases: Record<string, readonly [unknown, unknown]> = {
   'agent.connections.action': [{ ...op, id: 'connection', action: 'connect' }, accepted],
   'agent.connections.tier': [{ ...op, id: 'connection', tool: 'read', schemaHash: '0'.repeat(64), tier: 0 }, accepted],
   'agent.connections.address': [{ ...op, address: { url: 'http://localhost:3773/mcp', allowNetwork: false } }, accepted],
+  'agent.connections.add': [{ ...op, label: 'Docs', url: 'https://mcp.example.com/mcp' }, accepted],
   'agent.review.page': [null, { page: { backupAt: 1234, pending: [] }, cards: [] }],
   'agent.review.activate': [{ ...op, backupAt: 1234, oldDeviceOffOrErased: true }, accepted],
   'agent.settings.page': [null, { chatModels: [], compactionModels: [], spentTodayUsd: 0, capUsd: 2, codex: { _tag: 'missing' }, openRouterKey: 'missing', rules: [], paused: false, backupFolder: 'backup', ownership: { _tag: 'active', epoch: 1 } }],
@@ -50,6 +54,12 @@ const cases: Record<string, readonly [unknown, unknown]> = {
   'agent.settings.credentials': [{ provider: 'codex', action: 'setUp' }, undefined],
   'agent.settings.ownership': [{ ...op, action: { _tag: 'move' } }, accepted],
   'host.hello': [{ protocol: 2 }, { host: 'juno', protocol: 2 }],
+  'host.slack.channels': [{ accountId: 'account', pattern: '*alerts*', cursor: 'channel', limit: 20 }, { channels: [{ id: 'channel', name: 'alerts' }], next: 'next' }],
+  'host.views.list': [{ accountId: 'account' }, [view]],
+  'host.views.create': [{ accountId: 'account', view }, viewChange],
+  'host.views.update': [{ accountId: 'account', id: 'view', view }, { id: 'view', undo: { ...undo, restore: { ...view, name: 'Old' } } }],
+  'host.views.delete': [{ accountId: 'account', id: 'view' }, { id: 'view', undo: { id: 'view', expected: null, restore: view } }],
+  'host.views.undo': [{ accountId: 'account', undo }, undefined],
   'host.slack.search': [{ accountId: 'account', query: 'Example', limit: 20 }, messagePage],
   'host.slack.history': [{ accountId: 'account', channelId: 'channel', limit: 20 }, messagePage],
   'host.slack.replies': [{ accountId: 'account', channelId: 'channel', threadTs: '1.0', limit: 20 }, messagePage],
@@ -76,7 +86,7 @@ function roundTrip<S extends Schema.Codec<unknown, unknown>>(schema: S, value: u
 
 const groups = { ChatRpcs: C.ChatRpcs, CardRpcs: C.CardRpcs, ScheduledRpcs: C.ScheduledRpcs, RemembersRpcs: C.RemembersRpcs,
   MemoryRpcs: C.MemoryRpcs, ActivityRpcs: C.ActivityRpcs, ConnectionsRpcs: C.ConnectionsRpcs, ReviewRpcs: C.ReviewRpcs,
-  SettingsRpcs: C.SettingsRpcs, HostHelloRpcs: C.HostHelloRpcs, HostReadRpcs: C.HostReadRpcs,
+  SettingsRpcs: C.SettingsRpcs, HostHelloRpcs: C.HostHelloRpcs, HostReadRpcs: C.HostReadRpcs, HostViewRpcs: C.HostViewRpcs,
   HostActionRpcs: C.HostActionRpcs, HostPresenceRpcs: C.HostPresenceRpcs, HostScheduleRpcs: C.HostScheduleRpcs, HostNotificationRpcs: C.HostNotificationRpcs }
 
 describe('RPC group wire round trips', () => {

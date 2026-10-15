@@ -1,7 +1,7 @@
 import { useLayoutEffect } from 'react'
-import { accentAtom, densityAtom, persistAccent, persistTheme, resolvedThemeAtom, signedInAtom, themeAtom, type Accent, type Density, type ResolvedTheme, type Theme } from '@juno/state'
+import { accentAtom, densityAtom, persistAccent, persistTheme, privacyAtom, resolvedThemeAtom, signedInAtom, themeAtom, type Accent, type Density, type ResolvedTheme, type Theme } from '@juno/state'
 import { useAtom, useAtomValue } from '@juno/state/react'
-import { AppearanceSettings, applyTheme, Shell, type AccentName, type DensityName, type ThemeName, type ThemePreference } from '@juno/views'
+import { AppearanceSettings, applyPrivacy, applyTheme, Shell, type AccentName, type DensityName, type ThemeName, type ThemePreference } from '@juno/views'
 import { Frame } from './containers/Frame'
 import { Peek } from './containers/Peek'
 import { Session } from './containers/Session'
@@ -20,7 +20,14 @@ const _densityFromContract: DensityName = null as unknown as Density
 const _densityFromViews: Density = null as unknown as DensityName
 void [_accentFromContract, _accentFromTokens, _themeFromContract, _themeFromViews, _preferenceFromContract, _preferenceFromViews, _densityFromContract, _densityFromViews]
 
-/** The root container: the theme, and the shell in its signed-in or signed-out shape. */
+/** Privacy mode's one attribute on <html>, set before paint. A leaf, so a toggle re-renders nothing else. */
+function PrivacyRoot() {
+  const privacy = useAtomValue(privacyAtom)
+  useLayoutEffect(() => applyPrivacy(privacy), [privacy])
+  return null
+}
+
+/** The root container: the theme, privacy mode, and the shell in its signed-in or signed-out shape. */
 export function App() {
   const [theme, setTheme] = useAtom(themeAtom)
   const resolved = useAtomValue(resolvedThemeAtom)
@@ -45,9 +52,12 @@ export function App() {
   // the appearance block under it.
   if (signedIn !== undefined) {
     return (
-      <Frame sidebar={<Sidebar />} peek={<Peek />}>
-        <Workspace />
-      </Frame>
+      <>
+        <PrivacyRoot />
+        <Frame sidebar={<Sidebar />} peek={<Peek />}>
+          <Workspace />
+        </Frame>
+      </>
     )
   }
   return (

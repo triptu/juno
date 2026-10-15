@@ -2,7 +2,7 @@
  * The pages behind the Juno menu and Settings › Juno (SPEC 13.10), live from
  * the agent (`packages/agent/src/serve/pages.ts`, `src/settings/`), and what
  * their buttons call. A page whose records come with a later work package
- * (Scheduled, Connections, Review) streams an empty page, and its commands
+ * (Scheduled, Review) streams an empty page, and its commands
  * answer `unavailable`. Review's Activate needs the owner's word that the
  * old Mac is off (WP21), and recovery cannot happen before it, so it is
  * not here.
@@ -50,7 +50,8 @@ export const activityPageAtom = (limit: number) => activityFamily(limit)
 
 /** A model family, the cap, Pause and the rules: what Settings › Juno changes today. The backup folder comes with WP21. */
 export type JunoSettingsChange =
-  | { readonly _tag: 'model'; readonly purpose: 'chat' | 'compaction'; readonly provider: 'openrouter' | 'codex'; readonly family: string }
+  /** On a custom endpoint `family` is the model id, listed or typed. */
+  | { readonly _tag: 'model'; readonly purpose: 'chat' | 'compaction'; readonly provider: 'openrouter' | 'codex' | 'custom'; readonly family: string }
   | { readonly _tag: 'cap'; readonly usd: number }
   | { readonly _tag: 'paused'; readonly value: boolean }
   /** The whole list, in order. */
@@ -74,7 +75,9 @@ export function junoPageActions(registry: Registry) {
     removePin: (id: PinId, revision: Revision) => outcome(call(registry, 'agent.remembers.remove', { opId: op(), id, revision })),
     schedule: (id: ScheduleId, revision: Revision, action: 'pause' | 'resume' | 'delete') => outcome(call(registry, 'agent.scheduled.action', { opId: op(), id, revision, action })),
     tier: (id: ConnectionId, tool: string, schemaHash: string, tier: 0 | 3) => outcome(call(registry, 'agent.connections.tier', { opId: op(), id, tool, schemaHash, tier })),
-    connection: (id: ConnectionId, action: 'enable' | 'disable') => outcome(call(registry, 'agent.connections.action', { opId: op(), id, action })),
+    /** Connect waits for the browser sign-in when the server asks for one. */
+    connection: (id: ConnectionId, action: 'enable' | 'disable' | 'connect' | 'disconnect' | 'remove') => outcome(call(registry, 'agent.connections.action', { opId: op(), id, action })),
+    addConnection: (label: string, url: string) => outcome(call(registry, 'agent.connections.add', { opId: op(), label, url })),
     t3Address: (address: T3Address) => outcome(call(registry, 'agent.connections.address', { opId: op(), address })),
   }
 }

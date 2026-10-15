@@ -65,7 +65,7 @@ const PRIVATE_TITLE = 'Private channel'
 
 /**
  * One sidebar row, chat style: the channel icon or the person's photo, then
- * the title and time, a two-line "Sender: text" preview with the @ and count
+ * the title and time, a one-line "Sender: text" preview with the @ and count
  * tags, and the meta line with the channel, the people, the Main and
  * Reopened tags, a Main row's new-thread count and the Resolve check. The
  * check sits in a slot that is always reserved and shows on hover or
@@ -172,7 +172,7 @@ export const TopicRow = memo(function TopicRow({
         <span {...stylex.props(styles.line2)}>
           {/* The message sets the direction; the sender is isolated so a Latin
               name before Arabic text, or the reverse, keeps its own order. */}
-          <Text variant="preview" tone={unread ? 'subtle' : 'muted'} clamp={2} as="span" dir="auto" id={previewId} sx={styles.preview}>
+          <Text variant="preview" tone={unread ? 'subtle' : 'muted'} truncate as="span" dir="auto" id={previewId} data-sensitive="" sx={styles.preview}>
             {row.preview.text.length === 0 ? (
               row.preview.sender
             ) : (
@@ -316,6 +316,8 @@ const styles = stylex.create({
     minWidth: 0,
     paddingBlock: density['--density-row-padding-block'],
     paddingInline: spacing['--space-3'],
+    // One fixed height per density: the preview is one line, so every row is the same whole number of pixels.
+    height: `calc(${density['--density-row-estimate']} + 2 * ${density['--density-row-padding-block']})`,
     borderRadius: radii['--radius-3xl'],
     color: colors['--foreground-default'],
     userSelect: 'none',

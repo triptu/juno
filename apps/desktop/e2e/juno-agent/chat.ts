@@ -2,15 +2,7 @@
 // and a test fixture that runs the agent against a fake OpenRouter.
 import { startFakeOpenRouter, type FakeOpenRouter, type OpenRouterRequest } from '@juno/agent-testing/openrouter'
 import type { Locator, Page } from '@playwright/test'
-import { expect, launchApp, test as base, type RunningApp } from '../fixtures'
-
-/** A stand-in OpenRouter key, in the shape Settings › Juno accepts. */
-export const OPENROUTER_KEY = 'sk-or-v1-e2e0123456789abcdef0123456789abcdef'
-
-/** Gives the agent the key, as Settings › Juno does, so its chat requests reach the fake. */
-export async function setOpenRouterKey(running: RunningApp): Promise<void> {
-  expect(await running.win.evaluate((key) => window.juno.agent.setOpenRouterKey(key), OPENROUTER_KEY)).toBe('saved')
-}
+import { expect, launchApp, test as base } from '../fixtures'
 
 /**
  * The model the e2e agent talks to. It answers each message by echoing its
@@ -41,7 +33,6 @@ export const test = base.extend<{ readonly model: FakeOpenRouter }>({
       agent: true,
       fakeOpenRouterUrl: model.origin,
     })
-    await setOpenRouterKey(running)
     await use(running)
     await running.close()
   },

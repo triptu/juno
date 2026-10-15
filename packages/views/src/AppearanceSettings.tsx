@@ -1,5 +1,5 @@
 import * as stylex from '@stylexjs/stylex'
-import { spacing } from '@juno/tokens/tokens.stylex'
+import { layout, spacing } from '@juno/tokens/tokens.stylex'
 import { accentLabels, accentNames, Segmented, Swatch, Text, type AccentName, type DensityName, type ThemePreference } from '@juno/ui'
 
 export interface AppearanceSettingsProps {
@@ -91,7 +91,7 @@ const styles = stylex.create({
     display: 'flex',
     flexDirection: 'column',
     gap: spacing['--space-0-5'],
-    width: spacing['--space-18'],
+    width: layout['--settings-label-width'],
     flexShrink: 0,
   },
   labelStacked: {

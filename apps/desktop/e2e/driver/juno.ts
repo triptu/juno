@@ -275,7 +275,7 @@ export class Sidebar {
   }
 
   get unreadToggle() {
-    return this.root.getByRole('button', { name: 'Show unread only' })
+    return this.root.getByRole('button', { name: 'Unread only' })
   }
 
   async filter(name: SidebarFilterName): Promise<void> {
@@ -299,6 +299,76 @@ export class Sidebar {
     await this.list.getByRole('button', { name: 'Clear filters' }).click()
     await expect(this.filterButton('All')).toHaveAttribute('aria-pressed', 'true')
     await expect(this.unreadToggle).toHaveAttribute('aria-pressed', 'false')
+  }
+
+  // Views (SPEC 5 "Views", inventory 2.3).
+
+  /** The horizontally scrolling row of pills. */
+  get pillRow() {
+    return this.root.getByRole('group', { name: 'Quick filters' }).locator('[data-pill-row]')
+  }
+
+  /** A view's pill. Its name gains ", unread mention" while its dot shows. */
+  viewPill(name: string) {
+    return this.root.getByRole('group', { name: 'Quick filters' }).getByRole('button', { name: new RegExp(`^${escapeRegExp(name)}(, unread mention)?$`) })
+  }
+
+  /** The views' names, in pill order. */
+  viewNames(): Promise<string[]> {
+    return this.root.locator('[data-view-pill]').evaluateAll((pills) => pills.map((pill) => (pill.getAttribute('aria-label') ?? '').replace(/, unread mention$/, '')))
+  }
+
+  /** A view's id, for the menus' items. */
+  async viewId(name: string): Promise<string> {
+    return (await this.viewPill(name).getAttribute('data-view-pill'))!
+  }
+
+  async selectView(name: string): Promise<void> {
+    await this.viewPill(name).click()
+    await expect(this.viewPill(name)).toHaveAttribute('aria-pressed', 'true')
+  }
+
+  async expectViewDot(name: string, shown: boolean): Promise<void> {
+    await expect(this.viewPill(name)).toHaveAccessibleName(shown ? `${name}, unread mention` : name, { timeout: 10_000 })
+  }
+
+  /** The view sheet, new or edit. */
+  get viewSheet() {
+    return this.win.locator('[data-view-sheet]')
+  }
+
+  /**
+   * Makes a view through the New view pill and the sheet: the name, an icon
+   * by its label, the conversations by searching for each name, and Keep
+   * these out of All. A new view is selected once saved.
+   */
+  async createView(view: { readonly name: string; readonly icon?: string; readonly conversations?: ReadonlyArray<string>; readonly keepOutOfAll?: boolean }): Promise<void> {
+    await this.root.getByRole('button', { name: 'New view', exact: true }).click()
+    await expect(this.viewSheet).toBeVisible()
+    await this.fillViewSheet(view)
+    await this.viewSheet.getByRole('button', { name: 'Save' }).click()
+    await expect(this.viewSheet).toHaveCount(0)
+    await expect(this.viewPill(view.name)).toHaveAttribute('aria-pressed', 'true')
+  }
+
+  /** Fills the open sheet. Conversations are toggled: one already chosen is removed. */
+  async fillViewSheet(view: { readonly name?: string; readonly icon?: string; readonly conversations?: ReadonlyArray<string>; readonly keepOutOfAll?: boolean }): Promise<void> {
+    const sheet = this.viewSheet
+    if (view.name !== undefined) await sheet.getByRole('textbox', { name: 'Name' }).fill(view.name)
+    if (view.icon !== undefined) await sheet.getByRole('radio', { name: view.icon }).click()
+    for (const conversation of view.conversations ?? []) {
+      await sheet.getByRole('combobox', { name: 'Add channels and people' }).fill(conversation)
+      await sheet.getByRole('option', { name: conversation, exact: true }).click()
+      await expect(sheet.getByRole('option', { name: conversation, exact: true })).toHaveAttribute('aria-selected', 'true')
+    }
+    if (view.keepOutOfAll !== undefined) await sheet.getByRole('checkbox', { name: /Keep these out of All/ }).setChecked(view.keepOutOfAll)
+  }
+
+  /** Right-click a view's pill, then `item` in its menu (inventory 15.7). Returns the menu's labels. */
+  async viewMenu(name: string, item: 'view-edit' | 'view-left' | 'view-right' | 'view-delete'): Promise<string[]> {
+    await chooseNextMenuItem(this.win, item)
+    await this.viewPill(name).click({ button: 'right' })
+    return (await lastMenu(this.win)).labels
   }
 
   /** The status line under the filters, shown when the list may be behind Slack. */
@@ -523,6 +593,7 @@ export class Juno {
   readonly allTopics: AllTopicsPane
   readonly home: HomePane
   readonly peek: PeekPopover
+  readonly privacy: PrivacyMode
 
   constructor(app: ElectronApplication, win: Page) {
     this.app = app
@@ -540,6 +611,7 @@ export class Juno {
     this.allTopics = new AllTopicsPane(win)
     this.home = new HomePane(win)
     this.peek = new PeekPopover(win)
+    this.privacy = new PrivacyMode(app, win)
   }
 
   /** Makes the next native context menu pick `id` without showing it. */
@@ -873,6 +945,10 @@ export type TopicMenuItem =
   | 'notify-matters'
   | 'notify-never'
   | 'ignore-channel'
+  // Add to view (inventory 15.8), by the view's id.
+  | `view-add:${string}`
+  | `view-remove:${string}`
+  | 'view-new'
 
 /** The topic shown in the active tab. Hidden tabs stay in the page with `display: none`. */
 export type AllTopicsChipName = 'All' | 'Open' | 'Resolved' | 'Quiet' | 'Unfollowed'
@@ -910,6 +986,11 @@ export class AllTopicsRow {
 
   async expectVisible(): Promise<void> {
     await expect.poll(() => this.reveal(), { timeout: 10_000 }).toBe(true)
+  }
+
+  /** The "Sender: text" line under the title, the one part privacy mode blurs. */
+  get preview(): Locator {
+    return this.root.locator('[data-sensitive]')
   }
 
   async expectAbsent(): Promise<void> {
@@ -1360,6 +1441,13 @@ export class TopicPane {
     await this.pill.click()
   }
 
+  /** Waits for the open topic's rows; if it opened at its "N new" divider, jumps to the latest. Ends at the bottom. */
+  async toLatest(): Promise<void> {
+    await expect(this.divider.or(this.list.locator('[data-message-row]').last()).first()).toBeVisible({ timeout: 15_000 })
+    if ((await this.divider.count()) > 0) await this.jumpToLatest()
+    await this.expectAtBottom()
+  }
+
   /** A "2 replies · Title" link under a Main message, by its label or title. */
   threadLink(text: string | RegExp): ThreadLinkDriver {
     return new ThreadLinkDriver(this.win, this.list.getByRole('button', { name: text }))
@@ -1574,6 +1662,7 @@ export type AppMenuItem =
   | 'back'
   | 'forward'
   | 'toggle-sidebar'
+  | 'toggle-privacy'
   | 'juno'
   | 'undo'
   | `tab-${1 | 2 | 3 | 4 | 5 | 6 | 7 | 8}`
@@ -1691,6 +1780,41 @@ export class SidebarFrame {
   /** View › Hide Sidebar's label, which names what it will do. */
   async menuLabel(): Promise<string | undefined> {
     return this.app.evaluate(({ Menu }) => Menu.getApplicationMenu()?.getMenuItemById('toggle-sidebar')?.label)
+  }
+}
+
+/** Privacy mode (SPEC section 5): blurred message text, the sidebar footer, View › Hide Message Text. */
+export class PrivacyMode {
+  constructor(
+    readonly app: ElectronApplication,
+    readonly win: Page,
+  ) {}
+
+  /** The sidebar footer that says the mode is on. */
+  get footer(): Locator {
+    return this.win.getByRole('complementary', { name: 'Sidebar' }).getByRole('status').filter({ hasText: 'Message text hidden' })
+  }
+
+  get showButton(): Locator {
+    return this.footer.getByRole('button', { name: 'Show message text' })
+  }
+
+  /** The CSS filter on an element: `blur(6px)` while hidden, `none` otherwise. */
+  filterOf(target: Locator): Promise<string> {
+    return target.evaluate((node) => getComputedStyle(node).filter)
+  }
+
+  async expectBlurred(target: Locator, blurred = true): Promise<void> {
+    await expect.poll(() => this.filterOf(target)).toBe(blurred ? 'blur(6px)' : 'none')
+  }
+
+  async toggleWithMenu(): Promise<void> {
+    await clickAppMenu(this.app, 'toggle-privacy')
+  }
+
+  /** View › Hide or Show Message Text, which names what it will do. */
+  menuLabel(): Promise<string | undefined> {
+    return this.app.evaluate(({ Menu }) => Menu.getApplicationMenu()?.getMenuItemById('toggle-privacy')?.label)
   }
 }
 

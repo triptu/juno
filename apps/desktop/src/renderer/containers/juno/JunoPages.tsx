@@ -1,8 +1,10 @@
 import { memo, useState } from 'react'
-import { chatCopy, type JunoPage, type JunoSettingsPage as JunoSettingsPageModel, type PinId } from '@juno/agent-contract'
-import { copyText, nowAtom, registry, setOpenRouterKey } from '@juno/state'
+import { chatCopy, type ConnectionId, type JunoPage, type JunoSettingsPage as JunoSettingsPageModel, type PinId } from '@juno/agent-contract'
+import type { ProviderChange, ProviderKind } from '@juno/contract'
+import { copyText, nowAtom, registry } from '@juno/state'
 import {
   activityPageAtom,
+  agentProviderAtom,
   connectionsPageAtom,
   junoPageActions,
   junoSettingsAtom,
@@ -10,10 +12,11 @@ import {
   remembersPageAtom,
   reviewPageAtom,
   scheduledPageAtom,
+  setAgentProvider,
   type JunoSettingsChange,
 } from '@juno/state/agent'
 import { useAtomValue } from '@juno/state/react'
-import { ActivityPage, ConnectionsPage, JunoSettingsPage, MemoryPage, noopActions, RemembersPage, ReviewPage, ScheduledPage, type KeyEntry } from '@juno/views'
+import { ActivityPage, ConnectionsPage, JunoSettingsPage, MemoryPage, noopActions, ProviderSection, RemembersPage, ReviewPage, ScheduledPage, type ProviderDrafts } from '@juno/views'
 
 /** The pages' RPC-backed commands, one set for the app. */
 const actions = junoPageActions(registry)
@@ -53,15 +56,14 @@ export const JunoPageTab = memo(function JunoPageTab({ page }: { readonly page: 
 })
 
 /**
- * Settings › Juno. The models, spend, the OpenRouter key, Pause (juno-settings)
- * and the owner's rules (WP15) are served. Codex (WP20), Backup and This Mac
+ * Settings › Juno. The provider comes from main (juno-providers); the models,
+ * spend, Pause (juno-settings) and the owner's rules (WP15) from the agent. Codex (WP20), Backup and This Mac
  * (WP21) get no callbacks, so the view leaves them out until they are built.
  * The key goes from the field to main's keychain, never through the page.
  */
 function Settings() {
   const result = useAtomValue(junoSettingsAtom)
   const now = useNow()
-  const [entry, setEntry] = useState<{ readonly draft: string; readonly error?: string } | undefined>(undefined)
   // A change shows at once (performance 1: one frame for direct feedback) and gives way when the agent's page agrees or refuses it.
   const [shown, setShown] = useState<Shown>({})
   // The rules list while the owner edits it, saved as a whole.
@@ -72,7 +74,9 @@ function Settings() {
   if (left !== shown) setShown(left)
   // The saved list gives way to the agent's once the page shows it.
   if (served !== undefined && rules !== undefined && rulesError === undefined && sameRules(served.rules, rules)) setRules(undefined)
-  if (served === undefined) return null
+  const providers = <Providers rejected={served?.openRouterKey === 'rejected' || served?.customKeyRejected === true} />
+  // No agent runs until a provider is set up, and none answers until it starts: the provider section alone.
+  if (served === undefined) return <JunoSettingsPage now={now} providers={providers} onChatModel={noop} onCompactionModel={noop} onCap={noop} onPaused={noop} />
   const shownPage = withShown(served, shown)
   const page = rules === undefined ? shownPage : { ...shownPage, rules }
   // The rules are saved as a whole list when a field loses focus; empty rows are dropped, as the agent takes no empty rule.
@@ -92,32 +96,16 @@ function Settings() {
       if (outcome !== 'ok') setShown({})
     })
   }
-  const providerOf = (purpose: 'chat' | 'compaction', family: string) =>
-    (purpose === 'chat' ? page.chatModels : page.compactionModels).find((model) => model.family === family)?.provider ?? 'openrouter'
-  const save = async (draft: string) => {
-    const saved = await setOpenRouterKey(draft.trim())
-    if (saved === 'saved') setEntry(undefined)
-    else setEntry({ draft, error: saved === 'invalid' ? chatCopy.pages.settings.keyInvalid : chatCopy.pages.settings.keyFailed })
-  }
-  const keyEntry: KeyEntry | undefined =
-    entry === undefined
-      ? undefined
-      : {
-          draft: entry.draft,
-          ...(entry.error === undefined ? {} : { error: entry.error }),
-          onDraft: (draft) => setEntry({ draft }),
-          onSave: () => void save(entry.draft),
-          onCancel: () => setEntry(undefined),
-        }
+  // On a custom endpoint the chat model is an id, listed or typed; on OpenRouter a family.
+  const provider = page.provider === 'custom' ? 'custom' : 'openrouter'
   return (
     <JunoSettingsPage
       page={page}
       now={now}
-      onChatModel={(family) => change({ chat: family }, { _tag: 'model', purpose: 'chat', provider: providerOf('chat', family), family })}
-      onCompactionModel={(family) => change({ compaction: family }, { _tag: 'model', purpose: 'compaction', provider: providerOf('compaction', family), family })}
+      providers={providers}
+      onChatModel={(family) => change({ chat: family }, { _tag: 'model', purpose: 'chat', provider, family })}
+      onCompactionModel={(family) => change({ compaction: family }, { _tag: 'model', purpose: 'compaction', provider, family })}
       onCap={(usd) => void actions.settings({ _tag: 'cap', usd })}
-      onOpenRouterKey={() => setEntry({ draft: '' })}
-      {...(keyEntry === undefined ? {} : { keyEntry })}
       onPaused={(value) => change({ paused: value }, { _tag: 'paused', value })}
       onRuleChange={(id, text) => setRules(page.rules.map((rule) => (rule.id === id ? { id, text } : rule)))}
       onRuleAdd={() => setRules([...page.rules, { id: crypto.randomUUID(), text: '' }])}
@@ -128,6 +116,67 @@ function Settings() {
       }}
       onRulesCommit={() => commitRules()}
       {...(rulesError === undefined ? {} : { rulesError })}
+    />
+  )
+}
+
+const noop = () => {}
+
+const emptyDrafts: ProviderDrafts = { openRouterKey: '', baseUrl: '', customKey: '' }
+
+/**
+ * The provider section (SPEC 13.10), from main's provider state: OpenRouter
+ * or one OpenAI-compatible endpoint. Picking one that is set up switches to
+ * it; saving one sets it up and makes it active. Keys go to main and the
+ * keychain, never through the agent. The base URL field starts from the
+ * stored one.
+ */
+function Providers({ rejected }: { readonly rejected: boolean }) {
+  const state = useAtomValue(agentProviderAtom)
+  const [picked, setPicked] = useState<ProviderKind | undefined>(undefined)
+  const [drafts, setDrafts] = useState<ProviderDrafts>(emptyDrafts)
+  const [urlTouched, setUrlTouched] = useState(false)
+  const [error, setError] = useState<string | undefined>(undefined)
+  if (state === undefined) return null
+  const shown = picked ?? state.active ?? 'openRouter'
+  const shownDrafts = urlTouched ? drafts : { ...drafts, baseUrl: state.custom.baseUrl }
+  const usable = (kind: ProviderKind) => (kind === 'openRouter' ? state.openRouter.key === 'set' : state.custom.baseUrl !== '')
+  const apply = async (change: ProviderChange) => {
+    const result = await setAgentProvider(change)
+    if (result === 'saved' || result === 'removed') {
+      setDrafts(emptyDrafts)
+      setUrlTouched(false)
+      setError(undefined)
+      return
+    }
+    const copy = chatCopy.providers
+    const badUrl = change._tag === 'custom' && !/^https?:\/\/\S+$/i.test(change.baseUrl.trim())
+    setError(result === 'failed' ? copy.failed : badUrl ? copy.invalidUrl : copy.invalidKey)
+  }
+  return (
+    <ProviderSection
+      state={state}
+      shown={shown}
+      drafts={shownDrafts}
+      {...(error === undefined ? {} : { error })}
+      rejected={rejected}
+      onShow={(kind) => {
+        setPicked(kind)
+        setError(undefined)
+        if (usable(kind) && state.active !== kind) void apply({ _tag: 'use', provider: kind })
+      }}
+      onDraft={(next) => {
+        if (next.baseUrl !== shownDrafts.baseUrl) setUrlTouched(true)
+        setDrafts(next)
+      }}
+      onSave={() =>
+        void apply(
+          shown === 'openRouter'
+            ? { _tag: 'openRouter', key: shownDrafts.openRouterKey.trim() }
+            : { _tag: 'custom', baseUrl: shownDrafts.baseUrl.trim(), ...(shownDrafts.customKey.trim() === '' ? {} : { key: shownDrafts.customKey.trim() }) },
+        )
+      }
+      onRemove={() => void apply(shown === 'openRouter' ? { _tag: 'openRouter', key: null } : { _tag: 'custom', baseUrl: '' })}
     />
   )
 }
@@ -233,19 +282,30 @@ function Scheduled() {
 
 function Connections() {
   const result = useAtomValue(connectionsPageAtom)
+  const [error, setError] = useState<{ readonly id: ConnectionId | 'new'; readonly message: string } | undefined>(undefined)
   if (result._tag !== 'Success') return null
   const page = result.value
+  const copy = chatCopy.pages.connections
+  // An address the agent refused says so; anything else is one plain line.
+  const report = (id: ConnectionId | 'new') => (outcome: string) =>
+    setError(outcome === 'ok' ? undefined : { id, message: outcome === 'invalid' && (id === 'new' || page.connections.some((row) => row.id === id && row.t3 !== undefined)) ? copy.invalidAddress : copy.failed })
   // A tier change binds the tool's current schema; a tool listed without one cannot be moved yet.
   const schemaOf = (id: string, tool: string) => page.connections.find((row) => row.id === id)?.tools.find((entry) => entry.name === tool)?.schemaHash
   return (
     <ConnectionsPage
       page={page}
-      onEnabled={(id, enabled) => void actions.connection(id, enabled ? 'enable' : 'disable')}
-      onT3Address={(_id, address) => void actions.t3Address(address)}
+      {...(error === undefined ? {} : { error })}
+      onEnabled={(id, enabled) => void actions.connection(id, enabled ? 'enable' : 'disable').then(report(id))}
+      onAction={(id, action) => {
+        setError(undefined)
+        void actions.connection(id, action).then(report(id))
+      }}
+      onT3Address={(id, address) => void actions.t3Address(address).then(report(id))}
       onTier={(id, tool, tier) => {
         const schemaHash = schemaOf(id, tool)
-        if (schemaHash !== undefined) void actions.tier(id, tool, schemaHash, tier)
+        if (schemaHash !== undefined) void actions.tier(id, tool, schemaHash, tier).then(report(id))
       }}
+      onAdd={(label, url) => void actions.addConnection(label, url).then(report('new'))}
     />
   )
 }

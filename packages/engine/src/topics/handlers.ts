@@ -37,7 +37,9 @@ import { setSubscribed } from '../follow'
 import { countTopics, forgetUsers, listTopics, makeRowCache } from './query'
 
 const LIST_KEYS: InvalidationKeys = ['topics', 'topic_overlay', 'topic_reads', 'conversations', 'users', 'ignored_channels', 'thread_subs', 'prefs', 'topic_art']
-const COUNT_KEYS: InvalidationKeys = ['topics', 'topic_overlay', 'conversations', 'ignored_channels', 'thread_subs']
+/** The sidebar list and counts also follow the views: a view's conversations and Keep these out of All. All topics does not. */
+const SIDEBAR_KEYS: InvalidationKeys = [...LIST_KEYS, 'sidebar_views']
+const COUNT_KEYS: InvalidationKeys = ['topics', 'topic_overlay', 'conversations', 'ignored_channels', 'thread_subs', 'sidebar_views']
 const QUIET_TICK = '1 minute'
 
 const encodeRow = Schema.encodeSync(Schema.toCodecJson(TopicListRow))
@@ -107,7 +109,7 @@ export const TopicsHandlers = TopicsRoutes.toLayer(
     return {
       'topics.list': (payload) => {
         const limit = Math.max(1, Math.min(SIDEBAR_WINDOW, payload.range.limit))
-        const filter = { kind: payload.kind, unreadOnly: payload.unreadOnly, scope: payload.scope }
+        const filter = { kind: payload.kind, unreadOnly: payload.unreadOnly, scope: payload.scope, view: payload.view }
         // One row cache per workspace. It keeps the users it has read until the `users` table changes.
         const setup = Effect.gen(function* () {
           const cache = yield* rowCacheForSubscription
@@ -116,7 +118,7 @@ export const TopicsHandlers = TopicsRoutes.toLayer(
             return yield* listTopics(filter, { now, limit }, cache)
           })
         })
-        return serveLiveList(runs(LIST_KEYS, setup, true), { encodeRow, measure }).pipe(retryFirstRun('topics.list'), Stream.orDie)
+        return serveLiveList(runs(SIDEBAR_KEYS, setup, true), { encodeRow, measure }).pipe(retryFirstRun('topics.list'), Stream.orDie)
       },
       'topics.counts': (payload) =>
         serveLiveValue(runs(COUNT_KEYS, Effect.succeed(countTopics(payload.scope)), false), { measure }).pipe(retryFirstRun('topics.counts'), Stream.orDie),

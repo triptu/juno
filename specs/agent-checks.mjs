@@ -50,6 +50,8 @@ export const actionCases = [
   ['capReached', 'noAdmissionOverCap'],
   ['menuSchedule', 'scheduleFromOwnerAuthority'],
   ['resumeGrant', 'pauseRevokesGrants'],
+  ['redactExposed', 'redactionRevokesExposed'],
+  ['redactUnrelated', 'redactionKeepsUnrelated'],
 ]
 
 export const recoveryCases = [

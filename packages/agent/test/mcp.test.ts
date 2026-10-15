@@ -2,8 +2,8 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, expect, it } from 'vitest'
-import { fakeProvider, reply, startFakeNotion, startFakeLittlebird, unknownTool } from '@juno/agent-testing'
-import { createMcpManager, MCP_MIGRATIONS, NOTION, mcpExecutors, mcpTools, changeCard, serveMcp, type Credentials, type McpManagerApi } from '../src/mcp'
+import { fakeProvider, reply, startFakeMcpServer, startFakeNotion, startFakeLittlebird, unknownTool } from '@juno/agent-testing'
+import { createMcpManager, MCP_MIGRATIONS, NOTION, T3, mcpExecutors, mcpTools, changeCard, serveMcp, type Credentials, type McpManagerApi } from '../src/mcp'
 import { createProviderGuard, openTurns } from '../src'
 import { SONNET } from './turns-harness'
 import { openDatabase } from '../src/store/database'
@@ -13,7 +13,7 @@ const cleanup: Array<() => Promise<void>> = []
 afterEach(async () => { for (const close of cleanup.splice(0).reverse()) await close() })
 
 // Store type comes from the public credential bridge, without importing pi-mcp outside mcp/.
-function credentials(approve: (url: URL) => URL): Credentials {
+function credentials(approve: (url: URL) => URL, opened: string[] = []): Credentials {
   type State = Awaited<ReturnType<ReturnType<Credentials['oauth']>['load']>>
   const states = new Map<string, State>()
   return {
@@ -21,8 +21,19 @@ function credentials(approve: (url: URL) => URL): Credentials {
     bearer: async () => undefined,
     values: async () => [...states.values()].flatMap((s) => s?.tokens ? [s.tokens.access_token, s.tokens.refresh_token ?? ''] : []).filter(Boolean),
     clear: async (id) => { states.delete(id) },
-    openAuthorization: async (url) => { await fetch(approve(new URL(url))) },
+    openAuthorization: async (url) => { opened.push(url); await fetch(approve(new URL(url))) },
   }
+}
+
+async function bareManager(approve: (url: URL) => URL, opened: string[] = []) {
+  const dir = await mkdtemp(join(tmpdir(), 'juno-mcp-bare-'))
+  cleanup.push(() => rm(dir, { recursive: true, force: true }))
+  const store = { db: openDatabase(join(dir, 'agent.sqlite'), [MCP_MIGRATIONS]), now: Date.now }
+  initialize(store)
+  cleanup.push(async () => { store.db.close() })
+  const manager = createMcpManager({ store, credentials: credentials(approve, opened) })
+  cleanup.push(() => manager.close())
+  return manager
 }
 
 async function fixture(engine = false) {
@@ -215,4 +226,56 @@ it('keeps the owner tier decision and connection identity across a manager resta
   expect(restarted.state('notion')).toBe('ready')
   expect(restarted.stored('notion').epoch).toBe(epoch)
   expect(restarted.tool('notion', old.name).tier).toBe(3)
+})
+
+it('offers Notion, Littlebird and T3 Code, and adds a server by address that signs in only when it asks', async () => {
+  const server = await startFakeLittlebird()
+  cleanup.push(() => server.close())
+  const open = await startFakeMcpServer({ name: 'open', tools: [{ name: 'lookup', description: 'Looks something up.', inputSchema: { type: 'object' }, call: () => 'found' }] })
+  cleanup.push(() => open.close())
+  const opened: string[] = []
+  const manager = await bareManager(server.oauth.approve, opened)
+  expect(manager.page().connections.map((row) => [row.label, row.state, row.removable ?? false])).toEqual([
+    ['Notion', 'off', false], ['Littlebird', 'off', false], ['T3 Code', 'off', false],
+  ])
+  expect(manager.page().connections[2]?.t3).toEqual({ url: 'http://localhost:3773/mcp', allowNetwork: false })
+
+  await expect(manager.add('Bad', 'http://example.com/mcp')).rejects.toMatchObject({ reason: 'invalid' })
+  await manager.add('Open', open.url)
+  await manager.add('', server.url)
+  const [openRow, oauthRow] = manager.page().connections.slice(3)
+  if (!openRow || !oauthRow) throw new Error('Not added')
+  expect(oauthRow).toMatchObject({ label: new URL(server.url).host, state: 'off', removable: true })
+
+  // A server without auth connects with no browser at all.
+  await manager.authorize(openRow.id)
+  expect(manager.page().connections[3]).toMatchObject({ state: 'ready', tools: [{ name: 'lookup', tier: 3, hint: 'Looks something up.' }] })
+  expect(opened).toHaveLength(0)
+
+  // One that answers 401 gets the OAuth sign-in, and its tools.
+  await manager.authorize(oauthRow.id)
+  expect(opened).toHaveLength(1)
+  expect(manager.state(oauthRow.id)).toBe('ready')
+  expect(manager.definitions(oauthRow.id).length).toBeGreaterThan(3)
+
+  // Off and on again uses the stored sign-in; Connect does too.
+  await manager.disconnect(oauthRow.id, false)
+  await manager.authorize(oauthRow.id)
+  expect(manager.state(oauthRow.id)).toBe('ready')
+  expect(opened).toHaveLength(1)
+
+  await manager.remove(oauthRow.id)
+  expect(manager.page().connections.map((row) => row.label)).toEqual(['Notion', 'Littlebird', 'T3 Code', 'Open'])
+  await expect(manager.remove('notion')).rejects.toMatchObject({ reason: 'invalid' })
+})
+
+it('keeps T3 Code on this Mac unless the local network is allowed, and then only over https', async () => {
+  const manager = await bareManager((url) => url)
+  await expect(manager.address('http://192.168.1.22:3773/mcp', false)).rejects.toMatchObject({ reason: 'invalid' })
+  await expect(manager.address('http://192.168.1.22:3773/mcp', true)).rejects.toMatchObject({ reason: 'invalid' })
+  await expect(manager.address('https://t3.local:3773/mcp', false)).rejects.toMatchObject({ reason: 'invalid' })
+  await manager.address('https://t3.local:3773/mcp', true)
+  expect(manager.page().connections.find((row) => row.id === T3.id)).toMatchObject({ address: 'https://t3.local:3773/mcp', t3: { url: 'https://t3.local:3773/mcp', allowNetwork: true } })
+  await manager.address('http://127.0.0.1:3773/mcp', false)
+  expect(manager.stored(T3.id).config).toMatchObject({ url: 'http://127.0.0.1:3773/mcp', allowNetwork: false, noSecrets: true })
 })

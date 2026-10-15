@@ -1,9 +1,9 @@
 import { startTransition, useState } from 'react'
-import type { KindFilter } from '@juno/contract'
 import {
   activeTab,
   currentPlace,
   notificationStatusAtom,
+  privacyAtom,
   registry,
   setPresence,
   sidebarDotAtom,
@@ -11,6 +11,8 @@ import {
   sidebarListAtom,
   signedInAtom,
   tabsAtom,
+  viewPillsAtom,
+  viewSheetAtom,
   type Tabs,
 } from '@juno/state'
 import { junoNavAtom } from '@juno/state/agent'
@@ -21,9 +23,12 @@ import { EngineStatus, SyncNotice } from './EngineStatus'
 import { markFilterChange } from './filterMark'
 import { openJunoTab } from './juno/actions'
 import { openAllTopics, openHome, openNewTab, openNotifications, openPreferences } from './navigation'
+import { setPrivacy } from './privacy'
 import { Session } from './Session'
 import { TitlebarNav } from './TitlebarNav'
 import { TopicList } from './TopicList'
+import { closeViewSheet, moveView, newView, selectKind, selectView, showViewPillMenu } from './viewActions'
+import { ViewSheet } from './ViewSheet'
 
 function navigate(target: SidebarNavTarget, event: ActivateEvent): void {
   if (target === 'home') return openHome({ newTab: event.metaKey })
@@ -59,6 +64,8 @@ function activeNavOf(tabs: Tabs): SidebarNavTarget | undefined {
  */
 export function Sidebar() {
   const [filter, setFilter] = useAtom(sidebarFilterAtom)
+  const views = useAtomValue(viewPillsAtom)
+  const sheet = useAtomValue(viewSheetAtom)
   const channelsDot = useAtomValue(sidebarDotAtom('channels'))
   const dmsDot = useAtomValue(sidebarDotAtom('dms'))
   const user = useAtomValue(signedInAtom)
@@ -67,6 +74,7 @@ export function Sidebar() {
   const junoBusy = useAtomValue(junoNavAtom, (nav) => nav.busy)
   const [menuOpen, setMenuOpen] = useState(false)
   const status = useAtomValue(notificationStatusAtom)
+  const privacy = useAtomValue(privacyAtom)
   // The scope chip names the channel the list is narrowed to; its rows' refs carry it.
   const scopeChannel = useAtomValue(sidebarListAtom, (list) => (filter.scope === undefined ? undefined : list.refs.channels.get(filter.scope)))
 
@@ -79,15 +87,10 @@ export function Sidebar() {
     setMenuOpen(false)
     if (action === 'notifications') return openNotifications()
     if (action === 'preferences') return openPreferences()
+    if (action === 'privacy') return setPrivacy(!privacy)
     setPresence(registry, presence?.active === false ? 'active' : 'away')
   }
 
-  const changeKind = (kind: KindFilter) => {
-    if (kind === filter.kind) return
-    markFilterChange()
-    // The old rows stay until the new window arrives; never a blank list in between (performance.md 5.3).
-    startTransition(() => setFilter({ ...filter, kind }))
-  }
   const toggleUnread = () => {
     markFilterChange()
     startTransition(() => setFilter({ ...filter, unreadOnly: !filter.unreadOnly }))
@@ -104,7 +107,7 @@ export function Sidebar() {
     <SidebarView
       titlebarLeading={<TitlebarNav />}
       account={account}
-      filter={{ kind: filter.kind, unreadOnly: filter.unreadOnly }}
+      filter={{ kind: filter.kind, unreadOnly: filter.unreadOnly, view: filter.view }}
       dots={dots}
       {...(filter.scope === undefined ? {} : { scope: { name: scopeChannel?.name ?? filter.scope, kind: scopeChannel?.kind ?? 'public' } })}
       accountMenuOpen={menuOpen}
@@ -115,6 +118,7 @@ export function Sidebar() {
           workspace={user?.teamName ?? ''}
           {...(presence === undefined ? {} : { presence })}
           {...(paused === undefined ? {} : { paused })}
+          privacy={privacy}
           onAction={accountAction}
           sections={[
             { title: 'Session', content: <Session /> },
@@ -138,10 +142,19 @@ export function Sidebar() {
       junoBusy={junoBusy}
       onNewChat={openNewTab}
       onNavigate={navigate}
-      onFilterKind={changeKind}
+      onFilterKind={selectKind}
+      views={views}
+      onFilterView={selectView}
+      onNewView={newView}
+      onViewMenu={(id) => void showViewPillMenu(id)}
+      onMoveView={moveView}
+      {...(sheet === undefined ? {} : { viewSheet: <ViewSheet key={JSON.stringify(sheet)} sheet={sheet} /> })}
+      onCloseViewSheet={closeViewSheet}
       onToggleUnread={toggleUnread}
       onClearScope={clearScope}
       status={<SyncNotice />}
+      privacy={privacy}
+      onPrivacyOff={() => setPrivacy(false)}
     >
       <TopicList />
     </SidebarView>

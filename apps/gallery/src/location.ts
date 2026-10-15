@@ -1,4 +1,4 @@
-import { defaultAccent, isAccentName, isThemeName, type AccentName, type ThemeName } from '@juno/ui'
+import { defaultAccent, isAccentName, isThemeName, type AccentName, type DensityName, type ThemeName } from '@juno/ui'
 
 /**
  * The gallery's address lives in the hash so a static host needs no routing:
@@ -10,6 +10,8 @@ import { defaultAccent, isAccentName, isThemeName, type AccentName, type ThemeNa
  *
  * `__state` is `<group id>/<state key>`, or just `<state key>` for a state
  * with no group. `theme` and `accent` are left out when they are the defaults.
+ * `density=compact` draws the state in Compact density (inventory 3.3); the
+ * links the gallery makes leave it out.
  */
 export interface GalleryLocation {
   readonly component: string | null
@@ -17,6 +19,7 @@ export interface GalleryLocation {
   readonly state: string | null
   readonly theme: ThemeName
   readonly accent: AccentName
+  readonly density: DensityName
   /** The index filter. */
   readonly query: string
 }
@@ -32,6 +35,7 @@ export function parseHash(hash: string): GalleryLocation {
     state: params.get('__state') ?? legacyState,
     theme: isThemeName(theme) ? theme : 'light',
     accent: isAccentName(accent) ? accent : defaultAccent,
+    density: params.get('density') === 'compact' ? 'compact' : 'comfortable',
     query: params.get('q') ?? '',
   }
 }

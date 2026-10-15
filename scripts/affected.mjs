@@ -245,6 +245,8 @@ if (components.length > 0 || behaviour.length > 0) {
     script: 'test:gallery',
     args: [],
     // A name no component has keeps the shift guard idle when only the behaviour tests need a run.
+    // Every component takes 2.6 min on the default 4x8; 8x16 does it in 1.4.
+    machine: all ? 'linux/amd64:8x16' : undefined,
     env: all ? undefined : { GALLERY_SHIFT_ONLY: components.length > 0 ? components.map((item) => item.id).join(',') : 'none' },
     items: [...components, ...behaviour],
     why: all ? 'every component' : `${components.length} component(s)${components.length ? `: ${components.map((item) => item.id).join(', ')}` : ''}${behaviour.length ? ' and the behaviour tests' : ''}`,
@@ -285,7 +287,8 @@ const run = (step) =>
   new Promise((resolvePromise) => {
     const local = localAll || step.local
     const env = Object.entries(step.env ?? {}).flatMap(([key, value]) => ['--env', `${key}=${value}`])
-    const command = local ? ['pnpm', [step.script, ...step.args]] : ['node', [join(root, 'scripts/remote.mjs'), ...env, step.script, ...step.args]]
+    const machine = step.machine && !process.env.JUNO_REMOTE_MACHINE ? ['--machine', step.machine] : []
+    const command = local ? ['pnpm', [step.script, ...step.args]] : ['node', [join(root, 'scripts/remote.mjs'), ...machine, ...env, step.script, ...step.args]]
     const child = spawn(command[0], command[1], { cwd: root, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, ...(local ? step.env : {}) } })
     const prefix = `[${step.script}] `
     for (const stream of [child.stdout, child.stderr]) {

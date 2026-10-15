@@ -1,0 +1,417 @@
+[
+  {
+    "tag": "div",
+    "label": "Juno menu",
+    "rect": {
+      "x": 570,
+      "y": 88,
+      "w": 236,
+      "h": 206
+    },
+    "padding": "6px",
+    "gap": "normal",
+    "radius": "13px",
+    "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgb(251, 251, 248)",
+    "border": "1px solid rgba(0, 0, 0, 0)",
+    "shadow": "oklch(0 0 0 / 0.05) 0px 2px 6px -1px, oklch(0 0 0 / 0.13) 0px 14px 36px -8px",
+    "outline": "none 3px rgb(35, 33, 26) offset 0px",
+    "children": [
+      {
+        "tag": "div",
+        "label": "Juno pages",
+        "rect": {
+          "x": 577,
+          "y": 95,
+          "w": 222,
+          "h": 192
+        },
+        "padding": "0px",
+        "gap": "normal",
+        "radius": "0px",
+        "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+        "color": "rgb(35, 33, 26)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(35, 33, 26)",
+        "shadow": "none",
+        "outline": "none 2px rgb(180, 53, 31) offset 2px"
+      }
+    ]
+  },
+  {
+    "tag": "div",
+    "label": "Juno pages",
+    "rect": {
+      "x": 577,
+      "y": 95,
+      "w": 222,
+      "h": 192
+    },
+    "padding": "0px",
+    "gap": "normal",
+    "radius": "0px",
+    "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "0px none rgb(35, 33, 26)",
+    "shadow": "none",
+    "outline": "none 2px rgb(180, 53, 31) offset 2px",
+    "children": [
+      {
+        "tag": "div",
+        "label": "Scheduled",
+        "rect": {
+          "x": 577,
+          "y": 95,
+          "w": 222,
+          "h": 32
+        },
+        "padding": "0px 8px",
+        "gap": "10px",
+        "radius": "6px",
+        "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+        "color": "rgb(35, 33, 26)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(35, 33, 26)",
+        "shadow": "none",
+        "outline": "none 3px rgb(35, 33, 26) offset 0px"
+      },
+      {
+        "tag": "div",
+        "label": "What Juno remembers",
+        "rect": {
+          "x": 577,
+          "y": 127,
+          "w": 222,
+          "h": 32
+        },
+        "padding": "0px 8px",
+        "gap": "10px",
+        "radius": "6px",
+        "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+        "color": "rgb(35, 33, 26)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(35, 33, 26)",
+        "shadow": "none",
+        "outline": "none 3px rgb(35, 33, 26) offset 0px"
+      },
+      {
+        "tag": "div",
+        "label": "Memory of this chat",
+        "rect": {
+          "x": 577,
+          "y": 159,
+          "w": 222,
+          "h": 32
+        },
+        "padding": "0px 8px",
+        "gap": "10px",
+        "radius": "6px",
+        "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+        "color": "rgb(35, 33, 26)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(35, 33, 26)",
+        "shadow": "none",
+        "outline": "none 3px rgb(35, 33, 26) offset 0px"
+      },
+      {
+        "tag": "div",
+        "label": "Activity",
+        "rect": {
+          "x": 577,
+          "y": 191,
+          "w": 222,
+          "h": 32
+        },
+        "padding": "0px 8px",
+        "gap": "10px",
+        "radius": "6px",
+        "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+        "color": "rgb(35, 33, 26)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(35, 33, 26)",
+        "shadow": "none",
+        "outline": "none 3px rgb(35, 33, 26) offset 0px"
+      },
+      {
+        "tag": "div",
+        "label": "Connections",
+        "rect": {
+          "x": 577,
+          "y": 223,
+          "w": 222,
+          "h": 32
+        },
+        "padding": "0px 8px",
+        "gap": "10px",
+        "radius": "6px",
+        "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+        "color": "rgb(35, 33, 26)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(35, 33, 26)",
+        "shadow": "none",
+        "outline": "none 3px rgb(35, 33, 26) offset 0px"
+      },
+      {
+        "tag": "div",
+        "label": "Settings › Juno",
+        "rect": {
+          "x": 577,
+          "y": 255,
+          "w": 222,
+          "h": 32
+        },
+        "padding": "0px 8px",
+        "gap": "10px",
+        "radius": "6px",
+        "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+        "color": "rgb(35, 33, 26)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(35, 33, 26)",
+        "shadow": "none",
+        "outline": "none 3px rgb(35, 33, 26) offset 0px"
+      }
+    ]
+  },
+  {
+    "tag": "div",
+    "label": "Scheduled",
+    "rect": {
+      "x": 577,
+      "y": 95,
+      "w": 222,
+      "h": 32
+    },
+    "padding": "0px 8px",
+    "gap": "10px",
+    "radius": "6px",
+    "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "0px none rgb(35, 33, 26)",
+    "shadow": "none",
+    "outline": "none 3px rgb(35, 33, 26) offset 0px",
+    "children": [
+      {
+        "tag": "span",
+        "label": "Scheduled",
+        "rect": {
+          "x": 585,
+          "y": 100.9,
+          "w": 206,
+          "h": 20.3
+        },
+        "padding": "0px",
+        "gap": "6px",
+        "radius": "0px",
+        "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+        "color": "rgb(35, 33, 26)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(35, 33, 26)",
+        "shadow": "none",
+        "outline": "none 3px rgb(35, 33, 26) offset 0px"
+      }
+    ]
+  },
+  {
+    "tag": "div",
+    "label": "What Juno remembers",
+    "rect": {
+      "x": 577,
+      "y": 127,
+      "w": 222,
+      "h": 32
+    },
+    "padding": "0px 8px",
+    "gap": "10px",
+    "radius": "6px",
+    "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "0px none rgb(35, 33, 26)",
+    "shadow": "none",
+    "outline": "none 3px rgb(35, 33, 26) offset 0px",
+    "children": [
+      {
+        "tag": "span",
+        "label": "What Juno remembers",
+        "rect": {
+          "x": 585,
+          "y": 132.9,
+          "w": 206,
+          "h": 20.3
+        },
+        "padding": "0px",
+        "gap": "6px",
+        "radius": "0px",
+        "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+        "color": "rgb(35, 33, 26)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(35, 33, 26)",
+        "shadow": "none",
+        "outline": "none 3px rgb(35, 33, 26) offset 0px"
+      }
+    ]
+  },
+  {
+    "tag": "div",
+    "label": "Memory of this chat",
+    "rect": {
+      "x": 577,
+      "y": 159,
+      "w": 222,
+      "h": 32
+    },
+    "padding": "0px 8px",
+    "gap": "10px",
+    "radius": "6px",
+    "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "0px none rgb(35, 33, 26)",
+    "shadow": "none",
+    "outline": "none 3px rgb(35, 33, 26) offset 0px",
+    "children": [
+      {
+        "tag": "span",
+        "label": "Memory of this chat",
+        "rect": {
+          "x": 585,
+          "y": 164.9,
+          "w": 206,
+          "h": 20.3
+        },
+        "padding": "0px",
+        "gap": "6px",
+        "radius": "0px",
+        "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+        "color": "rgb(35, 33, 26)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(35, 33, 26)",
+        "shadow": "none",
+        "outline": "none 3px rgb(35, 33, 26) offset 0px"
+      }
+    ]
+  },
+  {
+    "tag": "div",
+    "label": "Activity",
+    "rect": {
+      "x": 577,
+      "y": 191,
+      "w": 222,
+      "h": 32
+    },
+    "padding": "0px 8px",
+    "gap": "10px",
+    "radius": "6px",
+    "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "0px none rgb(35, 33, 26)",
+    "shadow": "none",
+    "outline": "none 3px rgb(35, 33, 26) offset 0px",
+    "children": [
+      {
+        "tag": "span",
+        "label": "Activity",
+        "rect": {
+          "x": 585,
+          "y": 196.9,
+          "w": 206,
+          "h": 20.3
+        },
+        "padding": "0px",
+        "gap": "6px",
+        "radius": "0px",
+        "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+        "color": "rgb(35, 33, 26)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(35, 33, 26)",
+        "shadow": "none",
+        "outline": "none 3px rgb(35, 33, 26) offset 0px"
+      }
+    ]
+  },
+  {
+    "tag": "div",
+    "label": "Connections",
+    "rect": {
+      "x": 577,
+      "y": 223,
+      "w": 222,
+      "h": 32
+    },
+    "padding": "0px 8px",
+    "gap": "10px",
+    "radius": "6px",
+    "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "0px none rgb(35, 33, 26)",
+    "shadow": "none",
+    "outline": "none 3px rgb(35, 33, 26) offset 0px",
+    "children": [
+      {
+        "tag": "span",
+        "label": "Connections",
+        "rect": {
+          "x": 585,
+          "y": 228.9,
+          "w": 206,
+          "h": 20.3
+        },
+        "padding": "0px",
+        "gap": "6px",
+        "radius": "0px",
+        "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+        "color": "rgb(35, 33, 26)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(35, 33, 26)",
+        "shadow": "none",
+        "outline": "none 3px rgb(35, 33, 26) offset 0px"
+      }
+    ]
+  },
+  {
+    "tag": "div",
+    "label": "Settings › Juno",
+    "rect": {
+      "x": 577,
+      "y": 255,
+      "w": 222,
+      "h": 32
+    },
+    "padding": "0px 8px",
+    "gap": "10px",
+    "radius": "6px",
+    "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "0px none rgb(35, 33, 26)",
+    "shadow": "none",
+    "outline": "none 3px rgb(35, 33, 26) offset 0px",
+    "children": [
+      {
+        "tag": "span",
+        "label": "Settings › Juno",
+        "rect": {
+          "x": 585,
+          "y": 260.9,
+          "w": 206,
+          "h": 20.3
+        },
+        "padding": "0px",
+        "gap": "6px",
+        "radius": "0px",
+        "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+        "color": "rgb(35, 33, 26)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(35, 33, 26)",
+        "shadow": "none",
+        "outline": "none 3px rgb(35, 33, 26) offset 0px"
+      }
+    ]
+  }
+]

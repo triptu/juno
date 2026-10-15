@@ -109,10 +109,6 @@ const kinds = stylex.create({
       default: colors['--input-border'],
       ':focus-within': accent['--focus-ring'],
     },
-    boxShadow: {
-      default: 'none',
-      ':focus-within': `0 0 0 1px ${accent['--focus-ring']}`,
-    },
   },
   toast: {
     backgroundColor: colors['--foreground-default'],

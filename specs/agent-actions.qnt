@@ -11,8 +11,9 @@ module actionsProtocol {
   type Attempt = { id: int, auth: int, child: int, payload: Payload, key: int }
   type Receipt = { attempt: int, child: int, payload: Payload }
   // `pauses` is how many Pauses had happened when it was minted: Pause revokes
-  // every grant, and Resume restores none (SPEC 13.9).
-  type Grant = { target: int, opClass: int, source: int, rev: int, pauses: int }
+  // every grant, and Resume restores none (SPEC 13.9). `saw` is a ghost: the run
+  // that minted it read content a later removal takes (plan v3 §4.5).
+  type Grant = { target: int, opClass: int, source: int, rev: int, pauses: int, saw: bool }
   type Occurrence = { schedule: int, rev: int, due: int }
   // One spend reservation (WP9 `spend_reservations`). `actual` counts once
   // settled. `charged` is a ghost: what the provider really billed.
@@ -26,7 +27,7 @@ module actionsProtocol {
     nextAuth: int, nextApproval: int, schema: int, account: int, connection: int, precondition: int,
     invalid: bool, expired: bool, gen: int, epoch: int, localEpoch: int, active: bool,
     paused: bool, off: bool, pauses: int, crashed: bool, resumed: bool,
-    ownerRun: bool, clean: bool, sourceInRun: bool, grants: Set[Grant],
+    ownerRun: bool, clean: bool, sourceInRun: bool, seen: bool, grants: Set[Grant],
     schedule: bool, scheduleRev: int, scheduleAuthority: str, scheduleProposal: int, scheduleApproved: int, wake: Occurrence,
     queued: bool, admissions: List[Occurrence], starts: List[Occurrence],
     quiet: bool, deliverNow: bool, notifications: int,
@@ -51,7 +52,7 @@ module actionsProtocol {
     nextAuth: 1, nextApproval: 1, schema: 1, account: 1, connection: 1, precondition: 1,
     invalid: false, expired: false, gen: 0, epoch: 1, localEpoch: 1, active: true,
     paused: false, off: false, pauses: 0, crashed: false, resumed: false,
-    ownerRun: true, clean: true, sourceInRun: true, grants: Set(),
+    ownerRun: true, clean: true, sourceInRun: true, seen: false, grants: Set(),
     schedule: false, scheduleRev: 1, scheduleAuthority: "none", scheduleProposal: 0, scheduleApproved: 0,
     wake: { schedule: 1, rev: 1, due: 1 }, queued: false, admissions: List(), starts: List(),
     quiet: false, deliverNow: false, notifications: 0,
@@ -191,15 +192,15 @@ module actionsProtocol {
   action taint(owner: bool): bool = s' = { ...s, clean: false, ownerRun: owner, label: "taint" }
   action grantWith(k: int, guard: bool): bool =
     if (guard and not(s.ownerRun and s.clean and s.sourceInRun and mayAuthorize)) idle else
-    s' = { ...s, grants: s.grants.union(Set({ target: k, opClass: 2, source: s.gen, rev: 1, pauses: s.pauses })), label: "grant", target: k }
+    s' = { ...s, grants: s.grants.union(Set({ target: k, opClass: 2, source: s.gen, rev: 1, pauses: s.pauses, saw: s.seen })), label: "grant", target: k }
   action grantClick(k: int): bool =
     if (not(currentIntent(k).exists(i => valid(i) and s.approvals.exists(p =>
       p.child == k and p.rev == i.rev and p.digest == i.payload)))) idle else
-    s' = { ...s, grants: s.grants.union(Set({ target: k, opClass: 2, source: s.gen, rev: 1, pauses: s.pauses })), label: "grantClick", target: k }
+    s' = { ...s, grants: s.grants.union(Set({ target: k, opClass: 2, source: s.gen, rev: 1, pauses: s.pauses, saw: s.seen })), label: "grantClick", target: k }
   action scheduleWith(guard: bool): bool =
     if (guard and not(s.ownerRun and s.clean and s.sourceInRun and mayAuthorize)) idle else
     s' = { ...s, schedule: true, scheduleAuthority: if (s.ownerRun and s.clean and s.sourceInRun) "clean" else "none",
-      grants: s.grants.union(Set({ target: 1, opClass: 1, source: s.gen, rev: s.scheduleRev, pauses: s.pauses })), label: "schedule" }
+      grants: s.grants.union(Set({ target: 1, opClass: 1, source: s.gen, rev: s.scheduleRev, pauses: s.pauses, saw: s.seen })), label: "schedule" }
   action proposeSchedule =
     if (not(s.ownerRun)) idle else s' = { ...s, scheduleProposal: s.scheduleProposal + 1, label: "proposeSchedule" }
   action clickSchedule =
@@ -207,7 +208,7 @@ module actionsProtocol {
   action scheduleFromClick(guard: bool): bool =
     if (guard and not(s.scheduleProposal > 0 and s.scheduleApproved == s.scheduleProposal and mayAuthorize)) idle else
     s' = { ...s, schedule: true, scheduleAuthority: "click", scheduleApproved: 0,
-      grants: s.grants.union(Set({ target: 1, opClass: 1, source: s.gen, rev: s.scheduleRev, pauses: s.pauses })), label: "scheduleClick" }
+      grants: s.grants.union(Set({ target: 1, opClass: 1, source: s.gen, rev: s.scheduleRev, pauses: s.pauses, saw: s.seen })), label: "scheduleClick" }
   // "Tell me if nobody replies" in a message's menu (SPEC 13.6). The owner's
   // click enters through the inbox and creates the watch with no run, so what
   // the chat has read does not matter. The item is disabled while Juno is
@@ -215,7 +216,7 @@ module actionsProtocol {
   action scheduleFromMenu(guard: bool): bool =
     if (guard and not(mayAuthorize)) idle else
     s' = { ...s, schedule: true, scheduleAuthority: "menu",
-      grants: s.grants.union(Set({ target: 1, opClass: 1, source: s.gen, rev: s.scheduleRev, pauses: s.pauses })), label: "scheduleMenu" }
+      grants: s.grants.union(Set({ target: 1, opClass: 1, source: s.gen, rev: s.scheduleRev, pauses: s.pauses, saw: false })), label: "scheduleMenu" }
   val scheduleValid = s.schedule and s.grants.exists(g => g.target == 1 and g.opClass == 1 and
     g.rev == s.scheduleRev and g.source == s.gen)
   action queueWake = s' = { ...s, queued: true, wake: { schedule: 1, rev: s.scheduleRev, due: 1 }, label: "queue" }
@@ -292,15 +293,24 @@ module actionsProtocol {
     if (reservedOn(s.day) + actualOn(s.day) > limit or compactionOn(s.day, "") > limit / 4) idle else
     s' = { ...s, caps: s.caps.set(s.day, amount), label: "setCap" }
   }
-  action invalidate(kind: str): bool = s' = { ...s,
+  action invalidate(kind: str): bool = if (kind == "redact") redact("scoped") else s' = { ...s,
     schema: s.schema + (if (kind == "schema") 1 else 0), account: s.account + (if (kind == "account") 1 else 0),
     connection: s.connection + (if (kind == "connection") 1 else 0),
     precondition: s.precondition + (if (kind == "precondition") 1 else 0),
-    sourceInRun: s.sourceInRun and kind != "redact", invalid: s.invalid or kind == "redact", expired: s.expired or kind == "expire",
-    gen: s.gen + (if (kind == "redact") 1 else 0), grants: if (kind == "redact") Set() else s.grants,
-    scheduleProposal: if (kind == "redact") 0 else s.scheduleProposal,
-    scheduleApproved: if (kind == "redact") 0 else s.scheduleApproved,
-    schedule: if (kind == "redact") false else s.schedule, label: "invalidate" }
+    expired: s.expired or kind == "expire", label: "invalidate" }
+  // The current run reads content that a later removal takes (the owner's own messages; any run after them).
+  action see = s' = { ...s, seen: true, label: "see" }
+  // A removal (plan v3 §4.5, WP16): `gen` moves, so every open card expires and a waiting click is
+  // refused. Grants minted by runs that saw the removed content are revoked in the same transaction;
+  // the rest stay live in the new generation, so an unrelated schedule keeps waking. `scope` is
+  // "scoped", or the broken "little" (revokes none) and "all" (revokes every grant).
+  action redact(scope: str): bool = {
+    val kept = if (scope == "all") Set() else if (scope == "little") s.grants else s.grants.filter(g => not(g.saw))
+    s' = { ...s, sourceInRun: false, invalid: true, gen: s.gen + 1, seen: false,
+      grants: kept.map(g => { ...g, source: s.gen + 1 }),
+      scheduleProposal: 0, scheduleApproved: 0,
+      schedule: s.schedule and kept.exists(g => g.opClass == 1), label: "redact" }
+  }
 
   val newAuths = s.auths.exclude(before.auths)
   val intentBeforeDispatch = newAuths.forall(a => before.intents.contains(a.intent)) and before.intents.subseteq(s.intents)
@@ -328,7 +338,9 @@ module actionsProtocol {
     t.child == r.child and t.payload == r.payload and s.accepted.contains(t.id)))
   val scopedNoClickGrant = newAuths.forall(a => not(a.grant) or
     (a.intent.tier == 2 and before.grants.exists(g => g.target == a.intent.id and g.opClass == 2 and g.source == before.gen)))
-  val untrustedCannotGrant = s.grants.exclude(before.grants).isEmpty() or
+  // Grants compared without their generation: a removal carries grants into the next one, and mints none.
+  pure def ungenerated(gs: Set[Grant]): Set[Grant] = gs.map(g => { ...g, source: 0 })
+  val untrustedCannotGrant = ungenerated(s.grants).exclude(ungenerated(before.grants)).isEmpty() or
     (before.ownerRun and before.clean and before.sourceInRun) or
     (s.label == "grantClick" and before.approvals.exists(p => p.child == s.target and
       before.intents.exists(i => i.id == p.child and i.rev == p.rev and i.payload == p.digest))) or
@@ -343,6 +355,11 @@ module actionsProtocol {
   // Every live grant was minted since the last Pause (SPEC 13.9: after Resume,
   // steering a job needs a card again).
   val pauseRevokesGrants = s.grants.forall(g => g.pauses == s.pauses)
+  // A removal revokes every grant minted by a run that saw what it removed.
+  val redactionRevokesExposed = s.gen == before.gen or s.grants.forall(g => not(g.saw))
+  // ...and only those: a grant from a run that never saw it, such as an unrelated schedule's, stays live.
+  val redactionKeepsUnrelated = s.gen == before.gen or before.grants.filter(g => not(g.saw)).forall(old =>
+    s.grants.exists(g => g.target == old.target and g.opClass == old.opClass and g.rev == old.rev and g.pauses == old.pauses and g.source == s.gen))
   val quietHoursHoldNotifications = s.notifications == before.notifications or (not(before.off) and (not(before.quiet) or before.deliverNow))
   val scheduleGrantValid = not(s.schedule) or scheduleValid
   val occurrenceAdmissionOnce = s.admissions.listSet().forall(w => s.admissions.select(v => v == w).length() == 1)
@@ -379,7 +396,8 @@ module actionsProtocol {
     receiptMatchesAction and scopedNoClickGrant and untrustedCannotGrant and tier4NeverDispatched and allWritesGated and
     currentOwnerAuthorizes and pauseBlocksAuthorization and quietHoursHoldNotifications and scheduleGrantValid and
     occurrenceAdmissionOnce and cancelWinsBeforeAdmission and batchEffectsIndependent and outcomeEvidenceStable and
-    scheduleFromOwnerAuthority and cleanRunForNoClick and capHard and oneRaisePerClick and pauseRevokesGrants
+    scheduleFromOwnerAuthority and cleanRunForNoClick and capHard and oneRaisePerClick and pauseRevokesGrants and
+    redactionRevokesExposed and redactionKeepsUnrelated
 
   val pendingApproved = ids.filter(k => not(done(k)) and currentIntent(k).exists(i => valid(i) and
     s.approvals.exists(p => p.child == k and p.rev == i.rev and p.digest == i.payload and
@@ -415,7 +433,7 @@ module actionsProtocol {
       authorizeDispatch(k), transportSend(k), destinationAccept(k), recordReceipt(k), lose(k), reject(k), reconcile(k, true, true),
       crash, startup(true), pause("pause"), resume, cancel(true), taint(true), grantWith(k, true),
       proposeSchedule, clickSchedule, scheduleFromClick(true), scheduleWith(true), scheduleFromMenu(true), queueWake, deleteSchedule, admitWake(""), startWake(true),
-      invalidate("redact"), invalidate("schema"), seal,
+      redact("scoped"), see, invalidate("schema"), seal,
       all { s.nextSpend < 8, reserve(false, 2, true, "") }, all { s.nextSpend < 8, reserve(true, 2, true, "") },
       all { s.nextSpend < 8, reserve(false, 0, true, "") },
       { nondet cost = 0.to(3).oneOf(); settle("done", cost, cost, "") }, settle("refused", 0, 0, ""),
@@ -478,6 +496,8 @@ module actionsProtocol {
     if (op == "raise") allowDollar(k, bug != "raiseTwice") else
     if (op == "newDay") newDay else
     if (op == "owner") s' = { ...s, active: false, epoch: 2, label: "owner" } else
+    if (op == "see") see else
+    if (op == "redact") redact(if (bug == "revokeLittle") "little" else if (bug == "revokeAll") "all" else "scoped") else
     invalidate(op)
   }
   action script(commands: List[Command], bug: str): bool = all { not(reachedAgreement),
@@ -656,9 +676,17 @@ module actionsProtocol {
   pure val resumeGrant = List(c("tier2", 0), c("grant", 0), c("pause", 0), c("resume", 0), c("authorize", 0))
   action resumeGrantStep = script(resumeGrant, "")
   action resumeGrantBugStep = script(resumeGrant, "keepGrants")
-  action suiteInit = { nondet which = 0.to(49).oneOf(); all { s' = initial, before' = initial, pc' = 0, remaining' = drainLimit, scenario' = which } }
+  // A job started by a run that read the removed message loses its grant: steering it needs a card.
+  pure val redactExposed = List(c("tier2", 0), c("see", 0), c("grant", 0), c("redact", 0), c("authorize", 0))
+  action redactExposedStep = script(redactExposed, "")
+  action redactExposedBugStep = script(redactExposed, "revokeLittle")
+  // A schedule made before the removed message keeps its grant and still wakes; a job from a run that saw it does not.
+  pure val redactUnrelated = List(c("schedule", 0), c("see", 0), c("tier2", 0), c("grant", 0), c("redact", 0), c("queue", 0))
+  action redactUnrelatedStep = script(redactUnrelated, "")
+  action redactUnrelatedBugStep = script(redactUnrelated, "revokeAll")
+  action suiteInit = { nondet which = 0.to(51).oneOf(); all { s' = initial, before' = initial, pc' = 0, remaining' = drainLimit, scenario' = which } }
   val suiteCommands = List(negativeLookup, unknownRetry, hiddenRetry, approvalEdit, schemaRace, accountRace, connectionRace, preconditionRace, expireRace, redactRace, consumeBeforeSend, approvalReuse, startupAttempt, payloadBinding, receiptBinding, scopedGrant, reportGrant, reportLaunch, reportSchedule, wakeSchedule, destructive, ownerRace, pauseRace, offRace, quietNotification, cancelWake, cancelQueuedWake, duplicateWake, lateCancel, partialBatch, dedupeKey, dedupeAccept, parallelBudget, unknownSpend, compactionBudget, unknownDrain, approvedDrain, wakeDrain, pauseDrain, attemptEvidence, batchOrderRace, clickedSchedule,
-    compactionSettle, refusedSpend, dailyReset, raiseClick, overReportCap, capReached, menuSchedule, resumeGrant).nth(scenario)
+    compactionSettle, refusedSpend, dailyReset, raiseClick, overReportCap, capReached, menuSchedule, resumeGrant, redactExposed, redactUnrelated).nth(scenario)
   action suiteStep = script(suiteCommands, "")
   val case0 = scenario == 0 and reachedAgreement and (s.unknown == Set(1) and s.explained == Set(1))
   val case1 = scenario == 1 and reachedAgreement and (s.auths.size() == 1)
@@ -712,6 +740,9 @@ module actionsProtocol {
   val case47 = scenario == 47 and reachedAgreement and s.spends.size() == 4 and totalOn(0) == 8
   val case48 = scenario == 48 and reachedAgreement and not(s.schedule)
   val case49 = scenario == 49 and reachedAgreement and s.grants == Set() and s.auths == Set()
+  val case50 = scenario == 50 and reachedAgreement and s.grants == Set() and s.auths == Set()
+  val case51 = scenario == 51 and reachedAgreement and s.schedule and s.admissions.length() == 1 and
+    s.grants.forall(g => g.opClass == 1)
   // A click made before Pause waits, and after Resume is authorized and sent once.
   action resumedClickWitnessStep = script(List(c("propose", 0), c("click", 0), c("pause", 0), c("resume", 0)), "")
   val resumedClickSent = reachedAgreement and s.auths.size() == 1 and s.attempts.length() == 1 and s.receipts.size() == 1

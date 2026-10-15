@@ -229,7 +229,7 @@ export const NoteItem = Schema.TaggedStruct('note', {
 export type NoteItem = typeof NoteItem.Type
 
 /**
- * The 11 px uppercase label above a proactive group: "Scheduled · Daily
+ * The 11 px label above a proactive group: "Scheduled · Daily
  * catch-up", "T3 Code · Fix the sidebar flake". It carries "Why this?" and
  * one quiet action from the origin: "Pause schedule" for a schedule, "Mute
  * updates" for a job (milestone messages stop; the job runs on and stops

@@ -3,7 +3,8 @@ export {
   type FakeProvider, type FakeProviderOptions, type FakeRequest, type ModelStep, type UsageReport,
 } from './model/provider'
 export { compactorAnswer, type CompactorOptions } from './model/compactor'
-export { openRouterCatalogue, startFakeOpenRouter, type FakeOpenRouter, type FakeOpenRouterOptions, type OpenRouterRequest } from './model/openrouter'
+export { openRouterCatalogue, startFakeOpenRouter, type FakeOpenRouter, type FakeOpenRouterOptions, type OpenRouterRequest, type ToolCallAnswer } from './model/openrouter'
+export { startFakeOpenAi, type FakeOpenAi, type FakeOpenAiOptions, type OpenAiRequest } from './model/openai'
 export { codexModels, startFakeCodex, type FakeCodex, type FakeCodexOptions } from './codex/fakeCodex'
 export type { CodexInvocation, CodexModel, CodexToolCall, CodexToolOutcome, CodexTurn } from './codex/types'
 export { json, type FakeTool, type ToolCallRecord, type ToolResult } from './mcp/handler'

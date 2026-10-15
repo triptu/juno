@@ -79,7 +79,7 @@ export function createMainWindow(launch: Launch): BrowserWindow {
   })
 
   mainWindows.add(window)
-  setAppMenu(launch.sidebar?.collapsed ?? false)
+  setAppMenu({ sidebarHidden: launch.sidebar?.collapsed ?? false, privacy: launch.privacy === true })
   // The three-finger swipe (Electron does not see the two-finger one): left is Back, as in Safari.
   window.on('swipe', (_event, direction) => {
     if (direction === 'left') tabCommand(window, 'history.back')
@@ -134,12 +134,28 @@ function tabCommand(window: BaseWindow | undefined, command: MenuCommand): void 
   window.webContents.send(Events.menuCommand, command)
 }
 
-/** Whether the menu is built and with which View › Hide or Show Sidebar label. */
-let menuSidebarHidden: boolean | undefined
+/** What the View menu's labels follow: Hide or Show Sidebar, Hide or Show Message Text. */
+interface MenuState {
+  readonly sidebarHidden: boolean
+  readonly privacy: boolean
+}
 
-/** Rebuilds the app menu when the sidebar is hidden or shown, so View names the action it will take. */
-export function setSidebarHidden(hidden: boolean): void {
-  if (menuSidebarHidden !== undefined && menuSidebarHidden !== hidden) setAppMenu(hidden, true)
+/** The state the menu was built with; undefined until the first window. */
+let menuState: MenuState | undefined
+
+/** Rebuilds the app menu when the state its labels name changes, so View names the action it will take. */
+function updateAppMenu(patch: Partial<MenuState>): void {
+  if (menuState === undefined) return
+  const next = { ...menuState, ...patch }
+  if (next.sidebarHidden !== menuState.sidebarHidden || next.privacy !== menuState.privacy) setAppMenu(next, true)
+}
+
+export function setSidebarHidden(sidebarHidden: boolean): void {
+  updateAppMenu({ sidebarHidden })
+}
+
+export function setMenuPrivacy(privacy: boolean): void {
+  updateAppMenu({ privacy })
 }
 
 /** A menu item that hands `command` to the focused app window. */
@@ -159,13 +175,15 @@ const tabNumbers = [1, 2, 3, 4, 5, 6, 7, 8] as const
  * items wired through `fitMinimumSizeToZoom`: the default roles change the
  * zoom without telling main, so the minimum size could not follow.
  */
-function setAppMenu(sidebarHidden: boolean, rebuild = false): void {
-  if (menuSidebarHidden !== undefined && !rebuild) return
-  menuSidebarHidden = sidebarHidden
+function setAppMenu(state: MenuState, rebuild = false): void {
+  if (menuState !== undefined && !rebuild) return
+  menuState = state
   const view: MenuItemConstructorOptions[] = [
-    command('toggle-sidebar', sidebarHidden ? 'Show Sidebar' : 'Hide Sidebar', 'Control+Command+S', 'sidebar.toggle'),
+    command('toggle-sidebar', state.sidebarHidden ? 'Show Sidebar' : 'Hide Sidebar', 'Control+Command+S', 'sidebar.toggle'),
+    // Privacy mode (SPEC section 5): blurs message text for screen sharing.
+    command('toggle-privacy', state.privacy ? 'Show Message Text' : 'Hide Message Text', 'Control+Command+H', 'privacy.toggle'),
     // In a topic tab ⌘J opens or closes the Juno panel; elsewhere it opens the Juno tab.
-    ...(agentOn() ? [command('juno', 'Juno', 'CommandOrControl+J', 'juno.toggle')] : []),
+    command('juno', 'Juno', 'CommandOrControl+J', 'juno.toggle'),
     { type: 'separator' },
     { role: 'reload' },
     { role: 'forceReload' },
@@ -251,19 +269,16 @@ function setAppMenu(sidebarHidden: boolean, rebuild = false): void {
   )
 }
 
-/** The Juno Agent runs only with JUNO_AGENT=1 until the chat ships (ADR 0012, M2). */
-const agentOn = () => process.env.JUNO_AGENT === '1'
-
 /**
- * The page reads `?theme=`, `?accent=` and `?sidebar=` so its first render matches the window background, the saved accent and the
- * saved sidebar, and `?agent=1` so the Juno button and Ask Juno show from the first frame when the agent runs.
+ * The page reads `?theme=`, `?accent=`, `?density=`, `?privacy=` and `?sidebar=` so its first render matches the window background, the saved
+ * accent, density and privacy mode, and the saved sidebar.
  */
 function pageUrl(base: string, launch: Launch): string {
   const url = new URL(base)
-  if (agentOn()) url.searchParams.set('agent', '1')
   url.searchParams.set('theme', launch.theme)
   url.searchParams.set('accent', launch.accent ?? DEFAULT_ACCENT)
   url.searchParams.set('density', launch.density ?? DEFAULT_DENSITY)
+  if (launch.privacy === true) url.searchParams.set('privacy', 'on')
   const sidebar = launch.sidebar ?? DEFAULT_SIDEBAR
   url.searchParams.set('sidebar', `${sidebar.width}${sidebar.collapsed ? '-hidden' : ''}`)
   return url.toString()

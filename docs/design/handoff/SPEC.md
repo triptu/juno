@@ -61,15 +61,41 @@ Titles resolve in this order. A title you set by renaming (stored in Juno only) 
 
 ### Top to bottom
 
-1. **Title bar**: on the left, after the traffic lights, the sidebar button, Back and Forward (section 6); on the right, Search (⌘K), New chat (⌘N, section 9), and your avatar. The avatar menu holds Set yourself away or active, status, Notifications, Preferences, AI assist, switch workspace and sign out. There is no footer and no name label.
+1. **Title bar**: on the left, after the traffic lights, the sidebar button, Back and Forward (section 6); on the right, Search (⌘K), New chat (⌘N, section 9), and your avatar. The avatar menu holds Set yourself away or active, status, Notifications, Preferences, AI assist, switch workspace and sign out. There is no name label, and no footer except the privacy footer while privacy mode is on (below).
 2. **Navigation**: Home, All topics and Juno (⌘J). Only Juno shows a count: its unread messages, as a soft grey tag. A properly spaced hairline separates these from the list.
-3. **Quick filters** on one row: All · Channels · DMs on the left and an Unread toggle on the right. DMs include group DMs. There are no counters or dots on Unread. A small dot appears next to Channels or DMs when that group has unread topics you are not viewing.
-4. **Scope chip**, shown only when narrowed to one channel: "#eng ×". Narrowing is rare. It happens from ⌘K (a channel's "Show its topics" result), by clicking a #channel chip in a message, or by clicking a topic's context pill.
+3. **Quick filters** on one row: a horizontally scrollable row of pills on the left and an Unread only toggle on the right, an icon pill like Channels and DMs (a box with a dot on its corner) with that tooltip and accessible name, shown pressed while it is on. The pills are All, Channels (a hash icon), DMs (a person icon), then your views (below), then a "+" pill that makes a new view. Channels and DMs are icon-only, with a tooltip and an accessible name. DMs include group DMs. The row never grows taller: when the pills overflow, the row scrolls sideways with the trackpad or the mouse wheel and the list does not move. Unread only stays fixed at the right. There are no counters or dots on it. A small dot appears on Channels or DMs when that group has unread topics you are not viewing.
+4. **Scope chip**, shown only when narrowed to one channel: "#eng ×". Picking a view clears it. Narrowing is rare. It happens from ⌘K (a channel's "Show its topics" result), by clicking a #channel chip in a message, or by clicking a topic's context pill.
 5. **The topic list**: Pinned first, then Recent, sorted by latest activity.
+
+### Views
+
+A view is a set of channels and DMs you pick. Its pill shows the Main and threads of those conversations, by the same rules as All ("What shows up"). Views are Juno's own: nothing is written to Slack.
+
+- **The pill** shows the view's icon when it has one, otherwise its name. An icon pill has the name as its tooltip and accessible name. A view's pill shows a dot only when one of its topics has an unread mention of you; plain unread does not light it, so a view of bot channels stays quiet.
+- **Keep these out of All.** Each view has this one setting. When it is on, the view's conversations show only in that view: never in All, Channels or DMs, and they light none of those dots. ⌘K, All topics, Home and notifications still see everything. Narrowing to one of those channels ("Show its topics") still shows it. A conversation in two views is kept out of All when either view says so.
+- **Making and editing.** The "+" pill opens a small sheet with four fields and nothing else: the name, an optional icon from the app's icon set, the conversations (a searchable picker), and the Keep these out of All setting. Save makes the view and selects it. Right-click a pill for Edit view, Move left, Move right and Delete view; dragging a pill also reorders. Delete has Undo.
+- **Adding a conversation.** A channel's or DM's menu (and a Main row's menu) has **Add to view ›**: your views with a check on the ones that hold it (choosing a checked one removes it), then New view…, which opens the sheet with the conversation already in it. Adding and removing show a toast with Undo.
+- **Juno can make one.** "Make a Bots view with every alerts channel" is a Juno settings task: the same command the sheet uses. (Not wired to Juno yet; the engine command is the seam.)
+
+### Privacy mode
+
+For screen sharing. **Hide message text** in the avatar menu (or ⌃⌘H, View › Hide Message Text) blurs message text that shows without you opening anything, so it cannot be read over a shared screen:
+
+- the sidebar row preview ("Sender: text"),
+- the All topics preview line,
+- a Home row's title when Juno wrote it (the plain titles, such as "Elena asked you something", stay).
+
+What you need to find your way stays readable: titles, channel and people names, times, counts and tags. A topic, the Juno chat and a peek are not blurred: you open them on purpose. Hovering or focusing a blurred line does not reveal it, and blurred text cannot be selected.
+
+While the mode is on, macOS notifications keep their title (who or where) and replace the message with "Message hidden", because they show over a shared screen too.
+
+While the mode is on, a small footer at the bottom of the sidebar says "Message text hidden" with a **Show** button, which turns it off in one click. The avatar menu item reads **Show message text**.
+
+The mode is remembered across a relaunch, and the first frame after a relaunch is already blurred: a restart in the middle of a call must never show text. Juno never turns it off by itself. (Turning it on by itself when sharing starts is researched in `docs/research/screen-share-detection.md`, not built.)
 
 ### Row anatomy
 
-Each row is a tile followed by three lines. The tile is the topic's art: a small AI-drawn illustration about what the topic discusses, with no container. Every topic gets one, including a channel's Main and threads inside DMs. Until the art exists, or when AI is off, the tile shows a calm free-form placeholder shape picked per topic. A DM's Main shows the person's Slack profile photo instead (coloured initials when there is no photo). Line one is the title and time. Line two is a two-line preview of the latest message as "Sender: text", with any ">" quote lines stripped. Line three is meta: channel icon and name, a small stack of participant avatars, and tags such as Main or Reopened. There is no message count and no "messages outside threads" label. A Main row may also show a thread icon with the number of threads started in that channel since you last read its Main, hidden when zero. Unread topics have a semibold title and a soft grey count tag. Mentions of you get a quiet "@" tag. Density (Preferences › Appearance, section 14) is the only choice that changes the row.
+Each row is a tile followed by three lines. The tile is the topic's art: a small AI-drawn illustration about what the topic discusses, with no container. Every topic gets one, including a channel's Main and threads inside DMs. Until the art exists, or when AI is off, the tile shows a calm free-form placeholder shape picked per topic. A DM's Main shows the person's Slack profile photo instead (coloured initials when there is no photo). Line one is the title and time. Line two is a one-line preview of the latest message as "Sender: text", ending with an ellipsis when it does not fit, with any ">" quote lines stripped. Every row is the same height. Line three is meta: channel icon and name, a small stack of participant avatars, and tags such as Main or Reopened. There is no message count and no "messages outside threads" label. A Main row may also show a thread icon with the number of threads started in that channel since you last read its Main, hidden when zero. Unread topics have a semibold title and a soft grey count tag. Mentions of you get a quiet "@" tag. Density (Preferences › Appearance, section 14) is the only choice that changes the row.
 
 ### What shows up
 
@@ -99,8 +125,9 @@ Each row is a tile followed by three lines. The tile is the topic's art: a small
   - Resolve or reopen
   - Copy Slack link
   - Open in Slack
+  - Add to view (Main rows: the channel or DM)
   - Ignore #channel
-- **Channel context menu** (right-click a topic's context pill, a #channel chip in a message, or a channel result in ⌘K): Show its topics, Open Main, Mark channel as read or unread, Notify me, Ignore channel, and Ask Juno (section 7, Juno panel).
+- **Channel context menu** (right-click a topic's context pill, a #channel chip in a message, or a channel result in ⌘K): Show its topics, Open Main, Mark channel as read or unread, Notify me, Add to view, Ignore channel, and Ask Juno (section 7, Juno panel).
 - **Person menu** (right-click a sender's name or avatar in a message, or an @person chip): Notify me about them, and Ask Juno.
 - **Peek** is how you read without marking anything read. Hold the peek key while the pointer is over a sidebar row and the topic opens in a popover to the right of the sidebar. It is read-only and scrolls, and it does not mark anything read, open a tab or move focus, so you stay where you were. Moving to another row while holding the key switches the peek; releasing it closes the popover. The key defaults to ⌥ Option, which works while you type; Preferences can change it to Space, which works only when no text field has focus. (Fn is not offered: macOS does not report it to apps reliably.)
 - **Rename** happens inline in the row or the topic header. Enter saves and Esc cancels.
@@ -174,7 +201,7 @@ Juno can sit beside any topic, so you can talk about what you are looking at wit
 
 ## 8. Composer
 
-- **Shape.** A single line with a + attach button on the left and a round send button on the right. It grows with content to about 8 lines, then scrolls inside itself.
+- **Shape.** A single line with a round send button on the right. A + attach button joins it on the left when attachments are built; until then there is none. It grows with content to about 8 lines, then scrolls inside itself.
 - **No helper text.** Shortcuts like @, # and Enter to send are obvious and not spelled out. The channel is not repeated above the composer, because the header pill already shows it.
 - **Sending.** Enter sends at once: the message shows in the topic straight away and goes to Slack in the background, never twice. If Slack refuses it, it stays where it is with "Not sent.", Retry and Delete draft. Sends wait out a lost connection and go when it is back.
 - **Drafts.** Each topic keeps its own draft, through tab switches and restarts.
@@ -338,7 +365,7 @@ Juno speaks on its own only about things you set up: schedules you asked for, pr
   - **In the chat.** "Tell me if Sam doesn't reply by Thursday" sets one. Juno picks who has to reply and how long to wait from your words, or by its own judgement when you gave none, and shows the watch as a Schedule card.
   - **From the menu.** Tell me if nobody replies in your own message's menu (section 7) sets the watch at once, without asking Juno: your click is the approval. A reply from anyone but you counts. The wait is one notification day: the same time on your next notification day, or the start of your notification hours if that time falls outside them. A toast says "Watching for a reply until Thu 9:00 · Undo", and the chat shows the watch as a Schedule card. To change the time or who must reply, reply to the card or just say so. The item is disabled while Juno is paused or working on your other Mac.
   - A reply ends the watch quietly. If the wait runs out with no reply, Juno says so and brings a Send message card with a nudge draft in that thread, written to sound like you. You can edit it, and it sends only on your click. If a reply arrives while the card is open, the card expires. Juno never sets a watch again on its own. Watches are listed on Scheduled with the schedules.
-- **The label.** A proactive group carries a small uppercase label ("Scheduled · Daily catch-up", "T3 Code · Fix the sidebar flake") with "Why this?" and one quiet action: "Pause schedule" on a schedule's group, "Mute updates" on a job's group. Mute updates stops Juno's updates about that job; the job runs on and stops only from its Task card.
+- **The label.** A proactive group carries a small label ("Scheduled · Daily catch-up", "T3 Code · Fix the sidebar flake") with "Why this?" and one quiet action: "Pause schedule" on a schedule's group, "Mute updates" on a job's group. Mute updates stops Juno's updates about that job; the job runs on and stops only from its Task card.
 - **The summary when notification hours start** (section 14) also lands in the chat as one Juno message labelled "Summary", one line per message with a link to it. The app writes it from the list the notification counts, not the model, so it costs nothing.
 - **Nothing to say, nothing shown.** A wake that finds nothing worth saying shows nothing in the chat; Activity records that it ran.
 - **Delivery.** The chat always gets the message. Whether your Mac notifies follows section 14. A schedule either notifies or doesn't; there is no digest.
@@ -401,12 +428,12 @@ Juno remembers the whole chat. Older parts are kept as a summary that grows dens
 - **Untrusted content.** Anything Juno reads from Slack, a connection or a delegate can contain instructions. Once such content is in the conversation, the no-click rules for the Work tier stop for that run and Juno proposes cards instead, with a Because line. Only you can move a connection tool between Read and Outward, in Settings › Connections.
 - **Secrets.** Juno never puts a key or token into a tool call or a brief. A match is blocked and a fixed line says so (13.7).
 - **Three switches.** Pause Juno, a connection's own switch, and the global AI assist switch (section 15), which turns the chat off entirely. None of them is a Stop for a reply. Pause lets the current reply finish without acting (no card runs and no action is authorized), asks every running session and delegate to stop, and starts nothing new; the composer still works and messages wait for Resume. After Resume, telling a session something needs a card again, because Pause revokes what the conversation had allowed.
-- **Activity** lists every run: who asked, when, the outcome, each action from the Local tier up with the decision made, and one folded read line. Failures are in plain words with "Copy details".
-- **Settings are yours.** Models, the spend cap, rules, tiers and connections change only in Settings. No conversation can change them. Notification settings and hours (section 14) are the exception: Juno changes them from your own words in a clean conversation, like a schedule, never from something it read, and the change shows "Notifications changed · Undo". A correction about a message Juno read (Tell Juno quotes it, 14) brings Slack content into the run, so Juno proposes that change as a Change card with the old and new text; Apply makes it, and the card then reads "Applied · Undo".
+- **Activity** lists every run: who asked, when, the outcome, each action from the Local tier up with the decision made, and one folded read line. Only a run with actions gets a card; a run with none is its line alone, with its read line under it. Failures are in plain words with "Copy details".
+- **Settings are yours.** Models, the spend cap, rules, tiers and connections change only in Settings. No conversation can change them. Notification settings and hours (section 14), and custom sidebar views (section 5), are the exceptions: Juno changes them from your own words in a clean conversation, like a schedule, never from something it read, and the change shows Undo ("Notifications changed · Undo" for notifications, "Applied · Undo" for a view). A correction about a message Juno read (Tell Juno quotes it, 14) brings Slack content into the run, so Juno proposes that change as a Change card with the old and new text; Apply makes it, and the card then reads "Applied · Undo".
 
 ### 13.10 Settings and pages
 
-The Juno header menu (the chevron beside "Juno" in the Juno tab and the panel) opens Scheduled, What Juno remembers, Memory of this chat, Activity, Connections and Settings › Juno. **Settings › Juno** holds the chat model (the newest of Claude Sonnet, Claude Opus, Muse, GPT Sol or Grok, resolved from the provider's catalogue; Sonnet by default), the compaction model, today's spend and the daily cap ($2 by default), the OpenRouter key (with a line when the provider rejected it) and Codex status, your rules, Pause, the backup folder with "Rotate recovery phrase after removals" (off by default), and who owns Juno's state with Export recovery phrase, Move to another Mac and Restore from backup (13.8). **Connections** shows each server's state, the address in use, and the tools it offers with their tier. The T3 Code row also holds its address and the switch "Allow T3 Code over the local network", off by default; over the network only an https address works, so with the switch off Juno uses T3 Code on this Mac only.
+The Juno header menu (the chevron beside "Juno" in the Juno tab and the panel) opens Scheduled, What Juno remembers, Memory of this chat, Activity, Connections and Settings › Juno. **Settings › Juno** holds the chat model (the newest of Claude Sonnet, Claude Opus, Muse, GPT Sol or Grok, resolved from the provider's catalogue; Sonnet by default; each choice reads as the model's own name and its price, "Claude Sonnet 5.5 · $2 in, $10 out per million tokens"), the compaction model, today's spend and the daily cap ($2 by default), the OpenRouter key (with a line when the provider rejected it) and Codex status, your rules, Pause, the backup folder with "Rotate recovery phrase after removals" (off by default), and who owns Juno's state with Export recovery phrase, Move to another Mac and Restore from backup (13.8). **Connections** shows each server's state, the address in use, and the tools it offers with their tier. The T3 Code row also holds its address and the switch "Allow T3 Code over the local network", off by default; over the network only an https address works, so with the switch off Juno uses T3 Code on this Mac only.
 
 ### 13.11 Writing
 
@@ -519,7 +546,7 @@ Use the Littlebird design system's tokens.
 
 ## 17. Writing
 
-- **Case.** Sentence case everywhere.
+- **Case.** Sentence case everywhere, small labels included: "Today", "3 new", "Channels", never uppercase.
 - **Buttons** are short and start with a verb: Resolve, Send, Post in thread, Fix and send.
 - **Relative time:** 4m, 2h, Yesterday, 3d.
 - **Emoji.** None in chrome. Users' messages are their own, and so are reactions in the Juno chat: a reaction is content, not chrome.
@@ -538,6 +565,7 @@ Use the Littlebird design system's tokens.
 | ⌃Tab / ⌃⇧Tab, ⌘⇧] / ⌘⇧[ | Next / previous tab |
 | ⌘[ / ⌘] | Back / forward in the tab's history |
 | ⌃⌘S | Hide or show the sidebar |
+| ⌃⌘H | Hide or show message text (privacy mode, section 5) |
 | ⌘J | In a topic, open or close the Juno panel. Elsewhere, open the Juno tab with the composer focused |
 | ⌘Z | Undo the last topic action: resolve, reopen, pin, rename, mark read or unread, Notify me change or ignore. Sends are final (ADR 0010) |
 | ⌘ click / ⌘ Enter | Open in a new tab |

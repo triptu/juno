@@ -232,13 +232,13 @@ Root text settings: `font-size: 14.5px; line-height: 1.5; letter-spacing: 0; -we
 
 ### 2.2 Type roles
 
-Sizes are the Figtree values; the prototype's Inter value is half a pixel smaller for every sans role at or below 15px (see 2.1). Letter spacing is 0 for every sans role except the three uppercase labels. Family is sans unless stated.
+Sizes are the Figtree values; the prototype's Inter value is half a pixel smaller for every sans role at or below 15px (see 2.1). Letter spacing is 0 for every sans role. Every label is in sentence case (SPEC §17); there are no uppercase labels, so none needs tracking. Family is sans unless stated.
 
 | Role | Size | Weight | Line height | Letter spacing | Colour | Where |
 | --- | --- | --- | --- | --- | --- | --- |
-| Section label | 11px | 500 | normal | 0.06em, uppercase | muted | Pinned / Recent / channel groups, popover headings (People, Channels, Recent, Results, Juno) |
-| Table header | 11.5px | 500 | normal | 0.06em, uppercase | muted | All topics columns |
-| New divider | 11.5px | 600 | normal | 0.06em, uppercase | `--hl` | "3 NEW" |
+| Section label | 11px | 500 | normal | 0 | muted | Pinned / Recent / channel groups, popover headings (People, Channels, Recent, Results, Juno) |
+| Table header | 11.5px | 500 | normal | 0 | muted | All topics columns |
+| New divider | 11.5px | 600 | normal | 0 | `--hl` | "3 new", and the Juno chat's day label ("Today") in muted |
 | Tag | 11.5px | 500 | 18px box | 0 | subtle / muted | Main, Reopened, counts, @, confidence badge, menu hints, ⌘ hints |
 | Tag small | 12px | 500 / 400 | | 0 | | Row Resolve button, card footnotes, "Use", Mark read |
 | Meta | 12.5px | 400 | normal | 0 | muted | Row line 3, times, message timestamps, card headers, status chips (500), bubble name line, log reasons, the page header's 24px context pill (600) and island buttons (500) |
@@ -246,7 +246,7 @@ Sizes are the Figtree values; the prototype's Inter value is half a pixel smalle
 | Small button | 13px | 500 | 28px box | 0 | | Resolve (hint), Fix and send, Stop ignoring, Not yet |
 | Thread link | 13px | 400 (count 600) | 26px box | 0 | subtle | "2 replies · Title ›" |
 | UI default | 13.5px | 400 / 500 | 1.5 | 0 | default | Nav, menu items, filters, buttons, selects, inputs, toast, table "Where" |
-| Preview | 13.5px | 400 | 1.45 | 0 | muted (subtle if unread) | Row line 2, clamped to 1 or 2 lines |
+| Preview | 13.5px | 400 | 1.45 | 0 | muted (subtle if unread) | Row line 2, one line with an ellipsis |
 | Body small | 14px | 400 | 1.55–1.6 | 0 | subtle | Picker rows, Compact message body |
 | Body | 14.5px | 400 | 1.6 | 0 | default | Message body (Comfortable), composer (lh 22px), rule rows, palette labels, textareas |
 | Row title | 15px (14 compact) | 500, 600 unread | 22px box | 0 | default | Sidebar row line 1; All topics title is 14.5px |
@@ -345,9 +345,13 @@ All [proto] measured at 1280×800 with Inter unless marked.
 | `--home-width` | 480px: Home's column of item rows and the Ask Juno field |
 | `--page-width-narrow` | 680px |
 | `--page-width` | 720px (Juno) |
-| `--page-width-settings` | 760px (Preferences), 880px (Notifications) |
+| `--page-width-settings` | 760px: Notifications, Preferences and Settings › Juno, so the settings pages share one column and one title edge |
+| `--settings-label-width` | 104px: the label column of Preferences' rows (Theme, Accent, Density, Hold to peek), so every control starts on one edge |
 | `--palette-width` | 560px, max calc(100% − 48px), top offset 96px |
 | `--menu-width` | 236px context menu; `--menu-width-account` 248px avatar menu, `--menu-width-browse` 300px, `--menu-width-mention` 280px mention popover, `--menu-width-picker` 340px New chat pickers |
+| `--sidebar-inset` | 10px: the sidebar's inset on both sides (title bar end, nav, filter row, rows); the list's scrollbar gutter sits inside it on the right |
+| `--filter-pill-max-width` | 120px: a sidebar view's name pill; longer names end with an ellipsis (inventory 2.3) |
+| `--view-sheet-list-max-height` | 200px: the view sheet's conversation list, which scrolls past it |
 | `--toast-max-width` | 352px |
 | `--peek-width` | 480px peek popover, 8px right of the sidebar, from under the title bar to 8px above the window's bottom; never wider than the window has room for |
 | `--popover-max-height` | 400px, and never taller than the window below the title bar (`100vh − --titlebar-height − --space-5`), so the account menu fits at the minimum window size; the content scrolls inside. `--picker-max-height` 300px |
@@ -357,6 +361,7 @@ All [proto] measured at 1280×800 with Inter unless marked.
 | `--all-topics-columns` | All topics table grid: `minmax(200px, 1fr) minmax(0, 150px) 104px 44px 84px` |
 | `--all-topics-table-min` | 576px: below it the All topics table scrolls sideways (the columns' minimums, 16px gaps, row and table padding) |
 | `--code-block-max-height` | 150px, then the block scrolls inside; the wheel goes on to the page at its edges |
+| `--toolbar-clip-margin` | 44px: how far a message row may paint outside its box (the 36px toolbar and its shadow), so a narrow row's toolbar can sit above it. A plain length: Chromium ignores `calc()` in `overflow-clip-margin` |
 | `--toolbar-height` / `--toolbar-reserve` | 36px / 243px. The message hover toolbar's height, and the width a message header keeps free at its end so the name, the time and the first body line never run under it (inventory 6.5). The Main toolbar measures 223px with More (M6b), plus a 20px gap |
 | `--thumb-max-width` / `--thumb-max-height` | 360px / 280px. An image thumbnail in a message is scaled by its own aspect ratio inside this box, and the box is sized before the bytes arrive (performance.md 3.3). File cards are `--thumb-max-width` wide |
 
@@ -376,7 +381,7 @@ All [proto] measured at 1280×800 with Inter unless marked.
 | `--control-xl` | 36px | topic-list items in Juno cards, reply options (min), title input |
 | `--field-min` | 40px | Composer textarea single line (`--composer-padding-block` 9 + `--composer-line-height` 22 + 9), To field 44 |
 | `--row-44` / `--row-48` / `--row-52` | 44, 48, 52px | Today log row, notification rule row, All topics table row (ListRow `minHeight`) |
-| `--row-topic-estimate` | 85px | The `contain-intrinsic-size` estimate for sidebar rows off screen (performance.md 3.2). It sizes the content box, so it is the measured row (Comfortable, two preview lines: 107px) minus the 22px of block padding |
+| `--row-topic-estimate` | 66px | A sidebar row's content box (title, one-line preview, meta), rounded up to a whole pixel. The row's fixed height is this plus its block padding (88px Comfortable), and it is the exact `contain-intrinsic-size` for rows off screen (performance.md 3.2) |
 | `--row-message-estimate` | 56px | The same estimate for message rows off screen (performance.md 3.3): a name line and one body line, without the row's block padding |
 | `--row-bubble-estimate` | 38px | The estimate for a Juno chat bubble row off screen: one 22px line with 8px padding above and below |
 
@@ -412,9 +417,13 @@ Sidebar row heights per density (Preferences › Appearance; rows include the ti
 | Comfortable (default) | 90 / 109 | 11px | 3px | 14.5px |
 | Compact | 80 / 99 | 8px | 1px | 13.5px |
 
-[built M10] The `density` group in `tokens.stylex.ts` holds what changes, and `compact` in `themes.stylex.ts` overrides it on `<html>`: `--density-row-padding-block` 11px / 8px, `--density-row-line-gap` (line three's margin) 2px / 0px, `--density-row-tile-zoom` 1 / 0.8182 (the 44px tile drawn at 36px), `--density-row-estimate` (the off-screen estimate) `--row-topic-estimate` / 83px, `--density-message-padding-block` 4px / 2px, `--density-message-group-gap` 12px / 6px. The title size does not change yet.
+[built M10] The `density` group in `tokens.stylex.ts` holds what changes, and `compact` in `themes.stylex.ts` overrides it on `<html>`: `--density-row-padding-block` 11px / 8px, `--density-row-line-gap` (line three's margin) 2px / 0px, `--density-row-tile-zoom` 1 / 0.8182 (the 44px tile drawn at 36px), `--density-row-estimate` (the row's content height and off-screen estimate) `--row-topic-estimate` / 64px, `--density-message-padding-block` 4px / 2px, `--density-message-group-gap` 12px / 6px. The title size does not change yet.
 
 Gap between rows: 2px. All topics table row: min 52px. Notification rule row: min 48px. Today log row: min 44px. Palette result: 55px. Menu item: 30px (context) / 32px (other menus). Message group spacing (margin above a new sender): Compact 6px, Comfortable 12px. Message padding: 2 8 / 4 8.
+
+### Privacy mode
+
+`--privacy-blur` 6px (`sizes` group). With `data-privacy` on `<html>`, every element marked `data-sensitive` gets `filter: blur(var(--privacy-blur))` from `global.css` (SPEC section 5, Privacy mode). At 6px a 13px line reads as a soft grey bar: the shape of a line, no letters. Hover never removes it.
 
 ### Composer
 

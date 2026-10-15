@@ -17,24 +17,53 @@ export const AgentConfig = Schema.Struct({
 export type AgentConfig = typeof AgentConfig.Type
 
 /**
+ * The model provider main hands the agent (SPEC 13.10): OpenRouter with its
+ * key, or one OpenAI-compatible endpoint with its base URL and maybe a key.
+ * Keys come from the keychain (or `OPENROUTER_API_KEY` in development) and
+ * stay in the agent's memory.
+ */
+export const AgentProvider = Schema.Union([
+  Schema.TaggedStruct('openRouter', { key: Schema.String }),
+  Schema.TaggedStruct('custom', { baseUrl: Schema.String, key: Schema.NullOr(Schema.String) }),
+])
+export type AgentProvider = typeof AgentProvider.Type
+
+/**
  * main -> agent. A `hostPort` message carries a port to the host in
  * `ports[0]`; a new one follows every host restart. A `rendererPort` carries
- * a port to one renderer, for the agent's RPCs (`AgentRpcs`). `openRouterKey`
- * is the key main holds (the keychain's, or `OPENROUTER_API_KEY` in
- * development), sent once it is loaded and again on every change from
- * Settings › Juno; the agent keeps it in memory. `null` when there is none.
+ * a port to one renderer, for the agent's RPCs (`AgentRpcs`). `provider` is
+ * the active provider, sent at spawn and again on every change from
+ * Settings › Juno. Main runs the agent only while one is set up, so `null`
+ * comes only just before main stops it.
  */
 export const MainToAgent = Schema.Union([
   Schema.TaggedStruct('config', { config: AgentConfig }),
   Schema.TaggedStruct('hostPort', {}),
   Schema.TaggedStruct('rendererPort', {}),
-  Schema.TaggedStruct('openRouterKey', { key: Schema.NullOr(Schema.String) }),
+  Schema.TaggedStruct('provider', { provider: Schema.NullOr(AgentProvider) }),
+  /** Main's answer to a `credential` request. `value` is only set for `load`. */
+  Schema.TaggedStruct('credentialReply', { requestId: Schema.Number, ok: Schema.Boolean, value: Schema.optionalKey(Schema.NullOr(Schema.String)) }),
 ])
 export type MainToAgent = typeof MainToAgent.Type
+
+/**
+ * What the MCP manager asks main for (WP17). Main owns the keychain: an MCP
+ * connection's OAuth state (`load`, `save`, `clear`) is kept there by
+ * connection id, never in a file. `open` shows an authorization URL in the
+ * system browser. Main answers each with a `credentialReply`.
+ */
+export const CredentialRequest = Schema.Union([
+  Schema.TaggedStruct('load', { id: Schema.String }),
+  Schema.TaggedStruct('save', { id: Schema.String, state: Schema.String }),
+  Schema.TaggedStruct('clear', { id: Schema.String }),
+  Schema.TaggedStruct('open', { url: Schema.String }),
+])
+export type CredentialRequest = typeof CredentialRequest.Type
 
 /** agent -> main. */
 export const AgentToMain = Schema.Union([
   /** The agent reached its host on the current port. */
   Schema.TaggedStruct('ready', { host: HostHello }),
+  Schema.TaggedStruct('credential', { requestId: Schema.Number, request: CredentialRequest }),
 ])
 export type AgentToMain = typeof AgentToMain.Type

@@ -5,7 +5,7 @@ The Juno Agent core: a portable, durable personal assistant. A plain Node progra
 ## What it owns today
 
 - `startAgent(config, connection, { turns?, renderer? })`: connects to the host over the AgentHost port, calls `host.hello`, refuses a host on another protocol, follows `host.presence`, and, given `turns`, opens the turn engine on `config.agentDir` with the Slack read tools bound to the host. Given `renderer`, it serves the renderer's RPCs on the ports that transport gives. Returns `{ host, turns, reads, presence, presenceChanges, stop }`. `connection.acquire()` gives the next host port; the client takes a new one after the host restarts.
-- `openRouterTurns(key, picker?)`: the app's turn options: OpenRouter, with the owner's saved chat and compaction families (`src/settings/`) resolved in the picker's rows, and the saved daily cap. `modelPicker({ origin? })` lists the rows: OpenRouter's catalogue once read today (`createCatalogue`), else pi-ai's own (`piRows`). `openRouterKey()` holds the key main sends, in memory; a request waits until main has said whether there is one. Given a picker, `startAgent` also serves Settings › Juno.
+- `providerTurns(connection, picker?)`: the app's turn options: the active provider, OpenRouter or one OpenAI-compatible endpoint (`createProviderTransport`, both behind one guard), with the owner's saved choice (`src/settings/`) in the picker's rows, and the saved daily cap. `providerConnection()` holds the provider main sends, keys included, in memory; a request waits until main has sent one. `modelPicker(connection, { origin? })` lists the active provider's rows: OpenRouter's catalogue once read today (`createCatalogue`), else pi-ai's own (`piRows`); or the endpoint's `/models` (`listCustomModels`), else a typed id (`customRow`). Given a picker and a connection, `startAgent` also serves Settings › Juno.
 - `src/settings/`: Settings › Juno (`createJunoSettings`). See "Settings › Juno" below.
 - `src/serve/`: the renderer's RPCs (`AgentRpcs`). See "The chat server" below.
 - The turn engine (WP11): `openTurns(options)`, or the `TurnEngine` Effect service. See "Turns" below.
@@ -19,14 +19,14 @@ Files in the agent directory (plan v3 §2.2):
 | File | What |
 | --- | --- |
 | `owner.lock` | The single-writer lock: an SQLite file held with `locking_mode = EXCLUSIVE`. Its connection is referenced from module scope and closed last (G9). A second process fails with `OwnerLockHeld` |
-| `agent.sqlite` | Juno's own records, WAL with `synchronous = FULL`, `fullfsync` and `checkpoint_fullfsync` |
+| `agent.sqlite` | Juno's own records, WAL with `synchronous = FULL`, `fullfsync` and `checkpoint_fullfsync`, and `secure_delete = ON` (WP16) |
 | `pi-<incarnation>.sqlite` | The pi-durable journal, opened through pi's Node adapter with the same settings |
 
 What each folder does, and the spec transitions it implements (`specs/agent-recovery.qnt`, `specs/agent-memory.qnt`):
 
 | Folder | Does | Spec |
 | --- | --- | --- |
-| `store/` | `schema.ts`: the tables, as named migration sets. `database.ts`: open, pragmas, migrate. `ledger.ts`: Pause, AI off, authorization, attempt, receipt, startup classification. `memory.ts`: memory queue, jobs, publication and the compaction seam | `startup`, `pause`, `cancel`, `authorize`; memory `project`, `start`, `complete`, `publish`, `extend`, `merge`, `failJob` |
+| `store/` | `schema.ts`: the tables, as named migration sets. `database.ts`: open, pragmas, migrate. `ledger.ts`: Pause, AI off, authorization, attempt, receipt, startup classification. `memory.ts`: memory queue, jobs, publication and the compaction seam | `startup`, `pause`, `cancel`, `authorize`; memory `project`, `start`, `complete`, `publish`, `extend`, `merge`, `failJob`, and `redact` and `purge` for `redaction/` |
 | `inbox/` | `inbox.ts`: owner input, durable before it is acknowledged. `bridge.ts`: reset, submit with `requestId = op_id`, then `submitted` | `acceptInput`, `acknowledge`, `resetBridge`, `submit`, `markSubmitted` |
 | `projection/` | One transaction per pi commit: archive messages (chunks of at most 16 KB), their memory keys, the cursor | `project` |
 | `recovery/` | Incarnations and rotation; the open sequence: a journal at or ahead of both the archive cursor and the latest authorized position resumes, behind either rotates, newer schema stops | `openJournal`, `rollbackJournal`, `rotate`; `agent-recovery-replay.qnt` |
@@ -34,7 +34,7 @@ What each folder does, and the spec transitions it implements (`specs/agent-reco
 
 Notes for the work packages that build on it:
 
-- **Migrations.** Add a `MigrationSet` in your own folder (for example `spend/schema.ts`) and pass it in `CoreOptions.migrations`. Steps are append-only. `LOCAL_TABLES` lists tables a backup must not capture; add yours.
+- **Migrations.** Add a `MigrationSet` in your own folder (for example `spend/schema.ts`) and pass it in `CoreOptions.migrations`. Steps are append-only. `LOCAL_TABLES` lists tables a backup must not capture; add yours to the list in `backup/schema.ts`. Every other table must have a primary key: the session extension captures nothing from a table without one, and backup refuses to start.
 - **The run loop** in `runtime/core.ts` is the simplest router: one op at a time, follow-up order, no steering. WP11's router replaces it and keeps `inbox/bridge.ts`. Never reset while a run is live: pi ends a run when a reset is placed during a tool round.
 - **Compaction.** `runJob(store, key, model, h)` runs one job with a `CompactionModel` (`summarize(task)`); `readyKeys` says which keys may start. WP11's compactor schedules them (8 at once, waking at `due_at`) and calls the model through WP9's providers.
 - **Actions.** `store/ledger.ts` has the parts of the ledger that startup and Pause need. WP15 builds the dispatcher on `authorize`, `recordAttempt` and `recordReceipt` and adds intents, approvals and grants in its own migration set.
@@ -55,11 +55,11 @@ Each folder has one owner (plan v3 §17). Only that folder imports its library (
 | `src/providers/`, `src/spend/` | WP9, WP20 | `src/providers/` is the only importer of `@earendil-works/pi-ai` and `@openai/codex-sdk` |
 | `src/request/`, `src/compactor/`, `src/router/`, `src/jobs/`, `src/memory-tools/`, `src/pins/` | WP11 | |
 | `src/actions/`, `src/grants/`, `src/policy/` | WP15 (built; see "Actions") | |
-| `src/redaction/` | WP16 | |
+| `src/redaction/` | WP16 (built; see "Redaction") | |
 | `src/mcp/` | WP17 | the only importer of `@earendil-works/pi-mcp` |
 | `src/t3/`, `src/littlebird/` | WP18 | |
 | `src/schedule/` | WP19 | |
-| `src/ownership/`, `src/backup/` | WP21 | |
+| `src/ownership/`, `src/backup/` | WP21 (built; see "Ownership and backup") | |
 
 Versions are pinned exactly: pi 1.2.0 and the Codex SDK 0.162.1.
 
@@ -143,7 +143,7 @@ Cards, clicks, dispatch and grants (plan v3 §6, §9, §12, §19.5; SPEC 13.3, 1
 | Folder | Does | Spec |
 | --- | --- | --- |
 | `policy/` | Pure rules: `authorizeDecision`, `toolDecision` (the tier table with the clean-run rule), `mayMintGrant`, `bindingMatches` | the guards of `authorizeWith`, `grantWith`, `grantClick`, `scheduleFromClick`, `scheduleFromMenu` |
-| `grants/` | Mint a grant under one owner authority (a clean run, a current click, the message menu), find the live one, revoke | `grantWith`, `grantClick`, `scheduleFromMenu`, `pause`, `deleteSchedule`, `invalidate("redact")` |
+| `grants/` | Mint a grant under one owner authority (a clean run, a current click, the message menu), find the live one, revoke | `grantWith`, `grantClick`, `scheduleFromMenu`, `pause`, `deleteSchedule`, `redact` |
 | `actions/` | The card ledger (`cards.ts`), the dispatcher, the executors (the host's in `host.ts`, Juno's own in `proposals.ts`), the proposing tools, the migration set `actions` | `propose`, `click`, `authorizeDispatch`, `transportSend`, `recordReceipt`, `reject`, `lose`, `reconcile`, `resume` |
 
 **A card's life.**
@@ -158,7 +158,7 @@ startup: open authorizations ─▶ unknown (recovery) ─▶ reconcile once ─
 - **A click** approves the stored revision, digest and every child in order (`bindingMatches`), under its op id: the same op again is the same click. A card takes one click, and a dismissed, expired or clicked card takes none. It is durable before the RPC answers (`approval.committed`), and dispatch follows in the background.
 - **The dispatcher** drains approved children in click order, one at a time. It reads the facts and commits `authorize` in one synchronous step, so the policy decides on what is committed. Paused, off, not the owner, or no Slack account known yet: the click waits, and Resume, a presence change or `actions.kick()` (WP21, when this Mac becomes the owner) runs it. Anything else that fails the policy (stale, expired, source changed by a redaction, account changed, no executor, already authorized) is written on the approval and the click never runs; the card reads "Expired" or "Failed". One authorization is one attempt, executors never retry, and a child whose destination does not deduplicate is never authorized twice (`noRepeatAuthorization`). There is no retry button.
 - **Executors** run one child by its tool (`Executor`): `slack_send` and `topics_resolve` through the host's single-attempt RPCs; `delegate` (a Proposed task's Start, which also mints the job's grant), `spend_raise` (Allow $1 more today) and `juno_answer` (a question's answer goes to the model as a `click` op). A host error means the host refused before recording anything: failed. A lost answer is unknown. Reconcile looks for positive evidence once per start and never makes a second attempt.
-- **Grants**: a `delegate` in a clean owner run mints the job's grant under `cleanRun`; a Start click under `click`; the menu's reply watch under `menu` (WP19 calls `mintGrant`). Pause and AI off revoke every grant before the mode changes; a job's Stop revokes its own; WP16's removal calls `revokeAllGrants(store, 'redaction')` inside its transaction. Resume restores none, and one authority op mints a target's grant once, so a replayed call cannot restore a revoked grant.
+- **Grants**: a `delegate` in a clean owner run mints the job's grant under `cleanRun`; a Start click under `click`; the menu's reply watch under `menu` (WP19 calls `mintGrant`). Pause and AI off revoke every grant before the mode changes; a job's Stop revokes its own; WP16's removal calls `revokeExposedGrants(store, runs, gen)` inside its transaction: it revokes the grants minted by runs that saw the removed messages (found through the grant's op: a run input, a clicked card's run, or the job's run; a menu grant read nothing and stays) and carries the rest into the new generation, so an unrelated schedule keeps waking. Resume restores none, and one authority op mints a target's grant once, so a replayed call cannot restore a revoked grant.
 - **Untrusted content forces a card.** `toolDecision` turns a no-click call into a card once the run has read Slack, a connection or a report; `delegate` then proposes a Proposed task with the Because line "Juno read Slack or a report in this reply". Sending to Slack is a card in every run.
 - **What the model learns** (§19.5). A dismissal, an expiry and a settled click leave one outcome per card. The next input the model reads, of any kind, carries them first: `<card-outcome card="…" kind="sendMessage" outcome="declined|expired|done|failed">summary</card-outcome>`. It starts no run. The text is escaped, so it cannot close the tag, and a pin never covers it (`ownerWords`). A reply to a card quotes its summary.
 - **A batch** settles row by row: a row refused after another row ran reads Failed ("Sent 1 of 2"); a card whose click never ran because it expired reads Expired.
@@ -172,23 +172,62 @@ startup: open authorizations ─▶ unknown (recovery) ─▶ reconcile once ─
 
 **For the next packages.**
 
-- WP16 (redaction): call `revokeAllGrants(store, 'redaction')` in the removal's transaction and bump `memory_head.gen`; open cards proposed in the old generation expire and a waiting click is refused (`sourceChanged`). Register an executor for the `remove` card's child (the card's choice is in `args.choice.alsoRemoveReply`).
+- WP16 (redaction, built): in the removal's transaction, bump `memory_head.gen` and call `revokeExposedGrants(store, runsThatSaw, gen)`, which revokes only the grants minted by runs that saw the removed messages (spec `redact`, pairs `redactExposed` and `redactUnrelated`); open cards proposed in the old generation expire and a waiting click is refused (`sourceChanged`). Register an executor for the `remove` card's child (the card's choice is in `args.choice.alsoRemoveReply`).
 - WP17 (MCP): register one `Executor` per write tool through `openTurns({ actions: { executors } })` with `deduped: false` unless the server keeps a key, a `check` for the schema hash and preconditions, and a `reconcile` that reads back. Propose `change` and `connect` cards with `actions.propose`; `toolDecision('outward', run)` is always a card, and `toolDecision('read', run)` never is. Use `policy.toolDecision` for the allowlist's Tier 0 versus Tier 3.
 - WP18 (T3): register `t3_start` (deduped: false; reconcile by the tag `juno:<action id>`), mint the job's grant on Start with `mintGrant({ authority: { _tag: 'click', current: true } })`, and decide `t3_send` and `t3_stop` with `toolDecision('steer' | 'stopJob', run, { liveGrant })`.
 - WP19 (schedules): `toolDecision('scheduleCreate', run)` gives run or card; mint the schedule grant with `mintGrant({ opClass: 'schedule', authority })` for a clean run, a `proposedSchedule` click (register its executor) or the menu (`{ _tag: 'menu' }`), revoke it with `revokeGrant(store, 'schedule', id, 'delete')`, and register the `schedule` card's executor (its choice is `args.choice.action`).
 
 `test/policy.test.ts` checks the pure rules with properties; `test/actions.test.ts` runs every card kind on the engine (click, consume, send, receipt, unknown, dismiss); `test/actions-crash.test.ts` kills the agent at `approval.committed`, `authorization.consumed` and `attempt.beforeReceipt`.
 
+## Redaction (WP16)
+
+`src/redaction/` removes messages (plan v3 §4.5, §14.4; SPEC 13.8; specs `agent-memory.qnt` `redact` and `purge`, `agent-recovery.qnt` `raiseDeletion` and `redact`, `agent-actions.qnt` `redact`). `Turns.redaction` is the service; `openTurns({ backup })` takes the backup's hooks.
+
+| File | Does |
+| --- | --- |
+| `scope.ts` | Pure rules: what a removal reaches (`removalScope`), whether Juno's reply follows (`replyOf`), the runs that saw it (`runsThatSaw`) |
+| `redaction.ts` | The removal, in order, and the purge |
+| `card.ts` | `remove_messages` (the model proposes a Remove card) and the card's executor |
+| `quotes.ts` | Quotes of removed items in later replies and reactions become the placeholder; pins on those messages move |
+| `schema.ts` | `REDACTION_MIGRATIONS`: `removals`, `removed_ops`, `removed_bubbles`, and the local `redaction_purges` |
+
+**What a removal reaches.** A message is its whole pi entry (every chunk). An owner input also takes every entry of the same words sent again ("Try again" is a new op). "Also remove Juno's reply" takes everything the run wrote after the input and before the next one: Juno's words and tool calls, and the tool results, which can echo the owner's words (`remember` does).
+
+**One removal, in order.**
+
+1. The backup's `raiseDeletion(gen + 1)`, before anything else (G13). A crash here leaves the record ahead and nothing removed (`redaction.deletionRaised`).
+2. One transaction: `redactMemory` (in `store/memory.ts`) tombstones the messages (text cleared, ids kept, `redactions` rows), masks every view line whose node depends on them, moves `gen` and queues rebuilds. Then the attachments go, the inbox ops' text is cleared, pins sourced from them are deactivated and every version's text cleared (bumping `pin_rev`), quotes of them in later replies and reactions become `<quote from="…" removed="true"></quote>` in the archive (`quotes.ts`: the quoting message's version moves, its summaries are deleted and rebuilt, and its pins find their words again), removed Juno bubbles are recorded in `removed_bubbles` so later quotes of them render the placeholder too, remove cards that name them lose their preview line, `revokeExposedGrants` revokes the grants minted by runs that saw them and carries the rest into the new generation, and reports waiting in the inbox from jobs started in runs that saw them are failed with `removed`. The moved `gen` expires every open card, refuses a waiting click (`sourceChanged`), refuses a request built before it at the guard, and makes a running compaction job's publication stale (`redaction.committed`).
+3. Right after the commit, `invalidateChatCaches(store)` (`serve/chat.ts`) drops every cached chat page, quote and row index, and wakes the pages' subscribers, so the Removed note shows at once. Jobs started in runs that saw the messages are stopped, as their Task card's Stop does.
+4. The purge, one durable step at a time, in order, retried on the memory queue's delays: `purgeNodes` (node versions that depend on a removed message) and a truncating checkpoint, `purgeCodexThreads` (`providers/codex-purge.ts`: the session files of every recorded Codex thread), the journal (the router rotates between runs, which deletes the old file), then the backup's `regenerate(gen)`. One run of a step settles every removal waiting on it. Startup resumes it (`redaction.purged`).
+
+The same op again is the same removal; a removal of messages already gone changes nothing. Removals run one at a time.
+
+**The `remove` card.** `remove_messages({ messages: ['n12'] })` names owner messages by handle; the trusted side builds the card with each message's first line and time, and `offerReply` when Juno's reply follows the first. Its child is Tier 3 and deduplicated; the click runs the removal under `card:<action id>` with `args.choice.alsoRemoveReply`, and reconcile finds it by that op.
+
+**Free space.** `agent.sqlite` runs with `secure_delete = ON`: SQLite zeroes deleted content, freed pages included. FAST mode is not enough. A message over one page (4 KB) lives on overflow pages that are freed whole, and FAST leaves freed pages as they were; a probe found a cleared 16 KB message still in the file under FAST, and none under ON. The zeroed pages reach the main file only at a checkpoint, so the purge's first step ends with `wal_checkpoint(TRUNCATE)`, which also empties the WAL. The flow tests scan `agent.sqlite` and its WAL for the removed words, and fail with `secure_delete` off. The filesystem and the SSD may still keep old blocks; forensic erasure is not promised.
+
+**Cost** (`bench/commit-cost.ts`, 2026-10-15, three runs on the Mac at load 2 to 4, minimum per commit). At FULL with `fullfsync`, every commit takes 1.5 to 3.5 ms either way, and `secure_delete` is inside that noise. Without `fullfsync`, which shows its own cost: clearing a 16 KB message 0.050 to 0.054 ms without it, 0.081 to 0.082 ms with it (it writes the freed overflow pages as zeros); projecting a 16 KB message 0.55 to 0.58 against 0.58 to 0.65 ms; small rows (accept, project, clear) within 0.01 ms. So it adds at most about 0.07 ms to a commit that costs about 2 ms at FULL.
+
+**Not covered yet.**
+
+- Payloads of other cards proposed in runs that saw the message: they expire, and their text stays in the ledger.
+- The Settings line "Removal pending · 1 copy in a running job" is not shown: jobs are stopped at the removal, and the journal rotates at the next run boundary.
+
+`test/redaction-scope.test.ts` checks the pure rules with properties; `test/redaction.test.ts` runs removals on the engine (every place the words lived, a removal racing a running compaction, stale work refused, the Remove card, the owner's sheet through the renderer); `test/redaction-crash.test.ts` kills the agent at `redaction.deletionRaised`, `redaction.committed` and after each purge step.
+
 ## Settings › Juno
 
-`src/settings/settings.ts` serves the page and the owner's changes over the running engine (SPEC 13.10, plan v3 §7.1, §5.4). The owner's choices are one row of `juno_settings` (`SETTINGS_MIGRATIONS`, replicated): the chat family, the compaction family and the cap for days not yet started.
+`src/settings/settings.ts` serves the page and the owner's changes over the running engine (SPEC 13.10, plan v3 §7.1, §5.4). The owner's choices are one row of `juno_settings` (`SETTINGS_MIGRATIONS`, replicated): the chat family, the compaction family, the custom endpoint's model and the cap for days not yet started.
 
-- **Models.** One row per family, labelled as the owner sees it ("Claude Sonnet"), with the resolved model ("Claude Sonnet 5.5"), the provider and the price per million tokens. A family with no usable model has no `resolved`. A change saves the family and calls `Turns.setModels`: the chat model applies from the next run (the router reconfigures pi's root conversation between runs, `beforeRun`), the compaction model from the next compaction job. The catalogue is checked every hour and read at most once a day; when the rows change, the guard takes the new models (`refreshModels`) and the saved families move to their newest model. Codex rows come with WP20.
+- **Provider.** Main says which is active and sends it (`providerConnection`); the page's `provider` is `custom` for an endpoint. A switch reads the new provider's models and moves the engine to the saved choice there.
+- **A custom endpoint** (`providers/custom.ts`): rows are what `GET <baseUrl>/models` lists, by id, read at every refresh; when it lists none, `modelTyped` is set and the owner types an id (`{ _tag: 'model', provider: 'custom', family: <id> }`). Compaction uses the chat model. A reported window (`context_length`, `max_model_len`) is used, else 262,144 tokens; OpenRouter-style `pricing` is used, else the model costs $0 and `spendUntracked` is set. Requests use the plainest chat-completions shape (`max_tokens`, no `store`, no developer role) and send the key, or `none` when there is no key.
+- **Models on OpenRouter.** One row per family, labelled as the owner sees it ("Claude Sonnet"), with the resolved model ("Claude Sonnet 5.5"), the provider and the price per million tokens. A family with no usable model has no `resolved`. A change saves the family and calls `Turns.setModels`: the chat model applies from the next run (the router reconfigures pi's root conversation between runs, `beforeRun`), the compaction model from the next compaction job. The catalogue is checked every hour and read at most once a day; when the rows change, the guard takes the new models (`refreshModels`) and the saved families move to their newest model. Codex rows come with WP20.
 - **Spend.** Today's spend is the ledger's actual plus unknown spend; the cap is today's. A new cap applies today (`setCap`, refused below what today has committed) and is saved for later days.
-- **The key.** Only `missing`, `set` or `rejected`: a run that ends `failed: keyRejected` marks the current key, and a new key clears the mark.
+- **The key.** A run that ends `failed: keyRejected` marks the active provider's key (`openRouterKey: 'rejected'` or `customKeyRejected`), and a change from main clears the mark. Whether each key is set is main's `ProviderState`.
 - **Pause** sets the run mode and asks every running job to stop. It is refused while the mode is `off`. Settings change with AI assist off too.
 - **Rules** are the owner's lines (`actions/rules.ts`, the `owner_rules` table): replaced as one list, each one line of at most 280 bytes, at most 20. The model reads them with Juno's instructions. They can only make Juno ask more; tiers and cards are enforced in code.
-- **Not served yet**: Codex status (shown `missing`), the backup folder (the default `agentDir/backup`, with no backup taken; WP21) and ownership changes (WP21).
+- **Backup and This Mac** (WP21): the backup folder (`agentDir/backup` by default), the last backup's time, when the recovery phrase was exported, and who owns Juno's state (`active`, `released` with the move code or the other Mac's name, or `recovery` with the pending count). `{ _tag: 'backupFolder' }` takes an absolute path and starts a generation there. Move, restore and Activate are `agent.settings.ownership` and `agent.review.activate`.
+- **Not served yet**: Codex status (shown `missing`).
 
 ## The chat server (WP13b)
 
@@ -200,7 +239,8 @@ startup: open authorizations ─▶ unknown (recovery) ─▶ reconcile once ─
 - **Commands**: send, react and retry go to the engine's inbox and answer after the commit; a second Try again for the same failure names the retry already queued; `tooLong` and a failed write (`notDelivered`) come back as errors. With AI assist off they answer `unavailable`.
 - **Cards** (WP15): the page lists every card at the time Juno proposed it, and each job's Task card at the time it started; `cards` carries the `CardBinding` of each open card in the window. `agent.cards.approve`, `dismiss` and `editMessage` answer after their commit; a click or edit on a card the owner no longer sees is `stale`, on an expired card `expired`, on a card that does not take it `invalid`. `prepare` writes a button's data (an option, a reply, Keep, Pause or Delete on a schedule) into a new revision and returns the binding to approve; a button with no data returns the card's current binding. `askAgain` on an expired card sends the owner message "Ask again", replying to the card. `undo` answers `unavailable`.
 - **The Juno menu's pages** (`pages.ts`) are rebuilt on the same signal. What Juno remembers lists the active pins with their source message; edit, remove and "Remember this" check the pin's (or the message's) version and answer `stale` when it moved. Memory of this chat is the published view as a timeline, each line dated from its messages' earliest to latest time, and rechecked every 2 s because compaction publishes between runs. Activity lists each finished run: who asked ("You", a job's title, "A schedule"), when, the outcome (`stayedQuiet` when a complete run said nothing), whether it read untrusted content, and its actions (`actions/activity.ts`): each card the run proposed with its decision (approved, dismissed, expired, refused), outcome and a plain failure line with the detail behind Copy details, and each job it started with no click. The folded read line is not built. Scheduled lists persisted schedules and reply watches; Review streams an empty page. Connections streams the MCP manager when `ChatHost.connections` is supplied. Memory and Activity page with `{ cursor?, limit }`: the newest `limit` rows before the cursor, oldest first, and `moreAbove`.
-- **Not served yet**: Remove (WP16), review and ownership (WP21), and Codex sign-in (WP20). Their commands answer `unavailable`.
+- **Remove** (WP16): `agent.chat.remove` runs the owner's removal (`Turns.redaction.remove`) and answers once it committed. It works paused, offline and with AI assist off; only a missing engine or `updateNeeded` refuses it, and a message that is not in the chat is `stale`. A removed owner message is a `removed` note in its place, and a quote of it reads Removed.
+- **Not served yet**: review and ownership (WP21), and Codex sign-in (WP20). Their commands answer `unavailable`.
 - **Not listed yet**: notes ("Remembered"), and schedule origins (a wake shows as Juno's own run).
 - **What a message is about.** A message's `context` (a topic from the Juno panel, or a person or channel from Ask Juno) is stored with the op, reaches the model as an `<about>` element inside `<message>` (`router/input.ts`), and shows as the owner bubble's `about` line. A topic context is Slack content, so the run starts tainted, or is tainted when the message steers it.
 - **Cost**: each change rebuilds the whole list with a few queries, and parses finished runs' text again. That is fine for M2; a 5,000-message chat will want finished runs cached, against the budget in `docs/performance.md`.
@@ -211,7 +251,7 @@ startup: open authorizations ─▶ unknown (recovery) ─▶ reconcile once ─
 
 `src/mcp/` owns HTTP connections, loopback OAuth sign-in, tool discovery and tier decisions, the two fixed model tools, Notion's version checks and read-back, and the per-turn MCP endpoint for WP20. See [the MCP hand-off](src/mcp/README.md) for bootstrap, credential bridge and WP14 wiring, tests and the owner-only live check.
 
-Contract additions: `ActionsOptions.executors` accepts a callback for discovered tools; `TurnsOptions.tools` registers fixed adapter tools before resume; `ChatHost.connections` serves the Connections routes; discovered rows carry an optional `schemaHash` (always present from the manager). The request builder pages MCP results over 20 KB using ordinary archive attachments. No action protocol changed.
+`startAgent` runs the manager when given `mcp: { credentials }`; main's keychain bridge supplies them in the app. Contract additions: `agent.connections.add`, the `remove` action and `ConnectionRow.removable`; `credential`/`credentialReply` between the agent and main; `ActionsOptions.executors` accepts a callback for discovered tools; `TurnsOptions.tools` registers fixed adapter tools before resume; `ChatHost.connections` serves the Connections routes; discovered rows carry an optional `schemaHash` (always present from the manager). The request builder pages MCP results over 20 KB using ordinary archive attachments. No action protocol changed.
 
 ## Scheduler (WP19)
 
@@ -222,3 +262,33 @@ are wired by `startAgent`; `openTurns` starts the scheduler and registers its to
 runtime, the message-menu RPC and reply-based Send card expiry.
 `mintGrant` now joins a caller's transaction so a schedule and its grant commit
 together.
+
+## Sidebar view tool
+
+`src/view-tools/` owns `juno_views`, the local sidebar settings tool and its
+Undo records. It uses WP15's policy and Change cards, and binds the AgentHost
+view routes at startup. See [the tool README](src/view-tools/README.md).
+`slack_channels` finds all cached channels by name glob without reading messages.
+
+## Ownership and backup (WP21)
+
+`src/ownership/` and `src/backup/` implement plan v3 §14 and the `agent-recovery.qnt` transitions named below. `openTurns` builds both when `TurnsOptions.backup` gives main's keychain (`BackupKeychain`) and this Mac's name; without it Juno keeps no backup and cannot move. `Turns.ownership` and `Turns.backup` expose them.
+
+**Ownership** (`ownership/`). The core `ownership` row (`device_id`, `epoch`, `state`) is local; the backup manifest carries it instead. The dispatcher authorizes only while `state = active`, and the router starts or steers a run only then (`RouterOptions.admits`).
+
+- **Move** (`ownership.move()`, spec `releaseOwner`, `drain`, `checkpoint`, `publishRelease`): `released` commits first, so no click can authorize after the drain; then the live run, dispatch already handed off and projection finish; then the final checkpoint (a new generation) is published with `state: released` and the move code (8 characters of the manifest's hash). A crash after the release reopens released, and `resume` or Move again finishes; a final manifest already published is reused, so the code does not change (`ownership.released`). Running jobs are not stopped: their reports after the checkpoint stay on the old Mac.
+- **Restore** (`ownership.restore(folder)`, spec `beginRestore`, `replay`, `install`): stages the newest manifest the key authenticates into `restore.sqlite` and calls `restart`. The next open installs it before `agent.sqlite` opens, rechecking the deletion record (G11), then `enterRecovery` and `adoptRestoredKeys` (a key that came from the phrase becomes this Mac's backup key, and the deletion record becomes the restored store's): a new incarnation, this Mac's device id with the backup's epoch in `recovery`, and every click not yet authorized deleted, so it never runs without a new click. Authorizations without a receipt become `unknown` at recovery as usual.
+- **Review and Activate** (spec `review`, `activate`): in recovery every open card shows `mayHaveHappened` (`ownership.restored`), sends wait (`waiting: review`), and a click waits. `activate({ backupAt })` names the restore the owner reviewed; it expires the cards still open, takes `epoch + 1`, and calls `actions.kick()` and the router's kick, so reviewed clicks and waiting sends run once.
+- **A stale owner** (G7, spec `observeOwner`): before each write the backup reads the newest manifest in the folder. Another Mac at a higher epoch turns this Mac `released` (`deviceName` set; the chat banner is `otherDevice` and every command is refused `readOnly`). Before that read both Macs can act: `staleOwnerCannotAuthorize` stays a counterexample.
+
+**Backup** (`backup/`). One generation at a time in `<folder>/g000007/`: `snapshot.bin`, `segment-<n>.bin`, `manifest.json`.
+
+- **Capture** (S6): a snapshot is `VACUUM INTO` with local rows deleted; a segment is one **patchset** per replicated table. Patchsets, not changesets: a changeset holds old row values, so a segment cut after a removal would carry the removed text. Sessions attach only to replicated tables (G12). A replicated table must have a primary key.
+- **Keys**: the backup key (keychain) wraps a fresh data key per generation and authenticates manifests (HMAC). Segments are AES-256-GCM with a counter nonce reserved in `backup_progress` before use, and associated data binding generation, position and the previous segment's hash. Export recovery phrase makes a phrase, gives it to the keychain (`recoveryPhrase`) for main to show, and every later manifest carries the backup key wrapped by it (scrypt).
+- **When a generation starts**: none yet, the last close was not clean (changes before a crash were never captured), the deletion record is ahead of the generation and of the data (G13: the record was raised and the removal never committed), the schema or the set of tables changed (a patchset holds no schema, so a migration starts a generation instead of a schema segment), the folder changed, or an export failed after its cut. Otherwise an export cuts a segment, renames the manifest, then moves the export cursor (spec `exportAfterManifest`). A new generation's manifest is renamed before older generations are deleted (spec `shred`).
+- **Removal** (WP16's `RemovalBackup` is `backup.removal`): `raiseDeletion(gen)` raises the keychain record before the removal commits; the purge's last step calls `regenerate(gen)`, after the node versions that depend on the removal are gone, and it snapshots then and deletes the older generations. A committed removal never starts a generation earlier, so no snapshot is taken before the purge. A generation's `label` is the removals its snapshot excludes: the memory generation, less any removal whose `nodes` purge step has not run, or the record when the removal behind it never committed. A restore with a trusted record (this Mac's keychain when this Mac's key opened the backup, or a move's manifest) refuses a generation whose label is below it. Without one it restores and the Review page shows `unchecked` (`staleFolderCannotRestoreRemoved` stays a counterexample; the strict phrase option is off by default and not built).
+- **A folder Juno must not write over** (`ForeignBackup`): a manifest this key cannot verify (a new Mac pointed at the old Mac's folder before restoring), or one from another Mac at the same epoch (this Mac's own earlier install). Writing would delete the backup the owner may restore.
+- **A folder change** records the old folder in `backup_progress.retired`; this Mac's generations there go once a generation is published in the new folder, even after a failed first try.
+- Exports run every minute when something changed, and at close.
+
+Tests: `test/backup.test.ts` (Macs in-process: round trips, segments, a move, a voided click, a stale owner, WP16's removal and the regeneration, a record ahead, the key and record after a restore, the folder rules), `test/ownership-serve.test.ts` (the RPCs, banners and Review page) and `test/backup-crash.test.ts` (kills at `backup.segmentWritten`, `backup.manifestRenamed`, `ownership.released`, `restore.staged`, `restore.swapped`).

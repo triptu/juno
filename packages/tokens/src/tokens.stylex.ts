@@ -423,26 +423,23 @@ export const tracking = stylex.defineVars({
  * enough that the 0.01em tracking Inter needed is gone.
  */
 export const text = stylex.defineVars({
-  // Pinned / Recent / People / Channels headings. Rendered uppercase.
+  // Pinned / Recent / People / Channels headings, in sentence case (SPEC 17).
   '--text-section-label-family': fonts['--font-sans'],
   '--text-section-label-size': '11px',
   '--text-section-label-weight': '500',
   '--text-section-label-leading': 'normal',
-  '--text-section-label-tracking': '0.06em',
 
-  // Table column headers. Rendered uppercase.
+  // Table column headers, in sentence case.
   '--text-table-header-family': fonts['--font-sans'],
   '--text-table-header-size': '11.5px',
   '--text-table-header-weight': '500',
   '--text-table-header-leading': 'normal',
-  '--text-table-header-tracking': '0.06em',
 
-  // "3 NEW" divider label. Rendered uppercase.
+  // The "3 new" divider label and the Juno chat's day label, in sentence case.
   '--text-divider-family': fonts['--font-sans'],
   '--text-divider-size': '11.5px',
   '--text-divider-weight': '600',
   '--text-divider-leading': 'normal',
-  '--text-divider-tracking': '0.06em',
 
   // Tags and count badges: Main, Reopened, unread count, @, hints.
   '--text-tag-family': fonts['--font-sans'],
@@ -662,6 +659,9 @@ export const layout = stylex.defineVars({
   '--sidebar-min-width': '280px',
   '--sidebar-max-width': '480px',
   '--sidebar-resize-hit': '6px',
+  // The sidebar's inset on both sides: the title bar's end, the nav, the filter row and the rows. The list's
+  // scrollbar gutter sits inside it on the right, so the rows' right edge matches their left.
+  '--sidebar-inset': '10px',
   '--titlebar-height': '44px',
   // Kept free for the traffic lights at the start of the sidebar bar, or of
   // the tab strip while the sidebar is hidden.
@@ -698,6 +698,10 @@ export const layout = stylex.defineVars({
   // plus a 20px gap.
   '--toolbar-height': '36px',
   '--toolbar-reserve': '243px',
+  // How far a message row may paint outside its box: the toolbar's height
+  // and its shadow, for the toolbar raised above a narrow row. A length, not
+  // a calc(): Chromium ignores calc() in overflow-clip-margin.
+  '--toolbar-clip-margin': '44px',
   // Image thumbnails in a message: never wider or taller than this, scaled
   // by their own aspect ratio. File cards share the width.
   '--thumb-max-width': '360px',
@@ -714,7 +718,8 @@ export const layout = stylex.defineVars({
   '--page-width-narrow': '680px',
   '--page-width': '720px',
   '--page-width-settings': '760px',
-  '--page-width-wide': '880px',
+  // The label column of Preferences' rows (Theme, Accent, Density, Hold to peek), so the controls share one edge.
+  '--settings-label-width': '104px',
   '--palette-width': '560px',
   '--palette-top': '96px',
   '--menu-width': '236px',
@@ -723,6 +728,10 @@ export const layout = stylex.defineVars({
   '--menu-width-mention': '280px',
   // The New chat pickers' lists.
   '--menu-width-picker': '340px',
+  // A sidebar view's name pill (inventory 2.3): longer names end with an ellipsis.
+  '--filter-pill-max-width': '120px',
+  // The view sheet's conversation list (inventory 2.3), which scrolls past this.
+  '--view-sheet-list-max-height': '200px',
   // The peek popover beside the sidebar; never wider than the room left of the window.
   '--peek-width': '480px',
   // Never taller than the window below a title-bar anchor, so a menu fits
@@ -760,10 +769,11 @@ export const sizes = stylex.defineVars({
   '--row-44': '44px',
   '--row-48': '48px',
   '--row-52': '52px',
-  // The contain-intrinsic-size estimate for off-screen sidebar rows. It sizes
-  // the content box, so it is the row's measured height without its 11px
-  // block padding: 85px for a two-line preview (the row is 107px).
-  '--row-topic-estimate': '85px',
+  // A sidebar row's content box: three lines (title, one-line preview, meta),
+  // rounded up to a whole pixel. The row is this plus its block padding (88px
+  // in Comfortable) whatever it shows, so the off-screen estimate
+  // (contain-intrinsic-size) is exact and rows never land on a fraction.
+  '--row-topic-estimate': '66px',
   // The same estimate for off-screen message rows: one line of body under a
   // name, without the row's block padding (performance.md 3.3).
   '--row-message-estimate': '56px',
@@ -812,6 +822,8 @@ export const sizes = stylex.defineVars({
   '--tab-unread-dot': '6px',
   '--focus-ring-width': '2px',
   '--focus-ring-offset': '2px',
+  // Privacy mode: how far message text is blurred (tokens/global.css, [data-sensitive]).
+  '--privacy-blur': '6px',
 })
 
 /* -------------------------------------------------------------------------- */

@@ -31,9 +31,9 @@ export interface JunoComposerProps {
 }
 
 /**
- * The chat composer (inventory 12): a 672px field, the textarea growing to
- * 160px, and the round send button, dimmed while the draft is empty and
- * never disabled by a run. Enter sends, Shift Enter adds a line.
+ * The chat composer (inventory 12): a 40px field on the chat column's edges,
+ * the textarea growing to 160px, and the round send button, dimmed while the
+ * draft is empty and never disabled by a run. Enter sends, Shift Enter adds a line.
  */
 export function JunoComposer({ value, onChange, onSend, onEscape, quote, onClearQuote, enabled, placeholder = chatCopy.composer.placeholder, inputRef, column = 'page', context }: JunoComposerProps) {
   const panel = column === 'panel'
@@ -57,21 +57,23 @@ export function JunoComposer({ value, onChange, onSend, onEscape, quote, onClear
         </div>
       ) : null}
       <Surface kind="field" sx={[styles.box, panel && styles.wide]}>
-        <Textarea
-          ref={inputRef}
-          variant="inline"
-          maxHeight="assistant"
-          label={chatCopy.composer.placeholder}
-          placeholder={placeholder}
-          value={value}
-          disabled={!enabled}
-          onChange={(event) => onChange(event.currentTarget.value)}
-          onKeyDown={onKeyDown}
-          dir="auto"
-        />
-        <span {...stylex.props(styles.send)}>
-          <IconButton icon={ArrowUp} label={chatCopy.composer.send} size={28} iconSize={18} iconWeight="bold" radius="full" variant="primary" dimmed={!canSend} onClick={() => canSend && onSend()} />
-        </span>
+        <div {...stylex.props(styles.row)}>
+          <Textarea
+            ref={inputRef}
+            variant="inline"
+            maxHeight="assistant"
+            label={chatCopy.composer.placeholder}
+            placeholder={placeholder}
+            value={value}
+            disabled={!enabled}
+            onChange={(event) => onChange(event.currentTarget.value)}
+            onKeyDown={onKeyDown}
+            dir="auto"
+          />
+          <span {...stylex.props(styles.send)}>
+            <IconButton icon={ArrowUp} label={chatCopy.composer.send} size={28} iconSize={16} iconWeight="bold" radius="full" variant="primary" dimmed={!canSend} onClick={() => canSend && onSend()} />
+          </span>
+        </div>
       </Surface>
     </div>
   )
@@ -86,20 +88,19 @@ const styles = stylex.create({
     paddingBottom: spacing['--space-5'],
     boxSizing: 'border-box',
   },
+  // The bottom inset is the topic composer's, so the two fields end on one line when the panel sits beside a topic.
   outerPanel: {
     paddingTop: 0,
     paddingInline: spacing['--space-3'],
-    paddingBottom: spacing['--space-3'],
   },
   wide: {
     maxWidth: 'none',
   },
+  // The chat column's width less its 32px padding each side, so the field lines up with the bubbles and the header island.
   box: {
     display: 'flex',
-    alignItems: 'flex-end',
-    gap: spacing['--space-1'],
     width: '100%',
-    maxWidth: `calc(${layout['--page-width']} - ${spacing['--space-12']})`,
+    maxWidth: `calc(${layout['--page-width']} - ${spacing['--space-16']})`,
     marginInline: 'auto',
     paddingInlineStart: spacing['--space-3-5'],
     paddingInlineEnd: spacing['--space-1-5'],
@@ -108,11 +109,20 @@ const styles = stylex.create({
   // Above the field, lined up with its text.
   quote: {
     display: 'flex',
-    maxWidth: `calc(${layout['--page-width']} - ${spacing['--space-12']})`,
+    maxWidth: `calc(${layout['--page-width']} - ${spacing['--space-16']})`,
     marginInline: 'auto',
     marginBottom: spacing['--space-1-5'],
     paddingInline: spacing['--space-3-5'],
     boxSizing: 'border-box',
+  },
+  // 40px at one line (the textarea's 9 + 22 + 9): the row reaches into the field's 1px border, as the topic composer's does.
+  row: {
+    display: 'flex',
+    alignItems: 'flex-end',
+    flexGrow: 1,
+    minWidth: 0,
+    gap: spacing['--space-1'],
+    marginBlock: '-1px',
   },
   send: {
     display: 'inline-flex',

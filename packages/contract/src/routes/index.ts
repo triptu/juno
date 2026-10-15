@@ -15,7 +15,8 @@ import { ReadsRoutes } from './reads'
 import { SendRoutes } from './send'
 import { SessionRoutes } from './session'
 import { TopicsRoutes } from './topics'
+import { ViewsRoutes } from './views'
 
-export const AllRoutes = EngineRoutes.merge(SessionRoutes).merge(TopicsRoutes).merge(SearchRoutes).merge(PrefsRoutes).merge(MessagesRoutes).merge(ReadsRoutes).merge(ArtRoutes).merge(NewChatRoutes).merge(SendRoutes).merge(HomeRoutes).merge(AllTopicsRoutes).merge(NotificationsRoutes)
+export const AllRoutes = EngineRoutes.merge(SessionRoutes).merge(TopicsRoutes).merge(SearchRoutes).merge(PrefsRoutes).merge(MessagesRoutes).merge(ReadsRoutes).merge(ArtRoutes).merge(NewChatRoutes).merge(SendRoutes).merge(HomeRoutes).merge(AllTopicsRoutes).merge(NotificationsRoutes).merge(ViewsRoutes)
 
 export type AllRoutes = typeof AllRoutes

@@ -28,7 +28,7 @@ Run these from the repo root.
 | `pnpm health` | Reports unused code and dependencies, duplication, and large files and functions. Writes `.juno-status/health.json`. |
 | `pnpm test` | Runs every package's vitest suite (`packages/*/test`). |
 | `pnpm test:e2e` | Builds, runs the Playwright tests against the built app, then the gallery behaviour tests. |
-| `pnpm perf` | Builds and runs the perf scenarios (`apps/desktop/e2e/perf.spec.ts`), which fail over the budgets in `docs/performance.md`. `-g "<name>"` runs some of them; `JUNO_PERF_TRACE=<dir>` also writes traces for `scripts/perf-trace.mjs`. |
+| `pnpm perf` | Builds and runs the perf scenarios (`apps/desktop/e2e/perf.spec.ts`, config `playwright.perf.config.ts`), which fail over the budgets in `docs/performance.md`. A scenario that did not run, because its group's setup or an earlier scenario failed, fails the run too (`e2e/no-skips.ts`). `-g "<name>"` runs some of them; `JUNO_PERF_TRACE=<dir>` also writes traces for `scripts/perf-trace.mjs`. Passing `--reporter` replaces that check, so do not. |
 | `pnpm test:gallery` | Builds the gallery and runs only its behaviour tests (mouse-down activation, cursor rule, state switcher, layout-shift guard). |
 | `pnpm test:feel` | Builds, then records the feel suite against the fake Slack: slow-motion videos, filmstrips and frame checks in `apps/desktop/feel-report/`. See "The feel suite". |
 | `pnpm gallery` | Starts the fixture gallery at http://localhost:4174 (browser only, no Electron). |
@@ -190,17 +190,24 @@ state client to it over a `worker_threads` `MessageChannel`, with `memoryHost()`
 place of main and Node `fetch` in place of `net.fetch`. Under `JUNO_E2E=1` main
 exposes `globalThis.junoTest` (engine pid and supervisor state) for Playwright.
 
-With `JUNO_AGENT=1` (for example `JUNO_AGENT=1 pnpm dev`), main also forks the Juno
+Whenever a model provider is set up in Settings › Juno, main also forks the Juno
 Agent utility process (`src/main/agent.ts`, built from `src/agent/index.ts` to
 `out/main/agent.js`) without the Slack partition, and on every engine `ready` brokers
-a port between the agent and the engine's AgentHost server (ADR 0012). It stays off
-by default until the chat ships. The agent's OpenRouter key is the one saved in
-Settings › Juno, kept in the login keychain as the generic password
-`juno-openrouter-key`; `OPENROUTER_API_KEY` in the environment overrides it for
-development. Delete the item with `security delete-generic-password -s
-juno-openrouter-key` to start again with no key. Under `JUNO_E2E` the key is kept in
-memory, and `JUNO_FAKE_OPENROUTER_URL` points the agent at `startFakeOpenRouter()`
-from `@juno/agent-testing/openrouter`. The spike scripts behind the agent's design are in
+a port between the agent and the engine's AgentHost server (ADR 0012). With no
+provider it does not run. The providers are OpenRouter, with its key in the login
+keychain as the generic password `juno-openrouter-key`, and one OpenAI-compatible
+endpoint (for example Ollama at `http://localhost:11434/v1`), with its optional key
+as `juno-custom-provider-key` and its base URL and the active provider in
+`<userData>/juno-provider.json` (`src/main/providers.ts`). `OPENROUTER_API_KEY` in
+the environment sets OpenRouter up for development (for example
+`OPENROUTER_API_KEY=… pnpm dev`). To start again with no provider, delete both items
+(`security delete-generic-password -s juno-openrouter-key`, and the same for
+`juno-custom-provider-key`) and the file. Under `JUNO_E2E` the keys are kept in
+memory, `JUNO_E2E_OPENROUTER_KEY` sets OpenRouter up at launch (the fixtures'
+`agent: true`), and `JUNO_FAKE_OPENROUTER_URL` points the agent at
+`startFakeOpenRouter()` from `@juno/agent-testing/openrouter`; `startFakeOpenAi()`
+from `@juno/agent-testing/openai` is an endpoint to set up through
+`window.juno.agent.setProvider`. The spike scripts behind the agent's design are in
 `docs/juno-agent/spikes/`, with their results in `docs/juno-agent/spikes.md`.
 
 ## Sign-in and the live smoke
@@ -354,7 +361,7 @@ Nothing may move when the pointer or the keyboard touches it. `expectNoLayoutShi
 - **Recording.** `e2e/feel/recorder.ts` takes every compositor frame through the CDP screencast, and on every animation frame reads a few DOM probes (a rectangle, the scroll position, the rows at the top and bottom edges of the view, header text, an element's computed look), plus `layout-shift` and `long-animation-frame` entries and the input events.
 - **When probes read.** Once per frame, in a ResizeObserver created in that frame's `requestAnimationFrame`, so it is delivered after layout and after the app's own observers, just before paint. Reading in `requestAnimationFrame` itself sees states the app corrects before painting (the topic view pins its scroll position in a ResizeObserver), and reported jumps that never reached the screen. When a check and the images disagree, trust the images and fix the probe.
 - **Checks.** `e2e/feel/checks.ts` turns a recording into verdicts: an element lands and stays, the list stays at the bottom, the row in view holds still, feedback shows in the first frame after the event, a popover opens whole at its anchor, the pane switches from the old state to the new one with nothing between, no blank or flickering region (pixel diffs between frames), no long frames. They count frames and compare geometry, so a loaded machine slows a run down without failing it. Only the long-frame check uses durations: a frame over 100 ms with the page's own work in it fails; other frames over 50 ms only warn.
-- **Scenarios.** One `*.feel.ts` file per area: opening topics and what arrives while reading (`topic`), hover, press and popovers (`interaction`), a 300-message thread with late images, the divider, scrolling and reactions (`long`), tab restore (`tabs`), and a skipped placeholder for Juno chat (`chat`). Add a scenario with `feel.run({ name, title, probes, regions, checks }, action)`; mark steps with `rec.mark('press')` so checks can start there.
+- **Scenarios.** One `*.feel.ts` file per area: opening topics and what arrives while reading (`topic`), hover, press and popovers (`interaction`), a 300-message thread with late images, the divider, scrolling and reactions (`long`), tab restore (`tabs`), and the Juno tab and panel (`chat`). A scenario that skips fails the run (`e2e/no-skips.ts`) unless it is a placeholder recorded with `recordSkipped`, which adds a `placeholder` annotation. Add a scenario with `feel.run({ name, title, probes, regions, checks }, action)`; mark steps with `rec.mark('press')` so checks can start there.
 - **Artefacts.** `apps/desktop/feel-report/` (gitignored, emptied each run): per scenario `frames/NNNN.jpg`, `filmstrip.png` (labelled tiles, failed frames outlined in red), `video.webm` (4× slow motion) and `result.json`; and `index.html`, the contact sheet with every scenario's checks, video and filmstrip, failures first. Open it with `open apps/desktop/feel-report/index.html`.
 - **Needs.** The installed Google Chrome draws the filmstrips and computes the pixel diffs (`FEEL_BROWSER=chromium` uses Playwright's build instead). ffmpeg encodes the videos (`brew install ffmpeg`); without it the run still checks and writes filmstrips, and says there is no video.
 
@@ -469,18 +476,18 @@ An import graph over `apps/` and `packages/` decides what each change reaches: r
 
 **Results cache.** Each unit test file, gallery component (plus one item for the behaviour tests) and desktop e2e spec file is an item with a key: a hash of every file it reaches, its package and suite configs, and the lockfile. After a step passes, its items' keys are recorded in the system temp folder (`juno-cache/results`), shared by every worktree, whether the step ran here or remotely. An item whose key passed before is skipped and counted in the plan; `--no-cache` runs everything. `specs:check` keeps its own cache per Quint run. A failing step records nothing.
 
-`perf` and `test:feel` never run here; the plan reminds you to run them on the Mac when the renderer or a view changed. The graph errs towards running more: a module imported whole (`import x from`, `import * as`) brings everything it imports. A test whose behaviour depends on a file it does not import (a fixture read from disk, an environment variable) is not seen; the scheduled full run on `main` catches that.
+`perf` and `test:feel` never run here, but `pnpm verify:main --with-mac` runs both on the Mac after the other suites; the plan reminds you to run them on the Mac when the renderer or a view changed. The graph errs towards running more: a module imported whole (`import x from`, `import * as`) brings everything it imports. A test whose behaviour depends on a file it does not import (a fixture read from disk, an environment variable) is not seen; the scheduled full run on `main` catches that.
 
 ## Remote runs
 
-`pnpm remote <script> [args...]` runs a root script on a Namespace Linux machine (16 vCPU, 32 GB; `--machine` overrides) and streams its output and exit code back. Each run gets its own machine, so agents never wait for each other; nothing takes the local heavy-job lock. Use it for `test`, `specs:check`, `test:agent*`, `test:gallery`, `test:desktop` (the desktop e2e alone; it passes arguments on, for example `pnpm remote test:desktop e2e/topic.spec.ts`) and `test:e2e`. `perf` and `test:feel` are refused: they time the Mac. Desktop e2e tests tagged `@mac` (`{ tag: '@mac' }`) depend on macOS behaviour and are skipped on Linux; the Mac runs them. Today that is one test, the sidebar width surviving a relaunch.
+`pnpm remote <script> [args...]` runs a root script on a Namespace Linux machine of the shape that script needs (see "Machine shapes"; `--machine` or `JUNO_REMOTE_MACHINE` overrides) and streams its output and exit code back. Each run gets its own machine, so agents never wait for each other; nothing takes the local heavy-job lock. Use it for `test`, `specs:check`, `test:agent*`, `test:gallery`, `test:desktop` (the desktop e2e alone; it passes arguments on, for example `pnpm remote test:desktop e2e/topic.spec.ts`) and `test:e2e`. `perf` and `test:feel` are refused: they time the Mac. Desktop e2e tests tagged `@mac` (`{ tag: '@mac' }`) depend on macOS behaviour and are skipped on Linux; the Mac runs them. Today that is one test, the sidebar width surviving a relaunch.
 
 - **What is sent.** The files git sees in the worktree (tracked or new, not ignored), so uncommitted work is tested; `.env`, `node_modules`, build output and design images under `docs/` are not. The script stops if a file looks like a key or token file or holds what looks like a real Slack token.
 - **Where it runs.** In the image from `scripts/remote/Dockerfile` (Playwright's Ubuntu image with Node 26, pnpm, Java 21, the installed workspace and Quint's downloads). Its tag is a hash of the Dockerfile, `pnpm-lock.yaml` and `pnpm-workspace.yaml`; when the registry lacks it, the first run builds it with `nsc build` (about two minutes) while others on the same Mac wait. Inside, `scripts/remote/run.sh` links the workspace offline and runs the script under xvfb with more workers than the Mac uses.
 - **Results.** Output streams live; reports (spec traces, Playwright results) land in `.remote/<run>/`. The exit code is the script's own.
-- **Warm pool.** After a clean run the machine goes back to a pool kept in the system temp folder (`scripts/remote/pool.mjs`); the next run on this Mac claims it with the image already pulled, which takes a small suite from about 190 s to 19 s. A machine runs one job at a time. A detached reaper destroys it after `JUNO_REMOTE_IDLE_MINUTES` (default 10) idle minutes, every machine ends after 3 hours, and after a failure or Ctrl-C the machine is destroyed at once. `pnpm remote --status` lists the pool; `pnpm remote --drain` destroys the idle machines.
-- **Cap.** Machines in use and idle stay within `JUNO_REMOTE_MAX_VCPU` (default 64 vCPU, four 16x32 machines: the Team plan's Linux limit). A run waits while the pool is full and says so. An idle machine of another shape is destroyed to make room.
-- **Cost.** A 16x32 machine costs about $0.016 a minute. The cap bounds the spend at about $1 an hour with every machine busy; idle machines live at most 10 minutes. `--keep` leaves a machine up outside the pool for `nsc ssh <id>`.
+- **Warm pool.** After a clean run the machine goes back to a pool kept in the system temp folder (`scripts/remote/pool.mjs`); the next run on this Mac claims it with the image already pulled, which takes a small suite from about 190 s to 19 s. A machine runs one job at a time. The pool keeps at most `JUNO_REMOTE_IDLE_PER_SHAPE` (default 2) idle machines of each shape; a detached reaper destroys one after `JUNO_REMOTE_IDLE_MINUTES` (default 5) idle minutes, every machine ends after 3 hours, and after a failure or Ctrl-C the machine is destroyed at once. `pnpm remote --status` lists the pool; `pnpm remote --drain` destroys the idle machines.
+- **Cap.** Machines in use and idle stay within `JUNO_REMOTE_MAX_VCPU` (default 64 vCPU, the Team plan's Linux limit: for example sixteen 4x8 machines, or about three typical `pnpm affected` runs at once). A run waits while the pool is full and says so. An idle machine of another shape is destroyed to make room.
+- **Cost.** Namespace bills vCPU-minutes (about $0.001 each on the Team plan), whatever the shape, so a machine costs its vCPU count times the minutes it is up, idle or not. The cap bounds the spend at about $1 an hour with every machine busy. `--keep` leaves a machine up outside the pool for `nsc ssh <id>`.
 - **Setup.** `brew install namespacelabs/namespace/nsc` and `nsc login` once on the Mac. No credentials live in the repo.
 - **Timings** (2026-10-15, 16x32). Local times are with a free slot, before any queue wait. A new machine adds about 20 s to create and 45 s to pull the image; a warm one adds about 10 s.
 
@@ -523,7 +530,36 @@ Causes found so far (2026-10-15):
 - **A dropped first value in a live query trigger.** `notifications.status` dropped the first value of the presence stream as if the first run had already read it, but the two start together. When the launch schedule set presence in between, the menu never learned it and "Set yourself away" did nothing visible (103 of 300 runs, 8 workers). A trigger that carries state must not drop its first value.
 
 - **A row drawn at its estimate next to a held row.** When an older page went in above the rows in view, its rows were laid out at their size estimate; the one between the top of the view and the held row grew a frame later and moved what was on screen (the long-thread topic test, 12 of 200). The page's rows above the held row are now laid out in full (`eagerRows` in `TopicView.tsx`).
+
 - **A scroll set from a script is not the user's.** The topic list lets go of its hold on the bottom on the user's input (wheel, touch, key, pointer). A test that sets `scrollTop` gives no input, so a commit that adds rows before the scroll settles (the rest of the window, just after an open) puts the bottom back. `TopicPane.scrollUp` turns the mouse wheel over the list instead. Install a `scrollend` listener and await that before the wheel turns: the wheel reaches the page by another path than `evaluate`.
+
+## Machine shapes
+
+`pnpm remote` picks the smallest shape that keeps each script within about three minutes (`remoteShapes` in `scripts/remote.mjs`). Measured on 2026-10-15 with TypeScript 7; "script" is the time the script itself took, without the minute or so a new machine needs to start and pull the image:
+
+| Script | Shape | Script time | Why not smaller or bigger |
+| --- | --- | --- | --- |
+| `typecheck`, `lint`, `test:agent*` | 2x4 | typecheck with nothing cached 31 s (5.5 s on 16x32) | small and short; a bigger machine costs more than it saves |
+| `test` | 4x8 | about 96 s (158 s on 2x4, 85 s on 16x32) | the engine's `sync.test.ts` alone takes about 35 s, so more cores barely help |
+| `test:gallery`, some components | 4x8 | a few components take under a minute | |
+| `test:gallery`, every component | 8x16 (`pnpm affected` asks for it) | 1.4 min (2.6 min on 4x8, 53 s on 16x32) | 4x8 goes over three minutes with the start-up |
+| `test:desktop`, `test:e2e` | 8x16, 4 workers | 1.2 min (2.3 min on 4x8 with 2 workers, 26 s on 16x32) | on 4x8 with 4 workers two tests timed out; 2 workers are too slow |
+| `specs:check`, nothing cached | 8x16 | 126 s (214 s on 4x8, 82 to 100 s on 16x32) | CPU-bound at 90%; with the cache a run takes seconds on any shape |
+
+Workers follow the core count (`scripts/remote/run.sh`): vitest one per core, Electron one per two cores, the gallery three per core, spec simulations one per two cores beside one Apalache server per four. `pnpm remote --shards n` also splits the gallery (each machine takes every n-th state) and the spec check across n machines; it costs about the same and is not the default.
+
+A typical `pnpm affected` run (a view and an engine file changed: typecheck, lint, 90 vitest files, the gallery for one component and the whole desktop e2e), measured on 2026-10-15 with every item run (`--no-cache`):
+
+| | Before: 16x32 for every step | After: shapes above |
+| --- | --- | --- |
+| Machines | four of 16 vCPU (64 vCPU, the whole cap) | 2 + 4 + 4 + 8 = 18 vCPU |
+| Machine time while running | 60 vCPU-minutes (warm machines) | 37 to 38 vCPU-minutes (new machines, including start-up) |
+| Idle time afterwards, at most | 4 x 16 vCPU x 10 min = 640 vCPU-minutes | 18 vCPU x 5 min = 90 vCPU-minutes |
+| Cost | $0.06 running, up to $0.70 with idle time | $0.04 running, up to $0.13 with idle time |
+| Wall time | 289 s | 216 to 273 s |
+| Runs at once within the cap | one | three |
+
+Both wall times include waiting for machines, because other worktrees still on 16x32 held the cap; without waiting the new shapes take about 2.4 minutes with new machines (the desktop e2e is the longest step) and less with warm ones.
 
 ## Heavy jobs share one queue
 

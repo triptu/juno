@@ -145,7 +145,7 @@ export const AllTopicsRow = memo(function AllTopicsRow({
             </span>
           ) : null}
         </span>
-        <Text variant="meta" tone="muted" truncate dir="auto">
+        <Text variant="meta" tone="muted" truncate dir="auto" data-sensitive="">
           {row.preview.text.length === 0 ? (
             row.preview.sender
           ) : (
@@ -290,7 +290,7 @@ export function AllTopics({
                 {...activateHandlers<HTMLButtonElement>(() => onStatus(chip.id))}
               >
                 {chip.label}
-                <Text variant="ui" tone="muted" weight="regular" numeric sx={styles.count}>
+                <Text variant="ui" tone="subtle" weight="regular" numeric sx={styles.count}>
                   {counts[chip.id]}
                 </Text>
               </Button>

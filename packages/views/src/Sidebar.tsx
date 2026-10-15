@@ -1,18 +1,36 @@
 import * as stylex from '@stylexjs/stylex'
 import { Hash } from '@phosphor-icons/react/dist/icons/Hash'
+import { EyeSlash } from '@phosphor-icons/react/dist/icons/EyeSlash'
 import { House } from '@phosphor-icons/react/dist/icons/House'
 import { ListBullets } from '@phosphor-icons/react/dist/icons/ListBullets'
-import { Lock } from '@phosphor-icons/react/dist/icons/Lock'
 import { MagnifyingGlass } from '@phosphor-icons/react/dist/icons/MagnifyingGlass'
 import { NotePencil } from '@phosphor-icons/react/dist/icons/NotePencil'
+import { Notification } from '@phosphor-icons/react/dist/icons/Notification'
+import { Plus } from '@phosphor-icons/react/dist/icons/Plus'
 import { Sparkle } from '@phosphor-icons/react/dist/icons/Sparkle'
 import { User } from '@phosphor-icons/react/dist/icons/User'
-import { Users } from '@phosphor-icons/react/dist/icons/Users'
-import type { ReactNode } from 'react'
+import { useState, type DragEvent, type MouseEvent, type ReactNode } from 'react'
 import type { ConversationKind, KindFilter } from '@juno/contract'
-import { accent, colors, layout, sizes, spacing } from '@juno/tokens/tokens.stylex'
-import { activateHandlers, AvatarButton, Button, Chip, Divider, IconButton, NavItem, Popover, type ActivateEvent, type HueName } from '@juno/ui'
-import { countLabel } from './look'
+import { colors, layout, radii, sizes, spacing } from '@juno/tokens/tokens.stylex'
+import {
+  activateHandlers,
+  AvatarButton,
+  Button,
+  Chip,
+  Divider,
+  FilterPill,
+  Icon,
+  IconButton,
+  NavItem,
+  PillRow,
+  Popover,
+  Text,
+  viewIcons,
+  type ActivateEvent,
+  type HueName,
+  type ViewIconName,
+} from '@juno/ui'
+import { countLabel, kindIcon } from './look'
 
 export type SidebarNavTarget = 'home' | 'all-topics' | 'juno'
 
@@ -26,6 +44,18 @@ export interface SidebarAccount {
 export interface SidebarFilter {
   readonly kind: KindFilter
   readonly unreadOnly: boolean
+  /** The selected view's id; its pill is selected instead of the kind's. */
+  readonly view?: string | undefined
+}
+
+/** A view's pill (spec section 5, "Views"). */
+export interface SidebarViewPill {
+  readonly id: string
+  readonly name: string
+  /** Shown instead of the name, which becomes the tooltip and the accessible name. */
+  readonly icon?: ViewIconName | undefined
+  /** One of its topics has an unread mention of the user. */
+  readonly mention: boolean
 }
 
 /** Which groups have unread topics the list would show, for the dots (spec section 5). */
@@ -62,10 +92,26 @@ export interface SidebarProps {
   /** Fires on mouse down; `event.metaKey` asks for a new tab. */
   readonly onNavigate: (target: SidebarNavTarget, event: ActivateEvent) => void
   readonly onFilterKind: (kind: KindFilter) => void
+  /** The views, in pill order, after DMs. */
+  readonly views?: ReadonlyArray<SidebarViewPill>
+  /** Fires on mouse down, like the other filters. */
+  readonly onFilterView?: (id: string) => void
+  /** The "+" pill. */
+  readonly onNewView?: () => void
+  /** Right-click (or the context-menu key) on a view's pill. */
+  readonly onViewMenu?: (id: string) => void
+  /** A view's pill dropped before another view's, or at the end (`before` undefined). */
+  readonly onMoveView?: (id: string, before: string | undefined) => void
+  /** The view sheet, open under the filter row while present. */
+  readonly viewSheet?: ReactNode
+  readonly onCloseViewSheet?: () => void
   readonly onToggleUnread: () => void
   readonly onClearScope: () => void
   /** A status line under the filters, when the list may be behind Slack (`EngineNotice`). */
   readonly status?: ReactNode
+  /** Privacy mode is on (SPEC section 5): the footer says so and turns it off in one click. */
+  readonly privacy?: boolean
+  readonly onPrivacyOff?: () => void
   /** The topic list. */
   readonly children: ReactNode
 }
@@ -74,8 +120,9 @@ export interface SidebarProps {
  * The left pane (spec section 5): the title bar with the traffic-light
  * space, Search, New chat and the account button, the nav items, a hairline, the quick
  * filters with their dots and the Unread toggle, a status line when the
- * list may be behind Slack, the scope chip when scoped, and the list the
- * owner renders into it.
+ * list may be behind Slack, the scope chip when scoped, the list the
+ * owner renders into it, and, only while privacy mode is on, a footer that
+ * says so with a Show button.
  */
 export function Sidebar({
   titlebarLeading,
@@ -93,14 +140,26 @@ export function Sidebar({
   onNewChat,
   onNavigate,
   onFilterKind,
+  views = [],
+  onFilterView,
+  onNewView,
+  onViewMenu,
+  onMoveView,
+  viewSheet,
+  onCloseViewSheet,
   onToggleUnread,
   onClearScope,
   status,
+  privacy = false,
+  onPrivacyOff,
   children,
 }: SidebarProps) {
+  // The pill that is selected: a view, else the kind.
+  const selected = filter.view !== undefined && views.some((view) => view.id === filter.view) ? filter.view : undefined
+  const kind = selected === undefined ? filter.kind : undefined
   // A dot marks a group with unread topics that is not the one being viewed.
-  const channelsDot = dots.channels && filter.kind !== 'channels'
-  const dmsDot = dots.dms && filter.kind !== 'dms'
+  const channelsDot = dots.channels && kind !== 'channels'
+  const dmsDot = dots.dms && kind !== 'dms'
   return (
     <aside aria-label="Sidebar" {...stylex.props(styles.root)}>
       <header aria-label="Sidebar title bar" {...stylex.props(styles.titlebar)}>
@@ -162,62 +221,167 @@ export function Sidebar({
         <Divider />
       </div>
 
-      {/* Filters switch on mouse down, like the rows (performance.md 4.1). The dot is in the name ("Channels, unread"), so a screen reader hears it. */}
-      <div role="group" aria-label="Quick filters" {...stylex.props(styles.filters)}>
-        <Button variant="filter" aria-label="All" pressed={filter.kind === 'all'} {...activateHandlers<HTMLButtonElement>(() => onFilterKind('all'))}>
-          All
-        </Button>
-        <Button
-          variant="filter"
-          aria-label={channelsDot ? 'Channels, unread' : 'Channels'}
-          pressed={filter.kind === 'channels'}
-          {...activateHandlers<HTMLButtonElement>(() => onFilterKind('channels'))}
-        >
-          Channels
-          <Dot shown={channelsDot} />
-        </Button>
-        <Button variant="filter" aria-label={dmsDot ? 'DMs, unread' : 'DMs'} pressed={filter.kind === 'dms'} {...activateHandlers<HTMLButtonElement>(() => onFilterKind('dms'))}>
-          DMs
-          <Dot shown={dmsDot} />
-        </Button>
-        <span {...stylex.props(styles.unread)}>
-          <Button variant="filter" pressed={filter.unreadOnly} aria-label="Show unread only" {...activateHandlers<HTMLButtonElement>(() => onToggleUnread())}>
-            Unread
-          </Button>
-        </span>
-      </div>
+      {/* Filters switch on mouse down, like the rows (performance.md 4.1). A dot is in the name ("Channels, unread"), so a screen reader hears it. The view sheet hangs under the row. */}
+      <Popover
+        open={viewSheet !== undefined}
+        onClose={() => onCloseViewSheet?.()}
+        placement="bottom-start"
+        width="browse"
+        maxHeight="none"
+        layer="picker"
+        padding="md"
+        label="View"
+        anchor={
+          <div role="group" aria-label="Quick filters" {...stylex.props(styles.filters)}>
+            <PillRow>
+              <FilterPill>
+                <Button variant="filter" aria-label="All" pressed={kind === 'all'} {...activateHandlers<HTMLButtonElement>(() => onFilterKind('all'))}>
+                  All
+                </Button>
+              </FilterPill>
+              <FilterPill dot={channelsDot}>
+                <Button
+                  variant="filter"
+                  iconStart={Hash}
+                  title="Channels"
+                  aria-label={channelsDot ? 'Channels, unread' : 'Channels'}
+                  pressed={kind === 'channels'}
+                  {...activateHandlers<HTMLButtonElement>(() => onFilterKind('channels'))}
+                />
+              </FilterPill>
+              <FilterPill dot={dmsDot}>
+                <Button
+                  variant="filter"
+                  iconStart={User}
+                  title="DMs"
+                  aria-label={dmsDot ? 'DMs, unread' : 'DMs'}
+                  pressed={kind === 'dms'}
+                  {...activateHandlers<HTMLButtonElement>(() => onFilterKind('dms'))}
+                />
+              </FilterPill>
+              <ViewPills views={views} selected={selected} onFilterView={onFilterView} onViewMenu={onViewMenu} onMoveView={onMoveView} />
+              {onNewView === undefined ? null : (
+                <FilterPill>
+                  <Button variant="filter" iconStart={Plus} title="New view" aria-label="New view" aria-haspopup="dialog" pressed={false} onClick={onNewView} />
+                </FilterPill>
+              )}
+            </PillRow>
+            <span {...stylex.props(styles.unread)}>
+              {/* An icon pill like Channels and DMs: the dot on its corner is the unread mark the pills already use. */}
+              <Button
+                variant="filter"
+                iconStart={Notification}
+                title="Unread only"
+                aria-label="Unread only"
+                pressed={filter.unreadOnly}
+                {...activateHandlers<HTMLButtonElement>(() => onToggleUnread())}
+              />
+            </span>
+          </div>
+        }
+      >
+        {viewSheet}
+      </Popover>
 
       {status}
 
       {scope ? (
         <div {...stylex.props(styles.scope)}>
-          <Chip size={26} variant="filled" icon={scopeIcon(scope.kind)} onRemove={onClearScope} removeLabel="Show everything" title={`Showing ${scope.name} only`}>
+          <Chip size={26} variant="filled" icon={kindIcon(scope.kind)} onRemove={onClearScope} removeLabel="Show everything" title={`Showing ${scope.name} only`}>
             {scope.name}
           </Chip>
         </div>
       ) : null}
 
       {children}
+
+      {privacy ? (
+        <div {...stylex.props(styles.footer)}>
+          <div role="status" data-privacy-footer="" {...stylex.props(styles.privacy)}>
+            <Icon icon={EyeSlash} size={14} />
+            <Text variant="meta" tone="subtle" truncate sx={styles.privacyText}>
+              Message text hidden
+            </Text>
+            <Button variant="raised" size="xs" aria-label="Show message text" onClick={onPrivacyOff}>
+              Show
+            </Button>
+          </div>
+        </div>
+      ) : null}
     </aside>
   )
 }
 
-/** The 5px unread dot after a filter label. Its space is always reserved; only opacity changes. The button's name says it. */
-function Dot({ shown }: { readonly shown: boolean }) {
-  return <span aria-hidden {...stylex.props(styles.dot, shown && styles.dotShown)} />
+interface ViewPillsProps {
+  readonly views: ReadonlyArray<SidebarViewPill>
+  readonly selected: string | undefined
+  readonly onFilterView: SidebarProps['onFilterView']
+  readonly onViewMenu: SidebarProps['onViewMenu']
+  readonly onMoveView: SidebarProps['onMoveView']
 }
 
-function scopeIcon(kind: ConversationKind) {
-  switch (kind) {
-    case 'private':
-      return Lock
-    case 'im':
-      return User
-    case 'mpim':
-      return Users
-    default:
-      return Hash
+/**
+ * The views' pills. Dragging one along the row reorders it: a caret shows
+ * where it lands, and only the views take part. The drag is local state;
+ * the order changes when the owner saves it.
+ */
+function ViewPills({ views, selected, onFilterView, onViewMenu, onMoveView }: ViewPillsProps) {
+  const [drag, setDrag] = useState<{ readonly id: string; readonly over?: string; readonly side?: 'before' | 'after' } | undefined>(undefined)
+  const sideOf = (event: DragEvent<HTMLElement>): 'before' | 'after' => {
+    const box = event.currentTarget.getBoundingClientRect()
+    return event.clientX < box.left + box.width / 2 ? 'before' : 'after'
   }
+  const drop = () => {
+    if (drag?.over === undefined || drag.side === undefined) return
+    const at = views.findIndex((view) => view.id === drag.over)
+    const before = drag.side === 'before' ? drag.over : views[at + 1]?.id
+    if (before !== drag.id) onMoveView?.(drag.id, before)
+  }
+  return views.map((view) => {
+    const mark = drag !== undefined && drag.over === view.id && drag.id !== view.id ? drag.side : undefined
+    const on = view.id === selected
+    const dot = view.mention && !on
+    const name = dot ? `${view.name}, unread mention` : view.name
+    const icon = view.icon === undefined ? undefined : viewIcons[view.icon]
+    return (
+      <FilterPill key={view.id} dot={dot} {...(mark === undefined ? {} : { mark })}>
+        <Button
+          variant="filter"
+          data-view-pill={view.id}
+          aria-label={name}
+          {...(icon === undefined ? {} : { iconStart: icon, title: view.name })}
+          pressed={on}
+          draggable={onMoveView !== undefined}
+          onContextMenu={(event: MouseEvent<HTMLButtonElement>) => {
+            if (onViewMenu === undefined) return
+            event.preventDefault()
+            onViewMenu(view.id)
+          }}
+          onDragStart={(event) => {
+            event.dataTransfer.effectAllowed = 'move'
+            event.dataTransfer.setData('text/plain', view.name)
+            setDrag({ id: view.id })
+          }}
+          onDragOver={(event) => {
+            if (drag === undefined) return
+            event.preventDefault()
+            event.dataTransfer.dropEffect = 'move'
+            const side = sideOf(event)
+            if (drag.over !== view.id || drag.side !== side) setDrag({ id: drag.id, over: view.id, side })
+          }}
+          onDrop={(event) => {
+            event.preventDefault()
+            drop()
+            setDrag(undefined)
+          }}
+          onDragEnd={() => setDrag(undefined)}
+          {...activateHandlers<HTMLButtonElement>(() => onFilterView?.(view.id))}
+        >
+          {icon === undefined ? view.name : undefined}
+        </Button>
+      </FilterPill>
+    )
+  })
 }
 
 const styles = stylex.create({
@@ -248,7 +412,7 @@ const styles = stylex.create({
     flexShrink: 0,
     height: layout['--titlebar-height'],
     paddingInlineStart: layout['--titlebar-lights-inset'],
-    paddingInlineEnd: spacing['--space-2-5'],
+    paddingInlineEnd: layout['--sidebar-inset'],
     WebkitAppRegion: 'drag',
   },
   icons: {
@@ -266,7 +430,7 @@ const styles = stylex.create({
     flexDirection: 'column',
     gap: spacing['--space-0-5'],
     paddingTop: spacing['--space-1'],
-    paddingInline: spacing['--space-2-5'],
+    paddingInline: layout['--sidebar-inset'],
   },
   rule: {
     paddingTop: spacing['--space-3'],
@@ -276,30 +440,44 @@ const styles = stylex.create({
   filters: {
     display: 'flex',
     alignItems: 'center',
-    gap: spacing['--space-0-5'],
-    paddingInline: spacing['--space-2-5'],
+    flexGrow: 1,
+    minWidth: 0,
+    gap: spacing['--space-1-5'],
+    paddingInline: layout['--sidebar-inset'],
     paddingBottom: spacing['--space-2-5'],
   },
   unread: {
     display: 'inline-flex',
+    flexShrink: 0,
     marginInlineStart: 'auto',
-  },
-  dot: {
-    display: 'inline-block',
-    width: sizes['--unread-dot'],
-    height: sizes['--unread-dot'],
-    marginInlineStart: spacing['--space-1-5'],
-    borderRadius: '50%',
-    backgroundColor: accent['--hl'],
-    verticalAlign: 'middle',
-    opacity: 0,
-  },
-  dotShown: {
-    opacity: 1,
   },
   scope: {
     display: 'flex',
     paddingInline: spacing['--space-4'],
     paddingBottom: spacing['--space-2'],
+  },
+  // The sidebar inset on every side, so the widget sits as far from the bottom as from the edges.
+  footer: {
+    flexShrink: 0,
+    padding: layout['--sidebar-inset'],
+    borderTopWidth: '1px',
+    borderTopStyle: 'solid',
+    borderTopColor: colors['--border-subtle'],
+  },
+  // One line: the icon at the row text's inset, the Show button 4px from the edge on all three sides.
+  privacy: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: spacing['--space-2'],
+    height: sizes['--control-30'],
+    paddingInlineStart: spacing['--space-2-5'],
+    paddingInlineEnd: spacing['--space-1'],
+    borderRadius: radii['--radius-lg'],
+    backgroundColor: colors['--secondary-default'],
+    color: colors['--foreground-subtle'],
+  },
+  privacyText: {
+    flexGrow: 1,
+    minWidth: 0,
   },
 })

@@ -15,6 +15,8 @@ export const ConnectionConfig = Schema.Struct({
   noSecrets: Schema.Boolean,
   allowlist: Schema.Array(Schema.String),
   enabled: Schema.Boolean,
+  /** T3 Code only: false keeps it on this Mac; true allows an https address on the network. */
+  allowNetwork: Schema.optionalKey(Schema.Boolean),
 })
 export type ConnectionConfig = typeof ConnectionConfig.Type
 
@@ -38,12 +40,31 @@ export const NOTION: ConnectionConfig = {
   allowlist: ['notion-search', 'notion-fetch', 'search', 'fetch'], enabled: false,
 }
 
-export function endpoint(url: string): string {
-  const parsed = new URL(url)
+/** Read names must be confirmed from discovery and reviewed by the owner, never guessed. */
+export const LITTLEBIRD: ConnectionConfig = {
+  id: 'littlebird', label: 'Littlebird', url: 'https://mcp.littlebird.ai/mcp', transport: 'http',
+  auth: { kind: 'oauth' }, trusted: false, noSecrets: false,
+  allowlist: [], enabled: false,
+}
+
+/** T3 Code signs in once with OAuth and has no refresh, so an expired token needs a new sign-in. */
+export const T3: ConnectionConfig = {
+  id: 't3', label: 'T3 Code', url: 'http://localhost:3773/mcp', transport: 'http',
+  auth: { kind: 'oauth' }, trusted: false, noSecrets: true,
+  allowlist: ['t3_thread_read', 't3_thread_list', 't3_thread_search', 't3_thread_wait', 't3_pending_request_list', 't3_pending_request_read', 't3_project_list', 't3_worktree_list', 't3_worktree_status'],
+  enabled: false, allowNetwork: false,
+}
+
+export const PRESETS: ReadonlyArray<ConnectionConfig> = [NOTION, LITTLEBIRD, T3]
+
+export function endpoint(url: string, allowNetwork = true): string {
+  let parsed: URL
+  try { parsed = new URL(url) } catch { throw new McpError({ reason: 'invalid', message: 'Enter a full address, like https://mcp.example.com/mcp.' }) }
   const loopback = ['localhost', '127.0.0.1', '[::1]'].includes(parsed.hostname)
   if ((parsed.protocol !== 'https:' && !(parsed.protocol === 'http:' && loopback)) || parsed.username || parsed.password || parsed.hash || parsed.search) {
     throw new McpError({ reason: 'invalid', message: 'Use HTTPS, or HTTP on this Mac, without credentials in the address.' })
   }
+  if (!allowNetwork && !loopback) throw new McpError({ reason: 'invalid', message: 'Allow the local network to use an address on another machine.' })
   return parsed.href
 }
 

@@ -30,7 +30,7 @@ export interface LabelledRuleProps {
   readonly tone?: 'accent' | 'muted'
 }
 
-/** The "3 NEW" divider: an uppercase label followed by a rule. */
+/** The "3 new" divider: a label followed by a rule. */
 export function LabelledRule({ label, tone = 'accent' }: LabelledRuleProps) {
   return (
     <div role="separator" aria-label={label} {...stylex.props(styles.labelled)}>

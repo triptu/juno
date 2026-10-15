@@ -16,7 +16,7 @@ async function run(c: Case, script = c.script, verdicts: Record<string, Partial<
 }
 
 const failed = (result: Awaited<ReturnType<typeof run>>) => result.checks.filter((c) => c.pass === false).map((c) => c.name)
-const toolCall = (name: string, args: Record<string, string>): ModelStep => reply([{ type: 'toolCall', id: `bad-${name}`, name, arguments: args }])
+const toolCall = (name: string, args: Record<string, unknown>): ModelStep => reply([{ type: 'toolCall', id: `bad-${name}`, name, arguments: args as never }])
 
 describe('a good answer passes', () => {
   it.each(CASES.map((c) => [c.id, c] as const))('%s', async (_, c) => {
@@ -60,6 +60,12 @@ describe('each grader fails the answer it is for', () => {
     const same = '<say><src m="m1">It is paused until finance signs off on the new tax table</src>.</say>'
     const result = await run(c, [c.script[0]!, reply(same), reply('<say>It is paused until finance signs off on the new tax table.</say>')])
     expect(failed(result)).toEqual(['does not repeat itself word for word'])
+  })
+
+  it('a send the tool refused is no card', async () => {
+    const c = byId('card-send')
+    const result = await run(c, [c.script[0]!, toolCall('send_message', { messages: [{ topic: '#launch', text: 'I can make Thursday.' }] }), reply('<say>Here is a reply for #launch, ready for you to send.</say>')])
+    expect(failed(result)).toEqual(['proposes a card'])
   })
 
   it('"remember" answered in words only', async () => {

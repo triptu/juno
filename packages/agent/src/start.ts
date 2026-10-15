@@ -1,3 +1,4 @@
+import { bindViewHost } from './view-tools/host'
 /**
  * Starts the agent. The Electron entry (`apps/desktop/src/agent`) calls this
  * in the agent utility process; tests call it from Node.
@@ -10,7 +11,9 @@
  * compactor (`router/open.ts`). Given `renderer`, it serves the
  * renderer's RPCs (`AgentRpcs`) on the ports that transport gives
  * (`serve/server.ts`), with Settings › Juno when `turns` brings a model
- * picker (`openRouterTurns`). `stop` closes the renderer server, then the engine,
+ * picker and a provider connection (`providerTurns`). Given `mcp`, it
+ * runs the MCP manager on the engine's store with main's keychain bridge,
+ * gives the model its tools and serves Connections (`mcp/app.ts`). `stop` closes the renderer server, then the engine,
  * then the host client, so the owner lock is released last of the engine's
  * resources.
  */
@@ -21,7 +24,10 @@ import { bindActionHost } from './actions/host'
 import { AgentHost } from './host/client'
 import { bindHost, type BoundHost } from './host/reads'
 import type { HostConnection } from './host/port'
-import type { ModelPicker, OpenRouterKey } from './providers/openrouter'
+import { withMcp } from './mcp/app'
+import type { Credentials } from './mcp/types'
+import type { ProviderConnection } from './providers/connection'
+import type { ModelPicker } from './providers/picker'
 import type { Turns, TurnsOptions } from './router/open'
 import { open } from './router/service'
 import type { RendererTransport } from './serve/runner'
@@ -47,14 +53,13 @@ export interface AgentHandle {
 /**
  * What the engine needs beside the agent directory, which comes from
  * `config`, and the host reads and sends, which come from the port. With a
- * picker, the renderer gets Settings › Juno; with a key, the page shows its
- * state.
+ * picker and the provider connection, the renderer gets Settings › Juno.
  */
-export type AgentTurns = Omit<TurnsOptions, 'agentDir' | 'host' | 'actions'> & {
+export type AgentTurns = Omit<TurnsOptions, 'agentDir' | 'host' | 'actions' | 'views'> & {
   /** Executors other folders own. The host's sends come from the port. */
   readonly actions?: Omit<NonNullable<TurnsOptions['actions']>, 'host'>
   readonly picker?: ModelPicker
-  readonly key?: OpenRouterKey
+  readonly connection?: ProviderConnection
 }
 
 export interface AgentOptions {
@@ -62,13 +67,20 @@ export interface AgentOptions {
   readonly turns?: AgentTurns
   /** Serves the renderer's RPCs on these ports. */
   readonly renderer?: RendererTransport
+  /**
+   * Main's keychain and browser bridge for the MCP connections (WP17). With
+   * it and `turns`, the agent runs the MCP manager and serves Connections.
+   */
+  readonly mcp?: { readonly credentials: Credentials }
 }
 
 /** The host speaks another AgentHost protocol version than this agent. */
 export class HostProtocolMismatch extends Schema.TaggedError<HostProtocolMismatch>()('HostProtocolMismatch', { host: HostHello }) {}
 
 export function startAgent(config: AgentConfig, connection: HostConnection, options: AgentOptions = {}): Promise<AgentHandle> {
-  const { turns, renderer } = options
+  const { renderer } = options
+  const mcp = options.turns !== undefined && options.mcp !== undefined ? withMcp(options.turns, options.mcp.credentials) : undefined
+  const turns = mcp?.turns ?? options.turns
   return Effect.runPromise(
     Effect.gen(function* () {
       const scope = yield* Scope.make()
@@ -79,6 +91,7 @@ export function startAgent(config: AgentConfig, connection: HostConnection, opti
         if (hello.protocol !== AGENT_HOST_PROTOCOL) return yield* new HostProtocolMismatch({ host: hello })
         const bound = yield* bindHost.pipe(Effect.provide(context), Scope.provide(scope))
         const actionHost = yield* bindActionHost(bound.presence).pipe(Effect.provide(context))
+        const viewHost = yield* bindViewHost(bound.presence).pipe(Effect.provide(context))
         // A first start has no agent directory yet.
         if (turns !== undefined) mkdirSync(config.agentDir, { recursive: true })
         const engine =
@@ -89,6 +102,7 @@ export function startAgent(config: AgentConfig, connection: HostConnection, opti
                   ...turns,
                   agentDir: config.agentDir,
                   host: bound.reads,
+                  views: viewHost,
                   schedule: bound.schedule,
                   actions: { ...turns.actions, host: actionHost },
                   migrations: [CHAT_MIGRATIONS, ...(turns.migrations ?? [])],
@@ -108,14 +122,22 @@ export function startAgent(config: AgentConfig, connection: HostConnection, opti
             Scope.provide(scope),
           )
         }
+        const manager = engine?._tag === 'running' ? mcp?.manager() : undefined
+        if (engine?._tag === 'running' && manager !== undefined) {
+          // Registered after the engine, so the manager closes first.
+          yield* Effect.acquireRelease(Effect.sync(() => manager.subscribe(() => engine.actions.kick())), (unsubscribe) =>
+            Effect.promise(async () => { unsubscribe(); await manager.close() })).pipe(Scope.provide(scope))
+          // Reconnects the enabled servers without opening a browser; it never fails.
+          void manager.start()
+        }
         const picker = turns?.picker
+        const provider = turns?.connection
         const settings =
-          engine?._tag === 'running' && picker !== undefined
+          engine?._tag === 'running' && picker !== undefined && provider !== undefined
             ? yield* Effect.acquireRelease(
                 Effect.sync(() =>
                   createJunoSettings({
-                    turns: engine, picker, agentDir: config.agentDir,
-                    ...(turns?.key ? { key: turns.key } : {}),
+                    turns: engine, picker, connection: provider, agentDir: config.agentDir,
                     ...(turns?.onReport ? { onReport: turns.onReport } : {}),
                   }),
                 ),
@@ -124,7 +146,7 @@ export function startAgent(config: AgentConfig, connection: HostConnection, opti
             : undefined
         if (renderer !== undefined) {
           yield* Layer.buildWithScope(
-            rendererServer(renderer, { turns: engine, presence: bound.presence, presenceChanges: bound.presenceChanges, ...(engine?._tag === 'running' ? { schedule: { scheduler: engine.scheduler, host: bound.schedule } } : {}), ...(settings ? { settings } : {}) }),
+            rendererServer(renderer, { turns: engine, presence: bound.presence, presenceChanges: bound.presenceChanges, ...(engine?._tag === 'running' ? { schedule: { scheduler: engine.scheduler, host: bound.schedule } } : {}), ...(settings ? { settings } : {}), ...(manager ? { connections: manager } : {}) }),
             scope,
           )
         }

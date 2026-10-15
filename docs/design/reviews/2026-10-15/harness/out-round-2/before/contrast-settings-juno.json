@@ -1,0 +1,26 @@
+{
+  "light": [
+    {
+      "text": "Save",
+      "fg": "rgb(35, 33, 26)",
+      "bg": "241,238,228,1",
+      "ratio": 2.31,
+      "opacity": 0.4,
+      "size": "12px",
+      "weight": "500",
+      "path": "span<button<span<span<div<div"
+    }
+  ],
+  "dark": [
+    {
+      "text": "Save",
+      "fg": "rgb(238, 235, 226)",
+      "bg": "48,47,44,1",
+      "ratio": 3.08,
+      "opacity": 0.4,
+      "size": "12px",
+      "weight": "500",
+      "path": "span<button<span<span<div<div"
+    }
+  ]
+}

@@ -22,6 +22,9 @@ import {
   topicsRestore,
   topicsSubscribe,
   topicsUnsubscribe,
+  viewsAddChannel,
+  viewsRemoveChannel,
+  viewsRestore,
   type CommandResult,
   type UndoCommand,
 } from '@juno/contract'
@@ -122,5 +125,11 @@ function replay(registry: Registry, undo: UndoCommand): Promise<unknown> {
       return Promise.all(undo.restores.map((restore) => runCommand(registry, topicsRestore, restore)))
     case 'art.restore':
       return runCommand(registry, artRestore, payloadOf(undo))
+    case 'views.restore':
+      return runCommand(registry, viewsRestore, payloadOf(undo))
+    case 'views.addChannel':
+      return runCommand(registry, viewsAddChannel, payloadOf(undo))
+    case 'views.removeChannel':
+      return runCommand(registry, viewsRemoveChannel, payloadOf(undo))
   }
 }

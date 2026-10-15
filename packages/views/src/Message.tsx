@@ -77,6 +77,13 @@ export interface MessageProps {
 
 const HOVER = '@media (hover: hover)'
 
+// A row too narrow to keep the toolbar's reserve and still leave the name and
+// time 160px: the reserve (243) + 160 + the gutter (32), its gap (12) and the
+// row's inline padding (16). There the header takes the whole line and the
+// toolbar rises above the row's top edge, over the end of the row before, as
+// Slack's does, so it never covers the name or the time.
+const NARROW_ROW = '@container message (width < 464px)'
+
 const dim = stylex.keyframes({
   from: { opacity: 1 },
   to: { opacity: opacity['--opacity-dim'] },
@@ -86,10 +93,12 @@ const dim = stylex.keyframes({
  * One flat message (inventory 6.1): the avatar column, then the name and
  * time on the first message of a run, the body, files, reactions and, in
  * Main, the thread link. A message that mentions you sits on the accent
- * tint. The hover toolbar's slot is reserved at the top right of the row,
- * inside its box, so showing it never forces a layout: on a row with a
- * toolbar the header keeps its end free and is as tall as the toolbar, so
- * neither the name nor the first body line runs under it.
+ * tint. The hover toolbar sits at the top right of the row and shows by
+ * opacity and display only, absolutely placed, so showing it never forces a layout. On a row
+ * with a toolbar the header keeps its end free, so the toolbar covers the end
+ * of the first body line but never the name or the time; in a narrow row it
+ * rises above the row's top edge instead. The header is the same height with
+ * or without a toolbar, so every list of messages has one rhythm.
  *
  * A message Juno is still sending looks like the message it becomes, so the
  * swap moves nothing; a send that takes longer than `--delay-pending` dims
@@ -239,6 +248,12 @@ const styles = stylex.create({
     contain: 'content',
     contentVisibility: 'auto',
     containIntrinsicSize: `auto ${sizes['--row-message-estimate']}`,
+    // Paint containment clips at the row's edge; the raised toolbar of a
+    // narrow row (NARROW_ROW) and its shadow paint this far above it. A plain
+    // token: Chromium drops overflow-clip-margin given any calc().
+    overflowClipMargin: layout['--toolbar-clip-margin'],
+    containerName: 'message',
+    containerType: 'inline-size',
     backgroundColor: {
       default: 'transparent',
       ':hover': { default: null, [HOVER]: colors['--surface-hover'] },
@@ -250,14 +265,26 @@ const styles = stylex.create({
     outlineWidth: sizes['--focus-ring-width'],
     outlineOffset: `calc(-1 * ${sizes['--focus-ring-width']})`,
     outlineColor: accent['--focus-ring'],
-    // The toolbar and the gutter time read this: hidden until the pointer is
+    // The toolbar and the gutter time read these: hidden until the pointer is
     // over the row, or keyboard focus is on the row or inside it. Only
-    // opacity changes, so nothing moves.
+    // opacity and display change on an absolutely placed toolbar, so nothing
+    // moves, and a hidden toolbar never takes the pointer, which matters where
+    // it rises over the row before.
     '--row-action-opacity': {
       default: '0',
       ':hover': { default: null, [HOVER]: '1' },
       ':focus-visible': '1',
       ':has(:focus-visible)': '1',
+    },
+    // The toolbar is out of the layout until then too: every row has one, and
+    // laid out but transparent it was most of the list's style and layout work
+    // when a topic opened or the pane changed width (performance.md 8). It is
+    // absolutely placed in a reserved slot, so showing it moves nothing.
+    '--row-toolbar-display': {
+      default: 'none',
+      ':hover': { default: null, [HOVER]: 'block' },
+      ':focus-visible': 'block',
+      ':has(:focus-visible)': 'block',
     },
   },
   rowEager: {
@@ -267,6 +294,7 @@ const styles = stylex.create({
   rowHeld: {
     backgroundColor: colors['--surface-hover'],
     '--row-action-opacity': '1',
+    '--row-toolbar-display': 'block',
   },
   rowGroupStart: {
     marginTop: density['--density-message-group-gap'],
@@ -313,12 +341,15 @@ const styles = stylex.create({
     marginBottom: spacing['--space-0-5'],
     userSelect: 'none',
   },
-  // The toolbar's footprint (inventory 6.5). A continuation row has no
-  // header, so the toolbar shows over the end of its first line, as Slack's
-  // does; the row's paint containment keeps it inside the row.
+  // The toolbar's footprint (inventory 6.5): the name and time stay clear of
+  // it. The header is no taller for it, so the toolbar covers the end of the
+  // first body line on hover, as on a continuation row. A narrow row gives
+  // the whole line to the name, since its toolbar rises above the row.
   headerWithToolbar: {
-    paddingInlineEnd: layout['--toolbar-reserve'],
-    minHeight: `calc(${layout['--toolbar-height']} - ${spacing['--space-0-5']})`,
+    paddingInlineEnd: {
+      default: layout['--toolbar-reserve'],
+      [NARROW_ROW]: 0,
+    },
   },
   name: {
     flexShrink: 1,
@@ -353,14 +384,18 @@ const styles = stylex.create({
     marginTop: spacing['--space-0-5'],
     userSelect: 'none',
   },
-  // Inside the row's box (content-visibility brings paint containment, so
-  // nothing can hang above it), top right, over the header line's empty end.
+  // Top right, over the header line's empty end. In a narrow row it sits on
+  // the row's top edge, wholly above it: paint containment would clip it
+  // there, so the row's overflow-clip-margin lets it paint.
   toolbar: {
+    display: 'var(--row-toolbar-display)',
     position: 'absolute',
-    top: spacing['--space-0-5'],
+    top: {
+      default: spacing['--space-0-5'],
+      [NARROW_ROW]: `calc(-1 * ${layout['--toolbar-height']})`,
+    },
     right: spacing['--space-2'],
     zIndex: z['--z-toolbar'],
     opacity: 'var(--row-action-opacity)',
-    pointerEvents: 'auto',
   },
 })

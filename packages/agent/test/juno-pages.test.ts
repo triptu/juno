@@ -5,7 +5,7 @@ import { Effect, Stream } from 'effect'
 import { fakeActionHost, rejectedKey, reply, TEST_CHANNEL } from '@juno/agent-testing'
 import { Revision } from '@juno/agent-cards'
 import type { ChatItem, ChatPage, JunoSettingsPage, OpId, PinId, ScheduleId } from '@juno/agent-contract'
-import { openRouterTurns } from '../src/index'
+import { providerTurns } from '../src/index'
 import { run, served } from './serve-harness'
 import { say } from './turns-harness'
 
@@ -17,22 +17,24 @@ it('lists one model row per family from the OpenRouter catalogue, with Sonnet an
   const { client, follow, catalogueReads } = await served()
   const page = await follow(client['agent.settings.page']()).where(() => true, 'a page')
   expect(page.chatModels).toEqual([
-    { family: 'Claude Sonnet', resolved: 'Claude Sonnet 5.5', provider: 'openrouter', price: '$2 / $10 per million tokens', selected: true },
-    { family: 'Claude Opus', resolved: 'Claude Opus 5.5', provider: 'openrouter', price: '$4 / $20 per million tokens', selected: false },
-    { family: 'Muse', resolved: 'Muse Wonder', provider: 'openrouter', price: '$4 / $20 per million tokens', selected: false },
-    { family: 'GPT Sol', resolved: 'GPT-6.1 Sol', provider: 'openrouter', price: '$2 / $10 per million tokens', selected: false },
-    { family: 'Grok', resolved: 'Grok 4.7', provider: 'openrouter', price: '$2 / $6 per million tokens', selected: false },
+    { family: 'Claude Sonnet', resolved: 'Claude Sonnet 5.5', provider: 'openrouter', price: '$2 in, $10 out per million tokens', selected: true },
+    { family: 'Claude Opus', resolved: 'Claude Opus 5.5', provider: 'openrouter', price: '$4 in, $20 out per million tokens', selected: false },
+    { family: 'Muse', resolved: 'Muse Wonder', provider: 'openrouter', price: '$4 in, $20 out per million tokens', selected: false },
+    { family: 'GPT Sol', resolved: 'GPT-6.1 Sol', provider: 'openrouter', price: '$2 in, $10 out per million tokens', selected: false },
+    { family: 'Grok', resolved: 'Grok 4.7', provider: 'openrouter', price: '$2 in, $6 out per million tokens', selected: false },
   ])
   expect(page.compactionModels).toEqual([
-    { family: 'Claude Haiku', resolved: 'Claude Haiku 5.5', provider: 'openrouter', price: '$0.10 / $0.50 per million tokens', selected: true },
-    { family: 'Gemini Flash', resolved: 'Gemini 3.8 Flash', provider: 'openrouter', price: '$0.75 / $3.75 per million tokens', selected: false },
+    { family: 'Claude Haiku', resolved: 'Claude Haiku 5.5', provider: 'openrouter', price: '$0.10 in, $0.50 out per million tokens', selected: true },
+    { family: 'Gemini Flash', resolved: 'Gemini 3.8 Flash', provider: 'openrouter', price: '$0.75 in, $3.75 out per million tokens', selected: false },
   ])
-  expect(page).toMatchObject({ capUsd: 2, spentTodayUsd: 0, openRouterKey: 'missing', paused: false, rules: [], codex: { _tag: 'missing' }, ownership: { _tag: 'active', epoch: 1 } })
+  expect(page).toMatchObject({ capUsd: 2, spentTodayUsd: 0, openRouterKey: 'set', paused: false, rules: [], codex: { _tag: 'missing' }, ownership: { _tag: 'active', epoch: 1 } })
+  expect(page.provider).toBeUndefined()
+  expect(page.spendUntracked).toBeUndefined()
   expect(catalogueReads()).toBe(1)
 })
 
 it('a chosen chat model is used from the next run and kept for the next start', async () => {
-  const { h, client, follow, pageWhere, key, picker } = await served()
+  const { h, client, follow, pageWhere, connection, picker } = await served()
   const settings = follow(client['agent.settings.page']())
 
   const chose = await run(client['agent.settings.change']({ opId: 'op-1' as OpId, change: { _tag: 'model', purpose: 'chat', provider: 'openrouter', family: 'Claude Opus' } }))
@@ -46,7 +48,7 @@ it('a chosen chat model is used from the next run and kept for the next start', 
   expect(h.chatRequests().map((r) => r.model)).toEqual(['anthropic/claude-opus-5.5'])
 
   // The next start reads the saved family.
-  expect(openRouterTurns(key, picker).model(h.turns.store)).toEqual({ provider: 'openrouter', modelId: 'anthropic/claude-opus-5.5' })
+  expect(providerTurns(connection, picker).model(h.turns.store)).toEqual({ provider: 'openrouter', modelId: 'anthropic/claude-opus-5.5' })
 })
 
 it('a compaction model change applies to compaction, and an unknown family is refused', async () => {
@@ -108,11 +110,9 @@ it("Pause and Resume show in the chat's banner at once, with no message sent", a
   await pageWhere((p) => p.banner._tag === 'none', 'the banner gone')
 })
 
-it('shows whether the OpenRouter key is set, and when OpenRouter rejected it', async () => {
-  const { h, client, follow, key } = await served()
+it('shows when OpenRouter rejected its key, until main sends a new one', async () => {
+  const { h, client, follow, connection } = await served()
   const settings = follow(client['agent.settings.page']())
-  await settings.where((p) => p.openRouterKey === 'missing', 'no key')
-  key.set('sk-or-v1-test')
   await settings.where((p) => p.openRouterKey === 'set', 'the key set')
 
   h.fake.script([rejectedKey()])
@@ -120,10 +120,8 @@ it('shows whether the OpenRouter key is set, and when OpenRouter rejected it', a
   await h.ended('op-1')
   await settings.where((p) => p.openRouterKey === 'rejected', 'the key rejected')
 
-  key.set('sk-or-v1-other')
+  connection.set({ _tag: 'openRouter', key: 'sk-or-v1-other' })
   await settings.where((p) => p.openRouterKey === 'set', 'a new key')
-  key.set(null)
-  await settings.where((p) => p.openRouterKey === 'missing', 'the key removed')
 })
 
 it('What Juno remembers lists a pinned message, and edits and removes it with a revision check', async () => {

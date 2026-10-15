@@ -3,10 +3,10 @@ import type { ReactNode } from 'react'
 import { layout, spacing } from '@juno/tokens/tokens.stylex'
 import { Text } from './Text'
 
-export type PageWidth = 'narrow' | 'default' | 'settings' | 'wide'
+export type PageWidth = 'narrow' | 'default' | 'settings'
 
 export interface PageProps {
-  /** narrow 680, default 720, settings 760, wide 880. */
+  /** narrow 680, default 720, settings 760 (Notifications, Preferences and Settings › Juno). */
   readonly width?: PageWidth
   readonly children?: ReactNode
 }
@@ -79,6 +79,10 @@ const styles = stylex.create({
     minHeight: 0,
     overflowY: 'auto',
     overscrollBehavior: 'contain',
+    // The scrollbar's room is kept whether or not the page overflows, so a page
+    // that grows past the window (Settings › Juno once the agent's part arrives)
+    // does not move its centred column sideways.
+    scrollbarGutter: 'stable',
   },
   column: {
     display: 'flex',
@@ -130,5 +134,4 @@ const widths = stylex.create({
   narrow: { maxWidth: layout['--page-width-narrow'] },
   default: { maxWidth: layout['--page-width'] },
   settings: { maxWidth: layout['--page-width-settings'] },
-  wide: { maxWidth: layout['--page-width-wide'] },
 })
