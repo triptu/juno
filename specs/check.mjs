@@ -416,6 +416,10 @@ if (!outboxOnly && !boundedOnly && !memoryOnly && !recoveryOnly) {
     { ...options, samples: 1, witnesses: ['reachedAgreement', 'menuScheduleCreated'], requireCompletion: true })
   simulate('agent-actions', 'resumedClickWitnessStep', 'invariants', 'actions-resumed-click.itf.json', false, true,
     { ...options, samples: 1, witnesses: ['reachedAgreement', 'resumedClickSent'], requireCompletion: true })
+  for (const [step, witness] of [['reviewedRunWitnessStep', 'reviewedRunSent'], ['neverImpliedWitnessStep', 'reviewedRunSent'], ['irreversibleClickWitnessStep', 'clickedOnce']]) {
+    simulate('agent-actions', step, 'invariants', `actions-${step.replace('WitnessStep', '')}.itf.json`, false, true,
+      { ...options, samples: 1, witnesses: ['reachedAgreement', witness], requireCompletion: true })
+  }
   for (const [schedule, invariant] of actionCases) {
     simulate('agent-actions', `${schedule}BugStep`, invariant, `actions-${schedule}-bug.itf.json`, true, false, options)
   }
