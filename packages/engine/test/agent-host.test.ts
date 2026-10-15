@@ -10,7 +10,7 @@ import { MessageChannel, type MessagePort } from 'node:worker_threads'
 import { afterEach, describe, expect, it } from 'vitest'
 import { Effect, Exit, Layer, Schema, Scope, Stream } from 'effect'
 import { RpcClient, type RpcClientError, type RpcGroup } from 'effect/rpc'
-import { AgentHostRpcs, HostDispatch, HostPresence } from '@juno/agent-contract'
+import { AgentHostRpcs, HostDispatch, HostPresence, HostTopicId } from '@juno/agent-contract'
 import { hostProtocol, startAgent, type HostConnection, type HostPort } from '@juno/agent'
 import { forgedSendReceipt, hostileMessages, HOSTILE_USER } from '@juno/agent-testing'
 import { prefsSet } from '@juno/contract'
@@ -127,6 +127,25 @@ function send(account: string, text: string, ids: { readonly n?: number } = {}) 
 const posted = (engine: RunningEngine, clientMsgId: string) => engine.fake.messages(CHANNEL).filter((m) => m.client_msg_id === clientMsgId)
 
 describe('the AgentHost port', () => {
+  it('resolves locally with writes disabled, restores Undo, and never reapplies a repeated dispatch', async () => {
+    const { agent: { client }, account } = await hostWithAgent('disabled')
+    const topics = await ok(client['host.topics.list']({ limit: 20 }))
+    const topic = topics.topics[0]!
+    const base = send(account, '')
+    const dispatch = Schema.decodeUnknownSync(HostDispatch)({ ...base, payload: { ...base.payload,
+      tool: 'topics_resolve', destination_ids: [topic.topicId], args: { topicIds: [topic.topicId] } } })
+    const result = await ok(client['host.topics.resolve'](dispatch))
+    expect(result._tag).toBe('done')
+    expect((await ok(client['host.topics.get']({ topicId: HostTopicId.make(topic.topicId) }))).resolved).toBe(true)
+    await ok(client['host.topics.undoResolve']({ accountId: account, actionId: dispatch.actionId }))
+    await ok(client['host.topics.undoResolve']({ accountId: account, actionId: dispatch.actionId }))
+    expect(await ok(client['host.topics.resolve'](dispatch))).toEqual(result)
+    expect((await ok(client['host.topics.get']({ topicId: HostTopicId.make(topic.topicId) }))).resolved).toBe(false)
+    const bad = Schema.decodeUnknownSync(HostDispatch)({ ...send(account, ''), payload: { ...dispatch.payload, args: { topicIds: [topic.topicId, 'missing'] }, destination_ids: [topic.topicId, 'missing'] } })
+    expect(await failure(client['host.topics.resolve'](bad))).toMatchObject({ reason: 'rejected' })
+    expect((await ok(client['host.topics.get']({ topicId: HostTopicId.make(topic.topicId) }))).resolved).toBe(false)
+  })
+
   it('lists, creates, updates, deletes and undoes local views while Slack writes are disabled', async () => {
     const { engine, agent: { client }, account } = await hostWithAgent('disabled')
     const directory = await ok(client['host.slack.channels']({ accountId: account, pattern: '*E*', limit: 1 }))
@@ -261,7 +280,7 @@ describe('the AgentHost port', () => {
     const { engine, agent, account } = await hostWithAgent('disabled')
     const dispatch = send(account, 'Hello from Juno')
     expect(await failure(agent.client['host.outbox.send'](dispatch))).toMatchObject({ reason: 'unsupported' })
-    expect(await failure(agent.client['host.topics.resolve'](dispatch))).toMatchObject({ reason: 'unsupported' })
+    expect(await failure(agent.client['host.topics.resolve'](dispatch))).toMatchObject({ reason: 'rejected' })
     expect(posted(engine, dispatch.actionId)).toEqual([])
     expect(engine.fake.callCount('chat.postMessage')).toBe(0)
   })

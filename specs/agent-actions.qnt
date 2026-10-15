@@ -769,3 +769,22 @@ module actionsProtocol {
 }
 module agent_actions { import actionsProtocol(children = 2, drainLimit = 32).* }
 module agent_actions_bounded { import actionsProtocol(children = 1, drainLimit = 32).* }
+
+// Resolve commits its local effect and host receipt together. Undo retains
+// the receipt: a delayed delivery of the same authorization must not hide
+// the topic again, including after either process restarts.
+module agent_resolve {
+  var pc: int
+  var resolved: bool
+  var recorded: bool
+  action init = all { pc' = 0, resolved' = false, recorded' = false }
+  action advance(forget: bool) = all {
+    pc' = pc + 1,
+    if (pc == 0) all { resolved' = true, recorded' = true }
+    else if (pc == 1) all { resolved' = false, recorded' = not(forget) }
+    else all { resolved' = if (recorded) resolved else true, recorded' = true }
+  }
+  action step = advance(false)
+  action bugStep = advance(true)
+  val undoSurvivesRedelivery = pc < 2 or not(resolved)
+}

@@ -70,7 +70,8 @@ export const hostReconcileSend = Rpc.make('host.outbox.reconcileSend', { payload
   actionId: ActionId, attemptId: AttemptId }, success: Schema.Union([
     Schema.TaggedStruct('found', { message: HostMessage }), Schema.TaggedStruct('unknown', {}),
   ]), error: AgentHostError })
-export const HostActionRpcs = RpcGroup.make(hostSend, hostResolve, hostCancel, hostReconcileSend)
+export const hostUndoResolve = Rpc.make('host.topics.undoResolve', { payload: { accountId: AccountId, actionId: ActionId }, success: Schema.Void, error: AgentHostError })
+export const HostActionRpcs = RpcGroup.make(hostSend, hostResolve, hostUndoResolve, hostCancel, hostReconcileSend)
 
 export const HostPresence = Schema.Struct({
   online: Schema.Boolean, aiEnabled: Schema.Boolean, quietHours: Schema.Boolean,

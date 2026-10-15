@@ -78,6 +78,8 @@ export class JunoHost extends Context.Service<
       limit: number,
     ) => Effect.Effect<{ readonly topics: ReadonlyArray<TopicLink>; readonly next?: typeof HostCursor.Type }, AgentHostError>
     readonly topic: (topicId: string) => Effect.Effect<Topic, AgentHostError>
+    readonly resolve?: (dispatch: Dispatch) => Effect.Effect<typeof import('@juno/agent-contract').HostDispatchResult.Type, AgentHostError>
+    readonly undoResolve?: (actionId: string) => Effect.Effect<void, AgentHostError>
     readonly person: (userId: string) => Effect.Effect<{ readonly id: typeof HostUserId.Type; readonly name: string; readonly displayName: string }, AgentHostError>
 
     /** The current presence, then every change. */
