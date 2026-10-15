@@ -430,6 +430,8 @@ One long list, no "new chat". Scroll container under the header islands (§5); c
 - **Context menu on a message** (native): Copy · React and Reply (Juno's bubbles and cards) · Remember this (owner messages only; disabled over 280 bytes without a selection) · Remove. Remove opens the **Remove sheet** (`RemoveSheet`): a native-style sheet with the title "Remove from Juno", the body line, the rows as on the Remove card, the "Also remove Juno's reply" checkbox when offered, the cannot-recall line, and Keep · Remove (danger). It needs no run, so it works paused, offline, in recovery and with AI off.
 - **Elsewhere**: the sidebar's Juno nav item shows the unread count as the soft grey tag and the duotone sparkle while `busy`; the home's Ask Juno field shows `jobLine` in place of its placeholder as a text swap. ⌘J opens the tab and focuses the composer, except in a topic tab, where it toggles the panel (§12.1). Juno pages (Scheduled, What Juno remembers, Memory of this chat, Activity, Connections, and Review in recovery) use the §11 page shell: max-width 720, title serif 34, group cards `--radius-card` with rows divided by `--border-subtle`, rows min-height 48. Activity run outcomes print `chatCopy.pages.activity.outcome`; a failure row has "Copy details". Memory's masked lines read "being updated". A pin that changed under an edit reads "This changed. Check it and save again." Review lists the pending cards with "This may already have happened." and ends with "Activate Juno". Settings › Juno adds the ownership group (state, "Export recovery phrase", "Move to another Mac", "Restore from backup" with the attestation line), the rejected-key line, and "Removal pending · 1 copy in a running job · Stop job". The Connections T3 row adds the address field and the "Allow T3 Code over the local network" switch with its https note.
 
+- [built WP14] The Juno tab is a page tab like Home, one tab for the one chat (`apps/desktop/src/renderer/containers/juno/`). The window is the agent's page of at most 200 rows: the tab opens on `unread`, the panel on `latest`, an edge slot near view moves the window by 100 rows around the first or last row, and a window that reaches the newest row follows it. Rows stay in flow, so scroll anchoring holds the rows in view. A Juno bubble fully on screen for a second in the focused window marks the chat read through it. The menu's Remember this and Remove, the note's Undo and the group label's actions wait for the agent's pins, removal and schedules, so they show disabled or do nothing; the Juno menu's pages are not served yet (`openJunoPage` is the seam). Times: `juno.chat-send`, `juno.chat-bubble`, `juno.panel-open` (performance.md 1).
+
 ### 12.1 Juno panel
 
 **Shows:** `docs/design/juno-panel/` (`panel-light.png`, `panel-dark.png`). SPEC §7 "Juno panel" decides behaviour.
@@ -445,6 +447,7 @@ One long list, no "new chat". Scroll container under the header islands (§5); c
 - **Composer**: the Juno composer (§12) with outer padding `0 12 12` and placeholder "Ask about this topic".
 - **Keys**: ⌘J and the header's Juno button toggle the panel and focus its composer; Esc in an empty panel composer closes it and returns focus to the topic composer. Tab order: topic header → topic list → topic composer → panel header (Juno menu, Open in a tab, Close) → panel list → panel composer.
 - **Saved**: whether the panel is open (one pref for all topic tabs).
+- [built WP14] The panel is the `Workspace` view's `side` slot; the cover rule is a container query on the page row (840px = 360 + 480). The Juno button, ⌘J (View › Juno) and Ask Juno show only while the agent runs (`?agent=1`, JUNO_AGENT=1). The selection is read from the visible topic's DOM on `selectionchange` and kept when it collapses; the messages on screen are read once, at send time. The open flag is the workspace pref `junoPanel`.
 
 ## 13. Notifications page
 
@@ -537,6 +540,8 @@ Native menus **[spec]**. Prototype rendering for reference: 236px, padding 5, ra
 | — | | | |
 | Ask Juno | `sparkle` | | AI assist on (opens the Juno panel with an "About #eng" chip, §12.1) |
 
+[built WP14] Right-clicking the header's context pill or a #channel chip shows this menu. Mark channel as read and as unread show disabled until the engine has a channel-wide read command.
+
 ### 15.3 Notify me submenu
 
 Shown from 15.1 (also opened from the header's title, §5), 15.2 and 15.6. Three items with a checkmark (13, `--foreground-default`) on the current one: **Every message**, **When it matters** (default), **Never**. For a person the parent reads "Notify me about Maya". Choosing one applies at once with the toast "#design-review: Never" and Undo.
@@ -555,7 +560,7 @@ Right-click any tab (§4). Pin tab / Unpin tab (`push-pin`) · — · Close tab 
 
 ### 15.6 Person menu
 
-Right-click a sender's name or avatar in a message, or an @person chip. Notify me about Maya (`bell`, submenu §15.3) · — · Ask Juno (`sparkle`, AI assist on; opens the Juno panel with an "About Maya Chen" chip, §12.1).
+Right-click a sender's name or avatar in a message, or an @person chip. Notify me about Maya (`bell`, submenu §15.3) · — · Ask Juno (`sparkle`, AI assist on; opens the Juno panel with an "About Maya Chen" chip, §12.1). [built WP14] Ask Juno only; Notify me comes with the notifications work.
 
 ## 16. Toasts
 
