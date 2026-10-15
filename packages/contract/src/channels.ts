@@ -5,9 +5,9 @@
  * it, and a sandboxed preload should stay tiny. Schemas live in shell.ts; the
  * types below are imported from them, which is erased at compile time.
  */
-import type { Accent, SidebarLayout, SlackTarget, Theme } from './shell'
+import type { Accent, Density, SidebarLayout, SlackTarget, Theme } from './shell'
 
-export type { Accent, AppInfo, Platform, SidebarLayout, SlackTarget, Theme } from './shell'
+export type { Accent, AppInfo, Density, Platform, SidebarLayout, SlackTarget, Theme } from './shell'
 
 export const Channels = {
   appGetInfo: 'app.getInfo',
@@ -19,6 +19,8 @@ export const Channels = {
   launchSetTheme: 'launch.setTheme',
   /** Remember the accent so the next launch's first render already uses it. */
   launchSetAccent: 'launch.setAccent',
+  /** Remember the density so the next launch's first render already uses it. */
+  launchSetDensity: 'launch.setDensity',
   /** Remember the sidebar's width and hidden state so the next launch's first render has them. */
   launchSetSidebar: 'launch.setSidebar',
   /** Shows a native context menu at the pointer and answers with the chosen item's id, or null. */
@@ -50,8 +52,8 @@ export const Events = {
 /**
  * The app-menu items main hands to the renderer (architecture, shortcuts):
  * the tab keys, Back and Forward (also the three-finger swipe), Hide
- * Sidebar, and Edit › Undo, which undoes typing in a text field or else
- * Juno's last action.
+ * Sidebar, Edit › Undo, which undoes typing in a text field or else
+ * Juno's last action, and Settings (⌘,), which opens Preferences.
  */
 export type MenuCommand =
   | 'tab.new'
@@ -64,6 +66,7 @@ export type MenuCommand =
   | 'history.forward'
   | 'sidebar.toggle'
   | 'edit.undo'
+  | 'preferences.open'
 
 /** One item of a context menu the renderer asks for, or a separator. */
 export type ContextMenuLeaf =
@@ -116,6 +119,7 @@ export interface JunoBridge {
   readonly launch: {
     readonly setTheme: (theme: Theme) => Promise<unknown>
     readonly setAccent: (accent: Accent) => Promise<unknown>
+    readonly setDensity: (density: Density) => Promise<unknown>
     readonly setSidebar: (sidebar: SidebarLayout) => Promise<unknown>
   }
   readonly contextMenu: {

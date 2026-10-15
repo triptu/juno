@@ -64,12 +64,13 @@ export interface IpcDeps {
   readonly supervisor: EngineSupervisor
   readonly setTheme: (theme: Launch['theme']) => void
   readonly setAccent: (accent: NonNullable<Launch['accent']>) => void
+  readonly setDensity: (density: NonNullable<Launch['density']>) => void
   readonly setSidebar: (sidebar: NonNullable<Launch['sidebar']>) => void
   /** The topic the window shows, or null while it shows none or is not focused. */
   readonly setViewing: (topicId: string | null) => void
 }
 
-export function registerIpc({ supervisor, setTheme, setAccent, setSidebar, setViewing }: IpcDeps): void {
+export function registerIpc({ supervisor, setTheme, setAccent, setDensity, setSidebar, setViewing }: IpcDeps): void {
   handle(Channels.appGetInfo, () => ({
     name: app.getName(),
     version: app.getVersion(),
@@ -93,6 +94,10 @@ export function registerIpc({ supervisor, setTheme, setAccent, setSidebar, setVi
 
   handle(Channels.launchSetAccent, ({ accent }) => {
     setAccent(accent)
+  })
+
+  handle(Channels.launchSetDensity, ({ density }) => {
+    setDensity(density)
   })
 
   handle(Channels.launchSetSidebar, (sidebar) => {

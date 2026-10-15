@@ -1,7 +1,7 @@
 import { app, BrowserWindow, Menu, screen, shell, type BaseWindow, type BrowserWindowConstructorOptions, type MenuItemConstructorOptions } from 'electron'
 import { join } from 'node:path'
-import { DEFAULT_ACCENT, DEFAULT_SIDEBAR, Events, type MenuCommand } from '@juno/contract'
-import { BACKGROUND, type Launch } from './launch'
+import { DEFAULT_ACCENT, DEFAULT_DENSITY, DEFAULT_SIDEBAR, Events, type MenuCommand } from '@juno/contract'
+import { BACKGROUND, backgroundFor, type Launch } from './launch'
 import { APP_URL } from './scheme'
 
 /** Height of the drag strip drawn by the renderer. Keep in sync with --titlebar-height. */
@@ -75,7 +75,7 @@ export function createMainWindow(launch: Launch): BrowserWindow {
     ...launch.bounds,
     minWidth: MIN_WIDTH,
     minHeight: MIN_HEIGHT,
-    backgroundColor: BACKGROUND[launch.theme],
+    backgroundColor: backgroundFor(launch.theme),
   })
 
   mainWindows.add(window)
@@ -220,7 +220,26 @@ function setAppMenu(sidebarHidden: boolean, rebuild = false): void {
   ]
   Menu.setApplicationMenu(
     Menu.buildFromTemplate([
-      ...(process.platform === 'darwin' ? [{ role: 'appMenu' } satisfies MenuItemConstructorOptions] : []),
+      ...(process.platform === 'darwin'
+        ? [
+            {
+              label: app.name,
+              submenu: [
+                { role: 'about' },
+                { type: 'separator' },
+                command('preferences', 'Settings…', 'CommandOrControl+,', 'preferences.open'),
+                { type: 'separator' },
+                { role: 'services' },
+                { type: 'separator' },
+                { role: 'hide' },
+                { role: 'hideOthers' },
+                { role: 'unhide' },
+                { type: 'separator' },
+                { role: 'quit' },
+              ],
+            } satisfies MenuItemConstructorOptions,
+          ]
+        : []),
       { label: 'File', submenu: file },
       { label: 'Edit', submenu: edit },
       { label: 'View', submenu: view },
@@ -235,6 +254,7 @@ function pageUrl(base: string, launch: Launch): string {
   const url = new URL(base)
   url.searchParams.set('theme', launch.theme)
   url.searchParams.set('accent', launch.accent ?? DEFAULT_ACCENT)
+  url.searchParams.set('density', launch.density ?? DEFAULT_DENSITY)
   const sidebar = launch.sidebar ?? DEFAULT_SIDEBAR
   url.searchParams.set('sidebar', `${sidebar.width}${sidebar.collapsed ? '-hidden' : ''}`)
   return url.toString()

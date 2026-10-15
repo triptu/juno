@@ -62,9 +62,9 @@ function openTarget(target: NotificationTarget): void {
 const notifier = new Notifier({
   create: (options): ShownNotification => {
     if (e2e) {
-      let listener = () => {}
-      notificationsForTests.push({ ...options, click: () => listener() })
-      return { show: () => {}, close: () => {}, onClick: (f) => { listener = f } }
+      const recorded = { ...options, click: () => {} }
+      notificationsForTests.push(recorded)
+      return { show: () => {}, close: () => {}, onClick: (f) => { recorded.click = f } }
     }
     const shown = new Notification({ title: options.title, body: options.body })
     return { show: () => shown.show(), close: () => shown.close(), onClick: (f) => shown.on('click', f) }
@@ -109,6 +109,7 @@ app.whenReady().then(() => {
     setViewing: (topicId) => notifier.setViewing(topicId),
     setTheme: (theme) => updateLaunch({ theme }),
     setAccent: (accent) => updateLaunch({ accent }),
+    setDensity: (density) => updateLaunch({ density }),
     setSidebar: (sidebar) => {
       updateLaunch({ sidebar })
       setSidebarHidden(sidebar.collapsed)
@@ -154,7 +155,7 @@ if (e2e) {
       agentHost: () => agent?.host?.host,
       agentPid: () => agent?.pid,
       notifications: () => notificationsForTests.map(({ title, body }) => ({ title, body })),
-      clickNotification: (index: number) => notificationsForTests[index]?.click(),
+      clickNotification: (index = 0) => notificationsForTests[index]?.click(),
       dockBadge: () => badgeForTests,
       wake: () => notifier.wake(),
     },

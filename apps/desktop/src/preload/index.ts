@@ -27,6 +27,7 @@ const bridge: JunoBridge = {
   launch: {
     setTheme: (theme) => ipcRenderer.invoke(Channels.launchSetTheme, { theme }),
     setAccent: (accent) => ipcRenderer.invoke(Channels.launchSetAccent, { accent }),
+    setDensity: (density) => ipcRenderer.invoke(Channels.launchSetDensity, { density }),
     setSidebar: ({ width, collapsed }) => ipcRenderer.invoke(Channels.launchSetSidebar, { width, collapsed }),
   },
   contextMenu: {
