@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode, type RefObject } from 'react'
 import { chatCopy, type MessageMenu, type BubbleId, type ChatItem, type ChatPage, type ChatWindow, type OpId, type Quote, type ReplyTarget, type SendContext } from '@juno/agent-contract'
-import { copyText, registry, junoFocusAtom, nowAtom, openExternal, popupContextMenu } from '@juno/state'
+import { copyText, registry, junoChatTargetAtom, junoFocusAtom, nowAtom, openExternal, popupContextMenu } from '@juno/state'
 import { messageActions, agentConnectionStateAtom, chatItemsAtom } from '@juno/state/agent'
 import { afterPaint, measure } from '@juno/state/perf'
 import { useAtomValue } from '@juno/state/react'
@@ -346,6 +346,27 @@ export function JunoChat({ column, header, contextOf, composerContext, onSent, o
     row.scrollIntoView({ block: 'center', behavior: 'instant' })
     flashChatRow(row)
   }
+
+  // A notification asked the tab for a message (the hours-start summary): the window moves to it if it is not
+  // in it, then it scrolls into view and flashes. Before paint, so the open position does not show first. Each
+  // request is taken once; one for a message the agent has not appended yet waits for it.
+  const chatTarget = useAtomValue(junoChatTargetAtom)
+  const targetTaken = useRef(0)
+  const targetAsked = useRef(0)
+  useLayoutEffect(() => {
+    if (column !== 'page' || chatTarget === undefined || chatTarget.n <= targetTaken.current || !positioned) return
+    const scroller = scrollRef.current
+    const target = { _tag: 'bubble', id: chatTarget.id as BubbleId } as const
+    if (scroller === null || rowOf(scroller, target) === null) {
+      if (targetAsked.current === chatTarget.n) return
+      targetAsked.current = chatTarget.n
+      setWindow({ _tag: 'around', anchor: target.id, before: OVERLAP, limit: WINDOW })
+      return
+    }
+    targetTaken.current = chatTarget.n
+    if (registry.get(junoChatTargetAtom)?.n === chatTarget.n) registry.set(junoChatTargetAtom, undefined)
+    scrollTo(target)
+  }, [column, chatTarget, positioned, items])
 
   // Callbacks every row gets, stable for the chat's life (performance 5.1); they read the latest state through refs.
   const itemsRef = useRef(items)

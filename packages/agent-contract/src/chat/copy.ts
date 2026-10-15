@@ -86,6 +86,8 @@ export const chatCopy = {
     undo: 'Undo',
   },
   groupLabel: {
+    /** Over the hours-start summary (SPEC 14). It carries no Why this? and no action. */
+    summary: 'Summary',
     why: 'Why this?',
     pauseSchedule: 'Pause schedule',
     muteUpdates: 'Mute updates',

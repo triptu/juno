@@ -122,6 +122,7 @@ export {
   setPresence,
   whyPopoverAtom,
 } from './notifications'
+export { ignoredChannelsAtom, stopIgnoring } from './ignored'
 export { acquireRendererPort } from './port'
 export {
   accentAtom,
@@ -169,11 +170,15 @@ export {
   focusJunoComposer,
   junoAboutAtom,
   junoAvailableAtom,
+  junoChatTargetAtom,
   junoFocusAtom,
   junoPanelOpenAtom,
+  junoQuoteAtom,
   messageFlashAtom,
   openedAtNewAtom,
+  quoteInJuno,
   setJunoPanelOpen,
+  showInJunoChat,
 } from './junoPanel'
 export {
   freezeHome,
