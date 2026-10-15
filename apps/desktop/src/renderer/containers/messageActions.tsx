@@ -18,11 +18,12 @@
  * that window has the new text, so the old text never flashes back.
  */
 import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from 'react'
-import type { MessageRef, MessageView, TopicDetail } from '@juno/contract'
+import type { MessageView, TopicDetail } from '@juno/contract'
 import { deleteMessage, editMessage, reactToMessage, registry, type MessageWindow } from '@juno/state'
 import { Floating, InlineEdit, SelectionQuote, type MenuAnchor, type MessageActions } from '@juno/views'
 import { openTopic } from './navigation'
 import { showMessageMenu } from './topicActions'
+import { isOwnEditable, landedTs, refOf } from './messageRows'
 
 const EmojiPickerPanel = lazy(() => import('./EmojiPickerPanel'))
 
@@ -56,15 +57,6 @@ function preloadPicker(): void {
 
 /** The node is inside a message's text in this list. */
 const inMessageText = (node: Node | null, scroller: HTMLElement) => (node instanceof Element ? node : node?.parentElement)?.closest('[data-msg-text]') != null && scroller.contains(node)
-
-const refOf = (channel: string, message: MessageView): MessageRef => ({
-  channelId: channel,
-  ts: message.ts,
-  ...(message.clientMsgId === undefined ? {} : { clientMsgId: message.clientMsgId }),
-})
-
-/** The message can be edited and deleted by the user: their own, shown as a message, and not a failed send (that one has Delete draft). */
-export const isOwnEditable = (message: MessageView): boolean => message.fromMe && message.kind === 'message' && message.pending !== 'failed' && message.editText !== undefined
 
 /** The text a whole-message quote takes: the body as the list draws it, mentions as their names. */
 function textOf(scroller: HTMLElement | null, ts: string): string {
@@ -119,6 +111,12 @@ export function useMessageActions({ detail, list, scrollRef, composer }: Message
   useLayoutEffect(() => {
     latest.current = { list, editing, confirming, detail }
   })
+
+  // A message still sending takes Slack's ts when it lands: an editor open on it moves with it, text and all.
+  const landed = editing === undefined || list.rows.has(editing.ts) ? undefined : landedTs(list.rows, editing.ts)
+  useLayoutEffect(() => {
+    if (landed !== undefined) setEditing((current) => (current === undefined ? current : { ...current, ts: landed }))
+  }, [landed])
 
   // A saved edit ends when the window shows the new text; a sent delete when the row has left.
   const editedRev = editing?.savedRev === undefined ? undefined : list.rows.get(editing.ts)?.rev
@@ -198,9 +196,13 @@ export function useMessageActions({ detail, list, scrollRef, composer }: Message
       const people = latest.current.list.refs.people
       const sender = message.senderId === undefined ? undefined : { id: message.senderId, name: people.get(message.senderId)?.name ?? message.senderId }
       const chosen = await showMessageMenu(latest.current.detail, message, isOwnEditable(message), at, sender, onSender)
-      if (chosen === 'edit') startEdit(message)
-      else if (chosen === 'delete') askDelete(message)
-      else if (chosen === 'reply') handlers.onReply?.(message)
+      // The message may have been edited or deleted while the menu was open: act on it as it is now.
+      const rows = latest.current.list.rows
+      const now = rows.get(message.ts) ?? rows.get(landedTs(rows, message.ts) ?? '')
+      if (now === undefined) return
+      if (chosen === 'edit' && isOwnEditable(now)) startEdit(now)
+      else if (chosen === 'delete' && isOwnEditable(now)) askDelete(now)
+      else if (chosen === 'reply') handlers.onReply?.(now)
     }
     return { ...handlers, menu }
     // `channel` is fixed for a topic tab; the rest is read through refs.
