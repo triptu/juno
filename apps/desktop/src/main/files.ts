@@ -100,7 +100,8 @@ export function downloadFile(file: { readonly url: string; readonly name: string
     const onDownload = (_event: unknown, item: DownloadItem) => {
       if (item.getURLChain()[0] !== url.toString()) return
       session.off('will-download', onDownload)
-      const path = freePath(folder, file.name)
+      // Slack names the file in its download answer; the title the message shows may have no extension.
+      const path = freePath(folder, item.getFilename() || file.name)
       item.setSavePath(path)
       item.once('done', (_done, state) => {
         if (state !== 'completed') return resolve('failed')
