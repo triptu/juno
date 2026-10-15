@@ -1,6 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
-import { accent, colors, motion, sizes } from '@juno/tokens/tokens.stylex'
+import { accent, colors, motion, sizes, spacing, radii } from '@juno/tokens/tokens.stylex'
 
 export type TextButtonTone = 'default' | 'muted' | 'danger'
 
@@ -41,10 +41,10 @@ const styles = stylex.create({
     letterSpacing: 'inherit',
     textDecorationLine: 'underline',
     textDecorationColor: colors['--border-strongest'],
-    textUnderlineOffset: '2px',
+    textUnderlineOffset: spacing['--space-0-5'],
     userSelect: 'none',
     cursor: 'default',
-    borderRadius: '2px',
+    borderRadius: radii['--radius-inline'],
     transitionProperty: 'color, text-decoration-color',
     transitionDuration: motion['--duration-fast'],
     transitionTimingFunction: motion['--ease-out'],

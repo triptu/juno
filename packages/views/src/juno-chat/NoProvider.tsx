@@ -58,7 +58,7 @@ const styles = stylex.create({
     paddingInline: spacing['--space-4'],
   },
   body: {
-    maxWidth: '520px',
+    maxWidth: layout['--chat-empty-width'],
     textWrap: 'pretty',
   },
 })
