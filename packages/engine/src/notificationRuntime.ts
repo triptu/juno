@@ -1,7 +1,7 @@
 /** Shared session composition and host seam for the notifications feature. */
 import { ChannelId, UserId, isDm, messageMentionsMe, type Me, type Presence } from '@juno/domain'
 import { makeNotifications, readSettings, type Notifier, type Notifications } from '@juno/notifications'
-import { messageBody, plainText } from '@juno/richtext'
+import { messageBody, plainText, UNKNOWN_PERSON } from '@juno/richtext'
 import { SlackApi, SlackSession, type SocketEvent } from '@juno/slack'
 import type { NotificationSource, NotificationTarget } from '@juno/contract'
 import { HostChannelId, HostMessageTs, type HostSummary } from '@juno/agent-contract'
@@ -163,7 +163,7 @@ export const startNotifications = Effect.gen(function* () {
       if (settings.channels[channel.id] !== 'every' && settings.people[user ?? ''] !== 'every' && settings.threads?.[topicId] !== 'every') return
     }
     yield* notifications.receive({ channel: { id: ChannelId.make(channel.id), kind: channel.kind,
-      name: channel.person_name ?? channel.name ?? channel.id, ignored: channel.ignored === 1 },
+      name: channel.person_name ?? channel.name ?? (channel.kind === 'im' ? UNKNOWN_PERSON : channel.id), ignored: channel.ignored === 1 },
       senderId: UserId.make(user ?? ''), ...(channel.sender_name === null ? {} : { senderName: channel.sender_name }), mentionsMe, ts, text: plainText(body),
       topicId })
   })

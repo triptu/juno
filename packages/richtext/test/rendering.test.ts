@@ -98,9 +98,9 @@ describe('rich_text blocks', () => {
     })
   })
 
-  it('falls back to the raw id when a lookup does not know it', () => {
+  it('shows "Someone", never the raw id, when a lookup does not know the person yet', () => {
     const body = messageBody({ blocks: richText([{ type: 'rich_text_section', elements: [{ type: 'user', user_id: 'U0NEW' }] }]) }, lookups)
-    expect(body.blocks[0]).toEqual({ kind: 'paragraph', children: [{ kind: 'user', id: 'U0NEW', name: 'U0NEW', isMe: false }] })
+    expect(body.blocks[0]).toEqual({ kind: 'paragraph', children: [{ kind: 'user', id: 'U0NEW', name: 'Someone', isMe: false }] })
   })
 
   it('renders unicode emoji, skin tones from the hex form, and custom emoji by url', () => {

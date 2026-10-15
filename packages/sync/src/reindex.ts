@@ -21,6 +21,7 @@ import {
   MAX_PARTICIPANTS,
   maxTs,
   parseTopicId,
+  UNKNOWN_PERSON,
   type IndexInput,
   type IndexMessage,
   type Me,
@@ -135,7 +136,7 @@ const reindexOne = (id: string, options: ReindexOptions): Effect.Effect<boolean,
       user: (userId) => users.get(userId) ?? missing(userId),
       channel: (channelId) => channels.get(channelId),
     }
-    const senderName = (userId: UserId | undefined) => (userId === undefined ? 'Unknown' : (users.get(userId) ?? missing(userId) ?? userId))
+    const senderName = (userId: UserId | undefined) => (userId === undefined ? 'Unknown' : (users.get(userId) ?? missing(userId) ?? UNKNOWN_PERSON))
 
     // Coverage: is the stored history enough for an exact count?
     let historyComplete = true
