@@ -32,7 +32,7 @@ import { discoverSince } from './discovery'
 import { recheck, type RecheckOptions } from './recheck'
 import { applyPage, mainTopicOf, threadTopicOf } from './pages'
 import { reindexTopics } from './reindex'
-import { fillUsers } from './users'
+import { fillUsers, nameFirst } from './users'
 import {
   addSyncedRange,
   getSyncState,
@@ -188,7 +188,7 @@ const activeConversations = (entries: ReadonlyArray<CountEntry>, start: Ts): Eff
   })
 
 /** One thread from `getView`: root, unread and latest replies, Slack's subscription and read pointer. */
-const applyThreadView = (ctx: SyncContext, view: ThreadView, requestedAt: Ts): Effect.Effect<void, SqlError, StoreWriter | Invalidation> =>
+const applyThreadView = (ctx: SyncContext, view: ThreadView, requestedAt: Ts): Effect.Effect<void, BootError, BootServices> =>
   Effect.gen(function* () {
     const root = view.root_msg
     const channel = root.channel
@@ -196,6 +196,7 @@ const applyThreadView = (ctx: SyncContext, view: ThreadView, requestedAt: Ts): E
     // Slack omits unread_replies when nothing in the thread is unread.
     for (const reply of [...(view.latest_replies ?? []), ...(view.unread_replies ?? [])]) seen.set(reply.ts, reply)
     const topic = threadTopicOf(channel, root.ts)
+    yield* nameFirst(ctx, [root, ...seen.values()])
     yield* transaction(
       Effect.gen(function* () {
         // The view lists followed threads: a root without the flag is followed. Later events win over this page.
@@ -347,6 +348,7 @@ const loadHistoryWindow = (ctx: SyncContext, channel: string, start: Ts, options
       { channel, oldest: from, inclusive: true, limit: ctx.config.historyPageLimit, ignore_replies: true, no_user_profile: true },
       { lane: 'background', reason: 'history' },
     )
+    yield* nameFirst(ctx, page.messages)
     // The range first, so the index of this page already knows what history covers.
     const oldest = page.messages.at(-1)?.ts
     yield* transaction(addSyncedRange(channel, page.has_more && oldest !== undefined ? oldest : from, requestedAt))
@@ -384,6 +386,7 @@ const loadHistorySince = (ctx: SyncContext, channel: string, since: string): Eff
         },
         { lane: 'background', reason: 'history-since' },
       )
+      yield* nameFirst(ctx, page.messages)
       oldestSeen = page.messages.at(-1)?.ts ?? oldestSeen
       cursor = page.response_metadata?.next_cursor
       complete = !page.has_more || cursor === undefined || cursor === ''
@@ -416,6 +419,7 @@ const loadThreadPreviews = (ctx: SyncContext, seedReadBefore: string): Effect.Ef
         )
         .pipe(Effect.catchTag('SlackRejected', () => Effect.succeed(undefined)))
       if (page === undefined) continue
+      yield* nameFirst(ctx, page.messages)
       yield* applyPage(ctx, root.channel, page.messages, { kind: 'page', requestedAt }, { seedReadBefore })
       yield* Effect.yieldNow
     }
@@ -450,6 +454,8 @@ export const coldBoot = (ctx: SyncContext, phase: Phase): Effect.Effect<void, Bo
     const start = millisToTs(windowStart)
     yield* loadWorkspace(ctx, true)
     const counts = yield* loadCounts(ctx, undefined)
+    // Names before rows: the people of every DM and group DM, on the interactive lane.
+    yield* fillUsers(ctx, 'interactive')
     yield* loadThreadViews(ctx, { until: start, probe: true, lane: 'interactive' })
     const active = yield* activeConversations(counts.entries, start)
     yield* phase({ _tag: 'catching-up', done: 0, total: active.length })
@@ -497,6 +503,8 @@ export const catchUp = (ctx: SyncContext, previous: BootState, phase: Phase, opt
     if (options.refreshWorkspace) yield* loadWorkspace(ctx, false)
     // A full list after a workspace refresh, so a channel left while the app was closed drops out.
     const counts = yield* loadCounts(ctx, options.refreshWorkspace ? undefined : previous.countsLastFetched)
+    // Names first: a DM joined meanwhile, and anyone an earlier run left without one.
+    yield* fillUsers(ctx, 'interactive')
     const active = yield* activeConversations(counts.entries, start)
     const moved: Array<{ id: string; since: string | undefined }> = []
     for (const conversation of active) {

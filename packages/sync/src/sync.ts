@@ -32,7 +32,7 @@ import { applyActed, applyFrame, applySent, type Acted } from './events'
 import { fetchOlder, fetchTopic, type FetchLane, type FetchReport, type OpenError } from './open'
 import { applyPage } from './pages'
 import { reindexTopics } from './reindex'
-import { fetchUsers } from './users'
+import { nameUsers, wantUsers } from './users'
 import { clearPendingFollows, endEventCoverage, observeRead } from './write'
 
 export type SyncPhase =
@@ -93,6 +93,8 @@ export const runSync = (options: RunSyncOptions): Effect.Effect<never, SlackAuth
       rootFetches: yield* Queue.unbounded<RootFetch>(),
       readLookups: yield* Queue.unbounded<string>(),
       missingUsers: new Map(),
+      usersWanted: yield* Queue.sliding<void>(1),
+      usersOnBackground: false,
       unknownUsers: new Set(),
       lateReactions: new Map(),
       fetchesInFlight: new Set(),
@@ -119,16 +121,8 @@ export const runSync = (options: RunSyncOptions): Effect.Effect<never, SlackAuth
     // Catch-ups and reboots run in the background; joining the set below is what lets their auth failures end the sync.
     const background = yield* FiberSet.make<void, SlackAuthRequired>()
 
-    /** Names the senders an open fetch found unknown, in the background. */
-    const nameSenders = (report: FetchReport) =>
-      report.unknownUsers.length === 0
-        ? Effect.void
-        : FiberSet.run(
-            background,
-            fetchUsers(ctx, report.unknownUsers.filter((id) => !ctx.unknownUsers.has(id))).pipe(
-              Effect.catchIf(isNotAuth, (error) => Effect.logWarning('sync: senders not named', { tag: error._tag })),
-            ),
-          ).pipe(Effect.asVoid)
+    /** Names the senders an open fetch found unknown, through `nameUsers`. */
+    const nameSenders = (report: FetchReport) => Effect.sync(() => wantUsers(ctx, report.unknownUsers))
     const services = yield* Effect.context<SyncServices>()
     const fetched = (fetch: (lane: FetchLane) => Effect.Effect<FetchReport, OpenError, SyncServices>, label: string): Effect.Effect<FetchReport, OpenError> => {
       const run = (lane: FetchLane) => trackFetch(ctx, fetch(lane))
@@ -374,6 +368,6 @@ export const runSync = (options: RunSyncOptions): Effect.Effect<never, SlackAuth
       }
     })
 
-    yield* Effect.all([consumer, bootLoop, fetchRoots, lookUpReads, FiberSet.join(background)], { concurrency: 'unbounded', discard: true })
+    yield* Effect.all([consumer, bootLoop, fetchRoots, lookUpReads, nameUsers(ctx), FiberSet.join(background)], { concurrency: 'unbounded', discard: true })
     return yield* Effect.never
   })

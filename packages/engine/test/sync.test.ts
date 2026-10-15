@@ -7,7 +7,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
 import { Effect } from 'effect'
 import { afterEach, describe, expect, it } from 'vitest'
-import { viewsDelete, type UndoCommand } from '@juno/contract'
+import { viewsDelete, type TopicRow, type UndoCommand } from '@juno/contract'
 import { CONVERSATIONS, SELF_ID, startFakeSlack } from '@juno/fake-slack'
 import { prefs, Store, workspacePaths } from '@juno/store'
 import { runCommand, topicCountsAtom } from '@juno/state'
@@ -798,6 +798,49 @@ describe('subscriptions after a failure (review M3 finding 10)', () => {
     expect(apiCalls(engine, 'subscriptions.thread.add').at(-1)!.args['last_read']).toBe(root.ts)
     const rows = await engine.rowsUntil((list) => list.some((r) => r.id === id && r.unreadCount === 2), 'the thread after the read-cursor echo')
     expect(rows.find((r) => r.id === id)).toMatchObject({ unreadCount: 2 })
+  })
+})
+
+/** Every name a row shows: title, preview, place, partner and participants. */
+const namesShown = (row: TopicRow): ReadonlyArray<string> => [
+  row.title,
+  row.preview.sender,
+  row.preview.text,
+  row.channel.name,
+  row.channel.label,
+  ...(row.channel.partner === undefined ? [] : [row.channel.partner.name]),
+  ...row.participants.map((person) => person.name),
+]
+
+/** A raw user id, or the placeholder shown until a name arrives. */
+const UNNAMED = /\bU0[A-Z0-9]+\b|\bSomeone\b/
+
+describe('names (first real session)', () => {
+  it('a row has its people named when it first shows, while history is still loading', async () => {
+    const engine = await startTestEngine({
+      initial: (fake) => {
+        // Every history page waits, so names cannot come from the end of the boot.
+        fake.holdNext({ method: 'conversations.history', times: activeMains })
+        return fake.signIn()
+      },
+    })
+    engines.push(engine)
+    await engine.status('ready')
+    await waitFor(() => (engine.fake.heldCount({ method: 'conversations.history' }) === 1 ? true : undefined), 20_000, 'the first history page held')
+    const unnamed = (rows: ReadonlyArray<TopicRow>) => rows.flatMap((row) => namesShown(row).filter((text) => UNNAMED.test(text)).map((text) => `${row.id}: ${text}`))
+    // The followed threads are rows already, from getView, with every sender and mention named.
+    const early = await engine.rowsUntil((rows) => rows.length > 0, 'the followed threads')
+    expect(unnamed(early)).toEqual([])
+    // History lands one conversation at a time: each new row, DMs and group DMs included, is named when it shows.
+    for (let page = 0; page < activeMains; page++) {
+      engine.fake.release({ method: 'conversations.history' })
+      await waitFor(() => (engine.fake.heldCount({ method: 'conversations.history' }) === 1 || page === activeMains - 1 ? true : undefined), 20_000, 'the next history page')
+      expect(unnamed(await engine.rows())).toEqual([])
+    }
+    await engine.phase('live', 30_000)
+    const rows = await engine.rowsUntil((list) => list.some((row) => row.channel.kind === 'mpim'), 'the group DM')
+    expect(rows.find((row) => row.channel.kind === 'mpim')?.channel.name).toBe('Maya, Leo')
+    expect(unnamed(rows)).toEqual([])
   })
 })
 
