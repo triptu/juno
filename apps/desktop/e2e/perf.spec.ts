@@ -387,6 +387,14 @@ test.describe('large workspace', () => {
         await juno.sidebar.expectRows()
         const times = await juno.startupTimes()
         if (i > 0) runs.push(times)
+        // Where the start goes: main to the renderer's navigation, the bundle loaded and run (`juno.start` is
+        // marked after every import), then the shell and the rows.
+        const created = await running.app.evaluate(({ app }) => app.getAppMetrics().find((metric) => metric.type === 'Browser')?.creationTime ?? 0)
+        const page = await running.win.evaluate(() => {
+          const script = performance.getEntriesByType('resource').find((entry) => /\/index-[^/]*\.js$/.test(entry.name)) as PerformanceResourceTiming | undefined
+          return { origin: performance.timeOrigin, scriptLoaded: script?.responseEnd ?? Number.NaN, start: performance.getEntriesByName('juno.start', 'mark')[0]?.startTime ?? Number.NaN }
+        })
+        if (i > 0) console.log(`warm start ${i}: main to navigation ${(page.origin - created).toFixed(0)} ms, bundle loaded at +${page.scriptLoaded.toFixed(0)}, run at +${page.start.toFixed(0)}, shell at +${(created + times.mainToShell - page.origin).toFixed(0)}, rows at +${(created + times.mainToRows - page.origin).toFixed(0)}`)
       } finally {
         await running.close()
       }
