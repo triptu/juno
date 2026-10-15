@@ -6,6 +6,7 @@ const REASON = 'No Juno chat surface in the renderer yet. Record opening it, the
 
 // oxlint-disable-next-line no-empty-pattern
 test('open Juno chat', async ({}, info) => {
+  info.annotations.push({ type: 'placeholder' })
   await recordSkipped('juno-chat', 'Open Juno chat', info.title, REASON)
   test.skip(true, REASON)
 })

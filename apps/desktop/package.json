@@ -12,7 +12,7 @@
     "typecheck": "tsc -p tsconfig.node.json && tsc -p tsconfig.web.json && tsc -p tsconfig.e2e.json",
     "test": "vitest run",
     "test:e2e": "node ../../scripts/build-cached.mjs out pnpm build && node ../../scripts/without-run-as-node.mjs playwright test",
-    "perf": "node ../../scripts/build-cached.mjs out pnpm build && JUNO_PERF=1 node ../../scripts/without-run-as-node.mjs playwright test e2e/perf.spec.ts",
+    "perf": "node ../../scripts/build-cached.mjs out pnpm build && JUNO_PERF=1 node ../../scripts/without-run-as-node.mjs playwright test -c playwright.perf.config.ts",
     "test:feel": "node ../../scripts/build-cached.mjs out pnpm build && node ../../scripts/without-run-as-node.mjs playwright test -c playwright.feel.config.ts",
     "package": "pnpm build && electron-builder --config electron-builder.yml"
   },
