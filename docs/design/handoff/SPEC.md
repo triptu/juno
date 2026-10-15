@@ -477,7 +477,7 @@ Split the AI work into two kinds. **Decisions** are fast, cheap and structured: 
 | Feature | Kind | When it runs | Shows when |
 | --- | --- | --- | --- |
 | Topic titles | Generation | New thread, and on drift | Always, with no marker |
-| Wrong-place check | Decision | On send in Main, against the last 3–4 topics | Likely reply to one of them |
+| Wrong-place check | Decision | Typing pause in Main, against the last 3–4 topics; read on send, never waited for | Likely reply to one of them |
 | Clarity check | Decision plus minimal fixes | On send | Concrete fixes found |
 | Audience check | Decision | Typing pause | Sensitivity does not fit the channel |
 | Settled, suggest resolve | Decision | Each new message | High score |
