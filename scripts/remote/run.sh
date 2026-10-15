@@ -18,8 +18,10 @@ at_least() { echo $(( $1 > $2 ? $1 : $2 )); }
 export GALLERY_BROWSER=chromium JUNO_HEAVY_SLOTS=1 JUNO_TEST_FILE_PARALLEL=1
 export JUNO_TYPECHECK_JOBS=${JUNO_TYPECHECK_JOBS:-$(at_least $(( cores / 2 )) 1)}
 export JUNO_VITEST_WORKERS=${JUNO_VITEST_WORKERS:-$(at_least $cores 2)}
-# Electron and the gallery mostly wait on frames and timers, so they run more workers than cores.
-export JUNO_E2E_WORKERS=${JUNO_E2E_WORKERS:-$(at_least $cores 2)}
+# An Electron test runs the app, its engine and a fake Slack: half a core's worth
+# of workers kept tests on time on 4 cores, one per core did not. The gallery
+# mostly waits on frames and timers, so it runs more workers than cores.
+export JUNO_E2E_WORKERS=${JUNO_E2E_WORKERS:-$(at_least $(( cores / 2 )) 2)}
 export GALLERY_WORKERS=${GALLERY_WORKERS:-$(( cores * 3 ))} GALLERY_SHIFT_PARTS=${GALLERY_SHIFT_PARTS:-$(( cores * 3 ))}
 # Spec simulations run beside the Apalache checks here (on the Mac they run first).
 export SPECS_JOBS=${SPECS_JOBS:-$(at_least $(( cores / 2 )) 1)} SPECS_APALACHE=${SPECS_APALACHE:-$(at_least $(( cores / 4 )) 1)} SPECS_OVERLAP=1
