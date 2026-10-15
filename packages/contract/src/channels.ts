@@ -23,6 +23,12 @@ export const Channels = {
   agentProvider: 'agent.provider',
   /** Sets up, removes or switches the agent's provider; keys go to the keychain. */
   agentSetProvider: 'agent.setProvider',
+  /** A folder picker for the backup folder or a backup to restore from; the chosen path, or null. */
+  agentChooseFolder: 'agent.chooseFolder',
+  /** The recovery phrase from the last export, once; null after that. */
+  agentRecoveryPhrase: 'agent.recoveryPhrase',
+  /** Stores a recovery phrase the owner typed, for a restore on a new Mac. */
+  agentTypeRecoveryPhrase: 'agent.typeRecoveryPhrase',
   /** Remember the theme so the next launch paints the window in it. */
   launchSetTheme: 'launch.setTheme',
   /** Remember the accent so the next launch's first render already uses it. */
@@ -157,6 +163,15 @@ export interface JunoBridge {
     readonly setProvider: (change: ProviderChange) => Promise<unknown>
     /** Calls `listener` with each new `ProviderState`, undecoded. Returns the unsubscribe. */
     readonly onProvider: (listener: (state: unknown) => void) => () => void
+    /** Shows the folder picker; resolves with the chosen absolute path, or null when cancelled. */
+    readonly chooseFolder: (purpose: 'backup' | 'restore') => Promise<unknown>
+    /**
+     * The recovery phrase the agent just exported, for the sheet that shows
+     * it. Main answers it once; later calls resolve with null.
+     */
+    readonly recoveryPhrase: () => Promise<unknown>
+    /** Stores a phrase the owner typed in the keychain, before a restore. Resolves with `saved`, `invalid` or `failed`. */
+    readonly typeRecoveryPhrase: (phrase: string) => Promise<unknown>
   }
   readonly launch: {
     readonly setTheme: (theme: Theme) => Promise<unknown>

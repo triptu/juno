@@ -122,6 +122,12 @@ export const ShellRoutes = {
   },
   [Channels.agentProvider]: { input: Schema.Void, output: ProviderState },
   [Channels.agentSetProvider]: { input: ProviderChange, output: ProviderResult },
+  [Channels.agentChooseFolder]: { input: Schema.Struct({ purpose: Schema.Literals(['backup', 'restore']) }), output: Schema.NullOr(Schema.String) },
+  [Channels.agentRecoveryPhrase]: { input: Schema.Void, output: Schema.NullOr(Schema.String) },
+  [Channels.agentTypeRecoveryPhrase]: {
+    input: Schema.Struct({ phrase: Schema.String.check(Schema.isMaxLength(256)) }),
+    output: Schema.Literals(['saved', 'invalid', 'failed']),
+  },
   [Channels.launchSetTheme]: { input: Schema.Struct({ theme: ThemeSchema }), output: Schema.Void },
   [Channels.launchSetAccent]: { input: Schema.Struct({ accent: AccentSchema }), output: Schema.Void },
   [Channels.launchSetDensity]: { input: Schema.Struct({ density: DensitySchema }), output: Schema.Void },

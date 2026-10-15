@@ -36,6 +36,9 @@ const bridge: JunoBridge = {
         ipcRenderer.off(Events.agentProviderChanged, forward)
       }
     },
+    chooseFolder: (purpose) => ipcRenderer.invoke(Channels.agentChooseFolder, { purpose }),
+    recoveryPhrase: () => ipcRenderer.invoke(Channels.agentRecoveryPhrase),
+    typeRecoveryPhrase: (phrase) => ipcRenderer.invoke(Channels.agentTypeRecoveryPhrase, { phrase }),
   },
   launch: {
     setTheme: (theme) => ipcRenderer.invoke(Channels.launchSetTheme, { theme }),

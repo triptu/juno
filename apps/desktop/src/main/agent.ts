@@ -24,12 +24,18 @@
  *
  * The agent's MCP connections ask main for their OAuth state and to open a
  * sign-in page (`credential`, WP17). `mcpCredentials.ts` answers; the answer
- * goes only to the process that asked, never to one started after it.
+ * goes only to the process that asked, never to one started after it. The
+ * backup asks for its secrets the same way (`secret`, WP21), and
+ * `backupSecrets.ts` answers.
+ *
+ * After a restore is staged the agent says `restart` and exits. Main starts
+ * it again at once, without counting the exit as a crash, and the next open
+ * installs the restore.
  */
 import { app, MessageChannelMain, utilityProcess, type MessagePortMain, type UtilityProcess, type WebContents } from 'electron'
 import { join } from 'node:path'
 import { Schema } from 'effect'
-import { AgentToMain, type AgentConfig, type AgentProvider, type CredentialRequest, type HostHello, type MainToAgent } from '@juno/agent-contract'
+import { AgentToMain, type AgentConfig, type AgentProvider, type CredentialRequest, type HostHello, type MainToAgent, type SecretRequest } from '@juno/agent-contract'
 import { Events } from '@juno/contract/channels'
 import type { PortRequestResult } from '@juno/contract'
 
@@ -54,6 +60,8 @@ export class AgentSupervisor {
   private readonly pendingRendererPorts = new Map<WebContents, MessagePortMain>()
   /** The active provider; the agent runs only while there is one. */
   private provider: AgentProvider | null = null
+  /** The running process said it exits to install a restore. */
+  private restartAsked = false
 
   constructor(
     private readonly config: AgentConfig,
@@ -63,6 +71,8 @@ export class AgentSupervisor {
     private readonly engineReady: () => boolean,
     /** Answers an MCP credential request (`mcpCredentials.ts`). */
     private readonly credential: (request: CredentialRequest) => Promise<string | null | undefined>,
+    /** Answers a backup secret request (`backupSecrets.ts`). */
+    private readonly secret: (request: SecretRequest) => Promise<string | null | undefined>,
   ) {}
 
   get currentState(): AgentState {
@@ -104,6 +114,18 @@ export class AgentSupervisor {
         }
         // No detail crosses back: a keychain error could echo what it was given.
         this.credential(message.request).then((value) => reply({ ok: true, ...(value === undefined ? {} : { value }) }), () => reply({ ok: false }))
+        return
+      }
+      if (message._tag === 'secret') {
+        const reply = (answer: Omit<Extract<MainToAgent, { _tag: 'secretReply' }>, '_tag' | 'requestId'>) => {
+          if (this.child === child) child.postMessage({ _tag: 'secretReply', requestId: message.requestId, ...answer } satisfies MainToAgent)
+        }
+        // As for credentials: no detail crosses back.
+        this.secret(message.request).then((value) => reply({ ok: true, ...(value === undefined ? {} : { value }) }), () => reply({ ok: false }))
+        return
+      }
+      if (message._tag === 'restart') {
+        if (this.child === child) this.restartAsked = true
         return
       }
       if (message._tag === 'ready') {
@@ -191,7 +213,14 @@ export class AgentSupervisor {
     this.child = undefined
     this.spawned = false
     this.hello = undefined
+    const asked = this.restartAsked
+    this.restartAsked = false
     if (this.state === 'stopped' || this.state === 'failed') return
+    if (asked) {
+      this.state = 'restarting'
+      this.start()
+      return
+    }
     const now = Date.now()
     this.exits.push(now)
     while (this.exits.length > 0 && now - this.exits[0]! > CRASH_WINDOW_MS) this.exits.shift()
@@ -216,14 +245,25 @@ export function createAgentSupervisor(
   sendToEngine: (port: MessagePortMain) => void,
   engineReady: () => boolean,
   credential: (request: CredentialRequest) => Promise<string | null | undefined>,
+  secret: (request: SecretRequest) => Promise<string | null | undefined>,
 ): AgentSupervisor {
   const e2e = process.env.JUNO_E2E === '1'
   // Read only under JUNO_E2E, so a real run can never be pointed elsewhere.
   const openRouterOrigin = e2e ? process.env.JUNO_FAKE_OPENROUTER_URL : undefined
+  // Two test apps play two Macs: each has a name, and the backup exports often enough to see the other.
+  const deviceName = e2e ? process.env.JUNO_E2E_DEVICE_NAME : undefined
+  const interval = e2e ? Number(process.env.JUNO_E2E_BACKUP_INTERVAL_MS) : Number.NaN
   return new AgentSupervisor(
-    { agentDir: join(app.getPath('userData'), 'agent'), e2e, ...(openRouterOrigin === undefined ? {} : { openRouterOrigin }) },
+    {
+      agentDir: join(app.getPath('userData'), 'agent'),
+      e2e,
+      ...(openRouterOrigin === undefined ? {} : { openRouterOrigin }),
+      ...(deviceName === undefined ? {} : { deviceName }),
+      ...(Number.isFinite(interval) && interval > 0 ? { backupIntervalMs: interval } : {}),
+    },
     sendToEngine,
     engineReady,
     credential,
+    secret,
   )
 }
