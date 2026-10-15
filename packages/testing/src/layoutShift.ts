@@ -16,7 +16,10 @@ import type { Page } from '@playwright/test'
  *    pressing a control.
  * 2. A geometry fallback. The layout box of every HTML element under the root
  *    is taken before and after, relative to the root, and any element that
- *    moved or resized is reported. The boxes come from `offsetLeft`,
+ *    moved or resized is reported. An element added or removed, or one that
+ *    starts or stops being rendered (`display: none`), has no box on one
+ *    side and is not compared, as the browser's score does not count it;
+ *    anything it pushes is still reported. The boxes come from `offsetLeft`,
  *    `offsetTop`, `offsetWidth` and `offsetHeight`, which ignore transforms,
  *    so the press scale (and any other transform or opacity effect) is not a
  *    shift, as it is not for the browser's own score. This catches what the
@@ -71,6 +74,8 @@ export interface LayoutShiftReport {
 interface Snapshot {
   readonly el: HTMLElement
   readonly box: Box
+  /** False when the element has no layout box (`display: none`, or inside such an element). */
+  readonly rendered: boolean
 }
 
 interface PageState {
@@ -146,7 +151,7 @@ export async function measureLayoutShift(page: Page, action: () => Promise<unkno
         const html = [rootEl, ...Array.from(rootEl.querySelectorAll('*'))].filter((el): el is HTMLElement => el instanceof HTMLElement)
         return html.map((el) => {
           const at = layoutOrigin(el)
-          return { el, box: { x: at.x - origin.x, y: at.y - origin.y, width: el.offsetWidth, height: el.offsetHeight } }
+          return { el, box: { x: at.x - origin.x, y: at.y - origin.y, width: el.offsetWidth, height: el.offsetHeight }, rendered: el.getClientRects().length > 0 }
         })
       }
 
@@ -244,7 +249,7 @@ export async function measureLayoutShift(page: Page, action: () => Promise<unkno
       const moved: MovedElement[] = []
       for (const before of state.before) {
         const now = nowByElement.get(before.el)
-        if (!now) continue
+        if (!now || !before.rendered || !now.rendered) continue
         const differs =
           Math.abs(before.box.x - now.box.x) > epsilon ||
           Math.abs(before.box.y - now.box.y) > epsilon ||
