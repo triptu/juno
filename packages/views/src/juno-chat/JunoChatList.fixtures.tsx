@@ -3,7 +3,7 @@ import type { Banner, ChatItem, Ending } from '@juno/agent-contract'
 import { defineFixtures, fixture, scene, type FixtureFrame } from '@juno/ui'
 import { noopActions } from './commands'
 import { useFixtureControl } from './fixtures/control'
-import { bubbles, budget, conversation, day, essay, failedSend, jobs, juno, junoReplies, longText, manyCards, messageId, NOW, owner, ownerReplies, reacted, reactions, rightToLeft, scheduled, status, unusualReactions, withNewDivider } from './fixtures/data'
+import { bubbles, budget, conversation, day, essay, failedSend, jobs, juno, junoReplies, longText, manyCards, messageId, NOW, owner, ownerReplies, reacted, reactions, rightToLeft, scheduled, sourced, status, unusualReactions, withNewDivider } from './fixtures/data'
 import { JunoChatList, type JunoChatListProps } from './JunoChatList'
 
 const noop = () => {}
@@ -59,6 +59,13 @@ function StatusTextChanges() {
   useFixtureControl('status-text', () => setStep((n) => (n + 1) % texts.length))
   const items: ReadonlyArray<ChatItem> = [...ask('m-u', 'Find the room booking', { _tag: 'sent' }), status('m-u', texts[step])]
   return <JunoChatList {...base} items={items} />
+}
+
+/** The same bubbles with their sources as links and as plain words: a source is styled text in the line, so the swap moves nothing. Driven as above. */
+function SourcesLink() {
+  const [linked, setLinked] = useState(false)
+  useFixtureControl('sources', () => setLinked((v) => !v))
+  return <JunoChatList {...base} items={sourced(linked)} />
 }
 
 /** The chat ends with the AI-off line only when the banner says so. Driven as above. */
@@ -118,6 +125,10 @@ export default defineFixtures(
       'failed-send': list(failedSend),
       essay: list(essay, {}, { ...frame, height: 880 }),
     },
+    Sources: {
+      linked: list(sourced(true)),
+      hover: list(sourced(true), {}, { ...frame, hover: '[data-source]' }),
+    },
     Reactions: {
       'both-ways': list(reactions),
       'unusual-emoji': list(unusualReactions),
@@ -137,6 +148,7 @@ export default defineFixtures(
       'reaction-arrives': scene(() => <ReactionArrives />),
       'status-text-changes': scene(() => <StatusTextChanges />),
       'banner-ai-off': scene(() => <BannerToAiOff />),
+      'sources-link': scene(() => <SourcesLink />),
     },
   },
   frame,

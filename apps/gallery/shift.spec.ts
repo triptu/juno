@@ -383,6 +383,24 @@ test.describe('Juno chat', () => {
     expect(await bubbles.evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().toJSON()))).toEqual(before)
   })
 
+  test('a source in a bubble sits in the line like plain words', async ({ page }) => {
+    await open(page, 'JunoChatList', 'shift/sources-link')
+    // Every bubble's box and every line of its text: a source must not change a wrap, a line height or a bubble's size.
+    const layout = () =>
+      page.locator('[data-chat-owner], [data-chat-juno]').evaluateAll((nodes) =>
+        nodes.map((node) => {
+          const text = node.querySelector('p')!
+          const range = document.createRange()
+          range.selectNodeContents(text)
+          return { box: node.getBoundingClientRect().toJSON(), lines: Array.from(range.getClientRects(), (rect) => [rect.y, rect.height]) }
+        }),
+      )
+    const plain = await layout()
+    await step(page, 'sources')
+    await expect(page.locator('[data-source]')).toHaveCount(3)
+    expect(await layout()).toEqual(plain)
+  })
+
   for (const [state, settled] of [
     ['resolve-settles', 'Resolved 2'],
     ['send-settles', 'Sent 2'],

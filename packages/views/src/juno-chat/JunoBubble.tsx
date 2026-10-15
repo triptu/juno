@@ -47,7 +47,7 @@ export const JunoBubble = memo(function JunoBubble({ item, now, actions, enter =
         >
           <Text variant="bodySmall" tone="default" selectable dir="auto" as="p" sx={rowStyles.bubbleText}>
             {item.body.map((inline, index) => (
-              <Inline key={index} inline={inline} actions={actions} />
+              <Inline key={index} inline={inline} now={now} actions={actions} />
             ))}
           </Text>
           <ReactionBadge reactions={item.reactions} corner="end" />
@@ -62,13 +62,33 @@ export const JunoBubble = memo(function JunoBubble({ item, now, actions, enter =
   )
 })
 
-function Inline({ inline, actions }: { readonly inline: JunoInline; readonly actions: ChatActions }) {
-  if (inline._tag === 'text') return inline.text
-  return (
-    <TextButton tone="subtle" data-cite={inline.messageId} onClick={() => actions.onOpen({ _tag: 'chatMessage', messageId: inline.messageId }, { metaKey: false, shiftKey: false, altKey: false, source: 'pointer' })}>
-      {inline.text}
-    </TextButton>
-  )
+/** A Slack message's `ts` ("1760500000.000123", seconds) as epoch milliseconds. */
+const tsMillis = (ts: string) => Math.round(Number(ts) * 1000)
+
+function Inline({ inline, now, actions }: { readonly inline: JunoInline; readonly now: number; readonly actions: ChatActions }) {
+  switch (inline._tag) {
+    case 'text':
+      return inline.text
+    case 'cite':
+      return (
+        <TextButton tone="subtle" data-cite={inline.messageId} onClick={() => actions.onOpen({ _tag: 'chatMessage', messageId: inline.messageId }, { metaKey: false, shiftKey: false, altKey: false, source: 'pointer' })}>
+          {inline.text}
+        </TextButton>
+      )
+    case 'source':
+      return (
+        <TextButton
+          tone="subtle"
+          data-source={`${inline.channelId}/${inline.ts}`}
+          title={`${inline.place} · ${messageTime(tsMillis(inline.ts), now)}`}
+          onClick={(event) =>
+            actions.onOpen({ _tag: 'message', channelId: inline.channelId, ts: inline.ts }, { metaKey: event.metaKey, shiftKey: event.shiftKey, altKey: event.altKey, source: 'pointer' })
+          }
+        >
+          {inline.text}
+        </TextButton>
+      )
+  }
 }
 
 const appear = stylex.keyframes({
