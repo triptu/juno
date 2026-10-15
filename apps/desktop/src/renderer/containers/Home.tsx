@@ -22,6 +22,19 @@ function askJuno(): void {
   openJunoTab()
 }
 
+/** Takes Home at each stage (`showHome`), and while the first sync runs adds the items each new value brings (`fillHome`). */
+function useShowHome(key: string, stage: 0 | 1 | 2, value: unknown): void {
+  const appeared = useRef(false)
+  useLayoutEffect(() => {
+    // The entrance plays once, when Home first has something to show; the items arriving later just appear.
+    showHome(registry, key, { windowHeight: window.innerHeight, enter: stage > 0 && !appeared.current })
+    if (stage > 0) appeared.current = true
+  }, [key, stage])
+  useLayoutEffect(() => {
+    if (stage === 1) fillHome(registry, key)
+  }, [key, stage, value])
+}
+
 /**
  * Home (SPEC section 12): the Home tab, and what the workspace shows with
  * no tab open. It shows the items `home.view` had when Home appeared
@@ -38,23 +51,13 @@ export function HomePage() {
   const value = result._tag === 'Success' ? result.value : undefined
   const latest = value?.ready === true ? value : undefined
   const shown = useAtomValue(homeShownAtom(key))
-  const appeared = useRef(false)
   // The newest running job's state line replaces the field's placeholder (SPEC 13.4).
   const jobLine = useAtomValue(junoNavAtom, (nav) => nav.jobLine)
   // With AI assist off Home has no Ask Juno field (inventory 11).
   const junoOn = useAtomValue(junoAvailableAtom)
 
   // Nothing yet, the first sync running, or ready: Home is taken again at each step.
-  const stage = latest !== undefined ? 2 : value !== undefined ? 1 : 0
-  useLayoutEffect(() => {
-    // The entrance plays once, when Home first has something to show; the items arriving after the sync just appear.
-    showHome(registry, key, { windowHeight: window.innerHeight, enter: stage > 0 && !appeared.current })
-    if (stage > 0) appeared.current = true
-  }, [key, stage])
-  // While the first sync runs, each new value may bring items for the free slots.
-  useLayoutEffect(() => {
-    if (stage === 1) fillHome(registry, key)
-  }, [key, stage, value])
+  useShowHome(key, latest !== undefined ? 2 : value !== undefined ? 1 : 0, value)
 
   if (shown === undefined) return <div data-home="" data-home-waiting="" />
   const view = value === undefined ? shown.view : freezeHome(shown.view, value)
