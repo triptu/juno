@@ -6,9 +6,9 @@
  * away or active. Main records OS notifications instead of
  * showing them (`junoTest.notifications`).
  */
-import type { Page } from '@playwright/test'
 import { seedWorkspace, startFakeSlack, topic300Seed } from '@juno/fake-slack'
 import { expect, test } from './fixtures'
+import { watchFlashes } from './driver/flashes'
 
 const ALERTS_MAIN = '#alerts-prod'
 const RINA = 'Rina finished the onsite.'
@@ -177,20 +177,6 @@ test('Preferences lists an ignored channel, and Stop ignoring has Undo', async (
   await expect(preferences.ignored('alerts-prod')).toBeVisible()
   await expect(preferences.root.getByText('Nothing ignored.')).toHaveCount(0)
 })
-
-/** The rows that flash from now on (`flashChatRow` animates the row), by their text. */
-async function watchFlashes(win: Page): Promise<() => Promise<string[]>> {
-  await win.evaluate(() => {
-    const flashed: string[] = []
-    ;(globalThis as unknown as { flashedRows: string[] }).flashedRows = flashed
-    const animate = Element.prototype.animate
-    Element.prototype.animate = function (this: Element, ...args: Parameters<Element['animate']>) {
-      if (this.matches('[data-message-row], [data-chat-juno]')) flashed.push(this.textContent ?? '')
-      return animate.apply(this, args)
-    }
-  })
-  return () => win.evaluate(() => (globalThis as unknown as { flashedRows: string[] }).flashedRows)
-}
 
 const longThread = test.extend({
   // oxlint-disable-next-line no-empty-pattern

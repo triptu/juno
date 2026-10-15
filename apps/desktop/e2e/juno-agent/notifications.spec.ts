@@ -1,10 +1,10 @@
 // Notifications meeting the Juno chat (SPEC 14): the hours-start summary is
 // posted in the chat with no model call and its notification opens the chat
 // at it, and Tell Juno in the why popover quotes the message beside the topic.
-import type { Page } from '@playwright/test'
 import type { Juno } from '../driver/juno'
 import { ready } from './agent'
 import { expect, JunoChatPane, test } from './chat'
+import { watchFlashes } from '../driver/flashes'
 
 test.describe.configure({ timeout: 180_000 })
 
@@ -42,20 +42,6 @@ async function coverNow(juno: Juno): Promise<void> {
 const minutesNow = () => {
   const now = new Date()
   return now.getHours() * 60 + now.getMinutes()
-}
-
-/** The rows that flash from now on (`flashChatRow` animates the row), by their text. */
-async function watchFlashes(win: Page): Promise<() => Promise<string[]>> {
-  await win.evaluate(() => {
-    const flashed: string[] = []
-    ;(globalThis as unknown as { flashedRows: string[] }).flashedRows = flashed
-    const animate = Element.prototype.animate
-    Element.prototype.animate = function (this: Element, ...args: Parameters<Element['animate']>) {
-      if (this.matches('[data-message-row], [data-chat-juno]')) flashed.push(this.textContent ?? '')
-      return animate.apply(this, args)
-    }
-  })
-  return () => win.evaluate(() => (globalThis as unknown as { flashedRows: string[] }).flashedRows)
 }
 
 test('the hours-start summary is a Summary message in the Juno chat, and its notification opens the chat at it', async ({ juno, slack, model }) => {
