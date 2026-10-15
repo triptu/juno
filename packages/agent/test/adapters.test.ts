@@ -349,3 +349,20 @@ it('drops read names a preset no longer lists, before and after discovery', asyn
   await later.connect('littlebird')
   expect(later.tool('littlebird', 'get_account').tier).toBe(3)
 })
+
+it('says a T3 question needs an answer in T3 Code when Juno cannot show it', async () => {
+  const tools: FakeTool[] = [launch,
+    { name: 't3_thread_read', inputSchema: threadArgs, call: () => json({ thread: { status: 'waiting' } }) },
+    t3Tools[2]!,
+    { name: 't3_pending_request_list', inputSchema: threadArgs, call: () => json({ requestIds: ['request-test'] }) },
+    { name: 't3_pending_request_read', inputSchema: { type: 'object', properties: { threadId: str, requestId: str } }, call: () => json({ requestId: 'request-test', questions: [
+      { id: 'q1', question: 'First?', options: [{ label: 'A' }, { label: 'B' }] },
+      { id: 'q2', question: 'Second?', options: [{ label: 'C' }, { label: 'D' }] },
+    ] }) },
+  ]
+  const { turns, call, click } = await fixture('t3', tools)
+  await call('t3_start', start)
+  await click()
+  await expect.poll(() => turns.jobs.list()[0]?.state).toBe('T3 Code needs your answer in T3 Code')
+  expect(turns.actions.views().some((v) => v.card._tag === 'question')).toBe(false)
+})
