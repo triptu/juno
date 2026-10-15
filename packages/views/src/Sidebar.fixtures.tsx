@@ -2,6 +2,7 @@ import { defineFixtures, scene, type FixtureFrame } from '@juno/ui'
 import { AccountMenu } from './AccountMenu'
 import { AppearanceSettings } from './AppearanceSettings'
 import { EngineNotice } from './EngineStatusView'
+import { PrivacyOn } from './fixtures/privacy'
 import { hostileIds, newThreadsById, NOW, pinnedIds, recentIds, rows, rowsById } from './fixtures/topics'
 import { Sidebar, type SidebarProps, type SidebarViewPill } from './Sidebar'
 import { relativeTime } from './time'
@@ -160,6 +161,11 @@ export default defineFixtures(
       'juno-busy': scene(() => full({ junoUnread: 1, junoBusy: true })),
       'no-dots': scene(() => full({ dots: { channels: false, dms: false } })),
     },
+    // Privacy mode (SPEC section 5): previews blurred, the footer with Show.
+    Privacy: {
+      on: scene(() => <PrivacyOn>{full({ privacy: true, onPrivacyOff: noop }, { selected: rows.postgres.id })}</PrivacyOn>),
+      'row-hover': scene(() => <PrivacyOn>{full({ privacy: true, onPrivacyOff: noop })}</PrivacyOn>, { hover: '[data-topic-row]:nth-of-type(2)' }),
+    },
     'Account menu': {
       open: scene(() =>
         full({
@@ -179,6 +185,8 @@ export default defineFixtures(
     Interaction: {
       'row-hover': scene(() => full({}, { selected: rows.postgres.id }), { hover: '[data-topic-row]:nth-of-type(2)' }),
       'filter-hover': scene(() => full(), { hover: '[aria-label="Quick filters"] [aria-label^="Channels"]' }),
+      'unread-hover': scene(() => full(), { hover: '[aria-label="Unread only"]' }),
+      'unread-focus': scene(() => full(), { focus: '[aria-label="Unread only"]' }),
       'view-hover': scene(() => full(viewChrome), { hover: '[data-view-pill="vdesign"]' }),
       'nav-focus': scene(() => full(), { focus: '[aria-label="Pages"] [role="button"]:nth-of-type(2)' }),
     },

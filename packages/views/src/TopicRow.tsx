@@ -172,7 +172,7 @@ export const TopicRow = memo(function TopicRow({
         <span {...stylex.props(styles.line2)}>
           {/* The message sets the direction; the sender is isolated so a Latin
               name before Arabic text, or the reverse, keeps its own order. */}
-          <Text variant="preview" tone={unread ? 'subtle' : 'muted'} truncate as="span" dir="auto" id={previewId} sx={styles.preview}>
+          <Text variant="preview" tone={unread ? 'subtle' : 'muted'} truncate as="span" dir="auto" id={previewId} data-sensitive="" sx={styles.preview}>
             {row.preview.text.length === 0 ? (
               row.preview.sender
             ) : (

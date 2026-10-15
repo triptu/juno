@@ -125,7 +125,7 @@ export function createJunoSettings(options: SettingsOptions): JunoSettings {
   const offConnection = connection.subscribe(() => void refresh(true))
   const offOwnership = turns.ownership.subscribe(changed)
 
-  const priceText = (row: PickerModel) => (row.price === undefined ? {} : { price: `${money(row.price.input)} / ${money(row.price.output)} per million tokens` })
+  const priceText = (row: PickerModel) => (row.price === undefined ? {} : { price: `${money(row.price.input)} in, ${money(row.price.output)} out per million tokens` })
 
   /** The custom endpoint's rows: what it lists, with a typed model added when chosen. */
   const customChoices = (): ReadonlyArray<ModelChoice> => {

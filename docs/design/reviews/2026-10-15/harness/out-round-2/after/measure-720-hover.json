@@ -1,0 +1,314 @@
+[
+  {
+    "tag": "div",
+    "label": "DDev15:03What's the rollback if replicat",
+    "rect": {
+      "x": 418,
+      "y": 112,
+      "w": 268,
+      "h": 158
+    },
+    "padding": "4px 8px",
+    "gap": "12px",
+    "radius": "14px",
+    "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgb(244, 242, 235)",
+    "border": "0px none rgb(35, 33, 26)",
+    "shadow": "none",
+    "outline": "none 2px rgb(180, 53, 31) offset -2px",
+    "children": [
+      {
+        "tag": "span",
+        "label": "D",
+        "rect": {
+          "x": 426,
+          "y": 118,
+          "w": 32,
+          "h": 32
+        },
+        "padding": "0px",
+        "gap": "normal",
+        "radius": "0px",
+        "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+        "color": "rgb(35, 33, 26)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(35, 33, 26)",
+        "shadow": "none",
+        "outline": "none 3px rgb(35, 33, 26) offset 0px"
+      },
+      {
+        "tag": "span",
+        "label": "Dev15:03What's the rollback if replicati",
+        "rect": {
+          "x": 470,
+          "y": 116,
+          "w": 208,
+          "h": 150
+        },
+        "padding": "0px",
+        "gap": "normal",
+        "radius": "0px",
+        "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+        "color": "rgb(35, 33, 26)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(35, 33, 26)",
+        "shadow": "none",
+        "outline": "none 3px rgb(35, 33, 26) offset 0px"
+      },
+      {
+        "tag": "span",
+        "label": "👍✅👀",
+        "rect": {
+          "x": 483,
+          "y": 76,
+          "w": 195,
+          "h": 38
+        },
+        "padding": "0px",
+        "gap": "normal",
+        "radius": "0px",
+        "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+        "color": "rgb(35, 33, 26)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(35, 33, 26)",
+        "shadow": "none",
+        "outline": "none 3px rgb(35, 33, 26) offset 0px"
+      }
+    ]
+  },
+  {
+    "tag": "span",
+    "label": "D",
+    "rect": {
+      "x": 426,
+      "y": 118,
+      "w": 32,
+      "h": 32
+    },
+    "padding": "0px",
+    "gap": "normal",
+    "radius": "0px",
+    "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "0px none rgb(35, 33, 26)",
+    "shadow": "none",
+    "outline": "none 3px rgb(35, 33, 26) offset 0px",
+    "children": [
+      {
+        "tag": "span",
+        "label": "Dev",
+        "rect": {
+          "x": 426,
+          "y": 118,
+          "w": 32,
+          "h": 32
+        },
+        "padding": "0px",
+        "gap": "normal",
+        "radius": "999px",
+        "font": "12px/12px 600 \"Figtree Variable\"",
+        "color": "oklch(0.590356 0.0629807 252.357)",
+        "bg": "oklch(0.942431 0.0254597 252.357)",
+        "border": "0px none oklch(0.590356 0.0629807 252.357)",
+        "shadow": "none",
+        "outline": "none 3px oklch(0.590356 0.0629807 252.357) offset 0px"
+      }
+    ]
+  },
+  {
+    "tag": "span",
+    "label": "Dev",
+    "rect": {
+      "x": 470,
+      "y": 116,
+      "w": 25.7,
+      "h": 17.5
+    },
+    "padding": "0px",
+    "gap": "normal",
+    "radius": "0px",
+    "font": "14.5px/normal 600 \"Figtree Variable\"",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "0px none rgb(35, 33, 26)",
+    "shadow": "none",
+    "outline": "none 3px rgb(35, 33, 26) offset 0px",
+    "children": []
+  },
+  {
+    "tag": "time",
+    "label": "15:03",
+    "rect": {
+      "x": 503.7,
+      "y": 118,
+      "w": 34.3,
+      "h": 15
+    },
+    "padding": "0px",
+    "gap": "normal",
+    "radius": "0px",
+    "font": "12.5px/normal 400 \"Figtree Variable\"",
+    "color": "rgb(112, 110, 102)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "0px none rgb(112, 110, 102)",
+    "shadow": "none",
+    "outline": "none 3px rgb(112, 110, 102) offset 0px",
+    "children": []
+  },
+  {
+    "tag": "div",
+    "label": "Message actions",
+    "rect": {
+      "x": 483,
+      "y": 76,
+      "w": 195,
+      "h": 38
+    },
+    "padding": "4px",
+    "gap": "2px",
+    "radius": "16px",
+    "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgb(251, 251, 248)",
+    "border": "1px solid rgba(0, 0, 0, 0)",
+    "shadow": "oklch(0 0 0 / 0.05) 0px 2px 6px -1px, oklch(0 0 0 / 0.13) 0px 14px 36px -8px",
+    "outline": "none 3px rgb(35, 33, 26) offset 0px",
+    "children": [
+      {
+        "tag": "button",
+        "label": "React 👍",
+        "rect": {
+          "x": 488,
+          "y": 81,
+          "w": 28,
+          "h": 28
+        },
+        "padding": "0px",
+        "gap": "normal",
+        "radius": "12px",
+        "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+        "color": "rgb(35, 33, 26)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px solid rgba(0, 0, 0, 0)",
+        "shadow": "none",
+        "outline": "none 2px rgb(180, 53, 31) offset 2px"
+      },
+      {
+        "tag": "button",
+        "label": "React ✅",
+        "rect": {
+          "x": 518,
+          "y": 81,
+          "w": 28,
+          "h": 28
+        },
+        "padding": "0px",
+        "gap": "normal",
+        "radius": "12px",
+        "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+        "color": "rgb(35, 33, 26)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px solid rgba(0, 0, 0, 0)",
+        "shadow": "none",
+        "outline": "none 2px rgb(180, 53, 31) offset 2px"
+      },
+      {
+        "tag": "button",
+        "label": "React 👀",
+        "rect": {
+          "x": 548,
+          "y": 81,
+          "w": 28,
+          "h": 28
+        },
+        "padding": "0px",
+        "gap": "normal",
+        "radius": "12px",
+        "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+        "color": "rgb(35, 33, 26)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px solid rgba(0, 0, 0, 0)",
+        "shadow": "none",
+        "outline": "none 2px rgb(180, 53, 31) offset 2px"
+      },
+      {
+        "tag": "span",
+        "label": "",
+        "rect": {
+          "x": 580,
+          "y": 81,
+          "w": 1,
+          "h": 28
+        },
+        "padding": "4px 0px",
+        "gap": "normal",
+        "radius": "0px",
+        "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+        "color": "rgb(35, 33, 26)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(35, 33, 26)",
+        "shadow": "none",
+        "outline": "none 3px rgb(35, 33, 26) offset 0px"
+      },
+      {
+        "tag": "button",
+        "label": "More reactions",
+        "rect": {
+          "x": 585,
+          "y": 81,
+          "w": 28,
+          "h": 28
+        },
+        "padding": "0px",
+        "gap": "normal",
+        "radius": "12px",
+        "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+        "color": "rgb(96, 94, 82)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px solid rgba(0, 0, 0, 0)",
+        "shadow": "none",
+        "outline": "none 2px rgb(180, 53, 31) offset 2px"
+      },
+      {
+        "tag": "button",
+        "label": "Quote",
+        "rect": {
+          "x": 615,
+          "y": 81,
+          "w": 28,
+          "h": 28
+        },
+        "padding": "0px",
+        "gap": "normal",
+        "radius": "12px",
+        "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+        "color": "rgb(96, 94, 82)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px solid rgba(0, 0, 0, 0)",
+        "shadow": "none",
+        "outline": "none 2px rgb(180, 53, 31) offset 2px"
+      },
+      {
+        "tag": "button",
+        "label": "More",
+        "rect": {
+          "x": 645,
+          "y": 81,
+          "w": 28,
+          "h": 28
+        },
+        "padding": "0px",
+        "gap": "normal",
+        "radius": "12px",
+        "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+        "color": "rgb(96, 94, 82)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px solid rgba(0, 0, 0, 0)",
+        "shadow": "none",
+        "outline": "none 2px rgb(180, 53, 31) offset 2px"
+      }
+    ]
+  }
+]

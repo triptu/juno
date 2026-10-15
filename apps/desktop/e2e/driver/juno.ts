@@ -275,7 +275,7 @@ export class Sidebar {
   }
 
   get unreadToggle() {
-    return this.root.getByRole('button', { name: 'Show unread only' })
+    return this.root.getByRole('button', { name: 'Unread only' })
   }
 
   async filter(name: SidebarFilterName): Promise<void> {
@@ -593,6 +593,7 @@ export class Juno {
   readonly allTopics: AllTopicsPane
   readonly home: HomePane
   readonly peek: PeekPopover
+  readonly privacy: PrivacyMode
 
   constructor(app: ElectronApplication, win: Page) {
     this.app = app
@@ -610,6 +611,7 @@ export class Juno {
     this.allTopics = new AllTopicsPane(win)
     this.home = new HomePane(win)
     this.peek = new PeekPopover(win)
+    this.privacy = new PrivacyMode(app, win)
   }
 
   /** Makes the next native context menu pick `id` without showing it. */
@@ -984,6 +986,11 @@ export class AllTopicsRow {
 
   async expectVisible(): Promise<void> {
     await expect.poll(() => this.reveal(), { timeout: 10_000 }).toBe(true)
+  }
+
+  /** The "Sender: text" line under the title, the one part privacy mode blurs. */
+  get preview(): Locator {
+    return this.root.locator('[data-sensitive]')
   }
 
   async expectAbsent(): Promise<void> {
@@ -1641,6 +1648,7 @@ export type AppMenuItem =
   | 'back'
   | 'forward'
   | 'toggle-sidebar'
+  | 'toggle-privacy'
   | 'juno'
   | 'undo'
   | `tab-${1 | 2 | 3 | 4 | 5 | 6 | 7 | 8}`
@@ -1758,6 +1766,41 @@ export class SidebarFrame {
   /** View › Hide Sidebar's label, which names what it will do. */
   async menuLabel(): Promise<string | undefined> {
     return this.app.evaluate(({ Menu }) => Menu.getApplicationMenu()?.getMenuItemById('toggle-sidebar')?.label)
+  }
+}
+
+/** Privacy mode (SPEC section 5): blurred message text, the sidebar footer, View › Hide Message Text. */
+export class PrivacyMode {
+  constructor(
+    readonly app: ElectronApplication,
+    readonly win: Page,
+  ) {}
+
+  /** The sidebar footer that says the mode is on. */
+  get footer(): Locator {
+    return this.win.getByRole('complementary', { name: 'Sidebar' }).getByRole('status').filter({ hasText: 'Message text hidden' })
+  }
+
+  get showButton(): Locator {
+    return this.footer.getByRole('button', { name: 'Show message text' })
+  }
+
+  /** The CSS filter on an element: `blur(6px)` while hidden, `none` otherwise. */
+  filterOf(target: Locator): Promise<string> {
+    return target.evaluate((node) => getComputedStyle(node).filter)
+  }
+
+  async expectBlurred(target: Locator, blurred = true): Promise<void> {
+    await expect.poll(() => this.filterOf(target)).toBe(blurred ? 'blur(6px)' : 'none')
+  }
+
+  async toggleWithMenu(): Promise<void> {
+    await clickAppMenu(this.app, 'toggle-privacy')
+  }
+
+  /** View › Hide or Show Message Text, which names what it will do. */
+  menuLabel(): Promise<string | undefined> {
+    return this.app.evaluate(({ Menu }) => Menu.getApplicationMenu()?.getMenuItemById('toggle-privacy')?.label)
   }
 }
 

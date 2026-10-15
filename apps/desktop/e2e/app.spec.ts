@@ -98,7 +98,7 @@ test('exposes only the bridge to the page', async ({ win }) => {
     app: ['getInfo'],
     engine: ['requestPort', 'restart'],
     agent: ['requestPort', 'setOpenRouterKey', 'provider', 'setProvider', 'onProvider'],
-    launch: ['setTheme', 'setAccent', 'setDensity', 'setSidebar'],
+    launch: ['setTheme', 'setAccent', 'setDensity', 'setPrivacy', 'setSidebar'],
     contextMenu: ['popup'],
     shell: ['openExternal', 'openInSlack', 'editUndo'],
     clipboard: ['writeText'],

@@ -40,18 +40,18 @@ export const NOTION: ConnectionConfig = {
   allowlist: ['notion-search', 'notion-fetch', 'search', 'fetch'], enabled: false,
 }
 
-/** Littlebird's read names are the plan's (meetings, context search, routine reports, account); the hosted list is not yet read. */
+/** Read names must be confirmed from discovery and reviewed by the owner, never guessed. */
 export const LITTLEBIRD: ConnectionConfig = {
   id: 'littlebird', label: 'Littlebird', url: 'https://mcp.littlebird.ai/mcp', transport: 'http',
   auth: { kind: 'oauth' }, trusted: false, noSecrets: false,
-  allowlist: ['search_meetings', 'get_meeting', 'search_context', 'get_routine_report', 'get_account'], enabled: false,
+  allowlist: [], enabled: false,
 }
 
 /** T3 Code signs in once with OAuth and has no refresh, so an expired token needs a new sign-in. */
 export const T3: ConnectionConfig = {
   id: 't3', label: 'T3 Code', url: 'http://localhost:3773/mcp', transport: 'http',
   auth: { kind: 'oauth' }, trusted: false, noSecrets: true,
-  allowlist: ['t3_thread_read', 't3_thread_list', 't3_thread_search', 't3_thread_wait', 't3_pending_request_list', 't3_project_list', 't3_worktree_list', 't3_worktree_status'],
+  allowlist: ['t3_thread_read', 't3_thread_list', 't3_thread_search', 't3_thread_wait', 't3_pending_request_list', 't3_pending_request_read', 't3_project_list', 't3_worktree_list', 't3_worktree_status'],
   enabled: false, allowNetwork: false,
 }
 

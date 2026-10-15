@@ -9,7 +9,7 @@ import { runCommand } from '@juno/state'
 import { Exit } from 'effect'
 import { bootedEngine, readDb } from '../../../packages/engine/test/scenario'
 import { waitFor, type RunningEngine } from '../../../packages/engine/test/harness'
-import { DOCK_BADGE, Notifier } from '../src/main/notifier'
+import { DOCK_BADGE, HIDDEN_BODY, Notifier } from '../src/main/notifier'
 
 const engines: RunningEngine[] = []
 afterEach(async () => {
@@ -21,6 +21,7 @@ function connect(engine: RunningEngine) {
   const shown: Array<{ readonly title: string; readonly body: string; click: () => void }> = []
   const opened: NotificationTarget[] = []
   let badge = ''
+  let privacy = false
   const notifier = new Notifier({
     create: (options) => {
       const entry = { ...options, click: () => {} }
@@ -37,13 +38,22 @@ function connect(engine: RunningEngine) {
     },
     open: (target) => opened.push(target),
     send: (message: MainToEngine) => engine.main.host.deliver(message),
+    privacy: () => privacy,
   })
   // Main hears the engine from its start; the test connects after the boot.
   for (const message of engine.main.host.fromEngine) notifier.handle(message)
   engine.main.host.onEngine((message) => {
     notifier.handle(message)
   })
-  return { notifier, shown, opened, badge: () => badge }
+  return {
+    notifier,
+    shown,
+    opened,
+    badge: () => badge,
+    setPrivacy: (on: boolean) => {
+      privacy = on
+    },
+  }
 }
 
 it('shows what the engine decides, opens the message on click, hides the topic on screen and badges unread mentions', async () => {
@@ -68,6 +78,13 @@ it('shows what the engine decides, opens the message on click, hides the topic o
   await waitFor(() => readDb(engine, 'user.db', (db) => db.prepare('SELECT suppressed_at FROM notification_log WHERE ts = ?').get(second.ts))?.suppressed_at ?? undefined, 15_000, 'the suppressed row')
   expect(main.shown).toHaveLength(1)
   main.notifier.setViewing(null)
+
+  // Privacy mode: the notification still says who it is from, never what they wrote.
+  main.setPrivacy(true)
+  engine.fake.injectMessage({ channel: 'D0MAYA', user: 'U0MAYA', text: 'The salary sheet is attached' })
+  await waitFor(() => (main.shown.length === 2 ? true : undefined), 15_000, 'the notification in privacy mode')
+  expect(main.shown[1]).toMatchObject({ title: 'Maya', body: HIDDEN_BODY })
+  main.setPrivacy(false)
 
   // Reading every topic that mentions you clears the badge; a new mention brings it back.
   const mentioned = readDb(engine, 'cache.db', (db) => db.prepare('SELECT topic_id FROM topic_index WHERE mentions_me = 1 AND unread_count > 0').all()) as Array<{ topic_id: string }>
