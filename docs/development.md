@@ -422,7 +422,17 @@ Packages ship TypeScript source, so each package's `tsc -p` also checks the sour
 - **Incremental.** A project that runs uses `tsc --incremental`, with its build info in the package's `node_modules/.cache/tsc/`, so only what changed is checked again.
 - **Queued.** At most `JUNO_TYPECHECK_JOBS` (default 2) tsc processes in one run, and at most two at once on the Mac across every worktree (a separate `typecheck` queue in `scripts/heavy.mjs`, apart from the test slots).
 
-Timings (2026-10-15): the old `pnpm -r typecheck` took 34 s on a 16x32 machine and over 30 minutes on the loaded Mac. Now, remotely: 14.5 s with nothing cached, 0.0 s with everything cached (the run is about 30 s end to end on a warm machine). On the Mac at load 18: 203 s with nothing cached, 3.9 s with nothing changed, 8.2 s after a change to one engine test file (5 projects, incremental).
+Timings (2026-10-15):
+
+| Run | Old `pnpm -r typecheck` | `pnpm typecheck` |
+| --- | --- | --- |
+| Mac, quiet (load 3 to 5), nothing cached or built | 35.6 s | 36.6 s (same work, two tsc at once) |
+| Mac, quiet, incremental build info only (`--no-cache`) | 35.6 s | 15.4 s |
+| Mac, nothing changed | 35.6 s | 3.9 s |
+| Mac, one engine test file changed (5 projects) | 35.6 s | 8.2 s |
+| Mac, a dozen worktrees at once | over 30 minutes (reported) | at most two tsc on the Mac; the rest wait or are cached |
+| 16x32 remote, nothing cached | 34 s | 14.5 s |
+| 16x32 remote, all cached | | 0.0 s (about 30 s end to end, warm) |
 
 `pnpm lint` stays whole: oxlint, the cursor rule, `check-deps` and the fixture check take about 3 s together even on the loaded Mac, and `check-deps` needs the whole package graph to see a bad edge.
 
