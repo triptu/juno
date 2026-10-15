@@ -516,7 +516,7 @@ Split the AI work into two kinds. **Decisions** are fast, cheap and structured: 
 
 Things AI must not do: send anything without a click, rewrite your voice (the one exception is the nudge draft when a reply watch runs out, 13.6), add "needs you" style labels to the sidebar, or create noise to look helpful. A global AI assist switch turns off every AI surface, the Juno chat included.
 
-The Juno chat runs apart from the decision features: its own process, its own memory, and a chat model you pick in Settings (section 13.10) from OpenRouter or a local Codex. The decision features keep the fast path above.
+The Juno chat runs apart from the decision features: its own process, its own memory, and a chat model you pick in Settings (section 13.10) from OpenRouter or a local Codex. The decision features keep the fast path above. Preferences has a Use fast classifier switch, on by default; turning it off uses the decision chat model instead.
 
 ## 16. Visual system
 
