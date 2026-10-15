@@ -1,10 +1,21 @@
-import { useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type Ref } from 'react'
-import type { SendTarget, TopicDetail } from '@juno/contract'
-import { draftAtom, registry, saveDraft, sendMessage } from '@juno/state'
+import { lazy, Suspense, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type Ref } from 'react'
+import { audienceCheck, type SendTarget, type TopicDetail } from '@juno/contract'
+import { aiAssistOnAtom, checkMessage, draftAtom, precheckMessage, registry, saveDraft, sendMessage, showToast } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
-import { Composer, ComposerSlot } from '@juno/views'
+import { AudienceWarning, Composer, ComposerSlot } from '@juno/views'
 import type { ComposerHandle } from './messageActions'
-import { markSend } from './sendMark'
+import { afterCheck, choose, type CheckBar, type Destination, type Outcome } from './sendChecks'
+import { cancelSendMark, markSend } from './sendMark'
+
+const SendCheckPanel = lazy(() => import('./SendCheckPanel'))
+
+/** Fetch the bar's chunk once a composer has mounted, so the first bar does not wait for it. */
+let barLoaded = false
+function preloadBar(): void {
+  if (barLoaded) return
+  barLoaded = true
+  window.requestIdleCallback(() => void import('./SendCheckPanel'))
+}
 
 /** Typing pauses this long before the draft is written. */
 const DRAFT_SAVE_MS = 400
@@ -39,8 +50,15 @@ export function withQuote(draft: string, text: string): string {
  * (`drafts.get`), read once when the composer mounts and written back after
  * a pause in typing and when the tab hides, so it survives tab switches and
  * restarts. Until the draft has loaded, the `ComposerSlot` holds the place.
- * Enter queues the message (`messages.send`, which clears the stored draft
- * in the same transaction); the pending row shows in the list at once.
+ * While typing pauses in a Main, the model is asked whether the draft is a
+ * reply to a recent topic (`messages.precheck`). Enter runs the checks on
+ * send (`messages.check`, spec section 8), which use that answer only if it
+ * is already there, unless AI assist is off. When they find nothing the message is queued
+ * (`messages.send`, which clears the stored draft in the same transaction)
+ * and the pending row shows in the list at once; otherwise the check bar
+ * shows inside the composer until a choice, Esc or an edit. While typing
+ * pauses in a public channel, the audience line warns about hiring and
+ * people details.
  */
 export function TopicComposer({ detail, onSent, handle, onArrowUpEmpty }: TopicComposerProps) {
   const stored = useAtomValue(draftAtom(detail.id))
@@ -51,7 +69,14 @@ export function TopicComposer({ detail, onSent, handle, onArrowUpEmpty }: TopicC
 
 function LoadedComposer({ detail, initial, placeholder, onSent, handle, onArrowUpEmpty }: TopicComposerProps & { readonly initial: string; readonly placeholder: string }) {
   const id = detail.id
+  const aiAssist = useAtomValue(aiAssistOnAtom)
   const [text, setText] = useState(initial)
+  // The draft as it was when typing last paused: the audience line reads it.
+  const [paused, setPaused] = useState(initial)
+  const [bar, setBar] = useState<CheckBar | undefined>(undefined)
+  // The check Enter started; an edit or a newer Enter replaces it, and its answer is dropped.
+  const checking = useRef<object | undefined>(undefined)
+  const [waiting, setWaiting] = useState(false)
   const field = useRef<HTMLTextAreaElement>(null)
   // A quote just went in: the caret goes after it once it is drawn.
   const [quotedAt, setQuotedAt] = useState(0)
@@ -79,31 +104,95 @@ function LoadedComposer({ detail, initial, placeholder, onSent, handle, onArrowU
   })
   // The tab hid or closed: write what is typed now.
   useEffect(() => () => flushRef.current(), [])
+  // A saved Main draft is asked about once, as if typing had just paused.
+  useEffect(() => {
+    preloadBar()
+    if (aiAssist && detail.kind === 'main' && initial.trim() !== '') precheckMessage(registry, detail.channel.id, initial)
+    // Once per mount: later drafts are asked about as typing pauses.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const stopChecking = () => {
+    checking.current = undefined
+    setWaiting(false)
+  }
 
   const change = (next: string) => {
     setText(next)
+    // Editing closes the bar and drops a check still running: Enter checks the new text.
+    setBar(undefined)
+    stopChecking()
     unsaved.current = next
     clearTimeout(timer.current)
-    timer.current = setTimeout(flush, DRAFT_SAVE_MS)
+    timer.current = setTimeout(() => {
+      setPaused(next)
+      flush()
+      // The model answers the wrong-place question now, so Enter never waits for it.
+      if (aiAssist && detail.kind === 'main' && next.trim() !== '') precheckMessage(registry, detail.channel.id, next)
+    }, DRAFT_SAVE_MS)
   }
 
-  const target: SendTarget = { kind: 'channel', channelId: detail.channel.id, ...(detail.kind === 'thread' && detail.rootTs !== undefined ? { threadTs: detail.rootTs } : {}) }
-  const send = () => {
-    if (text.trim() === '') return
-    markSend()
+  const here = { channelId: detail.channel.id, ...(detail.kind === 'thread' && detail.rootTs !== undefined ? { threadTs: detail.rootTs } : {}) }
+  const deliver = (body: string, to: Destination) => {
     // The send clears the stored draft; a save still waiting must not write it back.
     clearTimeout(timer.current)
     unsaved.current = undefined
     setText('')
+    setPaused('')
+    setBar(undefined)
     onSent()
-    void sendMessage(registry, target, text, id).then((exit) => {
+    const target: SendTarget = { kind: 'channel', ...(to.kind === 'here' ? here : { channelId: detail.channel.id, threadTs: to.threadTs }) }
+    void sendMessage(registry, target, body, id).then((exit) => {
       if (exit._tag === 'Failure') {
         // Nothing was queued: the text comes back so it can be sent again.
-        setText((current) => (current === '' ? text : current))
+        setText((current) => (current === '' ? body : current))
         console.warn('juno: send failed', exit.cause)
+      } else if (to.kind === 'thread') {
+        showToast(registry, { text: `Posted in ${to.title}` })
       }
     })
   }
+  const follow = (outcome: Outcome) => {
+    if (outcome.kind === 'send') deliver(outcome.text, outcome.to)
+    else if (outcome.kind === 'bar') setBar(outcome.bar)
+    else setBar(undefined)
+  }
+
+  const send = () => {
+    if (bar !== undefined) return follow(choose(bar, 'primary'))
+    if (text.trim() === '' || checking.current !== undefined) return
+    markSend()
+    if (!aiAssist) return deliver(text, { kind: 'here' })
+    const token = {}
+    checking.current = token
+    setWaiting(true)
+    void checkMessage(registry, here, text).then((found) => {
+      if (checking.current !== token) return
+      stopChecking()
+      const outcome = afterCheck(text, found)
+      // The send measure is Enter to the pending row; a bar ends it without one.
+      if (outcome.kind !== 'send') cancelSendMark()
+      follow(outcome)
+    })
+  }
+
+  // A click on the bar takes the focus; typing goes on in the field.
+  const pick = (choice: 'primary' | 'secondary') => {
+    field.current?.focus()
+    if (bar !== undefined) follow(choose(bar, choice))
+  }
+  const audience = aiAssist && audienceCheck(text, detail.channel) !== undefined ? audienceCheck(paused, detail.channel) : undefined
+  const notices =
+    audience === undefined && bar === undefined ? undefined : (
+      <>
+        {audience === undefined ? null : <AudienceWarning message={audience.message} />}
+        {bar === undefined ? null : (
+          <Suspense fallback={null}>
+            <SendCheckPanel bar={bar} onPick={pick} />
+          </Suspense>
+        )}
+      </>
+    )
 
   useImperativeHandle(handle, () => ({
     focus: () => field.current?.focus(),
@@ -114,5 +203,17 @@ function LoadedComposer({ detail, initial, placeholder, onSent, handle, onArrowU
     },
   }))
 
-  return <Composer value={text} onChange={change} onSend={send} placeholder={placeholder} inputRef={field} {...(onArrowUpEmpty === undefined ? {} : { onArrowUpEmpty })} />
+  return (
+    <Composer
+      value={text}
+      onChange={change}
+      onSend={send}
+      placeholder={placeholder}
+      inputRef={field}
+      sending={waiting}
+      notices={notices}
+      {...(bar === undefined ? {} : { onEscape: () => setBar(undefined) })}
+      {...(onArrowUpEmpty === undefined ? {} : { onArrowUpEmpty })}
+    />
+  )
 }

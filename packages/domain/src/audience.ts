@@ -2,7 +2,7 @@
  * The audience check (spec section 8): a quiet warning while typing when the
  * draft reads like hiring or people details and the channel is public.
  */
-import { channelLabelBare, type ChannelInfo } from './channel'
+import { channelLabelBare, type ChannelNaming } from './channel'
 
 const TERMS = /\b(offer|salary|salaries|comp|compensation|candidate|candidates|layoffs?|performance review|headcount|fired|onsite|severance|pip|promotion|resign(?:ed|ation)?|terminat(?:ed|ion))\b/gi
 
@@ -13,7 +13,7 @@ export interface AudienceWarning {
 }
 
 /** Returns a warning for a public channel whose draft matches, otherwise `undefined`. */
-export function audienceCheck(draft: string, channel: ChannelInfo): AudienceWarning | undefined {
+export function audienceCheck(draft: string, channel: ChannelNaming): AudienceWarning | undefined {
   if (channel.kind !== 'public') return undefined
   const matched = Array.from(draft.matchAll(TERMS), (m) => m[0].toLowerCase())
   if (matched.length === 0) return undefined

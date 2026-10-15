@@ -18,7 +18,7 @@ import * as Atom from 'effect/reactivity/Atom'
 import { prefsGet, prefsSet } from '@juno/contract'
 import type { About } from '@juno/agent-contract'
 import { liveQuery, runCommand } from './atoms'
-import { notificationSettingsAtom } from './notifications'
+import { aiAssistOnAtom } from './notifications'
 import type { Registry } from './client'
 import { signedInAtom } from './session'
 
@@ -29,10 +29,7 @@ export const JUNO_PANEL_PREF = 'junoPanel'
  * AI assist is off (SPEC 7). Whether a provider is set up decides only what
  * the Juno tab and panel show: the chat, or "Add a provider".
  */
-export const junoAvailableAtom = Atom.make((get): boolean => {
-  const settings = get(notificationSettingsAtom)
-  return !(AsyncResult.isSuccess(settings) && settings.value.aiAssist === false)
-})
+export const junoAvailableAtom = aiAssistOnAtom
 
 const savedPanelAtom = liveQuery(prefsGet)({ key: JUNO_PANEL_PREF })
 const changedPanelAtom = Atom.family((_teamId: string) => Atom.make<boolean | undefined>(undefined).pipe(Atom.keepAlive))

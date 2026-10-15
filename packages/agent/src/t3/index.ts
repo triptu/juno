@@ -17,16 +17,22 @@ import { t3Driver } from './watch'
 
 export function createT3Adapter(manager: McpManagerApi) {
   let bound: { readonly actions: Actions; readonly jobs: Jobs } | undefined
+  /**
+   * Records a session T3 Code confirmed, so its Task card can watch and stop it.
+   * The grant needs the click's card and account to still hold; the job does not:
+   * a session that started is never hidden behind a Failed card.
+   */
   const attach = (call: ExecutorCall, threadId: string, grant: boolean) => {
     const args = Schema.decodeUnknownSync(Schema.Struct({ projectId: Schema.String, title: Schema.String }))(call.payload.args)
     const card = cardRow(manager.store, call.cardId)
-    if (!card || !bound || card.source_gen !== memoryGen(manager.store) || call.payload.account_id !== manager.stored('t3').epoch) return undefined
+    if (!card || !bound) return undefined
+    const current = card.source_gen === memoryGen(manager.store) && call.payload.account_id === manager.stored('t3').epoch
     const job = bound.jobs.start({
       kind: 't3', runId: card.run_id, originOp: call.opId, callId: call.actionId, title: args.title,
       place: `${args.projectId} · branch pending`,
       task: JSON.stringify({ threadId, project: args.projectId, epoch: call.payload.account_id }),
     })
-    if (grant) mintGrant(manager.store, { opClass: 'job', target: job.id, authority: { _tag: 'click', current: true }, sourceOp: call.opId })
+    if (grant && current) mintGrant(manager.store, { opClass: 'job', target: job.id, authority: { _tag: 'click', current: true }, sourceOp: call.opId })
     return job
   }
   const check: NonNullable<Executor['check']> = async (payload) => {
@@ -53,14 +59,15 @@ export function createT3Adapter(manager: McpManagerApi) {
     },
     reconcile: async (call) => {
       const result = await reconcileStart(manager, call)
-      if (result._tag === 'found') attach(call, result.receipt.threadId, false)
+      // Found without a job to show it would read Started with no Task card: keep it unknown.
+      if (result._tag === 'found' && attach(call, result.receipt.threadId, false) === undefined) return { _tag: 'unknown' }
       return result
     },
   }
   return {
     executors: [executor, questionExecutor(manager)],
-    stop: async (job: Parameters<typeof stopSession>[2]) => bound ? stopSession(manager, bound.actions, job) : false,
-    driver: t3Driver(manager, async (job, threadId, signal) => { if (bound) await proposeQuestions(manager, bound.actions, job, threadId, signal) }),
+    stop: async (job: Parameters<typeof stopSession>[2], click: string | undefined) => bound ? stopSession(manager, bound.actions, job, click) : false,
+    driver: t3Driver(manager, async (job, threadId, signal) => bound ? proposeQuestions(manager, bound.actions, job, threadId, signal) : false),
     tools: (context: { readonly actions: Actions; readonly jobs: Jobs; readonly current: () => Promise<ToolRun | undefined> }) => {
       bound = context
       return [...workTools(manager, context), defineTool<Start>({
