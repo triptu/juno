@@ -154,3 +154,44 @@ Each has a recommendation. They are left open because each changes what a surfac
 - `pnpm affected` after merging origin/main: typecheck, lint, `pnpm test`, `test:gallery` and `test:desktop` (207 passed) all passed. An earlier run before the merge passed everything but `test:desktop`, which never started because Namespace could not create a machine.
 - The harness ran twice, before (clean `b218096a`) and after (this branch). The numbers in findings 1 to 3 come from its `out-*` files.
 - Not run: `pnpm test:feel`. The heavy lock was held by another worktree's exclusive perf runs for most of this review. None of these changes touch a list, a scroll path or an animation.
+
+## Owner decisions implemented on `design-1016-2`
+
+Q1–Q6 are resolved. The send-check percentage is removed. Connections has one
+"Runs without asking" checkbox per tool, quiet Default text only for an overridden
+allowlisted tool, and secondary Connect and Sign in buttons. Home asks
+"Move #releases?" above "To Automated", with raised Move after quiet Keep in All.
+Backup paths are measured and cut in the middle, with the full path in the hover
+title. The palette reads "Search, or ask Juno".
+
+The recovery export focus fix was small enough to include: Export recovery phrase
+remains focusable while busy and ignores another press. The backup e2e flow opens
+it with Enter and checks that closing the phrase sheet returns focus to Export.
+
+The geometry tests hold the Connections and Backup row insets at 15px on both
+sides, the Home title and meta alignment and equal vertical button insets, and the
+narrow send-check bar's existing 8px end and bottom insets. The long-path case checks
+that the folder name survives, the full path remains in the title, and the result
+fits its measured width.
+
+Selected light and dark gallery captures are in `gallery/decisions/`:
+
+- `Composer-checks-narrow-audience-and-check-{light,dark}.png`
+- `Composer-checks-narrow-wrong-place-{light,dark}.png`
+- `ConnectionsPage-connections-servers-{light,dark}.png`
+- `ConnectionsPage-connections-off-{light,dark}.png`
+- `BackupSection-backup-long-path-{light,dark}.png`
+- `CommandPalette-states-recent-{light,dark}.png`
+- `Home-items-automated-{light,dark}.png` (hovered so both actions show)
+
+All these pairs were inspected. The full generated set is in
+`apps/gallery/shots/{SendCheckBar,Composer,ConnectionsPage,Home,BackupSection,JunoSettingsPage,CommandPalette}/`.
+They were generated through `pnpm gallery:shots`, with `GALLERY_SHOTS_ONLY` set to
+those components; Home was captured again with its action row hovered.
+
+After merging origin/main (`82778e3b`), `pnpm affected` passed typecheck, lint,
+unit tests, 115 gallery tests and 217 desktop e2e tests (47 existing skips).
+The health ratchet passed with no new unused exports or oversized functions.
+The first runs found three old-copy assertions and a path fixture too short to
+truncate; those were corrected before this pass. No perf or feel run was added
+for these copy and control changes.
