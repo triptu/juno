@@ -34,7 +34,8 @@ test('switching back to a scrolled tab restores it before the first paint', asyn
   const saved = await topEdgeNow(juno.topic.scroller)
   await juno.sidebar.row('#perf-main').openInNewTab()
   await juno.tabs.expectActive('perf-main')
-  await juno.topic.expectAtBottom()
+  // Main's oldest messages are the user's, so it opens at the "N new" divider after them.
+  await juno.topic.toLatest()
 
   const isThread = (v: ProbeFrame['values']) => header(v).includes(THREAD)
   const restored = (v: ProbeFrame['values']) => {

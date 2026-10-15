@@ -239,12 +239,25 @@ test('home open: from a topic to Home painted', async ({ juno, win }) => {
   const { home, sidebar, topic } = juno
   await home.open()
   await expect(home.item('waiting')).toBeVisible()
+  // The engine's time for each home.view run, from its juno.live-update measures.
+  await win.evaluate(() => {
+    const w = window as unknown as { __homeQuery: number[] }
+    w.__homeQuery = []
+    new PerformanceObserver((list) => {
+      for (const entry of list.getEntries() as Array<PerformanceEntry & { detail?: { devtools?: { properties?: ReadonlyArray<readonly [string, unknown]> } } }>) {
+        const properties = new Map(entry.detail?.devtools?.properties ?? [])
+        if (entry.name === 'juno.live-update' && properties.get('route') === 'home.view') w.__homeQuery.push(Number(properties.get('queryMs')))
+      }
+    }).observe({ type: 'measure' })
+  })
   const samples: number[] = []
+  const cold: string[] = []
   for (let i = 0; i < 20; i++) {
     await sidebar.row(POSTGRES).open()
     await topic.expectTitle(POSTGRES)
     await win.waitForTimeout(i % 4 === 3 ? 31_000 : 300)
     const nav = home.navItem
+    const queries = await win.evaluate(() => (window as unknown as { __homeQuery: number[] }).__homeQuery.length)
     await nav.evaluate((node) => {
       const w = window as unknown as { __homeSample?: Promise<number> }
       w.__homeSample = new Promise((resolve) => {
@@ -260,9 +273,18 @@ test('home open: from a topic to Home painted', async ({ juno, win }) => {
         )
       })
     })
-    await nav.click()
+    // `press`, not `click`: a pointerup in the next frame defers the end of the measure by a frame (performance.md 7.1).
+    const box = (await nav.boundingBox())!
+    await win.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+    await press(win)
     samples.push(await win.evaluate(() => (window as unknown as { __homeSample: Promise<number> }).__homeSample))
+    if (i % 4 === 3) {
+      await win.waitForTimeout(100)
+      const query = await win.evaluate((from) => (window as unknown as { __homeQuery: number[] }).__homeQuery.slice(from), queries)
+      cold.push(`${samples.at(-1)!.toFixed(1)} ms (home.view ${query.map((ms) => ms.toFixed(1)).join(', ') || 'no run'})`)
+    }
   }
+  console.log(`home open after the subscription's idle time: ${cold.join('; ')}`)
   const open = stats('home open (pointerdown on Home) to Home painted', samples)
   within('home open, p95', open.p95, 50)
 })
@@ -727,9 +749,7 @@ test.describe('topic view', () => {
       // the user's, so its first open is at the "N new" divider after them, not at the bottom.
       for (const title of [THREAD, MAIN]) {
         await juno.sidebar.row(title).open()
-        await expect(juno.topic.divider.or(juno.topic.list.locator('[data-message-row]').last()).first()).toBeVisible({ timeout: 15_000 })
-        if ((await juno.topic.divider.count()) > 0) await juno.topic.jumpToLatest()
-        await juno.topic.expectAtBottom()
+        await juno.topic.toLatest()
         await juno.sidebar.row(title).expectRead()
       }
     } finally {

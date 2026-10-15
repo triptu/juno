@@ -1341,6 +1341,13 @@ export class TopicPane {
     await this.pill.click()
   }
 
+  /** Waits for the open topic's rows; if it opened at its "N new" divider, jumps to the latest. Ends at the bottom. */
+  async toLatest(): Promise<void> {
+    await expect(this.divider.or(this.list.locator('[data-message-row]').last()).first()).toBeVisible({ timeout: 15_000 })
+    if ((await this.divider.count()) > 0) await this.jumpToLatest()
+    await this.expectAtBottom()
+  }
+
   /** A "2 replies · Title" link under a Main message, by its label or title. */
   threadLink(text: string | RegExp): ThreadLinkDriver {
     return new ThreadLinkDriver(this.win, this.list.getByRole('button', { name: text }))
