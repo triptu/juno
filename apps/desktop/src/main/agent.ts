@@ -177,6 +177,7 @@ export function createAgentSupervisor(sendToEngine: (port: MessagePortMain) => v
     { agentDir: join(app.getPath('userData'), 'agent'), e2e },
     sendToEngine,
     engineReady,
-    e2e ? undefined : process.env.OPENROUTER_API_KEY,
+    // Under e2e only the fake model server gets a key, and it is not a real one.
+    e2e ? (process.env.JUNO_FAKE_OPENROUTER_URL === undefined ? undefined : 'e2e-fake-key') : process.env.OPENROUTER_API_KEY,
   )
 }

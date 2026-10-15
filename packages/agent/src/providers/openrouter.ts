@@ -28,9 +28,10 @@ export function createOpenRouter(options: Omit<GuardOptions, 'transport'> & {
  * The turn engine's provider and models on OpenRouter, for the app: the
  * default chat and compaction families, resolved in pi-ai's catalogue. The
  * key is read on each request, so it may arrive after the engine opens; a
- * request without one fails, and the run ends `failed`.
+ * request without one fails, and the run ends `failed`. `baseUrl` points
+ * the models at another OpenAI-compatible server: the e2e tests' fake.
  */
-export function openRouterTurns(apiKey: () => Promise<string | undefined>): {
+export function openRouterTurns(apiKey: () => Promise<string | undefined>, options: { readonly baseUrl?: string } = {}): {
   readonly provider: (store: Store) => ProviderGuardApi
   readonly model: { readonly provider: string; readonly modelId: string }
   readonly compaction?: { readonly provider: string; readonly modelId: string }
@@ -38,7 +39,8 @@ export function openRouterTurns(apiKey: () => Promise<string | undefined>): {
   const chat = piFamilyModel(DEFAULT_CHAT_FAMILY)
   if (chat === undefined) throw new Error(`pi-ai has no ${DEFAULT_CHAT_FAMILY} model`)
   const compaction = piFamilyModel(DEFAULT_COMPACTION_FAMILY)
-  const models = compaction === undefined ? [chat] : [chat, compaction]
+  const at = (model: Model<Api>): Model<Api> => (options.baseUrl === undefined ? model : { ...model, baseUrl: options.baseUrl })
+  const models = (compaction === undefined ? [chat] : [chat, compaction]).map(at)
   return {
     provider: (store) => createOpenRouter({ store, models, apiKey }),
     model: { provider: chat.provider, modelId: chat.id },

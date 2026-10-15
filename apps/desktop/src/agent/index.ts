@@ -71,7 +71,10 @@ parent.on('message', (event) => {
     case 'config': {
       if (started) return
       started = true
-      startAgent(message.config, { acquire: nextPort }, { turns: openRouterTurns(apiKey), renderer: renderers }).then(
+      // The e2e tests point OpenRouter at their fake model server; nothing else may.
+      const fakeUrl = message.config.e2e ? process.env.JUNO_FAKE_OPENROUTER_URL : undefined
+      const turns = openRouterTurns(apiKey, fakeUrl === undefined ? {} : { baseUrl: fakeUrl })
+      startAgent(message.config, { acquire: nextPort }, { turns, renderer: renderers }).then(
         (agent) => send({ _tag: 'ready', host: agent.host }),
         (cause: unknown) => {
           console.error('agent: failed to start', cause)
