@@ -20,7 +20,7 @@ import {
   type NotifyTargetView,
   type Why,
 } from '@juno/contract'
-import { currentNotificationSettings, junoAgentOnAtom, loadNotificationSettings, popupContextMenu, registry, runAction, whyPopoverAtom } from '@juno/state'
+import { currentNotificationSettings, junoAvailableAtom, loadNotificationSettings, popupContextMenu, registry, runAction, whyPopoverAtom } from '@juno/state'
 import { askJunoAbout } from './juno/actions'
 import { openNotifications } from './navigation'
 
@@ -59,7 +59,7 @@ export function nativeMenu<A extends string>(items: ReadonlyArray<MenuItem<A>>, 
 export async function showPersonMenu(person: { readonly id: string; readonly name: string }, at?: ContextMenuAt): Promise<void> {
   const settings = currentNotificationSettings(registry) ?? (await loadNotificationSettings(registry))
   const target: NotifyTargetView = { kind: 'person', id: person.id }
-  const items = personMenuItems({ name: person.name, notify: choiceFor(settings, target), askJuno: registry.get(junoAgentOnAtom) })
+  const items = personMenuItems({ name: person.name, notify: choiceFor(settings, target), askJuno: registry.get(junoAvailableAtom) })
   const chosen = (await popupContextMenu(nativeMenu(items), at)) as NotifyAction | 'ask-juno' | undefined
   if (chosen === 'ask-juno') askJunoAbout({ _tag: 'person', userId: person.id, name: person.name })
   else if (chosen !== undefined) setNotifyLevel(target, notifyChoiceOf(chosen), person.name)

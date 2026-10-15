@@ -3,14 +3,14 @@
  * plays each case's script; live runs use `openRouterBackend`.
  */
 import { fakeProvider } from '@juno/agent-testing'
-import { createOpenRouter, createProviderGuard, type ModelRef } from '../src/index'
+import { createProviderGuard, createProviderTransport, providerConnection, type ModelRef } from '../src/index'
 import type { Case } from './cases'
 import { runSteps, type Backend } from './engine'
 import { grade, type CaseResult } from './grade'
 import type { Judge } from './judge'
 
 /** A model as pi-ai's catalogue describes it (only `src/providers` imports pi-ai). */
-export type CatalogueModel = ReturnType<Parameters<typeof createOpenRouter>[0]['models']>[number]
+export type CatalogueModel = ReturnType<Parameters<typeof createProviderTransport>[1]>[number]
 
 const SONNET: ModelRef = { provider: 'openrouter', modelId: 'anthropic/claude-sonnet-5.5' }
 const HAIKU: ModelRef = { provider: 'openrouter', modelId: 'anthropic/claude-haiku-5.5' }
@@ -28,7 +28,11 @@ export function openRouterBackend(chat: CatalogueModel, helper: CatalogueModel, 
   return {
     model: { provider: chat.provider, modelId: chat.id },
     helper: { provider: helper.provider, modelId: helper.id },
-    provider: (store) => createOpenRouter({ store, models: () => models, apiKey }),
+    provider: (store) => {
+      const connection = providerConnection()
+      void apiKey().then((key) => connection.set(key ? { _tag: 'openRouter', key } : null))
+      return createProviderGuard({ store, transport: createProviderTransport(connection, () => models) })
+    },
   }
 }
 

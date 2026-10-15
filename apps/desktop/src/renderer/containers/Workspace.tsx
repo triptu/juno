@@ -4,7 +4,7 @@ import type { TopicDetail } from '@juno/contract'
 import {
   activeTab,
   currentPlace,
-  junoAgentOnAtom,
+  junoAvailableAtom,
   junoPanelOpenAtom,
   mountedTabs,
   onMenuCommand,
@@ -146,7 +146,7 @@ export function Workspace() {
   const sidebarHidden = useAtomValue(sidebarLayoutAtom, (layout) => layout.collapsed)
   const mounted = mountedTabs(state)
   // The Juno panel shows beside a topic tab while it is open, and never on a page (SPEC 7).
-  const agentOn = useAtomValue(junoAgentOnAtom)
+  const agentOn = useAtomValue(junoAvailableAtom)
   const panelOpen = useAtomValue(junoPanelOpenAtom)
   const panelTopic = useAtomValue(tabsAtom, activeTopicOf)
 
@@ -160,7 +160,7 @@ export function Workspace() {
     const idle = requestIdleCallback(
       () => {
         void loadAllTopicsPage()
-        if (registry.get(junoAgentOnAtom)) void loadJuno()
+        if (registry.get(junoAvailableAtom)) void loadJuno()
       },
       { timeout: 5_000 },
     )

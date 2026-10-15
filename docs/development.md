@@ -190,17 +190,24 @@ state client to it over a `worker_threads` `MessageChannel`, with `memoryHost()`
 place of main and Node `fetch` in place of `net.fetch`. Under `JUNO_E2E=1` main
 exposes `globalThis.junoTest` (engine pid and supervisor state) for Playwright.
 
-With `JUNO_AGENT=1` (for example `JUNO_AGENT=1 pnpm dev`), main also forks the Juno
+Whenever a model provider is set up in Settings › Juno, main also forks the Juno
 Agent utility process (`src/main/agent.ts`, built from `src/agent/index.ts` to
 `out/main/agent.js`) without the Slack partition, and on every engine `ready` brokers
-a port between the agent and the engine's AgentHost server (ADR 0012). It stays off
-by default until the chat ships. The agent's OpenRouter key is the one saved in
-Settings › Juno, kept in the login keychain as the generic password
-`juno-openrouter-key`; `OPENROUTER_API_KEY` in the environment overrides it for
-development. Delete the item with `security delete-generic-password -s
-juno-openrouter-key` to start again with no key. Under `JUNO_E2E` the key is kept in
-memory, and `JUNO_FAKE_OPENROUTER_URL` points the agent at `startFakeOpenRouter()`
-from `@juno/agent-testing/openrouter`. The spike scripts behind the agent's design are in
+a port between the agent and the engine's AgentHost server (ADR 0012). With no
+provider it does not run. The providers are OpenRouter, with its key in the login
+keychain as the generic password `juno-openrouter-key`, and one OpenAI-compatible
+endpoint (for example Ollama at `http://localhost:11434/v1`), with its optional key
+as `juno-custom-provider-key` and its base URL and the active provider in
+`<userData>/juno-provider.json` (`src/main/providers.ts`). `OPENROUTER_API_KEY` in
+the environment sets OpenRouter up for development (for example
+`OPENROUTER_API_KEY=… pnpm dev`). To start again with no provider, delete both items
+(`security delete-generic-password -s juno-openrouter-key`, and the same for
+`juno-custom-provider-key`) and the file. Under `JUNO_E2E` the keys are kept in
+memory, `JUNO_E2E_OPENROUTER_KEY` sets OpenRouter up at launch (the fixtures'
+`agent: true`), and `JUNO_FAKE_OPENROUTER_URL` points the agent at
+`startFakeOpenRouter()` from `@juno/agent-testing/openrouter`; `startFakeOpenAi()`
+from `@juno/agent-testing/openai` is an endpoint to set up through
+`window.juno.agent.setProvider`. The spike scripts behind the agent's design are in
 `docs/juno-agent/spikes/`, with their results in `docs/juno-agent/spikes.md`.
 
 ## Sign-in and the live smoke

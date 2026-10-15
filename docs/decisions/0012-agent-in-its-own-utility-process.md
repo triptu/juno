@@ -15,7 +15,7 @@ Juno Agent (`docs/juno-agent/plan-v3.md`) is a portable assistant: it should be 
 - Main keeps what needs Electron: the keychain, OAuth windows (pi-mcp does not open a browser) and OS notifications. These become parentPort requests from the agent in WP13, like the engine's.
 - The renderer will get its own port to the agent for the chat (WP13), so chat traffic does not pass through the engine.
 - `check-deps` enforces the boundary: no agent package imports or declares Electron or a Slack package; the core also stays away from the store, sync, engine and UI packages; pi-durable, pi-mcp, pi-ai and the Codex SDK are each imported from one folder of `@juno/agent`; the agent entry imports no engine or Slack code.
-- Until the chat ships (M2), main starts the agent only when `JUNO_AGENT=1`, so app startup is unchanged.
+- Main starts the agent only while a model provider is set up (owner decision 10-15; until then it took `JUNO_AGENT=1`), so app startup with no provider is unchanged.
 
 ## Alternatives
 

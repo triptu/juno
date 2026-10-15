@@ -14,7 +14,7 @@ import type { Page } from '@playwright/test'
 import { largeSeed, startFakeSlack, topic300Seed, TOPIC300_MAIN_CHANNEL, TOPIC300_THREAD_CHANNEL, type FakeSlack } from '@juno/fake-slack'
 import { startFakeOpenRouter, type FakeOpenRouter } from '@juno/agent-testing/openrouter'
 import { expect, hooks, launchApp, tempUserData, test, writeSlackApp, type RunningApp, type SlackAppFixture } from './fixtures'
-import { answer, setOpenRouterKey } from './juno-agent/chat'
+import { answer } from './juno-agent/chat'
 import { Juno, press, type SidebarFilterName } from './driver/juno'
 
 test.skip(process.env['JUNO_PERF'] !== '1', 'set JUNO_PERF=1 to measure')
@@ -985,7 +985,6 @@ test.describe.serial('Juno chat', () => {
   test('send to your bubble and to the first answer, ⌘J to the panel, and scroll the chat', async () => {
     test.setTimeout(600_000)
     const running = await launch()
-    await setOpenRouterKey(running)
     const { win } = running
     const juno = new Juno(running.app, win)
     try {
