@@ -1762,9 +1762,11 @@ export class PaletteDriver {
 
   /** The text of the row the arrows or the pointer chose. */
   async activeText(): Promise<string> {
-    const id = await this.input.getAttribute('aria-activedescendant')
-    if (id === null) return ''
-    return (await this.root.locator(`[id="${id}"]`).innerText()).replace(/\s+/g, ' ').trim()
+    return this.input.evaluate((input) => {
+      const id = input.getAttribute('aria-activedescendant')
+      const row = id === null ? null : input.ownerDocument.getElementById(id)
+      return (row?.innerText ?? '').replace(/\s+/g, ' ').trim()
+    })
   }
 
   async expectActive(text: string | RegExp): Promise<void> {
