@@ -59,10 +59,10 @@ export async function addServer(juno: Juno, name: string, url: string): Promise<
   return { id, row }
 }
 
-/** Moves one of a server's tools to Read ("Needs no click") and waits for the agent to keep it. */
+/** Moves one of a server's tools to Read ("Runs without asking") and waits for the agent to keep it. */
 export async function makeRead(row: Locator, tool: string): Promise<void> {
   const item = row.locator(`[data-tool="${tool}"]`)
-  await item.getByLabel('Needs no click').click()
+  await item.getByLabel('Runs without asking').click()
   await expect(item).toHaveAttribute('data-tool-tier', '0')
 }
 

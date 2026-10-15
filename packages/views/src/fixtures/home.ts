@@ -35,7 +35,7 @@ export const homeItems = {
   automated: {
     id: 'automated:C0RELEASES',
     kind: 'automated',
-    title: 'Move #releases to Automated?',
+    title: 'Move #releases?',
     topics: [releases],
     at: NOW - 35 * MINUTE,
     channel: { id: 'C0RELEASES', kind: 'public', name: 'releases', label: '#releases', tint: 'public', icon: 'rocket', color: 'cyan' },

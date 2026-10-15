@@ -38,8 +38,8 @@ function ChipRemoval() {
 
 const route: SendCheckFinding = { kind: 'route', title: 'Staging bill doubled since August' }
 const fixes: SendCheckFinding = { kind: 'clarity', fixes: ['recieve → receive', 'the the → the', 'add ?'] }
-const routeBar = <SendCheckBar finding={route} confidence={0.97} onPrimary={noop} onSecondary={noop} />
-const clarityBar = <SendCheckBar finding={fixes} confidence={0.9} onPrimary={noop} onSecondary={noop} />
+const routeBar = <SendCheckBar finding={route} onPrimary={noop} onSecondary={noop} />
+const clarityBar = <SendCheckBar finding={fixes} onPrimary={noop} onSecondary={noop} />
 const audience = <AudienceWarning message="This reads like hiring or people detail. eng is a public channel." />
 
 /**
