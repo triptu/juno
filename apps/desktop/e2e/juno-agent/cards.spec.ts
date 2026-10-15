@@ -65,7 +65,7 @@ test.fixme(
     fake.forceError({ method: 'chat.postMessage', error: 'channel_not_found', times: 1 })
     await sendCard.getByRole('button', { name: 'Send', exact: true }).click()
 
-    await expect(sendCard).toHaveAttribute('data-card-status', 'failed', { timeout: 15_000 })
+    await expect(sendCard).toHaveAttribute('data-card-status', 'done', { timeout: 15_000 })
     await expect(sendCard.getByText('Sent 1 of 2', { exact: true })).toBeVisible()
     const sent = sendCard.locator('[data-send-row="sent"]')
     const failed = sendCard.locator('[data-send-row="failed"]')

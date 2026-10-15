@@ -74,4 +74,3 @@ test('an unknown tool is Tier 3 and proposes a card until it is moved to Needs n
   // The second call ran with no click: still only the first card.
   await expect(card(after, 'change')).toHaveCount(1)
 })
-

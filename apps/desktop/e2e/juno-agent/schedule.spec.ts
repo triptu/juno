@@ -276,13 +276,15 @@ test.fixme('quiet hours hold the schedule notification only, and the wake still 
     for (const day of ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']) {
       await next.juno.notifications.day('Notifications', day).click()
     }
-    await next.juno.notifications.setFrom('Notifications', '12am')
-    await next.juno.notifications.setTo('Notifications', '11:59pm')
+    const hour = new Date().getHours()
+    const label = (value: number) => `${value % 12 || 12}${value < 12 ? 'am' : 'pm'}`
+    await next.juno.notifications.setFrom('Notifications', label((hour + 23) % 24))
+    await next.juno.notifications.setTo('Notifications', label((hour + 2) % 24))
     await expect.poll(() => next.juno.osNotifications()).toContainEqual(expect.objectContaining({ body: expect.stringContaining('launch checklist') }))
   } finally { await next.running.close() }
 })
 
- test.fixme('"Tell me if nobody replies" on a message watches it and a reply ends the watch', async ({ juno, slack }) => {
+test.fixme('"Tell me if nobody replies" on a message watches it and a reply ends the watch', async ({ juno, slack }) => {
   // messageActions.tsx does not yet offer the reply-watch command.
   await ready(juno)
   await juno.sidebar.row(POSTGRES).open()
