@@ -144,6 +144,44 @@ test('a message over the size limit stays in the chat, marked too long, and neve
   expect(model.inputs()).toEqual([])
 })
 
+test('a storage failure keeps the message as Not delivered, and Try again stores it once', async ({ juno, model, userData }) => {
+  await ready(juno)
+  const chat = await openChat(juno)
+  const db = new DatabaseSync(join(userData, 'agent', 'agent.sqlite'))
+  try {
+    db.exec("PRAGMA busy_timeout = 10000")
+    // Fail only this inbox write; the real RPC must report the failed commit to the UI.
+    db.exec("CREATE TRIGGER fail_test_send BEFORE INSERT ON inbox WHEN NEW.text = 'keep my unsent message' BEGIN SELECT RAISE(FAIL, 'test storage failure'); END")
+    await chat.send('keep my unsent message')
+    const owner = chat.ownerBubble('keep my unsent message')
+    await expect(owner.locator('[data-delivery="failed"]')).toContainText(chatCopy.delivery.notDelivered)
+    expect(model.inputs()).toEqual([])
+    expect(db.prepare("SELECT count(*) AS count FROM inbox WHERE text = 'keep my unsent message'").get()?.count).toBe(0)
+
+    db.exec('DROP TRIGGER fail_test_send')
+    await owner.getByRole('button', { name: 'Try again' }).click()
+    await chat.expectJuno('You said: keep my unsent message')
+    await expect(owner).toHaveCount(1)
+    await expect(owner.locator('[data-delivery]')).toHaveCount(0)
+    expect(db.prepare("SELECT count(*) AS count FROM inbox WHERE text = 'keep my unsent message'").get()?.count).toBe(1)
+  } finally {
+    db.exec('DROP TRIGGER IF EXISTS fail_test_send')
+    db.close()
+  }
+})
+
+test('a message at the send limit is kept when request framing makes it too large', async ({ juno, model }) => {
+  await ready(juno)
+  const chat = await openChat(juno)
+  // The composer accepts 65,536 bytes, but the active request must also fit its framing.
+  const text = 'x'.repeat(65_536)
+  await chat.send(text)
+  await expect(chat.root.locator('[data-chat-ending]')).toHaveText(chatCopy.ending.blocked.tooLarge, { timeout: 15_000 })
+  await expect(chat.ownerBubble(text)).toHaveCount(1)
+  await expect(chat.root.locator('[data-delivery="failed"]')).toHaveCount(0)
+  expect(model.inputs()).toEqual([])
+})
+
 test('with a $0 daily cap a message brings the Budget card', async ({ juno, model }) => {
   await ready(juno)
   const settings = await openPage(juno, 'Settings › Juno')
