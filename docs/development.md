@@ -431,6 +431,8 @@ An import graph over `apps/` and `packages/` decides what each change reaches: r
 | Only e2e spec files | `pnpm test:desktop <those files>` |
 | Documentation only | nothing |
 
+**Results cache.** Each unit test file, gallery component (plus one item for the behaviour tests) and desktop e2e spec file is an item with a key: a hash of every file it reaches, its package and suite configs, and the lockfile. After a step passes, its items' keys are recorded in the system temp folder (`juno-cache/results`), shared by every worktree, whether the step ran here or remotely. An item whose key passed before is skipped and counted in the plan; `--no-cache` runs everything. `specs:check` keeps its own cache per Quint run. A failing step records nothing.
+
 `perf` and `test:feel` never run here; the plan reminds you to run them on the Mac when the renderer or a view changed. The graph errs towards running more: a module imported whole (`import x from`, `import * as`) brings everything it imports. A test whose behaviour depends on a file it does not import (a fixture read from disk, an environment variable) is not seen; the scheduled full run on `main` catches that.
 
 ## Remote runs
@@ -444,18 +446,22 @@ An import graph over `apps/` and `packages/` decides what each change reaches: r
 - **Cap.** Machines in use and idle stay within `JUNO_REMOTE_MAX_VCPU` (default 64 vCPU, four 16x32 machines: the Team plan's Linux limit). A run waits while the pool is full and says so. An idle machine of another shape is destroyed to make room.
 - **Cost.** A 16x32 machine costs about $0.016 a minute. The cap bounds the spend at about $1 an hour with every machine busy; idle machines live at most 10 minutes. `--keep` leaves a machine up outside the pool for `nsc ssh <id>`.
 - **Setup.** `brew install namespacelabs/namespace/nsc` and `nsc login` once on the Mac. No credentials live in the repo.
-- **Timings** (2026-10-15, current main). Local times are with a free slot, before any queue wait.
+- **Timings** (2026-10-15, 16x32). Local times are with a free slot, before any queue wait. A new machine adds about 20 s to create and 45 s to pull the image; a warm one adds about 10 s.
 
-  | Script | Local (Mac) | Remote, end to end | Remote, script only | Remote CPU busy |
-  | --- | --- | --- | --- | --- |
-  | `test` | 160 s | 145 to 223 s (8x16; 223 s included an image build) | about 100 s | not measured yet |
-  | `specs:check` | 629 s (614 to 645 s in other agents' logs) | 214 s (16x32) | 99.6 s | 87% of 16 cores |
-  | `test:agent`, `test:agent-contracts`, `test:agent-testing` | about 50 s, 5 s, 5 s | 84 s, 69 s, 65 s (8x16) | 18 s, 2 s, 2 s | 22 to 30% |
-  | `test:gallery` | 16.4 min (13.7 to 18.5 min in other agents' logs) | 163 to 193 s (16x32) | 1.4 min | 30 to 36% of 16 cores |
-  | `test:desktop` | 2.9 min plus the build | 124 to 134 s (16x32) | 25 s | not measured |
-  | `test:e2e` (both) | 19.7 min | about 4 min (16x32) | | |
+  | Script | Local (Mac) | Remote, new machine | Remote, warm machine | Script only | CPU busy |
+  | --- | --- | --- | --- | --- | --- |
+  | `test` | 160 s | 225 s | 107 s | about 85 s (the engine's `sync.test.ts` alone is about 60 s) | 8% |
+  | `specs:check`, nothing cached | 629 s (614 to 645 s in other agents' logs) | 214 s | 120 s | 82 to 100 s | 87% |
+  | `specs:check --shards 2` | | | | 68 and 72 s per shard | 80 to 84% |
+  | `specs:check`, all cached | | | 39 s | 0.2 s | |
+  | `test:agent-contracts` | about 5 s | 190 s | 14 to 21 s | 2 s | 12% |
+  | `test:gallery` | 16.4 min (13.7 to 18.5 min in other agents' logs) | 153 s | 85 s | 53 s | 30 to 36% |
+  | `test:desktop` | 2.9 min plus the build | 261 s | 124 s | 25 s | 31% |
 
-  About 20 s of each remote run is creating the machine and 45 s pulling the image.
+  The slowest Apalache check (about 50 to 70 s with the server start) is the floor of a spec check, so `--shards 2` saves about 20 s and more shards save nothing; it is not the default.
+- **Shards.** `pnpm remote --shards n <script>` runs the script on n machines at once with `JUNO_SHARD=i/n`; `specs:check` keeps its share of the jobs (dealt by expected cost, typechecks on every shard).
+- **Spec cache.** A remote spec check takes the Mac's cache of passing Quint runs along (staged in `.remote/`) and brings back what it adds, so a check that passed anywhere is not run again.
+- **Dials.** About one dial in four to Namespace's SSH gateway fails from this network and nsc takes 16 s to give up. The remote command prints a start line first; with none after 8 s, the run dials again (up to six times).
 - **`--dry-run`** prints the steps without creating anything.
 
 ## Heavy jobs share one queue
