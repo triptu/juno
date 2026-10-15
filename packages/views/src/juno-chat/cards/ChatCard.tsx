@@ -88,12 +88,13 @@ export function ChatCard({ id, kind, actions, label, source, status, because, di
         <div {...stylex.props(styles.footer)}>
           {status === undefined || open || working ? (
             <div aria-disabled={working || undefined} {...stylex.props(styles.buttons, working && styles.working)}>
-              {buttons}
+              {/* The default button last, at the trailing edge, as on the Mac: Dismiss before the card's own buttons. */}
               {dismiss ? (
                 <Button variant="ghost" size="md" tone="subtle" onClick={() => actions.onCard(id, { _tag: 'dismiss' })}>
                   {chatCopy.card.dismiss}
                 </Button>
               ) : null}
+              {buttons}
             </div>
           ) : (
             <AfterLine id={id} status={status} actions={actions} />

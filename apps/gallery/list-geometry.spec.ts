@@ -75,3 +75,26 @@ test('two-line picker rows are 44px, and Main’s title starts on the threads’
     expect(new Set(rows.map((row) => row.titleStart)).size, id).toBe(1)
   }
 })
+
+test('a Juno card’s default button is the last, at the trailing edge, as on the Mac', async ({ page }) => {
+  const states = [
+    ['ChangeCard', 'change/open'],
+    ['ConnectCard', 'connect/open'],
+    ['BudgetCard', 'budget/open'],
+    ['ScheduleCard', 'schedule/open'],
+    ['ProposedTaskCard', 'proposed-task/open'],
+    ['TaskCard', 'task/lost-sight'],
+    ['RemoveCard', 'remove/open'],
+  ] as const
+  for (const [component, id] of states) {
+    await open(page, component, id)
+    const buttons = await page.evaluate(() =>
+      [...document.querySelectorAll('[data-chat-card] button')]
+        .filter((button) => button.getAttribute('aria-label') === null)
+        .map((button) => getComputedStyle(button).backgroundColor !== 'rgba(0, 0, 0, 0)'),
+    )
+    expect(buttons.length, id).toBeGreaterThan(1)
+    // Only the default button is filled, and it comes last.
+    expect(buttons.indexOf(true), id).toBe(buttons.length - 1)
+  }
+})
