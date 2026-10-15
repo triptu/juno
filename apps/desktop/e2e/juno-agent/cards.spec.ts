@@ -49,9 +49,8 @@ const test = base.extend<{ readonly model: ScriptedModel }>({
 
 test.describe.configure({ timeout: 150_000 })
 
-test.fixme(
+test(
   'a multi-send card where one post fails says "Sent 1 of 2", the failed row says Failed with no button, and Activity has both',
-  // Slack writes are refused: packages/engine/src/startEngine.ts:61 defaults agentWrites to disabled and apps/desktop/src/engine/index.ts:80 never sets it.
   async ({ juno, fake, slack }) => {
     await ready(juno)
     const eng = slack.channel('eng')

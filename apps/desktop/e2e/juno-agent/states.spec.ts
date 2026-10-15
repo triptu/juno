@@ -211,9 +211,7 @@ test('offline, the chat shows the chip and its composer still works, and the chi
   await expect(chip).toHaveCount(0, { timeout: 30_000 })
 })
 
-test.fixme('offline, a message waits for the network and runs once back', async ({ juno, fake }) => {
-  // Blocked: packages/agent/src/runtime/core.ts:165 starts a run whenever the mode is `on`, offline or not, so the
-  // message runs at once and "Waiting for network" never shows.
+test('offline, a message waits for the network and runs once back', async ({ juno, fake }) => {
   await ready(juno)
   const chat = await openChat(juno)
   fake.goOffline()

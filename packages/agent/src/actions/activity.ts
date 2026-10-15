@@ -1,6 +1,6 @@
 /**
  * The actions under a run on the Activity page (plan v3 §13.3; SPEC 13.9):
- * each card the run proposed with the decision made about it and its
+ * each action the run proposed with the decision made about it and its
  * outcome, and each job the run started with no click. An open card has no
  * decision yet and is not listed. A failure is in plain words; what the
  * destination said is behind "Copy details".
@@ -46,18 +46,19 @@ function labelOf(payload: CardPayload): string {
 const tierOf = (payload: CardPayload): 1 | 2 | 3 =>
   'action' in payload ? payload.action.tier : 3
 
-function cardAction(store: Store, card: CardRow): ActivityAction | undefined {
-  const payload = payloadOf(store, card)
+type SendChild = Extract<CardPayload, { _tag: 'sendMessage' }>['messages'][number]
+
+function cardAction(store: Store, card: CardRow, payload: CardPayload, child?: SendChild): ActivityAction | undefined {
   const approvals = store.db.prepare('SELECT refused FROM approvals WHERE card_id = ?').all(card.id) as Array<{ refused: string | null }>
-  const base = { id: card.id, tier: tierOf(payload), label: labelOf(payload) }
+  const base = { id: child?.actionId ?? card.id, tier: tierOf(payload), label: child === undefined ? labelOf(payload) : `Message to ${child.target.name}` }
   if (card.dismissed_at !== null) return { ...base, decision: 'dismissed', outcome: 'none' }
   const refused = approvals.find((a) => a.refused !== null)?.refused
   const auths = store.db
     .prepare(
       `SELECT authorizations.outcome, action_results.detail FROM authorizations JOIN intents ON intents.id = authorizations.intent_id
-       LEFT JOIN action_results ON action_results.authorization_id = authorizations.id WHERE intents.card_id = ? ORDER BY consumed_at`,
+       LEFT JOIN action_results ON action_results.authorization_id = authorizations.id WHERE intents.card_id = ? AND (? IS NULL OR intents.action_id = ?) ORDER BY consumed_at`,
     )
-    .all(card.id) as Array<{ outcome: Outcome; detail: string | null }>
+    .all(card.id, child?.actionId ?? null, child?.actionId ?? null) as Array<{ outcome: Outcome; detail: string | null }>
   if (approvals.length === 0 && auths.length === 0) return expiry(store, card, store.now()) === undefined ? undefined : { ...base, decision: 'expired', outcome: 'none' }
   const decision = approvals.length === 0 ? 'noClick' : 'approved'
   if (auths.length === 0 && refused != null) {
@@ -76,8 +77,12 @@ function cardAction(store: Store, card: CardRow): ActivityAction | undefined {
 export function activityActions(store: Store, runId: string): ReadonlyArray<ActivityAction> {
   const cards = (store.db.prepare("SELECT id FROM cards WHERE run_id = ? AND kind NOT IN ('topics', 'task') ORDER BY created_at, id").all(runId) as Array<{ id: string }>)
     .flatMap(({ id }) => {
-      const action = cardAction(store, cardRow(store, id)!)
-      return action === undefined ? [] : [{ at: cardRow(store, id)!.created_at, action }]
+      const card = cardRow(store, id)!
+      const payload = payloadOf(store, card)
+      const actions = payload._tag === 'sendMessage'
+        ? payload.messages.map((child) => cardAction(store, card, payload, child))
+        : [cardAction(store, card, payload)]
+      return actions.flatMap((action) => action === undefined ? [] : [{ at: card.created_at, action }])
     })
   // A job a clean owner run started with no click.
   const jobs = (store.db
