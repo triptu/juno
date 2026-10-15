@@ -61,3 +61,4 @@ Small items noticed during work that are not yet assigned to a milestone. Remove
 - Home: Ask Juno does nothing until the renderer has a Juno tab (`askJuno` in `containers/Home.tsx`; the Juno Agent wiring opens it there, and ⌘J); the field does not show `jobLine` yet.
 - Home: "muted" in SPEC 12 is read as a thread set to Never (not followed); a DM whose Notify me is Never can still show. Use the notification levels once they are in the store.
 - Home: `for_you_cards` (user.db) is unused; drop it in a migration when the schema is next touched.
+- Juno Agent T3: a Task Stop that cannot be built does nothing visible; show a short failure line on the card. A second T3 question that arrives while a session already waits sends no new report.
