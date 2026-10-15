@@ -23,7 +23,7 @@ Run these from the repo root.
 | `pnpm dev` | Starts electron-vite with HMR for the renderer and reload for main and preload. |
 | `pnpm build` | Builds main, preload and renderer into `apps/desktop/out/`, then checks the renderer bundle size. |
 | `pnpm typecheck` | Typechecks every tsc project (each package's configs and `scripts/tsconfig.json`), skipping the ones whose inputs passed before; see "Typecheck". |
-| `pnpm lint` | Runs oxlint, the `cursor: pointer` check, then `check-deps`. |
+| `pnpm lint` | Runs oxlint, cursor and token checks, dependency and fixture checks, and the health ratchet. |
 | `pnpm check-deps` | The package graph and the import rules in `docs/architecture.md` section 3. Part of `pnpm lint`; run it alone for a quicker loop. |
 | `pnpm health` | Reports unused code and dependencies, duplication, and large files and functions. Writes `.juno-status/health.json`. |
 | `pnpm test` | Runs every package's vitest suite (`packages/*/test`). |
@@ -473,7 +473,7 @@ Effect and StyleX pitfalls are in their skills: `.claude/skills/effect/SKILL.md`
 
 ## Typecheck
 
-The repo uses TypeScript 7.0.2, the native compiler (`tsc` from the `typescript` package hands over to a platform binary). TypeScript 7 offers no JS API like `ts.createSourceFile`; `scripts/health-size.mjs`, the only code that needs it, imports `typescript-5` (an alias for 5.9.3, a root devDependency, used for nothing else). No other tool loads TypeScript: Vite, electron-vite and vitest transpile with esbuild, StyleX, the React Compiler and Playwright with Babel, oxlint and knip parse natively, and Quint does not use it. No tsconfig loads a language-service plugin.
+The repo uses TypeScript 7.0.2, the native compiler (`tsc` from the `typescript` package hands over to a platform binary). TypeScript 7 offers no JS API like `ts.createSourceFile`; `scripts/health-size.mjs`, and `scripts/check-tokens.mjs` import `typescript-5` (an alias for 5.9.3, a root devDependency, used by these checks). No other tool loads TypeScript: Vite, electron-vite and vitest transpile with esbuild, StyleX, the React Compiler and Playwright with Babel, oxlint and knip parse natively, and Quint does not use it. No tsconfig loads a language-service plugin.
 
 Packages ship TypeScript source, so each package's `tsc -p` also checks the source of every workspace package it depends on, and 29 projects repeat much of the same work. `pnpm typecheck` (`scripts/typecheck.mjs`) runs the same projects with the same tsconfigs, so the rules are unchanged, but:
 
@@ -716,3 +716,15 @@ strip `ELECTRON_RUN_AS_NODE` remain useful with the unmodified development
 Electron. Playwright's Electron launcher needs Node inspection and cannot drive
 the hardened package; the packaged smoke instead uses Chromium CDP. The
 `JUNO_E2E` fake-server seams remain available independently of the Node fuses.
+
+## StyleX token check
+
+`pnpm lint` runs `node scripts/check-tokens.mjs` over `packages/ui`,
+`packages/views` and the desktop renderer. It parses StyleX `create` calls,
+including aliased imports and nested conditions. Raw CSS colours, px/rem/em
+lengths (also inside templates and calc), and numeric length properties fail.
+Zero, percentages, unitless values, token references and 1px border/outline
+hairlines pass. Named component constants and runtime style parameters are
+not evaluated. For a real geometry exception, put `// tokens-allow: reason`
+after the declaration on the same line; an empty reason does not pass.
+Run the rule tests with `node --test scripts/check-tokens.test.mjs`.
