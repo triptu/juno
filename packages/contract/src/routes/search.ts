@@ -106,7 +106,7 @@ const commandFields = {
 
 export const PaletteCommand = Schema.Union([
   Schema.Struct({ kind: Schema.Literal('send-dm'), userId: Schema.String, text: Schema.String, place: Schema.String, ...commandFields }),
-  Schema.Struct({ kind: Schema.Literal('open-dm'), userId: Schema.String, mainId: Schema.optionalKey(Schema.String), ...commandFields }),
+  Schema.Struct({ kind: Schema.Literal('open-dm'), userId: Schema.String, person: Person, mainId: Schema.optionalKey(Schema.String), ...commandFields }),
   Schema.Struct({ kind: Schema.Literal('post'), channelId: Schema.String, text: Schema.String, place: Schema.String, ...commandFields }),
   Schema.Struct({ kind: Schema.Literal('ask'), prompt: Schema.String, ...commandFields }),
   Schema.Struct({ kind: Schema.Literal('resolve'), topicId: Schema.String, title: Schema.String, ...commandFields }),

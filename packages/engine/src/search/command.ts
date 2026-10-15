@@ -13,6 +13,7 @@ import { describeCommand, firstWords, mainLabel, mainTopicId, parseCommand, type
 import { StoreReader, type SqlClient } from '@juno/store'
 import { Effect } from 'effect'
 import { aiAssistOn } from '../ai'
+import { personFrom, userName, type UserRow } from '../topicRows'
 
 /** Text with fewer words never reaches the model. */
 export const MODEL_MIN_WORDS = 3
@@ -26,12 +27,13 @@ const MODEL_LIST_MAX = 40
 interface Context extends CommandContext {
   /** DM channel by person, for those with a DM Main. */
   readonly dms: ReadonlyMap<string, string>
+  readonly users: ReadonlyMap<string, UserRow>
 }
 
 const readContext = (sql: SqlClient.SqlClient) =>
   Effect.gen(function* () {
-    // People you talk to most recently come first: the grammar breaks first-name ties by this order.
-    const people = yield* sql<{ id: string; name: string; dm: string | null }>`SELECT u.id, COALESCE(NULLIF(u.display_name, ''), u.real_name, u.name, u.id) AS name, d.id AS dm
+    // Full names, as labels say them ("Send to Maya Chen"). People you talk to most recently come first: the grammar breaks first-name ties by this order.
+    const people = yield* sql<UserRow & { readonly dm: string | null }>`SELECT u.id, u.name, COALESCE(NULLIF(u.real_name, ''), NULLIF(u.display_name, '')) AS display_name, u.real_name, u.avatar_url, d.id AS dm
       FROM users u
       LEFT JOIN conversations d ON d.kind = 'im' AND d.user_id = u.id AND d.is_member = 1
       LEFT JOIN topic_index t ON t.topic_id = 'm:' || d.id
@@ -51,15 +53,16 @@ const readContext = (sql: SqlClient.SqlClient) =>
       ORDER BY i.last_activity_ts DESC LIMIT ${RESOLVABLE_TOPICS}`
     const dms = new Map<string, string>()
     for (const person of people) if (person.dm !== null && !dms.has(person.id)) dms.set(person.id, person.dm)
-    const unique = new Map(people.map((person) => [person.id, person]))
+    const users = new Map<string, UserRow>(people.map((person) => [person.id, person]))
     return {
-      people: [...unique.values()].map((person) => ({ id: person.id as UserId, name: person.name })),
+      people: [...users.values()].map((person) => ({ id: person.id as UserId, name: userName(person.id, person) })),
       channels: channels.map((c): ChannelInfo => ({ id: c.id as ChannelId, kind: c.kind, name: c.name ?? c.id })),
       topics: topics.map((t) => {
         const channel: ChannelInfo = { id: t.channel as ChannelId, kind: t.c_kind, name: t.c_name ?? t.channel }
         return { id: t.id as TopicId, title: t.kind === 'main' ? mainLabel(channel) : t.named || firstWords(t.title) || t.c_name || t.channel, channel }
       }),
       dms,
+      users,
     } satisfies Context
   })
 
@@ -95,7 +98,7 @@ function toWire(command: Command, ctx: Context): PaletteCommand {
       return { ...base, kind: 'send-dm', userId: command.userId, text: command.text, place: ctx.people.find((p) => p.id === command.userId)?.name ?? command.userId }
     case 'open-dm': {
       const dm = ctx.dms.get(command.userId)
-      return { ...base, kind: 'open-dm', userId: command.userId, ...(dm === undefined ? {} : { mainId: mainTopicId(dm as ChannelId) }) }
+      return { ...base, kind: 'open-dm', userId: command.userId, person: personFrom(command.userId, ctx.users.get(command.userId)), ...(dm === undefined ? {} : { mainId: mainTopicId(dm as ChannelId) }) }
     }
     case 'post':
       return { ...base, kind: 'post', channelId: command.channelId, text: command.text, place: `#${ctx.channels.find((c) => c.id === command.channelId)?.name ?? command.channelId}` }

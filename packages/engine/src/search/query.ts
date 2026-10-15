@@ -1,5 +1,6 @@
 import { SEARCH_LIMIT_MAX, SEARCH_PLACES_MAX, type SearchMessage, type SearchPlace, type SearchResult } from '@juno/contract'
 import { firstWords, mainLabel, mainTopicId, threadTopicId, tsToMillis, type ChannelId, type ConversationKind, type Ts } from '@juno/domain'
+import { messageBody, plainText } from '@juno/richtext'
 import { ftsQuery, StoreReader, type SqlClient } from '@juno/store'
 import { Effect } from 'effect'
 import { channelInfoOf, channelRefOf, parseIds, personFrom, userName, type UserRow } from '../topicRows'
@@ -50,7 +51,8 @@ export function searchStatements(sql: SqlClient.SqlClient, query: string, limit:
   const channels = sql<{ id: string; main: 0 | 1 }>`SELECT c.id, EXISTS (SELECT 1 FROM topic_index t WHERE t.topic_id = 'm:' || c.id) AS main
     FROM channels_fts f JOIN conversations c ON c.rowid = f.rowid LEFT JOIN ignored_channels g ON g.channel = c.id
     WHERE channels_fts MATCH ${query} AND c.is_member = 1 AND g.channel IS NULL ORDER BY f.rank, c.id LIMIT ${places}`
-  const people = sql<UserRow & { readonly dm: string | null }>`SELECT u.id, u.name, NULLIF(u.display_name, '') AS display_name, u.real_name, u.avatar_url,
+  // The full name first: search is for telling apart people who share a first name.
+  const people = sql<UserRow & { readonly dm: string | null }>`SELECT u.id, u.name, COALESCE(NULLIF(u.real_name, ''), NULLIF(u.display_name, '')) AS display_name, u.real_name, u.avatar_url,
       (SELECT d.id FROM conversations d WHERE d.kind = 'im' AND d.user_id = u.id AND d.is_member = 1
         AND EXISTS (SELECT 1 FROM topic_index t WHERE t.topic_id = 'm:' || d.id) LIMIT 1) AS dm
     FROM people_fts f JOIN users u ON u.rowid = f.rowid WHERE people_fts MATCH ${query} AND u.deleted = 0 ORDER BY f.rank, u.id LIMIT ${places}`
@@ -134,7 +136,13 @@ export const messageResults = (
         COALESCE(json_extract(i.preview_json, '$.rootText'), '') AS title
       FROM topic_index i LEFT JOIN topic_overlay o ON o.topic_id = i.topic_id WHERE i.topic_id IN ${sql.in(topicIds)}`) titles.set(row.id, row)
     const places = yield* readPlaces(sql, new Set(hits.map((hit) => hit.channel)))
-    const users = yield* readUsers(sql, new Set(hits.flatMap((hit) => (hit.user_id === null ? [] : [hit.user_id]))))
+    const mentioned = (pattern: RegExp) => hits.flatMap((hit) => [...hit.text.matchAll(pattern)].map((match) => match[1] as string))
+    const users = yield* readUsers(sql, new Set([...hits.flatMap((hit) => (hit.user_id === null ? [] : [hit.user_id])), ...mentioned(/<@([A-Z0-9]+)/g)]))
+    const channelIds = [...new Set(mentioned(/<#([A-Z0-9]+)/g))]
+    const channelNames = new Map(
+      channelIds.length === 0 ? [] : (yield* sql<{ id: string; name: string | null }>`SELECT id, name FROM conversations WHERE id IN ${sql.in(channelIds)}`).map((row) => [row.id, row.name ?? row.id]),
+    )
+    const lookups = { user: (id: string) => (users.has(id) ? userName(id, users.get(id)) : undefined), channel: (id: string) => channelNames.get(id) }
     return hits.map((hit): SearchMessage => {
       const place = placeOf(places, hit.channel)
       const known = titles.get(hit.topicId)
@@ -148,7 +156,7 @@ export const messageResults = (
         ts: hit.ts,
         place,
         sender: hit.user_id === null ? (hit.username ?? '') : userName(hit.user_id, users.get(hit.user_id)),
-        text: oneLine(hit.text),
+        text: oneLine(plainText(messageBody({ text: hit.text }, lookups))),
         stored: hit.stored,
       }
     })
