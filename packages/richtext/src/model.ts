@@ -63,8 +63,6 @@ export interface Lookups {
   readonly emoji?: (name: string) => string | undefined
 }
 
-export const emptyBody: MessageBody = { blocks: [] }
-
 /** All inline runs of a body in reading order, including list items. */
 export function inlinesOf(body: MessageBody): ReadonlyArray<Inline> {
   const out: Inline[] = []

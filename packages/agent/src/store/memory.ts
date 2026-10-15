@@ -20,10 +20,7 @@
  * The model calls are WP11's compactor; `runJob` is the seam it calls.
  */
 import { createHash } from 'node:crypto'
-import {
-  batch, children, compactionTask, complete, context as contextWindow, limits, mask, readyQueue, retryDelay, start, taintClosure, withinCutoff,
-  type Completion, type Input, type Key, type Line, type Node, type Ref, type Source,
-} from '@juno/agent-memory'
+import { batch, children, compactionTask, complete, context as contextWindow, mask, readyQueue, retryDelay, start, taintClosure, withinCutoff, type Completion, type Input, type Key, type Line, type Node, type Ref, type Source } from '@juno/agent-memory'
 import { transaction } from './database'
 import type { Store } from './store'
 
@@ -350,5 +347,3 @@ export async function runJob(store: Store, key: Key, model: CompactionModel, h?:
   }
   return publish(store, begun.snapshot, completion.node, { model: model.id, promptVer: PROMPT_VERSION })
 }
-
-export { limits as memoryLimits }

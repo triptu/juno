@@ -22,7 +22,6 @@ export const mention = (person: Person, isMe = false): BodyInline => ({ kind: 'u
 export const you: BodyInline = { kind: 'user', id: me.id, name: me.name, isMe: true }
 export const channel = (ref: { id: string; name: string }): BodyInline => ({ kind: 'channel', id: ref.id, name: ref.name })
 export const emoji = (name: string, unicode?: string, url?: string): BodyInline => ({ kind: 'emoji', name, ...(unicode === undefined ? {} : { unicode }), ...(url === undefined ? {} : { url }) })
-export const br: BodyInline = { kind: 'break' }
 export const date = (timestamp: number, format: string, fallback: string): BodyInline => ({ kind: 'date', timestamp, format, fallback })
 
 export const p = (...children: ReadonlyArray<BodyInline | string>): BodyBlock => ({ kind: 'paragraph', children: children.map((child) => (typeof child === 'string' ? t(child) : child)) })

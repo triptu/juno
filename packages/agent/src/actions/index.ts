@@ -23,10 +23,10 @@ import { localExecutors } from './proposals'
 export { resolveTool } from './resolve'
 export { ACTIONS_MIGRATIONS } from './schema'
 export type { ActionHost } from './host'
-export type { Executor, ExecutorCall, ExecutorResult } from './executor'
+export type { Executor, ExecutorCall } from './executor'
 export type { CardView, Choice, Proposal } from './cards'
-export { RESOLVE_SCHEMA, RESOLVE_TOOL, SLACK_CONNECTION, SLACK_SEND_SCHEMA, bindActionHost } from './host'
-export { ANSWER_TOOL, DELEGATE_TOOL, SPEND_RAISE_TOOL, budgetCard, proposedTask, question, resolveCard, sendMessageTool } from './proposals'
+
+export { budgetCard, proposedTask, question, resolveCard, sendMessageTool } from './proposals'
 
 /** What the turn engine takes for actions (`TurnsOptions.actions`). */
 export interface ActionsOptions {

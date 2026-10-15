@@ -20,8 +20,6 @@ export interface AllTopicsFilter {
   readonly sort: AllTopicsSort
 }
 
-export const defaultAllTopicsFilter: AllTopicsFilter = { status: 'all', kind: 'all', sort: 'recent' }
-
 export interface AllTopicsRow {
   readonly topic: Topic
   readonly status: AllTopicsStatus

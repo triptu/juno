@@ -22,7 +22,6 @@ import { transaction } from '../store/database'
 import { uuidv7, type Store } from '../store/store'
 
 export type GrantClass = 'job' | 'schedule'
-export type Revocation = 'pause' | 'off' | 'redaction' | 'stop' | 'delete'
 
 export interface Grant {
   readonly id: string
