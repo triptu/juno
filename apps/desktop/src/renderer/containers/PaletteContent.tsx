@@ -1,17 +1,20 @@
 /**
- * ⌘K (spec section 10, inventory 9, performance 4.3). Local results come
+ * ⌘K (spec section 10, inventory 9, performance 5.3). Local results come
  * from `searchAtom` through `useDeferredValue`, so a keystroke paints the
  * text at once and the rows follow in the same frame budget. After a pause
  * in typing, the command reading and Slack's search are asked for; a
  * command shows above the results, and Slack's matches are added under the
- * rows already shown, never moving them. Its own chunk: `Palette.tsx`
- * loads it on idle after the first paint.
+ * rows already shown, never moving them. Rows open topics (at a message,
+ * which then flashes), a channel's Main or a person's DM, narrow the
+ * sidebar, start a New chat to someone never messaged, or run the command.
+ * Its own chunk: `Palette.tsx` loads it on idle after the first paint.
  */
 import { useDeferredValue, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import type { ConversationKind, PaletteCommand, SearchChannel, SearchMessage, SearchResult } from '@juno/contract'
+import type { ConversationKind, PaletteCommand, SearchChannel, SearchMessage, SearchPerson, SearchResult } from '@juno/contract'
 import {
   appendUnseen,
   COMMAND_DELAY_MS,
+  loadOlderMessages,
   nowAtom,
   PALETTE_RECENT,
   PALETTE_RESULTS,
@@ -20,6 +23,8 @@ import {
   registry,
   searchAtom,
   searchSlackMessages,
+  sendMessage,
+  showToast,
   SLACK_DELAY_MS,
   SLACK_MIN_LENGTH,
   type OpenOptions,
@@ -28,9 +33,58 @@ import {
 import { afterPaint, measure } from '@juno/state/perf'
 import { useAtomValue } from '@juno/state/react'
 import { CommandPalette, type PaletteIconName, type PaletteItem, type PaletteSection } from '@juno/views'
-import { openTopic, warmTopic } from './navigation'
-import { closePalette, openMessage, openPerson, runPaletteCommand } from './paletteActions'
+import { junoCommands, openJunoTab } from './juno/actions'
+import { openNewChatTo, openTopic, openTopicAt, warmTopic } from './navigation'
+import { closePalette } from './paletteActions'
+import { resolveTopic } from './topicActions'
 import { scopeToChannel, showChannelMenu, type MenuChannel } from './placeMenus'
+
+/** The ts just after `ts`, so a page fetched "before" it includes it. */
+function justAfter(ts: string): string {
+  const [seconds = '0', micros = '0'] = ts.split('.')
+  const next = Number(micros) + 1
+  return next >= 1_000_000 ? `${Number(seconds) + 1}.000000` : `${seconds}.${String(next).padStart(6, '0')}`
+}
+
+/**
+ * A message result: its topic, opened at it, and it flashes. A match only
+ * Slack's search found is fetched first, with the page that ends at it, so
+ * the topic opens at it rather than at the bottom.
+ */
+async function openMessage(message: SearchMessage, options: OpenOptions): Promise<void> {
+  if (!message.stored) await loadOlderMessages(registry, message.topicId, justAfter(message.ts))
+  openTopicAt(message.topicId, message.ts, { ...options, flash: true })
+}
+
+/** A person's result: your Main with them, or a New chat addressed to them when you have never messaged (spec section 10). */
+function openPerson(person: Pick<SearchPerson, 'person' | 'mainId'>, options: OpenOptions): void {
+  if (person.mainId !== undefined) return openTopic(person.mainId, options)
+  openNewChatTo({ key: `u:${person.person.id}`, name: person.person.name, kind: 'im', tint: 'dm', person: person.person, empty: true })
+}
+
+/**
+ * Runs a command row. A send posts at once into that Main; sends are final
+ * (ADR 0010), so the toast has no Undo. "Ask" opens Juno with the request.
+ */
+async function runPaletteCommand(command: PaletteCommand): Promise<void> {
+  switch (command.kind) {
+    case 'send-dm':
+    case 'post': {
+      const to = command.kind === 'send-dm' ? { kind: 'person' as const, userId: command.userId } : { kind: 'channel' as const, channelId: command.channelId }
+      const exit = await sendMessage(registry, to, command.text)
+      showToast(registry, { text: exit._tag === 'Success' ? `Posted in ${command.place} · Main` : `Could not post in ${command.place}` })
+      return
+    }
+    case 'open-dm':
+      return openPerson(command, {})
+    case 'ask':
+      openJunoTab()
+      junoCommands.send(command.prompt)
+      return
+    case 'resolve':
+      return resolveTopic(command.topicId)
+  }
+}
 
 /** Rows under a command (inventory 9). */
 const RESULTS_UNDER_COMMAND = 6
