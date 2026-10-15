@@ -22,12 +22,16 @@ export interface FilesProps {
   readonly progress?: number | undefined
 }
 
+// The height of an image in a grid of them: about 3:2 in a 177px column.
+const TILE_HEIGHT = '120px'
+
 // The upload line's thickness.
 const PROGRESS_HEIGHT = '2px'
 
 /**
  * The files under a message, in Slack's order: an image with a thumbnail is
- * the thumbnail in a box of its final size, anything else is a card. While
+ * the thumbnail in a box of its final size, and images next to each other
+ * share a two-column grid of same-size cells; anything else is a card. While
  * the message uploads, a slim line under the files shows how far it has got;
  * it is drawn over the row's bottom padding, so it appearing or going moves
  * nothing.
@@ -37,14 +41,21 @@ export function Files({ files, onOpenImage, onDownload, tabbable = true, progres
   const tabIndex = tabbable ? 0 : -1
   return (
     <div {...stylex.props(styles.files)}>
-      {files.map((file, index) =>
-        file.thumb === undefined ? (
-          <FileCard key={file.id} file={file} onDownload={onDownload} tabIndex={tabIndex} />
-        ) : (
-          // Keyed by place: a sent file's id changes when Slack's copy replaces the staged one, and the image must stay.
-          <Thumbnail key={`thumb:${index}`} file={file} thumb={file.thumb} onOpen={onOpenImage} tabIndex={tabIndex} />
-        ),
-      )}
+      {runs(files).map((run) => {
+        if (run.kind === 'card') return <FileCard key={run.file.id} file={run.file} onDownload={onDownload} tabIndex={tabIndex} />
+        // Keyed by place: a sent file's id changes when Slack's copy replaces the staged one, and the image must stay.
+        if (run.images.length === 1) {
+          const { file, thumb, index } = run.images[0]!
+          return <Thumbnail key={`thumb:${index}`} file={file} thumb={thumb} onOpen={onOpenImage} tabIndex={tabIndex} />
+        }
+        return (
+          <div key={`grid:${run.images[0]!.index}`} data-thumbnail-grid="" {...stylex.props(styles.grid)}>
+            {run.images.map(({ file, thumb, index }) => (
+              <Thumbnail key={`thumb:${index}`} file={file} thumb={thumb} onOpen={onOpenImage} tabIndex={tabIndex} tile />
+            ))}
+          </div>
+        )
+      })}
       {progress === undefined ? null : (
         <span
           role="progressbar"
@@ -62,10 +73,37 @@ export function Files({ files, onOpenImage, onDownload, tabbable = true, progres
   )
 }
 
+interface ImageAt {
+  readonly file: FileView
+  readonly thumb: FileThumb
+  readonly index: number
+}
+
+type Run = { readonly kind: 'card'; readonly file: FileView } | { readonly kind: 'images'; readonly images: ReadonlyArray<ImageAt> }
+
+/** Images next to each other in Slack's order share a grid; every other file is a card of its own. */
+function runs(files: ReadonlyArray<FileView>): ReadonlyArray<Run> {
+  const out: Array<Run> = []
+  let images: Array<ImageAt> | undefined
+  files.forEach((file, index) => {
+    if (file.thumb === undefined) {
+      images = undefined
+      out.push({ kind: 'card', file })
+      return
+    }
+    if (images === undefined) {
+      images = []
+      out.push({ kind: 'images', images })
+    }
+    images.push({ file, thumb: file.thumb, index })
+  })
+  return out
+}
+
 // The thumbnail's caps, as numbers for the size arithmetic below. They
 // repeat --thumb-max-width and --thumb-max-height.
 const THUMB_MAX_WIDTH = 360
-const THUMB_MAX_HEIGHT = 280
+const THUMB_MAX_HEIGHT = 240
 
 /** The box an image gets, from its own dimensions and the caps, before any bytes arrive. */
 export function thumbnailBox(width: number, height: number): { readonly width: number; readonly height: number } {
@@ -80,15 +118,17 @@ interface ThumbnailProps {
   readonly thumb: FileThumb
   readonly onOpen: ((file: FileView) => void) | undefined
   readonly tabIndex: number
+  /** A cell of a grid of images: the grid sizes the box, and the image fills it. */
+  readonly tile?: boolean
 }
 
 /** With `onOpen` the box is a button with the same look; Enter and Space open it too. */
-function Thumbnail({ file, thumb, onOpen, tabIndex }: ThumbnailProps) {
+function Thumbnail({ file, thumb, onOpen, tabIndex, tile = false }: ThumbnailProps) {
   const [loaded, setLoaded] = useState<string | undefined>(undefined)
   const [failed, setFailed] = useState<string | undefined>(undefined)
   const box = thumbnailBox(thumb.width, thumb.height)
   const broken = failed === thumb.src
-  const sx = stylex.props(styles.thumb, styles.box(box.width, box.height, thumb.width, thumb.height), onOpen !== undefined && styles.thumbButton)
+  const sx = stylex.props(styles.thumb, tile ? styles.tile : styles.box(box.width, box.height, thumb.width, thumb.height), onOpen !== undefined && styles.thumbButton)
   // While a new src loads (the staged image giving way to Slack's), the one already shown stays under it.
   const previous = loaded !== undefined && loaded !== thumb.src ? loaded : undefined
   const content = broken ? (
@@ -227,6 +267,21 @@ const styles = stylex.create({
     outlineWidth: sizes['--focus-ring-width'],
     outlineOffset: sizes['--focus-ring-offset'],
     outlineColor: accent['--focus-ring'],
+  },
+  // Two columns across the thumbnail width, every cell the same size, so a
+  // message with several images is one tidy block that is sized before any
+  // bytes arrive. The viewer shows each image whole.
+  grid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+    gridAutoRows: TILE_HEIGHT,
+    gap: spacing['--space-1-5'],
+    width: layout['--thumb-max-width'],
+    maxWidth: '100%',
+  },
+  tile: {
+    width: '100%',
+    height: '100%',
   },
   box: (width: number, height: number, ratioWidth: number, ratioHeight: number) => ({
     width,

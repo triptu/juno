@@ -2,7 +2,7 @@
 // scan messages, topic_index, reactions or topic_overlay. The sidebar's
 // statements, and the topic view's: the Main and thread windows, their
 // reactions and thread titles, a channel's active threads, and the New chat
-// pickers, and All topics: its order, counts and places.
+// pickers, All topics (its order, counts and places), and ⌘K's local search.
 import { assert, describe, it } from '@effect/vitest'
 import { Effect, Layer } from 'effect'
 import * as fs from 'node:fs/promises'
@@ -15,6 +15,7 @@ import { staleStatement } from '../src/home/job'
 import { automatedStatements } from '../src/automatedView'
 import { pickerStatements } from '../src/newchat/query'
 import { mentionStatements } from '../src/mentions/query'
+import { searchStatements } from '../src/search/query'
 import { countsStatement as allTopicsCountsStatement, orderStatement, placesStatement } from '../src/topics/allTopics'
 import { countsStatement, listStatements, type ListFilter } from '../src/topics/query'
 
@@ -188,6 +189,17 @@ describe('query plans', () => {
       for (const statement of statements) {
         const lines = yield* plan(statement.sql, statement.params)
         assert.deepStrictEqual(scans(lines), [], `${statement.sql}\n${lines.join('\n')}`)
+      }
+    }).pipe(Effect.provide(freshStore)),
+  )
+
+  it.effect('⌘K search reads every table through FTS or an index', () =>
+    Effect.gen(function* () {
+      const reader = yield* StoreReader
+      for (const [name, statement] of Object.entries(searchStatements(reader, '"roll"*', 50))) {
+        const [sql, params] = statement.compile()
+        const lines = yield* plan(sql, params)
+        assert.deepStrictEqual(scans(lines), [], `${name}\n${lines.join('\n')}`)
       }
     }).pipe(Effect.provide(freshStore)),
   )

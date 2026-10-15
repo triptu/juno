@@ -69,6 +69,7 @@ const cases: Record<string, readonly [unknown, unknown]> = {
   'host.slack.person': [{ accountId: 'account', userId: 'person' }, { id: 'person', name: 'Example', displayName: 'Example' }],
   'host.outbox.send': [dispatch, unknown],
   'host.topics.resolve': [dispatch, unknown],
+  'host.topics.undoResolve': [{ accountId: 'account', actionId: dispatch.actionId }, undefined],
   'host.outbox.cancel': [{ authorizationId: 'authorization', attemptId: 'attempt' }, { _tag: 'cancel-requested' }],
   'host.outbox.reconcileSend': [{ accountId: 'account', channelId: 'channel', actionId: 'action', attemptId: 'attempt' }, { _tag: 'unknown' }],
   'host.schedule.check': [{ accountId: 'account', conversation: { channelId: 'C', ts: '100' }, refresh: true }, { owner: 'U', ownMessage: true, messages: [] }],

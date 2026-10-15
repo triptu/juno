@@ -123,6 +123,21 @@ test.describe('centred columns', () => {
   }
 })
 
+for (const state of ['recent', 'results', 'people', 'overflowing']) {
+  test(`palette ${state}: rows have symmetric insets`, async ({ page }) => {
+    await open(page, 'CommandPalette', `states/${state}`)
+    const insets = await page.getByRole('dialog', { name: 'Search and commands' }).evaluate((panel) => {
+      const box = panel.getBoundingClientRect()
+      return [...panel.querySelectorAll('[role="option"]')].map((row) => {
+        const rect = row.getBoundingClientRect()
+        return { left: rect.left - box.left, right: box.right - rect.right }
+      })
+    })
+    expect(insets.length).toBeGreaterThan(0)
+    for (const inset of insets) expect(inset.left).toBe(inset.right)
+  })
+}
+
 test.describe('composer controls', () => {
   test('the attach button mirrors the send button: 6px from its edge, centred on the one-line field', async ({ page }) => {
     await open(page, 'Composer', 'attachments/attach-button')
@@ -145,5 +160,108 @@ test.describe('composer controls', () => {
     expect(at.attach.top).toBe(at.attach.bottom)
     expect(at.send.top).toBe(at.send.bottom)
     expect(at.attach.top).toBe(at.send.top)
+  })
+})
+
+test.describe('composer attachments', () => {
+  test('the check bar, the chip row and the attach button share the 6px inset; the bar is 6px from the end too', async ({ page }) => {
+    await open(page, 'Composer', 'attachments/check-bar-with-chips')
+    const at = await page.evaluate(() => {
+      const field = document.querySelector('[data-composer-field]')!
+      const box = field.getBoundingClientRect()
+      const border = parseFloat(getComputedStyle(field).borderLeftWidth)
+      const inset = (element: Element) => {
+        const b = element.getBoundingClientRect()
+        return { start: b.left - box.left - border, end: box.right - border - b.right, top: b.top - box.top - border, bottom: b.bottom - box.top - border }
+      }
+      const chips = [...field.querySelectorAll('[data-attachment]')].map(inset)
+      return {
+        bar: inset(field.firstElementChild!),
+        chips,
+        attach: inset(field.querySelector('button[aria-label="Attach files"]')!),
+        send: inset(field.querySelector('button[aria-label="Send"]')!),
+      }
+    })
+    expect(at.attach.start).toBe(6)
+    expect(at.bar.start).toBe(at.attach.start)
+    expect(at.chips[0]!.start).toBe(at.attach.start)
+    expect(at.bar.end).toBe(at.send.end)
+    expect(at.bar.top).toBe(6)
+    expect(at.chips[0]!.top - at.bar.bottom).toBe(6)
+  })
+
+  test('image and file chips are the same 44px frame, with the remove button 4px from the top and end', async ({ page }) => {
+    await open(page, 'AttachmentChips', 'state/ready')
+    const chips = await page.evaluate(() =>
+      [...document.querySelectorAll('[data-attachment]')].map((chip) => {
+        const box = chip.getBoundingClientRect()
+        const remove = chip.querySelector('button')!.getBoundingClientRect()
+        const frame = getComputedStyle(chip.querySelector('[data-chip-frame]')!)
+        return { height: box.height, radius: getComputedStyle(chip).borderTopLeftRadius, border: `${frame.borderTopWidth} ${frame.borderTopStyle}`, top: remove.top - box.top, end: box.right - remove.right, size: remove.width }
+      }),
+    )
+    expect(chips.length).toBe(4)
+    for (const chip of chips) expect(chip).toEqual({ height: 44, radius: '14px', border: '1px solid', top: 4, end: 4, size: 20 })
+  })
+})
+
+test.describe('message images', () => {
+  test('one image fits 360 by 240; images side by side are a two-column grid of equal cells', async ({ page }) => {
+    await open(page, 'MessageList', 'files/thumbnails')
+    const at = await page.evaluate(() => {
+      const size = (element: Element) => {
+        const b = element.getBoundingClientRect()
+        return { left: b.left, top: b.top, width: b.width, height: b.height }
+      }
+      const grids = [...document.querySelectorAll('[data-thumbnail-grid]')].map((grid) => ({ grid: size(grid), cells: [...grid.querySelectorAll('[data-thumbnail]')].map(size) }))
+      const single = [...document.querySelectorAll('[data-thumbnail]')].filter((thumb) => thumb.closest('[data-thumbnail-grid]') === null).map(size)
+      return { grids, single }
+    })
+    expect(at.single.length).toBeGreaterThan(0)
+    for (const thumb of at.single) {
+      expect(thumb.width).toBeLessThanOrEqual(360)
+      expect(thumb.height).toBeLessThanOrEqual(240)
+    }
+    expect(at.grids.length).toBeGreaterThan(0)
+    for (const { grid, cells } of at.grids) {
+      expect(grid.width).toBe(360)
+      for (const cell of cells) expect({ width: cell.width, height: cell.height }).toEqual({ width: 177, height: 120 })
+      expect(cells[1]!.left - (cells[0]!.left + cells[0]!.width)).toBe(6)
+    }
+  })
+})
+
+test.describe('settings chips', () => {
+  // How far a chip and the text of the row's buttons end from the card's right edge.
+  const ends = (page: Page, chipSelector: string, card: string) =>
+    page.evaluate(
+      ([chipSelector, card]) => {
+        const chip = document.querySelector(chipSelector!)!
+        // The card: the This Mac group itself, or the group around the Codex row.
+        const holder = chip.closest(card!)!
+        const group = holder.hasAttribute('data-codex') ? holder.parentElement! : holder
+        const right = group.getBoundingClientRect().right
+        const text = (element: Element) => {
+          const range = document.createRange()
+          range.selectNodeContents(element)
+          return right - range.getBoundingClientRect().right
+        }
+        return { chip: right - chip.getBoundingClientRect().right, buttons: [...group.querySelectorAll('button')].map(text) }
+      },
+      [chipSelector, card],
+    )
+
+  test('This Mac: the owner chip ends where the Move and Restore text ends', async ({ page }) => {
+    await open(page, 'ThisMacSection', 'this-mac/active')
+    const at = await ends(page, '[data-owner-chip]', '[data-ownership]')
+    expect(at.buttons.length).toBe(2)
+    for (const button of at.buttons) expect(at.chip).toBe(button)
+    expect(at.chip).toBe(24)
+  })
+
+  // The Codex card has no text buttons: its chip ends at the row's 15px inset, like the values and fields of the cards above it.
+  test('Codex: with no text button in its card, the ready chip ends at the 15px inset', async ({ page }) => {
+    await open(page, 'JunoSettingsPage', 'settings/ready')
+    expect((await ends(page, '[data-codex-chip]', '[data-codex]')).chip).toBe(15)
   })
 })

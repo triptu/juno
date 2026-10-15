@@ -350,6 +350,7 @@ All [proto] measured at 1280×800 with Inter unless marked.
 | `--page-width-settings` | 760px: Notifications, Preferences and Settings › Juno, so the settings pages share one column and one title edge |
 | `--settings-label-width` | 104px: the label column of Preferences' rows (Theme, Accent, Density, Hold to peek), so every control starts on one edge |
 | `--palette-width` | 560px, max calc(100% − 48px), top offset 96px |
+| `--palette-list-max-height` | 400px; the palette list scrolls within this height |
 | `--menu-width` | 236px context menu; `--menu-width-account` 248px avatar menu, `--menu-width-browse` 300px, `--menu-width-mention` 280px mention popover, `--menu-width-picker` 340px New chat pickers |
 | `--sidebar-inset` | 10px: the sidebar's inset on both sides (title bar end, nav, filter row, rows); the list's scrollbar gutter sits inside it on the right |
 | `--filter-pill-max-width` | 120px: a sidebar view's name pill; longer names end with an ellipsis (inventory 2.3) |
@@ -365,7 +366,7 @@ All [proto] measured at 1280×800 with Inter unless marked.
 | `--code-block-max-height` | 150px, then the block scrolls inside; the wheel goes on to the page at its edges |
 | `--toolbar-clip-margin` | 44px: how far a message row may paint outside its box (the 36px toolbar and its shadow), so a narrow row's toolbar can sit above it. A plain length: Chromium ignores `calc()` in `overflow-clip-margin` |
 | `--toolbar-height` / `--toolbar-reserve` | 36px / 243px. The message hover toolbar's height, and the width a message header keeps free at its end so the name, the time and the first body line never run under it (inventory 6.5). The Main toolbar measures 223px with More (M6b), plus a 20px gap |
-| `--thumb-max-width` / `--thumb-max-height` | 360px / 280px. An image thumbnail in a message is scaled by its own aspect ratio inside this box, and the box is sized before the bytes arrive (performance.md 3.3). File cards are `--thumb-max-width` wide |
+| `--thumb-max-width` / `--thumb-max-height` | 360px / 240px. A lone image thumbnail in a message is scaled by its own aspect ratio inside this box, and the box is sized before the bytes arrive (performance.md 3.3). Images next to each other share a two-column grid this wide, cells 177 × 120, gap 6. File cards are `--thumb-max-width` wide |
 
 ### Controls
 

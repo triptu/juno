@@ -193,6 +193,19 @@ export {
   type HomeScene,
   type HomeShown,
 } from './home'
+export {
+  appendUnseen,
+  COMMAND_DELAY_MS,
+  PALETTE_RECENT,
+  PALETTE_RESULTS,
+  PALETTE_SLACK_RESULTS,
+  paletteOpenAtom,
+  readCommand,
+  searchAtom,
+  searchSlackMessages,
+  SLACK_DELAY_MS,
+  SLACK_MIN_LENGTH,
+} from './palette'
 export { attachFiles, type FileLike } from './staging'
 export {
   attachmentsAtom,

@@ -1,14 +1,14 @@
-import type { SearchResult } from '@juno/contract'
-import { ChannelId, firstWords, mainLabel, type ConversationKind } from '@juno/domain'
+import { SEARCH_LIMIT_MAX, SEARCH_PLACES_MAX, type SearchMessage, type SearchPlace, type SearchResult } from '@juno/contract'
+import { firstWords, mainLabel, mainTopicId, threadTopicId, tsToMillis, type ChannelId, type ConversationKind, type Ts } from '@juno/domain'
+import { messageBody, plainText } from '@juno/richtext'
 import { ftsQuery, StoreReader, type SqlClient } from '@juno/store'
 import { Effect } from 'effect'
+import { channelInfoOf, channelRefOf, parseIds, personFrom, userName, type UserRow } from '../topicRows'
 
-const topicColumns = `i.topic_id AS id, i.channel, i.kind,
+const topicColumns = `i.topic_id AS id, i.channel, i.kind, i.last_activity_ts,
   COALESCE(NULLIF(trim(o.manual_title), ''), NULLIF(trim(o.ai_title), '')) AS named_title,
-  COALESCE(json_extract(i.preview_json, '$.rootText'), '') AS title,
-  c.kind AS channel_kind, COALESCE(c.name, u.display_name, u.real_name, u.name, c.user_id, c.id) AS channel_name`
+  COALESCE(json_extract(i.preview_json, '$.rootText'), '') AS title`
 const topicJoins = `JOIN conversations c ON c.id = i.channel
-  LEFT JOIN users u ON u.id = c.user_id
   LEFT JOIN topic_overlay o ON o.topic_id = i.topic_id
   LEFT JOIN ignored_channels g ON g.channel = i.channel`
 const visible = `c.is_member = 1 AND g.channel IS NULL`
@@ -17,16 +17,27 @@ interface TopicHit {
   readonly id: string
   readonly channel: string
   readonly kind: string
+  readonly last_activity_ts: string | null
   readonly named_title: string | null
   readonly title: string
-  readonly channel_kind: ConversationKind
-  readonly channel_name: string
 }
 
-const topicResult = (hit: TopicHit): SearchResult => ({
-  kind: 'topic', id: hit.id, channelId: hit.channel,
-  title: hit.kind === 'main' ? mainLabel({ id: ChannelId.make(hit.channel), kind: hit.channel_kind, name: hit.channel_name }) : hit.named_title || firstWords(hit.title) || hit.channel_name,
-})
+interface MessageHit {
+  readonly channel: string
+  readonly ts: string
+  readonly thread_ts: string | null
+  readonly reply_count: number
+  readonly user_id: string | null
+  readonly text: string
+}
+
+interface ConversationRow {
+  readonly id: string
+  readonly kind: ConversationKind
+  readonly name: string | null
+  readonly user_id: string | null
+  readonly member_ids_json: string | null
+}
 
 /** The statements used by the query, also compiled by the benchmark profiler. */
 export function searchStatements(sql: SqlClient.SqlClient, query: string, limit: number) {
@@ -36,41 +47,156 @@ export function searchStatements(sql: SqlClient.SqlClient, query: string, limit:
       SELECT o.topic_id, rank AS score FROM overlay_titles_fts f JOIN topic_overlay o ON o.rowid = f.rowid WHERE overlay_titles_fts MATCH ?
     ) hits JOIN topic_index i ON i.topic_id = hits.topic_id ${topicJoins}
     WHERE ${visible} GROUP BY i.topic_id ORDER BY MIN(hits.score), i.last_activity_ts DESC, i.topic_id LIMIT ?`, [query, query, limit])
-  const channels = sql<{ id: string; name: string }>`SELECT c.id, c.name FROM channels_fts f
-    JOIN conversations c ON c.rowid = f.rowid LEFT JOIN ignored_channels g ON g.channel = c.id
-    WHERE channels_fts MATCH ${query} AND c.is_member = 1 AND g.channel IS NULL ORDER BY f.rank, c.id LIMIT ${limit}`
-  const people = sql<{ id: string; name: string }>`SELECT u.id, COALESCE(NULLIF(u.display_name, ''), u.real_name, u.name, u.id) AS name
-    FROM people_fts f JOIN users u ON u.rowid = f.rowid WHERE people_fts MATCH ${query} AND u.deleted = 0 ORDER BY f.rank, u.id LIMIT ${limit}`
-  const messages = sql<{ channel: string; ts: string; thread_ts: string | null; reply_count: number; text: string }>`SELECT m.channel, m.ts, m.thread_ts, m.reply_count, m.text
+  const places = Math.min(limit, SEARCH_PLACES_MAX)
+  const channels = sql<{ id: string; main: 0 | 1 }>`SELECT c.id, EXISTS (SELECT 1 FROM topic_index t WHERE t.topic_id = 'm:' || c.id) AS main
+    FROM channels_fts f JOIN conversations c ON c.rowid = f.rowid LEFT JOIN ignored_channels g ON g.channel = c.id
+    WHERE channels_fts MATCH ${query} AND c.is_member = 1 AND g.channel IS NULL ORDER BY f.rank, c.id LIMIT ${places}`
+  // The full name first: search is for telling apart people who share a first name.
+  const people = sql<UserRow & { readonly dm: string | null }>`SELECT u.id, u.name, COALESCE(NULLIF(u.real_name, ''), NULLIF(u.display_name, '')) AS display_name, u.real_name, u.avatar_url,
+      (SELECT d.id FROM conversations d WHERE d.kind = 'im' AND d.user_id = u.id AND d.is_member = 1
+        AND EXISTS (SELECT 1 FROM topic_index t WHERE t.topic_id = 'm:' || d.id) ORDER BY d.id LIMIT 1) AS dm
+    FROM people_fts f JOIN users u ON u.rowid = f.rowid WHERE people_fts MATCH ${query} AND u.deleted = 0 ORDER BY f.rank, u.id LIMIT ${places}`
+  const messages = sql<MessageHit>`SELECT m.channel, m.ts, m.thread_ts, m.reply_count, m.user_id, m.text
     FROM messages_fts f JOIN messages m ON m.rowid = f.rowid JOIN conversations c ON c.id = m.channel
     LEFT JOIN ignored_channels g ON g.channel = m.channel
-    WHERE messages_fts MATCH ${query} AND m.deleted = 0 AND c.is_member = 1 AND g.channel IS NULL ORDER BY f.rank LIMIT ${limit}`
+    WHERE messages_fts MATCH ${query} AND m.deleted = 0 AND c.is_member = 1 AND g.channel IS NULL ORDER BY f.rank, m.channel, m.ts LIMIT ${limit}`
   return { topics, channels, people, messages }
 }
 
-/** Indexed local search. Titles precede channels, people and message matches; FTS ranks each group. */
-export const querySearch = Effect.fn('search.query')(function* (text: string, requestedLimit = 50) {
+/** The thread a stored message is in (a root with replies is its own thread's first message), or its channel's Main. */
+export function topicOfMessage(channel: string, ts: string, threadTs: string | null, replyCount: number): string {
+  const thread = threadTs ?? (replyCount > 0 ? ts : undefined)
+  return thread === undefined ? mainTopicId(channel as ChannelId) : threadTopicId(channel as ChannelId, thread as Ts)
+}
+
+const millisOf = (ts: string | null): number => (ts === null ? 0 : tsToMillis(ts as Ts))
+
+/** Reads the users a set of ids names. */
+export const readUsers = (sql: SqlClient.SqlClient, ids: ReadonlySet<string>) =>
+  Effect.gen(function* () {
+    const users = new Map<string, UserRow>()
+    if (ids.size === 0) return users
+    const rows = yield* sql<UserRow>`SELECT id, name, NULLIF(display_name, '') AS display_name, real_name, avatar_url FROM users WHERE id IN ${sql.in([...ids])}`
+    for (const row of rows) users.set(row.id, row)
+    return users
+  })
+
+/** The places of a set of conversations, named as rows name them: "eng", "Maya Chen", "Maya, Leo". */
+export const readPlaces = (sql: SqlClient.SqlClient, channels: ReadonlySet<string>) =>
+  Effect.gen(function* () {
+    const places = new Map<string, SearchPlace>()
+    if (channels.size === 0) return places
+    const rows = yield* sql<ConversationRow>`SELECT id, kind, name, user_id, member_ids_json FROM conversations WHERE id IN ${sql.in([...channels])}`
+    const self = (yield* sql<{ self_user_id: string | null }>`SELECT self_user_id FROM team LIMIT 1`)[0]?.self_user_id ?? undefined
+    const members = new Map(rows.map((row) => [row.id, row.kind === 'mpim' ? parseIds(row.member_ids_json) : []]))
+    const ids = new Set<string>()
+    for (const row of rows) {
+      if (row.user_id !== null) ids.add(row.user_id)
+      for (const id of members.get(row.id) ?? []) ids.add(id)
+    }
+    const users = yield* readUsers(sql, ids)
+    for (const row of rows) {
+      const info = channelInfoOf(
+        { channel: row.id, c_kind: row.kind, c_name: row.name, c_user_id: row.user_id },
+        { members: members.get(row.id) ?? [] },
+        self,
+        (id) => userName(id, users.get(id)),
+      )
+      const { partnerId: _partnerId, ...place } = channelRefOf(info, undefined)
+      places.set(row.id, place)
+    }
+    return places
+  })
+
+/** A conversation the store no longer names still gets a place, so a result never drops. */
+function placeOf(places: ReadonlyMap<string, SearchPlace>, id: string): SearchPlace {
+  const known = places.get(id)
+  if (known !== undefined) return known
+  const { partnerId: _partnerId, ...place } = channelRefOf({ id: id as ChannelId, kind: 'public', name: id }, undefined)
+  return place
+}
+
+const topicTitle = (hit: Pick<TopicHit, 'kind' | 'named_title' | 'title'>, place: SearchPlace): string =>
+  hit.kind === 'main' ? mainLabel({ id: place.id as ChannelId, kind: place.kind, name: place.name }) : hit.named_title || firstWords(hit.title) || place.label
+
+/** One line, for a result's sub line. */
+const oneLine = (text: string): string => text.replace(/\s+/g, ' ').trim()
+
+/** Messages as results: each with its topic's title, its sender and its place. Shared with `search.slack`. */
+export const messageResults = (
+  hits: ReadonlyArray<MessageHit & { readonly topicId: string; readonly stored: boolean; readonly username?: string | undefined }>,
+) =>
+  Effect.gen(function* () {
+    if (hits.length === 0) return []
+    const sql = yield* StoreReader
+    const topicIds = [...new Set(hits.map((hit) => hit.topicId))]
+    const titles = new Map<string, Pick<TopicHit, 'kind' | 'named_title' | 'title'>>()
+    for (const row of yield* sql<TopicHit>`SELECT i.topic_id AS id, i.kind,
+        COALESCE(NULLIF(trim(o.manual_title), ''), NULLIF(trim(o.ai_title), '')) AS named_title,
+        COALESCE(json_extract(i.preview_json, '$.rootText'), '') AS title
+      FROM topic_index i LEFT JOIN topic_overlay o ON o.topic_id = i.topic_id WHERE i.topic_id IN ${sql.in(topicIds)}`) titles.set(row.id, row)
+    const places = yield* readPlaces(sql, new Set(hits.map((hit) => hit.channel)))
+    const mentioned = (pattern: RegExp) => hits.flatMap((hit) => [...hit.text.matchAll(pattern)].map((match) => match[1] as string))
+    const users = yield* readUsers(sql, new Set([...hits.flatMap((hit) => (hit.user_id === null ? [] : [hit.user_id])), ...mentioned(/<@([A-Z0-9]+)/g)]))
+    const channelIds = [...new Set(mentioned(/<#([A-Z0-9]+)/g))]
+    const channelNames = new Map(
+      channelIds.length === 0 ? [] : (yield* sql<{ id: string; name: string | null }>`SELECT id, name FROM conversations WHERE id IN ${sql.in(channelIds)}`).map((row) => [row.id, row.name ?? row.id]),
+    )
+    const lookups = { user: (id: string) => (users.has(id) ? userName(id, users.get(id)) : undefined), channel: (id: string) => channelNames.get(id) }
+    return hits.map((hit): SearchMessage => {
+      const place = placeOf(places, hit.channel)
+      const known = titles.get(hit.topicId)
+      const main = hit.topicId.startsWith('m:')
+      const title = known !== undefined ? topicTitle(known, place) : main ? mainLabel({ id: place.id as ChannelId, kind: place.kind, name: place.name }) : firstWords(hit.text) || place.label
+      return {
+        kind: 'message',
+        id: `${hit.channel}:${hit.ts}`,
+        topicId: hit.topicId,
+        title,
+        ts: hit.ts,
+        place,
+        sender: hit.user_id === null ? (hit.username ?? '') : userName(hit.user_id, users.get(hit.user_id)),
+        text: oneLine(plainText(messageBody({ text: hit.text }, lookups))),
+        stored: hit.stored,
+      }
+    })
+  })
+
+/**
+ * Indexed local search. Channels and people (at most `SEARCH_PLACES_MAX`
+ * each) come first, since a name typed is most often a place to go; then
+ * topic titles and message matches. FTS ranks each group, and a group runs
+ * only while the window has room.
+ */
+export const querySearch = Effect.fn('search.query')(function* (text: string, requestedLimit = SEARCH_LIMIT_MAX) {
   const sql = yield* StoreReader
-  const limit = Math.max(1, Math.min(50, requestedLimit))
+  const limit = Math.max(1, Math.min(SEARCH_LIMIT_MAX, requestedLimit))
   const terms = ftsQuery(text.trim())
   if (terms === '') {
     const recent = yield* sql.unsafe<TopicHit>(`SELECT ${topicColumns} FROM topic_index i ${topicJoins}
       WHERE ${visible} ORDER BY i.last_activity_ts DESC, i.topic_id LIMIT ?`, [limit])
-    return recent.map(topicResult)
+    const places = yield* readPlaces(sql, new Set(recent.map((hit) => hit.channel)))
+    return recent.map((hit) => topicResult(hit, placeOf(places, hit.channel)))
   }
   // Only the last word is a prefix, matching an input still being typed.
-  const query = `${terms}*`
-  const statements = searchStatements(sql, query, limit)
-  const topics = yield* statements.topics
-  const results: SearchResult[] = topics.map(topicResult)
-  if (results.length >= limit) return results
+  const statements = searchStatements(sql, `${terms}*`, limit)
   const channels = yield* statements.channels
-  results.push(...channels.map((hit): SearchResult => ({ kind: 'channel', ...hit })))
-  if (results.length >= limit) return results.slice(0, limit)
   const people = yield* statements.people
-  results.push(...people.map((hit): SearchResult => ({ kind: 'person', ...hit })))
-  if (results.length >= limit) return results.slice(0, limit)
-  const messages = yield* statements.messages
-  results.push(...messages.map((hit): SearchResult => ({ kind: 'message', id: `${hit.channel}:${hit.ts}`, topicId: hit.thread_ts !== null ? `t:${hit.channel}:${hit.thread_ts}` : hit.reply_count > 0 ? `t:${hit.channel}:${hit.ts}` : `m:${hit.channel}`, channelId: hit.channel, ts: hit.ts, text: hit.text })))
-  return results.slice(0, limit)
+  const room = limit - channels.length - people.length
+  const topics = room > 0 ? yield* statements.topics : []
+  const messages = room - topics.length > 0 ? yield* statements.messages : []
+  const places = yield* readPlaces(sql, new Set([...channels.map((hit) => hit.id), ...topics.map((hit) => hit.channel)]))
+  const results: SearchResult[] = [
+    ...channels.map((hit): SearchResult => ({ kind: 'channel', id: hit.id, place: placeOf(places, hit.id), ...(hit.main === 1 ? { mainId: mainTopicId(hit.id as ChannelId) } : {}) })),
+    ...people.map((hit): SearchResult => ({ kind: 'person', id: hit.id, person: personFrom(hit.id, hit), ...(hit.dm === null ? {} : { mainId: mainTopicId(hit.dm as ChannelId) }) })),
+    ...topics.slice(0, room).map((hit) => topicResult(hit, placeOf(places, hit.channel))),
+  ]
+  const left = limit - results.length
+  if (left <= 0) return results
+  const found = messages.slice(0, left).map((hit) => ({ ...hit, topicId: topicOfMessage(hit.channel, hit.ts, hit.thread_ts, hit.reply_count), stored: true }))
+  return [...results, ...(yield* messageResults(found))]
 })
+
+function topicResult(hit: TopicHit, place: SearchPlace): SearchResult {
+  return { kind: 'topic', id: hit.id, title: topicTitle(hit, place), place, at: millisOf(hit.last_activity_ts) }
+}

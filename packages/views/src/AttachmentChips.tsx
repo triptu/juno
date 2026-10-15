@@ -2,7 +2,7 @@ import * as stylex from '@stylexjs/stylex'
 import { WarningCircle } from '@phosphor-icons/react/dist/icons/WarningCircle'
 import { X } from '@phosphor-icons/react/dist/icons/X'
 import type { FileKind } from '@juno/contract'
-import { colors, motion, opacity, radii, sizes, spacing, tints } from '@juno/tokens/tokens.stylex'
+import { colors, opacity, radii, sizes, spacing, tints } from '@juno/tokens/tokens.stylex'
 import { Icon, IconButton, Text } from '@juno/ui'
 import { fileIcon, fileSize } from './FileCard'
 
@@ -39,9 +39,11 @@ function kindOf(mimetype: string): FileKind {
 
 /**
  * The chips of the files going with a message, in the composer's field
- * (inventory 7). An image with a preview is a square thumbnail; anything else
- * is its kind's icon, the name and the size. Every chip is 44px tall, so a
- * chip arriving, changing state or going never moves the others on its line.
+ * (inventory 7). Every chip is the same 44px frame with a hairline border: an
+ * image with a preview is the picture filling a 44px square, anything else is
+ * its kind's icon, the name and the size. Both have the same remove button in
+ * the top end corner, 4px from the frame. A chip arriving, changing state or
+ * going never moves the others on its line.
  */
 export function AttachmentChips({ files, onRemove }: AttachmentChipsProps) {
   return (
@@ -66,9 +68,8 @@ function ThumbnailChip({ file, preview, onRemove }: ChipProps & { readonly previ
   return (
     <div role="listitem" title={file.name} data-attachment={file.state} {...stylex.props(styles.chip, styles.thumbChip)}>
       <img src={preview} alt={file.name} data-sensitive="" draggable={false} decoding="async" loading="lazy" {...stylex.props(styles.thumb, file.state === 'staging' && styles.staging)} />
-      <span {...stylex.props(styles.cornerRemove)}>
-        <IconButton icon={X} label={`Remove ${file.name}`} size={20} iconSize={12} radius="full" variant="raised" noTooltip onClick={() => onRemove(file.id)} />
-      </span>
+      <Frame />
+      <Remove file={file} onRemove={onRemove} />
     </div>
   )
 }
@@ -90,12 +91,24 @@ function FileChip({ file, onRemove }: ChipProps) {
           </Text>
         </span>
       </span>
-      <IconButton icon={X} label={`Remove ${file.name}`} size={20} iconSize={12} radius="full" tone="muted" noTooltip onClick={() => onRemove(file.id)} />
+      <Frame failed={failed} />
+      <Remove file={file} onRemove={onRemove} />
     </div>
   )
 }
 
-const HOVER = '@media (hover: hover)'
+/** The chip's border, drawn over its content so a picture is framed like a file. */
+function Frame({ failed = false }: { readonly failed?: boolean }) {
+  return <span aria-hidden="true" data-chip-frame="" {...stylex.props(styles.frame, failed && styles.failedFrame)} />
+}
+
+function Remove({ file, onRemove }: ChipProps) {
+  return (
+    <span {...stylex.props(styles.remove)}>
+      <IconButton icon={X} label={`Remove ${file.name}`} size={20} iconSize={12} radius="full" variant="raised" noTooltip onClick={() => onRemove(file.id)} />
+    </span>
+  )
+}
 
 const styles = stylex.create({
   list: {
@@ -105,25 +118,33 @@ const styles = stylex.create({
     minWidth: 0,
   },
   // Concentric with the composer field: its 20px corner less the 6px inset.
+  // Insets inside are measured from the outer edge: the border is the frame
+  // drawn on top, so it takes no room.
   chip: {
     position: 'relative',
     flexShrink: 0,
     boxSizing: 'border-box',
     height: sizes['--control-44'],
     borderRadius: radii['--radius-2xl'],
+    overflow: 'hidden',
     userSelect: 'none',
+  },
+  frame: {
+    position: 'absolute',
+    inset: 0,
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: colors['--border-default'],
+    borderRadius: 'inherit',
+    pointerEvents: 'none',
+  },
+  failedFrame: {
+    borderColor: 'transparent',
   },
   // The box is the chip's from the start, so the picture arriving moves nothing.
   thumbChip: {
     width: sizes['--control-44'],
-    overflow: 'hidden',
     backgroundColor: colors['--secondary-default'],
-    // The remove button shows while the chip is pointed at or holds keyboard focus.
-    '--chip-remove-opacity': {
-      default: '0',
-      ':hover': { default: null, [HOVER]: '1' },
-      ':focus-within': '1',
-    },
   },
   thumb: {
     display: 'block',
@@ -131,34 +152,26 @@ const styles = stylex.create({
     height: '100%',
     objectFit: 'cover',
   },
-  cornerRemove: {
+  // 4px from the top and end edges, so its 10px radius is concentric with the chip's 14.
+  remove: {
     position: 'absolute',
-    top: spacing['--space-0-5'],
-    right: spacing['--space-0-5'],
+    top: spacing['--space-1'],
+    insetInlineEnd: spacing['--space-1'],
     display: 'inline-flex',
-    opacity: 'var(--chip-remove-opacity)',
-    transitionProperty: 'opacity',
-    transitionDuration: {
-      default: motion['--duration-fast'],
-      '@media (prefers-reduced-motion: reduce)': '0ms',
-    },
   },
+  // The icon tile is 6px from the start, top and bottom edges. The end
+  // keeps the remove button's 20px and 4px either side clear of the name.
   fileChip: {
     display: 'flex',
     alignItems: 'center',
-    gap: spacing['--space-1'],
     maxWidth: CHIP_MAX_WIDTH,
     minWidth: 0,
     flexShrink: 1,
-    paddingInlineStart: spacing['--space-1'],
-    paddingInlineEnd: spacing['--space-1-5'],
-    borderWidth: '1px',
-    borderStyle: 'solid',
-    borderColor: colors['--border-default'],
+    paddingInlineStart: spacing['--space-1-5'],
+    paddingInlineEnd: spacing['--space-7'],
     backgroundColor: colors['--background'],
   },
   failedChip: {
-    borderColor: 'transparent',
     backgroundColor: tints['--tint-warning-bg'],
   },
   fileBody: {
@@ -168,6 +181,7 @@ const styles = stylex.create({
     minWidth: 0,
     flexGrow: 1,
   },
+  // Concentric with the chip: its 14px corner less the 6px inset.
   icon: {
     display: 'inline-flex',
     alignItems: 'center',
@@ -175,7 +189,7 @@ const styles = stylex.create({
     flexShrink: 0,
     width: spacing['--space-8'],
     height: spacing['--space-8'],
-    borderRadius: radii['--radius-xl'],
+    borderRadius: radii['--radius-lg'],
     backgroundColor: colors['--secondary-default'],
     color: colors['--foreground-subtle'],
   },

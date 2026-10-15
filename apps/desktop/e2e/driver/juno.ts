@@ -594,6 +594,7 @@ export class Juno {
   readonly home: HomePane
   readonly peek: PeekPopover
   readonly privacy: PrivacyMode
+  readonly palette: PaletteDriver
 
   constructor(app: ElectronApplication, win: Page) {
     this.app = app
@@ -612,6 +613,7 @@ export class Juno {
     this.home = new HomePane(win)
     this.peek = new PeekPopover(win)
     this.privacy = new PrivacyMode(app, win)
+    this.palette = new PaletteDriver(app, win)
   }
 
   /** Makes the next native context menu pick `id` without showing it. */
@@ -1709,6 +1711,7 @@ export type AppMenuItem =
   | 'toggle-sidebar'
   | 'toggle-privacy'
   | 'juno'
+  | 'search'
   | 'undo'
   | `tab-${1 | 2 | 3 | 4 | 5 | 6 | 7 | 8}`
   | 'tab-last'
@@ -1719,6 +1722,103 @@ async function clickAppMenu(app: ElectronApplication, id: AppMenuItem): Promise<
     if (!item) throw new Error(`No menu item ${itemId}`)
     item.click(undefined, BrowserWindow.getAllWindows()[0])
   }, id)
+}
+
+/** ⌘K (spec section 10): the search and command palette. */
+export class PaletteDriver {
+  readonly root: Locator
+
+  constructor(
+    readonly app: ElectronApplication,
+    readonly win: Page,
+  ) {
+    this.root = win.getByRole('dialog', { name: 'Search and commands' })
+  }
+
+  get input(): Locator {
+    return this.root.getByRole('combobox')
+  }
+
+  /** ⌘K, through its app menu item (Go › Search…). */
+  async shortcut(): Promise<void> {
+    await clickAppMenu(this.app, 'search')
+  }
+
+  async open(): Promise<void> {
+    await this.shortcut()
+    await this.expectOpen()
+  }
+
+  async expectOpen(): Promise<void> {
+    await expect(this.root).toBeVisible({ timeout: 10_000 })
+    await expect(this.input).toBeFocused()
+  }
+
+  async expectClosed(): Promise<void> {
+    await expect(this.root).toHaveCount(0)
+  }
+
+  /** Types into the field, a key at a time as a person does. */
+  async type(text: string): Promise<void> {
+    await this.input.pressSequentially(text)
+  }
+
+  /** Local results now belong to the current input, rather than the held previous query. */
+  async expectResults(): Promise<void> {
+    await expect(this.root.getByRole('listbox')).toHaveAttribute('aria-busy', 'false', { timeout: 15_000 })
+  }
+
+  async clear(): Promise<void> {
+    await this.input.fill('')
+  }
+
+  async press(key: string): Promise<void> {
+    await this.input.press(key)
+  }
+
+  /** A section of rows: Recent, Results or Juno. */
+  section(heading: 'Recent' | 'Results' | 'Juno'): Locator {
+    return this.root.getByRole('group', { name: heading })
+  }
+
+  /** Rows whose text matches, label and sub line included. */
+  row(text: string | RegExp): Locator {
+    return this.root.getByRole('option').filter({ hasText: text })
+  }
+
+  rows(): Locator {
+    return this.root.getByRole('option')
+  }
+
+  /** The text of the row the arrows or the pointer chose. */
+  async activeText(): Promise<string> {
+    return this.input.evaluate((input) => {
+      const id = input.getAttribute('aria-activedescendant')
+      const row = id === null ? null : input.ownerDocument.getElementById(id)
+      return (row?.innerText ?? '').replace(/\s+/g, ' ').trim()
+    })
+  }
+
+  async expectActive(text: string | RegExp): Promise<void> {
+    await expect.poll(() => this.activeText(), { timeout: 10_000 }).toMatch(text)
+  }
+
+  /** Picks a row with the pointer; ⌘-click with `newTab`. */
+  async choose(text: string | RegExp, options: { readonly newTab?: boolean } = {}): Promise<void> {
+    const row = this.row(text).first()
+    await expect(row).toBeVisible({ timeout: 15_000 })
+    await row.click(options.newTab === true ? { modifiers: ['Meta'] } : {})
+  }
+
+  /** Right-clicks a row: the channel menu opens, and the next native menu picks `id`. */
+  async chooseFromMenu(text: string | RegExp, id: string): Promise<void> {
+    await chooseNextMenuItem(this.win, id)
+    await this.row(text).first().click({ button: 'right' })
+  }
+
+  async expectNoMatches(): Promise<void> {
+    await expect(this.root.getByText('No matches.')).toBeVisible({ timeout: 15_000 })
+  }
 }
 
 /** Back and Forward: the title bar buttons, the app menu (⌘[ and ⌘]), the mouse's side buttons and the swipe. */

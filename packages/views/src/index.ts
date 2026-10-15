@@ -2,6 +2,7 @@ export { AccountMenu, type AccountMenuAction, type AccountMenuProps, type Accoun
 export { ActiveThreads, type ActiveThreadsProps } from './ActiveThreads'
 export { AppearanceSettings, type AppearanceSettingsProps } from './AppearanceSettings'
 export { AppInfoView, type AppInfoViewProps } from './AppInfoView'
+export { CommandPalette, type CommandPaletteProps, type PaletteIconName, type PaletteItem, type PaletteSection } from './CommandPalette'
 export { AttachButton, type AttachButtonProps } from './AttachButton'
 export { AttachmentChips, type AttachmentChip, type AttachmentChipsProps } from './AttachmentChips'
 export { ChannelIconPicker, type ChannelIconPickerProps } from './ChannelIconPicker'

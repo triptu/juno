@@ -223,6 +223,9 @@ function setAppMenu(state: MenuState, rebuild = false): void {
   const go: MenuItemConstructorOptions[] = [
     command('back', 'Back', 'CommandOrControl+[', 'history.back'),
     command('forward', 'Forward', 'CommandOrControl+]', 'history.forward'),
+    { type: 'separator' },
+    // ⌘K (SPEC section 10) opens the palette, and closes it again.
+    command('search', 'Search…', 'CommandOrControl+K', 'palette.toggle'),
   ]
   const windowItems: MenuItemConstructorOptions[] = [
     { role: 'minimize' },
