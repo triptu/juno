@@ -20,4 +20,15 @@ const chat1 = [
   ) STRICT`,
 ]
 
-export const CHAT_MIGRATIONS: MigrationSet = { name: 'chat', steps: [chat1] }
+const chat2 = [
+  // The hours-start summaries the host handed over (SPEC 14, plan v3 §19.1): one Juno message each, with
+  // no run. `id` is the host's summary id; `sources` is JSON of channel, ts, place and sender, no message text.
+  `CREATE TABLE chat_summaries (
+    id TEXT PRIMARY KEY,
+    at INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    sources TEXT NOT NULL
+  ) STRICT`,
+]
+
+export const CHAT_MIGRATIONS: MigrationSet = { name: 'chat', steps: [chat1, chat2] }

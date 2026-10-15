@@ -11,12 +11,17 @@
  *   until a message about the topic is sent from it (`catchUpDoneAtom`).
  * - `junoFocusAtom`: bumped to ask the visible Juno composer for focus (⌘J,
  *   Ask Juno), so the request reaches a composer that mounts after it.
+ * - `junoChatTargetAtom`: a Juno message the Juno tab should scroll to and
+ *   flash once it shows, from the hours-start summary's notification.
+ * - `junoQuoteAtom`: a message to quote in the panel's composer, from the
+ *   why popover's Tell Juno (SPEC 14). The panel beside that topic takes it
+ *   as its selection quote.
  */
 import { Schema } from 'effect'
 import * as AsyncResult from 'effect/reactivity/AsyncResult'
 import * as Atom from 'effect/reactivity/Atom'
 import { prefsGet, prefsSet } from '@juno/contract'
-import type { About } from '@juno/agent-contract'
+import type { About, Selection } from '@juno/agent-contract'
 import { liveQuery, runCommand } from './atoms'
 import { aiAssistOnAtom } from './notifications'
 import type { Registry } from './client'
@@ -67,17 +72,46 @@ export interface JunoFocusRequest {
 
 export const junoFocusAtom = Atom.make<JunoFocusRequest>({ n: 0, where: 'tab' }).pipe(Atom.keepAlive)
 
+/** A Juno message for the Juno tab to show and flash; `n` counts requests. The tab clears it once taken. */
+export const junoChatTargetAtom = Atom.make<{ readonly n: number; readonly id: string } | undefined>(undefined).pipe(Atom.keepAlive)
+
+let chatTargets = 0
+
+export function showInJunoChat(registry: Registry, id: string): void {
+  registry.set(junoChatTargetAtom, { n: ++chatTargets, id })
+}
+
+/** A topic message to quote in the Juno panel's composer; `n` counts requests, so each is taken once. */
+export interface JunoQuoteRequest {
+  readonly n: number
+  readonly topicId: string
+  readonly selection: Selection
+}
+
+export const junoQuoteAtom = Atom.make<JunoQuoteRequest | undefined>(undefined).pipe(Atom.keepAlive)
+
+let quoteRequests = 0
+
+/** The panel clears the request once it has taken it, so a panel that opens later does not quote it again. */
+export function quoteInJuno(registry: Registry, topicId: string, selection: Selection): void {
+  registry.set(junoQuoteAtom, { n: ++quoteRequests, topicId, selection })
+}
+
 export function focusJunoComposer(registry: Registry, where: JunoFocusRequest['where']): void {
   registry.set(junoFocusAtom, { n: registry.get(junoFocusAtom).n + 1, where })
 }
 
 /**
  * A message a topic should show and flash once it is on screen: a Juno
- * source link opened it (SPEC 13.1). `n` counts requests, so the same
- * message asked twice flashes twice.
+ * source link or a notification opened it (SPEC 13.1, 14). `n` counts
+ * requests across the app, so the same message asked twice flashes twice.
+ * The topic clears the request once it has shown it, so a later open of
+ * the topic does not jump back to it.
  */
 export const messageFlashAtom = Atom.family((_topicId: string) => Atom.make<{ readonly ts: string; readonly n: number } | undefined>(undefined).pipe(Atom.keepAlive))
 
+let flashRequests = 0
+
 export function flashMessage(registry: Registry, topicId: string, ts: string): void {
-  registry.set(messageFlashAtom(topicId), { ts, n: (registry.get(messageFlashAtom(topicId))?.n ?? 0) + 1 })
+  registry.set(messageFlashAtom(topicId), { ts, n: ++flashRequests })
 }
