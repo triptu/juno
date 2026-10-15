@@ -60,6 +60,24 @@ describe('local search through the engine', () => {
     expect(await search(e, 'May')).toContainEqual(expect.objectContaining({ kind: 'person', id: 'U0MAYA', person: expect.objectContaining({ name: 'Maya Chen' }) }))
   })
 
+  it('breaks equal message ranks by channel and timestamp, independent of insertion order', async () => {
+    const e = await boot()
+    await Effect.runPromise(Effect.gen(function* () {
+      const sql = yield* StoreWriter
+      yield* transaction(Effect.gen(function* () {
+        yield* sql`INSERT INTO conversations (id, kind, name, is_member) VALUES ('C0TIE', 'public', 'tie', 1)`
+        for (const [channel, ts] of [['C0TIE', '1700000002.000000'], ['C0SEARCH', '1700000003.000000'], ['C0SEARCH', '1700000001.000000']]) {
+          yield* sql`INSERT INTO messages (channel, ts, text) VALUES (${channel}, ${ts}, 'equalrank')`
+        }
+      }))
+    }).pipe(Effect.provide(Store.layer(workspacePaths(e.userData, e.fake.teamId))), Effect.scoped))
+    expect((await search(e, 'equalrank')).map((result) => result.id)).toEqual([
+      'C0SEARCH:1700000001.000000',
+      'C0SEARCH:1700000003.000000',
+      'C0TIE:1700000002.000000',
+    ])
+  })
+
   it('excludes ignored channels and cached non-member channels', async () => {
     const e = await boot()
     const results = await search(e, 'rollout')

@@ -54,12 +54,12 @@ export function searchStatements(sql: SqlClient.SqlClient, query: string, limit:
   // The full name first: search is for telling apart people who share a first name.
   const people = sql<UserRow & { readonly dm: string | null }>`SELECT u.id, u.name, COALESCE(NULLIF(u.real_name, ''), NULLIF(u.display_name, '')) AS display_name, u.real_name, u.avatar_url,
       (SELECT d.id FROM conversations d WHERE d.kind = 'im' AND d.user_id = u.id AND d.is_member = 1
-        AND EXISTS (SELECT 1 FROM topic_index t WHERE t.topic_id = 'm:' || d.id) LIMIT 1) AS dm
+        AND EXISTS (SELECT 1 FROM topic_index t WHERE t.topic_id = 'm:' || d.id) ORDER BY d.id LIMIT 1) AS dm
     FROM people_fts f JOIN users u ON u.rowid = f.rowid WHERE people_fts MATCH ${query} AND u.deleted = 0 ORDER BY f.rank, u.id LIMIT ${places}`
   const messages = sql<MessageHit>`SELECT m.channel, m.ts, m.thread_ts, m.reply_count, m.user_id, m.text
     FROM messages_fts f JOIN messages m ON m.rowid = f.rowid JOIN conversations c ON c.id = m.channel
     LEFT JOIN ignored_channels g ON g.channel = m.channel
-    WHERE messages_fts MATCH ${query} AND m.deleted = 0 AND c.is_member = 1 AND g.channel IS NULL ORDER BY f.rank LIMIT ${limit}`
+    WHERE messages_fts MATCH ${query} AND m.deleted = 0 AND c.is_member = 1 AND g.channel IS NULL ORDER BY f.rank, m.channel, m.ts LIMIT ${limit}`
   return { topics, channels, people, messages }
 }
 
