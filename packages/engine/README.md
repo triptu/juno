@@ -84,3 +84,5 @@ incomplete or limited Slack history fails rather than reporting no reply.
 handlers and `agent-host/views.ts`. Saving captures the previous and resulting
 view in the same writer transaction. AgentHost Undo compares that snapshot
 before restoring it, so a later edit is not overwritten.
+
+Message windows publish `meta.windowCovered` from `src/messages/coverage.ts`. Main uses synced history ranges; threads use stored reply counts or the cursor coverage. Coverage-only changes are emitted even when no message changed. The renderer uses this to avoid positioning isolated cached messages before history arrives.

@@ -42,6 +42,7 @@ import {
 import { emojiUnicode, messageBody, plainText, splitEmojiName, type MessageBody, type MessageContent } from '@juno/richtext'
 import { syncState, StoreReader, type SqlClient, type SqlError } from '@juno/store'
 import type { PendingFile } from '@juno/sync'
+import { windowCovered } from './coverage'
 import { uploadsUrl } from '../staging'
 import type { ListRun } from '../protocol/live'
 import { personFrom, userName, type UserRow } from '../topicRows'
@@ -289,7 +290,7 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
     }
     cache.rows = nextRows
     cache.people = people
-    return { rows: out, total: out.length, refs: { people: [...people.values()] } }
+    return { rows: out, total: out.length, windowCovered: yield* windowCovered(target, stored[0]?.ts), refs: { people: [...people.values()] } }
   })
 
 const readUsers = (sql: SqlClient.SqlClient, cache: MessageCache, ids: Iterable<string>) =>
