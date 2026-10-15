@@ -278,6 +278,10 @@ export const chatCopy = {
       title: 'Check what was pending',
       body: 'Juno restored from a backup. These actions were waiting. Each may already have happened. Approve the ones you still want, then activate Juno.',
       activate: 'Activate Juno',
+      /** Shown when no trusted deletion record checked the backup (SPEC 13.8). */
+      unchecked: "Juno can't check that this backup is the newest. If the folder is out of date, messages you removed may come back. You can remove them again.",
+      /** "Move code 7KQ2-M9XA. Check that your other Mac shows the same code." */
+      moveCode: (code: string) => `Move code ${code}. Check that your other Mac shows the same code.`,
     },
     settings: {
       /** "Removal pending · 1 copy in a running job". */
@@ -292,6 +296,22 @@ export const chatCopy = {
       attest: 'Confirm the old Mac is off, erased, or has Juno removed. Juno cannot check this.',
       allowNetwork: 'Allow T3 Code over the local network',
       allowNetworkNote: 'Only an https address works over the network.',
+    },
+    connections: {
+      connect: 'Connect',
+      signIn: 'Sign in',
+      cancel: 'Cancel',
+      disconnect: 'Disconnect',
+      remove: 'Remove',
+      signingIn: 'Finish signing in in your browser.',
+      add: 'Add a server',
+      addSub: 'Any MCP server by its address. Juno signs in if the server asks.',
+      name: 'Name',
+      address: 'Address',
+      addButton: 'Add',
+      t3Address: 'T3 Code address',
+      invalidAddress: 'Use an https address, or http on this Mac.',
+      failed: 'That did not work. Check the connection and try again.',
     },
   },
 } as const

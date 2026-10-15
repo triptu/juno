@@ -41,12 +41,29 @@ export const MainToAgent = Schema.Union([
   Schema.TaggedStruct('hostPort', {}),
   Schema.TaggedStruct('rendererPort', {}),
   Schema.TaggedStruct('provider', { provider: Schema.NullOr(AgentProvider) }),
+  /** Main's answer to a `credential` request. `value` is only set for `load`. */
+  Schema.TaggedStruct('credentialReply', { requestId: Schema.Number, ok: Schema.Boolean, value: Schema.optionalKey(Schema.NullOr(Schema.String)) }),
 ])
 export type MainToAgent = typeof MainToAgent.Type
+
+/**
+ * What the MCP manager asks main for (WP17). Main owns the keychain: an MCP
+ * connection's OAuth state (`load`, `save`, `clear`) is kept there by
+ * connection id, never in a file. `open` shows an authorization URL in the
+ * system browser. Main answers each with a `credentialReply`.
+ */
+export const CredentialRequest = Schema.Union([
+  Schema.TaggedStruct('load', { id: Schema.String }),
+  Schema.TaggedStruct('save', { id: Schema.String, state: Schema.String }),
+  Schema.TaggedStruct('clear', { id: Schema.String }),
+  Schema.TaggedStruct('open', { url: Schema.String }),
+])
+export type CredentialRequest = typeof CredentialRequest.Type
 
 /** agent -> main. */
 export const AgentToMain = Schema.Union([
   /** The agent reached its host on the current port. */
   Schema.TaggedStruct('ready', { host: HostHello }),
+  Schema.TaggedStruct('credential', { requestId: Schema.Number, request: CredentialRequest }),
 ])
 export type AgentToMain = typeof AgentToMain.Type

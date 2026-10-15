@@ -69,7 +69,7 @@ it('a removal reaches every place the words lived, and Juno never sees them agai
   const slack = fakeActionHost()
   let opened: Harness | undefined
   const backup = fakeBackup(() => opened!.turns)
-  const h = (opened = await turnsHarness({ actions: { host: slack.host }, backup: backup.backup }))
+  const h = (opened = await turnsHarness({ actions: { host: slack.host }, removalBackup: backup.backup }))
   harnesses.push(h)
 
   // The owner says it, Juno pins it and repeats it.

@@ -18,6 +18,7 @@ pi packages and the Codex SDK may be imported anywhere in this package (`check-d
 | MCP manager logic without HTTP | any fake's `connectInMemory()` |
 | Connect, sign-in, token expiry, `list_changed`, schema hashes | `startFakeNotion()`, `startFakeLittlebird()`, `startFakeT3()` over HTTP |
 | Juno's own loopback MCP server's client, or a one-off server | `startFakeMcpServer()` |
+| A desktop e2e spec | `await import('@juno/agent-testing/mcp')`: the MCP fakes alone. pi-mcp has only an ESM entry and Playwright loads specs as CommonJS |
 | Taint, the secret filter, Slack reconcile | `hostileMessages`, `forgedSendReceipt()` |
 | Cards that send or resolve through the host (WP15) | `fakeActionHost()` |
 | Recovery after a kill or power loss (WP8, WP15, WP21, WP22) | `crashAt()`, `snapshotFiles()` |
@@ -38,7 +39,7 @@ A provider registered as `openrouter` with today's resolved slugs, their real co
 For the e2e tests, where the agent runs in its own process with the real OpenRouter provider. Import it from `@juno/agent-testing/openrouter`, which loads nothing else. Give the agent `origin` in place of `https://openrouter.ai` (main does so from `JUNO_FAKE_OPENROUTER_URL` under `JUNO_E2E`).
 
 - `GET /api/v1/models` answers `openRouterCatalogue()`: `fakeCatalogue` in OpenRouter's shape, with names such as "Anthropic: Claude Opus 5.5".
-- `POST /api/v1/messages` (Claude, Anthropic Messages) and `POST /api/v1/chat/completions` (the rest) stream `answer`, by default one `<say>` bubble. `answer` may be a function of the request, to answer what was sent. A request to a compaction model gets the compactor's answer instead, as with `fakeProvider()`.
+- `POST /api/v1/messages` (Claude, Anthropic Messages) and `POST /api/v1/chat/completions` (the rest) stream `answer`, by default one `<say>` bubble. `answer` may be a function of the request, to answer what was sent. It may return `{ toolCall: { name, arguments } }` instead of text; the request after the call carries the tool's result in `toolResult`. A request to a compaction model gets the compactor's answer instead, as with `fakeProvider()`.
 - `key`: a request carrying another key gets 401, as a rejected key does.
 - `requests` records each chat request's path, model, key, whether it was a compaction, and `input`, the last user message. `inputs()` lists the inputs of the chat requests that were not compactions. `catalogueReads()` counts list reads.
 

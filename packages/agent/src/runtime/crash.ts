@@ -70,6 +70,18 @@ export const CRASH_POINTS = {
     spec: 'agent-recovery.qnt', after: 'manifest', before: 'export', scenarios: ['exportCrash'],
     expect: '§14.4: the manifest is renamed but the export cursor is behind it; the next run re-exports, and the cursor never passes the manifest.',
   },
+  'ownership.released': {
+    spec: 'agent-recovery.qnt', after: 'releaseOwner', before: 'checkpoint', scenarios: ['releaseCrash', 'checkpointReopen'],
+    expect: '§14.2: the release is durable, so the Mac reopens released and admits and authorizes nothing; the next start writes the final checkpoint and publishes it.',
+  },
+  'restore.staged': {
+    spec: 'agent-recovery.qnt', after: 'replay', before: 'install', scenarios: ['manifestBeforeSegment', 'redactionDuringRestore'],
+    expect: '§14.4: the staged database is complete; the next open rechecks the deletion record, then installs it.',
+  },
+  'restore.swapped': {
+    spec: 'agent-recovery.qnt', after: 'install', before: 'review', scenarios: ['restoreApproval', 'restoreAttempt'],
+    expect: '§14.3: agent.sqlite is the restored file but recovery mode is not yet written; the next open finishes the install, so nothing is authorized before review.',
+  },
 } as const satisfies Record<string, CrashPointSpec>
 
 export type CrashPoint = keyof typeof CRASH_POINTS
