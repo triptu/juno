@@ -120,7 +120,7 @@ export const makeNotifications = Effect.fn('Notifications.make')(function* (noti
     const { aiAssist } = yield* configuration
     const target = aiAssist
       ? { kind: 'summary' as const, id: yield* notifier.summary({ id, at: now, sources, ...summary }) }
-      : { kind: 'message' as const, source }
+      : { kind: 'message' as const, source: { channelId: source.channelId, ts: source.ts, topicId: source.topicId } }
     yield* sql`UPDATE notification_log SET delivered_at = ${now} WHERE id IN ${sql.in(rows.map((row) => row.id))}`
     yield* logChanged
     yield* notifier.show({ id, ...summary, target })
