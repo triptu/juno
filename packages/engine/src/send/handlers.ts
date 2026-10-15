@@ -6,7 +6,7 @@
 import { NotSignedIn, SendRoutes } from '@juno/contract'
 import { liveQuery, transaction } from '@juno/store'
 import { Effect, Stream } from 'effect'
-import { Staging } from '../files/staging'
+import { Staging } from '../staging'
 import { Outbox } from '../outbox'
 import { retryFirstRun, serveLiveValue, timed } from '../protocol/live'
 import { Workspace } from '../workspace'

@@ -41,7 +41,7 @@ import {
 import { emojiUnicode, messageBody, plainText, splitEmojiName, type MessageBody, type MessageContent } from '@juno/richtext'
 import { StoreReader, type SqlClient, type SqlError } from '@juno/store'
 import type { PendingFile } from '@juno/sync'
-import { uploadsUrl } from '../files/staging'
+import { uploadsUrl } from '../staging'
 import type { ListRun } from '../protocol/live'
 import { personFrom, userName, type UserRow } from '../topicRows'
 import { actionsStatement, pendingStatement, reactionsStatement, threadTitlesStatement, windowStatements, type WindowMessage, type WindowTarget } from './window'

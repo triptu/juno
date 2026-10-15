@@ -50,8 +50,8 @@ import {
   type PendingPost,
   type TopicFetcher,
 } from '@juno/sync'
-import { UploadProgress } from '../files/progress'
-import { Staging } from '../files/staging'
+import { UploadProgress } from '../uploadProgress'
+import { Staging } from '../staging'
 import { Outbox } from '../outbox'
 import { SyncLink } from '../syncLink'
 import { Workspace, type OpenWorkspace, type StoreServices } from '../workspace'

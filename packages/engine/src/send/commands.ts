@@ -21,7 +21,7 @@ import { mainTopicId, threadTopicId, type ChannelId, type Ts } from '@juno/domai
 import { composeOutgoing } from '@juno/richtext'
 import { transaction } from '@juno/store'
 import { applyOpened, discardPost, queuePost, readPost, retryPost } from '@juno/sync'
-import { Staging } from '../files/staging'
+import { Staging } from '../staging'
 import { Outbox } from '../outbox'
 import { Workspace } from '../workspace'
 import { clearDraft } from './drafts'

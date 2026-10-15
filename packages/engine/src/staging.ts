@@ -15,7 +15,7 @@ import path from 'node:path'
 import { Clock, Context, Effect, Layer, Stream } from 'effect'
 import { MAX_FILE_BYTES, NotSignedIn, Rejected, type StagedFile, type StageError } from '@juno/contract'
 import { pendingPosts, type PendingFile } from '@juno/sync'
-import { Workspace, type OpenWorkspace } from '../workspace'
+import { Workspace, type OpenWorkspace } from './workspace'
 import { imageSize } from './imageSize'
 
 /** Staged bytes no post names are deleted after this long. */

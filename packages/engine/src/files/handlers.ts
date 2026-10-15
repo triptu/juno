@@ -5,8 +5,8 @@
 import { FilesRoutes } from '@juno/contract'
 import { Effect, Stream } from 'effect'
 import { serveLiveValue, timed } from '../protocol/live'
-import { UploadProgress } from './progress'
-import { Staging } from './staging'
+import { UploadProgress } from '../uploadProgress'
+import { Staging } from '../staging'
 
 export const FilesHandlers = FilesRoutes.toLayer(
   Effect.gen(function* () {
