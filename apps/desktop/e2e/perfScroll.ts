@@ -35,11 +35,15 @@ export async function scrollReading(win: Page, name: string, options: {
   readonly placeholders?: boolean
 }): Promise<void> {
   const sweep = async (label: string) => {
-    let result = { frames: [] as number[], loaf: 0, placeholders: 0 }
+    let result = { frames: [] as number[], loaf: 0, placeholders: 0, longFrames: [] as unknown[] }
     const trace = await traced(win, `${name}-${label}`, async () => {
       await win.evaluate((checkPlaceholders) => {
-        const state = { frames: [] as number[], loaf: 0, placeholders: 0, sampling: true }
-        const observer = new PerformanceObserver((entries) => { state.loaf += entries.getEntries().length })
+        const state = { frames: [] as number[], loaf: 0, placeholders: 0, sampling: true, longFrames: [] as unknown[] }
+        const record = (entries: PerformanceEntry[]) => {
+          state.loaf += entries.length
+          state.longFrames.push(...entries.map((entry) => entry.toJSON()))
+        }
+        const observer = new PerformanceObserver((entries) => record(entries.getEntries()))
         observer.observe({ type: 'long-animation-frame' })
         let last: number | undefined
         const grid = checkPlaceholders ? document.querySelector('[data-all-topics-table]') : null
@@ -62,9 +66,9 @@ export async function scrollReading(win: Page, name: string, options: {
         requestAnimationFrame(tick)
         Object.assign(window, { __scrollSample: () => {
           state.sampling = false
-          state.loaf += observer.takeRecords().length
+          record(observer.takeRecords())
           observer.disconnect()
-          return { frames: state.frames, loaf: state.loaf, placeholders: state.placeholders }
+          return { frames: state.frames, loaf: state.loaf, placeholders: state.placeholders, longFrames: state.longFrames }
         } })
       }, options.placeholders ?? false)
       for (const direction of [options.direction, -options.direction]) {
@@ -75,6 +79,7 @@ export async function scrollReading(win: Page, name: string, options: {
       }
       result = await win.evaluate(() => (window as unknown as { __scrollSample: () => typeof result }).__scrollSample())
     })
+    if (result.longFrames.length > 0) console.log(`${name}-${label}: long animation frames ${JSON.stringify(result.longFrames)}`)
     return { ...trace, ...result }
   }
   type Sweep = Awaited<ReturnType<typeof sweep>>
