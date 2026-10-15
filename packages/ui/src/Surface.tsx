@@ -1,11 +1,11 @@
 import * as stylex from '@stylexjs/stylex'
 import type { ElementType, HTMLAttributes, ReactNode } from 'react'
-import { accent, colors, radii, shadows, spacing } from '@juno/tokens/tokens.stylex'
+import { accent, colors, layout, radii, shadows, sizes, spacing } from '@juno/tokens/tokens.stylex'
 import type { LayoutStyles } from './internal/sx'
 
-export type SurfaceKind = 'card' | 'popover' | 'toolbar' | 'group' | 'inset' | 'field' | 'toast'
+export type SurfaceKind = 'card' | 'popover' | 'toolbar' | 'group' | 'inset' | 'field' | 'toast' | 'island'
 export type SurfacePadding = 'none' | 'xs' | 'sm' | 'md' | 'lg'
-export type SurfaceRadius = 'md' | 'lg' | 'xl' | '2xl' | '3xl' | 'card' | 'composer' | 'menu' | 'palette' | 'toast'
+export type SurfaceRadius = 'md' | 'lg' | 'xl' | '2xl' | '3xl' | 'card' | 'composer' | 'menu' | 'palette' | 'toast' | 'pill'
 
 export interface SurfaceProps extends Omit<HTMLAttributes<HTMLElement>, 'style' | 'className'> {
   readonly kind?: SurfaceKind
@@ -27,6 +27,7 @@ const paddingByKind: Record<SurfaceKind, SurfacePadding> = {
   inset: 'md',
   field: 'none',
   toast: 'none',
+  island: 'none',
 }
 
 const radiusByKind: Record<SurfaceKind, SurfaceRadius> = {
@@ -37,6 +38,7 @@ const radiusByKind: Record<SurfaceKind, SurfaceRadius> = {
   inset: 'lg',
   field: 'composer',
   toast: 'toast',
+  island: 'pill',
 }
 
 /**
@@ -44,7 +46,8 @@ const radiusByKind: Record<SurfaceKind, SurfaceRadius> = {
  * transparent border, never a coloured border. Inset is the one with a real
  * border, for a block sitting inside a card. Field is the composer frame: an
  * input border that turns into the focus colour while anything inside has
- * focus.
+ * focus. Island is a page header's control group: solid, the card ring,
+ * pill-shaped, one 28px control tall with an even inset around it.
  */
 export function Surface({ kind = 'card', padding, radius, as, sx, children, ...rest }: SurfaceProps) {
   const Tag = as ?? 'div'
@@ -53,9 +56,10 @@ export function Surface({ kind = 'card', padding, radius, as, sx, children, ...r
       {...rest}
       {...stylex.props(
         styles.base,
-        kinds[kind],
         radii_[radius ?? radiusByKind[kind]],
         paddings[padding ?? paddingByKind[kind]],
+        // After the padding, so the island's own inset wins over `none`.
+        kinds[kind],
         sx,
       )}
     >
@@ -115,6 +119,19 @@ const kinds = stylex.create({
     color: colors['--background'],
     boxShadow: shadows['--shadow-lg'],
   },
+  // The inset is what the 36px island leaves around a 28px control inside
+  // its 1px transparent border: 3px.
+  island: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: spacing['--space-0-5'],
+    height: layout['--header-island-height'],
+    paddingBlock: 0,
+    paddingInline: `calc((${layout['--header-island-height']} - ${sizes['--control-28']}) / 2 - 1px)`,
+    backgroundColor: colors['--surface-default'],
+    boxShadow: shadows['--card-ring'],
+    pointerEvents: 'auto',
+  },
 })
 
 const radii_ = stylex.create({
@@ -128,6 +145,7 @@ const radii_ = stylex.create({
   menu: { borderRadius: radii['--radius-menu'] },
   palette: { borderRadius: radii['--radius-palette'] },
   toast: { borderRadius: radii['--radius-toast'] },
+  pill: { borderRadius: radii['--radius-pill'] },
 })
 
 const paddings = stylex.create({

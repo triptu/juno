@@ -114,7 +114,7 @@ function pickOf(row: ConversationRow, users: ReadonlyMap<string, UserRow>, selfI
       const memberNames = parseIds(row.member_ids_json)
         .filter((id) => id !== selfId)
         .map((id) => userName(id, users.get(id)))
-      return { ...base, name: channelLabelBare({ id: row.id as ChannelId, kind: 'mpim', name: row.name ?? row.id, memberNames }) }
+      return { ...base, name: channelLabelBare({ kind: 'mpim', name: row.name ?? row.id, memberNames }) }
     }
     default:
       return { ...base, name: row.name ?? row.id }

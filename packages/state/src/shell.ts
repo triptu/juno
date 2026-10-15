@@ -2,7 +2,7 @@
 import { Effect, Schema } from 'effect'
 import * as Atom from 'effect/reactivity/Atom'
 import { AccentSchema, AppInfo, DEFAULT_ACCENT, DEFAULT_SIDEBAR, SIDEBAR_WIDTH, ThemeSchema, type Accent, type SidebarLayout, type SlackTarget, type Theme } from '@juno/contract'
-import type { ContextMenuItem, JunoBridge, MenuCommand } from '@juno/contract/channels'
+import type { ContextMenuAt, ContextMenuItem, JunoBridge, MenuCommand } from '@juno/contract/channels'
 
 export type { Accent, Theme } from '@juno/contract'
 
@@ -79,10 +79,11 @@ export function persistSidebar(sidebar: SidebarLayout): void {
   window.juno.launch.setSidebar(sidebar).catch(() => {})
 }
 
-/** Shows a native context menu at the pointer. Resolves with the chosen item's id, or undefined. */
-export async function popupContextMenu(items: ReadonlyArray<ContextMenuItem>): Promise<string | undefined> {
-  const chosen = await window.juno.contextMenu.popup(items).catch(() => null)
-  return typeof chosen === 'string' && items.some((item) => 'id' in item && item.id === chosen) ? chosen : undefined
+/** Shows a native context menu at the pointer, or at `at`. Resolves with the chosen item's id, or undefined. */
+export async function popupContextMenu(items: ReadonlyArray<ContextMenuItem>, at?: ContextMenuAt): Promise<string | undefined> {
+  const chosen = await window.juno.contextMenu.popup(items, at).catch(() => null)
+  const ids = items.flatMap((item) => ('submenu' in item ? item.submenu : [item])).flatMap((item) => ('id' in item ? [item.id] : []))
+  return typeof chosen === 'string' && ids.includes(chosen) ? chosen : undefined
 }
 
 /** Puts text on the clipboard. */
@@ -93,6 +94,11 @@ export function copyText(text: string): void {
 /** Opens a conversation in the Slack app. */
 export function openInSlack(target: SlackTarget): void {
   window.juno.shell.openInSlack(target).catch(() => {})
+}
+
+/** Undo in the focused text field. */
+export function editUndo(): void {
+  window.juno.shell.editUndo().catch(() => {})
 }
 
 /** Opens an http or https link in the browser. */

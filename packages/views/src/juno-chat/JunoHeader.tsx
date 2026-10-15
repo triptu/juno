@@ -1,8 +1,9 @@
-import * as stylex from '@stylexjs/stylex'
-import { DotsThree } from '@phosphor-icons/react/dist/icons/DotsThree'
 import { chatCopy, type Banner, type JunoPage } from '@juno/agent-contract'
-import { colors, layout, spacing } from '@juno/tokens/tokens.stylex'
-import { Chip, IconButton, OptionList, OptionRow, Popover, Text } from '@juno/ui'
+import type { ReactNode } from 'react'
+import { Chip, OptionList, OptionRow, Popover } from '@juno/ui'
+import { HeaderTitleButton } from '../header/HeaderControls'
+import { HeaderIslands } from '../header/HeaderIslands'
+import { JunoMark } from './JunoMark'
 import { TextButton } from './TextButton'
 
 export interface JunoHeaderProps {
@@ -12,6 +13,10 @@ export interface JunoHeaderProps {
   readonly onOpenPage: (page: JunoPage) => void
   /** The paused chip's Resume. */
   readonly onResume: () => void
+  /** `page` for the Juno tab (the chat's 720px column), `panel` for the Juno panel (its full width). Default `page`. */
+  readonly column?: 'page' | 'panel'
+  /** After the banner chip in the right island: the panel's Open in a tab and Close. */
+  readonly actions?: ReactNode
 }
 
 const pages: ReadonlyArray<{ readonly page: JunoPage; readonly label: string }> = [
@@ -24,29 +29,28 @@ const pages: ReadonlyArray<{ readonly page: JunoPage; readonly label: string }> 
 ]
 
 /**
- * The 44px bar over the chat (inventory 12): "Juno", the one banner chip
- * when the chat is not in its normal state, and the More menu with the six
- * pages. The chip is a 26px pill whose action is a text button: Resume on
- * paused, Review on recovery.
+ * The Juno header (inventory 12 and 12.1): the topic header's islands and
+ * band over the chat. Left: the Juno title button, which opens the Juno
+ * menu with the six pages. Right, only when there is something to show:
+ * the one banner chip, then the panel's `actions`. The chip's action is a
+ * text button: Resume on paused, Review on recovery. The owner's area is
+ * `position: relative`, with the chat list under it.
  */
-export function JunoHeader({ banner, menuOpen, onMenu, onOpenPage, onResume }: JunoHeaderProps) {
+export function JunoHeader({ banner, menuOpen, onMenu, onOpenPage, onResume, column = 'page', actions }: JunoHeaderProps) {
+  const chip = banner._tag === 'none' ? null : <BannerChip banner={banner} onResume={onResume} onOpenPage={onOpenPage} />
   return (
-    <header aria-label="Juno" {...stylex.props(styles.root)}>
-      <Text variant="heading" tone="default" as="h1">
-        Juno
-      </Text>
-      <span {...stylex.props(styles.chip)}>
-        <BannerChip banner={banner} onResume={onResume} onOpenPage={onOpenPage} />
-      </span>
-      <span {...stylex.props(styles.menu)}>
+    <HeaderIslands
+      column={column}
+      data={{ 'data-juno-header': '' }}
+      left={
         <Popover
           open={menuOpen}
           onClose={() => onMenu(false)}
           width="menu"
-          placement="bottom-end"
+          placement="bottom-start"
           role="menu"
           label="Juno menu"
-          anchor={<IconButton icon={DotsThree} label="More" size={30} iconSize={18} pressed={menuOpen} onClick={() => onMenu(!menuOpen)} />}
+          anchor={<HeaderTitleButton title="Juno" leading={<JunoMark size={18} />} expanded={menuOpen} onOpen={() => onMenu(!menuOpen)} />}
         >
           <OptionList role="menu" label="Juno pages" focusable>
             {pages.map((entry) => (
@@ -62,18 +66,25 @@ export function JunoHeader({ banner, menuOpen, onMenu, onOpenPage, onResume }: J
             ))}
           </OptionList>
         </Popover>
-      </span>
-    </header>
+      }
+      right={
+        chip === null && actions === undefined ? undefined : (
+          <>
+            {chip}
+            {actions}
+          </>
+        )
+      }
+    />
   )
 }
 
 /** One chip at a time, by the precedence the container applied. Its title is the full line. */
-function BannerChip({ banner, onResume, onOpenPage }: { readonly banner: Banner; readonly onResume: () => void; readonly onOpenPage: (page: JunoPage) => void }) {
+function BannerChip({ banner, onResume, onOpenPage }: { readonly banner: Exclude<Banner, { _tag: 'none' }>; readonly onResume: () => void; readonly onOpenPage: (page: JunoPage) => void }) {
   const copy = chatCopy.banner
-  if (banner._tag === 'none') return null
   const text = copy[banner._tag]
   return (
-    <Chip key={banner._tag} variant="filled" size={26} title={text.line} data-banner={banner._tag}>
+    <Chip key={banner._tag} variant="filled" size={28} title={text.line} data-banner={banner._tag}>
       {text.chip}
       {banner._tag === 'paused' ? (
         <>
@@ -93,34 +104,3 @@ function BannerChip({ banner, onResume, onOpenPage }: { readonly banner: Banner;
     </Chip>
   )
 }
-
-const styles = stylex.create({
-  root: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: spacing['--space-3'],
-    flexShrink: 0,
-    width: '100%',
-    height: layout['--titlebar-height'],
-    paddingInline: spacing['--space-5'],
-    boxSizing: 'border-box',
-    borderBottomWidth: '1px',
-    borderBottomStyle: 'solid',
-    borderBottomColor: colors['--border-subtle'],
-    color: colors['--foreground-default'],
-    userSelect: 'none',
-  },
-  // Fills the space between the title and the menu whether or not a chip is in it, so a chip coming or going changes no box.
-  chip: {
-    display: 'flex',
-    alignItems: 'center',
-    flexGrow: 1,
-    alignSelf: 'stretch',
-    minWidth: 0,
-  },
-  menu: {
-    display: 'inline-flex',
-    marginInlineStart: 'auto',
-    flexShrink: 0,
-  },
-})
