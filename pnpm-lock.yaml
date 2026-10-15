@@ -624,6 +624,9 @@ importers:
       effect:
         specifier: 4.0.3
         version: 4.0.3
+      https-proxy-agent:
+        specifier: 9.1.0
+        version: 9.1.0(supports-color@7.2.0)
     devDependencies:
       '@effect/vitest':
         specifier: 4.0.3
