@@ -5,7 +5,7 @@
  */
 import { Schema } from 'effect'
 import { Digest } from '@juno/agent-cards'
-import { Card, Deliver } from './cards'
+import { Card, Deliver, ReviewRule, ToolReview } from './cards'
 import { ChatMessageId, ConnectionId, JobId, PinId, RunId, ScheduleId } from './ids'
 
 /* Scheduled ---------------------------------------------------------------- */
@@ -76,6 +76,8 @@ export const ActivityAction = Schema.Struct({
   outcome: Schema.Literals(['done', 'failed', 'unknown', 'pending', 'none']),
   /** Plain words for a failure, with the technical detail behind "Copy details". */
   failure: Schema.optionalKey(Schema.Struct({ text: Schema.String, details: Schema.String })),
+  /** A connection call's auto-review: the rule, the reviewer's answers, and one line on why Juno asked or ran it. */
+  review: Schema.optionalKey(ToolReview),
 })
 export type ActivityAction = typeof ActivityAction.Type
 
@@ -107,15 +109,20 @@ export type ConnectionState = typeof ConnectionState.Type
 
 export const DiscoveredTool = Schema.Struct({
   name: Schema.String,
-  /** Current schema to bind an owner tier change. */
+  /** The schema the row was read at. */
   schemaHash: Schema.optionalKey(Digest),
-  /** Tier 0 reads need no click; Tier 3 is a card every time. */
-  tier: Schema.Literals([0, 3]),
-  /** The server's hint, shown and never trusted. */
+  /**
+   * A read: on the code's read list, or marked read-only by the server with
+   * its schema unchanged since Juno first saw it. Reads run with no review.
+   */
+  read: Schema.Boolean,
+  /** The server's one-line description, shown and never trusted. */
   hint: Schema.optionalKey(Schema.String),
-  /** On the server's default allowlist. */
-  allowlisted: Schema.Boolean,
-  /** Its schema changed since review: dropped to Tier 3. */
+  /** Offered to Juno. Every tool is on until the owner turns it off. */
+  enabled: Schema.Boolean,
+  /** The owner's auto-review rule for this tool. `auto` follows the connection's rule. */
+  review: ReviewRule,
+  /** Its schema changed since Juno first saw it, so a read-only claim no longer counts. */
   changed: Schema.optionalKey(Schema.Literal(true)),
 })
 export type DiscoveredTool = typeof DiscoveredTool.Type
@@ -144,6 +151,8 @@ export const ConnectionRow = Schema.Struct({
   t3: Schema.optionalKey(T3Address),
   tools: Schema.Array(DiscoveredTool),
   enabled: Schema.Boolean,
+  /** The owner's auto-review rule for every tool of this connection that has none of its own. */
+  review: ReviewRule,
   /** The owner added this server; Remove deletes it. Notion, Littlebird and T3 Code stay. */
   removable: Schema.optionalKey(Schema.Literal(true)),
 })
