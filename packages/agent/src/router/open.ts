@@ -182,7 +182,7 @@ export interface Turns {
   readonly pins: {
     readonly active: () => Pins
     /** "Remember this" on an owner message. */
-    readonly pinMessage: (input: { readonly messageId: number; readonly from?: number; readonly to?: number }) => PinResult
+    readonly pinMessage: (input: { readonly id?: string; readonly messageId: number; readonly from?: number; readonly to?: number }) => PinResult
     readonly edit: (expected: { readonly id: string; readonly version: number }, text: string) => PinResult
     readonly undo: (expected: { readonly id: string; readonly version: number }) => PinResult
   }
@@ -582,7 +582,7 @@ async function start(
     rotate: router.rotate,
     pins: {
       active: () => activePins(store),
-      pinMessage: (input) => pinMessage(store, { id: uuidv7(store.now()), ...input }),
+      pinMessage: (input) => pinMessage(store, { ...input, id: input.id ?? uuidv7(store.now()) }),
       edit: (expected, text) => editPin(store, expected, text),
       undo: (expected) => undoPin(store, expected),
     },

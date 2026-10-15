@@ -362,7 +362,7 @@ it('the owner removes a message from the sheet with AI assist off, and the chat 
   const messageId = String(ownerMessageId(h.turns, said)) as ChatMessageId
   const result = await run(client['agent.chat.remove']({ opId: 'remove-1' as OpId, messageId, alsoRemoveReply: true }))
   expect(result).toMatchObject({ _tag: 'Success', success: { opId: 'remove-1' } })
-  const page = await pageWhere((p) => of(p, 'note').length === 1, 'the Removed note')
+  const page = await pageWhere((p) => of(p, 'note').length === 2, 'the Removed notes')
   expect(of(page, 'note')[0]).toEqual({ _tag: 'note', id: messageId, kind: 'removed' })
   expect(of(page, 'owner').map((o) => o.text)).toEqual(['and the shed is blue'])
   // The reply that quoted it now reads Removed, and Juno's reply to it is gone.
