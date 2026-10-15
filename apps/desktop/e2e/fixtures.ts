@@ -57,6 +57,10 @@ export interface LaunchOptions {
   readonly agent?: boolean
   /** The fake OpenRouter the agent reads its catalogue from and sends chat requests to. */
   readonly fakeOpenRouterUrl?: string
+  /** This app's name in the backup, so two launches can play two Macs (`JUNO_E2E_DEVICE_NAME`). */
+  readonly deviceName?: string
+  /** How often the backup exports, in place of once a minute (`JUNO_E2E_BACKUP_INTERVAL_MS`). */
+  readonly backupIntervalMs?: number
 }
 
 /**
@@ -78,6 +82,8 @@ export async function launchApp(userData: string, options: LaunchOptions = {}): 
   if (options.agent === true) env.JUNO_E2E_OPENROUTER_KEY = E2E_OPENROUTER_KEY
   const openRouterUrl = options.fakeOpenRouterUrl ?? ownOpenRouter?.origin
   if (openRouterUrl !== undefined) env.JUNO_FAKE_OPENROUTER_URL = openRouterUrl
+  if (options.deviceName !== undefined) env.JUNO_E2E_DEVICE_NAME = options.deviceName
+  if (options.backupIntervalMs !== undefined) env.JUNO_E2E_BACKUP_INTERVAL_MS = String(options.backupIntervalMs)
 
   // Launch the package directory (like `electron .`), not the script, so
   // Electron reads package.json for the app name and version.

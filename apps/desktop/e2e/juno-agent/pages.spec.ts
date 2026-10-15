@@ -27,9 +27,9 @@ test('Settings › Juno shows what is built, with the provider in use, and pause
   await openPage(juno, 'Settings › Juno')
   const page = juno.win.locator('main')
   await expect(page.getByRole('heading', { name: 'Juno', exact: true })).toBeVisible()
-  for (const heading of ['Provider', 'Model', 'Spend', 'Rules', 'Pause']) await expect(page.getByRole('heading', { name: heading })).toBeVisible()
-  // Codex, Backup and This Mac wait for their work packages.
-  for (const heading of ['Codex', 'Backup', 'This Mac']) await expect(page.getByRole('heading', { name: heading })).toHaveCount(0)
+  for (const heading of ['Provider', 'Model', 'Spend', 'Rules', 'Pause', 'Backup', 'This Mac']) await expect(page.getByRole('heading', { name: heading })).toBeVisible()
+  // Codex waits for its work package.
+  await expect(page.getByRole('heading', { name: 'Codex' })).toHaveCount(0)
   // The launch set OpenRouter up: its key is set and it is in use.
   await expect(page.locator('[data-provider-shown]')).toHaveAttribute('data-provider-shown', 'openRouter')
   await expect(page.locator('[data-provider-key]')).toHaveAttribute('data-provider-key', 'set')
