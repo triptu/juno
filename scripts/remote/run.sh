@@ -13,7 +13,7 @@ electron=$(node -e "console.log(require('./apps/desktop/node_modules/electron'))
 
 # One job per machine, so it can use all of it. Sizes follow the core count
 # (2 to 16, see remoteShapes in scripts/remote.mjs) and never drop below 1.
-cores=$(nproc)
+cores=${JUNO_RUNNER_JOB_CORES:-$(nproc)}
 at_least() { echo $(( $1 > $2 ? $1 : $2 )); }
 export GALLERY_BROWSER=chromium JUNO_HEAVY_SLOTS=1 JUNO_TEST_FILE_PARALLEL=1
 export JUNO_TYPECHECK_JOBS=${JUNO_TYPECHECK_JOBS:-$(at_least $(( cores / 2 )) 1)}
@@ -26,7 +26,14 @@ export GALLERY_WORKERS=${GALLERY_WORKERS:-$(( cores * 3 ))} GALLERY_SHIFT_PARTS=
 # Spec simulations run beside the Apalache checks here (on the Mac they run first).
 export SPECS_JOBS=${SPECS_JOBS:-$(at_least $(( cores / 2 )) 1)} SPECS_APALACHE=${SPECS_APALACHE:-$(at_least $(( cores / 4 )) 1)} SPECS_OVERLAP=1
 # Samples how busy the machine is every 2 s, to size the workers above.
-( prev=($(head -1 /proc/stat)); while sleep 2; do
+( prev=($(head -1 /proc/stat)); previous_usage=$(awk '$1 == "usage_usec" { print $2 }' /sys/fs/cgroup/cpu.stat 2>/dev/null)
+  while sleep 2; do
+    if [ -n "${JUNO_RUNNER_JOB_CORES:-}" ]; then
+      usage=$(awk '$1 == "usage_usec" { print $2 }' /sys/fs/cgroup/cpu.stat)
+      echo $(( (usage - previous_usage) / (20000 * cores) )) >> /out/cpu.txt
+      previous_usage=$usage
+      continue
+    fi
     now=($(head -1 /proc/stat)); idle=$(( now[4] + now[5] - prev[4] - prev[5] )); total=0
     for i in 1 2 3 4 5 6 7 8; do total=$(( total + now[i] - prev[i] )); done
     [ $total -gt 0 ] && echo $(( 100 * (total - idle) / total )) >> /out/cpu.txt; prev=("${now[@]}")
@@ -38,11 +45,11 @@ code=$?
 echo "remote: script time $(( SECONDS - script_started )) s" >&2
 kill $sampler 2>/dev/null
 if [ -s /out/cpu.txt ]; then
-  sort -n /out/cpu.txt | awk '{ s += $1; v[NR] = $1 } END { printf "remote: CPU busy %d%% on average, %d%% at the median, over %d s on %d cores\n", s / NR, v[int((NR + 1) / 2)], NR * 2, '"$(nproc)"' }' >&2
+  sort -n /out/cpu.txt | awk '{ s += $1; v[NR] = $1 } END { printf "remote: CPU busy %d%% on average, %d%% at the median, over %d s on %d cores\n", s / NR, v[int((NR + 1) / 2)], NR * 2, '"$cores"' }' >&2
 fi
 
 reports=()
-for path in specs/traces apps/desktop/test-results apps/desktop/playwright-report apps/gallery/test-results apps/gallery/playwright-report apps/gallery/shots; do
+for path in specs/traces apps/desktop/test-results apps/desktop/playwright-report apps/desktop/blob-report apps/gallery/test-results apps/gallery/playwright-report apps/gallery/shots; do
   [ -e "$path" ] && reports+=("$path")
 done
 # The spec cache pnpm remote brought along, with what this run added to it.
