@@ -7,7 +7,8 @@ export default defineConfig({
     // repo root, which parallel `pnpm test` runs race on.
     fsModuleCachePath: fileURLToPath(new URL('./node_modules/.vitest-cache', import.meta.url)),
     // Several agents share one machine; keep each run small (see scripts/heavy.mjs).
-    maxWorkers: 2,
+    // A machine of its own (pnpm remote) sets JUNO_VITEST_WORKERS higher.
+    maxWorkers: Number(process.env.JUNO_VITEST_WORKERS ?? 2),
     include: ['test/**/*.test.ts'],
     // Engine tests boot a whole engine against an in-process fake Slack. On a
     // shared, loaded machine (load average 20 and up) a cold boot alone can take
