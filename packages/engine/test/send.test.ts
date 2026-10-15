@@ -46,7 +46,7 @@ async function send(engine: RunningEngine, text: string, rows: ReturnType<typeof
   const exit = await sendMessage(engine.registry, eng, text, MAIN)
   expect(valueOf(exit)).toEqual({ topicId: MAIN })
   const shown = await rows((list) => list.some((row) => row.pending !== undefined && textOf(row) === text), `"${text}" shown`)
-  return shown.find((row) => textOf(row) === text)!.pending!.clientMsgId
+  return shown.find((row) => textOf(row) === text)!.clientMsgId!
 }
 
 const textOf = (row: MessageView) =>
@@ -179,7 +179,7 @@ describe('send', () => {
     engine.fake.forceError({ method: 'chat.postMessage', error: 'restricted_action', times: 2 })
     const kept = await send(engine, 'Try me again', rows)
     const dropped = await send(engine, 'Throw me away', rows)
-    await rows((list) => list.filter((row) => row.pending?.state === 'failed').length === 2, 'both failed')
+    await rows((list) => list.filter((row) => row.pending === 'failed').length === 2, 'both failed')
     expect(inStore(engine, kept).pending).toBe('failed')
 
     expect(valueOf(await retryMessage(engine.registry, kept))).toBeUndefined()

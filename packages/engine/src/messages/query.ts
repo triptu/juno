@@ -388,9 +388,8 @@ function shapeRow(row: WindowMessage, body: CachedBody, input: ShapeInput): Mess
     reactions: kind === 'message' ? reactions : [],
     files: kind === 'message' ? filesOf(row) : [],
     ...(input.thread === undefined ? {} : { thread: input.thread }),
-    ...(input.pending === undefined
-      ? {}
-      : { pending: { clientMsgId: input.pending.client_msg_id, state: input.pending.state === 'failed' ? ('failed' as const) : ('sending' as const) } }),
+    ...(row.client_msg_id === null ? {} : { clientMsgId: row.client_msg_id }),
+    ...(input.pending === undefined ? {} : { pending: input.pending.state === 'failed' ? ('failed' as const) : ('sending' as const) }),
   }
   return { ...fields, rev: hashId(JSON.stringify(fields)) } as MessageView
 }
@@ -421,6 +420,7 @@ const pendingMessage = (row: PendingRow, selfId: string | undefined): WindowMess
   attachments_json: null,
   edited_ts: null,
   deleted: 0,
+  client_msg_id: row.client_msg_id,
   reply_count: 0,
   latest_reply: null,
   version: 0,
