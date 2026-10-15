@@ -1,22 +1,31 @@
-import { chatCopy } from '@juno/agent-contract'
+import { chatCopy, type ModelChoice } from '@juno/agent-contract'
 import { defineFixtures, fixture } from '@juno/ui'
 import { NOW, settings, settingsRecovery, settingsReleased, settingsTrouble } from './fixtures'
 import { JunoSettingsPage, type JunoSettingsPageProps } from './JunoSettingsPage'
+import { ProviderSection, type ProviderSectionProps } from './ProviderSection'
 
 const noop = () => {}
+const emptyDrafts = { openRouterKey: '', baseUrl: '', customKey: '' }
+const none: ProviderSectionProps['state'] = { active: null, openRouter: { key: 'missing' }, custom: { baseUrl: '', key: 'missing' } }
+const LOCAL = 'http://localhost:11434/v1'
+
+const provider = (props: Partial<ProviderSectionProps> = {}) => (
+  <ProviderSection state={{ ...none, active: 'openRouter', openRouter: { key: 'set' } }} shown="openRouter" drafts={emptyDrafts} onShow={noop} onDraft={noop} onSave={noop} onRemove={noop} {...props} />
+)
+const onCustom = (key: 'set' | 'missing' = 'missing') =>
+  provider({ state: { ...none, active: 'custom', custom: { baseUrl: LOCAL, key } }, shown: 'custom', drafts: { ...emptyDrafts, baseUrl: LOCAL } })
+
+const callbacks = { now: NOW, onChatModel: noop, onCompactionModel: noop, onCap: noop, onPaused: noop }
+
 const page = (props: Pick<JunoSettingsPageProps, 'page'>) =>
   fixture<JunoSettingsPageProps>({
     ...props,
-    now: NOW,
-    onChatModel: noop,
-    onCompactionModel: noop,
-    onCap: noop,
-    onOpenRouterKey: noop,
+    ...callbacks,
+    providers: provider(),
     onSignInCodex: noop,
     onRuleChange: noop,
     onRuleRemove: noop,
     onRuleAdd: noop,
-    onPaused: noop,
     onBackupFolder: noop,
     onExportPhrase: noop,
     onMove: noop,
@@ -24,23 +33,20 @@ const page = (props: Pick<JunoSettingsPageProps, 'page'>) =>
     onStopJob: noop,
   })
 
-/** What the app wires today: the models, spend, OpenRouter, the rules and Pause. Codex, Backup and This Mac wait for their work packages. */
-const today = (props: Pick<JunoSettingsPageProps, 'page' | 'keyEntry' | 'rulesError'>) =>
+/** What the app wires today: the provider, the models, spend, the rules and Pause. Codex, Backup and This Mac wait for their work packages. */
+const today = (props: Partial<Pick<JunoSettingsPageProps, 'page' | 'providers' | 'rulesError'>> = {}) =>
   fixture<JunoSettingsPageProps>({
+    page: settings,
+    providers: provider(),
     ...props,
-    now: NOW,
-    onChatModel: noop,
-    onCompactionModel: noop,
-    onCap: noop,
-    onOpenRouterKey: noop,
-    onPaused: noop,
+    ...callbacks,
     onRuleChange: noop,
     onRuleRemove: noop,
     onRuleAdd: noop,
     onRulesCommit: noop,
   })
 
-const entry = (draft: string, error?: string) => ({ draft, ...(error === undefined ? {} : { error }), onDraft: noop, onSave: noop, onCancel: noop })
+const local = (id: string, selected = false): ModelChoice => ({ family: id, resolved: id, provider: 'custom', selected })
 
 export default defineFixtures(
   JunoSettingsPage,
@@ -53,13 +59,19 @@ export default defineFixtures(
       released: page({ page: settingsReleased }),
     },
     Today: {
-      'built-today': today({ page: settings }),
-      'no-key': today({ page: { ...settings, openRouterKey: 'missing' } }),
-      'key-entry': today({ page: { ...settings, openRouterKey: 'missing' }, keyEntry: entry('sk-or-v1-0123') }),
-      'key-invalid': today({ page: { ...settings, openRouterKey: 'missing' }, keyEntry: entry('not a key', chatCopy.pages.settings.keyInvalid) }),
-      'key-rejected': today({ page: { ...settings, openRouterKey: 'rejected' } }),
+      'open-router': today(),
+      // No provider: no agent runs, so the page is the provider alone.
+      'no-provider': fixture<JunoSettingsPageProps>({ ...callbacks, providers: provider({ state: none }) }),
+      'key-rejected': today({ page: { ...settings, openRouterKey: 'rejected' }, providers: provider({ rejected: true }) }),
+      // An OpenAI-compatible endpoint that lists its models: one chat model, used for compaction too.
+      'custom-listed': today({
+        page: { ...settings, provider: 'custom', chatModels: [local('llama3.2', true), local('qwen2.5-coder')], compactionModels: [], spendUntracked: true },
+        providers: onCustom(),
+      }),
+      // One that lists none: the model id is typed.
+      'custom-typed': today({ page: { ...settings, provider: 'custom', chatModels: [local('mistral-small', true)], compactionModels: [], modelTyped: true, spendUntracked: true }, providers: onCustom('set') }),
       'no-rules': today({ page: { ...settings, rules: [] } }),
-      'rules-refused': today({ page: settings, rulesError: chatCopy.pages.settings.rulesInvalid }),
+      'rules-refused': today({ rulesError: chatCopy.pages.settings.rulesInvalid }),
     },
   },
   { width: 960, height: 880, padded: false },

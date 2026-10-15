@@ -7,7 +7,7 @@ import {
   discardMessage,
   dividerIndex,
   headerRenamingAtom,
-  junoAgentOnAtom,
+  junoAvailableAtom,
   junoPanelOpenAtom,
   loadOlderMessages,
   messageFlashAtom,
@@ -293,7 +293,7 @@ function Topic({ id, detail, readOnly = false, underHeader = true }: TopicProps)
     registry.set(openedAtNewAtom(id), dividerBefore)
     registry.set(catchUpDoneAtom(id), false)
   }, [id, readOnly, dividerBefore])
-  const agentOn = useAtomValue(junoAgentOnAtom)
+  const agentOn = useAtomValue(junoAvailableAtom)
   const panelOpen = useAtomValue(junoPanelOpenAtom)
 
   const [positioned, setPositioned] = useState(false)

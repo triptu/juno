@@ -130,8 +130,8 @@ test('Main’s Notify me is its channel’s, and the header is reached pill, tit
     await win.keyboard.press('Tab')
   }
   expect(order).toEqual(['eng, public channel. Show in sidebar.', 'Main', 'Threads, 3'])
-  // No Juno button until the Juno panel exists.
-  await expect(juno.topic.header.getByRole('button', { name: 'Juno ⌘J' })).toHaveCount(0)
+  // Juno is on unless AI assist is off, so the header has its button.
+  await expect(juno.topic.header.getByRole('button', { name: 'Juno ⌘J' })).toBeVisible()
 })
 
 test('the context pill scopes the sidebar to its channel', async ({ juno }) => {

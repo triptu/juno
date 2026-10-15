@@ -4,7 +4,8 @@ import { join } from 'node:path'
 import { createAgentSupervisor } from './agent'
 import { createSupervisor } from './engine'
 import { contextMenuForTests, registerIpc, slackLinksForTests } from './ipc'
-import { macKeychain, memoryKeychain, OpenRouterKeyStore } from './keychain'
+import { CUSTOM_ITEM, macKeychain, memoryKeychain, OPENROUTER_ITEM } from './keychain'
+import { ProviderStore } from './providers'
 import { launchWriter, readLaunch, type Launch } from './launch'
 import { registerAppScheme, serveAppScheme } from './scheme'
 import { SecretsStore } from './secrets'
@@ -80,21 +81,26 @@ const notifier = new Notifier({
 })
 supervisor.onReady(() => notifier.engineReady())
 
-// The agent process starts only on request until the chat ships (ADR 0012, M2).
-const agent =
-  process.env.JUNO_AGENT === '1'
-    ? createAgentSupervisor(
-        (port) => supervisor.send({ _tag: 'agentPort' }, [port]),
-        () => supervisor.currentState === 'ready',
-      )
-    : undefined
-supervisor.onReady(() => agent?.linkHost())
-
-// The OpenRouter key: the keychain's, or OPENROUTER_API_KEY in development. Tests get a keychain in memory.
-const openRouterKey = new OpenRouterKeyStore(e2e ? memoryKeychain() : macKeychain(), e2e ? undefined : process.env.OPENROUTER_API_KEY, (key) =>
-  agent?.setOpenRouterKey(key),
+// The agent runs whenever a model provider is set up (ADR 0012, SPEC 13.10).
+const agent = createAgentSupervisor(
+  (port) => supervisor.send({ _tag: 'agentPort' }, [port]),
+  () => supervisor.currentState === 'ready',
 )
-if (agent) void openRouterKey.load()
+supervisor.onReady(() => agent.linkHost())
+
+// The providers: keys in the keychain (in memory under tests), OPENROUTER_API_KEY as a development override.
+const providers = new ProviderStore(
+  app.getPath('userData'),
+  e2e ? { openRouter: memoryKeychain(), custom: memoryKeychain() } : { openRouter: macKeychain(OPENROUTER_ITEM), custom: macKeychain(CUSTOM_ITEM) },
+  // Under JUNO_E2E only the test seam: a test launches with a key, never the developer's.
+  e2e ? process.env.JUNO_E2E_OPENROUTER_KEY : process.env.OPENROUTER_API_KEY,
+  (state, provider) => {
+    agent.setProvider(provider)
+    for (const window of BrowserWindow.getAllWindows()) {
+      if (!window.isDestroyed()) window.webContents.send(Events.agentProviderChanged, state)
+    }
+  },
+)
 
 const sessionHost = new SessionHost({
   secrets: new SecretsStore(app.getPath('userData'), { plaintext: e2e }),
@@ -116,7 +122,7 @@ app.whenReady().then(() => {
     supervisor,
     setViewing: (topicId) => notifier.setViewing(topicId),
     agent,
-    openRouterKey,
+    providers,
     setTheme: (theme) => updateLaunch({ theme }),
     setAccent: (accent) => updateLaunch({ accent }),
     setDensity: (density) => updateLaunch({ density }),
@@ -128,7 +134,7 @@ app.whenReady().then(() => {
 
   // Fork the engine and open the window in the same tick; neither waits.
   supervisor.start()
-  agent?.start()
+  void providers.load()
   openWindow()
 
   app.on('activate', () => {
@@ -148,7 +154,7 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => {
   supervisor.stop()
-  agent?.stop()
+  agent.stop()
 })
 
 // The window's close writes its bounds as the app quits; a process that
@@ -170,9 +176,9 @@ if (e2e) {
       failEngine: () => supervisor.giveUp(),
       contextMenu: contextMenuForTests,
       slackLinks: slackLinksForTests,
-      agentState: () => agent?.currentState ?? 'stopped',
-      agentHost: () => agent?.host?.host,
-      agentPid: () => agent?.pid,
+      agentState: () => agent.currentState,
+      agentHost: () => agent.host?.host,
+      agentPid: () => agent.pid,
       notifications: () => notificationsForTests.map(({ title, body }) => ({ title, body })),
       clickNotification: (index = 0) => notificationsForTests[index]?.click(),
       dockBadge: () => badgeForTests,

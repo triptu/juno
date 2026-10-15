@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fakeProvider, type FakeProviderOptions } from '@juno/agent-testing'
 import type { BubbleId, ReplyTarget, SendContext } from '@juno/agent-contract'
-import { createProviderGuard, openTurns, type ActionsOptions, type HostReads, type MigrationSet, type ModelRef, type TurnEvent, type Turns } from '../src/index'
+import { createProviderGuard, openTurns, type ActionsOptions, type TurnsOptions, type HostReads, type MigrationSet, type ModelRef, type TurnEvent, type Turns } from '../src/index'
 
 export const SONNET: ModelRef = { provider: 'openrouter', modelId: 'anthropic/claude-sonnet-5.5' }
 export const HAIKU: ModelRef = { provider: 'openrouter', modelId: 'anthropic/claude-haiku-5.5' }
@@ -34,6 +34,8 @@ export interface HarnessOptions {
   readonly dir?: string
   /** Removal's backup hooks. */
   readonly backup?: import('../src/redaction').RemovalBackup
+  /** The app's provider and models (`providerTurns`) in place of the scripted fake. */
+  readonly app?: Pick<TurnsOptions, 'provider' | 'model' | 'compaction'>
 }
 
 export async function turnsHarness(options: HarnessOptions = {}) {
@@ -44,9 +46,9 @@ export async function turnsHarness(options: HarnessOptions = {}) {
     agentDir: dir,
     ...(options.now ? { now: options.now } : {}),
     ...(options.schedule ? { schedule: options.schedule } : {}),
-    provider: (store) => createProviderGuard({ store, transport: options.transport?.(fake) ?? fake.models }),
-    model: options.model ?? SONNET,
-    ...(options.compaction === false ? {} : { compaction: HAIKU }),
+    provider: options.app?.provider ?? ((store) => createProviderGuard({ store, transport: options.transport?.(fake) ?? fake.models })),
+    model: options.app?.model ?? options.model ?? SONNET,
+    ...(options.compaction === false ? {} : { compaction: options.app?.compaction ?? HAIKU }),
     ...(options.subagent ? { subagent: options.subagent } : {}),
     ...(options.views ? { views: options.views } : {}),
     ...(options.host ? { host: options.host } : {}),
