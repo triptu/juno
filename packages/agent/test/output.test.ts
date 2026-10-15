@@ -30,6 +30,15 @@ it('shows a source as its words, and keeps the handle the model wrote', () => {
   ])
 })
 
+it('reads the short form <src m3> as a source too', () => {
+  expect(parseOutput('<say><src m3>Thursday at 14:00</src>, and <src m12 >room 4</src>.</say>').bubbles[0]!.spans).toEqual([
+    { text: 'Thursday at 14:00', source: 'm3' },
+    { text: ', and ' },
+    { text: 'room 4', source: 'm12' },
+    { text: '.' },
+  ])
+})
+
 it('never shows a handle: a malformed source keeps only its words', () => {
   const texts = parseOutput(
     "<say>A <src m='m3'>single-quoted</src> one, a <src m=\"m4\"/>closed one, a <src>bare</src> one and <src m=\"m5\" >a spaced</src> one.</say>",
