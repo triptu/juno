@@ -2,7 +2,7 @@
 
 These specs describe the protocols and their limits. They do not certify the application code. Only the model checks are tests here.
 
-`follow.qnt` models the current follow command seam, two threads inside the quiet window, and one older thread. It includes Slack writes, socket delivery, HTTP pages, boot and hourly window passes, shorter reconnect reads, and activity lookups. Its `followProtocol` module takes constants; `follow` supplies the full simulator instance. `readstate.qnt` models read state as implemented in M4: Main and one followed thread that mirror, and one unfollowed thread that stays local. Its `readProtocol` module takes constants; `readstate` supplies the full simulator instance and `readstate-bounded.qnt` a small one. Like follow, it keeps Slack's event clock and Juno's observation clock apart. `outbox.qnt` models message sends, ambiguous failures, restart recovery and reconciliation, and edits, deletes and reaction toggles on Juno's own posts. Its `outboxProtocol` module takes constants; `outbox` supplies two draft IDs.
+`follow.qnt` models the current follow command seam, two threads inside the quiet window, and one older thread. It includes Slack writes, socket delivery, HTTP pages, boot and hourly window passes, shorter reconnect reads, and activity lookups. Its `followProtocol` module takes constants; `follow` supplies the full simulator instance. `readstate.qnt` models read state as implemented in M4: Main and one followed thread that mirror, and one unfollowed thread that stays local. Its `readProtocol` module takes constants; `readstate` supplies the full simulator instance and `readstate-bounded.qnt` a small one. Like follow, it keeps Slack's event clock and Juno's observation clock apart. `outbox.qnt` models message sends, ambiguous failures, restart recovery and reconciliation, and edits, deletes and reaction toggles on Juno's own posts. Its `outboxProtocol` module takes constants; `outbox` supplies two draft IDs. `catchup.qnt` models messages that other clients post, edit, delete and react to while the socket is down, and the recheck after the reconnect; `catchupProtocol` takes constants and `catchup` supplies three messages.
 
 ## Follow rules and assumptions
 
@@ -118,6 +118,28 @@ The corrected `echoKeepsRow` and `answerAfterEcho` schedules cover echo before a
 `pnpm specs:check --outbox` selects only this model, its 10,000 random traces and eleven corrected schedules plus six broken variants. `--traces` reduces random sampling to 100. The normal root check includes them too. No new Apalache run is added: the existing 19 bounded checks remain, and the twelve-minute total execution budget and 60-second child deadline are unchanged. This is sampled safety and a finite drain check, not an exhaustive or unbounded liveness proof.
 
 Validation on 2026-10-15: the full root `pnpm specs:check` passed in **636.2 seconds (10m 36s)**, excluding the machine-lock wait. It ran the 10,000 outbox samples, all seven corrected outbox schedules, all four expected outbox counterexamples, the existing protocol suites and all 19 bounded checks. Every outbox sample reached agreement. This run held both heavy-job slots with `pnpm exec node scripts/heavy.mjs --exclusive pnpm specs:check`. An earlier shared-slot run hit the same twelve-minute deadline during a bounded follow check. The execution budget and child deadlines are unchanged.
+
+## Catch-up rules and assumptions
+
+- Another client posts (in ts order, so a later key is a later ts), edits (a new version), deletes, and toggles a reaction on messages 1 to 3. Each change has a stamp from one clock and an event; `disconnect` drops queued events and nothing is sent while the socket is down. The code compares Slack's event ts with Juno's request ts the same way.
+- `deliver` applies an event as `events.ts` does: a post stores the message, an edit takes the newer version, a delete is a tombstone that always wins, and a reaction change applies when its stamp is newer than the message's `last_event_ts` (`jStamp`).
+- `requestPage(false)` is any fetch of the conversation (an opened topic); `requestPage(true)` is the recheck, due after `reconnect`. A page is Slack's state at the request (`requestedAt`) and lands later; HTTP answers survive a drop. `finishPage` merges it: newer versions apply, and its reactions apply to messages whose `jStamp` is older than `requestedAt`.
+- The recheck page records the messages the store held at the request (`known`); a known message missing from the page is deleted (`knownGuard`). Other pages infer no deletion. The recheck is requested only when no other fetch is in flight (`waitGuard`): the code runs rechecks one at a time under the work permit and waits for the opened topics' and roots' fetches requested before it (`awaitEarlierFetches`).
+- The model's pages are complete for all three messages: the recheck's topic limit and lookback are outside it, and so is a page's span (`has_more`). `seal` stops new changes and drops; the drain bound is 32 transitions.
+
+| Quint name | Plain meaning |
+| --- | --- |
+| `noFalseDelete` | Juno shows a message as deleted only when Slack deleted it. |
+| `quietAgreement` | Once quiet after `seal` (connected, no recheck due, no events or pages left), every message Juno holds is deleted as in Slack, or has Slack's version and reaction. A message posted and deleted while the socket was down may never be stored. |
+| `drainBound`, `reachedAgreement` | As for the outbox. |
+
+| Schedule | Ordering and guard | Broken property |
+| --- | --- | --- |
+| `newerThanPage` | After a reconnect the recheck's page is requested; a new message is posted and its event stores it; the page lands without it. The guard deletes only messages known at the request. The bug deletes the new message. | `noFalseDelete` |
+| `dropChanges` | An edit, a reaction and a delete while the socket is down. The guarded reconnect rechecks and Juno agrees with Slack. The bug reconnects without the recheck, the gap Juno had before M7: the old text, the old reaction and the deleted message stay. | `quietAgreement` |
+| `olderPage` | An opened topic's page is requested, the socket drops and the message is deleted. The guarded recheck waits for that page, then finds the message gone. The bug asks at once; the older page lands last and brings the deleted message back. | `quietAgreement` |
+
+The random simulation (10,000 traces of at most 160 transitions) found two forms of the `olderPage` race before the wait was added: an opened topic's page, and an earlier recheck's page, landing after a later recheck. Four seeds of 10,000 traces each pass with it. `pnpm specs:check` runs the random traces and the three pairs with the other protocols.
 
 ## Accepted Unsubscribe: three races and their guards
 

@@ -316,7 +316,12 @@ const regressions = [
   ['outbox', 'actionBeforeStore', 'actionNeedsMessage', 'outbox-action-before-store'],
   ['outbox', 'actionOnDiscarded', 'noActionOnDiscarded', 'outbox-action-on-discarded'],
   ['outbox', 'offlineSend', 'sendsWaitOffline', 'outbox-offline-send'],
+  ['catchup', 'newerThanPage', 'noFalseDelete', 'catchup-newer-than-page'],
+  ['catchup', 'dropChanges', 'quietAgreement', 'catchup-drop-changes'],
+  ['catchup', 'olderPage', 'quietAgreement', 'catchup-older-page'],
 ]
+// Specs whose corrected runs must reach their drained agreement.
+const drained = new Set(['outbox', 'catchup'])
 
 const selectedSpec = actionsOnly ? 'agent-actions.qnt' : recoveryOnly ? 'agent-recovery.qnt' : memoryOnly ? 'agent-memory.qnt' : outboxOnly ? 'outbox.qnt' : undefined
 for (const file of readdirSync(join(root, 'specs')).filter(name => name.endsWith('.qnt') && (!selectedSpec || name === selectedSpec || (recoveryOnly && name === 'agent-recovery-replay.qnt'))).toSorted()) {
@@ -324,13 +329,13 @@ for (const file of readdirSync(join(root, 'specs')).filter(name => name.endsWith
 }
 
 if (!memoryOnly && !actionsOnly && !recoveryOnly && !boundedOnly) {
-  for (const file of (outboxOnly ? ['outbox'] : ['follow', 'readstate', 'outbox'])) {
+  for (const file of (outboxOnly ? ['outbox'] : ['follow', 'readstate', 'outbox', 'catchup'])) {
     simulate(file, 'simulationStep', 'invariants', `${file}.itf.json`, false, true,
-      file === 'outbox' ? { witnesses: ['reachedAgreement'] } : {})
+      drained.has(file) ? { witnesses: ['reachedAgreement'] } : {})
   }
   for (const [file, schedule, invariant, name, guardedInvariant = 'invariants'] of regressions.filter(([file]) => !outboxOnly || file === 'outbox')) {
     simulate(file, `${schedule}Step`, guardedInvariant, `${name}.itf.json`, false, false,
-      file === 'outbox' ? { samples: 1, witnesses: ['reachedAgreement'], requireCompletion: true } : {})
+      drained.has(file) ? { samples: 1, witnesses: ['reachedAgreement'], requireCompletion: true } : {})
     simulate(file, `${schedule}BugStep`, invariant, `${name}-bug.itf.json`, true)
   }
   for (const schedule of ['answerBeforeEcho', 'lostLookupAbsent', 'reconnectPage', 'dependentDelete', 'actionRetry']) {

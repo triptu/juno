@@ -3,7 +3,9 @@
 // follows and unfollows (from another client and from Juno's commands),
 // follow events the socket delays across commands, Juno's own sends through
 // the outbox with lost answers and errors Slack may give after posting, and
-// socket drops, the store equals the fake, follow state equals the fake's
+// socket drops with posts, edits, deletes, reactions and sends made while the
+// socket is down (the recheck after a drop, specs/catchup.qnt), the store
+// equals the fake, follow state equals the fake's
 // (specs/follow.qnt `quietAgreement`), every send is in Slack and in the
 // store exactly once with no pending row left (specs/outbox.qnt
 // `quietAgreement`), and the incremental topic index equals a full rebuild.
@@ -65,6 +67,8 @@ describe('convergence', () => {
         for (let i = 0; i < 15; i++) seedThread(fake, { channel: 'C0PLATFORM', text: `Rollout ${i + 1}`, ago: 3 * DAY, replies: [2 * DAY + i * 60_000], follow: true })
         return fake.signIn()
       },
+      // Every topic the test touches is recent; the recheck reads all of them.
+      recheckTopics: 200,
     })
     await engine.status('ready')
     await engine.phase('live', 30_000)
@@ -121,6 +125,16 @@ describe('convergence', () => {
       sent.push(id)
     }
 
+    const toggleReaction = (target: ReturnType<typeof anyMessage>[number]) => {
+      const name = pick(['eyes', '+1', 'tada'])
+      const user = pick(PEOPLE)
+      const has = target.message.reactions?.find((r) => r.name === name)?.users?.includes(user) === true
+      if (has) fake.removeReaction({ channel: target.channel, ts: target.message.ts, name, user })
+      else fake.addReaction({ channel: target.channel, ts: target.message.ts, name, user })
+    }
+    const isStored = (channel: string, ts: string) =>
+      readDb(engine!, 'cache.db', (db) => db.prepare('SELECT 1 FROM messages WHERE channel = ? AND ts = ?').get(channel, ts)) !== undefined
+
     for (let round = 0; round < ROUNDS; round++) {
       if (rand() < 0.1) await sendFromJuno(round)
       const roll = rand()
@@ -131,11 +145,22 @@ describe('convergence', () => {
         const root = pick(roots())
         created.push({ channel: root.channel, ts: fake.injectMessage({ channel: root.channel, user: pick(PEOPLE), text: `reply ${round}`, threadTs: root.message.ts }).ts })
       } else if (!connected) {
-        // While the socket is down: new messages and follow changes. Edits and deletes during a drop are a known
-        // gap (sync README).
-        if (roll < 0.75) {
+        // While the socket is down: new messages, edits, deletes and reactions on recent messages, and follow
+        // changes. Changes to messages older than the recheck's reach are outside its promise.
+        const recent = () => anyMessage().filter((m) => created.some((c) => c.channel === m.channel && c.ts === m.message.ts))
+        if (roll < 0.62) {
           const channel = pick(conversations)
           created.push({ channel, ts: fake.injectMessage({ channel, user: pick(PEOPLE), text: `offline ${round}` }).ts })
+        } else if (roll < 0.67) {
+          const target = pick(recent())
+          if (target !== undefined) fake.editMessage({ channel: target.channel, ts: target.message.ts, text: `edited offline ${round}` })
+        } else if (roll < 0.71) {
+          // Only a message Juno has stored: one posted and deleted within the drop never reaches it, which is right.
+          const target = pick(recent().filter((m) => isStored(m.channel, m.message.ts)))
+          if (target !== undefined) fake.deleteMessage({ channel: target.channel, ts: target.message.ts })
+        } else if (roll < 0.77) {
+          const target = pick(recent())
+          if (target !== undefined) toggleReaction(target)
         } else if (roll < 0.9) {
           await changeFollow()
         } else {
@@ -151,12 +176,7 @@ describe('convergence', () => {
         const target = pick(anyMessage().filter((m) => created.some((c) => c.ts === m.message.ts)))
         if (target !== undefined) fake.deleteMessage({ channel: target.channel, ts: target.message.ts })
       } else if (roll < 0.82) {
-        const target = pick(anyMessage())
-        const name = pick(['eyes', '+1', 'tada'])
-        const user = pick(PEOPLE)
-        const has = target.message.reactions?.find((r) => r.name === name)?.users?.includes(user) === true
-        if (has) fake.removeReaction({ channel: target.channel, ts: target.message.ts, name, user })
-        else fake.addReaction({ channel: target.channel, ts: target.message.ts, name, user })
+        toggleReaction(pick(anyMessage()))
       } else if (roll < 0.86) {
         const channel = pick(conversations)
         const latest = fake.workspace.main(channel).at(-1)

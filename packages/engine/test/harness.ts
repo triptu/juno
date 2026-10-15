@@ -158,6 +158,8 @@ export interface EngineOptions {
   readonly agent?: { readonly transport: Transport; readonly writes?: 'enabled' | 'disabled' }
   /** How long a failed boot waits before it tries again (the app waits 30 s). */
   readonly bootRetryMillis?: number
+  /** How many topics the recheck after a drop reads (the app reads 10). */
+  readonly recheckTopics?: number
 }
 
 /** Starts a fake (unless reused) and the engine on it, with the atoms a test reads. */
@@ -181,7 +183,11 @@ export async function startTestEngine(options: EngineOptions = {}): Promise<Runn
     httpTransport: main.httpTransport,
     ...(options.agent === undefined ? {} : { agentTransport: options.agent.transport, agentWrites: options.agent.writes ?? 'disabled' }),
     sync: {
-      config: { sweepIntervalMillis: 0, ...(options.bootRetryMillis === undefined ? {} : { bootRetryMillis: options.bootRetryMillis }) },
+      config: {
+        sweepIntervalMillis: 0,
+        ...(options.bootRetryMillis === undefined ? {} : { bootRetryMillis: options.bootRetryMillis }),
+        ...(options.recheckTopics === undefined ? {} : { recheckTopics: options.recheckTopics }),
+      },
       onCycle: (event) => {
         if (event === 'started') {
           cycles += 1
