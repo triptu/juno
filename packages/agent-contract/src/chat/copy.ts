@@ -374,7 +374,7 @@ export const chatCopy = {
       tool: 'Tool', enabled: 'Enabled', autoReview: 'Auto-review', read: 'Read',
       rules: { auto: 'Auto', always: 'Always ask', never: 'Never ask' },
       connectionRule: 'Auto-review for all tools',
-      connectionRuleNote: "A tool's own rule comes first. Never ask still asks when only something Juno read asked for the call.",
+      connectionRuleNote: "A tool's own rule comes first. Never ask still asks for a delete, or when only something Juno read asked for the call.",
       changed: 'Changed',
       added: 'New',
       /** Why a fixed rule is fixed, under the tool's name. */

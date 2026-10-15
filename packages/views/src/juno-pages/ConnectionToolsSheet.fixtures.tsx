@@ -14,6 +14,10 @@ export default defineFixtures(
       tools: sheet({ row: notion! }),
       search: sheet({ row: notion!, initialQuery: 'create' }),
       'no-match': sheet({ row: notion!, initialQuery: 'calendar' }),
+      // A delete always asks, and says why.
+      delete: sheet({ row: notion!, initialQuery: 'trash' }),
+      // A tool whose schema changed, and one that is new.
+      'changed-and-new': sheet({ row: notion!, initialQuery: 'notion-get' }),
       'never-ask': sheet({ row: docs! }),
       't3-code': sheet({ row: t3! }),
       'not-connected': sheet({ row: littlebird! }),
