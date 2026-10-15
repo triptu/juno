@@ -1,6 +1,6 @@
 import { useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type Ref } from 'react'
 import { audienceCheck, type SendTarget, type TopicDetail } from '@juno/contract'
-import { aiAssistOnAtom, checkMessage, draftAtom, registry, saveDraft, sendMessage, showToast } from '@juno/state'
+import { aiAssistOnAtom, checkMessage, draftAtom, precheckMessage, registry, saveDraft, sendMessage, showToast } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import { AudienceWarning, Composer, ComposerSlot, SendCheckBar } from '@juno/views'
 import type { ComposerHandle } from './messageActions'
@@ -40,8 +40,10 @@ export function withQuote(draft: string, text: string): string {
  * (`drafts.get`), read once when the composer mounts and written back after
  * a pause in typing and when the tab hides, so it survives tab switches and
  * restarts. Until the draft has loaded, the `ComposerSlot` holds the place.
- * Enter first runs the checks on send (`messages.check`, spec section 8)
- * unless AI assist is off. When they find nothing the message is queued
+ * While typing pauses in a Main, the model is asked whether the draft is a
+ * reply to a recent topic (`messages.precheck`). Enter runs the checks on
+ * send (`messages.check`, spec section 8), which use that answer only if it
+ * is already there, unless AI assist is off. When they find nothing the message is queued
  * (`messages.send`, which clears the stored draft in the same transaction)
  * and the pending row shows in the list at once; otherwise the check bar
  * shows inside the composer until a choice, Esc or an edit. While typing
@@ -92,6 +94,12 @@ function LoadedComposer({ detail, initial, placeholder, onSent, handle, onArrowU
   })
   // The tab hid or closed: write what is typed now.
   useEffect(() => () => flushRef.current(), [])
+  // A saved Main draft is asked about once, as if typing had just paused.
+  useEffect(() => {
+    if (aiAssist && detail.kind === 'main' && initial.trim() !== '') precheckMessage(registry, detail.channel.id, initial)
+    // Once per mount: later drafts are asked about as typing pauses.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const stopChecking = () => {
     checking.current = undefined
@@ -108,6 +116,8 @@ function LoadedComposer({ detail, initial, placeholder, onSent, handle, onArrowU
     timer.current = setTimeout(() => {
       setPaused(next)
       flush()
+      // The model answers the wrong-place question now, so Enter never waits for it.
+      if (aiAssist && detail.kind === 'main' && next.trim() !== '') precheckMessage(registry, detail.channel.id, next)
     }, DRAFT_SAVE_MS)
   }
 
