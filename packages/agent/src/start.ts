@@ -10,7 +10,7 @@
  * compactor (`router/open.ts`). Given `renderer`, it serves the
  * renderer's RPCs (`AgentRpcs`) on the ports that transport gives
  * (`serve/server.ts`), with Settings › Juno when `turns` brings a model
- * picker (`openRouterTurns`). `stop` closes the renderer server, then the engine,
+ * picker and a provider connection (`providerTurns`). `stop` closes the renderer server, then the engine,
  * then the host client, so the owner lock is released last of the engine's
  * resources.
  */
@@ -21,7 +21,8 @@ import { bindActionHost } from './actions/host'
 import { AgentHost } from './host/client'
 import { bindHost, type BoundHost } from './host/reads'
 import type { HostConnection } from './host/port'
-import type { ModelPicker, OpenRouterKey } from './providers/openrouter'
+import type { ProviderConnection } from './providers/connection'
+import type { ModelPicker } from './providers/picker'
 import type { Turns, TurnsOptions } from './router/open'
 import { open } from './router/service'
 import type { RendererTransport } from './serve/runner'
@@ -47,14 +48,13 @@ export interface AgentHandle {
 /**
  * What the engine needs beside the agent directory, which comes from
  * `config`, and the host reads and sends, which come from the port. With a
- * picker, the renderer gets Settings › Juno; with a key, the page shows its
- * state.
+ * picker and the provider connection, the renderer gets Settings › Juno.
  */
 export type AgentTurns = Omit<TurnsOptions, 'agentDir' | 'host' | 'actions'> & {
   /** Executors other folders own. The host's sends come from the port. */
   readonly actions?: Omit<NonNullable<TurnsOptions['actions']>, 'host'>
   readonly picker?: ModelPicker
-  readonly key?: OpenRouterKey
+  readonly connection?: ProviderConnection
 }
 
 export interface AgentOptions {
@@ -103,13 +103,13 @@ export function startAgent(config: AgentConfig, connection: HostConnection, opti
           )
         }
         const picker = turns?.picker
+        const provider = turns?.connection
         const settings =
-          engine?._tag === 'running' && picker !== undefined
+          engine?._tag === 'running' && picker !== undefined && provider !== undefined
             ? yield* Effect.acquireRelease(
                 Effect.sync(() =>
                   createJunoSettings({
-                    turns: engine, picker, agentDir: config.agentDir,
-                    ...(turns?.key ? { key: turns.key } : {}),
+                    turns: engine, picker, connection: provider, agentDir: config.agentDir,
                     ...(turns?.onReport ? { onReport: turns.onReport } : {}),
                   }),
                 ),
