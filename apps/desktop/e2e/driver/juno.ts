@@ -275,7 +275,7 @@ export class Sidebar {
   }
 
   get unreadToggle() {
-    return this.root.getByRole('button', { name: 'Show unread only' })
+    return this.root.getByRole('button', { name: 'Unread only' })
   }
 
   async filter(name: SidebarFilterName): Promise<void> {

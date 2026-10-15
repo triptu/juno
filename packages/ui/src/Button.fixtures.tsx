@@ -57,7 +57,7 @@ export default defineFixtures(Button, {
           </Button>
           <Button variant="filter">Channels</Button>
           <Button variant="filter">DMs</Button>
-          <Button variant="filter" aria-label="Show unread only">
+          <Button variant="filter" aria-label="Unread only">
             Unread
           </Button>
         </Row>

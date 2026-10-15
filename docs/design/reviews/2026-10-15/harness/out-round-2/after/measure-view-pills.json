@@ -1,0 +1,415 @@
+[
+  {
+    "tag": "div",
+    "label": "AllHiring",
+    "rect": {
+      "x": 10,
+      "y": 171,
+      "w": 329,
+      "h": 28
+    },
+    "padding": "0px",
+    "gap": "2px",
+    "radius": "0px",
+    "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "0px none rgb(35, 33, 26)",
+    "shadow": "none",
+    "outline": "none 3px rgb(35, 33, 26) offset 0px",
+    "children": [
+      {
+        "tag": "span",
+        "label": "",
+        "rect": {
+          "x": 10,
+          "y": 171,
+          "w": 16,
+          "h": 28
+        },
+        "padding": "0px",
+        "gap": "normal",
+        "radius": "0px",
+        "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+        "color": "rgb(35, 33, 26)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(35, 33, 26)",
+        "shadow": "none",
+        "outline": "none 3px rgb(35, 33, 26) offset 0px"
+      },
+      {
+        "tag": "span",
+        "label": "All",
+        "rect": {
+          "x": 10,
+          "y": 171,
+          "w": 37.4,
+          "h": 28
+        },
+        "padding": "0px",
+        "gap": "normal",
+        "radius": "0px",
+        "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+        "color": "rgb(35, 33, 26)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(35, 33, 26)",
+        "shadow": "none",
+        "outline": "none 3px rgb(35, 33, 26) offset 0px"
+      },
+      {
+        "tag": "span",
+        "label": "",
+        "rect": {
+          "x": 49.4,
+          "y": 171,
+          "w": 28,
+          "h": 28
+        },
+        "padding": "0px",
+        "gap": "normal",
+        "radius": "0px",
+        "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+        "color": "rgb(35, 33, 26)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(35, 33, 26)",
+        "shadow": "none",
+        "outline": "none 3px rgb(35, 33, 26) offset 0px"
+      },
+      {
+        "tag": "span",
+        "label": "",
+        "rect": {
+          "x": 79.4,
+          "y": 171,
+          "w": 28,
+          "h": 28
+        },
+        "padding": "0px",
+        "gap": "normal",
+        "radius": "0px",
+        "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+        "color": "rgb(35, 33, 26)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(35, 33, 26)",
+        "shadow": "none",
+        "outline": "none 3px rgb(35, 33, 26) offset 0px"
+      },
+      {
+        "tag": "span",
+        "label": "",
+        "rect": {
+          "x": 109.4,
+          "y": 171,
+          "w": 28,
+          "h": 28
+        },
+        "padding": "0px",
+        "gap": "normal",
+        "radius": "0px",
+        "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+        "color": "rgb(35, 33, 26)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(35, 33, 26)",
+        "shadow": "none",
+        "outline": "none 3px rgb(35, 33, 26) offset 0px"
+      },
+      {
+        "tag": "span",
+        "label": "Hiring",
+        "rect": {
+          "x": 139.4,
+          "y": 171,
+          "w": 58.9,
+          "h": 28
+        },
+        "padding": "0px",
+        "gap": "normal",
+        "radius": "0px",
+        "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+        "color": "rgb(35, 33, 26)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(35, 33, 26)",
+        "shadow": "none",
+        "outline": "none 3px rgb(35, 33, 26) offset 0px"
+      },
+      {
+        "tag": "span",
+        "label": "",
+        "rect": {
+          "x": 200.3,
+          "y": 171,
+          "w": 28,
+          "h": 28
+        },
+        "padding": "0px",
+        "gap": "normal",
+        "radius": "0px",
+        "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+        "color": "rgb(35, 33, 26)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(35, 33, 26)",
+        "shadow": "none",
+        "outline": "none 3px rgb(35, 33, 26) offset 0px"
+      },
+      {
+        "tag": "span",
+        "label": "",
+        "rect": {
+          "x": 212.3,
+          "y": 171,
+          "w": 16,
+          "h": 28
+        },
+        "padding": "0px",
+        "gap": "normal",
+        "radius": "0px",
+        "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+        "color": "rgb(35, 33, 26)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(35, 33, 26)",
+        "shadow": "none",
+        "outline": "none 3px rgb(35, 33, 26) offset 0px"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "label": "All",
+    "rect": {
+      "x": 10,
+      "y": 171,
+      "w": 37.4,
+      "h": 28
+    },
+    "padding": "0px 10px",
+    "gap": "6px",
+    "radius": "12px",
+    "font": "13.5px/20.25px 500 \"Figtree Variable\"",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgb(241, 238, 228)",
+    "border": "1px solid rgba(0, 0, 0, 0)",
+    "shadow": "none",
+    "outline": "none 2px rgb(180, 53, 31) offset 2px",
+    "children": [
+      {
+        "tag": "span",
+        "label": "All",
+        "rect": {
+          "x": 21,
+          "y": 174.9,
+          "w": 15.4,
+          "h": 20.3
+        },
+        "padding": "0px",
+        "gap": "normal",
+        "radius": "0px",
+        "font": "13.5px/20.25px 500 \"Figtree Variable\"",
+        "color": "rgb(35, 33, 26)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(35, 33, 26)",
+        "shadow": "none",
+        "outline": "none 3px rgb(35, 33, 26) offset 0px"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "label": "Channels, unread",
+    "rect": {
+      "x": 49.4,
+      "y": 171,
+      "w": 28,
+      "h": 28
+    },
+    "padding": "0px",
+    "gap": "6px",
+    "radius": "12px",
+    "font": "13.5px/20.25px 500 \"Figtree Variable\"",
+    "color": "rgb(112, 110, 102)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "1px solid rgba(0, 0, 0, 0)",
+    "shadow": "none",
+    "outline": "none 2px rgb(180, 53, 31) offset 2px",
+    "children": [
+      {
+        "tag": "svg",
+        "label": "",
+        "rect": {
+          "x": 56.4,
+          "y": 178,
+          "w": 14,
+          "h": 14
+        },
+        "padding": "0px",
+        "gap": "normal",
+        "radius": "0px",
+        "font": "13.5px/20.25px 500 \"Figtree Variable\"",
+        "color": "rgb(112, 110, 102)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(112, 110, 102)",
+        "shadow": "none",
+        "outline": "none 3px rgb(112, 110, 102) offset 0px"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "label": "DMs, unread",
+    "rect": {
+      "x": 79.4,
+      "y": 171,
+      "w": 28,
+      "h": 28
+    },
+    "padding": "0px",
+    "gap": "6px",
+    "radius": "12px",
+    "font": "13.5px/20.25px 500 \"Figtree Variable\"",
+    "color": "rgb(112, 110, 102)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "1px solid rgba(0, 0, 0, 0)",
+    "shadow": "none",
+    "outline": "none 2px rgb(180, 53, 31) offset 2px",
+    "children": [
+      {
+        "tag": "svg",
+        "label": "",
+        "rect": {
+          "x": 86.4,
+          "y": 178,
+          "w": 14,
+          "h": 14
+        },
+        "padding": "0px",
+        "gap": "normal",
+        "radius": "0px",
+        "font": "13.5px/20.25px 500 \"Figtree Variable\"",
+        "color": "rgb(112, 110, 102)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(112, 110, 102)",
+        "shadow": "none",
+        "outline": "none 3px rgb(112, 110, 102) offset 0px"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "label": "Bots",
+    "rect": {
+      "x": 109.4,
+      "y": 171,
+      "w": 28,
+      "h": 28
+    },
+    "padding": "0px",
+    "gap": "6px",
+    "radius": "12px",
+    "font": "13.5px/20.25px 500 \"Figtree Variable\"",
+    "color": "rgb(112, 110, 102)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "1px solid rgba(0, 0, 0, 0)",
+    "shadow": "none",
+    "outline": "none 2px rgb(180, 53, 31) offset 2px",
+    "children": [
+      {
+        "tag": "svg",
+        "label": "",
+        "rect": {
+          "x": 116.4,
+          "y": 178,
+          "w": 14,
+          "h": 14
+        },
+        "padding": "0px",
+        "gap": "normal",
+        "radius": "0px",
+        "font": "13.5px/20.25px 500 \"Figtree Variable\"",
+        "color": "rgb(112, 110, 102)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(112, 110, 102)",
+        "shadow": "none",
+        "outline": "none 3px rgb(112, 110, 102) offset 0px"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "label": "Hiring, unread mention",
+    "rect": {
+      "x": 139.4,
+      "y": 171,
+      "w": 58.9,
+      "h": 28
+    },
+    "padding": "0px 10px",
+    "gap": "6px",
+    "radius": "12px",
+    "font": "13.5px/20.25px 500 \"Figtree Variable\"",
+    "color": "rgb(112, 110, 102)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "1px solid rgba(0, 0, 0, 0)",
+    "shadow": "none",
+    "outline": "none 2px rgb(180, 53, 31) offset 2px",
+    "children": [
+      {
+        "tag": "span",
+        "label": "Hiring",
+        "rect": {
+          "x": 150.4,
+          "y": 174.9,
+          "w": 36.9,
+          "h": 20.3
+        },
+        "padding": "0px",
+        "gap": "normal",
+        "radius": "0px",
+        "font": "13.5px/20.25px 500 \"Figtree Variable\"",
+        "color": "rgb(112, 110, 102)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(112, 110, 102)",
+        "shadow": "none",
+        "outline": "none 3px rgb(112, 110, 102) offset 0px"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "label": "New view",
+    "rect": {
+      "x": 200.3,
+      "y": 171,
+      "w": 28,
+      "h": 28
+    },
+    "padding": "0px",
+    "gap": "6px",
+    "radius": "12px",
+    "font": "13.5px/20.25px 500 \"Figtree Variable\"",
+    "color": "rgb(112, 110, 102)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "1px solid rgba(0, 0, 0, 0)",
+    "shadow": "none",
+    "outline": "none 2px rgb(180, 53, 31) offset 2px",
+    "children": [
+      {
+        "tag": "svg",
+        "label": "",
+        "rect": {
+          "x": 207.3,
+          "y": 178,
+          "w": 14,
+          "h": 14
+        },
+        "padding": "0px",
+        "gap": "normal",
+        "radius": "0px",
+        "font": "13.5px/20.25px 500 \"Figtree Variable\"",
+        "color": "rgb(112, 110, 102)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(112, 110, 102)",
+        "shadow": "none",
+        "outline": "none 3px rgb(112, 110, 102) offset 0px"
+      }
+    ]
+  }
+]

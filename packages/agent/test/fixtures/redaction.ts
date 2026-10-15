@@ -36,7 +36,7 @@ const turns = await openTurns({
   provider: (store) => createProviderGuard({ store, transport: fake.models }),
   model: { provider: 'openrouter', modelId: 'anthropic/claude-sonnet-5.5' },
   compaction: { provider: 'openrouter', modelId: 'anthropic/claude-haiku-5.5' },
-  backup: {
+  removalBackup: {
     raiseDeletion: async (gen) => {
       const backup = readBackup()
       writeBackup({ ...backup, record: Math.max(backup.record, gen) })

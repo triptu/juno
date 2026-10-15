@@ -17,15 +17,15 @@ it('lists one model row per family from the OpenRouter catalogue, with Sonnet an
   const { client, follow, catalogueReads } = await served()
   const page = await follow(client['agent.settings.page']()).where(() => true, 'a page')
   expect(page.chatModels).toEqual([
-    { family: 'Claude Sonnet', resolved: 'Claude Sonnet 5.5', provider: 'openrouter', price: '$2 / $10 per million tokens', selected: true },
-    { family: 'Claude Opus', resolved: 'Claude Opus 5.5', provider: 'openrouter', price: '$4 / $20 per million tokens', selected: false },
-    { family: 'Muse', resolved: 'Muse Wonder', provider: 'openrouter', price: '$4 / $20 per million tokens', selected: false },
-    { family: 'GPT Sol', resolved: 'GPT-6.1 Sol', provider: 'openrouter', price: '$2 / $10 per million tokens', selected: false },
-    { family: 'Grok', resolved: 'Grok 4.7', provider: 'openrouter', price: '$2 / $6 per million tokens', selected: false },
+    { family: 'Claude Sonnet', resolved: 'Claude Sonnet 5.5', provider: 'openrouter', price: '$2 in, $10 out per million tokens', selected: true },
+    { family: 'Claude Opus', resolved: 'Claude Opus 5.5', provider: 'openrouter', price: '$4 in, $20 out per million tokens', selected: false },
+    { family: 'Muse', resolved: 'Muse Wonder', provider: 'openrouter', price: '$4 in, $20 out per million tokens', selected: false },
+    { family: 'GPT Sol', resolved: 'GPT-6.1 Sol', provider: 'openrouter', price: '$2 in, $10 out per million tokens', selected: false },
+    { family: 'Grok', resolved: 'Grok 4.7', provider: 'openrouter', price: '$2 in, $6 out per million tokens', selected: false },
   ])
   expect(page.compactionModels).toEqual([
-    { family: 'Claude Haiku', resolved: 'Claude Haiku 5.5', provider: 'openrouter', price: '$0.10 / $0.50 per million tokens', selected: true },
-    { family: 'Gemini Flash', resolved: 'Gemini 3.8 Flash', provider: 'openrouter', price: '$0.75 / $3.75 per million tokens', selected: false },
+    { family: 'Claude Haiku', resolved: 'Claude Haiku 5.5', provider: 'openrouter', price: '$0.10 in, $0.50 out per million tokens', selected: true },
+    { family: 'Gemini Flash', resolved: 'Gemini 3.8 Flash', provider: 'openrouter', price: '$0.75 in, $3.75 out per million tokens', selected: false },
   ])
   expect(page).toMatchObject({ capUsd: 2, spentTodayUsd: 0, openRouterKey: 'set', paused: false, rules: [], codex: { _tag: 'missing' }, ownership: { _tag: 'active', epoch: 1 } })
   expect(page.provider).toBeUndefined()

@@ -4,6 +4,7 @@ import { House } from '@phosphor-icons/react/dist/icons/House'
 import { ListBullets } from '@phosphor-icons/react/dist/icons/ListBullets'
 import { MagnifyingGlass } from '@phosphor-icons/react/dist/icons/MagnifyingGlass'
 import { NotePencil } from '@phosphor-icons/react/dist/icons/NotePencil'
+import { Notification } from '@phosphor-icons/react/dist/icons/Notification'
 import { Plus } from '@phosphor-icons/react/dist/icons/Plus'
 import { Sparkle } from '@phosphor-icons/react/dist/icons/Sparkle'
 import { User } from '@phosphor-icons/react/dist/icons/User'
@@ -257,9 +258,15 @@ export function Sidebar({
               )}
             </PillRow>
             <span {...stylex.props(styles.unread)}>
-              <Button variant="filter" pressed={filter.unreadOnly} aria-label="Show unread only" {...activateHandlers<HTMLButtonElement>(() => onToggleUnread())}>
-                Unread
-              </Button>
+              {/* An icon pill like Channels and DMs: the dot on its corner is the unread mark the pills already use. */}
+              <Button
+                variant="filter"
+                iconStart={Notification}
+                title="Unread only"
+                aria-label="Unread only"
+                pressed={filter.unreadOnly}
+                {...activateHandlers<HTMLButtonElement>(() => onToggleUnread())}
+              />
             </span>
           </div>
         }
