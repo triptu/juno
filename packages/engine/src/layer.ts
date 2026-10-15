@@ -32,7 +32,7 @@ import { Status } from './status/Status'
 import { SyncRunner } from './session/SyncRunner'
 import { SyncLink } from './syncLink'
 import { AllTopicsHandlers, TopicsHandlers } from './topics/handlers'
-import { ViewsHandlers } from './views/handlers'
+import { ViewsHandlers } from './sidebarViews/handlers'
 import { Workspace } from './workspace'
 
 /**

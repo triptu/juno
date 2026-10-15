@@ -63,6 +63,9 @@ const iconLabels: Record<ViewIconName, string> = {
   gift: 'Gift',
 }
 
+/** A conversation's row id in the list, for aria-activedescendant. */
+const rowId = (id: string) => `view-sheet-${id}`
+
 /**
  * The view sheet (spec section 5 "Views", inventory 2.3): the name, an
  * optional icon, the conversations through a search, and Keep these out of
@@ -90,7 +93,6 @@ export function ViewSheet({
   // Chosen first, then the matches that are not chosen yet.
   const rows = [...chosen, ...results.filter((c) => !chosenIds.has(c.id))]
   const [active, setActive] = useState<string | undefined>(undefined)
-  const rowId = (id: string) => `view-sheet-${id}`
   const keys = useOptionListKeys({
     ids: rows.map((row) => rowId(row.id)),
     activeId: active,

@@ -29,6 +29,8 @@ describe('view name', () => {
   })
 })
 
+const labels = (items: ReadonlyArray<{ readonly type: string; readonly label?: string }>) => items.flatMap((item) => (item.label === undefined ? [] : [item.label]))
+
 describe('Add to view', () => {
   const views = [
     { id: 'v1', name: 'Bots', holds: true },
@@ -58,7 +60,6 @@ describe('Add to view', () => {
 
   it('is on a Main row and the channel menu, not on a thread', () => {
     const channel = { id: 'C1' as ChannelId, kind: 'public' as const, name: 'eng' }
-    const labels = (items: ReadonlyArray<{ readonly type: string; readonly label?: string }>) => items.flatMap((item) => (item.label === undefined ? [] : [item.label]))
     const state = { channel, unread: false, pinned: false, resolved: false, notify: 'matters' as const, aiAssist: false, views }
     expect(labels(topicMenuItems({ ...state, kind: 'main' }))).toContain('Add to view')
     expect(labels(topicMenuItems({ ...state, kind: 'thread' }))).not.toContain('Add to view')
