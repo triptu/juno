@@ -12,7 +12,7 @@ Plain data in, plain data out. The package never touches the store, Electron or 
 - `cacheKeyOf(task, input)`: `{ task, key, inputHash }` for the assistant's `ai_cache`. The hash covers the task version and the canonical input (sorted keys, `undefined` dropped), so equal inputs hash the same and a prompt change is made visible by bumping `version`.
 - `validateOutput(task, input, args)`: the schema check (pi-ai's validator) plus the task's `accept` rule. Both providers use it, for tool calls and for classifier answers.
 - `PiAiProvider.layer(config, models?)`: `config` is an `Effect<AiConfig>` read on every call, so a key or model added in preferences applies without a restart. `AiConfig` is `{ apiKey?, models?: { classifier?, decision?, generation?, art? } }`. `defaultModelPrefs` holds the default slugs.
-- `FakeAiProvider.layer`, `makeFakeAiProvider()`: deterministic. Select it with `JUNO_AI=fake` in the engine (that wiring is the assistant's job).
+- `FakeAiProvider.layer`, `makeFakeAiProvider()`: deterministic. Select it with `JUNO_AI=fake` in the engine (that wiring is the assistant's job). `FakeAiProvider.layerWith({ delayMillis })` answers that late and, like the real provider, gives no decision (`timeout`) past the task's timeout; e2e launches set it with `fakeAiDelayMillis` to watch a slow model.
 - `Type`, `Static`: TypeBox, re-exported so the assistant can declare tool parameters without importing pi-ai.
 
 Ids in outputs are plain strings. The `accept` rule of each task guarantees they point into the input, so the caller may brand them.

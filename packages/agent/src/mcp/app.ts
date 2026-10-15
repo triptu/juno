@@ -33,7 +33,7 @@ export function withMcp<T extends Wrapped>(turns: T, credentials: Credentials): 
         return turns.provider(store)
       },
       actions: { ...turns.actions, executors },
-      stopExternalJob: async (job) => job.kind === 't3' ? (t3?.stop(job) ?? false) : (turns.stopExternalJob?.(job) ?? false),
+      stopExternalJob: async (job, click) => job.kind === 't3' ? (t3?.stop(job, click) ?? false) : (turns.stopExternalJob?.(job, click) ?? false),
       jobDrivers: () => [...(turns.jobDrivers?.() ?? []), ...(t3 ? [t3.driver] : [])],
       tools: (context) => [
         ...(turns.tools?.(context) ?? []),

@@ -50,7 +50,7 @@ export function indexTopic(input: IndexInput): IndexedTopic | undefined {
   const participants: UserId[] = []
   for (let i = live.length - 1; i >= 0 && participants.length < MAX_PARTICIPANTS; i--) {
     const id = live[i]?.userId
-    if (id !== undefined && !participants.includes(id)) participants.push(id)
+    if (id !== undefined && id !== input.me.userId && !participants.includes(id)) participants.push(id)
   }
 
   const sender = latest.userId === input.me.userId ? 'You' : input.senderName(latest.userId)
