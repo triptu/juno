@@ -215,3 +215,35 @@ test.describe('message images', () => {
     }
   })
 })
+
+test.describe('settings chips', () => {
+  // How far a chip and the text of the row's buttons end from the card's right edge.
+  const ends = (page: Page, chipSelector: string, card: string) =>
+    page.evaluate(
+      ([chipSelector, card]) => {
+        const chip = document.querySelector(chipSelector!)!
+        const right = chip.closest(card!)!.getBoundingClientRect().right
+        const text = (element: Element) => {
+          const range = document.createRange()
+          range.selectNodeContents(element)
+          return right - range.getBoundingClientRect().right
+        }
+        return { chip: right - chip.getBoundingClientRect().right, buttons: [...chip.closest(card!)!.querySelectorAll('button')].map(text) }
+      },
+      [chipSelector, card],
+    )
+
+  test('This Mac: the owner chip ends where the Move and Restore text ends', async ({ page }) => {
+    await open(page, 'ThisMacSection', 'this-mac/active')
+    const at = await ends(page, '[data-owner-chip]', '[data-ownership]')
+    expect(at.buttons.length).toBe(2)
+    for (const button of at.buttons) expect(at.chip).toBe(button)
+    expect(at.chip).toBe(24)
+  })
+
+  // The Codex card has no text buttons: its chip ends at the row's 15px inset, like the values and fields of the cards above it.
+  test('Codex: with no text button in its card, the ready chip ends at the 15px inset', async ({ page }) => {
+    await open(page, 'JunoSettingsPage', 'settings/ready')
+    expect((await ends(page, '[data-codex-chip]', '[data-codex]')).chip).toBe(15)
+  })
+})
