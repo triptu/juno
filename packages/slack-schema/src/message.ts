@@ -84,7 +84,7 @@ export const Attachment = S.Struct({
   title_link: opt(S.String),
   image_width: opt(S.Number),
   image_height: opt(S.Number),
-  actions: opt(S.Array(S.Struct({ text: opt(S.String), url: opt(S.String), name: opt(S.String) }))),
+  actions: opt(S.Array(S.Struct({ type: opt(S.String), text: opt(S.String), url: opt(S.String), name: opt(S.String) }))),
   color: opt(S.String),
   author_name: opt(S.String),
   author_link: opt(S.String),
