@@ -5,6 +5,7 @@ import { Effect, Stream } from 'effect'
 import { fakeActionHost, rateLimited, reply, TEST_CHANNEL } from '@juno/agent-testing'
 import { Digest, Revision } from '@juno/agent-cards'
 import type { CardId, ChatItem, ChatPage, OpId } from '@juno/agent-contract'
+import type { HostReads } from '../src/index'
 import { ONLINE, run, served as chat } from './serve-harness'
 import { deferred, say } from './turns-harness'
 
@@ -35,6 +36,27 @@ it('a sent message shows as the owner bubble, then Juno answers it, and reading 
   expect(of(read, 'newDivider')).toEqual([])
   const after = await Effect.runPromise(client['agent.chat.summary']().pipe(Stream.take(1), Stream.runCollect))
   expect(after).toEqual([{ unread: 0, busy: false }])
+})
+
+it('words Juno took from a Slack message it read show as a source, and an unknown handle as plain words', async () => {
+  const review = { channelId: 'C0ENG', ts: '1760500000.000100', senderId: 'U0MAYA', senderName: 'Maya Chen', channelName: '#eng', text: 'Review moved to Thursday.' }
+  const page = { messages: [review] as never }
+  const host: HostReads = { search: async () => page, history: async () => page, replies: async () => page, topics: async () => ({ topics: [] }), person: async (id) => ({ id, name: 'maya', displayName: 'Maya' }) }
+  const { h, client, pageWhere } = await chat({ host })
+  h.fake.script([
+    reply({ type: 'toolCall', id: 'call-1', name: 'slack_search', arguments: { query: 'review' } }),
+    reply(say('It moved to <src m="m1">Thursday</src>, says <src m="m7">Maya</src>.')),
+  ])
+  await run(client['agent.chat.send']({ opId: 'op-1' as OpId, text: 'when is the review?' }))
+
+  const answered = await pageWhere((p) => of(p, 'juno').length === 1 && of(p, 'status').length === 0, 'the answer and no status')
+  expect(of(answered, 'juno')[0]!.body).toEqual([
+    { _tag: 'text', text: 'It moved to ' },
+    { _tag: 'source', text: 'Thursday', channelId: 'C0ENG', ts: '1760500000.000100', place: '#eng' },
+    { _tag: 'text', text: ', says ' },
+    { _tag: 'text', text: 'Maya' },
+    { _tag: 'text', text: '.' },
+  ])
 })
 
 it('a reaction shows on its bubble, and a reply quotes what it answers', async () => {

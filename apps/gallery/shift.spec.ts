@@ -383,6 +383,33 @@ test.describe('Juno chat', () => {
     expect(await bubbles.evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().toJSON()))).toEqual(before)
   })
 
+  test('a source in a bubble sits in the line like plain words', async ({ page }) => {
+    await open(page, 'JunoChatList', 'shift/sources-link')
+    // Every bubble's box, the lines of its text and where its last character sits: a source must not change a wrap, a line or a bubble.
+    // A range reports a box per nested element too, so lines are counted once each.
+    const layout = () =>
+      page.locator('[data-chat-owner], [data-chat-juno]').evaluateAll((nodes) =>
+        nodes.map((node) => {
+          const text = node.querySelector('p')!
+          const range = document.createRange()
+          range.selectNodeContents(text)
+          const lines = [...new Set(Array.from(range.getClientRects(), (rect) => `${rect.y} ${rect.height}`))]
+          const walker = document.createTreeWalker(text, NodeFilter.SHOW_TEXT)
+          let last: Text | undefined
+          while (walker.nextNode()) last = walker.currentNode as Text
+          const end = document.createRange()
+          end.setStart(last!, last!.length - 1)
+          end.setEnd(last!, last!.length)
+          const { x, y } = end.getBoundingClientRect()
+          return { box: node.getBoundingClientRect().toJSON(), lines, end: [x, y] }
+        }),
+      )
+    const plain = await layout()
+    await step(page, 'sources')
+    await expect(page.locator('[data-source]')).toHaveCount(3)
+    expect(await layout()).toEqual(plain)
+  })
+
   for (const [state, settled] of [
     ['resolve-settles', 'Resolved 2'],
     ['send-settles', 'Sent 2'],
