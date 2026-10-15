@@ -43,6 +43,7 @@ import type { Turns } from '../router/open'
 import { DOLLAR, dollars } from '../spend'
 import { ownerRules, setOwnerRules } from '../actions/rules'
 import { defaultBackupFolder } from '../backup/backup'
+import { backupFailure } from '../backup/errors'
 import { modelFor, save, type Purpose } from './store'
 
 /** How often the catalogue is checked; it is read at most once a day. */
@@ -50,11 +51,12 @@ const REFRESH_CHECK_MS = 60 * 60_000
 
 export type SettingsResult =
   | { readonly _tag: 'done' }
-  | { readonly _tag: 'refused'; readonly reason: 'invalid' | 'unavailable'; readonly message: string }
+  | { readonly _tag: 'refused'; readonly reason: 'invalid' | 'unavailable' | 'readOnly'; readonly message: string }
 
 export interface JunoSettings {
   readonly page: () => JunoSettingsPage
-  readonly change: (change: SettingsChange) => SettingsResult
+  /** A folder change answers once the backup is in the new folder. */
+  readonly change: (change: SettingsChange) => SettingsResult | Promise<SettingsResult>
   /** Called when the page may have changed: the provider, the catalogue, a run's spend. */
   readonly subscribe: (listener: () => void) => () => void
   /** Resolves after the first catalogue read, whatever its outcome. */
@@ -194,7 +196,7 @@ export function createJunoSettings(options: SettingsOptions): JunoSettings {
     }
   }
 
-  const change = (next: SettingsChange): SettingsResult => {
+  const change = (next: SettingsChange): SettingsResult | Promise<SettingsResult> => {
     switch (next._tag) {
       case 'model': {
         if (next.provider === 'codex') {
@@ -238,8 +240,18 @@ export function createJunoSettings(options: SettingsOptions): JunoSettings {
       case 'backupFolder': {
         if (backup === undefined) return { _tag: 'refused', reason: 'unavailable', message: 'Backup is not available on this Mac.' }
         if (!isAbsolute(next.path)) return { _tag: 'refused', reason: 'invalid', message: 'Choose a folder.' }
-        void backup.setFolder(next.path).catch(options.onReport)
-        break
+        // Answers once the first backup is in the new folder, or with why it is not.
+        return backup.setFolder(next.path).then(
+          (): SettingsResult => {
+            changed()
+            return { _tag: 'done' }
+          },
+          (error: unknown): SettingsResult => {
+            options.onReport?.(error)
+            changed()
+            return { _tag: 'refused', ...backupFailure(error) }
+          },
+        )
       }
     }
     changed()

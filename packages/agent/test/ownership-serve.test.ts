@@ -1,6 +1,6 @@
 // Settings › Juno's Backup and This Mac rows, the chat's ownership banners and the Review page as the
 // renderer reads them (SPEC 13.7, 13.8, 13.10), on two Macs sharing a backup folder.
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, expect, it } from 'vitest'
@@ -82,4 +82,53 @@ it('Restore from Settings opens in recovery: the banner, waiting sends and the R
   await pageWhere((p) => p.banner._tag === 'none' && of(p, 'juno').length === 1, 'the answer after Activate')
   await settings.where((p) => p.ownership._tag === 'active' && p.ownership.epoch === 2, 'this Mac owns Juno')
   await review.where((p) => p.page.backupAt === undefined && p.page.pending.length === 0, 'the review page empty')
+})
+
+it('A folder Juno cannot use says why, and the backup stays where it was', async () => {
+  const { client, follow } = await mac('Studio', fakeKeychain())
+  const settings = follow(client['agent.settings.page']())
+  const before = await settings.where((p) => p.ownership._tag === 'active', 'the page')
+  // A path under a file: the folder can never be made.
+  const file = join(tempDir(), 'notes.txt')
+  writeFileSync(file, 'not a folder')
+  expect(await run(client['agent.settings.change']({ opId: 'op-1' as OpId, change: { _tag: 'backupFolder', path: join(file, 'Juno') } }))).toMatchObject({
+    _tag: 'Failure',
+    failure: { reason: 'invalid', message: "Juno can't write to that folder. Choose another one." },
+  })
+
+  // Another Mac's backup: writing would delete it.
+  const theirs = tempDir()
+  const other = await mac('Laptop', fakeKeychain())
+  await run(other.client['agent.settings.change']({ opId: 'op-1' as OpId, change: { _tag: 'backupFolder', path: theirs } }))
+  expect(await run(client['agent.settings.change']({ opId: 'op-2' as OpId, change: { _tag: 'backupFolder', path: theirs } }))).toMatchObject({
+    _tag: 'Failure',
+    failure: { reason: 'invalid', message: 'That folder holds a Juno backup from another Mac. Restore from it, or choose another folder.' },
+  })
+  expect((await settings.where((p) => p.ownership._tag === 'active', 'the page')).backupFolder).toBe(before.backupFolder)
+})
+
+it('After a restore, the backup carries on in the folder it came from, also on a Mac that had a backup of its own', async () => {
+  const folder = tempDir()
+  const oldKeychain = fakeKeychain()
+  const old = await mac('Studio', oldKeychain)
+  await run(old.client['agent.settings.change']({ opId: 'op-1' as OpId, change: { _tag: 'backupFolder', path: folder } }))
+  await old.h.turns.backup!.exportPhrase()
+
+  // The new Mac backed up its own empty Juno before the restore replaced it.
+  const keychain = fakeKeychain({ recoveryPhrase: oldKeychain.values().recoveryPhrase! })
+  const fresh = await mac('Laptop', keychain)
+  await fresh.h.turns.backup!.flush()
+  expect(fresh.h.turns.backup!.lastAt()).toBeDefined()
+  await run(fresh.client['agent.settings.ownership']({ opId: 'op-1' as OpId, action: { _tag: 'restore', backupPath: folder, oldDeviceOffOrErased: true } }))
+  await fresh.h.stop()
+
+  const { h, client } = await mac('Laptop', keychain, fresh.h.dir)
+  const backupAt = h.turns.ownership.owner().backupAt!
+  expect(await run(client['agent.review.activate']({ opId: 'op-2' as OpId, backupAt, oldDeviceOffOrErased: true }))).toMatchObject({ _tag: 'Success' })
+  await h.turns.backup!.flush()
+  // So the old Mac, still running on this folder, sees that this one took over.
+  expect(h.turns.backup!.folder()).toBe(folder)
+  expect(h.turns.backup!.lastAt()).toBeGreaterThan(backupAt)
+  await old.h.turns.backup!.flush()
+  expect(old.h.turns.ownership.owner()).toMatchObject({ state: 'released', deviceName: 'Laptop' })
 })
