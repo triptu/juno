@@ -500,3 +500,25 @@ of 5.13, 3.77, 5.54 ms and after readings of 4.54, 5.36, 8.31 ms. They do not
 establish an improvement; host variation and event-loop contention dominate
 that comparison. Remaining remote repeats were cancelled at the shared
 capacity limit. The Mac runs above provide the complete five-pair series.
+
+The production-paced large fake cold boot (`pnpm remote bench:sync`, one
+4-vCPU machine per run) reached `live` in 579.264 s before and 459.310 s
+after, a 119.954 s reduction. Sidebar setup reached catch-up in 25.749 s
+and 16.537 s respectively. Both runs made 471 Web API calls: 300 history,
+113 getView, 50 replies, three discovery search calls and five setup calls;
+they stored the same 6,179 messages, 1,525 roots, 3,478 replies, 300 ranges
+and 2,574 reactions. Neither reported rate-limit or decode failures.
+
+This pair measures paced waiting, not throughput: the revised remote run
+averaged 2% CPU busy on four cores. History call time fell from 444.909 to
+357.526 s and replies from 74.740 to 58.682 s. Unpublished getView calls
+can now overlap independently with other methods. The seed and budgets
+were unchanged; discovery metadata saves a separate root lookup in the
+warm-boot test, but did not lower this cold-boot call total.
+
+These are single paced runs, not a repeated latency distribution. The
+baseline recorded `live` before its read-only guard rejected the later
+emoji read; the guard now permits `emojis/list`. That correction does not
+change the timed boot. Aggregate logs are in
+`.remote/20261015T171747-6397/run.log` and
+`.remote/20261015T182935-62134/run.log`. No live Slack was accessed.
