@@ -53,6 +53,8 @@ export {
   historyTarget,
   mountedTabs,
   homePlace,
+  junoPlace,
+  junoTab,
   homeTab,
   newChatPlace,
   openPlace,
@@ -114,3 +116,13 @@ export { redrawTopic, topicArtAtom } from './art'
 export { messageLink, slackLink, threadRootTs } from './links'
 export { headerRenamingAtom, renamingAtom, rowRenamingAtom, type RenameTarget } from './rename'
 export { dismissToast, runAction, showToast, TOAST_LIFE_MS, toastAtom, undoLast, undoStackAtom, UNDO_LIMIT, type Toast, type ToastContent } from './undo'
+export {
+  catchUpDoneAtom,
+  focusJunoComposer,
+  JUNO_PANEL_PREF,
+  junoAboutAtom,
+  junoFocusAtom,
+  junoPanelOpenAtom,
+  openedAtNewAtom,
+  setJunoPanelOpen,
+} from './junoPanel'
