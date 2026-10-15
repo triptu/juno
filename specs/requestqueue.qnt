@@ -27,7 +27,7 @@ module requestqueue {
     now >= nextStart.get(m), now >= paused.get(m),
     nextStart' = nextStart.set(m, now + interval.get(m)),
     starts' = starts.set(m, starts.get(m) + 1),
-    safe' = safe and now >= paused.get(m),
+    safe' = (safe and now >= paused.get(m)),
     now' = now, paused' = paused, interval' = interval,
   }
   action limited(m: int): bool = all {

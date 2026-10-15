@@ -379,16 +379,17 @@ export const shapeRows = (
     const joined = [...source]
 
     // Names and photos: participants, DM partners, group DM members and senders, in one lookup.
+    const usersUnchanged = cache.keepUsers && cache.users !== undefined && cache.users === cache.usersRead
     const userIds = new Set<string>()
-    const parsed = new Map<JoinedRow, ParsedColumns>()
+    const parsed: Array<ParsedColumns> = []
     for (const row of joined) {
       const hit = previous.get(row.topic_id)
       const columns =
         hit !== undefined && hit.source.participants_json === row.participants_json && hit.source.preview_json === row.preview_json && hit.source.c_members === row.c_members
           ? hit.parsed
           : parseColumns(row)
-      parsed.set(row, columns)
-      userIdsOf(row, columns, userIds)
+      parsed.push(columns)
+      if (!usersUnchanged || columns !== hit?.parsed || row.c_user_id !== hit.source.c_user_id) userIdsOf(row, columns, userIds)
     }
     // Only the ids no earlier run has read, when the cache keeps users; every id otherwise.
     const users: Map<string, UserRow | null> = cache.keepUsers ? (cache.users ??= new Map()) : new Map()
@@ -420,15 +421,17 @@ export const shapeRows = (
     // Build or reuse the domain topic of every row.
     const next = new Map<string, CacheEntry>()
     const entries: Array<CacheEntry> = []
-    for (const row of joined) {
+    for (let index = 0; index < joined.length; index++) {
+      const row = joined[index]!
       if (row.last_activity_ts === null) continue
       const hit = previous.get(row.topic_id)
-      const columns = parsed.get(row)!
+      const columns = parsed[index]!
       const entry: CacheEntry =
         hit !== undefined && sameSource(hit.source, row) && (peopleHold || samePeople(hit.people, personOf))
           ? hit
           : { ...entryOf(row, columns, selfId, personOf), source: row, parsed: columns }
       next.set(row.topic_id, entry)
+      for (const person of entry.people) people.set(person.id, person)
       entries.push(entry)
     }
 
@@ -456,12 +459,21 @@ export const shapeRows = (
     return { entries, place, finish }
   })
 
-/** Every column of the joined row equal: the topic built from it still holds. */
+/** Check the version first, then values: a removed index row can be recreated with the same version. */
 function sameSource(a: ListRow, b: ListRow): boolean {
-  const left = a as unknown as Record<string, unknown>
-  const right = b as unknown as Record<string, unknown>
-  for (const key in right) if (left[key] !== right[key]) return false
-  return true
+  return a.rev === b.rev &&
+    a.channel === b.channel && a.kind === b.kind && a.root_ts === b.root_ts &&
+    a.last_activity_ts === b.last_activity_ts && a.message_count === b.message_count &&
+    a.unread_count === b.unread_count && a.unread_exact === b.unread_exact && a.mentions_me === b.mentions_me &&
+    a.participants_json === b.participants_json && a.preview_json === b.preview_json &&
+    a.c_kind === b.c_kind && a.c_name === b.c_name &&
+    a.c_user_id === b.c_user_id && a.c_members === b.c_members &&
+    a.manual_title === b.manual_title && a.ai_title === b.ai_title &&
+    a.resolved_at === b.resolved_at && a.resolved_activity_ts === b.resolved_activity_ts &&
+    a.reopened_at === b.reopened_at && a.pinned_at === b.pinned_at &&
+    a.subscribed === b.subscribed && a.new_threads === b.new_threads &&
+    a.channel_activity_ts === b.channel_activity_ts &&
+    a.art_recipe === b.art_recipe && a.art_status === b.art_status
 }
 
 /** Every person the entry was built from is the same object this run: no name or photo changed. */
