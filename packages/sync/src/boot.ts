@@ -15,9 +15,9 @@
  * Warm boot: `client.userBoot`, a full `client.counts` (membership is
  * derived from it), history since the synced range for conversations whose
  * `latest` moved, `getView` back to the window, the discovery sweep for
- * the gap, users. The reconnect catch-up and the sweep are the same without
- * the workspace refresh, with `counts_last_fetched`, and with `getView` back
- * to the last moment the store was in step. `followPass` reads the followed
+ * the gap, users. Reconnect refreshes workspace and full membership on the
+ * background lane; a periodic sweep uses incremental counts. Both read
+ * `getView` back to the last moment the store was in step. `followPass` reads the followed
  * threads over the window and checks the follows it left out; `runSync`
  * schedules it.
  */
@@ -27,12 +27,13 @@ import { SlackEdge, SlackSession } from '@juno/slack'
 import type { Channel, ClientCountsArgs, CountEntry, Message, ThreadView } from '@juno/slack-schema'
 import { Invalidation, StoreWriter, transaction, type SqlError } from '@juno/store'
 import { Clock, Effect, Queue } from 'effect'
+import { readMetadata, storeMetadata, storeMembership } from './metadata'
 import { reindexOptions, type SyncContext } from './context'
 import { discoverSince } from './discovery'
 import { recheck, type RecheckOptions } from './recheck'
 import { applyPage, mainTopicOf, threadTopicOf } from './pages'
 import { reindexTopics } from './reindex'
-import { fillUsers } from './users'
+import { fillUsers, nameFirst } from './users'
 import {
   addSyncedRange,
   getSyncState,
@@ -40,15 +41,12 @@ import {
   markRepliesComplete,
   observeRead,
   readState,
-  replaceMembership,
   seedTopicRead,
   setChannelReads,
-  setMembership,
   setSyncState,
   setThreadSub,
   threadMessages,
   toConversationRow,
-  upsertConversations,
   upsertTeam,
   upsertUsers,
 } from './write'
@@ -65,7 +63,7 @@ export interface BootState {
   readonly lastSyncAt: number
 }
 
-export type Phase = (phase: { _tag: 'booting' } | { _tag: 'catching-up'; done: number; total: number }) => Effect.Effect<void>
+export type Phase = (phase: { _tag: 'booting'; first?: boolean } | { _tag: 'catching-up'; done: number; total: number; first?: boolean }) => Effect.Effect<void>
 
 export type BootError = SlackApiError | SqlError
 export type BootServices = SlackApi | SlackEdge | SlackSession | StoreWriter | Invalidation
@@ -97,11 +95,11 @@ const nowTs = Effect.map(Clock.currentTimeMillis, (now) => millisToTs(now))
  * response carries no membership or read state, observed live). `prefs`
  * only on a cold boot.
  */
-const loadWorkspace = (ctx: SyncContext, withPrefs: boolean): Effect.Effect<void, BootError, BootServices> =>
-  Effect.gen(function* () {
+const loadWorkspace = (ctx: SyncContext, withPrefs: boolean, lane: 'interactive' | 'background' = 'interactive'): Effect.Effect<void, BootError, BootServices> =>
+  readMetadata(ctx.metadata, (observed) => Effect.gen(function* () {
     const api = yield* SlackApi
-    const boot = yield* api.call('client.userBoot', { version_all_channels: true, return_all_relevant_mpdms: true }, { lane: 'interactive', reason: 'fetch-client-data' })
-    const prefs = withPrefs ? (yield* api.call('users.prefs.get', {}, { lane: 'interactive', reason: 'prefs' })).prefs : (boot.prefs ?? undefined)
+    const boot = yield* api.call('client.userBoot', { version_all_channels: true, return_all_relevant_mpdms: true }, { lane, reason: 'fetch-client-data' })
+    const prefs = withPrefs ? (yield* api.call('users.prefs.get', {}, { lane, reason: 'prefs' })).prefs : (boot.prefs ?? undefined)
     const selfId = ctx.me.userId
     ctx.me = { userId: selfId, usergroupIds: (boot.subteams?.self ?? []) as ReadonlyArray<UsergroupId> }
     yield* transaction(
@@ -109,10 +107,12 @@ const loadWorkspace = (ctx: SyncContext, withPrefs: boolean): Effect.Effect<void
         yield* upsertTeam(boot.team, selfId, prefs, undefined)
         yield* setSyncState(ME_KEY, ctx.me)
         yield* upsertUsers([boot.self])
-        yield* upsertConversations([...boot.channels.map((c) => toConversationRow(c)), ...boot.ims.map((im) => toConversationRow(im))])
+        yield* storeMetadata(observed, [...boot.channels.map((c) => toConversationRow(c)), ...boot.ims.map((im) => toConversationRow(im))])
       }),
     )
-  })
+    const presence = boot.self.manual_presence
+    if (presence === 'active' || presence === 'away') yield* ctx.onSelfPresence(presence)
+  }))
 
 /**
  * `client.counts`: which conversations the user is in, Slack's read pointers
@@ -124,27 +124,26 @@ const loadWorkspace = (ctx: SyncContext, withPrefs: boolean): Effect.Effect<void
  * socket was down) is fetched with `conversations.info` first, so the
  * membership write has a row to land on.
  */
-const loadCounts = (ctx: SyncContext, sinceFetched: number | undefined): Effect.Effect<{ entries: ReadonlyArray<CountEntry>; fetched: number | undefined }, BootError, BootServices> =>
-  Effect.gen(function* () {
+const loadCounts = (ctx: SyncContext, sinceFetched: number | undefined, lane: 'interactive' | 'background' = 'interactive'): Effect.Effect<{ entries: ReadonlyArray<CountEntry>; fetched: number | undefined }, BootError, BootServices> =>
+  readMetadata(ctx.metadata, (observed) => Effect.gen(function* () {
     const api = yield* SlackApi
     const args: ClientCountsArgs = { thread_counts_by_channel: true, ...(sinceFetched === undefined ? {} : { counts_last_fetched: sinceFetched }) }
     // The time before the call: a `*_marked` event that lands while counts is in flight is newer than the answer.
     const now = yield* Clock.currentTimeMillis
     const requestedAt = millisToTs(now)
-    const counts = yield* api.call('client.counts', args, { lane: 'interactive', reason: 'counts' })
+    const counts = yield* api.call('client.counts', args, { lane, reason: 'counts' })
     const entries = [...counts.channels, ...counts.ims, ...counts.mpims]
     const unknown = yield* unknownConversations(entries.map((e) => e.id))
     const fetched: Array<Channel> = []
     for (const id of unknown) {
-      const info = yield* api.call('conversations.info', { channel: id }, { lane: 'interactive', reason: 'conversation' }).pipe(Effect.catchTag('SlackRejected', () => Effect.succeed(undefined)))
+      const info = yield* api.call('conversations.info', { channel: id }, { lane, reason: 'conversation' }).pipe(Effect.catchTag('SlackRejected', () => Effect.succeed(undefined)))
       if (info !== undefined) fetched.push(info.channel)
     }
     yield* transaction(
       Effect.gen(function* () {
         const ids = entries.map((e) => e.id)
-        if (fetched.length > 0) yield* upsertConversations(fetched.map((c) => toConversationRow(c)))
-        if (sinceFetched === undefined) yield* replaceMembership(ids)
-        else yield* setMembership(ids, true)
+        if (fetched.length > 0) yield* storeMetadata(observed, fetched.map((c) => toConversationRow(c)))
+        yield* storeMembership(observed, ids, sinceFetched === undefined)
         yield* setChannelReads(entries, now)
         // A pointer Juno has never seen is Slack's; a known one applies when Slack's changed (specs/readstate.qnt).
         for (const entry of entries) {
@@ -155,7 +154,7 @@ const loadCounts = (ctx: SyncContext, sinceFetched: number | undefined): Effect.
       }),
     )
     return { entries, fetched: counts.counts_last_fetched }
-  })
+  }))
 
 /** Ids among `ids` with no `conversations` row. */
 const unknownConversations = (ids: ReadonlyArray<string>): Effect.Effect<ReadonlyArray<string>, SqlError, StoreWriter> =>
@@ -188,7 +187,7 @@ const activeConversations = (entries: ReadonlyArray<CountEntry>, start: Ts): Eff
   })
 
 /** One thread from `getView`: root, unread and latest replies, Slack's subscription and read pointer. */
-const applyThreadView = (ctx: SyncContext, view: ThreadView, requestedAt: Ts): Effect.Effect<void, SqlError, StoreWriter | Invalidation> =>
+const applyThreadView = (ctx: SyncContext, view: ThreadView, requestedAt: Ts): Effect.Effect<void, BootError, BootServices> =>
   Effect.gen(function* () {
     const root = view.root_msg
     const channel = root.channel
@@ -196,6 +195,7 @@ const applyThreadView = (ctx: SyncContext, view: ThreadView, requestedAt: Ts): E
     // Slack omits unread_replies when nothing in the thread is unread.
     for (const reply of [...(view.latest_replies ?? []), ...(view.unread_replies ?? [])]) seen.set(reply.ts, reply)
     const topic = threadTopicOf(channel, root.ts)
+    yield* nameFirst(ctx, [root, ...seen.values()])
     yield* transaction(
       Effect.gen(function* () {
         // The view lists followed threads: a root without the flag is followed. Later events win over this page.
@@ -347,6 +347,7 @@ const loadHistoryWindow = (ctx: SyncContext, channel: string, start: Ts, options
       { channel, oldest: from, inclusive: true, limit: ctx.config.historyPageLimit, ignore_replies: true, no_user_profile: true },
       { lane: 'background', reason: 'history' },
     )
+    yield* nameFirst(ctx, page.messages)
     // The range first, so the index of this page already knows what history covers.
     const oldest = page.messages.at(-1)?.ts
     yield* transaction(addSyncedRange(channel, page.has_more && oldest !== undefined ? oldest : from, requestedAt))
@@ -384,6 +385,7 @@ const loadHistorySince = (ctx: SyncContext, channel: string, since: string): Eff
         },
         { lane: 'background', reason: 'history-since' },
       )
+      yield* nameFirst(ctx, page.messages)
       oldestSeen = page.messages.at(-1)?.ts ?? oldestSeen
       cursor = page.response_metadata?.next_cursor
       complete = !page.has_more || cursor === undefined || cursor === ''
@@ -416,6 +418,7 @@ const loadThreadPreviews = (ctx: SyncContext, seedReadBefore: string): Effect.Ef
         )
         .pipe(Effect.catchTag('SlackRejected', () => Effect.succeed(undefined)))
       if (page === undefined) continue
+      yield* nameFirst(ctx, page.messages)
       yield* applyPage(ctx, root.channel, page.messages, { kind: 'page', requestedAt }, { seedReadBefore })
       yield* Effect.yieldNow
     }
@@ -442,7 +445,7 @@ const covered = (channel: string, start: Ts, latest: Ts): Effect.Effect<boolean,
 /** Everything Slack knows about the workspace, into an empty cache (architecture 5.2). */
 export const coldBoot = (ctx: SyncContext, phase: Phase): Effect.Effect<void, BootError, BootServices> =>
   Effect.gen(function* () {
-    yield* phase({ _tag: 'booting' })
+    yield* phase({ _tag: 'booting', first: true })
     const startedAt = yield* Clock.currentTimeMillis
     // Unfollowed threads count as read up to here; a reply during the boot stays unread.
     const bootTs = millisToTs(startedAt)
@@ -450,14 +453,16 @@ export const coldBoot = (ctx: SyncContext, phase: Phase): Effect.Effect<void, Bo
     const start = millisToTs(windowStart)
     yield* loadWorkspace(ctx, true)
     const counts = yield* loadCounts(ctx, undefined)
+    // Names before rows: the people of every DM and group DM, on the interactive lane.
+    yield* fillUsers(ctx, 'interactive')
     yield* loadThreadViews(ctx, { until: start, probe: true, lane: 'interactive' })
     const active = yield* activeConversations(counts.entries, start)
-    yield* phase({ _tag: 'catching-up', done: 0, total: active.length })
+    yield* phase({ _tag: 'catching-up', done: 0, total: active.length, first: true })
     let done = 0
     for (const conversation of active) {
       // A boot that failed half way left ranges behind; what they cover is not fetched again.
       if (!(yield* covered(conversation.id, start, conversation.latest))) yield* skipRejected(loadHistoryWindow(ctx, conversation.id, start, { seedReadBefore: bootTs }))
-      yield* phase({ _tag: 'catching-up', done: ++done, total: active.length })
+      yield* phase({ _tag: 'catching-up', done: ++done, total: active.length, first: true })
       yield* Effect.yieldNow
     }
     yield* fillUsers(ctx)
@@ -479,6 +484,8 @@ export interface CatchUpOptions {
   readonly refreshWorkspace: boolean
   /** Page the followed threads with activity since the window (warm boot) or `lastSyncAt` (reconnect). */
   readonly refreshThreads: boolean
+  /** Full metadata and membership after a socket gap, on the background lane. */
+  readonly refreshMetadata?: boolean
   /** Read the likely topics again for changes made during a gap (`recheck.ts`): after a drop or a restart, not on a sweep. */
   readonly recheck?: RecheckOptions
 }
@@ -494,9 +501,13 @@ export const catchUp = (ctx: SyncContext, previous: BootState, phase: Phase, opt
   Effect.gen(function* () {
     const startedAt = yield* Clock.currentTimeMillis
     const start = millisToTs(yield* windowStartMillis(ctx))
-    if (options.refreshWorkspace) yield* loadWorkspace(ctx, false)
+    const refreshMetadata = options.refreshWorkspace || options.refreshMetadata === true
+    const metadataLane = options.refreshMetadata === true ? 'background' : 'interactive'
+    if (refreshMetadata) yield* loadWorkspace(ctx, false, metadataLane)
     // A full list after a workspace refresh, so a channel left while the app was closed drops out.
-    const counts = yield* loadCounts(ctx, options.refreshWorkspace ? undefined : previous.countsLastFetched)
+    const counts = yield* loadCounts(ctx, refreshMetadata ? undefined : previous.countsLastFetched, metadataLane)
+    // Names first: a DM joined meanwhile, and anyone an earlier run left without one.
+    yield* fillUsers(ctx, 'interactive')
     const active = yield* activeConversations(counts.entries, start)
     const moved: Array<{ id: string; since: string | undefined }> = []
     for (const conversation of active) {

@@ -10,9 +10,10 @@
  * final failure) is a later milestone and replaces this module without
  * touching the commands' shape: local transaction, mirror, settle.
  *
- * `sendOnce` is the single-attempt mode for the agent's sends (plan v3
- * §6.3): one exchange on the `send` lane and no retry, so a call is
- * submitted at most once. `Offline` then means the answer is unknown, since
+ * `sendOnce` is the single-attempt mode for posts (plan v3 §6.3): one
+ * exchange on the `send` lane and no retry, so Juno submits a call at most
+ * once. The network stack below can still send it twice (ADR 0014); a post
+ * carries a `client_msg_id` so the copy is found and deleted. `Offline` then means the answer is unknown, since
  * Slack may have run the call before the answer was lost; an answer that
  * does not decode is unknown in the same way.
  *

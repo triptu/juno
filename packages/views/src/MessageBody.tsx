@@ -3,6 +3,7 @@ import type { MouseEvent, ReactNode } from 'react'
 import type { BodyBlock, BodyInline, MessageBody as MessageBodyModel } from '@juno/contract'
 import { accent, colors, radii, spacing, text, weights, sizes } from '@juno/tokens/tokens.stylex'
 import { Chip, CodeBlock, Divider, Text, type HueName } from '@juno/ui'
+import { AttachmentCard, AttachmentImage } from './AttachmentCard'
 import { slackDate } from './time'
 
 export interface MessageBodyProps {
@@ -70,6 +71,18 @@ interface BlockProps {
 
 function Block({ block, now, hueOf, onChannel, onLink, tabIndex }: BlockProps) {
   switch (block.kind) {
+    case 'attachment':
+      return <AttachmentCard attachment={block} tabbable={tabIndex === 0}
+        title={<Inlines inlines={block.title} now={now} hueOf={hueOf} onChannel={onChannel} onLink={onLink} tabIndex={tabIndex} />}
+        footer={<Inlines inlines={block.footer} now={now} hueOf={hueOf} onChannel={onChannel} onLink={onLink} tabIndex={tabIndex} />}>
+        {block.blocks.map((child, index) => <Block key={index} block={child} now={now} hueOf={hueOf} onChannel={onChannel} onLink={onLink} tabIndex={tabIndex} />)}
+      </AttachmentCard>
+    case 'image':
+      return <AttachmentImage image={block} />
+    case 'fields':
+      return <div {...stylex.props(styles.fields)}>{block.items.map((item, index) => <div key={index}><Inlines inlines={item} now={now} hueOf={hueOf} onChannel={onChannel} onLink={onLink} tabIndex={tabIndex} /></div>)}</div>
+    case 'context':
+      return <div {...stylex.props(styles.context)}><Inlines inlines={block.children} now={now} hueOf={hueOf} onChannel={onChannel} onLink={onLink} tabIndex={tabIndex} /></div>
     case 'paragraph':
       return (
         <p dir="auto" {...stylex.props(styles.paragraph)}>
@@ -242,6 +255,8 @@ function styled(value: string, style: { bold?: true; italic?: true; strike?: tru
 }
 
 const styles = stylex.create({
+  fields: { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: spacing['--space-3'], whiteSpace: 'pre-wrap' },
+  context: { color: colors['--foreground-muted'], fontSize: text['--text-tag-small-size'] },
   body: {
     display: 'flex',
     flexDirection: 'column',
@@ -335,7 +350,7 @@ const styles = stylex.create({
     textDecorationLine: 'underline',
     textDecorationColor: 'color-mix(in oklch, currentColor 35%, transparent)',
     textUnderlineOffset: sizes['--link-underline-offset'],
-    cursor: 'default',
+    cursor: 'pointer', // external-link-cursor
   },
   bold: {
     fontWeight: weights['--weight-semibold'],

@@ -71,8 +71,11 @@ export function normalize(inlines: ReadonlyArray<Inline>): Inline[] {
   return out
 }
 
+/** The name shown for a person whose name has not arrived yet. Never the raw id. */
+export const UNKNOWN_PERSON = 'Someone'
+
 export function userInline(id: string, lookups: Lookups, fallbackName?: string): Inline {
-  return { kind: 'user', id, name: lookups.user?.(id) ?? fallbackName ?? id, isMe: lookups.me !== undefined && lookups.me === id }
+  return { kind: 'user', id, name: lookups.user?.(id) ?? fallbackName ?? UNKNOWN_PERSON, isMe: lookups.me !== undefined && lookups.me === id }
 }
 
 export function channelInline(id: string, fallbackName: string | undefined, lookups: Lookups): Inline {

@@ -57,7 +57,7 @@ export type BodyInline = typeof BodyInline.Type
 export const BodyListStyle = Schema.Literals(['bullet', 'ordered', 'checked', 'unchecked'])
 export type BodyListStyle = typeof BodyListStyle.Type
 
-export const BodyBlock = Schema.Union([
+const ContentBlock = Schema.Union([
   Schema.Struct({ kind: Schema.Literal('paragraph'), children: Schema.Array(BodyInline) }),
   Schema.Struct({ kind: Schema.Literal('quote'), children: Schema.Array(BodyInline) }),
   Schema.Struct({ kind: Schema.Literal('code'), text: Schema.String }),
@@ -69,6 +69,9 @@ export const BodyBlock = Schema.Union([
   }),
   Schema.Struct({ kind: Schema.Literal('heading'), children: Schema.Array(BodyInline) }),
   Schema.Struct({ kind: Schema.Literal('divider') }),
+  Schema.Struct({ kind: Schema.Literal('context'), children: Schema.Array(BodyInline) }),
+  Schema.Struct({ kind: Schema.Literal('fields'), items: Schema.Array(Schema.Array(BodyInline)) }),
+  Schema.Struct({ kind: Schema.Literal('image'), url: Schema.String, alt: Schema.String, width: Schema.optionalKey(Schema.Number), height: Schema.optionalKey(Schema.Number) }),
   /**
    * A file shared with the message (M4, WP2), in the order Slack lists them.
    * The thumbnail and the rest of what the file card shows are in the
@@ -81,6 +84,16 @@ export const BodyBlock = Schema.Union([
     mimetype: Schema.String,
     width: Schema.optionalKey(Schema.Number),
     height: Schema.optionalKey(Schema.Number),
+  }),
+])
+export const BodyBlock = Schema.Union([
+  ContentBlock,
+  Schema.Struct({
+    kind: Schema.Literal('attachment'),
+    tint: Schema.Literals(['neutral', 'info', 'success', 'warning', 'danger']),
+    title: Schema.Array(BodyInline),
+    blocks: Schema.Array(ContentBlock),
+    footer: Schema.Array(BodyInline),
   }),
 ])
 export type BodyBlock = typeof BodyBlock.Type

@@ -13,6 +13,7 @@ import {
   contextTint,
   defaultChannelStyle,
   defaultPersonColor,
+  mentionedUserIds,
   type ChannelId,
   type ChannelInfo,
   type Topic,
@@ -22,6 +23,7 @@ import {
 import type { ChannelRef, Person, TopicArt } from '@juno/contract'
 import type { TopicIndexRow } from '@juno/store'
 import type { StoredPreview } from '@juno/sync'
+import { UNKNOWN_PERSON } from '@juno/richtext'
 
 export interface JoinedRow extends TopicIndexRow {
   readonly c_kind: 'public' | 'private' | 'im' | 'mpim'
@@ -65,8 +67,8 @@ export interface UserRow {
   readonly avatar_url: string | null
 }
 
-/** The name a row shows for a user: the display name, the real name, the handle, or the raw id. */
-export const userName = (id: string, user: UserRow | null | undefined): string => user?.display_name ?? user?.real_name ?? user?.name ?? id
+/** The name a row shows for a user: the display name, the real name, the handle, or "Someone" until the user is stored. Never the raw id. */
+export const userName = (_id: string, user: UserRow | null | undefined): string => user?.display_name ?? user?.real_name ?? user?.name ?? UNKNOWN_PERSON
 
 /** A `Person` for a user id. `known` is the person sent before, kept when nothing changed so callers can compare by identity. */
 export function personFrom(id: string, user: UserRow | null | undefined, known?: Person): Person {
@@ -113,12 +115,13 @@ function parsePreview(json: string | null): StoredPreview {
   }
 }
 
-/** Every user id the row names: participants, the DM partner, group DM members and the preview's sender. */
+/** Every user id the row names: participants, the DM partner, group DM members, the preview's sender and the people the root mentions (for the title). */
 export function userIdsOf(row: JoinedRow, columns: ParsedColumns, into: Set<string>): void {
   for (const id of columns.participants) into.add(id)
   for (const id of columns.members) into.add(id)
   if (row.c_user_id !== null) into.add(row.c_user_id)
   if (columns.preview.senderId !== undefined) into.add(columns.preview.senderId)
+  for (const id of mentionedUserIds(columns.preview.rootText)) into.add(id)
 }
 
 export function channelInfoOf(

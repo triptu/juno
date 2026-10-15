@@ -53,11 +53,13 @@ import {
   topicStatus,
   tsToMillis,
   byLatestActivity,
+  type ResolvedTitle,
   type Topic,
   type TopicStatus,
 } from '@juno/domain'
 import type { ChannelRef, Person, TopicArt, TopicCounts, TopicListRow } from '@juno/contract'
-import { StoreReader, type SqlError } from '@juno/store'
+import { StoreReader, syncState, type SqlError } from '@juno/store'
+import { BOOT_KEY } from '@juno/sync'
 import { Effect } from 'effect'
 import type { ListRun } from '../protocol/live'
 import {
@@ -91,12 +93,12 @@ import {
  *   from a synchronous invalidation handler, so the forget always lands
  *   before the run that the same change triggers.
  * Make one per subscription and workspace with `makeRowCache()`. A run
- * replaces `entries` and `people` with what it read, so they never outgrow
- * one window; `users` grows to the people the windows have named.
+ * replaces `entries` with one window. People and users are retained while
+ * their source map is unchanged, up to the people the windows have named.
  */
 export interface RowCache {
   entries: ReadonlyMap<string, CacheEntry>
-  people: ReadonlyMap<string, Person>
+  people: Map<string, Person>
   selfId: string | undefined
   readonly keepUsers: boolean
   users: Map<string, UserRow | null> | undefined
@@ -116,6 +118,8 @@ export interface CacheEntry {
   readonly participantIds: ReadonlyArray<string>
   /** The preview's sender as the row shows it. */
   readonly sender: string
+  /** The title, with the people a fallback title mentions named. */
+  readonly title: ResolvedTitle
   readonly shaped?: { readonly section: TopicListRow['section']; readonly status: TopicStatus; readonly row: TopicListRow }
 }
 
@@ -335,8 +339,8 @@ export const listTopics = (filter: ListFilter, options: QueryOptions, cache: Row
     recent.sort((a, b) => byLatestActivity(a.topic, b.topic))
 
     for (const entry of pinned) shaper.place(entry, 'pinned', topicStatus(entry.topic, ctx))
-    for (const entry of recent.slice(0, Math.max(0, options.limit - pinned.length))) shaper.place(entry, 'recent', topicStatus(entry.topic, ctx))
-    return shaper.finish()
+    for (const entry of recent.slice(0, Math.max(0, options.limit - pinned.length))) shaper.place(entry, 'recent', 'open')
+    return { ...shaper.finish(), windowCovered: (yield* syncState.get(BOOT_KEY)) !== undefined }
   })
 
 /** The quiet window's start as a ts, to the millisecond, so `ts < cutoff` is exactly the domain's quiet rule. */
@@ -379,16 +383,17 @@ export const shapeRows = (
     const joined = [...source]
 
     // Names and photos: participants, DM partners, group DM members and senders, in one lookup.
+    const usersUnchanged = cache.keepUsers && cache.users !== undefined && cache.users === cache.usersRead
     const userIds = new Set<string>()
-    const parsed = new Map<JoinedRow, ParsedColumns>()
+    const parsed: Array<ParsedColumns> = []
     for (const row of joined) {
       const hit = previous.get(row.topic_id)
       const columns =
         hit !== undefined && hit.source.participants_json === row.participants_json && hit.source.preview_json === row.preview_json && hit.source.c_members === row.c_members
           ? hit.parsed
           : parseColumns(row)
-      parsed.set(row, columns)
-      userIdsOf(row, columns, userIds)
+      parsed.push(columns)
+      if (!usersUnchanged || columns !== hit?.parsed || row.c_user_id !== hit.source.c_user_id) userIdsOf(row, columns, userIds)
     }
     // Only the ids no earlier run has read, when the cache keeps users; every id otherwise.
     const users: Map<string, UserRow | null> = cache.keepUsers ? (cache.users ??= new Map()) : new Map()
@@ -403,13 +408,9 @@ export const shapeRows = (
     // When no user was read or forgotten since the last run, every known person holds as it is.
     const peopleHold = cache.keepUsers && missing.length === 0 && users === cache.usersRead
     const knownPeople = cache.people
-    const people = new Map<string, Person>()
+    const people = peopleHold ? cache.people : new Map<string, Person>()
     const personOf = (id: string): Person => {
       let person = people.get(id)
-      if (person === undefined && peopleHold) {
-        person = knownPeople.get(id)
-        if (person !== undefined) people.set(id, person)
-      }
       if (person === undefined) {
         person = personFrom(id, users.get(id), knownPeople.get(id))
         people.set(id, person)
@@ -420,10 +421,11 @@ export const shapeRows = (
     // Build or reuse the domain topic of every row.
     const next = new Map<string, CacheEntry>()
     const entries: Array<CacheEntry> = []
-    for (const row of joined) {
+    for (let index = 0; index < joined.length; index++) {
+      const row = joined[index]!
       if (row.last_activity_ts === null) continue
       const hit = previous.get(row.topic_id)
-      const columns = parsed.get(row)!
+      const columns = parsed[index]!
       const entry: CacheEntry =
         hit !== undefined && sameSource(hit.source, row) && (peopleHold || samePeople(hit.people, personOf))
           ? hit
@@ -458,6 +460,7 @@ export const shapeRows = (
 
 /** Every column of the joined row equal: the topic built from it still holds. */
 function sameSource(a: ListRow, b: ListRow): boolean {
+  if (a.rev !== b.rev) return false
   const left = a as unknown as Record<string, unknown>
   const right = b as unknown as Record<string, unknown>
   for (const key in right) if (left[key] !== right[key]) return false
@@ -476,7 +479,7 @@ function entryOf(
   columns: ParsedColumns,
   selfId: string | undefined,
   personOf: (id: string) => Person,
-): Pick<CacheEntry, 'topic' | 'people' | 'channel' | 'named' | 'participantIds' | 'sender'> {
+): Pick<CacheEntry, 'topic' | 'people' | 'channel' | 'named' | 'participantIds' | 'sender' | 'title'> {
   const { participants, preview } = columns
   const used: Array<Person> = []
   const use = (id: string): Person => {
@@ -492,8 +495,10 @@ function entryOf(
   const named = shown.map(use)
   if (partner !== undefined) named.push(partner)
   const sender = preview.senderId !== undefined && preview.sender !== 'You' ? use(preview.senderId).name : preview.sender
+  const topic = topicFrom(row, columns, info)
   return {
-    topic: topicFrom(row, columns, info),
+    topic,
+    title: resolveTitle(topic, { user: (id) => use(id).name }),
     people: used,
     channel: channelRefOf(info, partner?.id),
     named,
@@ -508,7 +513,7 @@ function entryOf(
  * subscription. The channel and people are refs and not part of it.
  */
 function shape(entry: CacheEntry, section: TopicListRow['section'], status: TopicStatus): TopicListRow {
-  const { topic, source: row, sender } = entry
+  const { topic, source: row, sender, title } = entry
   const stored = entry.parsed.preview
   const label = channelLabel(topic.channel)
   // Everything the row is built from, in one short string; the row's rev is its hash.
@@ -529,10 +534,11 @@ function shape(entry: CacheEntry, section: TopicListRow['section'], status: Topi
     section,
     status,
     sender,
+    title.text,
+    title.source,
     ...entry.participantIds,
   ].join('\u0001')
 
-  const title = resolveTitle(topic)
   return {
     id: topic.id,
     rev: hashId(key),

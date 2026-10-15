@@ -8,13 +8,14 @@ import AllTopics from './AllTopics.fixtures'
 import ActiveThreads from './ActiveThreads.fixtures'
 import AppearanceSettings from './AppearanceSettings.fixtures'
 import AppInfoView from './AppInfoView.fixtures'
+import AttachmentCard from './AttachmentCard.fixtures'
 import AttachmentChips from './AttachmentChips.fixtures'
 import AudienceWarning from './AudienceWarning.fixtures'
 import ChannelIconPicker from './ChannelIconPicker.fixtures'
 import Composer from './Composer.fixtures'
 import ComposerSlot from './ComposerSlot.fixtures'
 import EmojiPicker from './EmojiPicker.fixtures'
-import EngineStatusView, { engineNoticeFixtures } from './EngineStatusView.fixtures'
+import EngineStatusView, { engineNoticeFixtures, syncProgressFixtures } from './EngineStatusView.fixtures'
 import Home from './Home.fixtures'
 import HoverToolbar from './HoverToolbar.fixtures'
 import ImageViewer from './ImageViewer.fixtures'
@@ -26,7 +27,7 @@ import NewDivider from './NewDivider.fixtures'
 import NewMessagesPill from './NewMessagesPill.fixtures'
 import NotificationsPage from './NotificationsPage.fixtures'
 import UpdateSettings from './UpdateSettings.fixtures'
-import PreferencesPage from './PreferencesPage.fixtures'
+import SettingsPage from './SettingsPage.fixtures'
 import PeekKeySetting from './PeekKeySetting.fixtures'
 import PeekView from './PeekView.fixtures'
 import Reactions from './Reactions.fixtures'
@@ -74,6 +75,7 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   AppearanceSettings,
   AppInfoView,
   AttachmentChips,
+  AttachmentCard,
   BackupSection,
   ChannelIconPicker,
   BudgetCard: budgetCard,
@@ -87,6 +89,7 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   ConnectionToolsSheet,
   EmojiPicker,
   EngineNotice: engineNoticeFixtures,
+  SyncProgress: syncProgressFixtures,
   EmptyChat,
   NoProvider,
   EngineStatusView,
@@ -111,7 +114,7 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   PeekKeySetting,
   PeekView,
   OwnerBubble,
-  PreferencesPage,
+  SettingsPage,
   UpdateSettings,
   ProposedScheduleCard: proposedScheduleCard,
   ProposedTaskCard: proposedTaskCard,

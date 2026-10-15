@@ -20,7 +20,7 @@ export const chatCopy = {
   empty: {
     title: 'What do you need?',
     body: 'Ask me to find, summarize, catch you up or tidy up. I can read your topics and propose messages, but nothing is sent until you press Send.',
-    suggestions: ['Catch me up on today', 'Summarize this topic', 'Draft a reply in this topic', 'Anything settled I can resolve?'],
+    suggestions: ['Catch me up on today', 'Summarize this topic', 'Draft a reply in this topic', 'Find topics I can resolve'],
   },
   composer: {
     placeholder: 'Ask Juno, like "what did I miss in #eng?"',
@@ -40,7 +40,7 @@ export const chatCopy = {
     memory: 'Memory of this chat',
     activity: 'Activity',
     connections: 'Connections',
-    settings: 'Settings › Juno',
+    settings: 'Settings',
     review: 'Review',
   },
   /** The Juno panel (SPEC 7, inventory 12.1). */
@@ -49,6 +49,10 @@ export const chatCopy = {
     openInTab: 'Open in a tab',
     close: 'Close Juno ⌘J',
     removeQuote: 'Remove quote',
+    /** The context line above the composer: what Juno sees with the next message. */
+    contextLabel: (place: string) => `Juno sees ${place}`,
+    selection: '+ selection',
+    removeSelection: 'Remove selection',
   },
   list: {
     newMessage: 'New message',
@@ -197,17 +201,14 @@ export const chatCopy = {
       showAll: 'Show all',
       /** The auto-review's one line on a connection call (SPEC 13.9): why Juno asked, or why it ran without asking. */
       review: {
-        always: 'Asked because your rule for this tool is Always ask.',
-        failed: "Asked because Juno couldn't review this call.",
-        notAsked: "Asked because you didn't ask for this.",
-        untrusted: 'Asked because only something Juno read asked for this.',
-        implied: "Asked because you didn't ask for exactly this.",
-        delete: "Asked because deleting can't be undone.",
-        send: "Asked because sending can't be undone.",
-        write: "Asked because this change can't be undone.",
+        always: 'Asked because your rule for this tool is Always ask.', failed: "Asked because Juno couldn't review this call.",
+        notAsked: "Asked because you didn't ask for this.", untrusted: 'Asked because only something Juno read asked for this.',
+        implied: "Asked because you didn't ask for exactly this.", delete: "Asked because deleting can't be undone.",
+        send: "Asked because sending can't be undone.", write: "Asked because this change can't be undone.",
         ranExplicit: 'Ran without asking because you asked for it and it can be undone.',
         ranNever: 'Ran without asking because your rule for this tool is Never ask.',
       },
+
     },
     remove: {
       remove: 'Remove',
@@ -369,17 +370,12 @@ export const chatCopy = {
       /** The Configure sheet's title. */
       tools: (label: string) => `${label} tools`,
       search: 'Search tools',
-      tool: 'Tool',
-      enabled: 'Enabled',
-      autoReview: 'Auto-review',
-      read: 'Read',
+      tool: 'Tool', enabled: 'Enabled', autoReview: 'Auto-review', read: 'Read',
       rules: { auto: 'Auto', always: 'Always ask', never: 'Never ask' },
       connectionRule: 'Auto-review for all tools',
       connectionRuleNote: "A tool's own rule comes first. Never ask still asks when only something Juno read asked for the call.",
       changed: 'Changed since Juno first saw it',
-      noTools: 'Connect to see its tools.',
-      noMatch: 'No tools match.',
-      done: 'Done',
+      noTools: 'Connect to see its tools.', noMatch: 'No tools match.', done: 'Done',
       connect: 'Connect',
       signIn: 'Sign in',
       cancel: 'Cancel',

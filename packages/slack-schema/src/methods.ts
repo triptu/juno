@@ -89,7 +89,8 @@ export const Methods = {
   'subscriptions.thread.mark': method(ThreadMarkArgs, ThreadMarkFields),
   'subscriptions.thread.add': method(ThreadSubscribeArgs, ThreadSubscribeFields),
   'subscriptions.thread.remove': method(ThreadSubscribeArgs, ThreadSubscribeFields),
-  'presence.set': method(S.Struct({ presence: S.Literals(['auto', 'away']) }), {}),
+  // The official client sends `active` or `away` (research section 3, Presence); `auto` is the public `users.setPresence` value.
+  'presence.set': method(S.Struct({ presence: S.Literals(['active', 'away']) }), {}),
   'chat.postMessage': method(ChatPostMessageArgs, ChatPostMessageFields),
   'chat.update': method(ChatUpdateArgs, ChatUpdateFields),
   'chat.delete': method(ChatDeleteArgs, ChatDeleteFields),

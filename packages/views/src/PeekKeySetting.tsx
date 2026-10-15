@@ -15,7 +15,7 @@ const options: ReadonlyArray<{ readonly value: PeekKeyName; readonly label: stri
   { value: 'space', label: 'Space' },
 ]
 
-/** The peek key preference (inventory, Preferences): one row laid out as Appearance's, "Hold to peek" beside a segmented control. */
+/** The peek key preference (inventory 14, Settings › General): one row laid out as Appearance's, "Hold to peek" beside a segmented control. */
 export function PeekKeySetting({ value, onChange }: PeekKeySettingProps) {
   return (
     <div {...stylex.props(styles.row)}>

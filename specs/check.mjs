@@ -297,6 +297,8 @@ if (process.argv[2] === '--verify-agent') {
 }
 
 const regressions = [
+  ['requestqueue', 'pauseWhileQueued', 'respectsPause', 'requestqueue-queued-pause'],
+  ['discovery', 'rootsFirst', 'noRedundantLookup', 'discovery-roots-first'],
   ['follow', 'stalePage', 'acceptedUnfollow', 'stale-follow-page'],
   ['follow', 'lateEvent', 'acceptedUnfollow', 'accepted-unsubscribe-late-event'],
   ['follow', 'pendingPage', 'acceptedUnfollow', 'accepted-unsubscribe-pending-page'],
@@ -316,12 +318,18 @@ const regressions = [
   ['outbox', 'actionBeforeStore', 'actionNeedsMessage', 'outbox-action-before-store'],
   ['outbox', 'actionOnDiscarded', 'noActionOnDiscarded', 'outbox-action-on-discarded'],
   ['outbox', 'offlineSend', 'sendsWaitOffline', 'outbox-offline-send'],
+  ['outbox', 'networkCopy', 'shownOnce', 'outbox-network-copy'],
+  ['outbox', 'sameText', 'keepsRealSends', 'outbox-same-text'],
   ['catchup', 'newerThanPage', 'noFalseDelete', 'catchup-newer-than-page'],
   ['catchup', 'dropChanges', 'quietAgreement', 'catchup-drop-changes'],
   ['catchup', 'olderPage', 'quietAgreement', 'catchup-older-page'],
+  ['metadata', 'staleRename', 'eventWins', 'metadata-stale-rename'],
+  ['metadata', 'staleMembership', 'eventWins', 'metadata-stale-membership'],
+  ['metadata', 'staleArchive', 'eventWins', 'metadata-stale-archive'],
+  ['metadata', 'missedRename', 'quietAgreement', 'metadata-missed-rename'],
 ]
 // Specs whose corrected runs must reach their drained agreement.
-const drained = new Set(['outbox', 'catchup'])
+const drained = new Set(['outbox', 'catchup', 'metadata'])
 
 const selectedSpec = actionsOnly ? 'agent-actions.qnt' : recoveryOnly ? 'agent-recovery.qnt' : memoryOnly ? 'agent-memory.qnt' : outboxOnly ? 'outbox.qnt' : undefined
 for (const file of readdirSync(join(root, 'specs')).filter(name => name.endsWith('.qnt') && (!selectedSpec || name === selectedSpec || (recoveryOnly && name === 'agent-recovery-replay.qnt'))).toSorted()) {
@@ -329,7 +337,7 @@ for (const file of readdirSync(join(root, 'specs')).filter(name => name.endsWith
 }
 
 if (!memoryOnly && !actionsOnly && !recoveryOnly && !boundedOnly) {
-  for (const file of (outboxOnly ? ['outbox'] : ['follow', 'readstate', 'outbox', 'catchup'])) {
+  for (const file of (outboxOnly ? ['outbox'] : ['follow', 'readstate', 'outbox', 'catchup', 'requestqueue', 'discovery', 'metadata'])) {
     simulate(file, 'simulationStep', 'invariants', `${file}.itf.json`, false, true,
       drained.has(file) ? { witnesses: ['reachedAgreement'] } : {})
   }

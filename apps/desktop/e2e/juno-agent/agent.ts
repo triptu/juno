@@ -6,7 +6,10 @@ import type { Juno } from '../driver/juno'
 import { hooks, launchApp, type LaunchOptions, type RunningApp } from '../fixtures'
 import { expect, JunoChatPane } from './chat'
 
-export type JunoPage = 'Scheduled' | 'What Juno remembers' | 'Memory of this chat' | 'Activity' | 'Connections' | 'Settings › Juno'
+export type JunoPage = 'Scheduled' | 'What Juno remembers' | 'Memory of this chat' | 'Activity' | 'Connections'
+
+/** The sections of Settings the Juno Agent's flows use. */
+export type JunoSettingsSection = 'Juno' | 'Connections' | 'Backup & This Mac'
 
 /** Signs in, waits for the first sync and for the agent. */
 export async function ready(juno: Juno): Promise<void> {
@@ -26,12 +29,25 @@ export async function openChat(juno: Juno): Promise<JunoChatPane> {
   return JunoChatPane.tab(juno.win)
 }
 
-/** Opens one of the Juno menu's pages from the Juno tab and returns the page. */
+/** Opens one of the Juno menu's pages from the Juno tab and returns the page. Connections opens in Settings. */
 export async function openPage(juno: Juno, label: JunoPage): Promise<Locator> {
   await openChat(juno)
   await juno.win.locator('main [data-juno-header]').getByRole('button', { name: 'Juno' }).click()
   await juno.win.getByRole('menuitem', { name: label }).click()
-  await juno.tabs.expectActive(label)
+  await juno.tabs.expectActive(label === 'Connections' ? 'Settings' : label)
+  return juno.win.locator('main')
+}
+
+/** Opens Settings from the Juno menu, which lands on its Juno section, then goes to `section`. Returns the page. */
+export async function openSettings(juno: Juno, section: JunoSettingsSection): Promise<Locator> {
+  await openChat(juno)
+  await juno.win.locator('main [data-juno-header]').getByRole('button', { name: 'Juno' }).click()
+  await juno.win.getByRole('menuitem', { name: 'Settings' }).click()
+  await juno.tabs.expectActive('Settings')
+  const nav = juno.win.getByRole('navigation', { name: 'Settings' })
+  await expect(nav.getByRole('button', { name: 'Juno' })).toHaveAttribute('aria-current', 'page')
+  if (section !== 'Juno') await nav.getByRole('button', { name: section }).click()
+  await expect(nav.getByRole('button', { name: section })).toHaveAttribute('aria-current', 'page')
   return juno.win.locator('main')
 }
 

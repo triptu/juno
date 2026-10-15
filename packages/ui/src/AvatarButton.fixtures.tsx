@@ -5,7 +5,7 @@ const photo = `data:image/svg+xml;utf8,${encodeURIComponent(
   '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" fill="#8EB5C9"/><circle cx="32" cy="26" r="12" fill="#F4E6D3"/><path d="M10 64c2-14 11-20 22-20s20 6 22 20Z" fill="#F4E6D3"/></svg>',
 )}`
 
-const base = { label: 'Account and preferences', initials: 'T', hue: 'cyan' } as const
+const base = { label: 'Account and settings', initials: 'T', hue: 'cyan' } as const
 
 export default defineFixtures(
   AvatarButton,

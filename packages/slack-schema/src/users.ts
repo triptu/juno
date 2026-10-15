@@ -59,6 +59,8 @@ export const User = S.Struct({
   is_email_confirmed: opt(S.Boolean),
   updated: opt(S.Number),
   presence: opt(S.String),
+  /** On `client.userBoot` `self`: `active` (Slack's automatic mode) or `away` set by hand. */
+  manual_presence: opt(S.String),
   locale: opt(S.String),
   who_can_share_contact_card: opt(S.String),
 })

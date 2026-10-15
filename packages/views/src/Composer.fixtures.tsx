@@ -213,6 +213,12 @@ export default defineFixtures(
         height: 300,
       }),
     },
+    Emoji: {
+      'suggestions-open': scene(() => <div {...stylex.props(styles.column)}><Composer {...base} value=":smi" placeholder="Reply" marks={[]}
+        mention={{ anchorAt: 0, listId: 'emoji', activeId: 'emoji-smile', onDismiss: noop,
+          list: <MentionSuggestions kind="emoji" id="emoji" activeId="emoji-smile" onActivate={noop} onPick={noop}
+            rows={[{ id: 'smile', name: 'smile', insert: '😄' }, { id: 'smiley', name: 'smiley', insert: '😃' }, { id: 'smirk', name: 'smirk', insert: '😏' }]} /> }} /></div>, { height: 260 }),
+    },
     Shift: {
       'notices-come-and-go': scene(() => <NoticesComeAndGo />, { height: 320 }),
       'notices-over-chips': scene(() => <NoticesComeAndGo withChips />, { height: 400 }),

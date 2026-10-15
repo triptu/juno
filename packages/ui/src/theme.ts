@@ -4,7 +4,7 @@ import { accentNames, accents, compact, dark, type AccentName } from '@juno/toke
 export type ThemeName = 'light' | 'dark'
 /** What the owner picks: System follows macOS. */
 export type ThemePreference = 'system' | ThemeName
-/** Preferences › Appearance › Density (inventory 3.3). */
+/** Settings › Appearance › Density (inventory 3.3). */
 export type DensityName = 'comfortable' | 'compact'
 export type { AccentName }
 

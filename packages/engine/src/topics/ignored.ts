@@ -1,4 +1,4 @@
-/** The ignore list on Preferences (inventory 14): ignored channels, newest first, with how many messages arrived since. */
+/** The ignore list on Settings › Ignored (inventory 14): ignored channels, newest first, with how many messages arrived since. */
 import { Effect } from 'effect'
 import { IGNORED_HIDDEN_CAP, type IgnoredChannel } from '@juno/contract'
 import { StoreReader, type SqlError } from '@juno/store'

@@ -41,7 +41,7 @@ export interface MessageProps {
   readonly time: string
   /** Epoch milliseconds, for `date` inlines. */
   readonly now: number
-  /** Main: thread links under messages, Reply in thread on the toolbar. */
+  /** Main: thread links under messages, Start thread or Open thread on the toolbar. */
   readonly main: boolean
   /**
    * Show the name and avatar even when the message continues its sender's
@@ -60,6 +60,7 @@ export interface MessageProps {
   /** The hover toolbar's actions. With them the row has a toolbar and reserves its place, so nothing moves when it shows. */
   readonly actions?: MessageActions
   /** The toolbar asks to confirm a delete and stays shown. */
+  readonly active?: boolean
   readonly confirmingDelete?: boolean
   /** The inline edit field, in place of the body while the message is edited. */
   readonly editor?: ReactNode
@@ -146,6 +147,7 @@ export const Message = memo(function Message({
   tabbable = false,
   hueOf,
   actions,
+  active = false,
   confirmingDelete = false,
   editor,
   onOpenThread,
@@ -173,6 +175,7 @@ export const Message = memo(function Message({
     actions === undefined || message.kind !== 'message' || pending === 'failed' || editor !== undefined ? undefined : (
       <HoverToolbar
         main={main}
+        hasThread={message.thread !== undefined}
         tabIndex={tabbable ? 0 : -1}
         onReact={(reaction) => actions.onReact(message, reaction)}
         onMoreReactions={(at) => actions.onMoreReactions(message, at)}
@@ -189,6 +192,7 @@ export const Message = memo(function Message({
       tabIndex={tabbable ? 0 : -1}
       data-message-row={message.ts}
       data-pending={pending}
+      data-popover-active={active ? '' : undefined}
       onFocus={focus}
       onPointerEnter={actions === undefined ? undefined : (event) => placeToolbar(event.currentTarget)}
       data-editing={editor === undefined ? undefined : ''}
@@ -196,8 +200,8 @@ export const Message = memo(function Message({
         styles.row,
         eager && styles.rowEager,
         header && !flush && styles.rowGroupStart,
+        (active || confirmingDelete || editor !== undefined) && styles.rowHeld,
         message.mentionsMe && styles.rowMention,
-        (confirmingDelete || editor !== undefined) && styles.rowHeld,
       )}
     >
       <span data-sender={header ? '' : undefined} {...stylex.props(styles.gutter)}>
@@ -246,8 +250,14 @@ export const Message = memo(function Message({
           tabbable={tabbable}
           progress={pending === 'sending' ? progress : undefined}
         />
-        <Reactions reactions={message.reactions} onToggle={toggle} />
-        {main && message.thread !== undefined && onOpenThread !== undefined ? <ThreadLink link={message.thread} onOpen={onOpenThread} tabIndex={tabbable ? 0 : -1} /> : null}
+        <div {...stylex.props(styles.reactionSlot)}>
+          <Reactions reactions={message.reactions} onToggle={toggle} />
+        </div>
+        {main ? (
+          <div {...stylex.props(styles.threadSlot)}>
+            {message.thread !== undefined && onOpenThread !== undefined ? <ThreadLink link={message.thread} onOpen={onOpenThread} tabIndex={tabbable ? 0 : -1} /> : null}
+          </div>
+        ) : null}
         {pending === 'failed' && clientMsgId !== undefined ? (
           <Text variant="meta" tone="muted" as="p" data-send-failed="" sx={styles.failed}>
             <span {...stylex.props(styles.failedIcon)}>
@@ -391,7 +401,18 @@ const styles = stylex.create({
       [NARROW_ROW]: 0,
     },
   },
+  reactionSlot: {
+    display: 'flex',
+    minHeight: `calc(${sizes['--control-24']} + ${spacing['--space-1-5']})`,
+    width: '100%',
+  },
+  threadSlot: {
+    display: 'flex',
+    minHeight: `calc(${sizes['--control-26']} + ${spacing['--space-1-5']})`,
+    maxWidth: '100%',
+  },
   name: {
+    width: sizes['--message-sender-width'],
     flexShrink: 1,
     minWidth: 0,
   },

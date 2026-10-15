@@ -1,7 +1,12 @@
 import * as stylex from '@stylexjs/stylex'
+import { CheckCircle } from '@phosphor-icons/react/dist/icons/CheckCircle'
+import { ClockCounterClockwise } from '@phosphor-icons/react/dist/icons/ClockCounterClockwise'
+import { PencilSimpleLine } from '@phosphor-icons/react/dist/icons/PencilSimpleLine'
+import { TextAlignLeft } from '@phosphor-icons/react/dist/icons/TextAlignLeft'
 import { chatCopy } from '@juno/agent-contract'
-import { accent, colors, motion, radii, sizes, spacing, text, layout } from '@juno/tokens/tokens.stylex'
-import { Illustration, Text } from '@juno/ui'
+import { motion, spacing, layout } from '@juno/tokens/tokens.stylex'
+import { Illustration, Text, type PhosphorIcon } from '@juno/ui'
+import { SuggestionChip } from './SuggestionChip'
 
 export interface EmptyChatProps {
   /** A suggestion pill was clicked: the text is sent as the owner's message. */
@@ -10,11 +15,12 @@ export interface EmptyChatProps {
   readonly enter?: boolean
 }
 
-const HOVER = '@media (hover: hover)'
+/** Each suggestion's icon, in the order of `chatCopy.empty.suggestions`. */
+const suggestionIcons: ReadonlyArray<PhosphorIcon> = [ClockCounterClockwise, TextAlignLeft, PencilSimpleLine, CheckCircle]
 
 /**
  * The empty chat (SPEC 13.1): the seated j, "What do you need?", one line
- * on what Juno can do, and four suggestion pills. The parts enter staggered
+ * on what Juno can do, and four suggestion chips. The parts enter staggered
  * once, per friendly-layer section 5.
  */
 export function EmptyChat({ onSuggest, enter = true }: EmptyChatProps) {
@@ -35,10 +41,8 @@ export function EmptyChat({ onSuggest, enter = true }: EmptyChatProps) {
         </Text>
       </span>
       <div role="group" aria-label="Suggestions" {...stylex.props(styles.pills, enter && styles.enter, enter && styles.delay3)}>
-        {copy.suggestions.map((suggestion) => (
-          <button key={suggestion} type="button" onClick={() => onSuggest(suggestion)} {...stylex.props(styles.pill)}>
-            {suggestion}
-          </button>
+        {copy.suggestions.map((suggestion, index) => (
+          <SuggestionChip key={suggestion} icon={suggestionIcons[index] ?? ClockCounterClockwise} label={suggestion} onSend={() => onSuggest(suggestion)} />
         ))}
       </div>
     </div>
@@ -70,48 +74,6 @@ const styles = stylex.create({
     display: 'flex',
     flexWrap: 'wrap',
     gap: spacing['--space-2'],
-  },
-  pill: {
-    appearance: 'none',
-    display: 'inline-flex',
-    alignItems: 'center',
-    height: sizes['--control-34'],
-    margin: 0,
-    paddingInline: spacing['--space-3'],
-    borderWidth: '1px',
-    borderStyle: 'solid',
-    borderColor: {
-      default: colors['--border-strong'],
-      ':hover': { default: null, [HOVER]: colors['--border-strongest'] },
-    },
-    borderRadius: radii['--radius-pill'],
-    backgroundColor: {
-      default: colors['--surface-default'],
-      ':hover': { default: null, [HOVER]: colors['--surface-hover'] },
-    },
-    color: colors['--foreground-default'],
-    fontFamily: text['--text-button-small-family'],
-    fontSize: text['--text-button-small-size'],
-    fontWeight: text['--text-button-small-weight'],
-    lineHeight: text['--text-button-small-leading'],
-    letterSpacing: text['--text-button-small-tracking'],
-    whiteSpace: 'nowrap',
-    userSelect: 'none',
-    cursor: 'default',
-    transitionProperty: 'scale, background-color, border-color',
-    transitionDuration: motion['--duration-fast'],
-    transitionTimingFunction: motion['--ease-out'],
-    scale: {
-      default: '1',
-      ':active': motion['--press-scale'],
-    },
-    outlineStyle: {
-      default: 'none',
-      ':focus-visible': 'solid',
-    },
-    outlineWidth: sizes['--focus-ring-width'],
-    outlineOffset: sizes['--focus-ring-offset'],
-    outlineColor: accent['--focus-ring'],
   },
   enter: {
     animationName: rise,

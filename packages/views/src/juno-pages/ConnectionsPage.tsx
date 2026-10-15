@@ -36,7 +36,7 @@ const stateLabel: Record<ConnectionState, string> = {
 export function ConnectionsPage({ page, error, onAction, onConfigure, onAdd }: ConnectionsPageProps) {
   const copy = chatCopy.pages.connections
   return (
-    <Page>
+    <Page width="settings">
       <PageHeader title="Connections" subtitle={copy.intro} />
       {page.connections.length === 0 ? (
         <EmptyState illustration="nothing-here" title="No connections" body="Juno's connections show up here once they are set up." enter={false} />

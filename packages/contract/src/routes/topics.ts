@@ -292,7 +292,7 @@ export const channelsIgnore = action('channels.ignore', { channel: Schema.String
 
 export const channelsUnignore = action('channels.unignore', { channel: Schema.String })
 
-/** One ignored channel on Preferences (inventory 14). `hidden` counts the messages since it was ignored, at most `IGNORED_HIDDEN_CAP`. */
+/** One ignored channel on Settings › Ignored (inventory 14). `hidden` counts the messages since it was ignored, at most `IGNORED_HIDDEN_CAP`. */
 export const IgnoredChannel = Schema.Struct({
   id: Schema.String,
   name: Schema.String,

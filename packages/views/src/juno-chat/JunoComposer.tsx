@@ -4,12 +4,16 @@ import type { KeyboardEvent, ReactNode, Ref } from 'react'
 import { chatCopy, type Quote } from '@juno/agent-contract'
 import { layout, spacing } from '@juno/tokens/tokens.stylex'
 import { IconButton, Surface, Textarea } from '@juno/ui'
+import { mentionProps, type ComposerMention } from '../Composer'
 import { QuoteStub } from './QuoteStub'
 
 export interface JunoComposerProps {
   /** The draft is the renderer's: controlled. */
   readonly value: string
-  readonly onChange: (value: string) => void
+  readonly onChange: (value: string, caret: number) => void
+  readonly mention?: ComposerMention
+  readonly onFieldKey?: (event: KeyboardEvent<HTMLTextAreaElement>) => boolean
+  readonly onCaret?: (caret: number) => void
   /** Enter, or the send button, with a non-empty draft. Sending while Juno works is like any send: it joins at the next step. */
   readonly onSend: () => void
   /** Esc with the composer empty and no quote: the Juno panel closes (SPEC, Juno panel). Never a Stop. */
@@ -26,7 +30,7 @@ export interface JunoComposerProps {
   readonly inputRef?: Ref<HTMLTextAreaElement>
   /** `panel`: the Juno panel's padding, full width. Default `page`. */
   readonly column?: 'page' | 'panel'
-  /** Above the field in the panel: the selection quote, the About chip, Catch me up. */
+  /** Above the field in the panel: Catch me up and the context line. */
   readonly context?: ReactNode
 }
 
@@ -35,10 +39,11 @@ export interface JunoComposerProps {
  * the textarea growing to 160px, and the round send button, dimmed while the
  * draft is empty and never disabled by a run. Enter sends, Shift Enter adds a line.
  */
-export function JunoComposer({ value, onChange, onSend, onEscape, quote, onClearQuote, enabled, placeholder = chatCopy.composer.placeholder, inputRef, column = 'page', context }: JunoComposerProps) {
+export function JunoComposer({ value, onChange, onSend, onEscape, quote, onClearQuote, enabled, placeholder = chatCopy.composer.placeholder, inputRef, column = 'page', context, mention, onFieldKey, onCaret }: JunoComposerProps) {
   const panel = column === 'panel'
   const canSend = enabled && value.trim().length > 0
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (onFieldKey?.(event) === true) return
     if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
       event.preventDefault()
       if (canSend) onSend()
@@ -56,7 +61,7 @@ export function JunoComposer({ value, onChange, onSend, onEscape, quote, onClear
           <QuoteStub quote={quote} {...(onClearQuote ? { onClear: onClearQuote } : {})} />
         </div>
       ) : null}
-      <Surface kind="field" sx={[styles.box, panel && styles.wide]}>
+      <Surface kind="field" data-composer-field="" sx={[styles.box, panel && styles.wide]}>
         <div {...stylex.props(styles.row)}>
           <Textarea
             ref={inputRef}
@@ -66,8 +71,9 @@ export function JunoComposer({ value, onChange, onSend, onEscape, quote, onClear
             placeholder={placeholder}
             value={value}
             disabled={!enabled}
-            onChange={(event) => onChange(event.currentTarget.value)}
+            onChange={(event) => onChange(event.currentTarget.value, event.currentTarget.selectionStart)}
             onKeyDown={onKeyDown}
+            {...mentionProps([], mention, onCaret)}
             dir="auto"
           />
           <span {...stylex.props(styles.send)}>
@@ -75,12 +81,15 @@ export function JunoComposer({ value, onChange, onSend, onEscape, quote, onClear
           </span>
         </div>
       </Surface>
+      {mention?.list}
     </div>
   )
 }
 
 const styles = stylex.create({
   outer: {
+    position: 'relative',
+    anchorScope: 'all',
     flexShrink: 0,
     width: '100%',
     paddingTop: spacing['--space-2'],
@@ -88,16 +97,18 @@ const styles = stylex.create({
     paddingBottom: spacing['--space-5'],
     boxSizing: 'border-box',
   },
-  // The bottom inset is the topic composer's, so the two fields end on one line when the panel sits beside a topic.
+  // With the panel's 8px inset under it, the topic composer's 20px bottom inset, so the two fields end on one line.
   outerPanel: {
     paddingTop: 0,
     paddingInline: spacing['--space-3'],
+    paddingBottom: spacing['--space-3'],
   },
   wide: {
     maxWidth: 'none',
   },
   // The chat column's width less its 32px padding each side, so the field lines up with the bubbles and the header island.
   box: {
+    anchorName: '--composer-box',
     display: 'flex',
     width: '100%',
     maxWidth: `calc(${layout['--page-width']} - ${spacing['--space-16']})`,

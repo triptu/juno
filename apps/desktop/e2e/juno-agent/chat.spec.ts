@@ -65,8 +65,8 @@ test('⌘J opens the panel beside a topic with its composer focused, and Esc in 
   const panel = JunoChatPane.panel(juno.win)
   await expect(panel.composer).toBeFocused()
   await expect(panel.composer).toHaveAttribute('placeholder', 'Ask about this topic')
-  // Beside the topic: 360px, and the topic keeps its header.
-  await expect.poll(() => juno.win.locator('aside[data-juno-panel]').evaluate((el) => el.getBoundingClientRect().width)).toBe(360)
+  // Beside the topic: 440px, and the topic keeps its header.
+  await expect.poll(() => juno.win.locator('aside[data-juno-panel]').evaluate((el) => el.getBoundingClientRect().width)).toBe(440)
   await expect(juno.win.locator('[data-topic-header]')).toBeVisible()
 
   await panel.composer.press('Escape')
@@ -91,12 +91,12 @@ test('the panel covers the topic when the topic would keep less than 480px', asy
   await juno.tabs.menu('juno')
   const panel = juno.win.locator('aside[data-juno-panel]')
   const page = juno.win.locator('main')
-  // Covering: as wide as the page, which keeps its full width under it.
+  // Covering: the page's width less the 8px inset each side, and the page keeps its full width under it.
   const width = (locator: typeof page) => locator.evaluate((el) => Math.round(el.getBoundingClientRect().width))
-  await expect.poll(async () => (await width(panel)) === (await width(page))).toBe(true)
-  expect(await width(page)).toBeLessThan(840)
+  await expect.poll(async () => (await width(panel)) === (await width(page)) - 16).toBe(true)
+  expect(await width(page)).toBeLessThan(856)
   await setWindowWidth(juno, 1600)
-  await expect.poll(() => panel.evaluate((el) => el.getBoundingClientRect().width)).toBe(360)
+  await expect.poll(() => panel.evaluate((el) => el.getBoundingClientRect().width)).toBe(440)
 })
 
 test('a message sent from the panel is about the topic, with the selection, and says so over the bubble', async ({ juno, model }) => {
@@ -116,8 +116,9 @@ test('a message sent from the panel is about the topic, with the selection, and 
   })
   await juno.tabs.menu('juno')
   const panel = JunoChatPane.panel(juno.win)
-  await expect(juno.win.locator('[data-panel-selection]')).toContainText('logical replication')
-  await expect(juno.win.locator('[data-panel-selection]')).toContainText('Leo')
+  // The context line adds "+ selection", with the words and their sender as its tooltip.
+  await expect(juno.win.locator('[data-panel-selection]')).toContainText('+ selection')
+  await expect(juno.win.locator('[data-panel-selection]')).toHaveAttribute('title', 'Leo: logical replication')
 
   await panel.send('is this settled?')
   await expect(panel.ownerBubble('is this settled?').locator('[data-about]')).toHaveText(/^About Draft plan is in the doc/)
@@ -132,6 +133,34 @@ test('a message sent from the panel is about the topic, with the selection, and 
   const tab = JunoChatPane.tab(juno.win)
   await tab.ownerBubble('is this settled?').locator('[data-about]').click()
   await juno.topic.expectTitle(POSTGRES)
+})
+
+test('the context line above the panel composer names the topic Juno sees', async ({ juno }) => {
+  await ready(juno)
+  await setWindowWidth(juno, 1400)
+  await juno.sidebar.row(POSTGRES).open()
+  await juno.tabs.menu('juno')
+  const line = juno.win.locator('[data-panel-sees]')
+  await expect(line).toHaveText(/^eng · Draft plan is in the doc/)
+  await expect(line).toHaveAttribute('title', /^Juno sees eng · Draft plan is in the doc/)
+})
+
+test('the panel is open in one tab and closed in another, and each keeps its state across a tab switch', async ({ juno }) => {
+  await ready(juno)
+  await setWindowWidth(juno, 1400)
+  const panel = juno.win.locator('aside[data-juno-panel]')
+  await juno.sidebar.row(POSTGRES).open()
+  await juno.tabs.menu('juno')
+  await expect(panel).toHaveCount(1)
+  // A second topic in a new tab: the panel is closed there.
+  await juno.sidebar.row(RINA).openInNewTab()
+  await juno.topic.expectTitle(RINA)
+  await expect(panel).toHaveCount(0)
+  // Back to the first tab: still open. And to the second: still closed.
+  await juno.tabs.select(POSTGRES)
+  await expect(panel).toHaveCount(1)
+  await juno.tabs.select('Rina finished the onsite')
+  await expect(panel).toHaveCount(0)
 })
 
 test('a topic opened at its "new" divider offers Catch me up in the panel, once', async ({ juno, model }) => {

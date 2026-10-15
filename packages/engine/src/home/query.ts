@@ -272,7 +272,7 @@ export const readHome = (): Effect.Effect<HomeRun, SqlError, StoreReader> =>
       const art = artRefOf(row, aiAssist)
       return {
         id: row.topic_id,
-        title: row.kind === 'main' ? channelLabel(info) : resolveTitle(topic).text,
+        title: row.kind === 'main' ? channelLabel(info) : resolveTitle(topic, { user: nameOf }).text,
         place: channelLabelBare(info),
         ...(art === undefined || art.recipe === '' ? {} : { art: art.recipe }),
       }

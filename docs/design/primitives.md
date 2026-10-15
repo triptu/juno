@@ -103,7 +103,7 @@ Typography. `variant` maps to the five variables of a type role in tokens: `sect
 
 `Divider`: 1px, `tone` `default` | `subtle`, `vertical`, `inset`. `LabelledRule`: the "3 new" divider, `label` + rule in `--hl` / `--hl-rule` (or `muted`); fills its row.
 
-`HeaderBand`: the static band behind a page header's islands (`--header-band` tall, solid to `--header-band-solid`, then a fade), `aria-hidden`, no pointer events. Used by the topic header, the Juno tab and the Juno panel.
+`HeaderBand`: the static band behind a page header's islands (`--header-band` tall, solid to `--header-band-solid`, then a fade), `aria-hidden`, no pointer events. Used by the topic header, the Juno tab and the Juno panel; `surface="panel"` draws it in `--panel-fill` for the panel.
 
 ## 10. Popover and OptionList
 
@@ -139,7 +139,7 @@ The composer is a feature component: `Surface field` + slots + `IconButton` + `T
 
 ## 13. ListRow
 
-Generic row for settings groups, logs and tables: `minHeight` 44 | 48 | 52, `padding` `settings` (8 14, the same inset at both ends) | `table` | `log`, bottom `divider` (default on), `leading`, `trailing`, children. With `onSelect` it is a focusable `role="button"` with a hover background and radius 16 (`selected` for the current row; muted text inside a selected row renders subtle). Rows set `contain: content`. Sidebar topic rows and All topics rows are feature components built on this.
+Generic row for settings groups, logs and tables: `minHeight` 32 | 44 | 48 | 52, `padding` `settings` (8 14, the same inset at both ends) | `table` | `log` | `navigation` (0 12, sidebar navigation’s 8px gap, 20px leading slot, 4px body gap and radius 12), bottom `divider` (default on), `leading`, `trailing`, children. With `onSelect` it is a focusable `role="button"` with a hover background and radius 16 (`selected` for the current row; muted text inside a selected row renders subtle). Rows set `contain: content`. Sidebar topic rows and All topics rows are feature components built on this.
 
 ## 14. Toast
 

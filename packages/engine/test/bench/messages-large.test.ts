@@ -127,6 +127,7 @@ describe.skipIf(process.env['JUNO_BENCH'] !== '1')('messages.list on the large s
       unmount()
 
       // The query alone on its own reader: a first run (every body parsed) and a subscription's re-run.
+      await engine.handle.stop()
       const paths = workspacePathsFromDir(join(engine.userData, 'workspaces', engine.fake.teamId))
       const isolated = await Effect.runPromise(
         Effect.gen(function* () {

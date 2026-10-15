@@ -52,6 +52,12 @@ test.describe('mouse-down activation', () => {
   })
 })
 
+test('message links use the hand cursor only when they open outside Juno', async ({ page }) => {
+  await page.goto('/#/MessageList?__state=thread/long')
+  await expect(page.getByRole('link', { name: 'runbook' })).toHaveCSS('cursor', 'pointer')
+  await expect(page.locator('[data-channel="C0ENG"]')).toHaveCSS('cursor', 'default')
+})
+
 /**
  * A one-line text that is cut off shows its full text as the tooltip when
  * hovered; one that fits shows none. The browser draws the tooltip itself, so
@@ -176,7 +182,7 @@ test('every message row is a whole number of pixels tall', async ({ page }) => {
  * also computes `user-select: text`, or when it is part of a field (a label
  * wrapping an input), which focuses the input wherever it is clicked.
  */
-test('no state shows the pointer, and the text cursor only over selectable text', async ({ page }) => {
+test('no state shows the pointer outside external links, and the text cursor only over selectable text', async ({ page }) => {
   const routes = await readRoutes(page)
 
   const offenders: string[] = []
@@ -189,7 +195,9 @@ test('no state shows the pointer, and the text cursor only over selectable text'
       for (const element of Array.from(frame.querySelectorAll('*'))) {
         const style = getComputedStyle(element)
         const describe = () => `${element.tagName.toLowerCase()}${element.id ? `#${element.id}` : ''}[cursor=${style.cursor}]`
-        if (style.cursor === 'pointer') bad.push(describe())
+        // Links that open outside Juno are the one place the hand cursor is allowed.
+        const external = element.closest('a[href^="http:"], a[href^="https:"], a[href^="mailto:"]') !== null
+        if (style.cursor === 'pointer' && !external) bad.push(describe())
         const inField = element.closest('label') !== null && element.closest('label')!.querySelector('input, textarea') !== null
         if (style.cursor === 'text' && style.userSelect !== 'text' && !inField) bad.push(describe())
       }

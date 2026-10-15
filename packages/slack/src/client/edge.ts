@@ -1,7 +1,7 @@
 /**
  * The edge ("Flannel") API: JSON POST to `<flannel url>/<method>?_x_app_name=client`
  * with the token inside the body (research section 1 and 3). Juno v1 uses it
- * for `users/info` in chunks of 100 at boot (architecture 5.2 step 6). The
+ * for `users/info` in chunks of 100 (architecture 5.2 step 6). The
  * base URL comes from `api.getFlannelHttpUrl` and is cached for its
  * `ttl_seconds`.
  *
@@ -50,11 +50,12 @@ export class SlackEdge extends Context.Service<SlackEdge, SlackEdgeShape>()('jun
       const api = yield* SlackApi
       const cached = yield* Ref.make<{ url: string; expiresAt: number } | undefined>(undefined)
 
-      const baseUrl = Effect.gen(function* () {
+      // On the lane of the call that needs it: an interactive lookup must not wait behind the background backfill.
+      const baseUrl = (lane: Lane) => Effect.gen(function* () {
         const now = yield* Clock.currentTimeMillis
         const current = yield* Ref.get(cached)
         if (current !== undefined && current.expiresAt > now) return current.url
-        const answer = yield* api.call('api.getFlannelHttpUrl', { include_external_workspaces: true }, { lane: 'background', reason: 'edge-url' })
+        const answer = yield* api.call('api.getFlannelHttpUrl', { include_external_workspaces: true }, { lane, reason: 'edge-url' })
         const url = answer.url.replace(/\/+$/, '')
         yield* Ref.set(cached, { url, expiresAt: now + (answer.ttl_seconds ?? 3600) * 1000 })
         return url
@@ -72,7 +73,7 @@ export class SlackEdge extends Context.Service<SlackEdge, SlackEdgeShape>()('jun
           const payload = JSON.stringify({ token: session.token, ...body })
           return yield* withRetries(queue, config, options.lane ?? 'background', key, () =>
             Effect.gen(function* () {
-              const base = yield* baseUrl
+              const base = yield* baseUrl(options.lane ?? 'background')
               const response = yield* transport
                 .request({
                   url: `${base}/${method}?_x_app_name=client`,

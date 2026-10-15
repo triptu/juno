@@ -17,7 +17,7 @@ export default defineFixtures(Popover, {
   Menu: {
     'account-menu': scene(
       () => (
-        <Popover open onClose={() => {}} width="account" placement="bottom-start" role="menu" label="Account" anchor={<IconButton icon={Hash} label="Account and preferences" size={30} />}>
+        <Popover open onClose={() => {}} width="account" placement="bottom-start" role="menu" label="Account" anchor={<IconButton icon={Hash} label="Account and settings" size={30} />}>
           <OptionHeader leading={<Avatar label="T" name="Tushar" hue="cyan" size={32} />} title="Tushar" sub="acme.slack.com" />
           <OptionSeparator />
           <OptionList role="menu" label="Account">

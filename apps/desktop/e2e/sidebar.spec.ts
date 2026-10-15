@@ -385,11 +385,11 @@ test('zooming in from the View menu keeps the whole sidebar inside the window', 
   expect(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.webContents.getZoomFactor())).toBeGreaterThan(1.9)
   const right = (selector: string) => win.evaluate((query) => ({ right: document.querySelector(query)!.getBoundingClientRect().right, width: window.innerWidth }), selector)
   await expect.poll(async () => { const { right: edge, width } = await right('aside'); return edge <= width }).toBe(true)
-  const account = await right('aside [aria-label="Account and preferences"]')
+  const account = await right('aside [aria-label="Account and settings"]')
   expect(account.right).toBeLessThanOrEqual(account.width)
 
   // The account menu ends inside the window; what does not fit scrolls inside it.
-  await win.evaluate(() => document.querySelector<HTMLElement>('aside [aria-label="Account and preferences"]')!.click())
+  await win.evaluate(() => document.querySelector<HTMLElement>('aside [aria-label="Account and settings"]')!.click())
   const menu = () => win.evaluate(() => ({ bottom: document.querySelector('[role="dialog"][aria-label="Account"]')?.getBoundingClientRect().bottom ?? Infinity, height: window.innerHeight }))
   await expect.poll(async () => { const { bottom, height } = await menu(); return bottom <= height }).toBe(true)
   await win.keyboard.press('Escape')

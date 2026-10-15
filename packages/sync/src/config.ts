@@ -17,6 +17,8 @@ export interface SyncConfigShape {
   readonly previewThreads: number
   /** Ids per edge `users/info` call. */
   readonly usersChunk: number
+  /** How long `nameUsers` waits after the first wanted id, so one call carries a burst. */
+  readonly usersBatchMillis: number
   /** How often the discovery sweep runs while live. 0 disables the timer; reconnects still catch up. */
   readonly sweepIntervalMillis: number
   /**
@@ -49,6 +51,7 @@ export const defaultSyncConfig: SyncConfigShape = {
   getViewPageLimit: 50,
   previewThreads: 50,
   usersChunk: 100,
+  usersBatchMillis: 50,
   sweepIntervalMillis: 10 * 60_000,
   followPassMillis: 60 * 60_000,
   discovery: 'search',

@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react'
 import { chatCopy } from '@juno/agent-contract'
 import { copyText, registry } from '@juno/state'
 import { chooseFolder, junoPageActions, takeRecoveryPhrase, typeRecoveryPhrase, type CommandAnswer } from '@juno/state/agent'
-import { MoveSheet, RecoveryPhraseSheet, RestoreSheet, SheetLayer, type JunoSettingsPageProps } from '@juno/views'
+import { MoveSheet, RecoveryPhraseSheet, RestoreSheet, SheetLayer, type JunoBackupPageProps } from '@juno/views'
 import { openJunoPage } from '../navigation'
 
 const actions = junoPageActions(registry)
@@ -15,11 +15,11 @@ type Sheet =
   | { readonly _tag: 'restore'; readonly folder?: string; readonly phrase: string; readonly attested: boolean; readonly busy: boolean; readonly error?: string }
   | { readonly _tag: 'move'; readonly busy: boolean; readonly error?: string }
 
-type BackupProps = Required<Pick<JunoSettingsPageProps, 'onBackupFolder' | 'onExportPhrase' | 'onMove' | 'onRestore' | 'onStopJob'>> &
-  Pick<JunoSettingsPageProps, 'backupBusy' | 'backupError'>
+type BackupProps = Required<Pick<JunoBackupPageProps, 'onBackupFolder' | 'onExportPhrase' | 'onMove' | 'onRestore' | 'onStopJob'>> &
+  Pick<JunoBackupPageProps, 'backupBusy' | 'backupError'>
 
 /**
- * Settings › Juno's Backup and This Mac (SPEC 13.8, WP21): the folder
+ * Settings › Backup & This Mac (SPEC 13.8, WP21): the folder
  * picker, Export recovery phrase, Move and Restore, and the sheets they
  * open. The phrase comes from main once, lives in this sheet's state while
  * it shows, and is gone when the sheet closes.

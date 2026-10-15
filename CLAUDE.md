@@ -19,7 +19,7 @@ Read the parts relevant to your task, and the package's README, before changing 
 - Business logic lives in Effect services outside the renderer. The renderer is UI only.
 - UI is layered: tokens, then primitives, then dumb views (props in, callbacks out), then containers that wire state to views. Views never import state, Effect or Electron.
 - Every design value comes from `@juno/tokens`. No raw colours or sizes in components.
-- The app should feel like a native macOS app. Never use `cursor: pointer`.
+- The app should feel like a native macOS app. Never use `cursor: pointer`, except on links in message content that open outside the app.
 - Speed is a feature. Every interaction has a budget in `docs/performance.md`, and changes must not regress it.
 
 ## Working rules

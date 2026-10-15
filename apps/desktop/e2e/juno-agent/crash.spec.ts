@@ -15,7 +15,7 @@ import type { OpenRouterRequest, ToolCallAnswer } from '@juno/agent-testing/open
 import type { CrashPoint } from '@juno/agent/crash'
 import { Juno } from '../driver/juno'
 import { hooks, launchApp, type LaunchOptions, type RunningApp } from '../fixtures'
-import { addServer, agentReady, card, expectArmedCrash, expectKilled, launchArmed, openChat, openPage, ready, restartArmed } from './agent'
+import { addServer, agentReady, card, expectArmedCrash, expectKilled, launchArmed, openChat, openSettings, ready, restartArmed } from './agent'
 import { answer as echo, expect, test as base } from './chat'
 import { startScriptedModel, type ScriptedModel } from './model'
 
@@ -275,7 +275,7 @@ for (const point of ['backup.segmentWritten', 'backup.manifestRenamed', 'ownersh
       await restartArmed(app, point)
       if (point === 'ownership.released') {
         await agentReady(app)
-        const settings = await openPage(juno, 'Settings › Juno')
+        const settings = await openSettings(juno, 'Backup & This Mac')
         await settings.getByRole('button', { name: 'Move', exact: true }).click()
         await juno.win.getByRole('dialog', { name: 'Move to another Mac' }).getByRole('button', { name: 'Move', exact: true }).click()
       }
@@ -289,12 +289,12 @@ for (const point of ['backup.segmentWritten', 'backup.manifestRenamed', 'ownersh
       if (point === 'ownership.released') {
         await expect(chat.composer).toBeDisabled()
         await expect(chat.root.locator('[data-banner="otherDevice"]')).toBeVisible()
-        const settings = await openPage(juno, 'Settings › Juno')
+        const settings = await openSettings(juno, 'Backup & This Mac')
         await expect(settings.locator('[data-owner-line]')).toHaveText(/^Move code /, { timeout: 30_000 })
       } else {
         await chat.send('are you still here?')
         await chat.expectJuno('You said: are you still here?')
-        const settings = await openPage(juno, 'Settings › Juno')
+        const settings = await openSettings(juno, 'Backup & This Mac')
         await expect(settings.locator('[data-last-backup]')).toContainText('Last backup', { timeout: 30_000 })
       }
       expect(mcp.materials()).toHaveLength(1)

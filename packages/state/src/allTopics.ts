@@ -68,7 +68,7 @@ export const allTopicsListAtom = Atom.make((get): AllTopicsWindow => {
   const offset = get(allTopicsOffsetAtom)
   const result = get(allTopicsWindowAtom(filter, offset))
   const shown = Option.getOrUndefined(get.self<AllTopicsWindow>())
-  if (!AsyncResult.isSuccess(result) || result.value.meta.seq === 0) return shown ?? { ...emptyWindow<TopicRow>(), filter, offset }
+  if (!AsyncResult.isSuccess(result) || result.value.meta.seq === 0 || result.value.meta.windowCovered === false) return shown ?? { ...emptyWindow<TopicRow>(), filter, offset }
   return { ...carryOver(shown, result.value), filter, offset }
 })
 

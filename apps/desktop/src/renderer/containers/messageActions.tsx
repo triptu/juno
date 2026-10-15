@@ -25,6 +25,8 @@ import { openTopic } from './navigation'
 import { showMessageMenu } from './topicActions'
 import { isOwnEditable, landedTs, refOf } from './messageRows'
 
+import { noteRecentEmoji, recentEmoji } from './recentEmoji'
+
 const EmojiPickerPanel = lazy(() => import('./EmojiPickerPanel'))
 
 /** What the composer lets the topic do to it. Filled by `TopicComposer` once its draft has loaded. */
@@ -39,13 +41,6 @@ const rowOf = (scroller: HTMLElement | null, ts: string) => scroller?.querySelec
 
 /** The picker's height and the gap under its anchor, for choosing whether it opens below or above (`--emoji-picker-height`). */
 const PICKER_ROOM = 368
-/** Frequently used reactions this session, newest first. */
-const RECENT_MAX = 18
-let recentReactions: ReadonlyArray<string> = ['+1', 'white_check_mark', 'eyes']
-const noteRecent = (name: string) => {
-  recentReactions = [name, ...recentReactions.filter((other) => other !== name)].slice(0, RECENT_MAX)
-}
-
 /** Fetch the picker's chunk once a topic has painted, so the first open does not wait for it. */
 let pickerLoaded = false
 const loadPicker = () => void import('./EmojiPickerPanel')
@@ -73,6 +68,7 @@ export interface MessageActionsInput {
 
 export interface MessageActionsOutput {
   readonly actions: MessageActions
+  readonly activeMessage: string | undefined
   readonly confirmingDelete: string | undefined
   readonly editing: { readonly ts: string; readonly editor: ReactNode } | undefined
   readonly onRowKey: (ts: string, event: KeyboardEvent<HTMLElement>) => void
@@ -104,6 +100,7 @@ export function useMessageActions({ detail, list, scrollRef, composer }: Message
   const [editing, setEditing] = useState<Editing | undefined>(undefined)
   const [confirming, setConfirming] = useState<{ readonly ts: string; readonly sent: boolean } | undefined>(undefined)
   const [picker, setPicker] = useState<Picker | undefined>(undefined)
+  const [menuMessage, setMenuMessage] = useState<string | undefined>(undefined)
   const [selection, setSelection] = useState<{ readonly x: number; readonly y: number } | undefined>(undefined)
 
   // The latest window and state, for callbacks created once.
@@ -143,7 +140,7 @@ export function useMessageActions({ detail, list, scrollRef, composer }: Message
     const react = (message: MessageView, name: string, on?: boolean) => {
       const mine = message.reactions.find((reaction) => reaction.name === name)?.me === true
       const want = on ?? !mine
-      if (want) noteRecent(name)
+      if (want) noteRecentEmoji(name)
       void reactToMessage(registry, refOf(channel, message), name, want)
     }
     const startEdit = (message: MessageView) => {
@@ -195,7 +192,13 @@ export function useMessageActions({ detail, list, scrollRef, composer }: Message
     const menu = async (message: MessageView, at: MenuAnchor, onSender = false) => {
       const people = latest.current.list.refs.people
       const sender = message.senderId === undefined ? undefined : { id: message.senderId, name: people.get(message.senderId)?.name ?? message.senderId }
-      const chosen = await showMessageMenu(latest.current.detail, message, isOwnEditable(message), at, sender, onSender)
+      setMenuMessage(message.ts)
+      let chosen: Awaited<ReturnType<typeof showMessageMenu>>
+      try {
+        chosen = await showMessageMenu(latest.current.detail, message, isOwnEditable(message), at, sender, onSender)
+      } finally {
+        setMenuMessage(undefined)
+      }
       // The message may have been edited or deleted while the menu was open: act on it as it is now.
       const rows = latest.current.list.rows
       const now = rows.get(message.ts) ?? rows.get(landedTs(rows, message.ts) ?? '')
@@ -336,7 +339,7 @@ export function useMessageActions({ detail, list, scrollRef, composer }: Message
     picker !== undefined ? (
       <Floating x={picker.x} y={picker.y} placement={picker.placement} layer="picker">
         <Suspense fallback={null}>
-          <EmojiPickerPanel recent={recentReactions} onPick={pick} onClose={closePicker} />
+          <EmojiPickerPanel recent={recentEmoji()} onPick={pick} onClose={closePicker} />
         </Suspense>
       </Floating>
     ) : selection !== undefined ? (
@@ -374,6 +377,7 @@ export function useMessageActions({ detail, list, scrollRef, composer }: Message
 
   return {
     actions,
+    activeMessage: picker?.ts ?? menuMessage,
     confirmingDelete: confirming?.ts,
     editing: editingRow,
     onRowKey,

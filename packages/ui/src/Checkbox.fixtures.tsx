@@ -24,7 +24,7 @@ export default defineFixtures(
     Availability: {
       disabled: fixture({
         label: 'Let Juno decide',
-        description: 'Turn AI assist on in Preferences to use this.',
+        description: 'Turn AI assist on in Settings to use this.',
         defaultChecked: true,
         disabled: true,
       }),

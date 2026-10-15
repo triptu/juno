@@ -12,11 +12,13 @@
  * Reconciliation: every write of a message that carries a `client_msg_id`
  * (the answer, the socket echo, a history or replies page, the lookup)
  * deletes the row with that id in the same transaction (`writeMessage`), so
- * the list never shows both, in whatever order they arrive.
+ * the list never shows both, in whatever order they arrive. A second
+ * message with the id, which the network made, is hidden and deleted
+ * (`sent.ts`).
  */
 import { mainTopicId, threadTopicId, type ChannelId, type Ts } from '@juno/domain'
 import { Invalidation, StoreWriter, type SqlError } from '@juno/store'
-import { Effect } from 'effect'
+import { Clock, Effect } from 'effect'
 import { syncKeys } from './keys'
 
 export type PostState = 'queued' | 'sending' | 'unknown' | 'failed'
@@ -149,8 +151,18 @@ const move = (
     return true
   })
 
-/** `queued` to `sending`, before the one request leaves. False when the row is gone or not queued. */
-export const claimPost = (clientMsgId: string) => move(clientMsgId, ['queued'], 'sending', { attempt: true })
+/**
+ * `queued` to `sending`, before the one request leaves, and the post is
+ * recorded as sent by `userId` (`sent.ts`). False when the row is gone or
+ * not queued.
+ */
+export const claimPost = (clientMsgId: string, userId: string): Effect.Effect<boolean, SqlError, StoreWriter | Invalidation> =>
+  Effect.gen(function* () {
+    const post = yield* readPost(clientMsgId)
+    if (!(yield* move(clientMsgId, ['queued'], 'sending', { attempt: true })) || post === undefined) return false
+    yield* recordSend(clientMsgId, post.channel, userId)
+    return true
+  })
 
 /** The answer was lost: Slack may hold the message. Look it up at `nextAt`. */
 export const postUnknown = (clientMsgId: string, nextAt: number, error: string) => move(clientMsgId, ['sending'], 'unknown', { nextAt, lastError: error })
@@ -221,4 +233,17 @@ export const reconcilePost = (clientMsgId: string): Effect.Effect<void, SqlError
   Effect.gen(function* () {
     const sql = yield* StoreWriter
     yield* sql`DELETE FROM pending_messages WHERE client_msg_id = ${clientMsgId}`
+  })
+
+/** How long a sent post's row is kept. A copy shows within seconds; a week covers a long time offline. */
+const KEEP_MILLIS = 7 * 24 * 60 * 60_000
+
+/** `userId` is about to send the post with `clientMsgId` to `channel` (`sent.ts`). Drops rows older than a week. */
+export const recordSend = (clientMsgId: string, channel: string, userId: string): Effect.Effect<void, SqlError, StoreWriter> =>
+  Effect.gen(function* () {
+    const sql = yield* StoreWriter
+    const now = yield* Clock.currentTimeMillis
+    yield* sql`DELETE FROM sent_posts WHERE sent_at < ${now - KEEP_MILLIS}`
+    yield* sql`INSERT INTO sent_posts (client_msg_id, channel, user_id, ts, sent_at) VALUES (${clientMsgId}, ${channel}, ${userId}, NULL, ${now})
+      ON CONFLICT (client_msg_id) DO NOTHING`
   })

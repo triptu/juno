@@ -39,9 +39,10 @@ import {
   type UserId,
   type Me,
 } from '@juno/domain'
-import { emojiUnicode, messageBody, plainText, splitEmojiName, type MessageBody, type MessageContent } from '@juno/richtext'
+import { emojiUnicode, messageBody, plainText, splitEmojiName, type Lookups, type MessageBody, type MessageContent } from '@juno/richtext'
 import { syncState, StoreReader, type SqlClient, type SqlError } from '@juno/store'
 import type { PendingFile } from '@juno/sync'
+import { windowCovered } from './coverage'
 import { uploadsUrl } from '../staging'
 import type { ListRun } from '../protocol/live'
 import { personFrom, userName, type UserRow } from '../topicRows'
@@ -275,7 +276,7 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
       if (held !== undefined && held.key === key) {
         view = held.row
       } else {
-        const thread = topicId === undefined ? undefined : threadLink(topicId, row, title, target.channel, conversation)
+        const thread = topicId === undefined ? undefined : threadLink(topicId, row, title, target.channel, conversation, lookups)
         view = shapeRow(row, body, { groupStart, isRoot, selfId, reactions: own, thread, cache, pending: pending.get(row.ts) })
       }
       nextRows.set(row.ts, { key, row: view })
@@ -289,7 +290,7 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
     }
     cache.rows = nextRows
     cache.people = people
-    return { rows: out, total: out.length, refs: { people: [...people.values()] } }
+    return { rows: out, total: out.length, windowCovered: yield* windowCovered(target, stored[0]?.ts), refs: { people: [...people.values()] } }
   })
 
 const readUsers = (sql: SqlClient.SqlClient, cache: MessageCache, ids: Iterable<string>) =>
@@ -346,6 +347,7 @@ function threadLink(
   title: { readonly manual_title: string | null; readonly ai_title: string | null } | undefined,
   channel: string,
   conversation: ConversationInfo | undefined,
+  lookups: Lookups,
 ): ThreadLink {
   const topic: Topic = {
     id: topicId as Topic['id'],
@@ -358,7 +360,8 @@ function threadLink(
     },
     ...(row.deleted === 0 && row.text !== '' ? { firstMessageText: row.text } : {}),
   }
-  const resolved = resolveTitle(topic)
+  // The root's own body was parsed with the same lookups, so the people it mentions are loaded: "@Maya fix the…", never "<@U…>".
+  const resolved = resolveTitle(topic, lookups)
   return {
     id: topicId,
     replyCount: row.reply_count,

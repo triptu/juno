@@ -15,7 +15,8 @@ import {
 } from '@juno/slack-schema'
 import { Invalidation, StoreWriter, transaction, type MessageRow, type SqlError } from '@juno/store'
 import { Clock, Effect, Queue } from 'effect'
-import { reindexOptions, type SyncContext } from './context'
+import { observeMetadata, patchMetadata } from './metadata'
+import { reindexOptions, wantUsers, type SyncContext } from './context'
 import { mergeRootCounters, mergeTombstone, type MergeSource } from './merge'
 import { mainTopicOf, mergeOne, threadTopicOf } from './pages'
 import { reindexTopics, topicsOfMessages } from './reindex'
@@ -124,7 +125,7 @@ export const applyFrame = (ctx: SyncContext, frame: RtmFrame): Effect.Effect<voi
       case 'channel_rename':
       case 'group_rename': {
         if (typeof frame.channel === 'string' || frame.channel.name === undefined) return
-        return yield* transaction(patchConversation(frame.channel.id, { name: frame.channel.name }))
+        return yield* transaction(patchMetadata(ctx.metadata, frame.channel.id, { name: frame.channel.name }))
       }
       // Conversations: an object refreshes the metadata; membership follows the event, never the object's `is_member`.
       case 'channel_joined':
@@ -142,23 +143,23 @@ export const applyFrame = (ctx: SyncContext, frame: RtmFrame): Effect.Effect<voi
         return yield* transaction(
           Effect.gen(function* () {
             const id = typeof frame.channel === 'string' ? frame.channel : frame.channel.id
-            if (typeof frame.channel !== 'string') yield* upsertConversations([toConversationRow(frame.channel)])
+            if (typeof frame.channel !== 'string') yield* observeMetadata(ctx.metadata, toConversationRow(frame.channel))
             switch (frame.type) {
               case 'channel_joined':
               case 'group_joined':
-                return yield* patchConversation(id, { is_member: 1, is_archived: 0 })
+                return yield* patchMetadata(ctx.metadata, id, { is_member: 1, is_archived: 0 })
               case 'channel_left':
               case 'group_left':
-                return yield* patchConversation(id, { is_member: 0 })
+                return yield* patchMetadata(ctx.metadata, id, { is_member: 0 })
               case 'channel_archive':
               case 'group_archive':
-                return yield* patchConversation(id, { is_archived: 1 })
+                return yield* patchMetadata(ctx.metadata, id, { is_archived: 1 })
               case 'channel_unarchive':
               case 'group_unarchive':
-                return yield* patchConversation(id, { is_archived: 0 })
+                return yield* patchMetadata(ctx.metadata, id, { is_archived: 0 })
               case 'channel_deleted':
               case 'group_deleted':
-                return yield* patchConversation(id, { is_archived: 1, is_member: 0 })
+                return yield* patchMetadata(ctx.metadata, id, { is_archived: 1, is_member: 0 })
               default:
                 return
             }
@@ -172,18 +173,23 @@ export const applyFrame = (ctx: SyncContext, frame: RtmFrame): Effect.Effect<voi
         return yield* transaction(
           Effect.gen(function* () {
             const id = typeof frame.channel === 'string' ? frame.channel : frame.channel.id
-            if (typeof frame.channel !== 'string') yield* upsertConversations([toConversationRow(frame.channel)])
-            yield* patchConversation(id, { is_member: 1 })
+            if (typeof frame.channel !== 'string') {
+              const row = toConversationRow(frame.channel)
+              yield* observeMetadata(ctx.metadata, row)
+              // The other side of a new DM, or the members of a group DM, before its row shows.
+              wantUsers(ctx, [...(row.user_id === null ? [] : [row.user_id]), ...(row.member_ids_json === null ? [] : (JSON.parse(row.member_ids_json) as Array<string>))])
+            }
+            yield* patchMetadata(ctx.metadata, id, { is_member: 1 })
           }),
         )
       case 'im_close':
       case 'mpim_close':
         if (typeof frame.channel === 'string') return
-        return yield* transaction(upsertConversations([toConversationRow(frame.channel)]))
+        return yield* transaction(observeMetadata(ctx.metadata, toConversationRow(frame.channel)))
       case 'member_joined_channel':
       case 'member_left_channel':
         if (frame.user !== ctx.me.userId) return
-        return yield* transaction(patchConversation(frame.channel, { is_member: frame.type === 'member_joined_channel' ? 1 : 0 }))
+        return yield* transaction(patchMetadata(ctx.metadata, frame.channel, { is_member: frame.type === 'member_joined_channel' ? 1 : 0 }))
       case 'user_change':
         return yield* transaction(upsertUsers([frame.user]))
       case 'pref_change':

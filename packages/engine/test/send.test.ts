@@ -41,6 +41,13 @@ function watch(engine: RunningEngine, topicId: string) {
     }, WAIT_MS, label)
 }
 
+/** Sends `text` to #eng's Main and answers with the `client_msg_id` of the post that went to Slack, for a post nothing holds. */
+async function post(engine: RunningEngine, text: string): Promise<string> {
+  const before = apiCalls(engine, 'chat.postMessage').length
+  expect(valueOf(await sendMessage(engine.registry, eng, text, MAIN))).toEqual({ topicId: MAIN })
+  return waitFor(() => apiCalls(engine, 'chat.postMessage')[before]?.args['client_msg_id'], WAIT_MS, `"${text}" posted`)
+}
+
 /** Sends `text` to #eng's Main and answers with its `client_msg_id`, from the pending row. */
 async function send(engine: RunningEngine, text: string, rows: ReturnType<typeof watch>): Promise<string> {
   const exit = await sendMessage(engine.registry, eng, text, MAIN)
@@ -132,6 +139,45 @@ describe('send', () => {
     await rows(settled('Second try'), 'posted on the second try')
     expect(apiCalls(engine, 'chat.postMessage')).toHaveLength(2)
     expect(inSlack(engine, id)).toBe(1)
+  })
+
+  // Chromium sends a request again when its reused connection closes with no answer (ADR 0014).
+  it('deletes the copy when the network sends a post twice, and keeps the one it stored first', async () => {
+    const engine = await booted()
+    engine.main.network.resend = true
+    const rows = watch(engine, MAIN)
+    await rows((list) => list.length > 0, 'the window')
+    engine.fake.holdFrames({ types: ['message'] })
+    engine.fake.loseResponse({ method: 'chat.postMessage' })
+    const id = await post(engine, 'Sent over a closed connection')
+    await rows(settled('Sent over a closed connection'), 'the answer to the second copy stored')
+    expect(apiCalls(engine, 'chat.postMessage')).toHaveLength(2)
+    expect(inSlack(engine, id)).toBe(2)
+    const kept = readDb(engine, 'user.db', (db) => (db.prepare('SELECT ts FROM sent_posts WHERE client_msg_id = ?').get(id) as { ts: string }).ts)
+    // The echo of the first copy arrives after the answer to the second.
+    engine.fake.releaseFrames()
+    await waitFor(() => (inSlack(engine, id) === 1 ? true : undefined), WAIT_MS, 'the copy deleted')
+    await quiet(engine)
+    expect((await rows(settled('Sent over a closed connection'), 'one row')).filter((row) => textOf(row) === 'Sent over a closed connection')).toHaveLength(1)
+    expect(engine.fake.messages('C0ENG').find((m) => m.client_msg_id === id)!.ts).toBe(kept)
+    expect(apiCalls(engine, 'chat.delete')).toHaveLength(1)
+  })
+
+  it('keeps two sends of the same text, and a message another person posts with the same id', async () => {
+    const engine = await booted()
+    engine.main.network.resend = true
+    const rows = watch(engine, MAIN)
+    await rows((list) => list.length > 0, 'the window')
+    const first = await post(engine, 'Same words twice')
+    await rows((list) => list.some((row) => textOf(row) === 'Same words twice' && row.pending === undefined), 'the first stored')
+    await post(engine, 'Same words twice')
+    await rows((list) => list.filter((row) => textOf(row) === 'Same words twice' && row.pending === undefined).length === 2, 'both stored')
+    engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0MAYA', text: 'Not a copy', clientMsgId: first })
+    await rows((list) => list.some((row) => textOf(row) === 'Not a copy'), 'the other message stored')
+    await quiet(engine)
+    expect(engine.fake.messages('C0ENG').filter((m) => m.text === 'Same words twice')).toHaveLength(2)
+    expect(inSlack(engine, first)).toBe(2)
+    expect(apiCalls(engine, 'chat.delete')).toHaveLength(0)
   })
 
   it('reconciles from the catch-up page when the answer is lost and the socket drops', async () => {

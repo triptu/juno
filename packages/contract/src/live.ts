@@ -58,6 +58,8 @@ export const LiveMeta = Schema.Struct({
   at: Schema.Number,
   /** Rows in the whole list, not just the window, when the engine knows. */
   total: Schema.optionalKey(Schema.Int),
+  /** The initial window is covered: fetched message history, or completed cold sync for topic-list membership. */
+  windowCovered: Schema.optionalKey(Schema.Boolean),
   /** The last query run failed; the data shown is from the previous run. */
   error: Schema.optionalKey(Schema.String),
 })

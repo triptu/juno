@@ -98,3 +98,15 @@ describe('posting', () => {
     expect(notMember.body).toEqual({ ok: false, error: 'channel_not_found' })
   })
 })
+
+describe('escaping', () => {
+  it('stores the text as the client escaped it, like Slack, and the blocks as plain text', async () => {
+    const posted = await client.ok('chat.postMessage', {
+      channel: 'C0ENG',
+      text: 'p95 -&gt; 800ms &amp; rising',
+      client_msg_id: 'uuid-escaped-1',
+    })
+    expect(posted.message.text).toBe('p95 -&gt; 800ms &amp; rising')
+    expect(JSON.stringify(posted.message.blocks)).toContain('p95 -> 800ms & rising')
+  })
+})

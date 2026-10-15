@@ -30,4 +30,4 @@ Errors are tagged and typed: `SlackAuthRequired`, `SlackRateLimited` (`retryAfte
 
 ## Testing
 
-`pnpm --filter @juno/slack test`. Tests start a real `@juno/fake-slack` per test and point the client layer at it (`test/helpers.ts`): the request lanes, the 429 handling, the auth failures and the socket lifecycle are all checked against the fake's HTTP and websocket server. Under `it.effect` the `TestClock` stops the 1.5 s background lane spacing; set `backgroundMinIntervalMillis: 0` or use `it.live` for tests that make several background calls.
+`pnpm --filter @juno/slack test`. Tests start a real `@juno/fake-slack` per test and point the client layer at it (`test/helpers.ts`): the request lanes, the 429 handling, the auth failures and the socket lifecycle are all checked against the fake's HTTP and websocket server. Under `it.effect` the `TestClock` stops the per-method background lane spacing; set `backgroundMinIntervalMillis: 0` or use `it.live` for tests that make several background calls.

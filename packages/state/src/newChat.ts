@@ -9,7 +9,7 @@
  */
 import * as AsyncResult from 'effect/reactivity/AsyncResult'
 import * as Atom from 'effect/reactivity/Atom'
-import { newChatConversations, newChatThreads, type MentionPick, type PickConversation, type PickThread, type SendTarget } from '@juno/contract'
+import { newChatConversations, newChatThreads, newChatFrequent, type MentionPick, type PickConversation, type PickThread, type SendTarget } from '@juno/contract'
 import { liveQuery } from './atoms'
 
 export interface NewChat {
@@ -64,3 +64,6 @@ export const pickConversationsAtom = (query: string | undefined) => (query === u
 /** The thread picker's rows, while its list is open: a channel's threads, or recent ones everywhere. */
 export const pickThreadsAtom = (open: { readonly channel?: string | undefined; readonly query: string } | undefined) =>
   open === undefined ? closed : threadsFamily({ ...(open.channel === undefined ? {} : { channel: open.channel }), query: open.query })
+
+/** Local frequent destinations; subscribing never delays New chat’s first paint. */
+export const frequentConversationsAtom = liveQuery(newChatFrequent)(undefined)
