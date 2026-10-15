@@ -4,7 +4,7 @@ import type { TopicDetail } from '@juno/contract'
 import { catchUpDoneAtom, junoAboutAtom, openedAtNewAtom, registry, topicAtom } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import { JunoHeader, JunoPanelActions, JunoPanelContext } from '@juno/views'
-import { closeJunoPanel, moveJunoToTab, openJunoPage } from './actions'
+import { closeJunoPanel, moveJunoToTab, openJunoPage, resumeJuno } from './actions'
 import { JunoChat } from './JunoChat'
 import { focusTopicComposer, useTopicSelection, visibleRange } from './topicContext'
 
@@ -87,7 +87,7 @@ export function JunoPanel({ topicId }: { readonly topicId: string }) {
           menuOpen={menuOpen}
           onMenu={setMenuOpen}
           onOpenPage={openJunoPage}
-          onResume={() => {}}
+          onResume={resumeJuno}
           actions={<JunoPanelActions onOpenInTab={moveJunoToTab} onClose={close} />}
         />
       )}

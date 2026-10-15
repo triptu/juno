@@ -40,7 +40,7 @@ function activeNavOf(tabs: Tabs): SidebarNavTarget | undefined {
   const tab = activeTab(tabs)
   if (tab === undefined) return 'home'
   const kind = currentPlace(tab).kind
-  return kind === 'home' || kind === 'juno' ? kind : undefined
+  return kind === 'home' || kind === 'juno' ? kind : kind === 'junoPage' ? 'juno' : undefined
 }
 
 /**

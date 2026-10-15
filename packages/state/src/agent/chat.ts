@@ -56,7 +56,8 @@ export const MAX_SEND_BYTES = 65_536
 
 const isRpcClientError = (error: unknown): error is RpcClientError => error instanceof RpcClientError
 
-function live<A, E>(tag: string, payload: unknown): Stream.Stream<A, E, AgentClient> {
+/** A stream RPC of the agent, retried across agent restarts. */
+export function live<A, E>(tag: string, payload: unknown): Stream.Stream<A, E, AgentClient> {
   const make = (): Stream.Stream<A, E, AgentClient> =>
     Stream.unwrap(Effect.map(AgentClient, (client) => client(tag as never, payload as never) as unknown as Stream.Stream<A, E | RpcClientError>)).pipe(
       Stream.catchIf(isRpcClientError, () => Stream.unwrap(Effect.map(Effect.sleep(RETRY_DELAY), make))),
@@ -202,7 +203,7 @@ export const chatItemsAtom = (window: Window) => itemsFamily(JSON.stringify(wind
 type CommandResult<A> = Exit.Exit<A, AgentCommandError | RpcClientError>
 
 /** Runs one agent RPC on `registry`'s client and resolves with its exit. */
-function call<A>(registry: Registry, tag: string, payload: unknown): Promise<CommandResult<A>> {
+export function call<A>(registry: Registry, tag: string, payload: unknown): Promise<CommandResult<A>> {
   const atom = AgentClient.runtime.fn<unknown>()(() => AgentClient.use((client) => client(tag as never, payload as never) as never))
   const unmount = registry.mount(atom)
   registry.set(atom, undefined)

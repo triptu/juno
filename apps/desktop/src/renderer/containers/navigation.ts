@@ -31,6 +31,7 @@ import {
   cycleTab,
   goToEntry,
   homePlace,
+  junoPagePlace,
   junoPlace,
   messageListAtom,
   messageWindowSpecAtom,
@@ -63,6 +64,7 @@ import {
   type Place,
   type Tabs,
 } from '@juno/state'
+import { chatCopy, type JunoPage } from '@juno/agent-contract'
 import { afterPaint, measure } from '@juno/state/perf'
 import { toggleSidebar } from './layout'
 
@@ -213,6 +215,11 @@ export function openNewTab(): void {
 /** The sidebar's Home item. Home is a singleton: the tab that shows it is focused. */
 export function openHome(options: OpenOptions = {}): void {
   show((tabs) => openPlace(tabs, homePlace, options), undefined)
+}
+
+/** A page behind the Juno menu, or Settings › Juno (SPEC 13.10). Each shows in one tab. */
+export function openJunoPage(page: JunoPage, options: OpenOptions = {}): void {
+  show((tabs) => openPlace(tabs, junoPagePlace(page), options), undefined)
 }
 
 /** The Juno tab (SPEC 13). One chat, so one tab: the tab that shows it is focused. */
@@ -395,6 +402,7 @@ function placeLabel(place: Place): string {
   if (place.kind === 'newChat') return 'New chat'
   if (place.kind === 'home') return 'Home'
   if (place.kind === 'juno') return 'Juno'
+  if (place.kind === 'junoPage') return chatCopy.pageTitles[place.page]
   const result = registry.get(topicAtom(place.topicId))
   const detail = result._tag === 'Success' ? result.value : null
   if (detail === null) return 'Topic'

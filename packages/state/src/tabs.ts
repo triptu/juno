@@ -26,6 +26,7 @@
 import { Option, Schema } from 'effect'
 import * as AsyncResult from 'effect/reactivity/AsyncResult'
 import * as Atom from 'effect/reactivity/Atom'
+import { JunoPage } from '@juno/agent-contract'
 import { prefsGet, prefsSet, type TopicDetail } from '@juno/contract'
 import { liveQuery, runCommand } from './atoms'
 import type { Registry } from './client'
@@ -34,11 +35,18 @@ import { newChatAtom, newChatTitle } from './newChat'
 import { signedInAtom } from './session'
 
 /** What a tab shows: a topic, a New chat (spec section 9), or a page: Home (section 12) or the Juno chat (section 13). */
-export type Place = { readonly kind: 'topic'; readonly topicId: string } | { readonly kind: 'newChat' } | { readonly kind: 'home' } | { readonly kind: 'juno' }
+export type Place =
+  | { readonly kind: 'topic'; readonly topicId: string }
+  | { readonly kind: 'newChat' }
+  | { readonly kind: 'home' }
+  | { readonly kind: 'juno' }
+  /** A page behind the Juno menu, or Settings › Juno (SPEC 13.10). One tab per page. */
+  | { readonly kind: 'junoPage'; readonly page: JunoPage }
 
 export const newChatPlace: Place = { kind: 'newChat' }
 export const homePlace: Place = { kind: 'home' }
 export const junoPlace: Place = { kind: 'juno' }
+export const junoPagePlace = (page: JunoPage): Place => ({ kind: 'junoPage', page })
 export const topicPlace = (topicId: string): Place => ({ kind: 'topic', topicId })
 
 /** The places a tab showed, oldest first, and the one it shows. */
@@ -89,7 +97,8 @@ export function tabTopic(tab: Tab): string | undefined {
   const place = currentPlace(tab)
   return place.kind === 'topic' ? place.topicId : undefined
 }
-const samePlace = (a: Place, b: Place) => (a.kind === 'topic' ? b.kind === 'topic' && a.topicId === b.topicId : a.kind === b.kind)
+const samePlace = (a: Place, b: Place) =>
+  a.kind === 'topic' ? b.kind === 'topic' && a.topicId === b.topicId : a.kind === 'junoPage' ? b.kind === 'junoPage' && a.page === b.page : a.kind === b.kind
 
 export const activeTab = (tabs: Tabs): Tab | undefined => tabs.tabs.find((tab) => tab.id === tabs.active)
 /** The tab that shows `topicId`, if one does. */
@@ -128,7 +137,8 @@ function push(history: TabHistory, place: Place): TabHistory {
 }
 
 export function openPlace(tabs: Tabs, place: Place, { newTab = false }: OpenOptions = {}): Tabs {
-  const showing = place.kind === 'topic' ? tabShowing(tabs, place.topicId) : place.kind === 'home' ? homeTab(tabs) : place.kind === 'juno' ? junoTab(tabs) : undefined
+  // A topic, Home, the Juno chat and each Juno page show in at most one tab: opening one again focuses it.
+  const showing = place.kind === 'newChat' ? undefined : tabs.tabs.find((tab) => samePlace(currentPlace(tab), place))
   if (showing !== undefined) return activateTab(tabs, showing.id)
   const at = tabs.tabs.findIndex((tab) => tab.id === tabs.active)
   if (at < 0 || newTab) {
@@ -277,6 +287,7 @@ export const TABS_PREF = 'tabs'
 const PlaceJson = Schema.Union([
   Schema.Struct({ kind: Schema.Literal('topic'), topicId: Schema.String }),
   Schema.Struct({ kind: Schema.Literals(['newChat', 'home', 'juno']) }),
+  Schema.Struct({ kind: Schema.Literal('junoPage'), page: JunoPage }),
 ])
 /**
  * A saved tab, or one saved before history, when a tab's id was its

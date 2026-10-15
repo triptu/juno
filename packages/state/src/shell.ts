@@ -92,6 +92,15 @@ export async function popupContextMenu(items: ReadonlyArray<ContextMenuItem>, at
   return typeof chosen === 'string' && ids.includes(chosen) ? chosen : undefined
 }
 
+/** What main did with an OpenRouter key from Settings › Juno. */
+export type OpenRouterKeyResult = 'saved' | 'removed' | 'invalid' | 'failed'
+
+/** Stores the OpenRouter key in the keychain through main, which hands it to the agent; `null` removes it. */
+export async function setOpenRouterKey(key: string | null): Promise<OpenRouterKeyResult> {
+  const result = await window.juno.agent.setOpenRouterKey(key).catch(() => 'failed')
+  return result === 'saved' || result === 'removed' || result === 'invalid' ? result : 'failed'
+}
+
 /** Puts text on the clipboard. */
 export function copyText(text: string): void {
   window.juno.clipboard.writeText(text).catch(() => {})

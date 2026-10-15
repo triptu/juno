@@ -8,7 +8,7 @@
  *
  * Each of these asks the composer it brings on screen for focus.
  */
-import type { About, JunoPage } from '@juno/agent-contract'
+import type { About } from '@juno/agent-contract'
 import {
   activeTab,
   currentPlace,
@@ -20,8 +20,10 @@ import {
   setJunoPanelOpen,
   tabsAtom,
 } from '@juno/state'
-import { chatActions } from '@juno/state/agent'
+import { chatActions, junoPageActions } from '@juno/state/agent'
 import { openJuno } from '../navigation'
+
+export { openJunoPage } from '../navigation'
 
 /** The chat's RPC-backed commands, one set for the app. */
 export const junoCommands = chatActions(registry)
@@ -82,9 +84,7 @@ export function askJunoAbout(about: Exclude<About, { _tag: 'topic' }>): void {
   else openJunoTab()
 }
 
-/**
- * The Juno menu's pages. None is served by the agent yet (`notServed` in
- * `packages/agent/src/serve/server.ts`); Settings › Juno and the model
- * picker come from the juno-settings work, which wires its page here.
- */
-export function openJunoPage(_page: JunoPage): void {}
+/** The paused chip's Resume: the same switch as Settings › Juno's Pause. */
+export function resumeJuno(): void {
+  void junoPageActions(registry).settings({ _tag: 'paused', value: false })
+}

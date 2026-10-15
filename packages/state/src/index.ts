@@ -54,6 +54,7 @@ export {
   historyTarget,
   mountedTabs,
   homePlace,
+  junoPagePlace,
   junoPlace,
   junoTab,
   homeTab,
@@ -108,9 +109,11 @@ export {
   persistSidebar,
   persistTheme,
   popupContextMenu,
+  setOpenRouterKey,
   sidebarLayoutAtom,
   themeAtom,
   type Accent,
+  type OpenRouterKeyResult,
   type Theme,
 } from './shell'
 export type { PortConnection, PortLike } from './transport'

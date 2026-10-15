@@ -1,4 +1,5 @@
 import { Activity, useEffect } from 'react'
+import { chatCopy } from '@juno/agent-contract'
 import type { TopicDetail } from '@juno/contract'
 import {
   activeTab,
@@ -19,6 +20,7 @@ import { useAtomValue } from '@juno/state/react'
 import { TopicArt, Workspace as WorkspaceView, type ActivateEvent, type WorkspaceTab, type WorkspaceTabIcon } from '@juno/views'
 import { HomePage } from './Home'
 import { runJunoShortcut } from './juno/actions'
+import { JunoPageTab } from './juno/JunoPages'
 import { JunoPanel } from './juno/JunoPanel'
 import { JunoTab } from './juno/JunoTab'
 import { closeTabById, openNewTab, runMenuCommand, showTabMenu, stepTabHistory, switchToTab } from './navigation'
@@ -49,7 +51,9 @@ function stripTab(summary: TabSummary): WorkspaceTab {
         ? { ...base, title: 'Home', icon: 'home' }
         : place.kind === 'juno'
           ? { ...base, title: 'Juno', icon: 'juno' }
-          : {
+          : place.kind === 'junoPage'
+            ? { ...base, title: chatCopy.pageTitles[place.page], icon: place.page === 'settings' ? 'preferences' : 'juno' }
+            : {
           ...base,
           title: detail == null ? '' : detail.kind === 'main' ? detail.channel.name : detail.title,
           icon: detail == null ? 'hash' : kindIcons[detail.channel.kind],
@@ -72,6 +76,8 @@ function Page({ tab }: { readonly tab: Tab }) {
       return <HomePage key="home" />
     case 'juno':
       return <JunoTab key="juno" />
+    case 'junoPage':
+      return <JunoPageTab key={place.page} page={place.page} />
   }
 }
 
