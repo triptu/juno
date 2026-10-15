@@ -169,6 +169,8 @@ describe.skipIf(process.env['JUNO_BENCH'] !== '1')('allTopics.list on the large 
     try {
       await engine.status('ready')
       await engine.phase('live', 600_000)
+      // The store is opened a second time below; the engine must have stopped writing.
+      await engine.syncIdle()
       const paths = workspacePathsFromDir(join(engine.userData, 'workspaces', engine.fake.teamId))
       const report = await Effect.runPromise(
         Effect.gen(function* () {

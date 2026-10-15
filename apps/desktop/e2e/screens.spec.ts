@@ -79,3 +79,20 @@ test('the topic header over a thread and a Main, light and dark', async ({ juno,
     await shoot(`topic-main-${theme.toLowerCase()}`)
   }
 })
+
+test('All topics, light and dark', async ({ juno, win }) => {
+  test.setTimeout(120_000)
+  await juno.signIn()
+  await juno.waitForSync()
+  // A resolved topic, so the page shows each status.
+  await juno.sidebar.row('Proposal: cut offline mode and public').chooseInMenu('resolve')
+  await juno.allTopics.open()
+  for (const theme of ['Light', 'Dark'] as const) {
+    if (theme === 'Dark') await juno.setTheme('Dark')
+    await win.mouse.move(20, 760)
+    await win.evaluate(() => document.fonts.ready)
+    await expect(win.locator('html')).not.toHaveAttribute('data-theme-switching', /.*/)
+    await win.waitForTimeout(300)
+    await win.screenshot({ path: resolve(screens, `all-topics-${theme.toLowerCase()}.png`) })
+  }
+})
