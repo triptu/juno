@@ -1,9 +1,4 @@
-import { SCHEDULE_MIGRATIONS, type Scheduler, type SchedulerOptions } from '../schedule'
-import { driveScheduler } from '../schedule/driver'
-import type { ViewHost } from '../view-tools/host'
-import { VIEW_MIGRATIONS } from '../view-tools/schema'
 import type { Pins } from '@juno/agent-memory'
-import { join } from 'node:path'
 import { ACTIONS_MIGRATIONS, type Actions, type ActionsOptions } from '../actions'
 import { createBackup, type Backup, type BackupKeychain } from '../backup/backup'
 import { adoptRestoredKeys, clearStagedRestore, installStaged } from '../backup/restore'
@@ -17,24 +12,25 @@ import { OWNERSHIP_MIGRATIONS } from '../ownership/schema'
 import type { Ownership } from '../ownership/service'
 import type { PinResult } from '../pins/pins'
 import type { ProviderGuardApi } from '../providers'
-import { recover } from '../recovery/recover'
 import { REDACTION_MIGRATIONS, type Redaction, type RemovalBackup } from '../redaction'
 import { type JunoTool, type ToolRun } from '../request/tool'
-import { AGENT_DATABASE_FILE, type UpdateNeeded } from '../runtime/core'
+import { openCore, type UpdateNeeded } from '../runtime/core'
 import { type Extension, type Journal, type JournalSettings } from '../runtime/journal'
-import { acquireOwnerLock } from '../runtime/lock'
+import { SCHEDULE_MIGRATIONS, type Scheduler, type SchedulerOptions } from '../schedule'
+import { driveScheduler } from '../schedule/driver'
 import { SETTINGS_MIGRATIONS } from '../settings/schema'
 import { SPEND_MIGRATIONS } from '../spend'
-import { StoreTooNew, openDatabase, type Database } from '../store/database'
 import type { JournalPosition, Mode } from '../store/ledger'
 import type { MemoryView } from '../store/memory'
 import type { MigrationSet } from '../store/schema'
-import { initialize, type Store } from '../store/store'
+import { type Store } from '../store/store'
+import type { ViewHost } from '../view-tools/host'
+import { VIEW_MIGRATIONS } from '../view-tools/schema'
 import type { RunState, TurnEvent } from './events'
 import type { HostReads } from './host-tools'
+import { createTurnModels } from './models'
 import { type Input, type Queued, type Retry } from './router'
 import { TURNS_MIGRATIONS } from './schema'
-import { createTurnModels } from './models'
 import { createTurnServices } from './services'
 import { createTurnSession } from './session'
 import { closeTurns, turnApi } from './turns'
@@ -58,10 +54,9 @@ import { closeTurns, turnApi } from './turns'
  * stops, pi closes, the projection finishes, `agent.sqlite` closes, and the
  * owner lock is released last.
  *
- * The open sequence mirrors `runtime/core.ts`'s `openCore`, which keeps the
- * serial loop for its crash tests. Steering needs the journal, which the
- * core does not expose, so the router owns this copy until the core takes a
- * router (see the README).
+ * `openCore` owns the lock, database and recovery sequence. Its router hook
+ * supplies the recovered journal file so steering can attach before resume.
+ * The core's default serial loop uses the same open sequence.
  */
 
 /** One archive message (§4.1). `opId` is the inbox op whose run wrote it. */
@@ -201,58 +196,42 @@ export interface Turns {
 }
 
 export async function openTurns(options: TurnsOptions): Promise<Turns | UpdateNeeded> {
-  const now = options.now ?? Date.now
-  const lock = acquireOwnerLock(options.agentDir)
-  let db: Database | undefined
+  let install: Awaited<ReturnType<typeof installStaged>>
   let backup: Backup | undefined
-  try {
-    // A restore staged before the restart replaces agent.sqlite now (§14.4).
-    const install = await installStaged(options.agentDir, options.backup?.keychain)
-    if (install._tag === 'quarantined') options.onReport?.(new Error('a staged restore was older than a removal and was not installed'))
-    try {
-      db = openDatabase(
-        join(options.agentDir, AGENT_DATABASE_FILE),
-        [SPEND_MIGRATIONS, TURNS_MIGRATIONS, JOBS_MIGRATIONS, SETTINGS_MIGRATIONS, ACTIONS_MIGRATIONS, SCHEDULE_MIGRATIONS, VIEW_MIGRATIONS, REDACTION_MIGRATIONS, BACKUP_MIGRATIONS, OWNERSHIP_MIGRATIONS, ...(options.migrations ?? []).filter((set) => set.name !== SCHEDULE_MIGRATIONS.name)],
-        now,
-      )
-    } catch (error) {
-      if (error instanceof StoreTooNew) return updateNeeded(lock.release)
-      throw error
-    }
-    const store: Store = { db, now }
-    initialize(store)
-    if (install._tag === 'installed') {
-      enterRecovery(store, install.restore)
-      if (options.backup !== undefined) await adoptRestoredKeys(install.restore, options.backup.keychain)
-      clearStagedRestore(options.agentDir)
-    }
-    // Capture starts before recovery writes anything, so a continued generation misses no row.
-    const relay = { notify: noop }
-    backup = openBackup(store, options, (name) => {
-      observeOwner(store, name)
-      relay.notify()
-    }, () => relay.notify())
-    const recovery = await recover(store, options.agentDir)
-    if (recovery._tag === 'updateNeeded') {
-      backup?.stop()
-      db.close()
-      return updateNeeded(lock.release)
-    }
-    const guard = options.provider(store)
-    const models = {
-      chat: typeof options.model === 'function' ? options.model(store) : options.model,
-      compaction: typeof options.compaction === 'function' ? options.compaction(store) : options.compaction,
-    }
-    return await start(store, guard, models, recovery.file, recovery._tag === 'resume' ? 'resumed' : 'rotated', options, { backup, relay }, () => {
-      store.db.close()
-      lock.release()
-    })
-  } catch (error) {
-    backup?.stop()
-    if (db?.isOpen) db.close()
-    lock.release()
-    throw error
-  }
+  const relay = { notify: noop }
+  return openCore({
+    agentDir: options.agentDir,
+    ...(options.now ? { now: options.now } : {}),
+    migrations: [SPEND_MIGRATIONS, TURNS_MIGRATIONS, JOBS_MIGRATIONS, SETTINGS_MIGRATIONS, ACTIONS_MIGRATIONS, SCHEDULE_MIGRATIONS, VIEW_MIGRATIONS, REDACTION_MIGRATIONS, BACKUP_MIGRATIONS, OWNERSHIP_MIGRATIONS, ...(options.migrations ?? []).filter((set) => set.name !== SCHEDULE_MIGRATIONS.name)],
+    router: {
+      beforeOpen: async () => {
+        // A restore staged before the restart replaces agent.sqlite now (§14.4).
+        install = await installStaged(options.agentDir, options.backup?.keychain)
+        if (install._tag === 'quarantined') options.onReport?.(new Error('a staged restore was older than a removal and was not installed'))
+      },
+      beforeRecovery: async (store) => {
+        if (install._tag === 'installed') {
+          enterRecovery(store, install.restore)
+          if (options.backup !== undefined) await adoptRestoredKeys(install.restore, options.backup.keychain)
+          clearStagedRestore(options.agentDir)
+        }
+        // Capture starts before recovery writes anything, so a continued generation misses no row.
+        backup = openBackup(store, options, (name) => {
+          observeOwner(store, name)
+          relay.notify()
+        }, () => relay.notify())
+      },
+      stop: () => backup?.stop(),
+      start: ({ store, file, opened, release }) => {
+        const guard = options.provider(store)
+        const models = {
+          chat: typeof options.model === 'function' ? options.model(store) : options.model,
+          compaction: typeof options.compaction === 'function' ? options.compaction(store) : options.compaction,
+        }
+        return start(store, guard, models, file, opened, options, { backup, relay }, release)
+      },
+    },
+  })
 }
 
 const noop = () => {}
@@ -276,10 +255,6 @@ function openBackup(store: Store, options: TurnsOptions, observed: (deviceName: 
     options.onReport?.(error)
     return undefined
   }
-}
-
-function updateNeeded(release: () => void): UpdateNeeded {
-  return { _tag: 'updateNeeded', close: async () => release() }
 }
 
 async function start(
