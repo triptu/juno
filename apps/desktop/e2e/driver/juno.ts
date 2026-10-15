@@ -535,7 +535,10 @@ export class Juno {
   async waitForSync(): Promise<void> {
     await this.sidebar.expectRows()
     await this.expectEngineLive()
-    // Park the pointer and the focus on the workspace: Home's greeting when it shows, which does nothing when clicked.
+    // Park the pointer and the focus on the workspace. With no tab open that is Home, whose rows sit
+    // where a blind click would land, so wait for it and click its greeting, which does nothing.
+    const tabOpen = this.win.getByRole('tablist').getByRole('tab', { selected: true })
+    await expect(this.home.greeting.or(tabOpen).first()).toBeVisible()
     if (await this.home.greeting.isVisible()) await this.home.greeting.click()
     else await this.win.mouse.click(900, 400)
   }
