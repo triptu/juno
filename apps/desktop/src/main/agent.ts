@@ -28,9 +28,9 @@
  * backup asks for its secrets the same way (`secret`, WP21), and
  * `backupSecrets.ts` answers.
  *
- * After a restore is staged the agent says `restart` and exits. Main starts
- * it again at once, without counting the exit as a crash, and the next open
- * installs the restore.
+ * After a restore is staged the agent says `restart`. Main ends the process
+ * and starts it again at once, without counting the exit as a crash, and the
+ * next open installs the restore.
  */
 import { app, MessageChannelMain, utilityProcess, type MessagePortMain, type UtilityProcess, type WebContents } from 'electron'
 import { join } from 'node:path'
@@ -125,7 +125,9 @@ export class AgentSupervisor {
         return
       }
       if (message._tag === 'restart') {
-        if (this.child === child) this.restartAsked = true
+        if (this.child !== child) return
+        this.restartAsked = true
+        child.kill()
         return
       }
       if (message._tag === 'ready') {

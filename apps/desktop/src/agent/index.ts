@@ -17,15 +17,15 @@
  *
  * The encrypted backup (WP21) reaches main's keychain the same way
  * (`keychainBridge`: `secret`, `secretReply`). After a restore is staged,
- * `restart` stops the agent, tells main, and exits; main starts it again at
- * once and the next open installs the restore. This Mac's name for the
+ * `restart` tells main and exits; main starts the agent again at once and
+ * the next open installs the restore. This Mac's name for the
  * other Mac's banner is the computer name from System Settings.
  */
 import { execFileSync } from 'node:child_process'
 import { hostname } from 'node:os'
 import { Schema } from 'effect'
 import { MainToAgent, type AgentToMain } from '@juno/agent-contract'
-import { credentialBridge, describeFailure, keychainBridge, modelPicker, providerConnection, providerTurns, rendererPorts, startAgent, type AgentHandle, type HostPort } from '@juno/agent'
+import { credentialBridge, describeFailure, keychainBridge, modelPicker, providerConnection, providerTurns, rendererPorts, startAgent, type HostPort } from '@juno/agent'
 import type { MessagePortMain } from 'electron'
 
 const parent = process.parentPort
@@ -78,22 +78,20 @@ const renderers = rendererPorts()
 const mcp = credentialBridge((requestId, request) => send({ _tag: 'credential', requestId, request }))
 const secrets = keychainBridge((requestId, request) => send({ _tag: 'secret', requestId, request }))
 
-let agent: AgentHandle | undefined
 let restarting = false
 /**
- * After a staged restore. The restore's answer is still on its way to the renderer, so the stop waits a
- * moment; then the engine closes, which releases the owner lock, and main starts a new process.
+ * After a staged restore. The restore's answer is still on its way to the renderer, so the exit waits a
+ * moment. The process exits without a graceful stop: a stop would end the renderer's streams as if they
+ * were done, while a closed port makes the renderer ask for the new process's. The store is safe to
+ * leave this way (the crash harness kills it at every step), and the exit releases the owner lock.
  */
 const restart = () => {
   if (restarting) return
   restarting = true
   setTimeout(() => {
-    void (agent?.stop() ?? Promise.resolve())
-      .catch((cause: unknown) => console.error('agent: stop before restart failed:', describeFailure(cause)))
-      .finally(() => {
-        send({ _tag: 'restart' })
-        process.exit(0)
-      })
+    // Main ends this process when it reads `restart`; exiting here too covers a message that never arrives.
+    send({ _tag: 'restart' })
+    setTimeout(() => process.exit(0), 1_000).unref()
   }, 200)
 }
 // The provider arrives from main at spawn and on every change.
@@ -135,10 +133,7 @@ parent.on('message', (event) => {
           }),
         )
         .then(
-        (handle) => {
-          agent = handle
-          send({ _tag: 'ready', host: handle.host })
-        },
+        (agent) => send({ _tag: 'ready', host: agent.host }),
         (cause: unknown) => {
           console.error('agent: failed to start', cause)
           process.exit(1)
