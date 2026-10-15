@@ -127,6 +127,7 @@ export {
   whyPopoverAtom,
   type WhyPopover,
 } from './notifications'
+export { ignoredChannelsAtom, stopIgnoring } from './ignored'
 export { acquireRendererPort, EngineFailed } from './port'
 export {
   accentAtom,

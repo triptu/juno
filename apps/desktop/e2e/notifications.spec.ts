@@ -1,8 +1,8 @@
 /**
  * Notifications from the owner's side (SPEC 14): Notify me on a channel,
  * thread or person, the OS notification and its click, why a message did
- * or did not notify, the Notifications page and Preferences, and Set
- * yourself away or active. Main records OS notifications instead of
+ * or did not notify, the Notifications page, Preferences and its ignore
+ * list, and Set yourself away or active. Main records OS notifications instead of
  * showing them (`junoTest.notifications`).
  */
 import { expect, test } from './fixtures'
@@ -151,4 +151,25 @@ test('Set yourself away and active from the avatar menu sets Slack presence', as
   slack.resetCalls()
   await juno.accountMenu.item(startsActive ? 'Set yourself active' : 'Set yourself away').click()
   await slack.expectPresenceSet(startsActive ? 'auto' : 'away')
+})
+
+test('Preferences lists an ignored channel, and Stop ignoring has Undo', async ({ juno }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  await juno.openPreferences()
+  const preferences = juno.preferences
+  await expect(preferences.root.getByText('Nothing ignored.')).toBeVisible()
+
+  await juno.sidebar.selectView('Automated')
+  await juno.sidebar.row(ALERTS_MAIN).chooseInMenu('ignore-channel')
+  await juno.expectToast('Ignoring #alerts-prod')
+  await juno.tabs.select('Preferences')
+  await expect(preferences.ignored('alerts-prod')).toContainText('Nothing hidden yet')
+
+  await preferences.stopIgnoring('alerts-prod')
+  await juno.expectToast('Stopped ignoring #alerts-prod')
+  await expect(preferences.root.getByText('Nothing ignored.')).toBeVisible()
+  await juno.undoFromToast()
+  await expect(preferences.ignored('alerts-prod')).toBeVisible()
+  await expect(preferences.root.getByText('Nothing ignored.')).toHaveCount(0)
 })
