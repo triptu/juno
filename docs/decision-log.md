@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-15 18:05 · orchestrator · Merged WP14: the Juno tab and the 360px Juno panel (⌘J in a topic, Esc closes, covers the topic under 480px), sending from the panel with the topic and selection as context, Catch me up, Ask Juno in person and channel menus and on Home, Settings › Juno and the six Juno pages as tabs, rules editing, cards, source links that open the message and flash it. The Juno bundle loads lazily (initial JS 920 KB). Providers (on by default with OpenRouter or an OpenAI-compatible endpoint) merge next together with their view wiring.
 - 10-15 17:20 · orchestrator · Merged: a Slack force_reload during the boot-retry wait now boots at once (one boot at a time, backoff and auth handling unchanged); a test-clock regression test fails on the old code. No Quint spec models boot retries.
 - 10-15 17:05 · Tushar · Sidebar row preview is one line, not two.
 - 10-15 17:00 · orchestrator · Merged WP19 end to end: the scheduler starts with the agent and admits due wakes, reply watches check for replies through the host with no model run, and an open nudge card expires when a reply arrives; four clock-driven flow tests, 171 agent tests pass.
