@@ -192,6 +192,31 @@ it('a reply to a Juno bubble carries that bubble to the model in full', async ()
   expect(h.turns.pins.pinMessage({ messageId: message.id })).toMatchObject({ _tag: 'changed', pin: { text: 'which deploy?' } })
 })
 
+it('a message sent beside a topic names the topic and the selection, taints its run, and a pin takes only the words', async () => {
+  h = await turnsHarness()
+  h.fake.script([reply(say('It is settled.')), reply(say('Maya runs it.'))])
+  const eng = { channelId: 'C1', name: 'eng', kindLabel: 'Public channel', tint: 'public' } as const
+  const panel = h.send('is this settled?', {
+    context: { _tag: 'topic', topicId: 'T1', title: 'Postgres "16" plan', place: eng, kind: 'thread', visible: { from: '1.1', to: '1.9' }, selection: { text: 'ship <it> Monday', sender: 'Maya Chen' } },
+  })
+  await h.ended(panel)
+  expect(h.chatRequests()[0]!.context.messages.map(textOf).at(-1)).toBe(
+    '<message id="n1"><about topic="T1" title="Postgres &quot;16&quot; plan" channel="#eng" channel-id="C1" kind="thread" visible="1.1..1.9">' +
+      '<selection from="Maya Chen">ship &lt;it&gt; Monday</selection></about>is this settled?</message>',
+  )
+  const person = h.send('who is she?', { context: { _tag: 'person', userId: 'U7', name: 'Maya Chen' } })
+  await h.ended(person)
+  expect(h.chatRequests()[1]!.context.messages.map(textOf).at(-1)).toBe('<message id="n2"><about person="U7" name="Maya Chen"/>who is she?</message>')
+
+  const clean = h.turns.store.db.prepare('SELECT op_id AS opId, clean FROM runs ORDER BY started_at').all()
+  expect(clean).toEqual([
+    { opId: panel, clean: 0 },
+    { opId: person, clean: 1 },
+  ])
+  const message = h.turns.messages().find((m) => m.opId === panel && m.kind === 'user')!
+  expect(h.turns.pins.pinMessage({ messageId: message.id })).toMatchObject({ _tag: 'changed', pin: { text: 'is this settled?' } })
+})
+
 it('a reaction other than a thumbs up reaches the model at its next step, with the bubble it is on', async () => {
   h = await turnsHarness()
   const inFlight = deferred()
