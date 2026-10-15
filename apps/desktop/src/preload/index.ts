@@ -14,6 +14,29 @@ function leaf(item: ContextMenuLeaf): ContextMenuLeaf {
   }
 }
 
+/**
+ * The engine port, asked for as the page starts rather than once its bundle
+ * has run (performance.md 4.1): the page's first request takes it. Main
+ * sends the port at once, even before the engine is ready, so it is usually
+ * here before the page asks. Later requests (a reconnect) go to main.
+ */
+let early: { readonly answer: Promise<unknown>; ports?: ReadonlyArray<MessagePort> } | undefined = {
+  answer: ipcRenderer.invoke(Channels.engineRequestPort),
+}
+// The page sees a failure when it asks; until then it is not unhandled.
+early.answer.catch(() => {})
+
+const forwardEnginePort = (ports: ReadonlyArray<MessagePort>) => window.postMessage({ _tag: PORT_HANDOFF_TAG }, '*', [...ports])
+
+function requestEnginePort(): Promise<unknown> {
+  const held = early
+  early = undefined
+  if (held === undefined) return ipcRenderer.invoke(Channels.engineRequestPort)
+  // The page listens before it asks (`acquirePort` in @juno/state).
+  if (held.ports !== undefined) forwardEnginePort(held.ports)
+  return held.answer
+}
+
 // The whole bridge. Add one function per shell route; never expose
 // ipcRenderer or Node APIs. The renderer validates every answer.
 const bridge: JunoBridge = {
@@ -21,7 +44,7 @@ const bridge: JunoBridge = {
     getInfo: () => ipcRenderer.invoke(Channels.appGetInfo),
   },
   engine: {
-    requestPort: () => ipcRenderer.invoke(Channels.engineRequestPort),
+    requestPort: requestEnginePort,
     restart: () => ipcRenderer.invoke(Channels.engineRestart),
   },
   agent: {
@@ -88,7 +111,12 @@ contextBridge.exposeInMainWorld('juno', bridge)
 // Main sends the engine port here; the page cannot receive it any other way.
 // Forward it as a window message; the page checks event.source and the tag.
 ipcRenderer.on(Events.enginePort, (event) => {
-  window.postMessage({ _tag: PORT_HANDOFF_TAG }, '*', event.ports)
+  // The early port waits for the page to ask; every later one goes straight to the page.
+  if (early !== undefined) {
+    early.ports = event.ports
+    return
+  }
+  forwardEnginePort(event.ports)
 })
 
 // The same for the Juno Agent's port.
