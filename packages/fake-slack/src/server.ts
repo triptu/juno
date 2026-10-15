@@ -509,6 +509,8 @@ export class FakeServer {
 
   /** Serves a file's bytes; `?download=1` asks the browser to save it. Thumb urls get the original bytes. */
   async #file(fileId: string, download: boolean, response: ServerResponse): Promise<void> {
+    await this.#hold(this.#stalls, 'file:bytes', { fileId })
+    await this.#hold(this.#holds, 'file:bytes', { fileId })
     if (this.#fileDelayMs > 0) await new Promise((resolve) => setTimeout(resolve, this.#fileDelayMs))
     const stored = this.workspace.files.get(fileId)
     if (stored?.bytes === undefined) return json(response, 404, { ok: false, error: 'file_not_found' })

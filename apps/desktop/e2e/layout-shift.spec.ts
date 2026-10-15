@@ -119,11 +119,14 @@ test('a Main message gains a thread link without moving', async ({ juno, win, sl
 test('delayed image bytes keep the reserved thumbnail box', async ({ juno, win, fake }) => {
   await juno.signIn()
   await juno.waitForSync()
-  fake.delayFiles({ ms: 700 })
+  fake.holdNext({ method: 'file:bytes', times: 100 })
   await juno.sidebar.row('Proposal: cut offline mode').open()
   const image = juno.topic.list.locator('[data-thumbnail] img').last()
   await expect(image).toBeVisible()
+  await expect.poll(() => fake.heldCount({ method: 'file:bytes' })).toBeGreaterThan(0)
+  expect(await image.evaluate((node) => node instanceof HTMLImageElement && node.complete)).toBe(false)
   await expectStableAnchor(win, '[data-thumbnail]', async () => {
+    fake.release({ method: 'file:bytes' })
     await expect.poll(() => image.evaluate((node) => node instanceof HTMLImageElement && node.complete && node.naturalWidth > 0)).toBe(true)
   })
 })
