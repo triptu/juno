@@ -124,6 +124,25 @@ const tabWalk = async (win: Page, presses: number) => {
   return stops
 }
 
+/** Each field's, button's and row text's distance from the left and right of the card it sits in, by the card's own edges. */
+const insets = (win: Page, root: string) =>
+  win.evaluate((sel) => {
+    const card = (el: Element): Element | null => {
+      for (let p = el.parentElement; p; p = p.parentElement) if (getComputedStyle(p).boxShadow !== 'none' && getComputedStyle(p).borderRadius !== '0px') return p
+      return null
+    }
+    const out: Array<Record<string, unknown>> = []
+    for (const el of document.querySelectorAll(`${sel} label, ${sel} button, ${sel} [role=listitem] > span > span, ${sel} [data-provider-key]`)) {
+      const c = card(el)
+      if (!c) continue
+      const r = el.getBoundingClientRect()
+      const k = c.getBoundingClientRect()
+      if (r.width === 0) continue
+      out.push({ what: `${el.tagName.toLowerCase()} ${(el.getAttribute('aria-label') ?? el.textContent ?? '').trim().slice(0, 30)}`, left: Math.round(r.left - k.left), right: Math.round(k.right - r.right), width: Math.round(r.width), cardWidth: Math.round(k.width) })
+    }
+    return out
+  }, root)
+
 const sweep = async (juno: Juno, name: string, root: string) => {
   const result: Record<string, unknown> = {}
   for (const theme of ['light', 'dark'] as const) {
@@ -181,6 +200,9 @@ test('slack surfaces', async ({ juno, slack }) => {
   })
 
   await step('topic scrolled', async () => {
+    // The driver waits for a scroll to end, which never comes when the thread fits the window.
+    const scrolls = await topic.scroller.evaluate((el) => el.scrollHeight > el.clientHeight + 240)
+    if (!scrolls) throw new Error('the thread fits the window; nothing to scroll under the header')
     await topic.scrollUp(240)
     await both(juno, '03-topic-scrolled-under-header')
     await topic.scrollToBottom()
@@ -361,6 +383,7 @@ test('slack surfaces', async ({ juno, slack }) => {
     await juno.openPreferences()
     await win.mouse.move(1300, 850)
     await both(juno, '25-preferences')
+    save('insets-preferences', await insets(win, 'main'))
     save('measure-preferences', await measure(win, 'main h1, main h2, main h3, main label, main button, main [role=radio]'))
     await sweep(juno, 'preferences', 'main')
     await win.locator('main').evaluate((m) => m.querySelector('[data-scroll]')?.scrollTo(0, 99999))
@@ -491,6 +514,7 @@ agentTest('juno surfaces', async ({ juno }) => {
   await step('settings juno', async () => {
     await openPage('Settings › Juno')
     await both(juno, '46-settings-juno')
+    save('insets-settings-juno', await insets(win, 'main'))
     save('measure-settings-juno', await measure(win, 'main h1, main h2, main h3, main label, main button, main input, main select, main p'))
     await sweep(juno, 'settings-juno', 'main')
     await win.locator('main').evaluate((m) => m.querySelector('[data-scroll]')?.scrollTo(0, 99999))
@@ -513,8 +537,21 @@ agentTest('juno surfaces', async ({ juno }) => {
       await openPage(label)
       await both(juno, `${n}-page-${label.toLowerCase().replaceAll(' ', '-')}`)
       save(`measure-page-${n}`, await measure(win, 'main h1, main h2, main h3, main button, main p'))
+      save(`insets-page-${n}`, await insets(win, 'main'))
     })
   }
+
+  await step('add a server', async () => {
+    await openPage('Connections')
+    const form = win.locator('[data-add-server]')
+    await form.scrollIntoViewIfNeeded()
+    await win.mouse.move(1300, 850)
+    await both(juno, '51b-add-a-server')
+    await form.getByRole('textbox').first().focus()
+    await win.keyboard.press('Shift+Tab')
+    await win.keyboard.press('Tab')
+    await both(juno, '51c-add-a-server-focus', form)
+  })
 
   await step('paused banner', async () => {
     await openPage('Settings › Juno')
