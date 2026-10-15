@@ -130,6 +130,23 @@ export default defineFixtures(
         ),
         onEscape: noop,
       }),
+      // A narrow topic column (720px window): the choices take a line of their own under the finding.
+      'narrow-audience-and-check': fixture(
+        {
+          ...base,
+          value: 'the offer for rina goes out friday',
+          placeholder: 'Message #eng',
+          notices: (
+            <>
+              {audience}
+              {clarityBar}
+            </>
+          ),
+          onEscape: noop,
+        },
+        { width: 336 },
+      ),
+      'narrow-wrong-place': fixture({ ...base, value: 'the preview environments reaper should cut the staging bill', placeholder: 'Message #eng', notices: routeBar, onEscape: noop }, { width: 336 }),
     },
     Shift: {
       'notices-come-and-go': scene(() => <NoticesComeAndGo />, { height: 320 }),

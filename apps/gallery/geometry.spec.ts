@@ -190,6 +190,23 @@ test.describe('composer attachments', () => {
     expect(at.chips[0]!.top - at.bar.bottom).toBe(6)
   })
 
+  for (const id of ['checks/narrow-audience-and-check', 'checks/narrow-wrong-place']) {
+    test(`${id}: in a 336px field the choices move under the finding and keep the bar's insets`, async ({ page }) => {
+      await open(page, 'Composer', id)
+      const at = await page.evaluate(() => {
+        const bar = document.querySelector('[data-send-check]')!
+        const box = bar.getBoundingClientRect()
+        const [, text, choices] = [...bar.children].map((child) => child.getBoundingClientRect())
+        return { textWidth: text!.width, textBottom: text!.bottom, choicesTop: choices!.top, end: box.right - choices!.right, bottom: box.bottom - choices!.bottom, top: text!.top - box.top }
+      })
+      // The finding keeps a readable width rather than a word per line.
+      expect(at.textWidth).toBeGreaterThanOrEqual(200)
+      expect(at.choicesTop).toBeGreaterThan(at.textBottom)
+      expect(at.end).toBe(8)
+      expect(at.bottom).toBe(at.top)
+    })
+  }
+
   test('image and file chips are the same 44px frame, with the remove button 4px from the top and end', async ({ page }) => {
     await open(page, 'AttachmentChips', 'state/ready')
     const chips = await page.evaluate(() =>
