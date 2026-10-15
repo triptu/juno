@@ -57,6 +57,7 @@ export default defineFixtures(
       recent: scene(() => <Palette initial="" sections={[{ heading: 'Recent', items: recent }]} />),
       results: scene(() => <Palette initial="eng" sections={[{ heading: 'Results', items: results }]} />),
       command: scene(() => <Palette initial="tell maya the wednesday slot works" sections={[{ heading: 'Juno', items: [command] }, { heading: 'Results', items: people }]} />),
+      overflowing: scene(() => <Palette initial="eng" sections={[{ heading: 'Results', items: [...results, ...recent] }]} />),
       people: scene(() => <Palette initial="maya" sections={[{ heading: 'Results', items: people }]} />),
       'no-matches': scene(() => <Palette initial="zebra crossing" sections={[]} />),
       waiting: scene(() => <Palette initial="zebra" sections={[]} settled={false} />),

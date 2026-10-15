@@ -418,6 +418,7 @@ A tab with the message list's area on top and the composer at the bottom, like a
 - Main rows read "#alerts-prod · Main" (SPEC 17), not "Main · #alerts-prod".
 - Rows: a topic's sub is "#eng · 4m"; a message match shows its topic's title with "#eng · Leo: matched text", the sender and text marked `data-sensitive`, so privacy mode blurs them. A channel shows its Main ("Public channel · Main") only when the store holds one, then "show its topics". A person reads "Message Maya Chen", full name, with "Direct message · Main", or "Starts a conversation" when there is no DM. Icons are 16 muted: `chats-circle` thread, the channel's `hash`/`lock`/`user`/`users` for a Main, `chat-text` message, `funnel-simple` show its topics, `user` person, and the command icons above. The badge is a 20px filled chip with `sparkle` 12.
 - Order: channels and people first (at most 3 each), then titles, then message matches. Slack's search adds up to 4 message matches under the local rows after a 400 ms pause in typing, never moving a row already shown.
+- The list reserves equal scrollbar gutters on both sides; geometry tests measure symmetric row insets with and without overflow.
 - Right-click on a channel result, or the context-menu key (or ⇧F10) on the active one, opens the channel menu (15.2); Show its topics, Open Main and Ask Juno close the palette.
 - Commands show only while AI assist is on. Esc gives focus back to where it was; a press on the dim closes.
 

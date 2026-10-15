@@ -75,9 +75,6 @@ export interface CommandPaletteProps {
   readonly onClose: () => void
 }
 
-/** The list scrolls past this height (inventory 9). */
-const LIST_MAX_HEIGHT = '400px'
-
 const rowDomId = (id: string) => `palette-${id}`
 
 /**
@@ -247,7 +244,7 @@ function PaletteRow({ item, active, now, onSelect, onActivate, onMenu }: Palette
           ) : null}
         </>
       }
-      label={item.label}
+      label={item.icon === 'public' && item.label.startsWith('#') ? item.label.slice(1) : item.label}
       {...(sub === undefined ? {} : { sub, subPlacement: 'below' as const })}
       trailing={
         // A command keeps its hint's place in flow, hidden while another row is active.
@@ -328,7 +325,8 @@ const styles = stylex.create({
     '::placeholder': { color: colors['--foreground-muted'], opacity: 1 },
   },
   scroll: {
-    maxHeight: LIST_MAX_HEIGHT,
+    maxHeight: layout['--palette-list-max-height'],
+    scrollbarGutter: 'stable both-edges',
     overflowY: 'auto',
     overscrollBehavior: 'contain',
     padding: spacing['--space-1-5'],

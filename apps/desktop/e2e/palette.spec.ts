@@ -161,20 +161,28 @@ test('a command shows above the results with its confidence, and Enter runs it',
   await expect.poll(() => fake.calls.filter((call) => call.method === 'chat.postMessage').map((call) => [call.args['channel'], call.args['text']])).toEqual([['D0MAYA', 'the wednesday slot works']])
 })
 
-test("Slack's search adds what the cache lacks under the local rows, and opening it lands on the message", async ({ juno, slack }) => {
+test("Slack's search adds what the cache lacks under the local rows, and opening it lands on the message", async ({ juno, slack, fake }) => {
   await juno.signIn()
   await juno.waitForSync()
   const { palette, topic } = juno
-  slack.as('Sam').postedLongAgo('eng', 'The zebra crossing budget was approved', 60)
+  slack.as('Sam').postedLongAgo('eng', 'The WAL position was approved sixty days ago', 60)
 
+  fake.holdNext({ method: 'search.modules.messages', reason: 'palette' })
   await palette.open()
-  await palette.type('zebra crossing')
-  const found = palette.row('The zebra crossing budget was approved')
+  await palette.type('WAL position')
+  const local = palette.row('replay from the WAL position')
+  await expect(local).toBeVisible()
+  const before = await local.boundingBox()
+  await expect.poll(() => fake.heldCount({ method: 'search.modules.messages' })).toBe(1)
+  fake.release({ method: 'search.modules.messages' })
+  const found = palette.row('The WAL position was approved sixty days ago')
   await expect(found).toBeVisible({ timeout: 15_000 })
   await expect(found).toContainText('#eng')
-  await palette.choose('The zebra crossing budget was approved')
+  expect(await local.boundingBox()).toEqual(before)
+  await expect(palette.rows().first()).toContainText('replay from the WAL position')
+  await palette.choose('The WAL position was approved sixty days ago')
   await palette.expectClosed()
-  const message = topic.message('The zebra crossing budget was approved')
+  const message = topic.message('The WAL position was approved sixty days ago')
   await expect(message).toBeInViewport({ timeout: 15_000 })
 })
 
