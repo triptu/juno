@@ -1,4 +1,6 @@
 import { resolve } from 'node:path'
+import { isBuiltin } from 'node:module'
+import { dependencies } from './package.json'
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
 import type { Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
@@ -61,15 +63,24 @@ function preloadFonts(patterns: ReadonlyArray<RegExp>): Plugin {
 // the build is started from.
 const repoRoot = resolve(__dirname, '../..')
 
-// Workspace packages ship TypeScript source, so main, preload and the engine
-// entry must bundle them. `effect` is bundled too: externalised, main loaded
-// the whole barrel through require("effect") before creating the window.
-// Measured on the M1 shell (7 runs, median): launch to first window 416 ms
-// external vs 314 ms bundled; launch to "Engine live" 526 ms vs 379 ms.
-// Everything else from node_modules stays external.
-const externalize = externalizeDepsPlugin({
-  exclude: ['@juno/agent', '@juno/agent-contract', '@juno/agent-juno', '@juno/contract', '@juno/engine', '@juno/slack', '@juno/state', 'effect'],
-})
+// Build-time dependencies are bundled. Only dependencies in the desktop manifest
+// remain external and are copied by electron-builder. Keep that boundary checked.
+const externalize = externalizeDepsPlugin()
+function runtimeImports(): Plugin {
+  return {
+    name: 'juno:runtime-imports',
+    generateBundle(_options, bundle) {
+      for (const file of Object.values(bundle)) {
+        if (file.type !== 'chunk') continue
+        for (const spec of [...file.imports, ...file.dynamicImports]) {
+          if (spec in bundle || spec.startsWith('.') || spec === 'electron' || isBuiltin(spec)) continue
+          const name = spec.split('/').slice(0, spec.startsWith('@') ? 2 : 1).join('/')
+          if (!(name in dependencies)) this.error(`Unpackaged runtime dependency: ${spec}`)
+        }
+      }
+    },
+  }
+}
 
 // electron-vite defaults every target to `minify: false`. Minified output is
 // less than half the size and parses faster; scripts/check-bundle-size.mjs
@@ -95,7 +106,8 @@ const reactCompiler = [
 
 export default defineConfig({
   main: {
-    plugins: [externalize],
+    define: { __JUNO_UPDATE_FEED_URL__: JSON.stringify(process.env.JUNO_UPDATE_FEED_URL ?? '') },
+    plugins: [externalize, runtimeImports()],
     build: {
       minify,
       rollupOptions: {
@@ -109,7 +121,7 @@ export default defineConfig({
     },
   },
   preload: {
-    plugins: [externalize],
+    plugins: [externalize, runtimeImports()],
     build: {
       minify,
       rollupOptions: { input: resolve(__dirname, 'src/preload/index.ts') },

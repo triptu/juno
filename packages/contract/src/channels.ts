@@ -10,6 +10,9 @@ import type { Accent, Density, ProviderChange, SidebarLayout, SlackTarget, Theme
 export type { Accent, AppInfo, Density, Platform, ProviderChange, ProviderKind, ProviderResult, ProviderState, SidebarLayout, SlackTarget, Theme } from './shell'
 
 export const Channels = {
+  updatesGet: 'updates.get',
+  updatesSet: 'updates.set',
+  updatesRestart: 'updates.restart',
   appGetInfo: 'app.getInfo',
   /** Renderer asks main for a fresh engine port. The port arrives on `Events.enginePort`. */
   engineRequestPort: 'engine.requestPort',
@@ -57,6 +60,7 @@ export type Channel = (typeof Channels)[keyof typeof Channels]
 
 /** main -> preload messages sent with `webContents.postMessage`. */
 export const Events = {
+  updatesChanged: 'updates.changed',
   /** Carries one MessagePort in `ports[0]`. */
   enginePort: 'engine.port',
   /** Carries one MessagePort to the Juno Agent in `ports[0]`. */
@@ -127,6 +131,12 @@ export const AGENT_PORT_HANDOFF_TAG = 'juno.agentPort'
  * Keep this surface small and typed. Never expose ipcRenderer itself.
  */
 export interface JunoBridge {
+  readonly updates: {
+    readonly get: () => Promise<unknown>
+    readonly set: (enabled: boolean) => Promise<unknown>
+    readonly restart: () => Promise<unknown>
+    readonly onChange: (listener: (state: unknown) => void) => () => void
+  }
   readonly app: {
     /** Name, version and platform of the running app, answered by main. */
     readonly getInfo: () => Promise<unknown>

@@ -43,3 +43,5 @@ Every view has a `<View>.fixtures.tsx` next to it, registered in `src/fixtures.t
 ## Testing
 
 Visual and behaviour checks run in the gallery, not in the package: `pnpm gallery` to look, `pnpm gallery:shots` for screenshots, `pnpm test:gallery` for behaviour (mouse-down activation, cursor rule, state switcher, no layout shift on hover, press or focus, and a message thumbnail that arrives late or fails). In the gallery a view is one state per address (`#/SignInView?__state=failure/keychain`), and `j` `k` `[` `]` move between states and components. A view's user flow is covered by an e2e spec against the built app.
+
+`UpdateSettings` is the dumb Preferences › About update setting and downloaded-version line. Its container supplies availability, enabled state, version and callbacks.

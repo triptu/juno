@@ -5,6 +5,7 @@ import type { AgentSupervisor } from './agent'
 import type { BackupSecrets } from './backupSecrets'
 import type { EngineSupervisor } from './engine'
 import type { ProviderStore } from './providers'
+import type { Updates } from './updates'
 import type { Launch } from './launch'
 import { APP_ORIGIN } from './scheme'
 
@@ -67,6 +68,7 @@ export const slackLinksForTests: string[] = []
 const e2e = process.env.JUNO_E2E === '1'
 
 export interface IpcDeps {
+  readonly updates: Updates
   readonly supervisor: EngineSupervisor
   /** The agent's supervisor; absent while the agent is off. */
   readonly agent: AgentSupervisor
@@ -82,7 +84,10 @@ export interface IpcDeps {
   readonly setViewing: (topicId: string | null) => void
 }
 
-export function registerIpc({ supervisor, agent, providers, backupSecrets, setTheme, setAccent, setDensity, setPrivacy, setSidebar, setViewing }: IpcDeps): void {
+export function registerIpc({ updates, supervisor, agent, providers, backupSecrets, setTheme, setAccent, setDensity, setPrivacy, setSidebar, setViewing }: IpcDeps): void {
+  handle(Channels.updatesGet, () => updates.get())
+  handle(Channels.updatesSet, ({ enabled }) => updates.set(enabled))
+  handle(Channels.updatesRestart, () => updates.restart())
   handle(Channels.appGetInfo, () => ({
     name: app.getName(),
     version: app.getVersion(),

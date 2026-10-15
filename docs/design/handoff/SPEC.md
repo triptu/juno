@@ -492,6 +492,8 @@ The order: ignored channel → Every message (thread, channel or person) → Nev
 - **Accent:** the accent colours in `docs/design/tokens.md`, Coral by default.
 - **Density:** Comfortable (the default) or Compact, which fits more text in the sidebar and the messages.
 
+**About**, in Preferences, shows the version and an opt-in "Download updates automatically" setting. Checks and downloads are quiet. Once downloaded, one line says "Juno {version} is ready" with **Restart to update**. Updates are off in development and tests; ordinary quit never installs an update.
+
 ![Preferences with ignored channels](screenshots/13-ui.png)
 
 *Figure 13. Preferences and the ignore list.*
