@@ -64,6 +64,12 @@ import { view, type CompactionModel, type MemoryView } from '../store/memory'
 import type { JournalPosition, Mode } from '../store/ledger'
 import { ACTIONS_MIGRATIONS, budgetCard, createActions, proposedTask, sendMessageTool, type Actions, type ActionsOptions } from '../actions'
 import { mintGrant } from '../grants/grants'
+import { createBackup, type Backup, type BackupKeychain } from '../backup/backup'
+import { clearStagedRestore, installStaged } from '../backup/restore'
+import { BACKUP_MIGRATIONS, LOCAL_TABLES } from '../backup/schema'
+import { enterRecovery, observeOwner } from '../ownership/ownership'
+import { OWNERSHIP_MIGRATIONS } from '../ownership/schema'
+import { createOwnership, type Ownership } from '../ownership/service'
 import { ownerRules, rulesSection } from '../actions/rules'
 
 /** One archive message (§4.1). `opId` is the inbox op whose run wrote it. */
@@ -104,6 +110,17 @@ export interface TurnsOptions {
   /** Other folders' migration sets. Spend, turns and jobs are always applied. */
   readonly migrations?: ReadonlyArray<MigrationSet>
   readonly schedule?: Pick<SchedulerOptions, 'replies' | 'cachedReplies' | 'account' | 'enabled'>
+  /** The encrypted backup, move and restore (WP21). Without it Juno keeps no backup and cannot move. */
+  readonly backup?: {
+    /** Main's keychain over the agent's port. */
+    readonly keychain: BackupKeychain
+    /** This Mac's name, for the other Mac's "Juno is working on your other Mac". */
+    readonly deviceName: string
+    /** Export interval; 0 exports only when asked. Default one minute. */
+    readonly intervalMs?: number
+    /** Restarts the agent process; the next open installs a staged restore. */
+    readonly restart?: () => void
+  }
   readonly now?: () => number
   readonly onReport?: (error: unknown) => void
 }
@@ -154,6 +171,10 @@ export interface Turns {
   }
   /** Cards, clicks and dispatch (WP15). */
   readonly actions: Actions
+  /** Who owns Juno, move, restore and Activate (WP21). */
+  readonly ownership: Ownership
+  /** The encrypted backup, when `backup` was given. Its `removal` hooks are WP16's `RemovalBackup`. */
+  readonly backup?: Backup
   readonly jobs: {
     readonly list: () => ReadonlyArray<Job>
     readonly active: () => ReadonlyArray<Job>
@@ -174,10 +195,13 @@ export async function openTurns(options: TurnsOptions): Promise<Turns | UpdateNe
   const lock = acquireOwnerLock(options.agentDir)
   let db: Database | undefined
   try {
+    // A restore staged before the restart replaces agent.sqlite now (§14.4).
+    const install = await installStaged(options.agentDir, options.backup?.keychain)
+    if (install._tag === 'quarantined') options.onReport?.(new Error('a staged restore was older than a removal and was not installed'))
     try {
       db = openDatabase(
         join(options.agentDir, AGENT_DATABASE_FILE),
-        [SPEND_MIGRATIONS, TURNS_MIGRATIONS, JOBS_MIGRATIONS, SETTINGS_MIGRATIONS, ACTIONS_MIGRATIONS, SCHEDULE_MIGRATIONS, VIEW_MIGRATIONS, ...(options.migrations ?? []).filter((set) => set.name !== SCHEDULE_MIGRATIONS.name)],
+        [SPEND_MIGRATIONS, TURNS_MIGRATIONS, JOBS_MIGRATIONS, SETTINGS_MIGRATIONS, ACTIONS_MIGRATIONS, SCHEDULE_MIGRATIONS, VIEW_MIGRATIONS, BACKUP_MIGRATIONS, OWNERSHIP_MIGRATIONS, ...(options.migrations ?? []).filter((set) => set.name !== SCHEDULE_MIGRATIONS.name)],
         now,
       )
     } catch (error) {
@@ -186,6 +210,14 @@ export async function openTurns(options: TurnsOptions): Promise<Turns | UpdateNe
     }
     const store: Store = { db, now }
     initialize(store)
+    if (install._tag === 'installed') {
+      enterRecovery(store, install.restore)
+      const keychain = options.backup?.keychain
+      if (keychain !== undefined && Number((await keychain.get('deletionRecord')) ?? 0) < install.restore.deletion) {
+        await keychain.set('deletionRecord', String(install.restore.deletion))
+      }
+      clearStagedRestore(options.agentDir)
+    }
     const recovery = await recover(store, options.agentDir)
     if (recovery._tag === 'updateNeeded') {
       db.close()
@@ -208,6 +240,27 @@ export async function openTurns(options: TurnsOptions): Promise<Turns | UpdateNe
 }
 
 const noop = () => {}
+
+/** The backup, or undefined without a keychain. A backup that cannot start is reported, and Juno runs without it. */
+function openBackup(store: Store, options: TurnsOptions, observed: (deviceName: string) => void, changed: () => void): Backup | undefined {
+  if (options.backup === undefined) return undefined
+  try {
+    return createBackup({
+      store,
+      agentDir: options.agentDir,
+      keychain: options.backup.keychain,
+      deviceName: options.backup.deviceName,
+      local: LOCAL_TABLES,
+      observed: (owner) => observed(owner.name),
+      changed,
+      ...(options.backup.intervalMs !== undefined ? { intervalMs: options.backup.intervalMs } : {}),
+      ...(options.onReport ? { onReport: options.onReport } : {}),
+    })
+  } catch (error) {
+    options.onReport?.(error)
+    return undefined
+  }
+}
 
 /** The Because line of a card Juno proposes after reading untrusted content (SPEC 13.3). */
 const UNTRUSTED_BECAUSE = 'Juno read Slack or a report in this reply'
@@ -263,6 +316,7 @@ async function start(
     },
     onRunEnded: () => compactor?.poke(),
     cards: { carry: (opId) => actions.carry(opId), quote: (cardId) => actions.quote(cardId) },
+    admits: () => ownership.admits(),
     ...(options.onReport ? { onReport: options.onReport } : {}),
   })
   const subagentModel = options.subagent ?? initial.compaction
@@ -366,6 +420,33 @@ async function start(
     journal!.resume()
   }
 
+  const backup = openBackup(store, options, (name) => {
+    observeOwner(store, name)
+    ownership.notify()
+  }, () => ownership.notify())
+  const ownership = createOwnership({
+    store,
+    agentDir: options.agentDir,
+    ...(backup !== undefined ? { backup: { backup, keychain: options.backup!.keychain } } : {}),
+    drain: async () => {
+      router.kick()
+      await router.idle()
+      await actions.idle()
+      await projection!.catchUp()
+    },
+    // §14 and WP15: this Mac owns Juno now, so waiting clicks and inputs run.
+    kick: () => {
+      actions.kick()
+      router.kick()
+    },
+    cards: () => actions.views(),
+    ...(options.backup?.restart ? { restart: options.backup.restart } : {}),
+    ...(options.onReport ? { onReport: options.onReport } : {}),
+  })
+  // The chat's banner and cards and Settings › Juno read ownership; they rebuild on a card change.
+  const ownershipChanged = () => actions.changed()
+  ownership.subscribe(ownershipChanged)
+
   attach(await file.start(settings))
   // pi keeps the model of its last configure: a run it resumes uses that one.
   running = (await journal!.model()) ?? running
@@ -402,6 +483,7 @@ async function start(
   router.start()
   actions.start()
   compactor?.poke()
+  void ownership.resume().catch(options.onReport ?? noop)
   const scheduleDriver = driveScheduler(scheduler, options.onReport ?? noop)
   void scheduleDriver.tick()
 
@@ -456,6 +538,8 @@ async function start(
       undo: (expected) => undoPin(store, expected),
     },
     actions,
+    ownership,
+    ...(backup !== undefined ? { backup } : {}),
     jobs: {
       list: jobs.list,
       active: jobs.active,
@@ -480,6 +564,8 @@ async function start(
         await projection!.catchUp()
         await journal!.close()
         await stopped
+        // The backup is the last writer: its final export sees every change.
+        await backup?.close()
         release()
       })()),
   }
