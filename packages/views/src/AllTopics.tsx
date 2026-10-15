@@ -490,10 +490,13 @@ const styles = stylex.create({
   rows: {
     position: 'relative',
   },
+  // Each row's box is fixed and contained, so a row entering or leaving lays out only itself.
   slot: {
     position: 'absolute',
     top: 0,
     insetInline: 0,
+    height: sizes['--row-52'],
+    contain: 'strict',
   },
   row: {
     cursor: 'default',
