@@ -124,3 +124,9 @@ Same script. A 1,900-token memory view inside the first user message, then a sec
 ## S6: backup capture
 
 `node:sqlite` in Electron's Node has `DatabaseSync.createSession()` and `applyChangeset()`. A changeset captured over an insert, an update and a delete applied cleanly to a fresh database (37 bytes, the expected final row). So §14.4 can use the session extension, not an application change log. WP21 still has to check two things: sessions attach per connection and per table, and a changeset holds no schema changes, so migrations need their own segment kind.
+
+**WP21 recheck (10-15)**, under the app's runtime (Electron 44.7.0, Node 24.21.0, SQLite 3.53.4): the session extension is available, so the plan's fallback (an application change log) is not needed. Three findings shaped the backup:
+
+- A **changeset holds the old values** of each updated or deleted row; a **patchset** holds only keys and new values. A segment cut after a removal would carry the removed text as a changeset, so segments are patchsets.
+- A table **without a primary key** captures nothing, silently. Backup refuses to start if a replicated table has none.
+- Sessions attach per table on one connection, so capture covers only replicated tables. A patchset holds no schema change, so a migration starts a new generation instead of needing a schema segment kind.
