@@ -1,0 +1,41 @@
+[
+  {
+    "tag": "input",
+    "role": "combobox",
+    "name": "Search, or tell Juno",
+    "inDialog": "Search and commands",
+    "ring": "none 3px rgb(35, 33, 26)",
+    "rect": [
+      465,
+      111,
+      458,
+      21
+    ]
+  },
+  {
+    "tag": "input",
+    "role": "combobox",
+    "name": "Search, or tell Juno",
+    "inDialog": "Search and commands",
+    "ring": "none 3px rgb(35, 33, 26)",
+    "rect": [
+      465,
+      111,
+      458,
+      21
+    ]
+  },
+  {
+    "tag": "input",
+    "role": "combobox",
+    "name": "Search, or tell Juno",
+    "inDialog": "Search and commands",
+    "ring": "none 3px rgb(35, 33, 26)",
+    "rect": [
+      465,
+      111,
+      458,
+      21
+    ]
+  }
+]

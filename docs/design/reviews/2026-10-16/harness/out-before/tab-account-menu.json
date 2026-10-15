@@ -1,0 +1,54 @@
+[
+  {
+    "tag": "div",
+    "role": "menu",
+    "name": "Account",
+    "inDialog": "Account",
+    "ring": "solid 2px rgb(180, 53, 31)",
+    "rect": [
+      80,
+      110,
+      276,
+      128
+    ]
+  },
+  {
+    "tag": "button",
+    "role": null,
+    "name": "Sign out",
+    "inDialog": "Account",
+    "ring": "solid 2px rgb(180, 53, 31)",
+    "rect": [
+      276,
+      279,
+      71,
+      28
+    ]
+  },
+  {
+    "tag": "button",
+    "role": null,
+    "name": "Ping engine",
+    "inDialog": "Account",
+    "ring": "solid 2px rgb(180, 53, 31)",
+    "rect": [
+      88,
+      403,
+      97,
+      32
+    ]
+  },
+  {
+    "tag": "div",
+    "role": "button",
+    "name": "Home",
+    "inDialog": null,
+    "ring": "solid 2px rgb(180, 53, 31)",
+    "rect": [
+      10,
+      48,
+      363,
+      32
+    ]
+  }
+]
