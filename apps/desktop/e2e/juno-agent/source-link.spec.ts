@@ -81,10 +81,14 @@ test('a source link scrolls the open topic to the message, and a reply that arri
   }, { timeout: 10_000 }).toBe(true)
   expect(await juno.topic.distanceFromBottom()).toBeGreaterThan(2_000)
 
+  await expect(panel.root).toBeVisible()
+  const before = (await placeIn(juno, LINKED))!
+
   // A reply arrives: the list does not go back to the bottom, so the cited message stays in view.
   slack.as('Leo').replyIn(THREAD, 'Cutover is a go')
   await expect(juno.topic.scroller.locator('[data-message-row]').filter({ hasText: 'Cutover is a go' })).toHaveCount(1)
   const after = (await placeIn(juno, LINKED))!
+  expect(after.top).toBe(before.top)
   expect(after.top).toBeGreaterThanOrEqual(0)
   expect(after.bottom).toBeLessThanOrEqual(after.height)
   expect(await juno.topic.distanceFromBottom()).toBeGreaterThan(2_000)

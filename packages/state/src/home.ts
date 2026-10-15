@@ -148,8 +148,8 @@ export interface HomeShown {
   readonly used: ReadonlySet<string>
   /** The first sync is still running: the greeting shows with `HOME_SYNCING_LINE`, and items fill in as they land. */
   readonly loading: boolean
-  /** Rows the list keeps room for, so rows that land later never move the ones shown; 0 when the items were all there at once. */
-  readonly slots: number
+  /** Row slots held through the first sync's visit: rows that land later fill them, so nothing shown moves. */
+  readonly reservedItems: number
 }
 
 /**
@@ -195,13 +195,12 @@ export function showHome(registry: Registry, key: string, options: { readonly wi
       enter: options.enter,
       used: syncing ? previous.used : new Set<string>(),
       loading: true,
-      slots: limit,
+      reservedItems: limit,
     })
   }
   const view = result.value
   // Rows shown while syncing keep their places; the free slots take the next items.
-  const kept = syncing
-  const items = kept ? addHomeItems(previous.view.items, view.items, previous.slots) : view.items.slice(0, limit)
+  const items = syncing ? addHomeItems(previous.view.items, view.items, previous.reservedItems) : view.items.slice(0, limit)
   const shown = { ...view, items }
   const done = caughtUp(shown)
   const greeting = homeGreeting({ now, firstName: view.firstName, items: items.length, caughtUp: done })
@@ -213,10 +212,10 @@ export function showHome(registry: Registry, key: string, options: { readonly wi
     now: now.getTime(),
     caughtUp: done,
     enter: options.enter,
-    used: kept ? previous.used : new Set<string>(),
+    used: syncing ? previous.used : new Set<string>(),
     loading: false,
-    // Caught up has its own layout; otherwise the reserved slots stay until Home appears again, so nothing moves.
-    slots: kept && !done ? previous.slots : 0,
+    // The reserved slots, and the hidden Browse link's place, stay until Home appears again, so nothing moves.
+    reservedItems: syncing ? previous.reservedItems : 0,
   })
 }
 
@@ -225,7 +224,7 @@ export function fillHome(registry: Registry, key: string): void {
   const shown = registry.get(homeShownAtom(key))
   const result = registry.get(homeViewAtom)
   if (shown?.loading !== true || result._tag !== 'Success' || result.value.ready) return
-  const items = addHomeItems(shown.view.items, result.value.items, shown.slots)
+  const items = addHomeItems(shown.view.items, result.value.items, shown.reservedItems)
   if (items !== shown.view.items) registry.set(homeShownAtom(key), { ...shown, view: { ...shown.view, items } })
 }
 
