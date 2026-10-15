@@ -774,17 +774,13 @@ module agent_actions_bounded { import actionsProtocol(children = 1, drainLimit =
 // the receipt: a delayed delivery of the same authorization must not hide
 // the topic again, including after either process restarts.
 module agent_resolve {
-  var pc: int
-  var resolved: bool
-  var recorded: bool
-  action init = all { pc' = 0, resolved' = false, recorded' = false }
-  action advance(forget: bool): bool = all {
-    pc' = pc + 1,
-    if (pc == 0) all { resolved' = true, recorded' = true }
-    else if (pc == 1) all { resolved' = false, recorded' = not(forget) }
-    else all { resolved' = if (recorded) resolved else true, recorded' = true }
-  }
+  var s: { pc: int, resolved: bool, recorded: bool, label: str }
+  action init = s' = { pc: 0, resolved: false, recorded: false, label: "init" }
+  action advance(forget: bool): bool =
+    if (s.pc == 0) s' = { pc: 1, resolved: true, recorded: true, label: "resolve" }
+    else if (s.pc == 1) s' = { pc: 2, resolved: false, recorded: not(forget), label: "undo" }
+    else s' = { pc: 3, resolved: if (s.recorded) s.resolved else true, recorded: true, label: "finished" }
   action step = advance(false)
   action bugStep = advance(true)
-  val undoSurvivesRedelivery = pc < 2 or not(resolved)
+  val undoSurvivesRedelivery = s.pc < 2 or not(s.resolved)
 }
