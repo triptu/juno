@@ -1,6 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import { chatCopy } from '@juno/agent-contract'
 import type { ProviderKind, ProviderState } from '@juno/contract'
+import { useEffect, useRef } from 'react'
 import { Button, Chip, ListRow, Section, Segmented, Surface, Text, TextField } from '@juno/ui'
 import { cell } from './cell'
 
@@ -21,6 +22,11 @@ export interface ProviderSectionProps {
   readonly error?: string
   /** The active provider refused its key on the last call. */
   readonly rejected?: boolean
+  /**
+   * Put focus in the first field, the key or an endpoint's base URL, each
+   * time the section is shown. For "Add a provider".
+   */
+  readonly focusFirst?: boolean
   /** A segment was picked: the container switches to it if it is set up, else shows its fields. */
   readonly onShow: (kind: ProviderKind) => void
   readonly onDraft: (drafts: ProviderDrafts) => void
@@ -33,9 +39,14 @@ export interface ProviderSectionProps {
  * key, or one OpenAI-compatible endpoint with a base URL and an optional
  * key. One is active at a time; saving one makes it active.
  */
-export function ProviderSection({ state, shown, drafts, error, rejected = false, onShow, onDraft, onSave, onRemove }: ProviderSectionProps) {
+export function ProviderSection({ state, shown, drafts, error, rejected = false, focusFirst = false, onShow, onDraft, onSave, onRemove }: ProviderSectionProps) {
   const copy = chatCopy.providers
   const openRouter = shown === 'openRouter'
+  const first = useRef<HTMLInputElement>(null)
+  // An effect, not autoFocus: a tab that is shown again runs its effects again, so the field takes focus then too.
+  useEffect(() => {
+    if (focusFirst) first.current?.focus()
+  }, [focusFirst])
   const setUp = openRouter ? state.openRouter.key === 'set' : state.custom.baseUrl !== ''
   const canSave = openRouter ? drafts.openRouterKey.trim() !== '' : drafts.baseUrl.trim() !== ''
   const keyDown = (event: { readonly key: string }) => {
@@ -64,6 +75,7 @@ export function ProviderSection({ state, shown, drafts, error, rejected = false,
                 label={copy.baseUrl}
                 type="url"
                 placeholder="http://localhost:11434/v1"
+                ref={first}
                 value={drafts.baseUrl}
                 onChange={(event) => onDraft({ ...drafts, baseUrl: event.currentTarget.value })}
                 onKeyDown={keyDown}
@@ -93,6 +105,7 @@ export function ProviderSection({ state, shown, drafts, error, rejected = false,
                 label={openRouter ? copy.key : copy.keyOptional}
                 type="password"
                 placeholder={openRouter ? 'sk-or-…' : ''}
+                {...(openRouter ? { ref: first } : {})}
                 value={openRouter ? drafts.openRouterKey : drafts.customKey}
                 invalid={problem !== undefined}
                 onChange={(event) => onDraft(openRouter ? { ...drafts, openRouterKey: event.currentTarget.value } : { ...drafts, customKey: event.currentTarget.value })}

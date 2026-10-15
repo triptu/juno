@@ -33,8 +33,7 @@ import { hasArt, TopicTab } from './TopicView'
 /** The All topics page is its own chunk (performance 2.1), loaded on idle once the window is up. */
 const AllTopicsPage = lazy(loadAllTopicsPage)
 // Rare pages load on first open, to keep the first bundle in budget.
-const NotificationsPage = lazy(() => import('./Notifications').then((chunk) => ({ default: chunk.NotificationsPage })))
-const PreferencesPage = lazy(() => import('./Preferences').then((chunk) => ({ default: chunk.PreferencesPage })))
+const SettingsTab = lazy(() => import('./Settings').then((chunk) => ({ default: chunk.SettingsTab })))
 
 const kindIcons: Record<TopicDetail['channel']['kind'], WorkspaceTabIcon> = {
   public: 'hash',
@@ -58,15 +57,13 @@ function stripTab(summary: TabSummary): WorkspaceTab {
         ? { ...base, title: 'Home', icon: 'home' }
         : place.kind === 'allTopics'
           ? { ...base, title: 'All topics', icon: 'all-topics' }
-          : place.kind === 'notifications'
-            ? { ...base, title: 'Notifications', icon: 'notifications' }
-            : place.kind === 'preferences'
-              ? { ...base, title: 'Preferences', icon: 'preferences' }
-              : place.kind === 'juno'
-                ? { ...base, title: 'Juno', icon: 'juno' }
-                : place.kind === 'junoPage'
-                  ? { ...base, title: chatCopy.pageTitles[place.page], icon: place.page === 'settings' ? 'preferences' : 'juno' }
-                  : {
+          : place.kind === 'settings'
+            ? { ...base, title: 'Settings', icon: 'settings' }
+            : place.kind === 'juno'
+              ? { ...base, title: 'Juno', icon: 'juno' }
+              : place.kind === 'junoPage'
+                ? { ...base, title: chatCopy.pageTitles[place.page], icon: 'juno' }
+                : {
           ...base,
           title: detail == null ? '' : detail.kind === 'main' ? detail.channel.name : detail.title,
           icon: detail == null ? 'hash' : kindIcons[detail.channel.kind],
@@ -99,16 +96,10 @@ function Page({ tab }: { readonly tab: Tab }) {
           <JunoPageTab page={place.page} />
         </Suspense>
       )
-    case 'notifications':
+    case 'settings':
       return (
-        <Suspense key="notifications" fallback={null}>
-          <NotificationsPage />
-        </Suspense>
-      )
-    case 'preferences':
-      return (
-        <Suspense key="preferences" fallback={null}>
-          <PreferencesPage />
+        <Suspense key="settings" fallback={null}>
+          <SettingsTab section={place.section} />
         </Suspense>
       )
     case 'allTopics':

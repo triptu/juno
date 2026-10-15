@@ -38,7 +38,7 @@ const stateLabel: Record<ConnectionState, string> = {
  */
 export function ConnectionsPage({ page, error, onEnabled, onAction, onT3Address, onTier, onAdd }: ConnectionsPageProps) {
   return (
-    <Page>
+    <Page width="settings">
       <PageHeader title="Connections" subtitle="Where Juno can read and act. A tool on a server's read list needs no click; everything else is a card, every time." />
       {page.connections.length === 0 ? <EmptyState illustration="nothing-here" title="No connections" body="Juno's connections show up here once they are set up." enter={false} /> : null}
       {page.connections.map((row) => (

@@ -48,9 +48,9 @@ test('answers app.getInfo over the typed IPC bridge', async ({ juno, app }) => {
   await juno.signIn()
   const version = await app.evaluate((electronModule) => electronModule.app.getVersion())
   const electron = await app.evaluate(() => process.versions.electron)
-  // The build line lives in the account menu's diagnostics block.
-  await juno.accountMenu.open()
-  await expect(juno.accountMenu.root.getByText(`Juno ${version} on ${process.platform}, Electron ${electron}`)).toBeVisible()
+  // The build line is in Settings › About.
+  await juno.openSettings('About')
+  await expect(juno.settings.root.getByText(`Juno ${version} on ${process.platform}, Electron ${electron}`)).toBeVisible()
 })
 
 test('switches to the dark theme in place', async ({ win }) => {

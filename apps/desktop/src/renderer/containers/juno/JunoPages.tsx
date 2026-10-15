@@ -1,7 +1,7 @@
 import { memo, useState } from 'react'
-import { chatCopy, modelChoiceKey, type ConnectionId, type JunoPage, type JunoSettingsPage as JunoSettingsPageModel, type PinId } from '@juno/agent-contract'
+import { chatCopy, modelChoiceKey, type ConnectionId, type JunoSettingsPage as JunoSettingsPageModel, type PinId } from '@juno/agent-contract'
 import type { ProviderChange, ProviderKind } from '@juno/contract'
-import { copyText, nowAtom, registry } from '@juno/state'
+import { copyText, nowAtom, registry, type JunoTabPage } from '@juno/state'
 import {
   activityPageAtom,
   agentProviderAtom,
@@ -16,9 +16,11 @@ import {
   type JunoSettingsChange,
 } from '@juno/state/agent'
 import { useAtomValue } from '@juno/state/react'
-import { ActivityPage, ConnectionsPage, JunoSettingsPage, MemoryPage, noopActions, ProviderSection, RemembersPage, ReviewPage, ScheduledPage, type ChatActions, type ProviderDrafts } from '@juno/views'
+import { ActivityPage, ConnectionsPage, JunoBackupPage, JunoSettingsPage, MemoryPage, noopActions, ProviderSection, RemembersPage, ReviewPage, ScheduledPage, type ChatActions, type ProviderDrafts } from '@juno/views'
+import { openSettings } from '../navigation'
 import { junoCommands, openJunoTab } from './actions'
 import { useBackupSettings } from './BackupSettings'
+import { useNoProvider } from './NoProviderFrame'
 
 /** The pages' RPC-backed commands, one set for the app. */
 const actions = junoPageActions(registry)
@@ -32,16 +34,15 @@ const PAGE_MAX = 200
 const useNow = () => useAtomValue(nowAtom, (time) => Math.floor(time / TIME_STEP) * TIME_STEP)
 
 /**
- * A Juno page in its tab (SPEC 13.10): the page behind the Juno menu, or
- * Settings › Juno, live from the agent. Until its first value arrives the
- * page draws nothing (performance 4.4: no spinner under 300 ms). Commands
- * answer through the page's own stream, so a refusal shows as the page
- * staying as it was.
+ * A Juno page in its tab (SPEC 13.10): a page behind the Juno menu, live
+ * from the agent. Until its first value arrives the page draws nothing
+ * (performance 4.4: no spinner under 300 ms). Commands answer through the
+ * page's own stream, so a refusal shows as the page staying as it was.
+ * Settings › Juno, Connections and Backup & This Mac are sections of
+ * Settings (`JunoSettings`, `JunoConnections`, `JunoBackup`).
  */
-export const JunoPageTab = memo(function JunoPageTab({ page }: { readonly page: JunoPage }) {
+export const JunoPageTab = memo(function JunoPageTab({ page }: { readonly page: JunoTabPage }) {
   switch (page) {
-    case 'settings':
-      return <Settings />
     case 'remembers':
       return <Remembers />
     case 'memory':
@@ -50,8 +51,6 @@ export const JunoPageTab = memo(function JunoPageTab({ page }: { readonly page: 
       return <Activity />
     case 'scheduled':
       return <Scheduled />
-    case 'connections':
-      return <Connections />
     case 'review':
       return <Review />
   }
@@ -59,20 +58,18 @@ export const JunoPageTab = memo(function JunoPageTab({ page }: { readonly page: 
 
 /**
  * Settings › Juno. The provider comes from main (juno-providers); the models,
- * spend, Pause (juno-settings), the owner's rules (WP15), and Backup and This
- * Mac (WP21, `BackupSettings.tsx`) from the agent. Codex (WP20) gets no
- * callback, so the view leaves it out until it is built. The key goes from
- * the field to main's keychain, never through the page.
+ * spend, Pause (juno-settings) and the owner's rules (WP15) from the agent.
+ * Codex's sign-in (WP20) gets no callback, so the view leaves it out until
+ * it is built. The key goes from the field to main's keychain, never
+ * through the page.
  */
-function Settings() {
+export function JunoSettings() {
   const result = useAtomValue(junoSettingsAtom)
-  const now = useNow()
   // A change shows at once (performance 1: one frame for direct feedback) and gives way when the agent's page agrees or refuses it.
   const [shown, setShown] = useState<Shown>({})
   // The rules list while the owner edits it, saved as a whole.
   const [rules, setRules] = useState<ReadonlyArray<Rule> | undefined>(undefined)
   const [rulesError, setRulesError] = useState<string | undefined>(undefined)
-  const backup = useBackupSettings()
   const served = result._tag === 'Success' ? result.value : undefined
   const left = served === undefined ? shown : unconfirmed(served, shown)
   if (left !== shown) setShown(left)
@@ -80,7 +77,7 @@ function Settings() {
   if (served !== undefined && rules !== undefined && rulesError === undefined && sameRules(served.rules, rules)) setRules(undefined)
   const providers = <Providers rejected={served?.openRouterKey === 'rejected' || served?.customKeyRejected === true} />
   // No agent runs until a provider is set up, and none answers until it starts: the provider section alone.
-  if (served === undefined) return <JunoSettingsPage now={now} providers={providers} onChatModel={noop} onCompactionModel={noop} onCap={noop} onPaused={noop} />
+  if (served === undefined) return <JunoSettingsPage providers={providers} onChatModel={noop} onCompactionModel={noop} onCap={noop} onPaused={noop} />
   const shownPage = withShown(served, shown)
   const page = rules === undefined ? shownPage : { ...shownPage, rules }
   // The rules are saved as a whole list when a field loses focus; empty rows are dropped, as the agent takes no empty rule.
@@ -103,29 +100,43 @@ function Settings() {
   // On a custom endpoint the chat model is an id, listed or typed; on OpenRouter a family.
   const provider = page.provider === 'custom' ? 'custom' : 'openrouter'
   return (
+    <JunoSettingsPage
+      page={page}
+      providers={providers}
+      onChatModel={(key) => {
+        const choice = page.chatModels.find(model => modelChoiceKey(model) === key)
+        change({ chat: key }, { _tag: 'model', purpose: 'chat', provider: choice?.provider ?? provider, family: choice?.family ?? key })
+      }}
+      onCompactionModel={(family) => change({ compaction: family }, { _tag: 'model', purpose: 'compaction', provider, family })}
+      onCap={(usd) => void actions.settings({ _tag: 'cap', usd })}
+      onPaused={(value) => change({ paused: value }, { _tag: 'paused', value })}
+      onRuleChange={(id, text) => setRules(page.rules.map((rule) => (rule.id === id ? { id, text } : rule)))}
+      onRuleAdd={() => setRules([...page.rules, { id: crypto.randomUUID(), text: '' }])}
+      onRuleRemove={(id) => {
+        const next = page.rules.filter((rule) => rule.id !== id)
+        setRules(next)
+        commitRules(next)
+      }}
+      onRulesCommit={() => commitRules()}
+      {...(rulesError === undefined ? {} : { rulesError })}
+    />
+  )
+}
+
+/**
+ * Settings › Backup & This Mac (WP21, `BackupSettings.tsx`), from the
+ * agent's settings page. With no provider no agent runs, and the page
+ * points to Settings › Juno; while the agent starts it draws nothing.
+ */
+export function JunoBackup() {
+  const result = useAtomValue(junoSettingsAtom)
+  const now = useNow()
+  const backup = useBackupSettings()
+  const noProvider = useNoProvider()
+  if (result._tag !== 'Success') return noProvider ? <JunoBackupPage now={now} {...backup.props} onAddProvider={() => openSettings('juno')} /> : null
+  return (
     <>
-      <JunoSettingsPage
-        page={page}
-        now={now}
-        providers={providers}
-        {...backup.props}
-        onChatModel={(key) => {
-          const choice = page.chatModels.find(model => modelChoiceKey(model) === key)
-          change({ chat: key }, { _tag: 'model', purpose: 'chat', provider: choice?.provider ?? provider, family: choice?.family ?? key })
-        }}
-        onCompactionModel={(family) => change({ compaction: family }, { _tag: 'model', purpose: 'compaction', provider, family })}
-        onCap={(usd) => void actions.settings({ _tag: 'cap', usd })}
-        onPaused={(value) => change({ paused: value }, { _tag: 'paused', value })}
-        onRuleChange={(id, text) => setRules(page.rules.map((rule) => (rule.id === id ? { id, text } : rule)))}
-        onRuleAdd={() => setRules([...page.rules, { id: crypto.randomUUID(), text: '' }])}
-        onRuleRemove={(id) => {
-          const next = page.rules.filter((rule) => rule.id !== id)
-          setRules(next)
-          commitRules(next)
-        }}
-        onRulesCommit={() => commitRules()}
-        {...(rulesError === undefined ? {} : { rulesError })}
-      />
+      <JunoBackupPage page={result.value} now={now} {...backup.props} onAddProvider={() => openSettings('juno')} />
       {backup.sheet}
     </>
   )
@@ -171,6 +182,8 @@ function Providers({ rejected }: { readonly rejected: boolean }) {
       drafts={shownDrafts}
       {...(error === undefined ? {} : { error })}
       rejected={rejected}
+      // "Add a provider" and the Juno menu land here; with nothing set up, the key field takes focus.
+      focusFirst={state.active === null}
       onShow={(kind) => {
         setPicked(kind)
         setError(undefined)
@@ -294,7 +307,7 @@ function Scheduled() {
   return <ScheduledPage page={page} now={now} onPause={act('pause')} onResume={act('resume')} onEdit={() => {}} onDelete={act('delete')} />
 }
 
-function Connections() {
+export function JunoConnections() {
   const result = useAtomValue(connectionsPageAtom)
   const [error, setError] = useState<{ readonly id: ConnectionId | 'new'; readonly message: string } | undefined>(undefined)
   if (result._tag !== 'Success') return null

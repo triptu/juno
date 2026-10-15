@@ -47,7 +47,7 @@ export function App() {
     persistAccent(next)
   }
 
-  // Signed in: the sidebar and the workspace; Preferences holds the
+  // Signed in: the sidebar and the workspace; Settings holds the
   // appearance settings. Otherwise the sign-in page is the whole page, with
   // the appearance block under it.
   if (signedIn !== undefined) {

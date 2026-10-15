@@ -44,10 +44,12 @@ async function ready(juno: Juno): Promise<void> {
 
 const openChat = (juno: Juno) => juno.win.getByRole('navigation', { name: 'Pages' }).getByRole('button', { name: /^Juno/ }).click()
 
+/** Settings › Backup & This Mac, through the Juno menu's Settings. */
 async function openSettings(juno: Juno): Promise<void> {
   await juno.win.locator('main [data-juno-header]').getByRole('button', { name: 'Juno' }).click()
-  await juno.win.getByRole('menuitem', { name: 'Settings › Juno' }).click()
-  await juno.tabs.expectActive('Settings › Juno')
+  await juno.win.getByRole('menuitem', { name: 'Settings' }).click()
+  await juno.tabs.expectActive('Settings')
+  await juno.win.getByRole('navigation', { name: 'Settings' }).getByRole('button', { name: 'Backup & This Mac' }).click()
 }
 
 /** The native folder picker is out of reach: main picks this folder the next time it is asked. */

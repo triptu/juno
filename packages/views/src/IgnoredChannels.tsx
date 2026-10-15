@@ -18,7 +18,7 @@ function hiddenLabel(hidden: number): string {
 }
 
 /**
- * The ignore list's rows (SPEC 14, inventory 14), inside Preferences' group
+ * The ignore list's rows (SPEC 14, inventory 14), inside Settings' group
  * card. Rows sit on the same 12px inset and 14px rhythm as Appearance's, so
  * the card's edges and the button's right edge line up with the controls
  * above.

@@ -2,7 +2,7 @@
  * Notifications from the owner's side (SPEC 14): Notify me on a channel,
  * thread or person, the OS notification and its click (also on a topic
  * already open in a tab), why a message did or did not notify, the
- * Notifications page, Preferences and its ignore list, and Set yourself
+ * Notifications and Ignored sections of Settings, and Set yourself
  * away or active. Main records OS notifications instead of
  * showing them (`junoTest.notifications`).
  */
@@ -109,7 +109,7 @@ test('a topic on screen in a focused window does not notify, and unread mentions
   await expect.poll(async () => (await juno.osNotifications()).map((notification) => notification.body), { timeout: 15_000 }).toContain('Disk at 95% on db-2')
 })
 
-test('the Notifications page saves hours and what matters, and Preferences changes the density', async ({ juno }) => {
+test('Settings › Notifications saves hours and what matters, and Appearance changes the density', async ({ juno }) => {
   await juno.signIn()
   await juno.waitForSync()
   await juno.openNotifications()
@@ -120,8 +120,8 @@ test('the Notifications page saves hours and what matters, and Preferences chang
   await page.day('Notifications', 'Saturday').click()
   await page.writeMatters('The launch and hiring.')
 
-  // Every value comes back from the engine: close the page and open it again.
-  await juno.tabs.close('Notifications')
+  // Every value comes back from the engine: close Settings and open it again.
+  await juno.tabs.close('Settings')
   await juno.openNotifications()
   await expect(page.root.getByRole('combobox', { name: 'Notifications from' })).toHaveValue(String(10 * 60))
   await expect(page.root.getByRole('combobox', { name: 'Active in Slack to' })).toHaveValue(String(20 * 60))
@@ -129,12 +129,14 @@ test('the Notifications page saves hours and what matters, and Preferences chang
   await expect(page.day('Active in Slack', 'Saturday')).toHaveAttribute('aria-pressed', 'false')
   await expect(page.matters).toHaveValue('The launch and hiring.')
 
-  await juno.openPreferences()
-  await expect(juno.preferences.themeRadio('System')).toHaveAttribute('aria-checked', 'true')
-  await juno.preferences.densityRadio('Compact').click()
+  // Settings is one tab: the avatar menu's Settings shows General in it, and the list moves between sections.
+  await juno.openSettings('Appearance')
+  await expect(juno.tabs.tab('Settings')).toHaveCount(1)
+  await expect(juno.settings.themeRadio('System')).toHaveAttribute('aria-checked', 'true')
+  await juno.settings.densityRadio('Compact').click()
   await expect.poll(() => juno.win.evaluate(() => document.documentElement.dataset['density'])).toBe('compact')
-  await juno.preferences.root.getByRole('button', { name: 'Open notification settings' }).click()
-  await juno.tabs.expectActive('Notifications')
+  await juno.settings.show('Notifications')
+  await expect(page.matters).toHaveValue('The launch and hiring.')
 })
 
 test('Set yourself away and active from the avatar menu sets Slack presence', async ({ juno, slack }) => {
@@ -157,25 +159,25 @@ test('Set yourself away and active from the avatar menu sets Slack presence', as
   await slack.expectPresenceSet(startsActive ? 'auto' : 'away')
 })
 
-test('Preferences lists an ignored channel, and Stop ignoring has Undo', async ({ juno }) => {
+test('Settings › Ignored lists an ignored channel, and Stop ignoring has Undo', async ({ juno }) => {
   await juno.signIn()
   await juno.waitForSync()
-  await juno.openPreferences()
-  const preferences = juno.preferences
-  await expect(preferences.root.getByText('Nothing ignored.')).toBeVisible()
+  await juno.openSettings('Ignored')
+  const settings = juno.settings
+  await expect(settings.root.getByText('Nothing ignored.')).toBeVisible()
 
   await juno.sidebar.selectView('Automated')
   await juno.sidebar.row(ALERTS_MAIN).chooseInMenu('ignore-channel')
   await juno.expectToast('Ignoring #alerts-prod')
-  await juno.tabs.select('Preferences')
-  await expect(preferences.ignored('alerts-prod')).toContainText('Nothing hidden yet')
+  await juno.tabs.select('Settings')
+  await expect(settings.ignored('alerts-prod')).toContainText('Nothing hidden yet')
 
-  await preferences.stopIgnoring('alerts-prod')
+  await settings.stopIgnoring('alerts-prod')
   await juno.expectToast('Stopped ignoring #alerts-prod')
-  await expect(preferences.root.getByText('Nothing ignored.')).toBeVisible()
+  await expect(settings.root.getByText('Nothing ignored.')).toBeVisible()
   await juno.undoFromToast()
-  await expect(preferences.ignored('alerts-prod')).toBeVisible()
-  await expect(preferences.root.getByText('Nothing ignored.')).toHaveCount(0)
+  await expect(settings.ignored('alerts-prod')).toBeVisible()
+  await expect(settings.root.getByText('Nothing ignored.')).toHaveCount(0)
 })
 
 const longThread = test.extend({

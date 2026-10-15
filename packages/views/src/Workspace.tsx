@@ -1,5 +1,4 @@
 import * as stylex from '@stylexjs/stylex'
-import { Bell } from '@phosphor-icons/react/dist/icons/Bell'
 import { Gear } from '@phosphor-icons/react/dist/icons/Gear'
 import { Hash } from '@phosphor-icons/react/dist/icons/Hash'
 import { House } from '@phosphor-icons/react/dist/icons/House'
@@ -15,7 +14,7 @@ import { colors, layout, z } from '@juno/tokens/tokens.stylex'
 import { EmptyState, IconButton, Tab, TabStrip, type ActivateEvent, type PhosphorIcon } from '@juno/ui'
 
 /** The icon a tab shows: the channel kind for a topic, the page's own icon otherwise. */
-export type WorkspaceTabIcon = 'hash' | 'lock' | 'user' | 'users' | 'new-chat' | 'home' | 'all-topics' | 'juno' | 'notifications' | 'preferences'
+export type WorkspaceTabIcon = 'hash' | 'lock' | 'user' | 'users' | 'new-chat' | 'home' | 'all-topics' | 'juno' | 'settings'
 
 export interface WorkspaceTab {
   readonly id: string
@@ -66,8 +65,7 @@ const icons: Record<WorkspaceTabIcon, PhosphorIcon> = {
   home: House,
   'all-topics': ListBullets,
   juno: Sparkle,
-  notifications: Bell,
-  preferences: Gear,
+  settings: Gear,
 }
 
 // --juno-panel-width + --juno-panel-topic-min: under this the page would be too narrow to read beside the panel.

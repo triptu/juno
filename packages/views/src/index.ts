@@ -59,7 +59,8 @@ export {
 // The topic tile, for the header and tab containers in the desktop app, which does not depend on ui.
 export { TopicArt } from '@juno/ui'
 export { NotificationsPage, type HoursKind } from './NotificationsPage'
-export { PreferencesPage } from './PreferencesPage'
+export { SettingsPage } from './SettingsPage'
+export { SettingsAbout, SettingsAppearance, SettingsGeneral, SettingsIgnored } from './SettingsSections'
 export { WhyPopover } from './WhyPopover'
 export { Home } from './Home'
 

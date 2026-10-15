@@ -14,7 +14,7 @@ export interface AccountMenuSection {
   readonly content: ReactNode
 }
 
-export type AccountMenuAction = 'presence' | 'privacy' | 'notifications' | 'preferences'
+export type AccountMenuAction = 'presence' | 'privacy' | 'notifications' | 'settings'
 
 export interface AccountMenuProps {
   readonly name: string
@@ -44,8 +44,9 @@ interface Item {
 /**
  * What the avatar button opens (inventory 2.1): who is signed in and
  * whether Slack shows them active, Set yourself away or active, Hide or
- * Show message text (privacy mode), the Notifications and Preferences
- * pages, then the blocks the owner passes.
+ * Show message text (privacy mode), Notifications and Settings (both
+ * open Settings, at Notifications and at General), then the blocks the
+ * owner passes.
  */
 export function AccountMenu({ name, initials, hue, avatarUrl, workspace, presence, paused, privacy = false, onAction, sections }: AccountMenuProps) {
   const items: ReadonlyArray<Item> =
@@ -55,7 +56,7 @@ export function AccountMenu({ name, initials, hue, avatarUrl, workspace, presenc
           presence?.active === false ? { id: 'presence', icon: Sun, label: 'Set yourself active' } : { id: 'presence', icon: Moon, label: 'Set yourself away' },
           privacy ? { id: 'privacy', icon: Eye, label: 'Show message text', hint: '⌃⌘H' } : { id: 'privacy', icon: EyeSlash, label: 'Hide message text', hint: '⌃⌘H' },
           { id: 'notifications', icon: Bell, label: 'Notifications', ...(paused === undefined ? {} : { hint: paused }) },
-          { id: 'preferences', icon: Gear, label: 'Preferences', hint: '⌘,' },
+          { id: 'settings', icon: Gear, label: 'Settings', hint: '⌘,' },
         ]
   const menu = useMenuActive(
     items.map((item) => `account-${item.id}`),

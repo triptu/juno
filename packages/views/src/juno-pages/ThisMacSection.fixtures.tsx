@@ -9,7 +9,7 @@ const base: ThisMacSectionProps = { page: settings, onMove: noop, onRestore: noo
 // The frame sizes a lone component to its content; the page fills the frame as it fills its tab.
 const column = stylex.create({ fill: { width: '100%' } })
 
-/** In the settings column, at the width Settings › Juno gives it. */
+/** In the settings column, at the width Settings gives it. */
 const inPage = (page: ThisMacSectionProps['page']): Fixture<ThisMacSectionProps> =>
   scene(() => (
     <div {...stylex.props(column.fill)}>

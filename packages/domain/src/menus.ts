@@ -196,7 +196,7 @@ export function whyLabel(notified: boolean): string {
   return notified ? 'Why did this notify?' : 'Why no notification?'
 }
 
-export type TabKind = 'topic' | 'all-topics' | 'juno' | 'notifications' | 'preferences'
+export type TabKind = 'topic' | 'all-topics' | 'juno' | 'settings'
 
 /** Topic tabs get the topic menu; page tabs have none. */
 export function tabMenuItems(tab: { readonly kind: TabKind; readonly topic?: TopicMenuState }): ReadonlyArray<MenuItem<TopicMenuAction>> {

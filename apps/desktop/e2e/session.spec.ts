@@ -28,8 +28,8 @@ test('signs in through Slack’s sign-in page: the token and cookie are captured
   const stored = JSON.parse(await readFile(join(userData, 'secrets.bin'), 'utf8')) as { teamId: string; token: string }
   expect(stored.teamId).toBe(fake.teamId)
   expect(stored.token.startsWith('xoxc-')).toBe(true)
-  await juno.accountMenu.open()
-  await expect(juno.accountMenu.engineStatus).toHaveText('Engine live')
+  await juno.openSettings('About')
+  await expect(juno.settings.engineStatus).toHaveText('Engine live')
 })
 
 test('comes back signed in after a relaunch', async ({ juno, fake, userData, running }) => {
