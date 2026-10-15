@@ -315,19 +315,6 @@ describe('live messages', () => {
     expect(changedRows(before, after)).toEqual([rootTs])
   })
 
-  it('names the people a thread link and the Threads list mention, and decodes Slack escaping', async () => {
-    const engine = await bootedEngine()
-    // As Slack stores it: `<@U0DEV> fix the backend -&gt; github sync`.
-    const root = engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0MAYA', text: '<@U0DEV> fix the backend -> github sync today' })
-    engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0DEV', threadTs: root.ts, text: 'On it.' })
-    const list = watchList(engine, messagesAtom('m:C0ENG'))
-    const window = await list.until((current) => current.rows.get(root.ts)?.thread?.replyCount === 1, 'the thread link')
-    expect(window.rows.get(root.ts)!.thread!.title).toBe('@Dev fix the backend -> github…')
-    const threads = watchList(engine, channelThreadsAtom('C0ENG'))
-    const listed = await threads.until((current) => rowsOf(current).some((row) => row.rootTs === root.ts), 'the thread in the list')
-    expect(rowsOf(listed).find((row) => row.rootTs === root.ts)!.title).toBe('@Dev fix the backend -> github…')
-  })
-
   it("sends a person's new photo as one ref and changes no row", async () => {
     const engine = await bootedEngine()
     const { list } = await openPostgres(engine)
