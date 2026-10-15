@@ -112,7 +112,11 @@ test('an engine restart mid-session keeps the open topic, the unsent text and th
 // `refreshWorkspace: false` (packages/sync/src/sync.ts), and `loadCounts` only fetches
 // conversations it has never seen, so a `channel_rename` lost while the socket was down is never
 // made up for: the sidebar, header and tab keep the old name until a restart. Leaves and archives
-// in the gap are missed the same way.
+// in the gap are missed the same way. A full refresh alone is unsafe: loadWorkspace and
+// replaceMembership overwrite socket changes received while their requests are in flight.
+// Fix needs an observation fence for conversation metadata and membership, a full refresh
+// after gaps, and a Quint model of stale snapshots versus newer events. This is broader than
+// changing refreshWorkspace to true; retain this regression until that protocol is covered.
 test.fixme('a channel renamed while the socket is down shows its new name once it is back', async ({ juno, fake }) => {
   await openMain(juno)
   fake.goOffline()
