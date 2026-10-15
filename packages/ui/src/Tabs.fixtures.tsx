@@ -7,7 +7,8 @@ import { Plus } from '@phosphor-icons/react/dist/icons/Plus'
 import { colors, spacing } from '@juno/tokens/tokens.stylex'
 import { defineFixtures, scene } from './fixtures/define'
 import { IconButton } from './IconButton'
-import { Tab, TabStrip } from './Tabs'
+import { Tab } from './Tabs'
+import { TabStrip } from './TabStrip'
 import { Text } from './Text'
 
 const newTab = <IconButton icon={Plus} label="New tab" size={28} iconSize={16} tone="muted" />
