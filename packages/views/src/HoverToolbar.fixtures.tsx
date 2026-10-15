@@ -18,6 +18,7 @@ export default defineFixtures(HoverToolbar, {
     'hover-quote': fixture({ main: true, onMore: noop }, { hover: '[aria-label="Quote"]' }),
     'hover-more': fixture({ main: true, onMore: noop }, { hover: '[aria-label="More"]' }),
     'press-reaction': fixture({ main: true, onMore: noop }, { press: 'button' }),
-    'focus-reply': fixture({ main: true, onMore: noop }, { focus: '[aria-label="Reply in thread"]' }),
+    'focus-start-thread': fixture({ main: true, onMore: noop }, { focus: '[aria-label="Start thread"]' }),
+    'focus-open-thread': fixture({ main: true, hasThread: true, onMore: noop }, { focus: '[aria-label="Open thread"]' }),
   },
 })

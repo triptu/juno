@@ -36,7 +36,7 @@ Slack has no concept of a topic. Juno builds one on top of Slack's data. Anythin
 | DM and group DM | Treated exactly like a channel. A DM has a Main thread and can have topics too. |
 | Thread (a message with replies) | A **topic**. Its first message is the thread root. |
 | Top-level channel messages that are not in a thread | That channel's **Main** thread, one per channel or DM. Rows read "#eng" with a small Main tag, never a bare "Main thread". |
-| Replying in thread | Replying inside a topic. From Main, "Reply in thread" turns that message into a topic. |
+| Replying in thread | Replying inside a topic. From Main, **Start thread** turns that message into a topic; **Open thread** opens an existing topic. |
 | Follow / unfollow thread | Notify me on a thread (section 5). Every message and When it matters follow the thread; Never unfollows it, and it leaves the sidebar. |
 | Mark unread | Works on a topic or on a whole channel. |
 | Quote (the ">" prefix) | Rendered as a soft quote block. Quoting inserts ">" lines. There is no separate reply object. |
@@ -180,7 +180,7 @@ The header has no bar. Two islands float over the top of the message list, 8px u
   - Three one-click reactions (👍 ✅ 👀).
   - A full emoji picker.
   - Quote.
-  - In Main threads, Reply in thread.
+  - In Main threads, Start thread or Open thread.
   - More: Edit, Delete and Tell me if nobody replies (13.6) on your own messages, Copy Slack link and Open in Slack. Right-clicking a message opens the same menu.
 - **Keyboard.** ↑ in an empty composer selects the newest message; ↑ and ↓ move the selection, and Esc returns to the composer. On your own selected message, E edits it inline and Delete or Backspace deletes it after one inline confirm (Enter confirms, Esc cancels).
 - **Quoting** follows Slack. Quoting inserts "> " lines into your reply. Selecting any part of a message shows a floating Quote button that quotes only the selection.

@@ -1,7 +1,7 @@
 // What a message does (spec section 7): edit and delete your own from the
 // keyboard, the toolbar's More and the message menu; reactions from the
 // toolbar, the emoji picker and the chips; Quote, whole and selected; and
-// Reply in thread from Main. Every change shows at once and reaches the fake
+// Start or open a thread from Main. Every change shows at once and reaches the fake
 // Slack through the outbox.
 import type { FakeSlack } from '@juno/fake-slack'
 import { expect, test } from './fixtures'
@@ -262,12 +262,24 @@ test('Quote puts the message in the composer as "> " lines; a selection quotes o
   await expect(quote).toHaveCount(0)
 })
 
-test('Reply in thread from Main opens the message’s thread with its composer', async ({ juno }) => {
+test('Open thread from Main opens the message’s thread with its composer', async ({ juno }) => {
   await openMain(juno)
   const { topic } = juno
   const root = topic.message(POSTGRES)
   await root.hover()
-  await root.getByRole('button', { name: 'Reply in thread' }).click()
+  await root.getByRole('button', { name: 'Open thread' }).click()
   await topic.expectTitle(/Postgres|Draft plan/)
   await expect(topic.composer).toHaveAttribute('aria-label', 'Reply')
+})
+
+test('Start thread from Main opens a new topic for the message', async ({ juno, fake }) => {
+  await openMain(juno)
+  const { topic } = juno
+  const ts = await sendOwn(juno, fake, 'A new topic from Main')
+  const root = topic.message('A new topic from Main')
+  await root.hover()
+  await root.getByRole('button', { name: 'Start thread' }).click()
+  await topic.expectTitle(/A new topic from Main/)
+  await expect(topic.composer).toHaveAttribute('aria-label', 'Reply')
+  expect(fake.messages('C0ENG').find((message) => message.ts === ts)?.reply_count ?? 0).toBe(0)
 })
