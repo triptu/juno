@@ -185,7 +185,7 @@ Juno can sit beside any topic, so you can talk about what you are looking at wit
 
 ## 8. Composer
 
-- **Shape.** A single line with a + attach button on the left and a round send button on the right. It grows with content to about 8 lines, then scrolls inside itself.
+- **Shape.** A single line with a round send button on the right. A + attach button joins it on the left when attachments are built; until then there is none. It grows with content to about 8 lines, then scrolls inside itself.
 - **No helper text.** Shortcuts like @, # and Enter to send are obvious and not spelled out. The channel is not repeated above the composer, because the header pill already shows it.
 - **Sending.** Enter sends at once: the message shows in the topic straight away and goes to Slack in the background, never twice. If Slack refuses it, it stays where it is with "Not sent.", Retry and Delete draft. Sends wait out a lost connection and go when it is back.
 - **Drafts.** Each topic keeps its own draft, through tab switches and restarts.
