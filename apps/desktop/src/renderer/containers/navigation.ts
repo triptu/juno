@@ -23,6 +23,7 @@ import {
   activeTab,
   allTopicsLayoutAtom,
   bottomWindow,
+  messagesAtom,
   closeAllTabs,
   closeOtherTabs,
   closeTab,
@@ -129,7 +130,10 @@ function apply(change: (tabs: Tabs) => Tabs): Tabs {
  */
 function whenReady(id: string, fresh: boolean): Promise<void> {
   return new Promise((resolve) => {
-    const releases: Array<() => void> = []
+    // The messages are asked for with the header, not after it, so the two queries overlap. A topic
+    // coming back keeps its window; a fresh open usually gets the bottom one (`openWindow`), and one
+    // with more unread than that asks for its own window once the header says so.
+    const releases: Array<() => void> = [registry.mount(messagesAtom(id, fresh ? bottomWindow : registry.get(messageWindowSpecAtom(id))))]
     let done = false
     let specSet = false
     let waited = false
