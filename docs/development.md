@@ -728,3 +728,10 @@ hairlines pass. Named component constants and runtime style parameters are
 not evaluated. For a real geometry exception, put `// tokens-allow: reason`
 after the declaration on the same line; an empty reason does not pass.
 Run the rule tests with `node --test scripts/check-tokens.test.mjs`.
+
+Measured on the shared Mac (2026-10-15), the token check alone took 0.36 s
+median (0.35–0.50 s, five successful runs including Node startup). Five
+alternating full lint runs with and without the check took 3.59 s
+(3.42–4.88 s) and 3.85 s (3.11–4.95 s) respectively. Other worktrees were
+active, so that full-lint difference is noise; budget about 0.36 s extra
+for parsing the StyleX source files, not a lint speedup.
