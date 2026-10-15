@@ -1,7 +1,7 @@
 import { Context, Effect, Layer } from 'effect'
 import { transaction } from '../store/database'
 import { uuidv7, type Store } from '../store/store'
-export { SPEND_MIGRATIONS, PROVIDER_LOCAL_TABLES } from './schema'
+export { SPEND_MIGRATIONS } from './schema'
 
 /** Integer nanodollars. Round each reservation up, never down. */
 export const DOLLAR = 1_000_000_000

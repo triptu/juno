@@ -13,9 +13,9 @@ import { cookieForHost, readCookies, type SlackCookie } from './cookies.ts'
 import { scanLevelDb } from './leveldb.ts'
 import { localConfigFromRecords, pickTeam, type LocalConfigTeam } from './localConfig.ts'
 
-export { cookieForHost, decryptCookieValue, deriveCookieKey, readCookies, type SlackCookie } from './cookies.ts'
-export { newestValue, parseLog, parseTable, scanLevelDb, type LevelDbRecord } from './leveldb.ts'
-export { localConfigFromRecords, LocalConfigTeam, pickTeam } from './localConfig.ts'
+export { type SlackCookie } from './cookies.ts'
+
+export { LocalConfigTeam, pickTeam } from './localConfig.ts'
 export { snappyUncompress } from './snappy.ts'
 
 export const LOCAL_STORAGE_DIR = join('Local Storage', 'leveldb')

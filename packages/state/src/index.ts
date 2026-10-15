@@ -1,23 +1,20 @@
-export { command, liveQuery, prefetch, rowAtom, runCommand, type CommandAtom, type ErrorOf, type LiveListAtom, type LiveValueAtom } from './atoms'
-export { configureConnection, connectionStateAtom, makeRegistry, registry, restartEngine, type ConnectionState, type Registry } from './client'
-export { engineStatusAtom, OFFLINE_GRACE_MILLIS, pingCommand, syncNoticeAtom, type SyncNotice } from './engine'
-export { importFromSlackAppCommand, sessionStatusAtom, signedInAtom, signInCommand, signOutCommand, type ReadySession } from './session'
-export { viewPillsAtom, viewSheetAtom, viewsAtom, type ViewPill, type ViewSheetState } from './views'
-export { defaultTopicListFilter, joinTopicWindow, topicCountsAtom, topicListAtom, type TopicListFilter } from './topics'
+export { liveQuery, runCommand, type LiveListAtom, type LiveValueAtom } from './atoms'
+export { configureConnection, connectionStateAtom, makeRegistry, registry, restartEngine, type Registry } from './client'
+export { engineStatusAtom, pingCommand, syncNoticeAtom } from './engine'
+export { importFromSlackAppCommand, sessionStatusAtom, signedInAtom, signInCommand, signOutCommand } from './session'
+export { viewPillsAtom, viewSheetAtom, viewsAtom, type ViewSheetState } from './views'
+export { defaultTopicListFilter, topicCountsAtom, topicListAtom, type TopicListFilter } from './topics'
 export {
   allTopicsFilterAtom,
   allTopicsLayoutAtom,
-  allTopicsListAtom,
   allTopicsOffsetAtom,
   allTopicsRowAtom,
   allTopicsSummaryAtom,
-  allTopicsWindowAtom,
   defaultAllTopicsFilter,
   type AllTopicsLayout,
-  type AllTopicsWindow,
 } from './allTopics'
-export { mirrorReadsAtom, shouldMarkRead, type ReadTrigger, type ReadView } from './reads'
-export { isPeekKey, PEEK_KEY_PREF, peekKeyAtom, setPeekKey, type PeekKey } from './peek'
+export { mirrorReadsAtom, shouldMarkRead } from './reads'
+export { isPeekKey, peekKeyAtom, setPeekKey, type PeekKey } from './peek'
 export {
   currentRowAtom,
   focusedTopicAtom,
@@ -29,27 +26,20 @@ export {
   sidebarRowAtom,
   sidebarSectionsAtom,
   topicSelectedAtom,
-  type SidebarGroup,
-  type SidebarSections,
   type SidebarWindow,
 } from './sidebar'
-export { applyListDelta, emptyWindow, sameOrder, type ListWindow, type WindowRefs } from './list'
+export { applyListDelta, emptyWindow, type ListWindow } from './list'
 export {
   bottomWindow,
   channelThreadsAtom,
   loadOlderMessages,
   locateMessage,
-  messageItem,
-  messageItemAtom,
   messageListAtom,
-  messageOrderAtom,
   messagesAtom,
   messageWindowSpecAtom,
   openTopic,
   prefetchTopic,
   topicAtom,
-  type MessageItem,
-  type MessageOrder,
   type MessageWindow,
   type MessageWindowSpec,
 } from './messages'
@@ -65,15 +55,12 @@ export {
   dividerIndex,
   goToEntry,
   historyStateAtom,
-  historyTarget,
   mountedTabs,
   allTopicsPlace,
   allTopicsTab,
   homePlace,
   junoPagePlace,
   junoPlace,
-  junoTab,
-  homeTab,
   notificationsPlace,
   preferencesPlace,
   newChatPlace,
@@ -82,7 +69,6 @@ export {
   scrollSnapshotAtom,
   setPinned,
   settleNewChat,
-  stepHistory,
   tabByNumber,
   tabsAtom,
   tabShowing,
@@ -90,7 +76,6 @@ export {
   tabTopic,
   topicPlace,
   updateTabs,
-  type HistoryState,
   type OpenOptions,
   type Place,
   type ScrollSnapshot,
@@ -101,7 +86,6 @@ export {
 export {
   emptyNewChat,
   newChatAtom,
-  newChatTitle,
   pickConversation,
   pickConversationsAtom,
   pickThread,
@@ -111,7 +95,18 @@ export {
   untouched,
   type NewChat,
 } from './newChat'
-export { checkMessage, deleteMessage, discardMessage, draftAtom, editMessage, precheckMessage, reactToMessage, retryMessage, saveDraft, SEND_CHECK_WAIT_MS, sendMessage } from './send'
+export {
+  checkMessage,
+  deleteMessage,
+  discardMessage,
+  draftAtom,
+  editMessage,
+  precheckMessage,
+  reactToMessage,
+  retryMessage,
+  saveDraft,
+  sendMessage,
+} from './send'
 export { errorOf } from './result'
 export {
   aiAssistOnAtom,
@@ -125,9 +120,8 @@ export {
   setMatters,
   setPresence,
   whyPopoverAtom,
-  type WhyPopover,
 } from './notifications'
-export { acquireRendererPort, EngineFailed } from './port'
+export { acquireRendererPort } from './port'
 export {
   accentAtom,
   appInfoAtom,
@@ -154,16 +148,24 @@ export {
   type ResolvedTheme,
   type Theme,
 } from './shell'
-export type { PortConnection, PortLike } from './transport'
-export { redrawTopic, topicArtAtom } from './art'
+export type { PortLike } from './transport'
+export { redrawTopic } from './art'
 export { messageLink, slackLink, threadRootTs } from './links'
 export { headerRenamingAtom, renamingAtom, rowRenamingAtom, tableRenamingAtom, type RenameTarget } from './rename'
-export { dismissToast, runAction, showToast, TOAST_LIFE_MS, toastAtom, undoLast, undoStackAtom, UNDO_LIMIT, type Toast, type ToastContent } from './undo'
+export {
+  dismissToast,
+  runAction,
+  showToast,
+  TOAST_LIFE_MS,
+  toastAtom,
+  undoLast,
+  undoStackAtom,
+  type ToastContent,
+} from './undo'
 export {
   catchUpDoneAtom,
   flashMessage,
   focusJunoComposer,
-  JUNO_PANEL_PREF,
   junoAboutAtom,
   junoAvailableAtom,
   junoFocusAtom,
@@ -171,26 +173,16 @@ export {
   messageFlashAtom,
   openedAtNewAtom,
   setJunoPanelOpen,
-  type JunoFocusRequest,
 } from './junoPanel'
 export {
-  caughtUp,
   freezeHome,
-  homeAppeared,
-  homeGreeting,
-  homeItemLimit,
-  homeScene,
   homeShownAtom,
   homeViewAtom,
   markFollowUpDone,
   markHomeItemUsed,
-  readyHomeView,
   showHome,
   resolveAllTopics,
   startVisitLog,
-  VISIT_MILLIS,
-  type HomeScene,
-  type HomeShown,
 } from './home'
 export {
   appendUnseen,
@@ -205,7 +197,7 @@ export {
   SLACK_DELAY_MS,
   SLACK_MIN_LENGTH,
 } from './palette'
-export { attachFiles, type FileLike } from './staging'
+export { attachFiles } from './staging'
 export {
   attachmentsAtom,
   clearAttachments,

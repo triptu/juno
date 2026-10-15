@@ -50,5 +50,4 @@ export function renderCard(card: Card, actions: ChatActions, now: number, enter 
   return <View card={card} actions={actions} now={now} enter={enter} />
 }
 
-export { ChatCard, type ChatCardProps } from './ChatCard'
 export { RemoveRows } from './RemoveCard'

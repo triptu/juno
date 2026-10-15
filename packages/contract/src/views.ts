@@ -4,9 +4,9 @@
  * one too: deleting a view returns it whole, so Undo puts it back as it was.
  */
 import { Schema } from 'effect'
-import { ViewIcon, VIEW_ICONS } from '@juno/domain'
+import { ViewIcon } from '@juno/domain'
 
-export { ViewIcon, VIEW_ICONS }
+export { ViewIcon }
 
 export const SavedView = Schema.Struct({
   id: Schema.String,
