@@ -397,3 +397,32 @@ it('Budget: a run the cap blocks brings the Budget card; Allow raises today by o
   await settle(h)
   expect(h.turns.guard.spend.snapshot().raises).toBe(1_000_000_000)
 })
+
+it('the model proposes Resolve, waits for a click, and keeps Undo after restart', async () => {
+  const slack = fakeActionHost()
+  const undone: string[] = []
+  const host = { ...slack.host, undoResolve: async (_account: string, id: string) => { undone.push(id) } }
+  let h = await turnsHarness({ compaction: false, actions: { host } })
+  try {
+    h.fake.script([call('topics_resolve', { topicIds: [`m:${TEST_CHANNEL}`] }), reply(say('Ready to resolve.'))])
+    await h.ended(h.send('resolve the test topic'))
+    const view = only(h)
+    expect(view.card).toMatchObject({ _tag: 'resolve', status: { _tag: 'open' } })
+    expect(slack.calls).toHaveLength(0)
+    expect(await h.turns.actions.undo(view.binding!.identity)).toBe(false)
+    expect(click(h, view)).toEqual({ _tag: 'accepted' })
+    await settle(h)
+    expect(slack.calls).toHaveLength(1)
+    expect(only(h).card).toMatchObject({ status: { _tag: 'done', undo: true } })
+    const binding = only(h).binding!
+    expect(await h.turns.actions.undo({ ...binding.identity, digest: Digest.make('0'.repeat(64)) })).toBe(false)
+    expect(undone).toHaveLength(0)
+    await h.stop()
+    h = await turnsHarness({ dir: h.dir, compaction: false, actions: { host } })
+    expect(await h.turns.actions.undo(binding.identity)).toBe(true)
+    expect(await h.turns.actions.undo(binding.identity)).toBe(true)
+    expect(undone).toHaveLength(1)
+    expect(only(h).card).toMatchObject({ status: { _tag: 'done', line: 'Undone' } })
+    expect(slack.calls).toHaveLength(1)
+  } finally { await h.close() }
+})

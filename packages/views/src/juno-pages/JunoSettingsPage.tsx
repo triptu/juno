@@ -227,7 +227,7 @@ export function JunoSettingsPage({
               data-codex={page.codex._tag}
               trailing={
                 <span {...stylex.props(cell.controls)}>
-                  <Chip variant={page.codex._tag === 'ready' ? 'filled' : 'outline'} size={20}>
+                  <Chip variant={page.codex._tag === 'ready' ? 'filled' : 'outline'} size={20} data-codex-chip="">
                     {page.codex._tag === 'ready' ? `Ready · ${page.codex.version}` : page.codex._tag === 'signedOut' ? 'Signed out' : 'Not installed'}
                   </Chip>
                   {page.codex._tag === 'signedOut' && onSignInCodex !== undefined ? (

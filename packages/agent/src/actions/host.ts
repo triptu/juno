@@ -35,6 +35,7 @@ export interface ActionHost {
   readonly account: () => string | undefined
   readonly send: (dispatch: Dispatch) => Promise<DispatchResult>
   readonly resolve: (dispatch: Dispatch) => Promise<DispatchResult>
+  readonly undoResolve?: (accountId: string, actionId: string) => Promise<void>
   /** A topic's link and place, for a card's target pill. */
   readonly topic: (topicId: string) => Promise<{ readonly topic: TopicLink; readonly place: Place }>
   /** `found` only on positive evidence. A miss is `unknown`, never proof that nothing was sent. */
@@ -71,6 +72,7 @@ export const bindActionHost = (presence: () => Presence | undefined) =>
       account: () => presence()?.accountId ?? undefined,
       send: (dispatch) => run(client['host.outbox.send'](dispatch)),
       resolve: (dispatch) => run(client['host.topics.resolve'](dispatch)),
+      undoResolve: (accountId, actionId) => run(client['host.topics.undoResolve']({ accountId: AccountId.make(accountId), actionId: ActionId.make(actionId) })),
       topic: (topicId) => run(client['host.topics.get']({ topicId: HostTopicId.make(topicId) })),
       reconcileSend: (input) =>
         run(

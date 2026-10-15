@@ -300,3 +300,5 @@ Tests: `test/backup.test.ts` (Macs in-process: round trips, segments, a move, a 
 The desktop supplies `TurnsOptions.online` from host presence. Queued inputs stay durable in the inbox while offline; `networkChanged` wakes the router when the host socket returns. Ownership, mode and network availability are checked together before a new run. Slack sign-in is separate from network availability, so local Codex works before a workspace is connected.
 
 `agent.chat.message` resolves a displayed owner message or Juno bubble to its archive entry and the local Remove sheet. The renderer captures selected UTF-8 byte offsets before opening the native menu. Remember uses the existing version-checked pin route; its operation id is the pin id, so transport redelivery cannot create a second pin. Active pins appear below their source with Undo until the next send or one minute. Removal uses the existing redaction transaction and purge hooks.
+
+`topics_resolve` always proposes a Tier 3 Resolve card. The host uses the user's local topic command, and the settled card keeps Undo across restart.

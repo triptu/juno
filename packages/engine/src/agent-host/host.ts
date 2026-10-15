@@ -18,6 +18,9 @@ import type { EnginePhase } from '@juno/contract'
 import { defaultNotificationSettings, inHours, type NotificationSettings, type Ts } from '@juno/domain'
 import { readSettings } from '@juno/notifications'
 import { liveQuery, StoreReader, type SqlError } from '@juno/store'
+import { EngineConfig } from '../config'
+import { MarkWorker } from '../markWorker'
+import { resolve, undoResolve } from './resolve'
 import { Outbox, type MirrorError } from '../outbox'
 import { SyncLink } from '../syncLink'
 import { Workspace, type StoreServices } from '../workspace'
@@ -78,9 +81,11 @@ const hoursAt = (millis: number, hours: Hours) => {
   }
 }
 
-export const JunoHostLive: Layer.Layer<JunoHost, never, Workspace | Outbox | SyncLink | PhaseSource> = Layer.effect(
+export const JunoHostLive: Layer.Layer<JunoHost, never, Workspace | Outbox | SyncLink | PhaseSource | EngineConfig | MarkWorker> = Layer.effect(
   JunoHost,
   Effect.gen(function* () {
+    const config = yield* EngineConfig
+    const worker = yield* MarkWorker
     const workspace = yield* Workspace
     const outbox = yield* Outbox
     const link = yield* SyncLink
@@ -199,6 +204,8 @@ export const JunoHostLive: Layer.Layer<JunoHost, never, Workspace | Outbox | Syn
       topics: (cursor, limit) => inStore(reads.topics(cursor, limit)),
       topic: (topicId) => inStore(reads.topic(topicId)),
       person: (userId) => inStore(reads.person(userId)),
+      resolve: (dispatch) => resolve(dispatch).pipe(Effect.provideService(Workspace, workspace), Effect.provideService(EngineConfig, config), Effect.provideService(MarkWorker, worker)),
+      undoResolve: (id) => undoResolve(id).pipe(Effect.provideService(Workspace, workspace), Effect.provideService(EngineConfig, config), Effect.provideService(MarkWorker, worker)),
       presence,
       schedule: {
         hours: inStore(watchHours),
