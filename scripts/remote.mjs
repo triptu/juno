@@ -14,7 +14,7 @@
 // lockfile or the Dockerfile changes. The worktree is streamed in as the files
 // git sees, tracked or new, with ignored files left out (.env, node_modules,
 // out/, test output). Reports come back into .remote/<run>/. After a clean run
-// the machine goes back to the pool and is destroyed after 10 idle minutes;
+// the machine goes back to the pool and is destroyed after 5 idle minutes;
 // after a failure or Ctrl-C it is destroyed at once. `--status` lists the pool
 // and `--drain` destroys its idle machines.
 //
@@ -27,7 +27,8 @@ import { tmpdir } from 'node:os'
 import { dirname, join, relative, resolve } from 'node:path'
 import { createInterface } from 'node:readline'
 import { fileURLToPath } from 'node:url'
-import { acquire, destroy, forget, reap, release, status } from './remote/pool.mjs'
+import { forwardSignals } from './remote/children.mjs'
+import { acquire, destroy, keep, reap, release, status } from './remote/pool.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -181,13 +182,13 @@ if (process.argv[2] === '--reap') {
 }
 if (process.argv[2] === '--status') {
   const pool = status()
-  console.log(pool.length === 0 ? 'remote: no machines in the pool' : pool.map((state) => `${state.id} ${state.machine} ${state.busy ? 'busy' : `idle ${Math.round(state.idleFor / 60000)} min`}, up ${Math.round((Date.now() - state.created) / 60000)} min`).join('\n'))
+  console.log(pool.length === 0 ? 'remote: no machines in the pool' : pool.map((state) => `${state.id} ${state.machine} ${state.destroying ? 'destroying (retry pending)' : state.kept ? 'kept until expiry' : state.busy ? 'busy' : `idle ${Math.round(state.idleFor / 60000)} min`}, up ${Math.round((Date.now() - state.created) / 60000)} min`).join('\n'))
   process.exit(0)
 }
 if (process.argv[2] === '--drain') {
-  for (const state of status()) if (!state.busy) destroy(state.id)
-  console.log('remote: idle machines destroyed')
-  process.exit(0)
+  const results = status().filter((state) => !state.busy && !state.kept).map((state) => destroy(state.id))
+  console.log(results.every(Boolean) ? 'remote: idle machines destroyed' : 'remote: some destroys failed; retained for retry')
+  process.exit(results.every(Boolean) ? 0 : 1)
 }
 
 // --shards n runs the script on n machines at once, each with JUNO_SHARD=i/n
@@ -196,9 +197,13 @@ const shardsAt = process.argv.indexOf('--shards')
 if (shardsAt > 1 && process.argv.slice(2, shardsAt).every((arg) => arg.startsWith('--'))) {
   const total = Number(process.argv[shardsAt + 1])
   const rest = process.argv.slice(2).filter((_, index) => index !== shardsAt - 2 && index !== shardsAt - 1)
+  const children = new Set()
+  forwardSignals(children)
   const runs = Array.from({ length: total }, (_, index) =>
     new Promise((resolvePromise) => {
       const child = spawn(process.execPath, [self, '--env', `JUNO_SHARD=${index}/${total}`, ...rest], { stdio: ['ignore', 'pipe', 'pipe'] })
+      children.add(child)
+      child.on('close', () => children.delete(child))
       for (const stream of [child.stdout, child.stderr]) createInterface({ input: stream }).on('line', (line) => console.log(`[${index + 1}/${total}] ${line}`))
       child.on('close', (code) => resolvePromise(code ?? 1))
     }),
@@ -249,7 +254,7 @@ if (options.dryRun) {
   console.log(`  a warm ${options.machine} machine from the pool, or nsc ${create('3h').map(quote).join(' ')} --cidfile <tmp>/id`)
   console.log(`  git ls-files ... | tar -czf - --null -T - | nsc ssh -T <id> ${quote(container('<image>'))}`)
   console.log(`  nsc ssh -T <id> 'cat /tmp/out/reports.tgz' | tar -xzf - -C .remote/${runId}`)
-  console.log(`  back to the pool after a clean run (destroyed when idle for 10 minutes), else nsc destroy <id> --force${options.keep ? '   (--keep: left up, outside the pool)' : ''}`)
+  console.log(`  back to the pool after a clean run (destroyed when idle for 5 minutes), else nsc destroy <id> --force${options.keep ? '   (--keep: tracked until its 3-hour expiry)' : ''}`)
   process.exit(0)
 }
 
@@ -262,8 +267,8 @@ let id
 let image
 let clean = false
 const cleanup = () => {
-  if (id && options.keep) forget(id)
-  else if (id && clean) release(id, image, self)
+  if (id && options.keep) keep(id)
+  else if (id && clean) release(id, image)
   else if (id) destroy(id)
   id = undefined
   rmSync(work, { recursive: true, force: true })
@@ -286,9 +291,9 @@ try {
   image = await ensureImage(registry, imageTag())
   const claimed = await acquire(
     options.machine,
-    async (duration) => {
+    async (duration, labels) => {
       const cidfile = join(work, 'id')
-      await retry('creating a machine', () => nsc([...create(duration), '--cidfile', cidfile]))
+      nsc([...create(duration), ...Object.entries(labels).flatMap(([key, value]) => ['--label', `${key}=${value}`]), '--cidfile', cidfile])
       return readFileSync(cidfile, 'utf8').trim()
     },
     (message) => console.error(`remote: ${message}`),
@@ -348,7 +353,7 @@ try {
     await sleep(1000 * tries)
   }
   code = reported
-  clean = true
+  clean = code === 0
   console.error(`remote: script done after ${elapsed()}`)
 
   const reports = hasReports ? spawnSync('nsc', ['ssh', '-T', id, 'cat /tmp/out/reports.tgz'], { maxBuffer: 1024 * 1024 * 1024 }) : undefined
