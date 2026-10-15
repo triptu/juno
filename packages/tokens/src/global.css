@@ -96,6 +96,14 @@ textarea {
   background: transparent;
 }
 
+/* Privacy mode (SPEC section 5): with data-privacy on <html>, text marked
+   data-sensitive is blurred. Hover and focus never reveal it, and it cannot
+   be selected or copied. Only filter changes, so rows keep their size. */
+[data-privacy] [data-sensitive] {
+  filter: blur(var(--privacy-blur));
+  user-select: none;
+}
+
 /* While the theme flips, every transition is off so colours change in one
    frame. Set data-theme-switching on <html>, swap the theme classes, then
    remove the attribute after two animation frames. */

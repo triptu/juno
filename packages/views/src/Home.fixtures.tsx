@@ -2,6 +2,7 @@ import * as stylex from '@stylexjs/stylex'
 import { spacing } from '@juno/tokens/tokens.stylex'
 import { defineFixtures, fixture, scene, type FixtureFrame } from '@juno/ui'
 import { homeItems, rewritten } from './fixtures/home'
+import { PrivacyOn } from './fixtures/privacy'
 import { NOW } from './fixtures/topics'
 import { Home, type HomeProps } from './Home'
 import { HomeScene, type HomeSceneName } from './HomeScene'
@@ -38,6 +39,12 @@ export default defineFixtures(
       three: state(),
       // The same rows with the assistant's title lines: every box stays where it was (gallery behaviour test).
       'ai-titles': state({ items: [rewritten.waiting, rewritten.resume, rewritten.moved] }),
+      // Privacy mode: an assistant title can quote the messages, so it blurs; the plain title and the meta line stay.
+      'ai-titles-privacy': scene<HomeProps>(() => (
+        <PrivacyOn>
+          <Home {...base} items={[rewritten.waiting, homeItems.resume, rewritten.moved]} />
+        </PrivacyOn>
+      )),
       'follow-up-and-tidy-up': state({ scene: 'evening', title: 'Evening, Tushar.', items: [homeItems.waiting, homeItems.followUp, homeItems.tidyUp] }),
       'buttons-used': state({ scene: 'evening', title: 'Evening, Tushar.', items: [homeItems.waiting, homeItems.followUp, homeItems.tidyUp], done: new Set([homeItems.followUp.id, homeItems.tidyUp.id]) }),
       // The Automated question, after the ones it ranks below.

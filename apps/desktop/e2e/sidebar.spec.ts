@@ -62,8 +62,8 @@ test('after sign-in the sidebar lists followed threads and Main, newest first, w
   await postgres.expectRead()
   await postgres.expectPreview('Dev: Booked 2–4pm. Will post results here.')
   await postgres.expectChannel('eng')
-  // The participant stack names everyone in it (the fake's display names are first names).
-  await expect(postgres.root.getByRole('img', { name: /Dev.*Leo/ })).toBeVisible()
+  // The participant stack names everyone but you (the fake's display names are first names).
+  await expect(postgres.root.getByRole('img', { name: 'Dev, Leo', exact: true })).toBeVisible()
 
   // A thread with an unread mention: semibold title, the @ tag, then the count.
   const rina = sidebar.row(RINA)
@@ -98,6 +98,21 @@ test('after sign-in the sidebar lists followed threads and Main, newest first, w
   // Both groups have unread topics, so both dots show.
   await sidebar.expectFilterDot('Channels', true)
   await sidebar.expectFilterDot('DMs', true)
+})
+
+test('rows in a DM or a group DM show no participant stack', async ({ juno }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  const { sidebar, win } = juno
+  await sidebar.filter('DMs')
+
+  // A thread in the DM with Maya, the DM's Main and the group DM's Main: the
+  // title or the channel already names the people, so the meta line does not.
+  const rows = [sidebar.row(OFFSITE).root, win.locator('[data-topic-id="m:D0MAYA"]'), win.locator('[data-topic-id="m:G0MAYALEO"]')]
+  for (const row of rows) {
+    await expect(row).toBeVisible()
+    await expect(row.getByRole('img')).toHaveCount(0)
+  }
 })
 
 test('the quick filters narrow the list and the Unread toggle hides read rows', async ({ juno }) => {

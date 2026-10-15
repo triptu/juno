@@ -3,6 +3,7 @@ import {
   activeTab,
   currentPlace,
   notificationStatusAtom,
+  privacyAtom,
   registry,
   setPresence,
   sidebarDotAtom,
@@ -22,6 +23,7 @@ import { EngineStatus, SyncNotice } from './EngineStatus'
 import { markFilterChange } from './filterMark'
 import { openJunoTab } from './juno/actions'
 import { openAllTopics, openHome, openNewTab, openNotifications, openPreferences } from './navigation'
+import { setPrivacy } from './privacy'
 import { Session } from './Session'
 import { TitlebarNav } from './TitlebarNav'
 import { TopicList } from './TopicList'
@@ -72,6 +74,7 @@ export function Sidebar() {
   const junoBusy = useAtomValue(junoNavAtom, (nav) => nav.busy)
   const [menuOpen, setMenuOpen] = useState(false)
   const status = useAtomValue(notificationStatusAtom)
+  const privacy = useAtomValue(privacyAtom)
   // The scope chip names the channel the list is narrowed to; its rows' refs carry it.
   const scopeChannel = useAtomValue(sidebarListAtom, (list) => (filter.scope === undefined ? undefined : list.refs.channels.get(filter.scope)))
 
@@ -84,6 +87,7 @@ export function Sidebar() {
     setMenuOpen(false)
     if (action === 'notifications') return openNotifications()
     if (action === 'preferences') return openPreferences()
+    if (action === 'privacy') return setPrivacy(!privacy)
     setPresence(registry, presence?.active === false ? 'active' : 'away')
   }
 
@@ -114,6 +118,7 @@ export function Sidebar() {
           workspace={user?.teamName ?? ''}
           {...(presence === undefined ? {} : { presence })}
           {...(paused === undefined ? {} : { paused })}
+          privacy={privacy}
           onAction={accountAction}
           sections={[
             { title: 'Session', content: <Session /> },
@@ -148,6 +153,8 @@ export function Sidebar() {
       onToggleUnread={toggleUnread}
       onClearScope={clearScope}
       status={<SyncNotice />}
+      privacy={privacy}
+      onPrivacyOff={() => setPrivacy(false)}
     >
       <TopicList />
     </SidebarView>

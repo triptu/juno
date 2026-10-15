@@ -2,6 +2,7 @@ import { defineFixtures, scene, type FixtureFrame } from '@juno/ui'
 import { AccountMenu } from './AccountMenu'
 import { AppearanceSettings } from './AppearanceSettings'
 import { EngineNotice } from './EngineStatusView'
+import { PrivacyOn } from './fixtures/privacy'
 import { hostileIds, newThreadsById, NOW, pinnedIds, recentIds, rows, rowsById } from './fixtures/topics'
 import { Sidebar, type SidebarProps, type SidebarViewPill } from './Sidebar'
 import { relativeTime } from './time'
@@ -159,6 +160,11 @@ export default defineFixtures(
       // A job runs: the sparkle is duotone, with the count beside it.
       'juno-busy': scene(() => full({ junoUnread: 1, junoBusy: true })),
       'no-dots': scene(() => full({ dots: { channels: false, dms: false } })),
+    },
+    // Privacy mode (SPEC section 5): previews blurred, the footer with Show.
+    Privacy: {
+      on: scene(() => <PrivacyOn>{full({ privacy: true, onPrivacyOff: noop }, { selected: rows.postgres.id })}</PrivacyOn>),
+      'row-hover': scene(() => <PrivacyOn>{full({ privacy: true, onPrivacyOff: noop })}</PrivacyOn>, { hover: '[data-topic-row]:nth-of-type(2)' }),
     },
     'Account menu': {
       open: scene(() =>

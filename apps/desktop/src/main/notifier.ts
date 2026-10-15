@@ -31,7 +31,12 @@ export interface NotifierDeps {
   readonly open: (target: NotificationTarget) => void
   /** To the engine over parentPort. */
   readonly send: (message: MainToEngine) => void
+  /** Privacy mode is on: the body, which quotes the message, is left out (SPEC section 5, Privacy mode). */
+  readonly privacy: () => boolean
 }
+
+/** The body while privacy mode is on. The title still says where it came from. */
+export const HIDDEN_BODY = 'Message hidden'
 
 /** Notifications kept alive for their click handler. Electron drops the handler of one it no longer references. */
 const KEPT = 20
@@ -76,7 +81,8 @@ export class Notifier {
 
   private show(notification: OsNotification): void {
     if (this.shown.has(notification.id)) return
-    const shown = this.deps.create({ title: notification.title, body: notification.body })
+    const body = this.deps.privacy() ? HIDDEN_BODY : notification.body
+    const shown = this.deps.create({ title: notification.title, body })
     shown.onClick(() => {
       this.shown.delete(notification.id)
       this.deps.open(notification.target)

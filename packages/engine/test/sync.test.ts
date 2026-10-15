@@ -86,7 +86,8 @@ describe('cold boot', () => {
       subscribed: true,
       titleSource: 'fallback',
     })
-    expect(postgres?.participants.map((p) => p.name)).toEqual(['Dev', 'Leo', 'Tushar'])
+    // The stack leaves out the signed-in user (Tushar), who replied in the thread.
+    expect(postgres?.participants.map((p) => p.name)).toEqual(['Dev', 'Leo'])
     expect(postgres?.participants[0]?.avatarUrl).toContain('/avatars/U0DEV.svg')
 
     // Main rows carry the channel label as title and the Main tag; counts come from the read pointer.

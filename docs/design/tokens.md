@@ -421,6 +421,10 @@ Sidebar row heights per density (Preferences › Appearance; rows include the ti
 
 Gap between rows: 2px. All topics table row: min 52px. Notification rule row: min 48px. Today log row: min 44px. Palette result: 55px. Menu item: 30px (context) / 32px (other menus). Message group spacing (margin above a new sender): Compact 6px, Comfortable 12px. Message padding: 2 8 / 4 8.
 
+### Privacy mode
+
+`--privacy-blur` 6px (`sizes` group). With `data-privacy` on `<html>`, every element marked `data-sensitive` gets `filter: blur(var(--privacy-blur))` from `global.css` (SPEC section 5, Privacy mode). At 6px a 13px line reads as a soft grey bar: the shape of a line, no letters. Hover never removes it.
+
 ### Composer
 
 Single line 40px; grows to `max-height` then scrolls inside. Prototype max is 184px (7.5 lines of 22px plus 18px padding). SPEC says "about 8 lines"; [proposed] `--composer-max-height: 194px` (9 + 8×22 + 9). Juno input max 160px.
