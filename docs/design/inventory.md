@@ -130,9 +130,11 @@ Centered, padding `48 16`, gap 8: title 14/500, body 13 muted lh 1.5, button 30p
 
 | Condition | Title | Body | Button |
 | --- | --- | --- | --- |
-| Unread filter on, nothing unread | No unread topics | Your filters are hiding everything. Older and resolved topics are in All topics. | Clear filters |
-| Channels/DMs filter or scope hides everything | No recent topics here | same | Clear filters |
-| No filters, nothing recent | No recent topics here | Topics with activity in the last 7 days show up here. | View all topics |
+| Unread filter on, nothing unread | You're all caught up | Nothing unread right now. Older and resolved topics live in All topics. | Clear filters |
+| Channels/DMs filter or scope hides everything | Nothing here with these filters | Older and resolved topics live in All topics. | Clear filters, View all topics |
+| No filters (or a view), nothing recent | It's quiet | Topics with activity in the last 7 days show up here. | View all topics |
+| First sync running, nothing arrived yet (engine phase before `live`) | Getting your topics | Juno is reading your conversations from Slack. Topics show up here as they arrive. | none, and no illustration |
+| A view with no conversations | No conversations in this view | Add channels and people to see their topics here. | Edit view |
 
 ## 3. Topic row
 

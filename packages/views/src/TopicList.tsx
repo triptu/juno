@@ -10,8 +10,11 @@ export interface TopicListSection {
   readonly ids: ReadonlyArray<string>
 }
 
-/** Why the list is empty, which picks the drawing and the copy (friendly-layer section 7). */
-export type TopicListEmpty = 'caught-up' | 'filtered' | 'quiet'
+/**
+ * Why the list is empty, which picks the drawing and the copy (friendly-layer section 7).
+ * `syncing`: the first sync has not brought any topic yet. `empty-view`: the selected view has no conversations.
+ */
+export type TopicListEmpty = 'caught-up' | 'filtered' | 'quiet' | 'syncing' | 'empty-view'
 
 export interface TopicListProps {
   /** Pinned first, then Recent. A section with no ids is skipped. */
@@ -29,6 +32,8 @@ export interface TopicListProps {
   readonly onClearFilters?: () => void
   /** Opens All topics, offered by the quiet and filtered empty states. */
   readonly onViewAll?: () => void
+  /** Opens the selected view's sheet, offered when the view has no conversations. */
+  readonly onEditView?: () => void
   /** A row got focus, by keyboard or pointer. The owner moves the roving tabindex to it. */
   readonly onRowFocus?: (id: string) => void
 }
@@ -42,7 +47,7 @@ const labels: Record<TopicListSectionId, string> = { pinned: 'Pinned', recent: '
  * the pointer is over the list. Arrow keys move focus between rows; the
  * rows themselves activate on Enter.
  */
-export function TopicList({ sections, renderRow, empty, quietDays = 7, enterEmpty = true, truncated = false, onClearFilters, onViewAll, onRowFocus }: TopicListProps) {
+export function TopicList({ sections, renderRow, empty, quietDays = 7, enterEmpty = true, truncated = false, onClearFilters, onViewAll, onEditView, onRowFocus }: TopicListProps) {
   const shown = sections.filter((section) => section.ids.length > 0)
   const isEmpty = shown.length === 0
   const onFocus =
@@ -55,7 +60,7 @@ export function TopicList({ sections, renderRow, empty, quietDays = 7, enterEmpt
   return (
     <ScrollArea role="group" aria-label="Topics" scrollbar="hover" onKeyDown={moveFocus} onFocus={onFocus} sx={styles.scroller}>
       {isEmpty && empty !== undefined ? (
-        <Empty kind={empty} quietDays={quietDays} enter={enterEmpty} onClearFilters={onClearFilters} onViewAll={onViewAll} />
+        <Empty kind={empty} quietDays={quietDays} enter={enterEmpty} onClearFilters={onClearFilters} onViewAll={onViewAll} onEditView={onEditView} />
       ) : (
         shown.map((section) => (
           <section key={section.id} aria-label={labels[section.id]} data-topic-section={section.id} {...stylex.props(styles.section)}>
@@ -88,10 +93,11 @@ interface EmptyProps {
   readonly enter: boolean
   readonly onClearFilters?: (() => void) | undefined
   readonly onViewAll?: (() => void) | undefined
+  readonly onEditView?: (() => void) | undefined
 }
 
 /** The empty list: why it is empty, and the next step (SPEC section 16). */
-function Empty({ kind, quietDays, enter, onClearFilters, onViewAll }: EmptyProps) {
+function Empty({ kind, quietDays, enter, onClearFilters, onViewAll, onEditView }: EmptyProps) {
   const clear =
     onClearFilters === undefined ? undefined : (
       <Button variant="secondary" size="md" onClick={onClearFilters}>
@@ -130,6 +136,17 @@ function Empty({ kind, quietDays, enter, onClearFilters, onViewAll }: EmptyProps
     }
     case 'quiet':
       return <EmptyState illustration="nothing-here" title="It's quiet" body={`Topics with activity in the last ${quietDays} days show up here.`} action={viewAll('secondary')} enter={enter} />
+    case 'syncing':
+      return <EmptyState title="Getting your topics" body="Juno is reading your conversations from Slack. Topics show up here as they arrive." enter={enter} />
+    case 'empty-view': {
+      const edit =
+        onEditView === undefined ? undefined : (
+          <Button variant="secondary" size="md" onClick={onEditView}>
+            Edit view
+          </Button>
+        )
+      return <EmptyState illustration="nothing-here" title="No conversations in this view" body="Add channels and people to see their topics here." action={edit} enter={enter} />
+    }
   }
 }
 

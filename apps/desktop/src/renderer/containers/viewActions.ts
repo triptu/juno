@@ -90,6 +90,12 @@ export async function showViewPillMenu(id: string): Promise<void> {
   }
 }
 
+/** Edit view in the empty state of a view with no conversations. */
+export function editSelectedView(): void {
+  const id = registry.get(sidebarFilterAtom).view
+  if (id !== undefined) registry.set(viewSheetAtom, { mode: 'edit', id })
+}
+
 /** The New view pill. */
 export function newView(): void {
   registry.set(viewSheetAtom, { mode: 'new', channels: [] })

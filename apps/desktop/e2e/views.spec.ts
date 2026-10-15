@@ -100,6 +100,17 @@ test('a view with no icon shows its name; edit it, reorder by menu and drag, and
   await sidebar.row(RINA).expectVisible()
 })
 
+test('a view with no conversations says so, and Edit view opens its sheet', async ({ juno }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  const { sidebar } = juno
+  await sidebar.createView({ name: 'Later' })
+  await sidebar.expectEmpty('No conversations in this view')
+  await sidebar.list.getByRole('button', { name: 'Edit view' }).click()
+  await expect(sidebar.viewSheet).toBeVisible()
+  await expect(sidebar.viewSheet.getByPlaceholder('Name')).toHaveValue('Later')
+})
+
 test('Add to view on a channel’s menu adds and removes it, with Undo, and New view… starts with it', async ({ juno }) => {
   await withoutAutomated(juno)
   const { sidebar } = juno
