@@ -72,7 +72,7 @@ agentTest('the Juno panel composer suggests emoji too', async ({ juno }) => {
   await juno.signIn()
   await juno.waitForSync()
   await juno.sidebar.row(POSTGRES).open()
-  await juno.win.keyboard.press('ControlOrMeta+j')
+  await juno.tabs.menu('juno')
   const field = juno.win.locator('[data-juno-composer="panel"] textarea')
   await expect(field).toBeFocused()
   await field.pressSequentially(':smi')
