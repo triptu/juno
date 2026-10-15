@@ -20,7 +20,7 @@ import {
   type Ts,
 } from '@juno/domain'
 import { conversationKind, type Channel, type CountEntry, type Im, type Reaction, type Team, type User } from '@juno/slack-schema'
-import { Invalidation, StoreWriter, type ConversationRow, type MessageRow, type SqlError, type UserRow } from '@juno/store'
+import { Invalidation, StoreWriter, syncedRanges, type ConversationRow, type MessageRow, type SqlError, type UserRow } from '@juno/store'
 import { Effect } from 'effect'
 import { syncKeys } from './keys'
 import { reconcilePost } from './posts'
@@ -754,21 +754,7 @@ export const setIgnored = (channel: string, at: string | null): Effect.Effect<bo
 
 /** The synced range a page covered, merged with the ranges it touches. */
 export const addSyncedRange = (channel: string, fromTs: string, toTs: string): Writer =>
-  Effect.gen(function* () {
-    const sql = yield* StoreWriter
-    const touching = yield* sql<{ from_ts: string; to_ts: string }>`
-      SELECT from_ts, to_ts FROM synced_ranges WHERE channel = ${channel} AND from_ts <= ${toTs} AND to_ts >= ${fromTs}`
-    let from = fromTs
-    let to = toTs
-    for (const r of touching) {
-      if (compareTs(r.from_ts, from) < 0) from = r.from_ts
-      if (compareTs(r.to_ts, to) > 0) to = r.to_ts
-    }
-    if (touching.length > 0) {
-      yield* sql`DELETE FROM synced_ranges WHERE channel = ${channel} AND from_ts IN ${sql.in(touching.map((r) => r.from_ts))}`
-    }
-    yield* sql`INSERT INTO synced_ranges (channel, from_ts, to_ts) VALUES (${channel}, ${from}, ${to})`
-  })
+  syncedRanges.add({ channel, from_ts: fromTs, to_ts: toTs })
 
 export const latestSyncedRange = (channel: string): Effect.Effect<{ from_ts: string; to_ts: string } | undefined, SqlError, StoreWriter> =>
   Effect.gen(function* () {
