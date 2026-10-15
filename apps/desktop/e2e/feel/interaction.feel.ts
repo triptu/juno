@@ -82,7 +82,7 @@ test('popovers open from their anchor, whole', async ({ juno, win, feel }) => {
   await juno.waitForSync()
 
   await juno.sidebar.row('#eng').open()
-  await juno.topic.expectTitle('#eng')
+  await juno.topic.expectTitle('Main')
   await win.waitForTimeout(300)
   const threads = await tag(juno.topic.threadsButton, 'threads-button')
   await feel.run({ name: 'threads-popover', title: 'Open the Threads list from a Main header', ...popover('[role="dialog"][aria-label="Threads"]', threads, 'the Threads list') }, async (rec) => {

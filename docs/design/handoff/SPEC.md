@@ -538,7 +538,7 @@ Use the Littlebird design system's tokens.
 | ⌘[ / ⌘] | Back / forward in the tab's history |
 | ⌃⌘S | Hide or show the sidebar |
 | ⌘J | In a topic, open or close the Juno panel. Elsewhere, open the Juno tab with the composer focused |
-| ⌘Z | Undo the last resolve, Notify me change, ignore or routed post |
+| ⌘Z | Undo the last topic action: resolve, reopen, pin, rename, mark read or unread, Notify me change or ignore. Sends are final (ADR 0010) |
 | ⌘ click / ⌘ Enter | Open in a new tab |
 | ↑ in an empty composer, then ↑ ↓ | Select a message. E edits and Delete or Backspace deletes your own selected message |
 | Hold ⌥ (or Space) over a sidebar row | Peek at the topic without opening it or marking it read |

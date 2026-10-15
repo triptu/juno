@@ -9,7 +9,7 @@
  *   message write fires every topic that shows it (`messagesOf`).
  * - `conversations`, `users`, `team`, `channel_reads`, `thread_subs`:
  *   mirror tables the view models join.
- * - `{ topic_reads: [id] }`, `{ topic_overlay: [id] }`: Juno's own state.
+ * - `{ topic_reads: [id] }`, `{ topic_overlay: [id] }`, `ignored_channels`: Juno's own state.
  */
 import { mainTopicId, threadTopicId, type ChannelId, type Ts } from '@juno/domain'
 import type { InvalidationKeys, MessageRow } from '@juno/store'
@@ -43,4 +43,5 @@ export const syncKeys = {
   threadSubs: ['thread_subs'] satisfies InvalidationKeys,
   reads: (topicId: string) => ({ topic_reads: [topicId] }) satisfies InvalidationKeys,
   overlay: (topicId: string) => ({ topic_overlay: [topicId] }) satisfies InvalidationKeys,
+  ignored: ['ignored_channels'] satisfies InvalidationKeys,
 }

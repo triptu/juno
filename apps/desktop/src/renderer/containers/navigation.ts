@@ -12,7 +12,12 @@
  * between (performance 4.4). Slack is asked only after that, by the tab
  * itself.
  */
-import { MESSAGE_WINDOW_DEFAULT, MESSAGE_WINDOW_MAX, type MenuCommand, type TopicDetail } from '@juno/contract'
+import {
+  MESSAGE_WINDOW_DEFAULT,
+  MESSAGE_WINDOW_MAX,
+  type MenuCommand,
+  type TopicDetail,
+} from '@juno/contract'
 import {
   activateTab,
   activeTab,
@@ -317,6 +322,9 @@ export function runMenuCommand(command: MenuCommand): void {
       return stepTabHistory(1)
     case 'sidebar.toggle':
       return toggleSidebar()
+    case 'edit.undo':
+      // `topicActions.ts` handles it.
+      return
     default: {
       const tab = tabByNumber(tabs, Number(command.slice('tab.select.'.length)))
       if (tab !== undefined) switchToTab(tab.id)
@@ -327,12 +335,6 @@ export function runMenuCommand(command: MenuCommand): void {
 /** Pointer enter, focus or keyboard selection of something that opens a topic. */
 export function warmTopic(id: string): void {
   prefetchTopic(registry, id)
-}
-
-/** The menu on a sidebar row or a thread entry (M5 adds the rest). */
-export async function showTopicMenu(id: string): Promise<void> {
-  const chosen = await popupContextMenu([{ id: 'new-tab', label: 'Open in new tab' }])
-  if (chosen === 'new-tab') openTopic(id, { newTab: true })
 }
 
 /** The tab menu (inventory 15.5). Copy Slack link and Open in Slack only on a topic tab whose header is local. */

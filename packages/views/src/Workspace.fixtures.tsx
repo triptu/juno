@@ -38,13 +38,13 @@ const lastTab = thirtySeven[thirtySeven.length - 1]?.id
 const base: Omit<WorkspaceProps, 'children'> = { tabs: [tabs.postgres, tabs.density], activeId: tabs.postgres.id, onSelectTab: noop, onCloseTab: noop, onNewTab: noop, onTabContextMenu: noop }
 
 const postgresPage = (
-  <TopicView header={<TopicHeader detail={details.postgres} onRename={noop} />} composer={<ComposerSlot placeholder="Reply" />}>
+  <TopicView header={<TopicHeader detail={details.postgres} onMenu={noop} onPill={noop} onResolve={noop} juno={{ open: false, onToggle: noop }} />} composer={<ComposerSlot placeholder="Reply" />}>
     <MessageList items={thread} main={false} now={NOW} onOpenThread={noop} onChannel={noop} onLink={noop} />
   </TopicView>
 )
 
 const engPage = (
-  <TopicView header={<TopicHeader detail={details.engMain} onThreads={noop} />} composer={<ComposerSlot placeholder="Message #eng" />}>
+  <TopicView header={<TopicHeader detail={details.engMain} onMenu={noop} onPill={noop} onThreads={noop} juno={{ open: false, onToggle: noop }} />} composer={<ComposerSlot placeholder="Message #eng" />}>
     <MessageList items={main} main now={NOW} dividerBefore={mainDividerBefore} onOpenThread={noop} onChannel={noop} onLink={noop} />
   </TopicView>
 )

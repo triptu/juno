@@ -1,6 +1,6 @@
 import { app, BrowserWindow, clipboard, ipcMain, Menu, shell, type IpcMainInvokeEvent, type MenuItemConstructorOptions } from 'electron'
 import { Schema } from 'effect'
-import { Channels, ShellRoutes, type ShellInput, type ShellOutput } from '@juno/contract'
+import { Channels, ShellRoutes, type ContextMenuLeaf, type ShellInput, type ShellOutput } from '@juno/contract'
 import type { EngineSupervisor } from './engine'
 import type { Launch } from './launch'
 import { APP_ORIGIN } from './scheme'
@@ -41,9 +41,20 @@ function isAppUrl(url: string): boolean {
 /**
  * Native menus are out of Playwright's reach. Under JUNO_E2E a test sets the
  * item the next context menu picks; that menu answers at once without
- * showing, and keeps the labels it was asked to show.
+ * showing, and keeps the labels it was asked to show and where.
  */
-export const contextMenuForTests: { next: string | null | undefined; lastLabels: ReadonlyArray<string> } = { next: undefined, lastLabels: [] }
+/** How a test reads a menu item: "-" for a separator, "(label)" when disabled, "label ✓" when checked; submenu items start with "> ". */
+function testLabel(item: ContextMenuLeaf): string {
+  if ('separator' in item) return '-'
+  const label = item.enabled === false ? `(${item.label})` : item.label
+  return item.checked === true ? `${label} ✓` : label
+}
+
+export const contextMenuForTests: { next: string | null | undefined; lastLabels: ReadonlyArray<string>; lastAt: { readonly x: number; readonly y: number } | null } = {
+  next: undefined,
+  lastLabels: [],
+  lastAt: null,
+}
 
 /** Under JUNO_E2E, links for the Slack app are recorded here instead of opening it. */
 export const slackLinksForTests: string[] = []
@@ -86,34 +97,35 @@ export function registerIpc({ supervisor, setTheme, setAccent, setSidebar }: Ipc
     setSidebar(sidebar)
   })
 
-  // A native menu at the pointer. The answer is the chosen item's id, or null.
+  // A native menu at the pointer, or at `at`. The answer is the chosen item's id, or null.
   handle(
     Channels.contextMenuPopup,
-    ({ items }, event) =>
+    ({ items, at }, event) =>
       new Promise<string | null>((resolve) => {
         if (contextMenuForTests.next !== undefined) {
           const next = contextMenuForTests.next
           contextMenuForTests.next = undefined
-          contextMenuForTests.lastLabels = items.map((item) => ('separator' in item ? '-' : item.enabled === false ? `(${item.label})` : item.label))
+          contextMenuForTests.lastAt = at ?? null
+          contextMenuForTests.lastLabels = items.flatMap((item) => ('submenu' in item ? [item.label, ...item.submenu.map((sub) => `> ${testLabel(sub)}`)] : [testLabel(item)]))
           return resolve(next)
         }
         let chosen: string | null = null
-        const menu = Menu.buildFromTemplate(
-          items.map((item): MenuItemConstructorOptions =>
-            'separator' in item
-              ? { type: 'separator' }
-              : {
-                  label: item.label,
-                  enabled: item.enabled ?? true,
-                  // Shown only: the app menu owns the shortcut.
-                  ...(item.accelerator === undefined ? {} : { accelerator: item.accelerator, registerAccelerator: false }),
-                  click: () => (chosen = item.id),
-                },
-          ),
-        )
+        const leaf = (item: ContextMenuLeaf): MenuItemConstructorOptions =>
+          'separator' in item
+            ? { type: 'separator' }
+            : {
+                label: item.label,
+                enabled: item.enabled ?? true,
+                ...(item.checked === undefined ? {} : { type: 'checkbox', checked: item.checked }),
+                // Shown only: the app menu owns the shortcut.
+                ...(item.accelerator === undefined ? {} : { accelerator: item.accelerator, registerAccelerator: false }),
+                click: () => (chosen = item.id),
+              }
+        const menu = Menu.buildFromTemplate(items.map((item) => ('submenu' in item ? { label: item.label, submenu: item.submenu.map(leaf) } : leaf(item))))
         const window = BrowserWindow.fromWebContents(event.sender) ?? undefined
+        const point = at === undefined ? {} : { x: Math.round(at.x), y: Math.round(at.y) }
         // The item's click runs before the menu reports it closed.
-        menu.popup({ ...(window === undefined ? {} : { window }), callback: () => setImmediate(() => resolve(chosen)) })
+        menu.popup({ ...(window === undefined ? {} : { window }), ...point, callback: () => setImmediate(() => resolve(chosen)) })
       }),
   )
 
@@ -132,6 +144,10 @@ export function registerIpc({ supervisor, setTheme, setAccent, setSidebar }: Ipc
 
   handle(Channels.clipboardWriteText, ({ text }) => {
     clipboard.writeText(text)
+  })
+
+  handle(Channels.shellEditUndo, (_input, event) => {
+    event.sender.undo()
   })
 }
 

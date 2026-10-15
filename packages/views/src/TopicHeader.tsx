@@ -1,32 +1,42 @@
-import * as stylex from '@stylexjs/stylex'
+import { ArrowCounterClockwise } from '@phosphor-icons/react/dist/icons/ArrowCounterClockwise'
 import { ChatsCircle } from '@phosphor-icons/react/dist/icons/ChatsCircle'
+import { CheckCircle } from '@phosphor-icons/react/dist/icons/CheckCircle'
 import { Hash } from '@phosphor-icons/react/dist/icons/Hash'
 import { Lock } from '@phosphor-icons/react/dist/icons/Lock'
 import { User } from '@phosphor-icons/react/dist/icons/User'
 import { Users } from '@phosphor-icons/react/dist/icons/Users'
-import { useState, type KeyboardEvent, type ReactNode } from 'react'
+import * as stylex from '@stylexjs/stylex'
+import type { ReactNode } from 'react'
 import type { TopicDetail } from '@juno/contract'
-import { colors, layout, radii, sizes, spacing, text } from '@juno/tokens/tokens.stylex'
-import { Avatar, Button, ChannelIcon, ContextPill, Popover, Text, type ContextTint, type PhosphorIcon } from '@juno/ui'
-import { channelIconFor, groupInitials, hueFor, initials } from './look'
+import { ContextPill, Popover, type ContextTint, type PhosphorIcon } from '@juno/ui'
+import { HeaderTitleButton, IslandButton, JunoToggle, type MenuAnchor } from './header/HeaderControls'
+import { HeaderIslands } from './header/HeaderIslands'
+import { RenameField } from './RenameField'
 
 export interface TopicHeaderProps {
   readonly detail: TopicDetail
-  /**
-   * Fills the icon slot next to the title with the topic's art, at the
-   * slot's size. Without it the slot shows the channel's icon or the DM
-   * partner's photo, so art drops in later with no shift.
-   */
-  readonly art?: ReactNode
+  /** The topic menu, opened from the title, is showing. */
+  readonly menuOpen?: boolean
+  /** The title asked for the topic menu (the row's menu, inventory 15.1), to open at `at`. */
+  readonly onMenu: (at: MenuAnchor) => void
+  /** The title is a field for Rename (from the topic menu). Threads only. */
+  readonly rename?: { readonly onSave: (title: string) => void; readonly onCancel: () => void }
+  /** The context pill: narrow the sidebar to the channel. */
+  readonly onPill?: () => void
+  /** Threads: Resolve or Reopen. Without it the button is not shown. */
+  readonly onResolve?: () => void
   /** Main only: the "Threads" button is pressed and its popover is open. */
   readonly threadsOpen?: boolean
   /** Main only: the "Threads" button was pressed, or the popover asked to close. */
   readonly onThreads?: (open: boolean) => void
   /** Main only: the popover's content, an `ActiveThreads`. */
   readonly threads?: ReactNode
-  /** Double-click to rename (not on Main). An empty title clears the manual one. */
-  readonly onRename?: (id: string, title: string) => void
+  /** The Juno panel's toggle. Hidden when absent (AI assist off). */
+  readonly juno?: { readonly open: boolean; readonly onToggle: () => void }
 }
+
+/** A one-off size: the header pill's widest (inventory 5). */
+const PILL_MAX_WIDTH = '160px'
 
 const kindLabels: Record<TopicDetail['channel']['kind'], string> = {
   public: 'Public channel',
@@ -50,183 +60,86 @@ const tints: Record<TopicDetail['channel']['kind'], ContextTint> = {
 }
 
 /**
- * The topic header (inventory 5): the context pill, the actions, then the
- * title with its icon slot. Main reads "#eng · Main" with the "Threads"
- * button; a thread renames on double-click. Pin, Resolve and More arrive in M5,
- * which is why the right side is quiet. The background and rule run the
- * full width; the content shares the message column's width and padding,
- * so pill, title, messages and composer keep one left edge on a wide
- * window. In a narrow one the pill drops its kind, then shrinks; the
- * actions never do.
+ * The topic header (SPEC 7, inventory 5): two islands over the top of the
+ * topic, with no bar. Left: the context pill (the channel's name; its kind
+ * is the tint, the icon, the tooltip and the accessible name) and the
+ * title, which opens the topic's menu. Right: Resolve or Reopen (Threads on
+ * Main) and Juno. Everything else is in the menu. The islands line up with
+ * the reading column, and under 480px Resolve shows as an icon and Threads
+ * as its count. Rename turns the title into a field in place.
  */
-export function TopicHeader({ detail, art, threadsOpen = false, onThreads, threads, onRename }: TopicHeaderProps) {
+export function TopicHeader({ detail, menuOpen = false, onMenu, rename, onPill, onResolve, threadsOpen = false, onThreads, threads, juno }: TopicHeaderProps) {
   const { channel } = detail
   const main = detail.kind === 'main'
-  const [draft, setDraft] = useState<string | undefined>(undefined)
-  const renaming = draft !== undefined && !main && onRename !== undefined
-
-  const commit = () => {
-    if (draft !== undefined && onRename !== undefined) onRename(detail.id, draft.trim())
-    setDraft(undefined)
-  }
-  const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === 'Enter') {
-      event.preventDefault()
-      commit()
-    } else if (event.key === 'Escape') {
-      event.preventDefault()
-      setDraft(undefined)
-    }
-  }
+  const kind = kindLabels[channel.kind]
+  const pillName = `${channel.name}, ${kind.toLowerCase()}`
 
   const threadCount = detail.threadCount ?? 0
   const threadsButton = (
-    <Button variant="outline" size="lg" tone="subtle" iconStart={ChatsCircle} pressed={threadsOpen} aria-expanded={threadsOpen} onClick={() => onThreads?.(!threadsOpen)}>
-      {threadCount > 0 ? `Threads · ${threadCount}` : 'Threads'}
-    </Button>
+    <IslandButton
+      icon={ChatsCircle}
+      label={threadCount > 0 ? `Threads · ${threadCount}` : 'Threads'}
+      narrowLabel={threadCount > 0 ? String(threadCount) : 'Threads'}
+      name={threadCount > 0 ? `Threads, ${threadCount}` : 'Threads'}
+      expanded={threadsOpen}
+      onClick={() => onThreads?.(!threadsOpen)}
+    />
   )
+
+  const resolve = main ? (
+    onThreads === undefined ? null : (
+      <Popover open={threadsOpen} onClose={() => onThreads(false)} anchor={threadsButton} placement="bottom-end" width="browse" padding="none" label="Threads">
+        {threads}
+      </Popover>
+    )
+  ) : onResolve === undefined ? null : detail.resolved ? (
+    <IslandButton icon={ArrowCounterClockwise} label="Reopen" onClick={onResolve} />
+  ) : (
+    <IslandButton icon={CheckCircle} label="Resolve" onClick={onResolve} />
+  )
+  const junoButton = juno === undefined ? null : <JunoToggle pressed={juno.open} onToggle={juno.onToggle} />
 
   return (
-    <header data-topic-header="" {...stylex.props(styles.header)}>
-      <div {...stylex.props(styles.content)}>
-        <div {...stylex.props(styles.row)}>
-          <ContextPill tint={tints[channel.kind]} icon={kindIcons[channel.kind]} name={channel.name} kindLabel={kindLabels[channel.kind]} showKind="roomy" />
-          <span {...stylex.props(styles.spacer)} />
-          {main && onThreads !== undefined ? (
-            <Popover open={threadsOpen} onClose={() => onThreads(false)} anchor={threadsButton} placement="bottom-end" width="browse" padding="none" label="Threads">
-              {threads}
-            </Popover>
-          ) : null}
-        </div>
-        <div {...stylex.props(styles.row, styles.titleRow)}>
-          <span {...stylex.props(styles.art)}>{art ?? <TopicIcon detail={detail} />}</span>
-          {renaming ? (
-            <input
-              type="text"
-              aria-label="Topic title"
-              value={draft}
-              autoFocus
-              onChange={(event) => setDraft(event.currentTarget.value)}
-              onFocus={(event) => event.currentTarget.select()}
-              onBlur={commit}
-              onKeyDown={onKeyDown}
-              {...stylex.props(styles.input)}
+    <HeaderIslands
+      column="reading"
+      data={{ 'data-topic-header': '' }}
+      left={
+        <>
+          <span {...stylex.props(styles.pill)}>
+            <ContextPill
+              tint={tints[channel.kind]}
+              icon={kindIcons[channel.kind]}
+              name={channel.name}
+              kindLabel={kind}
+              size={24}
+              {...(onPill === undefined ? {} : { onClick: onPill, label: `${pillName}. Show in sidebar.` })}
             />
-          ) : main ? (
-            <>
-              <Text variant="topicTitle" tone="default" truncate tooltipWhenTruncated dir="auto" sx={styles.title}>
-                {channel.label} · Main
-              </Text>
-            </>
+          </span>
+          {rename === undefined || main ? (
+            <HeaderTitleButton title={main ? 'Main' : detail.title} expanded={menuOpen} onOpen={onMenu} />
           ) : (
-            <Text
-              variant="topicTitle"
-              tone="default"
-              truncate
-              tooltipWhenTruncated
-              dir="auto"
-              onDoubleClick={onRename === undefined ? undefined : () => setDraft(detail.title)}
-              sx={styles.title}
-            >
-              {detail.title}
-            </Text>
+            <RenameField title={detail.title} size="header" onSave={rename.onSave} onCancel={rename.onCancel} />
           )}
-        </div>
-      </div>
-    </header>
+        </>
+      }
+      right={
+        resolve === null && junoButton === null ? undefined : (
+          <>
+            {resolve}
+            {junoButton}
+          </>
+        )
+      }
+    />
   )
-}
-
-/** What the icon slot shows until the topic has art: the DM partner's photo, the group's initials, or the channel's icon. */
-function TopicIcon({ detail }: { readonly detail: TopicDetail }) {
-  const { channel } = detail
-  if (channel.kind === 'im') {
-    const partner = channel.partner
-    const name = partner?.name ?? channel.name
-    return <Avatar label={initials(name)} size={32} hue={hueFor(partner?.color ?? channel.color, partner?.id ?? channel.id)} {...(partner?.avatarUrl === undefined ? {} : { src: partner.avatarUrl })} />
-  }
-  if (channel.kind === 'mpim') {
-    return <Avatar kind="group" label={groupInitials(channel.name)} size={32} hue={hueFor(channel.color, channel.id)} />
-  }
-  const icon = channelIconFor(channel.icon)
-  return <ChannelIcon name={channel.name} id={channel.id} color={hueFor(channel.color, channel.id)} size={32} {...(icon === undefined ? {} : { icon })} />
 }
 
 const styles = stylex.create({
-  header: {
-    flexShrink: 0,
-    width: '100%',
-    minHeight: layout['--topic-header-height'],
-    paddingBlock: spacing['--space-3-5'],
-    boxSizing: 'border-box',
-    borderBottomWidth: '1px',
-    borderBottomStyle: 'solid',
-    borderBottomColor: colors['--border-subtle'],
-    backgroundColor: colors['--background'],
-    userSelect: 'none',
-  },
-  // The message column's width and padding (MessageList `column`). A size
-  // container, so the pill can drop its kind by the header's width.
-  content: {
+  // The full name up to 160px, then an ellipsis; it gives way only once the title is at its floor.
+  pill: {
     display: 'flex',
-    flexDirection: 'column',
-    gap: spacing['--space-2'],
-    width: '100%',
-    maxWidth: layout['--reading-width'],
-    marginInline: 'auto',
-    paddingInline: spacing['--space-6'],
-    boxSizing: 'border-box',
-    containerType: 'inline-size',
-  },
-  row: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: spacing['--space-2'],
-    minWidth: 0,
-    minHeight: sizes['--control-32'],
-  },
-  titleRow: {
-    gap: spacing['--space-2-5'],
-  },
-  spacer: {
-    flexGrow: 1,
-  },
-  // The topic art slot: fixed at the avatar size, so art and the Tide
-  // placeholder drop in with no shift.
-  art: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-    width: sizes['--avatar-32'],
-    height: sizes['--avatar-32'],
-    overflow: 'hidden',
-  },
-  title: {
     flexShrink: 1,
     minWidth: 0,
-  },
-  // The rename input (inventory 5): the title's own type, pulled in by its
-  // padding so the text does not move when it appears.
-  input: {
-    flexGrow: 1,
-    minWidth: 0,
-    height: sizes['--control-34'],
-    marginBlock: `calc(-1 * ${spacing['--space-1']})`,
-    marginInlineStart: `calc(-1 * ${spacing['--space-2']})`,
-    paddingInline: spacing['--space-2'],
-    borderWidth: '1px',
-    borderStyle: 'solid',
-    borderColor: colors['--border-strongest'],
-    borderRadius: radii['--radius-lg'],
-    backgroundColor: colors['--surface-default'],
-    color: colors['--foreground-default'],
-    fontFamily: text['--text-topic-title-family'],
-    fontSize: text['--text-topic-title-size'],
-    fontWeight: text['--text-topic-title-weight'],
-    letterSpacing: text['--text-topic-title-tracking'],
-    outline: 'none',
-    cursor: 'text',
-    userSelect: 'text',
+    maxWidth: PILL_MAX_WIDTH,
   },
 })

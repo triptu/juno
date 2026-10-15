@@ -29,6 +29,7 @@ export default defineFixtures(Surface, {
     group: fixture({ kind: 'group', children: <div style={{ width: 480, height: 96 }} /> }),
     inset: fixture({ kind: 'inset', children: <Text variant="code">add a dry-run flag and tests for the selection logic</Text> }),
     toast: fixture({ kind: 'toast', padding: 'md', children: <Text variant="ui">Resolved · Postgres 16 migration plan</Text> }),
+    island: fixture({ kind: 'island', children: <div style={{ width: 160, height: 28 }} /> }),
   },
   Overview: {
     'all-kinds': scene(() => (

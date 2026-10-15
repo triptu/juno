@@ -1,5 +1,5 @@
 import * as stylex from '@stylexjs/stylex'
-import { useState, type KeyboardEvent, type ReactNode, type Ref } from 'react'
+import { useState, type KeyboardEvent, type MouseEvent, type ReactNode, type Ref } from 'react'
 import type { MessageView, Person } from '@juno/contract'
 import { layout, sizes, spacing } from '@juno/tokens/tokens.stylex'
 import { EmptyState, hueForId, ScrollArea, Text, type ActivateEvent, type HueName } from '@juno/ui'
@@ -46,7 +46,7 @@ export interface MessageListProps {
   readonly older?: OlderStatus
   /** The scroll element, for the container's open position and stick-to-bottom. */
   readonly scrollRef?: Ref<HTMLElement>
-  /** The divider, for the container to scroll it 80px from the top on open. */
+  /** The divider, for the container to scroll it 80px below the header band on open. */
   readonly anchorRef?: Ref<HTMLDivElement>
   /** The person hue for @mention chips. Default: the id's hash. */
   readonly hueOf?: (id: string) => HueName
@@ -60,6 +60,8 @@ export interface MessageListProps {
   readonly onRetry?: (clientMsgId: string) => void
   /** Delete draft on a failed send. */
   readonly onDiscard?: (clientMsgId: string) => void
+  /** Right-click or the context-menu key on a message: its menu, at the pointer. */
+  readonly onMessageMenu?: (ts: string, event: MouseEvent) => void
 }
 
 const ROW = '[data-message-row]'
@@ -76,6 +78,16 @@ function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
   event.preventDefault()
   next.focus()
   next.scrollIntoView({ block: 'nearest', behavior: 'instant' })
+}
+
+/** One handler for every row: the row under the pointer, or the focused row for the context-menu key. A field keeps its own menu. */
+function messageMenu(event: MouseEvent, onMessageMenu: (ts: string, event: MouseEvent) => void) {
+  const target = event.target
+  if (!(target instanceof Element) || target.closest('input, textarea') !== null) return
+  const ts = target.closest<HTMLElement>(ROW)?.dataset.messageRow
+  if (ts === undefined) return
+  event.preventDefault()
+  onMessageMenu(ts, event)
 }
 
 /**
@@ -105,6 +117,7 @@ export function MessageList({
   onToggleReaction,
   onRetry,
   onDiscard,
+  onMessageMenu,
 }: MessageListProps) {
   const [focusedTs, setFocusedTs] = useState<string | undefined>(undefined)
   const last = items[items.length - 1]
@@ -113,8 +126,15 @@ export function MessageList({
   const newCount = dividerIndex < 0 ? 0 : items.length - dividerIndex
 
   return (
-    <ScrollArea scrollbar="hover" ref={scrollRef} data-scroll="" sx={styles.scroller}>
-      <div role="list" aria-label="Messages" aria-busy={status === 'loading' || status === 'pending'} onKeyDown={onKeyDown} {...stylex.props(styles.column)}>
+    <ScrollArea scrollbar="hover" underHeader ref={scrollRef} data-scroll="" sx={styles.scroller}>
+      <div
+        role="list"
+        aria-label="Messages"
+        aria-busy={status === 'loading' || status === 'pending'}
+        onKeyDown={onKeyDown}
+        onContextMenu={onMessageMenu === undefined ? undefined : (event) => messageMenu(event, onMessageMenu)}
+        {...stylex.props(styles.column)}
+      >
         {older !== 'none' ? (
           <div aria-live="polite" {...stylex.props(styles.olderLine)}>
             {older === 'loading' ? (

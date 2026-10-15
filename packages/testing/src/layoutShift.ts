@@ -23,8 +23,10 @@ import type { Page } from '@playwright/test'
  *    score misses (small or off-screen elements) and works the same way
  *    whether or not the browser reports `layout-shift` entries.
  *
- * After the action it waits two animation frames, the longest transition or
- * animation declared under the root, and `settleMs`, then reads both.
+ * After the action it waits two animation frames, then until every
+ * transition or animation running under the root has finished (one iteration
+ * for an endless one), then `settleMs`, then reads both. Motion that is
+ * declared but not running cannot move anything, so it is not waited for.
  */
 export interface LayoutShiftOptions {
   /** CSS selector of the region to snapshot. Default: the gallery's `[data-fixture-frame]`, else `body`. */
@@ -77,11 +79,10 @@ interface PageState {
   startedAt: number
   root: HTMLElement
   before: Snapshot[]
-  beforeDeclaredMs: number
   describe: (node: Node | null) => string
   toEntry: (entry: PerformanceEntry) => ShiftEntry
   snapshot: () => Snapshot[]
-  declaredMs: () => number
+  runningMs: (endless: boolean) => number
 }
 
 const stateKey = '__junoLayoutShiftGuard'
@@ -148,26 +149,19 @@ export async function measureLayoutShift(page: Page, action: () => Promise<unkno
         })
       }
 
-      // "0.15s, 0s" or "150ms" to a list of milliseconds.
-      const milliseconds = (list: string): number[] =>
-        list.split(',').map((part) => {
-          const value = parseFloat(part)
-          if (Number.isNaN(value)) return 0
-          return part.trim().endsWith('ms') ? value : value * 1000
-        })
-      const declaredMs = (): number => {
+      // How long until the motion running under the root ends: what is left of
+      // each finite transition or animation, and one iteration of an endless one
+      // when `endless` is set.
+      const runningMs = (endless: boolean): number => {
         let longest = 0
-        for (const el of [rootEl, ...Array.from(rootEl.querySelectorAll('*'))]) {
-          const style = getComputedStyle(el)
-          for (const [durations, delays] of [
-            [style.transitionDuration, style.transitionDelay],
-            [style.animationDuration, style.animationDelay],
-          ] as const) {
-            const delay = milliseconds(delays)
-            milliseconds(durations).forEach((duration, index) => {
-              longest = Math.max(longest, duration + (delay[index % delay.length] ?? 0))
-            })
-          }
+        for (const animation of rootEl.getAnimations({ subtree: true })) {
+          if (animation.playState !== 'running') continue
+          const timing = animation.effect?.getComputedTiming()
+          if (!timing) continue
+          const end = Number(timing.endTime)
+          if (!Number.isFinite(end) && !endless) continue
+          const left = Number.isFinite(end) ? end - Number(timing.localTime ?? 0) : Number(timing.delay ?? 0) + Number(timing.duration ?? 0)
+          longest = Math.max(longest, left / Math.abs(animation.playbackRate || 1))
         }
         return longest
       }
@@ -199,11 +193,10 @@ export async function measureLayoutShift(page: Page, action: () => Promise<unkno
         startedAt,
         root: rootEl,
         before: snapshot(),
-        beforeDeclaredMs: declaredMs(),
         describe,
         toEntry,
         snapshot,
-        declaredMs,
+        runningMs,
       }
 
       if (state.observerSupported) {
@@ -229,9 +222,15 @@ export async function measureLayoutShift(page: Page, action: () => Promise<unkno
       const frames = () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
       const started = performance.now()
       await frames()
-      const wait = Math.max(state.beforeDeclaredMs, state.declaredMs()) + settle
-      if (wait > 0) {
+      // A transition can start another when it ends, so look again after each wait.
+      for (let round = 0; round < 4; round++) {
+        const wait = state.runningMs(round === 0)
+        if (wait <= 0) break
         await new Promise((resolve) => setTimeout(resolve, wait))
+        await frames()
+      }
+      if (settle > 0) {
+        await new Promise((resolve) => setTimeout(resolve, settle))
         await frames()
       }
 

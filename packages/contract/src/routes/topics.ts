@@ -6,9 +6,11 @@
  * first, then Recent, both by latest activity. `topics.counts` feeds the
  * small dots after the Channels and DMs filters.
  *
- * `topics.subscribe` and `topics.unsubscribe` are the first commands: one
- * local transaction, then the mirror to Slack for a thread. They return the
- * undo the engine computed (ADR 0010).
+ * `topics.subscribe` and `topics.unsubscribe` follow and unfollow a thread:
+ * one local transaction, then the mirror to Slack. The topic actions
+ * (resolve, reopen, pin, unpin, rename) and ignoring a channel are local to
+ * Juno; resolve also marks the topic read, which mirrors like any mark.
+ * Every command returns the undo the engine computed (ADR 0010).
  */
 import { Schema } from 'effect'
 import { Rpc, RpcGroup } from 'effect/rpc'
@@ -150,7 +152,30 @@ export const topicsCounts = liveValueRoute('topics.counts', { value: TopicCounts
  * (ADR 0010). The undo stack stores these and writes the matching command
  * atom on ⌘Z or the toast's Undo. Later commands add their shape here.
  */
+/**
+ * Overlay columns as stored, for an undo: a present key sets the column,
+ * `null` clears it. Only the engine builds one.
+ */
+export const OverlayPatch = Schema.Struct({
+  manualTitle: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  resolvedAt: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  resolvedActivityTs: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  reopenedAt: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  pinnedAt: Schema.optionalKey(Schema.NullOr(Schema.String)),
+})
+export type OverlayPatch = typeof OverlayPatch.Type
+
+const restorePayload = {
+  id: Schema.String,
+  overlay: OverlayPatch,
+  /** Also mark the topic unread from this message, as before a resolve or a mark read. */
+  unreadFrom: Schema.optionalKey(Schema.String),
+}
+
 export const UndoCommand = Schema.Union([
+  Schema.TaggedStruct('topics.restore', restorePayload),
+  Schema.TaggedStruct('channels.ignore', { channel: Schema.String }),
+  Schema.TaggedStruct('channels.unignore', { channel: Schema.String }),
   Schema.TaggedStruct('topics.subscribe', { id: Schema.String }),
   Schema.TaggedStruct('topics.unsubscribe', { id: Schema.String }),
   Schema.TaggedStruct('reads.markRead', { id: Schema.String, upTo: Schema.optionalKey(Schema.String) }),
@@ -184,4 +209,57 @@ export const topicsSubscribe = Rpc.make('topics.subscribe', { payload: topicPayl
 /** Unfollows a thread in Slack. Returns an undo that subscribes again. A Main is `NotFound`. */
 export const topicsUnsubscribe = Rpc.make('topics.unsubscribe', { payload: topicPayload, success: CommandResult, error: SubscribeError })
 
-export const TopicsRoutes = RpcGroup.make(topicsList, topicsCounts, topicsSubscribe, topicsUnsubscribe)
+/** Why a topic action did not happen: no workspace is open, or the id is not a topic the store knows (or the action does not apply to it). */
+export const TopicActionError = Schema.Union([NotSignedIn, NotFound])
+export type TopicActionError = typeof TopicActionError.Type
+
+const action = <Tag extends string, P extends Schema.Struct.Fields>(tag: Tag, payload: P) =>
+  Rpc.make(tag, { payload, success: CommandResult, error: TopicActionError })
+
+/**
+ * Resolves a topic: it leaves Recent until a new message reopens it (a
+ * pinned one stays in Pinned with a check), and it is marked read. It
+ * never unfollows. The undo puts back the resolve state, the Reopened tag
+ * and the unread messages together.
+ */
+export const topicsResolve = action('topics.resolve', topicPayload)
+
+/** Reopens a resolved topic. The undo resolves it again as it was. */
+export const topicsReopen = action('topics.reopen', topicPayload)
+
+/** Pins a topic: it shows in Pinned whatever its status, unless its channel is ignored. */
+export const topicsPin = action('topics.pin', topicPayload)
+
+export const topicsUnpin = action('topics.unpin', topicPayload)
+
+/**
+ * Renames a thread. An empty title, or the AI title, clears the manual
+ * title (architecture 4.4). Main has no title of its own: `NotFound`.
+ */
+export const topicsRename = action('topics.rename', { id: Schema.String, title: Schema.String })
+
+/** Puts overlay columns back, and the unread messages with `unreadFrom`: the undo of the actions above. */
+export const topicsRestore = action('topics.restore', restorePayload)
+
+/**
+ * Ignores a channel in Juno: its topics are hidden everywhere and never
+ * notify. Nothing changes in Slack. A DM cannot be ignored: `NotFound`.
+ */
+export const channelsIgnore = action('channels.ignore', { channel: Schema.String })
+
+export const channelsUnignore = action('channels.unignore', { channel: Schema.String })
+
+export const TopicsRoutes = RpcGroup.make(
+  topicsList,
+  topicsCounts,
+  topicsSubscribe,
+  topicsUnsubscribe,
+  topicsResolve,
+  topicsReopen,
+  topicsPin,
+  topicsUnpin,
+  topicsRename,
+  topicsRestore,
+  channelsIgnore,
+  channelsUnignore,
+)

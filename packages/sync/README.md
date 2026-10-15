@@ -74,7 +74,7 @@ Juno's pointer (`topic_reads.last_read_ts`) is the state the sidebar shows. The 
 
 | Rule | Code | Spec |
 | --- | --- | --- |
-| A mark moves the pointer and flag at once, stamps `observed_at` and re-indexes in one transaction. A mirrored mark (setting on; Main or a followed thread) sets `commanded` and writes or replaces the topic's one `mark` outbox row. | `engine/reads/commands.ts`, `writeLocalMark` | `localChange`; `pendingIntentWins` |
+| A mark moves the pointer and flag at once, stamps `observed_at` and re-indexes in one transaction. A mirrored mark (setting on; Main or a followed thread) sets `commanded` and writes or replaces the topic's one `mark` outbox row. | `engine/marks.ts`, `writeLocalMark` | `localChange`; `pendingIntentWins` |
 | A new row waits 400 ms; marks meanwhile, or while it is in flight, replace its intent (`gen`). | `writeLocalMark`, `MarkWorker` | `localChange` on a pending topic; `coalesceStep` |
 | Success ends the row unless the intent changed, records Slack's pointer (`slack_read_ts`) and stamps `observed_at`, so a page requested while the mark was pending cannot apply. A changed intent is sent again. | `endMark` | `respond`; `pendingPageStep` |
 | A transient error keeps the intent and retries with backoff, across restarts. | `deferMark` | `retry`; `retryAfterAcceptStep` |
@@ -95,7 +95,7 @@ Known limits: thread marks made elsewhere while the socket was down reach Juno a
 - A message first stored from a search match has no reaction state, files or blocks until a page or an event brings it.
 - A follow changed elsewhere during a drop, on a thread with no activity since the last sync, waits for the next window pass (at most an hour). A follow older than the window waits for its thread's next reply.
 - The sweep reads at most 150 matches per gap; a longer outage in a busy workspace misses older thread activity until the next sweep or open.
-- The persisted outbox for edits, deletes, reactions and uploads is a later milestone. Read marks and posts have their own workers in the engine (`reads/worker.ts`, `send/worker.ts`).
+- The persisted outbox for edits, deletes, reactions and uploads is a later milestone. Read marks and posts have their own workers in the engine (`markWorker.ts`, `send/worker.ts`).
 
 ## Must not
 

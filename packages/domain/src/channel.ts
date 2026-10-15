@@ -28,8 +28,11 @@ export function firstName(name: string): string {
   return name.trim().split(/\s+/)[0] ?? name
 }
 
+/** What a channel's label is made from. */
+export type ChannelNaming = Pick<ChannelInfo, 'kind' | 'name' | 'memberNames'>
+
 /** "#eng", "Maya Chen" or "Maya, Leo". The text a row, a toast or a tab uses. */
-export function channelLabel(channel: ChannelInfo): string {
+export function channelLabel(channel: ChannelNaming): string {
   switch (channel.kind) {
     case 'public':
     case 'private':
@@ -44,7 +47,7 @@ export function channelLabel(channel: ChannelInfo): string {
 }
 
 /** The label without a "#" prefix, for places that already show a hash icon. */
-export function channelLabelBare(channel: ChannelInfo): string {
+export function channelLabelBare(channel: ChannelNaming): string {
   const label = channelLabel(channel)
   return label.startsWith('#') ? label.slice(1) : label
 }
