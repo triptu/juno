@@ -62,6 +62,12 @@ async function converse(mac: Mac, text: string, answer: string) {
 
 const texts = (turns: Turns) => turns.messages().map((m) => m.text)
 
+/** The tables of agent.sqlite whose rows hold `word` anywhere. */
+const holding = (turns: Turns, word: string) =>
+  (turns.store.db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as Array<{ name: string }>)
+    .map((row) => row.name)
+    .filter((table) => JSON.stringify(turns.store.db.prepare(`SELECT * FROM "${table}"`).all()).includes(word))
+
 const manifestOf = (folder: string, gen: number) => parseManifest(readText(manifestPath(folder, gen))!)!.manifest
 
 let calls = 0
@@ -263,7 +269,7 @@ it('a stale owner: a Mac still running after a forced restore elsewhere stops wh
   expect(manifestOf(folder, 2).owner.name).toBe('Laptop')
 })
 
-it('a removal raises the deletion record, regenerates the backup without the message and destroys the old generation; an older copy of the folder is refused on this Mac', async () => {
+it('a removal raises the deletion record, its purge regenerates the backup without the message and destroys the old generation; an older copy of the folder is refused on this Mac', async () => {
   const folder = tempDir()
   const a = await startMac('Studio', fakeKeychain())
   await a.h.turns.backup!.setFolder(folder)
@@ -274,22 +280,18 @@ it('a removal raises the deletion record, regenerates the backup without the mes
   const before = tempDir()
   cpSync(folder, before, { recursive: true })
 
-  // WP16's removal, in its order: the record first, then the removal transaction, then the purge's
-  // backup step.
-  const { db } = a.h.turns.store
-  await a.h.turns.backup!.removal.raiseDeletion(1)
+  // The owner's Remove (WP16): the record is raised first, then the removal commits, then the purge
+  // regenerates the backup.
+  const secret = a.h.turns.messages().find((m) => m.kind === 'user' && m.text.includes('4417'))!
+  expect(await a.h.turns.redaction.remove({ opId: 'remove-1', messageIds: [secret.id], alsoRemoveReply: false })).toMatchObject({ _tag: 'removed', gen: 1 })
   expect(a.keychain.values().deletionRecord).toBe('1')
-  db.exec("UPDATE messages SET text = '', redacted_gen = 1 WHERE text LIKE '%4417%'")
-  db.exec("UPDATE inbox SET text = '' WHERE text LIKE '%4417%'")
-  db.exec('UPDATE memory_head SET gen = 1')
-  await a.h.turns.backup!.removal.regenerate(1)
-  // Idempotent: the purge step may run again after a crash.
-  await a.h.turns.backup!.removal.regenerate(1)
+  await a.h.turns.redaction.idle()
+  expect(a.h.turns.redaction.pending()).toEqual([])
   expect(generations(folder)).toEqual([2])
   expect(manifestOf(folder, 2)).toMatchObject({ label: 1, deletion: 1 })
 
   const { mac: b } = await restoreOnNewMac('Laptop', a, folder)
-  expect(texts(b.h.turns).join('\n')).not.toContain('4417')
+  expect(holding(b.h.turns, '4417')).toEqual([])
   expect(texts(b.h.turns).join('\n')).toContain('lunch at noon')
 
   // This Mac's keychain holds the record, so the copy from before the removal is refused.

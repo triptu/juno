@@ -11,7 +11,10 @@
  *    (G7, spec `observeOwner`);
  * 2. starts a new generation when one is due: none yet, the last close was
  *    not clean (changes made before a crash were never captured), the
- *    deletion record is ahead of the generation (G13), the schema or the
+ *    deletion record is ahead of both the generation and the data (G13: a
+ *    crash after the record was raised, before the removal committed; a
+ *    removal that committed regenerates through its purge, after the node
+ *    versions that depend on it are gone), the schema or the
  *    set of tables changed (a patchset holds no schema), the folder
  *    changed, or an earlier export failed after its cut;
  * 3. otherwise cuts the changes since the last segment, writes the
@@ -63,7 +66,11 @@ export interface BackupKeychain {
 export interface RemovalHooks {
   /** Raises the keychain deletion record to at least `gen`. Durable before it resolves. */
   readonly raiseDeletion: (gen: number) => Promise<void>
-  /** Starts a generation from a snapshot taken at memory generation `gen` or later, then deletes the older ones. Idempotent. */
+  /**
+   * Starts a generation from a snapshot taken now, then deletes the older ones. The purge calls it
+   * after the node versions that depend on removal `gen` are gone, so the snapshot holds nothing of
+   * it. Safe to repeat.
+   */
   readonly regenerate: (gen: number) => Promise<void>
 }
 
@@ -165,6 +172,8 @@ export function createBackup(options: BackupOptions): Backup {
   // The manifest must be written again although nothing changed (a new phrase).
   let republish = false
   let stopped = false
+  // The newest removal generation a `regenerate` snapshot of this process covers.
+  let regenerated = 0
 
   let queue: Promise<unknown> = Promise.resolve()
   const serial = <T>(f: () => Promise<T>): Promise<T> => {
@@ -303,9 +312,10 @@ export function createBackup(options: BackupOptions): Backup {
     if (ownedElsewhere(key)) return
     const p = progress()
     const at = due ? undefined : load(key)
+    const record = await deletionRecord()
     const stale =
       at === undefined ||
-      (await deletionRecord()) > p.label ||
+      (record > p.label && memoryGen() < record) ||
       at.manifest.schema.join() !== schema().join() ||
       replicatedTables(db, local).join() !== capture!.tables.join()
     if (stale) {
@@ -366,9 +376,10 @@ export function createBackup(options: BackupOptions): Backup {
         serial(async () => {
           if (stopped || owner().state !== 'active') return
           const key = await backupKey()
-          if (!due && progress().memory_gen >= gen && load(key) !== undefined) return
+          if (!due && regenerated >= gen && load(key) !== undefined) return
           if (ownedElsewhere(key)) return
           await newGeneration(key, 'active')
+          regenerated = Math.max(regenerated, gen)
         }),
     },
     close: async () => {
