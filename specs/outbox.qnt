@@ -11,7 +11,14 @@ module outboxProtocol {
     server: int -> int, request: int -> str, due: Set[int],
     events: Set[int], fetches: Set[Fetch], scan: Set[int],
     online: bool, connected: bool, catchup: bool, sealed: bool,
-    label: str, target: int
+    label: str, target: int,
+    // One action row per message (edit, delete or reaction toggle): none,
+    // waiting, transit, accepted, done or dropped. Kind `change` stands for
+    // an edit or a reaction toggle; `delete` replaces them. `stale` holds rows
+    // whose intent changed while a call was out. `actSent` records every
+    // action call that left Juno; `acted` every message Slack applied one to.
+    act: int -> str, actKind: int -> str, stale: Set[int],
+    actSent: Set[int], acted: Set[int]
   }
   var s: State
   var remaining: int
@@ -21,9 +28,14 @@ module outboxProtocol {
     s' = { created: Set(), row: drafts.mapBy(_ => "gone"), stored: Set(), discarded: Set(),
       server: drafts.mapBy(_ => 0), request: drafts.mapBy(_ => "idle"), due: Set(),
       events: Set(), fetches: Set(), scan: Set(),
-      online: true, connected: true, catchup: false, sealed: false, label: "init", target: 0 },
+      online: true, connected: true, catchup: false, sealed: false, label: "init", target: 0,
+      act: drafts.mapBy(_ => "none"), actKind: drafts.mapBy(_ => "change"), stale: Set(),
+      actSent: Set(), acted: Set() },
     remaining' = drainLimit, turn' = 0
   }
+
+  def actPending(k: int): bool = Set("waiting", "transit", "accepted").contains(s.act.get(k))
+  def actInFlight(k: int): bool = Set("transit", "accepted").contains(s.act.get(k))
 
   action send(k: int): bool = all {
     not(s.sealed), not(s.created.contains(k)),
@@ -93,6 +105,8 @@ module outboxProtocol {
       server: drafts.mapBy(k => s.server.get(k) + (if (accepted.contains(k)) 1 else 0)),
       row: drafts.mapBy(k => if (s.row.get(k) == "sending") (if (guard) "unknown" else "queued") else s.row.get(k)),
       request: drafts.mapBy(_ => "idle"), fetches: Set(),
+      // Action rows persist; their calls go out again.
+      act: drafts.mapBy(k => if (actInFlight(k)) "waiting" else s.act.get(k)),
       // Interrupted lookups become due again; their rows persist.
       due: s.due.union(drafts.filter(k => s.row.get(k) == "unknown")),
       label: "crash", target: 0 }
@@ -155,6 +169,77 @@ module outboxProtocol {
     s' = { ...s, due: s.due.union(Set(k)), label: "wake", target: k }
   }
 
+  // Actions on an existing message: edit, delete and reaction toggles.
+  def deleted(k: int): bool = s.actKind.get(k) == "delete" and s.act.get(k) == "done"
+  // On a queued or failed post nothing goes to Slack: an edit rewrites the
+  // row's text, a reaction on a failed post is refused, and a delete removes
+  // the row like Delete draft.
+  def localAction(k: int, kind: str): State =
+    if (kind == "delete") { ...s, row: s.row.set(k, "gone"), due: s.due.exclude(Set(k)),
+      discarded: s.discarded.union(Set(k)) } else s
+  // On a sending or unknown post the row depends on the post (depends_on);
+  // on a stored message it carries the ts. A newer intent replaces a waiting
+  // row; a row with a call out sends again after its answer.
+  action queueAction(k: int, kind: str): bool = {
+    val local = Set("queued", "failed").contains(s.row.get(k)) and not(actPending(k))
+    val queued = { ...s, actKind: s.actKind.set(k, kind),
+      act: s.act.set(k, if (actInFlight(k)) s.act.get(k) else "waiting"),
+      stale: if (actInFlight(k)) s.stale.union(Set(k)) else s.stale }
+    val after = if (local) localAction(k, kind) else queued
+    all {
+      not(s.sealed), s.created.contains(k), not(s.discarded.contains(k)), not(deleted(k)),
+      not(actPending(k) and s.actKind.get(k) == "delete"),
+      s' = { ...after, label: "queueAction", target: k }
+    }
+  }
+  // The worker resolves the ts from the stored message when it runs. With
+  // the guard off it calls with a guessed ts before the post is stored.
+  action runActionWith(k: int, guard: bool): bool = all {
+    s.online, s.act.get(k) == "waiting", not(guard) or s.stored.contains(k),
+    s' = { ...s, act: s.act.set(k, "transit"), stale: s.stale.exclude(Set(k)),
+      actSent: s.actSent.union(Set(k)), label: "runAction", target: k }
+  }
+  action runAction(k: int): bool = runActionWith(k, true)
+  // Slack applies the call. A repeat is harmless: an edit sets the text, a
+  // missing message counts as deleted, already_reacted and no_reaction count
+  // as done.
+  action actAccept(k: int): bool = all {
+    s.act.get(k) == "transit",
+    s' = { ...s, act: s.act.set(k, "accepted"), acted: s.acted.union(Set(k)), label: "actAccept", target: k }
+  }
+  // The answer is stored as the socket event would store it, and the row
+  // ends in the same transaction unless its intent changed meanwhile.
+  action actAnswer(k: int): bool = all {
+    s.act.get(k) == "accepted",
+    s' = { ...s, act: s.act.set(k, if (s.stale.contains(k)) "waiting" else "done"),
+      label: "actAnswer", target: k }
+  }
+  // A lost answer, timeout or rate limit: the row waits and goes out again.
+  action actFail(k: int): bool = all {
+    not(s.sealed), actInFlight(k),
+    s' = { ...s, act: s.act.set(k, "waiting"), label: "actFail", target: k }
+  }
+  // A refusal ends the row; the view shows the stored message again.
+  action actRefuse(k: int): bool = all {
+    not(s.sealed), s.act.get(k) == "transit",
+    s' = { ...s, act: s.act.set(k, "dropped"), stale: s.stale.exclude(Set(k)),
+      label: "actRefuse", target: k }
+  }
+  // A dependent action ends without a call when its post failed or was
+  // discarded. On a failed post an edit goes into the row's text, a reaction
+  // ends, and a delete discards the row.
+  action dropAction(k: int): bool = {
+    val discard = s.row.get(k) == "failed" and s.actKind.get(k) == "delete"
+    all {
+      s.act.get(k) == "waiting", not(s.stored.contains(k)),
+      Set("failed", "gone").contains(s.row.get(k)),
+      s' = { ...s, act: s.act.set(k, "dropped"), stale: s.stale.exclude(Set(k)),
+        row: if (discard) s.row.set(k, "gone") else s.row,
+        discarded: if (discard) s.discarded.union(Set(k)) else s.discarded,
+        label: "dropAction", target: k }
+    }
+  }
+
   action disconnect = all {
     not(s.sealed), s.connected,
     s' = { ...s, connected: false, events: Set(), scan: Set(), catchup: false, label: "disconnect" }
@@ -182,19 +267,25 @@ module outboxProtocol {
     (s.stored.contains(k) or s.discarded.contains(k)))
   val quiet = s.online and s.connected and not(s.catchup) and s.scan.size() == 0 and
     s.events.size() == 0 and s.fetches.size() == 0 and drafts.forall(k =>
-      s.request.get(k) == "idle" and Set("gone", "failed").contains(s.row.get(k)))
+      s.request.get(k) == "idle" and Set("gone", "failed").contains(s.row.get(k)) and not(actPending(k)))
   val agreed = s.created.forall(k => s.discarded.contains(k) or
     (s.row.get(k) == "gone" and s.stored.contains(k) and s.server.get(k) == 1) or
-    (s.row.get(k) == "failed" and not(s.stored.contains(k)) and s.server.get(k) == 0))
+    (s.row.get(k) == "failed" and not(s.stored.contains(k)) and s.server.get(k) == 0)) and
+    drafts.forall(k => s.act.get(k) == "done" implies s.acted.contains(k))
   val quietAgreement = (s.sealed and quiet) implies agreed
   val reachedAgreement = s.sealed and quiet and agreed
   val drainBound = remaining > 0 or reachedAgreement
-  val invariants = atMostOnce and noDoubleShow and noSilentLoss and quietAgreement and drainBound
+  val actionNeedsMessage = s.actSent.subseteq(s.stored) and s.acted.subseteq(s.stored)
+  val noActionOnDiscarded = s.actSent.intersect(s.discarded) == Set()
+  val actionsDrain = remaining > 0 or drafts.forall(k => not(actPending(k)))
+  val invariants = atMostOnce and noDoubleShow and noSilentLoss and quietAgreement and drainBound and
+    actionNeedsMessage and noActionOnDiscarded and actionsDrain
 
   action work = any {
     goOnline, reconnect, catchUp,
     { nondet k = drafts.oneOf(); nondet withEcho = Set(true, false).oneOf(); any {
       claim(k), accept(k, withEcho), answer(k), refused(k), lookup(k), wake(k),
+      runAction(k), actAccept(k), actAnswer(k), dropAction(k),
       all { s.request.get(k) == "dropped", lost(k) }
     } },
     { nondet k = s.events.oneOf(); echo(k) },
@@ -205,8 +296,10 @@ module outboxProtocol {
   action input = {
     nondet k = drafts.oneOf()
     nondet later = Set(true, false).oneOf()
+    nondet kind = Set("change", "delete").oneOf()
     any {
       send(k), refuse(k, later), drop(k), lost(k), crash, retry(k), discard(k),
+      queueAction(k, kind), actFail(k), actRefuse(k),
       page(k), disconnect, goOffline, seal,
       { nondet f = s.fetches.oneOf(); failLookup(f) }
     }
@@ -299,6 +392,66 @@ module outboxProtocol {
     if (turn == 9) { nondet f = s.fetches.filter(f => f.kind == "catchup").oneOf(); finishFetch(f) } else
     if (turn == 10) catchUp else
     if (turn == 11) { nondet f = s.fetches.oneOf(); finishFetch(f) } else
+    seal
+  ) }
+
+  // An edit queued while the post is out waits for the stored message. The
+  // bug calls with a guessed ts at once.
+  action actionBeforeStoreWith(guard: bool): bool = all { not(reachedAgreement), tick(
+    if (s.sealed) progress else
+    if (turn == 0) send(1) else
+    if (turn == 1) claim(1) else
+    if (turn == 2) queueAction(1, "change") else
+    if (turn == 3) (if (guard) accept(1, false) else runActionWith(1, false)) else
+    if (turn == 4) answer(1) else
+    if (turn == 5) runAction(1) else
+    seal
+  ) }
+  action actionBeforeStoreStep = actionBeforeStoreWith(true)
+  action actionBeforeStoreBugStep = actionBeforeStoreWith(false)
+
+  // The post is refused and the user deletes the draft while an edit waits
+  // on it. The edit ends without a call; the bug calls anyway.
+  action actionOnDiscardedWith(guard: bool): bool = all { not(reachedAgreement), tick(
+    if (s.sealed) progress else
+    if (turn == 0) send(1) else
+    if (turn == 1) claim(1) else
+    if (turn == 2) queueAction(1, "change") else
+    if (turn == 3) refuse(1, false) else
+    if (turn == 4) refused(1) else
+    if (turn == 5) discard(1) else
+    if (turn == 6) (if (guard) dropAction(1) else runActionWith(1, false)) else
+    seal
+  ) }
+  action actionOnDiscardedStep = actionOnDiscardedWith(true)
+  action actionOnDiscardedBugStep = actionOnDiscardedWith(false)
+
+  // A delete queued while the post is out, then the post is refused: the
+  // delete discards the failed row and ends.
+  action dependentDeleteStep = all { not(reachedAgreement), tick(
+    if (s.sealed) progress else
+    if (turn == 0) send(1) else
+    if (turn == 1) claim(1) else
+    if (turn == 2) queueAction(1, "delete") else
+    if (turn == 3) refuse(1, false) else
+    if (turn == 4) refused(1) else
+    if (turn == 5) dropAction(1) else
+    seal
+  ) }
+  // An edit on a stored message: Slack applies it, a newer edit arrives while
+  // the call is out, the answer is lost. The worker sends the newer text and
+  // the row ends.
+  action actionRetryStep = all { not(reachedAgreement), tick(
+    if (s.sealed) progress else
+    if (turn == 0) send(1) else
+    if (turn == 1) claim(1) else
+    if (turn == 2) accept(1, false) else
+    if (turn == 3) answer(1) else
+    if (turn == 4) queueAction(1, "change") else
+    if (turn == 5) runAction(1) else
+    if (turn == 6) actAccept(1) else
+    if (turn == 7) queueAction(1, "change") else
+    if (turn == 8) actFail(1) else
     seal
   ) }
 }
