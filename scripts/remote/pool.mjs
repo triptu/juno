@@ -6,7 +6,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, s
 import { hostname, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { capacity, machinesToDestroy, pendingVcpu } from './pool-decisions.mjs'
+import { capacity, machinesToDestroy, pendingVcpu, orphanGraceMs } from './pool-decisions.mjs'
 
 const dir = join(tmpdir(), 'juno-remote-pool')
 const owner = createHash('sha256').update(hostname()).update(dir).digest('hex').slice(0, 16)
@@ -16,6 +16,7 @@ const maxVcpu = Number(process.env.JUNO_REMOTE_MAX_VCPU ?? 24)
 const lifetimeMs = 3 * 60 * 60_000
 const handOutMs = lifetimeMs - 30 * 60_000
 mkdirSync(dir, { recursive: true })
+const transient = (error) => /ETIMEDOUT|context deadline exceeded|DeadlineExceeded|Unavailable|i\/o timeout|connection reset|connection refused/i.test(error.message)
 const sleep = (ms) => new Promise((resolvePromise) => setTimeout(resolvePromise, ms))
 const alive = (pid) => {
   if (!pid) return false
@@ -92,7 +93,7 @@ function ensureReaper() {
     let pid
     try { pid = Number(readFileSync(pidFile, 'utf8')) } catch { /* No watcher yet. */ }
     const version = existsSync(versionFile) ? Number(readFileSync(versionFile, 'utf8')) : 1
-    if (alive(pid) && version >= 3) return
+    if (alive(pid) && version >= 4) return
     // Upgrade housekeeping only. Machine/job owners are untouched.
     if (alive(pid)) {
       const command = spawnSync('ps', ['-p', String(pid), '-o', 'args='], { encoding: 'utf8', timeout: 1000 }).stdout ?? ''
@@ -101,7 +102,7 @@ function ensureReaper() {
     }
     const child = spawn(process.execPath, [fileURLToPath(import.meta.url), '--watch'], { detached: true, stdio: 'ignore', env: { ...process.env, JUNO_REMOTE_IDLE_MINUTES: '1' } })
     writeFileSync(pidFile, String(child.pid))
-    writeFileSync(versionFile, '3')
+    writeFileSync(versionFile, '4')
     child.unref()
   } finally { unlock('watcher-start') }
 }
@@ -143,10 +144,30 @@ function reconcile() {
   const pending = entries().filter((entry) => entry.pending).map((entry) => ({ ...entry, live: alive(entry.pid) }))
   const targets = machinesToDestroy({ instances, states, pending, owner, now: Date.now(), idleMs, lifetimeMs })
   for (const id of targets) destroy(id)
-  const present = new Set(instances.map((instance) => instance.cluster_id))
+  const remaining = targets.length ? list() : instances
+  const present = new Set(remaining.map((instance) => instance.cluster_id))
   for (const state of states) if (!present.has(state.id) && !state.live) forget(state.id)
-  for (const entry of pending) if (!entry.live) rmSync(statePath(entry.id), { force: true })
-  return targets.length ? list() : instances
+  for (const entry of pending) if (!entry.live) {
+    const observed = instances.some((instance) => instance.labels?.['juno-create'] === entry.token)
+    const gone = !remaining.some((instance) => instance.labels?.['juno-create'] === entry.token)
+    if (!entry.failed || (observed && gone) || Date.now() - entry.created >= orphanGraceMs) rmSync(statePath(entry.id), { force: true })
+  }
+  return remaining
+}
+
+async function provision(machine, pending, create) {
+  try {
+    const id = await create('3h', { 'juno-pool': owner, 'juno-create': pending.token })
+    lock(id)
+    write({ id, machine, created: Date.now(), lastUsed: Date.now(), images: [] })
+    rmSync(statePath(pending.id), { force: true })
+    return { id, warm: false, images: [] }
+  } catch (error) {
+    write({ ...pending, pid: undefined, failed: true })
+    if (error.instanceId && !destroy(error.instanceId)) throw new Error(`could not reclaim failed instance ${error.instanceId}; retained for reaper`)
+    if (error.instanceId) rmSync(statePath(pending.id), { force: true })
+    throw error
+  }
 }
 
 export async function acquire(machine, create, log, { fresh = false } = {}) {
@@ -156,10 +177,13 @@ export async function acquire(machine, create, log, { fresh = false } = {}) {
   ensureReaper()
   const started = Date.now()
   let reported = false
+  let createFailures = 0
+  let inventoryFailure
   for (;;) {
     let pending
     if (!takeLock('decide')) { await sleep(500); continue }
     try {
+      inventoryFailure = undefined
       const instances = reconcile()
       const all = machines()
       for (const state of all) {
@@ -181,23 +205,28 @@ export async function acquire(machine, create, log, { fresh = false } = {}) {
         write(pending)
       }
       if (!reported && Date.now() - started >= 60_000) {
-        usage = capacity(list(), machines())
+        usage = capacity(instances, machines())
         log(`waiting for capacity (cap ${maxVcpu} vCPU): ${usage.tracked} tracked, ${usage.untracked} untracked vCPU in the workspace`)
         reported = true
       }
+    } catch (error) {
+      if (!error.message.startsWith('nsc list failed:') || !transient(error)) throw error
+      inventoryFailure = error
     } finally { unlock('decide') }
+    if (inventoryFailure) {
+      log(`infrastructure: inventory unavailable, retrying in 2 s (${inventoryFailure.message.split('\n')[0]})`)
+      await sleep(2000)
+      continue
+    }
     if (pending) {
       // Do not hold the pool-wide decision lock over provisioning or SSH.
-      // A lost response is recovered by the attempt label, never retried here.
-      try {
-        const id = await create('3h', { 'juno-pool': owner, 'juno-create': pending.token })
-        lock(id)
-        write({ id, machine, created: Date.now(), lastUsed: Date.now(), images: [] })
-        rmSync(statePath(pending.id), { force: true })
-        return { id, warm: false, images: [] }
-      } catch (error) {
-        write({ ...pending, pid: undefined })
-        throw error
+      // Failed attempts remain reserved until observed and destroyed, or the
+      // orphan grace expires. Late arrivals retain their attempt label.
+      try { return await provision(machine, pending, create) } catch (error) {
+        if (!transient(error) || ++createFailures > 2) throw error
+        log(`infrastructure: create timed out; reclaiming attempt and retrying (${createFailures}/2)`)
+        await sleep(createFailures * 2000)
+        continue
       }
     }
     await sleep(10_000)

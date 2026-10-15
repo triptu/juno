@@ -246,8 +246,7 @@ if (components.length > 0 || behaviour.length > 0) {
     script: 'test:gallery',
     args: [],
     // A name no component has keeps the shift guard idle when only the behaviour tests need a run.
-    // Every component takes 2.6 min on the default 4x8; 8x16 does it in 1.4.
-    machine: all ? 'linux/amd64:8x16' : undefined,
+    // Keep the default 4-core gallery shape to leave room for other agents.
     env: all ? undefined : { GALLERY_SHIFT_ONLY: components.length > 0 ? components.map((item) => item.id).join(',') : 'none' },
     items: [...components, ...behaviour],
     why: all ? 'every component' : `${components.length} component(s)${components.length ? `: ${components.map((item) => item.id).join(', ')}` : ''}${behaviour.length ? ' and the behaviour tests' : ''}`,

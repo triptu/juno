@@ -110,3 +110,60 @@ test('watcher upgrade never signals an unrelated process with a reused PID', asy
     assert.doesNotThrow(() => process.kill(unrelated.pid, 0))
   } finally { unrelated.kill(); rmSync(dir, { recursive: true, force: true }) }
 })
+
+test('pool retries inventory failures and reclaims timed-out creates before retrying', () => {
+  for (const [knownId, exhausted] of [[false, false], [true, false], [true, true]]) {
+    const dir = mkdtempSync(join(tmpdir(), 'juno-pool-retry-'))
+    const poolDir = join(dir, 'juno-remote-pool')
+    const state = join(dir, 'instances.json')
+    const counter = join(dir, 'lists')
+    const executable = join(dir, 'nsc')
+    writeFileSync(state, '[]')
+    writeFileSync(executable, `#!/usr/bin/env node
+const fs = require('node:fs');
+const file = process.env.TEST_INSTANCES;
+if (process.argv[2] === 'list') {
+ const count = fs.existsSync(process.env.TEST_LISTS) ? Number(fs.readFileSync(process.env.TEST_LISTS)) : 0;
+ fs.writeFileSync(process.env.TEST_LISTS, String(count + 1));
+ if (count < 2) { console.error(count ? 'Unavailable' : 'spawnSync nsc ETIMEDOUT'); process.exit(1); }
+ console.log(fs.readFileSync(file, 'utf8'));
+} else if (process.argv[2] === 'destroy') {
+ fs.writeFileSync(file, JSON.stringify(JSON.parse(fs.readFileSync(file)).filter(x => x.cluster_id !== process.argv[3])));
+} else process.exit(2);
+`)
+    chmodSync(executable, 0o755)
+    const script = `
+import assert from 'node:assert/strict';
+import { mkdirSync, writeFileSync, readFileSync, readdirSync } from 'node:fs';
+import { acquire, destroy } from ${JSON.stringify(new URL('./pool.mjs', import.meta.url).href)};
+mkdirSync(${JSON.stringify(poolDir)}, { recursive: true });
+writeFileSync(${JSON.stringify(join(poolDir, 'watcher.pid'))}, String(process.pid));
+writeFileSync(${JSON.stringify(join(poolDir, 'watcher.version'))}, '4');
+let attempts = 0;
+const logs = [];
+const request = acquire('linux/amd64:2x4', async (_, labels) => {
+ attempts++;
+ const id = attempts === 1 ? 'partial' : 'ready';
+ writeFileSync(process.env.TEST_INSTANCES, JSON.stringify([{cluster_id:id,shape:{virtual_cpu:2},labels:{...labels,'juno-remote':'1'},created_at:new Date().toISOString()}]));
+ if (attempts === 1 || ${exhausted}) { const e = new Error('Creating Environment: context deadline exceeded'); if (${knownId}) e.instanceId = id; throw e; }
+ return id;
+}, message => logs.push(message));
+let result;
+if (${exhausted}) await assert.rejects(request, /context deadline exceeded/); else result = await request;
+assert.equal(attempts, ${exhausted ? 3 : 2});
+if (result) assert.equal(result.id, 'ready');
+assert(logs.some(x => x.includes('inventory unavailable')));
+assert(logs.some(x => x.includes('create timed out')));
+if (result) assert(destroy(result.id));
+assert.deepEqual(JSON.parse(readFileSync(process.env.TEST_INSTANCES)), []);
+assert(!readdirSync(${JSON.stringify(poolDir)}).some(x => x.startsWith('pending-')));
+`
+    try {
+      const result = spawnSync(process.execPath, ['--input-type=module', '-e', script], {
+        env: { ...process.env, TMPDIR: dir, PATH: `${dir}:${process.env.PATH}`, TEST_INSTANCES: state, TEST_LISTS: counter, JUNO_REMOTE_MAX_VCPU: '2' },
+        encoding: 'utf8', timeout: 30_000,
+      })
+      assert.equal(result.status, 0, result.stderr || result.error?.message)
+    } finally { rmSync(dir, { recursive: true, force: true }) }
+  }
+})

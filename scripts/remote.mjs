@@ -51,10 +51,10 @@ const remoteShapes = {
   'test:agent-contracts': '2x4',
   'test:agent-testing': '2x4',
   'test:gallery': '4x8',
-  'test:desktop': process.env.JUNO_REMOTE_SHARDED ? '4x8' : '8x16',
-  'test:e2e': '8x16',
+  'test:desktop': '4x8',
+  'test:e2e': '4x8',
   'specs:check': '8x16',
-  'specs:traces': '8x16',
+  'specs:traces': '2x4',
 }
 const localOnly = { perf: 'timing', 'test:feel': 'timing', 'gallery:shots': 'the Mac look' }
 
@@ -239,11 +239,12 @@ for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
 }
 
 let code = 1
+let infraFailure = false
 let finalized = false
 function finishLog(result) {
   if (finalized) return
   finalized = true
-  appendFileSync(runLog, `remote: exited with ${result}\nremote: summary ${JSON.stringify({ code: result, backend, warm, readySeconds, startupSeconds, machineSeconds, wallSeconds: (Date.now() - started) / 1000 })}\n`)
+  appendFileSync(runLog, `remote: exited with ${result}\nremote: summary ${JSON.stringify({ code: result, infraFailure, backend, warm, readySeconds, startupSeconds, machineSeconds, wallSeconds: (Date.now() - started) / 1000 })}\n`)
 }
 try {
   runner = runnerConfig()
@@ -272,7 +273,11 @@ try {
     async (duration, labels) => {
       const cidfile = join(work, 'id')
       acquiredAt = Date.now()
-      nsc([...create(duration), ...Object.entries(labels).flatMap(([key, value]) => ['--label', `${key}=${value}`]), '--cidfile', cidfile])
+      rmSync(cidfile, { force: true })
+      try { nsc([...create(duration), ...Object.entries(labels).flatMap(([key, value]) => ['--label', `${key}=${value}`]), '--cidfile', cidfile]) } catch (error) {
+        if (existsSync(cidfile)) error.instanceId = readFileSync(cidfile, 'utf8').trim()
+        throw error
+      }
       return readFileSync(cidfile, 'utf8').trim()
     },
     (message) => { console.error(`remote: ${message}`); appendFileSync(runLog, `remote: ${message}\n`) },
@@ -381,6 +386,7 @@ try {
 } catch (error) {
   appendFileSync(runLog, `remote: ${error.message}\n`)
   console.error(`remote: ${error.message}`)
+  infraFailure = true
   code = 255
   clean = false
 } finally {
