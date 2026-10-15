@@ -15,9 +15,9 @@ import { Clock, Effect } from 'effect'
 import { userName, type JoinedRow, type UserRow } from '../topicRows'
 import { messagesAfter, NO_READ } from './query'
 
-/** Home's calls per workspace per day, across its three tasks. */
+/** Home's calls per workspace per day, across its tasks. */
 export const HOME_DAILY_BUDGET = 300
-const HOME_TASKS = ['settledScore', 'followUps', 'homeTitle']
+const HOME_TASKS = ['settledScore', 'followUps', 'homeTitle', 'automatedChannel']
 const DAY = 24 * 60 * 60 * 1000
 
 /** Calls Home made today that stored an answer. */

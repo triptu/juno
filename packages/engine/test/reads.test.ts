@@ -27,8 +27,11 @@ const setMirror = (engine: RunningEngine, on: boolean) => runCommand(engine.regi
 const marks = (engine: RunningEngine) => apiCalls(engine).filter((c) => c.method === 'conversations.mark' || c.method === 'subscriptions.thread.mark')
 
 /** The sidebar row of a topic once `predicate` holds for it. */
+/** The topic's channel, narrowed to: it shows even when a view keeps the channel out of All, as Automated does #alerts-prod. */
+const scoped = (id: string): TopicListFilter => ({ kind: 'all', unreadOnly: false, scope: id.split(':')[1]! })
+
 const rowWhen = async (engine: RunningEngine, id: string, predicate: (row: TopicRow) => boolean, label: string) =>
-  (await engine.rowsUntil((rows) => rows.some((r) => r.id === id && predicate(r)), label)).find((r) => r.id === id)!
+  (await engine.rowsUntil((rows) => rows.some((r) => r.id === id && predicate(r)), label, scoped(id))).find((r) => r.id === id)!
 
 /** Juno's stored pointer for a topic. */
 const storedPointer = (engine: RunningEngine, id: string) =>
@@ -50,7 +53,7 @@ describe('marking read', () => {
     expect(marks(engine).map((c) => [c.method, c.args['channel'], c.args['ts']])).toEqual([['conversations.mark', ALERTS, latestMain(engine, ALERTS)]])
     expect(engine.fake.workspace.reads.get(ALERTS)).toBe(latestMain(engine, ALERTS))
     // Its own echo changes nothing.
-    expect((await engine.rows()).find((r) => r.id === ALERTS_MAIN)?.unreadCount).toBe(0)
+    expect((await engine.rows(scoped(ALERTS_MAIN))).find((r) => r.id === ALERTS_MAIN)?.unreadCount).toBe(0)
 
     // The undo marks the nine unread again, here and in Slack.
     expect(result.undo?._tag).toBe('reads.markUnread')
@@ -147,7 +150,7 @@ describe('the outbox', () => {
     await waitFor(() => (marks(first).length > 0 ? true : undefined), 10_000, 'the refused mark')
     const engine = await restart(engines, first, (fake) => fake.clear429({ method: 'conversations.mark' }))
     await waitFor(() => (engine.fake.workspace.reads.get(ALERTS) === latestMain(engine, ALERTS) ? true : undefined), 20_000, 'the mark after the restart')
-    expect((await engine.rows()).find((r) => r.id === ALERTS_MAIN)?.unreadCount).toBe(0)
+    expect((await engine.rows(scoped(ALERTS_MAIN))).find((r) => r.id === ALERTS_MAIN)?.unreadCount).toBe(0)
   })
 })
 
@@ -162,14 +165,14 @@ describe('marks from other clients (specs/readstate.qnt)', () => {
     // A frame stamped before Juno's mark, from another client that had read three messages.
     engine.fake.emitFrame({ type: 'channel_marked', channel: ALERTS, ts: messages.at(-7)!.ts, event_ts: messages.at(-1)!.ts })
     await sleep(300)
-    expect((await engine.rows()).find((r) => r.id === ALERTS_MAIN)?.unreadCount).toBe(0)
+    expect((await engine.rows(scoped(ALERTS_MAIN))).find((r) => r.id === ALERTS_MAIN)?.unreadCount).toBe(0)
     engine.fake.release()
     valueOf(await pending)
     await sleep(500)
     await quiet(engine)
     // Slack, asked afterwards, has Juno's mark.
     expect(storedPointer(engine, ALERTS_MAIN)).toBe(latestMain(engine, ALERTS))
-    expect((await engine.rows()).find((r) => r.id === ALERTS_MAIN)?.unreadCount).toBe(0)
+    expect((await engine.rows(scoped(ALERTS_MAIN))).find((r) => r.id === ALERTS_MAIN)?.unreadCount).toBe(0)
   })
 
   it('a newer official mark during a pending mark is kept and applies after the acknowledgement', async () => {
@@ -183,7 +186,7 @@ describe('marks from other clients (specs/readstate.qnt)', () => {
     engine.fake.markRead({ channel: ALERTS, ts: messages.at(-3)!.ts })
     await sleep(300)
     // The mark is still pending, so its intent stays visible.
-    expect((await engine.rows()).find((r) => r.id === ALERTS_MAIN)?.unreadCount).toBe(0)
+    expect((await engine.rows(scoped(ALERTS_MAIN))).find((r) => r.id === ALERTS_MAIN)?.unreadCount).toBe(0)
     engine.fake.release()
     await rowWhen(engine, ALERTS_MAIN, (r) => r.unreadCount === 2, 'the phone’s mark')
     expect(storedPointer(engine, ALERTS_MAIN)).toBe(messages.at(-3)!.ts)
@@ -206,7 +209,7 @@ describe('marks from other clients (specs/readstate.qnt)', () => {
     await quiet(engine)
     // The frame cannot be ordered against Juno's mark, so Slack was asked; it still has Juno's mark.
     expect(apiCalls(engine, 'conversations.info').map((c) => c.args['channel'])).toContain(ALERTS)
-    expect((await engine.rows()).find((r) => r.id === ALERTS_MAIN)?.unreadCount).toBe(0)
+    expect((await engine.rows(scoped(ALERTS_MAIN))).find((r) => r.id === ALERTS_MAIN)?.unreadCount).toBe(0)
   })
 })
 
@@ -234,7 +237,7 @@ describe('the mirror setting', () => {
     await waitFor(() => (apiCalls(engine, 'client.counts').length > 0 ? true : undefined), 20_000, 'the reconnect counts')
     await quiet(engine)
     expect(marks(engine)).toEqual([])
-    expect((await engine.rows()).find((r) => r.id === ALERTS_MAIN)?.unreadCount).toBe(0)
+    expect((await engine.rows(scoped(ALERTS_MAIN))).find((r) => r.id === ALERTS_MAIN)?.unreadCount).toBe(0)
     // A change in Slack still applies.
     engine.fake.markRead({ channel: ALERTS, ts: engine.fake.messages(ALERTS).at(-2)!.ts })
     await rowWhen(engine, ALERTS_MAIN, (r) => r.unreadCount === 1, 'Slack’s change')

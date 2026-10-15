@@ -22,6 +22,7 @@
  */
 import { Cause, Context, Effect, Fiber, Layer, Stream, SubscriptionRef } from 'effect'
 import { AiProvider } from '@juno/ai'
+import { sortClearCases } from '../automatedView'
 import { NotificationControl, startNotifications } from '../notificationRuntime'
 import { quietDaysOf } from '@juno/domain'
 import type { SlackAuthRequired } from '@juno/slack'
@@ -92,6 +93,8 @@ export class SyncRunner extends Context.Service<
               // The topic view's fetches run in this sync's context while it lives.
               onFetcher: (fetcher) => link.setFetcher(fetcher),
               openTopics: link.shown,
+              // Clear bot channels are in Automated before the sync reports live (SPEC 5, "Automated").
+              onBooted: sortClearCases.pipe(Effect.provide(open.context), Effect.catch((error) => Effect.logWarning('sync: Automated not sorted', error))),
             })
           }).pipe(
             Effect.provide(active.context),

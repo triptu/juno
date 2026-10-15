@@ -12,6 +12,7 @@ import { Store, StoreReader, workspacePathsFromDir, type StoreError } from '@jun
 import { reactionsStatement, threadsStatements, threadTitlesStatement, windowStatements, type WindowTarget } from '../src/messages/window'
 import { homeStatements } from '../src/home/query'
 import { staleStatement } from '../src/home/job'
+import { automatedStatements } from '../src/automatedView'
 import { pickerStatements } from '../src/newchat/query'
 import { countsStatement as allTopicsCountsStatement, orderStatement, placesStatement } from '../src/topics/allTopics'
 import { countsStatement, listStatements, type ListFilter } from '../src/topics/query'
@@ -163,6 +164,10 @@ describe('query plans', () => {
         homeStatements.threadAfter('C0ENG', '1700000000.000100', '1700000000.000000'),
         homeStatements.mainAfter('D0MAYA', '1700000000.000000'),
         staleStatement('settledScore', '1700000000.000000', '1800000000.000000', 12),
+        homeStatements.automated(),
+        homeStatements.fromApps('C0ALERTS'),
+        automatedStatements.candidates(),
+        automatedStatements.sample('C0ALERTS'),
       ]
       for (const statement of statements) {
         const lines = yield* plan(statement.sql, statement.params)
