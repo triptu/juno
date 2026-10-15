@@ -16,6 +16,7 @@ import { PrefsHandlers } from './prefs/handlers'
 import { MessagesHandlers } from './messages/handlers'
 import { NewChatHandlers } from './newchat/handlers'
 import { SendHandlers } from './send/handlers'
+import { ActionWorker } from './send/actionWorker'
 import { PostWorker } from './send/worker'
 import { ReadsHandlers } from './reads/handlers'
 import { MarkWorker } from './markWorker'
@@ -62,6 +63,7 @@ const EnginePhases = Layer.effectDiscard(
 export const Services = Layer.mergeAll(EnginePhases, ArtJob).pipe(
   Layer.provideMerge(MarkWorker.layer),
   Layer.provideMerge(PostWorker.layer),
+  Layer.provideMerge(ActionWorker.layer),
   Layer.provideMerge(SyncRunner.layer),
   Layer.provideMerge(AiProviderLive),
   Layer.provideMerge(NotificationControl.layer),

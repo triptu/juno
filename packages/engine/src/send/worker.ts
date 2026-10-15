@@ -197,7 +197,7 @@ export class PostWorker extends Context.Service<
 }
 
 /** Runs a store effect in the open workspace. A store failure is a bug (architecture 2.6). */
-const inStore =
+export const inStore =
   (open: OpenWorkspace) =>
   <A>(effect: Effect.Effect<A, SqlError, StoreServices>): Effect.Effect<A> =>
     effect.pipe(Effect.provide(open.context), Effect.orDie)
